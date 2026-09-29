@@ -1,0 +1,154 @@
+// The credential prompt and the add/edit form both reuse the password card's
+// shell; only what they add on top lives here.
+
+.network-secret-message {
+    font-size: var(--text-base);
+    color: var(--fg-subtle);
+    margin: var(--space-xs) var(--space-xs) 0;
+}
+
+.network-secret-label {
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    color: var(--fg-subtle);
+    margin: var(--space-sm) var(--space-xs) 0;
+}
+
+// The heading over a group of fields: the kind decides the groups, this is
+// what tells them apart from the field labels below them.
+.network-vpn-section {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    margin: var(--space-md) var(--space-xs) var(--space-2xs);
+}
+
+.network-secret-fields {
+    // The entries bring their own top margin; without this the first label
+    // sits twice as far from the header as the rest.
+    margin-top: calc(-1 * var(--space-xs));
+}
+
+// The kind decides how many fields there are, so the form has to bound
+// itself: a popover cannot scroll and cannot be resized once it is mapped.
+.network-vpn-form-scroll {
+    // Undo the scrolled window's own frame; the card around it is the frame.
+    background: transparent;
+
+    > viewport {
+        background: transparent;
+    }
+}
+
+// Required fields are marked before the save button has to name them.
+.network-secret-label.required {
+    color: var(--fg-default);
+}
+
+// A required field left empty, once save has said so.
+.network-vpn-form entry.network-password-input.error {
+    border-color: var(--status-error);
+
+    &:focus-within {
+        border-color: var(--status-error);
+    }
+}
+
+.network-vpn-raw {
+    background: var(--bg-surface);
+    border-radius: var(--rounding-element);
+    padding: var(--space-sm);
+    margin-top: var(--space-sm);
+    font-size: var(--text-base);
+    color: var(--fg-default);
+    min-height: 6em;
+}
+
+.network-vpn-kind {
+    margin-top: var(--space-sm);
+}
+
+button.network-vpn-import image {
+    -gtk-icon-size: var(--icon-sm);
+    color: var(--fg-subtle);
+}
+
+button.network-vpn-import:hover image {
+    color: var(--fg-default);
+}
+
+button.network-vpn-delete label {
+    color: var(--status-error);
+}
+
+button.network-vpn-edit {
+    border-radius: var(--rounding-element);
+    margin-left: var(--space-sm);
+
+    image {
+        -gtk-icon-size: var(--icon-sm);
+        color: var(--fg-subtle);
+    }
+
+    &:hover image {
+        color: var(--fg-default);
+    }
+}
+
+.network-item.vpn-add {
+    // The add row lives outside the factory's box, so the list's own
+    // sibling separator cannot reach it.
+    &.separated {
+        border-top: 1px solid var(--border-subtle);
+    }
+
+    image.network-item-signal {
+        color: var(--fg-subtle);
+    }
+
+    label.network-item-name {
+        color: var(--fg-subtle);
+    }
+
+    &:hover {
+        image.network-item-signal,
+        label.network-item-name {
+            color: var(--fg-default);
+        }
+    }
+}
+
+// The public key WireGuard derives rather than stores: readable nowhere else
+// in the profile, and the half the other end actually needs.
+.network-vpn-public-key {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-normal);
+    color: var(--fg-muted);
+    margin: var(--space-2xs) var(--space-xs) 0;
+}
+
+// The form is the stack's other page, and it starts where the browse page's
+// first section label starts. That label carries `--space-lg` above it
+// (`.dropdown-content .section-label`); the card carries nothing, so swapping
+// pages dropped the form flush against the active-connections list above it.
+.network-password-card.network-vpn-form {
+    margin-top: var(--space-lg);
+}
+
+// The credential prompt sits between the active-connections list and the VPN
+// section, and sections are spaced by their labels' `--space-lg`. The card has
+// no label, so it got the VPN label's gap below it and nothing above: it sat
+// flush against the connection card. `:not(:first-child)` because with nothing
+// connected the prompt is the first thing in the dropdown, and GTK skips the
+// hidden active-connections box when it matches that.
+.dropdown-content > .network-secret-card:not(:first-child) {
+    margin-top: var(--space-lg);
+}
+
+// A failed VPN row's reason, in the gateway's words, where the state word
+// would be.
+.vpn-item .network-item-security.failed {
+    color: var(--status-error);
+}

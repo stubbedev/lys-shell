@@ -1,0 +1,337 @@
+name: CI
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+
+permissions:
+    contents: read
+
+# Cancel superseded runs on PRs (fast feedback on fixup pushes), but NEVER on
+# master: the nix job populates the xilo cache + GH /nix/store cache in its
+# later steps, and a follow-up master push must not cancel that mid-build —
+# doing so leaves the cache unpopulated and forces the next run to recompile
+# wayle-deps from scratch (~30 min). Master runs queue instead of cancelling,
+# which also warms the cache sequentially: run N populates what run N+1 hits.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+    CARGO_TERM_COLOR: always
+    # Keep the runner's root disk from filling (the "No space left on device"
+    # failures). CI never debugs the binaries, so drop debuginfo — the largest
+    # part of a debug `target/` — and disable incremental artifacts, which add
+    # large per-crate caches with no cross-run value here. The container jobs
+    # (check/ubuntu/fedora) can't free host tool caches from inside the
+    # container, so shrinking what we generate is the durable lever.
+    CARGO_INCREMENTAL: "0"
+    CARGO_PROFILE_DEV_DEBUG: "0"
+    CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+    changes:
+        name: Detect changes
+        runs-on: ubuntu-latest
+        outputs:
+            code: ${{ steps.filter.outputs.code }}
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: dorny/paths-filter@v4
+              id: filter
+              with:
+                  filters: |
+                      code:
+                        - 'crates/**'
+                        - 'wayle/**'
+                        - 'resources/**'
+                        - 'scripts/**'
+                        - 'packaging/**'
+                        - 'Cargo.*'
+                        - '.github/workflows/ci.yml'
+
+    # Lint + test + schema share one container so the workspace and its
+    # dependencies compile once into a single target dir, then clippy, the test
+    # build, and `cargo run` reuse those artifacts — instead of three separate
+    # containers each compiling from scratch.
+    check:
+        name: Check (lint + test + schema)
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
+        runs-on: ubuntu-latest
+        container:
+            image: ghcr.io/stubbedev/wayle/ci-arch:latest
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
+        steps:
+            - uses: actions/checkout@v7
+              with:
+                  submodules: recursive
+
+            - name: Fix Git ownership
+              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+            # Save the cargo cache only on master; PRs restore it but don't
+            # write their own. Per-PR rust caches share the same hard 10 GiB
+            # repo cache budget as the nix /nix/store cache, and evicting that
+            # nix cache is what forced wayle-deps to recompile every run.
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
+
+            - name: Check formatting
+              run: cargo fmt --all --check
+
+            - name: Clippy
+              run: cargo clippy --workspace --all-targets -- -D warnings
+
+            # Baked into the ci-arch image; this covers the window where the
+            # running image predates that, since it only rebuilds on a push to
+            # master -- the same push that would need nextest here.
+            - name: Ensure cargo-nextest
+              run: |
+                  if ! command -v cargo-nextest >/dev/null; then
+                    curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C "$CARGO_HOME/bin"
+                  fi
+
+            # nextest runs each test in its own process, in parallel, and
+            # reports failures without swallowing output. It cannot run
+            # doctests, so those get their own step.
+            - name: Run tests
+              run: cargo nextest run --workspace --no-fail-fast
+
+            # The VPN sign-in tests need a gateway to talk to, so they are
+            # #[ignore]d in the normal suite and the gateways are started
+            # here directly with python — container jobs have no docker, and
+            # gateway.py needs nothing but the interpreter. Same gateways,
+            # same ports, as `just test-gateway` runs locally against the
+            # compose file; see crates/wayle-network/tests/mock-gateway.
+            - name: Run the VPN mock-gateway tests
+              run: |
+                  command -v python3 >/dev/null 2>&1 || pacman -Sy --noconfirm python
+                  gateways=()
+                  for spec in form:8443 saml:8444 anyconnect:8445 fortinet:8446 array:8447; do
+                      MODE=${spec%%:*} PORT=${spec##*:} \
+                          python3 crates/wayle-network/tests/mock-gateway/gateway.py &
+                      gateways+=("$!")
+                  done
+                  trap 'kill "${gateways[@]}" 2>/dev/null || true' EXIT
+                  # The last one to bind is the readiness signal, like
+                  # `just test-gateway` polls it.
+                  for _ in $(seq 30); do
+                      (exec 3<>/dev/tcp/127.0.0.1/8447) 2>/dev/null && break
+                      sleep 0.5
+                  done
+                  cargo nextest run -p wayle-network --run-ignored all --no-fail-fast -E 'test(mock::)'
+
+            - name: Run doctests
+              run: cargo test --doc --workspace
+
+            - name: Check config schema is up to date
+              run: |
+                  cargo run -q -p wayle -- config schema --stdout | jq -S . > /tmp/wayle-config.schema.json
+                  if ! diff -u schema/wayle-config.schema.json /tmp/wayle-config.schema.json; then
+                    echo "::error::Config schema is out of date. Regenerate with:"
+                    echo "  cargo run -p wayle -- config schema --stdout | jq -S . > schema/wayle-config.schema.json"
+                    exit 1
+                  fi
+
+    ubuntu:
+        name: Package (Ubuntu)
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
+        runs-on: ubuntu-latest
+        container:
+            image: ghcr.io/stubbedev/wayle/ci-ubuntu:latest
+        # CI only validates that packaging works; nothing here ships (release
+        # artifacts come from release.yml). So build debug — same package
+        # layout, far less compile time than --release. Release-only breakage
+        # is still caught by the `nix` job, which builds release.
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v7
+              with:
+                  submodules: recursive
+
+            - name: Fix Git ownership
+              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+            # Save the cargo cache only on master; PRs restore it but don't
+            # write their own. Per-PR rust caches share the same hard 10 GiB
+            # repo cache budget as the nix /nix/store cache, and evicting that
+            # nix cache is what forced wayle-deps to recompile every run.
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
+
+            - name: Build workspace
+              run: cargo build --workspace --locked
+
+            - name: Build archive
+              id: archive
+              run: |
+                  VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+                  ./scripts/ci/build-archive.sh target/debug "${VERSION}" x86_64
+                  echo "archive=wayle-${VERSION}-x86_64-linux.tar.gz" >> "$GITHUB_OUTPUT"
+                  echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+            - name: Build Ubuntu package
+              run: ./scripts/ci/build-packages.sh "${{ steps.archive.outputs.archive }}" "${{ steps.archive.outputs.version }}" deb
+
+    fedora:
+        name: Package (Fedora)
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
+        runs-on: ubuntu-latest
+        container:
+            image: ghcr.io/stubbedev/wayle/ci-fedora:latest
+        # Debug build — CI validates packaging only, nothing ships here. See
+        # the ubuntu job for rationale.
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v7
+              with:
+                  submodules: recursive
+
+            - name: Fix Git ownership
+              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+            # Save the cargo cache only on master; PRs restore it but don't
+            # write their own. Per-PR rust caches share the same hard 10 GiB
+            # repo cache budget as the nix /nix/store cache, and evicting that
+            # nix cache is what forced wayle-deps to recompile every run.
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
+
+            - name: Build workspace
+              run: cargo build --workspace --locked
+
+            - name: Build archive
+              id: archive
+              run: |
+                  VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+                  ./scripts/ci/build-archive.sh target/debug "${VERSION}" x86_64
+                  echo "archive=wayle-${VERSION}-x86_64-linux.tar.gz" >> "$GITHUB_OUTPUT"
+                  echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+            - name: Build Fedora package
+              run: ./scripts/ci/build-packages.sh "${{ steps.archive.outputs.archive }}" "${{ steps.archive.outputs.version }}" rpm
+
+    nix:
+        name: Nix build + cache
+        needs: changes
+        # Always build + push on master so the cache tracks every commit (a
+        # docs/schema-only commit still runs — mostly cache hits once wayle-deps
+        # is cached, but keeps the binary present). On PRs, only when code
+        # changed. Same-repo PRs also push to xilo (see the push step), so a
+        # deps bump compiled in a PR is a cache hit when it merges to master
+        # instead of a fresh ~30 min rebuild.
+        if: >-
+            needs.changes.outputs.code == 'true' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/master')
+        runs-on: ubuntu-latest
+        steps:
+            # Reclaim ~25 GiB of preinstalled tool caches (android/dotnet/etc.)
+            # before the release nix build. This job runs on the host (no
+            # container), so it can free host paths the container jobs can't.
+            - name: Free disk space
+              uses: jlumbroso/free-disk-space@v1.3.1
+              with:
+                  tool-cache: true
+                  large-packages: false
+                  docker-images: false
+                  swap-storage: false
+
+            - uses: actions/checkout@v7
+              with:
+                  submodules: recursive
+
+            - uses: cachix/install-nix-action@v31
+              with:
+                  extra_nix_config: |
+                      experimental-features = nix-command flakes
+                      # Pull from the self-hosted xilo cache on every event
+                      # (incl. fork PRs — read access is public, no secret).
+                      extra-substituters = https://nix.stubbe.dev/c/default/default
+                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
+
+            # No GitHub Actions /nix/store cache here any more. It existed to
+            # keep the `wayle-deps` layer (591 crates, ~30 min) off the critical
+            # path, because pushing the wayle output alone never carried it —
+            # deps are a build-time input, absent from the binary's runtime
+            # closure. `#wayle-deps` (see flake.nix) now builds that layer as its
+            # own output and the push step below sends it to xilo, so the
+            # substituter covers it for every consumer, not just CI runners.
+            #
+            # Dropping it also returns ~3.2 GiB to GitHub's hard 10 GiB
+            # per-repo cache budget — that snapshot plus the Swatinem rust caches
+            # was over budget, and the LRU eviction it caused is what made
+            # wayle-deps recompile on runs that should have been cache hits.
+            - name: Build package + deps layer
+              # --accept-flake-config: honor the flake's nixConfig substituter
+              # (the system extra_nix_config above sets it too, but this trusts
+              # the flake's own setting and silences the untrusted-config warning).
+              run: |
+                  nix build -L --accept-flake-config --print-out-paths \
+                    '.?submodules=1#wayle' \
+                    '.?submodules=1#wayle-deps' | tee /tmp/wayle-outpaths
+
+            # Push the build closure to the xilo cache. Runs on master pushes
+            # and same-repo PRs (both have the token) so PR-built deps are in
+            # xilo before merge. Fork PRs lack the secret and just pull via the
+            # substituter above.
+            #
+            # Spelled `<ns>/<cache>` to match the substituter URL above
+            # (/c/default/default) and `just cache-push`. A bare `default`
+            # resolves to the same cache (the server answers a bare-`default`
+            # push with "pushed N paths to default/default"), so the ref was
+            # never the problem: the 401 was the `ci` token, minted with scope
+            # `default/default/default`, which matched no cache. Rotated
+            # 2026-09-05; spelling it out here is just consistency.
+            - name: setup xilo
+              if: >-
+                  github.event_name == 'push' ||
+                  github.event.pull_request.head.repo.full_name == github.repository
+              uses: stubbedev/xilo@v1
+              with:
+                  url: https://nix.stubbe.dev
+                  cache: default/default
+                  token: ${{ secrets.XILO_TOKEN }}
+
+            # NOT continue-on-error. Populating the cache is the entire point of
+            # this job — a silent failure here means every consumer (local `nix
+            # build`, the next CI run, a release) recompiles wayle from source
+            # while the job still reports green. That is exactly how the 401
+            # above stayed hidden: every run from at least 2026-08-30 (as far
+            # back as the logs are kept) to the token rotation pushed nothing
+            # and reported success.
+            - name: Push to cache (xilo)
+              if: >-
+                  github.event_name == 'push' ||
+                  github.event.pull_request.head.repo.full_name == github.repository
+              run: |
+                  xilo push default/default $(cat /tmp/wayle-outpaths)
+
+    ci-status:
+        name: CI Status
+        if: always()
+        needs: [check, ubuntu, fedora, nix]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check results
+              run: |
+                  if [[ "${{ needs.check.result }}" == "failure" || \
+                        "${{ needs.ubuntu.result }}" == "failure" || \
+                        "${{ needs.nix.result }}" == "failure" || \
+                        "${{ needs.fedora.result }}" == "failure" ]]; then
+                    echo "One or more checks failed"
+                    exit 1
+                  fi
+                  echo "All checks passed or were skipped"

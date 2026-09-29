@@ -1,0 +1,45 @@
+
+
+settings-osd-enabled = Enabled
+    .description = Show on-screen display overlays for volume, brightness, etc.
+
+settings-osd-presets = Toast Presets
+    .description = Reusable toasts triggerable with `wayle toast --preset <id>`
+
+settings-osd-position = Position
+    .description = Where on screen the OSD appears (e.g. top-center, bottom-right)
+
+settings-osd-duration = Duration
+    .description = How long the OSD stays visible before auto-dismissing (ms)
+
+settings-osd-monitor = Monitor
+    .description = Which monitor shows the OSD: "primary" or a connector like "DP-1"
+
+settings-osd-margin = Margin
+    .description = Distance from the screen edge to the OSD
+
+settings-osd-border = Border
+    .description = Draw a border around the OSD overlay
+
+settings-osd-layer = Layer
+    .description = Layer-shell layer the OSD is placed on. Tearing mode demotes overlay to top.
+
+settings-osd-text-align = Text Alignment
+    .description = Horizontal alignment of OSD toast/toggle content
+
+
+## OsdPosition variants
+enum-osd-position-top-left = Top Left
+enum-osd-position-top = Top
+enum-osd-position-top-right = Top Right
+enum-osd-position-right = Right
+enum-osd-position-bottom-right = Bottom Right
+enum-osd-position-bottom = Bottom
+enum-osd-position-bottom-left = Bottom Left
+enum-osd-position-left = Left
+
+
+## OsdTextAlign variants
+enum-osd-text-align-start = Start
+enum-osd-text-align-center = Center
+enum-osd-text-align-end = End

@@ -1,0 +1,505 @@
+//! CSS theming for Wayle.
+//!
+//! Static CSS is compiled from SCSS at build time and embedded in the binary.
+//! Runtime theming is done via CSS custom properties.
+
+mod errors;
+mod palette_provider;
+pub mod watcher;
+
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+pub use errors::Error;
+use palette_provider::color::hex_to_rgba;
+use tracing::error;
+use wayle_config::{
+    infrastructure::themes::Palette,
+    schemas::{
+        bar::BarConfig,
+        general::GeneralConfig,
+        styling::{Size, StylingConfig, ThemeProvider},
+    },
+};
+
+/// Builds a CSS custom-property override declaration for a pixel [`Size`].
+///
+/// Scale sizes return an empty string so the SCSS `calc()` fallback applies;
+/// pixel sizes return `<name>: <n>px;` so the override wins.
+fn px_override(name: &str, size: Size) -> String {
+    match size.px_value() {
+        Some(px) => format!("    {name}: {px}px;\n"),
+        None => String::new(),
+    }
+}
+
+/// Static CSS compiled at build time.
+pub const STATIC_CSS: &str = include_str!(concat!(env!("OUT_DIR"), "/style.css"));
+
+/// Priority for per-component dynamic CSS providers.
+pub const COMPONENT_CSS_PRIORITY: u32 = 1000;
+
+/// Returns the SCSS source directory path.
+///
+/// Only useful during development for hot-reload watching.
+pub fn scss_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scss")
+}
+
+/// Generates CSS custom property overrides for the current theme.
+///
+/// Returns a `:root { ... }` block that sets all dynamic values.
+pub fn theme_css(
+    palette: &Palette,
+    general: &GeneralConfig,
+    bar: &BarConfig,
+    styling: &StylingConfig,
+) -> String {
+    let resolved = resolve_palette(palette, styling);
+
+    let global_rounding = styling.rounding.get();
+    let bar_rounding = bar.rounding.get();
+    let button_rounding = bar.button_rounding.get();
+    let group_rounding = bar.button_group_rounding.get();
+    let global = global_rounding.to_css_values();
+    let bar_values = bar_rounding.to_bar_css_values();
+    let bar_button_values = button_rounding.to_bar_element_css_values();
+    let bar_group_values = group_rounding.to_bar_element_css_values();
+    let dropdown_opacity = (bar.dropdown_opacity.get().value() as f32) / 100.0;
+    let dropdown_surface = hex_to_rgba(&resolved.surface, dropdown_opacity);
+
+    // Bar button sizes accept a scale multiplier or absolute pixels. The scale
+    // var feeds the `calc(base * bar-scale * scale)` in tokens SCSS; a pixel
+    // size instead emits a `*-override` var that the SCSS prefers via
+    // `var(--…-override, calc(…))`, so pixels bypass the scale entirely.
+    let btn_icon_size = bar.button_icon_size.get();
+    let btn_icon_padding = bar.button_icon_padding.get();
+    let btn_label_size = bar.button_label_size.get();
+    let btn_label_padding = bar.button_label_padding.get();
+    let btn_gap = bar.button_gap.get();
+
+    let btn_icon_scale = btn_icon_size.scale_value().unwrap_or(1.0);
+    let btn_icon_padding_scale = btn_icon_padding.scale_value().unwrap_or(1.0);
+    let btn_label_scale = btn_label_size.scale_value().unwrap_or(1.0);
+    let btn_label_padding_scale = btn_label_padding.scale_value().unwrap_or(1.0);
+    let btn_gap_scale = btn_gap.scale_value().unwrap_or(1.0);
+
+    let size_overrides = format!(
+        "{}{}{}{}{}",
+        px_override("--bar-btn-icon-size-override", btn_icon_size),
+        px_override("--bar-btn-icon-padding-override", btn_icon_padding),
+        px_override("--bar-btn-label-size-override", btn_label_size),
+        px_override("--bar-btn-label-padding-override", btn_label_padding),
+        px_override("--bar-btn-gap-override", btn_gap),
+    );
+
+    format!(
+        r#":root {{
+    --palette-bg: {bg};
+    --palette-surface: {surface};
+    --palette-elevated: {elevated};
+    --palette-fg: {fg};
+    --palette-fg-muted: {fg_muted};
+    --palette-primary: {primary};
+    --palette-red: {red};
+    --palette-yellow: {yellow};
+    --palette-green: {green};
+    --palette-blue: {blue};
+    --dropdown-surface: {dropdown_surface};
+
+    --cfg-font-sans: "{font_sans}";
+    --cfg-font-mono: "{font_mono}";
+
+    --global-scale: {global_scale};
+    --bar-scale: {bar_scale};
+    --bar-btn-icon-scale: {btn_icon_scale};
+    --bar-btn-icon-padding-scale: {btn_icon_padding_scale};
+    --bar-btn-label-scale: {btn_label_scale};
+    --bar-btn-label-padding-scale: {btn_label_padding_scale};
+    --bar-btn-gap-scale: {btn_gap_scale};
+{size_overrides}
+    --cfg-rounding-element: {rounding_element};
+    --cfg-rounding-container: {rounding_container};
+    --cfg-bar-rounding-element: {bar_rounding_element};
+    --cfg-bar-rounding-container: {bar_rounding_container};
+    --cfg-bar-button-rounding-element: {bar_button_rounding_element};
+    --cfg-bar-group-rounding-element: {bar_group_rounding_element};
+}}"#,
+        bg = resolved.bg,
+        surface = resolved.surface,
+        elevated = resolved.elevated,
+        fg = resolved.fg,
+        fg_muted = resolved.fg_muted,
+        primary = resolved.primary,
+        red = resolved.red,
+        yellow = resolved.yellow,
+        green = resolved.green,
+        blue = resolved.blue,
+        font_sans = general.font_sans.get(),
+        font_mono = general.font_mono.get(),
+        global_scale = styling.scale.get(),
+        bar_scale = bar.scale.get(),
+        rounding_element = global.element,
+        rounding_container = global.container,
+        bar_rounding_element = bar_values.element,
+        bar_rounding_container = bar_values.container,
+        bar_button_rounding_element = bar_button_values.element,
+        bar_group_rounding_element = bar_group_values.element,
+    )
+}
+
+/// Compiles SCSS from disk (development only).
+///
+/// Used when `WAYLE_DEV=1` for hot-reload of SCSS structure changes.
+///
+/// # Errors
+///
+/// Returns error if SCSS files cannot be read or compilation fails.
+pub fn compile_dev() -> Result<String, Error> {
+    let scss_path = scss_dir();
+    let main_path = scss_path.join("main.scss");
+    let main_content = fs::read_to_string(&main_path).map_err(Error::Io)?;
+    let options = grass::Options::default().load_path(&scss_path);
+
+    grass::from_string(&main_content, &options).map_err(Error::Compilation)
+}
+
+/// Compiles the user's optional SCSS overrides at `<config_dir>/styles/index.scss`.
+///
+/// Returns an empty string if the entry file is absent. A read or compile failure
+/// is logged via tracing and an empty string is returned, so a broken user
+/// stylesheet leaves the rest of the CSS bundle intact.
+///
+/// `<config_dir>/styles/` is on the SCSS load path, so the entry file can
+/// `@import` or `@use` sibling partials inside that directory.
+pub fn user_css(config_dir: &Path) -> String {
+    match try_user_css(config_dir) {
+        Ok(css) => css,
+        Err(err) => {
+            error!(error = %err, "user styles compilation failed");
+            String::new()
+        }
+    }
+}
+
+/// Like [`user_css`] but surfaces compilation errors instead of logging.
+///
+/// `Ok("")` means the entry file doesn't exist (no user overrides). `Ok(css)`
+/// is a successful compile. `Err` carries the read or compile error.
+///
+/// # Errors
+///
+/// Returns [`Error::Io`] on read failure, [`Error::Compilation`] on grass failure.
+pub fn try_user_css(config_dir: &Path) -> Result<String, Error> {
+    let styles_dir = config_dir.join("styles");
+    let entry_path = styles_dir.join("index.scss");
+
+    if !entry_path.exists() {
+        return Ok(String::new());
+    }
+
+    let content = fs::read_to_string(&entry_path).map_err(Error::Io)?;
+    let options = grass::Options::default().load_path(&styles_dir);
+
+    grass::from_string(&content, &options).map_err(Error::Compilation)
+}
+
+/// Returns `<config_dir>/styles/` if it exists, otherwise `None`.
+pub fn user_styles_dir(config_dir: &Path) -> Option<PathBuf> {
+    let dir = config_dir.join("styles");
+
+    if dir.is_dir() { Some(dir) } else { None }
+}
+
+/// Creates `<config_dir>/styles/` and a starter `index.scss` if either is missing.
+///
+/// A no-op once both exist; errors are logged and swallowed so failed
+/// scaffolding does not block startup.
+pub fn ensure_user_styles_scaffold(config_dir: &Path) {
+    const TEMPLATE: &str = "\
+// Custom Wayle styles. Anything here overrides the built-in styling.
+// Use @import \"name\" to bring in _name.scss from this folder.
+";
+
+    let styles_dir = config_dir.join("styles");
+
+    if let Err(err) = fs::create_dir_all(&styles_dir) {
+        error!(
+            error = %err,
+            path = %styles_dir.display(),
+            "cannot create user styles directory",
+        );
+        return;
+    }
+
+    let entry_path = styles_dir.join("index.scss");
+
+    if entry_path.exists() {
+        return;
+    }
+
+    if let Err(err) = fs::write(&entry_path, TEMPLATE) {
+        error!(
+            error = %err,
+            path = %entry_path.display(),
+            "cannot create user styles/index.scss",
+        );
+    }
+}
+
+/// Resolves the active palette based on the current theme provider.
+///
+/// Reads colors from the configured provider (wallust, matugen, pywal) or
+/// falls back to the built-in palette. Used by components that need palette
+/// colors outside of CSS (e.g., cairo drawing).
+///
+/// # Errors
+///
+/// Never errors -- falls back to the built-in palette if provider loading fails.
+pub fn resolve_palette(fallback: &Palette, styling: &StylingConfig) -> Palette {
+    use palette_provider::{matugen, pywal, wallust};
+
+    // A forced appearance overrides each provider's own light setting; `Auto`
+    // leaves the per-provider value in place.
+    let forced_light = styling.appearance.get().forced_light();
+
+    match styling.theme_provider.get() {
+        ThemeProvider::Wayle => fallback.clone(),
+
+        ThemeProvider::Matugen => {
+            let is_light = forced_light.unwrap_or_else(|| styling.matugen_light.get());
+            matugen::MatugenProvider::load(is_light).unwrap_or_else(|err| {
+                error!(error = %err, "matugen palette load failed");
+                fallback.clone()
+            })
+        }
+
+        ThemeProvider::Wallust => {
+            let is_light = forced_light.unwrap_or_else(|| styling.wallust_palette.get().is_light());
+            wallust::WallustProvider::load(is_light).unwrap_or_else(|err| {
+                error!(error = %err, "wallust palette load failed");
+                fallback.clone()
+            })
+        }
+
+        ThemeProvider::Pywal => {
+            let is_light = forced_light.unwrap_or_else(|| styling.pywal_light.get());
+            pywal::PywalProvider::load(is_light).unwrap_or_else(|err| {
+                error!(error = %err, "pywal palette load failed");
+                fallback.clone()
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wayle_config::{
+        infrastructure::themes::palettes,
+        schemas::{bar::BarConfig, styling::StylingConfig},
+    };
+
+    use super::*;
+
+    /// Design-token names a stylesheet references with `var(--…)`, for the
+    /// families the token file owns. Runtime-injected variables (bar, workspace,
+    /// palette) are someone else's to declare, so they are not collected; nor
+    /// is a reference with a fallback, which GTK resolves rather than drops.
+    fn token_refs(scss: &str) -> Vec<String> {
+        const FAMILIES: [&str; 8] = [
+            "--space-",
+            "--text-",
+            "--rounding-",
+            "--radius-",
+            "--icon-",
+            "--fg-",
+            "--bg-",
+            "--on-",
+        ];
+        scss.split("var(")
+            .skip(1)
+            .filter_map(|rest| {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                    .collect();
+                let has_fallback = rest[name.len()..].trim_start().starts_with(',');
+                (!has_fallback && FAMILIES.iter().any(|family| name.starts_with(family)))
+                    .then_some(name)
+            })
+            .collect()
+    }
+
+    fn scss_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(dir).expect("scss dir") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                scss_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "scss") {
+                out.push(path);
+            }
+        }
+    }
+
+    fn undeclared<'a>(refs: &'a [String], css: &str) -> Vec<&'a str> {
+        refs.iter()
+            .map(String::as_str)
+            .filter(|name| !css.contains(&format!("{name}:")))
+            .collect()
+    }
+
+    /// The declarations of the compiled rule with exactly this selector.
+    fn rule<'a>(css: &'a str, selector: &str) -> Option<&'a str> {
+        let start = css.find(&format!("{selector} {{"))? + selector.len() + 2;
+        let end = start + css[start..].find('}')?;
+        Some(&css[start..end])
+    }
+
+    /// Sections in the network dropdown are spaced by their labels, and the
+    /// credential prompt has none: without its own top margin it sat flush
+    /// against the connection card above it while keeping the VPN label's gap
+    /// below. Only when something precedes it, though — as the dropdown's first
+    /// visible child it would push the whole content down.
+    #[test]
+    fn the_credential_prompt_is_spaced_like_a_section_below_whatever_precedes_it() {
+        let spaced = rule(
+            STATIC_CSS,
+            ".dropdown-content > .network-secret-card:not(:first-child)",
+        )
+        .expect("the credential prompt has a rule of its own");
+        assert!(
+            spaced.contains("margin-top: var(--space-lg)"),
+            "got: {spaced}"
+        );
+
+        assert!(
+            rule(STATIC_CSS, ".network-secret-card").is_none()
+                && rule(STATIC_CSS, ".network-password-card")
+                    .is_some_and(|card| !card.contains("margin-top")),
+            "an unconditional top margin would also push down a prompt that opens the dropdown"
+        );
+    }
+
+    #[test]
+    fn a_failed_vpn_rows_reason_is_coloured_as_an_error() {
+        let failed = rule(STATIC_CSS, ".vpn-item .network-item-security.failed")
+            .expect("the failed row has a rule");
+        assert!(failed.contains("var(--status-error)"), "got: {failed}");
+    }
+
+    /// GTK drops a whole declaration whose `var()` names nothing, so a typo'd
+    /// or never-added token silently zeroes every margin in the rule — the
+    /// network dropdown's section headings sat flush against their neighbours
+    /// for exactly this, with `--space-2xs` undeclared, and `--text-2xs`,
+    /// `--icon-base`, `--rounding-full` and `--on-accent` did the same to
+    /// font sizes, an icon size, a radius and a colour elsewhere.
+    #[test]
+    fn every_token_a_stylesheet_uses_is_declared() {
+        let mut files = Vec::new();
+        scss_files(&scss_dir(), &mut files);
+        assert!(!files.is_empty(), "no scss files found");
+
+        let mut offenders = Vec::new();
+        for path in &files {
+            let refs = token_refs(&fs::read_to_string(path).expect("scss file"));
+            for name in undeclared(&refs, STATIC_CSS) {
+                offenders.push(format!("{}: {name}", path.display()));
+            }
+        }
+        assert_eq!(offenders, Vec::<String>::new());
+    }
+
+    /// Variables Rust sets at runtime rather than the token file: the
+    /// animation switches (zeroed when animations are off), the per-workspace
+    /// colour, and the bar-button size overrides. Theirs are the only
+    /// fallbacks that ever apply.
+    const RUNTIME_VARS: [&str; 3] = ["--cfg-anim-", "--ws-override-color", "--bar-btn-"];
+
+    /// Every variable referenced with a fallback, `var(--name, …)`, including
+    /// one whose fallback starts on the next line.
+    fn fallback_refs(scss: &str) -> Vec<String> {
+        scss.split("var(")
+            .skip(1)
+            .filter_map(|rest| {
+                let rest = rest.trim_start();
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                    .collect();
+                rest[name.len()..]
+                    .trim_start()
+                    .starts_with(',')
+                    .then_some(name)
+            })
+            .collect()
+    }
+
+    /// A fallback on a declared token never applies, and one on an undeclared
+    /// token is the only thing that does: either way the rule names a
+    /// variable that is not what it renders with.
+    #[test]
+    fn a_fallback_is_only_used_for_a_runtime_variable() {
+        let mut files = Vec::new();
+        scss_files(&scss_dir(), &mut files);
+
+        let mut offenders = Vec::new();
+        for path in &files {
+            for name in fallback_refs(&fs::read_to_string(path).expect("scss file")) {
+                if !RUNTIME_VARS.iter().any(|runtime| name.starts_with(runtime)) {
+                    offenders.push(format!("{}: {name}", path.display()));
+                }
+            }
+        }
+        assert_eq!(offenders, Vec::<String>::new());
+    }
+
+    #[test]
+    fn fallbacks_are_found_and_plain_references_are_not() {
+        let refs = fallback_refs(
+            "a { color: var(--fg-default); margin: var(--space-xxs, var(--space-xs)); \
+             width: var(\n  --bar-btn-gap-override,\n  1px); }",
+        );
+        // The nested `var(--space-xs)` has no fallback of its own.
+        assert_eq!(refs, ["--space-xxs", "--bar-btn-gap-override"]);
+    }
+
+    #[test]
+    fn an_undeclared_token_is_reported_and_a_declared_one_is_not() {
+        let refs = token_refs(
+            "a { margin: var(--space-sm) var(--space-9xl); color: var(--palette-fg); \
+             padding: var(--space-8xl, 4px); }",
+        );
+        // Palette variables are injected at runtime, and a fallback covers an
+        // undeclared name, so neither is collected.
+        assert_eq!(refs, ["--space-sm", "--space-9xl"]);
+        assert_eq!(undeclared(&refs, STATIC_CSS), ["--space-9xl"]);
+    }
+
+    #[test]
+    #[ignore = "requires display server"]
+    fn css_loads_into_gtk4() -> Result<(), Box<dyn std::error::Error>> {
+        gtk4::init()?;
+
+        let provider = gtk4::CssProvider::new();
+
+        provider.load_from_string(STATIC_CSS);
+
+        let theme = palettes::builtins()
+            .into_iter()
+            .next()
+            .ok_or("no built-in palettes")?;
+        let general = GeneralConfig::default();
+        let bar = BarConfig::default();
+        let styling = StylingConfig::default();
+        let theme_str = theme_css(&theme.palette, &general, &bar, &styling);
+
+        provider.load_from_string(&theme_str);
+
+        let combined = format!("{STATIC_CSS}\n{theme_str}");
+        provider.load_from_string(&combined);
+
+        Ok(())
+    }
+}

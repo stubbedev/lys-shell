@@ -1,0 +1,49 @@
+/// CLI application structure and parsing
+pub mod app;
+/// Audio control commands
+pub mod audio;
+/// Configuration management commands
+pub mod config;
+mod dbus;
+/// Icon management commands
+pub mod icons;
+/// Idle inhibit control commands
+pub mod idle;
+/// Application launcher (rofi shim) commands
+pub mod launcher;
+/// Lock screen command
+pub mod lock;
+
+/// Media control commands
+pub mod media;
+/// Notification control commands
+pub mod notify;
+/// Panel management commands
+pub mod panel;
+/// xdg-desktop-portal backend, picker stub, and dialog previewer
+pub mod portal;
+/// Power profile commands
+pub mod power;
+/// Screen recorder control commands
+pub mod recorder;
+/// Screenshot capture commands
+pub mod screenshot;
+/// ANSI styling for help output
+pub mod style;
+/// System tray commands
+pub mod systray;
+/// Custom toast command
+pub mod toast;
+/// VPN browser sign-in callback command
+pub mod vpn;
+/// Wallpaper control commands
+pub mod wallpaper;
+/// Widget control commands
+pub mod widget;
+
+/// Result type for CLI operations that return output text
+pub type CliResult = Result<String, String>;
+/// Result type for CLI operations that perform actions
+pub type CliAction = Result<(), String>;
+
+pub use app::{Cli, Commands};

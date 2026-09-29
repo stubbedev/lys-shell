@@ -1,0 +1,58 @@
+# Reads the area dropdown from new issues and adds the matching area:* label.
+#
+# https://github.com/stefanbuck/github-issue-parser
+# https://github.com/actions/github-script
+
+name: Label Issues
+
+on:
+    issues:
+        types: [opened, edited]
+
+permissions:
+    issues: write
+
+jobs:
+    label:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: stefanbuck/github-issue-parser@v3
+              id: bug
+              with:
+                  template-path: .github/ISSUE_TEMPLATE/bug_report.yml
+
+            - uses: stefanbuck/github-issue-parser@v3
+              id: feature
+              with:
+                  template-path: .github/ISSUE_TEMPLATE/feature_request.yml
+
+            - uses: actions/github-script@v9
+              env:
+                  BUG_AREA: ${{ steps.bug.outputs.issueparser_area }}
+                  FEATURE_AREA: ${{ steps.feature.outputs.issueparser_area }}
+              with:
+                  script: |
+                      const area = process.env.BUG_AREA || process.env.FEATURE_AREA;
+                      if (!area || area === 'Not sure') return;
+
+                      const map = {
+                          'Bar': 'area:bar',
+                          'Dropdowns (volume, network, bluetooth, etc.)': 'area:dropdowns',
+                          'Notifications': 'area:notifications',
+                          'OSD': 'area:osd',
+                          'Theming / Appearance': 'area:theming',
+                          'Configuration': 'area:config',
+                          'CLI': 'area:cli',
+                      };
+
+                      const label = map[area];
+                      if (!label) return;
+
+                      await github.rest.issues.addLabels({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: context.issue.number,
+                          labels: [label],
+                      });

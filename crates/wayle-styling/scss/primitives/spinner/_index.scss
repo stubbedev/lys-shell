@@ -1,0 +1,13 @@
+@import "mixins";
+
+spinner {
+    @include spinner-base;
+
+    &.sm {
+        @include spinner-sm;
+    }
+
+    &.lg {
+        @include spinner-lg;
+    }
+}

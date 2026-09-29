@@ -1,0 +1,271 @@
+// Bar module: pulse the icon during the pre-capture delay so it's clear a
+// recording is about to start (driven by the `recorder-preparing` class the
+// bar module toggles while `state.preparing` is set).
+@keyframes recorder-prepare-pulse {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.35;
+    }
+}
+
+.recorder-preparing .icon-container {
+    animation: recorder-prepare-pulse var(--cfg-anim-pulse, 0.6s) ease-in-out infinite alternate;
+}
+
+// Live status pill in the header: a pulsing dot + elapsed timer, shown only
+// while a recording is in progress.
+@keyframes recorder-status-blink {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.25;
+    }
+}
+
+.recorder-status {
+    border-spacing: var(--space-sm);
+
+    .recorder-status-dot {
+        min-width: var(--space-sm);
+        min-height: var(--space-sm);
+        border-radius: 9999px;
+        background: var(--status-error);
+        animation: recorder-status-blink 1s ease-in-out infinite alternate;
+
+        // Paused: steady (no blink), muted color.
+        &.paused {
+            background: var(--fg-subtle);
+            animation: none;
+        }
+    }
+
+    .recorder-status-time {
+        font-size: var(--text-md);
+        font-weight: var(--weight-semibold);
+        font-feature-settings: "tnum";
+        color: var(--fg-default);
+    }
+}
+
+.recorder-dropdown-content {
+    // Record / pause action buttons. The record button swaps between the
+    // `primary` (idle) and `danger` (recording) themed classes; this only
+    // handles their layout in the dropdown.
+    .recorder-controls {
+        margin-bottom: var(--space-sm);
+
+        > button {
+            min-height: calc(2rem * var(--global-scale));
+
+            // Record button carries an icon + label box; pad it like the old
+            // bare label did.
+            > box {
+                margin: var(--space-sm) var(--space-md);
+
+                image {
+                    -gtk-icon-size: var(--icon-sm);
+                }
+            }
+        }
+
+        // Pause/resume is icon-only to keep the action row compact.
+        .recorder-pause-button {
+            min-width: calc(2rem * var(--global-scale));
+
+            image {
+                -gtk-icon-size: var(--icon-sm);
+            }
+        }
+    }
+
+    // Section headers: a leading icon + the section label on one row. The
+    // shared `.section-label` carries vertical margins tuned for a stacked
+    // label; in this horizontal header they'd offset the text from the icon,
+    // so drop them and center both children on the row instead.
+    .recorder-section-header {
+        margin-top: var(--space-lg);
+        // Breathing room between the section title and its group/card below.
+        margin-bottom: var(--space-sm);
+
+        > image {
+            -gtk-icon-size: var(--icon-sm);
+            color: var(--fg-subtle);
+        }
+
+        > image,
+        > .section-label {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+    }
+
+    // Draggable webcam-position preview: the outer frame stands in for the
+    // screen, the inner frame for the picture-in-picture webcam. The inner
+    // frame can be dragged anywhere within the screen.
+    .recorder-position-preview {
+        border-radius: var(--rounding-element);
+        background: var(--bg-overlay);
+        border: 1px solid var(--border-strong);
+    }
+
+    .recorder-position-cam {
+        border-radius: var(--rounding-element);
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        opacity: 0.85;
+        transition: opacity var(--duration-fast);
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    // Settings grouped into elevated cards, one per section. Rows inside a
+    // card are flush and separated by hairlines, matching the audio dropdown.
+    .recorder-card {
+        padding: 0;
+
+        .recorder-row + .recorder-row {
+            border-top: 1px solid var(--border-subtle);
+        }
+    }
+
+    // Label + control rows (switches, combos, spin buttons). Padding matches
+    // the settings rows (`.setting-row`) so the popover reads consistently.
+    .recorder-row {
+        min-height: calc(2.25rem * var(--global-scale));
+        padding: var(--space-sm) var(--space-md);
+
+        > label {
+            font-size: var(--text-md);
+            font-weight: var(--weight-medium);
+            color: var(--fg-default);
+        }
+
+        // Compact switch tuned for the popover rows: shorter than the bare
+        // `switch` primitive (1.375rem) so it doesn't dominate the row.
+        > switch {
+            margin: var(--space-xs) 0;
+            min-height: calc(1rem * var(--global-scale));
+            min-width: calc(3.5rem * var(--global-scale));
+
+            slider {
+                min-width: calc(0.8rem * var(--global-scale));
+                min-height: calc(0.8rem * var(--global-scale));
+            }
+        }
+
+        // Raw gtk DropDown / SpinButton aren't themed at the primitive
+        // level (recorder is the only dropdown using them), so give them
+        // the same overlay-fill + border-on-focus treatment as the other
+        // popovers' inputs.
+        > dropdown,
+        > spinbutton {
+            // Capped so a long device name can't crowd the row label; the capped
+            // button factory truncates the selection to this width with a
+            // trailing "…" (the open list stays full-width). Font matches the
+            // settings dropdown (`text-sm`) so it isn't taller than its row.
+            min-width: calc(8rem * var(--global-scale));
+            color: var(--fg-default);
+            font-size: var(--text-sm);
+            font-weight: var(--weight-medium);
+            background: var(--bg-overlay);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--rounding-element);
+            transition: border-color var(--duration-fast);
+
+            &:focus-within {
+                border-color: var(--accent);
+            }
+        }
+
+        > dropdown > button {
+            all: unset;
+
+            > * {
+                margin: var(--space-xs) var(--space-sm);
+            }
+
+            arrow {
+                -gtk-icon-size: var(--icon-xs);
+                color: var(--fg-subtle);
+            }
+        }
+
+        // The open list (popover). GTK only themes the closed button by
+        // default, leaving the menu unstyled; match the settings dropdown —
+        // padded contents, a gap between rows, a clear hover, and an
+        // accent-tinted selected row.
+        > dropdown popover > contents {
+            padding: var(--space-xs);
+
+            listview row {
+                padding: var(--space-xs) var(--space-sm);
+                border-radius: var(--rounding-element);
+                color: var(--fg-muted);
+                transition: background-color var(--duration-fast);
+
+                &:not(:last-child) {
+                    margin-bottom: var(--space-xs);
+                }
+
+                &:hover {
+                    background-color: var(--bg-hover);
+                    color: var(--fg-default);
+                }
+
+                &:selected {
+                    background-color: var(--accent-subtle);
+                    color: var(--accent);
+                }
+            }
+        }
+
+        > spinbutton {
+            > text {
+                min-height: 0;
+                padding: var(--space-xs) var(--space-sm);
+            }
+
+            button {
+                all: unset;
+                color: var(--fg-muted);
+                padding: 0 var(--space-xs);
+                transition: color var(--duration-fast);
+
+                &:hover {
+                    color: var(--fg-default);
+                }
+            }
+        }
+    }
+}
+
+// Live on-screen webcam-position overlay (its own layer-shell window, so it is
+// styled at the top level rather than inside .recorder-dropdown).
+.webcam-preview-window {
+    background: transparent;
+
+    .webcam-preview-picture {
+        border-radius: var(--rounding-element);
+        border: 2px solid var(--accent);
+        background: rgba(0, 0, 0, 0.4);
+    }
+
+    .webcam-preview-done {
+        margin: var(--space-xs);
+        min-width: calc(1.75rem * var(--global-scale));
+        min-height: calc(1.75rem * var(--global-scale));
+        border-radius: var(--radius-full);
+        background: var(--accent);
+        color: var(--fg-on-accent);
+        opacity: 0.9;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+}

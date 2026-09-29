@@ -1,0 +1,1132 @@
+---
+title: Types
+outline: [2, 3]
+---
+
+<div v-pre>
+
+# Types
+
+Named types referenced across the config. Every field in [`/config/`](/config/) that shows a type like `Color` or `ClickAction` links here.
+
+## ActiveIndicator {#active-indicator}
+
+Visual indicator style for the active workspace.
+
+| Value | Meaning |
+|---|---|
+| `"background"` | Entire button gets a colored background. |
+| `"underline"` | Small colored bar under the workspace button. |
+
+## AnimationType {#animation-type}
+
+Enter/exit transition style for transient surfaces (OSD, toasts,
+notifications). Driven per frame by the custom revealer
+(`GskTransform` + opacity).
+
+| Value | Meaning |
+|---|---|
+| `"none"` | No transition; surfaces appear and disappear instantly. |
+| `"fade"` | Cross-fade opacity in and out. |
+| `"slide-up"` | Slide in from / out to the top edge. |
+| `"slide-down"` | Slide in from / out to the bottom edge. |
+| `"slide-left"` | Slide in from / out to the left edge. |
+| `"slide-right"` | Slide in from / out to the right edge. |
+| `"swing-up"` | Slide in from / out to the top edge with a rotating swing. |
+| `"swing-down"` | Slide in from / out to the bottom edge with a rotating swing. |
+| `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
+| `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
+| `"bounce"` | Scale in from a shrunken state with an elastic overshoot, then settle. |
+| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie" minimize, approximated with an affine scale-and-slide). Auto-orients to the edge the surface sits on. |
+| `"zoom"` | Scale in smoothly from the center with no overshoot. |
+| `"rotate"` | Spin in: rotate into place while scaling up and fading in. |
+| `"flip"` | Card flip: open out from a vertical edge (horizontal scale through zero). |
+
+## AnimationType2 {#animation-type2}
+
+Enter/exit transition style for transient surfaces (OSD, toasts,
+notifications). Driven per frame by the custom revealer
+(`GskTransform` + opacity).
+
+| Value | Meaning |
+|---|---|
+| `"none"` | No transition; surfaces appear and disappear instantly. |
+| `"fade"` | Cross-fade opacity in and out. |
+| `"slide-up"` | Slide in from / out to the top edge. |
+| `"slide-down"` | Slide in from / out to the bottom edge. |
+| `"slide-left"` | Slide in from / out to the left edge. |
+| `"slide-right"` | Slide in from / out to the right edge. |
+| `"swing-up"` | Slide in from / out to the top edge with a rotating swing. |
+| `"swing-down"` | Slide in from / out to the bottom edge with a rotating swing. |
+| `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
+| `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
+| `"bounce"` | Scale in from a shrunken state with an elastic overshoot, then settle. |
+| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie" minimize, approximated with an affine scale-and-slide). Auto-orients to the edge the surface sits on. |
+| `"zoom"` | Scale in smoothly from the center with no overshoot. |
+| `"rotate"` | Spin in: rotate into place while scaling up and fading in. |
+| `"flip"` | Card flip: open out from a vertical edge (horizontal scale through zero). |
+
+## AppIconSource {#app-icon-source}
+
+Icon source for app volume entries in the dropdown.
+
+| Value | Meaning |
+|---|---|
+| `"mapped"` | Wayle's curated symbolic icons matched by app name. |
+| `"native"` | Native application icons reported by PulseAudio. |
+
+## Appearance {#appearance}
+
+Light/dark appearance mode.
+
+`Auto` keeps each provider's own light setting and the configured static
+palette as-is. `Light`/`Dark` force the mode: dynamic providers switch their
+light flag, and the static palette swaps to its built-in light/dark variant
+when one exists.
+
+| Value | Meaning |
+|---|---|
+| `"auto"` | Follow each provider's own setting / the configured palette. |
+| `"light"` | Force the light variant. |
+| `"dark"` | Force the dark variant. |
+
+## BarButtonVariant {#bar-button-variant}
+
+Visual style variants for bar buttons.
+
+| Value | Meaning |
+|---|---|
+| `"basic"` | Icon + label, minimal background. |
+| `"block-prefix"` | Icon in colored pill container that blends into button edge. |
+| `"icon-square"` | Button background with colored icon container inside. |
+
+## BarCount {#bar-count}
+
+Frequency bar count clamped to 1-256 (mirrors `wayle_cava::BarCount`).
+
+Number in `[1, 256]`.
+
+Serialises as `uint16`.
+
+## BarGroup {#bar-group}
+
+Named group of modules. The name becomes a CSS ID selector.
+
+| Field | Description |
+|---|---|
+| `name` | Unique name for CSS targeting (becomes `#name` selector). |
+| `modules` | Modules contained in this group. |
+
+## BarItem {#bar-item}
+
+One entry in a bar layout section (`left`, `center`, or `right`).
+
+Three shapes are accepted, all interchangeable in the same array:
+
+- A plain module name: `"clock"`
+- A module with a CSS class for per-instance styling: `{ module = "clock", class = "primary" }`
+- A named group that wraps several modules in a shared container, addressable by CSS ID
+
+### Examples
+
+```toml
+[[bar.layout]]
+monitor = "*"
+
+# Plain module
+left = ["dashboard"]
+
+# Mix of plain and classed modules on the same side
+center = ["clock", { module = "clock", class = "secondary" }]
+
+# Named group (renders inside a GTK container with CSS ID `#status`)
+right = [{ name = "status", modules = ["battery", "network", "volume"] }]
+
+# Groups can hold classed modules too
+[[bar.layout]]
+monitor = "DP-2"
+left = [{ name = "clocks", modules = [
+  { module = "clock", class = "local" },
+  { module = "world-clock", class = "remote" }
+]}]
+```
+
+## BarLayout {#bar-layout}
+
+Layout configuration for a bar on a specific monitor.
+
+### Examples
+
+```toml
+# Single modules
+[[bar.layout]]
+monitor = "*"
+left = ["dashboard"]
+center = ["clock"]
+right = ["systray"]
+
+# Module with custom CSS class for per-instance styling
+[[bar.layout]]
+monitor = "DP-1"
+left = [{ module = "clock", class = "primary-clock" }, "clock"]
+center = ["media"]
+
+# Grouped modules (share a visual container, CSS-targetable by name)
+[[bar.layout]]
+monitor = "DP-2"
+left = [{ name = "status", modules = ["battery", "network"] }]
+
+# Groups can also contain classed modules
+[[bar.layout]]
+monitor = "DP-3"
+left = [{ name = "clocks", modules = [
+  { module = "clock", class = "local" },
+  { module = "world-clock", class = "remote" }
+]}]
+
+# Inherit from another layout
+[[bar.layout]]
+monitor = "*"
+left = ["dashboard"]
+center = ["clock"]
+right = ["systray"]
+
+[[bar.layout]]
+monitor = "HDMI-1"
+extends = "*"
+right = ["volume", "systray"]  # Override just this section
+
+# Hide bar on a specific monitor
+[[bar.layout]]
+monitor = "HDMI-2"
+show = false
+```
+
+| Field | Description |
+|---|---|
+| `monitor` | Monitor connector name (e.g., `"DP-1"`) or `"*"` for all monitors. |
+| `extends` | Inherit from another layout by its monitor value (e.g., `"*"`). |
+| `show` | Whether the bar is visible on this monitor. |
+| `left` | Modules in the left section. |
+| `center` | Modules in the center section. |
+| `right` | Modules in the right section. |
+
+## BarModule {#bar-module}
+
+Bar module name. Built-in modules or custom modules with a `custom-<id>` pattern.
+
+One of: `"battery"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"hyprsunset"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"mail"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"netstat"`, `"network"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"power-profiles"`, `"ram"`, `"recorder"`, `"separator"`, `"storage"`, `"systray"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"world-clock"`.
+
+String matching `^custom-[a-z0-9-]+$`.
+
+## BorderLocation {#border-location}
+
+Border placement for bar buttons.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | No border. |
+| `"top"` | Border on top edge only. |
+| `"bottom"` | Border on bottom edge only. |
+| `"left"` | Border on left edge only. |
+| `"right"` | Border on right edge only. |
+| `"all"` | Border on all edges. |
+
+## CavaDirection {#cava-direction}
+
+Bar growth direction relative to the bar's attached screen edge.
+
+| Value | Meaning |
+|---|---|
+| `"normal"` | Bars grow away from the attached edge. |
+| `"reverse"` | Bars grow toward the attached edge. |
+| `"mirror"` | Bars grow symmetrically from center. |
+
+## CavaInput {#cava-input}
+
+Audio capture backend.
+
+| Value | Meaning |
+|---|---|
+| `"pipe-wire"` | PipeWire multimedia server. |
+| `"pulse"` | PulseAudio sound server. |
+| `"alsa"` | Advanced Linux Sound Architecture. |
+| `"jack"` | JACK Audio Connection Kit. |
+| `"fifo"` | Named pipe (FIFO) input. |
+| `"port-audio"` | PortAudio cross-platform library. |
+| `"sndio"` | sndio audio subsystem (BSD). |
+| `"oss"` | Open Sound System (legacy). |
+| `"shmem"` | Shared memory input. |
+| `"winscap"` | Windows audio capture (WASAPI). |
+
+## CavaStyle {#cava-style}
+
+Visualization rendering style.
+
+| Value | Meaning |
+|---|---|
+| `"bars"` | Rectangular frequency bars. |
+| `"wave"` | Smooth curve connecting bar peaks. |
+| `"peaks"` | Bars with floating peak indicators that decay over time. |
+
+## ClassedModule {#classed-module}
+
+A module with an associated CSS class for custom styling.
+
+| Field | Description |
+|---|---|
+| `module` | The module type. |
+| `class` | CSS class added to the module's GTK widget. |
+
+## ClickAction {#click-action}
+
+String.
+
+## ColorValue {#color-value}
+
+CSS token, hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa), 'transparent', or 'auto'
+
+| Value | Meaning |
+|---|---|
+| `"bg-base"` | `--bg-base` - Application background. |
+| `"bg-surface"` | `--bg-surface` - Elevated surfaces. |
+| `"bg-surface-elevated"` | `--bg-surface-elevated` - Subtle elevation from surface (buttons on surface). |
+| `"bg-elevated"` | `--bg-elevated` - Higher elevation surfaces. |
+| `"bg-overlay"` | `--bg-overlay` - Popovers, dialogs. |
+| `"bg-hover"` | `--bg-hover` - Hover state background. |
+| `"bg-active"` | `--bg-active` - Active/pressed state background. |
+| `"bg-selected"` | `--bg-selected` - Selected item background. |
+| `"fg-default"` | `--fg-default` - Primary text color. |
+| `"fg-muted"` | `--fg-muted` - Secondary text color. |
+| `"fg-subtle"` | `--fg-subtle` - Tertiary/hint text color. |
+| `"fg-on-accent"` | `--fg-on-accent` - Text color on accent backgrounds. |
+| `"accent"` | `--accent` - Primary accent color. |
+| `"accent-subtle"` | `--accent-subtle` - Subtle accent background. |
+| `"accent-hover"` | `--accent-hover` - Accent hover state. |
+| `"status-error"` | `--status-error` - Error state color. |
+| `"status-warning"` | `--status-warning` - Warning state color. |
+| `"status-success"` | `--status-success` - Success state color. |
+| `"status-info"` | `--status-info` - Info state color. |
+| `"status-error-subtle"` | `--status-error-subtle` - Subtle error background. |
+| `"status-warning-subtle"` | `--status-warning-subtle` - Subtle warning background. |
+| `"status-success-subtle"` | `--status-success-subtle` - Subtle success background. |
+| `"status-info-subtle"` | `--status-info-subtle` - Subtle info background. |
+| `"status-error-hover"` | `--status-error-hover` - Error hover state. |
+| `"red"` | `--red` - Red color for stylistic/decorative use. |
+| `"yellow"` | `--yellow` - Yellow color for stylistic/decorative use. |
+| `"green"` | `--green` - Green color for stylistic/decorative use. |
+| `"blue"` | `--blue` - Blue color for stylistic/decorative use. |
+| `"border-subtle"` | `--border-subtle` - Subtle border color. |
+| `"border-default"` | `--border-default` - Default border color. |
+| `"border-strong"` | `--border-strong` - Strong border color. |
+| `"border-accent"` | `--border-accent` - Accent-colored border. |
+| `"border-error"` | `--border-error` - Error state border. |
+
+One of: `"transparent"`, `"auto"`.
+
+String matching `^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$`.
+
+## CyclingInterval {#cycling-interval}
+
+Cycling interval in minutes, minimum 1.
+
+Number `>= 1`.
+
+Serialises as `uint64`.
+
+## CyclingMode {#cycling-mode}
+
+Wallpaper cycling order.
+
+| Value | Meaning |
+|---|---|
+| `"sequential"` | Alphabetical order. |
+| `"shuffle"` | Random order. |
+
+## DisplayMode {#display-mode}
+
+What identifies a workspace in the UI.
+
+| Value | Meaning |
+|---|---|
+| `"label"` | Show workspace number or name. |
+| `"icon"` | Show icon from `workspace-map` (falls back to label if unmapped). |
+| `"none"` | Show nothing - only app icons visible. |
+
+## DropdownSize {#dropdown-size}
+
+Size override for a dropdown foldout panel.
+
+Each field is optional: when unset the dropdown keeps its built-in default
+size (scaled by the global scale). A [`Size`] may be a scale multiplier of
+the built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `"480px"`).
+
+| Field | Description |
+|---|---|
+| `width` | Panel width override. Unset uses the built-in default width. |
+| `height` | Panel height override. Unset uses the built-in default height. Has no |
+
+## ExecutionMode {#execution-mode}
+
+Execution mode for custom module commands.
+
+| Value | Meaning |
+|---|---|
+| `"poll"` | Run command at regular intervals defined by `interval-ms`.
+
+Best for commands that complete quickly and return current state
+(e.g., reading a file, querying system status). |
+| `"watch"` | Spawn long-running process and update display on each stdout line.
+
+Best for event-driven updates without polling overhead
+(e.g., `pactl subscribe`, `inotifywait`, `tail -f`).
+Configure `restart-policy` to control restarts after exit. |
+
+## FitMode {#fit-mode}
+
+Image scaling mode.
+
+| Value | Meaning |
+|---|---|
+| `"fill"` | Scale to cover entire display, cropping excess. |
+| `"fit"` | Scale to fit within display, letterboxing if needed. |
+| `"center"` | Display at original size, centered. |
+| `"stretch"` | Stretch to exactly fill, ignoring aspect ratio. |
+
+## FontWeightClass {#font-weight-class}
+
+Font weight class for typography.
+
+Maps to CSS classes like `.weight-normal`, `.weight-bold`, etc.
+Uses the existing `--weight-*` tokens defined in SCSS.
+
+| Value | Meaning |
+|---|---|
+| `"normal"` | Normal weight (--weight-normal: 400). |
+| `"medium"` | Medium weight (--weight-medium: 500). |
+| `"semibold"` | Semi-bold weight (--weight-semibold: 600). |
+| `"bold"` | Bold weight (--weight-bold: 700). |
+
+## Framerate {#framerate}
+
+Visualization framerate clamped to 1-360 fps (mirrors `wayle_cava::Framerate`).
+
+Number in `[1, 360]`.
+
+Serialises as `uint32`.
+
+## FrequencyHz {#frequency-hz}
+
+Frequency value in Hz, minimum 1 Hz.
+
+Cross-field constraints (high_cutoff > low_cutoff, samplerate/2 > high_cutoff)
+are validated at the service builder.
+
+Number `>= 1`.
+
+Serialises as `uint32`.
+
+## HexColor {#hex-color}
+
+GTK4 CSS hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa)
+
+String matching `^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$`.
+
+## IconPosition {#icon-position}
+
+Icon position within bar buttons.
+
+| Value | Meaning |
+|---|---|
+| `"start"` | Icon before label (left for horizontal, top for vertical bars). |
+| `"end"` | Icon after label (right for horizontal, bottom for vertical bars). |
+
+## IconSource {#icon-source}
+
+Source for resolving notification icons.
+
+| Value | Meaning |
+|---|---|
+| `"automatic"` | Use per-notification images when provided, otherwise Wayle's mapped icon. |
+| `"mapped"` | Always use Wayle's mapped icons regardless of what the app provides. |
+| `"application"` | Use the full application icon chain, falling back to mapped if unavailable. |
+
+## LabelStrategy {#label-strategy}
+
+What identifies each workspace's label.
+
+| Value | Meaning |
+|---|---|
+| `"index"` | Always show the index (e.g. `1`, `2`, `3`). |
+| `"name-or-index"` | Show the name when set, fall back to the index. |
+| `"name-only"` | Show only the name; unnamed workspaces show nothing. |
+| `"index-and-name"` | Show both, joined as `"1: web"`. Unnamed workspaces show the index alone. |
+
+## Layer {#layer}
+
+Layer-shell layer a window is placed on, from furthest back to furthest front.
+
+| Value | Meaning |
+|---|---|
+| `"background"` | Below everything else, used for wallpapers and ambient surfaces. |
+| `"bottom"` | Behind regular application windows. |
+| `"top"` | Above regular application windows. |
+| `"overlay"` | Above everything, including fullscreen application windows. |
+
+## Location {#location}
+
+Bar position on screen.
+
+| Value | Meaning |
+|---|---|
+| `"top"` | Top edge of the screen. |
+| `"bottom"` | Bottom edge of the screen. |
+| `"left"` | Left edge of the screen. |
+| `"right"` | Right edge of the screen. |
+
+## MailAccount {#mail-account}
+
+One mail account in the `[modules.mail]` per-account breakdown.
+
+Each account has its own notmuch query; the dropdown shows the per-account
+unread counts and the bar shows their sum.
+
+### Example
+
+```toml
+[[modules.mail.accounts]]
+name = "Work"
+query = "folder:work/INBOX and tag:unread"
+provider = "gmail"
+```
+
+| Field | Description |
+|---|---|
+| `name` | Display name shown in the dropdown. |
+| `query` | notmuch query whose match count is this account's unread total. |
+| `provider` | Provider, selecting the default brand icon. |
+| `icon` | Optional icon override. Empty uses the provider's default icon. |
+
+## MailProvider {#mail-provider}
+
+Mail provider, used to pick a default brand icon for an account.
+
+| Value | Meaning |
+|---|---|
+| `"generic"` | Generic mailbox; uses the plain mail glyph. |
+| `"gmail"` | Gmail. |
+| `"outlook"` | Microsoft Outlook. |
+| `"icloud"` | Apple iCloud Mail. |
+| `"proton"` | Proton Mail. |
+| `"fastmail"` | Fastmail. |
+| `"yahoo"` | Yahoo Mail. |
+
+## MatugenScheme {#matugen-scheme}
+
+Matugen color scheme type.
+
+| Value | Meaning |
+|---|---|
+| `"content"` | Adapts to image content. |
+| `"expressive"` | Bold, dramatic palette. |
+| `"fidelity"` | Stays close to source colors. |
+| `"fruit-salad"` | Playful multi-color palette. |
+| `"monochrome"` | Single-hue grayscale palette. |
+| `"neutral"` | Muted, understated palette. |
+| `"rainbow"` | Broad hue spread. |
+| `"tonal-spot"` | Balanced Material You default. |
+| `"vibrant"` | High-saturation palette. |
+
+## MediaIconType {#media-icon-type}
+
+Icon display mode for the media module.
+
+| Value | Meaning |
+|---|---|
+| `"default"` | Static icon from icon-name field. |
+| `"application"` | Dynamic icon from media player's desktop entry, falling back to icon-name. |
+| `"spinning-disc"` | Spinning disc icon that animates during playback. Uses slightly more CPU. |
+| `"application-mapped"` | Maps player to icon via glob patterns, with built-in mappings for common players. |
+
+## ModuleRef {#module-ref}
+
+Reference to a module, optionally with a custom CSS class.
+
+### Examples
+
+```toml
+# Plain module (just the name)
+left = ["clock"]
+
+# Module with custom CSS class
+left = [{ module = "clock", class = "primary-clock" }]
+```
+
+## MonitorWallpaperConfig {#monitor-wallpaper-config}
+
+Per-monitor wallpaper configuration.
+
+| Field | Description |
+|---|---|
+| `name` | Monitor name (e.g., "HDMI-1", "DP-1"). |
+| `fit-mode` | Image scaling mode for this monitor. |
+| `wallpaper` | Wallpaper image path for this monitor. |
+
+## NormalizedF64 {#normalized-f64}
+
+Floating-point value clamped to 0.0-1.0.
+
+Number in `[0.0, 1.0]`.
+
+Serialises as `double`.
+
+## Numbering {#numbering}
+
+How workspace numbers are displayed.
+
+| Value | Meaning |
+|---|---|
+| `"absolute"` | Show actual Hyprland workspace IDs (1, 2, 3, 4, 5, 6...). |
+| `"relative"` | Show numbers relative to monitor's starting workspace.
+
+If monitor has workspaces 4, 5, 6 assigned, they display as 1, 2, 3.
+Useful when keybinds use per-monitor numbering (Shift+1 for ws 4, etc.). |
+
+## OsdMonitor {#osd-monitor}
+
+"primary" or a monitor connector name (e.g. "DP-1")
+
+String.
+
+## OsdPosition {#osd-position}
+
+Screen anchor for the OSD overlay.
+
+| Value | Meaning |
+|---|---|
+| `"top-left"` | Top-left corner. |
+| `"top"` | Top-center edge. |
+| `"top-right"` | Top-right corner. |
+| `"right"` | Right-center edge. |
+| `"bottom-right"` | Bottom-right corner. |
+| `"bottom"` | Bottom-center edge. |
+| `"bottom-left"` | Bottom-left corner. |
+| `"left"` | Left-center edge. |
+
+## OsdTextAlign {#osd-text-align}
+
+Horizontal alignment of OSD toast/toggle content.
+
+| Value | Meaning |
+|---|---|
+| `"start"` | Align content to the start (left in LTR layouts). |
+| `"center"` | Center content horizontally. |
+| `"end"` | Align content to the end (right in LTR layouts). |
+
+## PaletteConfig {#palette-config}
+
+Color palette configuration for the active theme.
+
+| Field | Description |
+|---|---|
+| `bg` | Base background color (darkest). |
+| `surface` | Card and sidebar background. |
+| `elevated` | Raised element background. |
+| `fg` | Primary text color. |
+| `fg-muted` | Secondary text color. |
+| `primary` | Accent color for interactive elements. |
+| `red` | Red semantic color. |
+| `yellow` | Yellow semantic color. |
+| `green` | Green semantic color. |
+| `blue` | Blue semantic color. |
+
+## Percentage {#percentage}
+
+Percentage value clamped to 0-100.
+
+Number in `[0, 100]`.
+
+Serialises as `uint8`.
+
+## PopupCloseBehavior {#popup-close-behavior}
+
+Behavior when the close button is clicked on a popup card.
+
+| Value | Meaning |
+|---|---|
+| `"dismiss"` | Hide the popup; notification stays in history. |
+| `"remove"` | Remove the notification entirely. |
+
+## PopupMonitor {#popup-monitor}
+
+"primary" or a monitor connector name (e.g. "DP-1")
+
+String.
+
+## PopupPosition {#popup-position}
+
+Screen position for notification popups.
+
+| Value | Meaning |
+|---|---|
+| `"top-left"` | Top-left corner. |
+| `"top-center"` | Top-center edge. |
+| `"top-right"` | Top-right corner. |
+| `"bottom-left"` | Bottom-left corner. |
+| `"bottom-center"` | Bottom-center edge. |
+| `"bottom-right"` | Bottom-right corner. |
+| `"center-left"` | Center-left edge. |
+| `"center-right"` | Center-right edge. |
+
+## PywalContrast {#pywal-contrast}
+
+Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).
+
+Number in `[1.0, 21.0]`.
+
+Serialises as `double`.
+
+## RecorderFormat {#recorder-format}
+
+Container format / codec preset for recordings.
+
+| Value | Meaning |
+|---|---|
+| `"mp4"` | H.264 in an MP4 container. |
+| `"mkv"` | H.264 in a Matroska container (resilient to crashes). |
+| `"webm"` | VP9 in a WebM container. |
+
+## RestartDelay {#restart-delay}
+
+Restart delay in milliseconds, clamped to >= 1.
+
+Number `>= 1`.
+
+Serialises as `uint64`.
+
+## RestartPolicy {#restart-policy}
+
+Restart behavior for watch-mode custom modules.
+
+| Value | Meaning |
+|---|---|
+| `"never"` | Never restart after exit. |
+| `"on-exit"` | Restart after any exit code (success or failure). |
+| `"on-failure"` | Restart only after non-zero exit codes or signal termination. |
+
+## RoundingLevel {#rounding-level}
+
+Global rounding preference for UI components.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | Sharp corners (no rounding). |
+| `"sm"` | Subtle rounding. |
+| `"md"` | Moderate rounding (default). |
+| `"lg"` | Pronounced rounding. |
+| `"full"` | Pill shape (fully rounded ends). |
+
+## ScaleFactor {#scale-factor}
+
+Scale multiplier clamped to 0.25-3.0.
+
+Number in `[0.25, 3.0]`.
+
+Serialises as `float`.
+
+## SessionAction {#session-action}
+
+One action the dashboard session actions
+
+| Value | Meaning |
+|---|---|
+| `"lock"` | Lock the session |
+| `"log-out"` | Logout of the current session |
+| `"reboot"` | Reboot the machine |
+| `"power-off"` | Power off the machine |
+
+## ShadowPreset {#shadow-preset}
+
+Shadow style for the bar.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | No shadow. |
+| `"drop"` | Directional shadow opposite the anchor edge. |
+| `"floating"` | All-around shadow. |
+
+## SignedNormalizedF64 {#signed-normalized-f64}
+
+Floating-point value clamped to -1.0 to 1.0.
+
+Number in `[-1.0, 1.0]`.
+
+Serialises as `double`.
+
+## Size {#size}
+
+Size as a scale multiplier (number) or absolute pixels (e.g. "24px")
+
+Number `>= 0.0`.
+
+String matching `^[0-9]+(\.[0-9]+)?px$`.
+
+## StackingOrder {#stacking-order}
+
+Order in which popups are stacked on screen.
+
+| Value | Meaning |
+|---|---|
+| `"newest-first"` | Newest notifications appear closest to the configured position. |
+| `"oldest-first"` | Oldest notifications appear closest to the configured position. |
+
+## StateColors {#state-colors}
+
+Per-state color overrides for a custom module.
+
+Values are keyed in `color-map` by the JSON output's `alt` field, mirroring
+`icon-map`. Any field left unset falls back to the module's static color of
+the same name. Use the `"default"` key as a fallback state.
+
+| Field | Description |
+|---|---|
+| `icon-color` | Icon foreground color for this state. |
+| `icon-bg-color` | Icon container background color for this state. |
+| `label-color` | Label text color for this state. |
+| `button-bg-color` | Button background color for this state. |
+| `border-color` | Border color for this state. |
+
+## StorageMountPoint {#storage-mount-point}
+
+Storage mount targets accepted by `mount-point`.
+
+Supports a single string for backwards compatibility or an array of paths.
+
+String.
+
+## SurfaceAnimation {#surface-animation}
+
+Per-surface enter/exit animation override. Any field left unset falls back
+to the global `[animations]` enter/exit, then to `transition`/`duration`.
+
+| Field | Description |
+|---|---|
+| `enter` | Enter transition for this surface. Unset → global `enter`, then `transition`. |
+| `exit` | Exit transition for this surface. Unset → global `exit`, then `transition`. |
+| `enter-duration` | Enter duration in ms. Unset → global `enter-duration`, then `duration`. |
+| `exit-duration` | Exit duration in ms. Unset → global `exit-duration`, then `duration`. |
+
+## TemperatureUnit {#temperature-unit}
+
+Temperature unit for display.
+
+| Value | Meaning |
+|---|---|
+| `"metric"` | Celsius (metric). |
+| `"imperial"` | Fahrenheit (imperial). |
+
+## ThemeProvider {#theme-provider}
+
+Source of color palette values.
+
+Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
+
+| Value | Meaning |
+|---|---|
+| `"wayle"` | Static theming using Wayle's built-in palettes. |
+| `"matugen"` | Dynamic theming via Matugen. |
+| `"pywal"` | Dynamic theming via Pywal. |
+| `"wallust"` | Dynamic theming via Wallust. |
+
+## ThresholdEntry {#threshold-entry}
+
+A threshold entry that maps a numeric value range to color overrides.
+
+At least one of `above` or `below` must be set. When both are set,
+both conditions must be satisfied (AND logic).
+
+### TOML Example
+
+```toml
+[[modules.cpu.thresholds]]
+above = 70
+icon-color = "status-warning"
+label-color = "status-warning"
+
+[[modules.cpu.thresholds]]
+above = 90
+icon-color = "status-error"
+label-color = "status-error"
+```
+
+| Field | Description |
+|---|---|
+| `above` | Activate when metric value >= this threshold. |
+| `below` | Activate when metric value <= this threshold. |
+| `icon-color` | Override icon color when threshold is active. |
+| `label-color` | Override label color when threshold is active. |
+| `icon-bg-color` | Override icon background color when threshold is active. |
+| `button-bg-color` | Override button background color when threshold is active. |
+| `border-color` | Override border color when threshold is active. |
+
+## TimeFormat {#time-format}
+
+Time display format.
+
+| Value | Meaning |
+|---|---|
+| `"12h"` | 12-hour format with AM/PM (e.g., "6:30 AM"). |
+| `"24h"` | 24-hour format (e.g., "06:30"). |
+
+## ToastPreset {#toast-preset}
+
+A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.
+
+A preset captures a toast's text, icon, optional progress bar, duration, and
+CSS class so it can be fired by name. Any field can still be overridden per
+invocation on the command line (or over the widget socket).
+
+### Example
+
+```toml
+[[toasts.presets]]
+id = "saved"
+label = "Saved"
+icon = "ld-check-symbolic"
+duration-ms = 1500
+class = "success"
+
+# Fire it: wayle toast --preset saved
+```
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier. Trigger with `wayle toast --preset <id>`. |
+| `label` | Toast text. An explicit label on the command line overrides this. |
+| `icon` | Symbolic icon name shown beside the text. |
+| `percentage` | Progress percentage (0-100). When set, renders a progress bar instead |
+| `duration-ms` | Auto-dismiss duration in milliseconds. Unset falls back to the toast |
+| `class` | Extra CSS class applied to the toast for custom styling. |
+
+## TransitionDuration {#transition-duration}
+
+Transition duration in seconds, clamped to >= 0.
+
+Number `>= 0.0`.
+
+Serialises as `float`.
+
+## TransitionFps {#transition-fps}
+
+Transition frame rate clamped to 1-360 fps.
+
+Number in `[1, 360]`.
+
+Serialises as `uint32`.
+
+## TransitionType {#transition-type}
+
+Transition animation type.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | Instant change with no animation. |
+| `"simple"` | Basic crossfade. |
+| `"fade"` | Fade with bezier-controlled easing. |
+| `"left"` | Wipe from left edge to right. |
+| `"right"` | Wipe from right edge to left. |
+| `"top"` | Wipe from top edge to bottom. |
+| `"bottom"` | Wipe from bottom edge to top. |
+| `"wipe"` | Wipe at configurable angle. |
+| `"wave"` | Wavy wipe effect. |
+| `"grow"` | Growing circle from a position. |
+| `"center"` | Growing circle from center. |
+| `"outer"` | Shrinking circle from edges inward. |
+| `"any"` | Growing circle from random position. |
+| `"random"` | Randomly selects from all transition types. |
+
+## TrayItemOverride {#tray-item-override}
+
+Custom icon and color override for tray items matching a pattern.
+
+| Field | Description |
+|---|---|
+| `name` | Glob pattern to match against item ID or title. |
+| `icon` | Custom icon name (symbolic icon). |
+| `color` | Custom icon color. |
+
+## UrgencyBarThreshold {#urgency-bar-threshold}
+
+Minimum urgency level that shows a colored urgency bar on popup cards.
+
+All urgency levels at or above the threshold display the bar.
+For example, `Normal` shows bars on both normal and critical popups.
+
+| Value | Meaning |
+|---|---|
+| `"low"` | Show urgency bars on all popups. |
+| `"normal"` | Show urgency bars on normal and critical popups. |
+| `"critical"` | Show urgency bars on critical popups only. |
+| `"none"` | Never show urgency bars. |
+
+## UrgentMode {#urgent-mode}
+
+Where the urgent pulse animation is applied.
+
+| Value | Meaning |
+|---|---|
+| `"workspace"` | Pulse the entire workspace. |
+| `"application"` | Pulse only the app icon(s) belonging to the urgent window.
+
+Falls back to `workspace` when app icons are disabled. |
+
+## UserSessionConfig {#user-session-config}
+
+Settings for user session the in dashboard
+### Examples
+
+```toml
+[modules.dashboard.user-session]
+actions = [ "lock", "log-out", "reboot", "power-off" ]
+```
+
+| Field | Description |
+|---|---|
+| `actions` | Session actions to show on dashboard |
+
+## WallustBackend {#wallust-backend}
+
+Wallust image sampling backend.
+
+| Value | Meaning |
+|---|---|
+| `"full"` | Reads every pixel. |
+| `"resized"` | Resizes image before sampling. |
+| `"wal"` | Uses ImageMagick convert (pywal method). |
+| `"thumb"` | Fixed 512x512 thumbnail. |
+| `"fastresize"` | SIMD-accelerated resize. |
+| `"kmeans"` | K-means clustering. |
+
+## WallustColorspace {#wallust-colorspace}
+
+Wallust color space for dominant color selection.
+
+| Value | Meaning |
+|---|---|
+| `"lab"` | CIELAB perceptual color space. |
+| `"labmixed"` | LAB with mixing for sparse images. |
+| `"lch"` | Cylindrical LAB (hue/chroma/lightness). |
+| `"lchmixed"` | LCH with mixing. |
+| `"lchansi"` | LCH mapped to ANSI color ordering. |
+
+## WallustPalette {#wallust-palette}
+
+Wallust palette mode.
+
+| Value | Meaning |
+|---|---|
+| `"dark16"` | 8 dark colors with 16-color trick. |
+| `"dark"` | 8 dark colors, dark background and light contrast. |
+| `"darkcomp"` | Dark with complementary counterparts. |
+| `"darkcomp16"` | Dark complementary with 16-color trick. |
+| `"harddark"` | Dark with hard hue colors. |
+| `"harddark16"` | Hard dark with 16-color trick. |
+| `"harddarkcomp"` | Hard dark complementary variant. |
+| `"harddarkcomp16"` | Hard dark complementary with 16-color trick. |
+| `"light"` | Light background, dark foreground. |
+| `"light16"` | Light with 16-color trick. |
+| `"lightcomp"` | Light with complementary colors. |
+| `"lightcomp16"` | Light complementary with 16-color trick. |
+| `"softdark"` | Lightest colors with dark background. |
+| `"softdark16"` | Soft dark with 16-color trick. |
+| `"softdarkcomp"` | Soft dark complementary variant. |
+| `"softdarkcomp16"` | Soft dark complementary with 16-color trick. |
+| `"softlight"` | Light with soft pastel colors. |
+| `"softlight16"` | Soft light with 16-color trick. |
+| `"softlightcomp"` | Soft light with complementary colors. |
+| `"softlightcomp16"` | Soft light complementary with 16-color trick. |
+| `"ansidark"` | ANSI-ordered dark palette for LS_COLORS. |
+| `"ansidark16"` | ANSI dark with 16-color trick. |
+
+## WeatherProvider {#weather-provider}
+
+Weather data provider selection.
+
+| Value | Meaning |
+|---|---|
+| `"open-meteo"` | Open-Meteo (no API key required). |
+| `"visual-crossing"` | Visual Crossing (requires API key). |
+| `"weather-api"` | WeatherAPI.com (requires API key). |
+
+## WebcamPosition {#webcam-position}
+
+Corner the webcam picture-in-picture frame is anchored to in the recording.
+
+| Value | Meaning |
+|---|---|
+| `"top-left"` | Top-left corner. |
+| `"top-right"` | Top-right corner. |
+| `"bottom-left"` | Bottom-left corner. |
+| `"bottom-right"` | Bottom-right corner. |
+
+## WeekStart {#week-start}
+
+Which day appears in the first column of the calendar dropdown.
+
+| Value | Meaning |
+|---|---|
+| `"monday"` | Week starts on Monday. |
+| `"tuesday"` | Week starts on Tuesday. |
+| `"wednesday"` | Week starts on Wednesday. |
+| `"thursday"` | Week starts on Thursday. |
+| `"friday"` | Week starts on Friday. |
+| `"saturday"` | Week starts on Saturday. |
+| `"sunday"` | Week starts on Sunday (default). |
+
+## WorkspaceClickAction {#workspace-click-action}
+
+Click/scroll action: focus:this | focus:next | focus:previous | focus:last | dropdown:NAME | shell command | empty for none
+
+String.
+
+## WorkspaceMap {#workspace-map}
+
+Per-workspace icon and color overrides, keyed by workspace ID.
+
+TOML table keys are always strings, so `"1"` parses into the workspace
+with ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys
+that don't appear in the map fall back to the default behaviour set by
+[`HyprlandWorkspacesConfig::display_mode`].
+
+### Examples
+
+```toml
+[modules.hyprland-workspaces.workspace-map]
+# Whole entry on one line with an inline table
+1 = { label = "Web", icon = "ld-globe-symbolic", color = "#4a90d9" }
+2 = { icon = "ld-terminal-symbolic" }
+3 = { icon = "ld-code-symbolic", color = "accent" }
+
+# Or spread the entry across its own subtable
+[modules.hyprland-workspaces.workspace-map.4]
+label = "Chat"
+icon = "ld-message-square-symbolic"
+color = "status-success"
+
+# Negative IDs target Hyprland special workspaces
+[modules.hyprland-workspaces.workspace-map.-99]
+icon = "ld-scratch-symbolic"
+```
+
+## WorkspaceStyle {#workspace-style}
+
+Per-workspace styling override.
+
+| Field | Description |
+|---|---|
+| `icon` | Custom icon for this workspace. When set, the icon is shown regardless |
+| `color` | Custom background color for this workspace when active. |
+| `label` | Text shown instead of the workspace's name or index. |
+
+
+</div>

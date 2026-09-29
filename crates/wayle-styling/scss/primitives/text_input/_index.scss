@@ -1,0 +1,13 @@
+@import "mixins";
+
+entry {
+    @include entry-base;
+
+    &.error {
+        @include entry-error;
+    }
+
+    &.warning {
+        @include entry-warning;
+    }
+}

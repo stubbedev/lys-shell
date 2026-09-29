@@ -1,0 +1,468 @@
+use std::{collections::BTreeMap, ops::Deref};
+
+#[cfg(feature = "schema")]
+use schemars::schema_for;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use wayle_derive::{wayle_config, wayle_enum};
+
+use super::WorkspaceClickAction;
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
+use crate::{
+    ConfigProperty,
+    schemas::styling::{ColorValue, CssToken, Size},
+};
+
+/// What identifies a workspace in the UI.
+#[wayle_enum(default)]
+pub enum DisplayMode {
+    /// Show workspace number or name.
+    #[default]
+    Label,
+    /// Show icon from `workspace-map` (falls back to label if unmapped).
+    Icon,
+    /// Show nothing - only app icons visible.
+    None,
+}
+
+/// How workspace numbers are displayed.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum Numbering {
+    /// Show actual Hyprland workspace IDs (1, 2, 3, 4, 5, 6...).
+    #[default]
+    Absolute,
+    /// Show numbers relative to monitor's starting workspace.
+    ///
+    /// If monitor has workspaces 4, 5, 6 assigned, they display as 1, 2, 3.
+    /// Useful when keybinds use per-monitor numbering (Shift+1 for ws 4, etc.).
+    Relative,
+}
+
+/// Where the urgent pulse animation is applied.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum UrgentMode {
+    /// Pulse the entire workspace.
+    #[default]
+    Workspace,
+    /// Pulse only the app icon(s) belonging to the urgent window.
+    ///
+    /// Falls back to `workspace` when app icons are disabled.
+    Application,
+}
+
+/// Visual indicator style for the active workspace.
+#[wayle_enum(default)]
+pub enum ActiveIndicator {
+    /// Entire button gets a colored background.
+    #[default]
+    Background,
+    /// Small colored bar under the workspace button.
+    Underline,
+}
+
+impl ActiveIndicator {
+    /// CSS class for this indicator style.
+    pub fn css_class(self) -> &'static str {
+        match self {
+            Self::Background => "indicator-background",
+            Self::Underline => "indicator-underline",
+        }
+    }
+}
+
+/// Per-workspace styling override.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WorkspaceStyle {
+    /// Custom icon for this workspace. When set, the icon is shown regardless
+    /// of the module's `display-mode`, so a row can mix labelled workspaces
+    /// with icon-only ones (e.g. `[1][2][icon]`).
+    pub icon: Option<String>,
+    /// Custom background color for this workspace when active.
+    pub color: Option<ColorValue>,
+    /// Text shown instead of the workspace's name or index.
+    pub label: Option<String>,
+}
+
+/// Per-workspace icon and color overrides, keyed by workspace ID.
+///
+/// TOML table keys are always strings, so `"1"` parses into the workspace
+/// with ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys
+/// that don't appear in the map fall back to the default behaviour set by
+/// [`HyprlandWorkspacesConfig::display_mode`].
+///
+/// ## Examples
+///
+/// ```toml
+/// [modules.hyprland-workspaces.workspace-map]
+/// # Whole entry on one line with an inline table
+/// 1 = { label = "Web", icon = "ld-globe-symbolic", color = "#4a90d9" }
+/// 2 = { icon = "ld-terminal-symbolic" }
+/// 3 = { icon = "ld-code-symbolic", color = "accent" }
+///
+/// # Or spread the entry across its own subtable
+/// [modules.hyprland-workspaces.workspace-map.4]
+/// label = "Chat"
+/// icon = "ld-message-square-symbolic"
+/// color = "status-success"
+///
+/// # Negative IDs target Hyprland special workspaces
+/// [modules.hyprland-workspaces.workspace-map.-99]
+/// icon = "ld-scratch-symbolic"
+/// ```
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct WorkspaceMap(BTreeMap<i32, WorkspaceStyle>);
+
+impl Deref for WorkspaceMap {
+    type Target = BTreeMap<i32, WorkspaceStyle>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<BTreeMap<i32, WorkspaceStyle>> for WorkspaceMap {
+    fn from(map: BTreeMap<i32, WorkspaceStyle>) -> Self {
+        Self(map)
+    }
+}
+
+impl<'a> IntoIterator for &'a WorkspaceMap {
+    type Item = (&'a i32, &'a WorkspaceStyle);
+    type IntoIter = std::collections::btree_map::Iter<'a, i32, WorkspaceStyle>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl Serialize for WorkspaceMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let string_map: BTreeMap<String, &WorkspaceStyle> = self
+            .0
+            .iter()
+            .map(|(key, val)| (key.to_string(), val))
+            .collect();
+        string_map.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for WorkspaceMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string_map: BTreeMap<String, WorkspaceStyle> = BTreeMap::deserialize(deserializer)?;
+        let mut result = BTreeMap::new();
+        for (key, value) in string_map {
+            let id: i32 = key.parse().map_err(serde::de::Error::custom)?;
+            result.insert(id, value);
+        }
+        Ok(WorkspaceMap(result))
+    }
+}
+
+/// Hyprland workspace indicators with click-to-switch.
+#[wayle_config(i18n_prefix = "settings-modules-hyprland-workspaces")]
+pub struct HyprlandWorkspacesConfig {
+    /// Minimum number of workspace buttons to display.
+    ///
+    /// When set to 0 (default), only active and occupied workspaces are shown.
+    /// When set to N, at least N buttons are always visible, with empty ones
+    /// using `empty-color` styling.
+    #[serde(rename = "min-workspace-count")]
+    #[default(0)]
+    pub min_workspace_count: ConfigProperty<u8>,
+
+    /// Show only workspaces belonging to the bar's monitor.
+    ///
+    /// When true, each bar shows only its monitor's workspaces.
+    /// When false, all workspaces from all monitors are shown.
+    #[serde(rename = "monitor-specific")]
+    #[default(true)]
+    pub monitor_specific: ConfigProperty<bool>,
+
+    /// Include special workspaces (scratchpads) in the display.
+    ///
+    /// Special workspaces have negative IDs in Hyprland.
+    #[serde(rename = "show-special")]
+    #[default(true)]
+    pub show_special: ConfigProperty<bool>,
+
+    /// Pulse animation on workspaces with urgent windows.
+    ///
+    /// When a window requests attention (e.g., terminal bell), the workspace
+    /// button pulses until you switch to it.
+    #[serde(rename = "urgent-show")]
+    #[default(true)]
+    pub urgent_show: ConfigProperty<bool>,
+
+    /// Where the urgent pulse is applied.
+    ///
+    /// - `workspace`: Entire workspace pulses (default)
+    /// - `application`: Only the app icon(s) belonging to the urgent window
+    ///   pulse, falling back to `workspace` when app icons are disabled
+    #[serde(rename = "urgent-mode")]
+    #[default(UrgentMode::Workspace)]
+    pub urgent_mode: ConfigProperty<UrgentMode>,
+
+    /// What identifies each workspace button.
+    ///
+    /// - `label`: Shows workspace number (or name if `label-use-name` is true)
+    /// - `icon`: Shows icon from `workspace-map` (falls back to label if unmapped)
+    /// - `none`: Shows nothing - only app icons visible
+    #[serde(rename = "display-mode")]
+    #[default(DisplayMode::Label)]
+    pub display_mode: ConfigProperty<DisplayMode>,
+
+    /// Use workspace name instead of number when displaying labels.
+    ///
+    /// Only applies when `display-mode = "label"` or as fallback for unmapped
+    /// workspaces in `display-mode = "icon"`.
+    #[serde(rename = "label-use-name")]
+    #[default(false)]
+    pub label_use_name: ConfigProperty<bool>,
+
+    /// How workspace numbers are displayed.
+    ///
+    /// - `absolute`: Show actual Hyprland workspace IDs (1, 2, 3, 4, 5, 6...)
+    /// - `relative`: Show numbers relative to monitor's starting workspace.
+    ///   If a monitor has workspaces 4, 5, 6 assigned, they display as 1, 2, 3.
+    ///   Useful when keybinds use per-monitor numbering.
+    #[serde(rename = "numbering")]
+    #[default(Numbering::Absolute)]
+    pub numbering: ConfigProperty<Numbering>,
+
+    /// Text separator between workspace identity and app icons.
+    ///
+    /// Only shown when both `display-mode` is not `none` and `app-icons-show`
+    /// is enabled. Common values: `"|"`, `"·"`, `"-"`.
+    #[serde(rename = "divider")]
+    #[default(String::from(" "))]
+    pub divider: ConfigProperty<String>,
+
+    /// Show application icons for windows in each workspace.
+    ///
+    /// When enabled, displays icons for running applications.
+    /// Icons are resolved via `app-icon-map` configuration.
+    #[serde(rename = "app-icons-show")]
+    #[default(false)]
+    pub app_icons_show: ConfigProperty<bool>,
+
+    /// Deduplicate application icons within a workspace.
+    ///
+    /// When true, shows only one icon per unique window class.
+    /// When false, shows an icon for every window.
+    #[serde(rename = "app-icons-dedupe")]
+    #[default(true)]
+    pub app_icons_dedupe: ConfigProperty<bool>,
+
+    /// Fallback icon for applications not matched by `app-icon-map`.
+    #[serde(rename = "app-icons-fallback")]
+    #[default(String::from("ld-app-window-symbolic"))]
+    pub app_icons_fallback: ConfigProperty<String>,
+
+    /// Icon shown for empty workspaces when `app-icons-show` is enabled.
+    ///
+    /// When a workspace has no windows but is displayed (via `min-workspace-count`),
+    /// this icon appears as a placeholder.
+    #[serde(rename = "app-icons-empty")]
+    #[default(String::from("tb-minus-symbolic"))]
+    pub app_icons_empty: ConfigProperty<String>,
+
+    /// Gap between app icons within a workspace button.
+    ///
+    /// Only applies to spacing between app icons.
+    #[serde(rename = "icon-gap")]
+    #[default(Size::Scale(0.3))]
+    pub icon_gap: ConfigProperty<Size>,
+
+    /// Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+    ///
+    /// For horizontal bars, controls horizontal (left/right) padding.
+    /// For vertical bars, controls vertical (top/bottom) padding.
+    #[serde(rename = "workspace-padding")]
+    #[default(Size::Scale(0.5))]
+    pub workspace_padding: ConfigProperty<Size>,
+
+    /// Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+    ///
+    /// Applies to workspace identity icons and custom icons from `workspace-map`.
+    #[serde(rename = "icon-size")]
+    #[default(Size::default())]
+    pub icon_size: ConfigProperty<Size>,
+
+    /// Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+    ///
+    /// Applies to workspace number/name labels and the divider text.
+    #[serde(rename = "label-size")]
+    #[default(Size::default())]
+    pub label_size: ConfigProperty<Size>,
+
+    /// Workspaces to hide from the display.
+    ///
+    /// Glob patterns matching workspace IDs. Examples:
+    /// - `"10"` - hide workspace 10
+    /// - `"1?"` - hide workspaces 10-19
+    #[serde(rename = "workspace-ignore")]
+    #[default(Vec::new())]
+    pub workspace_ignore: ConfigProperty<Vec<String>>,
+
+    /// Visual indicator for the active workspace.
+    #[serde(rename = "active-indicator")]
+    #[default(ActiveIndicator::Background)]
+    pub active_indicator: ConfigProperty<ActiveIndicator>,
+
+    /// Highlight workspaces active on other monitors with a different color.
+    ///
+    /// When true, workspaces active on a different monior are highlicted differently.
+    /// When false, workspaces active on a another monitor are not specially highlighted.
+    ///
+    /// This setting only makes sense when `monitor-specific` is false.
+    #[serde(rename = "highlight-active-on-other-monitor")]
+    #[default(true)]
+    pub highlight_active_on_other_monitor: ConfigProperty<bool>,
+
+    /// Color for the active (focused) workspace.
+    ///
+    /// Applied to icons and labels. In `background` indicator mode,
+    /// also used as the button background.
+    #[serde(rename = "active-color")]
+    #[default(ColorValue::Token(CssToken::Accent))]
+    pub active_color: ConfigProperty<ColorValue>,
+
+    /// Color for occupied workspaces (has windows but not focused).
+    ///
+    /// Applied to icons and labels.
+    #[serde(rename = "occupied-color")]
+    #[default(ColorValue::Token(CssToken::FgMuted))]
+    pub occupied_color: ConfigProperty<ColorValue>,
+
+    /// Color for empty workspaces.
+    ///
+    /// Applied to the empty placeholder icon and labels.
+    #[serde(rename = "empty-color")]
+    #[default(ColorValue::Token(CssToken::FgSubtle))]
+    pub empty_color: ConfigProperty<ColorValue>,
+
+    /// Background color for the workspaces container.
+    #[serde(rename = "container-bg-color")]
+    #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]
+    pub container_bg_color: ConfigProperty<ColorValue>,
+
+    /// Display border around the workspaces container.
+    #[serde(rename = "border-show")]
+    #[default(false)]
+    pub border_show: ConfigProperty<bool>,
+
+    /// Border color for the workspaces container.
+    #[serde(rename = "border-color")]
+    #[default(ColorValue::Token(CssToken::BorderDefault))]
+    pub border_color: ConfigProperty<ColorValue>,
+
+    /// Active on other minitor indicator color.
+    ///
+    /// Only applies when `highlight-active-on-other-monitor` is `true`.
+    #[serde(rename = "active-on-other-monitor-color")]
+    #[default(ColorValue::Token(CssToken::Accent))]
+    pub active_on_other_monitor_color: ConfigProperty<ColorValue>,
+
+    /// Per-workspace icon and color overrides.
+    ///
+    /// Keys are workspace IDs (use negative for special workspaces).
+    ///
+    /// ## Example
+    ///
+    /// ```toml
+    /// [modules.hyprland-workspaces.workspace-map]
+    /// 1 = { icon = "ld-globe-symbolic", color = "#4a90d9" }
+    /// 2 = { icon = "ld-terminal-symbolic" }
+    /// ```
+    #[serde(rename = "workspace-map")]
+    #[default(WorkspaceMap::default())]
+    pub workspace_map: ConfigProperty<WorkspaceMap>,
+
+    /// Application icon mapping with glob pattern support.
+    ///
+    /// Maps window class or title to symbolic icon names. Supports:
+    /// - No prefix: Matches window class (e.g., `"*firefox*"`)
+    /// - `class:` prefix: Explicit class match (e.g., `"class:org.mozilla.*"`)
+    /// - `title:` prefix: Matches window title (e.g., `"title:*YouTube*"`)
+    ///
+    /// User mappings are merged with built-in defaults for common applications.
+    ///
+    /// ## Example
+    ///
+    /// ```toml
+    /// [modules.hyprland-workspaces.app-icon-map]
+    /// "*firefox*" = "ld-globe-symbolic"
+    /// "title:*YouTube*" = "ld-youtube-symbolic"
+    /// ```
+    #[serde(rename = "app-icon-map")]
+    #[default(BTreeMap::new())]
+    pub app_icon_map: ConfigProperty<BTreeMap<String, String>>,
+
+    /// Action on left-clicking a workspace. Default focuses it.
+    #[serde(rename = "left-click")]
+    #[default(WorkspaceClickAction::FocusWorkspace)]
+    pub left_click: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on middle-clicking a workspace.
+    #[serde(rename = "middle-click")]
+    #[default(WorkspaceClickAction::None)]
+    pub middle_click: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on right-clicking a workspace.
+    #[serde(rename = "right-click")]
+    #[default(WorkspaceClickAction::None)]
+    pub right_click: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on scrolling up over the module. Default focuses the previous workspace.
+    #[serde(rename = "scroll-up")]
+    #[default(WorkspaceClickAction::FocusPrevious)]
+    pub scroll_up: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on scrolling down over the module. Default focuses the next workspace.
+    #[serde(rename = "scroll-down")]
+    #[default(WorkspaceClickAction::FocusNext)]
+    pub scroll_down: ConfigProperty<WorkspaceClickAction>,
+}
+
+#[cfg(feature = "schema")]
+impl ModuleInfoProvider for HyprlandWorkspacesConfig {
+    fn module_info() -> ModuleInfo {
+        ModuleInfo {
+            name: String::from("hyprland-workspaces"),
+            schema: || schema_for!(HyprlandWorkspacesConfig),
+            layout_id: Some(String::from("hyprland-workspaces")),
+            array_entry: false,
+        }
+    }
+
+    fn groups() -> Vec<ConfigGroup> {
+        GroupDefaults::standard()
+    }
+}
+
+#[cfg(feature = "schema")]
+crate::register_module!(HyprlandWorkspacesConfig);
+
+/// Base size (in rem) the `icon_size` scale multiplier resolves against
+/// (`Scale(1.0)` = default). Shared by the shell resolver and the settings
+/// editor's scale↔px conversion.
+pub const ICON_BASE_REM: f32 = 1.3;
+/// Base size (in rem) the `label_size` scale multiplier resolves against.
+pub const LABEL_BASE_REM: f32 = 1.1;

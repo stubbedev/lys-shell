@@ -1,0 +1,5 @@
+@import "mixins";
+
+tooltip {
+    @include tooltip-base;
+}

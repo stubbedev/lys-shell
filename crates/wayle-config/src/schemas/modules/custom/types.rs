@@ -1,0 +1,161 @@
+use std::fmt::{self, Display, Formatter};
+
+use serde::{Deserialize, Deserializer, Serialize};
+use tracing::warn;
+use wayle_derive::wayle_enum;
+
+use crate::schemas::styling::ColorValue;
+
+/// Execution mode for custom module commands.
+#[wayle_enum(default)]
+pub enum ExecutionMode {
+    /// Run command at regular intervals defined by `interval-ms`.
+    ///
+    /// Best for commands that complete quickly and return current state
+    /// (e.g., reading a file, querying system status).
+    #[default]
+    Poll,
+
+    /// Spawn long-running process and update display on each stdout line.
+    ///
+    /// Best for event-driven updates without polling overhead
+    /// (e.g., `pactl subscribe`, `inotifywait`, `tail -f`).
+    /// Configure `restart-policy` to control restarts after exit.
+    Watch,
+}
+
+/// Restart behavior for watch-mode custom modules.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RestartPolicy {
+    /// Never restart after exit.
+    #[default]
+    Never,
+    /// Restart after any exit code (success or failure).
+    OnExit,
+    /// Restart only after non-zero exit codes or signal termination.
+    OnFailure,
+}
+
+const MIN_MS: u64 = 1;
+
+/// Restart delay in milliseconds, clamped to >= 1.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct RestartDelay(#[cfg_attr(feature = "schema", schemars(range(min = MIN_MS)))] u64);
+
+impl RestartDelay {
+    /// Default delay (1000ms).
+    pub const DEFAULT: Self = Self(1000);
+
+    /// Creates a delay, clamping to >= 1ms.
+    #[must_use]
+    pub fn new(value: u64) -> Self {
+        Self(value.max(MIN_MS))
+    }
+
+    /// Returns the inner millisecond value.
+    #[must_use]
+    pub fn value(self) -> u64 {
+        self.0
+    }
+}
+
+impl Default for RestartDelay {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Display for RestartDelay {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<u64> for RestartDelay {
+    fn from(value: u64) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for RestartDelay {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = u64::deserialize(deserializer)?;
+        if raw < MIN_MS {
+            warn!(
+                "restart-interval-ms {} below minimum ({}), clamped",
+                raw, MIN_MS
+            );
+        }
+        Ok(Self::new(raw))
+    }
+}
+
+/// Per-state color overrides for a custom module.
+///
+/// Values are keyed in `color-map` by the JSON output's `alt` field, mirroring
+/// `icon-map`. Any field left unset falls back to the module's static color of
+/// the same name. Use the `"default"` key as a fallback state.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct StateColors {
+    /// Icon foreground color for this state.
+    #[serde(default)]
+    pub icon_color: Option<ColorValue>,
+
+    /// Icon container background color for this state.
+    #[serde(default)]
+    pub icon_bg_color: Option<ColorValue>,
+
+    /// Label text color for this state.
+    #[serde(default)]
+    pub label_color: Option<ColorValue>,
+
+    /// Button background color for this state.
+    #[serde(default)]
+    pub button_bg_color: Option<ColorValue>,
+
+    /// Border color for this state.
+    #[serde(default)]
+    pub border_color: Option<ColorValue>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clamps_zero_to_minimum() {
+        assert_eq!(RestartDelay::new(0).value(), 1);
+    }
+
+    #[test]
+    fn preserves_valid_value() {
+        assert_eq!(RestartDelay::new(500).value(), 500);
+    }
+
+    #[test]
+    fn default_is_1000ms() {
+        assert_eq!(RestartDelay::default().value(), 1000);
+    }
+
+    #[test]
+    fn deserialize_clamps() {
+        let delay: RestartDelay = serde_json::from_str("0").unwrap();
+        assert_eq!(delay.value(), 1);
+    }
+
+    #[test]
+    fn deserialize_valid() {
+        let delay: RestartDelay = serde_json::from_str("250").unwrap();
+        assert_eq!(delay.value(), 250);
+    }
+}

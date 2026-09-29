@@ -1,0 +1,9 @@
+@import "mixins";
+
+checkbutton {
+    @include radio-base;
+}
+
+checkbutton.grouped:not(:last-child) {
+    margin-right: var(--space-md);
+}

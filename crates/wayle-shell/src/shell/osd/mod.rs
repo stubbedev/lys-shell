@@ -1,0 +1,264 @@
+pub(crate) mod messages;
+mod methods;
+mod toggles;
+mod watchers;
+
+use std::{sync::Arc, time::Duration};
+
+use gtk::{pango::EllipsizeMode, prelude::*};
+use gtk4_layer_shell::{KeyboardMode, LayerShell};
+use relm4::{gtk, prelude::*};
+use wayle_audio::AudioService;
+use wayle_brightness::BrightnessService;
+use wayle_config::ConfigService;
+use wayle_widgets::{WatcherToken, prelude::WayleRevealer};
+
+pub(crate) use self::messages::OsdInit;
+use self::{
+    messages::{OsdCmd, OsdEvent},
+    methods::{
+        anim_duration, anim_transition, event_fraction, event_icon, event_label,
+        event_slider_label, event_value, genie_edge, is_slider, is_toggle, osd_classes,
+        toast_align,
+    },
+};
+
+const BRIGHTNESS_ICON: &str = "ld-sun-symbolic";
+
+pub(crate) struct Osd {
+    config: Arc<ConfigService>,
+    audio: Option<Arc<AudioService>>,
+    brightness: Option<Arc<BrightnessService>>,
+    dismiss_id: u32,
+    ready: bool,
+    device_watcher: WatcherToken,
+    input_device_watcher: WatcherToken,
+    brightness_watcher: WatcherToken,
+
+    current_event: Option<OsdEvent>,
+    last_volume: Option<(u32, bool)>,
+    last_input_volume: Option<(u32, bool)>,
+    last_brightness: Option<u32>,
+
+    /// Whether the OSD window is mapped (driven through the revealer).
+    visible: bool,
+    /// Whether the revealer is showing its child (animates enter/exit).
+    revealed: bool,
+}
+
+#[allow(clippy::needless_borrow)]
+#[relm4::component(pub(crate))]
+impl Component for Osd {
+    type Init = OsdInit;
+    type Input = ();
+    type Output = ();
+    type CommandOutput = OsdCmd;
+
+    view! {
+        #[root]
+        gtk::Window {
+            set_decorated: false,
+            add_css_class: "osd-host",
+            set_default_size: (1, 1),
+            #[watch]
+            set_visible: model.visible,
+
+            #[name = "revealer"]
+            WayleRevealer {
+                // Set transition type + duration before toggling reveal_child so
+                // the correct per-direction (enter/exit) animation is in effect
+                // when the reveal flips.
+                #[watch]
+                set_transition: anim_transition(&model),
+                #[watch]
+                set_genie_edge: genie_edge(&model),
+                #[watch]
+                set_transition_duration: anim_duration(&model),
+                #[watch]
+                set_reveal_child: model.revealed,
+
+            #[name = "osd_container"]
+            gtk::Box {
+                set_orientation: gtk::Orientation::Vertical,
+
+                #[watch]
+                set_css_classes: &osd_classes(&model).iter().map(String::as_str).collect::<Vec<_>>(),
+
+                #[name = "slider_header"]
+                gtk::Box {
+                    add_css_class: "osd-header",
+
+                    #[watch]
+                    set_visible: is_slider(&model.current_event),
+
+                    #[name = "slider_icon"]
+                    gtk::Image {
+                        add_css_class: "osd-icon",
+                        set_valign: gtk::Align::Center,
+
+                        #[watch]
+                        set_icon_name: event_icon(&model.current_event),
+                    },
+
+                    #[name = "slider_label"]
+                    gtk::Label {
+                        add_css_class: "osd-label",
+                        set_hexpand: true,
+                        set_halign: gtk::Align::Start,
+                        set_valign: gtk::Align::Center,
+                        set_ellipsize: EllipsizeMode::End,
+
+                        #[watch]
+                        set_label: &event_slider_label(&model.current_event),
+                    },
+
+                    #[name = "value"]
+                    gtk::Label {
+                        add_css_class: "osd-value",
+                        set_valign: gtk::Align::Center,
+
+                        #[watch]
+                        set_label: &event_value(&model.current_event),
+                    },
+                },
+
+                #[name = "toggle_header"]
+                gtk::Box {
+                    add_css_class: "osd-header",
+                    // Align the icon+label group within the OSD's wide min-width
+                    // per `osd.text-align` (sliders keep their own layout).
+                    #[watch]
+                    set_halign: toast_align(&model),
+
+                    #[watch]
+                    set_visible: is_toggle(&model.current_event),
+
+                    #[name = "toggle_icon"]
+                    gtk::Image {
+                        add_css_class: "osd-icon",
+                        set_valign: gtk::Align::Center,
+
+                        #[watch]
+                        set_icon_name: event_icon(&model.current_event),
+                    },
+
+                    #[name = "toggle_label"]
+                    gtk::Label {
+                        add_css_class: "osd-label",
+                        set_valign: gtk::Align::Center,
+
+                        #[watch]
+                        set_label: &event_label(&model.current_event),
+                    },
+                },
+
+                #[name = "bar"]
+                gtk::ProgressBar {
+                    add_css_class: "osd-bar",
+
+                    #[watch]
+                    set_fraction: event_fraction(&model.current_event),
+
+                    #[watch]
+                    set_visible: is_slider(&model.current_event),
+                },
+            },
+            },
+        }
+    }
+
+    fn init(
+        init: Self::Init,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        root.init_layer_shell();
+        root.set_keyboard_mode(KeyboardMode::None);
+        root.set_namespace(Some("wayle-osd"));
+
+        let model = Self {
+            config: init.config.clone(),
+            audio: init.audio.clone(),
+            brightness: init.brightness.clone(),
+            dismiss_id: 0,
+            ready: false,
+            device_watcher: WatcherToken::new(),
+            input_device_watcher: WatcherToken::new(),
+            brightness_watcher: WatcherToken::new(),
+            current_event: None,
+            last_volume: None,
+            last_input_volume: None,
+            last_brightness: None,
+            visible: false,
+            revealed: false,
+        };
+
+        model.apply_position(&root);
+        model.apply_layer(&root);
+
+        sender.oneshot_command(async {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            OsdCmd::Ready
+        });
+
+        let widgets = view_output!();
+
+        watchers::spawn(&sender, &init.config, &init.audio, &init.brightness);
+        watchers::spawn_toast(&sender, &init.toast_bus);
+
+        ComponentParts { model, widgets }
+    }
+
+    fn update_cmd(&mut self, msg: OsdCmd, sender: ComponentSender<Self>, root: &Self::Root) {
+        match msg {
+            OsdCmd::Ready => {
+                self.ready = true;
+            }
+
+            OsdCmd::Dismiss(dismiss_id) => {
+                self.begin_dismiss(dismiss_id, &sender);
+            }
+
+            OsdCmd::Hide(dismiss_id) => {
+                self.finish_hide(dismiss_id);
+            }
+
+            OsdCmd::ConfigChanged => {
+                self.apply_position(root);
+                self.apply_layer(root);
+            }
+
+            OsdCmd::DeviceChanged(device) => {
+                self.handle_device_changed(device, &sender);
+            }
+
+            OsdCmd::VolumeChanged => {
+                self.handle_volume_changed(&sender, root);
+            }
+
+            OsdCmd::BrightnessDevicesChanged(devices) => {
+                self.handle_brightness_devices_changed(devices, &sender);
+            }
+
+            OsdCmd::BrightnessChanged => {
+                self.handle_brightness_changed(&sender, root);
+            }
+
+            OsdCmd::InputDeviceChanged(device) => {
+                self.handle_input_device_changed(device, &sender);
+            }
+
+            OsdCmd::InputVolumeChanged => {
+                self.handle_input_volume_changed(&sender, root);
+            }
+
+            OsdCmd::ToggleChanged(toggle) => {
+                self.handle_toggle_changed(toggle, &sender, root);
+            }
+
+            OsdCmd::ShowToast(toast) => {
+                self.handle_show_toast(toast, &sender, root);
+            }
+        }
+    }
+}

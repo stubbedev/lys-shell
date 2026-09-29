@@ -1,0 +1,44 @@
+#[cfg(feature = "schema")]
+use schemars::schema_for;
+use wayle_derive::wayle_config;
+
+#[cfg(feature = "schema")]
+use crate::docs::{ModuleInfo, ModuleInfoProvider};
+use crate::{
+    ConfigProperty,
+    schemas::styling::{ColorValue, CssToken, Size},
+};
+
+/// A vertical rule between bar modules.
+#[wayle_config(i18n_prefix = "settings-modules-separator")]
+pub struct SeparatorConfig {
+    /// Thickness of the separator line in pixels.
+    #[serde(rename = "size")]
+    #[default(1)]
+    pub size: ConfigProperty<u32>,
+
+    /// Length of the separator line. Accepts a scale multiplier or pixels (e.g. `"24px"`).
+    #[serde(rename = "length")]
+    #[default(Size::Scale(1.5))]
+    pub length: ConfigProperty<Size>,
+
+    /// Color of the separator line.
+    #[serde(rename = "color")]
+    #[default(ColorValue::Token(CssToken::FgSubtle))]
+    pub color: ConfigProperty<ColorValue>,
+}
+
+#[cfg(feature = "schema")]
+impl ModuleInfoProvider for SeparatorConfig {
+    fn module_info() -> ModuleInfo {
+        ModuleInfo {
+            name: String::from("separator"),
+            schema: || schema_for!(SeparatorConfig),
+            layout_id: Some(String::from("separator")),
+            array_entry: false,
+        }
+    }
+}
+
+#[cfg(feature = "schema")]
+crate::register_module!(SeparatorConfig);

@@ -1,0 +1,100 @@
+.network-connections-group {
+    border-radius: var(--rounding-element);
+    padding: 0;
+
+    .network-connection-card + .network-connection-card {
+        border-top: 1px solid var(--border-subtle);
+    }
+}
+
+.network-connection-card {
+    padding: var(--space-sm);
+}
+
+.network-connection-icon {
+    border-radius: var(--rounding-element);
+    margin-right: var(--space-sm);
+
+    image {
+        -gtk-icon-size: var(--icon-sm);
+    }
+
+    &.ethernet {
+        background: var(--accent-subtle);
+
+        image {
+            margin: calc(var(--space-sm) + var(--space-xs));
+            -gtk-icon-size: var(--icon-md);
+            color: var(--accent);
+        }
+    }
+
+    &.wifi {
+        background: var(--accent-subtle);
+
+        image {
+            margin: calc(var(--space-sm) + var(--space-xs));
+            -gtk-icon-size: var(--icon-md);
+            color: var(--accent);
+        }
+    }
+}
+
+.network-connection-name {
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--fg-default);
+}
+
+.network-connection-detail {
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
+    color: var(--fg-subtle);
+
+    &.error {
+        color: var(--status-error);
+    }
+}
+
+.network-connection-icon.error {
+    background: var(--status-error-subtle);
+
+    image {
+        margin: calc(var(--space-sm) + var(--space-xs));
+        color: var(--status-error);
+    }
+}
+
+.network-connection-status {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--fg-subtle);
+    margin-right: var(--space-sm);
+
+    &.error {
+        color: var(--status-error);
+        background: var(--status-error-subtle);
+    }
+}
+
+.network-hover-stack {
+    margin-left: var(--space-xs);
+}
+
+.network-connection-actions {
+    margin-left: 0;
+    margin-right: var(--space-sm);
+
+    button {
+        font-size: var(--text-sm);
+        font-weight: var(--weight-bold);
+
+        > box {
+            margin: var(--space-xs) var(--space-sm);
+        }
+    }
+}
+
+button.network-action-forget:hover {
+    color: var(--status-error);
+}

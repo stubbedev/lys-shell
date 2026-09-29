@@ -1,0 +1,29 @@
+[package]
+name = "wayle-launcher"
+description = "Launcher engine (rofi replacement): modes, matching, history"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+bitflags.workspace = true
+gio = "0.22"
+gio-unix = { version = "0.22.6", default-features = false }
+glib.workspace = true
+glob.workspace = true
+nucleo.workspace = true
+regex.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
+shlex.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+wayle-clipboard.workspace = true
+wayle-core.workspace = true
+
+[lints]
+workspace = true

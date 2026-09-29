@@ -1,0 +1,199 @@
+mod types;
+
+mod battery;
+mod bluetooth;
+mod brightness;
+mod cava;
+mod clock;
+mod cpu;
+mod custom;
+mod dashboard;
+/// Hyprland workspaces module configuration and shared base sizes.
+pub mod hyprland_workspaces;
+mod hyprsunset;
+mod idle_inhibit;
+mod keybind_mode;
+mod keyboard_input;
+mod mail;
+/// MangoWM workspaces module configuration and shared base sizes.
+pub mod mango_workspaces;
+mod media;
+mod microphone;
+mod netstat;
+mod network;
+/// Niri workspaces module configuration and shared base sizes.
+pub mod niri_workspaces;
+/// Notification module configuration and popup types.
+pub mod notification;
+mod power;
+mod power_profiles;
+mod ram;
+mod recorder;
+mod screenshot;
+mod separator;
+mod storage;
+/// sway workspaces module configuration and shared base sizes.
+pub mod sway_workspaces;
+/// System tray module configuration and shared base sizes.
+pub mod systray;
+mod treeman;
+mod volume;
+mod weather;
+mod window_title;
+mod world_clock;
+
+pub use battery::BatteryConfig;
+pub use bluetooth::BluetoothConfig;
+pub use brightness::BrightnessConfig;
+pub use cava::{
+    BarCount as CavaBarCount, CavaConfig, CavaDirection, CavaInput, CavaStyle,
+    Framerate as CavaFramerate, FrequencyHz,
+};
+pub use clock::{ClockConfig, WeekStart};
+pub use cpu::CpuConfig;
+pub use custom::{CustomModuleDefinition, ExecutionMode, RestartDelay, RestartPolicy, StateColors};
+pub use dashboard::DashboardConfig;
+pub use hyprland_workspaces::{
+    ActiveIndicator, DisplayMode, HyprlandWorkspacesConfig, Numbering, UrgentMode, WorkspaceMap,
+    WorkspaceStyle,
+};
+pub use hyprsunset::HyprsunsetConfig;
+pub use idle_inhibit::IdleInhibitConfig;
+pub use keybind_mode::KeybindModeConfig;
+pub use keyboard_input::KeyboardInputConfig;
+pub use mail::{MailAccount, MailConfig, MailProvider};
+pub use mango_workspaces::MangoWorkspacesConfig;
+pub use media::{BUILTIN_MAPPINGS, MediaConfig, MediaIconType};
+pub use microphone::MicrophoneConfig;
+pub use netstat::NetstatConfig;
+pub use network::{NetworkConfig, VpnShow};
+pub use niri_workspaces::{
+    LabelStrategy, NiriWorkspacesConfig, WorkspaceClickAction, WorkspaceMap as NiriWorkspaceMap,
+};
+pub use notification::{
+    IconSource, NotificationConfig, PopupCloseBehavior, PopupMonitor, PopupPosition, StackingOrder,
+    UrgencyBarThreshold,
+};
+pub use power::PowerConfig;
+pub use power_profiles::PowerProfilesConfig;
+pub use ram::RamConfig;
+pub use recorder::{RecorderConfig, RecorderFormat};
+pub use screenshot::ScreenshotConfig;
+pub use separator::SeparatorConfig;
+pub use storage::{StorageConfig, StorageMountPoint};
+pub use sway_workspaces::SwayWorkspacesConfig;
+pub use systray::{SystrayConfig, TrayItemOverride};
+pub use treeman::TreemanConfig;
+pub use types::TimeFormat;
+pub use volume::{AppIconSource, VolumeConfig};
+use wayle_derive::wayle_config;
+pub use weather::{TemperatureUnit, WeatherConfig, WeatherProvider};
+pub use window_title::{BUILTIN_MAPPINGS as WINDOW_TITLE_BUILTIN_MAPPINGS, WindowTitleConfig};
+pub use world_clock::WorldClockConfig;
+
+use crate::ConfigProperty;
+
+/// Configuration for all available Wayle modules.
+#[wayle_config]
+pub struct ModulesConfig {
+    /// Battery status module.
+    pub battery: BatteryConfig,
+    /// Bluetooth connection module.
+    pub bluetooth: BluetoothConfig,
+    /// Backlight brightness module.
+    pub brightness: BrightnessConfig,
+    /// Cava audio visualizer module.
+    pub cava: CavaConfig,
+    /// Clock display module.
+    pub clock: ClockConfig,
+    /// CPU usage module.
+    pub cpu: CpuConfig,
+    /// Dashboard module.
+    pub dashboard: DashboardConfig,
+    /// Hyprland workspace switcher module.
+    #[serde(rename = "hyprland-workspaces")]
+    pub hyprland_workspaces: HyprlandWorkspacesConfig,
+    /// Hyprsunset (blue light filter) module.
+    pub hyprsunset: HyprsunsetConfig,
+    /// Idle inhibitor module.
+    #[serde(rename = "idle-inhibit")]
+    pub idle_inhibit: IdleInhibitConfig,
+    /// Keybind mode indicator module.
+    #[serde(rename = "keybind-mode")]
+    pub keybind_mode: KeybindModeConfig,
+    /// Keyboard input module.
+    #[serde(rename = "keyboard-input")]
+    pub keyboard_input: KeyboardInputConfig,
+    /// Unread mail count module.
+    pub mail: MailConfig,
+    /// MangoWM tag switcher module.
+    #[serde(rename = "mango-workspaces")]
+    pub mango_workspaces: MangoWorkspacesConfig,
+    /// Media player module.
+    pub media: MediaConfig,
+    /// Microphone input module.
+    pub microphone: MicrophoneConfig,
+    /// Network connection module.
+    pub network: NetworkConfig,
+    /// Network traffic statistics module.
+    pub netstat: NetstatConfig,
+    /// Niri workspace switcher module.
+    #[serde(rename = "niri-workspaces")]
+    pub niri_workspaces: NiriWorkspacesConfig,
+    /// Notification center module.
+    #[serde(rename = "notifications")]
+    #[wayle(deprecated_alias = "notification")]
+    pub notifications: NotificationConfig,
+    /// Power menu module.
+    pub power: PowerConfig,
+    /// Power profile indicator/switcher module.
+    #[serde(rename = "power-profiles")]
+    pub power_profiles: PowerProfilesConfig,
+    /// RAM usage module.
+    pub ram: RamConfig,
+    /// Screen recorder module.
+    pub recorder: RecorderConfig,
+    /// Screenshot capture module.
+    pub screenshot: ScreenshotConfig,
+    /// Storage usage module.
+    pub storage: StorageConfig,
+    /// Separator module.
+    pub separator: SeparatorConfig,
+    /// sway workspace switcher module.
+    #[serde(rename = "sway-workspaces")]
+    pub sway_workspaces: SwayWorkspacesConfig,
+    /// System tray module.
+    pub systray: SystrayConfig,
+    /// treeman worktree health module.
+    pub treeman: TreemanConfig,
+    /// Volume control module.
+    pub volume: VolumeConfig,
+    /// Weather display module.
+    pub weather: WeatherConfig,
+    /// Window title module.
+    #[serde(rename = "window-title")]
+    pub window_title: WindowTitleConfig,
+    /// World clock module.
+    #[serde(rename = "world-clock")]
+    pub world_clock: WorldClockConfig,
+    /// Custom user-defined modules, each backed by a shell command. See
+    /// [`CustomModuleDefinition`] for all fields (id, command, interval, click
+    /// actions, icons, etc.). Reference them in a layout with `custom-<id>`.
+    ///
+    /// ## Example
+    ///
+    /// ```toml
+    /// [[modules.custom]]
+    /// id = "gpu-temp"
+    /// command = "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
+    /// interval-ms = 5000
+    /// icon-name = "ld-thermometer-symbolic"
+    ///
+    /// [[modules.custom]]
+    /// id = "weather"
+    /// command = "curl -s wttr.in/?format=%t"
+    /// interval-ms = 600000
+    /// ```
+    #[default(Vec::new())]
+    pub custom: ConfigProperty<Vec<CustomModuleDefinition>>,
+}
