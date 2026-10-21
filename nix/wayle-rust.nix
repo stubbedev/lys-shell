@@ -2,7 +2,6 @@
   lib,
   craneLib,
   rustPlatform,
-  runCommandLocal,
   pkg-config,
   cmake,
   clang,
@@ -33,27 +32,30 @@ let
 
   # GStreamer plugins the recorder loads at runtime (pipewiresrc, v4l2src,
   # x264enc, opusenc, mp4/matroska/webm mux, compositor, ...).
-  gstPlugins = (with gst_all_1; [
-    gstreamer
-    gst-plugins-base
-    gst-plugins-good
-    gst-plugins-bad
-    gst-plugins-ugly
-    gst-libav
-  ]) ++ [ pipewire ];
+  gstPlugins =
+    (with gst_all_1; [
+      gstreamer
+      gst-plugins-base
+      gst-plugins-good
+      gst-plugins-bad
+      gst-plugins-ugly
+      gst-libav
+    ])
+    ++ [ pipewire ];
 
   # Only the inputs the build actually needs, so editing docs/scripts/nix
   # doesn't bust the build cache. resources/ stays in because rust-embed
   # compiles it into the binary.
+  fileset = lib.fileset.unions [
+    ../Cargo.toml
+    ../Cargo.lock
+    ../crates
+    ../wayle
+    ../resources
+  ];
   src = lib.fileset.toSource {
     root = ../.;
-    fileset = lib.fileset.unions [
-      ../Cargo.toml
-      ../Cargo.lock
-      ../crates
-      ../wayle
-      ../resources
-    ];
+    inherit fileset;
   };
 
   # Args shared by the deps-only layer and the final build. crane keys the deps
@@ -99,7 +101,8 @@ let
       pam # lock screen authenticates via libpam
       libgbm # portal screencast dmabuf path links libgbm
       libdrm # pulled in by gbm/drm-ffi
-    ] ++ gstPlugins;
+    ]
+    ++ gstPlugins;
 
     # libspa-sys defines cast macros like `SPA_ID_INVALID ((uint32_t)0xffffffff)`
     # that bindgen's cexpr can't const-evaluate, so it relies on bindgen's
@@ -135,23 +138,55 @@ let
   # root Cargo.toml and every wayle* entry in Cargo.lock — all of which carry
   # the workspace version. Every `chore: release` bumps that version (70 changed
   # lines, zero dependency change) and would otherwise recompile all 591 crates
-  # (~30 min) on the release commit. Normalize the wayle version to 0.0.0 in the
-  # deps src so only a *real* Cargo.lock dependency change invalidates the layer;
-  # the final buildPackage below still uses the real version via commonArgs.
-  depsSrc = runCommandLocal "wayle-deps-src" { } ''
-    cp -r --no-preserve=mode,ownership ${src} $out
-    chmod -R u+w $out
-    find $out -name Cargo.toml -exec \
-      sed -i 's/^version = "${version}"$/version = "0.0.0"/' {} +
-    sed -i '/^name = "wayle/{n;s/^version = "${version}"$/version = "0.0.0"/;}' $out/Cargo.lock
-  '';
-
+  # (~30 min) on the release commit. So the dummy src drops the version from
+  # every manifest (cargo then reads 0.0.0) and takes a lock whose wayle*
+  # entries say 0.0.0: only a *real* Cargo.lock dependency change invalidates
+  # the layer, and the final buildPackage below still uses the real version via
+  # commonArgs. Both are rewritten at evaluation time from plain files, never
+  # read back out of a derivation, so the flake evaluates without a build.
+  lockLines = lib.splitString "\n" (builtins.readFile ../Cargo.lock);
+  isOwnVersion =
+    i: line:
+    i > 0
+    && lib.hasPrefix "name = \"wayle" (builtins.elemAt lockLines (i - 1))
+    && line == "version = \"${version}\"";
+  ownVersions = lib.length (lib.filter lib.id (lib.imap0 isOwnVersion lockLines));
+  ownCrates = lib.length (lib.filter (lib.hasPrefix "name = \"wayle") lockLines);
+  depsDummySrc = craneLib.mkDummySrc {
+    src = lib.fileset.toSource {
+      root = ../.;
+      fileset = lib.fileset.difference fileset ../Cargo.lock;
+    };
+    cargoLock =
+      assert lib.assertMsg (
+        ownVersions == ownCrates
+      ) "Cargo.lock: ${toString ownVersions} of ${toString ownCrates} wayle* entries are at ${version}";
+      builtins.toFile "Cargo.lock" (
+        lib.concatStringsSep "\n" (
+          lib.imap0 (i: line: if isOwnVersion i line then "version = \"0.0.0\"" else line) lockLines
+        )
+      );
+    cleanCargoTomlFilter =
+      path:
+      path != [
+        "package"
+        "version"
+      ]
+      &&
+        path != [
+          "workspace"
+          "package"
+          "version"
+        ]
+      && craneLib.filters.cargoTomlDefault path;
+  };
   # The cached dependency layer. Built once per Cargo.lock (version-independent
-  # via depsSrc); pushed to the xilo cache and reused across releases.
+  # via depsDummySrc); pushed to the xilo cache and reused across releases.
   cargoArtifacts = craneLib.buildDepsOnly (
     commonArgs
     // {
-      src = depsSrc;
+      dummySrc = depsDummySrc;
+      cargoVendorDir = craneLib.vendorCargoDeps { inherit src; };
       version = "0.0.0";
     }
   );
