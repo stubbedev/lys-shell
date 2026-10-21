@@ -45,8 +45,8 @@ context.objects = [
 `
 
 // Start runs a private pipewire for the test and points the
-// client library at it. A missing pipewire fails the test: the .#go
-// devShell provides one.
+// client library at it. A missing pipewire fails the test: the dev
+// shell provides one.
 func Start(t *testing.T) string {
 	t.Helper()
 	bin, err := exec.LookPath("pipewire")

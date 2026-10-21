@@ -32,5 +32,5 @@ nix develop -c cargo run --release --offline \
   --manifest-path internal/icons/testdata/symgold/Cargo.toml -- \
   internal/icons/testdata/symbolic
 # a larger corpus: generate its goldens the same way, then
-SYMBOLIC_CORPUS=/path/to/corpus nix develop .#go -c go test ./internal/icons/ -run TestToSymbolicMatchesRust
+SYMBOLIC_CORPUS=/path/to/corpus nix develop -c go test ./internal/icons/ -run TestToSymbolicMatchesRust
 ```

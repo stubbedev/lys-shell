@@ -266,7 +266,7 @@ jobs:
             # keep the `wayle-deps` layer (591 crates, ~30 min) off the critical
             # path, because pushing the wayle output alone never carried it —
             # deps are a build-time input, absent from the binary's runtime
-            # closure. `#wayle-deps` (see flake.nix) now builds that layer as its
+            # closure. `#wayle-deps` (see nix/package.nix) now builds that layer as its
             # own output and the push step below sends it to xilo, so the
             # substituter covers it for every consumer, not just CI runners.
             #

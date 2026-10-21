@@ -15,10 +15,6 @@ result
 # Golden outputs named "result" (not the nix build link)
 !**/testdata/**/result
 
-# Devenv
-.devenv*
-devenv.local.nix
-devenv.local.yaml
 
 # direnv
 .direnv

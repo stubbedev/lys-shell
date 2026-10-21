@@ -33,7 +33,7 @@ func scanGoUsage(t *testing.T) goUsage {
 				return nil
 			}
 			// The go tool's own rule: dot and underscore directories
-			// (.git, the devenv module cache in .devenv, agent
+			// (.git, the direnv cache in .direnv, agent
 			// worktrees in .claude) and testdata hold no package code.
 			name := d.Name()
 			switch {

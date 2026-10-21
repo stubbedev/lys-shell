@@ -38,7 +38,7 @@ type Bus struct {
 }
 
 // Start launches a dbus-daemon for the test and stops it at cleanup.
-// A missing dbus-daemon fails the test: the .#go devShell provides one.
+// A missing dbus-daemon fails the test: the dev shell provides one.
 func Start(t *testing.T) *Bus {
 	t.Helper()
 	daemon, err := exec.LookPath("dbus-daemon")

@@ -11,7 +11,7 @@
 let
   # GStreamer plugins the recorder's pipelines load at runtime
   # (pipewiresrc, v4l2src, x264enc, opusenc, mp4/matroska/webm mux,
-  # compositor), as in package.nix.
+  # compositor), as in wayle-rust.nix.
   gstPlugins = (with gst_all_1; [
     gstreamer
     gst-plugins-base
@@ -87,7 +87,7 @@ buildGoModule {
     done
   '';
 
-  # What package.nix installs beside the binaries, which the NixOS and
+  # What wayle-rust.nix installs beside the binaries, which the NixOS and
   # home-manager modules read from the package.
   postInstall = ''
     # Handler for the globalprotectcallback: URI scheme (GlobalProtect

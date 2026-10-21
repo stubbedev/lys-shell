@@ -11,11 +11,11 @@ just lint          # fmt + clippy -D warnings
 just check         # lint + test, run before every release
 ```
 
-The Go rewrite (`go-rewrite` branch) has its own shell with the pinned
-toolchain:
+The Go rewrite (`go-rewrite` branch) runs in the same shell, which also
+carries the pinned Go toolchain:
 
 ```sh
-nix develop .#go -c just go-check   # gofmt/gofumpt + vet + golangci-lint + test + test -race
+nix develop -c just go-check   # gofmt/gofumpt + vet + golangci-lint + test + test -race
 ```
 
 ## Tests define behavior

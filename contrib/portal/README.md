@@ -98,7 +98,7 @@ The shell (`wayle shell`) must be running for the interfaces that delegate to it
 
 ## Installing (Nix)
 
-`nix/package.nix` installs `wayle.portal`, the D-Bus activation file (with the
+`nix/wayle.nix` installs `wayle.portal`, the D-Bus activation file (with the
 store path substituted in), and reference copies of the systemd unit and
 `wayle-portals.conf` under `$out/share/wayle`. Enable the backend through the
 NixOS / home-manager module alongside the shell.

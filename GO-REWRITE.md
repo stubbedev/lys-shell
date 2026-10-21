@@ -21,11 +21,11 @@ launcher → lock screen → settings.
 ## Running
 
 ```sh
-nix develop .#go -c just go-check   # fmt + vet + golangci-lint + test (pinned toolchain)
+nix develop -c just go-check   # fmt + vet + golangci-lint + test (pinned toolchain)
 go run ./cmd/wayle shell            # the bar, from ~/.config/wayle/config.toml
 ```
 
-The `.#go` devShell is the Go counterpart of the Rust devShell: `go_1_27`
+The dev shell (nix/shell.nix) serves both halves: for Go, `go_1_27`
 pinned to the go.mod version (no toolchain downloads), the gelm lint stack,
 fontconfig with the config's default fonts wired over the host fontconfig
 (FONTCONFIG_FILE), sway for a headless compositor session, and dbus for the
@@ -39,7 +39,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 State pins for picking the work back up (2026-10-09): wayle
 `go-rewrite` on gelm `main` @ `f14e5c6`, both gates green
-(`nix develop .#go -c just go-check` here; `just check` in
+(`nix develop -c just go-check` here; `just check` in
 ~/git/private/gelm). gelm's AT-SPI bridge ships in every build and
 Run serves it while the desktop asks for assistive technologies
 (`GELM_A11Y=atspi` forces it), so wayle carries no `atspi` tag. The
@@ -368,7 +368,7 @@ wired in); both gates green. What remains, in the order to work it:
 
    ```sh
    systemctl --user stop wayle.service
-   cd ~/git/private/wayle && nix develop .#go -c go run ./cmd/wayle shell
+   cd ~/git/private/wayle && nix develop -c go run ./cmd/wayle shell
    ```
 
    then per panel open each dropdown in both shells and compare.
@@ -594,7 +594,7 @@ reverted.
 
 - [x] a live compositor session smoke test (headless sway: start, three
       config reloads incl. a side bar and a bad value, no fatal exits)
-- [x] `nix build .#wayle-go`: the Go shell built with the pinned
+- [x] `nix build .#wayle`: the Go shell built with the pinned
       toolchain, wrapped for its dlopens (libgstreamer, libglib, libpam,
       libpipewire)
       and the GStreamer plugin path; the bundled icons and the unit ship

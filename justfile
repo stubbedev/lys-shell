@@ -1,8 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Run cargo directly — the devenv shell (devenv.nix) provides the GTK/clang
-# build env and the rust-toolchain.toml nightly on PATH, no `nix develop`
-# needed. The flake devShells stay for CI and one-off `nix develop .#go`.
+# Run cargo directly — the flake dev shell (nix/shell.nix, loaded by direnv
+# through .envrc) provides the GTK/clang build env and the rust-toolchain.toml
+# nightly on PATH.
 cargo := "cargo"
 
 # Default — list recipes.
@@ -11,9 +11,9 @@ default:
 
 # ─────────────────────────── Go rewrite ───────────────────────────
 
-# Go toolchain: the `.#go` flake devShell pins go_1_27 (`nix develop .#go -c
-# just go-check`); a plain PATH `go` at 1.27 works too, the flake only adds
-# the lint stack, fonts, and a headless sway.
+# Go toolchain: the dev shell pins go_1_27 (`nix develop -c just go-check`);
+# a plain PATH `go` at 1.27 works too, the shell only adds the lint stack,
+# fonts, and a headless sway.
 go := "go"
 
 # Go release gate: format, lint, test — the mirror of `just check`.
@@ -315,17 +315,17 @@ test-gateway:
     done
     {{cargo}} nextest run -p wayle-network --run-ignored all -E 'test(mock::)'
 
-# Recompute nix/package-go.nix's vendorHash after a go.mod change (a gelm
+# Recompute nix/wayle.nix's vendorHash after a go.mod change (a gelm
 # bump): the vendor derivation is fixed-output, so a stale hash reuses
 # the old module set instead of reporting the new one. Run outside the
 # Go shell; needs nix.
 go-vendor-hash:
     #!/usr/bin/env bash
     set -euo pipefail
-    file=nix/package-go.nix
+    file=nix/wayle.nix
     sed -i 's|vendorHash = "sha256-[^"]*";|vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";|' "$file"
     # The build fails by design (the fake hash); its report is the point.
-    got=$( (nix build .#wayle-go --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
+    got=$( (nix build .#wayle --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
     if [ -z "$got" ]; then echo "no hash reported" >&2; exit 1; fi
     sed -i "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$got\";|" "$file"
     echo "vendorHash = $got"

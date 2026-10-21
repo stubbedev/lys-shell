@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-// The binding runs real pipelines; the .#go shell provides libgstreamer
+// The binding runs real pipelines; the dev shell provides libgstreamer
 // and the base and good plugins.
 func testGst(t *testing.T) *libgst {
 	t.Helper()
 	g, err := loadGst()
 	if err != nil {
-		t.Fatalf("libgstreamer: %v (run inside nix develop .#go)", err)
+		t.Fatalf("libgstreamer: %v (run inside nix develop)", err)
 	}
 	return g
 }
