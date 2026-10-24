@@ -1,7 +1,7 @@
 // Package portaldialogs is the shell's dev.stubbe.lys.PortalDialogs1 host
 // (lys-shell services/portal_dialogs and shell/portal_dialogs): the
 // native dialogs behind the portal backend's Access, Account,
-// AppChooser, DynamicLauncher and Wallpaper preview, in place of
+// AppChooser, DynamicLauncher, Usb and Wallpaper preview, in place of
 // xdg-desktop-portal-gtk.
 package portaldialogs
 
@@ -62,6 +62,14 @@ type LauncherRequest struct {
 	EditableName bool
 }
 
+// Device is one USB device an app asks to open, (ssb).
+type Device struct {
+	// ID is the frontend's device id; Name is how the user knows it.
+	ID, Name string
+	// Writable is whether the app asks to write to it.
+	Writable bool
+}
+
 // Host shows the dialogs; each call blocks until the user answers or
 // the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
@@ -80,6 +88,9 @@ type Host interface {
 	// for the request at handle, showing or waiting; false when no
 	// chooser is open for it.
 	UpdateChoices(handle string, choices []string) bool
+	// ChooseDevices replies whether the user allowed the app USB
+	// devices and the ids of the ones they picked.
+	ChooseDevices(portalreq.Caller, []Device) (bool, []string)
 	// ConfirmInstall replies whether to install a dynamic launcher,
 	// and under what name.
 	ConfirmInstall(portalreq.Caller, LauncherRequest) (bool, string)
@@ -128,6 +139,15 @@ func (d *Daemon) ChooseApplication(c portalreq.Caller, r ChooserRequest) (string
 // UpdateChoices updates the app chooser open for handle.
 func (d *Daemon) UpdateChoices(handle string, choices []string) (bool, *dbus.Error) {
 	return d.host.UpdateChoices(handle, choices), nil
+}
+
+// ChooseDevices is the USB device consent.
+func (d *Daemon) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []string, *dbus.Error) {
+	allowed, picked := d.host.ChooseDevices(c, devices)
+	if picked == nil {
+		picked = []string{}
+	}
+	return allowed, picked, nil
 }
 
 // ConfirmInstall is the dynamic-launcher install confirmation.
@@ -192,6 +212,16 @@ func (c *Client) UpdateChoices(ctx context.Context, handle string, choices []str
 	}
 	err = c.call(ctx, "UpdateChoices", &found, handle, choices)
 	return found, err
+}
+
+// ChooseDevices asks which USB devices an app may open, replying the
+// ids picked.
+func (c *Client) ChooseDevices(ctx context.Context, caller portalreq.Caller, devices []Device) (allowed bool, picked []string, err error) {
+	if devices == nil {
+		devices = []Device{}
+	}
+	err = c.obj.CallWithContext(ctx, iface+".ChooseDevices", 0, caller, devices).Store(&allowed, &picked)
+	return allowed, picked, err
 }
 
 // ConfirmInstall asks to install a dynamic launcher, replying the name

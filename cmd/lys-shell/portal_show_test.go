@@ -62,6 +62,10 @@ func (f fakeDialogs) ChooseApplication(_ portalreq.Caller, r portaldialogs.Choos
 
 func (fakeDialogs) UpdateChoices(string, []string) bool { return false }
 
+func (fakeDialogs) ChooseDevices(portalreq.Caller, []portaldialogs.Device) (bool, []string) {
+	return false, nil
+}
+
 func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
 	f.got.Store([]any{r})
 	return f.yes.Load(), r.Name

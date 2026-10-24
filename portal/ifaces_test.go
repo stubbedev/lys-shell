@@ -3,10 +3,12 @@ package portal
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // interactive calls a (u, a{sv}) method.
@@ -104,20 +107,95 @@ func TestAutostartPath(t *testing.T) {
 	}
 }
 
-func TestUsbGrantsTheRequestedAccess(t *testing.T) {
-	r := newRig(t, nil)
-	devices := []requestedDevice{{
-		ID:     "dev0",
-		Info:   Vardict{"vendor": dbus.MakeVariant("acme")},
+const acquireDevices = "org.freedesktop.impl.portal.Usb.AcquireDevices"
+
+// usbRequest is a writable pad the database names and a read-only key
+// known only by its id.
+var usbRequest = []requestedDevice{
+	{
+		ID: "dev0",
+		Info: Vardict{"properties": dbus.MakeVariant(map[string]dbus.Variant{
+			"ID_VENDOR_FROM_DATABASE": dbus.MakeVariant("Acme"), "ID_MODEL_ENC": dbus.MakeVariant(`Game\x20Pad`),
+			"ID_VENDOR_ID": dbus.MakeVariant("1234"), "ID_MODEL_ID": dbus.MakeVariant("abcd"),
+		})},
 		Access: Vardict{"writable": dbus.MakeVariant(true)},
-	}}
-	code, res := r.interactive(t, "org.freedesktop.impl.portal.Usb.AcquireDevices", handle, "", "org.app", devices, Vardict{})
+	},
+	{ID: "dev1", Info: Vardict{}, Access: Vardict{}},
+}
+
+// grants reads AcquireDevices' devices result as id=writable.
+func grants(t *testing.T, res Vardict) []string {
+	t.Helper()
 	var granted []grantedDevice
 	if err := dbus.Store([]any{res["devices"].Value()}, &granted); err != nil {
-		t.Fatal(err)
+		t.Fatalf("devices result %v: %v", res, err)
 	}
-	if code != ResponseSuccess || len(granted) != 1 || granted[0].ID != "dev0" || granted[0].Access["writable"].Value() != true || len(granted[0].Access) != 1 {
-		t.Errorf("AcquireDevices = %d %v", code, granted)
+	out := []string{}
+	for _, g := range granted {
+		out = append(out, fmt.Sprintf("%s=%v", g.ID, g.Access["writable"].Value()))
+	}
+	return out
+}
+
+// Nothing is granted without the user's answer: no shell is other, a
+// denial is cancelled, and only the devices picked are granted, with
+// the access asked for. The dialog names the app (the third argument,
+// after the parent window) and each device.
+func TestUsbGrantsOnlyWhatTheUserPicks(t *testing.T) {
+	r := newRig(t, nil)
+	if code, res := r.interactive(t, acquireDevices, handle, "wayland:x", "org.app", usbRequest, Vardict{}); code != ResponseOther || len(res) != 0 {
+		t.Errorf("without a shell = %d %v, want other and no grant", code, res)
+	}
+	d := serveDialogs(t, r, true)
+	code, res := r.interactive(t, acquireDevices, handle, "wayland:x", "org.app", usbRequest, Vardict{})
+	if got := grants(t, res); code != ResponseSuccess || !slices.Equal(got, []string{"dev0=true", "dev1=false"}) {
+		t.Errorf("all picked = %d %v", code, got)
+	}
+	want := []portaldialogs.Device{{ID: "dev0", Name: "Acme Game Pad (1234:abcd)", Writable: true}, {ID: "dev1", Name: "dev1"}}
+	if asked := d.asked.Load()[0]; !reflect.DeepEqual(asked, want) {
+		t.Errorf("asked %+v, want %+v", asked, want)
+	}
+	if callers := d.callers.Load(); callers[len(callers)-1].AppID != "org.app" || callers[len(callers)-1].ParentWindow != "wayland:x" {
+		t.Errorf("caller %+v", callers[len(callers)-1])
+	}
+	d.picks.Store(&[]string{"dev1"})
+	if _, res := r.interactive(t, acquireDevices, handle, "", "org.app", usbRequest, Vardict{}); !slices.Equal(grants(t, res), []string{"dev1=false"}) {
+		t.Errorf("one picked = %v", grants(t, res))
+	}
+	d.picks.Store(&[]string{})
+	if code, res := r.interactive(t, acquireDevices, handle, "", "org.app", usbRequest, Vardict{}); code != ResponseSuccess || len(grants(t, res)) != 0 {
+		t.Errorf("none picked = %d %v, want success with no devices", code, grants(t, res))
+	}
+	d.picks.Store(&[]string{"dev9"})
+	if code, res := r.interactive(t, acquireDevices, handle, "", "org.app", usbRequest, Vardict{}); code != ResponseOther || len(res) != 0 {
+		t.Errorf("a device never requested = %d %v, want other", code, res)
+	}
+	d.yes.Store(false)
+	if code, res := r.interactive(t, acquireDevices, handle, "", "org.app", usbRequest, Vardict{}); code != ResponseCancelled || len(res) != 0 {
+		t.Errorf("denied = %d %v, want cancelled", code, res)
+	}
+}
+
+func TestUsbDeviceName(t *testing.T) {
+	props := func(kv ...string) Vardict {
+		m := map[string]dbus.Variant{}
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i]] = dbus.MakeVariant(kv[i+1])
+		}
+		return Vardict{"properties": dbus.MakeVariant(m)}
+	}
+	for _, tc := range []struct {
+		info Vardict
+		want string
+	}{
+		{props("ID_VENDOR_ENC", `Acme\x20Inc\x20\x20`, "ID_MODEL_FROM_DATABASE", "Pad", "ID_VENDOR_ID", "1234", "ID_MODEL_ID", "abcd"), "Acme Inc Pad (1234:abcd)"},
+		{props("ID_VENDOR_ID", "1234", "ID_MODEL_ID", "abcd"), "USB device 1234:abcd"},
+		{props("ID_MODEL_ENC", `a\xZZb\`), `a\xZZb\`},
+		{Vardict{}, "dev7"},
+	} {
+		if got := usbDeviceName("dev7", tc.info); got != tc.want {
+			t.Errorf("usbDeviceName(%v) = %q, want %q", tc.info, got, tc.want)
+		}
 	}
 }
 

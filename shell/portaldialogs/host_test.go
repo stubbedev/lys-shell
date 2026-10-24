@@ -775,3 +775,46 @@ func TestConfirmInstallDrawsTheIcon(t *testing.T) {
 		}, "Cancel")
 	}
 }
+
+// Each device is a checked box naming it and the access asked; Allow
+// answers the ones left checked, Deny answers none.
+func TestChooseDevicesAnswersTheChecked(t *testing.T) {
+	hs := newHarness(t, nil)
+	devices := []Device{{ID: "d0", Name: "Pad", Writable: true}, {ID: "d1", Name: "Key"}}
+	type answer struct {
+		ok  bool
+		ids []string
+	}
+	for _, tc := range []struct {
+		click   string
+		uncheck int
+		want    answer
+	}{
+		{"Allow", -1, answer{true, []string{"d0", "d1"}}},
+		{"Allow", 0, answer{true, []string{"d1"}}},
+		{"Deny", -1, answer{false, nil}},
+	} {
+		got := make(chan answer, 1)
+		go func() {
+			ok, ids := hs.h.ChooseDevices(portalreq.Caller{Handle: "/r/test"}, devices)
+			got <- answer{ok, ids}
+		}()
+		c := hs.open(t)
+		checks := treetest.All[*widget.CheckButton](c.Root)
+		if len(checks) != 2 || !checks[0].Checked() || !checks[1].Checked() {
+			t.Fatalf("%d boxes, want two checked", len(checks))
+		}
+		for i, want := range []string{"Pad — read and write", "Key — read only"} {
+			if l, ok := checks[i].Child().(*widget.Label); !ok || l.Text() != want {
+				t.Errorf("box %d labelled %v, want %q", i, checks[i].Child(), want)
+			}
+		}
+		if tc.uncheck >= 0 {
+			hs.do(func() { checks[tc.uncheck].SetChecked(false) })
+		}
+		hs.do(func() { treetest.Button(t, c.Root, tc.click).OnClick() })
+		if a := <-got; a.ok != tc.want.ok || !slices.Equal(a.ids, tc.want.ids) {
+			t.Errorf("%s unchecking %d = %+v, want %+v", tc.click, tc.uncheck, a, tc.want)
+		}
+	}
+}

@@ -112,6 +112,9 @@ func interactiveCases() []interactiveCase {
 		{"DynamicLauncher", dialogs, func(r *rig) (uint32, error) {
 			return code(r, "org.freedesktop.impl.portal.DynamicLauncher.PrepareInstall", handle, "org.app", "", "App", dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1})}), Vardict{})
 		}},
+		{"Usb", dialogs, func(r *rig) (uint32, error) {
+			return code(r, acquireDevices, handle, "", "org.app", usbRequest, Vardict{})
+		}},
 		{"Wallpaper", dialogs, func(r *rig) (uint32, error) {
 			var c uint32
 			err := r.obj.Call("org.freedesktop.impl.portal.Wallpaper.SetWallpaperURI", 0, handle, "org.app", "", "file:///w.png",

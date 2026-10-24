@@ -338,6 +338,9 @@ type fakeDialogs struct {
 	gate
 	yes   dbustest.Var[bool]
 	asked dbustest.Var[[]any]
+	// picks are the device ids ChooseDevices answers, every one asked
+	// when unset.
+	picks dbustest.Var[*[]string]
 	// updated is the last UpdateChoices; it finds only handle open.
 	updated dbustest.Var[[]any]
 	edit    dbustest.Var[*portaldialogs.AccountInfo]
@@ -385,6 +388,20 @@ func (f *fakeDialogs) ChooseApplication(c portalreq.Caller, r portaldialogs.Choo
 func (f *fakeDialogs) UpdateChoices(h string, choices []string) bool {
 	f.updated.Store([]any{h, choices})
 	return h == string(handle)
+}
+
+func (f *fakeDialogs) ChooseDevices(c portalreq.Caller, devices []portaldialogs.Device) (bool, []string) {
+	if !f.answer(c, devices) {
+		return false, nil
+	}
+	if picks := f.picks.Load(); picks != nil {
+		return true, *picks
+	}
+	ids := make([]string, len(devices))
+	for i, d := range devices {
+		ids[i] = d.ID
+	}
+	return true, ids
 }
 
 func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {

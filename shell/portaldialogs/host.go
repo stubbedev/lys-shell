@@ -258,6 +258,42 @@ func (h *Dialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	return ok
 }
 
+// ChooseDevices asks which USB devices the app may open: a check
+// button per device, all checked, naming it and the access asked for.
+func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []string) {
+	picked := []string{}
+	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+		checks := make([]*widget.CheckButton, len(devices))
+		rows := make([]widget.Widget, len(devices))
+		for i, d := range devices {
+			access := "read only"
+			if d.Writable {
+				access = "read and write"
+			}
+			check := widget.NewCheckButton(true)
+			check.AddClass("portal-dialog-choice")
+			check.SetChild(h.label(d.Name+" — "+access, "portal-dialog-choice-label"))
+			checks[i], rows[i] = check, check
+		}
+		allow := func(ok bool, s string) {
+			if ok {
+				for i, check := range checks {
+					if check.Checked() {
+						picked = append(picked, devices[i].ID)
+					}
+				}
+			}
+			answer(ok, s)
+		}
+		return h.confirm(allow, h.headerIcon("drive-removable-media-symbolic"), "Allow access to USB devices?",
+			"The app can use the devices you leave checked until you revoke it.", "Deny", "Allow", rows...)
+	})
+	if !ok {
+		return false, nil
+	}
+	return true, picked
+}
+
 // ConfirmInstall confirms a dynamic launcher: its icon, the URL a web
 // app opens, and its name, in an entry when it is editable. An emptied
 // name installs under the default one.

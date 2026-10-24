@@ -58,6 +58,14 @@ func (f *fakeHost) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, 
 	return f.yes, r.Name + " (edited)"
 }
 
+func (f *fakeHost) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []string) {
+	f.record(c, devices)
+	if !f.yes {
+		return false, nil
+	}
+	return true, []string{devices[0].ID}
+}
+
 func (f *fakeHost) Dismiss(handle string) {
 	f.dismissed.Update(func(d []string) []string { return append(d, handle) })
 }
@@ -90,6 +98,14 @@ func TestDialogsRoundTrip(t *testing.T) {
 		launcher := LauncherRequest{Name: "App", Icon: []byte{0x89, 'P'}, Target: "https://example.org", EditableName: true}
 		if got, name, err := c.ConfirmInstall(ctx, caller, launcher); err != nil || got != yes || name != "App (edited)" || !reflect.DeepEqual(host.asked.Load()[0], launcher) {
 			t.Errorf("ConfirmInstall = %v, %q, %v (asked %v)", got, name, err, host.asked.Load())
+		}
+		devices := []Device{{ID: "d0", Name: "Pad", Writable: true}, {ID: "d1", Name: "Key"}}
+		allowed, ids, err := c.ChooseDevices(ctx, caller, devices)
+		if err != nil || allowed != yes || !reflect.DeepEqual(host.asked.Load()[0], devices) {
+			t.Errorf("ChooseDevices = %v, %v (asked %v)", allowed, err, host.asked.Load())
+		}
+		if yes && !slices.Equal(ids, []string{"d0"}) || !yes && len(ids) != 0 {
+			t.Errorf("ChooseDevices picked %v", ids)
 		}
 		chosen, err := c.ChooseApplication(ctx, caller, ChooserRequest{ContentType: "text/plain", Target: "x.txt"})
 		if asked := host.asked.Load(); err != nil || chosen != host.choice || !reflect.DeepEqual(asked[0], ChooserRequest{Choices: []string{}, ContentType: "text/plain", Target: "x.txt"}) {
