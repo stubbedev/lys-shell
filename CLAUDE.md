@@ -11,6 +11,7 @@ nix develop -c just build   # static binaries into dist/
 nix develop -c just test    # go test ./...
 nix develop -c just lint    # golangci-lint fmt --diff + go vet + golangci-lint run
 nix develop -c just check   # lint + test + race + schema-check, run before every release
+just hyprland-vm            # the shell on a live Hyprland in a NixOS VM (KVM), screenshots in ./result
 ```
 
 After a `go.mod` change (a lys-ui bump), refresh `nix/lys-shell.nix`'s

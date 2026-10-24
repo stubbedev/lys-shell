@@ -87,6 +87,13 @@ schema-check:
         exit 1
     fi
 
+# The shell on a live Hyprland in a NixOS VM (needs KVM): bars on every
+# output and hotplug, the Hyprland modules, launcher, popups, and the
+# session lock across a shell restart. Screenshots of every state land
+# in ./result.
+hyprland-vm:
+    nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-hyprland-vm
+
 # Lint, test, race, and the schema check. Run before every release.
 check: lint test race schema-check
 
