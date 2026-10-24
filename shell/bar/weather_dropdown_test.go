@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -397,7 +398,7 @@ func TestWeatherHeaderAndDailyWrappers(t *testing.T) {
 
 	var refresh *widget.Button
 	walkTree(v, func(w widget.Widget) bool {
-		if b, isBtn := w.(*widget.Button); isBtn && b.HasClass("ghost-icon") {
+		if b, isBtn := w.(*widget.Button); isBtn && b.HasClass(css.Icon) {
 			refresh = b
 		}
 		return true

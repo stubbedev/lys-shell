@@ -10,6 +10,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
@@ -148,9 +149,8 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	// template's `.dropdown-title` box lets the stylesheet ink the icon
 	// and title.
 	d.scanIcon = widget.NewThemeIcon("tb-refresh-symbolic", int(px))
-	// GhostIconButton: class ghost-icon only, the extra `ghost` the
-	// GhostButton template carries is not on it (mod.rs:95-121).
-	d.scanBtn = dropdownButton(d.scanIcon, "ghost-icon", nil)
+	// GhostIconButton: lys-ui's ghost icon square (mod.rs:95-121).
+	d.scanBtn = dropdownButton(d.scanIcon, nil, css.Ghost, css.Icon)
 	d.scanBtn.AddClass("bluetooth-scan-btn")
 	d.scanBtn.OnClick = d.onScan
 	d.toggle = widget.NewSwitch(false)

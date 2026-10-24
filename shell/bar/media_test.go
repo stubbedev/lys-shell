@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -463,8 +464,8 @@ func TestMediaPickerChrome(t *testing.T) {
 	if back == nil {
 		t.Fatal("the picker has no back button")
 	}
-	if !back.HasClass("ghost-icon") || !back.HasClass("picker-back") {
-		t.Errorf("back button classes = %v, want ghost-icon + picker-back", back.Classes())
+	if !back.HasClass(css.Icon) || !back.HasClass("picker-back") {
+		t.Errorf("back button classes = %v, want icon + picker-back", back.Classes())
 	}
 	if body == nil {
 		t.Error("the rows do not scroll in a .picker-body")
@@ -480,13 +481,13 @@ func TestMediaPickerChrome(t *testing.T) {
 	// option rows are plain classed buttons.
 	var ghost *widget.Button
 	walkTree(v.sources, func(w widget.Widget) bool {
-		if b, ok := w.(*widget.Button); ok && b != back && b.HasClass("ghost-icon") {
+		if b, ok := w.(*widget.Button); ok && b != back && b.HasClass(css.Icon) {
 			ghost = b
 		}
 		return true
 	})
 	if ghost != nil {
-		t.Error("another picker button wears the ghost-icon chrome")
+		t.Error("another picker button wears the ghost icon chrome")
 	}
 
 	// Back is NavigateBack: the player (or empty) page returns.

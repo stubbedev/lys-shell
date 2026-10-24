@@ -103,7 +103,7 @@
   transform: translateX(var(--space-xl));
   transition: opacity var(--duration-fast), transform var(--duration-fast);
 }
-.treeman-dropdown .treeman-wt-overlay .treeman-actions .ghost-icon {
+.treeman-dropdown .treeman-wt-overlay .treeman-actions .ghost.icon {
   margin-left: 2px;
 }
 .treeman-dropdown .treeman-wt-overlay:hover .treeman-actions {

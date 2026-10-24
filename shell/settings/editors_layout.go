@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -175,7 +176,7 @@ func (c *layoutEditor) card(i int) widget.Widget {
 		c.layouts = slices.Delete(c.layouts, i, i+1)
 		c.commit()
 		c.rebuild()
-	}, "ghost-icon")
+	}, css.Ghost, css.Icon)
 	header.AppendAligned(c.k.label(t.Get("settings-layout-monitor-label"), "layout-extends-label"), false, widget.AlignCenter)
 	header.AppendAligned(monitor, false, widget.AlignCenter)
 	header.AppendAligned(c.k.label(t.Get("settings-layout-extends-label"), "layout-extends-label"), false, widget.AlignCenter)

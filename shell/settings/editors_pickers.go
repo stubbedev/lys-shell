@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -278,7 +279,7 @@ type fileEditor struct {
 func newFileEditor(k *kit, s slot) *fileEditor {
 	c := &fileEditor{Box: widget.NewBox(widget.Row, 0, 0), entry: newText(k, s, false), k: k, slot: s}
 	c.AddClass("file-picker")
-	browse := k.button(k.icon("ld-folder-open-symbolic"), c.browse, "icon")
+	browse := k.button(k.icon("ld-folder-open-symbolic"), c.browse, css.Secondary, css.Icon)
 	c.AppendAligned(c.entry, true, widget.AlignCenter)
 	c.AppendAligned(browse, false, widget.AlignCenter)
 	return c

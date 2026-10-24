@@ -776,33 +776,30 @@ func TestBtPairingCardProgressDots(t *testing.T) {
 	}
 }
 
-// Ghost-icon buttons carry ghost-icon only; ghost buttons carry ghost
-// only — the two templates do not mix (mod.rs:95-121,
-// pairing_card/mod.rs:94-100).
+// Icon buttons are lys-ui's ghost icon square; text buttons are ghost
+// without the icon size (mod.rs:95-121, pairing_card/mod.rs:94-100).
 func TestBtGhostClassesAreExact(t *testing.T) {
 	d, _ := newTestBtDropdown(t, btWorld())
-	if !widget.HasClass(d.scanBtn, "ghost-icon") || !widget.HasClass(d.scanBtn, "bluetooth-scan-btn") {
-		t.Errorf("scan button classes wrong: ghost-icon %v scan-btn %v",
-			widget.HasClass(d.scanBtn, "ghost-icon"), widget.HasClass(d.scanBtn, "bluetooth-scan-btn"))
-	}
-	if widget.HasClass(d.scanBtn, css.Ghost) {
-		t.Error("the scan button carries the ghost class")
+	for _, class := range []string{css.Ghost, css.Icon, "bluetooth-scan-btn"} {
+		if !widget.HasClass(d.scanBtn, class) {
+			t.Errorf("the scan button lacks %s", class)
+		}
 	}
 	closeBtn := findButton(d.card.root, "bluetooth-pairing-close")
 	if closeBtn == nil {
 		t.Fatal("no pairing close button")
 	}
-	if widget.HasClass(closeBtn, css.Ghost) || !widget.HasClass(closeBtn, "ghost-icon") {
-		t.Error("the close button is not ghost-icon only")
+	if !widget.HasClass(closeBtn, css.Ghost) || !widget.HasClass(closeBtn, css.Icon) {
+		t.Error("the close button is not a ghost icon button")
 	}
-	// The row actions are GhostButtons: ghost, not ghost-icon.
+	// The row actions are text GhostButtons: ghost, not icon-sized.
 	mouse := rowNamed(t, d, "Mouse")
 	forget := mouse.actions.Children()[1].(*widget.Button)
 	if !widget.HasClass(forget, css.Ghost) || !widget.HasClass(forget, "bluetooth-forget") {
 		t.Error("the forget button is not the ghost template")
 	}
-	if widget.HasClass(forget, "ghost-icon") {
-		t.Error("the forget button carries the ghost-icon class")
+	if widget.HasClass(forget, css.Icon) {
+		t.Error("the forget button is icon-sized")
 	}
 }
 

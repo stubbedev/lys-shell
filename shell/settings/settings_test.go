@@ -432,7 +432,7 @@ func TestResetAllConfirmation(t *testing.T) {
 		}
 	}
 	walk(content)
-	if len(buttons) != 2 || !buttons[0].HasClass(css.Outline) || !buttons[1].HasClass(css.DestructiveAction) {
+	if len(buttons) != 2 || !buttons[0].HasClass(css.Secondary) || !buttons[1].HasClass(css.DestructiveAction) {
 		t.Fatalf("buttons %v, want cancel then the danger confirm", buttons)
 	}
 	buttons[0].ClickAt(widget.Point{})
@@ -1230,7 +1230,7 @@ func TestMonitorWallpaperCards(t *testing.T) {
 		t.Error("the identity label lacks the list's label class")
 	}
 	remove := header.Children()[len(header.Children())-1].(*widget.Button)
-	if !remove.HasClass("ghost-icon") || remove.HasClass("list-control-remove") || remove.TooltipText() != "" {
+	if !remove.HasClass(css.Ghost) || !remove.HasClass(css.Icon) || remove.HasClass("list-control-remove") || remove.TooltipText() != "" {
 		t.Errorf("remove button classes/tooltip %q are card_form's", remove.TooltipText())
 	}
 

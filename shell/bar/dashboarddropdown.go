@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/spawn"
@@ -90,10 +91,6 @@ func (v *dashboardView) label(text string, scale float64) *widget.Label {
 	return widget.NewLabel(v.font, v.px*scale, text, 0)
 }
 
-func (v *dashboardView) button(child widget.Widget, class string, onClick func()) *widget.Button {
-	return dropdownButton(child, class, onClick)
-}
-
 // quickActionTile is a quick action's column: the icon tile over the
 // label, spacing-0 — .quick-action-label's CSS margin-top carries the
 // gap (quick_actions/mod.rs:138-142). The column centers in the
@@ -131,10 +128,10 @@ func (v *dashboardView) card(iconName, heading string, extra ...widget.Widget) *
 
 // header is the DropdownHeader with the open-settings action.
 func (v *dashboardView) header() widget.Widget {
-	settings := v.button(v.icon("ld-settings-symbolic", 1), "ghost-icon", func() {
+	settings := dropdownButton(v.icon("ld-settings-symbolic", 1), func() {
 		// spawn_settings_app; the popover closes on the click.
 		_ = spawn.Quiet("lys-settings")
-	})
+	}, css.Ghost, css.Icon)
 	settings.AddClass("dashboard-settings-btn")
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))
 	return dropdownHeader(v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
@@ -164,7 +161,7 @@ func (v *dashboardView) quickActions() widget.Widget {
 		icon := v.icon(iconName, 1.3)
 		lbl := v.label(i18n.T(labelID), 0.8)
 		lbl.AddClass("quick-action-label")
-		b := v.button(quickActionTile(icon, lbl), "quick-action", onClick)
+		b := dropdownButton(quickActionTile(icon, lbl), onClick, "quick-action")
 		grid.Attach(b, col, row, 1, 1)
 		return toggle{b, icon}
 	}
@@ -309,14 +306,14 @@ func (v *dashboardView) controls() widget.Widget {
 	muteIcon := v.icon("ld-volume-2-symbolic", 1.1)
 	var muted bool
 	bctx := context.Background()
-	mute := v.button(muteIcon, "ghost-icon", func() {
+	mute := dropdownButton(muteIcon, func() {
 		target := !muted
 		go func() {
 			if err := v.ctx.Pulse.SetMuted(bctx, target); err != nil {
 				log.Printf("dashboard: mute toggle failed: %v", err)
 			}
 		}()
-	})
+	}, css.Ghost, css.Icon)
 	mute.AddClass("dashboard-volume-icon")
 	row.Append(mute, false)
 	slider := widgets.NewDebouncedSlider(0, v.font, v.px*0.9, 0, v.ctx.Invoke)
@@ -368,7 +365,7 @@ func (v *dashboardView) media() widget.Widget {
 	var current mpris.Player
 	var has bool
 	bctx := context.Background()
-	switchBtn := v.button(v.icon("ld-arrow-left-right-symbolic", 1), "ghost-icon", func() {
+	switchBtn := dropdownButton(v.icon("ld-arrow-left-right-symbolic", 1), func() {
 		// cycle_player: the next player after the active one.
 		src := v.ctx.Media
 		if src == nil {
@@ -387,7 +384,7 @@ func (v *dashboardView) media() widget.Widget {
 		if err := src.SetActive(players[(i+1)%len(players)].BusName); err != nil {
 			log.Printf("dashboard: switch player failed: %v", err)
 		}
-	})
+	}, css.Ghost, css.Icon)
 	switchBtn.AddClass("media-switch-btn")
 	card := v.card("ld-disc-3-symbolic", i18n.T("dropdown-dashboard-now-playing"), switchBtn)
 	artPx := int(math.Round(v.px * 3.5))
@@ -426,13 +423,13 @@ func (v *dashboardView) media() widget.Widget {
 			}
 		}()
 	}
-	prev := v.button(v.icon("ld-skip-back-symbolic", 1), "ghost-icon", func() { fire("previous", mpris.Source.Previous) })
+	prev := dropdownButton(v.icon("ld-skip-back-symbolic", 1), func() { fire("previous", mpris.Source.Previous) }, css.Ghost, css.Icon)
 	prev.AddClass("media-btn")
 	playIcon := v.icon("ld-play-symbolic", 1)
-	play := v.button(playIcon, "ghost-icon", func() { fire("play-pause", mpris.Source.PlayPause) })
+	play := dropdownButton(playIcon, func() { fire("play-pause", mpris.Source.PlayPause) }, css.Ghost, css.Icon)
 	play.AddClass("media-btn")
 	play.AddClass("play")
-	next := v.button(v.icon("ld-skip-forward-symbolic", 1), "ghost-icon", func() { fire("next", mpris.Source.Next) })
+	next := dropdownButton(v.icon("ld-skip-forward-symbolic", 1), func() { fire("next", mpris.Source.Next) }, css.Ghost, css.Icon)
 	next.AddClass("media-btn")
 	controls := widget.NewBox(widget.Row, 0, 0)
 	controls.AddClass("media-controls")

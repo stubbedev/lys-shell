@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -489,8 +490,8 @@ func TestAudioPickerBackAndOptionIconClasses(t *testing.T) {
 	if !ok {
 		t.Fatalf("picker-back = %T, want a button", found)
 	}
-	if !back.HasClass("ghost-icon") {
-		t.Error("the back button misses the ghost-icon class")
+	if !back.HasClass(css.Icon) {
+		t.Error("the back button is not icon-sized")
 	}
 	if findByClass(v.pickers[audioOutput], "audio-device-option-icon-img") != nil {
 		t.Error("the option image carries the invented icon-img class")

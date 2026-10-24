@@ -166,8 +166,8 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.AddClass("dropdown", "network-dropdown")
 
 	scanIcon := widget.NewThemeIcon("tb-refresh-symbolic", int(px))
-	v.scanBtn = dropdownButton(scanIcon, "network-scan-btn", v.startScan)
-	v.scanBtn.AddClass("ghost-icon")
+	v.scanBtn = dropdownButton(scanIcon, v.startScan, "network-scan-btn")
+	v.scanBtn.AddClass(css.Ghost, css.Icon)
 	v.wifiSwitch = widget.NewSwitch(false)
 	v.wifiSwitch.OnChanged = v.wifiToggled
 	header, icon, _ := dropdownHeaderParts(font, px, "tb-wifi-symbolic", i18n.T("dropdown-network-title"), v.scanBtn, v.wifiSwitch)
@@ -356,7 +356,7 @@ func (v *networkView) row(ap apSnapshot) widget.Widget {
 			actions.AddClass("network-item-actions")
 			forget := widget.NewLabel(v.font, v.px*0.85, i18n.T("dropdown-network-forget"), 0)
 			// GhostButton + network-item-forget (network_item.rs:115-123).
-			forgetBtn := dropdownButton(forget, css.Ghost, func() { v.forget(ssid) })
+			forgetBtn := dropdownButton(forget, func() { v.forget(ssid) }, css.Ghost)
 			forgetBtn.AddClass("network-item-forget")
 			actions.Append(forgetBtn, false)
 			trailing.Add("actions", actions)
@@ -672,17 +672,16 @@ func (v *networkView) statusLabel() *widget.Label {
 }
 
 func (v *networkView) ghostText(text, class string, onClick func()) *widget.Button {
-	b := dropdownButton(widget.NewLabel(v.font, v.px*0.85, text, 0), class, onClick)
-	b.AddClass(css.Ghost)
-	return b
+	return dropdownButton(v.buttonLabel(text), onClick, class, css.Ghost)
 }
 
 // primaryText is a PrimaryButton: the accent-filled action of a form.
 func (v *networkView) primaryText(text, class string, onClick func()) *widget.Button {
-	b := v.ghostText(text, class, onClick)
-	b.RemoveClass(css.Ghost)
-	b.AddClass(css.SuggestedAction)
-	return b
+	return dropdownButton(v.buttonLabel(text), onClick, class, css.SuggestedAction)
+}
+
+func (v *networkView) buttonLabel(text string) *widget.Label {
+	return widget.NewLabel(v.font, v.px*0.85, text, 0)
 }
 
 // errorLabel is a form's error line: wrapped, in the error color,
@@ -850,7 +849,7 @@ func newNetPasswordForm(v *networkView) *netPasswordForm {
 	info.Append(f.security, false)
 	header.Append(info, true)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(v.px))
-	pwClose := dropdownButton(closeIcon, "ghost-icon", f.cancel)
+	pwClose := dropdownButton(closeIcon, f.cancel, css.Ghost, css.Icon)
 	pwClose.AddClass("network-password-close")
 	header.Append(pwClose, false)
 	f.Append(header, false)
@@ -930,7 +929,7 @@ func newNetSecretForm(v *networkView) *netSecretForm {
 	info.Append(secTitle, false)
 	header.Append(info, true)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(v.px))
-	secretClose := dropdownButton(closeIcon, "ghost-icon", f.cancel)
+	secretClose := dropdownButton(closeIcon, f.cancel, css.Ghost, css.Icon)
 	secretClose.AddClass("network-password-close")
 	header.Append(secretClose, false)
 	f.Append(header, false)

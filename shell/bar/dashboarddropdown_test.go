@@ -536,7 +536,7 @@ func TestDashboardQuickActionTileCenters(t *testing.T) {
 	icon := widget.NewThemeIcon("ld-wifi-symbolic", 16)
 	label := widget.NewLabel(ctx.Font, 12, "WiFi", 0)
 	col := quickActionTile(icon, label)
-	b := dropdownButton(col, "quick-action", func() {})
+	b := dropdownButton(col, func() {}, "quick-action")
 	ctx.Theme.Attach(b)
 	b.Measure(widgetConstraintsMax(200, 120))
 	b.Arrange(render.Rect{W: 200, H: 120})

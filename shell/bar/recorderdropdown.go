@@ -275,18 +275,18 @@ func (v *recorderView) controls() widget.Widget {
 	content.Append(v.recordIcon, false)
 	content.Append(v.recordLabel, false)
 	content.Append(widget.NewSpacer(0, 0), true)
-	v.record = dropdownButton(content, "recorder-record-button", func() {
+	v.record = dropdownButton(content, func() {
 		if v.ctx.Recorder != nil {
 			v.ctx.Recorder.Toggle()
 		}
-	})
+	}, "recorder-record-button")
 	row.Append(v.record, true)
 	v.pauseIcon = widget.NewThemeIcon("ld-pause-symbolic", int(v.px))
-	v.pause = dropdownButton(v.pauseIcon, "recorder-pause-button", func() {
+	v.pause = dropdownButton(v.pauseIcon, func() {
 		if r := v.ctx.Recorder; r != nil {
 			r.SetPaused(!r.Snapshot().Paused)
 		}
-	})
+	}, "recorder-pause-button")
 	v.pause.AddClass(css.Secondary)
 	row.Append(v.pause, false)
 	return row

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/appicons"
@@ -419,15 +420,15 @@ func (v *mediaView) showPicker() {
 
 // buildPicker lists every player; picking one makes it active and
 // returns to the player view (source_picker/mod.rs: the .picker-header
-// row with the ghost-icon back button over the .picker-body scroll).
+// row with the ghost icon back button over the .picker-body scroll).
 func (v *mediaView) buildPicker() {
 	font, px := dropdownFont(v.ctx)
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("media-source-picker")
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("picker-header")
-	back := dropdownButton(widget.NewThemeIcon("ld-arrow-left-symbolic", int(px)), "picker-back", func() { v.mode = ""; v.refresh() })
-	back.AddClass("ghost-icon")
+	back := dropdownButton(widget.NewThemeIcon("ld-arrow-left-symbolic", int(px)), func() { v.mode = ""; v.refresh() }, "picker-back")
+	back.AddClass(css.Ghost, css.Icon)
 	header.Append(back, false)
 	headerLabel := widget.NewLabel(font, px, i18n.T("dropdown-media-sources"), 0)
 	headerLabel.AddClass("picker-title")

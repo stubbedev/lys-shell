@@ -257,9 +257,9 @@ func followInto[T any](life context.Context, what string, subscribe func(context
 // dropdownButton is a flat dropdown button: the class's stylesheet
 // rules paint it (the hover and active shades, the ink), so nothing is
 // set here.
-func dropdownButton(child widget.Widget, class string, onClick func()) *widget.Button {
+func dropdownButton(child widget.Widget, onClick func(), classes ...string) *widget.Button {
 	b := widget.NewButton(child, 0, 0)
-	b.AddClass(class)
+	b.AddClass(classes...)
 	b.OnClick = onClick
 	return b
 }

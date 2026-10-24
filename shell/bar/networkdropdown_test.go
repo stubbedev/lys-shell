@@ -430,7 +430,7 @@ func TestNetworkRowIsAClickableBoxNotAButton(t *testing.T) {
 	if forget == nil {
 		t.Fatal("no forget button in the row")
 	}
-	if !widget.HasClass(forget, css.Ghost) || widget.HasClass(forget, "ghost-icon") {
+	if !widget.HasClass(forget, css.Ghost) || widget.HasClass(forget, css.Icon) {
 		t.Error("the forget button is not GhostButton + network-item-forget")
 	}
 	clickAt(t, saved, forget)
@@ -496,20 +496,22 @@ func TestNetworkDropdownContentOnTheRootWrapper(t *testing.T) {
 	}
 }
 
-// The scan button is GhostIconButton: ghost-icon, never ghost
-// (network/mod.rs:97-109).
-func TestNetworkScanButtonGhostIconOnly(t *testing.T) {
+// The scan button is GhostIconButton: lys-ui's ghost icon square, not
+// a filled variant (network/mod.rs:97-109).
+func TestNetworkScanButtonGhostIcon(t *testing.T) {
 	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: &fakeWifiCtl{}})
 	// The empty list scans on open; its completion restyles the button
 	// off the test goroutine, so read on the loop.
-	ghostIcon, ghost := onHeadlessLoop(func() bool {
-		return widget.HasClass(v.scanBtn, "ghost-icon") && widget.HasClass(v.scanBtn, "network-scan-btn")
-	}), onHeadlessLoop(func() bool { return widget.HasClass(v.scanBtn, css.Ghost) })
+	ghostIcon, filled := onHeadlessLoop(func() bool {
+		return widget.HasClass(v.scanBtn, css.Ghost) && widget.HasClass(v.scanBtn, css.Icon) && widget.HasClass(v.scanBtn, "network-scan-btn")
+	}), onHeadlessLoop(func() bool {
+		return widget.HasClass(v.scanBtn, css.Secondary) || widget.HasClass(v.scanBtn, css.SuggestedAction)
+	})
 	if !ghostIcon {
-		t.Error("the scan button is not ghost-icon + network-scan-btn")
+		t.Error("the scan button is not ghost + icon + network-scan-btn")
 	}
-	if ghost {
-		t.Error("the scan button carries the ghost class")
+	if filled {
+		t.Error("the scan button carries a filled variant")
 	}
 }
 

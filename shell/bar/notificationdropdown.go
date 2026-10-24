@@ -105,7 +105,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	clearBox := widget.NewBox(widget.Row, 0, 0)
 	clearBox.Append(clearLabel, false)
 	v.clearBox = clearBox
-	v.clearAll = dropdownButton(clearBox, "notification-dropdown-clear-all", v.dismissAll)
+	v.clearAll = dropdownButton(clearBox, v.dismissAll, "notification-dropdown-clear-all")
 	v.clearAll.AddClass(css.Ghost)
 	header, headerIcon := dropdownHeaderIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
 	v.headerIcon = headerIcon
@@ -306,7 +306,7 @@ func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
 	actions := widget.NewBox(widget.Row, 0, 0)
 	actions.AddClass("notification-dropdown-group-actions")
 	clearLabel := widget.NewLabel(v.font, v.px*0.85, i18n.T("notification-dropdown-group-clear"), 0)
-	actions.AppendAligned(dropdownButton(clearLabel, "notification-dropdown-group-clear", g.clear), false, widget.AlignCenter)
+	actions.AppendAligned(dropdownButton(clearLabel, g.clear, "notification-dropdown-group-clear"), false, widget.AlignCenter)
 	chevron := widget.NewBox(widget.Row, 0, 0)
 	chevron.AddClass("notification-dropdown-group-chevron")
 	g.chevron = widget.NewThemeIcon("ld-chevron-up-symbolic", int(v.px))
@@ -459,8 +459,8 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	header.Append(it.time, false)
 	x := widget.NewThemeIcon("ld-x-symbolic", int(v.px*0.9))
 	id := n.ID
-	dismiss := dropdownButton(x, "notification-dropdown-item-dismiss", func() { v.dismiss(id) })
-	dismiss.AddClass("ghost-icon")
+	dismiss := dropdownButton(x, func() { v.dismiss(id) }, "notification-dropdown-item-dismiss")
+	dismiss.AddClass(css.Ghost, css.Icon)
 	header.Append(dismiss, false)
 	content.Append(header, false)
 	if n.Body != "" {
@@ -509,7 +509,7 @@ func (it *notifItem) actionRows() widget.Widget {
 			label := widget.NewLabel(v.font, v.px*0.9, a.Label, 0)
 			label.SetAlignment(render.AlignCenter)
 			key := a.ID
-			btn := dropdownButton(label, "notification-dropdown-item-action-btn", func() { it.invoke(key) })
+			btn := dropdownButton(label, func() { it.invoke(key) }, "notification-dropdown-item-action-btn")
 			row.Attach(btn, i, 0, 1, 1)
 		}
 		box.Append(row, false)

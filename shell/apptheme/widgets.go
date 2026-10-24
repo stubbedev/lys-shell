@@ -29,6 +29,7 @@ func WidgetTheme(p *styling.Palette, cfg *config.Config) *widget.Theme {
 	t.Surface = p.Surface
 	t.SurfaceHover = token(config.TokenBgHover)
 	t.SurfacePressed = token(config.TokenBgActive)
+	t.Secondary = token(config.TokenBgOverlay)
 	t.Text = p.Fg
 	t.TextMuted = p.FgMuted
 	t.Accent = p.Primary

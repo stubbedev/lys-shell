@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -72,7 +73,7 @@ var monitorWallpaperList = cardRow(cardSpec{
 		return map[string]any{"name": "", "fit-mode": string(config.FitFill), "wallpaper": ""}
 	},
 	addKey:   "settings-monitor-add",
-	chrome:   &cardChrome{card: "monitor-card", header: "monitor-card-header", body: "monitor-card-body", remove: []string{"ghost-icon"}},
+	chrome:   &cardChrome{card: "monitor-card", header: "monitor-card-header", body: "monitor-card-body", remove: []string{css.Ghost, css.Icon}},
 	classes:  []string{"monitor-wallpaper-control"},
 	listCls:  "monitor-wallpaper-list",
 	labelCls: "monitor-card-label",

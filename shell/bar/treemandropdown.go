@@ -8,6 +8,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/treeman"
@@ -72,7 +73,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "treeman-dropdown")
 	backIcon := widget.NewThemeIcon("ld-arrow-left-symbolic", int(px))
-	v.back = dropdownButton(backIcon, "ghost-icon", func() { v.openDetail("") })
+	v.back = dropdownButton(backIcon, func() { v.openDetail("") }, css.Ghost, css.Icon)
 	v.back.SetTooltip(i18n.T("dropdown-treeman-back"))
 	header, _, title := dropdownHeaderParts(font, px, "ld-layers-symbolic", i18n.T("dropdown-treeman-title"), v.back)
 	v.title = title
@@ -241,7 +242,7 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 	head.Append(v.capped(repo.Repo, 1, "treeman-repo-name"), true)
 	head.AppendAligned(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""), false, widget.AlignCenter)
 	name := repo.Repo
-	header := dropdownButton(head, "treeman-repo-header", func() {
+	header := dropdownButton(head, func() {
 		open := !fold.Revealed()
 		fold.SetRevealed(open)
 		chevron.SetThemeName(treemanChevron(open))
@@ -250,7 +251,7 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 		} else {
 			v.collapsed[name] = true
 		}
-	})
+	}, "treeman-repo-header")
 	card.Append(header, false)
 	card.Append(fold, false)
 	return card
@@ -298,7 +299,7 @@ func (v *treemanView) worktreeRow(wt treeman.Worktree) widget.Widget {
 
 func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Button {
 	glyph := widget.NewThemeIcon(icon, int(v.px*0.9))
-	b := dropdownButton(glyph, "ghost-icon", onClick)
+	b := dropdownButton(glyph, onClick, css.Ghost, css.Icon)
 	b.SetTooltip(tooltip)
 	return b
 }

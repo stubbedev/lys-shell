@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -117,7 +118,7 @@ func userSessionSection(ctx ModuleContext) widget.Widget {
 		// carries the pointer cursor, the hover shade, and the glyph
 		// ink; no Go hover fills.
 		button := widget.NewButton(glyph, 0, 0)
-		button.AddClass("icon", "session-btn")
+		button.AddClass(css.Secondary, css.Icon, "session-btn")
 		button.SetTooltip(spec.tooltip)
 		command := spec.command
 		// process::run_if_set: an empty command is a no-op.

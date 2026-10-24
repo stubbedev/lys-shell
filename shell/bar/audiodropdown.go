@@ -12,6 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -393,11 +394,11 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 	nameRow.Append(chevron, false)
 	// The button hugs its name (set_halign Start), so the chevron sits
 	// right after the device name, not at the row's far end.
-	info.AppendAligned(dropdownButton(nameRow, "audio-device-trigger-btn", func() { v.showPage(page) }), false, widget.AlignStart)
+	info.AppendAligned(dropdownButton(nameRow, func() { v.showPage(page) }, "audio-device-trigger-btn"), false, widget.AlignStart)
 	s.trigger.Append(info, true)
 	s.muteIcon = widget.NewThemeIcon("", int(v.px*1.1))
 	s.muteIcon.AddClass("audio-mute-icon")
-	s.mute = dropdownButton(s.muteIcon, "audio-mute-btn", s.toggleMute)
+	s.mute = dropdownButton(s.muteIcon, s.toggleMute, "audio-mute-btn")
 	s.trigger.AppendAligned(s.mute, false, widget.AlignCenter)
 	s.Append(s.trigger, false)
 
@@ -607,7 +608,7 @@ func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
 	header.Append(it.value, false)
 	it.muteIcon = widget.NewThemeIcon("", int(v.px))
 	it.muteIcon.AddClass("audio-mute-icon")
-	it.mute = dropdownButton(it.muteIcon, "audio-mute-btn", it.toggleMute)
+	it.mute = dropdownButton(it.muteIcon, it.toggleMute, "audio-mute-btn")
 	header.AppendAligned(it.mute, false, widget.AlignCenter)
 	it.Append(header, false)
 
@@ -678,8 +679,8 @@ func newDevicePicker(v *audioView, kind audioKind, title string) *devicePicker {
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("picker-header")
 	back := widget.NewThemeIcon("ld-arrow-left-symbolic", int(v.px))
-	backBtn := dropdownButton(back, "picker-back", func() { v.showPage("main") })
-	backBtn.AddClass("ghost-icon") // GhostIconButton's own class (device_picker/mod.rs:41)
+	backBtn := dropdownButton(back, func() { v.showPage("main") }, "picker-back")
+	backBtn.AddClass(css.Ghost, css.Icon)
 	header.Append(backBtn, false)
 	titleLabel := widget.NewLabel(v.font, v.px*1.05, title, 0)
 	titleLabel.AddClass("picker-title")
@@ -751,12 +752,12 @@ func (p *devicePicker) optionContent(d audioDevice, active bool) *widget.Box {
 func (p *devicePicker) row(d audioDevice, active bool) widget.Widget {
 	v := p.view
 	key := d.key
-	b := dropdownButton(p.optionContent(d, active), "audio-device-option", func() {
+	b := dropdownButton(p.optionContent(d, active), func() {
 		v.showPage("main")
 		v.write("set default device", func(ctx context.Context, src pulse.Source) error {
 			return src.SetDefault(ctx, key)
 		})
-	})
+	}, "audio-device-option")
 	if active {
 		b.AddClass("selected")
 	}

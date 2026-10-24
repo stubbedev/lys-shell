@@ -5,53 +5,6 @@ button {
 button image {
   -gtk-icon-size: var(--icon-md);
 }
-button.icon {
-  background: var(--bg-overlay);
-  color: var(--fg-subtle);
-}
-button.icon:hover {
-  background: var(--bg-active);
-}
-button.icon:disabled {
-  opacity: 0.5;
-}
-button.icon:focus-visible {
-  outline: var(--focus-ring-width) solid var(--fg-subtle);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.icon > image {
-  margin: var(--space-sm) var(--space-md);
-}
-button.icon > box {
-  margin: var(--space-sm) var(--space-md);
-}
-button.icon > label {
-  margin: var(--space-sm) var(--space-md);
-}
-button.ghost-icon {
-  background: transparent;
-  color: var(--fg-subtle);
-}
-button.ghost-icon:hover {
-  background: var(--bg-hover);
-  color: var(--fg-default);
-}
-button.ghost-icon:disabled {
-  opacity: 0.5;
-}
-button.ghost-icon:focus-visible {
-  outline: var(--focus-ring-width) solid var(--fg-subtle);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.ghost-icon > image {
-  margin: var(--space-sm) var(--space-md);
-}
-button.ghost-icon > box {
-  margin: var(--space-sm) var(--space-md);
-}
-button.ghost-icon > label {
-  margin: var(--space-sm) var(--space-md);
-}
 menubutton {
   all: unset;
 }

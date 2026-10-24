@@ -26,6 +26,7 @@ func TestWidgetThemeIsThePalette(t *testing.T) {
 		"Surface":        {th.Surface, p.Surface},
 		"SurfaceHover":   {th.SurfaceHover, token(config.TokenBgHover)},
 		"SurfacePressed": {th.SurfacePressed, token(config.TokenBgActive)},
+		"Secondary":      {th.Secondary, token(config.TokenBgOverlay)},
 		"Text":           {th.Text, p.Fg},
 		"TextMuted":      {th.TextMuted, p.FgMuted},
 		"Accent":         {th.Accent, p.Primary},
@@ -94,7 +95,8 @@ func TestThemeInstallsTheWidgetTheme(t *testing.T) {
 
 // The shell sheet leaves lys-ui's button variants their fills: a
 // suggested or destructive action paints the palette's primary or
-// error over the plain buttons' transparent rest.
+// error, a secondary one the control fill that sets it off the panel
+// surface, over the plain buttons' transparent rest.
 func TestShellSheetKeepsTheButtonVariantFills(t *testing.T) {
 	isolateConfigDir(t)
 	t.Cleanup(func() { widget.SetTheme(nil) })
@@ -104,18 +106,22 @@ func TestShellSheetKeepsTheButtonVariantFills(t *testing.T) {
 	if !ok {
 		t.Fatal("the palette has no status-error")
 	}
+	overlay, ok := p.Token(config.TokenBgOverlay)
+	if !ok || overlay == p.Surface {
+		t.Fatal("the palette's control fill is missing or the panel surface")
+	}
 	button := func(class string) *widget.Button {
 		b := widget.NewButton(widget.NewSpacer(40, 40), 0, 0)
 		b.AddClass(class)
 		return b
 	}
-	plain, suggested, destructive := button("plain"), button(css.SuggestedAction), button(css.DestructiveAction)
+	plain, suggested, destructive, secondary := button("plain"), button(css.SuggestedAction), button(css.DestructiveAction), button(css.Secondary)
 	root := widget.NewBox(widget.Column, 0, 0)
-	for _, b := range []*widget.Button{plain, suggested, destructive} {
+	for _, b := range []*widget.Button{plain, suggested, destructive, secondary} {
 		root.Append(b, false)
 	}
 	theme.Attach(root)
-	const w, h = 200, 200
+	const w, h = 200, 300
 	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
 	root.Arrange(render.Rect{W: w, H: h})
 	data := make([]byte, render.Stride(w)*h)
@@ -133,5 +139,8 @@ func TestShellSheetKeepsTheButtonVariantFills(t *testing.T) {
 	}
 	if got, _ := center(destructive); got != errColor {
 		t.Errorf("a destructive action paints %#08x, want status-error %#08x", uint32(got), uint32(errColor))
+	}
+	if got, _ := center(secondary); got != overlay {
+		t.Errorf("a secondary button paints %#08x, want the control fill %#08x", uint32(got), uint32(overlay))
 	}
 }

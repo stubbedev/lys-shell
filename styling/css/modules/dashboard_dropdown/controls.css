@@ -7,7 +7,7 @@
 .dashboard-dropdown .dashboard-slider-row:disabled {
   opacity: 0.35;
 }
-.dashboard-dropdown button.ghost-icon.dashboard-volume-icon > image {
+.dashboard-dropdown button.ghost.icon.dashboard-volume-icon > image {
   margin: var(--space-xs);
   color: var(--fg-muted);
 }

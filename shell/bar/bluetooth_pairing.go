@@ -113,7 +113,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	info.Append(c.deviceType, false)
 	header.AppendAligned(info, true, widget.AlignCenter)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(px))
-	closeBtn := dropdownButton(closeIcon, "ghost-icon", nil)
+	closeBtn := dropdownButton(closeIcon, nil, css.Ghost, css.Icon)
 	closeBtn.AddClass("bluetooth-pairing-close")
 	closeBtn.OnClick = func() { c.emit(pairingOutput{kind: outputCancelled}) }
 	header.Append(closeBtn, false)
@@ -213,7 +213,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	left.OnClick = func() { c.emit(c.rejectOutput()) }
 	actions.Append(left, true)
 	c.rightLabel = widget.NewLabel(font, px, "", 0)
-	c.right = dropdownButton(c.rightLabel, css.SuggestedAction, nil)
+	c.right = dropdownButton(c.rightLabel, nil, css.SuggestedAction)
 	c.right.OnClick = func() {
 		if out, ok := c.confirmOutput(); ok {
 			c.emit(out)
@@ -230,7 +230,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 // ghostButton is the GhostButton template: the `ghost` class's
 // stylesheet rules paint it (transparent until hovered, muted ink).
 func ghostButton(child widget.Widget) *widget.Button {
-	return dropdownButton(child, css.Ghost, nil)
+	return dropdownButton(child, nil, css.Ghost)
 }
 
 func isDigit(r rune) bool { return r >= '0' && r <= '9' }

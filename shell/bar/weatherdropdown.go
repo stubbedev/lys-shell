@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -199,7 +200,7 @@ func (v *weatherView) label(text string, scale float64, class string) *widget.La
 // never sets it visible).
 func (v *weatherView) header() widget.Widget {
 	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1), 0, 0)
-	refresh.AddClass("ghost-icon")
+	refresh.AddClass(css.Ghost, css.Icon)
 	refresh.OnClick = v.svc.Refresh
 	refresh.SetTooltip(i18n.T("dropdown-weather-refresh"))
 	row, glyph := dropdownHeaderIcon(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)

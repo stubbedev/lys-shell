@@ -28,10 +28,10 @@
   margin-top: var(--space-md);
   padding: 0;
 }
-.dashboard-dropdown button.ghost-icon.media-btn {
+.dashboard-dropdown button.ghost.icon.media-btn {
   margin: var(--space-xs);
 }
-.dashboard-dropdown button.ghost-icon.media-btn > image {
+.dashboard-dropdown button.ghost.icon.media-btn > image {
   -gtk-icon-size: var(--icon-sm);
   color: var(--fg-muted);
 }
