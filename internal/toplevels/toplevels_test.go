@@ -14,6 +14,8 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/wlr"
+
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 // A window is listed from its first done batch, with the batch's app id
@@ -56,7 +58,9 @@ func TestTrackerAppliesBatchesOnDone(t *testing.T) {
 }
 
 // startSway runs a private headless sway and points WAYLAND_DISPLAY and
-// XDG_RUNTIME_DIR at it for the test.
+// XDG_RUNTIME_DIR at it for the test. It gets a private session bus:
+// without one, nixpkgs' wrapper runs it under dbus-run-session, whose
+// process is not sway's. Its log is shown when it fails to start.
 func startSway(t *testing.T) *os.Process {
 	t.Helper()
 	if _, err := exec.LookPath("sway"); err != nil {
@@ -74,8 +78,14 @@ func startSway(t *testing.T) *os.Process {
 	if err := os.WriteFile(config, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	log, err := os.Create(filepath.Join(dir, "log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer log.Close()
 	cmd := exec.Command("sway", "-c", config)
-	cmd.Env = append(os.Environ(), "XDG_RUNTIME_DIR="+dir, "WLR_BACKENDS=headless", "WLR_RENDERER=pixman", "WLR_LIBINPUT_NO_DEVICES=1")
+	cmd.Stdout, cmd.Stderr = log, log
+	cmd.Env = append(os.Environ(), "XDG_RUNTIME_DIR="+dir, "DBUS_SESSION_BUS_ADDRESS="+dbustest.Start(t).Address, "WLR_BACKENDS=headless", "WLR_RENDERER=pixman", "WLR_LIBINPUT_NO_DEVICES=1")
 	cmd.Env = slices.DeleteFunc(cmd.Env, func(kv string) bool {
 		return strings.HasPrefix(kv, "WAYLAND_DISPLAY=") || strings.HasPrefix(kv, "SWAYSOCK=")
 	})
@@ -88,7 +98,8 @@ func startSway(t *testing.T) *os.Process {
 	})
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
-			t.Fatal("sway never opened its socket")
+			out, _ := os.ReadFile(log.Name())
+			t.Fatalf("sway never opened its socket:\n%s", out)
 		}
 		sockets, _ := filepath.Glob(filepath.Join(dir, "wayland-*"))
 		sockets = slices.DeleteFunc(sockets, func(s string) bool { return strings.HasSuffix(s, ".lock") })
