@@ -453,14 +453,14 @@ func TestNotificationItemFileIconFallsBack(t *testing.T) {
 func TestPanelBoxForwardsThePopover(t *testing.T) {
 	inner := &notificationView{Box: widget.NewBox(widget.Column, 0, 0)}
 	pop := &fakePopover{}
-	newPanelBox(10, 10, inner).attachPopover(pop)
+	newPanelBox(inner).attachPopover(pop)
 	inner.popdown()
 	entry := widget.NewEntry(testFont(t), 12, 0)
 	inner.focus(entry)
 	if pop.dismissed != 1 || pop.focused != entry {
 		t.Errorf("forwarded: dismissed %d focused %v", pop.dismissed, pop.focused)
 	}
-	newPanelBox(10, 10, widget.NewBox(widget.Column, 0, 0)).attachPopover(pop) // ignored
+	newPanelBox(widget.NewBox(widget.Column, 0, 0)).attachPopover(pop) // ignored
 	var unset popoverHook
 	unset.popdown() // no popover yet: a no-op
 	// A focus asked for before the popover exists lands on attach.

@@ -252,7 +252,7 @@ func TestDropdownInstancesAreCachedUntilReleased(t *testing.T) {
 		t.Error("the calendar panel was rebuilt")
 	}
 	inner := &countingContent{Box: widget.NewBox(widget.Column, 0, 0)}
-	p := newPanelBox(100, 100, inner)
+	p := newPanelBox(inner)
 	p.dropdownOpened()
 	p.dropdownClosed()
 	if inner.opened != 1 || inner.closed != 1 {
@@ -263,7 +263,7 @@ func TestDropdownInstancesAreCachedUntilReleased(t *testing.T) {
 // A click on the panel's empty rest plays the exit when the registry
 // gave it one (dismiss_on_spacer_click), else closes at once.
 func TestDropdownPanelRestClickPlaysTheExit(t *testing.T) {
-	p := newPanelBox(100, 100, widget.NewBox(widget.Column, 0, 0))
+	p := newPanelBox(widget.NewBox(widget.Column, 0, 0))
 	pop := &fakePopover{}
 	p.attachPopover(pop)
 	animated := 0
@@ -332,7 +332,7 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 	bar.Append(anchor, false)
 	bar.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 40}})
 	bar.Arrange(render.Rect{W: 600, H: 40})
-	root, _ := dropdownTree(calendarDropdown(ctx), cfg)
+	root, _ := dropdownTree(calendarDropdown(ctx), cfg, 0, 0)
 	arrange := func() []*widget.Label {
 		root.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 900}})
 		root.Arrange(render.Rect{W: 600, H: 900})

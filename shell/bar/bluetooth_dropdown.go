@@ -20,8 +20,6 @@ import (
 // available devices, and the empty states.
 
 const (
-	btBaseWidth     = 382
-	btBaseHeight    = 512
 	btScanDuration  = 30 * time.Second
 	btActionTimeout = 30 * time.Second
 	// btDetailSeparator sits between the device type and the battery.
@@ -81,7 +79,7 @@ type btDropdown struct {
 // when the popover closes, and takes the popover handle so the passkey
 // boxes can move the keyboard focus (grab_focus).
 type btDropdownRoot struct {
-	*btSurface
+	*widget.Box
 	d *btDropdown
 	popoverHook
 }
@@ -109,16 +107,15 @@ func btNoAdapterDropdown(ctx ModuleContext) widget.Widget {
 }
 
 // btShell is the frame the two entries share: the header over the
-// scrolled content, at the dropdown's fixed size (mod.rs:55-72).
+// scrolled content (mod.rs:55-72); the registry gives it the popover's
+// size, as for every dropdown.
 func btShell(font render.Font, px float64, icon string, scroll widget.Widget) widget.Widget {
 	header, _, _ := dropdownHeaderParts(font, px, icon, btText("dropdown-bluetooth-title"))
 	frame := widget.NewBox(widget.Column, 0, 0)
 	frame.AddClass("dropdown", "bluetooth-dropdown")
 	frame.Append(header, false)
 	frame.Append(scroll, true)
-	surface := newBtSurface(frame, 0, 0)
-	surface.w, surface.h = btBaseWidth, btBaseHeight
-	return &btDropdownRoot{btSurface: surface}
+	return &btDropdownRoot{Box: frame}
 }
 
 // bluetoothDropdown builds the dropdown content; the registry's
@@ -209,9 +206,7 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	frame.AddClass("dropdown", "bluetooth-dropdown")
 	frame.Append(header, false)
 	frame.Append(scroll, true)
-	surface := newBtSurface(frame, 0, 0)
-	surface.w, surface.h = btBaseWidth, btBaseHeight
-	d.root = &btDropdownRoot{btSurface: surface, d: d}
+	d.root = &btDropdownRoot{Box: frame, d: d}
 	d.card.focus = func(w widget.Widget) { d.root.focus(w) }
 	d.sync()
 	return d
@@ -349,7 +344,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	icon := widget.NewThemeIcon(s.icon, int(px*1.4))
 	// The icon tile (device_item's icon_container): the box paints the
 	// well (overlay, or accent-subtle while connected), the image the ink.
-	well := iconTile(icon, "bluetooth-device-icon", "bluetooth-icon")
+	well := iconTile(icon, "bluetooth-icon", "bluetooth-device-icon")
 	switch s.category {
 	case categoryConnected:
 		well.AddClass("connected")

@@ -5,16 +5,20 @@ import (
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
+
+	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/apptheme"
 )
 
-// pagedPanel is a w=200 panel over a column holding one expanding page
-// stack (sized to its visible page) with a 100px page and a tall one.
-func pagedPanel(h int, tall widget.Widget) (*panelBox, *widget.Stack) {
-	s := widget.NewStack().Add("short", widget.NewSpacer(10, 100)).Add("tall", tall)
+// pagedPanel is a panel over a 200px-wide column holding one expanding
+// page stack (sized to its visible page) with a 100px page and a tall
+// one.
+func pagedPanel(tall widget.Widget) (*panelBox, *widget.Stack) {
+	s := widget.NewStack().Add("short", widget.NewSpacer(200, 100)).Add("tall", tall)
 	s.SetHomogeneous(false)
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.Append(s, true)
-	return newPanelBox(200, h, col), s
+	return newPanelBox(col), s
 }
 
 func panelLayout(p *panelBox) (surface int, card render.Rect) {
@@ -26,7 +30,7 @@ func panelLayout(p *panelBox) (surface int, card render.Rect) {
 // The card is its visible page's natural height, anchored at the top;
 // the surface reserves the tallest page.
 func TestPanelCardTakesItsPageAndTheSurfaceReservesTheTallest(t *testing.T) {
-	p, s := pagedPanel(300, widget.NewSpacer(10, 500))
+	p, s := pagedPanel(widget.NewSpacer(10, 500))
 	surface, card := panelLayout(p)
 	if surface != 500 || card.H != 100 || card.Y != 0 {
 		t.Errorf("short page: surface %d card %+v, want 500 reserved and the 100 page's card at the top", surface, card)
@@ -38,31 +42,20 @@ func TestPanelCardTakesItsPageAndTheSurfaceReservesTheTallest(t *testing.T) {
 	}
 }
 
-// The configured height is the popover's height request: it floors the
-// surface, never the card, which stays its content's height (the Rust
-// audio dropdown's 512 leaves a ~300px card and a transparent rest).
-func TestPanelConfiguredHeightFloorsOnlyTheSurface(t *testing.T) {
-	p, _ := pagedPanel(600, widget.NewSpacer(10, 500))
-	surface, card := panelLayout(p)
-	if surface != 600 || card.H != 100 {
-		t.Errorf("surface %d card %+v, want the 600 floor and the 100 card", surface, card)
-	}
-}
-
 // Clamped to a monitor, every scroll propagates its content's natural
 // height up to the scrolled cap (find_and_clamp_scrolled_windows): a
 // list sizes the card instead of scrolling inside a fixed one, and
 // scrolls only past the cap.
 func TestClampedPanelScrollsSizeTheCard(t *testing.T) {
 	list := widget.NewScroll(widget.NewSpacer(10, 400))
-	p, s := pagedPanel(300, list)
+	p, s := pagedPanel(list)
 	p.clamp(1000)
 	s.Show("tall")
 	if surface, card := panelLayout(p); card.H != 400 || surface != 400 {
 		t.Errorf("a 400px list: surface %d card %+v, want both 400", surface, card)
 	}
 	long := widget.NewScroll(widget.NewSpacer(10, 2000))
-	p, s = pagedPanel(300, long)
+	p, s = pagedPanel(long)
 	p.clamp(1000)
 	s.Show("tall")
 	if _, card := panelLayout(p); card.H != 1000-panelMonitorMargin-panelScrollMargin {
@@ -71,7 +64,7 @@ func TestClampedPanelScrollsSizeTheCard(t *testing.T) {
 }
 
 func TestContentSizedPanelFollowsTheVisiblePage(t *testing.T) {
-	p, s := pagedPanel(-1, widget.NewSpacer(10, 500))
+	p, s := pagedPanel(widget.NewSpacer(10, 500))
 	surface, card := panelLayout(p)
 	if surface != 500 || card.H != 100 {
 		t.Errorf("content-sized: surface %d card %+v, want 500 reserved and the 100 page", surface, card)
@@ -83,7 +76,7 @@ func TestContentSizedPanelFollowsTheVisiblePage(t *testing.T) {
 }
 
 func TestPanelAnchorsAtTheTopAndTheRestCloses(t *testing.T) {
-	p, _ := pagedPanel(300, widget.NewSpacer(10, 500))
+	p, _ := pagedPanel(widget.NewSpacer(10, 500))
 	_, card := panelLayout(p)
 	if card.Y != 0 {
 		t.Errorf("card %+v, want it anchored at the surface's top like the Rust revealer's valign Start", card)
@@ -107,7 +100,7 @@ func TestPanelAnchorsAtTheTopAndTheRestCloses(t *testing.T) {
 // The card's height caps at the panel's monitor-derived ceiling even
 // when the measure constraints are looser.
 func TestPanelCapsAtTheMonitorCeiling(t *testing.T) {
-	p, _ := pagedPanel(300, widget.NewSpacer(10, 900))
+	p, _ := pagedPanel(widget.NewSpacer(10, 900))
 	p.maxH = 400
 	_, card := panelLayout(p)
 	if card.H > 400 {
@@ -115,14 +108,34 @@ func TestPanelCapsAtTheMonitorCeiling(t *testing.T) {
 	}
 }
 
-// The configured width is a floor: content wider than it widens the
-// surface, the Rust registry's natural-width sizing.
-func TestPanelWidthFloorsAtTheConfig(t *testing.T) {
+// The configured size is the popover's own size request, margins
+// included (the Rust popover's width and height requests around the
+// registry's margins): content smaller than it leaves the card at the
+// request less the margins and a transparent rest; content wider than
+// it widens the popover.
+func TestDropdownSizeFloorsThePopoverAroundItsMargins(t *testing.T) {
+	cfg := config.Defaults()
+	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
+	con := widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}
+
+	p, _ := pagedPanel(widget.NewSpacer(10, 50))
+	root, _ := dropdownTree(p, cfg, 382, 512)
+	// The bundle's `* { all: unset }` must not take the margins with it.
+	isolateConfigDir(t)
+	apptheme.New(cfg).Attach(root)
+	sz := widget.MeasureAsChild(root, con)
+	if sz != (widget.Size{W: 382, H: 512}) {
+		t.Fatalf("popover %+v, want the 382x512 request", sz)
+	}
+	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
+	if got := p.child.(interface{ Bounds() render.Rect }).Bounds(); got.W != 382-m.start-m.end || got.H != 100 {
+		t.Errorf("card %+v, want %d wide (the request less the margins) and its 100px content tall", got, 382-m.start-m.end)
+	}
+
 	wide := widget.NewBox(widget.Row, 0, 0)
 	wide.Append(widget.NewSpacer(500, 20), false)
-	p := newPanelBox(300, 0, wide)
-	sz := p.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 1000}})
-	if sz.W != 500 {
-		t.Errorf("panel width %d, want the content's 500 over the config's 300", sz.W)
+	root, _ = dropdownTree(newPanelBox(wide), cfg, 382, 0)
+	if sz := widget.MeasureAsChild(root, con); sz.W != 500+m.start+m.end {
+		t.Errorf("popover width %d, want the 500px content plus the margins", sz.W)
 	}
 }

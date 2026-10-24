@@ -80,8 +80,8 @@ func resolveDimension(override *config.Size, base, scale float64) int {
 // card fills the surface's width and takes its natural height, anchored
 // at the bar's edge (the revealer's valign Start over the spacer), so a
 // page switch resizes it, tweened by the stack's interpolate-size
-// (dropdown_resize::animate_height). The configured size floors the
-// surface (the popover's width and height requests), not the card.
+// (dropdown_resize::animate_height). The configured size is the
+// popover's own size request (dropdownTree), around the margins.
 //
 // A mapped popup cannot resize mid-grab without flicker, so the surface
 // reserves, up front, the room every stack's tallest page needs
@@ -90,7 +90,6 @@ func resolveDimension(override *config.Size, base, scale float64) int {
 // dropdown on a click, as the Rust spacer's gesture does.
 type panelBox struct {
 	widget.Base
-	w, h  int
 	child widget.Widget
 	// maxH caps the surface and the card (the monitor less 100, the
 	// registry's max_allowed_height); <= 0 takes the measure constraints.
@@ -101,8 +100,8 @@ type panelBox struct {
 	dismiss func()
 }
 
-func newPanelBox(w, h int, child widget.Widget) *panelBox {
-	return &panelBox{w: w, h: h, child: child}
+func newPanelBox(child widget.Widget) *panelBox {
+	return &panelBox{child: child}
 }
 
 // The registry's clamp_height margins below the monitor height: the
@@ -150,7 +149,7 @@ func walkPages(w widget.Widget, visit func(widget.Widget)) {
 // layout is the card's height and the surface's at width w: the card
 // is the content's natural height; the surface adds the worst stack's
 // shortfall - its neediest page against the height the stack is given
-// now (surface_height) - and floors at the configured height.
+// now (surface_height).
 func (p *panelBox) layout(w, maxH int) (card, surface int) {
 	if p.maxH > 0 {
 		maxH = min(maxH, p.maxH)
@@ -164,7 +163,7 @@ func (p *panelBox) layout(w, maxH int) (card, surface int) {
 			reserve = max(reserve, s.PageFloor(con)-s.Bounds().H)
 		}
 	})
-	return card, min(max(card+reserve, p.h), maxH)
+	return card, min(card+reserve, maxH)
 }
 
 // fit lays the content out in a w x h card at the origin.
@@ -174,11 +173,10 @@ func (p *panelBox) fit(w, h int) {
 }
 
 func (p *panelBox) Measure(con widget.Constraints) widget.Size {
-	// The Rust registry sizes the surface to the card's natural width,
-	// the configured width only a floor (the popover's width_request).
+	// The Rust registry sizes the surface to the card's natural width;
+	// the configured width floors the popover around it.
 	nat := p.child.Measure(widget.Constraints{Max: widget.Size{W: con.Max.W}})
-	w := max(p.w, nat.W)
-	w = min(w, con.Max.W)
+	w := min(max(con.Min.W, nat.W), con.Max.W)
 	_, surface := p.layout(w, con.Max.H)
 	return widget.Size{W: w, H: surface}
 }

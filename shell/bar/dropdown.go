@@ -152,8 +152,8 @@ func (r *dropdownRegistry) instance(name string, build func(ModuleContext) widge
 			st.SetInterpolateSize(true)
 		}
 	})
-	if w, h, ok := dropdownDims(name, r.cfg); ok {
-		content = newPanelBox(w, h, content)
+	if _, _, ok := dropdownDims(name, r.cfg); ok {
+		content = newPanelBox(content)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -278,7 +278,8 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		cfg.OnClosed = f.thawLabel
 	}
 	var rev *widget.Revealer
-	cfg.Content, rev = dropdownTree(content, r.cfg)
+	w, h, _ := dropdownDims(name, r.cfg)
+	cfg.Content, rev = dropdownTree(content, r.cfg, w, h)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -420,18 +421,26 @@ func roundMarginRem(rem, scale float64) int {
 // registry's surface margins around it. The theme reaches it through
 // the bar button it opens from: gelm styles a popover as a child of
 // its anchor, as GTK's popover CSS node is, so it inherits the bar
-// window's fonts and :root variables.
-func dropdownTree(content widget.Widget, cfg *config.Config) (*widget.Box, *widget.Revealer) {
+// window's fonts and :root variables. w x h is the dropdown's size, the
+// Rust popover's width and height requests: a floor for the whole
+// popover, margins included, so the card is that less the margins (a
+// zero or negative axis leaves it to the content).
+func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
 	card := popoverCard(rev, dropdownGravity(cfg.Bar.Location), cfg.Bar.DropdownShadow)
-	return withDropdownMargins(card, cfg), rev
+	root := withDropdownMargins(card, cfg)
+	root.SetSizeRequest(w, h)
+	return root, rev
 }
 
-func withDropdownMargins(card widget.Widget, cfg *config.Config) *widget.Box {
+func withDropdownMargins(card *widget.Box, cfg *config.Config) *widget.Box {
 	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
+	// Widget margins, as the registry's set_margin_*: the stylesheet's
+	// `* { all: unset }` resets CSS padding (and with it a programmatic
+	// one), never a widget's margin.
+	card.SetMargin(render.Insets{Top: m.top, Bottom: m.bottom, Left: m.start, Right: m.end})
 	box := widget.NewBox(widget.Column, 0, 0)
-	box.SetPadding(render.Insets{Top: m.top, Bottom: m.bottom, Left: m.start, Right: m.end})
 	box.Append(card, true)
 	return box
 }

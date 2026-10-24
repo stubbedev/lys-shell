@@ -692,13 +692,9 @@ func TestBtNoAdapterDropdownKeepsTheHeader(t *testing.T) {
 	if !visible(empty) {
 		t.Error("the no-adapter empty state is hidden")
 	}
-	// The shell is the dropdown frame at its fixed size, not a bare box.
-	if findBox(content, "bluetooth-dropdown") == nil {
+	// The shell is the dropdown frame, not a bare box.
+	if root, ok := content.(*btDropdownRoot); !ok || !root.HasClass("bluetooth-dropdown") {
 		t.Fatal("the no-adapter state is not the dropdown frame")
-	}
-	sz := content.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 700}})
-	if sz.W != btBaseWidth || sz.H != btBaseHeight {
-		t.Errorf("size = %dx%d, want the %dx%d base", sz.W, sz.H, btBaseWidth, btBaseHeight)
 	}
 	// A live dropdown with an adapter keeps the same header; the
 	// no-adapter state never grows device rows.
