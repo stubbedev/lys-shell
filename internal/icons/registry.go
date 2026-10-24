@@ -114,7 +114,8 @@ const iconChanges = unix.IN_CREATE | unix.IN_DELETE | unix.IN_MOVED_FROM | unix.
 
 // Watch runs onChange after each burst of icons appearing in or leaving
 // the icons directory (start_watcher), on the watcher's goroutine,
-// until stop. The directory must exist (EnsureSetup).
+// until stop; once stop returns, onChange never runs again, so stop must
+// not be called from onChange. The directory must exist (EnsureSetup).
 func (r *Registry) Watch(onChange func()) (stop func(), err error) {
 	w, err := fswatch.New(iconChanges, false)
 	if err != nil {
@@ -124,12 +125,17 @@ func (r *Registry) Watch(onChange func()) (stop func(), err error) {
 		_ = w.Close()
 		return nil, err
 	}
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		for range w.Changed() {
 			onChange()
 		}
 	}()
-	return func() { _ = w.Close() }, nil
+	return func() {
+		_ = w.Close()
+		<-done
+	}, nil
 }
 
 // SystemIconPaths are the existing <XDG_DATA_DIRS>/lys-shell/icons roots,

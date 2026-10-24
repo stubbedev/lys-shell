@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -81,6 +82,39 @@ func TestThemeSearchPaths(t *testing.T) {
 	}
 }
 
+func TestRegistryWatchStopWaitsForARunningCallback(t *testing.T) {
+	r := RegistryAt(t.TempDir())
+	if err := r.EnsureSetup(); err != nil {
+		t.Fatal(err)
+	}
+	started := make(chan struct{}, 16)
+	var finished atomic.Int32
+	stop, err := r.Watch(func() {
+		started <- struct{}{}
+		time.Sleep(100 * time.Millisecond)
+		finished.Add(1)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeIcon(t, r.IconsDir(), "ld-a-symbolic.svg", "")
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no change reported for an installed icon")
+	}
+	stop()
+	done := finished.Load()
+	if done == 0 {
+		t.Fatal("stop returned while the callback was still running")
+	}
+	writeIcon(t, r.IconsDir(), "ld-b-symbolic.svg", "")
+	time.Sleep(300 * time.Millisecond)
+	if got := finished.Load(); got != done {
+		t.Errorf("%d callbacks ran after stop returned", got-done)
+	}
+}
+
 func TestRegistryWatch(t *testing.T) {
 	r := RegistryAt(t.TempDir())
 	if err := r.EnsureSetup(); err != nil {
@@ -93,6 +127,18 @@ func TestRegistryWatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// One operation can tick more than once (a rename's MOVED_FROM and
+	// MOVED_TO may straddle two reads), so a step consumes its whole
+	// burst: everything until the watch has been quiet for a while.
+	quiet := func() {
+		for {
+			select {
+			case <-changes:
+			case <-time.After(300 * time.Millisecond):
+				return
+			}
+		}
+	}
 	expect := func(what string, want bool) {
 		t.Helper()
 		select {
@@ -100,6 +146,7 @@ func TestRegistryWatch(t *testing.T) {
 			if !want {
 				t.Errorf("%s: a change was reported", what)
 			}
+			quiet()
 		case <-time.After(300 * time.Millisecond):
 			if want {
 				t.Errorf("%s: no change reported", what)
