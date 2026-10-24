@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -57,6 +58,14 @@ func Setup(prefix string, console io.Writer) (io.Closer, error) {
 	log.SetOutput(out)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	return w, nil
+}
+
+// Library is the logger handed to gelm (app.SetLogger): its warnings
+// (an optional protocol that failed to bind) and errors (the
+// compositor's fatal protocol error) land beside wayle's own lines,
+// where GTK prints its own. gelm stays silent without one.
+func Library() *slog.Logger {
+	return slog.New(slog.NewTextHandler(log.Writer(), &slog.HandlerOptions{Level: slog.LevelWarn}))
 }
 
 // dailyFile is tracing_appender's daily rolling appender.

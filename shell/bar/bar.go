@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/desktopnotify"
+	"github.com/stubbedev/wayle/internal/logging"
 	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
@@ -63,6 +64,7 @@ func RunWith(cfg *config.Config) error { return run(cfg, nil) }
 
 // run shows the bar; with a service it follows config reloads.
 func run(cfg *config.Config, svc *config.Service) error {
+	app.SetLogger(logging.Library())
 	sess, err := app.Connect()
 	if err != nil {
 		return fmt.Errorf("bar: connect: %w", err)

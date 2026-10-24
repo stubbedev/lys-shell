@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/logging"
 	"github.com/stubbedev/wayle/internal/portal"
 	"github.com/stubbedev/wayle/shell/apptheme"
 )
@@ -45,6 +46,7 @@ func Run() error {
 		return fmt.Errorf("cannot load config: %w", err)
 	}
 	defer svc.Close()
+	app.SetLogger(logging.Library())
 	sess, err := app.Connect()
 	if err != nil {
 		return fmt.Errorf("settings: connect: %w", err)

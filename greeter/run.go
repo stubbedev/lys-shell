@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/logging"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/styling"
@@ -31,6 +32,7 @@ func Run(init Init) error {
 	if err := installIcons(); err != nil {
 		log.Printf("greeter: %v", err)
 	}
+	app.SetLogger(logging.Library())
 	sess, err := app.Connect()
 	if err != nil {
 		return fmt.Errorf("greeter: connect: %w", err)

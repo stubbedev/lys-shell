@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/stubbedev/gelm/app"
+
+	"github.com/stubbedev/wayle/internal/logging"
 )
 
 // waylandLoop is the portal's one Wayland connection: a headless gelm
@@ -42,6 +44,7 @@ func (w *waylandLoop) start() (*app.Application, chan struct{}, error) {
 	if w.a != nil {
 		return w.a, w.ended, nil
 	}
+	app.SetLogger(logging.Library())
 	sess, err := app.Connect()
 	if err != nil {
 		return nil, nil, err

@@ -102,3 +102,28 @@ func TestSetupRoutesTheStandardLogger(t *testing.T) {
 		t.Errorf("CLI logged to the console: %q", console.String())
 	}
 }
+
+// gelm's warnings and errors reach wayle's log; its debug chatter does
+// not.
+func TestLibraryLogsWarningsToTheLog(t *testing.T) {
+	var buf strings.Builder
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	l := Library()
+	l.Debug("bound an optional global")
+	l.Info("chatter")
+	l.Warn("optional protocol failed to bind")
+	l.Error("compositor fatal protocol error")
+	out := buf.String()
+	for _, want := range []string{"optional protocol failed to bind", "compositor fatal protocol error"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log %q lacks %q", out, want)
+		}
+	}
+	for _, unwanted := range []string{"bound an optional global", "chatter"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("log %q carries the below-warning %q", out, unwanted)
+		}
+	}
+}
