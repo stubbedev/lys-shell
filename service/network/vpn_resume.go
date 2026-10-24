@@ -47,6 +47,9 @@ type resumeTiming struct {
 	// agentSettle gives the secret agent time to re-register with an
 	// NM that just came back; both follow the same bus signal.
 	agentSettle time.Duration
+	// underlayLook is how often the network under an up tunnel is
+	// looked at (underlay.rs's LOOK_EVERY).
+	underlayLook time.Duration
 }
 
 // defaultResumeTiming is the Rust service's timing.
@@ -56,6 +59,7 @@ var defaultResumeTiming = resumeTiming{
 	retryDelay:   3 * time.Second,
 	nmStopWindow: 20 * time.Second,
 	agentSettle:  2 * time.Second,
+	underlayLook: 3 * time.Second,
 }
 
 // restoreRun is one restore in flight: its tunnels, whether it has

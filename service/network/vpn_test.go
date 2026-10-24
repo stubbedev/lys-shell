@@ -22,6 +22,7 @@ var fastResume = resumeTiming{
 	retryDelay:   50 * time.Millisecond,
 	nmStopWindow: 20 * time.Second,
 	agentSettle:  50 * time.Millisecond,
+	underlayLook: 30 * time.Millisecond,
 }
 
 type serviceFixture struct {

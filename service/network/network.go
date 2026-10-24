@@ -21,9 +21,11 @@ const (
 	properties  = "org.freedesktop.DBus.Properties"
 	deviceIface = "org.freedesktop.NetworkManager.Device"
 	apIface     = "org.freedesktop.NetworkManager.AccessPoint"
-	// wiredIface and ip4ConfigIface carry the link speed and addresses.
+	// wiredIface carries the link speed, the IP config objects the
+	// addresses.
 	wiredIface     = "org.freedesktop.NetworkManager.Device.Wired"
 	ip4ConfigIface = "org.freedesktop.NetworkManager.IP4Config"
+	ip6ConfigIface = "org.freedesktop.NetworkManager.IP6Config"
 )
 
 // Device types (NM_DEVICE_TYPE_*).
@@ -290,12 +292,8 @@ func (s *System) ip4(ctx context.Context, dev dbus.BusObject) string {
 	if err := dev.CallWithContext(ctx, properties+".Get", 0, deviceIface, "Ip4Config").Store(&cfg); err != nil || cfg == "/" || cfg == "" {
 		return ""
 	}
-	var data []map[string]dbus.Variant
-	if err := s.conn.Object(nmName, cfg).CallWithContext(ctx, properties+".Get", 0, ip4ConfigIface, "AddressData").Store(&data); err != nil {
-		return ""
-	}
-	for _, entry := range data {
-		if addr, ok := entry["address"].Value().(string); ok && addr != "" {
+	for _, addr := range (nm{s.conn}).configAddresses(ctx, cfg, ip4ConfigIface) {
+		if addr != "" {
 			return addr
 		}
 	}

@@ -37,9 +37,19 @@ type fakeNM struct {
 	addAndActive  []ConnectionDict
 
 	manager *prop.Properties
-	wifi    *fakeWifi
-	wired   bool
+	// underlay is the primary connection's IPv4 config, whose addresses
+	// say whether the network under a tunnel is usable.
+	underlay *prop.Properties
+	wifi     *fakeWifi
+	wired    bool
 }
+
+// The primary (non-VPN) connection the fake carries traffic on, and its
+// IPv4 config.
+const (
+	fakePrimaryPath = dbus.ObjectPath("/org/freedesktop/NetworkManager/ActiveConnection/primary")
+	fakeIP4Path     = dbus.ObjectPath("/org/freedesktop/NetworkManager/IP4Config/primary")
+)
 
 type registration struct {
 	sender string
@@ -85,9 +95,23 @@ func (f *fakeNM) own() {
 		"State":                 {Value: uint32(StateConnectedGlobal), Emit: prop.EmitTrue},
 		"WirelessEnabled":       {Value: true, Writable: true, Emit: prop.EmitTrue},
 		"PrimaryConnectionType": {Value: "", Emit: prop.EmitTrue},
+		"PrimaryConnection":     {Value: fakePrimaryPath, Emit: prop.EmitTrue},
 	}})
 	must(f.t, err)
 	f.manager = props
+	_, err = prop.Export(f.conn, fakePrimaryPath, prop.Map{activeIface: {
+		"Vpn":            {Value: false, Emit: prop.EmitTrue},
+		"Ip4Config":      {Value: fakeIP4Path, Emit: prop.EmitTrue},
+		"Ip6Config":      {Value: rootPath, Emit: prop.EmitTrue},
+		"Uuid":           {Value: "primary", Emit: prop.EmitTrue},
+		"State":          {Value: uint32(ActiveActivated), Emit: prop.EmitTrue},
+		"SpecificObject": {Value: rootPath, Emit: prop.EmitTrue},
+	}})
+	must(f.t, err)
+	f.underlay, err = prop.Export(f.conn, fakeIP4Path, prop.Map{ip4ConfigIface: {
+		"AddressData": {Value: addressData("192.168.1.166"), Emit: prop.EmitTrue},
+	}})
+	must(f.t, err)
 	f.exportWifi()
 	reply, err := f.conn.RequestName(nmName, dbus.NameFlagDoNotQueue)
 	must(f.t, err)
@@ -203,6 +227,21 @@ func (f *fakeNM) publishActive() {
 }
 
 func (f *fakeNM) setState(state State) { f.manager.SetMust(nmIface, "State", uint32(state)) }
+
+// setUnderlay sets the primary connection's IPv4 addresses: none is a
+// network that lost its lease.
+func (f *fakeNM) setUnderlay(addresses ...string) {
+	f.underlay.SetMust(ip4ConfigIface, "AddressData", addressData(addresses...))
+}
+
+// addressData is NM's AddressData for addresses.
+func addressData(addresses ...string) []map[string]dbus.Variant {
+	data := make([]map[string]dbus.Variant, 0, len(addresses))
+	for _, a := range addresses {
+		data = append(data, map[string]dbus.Variant{"address": dbus.MakeVariant(a), "prefix": dbus.MakeVariant(uint32(24))})
+	}
+	return data
+}
 
 // setPrimary sets the primary connection's NM type ("" for none).
 func (f *fakeNM) setPrimary(nmType string) {

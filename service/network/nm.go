@@ -129,6 +129,22 @@ func (n nm) activeState(ctx context.Context, path dbus.ObjectPath) ActiveState {
 	return ActiveState(state)
 }
 
+// configAddresses reads an IP config object's addresses (AddressData),
+// none when it cannot be read.
+func (n nm) configAddresses(ctx context.Context, config dbus.ObjectPath, iface string) []string {
+	var data []map[string]dbus.Variant
+	if err := n.prop(ctx, config, iface, "AddressData", &data); err != nil {
+		return nil
+	}
+	addresses := make([]string, 0, len(data))
+	for _, entry := range data {
+		if address, ok := entry["address"].Value().(string); ok {
+			addresses = append(addresses, address)
+		}
+	}
+	return addresses
+}
+
 // managerState reads NMState.
 func (n nm) managerState(ctx context.Context) State {
 	var state uint32

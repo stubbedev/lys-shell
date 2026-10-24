@@ -99,6 +99,9 @@ type vpnEntry struct {
 	// turnedOff is a tunnel someone turned off (from any NM client),
 	// which is never brought back on its own.
 	turnedOff bool
+	// stalled is a tunnel shown reconnecting because the network under
+	// it lost its address while it was up (vpn_underlay.go).
+	stalled bool
 	// toggle serializes toggles so a double-click can't start and stop
 	// at once.
 	toggle sync.Mutex
@@ -165,6 +168,7 @@ func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, 
 	s.rebuild()
 	s.resync(ctx)
 	go s.run(ctx, signals, profiles, failures)
+	go s.watchUnderlay(ctx)
 	return s, nil
 }
 
