@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -120,4 +121,60 @@ func TestIdleInhibitKeepsTheStylesheetInk(t *testing.T) {
 		}
 	}
 	state.Disable()
+}
+
+// namedHost is a fakeHost with an identity, so two compare unequal.
+type namedHost struct {
+	fakeHost
+	name string
+}
+
+// The bar holds one inhibitor while the state inhibits, from the user's
+// toggle or an app's hold, moves it when its bar closes, and drops it
+// when nothing asks any more.
+func TestIdleHolderFollowsTheStateAcrossBars(t *testing.T) {
+	state := idleinhibit.NewState(0)
+	var bound []app.Host
+	live := 0
+	h := &idleHolder{state: state, inhibit: func(host app.Host) (func(), error) {
+		bound = append(bound, host)
+		live++
+		return func() { live-- }, nil
+	}}
+	first, second := &namedHost{name: "DP-1"}, &namedHost{name: "DP-2"}
+	h.add(first)
+	h.add(second)
+	if live != 0 {
+		t.Fatal("an inhibitor without anything asking for one")
+	}
+	id := state.AddHold(idleinhibit.Hold{Owner: ":1.9", App: "org.app"})
+	h.sync()
+	if live != 1 || bound[0] != first {
+		t.Fatalf("an app's hold: %d live inhibitors on %v", live, bound)
+	}
+	h.sync()
+	if live != 1 {
+		t.Errorf("a repeated sync stacked inhibitors: %d", live)
+	}
+	h.remove(first)
+	if live != 1 || bound[len(bound)-1] != second {
+		t.Errorf("closing the holding bar: %d live, last bound %v", live, bound[len(bound)-1])
+	}
+	state.ReleaseHold(id)
+	state.Enable(true)
+	h.sync()
+	if live != 1 {
+		t.Errorf("the user's toggle: %d live", live)
+	}
+	state.Disable()
+	h.sync()
+	if live != 0 {
+		t.Errorf("nothing asks: %d live inhibitors", live)
+	}
+	h.remove(second)
+	state.Enable(true)
+	h.sync()
+	if live != 0 {
+		t.Error("an inhibitor bound with no bar open")
+	}
 }

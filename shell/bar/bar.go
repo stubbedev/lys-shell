@@ -178,6 +178,19 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// session bus for the `lys-shell idle` CLI.
 	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
 	baseCtx.IdleInhibit = inhibitState
+	// One inhibitor, held on a bar surface while the user's toggle or an
+	// app's portal hold asks for it.
+	var holder *idleHolder
+	if application.IdleInhibitAvailable() {
+		holder = &idleHolder{state: inhibitState, inhibit: application.InhibitIdle}
+		changes, stop := inhibitState.Changes()
+		defer stop()
+		go func() {
+			for range changes {
+				application.Invoke(holder.sync)
+			}
+		}()
+	}
 	baseCtx.Treeman = treeman.New("treeman")
 	// The weather service polls for the whole session (bootstrap/weather.rs);
 	// after its first fetch it only polls while a module or dropdown
@@ -296,7 +309,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 			a.Attach(layer)
 		}
 		rt.ctx.Dropdowns.attachHost(output.Name, layer, logicalSize(output).H)
-		return barWindow{layer, ctx.gen}, nil
+		if holder != nil {
+			holder.add(layer)
+		}
+		return barWindow{layer, ctx.gen, holder}, nil
 	}
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
@@ -642,11 +658,15 @@ func barLayoutFor(cfg *config.Config, connector string) (config.BarLayout, bool)
 // barWindow is an open bar: closing it closes the layer and ends the
 // generation its modules run in.
 type barWindow struct {
-	layer *app.LayerWindow
-	gen   *mountGen
+	layer  *app.LayerWindow
+	gen    *mountGen
+	holder *idleHolder
 }
 
 func (w barWindow) Close() {
+	if w.holder != nil {
+		w.holder.remove(w.layer)
+	}
 	w.layer.Close()
 	w.gen.retire()
 }

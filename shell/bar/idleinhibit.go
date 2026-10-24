@@ -1,6 +1,8 @@
 package bar
 
 import (
+	"log"
+	"slices"
 	"strconv"
 
 	"github.com/stubbedev/lys-ui/app"
@@ -36,16 +38,15 @@ func idleInhibitLabel(format string, active bool, durationMins uint32, remaining
 	return jinja.RenderOr(format, map[string]any{"state": state, "remaining": remaining, "duration": duration})
 }
 
-// idleInhibit is the module: the shared inhibit state rendered into
-// the bar, with the Wayland inhibitor bound to the bar surface.
+// idleInhibitModule is the module: the shared inhibit state rendered
+// into the bar. The Wayland inhibitor itself is the bar's idleHolder,
+// so idle is held with or without this module in the layout.
 type idleInhibitModule struct {
-	ctx     ModuleContext
-	state   *idleinhibit.State
-	label   *widget.Label
-	icon    *widget.Icon
-	root    widget.Widget
-	host    app.Host
-	release func()
+	ctx   ModuleContext
+	state *idleinhibit.State
+	label *widget.Label
+	icon  *widget.Icon
+	root  widget.Widget
 }
 
 func newIdleInhibit(ctx ModuleContext) (Module, error) {
@@ -57,41 +58,9 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 	m.icon = moduleIcon(ctx, ctx.Config.IdleInhibit.Icons()[config.IdleInhibitInactive])
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.render()
-	// Follow the shared state: every flip re-syncs the inhibitor and
-	// re-renders.
 	changes, stop := state.Changes()
-	follow(m.ctx, changes, stop, func(struct{}) { m.syncInhibitor() })
+	follow(m.ctx, changes, stop, func(struct{}) { m.render() })
 	return m, nil
-}
-
-// Attach binds the inhibitor lifecycle to a host surface. The bar
-// calls it once the layer window exists; the module is inert before
-// that. The state-following loop starts at construction and rides the
-// same notifications.
-func (m *idleInhibitModule) Attach(host app.Host) {
-	if m.ctx.App == nil || !m.ctx.App.IdleInhibitAvailable() {
-		return
-	}
-	m.ctx.Invoke(func() {
-		m.host = host
-		m.syncInhibitor()
-	})
-}
-
-// syncInhibitor matches the live inhibitor to the shared state, then
-// repaints. Runs on the loop goroutine.
-func (m *idleInhibitModule) syncInhibitor() {
-	active := m.state.Active()
-	switch {
-	case active && m.release == nil && m.host != nil:
-		if r, err := m.ctx.App.InhibitIdle(m.host); err == nil {
-			m.release = r
-		}
-	case !active && m.release != nil:
-		m.release()
-		m.release = nil
-	}
-	m.render()
 }
 
 // render applies the state to label and icon.
@@ -114,10 +83,54 @@ func (m *idleInhibitModule) render() {
 
 func (m *idleInhibitModule) Root() widget.Widget { return m.root }
 
-// Stop releases the inhibitor when the bar goes down.
-func (m *idleInhibitModule) Stop() {
-	if m.release != nil {
-		m.release()
-		m.release = nil
+// idleHolder keeps one Wayland idle inhibitor alive while the shared
+// state inhibits (the user's toggle or an app's hold), bound to an open
+// bar surface and moved to another when that bar closes. Loop goroutine
+// only.
+type idleHolder struct {
+	state *idleinhibit.State
+	// inhibit binds an inhibitor to a host (Application.InhibitIdle).
+	inhibit func(app.Host) (func(), error)
+	hosts   []app.Host
+	host    app.Host
+	release func()
+}
+
+// add offers an open bar surface.
+func (h *idleHolder) add(host app.Host) {
+	h.hosts = append(h.hosts, host)
+	h.sync()
+}
+
+// remove withdraws a bar surface before it closes.
+func (h *idleHolder) remove(host app.Host) {
+	h.hosts = slices.DeleteFunc(h.hosts, func(o app.Host) bool { return o == host })
+	if h.host == host {
+		h.drop()
 	}
+	h.sync()
+}
+
+// sync matches the inhibitor to the state.
+func (h *idleHolder) sync() {
+	if !h.state.Inhibiting() {
+		h.drop()
+		return
+	}
+	if h.release != nil || len(h.hosts) == 0 {
+		return
+	}
+	release, err := h.inhibit(h.hosts[0])
+	if err != nil {
+		log.Printf("idle-inhibit: cannot inhibit idle: %v", err)
+		return
+	}
+	h.host, h.release = h.hosts[0], release
+}
+
+func (h *idleHolder) drop() {
+	if h.release != nil {
+		h.release()
+	}
+	h.host, h.release = nil, nil
 }

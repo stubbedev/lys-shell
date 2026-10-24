@@ -23,7 +23,7 @@ Implemented natively by `lys-shell portal`:
 | `Settings` | `lys-shell-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast) |
 | `Notification` | the shell's notification daemon (incl. action buttons + ActionInvoked) |
 | `Wallpaper` | `dev.stubbe.lys.Wallpaper1` |
-| `Inhibit` | a systemd-logind inhibitor lock |
+| `Inhibit` | systemd-logind block locks (idle, sleep, shutdown for logout) with the app's reason, plus a hold on the shell's own idle inhibitor; monitor sessions follow the lock screen (user switching cannot be inhibited) |
 | `Clipboard` | `zwlr_data_control` (read/own the Wayland selection for RemoteDesktop sessions) |
 | `Background` | autostart `.desktop` entries + permission |
 | `Usb` | device-access permission grant (enumeration is frontend-side) |

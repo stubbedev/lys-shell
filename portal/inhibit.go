@@ -1,74 +1,177 @@
 package portal
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/service/idleinhibit"
 )
+
+// InhibitIface is org.freedesktop.impl.portal.Inhibit.
+const InhibitIface = "org.freedesktop.impl.portal.Inhibit"
 
 // Inhibit flags of the portal spec.
 const (
-	inhibitLogout  = 1
-	inhibitSuspend = 4
-	inhibitIdle    = 8
+	inhibitLogout     = 1
+	inhibitUserSwitch = 2
+	inhibitSuspend    = 4
+	inhibitIdle       = 8
 )
 
-// inhibitor is org.freedesktop.impl.portal.Inhibit (inhibit.rs): a
-// logind block lock for the request's lifetime, held by a Request at
-// the handle whose Close drops the lock's fd.
+// sessionRunning is the session-state a monitor reports: lys-shell has
+// no session manager that asks apps before ending the session, so the
+// state never moves to Query End (2) or Ending (3).
+const sessionRunning = 1
+
+// monitorStateDelay is how long after CreateMonitor's reply the first
+// StateChanged goes out: the frontend registers the session when the
+// reply arrives and drops signals for sessions it does not know.
+const monitorStateDelay = 100 * time.Millisecond
+
+// shellCallTimeout bounds a call to the running shell.
+const shellCallTimeout = 5 * time.Second
+
+// screensaver is where a monitor's screensaver-active comes from:
+// logind's LockedHint, which the lock screen sets.
+type screensaver interface {
+	screensaverActive() (bool, error)
+	watchScreensaver(fn func(active bool)) (stop func(), err error)
+}
+
+// inhibitor is org.freedesktop.impl.portal.Inhibit. Inhibit holds,
+// for a Request's lifetime, a logind block lock (idle, sleep, and
+// shutdown for logout, since powering off ends the session too) and,
+// for idle, a hold on the shell's own idle inhibitor, which idle
+// daemons that ignore logind (swayidle) still obey. User switching has
+// nothing to inhibit it on this desktop. CreateMonitor sessions get
+// StateChanged when the screen locks or unlocks.
 type inhibitor struct {
-	conn *dbus.Conn
-	// lock takes a logind lock for what ("idle:sleep:shutdown").
-	lock func(what string) (*os.File, error)
+	conn     *dbus.Conn
+	sessions *sessions
+	// lock takes a logind lock for what ("idle:sleep:shutdown") with a
+	// reason.
+	lock func(what, why string) (*os.File, error)
+	// holdIdle holds the shell's idle inhibitor for an app.
+	holdIdle    func(app, reason string) (release func(), err error)
+	screensaver screensaver
+
+	mu       sync.Mutex
+	monitors map[dbus.ObjectPath]bool
+	unwatch  func()
 }
 
-func (i inhibitor) iface() dbusx.Interface {
+func newInhibitor(conn *dbus.Conn, sessions *sessions, lg *logind) *inhibitor {
+	return &inhibitor{
+		conn: conn, sessions: sessions, lock: lg.lock, holdIdle: shellIdleHold(conn), screensaver: lg,
+		monitors: map[dbus.ObjectPath]bool{},
+	}
+}
+
+func (i *inhibitor) iface() dbusx.Interface {
 	return dbusx.Interface{
-		Name:       "org.freedesktop.impl.portal.Inhibit",
+		Name:       InhibitIface,
 		Methods:    i,
-		Properties: dbusx.Getters{"version": func() any { return uint32(1) }},
+		Properties: dbusx.Getters{"version": func() any { return uint32(3) }},
 	}
 }
 
-// Inhibit takes the lock and exports its Request; nothing to inhibit,
-// or a logind failure, leaves the request without one.
-func (i inhibitor) Inhibit(handle dbus.ObjectPath, _, _ string, flags uint32, _ Vardict) *dbus.Error {
-	what := inhibitWhat(flags)
-	if what == "" {
-		return nil
+// shellIdleHold holds idle through the shell's IdleInhibit1 service,
+// which releases the hold by itself should the portal leave the bus.
+func shellIdleHold(conn *dbus.Conn) func(app, reason string) (func(), error) {
+	return func(app, reason string) (func(), error) {
+		obj := conn.Object(idleinhibit.ServiceName, idleinhibit.ServicePath)
+		ctx, cancel := context.WithTimeout(context.Background(), shellCallTimeout)
+		defer cancel()
+		var id uint32
+		if err := obj.CallWithContext(ctx, idleinhibit.ServiceName+".Hold", 0, app, reason).Store(&id); err != nil {
+			return nil, fmt.Errorf("shell idle hold: %w", err)
+		}
+		return func() {
+			ctx, cancel := context.WithTimeout(context.Background(), shellCallTimeout)
+			defer cancel()
+			if err := obj.CallWithContext(ctx, idleinhibit.ServiceName+".Release", 0, id).Err; err != nil {
+				warnf("inhibit: releasing the shell idle hold: %v", err)
+			}
+		}, nil
 	}
-	fd, err := i.lock(what)
-	if err != nil {
-		warnf("inhibit: %v", err)
-		return nil
+}
+
+// Inhibit takes what it can of the flags and exports a Request at the
+// handle whose Close releases it all. The Request is exported even when
+// nothing could be taken, so the frontend's Close never meets an
+// unknown object; the call then fails, which the app sees as response
+// 2.
+func (i *inhibitor) Inhibit(handle dbus.ObjectPath, appID, _ string, flags uint32, options Vardict) *dbus.Error {
+	why := stringOr(options, "reason", "")
+	if why == "" {
+		why = "Application requested"
 	}
-	l := &inhibitLock{fd: fd}
+	l := &inhibitLock{}
+	var failures []error
+	if what := inhibitWhat(flags); what != "" {
+		fd, err := i.lock(what, why)
+		if err != nil {
+			failures = append(failures, err)
+		}
+		l.fd = fd
+	}
+	if flags&inhibitIdle != 0 {
+		release, err := i.holdIdle(appID, why)
+		if err != nil {
+			failures = append(failures, err)
+		}
+		l.idle = release
+	}
+	if flags&inhibitUserSwitch != 0 {
+		failures = append(failures, errors.New("user switching cannot be inhibited on this desktop"))
+	}
 	unexport, err := dbusx.Export(i.conn, handle, dbusx.Interface{Name: RequestIface, Methods: l})
 	if err != nil {
-		warnf("inhibit: cannot export request object: %v", err)
-		_ = fd.Close()
-		return nil
+		l.release()
+		return dbusx.Failed(fmt.Sprintf("export the request: %v", err))
 	}
 	l.unexport = unexport
+	for _, f := range failures {
+		warnf("inhibit %s: %v", appID, f)
+	}
+	if !l.holding() {
+		return dbusx.Failed(fmt.Sprintf("nothing could be inhibited: %v", errors.Join(failures...)))
+	}
 	return nil
 }
 
-// inhibitLock is the Request holding one lock.
+// inhibitLock is the Request holding one inhibition.
 type inhibitLock struct {
 	once     sync.Once
 	fd       *os.File
+	idle     func()
 	unexport func()
+}
+
+func (l *inhibitLock) holding() bool { return l.fd != nil || l.idle != nil }
+
+func (l *inhibitLock) release() {
+	if l.fd != nil {
+		_ = l.fd.Close()
+	}
+	if l.idle != nil {
+		l.idle()
+	}
 }
 
 // Close releases the inhibition.
 func (l *inhibitLock) Close() *dbus.Error {
 	l.once.Do(func() {
 		l.unexport()
-		_ = l.fd.Close()
+		l.release()
 	})
 	return nil
 }
@@ -88,18 +191,68 @@ func inhibitWhat(flags uint32) string {
 	return strings.Join(what, ":")
 }
 
-// logindLock takes a block inhibitor from logind on the system bus.
-func logindLock(what string) (*os.File, error) {
-	conn, err := dbus.ConnectSystemBus()
-	if err != nil {
-		return nil, err
+// CreateMonitor opens a monitoring session: it gets the current state
+// right after the reply, and again whenever the screen locks or
+// unlocks, until it closes.
+func (i *inhibitor) CreateMonitor(_, session dbus.ObjectPath, appID, _ string) (uint32, *dbus.Error) {
+	if err := i.sessions.mount(session, func() { i.dropMonitor(session) }); err != nil {
+		warnf("inhibit: cannot mount monitor session for %s: %v", appID, err)
+		return ResponseOther, nil
 	}
-	defer func() { _ = conn.Close() }()
-	var fd dbus.UnixFD
-	err = conn.Object("org.freedesktop.login1", "/org/freedesktop/login1").
-		Call("org.freedesktop.login1.Manager.Inhibit", 0, what, "lys-shell portal", "Application requested", "block").Store(&fd)
-	if err != nil {
-		return nil, err
+	i.mu.Lock()
+	i.monitors[session] = true
+	if i.unwatch == nil {
+		unwatch, err := i.screensaver.watchScreensaver(i.broadcast)
+		if err != nil {
+			warnf("inhibit: screensaver state will not follow the lock screen: %v", err)
+		} else {
+			i.unwatch = unwatch
+		}
 	}
-	return os.NewFile(uintptr(fd), "inhibit"), nil
+	i.mu.Unlock()
+	time.AfterFunc(monitorStateDelay, func() {
+		active, err := i.screensaver.screensaverActive()
+		if err != nil {
+			warnf("inhibit: reading the screensaver state: %v", err)
+		}
+		i.emitState(session, active)
+	})
+	return ResponseSuccess, nil
+}
+
+// QueryEndResponse acknowledges a Query End this backend never sends.
+func (i *inhibitor) QueryEndResponse(dbus.ObjectPath) *dbus.Error { return nil }
+
+func (i *inhibitor) dropMonitor(session dbus.ObjectPath) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	delete(i.monitors, session)
+	if len(i.monitors) == 0 && i.unwatch != nil {
+		i.unwatch()
+		i.unwatch = nil
+	}
+}
+
+// broadcast sends every live monitor the new screensaver state.
+func (i *inhibitor) broadcast(active bool) {
+	i.mu.Lock()
+	live := make([]dbus.ObjectPath, 0, len(i.monitors))
+	for s := range i.monitors {
+		live = append(live, s)
+	}
+	i.mu.Unlock()
+	for _, s := range live {
+		i.emitState(s, active)
+	}
+}
+
+func (i *inhibitor) emitState(session dbus.ObjectPath, active bool) {
+	i.mu.Lock()
+	live := i.monitors[session]
+	i.mu.Unlock()
+	if !live {
+		return
+	}
+	state := Vardict{"screensaver-active": dbus.MakeVariant(active), "session-state": dbus.MakeVariant(uint32(sessionRunning))}
+	_ = i.conn.Emit(ObjectPath, InhibitIface+".StateChanged", session, state)
 }

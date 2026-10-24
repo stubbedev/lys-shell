@@ -31,12 +31,12 @@ type Backend struct {
 	sessions *sessions
 	// spawn starts a program the portal hands off to (detach; a
 	// recorder in tests).
-	spawn func(argv, env []string) error
-	// inhibitLock takes a logind lock (logindLock; a fake in tests).
-	inhibitLock func(what string) (*os.File, error)
-	notifier    *notifier
-	clipboard   *clipboardBridge
-	shortcuts   *globalShortcuts
+	spawn     func(argv, env []string) error
+	logind    *logind
+	inhibitor *inhibitor
+	notifier  *notifier
+	clipboard *clipboardBridge
+	shortcuts *globalShortcuts
 	// sizes is the running streams' sizes, ScreenCast's for RemoteDesktop.
 	sizes      *streamSizes
 	screenCast *screenCast
@@ -48,8 +48,9 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b := &Backend{
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
 		settings: &settings{cfg: cfg, gtk: hostGTKSettings, getenv: os.Getenv},
-		spawn:    detach, inhibitLock: logindLock, notifier: newNotifier(conn),
+		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
+	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
 	b.sizes = &streamSizes{sizes: map[uint32][2]int32{}}
@@ -70,7 +71,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		usbIface(),
 		emailIface(b.spawn),
 		secretIface(),
-		inhibitor{b.conn, b.inhibitLock}.iface(),
+		b.inhibitor.iface(),
 		screenshotIface(b.conn),
 		fileChooserIface(b.conn),
 		printIface(b.conn),
@@ -109,6 +110,7 @@ func (b *Backend) Serve() (stop func(), err error) {
 		unwatch()
 		unforward()
 		b.sessions.clearAll()
+		b.logind.close()
 		release()
 	}, nil
 }

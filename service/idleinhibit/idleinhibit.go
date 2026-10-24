@@ -4,6 +4,7 @@
 package idleinhibit
 
 import (
+	"maps"
 	"strconv"
 	"sync"
 	"time"
@@ -17,16 +18,25 @@ const (
 	ServicePath = "/dev/stubbe/lys/IdleInhibit"
 )
 
-// State is the reactive state: whether inhibition runs, the stored
-// duration in minutes (0 = indefinite), and the seconds left on the
-// timer when one is running.
+// State is the reactive state: whether the user's inhibition runs,
+// the stored duration in minutes (0 = indefinite), the seconds left on
+// the timer when one is running, and the holds apps (through the
+// desktop portal) keep alongside it.
 type State struct {
 	mu            sync.Mutex
 	active        bool
 	durationMins  uint32
 	remainingSecs int
 	timerStop     chan struct{}
+	holds         map[uint32]Hold
+	nextHold      uint32
 	changes       feed.Tick
+}
+
+// Hold is one app's inhibition: who asked (an owner the daemon
+// releases together when it leaves the bus), for which app, and why.
+type Hold struct {
+	Owner, App, Reason string
 }
 
 // NewState starts with the given duration in minutes and inhibition
@@ -47,6 +57,64 @@ func (s *State) Duration() uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.durationMins
+}
+
+// Inhibiting reports whether idle must be inhibited: the user's
+// inhibition is on, or an app holds one.
+func (s *State) Inhibiting() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.active || len(s.holds) > 0
+}
+
+// AddHold registers an app's inhibition, leaving the user's untouched,
+// until the returned id is released.
+func (s *State) AddHold(h Hold) uint32 {
+	s.mu.Lock()
+	if s.holds == nil {
+		s.holds = map[uint32]Hold{}
+	}
+	s.nextHold++
+	id := s.nextHold
+	s.holds[id] = h
+	s.mu.Unlock()
+	s.notify()
+	return id
+}
+
+// ReleaseHold drops one hold; false when id names none.
+func (s *State) ReleaseHold(id uint32) bool {
+	s.mu.Lock()
+	_, ok := s.holds[id]
+	delete(s.holds, id)
+	s.mu.Unlock()
+	if ok {
+		s.notify()
+	}
+	return ok
+}
+
+// ReleaseOwner drops every hold owner took.
+func (s *State) ReleaseOwner(owner string) {
+	s.mu.Lock()
+	n := len(s.holds)
+	for id, h := range s.holds {
+		if h.Owner == owner {
+			delete(s.holds, id)
+		}
+	}
+	dropped := len(s.holds) != n
+	s.mu.Unlock()
+	if dropped {
+		s.notify()
+	}
+}
+
+// Holds lists the apps' holds, by id.
+func (s *State) Holds() map[uint32]Hold {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return maps.Clone(s.holds)
 }
 
 // Remaining returns the seconds left, 0 when inactive or indefinite.
@@ -224,9 +292,6 @@ func (s *State) stopTimerLocked() {
 		s.timerStop = nil
 	}
 }
-
-// Err values surface through the daemon's error replies.
-var _ = struct{}{}
 
 // FormatDuration renders seconds as H:MM:SS above the hour and M:SS
 // within it (helpers.rs's format_duration).

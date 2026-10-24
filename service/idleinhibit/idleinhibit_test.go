@@ -3,6 +3,10 @@ package idleinhibit
 import (
 	"testing"
 	"time"
+
+	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 func waitChange(t *testing.T, ch <-chan struct{}) {
@@ -169,5 +173,72 @@ func TestFormatDuration(t *testing.T) {
 		if got := FormatDuration(tc.secs); got != tc.want {
 			t.Errorf("FormatDuration(%d) = %q, want %q", tc.secs, got, tc.want)
 		}
+	}
+}
+
+// An app's hold inhibits alongside the user's toggle without changing
+// it; idle stays inhibited until both are gone.
+func TestStateHoldsInhibitAlongsideTheToggle(t *testing.T) {
+	s := NewState(0)
+	if s.Inhibiting() {
+		t.Fatal("a fresh state inhibits")
+	}
+	a := s.AddHold(Hold{Owner: ":1.5", App: "org.app", Reason: "playing"})
+	b := s.AddHold(Hold{Owner: ":1.6", App: "org.other"})
+	if !s.Inhibiting() || s.Active() {
+		t.Errorf("held: inhibiting %v, user active %v", s.Inhibiting(), s.Active())
+	}
+	s.Enable(true)
+	s.Disable()
+	if !s.Inhibiting() {
+		t.Error("the user's toggle off dropped the apps' holds")
+	}
+	if !s.ReleaseHold(a) || s.ReleaseHold(a) {
+		t.Error("a hold released twice, or not at all")
+	}
+	s.ReleaseOwner(":1.6")
+	if s.Inhibiting() || len(s.Holds()) != 0 || s.ReleaseHold(b) {
+		t.Errorf("after releasing everything: inhibiting %v, holds %v", s.Inhibiting(), s.Holds())
+	}
+}
+
+// Over the bus a hold belongs to its caller: only it releases the hold,
+// and its holds go when it leaves the bus.
+func TestDaemonHoldsFollowTheirCaller(t *testing.T) {
+	bus := dbustest.Start(t)
+	state := NewState(0)
+	release, err := NewDaemon(state).Export(bus.Conn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(release)
+	portal := bus.Conn(t)
+	other := bus.Conn(t)
+	call := func(c *dbus.Conn, method string, args ...any) *dbus.Call {
+		return c.Object(ServiceName, ServicePath).Call(ServiceName+"."+method, 0, args...)
+	}
+	var id uint32
+	if err := call(portal, "Hold", "org.app", "playing").Store(&id); err != nil || id == 0 {
+		t.Fatalf("Hold = %d, %v", id, err)
+	}
+	if h := state.Holds()[id]; h.App != "org.app" || h.Reason != "playing" || h.Owner != portal.Names()[0] {
+		t.Errorf("hold = %+v", h)
+	}
+	if err := call(other, "Release", id).Err; err == nil {
+		t.Error("another caller released the hold")
+	}
+	if err := call(portal, "Release", id).Err; err != nil || state.Inhibiting() {
+		t.Errorf("Release = %v, inhibiting %v", err, state.Inhibiting())
+	}
+	if err := call(portal, "Hold", "org.app", "again").Store(&id); err != nil {
+		t.Fatal(err)
+	}
+	_ = portal.Close()
+	deadline := time.Now().Add(2 * time.Second)
+	for state.Inhibiting() && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if state.Inhibiting() {
+		t.Error("a departed caller's hold kept idle inhibited")
 	}
 }

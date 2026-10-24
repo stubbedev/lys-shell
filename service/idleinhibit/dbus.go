@@ -1,24 +1,77 @@
 package idleinhibit
 
 import (
+	"fmt"
+
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
-// Daemon is the dev.stubbe.lys.IdleInhibit1 object
-// (wayle-shell-core/src/services/idle_inhibit/dbus.rs), which the
-// `lys-shell idle` CLI drives from another process.
+// Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the
+// `lys-shell idle` CLI drives from another process and the desktop
+// portal holds idle through for apps.
 type Daemon struct {
 	state *State
+	conn  *dbus.Conn
 }
 
 // NewDaemon wraps the state for export.
 func NewDaemon(state *State) *Daemon { return &Daemon{state: state} }
 
-// Export serves the interface under its well-known name; the returned
-// release drops the name.
+// Export serves the interface under its well-known name and releases
+// the holds of every caller that leaves the bus; the returned release
+// stops both.
 func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
+	d.conn = conn
+	match := []dbus.MatchOption{
+		dbus.WithMatchSender("org.freedesktop.DBus"),
+		dbus.WithMatchInterface("org.freedesktop.DBus"),
+		dbus.WithMatchMember("NameOwnerChanged"),
+	}
+	if err := conn.AddMatchSignal(match...); err != nil {
+		return nil, fmt.Errorf("idle inhibit: watch NameOwnerChanged: %w", err)
+	}
+	signals := make(chan *dbus.Signal, 16)
+	conn.Signal(signals)
+	done := make(chan struct{})
+	go d.releaseDeparted(signals, done)
+	release, err := d.serve(conn)
+	if err != nil {
+		conn.RemoveSignal(signals)
+		close(done)
+		_ = conn.RemoveMatchSignal(match...)
+		return nil, err
+	}
+	return func() {
+		release()
+		conn.RemoveSignal(signals)
+		close(done)
+		_ = conn.RemoveMatchSignal(match...)
+	}, nil
+}
+
+// releaseDeparted drops the holds of every bus name that loses its
+// owner, until done closes.
+func (d *Daemon) releaseDeparted(signals <-chan *dbus.Signal, done <-chan struct{}) {
+	for {
+		select {
+		case <-done:
+			return
+		case sig := <-signals:
+			if sig.Name != "org.freedesktop.DBus.NameOwnerChanged" || len(sig.Body) != 3 {
+				continue
+			}
+			name, _ := sig.Body[0].(string)
+			newOwner, _ := sig.Body[2].(string)
+			if newOwner == "" {
+				d.state.ReleaseOwner(name)
+			}
+		}
+	}
+}
+
+func (d *Daemon) serve(conn *dbus.Conn) (func(), error) {
 	return dbusx.Serve(conn, dbusx.Service{
 		Name:      ServiceName,
 		Path:      ServicePath,
@@ -31,6 +84,29 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 			"Indefinite": func() any { return d.state.Duration() == 0 },
 		},
 	})
+}
+
+// Hold inhibits idle for app until Release with the returned id, or
+// until the caller leaves the bus.
+func (d *Daemon) Hold(app, reason string, sender dbus.Sender) (uint32, *dbus.Error) {
+	id := d.state.AddHold(Hold{Owner: string(sender), App: app, Reason: reason})
+	var present bool
+	err := d.conn.BusObject().Call("org.freedesktop.DBus.NameHasOwner", 0, string(sender)).Store(&present)
+	if err == nil && !present {
+		d.state.ReleaseHold(id)
+		return 0, dbusx.Failed("the caller left the bus")
+	}
+	return id, nil
+}
+
+// Release ends a hold the caller took.
+func (d *Daemon) Release(id uint32, sender dbus.Sender) *dbus.Error {
+	h, ok := d.state.Holds()[id]
+	if !ok || h.Owner != string(sender) {
+		return dbusx.Failed("no such hold")
+	}
+	d.state.ReleaseHold(id)
+	return nil
 }
 
 // Enable turns inhibition on, indefinite or timed.

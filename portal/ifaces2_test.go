@@ -244,32 +244,77 @@ func TestWallpaperFailsWithoutTheShell(t *testing.T) {
 	}
 }
 
-func TestInhibitHoldsTheLockUntilClose(t *testing.T) {
-	var asked dbustest.Var[[]string]
-	var lockErr dbustest.Var[error]
-	var held dbustest.Var[*os.File]
-	r := newRig(t, func(b *Backend) {
-		b.inhibitLock = func(what string) (*os.File, error) {
-			asked.Update(func(w []string) []string { return append(w, what) })
-			if err := lockErr.Load(); err != nil {
+// fakeScreensaver is a screensaver whose state the test sets and whose
+// watch it can fire.
+type fakeScreensaver struct {
+	active  dbustest.Var[bool]
+	watcher dbustest.Var[func(bool)]
+	stops   dbustest.Var[int]
+}
+
+func (f *fakeScreensaver) screensaverActive() (bool, error) { return f.active.Load(), nil }
+
+func (f *fakeScreensaver) watchScreensaver(fn func(bool)) (func(), error) {
+	f.watcher.Store(fn)
+	return func() { f.stops.Update(func(n int) int { return n + 1 }) }, nil
+}
+
+// inhibitRig is a rig whose logind locks and shell idle holds are
+// recorded fakes; lockErr and idleErr make them fail.
+type inhibitRig struct {
+	*rig
+	asked    dbustest.Var[[]string]
+	held     dbustest.Var[*os.File]
+	idleHeld dbustest.Var[int]
+	lockErr  dbustest.Var[error]
+	idleErr  dbustest.Var[error]
+	saver    *fakeScreensaver
+}
+
+func newInhibitRig(t *testing.T) *inhibitRig {
+	t.Helper()
+	ir := &inhibitRig{saver: &fakeScreensaver{}}
+	ir.rig = newRig(t, func(b *Backend) {
+		b.inhibitor.lock = func(what, why string) (*os.File, error) {
+			ir.asked.Update(func(w []string) []string { return append(w, what+" "+why) })
+			if err := ir.lockErr.Load(); err != nil {
 				return nil, err
 			}
 			pr, pw, err := os.Pipe()
-			held.Store(pr)
+			ir.held.Store(pr)
 			return pw, err
 		}
+		b.inhibitor.holdIdle = func(app, reason string) (func(), error) {
+			if err := ir.idleErr.Load(); err != nil {
+				return nil, err
+			}
+			ir.idleHeld.Update(func(n int) int { return n + 1 })
+			return func() { ir.idleHeld.Update(func(n int) int { return n - 1 }) }, nil
+		}
+		b.inhibitor.screensaver = ir.saver
 	})
-	const iface = "org.freedesktop.impl.portal.Inhibit.Inhibit"
-	if err := r.obj.Call(iface, 0, handle, "org.app", "", uint32(inhibitIdle|inhibitSuspend|inhibitLogout), Vardict{}).Err; err != nil {
+	return ir
+}
+
+func (ir *inhibitRig) inhibit(flags uint32, options Vardict) error {
+	return ir.obj.Call(InhibitIface+".Inhibit", 0, handle, "org.app", "", flags, options).Err
+}
+
+func TestInhibitHoldsTheLockUntilClose(t *testing.T) {
+	r := newInhibitRig(t)
+	if err := r.inhibit(inhibitIdle|inhibitSuspend|inhibitLogout, Vardict{"reason": dbus.MakeVariant("Playing music")}); err != nil {
 		t.Fatal(err)
 	}
-	if got := asked.Load(); !slices.Equal(got, []string{"idle:sleep:shutdown"}) {
-		t.Fatalf("logind asked for %v", got)
+	if got := r.asked.Load(); !slices.Equal(got, []string{"idle:sleep:shutdown Playing music"}) {
+		t.Fatalf("logind asked for %v, want the lock with the app's reason", got)
+	}
+	if r.idleHeld.Load() != 1 {
+		t.Error("idle was not held on the shell's inhibitor")
 	}
 	req := r.client.Object(BusName, handle)
 	readDone := make(chan error, 1)
 	go func() {
-		_, err := io.ReadAll(held.Load())
+		_, err := io.ReadAll(r.held.Load())
 		readDone <- err
 	}()
 	select {
@@ -285,18 +330,115 @@ func TestInhibitHoldsTheLockUntilClose(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Close kept the lock")
 	}
+	if r.idleHeld.Load() != 0 {
+		t.Error("Close kept the shell idle hold")
+	}
 	if err := req.Call(RequestIface+".Close", 0).Err; err == nil {
 		t.Error("the Request outlived its lock")
 	}
+}
 
-	// No flags asks logind for nothing; a logind failure exports nothing.
-	_ = r.obj.Call(iface, 0, handle, "org.app", "", uint32(2), Vardict{}).Err
-	lockErr.Store(errors.New("no logind"))
-	_ = r.obj.Call(iface, 0, handle, "org.app", "", uint32(inhibitIdle), Vardict{}).Err
-	if got := asked.Load(); len(got) != 2 {
-		t.Errorf("logind asked %v", got)
+// Without a reason logind still gets one; suspend alone takes no idle
+// hold.
+func TestInhibitDefaultsTheReason(t *testing.T) {
+	r := newInhibitRig(t)
+	if err := r.inhibit(inhibitSuspend, Vardict{}); err != nil {
+		t.Fatal(err)
 	}
-	if err := req.Call(RequestIface+".Close", 0).Err; err == nil {
-		t.Error("a failed lock exported a Request")
+	if got := r.asked.Load(); !slices.Equal(got, []string{"sleep Application requested"}) || r.idleHeld.Load() != 0 {
+		t.Errorf("asked %v, idle holds %d", got, r.idleHeld.Load())
+	}
+}
+
+// User switching has nothing to inhibit it: asked alone the call fails;
+// beside idle the idle part still holds.
+func TestInhibitUserSwitchIsRefused(t *testing.T) {
+	r := newInhibitRig(t)
+	if err := r.inhibit(inhibitUserSwitch, Vardict{}); err == nil {
+		t.Error("a user-switch inhibition succeeded")
+	}
+	if got := r.asked.Load(); len(got) != 0 {
+		t.Errorf("logind asked %v for a user switch", got)
+	}
+	req := r.client.Object(BusName, handle)
+	if err := req.Call(RequestIface+".Close", 0).Err; err != nil {
+		t.Errorf("Close after a refused inhibition: %v", err)
+	}
+	if err := r.inhibit(inhibitUserSwitch|inhibitIdle, Vardict{}); err != nil {
+		t.Errorf("idle beside a user switch: %v", err)
+	}
+	if r.idleHeld.Load() != 1 {
+		t.Error("the idle part was not held")
+	}
+}
+
+// When logind and the shell both refuse, the call fails, but the
+// Request is there for the frontend's Close.
+func TestInhibitFailureStillExportsTheRequest(t *testing.T) {
+	r := newInhibitRig(t)
+	r.lockErr.Store(errors.New("no logind"))
+	r.idleErr.Store(errors.New("no shell"))
+	if err := r.inhibit(inhibitIdle, Vardict{}); err == nil {
+		t.Error("an inhibition that holds nothing succeeded")
+	}
+	if err := r.client.Object(BusName, handle).Call(RequestIface+".Close", 0).Err; err != nil {
+		t.Errorf("Close after a failed lock: %v", err)
+	}
+	// The shell alone still holds idle.
+	r.idleErr.Store(nil)
+	if err := r.inhibit(inhibitIdle, Vardict{}); err != nil || r.idleHeld.Load() != 1 {
+		t.Errorf("logind down, shell up: %v, %d holds", err, r.idleHeld.Load())
+	}
+}
+
+// A monitor gets the current state right after it opens and again when
+// the screen locks; a closed monitor gets nothing and the watch stops.
+func TestInhibitMonitorFollowsTheLockScreen(t *testing.T) {
+	r := newInhibitRig(t)
+	if err := r.client.AddMatchSignal(dbus.WithMatchInterface(InhibitIface)); err != nil {
+		t.Fatal(err)
+	}
+	next := func() (dbus.ObjectPath, Vardict) {
+		t.Helper()
+		timeout := time.After(2 * time.Second)
+		for {
+			select {
+			case s := <-r.signals:
+				if s.Name == InhibitIface+".StateChanged" {
+					return s.Body[0].(dbus.ObjectPath), s.Body[1].(map[string]dbus.Variant)
+				}
+			case <-timeout:
+				t.Fatal("no StateChanged")
+			}
+		}
+	}
+	var code uint32
+	if err := r.obj.Call(InhibitIface+".CreateMonitor", 0, handle, sessA, "org.app", "").Store(&code); err != nil || code != ResponseSuccess {
+		t.Fatalf("CreateMonitor = %d, %v", code, err)
+	}
+	session, state := next()
+	if session != sessA || state["screensaver-active"].Value() != false || state["session-state"].Value() != uint32(1) {
+		t.Errorf("initial state %s %v", session, state)
+	}
+	r.saver.watcher.Load()(true)
+	if _, state := next(); state["screensaver-active"].Value() != true {
+		t.Errorf("after locking: %v", state)
+	}
+	if err := r.obj.Call(InhibitIface+".QueryEndResponse", 0, sessA).Err; err != nil {
+		t.Errorf("QueryEndResponse: %v", err)
+	}
+	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	if r.saver.stops.Load() != 1 {
+		t.Error("the screensaver watch outlived the last monitor")
+	}
+	r.saver.watcher.Load()(false)
+	select {
+	case s := <-r.signals:
+		if s.Name == InhibitIface+".StateChanged" {
+			t.Errorf("a closed monitor got %v", s.Body)
+		}
+	case <-time.After(150 * time.Millisecond):
 	}
 }
