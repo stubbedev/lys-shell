@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -69,10 +70,18 @@ type Entry struct {
 	IsDir    bool
 	Size     int64
 	Modified time.Time
+	// Label is the name shown in place of the basename: a trashed
+	// file's original name; "" shows the basename.
+	Label string
 }
 
-// Name is the entry's basename.
-func (e Entry) Name() string { return filepath.Base(e.Path) }
+// Name is the entry's shown name: its label, else its basename.
+func (e Entry) Name() string {
+	if e.Label != "" {
+		return e.Label
+	}
+	return filepath.Base(e.Path)
+}
 
 // Kind is the displayed type: Folder, the uppercased extension (PNG),
 // or File without one.
@@ -80,7 +89,7 @@ func (e Entry) Kind() string {
 	if e.IsDir {
 		return "Folder"
 	}
-	if ext := strings.TrimPrefix(filepath.Ext(e.Path), "."); ext != "" {
+	if ext := strings.TrimPrefix(filepath.Ext(e.Name()), "."); ext != "" {
 		return strings.ToUpper(ext)
 	}
 	return "File"
@@ -645,14 +654,11 @@ const recentLocation = "recent:"
 const maxRecent = 100
 
 // RecentFile is the recently-used list GTK writes,
-// $XDG_DATA_HOME/recently-used.xbel; "" without a home.
-func RecentFile(home string) string {
-	data := os.Getenv("XDG_DATA_HOME")
-	if data == "" {
-		if home == "" {
-			return ""
-		}
-		data = filepath.Join(home, ".local", "share")
+// $XDG_DATA_HOME/recently-used.xbel; "" without a data home.
+func RecentFile() string {
+	data, ok := xdg.DataHome()
+	if !ok {
+		return ""
 	}
 	return filepath.Join(data, "recently-used.xbel")
 }
@@ -709,9 +715,20 @@ func ListRecent(path string, mode Mode) ([]Entry, error) {
 // directory (not hidden ones).
 func OtherLocations(mounts io.Reader, home, user string) []Place {
 	locations := []Place{{"Computer", "/", "drive-harddisk-symbolic"}}
-	if mounts == nil {
-		return locations
+	for _, path := range VisibleMounts(mounts, home, user) {
+		locations = append(locations, Place{filepath.Base(path), path, "drive-removable-media-symbolic"})
 	}
+	return locations
+}
+
+// VisibleMounts are the user-visible mount points in a
+// /proc/self/mounts listing, each once, in its order; none for a nil
+// listing.
+func VisibleMounts(mounts io.Reader, home, user string) []string {
+	if mounts == nil {
+		return nil
+	}
+	var paths []string
 	seen := map[string]bool{}
 	sc := bufio.NewScanner(mounts)
 	for sc.Scan() {
@@ -724,9 +741,60 @@ func OtherLocations(mounts io.Reader, home, user string) []Place {
 			continue
 		}
 		seen[path] = true
-		locations = append(locations, Place{filepath.Base(path), path, "drive-removable-media-symbolic"})
+		paths = append(paths, path)
 	}
-	return locations
+	return paths
+}
+
+// NetworkLocations are the network shares gvfs mounted, as its FUSE
+// daemon shows them under runtimeDir/gvfs, one folder each named
+// "<type>:<key>=<value>,...": labelled by share and server, else by
+// user and host; none without gvfsd-fuse running.
+func NetworkLocations(runtimeDir string) []Place {
+	if runtimeDir == "" {
+		return nil
+	}
+	dir := filepath.Join(runtimeDir, "gvfs")
+	des, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var places []Place
+	for _, de := range des {
+		if de.IsDir() {
+			places = append(places, Place{gvfsLabel(de.Name()), filepath.Join(dir, de.Name()), "folder-remote-symbolic"})
+		}
+	}
+	return places
+}
+
+// gvfsLabel names a gvfs mount from its "<type>:<key>=<value>,..."
+// folder name: "share on server", "user@host", "host", else the name.
+func gvfsLabel(name string) string {
+	_, params, ok := strings.Cut(name, ":")
+	if !ok {
+		return name
+	}
+	kv := map[string]string{}
+	for pair := range strings.SplitSeq(params, ",") {
+		if k, v, ok := strings.Cut(pair, "="); ok {
+			if u, err := url.PathUnescape(v); err == nil {
+				v = u
+			}
+			kv[k] = v
+		}
+	}
+	switch {
+	case kv["share"] != "" && kv["server"] != "":
+		return kv["share"] + " on " + kv["server"]
+	case kv["host"] != "" && kv["user"] != "":
+		return kv["user"] + "@" + kv["host"]
+	case kv["host"] != "":
+		return kv["host"]
+	case kv["server"] != "":
+		return kv["server"]
+	}
+	return name
 }
 
 // userVisibleMount is g_unix_mount_guess_should_display's path rule.
@@ -779,8 +847,11 @@ const maxCrumbTail = 3
 // standing for (and jumping to) the deepest collapsed one. Recent is
 // one crumb.
 func Crumbs(dir, home string) []Crumb {
-	if dir == recentLocation {
+	switch dir {
+	case recentLocation:
 		return []Crumb{{"Recent", recentLocation, true}}
+	case trashLocation:
+		return []Crumb{{"Trash", trashLocation, true}}
 	}
 	base, baseLabel := "/", "/"
 	rest := strings.TrimPrefix(dir, "/")

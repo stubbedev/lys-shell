@@ -1,7 +1,6 @@
 package filechooser
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"image"
@@ -102,8 +101,11 @@ type Deps struct {
 	// ViewFile persists the sort and layout; "" keeps them in memory.
 	ViewFile string
 	// RecentFile is the recently-used list the Recent place lists
-	// (RecentFile(home)); "" offers no Recent.
+	// (RecentFile()); "" offers no Recent.
 	RecentFile string
+	// TrashDirs are the trash directories the Trash place lists
+	// (SystemTrashDirs); nil offers no Trash.
+	TrashDirs func() []string
 	// Target is the output a dialog maps on (the focused one, else the
 	// first) with its logical size, which the sheet is centred on; false
 	// while none is known, when the compositor places it.
@@ -265,7 +267,7 @@ func (c *Chooser) begin(r request) {
 	c.thumbs, c.waiting = map[thumbKey]image.Image{}, map[thumbKey][]func(image.Image){}
 	c.replacing = ""
 	c.s = newSession(r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
-	c.s.hidden, c.s.recursive, c.s.recentFile = c.hidden, c.recursive, c.d.RecentFile
+	c.s.hidden, c.s.recursive, c.s.recentFile, c.s.trashDirs = c.hidden, c.recursive, c.d.RecentFile, c.d.TrashDirs
 	c.s.request = c.requestListing
 	if r.currentFilter > 0 && int(r.currentFilter) < len(c.s.filters) {
 		c.s.active = int(r.currentFilter)
@@ -302,10 +304,10 @@ func (c *Chooser) requestListing(dir string) {
 }
 
 // watch follows dir on disk, reloading its listing when it changes;
-// Recent and a folder that cannot be watched are not followed.
+// Recent, Trash and a folder that cannot be watched are not followed.
 func (c *Chooser) watch(dir string) {
 	c.unwatch()
-	if dir == recentLocation {
+	if virtualLocation(dir) {
 		return
 	}
 	w, err := fswatch.New(fswatch.Changes, false)
@@ -626,8 +628,13 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 		return list
 	}
 	favorites := c.d.Places()
-	if c.d.RecentFile != "" && (c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple) {
+	// Recent and Trash list files to open, never a folder to save in.
+	opening := c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple
+	if c.d.RecentFile != "" && opening {
 		favorites = append([]Place{{"Recent", recentLocation, "document-open-recent-symbolic"}}, favorites...)
+	}
+	if c.d.TrashDirs != nil && opening {
+		favorites = append(favorites, Place{"Trash", trashLocation, "user-trash-symbolic"})
 	}
 	section("Favorites", favorites)
 	u.locations = section("Locations", c.d.Locations())
@@ -1190,7 +1197,7 @@ func (c *Chooser) hideLocation() {
 // else warns.
 func (c *Chooser) goToLocation(text string) {
 	base := c.s.dir
-	if base == recentLocation {
+	if virtualLocation(base) {
 		base = c.d.Home
 	}
 	path := (&session{dir: base}).savePath(strings.TrimSpace(text), c.d.Home)
@@ -1226,7 +1233,7 @@ func (c *Chooser) showNewFolder() {
 // it; a name that is taken or cannot be made warns.
 func (c *Chooser) createFolder() {
 	name := strings.TrimSpace(c.ui.newFolderName.Text())
-	if name == "" || c.s.dir == recentLocation {
+	if name == "" || virtualLocation(c.s.dir) {
 		return
 	}
 	if name == "." || name == ".." || strings.Contains(name, "/") {
@@ -1500,18 +1507,6 @@ func (c *Chooser) fillPreview(icon *widget.Box, name, info *widget.Label, e Entr
 }
 
 // --- system defaults ------------------------------------------------
-
-// SystemLocations reads the mount table for OtherLocations.
-func SystemLocations(home string) func() []Place {
-	return func() []Place {
-		f, err := os.Open("/proc/self/mounts")
-		if err != nil {
-			return OtherLocations(nil, home, os.Getenv("USER"))
-		}
-		defer func() { _ = f.Close() }()
-		return OtherLocations(bufio.NewReader(f), home, os.Getenv("USER"))
-	}
-}
 
 // droppedPath is the first local path in a text/uri-list payload.
 func droppedPath(data []byte) (string, bool) {

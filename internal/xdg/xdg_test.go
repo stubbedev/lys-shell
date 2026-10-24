@@ -47,3 +47,21 @@ func TestCacheHome(t *testing.T) {
 		t.Error("a cache home with neither")
 	}
 }
+
+// The data home is the variable's directory itself, else
+// ~/.local/share.
+func TestDataHome(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/d")
+	if got, ok := DataHome(); !ok || got != "/d" {
+		t.Errorf("DataHome = %q, %v", got, ok)
+	}
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "/home/u")
+	if got, ok := DataHome(); !ok || got != "/home/u/.local/share" {
+		t.Errorf("DataHome under HOME = %q, %v", got, ok)
+	}
+	t.Setenv("HOME", "")
+	if _, ok := DataHome(); ok {
+		t.Error("a data home with neither")
+	}
+}

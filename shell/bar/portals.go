@@ -53,9 +53,10 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		Home:           home,
 		Places:         func() []filechooser.Place { return filechooser.UserPlaces(home) },
 		Locations:      filechooser.SystemLocations(home),
-		WatchLocations: filechooser.WatchMounts,
+		WatchLocations: filechooser.WatchSystemLocations,
 		ViewFile:       viewFile,
-		RecentFile:     filechooser.RecentFile(home),
+		RecentFile:     filechooser.RecentFile(),
+		TrashDirs:      filechooser.SystemTrashDirs(home),
 		Target:         func() (*app.Output, int, int, bool) { return dialogOutput(outputs(), focused) },
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {

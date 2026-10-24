@@ -34,6 +34,8 @@ type session struct {
 	request func(dir string)
 	// recentFile is the recently-used list the Recent place reads.
 	recentFile string
+	// trashDirs are the trash directories the Trash place lists.
+	trashDirs func() []string
 
 	search    string
 	recursive bool
@@ -104,10 +106,14 @@ type listing struct {
 	err     error
 }
 
-// read lists dir, or the Recent files; safe off the loop.
+// read lists dir, or the Recent or trashed files; safe off the loop.
 func (s *session) read(dir string) listing {
-	if dir == recentLocation {
+	switch dir {
+	case recentLocation:
 		entries, err := ListRecent(s.recentFile, s.mode)
+		return listing{entries: entries, err: err}
+	case trashLocation:
+		entries, err := ListTrash(s.trashDirs(), s.mode)
 		return listing{entries: entries, err: err}
 	}
 	entries, err := ListDir(dir, s.mode)
@@ -214,10 +220,10 @@ func (s *session) step(back bool) bool {
 	return true
 }
 
-// up goes to the parent; false at the root, and in Recent.
+// up goes to the parent; false at the root, and in Recent or Trash.
 func (s *session) up() bool {
 	parent := filepath.Dir(s.dir)
-	if parent == s.dir || s.dir == recentLocation {
+	if parent == s.dir || virtualLocation(s.dir) {
 		return false
 	}
 	s.goTo(parent)

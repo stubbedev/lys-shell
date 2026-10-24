@@ -24,6 +24,11 @@ func DataDir() (string, bool) { return baseDir("XDG_DATA_HOME", ".local/share") 
 // false when neither variable is set.
 func CacheHome() (string, bool) { return home("XDG_CACHE_HOME", ".cache") }
 
+// DataHome is the user's data directory itself, $XDG_DATA_HOME or
+// ~/.local/share, where data shared across apps lives (the trash, the
+// recently-used list); false when neither variable is set.
+func DataHome() (string, bool) { return home("XDG_DATA_HOME", ".local/share") }
+
 // baseDir is lys-shell's directory under the base directory env names,
 // else under home's fallback.
 func baseDir(env, fallback string) (string, bool) {

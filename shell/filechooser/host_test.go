@@ -1364,6 +1364,47 @@ func TestRecentAndListingErrors(t *testing.T) {
 	answer(t, got)
 }
 
+// Trash lists the trashed files by their original names when opening
+// files, has no parent, and answers the trashed file itself; a save
+// or a folder pick never offers it.
+func TestTrashPlace(t *testing.T) {
+	hs := newHarness(t, "")
+	trash := filepath.Join(t.TempDir(), "Trash")
+	trashed := writeTrashed(t, trash, "notes.txt.2", trashInfo("/home/u/notes.txt"))
+	hs.c.d.TrashDirs = func() []string { return []string{trash} }
+	got := hs.open(t, OpenRequest{})
+	if !hasButton(hs.cfg.Root, "Trash") {
+		t.Fatal("no Trash place")
+	}
+	hs.do(func() { hs.c.goTo(trashLocation) })
+	if shown := hs.shown(); !slices.Equal(shown, []string{"notes.txt"}) {
+		t.Errorf("Trash shows %v", shown)
+	}
+	var up bool
+	hs.do(func() { up = hs.c.s.up() })
+	if up {
+		t.Error("Trash has a parent")
+	}
+	hs.pick(t, "notes.txt")
+	hs.click(t, "Open")
+	if uris := answer(t, got); !slices.Equal(uris, []string{fileuri.FromPath(trashed)}) {
+		t.Errorf("opened %v, want the trashed file", uris)
+	}
+
+	got = hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+	if hasButton(hs.cfg.Root, "Trash") {
+		t.Error("a save offers Trash")
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+	got = hs.open(t, OpenRequest{Directory: true})
+	if hasButton(hs.cfg.Root, "Trash") {
+		t.Error("a folder pick offers Trash")
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
 // A dropped file opens its folder with it selected.
 func TestDropSelectsTheFile(t *testing.T) {
 	hs := newHarness(t, "")

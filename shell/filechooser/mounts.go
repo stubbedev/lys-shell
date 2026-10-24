@@ -1,12 +1,17 @@
 package filechooser
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // WatchMounts calls changed (off the loop) each time the mount table
@@ -59,5 +64,66 @@ func WatchMounts(changed func()) (stop func()) {
 		<-done
 		_ = quitR.Close()
 		_ = table.Close()
+	}
+}
+
+// SystemLocations reads the mount table for OtherLocations, then the
+// gvfs network shares.
+func SystemLocations(home string) func() []Place {
+	return func() []Place {
+		locations := OtherLocations(readMounts(), home, os.Getenv("USER"))
+		return append(locations, NetworkLocations(os.Getenv("XDG_RUNTIME_DIR"))...)
+	}
+}
+
+// SystemTrashDirs reads the data home and the mount table for
+// TrashDirs: the home trash, then the user-visible mounts' trashes.
+func SystemTrashDirs(home string) func() []string {
+	return func() []string {
+		data, _ := xdg.DataHome()
+		return TrashDirs(data, VisibleMounts(readMounts(), home, os.Getenv("USER")), os.Getuid())
+	}
+}
+
+// readMounts is the mount table, nil when it cannot be read.
+func readMounts() io.Reader {
+	data, err := os.ReadFile("/proc/self/mounts")
+	if err != nil {
+		log.Printf("file chooser: cannot read the mounts: %v", err)
+		return nil
+	}
+	return bytes.NewReader(data)
+}
+
+// WatchSystemLocations calls changed (off the loop) whenever
+// SystemLocations may have changed, until stop is called: a mount came
+// or went (WatchMounts), or gvfs mounted or unmounted a share under
+// $XDG_RUNTIME_DIR/gvfs, which the mount table does not show.
+func WatchSystemLocations(changed func()) (stop func()) {
+	stopMounts := WatchMounts(changed)
+	runtime := os.Getenv("XDG_RUNTIME_DIR")
+	if runtime == "" {
+		return stopMounts
+	}
+	w, err := fswatch.New(fswatch.Changes, false)
+	if err != nil {
+		log.Printf("file chooser: cannot follow the network shares: %v", err)
+		return stopMounts
+	}
+	if err := w.Add(filepath.Join(runtime, "gvfs")); err != nil {
+		_ = w.Close()
+		return stopMounts
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range w.Changed() {
+			changed()
+		}
+	}()
+	return func() {
+		stopMounts()
+		_ = w.Close()
+		<-done
 	}
 }
