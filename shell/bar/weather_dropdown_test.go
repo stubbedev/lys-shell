@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/weather"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestWeatherSettingsMapsTheConfig(t *testing.T) {
@@ -479,5 +481,51 @@ func TestWeatherHeaderAndDailyWrappers(t *testing.T) {
 	}
 	if tempRow == nil || tempRow.Spacing() != 2 {
 		t.Errorf("the temp row spacing = %v, want the literal 2", tempRow)
+	}
+}
+
+// The loaded trees are the Rust ones: the stats and hourly rows are
+// homogeneous and spacing-0 (the stylesheet owns the gaps), the cells
+// center their image and text as GTK's fill-width image and labels
+// do, the header leaves its icon hidden, and the forecast temperatures
+// carry no degree sign (format_temp_value).
+func TestWeatherDropdownTreesMatchRust(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	ok := fixedWeather(&weather.Weather{
+		Current: weather.Current{Temperature: 11, Condition: weather.CondRain},
+		Hourly:  []weather.Hourly{{Temperature: 13}, {Temperature: 12}},
+		Daily:   []weather.Daily{{Date: time.Now(), TempLow: 4, TempHigh: 12}},
+	}, nil)
+	defer ok.Close()
+	ctx.Weather = ok
+	waitHeadless(t, "the loaded status", func() bool { return ok.Status().Kind == weather.Loaded })
+	v := weatherDropdown(ctx).(*weatherView)
+	defer v.dropdownClosed()
+
+	for _, class := range []string{"weather-stats", "hourly-forecast"} {
+		row := classedBox(t, v.loaded, class)
+		if !row.Homogeneous() || row.Spacing() != 0 {
+			t.Errorf(".%s: homogeneous %v spacing %d, want homogeneous and 0", class, row.Homogeneous(), row.Spacing())
+		}
+	}
+	for _, class := range []string{"weather-stat", "hourly-item"} {
+		cell := classedBox(t, v.loaded, class)
+		if cell.Spacing() != 0 {
+			t.Errorf(".%s spacing %d, want 0", class, cell.Spacing())
+		}
+		for _, l := range treetest.All[*widget.Label](cell) {
+			if l.Alignment() != render.AlignCenter {
+				t.Errorf(".%s label %q aligns %v, want centered", class, l.Text(), l.Alignment())
+			}
+		}
+	}
+	for _, class := range []string{"hourly-temp", "daily-high", "daily-low"} {
+		if l := classedWidget(t, v.loaded, class).(*widget.Label); strings.Contains(l.Text(), "°") {
+			t.Errorf(".%s = %q, want the bare number", class, l.Text())
+		}
+	}
+	header := classedBox(t, v, "dropdown-title")
+	if icons := treetest.All[*widget.Icon](header); len(icons) != 1 || icons[0].Visible() {
+		t.Error("the weather header shows its icon; the Rust header leaves it hidden")
 	}
 }

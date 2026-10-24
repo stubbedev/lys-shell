@@ -194,13 +194,17 @@ func (v *weatherView) label(text string, scale float64, class string) *widget.La
 	return l
 }
 
-// header is the DropdownHeader: the title and the refresh action.
+// header is the DropdownHeader: the title and the refresh action. It is
+// the one header that leaves the template's icon hidden (weather/mod.rs
+// never sets it visible).
 func (v *weatherView) header() widget.Widget {
 	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1), 6, 6)
 	refresh.AddClass("ghost-icon")
 	refresh.OnClick = v.svc.Refresh
 	refresh.SetTooltip(i18n.T("dropdown-weather-refresh"))
-	return dropdownHeader(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
+	row, glyph := dropdownHeaderIcon(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
+	glyph.SetVisible(false)
+	return row
 }
 
 // vcentered fills a column page's height and centers its kids as a
@@ -306,8 +310,12 @@ func (v *weatherView) statsGrid(w *weather.Weather, imperial bool) widget.Widget
 	if len(w.Daily) > 0 {
 		rain = strconv.Itoa(int(w.Daily[0].RainChance)) + "%"
 	}
-	row := widget.NewBox(widget.Row, 6, 0)
+	// stats_grid: a homogeneous spacing-0 row whose 1px gaps are the
+	// rule's border-spacing over its background; each cell's image and
+	// labels fill the column and render centered, as GTK's do.
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("weather-stats")
+	row.SetHomogeneous(true)
 	stats := []struct {
 		icon, value, label, class string
 	}{
@@ -317,35 +325,44 @@ func (v *weatherView) statsGrid(w *weather.Weather, imperial bool) widget.Widget
 		{"ld-cloud-rain-symbolic", rain, "dropdown-weather-rain", "rain"},
 	}
 	for i, s := range stats {
-		cell := widget.NewBox(widget.Column, 2, 6)
+		cell := widget.NewBox(widget.Column, 0, 0)
 		cell.AddClass("weather-stat")
 		setClass(cell, "stat-first", i == 0)
 		setClass(cell, "stat-last", i == len(stats)-1)
-		cell.Append(v.icon(s.icon, 1.3, "weather-stat-icon", s.class), false)
-		cell.Append(v.label(s.value, 1, "weather-stat-value"), false)
-		cell.Append(v.label(i18n.T(s.label), 0.8, "weather-stat-label"), false)
+		cell.AppendAligned(v.icon(s.icon, 1.3, "weather-stat-icon", s.class), false, widget.AlignCenter)
+		cell.Append(v.centeredLabel(s.value, 1, "weather-stat-value"), false)
+		cell.Append(v.centeredLabel(i18n.T(s.label), 0.8, "weather-stat-label"), false)
 		row.Append(cell, true)
 	}
 	return row
 }
 
+// centeredLabel is a label that fills its column and centers its text,
+// a GTK label's default xalign.
+func (v *weatherView) centeredLabel(text string, scale float64, class string) *widget.Label {
+	l := v.label(text, scale, class)
+	l.SetAlignment(render.AlignCenter)
+	return l
+}
+
 // hourly is hourly_forecast: "Now" then the next four hours.
 func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.TimeFormat) widget.Widget {
-	col := widget.NewBox(widget.Column, 6, 0)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("weather-section")
 	col.Append(v.label(i18n.T("dropdown-weather-hourly"), 0.9, "section-label"), false)
-	row := widget.NewBox(widget.Row, 4, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("hourly-forecast")
+	row.SetHomogeneous(true)
 	for i, h := range w.Hourly[:min(len(w.Hourly), weatherHourlyItems)] {
 		when := i18n.T("dropdown-weather-now")
 		if i > 0 {
 			when = weatherHourLabel(h.Time, format)
 		}
-		item := widget.NewBox(widget.Column, 4, 4)
+		item := widget.NewBox(widget.Column, 0, 0)
 		item.AddClass("hourly-item")
-		item.Append(v.label(when, 0.85, "hourly-time"), false)
-		item.Append(v.icon(weatherConditionIcon(h.Condition, h.IsDay), 1.4, "hourly-icon", weatherConditionClass(h.Condition)), false)
-		item.Append(v.label(weatherTemp(h.Temperature, imperial)+"°", 1, "hourly-temp"), false)
+		item.Append(v.centeredLabel(when, 0.85, "hourly-time"), false)
+		item.AppendAligned(v.icon(weatherConditionIcon(h.Condition, h.IsDay), 1.4, "hourly-icon", weatherConditionClass(h.Condition)), false, widget.AlignCenter)
+		item.Append(v.centeredLabel(weatherTemp(h.Temperature, imperial), 1, "hourly-temp"), false)
 		row.Append(item, true)
 	}
 	col.Append(row, false)
@@ -399,8 +416,8 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		row.AppendAligned(bar, false, widget.AlignCenter)
 		temps := widget.NewBox(widget.Row, 0, 0)
 		temps.AddClass("daily-temps")
-		temps.Append(v.label(weatherTemp(d.TempHigh, imperial)+"°", 1, "daily-high"), false)
-		temps.Append(v.label(weatherTemp(d.TempLow, imperial)+"°", 1, "daily-low"), false)
+		temps.Append(v.label(weatherTemp(d.TempHigh, imperial), 1, "daily-high"), false)
+		temps.Append(v.label(weatherTemp(d.TempLow, imperial), 1, "daily-low"), false)
 		row.Append(temps, false)
 		list.Append(row, false)
 	}
