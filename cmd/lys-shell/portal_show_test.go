@@ -22,14 +22,14 @@ type fakeChooser struct {
 	got  *dbustest.Var[any]
 }
 
-func (f fakeChooser) Open(_ portalreq.Caller, r filechooser.OpenRequest) []string {
+func (f fakeChooser) Open(_ portalreq.Caller, r filechooser.OpenRequest) filechooser.Result {
 	f.got.Store(r)
-	return f.uris.Load()
+	return filechooser.Result{URIs: f.uris.Load()}
 }
 
-func (f fakeChooser) Save(_ portalreq.Caller, r filechooser.SaveRequest) []string {
+func (f fakeChooser) Save(_ portalreq.Caller, r filechooser.SaveRequest) filechooser.Result {
 	f.got.Store(r)
-	return f.uris.Load()
+	return filechooser.Result{URIs: f.uris.Load()}
 }
 
 func (fakeChooser) Dismiss(string) {}

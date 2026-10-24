@@ -126,7 +126,7 @@ func dialogOutput(outs []*app.Output, focused func() (string, bool)) (*app.Outpu
 func pickImage(application *app.Application, chooser *filechooser.Chooser, chosen func(string)) {
 	images := filechooser.Filter{Name: "Images", Rules: []filechooser.Rule{{Kind: filechooser.RuleMIME, Value: "image/*"}}}
 	go func() {
-		uris := chooser.Open(portalreq.Caller{Modal: true}, filechooser.OpenRequest{Title: "Choose a picture", Filters: []filechooser.Filter{images}})
+		uris := chooser.Open(portalreq.Caller{Modal: true}, filechooser.OpenRequest{Title: "Choose a picture", Filters: []filechooser.Filter{images}}).URIs
 		if len(uris) == 0 {
 			return
 		}
@@ -144,7 +144,7 @@ func pickOutput(application *app.Application, chooser *filechooser.Chooser, sugg
 	go func() {
 		uris := chooser.Save(portalreq.Caller{Modal: true}, filechooser.SaveRequest{
 			Title: "Print to File", CurrentName: filepath.Base(suggested), CurrentFolder: filepath.Dir(suggested),
-		})
+		}).URIs
 		if len(uris) == 0 {
 			return
 		}

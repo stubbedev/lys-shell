@@ -24,13 +24,15 @@ const (
 	ModeOpenFile Mode = iota
 	ModeOpenMultiple
 	ModeFolder
+	ModeFolders
 	ModeSave
 )
 
-// openMode maps an open request to its mode; a directory pick wins
-// over multiple, as the portal spec has it.
+// openMode maps an open request to its mode.
 func openMode(r OpenRequest) Mode {
 	switch {
+	case r.Directory && r.Multiple:
+		return ModeFolders
 	case r.Directory:
 		return ModeFolder
 	case r.Multiple:
@@ -39,12 +41,18 @@ func openMode(r OpenRequest) Mode {
 	return ModeOpenFile
 }
 
+// folders reports a folder pick.
+func (m Mode) folders() bool { return m == ModeFolder || m == ModeFolders }
+
+// multiple reports a pick of several.
+func (m Mode) multiple() bool { return m == ModeOpenMultiple || m == ModeFolders }
+
 // confirmLabel is the confirm button's text.
 func (m Mode) confirmLabel() string {
-	switch m {
-	case ModeSave:
+	switch {
+	case m == ModeSave:
 		return "Save"
-	case ModeFolder:
+	case m.folders():
 		return "Select"
 	}
 	return "Open"
@@ -80,7 +88,7 @@ func statEntry(path string, mode Mode) (Entry, bool) {
 	if info, err := os.Stat(path); err == nil {
 		e.IsDir, e.Size, e.Modified = info.IsDir(), info.Size(), info.ModTime()
 	}
-	if !e.IsDir && mode == ModeFolder {
+	if !e.IsDir && mode.folders() {
 		return Entry{}, false
 	}
 	return e, true
@@ -360,6 +368,46 @@ func matchesEverything(f Filter) bool {
 	return slices.ContainsFunc(f.Rules, func(r Rule) bool {
 		return r.Kind == RuleGlob && (r.Value == "*" || r.Value == "*.*")
 	})
+}
+
+// filterExt is the extension a filter names when it names one: a
+// single *.ext glob (GTK's case classes read back as lower case), or a
+// single MIME type with a canonical one; "" otherwise.
+func filterExt(f Filter) string {
+	if len(f.Rules) != 1 {
+		return ""
+	}
+	r := f.Rules[0]
+	if r.Kind == RuleMIME {
+		return mimeExt(r.Value)
+	}
+	ext, ok := strings.CutPrefix(r.Value, "*.")
+	if !ok || ext == "" {
+		return ""
+	}
+	var b strings.Builder
+	for i := 0; i < len(ext); i++ {
+		switch {
+		case ext[i] == '[' && i+3 < len(ext) && ext[i+3] == ']':
+			b.WriteByte(strings.ToLower(ext[i+1 : i+2])[0])
+			i += 3
+		case strings.ContainsRune("*?[]", rune(ext[i])):
+			return ""
+		default:
+			b.WriteByte(ext[i])
+		}
+	}
+	return b.String()
+}
+
+// withExtension gives name the filter's extension in place of its own;
+// a name or filter without one is left as it is.
+func withExtension(name string, f Filter) string {
+	ext := filterExt(f)
+	if name == "" || ext == "" {
+		return name
+	}
+	return strings.TrimSuffix(name, filepath.Ext(name)) + "." + ext
 }
 
 // allFiles is the escape hatch appended after a request's filters.

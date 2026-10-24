@@ -4,7 +4,6 @@ import (
 	"log"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/stubbedev/lys-ui/app"
@@ -138,7 +137,7 @@ func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) (bool, []portalreq
 	var picked []portalreq.Selection
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
-		rows, collect := h.choices(r.Choices)
+		rows, collect := widgets.ChoiceRows(h.d.Font, r.Choices, "portal-dialog-choice")
 		grant := func(ok bool, s string) {
 			if ok {
 				picked = collect()
@@ -151,52 +150,6 @@ func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) (bool, []portalreq
 		return false, nil
 	}
 	return true, picked
-}
-
-// choices builds a row per choice (a check button for a yes/no, a
-// labelled dropdown otherwise) and the function reading what the user
-// picked.
-func (h *Dialogs) choices(choices []portalreq.Choice) ([]widget.Widget, func() []portalreq.Selection) {
-	rows := make([]widget.Widget, 0, len(choices))
-	reads := make([]func() portalreq.Selection, 0, len(choices))
-	for _, c := range choices {
-		if c.Boolean() {
-			check := widget.NewCheckButton(c.Start() == "true")
-			check.AddClass("portal-dialog-choice")
-			check.SetChild(h.label(c.Label, "portal-dialog-choice-label"))
-			rows = append(rows, check)
-			reads = append(reads, func() portalreq.Selection {
-				return portalreq.Selection{ID: c.ID, Value: strconv.FormatBool(check.Checked())}
-			})
-			continue
-		}
-		labels := make([]string, len(c.Options))
-		start := 0
-		for i, o := range c.Options {
-			labels[i] = o.Label
-			if o.ID == c.Start() {
-				start = i
-			}
-		}
-		drop := widget.NewDropdown(h.d.Font, 13, labels, start)
-		drop.AddClass("portal-dialog-choice")
-		row := widget.NewBox(widget.Row, 8, 0)
-		label := h.label(c.Label, "portal-dialog-choice-label")
-		label.SetWrap(false)
-		row.Append(label, true)
-		row.Append(drop, false)
-		rows = append(rows, row)
-		reads = append(reads, func() portalreq.Selection {
-			return portalreq.Selection{ID: c.ID, Value: c.Options[drop.Selected()].ID}
-		})
-	}
-	return rows, func() []portalreq.Selection {
-		out := make([]portalreq.Selection, 0, len(reads))
-		for _, read := range reads {
-			out = append(out, read())
-		}
-		return out
-	}
 }
 
 // Account asks to share the user's name and avatar, previewing it.

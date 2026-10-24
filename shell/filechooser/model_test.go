@@ -537,3 +537,30 @@ func TestWithAllFilesDoesNotAliasTheRequest(t *testing.T) {
 		t.Errorf("All Files became %q through the request's backing array", got[1].Name)
 	}
 }
+
+// A filter names an extension when it is one *.ext glob (case classes
+// read back) or one MIME type with a canonical one.
+func TestFilterExt(t *testing.T) {
+	for _, tc := range []struct {
+		f    Filter
+		want string
+	}{
+		{Filter{Rules: []Rule{{RuleGlob, "*.txt"}}}, "txt"},
+		{Filter{Rules: []Rule{{RuleGlob, "*.[pP][nN][gG]"}}}, "png"},
+		{Filter{Rules: []Rule{{RuleMIME, "application/pdf"}}}, "pdf"},
+		{Filter{Rules: []Rule{{RuleGlob, "*"}}}, ""},
+		{Filter{Rules: []Rule{{RuleGlob, "*.tar.*"}}}, ""},
+		{Filter{Rules: []Rule{{RuleGlob, "*.png"}, {RuleGlob, "*.jpg"}}}, ""},
+		{Filter{Rules: []Rule{{RuleMIME, "image/*"}}}, ""},
+	} {
+		if got := filterExt(tc.f); got != tc.want {
+			t.Errorf("filterExt(%v) = %q, want %q", tc.f.Rules, got, tc.want)
+		}
+	}
+	if got := withExtension("notes.md", Filter{Rules: []Rule{{RuleGlob, "*.txt"}}}); got != "notes.txt" {
+		t.Errorf("withExtension = %q", got)
+	}
+	if got := withExtension("", Filter{Rules: []Rule{{RuleGlob, "*.txt"}}}); got != "" {
+		t.Errorf("an empty name took %q", got)
+	}
+}

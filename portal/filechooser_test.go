@@ -3,6 +3,7 @@ package portal
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"testing"
@@ -10,12 +11,14 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
-// fakeChooser is the shell's file dialog.
+// fakeChooser is the shell's file dialog: it answers the URIs, the
+// filter the request started on, and each choice's start value.
 type fakeChooser struct {
 	gate
 	uris   dbustest.Var[[]string]
@@ -23,20 +26,31 @@ type fakeChooser struct {
 	saved  dbustest.Var[filechooser.SaveRequest]
 }
 
-func (f *fakeChooser) Open(c portalreq.Caller, r filechooser.OpenRequest) []string {
-	f.opened.Store(r)
-	if f.enter(c) {
-		return nil
+func answerChooser(uris []string, filters []filechooser.Filter, current int32, choices []portalreq.Choice) filechooser.Result {
+	res := filechooser.Result{URIs: uris}
+	if int(current) < len(filters) {
+		res.Filter = filters[current]
 	}
-	return f.uris.Load()
+	for _, c := range choices {
+		res.Choices = append(res.Choices, portalreq.Selection{ID: c.ID, Value: c.Start()})
+	}
+	return res
 }
 
-func (f *fakeChooser) Save(c portalreq.Caller, r filechooser.SaveRequest) []string {
+func (f *fakeChooser) Open(c portalreq.Caller, r filechooser.OpenRequest) filechooser.Result {
+	f.opened.Store(r)
+	if f.enter(c) {
+		return filechooser.Result{}
+	}
+	return answerChooser(f.uris.Load(), r.Filters, r.CurrentFilter, r.Choices)
+}
+
+func (f *fakeChooser) Save(c portalreq.Caller, r filechooser.SaveRequest) filechooser.Result {
 	f.saved.Store(r)
 	if f.enter(c) {
-		return nil
+		return filechooser.Result{}
 	}
-	return f.uris.Load()
+	return answerChooser(f.uris.Load(), r.Filters, r.CurrentFilter, r.Choices)
 }
 
 func serveChooser(t *testing.T, r *rig, uris ...string) *fakeChooser {
@@ -83,11 +97,12 @@ func TestFileChooserSave(t *testing.T) {
 	}
 
 	// SaveFiles picks a folder and names each file inside it.
-	f.uris.Store([]string{"file:///home/u/Docs/"})
+	docs := t.TempDir()
+	f.uris.Store([]string{fileuri.FromPath(docs)})
 	code, res = r.interactive(t, fileChooserIfaceName+"SaveFiles", handle, "org.app", "", "Save all", Vardict{
 		"files": dbus.MakeVariant([][]byte{[]byte("a.txt\x00"), []byte("my notes#1.txt\x00")}),
 	})
-	want := []string{"file:///home/u/Docs/a.txt", "file:///home/u/Docs/my%20notes%231.txt"}
+	want := []string{fileuri.FromPath(filepath.Join(docs, "a.txt")), fileuri.FromPath(filepath.Join(docs, "my notes#1.txt"))}
 	if code != ResponseSuccess || !slices.Equal(res["uris"].Value().([]string), want) {
 		t.Errorf("SaveFiles = %d %v, want %v", code, res, want)
 	}
@@ -234,6 +249,95 @@ func TestFileChooserPassesModal(t *testing.T) {
 		callers := f.callers.Load()
 		if got := callers[len(callers)-1]; got.Modal != tc.want {
 			t.Errorf("options %v: modal %v, want %v", tc.options, got.Modal, tc.want)
+		}
+	}
+}
+
+// The app's accept label, filters with the current one, and choices
+// reach the dialog, and the filter and choices come back; a
+// current_filter not among the filters starts on the first, and with
+// no filters it is the one filter.
+func TestFileChooserOptions(t *testing.T) {
+	r := newRig(t, nil)
+	f := serveChooser(t, r, "file:///a.png")
+	txt := filechooser.Filter{Name: "Text", Rules: []filechooser.Rule{{Kind: filechooser.RuleGlob, Value: "*.txt"}}}
+	png := filechooser.Filter{Name: "Images", Rules: []filechooser.Rule{{Kind: filechooser.RuleGlob, Value: "*.png"}}}
+	choices := []portalreq.Choice{{ID: "ro", Label: "Read-only", Options: []portalreq.Option{}, Initial: "true"}}
+	code, res := r.interactive(t, fileChooserIfaceName+"OpenFile", handle, "org.app", "", "Pick", Vardict{
+		"accept_label": dbus.MakeVariant("_Import"), "filters": dbus.MakeVariant([]filechooser.Filter{txt, png}),
+		"current_filter": dbus.MakeVariant(png), "choices": dbus.MakeVariant(choices),
+	})
+	got := f.opened.Load()
+	if got.AcceptLabel != "_Import" || got.CurrentFilter != 1 || len(got.Choices) != 1 || got.Choices[0].ID != "ro" {
+		t.Errorf("open request = %+v", got)
+	}
+	var cf filechooser.Filter
+	if err := dbus.Store([]any{res["current_filter"].Value()}, &cf); err != nil || code != ResponseSuccess || cf.Name != "Images" {
+		t.Errorf("current_filter = %v, %v", res["current_filter"], err)
+	}
+	var picked []portalreq.Selection
+	if err := dbus.Store([]any{res["choices"].Value()}, &picked); err != nil || !slices.Equal(picked, []portalreq.Selection{{ID: "ro", Value: "true"}}) {
+		t.Errorf("choices = %v, %v", res["choices"], err)
+	}
+	other := filechooser.Filter{Name: "Other", Rules: []filechooser.Rule{{Kind: filechooser.RuleGlob, Value: "*.x"}}}
+	r.interactive(t, fileChooserIfaceName+"OpenFile", handle, "org.app", "", "Pick", Vardict{
+		"filters": dbus.MakeVariant([]filechooser.Filter{txt, png}), "current_filter": dbus.MakeVariant(other),
+	})
+	if got := f.opened.Load(); got.CurrentFilter != 0 || len(got.Filters) != 2 {
+		t.Errorf("a stray current_filter = %+v", got)
+	}
+	_, res = r.interactive(t, fileChooserIfaceName+"OpenFile", handle, "org.app", "", "Pick", Vardict{"current_filter": dbus.MakeVariant(png)})
+	if got := f.opened.Load(); len(got.Filters) != 1 || got.Filters[0].Name != "Images" {
+		t.Errorf("current_filter alone = %+v", got)
+	}
+	if _, has := res["choices"]; has {
+		t.Errorf("choices without any asked: %v", res)
+	}
+	if code, _ := r.interactive(t, fileChooserIfaceName+"OpenFile", handle, "org.app", "", "Pick", Vardict{"current_filter": dbus.MakeVariant("nope")}); code != ResponseOther {
+		t.Errorf("a malformed current_filter = %d, want other", code)
+	}
+}
+
+// Saving an existing file again starts in its folder with its name.
+func TestFileChooserSaveCurrentFile(t *testing.T) {
+	r := newRig(t, nil)
+	f := serveChooser(t, r, "file:///home/u/Docs/report.odt")
+	r.interactive(t, fileChooserIfaceName+"SaveFile", handle, "org.app", "", "Save As", Vardict{
+		"current_name": dbus.MakeVariant("Untitled"), "current_file": dbus.MakeVariant([]byte("/home/u/Docs/report.odt\x00")),
+	})
+	if got := f.saved.Load(); got.CurrentFolder != "/home/u/Docs" || got.CurrentName != "report.odt" {
+		t.Errorf("save request = %+v", got)
+	}
+}
+
+// SaveFiles numbers a name taken in the folder, or earlier in the list,
+// and fails names that are not plain file names.
+func TestFileChooserSaveFilesNames(t *testing.T) {
+	r := newRig(t, nil)
+	docs := t.TempDir()
+	if err := os.WriteFile(filepath.Join(docs, "a.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	serveChooser(t, r, fileuri.FromPath(docs))
+	files := func(names ...string) Vardict {
+		raw := make([][]byte, len(names))
+		for i, n := range names {
+			raw[i] = []byte(n + "\x00")
+		}
+		return Vardict{"files": dbus.MakeVariant(raw)}
+	}
+	code, res := r.interactive(t, fileChooserIfaceName+"SaveFiles", handle, "org.app", "", "x", files("a.txt", "b", "b", ".bashrc"))
+	var got []string
+	for _, u := range res["uris"].Value().([]string) {
+		p, _ := fileuri.Path(u)
+		got = append(got, filepath.Base(p))
+	}
+	if want := []string{"a (2).txt", "b", "b (2)", ".bashrc"}; code != ResponseSuccess || !slices.Equal(got, want) {
+		t.Errorf("SaveFiles = %d %v, want %v", code, got, want)
+	}
+	for _, bad := range []string{"..", ".", "", "sub/x.txt"} {
+		if code, _ := r.interactive(t, fileChooserIfaceName+"SaveFiles", handle, "org.app", "", "x", files(bad)); code != ResponseOther {
+			t.Errorf("SaveFiles %q = %d, want other", bad, code)
 		}
 	}
 }

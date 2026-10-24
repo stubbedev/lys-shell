@@ -224,25 +224,40 @@ func (s *session) activate(i int) activation {
 	return activateConfirm
 }
 
-// result is what confirming answers given the selected rows and the
-// save entry's text; false keeps the dialog open (nothing to answer
-// yet). A folder pick answers the selected folder, else the one shown,
-// as GTK's chooser does; a save answers name in the folder shown; an
-// open answers the selected files, never folders.
-func (s *session) result(selected []int, name string) ([]string, bool) {
-	switch s.mode {
-	case ModeSave:
-		if name == "" {
-			return nil, false
-		}
-		return []string{fileuri.FromPath(filepath.Join(s.dir, name))}, true
-	case ModeFolder:
+// savePath resolves the save entry's text to the path it names: an
+// absolute path, one under ~, or one relative to the folder shown, its
+// . and .. resolved; "" for no text.
+func (s *session) savePath(name, home string) string {
+	switch {
+	case name == "":
+		return ""
+	case name == "~" || strings.HasPrefix(name, "~/"):
+		name = filepath.Join(home, strings.TrimPrefix(name, "~"))
+	case !filepath.IsAbs(name):
+		name = filepath.Join(s.dir, name)
+	}
+	return filepath.Clean(name)
+}
+
+// result is what confirming an open answers given the selected rows;
+// false keeps the dialog open (nothing to answer yet). A folder pick
+// answers the selected folders, else the one shown, as GTK's chooser
+// does; an open answers the selected files, never folders.
+func (s *session) result(selected []int) ([]string, bool) {
+	if s.mode.folders() {
+		var uris []string
 		for _, i := range selected {
 			if i >= 0 && i < len(s.entries) && s.entries[i].IsDir {
-				return []string{fileuri.FromPath(s.entries[i].Path)}, true
+				uris = append(uris, fileuri.FromPath(s.entries[i].Path))
+				if !s.mode.multiple() {
+					break
+				}
 			}
 		}
-		return []string{fileuri.FromPath(s.dir)}, true
+		if len(uris) == 0 {
+			uris = []string{fileuri.FromPath(s.dir)}
+		}
+		return uris, true
 	}
 	var uris []string
 	for _, i := range selected {

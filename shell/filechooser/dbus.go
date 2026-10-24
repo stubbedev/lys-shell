@@ -44,6 +44,13 @@ type OpenRequest struct {
 	Filters             []Filter
 	// CurrentFolder seeds the starting directory ("" is the default).
 	CurrentFolder string
+	// AcceptLabel names the confirm button ("" for the mode's own).
+	AcceptLabel string
+	// CurrentFilter is the index of the filter to start on (the
+	// first by default).
+	CurrentFilter int32
+	// Choices are extra questions shown with the dialog.
+	Choices []portalreq.Choice
 }
 
 // SaveRequest is one save dialog.
@@ -52,14 +59,25 @@ type SaveRequest struct {
 	CurrentName   string
 	Filters       []Filter
 	CurrentFolder string
+	AcceptLabel   string
+	CurrentFilter int32
+	Choices       []portalreq.Choice
 }
 
-// Host shows the dialogs; each blocks until the user answers and
-// replies the chosen file:// URIs, none on a cancel or when the request
-// is dismissed.
+// Result is what a dialog answers, (asa(sa(us))a(ss)) on the wire as
+// three values: the chosen file:// URIs (none on a cancel or a
+// dismissal), the filter active at the end (a nameless empty one for
+// none), and what was picked for each choice.
+type Result struct {
+	URIs    []string
+	Filter  Filter
+	Choices []portalreq.Selection
+}
+
+// Host shows the dialogs; each blocks until the user answers.
 type Host interface {
-	Open(portalreq.Caller, OpenRequest) []string
-	Save(portalreq.Caller, SaveRequest) []string
+	Open(portalreq.Caller, OpenRequest) Result
+	Save(portalreq.Caller, SaveRequest) Result
 	// Dismiss takes down the dialog showing for the request at handle.
 	Dismiss(handle string)
 }
@@ -76,14 +94,22 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	return dbusx.Serve(conn, dbusx.Service{Name: ServiceName, Path: ServicePath, Interface: iface, Methods: d})
 }
 
-// OpenFile opens existing files or a directory.
-func (d *Daemon) OpenFile(c portalreq.Caller, title string, multiple, directory bool, filters []Filter, currentFolder string) ([]string, *dbus.Error) {
-	return nonNil(d.host.Open(c, OpenRequest{title, multiple, directory, filters, currentFolder})), nil
+// OpenFile opens existing files or directories.
+func (d *Daemon) OpenFile(c portalreq.Caller, r OpenRequest) ([]string, Filter, []portalreq.Selection, *dbus.Error) {
+	res := d.host.Open(c, r)
+	return nonNil(res.URIs), withRules(res.Filter), nonNil(res.Choices), nil
 }
 
 // SaveFile chooses a save destination.
-func (d *Daemon) SaveFile(c portalreq.Caller, title, currentName string, filters []Filter, currentFolder string) ([]string, *dbus.Error) {
-	return nonNil(d.host.Save(c, SaveRequest{title, currentName, filters, currentFolder})), nil
+func (d *Daemon) SaveFile(c portalreq.Caller, r SaveRequest) ([]string, Filter, []portalreq.Selection, *dbus.Error) {
+	res := d.host.Save(c, r)
+	return nonNil(res.URIs), withRules(res.Filter), nonNil(res.Choices), nil
+}
+
+// withRules gives a filter a non-nil rule list for the wire.
+func withRules(f Filter) Filter {
+	f.Rules = nonNil(f.Rules)
+	return f
 }
 
 // Dismiss takes down the dialog showing for the request at handle.
@@ -107,15 +133,37 @@ type Client struct{ obj dbus.BusObject }
 func NewClient(conn *dbus.Conn) *Client { return &Client{obj: conn.Object(ServiceName, ServicePath)} }
 
 // Open shows the open dialog.
-func (c *Client) Open(ctx context.Context, caller portalreq.Caller, r OpenRequest) (uris []string, err error) {
-	err = c.obj.CallWithContext(ctx, iface+".OpenFile", 0, caller, r.Title, r.Multiple, r.Directory, nonNil(r.Filters), r.CurrentFolder).Store(&uris)
-	return uris, err
+func (c *Client) Open(ctx context.Context, caller portalreq.Caller, r OpenRequest) (res Result, err error) {
+	r.Filters, r.Choices = wireFilters(r.Filters), wireChoices(r.Choices)
+	err = c.obj.CallWithContext(ctx, iface+".OpenFile", 0, caller, r).Store(&res.URIs, &res.Filter, &res.Choices)
+	return res, err
 }
 
 // Save shows the save dialog.
-func (c *Client) Save(ctx context.Context, caller portalreq.Caller, r SaveRequest) (uris []string, err error) {
-	err = c.obj.CallWithContext(ctx, iface+".SaveFile", 0, caller, r.Title, r.CurrentName, nonNil(r.Filters), r.CurrentFolder).Store(&uris)
-	return uris, err
+func (c *Client) Save(ctx context.Context, caller portalreq.Caller, r SaveRequest) (res Result, err error) {
+	r.Filters, r.Choices = wireFilters(r.Filters), wireChoices(r.Choices)
+	err = c.obj.CallWithContext(ctx, iface+".SaveFile", 0, caller, r).Store(&res.URIs, &res.Filter, &res.Choices)
+	return res, err
+}
+
+// wireFilters gives every list a filter list holds a non-nil value, as
+// the wire types an empty one.
+func wireFilters(filters []Filter) []Filter {
+	out := make([]Filter, len(filters))
+	for i, f := range filters {
+		out[i] = withRules(f)
+	}
+	return out
+}
+
+// wireChoices does the same for choices.
+func wireChoices(choices []portalreq.Choice) []portalreq.Choice {
+	out := make([]portalreq.Choice, len(choices))
+	for i, c := range choices {
+		c.Options = nonNil(c.Options)
+		out[i] = c
+	}
+	return out
 }
 
 // Dismiss takes down the dialog showing for the request at handle.

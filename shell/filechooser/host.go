@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
@@ -101,8 +102,13 @@ type Chooser struct {
 	win     Window
 	rev     *widget.Revealer
 	closing bool
-	reply   func([]string)
+	reply   func(Result)
 	queue   dialogqueue.Queue
+	// readChoices reads the request's choices as the user left them.
+	readChoices func() []portalreq.Selection
+	// replacing is the existing file a save asked to replace, which a
+	// second confirm of the same name replaces.
+	replacing string
 	// modal is whether the request showing holds the keyboard.
 	modal bool
 	s     *session
@@ -150,14 +156,29 @@ func New(d Deps) *Chooser {
 	return c
 }
 
+// request is one dialog, open or save.
+type request struct {
+	title, folder, name, acceptLabel string
+	mode                             Mode
+	filters                          []Filter
+	currentFilter                    int32
+	choices                          []portalreq.Choice
+}
+
 // Open shows the open dialog.
-func (c *Chooser) Open(caller portalreq.Caller, r OpenRequest) []string {
-	return c.ask(caller, r.Title, openMode(r), r.Filters, r.CurrentFolder, "")
+func (c *Chooser) Open(caller portalreq.Caller, r OpenRequest) Result {
+	return c.ask(caller, request{
+		title: r.Title, folder: r.CurrentFolder, acceptLabel: r.AcceptLabel, mode: openMode(r),
+		filters: r.Filters, currentFilter: r.CurrentFilter, choices: r.Choices,
+	})
 }
 
 // Save shows the save dialog seeded with the suggested name.
-func (c *Chooser) Save(caller portalreq.Caller, r SaveRequest) []string {
-	return c.ask(caller, r.Title, ModeSave, r.Filters, r.CurrentFolder, r.CurrentName)
+func (c *Chooser) Save(caller portalreq.Caller, r SaveRequest) Result {
+	return c.ask(caller, request{
+		title: r.Title, folder: r.CurrentFolder, name: r.CurrentName, acceptLabel: r.AcceptLabel, mode: ModeSave,
+		filters: r.Filters, currentFilter: r.CurrentFilter, choices: r.Choices,
+	})
 }
 
 // Dismiss answers the request at handle with nothing: the dialog
@@ -172,38 +193,50 @@ func (c *Chooser) Dismiss(handle string) {
 }
 
 // ask queues a request on the loop and waits for its answer.
-func (c *Chooser) ask(caller portalreq.Caller, title string, mode Mode, filters []Filter, folder, name string) []string {
-	ch := make(chan []string, 1)
+func (c *Chooser) ask(caller portalreq.Caller, r request) Result {
+	ch := make(chan Result, 1)
 	c.d.Invoke(func() {
 		c.queue.Enqueue(caller.Handle, func() {
-			c.reply = func(uris []string) { ch <- uris }
+			c.reply = func(res Result) { ch <- res }
 			c.modal = caller.Modal
-			c.begin(title, mode, filters, folder, name)
-		}, func() { ch <- nil })
+			c.begin(r)
+		}, func() { ch <- Result{} })
 	})
 	return <-ch
 }
 
-// finish answers the request showing, stops its search, plays the
+// finish answers the request showing with uris (none for a cancel),
+// the filter active and the choices made, stops its search, plays the
 // exit, and shows the next request waiting.
 func (c *Chooser) finish(uris []string) {
 	c.cancelWalk()
 	if c.reply == nil {
 		return
 	}
+	res := Result{URIs: uris}
+	if len(uris) > 0 {
+		if c.s.active >= 0 && c.s.active < len(c.s.filters) {
+			res.Filter = c.s.filters[c.s.active]
+		}
+		res.Choices = c.readChoices()
+	}
 	reply := c.reply
 	c.reply = nil
-	reply(uris)
+	reply(res)
 	c.hide()
 	c.queue.Done()
 }
 
-func (c *Chooser) begin(title string, mode Mode, filters []Filter, folder, name string) {
+func (c *Chooser) begin(r request) {
 	c.thumbs, c.waiting = map[thumbKey]image.Image{}, map[thumbKey][]*widget.Image{}
-	c.s = newSession(mode, folder, filters, c.d.MIME, c.d.Home, c.view)
+	c.replacing = ""
+	c.s = newSession(r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
 	c.s.hidden, c.s.recursive = c.hidden, c.recursive
+	if r.currentFilter > 0 && int(r.currentFilter) < len(c.s.filters) {
+		c.s.active = int(r.currentFilter)
+	}
 	c.s.refresh()
-	c.build(title, name)
+	c.build(r)
 	c.show()
 }
 
@@ -235,6 +268,10 @@ type ui struct {
 	viewIcon                *widget.Box
 	previewToggle, hiddenTg *widget.ToggleButton
 	recursiveToggle         *widget.ToggleButton
+	// notice is a warning or the replace prompt over the footer.
+	notice      *widget.Box
+	noticeLabel *widget.Label
+	replace     *widget.Button
 }
 
 func (c *Chooser) label(text, class string) *widget.Label {
@@ -288,9 +325,10 @@ func setIcon(holder *widget.Box, icon string) {
 	holder.Append(widget.NewThemeIcon(icon, navIconPx), false)
 }
 
-func (c *Chooser) build(title, name string) {
+func (c *Chooser) build(r request) {
 	u := &ui{}
 	s := c.s
+	title, name := r.title, r.name
 
 	// Header: up, the centred title, the view toggles. The bar is the
 	// sheet's drag handle.
@@ -348,7 +386,22 @@ func (c *Chooser) build(title, name string) {
 	u.name.SetPlaceholder("File name")
 	u.name.SetText(name)
 	u.name.OnActivate = func(string) { c.confirm() }
+	u.name.OnChanged = func(string) { c.clearNotice() }
 	u.name.SetVisible(s.mode == ModeSave)
+
+	// The notice: a warning, or the replace prompt with its button.
+	u.notice = widget.NewBox(widget.Row, 8, 0)
+	u.notice.AddClass("file-chooser-notice")
+	u.noticeLabel = c.label("", "file-chooser-notice-label")
+	u.noticeLabel.SetWrap(true)
+	u.notice.Append(u.noticeLabel, true)
+	u.replace, _ = c.textButton("Replace", "file-chooser-replace", c.confirm)
+	u.replace.AddClass("destructive-action")
+	u.notice.Append(u.replace, false)
+	u.notice.SetVisible(false)
+
+	choiceRows, readChoices := widgets.ChoiceRows(c.d.Font, r.choices, "file-chooser-choice")
+	c.readChoices = readChoices
 
 	// Footer: the type filter, cancel, confirm.
 	footer := widget.NewBox(widget.Row, 8, 0)
@@ -363,12 +416,19 @@ func (c *Chooser) build(title, name string) {
 	u.filterLabel.SetMaxWidthChars(28)
 	u.filterButton.SetVisible(len(s.filters) > 0)
 	if len(s.filters) > 0 {
-		u.filterLabel.SetText(FilterLabel(s.filters[0]))
+		u.filterLabel.SetText(FilterLabel(s.filters[s.active]))
 	}
 	footer.Append(u.filterButton, false)
+	for _, row := range choiceRows {
+		footer.Append(row, false)
+	}
 	footer.Append(widget.NewSpacer(0, 0), true)
 	cancel, _ := c.textButton("Cancel", "file-chooser-cancel", func() { c.finish(nil) })
-	confirm, _ := c.textButton(s.mode.confirmLabel(), "file-chooser-confirm", c.confirm)
+	accept := r.acceptLabel
+	if accept == "" {
+		accept = s.mode.confirmLabel()
+	}
+	confirm, _ := c.textButton(accept, "file-chooser-confirm", c.confirm)
 	confirm.AddClass("suggested-action")
 	footer.Append(cancel, false)
 	footer.Append(confirm, false)
@@ -379,6 +439,7 @@ func (c *Chooser) build(title, name string) {
 	surface.Append(crumbBar, false)
 	surface.Append(body, true)
 	surface.Append(u.name, false)
+	surface.Append(u.notice, false)
 	surface.Append(footer, false)
 
 	// The filter popup sits in the sheet itself rather than an
@@ -483,7 +544,7 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	u.grid.AddClass("file-chooser-grid")
 	u.grid.SetCellWidth(gridCellW)
 	mode := widget.SelectionSingle
-	if c.s.mode == ModeOpenMultiple {
+	if c.s.mode.multiple() {
 		mode = widget.SelectionMultiple
 	}
 	for _, l := range []*widget.List{u.list, u.grid} {
@@ -974,10 +1035,15 @@ func (c *Chooser) setFilterPopup(on bool) {
 	c.ui.filterButton.SetActive(on)
 }
 
+// selectFilter makes filter i the active one; a save name takes its
+// extension.
 func (c *Chooser) selectFilter(i int) {
 	c.s.selectFilter(i)
 	c.ui.filterLabel.SetText(FilterLabel(c.s.filters[c.s.active]))
 	c.setFilterPopup(false)
+	if c.s.mode == ModeSave {
+		c.ui.name.SetText(withExtension(c.ui.name.Text(), c.s.filters[c.s.active]))
+	}
 	c.relist()
 }
 
@@ -1003,9 +1069,61 @@ func (c *Chooser) confirm() {
 	if c.reply == nil {
 		return
 	}
-	if uris, ok := c.s.result(c.activeView().Selection(), c.ui.name.Text()); ok {
+	if c.s.mode == ModeSave {
+		c.confirmSave()
+		return
+	}
+	if uris, ok := c.s.result(c.activeView().Selection()); ok {
 		c.finish(uris)
 	}
+}
+
+// confirmSave answers the path the name entry names, once it can be
+// written: a folder it names opens instead, a folder missing or not
+// writable is a warning, and an existing file is replaced only once the
+// user confirms it in the notice.
+func (c *Chooser) confirmSave() {
+	path := c.s.savePath(strings.TrimSpace(c.ui.name.Text()), c.d.Home)
+	if path == "" {
+		return
+	}
+	info, err := os.Stat(path)
+	if err == nil && info.IsDir() {
+		c.ui.name.SetText("")
+		c.goTo(path)
+		return
+	}
+	dir := filepath.Dir(path)
+	if d, derr := os.Stat(dir); derr != nil || !d.IsDir() {
+		c.warn("The folder " + dir + " does not exist.")
+		return
+	}
+	if unix.Access(dir, unix.W_OK) != nil {
+		c.warn("You cannot save in " + dir + ".")
+		return
+	}
+	if err == nil && c.replacing != path {
+		c.replacing = path
+		c.ui.noticeLabel.SetText("“" + filepath.Base(path) + "” already exists in " + dir + ". Replace it?")
+		c.ui.replace.SetVisible(true)
+		c.ui.notice.SetVisible(true)
+		return
+	}
+	c.finish([]string{fileuri.FromPath(path)})
+}
+
+// warn shows a warning in the notice.
+func (c *Chooser) warn(text string) {
+	c.replacing = ""
+	c.ui.noticeLabel.SetText(text)
+	c.ui.replace.SetVisible(false)
+	c.ui.notice.SetVisible(true)
+}
+
+// clearNotice takes the notice down: the name changed.
+func (c *Chooser) clearNotice() {
+	c.replacing = ""
+	c.ui.notice.SetVisible(false)
 }
 
 // selected is the first selected entry of the active view.

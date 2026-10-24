@@ -212,34 +212,51 @@ func TestSessionResult(t *testing.T) {
 	uri := func(rel string) string { return "file://" + filepath.Join(root, rel) }
 
 	o := open(t, ModeOpenMultiple, root, nil)
-	got, ok := o.result([]int{index(t, o, "a.png"), index(t, o, "docs"), index(t, o, "b.txt"), 99}, "")
+	got, ok := o.result([]int{index(t, o, "a.png"), index(t, o, "docs"), index(t, o, "b.txt"), 99})
 	if !ok || !slices.Equal(got, []string{uri("a.png"), uri("b.txt")}) {
 		t.Errorf("open = %v %v, want the files only", got, ok)
 	}
-	if got, ok := o.result([]int{index(t, o, "docs")}, ""); ok {
+	if got, ok := o.result([]int{index(t, o, "docs")}); ok {
 		t.Errorf("only a folder selected answered %v, want the dialog kept", got)
 	}
-	if _, ok := o.result(nil, ""); ok {
+	if _, ok := o.result(nil); ok {
 		t.Error("nothing selected answered")
-	}
-
-	sv := open(t, ModeSave, root, nil)
-	if got, ok := sv.result(nil, "new file.txt"); !ok || !slices.Equal(got, []string{"file://" + filepath.Join(root, "new%20file.txt")}) {
-		t.Errorf("save = %v %v", got, ok)
-	}
-	if _, ok := sv.result(nil, ""); ok {
-		t.Error("an empty save name answered")
 	}
 
 	f := open(t, ModeFolder, root, nil)
 	if got := names(f.entries); !slices.Equal(got, []string{"docs", "pics"}) {
 		t.Errorf("folder mode lists %v, want folders only", got)
 	}
-	if got, ok := f.result(nil, ""); !ok || !slices.Equal(got, []string{"file://" + root}) {
+	if got, ok := f.result(nil); !ok || !slices.Equal(got, []string{"file://" + root}) {
 		t.Errorf("folder with none selected = %v, want the folder shown", got)
 	}
-	if got, _ := f.result([]int{index(t, f, "pics")}, ""); !slices.Equal(got, []string{uri("pics")}) {
-		t.Errorf("folder with one selected = %v, want it", got)
+	if got, _ := f.result([]int{index(t, f, "pics"), index(t, f, "docs")}); !slices.Equal(got, []string{uri("pics")}) {
+		t.Errorf("a single-folder pick with two selected = %v, want the first", got)
+	}
+	fs := open(t, ModeFolders, root, nil)
+	if got, _ := fs.result([]int{index(t, fs, "pics"), index(t, fs, "docs")}); !slices.Equal(got, []string{uri("pics"), uri("docs")}) {
+		t.Errorf("a multiple-folder pick = %v, want both", got)
+	}
+}
+
+// The save entry names a path: absolute, under ~, or relative to the
+// folder shown, . and .. resolved.
+func TestSessionSavePath(t *testing.T) {
+	root := tree(t)
+	sv := open(t, ModeSave, root, nil)
+	for name, want := range map[string]string{
+		"new file.txt":  filepath.Join(root, "new file.txt"),
+		"docs/out.txt":  filepath.Join(root, "docs", "out.txt"),
+		"../up.txt":     filepath.Join(filepath.Dir(root), "up.txt"),
+		"/tmp/x":        "/tmp/x",
+		"~/notes.md":    "/home/u/notes.md",
+		"~":             "/home/u",
+		"docs/./a/../b": filepath.Join(root, "docs", "b"),
+		"":              "",
+	} {
+		if got := sv.savePath(name, "/home/u"); got != want {
+			t.Errorf("savePath(%q) = %q, want %q", name, got, want)
+		}
 	}
 }
 
@@ -251,7 +268,8 @@ func TestOpenModeAndConfirmLabel(t *testing.T) {
 	}{
 		{OpenRequest{}, ModeOpenFile, "Open"},
 		{OpenRequest{Multiple: true}, ModeOpenMultiple, "Open"},
-		{OpenRequest{Multiple: true, Directory: true}, ModeFolder, "Select"},
+		{OpenRequest{Directory: true}, ModeFolder, "Select"},
+		{OpenRequest{Multiple: true, Directory: true}, ModeFolders, "Select"},
 	} {
 		if got := openMode(c.r); got != c.mode || got.confirmLabel() != c.label {
 			t.Errorf("openMode(%+v) = %v %q, want %v %q", c.r, got, got.confirmLabel(), c.mode, c.label)

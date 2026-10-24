@@ -67,14 +67,14 @@ func verdict(ok bool, yes, no string) []string {
 func showFileChooser(m *cli.Matches) error {
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
 		c := filechooser.NewClient(conn)
-		var uris []string
+		var res filechooser.Result
 		var err error
 		if m.Flag("save") {
-			uris, err = c.Save(ctx, portalreq.Caller{}, filechooser.SaveRequest{Title: "Preview: Save File", CurrentName: "untitled.txt"})
+			res, err = c.Save(ctx, portalreq.Caller{}, filechooser.SaveRequest{Title: "Preview: Save File", CurrentName: "untitled.txt"})
 		} else {
-			uris, err = c.Open(ctx, portalreq.Caller{}, filechooser.OpenRequest{Title: "Preview: Open File", Multiple: m.Flag("multiple"), Directory: m.Flag("directory")})
+			res, err = c.Open(ctx, portalreq.Caller{}, filechooser.OpenRequest{Title: "Preview: Open File", Multiple: m.Flag("multiple"), Directory: m.Flag("directory")})
 		}
-		return orCancelled(uris...), "FileChooser", "show file chooser", err
+		return orCancelled(res.URIs...), "FileChooser", "show file chooser", err
 	})(m)
 }
 

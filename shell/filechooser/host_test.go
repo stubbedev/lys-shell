@@ -135,7 +135,7 @@ func (hs *harness) open(t *testing.T, r OpenRequest) chan []string {
 	if r.CurrentFolder == "" {
 		r.CurrentFolder = hs.root
 	}
-	return hs.ask(t, func() []string { return hs.c.Open(testCaller, r) })
+	return hs.ask(t, func() []string { return hs.c.Open(testCaller, r).URIs })
 }
 
 func answer(t *testing.T, got chan []string) []string {
@@ -312,7 +312,7 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	first := hs.open(t, OpenRequest{})
 	second := make(chan []string, 1)
 	go func() {
-		second <- hs.c.Save(portalreq.Caller{Handle: "/r/second", Modal: true}, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"})
+		second <- hs.c.Save(portalreq.Caller{Handle: "/r/second", Modal: true}, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"}).URIs
 	}()
 	pending(t, first)
 	hs.click(t, "Cancel")
@@ -347,7 +347,7 @@ func TestSpaceInATextFieldTypes(t *testing.T) {
 func TestSaveAnswersTheNameInTheFolder(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.ask(t, func() []string {
-		return hs.c.Save(testCaller, SaveRequest{Title: "Save", CurrentName: "draft.txt", CurrentFolder: hs.root})
+		return hs.c.Save(testCaller, SaveRequest{Title: "Save", CurrentName: "draft.txt", CurrentFolder: hs.root}).URIs
 	})
 	var focused bool
 	var text string
@@ -496,7 +496,7 @@ func TestDropNavigates(t *testing.T) {
 func TestOpenFailureAnswersNothing(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.openErr = errors.New("no layer shell")
-	if uris := hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}); uris != nil {
+	if uris := hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}).URIs; uris != nil {
 		t.Errorf("an unmapped chooser answered %v", uris)
 	}
 }
@@ -666,7 +666,7 @@ func TestSheetWindowIsPlacedByItsMargins(t *testing.T) {
 func TestModalDecidesTheKeyboard(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.ask(t, func() []string {
-		return hs.c.Open(portalreq.Caller{Handle: "/r/m", Modal: true}, OpenRequest{CurrentFolder: hs.root})
+		return hs.c.Open(portalreq.Caller{Handle: "/r/m", Modal: true}, OpenRequest{CurrentFolder: hs.root}).URIs
 	})
 	if hs.cfg.Keyboard != app.KeyboardExclusive {
 		t.Errorf("modal keyboard = %v, want exclusive", hs.cfg.Keyboard)
@@ -674,7 +674,7 @@ func TestModalDecidesTheKeyboard(t *testing.T) {
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
 	hs.ask(t, func() []string {
-		return hs.c.Open(portalreq.Caller{Handle: "/r/n", Modal: false}, OpenRequest{CurrentFolder: hs.root})
+		return hs.c.Open(portalreq.Caller{Handle: "/r/n", Modal: false}, OpenRequest{CurrentFolder: hs.root}).URIs
 	})
 	if hs.cfg.Keyboard != app.KeyboardOnDemand {
 		t.Errorf("non-modal keyboard = %v, want on demand", hs.cfg.Keyboard)
@@ -687,7 +687,7 @@ func TestConcurrentRequestsBothGetAnswers(t *testing.T) {
 	first := hs.open(t, OpenRequest{})
 	second := make(chan []string, 1)
 	go func() {
-		second <- hs.c.Open(portalreq.Caller{Handle: "/r/2"}, OpenRequest{CurrentFolder: hs.root})
+		second <- hs.c.Open(portalreq.Caller{Handle: "/r/2"}, OpenRequest{CurrentFolder: hs.root}).URIs
 	}()
 	select {
 	case uris := <-first:
@@ -855,4 +855,187 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 	if uris := answer(t, got); len(uris) != 0 {
 		t.Errorf("a dismissed chooser answered %v", uris)
 	}
+}
+
+// askResult starts a request and waits for its surface, answering the
+// whole Result.
+func (hs *harness) askResult(t *testing.T, fn func() Result) chan Result {
+	t.Helper()
+	got := make(chan Result, 1)
+	go func() { got <- fn() }()
+	select {
+	case hs.cfg = <-hs.opened:
+	case <-time.After(treetest.Liveness):
+		t.Fatal("no chooser opened")
+	}
+	return got
+}
+
+func result(t *testing.T, got chan Result) Result {
+	t.Helper()
+	select {
+	case r := <-got:
+		return r
+	case <-time.After(treetest.Liveness):
+		t.Fatal("the request was never answered")
+		return Result{}
+	}
+}
+
+var (
+	txtFilter = Filter{Name: "Text", Rules: []Rule{{RuleGlob, "*.txt"}}}
+	pngFilter = Filter{Name: "Images", Rules: []Rule{{RuleGlob, "*.[pP][nN][gG]"}}}
+)
+
+// The confirm button takes the accept label, the dialog starts on the
+// current filter, and the answer carries the filter active and the
+// choices made; a cancel carries neither.
+func TestOpenTakesTheAppsOptions(t *testing.T) {
+	hs := newHarness(t, "")
+	choices := []portalreq.Choice{
+		{ID: "encoding", Label: "Encoding", Options: []portalreq.Option{{ID: "utf8", Label: "UTF-8"}, {ID: "latin1", Label: "Latin-1"}}, Initial: "latin1"},
+		{ID: "readonly", Label: "Open read-only", Initial: "true"},
+	}
+	got := hs.askResult(t, func() Result {
+		return hs.c.Open(testCaller, OpenRequest{
+			CurrentFolder: hs.root, AcceptLabel: "Import", Filters: []Filter{txtFilter, pngFilter}, CurrentFilter: 1, Choices: choices,
+		})
+	})
+	if shown := hs.shown(); !slices.Equal(shown, []string{"docs", "pics", "a.png"}) {
+		t.Errorf("listing = %v, want the image filter applied from the start", shown)
+	}
+	checks := treetest.All[*widget.CheckButton](hs.cfg.Root)
+	if len(checks) != 1 || !checks[0].Checked() {
+		t.Fatalf("%d check buttons, want the read-only choice checked", len(checks))
+	}
+	hs.do(func() { checks[0].SetChecked(false) })
+	hs.pick(t, "a.png")
+	hs.click(t, "Import")
+	r := result(t, got)
+	if !slices.Equal(r.URIs, []string{hs.uri("a.png")}) || r.Filter.Name != "Images" {
+		t.Errorf("result %+v", r)
+	}
+	if want := []portalreq.Selection{{ID: "encoding", Value: "latin1"}, {ID: "readonly", Value: "false"}}; !slices.Equal(r.Choices, want) {
+		t.Errorf("choices = %v, want %v", r.Choices, want)
+	}
+	got = hs.askResult(t, func() Result { return hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root, Choices: choices}) })
+	hs.click(t, "Cancel")
+	if r := result(t, got); r.URIs != nil || r.Choices != nil || len(r.Filter.Rules) != 0 {
+		t.Errorf("a cancel answered %+v", r)
+	}
+}
+
+// A pick of several folders answers each selected one.
+func TestOpenSeveralFolders(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{Directory: true, Multiple: true})
+	hs.do(func() {
+		hs.c.activeView().Select(slices.Index(names(hs.c.s.entries), "docs"))
+		hs.c.activeView().SelectAll()
+	})
+	hs.click(t, "Select")
+	if uris := answer(t, got); !slices.Equal(uris, []string{hs.uri("docs"), hs.uri("pics")}) {
+		t.Errorf("answered %v, want both folders", uris)
+	}
+}
+
+// The save name may be a path: absolute, under ~ (home), or into a
+// subfolder; a folder it names opens instead.
+func TestSaveResolvesTheNamedPath(t *testing.T) {
+	hs := newHarness(t, "")
+	elsewhere := t.TempDir()
+	for name, want := range map[string]string{
+		filepath.Join(elsewhere, "abs.txt"): "file://" + filepath.Join(elsewhere, "abs.txt"),
+		"~/docs/home.txt":                   hs.uri("docs/home.txt"),
+		"docs/sub.txt":                      hs.uri("docs/sub.txt"),
+	} {
+		got := hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+		hs.do(func() { hs.c.ui.name.SetText(name) })
+		hs.click(t, "Save")
+		if uris := answer(t, got); !slices.Equal(uris, []string{want}) {
+			t.Errorf("%q answered %v, want %s", name, uris, want)
+		}
+	}
+	got := hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+	hs.do(func() { hs.c.ui.name.SetText("docs") })
+	hs.click(t, "Save")
+	pending(t, got)
+	var dir, text string
+	hs.do(func() { dir, text = hs.c.s.dir, hs.c.ui.name.Text() })
+	if dir != filepath.Join(hs.root, "docs") || text != "" {
+		t.Errorf("naming a folder left %s with %q, want it opened and the name cleared", dir, text)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// An existing file is replaced only on the notice's confirm; changing
+// the name drops the prompt. A folder missing or not writable warns.
+func TestSaveAsksBeforeReplacing(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.ask(t, func() []string {
+		return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: "b.txt"}).URIs
+	})
+	hs.click(t, "Save")
+	pending(t, got)
+	var notice string
+	var visible bool
+	hs.do(func() { notice, visible = hs.c.ui.noticeLabel.Text(), hs.c.ui.notice.Visible() })
+	if !visible || notice != "“b.txt” already exists in "+hs.root+". Replace it?" {
+		t.Errorf("notice %v %q", visible, notice)
+	}
+	hs.do(func() { hs.c.ui.name.SetText("b.txt ") })
+	hs.do(func() { visible = hs.c.ui.notice.Visible() })
+	if visible {
+		t.Error("editing the name kept the replace prompt")
+	}
+	hs.click(t, "Save")
+	pending(t, got)
+	hs.click(t, "Replace")
+	if uris := answer(t, got); !slices.Equal(uris, []string{hs.uri("b.txt")}) {
+		t.Errorf("replace answered %v", uris)
+	}
+
+	got = hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+	hs.do(func() { hs.c.ui.name.SetText("missing/x.txt") })
+	hs.click(t, "Save")
+	pending(t, got)
+	hs.do(func() { notice = hs.c.ui.noticeLabel.Text() })
+	if notice != "The folder "+filepath.Join(hs.root, "missing")+" does not exist." {
+		t.Errorf("missing folder notice %q", notice)
+	}
+	locked := filepath.Join(hs.root, "locked")
+	if err := os.Mkdir(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	hs.do(func() { hs.c.ui.name.SetText("locked/x.txt") })
+	hs.click(t, "Save")
+	pending(t, got)
+	hs.do(func() { notice = hs.c.ui.noticeLabel.Text() })
+	if os.Geteuid() != 0 && notice != "You cannot save in "+locked+"." {
+		t.Errorf("read-only folder notice %q", notice)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// Picking a filter gives the save name its extension.
+func TestSaveFilterSetsTheExtension(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.ask(t, func() []string {
+		return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: "report.txt", Filters: []Filter{txtFilter, pngFilter}}).URIs
+	})
+	hs.do(func() { hs.c.selectFilter(1) })
+	var text string
+	hs.do(func() { text = hs.c.ui.name.Text() })
+	if text != "report.png" {
+		t.Errorf("name = %q after the image filter", text)
+	}
+	hs.do(func() { hs.c.selectFilter(2) }) // All Files: no extension
+	hs.do(func() { text = hs.c.ui.name.Text() })
+	if text != "report.png" {
+		t.Errorf("name = %q after All Files", text)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
 }
