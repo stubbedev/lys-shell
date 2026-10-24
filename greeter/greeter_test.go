@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-ui/widget"
+
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 func TestParseOptions(t *testing.T) {
@@ -397,5 +400,20 @@ func TestWriteIcons(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+}
+
+// The greeter's stylesheet comes with lys-ui's theme on the configured
+// palette, so its lys-ui widgets match the stylesheet.
+func TestStylesheetInstallsTheWidgetTheme(t *testing.T) {
+	t.Cleanup(func() { widget.SetTheme(nil) })
+	cfg := config.Defaults()
+	Stylesheet(cfg)
+	p, err := styling.PaletteFromHex(cfg.Styling.ActivePalette())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if widget.Current().Bg != p.Bg || widget.Current().Accent != p.Primary {
+		t.Error("the greeter left lys-ui's theme off the configured palette")
 	}
 }

@@ -52,14 +52,21 @@ type Theme struct {
 	userStamp string
 }
 
-// New resolves the palette and compiles the bundle. A provider or
-// user-stylesheet failure logs and falls back (the configured palette,
-// no user CSS), the Rust shell's behavior.
+// New resolves the palette, compiles the bundle and installs lys-ui's
+// theme from the palette (WidgetTheme). A provider or user-stylesheet
+// failure logs and falls back (the configured palette, no user CSS),
+// the Rust shell's behavior.
 func New(cfg *config.Config) *Theme {
 	t := &Theme{cfg: cfg}
 	t.Sheet = widget.NewStylesheet(t.Bundle(), Priority)
+	t.installWidgetTheme()
 	t.userStamp = userStylesStamp()
 	return t
+}
+
+// installWidgetTheme gives lys-ui's widgets the resolved palette.
+func (t *Theme) installWidgetTheme() {
+	widget.SetTheme(WidgetTheme(t.RenderPalette(), t.cfg))
 }
 
 // Bundle builds init_css_provider's CSS (bootstrap.rs): static, theme,
@@ -82,14 +89,15 @@ func (t *Theme) Bundle() string {
 	return styling.StaticCSS + "\n" + theme + "\n" + t.cfg.Animations.CSSOverrides() + "\n" + user
 }
 
-// Reload recompiles the bundle into the attached stylesheet: every
-// root restyles on the next frame.
+// Reload recompiles the bundle into the attached stylesheet and
+// reinstalls lys-ui's theme: every root restyles on the next frame.
 func (t *Theme) Reload() {
 	if t.scope == nil {
 		t.scope = widget.NewBox(widget.Row, 0, 0)
 		t.scope.AttachStylesheet(t.Sheet)
 	}
 	t.Sheet.Load(t.Bundle())
+	t.installWidgetTheme()
 }
 
 // SetConfig recompiles the bundle for a new config snapshot.

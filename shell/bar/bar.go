@@ -582,23 +582,6 @@ func logicalSize(output *app.Output) widget.Size {
 	return widget.Size{W: output.ModeW / scale, H: output.ModeH / scale}
 }
 
-// applyPalette seeds lys-ui's widget theme from the lys-shell palette, so
-// widgets the stylesheet does not target still match the tokens: the
-// mapping follows the token table (bg-base, bg-surface, fg-default,
-// fg-on-accent) with the border-default token for widget strokes.
-func applyPalette(palette *styling.Palette) {
-	border, _ := palette.Token(config.TokenBorderDefault)
-	widget.SetTheme(&widget.Theme{
-		Bg:        palette.Bg,
-		Surface:   palette.Surface,
-		Text:      palette.Fg,
-		TextMuted: palette.FgMuted,
-		Accent:    palette.Primary,
-		OnAccent:  palette.Surface,
-		Border:    border,
-	})
-}
-
 // barRuntime is the state a mount generation of bars is built from:
 // the module context (with its dropdown registry), the theme, and what
 // derive resolves from a config snapshot.
@@ -622,7 +605,6 @@ type barRuntime struct {
 // leaves the previous font in place.
 func (r *barRuntime) derive(cfg *config.Config) error {
 	*r.palette = *r.theme.RenderPalette()
-	applyPalette(r.palette)
 	r.style = computeStyle(cfg, r.palette)
 	r.moduleStyle = r.style.forModules()
 	face, err := app.Font(cfg.General.FontSans, r.style.labelPx)

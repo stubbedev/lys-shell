@@ -141,9 +141,16 @@ func (s *screen) applyDebugOps(spec string, after func(time.Duration, func())) {
 }
 
 // Stylesheet is install_css: the compiled stylesheet and the configured
-// palette's theme, at the bundle's priority. The greeter carries no
-// user styles: pre-login there is no user.
+// palette's theme, at the bundle's priority, with lys-ui's theme
+// installed from the same palette. The greeter carries no user styles:
+// pre-login there is no user.
 func Stylesheet(cfg *config.Config) *widget.Stylesheet {
-	theme := styling.ThemeCSS(cfg.Styling.ActivePalette(), cfg.General, cfg.Bar, cfg.Styling)
+	palette := cfg.Styling.ActivePalette()
+	if p, err := styling.PaletteFromHex(palette); err == nil {
+		widget.SetTheme(apptheme.WidgetTheme(p, cfg))
+	} else {
+		log.Printf("greeter: palette: %v", err)
+	}
+	theme := styling.ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling)
 	return widget.NewStylesheet(styling.StaticCSS+"\n"+theme, apptheme.Priority)
 }
