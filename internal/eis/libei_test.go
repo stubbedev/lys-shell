@@ -36,6 +36,7 @@ type libei struct {
 	button         func(dev uintptr, code uint32, press bool)
 	scrollDelta    func(dev uintptr, x, y float64)
 	scrollDiscrete func(dev uintptr, x, y int32)
+	scrollStop     func(dev uintptr, x, y bool)
 	key            func(dev uintptr, code uint32, press bool)
 	keysym         func(dev uintptr, sym uint32, press bool)
 	bindCaps       uintptr // variadic, NULL-terminated
@@ -80,6 +81,7 @@ func loadLibei(t *testing.T) *libei {
 			{&l.button, "ei_device_button_button"},
 			{&l.scrollDelta, "ei_device_scroll_delta"},
 			{&l.scrollDiscrete, "ei_device_scroll_discrete"},
+			{&l.scrollStop, "ei_device_scroll_stop"},
 			{&l.key, "ei_device_keyboard_key"},
 			{&l.keysym, "ei_device_text_keysym"},
 		} {
@@ -138,6 +140,7 @@ func (r *recorder) Motion(dx, dy float64)       { r.add(fmt.Sprint("motion ", dx
 func (r *recorder) Button(c uint32, p bool)     { r.add(fmt.Sprint("button ", c, " ", p)) }
 func (r *recorder) Scroll(dx, dy float64)       { r.add(fmt.Sprint("scroll ", dx, " ", dy)) }
 func (r *recorder) ScrollDiscrete(dx, dy int32) { r.add(fmt.Sprint("discrete ", dx, " ", dy)) }
+func (r *recorder) ScrollStop(x, y bool)        { r.add(fmt.Sprint("stop ", x, " ", y)) }
 func (r *recorder) Key(c uint32, p bool)        { r.add(fmt.Sprint("key ", c, " ", p)) }
 func (r *recorder) Keysym(sym uint32, p bool)   { r.add(fmt.Sprint("keysym ", sym, " ", p)) }
 
@@ -188,6 +191,7 @@ func emulate(l *libei, ei, dev uintptr) {
 		l.motion(dev, 1.5, -2)
 		l.button(dev, 0x110, true)
 		l.scrollDelta(dev, 0, 3)
+		l.scrollStop(dev, false, true)
 		l.scrollDiscrete(dev, 0, 240)
 	}
 	if l.hasCap(dev, eiCapKeyboard) {
@@ -227,7 +231,7 @@ func TestLibeiSenderEmulatesThroughTheServer(t *testing.T) {
 		t.Fatalf("connected %v, %d devices resumed; want a keyboard and a pointer", connected, resumed)
 	}
 	deadline := time.Now().Add(2 * time.Second)
-	want := []string{"motion 1.5 -2", "button 272 true", "scroll 0 3", "discrete 0 240", "key 30 true", "key 30 false", "keysym 65 true"}
+	want := []string{"motion 1.5 -2", "button 272 true", "scroll 0 3", "stop false true", "discrete 0 240", "key 30 true", "key 30 false", "keysym 65 true"}
 	for time.Now().Before(deadline) && len(rec.list()) < len(want) {
 		time.Sleep(10 * time.Millisecond)
 	}

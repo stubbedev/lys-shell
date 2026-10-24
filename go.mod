@@ -5,8 +5,9 @@ go 1.27.1
 require (
 	github.com/ebitengine/purego v0.11.1
 	github.com/godbus/dbus/v5 v5.2.2
+	github.com/neurlang/wayland v0.4.5
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-ui v0.0.0-20261024131436-b4ed4d0aa4f9
+	github.com/stubbedev/lys-ui v0.0.0-20261024193143-ab92f3323741
 	github.com/unxed/xkb-go v0.1.8
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
@@ -26,7 +27,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yalue/native_endian v1.0.2 // indirect
 	golang.org/x/net v0.60.0 // indirect

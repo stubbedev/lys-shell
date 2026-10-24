@@ -497,8 +497,9 @@ func TestMediaPickerChrome(t *testing.T) {
 }
 
 // The transport buttons carry no programmatic padding (button.media-control
-// paints the box, static.css:6057-6071) and the pointer cursor every
-// button gets.
+// paints the box, static.css:6057-6071): each measures as a button of
+// its classes built with none. They get the pointer cursor every button
+// gets.
 func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC", State: mpris.StatePlaying})
@@ -516,9 +517,11 @@ func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
 		{v.next, "ld-skip-forward-symbolic", px},
 		{v.loop, "ld-repeat-symbolic", px},
 	} {
-		want := widget.NewThemeIcon(tc.glyph, int(tc.px)).Measure(widgetConstraintsMax(200, 200))
+		bare := widget.NewButton(widget.NewThemeIcon(tc.glyph, int(tc.px)), 0, 0)
+		bare.AddClass(tc.b.Classes()...)
+		want := bare.Measure(widgetConstraintsMax(200, 200))
 		if got := tc.b.Measure(widgetConstraintsMax(200, 200)); got != want {
-			t.Errorf("%s measures %v, want the bare icon's %v (programmatic padding)", tc.glyph, got, want)
+			t.Errorf("%s measures %v, want an unpadded button's %v (programmatic padding)", tc.glyph, got, want)
 		}
 		if got := widget.CursorNameOf(tc.b); got != "pointer" {
 			t.Errorf("%s cursor = %q, want pointer", tc.glyph, got)

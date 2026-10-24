@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-ui/vinput"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
@@ -32,13 +33,22 @@ func (f *fakeSink) MotionAbsolute(x, y, w, h uint32) error {
 	return nil
 }
 func (f *fakeSink) Button(c uint32, p bool) error { f.log(sprint("button", c, p)); return nil }
-func (f *fakeSink) Axis(a uint32, v float64) error {
-	f.log(sprint("axis", a, v))
+
+// sourceNames name the scroll sources in the log.
+var sourceNames = map[vinput.AxisSource]string{vinput.SourceWheel: "wheel", vinput.SourceFinger: "finger"}
+
+func (f *fakeSink) Axis(src vinput.AxisSource, a vinput.ScrollAxis, v float64) error {
+	f.log(sprint("axis", sourceNames[src], a, v))
 	return nil
 }
 
-func (f *fakeSink) AxisDiscrete(a uint32, v float64, s int32) error {
-	f.log(sprint("discrete", a, v, s))
+func (f *fakeSink) AxisDiscrete(src vinput.AxisSource, a vinput.ScrollAxis, v float64, s int32) error {
+	f.log(sprint("discrete", sourceNames[src], a, v, s))
+	return nil
+}
+
+func (f *fakeSink) AxisStop(src vinput.AxisSource, a vinput.ScrollAxis) error {
+	f.log(sprint("stop", sourceNames[src], a))
 	return nil
 }
 func (f *fakeSink) Key(c uint32, p bool) error { f.log(sprint("key", c, p)); return nil }
@@ -187,10 +197,10 @@ func TestRemoteDesktopReplaysInput(t *testing.T) {
 		"motion 1.5 -2",
 		"abs 353408 0 819200 276480",
 		"button 272 true",
-		"axis 0 3",
-		"axis 1 2",
-		"discrete 1 -30 -2",
-		"discrete 0 15 1",
+		"axis finger 0 3",
+		"axis finger 1 2",
+		"discrete wheel 1 -30 -2",
+		"discrete wheel 0 15 1",
 		"key 30 true",
 		"key 42 true", "key 30 true",
 		"key 30 false", "key 42 false",
@@ -359,6 +369,48 @@ func TestKeysymsReachLevelThree(t *testing.T) {
 
 // Hi-res wheel steps below a detent scroll smoothly and add up to whole
 // steps instead of being dropped.
+// A smooth scroll with finish ends the scroll on both axes after its
+// deltas, as lifted fingers do, over D-Bus and EIS; without finish no
+// scroll ends, and without the pointer granted nothing reaches the
+// devices.
+func TestRemoteDesktopFinishEndsTheScroll(t *testing.T) {
+	r, sink := remoteRig(t, nil)
+	serveDialogs(t, r, true)
+	if code, _ := r.remoteStart(t, Vardict{"types": dbus.MakeVariant(devicePointer)}); code != ResponseSuccess {
+		t.Fatal("Start failed")
+	}
+	axis := func(options Vardict, dx, dy float64) {
+		t.Helper()
+		if err := r.obj.Call(RemoteDesktopIface+".NotifyPointerAxis", 0, sessA, options, dx, dy).Err; err != nil {
+			t.Fatal(err)
+		}
+	}
+	axis(Vardict{}, 0, 2)
+	axis(Vardict{"finish": dbus.MakeVariant(true)}, 1, 3)
+	axis(Vardict{"finish": dbus.MakeVariant(false)}, 0, 1)
+	in, err := r.backend.remote.input(sessA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eisInput{in}.ScrollStop(true, false)
+	want := []string{
+		"axis finger 0 2",
+		"axis finger 0 3", "axis finger 1 1", "stop finger 0", "stop finger 1",
+		"axis finger 0 1",
+		"stop finger 1",
+	}
+	if got := sink.events.Load(); !slices.Equal(got, want) {
+		t.Errorf("input =\n%q\nwant\n%q", got, want)
+	}
+
+	keyboardOnly := &remoteInput{sink: sink, granted: deviceKeyboard}
+	sink.events.Store(nil)
+	eisInput{keyboardOnly}.ScrollStop(true, true)
+	if got := sink.events.Load(); len(got) != 0 {
+		t.Errorf("a scroll stop without the pointer granted reached the devices: %q", got)
+	}
+}
+
 func TestEISScrollAddsUpHiResSteps(t *testing.T) {
 	sink := &fakeSink{}
 	e := eisInput{&remoteInput{sink: sink, granted: devicePointer}}
@@ -366,7 +418,7 @@ func TestEISScrollAddsUpHiResSteps(t *testing.T) {
 	e.ScrollDiscrete(0, 60)
 	e.ScrollDiscrete(-240, 0)
 	e.ScrollDiscrete(0, 0)
-	want := []string{"discrete 0 7.5 0", "discrete 0 7.5 1", "discrete 1 -30 -2"}
+	want := []string{"discrete wheel 0 7.5 0", "discrete wheel 0 7.5 1", "discrete wheel 1 -30 -2"}
 	if got := sink.events.Load(); !slices.Equal(got, want) {
 		t.Errorf("scrolled %q, want %q", got, want)
 	}
@@ -410,7 +462,7 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 	e.ScrollDiscrete(0, 0)
 	e.Scroll(1, 0)
 	e.Keysym(0x41, true)
-	want := []string{"discrete 0 30 2", "discrete 1 -15 -1", "axis 1 1", "key 42 true", "key 30 true"}
+	want := []string{"discrete wheel 0 30 2", "discrete wheel 1 -15 -1", "axis finger 1 1", "key 42 true", "key 30 true"}
 	if got := sink.events.Load(); !slices.Equal(got, want) {
 		t.Errorf("replayed %q, want %q", got, want)
 	}

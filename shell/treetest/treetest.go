@@ -26,12 +26,17 @@ var Loop sync.Mutex
 // stretches past a couple of seconds.
 const Liveness = 10 * time.Second
 
-// Walk visits w and every descendant, depth first.
+// Walk visits w and every descendant, depth first: a hidden
+// revealer's content too, which its Children leave out.
 func Walk(w widget.Widget, visit func(widget.Widget)) {
 	if w == nil {
 		return
 	}
 	visit(w)
+	if r, ok := w.(*widget.Revealer); ok {
+		Walk(r.Child(), visit)
+		return
+	}
 	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
 		for _, k := range c.Children() {
 			Walk(k, visit)

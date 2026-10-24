@@ -3,9 +3,9 @@ package bar
 import (
 	"testing"
 
+	"github.com/neurlang/wayland/wl"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
-	"github.com/stubbedev/lys-ui/third_party/neurlang-wayland/wl"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -317,10 +317,10 @@ func TestDropdownPopoverFollowsAutohide(t *testing.T) {
 	}
 }
 
-// The popover tree carries the theme at its root, where :root matches,
-// so a panel's labels resolve their ink through the theme's variables;
-// with the sheet lower in the tree they resolved nothing and painted
-// transparent.
+// The popover tree takes the theme from the bar it is anchored to: a
+// panel's labels resolve their ink through the bar theme's variables,
+// the title in the palette's text color; with the sheet lower in the
+// tree they resolved nothing and painted transparent.
 func TestDropdownTreeStylesThePanelText(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := styledContext(t, cfg)
@@ -342,15 +342,14 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 		}
 		return labels
 	}
-	for _, l := range arrange() {
-		if widget.CascadeColor(l) != 0 {
-			t.Fatalf("label %q has ink before the popover is anchored: the tree carries a theme of its own", l.Text())
-		}
-	}
 	widget.SetStyleAnchor(root, anchor)
 	for _, l := range arrange() {
-		if widget.CascadeColor(l) == 0 {
+		c := widget.CascadeColor(l)
+		if c.A() == 0 {
 			t.Errorf("label %q has no ink from the bar's theme", l.Text())
+		}
+		if want := ctx.Theme.RenderPalette().Fg; l.Text() == "Calendar" && c != want {
+			t.Errorf("the title has ink %#x, want the bar theme's %#x", uint32(c), uint32(want))
 		}
 	}
 	// The view is the Dropdown template's .dropdown box under the

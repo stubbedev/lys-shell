@@ -262,7 +262,8 @@ func TestFrontendOpenURIAsksTheAppChooser(t *testing.T) {
 // the streams it needs to place absolute motion: a point inside the
 // stream reaches the virtual pointer mapped onto the output, one
 // outside every stream is refused by the frontend, and a stream the
-// session does not run is refused by the backend.
+// session does not run is refused by the backend. A finished scroll
+// reaches the pointer as a finger scroll and its stop.
 func TestFrontendDrivesRemoteDesktopThroughTheScreenStreams(t *testing.T) {
 	r, sink := remoteRig(t, nil)
 	serveDialogs(t, r, true)
@@ -300,8 +301,12 @@ func TestFrontendDrivesRemoteDesktopThroughTheScreenStreams(t *testing.T) {
 			t.Fatalf("NotifyPointerMotionAbsolute(%d, %v, %v): %v", m.stream, m.x, m.y, err)
 		}
 	}
+	// A scroll with finish ends with a stop on both axes.
+	if err := f.obj.Call(publicRemote+".NotifyPointerAxis", 0, session, Vardict{"finish": dbus.MakeVariant(true)}, 0.0, 2.0).Err; err != nil {
+		t.Fatalf("NotifyPointerAxis: %v", err)
+	}
 	// DP-2 is at (1280, 0) in a layout 3200x1080, in 256ths of a pixel.
-	want := []string{"abs 353408 1280 819200 276480", "abs 327680 0 819200 276480"}
+	want := []string{"abs 353408 1280 819200 276480", "abs 327680 0 819200 276480", "axis finger 0 2", "stop finger 0", "stop finger 1"}
 	waitFor(t, func() bool { return len(sink.events.Load()) >= len(want) })
 	if got := sink.events.Load(); !slices.Equal(got, want) {
 		t.Errorf("input = %q, want %q", got, want)

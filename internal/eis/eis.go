@@ -23,6 +23,9 @@ type Handler interface {
 	Scroll(dx, dy float64)
 	// ScrollDiscrete is wheel scrolling in 120ths of a detent.
 	ScrollDiscrete(dx, dy int32)
+	// ScrollStop ends the smooth scrolling on the axes set (the
+	// fingers lifted); a cancel ends it the same way.
+	ScrollStop(x, y bool)
 	Key(code uint32, pressed bool)
 	Keysym(sym uint32, pressed bool)
 }
@@ -223,6 +226,11 @@ func (s *server) dispatch(m message) (done bool, err error) {
 			x, y := r.i32(), r.i32()
 			if r.err == nil {
 				s.h.ScrollDiscrete(x, y)
+			}
+		case 3: // scroll_stop(x, y, is_cancel)
+			x, y, _ := r.u32(), r.u32(), r.u32()
+			if r.err == nil {
+				s.h.ScrollStop(x != 0, y != 0)
 			}
 		}
 	case ifButton:

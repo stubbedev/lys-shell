@@ -135,6 +135,7 @@ func TestDropdownSizeFloorsThePopoverAroundItsMargins(t *testing.T) {
 	wide := widget.NewBox(widget.Row, 0, 0)
 	wide.Append(widget.NewSpacer(500, 20), false)
 	root, _ = dropdownTree(newPanelBox(wide), cfg, 382, 0)
+	apptheme.New(cfg).Attach(root)
 	if sz := widget.MeasureAsChild(root, con); sz.W != 500+m.start+m.end {
 		t.Errorf("popover width %d, want the 500px content plus the margins", sz.W)
 	}

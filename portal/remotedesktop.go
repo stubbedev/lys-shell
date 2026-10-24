@@ -43,8 +43,9 @@ type inputSink interface {
 	Motion(dx, dy float64) error
 	MotionAbsolute(x, y, width, height uint32) error
 	Button(code uint32, pressed bool) error
-	Axis(axis uint32, value float64) error
-	AxisDiscrete(axis uint32, value float64, steps int32) error
+	Axis(src vinput.AxisSource, axis vinput.ScrollAxis, value float64) error
+	AxisDiscrete(src vinput.AxisSource, axis vinput.ScrollAxis, value float64, steps int32) error
+	AxisStop(src vinput.AxisSource, axis vinput.ScrollAxis) error
 	Key(code uint32, pressed bool) error
 	Keymap() []byte
 	Close()
@@ -105,7 +106,7 @@ func (in *remoteInput) keysym(sym uint32, pressed bool) {
 // scrollDiscrete scrolls v120 120ths of a detent on axis: the smooth
 // amount at once, and a wheel step each time the 120ths add up to one,
 // so hi-res wheels below a detent are not dropped.
-func (in *remoteInput) scrollDiscrete(axis uint32, v120 int32) {
+func (in *remoteInput) scrollDiscrete(axis vinput.ScrollAxis, v120 int32) {
 	if v120 == 0 {
 		return
 	}
@@ -114,7 +115,7 @@ func (in *remoteInput) scrollDiscrete(axis uint32, v120 int32) {
 	steps := total / 120
 	in.scrollRest[axis] = total % 120
 	in.scrollMu.Unlock()
-	_ = in.sink.AxisDiscrete(axis, float64(v120)*discreteStep/120, steps)
+	_ = in.sink.AxisDiscrete(vinput.SourceWheel, axis, float64(v120)*discreteStep/120, steps)
 }
 
 // keysymISOLevel3Shift is the AltGr key's keysym.
@@ -495,26 +496,44 @@ func (o remoteDesktopObject) NotifyPointerButton(session dbus.ObjectPath, _ Vard
 	return o.with(session, devicePointer, func(in *remoteInput) { _ = in.sink.Button(uint32(button), state != 0) })
 }
 
-// NotifyPointerAxis scrolls smoothly, vertical then horizontal.
-func (o remoteDesktopObject) NotifyPointerAxis(session dbus.ObjectPath, _ Vardict, dx, dy float64) *dbus.Error {
-	return o.with(session, devicePointer, func(in *remoteInput) { smoothScroll(in.sink, dx, dy) })
+// NotifyPointerAxis scrolls smoothly, vertical then horizontal, as a
+// finger scroll does; finish ends the scroll on both axes (the fingers
+// lifted), which lets the app run its kinetic scrolling.
+func (o remoteDesktopObject) NotifyPointerAxis(session dbus.ObjectPath, options Vardict, dx, dy float64) *dbus.Error {
+	finish, _ := optBool(options, "finish")
+	return o.with(session, devicePointer, func(in *remoteInput) {
+		smoothScroll(in.sink, dx, dy)
+		if finish {
+			stopScroll(in.sink, true, true)
+		}
+	})
 }
 
 func smoothScroll(sink inputSink, dx, dy float64) {
 	if dy != 0 {
-		_ = sink.Axis(0, dy)
+		_ = sink.Axis(vinput.SourceFinger, vinput.AxisVertical, dy)
 	}
 	if dx != 0 {
-		_ = sink.Axis(1, dx)
+		_ = sink.Axis(vinput.SourceFinger, vinput.AxisHorizontal, dx)
+	}
+}
+
+// stopScroll ends a finger scroll on the axes set, vertical first.
+func stopScroll(sink inputSink, horizontal, vertical bool) {
+	if vertical {
+		_ = sink.AxisStop(vinput.SourceFinger, vinput.AxisVertical)
+	}
+	if horizontal {
+		_ = sink.AxisStop(vinput.SourceFinger, vinput.AxisHorizontal)
 	}
 }
 
 // axisOf is a wl_pointer axis: 1 horizontal, anything else vertical.
-func axisOf(axis uint32) uint32 {
+func axisOf(axis uint32) vinput.ScrollAxis {
 	if axis == 1 {
-		return 1
+		return vinput.AxisHorizontal
 	}
-	return 0
+	return vinput.AxisVertical
 }
 
 // discreteStep is one wheel click in axis units.
@@ -523,7 +542,7 @@ const discreteStep = 15
 // NotifyPointerAxisDiscrete scrolls whole wheel steps.
 func (o remoteDesktopObject) NotifyPointerAxisDiscrete(session dbus.ObjectPath, _ Vardict, axis uint32, steps int32) *dbus.Error {
 	return o.with(session, devicePointer, func(in *remoteInput) {
-		_ = in.sink.AxisDiscrete(axisOf(axis), float64(steps)*discreteStep, steps)
+		_ = in.sink.AxisDiscrete(vinput.SourceWheel, axisOf(axis), float64(steps)*discreteStep, steps)
 	})
 }
 
@@ -593,8 +612,15 @@ func (e eisInput) Keysym(sym uint32, pressed bool) {
 // ScrollDiscrete scrolls 120ths of a detent, vertical then horizontal.
 func (e eisInput) ScrollDiscrete(dx, dy int32) {
 	if e.pointer() {
-		e.in.scrollDiscrete(0, dy)
-		e.in.scrollDiscrete(1, dx)
+		e.in.scrollDiscrete(vinput.AxisVertical, dy)
+		e.in.scrollDiscrete(vinput.AxisHorizontal, dx)
+	}
+}
+
+// ScrollStop ends the client's finger scroll on the axes it names.
+func (e eisInput) ScrollStop(x, y bool) {
+	if e.pointer() {
+		stopScroll(e.in.sink, x, y)
 	}
 }
 
