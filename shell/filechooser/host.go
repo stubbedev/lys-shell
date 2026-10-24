@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
@@ -99,6 +100,7 @@ type Chooser struct {
 	rev     *widget.Revealer
 	closing bool
 	reply   func([]string)
+	handle  string
 	s       *session
 	ui      *ui
 
@@ -143,21 +145,32 @@ func New(d Deps) *Chooser {
 }
 
 // Open shows the open dialog.
-func (c *Chooser) Open(r OpenRequest) []string {
-	return c.ask(r.Title, openMode(r), r.Filters, r.CurrentFolder, "")
+func (c *Chooser) Open(caller portalreq.Caller, r OpenRequest) []string {
+	return c.ask(caller, r.Title, openMode(r), r.Filters, r.CurrentFolder, "")
 }
 
 // Save shows the save dialog seeded with the suggested name.
-func (c *Chooser) Save(r SaveRequest) []string {
-	return c.ask(r.Title, ModeSave, r.Filters, r.CurrentFolder, r.CurrentName)
+func (c *Chooser) Save(caller portalreq.Caller, r SaveRequest) []string {
+	return c.ask(caller, r.Title, ModeSave, r.Filters, r.CurrentFolder, r.CurrentName)
+}
+
+// Dismiss cancels, and takes down, the dialog showing for the request
+// at handle; another request's dialog stays.
+func (c *Chooser) Dismiss(handle string) {
+	c.d.Invoke(func() {
+		if c.reply != nil && handle != "" && c.handle == handle {
+			c.finish(nil)
+		}
+	})
 }
 
 // ask shows a request on the loop and waits for its answer.
-func (c *Chooser) ask(title string, mode Mode, filters []Filter, folder, name string) []string {
+func (c *Chooser) ask(caller portalreq.Caller, title string, mode Mode, filters []Filter, folder, name string) []string {
 	ch := make(chan []string, 1)
 	c.d.Invoke(func() {
 		c.settle(nil)
 		c.reply = func(uris []string) { ch <- uris }
+		c.handle = caller.Handle
 		c.begin(title, mode, filters, folder, name)
 	})
 	return <-ch
@@ -168,7 +181,7 @@ func (c *Chooser) settle(uris []string) {
 	c.cancelWalk()
 	if c.reply != nil {
 		reply := c.reply
-		c.reply = nil
+		c.reply, c.handle = nil, ""
 		reply(uris)
 	}
 }

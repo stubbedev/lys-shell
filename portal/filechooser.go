@@ -1,7 +1,6 @@
 package portal
 
 import (
-	"context"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -27,34 +26,52 @@ func fileChooserIface(conn *dbus.Conn) dbusx.Interface {
 func (f fileChooser) client() *filechooser.Client { return filechooser.NewClient(f.conn) }
 
 // OpenFile opens existing files or a directory.
-func (f fileChooser) OpenFile(_ dbus.ObjectPath, _, _, title string, options Vardict) (uint32, Vardict, *dbus.Error) {
+func (f fileChooser) OpenFile(handle dbus.ObjectPath, appID, parent, title string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	client := f.client()
+	c, ok := beginOr(f.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
 	multiple, _ := optBool(options, "multiple")
 	directory, _ := optBool(options, "directory")
-	uris, err := f.client().Open(context.Background(), filechooser.OpenRequest{
+	uris, err := client.Open(c.ctx, c.caller, filechooser.OpenRequest{
 		Title: title, Multiple: multiple, Directory: directory,
 		Filters: fileFilters(options), CurrentFolder: currentFolder(options),
 	})
-	return urisResponse("open", uris, err)
+	return urisResponse(c, "open", uris, err)
 }
 
 // SaveFile chooses a save destination.
-func (f fileChooser) SaveFile(_ dbus.ObjectPath, _, _, title string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	uris, err := f.client().Save(context.Background(), filechooser.SaveRequest{
+func (f fileChooser) SaveFile(handle dbus.ObjectPath, appID, parent, title string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	client := f.client()
+	c, ok := beginOr(f.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
+	uris, err := client.Save(c.ctx, c.caller, filechooser.SaveRequest{
 		Title: title, CurrentName: stringOr(options, "current_name", ""),
 		Filters: fileFilters(options), CurrentFolder: currentFolder(options),
 	})
-	return urisResponse("save", uris, err)
+	return urisResponse(c, "save", uris, err)
 }
 
 // SaveFiles picks a folder and replies one URI per requested file
 // name inside it. The names are escaped into the URI (the Rust join
 // left a name with a space or '#' an invalid URI).
-func (f fileChooser) SaveFiles(_ dbus.ObjectPath, _, _, title string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	picked, err := f.client().Open(context.Background(), filechooser.OpenRequest{
+func (f fileChooser) SaveFiles(handle dbus.ObjectPath, appID, parent, title string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	client := f.client()
+	c, ok := beginOr(f.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
+	picked, err := client.Open(c.ctx, c.caller, filechooser.OpenRequest{
 		Title: title, Directory: true, CurrentFolder: currentFolder(options),
 	})
 	if err != nil || len(picked) == 0 {
-		return urisResponse("folder pick", nil, err)
+		return urisResponse(c, "folder pick", nil, err)
 	}
 	folder := strings.TrimRight(picked[0], "/")
 	files, _ := options["files"].Value().([][]byte)
@@ -62,18 +79,14 @@ func (f fileChooser) SaveFiles(_ dbus.ObjectPath, _, _, title string, options Va
 	for _, name := range files {
 		uris = append(uris, folder+"/"+fileuri.Encode(cString(name), ""))
 	}
-	return urisResponse("save files", uris, nil)
+	return urisResponse(c, "save files", uris, nil)
 }
 
-// urisResponse is the chosen URIs as a reply: none is a cancel, a
-// failed dialog (no shell) other.
-func urisResponse(what string, uris []string, err error) (uint32, Vardict, *dbus.Error) {
-	switch {
-	case err != nil:
-		warnf("filechooser: %s failed: %v", what, err)
-		return ResponseOther, Vardict{}, nil
-	case len(uris) == 0:
-		return ResponseCancelled, Vardict{}, nil
+// urisResponse is the chosen URIs as a reply: none (or a closed
+// request) is a cancel, a failed dialog (no shell) other.
+func urisResponse(c *call, what string, uris []string, err error) (uint32, Vardict, *dbus.Error) {
+	if code := c.response("filechooser "+what, len(uris) > 0, err); code != ResponseSuccess {
+		return code, Vardict{}, nil
 	}
 	return ResponseSuccess, Vardict{"uris": dbus.MakeVariant(uris)}, nil
 }

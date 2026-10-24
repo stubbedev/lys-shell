@@ -9,12 +9,12 @@ import (
 // usb is org.freedesktop.impl.portal.Usb (usb.rs): the frontend
 // enumerates devices, the backend only grants, and grants every
 // requested device its asked-for access.
-type usb struct{}
+type usb struct{ conn *dbus.Conn }
 
-func usbIface() dbusx.Interface {
+func usbIface(conn *dbus.Conn) dbusx.Interface {
 	return dbusx.Interface{
 		Name:       "org.freedesktop.impl.portal.Usb",
-		Methods:    usb{},
+		Methods:    usb{conn},
 		Properties: dbusx.Getters{"version": func() any { return uint32(1) }},
 	}
 }
@@ -33,7 +33,12 @@ type grantedDevice struct {
 }
 
 // AcquireDevices grants the requested devices.
-func (usb) AcquireDevices(_ dbus.ObjectPath, _, _ string, devices []requestedDevice, _ Vardict) (uint32, Vardict, *dbus.Error) {
+func (u usb) AcquireDevices(handle dbus.ObjectPath, appID, parent string, devices []requestedDevice, _ Vardict) (uint32, Vardict, *dbus.Error) {
+	c, ok := beginOr(u.conn, handle, appID, parent, nil)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
 	granted := make([]grantedDevice, 0, len(devices))
 	for _, d := range devices {
 		granted = append(granted, grantedDevice{ID: d.ID, Access: d.Access})

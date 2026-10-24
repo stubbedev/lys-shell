@@ -2,6 +2,7 @@ package sharepicker
 
 import (
 	"context"
+	"image"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/capture"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -34,9 +36,39 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	}
 	ch := make(chan string, 1)
 	p.snapshot()
-	p.reply, p.allowToken, p.multiple = ch, allowToken, multiple
+	p.reply, p.handle, p.allowToken, p.multiple = ch, "/r/test", allowToken, multiple
 	p.root = p.build(nil)
 	return p, ch
+}
+
+// fakeRegion is the region overlay; it records cancels.
+type fakeRegion struct{ cancels int }
+
+func (*fakeRegion) Request(map[string]*image.RGBA) (regionoverlay.Selection, bool) {
+	return regionoverlay.Selection{}, false
+}
+func (f *fakeRegion) Cancel() { f.cancels++ }
+
+// Dismissing the request the picker shows answers it cancelled, the
+// region overlay it opened included; another request's dismissal does
+// nothing.
+func TestDismissCancelsItsRequestOnly(t *testing.T) {
+	p, ch := testPicker(t, config.DefaultsSharePicker(), false, false)
+	region := &fakeRegion{}
+	p.region = region
+	p.invoke = func(fn func()) { fn() }
+	p.Dismiss("/r/other")
+	if p.reply == nil {
+		t.Fatal("another request's dismissal answered this one")
+	}
+	p.selecting = true
+	p.Dismiss("/r/test")
+	if got := <-ch; got != "" {
+		t.Errorf("a dismissed picker replied %q, want the cancel", got)
+	}
+	if region.cancels != 1 {
+		t.Errorf("region overlay cancels = %d, want the open overlay taken down", region.cancels)
+	}
 }
 
 func TestSingleSelectConfirmsAtOnce(t *testing.T) {
@@ -203,9 +235,11 @@ func TestMonitorAreaPlacement(t *testing.T) {
 
 type fakePicker struct{ reply string }
 
-func (f fakePicker) Pick(list string, token, multi bool) string {
-	return f.reply + "|" + list + "|" + boolStr(token) + boolStr(multi)
+func (f fakePicker) Pick(c portalreq.Caller, list string, token, multi bool) string {
+	return f.reply + "|" + c.Handle + "|" + list + "|" + boolStr(token) + boolStr(multi)
 }
+
+func (fakePicker) Dismiss(string) {}
 
 func boolStr(b bool) string {
 	if b {
@@ -223,8 +257,8 @@ func TestDaemonOverTheBus(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer release()
-	got, err := NewClient(client).Pick(context.Background(), "1[HC>]a[HT>]b[HE>]", true, false)
-	if err != nil || got != "/screen:DP-1|1[HC>]a[HT>]b[HE>]|tf" {
+	got, err := NewClient(client).Pick(context.Background(), portalreq.Caller{Handle: "/r/1"}, "1[HC>]a[HT>]b[HE>]", true, false)
+	if err != nil || got != "/screen:DP-1|/r/1|1[HC>]a[HT>]b[HE>]|tf" {
 		t.Fatalf("Pick = %q %v", got, err)
 	}
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {

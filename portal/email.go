@@ -16,18 +16,24 @@ import (
 // list of paths it passes here; a mail client that cannot take them is
 // a failure, never a compose window silently missing the files.
 type email struct {
+	conn  *dbus.Conn
 	spawn func(argv, env []string) error
 }
 
-func emailIface(spawn func(argv, env []string) error) dbusx.Interface {
+func emailIface(conn *dbus.Conn, spawn func(argv, env []string) error) dbusx.Interface {
 	return dbusx.Interface{
 		Name:    "org.freedesktop.impl.portal.Email",
-		Methods: email{spawn},
+		Methods: email{conn, spawn},
 	}
 }
 
 // ComposeEmail opens the compose window.
-func (e email) ComposeEmail(_ dbus.ObjectPath, _, _ string, options Vardict) (uint32, Vardict, *dbus.Error) {
+func (e email) ComposeEmail(handle dbus.ObjectPath, appID, parent string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	c, ok := beginOr(e.conn, handle, appID, parent, nil)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
 	var env []string
 	if token, ok := optString(options, "activation_token"); ok && token != "" {
 		env = []string{"XDG_ACTIVATION_TOKEN=" + token}

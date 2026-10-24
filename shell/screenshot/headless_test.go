@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
@@ -64,7 +65,7 @@ func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 		Region: &fakeRegion{sel: regionoverlay.Selection{Output: frozen[0].connector, X: 5, Y: 5, Width: 30, Height: 20}, ok: true},
 		Notify: func(string) {},
 	}
-	path, err := h.Capture(ModeRegion, "")
+	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatal(err)
 	}

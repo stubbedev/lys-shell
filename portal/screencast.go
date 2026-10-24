@@ -1,7 +1,6 @@
 package portal
 
 import (
-	"context"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -139,21 +138,15 @@ func (c *screenCast) config(s *session) castState {
 	return cfg
 }
 
-// pick asks the share picker, giving up when the request is closed;
-// ok is false for a cancel, a closed request, or no shell.
-func (c *screenCast) pick(cancelled <-chan struct{}, allowToken, multiple bool) (token bool, targets []captureTarget, ok bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		select {
-		case <-cancelled:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+// pick asks the share picker for the call; ok is false for a cancel, a
+// closed request, or no shell.
+func (c *screenCast) pick(call *call, allowToken, multiple bool) (token bool, targets []captureTarget, ok bool) {
 	// No window list: the picker enumerates toplevels itself and
 	// replies identifiers the capture re-resolves.
-	reply, err := sharepicker.NewClient(c.conn).Pick(ctx, "", allowToken, multiple)
+	reply, err := sharepicker.NewClient(c.conn).Pick(call.ctx, call.caller, "", allowToken, multiple)
+	if call.closed() {
+		return false, nil, false
+	}
 	if err != nil {
 		warnf("screencast: picker call failed: %v", err)
 		return false, nil, false
@@ -285,25 +278,25 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 // Start picks the sources (or replays the token), starts their streams
 // and replies them. A restored source that is gone re-prompts once
 // (xdph's restore validation) rather than failing the request.
-func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
+func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent string, _ Vardict) (uint32, Vardict, *dbus.Error) {
 	s, err := o.c.sessions.lookup(session, appID, kindScreenCast)
 	if err != nil {
 		warnf("screencast: Start: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	cfg := o.c.config(s)
-	var cancelled <-chan struct{}
-	if req, err := mountRequest(o.c.conn, handle); err == nil {
-		defer req.end()
-		cancelled = req.Cancelled()
+	call, ok := beginOr(o.c.conn, handle, appID, parent, sharepicker.NewClient(o.c.conn).Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
 	}
+	defer call.end()
+	cfg := o.c.config(s)
 	restoring := cfg.restore != nil
 	allowToken, targets := cfg.persistMode > 0, []captureTarget(nil)
 	if restoring {
 		targets = []captureTarget{*cfg.restore}
 	} else {
 		var ok bool
-		if allowToken, targets, ok = o.c.pick(cancelled, cfg.persistMode > 0, cfg.multiple); !ok {
+		if allowToken, targets, ok = o.c.pick(call, cfg.persistMode > 0, cfg.multiple); !ok {
 			return ResponseCancelled, Vardict{}, nil
 		}
 	}
@@ -311,7 +304,7 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, _ string
 	if err != nil && restoring {
 		warnf("screencast: restored target unavailable, re-prompting: %v", err)
 		var ok bool
-		if allowToken, targets, ok = o.c.pick(cancelled, cfg.persistMode > 0, cfg.multiple); !ok {
+		if allowToken, targets, ok = o.c.pick(call, cfg.persistMode > 0, cfg.multiple); !ok {
 			return ResponseCancelled, Vardict{}, nil
 		}
 		streams, err = o.c.begin(s, targets, cfg.cursorMode)

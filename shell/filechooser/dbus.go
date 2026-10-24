@@ -9,6 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // D-Bus identity (wayle-ipc file_chooser.rs).
@@ -54,10 +55,13 @@ type SaveRequest struct {
 }
 
 // Host shows the dialogs; each blocks until the user answers and
-// replies the chosen file:// URIs, none on a cancel.
+// replies the chosen file:// URIs, none on a cancel or when the request
+// is dismissed.
 type Host interface {
-	Open(OpenRequest) []string
-	Save(SaveRequest) []string
+	Open(portalreq.Caller, OpenRequest) []string
+	Save(portalreq.Caller, SaveRequest) []string
+	// Dismiss takes down the dialog showing for the request at handle.
+	Dismiss(handle string)
 }
 
 // Daemon serves a Host as dev.stubbe.lys.FileChooser1.
@@ -73,13 +77,19 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 }
 
 // OpenFile opens existing files or a directory.
-func (d *Daemon) OpenFile(title string, multiple, directory bool, filters []Filter, currentFolder string) ([]string, *dbus.Error) {
-	return nonNil(d.host.Open(OpenRequest{title, multiple, directory, filters, currentFolder})), nil
+func (d *Daemon) OpenFile(c portalreq.Caller, title string, multiple, directory bool, filters []Filter, currentFolder string) ([]string, *dbus.Error) {
+	return nonNil(d.host.Open(c, OpenRequest{title, multiple, directory, filters, currentFolder})), nil
 }
 
 // SaveFile chooses a save destination.
-func (d *Daemon) SaveFile(title, currentName string, filters []Filter, currentFolder string) ([]string, *dbus.Error) {
-	return nonNil(d.host.Save(SaveRequest{title, currentName, filters, currentFolder})), nil
+func (d *Daemon) SaveFile(c portalreq.Caller, title, currentName string, filters []Filter, currentFolder string) ([]string, *dbus.Error) {
+	return nonNil(d.host.Save(c, SaveRequest{title, currentName, filters, currentFolder})), nil
+}
+
+// Dismiss takes down the dialog showing for the request at handle.
+func (d *Daemon) Dismiss(handle string) *dbus.Error {
+	d.host.Dismiss(handle)
+	return nil
 }
 
 func nonNil[T any](s []T) []T {
@@ -97,13 +107,18 @@ type Client struct{ obj dbus.BusObject }
 func NewClient(conn *dbus.Conn) *Client { return &Client{obj: conn.Object(ServiceName, ServicePath)} }
 
 // Open shows the open dialog.
-func (c *Client) Open(ctx context.Context, r OpenRequest) (uris []string, err error) {
-	err = c.obj.CallWithContext(ctx, iface+".OpenFile", 0, r.Title, r.Multiple, r.Directory, nonNil(r.Filters), r.CurrentFolder).Store(&uris)
+func (c *Client) Open(ctx context.Context, caller portalreq.Caller, r OpenRequest) (uris []string, err error) {
+	err = c.obj.CallWithContext(ctx, iface+".OpenFile", 0, caller, r.Title, r.Multiple, r.Directory, nonNil(r.Filters), r.CurrentFolder).Store(&uris)
 	return uris, err
 }
 
 // Save shows the save dialog.
-func (c *Client) Save(ctx context.Context, r SaveRequest) (uris []string, err error) {
-	err = c.obj.CallWithContext(ctx, iface+".SaveFile", 0, r.Title, r.CurrentName, nonNil(r.Filters), r.CurrentFolder).Store(&uris)
+func (c *Client) Save(ctx context.Context, caller portalreq.Caller, r SaveRequest) (uris []string, err error) {
+	err = c.obj.CallWithContext(ctx, iface+".SaveFile", 0, caller, r.Title, r.CurrentName, nonNil(r.Filters), r.CurrentFolder).Store(&uris)
 	return uris, err
+}
+
+// Dismiss takes down the dialog showing for the request at handle.
+func (c *Client) Dismiss(ctx context.Context, handle string) error {
+	return c.obj.CallWithContext(ctx, iface+".Dismiss", 0, handle).Err
 }

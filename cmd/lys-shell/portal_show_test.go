@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
@@ -20,9 +21,17 @@ type fakeChooser struct {
 	got  *dbustest.Var[any]
 }
 
-func (f fakeChooser) Open(r filechooser.OpenRequest) []string { f.got.Store(r); return f.uris.Load() }
+func (f fakeChooser) Open(_ portalreq.Caller, r filechooser.OpenRequest) []string {
+	f.got.Store(r)
+	return f.uris.Load()
+}
 
-func (f fakeChooser) Save(r filechooser.SaveRequest) []string { f.got.Store(r); return f.uris.Load() }
+func (f fakeChooser) Save(_ portalreq.Caller, r filechooser.SaveRequest) []string {
+	f.got.Store(r)
+	return f.uris.Load()
+}
+
+func (fakeChooser) Dismiss(string) {}
 
 // fakeDialogs answers yes (or with id) and records the last call.
 type fakeDialogs struct {
@@ -31,41 +40,53 @@ type fakeDialogs struct {
 	got *dbustest.Var[[]any]
 }
 
-func (f fakeDialogs) Access(r portaldialogs.AccessRequest) bool {
+func (f fakeDialogs) Access(_ portalreq.Caller, r portaldialogs.AccessRequest) bool {
 	f.got.Store([]any{r})
 	return f.yes.Load()
 }
 
-func (f fakeDialogs) Account(reason string) bool { f.got.Store([]any{reason}); return f.yes.Load() }
+func (f fakeDialogs) Account(_ portalreq.Caller, reason string) bool {
+	f.got.Store([]any{reason})
+	return f.yes.Load()
+}
 
-func (f fakeDialogs) ConfirmWallpaper(uri string) bool { f.got.Store([]any{uri}); return f.yes.Load() }
+func (f fakeDialogs) ConfirmWallpaper(_ portalreq.Caller, uri string) bool {
+	f.got.Store([]any{uri})
+	return f.yes.Load()
+}
 
-func (f fakeDialogs) ChooseApplication(choices []string, contentType, uri string) string {
+func (f fakeDialogs) ChooseApplication(_ portalreq.Caller, choices []string, contentType, uri string) string {
 	f.got.Store([]any{choices, contentType, uri})
 	return f.id.Load()
 }
 
-func (f fakeDialogs) ConfirmInstall(name, icon string) bool {
+func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, name, icon string) bool {
 	f.got.Store([]any{name, icon})
 	return f.yes.Load()
 }
 
+func (fakeDialogs) Dismiss(string) {}
+
 type fakePrinter struct{ granted *dbustest.Var[bool] }
 
-func (f fakePrinter) Prepare(string) (bool, []printdialog.Setting, uint32) {
+func (f fakePrinter) Prepare(portalreq.Caller, string) (bool, []printdialog.Setting, uint32) {
 	return f.granted.Load(), []printdialog.Setting{{Key: "copies", Value: "1"}}, 7
 }
 
-func (fakePrinter) Print(string, *os.File, uint32) bool { return false }
+func (fakePrinter) Print(portalreq.Caller, string, *os.File, uint32) bool { return false }
+
+func (fakePrinter) Dismiss(string) {}
 
 // fakeShot is dev.stubbe.lys.Screenshot1 answering fixed values.
 type fakeShot struct{ path string }
 
-func (f fakeShot) Capture(mode, target string) (string, *dbus.Error) {
+func (f fakeShot) Capture(_ portalreq.Caller, mode, target string) (string, *dbus.Error) {
 	return f.path + ":" + mode + ":" + target, nil
 }
 
-func (fakeShot) PickColor() (float64, float64, float64, *dbus.Error) { return 0.25, 0.5, 1, nil }
+func (fakeShot) PickColor(portalreq.Caller) (float64, float64, float64, *dbus.Error) {
+	return 0.25, 0.5, 1, nil
+}
 
 func export(t *testing.T, export func(*dbus.Conn) (func(), error)) {
 	t.Helper()

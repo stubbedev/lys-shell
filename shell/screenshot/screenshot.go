@@ -17,10 +17,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -48,9 +50,11 @@ type Host struct {
 	// Region and Picker are the freeze-frame overlays.
 	Region interface {
 		Request(frames map[string]*image.RGBA) (regionoverlay.Selection, bool)
+		Cancel()
 	}
 	Picker interface {
 		Request(frames map[string]*image.RGBA) (colorpicker.RGB, bool)
+		Cancel()
 	}
 	// Focus resolves the focused output and the active window.
 	Focus Focus
@@ -63,24 +67,59 @@ type Host struct {
 	// capture in tests.
 	now    func() time.Time
 	frozen func() ([]frozenOutput, error)
+
+	// interactive is the request handle and the cancel of the overlay
+	// open for a portal request, so Dismiss can take it down.
+	mu          sync.Mutex
+	interactive struct {
+		handle string
+		cancel func()
+	}
 }
 
 // Capture takes a screenshot and returns the saved PNG path, or "" when
 // the user cancelled a region selection.
-func (h *Host) Capture(mode, target string) (string, error) {
-	img, ok, err := h.grab(mode, target)
+func (h *Host) Capture(c portalreq.Caller, mode, target string) (string, error) {
+	img, ok, err := h.grab(c, mode, target)
 	if err != nil || !ok {
 		return "", err
 	}
 	return h.save(img)
 }
 
+// Dismiss cancels the overlay open for the request at handle; another
+// request's stays.
+func (h *Host) Dismiss(handle string) {
+	h.mu.Lock()
+	cancel := h.interactive.cancel
+	match := handle != "" && h.interactive.handle == handle
+	h.mu.Unlock()
+	if match && cancel != nil {
+		cancel()
+	}
+}
+
+// overlay runs one overlay request for c, dismissable meanwhile.
+func overlay[T any](h *Host, c portalreq.Caller, cancel func(), request func() (T, bool)) (T, bool) {
+	h.mu.Lock()
+	h.interactive.handle, h.interactive.cancel = c.Handle, cancel
+	h.mu.Unlock()
+	defer func() {
+		h.mu.Lock()
+		if h.interactive.handle == c.Handle {
+			h.interactive.handle, h.interactive.cancel = "", nil
+		}
+		h.mu.Unlock()
+	}()
+	return request()
+}
+
 // grab captures the image for a mode; ok is false for a cancelled
 // region.
-func (h *Host) grab(mode, target string) (*image.RGBA, bool, error) {
+func (h *Host) grab(c portalreq.Caller, mode, target string) (*image.RGBA, bool, error) {
 	switch mode {
 	case ModeRegion:
-		return h.captureRegion()
+		return h.captureRegion(c)
 	case ModeOutput:
 		name := target
 		if name == "" && h.Focus != nil {
@@ -159,7 +198,7 @@ func (h *Host) logical() map[string]regionoverlay.Monitor {
 // before the overlay maps (so transient popups survive), show the
 // overlay over those frames, and crop the selection out of the frame
 // of its output. Not ok means the user cancelled.
-func (h *Host) captureRegion() (*image.RGBA, bool, error) {
+func (h *Host) captureRegion(c portalreq.Caller) (*image.RGBA, bool, error) {
 	frozen, err := h.captureAll()
 	if err != nil {
 		return nil, false, err
@@ -169,7 +208,7 @@ func (h *Host) captureRegion() (*image.RGBA, bool, error) {
 	for _, f := range frozen {
 		frames[f.connector] = f.image
 	}
-	sel, ok := h.Region.Request(frames)
+	sel, ok := overlay(h, c, h.Region.Cancel, func() (regionoverlay.Selection, bool) { return h.Region.Request(frames) })
 	if !ok {
 		return nil, false, nil
 	}
@@ -211,7 +250,7 @@ func (h *Host) captureFullScreen() (*image.RGBA, error) {
 
 // PickColor freezes every output and lets the user pick one pixel with
 // the loupe, returning sRGB channels in [0, 1]. Cancelling is an error.
-func (h *Host) PickColor() (r, g, b float64, err error) {
+func (h *Host) PickColor(caller portalreq.Caller) (r, g, b float64, err error) {
 	frozen, err := h.captureAll()
 	if err != nil {
 		return 0, 0, 0, err
@@ -223,7 +262,7 @@ func (h *Host) PickColor() (r, g, b float64, err error) {
 	if len(frames) == 0 {
 		return 0, 0, 0, errors.New("no outputs available")
 	}
-	c, ok := h.Picker.Request(frames)
+	c, ok := overlay(h, caller, h.Picker.Cancel, func() (colorpicker.RGB, bool) { return h.Picker.Request(frames) })
 	if !ok {
 		return 0, 0, 0, errors.New("color pick cancelled")
 	}

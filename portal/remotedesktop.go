@@ -212,12 +212,18 @@ func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID str
 
 // Start asks the user to allow control, then creates the devices and
 // replies the granted types.
-func (o remoteDesktopObject) Start(_, session dbus.ObjectPath, appID, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
+func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, parent string, _ Vardict) (uint32, Vardict, *dbus.Error) {
 	s, err := o.r.sessions.lookup(session, appID, kindRemoteDesktop)
 	if err != nil {
 		warnf("remotedesktop: Start: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
+	dialogs := portaldialogs.NewClient(o.r.conn)
+	c, ok := beginOr(o.r.conn, handle, appID, parent, dialogs.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
 	s.mu.Lock()
 	types := s.remote.types
 	s.mu.Unlock()
@@ -225,14 +231,14 @@ func (o remoteDesktopObject) Start(_, session dbus.ObjectPath, appID, _ string, 
 	if types != 0 {
 		granted = types & (deviceKeyboard | devicePointer)
 	}
-	allowed, err := portaldialogs.NewClient(o.r.conn).Access(context.Background(), portaldialogs.AccessRequest{
+	allowed, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 		Title: "Remote control", Body: "An application is requesting control of your pointer and keyboard.",
 		GrantLabel: "Allow", DenyLabel: "Deny", Icon: "input-keyboard-symbolic",
 	})
-	if err != nil || !allowed {
-		if err != nil {
-			warnf("remotedesktop: consent dialog unavailable; denying: %v", err)
-		}
+	if err != nil && !c.closed() {
+		warnf("remotedesktop: consent dialog unavailable; denying: %v", err)
+	}
+	if err != nil || !allowed || c.closed() {
 		return ResponseCancelled, Vardict{}, nil
 	}
 	sink, err := o.r.dial()

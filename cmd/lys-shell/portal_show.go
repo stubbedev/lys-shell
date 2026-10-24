@@ -8,6 +8,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/internal/dbuscli"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
@@ -69,9 +70,9 @@ func showFileChooser(m *cli.Matches) error {
 		var uris []string
 		var err error
 		if m.Flag("save") {
-			uris, err = c.Save(ctx, filechooser.SaveRequest{Title: "Preview: Save File", CurrentName: "untitled.txt"})
+			uris, err = c.Save(ctx, portalreq.Caller{}, filechooser.SaveRequest{Title: "Preview: Save File", CurrentName: "untitled.txt"})
 		} else {
-			uris, err = c.Open(ctx, filechooser.OpenRequest{Title: "Preview: Open File", Multiple: m.Flag("multiple"), Directory: m.Flag("directory")})
+			uris, err = c.Open(ctx, portalreq.Caller{}, filechooser.OpenRequest{Title: "Preview: Open File", Multiple: m.Flag("multiple"), Directory: m.Flag("directory")})
 		}
 		return orCancelled(uris...), "FileChooser", "show file chooser", err
 	})(m)
@@ -81,26 +82,26 @@ func showScreenshot(m *cli.Matches) error {
 	mode, _ := cli.Value[string](m, "mode")
 	target, _ := cli.Value[string](m, "target")
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-		path, err := screenshot.NewClient(conn).Capture(ctx, mode, target)
+		path, err := screenshot.NewClient(conn).Capture(ctx, portalreq.Caller{}, mode, target)
 		return orCancelled(path), "Screenshot", "capture screenshot", err
 	})(m)
 }
 
 var showColor = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	r, g, b, err := screenshot.NewClient(conn).PickColor(ctx)
+	r, g, b, err := screenshot.NewClient(conn).PickColor(ctx, portalreq.Caller{})
 	return []string{fmt.Sprintf("rgb(%.3f, %.3f, %.3f)", r, g, b)}, "Screenshot", "pick color", err
 })
 
 func showScreenCast(m *cli.Matches) error {
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
 		// No window list: the picker with no pre-seeded sources.
-		selection, err := sharepicker.NewClient(conn).Pick(ctx, "", m.Flag("allow_token"), m.Flag("multiple"))
+		selection, err := sharepicker.NewClient(conn).Pick(ctx, portalreq.Caller{}, "", m.Flag("allow_token"), m.Flag("multiple"))
 		return orCancelled(selection), "SharePicker", "show share picker", err
 	})(m)
 }
 
 var showPrint = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	granted, settings, token, err := printdialog.NewClient(conn).Prepare(ctx, "Preview: Print")
+	granted, settings, token, err := printdialog.NewClient(conn).Prepare(ctx, portalreq.Caller{}, "Preview: Print")
 	if !granted {
 		return []string{"cancelled"}, "Print", "show print dialog", err
 	}
@@ -108,7 +109,7 @@ var showPrint = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string,
 })
 
 var showAccess = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	granted, err := portaldialogs.NewClient(conn).Access(ctx, portaldialogs.AccessRequest{
+	granted, err := portaldialogs.NewClient(conn).Access(ctx, portalreq.Caller{}, portaldialogs.AccessRequest{
 		Title:      "Preview: Access",
 		Subtitle:   "An application is requesting access",
 		Body:       "This is a preview of the generic access prompt.",
@@ -120,24 +121,24 @@ var showAccess = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string
 })
 
 var showAccount = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	shared, err := portaldialogs.NewClient(conn).Account(ctx, "This is a preview of the account-sharing consent prompt.")
+	shared, err := portaldialogs.NewClient(conn).Account(ctx, portalreq.Caller{}, "This is a preview of the account-sharing consent prompt.")
 	return verdict(shared, "shared", "declined"), "Account", "show account prompt", err
 })
 
 var showAppChooser = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	id, err := portaldialogs.NewClient(conn).ChooseApplication(ctx, nil, "text/plain", "")
+	id, err := portaldialogs.NewClient(conn).ChooseApplication(ctx, portalreq.Caller{}, nil, "text/plain", "")
 	return orCancelled(id), "AppChooser", "show app chooser", err
 })
 
 var showDynamicLauncher = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	ok, err := portaldialogs.NewClient(conn).ConfirmInstall(ctx, "Preview Launcher", "application-x-executable")
+	ok, err := portaldialogs.NewClient(conn).ConfirmInstall(ctx, portalreq.Caller{}, "Preview Launcher", "application-x-executable")
 	return verdict(ok, "approved", "rejected"), "DynamicLauncher", "show install confirmation", err
 })
 
 func showWallpaper(m *cli.Matches) error {
 	uri, _ := cli.Value[string](m, "uri")
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-		ok, err := portaldialogs.NewClient(conn).ConfirmWallpaper(ctx, uri)
+		ok, err := portaldialogs.NewClient(conn).ConfirmWallpaper(ctx, portalreq.Caller{}, uri)
 		return verdict(ok, "accepted", "declined"), "Wallpaper", "show wallpaper preview", err
 	})(m)
 }

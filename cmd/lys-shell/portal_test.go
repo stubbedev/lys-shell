@@ -7,6 +7,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/portal"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -18,7 +19,7 @@ type fakePicker struct {
 	got       *dbustest.Var[[]any]
 }
 
-func (f fakePicker) Pick(windowList string, allowToken, multiple bool) (string, *dbus.Error) {
+func (f fakePicker) Pick(_ portalreq.Caller, windowList string, allowToken, multiple bool) (string, *dbus.Error) {
 	f.got.Store([]any{windowList, allowToken, multiple})
 	return f.selection, nil
 }

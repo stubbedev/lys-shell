@@ -118,6 +118,12 @@ func (p *Picker) Request(frames map[string]*image.RGBA) (RGB, bool) {
 	return r.color, r.ok
 }
 
+// Cancel answers the open request, if any, as cancelled and takes the
+// surfaces down. Call it from any goroutine but the loop's.
+func (p *Picker) Cancel() {
+	p.app.Invoke(func() { p.finish(RGB{}, false) })
+}
+
 func (p *Picker) show(ch chan result, frames map[string]*image.RGBA) {
 	p.finish(RGB{}, false)
 	p.reply = ch

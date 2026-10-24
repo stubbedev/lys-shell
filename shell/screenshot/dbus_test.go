@@ -8,19 +8,22 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // switchCapturer is a host whose failure the test flips while the
 // daemon serves it from the bus goroutine.
 type switchCapturer struct{ err dbustest.Var[error] }
 
-func (s *switchCapturer) Capture(mode, target string) (string, error) {
-	return fakeCapturer{err: s.err.Load()}.Capture(mode, target)
+func (s *switchCapturer) Capture(c portalreq.Caller, mode, target string) (string, error) {
+	return fakeCapturer{err: s.err.Load()}.Capture(c, mode, target)
 }
 
-func (s *switchCapturer) PickColor() (float64, float64, float64, error) {
-	return fakeCapturer{err: s.err.Load()}.PickColor()
+func (s *switchCapturer) PickColor(c portalreq.Caller) (float64, float64, float64, error) {
+	return fakeCapturer{err: s.err.Load()}.PickColor(c)
 }
+
+func (s *switchCapturer) Dismiss(string) {}
 
 func TestDaemonOverTheBus(t *testing.T) {
 	bus := dbustest.Start(t)
@@ -33,11 +36,11 @@ func TestDaemonOverTheBus(t *testing.T) {
 	}
 	defer release()
 	c := NewClient(client)
-	path, err := c.Capture(context.Background(), "output", "DP-1")
+	path, err := c.Capture(context.Background(), portalreq.Caller{}, "output", "DP-1")
 	if err != nil || path != "/p/outputDP-1" {
 		t.Fatalf("Capture = %q %v", path, err)
 	}
-	r, g, b, err := c.PickColor(context.Background())
+	r, g, b, err := c.PickColor(context.Background(), portalreq.Caller{})
 	if err != nil || r != 0.5 || g != 0.25 || b != 1 {
 		t.Fatalf("PickColor = %v %v %v %v", r, g, b, err)
 	}
@@ -49,7 +52,7 @@ func TestDaemonOverTheBus(t *testing.T) {
 
 	// Host errors arrive as Failed replies carrying the message.
 	host.err.Store(errors.New("window capture not supported on this compositor"))
-	_, err = c.Capture(context.Background(), "window", "")
+	_, err = c.Capture(context.Background(), portalreq.Caller{}, "window", "")
 	var dbusErr dbus.Error
 	if !errors.As(err, &dbusErr) || dbusErr.Name != "org.freedesktop.DBus.Error.Failed" ||
 		dbusErr.Body[0] != "window capture not supported on this compositor" {

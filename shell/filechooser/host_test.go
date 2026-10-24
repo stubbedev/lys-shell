@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -133,7 +134,7 @@ func (hs *harness) open(t *testing.T, r OpenRequest) chan []string {
 	if r.CurrentFolder == "" {
 		r.CurrentFolder = hs.root
 	}
-	return hs.ask(t, func() []string { return hs.c.Open(r) })
+	return hs.ask(t, func() []string { return hs.c.Open(testCaller, r) })
 }
 
 func answer(t *testing.T, got chan []string) []string {
@@ -307,7 +308,7 @@ func TestCancelEscapeAndPreemption(t *testing.T) {
 	}
 
 	first := hs.open(t, OpenRequest{})
-	second := hs.ask(t, func() []string { return hs.c.Save(SaveRequest{CurrentFolder: hs.root, CurrentName: "x"}) })
+	second := hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"}) })
 	if uris := answer(t, first); uris != nil {
 		t.Errorf("a preempted request answered %v", uris)
 	}
@@ -334,7 +335,7 @@ func TestSpaceInATextFieldTypes(t *testing.T) {
 func TestSaveAnswersTheNameInTheFolder(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.ask(t, func() []string {
-		return hs.c.Save(SaveRequest{Title: "Save", CurrentName: "draft.txt", CurrentFolder: hs.root})
+		return hs.c.Save(testCaller, SaveRequest{Title: "Save", CurrentName: "draft.txt", CurrentFolder: hs.root})
 	})
 	var focused bool
 	var text string
@@ -481,7 +482,7 @@ func TestDropNavigates(t *testing.T) {
 func TestOpenFailureAnswersNothing(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.openErr = errors.New("no layer shell")
-	if uris := hs.c.Open(OpenRequest{CurrentFolder: hs.root}); uris != nil {
+	if uris := hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}); uris != nil {
 		t.Errorf("an unmapped chooser answered %v", uris)
 	}
 }
@@ -750,5 +751,25 @@ func TestLayoutWidgetsReportTheirChildToTheFocusRing(t *testing.T) {
 			t.Errorf("%s did not report its child", name)
 		}
 		cv.FinishFocus()
+	}
+}
+
+// testCaller is the request the tests' dialogs serve.
+var testCaller = portalreq.Caller{Handle: "/r/test", AppID: "org.app"}
+
+// Dismissing the request the chooser shows answers it with nothing and
+// takes it down; another request's dismissal leaves it up.
+func TestDismissTakesDownItsRequestOnly(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	hs.c.Dismiss("/r/other")
+	select {
+	case uris := <-got:
+		t.Fatalf("another request's dismissal answered %v", uris)
+	case <-time.After(50 * time.Millisecond):
+	}
+	hs.c.Dismiss(testCaller.Handle)
+	if uris := answer(t, got); len(uris) != 0 {
+		t.Errorf("a dismissed chooser answered %v", uris)
 	}
 }

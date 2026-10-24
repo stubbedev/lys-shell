@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/cli"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/portal"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -60,7 +61,7 @@ func runSharePicker(m *cli.Matches) error {
 	}
 	defer func() { _ = conn.Close() }()
 	// The legacy single-select path: never multi-select.
-	selection, err := sharepicker.NewClient(conn).Pick(context.Background(), os.Getenv("XDPH_WINDOW_SHARING_LIST"), m.Flag("allow_token"), false)
+	selection, err := sharepicker.NewClient(conn).Pick(context.Background(), portalreq.Caller{}, os.Getenv("XDPH_WINDOW_SHARING_LIST"), m.Flag("allow_token"), false)
 	if err != nil {
 		_, _ = fmt.Fprintln(m.Stderr(), dbusError("SharePicker", "open share picker", err, false))
 		return cli.ExitError{Code: 1}

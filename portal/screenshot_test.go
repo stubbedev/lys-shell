@@ -7,29 +7,42 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
 // fakeShooter is the shell's dev.stubbe.lys.Screenshot1.
 type fakeShooter struct {
+	gate
 	path  string
 	err   dbustest.Var[error]
 	modes dbustest.Var[[]string]
 }
 
-func (f *fakeShooter) Capture(mode, target string) (string, *dbus.Error) {
+func (f *fakeShooter) Capture(c portalreq.Caller, mode, target string) (string, *dbus.Error) {
 	f.modes.Update(func(m []string) []string { return append(m, mode+"|"+target) })
+	if f.enter(c) {
+		return "", nil
+	}
 	if err := f.err.Load(); err != nil {
 		return "", dbus.MakeFailedError(err)
 	}
 	return f.path, nil
 }
 
-func (f *fakeShooter) PickColor() (float64, float64, float64, *dbus.Error) {
+func (f *fakeShooter) PickColor(c portalreq.Caller) (float64, float64, float64, *dbus.Error) {
+	if f.enter(c) {
+		return 0, 0, 0, dbus.MakeFailedError(errors.New("color pick cancelled"))
+	}
 	if err := f.err.Load(); err != nil {
 		return 0, 0, 0, dbus.MakeFailedError(err)
 	}
 	return 0.25, 0.5, 1, nil
+}
+
+func (f *fakeShooter) Dismiss(handle string) *dbus.Error {
+	f.gate.Dismiss(handle)
+	return nil
 }
 
 func serveShooter(t *testing.T, r *rig, f *fakeShooter) {

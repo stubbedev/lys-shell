@@ -47,6 +47,13 @@ expose (only KWin/Mutter back it). With no backend advertising it, the frontend
 does not export the portal, and clients see it is unavailable instead of
 creating sessions that can never capture.
 
+Every call that takes a request handle mounts an
+`org.freedesktop.impl.portal.Request` there for as long as it runs. When the
+app closes the request (or exits) mid-dialog, the call replies cancelled and
+the shell takes the dialog down: each `dev.stubbe.lys.*` dialog service takes
+the request it serves (handle, app id, parent window) and has a `Dismiss`
+method for it.
+
 ## Previewing dialogs
 
 `lys-shell portal show <dialog>` pops a single dialog UI directly, without an

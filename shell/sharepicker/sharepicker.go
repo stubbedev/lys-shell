@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/reveal"
@@ -63,6 +64,7 @@ type Picker struct {
 	d      Deps
 	region interface {
 		Request(frames map[string]*image.RGBA) (regionoverlay.Selection, bool)
+		Cancel()
 	}
 
 	// cfg, anims, and scale are the request's config snapshot
@@ -72,6 +74,8 @@ type Picker struct {
 	scale float64
 
 	reply      chan string
+	handle     string
+	selecting  bool
 	allowToken bool
 	multiple   bool
 	pending    []string
@@ -101,19 +105,33 @@ func New(a *app.Application, d Deps, region *regionoverlay.Overlay) *Picker {
 // multiple enables multi-select. A request arriving while one is open
 // answers the older one with an empty (cancelled) reply. Call it from
 // any goroutine but the loop's.
-func (p *Picker) Pick(windowList string, allowToken, multiple bool) string {
+func (p *Picker) Pick(c portalreq.Caller, windowList string, allowToken, multiple bool) string {
 	ch := make(chan string, 1)
 	toplevels := sharepreview.ParseList(windowList)
-	p.invoke(func() { p.show(ch, toplevels, allowToken, multiple) })
+	p.invoke(func() { p.show(c, ch, toplevels, allowToken, multiple) })
 	return <-ch
+}
+
+// Dismiss cancels the picker showing for the request at handle, the
+// region overlay it opened included; another request's picker stays.
+func (p *Picker) Dismiss(handle string) {
+	p.invoke(func() {
+		if p.reply == nil || handle == "" || p.handle != handle {
+			return
+		}
+		if p.selecting {
+			p.region.Cancel()
+		}
+		p.answer("")
+	})
 }
 
 // show replaces any open request, re-reads the config, and maps the
 // surface with its enter transition.
-func (p *Picker) show(ch chan string, toplevels []sharepreview.Toplevel, allowToken, multiple bool) {
+func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []sharepreview.Toplevel, allowToken, multiple bool) {
 	p.answer("")
 	p.snapshot()
-	p.reply, p.allowToken, p.multiple, p.pending = ch, allowToken, multiple, nil
+	p.reply, p.handle, p.allowToken, p.multiple, p.pending = ch, c.Handle, allowToken, multiple, nil
 	p.root = p.build(toplevels)
 	if err := p.mapSurface(); err != nil {
 		log.Printf("share picker: %v", err)
@@ -188,7 +206,7 @@ func (p *Picker) dismiss() {
 func (p *Picker) answer(s string) {
 	if p.reply != nil {
 		p.reply <- s
-		p.reply = nil
+		p.reply, p.handle = nil, ""
 	}
 	p.dismiss()
 }
@@ -513,9 +531,11 @@ func (p *Picker) regionPage() widget.Widget {
 	btn.SetCursorName("pointer")
 	btn.OnClick = func() {
 		p.hide()
+		p.selecting = true
 		go func() {
 			sel, ok := p.region.Request(nil)
 			p.invoke(func() {
+				p.selecting = false
 				if p.reply == nil {
 					return // the request was answered meanwhile
 				}

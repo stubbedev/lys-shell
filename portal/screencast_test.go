@@ -9,23 +9,28 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // fakeSharePicker is the shell's dev.stubbe.lys.SharePicker1.
 type fakeSharePicker struct {
+	gate
 	reply dbustest.Var[string]
 	asked dbustest.Var[[]any]
-	// block holds Pick until closed (a picker the user leaves open).
-	block chan struct{}
 }
 
-func (f *fakeSharePicker) Pick(windowList string, allowToken, multiple bool) (string, *dbus.Error) {
+func (f *fakeSharePicker) Pick(c portalreq.Caller, windowList string, allowToken, multiple bool) (string, *dbus.Error) {
 	f.asked.Update(func(a []any) []any { return append(a, []any{windowList, allowToken, multiple}) })
-	if f.block != nil {
-		<-f.block
+	if f.enter(c) {
+		return "", nil
 	}
 	return f.reply.Load(), nil
+}
+
+func (f *fakeSharePicker) Dismiss(handle string) *dbus.Error {
+	f.gate.Dismiss(handle)
+	return nil
 }
 
 func serveSharePicker(t *testing.T, r *rig, reply string) *fakeSharePicker {
@@ -230,36 +235,6 @@ func TestScreenCastStartsAllOrNothing(t *testing.T) {
 	}
 	if _, ok := r.backend.sizes.get(40); ok {
 		t.Error("a rolled-back stream registered its size")
-	}
-}
-
-func TestScreenCastRequestCloseEndsThePicker(t *testing.T) {
-	r, _ := castRig(t)
-	p := serveSharePicker(t, r, "/screen:DP-1")
-	p.block = make(chan struct{})
-	defer close(p.block)
-	r.castSession(t, Vardict{})
-	done := make(chan uint32, 1)
-	go func() {
-		var code uint32
-		var res map[string]dbus.Variant
-		_ = r.obj.Call(ScreenCastIface+".Start", 0, handle, sessA, "org.app", "", Vardict{}).Store(&code, &res)
-		done <- code
-	}()
-	deadline := time.Now().Add(2 * time.Second)
-	for len(p.asked.Load()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if err := r.client.Object(BusName, handle).Call(RequestIface+".Close", 0).Err; err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case code := <-done:
-		if code != ResponseCancelled {
-			t.Errorf("Start = %d after Close", code)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Close did not end the picker")
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // D-Bus identity (wayle-ipc's screenshot proxy).
@@ -16,8 +18,9 @@ const (
 
 // capturer is what the daemon serves: the Host, or a fake in tests.
 type capturer interface {
-	Capture(mode, target string) (string, error)
-	PickColor() (r, g, b float64, err error)
+	Capture(c portalreq.Caller, mode, target string) (string, error)
+	PickColor(c portalreq.Caller) (r, g, b float64, err error)
+	Dismiss(handle string)
 }
 
 // Daemon exports a Host as dev.stubbe.lys.Screenshot1.
@@ -47,9 +50,9 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 // Capture captures a screenshot and blocks until it is saved or
 // cancelled. mode is region, output, screen, or window; target is an
 // output connector name (output mode) or empty. Replies the saved PNG
-// path, empty when a region selection was cancelled.
-func (d *Daemon) Capture(mode, target string) (string, *dbus.Error) {
-	path, err := d.host.Capture(mode, target)
+// path, empty when a region selection was cancelled or dismissed.
+func (d *Daemon) Capture(c portalreq.Caller, mode, target string) (string, *dbus.Error) {
+	path, err := d.host.Capture(c, mode, target)
 	if err != nil {
 		return "", dbus.MakeFailedError(err)
 	}
@@ -58,12 +61,19 @@ func (d *Daemon) Capture(mode, target string) (string, *dbus.Error) {
 
 // PickColor picks one screen color interactively, replying sRGB
 // (r, g, b) in [0, 1]; cancelling is an error.
-func (d *Daemon) PickColor() (float64, float64, float64, *dbus.Error) {
-	r, g, b, err := d.host.PickColor()
+func (d *Daemon) PickColor(c portalreq.Caller) (float64, float64, float64, *dbus.Error) {
+	r, g, b, err := d.host.PickColor(c)
 	if err != nil {
 		return 0, 0, 0, dbus.MakeFailedError(err)
 	}
 	return r, g, b, nil
+}
+
+// Dismiss cancels the region selection or color pick showing for the
+// request at handle.
+func (d *Daemon) Dismiss(handle string) *dbus.Error {
+	d.host.Dismiss(handle)
+	return nil
 }
 
 // Client calls the daemon: the `lys-shell screenshot` CLI, and the portal
@@ -78,14 +88,20 @@ func NewClient(conn *dbus.Conn) *Client {
 }
 
 // Capture asks the shell for a screenshot; see Daemon.Capture.
-func (c *Client) Capture(ctx context.Context, mode, target string) (string, error) {
+func (c *Client) Capture(ctx context.Context, caller portalreq.Caller, mode, target string) (string, error) {
 	var path string
-	err := c.obj.CallWithContext(ctx, iface+".Capture", 0, mode, target).Store(&path)
+	err := c.obj.CallWithContext(ctx, iface+".Capture", 0, caller, mode, target).Store(&path)
 	return path, err
 }
 
 // PickColor asks the shell for an interactive color pick.
-func (c *Client) PickColor(ctx context.Context) (r, g, b float64, err error) {
-	err = c.obj.CallWithContext(ctx, iface+".PickColor", 0).Store(&r, &g, &b)
+func (c *Client) PickColor(ctx context.Context, caller portalreq.Caller) (r, g, b float64, err error) {
+	err = c.obj.CallWithContext(ctx, iface+".PickColor", 0, caller).Store(&r, &g, &b)
 	return r, g, b, err
+}
+
+// Dismiss cancels the selection or pick showing for the request at
+// handle.
+func (c *Client) Dismiss(ctx context.Context, handle string) error {
+	return c.obj.CallWithContext(ctx, iface+".Dismiss", 0, handle).Err
 }

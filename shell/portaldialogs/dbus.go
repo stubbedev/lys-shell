@@ -11,6 +11,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // D-Bus identity (wayle-ipc portal_dialogs.rs).
@@ -28,20 +29,24 @@ type AccessRequest struct {
 	Icon string
 }
 
-// Host shows the dialogs; each call blocks until the user answers.
+// Host shows the dialogs; each call blocks until the user answers or
+// the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
 	// Access replies whether the user granted.
-	Access(AccessRequest) bool
+	Access(portalreq.Caller, AccessRequest) bool
 	// Account replies whether the user shares their account info.
-	Account(reason string) bool
+	Account(c portalreq.Caller, reason string) bool
 	// ConfirmWallpaper previews a file:// image and replies whether to
 	// set it.
-	ConfirmWallpaper(uri string) bool
+	ConfirmWallpaper(c portalreq.Caller, uri string) bool
 	// ChooseApplication replies the chosen desktop-file id, "" on
 	// cancel; choices are candidate ids (none offers every app).
-	ChooseApplication(choices []string, contentType, uri string) string
+	ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) string
 	// ConfirmInstall replies whether to install a dynamic launcher.
-	ConfirmInstall(name, iconName string) bool
+	ConfirmInstall(c portalreq.Caller, name, iconName string) bool
+	// Dismiss takes down the dialog showing for the request at handle,
+	// when one is; the app closed the request.
+	Dismiss(handle string)
 }
 
 // Daemon serves a Host as dev.stubbe.lys.PortalDialogs1.
@@ -57,26 +62,34 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 }
 
 // Access is the grant/deny prompt.
-func (d *Daemon) Access(title, subtitle, body, grantLabel, denyLabel, icon string) (bool, *dbus.Error) {
-	return d.host.Access(AccessRequest{title, subtitle, body, grantLabel, denyLabel, icon}), nil
+func (d *Daemon) Access(c portalreq.Caller, title, subtitle, body, grantLabel, denyLabel, icon string) (bool, *dbus.Error) {
+	return d.host.Access(c, AccessRequest{title, subtitle, body, grantLabel, denyLabel, icon}), nil
 }
 
 // Account is the account-info consent.
-func (d *Daemon) Account(reason string) (bool, *dbus.Error) { return d.host.Account(reason), nil }
+func (d *Daemon) Account(c portalreq.Caller, reason string) (bool, *dbus.Error) {
+	return d.host.Account(c, reason), nil
+}
 
 // ConfirmWallpaper is the wallpaper preview confirmation.
-func (d *Daemon) ConfirmWallpaper(uri string) (bool, *dbus.Error) {
-	return d.host.ConfirmWallpaper(uri), nil
+func (d *Daemon) ConfirmWallpaper(c portalreq.Caller, uri string) (bool, *dbus.Error) {
+	return d.host.ConfirmWallpaper(c, uri), nil
 }
 
 // ChooseApplication is the app chooser.
-func (d *Daemon) ChooseApplication(choices []string, contentType, uri string) (string, *dbus.Error) {
-	return d.host.ChooseApplication(choices, contentType, uri), nil
+func (d *Daemon) ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) (string, *dbus.Error) {
+	return d.host.ChooseApplication(c, choices, contentType, uri), nil
 }
 
 // ConfirmInstall is the dynamic-launcher install confirmation.
-func (d *Daemon) ConfirmInstall(name, iconName string) (bool, *dbus.Error) {
-	return d.host.ConfirmInstall(name, iconName), nil
+func (d *Daemon) ConfirmInstall(c portalreq.Caller, name, iconName string) (bool, *dbus.Error) {
+	return d.host.ConfirmInstall(c, name, iconName), nil
+}
+
+// Dismiss takes down the dialog showing for the request at handle.
+func (d *Daemon) Dismiss(handle string) *dbus.Error {
+	d.host.Dismiss(handle)
+	return nil
 }
 
 // Client calls the shell's dialogs; a dialog waits on the user, so the
@@ -91,34 +104,39 @@ func (c *Client) call(ctx context.Context, method string, out any, args ...any) 
 }
 
 // Access shows the grant/deny prompt.
-func (c *Client) Access(ctx context.Context, r AccessRequest) (granted bool, err error) {
-	err = c.call(ctx, "Access", &granted, r.Title, r.Subtitle, r.Body, r.GrantLabel, r.DenyLabel, r.Icon)
+func (c *Client) Access(ctx context.Context, caller portalreq.Caller, r AccessRequest) (granted bool, err error) {
+	err = c.call(ctx, "Access", &granted, caller, r.Title, r.Subtitle, r.Body, r.GrantLabel, r.DenyLabel, r.Icon)
 	return granted, err
 }
 
 // Account asks to share the account info.
-func (c *Client) Account(ctx context.Context, reason string) (shared bool, err error) {
-	err = c.call(ctx, "Account", &shared, reason)
+func (c *Client) Account(ctx context.Context, caller portalreq.Caller, reason string) (shared bool, err error) {
+	err = c.call(ctx, "Account", &shared, caller, reason)
 	return shared, err
 }
 
 // ConfirmWallpaper previews uri and asks to set it.
-func (c *Client) ConfirmWallpaper(ctx context.Context, uri string) (ok bool, err error) {
-	err = c.call(ctx, "ConfirmWallpaper", &ok, uri)
+func (c *Client) ConfirmWallpaper(ctx context.Context, caller portalreq.Caller, uri string) (ok bool, err error) {
+	err = c.call(ctx, "ConfirmWallpaper", &ok, caller, uri)
 	return ok, err
 }
 
 // ChooseApplication picks a handler; "" is a cancel.
-func (c *Client) ChooseApplication(ctx context.Context, choices []string, contentType, uri string) (id string, err error) {
+func (c *Client) ChooseApplication(ctx context.Context, caller portalreq.Caller, choices []string, contentType, uri string) (id string, err error) {
 	if choices == nil {
 		choices = []string{}
 	}
-	err = c.call(ctx, "ChooseApplication", &id, choices, contentType, uri)
+	err = c.call(ctx, "ChooseApplication", &id, caller, choices, contentType, uri)
 	return id, err
 }
 
 // ConfirmInstall asks to install a dynamic launcher.
-func (c *Client) ConfirmInstall(ctx context.Context, name, iconName string) (ok bool, err error) {
-	err = c.call(ctx, "ConfirmInstall", &ok, name, iconName)
+func (c *Client) ConfirmInstall(ctx context.Context, caller portalreq.Caller, name, iconName string) (ok bool, err error) {
+	err = c.call(ctx, "ConfirmInstall", &ok, caller, name, iconName)
 	return ok, err
+}
+
+// Dismiss takes down the dialog showing for the request at handle.
+func (c *Client) Dismiss(ctx context.Context, handle string) error {
+	return c.obj.CallWithContext(ctx, iface+".Dismiss", 0, handle).Err
 }

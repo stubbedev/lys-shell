@@ -1,7 +1,6 @@
 package portal
 
 import (
-	"context"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -23,19 +22,6 @@ type dialogs struct{ conn *dbus.Conn }
 
 func (d dialogs) client() *portaldialogs.Client { return portaldialogs.NewClient(d.conn) }
 
-// confirm maps a yes/no dialog onto a response: yes is success, no a
-// cancel, a failed prompt (no shell) other.
-func confirm(what string, yes bool, err error) uint32 {
-	switch {
-	case err != nil:
-		warnf("%s: prompt failed: %v", what, err)
-		return ResponseOther
-	case !yes:
-		return ResponseCancelled
-	}
-	return ResponseSuccess
-}
-
 func dialogIfaces(conn *dbus.Conn) []dbusx.Interface {
 	version := func(v uint32) dbusx.Getters { return dbusx.Getters{"version": func() any { return v }} }
 	d := dialogs{conn}
@@ -54,14 +40,20 @@ func dialogIfaces(conn *dbus.Conn) []dbusx.Interface {
 type accessMethods struct{ dialogs }
 
 // AccessDialog shows a grant/deny prompt.
-func (a accessMethods) AccessDialog(_ dbus.ObjectPath, _, _, title, subtitle, body string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	granted, err := a.client().Access(context.Background(), portaldialogs.AccessRequest{
+func (a accessMethods) AccessDialog(handle dbus.ObjectPath, appID, parent, title, subtitle, body string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	client := a.client()
+	c, ok := beginOr(a.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
+	granted, err := client.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 		Title: title, Subtitle: subtitle, Body: body,
 		GrantLabel: stringOr(options, "grant_label", "Allow"),
 		DenyLabel:  stringOr(options, "deny_label", "Deny"),
 		Icon:       stringOr(options, "icon", ""),
 	})
-	return confirm("access", granted, err), Vardict{}, nil
+	return c.response("access", granted, err), Vardict{}, nil
 }
 
 // accountMethods is org.freedesktop.impl.portal.Account (account.rs).
@@ -69,9 +61,15 @@ type accountMethods struct{ dialogs }
 
 // GetUserInformation returns the user's id, real name and avatar once
 // they agree to share them.
-func (a accountMethods) GetUserInformation(_ dbus.ObjectPath, _, _ string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	shared, err := a.client().Account(context.Background(), stringOr(options, "reason", ""))
-	if code := confirm("account", shared, err); code != ResponseSuccess {
+func (a accountMethods) GetUserInformation(handle dbus.ObjectPath, appID, parent string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	client := a.client()
+	c, ok := beginOr(a.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
+	shared, err := client.Account(c.ctx, c.caller, stringOr(options, "reason", ""))
+	if code := c.response("account", shared, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
 	info := currentUser()
@@ -111,9 +109,15 @@ func currentUser() userInfo {
 type appChooserMethods struct{ dialogs }
 
 // ChooseApplication lets the user pick the handler.
-func (a appChooserMethods) ChooseApplication(_ dbus.ObjectPath, _, _ string, choices []string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	choice, err := a.client().ChooseApplication(context.Background(), choices, stringOr(options, "content_type", ""), stringOr(options, "uri", ""))
-	if code := confirm("appchooser", choice != "", err); code != ResponseSuccess {
+func (a appChooserMethods) ChooseApplication(handle dbus.ObjectPath, appID, parent string, choices []string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	client := a.client()
+	c, ok := beginOr(a.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
+	choice, err := client.ChooseApplication(c.ctx, c.caller, choices, stringOr(options, "content_type", ""), stringOr(options, "uri", ""))
+	if code := c.response("appchooser", choice != "", err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
 	return ResponseSuccess, Vardict{"choice": dbus.MakeVariant(choice)}, nil
@@ -129,9 +133,15 @@ type launcherMethods struct{ dialogs }
 
 // PrepareInstall confirms installing a launcher and echoes its name and
 // icon back; the frontend writes the desktop file.
-func (l launcherMethods) PrepareInstall(_ dbus.ObjectPath, _, _, name string, icon dbus.Variant, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	ok, err := l.client().ConfirmInstall(context.Background(), name, "")
-	if code := confirm("dynamiclauncher", ok, err); code != ResponseSuccess {
+func (l launcherMethods) PrepareInstall(handle dbus.ObjectPath, appID, parent, name string, icon dbus.Variant, _ Vardict) (uint32, Vardict, *dbus.Error) {
+	client := l.client()
+	c, ok := beginOr(l.conn, handle, appID, parent, client.Dismiss)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
+	yes, err := client.ConfirmInstall(c.ctx, c.caller, name, "")
+	if code := c.response("dynamiclauncher", yes, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
 	return ResponseSuccess, Vardict{"name": dbus.MakeVariant(name), "icon": icon}, nil

@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -84,7 +85,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 // oneshot.
 func (s *captureServices) trigger(mode, target string) {
 	go func() {
-		if _, err := s.host.Capture(mode, target); err != nil {
+		if _, err := s.host.Capture(portalreq.Caller{}, mode, target); err != nil {
 			log.Printf("screenshot: %v", err)
 		}
 	}()

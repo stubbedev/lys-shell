@@ -25,21 +25,26 @@ const secretLen = 64
 // change, or the keyring becomes undecryptable: only a missing file is
 // ever created, never one that fails to read. The frontend's token
 // option carries nothing this backend issued, so it is not read.
-type secret struct{}
+type secret struct{ conn *dbus.Conn }
 
-func secretIface() dbusx.Interface {
+func secretIface(conn *dbus.Conn) dbusx.Interface {
 	return dbusx.Interface{
 		Name:       "org.freedesktop.impl.portal.Secret",
-		Methods:    secret{},
+		Methods:    secret{conn},
 		Properties: dbusx.Getters{"version": func() any { return uint32(1) }},
 	}
 }
 
 // RetrieveSecret writes the app's secret to fd. A host app (no app id)
 // has no identity to key a secret by and is refused.
-func (secret) RetrieveSecret(_ dbus.ObjectPath, appID string, fd dbus.UnixFD, _ Vardict) (uint32, Vardict, *dbus.Error) {
+func (s secret) RetrieveSecret(handle dbus.ObjectPath, appID string, fd dbus.UnixFD, _ Vardict) (uint32, Vardict, *dbus.Error) {
 	f := os.NewFile(uintptr(fd), "secret")
 	defer func() { _ = f.Close() }()
+	c, ok := beginOr(s.conn, handle, appID, "", nil)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
 	if appID == "" {
 		warnf("secret: refusing a master secret to an app without an app id")
 		return ResponseOther, Vardict{}, nil

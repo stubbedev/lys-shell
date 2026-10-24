@@ -16,6 +16,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -96,7 +97,7 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 	}{{"Allow", true}, {"Deny", false}} {
 		got := make(chan bool, 1)
 		go func() {
-			got <- hs.h.Access(AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
+			got <- hs.h.Access(portalreq.Caller{Handle: "/r/test"}, AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
 		}()
 		c := hs.open(t)
 		if l := treetest.Labels(c.Root); !slices.Contains(l, "Camera") || !slices.Contains(l, "Sub\nBody") {
@@ -133,14 +134,14 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 func TestEscapeAndPreemption(t *testing.T) {
 	hs := newHarness(t, nil)
 	first := make(chan bool, 1)
-	go func() { first <- hs.h.ConfirmInstall("App", "") }()
+	go func() { first <- hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/test"}, "App", "") }()
 	c := hs.open(t)
 	if l := treetest.Labels(c.Root); !slices.Contains(l, "Install “App”?") {
 		t.Errorf("labels = %q", l)
 	}
 	// A second request answers the first no.
 	second := make(chan bool, 1)
-	go func() { second <- hs.h.Account("") }()
+	go func() { second <- hs.h.Account(portalreq.Caller{Handle: "/r/test"}, "") }()
 	select {
 	case r := <-first:
 		if r {
@@ -162,7 +163,7 @@ func TestEscapeAndPreemption(t *testing.T) {
 func TestOpenFailureAnswersNo(t *testing.T) {
 	hs := newHarness(t, nil)
 	hs.openErr = errors.New("no layer shell")
-	if hs.h.ConfirmWallpaper("file:///x.png") {
+	if hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/test"}, "file:///x.png") {
 		t.Error("an unmapped dialog answered yes")
 	}
 }
@@ -170,7 +171,9 @@ func TestOpenFailureAnswersNo(t *testing.T) {
 func TestWallpaperPreviewShowsTheImage(t *testing.T) {
 	hs := newHarness(t, nil)
 	got := make(chan bool, 1)
-	go func() { got <- hs.h.ConfirmWallpaper("file:///home/u/My%20Walls/a.png") }()
+	go func() {
+		got <- hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/test"}, "file:///home/u/My%20Walls/a.png")
+	}()
 	c := hs.open(t)
 	var img *widget.Image
 	treetest.Walk(c.Root, func(w widget.Widget) {
@@ -206,7 +209,7 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	apps := []desktopentry.App{installApp(t, dir, "viewer.desktop", "Image Viewer"), installApp(t, dir, "editor.desktop", "Text Editor")}
 	hs := newHarness(t, apps)
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(nil, "image/png", "") }()
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, nil, "image/png", "") }()
 	c := hs.open(t)
 	// The search is a gtk::SearchEntry; its search-changed delay runs
 	// instantly here.
@@ -259,7 +262,9 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 	dir := t.TempDir()
 	hs := newHarness(t, []desktopentry.App{installApp(t, dir, "viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication([]string{"viewer.desktop"}, "", "") }()
+	go func() {
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, []string{"viewer.desktop"}, "", "")
+	}()
 	c := hs.open(t)
 	treetest.Walk(c.Root, func(w widget.Widget) {
 		if _, ok := w.(*widget.CheckButton); ok {
@@ -276,7 +281,7 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{installApp(t, t.TempDir(), "viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(nil, "", "") }()
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, nil, "", "") }()
 	c := hs.open(t)
 	var rowY, scrollY int
 	hs.do(func() {
@@ -306,7 +311,7 @@ func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
 	}
 	hs := newHarness(t, []desktopentry.App{long})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(nil, "", "") }()
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, nil, "", "") }()
 	c := hs.open(t)
 	var w int
 	hs.do(func() { w = c.Root.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}).W })
@@ -315,4 +320,37 @@ func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
 	}
 	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
 	<-got
+}
+
+// Dismissing the request a dialog shows answers it no and takes it
+// down; dismissing another request leaves it up.
+func TestDismissTakesDownItsRequestOnly(t *testing.T) {
+	hs := newHarness(t, nil)
+	got := make(chan bool, 1)
+	go func() {
+		got <- hs.h.Access(portalreq.Caller{Handle: "/r/mine"}, AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
+	}()
+	hs.open(t)
+	hs.h.Dismiss("/r/other")
+	hs.h.Dismiss("")
+	select {
+	case r := <-got:
+		t.Fatalf("dismissing another request answered %v", r)
+	case <-time.After(50 * time.Millisecond):
+	}
+	hs.h.Dismiss("/r/mine")
+	select {
+	case r := <-got:
+		if r {
+			t.Error("a dismissed dialog answered yes")
+		}
+	case <-time.After(treetest.Liveness):
+		t.Fatal("Dismiss left the dialog waiting")
+	}
+	hs.mu.Lock()
+	closed := hs.windows[0].closed
+	hs.mu.Unlock()
+	if !closed {
+		t.Error("a dismissed dialog stayed mapped")
+	}
 }

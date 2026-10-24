@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
@@ -53,21 +54,23 @@ type Deps struct {
 
 // Dialogs is the dev.stubbe.lys.PortalDialogs1 host: one overlay showing
 // the latest request; a request arriving while one is open answers the
-// older one no (or "" for an app chooser). Its Host methods may be
-// called from any goroutine; the rest runs on the loop.
+// older one no (or "" for an app chooser), and so does dismissing the
+// request it shows. Its Host methods may be called from any goroutine;
+// the rest runs on the loop.
 type Dialogs struct {
 	d       Deps
 	win     Window
 	rev     *widget.Revealer
 	answer  func(confirmed bool, choice string)
+	handle  string
 	closing bool
 }
 
 // New builds the host; nothing maps until a request.
 func New(d Deps) *Dialogs { return &Dialogs{d: d} }
 
-// ask shows a dialog on the loop and waits for its answer.
-func (h *Dialogs) ask(build func(answer func(bool, string)) widget.Widget) (bool, string) {
+// ask shows a dialog for c on the loop and waits for its answer.
+func (h *Dialogs) ask(c portalreq.Caller, build func(answer func(bool, string)) widget.Widget) (bool, string) {
 	type result struct {
 		ok     bool
 		choice string
@@ -76,17 +79,28 @@ func (h *Dialogs) ask(build func(answer func(bool, string)) widget.Widget) (bool
 	h.d.Invoke(func() {
 		h.settle(false, "")
 		h.answer = func(ok bool, choice string) { ch <- result{ok, choice} }
+		h.handle = c.Handle
 		h.show(build(h.finish))
 	})
 	r := <-ch
 	return r.ok, r.choice
 }
 
+// Dismiss answers no to, and takes down, the dialog showing for the
+// request at handle; another request's dialog stays.
+func (h *Dialogs) Dismiss(handle string) {
+	h.d.Invoke(func() {
+		if h.answer != nil && handle != "" && h.handle == handle {
+			h.finish(false, "")
+		}
+	})
+}
+
 // settle answers the open request, if any.
 func (h *Dialogs) settle(ok bool, choice string) {
 	if h.answer != nil {
 		answer := h.answer
-		h.answer = nil
+		h.answer, h.handle = nil, ""
 		answer(ok, choice)
 	}
 }
@@ -99,8 +113,8 @@ func (h *Dialogs) finish(ok bool, choice string) {
 
 // Access is the grant/deny prompt: the permission's icon above the
 // title, the subtitle and body below it.
-func (h *Dialogs) Access(r AccessRequest) bool {
-	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
+func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) bool {
+	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
 		return h.confirm(answer, h.headerIcon(r.Icon), r.Title, detail, r.DenyLabel, r.GrantLabel)
 	})
@@ -108,8 +122,8 @@ func (h *Dialogs) Access(r AccessRequest) bool {
 }
 
 // Account asks to share the user's name and avatar, previewing it.
-func (h *Dialogs) Account(reason string) bool {
-	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
+func (h *Dialogs) Account(c portalreq.Caller, reason string) bool {
+	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		if reason == "" {
 			reason = "An application is requesting your name and avatar."
 		}
@@ -119,8 +133,8 @@ func (h *Dialogs) Account(reason string) bool {
 }
 
 // ConfirmWallpaper previews a file:// image before it is set.
-func (h *Dialogs) ConfirmWallpaper(uri string) bool {
-	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
+func (h *Dialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
+	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		path, _ := fileuri.Path(uri)
 		return h.confirm(answer, h.headerFile(path, wallpaperPx), "Set as wallpaper?", "", "Cancel", "Set wallpaper")
 	})
@@ -128,8 +142,8 @@ func (h *Dialogs) ConfirmWallpaper(uri string) bool {
 }
 
 // ConfirmInstall confirms a dynamic launcher.
-func (h *Dialogs) ConfirmInstall(name, iconName string) bool {
-	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
+func (h *Dialogs) ConfirmInstall(c portalreq.Caller, name, iconName string) bool {
+	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		return h.confirm(answer, h.headerIcon(iconName), "Install “"+name+"”?", "", "Cancel", "Install")
 	})
 	return ok
@@ -137,8 +151,8 @@ func (h *Dialogs) ConfirmInstall(name, iconName string) bool {
 
 // ChooseApplication is the app chooser: icon + name rows with a live
 // search filter, and "always use" when the type is known.
-func (h *Dialogs) ChooseApplication(choices []string, contentType, _ string) string {
-	_, choice := h.ask(func(answer func(bool, string)) widget.Widget {
+func (h *Dialogs) ChooseApplication(c portalreq.Caller, choices []string, contentType, _ string) string {
+	_, choice := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		return h.chooser(answer, h.d.Candidates(choices, contentType), contentType)
 	})
 	return choice

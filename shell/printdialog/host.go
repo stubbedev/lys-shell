@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
@@ -73,6 +74,7 @@ type Dialog struct {
 	rev     *widget.Revealer
 	closing bool
 	answer  func(p prepared, ok bool)
+	handle  string
 
 	mu   sync.Mutex
 	jobs map[uint32]prepared
@@ -84,7 +86,7 @@ func New(d Deps) *Dialog { return &Dialog{d: d, jobs: map[uint32]prepared{}, nex
 
 // Prepare shows the printer picker and settings form; a confirmed one
 // is stashed under the returned token.
-func (h *Dialog) Prepare(title string) (bool, []Setting, uint32) {
+func (h *Dialog) Prepare(c portalreq.Caller, title string) (bool, []Setting, uint32) {
 	queues := h.queues()
 	ch := make(chan struct {
 		p  prepared
@@ -98,6 +100,7 @@ func (h *Dialog) Prepare(title string) (bool, []Setting, uint32) {
 				ok bool
 			}{p, ok}
 		}
+		h.handle = c.Handle
 		h.show(h.build(queues))
 	})
 	r := <-ch
@@ -112,9 +115,19 @@ func (h *Dialog) Prepare(title string) (bool, []Setting, uint32) {
 	return true, r.p.form.settings(r.p.printer), token
 }
 
+// Dismiss cancels, and takes down, the dialog showing for the request
+// at handle; another request's dialog stays.
+func (h *Dialog) Dismiss(handle string) {
+	h.d.Invoke(func() {
+		if h.answer != nil && handle != "" && h.handle == handle {
+			h.finish(prepared{}, false)
+		}
+	})
+}
+
 // Print spools document to the printer prepared under token, once;
 // the dialog owns and closes the document.
-func (h *Dialog) Print(title string, document *os.File, token uint32) bool {
+func (h *Dialog) Print(_ portalreq.Caller, title string, document *os.File, token uint32) bool {
 	defer func() { _ = document.Close() }()
 	h.mu.Lock()
 	job, ok := h.jobs[token]
@@ -175,7 +188,7 @@ func (h *Dialog) queues() []queue {
 func (h *Dialog) settle(p prepared, ok bool) {
 	if h.answer != nil {
 		answer := h.answer
-		h.answer = nil
+		h.answer, h.handle = nil, ""
 		answer(p, ok)
 	}
 }

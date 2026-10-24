@@ -16,6 +16,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
@@ -333,33 +334,37 @@ func (f *fakeWallpaperd) SetWallpaper(path, monitor string) *dbus.Error {
 
 // fakeDialogs answers every dialog with yes or no.
 type fakeDialogs struct {
+	gate
 	yes   dbustest.Var[bool]
 	asked dbustest.Var[[]any]
 }
 
-func (f *fakeDialogs) Access(r portaldialogs.AccessRequest) bool {
-	f.asked.Store([]any{r})
-	return f.yes.Load()
+// answer records a dialog and gives the configured verdict, no when
+// it was dismissed.
+func (f *fakeDialogs) answer(c portalreq.Caller, args ...any) bool {
+	f.asked.Store(args)
+	return !f.enter(c) && f.yes.Load()
 }
 
-func (f *fakeDialogs) Account(reason string) bool { f.asked.Store([]any{reason}); return f.yes.Load() }
-
-func (f *fakeDialogs) ConfirmWallpaper(uri string) bool {
-	f.asked.Store([]any{uri})
-	return f.yes.Load()
+func (f *fakeDialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) bool {
+	return f.answer(c, r)
 }
 
-func (f *fakeDialogs) ChooseApplication(choices []string, contentType, uri string) string {
-	f.asked.Store([]any{choices, contentType, uri})
-	if f.yes.Load() {
+func (f *fakeDialogs) Account(c portalreq.Caller, reason string) bool { return f.answer(c, reason) }
+
+func (f *fakeDialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
+	return f.answer(c, uri)
+}
+
+func (f *fakeDialogs) ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) string {
+	if f.answer(c, choices, contentType, uri) {
 		return "org.chosen.desktop"
 	}
 	return ""
 }
 
-func (f *fakeDialogs) ConfirmInstall(name, icon string) bool {
-	f.asked.Store([]any{name, icon})
-	return f.yes.Load()
+func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, name, icon string) bool {
+	return f.answer(c, name, icon)
 }
 
 func serveDialogs(t *testing.T, r *rig, yes bool) *fakeDialogs {

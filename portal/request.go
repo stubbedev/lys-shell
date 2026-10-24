@@ -1,11 +1,14 @@
 package portal
 
 import (
+	"context"
+	"fmt"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // RequestIface is the object the frontend passes the handle of into
@@ -13,8 +16,8 @@ import (
 const RequestIface = "org.freedesktop.impl.portal.Request"
 
 // request is an org.freedesktop.impl.portal.Request exported at a
-// method's handle for the length of the call (request.rs RequestGuard).
-// Close() from the app closes Cancelled.
+// method's handle for the length of the call. Close() from the app
+// closes Cancelled.
 type request struct {
 	once      sync.Once
 	cancelled chan struct{}
@@ -47,4 +50,95 @@ type requestObject struct{ r *request }
 func (o requestObject) Close() *dbus.Error {
 	o.r.cancel()
 	return nil
+}
+
+// call is one method call's Request at its handle. ctx ends when the
+// app closes the request, and the shell is then asked to take down the
+// dialog the call shows; the call's Request lives until end.
+type call struct {
+	ctx    context.Context
+	caller portalreq.Caller
+	req    *request
+	cancel context.CancelFunc
+	done   chan struct{}
+	// watching ends once the Close watcher returned, its dismissal
+	// (if any) sent.
+	watching sync.WaitGroup
+}
+
+// begin mounts the Request for one call to the app's request at handle.
+// dismiss, when set, is the shell service's Dismiss: it takes the call's
+// dialog down should the app close the request mid-dialog.
+func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, dismiss func(ctx context.Context, handle string) error) (*call, error) {
+	req, err := mountRequest(conn, handle)
+	if err != nil {
+		return nil, fmt.Errorf("mount the request at %s: %w", handle, err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c := &call{
+		ctx: ctx, caller: portalreq.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow},
+		req: req, cancel: cancel, done: make(chan struct{}),
+	}
+	c.watching.Go(func() {
+		select {
+		case <-req.Cancelled():
+			cancel()
+			if dismiss == nil {
+				return
+			}
+			dctx, dcancel := context.WithTimeout(context.Background(), shellCallTimeout)
+			defer dcancel()
+			if err := dismiss(dctx, string(handle)); err != nil {
+				warnf("dismissing the dialog for %s: %v", handle, err)
+			}
+		case <-c.done:
+		}
+	})
+	return c, nil
+}
+
+// closed reports whether the app closed the request.
+func (c *call) closed() bool {
+	select {
+	case <-c.req.Cancelled():
+		return true
+	default:
+		return false
+	}
+}
+
+// end unexports the Request: it never outlives its method call. A
+// dismissal the app's Close set off has reached the shell by then.
+func (c *call) end() {
+	close(c.done)
+	c.watching.Wait()
+	c.cancel()
+	c.req.end()
+}
+
+// beginOr is begin for a method replying (u, a{sv}): a Request that
+// cannot be mounted fails the call with Other.
+func beginOr(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, dismiss func(context.Context, string) error) (*call, bool) {
+	c, err := begin(conn, handle, appID, parentWindow, dismiss)
+	if err != nil {
+		warnf("%v", err)
+		return nil, false
+	}
+	return c, true
+}
+
+// response maps a dialog's outcome onto a reply code: the app having
+// closed the request is a cancel whatever the shell answered; then a
+// failed dialog (no shell) is other, a no a cancel, a yes success.
+func (c *call) response(what string, ok bool, err error) uint32 {
+	switch {
+	case c.closed():
+		return ResponseCancelled
+	case err != nil:
+		warnf("%s: dialog failed: %v", what, err)
+		return ResponseOther
+	case !ok:
+		return ResponseCancelled
+	}
+	return ResponseSuccess
 }

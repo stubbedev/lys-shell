@@ -159,6 +159,12 @@ func (o *Overlay) Request(frames map[string]*image.RGBA) (Selection, bool) {
 	return r.sel, r.ok
 }
 
+// Cancel answers the open request, if any, as cancelled and takes the
+// surfaces down. Call it from any goroutine but the loop's.
+func (o *Overlay) Cancel() {
+	o.app.Invoke(func() { o.finish(Selection{}, false) })
+}
+
 // show replaces any open request with a fresh one and maps the
 // surfaces.
 func (o *Overlay) show(ch chan result, frames map[string]*image.RGBA) {

@@ -6,33 +6,44 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // fakeHost answers every dialog from fixed replies and records what it
-// was asked.
+// was asked, by whom, and what was dismissed.
 type fakeHost struct {
-	yes    bool
-	choice string
-	asked  dbustest.Var[[]any]
+	yes       bool
+	choice    string
+	asked     dbustest.Var[[]any]
+	caller    dbustest.Var[portalreq.Caller]
+	dismissed dbustest.Var[[]string]
 }
 
-func (f *fakeHost) record(args ...any) { f.asked.Store(args) }
+func (f *fakeHost) record(c portalreq.Caller, args ...any) {
+	f.caller.Store(c)
+	f.asked.Store(args)
+}
 
-func (f *fakeHost) Access(r AccessRequest) bool { f.record(r); return f.yes }
-func (f *fakeHost) Account(reason string) bool  { f.record(reason); return f.yes }
-func (f *fakeHost) ConfirmWallpaper(uri string) bool {
-	f.record(uri)
+func (f *fakeHost) Access(c portalreq.Caller, r AccessRequest) bool { f.record(c, r); return f.yes }
+func (f *fakeHost) Account(c portalreq.Caller, reason string) bool  { f.record(c, reason); return f.yes }
+
+func (f *fakeHost) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
+	f.record(c, uri)
 	return f.yes
 }
 
-func (f *fakeHost) ChooseApplication(choices []string, contentType, uri string) string {
-	f.record(choices, contentType, uri)
+func (f *fakeHost) ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) string {
+	f.record(c, choices, contentType, uri)
 	return f.choice
 }
 
-func (f *fakeHost) ConfirmInstall(name, iconName string) bool {
-	f.record(name, iconName)
+func (f *fakeHost) ConfirmInstall(c portalreq.Caller, name, iconName string) bool {
+	f.record(c, name, iconName)
 	return f.yes
+}
+
+func (f *fakeHost) Dismiss(handle string) {
+	f.dismissed.Update(func(d []string) []string { return append(d, handle) })
 }
 
 func TestDialogsRoundTrip(t *testing.T) {
@@ -44,30 +55,34 @@ func TestDialogsRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 		c, ctx := NewClient(bus.Conn(t)), context.Background()
+		caller := portalreq.Caller{Handle: "/r/1", AppID: "org.app", ParentWindow: "wayland:abc"}
 		req := AccessRequest{"T", "S", "B", "Allow", "Deny", "camera"}
-		if got, err := c.Access(ctx, req); err != nil || got != yes || host.asked.Load()[0] != req {
-			t.Errorf("Access = %v, %v (asked %v)", got, err, host.asked.Load())
+		if got, err := c.Access(ctx, caller, req); err != nil || got != yes || host.asked.Load()[0] != req || host.caller.Load() != caller {
+			t.Errorf("Access = %v, %v (asked %v by %+v)", got, err, host.asked.Load(), host.caller.Load())
 		}
-		if got, err := c.Account(ctx, "why"); err != nil || got != yes || host.asked.Load()[0] != "why" {
+		if got, err := c.Account(ctx, caller, "why"); err != nil || got != yes || host.asked.Load()[0] != "why" {
 			t.Errorf("Account = %v, %v", got, err)
 		}
-		if got, err := c.ConfirmWallpaper(ctx, "file:///a.png"); err != nil || got != yes {
+		if got, err := c.ConfirmWallpaper(ctx, caller, "file:///a.png"); err != nil || got != yes {
 			t.Errorf("ConfirmWallpaper = %v, %v", got, err)
 		}
-		if got, err := c.ConfirmInstall(ctx, "App", "app-icon"); err != nil || got != yes || host.asked.Load()[1] != "app-icon" {
+		if got, err := c.ConfirmInstall(ctx, caller, "App", "app-icon"); err != nil || got != yes || host.asked.Load()[1] != "app-icon" {
 			t.Errorf("ConfirmInstall = %v, %v", got, err)
 		}
-		got, err := c.ChooseApplication(ctx, nil, "text/plain", "file:///x")
+		got, err := c.ChooseApplication(ctx, caller, nil, "text/plain", "file:///x")
 		if asked := host.asked.Load(); err != nil || got != host.choice || len(asked[0].([]string)) != 0 || asked[1] != "text/plain" {
 			t.Errorf("ChooseApplication = %q, %v (asked %v)", got, err, asked)
 		}
-		if _, _ = c.ChooseApplication(ctx, []string{"a", "b"}, "", ""); !slices.Equal(host.asked.Load()[0].([]string), []string{"a", "b"}) {
+		if _, _ = c.ChooseApplication(ctx, caller, []string{"a", "b"}, "", ""); !slices.Equal(host.asked.Load()[0].([]string), []string{"a", "b"}) {
 			t.Errorf("choices = %v", host.asked.Load()[0])
+		}
+		if err := c.Dismiss(ctx, "/r/1"); err != nil || !slices.Equal(host.dismissed.Load(), []string{"/r/1"}) {
+			t.Errorf("Dismiss = %v, dismissed %v", err, host.dismissed.Load())
 		}
 		release()
 	}
 	// Without a host every call is an error, never a silent answer.
-	if _, err := NewClient(bus.Conn(t)).Access(context.Background(), AccessRequest{}); err == nil {
+	if _, err := NewClient(bus.Conn(t)).Access(context.Background(), portalreq.Caller{}, AccessRequest{}); err == nil {
 		t.Error("Access answered without a host")
 	}
 }

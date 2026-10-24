@@ -9,24 +9,32 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
 // fakeChooser is the shell's file dialog.
 type fakeChooser struct {
-	uris  dbustest.Var[[]string]
-	open  dbustest.Var[filechooser.OpenRequest]
-	saved dbustest.Var[filechooser.SaveRequest]
+	gate
+	uris   dbustest.Var[[]string]
+	opened dbustest.Var[filechooser.OpenRequest]
+	saved  dbustest.Var[filechooser.SaveRequest]
 }
 
-func (f *fakeChooser) Open(r filechooser.OpenRequest) []string {
-	f.open.Store(r)
+func (f *fakeChooser) Open(c portalreq.Caller, r filechooser.OpenRequest) []string {
+	f.opened.Store(r)
+	if f.enter(c) {
+		return nil
+	}
 	return f.uris.Load()
 }
 
-func (f *fakeChooser) Save(r filechooser.SaveRequest) []string {
+func (f *fakeChooser) Save(c portalreq.Caller, r filechooser.SaveRequest) []string {
 	f.saved.Store(r)
+	if f.enter(c) {
+		return nil
+	}
 	return f.uris.Load()
 }
 
@@ -55,7 +63,7 @@ func TestFileChooserOpen(t *testing.T) {
 	if code != ResponseSuccess || !slices.Equal(res["uris"].Value().([]string), []string{"file:///a.png", "file:///b.png"}) {
 		t.Errorf("OpenFile = %d %v", code, res)
 	}
-	got := f.open.Load()
+	got := f.opened.Load()
 	if got.Title != "Pick" || !got.Multiple || got.Directory || got.CurrentFolder != "/home/u" || len(got.Filters) != 1 || got.Filters[0].Name != "Images" || !slices.Equal(got.Filters[0].Rules, filters[0].Rules) {
 		t.Errorf("open request = %+v", got)
 	}
@@ -82,7 +90,7 @@ func TestFileChooserSave(t *testing.T) {
 	if code != ResponseSuccess || !slices.Equal(res["uris"].Value().([]string), want) {
 		t.Errorf("SaveFiles = %d %v, want %v", code, res, want)
 	}
-	if req := f.open.Load(); !req.Directory || req.Multiple || len(req.Filters) != 0 {
+	if req := f.opened.Load(); !req.Directory || req.Multiple || len(req.Filters) != 0 {
 		t.Errorf("folder pick = %+v", req)
 	}
 	f.uris.Store(nil)
@@ -106,17 +114,21 @@ func TestFileChooserWithoutTheShell(t *testing.T) {
 
 // fakePrinter is the shell's print host.
 type fakePrinter struct {
+	gate
 	granted bool
 	sent    bool
 	got     dbustest.Var[[]any]
 }
 
-func (f *fakePrinter) Prepare(title string) (bool, []printdialog.Setting, uint32) {
+func (f *fakePrinter) Prepare(c portalreq.Caller, title string) (bool, []printdialog.Setting, uint32) {
 	f.got.Store([]any{title})
+	if f.enter(c) {
+		return false, nil, 0
+	}
 	return f.granted, []printdialog.Setting{{Key: "printer", Value: "Office"}, {Key: "n-copies", Value: "2"}}, 7
 }
 
-func (f *fakePrinter) Print(title string, doc *os.File, token uint32) bool {
+func (f *fakePrinter) Print(_ portalreq.Caller, title string, doc *os.File, token uint32) bool {
 	defer doc.Close()
 	b, _ := io.ReadAll(doc)
 	f.got.Store([]any{title, string(b), token})

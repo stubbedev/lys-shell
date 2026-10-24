@@ -17,12 +17,12 @@ const autostartDBusActivatable = 1
 // background is org.freedesktop.impl.portal.Background (background.rs):
 // apps may always keep running, and autostart is an entry under
 // $XDG_CONFIG_HOME/autostart.
-type background struct{}
+type background struct{ conn *dbus.Conn }
 
-func backgroundIface() dbusx.Interface {
+func backgroundIface(conn *dbus.Conn) dbusx.Interface {
 	return dbusx.Interface{
 		Name:       "org.freedesktop.impl.portal.Background",
-		Methods:    background{},
+		Methods:    background{conn},
 		Properties: dbusx.Getters{"version": func() any { return uint32(2) }},
 	}
 }
@@ -31,7 +31,12 @@ func backgroundIface() dbusx.Interface {
 func (background) GetAppState() (Vardict, *dbus.Error) { return Vardict{}, nil }
 
 // NotifyBackground allows the app to keep running (result 1).
-func (background) NotifyBackground(_ dbus.ObjectPath, _, _ string) (uint32, Vardict, *dbus.Error) {
+func (b background) NotifyBackground(handle dbus.ObjectPath, appID, _ string) (uint32, Vardict, *dbus.Error) {
+	c, ok := beginOr(b.conn, handle, appID, "", nil)
+	if !ok {
+		return ResponseOther, Vardict{}, nil
+	}
+	defer c.end()
 	return ResponseSuccess, Vardict{"result": dbus.MakeVariant(uint32(1))}, nil
 }
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -90,7 +91,7 @@ func (hs *harness) prepare(t *testing.T) (chan prepareResult, app.LayerConfig) {
 	t.Helper()
 	got := make(chan prepareResult, 1)
 	go func() {
-		ok, s, tok := hs.h.Prepare("Doc")
+		ok, s, tok := hs.h.Prepare(testCaller, "Doc")
 		got <- prepareResult{ok, s, tok}
 	}()
 	select {
@@ -147,7 +148,7 @@ func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 		}
 	}
 
-	if !hs.h.Print("Doc", document(t, "%PDF body"), r.token) {
+	if !hs.h.Print(testCaller, "Doc", document(t, "%PDF body"), r.token) {
 		t.Fatal("the prepared job did not spool")
 	}
 	hs.mu.Lock()
@@ -161,7 +162,7 @@ func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 		t.Errorf("job attrs = %+v", g)
 	}
 	// A token spools once.
-	if hs.h.Print("Doc", document(t, "again"), r.token) {
+	if hs.h.Print(testCaller, "Doc", document(t, "again"), r.token) {
 		t.Error("a used token spooled again")
 	}
 }
@@ -266,7 +267,7 @@ func TestPrintToFileAndAMissingScheduler(t *testing.T) {
 	if !slices.Contains(r.settings, Setting{"printer", fileQueue}) {
 		t.Fatalf("settings = %v", r.settings)
 	}
-	if !hs.h.Print("Doc", document(t, "%PDF to file"), r.token) {
+	if !hs.h.Print(testCaller, "Doc", document(t, "%PDF to file"), r.token) {
 		t.Fatal("print to file failed")
 	}
 	if b, err := os.ReadFile(hs.out); err != nil || string(b) != "%PDF to file" {
@@ -280,7 +281,7 @@ func TestPrintToFileAndAMissingScheduler(t *testing.T) {
 func TestPrintFailures(t *testing.T) {
 	hs := newHarness(t)
 	doc := document(t, "x")
-	if hs.h.Print("Doc", doc, 77) {
+	if hs.h.Print(testCaller, "Doc", doc, 77) {
 		t.Error("an unknown token spooled")
 	}
 	if _, err := doc.Read(make([]byte, 1)); err == nil {
@@ -290,7 +291,7 @@ func TestPrintFailures(t *testing.T) {
 	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
 	r := <-got
 	hs.spoolErr = errors.New("printer on fire")
-	if hs.h.Print("Doc", document(t, "x"), r.token) {
+	if hs.h.Print(testCaller, "Doc", document(t, "x"), r.token) {
 		t.Error("a refused job reported sent")
 	}
 	got, c = hs.prepare(t)
@@ -300,7 +301,32 @@ func TestPrintFailures(t *testing.T) {
 	})
 	r = <-got
 	hs.out = filepath.Join(t.TempDir(), "missing-dir", "output.pdf")
-	if hs.h.Print("Doc", document(t, "x"), r.token) {
+	if hs.h.Print(testCaller, "Doc", document(t, "x"), r.token) {
 		t.Error("an unwritable output reported sent")
+	}
+}
+
+// testCaller is the request the tests' dialogs serve.
+var testCaller = portalreq.Caller{Handle: "/r/test", AppID: "org.app"}
+
+// Dismissing the request the dialog shows cancels it; another request's
+// dismissal leaves it up.
+func TestDismissCancelsItsRequestOnly(t *testing.T) {
+	hs := newHarness(t)
+	got, _ := hs.prepare(t)
+	hs.h.Dismiss("/r/other")
+	select {
+	case r := <-got:
+		t.Fatalf("another request's dismissal answered %+v", r)
+	case <-time.After(50 * time.Millisecond):
+	}
+	hs.h.Dismiss(testCaller.Handle)
+	select {
+	case r := <-got:
+		if r.ok || r.token != 0 {
+			t.Errorf("a dismissed dialog prepared %+v", r)
+		}
+	case <-time.After(treetest.Liveness):
+		t.Fatal("Dismiss left the dialog waiting")
 	}
 }
