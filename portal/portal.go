@@ -86,7 +86,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		b.screenCast.iface(),
 		b.remote.iface(),
 		b.notifier.iface(),
-		wallpaperIface(b.conn),
+		wallpaperIface(b.conn, b.cfg),
 	}, dialogIfaces(b.conn, b.cfg)...)
 }
 

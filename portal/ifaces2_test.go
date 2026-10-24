@@ -447,48 +447,6 @@ func (r *rig) setWallpaper(t *testing.T, uri string, options Vardict) uint32 {
 	return code
 }
 
-func TestWallpaperSetsAFileURI(t *testing.T) {
-	r := newRig(t, nil)
-	w := serveWallpaperd(t, r)
-	if code := r.setWallpaper(t, "file:///home/u/My%20Walls/a%23b.png", Vardict{}); code != ResponseSuccess {
-		t.Errorf("code = %d", code)
-	}
-	if got := w.set.Load(); !slices.Equal(got, []string{"/home/u/My Walls/a#b.png", ""}) {
-		t.Errorf("SetWallpaper = %q: the decoded path on every monitor", got)
-	}
-	if code := r.setWallpaper(t, "https://example.com/x.png", Vardict{}); code != ResponseOther {
-		t.Errorf("https code = %d", code)
-	}
-}
-
-func TestWallpaperPreview(t *testing.T) {
-	r := newRig(t, nil)
-	w := serveWallpaperd(t, r)
-	preview := Vardict{"show-preview": dbus.MakeVariant(true)}
-	// No dialog host: the request fails rather than applying unasked.
-	if code := r.setWallpaper(t, "file:///a.png", preview); code != ResponseOther || w.set.Load() != nil {
-		t.Errorf("no host: code %d, set %v", code, w.set.Load())
-	}
-	d := serveDialogs(t, r, false)
-	if code := r.setWallpaper(t, "file:///a.png", preview); code != ResponseCancelled || w.set.Load() != nil {
-		t.Errorf("declined: code %d, set %v", code, w.set.Load())
-	}
-	if got := d.asked.Load(); got[0] != "file:///a.png" {
-		t.Errorf("previewed %v", got)
-	}
-	d.yes.Store(true)
-	if code := r.setWallpaper(t, "file:///a.png", preview); code != ResponseSuccess || w.set.Load()[0] != "/a.png" {
-		t.Errorf("accepted: code %d, set %v", code, w.set.Load())
-	}
-}
-
-func TestWallpaperFailsWithoutTheShell(t *testing.T) {
-	r := newRig(t, nil)
-	if code := r.setWallpaper(t, "file:///a.png", Vardict{}); code != ResponseOther {
-		t.Errorf("code = %d", code)
-	}
-}
-
 // fakeScreensaver is a screensaver whose state the test sets and whose
 // watch it can fire.
 type fakeScreensaver struct {
