@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://github.com/stubbedev/lys-shell/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/stubbedev/lys-shell/ci.yml?branch=master&style=for-the-badge&label=CI" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT license"></a>
+  <a href="https://stubbedev.github.io/lys-shell/"><img src="https://img.shields.io/badge/docs-stubbedev.github.io-informational?style=for-the-badge" alt="Documentation"></a>
 </p>
 
 <p align="center">

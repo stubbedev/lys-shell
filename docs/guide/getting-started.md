@@ -12,11 +12,11 @@ lys-shell requires a Wayland compositor that implements the `wlr-layer-shell` pr
 
 On Hyprland, the built-in lock screen needs one extra compositor setting: `misc:allow_session_lock_restore = true`. lys-shell keeps its lock client inside the shell process, so a shell restart while the session is locked (for example a `home-manager switch` bouncing `lys-shell.service`) has to re-take the lock, and Hyprland refuses that takeover unless the flag is set — the session would stay stuck on Hyprland's crashed-lockscreen render.
 
-<a href="/lys-shell-preview.png" target="_blank" rel="noopener">
+<a href="../lys-shell-preview.png" target="_blank" rel="noopener">
   <img src="/lys-shell-preview.png" alt="lys-shell desktop shell" style="margin-bottom: 1.5rem;">
 </a>
 
-<a href="/lys-settings-preview.png" target="_blank" rel="noopener">
+<a href="../lys-settings-preview.png" target="_blank" rel="noopener">
   <img src="/lys-settings-preview.png" alt="lys-shell settings GUI">
 </a>
 

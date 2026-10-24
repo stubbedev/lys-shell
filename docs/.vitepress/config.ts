@@ -3,11 +3,12 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'lys-shell',
   description: 'A configurable desktop shell for Wayland.',
+  base: '/lys-shell/',
   cleanUrls: true,
   lastUpdated: true,
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/lys-shell.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/lys-shell/lys-shell.svg' }],
   ],
 
   markdown: {
@@ -116,7 +117,6 @@ export default defineConfig({
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/stubbedev/lys-shell' },
-      { icon: 'discord', link: 'https://discord.gg/GYRGnNMf2c' },
     ],
 
     footer: {
