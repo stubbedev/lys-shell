@@ -59,8 +59,23 @@ let
     bind = , escape, submap, reset
     submap = reset
 
+    exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE && systemctl --user start hyprland-vm-session.target
     exec-once = lys-shell shell > /tmp/lys/shell.log 2>&1
   '';
+
+  # Clicks through the compositor's virtual pointer (QEMU's tablet does
+  # not reach the seat), built from the shell's own module set.
+  vmclick = self.packages.${pkgs.stdenv.hostPlatform.system}.lys-shell.overrideAttrs {
+    pname = "vmclick";
+    subPackages = [ "internal/tools/vmclick" ];
+    postInstall = "";
+    postFixup = "";
+  };
+
+  portalClient = pkgs.writers.writePython3Bin "portal-client" {
+    libraries = [ pkgs.python3Packages.jeepney ];
+    flakeIgnore = [ "E501" ];
+  } (builtins.readFile ./portal-client.py);
 
   shellConfig = (pkgs.formats.yaml { }).generate "config.yaml" {
     lock = {
@@ -146,7 +161,21 @@ pkgs.testers.nixosTest {
         ];
       };
 
+      # The session target a compositor starts once its environment is
+      # in systemd, so graphical-session.target (and with it the portal
+      # frontend) comes up as on a desktop.
+      systemd.user.targets.hyprland-vm-session = {
+        bindsTo = [ "graphical-session.target" ];
+        wants = [ "graphical-session-pre.target" ];
+        after = [ "graphical-session-pre.target" ];
+      };
+
+      # The screencast stream is a PipeWire node.
+      services.pipewire.enable = true;
+
       environment.systemPackages = [
+        portalClient
+        vmclick
         pkgs.hyprland
         pkgs.foot
         pkgs.libnotify
@@ -167,8 +196,8 @@ pkgs.testers.nixosTest {
             if check():
                 return
             time.sleep(pause)
-        print(machine.execute("cat /tmp/lys/shell.log")[1])
-        print(machine.execute("tail -n 80 ${runtimeDir}/hypr/*/hyprland.log")[1])
+        print(machine.execute("cat /tmp/lys/*.log | grep -v aquamarine | tail -n 80")[1])
+        print(machine.execute("journalctl _UID=${toString uid} --no-pager -n 80 | grep -v aquamarine")[1])
         raise Exception("timed out waiting for " + what)
 
     wait("Hyprland's socket", lambda: machine.execute("ls ${runtimeDir}/hypr/*/.socket.sock")[0] == 0, tries=90)
@@ -262,6 +291,67 @@ pkgs.testers.nixosTest {
     wait("the notification popup", lambda: "lys-shell-notification-popup" in namespaces())
     time.sleep(1)
     machine.screenshot("06-notification")
+
+    # A dropdown opens on a real click, through the compositor's
+    # virtual pointer, which spans the whole output layout.
+    def click(x, y):
+        mons = hypr_json("monitors")
+        width = max(m["x"] + m["width"] for m in mons)
+        height = max(m["y"] + m["height"] for m in mons)
+        machine.succeed(
+            f"su - ${user} -c '{env} WAYLAND_DISPLAY=$(basename $(ls ${runtimeDir}/wayland-* | head -1)) "
+            f"vmclick {x} {y} {width} {height}'"
+        )
+
+    def layer(namespace):
+        for mon in hypr_json("layers").values():
+            for level in mon["levels"].values():
+                for found in level:
+                    if found["namespace"] == namespace:
+                        return found
+        raise Exception(f"no {namespace} layer")
+
+    click(640, 22)
+    time.sleep(2)
+    machine.screenshot("06b-calendar-dropdown")
+    machine.send_key("esc")
+    time.sleep(1)
+
+    # The portal on Hyprland: an application's screenshot comes back as
+    # a file, and a screencast request raises the share picker over the
+    # windows hyprland_toplevel_export lists.
+    machine.succeed(f"su - ${user} -c '{env} portal-client screenshot > /tmp/lys/shot.json 2>&1 &'")
+    # The frontend asks the user once whether an app may screenshot
+    # without a dialog of its own: the shell's consent prompt, granted
+    # with its Allow button, the last one at the bottom right.
+    wait("the screenshot consent dialog", lambda: "lys-shell-portal-dialog" in namespaces())
+    time.sleep(1)
+    machine.screenshot("06c-screenshot-consent")
+    dialog = layer("lys-shell-portal-dialog")
+    click(dialog["x"] + dialog["w"] - 60, dialog["y"] + dialog["h"] - 32)
+    wait("the screenshot answer", lambda: machine.execute("grep -q code /tmp/lys/shot.json")[0] == 0, tries=30)
+    shot = json.loads(machine.succeed("cat /tmp/lys/shot.json"))
+    uri = shot["results"]["uri"]
+    if not uri.startswith("file://"):
+        raise Exception(f"screenshot portal answered {shot}")
+    machine.succeed(f"test -s '{uri[len('file://'):]}'")
+
+    machine.succeed(f"su - ${user} -c '{env} portal-client screencast > /tmp/lys/cast.json 2>&1 &'")
+    wait("the share picker", lambda: "lys-shell-share-picker" in namespaces())
+    time.sleep(2)
+    machine.screenshot("06c-share-picker")
+    machine.send_key("esc")
+    wait("the cancelled screencast", lambda: machine.execute("grep -q code /tmp/lys/cast.json")[0] == 0)
+    print(machine.succeed("cat /tmp/lys/cast.json"))
+
+    # The region overlay and the colour picker freeze the output and
+    # close on Escape.
+    shell_bg("screenshot region", "region")
+    wait("the region overlay", lambda: "lys-shell-region-overlay" in namespaces())
+    time.sleep(1)
+    machine.screenshot("06d-region-overlay")
+    machine.send_key("esc")
+    wait("the region overlay to close", lambda: "lys-shell-region-overlay" not in namespaces())
 
     # The session lock covers every output and a typed password lifts it.
     def logged(log, line):
