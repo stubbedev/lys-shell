@@ -21,6 +21,11 @@ let
     gst-libav
   ]) ++ [ pipewire ];
 
+  # Where GStreamer finds those plugins. getLib, not the default output:
+  # gstreamer's first output is -bin, which carries no plugins, so the
+  # core elements (filesink, queue) would go missing.
+  gstPluginPath = lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" gstPlugins;
+
   # The libraries the binaries dlopen through purego: libgstreamer and
   # libglib (recorder), libpam (lock screen), libpipewire (the ScreenCast
   # portal) and libgbm (its dmabuf path).
@@ -95,7 +100,7 @@ buildGoModule {
     for bin in wayle wayle-greeter wayle-lock wayle-settings; do
       wrapProgram $out/bin/$bin \
         --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libs}" \
-        --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
+        --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${gstPluginPath}"
     done
   '';
 
@@ -130,7 +135,7 @@ buildGoModule {
   '';
 
   # The dev shell puts the same libraries and plugins on its paths.
-  passthru = { inherit libs gstPlugins; };
+  passthru = { inherit libs gstPluginPath; };
 
   meta = {
     description = "Wayland desktop shell";

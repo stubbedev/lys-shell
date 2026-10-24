@@ -41,7 +41,7 @@
         LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.wayle.libs ++ [ pkgs.libei ]);
 
         # The recorder's GStreamer pipeline finds its plugins via this path.
-        GST_PLUGIN_SYSTEM_PATH_1_0 = lib.makeSearchPath "lib/gstreamer-1.0" self'.packages.wayle.gstPlugins;
+        GST_PLUGIN_SYSTEM_PATH_1_0 = self'.packages.wayle.gstPluginPath;
 
         # gelm is pure Go by design; keep accidental cgo out (`just race`
         # re-enables it per invocation).
