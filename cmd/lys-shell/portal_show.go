@@ -82,14 +82,17 @@ func showScreenshot(m *cli.Matches) error {
 	mode, _ := cli.Value[string](m, "mode")
 	target, _ := cli.Value[string](m, "target")
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-		path, err := screenshot.NewClient(conn).Capture(ctx, portalreq.Caller{}, mode, target)
+		path, err := screenshot.NewClient(conn).CapturePrivate(ctx, portalreq.Caller{}, mode, target)
 		return orCancelled(path), "Screenshot", "capture screenshot", err
 	})(m)
 }
 
 var showColor = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	r, g, b, err := screenshot.NewClient(conn).PickColor(ctx, portalreq.Caller{})
-	return []string{fmt.Sprintf("rgb(%.3f, %.3f, %.3f)", r, g, b)}, "Screenshot", "pick color", err
+	c, picked, err := screenshot.NewClient(conn).PickColor(ctx, portalreq.Caller{})
+	if !picked {
+		return []string{"cancelled"}, "Screenshot", "pick color", err
+	}
+	return []string{fmt.Sprintf("rgb(%.3f, %.3f, %.3f)", c[0], c[1], c[2])}, "Screenshot", "pick color", err
 })
 
 func showScreenCast(m *cli.Matches) error {

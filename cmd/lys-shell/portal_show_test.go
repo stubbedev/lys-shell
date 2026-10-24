@@ -84,15 +84,23 @@ func (fakePrinter) Print(portalreq.Caller, string, *os.File, uint32) bool { retu
 
 func (fakePrinter) Dismiss(string) {}
 
-// fakeShot is dev.stubbe.lys.Screenshot1 answering fixed values.
-type fakeShot struct{ path string }
+// fakeShot is dev.stubbe.lys.Screenshot1 answering fixed values; a
+// preview takes the app's private capture, never the user's.
+type fakeShot struct {
+	path   string
+	picked *dbustest.Var[bool]
+}
 
 func (f fakeShot) Capture(_ portalreq.Caller, mode, target string) (string, *dbus.Error) {
+	return "user:" + mode, nil
+}
+
+func (f fakeShot) CapturePrivate(_ portalreq.Caller, mode, target string) (string, *dbus.Error) {
 	return f.path + ":" + mode + ":" + target, nil
 }
 
-func (fakeShot) PickColor(portalreq.Caller) (float64, float64, float64, *dbus.Error) {
-	return 0.25, 0.5, 1, nil
+func (f fakeShot) PickColor(portalreq.Caller) (bool, float64, float64, float64, *dbus.Error) {
+	return f.picked.Load(), 0.25, 0.5, 1, nil
 }
 
 func export(t *testing.T, export func(*dbus.Conn) (func(), error)) {
@@ -202,7 +210,9 @@ func TestPortalShowPrintScreenCastAndScreenshot(t *testing.T) {
 	}
 
 	conn := dbustest.SessionConn(t)
-	if err := conn.Export(fakeShot{"/tmp/shot.png"}, screenshot.ServicePath, screenshot.ServiceName); err != nil {
+	picked := &dbustest.Var[bool]{}
+	picked.Store(true)
+	if err := conn.Export(fakeShot{"/tmp/shot.png", picked}, screenshot.ServicePath, screenshot.ServiceName); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conn.RequestName(screenshot.ServiceName, dbus.NameFlagDoNotQueue); err != nil {
@@ -213,5 +223,9 @@ func TestPortalShowPrintScreenCastAndScreenshot(t *testing.T) {
 	}
 	if stdout, _, code := show(t, "color"); code != 0 || stdout != "rgb(0.250, 0.500, 1.000)\n" {
 		t.Errorf("color: code %d stdout %q", code, stdout)
+	}
+	picked.Store(false)
+	if stdout, _, code := show(t, "color"); code != 0 || stdout != "cancelled\n" {
+		t.Errorf("color cancel: code %d stdout %q", code, stdout)
 	}
 }

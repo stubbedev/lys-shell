@@ -19,7 +19,11 @@ func (s *switchCapturer) Capture(c portalreq.Caller, mode, target string) (strin
 	return fakeCapturer{err: s.err.Load()}.Capture(c, mode, target)
 }
 
-func (s *switchCapturer) PickColor(c portalreq.Caller) (float64, float64, float64, error) {
+func (s *switchCapturer) CapturePrivate(c portalreq.Caller, mode, target string) (string, error) {
+	return fakeCapturer{err: s.err.Load()}.CapturePrivate(c, mode, target)
+}
+
+func (s *switchCapturer) PickColor(c portalreq.Caller) ([3]float64, bool, error) {
 	return fakeCapturer{err: s.err.Load()}.PickColor(c)
 }
 
@@ -40,9 +44,12 @@ func TestDaemonOverTheBus(t *testing.T) {
 	if err != nil || path != "/p/outputDP-1" {
 		t.Fatalf("Capture = %q %v", path, err)
 	}
-	r, g, b, err := c.PickColor(context.Background(), portalreq.Caller{})
-	if err != nil || r != 0.5 || g != 0.25 || b != 1 {
-		t.Fatalf("PickColor = %v %v %v %v", r, g, b, err)
+	color, picked, err := c.PickColor(context.Background(), portalreq.Caller{})
+	if err != nil || !picked || color != [3]float64{0.5, 0.25, 1} {
+		t.Fatalf("PickColor = %v %v %v", color, picked, err)
+	}
+	if path, err := c.CapturePrivate(context.Background(), portalreq.Caller{}, "window", "id-1"); err != nil || path != "/private/windowid-1" {
+		t.Fatalf("CapturePrivate = %q %v", path, err)
 	}
 
 	// A second daemon cannot steal the name.

@@ -7,9 +7,12 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-ui/capture"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
@@ -353,19 +356,95 @@ func TestHostSaveFailure(t *testing.T) {
 	}
 }
 
+// A pick replies its color, a cancel no color and no error, and a
+// failure an error.
 func TestHostPickColor(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{})
-	r, g, b, err := h.PickColor(portalreq.Caller{})
-	if err != nil || r != 1 || g != 0.2 || b != 0 {
-		t.Fatalf("pick = %v %v %v %v", r, g, b, err)
+	c, picked, err := h.PickColor(portalreq.Caller{})
+	if err != nil || !picked || c != [3]float64{1, 0.2, 0} {
+		t.Fatalf("pick = %v %v %v", c, picked, err)
 	}
 	h.Picker = fakePicker{ok: false}
-	if _, _, _, err := h.PickColor(portalreq.Caller{}); err == nil || err.Error() != "color pick cancelled" {
-		t.Fatalf("cancel err = %v", err)
+	if _, picked, err := h.PickColor(portalreq.Caller{}); err != nil || picked {
+		t.Fatalf("cancel = %v, %v; want no pick and no error", picked, err)
 	}
 	h.frozen = func() ([]frozenOutput, error) { return nil, nil }
-	if _, _, _, err := h.PickColor(portalreq.Caller{}); err == nil || err.Error() != "no outputs available" {
+	if _, _, err := h.PickColor(portalreq.Caller{}); err == nil || err.Error() != "no outputs available" {
 		t.Fatalf("no outputs err = %v", err)
+	}
+}
+
+// An app's capture goes to a private file of its own in the cache, and
+// leaves the user's directory, clipboard and notifications alone.
+func TestHostCapturePrivate(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	h, notified, copies := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
+	first, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/1"}, ModeRegion, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/2"}, ModeRegion, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(cache, "lys-shell", "portal-screenshots")
+	if filepath.Dir(first) != dir || filepath.Dir(second) != dir || first == second {
+		t.Errorf("private captures at %q and %q, want two files in %s", first, second, dir)
+	}
+	if info, err := os.Stat(first); err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("a private capture is %v, %v; want 0600", info, err)
+	}
+	if *copies != 0 || len(*notified) != 0 {
+		t.Errorf("an app's capture copied %d times and notified %v", *copies, *notified)
+	}
+	if _, err := os.Stat(h.Config().OutputDirectory); !errors.Is(err, os.ErrNotExist) {
+		t.Error("an app's capture went to the user's screenshot directory")
+	}
+	if path, err := (&Host{Region: &fakeRegion{}, frozen: h.frozen, Monitors: h.Monitors}).CapturePrivate(portalreq.Caller{}, ModeRegion, ""); err != nil || path != "" {
+		t.Errorf("a cancelled private capture = %q, %v", path, err)
+	}
+}
+
+// Two captures in the same second keep both files.
+func TestHostKeepsCapturesOfTheSameSecond(t *testing.T) {
+	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
+	var paths []string
+	for range 3 {
+		path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, filepath.Base(path))
+	}
+	want := []string{"Screenshot_2026-09-30_12-34-56.png", "Screenshot_2026-09-30_12-34-56-2.png", "Screenshot_2026-09-30_12-34-56-3.png"}
+	if !slices.Equal(paths, want) {
+		t.Errorf("saved %q, want %q", paths, want)
+	}
+}
+
+// A selection past its output's edge keeps the other output's part.
+func TestHostRegionAcrossOutputs(t *testing.T) {
+	// DP-1 (red, 2x) spans x 0-100, DP-2 (green, 1x) x 100-200.
+	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 90, Y: 0, Width: 20, Height: 10}, ok: true})
+	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := img.Bounds(); b.Dx() != 20 || b.Dy() != 10 {
+		t.Fatalf("saved %v, want the 20x10 logical selection", b)
+	}
+	if left, right := color.RGBAModel.Convert(img.At(2, 5)).(color.RGBA), color.RGBAModel.Convert(img.At(17, 5)).(color.RGBA); left != red || right != green {
+		t.Errorf("left half %v, right half %v; want DP-1's red then DP-2's green", left, right)
 	}
 }
 
@@ -398,8 +477,15 @@ func (f fakeCapturer) Capture(_ portalreq.Caller, mode, target string) (string, 
 	return "/p/" + mode + target, nil
 }
 
-func (f fakeCapturer) PickColor(portalreq.Caller) (float64, float64, float64, error) {
-	return 0.5, 0.25, 1, f.err
+func (f fakeCapturer) CapturePrivate(_ portalreq.Caller, mode, target string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return "/private/" + mode + target, nil
+}
+
+func (f fakeCapturer) PickColor(portalreq.Caller) ([3]float64, bool, error) {
+	return [3]float64{0.5, 0.25, 1}, f.err == nil, f.err
 }
 
 func (fakeCapturer) Dismiss(string) {}
@@ -409,15 +495,18 @@ func TestDaemonMethods(t *testing.T) {
 	if p, err := d.Capture(portalreq.Caller{}, "output", "DP-1"); err != nil || p != "/p/outputDP-1" {
 		t.Fatalf("Capture = %q %v", p, err)
 	}
-	if r, g, b, err := d.PickColor(portalreq.Caller{}); err != nil || r != 0.5 || g != 0.25 || b != 1 {
-		t.Fatalf("PickColor = %v %v %v %v", r, g, b, err)
+	if picked, r, g, b, err := d.PickColor(portalreq.Caller{}); err != nil || !picked || r != 0.5 || g != 0.25 || b != 1 {
+		t.Fatalf("PickColor = %v %v %v %v %v", picked, r, g, b, err)
+	}
+	if p, err := d.CapturePrivate(portalreq.Caller{}, "window", "id-1"); err != nil || p != "/private/windowid-1" {
+		t.Fatalf("CapturePrivate = %q %v", p, err)
 	}
 	d = &Daemon{host: fakeCapturer{err: errors.New("no outputs available")}}
 	_, err := d.Capture(portalreq.Caller{}, "output", "")
 	if err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" || err.Body[0] != "no outputs available" {
 		t.Fatalf("Capture error = %v", err)
 	}
-	if _, _, _, err := d.PickColor(portalreq.Caller{}); err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" {
+	if _, _, _, _, err := d.PickColor(portalreq.Caller{}); err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" {
 		t.Fatalf("PickColor error = %v", err)
 	}
 }
@@ -457,5 +546,20 @@ func TestDismissCancelsItsOverlayOnly(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Dismiss left the selection open")
+	}
+}
+
+// A picked window matches by its ext identifier alone; without one the
+// focused window's app id and title match.
+func TestMatchesToplevel(t *testing.T) {
+	tl := capture.Toplevel{AppID: "foot", Title: "~", Identifier: "id-7"}
+	if !matchesToplevel(tl, windowTarget{identifier: "id-7"}) {
+		t.Error("the picked window's identifier did not match")
+	}
+	if matchesToplevel(tl, windowTarget{identifier: "id-8", appID: "foot", hasAppID: true}) {
+		t.Error("another identifier matched by app id")
+	}
+	if !matchesToplevel(tl, windowTarget{appID: "foot", hasAppID: true}) {
+		t.Error("the focused window's app id did not match")
 	}
 }

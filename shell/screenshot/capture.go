@@ -29,9 +29,12 @@ type frozenOutput struct {
 	image     *image.RGBA
 }
 
-// windowTarget identifies the window to capture, resolved from the
-// compositor's focus state.
+// windowTarget identifies the window to capture: one the user picked
+// by its ext-foreign-toplevel identifier, or the focused one resolved
+// from the compositor's focus state.
 type windowTarget struct {
+	// identifier is the picked window's ext toplevel identifier.
+	identifier string
 	// hyprlandHandle is the toplevel-export handle (the window
 	// address), when on Hyprland.
 	hyprlandHandle uint64
@@ -131,7 +134,7 @@ func captureWindow(t windowTarget) (*image.RGBA, error) {
 	}
 	defer func() { _ = c.Close() }()
 	var f *capture.Frame
-	if t.hasHandle && c.HasHyprlandExport() {
+	if t.identifier == "" && t.hasHandle && c.HasHyprlandExport() {
 		f, err = c.CaptureHyprlandWindow(t.hyprlandHandle, capture.Options{})
 		if err != nil {
 			return nil, fmt.Errorf("window capture failed: %w", err)
@@ -146,7 +149,7 @@ func captureWindow(t windowTarget) (*image.RGBA, error) {
 		}
 		idx := -1
 		for i, tl := range tls {
-			if matchesTarget(tl.AppID, tl.Title, t) {
+			if matchesToplevel(tl, t) {
 				idx = i
 				break
 			}
@@ -164,6 +167,15 @@ func captureWindow(t windowTarget) (*image.RGBA, error) {
 		return nil, fmt.Errorf("cannot decode capture: %w", err)
 	}
 	return img, nil
+}
+
+// matchesToplevel matches an ext toplevel against the target: by its
+// identifier when the target names one, else by app id and title.
+func matchesToplevel(tl capture.Toplevel, t windowTarget) bool {
+	if t.identifier != "" {
+		return tl.Identifier == t.identifier
+	}
+	return matchesTarget(tl.AppID, tl.Title, t)
 }
 
 // matchesTarget matches an ext toplevel against the target by app id
@@ -255,6 +267,31 @@ func cropFrozen(img *image.RGBA, logicalW, logicalH int, sel regionoverlay.Selec
 	w, h = min(w, b.Dx()-x), min(h, b.Dy()-y)
 	out := image.NewRGBA(image.Rect(0, 0, w, h))
 	draw.Draw(out, out.Bounds(), img, image.Pt(b.Min.X+x, b.Min.Y+y), draw.Src)
+	return out
+}
+
+// cropAcross crops a selection spanning several outputs out of their
+// frozen frames, at logical resolution as the whole-screen composite:
+// each output's part is cropped at its frame's resolution, scaled to
+// its logical size, and placed by its offset in the selection.
+func cropAcross(frames map[string]*image.RGBA, monitors []regionoverlay.Monitor, sel image.Rectangle) *image.RGBA {
+	out := image.NewRGBA(image.Rect(0, 0, sel.Dx(), sel.Dy()))
+	for _, m := range monitors {
+		frame, ok := frames[m.Connector]
+		mon := image.Rect(m.X, m.Y, m.X+m.Width, m.Y+m.Height)
+		part := sel.Intersect(mon)
+		if !ok || part.Empty() {
+			continue
+		}
+		crop := cropFrozen(frame, m.Width, m.Height, regionoverlay.Selection{
+			Output: m.Connector, X: part.Min.X - m.X, Y: part.Min.Y - m.Y, Width: part.Dx(), Height: part.Dy(),
+		})
+		if b := crop.Bounds(); b.Dx() != part.Dx() || b.Dy() != part.Dy() {
+			crop = sharepreview.Resize(crop, part.Dx(), part.Dy())
+		}
+		at := part.Min.Sub(sel.Min)
+		draw.Draw(out, image.Rectangle{Min: at, Max: at.Add(part.Size())}, crop, crop.Bounds().Min, draw.Src)
+	}
 	return out
 }
 

@@ -14,15 +14,18 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -77,14 +80,27 @@ type Host struct {
 	}
 }
 
-// Capture takes a screenshot and returns the saved PNG path, or "" when
-// the user cancelled a region selection.
+// Capture takes a screenshot for the user and returns the saved PNG
+// path, or "" when the user cancelled a region selection. It is saved
+// where [modules.screenshot] says, then copied and announced as it
+// says.
 func (h *Host) Capture(c portalreq.Caller, mode, target string) (string, error) {
 	img, ok, err := h.grab(c, mode, target)
 	if err != nil || !ok {
 		return "", err
 	}
 	return h.save(img)
+}
+
+// CapturePrivate takes a screenshot for an app: saved to a file of its
+// own in lys-shell's cache, with none of the user's save, clipboard or
+// notification settings applied. "" is a cancelled selection.
+func (h *Host) CapturePrivate(c portalreq.Caller, mode, target string) (string, error) {
+	img, ok, err := h.grab(c, mode, target)
+	if err != nil || !ok {
+		return "", err
+	}
+	return h.savePrivate(img)
 }
 
 // Dismiss cancels the overlay open for the request at handle; another
@@ -131,8 +147,8 @@ func (h *Host) grab(c portalreq.Caller, mode, target string) (*image.RGBA, bool,
 		img, err := h.captureFullScreen()
 		return img, err == nil, err
 	case ModeWindow:
-		var t windowTarget
-		if h.Focus != nil {
+		t := windowTarget{identifier: target}
+		if target == "" && h.Focus != nil {
 			t = h.Focus.ActiveWindow()
 		}
 		img, err := captureWindow(t)
@@ -141,15 +157,16 @@ func (h *Host) grab(c portalreq.Caller, mode, target string) (*image.RGBA, bool,
 	return nil, false, fmt.Errorf("unknown screenshot mode: %s", mode)
 }
 
-// save writes the PNG, then applies the clipboard and notify options.
+// save writes the PNG under the configured name, then applies the
+// clipboard and notify options.
 func (h *Host) save(img *image.RGBA) (string, error) {
 	cfg := h.Config()
 	dir := resolveDir(cfg.OutputDirectory)
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the user's pictures directory
 		return "", fmt.Errorf("cannot create %s: %w", dir, err)
 	}
-	path := filepath.Join(dir, cfg.FilenameFormat.Layout().Format(h.clock()))
-	if err := savePNG(img, path); err != nil {
+	path, err := saveNew(img, filepath.Join(dir, cfg.FilenameFormat.Layout().Format(h.clock())))
+	if err != nil {
 		return "", err
 	}
 	if cfg.CopyToClipboard && h.Copy != nil {
@@ -220,7 +237,13 @@ func (h *Host) captureRegion(c portalreq.Caller) (*image.RGBA, bool, error) {
 	if !ok {
 		return nil, false, errors.New("no logical geometry for the selected output")
 	}
-	return cropFrozen(frame, mon.Width, mon.Height, sel), true, nil
+	if sel.X+sel.Width <= mon.Width && sel.Y+sel.Height <= mon.Height {
+		return cropFrozen(frame, mon.Width, mon.Height, sel), true, nil
+	}
+	// A selection past its output's edge takes the other outputs'
+	// parts too.
+	global := image.Rect(mon.X+sel.X, mon.Y+sel.Y, mon.X+sel.X+sel.Width, mon.Y+sel.Y+sel.Height)
+	return cropAcross(frames, h.Monitors(), global), true, nil
 }
 
 // captureFullScreen composites every output into one image spanning
@@ -249,37 +272,86 @@ func (h *Host) captureFullScreen() (*image.RGBA, error) {
 }
 
 // PickColor freezes every output and lets the user pick one pixel with
-// the loupe, returning sRGB channels in [0, 1]. Cancelling is an error.
-func (h *Host) PickColor(caller portalreq.Caller) (r, g, b float64, err error) {
+// the loupe, returning sRGB channels in [0, 1]; picked is false when
+// the user cancelled, and an error is a failure.
+func (h *Host) PickColor(caller portalreq.Caller) (color [3]float64, picked bool, err error) {
 	frozen, err := h.captureAll()
 	if err != nil {
-		return 0, 0, 0, err
+		return color, false, err
 	}
 	frames := make(map[string]*image.RGBA, len(frozen))
 	for _, f := range frozen {
 		frames[f.connector] = f.image
 	}
 	if len(frames) == 0 {
-		return 0, 0, 0, errors.New("no outputs available")
+		return color, false, errors.New("no outputs available")
 	}
 	c, ok := overlay(h, caller, h.Picker.Cancel, func() (colorpicker.RGB, bool) { return h.Picker.Request(frames) })
 	if !ok {
-		return 0, 0, 0, errors.New("color pick cancelled")
+		return color, false, nil
 	}
-	r, g, b = c.Float()
-	return r, g, b, nil
+	color[0], color[1], color[2] = c.Float()
+	return color, true, nil
 }
 
-// savePNG encodes with the fastest compression: a snappy save beats the
-// smallest file. Opaque images encode as RGB, like the Rust RgbImage.
-func savePNG(img image.Image, path string) error {
-	f, err := os.Create(path) //nolint:gosec // the configured screenshot path
-	if err != nil {
-		return fmt.Errorf("cannot create %s: %w", path, err)
+// maxNameTries bounds the numbered names saveNew tries.
+const maxNameTries = 100
+
+// saveNew saves under path, or "name-2.png", "name-3.png", ... when
+// that exists: two captures in the same second (the default name's
+// resolution) never overwrite each other.
+func saveNew(img image.Image, path string) (string, error) {
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	for i := 1; i <= maxNameTries; i++ {
+		name := path
+		if i > 1 {
+			name = fmt.Sprintf("%s-%d%s", base, i, ext)
+		}
+		f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // the configured screenshot path, readable as any picture
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("cannot create %s: %w", name, err)
+		}
+		if err := writePNG(img, f); err != nil {
+			return "", err
+		}
+		return name, nil
 	}
+	return "", fmt.Errorf("cannot save %s: %d numbered names taken", path, maxNameTries)
+}
+
+// savePrivate saves an app's screenshot to a new private file under
+// $XDG_CACHE_HOME/lys-shell/portal-screenshots.
+func (h *Host) savePrivate(img image.Image) (string, error) {
+	cache, ok := xdg.CacheDir()
+	if !ok {
+		return "", errors.New("no cache directory for the screenshot (XDG_CACHE_HOME and HOME unset)")
+	}
+	dir := filepath.Join(cache, "portal-screenshots")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("cannot create %s: %w", dir, err)
+	}
+	f, err := os.CreateTemp(dir, h.clock().UTC().Format("screenshot-20060102-150405-*.png"))
+	if err != nil {
+		return "", fmt.Errorf("cannot create a screenshot in %s: %w", dir, err)
+	}
+	if err := writePNG(img, f); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
+}
+
+// writePNG encodes into f with the fastest compression (a snappy save
+// beats the smallest file) and closes it; a failed write removes it.
+// Opaque images encode as RGB, like the Rust RgbImage.
+func writePNG(img image.Image, f *os.File) error {
+	path := f.Name()
 	w := bufio.NewWriter(f)
 	enc := png.Encoder{CompressionLevel: png.BestSpeed}
-	err = enc.Encode(w, img)
+	err := enc.Encode(w, img)
 	if err == nil {
 		err = w.Flush()
 	}
@@ -287,6 +359,7 @@ func savePNG(img image.Image, path string) error {
 		err = cerr
 	}
 	if err != nil {
+		_ = os.Remove(path)
 		return fmt.Errorf("cannot save %s: %w", path, err)
 	}
 	return nil
