@@ -554,3 +554,17 @@ func TestNetworkWifiTileSwapsWifiForError(t *testing.T) {
 		t.Error("the tile did not return to its wifi state")
 	}
 }
+
+// The connection tiles carry network-connection-icon and their kind as
+// two classes, the selectors the tile rules use (a single
+// "network-connection-icon ethernet" class matched none of them).
+func TestNetworkConnectionTilesCarryTheirClasses(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: &fakeWifiCtl{}})
+	wired := v.active.wired.Children()[0].(*widget.Box)
+	if !wired.HasClass("network-connection-icon") || !wired.HasClass("ethernet") {
+		t.Errorf("wired tile classes %v, want network-connection-icon and ethernet", wired.Classes())
+	}
+	if !v.active.wifiTile.HasClass("network-connection-icon") {
+		t.Errorf("wifi tile classes %v, want network-connection-icon", v.active.wifiTile.Classes())
+	}
+}

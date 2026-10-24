@@ -100,7 +100,7 @@ func (v *dashboardView) button(child widget.Widget, class string, onClick func()
 // gap (quick_actions/mod.rs:138-142).
 func quickActionTile(icon *widget.Icon, label widget.Widget) *widget.Box {
 	col := widget.NewBox(widget.Column, 0, 0)
-	col.Append(iconTile(icon, "quick-action-icon", ""), false)
+	col.Append(iconTile(icon, "", "quick-action-icon"), false)
 	col.Append(label, false)
 	return col
 }
@@ -596,7 +596,7 @@ func (v *dashboardView) battery() widget.Widget {
 	status := widget.NewBox(widget.Row, 8, 0)
 	status.AddClass("battery-status")
 	icon := v.icon("ld-battery-full-symbolic", 1.4)
-	tile := iconTile(icon, "battery-icon", "")
+	tile := iconTile(icon, "", "battery-icon")
 	percent := v.label("", 1.3)
 	percent.AddClass("battery-percent")
 	status.Append(tile, false)

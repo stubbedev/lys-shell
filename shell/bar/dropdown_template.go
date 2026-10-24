@@ -271,11 +271,14 @@ func dropdownButton(child widget.Widget, class string, onClick func()) *widget.B
 
 // iconTile wraps icon in the styled tile box the stylesheets target:
 // the box paints the tile (overlay background, radius, min size) and
-// the image paints through its own class (size, ink, margin).
-func iconTile(icon *widget.Icon, boxClass, imgClass string) *widget.Box {
-	icon.AddClass(imgClass)
+// the image paints through its own class (size, ink, margin; "" for
+// none). Each box class is one class name.
+func iconTile(icon *widget.Icon, imgClass string, boxClasses ...string) *widget.Box {
+	if imgClass != "" {
+		icon.AddClass(imgClass)
+	}
 	tile := widget.NewBox(widget.Row, 0, 0)
-	tile.AddClass(boxClass)
+	tile.AddClass(boxClasses...)
 	tile.Append(icon, false)
 	return tile
 }

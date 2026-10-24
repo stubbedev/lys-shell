@@ -380,7 +380,7 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 	s.trigger = widget.NewBox(widget.Row, 0, 0)
 	s.trigger.AddClass("audio-device-trigger")
 	s.icon = widget.NewThemeIcon("", int(v.px*1.4))
-	s.trigger.AppendAligned(iconTile(s.icon, "audio-device-icon", "audio-device-icon-img"), false, widget.AlignCenter)
+	s.trigger.AppendAligned(iconTile(s.icon, "audio-device-icon-img", "audio-device-icon"), false, widget.AlignCenter)
 	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("audio-device-info")
 	title := i18n.T("dropdown-audio-output")
@@ -607,7 +607,7 @@ func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
 		iconName = "ld-app-window-symbolic"
 	}
 	icon := widget.NewThemeIcon(iconName, int(v.px*1.2))
-	header.AppendAligned(iconTile(icon, "audio-app-icon", "audio-app-icon-img"), false, widget.AlignCenter)
+	header.AppendAligned(iconTile(icon, "audio-app-icon-img", "audio-app-icon"), false, widget.AlignCenter)
 	name := widget.NewLabel(v.font, v.px, r.name, 0)
 	name.AddClass("audio-app-name")
 	name.SetEllipsize(widget.EllipsizeEnd)

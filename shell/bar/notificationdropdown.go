@@ -298,7 +298,7 @@ func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
 	header.AddClass("notification-dropdown-group-header")
 	header.SetCursorName("pointer")
 	header.SetOnClickWithin(g.toggle)
-	header.AppendAligned(iconTile(g.icon, "notification-dropdown-group-icon", "notification-dropdown-group-icon-img"), false, widget.AlignCenter)
+	header.AppendAligned(iconTile(g.icon, "notification-dropdown-group-icon-img", "notification-dropdown-group-icon"), false, widget.AlignCenter)
 	header.AppendAligned(info, true, widget.AlignCenter)
 	actions := widget.NewBox(widget.Row, 0, 0)
 	actions.AddClass("notification-dropdown-group-actions")
@@ -437,7 +437,7 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	main.AddClass("notification-dropdown-item-main")
 	icon := notifyui.ResolveIcon(v.ctx.Config.Notification.IconSource, n)
 	glyph, isFile := itemIcon(icon, notifIconPx)
-	tile := iconTile(glyph, "notification-dropdown-item-icon", "notification-dropdown-item-icon-img")
+	tile := iconTile(glyph, "notification-dropdown-item-icon-img", "notification-dropdown-item-icon")
 	if isFile {
 		tile.AddClass("file-icon")
 	}

@@ -175,7 +175,7 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("brightness-device-header")
 	icon := widget.NewThemeIcon(brightnessDeviceIcon, int(v.px*1.2))
-	header.AppendAligned(iconTile(icon, "brightness-device-icon", "brightness-device-icon-img"), false, widget.AlignCenter) // set_valign Center
+	header.AppendAligned(iconTile(icon, "brightness-device-icon-img", "brightness-device-icon"), false, widget.AlignCenter) // set_valign Center
 	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("brightness-device-info")
 	title := widget.NewLabel(v.font, v.px, friendlyDeviceName(d.Name, d.Type), 0)

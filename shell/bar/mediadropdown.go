@@ -393,7 +393,7 @@ func mediaArt(url, placeholder, boxClass, imgClass string, px int) widget.Widget
 		img = widget.NewURLImage(url)
 	}
 	if img == nil {
-		return iconTile(widget.NewThemeIcon(placeholder, px), boxClass, imgClass)
+		return iconTile(widget.NewThemeIcon(placeholder, px), imgClass, boxClass)
 	}
 	img.SetScale(widget.ImageCover)
 	return img

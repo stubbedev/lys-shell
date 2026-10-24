@@ -100,7 +100,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("bluetooth-pairing-header")
 	c.icon = widget.NewThemeIcon("ld-bluetooth-symbolic", int(px*1.4))
-	header.Append(iconTile(c.icon, "bluetooth-device-icon", "bluetooth-icon"), false)
+	header.Append(iconTile(c.icon, "bluetooth-icon", "bluetooth-device-icon"), false)
 	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("bluetooth-pairing-device-info")
 	c.deviceName = widget.NewLabel(font, px, "", 0)
