@@ -282,7 +282,7 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.apps, true)
 	v.main = widget.NewStack()
 	v.main.Add("devices", content)
-	v.main.Add("empty", centeredEmpty(emptyState(font, px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-devices-title"), i18n.T("dropdown-audio-no-devices-description"))))
+	v.main.Add("empty", emptyState(font, px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-devices-title"), i18n.T("dropdown-audio-no-devices-description")))
 
 	v.pickers[audioOutput] = newDevicePicker(v, audioOutput, i18n.T("dropdown-audio-output-devices"))
 	v.pickers[audioInput] = newDevicePicker(v, audioInput, i18n.T("dropdown-audio-input-devices"))
@@ -345,16 +345,6 @@ func (v *audioView) follow() {
 
 // dropdownClosed implements dropdownCloser.
 func (v *audioView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }
-
-// centeredEmpty wraps an empty state the way its Rust callers do (the
-// vexpand, valign-Center boxes of main_section/mod.rs:58 and
-// app_volumes/mod.rs:56): the stack page keeps the full height and the
-// state sits centered in it.
-func centeredEmpty(col *widget.Box) *widget.Box {
-	wrap := widget.NewBox(widget.Row, 0, 0)
-	wrap.AppendAligned(col, true, widget.AlignCenter)
-	return wrap
-}
 
 // volumeSection is VolumeSection: the kind's label, the default
 // device's icon and name (opening the picker), its mute button and
@@ -553,7 +543,7 @@ func newAppVolumes(v *audioView) *appVolumes {
 	// (app_volumes/mod.rs:66).
 	empty, glyph := emptyStateIcon(v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), "")
 	glyph.AddClass("sm")
-	a.Add("empty", centeredEmpty(empty))
+	a.Add("empty", empty)
 	return a
 }
 

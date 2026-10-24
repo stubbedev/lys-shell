@@ -398,8 +398,8 @@ func TestBatteryEmptyStateMatchesTheTemplate(t *testing.T) {
 	if desc.Wrap() {
 		t.Error("the battery empty description wraps; the EmptyState template leaves wrap off")
 	}
-	if desc.MaxWidthChars() != 0 || desc.Alignment() != render.AlignStart {
-		t.Error("the battery empty description carries brightness's wrap tuning")
+	if desc.MaxWidthChars() != 0 {
+		t.Error("the battery empty description carries brightness's width cap")
 	}
 	icon := brightnessOne[*widget.Icon](t, v, "icon")
 	if !icon.HasClass("icon") {

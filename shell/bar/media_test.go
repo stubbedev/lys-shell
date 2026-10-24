@@ -570,3 +570,27 @@ func TestMediaSeekResetsOnPlayerSwitch(t *testing.T) {
 		t.Errorf("without a player the knob = %v, want 0", v.seek.Value())
 	}
 }
+
+// With no player the card keeps the player's height: the player and
+// the empty state are pages of one homogeneous stack (the relm4
+// if/else's gtk::Stack), so a player appearing or leaving never
+// resizes the dropdown.
+func TestMediaEmptyStateKeepsThePlayersHeight(t *testing.T) {
+	source := newFakeMedia()
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Media = source
+	v := mediaDropdown(ctx).(*mediaView)
+	defer v.dropdownClosed()
+	if v.mode != "empty" || v.main.Visible() != "empty" {
+		t.Fatalf("mode %q page %q, want the empty state", v.mode, v.main.Visible())
+	}
+	con := widgetConstraintsMax(380, 900)
+	empty := v.main.Measure(con).H
+	player := v.player.Measure(con).H
+	if bare := v.empty.Measure(con).H; bare >= player {
+		t.Fatalf("the bare empty state (%d) is not shorter than the player (%d): the test proves nothing", bare, player)
+	}
+	if empty != player {
+		t.Errorf("the empty main page is %dpx, want the player's %dpx", empty, player)
+	}
+}

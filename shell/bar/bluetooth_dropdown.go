@@ -387,7 +387,12 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		}
 		row.statusShown = s.connected || s.paired || pending != 0
 		row.status = status
+		// The status page sits at the slot's end and middle (the
+		// status box's halign End, valign Center): the slot is as wide
+		// as the actions, so the status hugs the row's edge.
 		statusPage := widget.NewBox(widget.Row, 0, 0)
+		statusPage.SetHAlign(widget.AlignEnd)
+		statusPage.SetVAlign(widget.AlignCenter)
 		statusPage.Append(status, false)
 
 		actions := widget.NewBox(widget.Row, 0, 0)

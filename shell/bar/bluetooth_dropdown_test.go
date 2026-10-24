@@ -898,3 +898,23 @@ func TestBluetoothRowsAreInThePanel(t *testing.T) {
 		}
 	}
 }
+
+// At rest the status hugs the row's end: the slot is as wide as the
+// actions page, and the status page sits at its end (the Rust status
+// box's halign End), so a short "Paired" never floats mid-row.
+func TestBtDeviceStatusSitsAtTheRowsEnd(t *testing.T) {
+	d, _ := newTestBtDropdown(t, btWorld())
+	row := rowNamed(t, d, "Headset")
+	row.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	row.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
+	slot, status := boundsOf(row.slot), boundsOf(row.status)
+	if status.W >= slot.W {
+		t.Fatalf("status %+v fills its slot %+v: the test proves nothing", status, slot)
+	}
+	if end, slotEnd := status.X+status.W, slot.X+slot.W; end != slotEnd {
+		t.Errorf("the status ends at %d, want the slot's end %d", end, slotEnd)
+	}
+	if d := midY(status) - midY(slot); d < -1 || d > 1 {
+		t.Errorf("the status sits %dpx off the slot's middle", d)
+	}
+}

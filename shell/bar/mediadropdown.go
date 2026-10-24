@@ -94,8 +94,11 @@ type mediaView struct {
 	*widget.Box
 	// pages slides between the main page (the player or the empty
 	// state, in main) and the source picker (sources).
-	pages   *widget.Stack
-	main    *widget.Box
+	pages *widget.Stack
+	// main holds the player and the empty state as pages of one
+	// homogeneous stack (the relm4 if/else's gtk::Stack), so the card
+	// keeps the player's height with no player.
+	main    *widget.Stack
 	sources *widget.Box
 	player  *widget.Box
 	empty   *widget.Box
@@ -143,7 +146,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	v := &mediaView{ctx: ctx, src: ctx.Media, stop: make(chan struct{})}
 	v.Box = widget.NewBox(widget.Column, 0, 14)
 	v.AddClass("dropdown", "media-dropdown")
-	v.main = widget.NewBox(widget.Column, 0, 0)
+	v.main = widget.NewStack()
 	v.sources = widget.NewBox(widget.Column, 0, 0)
 	v.pages = widget.NewStack()
 	pageSlide(v.pages, ctx.Config)
@@ -152,6 +155,8 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	v.Append(v.pages, true)
 	v.empty = mediaEmptyState(ctx)
 	v.buildPlayer(font, px)
+	v.main.Add("player", v.player)
+	v.main.Add("empty", v.empty)
 	v.refresh()
 	v.follow()
 	return v
@@ -289,15 +294,13 @@ func (v *mediaView) seekTo(percent float64) {
 	})
 }
 
-// show swaps the visible view; the page expands, so the empty state
-// centers in it (empty_state's set_expand) and the player takes it.
-func (v *mediaView) show(mode string, w widget.Widget) {
+// show swaps the visible main page, "player" or "empty".
+func (v *mediaView) show(mode string) {
 	if v.mode == mode {
 		return
 	}
 	v.mode = mode
-	v.main.Clear()
-	v.main.Append(w, true)
+	v.main.Show(mode)
 	v.pages.Show("main")
 }
 
@@ -322,10 +325,10 @@ func (v *mediaView) refresh() {
 		return
 	}
 	if !ok {
-		v.show("empty", v.empty)
+		v.show("empty")
 		return
 	}
-	v.show("player", v.player)
+	v.show("player")
 	v.identity.SetText(p.Identity)
 	v.sourceIcon.SetThemeName(mediaSourceIcon(p))
 	v.title.SetText(orUnknown(p.Title, i18n.T("dropdown-media-unknown-title")))

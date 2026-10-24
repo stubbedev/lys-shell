@@ -107,10 +107,8 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	empty, _, desc := templateEmptyState(font, px, brightnessDeviceIcon, []string{"sm"},
 		i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
 	empty.AddClass("brightness-empty")
-	// mod.rs:108-111: WordChar wrap, centered justification, 32 max
-	// width chars.
+	// mod.rs:108-111: WordChar wrap, 32 max width chars.
 	desc.SetWrap(true)
-	desc.SetAlignment(render.AlignCenter)
 	desc.SetMaxWidthChars(32)
 	// DropdownContent: the sheet wraps the device list and the empty
 	// state in it. No ScrolledWindow — Rust shows the list bare and the

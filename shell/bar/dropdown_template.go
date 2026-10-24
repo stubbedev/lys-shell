@@ -95,8 +95,7 @@ func dropdownHeaderParts(font render.Font, px float64, icon, title string, actio
 // emptyState is the EmptyState template: a muted icon over the title
 // and the wrapped description, spacing-0 with the CSS margins carrying
 // the gaps (the Rust template sets none). An empty description still
-// renders its (empty) label: the node the stylesheet margins. The
-// caller expands it so it centers in its page.
+// renders its (empty) label: the node the stylesheet margins.
 func emptyState(font render.Font, px float64, icon, title, description string) *widget.Box {
 	col, _ := emptyStateIcon(font, px, icon, title, description)
 	return col
@@ -106,40 +105,36 @@ func emptyState(font render.Font, px float64, icon, title, description string) *
 // stylesheet paints it: .empty-state .icon colors and sizes the glyph,
 // .title and .description ink the text.
 func emptyStateIcon(font render.Font, px float64, icon, title, description string) (*widget.Box, *widget.Icon) {
-	return emptyStateSized(font, px, icon, title, description, "")
-}
-
-// emptyStateSized is emptyStateIcon with the icon's extra size class:
-// "sm" picks .empty-state .icon.sm (the icon-2xl glyph), "" the
-// default.
-func emptyStateSized(font render.Font, px float64, icon, title, description, iconClass string) (*widget.Box, *widget.Icon) {
-	var extra []string
-	if iconClass != "" {
-		extra = []string{iconClass}
-	}
-	col, glyph, desc := templateEmptyState(font, px, icon, extra, title, description)
-	desc.SetWrap(true)
-	desc.SetMaxWidthChars(32)
+	col, glyph, _ := templateEmptyState(font, px, icon, nil, title, description)
 	return col, glyph
 }
 
 // templateEmptyState is the EmptyState template with its parts handed
 // back: the icon for state swaps, the description label for callers
-// that tune it (wrap, width cap). iconExtra carries the icon's extra
+// that tune it (the brightness dropdown wraps it). iconExtra carries the icon's extra
 // classes (the "sm" size); the gaps are the .title/.description
-// margin-top rules, and the caller expands the box so it centers.
+// margin-top rules. The box expands and centers at its natural size
+// (the template's set_expand and set_align), so it sits in the middle
+// of whatever page holds it, its icon and text centered in it as GTK
+// centers a fill-width label's text.
 func templateEmptyState(font render.Font, px float64, icon string, iconExtra []string, title, description string) (*widget.Box, *widget.Icon, *widget.Label) {
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("empty-state")
+	col.SetHExpand(true)
+	col.SetVExpand(true)
+	col.SetHAlign(widget.AlignCenter)
+	col.SetVAlign(widget.AlignCenter)
 	glyph := widget.NewThemeIcon(icon, int(px*2))
 	glyph.AddClass("icon")
 	glyph.AddClass(iconExtra...)
-	col.Append(glyph, false)
+	col.AppendAligned(glyph, false, widget.AlignCenter)
 	titleLbl := widget.NewLabel(font, px*1.1, title, 0)
 	titleLbl.AddClass("title")
+	titleLbl.SetAlignment(render.AlignCenter)
 	col.Append(titleLbl, false)
 	desc := widget.NewLabel(font, px*0.9, description, 0)
 	desc.AddClass("description")
+	desc.SetAlignment(render.AlignCenter)
 	col.Append(desc, false)
 	return col, glyph, desc
 }
