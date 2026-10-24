@@ -2,11 +2,14 @@ package portal
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -222,12 +225,99 @@ func TestSecretIsStablePerApp(t *testing.T) {
 	if st, err := os.Stat(path); err != nil || st.Mode().Perm() != 0o600 {
 		t.Errorf("stored secret mode = %v, %v", st, err)
 	}
-	// A stored secret of the wrong length is replaced.
+}
+
+// A secret file that cannot be read, or reads short (a truncated
+// file), is an error and is left as it is: replacing it would make the
+// app's keyring undecryptable for good.
+func TestSecretNeverReplacesAStoredOne(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	r := newRig(t, nil)
+	path := filepath.Join(data, "lys-shell/portal/secrets/org.app")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte("short"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, fresh := r.retrieveSecret(t, "org.app"); len(fresh) != secretLen || bytes.Equal(fresh, first) {
-		t.Errorf("a short secret was kept: %d bytes", len(fresh))
+	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
+		t.Errorf("a short secret = %d, %d bytes; want other and nothing", code, len(got))
+	}
+	if got, _ := os.ReadFile(path); string(got) != "short" {
+		t.Errorf("the short secret was replaced with %d bytes", len(got))
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a 0000 file")
+	}
+	full := bytes.Repeat([]byte{7}, secretLen)
+	if err := os.WriteFile(path, full, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
+		t.Errorf("an unreadable secret = %d, %d bytes; want other and nothing", code, len(got))
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(path); !bytes.Equal(got, full) {
+		t.Error("the unreadable secret was replaced")
+	}
+}
+
+// Concurrent first uses agree on one secret, and a write that fails
+// leaves no file behind to be read as a secret later.
+func TestSecretCreationIsAtomic(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	dir := filepath.Join(data, "lys-shell/portal/secrets")
+	got := make([][]byte, 8)
+	var wg sync.WaitGroup
+	for i := range got {
+		wg.Go(func() {
+			v, err := loadOrCreateSecret("org.app")
+			if err != nil {
+				t.Error(err)
+			}
+			got[i] = v
+		})
+	}
+	wg.Wait()
+	for i, v := range got {
+		if len(v) != secretLen || !bytes.Equal(v, got[0]) {
+			t.Fatalf("call %d got a different secret", i)
+		}
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
+		t.Errorf("%d entries in the secrets dir, want the secret alone", len(entries))
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only dir")
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if _, err := loadOrCreateSecret("org.other"); err == nil {
+		t.Error("a secret was handed out though it could not be stored")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "org.other")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a failed write left a file: %v", err)
+	}
+}
+
+func TestSecretRefusesAnAppWithoutAnID(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	r := newRig(t, nil)
+	if code, got := r.retrieveSecret(t, ""); code != ResponseOther || len(got) != 0 {
+		t.Errorf("no app id = %d, %d bytes", code, len(got))
+	}
+	if _, err := os.Stat(filepath.Join(data, "lys-shell/portal/secrets/_")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a shared host secret was stored: %v", err)
 	}
 }
 
