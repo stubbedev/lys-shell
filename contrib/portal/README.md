@@ -21,7 +21,7 @@ Implemented natively by `lys-shell portal`:
 | `Screenshot` (+ PickColor) | the shell's `dev.stubbe.lys.Screenshot1` overlay |
 | `GlobalShortcuts` | `hyprland-global-shortcuts-v1` (where the compositor implements it) |
 | `Settings` | `lys-shell-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast) |
-| `Notification` | the shell's notification daemon (incl. action buttons + ActionInvoked) |
+| `Notification` (v2) | the shell's notification daemon: update by id, body click as the default action, buttons with targets, priority/category/display hints, markup body, themed, file-descriptor and bytes icons |
 | `Wallpaper` | `dev.stubbe.lys.Wallpaper1` |
 | `Inhibit` | systemd-logind block locks (idle, sleep, shutdown for logout) with the app's reason, plus a hold on the shell's own idle inhibitor; monitor sessions follow the lock screen (user switching cannot be inhibited) |
 | `Clipboard` | `zwlr_data_control` (read/own the Wayland selection for RemoteDesktop sessions) |

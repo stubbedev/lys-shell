@@ -161,3 +161,19 @@ func TestOpenRejectsGarbageAndMissing(t *testing.T) {
 		t.Error("a missing file decoded")
 	}
 }
+
+// Decode reads in-memory bytes as Open reads a file, and refuses what
+// is no image.
+func TestDecodeBytes(t *testing.T) {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, sample()); err != nil {
+		t.Fatal(err)
+	}
+	img, err := Decode(buf.Bytes())
+	if err != nil || rgba(img, 1, 0) != (color.NRGBA{B: 255, A: 255}) {
+		t.Fatalf("png bytes = %v, %v", img, err)
+	}
+	if _, err := Decode([]byte("not an image")); err == nil {
+		t.Error("garbage decoded")
+	}
+}

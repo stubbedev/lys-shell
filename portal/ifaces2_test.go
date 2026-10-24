@@ -1,9 +1,14 @@
 package portal
 
 import (
+	"bytes"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -16,16 +21,37 @@ import (
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
-// fakeNotifyd is the shell's notification daemon.
+// notifyCall is one Notify the fake daemon received.
+type notifyCall struct {
+	appName       string
+	replaces      uint32
+	icon, summary string
+	body          string
+	actions       []string
+	hints         map[string]dbus.Variant
+	expire        int32
+}
+
+// fakeNotifyd is the shell's notification daemon; fail makes Notify
+// refuse.
 type fakeNotifyd struct {
 	conn   *dbus.Conn
 	next   uint32
-	notify dbustest.Var[[]any]
+	calls  dbustest.Var[[]notifyCall]
 	closed dbustest.Var[[]uint32]
+	fail   dbustest.Var[bool]
 }
 
 func (f *fakeNotifyd) Notify(appName string, replaces uint32, icon, summary, body string, actions []string, hints map[string]dbus.Variant, expire int32) (uint32, *dbus.Error) {
-	f.notify.Store([]any{appName, replaces, icon, summary, body, actions, len(hints), expire})
+	if f.fail.Load() {
+		return 0, dbus.MakeFailedError(errors.New("refused"))
+	}
+	f.calls.Update(func(c []notifyCall) []notifyCall {
+		return append(c, notifyCall{appName, replaces, icon, summary, body, actions, hints, expire})
+	})
+	if replaces != 0 {
+		return replaces, nil
+	}
 	f.next++
 	return f.next, nil
 }
@@ -33,6 +59,15 @@ func (f *fakeNotifyd) Notify(appName string, replaces uint32, icon, summary, bod
 func (f *fakeNotifyd) CloseNotification(id uint32) *dbus.Error {
 	f.closed.Update(func(ids []uint32) []uint32 { return append(ids, id) })
 	return nil
+}
+
+func (f *fakeNotifyd) last(t *testing.T) notifyCall {
+	t.Helper()
+	calls := f.calls.Load()
+	if len(calls) == 0 {
+		t.Fatal("no Notify")
+	}
+	return calls[len(calls)-1]
 }
 
 func serveNotifyd(t *testing.T, r *rig) *fakeNotifyd {
@@ -55,51 +90,68 @@ type gicon struct {
 
 const notificationAdd = NotificationIface + ".AddNotification"
 
+// nextActionInvoked waits for the portal's ActionInvoked.
+func nextActionInvoked(t *testing.T, r *rig) []any {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case s := <-r.signals:
+			if s.Name == NotificationIface+".ActionInvoked" {
+				return s.Body
+			}
+		case <-deadline:
+			t.Fatal("no ActionInvoked forwarded")
+		}
+	}
+}
+
 func TestNotificationShowsAndForwardsActions(t *testing.T) {
 	r := newRig(t, nil)
 	d := serveNotifyd(t, r)
 	n := Vardict{
-		"title":          dbus.MakeVariant("Hello"),
-		"body":           dbus.MakeVariant("World"),
-		"icon":           dbus.MakeVariant(gicon{"themed", dbus.MakeVariant([]string{"mail-unread", "mail-unread-symbolic"})}),
-		"default-action": dbus.MakeVariant("open"),
+		"title":                 dbus.MakeVariant("Hello"),
+		"body":                  dbus.MakeVariant("World <3"),
+		"icon":                  dbus.MakeVariant(gicon{"themed", dbus.MakeVariant([]string{"mail-unread", "mail-unread-symbolic"})}),
+		"default-action":        dbus.MakeVariant("app.open"),
+		"default-action-target": dbus.MakeVariant(dbus.MakeVariant("inbox")),
 		"buttons": dbus.MakeVariant([]map[string]dbus.Variant{
-			{"label": dbus.MakeVariant("Reply"), "action": dbus.MakeVariant("reply")},
+			{"label": dbus.MakeVariant("Reply"), "action": dbus.MakeVariant("app.reply"), "target": dbus.MakeVariant(dbus.MakeVariant(uint32(7)))},
 			{"label": dbus.MakeVariant("No action")},
+			{"action": dbus.MakeVariant("app.alert"), "purpose": dbus.MakeVariant("system.custom-alert")},
 		}),
 	}
 	if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", n).Err; err != nil {
 		t.Fatal(err)
 	}
-	want := []any{"org.app", uint32(0), "mail-unread", "Hello", "World", []string{"open", "Default", "reply", "Reply"}, 0, int32(-1)}
-	got := d.notify.Load()
-	if len(got) != len(want) || !slices.Equal(got[5].([]string), want[5].([]string)) {
-		t.Fatalf("Notify = %v, want %v", got, want)
+	got := d.last(t)
+	if got.appName != "org.app" || got.replaces != 0 || got.icon != "mail-unread" || got.summary != "Hello" || got.body != "World &lt;3" || got.expire != -1 {
+		t.Errorf("Notify = %+v", got)
 	}
-	for i := range want {
-		if i != 5 && got[i] != want[i] {
-			t.Errorf("Notify arg %d = %v, want %v", i, got[i], want[i])
-		}
+	// The default action is the daemon's body-click key with no button
+	// of its own; a button needs an action and a label.
+	if want := []string{"default", "", "button-0", "Reply"}; !slices.Equal(got.actions, want) {
+		t.Errorf("actions = %q, want %q", got.actions, want)
+	}
+	if got.hints["desktop-entry"].Value() != "org.app" {
+		t.Errorf("hints = %v, want the app for grouping", got.hints)
 	}
 
-	// The daemon's press on our notification reaches the app; one on a
-	// notification the portal did not create does not.
-	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(99), "x")
-	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(41), "reply")
-	deadline := time.After(2 * time.Second)
-	for {
-		select {
-		case s := <-r.signals:
-			if s.Name != NotificationIface+".ActionInvoked" {
-				continue
-			}
-			if s.Body[0] != "org.app" || s.Body[1] != "n1" || s.Body[2] != "reply" {
-				t.Fatalf("ActionInvoked = %v", s.Body)
-			}
-		case <-deadline:
-			t.Fatal("no ActionInvoked forwarded")
-		}
-		break
+	// A body click reaches the app as its default action and target; a
+	// press on a notification the portal did not create does not.
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(99), "default")
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(41), "default")
+	body := nextActionInvoked(t, r)
+	if body[0] != "org.app" || body[1] != "n1" || body[2] != "app.open" {
+		t.Fatalf("ActionInvoked = %v", body)
+	}
+	if params := body[3].([]dbus.Variant); len(params) != 1 || params[0].Value() != "inbox" {
+		t.Errorf("default parameter = %v, want the target", params)
+	}
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(41), "button-0")
+	body = nextActionInvoked(t, r)
+	if body[2] != "app.reply" || body[3].([]dbus.Variant)[0].Value() != uint32(7) {
+		t.Errorf("button ActionInvoked = %v", body)
 	}
 
 	// Remove closes the daemon's notification once; an unknown one is
@@ -115,17 +167,159 @@ func TestNotificationShowsAndForwardsActions(t *testing.T) {
 	}
 }
 
-func TestNotificationDefaults(t *testing.T) {
+// Reusing an id updates the notification in place; show-as-new replaces
+// it with a fresh one.
+func TestNotificationReplacesByID(t *testing.T) {
 	r := newRig(t, nil)
 	d := serveNotifyd(t, r)
-	if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", Vardict{"icon": dbus.MakeVariant(gicon{"file", dbus.MakeVariant("/x.png")})}).Err; err != nil {
+	for _, title := range []string{"one", "two"} {
+		if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", Vardict{"title": dbus.MakeVariant(title)}).Err; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := d.last(t); got.replaces != 41 || got.summary != "two" {
+		t.Errorf("second Notify = %+v, want it to replace 41", got)
+	}
+	again := Vardict{"title": dbus.MakeVariant("three"), "display-hint": dbus.MakeVariant([]string{"show-as-new"})}
+	if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", again).Err; err != nil {
 		t.Fatal(err)
 	}
-	if got := d.notify.Load(); got[3] != "org.app" || got[4] != "" || got[2] != "" || len(got[5].([]string)) != 0 {
-		t.Errorf("Notify = %v: the app id titles it, no body, no icon, no actions", got)
+	if got := d.last(t); got.replaces != 0 || !slices.Equal(d.closed.Load(), []uint32{41}) {
+		t.Errorf("show-as-new: Notify %+v, closed %v", got, d.closed.Load())
+	}
+	if err := r.obj.Call(NotificationIface+".RemoveNotification", 0, "org.app", "n1").Err; err != nil {
+		t.Fatal(err)
+	}
+	if got := d.closed.Load(); !slices.Equal(got, []uint32{41, 42}) {
+		t.Errorf("closed = %v, want the fresh one closed by Remove", got)
+	}
+}
+
+// A notification the daemon closes is forgotten: removing it later
+// asks the daemon nothing.
+func TestNotificationClosedByTheDaemonIsForgotten(t *testing.T) {
+	r := newRig(t, nil)
+	d := serveNotifyd(t, r)
+	if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".NotificationClosed", uint32(41), uint32(2))
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		r.backend.notifier.mu.Lock()
+		n := len(r.backend.notifier.byDaemon)
+		r.backend.notifier.mu.Unlock()
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("a closed notification stayed tracked")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := r.obj.Call(NotificationIface+".RemoveNotification", 0, "org.app", "n1").Err; err != nil {
+		t.Fatal(err)
+	}
+	if got := d.closed.Load(); len(got) != 0 {
+		t.Errorf("closed %v after the daemon closed it", got)
+	}
+}
+
+// The v2 options reach the daemon as hints.
+func TestNotificationOptionsBecomeHints(t *testing.T) {
+	r := newRig(t, nil)
+	d := serveNotifyd(t, r)
+	n := Vardict{
+		"priority":     dbus.MakeVariant("urgent"),
+		"category":     dbus.MakeVariant("im.received"),
+		"display-hint": dbus.MakeVariant([]string{"transient", "persistent"}),
+		"sound":        dbus.MakeVariant("silent"),
+		"markup-body":  dbus.MakeVariant("<b>bold</b>"),
+		"body":         dbus.MakeVariant("plain"),
+	}
+	if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", n).Err; err != nil {
+		t.Fatal(err)
+	}
+	got := d.last(t)
+	for k, want := range map[string]any{"urgency": byte(2), "category": "im.received", "transient": true, "resident": true, "suppress-sound": true} {
+		if got.hints[k].Value() != want {
+			t.Errorf("hint %s = %v, want %v", k, got.hints[k].Value(), want)
+		}
+	}
+	if got.body != "<b>bold</b>" || got.expire != 0 {
+		t.Errorf("body %q expire %d, want the markup body and no expiry", got.body, got.expire)
+	}
+	for priority, want := range map[string]byte{"low": 0, "normal": 1, "high": 1, "urgent": 2} {
+		if got := priorityUrgency(priority); got != want {
+			t.Errorf("priority %s = %d, want %d", priority, got, want)
+		}
+	}
+}
+
+// A file-descriptor icon (what the frontend sends since version 2) and
+// a bytes icon reach the daemon as image-data.
+func TestNotificationFileIconBecomesImageData(t *testing.T) {
+	r := newRig(t, nil)
+	d := serveNotifyd(t, r)
+	var buf bytes.Buffer
+	img := image.NewNRGBA(image.Rect(0, 0, 3, 2))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "icon.png")
+	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	icons := []dbus.Variant{
+		dbus.MakeVariant(gicon{"file-descriptor", dbus.MakeVariant(dbus.UnixFD(f.Fd()))}),
+		dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant(buf.Bytes())}),
+	}
+	for _, icon := range icons {
+		if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", Vardict{"icon": icon}).Err; err != nil {
+			t.Fatal(err)
+		}
+		fields, ok := d.last(t).hints["image-data"].Value().([]any)
+		if !ok || len(fields) != 7 || fields[0] != int32(3) || fields[1] != int32(2) || fields[5] != int32(4) {
+			t.Fatalf("image-data = %v", d.last(t).hints["image-data"])
+		}
+		if px := fields[6].([]byte); px[0] != 255 || px[3] != 255 {
+			t.Errorf("first pixel = %v, want opaque red", px[:4])
+		}
+	}
+}
+
+func TestNotificationDefaultsAndFailures(t *testing.T) {
+	r := newRig(t, nil)
+	d := serveNotifyd(t, r)
+	if err := r.obj.Call(notificationAdd, 0, "org.app", "n1", Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	if got := d.last(t); got.summary != "org.app" || got.body != "" || got.icon != "" || len(got.actions) != 0 {
+		t.Errorf("Notify = %+v: the app id titles it, no body, no icon, no actions", got)
 	}
 	if got := notificationIcon(Vardict{"icon": dbus.MakeVariant("dialog-information")}); got != "dialog-information" {
 		t.Errorf("bare icon = %q", got)
+	}
+	d.fail.Store(true)
+	if err := r.obj.Call(notificationAdd, 0, "org.app", "n2", Vardict{}).Err; err == nil {
+		t.Error("a notification the daemon refused reported success")
+	}
+	v, err := r.obj.GetProperty(NotificationIface + ".SupportedOptions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts, _ := v.Value().(map[string]dbus.Variant)
+	if _, ok := opts["category"]; !ok {
+		t.Errorf("SupportedOptions = %v", opts)
+	}
+	if v, _ := r.obj.GetProperty(NotificationIface + ".version"); v.Value() != uint32(2) {
+		t.Errorf("version = %v", v)
 	}
 }
 

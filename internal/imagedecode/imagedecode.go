@@ -8,6 +8,7 @@ package imagedecode
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"  // GIF decoder
@@ -25,6 +26,18 @@ func init() {
 	for _, magic := range []string{"P1", "P2", "P3", "P4", "P5", "P6"} {
 		image.RegisterFormat("pnm", magic, decodePNM, decodePNMConfig)
 	}
+}
+
+// Decode decodes image bytes, sniffed as Open sniffs a file.
+func Decode(data []byte) (image.Image, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err == nil {
+		return img, nil
+	}
+	if tga, tgaErr := decodeTGA(bytes.NewReader(data)); tgaErr == nil {
+		return tga, nil
+	}
+	return nil, err
 }
 
 // Open decodes the image file at path. The format is sniffed from the
