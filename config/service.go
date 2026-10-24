@@ -171,15 +171,15 @@ func build(configTree, runtimeTree any, warn *table, sink DiagnosticSink) (*Conf
 	return cfg, ra.staged, err
 }
 
-// readRuntime parses runtime.yaml. A missing one beside a runtime.toml
-// from before the YAML switch is an error naming the file to convert,
-// so the old overrides are not dropped without a word.
+// readRuntime parses runtime.yaml. A missing one is no overrides (the
+// file exists only once something wrote one), unless a runtime.toml
+// from before the YAML switch is beside it: that is an error naming
+// the file to convert, so the old overrides are not dropped without a
+// word.
 func readRuntime(path string) (any, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // runtime.yaml in the config dir
 	if errors.Is(err, fs.ErrNotExist) {
-		if legacy := legacyTOMLError(filepath.Join(filepath.Dir(path), "runtime.toml"), path); legacy != nil {
-			return nil, legacy
-		}
+		return nil, legacyTOMLError(filepath.Join(filepath.Dir(path), "runtime.toml"), path)
 	}
 	if err != nil {
 		return nil, &LoadError{msg: "cannot read file", err: err}

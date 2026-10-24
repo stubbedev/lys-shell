@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -325,5 +327,55 @@ func TestSecrets(t *testing.T) {
 	}
 	if !isEnvFile("/x/.env") || !isEnvFile("/x/.a.env") || isEnvFile("/x/a.env") {
 		t.Error("isEnvFile")
+	}
+}
+
+// logged runs fn with the standard logger writing to a buffer and
+// returns what it logged.
+func logged(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	defer log.SetOutput(prev)
+	fn()
+	return buf.String()
+}
+
+// runtime.yaml exists only once an override was written: without it
+// the config loads silently, and deleting it drops the overrides. A
+// runtime.yaml that cannot be read or parsed still says so.
+func TestMissingRuntimeYAMLIsNoOverrides(t *testing.T) {
+	dir := t.TempDir()
+	var svc *Service
+	if out := logged(t, func() { svc = Load(dir, DiscardDiagnostics) }); out != "" {
+		t.Errorf("loading without runtime.yaml logged %q", out)
+	}
+	if svc.Config().Bar.Location != LocationTop {
+		t.Errorf("bar.location = %v without overrides", svc.Config().Bar.Location)
+	}
+
+	runtime := writeFile(t, dir, "runtime.yaml", "bar:\n  location: left\n")
+	svc.reloadRuntime()
+	if svc.Config().Bar.Location != LocationLeft {
+		t.Fatalf("bar.location = %v after the override", svc.Config().Bar.Location)
+	}
+	if err := os.Remove(runtime); err != nil {
+		t.Fatal(err)
+	}
+	svc.reloadRuntime()
+	if svc.Config().Bar.Location != LocationTop {
+		t.Errorf("bar.location = %v after runtime.yaml was deleted", svc.Config().Bar.Location)
+	}
+
+	for name, write := range map[string]func(string){
+		"malformed":  func(p string) { writeFile(t, dir, "runtime.yaml", "bar: [\n") },
+		"unreadable": func(p string) { writeFile(t, dir, "runtime.yaml", "bar: {}\n"); _ = os.Chmod(p, 0) },
+	} {
+		write(runtime)
+		if out := logged(t, func() { Load(dir, DiscardDiagnostics) }); !strings.Contains(out, "config: runtime.yaml failed") {
+			t.Errorf("%s runtime.yaml logged %q", name, out)
+		}
+		_ = os.Remove(runtime)
 	}
 }

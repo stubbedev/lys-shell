@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"io/fs"
 	"path/filepath"
 )
 
@@ -78,7 +77,7 @@ func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 		configTree = nil
 	}
 	runtimeTree, err := readRuntime(RuntimeOverlayPath(path))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err != nil {
 		errs = append(errs, err)
 	}
 	cfg, _, err := build(configTree, runtimeTree, nil, sink)
