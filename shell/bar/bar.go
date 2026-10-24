@@ -127,8 +127,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if clip, err := clipboard.Start(application, clipboard.DefaultHistory()); err == nil {
 		baseCtx.Clipboard = clip
 	}
-	if hyprland.IsRunning() {
-		if conn, err := hyprland.Connect(); err == nil {
+	if detectCompositor() == compositorHyprland {
+		if conn, err := hyprland.Connect(); err != nil {
+			log.Printf("bar: Hyprland modules will not appear: %v", err)
+		} else {
 			baseCtx.Hyprland = conn
 		}
 	}

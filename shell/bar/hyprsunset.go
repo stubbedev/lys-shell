@@ -99,6 +99,9 @@ type hyprsunsetModule struct {
 }
 
 func newHyprsunset(ctx ModuleContext) (Module, error) {
+	if err := requireCompositor("hyprsunset", compositorHyprland); err != nil {
+		return nil, err
+	}
 	return newHyprsunsetWith(ctx, liveSunsetEnv()), nil
 }
 

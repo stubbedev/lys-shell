@@ -49,6 +49,7 @@ func fakeMangoSocket(t *testing.T, monitors, clients string) chan string {
 			_, _ = conn.Write([]byte("{}\n"))
 		}
 	})
+	clearCompositorEnv(t)
 	t.Setenv("MANGO_INSTANCE_SIGNATURE", path)
 	return dispatched
 }

@@ -63,6 +63,7 @@ func fakeI3(t *testing.T, workspaces, tree string) {
 			_, _ = conn.Write(append(out, body...))
 		}
 	})
+	clearCompositorEnv(t)
 	t.Setenv("SWAYSOCK", path)
 }
 
@@ -127,6 +128,7 @@ func fakeNiriSocket(t *testing.T, workspaces, windows string) {
 			}
 		}
 	})
+	clearCompositorEnv(t)
 	t.Setenv("NIRI_SOCKET", path)
 }
 

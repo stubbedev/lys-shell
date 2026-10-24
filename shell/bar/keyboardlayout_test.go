@@ -222,11 +222,11 @@ func fakeSwayInputs(t *testing.T, inputs string, events chan string) {
 			}
 		}
 	})
+	clearCompositorEnv(t)
 	t.Setenv("SWAYSOCK", path)
 }
 
 func TestKeyboardLayoutFollowsSwayInputEvents(t *testing.T) {
-	clearCompositorEnv(t)
 	events := make(chan string, 1)
 	t.Cleanup(func() { close(events) })
 	fakeSwayInputs(t, `[{"type":"pointer"},{"type":"keyboard","xkb_active_layout_name":"German"}]`, events)
@@ -277,11 +277,11 @@ func fakeNiriLayouts(t *testing.T, names string, switches chan int) {
 			}
 		}
 	})
+	clearCompositorEnv(t)
 	t.Setenv(niri.SocketEnv, path)
 }
 
 func TestKeyboardLayoutFollowsNiriLayoutSwitches(t *testing.T) {
-	clearCompositorEnv(t)
 	switches := make(chan int, 1)
 	t.Cleanup(func() { close(switches) })
 	fakeNiriLayouts(t, `["English (US)","German"]`, switches)
@@ -297,7 +297,6 @@ func TestKeyboardLayoutFollowsNiriLayoutSwitches(t *testing.T) {
 }
 
 func TestKeyboardLayoutFollowsMangosActiveMonitor(t *testing.T) {
-	clearCompositorEnv(t)
 	fakeMangoSocket(t,
 		`[{"name":"DP-1","active":false,"tags":[],"active_tags":[],"keyboardlayout":"German"},`+
 			`{"name":"eDP-1","active":true,"tags":[],"active_tags":[],"keyboardlayout":"English (US)"}]`,
@@ -308,7 +307,6 @@ func TestKeyboardLayoutFollowsMangosActiveMonitor(t *testing.T) {
 }
 
 func TestKeyboardLayoutHidesWithLabelShowOff(t *testing.T) {
-	clearCompositorEnv(t)
 	events := make(chan string)
 	t.Cleanup(func() { close(events) })
 	fakeSwayInputs(t, `[{"type":"keyboard","xkb_active_layout_name":"German"}]`, events)

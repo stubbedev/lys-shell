@@ -69,7 +69,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 	switch {
 	case ctx.Hyprland != nil:
 		return hyprlandLayoutSource(ctx.Hyprland), nil
-	case niri.IsRunning():
+	case detectCompositor() == compositorNiri:
 		conn, err := niri.Connect()
 		if err != nil {
 			return layoutSource{}, err
@@ -86,7 +86,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 			subscribe: func(ModuleContext) (<-chan struct{}, func(), error) { return niri.Subscribe() },
 			close:     func() { _ = conn.Close() },
 		}, nil
-	case mango.IsRunning():
+	case detectCompositor() == compositorMango:
 		w, err := mango.Watch()
 		if err != nil {
 			return layoutSource{}, err
@@ -99,7 +99,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 			subscribe: func(ModuleContext) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },
 			close:     w.Close,
 		}, nil
-	case sway.IsRunning():
+	case detectCompositor() == compositorSway:
 		conn, err := sway.Connect()
 		if err != nil {
 			return layoutSource{}, err

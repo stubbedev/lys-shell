@@ -2,7 +2,6 @@ package bar
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"sync"
 
@@ -14,8 +13,8 @@ import (
 
 // newSwayWorkspaces is the sway-workspaces factory.
 func newSwayWorkspaces(ctx ModuleContext) (Module, error) {
-	if !sway.IsRunning() {
-		return nil, errors.New("sway-workspaces: sway is not running")
+	if err := requireCompositor("sway-workspaces", compositorSway); err != nil {
+		return nil, err
 	}
 	conn, err := sway.Connect()
 	if err != nil {
@@ -26,8 +25,8 @@ func newSwayWorkspaces(ctx ModuleContext) (Module, error) {
 
 // newNiriWorkspaces is the niri-workspaces factory.
 func newNiriWorkspaces(ctx ModuleContext) (Module, error) {
-	if !niri.IsRunning() {
-		return nil, errors.New("niri-workspaces: niri is not running")
+	if err := requireCompositor("niri-workspaces", compositorNiri); err != nil {
+		return nil, err
 	}
 	conn, err := niri.Connect()
 	if err != nil {
@@ -181,8 +180,8 @@ func (b *niriBackend) close()                                      { _ = b.conn.
 // newMangoWorkspaces is the mango-workspaces factory: the watcher runs
 // from construction, like MangoService::new's start_monitoring.
 func newMangoWorkspaces(ctx ModuleContext) (Module, error) {
-	if !mango.IsRunning() {
-		return nil, errors.New("mango-workspaces: mango is not running")
+	if err := requireCompositor("mango-workspaces", compositorMango); err != nil {
+		return nil, err
 	}
 	w, err := mango.Watch()
 	if err != nil {
