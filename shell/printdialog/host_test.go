@@ -96,7 +96,7 @@ func (hs *harness) prepare(t *testing.T) (chan prepareResult, app.LayerConfig) {
 	select {
 	case c := <-hs.opened:
 		return got, c
-	case <-time.After(2 * time.Second):
+	case <-time.After(treetest.Liveness):
 		t.Fatal("no dialog opened")
 		return nil, app.LayerConfig{}
 	}
@@ -243,7 +243,7 @@ func TestCancelEscapeAndPreemption(t *testing.T) {
 		if r.ok {
 			t.Errorf("a preempted prepare answered %+v", r)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(treetest.Liveness):
 		t.Fatal("a preempted prepare was never answered")
 	}
 	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })

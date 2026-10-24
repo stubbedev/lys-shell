@@ -82,7 +82,7 @@ func (hs *harness) open(t *testing.T) app.LayerConfig {
 	select {
 	case c := <-hs.opened:
 		return c
-	case <-time.After(2 * time.Second):
+	case <-time.After(treetest.Liveness):
 		t.Fatal("no dialog opened")
 		return app.LayerConfig{}
 	}
@@ -146,7 +146,7 @@ func TestEscapeAndPreemption(t *testing.T) {
 		if r {
 			t.Error("a preempted request answered yes")
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(treetest.Liveness):
 		t.Fatal("a preempted request was never answered")
 	}
 	c = hs.open(t)

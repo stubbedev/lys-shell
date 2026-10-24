@@ -5,6 +5,7 @@ package treetest
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
@@ -17,6 +18,13 @@ import (
 // lock, never a lock of its own (a finished test's harness can still be
 // draining while the next one builds).
 var Loop sync.Mutex
+
+// Liveness is how long a surface harness waits for a surface to open or
+// a request to be answered before failing: a guard against a hang, not
+// a speed bound. The first surface of a test binary compiles the whole
+// stylesheet bundle, which the race detector under a parallel test run
+// stretches past a couple of seconds.
+const Liveness = 10 * time.Second
 
 // Walk visits w and every descendant, depth first.
 func Walk(w widget.Widget, visit func(widget.Widget)) {

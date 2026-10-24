@@ -122,7 +122,7 @@ func (hs *harness) ask(t *testing.T, fn func() []string) chan []string {
 	go func() { got <- fn() }()
 	select {
 	case hs.cfg = <-hs.opened:
-	case <-time.After(2 * time.Second):
+	case <-time.After(treetest.Liveness):
 		t.Fatal("no chooser opened")
 	}
 	return got
@@ -141,7 +141,7 @@ func answer(t *testing.T, got chan []string) []string {
 	select {
 	case uris := <-got:
 		return uris
-	case <-time.After(2 * time.Second):
+	case <-time.After(treetest.Liveness):
 		t.Fatal("the request was never answered")
 		return nil
 	}
