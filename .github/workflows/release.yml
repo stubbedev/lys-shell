@@ -75,7 +75,7 @@ jobs:
             - name: Build Debian package
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends debhelper desktop-file-utils dpkg-dev
+                  sudo apt-get install -y --no-install-recommends build-essential debhelper desktop-file-utils dpkg-dev
                   VERSION="${GITHUB_REF_NAME#v}"
                   ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" deb
 

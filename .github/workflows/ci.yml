@@ -65,7 +65,7 @@ jobs:
             - name: Build Debian package
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends debhelper desktop-file-utils dpkg-dev
+                  sudo apt-get install -y --no-install-recommends build-essential debhelper desktop-file-utils dpkg-dev
                   ./scripts/ci/build-packages.sh "lys-shell-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz" "${{ steps.archive.outputs.version }}" deb
 
             - uses: actions/upload-artifact@v4
