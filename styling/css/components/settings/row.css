@@ -26,9 +26,8 @@
   color: var(--fg-subtle);
 }
 
-.setting-row .badge-subtle {
+.setting-row badge {
   margin-left: var(--space-sm);
-  font-size: var(--text-xs);
 }
 
 .setting-control {

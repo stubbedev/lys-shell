@@ -80,6 +80,18 @@ func (k *kit) button(child widget.Widget, onClick func(), classes ...string) *wi
 	return b
 }
 
+// badge is lys-ui's quiet badge reading text; a status class
+// (success, warning, error, info) tints it.
+func (k *kit) badge(text string, classes ...string) *widget.Badge {
+	b := widget.NewBadge(k.face, text)
+	b.SetVariant(widget.BadgeSecondary)
+	b.AddClass(classes...)
+	return b
+}
+
+// badgeStatuses are the status classes a badge's tint comes from.
+var badgeStatuses = []string{"success", "warning", "error", "info"}
+
 // control is a row's editor: its widget, and refresh re-reading the
 // value after the config changed.
 type control interface {
@@ -94,7 +106,7 @@ type settingRow struct {
 	kit   *kit
 	path  string
 	ctl   control
-	badge *widget.Label
+	badge *widget.Badge
 	reset *widget.Button
 	// action is the row's RowBehavior::Action.
 	action bool
@@ -117,9 +129,9 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 	if spec.unit != "" {
 		labelRow.Append(k.label("("+spec.unit+")", "setting-unit"), false)
 	}
-	r.badge = k.label("", "badge-subtle")
+	r.badge = k.badge("")
 	labelRow.Append(r.badge, false)
-	if d, ok := ctl.(interface{ dirtyBadge() *widget.Label }); ok {
+	if d, ok := ctl.(interface{ dirtyBadge() *widget.Badge }); ok {
 		labelRow.Append(d.dirtyBadge(), false)
 	}
 	info.Append(labelRow, false)
@@ -170,7 +182,7 @@ func (r *settingRow) refreshSource() {
 	r.badge.SetVisible(src.badge)
 	r.badge.SetText(src.label)
 	r.badge.SetTooltip(src.tooltip)
-	r.badge.SetClasses("badge-subtle")
+	r.badge.RemoveClass(badgeStatuses...)
 	if src.class != "" {
 		r.badge.AddClass(src.class)
 	}

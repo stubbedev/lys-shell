@@ -88,7 +88,7 @@
   background: var(--accent-subtle);
   color: var(--accent);
 }
-.treeman-dropdown .treeman-wt .badge {
+.treeman-dropdown .treeman-wt badge {
   margin-left: var(--space-sm);
   transition: opacity var(--duration-fast);
 }
@@ -110,7 +110,7 @@
   opacity: 1;
   transform: translateX(0);
 }
-.treeman-dropdown .treeman-wt-overlay:hover .treeman-wt .badge {
+.treeman-dropdown .treeman-wt-overlay:hover .treeman-wt badge {
   opacity: 0;
 }
 .treeman-dropdown .treeman-detail .treeman-detail-head {
@@ -132,7 +132,7 @@
   background: var(--accent-subtle);
   color: var(--accent);
 }
-.treeman-dropdown .treeman-detail .treeman-detail-head .badge {
+.treeman-dropdown .treeman-detail .treeman-detail-head badge {
   margin-left: var(--space-sm);
 }
 .treeman-dropdown .treeman-detail .treeman-detail-fields {

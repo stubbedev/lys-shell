@@ -284,7 +284,7 @@ func newFileEditor(k *kit, s slot) *fileEditor {
 	return c
 }
 
-func (c *fileEditor) dirtyBadge() *widget.Label { return c.entry.badge }
+func (c *fileEditor) dirtyBadge() *widget.Badge { return c.entry.badge }
 
 func (c *fileEditor) refresh() { c.entry.refresh() }
 
@@ -423,7 +423,7 @@ type themeSelector struct {
 	*widget.Box
 	k      *kit
 	btn    *widget.Button
-	badge  *widget.Label
+	badge  *widget.Badge
 	themes []config.ThemeEntry
 	picker *searchPicker
 }
@@ -437,12 +437,12 @@ func newThemeSelector(k *kit) *themeSelector {
 	content.AppendAligned(k.icon("ld-chevron-down-symbolic", "theme-preset-button-chevron"), false, widget.AlignCenter)
 	c.btn = k.button(content, c.open, "theme-preset-button")
 	c.Append(c.btn, false)
-	c.badge = k.label("", "badge", "badge-subtle")
+	c.badge = k.badge("")
 	c.refresh()
 	return c
 }
 
-func (c *themeSelector) dirtyBadge() *widget.Label { return c.badge }
+func (c *themeSelector) dirtyBadge() *widget.Badge { return c.badge }
 
 // refresh shows the base theme on the badge.
 func (c *themeSelector) refresh() {

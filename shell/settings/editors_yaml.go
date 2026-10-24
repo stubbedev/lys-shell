@@ -21,7 +21,7 @@ type yamlEditor struct {
 	key    string
 	scroll *widget.Scroll
 	area   *widget.TextArea
-	badge  *widget.Label
+	badge  *widget.Badge
 	// shown is the document the stored value last rendered as: a
 	// refresh replaces the text only when the value moved.
 	shown string
@@ -29,7 +29,7 @@ type yamlEditor struct {
 
 func newYAMLEditor(k *kit, s slot, key string, minLines int) *yamlEditor {
 	c := &yamlEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s, key: key}
-	c.badge = k.label(i18n.Settings().Get("settings-source-unsaved"), "badge-subtle", "warning")
+	c.badge = k.badge(i18n.Settings().Get("settings-source-unsaved"), "warning")
 	c.badge.SetVisible(false)
 	c.area = widget.NewTextArea(k.mono, 14, 0)
 	c.area.SetLineNumbers(true)
@@ -50,7 +50,7 @@ func newYAMLEditor(k *kit, s slot, key string, minLines int) *yamlEditor {
 	return c
 }
 
-func (c *yamlEditor) dirtyBadge() *widget.Label { return c.badge }
+func (c *yamlEditor) dirtyBadge() *widget.Badge { return c.badge }
 
 // document renders the stored value under the key.
 func (c *yamlEditor) document() string {

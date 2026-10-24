@@ -58,14 +58,7 @@
 }
 
 .network-connection-status {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--fg-subtle);
   margin-right: var(--space-sm);
-}
-.network-connection-status.error {
-  color: var(--status-error);
-  background: var(--status-error-subtle);
 }
 
 .network-hover-stack {

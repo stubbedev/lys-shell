@@ -149,7 +149,7 @@ type text struct {
 	k        *kit
 	slot     slot
 	optional bool
-	badge    *widget.Label
+	badge    *widget.Badge
 	syncing  bool
 }
 
@@ -157,7 +157,7 @@ func newText(k *kit, s slot, optional bool) *text {
 	t := i18n.Settings()
 	c := &text{Entry: k.entry(), k: k, slot: s, optional: optional}
 	c.AddClass("setting-text-entry")
-	c.badge = k.label(t.Get("settings-source-unsaved"), "badge-subtle", "warning")
+	c.badge = k.badge(t.Get("settings-source-unsaved"), "warning")
 	c.badge.SetVisible(false)
 	c.OnChanged = func(string) {
 		if !c.syncing {
@@ -173,7 +173,7 @@ func newText(k *kit, s slot, optional bool) *text {
 	return c
 }
 
-func (c *text) dirtyBadge() *widget.Label { return c.badge }
+func (c *text) dirtyBadge() *widget.Badge { return c.badge }
 
 // commit writes the typed text; false when the field refused it (the
 // badge stays up).

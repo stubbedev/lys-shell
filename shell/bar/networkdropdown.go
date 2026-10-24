@@ -583,7 +583,7 @@ type netActive struct {
 	wifiTile             *widget.Box
 	wifiName, wifiDetail *widget.Label
 	wifiStatus           *widget.Label
-	badge                *widget.Label
+	badge                *widget.Badge
 	trailing             *widget.Stack
 	hovered              bool
 	connected, wifiErr   bool
@@ -640,8 +640,9 @@ func newNetActive(v *networkView) *netActive {
 	status := widget.NewBox(widget.Row, 0, 0)
 	a.wifiStatus = v.statusLabel()
 	status.Append(a.wifiStatus, false)
-	a.badge = widget.NewLabel(v.font, v.px*0.8, "", 0)
-	a.badge.AddClass("badge-subtle", "network-connection-status")
+	a.badge = widget.NewBadge(v.font, "")
+	a.badge.SetVariant(widget.BadgeSecondary)
+	a.badge.AddClass("network-connection-status")
 	status.Append(a.badge, false)
 	a.trailing.Add("status", status)
 	actions := widget.NewBox(widget.Row, 0, 0)

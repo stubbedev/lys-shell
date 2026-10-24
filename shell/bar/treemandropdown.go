@@ -151,12 +151,13 @@ func (v *treemanView) dotIn(row *widget.Box, b treeman.Bucket) {
 	row.AppendAligned(v.dot(b), false, widget.AlignCenter)
 }
 
-// badge is a small colored label; the .badge rule (or its variant)
-// paints both the fill and the ink.
-func (v *treemanView) badge(text, variant string) *widget.Label {
-	b := widget.NewLabel(v.font, v.px*0.8, text, 0)
-	b.AddClass("badge")
-	if variant != "" {
+// badge is lys-ui's Badge: the quiet secondary fill, or with a status
+// variant the status color's fill.
+func (v *treemanView) badge(text, variant string) *widget.Badge {
+	b := widget.NewBadge(v.font, text)
+	if variant == "" {
+		b.SetVariant(widget.BadgeSecondary)
+	} else {
 		b.AddClass(variant)
 	}
 	return b

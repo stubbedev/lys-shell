@@ -1924,3 +1924,26 @@ func TestSettingsIsSingleInstance(t *testing.T) {
 	}
 	again.Close()
 }
+
+// A row's source badge is lys-ui's quiet Badge tinted by its status:
+// a source change swaps the tint, never stacks two.
+func TestRowBadgeIsALysUIBadgeWithOneTint(t *testing.T) {
+	k := testKit(t, "")
+	spec := field("bar.dropdown-shadow")
+	row := newSettingRow(k, spec, fieldControl(k, spec))
+	if row.badge.Variant() != widget.BadgeSecondary {
+		t.Errorf("badge variant %v, want the quiet secondary", row.badge.Variant())
+	}
+	row.ctl.(*toggle).SetOn(false)
+	row.refresh()
+	if !row.badge.HasClass("success") {
+		t.Fatal("a runtime override did not tint the badge success")
+	}
+	k.store.reset(spec.path)
+	row.refresh()
+	for _, status := range badgeStatuses {
+		if row.badge.HasClass(status) {
+			t.Errorf("the default source kept the %s tint", status)
+		}
+	}
+}

@@ -238,7 +238,7 @@ func TestTreemanDotsAndBadgesDoNotStretch(t *testing.T) {
 	rows := v.list.Children()[1].(*widget.Box).Children()[1].(*widget.Revealer).Child().(*widget.Box)
 	row := rows.Children()[0].(*widget.Overlay).Children()[0].(*widget.Box)
 	dot := row.Children()[0].(*widget.Box)
-	badge := row.Children()[2].(*widget.Label)
+	badge := row.Children()[2].(*widget.Badge)
 	if dot.Bounds().H >= row.Bounds().H {
 		t.Errorf("the row dot stretched to %d of %d", dot.Bounds().H, row.Bounds().H)
 	}
@@ -260,7 +260,7 @@ func TestTreemanDotsAndBadgesDoNotStretch(t *testing.T) {
 	if headDot := head.Children()[0].(*widget.Box); headDot.Bounds().H >= head.Bounds().H {
 		t.Errorf("the detail dot stretched to %d of %d", headDot.Bounds().H, head.Bounds().H)
 	}
-	headBadge := head.Children()[2].(*widget.Label)
+	headBadge := head.Children()[2].(*widget.Badge)
 	if headBadge.Bounds().H >= head.Bounds().H {
 		t.Errorf("the detail badge stretched to %d of %d", headBadge.Bounds().H, head.Bounds().H)
 	}
