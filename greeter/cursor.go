@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/gtksettings"
 )
 
 // The greeter runs pre-login, so there is no session to ask what
@@ -306,25 +307,8 @@ func parseSway(text string) Cursor {
 
 // parseGTKSettings reads gtk-cursor-theme-name/-size.
 func parseGTKSettings(text string) Cursor {
-	var c Cursor
-	for line := range strings.SplitSeq(text, "\n") {
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		value = strings.Trim(strings.TrimSpace(value), `"`)
-		switch strings.TrimSpace(key) {
-		case "gtk-cursor-theme-name":
-			if c.Theme == "" && value != "" {
-				c.Theme = value
-			}
-		case "gtk-cursor-theme-size":
-			if c.Size == 0 {
-				c.Size = parseSize(value)
-			}
-		}
-	}
-	return c
+	s := gtksettings.Parse(text)
+	return Cursor{Theme: s.CursorTheme, Size: s.CursorSize}
 }
 
 // parseIndexTheme reads the Inherits= of ~/.icons/default/index.theme

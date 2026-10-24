@@ -225,6 +225,7 @@ func themePage(*config.Config) pageSpec {
 	return pageSpec{id: "theme", navKey: "settings-nav-theme", icon: "ld-palette-symbolic", header: "settings-page-theme", sections: []sectionSpec{
 		{title: "settings-section-provider", rows: []rowSpec{
 			field("styling.appearance"),
+			field("styling.high-contrast"),
 			field("styling.theme-provider"),
 			field("styling.theming-monitor"),
 		}},

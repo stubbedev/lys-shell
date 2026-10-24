@@ -27,6 +27,7 @@ const ObjectPath = dbus.ObjectPath("/org/freedesktop/portal/desktop")
 type Backend struct {
 	conn     *dbus.Conn
 	cfg      *config.Service
+	settings *settings
 	sessions *sessions
 	// spawn starts a program the portal hands off to (detach; a
 	// recorder in tests).
@@ -48,7 +49,8 @@ type Backend struct {
 func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b := &Backend{
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
-		spawn: detach, inhibitLock: logindLock, notifier: newNotifier(conn),
+		settings: &settings{cfg: cfg, gtk: hostGTKSettings, getenv: os.Getenv},
+		spawn:    detach, inhibitLock: logindLock, notifier: newNotifier(conn),
 		zones: outputZones,
 	}
 	// One Wayland connection serves every interface that needs the
@@ -65,7 +67,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 // interfaces is every interface the backend mounts at ObjectPath.
 func (b *Backend) interfaces() []dbusx.Interface {
 	return append([]dbusx.Interface{
-		settingsIface(b.cfg),
+		b.settings.iface(),
 		lockdownIface(),
 		backgroundIface(),
 		usbIface(),
@@ -104,7 +106,7 @@ func (b *Backend) Serve() (stop func(), err error) {
 		warnf("notification: cannot subscribe to ActionInvoked: %v", err)
 		unforward = func() {}
 	}
-	unwatch := watchSettings(b.conn, b.cfg)
+	unwatch := b.settings.watch(b.conn)
 	return func() {
 		unwatch()
 		unforward()

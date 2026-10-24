@@ -13,6 +13,9 @@ type StylingConfig struct {
 	// palette; `Light`/`Dark` force the mode (static palettes swap to their
 	// built-in light/dark variant when one exists).
 	Appearance Appearance `cfg:"appearance"`
+	// Ask apps for higher contrast: the `contrast` preference the
+	// desktop portal tells GTK, Qt and Chromium apps.
+	HighContrast bool `cfg:"high-contrast"`
 	// ColorExtractor is theme-provider, theming-monitor, and the
 	// matugen-/wallust-/pywal- keys.
 	ColorExtractor ColorExtractorConfig `cfg:",inline"`

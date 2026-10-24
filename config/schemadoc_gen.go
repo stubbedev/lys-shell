@@ -1227,6 +1227,7 @@ var schemaDocs = map[string]string{
 	"StylingConfig.Appearance":                               "Light/dark appearance mode. `Auto` follows each provider / the configured\npalette; `Light`/`Dark` force the mode (static palettes swap to their\nbuilt-in light/dark variant when one exists).",
 	"StylingConfig.Available":                                "Available is the discovered themes, populated at runtime from\nthe built-ins and themes/ (never read from a config file).",
 	"StylingConfig.ColorExtractor":                           "ColorExtractor is theme-provider, theming-monitor, and the\nmatugen-/wallust-/pywal- keys.",
+	"StylingConfig.HighContrast":                             "Ask apps for higher contrast: the `contrast` preference the\ndesktop portal tells GTK, Qt and Chromium apps.",
 	"StylingConfig.Palette":                                  "Active color palette.",
 	"StylingConfig.PaletteBaseTheme":                         "Currently active theme preset name, and/or the base for the\npalette when the palette has been modified. Persisted backing\nstate for the theme selector; not a labeled setting of its own.",
 	"StylingConfig.Rounding":                                 "Corner rounding for dropdowns, popovers, and dialogs.",

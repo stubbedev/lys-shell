@@ -11,6 +11,9 @@ settings-styling-rounding = Rounding
 settings-styling-appearance = Appearance
     .description = Light/dark mode. Auto follows the palette/provider; Light/Dark force it
 
+settings-styling-high-contrast = High Contrast
+    .description = Ask apps for higher contrast through the desktop portal
+
 settings-styling-theme-provider = Theme Provider
     .description = Source for color palette (lys-shell, matugen, pywal, wallust)
 

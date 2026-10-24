@@ -7390,6 +7390,11 @@
           "default": "auto",
           "description": "Light/dark appearance mode. `Auto` follows each provider / the configured\npalette; `Light`/`Dark` force the mode (static palettes swap to their\nbuilt-in light/dark variant when one exists)."
         },
+        "high-contrast": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Ask apps for higher contrast: the `contrast` preference the\ndesktop portal tells GTK, Qt and Chromium apps."
+        },
         "matugen-contrast": {
           "$ref": "#/$defs/SignedNormalizedF64",
           "default": 0.0,
@@ -10095,6 +10100,7 @@
       "$ref": "#/$defs/StylingConfig",
       "default": {
         "appearance": "auto",
+        "high-contrast": false,
         "matugen-contrast": 0.0,
         "matugen-light": false,
         "matugen-scheme": "tonal-spot",
