@@ -338,7 +338,9 @@ type fakeDialogs struct {
 	gate
 	yes   dbustest.Var[bool]
 	asked dbustest.Var[[]any]
-	edit  dbustest.Var[*portaldialogs.AccountInfo]
+	// updated is the last UpdateChoices; it finds only handle open.
+	updated dbustest.Var[[]any]
+	edit    dbustest.Var[*portaldialogs.AccountInfo]
 }
 
 // answer records a dialog and gives the configured verdict, no when
@@ -373,11 +375,16 @@ func (f *fakeDialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	return f.answer(c, uri)
 }
 
-func (f *fakeDialogs) ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) string {
-	if f.answer(c, choices, contentType, uri) {
-		return "org.chosen.desktop"
+func (f *fakeDialogs) ChooseApplication(c portalreq.Caller, r portaldialogs.ChooserRequest) string {
+	if f.answer(c, r) {
+		return "org.chosen.App"
 	}
 	return ""
+}
+
+func (f *fakeDialogs) UpdateChoices(h string, choices []string) bool {
+	f.updated.Store([]any{h, choices})
+	return h == string(handle)
 }
 
 func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, name, icon string) bool {

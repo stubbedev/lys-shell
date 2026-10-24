@@ -1,6 +1,9 @@
 package portal
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
@@ -100,7 +103,10 @@ func (a accountMethods) GetUserInformation(handle dbus.ObjectPath, appID, parent
 // (appchooser.rs).
 type appChooserMethods struct{ dialogs }
 
-// ChooseApplication lets the user pick the handler.
+// ChooseApplication lets the user pick the handler: the frontend's
+// choices, preselecting its last choice, naming the file or URI opened.
+// The shell cannot mint an activation token, so the one given is
+// handed back for the chosen app.
 func (a appChooserMethods) ChooseApplication(handle dbus.ObjectPath, appID, parent string, choices []string, options Vardict) (uint32, Vardict, *dbus.Error) {
 	client := a.client()
 	c, ok := beginOr(a.conn, handle, appID, parent, client.Dismiss)
@@ -108,16 +114,37 @@ func (a appChooserMethods) ChooseApplication(handle dbus.ObjectPath, appID, pare
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
-	choice, err := client.ChooseApplication(c.ctx, c.caller, choices, stringOr(options, "content_type", ""), stringOr(options, "uri", ""))
+	c.modal(options)
+	choice, err := client.ChooseApplication(c.ctx, c.caller, portaldialogs.ChooserRequest{
+		Choices:     choices,
+		LastChoice:  stringOr(options, "last_choice", ""),
+		ContentType: stringOr(options, "content_type", ""),
+		Target:      stringOr(options, "filename", stringOr(options, "uri", "")),
+	})
 	if code := c.response("appchooser", choice != "", err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
-	return ResponseSuccess, Vardict{"choice": dbus.MakeVariant(choice)}, nil
+	results := Vardict{"choice": dbus.MakeVariant(choice)}
+	if token := stringOr(options, "activation_token", ""); token != "" {
+		results["activation_token"] = dbus.MakeVariant(token)
+	}
+	return ResponseSuccess, results, nil
 }
 
-// UpdateChoices is accepted and ignored: the open chooser does not
-// live-update.
-func (appChooserMethods) UpdateChoices(_ dbus.ObjectPath, _ []string) *dbus.Error { return nil }
+// UpdateChoices replaces the choices of the chooser open for handle;
+// none open is NotFound.
+func (a appChooserMethods) UpdateChoices(handle dbus.ObjectPath, choices []string) *dbus.Error {
+	ctx, cancel := context.WithTimeout(context.Background(), shellCallTimeout)
+	defer cancel()
+	found, err := a.client().UpdateChoices(ctx, string(handle), choices)
+	if err != nil {
+		return dbus.MakeFailedError(fmt.Errorf("appchooser: update choices for %s: %w", handle, err))
+	}
+	if !found {
+		return dbus.NewError(errNotFound, []any{"no app chooser open for " + string(handle)})
+	}
+	return nil
+}
 
 // launcherMethods is org.freedesktop.impl.portal.DynamicLauncher
 // (dynamiclauncher.rs).

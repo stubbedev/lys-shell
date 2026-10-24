@@ -212,3 +212,35 @@ func TestDescribe(t *testing.T) {
 		t.Errorf("host app = %q", name)
 	}
 }
+
+// The portal's application id is the desktop id without ".desktop",
+// and maps back to the same desktop id.
+func TestAppIDRoundTrip(t *testing.T) {
+	a := App{ID: "org.example.Viewer.desktop"}
+	if got := a.AppID(); got != "org.example.Viewer" {
+		t.Errorf("AppID = %q", got)
+	}
+	if got := FileID(a.AppID()); got != a.ID {
+		t.Errorf("FileID = %q, want %q", got, a.ID)
+	}
+	if got := (App{ID: "desktop.desktop"}).AppID(); got != "desktop" {
+		t.Errorf("AppID strips more than the suffix: %q", got)
+	}
+}
+
+// FindApps answers the ids in the order asked, the earlier dir winning,
+// and skips the ids with no loadable entry.
+func TestFindAppsKeepsTheOrderAsked(t *testing.T) {
+	dir, _ := appsFixture(t)
+	user := t.TempDir()
+	write(t, user, "mytool.desktop", "[Desktop Entry]\nType=Application\nName=User Tool\nExec=mytool\n")
+	write(t, user, "gone.desktop", "[Desktop Entry]\nType=Application\nName=Gone\nHidden=true\nExec=mytool\n")
+	apps := FindApps([]string{user, dir}, []string{"nodisplay.desktop", "missing.desktop", "gone.desktop", "mytool.desktop"})
+	var got []string
+	for _, a := range apps {
+		got = append(got, a.ID+"="+a.DisplayName())
+	}
+	if want := []string{"nodisplay.desktop=NoDisplay", "mytool.desktop=User Tool"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("FindApps = %q, want %q", got, want)
+	}
+}

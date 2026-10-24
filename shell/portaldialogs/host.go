@@ -73,10 +73,21 @@ type Dialogs struct {
 	closing bool
 	// app and appIcon name the requester of the dialog showing.
 	app, appIcon string
+	// choosers are the app chooser requests open, showing or waiting,
+	// by handle.
+	choosers map[string]*appChooser
+}
+
+// appChooser is one open app chooser request: the request, kept
+// current by UpdateChoices, and while it shows the refresh refilling
+// its list from it.
+type appChooser struct {
+	req     ChooserRequest
+	refresh func()
 }
 
 // New builds the host; nothing maps until a request.
-func New(d Deps) *Dialogs { return &Dialogs{d: d} }
+func New(d Deps) *Dialogs { return &Dialogs{d: d, choosers: map[string]*appChooser{}} }
 
 // ask shows a dialog for c on the loop and waits for its answer.
 func (h *Dialogs) ask(c portalreq.Caller, build func(answer func(bool, string)) widget.Widget) (bool, string) {
@@ -255,12 +266,33 @@ func (h *Dialogs) ConfirmInstall(c portalreq.Caller, name, iconName string) bool
 }
 
 // ChooseApplication is the app chooser: icon + name rows with a live
-// search filter, and "always use" when the type is known.
-func (h *Dialogs) ChooseApplication(c portalreq.Caller, choices []string, contentType, _ string) string {
-	_, choice := h.ask(c, func(answer func(bool, string)) widget.Widget {
-		return h.chooser(answer, h.d.Candidates(choices, contentType), contentType)
-	})
+// search filter, and "always use" when the type is known. Its choices
+// follow UpdateChoices while it is open.
+func (h *Dialogs) ChooseApplication(c portalreq.Caller, r ChooserRequest) string {
+	ac := &appChooser{req: r}
+	if c.Handle != "" {
+		h.d.Invoke(func() { h.choosers[c.Handle] = ac })
+		defer h.d.Invoke(func() { delete(h.choosers, c.Handle) })
+	}
+	_, choice := h.ask(c, func(answer func(bool, string)) widget.Widget { return h.chooser(answer, ac) })
 	return choice
+}
+
+// UpdateChoices replaces the choices of the app chooser open for
+// handle, refilling its list when it shows.
+func (h *Dialogs) UpdateChoices(handle string, choices []string) bool {
+	found := make(chan bool, 1)
+	h.d.Invoke(func() {
+		ac, ok := h.choosers[handle]
+		if ok {
+			ac.req.Choices = choices
+			if ac.refresh != nil {
+				ac.refresh()
+			}
+		}
+		found <- ok
+	})
+	return <-found
 }
 
 func nonEmpty(parts ...string) []string {
@@ -380,33 +412,49 @@ func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title
 	return h.surface(rows...)
 }
 
-// chooser lists the apps in a ListBox of icon + name rows; activating
-// one answers its id. The search hides the rows whose name lacks the
-// query (the list's filter, as set_filter_func does).
-func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, contentType string) widget.Widget {
+// chooser lists the request's apps in a ListBox of icon + name rows,
+// the last choice selected; activating one answers its app id. The
+// search hides the rows whose name lacks the query (the list's filter,
+// as set_filter_func does).
+func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widget {
+	contentType := ac.req.ContentType
 	list := widget.NewListBox()
 	list.AddClass("portal-dialog-app-list")
-	names := make([]string, len(apps))
-	for i, a := range apps {
-		names[i] = strings.ToLower(a.DisplayName())
-		list.Append(h.appRow(a))
+	var apps []desktopentry.App
+	var names []string
+	ac.refresh = func() {
+		selected := ac.req.LastChoice
+		if i := list.Selected(); i >= 0 {
+			selected = apps[i].AppID()
+		}
+		for list.Len() > 0 {
+			list.RemoveAt(list.Len() - 1)
+		}
+		apps = h.d.Candidates(ac.req.Choices, contentType)
+		names = make([]string, len(apps))
+		for i, a := range apps {
+			names[i] = strings.ToLower(a.DisplayName())
+			list.Append(h.appRow(a))
+		}
+		list.Select(slices.IndexFunc(apps, func(a desktopentry.App) bool { return a.AppID() == selected }))
+		list.InvalidateFilter()
 	}
 	remember := widget.NewCheckButton(false)
 	remember.AddClass("portal-dialog-remember")
 	remember.SetChild(widget.NewLabel(h.d.Font, 13, "Always use for this file type", 0))
 	list.OnActivate = func(i int) {
-		id := apps[i].ID
 		if remember.Checked() && contentType != "" {
-			if err := h.d.SetDefault(id, contentType); err != nil {
-				log.Printf("appchooser: set-default %s for %s: %v", id, contentType, err)
+			if err := h.d.SetDefault(apps[i].ID, contentType); err != nil {
+				log.Printf("appchooser: set-default %s for %s: %v", apps[i].ID, contentType, err)
 			}
 		}
-		answer(true, id)
+		answer(true, apps[i].AppID())
 	}
 	query := ""
 	list.SetFilterFunc(func(r *widget.ListBoxRow) bool {
 		return query == "" || strings.Contains(names[r.Index()], query)
 	})
+	ac.refresh()
 	// gtk::SearchEntry: the list filters on search-changed, after the
 	// default delay.
 	search := widget.NewSearchEntry(h.d.Font, 13, "Search applications…")
@@ -419,16 +467,26 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	scroll.FillX, scroll.FillY = true, true
 	scroll.SetSizeRequest(0, appListHeight)
 	scroll.SetMaxContentHeight(appListHeight)
-	var rememberRow widget.Widget
+	var rememberRow, target widget.Widget
 	if contentType != "" {
 		rememberRow = remember
 	}
+	if ac.req.Target != "" {
+		target = h.label("Choose an application to open “"+ac.req.Target+"”.", "portal-dialog-body")
+	}
+	open := h.button("Open", "portal-dialog-confirm", func() {
+		if i := list.Selected(); i >= 0 {
+			list.OnActivate(i)
+		}
+	})
+	open.AddClass("suggested-action")
 	return h.surface(
 		h.label("Open With", "portal-dialog-title"),
+		target,
 		search,
 		scroll,
 		rememberRow,
-		h.actions(h.button("Cancel", "portal-dialog-cancel", func() { answer(false, "") })),
+		h.actions(h.button("Cancel", "portal-dialog-cancel", func() { answer(false, "") }), open),
 	)
 }
 
@@ -515,23 +573,20 @@ func (h *Dialogs) hide() {
 }
 
 // CandidateApps is the chooser's list (candidate_apps): the given
-// desktop ids, else the apps recommended for the type, else every app.
+// app ids' entries, else the apps recommended for the type, else every app.
 func CandidateApps(choices []string, contentType string) []desktopentry.App {
 	dirs := desktopentry.ApplicationDirs()
-	all := desktopentry.AllApps(dirs)
 	if len(choices) > 0 {
-		var out []desktopentry.App
-		for _, a := range all {
-			if slices.Contains(choices, a.ID) {
-				out = append(out, a)
-			}
+		ids := make([]string, len(choices))
+		for i, id := range choices {
+			ids[i] = desktopentry.FileID(id)
 		}
-		return out
+		return desktopentry.FindApps(dirs, ids)
 	}
 	if contentType != "" {
 		if rec := desktopentry.RecommendedFor(dirs, desktopentry.MimeAppsLists(), contentType); len(rec) > 0 {
 			return rec
 		}
 	}
-	return all
+	return desktopentry.AllApps(dirs)
 }

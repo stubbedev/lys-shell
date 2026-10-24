@@ -55,10 +55,12 @@ func (f fakeDialogs) ConfirmWallpaper(_ portalreq.Caller, uri string) bool {
 	return f.yes.Load()
 }
 
-func (f fakeDialogs) ChooseApplication(_ portalreq.Caller, choices []string, contentType, uri string) string {
-	f.got.Store([]any{choices, contentType, uri})
+func (f fakeDialogs) ChooseApplication(_ portalreq.Caller, r portaldialogs.ChooserRequest) string {
+	f.got.Store([]any{r})
 	return f.id.Load()
 }
+
+func (fakeDialogs) UpdateChoices(string, []string) bool { return false }
 
 func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, name, icon string) bool {
 	f.got.Store([]any{name, icon})
@@ -151,12 +153,12 @@ func TestPortalShowDialogs(t *testing.T) {
 		{[]string{"wallpaper", "--uri", "file:///w.png"}, "accepted\n", "declined\n", func(a []any) bool {
 			return a[0] == "file:///w.png"
 		}},
-		{[]string{"app-chooser"}, "editor.desktop\n", "cancelled\n", func(a []any) bool {
-			return a[1] == "text/plain"
+		{[]string{"app-chooser"}, "org.example.Editor\n", "cancelled\n", func(a []any) bool {
+			return a[0].(portaldialogs.ChooserRequest).ContentType == "text/plain"
 		}},
 	} {
 		yes.Store(true)
-		id.Store("editor.desktop")
+		id.Store("org.example.Editor")
 		stdout, stderr, code := show(t, c.args...)
 		if code != 0 || stdout != c.yes || stderr != "" {
 			t.Errorf("%v yes: code %d stdout %q stderr %q", c.args, code, stdout, stderr)

@@ -57,9 +57,20 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 			hs.opened <- c
 			return w, nil
 		},
-		Invoke:     hs.do,
-		Font:       face,
-		Candidates: func([]string, string) []desktopentry.App { return apps },
+		Invoke: hs.do,
+		Font:   face,
+		Candidates: func(choices []string, _ string) []desktopentry.App {
+			if len(choices) == 0 {
+				return apps
+			}
+			var out []desktopentry.App
+			for _, id := range choices {
+				if i := slices.IndexFunc(apps, func(a desktopentry.App) bool { return a.AppID() == id }); i >= 0 {
+					out = append(out, apps[i])
+				}
+			}
+			return out
+		},
 		SetDefault: func(id, mime string) error {
 			hs.mu.Lock()
 			defer hs.mu.Unlock()
@@ -266,10 +277,12 @@ func installApp(t *testing.T, dir, id, name string) desktopentry.App {
 
 func TestAppChooserFiltersAndPicks(t *testing.T) {
 	dir := t.TempDir()
-	apps := []desktopentry.App{installApp(t, dir, "viewer.desktop", "Image Viewer"), installApp(t, dir, "editor.desktop", "Text Editor")}
+	apps := []desktopentry.App{installApp(t, dir, "org.example.Viewer.desktop", "Image Viewer"), installApp(t, dir, "org.example.Editor.desktop", "Text Editor")}
 	hs := newHarness(t, apps)
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, nil, "image/png", "") }()
+	go func() {
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{ContentType: "image/png"})
+	}()
 	c := hs.open(t)
 	// The search is a gtk::SearchEntry; its search-changed delay runs
 	// instantly here.
@@ -308,22 +321,24 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	}
 	hs.do(func() { remember.SetChecked(true) })
 	hs.do(func() { list.OnActivate(1) })
-	if id := <-got; id != "editor.desktop" {
+	// The answer is the portal's app id; the default is recorded for
+	// the desktop file.
+	if id := <-got; id != "org.example.Editor" {
 		t.Errorf("picked %q", id)
 	}
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
-	if !slices.Equal(hs.defaults, []string{"editor.desktop=image/png"}) {
+	if !slices.Equal(hs.defaults, []string{"org.example.Editor.desktop=image/png"}) {
 		t.Errorf("set-default = %v", hs.defaults)
 	}
 }
 
 func TestAppChooserCancelAndNoType(t *testing.T) {
 	dir := t.TempDir()
-	hs := newHarness(t, []desktopentry.App{installApp(t, dir, "viewer.desktop", "Image Viewer")})
+	hs := newHarness(t, []desktopentry.App{installApp(t, dir, "org.example.Viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, []string{"viewer.desktop"}, "", "")
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{Choices: []string{"org.example.Viewer"}})
 	}()
 	c := hs.open(t)
 	treetest.Walk(c.Root, func(w widget.Widget) {
@@ -341,7 +356,7 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{installApp(t, t.TempDir(), "viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, nil, "", "") }()
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{}) }()
 	c := hs.open(t)
 	var rowY, scrollY int
 	hs.do(func() {
@@ -371,7 +386,7 @@ func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
 	}
 	hs := newHarness(t, []desktopentry.App{long})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, nil, "", "") }()
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{}) }()
 	c := hs.open(t)
 	var w int
 	hs.do(func() { w = c.Root.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}).W })
@@ -511,5 +526,146 @@ func TestAccountEditsBeforeSharing(t *testing.T) {
 	})
 	if !r.ok || r.info != (AccountInfo{Name: "Ada Lovelace", Image: "/pics/cat.png"}) {
 		t.Errorf("chosen = %+v", r)
+	}
+}
+
+// The portal names apps by app id, the desktop id without ".desktop":
+// a choice lists its entry, and a desktop-file id matches none.
+func TestCandidateAppsTakeAppIDs(t *testing.T) {
+	data := t.TempDir()
+	apps := filepath.Join(data, "applications")
+	if err := os.MkdirAll(apps, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	installApp(t, apps, "org.example.Viewer.desktop", "Image Viewer")
+	installApp(t, apps, "org.example.Editor.desktop", "Text Editor")
+	t.Setenv("XDG_DATA_HOME", data)
+	t.Setenv("XDG_DATA_DIRS", t.TempDir())
+	var ids []string
+	for _, a := range CandidateApps([]string{"org.example.Editor", "org.example.Viewer"}, "") {
+		ids = append(ids, a.AppID())
+	}
+	if !slices.Equal(ids, []string{"org.example.Editor", "org.example.Viewer"}) {
+		t.Errorf("candidates = %q, want both choices in order", ids)
+	}
+	if got := CandidateApps([]string{"org.example.Viewer.desktop"}, ""); len(got) != 0 {
+		t.Errorf("a desktop-file id choice listed %v", got)
+	}
+}
+
+// chooserApps are two installed apps for the chooser tests.
+func chooserApps(t *testing.T) []desktopentry.App {
+	dir := t.TempDir()
+	return []desktopentry.App{installApp(t, dir, "org.example.Viewer.desktop", "Image Viewer"), installApp(t, dir, "org.example.Editor.desktop", "Text Editor")}
+}
+
+// The last choice is selected, and Open answers the selected app; with
+// no last choice listed nothing is selected and Open answers nothing.
+func TestAppChooserPreselectsTheLastChoice(t *testing.T) {
+	hs := newHarness(t, chooserApps(t))
+	got := make(chan string, 1)
+	go func() {
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{LastChoice: "org.example.Editor"})
+	}()
+	c := hs.open(t)
+	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != 1 {
+		t.Errorf("selected row %d, want the last choice's (1)", sel)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Open").OnClick() })
+	select {
+	case id := <-got:
+		if id != "org.example.Editor" {
+			t.Errorf("Open answered %q", id)
+		}
+	case <-time.After(treetest.Liveness):
+		t.Fatal("Open answered nothing")
+	}
+
+	go func() {
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test2"}, ChooserRequest{LastChoice: "org.example.Gone"})
+	}()
+	c = hs.open(t)
+	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != -1 {
+		t.Errorf("selected row %d for a last choice not listed", sel)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Open").OnClick() })
+	select {
+	case id := <-got:
+		t.Fatalf("Open with nothing selected answered %q", id)
+	case <-time.After(50 * time.Millisecond):
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
+	<-got
+}
+
+// UpdateChoices refills the chooser showing, keeping the selection,
+// and reaches a chooser still waiting; it finds no chooser for another
+// request or once the request is answered.
+func TestAppChooserUpdateChoices(t *testing.T) {
+	hs := newHarness(t, chooserApps(t))
+	got := make(chan string, 2)
+	viewer := ChooserRequest{Choices: []string{"org.example.Viewer"}, LastChoice: "org.example.Viewer"}
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/a"}, viewer) }()
+	c := hs.open(t)
+	list := treetest.First[*widget.ListBox](t, c.Root)
+	if list.Len() != 1 {
+		t.Fatalf("%d rows, want the one choice", list.Len())
+	}
+	if !hs.h.UpdateChoices("/r/a", []string{"org.example.Editor", "org.example.Viewer"}) {
+		t.Fatal("UpdateChoices did not find the chooser showing")
+	}
+	if list.Len() != 2 || list.Selected() != 1 {
+		t.Errorf("after the update: %d rows, row %d selected; want 2, the viewer (1)", list.Len(), list.Selected())
+	}
+	if hs.h.UpdateChoices("/r/other", []string{"org.example.Editor"}) {
+		t.Error("UpdateChoices found a chooser for another request")
+	}
+
+	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/b"}, viewer) }()
+	waitFor(t, func() bool { return hs.h.UpdateChoices("/r/b", []string{"org.example.Editor"}) })
+	hs.do(func() { list.OnActivate(0) })
+	if id := <-got; id != "org.example.Editor" {
+		t.Errorf("the updated chooser answered %q", id)
+	}
+	if hs.h.UpdateChoices("/r/a", nil) {
+		t.Error("UpdateChoices found a chooser already answered")
+	}
+	c = hs.open(t)
+	var names []string
+	for _, l := range treetest.WithClass(c.Root, "portal-dialog-app-name") {
+		names = append(names, l.(*widget.Label).Text())
+	}
+	if !slices.Equal(names, []string{"Text Editor"}) {
+		t.Errorf("the waiting chooser shows %q, want its updated choice", names)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
+	<-got
+}
+
+// The file or URI opened is named; with neither there is no line.
+func TestAppChooserNamesTheTarget(t *testing.T) {
+	hs := newHarness(t, chooserApps(t))
+	for target, want := range map[string]bool{"report.pdf": true, "": false} {
+		got := make(chan string, 1)
+		go func() {
+			got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{Target: target})
+		}()
+		c := hs.open(t)
+		line := "Choose an application to open “" + target + "”."
+		if has := slices.ContainsFunc(treetest.Labels(c.Root), func(l string) bool { return strings.HasPrefix(l, "Choose an application") }); has != want || want && !slices.Contains(treetest.Labels(c.Root), line) {
+			t.Errorf("target %q: labels %q", target, treetest.Labels(c.Root))
+		}
+		hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
+		<-got
+	}
+}
+
+// waitFor polls cond until it holds, failing after treetest.Liveness.
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(treetest.Liveness); !cond(); time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("condition never held")
+		}
 	}
 }

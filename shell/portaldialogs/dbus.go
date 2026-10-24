@@ -35,6 +35,21 @@ type AccessRequest struct {
 // avatar image path ("" for none).
 type AccountInfo struct{ Name, Image string }
 
+// ChooserRequest is one app chooser, (asss). App ids are desktop ids
+// without ".desktop", as the portal speaks them.
+type ChooserRequest struct {
+	// Choices are the app ids offered; none offers the apps for
+	// ContentType.
+	Choices []string
+	// LastChoice is the app id preselected, "" for none.
+	LastChoice string
+	// ContentType is the type opened, "" when unknown.
+	ContentType string
+	// Target names what is opened (a file's basename or a URI), ""
+	// for nothing to name.
+	Target string
+}
+
 // Host shows the dialogs; each call blocks until the user answers or
 // the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
@@ -47,9 +62,12 @@ type Host interface {
 	// ConfirmWallpaper previews a file:// image and replies whether to
 	// set it.
 	ConfirmWallpaper(c portalreq.Caller, uri string) bool
-	// ChooseApplication replies the chosen desktop-file id, "" on
-	// cancel; choices are candidate ids (none offers every app).
-	ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) string
+	// ChooseApplication replies the chosen app id, "" on cancel.
+	ChooseApplication(portalreq.Caller, ChooserRequest) string
+	// UpdateChoices replaces the app ids offered by the app chooser
+	// for the request at handle, showing or waiting; false when no
+	// chooser is open for it.
+	UpdateChoices(handle string, choices []string) bool
 	// ConfirmInstall replies whether to install a dynamic launcher.
 	ConfirmInstall(c portalreq.Caller, name, iconName string) bool
 	// Dismiss takes down the dialog showing for the request at handle,
@@ -90,8 +108,13 @@ func (d *Daemon) ConfirmWallpaper(c portalreq.Caller, uri string) (bool, *dbus.E
 }
 
 // ChooseApplication is the app chooser.
-func (d *Daemon) ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) (string, *dbus.Error) {
-	return d.host.ChooseApplication(c, choices, contentType, uri), nil
+func (d *Daemon) ChooseApplication(c portalreq.Caller, r ChooserRequest) (string, *dbus.Error) {
+	return d.host.ChooseApplication(c, r), nil
+}
+
+// UpdateChoices updates the app chooser open for handle.
+func (d *Daemon) UpdateChoices(handle string, choices []string) (bool, *dbus.Error) {
+	return d.host.UpdateChoices(handle, choices), nil
 }
 
 // ConfirmInstall is the dynamic-launcher install confirmation.
@@ -138,13 +161,23 @@ func (c *Client) ConfirmWallpaper(ctx context.Context, caller portalreq.Caller, 
 	return ok, err
 }
 
-// ChooseApplication picks a handler; "" is a cancel.
-func (c *Client) ChooseApplication(ctx context.Context, caller portalreq.Caller, choices []string, contentType, uri string) (id string, err error) {
+// ChooseApplication picks a handler's app id; "" is a cancel.
+func (c *Client) ChooseApplication(ctx context.Context, caller portalreq.Caller, r ChooserRequest) (id string, err error) {
+	if r.Choices == nil {
+		r.Choices = []string{}
+	}
+	err = c.call(ctx, "ChooseApplication", &id, caller, r)
+	return id, err
+}
+
+// UpdateChoices replaces the app ids the chooser open for handle
+// offers; false when none is open for it.
+func (c *Client) UpdateChoices(ctx context.Context, handle string, choices []string) (found bool, err error) {
 	if choices == nil {
 		choices = []string{}
 	}
-	err = c.call(ctx, "ChooseApplication", &id, caller, choices, contentType, uri)
-	return id, err
+	err = c.call(ctx, "UpdateChoices", &found, handle, choices)
+	return found, err
 }
 
 // ConfirmInstall asks to install a dynamic launcher.

@@ -43,9 +43,14 @@ func (f *fakeHost) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	return f.yes
 }
 
-func (f *fakeHost) ChooseApplication(c portalreq.Caller, choices []string, contentType, uri string) string {
-	f.record(c, choices, contentType, uri)
+func (f *fakeHost) ChooseApplication(c portalreq.Caller, r ChooserRequest) string {
+	f.record(c, r)
 	return f.choice
+}
+
+func (f *fakeHost) UpdateChoices(handle string, choices []string) bool {
+	f.asked.Store([]any{handle, choices})
+	return handle == "/r/1"
 }
 
 func (f *fakeHost) ConfirmInstall(c portalreq.Caller, name, iconName string) bool {
@@ -85,12 +90,19 @@ func TestDialogsRoundTrip(t *testing.T) {
 		if got, err := c.ConfirmInstall(ctx, caller, "App", "app-icon"); err != nil || got != yes || host.asked.Load()[1] != "app-icon" {
 			t.Errorf("ConfirmInstall = %v, %v", got, err)
 		}
-		chosen, err := c.ChooseApplication(ctx, caller, nil, "text/plain", "file:///x")
-		if asked := host.asked.Load(); err != nil || chosen != host.choice || len(asked[0].([]string)) != 0 || asked[1] != "text/plain" {
+		chosen, err := c.ChooseApplication(ctx, caller, ChooserRequest{ContentType: "text/plain", Target: "x.txt"})
+		if asked := host.asked.Load(); err != nil || chosen != host.choice || !reflect.DeepEqual(asked[0], ChooserRequest{Choices: []string{}, ContentType: "text/plain", Target: "x.txt"}) {
 			t.Errorf("ChooseApplication = %q, %v (asked %v)", chosen, err, asked)
 		}
-		if _, _ = c.ChooseApplication(ctx, caller, []string{"a", "b"}, "", ""); !slices.Equal(host.asked.Load()[0].([]string), []string{"a", "b"}) {
-			t.Errorf("choices = %v", host.asked.Load()[0])
+		r := ChooserRequest{Choices: []string{"a", "b"}, LastChoice: "b"}
+		if _, _ = c.ChooseApplication(ctx, caller, r); !reflect.DeepEqual(host.asked.Load()[0], r) {
+			t.Errorf("request = %v", host.asked.Load()[0])
+		}
+		if found, err := c.UpdateChoices(ctx, "/r/1", []string{"c"}); err != nil || !found || !slices.Equal(host.asked.Load()[1].([]string), []string{"c"}) {
+			t.Errorf("UpdateChoices = %v, %v (asked %v)", found, err, host.asked.Load())
+		}
+		if found, err := c.UpdateChoices(ctx, "/r/none", nil); err != nil || found {
+			t.Errorf("UpdateChoices without a chooser = %v, %v", found, err)
 		}
 		if err := c.Dismiss(ctx, "/r/1"); err != nil || !slices.Equal(host.dismissed.Load(), []string{"/r/1"}) {
 			t.Errorf("Dismiss = %v, dismissed %v", err, host.dismissed.Load())

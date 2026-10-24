@@ -127,7 +127,7 @@ var showAccount = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]strin
 })
 
 var showAppChooser = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	id, err := portaldialogs.NewClient(conn).ChooseApplication(ctx, portalreq.Caller{}, nil, "text/plain", "")
+	id, err := portaldialogs.NewClient(conn).ChooseApplication(ctx, portalreq.Caller{}, portaldialogs.ChooserRequest{ContentType: "text/plain"})
 	return orCancelled(id), "AppChooser", "show app chooser", err
 })
 

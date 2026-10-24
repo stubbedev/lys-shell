@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"errors"
 	"os"
 	"os/user"
 	"reflect"
@@ -136,15 +137,39 @@ func TestAccountSharesTheUser(t *testing.T) {
 func TestAppChooserAndLauncherResults(t *testing.T) {
 	r := newRig(t, nil)
 	d := serveDialogs(t, r, true)
-	_, res := r.interactive(t, chooseApp, handle, "org.app", "", []string{"a.desktop", "b.desktop"}, Vardict{
+	_, res := r.interactive(t, chooseApp, handle, "org.app", "", []string{"org.a.App", "org.b.App"}, Vardict{
 		"content_type": dbus.MakeVariant("image/png"), "uri": dbus.MakeVariant("file:///x.png"),
+		"last_choice": dbus.MakeVariant("org.b.App"),
 	})
-	asked := d.asked.Load()
-	if res["choice"].Value() != "org.chosen.desktop" || !slices.Equal(asked[0].([]string), []string{"a.desktop", "b.desktop"}) || asked[1] != "image/png" || asked[2] != "file:///x.png" {
-		t.Errorf("choice = %v, asked %v", res, asked)
+	want := portaldialogs.ChooserRequest{Choices: []string{"org.a.App", "org.b.App"}, LastChoice: "org.b.App", ContentType: "image/png", Target: "file:///x.png"}
+	if asked := d.asked.Load(); res["choice"].Value() != "org.chosen.App" || !reflect.DeepEqual(asked[0], want) {
+		t.Errorf("choice = %v, asked %+v, want %+v", res, asked, want)
 	}
-	if err := r.obj.Call("org.freedesktop.impl.portal.AppChooser.UpdateChoices", 0, handle, []string{"c"}).Err; err != nil {
-		t.Error(err)
+	if _, ok := res["activation_token"]; ok {
+		t.Errorf("an activation token with none given: %v", res)
+	}
+	// The basename names the file over its URI; the token given comes
+	// back with the choice.
+	_, res = r.interactive(t, chooseApp, handle, "org.app", "", []string{}, Vardict{
+		"uri": dbus.MakeVariant("file:///d/x.png"), "filename": dbus.MakeVariant("x.png"),
+		"activation_token": dbus.MakeVariant("tok"),
+	})
+	if got := d.asked.Load()[0].(portaldialogs.ChooserRequest); got.Target != "x.png" || res["activation_token"].Value() != "tok" {
+		t.Errorf("target %q, results %v", got.Target, res)
+	}
+	d.yes.Store(false)
+	if _, res = r.interactive(t, chooseApp, handle, "org.app", "", []string{}, Vardict{"activation_token": dbus.MakeVariant("tok")}); len(res) != 0 {
+		t.Errorf("a cancel returned %v", res)
+	}
+	d.yes.Store(true)
+
+	update := "org.freedesktop.impl.portal.AppChooser.UpdateChoices"
+	if err := r.obj.Call(update, 0, handle, []string{"org.c.App"}).Err; err != nil || !reflect.DeepEqual(d.updated.Load(), []any{string(handle), []string{"org.c.App"}}) {
+		t.Errorf("UpdateChoices = %v, the shell got %v", err, d.updated.Load())
+	}
+	var dErr dbus.Error
+	if err := r.obj.Call(update, 0, dbus.ObjectPath("/no/such/request"), []string{"org.c.App"}).Err; !errors.As(err, &dErr) || dErr.Name != errNotFound {
+		t.Errorf("UpdateChoices without a chooser = %v, want %s", err, errNotFound)
 	}
 
 	icon := dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1, 2})})

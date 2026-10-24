@@ -29,6 +29,14 @@ type App struct {
 	file *KeyFile
 }
 
+// AppID is the application id the entry is for: the desktop id
+// without ".desktop", the form the desktop portal speaks.
+func (a App) AppID() string { return strings.TrimSuffix(a.ID, ".desktop") }
+
+// FileID is the desktop id of the entry for appID, the inverse of
+// AppID.
+func FileID(appID string) string { return appID + ".desktop" }
+
 // Link is a Type=Link entry, which gio's app list skips and rofi shows.
 type Link struct {
 	ID   string
@@ -113,6 +121,26 @@ func FindApp(dirs []string, id string) (App, bool) {
 		}
 	}
 	return App{}, false
+}
+
+// FindApps looks the desktop ids up in the application dirs in one
+// walk, in the order given, skipping the ones not found or loadable.
+func FindApps(dirs, ids []string) []App {
+	paths := make(map[string]string, len(ids))
+	for _, f := range walk(dirs) {
+		if slices.Contains(ids, f.id) {
+			paths[f.id] = f.path
+		}
+	}
+	apps := make([]App, 0, len(paths))
+	for _, id := range ids {
+		if path, ok := paths[id]; ok {
+			if app, ok := LoadApp(id, path); ok {
+				apps = append(apps, app)
+			}
+		}
+	}
+	return apps
 }
 
 // LoadApp reads one entry, applying gio's load rules (see AllApps).
@@ -463,7 +491,7 @@ func Describe(dirs []string, appID string) (name, icon string) {
 	if appID == "" {
 		return "An application", ""
 	}
-	app, ok := FindApp(dirs, appID+".desktop")
+	app, ok := FindApp(dirs, FileID(appID))
 	if !ok {
 		return appID, ""
 	}
