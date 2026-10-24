@@ -242,14 +242,19 @@ func TestSystrayFollowsTheStore(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Systray.Blacklist = []string{"hidden*"}
 	m, _, store := newTrayForTest(t, cfg)
-	if m.root.Visible() {
-		t.Error("an empty tray should hide")
+	chrome := widget.NewBox(widget.Row, 0, 0)
+	onHeadlessLoop(func() bool { m.setChrome(chrome); return true })
+	if chrome.Visible() {
+		t.Error("an empty tray should hide its module wrapper")
 	}
 	store.Put(&sni.Item{Bus: ":1.1", Path: "/a", ID: "shown", IconName: "one"})
 	store.Put(&sni.Item{Bus: ":1.2", Path: "/b", ID: "hidden-app"})
 	waitHeadless(t, "the one button not blacklisted", func() bool { return len(m.root.Children()) == 1 })
+	if !onHeadlessLoop(chrome.Visible) {
+		t.Fatal("a tray with a button should show its module wrapper")
+	}
 	if !onHeadlessLoop(m.root.Visible) {
-		t.Fatal("a tray with a button should show")
+		t.Error("the item box itself stays visible, as in Rust")
 	}
 }
 

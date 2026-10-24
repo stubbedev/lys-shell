@@ -262,6 +262,11 @@ type systrayModule struct {
 
 	entries map[string]*trayEntry
 	root    *widget.Box
+	// chrome is the module wrapper, hidden while the tray is empty as
+	// mod.rs hides the root's parent; shown mirrors its visibility for
+	// a chrome that arrives later.
+	chrome moduleChrome
+	shown  bool
 
 	// The open menu: its item key, popover, and stack.
 	menuKey string
@@ -350,7 +355,19 @@ func (m *systrayModule) refresh() {
 	for _, e := range order {
 		m.root.Append(e.button, false)
 	}
-	m.root.SetVisible(len(order) > 0)
+	m.shown = len(order) > 0
+	m.showChrome()
+}
+
+func (m *systrayModule) showChrome() {
+	if m.chrome != nil {
+		m.chrome.SetVisible(m.shown)
+	}
+}
+
+func (m *systrayModule) setChrome(c moduleChrome) {
+	m.chrome = c
+	m.showChrome()
 }
 
 // newEntry builds one item's button and wires its clicks.
