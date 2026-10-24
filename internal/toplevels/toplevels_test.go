@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -125,54 +126,44 @@ func waitWindows(t *testing.T, w *Watcher, want func([]Window) bool) []Window {
 	}
 }
 
-// probeEnv makes the test binary a probe client: it maps one window
-// under this app id until its stdin closes.
-const probeEnv = "LYS_TOPLEVELS_PROBE"
-
-func TestMain(m *testing.M) {
-	if appID := os.Getenv(probeEnv); appID != "" {
-		os.Exit(runProbe(appID))
-	}
-	os.Exit(m.Run())
-}
-
-// runProbe maps the probe window and exits when stdin closes; the
-// window goes away with the connection.
-func runProbe(appID string) int {
-	sess, err := app.Connect()
-	if err != nil {
-		return 1
-	}
-	a := app.NewApplication(sess)
-	if _, err := a.NewWindow(app.WindowConfig{Title: "probe", AppID: appID, Width: 200, Height: 100, Root: widget.NewBox(widget.Column, 0, 0)}); err != nil {
-		return 1
-	}
-	go func() {
-		_, _ = io.Copy(io.Discard, os.Stdin)
-		os.Exit(0)
-	}()
-	_ = a.Run()
-	return 1
-}
-
-// startProbe maps a window under appID in a child process (a separate
-// client, as a real app is); closing the returned writer ends it.
+// startProbe maps a window under appID on a connection of its own, a
+// separate client as a real app is; closing the returned closer closes
+// the window and ends its loop.
 func startProbe(t *testing.T, appID string) io.Closer {
 	t.Helper()
-	cmd := exec.Command(os.Args[0], "-test.run=^$")
-	cmd.Env = append(os.Environ(), probeEnv+"="+appID)
-	stdin, err := cmd.StdinPipe()
+	sess, err := app.Connect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cmd.Start(); err != nil {
+	a := app.NewApplication(sess)
+	win, err := a.NewWindow(app.WindowConfig{Title: "probe", AppID: appID, Width: 200, Height: 100, Root: widget.NewBox(widget.Column, 0, 0)})
+	if err != nil {
+		sess.Close()
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_ = stdin.Close()
-		_ = cmd.Wait()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = a.Run()
+	}()
+	var once sync.Once
+	stop := closer(func() {
+		once.Do(func() {
+			a.Invoke(win.Close)
+			<-done
+			sess.Close()
+		})
 	})
-	return stdin
+	t.Cleanup(func() { _ = stop.Close() })
+	return stop
+}
+
+// closer is a func as an io.Closer.
+type closer func()
+
+func (c closer) Close() error {
+	c()
+	return nil
 }
 
 // Against a real compositor: a window that maps is listed under its app
