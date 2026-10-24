@@ -1,12 +1,15 @@
-// Package regionoverlay is the slurp-like region selection overlay
-// (crates/lys-shell/src/shell/region_overlay): a layer surface on
-// every monitor, a dim wash with a transparent hole where the dragged
-// rectangle overlaps that monitor, an accent border, and a "W × H"
-// size label. The drag is tracked in global (compositor-layout)
-// logical coordinates, so it can start on one monitor and end on
-// another. The screenshot host passes frozen per-output frames, which
-// the surfaces paint behind the wash (freeze-frame); the share picker
-// passes none, so the live screen shows through.
+// Package regionoverlay is the region selection overlay: a layer
+// surface on every monitor, a dim wash with a transparent hole where
+// the selection overlaps that monitor, an accent border with resize
+// handles, and a "W × H" size label. A drag draws the selection and a
+// plain click picks the window (else the output) under the pointer;
+// the selection is then moved, resized from its edges and corners or
+// nudged with the arrow keys until Enter or a double-click confirms
+// it. Everything is tracked in global (compositor-layout) logical
+// coordinates, so a selection can span monitors. The screenshot host
+// passes frozen per-output frames, which the surfaces paint behind the
+// wash (freeze-frame) with a magnifier at the pointer; the share
+// picker passes none, so the live screen shows through.
 package regionoverlay
 
 import (
@@ -18,6 +21,8 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/shell/loupe"
 )
 
 // Selection is a region the user dragged, in logical pixels relative
@@ -48,38 +53,49 @@ func MonitorOf(o *app.Output) Monitor {
 	return m
 }
 
-// dragRect is a drag in global logical coordinates.
-type dragRect struct {
-	startX, startY float64
-	endX, endY     float64
+// rect is the monitor's global logical rectangle.
+func (m Monitor) rect() image.Rectangle { return image.Rect(m.X, m.Y, m.X+m.Width, m.Y+m.Height) }
+
+// layout is the bounding box of the monitors.
+func layout(mons []Monitor) image.Rectangle {
+	var b image.Rectangle
+	for _, m := range mons {
+		b = b.Union(m.rect())
+	}
+	return b
 }
 
-// normalized is (x, y, w, h) with a positive extent whatever the drag
-// direction.
-func (r dragRect) normalized() (x, y, w, h float64) {
-	return math.Min(r.startX, r.endX), math.Min(r.startY, r.endY),
-		math.Abs(r.endX - r.startX), math.Abs(r.endY - r.startY)
-}
-
-// finalize resolves a global drag to an output-relative selection: the
+// finalize resolves a global selection to an output-relative one: the
 // output is the one containing the rectangle's top-left corner, else
-// the first monitor. A drag under one logical pixel on either axis is
-// no selection (a plain click cancels).
-func finalize(r dragRect, mons []Monitor) (Selection, bool) {
-	gx, gy, gw, gh := r.normalized()
-	if gw < 1 || gh < 1 || len(mons) == 0 {
+// the first monitor. An empty rectangle is no selection.
+func finalize(r image.Rectangle, mons []Monitor) (Selection, bool) {
+	if r.Empty() || len(mons) == 0 {
 		return Selection{}, false
 	}
-	x, y := int(math.Round(gx)), int(math.Round(gy))
-	w, h := int(math.Round(gw)), int(math.Round(gh))
 	mon := mons[0]
 	for _, m := range mons {
-		if x >= m.X && x < m.X+m.Width && y >= m.Y && y < m.Y+m.Height {
+		if r.Min.In(m.rect()) {
 			mon = m
 			break
 		}
 	}
-	return Selection{Output: mon.Connector, X: x - mon.X, Y: y - mon.Y, Width: w, Height: h}, true
+	return Selection{Output: mon.Connector, X: r.Min.X - mon.X, Y: r.Min.Y - mon.Y, Width: r.Dx(), Height: r.Dy()}, true
+}
+
+// pick is what a click at p selects: the topmost window under it, else
+// the monitor it is on.
+func pick(p image.Point, windows []image.Rectangle, mons []Monitor) (image.Rectangle, bool) {
+	for _, w := range windows {
+		if p.In(w) {
+			return w, true
+		}
+	}
+	for _, m := range mons {
+		if p.In(m.rect()) {
+			return m.rect(), true
+		}
+	}
+	return image.Rectangle{}, false
 }
 
 // Paint constants of region_overlay/mod.rs's draw func.
@@ -90,13 +106,36 @@ const (
 	labelPx     = 14.0
 	labelPad    = 6
 	labelGap    = 4
+	// handleSize is the edge of the square handles on the corners and
+	// edge midpoints of a selection up for adjustment.
+	handleSize = 7
+	hintPx     = 13.0
+	hintMargin = 24
 )
+
+// hintText tells how to finish once a selection is up for adjustment.
+const hintText = "Drag to adjust · Enter or double-click to confirm · Esc to cancel"
 
 // labelBacking is the size label's dark box, rgba(0, 0, 0, 0.75).
 var labelBacking = render.Color(191 << 24)
 
-// escapeKeycode is the evdev code of Escape.
-const escapeKeycode = 1
+// The evdev codes of the overlay's keys.
+const (
+	keyEscape      = 1
+	keyEnter       = 28
+	keyKeypadEnter = 96
+	keyUp          = 103
+	keyLeft        = 105
+	keyRight       = 106
+	keyDown        = 108
+)
+
+// nudgeStep is how far an arrow key moves the selection; Shift moves
+// it nudgeStepShift.
+const (
+	nudgeStep      = 1
+	nudgeStepShift = 10
+)
 
 // result is one request's answer.
 type result struct {
@@ -109,6 +148,9 @@ type result struct {
 type Overlay struct {
 	app     *app.Application
 	outputs func() []*app.Output
+	// windows lists the visible windows' global logical rectangles,
+	// topmost first, that a click picks from; nil picks outputs only.
+	windows func() []image.Rectangle
 	// font is the size label's monospace bold face; sheet styles the
 	// surfaces, the area's color (--palette-primary) being the accent.
 	font  render.Font
@@ -118,18 +160,22 @@ type Overlay struct {
 	surfaces []*app.LayerWindow
 	areas    []*area
 	monitors []Monitor
-	// drag is the shared rectangle every surface paints; nil before
-	// the first press.
-	drag *dragRect
+	// shown are the windows a click picks from, read when the request
+	// opened.
+	shown []image.Rectangle
+	// ed is the selection every surface paints.
+	ed editor
 	// pointer is the last global pointer position any surface saw,
-	// where a press starts the drag.
-	pointerX, pointerY float64
+	// where a press lands; onSurface is false once it left them all.
+	pointer   image.Point
+	onSurface bool
 }
 
 // New builds the overlay on the application; outputs lists the
-// monitors to cover at each request.
-func New(a *app.Application, outputs func() []*app.Output, font render.Font, sheet *widget.Stylesheet) *Overlay {
-	return &Overlay{app: a, outputs: outputs, font: font, sheet: sheet}
+// monitors to cover at each request, windows (nil for none) the
+// windows a click can pick.
+func New(a *app.Application, outputs func() []*app.Output, windows func() []image.Rectangle, font render.Font, sheet *widget.Stylesheet) *Overlay {
+	return &Overlay{app: a, outputs: outputs, windows: windows, font: font, sheet: sheet}
 }
 
 // surfaceRoot is one surface's tree, window.region-overlay-window >
@@ -146,8 +192,8 @@ func (o *Overlay) surfaceRoot(a *area) widget.Widget {
 	return root
 }
 
-// Request opens the overlay and blocks until the user drags a region
-// (ok) or cancels with Escape or a click (not ok). frames maps
+// Request opens the overlay and blocks until the user confirms a
+// region (ok) or cancels with Escape (not ok). frames maps
 // connector names to frozen frames painted behind the wash; nil or a
 // missing connector leaves that surface transparent over the live
 // screen. A request arriving while one is open cancels the older one.
@@ -184,6 +230,11 @@ func (o *Overlay) open(frames map[string]*image.RGBA) {
 	for _, out := range outs {
 		o.monitors = append(o.monitors, MonitorOf(out))
 	}
+	o.ed = editor{bounds: layout(o.monitors)}
+	o.shown = nil
+	if o.windows != nil {
+		o.shown = o.windows()
+	}
 	for i, out := range outs {
 		mon := o.monitors[i]
 		a := &area{o: o, mon: mon, frame: frames[mon.Connector]}
@@ -195,11 +246,7 @@ func (o *Overlay) open(frames map[string]*image.RGBA) {
 			Keyboard:      app.KeyboardExclusive,
 			Namespace:     "lys-shell-region-overlay",
 			Root:          o.surfaceRoot(a),
-			OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
-				if keycode == escapeKeycode {
-					o.finish(Selection{}, false)
-				}
-			},
+			OnKey:         func(_ *widget.Router, keycode uint32, mods app.Mods) { o.key(keycode, mods) },
 		})
 		if err != nil {
 			log.Printf("region overlay: surface on %s: %v", mon.Connector, err)
@@ -220,33 +267,59 @@ func (o *Overlay) finish(sel Selection, ok bool) {
 	for _, s := range o.surfaces {
 		s.Close()
 	}
-	o.surfaces, o.areas, o.drag = nil, nil, nil
+	o.surfaces, o.areas, o.ed = nil, nil, editor{}
 }
 
-// press starts the drag at the last pointer position.
-func (o *Overlay) press() {
-	o.drag = &dragRect{startX: o.pointerX, startY: o.pointerY, endX: o.pointerX, endY: o.pointerY}
-	o.redraw()
-}
-
-// move extends the drag to a global position.
-func (o *Overlay) move(x, y float64) {
-	if o.drag == nil {
-		return
+// confirm answers the selection; without one it does nothing.
+func (o *Overlay) confirm() {
+	if sel, ok := finalize(o.ed.sel, o.monitors); ok {
+		o.finish(sel, true)
 	}
-	o.drag.endX, o.drag.endY = x, y
-	o.redraw()
 }
 
-// release concludes the gesture: a real rectangle answers, anything
-// else cancels.
-func (o *Overlay) release() {
-	if o.drag == nil {
+// key handles the overlay's keys: Escape cancels, Enter confirms, the
+// arrows nudge the selection (further with Shift).
+func (o *Overlay) key(keycode uint32, mods app.Mods) {
+	step := nudgeStep
+	if mods&app.ModShift != 0 {
+		step = nudgeStepShift
+	}
+	switch keycode {
+	case keyEscape:
 		o.finish(Selection{}, false)
+	case keyEnter, keyKeypadEnter:
+		o.confirm()
+	case keyLeft:
+		o.ed.nudge(-step, 0)
+	case keyRight:
+		o.ed.nudge(step, 0)
+	case keyUp:
+		o.ed.nudge(0, -step)
+	case keyDown:
+		o.ed.nudge(0, step)
+	default:
 		return
 	}
-	sel, ok := finalize(*o.drag, o.monitors)
-	o.finish(sel, ok)
+	o.redraw()
+}
+
+// press starts a gesture at the last pointer position.
+func (o *Overlay) press() {
+	o.ed.press(o.pointer)
+	o.redraw()
+}
+
+// move follows the gesture to a global position.
+func (o *Overlay) move(p image.Point) {
+	o.pointer = p
+	o.ed.drag(p)
+	o.redraw()
+}
+
+// release ends the gesture: a click picks what lies under it.
+func (o *Overlay) release() {
+	o.ed.release(func(p image.Point) (image.Rectangle, bool) { return pick(p, o.shown, o.monitors) })
+	o.redraw()
 }
 
 func (o *Overlay) redraw() {
@@ -272,20 +345,33 @@ func (a *area) Measure(con widget.Constraints) widget.Size { return con.Max }
 
 func (a *area) HitTest(p widget.Point) widget.Widget { return a.HitLeaf(a, p) }
 
-// CursorName implements widget.CursorNamer.
-func (a *area) CursorName() string { return "crosshair" }
+// CursorName implements widget.CursorNamer: the shape for what a press
+// at the pointer would do.
+func (a *area) CursorName() string { return a.o.ed.cursor(a.o.pointer) }
 
 // global maps a surface-local point to the layout.
-func (a *area) global(p widget.Point) (float64, float64) {
-	return float64(a.mon.X + p.X), float64(a.mon.Y + p.Y)
+func (a *area) global(p widget.Point) image.Point {
+	b := a.Bounds()
+	return image.Pt(a.mon.X+p.X-b.X, a.mon.Y+p.Y-b.Y)
 }
 
-// HoverMove implements widget.HoverMover: track where a press starts.
+// HoverMove implements widget.HoverMover: track where a press lands,
+// which the magnifier and the cursor follow.
 func (a *area) HoverMove(p widget.Point) {
-	a.o.pointerX, a.o.pointerY = a.global(p)
+	a.o.pointer, a.o.onSurface = a.global(p), true
+	a.o.redraw()
 }
 
-// SetPressed implements widget.PressSetter: a press starts the drag.
+// SetHovered implements widget.HoverSetter: leaving every surface
+// hides the magnifier.
+func (a *area) SetHovered(on bool) {
+	if !on {
+		a.o.onSurface = false
+		a.o.redraw()
+	}
+}
+
+// SetPressed implements widget.PressSetter: a press starts a gesture.
 func (a *area) SetPressed(on bool) {
 	if on {
 		a.o.press()
@@ -294,61 +380,78 @@ func (a *area) SetPressed(on bool) {
 
 // DragMove implements widget.DragMover. Under the implicit grab the
 // point can lie beyond this surface; mapping it through the monitor
-// offset carries the drag across outputs.
-func (a *area) DragMove(p widget.Point) {
-	a.o.move(a.global(p))
-}
+// offset carries the gesture across outputs.
+func (a *area) DragMove(p widget.Point) { a.o.move(a.global(p)) }
 
 // PressEnd implements widget.PressEnder: the release (or a lost
 // pointer) ends the gesture.
 func (a *area) PressEnd() { a.o.release() }
 
-// localSelection is the drag in this surface's logical coordinates.
-func (a *area) localSelection() (render.Rect, bool) {
-	if a.o.drag == nil {
-		return render.Rect{}, false
+// DoubleClickAt implements widget.DoubleClicker: a double-click on the
+// selection confirms it.
+func (a *area) DoubleClickAt(p widget.Point) {
+	if a.global(p).In(a.o.ed.sel) {
+		a.o.confirm()
 	}
-	gx, gy, gw, gh := a.o.drag.normalized()
-	return render.Rect{
-		X: int(math.Round(gx)) - a.mon.X,
-		Y: int(math.Round(gy)) - a.mon.Y,
-		W: int(math.Round(gw)),
-		H: int(math.Round(gh)),
-	}, true
+}
+
+// local maps a global rectangle into this surface's coordinates.
+func (a *area) local(r image.Rectangle) render.Rect {
+	b := a.Bounds()
+	return render.Rect{X: r.Min.X - a.mon.X + b.X, Y: r.Min.Y - a.mon.Y + b.Y, W: r.Dx(), H: r.Dy()}
 }
 
 func (a *area) Paint(cv *render.Canvas) {
 	b := a.Bounds()
 	dev := cv.MapRect(b)
-	sel, dragging := a.localSelection()
-	if dragging {
-		sel.X += b.X
-		sel.Y += b.Y
-	}
+	ed := &a.o.ed
+	selected := !ed.sel.Empty()
+	sel := a.local(ed.sel)
 	selDev := cv.MapRect(sel).Intersect(dev)
 	if a.frame != nil {
-		a.paintFrozen(cv, dev, selDev, dragging)
+		a.paintFrozen(cv, dev, selDev, selected)
 	} else {
 		cv.ClearDevice(dev, render.Color(dimAlpha<<24))
-		if dragging && !selDev.Empty() {
+		if selected && !selDev.Empty() {
 			cv.ClearDevice(selDev, 0)
 		}
 	}
-	if dragging {
+	if selected {
 		a.paintBorderAndLabel(cv, sel)
 	}
+	if ed.adjusting() {
+		a.paintHandles(cv, sel)
+		a.paintHint(cv, b)
+	}
+	if a.magnifying() {
+		p := a.o.pointer
+		lx, ly := float64(p.X-a.mon.X), float64(p.Y-a.mon.Y)
+		cx, cy := loupe.SampleAt(a.frame, a.mon.Width, a.mon.Height, lx, ly)
+		x0, y0 := loupe.Place(b, lx, ly, loupe.Size, loupe.Size)
+		cv.FillRect(render.Rect{X: x0 - 2, Y: y0 - 2, W: loupe.Size + 4, H: loupe.Size + 4}, labelBacking)
+		loupe.Draw(cv, a.frame, cx, cy, x0, y0)
+	}
+}
+
+// magnifying reports whether this surface shows the magnifier: it has
+// a frozen frame, the pointer is on it, and an edge is being placed
+// (before the first press, while drawing, or while resizing).
+func (a *area) magnifying() bool {
+	ed := &a.o.ed
+	placing := ed.gesture == gestureCreate || ed.gesture == gestureResize || ed.sel.Empty()
+	return a.frame != nil && a.o.onSurface && placing && a.o.pointer.In(a.mon.rect())
 }
 
 // paintFrozen draws the washed frame and, inside the selection, the
 // bright one: the wash-then-hole composite of the Rust overlay, whose
 // transparent drawing area sits over the frame picture.
-func (a *area) paintFrozen(cv *render.Canvas, dev, selDev render.Rect, dragging bool) {
+func (a *area) paintFrozen(cv *render.Canvas, dev, selDev render.Rect, selected bool) {
 	if a.bright == nil || a.bright.Bounds().Dx() != dev.W || a.bright.Bounds().Dy() != dev.H {
 		a.bright = render.Resample(a.frame, a.frame.Bounds(), dev.W, dev.H)
 		a.dim = wash(a.bright)
 	}
 	cv.DrawImageDevice(a.dim, dev.X, dev.Y)
-	if dragging && !selDev.Empty() {
+	if selected && !selDev.Empty() {
 		sub := image.Rect(selDev.X-dev.X, selDev.Y-dev.Y, selDev.X-dev.X+selDev.W, selDev.Y-dev.Y+selDev.H)
 		cv.DrawImageDevice(a.bright.SubImage(sub), selDev.X, selDev.Y)
 	}
@@ -388,6 +491,43 @@ func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
 	bx, by := labelOrigin(sel, boxH)
 	cv.FillRect(render.Rect{X: bx, Y: by, W: boxW, H: boxH}, labelBacking)
 	a.o.font.Draw(cv, shaped, bx+labelPad, by+labelPad+ascent, accent)
+}
+
+// handleRects are the handles' squares: the four corners, then the
+// four edge midpoints, centred on the selection's edge.
+func handleRects(sel render.Rect) []render.Rect {
+	h := handleSize
+	xs := []int{sel.X, sel.X + sel.W/2, sel.X + sel.W}
+	ys := []int{sel.Y, sel.Y + sel.H/2, sel.Y + sel.H}
+	at := func(x, y int) render.Rect { return render.Rect{X: x - h/2, Y: y - h/2, W: h, H: h} }
+	return []render.Rect{
+		at(xs[0], ys[0]), at(xs[2], ys[0]), at(xs[0], ys[2]), at(xs[2], ys[2]),
+		at(xs[1], ys[0]), at(xs[1], ys[2]), at(xs[0], ys[1]), at(xs[2], ys[1]),
+	}
+}
+
+// paintHandles fills the handles in the accent, ringed in the label's
+// dark backing so they read on any content.
+func (a *area) paintHandles(cv *render.Canvas, sel render.Rect) {
+	accent := widget.CascadeColor(a)
+	for _, r := range handleRects(sel) {
+		cv.FillRect(render.Rect{X: r.X - 1, Y: r.Y - 1, W: r.W + 2, H: r.H + 2}, labelBacking)
+		cv.FillRect(r, accent)
+	}
+}
+
+// paintHint draws how to finish, centred at the bottom of the surface.
+func (a *area) paintHint(cv *render.Canvas, b render.Rect) {
+	if a.o.font == nil {
+		return
+	}
+	shaped := a.o.font.Shape(hintText, hintPx)
+	w := int(math.Ceil(shaped.Advance())) + labelPad*2
+	ascent := int(math.Ceil(shaped.Ascent()))
+	h := ascent + labelPad*2
+	x, y := b.X+(b.W-w)/2, b.Y+b.H-hintMargin-h
+	cv.FillRect(render.Rect{X: x, Y: y, W: w, H: h}, labelBacking)
+	a.o.font.Draw(cv, shaped, x+labelPad, y+labelPad+ascent, widget.CascadeColor(a))
 }
 
 // labelText is the size label in logical pixels.

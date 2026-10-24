@@ -253,7 +253,7 @@ func TestParseEventWindowAddressesAndV2Payloads(t *testing.T) {
 
 func TestClientsRulesAndActiveWorkspace(t *testing.T) {
 	fake := startFake(t, map[string]string{
-		"j/clients":         `[{"address":"0x55d0a1","class":"kitty","title":"t","workspace":{"id":2,"name":"2"},"monitor":0,"floating":false,"at":[0,0],"size":[1,1],"pid":1}]`,
+		"j/clients":         `[{"address":"0x55d0a1","class":"kitty","title":"t","workspace":{"id":2,"name":"2"},"monitor":0,"floating":false,"at":[5,6],"size":[70,80],"mapped":true,"hidden":false,"focusHistoryID":3,"pid":1}]`,
 		"j/workspacerules":  `[{"workspaceString":"3","monitor":"DP-1"},{"workspaceString":"special:magic"}]`,
 		"j/activeworkspace": `{"id":4,"name":"4","monitor":"DP-1","windows":1}`,
 	})
@@ -262,7 +262,8 @@ func TestClientsRulesAndActiveWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(clients) != 1 || clients[0].Address != "55d0a1" || clients[0].Workspace.ID != 2 || clients[0].Class != "kitty" {
+	if len(clients) != 1 || clients[0].Address != "55d0a1" || clients[0].Workspace.ID != 2 || clients[0].Class != "kitty" ||
+		clients[0].At != [2]int{5, 6} || clients[0].Size != [2]int{70, 80} || !clients[0].Mapped || clients[0].Hidden || clients[0].FocusHistoryID != 3 {
 		t.Errorf("clients = %+v, want the address normalized", clients)
 	}
 	rules, err := conn.WorkspaceRules()

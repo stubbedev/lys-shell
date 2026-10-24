@@ -20,7 +20,7 @@ func screenshotCommand() *cli.Command {
 		Name:  "screenshot",
 		About: "Screenshot capture commands",
 		Subcommands: []*cli.Command{
-			{Name: "region", About: "Capture a drag-selected region", Run: captureScreenshot(screenshot.ModeRegion)},
+			{Name: "region", About: "Capture a dragged region or a clicked window", Run: captureScreenshot(screenshot.ModeRegion)},
 			{
 				Name:  "output",
 				About: "Capture a whole output (the focused output when NAME is omitted)",

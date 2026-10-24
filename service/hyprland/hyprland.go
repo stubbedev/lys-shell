@@ -58,6 +58,10 @@ type Monitor struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	} `json:"activeWorkspace"`
+	// SpecialWS is the special workspace shown over it, ID 0 for none.
+	SpecialWS struct {
+		ID int `json:"id"`
+	} `json:"specialWorkspace"`
 	// Focused is the compositor's keyboard focus.
 	Focused bool `json:"focused"`
 }
@@ -73,6 +77,15 @@ type Client struct {
 	} `json:"workspace"`
 	Monitor  int  `json:"monitor"`
 	Floating bool `json:"floating"`
+	// At and Size are the window's global logical position and size.
+	At   [2]int `json:"at"`
+	Size [2]int `json:"size"`
+	// Mapped and Hidden say whether the window is on screen at all.
+	Mapped bool `json:"mapped"`
+	Hidden bool `json:"hidden"`
+	// FocusHistoryID is the window's place in the focus history, 0 the
+	// most recently focused.
+	FocusHistoryID int `json:"focusHistoryID"`
 }
 
 // WorkspaceRule is one entry of j/workspacerules.

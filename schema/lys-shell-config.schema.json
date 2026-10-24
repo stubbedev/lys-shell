@@ -7237,7 +7237,7 @@
         },
         {
           "const": "region",
-          "description": "Region selection via an external tool (e.g. `slurp`).",
+          "description": "Region selection on the shell's region overlay.",
           "type": "string"
         }
       ]

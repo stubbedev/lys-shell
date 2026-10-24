@@ -3103,7 +3103,7 @@ _lys-shell__help__recorder__toggle_commands() {
 (( $+functions[_lys-shell__help__screenshot_commands] )) ||
 _lys-shell__help__screenshot_commands() {
     local commands; commands=(
-'region:Capture a drag-selected region' \
+'region:Capture a dragged region or a clicked window' \
 'output:Capture a whole output (the focused output when NAME is omitted)' \
 'window:Capture the active window' \
     )
@@ -4190,7 +4190,7 @@ _lys-shell__recorder__toggle_commands() {
 (( $+functions[_lys-shell__screenshot_commands] )) ||
 _lys-shell__screenshot_commands() {
     local commands; commands=(
-'region:Capture a drag-selected region' \
+'region:Capture a dragged region or a clicked window' \
 'output:Capture a whole output (the focused output when NAME is omitted)' \
 'window:Capture the active window' \
 'help:Print this message or the help of the given subcommand(s)' \
@@ -4200,7 +4200,7 @@ _lys-shell__screenshot_commands() {
 (( $+functions[_lys-shell__screenshot__help_commands] )) ||
 _lys-shell__screenshot__help_commands() {
     local commands; commands=(
-'region:Capture a drag-selected region' \
+'region:Capture a dragged region or a clicked window' \
 'output:Capture a whole output (the focused output when NAME is omitted)' \
 'window:Capture the active window' \
 'help:Print this message or the help of the given subcommand(s)' \

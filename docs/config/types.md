@@ -968,7 +968,7 @@ Page shown when the screen-share picker opens.
 |---|---|
 | `"windows"` | Per-window previews. |
 | `"outputs"` | Per-output (monitor) previews. |
-| `"region"` | Region selection via an external tool (e.g. `slurp`). |
+| `"region"` | Region selection on the shell's region overlay. |
 
 ## SignedNormalizedF64 {#signed-normalized-f64}
 

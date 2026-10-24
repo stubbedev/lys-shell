@@ -1,7 +1,10 @@
 package screenshot
 
 import (
+	"cmp"
 	"encoding/json"
+	"image"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/sway"
 )
 
 // Focus resolves what the output and window modes capture: the focused
@@ -86,6 +90,86 @@ func (f CompositorFocus) ActiveWindow() windowTarget {
 		}
 	}
 	return windowTarget{}
+}
+
+// Windows is what the region overlay's click picks from: the visible
+// windows' global logical rectangles, topmost first, from Hyprland or
+// sway; none from niri and mango, which report no window geometry, so
+// a click there picks the output.
+func (f CompositorFocus) Windows() []image.Rectangle {
+	if f.Hyprland != nil {
+		mons, err := f.Hyprland.Monitors()
+		if err != nil {
+			return nil
+		}
+		clients, err := f.Hyprland.Clients()
+		if err != nil {
+			return nil
+		}
+		return hyprlandWindows(mons, clients)
+	}
+	if sway.SocketPath() == "" {
+		return nil
+	}
+	conn, err := sway.Connect()
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = conn.Close() }()
+	wins, err := conn.Windows()
+	if err != nil {
+		return nil
+	}
+	return swayWindows(wins)
+}
+
+// hyprlandWindows are the clients on screen (mapped, not hidden, on a
+// workspace a monitor shows): those on a shown special workspace
+// first, then floating ones, each by focus history, most recent first.
+func hyprlandWindows(mons []hyprland.Monitor, clients []hyprland.Client) []image.Rectangle {
+	shown, special := map[int]bool{}, map[int]bool{}
+	for _, m := range mons {
+		shown[m.ActiveWS.ID] = true
+		if m.SpecialWS.ID != 0 {
+			shown[m.SpecialWS.ID], special[m.SpecialWS.ID] = true, true
+		}
+	}
+	visible := slices.DeleteFunc(slices.Clone(clients), func(c hyprland.Client) bool {
+		return !c.Mapped || c.Hidden || !shown[c.Workspace.ID] || c.Size[0] <= 0 || c.Size[1] <= 0
+	})
+	rank := func(c hyprland.Client) int {
+		switch {
+		case special[c.Workspace.ID]:
+			return 0
+		case c.Floating:
+			return 1
+		}
+		return 2
+	}
+	slices.SortStableFunc(visible, func(a, b hyprland.Client) int {
+		return cmp.Or(cmp.Compare(rank(a), rank(b)), cmp.Compare(a.FocusHistoryID, b.FocusHistoryID))
+	})
+	rects := make([]image.Rectangle, len(visible))
+	for i, c := range visible {
+		rects[i] = image.Rect(c.At[0], c.At[1], c.At[0]+c.Size[0], c.At[1]+c.Size[1])
+	}
+	return rects
+}
+
+// swayWindows are the visible windows, floating ones first (they sit
+// over the tiling), each kind latest in the tree first.
+func swayWindows(wins []sway.Window) []image.Rectangle {
+	var floating, tiled []image.Rectangle
+	for _, w := range slices.Backward(wins) {
+		switch {
+		case !w.Visible || w.Rect.Empty():
+		case w.Floating:
+			floating = append(floating, w.Rect)
+		default:
+			tiled = append(tiled, w.Rect)
+		}
+	}
+	return append(floating, tiled...)
 }
 
 // parseHyprlandActiveWindow reads j/activewindow: the address (hex,

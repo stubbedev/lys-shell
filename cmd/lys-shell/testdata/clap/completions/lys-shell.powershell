@@ -946,7 +946,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
         'lys-shell;screenshot' {
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
-            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a dragged region or a clicked window')
             [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
             [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
@@ -968,7 +968,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;screenshot;help' {
-            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a dragged region or a clicked window')
             [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
             [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
@@ -1580,7 +1580,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;screenshot' {
-            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a dragged region or a clicked window')
             [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
             [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
             break

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"net"
 	"os"
 	"strconv"
@@ -241,16 +242,27 @@ type Window struct {
 	Focused      bool
 	Floating     bool
 	Urgent       bool
+	// Visible says the window is on screen; Rect is its container's
+	// global logical rectangle.
+	Visible bool
+	Rect    image.Rectangle
 }
 
 // treeNode is types.rs's TreeNode.
 type treeNode struct {
-	ID               int64   `json:"id"`
-	Type             string  `json:"type"`
-	Name             *string `json:"name"`
-	AppID            *string `json:"app_id"`
-	Focused          bool    `json:"focused"`
-	Urgent           bool    `json:"urgent"`
+	ID      int64   `json:"id"`
+	Type    string  `json:"type"`
+	Name    *string `json:"name"`
+	AppID   *string `json:"app_id"`
+	Focused bool    `json:"focused"`
+	Urgent  bool    `json:"urgent"`
+	Visible *bool   `json:"visible"`
+	Rect    struct {
+		X      int `json:"x"`
+		Y      int `json:"y"`
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"rect"`
 	WindowProperties *struct {
 		Class *string `json:"class"`
 	} `json:"window_properties"`
@@ -272,6 +284,8 @@ func collectWindows(n *treeNode, workspace int64, hasWorkspace bool, out *[]Wind
 		w := Window{
 			ID: n.ID, WorkspaceID: workspace, HasWorkspace: hasWorkspace,
 			Focused: n.Focused, Floating: n.Type == "floating_con", Urgent: n.Urgent,
+			Visible: n.Visible != nil && *n.Visible,
+			Rect:    image.Rect(n.Rect.X, n.Rect.Y, n.Rect.X+n.Rect.Width, n.Rect.Y+n.Rect.Height),
 		}
 		if n.Name != nil {
 			w.Title, w.HasTitle = *n.Name, true

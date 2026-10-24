@@ -1,4 +1,4 @@
-Capture a drag-selected region
+Capture a dragged region or a clicked window
 
 Usage: lys-shell screenshot region
 

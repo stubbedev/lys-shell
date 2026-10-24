@@ -762,7 +762,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;screenshot'= {
             cand -h 'Print help'
             cand --help 'Print help'
-            cand region 'Capture a drag-selected region'
+            cand region 'Capture a dragged region or a clicked window'
             cand output 'Capture a whole output (the focused output when NAME is omitted)'
             cand window 'Capture the active window'
             cand help 'Print this message or the help of the given subcommand(s)'
@@ -780,7 +780,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand --help 'Print help'
         }
         &'lys-shell;screenshot;help'= {
-            cand region 'Capture a drag-selected region'
+            cand region 'Capture a dragged region or a clicked window'
             cand output 'Capture a whole output (the focused output when NAME is omitted)'
             cand window 'Capture the active window'
             cand help 'Print this message or the help of the given subcommand(s)'
@@ -1252,7 +1252,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;recorder;status'= {
         }
         &'lys-shell;help;screenshot'= {
-            cand region 'Capture a drag-selected region'
+            cand region 'Capture a dragged region or a clicked window'
             cand output 'Capture a whole output (the focused output when NAME is omitted)'
             cand window 'Capture the active window'
         }

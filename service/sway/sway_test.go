@@ -3,6 +3,7 @@ package sway
 import (
 	"context"
 	"encoding/json"
+	"image"
 	"net"
 	"os"
 	"path/filepath"
@@ -100,7 +101,7 @@ const fixtureTree = `{"id":1,"type":"root","nodes":[
  {"id":2,"type":"output","name":"DP-1","nodes":[
   {"id":10,"type":"workspace","name":"1","nodes":[
     {"id":11,"type":"con","nodes":[
-      {"id":12,"type":"con","name":"vim","app_id":"foot","focused":true,"nodes":[],"floating_nodes":[]},
+      {"id":12,"type":"con","name":"vim","app_id":"foot","focused":true,"visible":true,"rect":{"x":10,"y":20,"width":300,"height":200},"nodes":[],"floating_nodes":[]},
       {"id":13,"type":"con","name":"Steam","app_id":null,"window_properties":{"class":"steam"},"urgent":true,"nodes":[],"floating_nodes":[]}
     ],"floating_nodes":[]}
   ],"floating_nodes":[
@@ -155,8 +156,12 @@ func TestWindowsWalksTheTree(t *testing.T) {
 		t.Fatalf("windows = %+v, want the three leaves (split containers and workspaces are not windows)", windows)
 	}
 	vim, steam, pav := windows[0], windows[1], windows[2]
-	if vim.ID != 12 || vim.AppID != "foot" || vim.Title != "vim" || !vim.Focused || vim.WorkspaceID != 10 || !vim.HasWorkspace {
+	if vim.ID != 12 || vim.AppID != "foot" || vim.Title != "vim" || !vim.Focused || vim.WorkspaceID != 10 || !vim.HasWorkspace ||
+		!vim.Visible || vim.Rect != image.Rect(10, 20, 310, 220) {
 		t.Errorf("vim = %+v", vim)
+	}
+	if steam.Visible {
+		t.Errorf("steam = %+v, visible without the tree saying so", steam)
 	}
 	if steam.AppID != "steam" || !steam.HasAppID || !steam.Urgent {
 		t.Errorf("steam = %+v, want the X11 class as app id", steam)

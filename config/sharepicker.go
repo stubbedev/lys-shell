@@ -75,7 +75,7 @@ const (
 	SharePickerWindows SharePickerPage = "windows"
 	// Per-output (monitor) previews.
 	SharePickerOutputs SharePickerPage = "outputs"
-	// Region selection via an external tool (e.g. `slurp`).
+	// Region selection on the shell's region overlay.
 	SharePickerRegion SharePickerPage = "region"
 )
 

@@ -43,7 +43,8 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 	} else {
 		log.Printf("screenshot: overlay font %q: %v", cfg.General.FontMono, err)
 	}
-	region := regionoverlay.New(application, outputs, font, sheet)
+	focus := screenshot.CompositorFocus{Hyprland: hypr}
+	region := regionoverlay.New(application, outputs, focus.Windows, font, sheet)
 	monitors := func() []regionoverlay.Monitor {
 		outs := outputs()
 		mons := make([]regionoverlay.Monitor, len(outs))
@@ -57,7 +58,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 		Monitors: monitors,
 		Region:   region,
 		Picker:   colorpicker.New(application, outputs, font, colorpicker.HistoryPath()),
-		Focus:    screenshot.CompositorFocus{Hyprland: hypr},
+		Focus:    focus,
 		Copy:     clipboardCopier(application),
 	}}
 	conn, err := dbus.ConnectSessionBus()

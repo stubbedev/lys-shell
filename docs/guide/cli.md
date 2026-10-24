@@ -127,7 +127,7 @@ lys-shell recorder status
 Screenshots:
 
 ```sh
-lys-shell screenshot region        # drag-select a region
+lys-shell screenshot region        # drag a region or click a window, adjust, Enter
 lys-shell screenshot output DP-1   # whole output (focused output if omitted)
 lys-shell screenshot window        # the active window
 ```

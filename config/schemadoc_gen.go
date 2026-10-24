@@ -1202,7 +1202,7 @@ var schemaDocs = map[string]string{
 	"SharePickerConfig.WindowsSpacing":                       "Spacing between window cards: a multiplier of the default 12px\n(`1.0` = default) or absolute pixels.",
 	"SharePickerPage":                                        "Page shown when the screen-share picker opens.",
 	"SharePickerPage=outputs":                                "Per-output (monitor) previews.",
-	"SharePickerPage=region":                                 "Region selection via an external tool (e.g. `slurp`).",
+	"SharePickerPage=region":                                 "Region selection on the shell's region overlay.",
 	"SharePickerPage=windows":                                "Per-window previews.",
 	"SignedNormalizedF64":                                    "Floating-point value clamped to -1.0 to 1.0.",
 	"StackingOrder":                                          "Order in which popups are stacked on screen.",
