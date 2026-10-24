@@ -103,7 +103,8 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 	}{{"Allow", true}, {"Deny", false}} {
 		got := make(chan bool, 1)
 		go func() {
-			got <- hs.h.Access(portalreq.Caller{Handle: "/r/test"}, AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
+			ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/test"}, AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
+			got <- ok
 		}()
 		c := hs.open(t)
 		if l := treetest.Labels(c.Root); !slices.Contains(l, "Camera") || !slices.Contains(l, "Sub\nBody") {
@@ -375,7 +376,8 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 	hs := newHarness(t, nil)
 	got := make(chan bool, 1)
 	go func() {
-		got <- hs.h.Access(portalreq.Caller{Handle: "/r/mine"}, AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
+		ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/mine"}, AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
+		got <- ok
 	}()
 	hs.open(t)
 	hs.h.Dismiss("/r/other")
@@ -399,5 +401,53 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 	hs.mu.Unlock()
 	if !closed {
 		t.Error("a dismissed dialog stayed mapped")
+	}
+}
+
+// Access shows a check button per yes/no choice and a dropdown per list
+// choice, starting at their initial values, and a grant returns what the
+// user left them at; a deny returns nothing.
+func TestAccessChoices(t *testing.T) {
+	hs := newHarness(t, nil)
+	req := AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portalreq.Choice{
+		{ID: "remember", Label: "Remember this", Initial: "false"},
+		{ID: "scope", Label: "Scope", Options: []portalreq.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
+	}}
+	type answer struct {
+		ok     bool
+		picked []portalreq.Selection
+	}
+	for _, grant := range []bool{true, false} {
+		got := make(chan answer, 1)
+		go func() {
+			ok, picked := hs.h.Access(portalreq.Caller{Handle: "/r/c"}, req)
+			got <- answer{ok, picked}
+		}()
+		c := hs.open(t)
+		checks := treetest.All[*widget.CheckButton](c.Root)
+		drops := treetest.All[*widget.Dropdown](c.Root)
+		if len(checks) != 1 || len(drops) != 1 || checks[0].Checked() || drops[0].Selected() != 1 {
+			t.Fatalf("%d checks, %d dropdowns at their initial values?", len(checks), len(drops))
+		}
+		hs.do(func() {
+			checks[0].SetChecked(true)
+			drops[0].SetSelected(0)
+			label := "Deny"
+			if grant {
+				label = "Allow"
+			}
+			treetest.Button(t, c.Root, label).OnClick()
+		})
+		r := <-got
+		if !grant {
+			if r.ok || r.picked != nil {
+				t.Errorf("deny = %+v", r)
+			}
+			continue
+		}
+		want := []portalreq.Selection{{ID: "remember", Value: "true"}, {ID: "scope", Value: "once"}}
+		if !r.ok || !slices.Equal(r.picked, want) {
+			t.Errorf("grant = %+v, want %+v", r, want)
+		}
 	}
 }

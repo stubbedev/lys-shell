@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/stubbedev/lys-ui/app"
@@ -119,12 +120,69 @@ func (h *Dialogs) finish(ok bool, choice string) {
 
 // Access is the grant/deny prompt: the permission's icon above the
 // title, the subtitle and body below it.
-func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) bool {
+func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) (bool, []portalreq.Selection) {
+	var picked []portalreq.Selection
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
-		return h.confirm(answer, h.headerIcon(r.Icon), r.Title, detail, r.DenyLabel, r.GrantLabel)
+		rows, collect := h.choices(r.Choices)
+		grant := func(ok bool, s string) {
+			if ok {
+				picked = collect()
+			}
+			answer(ok, s)
+		}
+		return h.confirm(grant, h.headerIcon(r.Icon), r.Title, detail, r.DenyLabel, r.GrantLabel, rows...)
 	})
-	return ok
+	if !ok {
+		return false, nil
+	}
+	return true, picked
+}
+
+// choices builds a row per choice (a check button for a yes/no, a
+// labelled dropdown otherwise) and the function reading what the user
+// picked.
+func (h *Dialogs) choices(choices []portalreq.Choice) ([]widget.Widget, func() []portalreq.Selection) {
+	rows := make([]widget.Widget, 0, len(choices))
+	reads := make([]func() portalreq.Selection, 0, len(choices))
+	for _, c := range choices {
+		if c.Boolean() {
+			check := widget.NewCheckButton(c.Start() == "true")
+			check.AddClass("portal-dialog-choice")
+			check.SetChild(h.label(c.Label, "portal-dialog-choice-label"))
+			rows = append(rows, check)
+			reads = append(reads, func() portalreq.Selection {
+				return portalreq.Selection{ID: c.ID, Value: strconv.FormatBool(check.Checked())}
+			})
+			continue
+		}
+		labels := make([]string, len(c.Options))
+		start := 0
+		for i, o := range c.Options {
+			labels[i] = o.Label
+			if o.ID == c.Start() {
+				start = i
+			}
+		}
+		drop := widget.NewDropdown(h.d.Font, 13, labels, start)
+		drop.AddClass("portal-dialog-choice")
+		row := widget.NewBox(widget.Row, 8, 0)
+		label := h.label(c.Label, "portal-dialog-choice-label")
+		label.SetWrap(false)
+		row.Append(label, true)
+		row.Append(drop, false)
+		rows = append(rows, row)
+		reads = append(reads, func() portalreq.Selection {
+			return portalreq.Selection{ID: c.ID, Value: c.Options[drop.Selected()].ID}
+		})
+	}
+	return rows, func() []portalreq.Selection {
+		out := make([]portalreq.Selection, 0, len(reads))
+		for _, read := range reads {
+			out = append(out, read())
+		}
+		return out
+	}
 }
 
 // Account asks to share the user's name and avatar, previewing it.
@@ -262,7 +320,7 @@ func (h *Dialogs) actions(buttons ...*widget.Button) widget.Widget {
 }
 
 // confirm is a yes/no dialog.
-func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title, body, cancel, confirm string) widget.Widget {
+func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title, body, cancel, confirm string, extra ...widget.Widget) widget.Widget {
 	rows := []widget.Widget{}
 	if header != nil {
 		rows = append(rows, widgets.Center(header))
@@ -271,6 +329,7 @@ func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title
 	if body != "" {
 		rows = append(rows, h.label(body, "portal-dialog-body"))
 	}
+	rows = append(rows, extra...)
 	confirmButton := h.button(confirm, "portal-dialog-confirm", func() { answer(true, "") })
 	confirmButton.AddClass("suggested-action")
 	rows = append(rows, h.actions(

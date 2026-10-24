@@ -3,11 +3,13 @@ package portal
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
@@ -55,7 +57,7 @@ func TestAccessDialogLabels(t *testing.T) {
 	r := newRig(t, nil)
 	d := serveDialogs(t, r, true)
 	r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{})
-	if got := d.asked.Load()[0]; got != (portaldialogs.AccessRequest{Title: "T", Subtitle: "S", Body: "B", GrantLabel: "Allow", DenyLabel: "Deny"}) {
+	if got := d.asked.Load()[0]; !reflect.DeepEqual(got, portaldialogs.AccessRequest{Title: "T", Subtitle: "S", Body: "B", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portalreq.Choice{}}) {
 		t.Errorf("defaults = %+v", got)
 	}
 	r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{
@@ -63,6 +65,37 @@ func TestAccessDialogLabels(t *testing.T) {
 	})
 	if got := d.asked.Load()[0].(portaldialogs.AccessRequest); got.GrantLabel != "Share" || got.DenyLabel != "Keep" || got.Icon != "camera-web" {
 		t.Errorf("labels = %+v", got)
+	}
+}
+
+// Choices reach the dialog and come back with the grant; a deny returns
+// none, and malformed choices fail the call.
+func TestAccessDialogChoicesRoundTrip(t *testing.T) {
+	r := newRig(t, nil)
+	d := serveDialogs(t, r, true)
+	choices := []portalreq.Choice{
+		{ID: "remember", Label: "Remember", Options: []portalreq.Option{}, Initial: "true"},
+		{ID: "scope", Label: "Scope", Options: []portalreq.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
+	}
+	code, res := r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{"choices": dbus.MakeVariant(choices)})
+	if got := d.asked.Load()[0].(portaldialogs.AccessRequest); !reflect.DeepEqual(got.Choices, choices) {
+		t.Errorf("the dialog got choices %+v", got.Choices)
+	}
+	var picked []portalreq.Selection
+	if err := dbus.Store([]any{res["choices"].Value()}, &picked); err != nil {
+		t.Fatalf("choices result %v: %v", res, err)
+	}
+	want := []portalreq.Selection{{ID: "remember", Value: "true"}, {ID: "scope", Value: "always"}}
+	if code != ResponseSuccess || !reflect.DeepEqual(picked, want) {
+		t.Errorf("granted %d with %+v, want %+v", code, picked, want)
+	}
+	d.yes.Store(false)
+	if code, res := r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{"choices": dbus.MakeVariant(choices)}); code != ResponseCancelled || len(res) != 0 {
+		t.Errorf("denied = %d %v, want no choices", code, res)
+	}
+	bad := []portalreq.Choice{{ID: "", Label: "No id"}}
+	if code, _ := r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{"choices": dbus.MakeVariant(bad)}); code != ResponseOther {
+		t.Errorf("a choice without an id = %d, want other", code)
 	}
 }
 

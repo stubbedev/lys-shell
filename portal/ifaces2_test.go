@@ -346,8 +346,15 @@ func (f *fakeDialogs) answer(c portalreq.Caller, args ...any) bool {
 	return !f.enter(c) && f.yes.Load()
 }
 
-func (f *fakeDialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) bool {
-	return f.answer(c, r)
+func (f *fakeDialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) (bool, []portalreq.Selection) {
+	if !f.answer(c, r) {
+		return false, nil
+	}
+	picked := make([]portalreq.Selection, 0, len(r.Choices))
+	for _, ch := range r.Choices {
+		picked = append(picked, portalreq.Selection{ID: ch.ID, Value: ch.Start()})
+	}
+	return true, picked
 }
 
 func (f *fakeDialogs) Account(c portalreq.Caller, reason string) bool { return f.answer(c, reason) }

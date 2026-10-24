@@ -1,6 +1,12 @@
 package portal
 
-import "github.com/godbus/dbus/v5"
+import (
+	"fmt"
+
+	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/portalreq"
+)
 
 // Vardict is a portal a{sv}: every interactive method's options and
 // results (dbus_util.rs).
@@ -45,4 +51,28 @@ func stringOr(options Vardict, key, fallback string) string {
 		return s
 	}
 	return fallback
+}
+
+// optChoices reads a choices option, a(ssa(ss)s); a malformed one, or
+// a list choice without options' ids and labels, is an error.
+func optChoices(options Vardict) ([]portalreq.Choice, error) {
+	v, ok := options["choices"]
+	if !ok {
+		return nil, nil
+	}
+	var choices []portalreq.Choice
+	if err := dbus.Store([]any{v.Value()}, &choices); err != nil {
+		return nil, fmt.Errorf("malformed choices: %w", err)
+	}
+	for _, c := range choices {
+		if c.ID == "" || c.Label == "" {
+			return nil, fmt.Errorf("a choice without an id or label: %+v", c)
+		}
+		for _, o := range c.Options {
+			if o.ID == "" || o.Label == "" {
+				return nil, fmt.Errorf("choice %s has an option without an id or label", c.ID)
+			}
+		}
+	}
+	return choices, nil
 }

@@ -109,7 +109,7 @@ var showPrint = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string,
 })
 
 var showAccess = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	granted, err := portaldialogs.NewClient(conn).Access(ctx, portalreq.Caller{}, portaldialogs.AccessRequest{
+	granted, _, err := portaldialogs.NewClient(conn).Access(ctx, portalreq.Caller{}, portaldialogs.AccessRequest{
 		Title:      "Preview: Access",
 		Subtitle:   "An application is requesting access",
 		Body:       "This is a preview of the generic access prompt.",

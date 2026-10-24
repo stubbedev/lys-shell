@@ -40,9 +40,9 @@ type fakeDialogs struct {
 	got *dbustest.Var[[]any]
 }
 
-func (f fakeDialogs) Access(_ portalreq.Caller, r portaldialogs.AccessRequest) bool {
+func (f fakeDialogs) Access(_ portalreq.Caller, r portaldialogs.AccessRequest) (bool, []portalreq.Selection) {
 	f.got.Store([]any{r})
-	return f.yes.Load()
+	return f.yes.Load(), nil
 }
 
 func (f fakeDialogs) Account(_ portalreq.Caller, reason string) bool {

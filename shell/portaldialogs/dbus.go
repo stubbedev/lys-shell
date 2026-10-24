@@ -27,13 +27,16 @@ type AccessRequest struct {
 	GrantLabel, DenyLabel string
 	// Icon is a themed icon name for the permission, "" for none.
 	Icon string
+	// Choices are extra questions shown with the prompt.
+	Choices []portalreq.Choice
 }
 
 // Host shows the dialogs; each call blocks until the user answers or
 // the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
-	// Access replies whether the user granted.
-	Access(portalreq.Caller, AccessRequest) bool
+	// Access replies whether the user granted and, when granted, what
+	// they picked for each choice.
+	Access(portalreq.Caller, AccessRequest) (bool, []portalreq.Selection)
 	// Account replies whether the user shares their account info.
 	Account(c portalreq.Caller, reason string) bool
 	// ConfirmWallpaper previews a file:// image and replies whether to
@@ -62,8 +65,12 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 }
 
 // Access is the grant/deny prompt.
-func (d *Daemon) Access(c portalreq.Caller, title, subtitle, body, grantLabel, denyLabel, icon string) (bool, *dbus.Error) {
-	return d.host.Access(c, AccessRequest{title, subtitle, body, grantLabel, denyLabel, icon}), nil
+func (d *Daemon) Access(c portalreq.Caller, title, subtitle, body, grantLabel, denyLabel, icon string, choices []portalreq.Choice) (bool, []portalreq.Selection, *dbus.Error) {
+	granted, picked := d.host.Access(c, AccessRequest{title, subtitle, body, grantLabel, denyLabel, icon, choices})
+	if picked == nil {
+		picked = []portalreq.Selection{}
+	}
+	return granted, picked, nil
 }
 
 // Account is the account-info consent.
@@ -104,9 +111,13 @@ func (c *Client) call(ctx context.Context, method string, out any, args ...any) 
 }
 
 // Access shows the grant/deny prompt.
-func (c *Client) Access(ctx context.Context, caller portalreq.Caller, r AccessRequest) (granted bool, err error) {
-	err = c.call(ctx, "Access", &granted, caller, r.Title, r.Subtitle, r.Body, r.GrantLabel, r.DenyLabel, r.Icon)
-	return granted, err
+func (c *Client) Access(ctx context.Context, caller portalreq.Caller, r AccessRequest) (granted bool, picked []portalreq.Selection, err error) {
+	choices := r.Choices
+	if choices == nil {
+		choices = []portalreq.Choice{}
+	}
+	err = c.obj.CallWithContext(ctx, iface+".Access", 0, caller, r.Title, r.Subtitle, r.Body, r.GrantLabel, r.DenyLabel, r.Icon, choices).Store(&granted, &picked)
+	return granted, picked, err
 }
 
 // Account asks to share the account info.

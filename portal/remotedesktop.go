@@ -231,7 +231,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 	if types != 0 {
 		granted = types & (deviceKeyboard | devicePointer)
 	}
-	allowed, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+	allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 		Title: "Remote control", Body: "An application is requesting control of your pointer and keyboard.",
 		GrantLabel: "Allow", DenyLabel: "Deny", Icon: "input-keyboard-symbolic",
 	})

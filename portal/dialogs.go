@@ -48,13 +48,26 @@ func (a accessMethods) AccessDialog(handle dbus.ObjectPath, appID, parent, title
 	}
 	defer c.end()
 	c.modal(options)
-	granted, err := client.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+	choices, err := optChoices(options)
+	if err != nil {
+		warnf("access: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
+	granted, picked, err := client.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 		Title: title, Subtitle: subtitle, Body: body,
 		GrantLabel: stringOr(options, "grant_label", "Allow"),
 		DenyLabel:  stringOr(options, "deny_label", "Deny"),
 		Icon:       stringOr(options, "icon", ""),
+		Choices:    choices,
 	})
-	return c.response("access", granted, err), Vardict{}, nil
+	if code := c.response("access", granted, err); code != ResponseSuccess {
+		return code, Vardict{}, nil
+	}
+	results := Vardict{}
+	if len(choices) > 0 {
+		results["choices"] = dbus.MakeVariant(picked)
+	}
+	return ResponseSuccess, results, nil
 }
 
 // accountMethods is org.freedesktop.impl.portal.Account (account.rs).

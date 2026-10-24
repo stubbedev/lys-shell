@@ -2,6 +2,7 @@ package portaldialogs
 
 import (
 	"context"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -24,8 +25,15 @@ func (f *fakeHost) record(c portalreq.Caller, args ...any) {
 	f.asked.Store(args)
 }
 
-func (f *fakeHost) Access(c portalreq.Caller, r AccessRequest) bool { f.record(c, r); return f.yes }
-func (f *fakeHost) Account(c portalreq.Caller, reason string) bool  { f.record(c, reason); return f.yes }
+func (f *fakeHost) Access(c portalreq.Caller, r AccessRequest) (bool, []portalreq.Selection) {
+	f.record(c, r)
+	if !f.yes {
+		return false, nil
+	}
+	return true, []portalreq.Selection{{ID: "picked", Value: "x"}}
+}
+
+func (f *fakeHost) Account(c portalreq.Caller, reason string) bool { f.record(c, reason); return f.yes }
 
 func (f *fakeHost) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	f.record(c, uri)
@@ -56,9 +64,13 @@ func TestDialogsRoundTrip(t *testing.T) {
 		}
 		c, ctx := NewClient(bus.Conn(t)), context.Background()
 		caller := portalreq.Caller{Handle: "/r/1", AppID: "org.app", ParentWindow: "wayland:abc"}
-		req := AccessRequest{"T", "S", "B", "Allow", "Deny", "camera"}
-		if got, err := c.Access(ctx, caller, req); err != nil || got != yes || host.asked.Load()[0] != req || host.caller.Load() != caller {
+		req := AccessRequest{"T", "S", "B", "Allow", "Deny", "camera", []portalreq.Choice{{ID: "c", Label: "C", Options: []portalreq.Option{}}}}
+		got, picked, err := c.Access(ctx, caller, req)
+		if err != nil || got != yes || !reflect.DeepEqual(host.asked.Load()[0], req) || host.caller.Load() != caller {
 			t.Errorf("Access = %v, %v (asked %v by %+v)", got, err, host.asked.Load(), host.caller.Load())
+		}
+		if yes && !reflect.DeepEqual(picked, []portalreq.Selection{{ID: "picked", Value: "x"}}) || !yes && len(picked) != 0 {
+			t.Errorf("Access picked %v", picked)
 		}
 		if got, err := c.Account(ctx, caller, "why"); err != nil || got != yes || host.asked.Load()[0] != "why" {
 			t.Errorf("Account = %v, %v", got, err)
@@ -69,9 +81,9 @@ func TestDialogsRoundTrip(t *testing.T) {
 		if got, err := c.ConfirmInstall(ctx, caller, "App", "app-icon"); err != nil || got != yes || host.asked.Load()[1] != "app-icon" {
 			t.Errorf("ConfirmInstall = %v, %v", got, err)
 		}
-		got, err := c.ChooseApplication(ctx, caller, nil, "text/plain", "file:///x")
-		if asked := host.asked.Load(); err != nil || got != host.choice || len(asked[0].([]string)) != 0 || asked[1] != "text/plain" {
-			t.Errorf("ChooseApplication = %q, %v (asked %v)", got, err, asked)
+		chosen, err := c.ChooseApplication(ctx, caller, nil, "text/plain", "file:///x")
+		if asked := host.asked.Load(); err != nil || chosen != host.choice || len(asked[0].([]string)) != 0 || asked[1] != "text/plain" {
+			t.Errorf("ChooseApplication = %q, %v (asked %v)", chosen, err, asked)
 		}
 		if _, _ = c.ChooseApplication(ctx, caller, []string{"a", "b"}, "", ""); !slices.Equal(host.asked.Load()[0].([]string), []string{"a", "b"}) {
 			t.Errorf("choices = %v", host.asked.Load()[0])
@@ -82,7 +94,7 @@ func TestDialogsRoundTrip(t *testing.T) {
 		release()
 	}
 	// Without a host every call is an error, never a silent answer.
-	if _, err := NewClient(bus.Conn(t)).Access(context.Background(), portalreq.Caller{}, AccessRequest{}); err == nil {
+	if _, _, err := NewClient(bus.Conn(t)).Access(context.Background(), portalreq.Caller{}, AccessRequest{}); err == nil {
 		t.Error("Access answered without a host")
 	}
 }
