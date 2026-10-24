@@ -188,8 +188,7 @@ func (v *view) Paint(cv *render.Canvas) {
 	cv.PopAlpha(prevAlpha)
 }
 
-// backdrop is the surface's letterbox color (.wallpaper-window's
-// background: black).
+// backdrop is the surface's letterbox color.
 var backdrop = render.RGB(0, 0, 0)
 
 // fillOutside fills the device-pixel ring of outer around inner.

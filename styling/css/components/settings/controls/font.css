@@ -16,12 +16,6 @@ menubutton.font > button {
   padding: var(--space-md);
 }
 
-image.font-picker-search-icon {
-  margin-left: var(--space-sm);
-  margin-right: var(--space-sm);
-  color: var(--fg-subtle);
-}
-
 .font-picker-popover entry {
   border-spacing: 0;
 }

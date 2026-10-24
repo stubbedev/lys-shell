@@ -31,11 +31,6 @@
   min-height: calc(1.25rem * var(--global-scale));
 }
 
-.color-value-row {
-  border-spacing: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
-}
-
 .setting-control dropdown.color-value-dropdown button {
   padding: 0;
 }
@@ -194,11 +189,6 @@
   border: none;
 }
 
-.color-value-label {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-}
-
 window.colorchooser {
   font-size: var(--text-sm);
 }
@@ -210,13 +200,4 @@ window.colorchooser headerbar {
 
 window.colorchooser headerbar button {
   padding: var(--space-xs) var(--space-md);
-}
-
-.color-value-group-header {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: var(--space-sm) var(--space-md) var(--space-xs);
 }

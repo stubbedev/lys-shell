@@ -22,10 +22,6 @@
   font-weight: var(--weight-semibold);
   text-transform: capitalize;
 }
-.dashboard-dropdown .user-session-time {
-  font-size: var(--text-xs);
-  color: var(--fg-subtle);
-}
 .dashboard-dropdown .session-actions {
   border-spacing: var(--space-xs);
 }

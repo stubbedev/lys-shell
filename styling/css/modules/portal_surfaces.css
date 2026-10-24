@@ -171,15 +171,6 @@ button.file-chooser-filter:checked {
   color: var(--accent);
 }
 
-.file-chooser-list-scroll {
-  padding: var(--space-sm);
-}
-
-.file-chooser-icon {
-  -gtk-icon-size: 1.125rem;
-  color: var(--fg-muted);
-}
-
 .file-chooser-list row {
   padding: var(--space-xs) var(--space-sm);
 }
@@ -187,7 +178,6 @@ button.file-chooser-filter:checked {
   background: var(--bg-elevated);
 }
 
-.file-chooser-list row:selected .file-chooser-icon,
 .file-chooser-list row:selected .file-chooser-cell {
   color: var(--fg-on-accent);
 }
@@ -211,32 +201,10 @@ button.file-chooser-filter:checked {
   margin: var(--space-lg);
 }
 
-.file-chooser-ql-name {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-default);
-}
-
-.file-chooser-ql-info {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-
 .file-chooser-preview {
   background: var(--bg-base);
   border-left: 1px solid var(--border-subtle);
   padding: var(--space-lg);
-}
-
-.file-chooser-preview-name {
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-default);
-}
-
-.file-chooser-preview-info {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
 }
 
 .file-chooser-colheader {
@@ -300,14 +268,6 @@ button.file-chooser-filter:checked {
 
 .file-chooser-grid-cell {
   padding: var(--space-xs);
-}
-
-.file-chooser-grid-icon {
-  color: var(--fg-muted);
-}
-
-.file-chooser-grid flowboxchild:selected .file-chooser-grid-icon {
-  color: var(--fg-on-accent);
 }
 
 .file-chooser-footer {
@@ -380,8 +340,7 @@ button.file-chooser-filter:checked {
   color: var(--fg-default);
 }
 
-.portal-dialog-body,
-.file-chooser-path {
+.portal-dialog-body {
   font-size: var(--text-sm);
   color: var(--fg-muted);
 }

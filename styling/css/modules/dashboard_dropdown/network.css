@@ -4,17 +4,9 @@
 .dashboard-dropdown .network-connection.disconnected image.network-connection-icon {
   color: var(--fg-subtle);
 }
-.dashboard-dropdown .network-connection.disconnected .network-name {
-  color: var(--fg-subtle);
-}
 .dashboard-dropdown image.network-connection-icon {
   -gtk-icon-size: var(--icon-sm);
   color: var(--accent);
-}
-.dashboard-dropdown .network-name {
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  color: var(--fg-default);
 }
 .dashboard-dropdown image.speed-arrow {
   -gtk-icon-size: var(--icon-md);

@@ -86,11 +86,3 @@ popover.dropdown > contents .dropdown {
 .dropdown-content > :first-child .section-label:first-child {
   margin-top: 0;
 }
-
-.dropdown-footer {
-  padding: var(--space-sm) var(--space-md);
-  border-top: 1px solid var(--border-default);
-  border-bottom-left-radius: var(--rounding-container);
-  border-bottom-right-radius: var(--rounding-container);
-  font-size: var(--text-md);
-}

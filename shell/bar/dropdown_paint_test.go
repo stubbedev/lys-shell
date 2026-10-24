@@ -125,7 +125,7 @@ func TestBatteryGaugePaintsFromTheLevelbarRules(t *testing.T) {
 // width — no threshold tint survives.
 func TestDashboardRingPaintsFromTheCascade(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
-	r, overlay := newProgressRing("lg", ctx.Font, 12)
+	r, overlay := newProgressRing(ctx.Font, 12)
 	ctx.Theme.Attach(overlay)
 	r.set(0.75, "75%", "success")
 	sz := overlay.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
@@ -167,17 +167,22 @@ func spanOf(data []byte, h int, want func(render.Color) bool) (minX, maxX int) {
 	return minX, maxX
 }
 
-// The ring is a gtk::Overlay the stylesheet sizes: .progress-ring.lg's
-// min size is its diameter, the canvas fills it, and the label sits on
-// the canvas's center rather than under it.
+// The ring is a gtk::Overlay the stylesheet sizes: .progress-ring's
+// min size is its diameter (a ring outside the stylesheet has none),
+// the canvas fills it, and the label sits on the canvas's center
+// rather than under it.
 func TestProgressRingIsAnOverlayTheStylesheetSizes(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
-	r, overlay := newProgressRing("lg", ctx.Font, 12)
+	_, bare := newProgressRing(ctx.Font, 12)
+	if s := widget.MeasureAsChild(bare, widget.Constraints{Max: widget.Size{W: 400, H: 400}}); s.H >= 40 {
+		t.Fatalf("a ring outside the stylesheet measures %v: its size is not the stylesheet's", s)
+	}
+	r, overlay := newProgressRing(ctx.Font, 12)
 	ctx.Theme.Attach(overlay)
 	r.set(0.5, "50%", "")
 	sz := widget.MeasureAsChild(overlay, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
 	if sz.W < 40 || sz.W != sz.H {
-		t.Fatalf("the ring measures %v, want the square .progress-ring.lg min size", sz)
+		t.Fatalf("the ring measures %v, want the square .progress-ring min size", sz)
 	}
 	widget.ArrangeAsChild(overlay, render.Rect{W: sz.W, H: sz.H})
 	if b := r.Bounds(); b.W != sz.W || b.H != sz.H {
@@ -186,10 +191,5 @@ func TestProgressRingIsAnOverlayTheStylesheetSizes(t *testing.T) {
 	lb, rb := r.label.Bounds(), r.Bounds()
 	if dx, dy := (lb.X+lb.W/2)-(rb.X+rb.W/2), (lb.Y+lb.H/2)-(rb.Y+rb.H/2); dx < -1 || dx > 1 || dy < -1 || dy > 1 {
 		t.Errorf("the label %+v sits off the ring's center %+v", lb, rb)
-	}
-	_, sm := newProgressRing("sm", ctx.Font, 12)
-	ctx.Theme.Attach(sm)
-	if s := widget.MeasureAsChild(sm, widget.Constraints{Max: widget.Size{W: 400, H: 400}}); s.W >= sz.W {
-		t.Errorf("the sm ring measures %v, not under the lg %v: the size class is ignored", s, sz)
 	}
 }

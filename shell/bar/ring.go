@@ -23,14 +23,14 @@ var ringVariants = []string{"success", "warning", "error"}
 
 // newProgressRing builds the ring's gtk::Overlay: the canvas fills it
 // and the label sits centered on top, and the overlay's .progress-ring
-// size class sets its min-width and min-height, the ring's diameter.
-func newProgressRing(sizeClass string, font render.Font, px float64) (*progressRing, *widget.Overlay) {
+// rule sets its min-width and min-height, the ring's diameter.
+func newProgressRing(font render.Font, px float64) (*progressRing, *widget.Overlay) {
 	r := &progressRing{}
-	r.AddClass("progress-ring-canvas", sizeClass)
+	r.AddClass("progress-ring-canvas")
 	r.label = widget.NewLabel(font, px, "", 0)
 	r.label.AddClass("ring-text")
 	overlay := widget.NewOverlay()
-	overlay.AddClass("progress-ring", sizeClass)
+	overlay.AddClass("progress-ring")
 	overlay.Append(r)
 	overlay.AppendAligned(r.label, widget.AlignCenter, widget.AlignCenter)
 	return r, overlay

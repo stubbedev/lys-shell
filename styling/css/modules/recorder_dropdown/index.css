@@ -167,24 +167,3 @@
 .recorder-dropdown-content .recorder-row > spinbutton button:hover {
   color: var(--fg-default);
 }
-
-.webcam-preview-window {
-  background: transparent;
-}
-.webcam-preview-window .webcam-preview-picture {
-  border-radius: var(--rounding-element);
-  border: 2px solid var(--accent);
-  background: rgba(0, 0, 0, 0.4);
-}
-.webcam-preview-window .webcam-preview-done {
-  margin: var(--space-xs);
-  min-width: calc(1.75rem * var(--global-scale));
-  min-height: calc(1.75rem * var(--global-scale));
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--fg-on-accent);
-  opacity: 0.9;
-}
-.webcam-preview-window .webcam-preview-done:hover {
-  opacity: 1;
-}

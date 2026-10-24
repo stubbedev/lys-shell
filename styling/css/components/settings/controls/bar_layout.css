@@ -51,13 +51,6 @@
   margin-right: var(--space-md);
 }
 
-.layout-zone-empty {
-  font-size: var(--text-sm);
-  font-style: italic;
-  color: var(--fg-subtle);
-  padding: var(--space-xs);
-}
-
 .layout-monitor-input,
 .layout-extends-input {
   font-size: var(--text-sm);
@@ -147,15 +140,8 @@ menubutton.zone-add-btn > button:hover {
   padding: var(--space-xl);
 }
 
-
 .module-picker-popover contents {
   padding: var(--space-md);
-}
-
-image.module-picker-search-icon {
-  margin-left: var(--space-sm);
-  margin-right: var(--space-sm);
-  color: var(--fg-subtle);
 }
 
 .module-picker-popover entry {

@@ -793,7 +793,7 @@ func (v *dashboardView) systemStats() widget.Widget {
 	ring := func(labelID string) *progressRing {
 		// ProgressRing: the canvas paints from its cascade; the variant
 		// class recolors it.
-		r, overlay := newProgressRing("lg", v.font, v.px*0.85)
+		r, overlay := newProgressRing(v.font, v.px*0.85)
 		col := widget.NewBox(widget.Column, 4, 0)
 		col.AddClass("stat-inline")
 		col.Append(overlay, false)
