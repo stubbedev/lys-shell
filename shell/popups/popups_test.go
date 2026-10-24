@@ -16,6 +16,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -24,11 +25,24 @@ func testFont(t *testing.T) render.Font { return treetest.Font(t) }
 
 func newTestPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *notifications.Service) {
 	t.Helper()
+	p, svc, _ := newClockedPopups(t, ncfg)
+	return p, svc
+}
+
+// newClockedPopups is a popup host whose service and card ages keep
+// time by the returned fake clock: countdowns run out only when it is
+// advanced.
+func newClockedPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *notifications.Service, *fakeclock.Clock) {
+	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	svc := notifications.NewService()
+	clock := fakeclock.New()
+	svc.UseClock(clock)
 	cfg := config.Defaults()
 	cfg.Notification = ncfg
-	return New(nil, svc, cfg, testFont(t), nil, nil), svc
+	p := New(nil, svc, cfg, testFont(t), nil, nil)
+	p.now = clock.Now
+	return p, svc, clock
 }
 
 func TestSyncTracksPopupSet(t *testing.T) {
@@ -211,22 +225,24 @@ func (s *signals) count(prefix string) int {
 func TestHoverPausesTheCountdown(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.PopupDuration = 40
-	p, svc := newTestPopups(t, cfg)
+	p, svc, clock := newClockedPopups(t, cfg)
 	id := svc.Notify("app", 0, "", "Hover", "", nil, -1)
 	p.sync()
 	c := cardOf(t, p, id)
 	r := &widget.Router{Root: c.root}
 	b := c.title.Bounds()
+	clock.Advance(10 * time.Millisecond)
 	r.Move(widget.Point{X: b.X + 1, Y: b.Y + 1})
-	time.Sleep(80 * time.Millisecond)
+	clock.Advance(time.Hour)
 	if got := len(svc.Popups()); got != 1 {
 		t.Fatalf("hovered popup timed out: popups = %d", got)
 	}
 	r.Leave()
-	deadline := time.Now().Add(time.Second)
-	for len(svc.Popups()) > 0 && time.Now().Before(deadline) {
-		time.Sleep(2 * time.Millisecond)
+	clock.Advance(29 * time.Millisecond)
+	if got := len(svc.Popups()); got != 1 {
+		t.Fatalf("the leave restarted short of the 30ms left: popups = %d", got)
 	}
+	clock.Advance(time.Millisecond)
 	if got := len(svc.Popups()); got != 0 {
 		t.Fatalf("popup survived the leave: popups = %d", got)
 	}
@@ -236,17 +252,14 @@ func TestHoverPauseOffKeepsCounting(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.PopupHoverPause = false
 	cfg.PopupDuration = 30
-	p, svc := newTestPopups(t, cfg)
+	p, svc, clock := newClockedPopups(t, cfg)
 	id := svc.Notify("app", 0, "", "Bare", "", nil, -1)
 	p.sync()
 	c := cardOf(t, p, id)
 	r := &widget.Router{Root: c.root}
 	b := c.title.Bounds()
 	r.Move(widget.Point{X: b.X + 1, Y: b.Y + 1})
-	deadline := time.Now().Add(time.Second)
-	for len(svc.Popups()) > 0 && time.Now().Before(deadline) {
-		time.Sleep(2 * time.Millisecond)
-	}
+	clock.Advance(30 * time.Millisecond)
 	if got := len(svc.Popups()); got != 0 {
 		t.Fatalf("a hovered card paused with hover-pause off: popups = %d", got)
 	}
@@ -256,8 +269,8 @@ func TestCardContent(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.IconSource = config.IconSourceMapped
 	cfg.PopupUrgencyBar = config.UrgencyBarThresholdCritical
-	p, svc := newTestPopups(t, cfg)
-	p.now = func() time.Time { return time.Now().Add(5*time.Minute + time.Second) }
+	p, svc, clock := newClockedPopups(t, cfg)
+	p.now = func() time.Time { return clock.Now().Add(5*time.Minute + time.Second) }
 	full := svc.NotifyHints("firefox", 0, "", "Download done", "a &amp; <b>b</b>", nil,
 		map[string]dbus.Variant{"urgency": dbus.MakeVariant(byte(2))}, 0)
 	bare := svc.Notify("", 0, "", "No app", "", nil, 0)

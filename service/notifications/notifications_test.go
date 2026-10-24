@@ -3,6 +3,8 @@ package notifications
 import (
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/fakeclock"
 )
 
 // collect waits for n events.
@@ -22,10 +24,23 @@ func collect(t *testing.T, feed <-chan Event, n int) []Event {
 }
 
 // newTestService isolates the DND state dir per test.
+// newTestService is a service on a fake clock (advance drives it), its
+// state in a temporary directory.
 func newTestService(t *testing.T) *Service {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	return NewService()
+	s := NewService()
+	s.UseClock(fakeclock.New())
+	return s
+}
+
+// advance moves a test service's fake clock d forward, running the
+// countdowns and expiries that fall due.
+func advance(s *Service, d time.Duration) {
+	s.mu.Lock()
+	c := s.clock.(*fakeclock.Clock)
+	s.mu.Unlock()
+	c.Advance(d)
 }
 
 func TestNotifyStoresAndEmits(t *testing.T) {
@@ -118,26 +133,22 @@ func TestExpiryRemoves(t *testing.T) {
 	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "flash", "", nil, 30)
 	<-feed
-	deadline := time.Now().Add(2 * time.Second)
-	for s.Count() > 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
+	advance(s, 29*time.Millisecond)
+	if got := s.Count(); got != 1 {
+		t.Fatalf("expired early, count = %d", got)
 	}
+	advance(s, time.Millisecond)
 	if got := s.Count(); got != 0 {
 		t.Fatalf("expired notification stayed, count = %d", got)
 	}
 	sawExpired := false
-	for {
-		select {
-		case ev := <-feed:
-			if ev.Kind == EventRemove && ev.Reason == Expired {
-				sawExpired = true
-			}
-		case <-time.After(100 * time.Millisecond):
-			if !sawExpired {
-				t.Fatal("no expired close event")
-			}
-			return
+	for len(feed) > 0 {
+		if ev := <-feed; ev.Kind == EventRemove && ev.Reason == Expired {
+			sawExpired = true
 		}
+	}
+	if !sawExpired {
+		t.Fatal("no expired close event")
 	}
 }
 
@@ -146,7 +157,7 @@ func TestZeroTimeoutNeverExpires(t *testing.T) {
 	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "sticky", "", nil, 0)
 	<-feed
-	time.Sleep(60 * time.Millisecond)
+	advance(s, 24*time.Hour)
 	if got := s.Count(); got != 1 {
 		t.Fatalf("expire_timeout 0 removed the notification")
 	}

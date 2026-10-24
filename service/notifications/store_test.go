@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/fakeclock"
 )
 
 func openTestStore(t *testing.T) (*Store, string) {
@@ -189,22 +191,30 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 }
 
 func TestRestoredExpiryStillFires(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	st, _ := openTestStore(t)
-	if err := st.Add(&Notification{ID: 7, AppName: "app", Summary: "soon", ExpireMS: 1500, Added: time.Now().Add(-100 * time.Millisecond)}); err != nil {
+	clock := fakeclock.New()
+	if err := st.Add(&Notification{ID: 7, AppName: "app", Summary: "soon", ExpireMS: 1500, Added: clock.Now().Add(-100 * time.Millisecond)}); err != nil {
 		t.Fatal(err)
 	}
-	svc := newStoredService(t, st)
+	svc := NewService()
+	svc.UseClock(clock)
+	if err := svc.AttachStore(st); err != nil {
+		t.Fatal(err)
+	}
 	if svc.Count() != 1 {
 		t.Fatal("the pending notification was not restored")
 	}
-	deadline := time.Now().Add(4 * time.Second)
-	for svc.Count() > 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
+	// 100ms of its 1500 had passed before the restore.
+	clock.Advance(1399 * time.Millisecond)
+	if svc.Count() != 1 {
+		t.Fatal("a restored notification expired early")
 	}
+	clock.Advance(time.Millisecond)
 	if svc.Count() != 0 {
 		t.Error("a restored notification never expired")
 	}
-	if got, _ := st.Load(time.Now(), false); len(got) != 0 {
+	if got, _ := st.Load(clock.Now(), false); len(got) != 0 {
 		t.Errorf("the expired one stayed on disk: %v", got)
 	}
 }

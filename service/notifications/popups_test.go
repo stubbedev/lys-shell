@@ -5,22 +5,17 @@ import (
 	"time"
 )
 
-// waitPopups polls until the popup list has want entries or the
-// deadline passes, returning the final count.
-func waitPopups(s *Service, want int, within time.Duration) int {
-	deadline := time.Now().Add(within)
-	for len(s.Popups()) != want && time.Now().Before(deadline) {
-		time.Sleep(2 * time.Millisecond)
-	}
-	return len(s.Popups())
-}
-
 func TestPopupTimesOutButStaysInHistory(t *testing.T) {
 	s := newTestService(t)
 	s.SetPopupDuration(30 * time.Millisecond)
 	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "one", "", nil, -1)
-	if got := waitPopups(s, 0, time.Second); got != 0 {
+	advance(s, 29*time.Millisecond)
+	if got := len(s.Popups()); got != 1 {
+		t.Fatalf("popups before the duration = %d, want 1", got)
+	}
+	advance(s, time.Millisecond)
+	if got := len(s.Popups()); got != 0 {
 		t.Fatalf("popups after the duration = %d, want 0", got)
 	}
 	if got := s.Count(); got != 1 {
@@ -57,10 +52,12 @@ func TestPopupDurationRules(t *testing.T) {
 	s.Notify("app", 0, "", "short", "", nil, 20)
 	// Zero never times out.
 	sticky := s.Notify("app", 0, "", "sticky", "", nil, 0)
-	if got := waitPopups(s, 1, time.Second); got != 1 {
+	advance(s, 20*time.Millisecond)
+	if got := len(s.Popups()); got != 1 {
 		t.Fatalf("popups = %d, want only the sticky one left", got)
 	}
-	if s.Popups()[0].ID != sticky {
+	advance(s, 24*time.Hour)
+	if got := s.Popups(); len(got) != 1 || got[0].ID != sticky {
 		t.Fatal("the zero-timeout popup timed out")
 	}
 	s.mu.Lock()
@@ -75,20 +72,26 @@ func TestHoverPauseHoldsThePopup(t *testing.T) {
 	s := newTestService(t)
 	s.SetPopupDuration(40 * time.Millisecond)
 	id := s.Notify("app", 0, "", "hover me", "", nil, -1)
+	advance(s, 10*time.Millisecond)
 	s.InhibitPopup(id)
-	time.Sleep(80 * time.Millisecond)
+	advance(s, time.Hour)
 	if got := len(s.Popups()); got != 1 {
 		t.Fatalf("paused popup timed out: popups = %d", got)
 	}
 	s.mu.Lock()
 	left := s.timers[id].duration
 	s.mu.Unlock()
-	if left <= 0 || left > 40*time.Millisecond {
-		t.Fatalf("paused remaining = %v, want what was left of 40ms", left)
+	if left != 30*time.Millisecond {
+		t.Fatalf("paused remaining = %v, want the 30ms left of 40ms", left)
 	}
 	// Releasing resumes with the time left, then the popup goes.
 	s.ReleasePopup(id)
-	if got := waitPopups(s, 0, time.Second); got != 0 {
+	advance(s, 29*time.Millisecond)
+	if got := len(s.Popups()); got != 1 {
+		t.Fatalf("released popup left early: popups = %d", got)
+	}
+	advance(s, time.Millisecond)
+	if got := len(s.Popups()); got != 0 {
 		t.Fatalf("released popup never timed out: popups = %d", got)
 	}
 }
@@ -160,7 +163,7 @@ func TestRemoveExpiredOffKeepsHistory(t *testing.T) {
 	s := newTestService(t)
 	s.SetRemoveExpired(false)
 	s.Notify("app", 0, "", "flash", "", nil, 20)
-	time.Sleep(60 * time.Millisecond)
+	advance(s, time.Hour)
 	if got := s.Count(); got != 1 {
 		t.Fatalf("history = %d, want expired entries kept with remove-expired off", got)
 	}

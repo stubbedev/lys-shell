@@ -123,12 +123,13 @@ const (
 type EventKind string
 
 // popupTimer is one popup's pausable countdown (popup_timer.rs's
-// PopupTimer): running while timer is set, paused with the remaining
+// PopupTimer): running while stop is set, paused with the remaining
 // time held in duration.
 type popupTimer struct {
 	started  time.Time
 	duration time.Duration
-	timer    *time.Timer
+	// stop disarms the running countdown; nil while paused.
+	stop func() bool
 }
 
 // remaining is the time left on a running countdown.
@@ -142,7 +143,7 @@ type Service struct {
 	next uint32
 	all  []*Notification
 	// expiry holds the history-expiry timers (remove-expired).
-	expiry map[uint32]*time.Timer
+	expiry map[uint32]*expiryTimer
 	// popups is the visible popup list, newest first; timers holds
 	// each one's countdown.
 	popups        []*Notification
@@ -158,13 +159,44 @@ type Service struct {
 	cacheImage func(imageData) (string, bool)
 	// store persists the history; nil keeps it in memory only.
 	store *Store
+	// clock stamps arrivals and arms the countdowns and expiries.
+	clock Clock
 }
+
+// Clock is the service's time source: when a notification arrived,
+// and the popup countdowns and history expiries it arms.
+type Clock interface {
+	Now() time.Time
+	// AfterFunc runs fn once d has passed; stop disarms it, reporting
+	// whether it was still armed.
+	AfterFunc(d time.Duration, fn func()) (stop func() bool)
+}
+
+type wallClock struct{}
+
+func (wallClock) Now() time.Time { return time.Now() }
+
+func (wallClock) AfterFunc(d time.Duration, fn func()) func() bool {
+	return time.AfterFunc(d, fn).Stop
+}
+
+// UseClock makes the service keep time by c instead of the wall clock,
+// for a host that drives time itself; call it before the first
+// notification.
+func (s *Service) UseClock(c Clock) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clock = c
+}
+
+// expiryTimer is one history entry's armed expiry.
+type expiryTimer struct{ stop func() bool }
 
 // NewService restores the DND flag from the state dir.
 func NewService() *Service {
 	return &Service{
 		next:          0,
-		expiry:        make(map[uint32]*time.Timer),
+		expiry:        make(map[uint32]*expiryTimer),
 		timers:        make(map[uint32]*popupTimer),
 		popupDuration: DefaultPopupDuration,
 		dnd:           loadDND(),
@@ -172,6 +204,7 @@ func NewService() *Service {
 		owners:        make(map[uint32]string),
 		cacheImage:    cacheImage,
 		events:        feed.New[Event](32),
+		clock:         wallClock{},
 	}
 }
 
@@ -302,7 +335,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 		Body:         body,
 		Actions:      ParseActions(actions),
 		ExpireMS:     expireTimeout,
-		Added:        time.Now(),
+		Added:        s.clock.Now(),
 		Urgency:      h.urgency,
 		ImagePath:    h.imagePath,
 		DesktopEntry: h.desktopEntry,
@@ -446,12 +479,12 @@ func (s *Service) InhibitPopup(id uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	t, ok := s.timers[id]
-	if !ok || t.timer == nil {
+	if !ok || t.stop == nil {
 		return
 	}
-	t.timer.Stop()
-	t.timer = nil
-	t.duration = t.remaining(time.Now())
+	t.stop()
+	t.stop = nil
+	t.duration = t.remaining(s.clock.Now())
 }
 
 // ReleasePopup resumes a paused countdown with the time it had left,
@@ -460,7 +493,7 @@ func (s *Service) InhibitPopup(id uint32) {
 func (s *Service) ReleasePopup(id uint32) {
 	s.mu.Lock()
 	t, ok := s.timers[id]
-	if !ok || t.timer != nil {
+	if !ok || t.stop != nil {
 		s.mu.Unlock()
 		return
 	}
@@ -480,14 +513,14 @@ func (s *Service) ReleasePopup(id uint32) {
 // out the popup leaves the list, the history keeps the notification.
 // The caller holds mu.
 func (s *Service) startPopupTimerLocked(id uint32, d time.Duration) {
-	if old, ok := s.timers[id]; ok && old.timer != nil {
-		old.timer.Stop()
+	if old, ok := s.timers[id]; ok && old.stop != nil {
+		old.stop()
 	}
-	t := &popupTimer{started: time.Now(), duration: d}
-	t.timer = time.AfterFunc(d, func() {
+	t := &popupTimer{started: s.clock.Now(), duration: d}
+	t.stop = s.clock.AfterFunc(d, func() {
 		s.mu.Lock()
 		// A pause or restart since replaced this countdown.
-		if s.timers[id] != t || t.timer == nil {
+		if s.timers[id] != t || t.stop == nil {
 			s.mu.Unlock()
 			return
 		}
@@ -504,8 +537,8 @@ func (s *Service) startPopupTimerLocked(id uint32, d time.Duration) {
 // it was on the list. The caller holds mu.
 func (s *Service) dropPopupLocked(id uint32) bool {
 	if t, ok := s.timers[id]; ok {
-		if t.timer != nil {
-			t.timer.Stop()
+		if t.stop != nil {
+			t.stop()
 		}
 		delete(s.timers, id)
 	}
@@ -522,7 +555,7 @@ func (s *Service) dropPopupLocked(id uint32) bool {
 // expiry timer, reporting whether it was stored. The caller holds mu.
 func (s *Service) removeHistoryLocked(id uint32) bool {
 	if timer, ok := s.expiry[id]; ok {
-		timer.Stop()
+		timer.stop()
 		delete(s.expiry, id)
 	}
 	delete(s.owners, id)
@@ -539,8 +572,8 @@ func (s *Service) removeHistoryLocked(id uint32) bool {
 // entry closes with the Expired reason once its timeout passes. The
 // caller holds mu.
 func (s *Service) startExpiryLocked(n *Notification) {
-	var timer *time.Timer
-	timer = time.AfterFunc(time.Until(n.Expires), func() {
+	timer := &expiryTimer{}
+	timer.stop = s.clock.AfterFunc(n.Expires.Sub(s.clock.Now()), func() {
 		// A replacement under the same id stopped this timer; a fire
 		// racing that Stop must not close the newcomer.
 		s.mu.Lock()
@@ -615,9 +648,9 @@ func (s *Service) findLocked(id uint32) *Notification {
 // re-armed. Restored notifications do not pop up again.
 func (s *Service) AttachStore(st *Store) error {
 	s.mu.Lock()
-	removeExpired := s.removeExpired
+	removeExpired, now := s.removeExpired, s.clock.Now()
 	s.mu.Unlock()
-	stored, err := st.Load(time.Now(), removeExpired)
+	stored, err := st.Load(now, removeExpired)
 	if err != nil {
 		return fmt.Errorf("notifications: restoring the history: %w", err)
 	}

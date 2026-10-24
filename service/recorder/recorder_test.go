@@ -68,7 +68,10 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 }
 
 func TestRecordPauseStopSaves(t *testing.T) {
-	engine := &recordertest.Engine{WriteOutput: true}
+	// The gate holds the start at the portal session, so the claim
+	// Start makes is what the snapshot shows, however fast the rest runs.
+	gate := make(chan struct{})
+	engine := &recordertest.Engine{WriteOutput: true, Gate: gate}
 	s, log := newState(t, engine, func(c *config.RecorderConfig) {
 		c.OutputFormat = config.RecorderFormatWebm
 		c.Microphone, c.MicrophoneDevice, c.SystemAudio = true, "mic0", true
@@ -78,6 +81,7 @@ func TestRecordPauseStopSaves(t *testing.T) {
 	if snap := s.Snapshot(); snap.Status != recorder.StatusStarting || !snap.Preparing || snap.Active {
 		t.Fatalf("after Start = %+v, want a synchronous Starting claim", snap)
 	}
+	close(gate)
 	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
 	snap := s.Snapshot()
 	if snap.Preparing || snap.Status != recorder.StatusRecording || filepath.Ext(snap.OutputPath) != ".webm" {
