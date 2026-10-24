@@ -95,7 +95,7 @@ func writeScript(t *testing.T, body string) string {
 
 func TestScriptRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	script := writeScript(t, "#!/bin/sh\nif [ \"$ROFI_RETV\" = 0 ]; then\n  printf '\\0prompt\\x1ftest\\n'\n  echo one\n  echo two\nelif [ \"$1\" = one ]; then\n  echo picked-one\nfi\n")
+	script := writeScript(t, "#!/bin/sh\nif [ \"$ROFI_RETV\" = 0 ]; then\n  printf '\\0prompt\\037test\\n'\n  echo one\n  echo two\nelif [ \"$1\" = one ]; then\n  echo picked-one\nfi\n")
 	m := NewScript("test", script)
 	st := m.Load(ctx)
 	if st.Prompt != "test" || len(st.Items) != 2 {
@@ -114,7 +114,7 @@ func TestScriptRoundTrip(t *testing.T) {
 
 func TestScriptEnvironmentAndHotKeys(t *testing.T) {
 	ctx := context.Background()
-	script := writeScript(t, "#!/bin/sh\nif [ \"$ROFI_RETV\" = 0 ]; then\n  printf '\\0data\\x1fsaved\\n'\n  printf 'row\\0info\\x1fI\\n'\nelse\n  echo \"$ROFI_RETV:$1:$ROFI_INFO:$ROFI_DATA:$ROFI_INPUT\"\nfi\n")
+	script := writeScript(t, "#!/bin/sh\nif [ \"$ROFI_RETV\" = 0 ]; then\n  printf '\\0data\\037saved\\n'\n  printf 'row\\0info\\037I\\n'\nelse\n  echo \"$ROFI_RETV:$1:$ROFI_INFO:$ROFI_DATA:$ROFI_INPUT\"\nfi\n")
 	m := NewScript("env", script)
 	m.Load(ctx)
 	// kb-custom without use-hot-keys does nothing.
