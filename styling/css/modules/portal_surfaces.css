@@ -105,6 +105,7 @@ button.file-chooser-filter:checked {
   background: transparent;
 }
 .file-chooser-filter-list row {
+  background-color: transparent;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--rounding-element);
   color: var(--fg-default);
@@ -156,6 +157,7 @@ button.file-chooser-filter:checked {
   background: transparent;
 }
 .file-chooser-places row {
+  background-color: transparent;
   border-radius: var(--rounding-element);
   padding: var(--space-xs) var(--space-sm);
   transition: background var(--duration-fast);

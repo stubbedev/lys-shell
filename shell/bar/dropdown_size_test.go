@@ -122,7 +122,7 @@ func TestDropdownSizeFloorsThePopoverAroundItsMargins(t *testing.T) {
 
 	p, _ := pagedPanel(widget.NewSpacer(10, 50))
 	root, _ := dropdownTree(p, cfg, 382, 512)
-	// The bundle's `* { all: unset }` must not take the margins with it.
+	// The bundle's rules must not take the margins with them.
 	isolateConfigDir(t)
 	apptheme.New(cfg).Attach(root)
 	sz := widget.MeasureAsChild(root, con)

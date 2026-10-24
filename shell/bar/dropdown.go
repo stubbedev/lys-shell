@@ -436,9 +436,9 @@ func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.
 
 func withDropdownMargins(card *widget.Box, cfg *config.Config) *widget.Box {
 	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
-	// Widget margins, as the registry's set_margin_*: the stylesheet's
-	// `* { all: unset }` resets CSS padding (and with it a programmatic
-	// one), never a widget's margin.
+	// Widget margins, as the registry's set_margin_*: a stylesheet
+	// padding rule replaces a programmatic padding, never a widget's
+	// margin.
 	card.SetMargin(render.Insets{Top: m.top, Bottom: m.bottom, Left: m.start, Right: m.end})
 	box := widget.NewBox(widget.Column, 0, 0)
 	box.Append(card, true)

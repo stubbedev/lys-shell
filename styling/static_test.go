@@ -67,12 +67,16 @@ func orderGaps(fsys fs.FS, root string, order []string) []string {
 	return append(gaps, unlisted...)
 }
 
-// TestStaticCSSIsTheBundle spot-checks the concatenation: the global
-// reset first, then the token block and the bar rules the Go bar
-// relies on.
+// TestStaticCSSIsTheBundle spot-checks the concatenation: the palette
+// first, then the token block and the bar rules the Go bar relies on.
+// No rule resets every node: lys-ui's theme layer styles the widgets
+// the shell does not, and a universal `all: unset` would erase it.
 func TestStaticCSSIsTheBundle(t *testing.T) {
-	if !strings.HasPrefix(StaticCSS, "* {\n  all: unset;\n}") {
-		t.Errorf("StaticCSS does not open with the reset: %.40q", StaticCSS)
+	if !strings.HasPrefix(StaticCSS, ":root {\n  --palette-bg:") {
+		t.Errorf("StaticCSS does not open with the palette: %.40q", StaticCSS)
+	}
+	if strings.Contains(StaticCSS, "* {\n  all: unset;") {
+		t.Error("StaticCSS resets every node, erasing lys-ui's theme layer")
 	}
 	for _, want := range []string{
 		"--bg-surface-elevated: color-mix(in srgb, var(--palette-surface) 93%, var(--palette-fg));",
