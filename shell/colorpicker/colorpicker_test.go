@@ -9,6 +9,8 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/shell/loupe"
 )
 
 func TestParseHex(t *testing.T) {
@@ -92,22 +94,12 @@ func gradient() *image.RGBA {
 	return img
 }
 
-func TestSampleAt(t *testing.T) {
-	img := gradient()
-	if x, y := sampleAt(img, 60, 40, 10.6, 5.2); x != 21 || y != 10 {
-		t.Errorf("scaled sample = %d,%d", x, y)
-	}
-	if x, y := sampleAt(img, 60, 40, -5, 900); x != 0 || y != 79 {
-		t.Errorf("clamped sample = %d,%d", x, y)
-	}
-}
-
 func TestClickPicksAndRemembers(t *testing.T) {
 	dir := t.TempDir()
 	p := &Picker{historyPath: filepath.Join(dir, "h")}
 	ch := make(chan result, 1)
 	p.reply = ch
-	l := &loupe{p: p, frame: gradient(), logicalW: 60, logicalH: 40}
+	l := &surface{p: p, frame: gradient(), logicalW: 60, logicalH: 40}
 	l.Arrange(render.Rect{W: 60, H: 40})
 	l.ClickAt(widget.Point{X: 10, Y: 5})
 	r := <-ch
@@ -153,13 +145,13 @@ func TestLoupePaints(t *testing.T) {
 	drawLoupe(cv, nil, img, 60, 40, box, 50, 50, []RGB{{255, 0, 0}})
 	// The grid's top-left cell sits just right-below the cursor offset
 	// and shows the pixel radius cells up-left of the center.
-	cx, cy := sampleAt(img, 60, 40, 50, 50)
-	want := img.RGBAAt(max(cx-radius, 0), max(cy-radius, 0))
+	cx, cy := loupe.SampleAt(img, 60, 40, 50, 50)
+	want := img.RGBAAt(max(cx-loupe.Radius, 0), max(cy-loupe.Radius, 0))
 	if got := at(50+24+1, 50+24+1); got != render.RGB(want.R, want.G, want.B) {
 		t.Fatalf("grid cell = %#x, want %v", uint32(got), want)
 	}
 	// The first history swatch is red.
-	swatchY := 50 + 24 + (2*radius+1)*zoom + readoutH + 5
+	swatchY := 50 + 24 + loupe.Size + readoutH + 5
 	if got := at(50+24+5, swatchY); got != render.RGB(255, 0, 0) {
 		t.Fatalf("swatch = %#x", uint32(got))
 	}

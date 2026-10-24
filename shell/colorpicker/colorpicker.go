@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"image"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,20 +21,15 @@ import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
-// Loupe geometry of color_picker/mod.rs.
+// Card geometry of color_picker/mod.rs, around the loupe's grid.
 const (
-	// zoom is the size of one magnified source pixel.
-	zoom = 11
-	// radius is the loupe radius in source pixels: the grid is
-	// 2*radius+1 square.
-	radius = 8
 	// historyMax is the most swatches kept.
 	historyMax = 8
 
-	offset     = 24.0
 	panelPad   = 10
 	readoutH   = 28
 	swatchSize = 16
@@ -46,8 +40,6 @@ const (
 // Colors of the loupe card.
 var (
 	cardBacking   = render.RGBA(20, 20, 26, 235)
-	crossWhite    = render.RGBA(255, 255, 255, 242)
-	crossBlack    = render.RGBA(0, 0, 0, 230)
 	hexColor      = render.RGBA(255, 255, 255, 242)
 	swatchOutline = render.RGBA(255, 255, 255, 77)
 )
@@ -133,7 +125,7 @@ func (p *Picker) show(ch chan result, frames map[string]*image.RGBA) {
 		if !ok || frame == nil {
 			continue
 		}
-		l := &loupe{p: p, frame: frame, logicalW: mon.Width, logicalH: mon.Height}
+		l := &surface{p: p, frame: frame, logicalW: mon.Width, logicalH: mon.Height}
 		layer, err := p.app.NewLayer(app.LayerConfig{
 			Output:        out,
 			Layer:         app.LayerOverlay,
@@ -236,27 +228,14 @@ func parseHex(line string) (RGB, bool) {
 	return RGB{uint8(v >> 16), uint8(v >> 8), uint8(v)}, true
 }
 
-// sampleAt is the source pixel under a surface-local logical point:
-// the point scaled to the frame's physical resolution, truncated and
-// clamped.
-func sampleAt(img *image.RGBA, logicalW, logicalH int, lx, ly float64) (int, int) {
-	b := img.Bounds()
-	sx := float64(b.Dx()) / float64(max(logicalW, 1))
-	sy := float64(b.Dy()) / float64(max(logicalH, 1))
-	return clampIndex(int(lx*sx), b.Dx()-1), clampIndex(int(ly*sy), b.Dy()-1)
-}
-
 // pixel reads img at frame coordinates as an opaque 8-bit color.
 func pixel(img *image.RGBA, x, y int) RGB {
-	c := img.RGBAAt(img.Bounds().Min.X+x, img.Bounds().Min.Y+y)
+	c := loupe.Pixel(img, x, y)
 	return RGB{c.R, c.G, c.B}
 }
 
-// clampIndex clamps v into [0, hi].
-func clampIndex(v, hi int) int { return min(max(v, 0), hi) }
-
-// loupe is one monitor's picker surface.
-type loupe struct {
+// surface is one monitor's picker surface.
+type surface struct {
 	widget.Base
 	p                  *Picker
 	frame              *image.RGBA
@@ -270,23 +249,23 @@ type loupe struct {
 	bright *image.RGBA
 }
 
-func (l *loupe) Measure(con widget.Constraints) widget.Size { return con.Max }
+func (l *surface) Measure(con widget.Constraints) widget.Size { return con.Max }
 
-func (l *loupe) HitTest(p widget.Point) widget.Widget { return l.HitLeaf(l, p) }
+func (l *surface) HitTest(p widget.Point) widget.Widget { return l.HitLeaf(l, p) }
 
 // CursorName implements widget.CursorNamer: the loupe replaces the
 // pointer.
-func (l *loupe) CursorName() string { return "none" }
+func (l *surface) CursorName() string { return "none" }
 
 // HoverMove implements widget.HoverMover.
-func (l *loupe) HoverMove(p widget.Point) {
+func (l *surface) HoverMove(p widget.Point) {
 	b := l.Bounds()
 	l.cursorX, l.cursorY, l.hasCursor = float64(p.X-b.X), float64(p.Y-b.Y), true
 	l.Invalidate()
 }
 
 // SetHovered implements widget.HoverSetter: leaving hides the loupe.
-func (l *loupe) SetHovered(on bool) {
+func (l *surface) SetHovered(on bool) {
 	if !on {
 		l.hasCursor = false
 		l.Invalidate()
@@ -295,13 +274,13 @@ func (l *loupe) SetHovered(on bool) {
 
 // ClickAt implements widget.Clicker: the release picks the pixel under
 // it.
-func (l *loupe) ClickAt(p widget.Point) {
+func (l *surface) ClickAt(p widget.Point) {
 	b := l.Bounds()
-	x, y := sampleAt(l.frame, l.logicalW, l.logicalH, float64(p.X-b.X), float64(p.Y-b.Y))
+	x, y := loupe.SampleAt(l.frame, l.logicalW, l.logicalH, float64(p.X-b.X), float64(p.Y-b.Y))
 	l.p.finish(pixel(l.frame, x, y), true)
 }
 
-func (l *loupe) Paint(cv *render.Canvas) {
+func (l *surface) Paint(cv *render.Canvas) {
 	b := l.Bounds()
 	dev := cv.MapRect(b)
 	if l.bright == nil || l.bright.Bounds().Dx() != dev.W || l.bright.Bounds().Dy() != dev.H {
@@ -318,41 +297,19 @@ func (l *loupe) Paint(cv *render.Canvas) {
 // color chip with its hex, and the history swatches. box is the
 // surface's logical rect, (cx, cy) the cursor inside it.
 func drawLoupe(cv *render.Canvas, font render.Font, img *image.RGBA, logicalW, logicalH int, box render.Rect, cx, cy float64, history []RGB) {
-	centerX, centerY := sampleAt(img, logicalW, logicalH, cx, cy)
-	grid := 2*radius + 1
-	loupeSize := grid * zoom
+	centerX, centerY := loupe.SampleAt(img, logicalW, logicalH, cx, cy)
 	historyH := 0
 	if len(history) > 0 {
 		historyH = swatchSize + panelPad
 	}
-	panelW, panelH := loupeSize, loupeSize+readoutH+historyH
-
-	px, py := cx+offset, cy+offset
-	if px+float64(panelW) > float64(box.W) {
-		px = cx - offset - float64(panelW)
-	}
-	if py+float64(panelH) > float64(box.H) {
-		py = cy - offset - float64(panelH)
-	}
-	x0 := box.X + int(math.Max(px, 0))
-	y0 := box.Y + int(math.Max(py, 0))
+	panelW, panelH := loupe.Size, loupe.Size+readoutH+historyH
+	x0, y0 := loupe.Place(box, cx, cy, panelW, panelH)
 
 	cv.FillRect(render.Rect{X: x0 - 4, Y: y0 - 4, W: panelW + 8, H: panelH + 8}, cardBacking)
-	b := img.Bounds()
-	for gy := -radius; gy <= radius; gy++ {
-		for gx := -radius; gx <= radius; gx++ {
-			c := pixel(img, clampIndex(centerX+gx, b.Dx()-1), clampIndex(centerY+gy, b.Dy()-1))
-			cv.FillRect(render.Rect{X: x0 + (gx+radius)*zoom, Y: y0 + (gy+radius)*zoom, W: zoom, H: zoom}, render.RGB(c.R, c.G, c.B))
-		}
-	}
-	// The crosshair: a white box on the picked pixel, ringed in black
-	// so it reads on any color.
-	cx0, cy0 := x0+radius*zoom, y0+radius*zoom
-	cv.BorderRect(render.Rect{X: cx0 - 1, Y: cy0 - 1, W: zoom + 2, H: zoom + 2}, 2, crossWhite)
-	cv.BorderRect(render.Rect{X: cx0 - 2, Y: cy0 - 2, W: zoom + 4, H: zoom + 4}, 1, crossBlack)
+	loupe.Draw(cv, img, centerX, centerY, x0, y0)
 
 	picked := pixel(img, centerX, centerY)
-	ry := y0 + loupeSize
+	ry := y0 + loupe.Size
 	cv.FillRect(render.Rect{X: x0, Y: ry + 4, W: 20, H: 20}, render.RGB(picked.R, picked.G, picked.B))
 	if font != nil {
 		shaped := font.Shape(picked.Hex(), hexPx)
