@@ -2,8 +2,12 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"image"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -13,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/eis"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // RemoteDesktopIface lets a session drive the pointer and keyboard
@@ -21,10 +26,12 @@ import (
 // keyboard. Touch is not supported.
 const RemoteDesktopIface = "org.freedesktop.impl.portal.RemoteDesktop"
 
-// Device types.
+// Device types; touch (4) is not offered.
 const (
 	deviceKeyboard uint32 = 1
 	devicePointer  uint32 = 2
+
+	availableDevices = deviceKeyboard | devicePointer
 )
 
 // keyLeftShift is the evdev code a shifted keysym is typed with.
@@ -45,22 +52,31 @@ type inputSink interface {
 
 func dialInput() (inputSink, error) { return vinput.Dial("", vinput.Options{Keyboard: true}) }
 
-// remoteInput is a started session's devices and keysym table.
+// remoteInput is a started session's devices, the device types the
+// user granted, its keysym table, and the scroll left over from hi-res
+// wheel steps.
 type remoteInput struct {
 	sink    inputSink
+	granted uint32
 	once    sync.Once
 	keysyms map[uint32]keysymKey
+
+	scrollMu sync.Mutex
+	// scrollRest is each axis' 120ths of a detent not yet a whole step.
+	scrollRest [2]int32
 }
 
-// keysymKey is how a keysym is typed: its key and whether shift is held.
+// keysymKey is how a keysym is typed: its key, and whether shift and
+// the level-3 key (AltGr) are held.
 type keysymKey struct {
-	code  uint32
-	shift bool
+	code          uint32
+	shift, level3 bool
+	level3Code    uint32
 }
 
-// keysym types a keysym by its key in the seat's keymap, shift around
-// it when the symbol is on the shifted level; one the keymap does not
-// carry is dropped.
+// keysym types a keysym by its key in the seat's keymap, with shift
+// and AltGr held as its level needs; one the keymap does not carry is
+// dropped.
 func (in *remoteInput) keysym(sym uint32, pressed bool) {
 	in.once.Do(func() { in.keysyms = keysymTable(in.sink.Keymap()) })
 	k, ok := in.keysyms[sym]
@@ -68,6 +84,9 @@ func (in *remoteInput) keysym(sym uint32, pressed bool) {
 		return
 	}
 	if pressed {
+		if k.level3 {
+			_ = in.sink.Key(k.level3Code, true)
+		}
 		if k.shift {
 			_ = in.sink.Key(keyLeftShift, true)
 		}
@@ -78,11 +97,35 @@ func (in *remoteInput) keysym(sym uint32, pressed bool) {
 	if k.shift {
 		_ = in.sink.Key(keyLeftShift, false)
 	}
+	if k.level3 {
+		_ = in.sink.Key(k.level3Code, false)
+	}
 }
 
+// scrollDiscrete scrolls v120 120ths of a detent on axis: the smooth
+// amount at once, and a wheel step each time the 120ths add up to one,
+// so hi-res wheels below a detent are not dropped.
+func (in *remoteInput) scrollDiscrete(axis uint32, v120 int32) {
+	if v120 == 0 {
+		return
+	}
+	in.scrollMu.Lock()
+	total := in.scrollRest[axis] + v120
+	steps := total / 120
+	in.scrollRest[axis] = total % 120
+	in.scrollMu.Unlock()
+	_ = in.sink.AxisDiscrete(axis, float64(v120)*discreteStep/120, steps)
+}
+
+// keysymISOLevel3Shift is the AltGr key's keysym.
+const keysymISOLevel3Shift = 0xfe03
+
 // keysymTable maps each keysym of the keymap's first group to the
-// evdev key that types it, unshifted first. The xkb keycode is the
-// evdev one plus 8.
+// evdev key that types it, on the plainest level: unshifted, shifted,
+// then with AltGr and with AltGr and shift. Level 3 is reached through
+// the key carrying ISO_Level3_Shift, and only when the keymap puts
+// that key in Mod5, the modifier the levels are computed with. The xkb
+// keycode is the evdev one plus 8.
 func keysymTable(keymap []byte) map[uint32]keysymKey {
 	table := map[uint32]keysymKey{}
 	if len(keymap) == 0 {
@@ -93,30 +136,98 @@ func keysymTable(keymap []byte) map[uint32]keysymKey {
 		warnf("remotedesktop: the seat keymap does not parse: %v", err)
 		return table
 	}
-	for _, shift := range []bool{false, true} {
+	add := func(mods xkb.ModMask, k keysymKey) {
 		state := km.NewState()
-		if shift {
-			state.UpdateMask(xkb.ModShift, 0, 0, 0, 0, 0)
-		}
+		state.UpdateMask(mods, 0, 0, 0, 0, 0)
 		for kc := km.MinKeycode(); kc <= km.MaxKeycode(); kc++ {
 			if kc < 8 {
 				continue
 			}
 			for _, sym := range state.KeyGetSyms(kc) {
 				if _, taken := table[uint32(sym)]; !taken && sym != 0 {
-					table[uint32(sym)] = keysymKey{uint32(kc) - 8, shift}
+					k.code = uint32(kc) - 8
+					table[uint32(sym)] = k
 				}
 			}
 		}
 	}
+	add(0, keysymKey{})
+	add(xkb.ModShift, keysymKey{shift: true})
+	level3, ok := table[keysymISOLevel3Shift]
+	if !ok || !inModifierMap(keymap, km.KeyGetName(xkb.Keycode(level3.code+8)), "Mod5") {
+		return table
+	}
+	add(xkb.ModMod5, keysymKey{level3: true, level3Code: level3.code})
+	add(xkb.ModMod5|xkb.ModShift, keysymKey{shift: true, level3: true, level3Code: level3.code})
 	return table
 }
 
-// remoteState is a RemoteDesktop session's device types and, once
-// started, its devices; it lives on the session, guarded by its mu.
+// inModifierMap reports whether the keymap text's modifier_map puts
+// the key named name in the real modifier mod: libxkbcommon writes one
+// `modifier_map <mod> { <KEY>, ... };` line per modifier, and the
+// parser does not expose the map.
+func inModifierMap(keymap []byte, name, mod string) bool {
+	if name == "" {
+		return false
+	}
+	for line := range strings.SplitSeq(string(keymap), "\n") {
+		keys, ok := strings.CutPrefix(strings.TrimSpace(line), "modifier_map "+mod+" {")
+		if ok && strings.Contains(keys, "<"+name+">") {
+			return true
+		}
+	}
+	return false
+}
+
+// remoteState is a RemoteDesktop session's options and, once started,
+// its devices; it lives on the session, guarded by its mu.
 type remoteState struct {
-	types uint32
-	input *remoteInput
+	types, persistMode uint32
+	restore            *remoteRestore
+	input              *remoteInput
+}
+
+// remoteRestore is what a RemoteDesktop restore token keeps: the device
+// types the user granted and the screens shared with them.
+type remoteRestore struct {
+	devices uint32
+	targets []captureTarget
+}
+
+// remoteTokenPrefix marks a RemoteDesktop token's data, which a
+// ScreenCast token's never starts with.
+const remoteTokenPrefix = "remote:"
+
+func encodeRemoteRestore(r remoteRestore) restoreToken {
+	data := remoteTokenPrefix + strconv.FormatUint(uint64(r.devices), 10) + "/" + joinTargets(r.targets)
+	return restoreToken{restoreVendor, restoreVersion, dbus.MakeVariant(data)}
+}
+
+// decodeRemoteRestore reads a RemoteDesktop token this portal issued;
+// any other is none.
+func decodeRemoteRestore(v dbus.Variant) (remoteRestore, bool) {
+	fields, ok := v.Value().([]any)
+	if !ok || len(fields) != 3 || fields[0] != restoreVendor {
+		return remoteRestore{}, false
+	}
+	data, _ := fields[2].(dbus.Variant)
+	payload, _ := data.Value().(string)
+	rest, ok := strings.CutPrefix(payload, remoteTokenPrefix)
+	devices, targets, found := strings.Cut(rest, "/")
+	if !ok || !found {
+		return remoteRestore{}, false
+	}
+	n, err := strconv.ParseUint(devices, 10, 32)
+	if err != nil || n == 0 || uint32(n)&^availableDevices != 0 {
+		return remoteRestore{}, false
+	}
+	r := remoteRestore{devices: uint32(n)}
+	if targets != "" {
+		if r.targets, ok = parseTargets(targets); !ok {
+			return remoteRestore{}, false
+		}
+	}
+	return r, true
 }
 
 // started is whether Start created the session's devices.
@@ -127,13 +238,14 @@ func (r *remoteState) started() bool { return r.input != nil }
 type remoteDesktop struct {
 	conn     *dbus.Conn
 	sessions *sessions
-	sizes    *streamSizes
+	// cast shares the session's screens and knows its streams.
+	cast *screenCast
 	// dial creates a session's devices (dialInput; a fake in tests).
 	dial func() (inputSink, error)
 }
 
-func newRemoteDesktop(conn *dbus.Conn, s *sessions, sizes *streamSizes, dial func() (inputSink, error)) *remoteDesktop {
-	return &remoteDesktop{conn: conn, sessions: s, sizes: sizes, dial: dial}
+func newRemoteDesktop(conn *dbus.Conn, s *sessions, cast *screenCast, dial func() (inputSink, error)) *remoteDesktop {
+	return &remoteDesktop{conn: conn, sessions: s, cast: cast, dial: dial}
 }
 
 func (r *remoteDesktop) iface() dbusx.Interface {
@@ -141,7 +253,7 @@ func (r *remoteDesktop) iface() dbusx.Interface {
 		Name:    RemoteDesktopIface,
 		Methods: remoteDesktopObject{r},
 		Properties: dbusx.Getters{
-			"AvailableDeviceTypes": func() any { return deviceKeyboard | devicePointer },
+			"AvailableDeviceTypes": func() any { return availableDevices },
 			"version":              func() any { return uint32(2) },
 		},
 	}
@@ -196,7 +308,8 @@ func (o remoteDesktopObject) CreateSession(_, session dbus.ObjectPath, appID str
 	return ResponseSuccess, Vardict{}, nil
 }
 
-// SelectDevices records the device types (both when none are named).
+// SelectDevices records the device types (both when none are named),
+// the persist mode, and a replayed restore token.
 func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID string, options Vardict) (uint32, Vardict, *dbus.Error) {
 	s, err := o.r.sessions.lookup(session, appID, kindRemoteDesktop)
 	if err != nil {
@@ -205,16 +318,41 @@ func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID str
 	}
 	types, ok := optU32(options, "types")
 	if !ok {
-		types = deviceKeyboard | devicePointer
+		types = availableDevices
+	}
+	if types == 0 || types&^availableDevices != 0 {
+		warnf("remotedesktop: SelectDevices: device types %#x, of %#x offered", types, availableDevices)
+		return ResponseOther, Vardict{}, nil
+	}
+	persist, _ := optU32(options, "persist_mode")
+	var restore *remoteRestore
+	if v, ok := options["restore_data"]; ok {
+		if r, ok := decodeRemoteRestore(v); ok {
+			restore = &r
+		}
 	}
 	s.mu.Lock()
-	s.remote.types = types
+	s.remote.types, s.remote.persistMode, s.remote.restore = types, persist, restore
 	s.mu.Unlock()
 	return ResponseSuccess, Vardict{}, nil
 }
 
-// Start asks the user to allow control, then creates the devices and
-// replies the granted types.
+// devicesPhrase names device types for the consent dialog.
+func devicesPhrase(types uint32) string {
+	switch types {
+	case deviceKeyboard:
+		return "your keyboard"
+	case devicePointer:
+		return "your pointer"
+	}
+	return "your keyboard and pointer"
+}
+
+// Start asks the user to allow control of the selected devices (and
+// picks the screens when the session shares them), unless a restore
+// token of the same devices replays an earlier grant; then it creates
+// the devices and replies them, the streams, whether the clipboard is
+// enabled, and a restore token when persisting.
 func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, parent string, _ Vardict) (uint32, Vardict, *dbus.Error) {
 	s, err := o.r.sessions.lookup(session, appID, kindRemoteDesktop)
 	if err != nil {
@@ -222,27 +360,49 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		return ResponseOther, Vardict{}, nil
 	}
 	dialogs := portaldialogs.NewClient(o.r.conn)
-	c, ok := beginOr(o.r.conn, handle, appID, parent, dialogs.Dismiss)
+	c, ok := beginOr(o.r.conn, handle, appID, parent, func(ctx context.Context, h string) error {
+		return errors.Join(dialogs.Dismiss(ctx, h), sharepicker.NewClient(o.r.conn).Dismiss(ctx, h))
+	})
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
 	s.mu.Lock()
-	types := s.remote.types
+	state, clipboard := *s.remote, s.clipboard
 	s.mu.Unlock()
-	granted := deviceKeyboard | devicePointer
-	if types != 0 {
-		granted = types & (deviceKeyboard | devicePointer)
+	sharing := sharesScreens(s)
+	restoring := state.restore != nil && state.restore.devices == state.types
+	if sharing {
+		// The session's persist mode is RemoteDesktop's: it governs the
+		// picker's token box, and a token replays the screens it kept.
+		s.mu.Lock()
+		s.cast.persistMode = state.persistMode
+		if restoring && len(state.restore.targets) > 0 && allOfTypes(state.restore.targets, s.cast.types) {
+			s.cast.restore = state.restore.targets
+		}
+		s.mu.Unlock()
 	}
-	allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
-		Title: "Remote control", Body: "An application is requesting control of your pointer and keyboard.",
-		GrantLabel: "Allow", DenyLabel: "Deny", Icon: "input-keyboard-symbolic",
-	})
-	if err != nil && !c.closed() {
-		warnf("remotedesktop: consent dialog unavailable; denying: %v", err)
+	if !restoring {
+		body := "It asks to control " + devicesPhrase(state.types) + "."
+		if sharing {
+			body = "It asks to control " + devicesPhrase(state.types) + " and to see your screen."
+		}
+		allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+			Title: "Allow remote control?", Body: body,
+			GrantLabel: "Allow", DenyLabel: "Deny", Icon: "input-keyboard-symbolic",
+		})
+		if code := c.response("remotedesktop", allowed, err); code != ResponseSuccess {
+			return ResponseCancelled, Vardict{}, nil
+		}
 	}
-	if err != nil || !allowed || c.closed() {
-		return ResponseCancelled, Vardict{}, nil
+	results := Vardict{}
+	var shared sharedScreens
+	if sharing {
+		var code uint32
+		if shared, code = o.r.cast.share(c, s); code != ResponseSuccess {
+			return code, Vardict{}, nil
+		}
+		results["streams"] = dbus.MakeVariant(shared.streams)
 	}
 	sink, err := o.r.dial()
 	if err != nil {
@@ -251,20 +411,30 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 	}
 	s.mu.Lock()
 	old := s.remote.input
-	s.remote.input = &remoteInput{sink: sink}
+	s.remote.input = &remoteInput{sink: sink, granted: state.types}
 	s.mu.Unlock()
 	if old != nil {
 		old.sink.Close()
 	}
-	return ResponseSuccess, Vardict{"devices": dbus.MakeVariant(granted)}, nil
+	results["devices"] = dbus.MakeVariant(state.types)
+	results["clipboard_enabled"] = dbus.MakeVariant(clipboard)
+	if state.persistMode > 0 && (!sharing || shared.allowToken) {
+		results["restore_data"] = dbus.MakeVariant(encodeRemoteRestore(remoteRestore{devices: state.types, targets: shared.targets}))
+		results["persist_mode"] = dbus.MakeVariant(state.persistMode)
+	}
+	return ResponseSuccess, results, nil
 }
 
-// with runs fn on the started session's devices; an unknown or
-// unstarted session is an error.
-func (o remoteDesktopObject) with(session dbus.ObjectPath, fn func(*remoteInput)) *dbus.Error {
+// with runs fn on the started session's devices when the user granted
+// the device type it drives; an unknown or unstarted session, or a
+// device type not granted, is an error.
+func (o remoteDesktopObject) with(session dbus.ObjectPath, device uint32, fn func(*remoteInput)) *dbus.Error {
 	in, err := o.r.input(session)
 	if err != nil {
 		return dbusx.Failed(err.Error())
+	}
+	if in.granted&device == 0 {
+		return dbusx.Failed(fmt.Sprintf("remote-desktop session %s was not granted device type %d", session, device))
 	}
 	fn(in)
 	return nil
@@ -272,29 +442,62 @@ func (o remoteDesktopObject) with(session dbus.ObjectPath, fn func(*remoteInput)
 
 // NotifyPointerMotion moves the pointer relatively.
 func (o remoteDesktopObject) NotifyPointerMotion(session dbus.ObjectPath, _ Vardict, dx, dy float64) *dbus.Error {
-	return o.with(session, func(in *remoteInput) { _ = in.sink.Motion(dx, dy) })
+	return o.with(session, devicePointer, func(in *remoteInput) { _ = in.sink.Motion(dx, dy) })
 }
 
-// NotifyPointerMotionAbsolute moves the pointer within a ScreenCast
-// stream's extent; an unknown stream is dropped.
+// absoluteScale keeps a fraction of a logical pixel in the virtual
+// pointer's whole-number absolute motion.
+const absoluteScale = 256
+
+// NotifyPointerMotionAbsolute moves the pointer to (x, y) of one of the
+// session's monitor streams, in its logical coordinates: placed by the
+// stream's position in the compositor's layout, whose extent the
+// virtual pointer's absolute motion spans.
 func (o remoteDesktopObject) NotifyPointerMotionAbsolute(session dbus.ObjectPath, _ Vardict, stream uint32, x, y float64) *dbus.Error {
-	size, ok := o.r.sizes.get(stream)
-	if !ok {
-		return nil
+	s, err := o.r.session(session)
+	if err != nil {
+		return dbusx.Failed(err.Error())
 	}
-	return o.with(session, func(in *remoteInput) {
-		_ = in.sink.MotionAbsolute(uint32(max(x, 0)), uint32(max(y, 0)), uint32(max(size[0], 1)), uint32(max(size[1], 1)))
+	st, ok := o.r.cast.stream(s, stream)
+	if !ok {
+		return dbusx.Failed(fmt.Sprintf("session %s runs no stream %d", session, stream))
+	}
+	outputs, err := o.r.cast.outputs()
+	if err != nil {
+		return dbusx.Failed(fmt.Sprintf("no output layout for absolute motion: %v", err))
+	}
+	sx, sy, sw, sh, ok := st.target.geometry(outputs)
+	if !ok {
+		return dbusx.Failed(fmt.Sprintf("stream %d has no place in the layout", stream))
+	}
+	box := layoutBox(outputs)
+	gx := float64(sx) + min(max(x, 0), float64(sw))
+	gy := float64(sy) + min(max(y, 0), float64(sh))
+	return o.with(session, devicePointer, func(in *remoteInput) {
+		_ = in.sink.MotionAbsolute(
+			uint32((gx-float64(box.Min.X))*absoluteScale), uint32((gy-float64(box.Min.Y))*absoluteScale),
+			uint32(box.Dx()*absoluteScale), uint32(box.Dy()*absoluteScale))
 	})
+}
+
+// layoutBox is the outputs' bounding box in the compositor's logical
+// space.
+func layoutBox(outputs []outputGeometry) image.Rectangle {
+	var box image.Rectangle
+	for _, o := range outputs {
+		box = box.Union(image.Rect(int(o.x), int(o.y), int(o.x+o.width), int(o.y+o.height)))
+	}
+	return box
 }
 
 // NotifyPointerButton presses or releases an evdev button.
 func (o remoteDesktopObject) NotifyPointerButton(session dbus.ObjectPath, _ Vardict, button int32, state uint32) *dbus.Error {
-	return o.with(session, func(in *remoteInput) { _ = in.sink.Button(uint32(button), state != 0) })
+	return o.with(session, devicePointer, func(in *remoteInput) { _ = in.sink.Button(uint32(button), state != 0) })
 }
 
 // NotifyPointerAxis scrolls smoothly, vertical then horizontal.
 func (o remoteDesktopObject) NotifyPointerAxis(session dbus.ObjectPath, _ Vardict, dx, dy float64) *dbus.Error {
-	return o.with(session, func(in *remoteInput) { smoothScroll(in.sink, dx, dy) })
+	return o.with(session, devicePointer, func(in *remoteInput) { smoothScroll(in.sink, dx, dy) })
 }
 
 func smoothScroll(sink inputSink, dx, dy float64) {
@@ -319,19 +522,19 @@ const discreteStep = 15
 
 // NotifyPointerAxisDiscrete scrolls whole wheel steps.
 func (o remoteDesktopObject) NotifyPointerAxisDiscrete(session dbus.ObjectPath, _ Vardict, axis uint32, steps int32) *dbus.Error {
-	return o.with(session, func(in *remoteInput) {
+	return o.with(session, devicePointer, func(in *remoteInput) {
 		_ = in.sink.AxisDiscrete(axisOf(axis), float64(steps)*discreteStep, steps)
 	})
 }
 
 // NotifyKeyboardKeycode presses or releases an evdev key.
 func (o remoteDesktopObject) NotifyKeyboardKeycode(session dbus.ObjectPath, _ Vardict, keycode int32, state uint32) *dbus.Error {
-	return o.with(session, func(in *remoteInput) { _ = in.sink.Key(uint32(keycode), state != 0) })
+	return o.with(session, deviceKeyboard, func(in *remoteInput) { _ = in.sink.Key(uint32(keycode), state != 0) })
 }
 
 // NotifyKeyboardKeysym types a keysym through the seat's keymap.
 func (o remoteDesktopObject) NotifyKeyboardKeysym(session dbus.ObjectPath, _ Vardict, keysym int32, state uint32) *dbus.Error {
-	return o.with(session, func(in *remoteInput) { in.keysym(uint32(keysym), state != 0) })
+	return o.with(session, deviceKeyboard, func(in *remoteInput) { in.keysym(uint32(keysym), state != 0) })
 }
 
 // NotifyTouchDown is unsupported.
@@ -350,23 +553,48 @@ func (remoteDesktopObject) NotifyTouchUp(_ dbus.ObjectPath, _ Vardict, _ uint32)
 	return nil
 }
 
-// eisInput replays an EIS client's emulation onto a session's devices.
+// eisInput replays an EIS client's emulation onto a session's devices,
+// the device types the user granted only.
 type eisInput struct{ in *remoteInput }
 
-func (e eisInput) Motion(dx, dy float64)            { _ = e.in.sink.Motion(dx, dy) }
-func (e eisInput) Button(code uint32, pressed bool) { _ = e.in.sink.Button(code, pressed) }
-func (e eisInput) Scroll(dx, dy float64)            { smoothScroll(e.in.sink, dx, dy) }
-func (e eisInput) Key(code uint32, pressed bool)    { _ = e.in.sink.Key(code, pressed) }
-func (e eisInput) Keysym(sym uint32, pressed bool)  { e.in.keysym(sym, pressed) }
+func (e eisInput) pointer() bool  { return e.in.granted&devicePointer != 0 }
+func (e eisInput) keyboard() bool { return e.in.granted&deviceKeyboard != 0 }
 
-// ScrollDiscrete turns 120ths of a detent into whole wheel steps,
-// vertical then horizontal.
-func (e eisInput) ScrollDiscrete(dx, dy int32) {
-	if dy != 0 {
-		_ = e.in.sink.AxisDiscrete(0, float64(dy/120)*discreteStep, dy/120)
+func (e eisInput) Motion(dx, dy float64) {
+	if e.pointer() {
+		_ = e.in.sink.Motion(dx, dy)
 	}
-	if dx != 0 {
-		_ = e.in.sink.AxisDiscrete(1, float64(dx/120)*discreteStep, dx/120)
+}
+
+func (e eisInput) Button(code uint32, pressed bool) {
+	if e.pointer() {
+		_ = e.in.sink.Button(code, pressed)
+	}
+}
+
+func (e eisInput) Scroll(dx, dy float64) {
+	if e.pointer() {
+		smoothScroll(e.in.sink, dx, dy)
+	}
+}
+
+func (e eisInput) Key(code uint32, pressed bool) {
+	if e.keyboard() {
+		_ = e.in.sink.Key(code, pressed)
+	}
+}
+
+func (e eisInput) Keysym(sym uint32, pressed bool) {
+	if e.keyboard() {
+		e.in.keysym(sym, pressed)
+	}
+}
+
+// ScrollDiscrete scrolls 120ths of a detent, vertical then horizontal.
+func (e eisInput) ScrollDiscrete(dx, dy int32) {
+	if e.pointer() {
+		e.in.scrollDiscrete(0, dy)
+		e.in.scrollDiscrete(1, dx)
 	}
 }
 

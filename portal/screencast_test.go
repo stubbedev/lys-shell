@@ -101,7 +101,7 @@ func castRig(t *testing.T, fail ...string) (*rig, *fakeStarts) {
 		f.fail[p] = true
 	}
 	r := newRig(t, func(b *Backend) {
-		b.screenCast = newScreenCast(b.conn, b.sessions, b.sizes, f.start, f.outputs)
+		b.screenCast = newScreenCast(b.conn, b.sessions, f.start, f.outputs)
 	})
 	return r, f
 }
@@ -191,20 +191,27 @@ func TestScreenCastPicksAndStreams(t *testing.T) {
 	if got, ok := decodeRestore(res["restore_data"]); !ok || !slices.Equal(payloads(got), []string{"screen:DP-1"}) {
 		t.Errorf("restore_data = %v", res["restore_data"])
 	}
-	if size, ok := r.backend.sizes.get(40); !ok || size != [2]int32{1920, 1080} {
-		t.Errorf("RemoteDesktop sees %v, %v", size, ok)
+	if !r.sessionRuns(sessA, 40) {
+		t.Error("the session does not list its stream")
 	}
 
-	// Closing the session stops its streams and forgets their sizes.
+	// Closing the session stops its streams.
 	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
 		t.Fatal(err)
 	}
 	if !f.streams.Load()[0].closed.Load() {
 		t.Error("the stream outlived its session")
 	}
-	if _, ok := r.backend.sizes.get(40); ok {
-		t.Error("a closed stream's size stayed registered")
+}
+
+// sessionRuns reports whether the live session at path runs node.
+func (r *rig) sessionRuns(path dbus.ObjectPath, node uint32) bool {
+	s, live := r.backend.sessions.get(path)
+	if !live {
+		return false
 	}
+	_, ok := r.backend.screenCast.stream(s, node)
+	return ok
 }
 
 // A region sits at its output's position plus its offset; a window's
@@ -348,8 +355,8 @@ func TestScreenCastStartsAllOrNothing(t *testing.T) {
 	if s := f.streams.Load(); len(s) != 1 || !s[0].closed.Load() {
 		t.Error("the stream started before the failure kept running")
 	}
-	if _, ok := r.backend.sizes.get(40); ok {
-		t.Error("a rolled-back stream registered its size")
+	if r.sessionRuns(sessA, 40) {
+		t.Error("the session lists a rolled-back stream")
 	}
 }
 
@@ -423,9 +430,6 @@ func TestScreenCastSourceLossClosesTheSession(t *testing.T) {
 	r.waitClosed(t, sessA)
 	if !streams[0].closed.Load() || !streams[1].closed.Load() {
 		t.Error("streams outlived their session")
-	}
-	if _, ok := r.backend.sizes.get(streams[0].node); ok {
-		t.Error("a closed session's stream size stayed registered")
 	}
 	if _, live := r.backend.sessions.get(sessA); live {
 		t.Error("the session stayed live")

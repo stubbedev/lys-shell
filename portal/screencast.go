@@ -1,7 +1,7 @@
 package portal
 
 import (
-	"sync"
+	"slices"
 
 	"github.com/godbus/dbus/v5"
 
@@ -33,38 +33,11 @@ type castState struct {
 	streams                        []startedStream
 }
 
-// streamSizes maps a running stream's node id to its size, shared with
-// RemoteDesktop, which maps absolute pointer motion onto a stream.
-type streamSizes struct {
-	mu    sync.Mutex
-	sizes map[uint32][2]int32
-}
-
-func (s *streamSizes) set(node uint32, w, h int32) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sizes[node] = [2]int32{w, h}
-}
-
-func (s *streamSizes) drop(node uint32) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.sizes, node)
-}
-
-func (s *streamSizes) get(node uint32) ([2]int32, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	size, ok := s.sizes[node]
-	return size, ok
-}
-
 // screenCast is the interface: its sessions' state lives on the
 // session records.
 type screenCast struct {
 	conn     *dbus.Conn
 	sessions *sessions
-	sizes    *streamSizes
 	// start runs one stream (startScreenStream; a fake in tests).
 	start func(target captureTarget, cursor bool, fps uint32) (screenStream, error)
 	// outputs is the outputs' logical geometry (the Wayland loop's; a
@@ -79,13 +52,11 @@ type startedStream struct {
 	stream  screenStream
 	target  captureTarget
 	node    uint32
-	width   int32
-	height  int32
 	stopped chan struct{}
 }
 
-func newScreenCast(conn *dbus.Conn, s *sessions, sizes *streamSizes, start func(captureTarget, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
-	return &screenCast{conn: conn, sessions: s, sizes: sizes, start: start, outputs: outputs}
+func newScreenCast(conn *dbus.Conn, s *sessions, start func(captureTarget, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
+	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs}
 }
 
 func (c *screenCast) iface() dbusx.Interface {
@@ -127,7 +98,6 @@ func (c *screenCast) sharing(s *session) {
 func (c *screenCast) stopStreams(streams []startedStream) {
 	for _, s := range streams {
 		close(s.stopped)
-		c.sizes.drop(s.node)
 		s.stream.Close()
 	}
 }
@@ -189,11 +159,9 @@ func (c *screenCast) begin(session *session, targets []captureTarget, cursorMode
 			c.stopStreams(started)
 			return nil, err
 		}
-		w, h := s.Size()
-		started = append(started, startedStream{stream: s, target: t, node: s.NodeID(), width: w, height: h, stopped: make(chan struct{})})
+		started = append(started, startedStream{stream: s, target: t, node: s.NodeID(), stopped: make(chan struct{})})
 	}
 	for _, s := range started {
-		c.sizes.set(s.node, s.width, s.height)
 		go c.watch(session, s)
 	}
 	session.mu.Lock()
@@ -339,21 +307,38 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 		return ResponseOther, Vardict{}, nil
 	}
 	defer call.end()
-	results, code := o.c.share(call, s)
-	return code, results, nil
+	shared, code := o.c.share(call, s)
+	if code != ResponseSuccess {
+		return code, Vardict{}, nil
+	}
+	results := Vardict{"streams": dbus.MakeVariant(shared.streams)}
+	if cfg := o.c.config(s); cfg.persistMode > 0 && shared.allowToken {
+		results["restore_data"] = dbus.MakeVariant(encodeRestore(shared.targets))
+		results["persist_mode"] = dbus.MakeVariant(cfg.persistMode)
+	}
+	return ResponseSuccess, results, nil
 }
 
-// share picks the session's sources (or replays its token), starts
-// their streams, and makes the results Start replies: the streams and,
-// when granted, a restore token for all of them.
-func (c *screenCast) share(call *call, s *session) (Vardict, uint32) {
+// sharedScreens is what share started: the streams Start replies, the
+// sources behind them, and whether the user granted a restore token.
+type sharedScreens struct {
+	streams    []castStream
+	targets    []captureTarget
+	allowToken bool
+}
+
+// share picks the session's sources (or replays its restore targets)
+// and starts their streams, for ScreenCast.Start or a RemoteDesktop
+// session's.
+func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	cfg := c.config(s)
+	// Replaying a token is the grant it was issued for.
 	restoring := len(cfg.restore) > 0
-	allowToken, targets := cfg.persistMode > 0, cfg.restore
+	allowToken, targets := restoring, cfg.restore
 	if !restoring {
 		var code uint32
 		if allowToken, targets, code = c.pick(call, cfg); code != ResponseSuccess {
-			return Vardict{}, code
+			return sharedScreens{}, code
 		}
 	}
 	streams, err := c.begin(s, targets, cfg.cursorMode)
@@ -361,13 +346,13 @@ func (c *screenCast) share(call *call, s *session) (Vardict, uint32) {
 		warnf("screencast: restored target unavailable, re-prompting: %v", err)
 		var code uint32
 		if allowToken, targets, code = c.pick(call, cfg); code != ResponseSuccess {
-			return Vardict{}, code
+			return sharedScreens{}, code
 		}
 		streams, err = c.begin(s, targets, cfg.cursorMode)
 	}
 	if err != nil {
 		warnf("screencast: failed to start stream: %v", err)
-		return Vardict{}, ResponseOther
+		return sharedScreens{}, ResponseOther
 	}
 	outputs, err := c.outputs()
 	if err != nil {
@@ -377,10 +362,26 @@ func (c *screenCast) share(call *call, s *session) (Vardict, uint32) {
 	for _, st := range streams {
 		out = append(out, castStream{st.node, streamProps(st, outputs)})
 	}
-	results := Vardict{"streams": dbus.MakeVariant(out)}
-	if cfg.persistMode > 0 && allowToken {
-		results["restore_data"] = dbus.MakeVariant(encodeRestore(targets))
-		results["persist_mode"] = dbus.MakeVariant(cfg.persistMode)
+	return sharedScreens{streams: out, targets: targets, allowToken: allowToken}, ResponseSuccess
+}
+
+// stream is the session's running stream on node.
+func (c *screenCast) stream(s *session, node uint32) (startedStream, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cast == nil {
+		return startedStream{}, false
 	}
-	return results, ResponseSuccess
+	i := slices.IndexFunc(s.cast.streams, func(st startedStream) bool { return st.node == node })
+	if i < 0 {
+		return startedStream{}, false
+	}
+	return s.cast.streams[i], true
+}
+
+// sharesScreens is whether SelectSources was called on the session.
+func sharesScreens(s *session) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cast != nil
 }

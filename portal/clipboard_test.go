@@ -66,7 +66,7 @@ func clipRig(t *testing.T, startErr error) (*rig, *fakeClip) {
 			f.changed.Store(changed)
 			return f, nil
 		})
-		b.remote = newRemoteDesktop(b.conn, b.sessions, b.sizes, func() (inputSink, error) {
+		b.remote = newRemoteDesktop(b.conn, b.sessions, b.screenCast, func() (inputSink, error) {
 			return &fakeSink{keymap: []byte(testKeymap)}, nil
 		})
 	})

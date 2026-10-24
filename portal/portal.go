@@ -32,14 +32,12 @@ type Backend struct {
 	sessions *sessions
 	// spawn starts a program the portal hands off to (detach; a
 	// recorder in tests).
-	spawn     func(argv, env []string) error
-	logind    *logind
-	inhibitor *inhibitor
-	notifier  *notifier
-	clipboard *clipboardBridge
-	shortcuts *globalShortcuts
-	// sizes is the running streams' sizes, ScreenCast's for RemoteDesktop.
-	sizes      *streamSizes
+	spawn      func(argv, env []string) error
+	logind     *logind
+	inhibitor  *inhibitor
+	notifier   *notifier
+	clipboard  *clipboardBridge
+	shortcuts  *globalShortcuts
 	screenCast *screenCast
 	remote     *remoteDesktop
 	// windows is the compositor's window list (a fake in tests).
@@ -58,9 +56,8 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
 	loop := &waylandLoop{}
-	b.sizes = &streamSizes{sizes: map[uint32][2]int32{}}
-	b.screenCast = newScreenCast(conn, b.sessions, b.sizes, startScreenStream, loop.outputs)
-	b.remote = newRemoteDesktop(conn, b.sessions, b.sizes, dialInput)
+	b.screenCast = newScreenCast(conn, b.sessions, startScreenStream, loop.outputs)
+	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, waylandShortcutsStarter(loop))
 	loop.onEnd(b.clipboard.loopEnded)

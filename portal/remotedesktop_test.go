@@ -14,6 +14,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // fakeSink records the injected input.
@@ -64,14 +65,21 @@ xkb_symbols "test" {
 };
 `
 
+// remoteRig has the fake virtual input, the fake streams over a
+// 2x-scaled DP-1 left of a 1x DP-2, and a fake clipboard device.
 func remoteRig(t *testing.T, dialErr error) (*rig, *fakeSink) {
 	sink := &fakeSink{keymap: []byte(testKeymap)}
+	starts := &fakeStarts{fail: map[string]bool{}}
 	r := newRig(t, func(b *Backend) {
-		b.remote = newRemoteDesktop(b.conn, b.sessions, b.sizes, func() (inputSink, error) {
+		b.screenCast = newScreenCast(b.conn, b.sessions, starts.start, starts.outputs)
+		b.remote = newRemoteDesktop(b.conn, b.sessions, b.screenCast, func() (inputSink, error) {
 			if dialErr != nil {
 				return nil, dialErr
 			}
 			return sink, nil
+		})
+		b.clipboard = newClipboardBridge(b.conn, b.sessions, func(func(selectionChange)) (clipDevice, error) {
+			return &fakeClip{data: "copied"}, nil
 		})
 	})
 	return r, sink
@@ -88,11 +96,17 @@ func (r *rig) remoteStart(t *testing.T, options Vardict) (uint32, map[string]dbu
 
 func (r *rig) notify(t *testing.T, method string, args ...any) {
 	t.Helper()
-	if err := r.obj.Call(RemoteDesktopIface+"."+method, 0, append([]any{sessA, Vardict{}}, args...)...).Err; err != nil {
+	if err := r.notifyErr(method, args...); err != nil {
 		t.Fatalf("%s: %v", method, err)
 	}
 }
 
+func (r *rig) notifyErr(method string, args ...any) error {
+	return r.obj.Call(RemoteDesktopIface+"."+method, 0, append([]any{sessA, Vardict{}}, args...)...).Err
+}
+
+// The user is asked first, told which devices; nothing is injected
+// before an allowed Start, and the devices granted are the ones asked.
 func TestRemoteDesktopAsksFirst(t *testing.T) {
 	r, sink := remoteRig(t, nil)
 	if code, _ := r.remoteStart(t, Vardict{}); code != ResponseCancelled {
@@ -102,10 +116,10 @@ func TestRemoteDesktopAsksFirst(t *testing.T) {
 	if code, _ := r.remoteStart(t, Vardict{}); code != ResponseCancelled {
 		t.Errorf("denied = %d", code)
 	}
-	if got := d.asked.Load(); len(got) == 0 {
-		t.Error("no consent asked")
+	if got := d.asked.Load(); len(got) == 0 || !strings.Contains(got[0].(portaldialogs.AccessRequest).Body, "your keyboard and pointer") {
+		t.Errorf("consent asked %v, want the devices named", got)
 	}
-	if err := r.obj.Call(RemoteDesktopIface+".NotifyPointerMotion", 0, sessA, Vardict{}, 1.0, 2.0).Err; err == nil {
+	if err := r.notifyErr("NotifyPointerMotion", 1.0, 2.0); err == nil {
 		t.Error("input before an allowed Start was accepted")
 	}
 	if len(sink.events.Load()) != 0 {
@@ -113,21 +127,51 @@ func TestRemoteDesktopAsksFirst(t *testing.T) {
 	}
 	d.yes.Store(true)
 	code, res := r.remoteStart(t, Vardict{"types": dbus.MakeVariant(devicePointer)})
-	if code != ResponseSuccess || res["devices"].Value() != devicePointer {
+	if code != ResponseSuccess || res["devices"].Value() != devicePointer || res["clipboard_enabled"].Value() != false {
 		t.Errorf("Start = %d %v", code, res)
 	}
+	if body := d.asked.Load()[0].(portaldialogs.AccessRequest).Body; !strings.Contains(body, "your pointer") || strings.Contains(body, "keyboard") {
+		t.Errorf("a pointer-only consent says %q", body)
+	}
+	if _, has := res["streams"]; has {
+		t.Errorf("streams without screen sharing: %v", res)
+	}
+	if code, _ := r.interactive(t, RemoteDesktopIface+".SelectDevices", handle, sessA, "org.app", Vardict{"types": dbus.MakeVariant(uint32(4))}); code != ResponseOther {
+		t.Errorf("touch, not offered = %d", code)
+	}
+}
+
+// startSharing starts sessA as a remote-desktop session that also
+// shares the screen the picker replies.
+func (r *rig) startSharing(t *testing.T, reply string, devices Vardict) map[string]dbus.Variant {
+	t.Helper()
+	serveSharePicker(t, r, reply)
+	r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})
+	r.interactive(t, ScreenCastIface+".SelectSources", handle, sessA, "org.app", Vardict{"types": dbus.MakeVariant(sourceMonitor | sourceWindow)})
+	code, res := r.remoteStart(t, devices)
+	if code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	return res
 }
 
 func TestRemoteDesktopReplaysInput(t *testing.T) {
 	r, sink := remoteRig(t, nil)
 	serveDialogs(t, r, true)
-	if code, res := r.remoteStart(t, Vardict{}); code != ResponseSuccess || res["devices"].Value() != uint32(3) {
-		t.Fatalf("Start = %d %v", code, res)
+	res := r.startSharing(t, "/screen:DP-2;window:w1", Vardict{})
+	if res["devices"].Value() != uint32(3) {
+		t.Fatalf("Start = %v", res)
 	}
-	r.backend.sizes.set(40, 1920, 1080)
 	r.notify(t, "NotifyPointerMotion", 1.5, -2.0)
-	r.notify(t, "NotifyPointerMotionAbsolute", uint32(40), 100.0, -5.0)
-	r.notify(t, "NotifyPointerMotionAbsolute", uint32(99), 1.0, 1.0) // unknown stream: dropped
+	// DP-2 is at (1280, 0) in a layout 3200x1080: (100.5, -5) is
+	// (1380.5, 0), in 256ths of a pixel.
+	r.notify(t, "NotifyPointerMotionAbsolute", uint32(40), 100.5, -5.0)
+	if err := r.notifyErr("NotifyPointerMotionAbsolute", uint32(99), 1.0, 1.0); err == nil {
+		t.Error("a stream the session does not run took absolute motion")
+	}
+	if err := r.notifyErr("NotifyPointerMotionAbsolute", uint32(41), 1.0, 1.0); err == nil {
+		t.Error("a window stream, whose place is unknown, took absolute motion")
+	}
 	r.notify(t, "NotifyPointerButton", int32(0x110), uint32(1))
 	r.notify(t, "NotifyPointerAxis", 0.0, 3.0)
 	r.notify(t, "NotifyPointerAxis", 2.0, 0.0)
@@ -141,7 +185,7 @@ func TestRemoteDesktopReplaysInput(t *testing.T) {
 	r.notify(t, "NotifyTouchDown", uint32(40), uint32(0), 1.0, 1.0)
 	want := []string{
 		"motion 1.5 -2",
-		"abs 100 0 1920 1080",
+		"abs 353408 0 819200 276480",
 		"button 272 true",
 		"axis 0 3",
 		"axis 1 2",
@@ -163,6 +207,108 @@ func TestRemoteDesktopReplaysInput(t *testing.T) {
 	}
 }
 
+// Start shares the screens a remote-desktop session selected, with
+// their places, and says whether the clipboard is enabled; the
+// clipboard then works for the session.
+func TestRemoteDesktopSharesScreensAndClipboard(t *testing.T) {
+	r, _ := remoteRig(t, nil)
+	serveDialogs(t, r, true)
+	r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	res := r.startSharing(t, "/screen:DP-1", Vardict{})
+	if res["clipboard_enabled"].Value() != true {
+		t.Errorf("clipboard_enabled = %v after RequestClipboard", res["clipboard_enabled"])
+	}
+	streams := castStreams(t, res)
+	if len(streams) != 1 || pair(streams[0].Props["position"]) != [2]int32{0, 0} || pair(streams[0].Props["size"]) != [2]int32{1280, 720} {
+		t.Errorf("streams = %+v", streams)
+	}
+	var fd dbus.UnixFD
+	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Store(&fd); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := io.ReadAll(os.NewFile(uintptr(fd), "read"))
+	if string(got) != "copied" {
+		t.Errorf("read %q through the remote-desktop session", got)
+	}
+}
+
+// Only the device types granted reach the devices, over D-Bus and EIS.
+func TestRemoteDesktopEnforcesTheGrantedDevices(t *testing.T) {
+	r, sink := remoteRig(t, nil)
+	serveDialogs(t, r, true)
+	if code, _ := r.remoteStart(t, Vardict{"types": dbus.MakeVariant(devicePointer)}); code != ResponseSuccess {
+		t.Fatal("Start failed")
+	}
+	for _, call := range [][]any{
+		{"NotifyKeyboardKeycode", int32(30), uint32(1)},
+		{"NotifyKeyboardKeysym", int32(0x61), uint32(1)},
+	} {
+		if err := r.notifyErr(call[0].(string), call[1:]...); err == nil {
+			t.Errorf("%s without the keyboard granted succeeded", call[0])
+		}
+	}
+	in, err := r.backend.remote.input(sessA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := eisInput{in}
+	e.Key(30, true)
+	e.Keysym(0x61, true)
+	e.Motion(1, 1)
+	if got := sink.events.Load(); !slices.Equal(got, []string{"motion 1 1"}) {
+		t.Errorf("injected %q, want the pointer only", got)
+	}
+}
+
+// A restore token of the same devices replays the grant and the shared
+// screens without asking; one of other devices asks again.
+func TestRemoteDesktopRestoreToken(t *testing.T) {
+	r, _ := remoteRig(t, nil)
+	d := serveDialogs(t, r, true)
+	res := r.startSharing(t, "r/screen:DP-2", Vardict{"persist_mode": dbus.MakeVariant(uint32(2))})
+	kept, ok := decodeRemoteRestore(res["restore_data"])
+	if !ok || res["persist_mode"].Value() != uint32(2) || kept.devices != 3 || !slices.Equal(payloads(kept.targets), []string{"screen:DP-2"}) {
+		t.Fatalf("token keeps %+v, %v (results %v)", kept, ok, res)
+	}
+	// The frontend hands the token back as the (suv) it got.
+	token := dbus.MakeVariant(encodeRemoteRestore(kept))
+
+	r2, sink2 := remoteRig(t, nil)
+	d2 := serveDialogs(t, r2, false)
+	p2 := serveSharePicker(t, r2, "")
+	r2.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})
+	r2.interactive(t, ScreenCastIface+".SelectSources", handle, sessA, "org.app", Vardict{})
+	code, res2 := r2.remoteStart(t, Vardict{"restore_data": token, "persist_mode": dbus.MakeVariant(uint32(2))})
+	if code != ResponseSuccess || len(d2.asked.Load()) != 0 || len(p2.asked.Load()) != 0 {
+		t.Fatalf("replay = %d, asked consent %v, picker %v", code, d2.asked.Load(), p2.asked.Load())
+	}
+	if streams := castStreams(t, res2); len(streams) != 1 || pair(streams[0].Props["position"]) != [2]int32{1280, 0} {
+		t.Errorf("replayed streams %+v", streams)
+	}
+	if _, ok := res2["restore_data"]; !ok {
+		t.Error("a replayed grant was not reissued")
+	}
+	r2.notify(t, "NotifyPointerMotion", 1.0, 0.0)
+	if len(sink2.events.Load()) != 1 {
+		t.Error("the replayed session takes no input")
+	}
+
+	r3, _ := remoteRig(t, nil)
+	d3 := serveDialogs(t, r3, false)
+	if code, _ := r3.remoteStart(t, Vardict{"restore_data": token, "types": dbus.MakeVariant(deviceKeyboard)}); code != ResponseCancelled || len(d3.asked.Load()) != 1 {
+		t.Errorf("a token of other devices = %d, asked %d times", code, len(d3.asked.Load()))
+	}
+	if _, ok := decodeRemoteRestore(dbus.MakeVariant(encodeRestore([]captureTarget{{kind: targetOutput, name: "DP-1"}}))); ok {
+		t.Error("a ScreenCast token decoded as a RemoteDesktop one")
+	}
+	if len(d.asked.Load()) != 1 {
+		t.Errorf("the first start asked %d times", len(d.asked.Load()))
+	}
+}
+
 func TestRemoteDesktopWithoutVirtualInput(t *testing.T) {
 	r, _ := remoteRig(t, errors.New("no zwlr_virtual_pointer_manager_v1"))
 	serveDialogs(t, r, true)
@@ -171,6 +317,58 @@ func TestRemoteDesktopWithoutVirtualInput(t *testing.T) {
 	}
 	if got := keysymTable([]byte("not a keymap")); len(got) != 0 {
 		t.Errorf("a garbage keymap mapped %v", got)
+	}
+}
+
+// level3Keymap has AltGr in Mod5 and a four-level key: e, E, €, ¢.
+const level3Keymap = `xkb_keymap {
+xkb_keycodes "test" { minimum = 8; maximum = 255; <AD03> = 26; <LFSH> = 50; <RALT> = 108; };
+xkb_types "test" {
+  type "ONE_LEVEL" { modifiers = none; level_name[Level1] = "Any"; };
+  type "FOUR_LEVEL" { modifiers = Shift+Mod5; map[Shift] = Level2; map[Mod5] = Level3; map[Shift+Mod5] = Level4;
+    level_name[Level1] = "Base"; level_name[Level2] = "Shift"; level_name[Level3] = "AltGr"; level_name[Level4] = "Shift AltGr"; };
+};
+xkb_compat "test" { };
+xkb_symbols "test" {
+  key <AD03> { type = "FOUR_LEVEL", [ e, E, EuroSign, cent ] };
+  key <LFSH> { [ Shift_L ] };
+  key <RALT> { [ ISO_Level3_Shift ] };
+  modifier_map Shift { <LFSH> };
+  modifier_map Mod5 { <RALT> };
+};
+};
+`
+
+// Level-3 symbols are typed with AltGr held (and shift for level 4),
+// but only when the keymap puts AltGr in Mod5.
+func TestKeysymsReachLevelThree(t *testing.T) {
+	sink := &fakeSink{keymap: []byte(level3Keymap)}
+	in := &remoteInput{sink: sink, granted: deviceKeyboard}
+	in.keysym(0x20ac, true) // EuroSign
+	in.keysym(0x20ac, false)
+	in.keysym(0xa2, true) // cent
+	want := []string{"key 100 true", "key 18 true", "key 18 false", "key 100 false", "key 100 true", "key 42 true", "key 18 true"}
+	if got := sink.events.Load(); !slices.Equal(got, want) {
+		t.Errorf("typed %q, want %q", got, want)
+	}
+	notMod5 := strings.Replace(level3Keymap, "modifier_map Mod5 { <RALT> };", "modifier_map Mod4 { <RALT> };", 1)
+	if k, ok := keysymTable([]byte(notMod5))[0x20ac]; ok {
+		t.Errorf("AltGr outside Mod5 still types € as %+v", k)
+	}
+}
+
+// Hi-res wheel steps below a detent scroll smoothly and add up to whole
+// steps instead of being dropped.
+func TestEISScrollAddsUpHiResSteps(t *testing.T) {
+	sink := &fakeSink{}
+	e := eisInput{&remoteInput{sink: sink, granted: devicePointer}}
+	e.ScrollDiscrete(0, 60)
+	e.ScrollDiscrete(0, 60)
+	e.ScrollDiscrete(-240, 0)
+	e.ScrollDiscrete(0, 0)
+	want := []string{"discrete 0 7.5 0", "discrete 0 7.5 1", "discrete 1 -30 -2"}
+	if got := sink.events.Load(); !slices.Equal(got, want) {
+		t.Errorf("scrolled %q, want %q", got, want)
 	}
 }
 
@@ -184,6 +382,7 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 	if !errors.As(err, &de) || !strings.Contains(de.Body[0].(string), "is not started") {
 		t.Errorf("ConnectToEIS before Start = %v", err)
 	}
+	r.interactive(t, RemoteDesktopIface+".SelectDevices", handle, sessA, "org.app", Vardict{})
 	r.interactive(t, RemoteDesktopIface+".Start", handle, sessA, "org.app", "", Vardict{})
 	if err := r.obj.Call(RemoteDesktopIface+".ConnectToEIS", 0, sessA, "org.app", Vardict{}).Store(&fd); err != nil {
 		t.Fatal(err)
