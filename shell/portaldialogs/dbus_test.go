@@ -53,9 +53,9 @@ func (f *fakeHost) UpdateChoices(handle string, choices []string) bool {
 	return handle == "/r/1"
 }
 
-func (f *fakeHost) ConfirmInstall(c portalreq.Caller, name, iconName string) bool {
-	f.record(c, name, iconName)
-	return f.yes
+func (f *fakeHost) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, string) {
+	f.record(c, r)
+	return f.yes, r.Name + " (edited)"
 }
 
 func (f *fakeHost) Dismiss(handle string) {
@@ -87,8 +87,9 @@ func TestDialogsRoundTrip(t *testing.T) {
 		if got, err := c.ConfirmWallpaper(ctx, caller, "file:///a.png"); err != nil || got != yes {
 			t.Errorf("ConfirmWallpaper = %v, %v", got, err)
 		}
-		if got, err := c.ConfirmInstall(ctx, caller, "App", "app-icon"); err != nil || got != yes || host.asked.Load()[1] != "app-icon" {
-			t.Errorf("ConfirmInstall = %v, %v", got, err)
+		launcher := LauncherRequest{Name: "App", Icon: []byte{0x89, 'P'}, Target: "https://example.org", EditableName: true}
+		if got, name, err := c.ConfirmInstall(ctx, caller, launcher); err != nil || got != yes || name != "App (edited)" || !reflect.DeepEqual(host.asked.Load()[0], launcher) {
+			t.Errorf("ConfirmInstall = %v, %q, %v (asked %v)", got, name, err, host.asked.Load())
 		}
 		chosen, err := c.ChooseApplication(ctx, caller, ChooserRequest{ContentType: "text/plain", Target: "x.txt"})
 		if asked := host.asked.Load(); err != nil || chosen != host.choice || !reflect.DeepEqual(asked[0], ChooserRequest{Choices: []string{}, ContentType: "text/plain", Target: "x.txt"}) {

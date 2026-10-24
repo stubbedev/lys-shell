@@ -2292,6 +2292,17 @@
       },
       "type": "object"
     },
+    "DynamicLauncherConfig": {
+      "description": "Launcher installation policy.",
+      "properties": {
+        "install-token-apps": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "App ids granted an install token, with which they install\ndesktop launchers with no confirmation dialog (a software center,\nsuch as `org.gnome.Software`). Every other app asks the user."
+        }
+      },
+      "type": "object"
+    },
     "ExecutionMode": {
       "description": "Execution mode for custom module commands.",
       "oneOf": [
@@ -6386,6 +6397,13 @@
     "PortalConfig": {
       "description": "Desktop-portal policy for sandboxed apps.",
       "properties": {
+        "dynamic-launcher": {
+          "$ref": "#/$defs/DynamicLauncherConfig",
+          "default": {
+            "install-token-apps": []
+          },
+          "description": "Which apps may install launchers without asking."
+        },
         "lockdown": {
           "$ref": "#/$defs/LockdownConfig",
           "default": {
@@ -10141,6 +10159,9 @@
     "portal": {
       "$ref": "#/$defs/PortalConfig",
       "default": {
+        "dynamic-launcher": {
+          "install-token-apps": []
+        },
         "lockdown": {
           "disable-application-handlers": false,
           "disable-camera": false,

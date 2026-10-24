@@ -2,10 +2,13 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/useraccount"
@@ -22,17 +25,16 @@ type dialogs struct{ conn *dbus.Conn }
 
 func (d dialogs) client() *portaldialogs.Client { return portaldialogs.NewClient(d.conn) }
 
-func dialogIfaces(conn *dbus.Conn) []dbusx.Interface {
+func dialogIfaces(conn *dbus.Conn, cfg *config.Service) []dbusx.Interface {
 	version := func(v uint32) dbusx.Getters { return dbusx.Getters{"version": func() any { return v }} }
 	d := dialogs{conn}
 	launcher := version(1)
-	// Applications and web apps.
-	launcher["SupportedLauncherTypes"] = func() any { return uint32(1 | 2) }
+	launcher["SupportedLauncherTypes"] = func() any { return launcherApplication | launcherWebApp }
 	return []dbusx.Interface{
 		{Name: "org.freedesktop.impl.portal.Access", Methods: accessMethods{d}, Properties: version(1)},
 		{Name: "org.freedesktop.impl.portal.Account", Methods: accountMethods{d}, Properties: version(1)},
 		{Name: "org.freedesktop.impl.portal.AppChooser", Methods: appChooserMethods{d}, Properties: version(2)},
-		{Name: "org.freedesktop.impl.portal.DynamicLauncher", Methods: launcherMethods{d}, Properties: launcher},
+		{Name: "org.freedesktop.impl.portal.DynamicLauncher", Methods: launcherMethods{d, cfg}, Properties: launcher},
 	}
 }
 
@@ -148,25 +150,74 @@ func (a appChooserMethods) UpdateChoices(handle dbus.ObjectPath, choices []strin
 
 // launcherMethods is org.freedesktop.impl.portal.DynamicLauncher
 // (dynamiclauncher.rs).
-type launcherMethods struct{ dialogs }
+type launcherMethods struct {
+	dialogs
+	cfg *config.Service
+}
 
-// PrepareInstall confirms installing a launcher and echoes its name and
-// icon back; the frontend writes the desktop file.
-func (l launcherMethods) PrepareInstall(handle dbus.ObjectPath, appID, parent, name string, icon dbus.Variant, _ Vardict) (uint32, Vardict, *dbus.Error) {
+// The launcher types, SupportedLauncherTypes' bits.
+const (
+	launcherApplication uint32 = 1
+	launcherWebApp      uint32 = 2
+)
+
+// PrepareInstall confirms installing a launcher, showing its icon and,
+// for a web app, the URL it opens; the user may edit the name unless
+// editable_name is false. The icon goes back as it came (editing it is
+// not supported); the frontend writes the desktop file.
+func (l launcherMethods) PrepareInstall(handle dbus.ObjectPath, appID, parent, name string, icon dbus.Variant, options Vardict) (uint32, Vardict, *dbus.Error) {
+	data, err := bytesIcon(icon)
+	if err != nil {
+		warnf("dynamiclauncher: %s's launcher %q: %v", appID, name, err)
+		return ResponseOther, Vardict{}, nil
+	}
+	req := portaldialogs.LauncherRequest{Name: name, Icon: data, EditableName: true}
+	if editable, ok := optBool(options, "editable_name"); ok {
+		req.EditableName = editable
+	}
+	if kind, ok := optU32(options, "launcher_type"); ok && kind == launcherWebApp {
+		req.Target = stringOr(options, "target", "")
+	}
 	client := l.client()
 	c, ok := beginOr(l.conn, handle, appID, parent, client.Dismiss)
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
-	yes, err := client.ConfirmInstall(c.ctx, c.caller, name, "")
+	c.modal(options)
+	yes, chosen, err := client.ConfirmInstall(c.ctx, c.caller, req)
 	if code := c.response("dynamiclauncher", yes, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
-	return ResponseSuccess, Vardict{"name": dbus.MakeVariant(name), "icon": icon}, nil
+	if !req.EditableName {
+		chosen = name
+	}
+	return ResponseSuccess, Vardict{"name": dbus.MakeVariant(chosen), "icon": icon}, nil
 }
 
-// RequestInstallToken grants the token the frontend mints.
-func (launcherMethods) RequestInstallToken(_ string, _ Vardict) (uint32, *dbus.Error) {
-	return ResponseSuccess, nil
+// bytesIcon is the image of a ('bytes', <ay>) icon, the only kind the
+// frontend passes.
+func bytesIcon(icon dbus.Variant) ([]byte, error) {
+	kind, inner, ok := serializedIcon(icon)
+	if !ok || kind != "bytes" {
+		return nil, fmt.Errorf("icon %v is not a serialized bytes icon", icon)
+	}
+	data, ok := inner.Value().([]byte)
+	if !ok {
+		return nil, errors.New("a bytes icon without bytes")
+	}
+	if len(data) > maxIconBytes {
+		return nil, fmt.Errorf("icon larger than %d bytes", maxIconBytes)
+	}
+	return data, nil
+}
+
+// RequestInstallToken grants an install token, installing with no
+// dialog, only to the apps portal.dynamic-launcher.install-token-apps
+// names.
+func (l launcherMethods) RequestInstallToken(appID string, _ Vardict) (uint32, *dbus.Error) {
+	if appID != "" && slices.Contains(l.cfg.Config().Portal.DynamicLauncher.InstallTokenApps, appID) {
+		return ResponseSuccess, nil
+	}
+	return ResponseOther, nil
 }

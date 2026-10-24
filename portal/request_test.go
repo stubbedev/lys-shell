@@ -110,7 +110,7 @@ func interactiveCases() []interactiveCase {
 			return code(r, "org.freedesktop.impl.portal.AppChooser.ChooseApplication", handle, "org.app", "", []string{}, Vardict{})
 		}},
 		{"DynamicLauncher", dialogs, func(r *rig) (uint32, error) {
-			return code(r, "org.freedesktop.impl.portal.DynamicLauncher.PrepareInstall", handle, "org.app", "", "App", dbus.MakeVariant(""), Vardict{})
+			return code(r, "org.freedesktop.impl.portal.DynamicLauncher.PrepareInstall", handle, "org.app", "", "App", dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1})}), Vardict{})
 		}},
 		{"Wallpaper", dialogs, func(r *rig) (uint32, error) {
 			var c uint32

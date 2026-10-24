@@ -15,6 +15,12 @@ Desktop-portal policy for sandboxed apps.
 |---|---|---|---|
 | `lockdown` | [`LockdownConfig`](/config/types#lockdown-config) | `{...}` | Features to lock down for every app, for kiosk or shared setups. |
 
+## Dynamic launcher
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `dynamic-launcher` | [`DynamicLauncherConfig`](/config/types#dynamic-launcher-config) | `{...}` | Which apps may install launchers without asking. |
+
 ## Default configuration
 
 ```yaml
@@ -27,6 +33,8 @@ portal:
     disable-camera: false
     disable-microphone: false
     disable-sound-output: false
+  dynamic-launcher:
+    install-token-apps: []
 ```
 
 

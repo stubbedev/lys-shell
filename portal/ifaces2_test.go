@@ -387,8 +387,11 @@ func (f *fakeDialogs) UpdateChoices(h string, choices []string) bool {
 	return h == string(handle)
 }
 
-func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, name, icon string) bool {
-	return f.answer(c, name, icon)
+func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
+	if !f.answer(c, r) {
+		return false, ""
+	}
+	return true, "Renamed"
 }
 
 func serveDialogs(t *testing.T, r *rig, yes bool) *fakeDialogs {

@@ -7,6 +7,18 @@ package config
 type PortalConfig struct {
 	// Features to lock down for every app, for kiosk or shared setups.
 	Lockdown LockdownConfig `cfg:"lockdown"`
+	// Which apps may install launchers without asking.
+	DynamicLauncher DynamicLauncherConfig `cfg:"dynamic-launcher"`
+}
+
+// DynamicLauncherConfig is the portal.dynamic-launcher section.
+//
+// Launcher installation policy.
+type DynamicLauncherConfig struct {
+	// App ids granted an install token, with which they install
+	// desktop launchers with no confirmation dialog (a software center,
+	// such as `org.gnome.Software`). Every other app asks the user.
+	InstallTokenApps []string `cfg:"install-token-apps"`
 }
 
 // LockdownConfig is the portal.lockdown section: the Lockdown portal
@@ -32,5 +44,8 @@ type LockdownConfig struct {
 	DisableSoundOutput bool `cfg:"disable-sound-output"`
 }
 
-// DefaultsPortal returns the schema defaults: nothing locked down.
-func DefaultsPortal() PortalConfig { return PortalConfig{} }
+// DefaultsPortal returns the schema defaults: nothing locked down, and
+// no app installs launchers without asking.
+func DefaultsPortal() PortalConfig {
+	return PortalConfig{DynamicLauncher: DynamicLauncherConfig{InstallTokenApps: []string{}}}
+}

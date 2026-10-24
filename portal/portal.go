@@ -83,7 +83,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		b.remote.iface(),
 		b.notifier.iface(),
 		wallpaperIface(b.conn),
-	}, dialogIfaces(b.conn)...)
+	}, dialogIfaces(b.conn, b.cfg)...)
 }
 
 // Serve mounts the interfaces, claims BusName (failing loudly when

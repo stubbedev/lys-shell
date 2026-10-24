@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
@@ -257,12 +258,40 @@ func (h *Dialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	return ok
 }
 
-// ConfirmInstall confirms a dynamic launcher.
-func (h *Dialogs) ConfirmInstall(c portalreq.Caller, name, iconName string) bool {
+// ConfirmInstall confirms a dynamic launcher: its icon, the URL a web
+// app opens, and its name, in an entry when it is editable. An emptied
+// name installs under the default one.
+func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, string) {
+	chosen := r.Name
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
-		return h.confirm(answer, h.headerIcon(iconName), "Install “"+name+"”?", "", "Cancel", "Install")
+		var extra []widget.Widget
+		title := "Install “" + r.Name + "”?"
+		var entry *widget.Entry
+		if r.EditableName {
+			title = "Install launcher?"
+			entry = widget.NewEntry(h.d.Font, 13, 0)
+			entry.AddClass("portal-dialog-entry")
+			entry.SetText(r.Name)
+			extra = append(extra, entry)
+		}
+		body := ""
+		if r.Target != "" {
+			body = "Opens " + r.Target
+		}
+		install := func(ok bool, s string) {
+			if ok && entry != nil {
+				if name := strings.TrimSpace(entry.Text()); name != "" {
+					chosen = name
+				}
+			}
+			answer(ok, s)
+		}
+		return h.confirm(install, h.headerBytes(r.Icon), title, body, "Cancel", "Install", extra...)
 	})
-	return ok
+	if !ok {
+		return false, ""
+	}
+	return true, chosen
 }
 
 // ChooseApplication is the app chooser: icon + name rows with a live
@@ -341,6 +370,23 @@ func (h *Dialogs) headerIcon(name string) widget.Widget {
 	}
 	icon.AddClass("portal-dialog-image")
 	return icon
+}
+
+// headerBytes is the header image slot showing an encoded image (PNG
+// or JPEG, else SVG) fitted into the header square, nil for none.
+func (h *Dialogs) headerBytes(data []byte) widget.Widget {
+	if len(data) == 0 {
+		return nil
+	}
+	decoded, err := imagedecode.Decode(data)
+	if err != nil {
+		icon := widget.NewSVGIcon(data, headerPx)
+		icon.AddClass("portal-dialog-image")
+		return icon
+	}
+	img := widget.NewImage(decoded)
+	img.AddClass("portal-dialog-image")
+	return widgets.NewPinned(img, headerPx, headerPx)
 }
 
 // headerFile is the header image slot showing an image file fitted

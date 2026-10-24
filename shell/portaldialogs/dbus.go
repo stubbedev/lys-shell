@@ -50,6 +50,18 @@ type ChooserRequest struct {
 	Target string
 }
 
+// LauncherRequest is one dynamic launcher to confirm, (saysb).
+type LauncherRequest struct {
+	// Name is the launcher's default name.
+	Name string
+	// Icon is the launcher's image (PNG, JPEG or SVG), empty for none.
+	Icon []byte
+	// Target is the URL a web app opens, "" for an application.
+	Target string
+	// EditableName lets the user change the name.
+	EditableName bool
+}
+
 // Host shows the dialogs; each call blocks until the user answers or
 // the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
@@ -68,8 +80,9 @@ type Host interface {
 	// for the request at handle, showing or waiting; false when no
 	// chooser is open for it.
 	UpdateChoices(handle string, choices []string) bool
-	// ConfirmInstall replies whether to install a dynamic launcher.
-	ConfirmInstall(c portalreq.Caller, name, iconName string) bool
+	// ConfirmInstall replies whether to install a dynamic launcher,
+	// and under what name.
+	ConfirmInstall(portalreq.Caller, LauncherRequest) (bool, string)
 	// Dismiss takes down the dialog showing for the request at handle,
 	// when one is; the app closed the request.
 	Dismiss(handle string)
@@ -118,8 +131,9 @@ func (d *Daemon) UpdateChoices(handle string, choices []string) (bool, *dbus.Err
 }
 
 // ConfirmInstall is the dynamic-launcher install confirmation.
-func (d *Daemon) ConfirmInstall(c portalreq.Caller, name, iconName string) (bool, *dbus.Error) {
-	return d.host.ConfirmInstall(c, name, iconName), nil
+func (d *Daemon) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, string, *dbus.Error) {
+	ok, name := d.host.ConfirmInstall(c, r)
+	return ok, name, nil
 }
 
 // Dismiss takes down the dialog showing for the request at handle.
@@ -180,10 +194,14 @@ func (c *Client) UpdateChoices(ctx context.Context, handle string, choices []str
 	return found, err
 }
 
-// ConfirmInstall asks to install a dynamic launcher.
-func (c *Client) ConfirmInstall(ctx context.Context, caller portalreq.Caller, name, iconName string) (ok bool, err error) {
-	err = c.call(ctx, "ConfirmInstall", &ok, caller, name, iconName)
-	return ok, err
+// ConfirmInstall asks to install a dynamic launcher, replying the name
+// the user chose.
+func (c *Client) ConfirmInstall(ctx context.Context, caller portalreq.Caller, r LauncherRequest) (ok bool, name string, err error) {
+	if r.Icon == nil {
+		r.Icon = []byte{}
+	}
+	err = c.obj.CallWithContext(ctx, iface+".ConfirmInstall", 0, caller, r).Store(&ok, &name)
+	return ok, name, err
 }
 
 // Dismiss takes down the dialog showing for the request at handle.

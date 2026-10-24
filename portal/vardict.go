@@ -53,6 +53,21 @@ func stringOr(options Vardict, key, fallback string) string {
 	return fallback
 }
 
+// serializedIcon splits a g_icon_serialize() icon, (sv), into its kind
+// and value; false for any other shape.
+func serializedIcon(v dbus.Variant) (kind string, value dbus.Variant, ok bool) {
+	parts, ok := v.Value().([]any)
+	if !ok || len(parts) != 2 {
+		return "", dbus.Variant{}, false
+	}
+	kind, kindOK := parts[0].(string)
+	value, valueOK := parts[1].(dbus.Variant)
+	if !kindOK || !valueOK {
+		return "", dbus.Variant{}, false
+	}
+	return kind, value, true
+}
+
 // optChoices reads a choices option, a(ssa(ss)s); a malformed one, or
 // a list choice without options' ids and labels, is an error.
 func optChoices(options Vardict) ([]portalreq.Choice, error) {

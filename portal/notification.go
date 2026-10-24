@@ -320,16 +320,12 @@ func priorityUrgency(priority string) byte {
 // notificationIcon is a bare icon name, or the first name of a
 // serialized themed icon ('themed', <['name', ...]>).
 func notificationIcon(notification Vardict) string {
-	switch v := notification["icon"].Value().(type) {
-	case string:
-		return v
-	case []any:
-		if len(v) == 2 && v[0] == "themed" {
-			if inner, ok := v[1].(dbus.Variant); ok {
-				if names, ok := inner.Value().([]string); ok && len(names) > 0 {
-					return names[0]
-				}
-			}
+	if name, ok := notification["icon"].Value().(string); ok {
+		return name
+	}
+	if kind, inner, ok := serializedIcon(notification["icon"]); ok && kind == "themed" {
+		if names, ok := inner.Value().([]string); ok && len(names) > 0 {
+			return names[0]
 		}
 	}
 	return ""
@@ -338,16 +334,12 @@ func notificationIcon(notification Vardict) string {
 // iconImage decodes a ('file-descriptor', <h>) or ('bytes', <ay>) icon;
 // nil without one.
 func iconImage(notification Vardict) (image.Image, error) {
-	v, ok := notification["icon"].Value().([]any)
-	if !ok || len(v) != 2 {
-		return nil, nil
-	}
-	inner, ok := v[1].(dbus.Variant)
+	kind, inner, ok := serializedIcon(notification["icon"])
 	if !ok {
 		return nil, nil
 	}
 	var data []byte
-	switch v[0] {
+	switch kind {
 	case "file-descriptor":
 		fd, ok := inner.Value().(dbus.UnixFD)
 		if !ok {

@@ -62,9 +62,9 @@ func (f fakeDialogs) ChooseApplication(_ portalreq.Caller, r portaldialogs.Choos
 
 func (fakeDialogs) UpdateChoices(string, []string) bool { return false }
 
-func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, name, icon string) bool {
-	f.got.Store([]any{name, icon})
-	return f.yes.Load()
+func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
+	f.got.Store([]any{r})
+	return f.yes.Load(), r.Name
 }
 
 func (fakeDialogs) Dismiss(string) {}
@@ -148,7 +148,7 @@ func TestPortalShowDialogs(t *testing.T) {
 			return strings.Contains(a[0].(string), "account-sharing")
 		}},
 		{[]string{"dynamic-launcher"}, "approved\n", "rejected\n", func(a []any) bool {
-			return a[0] == "Preview Launcher" && a[1] == "application-x-executable"
+			return a[0].(portaldialogs.LauncherRequest).Name == "Preview Launcher"
 		}},
 		{[]string{"wallpaper", "--uri", "file:///w.png"}, "accepted\n", "declined\n", func(a []any) bool {
 			return a[0] == "file:///w.png"

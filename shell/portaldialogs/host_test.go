@@ -1,7 +1,10 @@
 package portaldialogs
 
 import (
+	"bytes"
 	"errors"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
@@ -164,7 +167,10 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 func TestRequestsQueueAndEscape(t *testing.T) {
 	hs := newHarness(t, nil)
 	first := make(chan bool, 1)
-	go func() { first <- hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/1", AppID: "org.one"}, "App", "") }()
+	go func() {
+		ok, _ := hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/1", AppID: "org.one"}, LauncherRequest{Name: "App"})
+		first <- ok
+	}()
 	c := hs.open(t)
 	if l := treetest.Labels(c.Root); !slices.Contains(l, "Install “App”?") || !slices.Contains(l, "App org.one") {
 		t.Errorf("labels = %q", l)
@@ -667,5 +673,105 @@ func waitFor(t *testing.T, cond func() bool) {
 		if time.Now().After(deadline) {
 			t.Fatal("condition never held")
 		}
+	}
+}
+
+// pngBytes is a small encoded PNG.
+func pngBytes(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewNRGBA(image.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// installDialog shows ConfirmInstall for r and answers it with click,
+// after inspect looks at the dialog.
+func installDialog(t *testing.T, hs *harness, r LauncherRequest, inspect func(app.LayerConfig), click string) (bool, string) {
+	t.Helper()
+	type answer struct {
+		ok   bool
+		name string
+	}
+	got := make(chan answer, 1)
+	go func() {
+		ok, name := hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/test"}, r)
+		got <- answer{ok, name}
+	}()
+	c := hs.open(t)
+	inspect(c)
+	hs.do(func() { treetest.Button(t, c.Root, click).OnClick() })
+	a := <-got
+	return a.ok, a.name
+}
+
+// An editable name is in an entry and the edit comes back; emptied, the
+// default name does. A fixed name has no entry.
+func TestConfirmInstallEditsTheName(t *testing.T) {
+	hs := newHarness(t, nil)
+	for edit, want := range map[string]string{"My Launcher": "My Launcher", "  ": "App"} {
+		ok, name := installDialog(t, hs, LauncherRequest{Name: "App", EditableName: true}, func(c app.LayerConfig) {
+			entry := treetest.First[*widget.Entry](t, c.Root)
+			if entry.Text() != "App" {
+				t.Errorf("entry starts at %q", entry.Text())
+			}
+			hs.do(func() { entry.SetText(edit) })
+		}, "Install")
+		if !ok || name != want {
+			t.Errorf("edited to %q: %v %q, want %q", edit, ok, name, want)
+		}
+	}
+	ok, name := installDialog(t, hs, LauncherRequest{Name: "App"}, func(c app.LayerConfig) {
+		if len(treetest.All[*widget.Entry](c.Root)) != 0 || !slices.Contains(treetest.Labels(c.Root), "Install “App”?") {
+			t.Errorf("a fixed name: entries %d, labels %q", len(treetest.All[*widget.Entry](c.Root)), treetest.Labels(c.Root))
+		}
+	}, "Install")
+	if !ok || name != "App" {
+		t.Errorf("fixed name answered %v %q", ok, name)
+	}
+	if ok, name := installDialog(t, hs, LauncherRequest{Name: "App", EditableName: true}, func(app.LayerConfig) {}, "Cancel"); ok || name != "" {
+		t.Errorf("cancel answered %v %q", ok, name)
+	}
+}
+
+// A web app's URL is shown; an application shows none.
+func TestConfirmInstallShowsTheTarget(t *testing.T) {
+	hs := newHarness(t, nil)
+	for target, want := range map[string]bool{"https://example.org/app": true, "": false} {
+		installDialog(t, hs, LauncherRequest{Name: "App", Target: target}, func(c app.LayerConfig) {
+			has := slices.ContainsFunc(treetest.Labels(c.Root), func(l string) bool { return strings.HasPrefix(l, "Opens ") })
+			if has != want || want && !slices.Contains(treetest.Labels(c.Root), "Opens "+target) {
+				t.Errorf("target %q: labels %q", target, treetest.Labels(c.Root))
+			}
+		}, "Cancel")
+	}
+}
+
+// The icon's bytes are drawn: a raster as an image, an SVG as an icon,
+// none as nothing.
+func TestConfirmInstallDrawsTheIcon(t *testing.T) {
+	hs := newHarness(t, nil)
+	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4"/></svg>`)
+	for _, tc := range []struct {
+		name         string
+		icon         []byte
+		images, svgs int
+	}{{"png", pngBytes(t), 1, 0}, {"svg", svg, 0, 1}, {"none", nil, 0, 0}} {
+		installDialog(t, hs, LauncherRequest{Name: "App", Icon: tc.icon}, func(c app.LayerConfig) {
+			header := treetest.WithClass(c.Root, "portal-dialog-image")
+			var images, svgs int
+			for _, w := range header {
+				switch w.(type) {
+				case *widget.Image:
+					images++
+				case *widget.Icon:
+					svgs++
+				}
+			}
+			if images != tc.images || svgs != tc.svgs {
+				t.Errorf("%s: %d images, %d icons in the header; want %d, %d", tc.name, images, svgs, tc.images, tc.svgs)
+			}
+		}, "Cancel")
 	}
 }

@@ -29,7 +29,7 @@ func (r *rig) eachDialog(t *testing.T) map[string]uint32 {
 	codes[accessDialog], _ = r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{})
 	codes[userInfoCall], _ = r.interactive(t, userInfoCall, handle, "org.app", "", Vardict{})
 	codes[chooseApp], _ = r.interactive(t, chooseApp, handle, "org.app", "", []string{"a.desktop"}, Vardict{})
-	codes[prepInstall], _ = r.interactive(t, prepInstall, handle, "org.app", "", "App", dbus.MakeVariant("icon"), Vardict{})
+	codes[prepInstall], _ = r.interactive(t, prepInstall, handle, "org.app", "", "App", dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1})}), Vardict{})
 	return codes
 }
 
@@ -172,23 +172,70 @@ func TestAppChooserAndLauncherResults(t *testing.T) {
 		t.Errorf("UpdateChoices without a chooser = %v, want %s", err, errNotFound)
 	}
 
-	icon := dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1, 2})})
-	_, res = r.interactive(t, prepInstall, handle, "org.app", "", "My App", icon, Vardict{})
-	// The icon goes back as it came, a (sv) GIcon: the call surviving at
-	// all is the wire check (a struct re-encoded as an array is a
-	// malformed reply the bus disconnects the backend for).
-	if got, ok := res["icon"].Value().([]any); res["name"].Value() != "My App" || !ok || len(got) != 2 || got[0] != "bytes" || !slices.Equal(got[1].(dbus.Variant).Value().([]byte), []byte{1, 2}) {
-		t.Errorf("launcher results = %v", res)
-	}
-	if got := d.asked.Load(); got[0] != "My App" || got[1] != "" {
-		t.Errorf("ConfirmInstall asked %v", got)
-	}
-	var code uint32
-	if err := r.obj.Call("org.freedesktop.impl.portal.DynamicLauncher.RequestInstallToken", 0, "org.app", Vardict{}).Store(&code); err != nil || code != ResponseSuccess {
-		t.Errorf("RequestInstallToken = %d, %v", code, err)
-	}
 	v, err := r.obj.GetProperty("org.freedesktop.impl.portal.DynamicLauncher.SupportedLauncherTypes")
 	if err != nil || v.Value() != uint32(3) {
 		t.Errorf("SupportedLauncherTypes = %v, %v", v, err)
+	}
+}
+
+// The dialog gets the icon's bytes, the web app's URL and whether the
+// name is editable; the name chosen comes back (the default when it
+// was not editable) with the icon as it came.
+func TestPrepareInstall(t *testing.T) {
+	r := newRig(t, nil)
+	d := serveDialogs(t, r, true)
+	icon := dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1, 2})})
+	_, res := r.interactive(t, prepInstall, handle, "org.app", "", "My App", icon, Vardict{})
+	// The icon goes back as it came, a (sv) GIcon: the call surviving at
+	// all is the wire check (a struct re-encoded as an array is a
+	// malformed reply the bus disconnects the backend for).
+	if got, ok := res["icon"].Value().([]any); res["name"].Value() != "Renamed" || !ok || len(got) != 2 || got[0] != "bytes" || !slices.Equal(got[1].(dbus.Variant).Value().([]byte), []byte{1, 2}) {
+		t.Errorf("launcher results = %v", res)
+	}
+	if got := d.asked.Load()[0]; !reflect.DeepEqual(got, portaldialogs.LauncherRequest{Name: "My App", Icon: []byte{1, 2}, EditableName: true}) {
+		t.Errorf("ConfirmInstall asked %+v", got)
+	}
+	web := Vardict{"launcher_type": dbus.MakeVariant(launcherWebApp), "target": dbus.MakeVariant("https://example.org"), "editable_name": dbus.MakeVariant(false)}
+	if _, res = r.interactive(t, prepInstall, handle, "org.app", "", "My App", icon, web); res["name"].Value() != "My App" {
+		t.Errorf("a fixed name came back as %v", res["name"])
+	}
+	if got := d.asked.Load()[0].(portaldialogs.LauncherRequest); got.Target != "https://example.org" || got.EditableName {
+		t.Errorf("web app asked %+v", got)
+	}
+	app := Vardict{"launcher_type": dbus.MakeVariant(launcherApplication), "target": dbus.MakeVariant("https://example.org")}
+	if r.interactive(t, prepInstall, handle, "org.app", "", "My App", icon, app); d.asked.Load()[0].(portaldialogs.LauncherRequest).Target != "" {
+		t.Errorf("an application showed a target: %+v", d.asked.Load()[0])
+	}
+	d.asked.Store(nil)
+	themed := dbus.MakeVariant(gicon{"themed", dbus.MakeVariant([]string{"app"})})
+	if code, _ := r.interactive(t, prepInstall, handle, "org.app", "", "My App", themed, Vardict{}); code != ResponseOther || d.asked.Load() != nil {
+		t.Errorf("a themed icon = %d, asked %v; want other, unasked", code, d.asked.Load())
+	}
+}
+
+// Only the configured apps get an install token; every other app asks.
+func TestRequestInstallTokenFollowsTheAllowlist(t *testing.T) {
+	r := newRig(t, nil)
+	token := func(appID string) uint32 {
+		t.Helper()
+		var code uint32
+		if err := r.obj.Call("org.freedesktop.impl.portal.DynamicLauncher.RequestInstallToken", 0, appID, Vardict{}).Store(&code); err != nil {
+			t.Fatal(err)
+		}
+		return code
+	}
+	if code := token("org.app"); code == ResponseSuccess {
+		t.Error("an app got an install token by default")
+	}
+	if err := r.cfg.SetByPath("portal.dynamic-launcher.install-token-apps", []any{"org.gnome.Software"}); err != nil {
+		t.Fatal(err)
+	}
+	if code := token("org.gnome.Software"); code != ResponseSuccess {
+		t.Errorf("an allowlisted app = %d", code)
+	}
+	for _, id := range []string{"org.app", ""} {
+		if code := token(id); code == ResponseSuccess {
+			t.Errorf("%q got an install token", id)
+		}
 	}
 }

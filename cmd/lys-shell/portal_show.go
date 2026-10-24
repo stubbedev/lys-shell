@@ -132,7 +132,7 @@ var showAppChooser = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]st
 })
 
 var showDynamicLauncher = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	ok, err := portaldialogs.NewClient(conn).ConfirmInstall(ctx, portalreq.Caller{}, "Preview Launcher", "application-x-executable")
+	ok, _, err := portaldialogs.NewClient(conn).ConfirmInstall(ctx, portalreq.Caller{}, portaldialogs.LauncherRequest{Name: "Preview Launcher", EditableName: true})
 	return verdict(ok, "approved", "rejected"), "DynamicLauncher", "show install confirmation", err
 })
 

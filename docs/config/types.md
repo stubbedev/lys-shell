@@ -372,6 +372,14 @@ the built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `"480px"`).
 | `width` | Panel width override. Unset uses the built-in default width. |
 | `height` | Panel height override. Unset uses the built-in default height. Has no |
 
+## DynamicLauncherConfig {#dynamic-launcher-config}
+
+Launcher installation policy.
+
+| Field | Description |
+|---|---|
+| `install-token-apps` | App ids granted an install token, with which they install |
+
 ## ExecutionMode {#execution-mode}
 
 Execution mode for custom module commands.
