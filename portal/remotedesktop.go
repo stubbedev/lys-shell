@@ -119,6 +119,9 @@ type remoteState struct {
 	input *remoteInput
 }
 
+// started is whether Start created the session's devices.
+func (r *remoteState) started() bool { return r.input != nil }
+
 // remoteDesktop is the interface: its sessions' state lives on the
 // session records.
 type remoteDesktop struct {

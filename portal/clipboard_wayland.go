@@ -14,10 +14,10 @@ type waylandClipboard struct {
 	dev  *app.DataControl
 }
 
-// waylandClipboardStarter binds the device on loop; ownerChanged runs
-// on every clipboard selection change.
-func waylandClipboardStarter(loop *waylandLoop) func(func()) (clipDevice, error) {
-	return func(ownerChanged func()) (clipDevice, error) {
+// waylandClipboardStarter binds the device on loop; changed runs on
+// every clipboard selection change.
+func waylandClipboardStarter(loop *waylandLoop) func(func(selectionChange)) (clipDevice, error) {
+	return func(changed func(selectionChange)) (clipDevice, error) {
 		w := &waylandClipboard{loop: loop}
 		err := loop.do(func(a *app.Application) error {
 			dev, err := a.DataControl()
@@ -26,10 +26,17 @@ func waylandClipboardStarter(loop *waylandLoop) func(func()) (clipDevice, error)
 			}
 			// Registered before the loop next dispatches, so the current
 			// selection's announcement is not missed.
-			dev.OnSelection(func(sel app.Selection, _ *app.SelectionOffer) {
-				if sel == app.SelectionClipboard {
-					go ownerChanged()
+			// Run on the loop, in order: a claim's echo must not overtake
+			// the selection it replaced.
+			dev.OnSelection(func(sel app.Selection, offer *app.SelectionOffer) {
+				if sel != app.SelectionClipboard {
+					return
 				}
+				var change selectionChange
+				if offer != nil {
+					change = selectionChange{mimes: offer.Mimes(), own: offer.Own()}
+				}
+				changed(change)
 			})
 			w.dev = dev
 			return nil
@@ -45,6 +52,15 @@ func (w *waylandClipboard) own(mimes []string, pass func(string, *os.File)) erro
 	return w.loop.do(func(*app.Application) error {
 		_, err := w.dev.SetSelection(app.SelectionClipboard, app.SelectionSource{Mimes: mimes, Pass: pass})
 		return err
+	})
+}
+
+func (w *waylandClipboard) clear() error {
+	return w.loop.do(func(*app.Application) error {
+		if offer := w.dev.Offer(app.SelectionClipboard); offer == nil || !offer.Own() {
+			return nil
+		}
+		return w.dev.ClearSelection(app.SelectionClipboard)
 	})
 }
 

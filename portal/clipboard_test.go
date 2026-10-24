@@ -18,16 +18,22 @@ import (
 // fakeClip is the data-control device: the selection it holds, and the
 // claims made on it.
 type fakeClip struct {
-	owner  dbustest.Var[func()]
-	starts dbustest.Var[int]
-	mimes  dbustest.Var[[]string]
-	pass   dbustest.Var[func(string, *os.File)]
-	data   string
+	changed dbustest.Var[func(selectionChange)]
+	starts  dbustest.Var[int]
+	mimes   dbustest.Var[[]string]
+	pass    dbustest.Var[func(string, *os.File)]
+	cleared dbustest.Var[int]
+	data    string
 }
 
 func (f *fakeClip) own(mimes []string, pass func(string, *os.File)) error {
 	f.mimes.Store(mimes)
 	f.pass.Store(pass)
+	return nil
+}
+
+func (f *fakeClip) clear() error {
+	f.cleared.Update(func(n int) int { return n + 1 })
 	return nil
 }
 
@@ -46,25 +52,55 @@ func (f *fakeClip) read(mime string) (*os.File, error) {
 	return r, nil
 }
 
+// clipRig has two RemoteDesktop sessions, not started, a consenting
+// shell, and virtual input.
 func clipRig(t *testing.T, startErr error) (*rig, *fakeClip) {
+	t.Helper()
 	f := &fakeClip{data: "copied"}
 	r := newRig(t, func(b *Backend) {
-		b.clipboard = newClipboardBridge(b.conn, b.sessions, func(owner func()) (clipDevice, error) {
+		b.clipboard = newClipboardBridge(b.conn, b.sessions, func(changed func(selectionChange)) (clipDevice, error) {
 			f.starts.Update(func(n int) int { return n + 1 })
 			if startErr != nil {
 				return nil, startErr
 			}
-			f.owner.Store(owner)
+			f.changed.Store(changed)
 			return f, nil
 		})
+		b.remote = newRemoteDesktop(b.conn, b.sessions, b.sizes, func() (inputSink, error) {
+			return &fakeSink{keymap: []byte(testKeymap)}, nil
+		})
 	})
-	// The clipboard belongs to RemoteDesktop sessions.
+	serveDialogs(t, r, true)
 	for _, sess := range []dbus.ObjectPath{sessA, sessB} {
 		if code, _ := r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sess, "org.app", Vardict{}); code != ResponseSuccess {
 			t.Fatalf("CreateSession %s = %d", sess, code)
 		}
 	}
 	return r, f
+}
+
+// enableClipboard requests the clipboard for sess and starts it.
+func (r *rig) enableClipboard(t *testing.T, sess dbus.ObjectPath) {
+	t.Helper()
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sess, Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := r.interactive(t, RemoteDesktopIface+".Start", handle, sess, "org.app", "", Vardict{}); code != ResponseSuccess {
+		t.Fatalf("Start %s = %d", sess, code)
+	}
+}
+
+// ownerChanged reads a SelectionOwnerChanged: its session, mime types
+// and session_is_owner.
+func ownerChanged(t *testing.T, s *dbus.Signal) (dbus.ObjectPath, []string, bool) {
+	t.Helper()
+	options, _ := s.Body[1].(map[string]dbus.Variant)
+	mimes, okM := options["mime_types"].Value().([]string)
+	isOwner, okO := options["session_is_owner"].Value().(bool)
+	if !okM || !okO {
+		t.Fatalf("SelectionOwnerChanged options %v lack mime_types or session_is_owner", options)
+	}
+	return s.Body[0].(dbus.ObjectPath), mimes, isOwner
 }
 
 // clipSignal waits for the next Clipboard signal.
@@ -105,9 +141,12 @@ const (
 	sessC = dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_2/c")
 )
 
+// A session must request the clipboard before it starts and use it only
+// after; the device starts once, and an enabled session reads the
+// selection and hears of every new one with its mime types and that
+// another client owns it.
 func TestClipboardReadsAndFollowsTheSelection(t *testing.T) {
 	r, f := clipRig(t, nil)
-	// Before any session asks, there is no device and nothing to read.
 	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
 		t.Error("read without RequestClipboard")
 	}
@@ -118,6 +157,15 @@ func TestClipboardReadsAndFollowsTheSelection(t *testing.T) {
 	}
 	if f.starts.Load() != 1 {
 		t.Errorf("device started %d times", f.starts.Load())
+	}
+	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
+		t.Error("a session not started read the clipboard")
+	}
+	if code, _ := r.interactive(t, RemoteDesktopIface+".Start", handle, sessA, "org.app", "", Vardict{}); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err == nil {
+		t.Error("RequestClipboard after Start succeeded")
 	}
 	var fd dbus.UnixFD
 	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Store(&fd); err != nil {
@@ -131,28 +179,41 @@ func TestClipboardReadsAndFollowsTheSelection(t *testing.T) {
 		t.Error("an unoffered mime read")
 	}
 
-	f.owner.Load()()
-	if s := r.clipSignal(t, "SelectionOwnerChanged"); s.Body[0] != sessA {
-		t.Errorf("owner changed for %v", s.Body)
+	f.changed.Load()(selectionChange{mimes: []string{"text/plain", "image/png"}})
+	sess, mimes, isOwner := ownerChanged(t, r.clipSignal(t, "SelectionOwnerChanged"))
+	if sess != sessA || !slices.Equal(mimes, []string{"text/plain", "image/png"}) || isOwner {
+		t.Errorf("owner changed for %s: %v, owner %v", sess, mimes, isOwner)
 	}
 	r.noClipSignal(t) // only the enabled session hears it
 }
 
+// The session's selection is ours to serve: its echo tells it it is the
+// owner (and the others that they are not), and a receiver's request
+// reaches it alone, under a serial only it may answer.
 func TestClipboardServesTheSessionsSelection(t *testing.T) {
 	r, f := clipRig(t, nil)
-	_ = r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err
-	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_types": dbus.MakeVariant([]string{"text/plain", "text/html"})}).Err; err != nil {
+	r.enableClipboard(t, sessA)
+	r.enableClipboard(t, sessB)
+	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_types": dbus.MakeVariant([]string{"text/plain", "text/uri-list"})}).Err; err != nil {
 		t.Fatal(err)
 	}
-	if got := f.mimes.Load(); !slices.Equal(got, []string{"text/plain", "text/html"}) {
+	if got := f.mimes.Load(); !slices.Equal(got, []string{"text/plain", "text/uri-list"}) {
 		t.Errorf("claimed %v", got)
 	}
-	_ = r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_type": dbus.MakeVariant("text/uri-list")}).Err
-	if got := f.mimes.Load(); !slices.Equal(got, []string{"text/uri-list"}) {
-		t.Errorf("single mime claimed %v", got)
+	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{}).Err; err == nil {
+		t.Error("SetSelection without mime_types succeeded")
+	}
+	f.changed.Load()(selectionChange{mimes: []string{"text/plain", "text/uri-list"}, own: true})
+	owners := map[dbus.ObjectPath]bool{}
+	for range 2 {
+		sess, _, isOwner := ownerChanged(t, r.clipSignal(t, "SelectionOwnerChanged"))
+		owners[sess] = isOwner
+	}
+	if !owners[sessA] || owners[sessB] || len(owners) != 2 {
+		t.Errorf("session_is_owner = %v, want only %s", owners, sessA)
 	}
 
-	// A receiver asks: the session is told, takes the pipe and fills it.
+	// A receiver asks: only the owner is told, takes the pipe and fills it.
 	recv, pipe, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
@@ -163,6 +224,10 @@ func TestClipboardServesTheSessionsSelection(t *testing.T) {
 	if s.Body[0] != sessA || s.Body[1] != "text/uri-list" || s.Body[2] != uint32(1) {
 		t.Fatalf("transfer = %v", s.Body)
 	}
+	r.noClipSignal(t)
+	if err := r.obj.Call(ClipboardIface+".SelectionWrite", 0, sessB, uint32(1)).Err; err == nil {
+		t.Error("another session took the owner's transfer")
+	}
 	var fd dbus.UnixFD
 	if err := r.obj.Call(ClipboardIface+".SelectionWrite", 0, sessA, uint32(1)).Store(&fd); err != nil {
 		t.Fatal(err)
@@ -170,7 +235,9 @@ func TestClipboardServesTheSessionsSelection(t *testing.T) {
 	w := os.NewFile(uintptr(fd), "write")
 	_, _ = w.WriteString("file:///x")
 	_ = w.Close()
-	_ = r.obj.Call(ClipboardIface+".SelectionWriteDone", 0, sessA, uint32(1), true).Err
+	if err := r.obj.Call(ClipboardIface+".SelectionWriteDone", 0, sessA, uint32(1), true).Err; err != nil {
+		t.Error(err)
+	}
 	_ = recv.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if got, err := io.ReadAll(recv); err != nil || string(got) != "file:///x" {
 		t.Errorf("receiver got %q, %v: the backend kept its copy open or lost the data", got, err)
@@ -184,7 +251,8 @@ func TestClipboardServesTheSessionsSelection(t *testing.T) {
 		t.Errorf("a second SelectionWrite = %v, want the no-pending-transfer error", err)
 	}
 
-	// A transfer nobody took is closed when the selection changes.
+	// A transfer nobody took is closed when another client's selection
+	// replaces ours.
 	recv2, pipe2, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
@@ -194,10 +262,53 @@ func TestClipboardServesTheSessionsSelection(t *testing.T) {
 	if s := r.clipSignal(t, "SelectionTransfer"); s.Body[2] != uint32(2) {
 		t.Errorf("serial = %v", s.Body[2])
 	}
-	_ = r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_type": dbus.MakeVariant("text/plain")}).Err
+	f.changed.Load()(selectionChange{mimes: []string{"text/plain"}})
 	_ = recv2.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if got, err := io.ReadAll(recv2); err != nil || len(got) != 0 {
 		t.Errorf("an abandoned transfer stayed open: %q, %v", got, err)
+	}
+}
+
+// The owner session closing gives up its claim, and its transfers end;
+// another session closing leaves the claim.
+func TestClipboardOwnerClosing(t *testing.T) {
+	r, f := clipRig(t, nil)
+	r.enableClipboard(t, sessA)
+	r.enableClipboard(t, sessB)
+	_ = r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_types": dbus.MakeVariant([]string{"text/plain"})}).Err
+	if err := r.client.Object(BusName, sessB).Call(SessionIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	if f.cleared.Load() != 0 {
+		t.Error("another session closing cleared the claim")
+	}
+	recv, pipe, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recv.Close()
+	f.pass.Load()("text/plain", pipe)
+	r.clipSignal(t, "SelectionTransfer")
+	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	if f.cleared.Load() != 1 {
+		t.Errorf("the owner closing cleared %d times", f.cleared.Load())
+	}
+	_ = recv.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if got, err := io.ReadAll(recv); err != nil || len(got) != 0 {
+		t.Errorf("the closed owner's transfer stayed open: %q, %v", got, err)
+	}
+	// A request after the owner is gone ends at once.
+	recv2, pipe2, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recv2.Close()
+	f.pass.Load()("text/plain", pipe2)
+	_ = recv2.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if got, err := io.ReadAll(recv2); err != nil || len(got) != 0 {
+		t.Errorf("a request with no owner stayed open: %q, %v", got, err)
 	}
 }
 
@@ -211,32 +322,38 @@ func TestClipboardBelongsToLiveRemoteSessions(t *testing.T) {
 	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessC, Vardict{}).Err; err == nil {
 		t.Error("a ScreenCast session enabled the clipboard")
 	}
-	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
-		t.Fatal(err)
-	}
+	r.enableClipboard(t, sessA)
 	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
 		t.Fatal(err)
 	}
-	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
-		t.Error("a closed session read the clipboard")
+	for _, call := range [][]any{
+		{ClipboardIface + ".SelectionRead", sessA, "text/plain"},
+		{ClipboardIface + ".SetSelection", sessA, Vardict{"mime_types": dbus.MakeVariant([]string{"text/plain"})}},
+		{ClipboardIface + ".SelectionWriteDone", sessA, uint32(1), true},
+	} {
+		if err := r.obj.Call(call[0].(string), 0, call[1:]...).Err; err == nil {
+			t.Errorf("a closed session's %s succeeded", call[0])
+		}
 	}
 	if got := r.backend.clipboard.enabledSessions(); len(got) != 0 {
 		t.Errorf("enabled sessions after close: %v", got)
 	}
 }
 
+// Without data-control RequestClipboard fails, so the app can tell, and
+// is tried again on the next request.
 func TestClipboardWithoutDataControl(t *testing.T) {
 	r, f := clipRig(t, errors.New("no data-control"))
-	_ = r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err
-	_ = r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessB, Vardict{}).Err
+	for _, sess := range []dbus.ObjectPath{sessA, sessB} {
+		if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sess, Vardict{}).Err; err == nil {
+			t.Errorf("RequestClipboard for %s succeeded without data-control", sess)
+		}
+	}
 	if f.starts.Load() != 2 {
 		t.Errorf("a failed start is not retried: %d", f.starts.Load())
 	}
-	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_type": dbus.MakeVariant("text/plain")}).Err; err == nil {
+	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_types": dbus.MakeVariant([]string{"text/plain"})}).Err; err == nil {
 		t.Error("a session without the clipboard set the selection")
-	}
-	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
-		t.Error("read without a device")
 	}
 }
 
@@ -244,14 +361,12 @@ func TestClipboardWithoutDataControl(t *testing.T) {
 // must request the clipboard again, which starts a fresh device.
 func TestClipboardRestartsAfterTheLoopEnds(t *testing.T) {
 	r, f := clipRig(t, nil)
-	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
-		t.Fatal(err)
-	}
+	r.enableClipboard(t, sessA)
 	r.backend.clipboard.loopEnded()
 	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
 		t.Error("a read after the device died")
 	}
-	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessB, Vardict{}).Err; err != nil {
 		t.Fatal(err)
 	}
 	if f.starts.Load() != 2 {
