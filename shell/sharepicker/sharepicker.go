@@ -469,12 +469,13 @@ func cardTitle(tl sharepreview.Toplevel) string {
 // loadPreview is update_frame_lazily: the capture runs off the loop and
 // lands back on it; the spinner goes and the card drops its loading
 // class either way. grab gets the request's resize size, read on the
-// loop since the next request re-snapshots the config.
+// loop since the next request re-snapshots the config; the loop's
+// invoke is read here too, not from the capture goroutine.
 func (p *Picker) loadPreview(preview *widget.Image, card *widget.Box, spinner *widget.Spinner, grab func(size int) (*image.RGBA, error)) {
-	size := int(p.cfg.ResizeSize)
+	size, invoke := int(p.cfg.ResizeSize), p.invoke
 	go func() {
 		img, err := grab(size)
-		p.invoke(func() {
+		invoke(func() {
 			if spinner != nil {
 				spinner.SetVisible(false)
 			}
