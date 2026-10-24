@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestIconString(t *testing.T) {
@@ -167,5 +168,17 @@ func TestWithActivationToken(t *testing.T) {
 		if !ran || got != tc.want {
 			t.Errorf("%s: ran %v with %q, want %q", name, ran, got, tc.want)
 		}
+	}
+}
+
+// An app icon resolves through GTK's dash fallbacks, as a notification
+// daemon's GThemedIcon does.
+func TestNewIconFallsBackAlongTheName(t *testing.T) {
+	treetest.IconTheme(t, "org.example")
+	if ink := treetest.Ink(NewIcon(Icon{Name: "org.example-app"}, 24, 0)); ink == 0 {
+		t.Error("an app icon with a present dash-shortened form drew nothing")
+	}
+	if ink := treetest.Ink(NewIcon(Icon{Name: "missing"}, 24, 0)); ink != 0 {
+		t.Error("an absent icon drew something")
 	}
 }

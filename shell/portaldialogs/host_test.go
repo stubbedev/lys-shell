@@ -818,3 +818,16 @@ func TestChooseDevicesAnswersTheChecked(t *testing.T) {
 		}
 	}
 }
+
+// A requesting app's icon resolves through GTK's dash fallbacks; a
+// path loads as a file.
+func TestDialogIconFallsBackAlongTheName(t *testing.T) {
+	treetest.IconTheme(t, "org.example")
+	h := &Dialogs{}
+	if ink := treetest.Ink(h.icon("org.example-app", 24)); ink == 0 {
+		t.Error("an app icon with a present dash-shortened form drew nothing")
+	}
+	if h.icon("", 24) != nil {
+		t.Error("no name built an icon")
+	}
+}

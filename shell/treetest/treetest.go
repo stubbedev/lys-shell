@@ -3,6 +3,8 @@
 package treetest
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -119,4 +121,47 @@ func Font(t *testing.T) render.Font {
 		t.Fatalf("test font: %v", err)
 	}
 	return face
+}
+
+// IconTheme points theme icon lookups at a temp hicolor theme holding
+// one solid square SVG app icon per name, for the duration of the test.
+func IconTheme(t *testing.T, names ...string) {
+	t.Helper()
+	base := t.TempDir()
+	apps := filepath.Join(base, "hicolor", "scalable", "apps")
+	if err := os.MkdirAll(apps, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	index := "[Icon Theme]\nName=Hicolor\nDirectories=scalable/apps\n\n[scalable/apps]\nSize=48\nMinSize=8\nMaxSize=512\nType=Scalable\n"
+	if err := os.WriteFile(filepath.Join(base, "hicolor", "index.theme"), []byte(index), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const square = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#e04020"/></svg>`
+	for _, n := range names {
+		if err := os.WriteFile(filepath.Join(apps, n+".svg"), []byte(square), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	widget.SetIconSearchPaths([]string{base})
+	widget.RefreshIcons()
+	t.Cleanup(func() {
+		widget.SetIconSearchPaths(nil)
+		widget.RefreshIcons()
+	})
+}
+
+// Ink counts the pixels w paints when laid out at its natural size.
+func Ink(w widget.Widget) int {
+	sz := w.Measure(widget.Constraints{Max: widget.Size{W: 256, H: 256}})
+	w.Arrange(render.Rect{W: max(sz.W, 1), H: max(sz.H, 1)})
+	data := make([]byte, render.Stride(256)*256)
+	cv := render.NewScaled(data, render.Stride(256), 256, 256, 1, 1)
+	w.Paint(cv)
+	n := 0
+	for i := 3; i < len(data); i += 4 {
+		if data[i] > 0 {
+			n++
+		}
+	}
+	return n
 }

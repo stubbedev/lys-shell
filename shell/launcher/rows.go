@@ -156,14 +156,14 @@ func rowIcon(icon engine.Icon, px int) *widget.Icon {
 	var w *widget.Icon
 	switch ic := icon.(type) {
 	case engine.IconName:
-		w = widget.NewThemeIcon(string(ic), px)
+		w = widget.NewThemeIconFallback(string(ic), px)
 	case engine.IconFile:
 		w = widget.NewFileIcon(string(ic), px)
 	case engine.IconThumbnail:
 		if cached, ok := engine.CachedThumbnail(ic.Path); ok {
 			w = widget.NewFileIcon(cached, px)
 		} else {
-			w = widget.NewThemeIcon(ic.Fallback, px)
+			w = widget.NewThemeIconFallback(ic.Fallback, px)
 		}
 	default:
 		return nil

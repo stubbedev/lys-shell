@@ -145,7 +145,7 @@ func NewIcon(icon Icon, size int, tint render.Color) *widget.Icon {
 	if icon.File != "" {
 		return widget.NewFileIcon(icon.File, size)
 	}
-	w := widget.NewThemeIcon(icon.Name, size)
+	w := widget.NewThemeIconFallback(icon.Name, size)
 	if strings.HasSuffix(icon.Name, "-symbolic") {
 		w.SetTint(tint)
 	}

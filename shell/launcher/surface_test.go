@@ -645,3 +645,17 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 		t.Errorf("%d .launcher-listview nodes, want the one listview", len(lists))
 	}
 }
+
+// A desktop entry names a specific icon a theme may lack: the row
+// resolves it through GTK's dash fallbacks (preferences-system-network
+// to preferences-system), as a GAppInfo icon does, instead of drawing
+// nothing.
+func TestRowIconFallsBackAlongTheName(t *testing.T) {
+	treetest.IconTheme(t, "preferences-system")
+	if ink := treetest.Ink(rowIcon(engine.IconName("preferences-system-network"), 24)); ink == 0 {
+		t.Error("the row drew no icon for a name whose dash-shortened form exists")
+	}
+	if ink := treetest.Ink(rowIcon(engine.IconName("unrelated-app"), 24)); ink != 0 {
+		t.Error("a name with no present form drew an icon")
+	}
+}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/sni"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeTray records the tray calls and serves a scripted menu.
@@ -375,5 +376,14 @@ func TestSystrayMenuShortcutsFire(t *testing.T) {
 	}
 	if trayAccelSpec([][]string{{"Hyper", "Super", "F5"}}) != "<Super>F5" || trayAccelSpec(nil) != "" {
 		t.Error("trayAccelSpec: unknown modifiers drop, an empty shortcut is none")
+	}
+}
+
+// A tray menu item's icon name resolves through GTK's dash fallbacks,
+// as the GTK menu's GThemedIcon does.
+func TestTrayMenuIconFallsBackAlongTheName(t *testing.T) {
+	treetest.IconTheme(t, "org.example")
+	if ink := treetest.Ink(trayMenuIcon(sni.MenuItem{IconName: "org.example-app"}, 24)); ink == 0 {
+		t.Error("a menu icon with a present dash-shortened form drew nothing")
 	}
 }

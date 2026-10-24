@@ -200,7 +200,7 @@ func buildTrayIcon(src trayIconSource, px int) *widget.Icon {
 		}
 		return widget.NewThemeIcon(trayFallbackIcon, px)
 	}
-	return widget.NewThemeIcon(src.name, px)
+	return widget.NewThemeIconFallback(src.name, px)
 }
 
 // trayButton is one item: its icon in a button taking the three
@@ -663,7 +663,7 @@ func trayAccelSpec(shortcut [][]string) string {
 // icon-data; nil without either.
 func trayMenuIcon(n sni.MenuItem, px int) *widget.Icon {
 	if n.IconName != "" {
-		return widget.NewThemeIcon(n.IconName, px)
+		return widget.NewThemeIconFallback(n.IconName, px)
 	}
 	if len(n.IconData) > 0 {
 		if ic, err := render.LoadPNG(n.IconData, px, px); err == nil {

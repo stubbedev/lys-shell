@@ -648,14 +648,20 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	return scroll
 }
 
+// placeIcon is a place's icon, through GTK's dash fallbacks as the GTK
+// sidebar's GThemedIcon resolves it.
+func placeIcon(p Place) *widget.Icon {
+	icon := widget.NewThemeIconFallback(p.Icon, navIconPx)
+	icon.AddClass("file-chooser-place-icon")
+	return icon
+}
+
 // fillPlaces lists places in list, a button each.
 func (c *Chooser) fillPlaces(list *widget.Box, places []Place) {
 	list.Clear()
 	for _, p := range places {
 		row := widget.NewBox(widget.Row, 8, 0)
-		icon := widget.NewThemeIcon(p.Icon, navIconPx)
-		icon.AddClass("file-chooser-place-icon")
-		row.Append(icon, false)
+		row.Append(placeIcon(p), false)
 		l := c.label(p.Label, "")
 		l.SetEllipsize(widget.EllipsizeEnd)
 		row.Append(l, true)
@@ -829,7 +835,7 @@ func (c *Chooser) entryIcon(e Entry, px int) widget.Widget {
 	if e.IsDir {
 		return widget.NewThemeIcon("folder-symbolic", px)
 	}
-	return c.thumb(e.Path, px, widget.NewThemeIcon(c.d.MIME.GenericIcon(c.d.MIME.TypeByName(e.Name())), px))
+	return c.thumb(e.Path, px, widget.NewThemeIconFallback(c.d.MIME.GenericIcon(c.d.MIME.TypeByName(e.Name())), px))
 }
 
 // thumb is a px square showing fallback until one of the bounded

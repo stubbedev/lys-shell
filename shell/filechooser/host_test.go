@@ -1587,3 +1587,15 @@ func TestDragFilesOut(t *testing.T) {
 	hs.click(t, "Cancel")
 	answer(t, got)
 }
+
+// A place's icon resolves through GTK's dash fallbacks, as the GTK
+// sidebar's GThemedIcon does: folder-documents finds folder.
+func TestPlaceIconFallsBackAlongTheName(t *testing.T) {
+	treetest.IconTheme(t, "folder")
+	if treetest.Ink(placeIcon(Place{"Documents", "/d", "folder-documents"})) == 0 {
+		t.Error("a place icon with a present dash-shortened form drew nothing")
+	}
+	if treetest.Ink(placeIcon(Place{"Odd", "/o", "unrelated"})) != 0 {
+		t.Error("an absent place icon drew something")
+	}
+}

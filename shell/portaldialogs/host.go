@@ -348,7 +348,7 @@ func (h *Dialogs) icon(name string, px int) *widget.Icon {
 	if filepath.IsAbs(name) {
 		return widget.NewFileIcon(name, px)
 	}
-	return widget.NewThemeIcon(name, px)
+	return widget.NewThemeIconFallback(name, px)
 }
 
 // headerIcon is the header image slot showing a themed icon.
