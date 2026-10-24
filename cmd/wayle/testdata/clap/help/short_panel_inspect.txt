@@ -1,4 +1,4 @@
-Open GTK Inspector for debugging
+Open the widget inspector for debugging
 
 Usage: wayle panel inspect
 

@@ -11,11 +11,12 @@ import (
 	"github.com/stubbedev/wayle/internal/cli"
 )
 
-// The goldens under testdata/clap were captured from the Rust wayle
-// 0.8.53 binary (clap 4.5; the version lines re-captured from 0.8.54): every command's -h and --help, a battery
-// of parse errors with their exit codes, colored (tty) renderings, and
-// the five completion scripts. The Go tree must reproduce them byte
-// for byte.
+// The goldens under testdata/clap are the CLI's contract, first
+// captured from the Rust wayle 0.8.53 binary (clap 4.5): every
+// command's -h and --help, a battery of parse errors with their exit
+// codes, colored (tty) renderings, and the five completion scripts.
+// The binary must reproduce them byte for byte; a deliberate CLI
+// change edits them in the same commit.
 
 func runCaptured(t *testing.T, color bool, args ...string) (stdout, stderr string, code int) {
 	t.Helper()

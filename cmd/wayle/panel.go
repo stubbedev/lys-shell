@@ -30,7 +30,7 @@ func panelCommand() *cli.Command {
 			{Name: "restart", About: "Restart the panel daemon", Run: panelRestart},
 			{Name: "status", About: "Check panel status", Run: panelStatus},
 			{Name: "settings", About: "Open panel settings", Run: panelSettings},
-			{Name: "inspect", About: "Open GTK Inspector for debugging", Run: panelInspect},
+			{Name: "inspect", About: "Open the widget inspector for debugging", Run: panelInspect},
 			{Name: "hide", About: "Hide the bar on a monitor", Args: monitor("hide"), Run: barVisibility("hide bar", "BarHide", "All bars hidden", "Bar hidden on ")},
 			{Name: "show", About: "Show the bar on a monitor", Args: monitor("show"), Run: barVisibility("show bar", "BarShow", "All bars shown", "Bar shown on ")},
 			{Name: "toggle", About: "Toggle bar visibility on a monitor", Args: monitor("toggle"), Run: barVisibility("toggle bar", "BarToggle", "All bars toggled", "Bar toggled on ")},
@@ -198,7 +198,7 @@ func panelInspect(m *cli.Matches) error {
 	if err := activateAction(conn, shellipc.ActionInspect); err != nil {
 		return cliMessage("Failed to open inspector: " + rusterr.Zbus(err))
 	}
-	fmt.Fprintln(m.Stdout(), "GTK Inspector opened")
+	fmt.Fprintln(m.Stdout(), "Inspector opened")
 	return nil
 }
 

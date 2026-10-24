@@ -10,16 +10,15 @@ import (
 	"github.com/stubbedev/wayle/internal/dbusx"
 )
 
-// The shell's GApplication identity (wayle-ipc/src/shell.rs): the
-// Rust shell is a GtkApplication, so the name and its org.gtk.Actions
-// object come from GIO; the Go shell serves the same two actions.
+// The shell's application identity: the name and the org.gtk.Actions
+// object a GtkApplication exports through GIO, so `wayle panel` and
+// gapplication(1) reach the shell the same way.
 const (
-	AppID          = "com.wayle.shell"
-	AppPath        = dbus.ObjectPath("/com/wayle/shell")
-	ActionsIface   = "org.gtk.Actions"
-	ActionQuit     = "quit"
-	ActionInspect  = "inspector"
-	errNoInspector = "the GTK inspector does not exist in the Go shell"
+	AppID         = "com.wayle.shell"
+	AppPath       = dbus.ObjectPath("/com/wayle/shell")
+	ActionsIface  = "org.gtk.Actions"
+	ActionQuit    = "quit"
+	ActionInspect = "inspector"
 )
 
 // IsRunning is bootstrap.rs's is_already_running / the CLI's
@@ -30,10 +29,16 @@ func IsRunning(conn *dbus.Conn) (bool, error) {
 	return owned, err
 }
 
-// actions is GIO's action-group exporter for the two stateless
-// actions.
+// Actions is what the two stateless actions run: Quit ends the shell,
+// Inspect opens gelm's inspector.
+type Actions struct {
+	Quit    func()
+	Inspect func()
+}
+
+// actions is GIO's action-group exporter for Actions.
 type actions struct {
-	quit func()
+	run Actions
 }
 
 // actionDescription is org.gtk.Actions' (bgav): enabled, parameter
@@ -74,10 +79,11 @@ func (a *actions) DescribeAll() (map[string]actionDescription, *dbus.Error) {
 func (a *actions) Activate(name string, _ []dbus.Variant, _ map[string]dbus.Variant) *dbus.Error {
 	switch name {
 	case ActionQuit:
-		a.quit()
+		a.run.Quit()
 		return nil
 	case ActionInspect:
-		return dbusx.Failed(errNoInspector)
+		a.run.Inspect()
+		return nil
 	default:
 		return dbusx.InvalidArgs("action '" + name + "' does not exist")
 	}
@@ -88,10 +94,10 @@ func (a *actions) SetState(name string, _ dbus.Variant, _ map[string]dbus.Varian
 	return dbusx.InvalidArgs("action '" + name + "' is stateless")
 }
 
-// ServeApplication takes the application id and exports the actions;
-// quit runs on "quit". A shell already holding the id is an error.
-func ServeApplication(conn *dbus.Conn, quit func()) (func(), error) {
-	a := &actions{quit: quit}
+// ServeApplication takes the application id and exports run as its
+// actions. A shell already holding the id is an error.
+func ServeApplication(conn *dbus.Conn, run Actions) (func(), error) {
+	a := &actions{run: run}
 	if err := conn.Export(a, AppPath, ActionsIface); err != nil {
 		return nil, fmt.Errorf("export %s: %w", ActionsIface, err)
 	}

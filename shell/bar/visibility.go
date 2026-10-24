@@ -103,8 +103,11 @@ func serveShellIPC(application *app.Application, bars *barSet, lock func() bool)
 		return func() {}
 	}
 	var releases []func()
-	quit := func() { application.Invoke(application.Quit) }
-	if release, err := shellipc.ServeApplication(conn, quit); err == nil {
+	run := shellipc.Actions{
+		Quit:    func() { application.Invoke(application.Quit) },
+		Inspect: func() { application.Invoke(func() { application.SetInspect(true) }) },
+	}
+	if release, err := shellipc.ServeApplication(conn, run); err == nil {
 		releases = append(releases, release)
 	} else {
 		log.Printf("shell ipc: application id: %v", err)

@@ -17,7 +17,10 @@ func fakeShell(t *testing.T) {
 	// The quit lands on a D-Bus goroutine; the channel hands it the
 	// release with an ordering the race detector sees.
 	released := make(chan func(), 1)
-	release, err := shellipc.ServeApplication(conn, func() { go (<-released)() })
+	release, err := shellipc.ServeApplication(conn, shellipc.Actions{
+		Quit:    func() { go (<-released)() },
+		Inspect: func() {},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,9 +45,8 @@ func TestPanelLifecycleCommands(t *testing.T) {
 	if stdout, _, code := runCaptured(t, false, "panel", "start"); code != 0 || stdout != "Panel is already running\n" {
 		t.Errorf("start while running: %d %q", code, stdout)
 	}
-	if _, stderr, code := runCaptured(t, false, "panel", "inspect"); code != 1 ||
-		stderr != "Error: Failed to open inspector: org.freedesktop.DBus.Error.Failed: the GTK inspector does not exist in the Go shell\n" {
-		t.Errorf("inspect: %d %q", code, stderr)
+	if stdout, stderr, code := runCaptured(t, false, "panel", "inspect"); code != 0 || stdout != "Inspector opened\n" {
+		t.Errorf("inspect: %d %q %q", code, stdout, stderr)
 	}
 	if stdout, stderr, code := runCaptured(t, false, "panel", "stop"); code != 0 || stdout != "Panel stopped\n" {
 		t.Errorf("stop: %d %q %q", code, stdout, stderr)

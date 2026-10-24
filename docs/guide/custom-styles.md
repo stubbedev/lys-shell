@@ -37,15 +37,19 @@ The same `class = "..."` field can be applied to any item in `left`, `center`, o
 
 ## Finding selectors and variables
 
+The built-in stylesheet is the reference for selectors and variables: its sources live in [`styling/scss`](https://github.com/stubbedev/wayle/tree/master/styling/scss), one partial per bar module and dropdown. Every rule there reads its colors, sizes and spacing from CSS variables, and overriding a variable inside a narrower selector is the robust way to change one thing.
+
+To see which widget sits where, open the inspector on the running shell:
+
 ```sh
 wayle panel inspect
 ```
 
-The GTK Inspector opens against the running shell. The picker shows every widget's CSS classes, its computed style, and the variables in scope. The full set of variables Wayle defines lives in the styles that ship with the project; the inspector is the practical way to discover which ones a given widget reads from.
+It draws the widget tree over every bar and dropdown. While it is open, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> toggles the overlay and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> prints the focused surface's tree, with each widget's bounds, role and hover, focus and press state, to the shell's stdout (`journalctl --user -u wayle` when it runs as a service). Starting the shell with `GELM_INSPECT=1` arms the inspector from the start.
 
 ### Inspecting dropdowns
 
-Dropdowns close as soon as focus leaves the bar, so they vanish the moment the inspector takes focus. To keep a dropdown open long enough to inspect it, disable autohide first. Either toggle **Bar → Dropdown → Dropdown Autohide** in the settings GUI, or set this in `config.toml`:
+Dropdowns close as soon as focus leaves the bar. To keep one open while inspecting it, disable autohide first. Either toggle **Bar → Dropdown → Dropdown Autohide** in the settings GUI, or set this in `config.toml`:
 
 ```toml
 [bar]
@@ -54,7 +58,7 @@ dropdown-autohide = false
 
 Open the dropdown, then run `wayle panel inspect`. Re-enable autohide afterwards.
 
-GTK4's CSS is a subset of web CSS. See [docs.gtk.org/gtk4/css-overview.html](https://docs.gtk.org/gtk4/css-overview.html) for the full reference.
+Wayle renders with [gelm](https://github.com/stubbedev/gelm), which implements GTK4's CSS dialect: a subset of web CSS. See [docs.gtk.org/gtk4/css-overview.html](https://docs.gtk.org/gtk4/css-overview.html) for the reference.
 
 ## Sass features
 

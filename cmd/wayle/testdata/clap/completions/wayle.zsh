@@ -2891,7 +2891,7 @@ _wayle__help__panel_commands() {
 'restart:Restart the panel daemon' \
 'status:Check panel status' \
 'settings:Open panel settings' \
-'inspect:Open GTK Inspector for debugging' \
+'inspect:Open the widget inspector for debugging' \
 'hide:Hide the bar on a monitor' \
 'show:Show the bar on a monitor' \
 'toggle:Toggle bar visibility on a monitor' \
@@ -3660,7 +3660,7 @@ _wayle__panel_commands() {
 'restart:Restart the panel daemon' \
 'status:Check panel status' \
 'settings:Open panel settings' \
-'inspect:Open GTK Inspector for debugging' \
+'inspect:Open the widget inspector for debugging' \
 'hide:Hide the bar on a monitor' \
 'show:Show the bar on a monitor' \
 'toggle:Toggle bar visibility on a monitor' \
@@ -3676,7 +3676,7 @@ _wayle__panel__help_commands() {
 'restart:Restart the panel daemon' \
 'status:Check panel status' \
 'settings:Open panel settings' \
-'inspect:Open GTK Inspector for debugging' \
+'inspect:Open the widget inspector for debugging' \
 'hide:Hide the bar on a monitor' \
 'show:Show the bar on a monitor' \
 'toggle:Toggle bar visibility on a monitor' \

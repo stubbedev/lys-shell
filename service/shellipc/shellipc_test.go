@@ -114,7 +114,11 @@ func TestApplicationActions(t *testing.T) {
 		t.Fatalf("running before serving: %v %v", running, err)
 	}
 	quit := make(chan struct{}, 1)
-	release, err := ServeApplication(dbustest.SessionConn(t), func() { quit <- struct{}{} })
+	inspect := make(chan struct{}, 1)
+	release, err := ServeApplication(dbustest.SessionConn(t), Actions{
+		Quit:    func() { quit <- struct{}{} },
+		Inspect: func() { inspect <- struct{}{} },
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,14 +134,23 @@ func TestApplicationActions(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-quit
-	if err := activate(ActionInspect); err == nil {
-		t.Error("the inspector opened in the Go shell")
+	select {
+	case <-inspect:
+		t.Error("quit opened the inspector")
+	default:
+	}
+	if err := activate(ActionInspect); err != nil {
+		t.Fatal(err)
+	}
+	<-inspect
+	if err := activate("missing"); err == nil {
+		t.Error("an unknown action activated")
 	}
 	var names []string
 	if err := obj.Call(ActionsIface+".List", 0).Store(&names); err != nil || !slices.Equal(names, []string{"inspector", "quit"}) {
 		t.Errorf("List = %v, %v", names, err)
 	}
-	if _, err := ServeApplication(dbustest.SessionConn(t), func() {}); err == nil {
+	if _, err := ServeApplication(dbustest.SessionConn(t), Actions{Quit: func() {}, Inspect: func() {}}); err == nil {
 		t.Error("a second shell took the application id")
 	}
 }
