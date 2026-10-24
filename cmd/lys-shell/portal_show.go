@@ -104,7 +104,7 @@ func showScreenCast(m *cli.Matches) error {
 }
 
 var showPrint = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	granted, settings, token, err := printdialog.NewClient(conn).Prepare(ctx, portalreq.Caller{}, "Preview: Print")
+	granted, settings, _, token, err := printdialog.NewClient(conn).Prepare(ctx, portalreq.Caller{}, printdialog.PrepareRequest{Title: "Preview: Print"})
 	if !granted {
 		return []string{"cancelled"}, "Print", "show print dialog", err
 	}

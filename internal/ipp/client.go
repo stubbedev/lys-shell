@@ -66,12 +66,21 @@ func NewClient(server string) *Client {
 	return c
 }
 
-// Printer is one queue as the dialog lists it.
+// Printer is one queue as the dialog lists it, with what it supports
+// (empty when it does not say).
 type Printer struct {
 	Name, Location, StateMessage string
 	// State is printer-state: 3 idle, 4 processing, 5 stopped.
 	State     int32
 	Accepting bool
+	// Media are its PWG media names, Sides its sides keywords,
+	// ColorModes its print-color-mode keywords, Qualities its
+	// print-quality enums; each with its default.
+	Media, Sides, ColorModes   []string
+	MediaDefault, SidesDefault string
+	ColorModeDefault           string
+	Qualities                  []int32
+	QualityDefault             int32
 }
 
 // The printer-state values.
@@ -98,7 +107,9 @@ func PrinterURI(name string) string { return "ipp://localhost/printers/" + url.P
 func (c *Client) Printers(ctx context.Context) ([]Printer, error) {
 	req := Message{Code: OpCUPSGetPrinters, Groups: []Group{operation("ipp://localhost/",
 		String(TagKeyword, "requested-attributes",
-			"printer-name", "printer-location", "printer-state", "printer-state-message", "printer-is-accepting-jobs"),
+			"printer-name", "printer-location", "printer-state", "printer-state-message", "printer-is-accepting-jobs",
+			"media-supported", "media-default", "sides-supported", "sides-default",
+			"print-color-mode-supported", "print-color-mode-default", "print-quality-supported", "print-quality-default"),
 	)}}
 	resp, err := c.do(ctx, "/", req, nil)
 	if err != nil {
@@ -119,6 +130,11 @@ func (c *Client) Printers(ctx context.Context) ([]Printer, error) {
 		if a, ok := g.Int("printer-is-accepting-jobs"); ok {
 			p.Accepting = a != 0
 		}
+		p.Media, p.MediaDefault = g.Texts("media-supported"), g.Text("media-default")
+		p.Sides, p.SidesDefault = g.Texts("sides-supported"), g.Text("sides-default")
+		p.ColorModes, p.ColorModeDefault = g.Texts("print-color-mode-supported"), g.Text("print-color-mode-default")
+		p.Qualities = g.Ints("print-quality-supported")
+		p.QualityDefault, _ = g.Int("print-quality-default")
 		out = append(out, p)
 	}
 	return out, nil

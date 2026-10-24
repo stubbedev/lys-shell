@@ -23,14 +23,40 @@ const (
 // Setting is one flat print-setting key/value pair.
 type Setting struct{ Key, Value string }
 
+// PageSetup is a GtkPageSetup: the paper's GTK and display names, its
+// size and margins in millimetres, and the orientation; (sssddddddss),
+// PPDName first.
+type PageSetup struct {
+	PPDName, Name, DisplayName                       string
+	Width, Height                                    float64
+	MarginTop, MarginBottom, MarginLeft, MarginRight float64
+	Orientation                                      string
+}
+
+// PrepareRequest is what an app asks a print dialog with, (sa(ss)
+// (sssddddddss)sbbas): the job title, its current settings and page
+// setup to start from, the confirm button's label ("" for Print),
+// whether it can print just its current page or a selection, and the
+// formats it can write for Print to File (none means pdf).
+type PrepareRequest struct {
+	Title                            string
+	Settings                         []Setting
+	PageSetup                        PageSetup
+	AcceptLabel                      string
+	HasCurrentPage, HasSelectedPages bool
+	OutputFormats                    []string
+}
+
 // Host shows the dialog and spools the jobs.
 type Host interface {
-	// Prepare lets the user pick a printer and settings for title and
-	// stashes them under the returned token; granted is false on a
-	// cancel or when the request is dismissed.
-	Prepare(c portalreq.Caller, title string) (granted bool, settings []Setting, token uint32)
+	// Prepare lets the user pick a printer and settings for the
+	// request and stashes them under the returned token, for that app
+	// alone; granted is false on a cancel or when the request is
+	// dismissed.
+	Prepare(portalreq.Caller, PrepareRequest) (granted bool, settings []Setting, setup PageSetup, token uint32)
 	// Print spools document (a PDF the host takes ownership of) to the
-	// printer prepared under token, and reports whether it was sent.
+	// printer the app prepared under token, or, without a token,
+	// through the dialog first; it reports whether it was sent.
 	Print(c portalreq.Caller, title string, document *os.File, token uint32) bool
 	// Dismiss takes down the dialog showing for the request at handle.
 	Dismiss(handle string)
@@ -49,12 +75,12 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 }
 
 // Prepare shows the dialog.
-func (d *Daemon) Prepare(c portalreq.Caller, title string) (bool, []Setting, uint32, *dbus.Error) {
-	granted, settings, token := d.host.Prepare(c, title)
+func (d *Daemon) Prepare(c portalreq.Caller, r PrepareRequest) (bool, []Setting, PageSetup, uint32, *dbus.Error) {
+	granted, settings, setup, token := d.host.Prepare(c, r)
 	if settings == nil {
 		settings = []Setting{}
 	}
-	return granted, settings, token, nil
+	return granted, settings, setup, token, nil
 }
 
 // Print spools document.
@@ -75,9 +101,15 @@ type Client struct{ obj dbus.BusObject }
 func NewClient(conn *dbus.Conn) *Client { return &Client{obj: conn.Object(ServiceName, ServicePath)} }
 
 // Prepare shows the dialog.
-func (c *Client) Prepare(ctx context.Context, caller portalreq.Caller, title string) (granted bool, settings []Setting, token uint32, err error) {
-	err = c.obj.CallWithContext(ctx, iface+".Prepare", 0, caller, title).Store(&granted, &settings, &token)
-	return granted, settings, token, err
+func (c *Client) Prepare(ctx context.Context, caller portalreq.Caller, r PrepareRequest) (granted bool, settings []Setting, setup PageSetup, token uint32, err error) {
+	if r.Settings == nil {
+		r.Settings = []Setting{}
+	}
+	if r.OutputFormats == nil {
+		r.OutputFormats = []string{}
+	}
+	err = c.obj.CallWithContext(ctx, iface+".Prepare", 0, caller, r).Store(&granted, &settings, &setup, &token)
+	return granted, settings, setup, token, err
 }
 
 // Print spools document, which stays the caller's to close.

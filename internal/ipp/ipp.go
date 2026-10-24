@@ -105,6 +105,26 @@ func (g Group) Text(name string) string {
 	return ""
 }
 
+// Texts is every value of name as text, none when absent.
+func (g Group) Texts(name string) []string {
+	a, _ := g.Get(name)
+	out := make([]string, len(a.Values))
+	for i, v := range a.Values {
+		out[i] = v.Text
+	}
+	return out
+}
+
+// Ints is every value of name as an integer, none when absent.
+func (g Group) Ints(name string) []int32 {
+	a, _ := g.Get(name)
+	out := make([]int32, len(a.Values))
+	for i, v := range a.Values {
+		out[i] = v.Int
+	}
+	return out
+}
+
 // Int is the first value of name as an integer, false when absent.
 func (g Group) Int(name string) (int32, bool) {
 	if a, ok := g.Get(name); ok && len(a.Values) > 0 {

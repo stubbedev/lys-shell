@@ -76,8 +76,8 @@ func (fakeDialogs) Dismiss(string) {}
 
 type fakePrinter struct{ granted *dbustest.Var[bool] }
 
-func (f fakePrinter) Prepare(portalreq.Caller, string) (bool, []printdialog.Setting, uint32) {
-	return f.granted.Load(), []printdialog.Setting{{Key: "copies", Value: "1"}}, 7
+func (f fakePrinter) Prepare(portalreq.Caller, printdialog.PrepareRequest) (bool, []printdialog.Setting, printdialog.PageSetup, uint32) {
+	return f.granted.Load(), []printdialog.Setting{{Key: "copies", Value: "1"}}, printdialog.PageSetup{}, 7
 }
 
 func (fakePrinter) Print(portalreq.Caller, string, *os.File, uint32) bool { return false }

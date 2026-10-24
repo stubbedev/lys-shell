@@ -3,6 +3,7 @@ package portal
 import (
 	"io"
 	"os"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -120,12 +121,13 @@ type fakePrinter struct {
 	got     dbustest.Var[[]any]
 }
 
-func (f *fakePrinter) Prepare(c portalreq.Caller, title string) (bool, []printdialog.Setting, uint32) {
-	f.got.Store([]any{title})
+func (f *fakePrinter) Prepare(c portalreq.Caller, r printdialog.PrepareRequest) (bool, []printdialog.Setting, printdialog.PageSetup, uint32) {
+	f.got.Store([]any{r})
 	if f.enter(c) {
-		return false, nil, 0
+		return false, nil, printdialog.PageSetup{}, 0
 	}
-	return f.granted, []printdialog.Setting{{Key: "printer", Value: "Office"}, {Key: "n-copies", Value: "2"}}, 7
+	setup := printdialog.PageSetup{Name: "iso_a4", DisplayName: "A4", Width: 210, Height: 297, MarginTop: 6.35, Orientation: "landscape"}
+	return f.granted, []printdialog.Setting{{Key: "printer", Value: "Office"}, {Key: "n-copies", Value: "2"}}, setup, 7
 }
 
 func (f *fakePrinter) Print(_ portalreq.Caller, title string, doc *os.File, token uint32) bool {
@@ -146,14 +148,33 @@ func servePrinter(t *testing.T, r *rig, f *fakePrinter) {
 
 func TestPrintPrepareAndSpool(t *testing.T) {
 	r := newRig(t, nil)
-	servePrinter(t, r, &fakePrinter{granted: true, sent: true})
-	code, res := r.interactive(t, "org.freedesktop.impl.portal.Print.PreparePrint", handle, "org.app", "", "Doc", Vardict{}, Vardict{}, Vardict{})
+	host := &fakePrinter{granted: true, sent: true}
+	servePrinter(t, r, host)
+	in := Vardict{"n-copies": dbus.MakeVariant("3"), "printer": dbus.MakeVariant("Office"), "bogus": dbus.MakeVariant(uint32(1))}
+	inSetup := Vardict{"Name": dbus.MakeVariant("na_letter"), "Width": dbus.MakeVariant(215.9), "Orientation": dbus.MakeVariant("portrait")}
+	opts := Vardict{"accept_label": dbus.MakeVariant("Export"), "has_current_page": dbus.MakeVariant(true), "supported_output_file_formats": dbus.MakeVariant([]string{"ps", "pdf"})}
+	code, res := r.interactive(t, "org.freedesktop.impl.portal.Print.PreparePrint", handle, "org.app", "", "Doc", in, inSetup, opts)
 	settings, _ := res["settings"].Value().(map[string]dbus.Variant)
 	if code != ResponseSuccess || res["token"].Value() != uint32(7) || settings["printer"].Value() != "Office" || settings["n-copies"].Value() != "2" {
 		t.Errorf("PreparePrint = %d %v", code, res)
 	}
-	if ps, ok := res["page_setup"].Value().(map[string]dbus.Variant); !ok || len(ps) != 0 {
-		t.Errorf("page_setup = %v, want an empty a{sv}", res["page_setup"])
+	// The app's settings, page setup and options reach the dialog.
+	want := printdialog.PrepareRequest{
+		Title:       "Doc",
+		Settings:    []printdialog.Setting{{Key: "n-copies", Value: "3"}, {Key: "printer", Value: "Office"}},
+		PageSetup:   printdialog.PageSetup{Name: "na_letter", Width: 215.9, Orientation: "portrait"},
+		AcceptLabel: "Export", HasCurrentPage: true, OutputFormats: []string{"ps", "pdf"},
+	}
+	if got := host.got.Load()[0]; !reflect.DeepEqual(got, want) {
+		t.Errorf("the dialog got %+v, want %+v", got, want)
+	}
+	// The page setup comes back under the spec's key, typed as GTK's.
+	ps, ok := res["page-setup"].Value().(map[string]dbus.Variant)
+	if !ok || ps["Name"].Value() != "iso_a4" || ps["Width"].Value() != 210.0 || ps["Height"].Value() != 297.0 || ps["MarginTop"].Value() != 6.35 || ps["Orientation"].Value() != "landscape" {
+		t.Errorf("page-setup = %v", res["page-setup"])
+	}
+	if _, has := res["page_setup"]; has {
+		t.Error("the page setup is still under page_setup")
 	}
 
 	doc, err := os.CreateTemp(t.TempDir(), "doc")

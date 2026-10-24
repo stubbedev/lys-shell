@@ -39,7 +39,9 @@ type harness struct {
 	listErr  error
 	spoolErr error
 	jobs     []spooled
-	out      string
+	home     string
+	// picked is the file the file chooser answers, "" for a cancel.
+	picked string
 }
 
 func newHarness(t *testing.T) *harness {
@@ -47,7 +49,8 @@ func newHarness(t *testing.T) *harness {
 	face := treetest.Font(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
-	hs := &harness{opened: make(chan app.LayerConfig, 4), out: filepath.Join(t.TempDir(), "output.pdf")}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	hs := &harness{opened: make(chan app.LayerConfig, 4), home: t.TempDir()}
 	hs.printers = []ipp.Printer{{Name: "office", Location: "Hall", State: ipp.StateIdle, Accepting: true}}
 	hs.h = New(Deps{
 		Config: func() *config.Config { return cfg },
@@ -69,8 +72,16 @@ func newHarness(t *testing.T) *harness {
 			hs.jobs = append(hs.jobs, spooled{j, string(b)})
 			return hs.spoolErr
 		},
-		OutputFile: func() string { return hs.out },
-		User:       "u",
+		PickOutput: func(_ string, chosen func(string)) {
+			hs.mu.Lock()
+			picked := hs.picked
+			hs.mu.Unlock()
+			if picked != "" {
+				chosen(picked)
+			}
+		},
+		Home: hs.home,
+		User: "u",
 	})
 	return hs
 }
@@ -84,24 +95,46 @@ func (hs *harness) do(fn func()) {
 type prepareResult struct {
 	ok       bool
 	settings []Setting
+	setup    PageSetup
 	token    uint32
 }
 
 func (hs *harness) prepare(t *testing.T) (chan prepareResult, app.LayerConfig) {
 	t.Helper()
+	return hs.prepareWith(t, testCaller, PrepareRequest{Title: "Doc"})
+}
+
+func (hs *harness) prepareWith(t *testing.T, c portalreq.Caller, r PrepareRequest) (chan prepareResult, app.LayerConfig) {
+	t.Helper()
 	got := make(chan prepareResult, 1)
 	go func() {
-		ok, s, tok := hs.h.Prepare(testCaller, "Doc")
-		got <- prepareResult{ok, s, tok}
+		ok, s, setup, tok := hs.h.Prepare(c, r)
+		got <- prepareResult{ok, s, setup, tok}
 	}()
+	return got, hs.open(t)
+}
+
+// open waits for the next dialog.
+func (hs *harness) open(t *testing.T) app.LayerConfig {
+	t.Helper()
 	select {
 	case c := <-hs.opened:
-		return got, c
+		return c
 	case <-time.After(treetest.Liveness):
 		t.Fatal("no dialog opened")
-		return nil, app.LayerConfig{}
+		return app.LayerConfig{}
 	}
 }
+
+// The dropdowns of the form, in its order.
+const (
+	dropPages = iota
+	dropOrientation
+	dropPaper
+	dropColor
+	dropSides
+	dropQuality
+)
 
 func document(t *testing.T, body string) *os.File {
 	t.Helper()
@@ -134,18 +167,21 @@ func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 	hs.do(func() {
 		copies.SetValue(2)
 		pages.SetText("2-3")
-		dropdowns[0].SetSelected(1) // landscape
-		dropdowns[2].SetSelected(1) // grayscale
+		dropdowns[dropOrientation].SetSelected(1) // landscape
+		dropdowns[dropColor].SetSelected(1)       // grayscale
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
 	r := <-got
 	if !r.ok || r.token == 0 {
 		t.Fatalf("prepare = %+v", r)
 	}
-	for _, want := range []Setting{{"printer", "office"}, {"n-copies", "2"}, {"orientation", "landscape"}, {"use-color", "false"}, {"page-ranges", "1-2"}} {
+	for _, want := range []Setting{{"printer", "office"}, {"n-copies", "2"}, {"orientation", "landscape"}, {"use-color", "false"}, {"print-pages", "ranges"}, {"page-ranges", "1-2"}} {
 		if !slices.Contains(r.settings, want) {
 			t.Errorf("settings %v lack %v", r.settings, want)
 		}
+	}
+	if r.setup.Name != "iso_a4" || r.setup.Width != 210 || r.setup.Orientation != "landscape" {
+		t.Errorf("page setup = %+v, want the chosen A4 in landscape", r.setup)
 	}
 
 	if !hs.h.Print(testCaller, "Doc", document(t, "%PDF body"), r.token) {
@@ -241,8 +277,8 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	first, c := hs.prepare(t)
 	second := make(chan prepareResult, 1)
 	go func() {
-		ok, s, tok := hs.h.Prepare(portalreq.Caller{Handle: "/r/second"}, "Doc 2")
-		second <- prepareResult{ok, s, tok}
+		ok, s, setup, tok := hs.h.Prepare(portalreq.Caller{Handle: "/r/second"}, PrepareRequest{Title: "Doc 2"})
+		second <- prepareResult{ok, s, setup, tok}
 	}()
 	select {
 	case r := <-first:
@@ -267,28 +303,57 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	}
 }
 
+// Print to File writes the file the user picked; one that exists is
+// replaced only after a second confirm. Without CUPS it is the only
+// queue.
 func TestPrintToFileAndAMissingScheduler(t *testing.T) {
 	hs := newHarness(t)
 	hs.listErr = errors.New("connect: no such file")
 	hs.printers = nil
-	got, c := hs.prepare(t)
 	if q := hs.h.queues(); len(q) != 1 || q[0].name != fileQueue {
 		t.Errorf("without CUPS the queues are %+v, want only %s", q, fileQueue)
 	}
-	_ = c
-	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
+	out := filepath.Join(t.TempDir(), "report.pdf")
+	hs.picked = out
+	got, c := hs.prepare(t)
+	if !slices.Contains(treetest.Labels(c.Root), filepath.Join(hs.home, "output.pdf")) {
+		t.Errorf("labels %q lack the suggested output", treetest.Labels(c.Root))
+	}
+	hs.do(func() {
+		treetest.Button(t, c.Root, "Choose…").OnClick()
+		treetest.Button(t, c.Root, "Print").OnClick()
+	})
 	r := <-got
-	if !slices.Contains(r.settings, Setting{"printer", fileQueue}) {
+	if !slices.Contains(r.settings, Setting{"printer", fileQueue}) || !slices.Contains(r.settings, Setting{"output-uri", "file://" + out}) {
 		t.Fatalf("settings = %v", r.settings)
 	}
 	if !hs.h.Print(testCaller, "Doc", document(t, "%PDF to file"), r.token) {
 		t.Fatal("print to file failed")
 	}
-	if b, err := os.ReadFile(hs.out); err != nil || string(b) != "%PDF to file" {
+	if b, err := os.ReadFile(out); err != nil || string(b) != "%PDF to file" {
 		t.Errorf("output = %q %v", b, err)
 	}
 	if len(hs.jobs) != 0 {
 		t.Error("print to file reached the scheduler")
+	}
+
+	// The file exists now: the first Print asks, the second replaces.
+	got, c = hs.prepare(t)
+	hs.do(func() {
+		treetest.Button(t, c.Root, "Choose…").OnClick()
+		treetest.Button(t, c.Root, "Print").OnClick()
+	})
+	select {
+	case r := <-got:
+		t.Fatalf("an existing file was replaced without asking: %+v", r)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if !slices.Contains(treetest.Labels(c.Root), "report.pdf exists. Print again to replace it.") {
+		t.Errorf("labels %q lack the replace note", treetest.Labels(c.Root))
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
+	if r := <-got; !r.ok {
+		t.Error("the second Print did not confirm")
 	}
 }
 
@@ -308,15 +373,133 @@ func TestPrintFailures(t *testing.T) {
 	if hs.h.Print(testCaller, "Doc", document(t, "x"), r.token) {
 		t.Error("a refused job reported sent")
 	}
+	hs.picked = filepath.Join(t.TempDir(), "missing-dir", "output.pdf")
 	got, c = hs.prepare(t)
 	hs.do(func() {
 		treetest.First[*widget.ListBox](t, c.Root).Select(1) // Print to File
+		treetest.Button(t, c.Root, "Choose…").OnClick()
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
 	r = <-got
-	hs.out = filepath.Join(t.TempDir(), "missing-dir", "output.pdf")
 	if hs.h.Print(testCaller, "Doc", document(t, "x"), r.token) {
 		t.Error("an unwritable output reported sent")
+	}
+}
+
+// A token prints once, for the app that prepared it, until it expires;
+// tokens are not sequential.
+func TestTokensBelongToTheirApp(t *testing.T) {
+	hs := newHarness(t)
+	confirm := func() uint32 {
+		got, c := hs.prepare(t)
+		hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
+		return (<-got).token
+	}
+	first, second := confirm(), confirm()
+	if first == 0 || second == 0 || second == first+1 {
+		t.Errorf("tokens %d then %d, want random non-zero ones", first, second)
+	}
+	other := portalreq.Caller{Handle: "/r/other", AppID: "org.other"}
+	if hs.h.Print(other, "Doc", document(t, "x"), first) {
+		t.Error("another app printed with the token")
+	}
+	if !hs.h.Print(testCaller, "Doc", document(t, "x"), first) {
+		t.Error("the preparing app could not print")
+	}
+	hs.h.now = func() time.Time { return time.Now().Add(tokenLifetime + time.Minute) }
+	if hs.h.Print(testCaller, "Doc", document(t, "x"), second) {
+		t.Error("an expired token printed")
+	}
+}
+
+// Print without a token shows the dialog first.
+func TestPrintWithoutATokenAsks(t *testing.T) {
+	hs := newHarness(t)
+	sent := make(chan bool, 1)
+	go func() { sent <- hs.h.Print(testCaller, "Doc", document(t, "%PDF"), 0) }()
+	c := hs.open(t)
+	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
+	if !<-sent {
+		t.Fatal("Print without a token did not spool after the dialog")
+	}
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	if len(hs.jobs) != 1 || hs.jobs[0].job.Printer != "office" {
+		t.Errorf("spooled %+v", hs.jobs)
+	}
+}
+
+// The form starts from the app's settings, page setup and options:
+// the printer, copies, paper, pages, the confirm label, and the pages
+// choices it can print.
+func TestPrepareStartsFromTheApp(t *testing.T) {
+	hs := newHarness(t)
+	hs.printers = append(hs.printers, ipp.Printer{Name: "lab", State: ipp.StateIdle, Accepting: true})
+	got, c := hs.prepareWith(t, testCaller, PrepareRequest{
+		Title:          "Doc",
+		Settings:       []Setting{{"printer", "lab"}, {"n-copies", "4"}, {"print-pages", "ranges"}, {"page-ranges", "1-2"}},
+		PageSetup:      PageSetup{Name: "na_letter"},
+		AcceptLabel:    "Export",
+		HasCurrentPage: true,
+	})
+	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != 1 {
+		t.Errorf("printer row %d selected, want lab", sel)
+	}
+	if v := treetest.All[*widget.SpinButton](c.Root)[0].Value(); v != 4 {
+		t.Errorf("copies = %v", v)
+	}
+	dropdowns := treetest.All[*widget.Dropdown](c.Root)
+	if items := dropdowns[dropPages].Items(); !slices.Equal(items, []string{"All pages", "Current page", "Range"}) || dropdowns[dropPages].Selection() != "Range" {
+		t.Errorf("pages %v on %q", items, dropdowns[dropPages].Selection())
+	}
+	if p := dropdowns[dropPaper].Selection(); p != "Letter" {
+		t.Errorf("paper = %q", p)
+	}
+	if e := treetest.All[*widget.Entry](c.Root)[0].Text(); e != "2-3" {
+		t.Errorf("range = %q", e)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Export").OnClick() })
+	if r := <-got; !slices.Contains(r.settings, Setting{"printer", "lab"}) || !slices.Contains(r.settings, Setting{"n-copies", "4"}) {
+		t.Errorf("settings = %v", r.settings)
+	}
+}
+
+// The paper, sides, color and quality offered are the selected
+// printer's; switching printers keeps a choice the next one offers.
+func TestFormFollowsThePrinter(t *testing.T) {
+	hs := newHarness(t)
+	hs.printers = []ipp.Printer{
+		{
+			Name: "mono", State: ipp.StateIdle, Accepting: true, Media: []string{"iso_a4_210x297mm", "iso_a5_148x210mm"},
+			Sides: []string{"one-sided"}, ColorModes: []string{"monochrome"}, Qualities: []int32{qualityNormal},
+		},
+		{Name: "photo", State: ipp.StateIdle, Accepting: true, Media: []string{"iso_a5_148x210mm", "na_index-4x6_4x6in"}, MediaDefault: "na_index-4x6_4x6in"},
+	}
+	got, c := hs.prepare(t)
+	dropdowns := treetest.All[*widget.Dropdown](c.Root)
+	if items := dropdowns[dropPaper].Items(); !slices.Equal(items, []string{"A4", "A5"}) {
+		t.Errorf("mono papers %v", items)
+	}
+	if items := dropdowns[dropColor].Items(); !slices.Equal(items, []string{"Grayscale"}) {
+		t.Errorf("mono colors %v", items)
+	}
+	if items := dropdowns[dropSides].Items(); !slices.Equal(items, []string{"One-sided"}) {
+		t.Errorf("mono sides %v", items)
+	}
+	hs.do(func() {
+		dropdowns[dropPaper].SetSelected(1) // A5
+		treetest.First[*widget.ListBox](t, c.Root).Select(1)
+	})
+	if items := dropdowns[dropPaper].Items(); !slices.Equal(items, []string{"A5", "Index-4x6"}) || dropdowns[dropPaper].Selection() != "A5" {
+		t.Errorf("photo papers %v on %q, want A5 kept", items, dropdowns[dropPaper].Selection())
+	}
+	if items := dropdowns[dropColor].Items(); !slices.Equal(items, []string{"Color", "Grayscale"}) {
+		t.Errorf("photo colors %v", items)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
+	r := <-got
+	if !slices.Contains(r.settings, Setting{"paper-format", "iso_a5"}) || !slices.Contains(r.settings, Setting{"printer", "photo"}) {
+		t.Errorf("settings = %v", r.settings)
 	}
 }
 

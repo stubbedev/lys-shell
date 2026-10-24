@@ -88,6 +88,14 @@ func (f *fakeCUPS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				String(TagName, "printer-name", "office"), String(TagText, "printer-location", "2nd floor"),
 				Enum("printer-state", StateIdle),
 				{"printer-is-accepting-jobs", []Value{{Tag: TagBoolean, Int: 1}}},
+				String(TagKeyword, "media-supported", "iso_a4_210x297mm", "na_letter_8.5x11in"),
+				String(TagKeyword, "media-default", "iso_a4_210x297mm"),
+				String(TagKeyword, "sides-supported", "one-sided", "two-sided-long-edge"),
+				String(TagKeyword, "sides-default", "one-sided"),
+				String(TagKeyword, "print-color-mode-supported", "monochrome"),
+				String(TagKeyword, "print-color-mode-default", "monochrome"),
+				{"print-quality-supported", []Value{{Tag: TagEnum, Int: 3}, {Tag: TagEnum, Int: 4}}},
+				Enum("print-quality-default", 4),
 			}},
 			Group{Tag: tagPrinter, Attrs: []Attr{
 				String(TagName, "printer-name", "lab"), Enum("printer-state", StateStopped),
@@ -111,8 +119,14 @@ func TestClientListsPrinters(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Printer{
-		{Name: "office", Location: "2nd floor", State: StateIdle, Accepting: true},
-		{Name: "lab", StateMessage: "Out of paper", State: StateStopped, Accepting: false},
+		{
+			Name: "office", Location: "2nd floor", State: StateIdle, Accepting: true,
+			Media: []string{"iso_a4_210x297mm", "na_letter_8.5x11in"}, MediaDefault: "iso_a4_210x297mm",
+			Sides: []string{"one-sided", "two-sided-long-edge"}, SidesDefault: "one-sided",
+			ColorModes: []string{"monochrome"}, ColorModeDefault: "monochrome",
+			Qualities: []int32{3, 4}, QualityDefault: 4,
+		},
+		{Name: "lab", StateMessage: "Out of paper", State: StateStopped, Accepting: false, Media: []string{}, Sides: []string{}, ColorModes: []string{}, Qualities: []int32{}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("printers = %+v, want %+v (a nameless queue is skipped)", got, want)

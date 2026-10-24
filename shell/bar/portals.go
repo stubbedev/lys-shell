@@ -86,7 +86,8 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		Sheet:      sheet,
 		Printers:   cups.Printers,
 		Spool:      func(ctx context.Context, j ipp.Job) error { _, err := cups.Print(ctx, j); return err },
-		OutputFile: printdialog.FileOutput,
+		PickOutput: func(suggested string, chosen func(string)) { pickOutput(application, chooser, suggested, chosen) },
+		Home:       home,
 		User:       currentUser(),
 	})
 	if _, err := printdialog.NewDaemon(printer).Export(conn); err != nil {
@@ -126,6 +127,24 @@ func pickImage(application *app.Application, chooser *filechooser.Chooser, chose
 	images := filechooser.Filter{Name: "Images", Rules: []filechooser.Rule{{Kind: filechooser.RuleMIME, Value: "image/*"}}}
 	go func() {
 		uris := chooser.Open(portalreq.Caller{Modal: true}, filechooser.OpenRequest{Title: "Choose a picture", Filters: []filechooser.Filter{images}})
+		if len(uris) == 0 {
+			return
+		}
+		if path, ok := fileuri.Path(uris[0]); ok {
+			application.Invoke(func() { chosen(path) })
+		}
+	}()
+}
+
+// pickOutput lets the user choose the file Print to File writes with
+// the file chooser, starting from suggested, and hands the path to
+// chosen on the loop. The chooser waits on the user, so it runs off the
+// loop.
+func pickOutput(application *app.Application, chooser *filechooser.Chooser, suggested string, chosen func(string)) {
+	go func() {
+		uris := chooser.Save(portalreq.Caller{Modal: true}, filechooser.SaveRequest{
+			Title: "Print to File", CurrentName: filepath.Base(suggested), CurrentFolder: filepath.Dir(suggested),
+		})
 		if len(uris) == 0 {
 			return
 		}
