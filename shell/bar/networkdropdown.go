@@ -10,6 +10,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/network"
@@ -355,7 +356,7 @@ func (v *networkView) row(ap apSnapshot) widget.Widget {
 			actions.AddClass("network-item-actions")
 			forget := widget.NewLabel(v.font, v.px*0.85, i18n.T("dropdown-network-forget"), 0)
 			// GhostButton + network-item-forget (network_item.rs:115-123).
-			forgetBtn := dropdownButton(forget, "ghost", func() { v.forget(ssid) })
+			forgetBtn := dropdownButton(forget, css.Ghost, func() { v.forget(ssid) })
 			forgetBtn.AddClass("network-item-forget")
 			actions.Append(forgetBtn, false)
 			trailing.Add("actions", actions)
@@ -672,15 +673,15 @@ func (v *networkView) statusLabel() *widget.Label {
 
 func (v *networkView) ghostText(text, class string, onClick func()) *widget.Button {
 	b := dropdownButton(widget.NewLabel(v.font, v.px*0.85, text, 0), class, onClick)
-	b.AddClass("ghost")
+	b.AddClass(css.Ghost)
 	return b
 }
 
 // primaryText is a PrimaryButton: the accent-filled action of a form.
 func (v *networkView) primaryText(text, class string, onClick func()) *widget.Button {
 	b := v.ghostText(text, class, onClick)
-	b.RemoveClass("ghost")
-	b.AddClass("primary")
+	b.RemoveClass(css.Ghost)
+	b.AddClass(css.SuggestedAction)
 	return b
 }
 

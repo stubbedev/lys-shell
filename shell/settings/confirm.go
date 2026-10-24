@@ -2,6 +2,7 @@ package settings
 
 import (
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 )
@@ -67,8 +68,8 @@ func confirmContent(k *kit, spec confirmSpec, respond func(string)) *widget.Box 
 	footer := widget.NewBox(widget.Row, 0, 0)
 	footer.AddClass("modal-footer")
 	footer.Append(widget.NewSpacer(0, 0), true)
-	footer.Append(k.button(k.label(spec.cancel), func() { respond(responseCancel) }, "secondary"), false)
-	footer.Append(k.button(k.label(spec.confirm), func() { respond(responseConfirm) }, "danger"), false)
+	footer.Append(k.button(k.label(spec.cancel), func() { respond(responseCancel) }, css.Outline), false)
+	footer.Append(k.button(k.label(spec.confirm), func() { respond(responseConfirm) }, css.DestructiveAction), false)
 	root.Append(footer, false)
 	return root
 }

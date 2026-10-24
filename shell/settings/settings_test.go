@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -431,7 +432,7 @@ func TestResetAllConfirmation(t *testing.T) {
 		}
 	}
 	walk(content)
-	if len(buttons) != 2 || !buttons[0].HasClass("secondary") || !buttons[1].HasClass("danger") {
+	if len(buttons) != 2 || !buttons[0].HasClass(css.Outline) || !buttons[1].HasClass(css.DestructiveAction) {
 		t.Fatalf("buttons %v, want cancel then the danger confirm", buttons)
 	}
 	buttons[0].ClickAt(widget.Point{})

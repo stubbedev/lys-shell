@@ -147,11 +147,6 @@ menubutton.zone-add-btn > button:hover {
   padding: var(--space-xl);
 }
 
-.bar-layout-control > button.ghost {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  margin-top: var(--space-xs);
-}
 
 .module-picker-popover contents {
   padding: var(--space-md);

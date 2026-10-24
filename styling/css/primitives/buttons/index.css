@@ -1,61 +1,9 @@
 button {
-  all: unset;
   border-radius: var(--rounding-element);
   font-size: var(--text-md);
-  font-weight: var(--weight-medium);
 }
 button image {
   -gtk-icon-size: var(--icon-md);
-}
-button:hover {
-  transition: background var(--duration-fast);
-}
-button.primary {
-  background: var(--accent);
-  color: var(--fg-on-accent);
-}
-button.primary:hover {
-  background: var(--accent-hover);
-}
-button.primary:disabled {
-  opacity: 0.5;
-}
-button.primary:focus-visible {
-  outline: var(--focus-ring-width) solid var(--accent);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.primary > image {
-  margin: var(--space-sm) var(--space-md);
-}
-button.primary > box {
-  margin: var(--space-sm) var(--space-md);
-}
-button.primary > label {
-  margin: var(--space-sm) var(--space-md);
-}
-button.secondary {
-  background: var(--bg-overlay);
-  color: var(--fg-muted);
-}
-button.secondary:hover {
-  background: var(--bg-active);
-  color: var(--fg-default);
-}
-button.secondary:disabled {
-  opacity: 0.5;
-}
-button.secondary:focus-visible {
-  outline: var(--focus-ring-width) solid var(--fg-muted);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.secondary > image {
-  margin: var(--space-sm) var(--space-md);
-}
-button.secondary > box {
-  margin: var(--space-sm) var(--space-md);
-}
-button.secondary > label {
-  margin: var(--space-sm) var(--space-md);
 }
 button.icon {
   background: var(--bg-overlay);
@@ -78,53 +26,6 @@ button.icon > box {
   margin: var(--space-sm) var(--space-md);
 }
 button.icon > label {
-  margin: var(--space-sm) var(--space-md);
-}
-button.danger {
-  background: var(--status-error);
-  color: var(--fg-on-accent);
-}
-button.danger:hover {
-  background: var(--status-error-hover);
-}
-button.danger:disabled {
-  opacity: 0.5;
-}
-button.danger:focus-visible {
-  outline: var(--focus-ring-width) solid var(--status-error);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.danger > image {
-  margin: var(--space-sm) var(--space-md);
-}
-button.danger > box {
-  margin: var(--space-sm) var(--space-md);
-}
-button.danger > label {
-  margin: var(--space-sm) var(--space-md);
-}
-button.ghost {
-  background: transparent;
-  color: var(--fg-muted);
-}
-button.ghost:hover {
-  background: var(--bg-hover);
-  color: var(--fg-default);
-}
-button.ghost:disabled {
-  opacity: 0.5;
-}
-button.ghost:focus-visible {
-  outline: var(--focus-ring-width) solid var(--fg-muted);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.ghost > image {
-  margin: var(--space-sm) var(--space-md);
-}
-button.ghost > box {
-  margin: var(--space-sm) var(--space-md);
-}
-button.ghost > label {
   margin: var(--space-sm) var(--space-md);
 }
 button.ghost-icon {
@@ -151,43 +52,6 @@ button.ghost-icon > box {
 button.ghost-icon > label {
   margin: var(--space-sm) var(--space-md);
 }
-button.link {
-  background: none;
-  color: var(--accent);
-  text-decoration: none;
-}
-button.link > image {
-  margin: var(--space-xs) var(--space-sm);
-}
-button.link > box {
-  margin: var(--space-xs) var(--space-sm);
-}
-button.link > label {
-  margin: var(--space-xs) var(--space-sm);
-}
-button.link:hover label {
-  text-decoration: underline;
-}
-button.link:disabled {
-  opacity: 0.5;
-}
-button.link:focus-visible {
-  outline: var(--focus-ring-width) solid var(--accent);
-  outline-offset: calc(0.125rem * var(--global-scale));
-}
-button.link.muted {
-  color: var(--fg-muted);
-}
-button.link.muted:focus-visible {
-  outline-color: var(--fg-muted);
-}
-button.link.danger {
-  color: var(--status-error);
-}
-button.link.danger:focus-visible {
-  outline-color: var(--status-error);
-}
-
 menubutton {
   all: unset;
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/portal"
@@ -490,7 +491,7 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	f.advLabel = widget.NewLabel(v.font, v.px*0.85, "", 0)
 	f.advLabel.AddClass("network-secret-label")
 	f.advanced = dropdownButton(f.advLabel, "network-vpn-advanced", f.toggleAdvanced)
-	f.advanced.AddClass("ghost")
+	f.advanced.AddClass(css.Ghost)
 	body.Append(f.advanced, false)
 	f.rawHint = f.fieldLabel("")
 	f.rawHint.SetWrap(true)

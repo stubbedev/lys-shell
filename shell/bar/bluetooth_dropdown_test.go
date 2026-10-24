@@ -11,6 +11,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
@@ -784,20 +785,20 @@ func TestBtGhostClassesAreExact(t *testing.T) {
 		t.Errorf("scan button classes wrong: ghost-icon %v scan-btn %v",
 			widget.HasClass(d.scanBtn, "ghost-icon"), widget.HasClass(d.scanBtn, "bluetooth-scan-btn"))
 	}
-	if widget.HasClass(d.scanBtn, "ghost") {
+	if widget.HasClass(d.scanBtn, css.Ghost) {
 		t.Error("the scan button carries the ghost class")
 	}
 	closeBtn := findButton(d.card.root, "bluetooth-pairing-close")
 	if closeBtn == nil {
 		t.Fatal("no pairing close button")
 	}
-	if widget.HasClass(closeBtn, "ghost") || !widget.HasClass(closeBtn, "ghost-icon") {
+	if widget.HasClass(closeBtn, css.Ghost) || !widget.HasClass(closeBtn, "ghost-icon") {
 		t.Error("the close button is not ghost-icon only")
 	}
 	// The row actions are GhostButtons: ghost, not ghost-icon.
 	mouse := rowNamed(t, d, "Mouse")
 	forget := mouse.actions.Children()[1].(*widget.Button)
-	if !widget.HasClass(forget, "ghost") || !widget.HasClass(forget, "bluetooth-forget") {
+	if !widget.HasClass(forget, css.Ghost) || !widget.HasClass(forget, "bluetooth-forget") {
 		t.Error("the forget button is not the ghost template")
 	}
 	if widget.HasClass(forget, "ghost-icon") {

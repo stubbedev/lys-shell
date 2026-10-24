@@ -116,7 +116,7 @@ func userSessionSection(ctx ModuleContext) widget.Widget {
 		// button.icon.session-btn: the IconButton template's class
 		// carries the pointer cursor, the hover shade, and the glyph
 		// ink; no Go hover fills.
-		button := widget.NewButton(glyph, 6, 6)
+		button := widget.NewButton(glyph, 0, 0)
 		button.AddClass("icon", "session-btn")
 		button.SetTooltip(spec.tooltip)
 		command := spec.command

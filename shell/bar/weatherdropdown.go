@@ -198,7 +198,7 @@ func (v *weatherView) label(text string, scale float64, class string) *widget.La
 // the one header that leaves the template's icon hidden (weather/mod.rs
 // never sets it visible).
 func (v *weatherView) header() widget.Widget {
-	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1), 6, 6)
+	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1), 0, 0)
 	refresh.AddClass("ghost-icon")
 	refresh.OnClick = v.svc.Refresh
 	refresh.SetTooltip(i18n.T("dropdown-weather-refresh"))
@@ -235,7 +235,7 @@ func (v *weatherView) errorPage() widget.Widget {
 	title.SetEllipsize(widget.EllipsizeEnd)
 	v.errorText = v.label("", 0.95, "error-text")
 	v.errorText.SetEllipsize(widget.EllipsizeEnd)
-	retry := widget.NewButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-weather-retry"), 0), 8, 6)
+	retry := widget.NewButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-weather-retry"), 0), 0, 0)
 	retry.AddClass("weather-retry-btn")
 	retry.OnClick = v.svc.Refresh
 	vcentered(col, v.icon("ld-info-symbolic", 2.5, "error-icon"), title, v.errorText, retry)

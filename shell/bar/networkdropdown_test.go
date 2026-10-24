@@ -11,6 +11,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -429,7 +430,7 @@ func TestNetworkRowIsAClickableBoxNotAButton(t *testing.T) {
 	if forget == nil {
 		t.Fatal("no forget button in the row")
 	}
-	if !widget.HasClass(forget, "ghost") || widget.HasClass(forget, "ghost-icon") {
+	if !widget.HasClass(forget, css.Ghost) || widget.HasClass(forget, "ghost-icon") {
 		t.Error("the forget button is not GhostButton + network-item-forget")
 	}
 	clickAt(t, saved, forget)
@@ -503,7 +504,7 @@ func TestNetworkScanButtonGhostIconOnly(t *testing.T) {
 	// off the test goroutine, so read on the loop.
 	ghostIcon, ghost := onHeadlessLoop(func() bool {
 		return widget.HasClass(v.scanBtn, "ghost-icon") && widget.HasClass(v.scanBtn, "network-scan-btn")
-	}), onHeadlessLoop(func() bool { return widget.HasClass(v.scanBtn, "ghost") })
+	}), onHeadlessLoop(func() bool { return widget.HasClass(v.scanBtn, css.Ghost) })
 	if !ghostIcon {
 		t.Error("the scan button is not ghost-icon + network-scan-btn")
 	}

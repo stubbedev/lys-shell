@@ -6,6 +6,7 @@ import (
 	"github.com/stubbedev/lys-ui/highlight"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -43,7 +44,7 @@ func newYAMLEditor(k *kit, s slot, key string, minLines int) *yamlEditor {
 	if minLines > 0 {
 		c.scroll.AddClass("yaml-editor-lines-" + strconv.Itoa(minLines))
 	}
-	apply := k.button(k.label(i18n.Settings().Get("settings-apply")), c.apply, "primary")
+	apply := k.button(k.label(i18n.Settings().Get("settings-apply")), c.apply, css.SuggestedAction)
 	c.Append(c.scroll, true)
 	c.AppendAligned(apply, false, widget.AlignEnd)
 	c.refresh()

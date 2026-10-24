@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 )
@@ -81,7 +82,7 @@ func greeterApplyFooter(k *kit) widget.Widget {
 			return
 		}
 		log.Printf("settings: greeter apply: launched pkexec lys-greeter apply-config")
-	}, "primary"), false, widget.AlignStart)
+	}, css.SuggestedAction), false, widget.AlignStart)
 	hint := k.label(greeterApplyHint, "settings-section-title")
 	hint.SetWrap(true)
 	box.Append(hint, false)

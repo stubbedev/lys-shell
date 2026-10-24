@@ -375,7 +375,7 @@ func (m *systrayModule) newEntry(it sni.Item) *trayEntry {
 	e := &trayEntry{item: it}
 	px := m.iconPx()
 	e.slot = newFixedBox(px, px, nil)
-	inner := widget.NewButton(e.slot, 2, 4)
+	inner := widget.NewButton(e.slot, 0, 0)
 	inner.AddClass("systray-item")
 	if m.ctx.Style != nil {
 		inner.BgHover = m.ctx.Style.buttonBgHover

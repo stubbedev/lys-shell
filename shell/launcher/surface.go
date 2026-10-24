@@ -752,7 +752,7 @@ func (s *Surface) rebuildTabs(names []string, activeMode int) {
 		if shown, ok := s.cur.ui.displayNames[name]; ok {
 			label = shown
 		}
-		b := widget.NewButton(widget.NewLabel(s.d.Font, fontPx, label, 0), 4, 6)
+		b := widget.NewButton(widget.NewLabel(s.d.Font, fontPx, label, 0), 0, 0)
 		b.AddClass("launcher-tab")
 		if i == activeMode {
 			b.AddClass("active")

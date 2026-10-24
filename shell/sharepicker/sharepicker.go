@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-ui/capture"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
@@ -569,7 +570,7 @@ func (p *Picker) regionPage() widget.Widget {
 	lbl := p.label("Select region")
 	lbl.SetAlignment(render.AlignCenter)
 	btn := widget.NewButton(lbl, 0, 0)
-	btn.AddClass("primary", "share-picker-region-button")
+	btn.AddClass(css.SuggestedAction, "share-picker-region-button")
 	btn.SetCursorName("pointer")
 	btn.OnClick = func() {
 		p.hide()

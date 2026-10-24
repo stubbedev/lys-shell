@@ -211,7 +211,7 @@ func (v *calendarView) calendar() widget.Widget {
 	nav := widget.NewBox(widget.Row, 0, 0)
 	nav.AddClass("cal-nav")
 	navBtn := func(child widget.Widget, onClick func()) *widget.Button {
-		b := widget.NewButton(child, 4, 6)
+		b := widget.NewButton(child, 0, 0)
 		b.AddClass("cal-nav-btn")
 		// No programmatic pressed shade: .cal-nav-btn is all:unset and
 		// the stylesheet paints the hover.

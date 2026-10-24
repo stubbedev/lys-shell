@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
@@ -212,7 +213,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	left.OnClick = func() { c.emit(c.rejectOutput()) }
 	actions.Append(left, true)
 	c.rightLabel = widget.NewLabel(font, px, "", 0)
-	c.right = dropdownButton(c.rightLabel, "primary", nil)
+	c.right = dropdownButton(c.rightLabel, css.SuggestedAction, nil)
 	c.right.OnClick = func() {
 		if out, ok := c.confirmOutput(); ok {
 			c.emit(out)
@@ -229,7 +230,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 // ghostButton is the GhostButton template: the `ghost` class's
 // stylesheet rules paint it (transparent until hovered, muted ink).
 func ghostButton(child widget.Widget) *widget.Button {
-	return dropdownButton(child, "ghost", nil)
+	return dropdownButton(child, css.Ghost, nil)
 }
 
 func isDigit(r rune) bool { return r >= '0' && r <= '9' }

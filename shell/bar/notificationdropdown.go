@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -105,7 +106,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	clearBox.Append(clearLabel, false)
 	v.clearBox = clearBox
 	v.clearAll = dropdownButton(clearBox, "notification-dropdown-clear-all", v.dismissAll)
-	v.clearAll.AddClass("ghost")
+	v.clearAll.AddClass(css.Ghost)
 	header, headerIcon := dropdownHeaderIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
 	v.headerIcon = headerIcon
 	v.Append(header, false)

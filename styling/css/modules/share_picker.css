@@ -106,11 +106,7 @@
 }
 
 .share-picker-region-button {
-  min-height: calc(2.25rem * var(--global-scale));
   font-weight: var(--weight-semibold);
-}
-.share-picker-region-button.primary > label {
-  margin: var(--space-sm) var(--space-xl);
 }
 .share-picker-region-button:hover {
   box-shadow: var(--shadow-sm);

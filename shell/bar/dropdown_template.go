@@ -258,7 +258,7 @@ func followInto[T any](life context.Context, what string, subscribe func(context
 // rules paint it (the hover and active shades, the ink), so nothing is
 // set here.
 func dropdownButton(child widget.Widget, class string, onClick func()) *widget.Button {
-	b := widget.NewButton(child, 6, 8)
+	b := widget.NewButton(child, 0, 0)
 	b.AddClass(class)
 	b.OnClick = onClick
 	return b

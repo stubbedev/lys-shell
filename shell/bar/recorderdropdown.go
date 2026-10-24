@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/recorder"
@@ -286,7 +287,7 @@ func (v *recorderView) controls() widget.Widget {
 			r.SetPaused(!r.Snapshot().Paused)
 		}
 	})
-	v.pause.AddClass("secondary")
+	v.pause.AddClass(css.Secondary)
 	row.Append(v.pause, false)
 	return row
 }
@@ -360,13 +361,13 @@ func (v *recorderView) applyState(c recorder.Change) {
 	} else {
 		v.statusDot.RemoveClass("paused")
 	}
-	v.record.RemoveClass("danger", "primary")
+	v.record.RemoveClass(css.DestructiveAction, css.SuggestedAction)
 	if c.Active {
-		v.record.AddClass("danger")
+		v.record.AddClass(css.DestructiveAction)
 		v.recordIcon.SetThemeName("ld-square-symbolic")
 		v.recordLabel.SetText(i18n.T("dropdown-recorder-stop"))
 	} else {
-		v.record.AddClass("primary")
+		v.record.AddClass(css.SuggestedAction)
 		v.recordIcon.SetThemeName("ld-circle-dot-symbolic")
 		v.recordLabel.SetText(i18n.T("dropdown-recorder-record"))
 	}

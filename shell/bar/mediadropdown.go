@@ -253,13 +253,13 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 
 	controls := widget.NewBox(widget.Row, 0, 0)
 	controls.AddClass("media-controls")
-	v.shuffle = v.controlButton(widget.NewThemeIcon("ld-shuffle-symbolic", int(px)), "secondary", func() { v.fire("toggle shuffle", v.src.ToggleShuffle) })
+	v.shuffle = v.controlButton(widget.NewThemeIcon("ld-shuffle-symbolic", int(px)), "minor", func() { v.fire("toggle shuffle", v.src.ToggleShuffle) })
 	v.previous = v.controlButton(widget.NewThemeIcon("ld-skip-back-symbolic", int(px)), "", func() { v.fire("previous track", v.src.Previous) })
 	v.playIcon = widget.NewThemeIcon("ld-play-symbolic", int(px*1.4))
 	v.playPause = v.controlButton(v.playIcon, "main", func() { v.fire("play/pause", v.src.PlayPause) })
 	v.next = v.controlButton(widget.NewThemeIcon("ld-skip-forward-symbolic", int(px)), "", func() { v.fire("next track", v.src.Next) })
 	v.loopIcon = widget.NewThemeIcon("ld-repeat-symbolic", int(px))
-	v.loop = v.controlButton(v.loopIcon, "secondary", func() { v.fire("toggle loop", v.src.ToggleLoop) })
+	v.loop = v.controlButton(v.loopIcon, "minor", func() { v.fire("toggle loop", v.src.ToggleLoop) })
 	for _, b := range []*widget.Button{v.shuffle, v.previous, v.playPause, v.next, v.loop} {
 		controls.AppendAligned(b, false, widget.AlignCenter)
 	}

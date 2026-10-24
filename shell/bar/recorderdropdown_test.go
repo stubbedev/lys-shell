@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -120,7 +121,7 @@ func TestRecorderDropdownStateAndControls(t *testing.T) {
 	ctx, _, engine := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
-	if v.status.Visible() || v.pause.Enabled() || !v.record.HasClass("primary") || v.recordLabel.Text() != i18n.T("dropdown-recorder-record") {
+	if v.status.Visible() || v.pause.Enabled() || !v.record.HasClass(css.SuggestedAction) || v.recordLabel.Text() != i18n.T("dropdown-recorder-record") {
 		t.Error("idle: want the record button, no status, pause disabled")
 	}
 	if v.webcam.Visible() || v.webcamHeader.Visible() {
@@ -129,7 +130,7 @@ func TestRecorderDropdownStateAndControls(t *testing.T) {
 
 	v.record.OnClick()
 	waitHeadless(t, "recording", func() bool { return v.status.Visible() })
-	if !v.record.HasClass("danger") || v.record.HasClass("primary") || v.recordLabel.Text() != i18n.T("dropdown-recorder-stop") || !v.pause.Enabled() {
+	if !v.record.HasClass(css.DestructiveAction) || v.record.HasClass(css.SuggestedAction) || v.recordLabel.Text() != i18n.T("dropdown-recorder-stop") || !v.pause.Enabled() {
 		t.Error("recording: want stop, danger, pause enabled")
 	}
 	v.pause.OnClick()

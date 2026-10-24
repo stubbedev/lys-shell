@@ -5,6 +5,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/styling"
@@ -88,5 +89,49 @@ func TestThemeInstallsTheWidgetTheme(t *testing.T) {
 	th.SetConfig(next)
 	if widget.Current().Accent != render.RGB(0xff, 0, 0) {
 		t.Errorf("a new palette left lys-ui's accent at %#08x", uint32(widget.Current().Accent))
+	}
+}
+
+// The shell sheet leaves lys-ui's button variants their fills: a
+// suggested or destructive action paints the palette's primary or
+// error over the plain buttons' transparent rest.
+func TestShellSheetKeepsTheButtonVariantFills(t *testing.T) {
+	isolateConfigDir(t)
+	t.Cleanup(func() { widget.SetTheme(nil) })
+	theme := New(config.Defaults())
+	p := theme.RenderPalette()
+	errColor, ok := p.Token(config.TokenStatusError)
+	if !ok {
+		t.Fatal("the palette has no status-error")
+	}
+	button := func(class string) *widget.Button {
+		b := widget.NewButton(widget.NewSpacer(40, 40), 0, 0)
+		b.AddClass(class)
+		return b
+	}
+	plain, suggested, destructive := button("plain"), button(css.SuggestedAction), button(css.DestructiveAction)
+	root := widget.NewBox(widget.Column, 0, 0)
+	for _, b := range []*widget.Button{plain, suggested, destructive} {
+		root.Append(b, false)
+	}
+	theme.Attach(root)
+	const w, h = 200, 200
+	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	root.Arrange(render.Rect{W: w, H: h})
+	data := make([]byte, render.Stride(w)*h)
+	root.Paint(render.NewScaled(data, render.Stride(w), w, h, 1, 1))
+	center := func(b *widget.Button) (widget.Color, byte) {
+		r := b.Bounds()
+		i := (r.Y+r.H/2)*render.Stride(w) + (r.X+r.W/2)*4
+		return render.RGB(data[i+2], data[i+1], data[i]), data[i+3]
+	}
+	if _, alpha := center(plain); alpha != 0 {
+		t.Errorf("a plain button paints alpha %d at rest, want transparent", alpha)
+	}
+	if got, _ := center(suggested); got != p.Primary {
+		t.Errorf("a suggested action paints %#08x, want the primary %#08x", uint32(got), uint32(p.Primary))
+	}
+	if got, _ := center(destructive); got != errColor {
+		t.Errorf("a destructive action paints %#08x, want status-error %#08x", uint32(got), uint32(errColor))
 	}
 }
