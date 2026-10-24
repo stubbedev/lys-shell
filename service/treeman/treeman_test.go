@@ -50,33 +50,122 @@ func TestSocketPathLookup(t *testing.T) {
 	}
 }
 
-func TestReadParsesStatusJSON(t *testing.T) {
+// fakeTreemanBin writes a treeman that answers only `status --format
+// json`, printing the JSON lines of the file at lines in turn (one per
+// run, the last repeating); a line "FAIL" exits non-zero. Any other
+// arguments exit 2.
+func fakeTreemanBin(t *testing.T, outputs ...string) string {
+	t.Helper()
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "fake-treeman")
-	script := "#!/bin/sh\ncat <<'JSON'\n{\"total\":3,\"stable\":1,\"up\":1,\"down\":0,\"failed\":1,\"class\":\"failed\"}\nJSON\n"
+	lines := filepath.Join(dir, "outputs")
+	if err := os.WriteFile(lines, []byte(strings.Join(outputs, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	count := filepath.Join(dir, "count")
+	bin := filepath.Join(dir, "treeman")
+	script := `#!/bin/sh
+[ "$*" = "status --format json" ] || exit 2
+n=$(cat "` + count + `" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "` + count + `"
+total=$(wc -l < "` + lines + `")
+[ $n -gt $total ] && n=$total
+line=$(sed -n "${n}p" "` + lines + `")
+[ "$line" = FAIL ] && exit 1
+echo "$line"
+`
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	s := New(bin)
-	status, err := s.Read(context.Background())
-	if err != nil {
-		t.Fatalf("Read: %v", err)
-	}
-	if status == nil || status.Total != 3 || status.Failed != 1 {
-		t.Fatalf("status = %+v err=%v", status, err)
-	}
-	if got := status.WorstBucket(); got != BucketFailed {
-		t.Errorf("worst = %v", got)
-	}
+	return bin
+}
 
-	// A failing treeman reads as nil, not an error.
-	s2 := New(filepath.Join(dir, "missing-treeman"))
-	if status, err := s2.Read(context.Background()); err != nil || status != nil {
-		t.Errorf("missing binary = %+v err=%v, want nil,nil", status, err)
+// waitStatus waits for a tick that leaves Status at total.
+func waitStatus(t *testing.T, s *System, ticks <-chan struct{}, total uint32) {
+	t.Helper()
+	deadline := time.After(3 * time.Second)
+	for {
+		if st := s.Status(); st != nil && st.Total == total {
+			return
+		}
+		select {
+		case <-ticks:
+		case <-deadline:
+			t.Fatalf("status = %+v, want total %d", s.Status(), total)
+		}
 	}
 }
 
-func TestSubscribeTicksOnEvents(t *testing.T) {
+func TestStatusComesFromTheJSONStatusCommand(t *testing.T) {
+	t.Setenv("TREEMAN_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	s := New(fakeTreemanBin(t, `{"total":3,"stable":1,"up":1,"down":0,"failed":1,"class":"failed"}`))
+	defer s.Stop()
+	if s.Status() != nil {
+		t.Fatal("a status before the first fetch")
+	}
+	ticks, _, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, s, ticks, 3)
+	if got := s.Status().WorstBucket(); got != BucketFailed {
+		t.Errorf("worst = %v", got)
+	}
+}
+
+// Without the binary the service idles: no status, no ticks, and no
+// re-spawning (service.rs's Fetch::Unavailable).
+func TestAMissingTreemanIdles(t *testing.T) {
+	s := New(filepath.Join(t.TempDir(), "missing-treeman"))
+	if _, outcome := s.fetch(context.Background()); outcome != fetchUnavailable {
+		t.Errorf("missing binary outcome = %v, want unavailable", outcome)
+	}
+	if !New("true").refresh(context.Background()) {
+		t.Error("an installed treeman reported unavailable")
+	}
+	if s.refresh(context.Background()) {
+		t.Error("refresh with a missing binary: want the loop to stop")
+	}
+	if s.Status() != nil {
+		t.Errorf("status = %+v, want none", s.Status())
+	}
+}
+
+// A failed or unparsable run keeps the last status and publishes
+// nothing (Fetch::Empty).
+func TestAFailedRunKeepsTheLastStatus(t *testing.T) {
+	s := New(fakeTreemanBin(t, `{"total":2}`, "FAIL", "not json", `{"total":2}`))
+	ticks, stop := s.changes.Subscribe()
+	defer stop()
+	for range 4 {
+		if !s.refresh(context.Background()) {
+			t.Fatal("refresh stopped the loop")
+		}
+		if st := s.Status(); st == nil || st.Total != 2 {
+			t.Fatalf("status = %+v, want the first status kept", st)
+		}
+	}
+	<-ticks
+	select {
+	case <-ticks:
+		t.Error("an unchanged status ticked again")
+	default:
+	}
+}
+
+// With the daemon down the service polls the CLI every retry.
+func TestPollsWithoutTheDaemon(t *testing.T) {
+	t.Setenv("TREEMAN_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	s := New(fakeTreemanBin(t, `{"total":1}`, `{"total":2}`))
+	s.retry = 20 * time.Millisecond
+	defer s.Stop()
+	ticks, _, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, s, ticks, 1)
+	waitStatus(t, s, ticks, 2)
+}
+
+func TestDaemonEventsRefetch(t *testing.T) {
 	dir := t.TempDir()
 	sock := filepath.Join(dir, "treeman.sock")
 	ln, err := net.Listen("unix", sock)
@@ -84,7 +173,7 @@ func TestSubscribeTicksOnEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-
+	event := make(chan struct{})
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -97,8 +186,7 @@ func TestSubscribeTicksOnEvents(t *testing.T) {
 				if _, err := c.Read(buf); err != nil {
 					return
 				}
-				// Hold the stream open, then deliver one event.
-				time.Sleep(100 * time.Millisecond)
+				<-event
 				c.Write([]byte("{\"event\":{}}\n"))
 				time.Sleep(2 * time.Second)
 			}(conn)
@@ -106,25 +194,16 @@ func TestSubscribeTicksOnEvents(t *testing.T) {
 	}()
 
 	t.Setenv("TREEMAN_SOCKET", sock)
-	s := New("true")
-	ticks, stop, err := s.Subscribe(context.Background())
+	s := New(fakeTreemanBin(t, `{"total":1}`, `{"total":5}`))
+	s.retry = time.Hour
+	defer s.Stop()
+	ticks, _, err := s.Subscribe(context.Background())
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
-	defer stop()
-
-	// The initial read tick arrives immediately.
-	select {
-	case <-ticks:
-	case <-time.After(2 * time.Second):
-		t.Fatal("no initial tick")
-	}
-	// The daemon's event collapses into one debounced tick.
-	select {
-	case <-ticks:
-	case <-time.After(3 * time.Second):
-		t.Fatal("no event tick")
-	}
+	waitStatus(t, s, ticks, 1)
+	close(event)
+	waitStatus(t, s, ticks, 5)
 }
 
 // Every subscriber sees every change (one bar per output), and Stop

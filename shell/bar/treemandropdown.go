@@ -99,16 +99,11 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	return v
 }
 
-func (v *treemanView) read(ctx context.Context) *treeman.Status {
+func (v *treemanView) read(context.Context) *treeman.Status {
 	if v.ctx.Treeman == nil {
 		return nil
 	}
-	s, err := v.ctx.Treeman.Read(ctx)
-	if err != nil {
-		log.Printf("treeman: %v", err)
-		return nil
-	}
-	return s
+	return v.ctx.Treeman.Status()
 }
 
 // apply is StatusChanged: the list re-renders and the page resyncs.

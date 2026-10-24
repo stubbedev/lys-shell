@@ -7,9 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -147,13 +150,14 @@ func SocketPath() (string, bool) {
 
 const subscribeRequest = `{"method":"event_subscribe","event_subscribe":{}}` + "\n"
 
-// Source is the module's seam. Nil snapshots mean treeman is not
-// installed.
+// Source is the module's seam.
 type Source interface {
-	// Read runs `treeman status` and parses the snapshot.
-	Read(ctx context.Context) (*Status, error)
-	// Subscribe ticks on daemon activity (debounced). The channel
-	// closes when the source stops; stop terminates the loop.
+	// Status is the latest snapshot (the Rust service's status
+	// property): nil until treeman reported one, and for good when
+	// treeman is not installed.
+	Status() *Status
+	// Subscribe ticks when Status changes. The channel closes when the
+	// source stops; stop unsubscribes.
 	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 	// RunAction queues an action with the treeman daemon; the status
 	// subscription reports its progress. A failure carries the
@@ -161,9 +165,22 @@ type Source interface {
 	RunAction(ctx context.Context, action Action, path string) error
 }
 
-// System is the real client. Zero-value usable through New.
+// The service's timing (service.rs): the pause before reconnecting a
+// dropped or absent daemon (and so the poll period while it is down),
+// and the window an event burst collapses into one fetch.
+const (
+	reconnectDelay = 5 * time.Second
+	debounce       = 200 * time.Millisecond
+)
+
+// System is the real client, built by New.
 type System struct {
 	binary string
+	// retry is reconnectDelay (shorter under test).
+	retry time.Duration
+
+	mu     sync.Mutex
+	status *Status
 
 	changes feed.Tick
 	start   sync.Once
@@ -176,26 +193,73 @@ func New(binary string) *System {
 	if binary == "" {
 		binary = "treeman"
 	}
-	return &System{binary: binary, stopped: make(chan struct{})}
+	return &System{binary: binary, retry: reconnectDelay, stopped: make(chan struct{})}
 }
 
-// Read runs `treeman status`; a missing binary or non-zero exit reads
-// as nil (the Rust service's Empty/Unavailable paths).
-func (s *System) Read(ctx context.Context) (*Status, error) {
-	out, err := exec.CommandContext(ctx, s.binary, "status").Output() //nolint:gosec // the binary name is the client's own
+// Status implements Source.
+func (s *System) Status() *Status {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.status
+}
+
+// fetchOutcome classifies one `treeman status` run (service.rs's
+// Fetch).
+type fetchOutcome int
+
+const (
+	// fetchData parsed a status.
+	fetchData fetchOutcome = iota
+	// fetchEmpty ran without usable data (non-zero exit, bad JSON):
+	// the last status stands.
+	fetchEmpty
+	// fetchUnavailable could not find the binary: treeman is not
+	// installed.
+	fetchUnavailable
+)
+
+// fetch runs `treeman status --format json` and classifies the run.
+func (s *System) fetch(ctx context.Context) (*Status, fetchOutcome) {
+	out, err := exec.CommandContext(ctx, s.binary, "status", "--format", "json").Output() //nolint:gosec // the binary name is the client's own
+	if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
+		return nil, fetchUnavailable
+	}
 	if err != nil {
-		return nil, nil
+		return nil, fetchEmpty
 	}
 	var status Status
 	if err := json.Unmarshal(out, &status); err != nil {
-		return nil, nil
+		log.Printf("treeman: cannot parse status JSON: %v", err)
+		return nil, fetchEmpty
 	}
-	return &status, nil
+	return &status, fetchData
 }
 
-// Subscribe starts the event loop: an initial read, then a refetch
-// whenever the event stream delivers (bursts collapse into one read
-// after a short debounce). The loop reconnects when the socket drops.
+// refresh fetches and publishes a changed status; false when treeman
+// is not installed, which ends the loop instead of re-spawning a
+// missing command every reconnect.
+func (s *System) refresh(ctx context.Context) bool {
+	next, outcome := s.fetch(ctx)
+	switch outcome {
+	case fetchUnavailable:
+		return false
+	case fetchEmpty:
+		return true
+	}
+	s.mu.Lock()
+	changed := !reflect.DeepEqual(s.status, next)
+	if changed {
+		s.status = next
+	}
+	s.mu.Unlock()
+	if changed {
+		feed.Notify(&s.changes)
+	}
+	return true
+}
+
+// Subscribe implements Source; the first subscription starts the
+// service loop.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
 	s.start.Do(func() { go s.run() })
 	ticks, stop := s.changes.Subscribe()
@@ -209,66 +273,61 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 	return ticks, stop, nil
 }
 
-// run is the reconnect loop; the debounce mirrors the Rust service.
+// run is service.rs's run: fetch (which works with the daemon down),
+// follow the daemon's events, and after the stream drops or the daemon
+// is absent wait reconnectDelay and go again - the poll that keeps the
+// status fresh without a daemon.
 func (s *System) run() {
-	stopped := s.stopped
-	feed.Notify(&s.changes)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-s.stopped
+		cancel()
+	}()
 	for {
-		select {
-		case <-stopped:
-			return
-		default:
-		}
-		if s.consume(stopped) {
+		if !s.refresh(ctx) {
 			return
 		}
+		s.consume(ctx)
 		select {
-		case <-stopped:
+		case <-ctx.Done():
 			return
-		case <-time.After(2 * time.Second):
+		case <-time.After(s.retry):
 		}
 	}
 }
 
-// consume drains one event connection; true return means stop.
-func (s *System) consume(stopped chan struct{}) bool {
+// consume follows one event connection, refreshing once per debounced
+// burst, until the stream ends or ctx does. An absent daemon returns
+// at once.
+func (s *System) consume(ctx context.Context) {
 	path, ok := SocketPath()
 	if !ok {
-		time.Sleep(2 * time.Second)
-		return false
+		return
 	}
 	conn, err := dial(path)
 	if err != nil {
-		time.Sleep(2 * time.Second)
-		return false
+		return
 	}
 	defer func() { _ = conn.Close() }()
 	if _, err := conn.Write([]byte(subscribeRequest)); err != nil {
-		return false
+		return
 	}
 	lines := make(chan string, 8)
-	go readLines(conn, lines)
-	dirty := false
-	debounce := time.NewTimer(time.Hour)
-	debounce.Stop()
+	go readLines(conn, lines, ctx.Done())
+	timer := time.NewTimer(debounce)
+	timer.Stop()
 	for {
 		select {
-		case <-stopped:
-			return true
+		case <-ctx.Done():
+			return
 		case _, ok := <-lines:
 			if !ok {
-				if dirty {
-					feed.Notify(&s.changes)
-				}
-				return false
+				return
 			}
-			dirty = true
-			debounce.Reset(300 * time.Millisecond)
-		case <-debounce.C:
-			feed.Notify(&s.changes)
-			dirty = false
-			debounce.Reset(time.Hour)
-			debounce.Stop()
+			timer.Reset(debounce)
+		case <-timer.C:
+			s.refresh(ctx)
 		}
 	}
 }

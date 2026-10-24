@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
@@ -67,9 +66,7 @@ func newTreeman(ctx ModuleContext) (Module, error) {
 	m := &treemanModule{ctx: ctx, src: ctx.Treeman, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.Treeman.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
-	if err := m.refresh(); err != nil {
-		return nil, err
-	}
+	m.refresh()
 	if ctx.App == nil {
 		// Headless construction renders the resting state; no loop to
 		// follow events on.
@@ -82,20 +79,16 @@ func newTreeman(ctx ModuleContext) (Module, error) {
 	m.stop = stop
 	go func() {
 		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
+			m.ctx.Invoke(m.refresh)
 		}
 	}()
 	return m, nil
 }
 
-// refresh re-reads the treeman status and shows it.
-func (m *treemanModule) refresh() error {
+// refresh shows the service's latest status.
+func (m *treemanModule) refresh() {
 	cfg := m.ctx.Config.Treeman
-	status, err := m.src.Read(context.Background())
-	if err != nil {
-		return err
-	}
-	v := treemanDisplay(cfg, status)
+	v := treemanDisplay(cfg, m.src.Status())
 	text := v.label
 	if !cfg.LabelShow {
 		text = ""
@@ -105,7 +98,6 @@ func (m *treemanModule) refresh() error {
 		m.icon.SetThemeName(v.icon)
 	}
 	m.show(v)
-	return nil
 }
 
 // show moves the severity class and visibility on the module root.

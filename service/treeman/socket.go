@@ -10,15 +10,17 @@ func dial(path string) (net.Conn, error) {
 	return net.Dial("unix", path)
 }
 
-// readLines pumps NDJSON lines until the stream closes.
-func readLines(conn net.Conn, out chan<- string) {
+// readLines pumps NDJSON lines until the stream closes or the reader
+// is done.
+func readLines(conn net.Conn, out chan<- string, done <-chan struct{}) {
 	defer close(out)
 	scanner := bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
-		out <- scanner.Text()
-	}
-	if scanner.Err() != nil {
-		out <- ""
+		select {
+		case out <- scanner.Text():
+		case <-done:
+			return
+		}
 	}
 }

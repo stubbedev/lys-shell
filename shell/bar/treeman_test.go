@@ -24,10 +24,10 @@ type fakeTreeman struct {
 	actions   []string
 }
 
-func (f *fakeTreeman) Read(context.Context) (*treeman.Status, error) {
+func (f *fakeTreeman) Status() *treeman.Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.status, nil
+	return f.status
 }
 
 func (f *fakeTreeman) setStatus(s *treeman.Status) {
@@ -126,9 +126,7 @@ func TestTreemanModuleFollowsBuckets(t *testing.T) {
 		{treeman.Status{Total: 2, Stable: 1, Failed: 1}, cfg.Treeman.IconFailed, "failed"},
 	} {
 		src.status = &tc.status
-		if err := tm.refresh(); err != nil {
-			t.Fatal(err)
-		}
+		tm.refresh()
 		if tm.icon.Name() != tc.icon || !widget.HasClass(chrome, tc.class) {
 			t.Errorf("%+v: icon %q classes %v, want %q and .%s", tc.status, tm.icon.Name(), chrome.Classes(), tc.icon, tc.class)
 		}
@@ -140,25 +138,19 @@ func TestTreemanModuleFollowsBuckets(t *testing.T) {
 	}
 
 	src.status = &treeman.Status{}
-	if err := tm.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	tm.refresh()
 	if !chrome.Visible() || widget.HasClass(chrome, "failed") {
 		t.Errorf("empty without hide-if-empty: visible %v classes %v", chrome.Visible(), chrome.Classes())
 	}
 	cfg.Treeman.HideIfEmpty = true
-	if err := tm.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	tm.refresh()
 	if chrome.Visible() {
 		t.Error("hide-if-empty left the empty module shown")
 	}
 
 	cfg.Treeman.HideIfEmpty = false
 	src.status = nil
-	if err := tm.refresh(); err != nil {
-		t.Fatalf("missing binary refresh: %v", err)
-	}
+	tm.refresh()
 	if got := label.Text(); got != "--" || tm.icon.Name() != cfg.Treeman.IconName {
 		t.Errorf("unavailable: label %q icon %q, want -- and the resting icon", got, tm.icon.Name())
 	}
