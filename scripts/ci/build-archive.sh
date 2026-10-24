@@ -24,7 +24,7 @@ for bin in lys-shell lys-greeter lys-lock lys-settings; do
 	cp "${BIN_DIR}/${bin}" "${STAGING}/"
 done
 "${BIN_DIR}/lys-shell" completions bash >"${STAGING}/completions/completions.bash"
-"${BIN_DIR}/lys-shell" completions zsh >"${STAGING}/completions/_lys_shell"
+"${BIN_DIR}/lys-shell" completions zsh >"${STAGING}/completions/_lys-shell"
 "${BIN_DIR}/lys-shell" completions fish >"${STAGING}/completions/lys-shell.fish"
 
 cp LICENSE "${STAGING}/"

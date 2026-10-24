@@ -45,7 +45,7 @@ override_dh_auto_install:
 	install -m 0644 completions/completions.bash debian/lys-shell/usr/share/bash-completion/completions/lys-shell
 
 	install -d debian/lys-shell/usr/share/zsh/vendor-completions
-	install -m 0644 completions/_lys_shell debian/lys-shell/usr/share/zsh/vendor-completions/_lys_shell
+	install -m 0644 completions/_lys-shell debian/lys-shell/usr/share/zsh/vendor-completions/_lys-shell
 
 	install -d debian/lys-shell/usr/share/fish/vendor_completions.d
 	install -m 0644 completions/lys-shell.fish debian/lys-shell/usr/share/fish/vendor_completions.d/lys-shell.fish

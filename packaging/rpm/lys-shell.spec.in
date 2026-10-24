@@ -77,7 +77,7 @@ install -d %{buildroot}%{_datadir}/bash-completion/completions
 install -m 0644 completions/completions.bash %{buildroot}%{_datadir}/bash-completion/completions/lys-shell
 
 install -d %{buildroot}%{_datadir}/zsh/site-functions
-install -m 0644 completions/_lys_shell %{buildroot}%{_datadir}/zsh/site-functions/_lys_shell
+install -m 0644 completions/_lys-shell %{buildroot}%{_datadir}/zsh/site-functions/_lys-shell
 
 install -d %{buildroot}%{_datadir}/fish/vendor_completions.d
 install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/lys-shell.fish
@@ -99,7 +99,7 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %{_datadir}/icons/hicolor/scalable/apps/lys-settings.svg
 %{_datadir}/icons/hicolor/scalable/actions/*.svg
 %{_datadir}/bash-completion/completions/lys-shell
-%{_datadir}/zsh/site-functions/_lys_shell
+%{_datadir}/zsh/site-functions/_lys-shell
 %{_datadir}/fish/vendor_completions.d/lys-shell.fish
 
 %changelog
