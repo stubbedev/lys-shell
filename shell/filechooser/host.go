@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 	"golang.org/x/sys/unix"
 
@@ -694,8 +695,10 @@ func (c *Chooser) views(u *ui) widget.Widget {
 
 	u.list = widget.NewList[widget.Widget](rows{c, false}, listRowH)
 	u.list.AddClass("file-chooser-list")
+	u.list.DragContent = c.dragOut
 	u.grid = widget.NewList[widget.Widget](rows{c, true}, gridCellH)
 	u.grid.AddClass("file-chooser-grid")
+	u.grid.DragContent = c.dragOut
 	u.grid.SetCellWidth(gridCellW)
 	u.listView, u.gridView = &typeAhead{List: u.list, typed: c.typeAhead}, &typeAhead{List: u.grid, typed: c.typeAhead}
 	mode := widget.SelectionSingle
@@ -1507,6 +1510,40 @@ func (c *Chooser) fillPreview(icon *widget.Box, name, info *widget.Label, e Entr
 }
 
 // --- system defaults ------------------------------------------------
+
+// gnomeCopiedFiles is the clipboard and drag format GNOME's file
+// managers read: the operation on the first line, then one URI a line.
+const gnomeCopiedFiles = "x-special/gnome-copied-files"
+
+// dragOut is what dragging rows of the listing shown offers another
+// app: their files as a uri list (and the GNOME file managers' form),
+// to copy, never to move, so a drop cannot take the files away. A
+// listing still loading shows stale rows and offers nothing.
+func (c *Chooser) dragOut(rows []int) *widget.DragContent {
+	if c.s == nil || c.s.loading {
+		return nil
+	}
+	var paths []string
+	for _, i := range rows {
+		if i >= 0 && i < len(c.s.entries) {
+			paths = append(paths, c.s.entries[i].Path)
+		}
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+	return &widget.DragContent{Content: filesContent(paths), Actions: transfer.ActionCopy}
+}
+
+// filesContent offers paths as a uri list and GNOME's copied-files
+// form.
+func filesContent(paths []string) transfer.Content {
+	copied := []string{"copy"}
+	for _, p := range paths {
+		copied = append(copied, transfer.FileURI(p))
+	}
+	return transfer.Merge(transfer.Files(paths...), transfer.Bytes(gnomeCopiedFiles, []byte(strings.Join(copied, "\n"))))
+}
 
 // droppedPath is the first local path in a text/uri-list payload.
 func droppedPath(data []byte) (string, bool) {

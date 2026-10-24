@@ -13,12 +13,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -1502,6 +1504,81 @@ func TestListingShowsLoading(t *testing.T) {
 	if empty != "Loading…" || !visible {
 		t.Errorf("a folder being read shows %q (%v)", empty, visible)
 	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// dragRead is what a drag's content writes for mime.
+func dragRead(t *testing.T, d *widget.DragContent, mime string) string {
+	t.Helper()
+	var b strings.Builder
+	if err := d.Write(mime, &b); err != nil {
+		t.Fatalf("write %s: %v", mime, err)
+	}
+	return b.String()
+}
+
+// Rows dragged out offer their files to copy, as a uri list and in
+// the GNOME file managers' form, from the list and the grid alike; a
+// folder pick drags folders and a trashed file its real path; nothing
+// is offered while a listing loads or for rows that are gone.
+func TestDragFilesOut(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{Multiple: true})
+	var drag *widget.DragContent
+	hs.do(func() {
+		rows := []int{slices.Index(names(hs.c.s.entries), "a.png"), slices.Index(names(hs.c.s.entries), "b.txt")}
+		drag = hs.c.ui.list.DragContent(rows)
+		if g := hs.c.ui.grid.DragContent(rows); g == nil {
+			t.Error("the grid offers no drag")
+		}
+	})
+	if drag == nil {
+		t.Fatal("dragging two files offered nothing")
+	}
+	if drag.Actions != transfer.ActionCopy {
+		t.Errorf("actions = %v, want copy only", drag.Actions)
+	}
+	if list := dragRead(t, drag, transfer.MimeURIList); list != hs.uri("a.png")+"\r\n"+hs.uri("b.txt")+"\r\n" {
+		t.Errorf("uri list = %q", list)
+	}
+	if gnome := dragRead(t, drag, gnomeCopiedFiles); gnome != "copy\n"+hs.uri("a.png")+"\n"+hs.uri("b.txt") {
+		t.Errorf("gnome copied files = %q", gnome)
+	}
+	hs.do(func() {
+		if d := hs.c.ui.list.DragContent([]int{99}); d != nil {
+			t.Error("a row that is gone offered a drag")
+		}
+		hs.c.s.loading = true
+		if d := hs.c.ui.list.DragContent([]int{0}); d != nil {
+			t.Error("a loading listing offered a drag")
+		}
+		hs.c.s.loading = false
+	})
+	hs.click(t, "Cancel")
+	answer(t, got)
+
+	got = hs.open(t, OpenRequest{Directory: true})
+	hs.do(func() {
+		d := hs.c.ui.list.DragContent([]int{slices.Index(names(hs.c.s.entries), "docs")})
+		if d == nil || dragRead(t, d, transfer.MimeURIList) != hs.uri("docs")+"\r\n" {
+			t.Errorf("a folder pick drags %v", d)
+		}
+	})
+	hs.click(t, "Cancel")
+	answer(t, got)
+
+	trash := filepath.Join(t.TempDir(), "Trash")
+	trashed := writeTrashed(t, trash, "notes.txt.2", trashInfo("/home/u/notes.txt"))
+	hs.c.d.TrashDirs = func() []string { return []string{trash} }
+	got = hs.open(t, OpenRequest{})
+	hs.do(func() { hs.c.goTo(trashLocation) })
+	hs.do(func() {
+		d := hs.c.ui.list.DragContent([]int{0})
+		if d == nil || dragRead(t, d, transfer.MimeURIList) != transfer.FileURI(trashed)+"\r\n" {
+			t.Errorf("a trashed file drags %v", d)
+		}
+	})
 	hs.click(t, "Cancel")
 	answer(t, got)
 }
