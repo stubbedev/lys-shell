@@ -169,8 +169,13 @@ func TestHyprLabelsAndClasses(t *testing.T) {
 	if got := hyprLabel(5, 5, "web", false); got != "5" {
 		t.Errorf("use-name off = %q", got)
 	}
-	if got := hyprLabel(-98, -98, "special:magic", false); got != "-98" {
-		t.Errorf("special without use-name = %q, want the id as Rust renders it", got)
+	for _, useName := range []bool{false, true} {
+		if got := hyprLabel(-98, -98, "special:magic", useName); got != "magic" {
+			t.Errorf("special (use-name %v) = %q, want its name, not Hyprland's arbitrary id", useName, got)
+		}
+	}
+	if got := hyprLabel(-99, -99, "special", false); got != "-99" {
+		t.Errorf("an unnamed special workspace = %q, want the id it has no name for", got)
 	}
 	if hyprIDClass(-98) != "workspace-id-neg98" || hyprIDClass(3) != "workspace-id-3" {
 		t.Error("id classes wrong")
@@ -367,7 +372,7 @@ func TestHyprlandModuleBuildsTheBarMonitorsRow(t *testing.T) {
 	if !reflect.DeepEqual(one.classes, want) {
 		t.Errorf("classes = %v, want %v", one.classes, want)
 	}
-	if one.label != "1" || special.label != "-98" {
+	if one.label != "1" || special.label != "magic" {
 		t.Errorf("labels = %q %q", one.label, special.label)
 	}
 	if !widget.HasClass(m.root, "workspaces") || widget.HasClass(m.root, "hyprland") {

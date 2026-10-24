@@ -160,8 +160,14 @@ func hyprDisplayID(id int, numbering config.Numbering, barMonitor string, monito
 	return id
 }
 
-// hyprLabel is format_workspace_label.
+// hyprLabel is format_workspace_label, except for special workspaces:
+// Hyprland numbers those -99 upward in creation order, an id nobody
+// chose or recognizes, so a scratchpad shows its name ("special:magic"
+// as "magic") instead.
 func hyprLabel(displayID, id int, name string, useName bool) string {
+	if special, ok := strings.CutPrefix(name, "special:"); ok && id < 0 && special != "" {
+		return special
+	}
 	if useName && name != "" && name != strconv.Itoa(id) {
 		return name
 	}
