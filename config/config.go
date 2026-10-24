@@ -54,6 +54,8 @@ type Config struct {
 	Animations AnimationsConfig `cfg:"animations"`
 	// Wallpaper service settings.
 	Wallpaper WallpaperConfig `cfg:"wallpaper"`
+	// Desktop-portal policy for sandboxed apps.
+	Portal PortalConfig `cfg:"portal"`
 }
 
 // Defaults returns the schema defaults for every section.
@@ -72,6 +74,7 @@ func Defaults() *Config {
 		Launcher:      DefaultsLauncher(),
 		Animations:    DefaultsAnimations(),
 		Wallpaper:     DefaultsWallpaper(),
+		Portal:        DefaultsPortal(),
 	}
 }
 

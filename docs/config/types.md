@@ -669,6 +669,20 @@ How the lock screen background is rendered.
 | `"image"` | A specific image file (`background-image`). |
 | `"wallpaper"` | Reuse the current desktop wallpaper. |
 
+## LockdownConfig {#lockdown-config}
+
+Features no app may use while set.
+
+| Field | Description |
+|---|---|
+| `disable-printing` | Refuse printing. |
+| `disable-save-to-disk` | Refuse saving files through the file chooser. |
+| `disable-application-handlers` | Refuse opening URIs and files in other applications. |
+| `disable-location` | Refuse location access. |
+| `disable-camera` | Refuse camera access. |
+| `disable-microphone` | Refuse microphone access. |
+| `disable-sound-output` | Refuse sound output. |
+
 ## MailAccount {#mail-account}
 
 One mail account in the `modules.mail` per-account breakdown.

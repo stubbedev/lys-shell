@@ -3869,6 +3869,47 @@
       },
       "type": "object"
     },
+    "LockdownConfig": {
+      "description": "Features no app may use while set.",
+      "properties": {
+        "disable-application-handlers": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse opening URIs and files in other applications."
+        },
+        "disable-camera": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse camera access."
+        },
+        "disable-location": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse location access."
+        },
+        "disable-microphone": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse microphone access."
+        },
+        "disable-printing": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse printing."
+        },
+        "disable-save-to-disk": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse saving files through the file chooser."
+        },
+        "disable-sound-output": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Refuse sound output."
+        }
+      },
+      "type": "object"
+    },
     "MailAccount": {
       "description": "One mail account in the `modules.mail` per-account breakdown.\n\nEach account has its own notmuch query; the dropdown shows the per-account\nunread counts and the bar shows their sum.\n\n## Example\n\n```yaml\nmodules: {mail: {accounts: [{name: Work, query: \"folder:work/INBOX and tag:unread\", provider: gmail}]}}\n```",
       "properties": {
@@ -6341,6 +6382,25 @@
           "type": "string"
         }
       ]
+    },
+    "PortalConfig": {
+      "description": "Desktop-portal policy for sandboxed apps.",
+      "properties": {
+        "lockdown": {
+          "$ref": "#/$defs/LockdownConfig",
+          "default": {
+            "disable-application-handlers": false,
+            "disable-camera": false,
+            "disable-location": false,
+            "disable-microphone": false,
+            "disable-printing": false,
+            "disable-save-to-disk": false,
+            "disable-sound-output": false
+          },
+          "description": "Features to lock down for every app, for kiosk or shared setups."
+        }
+      },
+      "type": "object"
     },
     "PowerConfig": {
       "description": "Shutdown, reboot, and logout menu.",
@@ -10077,6 +10137,21 @@
         "text-align": "center"
       },
       "description": "On-screen display settings."
+    },
+    "portal": {
+      "$ref": "#/$defs/PortalConfig",
+      "default": {
+        "lockdown": {
+          "disable-application-handlers": false,
+          "disable-camera": false,
+          "disable-location": false,
+          "disable-microphone": false,
+          "disable-printing": false,
+          "disable-save-to-disk": false,
+          "disable-sound-output": false
+        }
+      },
+      "description": "Desktop-portal policy for sandboxed apps."
     },
     "share-picker": {
       "$ref": "#/$defs/SharePickerConfig",

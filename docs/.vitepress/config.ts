@@ -76,6 +76,7 @@ export default defineConfig({
             { text: 'general', link: '/config/general' },
             { text: 'osd', link: '/config/osd' },
             { text: 'wallpaper', link: '/config/wallpaper' },
+            { text: 'portal', link: '/config/portal' },
           ],
         },
         {

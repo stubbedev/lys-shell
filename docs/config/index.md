@@ -26,6 +26,7 @@ Editor intellisense via JSON Schema. Install the [YAML extension](https://market
 | [`lock`](/config/lock) | Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`. |
 | [`mail-account`](/config/mail-account) | One mail account in the `modules.mail` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
+| [`portal`](/config/portal) | Desktop-portal policy for sandboxed apps. |
 | [`share-picker`](/config/share-picker) | Screen-share picker shown by xdg-desktop-portal when an app requests a |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
 | [`toast-preset`](/config/toast-preset) | A reusable toast preset, triggerable by id with `lys-shell toast --preset <id>`. |

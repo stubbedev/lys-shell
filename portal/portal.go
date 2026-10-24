@@ -68,7 +68,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 func (b *Backend) interfaces() []dbusx.Interface {
 	return append([]dbusx.Interface{
 		b.settings.iface(),
-		lockdownIface(),
+		lockdown{b.cfg}.iface(),
 		backgroundIface(),
 		usbIface(),
 		emailIface(b.spawn),
@@ -107,7 +107,9 @@ func (b *Backend) Serve() (stop func(), err error) {
 		unforward = func() {}
 	}
 	unwatch := b.settings.watch(b.conn)
+	unwatchLockdown := lockdown{b.cfg}.watch(b.conn)
 	return func() {
+		unwatchLockdown()
 		unwatch()
 		unforward()
 		b.sessions.clearAll()

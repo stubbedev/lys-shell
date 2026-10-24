@@ -272,18 +272,62 @@ func TestSettingChangedFollowsTheConfig(t *testing.T) {
 	}
 }
 
-func TestLockdownLocksNothing(t *testing.T) {
-	r := newRig(t, nil)
+func readLockdown(t *testing.T, r *rig) map[string]dbus.Variant {
+	t.Helper()
 	var all map[string]dbus.Variant
-	if err := r.obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, "org.freedesktop.impl.portal.Lockdown").Store(&all); err != nil {
+	if err := r.obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, LockdownIface).Store(&all); err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 8 || all["version"].Value() != uint32(1) {
-		t.Fatalf("lockdown = %v", all)
+	return all
+}
+
+// By default nothing is locked down, and the interface carries only the
+// seven properties the spec defines.
+func TestLockdownLocksNothingByDefault(t *testing.T) {
+	r := newRig(t, nil)
+	all := readLockdown(t, r)
+	if len(all) != 7 {
+		t.Fatalf("lockdown = %v, want the seven spec properties", all)
 	}
 	for name, v := range all {
-		if name != "version" && v.Value() != false {
+		if v.Value() != false {
 			t.Errorf("%s = %v", name, v)
+		}
+	}
+}
+
+// A config value flips its property and announces it; the others stay
+// put, and a D-Bus write is refused.
+func TestLockdownFollowsTheConfig(t *testing.T) {
+	r := newRig(t, nil)
+	if err := r.client.AddMatchSignal(dbus.WithMatchInterface("org.freedesktop.DBus.Properties")); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.cfg.SetByPath("portal.lockdown.disable-printing", true); err != nil {
+		t.Fatal(err)
+	}
+	all := readLockdown(t, r)
+	if all["disable-printing"].Value() != true || all["disable-camera"].Value() != false {
+		t.Errorf("after disabling printing: %v", all)
+	}
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case s := <-r.signals:
+			if s.Name != "org.freedesktop.DBus.Properties.PropertiesChanged" {
+				continue
+			}
+			changed := s.Body[1].(map[string]dbus.Variant)
+			if s.Body[0] != LockdownIface || len(changed) != 1 || changed["disable-printing"].Value() != true {
+				t.Errorf("PropertiesChanged %v", s.Body)
+			}
+			err := r.obj.Call("org.freedesktop.DBus.Properties.Set", 0, LockdownIface, "disable-printing", dbus.MakeVariant(false)).Err
+			if err == nil {
+				t.Error("a D-Bus write to a lockdown property was accepted")
+			}
+			return
+		case <-timeout:
+			t.Fatal("no PropertiesChanged after a lockdown config change")
 		}
 	}
 }
