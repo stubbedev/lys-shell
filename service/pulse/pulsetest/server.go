@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // DefaultVersion is the protocol version the fake announces:

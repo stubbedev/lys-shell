@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Alimentation
+### Configuration lys-shell - Module Alimentation
 
 ## Configuration du module Alimentation
 

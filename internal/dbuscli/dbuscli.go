@@ -1,5 +1,5 @@
 // Package dbuscli turns D-Bus call failures into the CLI's
-// user-facing messages (wayle/src/cli/dbus.rs's format_error).
+// user-facing messages (lys-shell/src/cli/dbus.rs's format_error).
 //
 // zbus surfaces a method's error reply as a MethodError: a name
 // containing ServiceUnknown means the shell is down, anything else
@@ -33,7 +33,7 @@ func FormatPropertyError(service, op string, err error) error {
 }
 
 func format(service, op string, err error, property bool) error {
-	notRunning := Message(service + " service not running. Start wayle shell first.")
+	notRunning := Message(service + " service not running. Start lys-shell shell first.")
 	timedOut := Message(op + " timed out - service not responding")
 	de, ok := replyError(err)
 	if !ok {

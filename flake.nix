@@ -1,7 +1,7 @@
 {
-  description = "wayle — a Wayland desktop shell";
+  description = "lys-shell — a Wayland desktop shell";
 
-  # Always use the self-hosted xilo cache for wayle builds (CI, releases, and
+  # Always use the self-hosted xilo cache for lys-shell builds (CI, releases, and
   # local dev via `nix build`). Read access is public; pushes are CI/release
   # only (XILO_TOKEN). Users are prompted before an untrusted flake's config
   # is honoured, or add the key to trusted-public-keys in nix.conf.

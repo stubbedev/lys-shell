@@ -1,0 +1,6 @@
+Capture the active window
+
+Usage: lys-shell screenshot window
+
+Options:
+  -h, --help  Print help

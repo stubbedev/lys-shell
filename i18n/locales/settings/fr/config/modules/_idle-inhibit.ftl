@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Inhibiteur de veille
+### Configuration lys-shell - Module Inhibiteur de veille
 
 ## Configuration du module Inhibiteur de veille
 

@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func testFont(t *testing.T) render.Font { return treetest.Font(t) }

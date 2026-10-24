@@ -1,4 +1,4 @@
-### Wayle Configuration - Netstat Module
+### lys-shell Configuration - Netstat Module
 
 ## Netstat Module Configuration
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 )
 
 // CLI runs the notmuch binary, as the Rust service does.
@@ -80,7 +80,7 @@ func (CLI) DatabasePath(ctx context.Context) (string, bool) {
 	return path, path != ""
 }
 
-// DesktopNotifier fires mail notifications as "Wayle" through the
+// DesktopNotifier fires mail notifications as "lys-shell" through the
 // session notification daemon.
 type DesktopNotifier struct {
 	Sender *desktopnotify.Sender
@@ -95,7 +95,7 @@ func (d DesktopNotifier) Notify(summary, body, icon string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 		defer cancel()
-		if _, err := d.Sender.Send(ctx, "Wayle", summary, body, icon); err != nil {
+		if _, err := d.Sender.Send(ctx, "lys-shell", summary, body, icon); err != nil {
 			log.Printf("mail: notify: %v", err)
 		}
 	}()

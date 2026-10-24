@@ -9,18 +9,18 @@ import (
 )
 
 // The config schema is declared once, on the Go types, through `cfg`
-// struct tags; loading, runtime overrides, `wayle config get/set/
+// struct tags; loading, runtime overrides, `lys-shell config get/set/
 // reset/default`, and the JSON Schema all walk the same metadata, so a
 // key added to a struct is covered everywhere by construction. This is
-// the Go counterpart of the #[wayle_config] derive
-// (crates/wayle-derive/src/{wayle_config,derives,field_utils}.rs).
+// the Go counterpart of the #[lys_shell_config] derive
+// (crates/wayle-derive/src/{lys_shell_config,derives,field_utils}.rs).
 //
 // Tag grammar: `cfg:"key[,option...]"`.
 //
 //	key               the canonical TOML/YAML key (serde rename)
 //	alias=<k>         an extra key accepted on read (serde alias)
 //	deprecated=<k>    a legacy key accepted on read with a warning
-//	                  (#[wayle(deprecated_alias)])
+//	                  (#[lys-shell(deprecated_alias)])
 //	inline            a Go-only grouping struct whose fields belong to
 //	                  the parent table (no key of its own)
 //	required          inside a value struct: a missing key is an error
@@ -28,7 +28,7 @@ import (
 //	default           inside a value struct without #[serde(default)]:
 //	                  this field has a field-level serde default
 //	nolayer           serialized and in the schema, but never applied
-//	                  from a layer (#[wayle(skip)] with serde, i.e.
+//	                  from a layer (#[lys-shell(skip)] with serde, i.e.
 //	                  `imports`)
 //	noi18n            no settings label of its own (#[i18n(skip)])
 //

@@ -4,10 +4,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 )
 
 // Window geometry and the page switch (app/mod.rs, app/window.rs).

@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Titre de fenêtre
+### Configuration lys-shell - Module Titre de fenêtre
 
 ## Configuration du module Titre de fenêtre
 

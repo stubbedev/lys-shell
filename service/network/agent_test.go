@@ -11,8 +11,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // fakeSignIn stands in for package openconnect: it claims openconnect
@@ -202,8 +202,8 @@ func errText(err error) string {
 func TestAgentRegistersWithItsIdentifierAndVPNHints(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
 	got := fx.nm.registered(t)
-	if got.id != "com.wayle.network" || got.caps != 0x1 {
-		t.Errorf("registered as %q caps %#x, want com.wayle.network 0x1", got.id, got.caps)
+	if got.id != "dev.stubbe.lys.network" || got.caps != 0x1 {
+		t.Errorf("registered as %q caps %#x, want dev.stubbe.lys.network 0x1", got.id, got.caps)
 	}
 	if got.sender != fx.name {
 		t.Errorf("registered from %q, want the agent's own peer %q", got.sender, fx.name)

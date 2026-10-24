@@ -1,4 +1,4 @@
-### Wayle Configuration - Systray Module
+### lys-shell Configuration - Systray Module
 
 ## Systray Module Configuration
 

@@ -1,4 +1,4 @@
-### Wayle Configuration - Clock Module
+### lys-shell Configuration - Clock Module
 
 ## Clock Module Configuration
 

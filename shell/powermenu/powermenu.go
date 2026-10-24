@@ -10,13 +10,13 @@ package powermenu
 import (
 	"log"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/shell/widgets"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // iconPx is the button icon size (--icon-lg).
@@ -98,7 +98,7 @@ func (m *Menu) Show() {
 		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardExclusive,
-		Namespace:     "wayle-power-menu",
+		Namespace:     "lys-shell-power-menu",
 		Root:          root,
 		KeyCapture: func(a app.Accel) bool {
 			if a.Sym == escape.Sym { // whatever modifiers are held

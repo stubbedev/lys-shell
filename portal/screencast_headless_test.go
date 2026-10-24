@@ -4,18 +4,18 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/wayle/internal/pipewire/pwtest"
+	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 )
 
 // The real capture-to-PipeWire path against a private headless
-// compositor; runs only with WAYLE_CAPTURE_HEADLESS=1 and
+// compositor; runs only with LYS_SHELL_CAPTURE_HEADLESS=1 and
 // WAYLAND_DISPLAY/XDG_RUNTIME_DIR pointing at that session (it must
 // never stream a developer's screen). The PipeWire daemon is private.
 func TestHeadlessScreenStreams(t *testing.T) {
-	if os.Getenv("WAYLE_CAPTURE_HEADLESS") == "" {
-		t.Skip("WAYLE_CAPTURE_HEADLESS is not set")
+	if os.Getenv("LYS_SHELL_CAPTURE_HEADLESS") == "" {
+		t.Skip("LYS_SHELL_CAPTURE_HEADLESS is not set")
 	}
 	c, err := capture.Connect()
 	if err != nil {
@@ -54,11 +54,11 @@ func TestHeadlessScreenStreams(t *testing.T) {
 
 // TestHeadlessGPUStream takes the zero-copy path against a private
 // compositor that renders on the GPU (WLR_RENDERER=gles2 on a render
-// node); WAYLE_CAPTURE_DMABUF=1 asks for it, with the same rule as
+// node); LYS_SHELL_CAPTURE_DMABUF=1 asks for it, with the same rule as
 // above: never a developer's screen.
 func TestHeadlessGPUStream(t *testing.T) {
-	if os.Getenv("WAYLE_CAPTURE_DMABUF") == "" {
-		t.Skip("WAYLE_CAPTURE_DMABUF is not set")
+	if os.Getenv("LYS_SHELL_CAPTURE_DMABUF") == "" {
+		t.Skip("LYS_SHELL_CAPTURE_DMABUF is not set")
 	}
 	c, err := capture.Connect()
 	if err != nil {

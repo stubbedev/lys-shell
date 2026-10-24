@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/shell/layering"
-	"github.com/stubbedev/wayle/shell/notifyui"
-	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/shell/layering"
+	"github.com/stubbedev/lys-shell/shell/notifyui"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // Card geometry (templates.rs, card/methods.rs).
@@ -60,7 +60,7 @@ type Popups struct {
 // rows.
 type card struct {
 	id uint32
-	// rev plays the card's enter and exit (the WayleRevealer around it).
+	// rev plays the card's enter and exit (the LysShellRevealer around it).
 	rev     *widget.Revealer
 	root    *widget.Box
 	iconBox *widget.Box
@@ -435,7 +435,7 @@ func (p *Popups) ensureWindow(out *app.Output) (*app.LayerWindow, *widget.Box, e
 		Layer:     layering.For(p.cfg.General, cfg.PopupLayer),
 		Anchor:    popupAnchors(cfg.PopupPosition),
 		Margin:    popupMargins(cfg, scale),
-		Namespace: "wayle-notification-popup",
+		Namespace: "lys-shell-notification-popup",
 		Root:      host,
 	})
 	return win, list, err

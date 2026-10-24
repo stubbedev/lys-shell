@@ -9,10 +9,10 @@ import (
 // GreeterConfig is the [greeter] section
 // (crates/wayle-config/src/schemas/greeter/mod.rs).
 //
-// Greeter (display manager): the pre-login screen `wayle-greeter` renders as
+// Greeter (display manager): the pre-login screen `lys-greeter` renders as
 // a greetd greeter.
 //
-// The greeter reads the system config (`/etc/wayle/config.toml`), so these
+// The greeter reads the system config (`/etc/lys-shell/config.toml`), so these
 // settings take effect there — copy or symlink your user config if you want
 // the login screen to follow it.
 type GreeterConfig struct {
@@ -56,16 +56,16 @@ func DefaultsGreeter() GreeterConfig {
 
 // GreeterConfigPath is the system config the greeter reads when no
 // --config is given: pre-login there is no $HOME to discover from.
-const GreeterConfigPath = "/etc/wayle/config.toml"
+const GreeterConfigPath = "/etc/lys-shell/config.toml"
 
 // RuntimeOverlayPath is the runtime.toml beside a config file: where
-// `wayle-greeter apply-config` writes the settings GUI's overrides so
+// `lys-greeter apply-config` writes the settings GUI's overrides so
 // they never clobber a hand-written config.toml.
 func RuntimeOverlayPath(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), "runtime.toml")
 }
 
-// LoadGreeter is wayle-greeter's config::load: the file at path with
+// LoadGreeter is lys-greeter's config::load: the file at path with
 // its imports on the config layer, the sibling runtime.toml on the
 // runtime layer. A file that fails to load leaves its layer out (the
 // errors come back joined beside a usable config), so the greeter
@@ -96,8 +96,8 @@ func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 	return cfg, errors.Join(errs...)
 }
 
-// GreeterApplyKeys are the [greeter] keys wayle-settings pushes to the
-// login screen and wayle-greeter apply-config accepts (apply.rs
+// GreeterApplyKeys are the [greeter] keys lys-settings pushes to the
+// login screen and lys-greeter apply-config accepts (apply.rs
 // ALLOWED_KEYS), in the settings app's order.
 var GreeterApplyKeys = []string{
 	"background-mode", "background-image", "background-color",

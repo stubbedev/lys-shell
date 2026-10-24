@@ -3,9 +3,9 @@ package bar
 import (
 	"errors"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // power is the icon-only power module: its bindings run the session

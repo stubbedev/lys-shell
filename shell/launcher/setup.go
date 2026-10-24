@@ -1,5 +1,5 @@
-// Package launcher is the launcher surface (crates/wayle-shell/src/
-// shell/launcher): a layer-shell overlay per `wayle launcher` session,
+// Package launcher is the launcher surface (crates/lys-shell/src/
+// shell/launcher): a layer-shell overlay per `lys-shell launcher` session,
 // hosting the service/launcher engine. Sessions arrive over the
 // launcher socket; the engine runs on its own goroutine and this
 // package only renders and forwards input.
@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/launcheripc"
-	engine "github.com/stubbedev/wayle/service/launcher"
-	"github.com/stubbedev/wayle/service/launcher/modes"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
 
 // uiSettings are one session's resolved UI knobs (setup.rs UiSettings).

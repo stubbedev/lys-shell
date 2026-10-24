@@ -1,9 +1,0 @@
-Adjust timer duration (upper limit)
-
-Usage: wayle idle duration <VALUE>
-
-Arguments:
-  <VALUE>  +N to add, -N to subtract, N to set absolute
-
-Options:
-  -h, --help  Print help

@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // Bucket is the coarse worktree state, mirroring treeman's bucket

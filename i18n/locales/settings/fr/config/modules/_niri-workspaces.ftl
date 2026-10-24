@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Espaces de travail Niri
+### Configuration lys-shell - Module Espaces de travail Niri
 
 ## Configuration du module Espaces de travail Niri
 

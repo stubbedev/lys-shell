@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Mode de raccourcis
+### Configuration lys-shell - Module Mode de raccourcis
 
 ## Configuration du module Mode de raccourcis
 

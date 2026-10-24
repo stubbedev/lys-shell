@@ -1,4 +1,4 @@
-### Wayle Settings Dialog
+### lys-shell Settings Dialog
 
 missing-i18n-key = (unlabeled)
     .description = This setting has no label configured

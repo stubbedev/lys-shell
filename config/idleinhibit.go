@@ -4,7 +4,7 @@ package config
 //
 // Toggle that prevents screen dim, lock, and suspend while active.
 //
-// Controllable from the CLI: `wayle idle on|off|duration|remaining|status`.
+// Controllable from the CLI: `lys-shell idle on|off|duration|remaining|status`.
 type IdleInhibitConfig struct {
 	// Duration in minutes when service starts. 0 means indefinite.
 	StartupDuration uint32 `cfg:"startup-duration"`
@@ -72,8 +72,8 @@ func DefaultsIdleInhibit() IdleInhibitConfig {
 		LabelColor:      mustColor("green"),
 		LabelMaxLength:  0,
 		ButtonBgColor:   mustColor("bg-surface-elevated"),
-		LeftClick:       ParseClickAction("wayle idle toggle --indefinite"),
-		RightClick:      ParseClickAction("wayle idle toggle"),
+		LeftClick:       ParseClickAction("lys-shell idle toggle --indefinite"),
+		RightClick:      ParseClickAction("lys-shell idle toggle"),
 		MiddleClick:     ClickAction{},
 		ScrollUp:        ClickAction{},
 		ScrollDown:      ClickAction{},

@@ -1,4 +1,4 @@
-### Wayle Configuration - Mail Module
+### lys-shell Configuration - Mail Module
 
 ## Mail Module Configuration
 

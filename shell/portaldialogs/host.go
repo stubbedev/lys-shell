@@ -7,15 +7,15 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/desktopentry"
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/shell/widgets"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // The surface's sizes (shell/portal_dialogs: set_width_request,
@@ -51,7 +51,7 @@ type Deps struct {
 	Avatar     func() string
 }
 
-// Dialogs is the com.wayle.PortalDialogs1 host: one overlay showing
+// Dialogs is the dev.stubbe.lys.PortalDialogs1 host: one overlay showing
 // the latest request; a request arriving while one is open answers the
 // older one no (or "" for an app chooser). Its Host methods may be
 // called from any goroutine; the rest runs on the loop.
@@ -347,7 +347,7 @@ func (h *Dialogs) show(tree widget.Widget) {
 		Layer:         app.LayerOverlay,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
-		Namespace:     "wayle-portal-dialog",
+		Namespace:     "lys-shell-portal-dialog",
 		Root:          root,
 		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 			if keycode == escapeKeycode {

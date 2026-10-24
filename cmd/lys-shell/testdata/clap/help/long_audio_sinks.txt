@@ -1,0 +1,6 @@
+List available audio sinks (outputs)
+
+Usage: lys-shell audio sinks
+
+Options:
+  -h, --help  Print help

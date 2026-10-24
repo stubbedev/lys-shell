@@ -1,6 +1,0 @@
-Go back to previous wallpaper
-
-Usage: wayle wallpaper previous
-
-Options:
-  -h, --help  Print help

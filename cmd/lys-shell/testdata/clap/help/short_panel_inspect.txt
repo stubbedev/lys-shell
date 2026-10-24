@@ -1,0 +1,6 @@
+Open the widget inspector for debugging
+
+Usage: lys-shell panel inspect
+
+Options:
+  -h, --help  Print help

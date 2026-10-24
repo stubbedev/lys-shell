@@ -1,9 +1,0 @@
-Remove installed icons
-
-Usage: wayle icons remove <NAMES>...
-
-Arguments:
-  <NAMES>...  Icon names to remove (e.g., tb-home-symbolic si-firefox-symbolic)
-
-Options:
-  -h, --help  Print help

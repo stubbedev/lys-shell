@@ -44,7 +44,7 @@ type Loader struct {
 	bundles   []*bundle
 }
 
-// Fallback is the fallback language both wayle domains declare in
+// Fallback is the fallback language both lys-shell domains declare in
 // their i18n.toml.
 var Fallback = MustLangID("en-US")
 
@@ -53,7 +53,7 @@ var Fallback = MustLangID("en-US")
 type Assets struct {
 	fsys fs.FS
 	// file, when set, is the one FTL file each locale holds (a crate
-	// whose locales are plain files, as wayle-greeter's are, loaded by
+	// whose locales are plain files, as lys-greeter's are, loaded by
 	// i18n-embed under the crate's name) instead of `_*.ftl` partials.
 	file string
 }

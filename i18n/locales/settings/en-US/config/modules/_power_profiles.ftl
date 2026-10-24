@@ -1,4 +1,4 @@
-### Wayle Configuration - Power Profiles Module
+### lys-shell Configuration - Power Profiles Module
 
 ## Power Profiles Module Configuration
 

@@ -2,7 +2,7 @@
 
 `corpus.jsonl` holds one case per line: a template `t` and its context
 `c`. `corpus.golden.jsonl` holds what minijinja 2.15.1 (features `builtins`
-and `serde`, default features off), the engine wayle's templates were
+and `serde`, default features off), the engine lys-shell's templates were
 written against, renders for each: `{"ok": "<output>"}`, or
 `{"err": true}` where it fails. `TestMatchesMinijinja` replays the
 corpus through this package and compares.

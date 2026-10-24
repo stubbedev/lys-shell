@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // goldenCases mirror testdata/rust/generator.rs.txt: the Rust
@@ -100,7 +100,7 @@ func TestExtractMatchesRustGolden(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(out, "result"), []byte(resultLine(err)), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if cache := filepath.Join(root, "cache", "wayle", "matugen-colors.json"); fileExists(cache) {
+			if cache := filepath.Join(root, "cache", "lys-shell", "matugen-colors.json"); fileExists(cache) {
 				copyFile(t, cache, filepath.Join(out, "matugen-colors.json"))
 			}
 			compareDir(t, filepath.Join("testdata", "rust", name), out, root)
@@ -163,7 +163,7 @@ func TestWallustPathErrorWithoutHome(t *testing.T) {
 	cfg := DefaultConfig()
 	err := Extract(context.Background(), cfg, "/walls/a.png")
 	var pathErr *PathError
-	if !errors.As(err, &pathErr) || err.Error() != "cannot access wayle data directory" {
+	if !errors.As(err, &pathErr) || err.Error() != "cannot access lys-shell data directory" {
 		t.Fatalf("err = %v, want the data-directory PathError", err)
 	}
 }
@@ -172,8 +172,8 @@ func TestColorsPaths(t *testing.T) {
 	cache := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", cache)
 	for tool, want := range map[Tool]string{
-		Matugen: filepath.Join(cache, "wayle", "matugen-colors.json"),
-		Wallust: filepath.Join(cache, "wayle", "wallust-colors.json"),
+		Matugen: filepath.Join(cache, "lys-shell", "matugen-colors.json"),
+		Wallust: filepath.Join(cache, "lys-shell", "wallust-colors.json"),
 		Pywal:   filepath.Join(cache, "wal", "colors.json"),
 	} {
 		got, ok, err := ColorsPath(tool)

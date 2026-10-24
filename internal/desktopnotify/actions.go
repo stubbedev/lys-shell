@@ -20,7 +20,7 @@ type Action struct {
 // the button pressed, or ok=false when the notification closed or
 // expired without one, or ctx ended first. timeout is the daemon's
 // expire timeout. The icon also goes in the image-path hint, as
-// libnotify does, which wayle's own popup reads.
+// libnotify does, which lys-shell's own popup reads.
 func (s *Sender) Ask(ctx context.Context, appName, summary, body, appIcon string, actions []Action, timeout time.Duration) (key string, ok bool, err error) {
 	// Subscribe before sending, so the answer cannot race the id.
 	match := []dbus.MatchOption{dbus.WithMatchInterface(busName), dbus.WithMatchObjectPath(path)}

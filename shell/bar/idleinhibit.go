@@ -3,13 +3,13 @@ package bar
 import (
 	"strconv"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/jinja"
-	"github.com/stubbedev/wayle/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/service/idleinhibit"
 )
 
 // idleInhibitLabel is helpers.rs's build_label: On/Off state, the

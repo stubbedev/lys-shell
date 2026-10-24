@@ -12,7 +12,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/wayle/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/fswatch"
 )
 
 // hotplugSettle is the pause before a hotplug-triggered DDC scan, so

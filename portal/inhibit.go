@@ -7,7 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // Inhibit flags of the portal spec.
@@ -97,7 +97,7 @@ func logindLock(what string) (*os.File, error) {
 	defer func() { _ = conn.Close() }()
 	var fd dbus.UnixFD
 	err = conn.Object("org.freedesktop.login1", "/org/freedesktop/login1").
-		Call("org.freedesktop.login1.Manager.Inhibit", 0, what, "Wayle portal", "Application requested", "block").Store(&fd)
+		Call("org.freedesktop.login1.Manager.Inhibit", 0, what, "lys-shell portal", "Application requested", "block").Store(&fd)
 	if err != nil {
 		return nil, err
 	}

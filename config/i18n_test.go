@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/lys-shell/i18n"
 )
 
 // leafPaths lists every leaf field path under t with the struct type

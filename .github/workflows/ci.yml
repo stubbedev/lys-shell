@@ -66,12 +66,12 @@ jobs:
               run: |
                   sudo apt-get update
                   sudo apt-get install -y --no-install-recommends debhelper desktop-file-utils dpkg-dev
-                  ./scripts/ci/build-packages.sh "wayle-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz" "${{ steps.archive.outputs.version }}" deb
+                  ./scripts/ci/build-packages.sh "lys-shell-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz" "${{ steps.archive.outputs.version }}" deb
 
             - uses: actions/upload-artifact@v4
               with:
                   name: archive
-                  path: wayle-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz
+                  path: lys-shell-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz
 
     rpm:
         name: Package (rpm)
@@ -89,7 +89,7 @@ jobs:
             - name: Build Fedora package
               run: |
                   dnf -y --setopt=install_weak_deps=False install rpm-build desktop-file-utils systemd-rpm-macros
-                  ./scripts/ci/build-packages.sh "wayle-${{ needs.package.outputs.version }}-x86_64-linux.tar.gz" "${{ needs.package.outputs.version }}" rpm
+                  ./scripts/ci/build-packages.sh "lys-shell-${{ needs.package.outputs.version }}-x86_64-linux.tar.gz" "${{ needs.package.outputs.version }}" rpm
 
     nix:
         name: Nix build + cache
@@ -108,7 +108,7 @@ jobs:
 
             - name: Build package
               run: |
-                  nix build -L --accept-flake-config --print-out-paths .#wayle | tee /tmp/wayle-outpaths
+                  nix build -L --accept-flake-config --print-out-paths .#lys-shell | tee /tmp/lys-shell-outpaths
 
             # Push the build closure to the xilo cache on master pushes and
             # same-repo PRs (both have the token); fork PRs lack the secret and
@@ -130,7 +130,7 @@ jobs:
                   github.event_name == 'push' ||
                   github.event.pull_request.head.repo.full_name == github.repository
               run: |
-                  xilo push default/default $(cat /tmp/wayle-outpaths)
+                  xilo push default/default $(cat /tmp/lys-shell-outpaths)
 
     ci-status:
         name: CI Status

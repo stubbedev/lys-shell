@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/icons"
-	"github.com/stubbedev/wayle/internal/icons/icontest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/icons"
+	"github.com/stubbedev/lys-shell/internal/icons/icontest"
 )
 
 func account(p config.MailProvider, icon *string) config.MailAccount {

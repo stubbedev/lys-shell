@@ -6,11 +6,11 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/shell/screenshot"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
-// fakeShooter is the shell's com.wayle.Screenshot1.
+// fakeShooter is the shell's dev.stubbe.lys.Screenshot1.
 type fakeShooter struct {
 	path  string
 	err   dbustest.Var[error]

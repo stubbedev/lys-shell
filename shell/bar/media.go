@@ -3,14 +3,14 @@ package bar
 import (
 	"errors"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/desktopentry"
-	"github.com/stubbedev/wayle/internal/glob"
-	"github.com/stubbedev/wayle/internal/jinja"
-	"github.com/stubbedev/wayle/service/mpris"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 // The status glyphs helpers.rs embeds (Nerd Font media icons).
@@ -188,7 +188,7 @@ func (m *mediaModule) refresh() {
 	setClass(m.chrome, "media-spinning", ok && p.State == mpris.StatePlaying)
 }
 
-// classer is a widget carrying style classes (every gelm node).
+// classer is a widget carrying style classes (every lys-ui node).
 type classer interface {
 	AddClass(names ...string)
 	RemoveClass(names ...string)

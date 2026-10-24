@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stubbedev/wayle/internal/scss"
+	"github.com/stubbedev/lys-shell/internal/scss"
 )
 
 // userStylesTemplate is the starter index.scss, byte for byte the one
 // ensure_user_styles_scaffold writes.
-const userStylesTemplate = "// Custom Wayle styles. Anything here overrides the built-in styling.\n" +
+const userStylesTemplate = "// Custom lys-shell styles. Anything here overrides the built-in styling.\n" +
 	"// Use @import \"name\" to bring in _name.scss from this folder.\n"
 
 // UserCSS compiles the user's optional overrides at

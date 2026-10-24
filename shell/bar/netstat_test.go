@@ -3,8 +3,8 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/sysinfo"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
 
 func TestNetstatLabelPlaceholders(t *testing.T) {

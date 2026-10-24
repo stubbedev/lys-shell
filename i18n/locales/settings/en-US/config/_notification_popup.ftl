@@ -1,4 +1,4 @@
-### Wayle Configuration - Notification Module Settings
+### lys-shell Configuration - Notification Module Settings
 
 ## Shared Settings
 

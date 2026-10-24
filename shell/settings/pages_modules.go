@@ -1,6 +1,6 @@
 package settings
 
-import "github.com/stubbedev/wayle/config"
+import "github.com/stubbedev/lys-shell/config"
 
 // The module pages (pages/modules), in modules::factories order.
 

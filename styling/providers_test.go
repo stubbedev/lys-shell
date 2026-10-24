@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func writeJSON(t *testing.T, path, body string) {
@@ -170,13 +170,13 @@ func TestResolvePalette(t *testing.T) {
 	cache := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", cache)
 	fallback := config.DefaultsStyling().ActivePalette()
-	writeJSON(t, filepath.Join(cache, "wayle", "matugen-colors.json"), matugenOld)
+	writeJSON(t, filepath.Join(cache, "lys-shell", "matugen-colors.json"), matugenOld)
 	writeJSON(t, filepath.Join(cache, "wal", "colors.json"), `{"special": {"background": "#e0e0e0", "foreground": "#101010"},
   "colors": {"color1": "#1", "color2": "#2", "color3": "#3", "color4": "#4", "color7": "#7"}}`)
 
 	s := config.DefaultsStyling()
 	if got, err := ResolvePalette(fallback, s); err != nil || got != fallback {
-		t.Errorf("wayle provider = %+v, %v; want the fallback, no error", got, err)
+		t.Errorf("lys-shell provider = %+v, %v; want the fallback, no error", got, err)
 	}
 
 	s.ColorExtractor.ThemeProvider = config.ThemeProviderMatugen

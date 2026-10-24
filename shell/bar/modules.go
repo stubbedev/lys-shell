@@ -8,29 +8,29 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/bluetooth"
-	"github.com/stubbedev/wayle/service/brightness"
-	"github.com/stubbedev/wayle/service/clipboard"
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/service/idleinhibit"
-	"github.com/stubbedev/wayle/service/mail"
-	"github.com/stubbedev/wayle/service/mpris"
-	"github.com/stubbedev/wayle/service/network"
-	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/service/recorder"
-	"github.com/stubbedev/wayle/service/sni"
-	"github.com/stubbedev/wayle/service/treeman"
-	"github.com/stubbedev/wayle/service/upower"
-	"github.com/stubbedev/wayle/service/weather"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/shell/powermenu"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/bluetooth"
+	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/mail"
+	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/sni"
+	"github.com/stubbedev/lys-shell/service/treeman"
+	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/service/weather"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/powermenu"
 )
 
 // ModuleContext carries what a module needs at construction time: the
@@ -89,7 +89,7 @@ type ModuleContext struct {
 	// modules (workspaces) key their state on it.
 	Connector string
 	// Screenshot starts a capture on the in-process screenshot host
-	// (the `wayle screenshot ...` builtin); nil before the host is up.
+	// (the `lys-shell screenshot ...` builtin); nil before the host is up.
 	Screenshot func(mode, target string)
 	// Theme is the bar stylesheet every bar root attaches; nil in
 	// headless construction, where the tree builds unstyled.

@@ -3,9 +3,9 @@ package bar
 import (
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/strftime"
+	"github.com/stubbedev/lys-shell/strftime"
 )
 
 // clock renders the time through the configured strftime format and

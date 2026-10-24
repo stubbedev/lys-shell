@@ -6,28 +6,28 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // The greeter runs pre-login, so there is no session to ask what
 // cursor the user sees (cursor.rs). The last user's own dotfiles are
-// read best effort: the record a wayle session leaves, then the
+// read best effort: the record a lys-shell session leaves, then the
 // compositor matching the remembered session first (Hyprland env and
 // hyprctl setcursor, niri's cursor block, sway's seat xcursor_theme),
 // then GTK settings.ini and ~/.icons/default/index.theme.
 //
-// Like GTK 4.22, gelm asks the compositor to draw the cursor
+// Like GTK 4.22, lys-ui asks the compositor to draw the cursor
 // (cursor-shape-v1) when it can; on a host without the protocol (cage)
 // it draws xcursor themes client-side from XCURSOR_THEME and
 // XCURSOR_SIZE, so the resolved cursor is applied by exporting those
 // before connecting. The bundled-PNG fallback the Rust greeter works
 // around does not exist here.
 
-// recordedRel is where a running wayle session records its live cursor
+// recordedRel is where a running lys-shell session records its live cursor
 // (RecordCursor), relative to the user's home.
-const recordedRel = ".local/state/wayle/greeter-cursor"
+const recordedRel = ".local/state/lys-shell/greeter-cursor"
 
-// recordFile is the record's name inside the wayle state dir.
+// recordFile is the record's name inside the lys-shell state dir.
 const recordFile = "greeter-cursor"
 
 // Cursor is what one source found; either side may be missing.
@@ -117,7 +117,7 @@ func ResolveCursor(g config.GreeterConfig, detected Cursor) Cursor {
 	return resolved
 }
 
-// ApplyCursor exports the resolved cursor for gelm's theme loader.
+// ApplyCursor exports the resolved cursor for lys-ui's theme loader.
 func ApplyCursor(c Cursor) {
 	if c.Theme != "" {
 		_ = os.Setenv("XCURSOR_THEME", c.Theme)
@@ -128,7 +128,7 @@ func ApplyCursor(c Cursor) {
 // RecordCursor is the shell side (cursor_record.rs): from inside the
 // live session, XCURSOR_THEME and XCURSOR_SIZE (falling back to
 // HYPRCURSOR_SIZE) are the resolved truth, so they are written to
-// $XDG_STATE_HOME/wayle/greeter-cursor for the next login screen.
+// $XDG_STATE_HOME/lys-shell/greeter-cursor for the next login screen.
 // Nothing is written when neither is exported, so a good record is
 // never clobbered by blanks.
 func RecordCursor() error {
@@ -149,8 +149,8 @@ func RecordCursor() error {
 		}
 		dir = filepath.Join(home, ".local", "state")
 	}
-	dir = filepath.Join(dir, "wayle")
-	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // wayle's state dir
+	dir = filepath.Join(dir, "lys-shell")
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // lys-shell's state dir
 		return err
 	}
 	var body strings.Builder

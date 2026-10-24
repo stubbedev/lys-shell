@@ -3,9 +3,9 @@ package launcher
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // fontPx is GTK's default 11pt at 96 dpi, which the launcher's labels

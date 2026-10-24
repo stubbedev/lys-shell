@@ -2,9 +2,9 @@ _:
 let
   # Built with the toolchain go.mod pins. The overlay builds it against the
   # consumer's nixpkgs, so the pin is applied per package set.
-  wayleFor =
+  lysShellFor =
     pkgs:
-    pkgs.callPackage ./wayle.nix {
+    pkgs.callPackage ./lys-shell.nix {
       buildGoModule = pkgs.buildGoModule.override { go = pkgs.go_1_27; };
     };
 in
@@ -13,13 +13,13 @@ in
     { pkgs, ... }:
     {
       packages = rec {
-        wayle = wayleFor pkgs;
-        default = wayle;
+        lys-shell = lysShellFor pkgs;
+        default = lys-shell;
       };
     };
 
-  # Adds `wayle` to a nixpkgs instance: `nixpkgs.overlays = [ wayle.overlays.default ];`
+  # Adds `lys-shell` to a nixpkgs instance: `nixpkgs.overlays = [ lys-shell.overlays.default ];`
   flake.overlays.default = _final: prev: {
-    wayle = wayleFor prev;
+    lys-shell = lysShellFor prev;
   };
 }

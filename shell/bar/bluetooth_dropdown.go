@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/service/bluetooth"
+	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
 
 // The bluetooth dropdown, ported from

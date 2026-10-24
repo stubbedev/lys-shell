@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/capture"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/sharepreview"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
-	"github.com/stubbedev/wayle/shell/treetest"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // testPicker is a picker without an application: the loop marshal is a

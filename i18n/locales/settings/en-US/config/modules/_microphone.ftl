@@ -1,4 +1,4 @@
-### Wayle Configuration - Microphone Module
+### lys-shell Configuration - Microphone Module
 
 ## Microphone Module Configuration
 

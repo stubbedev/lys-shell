@@ -1,6 +1,0 @@
-Toggle recording on/off
-
-Usage: wayle recorder toggle
-
-Options:
-  -h, --help  Print help

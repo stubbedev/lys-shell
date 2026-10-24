@@ -1,5 +1,5 @@
-// Package pipewire is the PipeWire video producer wayle's ScreenCast
-// portal streams through (wayle-portal screencast/pipewire.rs): an
+// Package pipewire is the PipeWire video producer lys-shell's ScreenCast
+// portal streams through (lys-shell-portal screencast/pipewire.rs): an
 // output stream on its own pw_thread_loop, fed one captured frame per
 // cycle the consumer drives, stamped with the header, transform and
 // damage metas. libpipewire is bound through purego, so the binary
@@ -13,7 +13,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/stubbedev/wayle/internal/clib"
+	"github.com/stubbedev/lys-shell/internal/clib"
 )
 
 var libCandidates = clib.SystemCandidates("libpipewire-0.3.so.0")

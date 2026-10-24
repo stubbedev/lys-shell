@@ -1,6 +1,0 @@
-Toggle Do Not Disturb mode
-
-Usage: wayle notify dnd
-
-Options:
-  -h, --help  Print help

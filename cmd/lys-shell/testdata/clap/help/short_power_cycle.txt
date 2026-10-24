@@ -1,0 +1,6 @@
+Cycle to next power profile
+
+Usage: lys-shell power cycle
+
+Options:
+  -h, --help  Print help

@@ -7,13 +7,13 @@ import (
 	"os"
 	"sync"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/ipp"
-	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // The sheet's geometry (shell/print: the surface's width request, the
@@ -65,7 +65,7 @@ type prepared struct {
 	form    form
 }
 
-// Dialog is the com.wayle.Print1 host. Prepare and Print may be called
+// Dialog is the dev.stubbe.lys.Print1 host. Prepare and Print may be called
 // from any goroutine; the UI runs on the loop.
 type Dialog struct {
 	d       Deps
@@ -325,7 +325,7 @@ func (h *Dialog) show(tree widget.Widget) {
 		Layer:         app.LayerOverlay,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
-		Namespace:     "wayle-print",
+		Namespace:     "lys-shell-print",
 		Root:          root,
 		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 			if keycode == escapeKeycode {

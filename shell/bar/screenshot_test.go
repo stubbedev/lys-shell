@@ -3,9 +3,9 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestScreenshotBuiltin(t *testing.T) {
@@ -34,12 +34,12 @@ func TestScreenshotBindingRunsInProcess(t *testing.T) {
 	var got []string
 	ctx.Screenshot = func(mode, target string) { got = append(got, mode+"|"+target) }
 	runClickAction(ctx, ctx.Config.Screenshot.Clicks().RightClick)
-	runShellBuiltin(ctx, "wayle screenshot output HDMI-A-1")
+	runShellBuiltin(ctx, "lys-shell screenshot output HDMI-A-1")
 	if len(got) != 2 || got[0] != "output|" || got[1] != "output|HDMI-A-1" {
 		t.Fatalf("triggered %v", got)
 	}
 	// Other builtins never reach the screenshot host.
-	runShellBuiltin(ctx, "wayle audio output-mute")
+	runShellBuiltin(ctx, "lys-shell audio output-mute")
 	if len(got) != 2 {
 		t.Fatalf("a foreign builtin triggered a capture: %v", got)
 	}

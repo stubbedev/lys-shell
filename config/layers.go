@@ -10,7 +10,7 @@ import (
 
 // Layer application: a parsed tree applied onto a typed config, field
 // by field, the way the derived ApplyConfigLayer/ApplyRuntimeLayer
-// walk a #[wayle_config] tree (crates/wayle-derive/src/derives.rs,
+// walk a #[lys_shell_config] tree (crates/wayle-derive/src/derives.rs,
 // crates/wayle-config/src/property/config.rs):
 //
 //   - keys are matched canonical first, then aliases, then deprecated
@@ -128,7 +128,7 @@ func (a *layerApply) applyLeaf(dst reflect.Value, v any, path string) error {
 			d := Diagnostic{Kind: DiagnosticWarning, Title: "config.toml change ignored"}.
 				field("Field", path).
 				field("Reason", "runtime override active")
-			d.Hint = "wayle config reset " + path
+			d.Hint = "lys-shell config reset " + path
 			a.sink(d)
 		}
 	}

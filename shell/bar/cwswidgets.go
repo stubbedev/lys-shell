@@ -3,11 +3,11 @@ package bar
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // cwsContainer is the `.workspaces.<kind>` box: the buttons in a row
@@ -207,7 +207,7 @@ func (m *cwsView) cwsResolveColors(model cwsButtonModel) cwsColors {
 	return out
 }
 
-// cwsButton is one `.workspace` button: a gelm Button with literal
+// cwsButton is one `.workspace` button: a lys-ui Button with literal
 // state backgrounds (BgExplicit: transparent at rest, the hover fill on
 // hover), the content box centered in it, the active underline and
 // inactive opacity painted around it, and the five input bindings

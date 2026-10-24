@@ -1,4 +1,4 @@
-### Wayle Configuration - Dashboard Module
+### lys-shell Configuration - Dashboard Module
 
 ## Dashboard Module Configuration
 

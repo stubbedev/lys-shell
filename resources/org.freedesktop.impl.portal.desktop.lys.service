@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.lys
+Exec=/usr/bin/lys-shell portal
+SystemdService=xdg-desktop-portal-lys-shell.service

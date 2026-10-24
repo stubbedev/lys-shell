@@ -11,7 +11,7 @@ Native screen recorder backed by a GStreamer pipeline.
 
 Click the bar button to start/stop; the dropdown exposes the recording
 options below. Controllable from the CLI / RPC socket:
-`wayle recorder start|stop|toggle|pause|status`.
+`lys-shell recorder start|stop|toggle|pause|status`.
 
 Add it to your layout with `recorder`:
 
@@ -70,7 +70,7 @@ right = ["recorder"]
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `left-click` | [`ClickAction`](/config/types#click-action) | `"wayle recorder toggle"` | Action on left click. Default toggles recording. |
+| `left-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell recorder toggle"` | Action on left click. Default toggles recording. |
 | `right-click` | [`ClickAction`](/config/types#click-action) | `"dropdown:recorder"` | Action on right click. Default opens the recorder dropdown. |
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
@@ -106,7 +106,7 @@ label-show = true
 label-color = "red"
 label-max-length = 0
 button-bg-color = "bg-surface-elevated"
-left-click = "wayle recorder toggle"
+left-click = "lys-shell recorder toggle"
 right-click = "dropdown:recorder"
 middle-click = ""
 scroll-up = ""

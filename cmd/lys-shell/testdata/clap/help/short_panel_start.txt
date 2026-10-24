@@ -1,0 +1,6 @@
+Start the panel daemon
+
+Usage: lys-shell panel start
+
+Options:
+  -h, --help  Print help

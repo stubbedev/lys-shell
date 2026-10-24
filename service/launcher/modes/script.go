@@ -1,6 +1,6 @@
 // Package modes holds the launch modes (crates/wayle-launcher/src/
 // modes): drun, run, window, ssh, the file browsers, script and dmenu,
-// combi, and the wayle-only calc, emoji, clipboard, and keys modes.
+// combi, and the lys-shell-only calc, emoji, clipboard, and keys modes.
 package modes
 
 import (
@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // Script is a custom script mode speaking the rofi-script(5) protocol
@@ -287,7 +287,7 @@ func applyHeader(header string, p *parsedOutput) {
 	case "delim":
 		// handled up front
 	case "theme":
-		// No rasi: accepted and ignored (a documented wayle divergence).
+		// No rasi: accepted and ignored (a documented lys-shell divergence).
 	default:
 		log.Printf("launcher: unknown script mode option %q", key)
 	}

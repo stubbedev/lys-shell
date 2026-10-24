@@ -3,9 +3,9 @@ package styling
 import (
 	"testing"
 
-	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/lys-ui/render"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestColorMixInterpolatesPremultipliedChannels(t *testing.T) {

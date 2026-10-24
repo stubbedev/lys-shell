@@ -9,7 +9,7 @@ outline: [2, 3]
 
 Toggle that prevents screen dim, lock, and suspend while active.
 
-Controllable from the CLI: `wayle idle on|off|duration|remaining|status`.
+Controllable from the CLI: `lys-shell idle on|off|duration|remaining|status`.
 
 Add it to your layout with `idle-inhibit`:
 
@@ -62,8 +62,8 @@ right = ["idle-inhibit"]
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `left-click` | [`ClickAction`](/config/types#click-action) | `"wayle idle toggle --indefinite"` | Action on left click. Default toggles indefinite idle inhibit. |
-| `right-click` | [`ClickAction`](/config/types#click-action) | `"wayle idle toggle"` | Action on right click. Default toggles timed idle inhibit. |
+| `left-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell idle toggle --indefinite"` | Action on left click. Default toggles indefinite idle inhibit. |
+| `right-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell idle toggle"` | Action on right click. Default toggles timed idle inhibit. |
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
@@ -85,8 +85,8 @@ label-show = true
 label-color = "green"
 label-max-length = 0
 button-bg-color = "bg-surface-elevated"
-left-click = "wayle idle toggle --indefinite"
-right-click = "wayle idle toggle"
+left-click = "lys-shell idle toggle --indefinite"
+right-click = "lys-shell idle toggle"
 middle-click = ""
 scroll-up = ""
 scroll-down = ""

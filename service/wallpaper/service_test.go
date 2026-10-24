@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 func seeded() *rand.Rand { return rand.New(rand.NewPCG(1, 2)) }
@@ -92,8 +92,8 @@ func TestScanPicksSupportedExtensionsOnly(t *testing.T) {
 
 func TestNewCyclingErrors(t *testing.T) {
 	var notFound *DirectoryNotFoundError
-	if _, err := newCycling("/nonexistent/wayle", Sequential, time.Minute, seeded()); !errors.As(err, &notFound) ||
-		err.Error() != "directory not found: /nonexistent/wayle" {
+	if _, err := newCycling("/nonexistent/lys-shell", Sequential, time.Minute, seeded()); !errors.As(err, &notFound) ||
+		err.Error() != "directory not found: /nonexistent/lys-shell" {
 		t.Errorf("missing dir err = %v", err)
 	}
 	dir := imageDir(t, "readme.md")

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 const implPrefix = "org.freedesktop.impl.portal."
@@ -34,8 +34,8 @@ func readResource(t *testing.T, name string) string {
 	return string(b)
 }
 
-// TestManifestsMatchTheMountedInterfaces pins wayle.portal (what the
-// frontend discovers) and wayle-portals.conf (how it routes) to what
+// TestManifestsMatchTheMountedInterfaces pins lys-shell.portal (what the
+// frontend discovers) and lys-shell-portals.conf (how it routes) to what
 // the backend mounts, as manifest.rs does: a drifted list silently
 // drops an interface at runtime.
 func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
@@ -47,7 +47,7 @@ func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
 	}
 
 	var declared []string
-	for line := range strings.Lines(readResource(t, "wayle.portal")) {
+	for line := range strings.Lines(readResource(t, "lys-shell.portal")) {
 		if list, ok := strings.CutPrefix(strings.TrimSpace(line), "Interfaces="); ok {
 			for iface := range strings.SplitSeq(list, ";") {
 				if name, ok := strings.CutPrefix(iface, implPrefix); ok {
@@ -58,23 +58,23 @@ func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
 	}
 	slices.Sort(declared)
 	if !slices.Equal(declared, want) {
-		t.Errorf("wayle.portal Interfaces= %v\nwant %v", declared, want)
+		t.Errorf("lys-shell.portal Interfaces= %v\nwant %v", declared, want)
 	}
 
-	conf := readResource(t, "wayle-portals.conf")
+	conf := readResource(t, "lys-shell-portals.conf")
 	var routed []string
 	for line := range strings.Lines(conf) {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), implPrefix); ok {
-			if name, target, ok := strings.Cut(rest, "="); ok && strings.TrimSpace(target) == "wayle" {
+			if name, target, ok := strings.Cut(rest, "="); ok && strings.TrimSpace(target) == "lys-shell" {
 				routed = append(routed, name)
 			}
 		}
 	}
 	slices.Sort(routed)
 	if !slices.Equal(routed, want) {
-		t.Errorf("wayle-portals.conf routes %v\nwant %v", routed, want)
+		t.Errorf("lys-shell-portals.conf routes %v\nwant %v", routed, want)
 	}
-	if !strings.Contains(conf, "\ndefault=wayle\n") || strings.Contains(conf, "=gtk") {
-		t.Error("portals.conf must default to wayle and delegate nothing to gtk")
+	if !strings.Contains(conf, "\ndefault=lys-shell\n") || strings.Contains(conf, "=gtk") {
+		t.Error("portals.conf must default to lys-shell and delegate nothing to gtk")
 	}
 }

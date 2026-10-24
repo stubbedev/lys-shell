@@ -73,7 +73,7 @@ func DefaultsMicrophone() MicrophoneConfig {
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
 		LeftClick:      ParseClickAction("dropdown:audio"),
 		RightClick:     ClickAction{},
-		MiddleClick:    ParseClickAction("wayle audio input-mute"),
+		MiddleClick:    ParseClickAction("lys-shell audio input-mute"),
 		ScrollUp:       ClickAction{},
 		ScrollDown:     ClickAction{},
 		Thresholds:     []ThresholdEntry{},

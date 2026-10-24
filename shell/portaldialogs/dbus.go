@@ -1,5 +1,5 @@
-// Package portaldialogs is the shell's com.wayle.PortalDialogs1 host
-// (wayle-shell services/portal_dialogs and shell/portal_dialogs): the
+// Package portaldialogs is the shell's dev.stubbe.lys.PortalDialogs1 host
+// (lys-shell services/portal_dialogs and shell/portal_dialogs): the
 // native dialogs behind the portal backend's Access, Account,
 // AppChooser, DynamicLauncher and Wallpaper preview, in place of
 // xdg-desktop-portal-gtk.
@@ -10,14 +10,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // D-Bus identity (wayle-ipc portal_dialogs.rs).
 const (
-	ServiceName = "com.wayle.PortalDialogs1"
-	ServicePath = dbus.ObjectPath("/com/wayle/PortalDialogs")
-	iface       = "com.wayle.PortalDialogs1"
+	ServiceName = "dev.stubbe.lys.PortalDialogs1"
+	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/PortalDialogs")
+	iface       = "dev.stubbe.lys.PortalDialogs1"
 )
 
 // AccessRequest is one grant/deny prompt.
@@ -44,7 +44,7 @@ type Host interface {
 	ConfirmInstall(name, iconName string) bool
 }
 
-// Daemon serves a Host as com.wayle.PortalDialogs1.
+// Daemon serves a Host as dev.stubbe.lys.PortalDialogs1.
 type Daemon struct{ host Host }
 
 // NewDaemon wraps the host for export.

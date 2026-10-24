@@ -5,12 +5,12 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // SettingsIface serves org.freedesktop.appearance from the live styling
-// config, so GTK, Qt and Chromium follow wayle's theme (settings.rs).
+// config, so GTK, Qt and Chromium follow lys-shell's theme (settings.rs).
 const SettingsIface = "org.freedesktop.impl.portal.Settings"
 
 // AppearanceNS is the cross-desktop namespace every toolkit reads.

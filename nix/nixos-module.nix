@@ -6,12 +6,12 @@ self:
   ...
 }:
 let
-  cfg = config.programs.wayle;
+  cfg = config.programs.lys-shell;
   tomlFormat = pkgs.formats.toml { };
 
   # Directory the greeter remembers the last-selected session in. Must be
   # writable by the greetd user (`greeter`); the tmpfiles rule below creates it.
-  greeterStateDir = "/var/lib/wayle-greeter";
+  greeterStateDir = "/var/lib/lys-greeter";
 
   # Forces both render layers onto their software paths: wlroots' pixman
   # renderer (DRM dumb buffers, no EGL/GBM) for cage, and GTK's cairo GSK
@@ -33,7 +33,7 @@ let
   # The greeter runs as the unprivileged `greeter` user (home /var/empty) and
   # cannot read a normal user's often-0700 home, so a cursor theme installed only
   # via home-manager is invisible to it — with no theme resolvable it shows the
-  # large built-in fallback cursor. So we don't invent a wayle-specific cursor
+  # large built-in fallback cursor. So we don't invent a lys-shell-specific cursor
   # knob: we inherit the system-wide cursor the user already configures
   # (`environment.sessionVariables`, falling back to `environment.variables`) and
   # point XCURSOR_PATH at the system icon dir, where a theme installed via
@@ -61,10 +61,10 @@ let
     ++ lib.optional (cursorName != "") "XCURSOR_THEME=${cursorName}";
 
   # The greetd `default_session` command: a kiosk compositor (cage) hosting the
-  # wayle greeter. The greeter discovers Wayland sessions from `session.dirs`,
+  # lys-shell greeter. The greeter discovers Wayland sessions from `session.dirs`,
   # lets the user pick one, and remembers the choice under `greeterStateDir`.
   # cage's `-s` allows VT switching. The greeter reads its theme from
-  # /etc/wayle/config.toml (written below from `greeter.settings`).
+  # /etc/lys-shell/config.toml (written below from `greeter.settings`).
   #
   # Layering, outermost first: [graphicsWrapper] env[software vars] cage → greeter.
   # The graphicsWrapper (e.g. nixGL) must wrap the whole thing so it injects the
@@ -72,7 +72,7 @@ let
   greeterCommand =
     let
       cageExe = lib.getExe cfg.greeter.cagePackage;
-      greeterExe = lib.getExe' cfg.greeter.package "wayle-greeter";
+      greeterExe = lib.getExe' cfg.greeter.package "lys-greeter";
       envArgs = lib.concatMapStringsSep " " (
         e: "--env ${lib.escapeShellArg e}"
       ) cfg.greeter.session.environment;
@@ -97,25 +97,25 @@ let
         + " ";
     in
     "${wrapperPrefix}${envPrefix}${cageExe} -s -- "
-    + "${greeterExe} --config /etc/wayle/config.toml "
+    + "${greeterExe} --config /etc/lys-shell/config.toml "
     + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${xsessionDirArgs} ${envArgs} ${fallback}";
 in
 {
-  options.programs.wayle = {
-    enable = lib.mkEnableOption "the Wayle desktop shell";
+  options.programs.lys-shell = {
+    enable = lib.mkEnableOption "the lys-shell desktop shell";
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = self.packages.${pkgs.stdenv.hostPlatform.system}.wayle;
-      defaultText = lib.literalExpression "wayle.packages.\${system}.wayle";
-      description = "The wayle package to install.";
+      default = self.packages.${pkgs.stdenv.hostPlatform.system}.lys-shell;
+      defaultText = lib.literalExpression "lys-shell.packages.\${system}.lys-shell";
+      description = "The lys-shell package to install.";
     };
 
     autoInstallDependencies = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable the backing system services wayle integrates with: UPower
+        Enable the backing system services lys-shell integrates with: UPower
         (battery), BlueZ (bluetooth), and GeoClue (location for the hyprsunset
         auto-schedule), plus wl-clipboard and xdg-utils. Set with `mkDefault` so
         your own settings win. Networking (NetworkManager),
@@ -126,13 +126,13 @@ in
 
     systemd = {
       enable = lib.mkEnableOption ''
-        a systemd user service that runs `wayle shell` in the graphical session.
+        a systemd user service that runs `lys-shell shell` in the graphical session.
         Leave this off if you start the bar from your compositor config instead'';
 
       target = lib.mkOption {
         type = lib.types.str;
         default = "graphical-session.target";
-        description = "Systemd target the wayle user service binds to.";
+        description = "Systemd target the lys-shell user service binds to.";
       };
     };
 
@@ -141,14 +141,14 @@ in
         type = lib.types.bool;
         default = true;
         description = ''
-          Register wayle as the xdg-desktop-portal backend so screen sharing,
+          Register lys-shell as the xdg-desktop-portal backend so screen sharing,
           screenshots, remote control, global shortcuts, appearance settings,
           notifications, wallpaper, idle-inhibit, file/app/print dialogs and the
-          rest work on any Wayland compositor. wayle implements every interface
-          natively, so this enables `xdg.portal`, adds only wayle to
+          rest work on any Wayland compositor. lys-shell implements every interface
+          natively, so this enables `xdg.portal`, adds only lys-shell to
           `extraPortals`, routes everything to it via `xdg.portal.config.common`
           (with `mkDefault`, so your own routing wins), and defines the
-          `xdg-desktop-portal-wayle` user service the frontend activates. No
+          `xdg-desktop-portal-lys-shell` user service the frontend activates. No
           xdg-desktop-portal-gtk needed.
         '';
       };
@@ -156,17 +156,17 @@ in
 
     lock = {
       enable = lib.mkEnableOption ''
-        a PAM service for the wayle session lock. Wayle locks the session
+        a PAM service for the lys-shell session lock. lys-shell locks the session
         natively via `ext-session-lock-v1` (the `lock` CLI / logind `Lock`
         signal); authenticating the unlock needs a PAM service, which NixOS does
         not provide by default. This declares one named `lock.pamService`'';
 
       pamService = lib.mkOption {
         type = lib.types.str;
-        default = "wayle";
+        default = "lys-shell";
         description = ''
           Name of the PAM service created for unlock authentication. Must match
-          `lock.pam-service` in your wayle config (the config default is
+          `lock.pam-service` in your lys-shell config (the config default is
           `system-auth`, which exists on Arch/Fedora but not NixOS — point it at
           this service, or set this to a service that already exists).
         '';
@@ -175,7 +175,7 @@ in
 
     greeter = {
       enable = lib.mkEnableOption ''
-        the wayle greetd greeter: a login screen that shares the desktop/lock
+        the lys-shell greetd greeter: a login screen that shares the desktop/lock
         theme and lets the user pick a Wayland session. Enables `services.greetd`
         with a kiosk compositor (cage) hosting the greeter; on login it starts
         the selected session (discovered from `greeter.session.dirs`)'';
@@ -183,8 +183,8 @@ in
       package = lib.mkOption {
         type = lib.types.package;
         default = cfg.package;
-        defaultText = lib.literalExpression "config.programs.wayle.package";
-        description = "Package providing the `wayle-greeter` binary.";
+        defaultText = lib.literalExpression "config.programs.lys-shell.package";
+        description = "Package providing the `lys-greeter` binary.";
       };
 
       cagePackage = lib.mkOption {
@@ -283,8 +283,8 @@ in
           }
         '';
         description = ''
-          Theme/background/clock config written to {file}`/etc/wayle/config.toml`
-          and read by the greeter. Uses the full wayle config schema; the
+          Theme/background/clock config written to {file}`/etc/lys-shell/config.toml`
+          and read by the greeter. Uses the full lys-shell config schema; the
           greeter honours `styling`, `greeter.*` (background, clock, cursor,
           user list, power buttons), and `wallpaper`. Leave empty to use the
           built-in defaults.
@@ -297,8 +297,8 @@ in
     {
       environment.systemPackages = [ cfg.package ];
 
-      systemd.user.services.wayle = lib.mkIf cfg.systemd.enable {
-        description = "Wayle desktop shell";
+      systemd.user.services.lys-shell = lib.mkIf cfg.systemd.enable {
+        description = "lys-shell desktop shell";
         partOf = [ cfg.systemd.target ];
         # The recorder captures via the xdg-desktop-portal ScreenCast interface
         # over PipeWire; order after (and weakly want) both so they're up when
@@ -325,12 +325,12 @@ in
     (lib.mkIf cfg.portal.enable {
       xdg.portal = {
         enable = true;
-        # Wayle implements every interface natively — no xdg-desktop-portal-gtk.
+        # lys-shell implements every interface natively — no xdg-desktop-portal-gtk.
         extraPortals = [ cfg.package ];
-        # Route everything to wayle regardless of XDG_CURRENT_DESKTOP. mkDefault
+        # Route everything to lys-shell regardless of XDG_CURRENT_DESKTOP. mkDefault
         # so a user's own xdg.portal.config wins.
         config.common = lib.mkDefault {
-          default = [ "wayle" ];
+          default = [ "lys-shell" ];
         };
       };
 
@@ -343,13 +343,13 @@ in
       # — the frontend blocks on the backend's interfaces, the backend blocks
       # on the frontend finishing — until 25s D-Bus timeouts break it and the
       # frontend fails. graphical-session.target ordering is enough.
-      systemd.user.services.xdg-desktop-portal-wayle = {
-        description = "Wayle xdg-desktop-portal backend";
+      systemd.user.services.xdg-desktop-portal-lys-shell = {
+        description = "lys-shell xdg-desktop-portal backend";
         partOf = [ "graphical-session.target" ];
         after = [ "graphical-session.target" ];
         serviceConfig = {
           Type = "dbus";
-          BusName = "org.freedesktop.impl.portal.desktop.wayle";
+          BusName = "org.freedesktop.impl.portal.desktop.lys";
           ExecStart = "${lib.getExe cfg.package} portal";
           Restart = "on-failure";
           RestartSec = 3;
@@ -365,11 +365,11 @@ in
       # running gnome-keyring-daemon so unlocking the session also unlocks the
       # `login` keyring. That matters on autologin setups (e.g. greetd
       # initial_session straight into a locked compositor): no password is ever
-      # typed at login, so the wayle unlock is the only PAM interaction that
+      # typed at login, so the lys-shell unlock is the only PAM interaction that
       # can unlock the keyring — without this, secret-service clients (Chrome,
       # ...) prompt for the keyring password on first use every session. The
       # lines are `optional`, so with no keyring daemon running they no-op.
-      # The user's wayle config `lock.pam-service` must name this same service.
+      # The user's lys-shell config `lock.pam-service` must name this same service.
       security.pam.services.${cfg.lock.pamService}.enableGnomeKeyring = true;
     })
 
@@ -389,17 +389,17 @@ in
 
       # The greeter runs as the greetd user with no $HOME, so its theme config
       # lives system-wide. environment.etc files are world-readable (0444).
-      environment.etc."wayle/config.toml" = lib.mkIf (cfg.greeter.settings != { }) {
-        source = tomlFormat.generate "wayle-greeter-config.toml" cfg.greeter.settings;
+      environment.etc."lys-shell/config.toml" = lib.mkIf (cfg.greeter.settings != { }) {
+        source = tomlFormat.generate "lys-greeter-config.toml" cfg.greeter.settings;
       };
 
       # Let any local user push their greeter (login-screen) choices from
-      # wayle-settings to the system config via `pkexec wayle-greeter
-      # apply-config` (writes only greeter keys to /etc/wayle/runtime.toml,
+      # lys-settings to the system config via `pkexec lys-greeter
+      # apply-config` (writes only greeter keys to /etc/lys-shell/runtime.toml,
       # which the greeter overlays on config.toml). Admin auth is required.
       security.polkit.enable = true;
-      environment.etc."polkit-1/actions/dev.stubbe.wayle.greeter.policy".source =
-        "${cfg.greeter.package}/share/polkit-1/actions/dev.stubbe.wayle.greeter.policy";
+      environment.etc."polkit-1/actions/dev.stubbe.lys.greeter.policy".source =
+        "${cfg.greeter.package}/share/polkit-1/actions/dev.stubbe.lys.greeter.policy";
 
       environment.systemPackages = [ cfg.greeter.cagePackage ];
     })
@@ -409,14 +409,14 @@ in
       hardware.bluetooth.enable = lib.mkDefault true;
 
       # GeoClue backs the hyprsunset auto-schedule's location lookup. The
-      # appConfig entry whitelists wayle (DesktopId "wayle") so the daemon
+      # appConfig entry whitelists lys-shell (DesktopId "lys-shell") so the daemon
       # serves it without an agent prompt; isSystem skips the per-user agent.
       # If GeoClue is unavailable the schedule falls back to the configured
       # latitude/longitude, so this is purely a convenience.
       services.geoclue2 = {
         enable = lib.mkDefault true;
-        appConfig.wayle = {
-          desktopID = "wayle";
+        appConfig.lys-shell = {
+          desktopID = "lys-shell";
           isAllowed = true;
           isSystem = true;
         };

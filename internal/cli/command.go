@@ -1,5 +1,5 @@
-// Package cli is wayle's declarative command tree: a port of the clap
-// subset the Rust CLI (wayle/src/cli) uses, so the Go binary keeps its
+// Package cli is lys-shell's declarative command tree: a port of the clap
+// subset the Rust CLI (lys-shell/src/cli) uses, so the Go binary keeps its
 // help text, flags, error messages, exit codes, and shell completions
 // byte-for-byte.
 //
@@ -121,7 +121,7 @@ type cmd struct {
 	longAbout      string
 	afterLongHelp  string
 	version        string
-	bin            string // the usage name, e.g. "wayle audio"
+	bin            string // the usage name, e.g. "lys-shell audio"
 	args           []*arg
 	subs           []*cmd
 	parent         *cmd

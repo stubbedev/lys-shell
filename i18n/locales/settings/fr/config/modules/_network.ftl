@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Réseau
+### Configuration lys-shell - Module Réseau
 
 ## Configuration du module Réseau
 

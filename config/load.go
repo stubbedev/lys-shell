@@ -51,7 +51,7 @@ func createDefaultConfigFile(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // the config dir is user-owned and world-readable, like the Rust create_dir_all
 		return &LoadError{msg: "cannot create directory", err: err}
 	}
-	if err := os.WriteFile(path, []byte("# Wayle configuration file\n"), 0o644); err != nil { //nolint:gosec // config files are not secret; the Rust fs::write default mode
+	if err := os.WriteFile(path, []byte("# lys-shell configuration file\n"), 0o644); err != nil { //nolint:gosec // config files are not secret; the Rust fs::write default mode
 		return &LoadError{msg: "cannot write file", err: err}
 	}
 	return nil

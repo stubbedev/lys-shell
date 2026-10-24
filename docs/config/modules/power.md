@@ -50,7 +50,7 @@ right = ["power"]
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
-| `left-click` | [`ClickAction`](/config/types#click-action) | `":menu"` | Action on left click. Default opens wayle's native power menu (`:menu`). |
+| `left-click` | [`ClickAction`](/config/types#click-action) | `":menu"` | Action on left click. Default opens lys-shell's native power menu (`:menu`). |
 
 ## Default configuration
 

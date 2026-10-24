@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// style is one anstyle Style from wayle/src/cli/app.rs's get_styles:
+// style is one anstyle Style from lys-shell/src/cli/app.rs's get_styles:
 // an optional bold effect and an optional ANSI foreground. It renders
 // the way anstyle does (effects first, then the color, one SGR each).
 type style struct {

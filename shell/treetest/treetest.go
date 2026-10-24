@@ -1,4 +1,4 @@
-// Package treetest walks gelm widget trees for the shell's surface
+// Package treetest walks lys-ui widget trees for the shell's surface
 // tests: find the button a user would click, read what the labels say.
 package treetest
 
@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 	"golang.org/x/image/font/gofont/goregular"
 )
 
 // Loop stands in for the process's one UI goroutine in the surface
-// harnesses: gelm keeps its style and layout scratch per process, so
+// harnesses: lys-ui keeps its style and layout scratch per process, so
 // every harness in a test binary runs its widget work under this one
 // lock, never a lock of its own (a finished test's harness can still be
 // draining while the next one builds).

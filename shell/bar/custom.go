@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/jinja"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/jinja"
 )
 
 // Custom module limits (watchers/command.rs, events.rs, helpers.rs).

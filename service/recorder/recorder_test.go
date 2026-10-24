@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/recorder"
-	"github.com/stubbedev/wayle/service/recorder/recordertest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder/recordertest"
 )
 
 // hookLog records the toasts and notifications.
@@ -246,10 +246,10 @@ func TestOutputPath(t *testing.T) {
 	t.Setenv("XDG_VIDEOS_DIR", "")
 	t.Setenv("HOME", "/home/u")
 	now := time.Date(2026, 10, 1, 9, 8, 7, 0, time.Local)
-	if got := recorder.OutputPath("", recorder.FormatMKV, now); got != "/home/u/Videos/wayle-20261001-090807.mkv" {
+	if got := recorder.OutputPath("", recorder.FormatMKV, now); got != "/home/u/Videos/lys-shell-20261001-090807.mkv" {
 		t.Errorf("default = %q", got)
 	}
-	if got := recorder.OutputPath("/custom", recorder.FormatMP4, now); got != "/custom/wayle-20261001-090807.mp4" {
+	if got := recorder.OutputPath("/custom", recorder.FormatMP4, now); got != "/custom/lys-shell-20261001-090807.mp4" {
 		t.Errorf("configured = %q", got)
 	}
 	t.Setenv("XDG_VIDEOS_DIR", "/vids")

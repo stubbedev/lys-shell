@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/image/draw"
 
-	"github.com/stubbedev/wayle/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 )
 
 // thumbMaxBytes skips images too large to decode for a row icon.

@@ -1,4 +1,4 @@
-### Wayle Configuration - Volume Module
+### lys-shell Configuration - Volume Module
 
 ## Volume Module Configuration
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/icons"
+	"github.com/stubbedev/lys-shell/internal/icons"
 )
 
 // fakeIconSearch records what initIcons does to the icon search path.

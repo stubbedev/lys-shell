@@ -10,11 +10,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stubbedev/wayle/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // cacheImage is image_cache.rs's cache_image_data: inline pixels become
-// $XDG_CACHE_HOME/wayle/notifications/<content hash>.png, written once.
+// $XDG_CACHE_HOME/lys-shell/notifications/<content hash>.png, written once.
 // Only 8-bit RGB and RGBA are supported; anything else, or a buffer too
 // short for its geometry, caches nothing.
 func cacheImage(img imageData) (string, bool) {
@@ -77,7 +77,7 @@ func imageRGBA(img imageData) (*image.NRGBA, bool) {
 }
 
 func writePNG(path string, img image.Image) error {
-	f, err := os.Create(path) //nolint:gosec // wayle's own cache dir
+	f, err := os.Create(path) //nolint:gosec // lys-shell's own cache dir
 	if err != nil {
 		return err
 	}

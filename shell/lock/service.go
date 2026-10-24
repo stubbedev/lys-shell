@@ -9,16 +9,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/credential"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/auth"
+	"github.com/stubbedev/lys-shell/shell/credential"
 )
 
-// appLocker adapts gelm's session lock to the screen.
+// appLocker adapts lys-ui's session lock to the screen.
 type appLocker struct{ a *app.Application }
 
 func (l appLocker) Available() bool { return l.a.SessionLockAvailable() }
@@ -48,8 +48,8 @@ func (l appLocker) Focus(w widget.Widget) {
 
 // Start wires the lock screen into the running shell: the logind
 // triggers, lock-on-start, and the LockedHint restart recovery. The
-// shell serves `wayle lock` by handing Screen.Lock to its
-// com.wayle.Shell1 hooks. The returned stop ends the logind listener.
+// shell serves `lys-shell lock` by handing Screen.Lock to its
+// dev.stubbe.lys.Shell1 hooks. The returned stop ends the logind listener.
 func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widget.Stylesheet) (*Screen, func()) {
 	ld := systemLogind()
 	deps := Deps{
@@ -118,7 +118,7 @@ func claimLockOnStart(runtimeDir string) bool {
 	if runtimeDir == "" {
 		return true
 	}
-	marker := filepath.Join(runtimeDir, "wayle", "lock-on-start.done")
+	marker := filepath.Join(runtimeDir, "lys-shell", "lock-on-start.done")
 	_ = os.MkdirAll(filepath.Dir(marker), 0o700) //nolint:gosec // our own runtime dir
 	// O_EXCL is the atomic first-writer-wins test: exactly one shell
 	// per session sees success.

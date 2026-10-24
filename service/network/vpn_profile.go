@@ -7,7 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
 )
 
 // This file turns form values into a NetworkManager connection profile,
@@ -232,7 +232,7 @@ func splitServers(raw string) (v4, v6 []string) {
 }
 
 // ReadProfileValues reads a saved profile back into form values, for
-// the edit form. The -flags keys are wayle's own bookkeeping and stay
+// the edit form. The -flags keys are lys-shell's own bookkeeping and stay
 // off the form.
 func ReadProfileValues(dict ConnectionDict) map[string]string {
 	values := map[string]string{}

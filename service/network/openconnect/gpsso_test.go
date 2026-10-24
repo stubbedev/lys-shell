@@ -189,7 +189,7 @@ func TestACallbackWithNothingWaitingIsDropped(t *testing.T) {
 }
 
 // deliverWhenOpened swaps the browser for one that, once opened, hands
-// uri back through DeliverSSOCallback the way `wayle vpn sso-callback`
+// uri back through DeliverSSOCallback the way `lys-shell vpn sso-callback`
 // does through the shell.
 func deliverWhenOpened(t *testing.T, uri string) *string {
 	t.Helper()

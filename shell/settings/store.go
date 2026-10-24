@@ -1,4 +1,4 @@
-// Package settings is wayle-settings: the GUI over the config, every
+// Package settings is lys-settings: the GUI over the config, every
 // change a runtime override persisted to runtime.toml as it lands.
 // Pages are data (page.go): rows name config paths, and the editor for
 // each comes from the field's type (config.Field) unless the page asks
@@ -12,8 +12,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 )
 
 // store is the config the window edits. Every write is a runtime

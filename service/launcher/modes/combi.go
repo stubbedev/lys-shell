@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // Combi merges several modes into one list, !bang filterable

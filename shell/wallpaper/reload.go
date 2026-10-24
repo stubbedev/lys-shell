@@ -5,9 +5,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/wallpaper"
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 // SetConfig applies a reloaded config: the extraction settings

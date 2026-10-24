@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 )
 
 // fakeDevice plays the data-control device: the test announces

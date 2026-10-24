@@ -1,7 +1,7 @@
 
 
 settings-lock-enabled = Enabled
-    .description = Let Wayle lock the session (responds to loginctl lock-session and `wayle lock`)
+    .description = Let lys-shell lock the session (responds to loginctl lock-session and `lys-shell lock`)
 
 settings-lock-lock-on-start = Lock on Start
     .description = Lock the session as soon as the shell starts, for autologin setups where the lock screen is the access gate

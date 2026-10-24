@@ -46,7 +46,7 @@ func TestAUUIDThatCouldEscapeTheDirectoryIsRefused(t *testing.T) {
 func TestARealUUIDLandsInsideTheStateDirectory(t *testing.T) {
 	base := stateHome(t)
 	path, ok := cachePath("6a1c-uuid", "cookie")
-	if !ok || path != filepath.Join(base, "wayle/vpn/6a1c-uuid.cookie") {
+	if !ok || path != filepath.Join(base, "lys-shell/vpn/6a1c-uuid.cookie") {
 		t.Errorf("path = %q, %v", path, ok)
 	}
 }
@@ -56,7 +56,7 @@ func TestTheStateDirectoryFallsBackToHomeForARelativeXDGStateHome(t *testing.T) 
 	t.Setenv("HOME", home)
 	for _, xdg := range []string{"", "relative/state"} {
 		t.Setenv("XDG_STATE_HOME", xdg)
-		if dir, ok := cacheDirectory(); !ok || dir != filepath.Join(home, ".local/state/wayle/vpn") {
+		if dir, ok := cacheDirectory(); !ok || dir != filepath.Join(home, ".local/state/lys-shell/vpn") {
 			t.Errorf("XDG_STATE_HOME=%q: dir = %q, %v", xdg, dir, ok)
 		}
 	}
@@ -67,7 +67,7 @@ func TestCredentialsAreWrittenPrivateAndInTheRustsFormat(t *testing.T) {
 	storeSession("fmt", session{cookie: "authcookie=abc", host: "vpn.example.com", gwcert: "pin-sha256:AAAA"})
 	storePassword("fmt", "hunter2")
 
-	dir := filepath.Join(base, "wayle/vpn")
+	dir := filepath.Join(base, "lys-shell/vpn")
 	info, err := os.Stat(dir)
 	if err != nil || info.Mode().Perm() != 0o700 {
 		t.Fatalf("directory mode = %v, %v", info, err)

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // SSHConfig is the ssh mode's knobs (rofi's -ssh-* family).

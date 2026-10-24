@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // captureRetry spaces out attempts to reopen a capture whose source

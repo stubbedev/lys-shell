@@ -7,9 +7,9 @@ package layering
 import (
 	"log"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // For is the stack layer a surface configured with layer takes, with

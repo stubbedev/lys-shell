@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 type fakeLayer struct{ closed bool }

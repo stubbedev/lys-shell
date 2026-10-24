@@ -1,0 +1,6 @@
+Lock the session via lys-shell's lock screen
+
+Usage: lys-shell lock
+
+Options:
+  -h, --help  Print help

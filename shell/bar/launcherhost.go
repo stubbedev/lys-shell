@@ -4,18 +4,18 @@ import (
 	"log"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/launcheripc"
-	engine "github.com/stubbedev/wayle/service/launcher"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/shell/launcher"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/launcher"
 )
 
 // startLauncher serves the launcher socket from the shell, as the Rust
-// shell's launcher service does: `wayle launcher` sessions open the
+// shell's launcher service does: `lys-shell launcher` sessions open the
 // surface on the UI loop, which reads the live config on every session
 // (so a reload reaches the next one). The returned stop closes the
 // socket.

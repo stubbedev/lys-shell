@@ -1,4 +1,4 @@
-### Wayle Configuration - Mango Workspaces Module
+### lys-shell Configuration - Mango Workspaces Module
 
 ## Mango Workspaces Module Configuration
 

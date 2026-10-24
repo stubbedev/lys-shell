@@ -3,9 +3,9 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestAnchorsForEachLocation(t *testing.T) {

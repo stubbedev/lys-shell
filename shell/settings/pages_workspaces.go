@@ -1,6 +1,6 @@
 package settings
 
-import "github.com/stubbedev/wayle/config"
+import "github.com/stubbedev/lys-shell/config"
 
 // The workspace module pages (pages/modules/*_workspaces).
 

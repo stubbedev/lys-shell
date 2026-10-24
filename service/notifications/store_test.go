@@ -10,7 +10,7 @@ import (
 
 func openTestStore(t *testing.T) (*Store, string) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "wayle", "notifications.db")
+	path := filepath.Join(t.TempDir(), "lys-shell", "notifications.db")
 	st, err := OpenStore(path)
 	if err != nil {
 		t.Fatal(err)

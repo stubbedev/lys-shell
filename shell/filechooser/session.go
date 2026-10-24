@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/mime"
 )
 
 // session is one open request's state, free of widgets: where it is,

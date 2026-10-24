@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
-	"github.com/stubbedev/wayle/service/pulse/pulsetest"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 )
 
 func playback(index, sinkIndex uint32) native.StreamInfo {

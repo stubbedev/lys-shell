@@ -1,4 +1,4 @@
-// Package portal is the xdg-desktop-portal client side wayle needs: the
+// Package portal is the xdg-desktop-portal client side lys-shell needs: the
 // Request/Response handshake and the ScreenCast session the recorder
 // captures through (wayle-recorder portal.rs, which uses ashpd).
 package portal
@@ -38,7 +38,7 @@ var ErrCancelled = errors.New("portal: request cancelled")
 func token() string {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
-	return "wayle_" + hex.EncodeToString(b[:])
+	return "lys_shell_" + hex.EncodeToString(b[:])
 }
 
 // requestPath is where the portal will put the Request object for a

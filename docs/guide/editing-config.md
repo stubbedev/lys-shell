@@ -4,11 +4,11 @@ title: Editing config
 
 # Editing config
 
-Wayle reads configuration from `~/.config/wayle/config.toml` or `~/.config/wayle/config.yaml`. All fields have defaults, so the config file may be empty; declare only the fields that should override a default.
+lys-shell reads configuration from `~/.config/lys-shell/config.toml` or `~/.config/lys-shell/config.yaml`. All fields have defaults, so the config file may be empty; declare only the fields that should override a default.
 
-The `wayle config` CLI and the settings GUI write to `~/.config/wayle/runtime.toml` rather than `config.toml`. For each field, Wayle uses the first value defined among these sources:
+The `lys-shell config` CLI and the settings GUI write to `~/.config/lys-shell/runtime.toml` rather than `config.toml`. For each field, lys-shell uses the first value defined among these sources:
 
-1. `runtime.toml` - overrides written by `wayle config` or the settings GUI.
+1. `runtime.toml` - overrides written by `lys-shell config` or the settings GUI.
 2. `config.toml` - values declared by hand.
 3. The built-in default.
 
@@ -26,7 +26,7 @@ Every supported key is documented in the [config reference](/config/).
 
 ## TOML or YAML
 
-Both formats are accepted and map to the same fields. When more than one exists, Wayle prefers `config.yaml`, then `config.yml`, then `config.toml`. A fresh install creates `config.toml`; to switch to YAML, just write a `config.yaml`. The minimal override above is equivalent to:
+Both formats are accepted and map to the same fields. When more than one exists, lys-shell prefers `config.yaml`, then `config.yml`, then `config.toml`. A fresh install creates `config.toml`; to switch to YAML, just write a `config.yaml`. The minimal override above is equivalent to:
 
 ```yaml
 bar:
@@ -67,34 +67,34 @@ Paths are resolved relative to the importing file's directory; the `.toml` exten
 
 ## Editor setup
 
-On startup, Wayle writes a JSON Schema for the configuration to `~/.config/wayle/schema.json`. Any TOML language server with JSON Schema support can use this file for completion, hover documentation, and validation. The schema is generated from the installed binary and matches the version of Wayle on disk.
+On startup, lys-shell writes a JSON Schema for the configuration to `~/.config/lys-shell/schema.json`. Any TOML language server with JSON Schema support can use this file for completion, hover documentation, and validation. The schema is generated from the installed binary and matches the version of lys-shell on disk.
 
-[Tombi](https://tombi-toml.github.io/tombi/) is one such server. The Tombi extension is available in the VS Code marketplace; the `tombi` LSP binary runs under Neovim, Helix, and Zed. Configure the server to associate `~/.config/wayle/schema.json` with `config.toml`.
+[Tombi](https://tombi-toml.github.io/tombi/) is one such server. The Tombi extension is available in the VS Code marketplace; the `tombi` LSP binary runs under Neovim, Helix, and Zed. Configure the server to associate `~/.config/lys-shell/schema.json` with `config.toml`.
 
-The same schema is published in the repository at [`schema/wayle-config.schema.json`](https://github.com/stubbedev/wayle/blob/master/schema/wayle-config.schema.json) and works for YAML too. Add a modeline at the top of `config.yaml` so any `yaml-language-server` gives completion and validation:
+The same schema is published in the repository at [`schema/lys-shell-config.schema.json`](https://github.com/stubbedev/lys-shell/blob/master/schema/lys-shell-config.schema.json) and works for YAML too. Add a modeline at the top of `config.yaml` so any `yaml-language-server` gives completion and validation:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/stubbedev/wayle/master/schema/wayle-config.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/stubbedev/lys-shell/master/schema/lys-shell-config.schema.json
 ```
 
-You can regenerate the schema for the exact version you run with `wayle config schema --stdout`.
+You can regenerate the schema for the exact version you run with `lys-shell config schema --stdout`.
 
 ## Live reload
 
-Wayle watches the configuration directory. Changes to `config.toml` trigger an in-process reload; a shell restart is not required. Invalid configuration is rejected, the previous valid state is retained, and parse or validation errors are recorded in the log.
+lys-shell watches the configuration directory. Changes to `config.toml` trigger an in-process reload; a shell restart is not required. Invalid configuration is rejected, the previous valid state is retained, and parse or validation errors are recorded in the log.
 
 ## Editing from the CLI
 
-The `wayle config` subcommand reads and writes individual fields by dotted path:
+The `lys-shell config` subcommand reads and writes individual fields by dotted path:
 
 ```bash
-wayle config get bar.scale
-wayle config set modules.clock.format "%H:%M"
-wayle config reset modules.clock.format
+lys-shell config get bar.scale
+lys-shell config set modules.clock.format "%H:%M"
+lys-shell config reset modules.clock.format
 ```
 
-`set` writes to `~/.config/wayle/runtime.toml`; `config.toml` is never modified by the CLI or GUI Settings dialog. `reset` removes the runtime override for the given path, reverting the field to the value declared in `config.toml` or to the built-in default.
+`set` writes to `~/.config/lys-shell/runtime.toml`; `config.toml` is never modified by the CLI or GUI Settings dialog. `reset` removes the runtime override for the given path, reverting the field to the value declared in `config.toml` or to the built-in default.
 
 ## Printing the default configuration
 
-`wayle config default --stdout` prints every key with its default value to standard output. Without `--stdout`, the command writes `config.toml.example` to the configuration directory; `config.toml` is not modified. `wayle config schema --stdout` prints the JSON Schema in the same manner.
+`lys-shell config default --stdout` prints every key with its default value to standard output. Without `--stdout`, the command writes `config.toml.example` to the configuration directory; `config.toml` is not modified. `lys-shell config schema --stdout` prints the JSON Schema in the same manner.

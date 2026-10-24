@@ -1,9 +1,9 @@
 package osd
 
 import (
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // iconPx is the icons' size before the stylesheet's -gtk-icon-size.

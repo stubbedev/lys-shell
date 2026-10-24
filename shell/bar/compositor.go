@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/stubbedev/wayle/service/mango"
-	"github.com/stubbedev/wayle/service/niri"
-	"github.com/stubbedev/wayle/service/sway"
+	"github.com/stubbedev/lys-shell/service/mango"
+	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/sway"
 )
 
 // compositor is compositor.rs's Compositor: the session's compositor

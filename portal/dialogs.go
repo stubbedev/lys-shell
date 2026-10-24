@@ -9,12 +9,12 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // The interfaces whose whole job is one of the shell's native dialogs
-// (com.wayle.PortalDialogs1): Access, Account, AppChooser and
+// (dev.stubbe.lys.PortalDialogs1): Access, Account, AppChooser and
 // DynamicLauncher. No xdg-desktop-portal-gtk.
 
 // dialogs carries the D-Bus methods of all four; their names do not

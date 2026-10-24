@@ -11,8 +11,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // fakeClip is the data-control device: the selection it holds, and the

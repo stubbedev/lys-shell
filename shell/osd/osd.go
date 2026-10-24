@@ -1,6 +1,6 @@
-// Package osd is the on-screen display (wayle-shell osd/): one layer
+// Package osd is the on-screen display (lys-shell osd/): one layer
 // surface on the configured monitor flashing volume, microphone,
-// brightness, and lock-key events and the toasts `wayle toast` pushes,
+// brightness, and lock-key events and the toasts `lys-shell toast` pushes,
 // styled by the stylesheet's .osd rules and dismissed after
 // osd.duration.
 package osd
@@ -9,15 +9,15 @@ import (
 	"log"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/widgetipc"
-	"github.com/stubbedev/wayle/shell/layering"
-	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/widgetipc"
+	"github.com/stubbedev/lys-shell/shell/layering"
+	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // readyDelay is the start-up quiet period: the services report their
@@ -86,7 +86,7 @@ func New(d Deps, cfg *config.Config) *Osd {
 // Show flashes ev (show_event).
 func (o *Osd) Show(ev Event) { o.d.Invoke(func() { o.show(ev) }) }
 
-// ShowToast flashes a `wayle toast` request (handle_show_toast).
+// ShowToast flashes a `lys-shell toast` request (handle_show_toast).
 func (o *Osd) ShowToast(req widgetipc.ToastRequest) {
 	o.d.Invoke(func() { o.show(toastEvent(req, o.cfg.Osd)) })
 }
@@ -177,7 +177,7 @@ func (o *Osd) place() bool {
 		Anchor:    anchor,
 		Margin:    margin,
 		Keyboard:  app.KeyboardNone,
-		Namespace: "wayle-osd",
+		Namespace: "lys-shell-osd",
 		Root:      f.root(o.d.Sheet),
 	})
 	if err != nil {

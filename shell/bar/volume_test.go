@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // fakePulseSource is a scripted pulse.Source: dev is both the default

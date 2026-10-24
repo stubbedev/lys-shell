@@ -1,4 +1,4 @@
-### Wayle Configuration - Treeman Module
+### lys-shell Configuration - Treeman Module
 
 ## Treeman Module Configuration
 

@@ -1,4 +1,4 @@
-### Configuration Wayle - Paramètres du module de notification
+### Configuration lys-shell - Paramètres du module de notification
 
 ## Paramètres partagés
 

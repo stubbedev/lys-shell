@@ -5,8 +5,8 @@ import (
 	"log"
 	"slices"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/icons"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/icons"
 )
 
 // providerIconSlugs is install_provider_icons' selection: the Simple

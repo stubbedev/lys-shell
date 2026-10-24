@@ -1,8 +1,8 @@
 dist/
-wayle-design
+lys-shell-design
 
 # Temporary sandboxes
-Wayle
+lys-shell
 sandbox/
 
 result

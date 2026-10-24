@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/desktopentry"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 type fakeWindow struct{ closed bool }
@@ -104,7 +104,7 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 		}
 		// Unanchored and unsized: the compositor centers the
 		// content-sized dialog, as the GTK window is.
-		if c.Layer != app.LayerOverlay || c.Namespace != "wayle-portal-dialog" || c.Keyboard != app.KeyboardOnDemand ||
+		if c.Layer != app.LayerOverlay || c.Namespace != "lys-shell-portal-dialog" || c.Keyboard != app.KeyboardOnDemand ||
 			c.Anchor != 0 || c.Width != 0 || c.Height != 0 {
 			t.Errorf("surface = %+v", c)
 		}

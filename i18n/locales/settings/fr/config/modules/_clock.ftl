@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Horloge
+### Configuration lys-shell - Module Horloge
 
 ## Configuration du module Horloge
 

@@ -48,7 +48,7 @@ jobs:
                   draft: true
                   token: ${{ secrets.GITHUB_TOKEN }}
 
-    # The binaries are static Go (gelm dlopens what it needs), so one build
+    # The binaries are static Go (lys-ui dlopens what it needs), so one build
     # serves the archive and both packages. The nix closure is not built
     # here: the tag points at the release commit on master, whose push
     # already ran ci.yml's nix job and pushed that closure to xilo.
@@ -77,12 +77,12 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y --no-install-recommends debhelper desktop-file-utils dpkg-dev
                   VERSION="${GITHUB_REF_NAME#v}"
-                  ./scripts/ci/build-packages.sh "wayle-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" deb
+                  ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" deb
 
             - uses: actions/upload-artifact@v4
               with:
                   name: archive
-                  path: wayle-*-x86_64-linux.tar.gz
+                  path: lys-shell-*-x86_64-linux.tar.gz
 
             - name: Upload to release
               env:
@@ -90,7 +90,7 @@ jobs:
               run: |
                   VERSION="${GITHUB_REF_NAME#v}"
                   gh release upload "${{ github.ref_name }}" \
-                    "wayle-${VERSION}-x86_64-linux.tar.gz" \
+                    "lys-shell-${VERSION}-x86_64-linux.tar.gz" \
                     debbuild/DEBS/*/*.deb \
                     --clobber
 
@@ -111,7 +111,7 @@ jobs:
               run: |
                   dnf -y --setopt=install_weak_deps=False install rpm-build desktop-file-utils systemd-rpm-macros gh
                   VERSION="${GITHUB_REF_NAME#v}"
-                  ./scripts/ci/build-packages.sh "wayle-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" rpm
+                  ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" rpm
 
             - name: Upload to release
               env:

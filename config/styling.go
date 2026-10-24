@@ -34,11 +34,11 @@ func DefaultsStyling() StylingConfig {
 		Rounding:       RoundingSm,
 		Appearance:     AppearanceAuto,
 		ColorExtractor: DefaultsColorExtractor(),
-		Palette:        paletteConfigOf(wayleTheme),
+		Palette:        paletteConfigOf(lysShellTheme),
 	}
 }
 
-// ActivePalette is the palette the static (wayle) provider renders:
+// ActivePalette is the palette the static (lys-shell) provider renders:
 // the configured [styling.palette], or — when the appearance forces
 // light or dark and palette-base-theme names a built-in family with
 // that variant — the variant's palette (theme_provider.rs
@@ -129,10 +129,10 @@ func (a Appearance) ForcedLight() (light, ok bool) {
 // Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
 type ThemeProvider string
 
-// Theme providers; Wayle is the default.
+// Theme providers; lys-shell is the default.
 const (
-	// Static theming using Wayle's built-in palettes.
-	ThemeProviderWayle ThemeProvider = "wayle"
+	// Static theming using lys-shell's built-in palettes.
+	ThemeProviderLysShell ThemeProvider = "lys-shell"
 	// Dynamic theming via Matugen.
 	ThemeProviderMatugen ThemeProvider = "matugen"
 	// Dynamic theming via Pywal.
@@ -141,4 +141,4 @@ const (
 	ThemeProviderWallust ThemeProvider = "wallust"
 )
 
-var _ = registerEnum(ThemeProviderWayle, ThemeProviderMatugen, ThemeProviderPywal, ThemeProviderWallust)
+var _ = registerEnum(ThemeProviderLysShell, ThemeProviderMatugen, ThemeProviderPywal, ThemeProviderWallust)

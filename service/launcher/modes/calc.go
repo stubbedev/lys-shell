@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // Calc is the calculator mode (calc.rs): the query is an expression and

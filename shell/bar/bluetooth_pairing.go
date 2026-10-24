@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/service/bluetooth"
+	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
 
 // pairingVariant is PairingVariant: which prompt the card shows. The

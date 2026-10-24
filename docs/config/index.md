@@ -7,10 +7,10 @@ outline: [2]
 
 # Config reference
 
-Every config file lives at `~/.config/wayle/config.toml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.
+Every config file lives at `~/.config/lys-shell/config.toml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.
 
 ::: tip
-Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visualstudio.com/items?itemName=tombi-toml.tombi) for VSCode or the `tombi` LSP for Neovim, Helix, or Zed. The schema is written to `~/.config/wayle/schema.json` on startup.
+Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visualstudio.com/items?itemName=tombi-toml.tombi) for VSCode or the `tombi` LSP for Neovim, Helix, or Zed. The schema is written to `~/.config/lys-shell/schema.json` on startup.
 :::
 
 ## Top-level sections
@@ -21,14 +21,14 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
-| [`greeter`](/config/greeter) | Greeter (display manager): the pre-login screen `wayle-greeter` renders as |
+| [`greeter`](/config/greeter) | Greeter (display manager): the pre-login screen `lys-greeter` renders as |
 | [`launcher`](/config/launcher) | Application launcher / dmenu (rofi replacement). |
-| [`lock`](/config/lock) | Lock screen: a secure session lock rendered by Wayle via `ext-session-lock-v1`. |
+| [`lock`](/config/lock) | Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`. |
 | [`mail-account`](/config/mail-account) | One mail account in the `[modules.mail]` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
 | [`share-picker`](/config/share-picker) | Screen-share picker shown by xdg-desktop-portal when an app requests a |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
-| [`toast-preset`](/config/toast-preset) | A reusable toast preset, triggerable by id with `wayle toast --preset <id>`. |
+| [`toast-preset`](/config/toast-preset) | A reusable toast preset, triggerable by id with `lys-shell toast --preset <id>`. |
 | [`wallpaper`](/config/wallpaper) | Wallpaper rendering, cycling, and per-monitor overrides. |
 
 ## Bar modules

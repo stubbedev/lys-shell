@@ -6,4 +6,4 @@ dynamic_threshold = true
 saturation = 35
 
 [templates]
-colors = { template = "colors.json", target = "@ROOT@/cache/wayle/wallust-colors.json" }
+colors = { template = "colors.json", target = "@ROOT@/cache/lys-shell/wallust-colors.json" }

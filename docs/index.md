@@ -1,16 +1,16 @@
 ---
-title: Wayle
+title: lys-shell
 layout: doc
 ---
  
 <div style="display: flex; gap: 16px; align-items: center;">
-<img src="/wayle.svg" alt="Wayle settings GUI" style="float: left; width: 150px; height: auto;">
+<img src="/lys-shell.svg" alt="lys-shell settings GUI" style="float: left; width: 150px; height: auto;">
 </div>
 
 
-# Wayle Documentation
+# lys-shell Documentation
 
-A Wayland desktop shell with the bar, notifications, OSD, wallpaper, and device controls built in. Written in Go on [gelm](https://github.com/stubbedev/gelm), a pure-Go Wayland toolkit.
+A Wayland desktop shell with the bar, notifications, OSD, wallpaper, and device controls built in. Written in Go on [lys-ui](https://github.com/stubbedev/lys-ui), a pure-Go Wayland toolkit.
 
 
 <div style="display: flex; gap: 16px; align-items: center;">

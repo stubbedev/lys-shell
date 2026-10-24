@@ -7,7 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 // switchCapturer is a host whose failure the test flips while the

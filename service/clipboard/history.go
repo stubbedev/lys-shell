@@ -1,7 +1,7 @@
 // Package clipboard is the session's clipboard history
 // (crates/wayle-clipboard): what gets remembered, how it is labelled,
 // what is refused, and the service that keeps it current from the
-// Wayland selection over gelm's data-control device.
+// Wayland selection over lys-ui's data-control device.
 //
 // An entry is bytes plus the mime type they arrived under, not a
 // string. A file manager puts text/uri-list on the clipboard, an
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/stubbedev/wayle/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // DefaultCapacity is how many entries are kept before the oldest is
@@ -44,7 +44,7 @@ var TextMimes = []string{
 // URIListMime is the mime type a file manager copies files under.
 const URIListMime = "text/uri-list"
 
-// SensitiveMimes are the mime types wayle will not remember, however
+// SensitiveMimes are the mime types lys-shell will not remember, however
 // they are offered. Password managers mark a selection with one of
 // these to ask clipboard managers not to keep it, and honouring that
 // is the difference between a convenience and a credential leak.
@@ -54,7 +54,7 @@ var SensitiveMimes = []string{
 	"x-kde-passwordManagerHint",
 	"org.kde.passwordManagerHint",
 	"password",
-	"x-wayle-no-history",
+	"x-lys-shell-no-history",
 }
 
 // Kind is what a remembered selection is, for labelling and for

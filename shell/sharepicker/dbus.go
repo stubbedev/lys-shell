@@ -9,9 +9,9 @@ import (
 
 // D-Bus identity (wayle-ipc's share_picker proxy).
 const (
-	ServiceName = "com.wayle.SharePicker1"
-	ServicePath = "/com/wayle/SharePicker"
-	iface       = "com.wayle.SharePicker1"
+	ServiceName = "dev.stubbe.lys.SharePicker1"
+	ServicePath = "/dev/stubbe/lys/SharePicker"
+	iface       = "dev.stubbe.lys.SharePicker1"
 )
 
 // picker is what the daemon serves: the Picker, or a fake in tests.
@@ -19,7 +19,7 @@ type picker interface {
 	Pick(windowList string, allowToken, multiple bool) string
 }
 
-// Daemon exports a Picker as com.wayle.SharePicker1.
+// Daemon exports a Picker as dev.stubbe.lys.SharePicker1.
 type Daemon struct {
 	picker picker
 }
@@ -50,7 +50,7 @@ func (d *Daemon) Pick(windowList string, allowToken, multiple bool) (string, *db
 	return d.picker.Pick(windowList, allowToken, multiple), nil
 }
 
-// Client calls the daemon: the `wayle portal share-picker` stub XDPH
+// Client calls the daemon: the `lys-shell portal share-picker` stub XDPH
 // execs, and the portal backend's ScreenCast source selection.
 type Client struct {
 	obj dbus.BusObject

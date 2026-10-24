@@ -1,7 +1,7 @@
 // Package icons ports crates/wayle-icons: the icon sources (Tabler,
 // Simple Icons, Material, Lucide), fetching from their CDNs, the SVG to
 // GTK-symbolic transform, local imports, the on-disk icon directory,
-// format migration, and the config-driven sync behind `wayle icons`.
+// format migration, and the config-driven sync behind `lys-shell icons`.
 package icons
 
 import (

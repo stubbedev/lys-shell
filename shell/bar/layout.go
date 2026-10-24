@@ -1,9 +1,9 @@
-// Package bar renders wayle's bar: the layer surfaces docked to the
+// Package bar renders lys-shell's bar: the layer surfaces docked to the
 // screen edges, one per output that the config gives a layout.
 package bar
 
 import (
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // FindLayout resolves the layout for one output's connector name: the

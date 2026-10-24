@@ -151,7 +151,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		enc.pos += n
 	case reflect.Ptr:
 		if v.Type() == fileType {
-			// wayle patch: the file's descriptor, as a UnixFD.
+			// lys-shell patch: the file's descriptor, as a UnixFD.
 			enc.encode(reflect.ValueOf(UnixFD(v.Interface().(*os.File).Fd())), depth)
 			break
 		}
@@ -197,7 +197,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		case variantType:
 			variant := v.Interface().(Variant)
 			enc.encode(reflect.ValueOf(variant.sig), depth+1)
-			// wayle patch: by the signature (wayle_encode_as.go).
+			// lys-shell patch: by the signature (lys_shell_encode_as.go).
 			enc.encodeAs(reflect.ValueOf(variant.value), variant.sig.str, depth+1)
 		default:
 			for i := 0; i < v.Type().NumField(); i++ {

@@ -11,7 +11,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/stubbedev/wayle/internal/pipewire/pwtest"
+	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 )
 
 // solid fills every frame with one byte.
@@ -152,7 +152,7 @@ func link(t *testing.T) {
 	}
 	var out []byte
 	for range 100 {
-		out, err = exec.Command(bin, "wayle-screencast:output_0", "test-consumer:input_0").CombinedOutput()
+		out, err = exec.Command(bin, "lys-shell-screencast:output_0", "test-consumer:input_0").CombinedOutput()
 		if err == nil {
 			return
 		}

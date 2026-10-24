@@ -1,6 +1,0 @@
-Disable idle inhibition
-
-Usage: wayle idle off
-
-Options:
-  -h, --help  Print help

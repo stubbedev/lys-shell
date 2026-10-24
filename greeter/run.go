@@ -8,21 +8,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/logging"
-	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/logging"
+	"github.com/stubbedev/lys-shell/service/auth"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // Run shows the greeter until greetd starts a session (or the window
 // closes): one fullscreen window on the kiosk compositor.
 func Run(init Init) error {
-	// gelm draws the cursor client-side from the XCURSOR_* theme: set
+	// lys-ui draws the cursor client-side from the XCURSOR_* theme: set
 	// the resolved one before connecting.
 	ApplyCursor(ResolveCursor(init.Config.Greeter, DetectCursor(cursorHome(init.Users, init.LastUser), init.LastSession)))
 
@@ -75,8 +75,8 @@ func Run(init Init) error {
 		loadAvatar: decodeImage,
 	})
 	win, err = a.NewWindow(app.WindowConfig{
-		Title:      "wayle-greeter",
-		AppID:      "dev.stubbe.wayle.greeter",
+		Title:      "lys-greeter",
+		AppID:      "dev.stubbe.lys.greeter",
 		Root:       s.root,
 		Background: render.RGB(0, 0, 0),
 	})
@@ -87,10 +87,10 @@ func Run(init Init) error {
 	s.start()
 	a.Every(time.Second, s.refreshClock)
 	a.Every(250*time.Millisecond, func() { s.setCapsLock(sess.Mods()&app.ModCapsLock != 0) })
-	s.applyDebugOps(os.Getenv("WAYLE_GREETER_DEBUG"), func(d time.Duration, fn func()) {
+	s.applyDebugOps(os.Getenv("LYS_SHELL_GREETER_DEBUG"), func(d time.Duration, fn func()) {
 		time.AfterFunc(d, func() { a.Invoke(fn) })
 	})
-	log.Printf("wayle-greeter starting (%d sessions)", len(init.Sessions))
+	log.Printf("lys-greeter starting (%d sessions)", len(init.Sessions))
 	err = a.Run()
 	if err == app.ErrClosed { //nolint:errorlint // the loop's sentinel
 		return nil
@@ -112,7 +112,7 @@ func cursorHome(users []User, lastUser string) string {
 	return ""
 }
 
-// applyDebugOps is the dev-harness hook (WAYLE_GREETER_DEBUG):
+// applyDebugOps is the dev-harness hook (LYS_SHELL_GREETER_DEBUG):
 // comma-separated "popup" opens the session picker and
 // "login=<user>:<pass>" fills the form and submits, each a second in.
 // greetd never forwards the variable, so production never sees it.

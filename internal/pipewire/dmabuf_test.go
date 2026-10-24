@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/wayle/internal/pipewire/pwtest"
+	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 )
 
 func TestObjectHasFindsTheModifier(t *testing.T) {

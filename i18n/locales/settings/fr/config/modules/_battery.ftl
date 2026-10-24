@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Batterie
+### Configuration lys-shell - Module Batterie
 
 ## Configuration du module Batterie
 

@@ -46,7 +46,7 @@ func (s *Sender) Send(ctx context.Context, appName, summary, body, appIcon strin
 const sendTimeout = 5 * time.Second
 
 // iconHints carries appIcon in the image-path hint too, as libnotify
-// does: wayle's own popup reads that hint in its default icon mode.
+// does: lys-shell's own popup reads that hint in its default icon mode.
 func iconHints(appIcon string) map[string]dbus.Variant {
 	hints := map[string]dbus.Variant{}
 	if appIcon != "" {

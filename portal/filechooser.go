@@ -6,13 +6,13 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/shell/filechooser"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/shell/filechooser"
 )
 
 // fileChooser is org.freedesktop.impl.portal.FileChooser over the
-// shell's com.wayle.FileChooser1 (filechooser.rs): OpenFile, SaveFile,
+// shell's dev.stubbe.lys.FileChooser1 (filechooser.rs): OpenFile, SaveFile,
 // and SaveFiles as a folder pick.
 type fileChooser struct{ conn *dbus.Conn }
 

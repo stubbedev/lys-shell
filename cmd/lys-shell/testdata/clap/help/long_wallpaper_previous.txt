@@ -1,0 +1,6 @@
+Go back to previous wallpaper
+
+Usage: lys-shell wallpaper previous
+
+Options:
+  -h, --help  Print help

@@ -28,14 +28,14 @@ type Store struct {
 	db *sql.DB
 }
 
-// StorePath is persistence.rs's path: $HOME/.local/share/wayle/
+// StorePath is persistence.rs's path: $HOME/.local/share/lys-shell/
 // notifications.db (HOME, not XDG_DATA_HOME, as the Rust store does).
 func StorePath() (string, error) {
 	home := os.Getenv("HOME")
 	if home == "" {
 		return "", errors.New("notifications: HOME is not set")
 	}
-	return filepath.Join(home, ".local", "share", "wayle", "notifications.db"), nil
+	return filepath.Join(home, ".local", "share", "lys-shell", "notifications.db"), nil
 }
 
 // OpenStore opens (creating if needed) the history at path; tests pass
@@ -104,7 +104,7 @@ func (st *Store) Remove(id uint32) error {
 }
 
 // Load reads the history newest first (load_all). With removeExpired,
-// a notification whose positive timeout ran out while wayle was not
+// a notification whose positive timeout ran out while lys-shell was not
 // running stays out.
 func (st *Store) Load(now time.Time, removeExpired bool) ([]*Notification, error) {
 	rows, err := st.db.Query(`SELECT id, app_name, replaces_id, app_icon, summary, body,

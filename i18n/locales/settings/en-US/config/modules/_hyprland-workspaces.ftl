@@ -1,4 +1,4 @@
-### Wayle Configuration - Hyprland Workspaces Module
+### lys-shell Configuration - Hyprland Workspaces Module
 
 ## Hyprland Workspaces Module Configuration
 

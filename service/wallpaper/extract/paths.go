@@ -22,28 +22,28 @@ func xdgBase(env, fallback string) (string, error) {
 	return filepath.Join(home, fallback), nil
 }
 
-// wayleDir resolves $base/wayle and creates it when absent, as
+// lysShellDir resolves $base/lys-shell and creates it when absent, as
 // ConfigPaths::cache_dir / data_dir do.
-func wayleDir(env, fallback string) (string, error) {
+func lysShellDir(env, fallback string) (string, error) {
 	base, err := xdgBase(env, fallback)
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "wayle")
+	dir := filepath.Join(base, "lys-shell")
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // matches create_dir_all's default mode
 		return "", err
 	}
 	return dir, nil
 }
 
-// cacheDir is $XDG_CACHE_HOME/wayle (~/.cache/wayle), created on demand.
-func cacheDir() (string, error) { return wayleDir("XDG_CACHE_HOME", ".cache") }
+// cacheDir is $XDG_CACHE_HOME/lys-shell (~/.cache/lys-shell), created on demand.
+func cacheDir() (string, error) { return lysShellDir("XDG_CACHE_HOME", ".cache") }
 
-// dataDir is $XDG_DATA_HOME/wayle (~/.local/share/wayle), created on demand.
-func dataDir() (string, error) { return wayleDir("XDG_DATA_HOME", ".local/share") }
+// dataDir is $XDG_DATA_HOME/lys-shell (~/.local/share/lys-shell), created on demand.
+func dataDir() (string, error) { return lysShellDir("XDG_DATA_HOME", ".local/share") }
 
-// MatugenColorsPath is where wayle saves matugen's JSON output
-// ($XDG_CACHE_HOME/wayle/matugen-colors.json); the wayle cache dir is
+// MatugenColorsPath is where lys-shell saves matugen's JSON output
+// ($XDG_CACHE_HOME/lys-shell/matugen-colors.json); the lys-shell cache dir is
 // created on demand.
 func MatugenColorsPath() (string, error) {
 	dir, err := cacheDir()
@@ -54,7 +54,7 @@ func MatugenColorsPath() (string, error) {
 }
 
 // WallustColorsPath is the wallust template's target
-// ($XDG_CACHE_HOME/wayle/wallust-colors.json); the wayle cache dir is
+// ($XDG_CACHE_HOME/lys-shell/wallust-colors.json); the lys-shell cache dir is
 // created on demand.
 func WallustColorsPath() (string, error) {
 	dir, err := cacheDir()

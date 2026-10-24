@@ -3,8 +3,8 @@ package network
 import (
 	"context"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // SignIn is the agent's seam to the native openconnect sign-ins: an
@@ -17,7 +17,7 @@ type SignIn interface {
 	// ProfileFrom recognises an openconnect profile in NM's connection
 	// dictionary.
 	ProfileFrom(conn ConnectionDict, uuid, name string) (openconnect.Profile, bool)
-	// IsSupported reports whether wayle signs into this profile itself.
+	// IsSupported reports whether lys-shell signs into this profile itself.
 	IsSupported(p openconnect.Profile) bool
 	// Authenticate signs in and returns the plugin's secrets.
 	Authenticate(ctx context.Context, p openconnect.Profile, requestNew, unattended bool, prompter secrets.Prompter) (map[string]string, error)

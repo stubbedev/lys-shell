@@ -50,7 +50,7 @@ type Prompter interface {
 }
 
 // AuthenticationFailedError is a gateway refusing an authentication,
-// or asking for something wayle cannot do (VpnAuthenticationFailed).
+// or asking for something lys-shell cannot do (VpnAuthenticationFailed).
 // Its message is shown to the user verbatim; it discredits a cached
 // password.
 type AuthenticationFailedError struct{ Reason string }
@@ -65,7 +65,7 @@ type SignInIncompleteError struct{ Reason string }
 
 func (e *SignInIncompleteError) Error() string { return e.Reason }
 
-// ProtocolUnsupportedError is a gateway answering in a shape wayle's
+// ProtocolUnsupportedError is a gateway answering in a shape lys-shell's
 // sign-in does not recognise (VpnProtocolUnsupported): the agent turns
 // it into NM's NoSecrets so another agent or the plugin's own dialog
 // can try.

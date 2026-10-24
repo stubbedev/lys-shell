@@ -1,4 +1,4 @@
-### Wayle Configuration - Media Module
+### lys-shell Configuration - Media Module
 
 ## Media Module Configuration
 

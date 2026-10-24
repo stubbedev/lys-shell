@@ -128,7 +128,7 @@ func DefaultsNotification() NotificationConfig {
 		LabelMaxLength:     0,
 		ButtonBgColor:      mustColor("bg-surface-elevated"),
 		LeftClick:          ParseClickAction("dropdown:notification"),
-		RightClick:         ParseClickAction("wayle notify dnd"),
+		RightClick:         ParseClickAction("lys-shell notify dnd"),
 		MiddleClick:        ClickAction{},
 		ScrollUp:           ClickAction{},
 		ScrollDown:         ClickAction{},
@@ -241,9 +241,9 @@ type IconSource string
 
 // IconSource values.
 const (
-	// Use per-notification images when provided, otherwise Wayle's mapped icon.
+	// Use per-notification images when provided, otherwise lys-shell's mapped icon.
 	IconSourceAutomatic IconSource = "automatic"
-	// Always use Wayle's mapped icons regardless of what the app provides.
+	// Always use lys-shell's mapped icons regardless of what the app provides.
 	IconSourceMapped IconSource = "mapped"
 	// Use the full application icon chain, falling back to mapped if unavailable.
 	IconSourceApplication IconSource = "application"

@@ -1,0 +1,6 @@
+Capture a drag-selected region
+
+Usage: lys-shell screenshot region
+
+Options:
+  -h, --help  Print help

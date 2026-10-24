@@ -1,4 +1,4 @@
-### Configuration Wayle - Paramètres de la barre
+### Configuration lys-shell - Paramètres de la barre
 
 ## Configuration de la barre - Paramètres généraux
 

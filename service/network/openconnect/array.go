@@ -17,7 +17,7 @@ import (
 // There is no challenge round. A gateway that wants a second factor is
 // not something this dialect can describe, so it reads as a refusal.
 // Not verified against a real Array gateway; the likeliest thing to be
-// wrong is method, which wayle sends empty.
+// wrong is method, which lys-shell sends empty.
 
 // arrayCookiePrefix is the prefix of the cookie a successful sign-in
 // sets.

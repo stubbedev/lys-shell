@@ -1,4 +1,4 @@
-### Wayle Configuration - Network Module
+### lys-shell Configuration - Network Module
 
 ## Network Module Configuration
 

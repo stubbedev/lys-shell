@@ -1,0 +1,6 @@
+Stop wallpaper cycling
+
+Usage: lys-shell wallpaper stop
+
+Options:
+  -h, --help  Print help

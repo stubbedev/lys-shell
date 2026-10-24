@@ -4,11 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 type fakeWindow struct{ closed bool }
@@ -74,7 +74,7 @@ func TestShowMapsTheOverlay(t *testing.T) {
 	cfg := h.opened[0]
 	all := app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight
 	if cfg.Layer != app.LayerOverlay || cfg.Anchor != all || cfg.Keyboard != app.KeyboardExclusive ||
-		cfg.ExclusiveZone != -1 || cfg.Namespace != "wayle-power-menu" {
+		cfg.ExclusiveZone != -1 || cfg.Namespace != "lys-shell-power-menu" {
 		t.Errorf("layer config = %+v", cfg)
 	}
 	if got := len(h.buttons(t)); got != 5 {

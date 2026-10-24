@@ -9,9 +9,9 @@ import (
 
 // D-Bus identity (wayle-ipc's screenshot proxy).
 const (
-	ServiceName = "com.wayle.Screenshot1"
-	ServicePath = "/com/wayle/Screenshot"
-	iface       = "com.wayle.Screenshot1"
+	ServiceName = "dev.stubbe.lys.Screenshot1"
+	ServicePath = "/dev/stubbe/lys/Screenshot"
+	iface       = "dev.stubbe.lys.Screenshot1"
 )
 
 // capturer is what the daemon serves: the Host, or a fake in tests.
@@ -20,7 +20,7 @@ type capturer interface {
 	PickColor() (r, g, b float64, err error)
 }
 
-// Daemon exports a Host as com.wayle.Screenshot1.
+// Daemon exports a Host as dev.stubbe.lys.Screenshot1.
 type Daemon struct {
 	host capturer
 }
@@ -66,7 +66,7 @@ func (d *Daemon) PickColor() (float64, float64, float64, *dbus.Error) {
 	return r, g, b, nil
 }
 
-// Client calls the daemon: the `wayle screenshot` CLI, and the portal
+// Client calls the daemon: the `lys-shell screenshot` CLI, and the portal
 // backend's Screenshot and PickColor.
 type Client struct {
 	obj dbus.BusObject

@@ -1,6 +1,6 @@
 // Package eis is an EIS server: the receiving end of libei, which
 // remote-desktop clients prefer over the portal's Notify* D-Bus calls
-// (wayle-portal remotedesktop/eis.rs, which used reis). ConnectToEIS
+// (lys-shell-portal remotedesktop/eis.rs, which used reis). ConnectToEIS
 // hands the app one end of a socket pair; Serve speaks the ei protocol
 // on the other, advertises a seat with a pointer and a keyboard, and
 // replays what the client emulates onto a Handler.
@@ -296,7 +296,7 @@ func (s *server) addSeat() error {
 	if err := s.send(newMessage(s.connection, 1).u64(s.seat).u32(v)); err != nil {
 		return err
 	}
-	if err := s.send(newMessage(s.seat, 1).str("wayle")); err != nil {
+	if err := s.send(newMessage(s.seat, 1).str("lys-shell")); err != nil {
 		return err
 	}
 	for _, c := range capInterface {
@@ -325,12 +325,12 @@ func (s *server) bind(caps uint64) error {
 		if caps&capText != 0 {
 			ifaces = append(ifaces, ifText)
 		}
-		if err := s.addDevice("wayle-keyboard", ifaces); err != nil {
+		if err := s.addDevice("lys-shell-keyboard", ifaces); err != nil {
 			return err
 		}
 	}
 	if caps&(capPointer|capButton|capScroll) != 0 {
-		return s.addDevice("wayle-pointer", []string{ifPointer, ifButton, ifScroll})
+		return s.addDevice("lys-shell-pointer", []string{ifPointer, ifButton, ifScroll})
 	}
 	return nil
 }

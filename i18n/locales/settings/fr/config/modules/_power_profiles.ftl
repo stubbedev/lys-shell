@@ -1,4 +1,4 @@
-### Wayle Configuration - Module Profils d'alimentation
+### lys-shell Configuration - Module Profils d'alimentation
 
 ## Configuration du module Profils d'alimentation
 

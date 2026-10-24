@@ -3,9 +3,9 @@ package settings
 import (
 	"slices"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // actionChoice is ActionChoice: a labeled preset command.
@@ -147,14 +147,14 @@ func actionChoices(module string) []actionChoice {
 	switch module {
 	case "recorder":
 		return []actionChoice{
-			shell("Toggle recording", "wayle recorder toggle"), shell("Start recording", "wayle recorder start"),
-			shell("Stop recording", "wayle recorder stop"), shell("Pause recording", "wayle recorder pause"),
-			shell("Resume recording", "wayle recorder resume"), dropdown("Open recorder panel", "recorder"),
+			shell("Toggle recording", "lys-shell recorder toggle"), shell("Start recording", "lys-shell recorder start"),
+			shell("Stop recording", "lys-shell recorder stop"), shell("Pause recording", "lys-shell recorder pause"),
+			shell("Resume recording", "lys-shell recorder resume"), dropdown("Open recorder panel", "recorder"),
 		}
 	case "screenshot":
 		return []actionChoice{
-			shell("Capture region", "wayle screenshot region"), shell("Capture output", "wayle screenshot output"),
-			shell("Capture window", "wayle screenshot window"),
+			shell("Capture region", "lys-shell screenshot region"), shell("Capture output", "lys-shell screenshot output"),
+			shell("Capture window", "lys-shell screenshot window"),
 		}
 	case "battery":
 		return []actionChoice{dropdown("Open battery panel", "battery")}
@@ -171,11 +171,11 @@ func actionChoices(module string) []actionChoice {
 		return []actionChoice{dropdown("Open network panel", "network")}
 	case "media":
 		return []actionChoice{
-			shell("Play / pause", "wayle media play-pause"), shell("Next track", "wayle media next"),
-			shell("Previous track", "wayle media previous"), dropdown("Open media panel", "media"),
+			shell("Play / pause", "lys-shell media play-pause"), shell("Next track", "lys-shell media next"),
+			shell("Previous track", "lys-shell media previous"), dropdown("Open media panel", "media"),
 		}
 	case "notifications", "notification":
-		return []actionChoice{shell("Toggle do not disturb", "wayle notify dnd"), dropdown("Open notifications panel", "notification")}
+		return []actionChoice{shell("Toggle do not disturb", "lys-shell notify dnd"), dropdown("Open notifications panel", "notification")}
 	case "mail":
 		return []actionChoice{dropdown("Open mail panel", "mail")}
 	case "weather":
@@ -196,18 +196,18 @@ func actionChoices(module string) []actionChoice {
 		return []actionChoice{shell("Open power menu", ":menu")}
 	case "idle-inhibit":
 		return []actionChoice{
-			shell("Toggle idle inhibit", "wayle idle toggle"),
-			shell("Toggle idle inhibit (indefinite)", "wayle idle toggle --indefinite"),
+			shell("Toggle idle inhibit", "lys-shell idle toggle"),
+			shell("Toggle idle inhibit (indefinite)", "lys-shell idle toggle --indefinite"),
 		}
 	case "volume":
 		return []actionChoice{
-			shell("Toggle output mute", "wayle audio output-mute"), shell("Volume up (+5%)", "wayle audio output-volume +5"),
-			shell("Volume down (-5%)", "wayle audio output-volume -5"), dropdown("Open audio panel", "audio"),
+			shell("Toggle output mute", "lys-shell audio output-mute"), shell("Volume up (+5%)", "lys-shell audio output-volume +5"),
+			shell("Volume down (-5%)", "lys-shell audio output-volume -5"), dropdown("Open audio panel", "audio"),
 		}
 	case "microphone":
 		return []actionChoice{
-			shell("Toggle input mute", "wayle audio input-mute"), shell("Mic volume up (+5%)", "wayle audio input-volume +5"),
-			shell("Mic volume down (-5%)", "wayle audio input-volume -5"), dropdown("Open audio panel", "audio"),
+			shell("Toggle input mute", "lys-shell audio input-mute"), shell("Mic volume up (+5%)", "lys-shell audio input-volume +5"),
+			shell("Mic volume down (-5%)", "lys-shell audio input-volume -5"), dropdown("Open audio panel", "audio"),
 		}
 	case "cava":
 		return []actionChoice{dropdown("Open audio panel", "audio")}

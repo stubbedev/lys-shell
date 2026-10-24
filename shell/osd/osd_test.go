@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/widgetipc"
-	"github.com/stubbedev/wayle/service/brightness"
-	"github.com/stubbedev/wayle/service/keytoggles"
-	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/widgetipc"
+	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/keytoggles"
+	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeWindow records what the OSD asks of its surface.
@@ -101,8 +101,8 @@ func TestQuietPeriodDropsEvents(t *testing.T) {
 		t.Fatalf("%d surfaces after the quiet period, want 1", len(h.opened))
 	}
 	lc := h.opened[0].cfg
-	if lc.Namespace != "wayle-osd" || lc.Keyboard != app.KeyboardNone || lc.Output != h.outputs[0] {
-		t.Errorf("surface %+v, want wayle-osd on the primary without keyboard", lc)
+	if lc.Namespace != "lys-shell-osd" || lc.Keyboard != app.KeyboardNone || lc.Output != h.outputs[0] {
+		t.Errorf("surface %+v, want lys-shell-osd on the primary without keyboard", lc)
 	}
 	if lc.Width != 0 || lc.Height != 0 {
 		t.Errorf("surface sized %dx%d, want content-sized", lc.Width, lc.Height)

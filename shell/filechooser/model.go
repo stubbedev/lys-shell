@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/glob"
-	"github.com/stubbedev/wayle/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/mime"
 )
 
 // Mode is what the chooser is doing.

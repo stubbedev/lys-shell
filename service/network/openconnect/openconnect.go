@@ -8,7 +8,7 @@
 // spawning the plugin's own nm-openconnect-auth-dialog, which drives
 // libopenconnect through the whole sign-in.
 //
-// wayle authenticates itself instead. For GlobalProtect that is a form
+// lys-shell authenticates itself instead. For GlobalProtect that is a form
 // POST and, when the gateway asks, a second one carrying the 2FA
 // answer; for AnyConnect it is an XML exchange in which the gateway
 // describes the form it wants filled in; Fortinet, Array and the
@@ -33,30 +33,30 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // ServiceType is the NM service name of the openconnect plugin.
 const ServiceType = "org.freedesktop.NetworkManager.openconnect"
 
-// The profile's vpn.data keys wayle adds of its own; the plugin has no
+// The profile's vpn.data keys lys-shell adds of its own; the plugin has no
 // notion of any of them.
 const (
-	// UsernameKey is where wayle keeps the sign-in username. The
-	// plugin's auth dialog asks every time; wayle stores it in the
+	// UsernameKey is where lys-shell keeps the sign-in username. The
+	// plugin's auth dialog asks every time; lys-shell stores it in the
 	// profile, where it is a setting the user can see and edit rather
 	// than hidden state.
-	UsernameKey = "wayle-username"
+	UsernameKey = "lys-shell-username"
 	// SSOKey records that this profile wants the browser sign-in
 	// ("yes" or "true"). openconnect's own switch for this is a
 	// command-line flag, not a profile setting.
-	SSOKey = "wayle-sso"
+	SSOKey = "lys-shell-sso"
 	// SignInKey lets a profile ask for the plugin's own auth dialog
-	// instead of wayle's sign-in: "plugin" opts out; anything else is the
-	// default, which is wayle. The escape hatch for a gateway wayle reads
+	// instead of lys-shell's sign-in: "plugin" opts out; anything else is the
+	// default, which is lys-shell. The escape hatch for a gateway lys-shell reads
 	// wrong — above all one of the web-login protocols, whose pages are
 	// per-deployment markup.
-	SignInKey = "wayle-signin"
+	SignInKey = "lys-shell-signin"
 )
 
 const (
@@ -100,7 +100,7 @@ type signIn struct {
 	rememberPassword string
 }
 
-// Profile is the openconnect settings wayle needs out of an NM profile.
+// Profile is the openconnect settings lys-shell needs out of an NM profile.
 type Profile struct {
 	UUID     string
 	Name     string
@@ -113,7 +113,7 @@ type Profile struct {
 	// gateway.
 	SSO bool
 	// PluginSignIn is whether this profile asked to be signed in by the
-	// plugin's own auth dialog rather than by wayle.
+	// plugin's own auth dialog rather than by lys-shell.
 	PluginSignIn bool
 }
 
@@ -173,16 +173,16 @@ var Protocols = []Protocol{
 	{"f5", "F5 BIG-IP"},
 }
 
-// nativeProtocols are the protocols wayle signs into itself.
+// nativeProtocols are the protocols lys-shell signs into itself.
 var nativeProtocols = []string{"gp", "anyconnect", "fortinet", "array", "nc", "pulse", "f5"}
 
-// SignsInNatively reports whether wayle signs into this protocol itself,
+// SignsInNatively reports whether lys-shell signs into this protocol itself,
 // rather than leaving it to the plugin's own auth dialog. The form asks
 // this at configuration time, so the answer arrives while the protocol
 // is being picked rather than as a failure on the first connect.
 func SignsInNatively(protocol string) bool { return slices.Contains(nativeProtocols, protocol) }
 
-// IsSupported reports whether wayle can produce this profile's secrets
+// IsSupported reports whether lys-shell can produce this profile's secrets
 // natively.
 func IsSupported(p Profile) bool {
 	return SignsInNatively(p.Protocol) && p.Gateway != "" && !p.PluginSignIn

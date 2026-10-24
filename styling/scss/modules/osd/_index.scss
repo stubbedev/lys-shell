@@ -63,7 +63,7 @@ progressbar.osd-bar {
     border: 1px solid var(--border-default);
 }
 
-// Semantic toast variants, applied via `wayle toast --class <name>` or a
+// Semantic toast variants, applied via `lys-shell toast --class <name>` or a
 // preset's `class`. Each tints the surface, icon, label, and progress fill
 // with its status color and adds a left accent stripe.
 @mixin toast-variant($accent) {

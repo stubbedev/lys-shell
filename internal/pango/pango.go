@@ -1,8 +1,8 @@
 // Package pango reads Pango markup - what rofi rows, drun's display
 // format, and script messages are written in - and translates it into
-// gelm's rich-label subset. Weight, style, and hex foreground colors
+// lys-ui's rich-label subset. Weight, style, and hex foreground colors
 // carry over; size, underline, fonts, and the other Pango attributes
-// parse and render as plain text, since gelm's labels have no run
+// parse and render as plain text, since lys-ui's labels have no run
 // sizes or decorations.
 package pango
 
@@ -18,7 +18,7 @@ type frame struct {
 	close string
 }
 
-// Translate converts Pango markup into gelm markup (b, i, u, s, span
+// Translate converts Pango markup into lys-ui markup (b, i, u, s, span
 // color). It reports false for markup Pango itself would reject: a
 // stray or mismatched tag, an unknown element, a broken entity.
 func Translate(markup string) (string, bool) {
@@ -45,8 +45,8 @@ func Escape(text string) string {
 	return r.Replace(text)
 }
 
-// escapeGelm writes text in gelm's allowlisted entities.
-func escapeGelm(out *strings.Builder, text string) {
+// escapeLysUI writes text in lys-ui's allowlisted entities.
+func escapeLysUI(out *strings.Builder, text string) {
 	for _, r := range text {
 		switch r {
 		case '&':
@@ -120,7 +120,7 @@ func walk(src string, out *strings.Builder, rich bool) bool {
 			}
 			i += end + 1
 			if rich {
-				escapeGelm(out, string(r))
+				escapeLysUI(out, string(r))
 			} else {
 				out.WriteRune(r)
 			}
@@ -128,7 +128,7 @@ func walk(src string, out *strings.Builder, rich bool) bool {
 			r, size := utf8.DecodeRuneInString(src[i:])
 			i += size
 			if rich {
-				escapeGelm(out, string(r))
+				escapeLysUI(out, string(r))
 			} else {
 				out.WriteRune(r)
 			}
@@ -166,7 +166,7 @@ func entity(body string) (rune, bool) {
 	return rune(v), true
 }
 
-// translateTag returns the gelm open and close for a Pango element.
+// translateTag returns the lys-ui open and close for a Pango element.
 func translateTag(name, attrs string) (string, string, bool) {
 	switch name {
 	case "b":
@@ -182,7 +182,7 @@ func translateTag(name, attrs string) (string, string, bool) {
 		return spanTag(attrs)
 	}
 	// markup, big, small, sub, sup, tt: the text stays, the styling has
-	// no gelm counterpart.
+	// no lys-ui counterpart.
 	return "", "", strings.TrimSpace(attrs) == ""
 }
 

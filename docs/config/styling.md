@@ -23,7 +23,7 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `theme-provider` | [`ThemeProvider`](/config/types#theme-provider) | `"wayle"` | Theme provider (wayle, matugen, pywal, wallust). |
+| `theme-provider` | [`ThemeProvider`](/config/types#theme-provider) | `"lys-shell"` | Theme provider (lys-shell, matugen, pywal, wallust). |
 
 ## Matugen
 
@@ -67,7 +67,7 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 scale = 1.0099999904632568
 rounding = "sm"
 appearance = "auto"
-theme-provider = "wayle"
+theme-provider = "lys-shell"
 theming-monitor = ""
 matugen-scheme = "tonal-spot"
 matugen-contrast = 0.0

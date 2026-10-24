@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/jinja"
-	"github.com/stubbedev/wayle/service/sysinfo"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
 
 // pad2 is Rust's "{:02.0}" of an f32: whole number, zero-padded to two.

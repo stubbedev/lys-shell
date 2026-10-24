@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/internal/desktopnotify"
-	"github.com/stubbedev/wayle/internal/icons"
-	"github.com/stubbedev/wayle/service/mail"
+	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/internal/icons"
+	"github.com/stubbedev/lys-shell/service/mail"
 )
 
 // startMail builds and runs the shared mail service, as the Rust

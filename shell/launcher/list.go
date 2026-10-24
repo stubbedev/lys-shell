@@ -1,8 +1,8 @@
 package launcher
 
 import (
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // rowPx is the fixed row height the list is sized and laid out with
@@ -13,7 +13,7 @@ const rowPx = 40
 // viewport exist as widgets, so a ten-thousand-row dmenu costs a
 // viewport's worth. It owns the selection and the scroll offset; the
 // row widgets are the surface's (factory), styled by CSS classes. It is
-// a widget of its own rather than a gelm List because the launcher
+// a widget of its own rather than a lys-ui List because the launcher
 // binds every pointer button, click count, and wheel direction itself.
 type resultList struct {
 	widget.Base

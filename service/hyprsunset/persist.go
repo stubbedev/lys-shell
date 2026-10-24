@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// overrideFile is the record's name inside the wayle state dir.
+// overrideFile is the record's name inside the lys-shell state dir.
 const overrideFile = "hyprsunset-override"
 
 // overrideMaxAge discards records old enough to span a whole day/night
@@ -44,7 +44,7 @@ func ClearOverride(dir string) {
 // LoadOverride reads the record; false when absent, malformed, or
 // stale.
 func LoadOverride(dir string, now time.Time) (Override, bool) {
-	body, err := os.ReadFile(filepath.Join(dir, overrideFile)) //nolint:gosec // wayle's own state dir
+	body, err := os.ReadFile(filepath.Join(dir, overrideFile)) //nolint:gosec // lys-shell's own state dir
 	if err != nil {
 		return Override{}, false
 	}

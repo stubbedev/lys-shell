@@ -11,7 +11,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 // interactive calls a (u, a{sv}) method.
@@ -218,7 +218,7 @@ func TestSecretIsStablePerApp(t *testing.T) {
 	if _, other := r.retrieveSecret(t, "org.other"); bytes.Equal(first, other) {
 		t.Error("two apps share a secret")
 	}
-	path := filepath.Join(data, "wayle/portal/secrets/org.app")
+	path := filepath.Join(data, "lys-shell/portal/secrets/org.app")
 	if st, err := os.Stat(path); err != nil || st.Mode().Perm() != 0o600 {
 		t.Errorf("stored secret mode = %v, %v", st, err)
 	}

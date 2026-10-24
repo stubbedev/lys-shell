@@ -9,7 +9,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // secretLen is the master secret's length, as the reference backends.
@@ -18,7 +18,7 @@ const secretLen = 64
 // secret is org.freedesktop.impl.portal.Secret (secret.rs): a stable
 // per-app master secret libsecret derives the app's keyring key from,
 // generated on first use and kept at
-// $XDG_DATA_HOME/wayle/portal/secrets/<app_id> (0600). It must never
+// $XDG_DATA_HOME/lys-shell/portal/secrets/<app_id> (0600). It must never
 // change, or the keyring becomes undecryptable.
 type secret struct{}
 
@@ -80,7 +80,7 @@ func secretPath(appID string) (string, error) {
 		}
 		base = filepath.Join(home, ".local/share")
 	}
-	return filepath.Join(base, "wayle/portal/secrets", sanitizeAppID(appID)), nil
+	return filepath.Join(base, "lys-shell/portal/secrets", sanitizeAppID(appID)), nil
 }
 
 // sanitizeAppID maps an app id to one safe path component: anything

@@ -7,13 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // This file brings tunnels back after a suspend (vpn/resume.rs).
 //
 // NetworkManager tears a VPN down when the machine sleeps (unless its
-// profile is persistent, as the openconnect profiles wayle makes are)
+// profile is persistent, as the openconnect profiles lys-shell makes are)
 // and brings none back on wake: a VPN is never autoconnected. So the
 // tunnels up on the way down are recorded and re-activated once the
 // network is back, through restore: the agent hands NM whatever it has

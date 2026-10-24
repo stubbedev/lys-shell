@@ -1,6 +1,6 @@
 // Package sharepicker is the screencast source picker
-// (crates/wayle-shell/src/shell/share_picker) the portal pops over
-// com.wayle.SharePicker1: a layer surface with Windows, Outputs, and
+// (crates/lys-shell/src/shell/share_picker) the portal pops over
+// dev.stubbe.lys.SharePicker1: a layer surface with Windows, Outputs, and
 // Region pages. A card or region confirms at once in single-select
 // mode; in multi-select mode cards toggle into a pending set the Share
 // button confirms. The reply is the XDPH selection suffix -
@@ -16,17 +16,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/capture"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/sharepreview"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
-	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/shell/widgets"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // escapeKeycode is the evdev code of Escape.
@@ -57,7 +57,7 @@ type Deps struct {
 }
 
 // Picker is the share picker component. Pick is its entry point; the
-// rest runs on the gelm loop goroutine.
+// rest runs on the lys-ui loop goroutine.
 type Picker struct {
 	app    *app.Application
 	d      Deps
@@ -148,7 +148,7 @@ func (p *Picker) mapSurface() error {
 		Layer:         app.LayerOverlay,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
-		Namespace:     "wayle-share-picker",
+		Namespace:     "lys-shell-share-picker",
 		Root:          p.root,
 		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 			if keycode == escapeKeycode {

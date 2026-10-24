@@ -1,4 +1,4 @@
 import DefaultTheme from 'vitepress/theme'
-import './wayle.css'
+import './lys-shell.css'
 
 export default DefaultTheme

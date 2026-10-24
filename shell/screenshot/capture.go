@@ -8,10 +8,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/wayle/service/sharepreview"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
 // The compositor-agnostic capture half of the host

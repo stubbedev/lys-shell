@@ -1,6 +1,0 @@
-Run the desktop shell in the foreground
-
-Usage: wayle shell
-
-Options:
-  -h, --help  Print help

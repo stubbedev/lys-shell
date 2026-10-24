@@ -1,12 +1,12 @@
-// Package lock is the secure lock screen (wayle-shell's shell/lock): an
+// Package lock is the secure lock screen (lys-shell's shell/lock): an
 // ext-session-lock surface per output, so the compositor blanks every
 // output, routes input only here, and keeps the session locked if the
 // shell dies. The password is verified by a PAM conversation on a
 // worker goroutine (service/auth), so the event loop is never stalled.
 //
 // Triggers: logind's Lock and Unlock signals (loginctl lock-session,
-// idle daemons), the com.wayle.Shell1 Lock method (`wayle lock`,
-// wayle-lock), lock-on-start for autologin sessions, and the LockedHint
+// idle daemons), the dev.stubbe.lys.Shell1 Lock method (`lys-shell lock`,
+// lys-lock), lock-on-start for autologin sessions, and the LockedHint
 // restart recovery. The screen reports its state back with
 // SetLockedHint.
 package lock
@@ -17,15 +17,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/credential"
-	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/auth"
+	"github.com/stubbedev/lys-shell/shell/credential"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // blackout is the surface's clear color under the background, opaque
@@ -33,7 +33,7 @@ import (
 var blackout = render.RGB(0, 0, 0)
 
 // locker is the session-lock surface the screen drives; appLocker
-// adapts gelm's, tests substitute a fake.
+// adapts lys-ui's, tests substitute a fake.
 type locker interface {
 	// Available reports ext-session-lock-v1 support.
 	Available() bool
@@ -195,7 +195,7 @@ func (s *Screen) loadBackground() image.Image {
 	return img
 }
 
-// buildFace builds one output's surface; gelm calls it for every
+// buildFace builds one output's surface; lys-ui calls it for every
 // output at lock time and again for each output plugged in while
 // locked. A new face picks up the current state.
 func (s *Screen) buildFace(*app.Output) app.LockSurface {

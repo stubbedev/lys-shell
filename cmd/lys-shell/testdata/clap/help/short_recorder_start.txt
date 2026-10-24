@@ -1,0 +1,6 @@
+Start recording
+
+Usage: lys-shell recorder start
+
+Options:
+  -h, --help  Print help

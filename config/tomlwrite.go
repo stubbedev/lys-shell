@@ -9,7 +9,7 @@ import (
 )
 
 // TOML output byte-compatible with the Rust side's toml 1.x
-// serializer (toml/src/ser/document + toml_writer), so `wayle config
+// serializer (toml/src/ser/document + toml_writer), so `lys-shell config
 // default`, `get`, `set`, and runtime.toml read the same as before the
 // port: key-values before sub-tables, implicit parent tables elided,
 // arrays of tables as [[headers]], multi-line arrays in pretty mode,
@@ -127,7 +127,7 @@ func childKey(parent []string, key string) []string {
 }
 
 // TOMLInline renders a value on one line, like toml::Value's Display
-// (the form `wayle config set` echoes).
+// (the form `lys-shell config set` echoes).
 func TOMLInline(v any) string { return tomlValue(v, false) }
 
 // TOMLDocument renders a table (map[string]any, nested tables as

@@ -182,7 +182,7 @@ func TestReloadWarnsWhenRuntimeShadowsConfig(t *testing.T) {
 	}
 	var warned bool
 	for _, d := range diags() {
-		if d.Kind == DiagnosticWarning && d.Field("Field") == "bar.location" && d.Hint == "wayle config reset bar.location" {
+		if d.Kind == DiagnosticWarning && d.Field("Field") == "bar.location" && d.Hint == "lys-shell config reset bar.location" {
 			warned = true
 		}
 	}
@@ -264,32 +264,32 @@ func TestDebounceCeiling(t *testing.T) {
 
 func TestIsImmutableStore(t *testing.T) {
 	t.Setenv("NIX_STORE_DIR", "")
-	if !isImmutableStore("/nix/store") || isImmutableStore("/nix/store/abc-source") || isImmutableStore("/home/u/.config/wayle") {
+	if !isImmutableStore("/nix/store") || isImmutableStore("/nix/store/abc-source") || isImmutableStore("/home/u/.config/lys-shell") {
 		t.Error("only the store root is immutable")
 	}
 }
 
 func TestSecrets(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, ".env", "WAYLE_TEST_A=one\n# comment\nexport WAYLE_TEST_B=\"two words\"\n")
-	writeFile(t, dir, ".api.env", "WAYLE_TEST_C='three' \n")
-	writeFile(t, dir, "not.env", "WAYLE_TEST_D=four\n")
-	t.Setenv("WAYLE_TEST_A", "preset")
-	for _, k := range []string{"WAYLE_TEST_B", "WAYLE_TEST_C", "WAYLE_TEST_D"} {
+	writeFile(t, dir, ".env", "LYS_SHELL_TEST_A=one\n# comment\nexport LYS_SHELL_TEST_B=\"two words\"\n")
+	writeFile(t, dir, ".api.env", "LYS_SHELL_TEST_C='three' \n")
+	writeFile(t, dir, "not.env", "LYS_SHELL_TEST_D=four\n")
+	t.Setenv("LYS_SHELL_TEST_A", "preset")
+	for _, k := range []string{"LYS_SHELL_TEST_B", "LYS_SHELL_TEST_C", "LYS_SHELL_TEST_D"} {
 		_ = os.Unsetenv(k)
 		t.Cleanup(func() { _ = os.Unsetenv(k) })
 	}
 	LoadEnvFiles(dir)
-	if got, _ := ResolveSecret("$WAYLE_TEST_A"); got != "preset" {
+	if got, _ := ResolveSecret("$LYS_SHELL_TEST_A"); got != "preset" {
 		t.Errorf("an existing variable was overridden: %q", got)
 	}
-	if got, ok := ResolveSecret("$WAYLE_TEST_B"); !ok || got != "two words" {
+	if got, ok := ResolveSecret("$LYS_SHELL_TEST_B"); !ok || got != "two words" {
 		t.Errorf("B = %q %v", got, ok)
 	}
-	if got, ok := ResolveSecret("$WAYLE_TEST_C"); !ok || got != "three" {
+	if got, ok := ResolveSecret("$LYS_SHELL_TEST_C"); !ok || got != "three" {
 		t.Errorf("C = %q %v", got, ok)
 	}
-	if _, ok := ResolveSecret("$WAYLE_TEST_D"); ok {
+	if _, ok := ResolveSecret("$LYS_SHELL_TEST_D"); ok {
 		t.Error("not.env is not a secrets file")
 	}
 	if got, ok := ResolveSecret("literal"); !ok || got != "literal" {

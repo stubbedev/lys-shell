@@ -12,10 +12,10 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
-// allowedKeys are the [greeter] keys wayle-settings may push to the
+// allowedKeys are the [greeter] keys lys-settings may push to the
 // system config (apply.rs ALLOWED_KEYS).
 var allowedKeys = func() map[string]bool {
 	m := make(map[string]bool, len(config.GreeterApplyKeys))
@@ -25,8 +25,8 @@ var allowedKeys = func() map[string]bool {
 	return m
 }()
 
-// RunApplyConfig is `wayle-greeter apply-config [--config PATH]
-// <STAGED.toml>`, run as root through pkexec by wayle-settings: it
+// RunApplyConfig is `lys-greeter apply-config [--config PATH]
+// <STAGED.toml>`, run as root through pkexec by lys-settings: it
 // copies only the allowlisted [greeter] keys of the staged file into
 // runtime.toml beside the system config, never touching config.toml.
 // It returns the exit code and writes its messages to stdout/stderr.
@@ -50,7 +50,7 @@ func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if staged == "" {
-		return applyFail(stderr, "usage: wayle-greeter apply-config [--config PATH] <STAGED.toml>")
+		return applyFail(stderr, "usage: lys-greeter apply-config [--config PATH] <STAGED.toml>")
 	}
 	dest, err := applyConfig(staged, configPath, asPkexecCaller)
 	if err != nil {
@@ -61,7 +61,7 @@ func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 }
 
 func applyFail(stderr io.Writer, msg string) int {
-	_, _ = fmt.Fprintf(stderr, "wayle-greeter apply-config: %s\n", msg)
+	_, _ = fmt.Fprintf(stderr, "lys-greeter apply-config: %s\n", msg)
 	return 1
 }
 
@@ -69,7 +69,7 @@ func applyFail(stderr io.Writer, msg string) int {
 // returns its path. readAsCaller performs the one privileged read a
 // user controls - the background image - with the caller's rights.
 func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, error)) ([]byte, error)) (string, error) {
-	text, err := os.ReadFile(staged) //nolint:gosec // the staged file wayle-settings names
+	text, err := os.ReadFile(staged) //nolint:gosec // the staged file lys-settings names
 	if err != nil {
 		return "", fmt.Errorf("cannot read %s: %w", staged, err)
 	}
@@ -107,7 +107,7 @@ func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, er
 	if err := toml.NewEncoder(&out).Encode(root); err != nil {
 		return "", fmt.Errorf("serialize failed: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil { //nolint:gosec // /etc/wayle is world-readable config
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil { //nolint:gosec // /etc/lys-shell is world-readable config
 		return "", fmt.Errorf("cannot create %s: %w", filepath.Dir(dest), err)
 	}
 	if err := os.WriteFile(dest, out.Bytes(), 0o644); err != nil { //nolint:gosec // the greeter user reads it

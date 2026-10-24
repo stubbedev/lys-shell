@@ -1,4 +1,4 @@
-### Wayle Configuration - Weather Module
+### lys-shell Configuration - Weather Module
 
 ## Weather Module Configuration
 

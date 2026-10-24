@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/version"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
-// Helpers behind `wayle config` (wayle/src/cli/config), kept here so
+// Helpers behind `lys-shell config` (lys-shell/src/cli/config), kept here so
 // the output forms live next to the tree they format.
 
-// FormatGetValue renders a `wayle config get` result: scalars bare
+// FormatGetValue renders a `lys-shell config get` result: scalars bare
 // (strings unquoted, floats in Rust's f64 Display), tables as a pretty
 // TOML document, arrays inline.
 func FormatGetValue(v any) string {
@@ -40,7 +40,7 @@ func FormatGetValue(v any) string {
 	return TOMLInline(v)
 }
 
-// ParseCLIValue reads a `wayle config set` value as a TOML value
+// ParseCLIValue reads a `lys-shell config set` value as a TOML value
 // ("true", "5", "[1, 2]", "{ a = 1 }", "\"quoted\""); anything that is
 // not valid TOML is taken as a plain string.
 func ParseCLIValue(raw string) any {
@@ -55,7 +55,7 @@ func ParseCLIValue(raw string) any {
 }
 
 // DefaultTOML renders the default configuration as pretty TOML (the
-// `wayle config default` output).
+// `lys-shell config default` output).
 func DefaultTOML() string {
 	out, _ := tomlPretty(encode(Defaults()))
 	return out
@@ -94,7 +94,7 @@ func EnsureSchemaCurrent(dir string) error {
 	}
 	schemaPath := SchemaPath(dir)
 	existing, err := os.ReadFile(schemaPath) //nolint:gosec // schema.json in the config dir
-	if err != nil || !strings.Contains(string(existing), "wayle-config-"+version.Version) {
+	if err != nil || !strings.Contains(string(existing), "lys-shell-config-"+version.Version) {
 		if err := os.WriteFile(schemaPath, []byte(GenerateSchema()), 0o644); err != nil { //nolint:gosec // an editor schema, not secret
 			return err
 		}

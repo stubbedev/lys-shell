@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/service/launcher"
-	"github.com/stubbedev/wayle/service/niri"
-	"github.com/stubbedev/wayle/service/sway"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/sway"
 )
 
 // WindowField is a window field fed to the matcher

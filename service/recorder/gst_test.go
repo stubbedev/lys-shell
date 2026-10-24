@@ -24,7 +24,7 @@ func TestGstHasFactory(t *testing.T) {
 	if !g.hasFactory("videotestsrc") {
 		t.Error("videotestsrc not found")
 	}
-	if g.hasFactory("wayle-no-such-element") {
+	if g.hasFactory("lys-shell-no-such-element") {
 		t.Error("a missing element was found")
 	}
 }
@@ -89,11 +89,11 @@ func TestGstWatchReportsAnUnexpectedEnd(t *testing.T) {
 
 func TestGstLaunchFailures(t *testing.T) {
 	g := testGst(t)
-	if _, err := g.launchPipeline(`wayle-no-such-element ! fakesink`); err == nil || !strings.Contains(err.Error(), "wayle-no-such-element") {
+	if _, err := g.launchPipeline(`lys-shell-no-such-element ! fakesink`); err == nil || !strings.Contains(err.Error(), "lys-shell-no-such-element") {
 		t.Errorf("unknown element: %v", err)
 	}
 	// An unwritable path fails the state change with the sink's error.
-	_, err := g.launchPipeline(`videotestsrc ! fakesink name=a videotestsrc ! filesink location=/nonexistent/wayle/x.raw`)
+	_, err := g.launchPipeline(`videotestsrc ! fakesink name=a videotestsrc ! filesink location=/nonexistent/lys-shell/x.raw`)
 	if err == nil {
 		t.Fatal("unwritable output: want an error")
 	}

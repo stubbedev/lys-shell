@@ -7,7 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 type fakeDaemon struct {
@@ -38,14 +38,14 @@ func TestSendDeliversToTheDaemon(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	id, err := NewSender(bus.Conn(t)).Send(context.Background(), "Wayle", "Alice", "Lunch?", "ld-mail-symbolic")
+	id, err := NewSender(bus.Conn(t)).Send(context.Background(), "lys-shell", "Alice", "Lunch?", "ld-mail-symbolic")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if id != 7 {
 		t.Errorf("id = %d, want the daemon's 7", id)
 	}
-	want := []string{"Wayle", "ld-mail-symbolic", "Alice", "Lunch?"}
+	want := []string{"lys-shell", "ld-mail-symbolic", "Alice", "Lunch?"}
 	daemon.mu.Lock()
 	defer daemon.mu.Unlock()
 	for i, w := range want {
@@ -57,7 +57,7 @@ func TestSendDeliversToTheDaemon(t *testing.T) {
 
 func TestSendWithoutADaemonErrors(t *testing.T) {
 	bus := dbustest.Start(t)
-	if _, err := NewSender(bus.Conn(t)).Send(context.Background(), "Wayle", "s", "b", ""); err == nil {
+	if _, err := NewSender(bus.Conn(t)).Send(context.Background(), "lys-shell", "s", "b", ""); err == nil {
 		t.Error("no daemon on the bus: want an error")
 	}
 }
@@ -74,7 +74,7 @@ func TestSendCarriesTheIconAsImagePathOnlyWhenSet(t *testing.T) {
 	}
 	sender := NewSender(bus.Conn(t))
 	for _, icon := range []string{"/tmp/shot.png", ""} {
-		if _, err := sender.Send(context.Background(), "Wayle", "s", "b", icon); err != nil {
+		if _, err := sender.Send(context.Background(), "lys-shell", "s", "b", icon); err != nil {
 			t.Fatal(err)
 		}
 	}

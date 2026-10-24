@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 func withBg(t *testing.T, cfg *config.Config, hex string) *config.Config {

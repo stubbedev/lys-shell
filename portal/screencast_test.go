@@ -8,11 +8,11 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/shell/sharepicker"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// fakeSharePicker is the shell's com.wayle.SharePicker1.
+// fakeSharePicker is the shell's dev.stubbe.lys.SharePicker1.
 type fakeSharePicker struct {
 	reply dbustest.Var[string]
 	asked dbustest.Var[[]any]

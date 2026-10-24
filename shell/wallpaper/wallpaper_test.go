@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/wallpaper"
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 func solid(w, h int, c color.NRGBA) *image.NRGBA {
@@ -343,7 +343,7 @@ func TestBootstrapCyclingTakesPrecedence(t *testing.T) {
 		t.Errorf("DP-1 = %q, want the first cycle image", got)
 	}
 	// A cycling directory that fails falls back to the single image.
-	c.CyclingDirectory = "/nonexistent/wayle"
+	c.CyclingDirectory = "/nonexistent/lys-shell"
 	svc = newSvc("DP-1")
 	Bootstrap(svc, c)
 	if svc.CyclingConfig() != nil || svc.Monitors()["DP-1"].Wallpaper != filepath.Join(single, "single.png") {

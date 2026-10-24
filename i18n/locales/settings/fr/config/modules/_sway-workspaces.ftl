@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Espaces de travail Sway
+### Configuration lys-shell - Module Espaces de travail Sway
 
 ## Configuration du module Espaces de travail Sway
 

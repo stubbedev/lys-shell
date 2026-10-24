@@ -1,7 +1,7 @@
-// Package version is the wayle release version: what `wayle --version`
-// and the notification server report, and what nix/wayle.nix reads for
+// Package version is the lys-shell release version: what `lys-shell --version`
+// and the notification server report, and what nix/lys-shell.nix reads for
 // the package version. `just release-*` bumps it.
 package version
 
-// Version is the wayle release version.
+// Version is the lys-shell release version.
 const Version = "0.8.54"

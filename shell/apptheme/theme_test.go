@@ -7,15 +7,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 func isolateConfigDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	return filepath.Join(dir, "wayle")
+	return filepath.Join(dir, "lys-shell")
 }
 
 func TestBundleCarriesStaticThemeAndUserCSS(t *testing.T) {

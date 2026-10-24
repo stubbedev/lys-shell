@@ -25,8 +25,8 @@ func Lock(ctx context.Context, conn *dbus.Conn) error {
 	return conn.Object(ServiceName, ServicePath).CallWithContext(ctx, ServiceName+".Lock", 0).Err
 }
 
-// LockCommand is `wayle lock` and the wayle-lock binary
-// (wayle/src/cli/lock.rs): lock through the running shell and print
+// LockCommand is `lys-shell lock` and the lys-lock binary
+// (lys-shell/src/cli/lock.rs): lock through the running shell and print
 // "Session locked"; the errors carry the Rust CLI's wording. connErr is
 // the session-bus dial's error.
 func LockCommand(ctx context.Context, conn *dbus.Conn, connErr error, stdout io.Writer) error {

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // DebouncedSlider's cadences (wayle-widgets slider/debounced).
@@ -70,7 +70,7 @@ func (s *pressSlider) SetPressed(on bool) {
 	}
 }
 
-// NewDebouncedSlider builds a 0-100 slider (every wayle slider is a
+// NewDebouncedSlider builds a 0-100 slider (every lys-shell slider is a
 // percentage); with a font the
 // value label shows (format, default "{:.0}%"). invoke runs the
 // trailing commit on the loop.

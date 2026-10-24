@@ -1,9 +1,9 @@
 package portal
 
-import "github.com/stubbedev/wayle/internal/dbusx"
+import "github.com/stubbedev/lys-shell/internal/dbusx"
 
 // lockdownIface is the read-only policy the frontend consults before
-// allowing printing, saving, devices and so on. Wayle locks nothing
+// allowing printing, saving, devices and so on. lys-shell locks nothing
 // down: every property is false (lockdown.rs).
 func lockdownIface() dbusx.Interface {
 	props := dbusx.Getters{"version": func() any { return uint32(1) }}

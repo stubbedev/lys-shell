@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 func TestEachWebProtocolKnowsItsEndpointAndCookie(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 func TestWorstBucket(t *testing.T) {

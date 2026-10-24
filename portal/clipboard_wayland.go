@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 )
 
 // waylandClipboard is the seat's data-control device on the portal's

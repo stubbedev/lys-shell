@@ -15,7 +15,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/shlex"
+	"github.com/stubbedev/lys-shell/internal/shlex"
 )
 
 // App is one application desktop entry, the GDesktopAppInfo a gio

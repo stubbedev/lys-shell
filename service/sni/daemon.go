@@ -7,14 +7,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
-// Wayle's own interface over the tray, which `wayle systray` drives
+// lys-shell's own interface over the tray, which `lys-shell systray` drives
 // (wayle-systray/src/dbus).
 const (
-	DaemonName = "com.wayle.SystemTray1"
-	DaemonPath = dbus.ObjectPath("/com/wayle/SystemTray")
+	DaemonName = "dev.stubbe.lys.SystemTray1"
+	DaemonPath = dbus.ObjectPath("/dev/stubbe/lys/SystemTray")
 )
 
 // Activator is the primary activation the daemon forwards to an item.
@@ -22,7 +22,7 @@ type Activator interface {
 	Activate(ctx context.Context, it Item, x, y int32) error
 }
 
-// Daemon is the com.wayle.SystemTray1 object (SystemTrayDaemon).
+// Daemon is the dev.stubbe.lys.SystemTray1 object (SystemTrayDaemon).
 type Daemon struct {
 	store     *Store
 	activator Activator

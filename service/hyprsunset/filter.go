@@ -78,7 +78,7 @@ func parseNumeric(reply string) (int, bool) {
 	return int(math.Round(v)), true
 }
 
-// Filter owns the hyprsunset child wayle spawned. One per process, like
+// Filter owns the hyprsunset child lys-shell spawned. One per process, like
 // the Rust CHILD static: stopping signals exactly that child instead of
 // every hyprsunset on the system.
 type Filter struct {

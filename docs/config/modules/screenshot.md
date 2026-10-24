@@ -10,7 +10,7 @@ outline: [2, 3]
 Screenshot capture button.
 
 Click the bar button to capture a region, output, or window. Controllable
-from the CLI / RPC socket: `wayle screenshot region|output|window`.
+from the CLI / RPC socket: `lys-shell screenshot region|output|window`.
 
 Add it to your layout with `screenshot`:
 
@@ -49,9 +49,9 @@ right = ["screenshot"]
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `left-click` | [`ClickAction`](/config/types#click-action) | `"wayle screenshot region"` | Action on left click. Default captures a region. |
-| `right-click` | [`ClickAction`](/config/types#click-action) | `"wayle screenshot output"` | Action on right click. Default captures the focused output. |
-| `middle-click` | [`ClickAction`](/config/types#click-action) | `"wayle screenshot window"` | Action on middle click. Default captures the active window. |
+| `left-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell screenshot region"` | Action on left click. Default captures a region. |
+| `right-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell screenshot output"` | Action on right click. Default captures the focused output. |
+| `middle-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell screenshot window"` | Action on middle click. Default captures the active window. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
 
@@ -74,9 +74,9 @@ label-show = false
 label-color = "accent"
 label-max-length = 0
 button-bg-color = "bg-surface-elevated"
-left-click = "wayle screenshot region"
-right-click = "wayle screenshot output"
-middle-click = "wayle screenshot window"
+left-click = "lys-shell screenshot region"
+right-click = "lys-shell screenshot output"
+middle-click = "lys-shell screenshot window"
 scroll-up = ""
 scroll-down = ""
 ```

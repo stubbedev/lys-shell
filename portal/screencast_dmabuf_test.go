@@ -6,12 +6,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/stubbedev/gelm/capture"
-	"github.com/stubbedev/gelm/dmabuf"
+	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-ui/dmabuf"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/wayle/internal/gbm"
-	"github.com/stubbedev/wayle/internal/pipewire"
+	"github.com/stubbedev/lys-shell/internal/gbm"
+	"github.com/stubbedev/lys-shell/internal/pipewire"
 )
 
 // fakeGBM allocates memfds posing as buffer objects.

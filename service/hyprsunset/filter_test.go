@@ -12,7 +12,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/prop"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 // fakeSocket answers hyprsunset's two queries like the real daemon.
@@ -158,8 +158,8 @@ func TestQueryLocationOverGeoClue(t *testing.T) {
 		t.Errorf("location = %+v", loc)
 	}
 	// The client was configured before Start.
-	if id, _ := clientProps.Get(geoclueClient, "DesktopId"); id.Value() != "wayle" {
-		t.Errorf("DesktopId = %v, want wayle", id.Value())
+	if id, _ := clientProps.Get(geoclueClient, "DesktopId"); id.Value() != "lys-shell" {
+		t.Errorf("DesktopId = %v, want lys-shell", id.Value())
 	}
 	if lvl, _ := clientProps.Get(geoclueClient, "RequestedAccuracyLevel"); lvl.Value() != accuracyCity {
 		t.Errorf("accuracy = %v, want city", lvl.Value())

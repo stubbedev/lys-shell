@@ -21,7 +21,7 @@ On-screen display overlay for transient events like volume and brightness.
 | `margin` | [`Size`](/config/types#size) | `1` | Margin from screen edges: a multiplier of the default 150px (`1.0` = default) or absolute pixels (e.g. `"150px"`). |
 | `border` | bool | `true` | Show a border around the OSD. |
 | `layer` | [`Layer`](/config/types#layer) | `"overlay"` | Layer-shell layer the OSD is placed on. |
-| `presets` | array of [`ToastPreset`](/config/types#toast-preset) | `[]` | Reusable toast presets, each triggerable with `wayle toast --preset <id>`. |
+| `presets` | array of [`ToastPreset`](/config/types#toast-preset) | `[]` | Reusable toast presets, each triggerable with `lys-shell toast --preset <id>`. |
 
 ::: details More about `layer`
 

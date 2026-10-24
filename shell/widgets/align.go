@@ -3,10 +3,10 @@ package widgets
 import (
 	"fmt"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
-// aligner is a widget with GTK's halign and valign; every gelm widget,
+// aligner is a widget with GTK's halign and valign; every lys-ui widget,
 // and every type built on widget.Base, has them.
 type aligner interface {
 	SetHAlign(widget.Align)

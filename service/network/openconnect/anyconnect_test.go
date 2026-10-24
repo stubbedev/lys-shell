@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // acMainForm is a gateway's opening form, as an ASA writes it.
@@ -314,7 +314,7 @@ func TestAWrongAnyConnectPasswordIsTheGatewaysOwnRefusal(t *testing.T) {
 	stateHome(t)
 	prompter := &fakePrompter{answers: map[string]string{"username": fakeUser, "password": "wrong"}}
 	_, err := testAttempt(profileFor("mock-anyconnect", "anyconnect", g.addr), prompter).anyconnect()
-	// A refusal must not read as "wayle does not speak this protocol", or
+	// A refusal must not read as "lys-shell does not speak this protocol", or
 	// NM would quietly hand a wrong password to the next agent.
 	if !secrets.DiscreditsPassword(err) || !strings.Contains(err.Error(), "Login failed.") {
 		t.Errorf("err = %v", err)

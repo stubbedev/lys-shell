@@ -5,16 +5,16 @@ import (
 	"slices"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/network"
-	"github.com/stubbedev/wayle/service/shellipc"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/service/shellipc"
 )
 
-// barSet tracks each output's bar for `wayle panel hide|show|toggle`
+// barSet tracks each output's bar for `lys-shell panel hide|show|toggle`
 // (the Rust shell's BarMap plus the hidden_bars watcher) and config
-// reloads. gelm cannot unmap a layer surface, so hiding closes the
+// reloads. lys-ui cannot unmap a layer surface, so hiding closes the
 // bar's layer and showing builds a fresh one with open.
 type barSet struct {
 	open  func(*app.Output, config.BarLayout) (barLayer, error)
@@ -94,7 +94,7 @@ func (b *barSet) sync(name string, entry *barEntry) {
 }
 
 // serveShellIPC takes the application id (its quit action ends the
-// loop) and serves com.wayle.Shell1 over bars, with lock as its Lock hook. A shell already owning
+// loop) and serves dev.stubbe.lys.Shell1 over bars, with lock as its Lock hook. A shell already owning
 // the id is logged: the single-instance check runs before RunWith.
 func serveShellIPC(application *app.Application, bars *barSet, lock func() bool) func() {
 	conn, err := dbus.ConnectSessionBus()

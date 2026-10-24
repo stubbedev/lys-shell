@@ -1,4 +1,4 @@
-// Package printdialog is the shell's com.wayle.Print1 host (wayle-shell
+// Package printdialog is the shell's dev.stubbe.lys.Print1 host (lys-shell
 // services/print and shell/print): the print dialog and spooler behind
 // the portal backend's Print.
 package printdialog
@@ -9,14 +9,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // D-Bus identity (wayle-ipc print.rs).
 const (
-	ServiceName = "com.wayle.Print1"
-	ServicePath = dbus.ObjectPath("/com/wayle/Print")
-	iface       = "com.wayle.Print1"
+	ServiceName = "dev.stubbe.lys.Print1"
+	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/Print")
+	iface       = "dev.stubbe.lys.Print1"
 )
 
 // Setting is one flat print-setting key/value pair.
@@ -33,7 +33,7 @@ type Host interface {
 	Print(title string, document *os.File, token uint32) bool
 }
 
-// Daemon serves a Host as com.wayle.Print1.
+// Daemon serves a Host as dev.stubbe.lys.Print1.
 type Daemon struct{ host Host }
 
 // NewDaemon wraps the host for export.

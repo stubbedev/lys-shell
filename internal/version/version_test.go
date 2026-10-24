@@ -21,7 +21,7 @@ func TestVersionIsSemver(t *testing.T) {
 	}
 }
 
-// nix/wayle.nix reads the version off the line that starts with
+// nix/lys-shell.nix reads the version off the line that starts with
 // `const Version = "` and ends with its closing quote; the source must
 // keep that one line.
 func TestVersionLineIsWhatNixReads(t *testing.T) {

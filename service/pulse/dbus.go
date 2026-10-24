@@ -11,10 +11,10 @@ import (
 
 // D-Bus identity (crates/wayle-audio/src/dbus/mod.rs).
 const (
-	ServiceName = "com.wayle.Audio1"
-	ServicePath = "/com/wayle/Audio"
+	ServiceName = "dev.stubbe.lys.Audio1"
+	ServicePath = "/dev/stubbe/lys/Audio"
 	// Interface is the object's interface name.
-	Interface = "com.wayle.Audio1"
+	Interface = "dev.stubbe.lys.Audio1"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 )
 
 // Daemon serves the audio service on the session bus
-// (dbus/server.rs's AudioDaemon) for the `wayle audio` CLI and
+// (dbus/server.rs's AudioDaemon) for the `lys-shell audio` CLI and
 // scripts.
 type Daemon struct {
 	svc *Service
@@ -57,7 +57,7 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	return func() { _, _ = conn.ReleaseName(ServiceName) }, nil
 }
 
-// audioObject carries the com.wayle.Audio1 methods; godbus exports
+// audioObject carries the dev.stubbe.lys.Audio1 methods; godbus exports
 // every method returning *dbus.Error.
 type audioObject struct {
 	svc *Service

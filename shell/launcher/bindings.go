@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	engine "github.com/stubbedev/wayle/service/launcher"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // keyAction is a surface action a key can trigger (views.rs KeyAction).

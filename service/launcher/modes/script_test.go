@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 func TestScriptParsesHeadersAndRows(t *testing.T) {

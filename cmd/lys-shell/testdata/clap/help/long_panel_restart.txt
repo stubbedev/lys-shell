@@ -1,0 +1,6 @@
+Restart the panel daemon
+
+Usage: lys-shell panel restart
+
+Options:
+  -h, --help  Print help

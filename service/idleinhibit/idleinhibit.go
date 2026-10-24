@@ -1,6 +1,6 @@
 // Package idleinhibit is the shared idle-inhibit service: reactive
 // state (active, duration, remaining), the session-bus daemon the
-// `wayle idle` CLI drives, and the client half of that interface.
+// `lys-shell idle` CLI drives, and the client half of that interface.
 package idleinhibit
 
 import (
@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // D-Bus identity.
 const (
-	ServiceName = "com.wayle.IdleInhibit1"
-	ServicePath = "/com/wayle/IdleInhibit"
+	ServiceName = "dev.stubbe.lys.IdleInhibit1"
+	ServicePath = "/dev/stubbe/lys/IdleInhibit"
 )
 
 // State is the reactive state: whether inhibition runs, the stored

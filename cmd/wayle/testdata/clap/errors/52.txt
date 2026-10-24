@@ -1,9 +1,0 @@
-args: idle toggle -ii
-code: 2
---- stdout
---- stderr
-error: the argument '--indefinite' cannot be used multiple times
-
-Usage: wayle idle toggle [OPTIONS]
-
-For more information, try '--help'.

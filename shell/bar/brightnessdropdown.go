@@ -9,12 +9,12 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/brightness"
-	"github.com/stubbedev/wayle/shell/widgets"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // brightnessDeviceIcon is DEVICE_ICON.

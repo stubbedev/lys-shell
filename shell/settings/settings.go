@@ -9,20 +9,20 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/logging"
-	"github.com/stubbedev/wayle/internal/portal"
-	"github.com/stubbedev/wayle/shell/apptheme"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/logging"
+	"github.com/stubbedev/lys-shell/internal/portal"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 )
 
-// appID is the window's application id (com.wayle.settings, the
+// appID is the window's application id (dev.stubbe.lys.settings, the
 // desktop entry's name).
-const appID = "com.wayle.settings"
+const appID = "dev.stubbe.lys.settings"
 
 // Run loads the config and shows the settings window until it closes
 // (main.rs). A config that cannot load is an error: the window edits
@@ -99,7 +99,7 @@ func Run() error {
 	w.onResetAll = func() { confirmResetAll(application, win, k, theme) }
 
 	// A change from any source - a row, the reset buttons, the config
-	// file, another wayle - restyles the window and refreshes the page.
+	// file, another lys-shell - restyles the window and refreshes the page.
 	cancel := svc.Subscribe(func(_, next *config.Config) {
 		application.Invoke(func() {
 			theme.SetConfig(next)
@@ -143,7 +143,7 @@ func resetAllDialog(k *kit, content widget.Widget, background render.Color) app.
 	}
 }
 
-// claimInstance is the com.wayle.settings single-instance guard
+// claimInstance is the dev.stubbe.lys.settings single-instance guard
 // (set_application_id): the first launch is the primary, a later one
 // forwards its invocation and exits.
 // onRelaunch runs on the loop for each later launch.

@@ -12,8 +12,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 var fastResume = resumeTiming{
@@ -317,13 +317,13 @@ func TestAWireGuardProfileMadeHereIsItsUsersOwn(t *testing.T) {
 		"peer-endpoint":    "vpn.invalid:51820",
 		"peer-allowed-ips": "10.123.45.0/24",
 	}
-	must(t, fx.svc.VPN.Add(t.Context(), WireGuard, "wayle-test-wireguard", values))
+	must(t, fx.svc.VPN.Add(t.Context(), WireGuard, "lys-shell-test-wireguard", values))
 	added := fx.lastAdded(t)
 	if got := permissions(added); !slices.Equal(got, []string{"user:" + me + ":"}) {
 		t.Errorf("permissions = %v", got)
 	}
 	uuid := dictReader(added).str("connection", "uuid")
-	fx.waitRow(t, uuid, "the new profile in the list", func(r VPN) bool { return r.WireGuard && r.Name == "wayle-test-wireguard" })
+	fx.waitRow(t, uuid, "the new profile in the list", func(r VPN) bool { return r.WireGuard && r.Name == "lys-shell-test-wireguard" })
 	stored, err := fx.svc.VPN.SettingsOf(t.Context(), uuid)
 	must(t, err)
 	if KindOf(stored) != WireGuard || ReadProfileValues(stored)["interface"] != "wgtest0" {
@@ -339,8 +339,8 @@ func TestAWireGuardProfileMadeHereIsItsUsersOwn(t *testing.T) {
 func TestAnOpenconnectProfileIsSystemWideAndPersistent(t *testing.T) {
 	fx := startService(t, nil)
 	fx.svc.VPN.pluginDirs = nil
-	must(t, fx.svc.VPN.Add(t.Context(), openconnect.ServiceType, "wayle-test-openconnect", map[string]string{
-		"gateway": "vpn.invalid", "protocol": "gp", "wayle-username": "tester",
+	must(t, fx.svc.VPN.Add(t.Context(), openconnect.ServiceType, "lys-shell-test-openconnect", map[string]string{
+		"gateway": "vpn.invalid", "protocol": "gp", "lys-shell-username": "tester",
 	}))
 	added := fx.lastAdded(t)
 	if got := permissions(added); got != nil {
@@ -350,7 +350,7 @@ func TestAnOpenconnectProfileIsSystemWideAndPersistent(t *testing.T) {
 		t.Error("openconnect profile not persistent")
 	}
 	read := ReadProfileValues(added)
-	if read["wayle-username"] != "tester" || read["protocol"] != "gp" {
+	if read["lys-shell-username"] != "tester" || read["protocol"] != "gp" {
 		t.Errorf("read back = %v", read)
 	}
 }

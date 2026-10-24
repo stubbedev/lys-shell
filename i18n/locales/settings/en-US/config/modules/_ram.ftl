@@ -1,4 +1,4 @@
-### Wayle Configuration - RAM Module
+### lys-shell Configuration - RAM Module
 
 ## RAM Module Configuration
 

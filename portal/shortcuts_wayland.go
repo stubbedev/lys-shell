@@ -1,6 +1,6 @@
 package portal
 
-import "github.com/stubbedev/gelm/app"
+import "github.com/stubbedev/lys-ui/app"
 
 // waylandShortcuts registers on the compositor's
 // hyprland-global-shortcuts-v1 through the portal's Wayland loop.

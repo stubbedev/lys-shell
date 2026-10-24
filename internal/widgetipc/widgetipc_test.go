@@ -13,11 +13,11 @@ import (
 
 func TestSocketPathLookup(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
-	if got := SocketPath(); got != "/run/user/1000/wayle/widget.sock" {
+	if got := SocketPath(); got != "/run/user/1000/lys-shell/widget.sock" {
 		t.Errorf("runtime dir = %q", got)
 	}
 	os.Unsetenv("XDG_RUNTIME_DIR")
-	if got := SocketPath(); got != "/tmp/wayle-widget.sock" {
+	if got := SocketPath(); got != "/tmp/lys-shell-widget.sock" {
 		t.Errorf("fallback = %q", got)
 	}
 }
@@ -124,9 +124,9 @@ func TestServerRepliesLikeRust(t *testing.T) {
 func TestClientErrorsMatchRust(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", dir)
-	path := filepath.Join(dir, "wayle", "widget.sock")
+	path := filepath.Join(dir, "lys-shell", "widget.sock")
 	err := SendWidgetUpdate(context.Background(), "a", "b")
-	want := "cannot connect to wayle widget socket at " + path + ": No such file or directory (os error 2)"
+	want := "cannot connect to lys-shell widget socket at " + path + ": No such file or directory (os error 2)"
 	if err == nil || err.Error() != want {
 		t.Fatalf("no shell: %v\nwant %s", err, want)
 	}
@@ -158,7 +158,7 @@ func TestClientErrorsMatchRust(t *testing.T) {
 func TestListenReplacesStaleSocketAndRestrictsIt(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", dir)
-	path := filepath.Join(dir, "wayle", "widget.sock")
+	path := filepath.Join(dir, "lys-shell", "widget.sock")
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}

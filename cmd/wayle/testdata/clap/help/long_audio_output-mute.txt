@@ -1,6 +1,0 @@
-Toggle output mute state
-
-Usage: wayle audio output-mute
-
-Options:
-  -h, --help  Print help

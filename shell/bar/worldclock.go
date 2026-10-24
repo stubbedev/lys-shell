@@ -7,10 +7,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/internal/jinja"
-	"github.com/stubbedev/wayle/strftime"
+	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/strftime"
 )
 
 // worldClockRender is helpers.rs's format_world_clock: the format

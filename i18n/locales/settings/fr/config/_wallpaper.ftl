@@ -1,9 +1,9 @@
-### Configuration Wayle - Paramètres du fond d'écran
+### Configuration lys-shell - Paramètres du fond d'écran
 
 ## Moteur
 
 settings-wallpaper-engine-enabled = Moteur de fond d'écran
-    .description = Activer le moteur de fond d'écran intégré de Wayle (désactiver pour utiliser hyprpaper, swaybg, etc.)
+    .description = Activer le moteur de fond d'écran intégré de lys-shell (désactiver pour utiliser hyprpaper, swaybg, etc.)
 
 ## Transition
 

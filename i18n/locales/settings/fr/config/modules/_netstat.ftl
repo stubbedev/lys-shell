@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Statistiques réseau
+### Configuration lys-shell - Module Statistiques réseau
 
 ## Configuration du module Statistiques réseau
 

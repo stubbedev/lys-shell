@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"image"
 
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/wayle/internal/gbm"
-	"github.com/stubbedev/wayle/internal/pipewire"
+	"github.com/stubbedev/lys-shell/internal/gbm"
+	"github.com/stubbedev/lys-shell/internal/pipewire"
 )
 
 // defaultFPS is the advertised capture rate, clamped to the output's

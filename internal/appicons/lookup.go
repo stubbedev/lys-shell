@@ -3,7 +3,7 @@ package appicons
 import (
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/glob"
 )
 
 // Lookup is icons.rs lookup_app_icon: the first Default pattern that

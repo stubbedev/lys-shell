@@ -230,7 +230,7 @@ func (dec *decoder) decode(s string, depth int) any {
 		}
 		elem := typeFor(sig)
 		if sig == "h" && dec.fds != nil {
-			// wayle patch: with the message's fds at hand, decode's 'h' case
+			// lys-shell patch: with the message's fds at hand, decode's 'h' case
 			// yields UnixFD, which a []UnixFDIndex cannot hold; the append
 			// panicked and the whole body decoded empty.
 			elem = unixFDType
@@ -249,7 +249,7 @@ func (dec *decoder) decode(s string, depth int) any {
 		for dec.pos < spos+int(length) {
 			ev := reflect.ValueOf(dec.decode(s[1:], depth+1))
 			if ev.Type() != elem && sig == "h" {
-				// wayle patch: an index past the message's fds.
+				// lys-shell patch: an index past the message's fds.
 				panic(InvalidMessageError("invalid index for unix fd"))
 			}
 			v = reflect.Append(v, ev)

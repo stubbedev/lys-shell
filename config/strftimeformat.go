@@ -1,6 +1,6 @@
 package config
 
-import "github.com/stubbedev/wayle/strftime"
+import "github.com/stubbedev/lys-shell/strftime"
 
 // StrftimeFormat is a chrono strftime format string compiled at load,
 // so an unsupported specifier is a diagnostic for its field instead of

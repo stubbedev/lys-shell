@@ -1,0 +1,5 @@
+args: --version extra
+code: 0
+--- stdout
+lys-shell 0.8.54
+--- stderr

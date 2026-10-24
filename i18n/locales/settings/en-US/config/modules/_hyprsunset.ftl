@@ -1,4 +1,4 @@
-### Wayle Configuration - Hyprsunset Module
+### lys-shell Configuration - Hyprsunset Module
 
 ## Hyprsunset Module Configuration
 

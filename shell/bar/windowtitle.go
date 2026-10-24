@@ -5,16 +5,16 @@ import (
 	"log"
 	"strings"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/glob"
-	"github.com/stubbedev/wayle/internal/jinja"
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/service/mango"
-	"github.com/stubbedev/wayle/service/niri"
-	"github.com/stubbedev/wayle/service/sway"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/mango"
+	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/sway"
 )
 
 // windowTitleLabel is helpers.rs's format_label: the template over

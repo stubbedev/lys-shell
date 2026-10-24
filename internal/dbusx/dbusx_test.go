@@ -7,8 +7,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 type echo struct{}
@@ -18,9 +18,9 @@ func (echo) Echo(s string) (string, *dbus.Error) { return s, nil }
 func (echo) Fail() *dbus.Error { return dbusx.Failed("it broke") }
 
 const (
-	name  = "com.wayle.Test1"
-	iface = "com.wayle.Test1"
-	path  = dbus.ObjectPath("/com/wayle/Test")
+	name  = "dev.stubbe.lys.Test1"
+	iface = "dev.stubbe.lys.Test1"
+	path  = dbus.ObjectPath("/dev/stubbe/lys/Test")
 )
 
 func serve(t *testing.T, conn *dbus.Conn, count *dbustest.Var[uint32]) func() {
@@ -109,7 +109,7 @@ func TestExportServesSeveralInterfacesOnOnePath(t *testing.T) {
 	server, client := bus.Conn(t), bus.Conn(t)
 	unexport, err := dbusx.Export(server, path,
 		dbusx.Interface{Name: iface, Methods: echo{}, Properties: dbusx.Getters{"version": func() any { return uint32(2) }}},
-		dbusx.Interface{Name: "com.wayle.Other1", Methods: other{}, Properties: dbusx.Getters{"version": func() any { return uint32(1) }}},
+		dbusx.Interface{Name: "dev.stubbe.lys.Other1", Methods: other{}, Properties: dbusx.Getters{"version": func() any { return uint32(1) }}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -119,18 +119,18 @@ func TestExportServesSeveralInterfacesOnOnePath(t *testing.T) {
 	if err := obj.Call(iface+".Echo", 0, "hi").Store(&out); err != nil || out != "hi" {
 		t.Fatalf("Echo = %q, %v", out, err)
 	}
-	if err := obj.Call("com.wayle.Other1.Ping", 0).Store(&out); err != nil || out != "pong" {
+	if err := obj.Call("dev.stubbe.lys.Other1.Ping", 0).Store(&out); err != nil || out != "pong" {
 		t.Fatalf("Ping = %q, %v", out, err)
 	}
 	// One Properties object answers for each interface with its own values.
-	for name, want := range map[string]uint32{iface: 2, "com.wayle.Other1": 1} {
+	for name, want := range map[string]uint32{iface: 2, "dev.stubbe.lys.Other1": 1} {
 		v, err := obj.GetProperty(name + ".version")
 		if err != nil || v.Value() != want {
 			t.Errorf("%s.version = %v, %v; want %d", name, v, err, want)
 		}
 	}
 	var all map[string]dbus.Variant
-	err = obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, "com.wayle.Missing1").Store(&all)
+	err = obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, "dev.stubbe.lys.Missing1").Store(&all)
 	var de dbus.Error
 	if !errors.As(err, &de) || de.Name != dbusx.ErrUnknownIface {
 		t.Errorf("GetAll of an unexported interface = %v", err)
@@ -139,7 +139,7 @@ func TestExportServesSeveralInterfacesOnOnePath(t *testing.T) {
 	if err := obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{iface, "com.wayle.Other1"} {
+	for _, name := range []string{iface, "dev.stubbe.lys.Other1"} {
 		if !strings.Contains(xml, `<interface name="`+name+`">`) {
 			t.Errorf("introspection lacks %s:\n%s", name, xml)
 		}
@@ -147,7 +147,7 @@ func TestExportServesSeveralInterfacesOnOnePath(t *testing.T) {
 
 	// Unexporting removes every interface again.
 	unexport()
-	if err := obj.Call("com.wayle.Other1.Ping", 0).Err; err == nil {
+	if err := obj.Call("dev.stubbe.lys.Other1.Ping", 0).Err; err == nil {
 		t.Error("Ping still answers after unexport")
 	}
 	if _, err := obj.GetProperty(iface + ".version"); err == nil {

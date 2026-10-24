@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/service/upower"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestBatteryFormatters(t *testing.T) {
@@ -258,7 +258,7 @@ func TestBatteryHealthDotIsAClassedBoxTheCSSPaints(t *testing.T) {
 }
 
 // Every box Rust builds spacing-0 reports 0 — the cascade's margins
-// and border-spacing own the gaps, and gelm adds them to the
+// and border-spacing own the gaps, and lys-ui adds them to the
 // constructor spacing. valign Center rides along: the meta column and
 // the charge switch sit on their rows' middles.
 func TestBatterySectionsKeepRustsZeroSpacing(t *testing.T) {

@@ -1,7 +1,0 @@
-Output JSON Schema for the configuration (for editor intellisense)
-
-Usage: wayle config schema [OPTIONS]
-
-Options:
-      --stdout  Print to stdout instead of writing to config directory
-  -h, --help    Print help

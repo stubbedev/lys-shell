@@ -1,0 +1,6 @@
+Toggle recording on/off
+
+Usage: lys-shell recorder toggle
+
+Options:
+  -h, --help  Print help

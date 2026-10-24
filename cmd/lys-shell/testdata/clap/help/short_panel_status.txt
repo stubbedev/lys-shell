@@ -1,0 +1,6 @@
+Check panel status
+
+Usage: lys-shell panel status
+
+Options:
+  -h, --help  Print help

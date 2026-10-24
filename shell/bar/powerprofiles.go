@@ -6,10 +6,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/powerprofiles"
 )
 
 // powerProfilesLabel is helpers.rs's format_label: the only variable

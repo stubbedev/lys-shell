@@ -11,8 +11,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/openconnect/openconnecttest"
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/openconnect/openconnecttest"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // connection is an NM connection dictionary as GetSecrets hands it.
@@ -56,8 +56,8 @@ func TestAnotherPluginsProfileIsNotOurs(t *testing.T) {
 	}
 }
 
-func TestEveryProtocolWayleSignsIntoIsClaimed(t *testing.T) {
-	// A protocol wayle implements must be claimed, or the sign-in it has
+func TestEveryProtocolLysShellSignsIntoIsClaimed(t *testing.T) {
+	// A protocol lys-shell implements must be claimed, or the sign-in it has
 	// would never run — the web-login ones included.
 	for _, protocol := range []string{"gp", "anyconnect", "fortinet", "array", "nc", "pulse", "f5"} {
 		if p := mustProfile(t, map[string]string{"gateway": "vpn.example.com", "protocol": protocol}); !IsSupported(p) {
@@ -88,13 +88,13 @@ func TestTheProtocolPickerOffersEveryProtocolNativeFirst(t *testing.T) {
 }
 
 func TestAProfileCanHandItselfBackToThePluginsAuthDialog(t *testing.T) {
-	// The escape hatch for a gateway wayle reads wrong.
+	// The escape hatch for a gateway lys-shell reads wrong.
 	opted := mustProfile(t, map[string]string{"gateway": "vpn.example.com", "protocol": "f5", SignInKey: "plugin"})
 	if !opted.PluginSignIn || IsSupported(opted) {
 		t.Errorf("profile = %+v", opted)
 	}
-	// Any other value, and the absent key, mean the default: wayle.
-	for _, value := range []string{"wayle", "", "yes"} {
+	// Any other value, and the absent key, mean the default: lys-shell.
+	for _, value := range []string{"lys-shell", "", "yes"} {
 		normal := mustProfile(t, map[string]string{"gateway": "vpn.example.com", "protocol": "f5", SignInKey: value})
 		if normal.PluginSignIn || !IsSupported(normal) {
 			t.Errorf("%q opted out: %+v", value, normal)

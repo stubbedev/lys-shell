@@ -3,8 +3,8 @@ package bar
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // progressRing is ProgressRing: a DrawingArea-classed canvas whose

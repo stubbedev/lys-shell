@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // near absorbs the truncation of the raw conversion (0.4 reads back

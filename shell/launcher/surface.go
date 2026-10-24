@@ -7,16 +7,16 @@ import (
 	"slices"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/launcheripc"
-	"github.com/stubbedev/wayle/internal/pango"
-	engine "github.com/stubbedev/wayle/service/launcher"
-	"github.com/stubbedev/wayle/service/launcher/modes"
-	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	"github.com/stubbedev/lys-shell/internal/pango"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/modes"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // dumpDebounce is how long -dump waits for the matches to settle.
@@ -144,7 +144,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 	dialog := setup.ui.errorMessage != nil
 	if len(setup.modes) == 0 && !dialog {
 		log.Printf("launcher: no usable modes in session request")
-		// The one thing wayle's launcher calls a menu error: it was
+		// The one thing lys-shell's launcher calls a menu error: it was
 		// asked for a menu it cannot build.
 		s.d.FireHook(setup.ui.hooks.MenuError, engine.HookContext{Error: "no usable modes"})
 		sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
@@ -639,7 +639,7 @@ func (s *Surface) reveal(a *active) {
 		Height:        uint32(max(h, 1)),
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
-		Namespace:     "wayle-launcher",
+		Namespace:     "lys-shell-launcher",
 		Root:          a.views.root,
 		KeyCapture:    s.keyCaptured,
 		OnClosed: func() {
@@ -763,7 +763,7 @@ func (s *Surface) rebuildTabs(names []string, activeMode int) {
 	}
 }
 
-// messageMarkup is the message line's markup in gelm's dialect: the
+// messageMarkup is the message line's markup in lys-ui's dialect: the
 // Pango markup translated, its weights and colors kept; markup that
 // does not parse shows as the literal text, like a row's.
 func messageMarkup(markup string) string {

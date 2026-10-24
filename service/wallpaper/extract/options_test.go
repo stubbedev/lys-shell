@@ -3,7 +3,7 @@ package extract
 import (
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestParseToolAcceptsTheRustAliases(t *testing.T) {
@@ -16,8 +16,8 @@ func TestParseToolAcceptsTheRustAliases(t *testing.T) {
 			t.Errorf("ParseTool(%q) = %v, %v; want %v", in, got, err, want)
 		}
 	}
-	if _, err := ParseTool("wayle"); err == nil || err.Error() != "Invalid color extractor: wayle" {
-		t.Errorf("ParseTool(wayle) err = %v, want the Rust message", err)
+	if _, err := ParseTool("lys-shell"); err == nil || err.Error() != "Invalid color extractor: lys-shell" {
+		t.Errorf("ParseTool(lys-shell) err = %v, want the Rust message", err)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestWallustPaletteIsLight(t *testing.T) {
 func TestFromConfigPicksTheProvidersTool(t *testing.T) {
 	c := config.DefaultsColorExtractor()
 	if got := FromConfig(c).Tool; got != None {
-		t.Errorf("the wayle provider extracts with %s, want none", got)
+		t.Errorf("the lys-shell provider extracts with %s, want none", got)
 	}
 	c.ThemeProvider, c.WallustSaturation, c.PywalContrast = config.ThemeProviderWallust, 40, 7.5
 	ex := FromConfig(c)

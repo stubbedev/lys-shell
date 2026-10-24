@@ -1,11 +1,11 @@
 package filechooser
 
 import (
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
-// The chooser's layout pieces gelm has no widget for: a drag surface
+// The chooser's layout pieces lys-ui has no widget for: a drag surface
 // (the title bar that moves the sheet, the column and corner grips)
 // and the free placement of a child inside a larger rect (the sheet on
 // the full-screen overlay, the cards over the file list).

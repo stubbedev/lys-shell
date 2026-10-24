@@ -3,14 +3,14 @@ package i18n
 import (
 	"testing"
 
-	greeterlocales "github.com/stubbedev/wayle/i18n/locales/greeter"
+	greeterlocales "github.com/stubbedev/lys-shell/i18n/locales/greeter"
 )
 
 // TestGreeterDomain pins the greeter's file-per-locale domain: the
 // French file answers a French desktop, en-US the rest, and an
 // argument is isolated as fluent-bundle does.
 func TestGreeterDomain(t *testing.T) {
-	assets := NewFileAssets(greeterlocales.FS, "wayle-greeter.ftl")
+	assets := NewFileAssets(greeterlocales.FS, "lys-greeter.ftl")
 	available, err := assets.Available()
 	if err != nil || len(available) != 2 {
 		t.Fatalf("available = %v, %v; want en-US and fr", available, err)

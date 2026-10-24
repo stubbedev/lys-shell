@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
-	"github.com/stubbedev/wayle/service/pulse/pulsetest"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 )
 
 func speakers() native.DeviceInfo {
@@ -57,7 +57,7 @@ func TestDialNegotiatesVersionAndIntrospects(t *testing.T) {
 	srv.PutSink(speakers())
 	srv.PutSource(monitor())
 	srv.SetDefaults("alsa_output.speakers", "alsa_output.speakers.monitor")
-	c := dial(t, srv, native.Options{ClientName: "wayle-test"})
+	c := dial(t, srv, native.Options{ClientName: "lys-shell-test"})
 	if c.Version() != native.ProtocolVersion {
 		t.Errorf("negotiated %d, want min(35, %d)", c.Version(), native.ProtocolVersion)
 	}

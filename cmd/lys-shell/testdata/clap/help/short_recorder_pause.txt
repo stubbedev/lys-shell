@@ -1,0 +1,6 @@
+Pause the active recording
+
+Usage: lys-shell recorder pause
+
+Options:
+  -h, --help  Print help

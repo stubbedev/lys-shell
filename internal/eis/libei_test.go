@@ -11,7 +11,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/stubbedev/wayle/internal/clib"
+	"github.com/stubbedev/lys-shell/internal/clib"
 )
 
 // libei is the reference C client, the oracle the server is held to.
@@ -148,7 +148,7 @@ func drive(t *testing.T, l *libei, fd int, caps []uintptr, want int, timeout tim
 	t.Helper()
 	ei := l.newSender(nil)
 	defer l.unref(ei)
-	l.configureName(ei, "wayle-test")
+	l.configureName(ei, "lys-shell-test")
 	if rc := l.setupFd(ei, int32(fd)); rc != 0 {
 		t.Fatalf("ei_setup_backend_fd = %d", rc)
 	}

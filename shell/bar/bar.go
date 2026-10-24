@@ -9,38 +9,38 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/desktopnotify"
-	"github.com/stubbedev/wayle/internal/logging"
-	"github.com/stubbedev/wayle/internal/spawn"
-	"github.com/stubbedev/wayle/internal/widgetipc"
-	"github.com/stubbedev/wayle/service/bluetooth"
-	"github.com/stubbedev/wayle/service/brightness"
-	"github.com/stubbedev/wayle/service/clipboard"
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/service/idleinhibit"
-	"github.com/stubbedev/wayle/service/mpris"
-	"github.com/stubbedev/wayle/service/network"
-	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/service/recorder"
-	"github.com/stubbedev/wayle/service/sni"
-	"github.com/stubbedev/wayle/service/treeman"
-	"github.com/stubbedev/wayle/service/upower"
-	"github.com/stubbedev/wayle/service/weather"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/shell/layering"
-	"github.com/stubbedev/wayle/shell/lock"
-	"github.com/stubbedev/wayle/shell/osd"
-	"github.com/stubbedev/wayle/shell/popups"
-	"github.com/stubbedev/wayle/shell/powermenu"
-	wallpapershell "github.com/stubbedev/wayle/shell/wallpaper"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/internal/logging"
+	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/internal/widgetipc"
+	"github.com/stubbedev/lys-shell/service/bluetooth"
+	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/sni"
+	"github.com/stubbedev/lys-shell/service/treeman"
+	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/service/weather"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/layering"
+	"github.com/stubbedev/lys-shell/shell/lock"
+	"github.com/stubbedev/lys-shell/shell/osd"
+	"github.com/stubbedev/lys-shell/shell/popups"
+	"github.com/stubbedev/lys-shell/shell/powermenu"
+	wallpapershell "github.com/stubbedev/lys-shell/shell/wallpaper"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // Run loads the user config and shows the bar. A config failure logs
@@ -49,7 +49,7 @@ import (
 func Run() error {
 	svc, err := config.Open()
 	if err != nil {
-		log.Printf("wayle: config: %v", err)
+		log.Printf("lys-shell: config: %v", err)
 	}
 	if svc == nil {
 		return RunWith(config.Defaults())
@@ -59,7 +59,7 @@ func Run() error {
 }
 
 // RunWith shows the bar from a prepared config: one layer surface per
-// output the layout gives a visible bar, then the gelm loop.
+// output the layout gives a visible bar, then the lys-ui loop.
 func RunWith(cfg *config.Config) error { return run(cfg, nil) }
 
 // run shows the bar; with a service it follows config reloads.
@@ -72,11 +72,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 	defer sess.Close()
 
 	application := app.NewApplication(sess)
-	// gelm's Run serves the tree on the accessibility bus while the
-	// desktop asks for assistive technologies (GELM_A11Y=atspi forces it,
+	// lys-ui's Run serves the tree on the accessibility bus while the
+	// desktop asks for assistive technologies (LYS_UI_A11Y=atspi forces it,
 	// as GTK_A11Y does for the Rust shell).
 	// Surfaces animate their content through [animations] (shell/reveal),
-	// as the Rust shell's revealers do; gelm's own surface fades would
+	// as the Rust shell's revealers do; lys-ui's own surface fades would
 	// stack on top of them.
 	application.SetSurfaceMotion(false)
 	// current is the live config snapshot the long-lived services read.
@@ -175,7 +175,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		baseCtx.Media = media
 	}
 	// The idle-inhibit service owns its state here and serves it on the
-	// session bus for the `wayle idle` CLI.
+	// session bus for the `lys-shell idle` CLI.
 	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
 	baseCtx.IdleInhibit = inhibitState
 	baseCtx.Treeman = treeman.New("treeman")
@@ -276,7 +276,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
-	// openBar builds one output's bar layer; `wayle panel show` and a
+	// openBar builds one output's bar layer; `lys-shell panel show` and a
 	// reload reopen bars through it.
 	openBar := func(output *app.Output, layout config.BarLayout) (barLayer, error) {
 		ctx := rt.ctx
@@ -401,7 +401,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	osdCtx, stopOsd := context.WithCancel(context.Background())
 	defer stopOsd()
 	go osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness)
-	// The ext-session-lock screen and its triggers (logind, and `wayle
+	// The ext-session-lock screen and its triggers (logind, and `lys-shell
 	// lock` through Shell1).
 	lockScreen, stopLock := lock.Start(application, current.Load(), font, theme.Sheet)
 	defer stopLock()
@@ -409,9 +409,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 		application.Invoke(lockScreen.Lock)
 		return true
 	})()
-	// The launcher surface serves `wayle launcher` sessions.
+	// The launcher surface serves `lys-shell launcher` sessions.
 	defer startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font)()
-	// The widget socket carries out-of-process pushes (`wayle toast`).
+	// The widget socket carries out-of-process pushes (`lys-shell toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {
 		defer stop()
@@ -448,7 +448,7 @@ func connectAudio() *pulse.Service {
 // layerConfigFor measures the tree for one output (its logical size)
 // and maps it onto a layer surface config: anchors from the location,
 // margins from the insets, the exclusive zone from the bar's thickness
-// (the Rust shell's auto exclusive zone), and the wayle-bar namespace.
+// (the Rust shell's auto exclusive zone), and the lys-shell-bar namespace.
 // The compositor stretches only the doubly anchored axis, so a top or
 // bottom bar sizes its height and a side bar its width. The caller pins
 // the output.
@@ -472,7 +472,7 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 		Width:         width,
 		Height:        height,
 		ExclusiveZone: exclusiveZone(ctx.Config.Bar.Exclusive, thickness),
-		Namespace:     "wayle-bar-" + connector,
+		Namespace:     "lys-shell-bar-" + connector,
 		Root:          root,
 	}
 }
@@ -517,7 +517,7 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) wid
 // measureThickness resolves the bar's content-driven thickness: the
 // natural height of the tree at the output's width, or for a side bar
 // the natural width at the output's height. A priming arrange runs
-// first: gelm links a widget to its container at arrange time, and the
+// first: lys-ui links a widget to its container at arrange time, and the
 // bar stylesheet (attached to the root) reaches a widget only through
 // those links, so the unprimed tree would measure unstyled.
 func measureThickness(root widget.Widget, output widget.Size, vertical bool) int {
@@ -561,7 +561,7 @@ func logicalSize(output *app.Output) widget.Size {
 	return widget.Size{W: output.ModeW / scale, H: output.ModeH / scale}
 }
 
-// applyPalette seeds gelm's widget theme from the wayle palette, so
+// applyPalette seeds lys-ui's widget theme from the lys-shell palette, so
 // widgets the stylesheet does not target still match the tokens: the
 // mapping follows the token table (bg-base, bg-surface, fg-default,
 // fg-on-accent) with the border-default token for widget strokes.
@@ -590,7 +590,7 @@ type barRuntime struct {
 	palette *styling.Palette
 	// style is the dropdowns'; moduleStyle is the modules', which
 	// leave their normal ink to the stylesheet (--bar-btn-label-color):
-	// a zero fg is "unset" to gelm, so only a module's deliberate state
+	// a zero fg is "unset" to lys-ui, so only a module's deliberate state
 	// color stays programmatic.
 	style, moduleStyle barStyle
 	font               render.Font

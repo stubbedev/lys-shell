@@ -1,6 +1,6 @@
 # xdg-desktop-portal-hyprland integration
 
-Wayle ships the screencast picker that the Hyprland portal (XDPH) shows when an
+lys-shell ships the screencast picker that the Hyprland portal (XDPH) shows when an
 app asks to screen-share. The picker is the running shell's own layer-shell
 surface, driven over D-Bus — no separate process or repo.
 
@@ -8,36 +8,36 @@ surface, driven over D-Bus — no separate process or repo.
 
 XDPH execs its `custom_picker_binary` through `/bin/sh`, sets
 `XDPH_WINDOW_SHARING_LIST`, and reads the chosen source from the binary's
-stdout. Point it at the `wayle portal share-picker` subcommand:
+stdout. Point it at the `lys-shell portal share-picker` subcommand:
 
 `~/.config/hypr/xdph.conf`:
 
 ```ini
 screencopy {
-  custom_picker_binary = wayle portal share-picker
+  custom_picker_binary = lys-shell portal share-picker
 }
 ```
 
-Use an absolute path if `wayle` is not on XDPH's `PATH` (it usually is not under
+Use an absolute path if `lys-shell` is not on XDPH's `PATH` (it usually is not under
 systemd):
 
 ```ini
 screencopy {
-  custom_picker_binary = /run/current-system/sw/bin/wayle portal share-picker
+  custom_picker_binary = /run/current-system/sw/bin/lys-shell portal share-picker
 }
 ```
 
 The stub forwards the request to the running shell over
-`com.wayle.SharePicker1` (the shell registers it at startup), the shell pops up
+`dev.stubbe.lys.SharePicker1` (the shell registers it at startup), the shell pops up
 the picker surface, and the selection is printed back as the
 `[SELECTION].../...` line XDPH expects. Pass `--allow-token` to pre-check the
 restore-token box:
 
 ```ini
-custom_picker_binary = wayle portal share-picker --allow-token
+custom_picker_binary = lys-shell portal share-picker --allow-token
 ```
 
-The shell must be running (`wayle shell`) for the picker to appear; otherwise
+The shell must be running (`lys-shell shell`) for the picker to appear; otherwise
 the stub exits with an error and XDPH falls back to its own behaviour.
 
 ## Removing the second prompt for "share whole monitor" (Chrome)

@@ -5,14 +5,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/service/wallpaper"
-	"github.com/stubbedev/wayle/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // wallpaperPortal maps SetWallpaperURI onto the shell's
-// com.wayle.Wallpaper1, on every monitor; only file:// URIs are
+// dev.stubbe.lys.Wallpaper1, on every monitor; only file:// URIs are
 // supported (wallpaper.rs).
 type wallpaperPortal struct{ conn *dbus.Conn }
 

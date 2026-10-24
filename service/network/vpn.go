@@ -15,12 +15,12 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // This file is VPN state and control with NetworkManager as the single
 // source of truth (vpn/mod.rs). Every VPN is an NM profile, a plugin
-// VPN or a native WireGuard one; nothing is declared in wayle's config,
+// VPN or a native WireGuard one; nothing is declared in lys-shell's config,
 // so a VPN added from the widget shows up with no restart.
 //
 // Neither watcher polls: the list rides Settings (NM's NewConnection /
@@ -386,7 +386,7 @@ func (s *VPNService) own(kind string, dict ConnectionDict) {
 	}
 }
 
-// Remove deletes a profile and whatever wayle cached for it: leaving a
+// Remove deletes a profile and whatever lys-shell cached for it: leaving a
 // cached cookie or password behind would keep a live credential on disk
 // for a profile that no longer exists. Nothing is forgotten when NM
 // refuses: the profile is still there.

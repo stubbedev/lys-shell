@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: wayle
-Source: https://github.com/wayle-rs/wayle
+Upstream-Name: lys-shell
+Source: https://github.com/stubbedev/lys-shell
 
 Files: *
 Copyright: 2025 Jas Singh

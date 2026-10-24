@@ -29,8 +29,8 @@ type ThemeEntry struct {
 	Builtin bool
 }
 
-// wayleTheme is the default palette (palettes.rs wayle_theme).
-var wayleTheme = Palette{
+// lysShellTheme is the default palette (palettes.rs lys_shell_theme).
+var lysShellTheme = Palette{
 	Bg: "#141420", Surface: "#1c1c2c", Elevated: "#262638",
 	Fg: "#d4d6e8", FgMuted: "#8a8ca4", Primary: "#e0947a",
 	Red: "#e46870", Yellow: "#e0b870", Green: "#68c898", Blue: "#78a0e0",
@@ -52,7 +52,7 @@ var builtinThemes = []struct {
 	name    string
 	palette Palette
 }{
-	{"wayle", wayleTheme},
+	{"lys-shell", lysShellTheme},
 	{"catppuccin-mocha", Palette{"#11111b", "#181825", "#1e1e2e", "#cdd6f4", "#bac2de", "#b4befe", "#f38ba8", "#f9e2af", "#a6e3a1", "#74c7ec"}},
 	{"catppuccin-macchiato", Palette{"#181926", "#1e2030", "#24273a", "#cad3f5", "#b8c0e0", "#b7bdf8", "#ed8796", "#eed49f", "#a6da95", "#8aadf4"}},
 	{"catppuccin-frappe", Palette{"#232634", "#292c3c", "#303446", "#c6d0f5", "#b5bfe2", "#babbf1", "#e78284", "#e5c890", "#a6d189", "#8caaee"}},

@@ -8,8 +8,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 func TestANetworkMissingForTheStallRunIsLostOnce(t *testing.T) {

@@ -1,8 +1,8 @@
-// Package portal is wayle's xdg-desktop-portal backend
-// (crates/wayle-portal): the org.freedesktop.impl.portal.* interfaces
+// Package portal is lys-shell's xdg-desktop-portal backend
+// (crates/lys-shell-portal): the org.freedesktop.impl.portal.* interfaces
 // the compositor-independent xdg-desktop-portal frontend routes
 // sandboxed apps' requests to, served as one object under the
-// org.freedesktop.impl.portal.desktop.wayle name that `wayle portal`
+// org.freedesktop.impl.portal.desktop.lys name that `lys-shell portal`
 // claims. Interactive interfaces delegate their dialogs to the running
 // shell over its own D-Bus services.
 package portal
@@ -13,12 +13,12 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
-// BusName is the backend's well-known name (wayle.portal's DBusName).
-const BusName = "org.freedesktop.impl.portal.desktop.wayle"
+// BusName is the backend's well-known name (lys-shell.portal's DBusName).
+const BusName = "org.freedesktop.impl.portal.desktop.lys"
 
 // ObjectPath is where every interface is mounted.
 const ObjectPath = dbus.ObjectPath("/org/freedesktop/portal/desktop")

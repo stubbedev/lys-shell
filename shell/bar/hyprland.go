@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/appicons"
-	"github.com/stubbedev/wayle/internal/glob"
-	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-shell/service/hyprland"
 )
 
 // The hyprland-workspaces module (hyprland_workspaces/): the filter

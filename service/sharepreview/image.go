@@ -1,5 +1,5 @@
 // Package sharepreview is the capture half of wayle-share-preview on
-// top of gelm's capture package: turning captured frames into images
+// top of lys-ui's capture package: turning captured frames into images
 // (the output-transform correction, the preview downscale), the XDPH
 // window list the share picker reads, and the best-effort gbm dmabuf
 // allocator the screencast producer's zero-copy path imports.
@@ -8,7 +8,7 @@ package sharepreview
 import (
 	"image"
 
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 	xdraw "golang.org/x/image/draw"
 )
 

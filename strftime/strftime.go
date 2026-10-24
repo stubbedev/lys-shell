@@ -1,4 +1,4 @@
-// Package strftime formats wayle's strftime-style format strings.
+// Package strftime formats lys-shell's strftime-style format strings.
 // The clock and other time-bearing modules take user formats in
 // strftime syntax; Go layouts are never user-facing.
 package strftime

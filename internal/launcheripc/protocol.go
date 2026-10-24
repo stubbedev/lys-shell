@@ -1,5 +1,5 @@
 // Package launcheripc is the launcher socket (wayle-ipc
-// launcher_socket.rs): the protocol between `wayle launcher` (the rofi
+// launcher_socket.rs): the protocol between `lys-shell launcher` (the rofi
 // shim) and the launcher surface in the shell, with both halves - the
 // CLI's client and the shell's server.
 //
@@ -25,13 +25,13 @@ import (
 // RowChunk is the number of rows per rows frame when streaming stdin.
 const RowChunk = 2000
 
-// SocketPath is $XDG_RUNTIME_DIR/wayle/launcher.sock, or
+// SocketPath is $XDG_RUNTIME_DIR/lys-shell/launcher.sock, or
 // /tmp/wayle-launcher.sock when the runtime dir is unset.
 func SocketPath() string {
 	if dir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
-		return filepath.Join(dir, "wayle", "launcher.sock")
+		return filepath.Join(dir, "lys-shell", "launcher.sock")
 	}
-	return "/tmp/wayle-launcher.sock"
+	return "/tmp/lys-shell-launcher.sock"
 }
 
 // WidthUnit is the unit of a rofi -width value.

@@ -1,6 +1,6 @@
 package settings
 
-import "github.com/stubbedev/wayle/config"
+import "github.com/stubbedev/lys-shell/config"
 
 // initialPage is the page the window opens on (INITIAL_PAGE_ID), or
 // the first page while that one is not ported.

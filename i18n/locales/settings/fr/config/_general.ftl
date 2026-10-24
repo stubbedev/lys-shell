@@ -1,4 +1,4 @@
-### Configuration Wayle - Paramètres généraux
+### Configuration lys-shell - Paramètres généraux
 
 ## Configuration générale
 

@@ -118,7 +118,7 @@ func (NormalizedF64) configSchema(*schemaGen) Schema {
 
 // BarCount is the cava bar count (modules/cava/types.rs).
 //
-// Frequency bar count clamped to 1-256 (mirrors `wayle_cava::BarCount`).
+// Frequency bar count clamped to 1-256.
 type BarCount uint16
 
 // UnmarshalConfig implements Unmarshaler.
@@ -137,7 +137,7 @@ func (BarCount) configSchema(*schemaGen) Schema {
 
 // Framerate is the cava frame rate (modules/cava/types.rs).
 //
-// Visualization framerate clamped to 1-360 fps (mirrors `wayle_cava::Framerate`).
+// Visualization framerate clamped to 1-360 fps.
 type Framerate uint32
 
 // UnmarshalConfig implements Unmarshaler.

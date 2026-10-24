@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	analyzer "github.com/stubbedev/wayle/cava"
-	"github.com/stubbedev/wayle/config"
+	analyzer "github.com/stubbedev/lys-shell/cava"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 var (

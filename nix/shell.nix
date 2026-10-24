@@ -9,7 +9,7 @@
     {
       devShells.default = pkgs.mkShell {
         # The Go toolchain go.mod pins, from the package.
-        inputsFrom = [ self'.packages.wayle ];
+        inputsFrom = [ self'.packages.lys-shell ];
 
         packages = with pkgs; [
           # Lint, format and debug (config in .golangci.yml).
@@ -38,12 +38,12 @@
         ];
 
         # The binaries dlopen these through purego; the EIS tests add libei.
-        LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.wayle.libs ++ [ pkgs.libei ]);
+        LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.lys-shell.libs ++ [ pkgs.libei ]);
 
         # The recorder's GStreamer pipeline finds its plugins via this path.
-        GST_PLUGIN_SYSTEM_PATH_1_0 = self'.packages.wayle.gstPluginPath;
+        GST_PLUGIN_SYSTEM_PATH_1_0 = self'.packages.lys-shell.gstPluginPath;
 
-        # gelm is pure Go by design; keep accidental cgo out (`just race`
+        # lys-ui is pure Go by design; keep accidental cgo out (`just race`
         # re-enables it per invocation).
         CGO_ENABLED = "0";
 
@@ -51,7 +51,7 @@
           let
             # The config's defaults (Inter, JetBrains Mono) plus the common
             # Nerd Font, layered over the host fontconfig when one exists:
-            # `wayle shell` finds fonts in a bare container or headless
+            # `lys-shell shell` finds fonts in a bare container or headless
             # session, and sees the same set on a NixOS host as outside the
             # shell.
             extraFontDirs = lib.concatMapStrings (font: "  <dir>${font}/share/fonts</dir>\n") [
@@ -61,7 +61,7 @@
             ];
           in
           ''
-            fontconf="''${TMPDIR:-/tmp}/wayle-fonts.conf"
+            fontconf="''${TMPDIR:-/tmp}/lys-shell-fonts.conf"
             cat > "$fontconf" <<EOF
             <?xml version="1.0"?>
             <!DOCTYPE fontconfig SYSTEM "fonts.dtd">

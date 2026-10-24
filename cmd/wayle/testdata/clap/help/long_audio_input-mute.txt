@@ -1,6 +1,0 @@
-Toggle input mute state
-
-Usage: wayle audio input-mute
-
-Options:
-  -h, --help  Print help

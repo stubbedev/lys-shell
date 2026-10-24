@@ -9,11 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/brightness"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 func TestBrightnessLabel(t *testing.T) {

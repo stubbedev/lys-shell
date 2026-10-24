@@ -3,7 +3,7 @@ package launcher
 import (
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/shlex"
+	"github.com/stubbedev/lys-shell/internal/shlex"
 )
 
 // Lookup resolves a template placeholder; false (or an empty value)

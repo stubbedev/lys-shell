@@ -1,0 +1,6 @@
+Dismiss all notifications
+
+Usage: lys-shell notify dismiss-all
+
+Options:
+  -h, --help  Print help

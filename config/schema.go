@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/version"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // JSON Schema generation by reflection over the Config tree, producing
@@ -137,7 +137,7 @@ type schemaGen struct {
 }
 
 // GenerateSchema returns the JSON Schema of the whole config, compact
-// with sorted keys (the `wayle config schema --stdout` output).
+// with sorted keys (the `lys-shell config schema --stdout` output).
 func GenerateSchema() string {
 	return marshalJSON(generateSchemaTree())
 }
@@ -154,7 +154,7 @@ func generateSchemaTree() Schema {
 	schema := g.structSchema(root.Type())
 	schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
 	schema["title"] = schemaName(root.Type())
-	schema["$id"] = "wayle-config-" + version.Version
+	schema["$id"] = "lys-shell-config-" + version.Version
 	if len(g.defs) > 0 {
 		defs := Schema{}
 		for k, v := range g.defs {

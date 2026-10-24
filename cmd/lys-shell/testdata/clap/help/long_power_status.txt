@@ -1,0 +1,6 @@
+Show current power profile
+
+Usage: lys-shell power status
+
+Options:
+  -h, --help  Print help

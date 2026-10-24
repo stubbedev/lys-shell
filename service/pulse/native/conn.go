@@ -2,7 +2,7 @@
 // the pstream framing, the tagstruct encoding, the handshake, the
 // introspection and control commands wayle-audio drives through
 // libpulse, the subscription events, and record streams. PipeWire's
-// pipewire-pulse serves the same protocol, so this is also how wayle
+// pipewire-pulse serves the same protocol, so this is also how lys-shell
 // talks to PipeWire.
 //
 // The client speaks protocol version 32 without shared memory, so

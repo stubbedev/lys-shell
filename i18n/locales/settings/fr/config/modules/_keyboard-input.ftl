@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Saisie clavier
+### Configuration lys-shell - Module Saisie clavier
 
 ## Configuration du module Saisie clavier
 

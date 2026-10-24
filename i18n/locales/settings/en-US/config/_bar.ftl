@@ -1,4 +1,4 @@
-### Wayle Configuration - Bar Settings
+### lys-shell Configuration - Bar Settings
 
 ## Bar Configuration - Bar Settings
 

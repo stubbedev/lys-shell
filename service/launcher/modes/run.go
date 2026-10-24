@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // IsIgnored reports whether an entry is one the user keeps out of

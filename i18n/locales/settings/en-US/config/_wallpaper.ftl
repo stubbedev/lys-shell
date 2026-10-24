@@ -1,4 +1,4 @@
-### Wayle Configuration - Wallpaper Settings
+### lys-shell Configuration - Wallpaper Settings
 
 ## Wallpaper
 

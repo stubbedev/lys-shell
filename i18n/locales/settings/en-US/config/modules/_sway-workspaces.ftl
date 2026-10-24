@@ -1,4 +1,4 @@
-### Wayle Configuration - Sway Workspaces Module
+### lys-shell Configuration - Sway Workspaces Module
 
 ## Sway Workspaces Module Configuration
 

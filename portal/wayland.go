@@ -4,12 +4,12 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/internal/logging"
+	"github.com/stubbedev/lys-shell/internal/logging"
 )
 
-// waylandLoop is the portal's one Wayland connection: a headless gelm
+// waylandLoop is the portal's one Wayland connection: a headless lys-ui
 // loop, started on first use by the interfaces that need the
 // compositor (Clipboard's data-control device, GlobalShortcuts). It
 // maps no surface; Hold keeps it running without one.

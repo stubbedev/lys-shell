@@ -1,7 +1,7 @@
-// Package apptheme is what every wayle GTK-era surface loads at start
-// (bootstrap.rs, wayle-settings app/css.rs): the Rust stylesheet
+// Package apptheme is what every lys-shell GTK-era surface loads at start
+// (bootstrap.rs, lys-settings app/css.rs): the Rust stylesheet
 // bundle with its hot reload, the stylesheet font resolver, and the
-// wayle icon registry on the icon search path.
+// lys-shell icon registry on the icon search path.
 package apptheme
 
 import (
@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // Priority is the bundle's provider priority: bootstrap.rs loads it at

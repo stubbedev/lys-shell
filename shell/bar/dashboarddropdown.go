@@ -9,18 +9,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/spawn"
-	"github.com/stubbedev/wayle/service/mpris"
-	"github.com/stubbedev/wayle/service/network"
-	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/service/sysinfo"
-	"github.com/stubbedev/wayle/service/upower"
-	"github.com/stubbedev/wayle/shell/widgets"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/service/sysinfo"
+	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // dashboardPoll paces what has no change signal while the dashboard is
@@ -129,7 +129,7 @@ func (v *dashboardView) card(iconName, heading string, extra ...widget.Widget) *
 func (v *dashboardView) header() widget.Widget {
 	settings := v.button(v.icon("ld-settings-symbolic", 1), "ghost-icon", func() {
 		// spawn_settings_app; the popover closes on the click.
-		_ = spawn.Quiet("wayle-settings")
+		_ = spawn.Quiet("lys-settings")
 	})
 	settings.AddClass("dashboard-settings-btn")
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))

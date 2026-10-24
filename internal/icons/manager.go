@@ -12,7 +12,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/stubbedev/wayle/internal/icons/usvg"
+	"github.com/stubbedev/lys-shell/internal/icons/usvg"
 )
 
 // This file ports manager.rs: install from a CDN, remove, list, and

@@ -1,5 +1,5 @@
-// Package filechooser is the shell's com.wayle.FileChooser1 host
-// (wayle-shell services/file_chooser and shell/file_chooser): the file
+// Package filechooser is the shell's dev.stubbe.lys.FileChooser1 host
+// (lys-shell services/file_chooser and shell/file_chooser): the file
 // dialog behind the portal backend's FileChooser.
 package filechooser
 
@@ -8,14 +8,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // D-Bus identity (wayle-ipc file_chooser.rs).
 const (
-	ServiceName = "com.wayle.FileChooser1"
-	ServicePath = dbus.ObjectPath("/com/wayle/FileChooser")
-	iface       = "com.wayle.FileChooser1"
+	ServiceName = "dev.stubbe.lys.FileChooser1"
+	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/FileChooser")
+	iface       = "dev.stubbe.lys.FileChooser1"
 )
 
 // Rule kinds of a Filter.
@@ -60,7 +60,7 @@ type Host interface {
 	Save(SaveRequest) []string
 }
 
-// Daemon serves a Host as com.wayle.FileChooser1.
+// Daemon serves a Host as dev.stubbe.lys.FileChooser1.
 type Daemon struct{ host Host }
 
 // NewDaemon wraps the host for export.

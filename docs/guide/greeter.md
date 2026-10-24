@@ -1,10 +1,10 @@
 # Greeter (login screen)
 
-`wayle-greeter` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
+`lys-greeter` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
 display-manager login screen that can replace sddm/gdm for Wayland sessions. It
-shares the wayle theme (colors, fonts) and has its own `[greeter]` config
+shares the lys-shell theme (colors, fonts) and has its own `[greeter]` config
 section for appearance: background, clock, cursor, user list, and power
-buttons — editable under **Greeter → Login Screen** in `wayle-settings`.
+buttons — editable under **Greeter → Login Screen** in `lys-settings`.
 
 Features:
 
@@ -44,8 +44,8 @@ where that file lives per setup):
 
 When `cursor-theme` / `cursor-size` are not set, the greeter auto-detects the
 cursor the last logged-in user actually sees. The primary source is a small file
-each running wayle shell writes at startup —
-`~/.local/state/wayle/greeter-cursor`, recording the session's live
+each running lys-shell shell writes at startup —
+`~/.local/state/lys-shell/greeter-cursor`, recording the session's live
 `XCURSOR_THEME` / `XCURSOR_SIZE` (size falling back to `HYPRCURSOR_SIZE`). That
 is exactly what the compositor exported, so the login screen keeps the last
 session's cursor even when it was set via env or `hyprcursor` rather than a
@@ -69,13 +69,13 @@ home is readable by the greetd user (e.g. `chmod o+x` on `$HOME`); otherwise the
 > setups install the theme system-wide and pass `XCURSOR_THEME` / `XCURSOR_PATH`
 > in the greetd command.
 
-These options live under **Greeter → Login Screen** in `wayle-settings`. The
-greeter reads the *system* config (`/etc/wayle/config.toml` plus a
+These options live under **Greeter → Login Screen** in `lys-settings`. The
+greeter reads the *system* config (`/etc/lys-shell/config.toml` plus a
 `runtime.toml` overlay beside it), not your user config. The **Apply to login
 screen** button on that page pushes the current greeter values to the system via
-`pkexec wayle-greeter apply-config` (bundled polkit action
-`dev.stubbe.wayle.greeter.apply-config`, admin auth), writing only greeter keys
-to `/etc/wayle/runtime.toml` — so any user can set the login-screen background
+`pkexec lys-greeter apply-config` (bundled polkit action
+`dev.stubbe.lys.greeter.apply-config`, admin auth), writing only greeter keys
+to `/etc/lys-shell/runtime.toml` — so any user can set the login-screen background
 without hand-editing root-owned files, and a hand-written `config.toml` is never
 clobbered.
 
@@ -86,7 +86,7 @@ whose single client is the greeter. On successful login greetd replaces the
 greeter with your chosen session.
 
 ```
-greetd → cage -s → wayle-greeter → (login) → your compositor
+greetd → cage -s → lys-greeter → (login) → your compositor
 ```
 
 ## NixOS
@@ -94,9 +94,9 @@ greetd → cage -s → wayle-greeter → (login) → your compositor
 Enable it through the system module:
 
 ```nix
-programs.wayle.greeter = {
+programs.lys-shell.greeter = {
   enable = true;
-  # Theme it like your desktop (full wayle config schema; the greeter honours
+  # Theme it like your desktop (full lys-shell config schema; the greeter honours
   # styling, greeter.* and wallpaper).
   settings = {
     styling.appearance = "dark";
@@ -119,7 +119,7 @@ contains the session files of every installed Wayland compositor. Options:
 | `greeter.renderer` | `"auto"` | `auto` tries GPU and falls back to software; `software` forces the driver-free pixman + cairo path. |
 | `greeter.graphicsWrapper` | `[]` | Command prefix (e.g. a nixGL wrapper) around the whole launch — for non-NixOS-style driver setups. |
 
-The last session/username are stored in `/var/lib/wayle-greeter/`, owned by the
+The last session/username are stored in `/var/lib/lys-greeter/`, owned by the
 greetd user.
 
 ## Other distros (manual greetd)
@@ -129,21 +129,21 @@ Point greetd's `default_session` at the greeter, hosted by cage:
 ```toml
 # /etc/greetd/config.toml
 [default_session]
-command = "cage -s -- wayle-greeter --config /etc/wayle/config.toml --state /var/lib/wayle-greeter/last-session"
+command = "cage -s -- lys-greeter --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session"
 user = "greeter"
 ```
 
 - The greeter runs pre-login as the greetd user (no `$HOME`), so its theme
-  config lives at a system path — `/etc/wayle/config.toml` by default.
+  config lives at a system path — `/etc/lys-shell/config.toml` by default.
 - Create the state dir and make it writable by the greetd user:
-  `install -d -o greeter -g greeter -m 0700 /var/lib/wayle-greeter`.
+  `install -d -o greeter -g greeter -m 0700 /var/lib/lys-greeter`.
 - Sessions are discovered from `/usr/local/share/wayland-sessions` and
   `/usr/share/wayland-sessions`; add `--sessions DIR` to override.
 - An explicit fallback session can be appended: `-- sway` (offered as
   "Custom", and the only entry when no `.desktop` sessions exist).
 
-With home-manager, `programs.wayle.greeter.enable` installs a
-`wayle-greeter-session` wrapper (cage + greeter in one command) you can point
+With home-manager, `programs.lys-shell.greeter.enable` installs a
+`lys-greeter-session` wrapper (cage + greeter in one command) you can point
 greetd at directly.
 
 ### Software rendering / nixGL
@@ -157,20 +157,20 @@ On non-NixOS hosts running the nix-built package, GPU acceleration needs
 [nixGL](https://github.com/nix-community/nixGL) wrapping the whole launch:
 
 ```
-nixGLIntel wayle-greeter-session --config /etc/wayle/config.toml --state /var/lib/wayle-greeter/last-session
+nixGLIntel lys-greeter-session --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session
 ```
 
 ## CLI reference
 
 ```
-wayle-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
+lys-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
 ```
 
 | Flag | Default | What it does |
 | --- | --- | --- |
-| `--config PATH` | `/etc/wayle/config.toml` | Wayle config used for theming. |
+| `--config PATH` | `/etc/lys-shell/config.toml` | lys-shell config used for theming. |
 | `--sessions DIR` | `/usr/{local/,}share/wayland-sessions` | Wayland session `.desktop` dir (repeatable; overrides defaults). |
 | `--xsessions DIR` | `/usr/{local/,}share/xsessions` | X11 session `.desktop` dir (repeatable; launched via `startx`). |
-| `--state PATH` | `$XDG_STATE_HOME/wayle-greeter/last-session` | File the last session id is remembered in (username in a `last-user` sibling). |
+| `--state PATH` | `$XDG_STATE_HOME/lys-greeter/last-session` | File the last session id is remembered in (username in a `last-user` sibling). |
 | `--env KEY=VAL` | — | Extra environment for the started session (repeatable). |
 | `-- <argv...>` | — | Optional explicit fallback session ("Custom"). |

@@ -4,7 +4,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // configSetter is ModuleContext.SetConfig over a config service: the

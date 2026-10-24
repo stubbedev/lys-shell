@@ -8,16 +8,16 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/credential"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/auth"
+	"github.com/stubbedev/lys-shell/shell/credential"
 )
 
-// t is the greeter's t! (wayle-greeter.ftl, the desktop locale).
+// t is the greeter's t! (lys-greeter.ftl, the desktop locale).
 func t(id string, args ...i18n.Arg) string { return i18n.Greeter().Get(id, args...) }
 
 // CustomSessionName labels the explicit `-- <argv>` session.

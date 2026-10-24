@@ -3,7 +3,7 @@ package network
 import (
 	"slices"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // This file turns "NM wants secrets for setting X, hinting at keys Y"

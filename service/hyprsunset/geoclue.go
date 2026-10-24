@@ -49,7 +49,7 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, timeout time.Duration) 
 	}
 	// DesktopId is mandatory before Start; without a requested accuracy
 	// the daemon yields nothing.
-	if err := set("DesktopId", "wayle"); err != nil {
+	if err := set("DesktopId", "lys-shell"); err != nil {
 		return Location{}, fmt.Errorf("geoclue: desktop id: %w", err)
 	}
 	if err := set("RequestedAccuracyLevel", accuracyCity); err != nil {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
 )
 
 func dataOf(t *testing.T, dict ConnectionDict) map[string]string {

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/weather"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/weather"
 )
 
 // osWrite writes one config variant for the load tests.

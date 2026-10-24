@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/icons/icontest"
+	"github.com/stubbedev/lys-shell/internal/icons/icontest"
 )
 
 const homeSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9" stroke="#000" stroke-width="2" fill="none"/></svg>`
@@ -91,7 +91,7 @@ func TestManagerListMergesSystemIcons(t *testing.T) {
 	m := newTestManager(t, icontest.NewCDN(nil))
 	user := m.Registry().IconsDir()
 	data := t.TempDir()
-	system := filepath.Join(data, "wayle", "icons", "hicolor", "scalable", "actions")
+	system := filepath.Join(data, "lys-shell", "icons", "hicolor", "scalable", "actions")
 	for _, d := range []string{user, system} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			t.Fatal(err)

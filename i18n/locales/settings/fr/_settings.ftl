@@ -1,4 +1,4 @@
-### Dialogue des paramètres Wayle
+### Dialogue des paramètres lys-shell
 
 missing-i18n-key = (sans libellé)
     .description = Ce paramètre n'a pas de libellé configuré

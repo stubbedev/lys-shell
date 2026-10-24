@@ -1,0 +1,6 @@
+Install bundled icons required by lys-shell components
+
+Usage: lys-shell icons setup
+
+Options:
+  -h, --help  Print help

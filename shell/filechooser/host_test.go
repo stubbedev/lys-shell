@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 type fakeWindow struct {
@@ -190,7 +190,7 @@ func (hs *harness) uri(rel string) string { return "file://" + filepath.Join(hs.
 func TestOpenAnswersTheSelectedFile(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{Title: "Pick one"})
-	if hs.cfg.Layer != app.LayerOverlay || hs.cfg.Namespace != "wayle-file-chooser" || hs.cfg.Keyboard != app.KeyboardExclusive {
+	if hs.cfg.Layer != app.LayerOverlay || hs.cfg.Namespace != "lys-shell-file-chooser" || hs.cfg.Keyboard != app.KeyboardExclusive {
 		t.Errorf("surface = %+v", hs.cfg)
 	}
 	if l := treetest.Labels(hs.cfg.Root); !slices.Contains(l, "Pick one") {

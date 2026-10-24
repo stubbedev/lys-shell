@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // testPin stands in for the pin gpLogin reads off the TLS connection.

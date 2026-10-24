@@ -3,12 +3,12 @@ package idleinhibit
 import (
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
-// Daemon is the com.wayle.IdleInhibit1 object
+// Daemon is the dev.stubbe.lys.IdleInhibit1 object
 // (wayle-shell-core/src/services/idle_inhibit/dbus.rs), which the
-// `wayle idle` CLI drives from another process.
+// `lys-shell idle` CLI drives from another process.
 type Daemon struct {
 	state *State
 }

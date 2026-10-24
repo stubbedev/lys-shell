@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/portal"
-	"github.com/stubbedev/wayle/service/network"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/portal"
+	"github.com/stubbedev/lys-shell/service/network"
 )
 
 // fakeVPN is a scripted vpnControl.

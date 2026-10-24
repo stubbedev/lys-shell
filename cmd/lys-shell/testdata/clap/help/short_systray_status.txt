@@ -1,0 +1,6 @@
+Show system tray status
+
+Usage: lys-shell systray status
+
+Options:
+  -h, --help  Print help

@@ -5,14 +5,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/mpris"
-	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/service/sni"
+	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-shell/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/service/sni"
 )
 
-// serveCLIDaemons exports the session-bus interfaces the `wayle` CLI
+// serveCLIDaemons exports the session-bus interfaces the `lys-shell` CLI
 // drives (the Rust services' with_daemon registrations in
-// wayle-shell/src/bootstrap). Each is optional, as in Rust: a service
+// lys-shell/src/bootstrap). Each is optional, as in Rust: a service
 // that cannot start is logged and its CLI reports it as not running.
 // The returned release drops every name and the connection.
 func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
@@ -33,7 +33,7 @@ func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
 		release, err := powerprofiles.ServeDaemon(conn, ctx.PowerProfiles)
 		serve("power-profiles", release, err)
 	}
-	// The bar's media service is the one the daemon serves, so `wayle
+	// The bar's media service is the one the daemon serves, so `lys-shell
 	// media` and the module agree on the active player.
 	if media, ok := ctx.Media.(*mpris.Service); ok {
 		release, err := mpris.ServeDaemon(conn, media)

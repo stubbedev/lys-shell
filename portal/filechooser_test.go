@@ -8,9 +8,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/shell/filechooser"
-	"github.com/stubbedev/wayle/shell/printdialog"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/shell/filechooser"
+	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
 // fakeChooser is the shell's file dialog.

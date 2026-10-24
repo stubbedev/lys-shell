@@ -1,9 +1,9 @@
 package settings
 
 import (
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/lys-shell/i18n"
 )
 
 // Modal text widths (confirm_modal: max_width_chars).

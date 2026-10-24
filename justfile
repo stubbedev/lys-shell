@@ -14,39 +14,39 @@ default:
 
 # ─────────────────────────── Build & Run ───────────────────────────
 
-# Build the release binaries into dist/: pure Go (gelm dlopens what it
+# Build the release binaries into dist/: pure Go (lys-ui dlopens what it
 # needs through purego), stripped.
 build:
-    CGO_ENABLED=0 {{go}} build -trimpath -ldflags "-s -w" -o {{dist}}/ ./cmd/wayle ./cmd/wayle-greeter ./cmd/wayle-lock ./cmd/wayle-settings
+    CGO_ENABLED=0 {{go}} build -trimpath -ldflags "-s -w" -o {{dist}}/ ./cmd/lys-shell ./cmd/lys-greeter ./cmd/lys-lock ./cmd/lys-settings
 
-# Run the wayle binary. Extra args pass through: `just run config get bar.location`.
+# Run the lys-shell binary. Extra args pass through: `just run config get bar.location`.
 run *args:
-    {{go}} run ./cmd/wayle {{args}}
+    {{go}} run ./cmd/lys-shell {{args}}
 
 # Run the settings app.
 run-settings *args:
-    {{go}} run ./cmd/wayle-settings {{args}}
+    {{go}} run ./cmd/lys-settings {{args}}
 
 # Stop the packaged shell so a dev build can take over (only one instance may
-# hold the com.wayle.shell bus name), run it, then restore the service on exit.
+# hold the dev.stubbe.lys.shell bus name), run it, then restore the service on exit.
 dev-shell *args:
     #!/usr/bin/env bash
     set -uo pipefail
-    was_active=$(systemctl --user is-active wayle.service || true)
-    if [ "$was_active" = "active" ]; then systemctl --user stop wayle.service; fi
-    trap '[ "$was_active" = "active" ] && systemctl --user start wayle.service' EXIT
-    {{go}} run ./cmd/wayle shell {{args}}
+    was_active=$(systemctl --user is-active lys-shell.service || true)
+    if [ "$was_active" = "active" ]; then systemctl --user stop lys-shell.service; fi
+    trap '[ "$was_active" = "active" ] && systemctl --user start lys-shell.service' EXIT
+    {{go}} run ./cmd/lys-shell shell {{args}}
 
 # Run the greeter as a window on your current session for UI iteration: your
 # user config for theming, throwaway state in /tmp. Login attempts only show an
 # error unless a real greetd socket is around ($GREETD_SOCK), which is fine for
 # visuals.
 dev-greeter *args:
-    {{go}} run ./cmd/wayle-greeter --config ~/.config/wayle/config.toml --state /tmp/wayle-greeter-dev/last-session {{args}}
+    {{go}} run ./cmd/lys-greeter --config ~/.config/lys-shell/config.toml --state /tmp/lys-greeter-dev/last-session {{args}}
 
 # Tail today's shell log — `just logs 200` for more backlog.
 logs lines="80":
-    tail -n {{lines}} -f "${XDG_STATE_HOME:-$HOME/.local/state}/wayle/wayle-shell.$(date +%F).log"
+    tail -n {{lines}} -f "${XDG_STATE_HOME:-$HOME/.local/state}/lys-shell/lys-shell.$(date +%F).log"
 
 # Remove the build output.
 clean:
@@ -80,8 +80,8 @@ schema-check:
     set -euo pipefail
     got=$(mktemp)
     trap 'rm -f "$got"' EXIT
-    {{go}} run ./cmd/wayle config schema --stdout | jq -S . > "$got"
-    if ! diff -u schema/wayle-config.schema.json "$got"; then
+    {{go}} run ./cmd/lys-shell config schema --stdout | jq -S . > "$got"
+    if ! diff -u schema/lys-shell-config.schema.json "$got"; then
         echo "Config schema is out of date: run \`just schema\`." >&2
         exit 1
     fi
@@ -94,24 +94,24 @@ check: lint test race schema-check
 # Regenerate the committed config JSON schema. Its $id embeds the version,
 # so the release flow rewrites it on every bump.
 schema:
-    {{go}} run ./cmd/wayle config schema --stdout | jq -S . > schema/wayle-config.schema.json
+    {{go}} run ./cmd/lys-shell config schema --stdout | jq -S . > schema/lys-shell-config.schema.json
 
 # Recompile styling/scss into the embedded stylesheet (styling/static.css)
 # with grass, and record the source hash the freshness test checks.
 css:
     grass --load-path styling/scss styling/scss/main.scss > styling/static.css
-    WAYLE_UPDATE_STATIC_CSS=1 {{go}} test ./styling -run TestStaticCSSIsFresh -count=1
+    LYS_SHELL_UPDATE_STATIC_CSS=1 {{go}} test ./styling -run TestStaticCSSIsFresh -count=1
 
-# Recompute nix/wayle.nix's vendorHash after a go.mod change (a gelm
+# Recompute nix/lys-shell.nix's vendorHash after a go.mod change (a lys-ui
 # bump): the vendor derivation is fixed-output, so a stale hash reuses
 # the old module set instead of reporting the new one. Needs nix.
 vendor-hash:
     #!/usr/bin/env bash
     set -euo pipefail
-    file=nix/wayle.nix
+    file=nix/lys-shell.nix
     sed -i 's|vendorHash = "sha256-[^"]*";|vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";|' "$file"
     # The build fails by design (the fake hash); its report is the point.
-    got=$( (nix build .#wayle --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
+    got=$( (nix build .#lys-shell --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
     if [ -z "$got" ]; then echo "no hash reported" >&2; exit 1; fi
     sed -i "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$got\";|" "$file"
     echo "vendorHash = $got"
@@ -143,7 +143,7 @@ cache-push:
         echo "  xilo login https://nix.stubbe.dev --token <tok> --cache default/default" >&2
         exit 1
     fi
-    nix build .#wayle -L --accept-flake-config
+    nix build .#lys-shell -L --accept-flake-config
     xilo push default/default ./result --url https://nix.stubbe.dev
 
 # ─────────────────────────── Release ───────────────────────────
@@ -165,13 +165,13 @@ release-preview:
 # Refuse to release a commit CI has already judged broken, without waiting on
 # anything: one status read, no polling. A run still in flight (or not started,
 # or never, because HEAD is unpushed) is not an error — the tag pushed below
-# gets its own CI run, which is the real verification. WAYLE_RELEASE_NO_CI=1
+# gets its own CI run, which is the real verification. LYS_SHELL_RELEASE_NO_CI=1
 # checks locally instead (offline, or CI is down).
 _reject-red-ci:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -n "${WAYLE_RELEASE_NO_CI:-}" ]; then
-        echo "WAYLE_RELEASE_NO_CI set — running the local check instead."
+    if [ -n "${LYS_SHELL_RELEASE_NO_CI:-}" ]; then
+        echo "LYS_SHELL_RELEASE_NO_CI set — running the local check instead."
         just check
         exit 0
     fi
@@ -182,7 +182,7 @@ _reject-red-ci:
         completedsuccess) echo "CI green for ${SHA:0:7}." ;;
         completed*)
             echo "Error: CI concluded '$CONCLUSION' for ${SHA:0:7} — not releasing." >&2
-            echo "Fix it, or set WAYLE_RELEASE_NO_CI=1 to check locally instead." >&2
+            echo "Fix it, or set LYS_SHELL_RELEASE_NO_CI=1 to check locally instead." >&2
             exit 1
             ;;
         *) echo "No finished CI run for ${SHA:0:7} yet — releasing anyway; the tag's run verifies it." ;;
@@ -231,11 +231,11 @@ _release bump:
     }
     # The schema $id embeds the version; regenerate it from the bumped binary.
     just schema
-    grep -q "\"\$id\": \"wayle-config-${NEW}\"" schema/wayle-config.schema.json || {
-        echo "Error: schema \$id is not wayle-config-${NEW} after the bump." >&2
+    grep -q "\"\$id\": \"lys-shell-config-${NEW}\"" schema/lys-shell-config.schema.json || {
+        echo "Error: schema \$id is not lys-shell-config-${NEW} after the bump." >&2
         exit 1
     }
-    git add internal/version/version.go schema/wayle-config.schema.json
+    git add internal/version/version.go schema/lys-shell-config.schema.json
     git commit -m "chore: release v${NEW}"
     git tag -a "v${NEW}" -m "v${NEW}"
     git push origin HEAD
@@ -243,7 +243,7 @@ _release bump:
     echo
     echo "Tagged and pushed v${NEW}. The build, archives and cache push run on CI."
     echo "  status:  gh run list --workflow Release --limit 1"
-    echo "  actions: https://github.com/stubbedev/wayle/actions"
+    echo "  actions: https://github.com/stubbedev/lys-shell/actions"
 
 release-patch: (_release "patch")
 release-minor: (_release "minor")

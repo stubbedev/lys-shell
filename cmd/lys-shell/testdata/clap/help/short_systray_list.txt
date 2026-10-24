@@ -1,0 +1,6 @@
+List all system tray items
+
+Usage: lys-shell systray list
+
+Options:
+  -h, --help  Print help

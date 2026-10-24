@@ -2,9 +2,9 @@ package portal
 
 import (
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // InputCaptureIface is present and introspectable but captures nothing

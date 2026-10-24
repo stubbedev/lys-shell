@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Mémoire vive
+### Configuration lys-shell - Module Mémoire vive
 
 ## Configuration du module Mémoire vive
 

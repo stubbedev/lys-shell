@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Météo
+### Configuration lys-shell - Module Météo
 
 ## Configuration du module Météo
 

@@ -4,14 +4,14 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // screenshotModule is the screenshot capture button
 // (wayle-bar-hardware/src/modules/screenshot): an icon and an optional
-// static label whose bindings run `wayle screenshot region|output|window`
+// static label whose bindings run `lys-shell screenshot region|output|window`
 // (in-process through the builtin) by default.
 type screenshotModule struct {
 	root widget.Widget

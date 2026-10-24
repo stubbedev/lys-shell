@@ -1,0 +1,1321 @@
+
+use builtin;
+use str;
+
+set edit:completion:arg-completer[lys-shell] = {|@words|
+    fn spaces {|n|
+        builtin:repeat $n ' ' | str:join ''
+    }
+    fn cand {|text desc|
+        edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc
+    }
+    var command = 'lys-shell'
+    for word $words[1..-1] {
+        if (str:has-prefix $word '-') {
+            break
+        }
+        set command = $command';'$word
+    }
+    var completions = [
+        &'lys-shell'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand audio 'Audio control commands'
+            cand config 'Configuration management commands'
+            cand icons 'Icon management commands'
+            cand media 'Media player control commands'
+            cand notify 'Notification control commands'
+            cand panel 'Panel management commands'
+            cand power 'Power profile commands'
+            cand systray 'System tray commands'
+            cand wallpaper 'Wallpaper control commands'
+            cand idle 'Idle inhibit control commands'
+            cand launcher 'Application launcher / dmenu with rofi-compatible flags'
+            cand lock 'Lock the session via lys-shell''s lock screen'
+            cand vpn 'VPN commands'
+            cand recorder 'Screen recorder control commands'
+            cand screenshot 'Screenshot capture commands'
+            cand widget 'Widget control commands'
+            cand toast 'Show a custom on-screen toast'
+            cand portal 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer'
+            cand shell 'Run the desktop shell in the foreground'
+            cand completions 'Generate shell completions'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;audio'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand output-volume 'Get or set output volume level'
+            cand output-mute 'Toggle output mute state'
+            cand input-volume 'Get or set input volume level'
+            cand input-mute 'Toggle input mute state'
+            cand sinks 'List available audio sinks (outputs)'
+            cand sources 'List available audio sources (inputs)'
+            cand status 'Show current audio status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;audio;output-volume'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;output-mute'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;input-volume'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;input-mute'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;sinks'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;sources'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;audio;help'= {
+            cand output-volume 'Get or set output volume level'
+            cand output-mute 'Toggle output mute state'
+            cand input-volume 'Get or set input volume level'
+            cand input-mute 'Toggle input mute state'
+            cand sinks 'List available audio sinks (outputs)'
+            cand sources 'List available audio sources (inputs)'
+            cand status 'Show current audio status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;audio;help;output-volume'= {
+        }
+        &'lys-shell;audio;help;output-mute'= {
+        }
+        &'lys-shell;audio;help;input-volume'= {
+        }
+        &'lys-shell;audio;help;input-mute'= {
+        }
+        &'lys-shell;audio;help;sinks'= {
+        }
+        &'lys-shell;audio;help;sources'= {
+        }
+        &'lys-shell;audio;help;status'= {
+        }
+        &'lys-shell;audio;help;help'= {
+        }
+        &'lys-shell;config'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand get 'Get the value of a configuration path'
+            cand set 'Set the value of a configuration path'
+            cand reset 'Reset a configuration path to its default value'
+            cand schema 'Output JSON Schema for the configuration (for editor intellisense)'
+            cand default 'Output the default configuration as TOML'
+            cand docs 'Generate markdown reference pages for every registered schema'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;config;get'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;config;set'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;config;reset'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;config;schema'= {
+            cand --stdout 'Print to stdout instead of writing to config directory'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;config;default'= {
+            cand --stdout 'Print to stdout instead of writing config.toml.example'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;config;docs'= {
+            cand --out 'Output directory for the generated pages'
+            cand --only 'Regenerate only the named module'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;config;help'= {
+            cand get 'Get the value of a configuration path'
+            cand set 'Set the value of a configuration path'
+            cand reset 'Reset a configuration path to its default value'
+            cand schema 'Output JSON Schema for the configuration (for editor intellisense)'
+            cand default 'Output the default configuration as TOML'
+            cand docs 'Generate markdown reference pages for every registered schema'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;config;help;get'= {
+        }
+        &'lys-shell;config;help;set'= {
+        }
+        &'lys-shell;config;help;reset'= {
+        }
+        &'lys-shell;config;help;schema'= {
+        }
+        &'lys-shell;config;help;default'= {
+        }
+        &'lys-shell;config;help;docs'= {
+        }
+        &'lys-shell;config;help;help'= {
+        }
+        &'lys-shell;icons'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand setup 'Install bundled icons required by lys-shell components'
+            cand install 'Install icons from a CDN source'
+            cand import 'Import local SVG file(s) as icons'
+            cand remove 'Remove installed icons'
+            cand sources 'List available icon sources'
+            cand list 'List installed icons'
+            cand open 'Open the icons directory in file manager'
+            cand export 'Export all installed icons to a directory'
+            cand sync 'Install any icons referenced in config but not yet on disk'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;icons;setup'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;icons;install'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;icons;import'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;icons;remove'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;icons;sources'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;icons;list'= {
+            cand -s 'Filter by source prefix (e.g., tb, si, md)'
+            cand --source 'Filter by source prefix (e.g., tb, si, md)'
+            cand -i 'Interactive fuzzy search (requires fzf)'
+            cand --interactive 'Interactive fuzzy search (requires fzf)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;icons;open'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;icons;export'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;icons;sync'= {
+            cand --dry-run 'Preview what would be installed without making changes'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;icons;help'= {
+            cand setup 'Install bundled icons required by lys-shell components'
+            cand install 'Install icons from a CDN source'
+            cand import 'Import local SVG file(s) as icons'
+            cand remove 'Remove installed icons'
+            cand sources 'List available icon sources'
+            cand list 'List installed icons'
+            cand open 'Open the icons directory in file manager'
+            cand export 'Export all installed icons to a directory'
+            cand sync 'Install any icons referenced in config but not yet on disk'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;icons;help;setup'= {
+        }
+        &'lys-shell;icons;help;install'= {
+        }
+        &'lys-shell;icons;help;import'= {
+        }
+        &'lys-shell;icons;help;remove'= {
+        }
+        &'lys-shell;icons;help;sources'= {
+        }
+        &'lys-shell;icons;help;list'= {
+        }
+        &'lys-shell;icons;help;open'= {
+        }
+        &'lys-shell;icons;help;export'= {
+        }
+        &'lys-shell;icons;help;sync'= {
+        }
+        &'lys-shell;icons;help;help'= {
+        }
+        &'lys-shell;media'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all available media players'
+            cand play-pause 'Toggle play/pause for a media player'
+            cand next 'Skip to next track'
+            cand previous 'Go to previous track'
+            cand shuffle 'Toggle or set shuffle mode'
+            cand loop 'Set loop/repeat mode'
+            cand active 'Get or set the active media player'
+            cand info 'Display detailed information about a media player'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;media;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;media;play-pause'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;media;next'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;media;previous'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;media;shuffle'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;media;loop'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;media;active'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;media;info'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;media;help'= {
+            cand list 'List all available media players'
+            cand play-pause 'Toggle play/pause for a media player'
+            cand next 'Skip to next track'
+            cand previous 'Go to previous track'
+            cand shuffle 'Toggle or set shuffle mode'
+            cand loop 'Set loop/repeat mode'
+            cand active 'Get or set the active media player'
+            cand info 'Display detailed information about a media player'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;media;help;list'= {
+        }
+        &'lys-shell;media;help;play-pause'= {
+        }
+        &'lys-shell;media;help;next'= {
+        }
+        &'lys-shell;media;help;previous'= {
+        }
+        &'lys-shell;media;help;shuffle'= {
+        }
+        &'lys-shell;media;help;loop'= {
+        }
+        &'lys-shell;media;help;active'= {
+        }
+        &'lys-shell;media;help;info'= {
+        }
+        &'lys-shell;media;help;help'= {
+        }
+        &'lys-shell;notify'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all notifications'
+            cand dismiss 'Dismiss a notification by ID'
+            cand dismiss-all 'Dismiss all notifications'
+            cand dnd 'Toggle Do Not Disturb mode'
+            cand status 'Show notification status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;notify;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;notify;dismiss'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;notify;dismiss-all'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;notify;dnd'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;notify;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;notify;help'= {
+            cand list 'List all notifications'
+            cand dismiss 'Dismiss a notification by ID'
+            cand dismiss-all 'Dismiss all notifications'
+            cand dnd 'Toggle Do Not Disturb mode'
+            cand status 'Show notification status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;notify;help;list'= {
+        }
+        &'lys-shell;notify;help;dismiss'= {
+        }
+        &'lys-shell;notify;help;dismiss-all'= {
+        }
+        &'lys-shell;notify;help;dnd'= {
+        }
+        &'lys-shell;notify;help;status'= {
+        }
+        &'lys-shell;notify;help;help'= {
+        }
+        &'lys-shell;panel'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand start 'Start the panel daemon'
+            cand stop 'Stop the panel daemon'
+            cand restart 'Restart the panel daemon'
+            cand status 'Check panel status'
+            cand settings 'Open panel settings'
+            cand inspect 'Open the widget inspector for debugging'
+            cand hide 'Hide the bar on a monitor'
+            cand show 'Show the bar on a monitor'
+            cand toggle 'Toggle bar visibility on a monitor'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;panel;start'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;restart'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;settings'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;inspect'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;hide'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;show'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;toggle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;panel;help'= {
+            cand start 'Start the panel daemon'
+            cand stop 'Stop the panel daemon'
+            cand restart 'Restart the panel daemon'
+            cand status 'Check panel status'
+            cand settings 'Open panel settings'
+            cand inspect 'Open the widget inspector for debugging'
+            cand hide 'Hide the bar on a monitor'
+            cand show 'Show the bar on a monitor'
+            cand toggle 'Toggle bar visibility on a monitor'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;panel;help;start'= {
+        }
+        &'lys-shell;panel;help;stop'= {
+        }
+        &'lys-shell;panel;help;restart'= {
+        }
+        &'lys-shell;panel;help;status'= {
+        }
+        &'lys-shell;panel;help;settings'= {
+        }
+        &'lys-shell;panel;help;inspect'= {
+        }
+        &'lys-shell;panel;help;hide'= {
+        }
+        &'lys-shell;panel;help;show'= {
+        }
+        &'lys-shell;panel;help;toggle'= {
+        }
+        &'lys-shell;panel;help;help'= {
+        }
+        &'lys-shell;power'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand status 'Show current power profile'
+            cand set 'Set power profile'
+            cand cycle 'Cycle to next power profile'
+            cand list 'List available power profiles'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;power;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;power;set'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;power;cycle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;power;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;power;help'= {
+            cand status 'Show current power profile'
+            cand set 'Set power profile'
+            cand cycle 'Cycle to next power profile'
+            cand list 'List available power profiles'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;power;help;status'= {
+        }
+        &'lys-shell;power;help;set'= {
+        }
+        &'lys-shell;power;help;cycle'= {
+        }
+        &'lys-shell;power;help;list'= {
+        }
+        &'lys-shell;power;help;help'= {
+        }
+        &'lys-shell;systray'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all system tray items'
+            cand activate 'Activate a tray item by ID'
+            cand status 'Show system tray status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;systray;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;systray;activate'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;systray;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;systray;help'= {
+            cand list 'List all system tray items'
+            cand activate 'Activate a tray item by ID'
+            cand status 'Show system tray status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;systray;help;list'= {
+        }
+        &'lys-shell;systray;help;activate'= {
+        }
+        &'lys-shell;systray;help;status'= {
+        }
+        &'lys-shell;systray;help;help'= {
+        }
+        &'lys-shell;wallpaper'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand set 'Set wallpaper from an image file'
+            cand cycle 'Start cycling wallpapers from a directory'
+            cand stop 'Stop wallpaper cycling'
+            cand next 'Skip to next wallpaper'
+            cand previous 'Go back to previous wallpaper'
+            cand info 'Display current wallpaper information'
+            cand theming-monitor 'Set which monitor to use for color extraction'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;wallpaper;set'= {
+            cand -f 'Image fit mode'
+            cand --fit 'Image fit mode'
+            cand --monitor 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, applies to all monitors'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;wallpaper;cycle'= {
+            cand -i 'Interval in seconds between changes'
+            cand --interval 'Interval in seconds between changes'
+            cand -m 'Cycling mode'
+            cand --mode 'Cycling mode'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;wallpaper;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;wallpaper;next'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;wallpaper;previous'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;wallpaper;info'= {
+            cand --monitor 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, shows global state'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;wallpaper;theming-monitor'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;wallpaper;help'= {
+            cand set 'Set wallpaper from an image file'
+            cand cycle 'Start cycling wallpapers from a directory'
+            cand stop 'Stop wallpaper cycling'
+            cand next 'Skip to next wallpaper'
+            cand previous 'Go back to previous wallpaper'
+            cand info 'Display current wallpaper information'
+            cand theming-monitor 'Set which monitor to use for color extraction'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;wallpaper;help;set'= {
+        }
+        &'lys-shell;wallpaper;help;cycle'= {
+        }
+        &'lys-shell;wallpaper;help;stop'= {
+        }
+        &'lys-shell;wallpaper;help;next'= {
+        }
+        &'lys-shell;wallpaper;help;previous'= {
+        }
+        &'lys-shell;wallpaper;help;info'= {
+        }
+        &'lys-shell;wallpaper;help;theming-monitor'= {
+        }
+        &'lys-shell;wallpaper;help;help'= {
+        }
+        &'lys-shell;idle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand on 'Enable idle inhibition'
+            cand off 'Disable idle inhibition'
+            cand duration 'Adjust timer duration (upper limit)'
+            cand remaining 'Adjust remaining time on active timer'
+            cand status 'Show current idle inhibit status'
+            cand toggle 'Toggle idle inhibition on/off'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;idle;on'= {
+            cand -i 'Force indefinite mode (ignore default duration)'
+            cand --indefinite 'Force indefinite mode (ignore default duration)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;idle;off'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;idle;duration'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;idle;remaining'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;idle;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;idle;toggle'= {
+            cand -i 'Use indefinite mode when enabling'
+            cand --indefinite 'Use indefinite mode when enabling'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;idle;help'= {
+            cand on 'Enable idle inhibition'
+            cand off 'Disable idle inhibition'
+            cand duration 'Adjust timer duration (upper limit)'
+            cand remaining 'Adjust remaining time on active timer'
+            cand status 'Show current idle inhibit status'
+            cand toggle 'Toggle idle inhibition on/off'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;idle;help;on'= {
+        }
+        &'lys-shell;idle;help;off'= {
+        }
+        &'lys-shell;idle;help;duration'= {
+        }
+        &'lys-shell;idle;help;remaining'= {
+        }
+        &'lys-shell;idle;help;status'= {
+        }
+        &'lys-shell;idle;help;toggle'= {
+        }
+        &'lys-shell;idle;help;help'= {
+        }
+        &'lys-shell;launcher'= {
+        }
+        &'lys-shell;lock'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;vpn'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand sso-callback 'Hand a browser sign-in callback to the running shell'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;vpn;sso-callback'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;vpn;help'= {
+            cand sso-callback 'Hand a browser sign-in callback to the running shell'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;vpn;help;sso-callback'= {
+        }
+        &'lys-shell;vpn;help;help'= {
+        }
+        &'lys-shell;recorder'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand start 'Start recording'
+            cand stop 'Stop recording'
+            cand toggle 'Toggle recording on/off'
+            cand pause 'Pause the active recording'
+            cand resume 'Resume a paused recording'
+            cand status 'Show current recorder status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;recorder;start'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;toggle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;pause'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;resume'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;help'= {
+            cand start 'Start recording'
+            cand stop 'Stop recording'
+            cand toggle 'Toggle recording on/off'
+            cand pause 'Pause the active recording'
+            cand resume 'Resume a paused recording'
+            cand status 'Show current recorder status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;recorder;help;start'= {
+        }
+        &'lys-shell;recorder;help;stop'= {
+        }
+        &'lys-shell;recorder;help;toggle'= {
+        }
+        &'lys-shell;recorder;help;pause'= {
+        }
+        &'lys-shell;recorder;help;resume'= {
+        }
+        &'lys-shell;recorder;help;status'= {
+        }
+        &'lys-shell;recorder;help;help'= {
+        }
+        &'lys-shell;screenshot'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand region 'Capture a drag-selected region'
+            cand output 'Capture a whole output (the focused output when NAME is omitted)'
+            cand window 'Capture the active window'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;screenshot;region'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;screenshot;output'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;screenshot;window'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;screenshot;help'= {
+            cand region 'Capture a drag-selected region'
+            cand output 'Capture a whole output (the focused output when NAME is omitted)'
+            cand window 'Capture the active window'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;screenshot;help;region'= {
+        }
+        &'lys-shell;screenshot;help;output'= {
+        }
+        &'lys-shell;screenshot;help;window'= {
+        }
+        &'lys-shell;screenshot;help;help'= {
+        }
+        &'lys-shell;widget'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand update 'Push an output update to a bar widget by its config id'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;widget;update'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'lys-shell;widget;help'= {
+            cand update 'Push an output update to a bar widget by its config id'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;widget;help;update'= {
+        }
+        &'lys-shell;widget;help;help'= {
+        }
+        &'lys-shell;toast'= {
+            cand --icon 'Icon name shown beside the text'
+            cand --percentage 'Progress percentage (0-100); shows a progress bar when set'
+            cand --duration 'Auto-dismiss duration in milliseconds (toast config default when unset)'
+            cand --preset 'Preset id from `[[toasts.presets]]` to base this toast on'
+            cand --class 'Extra CSS class applied to the toast for custom styling'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)'
+            cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;portal;run'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;share-picker'= {
+            cand --allow-token 'Pre-check the "allow restore token" box'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;portal;show;file-chooser'= {
+            cand --save 'Show the save dialog instead of the open dialog'
+            cand --multiple 'Allow selecting multiple files (open only)'
+            cand --directory 'Select a directory instead of files (open only)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;screenshot'= {
+            cand --mode 'Capture mode: `region`, `output`, `screen`, or `window`'
+            cand --target 'Output connector name (used by `output` mode)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;color'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;print'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;screen-cast'= {
+            cand --allow-token 'Pre-check the "allow restore token" box'
+            cand --multiple 'Allow selecting multiple sources'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;access'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;account'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;app-chooser'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;dynamic-launcher'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;wallpaper'= {
+            cand --uri '`file://` image URI to preview (defaults to a placeholder)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;show;help'= {
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;portal;show;help;file-chooser'= {
+        }
+        &'lys-shell;portal;show;help;screenshot'= {
+        }
+        &'lys-shell;portal;show;help;color'= {
+        }
+        &'lys-shell;portal;show;help;print'= {
+        }
+        &'lys-shell;portal;show;help;screen-cast'= {
+        }
+        &'lys-shell;portal;show;help;access'= {
+        }
+        &'lys-shell;portal;show;help;account'= {
+        }
+        &'lys-shell;portal;show;help;app-chooser'= {
+        }
+        &'lys-shell;portal;show;help;dynamic-launcher'= {
+        }
+        &'lys-shell;portal;show;help;wallpaper'= {
+        }
+        &'lys-shell;portal;show;help;help'= {
+        }
+        &'lys-shell;portal;help'= {
+            cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)'
+            cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;portal;help;run'= {
+        }
+        &'lys-shell;portal;help;share-picker'= {
+        }
+        &'lys-shell;portal;help;show'= {
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+        }
+        &'lys-shell;portal;help;show;file-chooser'= {
+        }
+        &'lys-shell;portal;help;show;screenshot'= {
+        }
+        &'lys-shell;portal;help;show;color'= {
+        }
+        &'lys-shell;portal;help;show;print'= {
+        }
+        &'lys-shell;portal;help;show;screen-cast'= {
+        }
+        &'lys-shell;portal;help;show;access'= {
+        }
+        &'lys-shell;portal;help;show;account'= {
+        }
+        &'lys-shell;portal;help;show;app-chooser'= {
+        }
+        &'lys-shell;portal;help;show;dynamic-launcher'= {
+        }
+        &'lys-shell;portal;help;show;wallpaper'= {
+        }
+        &'lys-shell;portal;help;help'= {
+        }
+        &'lys-shell;shell'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;completions'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;help'= {
+            cand audio 'Audio control commands'
+            cand config 'Configuration management commands'
+            cand icons 'Icon management commands'
+            cand media 'Media player control commands'
+            cand notify 'Notification control commands'
+            cand panel 'Panel management commands'
+            cand power 'Power profile commands'
+            cand systray 'System tray commands'
+            cand wallpaper 'Wallpaper control commands'
+            cand idle 'Idle inhibit control commands'
+            cand launcher 'Application launcher / dmenu with rofi-compatible flags'
+            cand lock 'Lock the session via lys-shell''s lock screen'
+            cand vpn 'VPN commands'
+            cand recorder 'Screen recorder control commands'
+            cand screenshot 'Screenshot capture commands'
+            cand widget 'Widget control commands'
+            cand toast 'Show a custom on-screen toast'
+            cand portal 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer'
+            cand shell 'Run the desktop shell in the foreground'
+            cand completions 'Generate shell completions'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;help;audio'= {
+            cand output-volume 'Get or set output volume level'
+            cand output-mute 'Toggle output mute state'
+            cand input-volume 'Get or set input volume level'
+            cand input-mute 'Toggle input mute state'
+            cand sinks 'List available audio sinks (outputs)'
+            cand sources 'List available audio sources (inputs)'
+            cand status 'Show current audio status'
+        }
+        &'lys-shell;help;audio;output-volume'= {
+        }
+        &'lys-shell;help;audio;output-mute'= {
+        }
+        &'lys-shell;help;audio;input-volume'= {
+        }
+        &'lys-shell;help;audio;input-mute'= {
+        }
+        &'lys-shell;help;audio;sinks'= {
+        }
+        &'lys-shell;help;audio;sources'= {
+        }
+        &'lys-shell;help;audio;status'= {
+        }
+        &'lys-shell;help;config'= {
+            cand get 'Get the value of a configuration path'
+            cand set 'Set the value of a configuration path'
+            cand reset 'Reset a configuration path to its default value'
+            cand schema 'Output JSON Schema for the configuration (for editor intellisense)'
+            cand default 'Output the default configuration as TOML'
+            cand docs 'Generate markdown reference pages for every registered schema'
+        }
+        &'lys-shell;help;config;get'= {
+        }
+        &'lys-shell;help;config;set'= {
+        }
+        &'lys-shell;help;config;reset'= {
+        }
+        &'lys-shell;help;config;schema'= {
+        }
+        &'lys-shell;help;config;default'= {
+        }
+        &'lys-shell;help;config;docs'= {
+        }
+        &'lys-shell;help;icons'= {
+            cand setup 'Install bundled icons required by lys-shell components'
+            cand install 'Install icons from a CDN source'
+            cand import 'Import local SVG file(s) as icons'
+            cand remove 'Remove installed icons'
+            cand sources 'List available icon sources'
+            cand list 'List installed icons'
+            cand open 'Open the icons directory in file manager'
+            cand export 'Export all installed icons to a directory'
+            cand sync 'Install any icons referenced in config but not yet on disk'
+        }
+        &'lys-shell;help;icons;setup'= {
+        }
+        &'lys-shell;help;icons;install'= {
+        }
+        &'lys-shell;help;icons;import'= {
+        }
+        &'lys-shell;help;icons;remove'= {
+        }
+        &'lys-shell;help;icons;sources'= {
+        }
+        &'lys-shell;help;icons;list'= {
+        }
+        &'lys-shell;help;icons;open'= {
+        }
+        &'lys-shell;help;icons;export'= {
+        }
+        &'lys-shell;help;icons;sync'= {
+        }
+        &'lys-shell;help;media'= {
+            cand list 'List all available media players'
+            cand play-pause 'Toggle play/pause for a media player'
+            cand next 'Skip to next track'
+            cand previous 'Go to previous track'
+            cand shuffle 'Toggle or set shuffle mode'
+            cand loop 'Set loop/repeat mode'
+            cand active 'Get or set the active media player'
+            cand info 'Display detailed information about a media player'
+        }
+        &'lys-shell;help;media;list'= {
+        }
+        &'lys-shell;help;media;play-pause'= {
+        }
+        &'lys-shell;help;media;next'= {
+        }
+        &'lys-shell;help;media;previous'= {
+        }
+        &'lys-shell;help;media;shuffle'= {
+        }
+        &'lys-shell;help;media;loop'= {
+        }
+        &'lys-shell;help;media;active'= {
+        }
+        &'lys-shell;help;media;info'= {
+        }
+        &'lys-shell;help;notify'= {
+            cand list 'List all notifications'
+            cand dismiss 'Dismiss a notification by ID'
+            cand dismiss-all 'Dismiss all notifications'
+            cand dnd 'Toggle Do Not Disturb mode'
+            cand status 'Show notification status'
+        }
+        &'lys-shell;help;notify;list'= {
+        }
+        &'lys-shell;help;notify;dismiss'= {
+        }
+        &'lys-shell;help;notify;dismiss-all'= {
+        }
+        &'lys-shell;help;notify;dnd'= {
+        }
+        &'lys-shell;help;notify;status'= {
+        }
+        &'lys-shell;help;panel'= {
+            cand start 'Start the panel daemon'
+            cand stop 'Stop the panel daemon'
+            cand restart 'Restart the panel daemon'
+            cand status 'Check panel status'
+            cand settings 'Open panel settings'
+            cand inspect 'Open the widget inspector for debugging'
+            cand hide 'Hide the bar on a monitor'
+            cand show 'Show the bar on a monitor'
+            cand toggle 'Toggle bar visibility on a monitor'
+        }
+        &'lys-shell;help;panel;start'= {
+        }
+        &'lys-shell;help;panel;stop'= {
+        }
+        &'lys-shell;help;panel;restart'= {
+        }
+        &'lys-shell;help;panel;status'= {
+        }
+        &'lys-shell;help;panel;settings'= {
+        }
+        &'lys-shell;help;panel;inspect'= {
+        }
+        &'lys-shell;help;panel;hide'= {
+        }
+        &'lys-shell;help;panel;show'= {
+        }
+        &'lys-shell;help;panel;toggle'= {
+        }
+        &'lys-shell;help;power'= {
+            cand status 'Show current power profile'
+            cand set 'Set power profile'
+            cand cycle 'Cycle to next power profile'
+            cand list 'List available power profiles'
+        }
+        &'lys-shell;help;power;status'= {
+        }
+        &'lys-shell;help;power;set'= {
+        }
+        &'lys-shell;help;power;cycle'= {
+        }
+        &'lys-shell;help;power;list'= {
+        }
+        &'lys-shell;help;systray'= {
+            cand list 'List all system tray items'
+            cand activate 'Activate a tray item by ID'
+            cand status 'Show system tray status'
+        }
+        &'lys-shell;help;systray;list'= {
+        }
+        &'lys-shell;help;systray;activate'= {
+        }
+        &'lys-shell;help;systray;status'= {
+        }
+        &'lys-shell;help;wallpaper'= {
+            cand set 'Set wallpaper from an image file'
+            cand cycle 'Start cycling wallpapers from a directory'
+            cand stop 'Stop wallpaper cycling'
+            cand next 'Skip to next wallpaper'
+            cand previous 'Go back to previous wallpaper'
+            cand info 'Display current wallpaper information'
+            cand theming-monitor 'Set which monitor to use for color extraction'
+        }
+        &'lys-shell;help;wallpaper;set'= {
+        }
+        &'lys-shell;help;wallpaper;cycle'= {
+        }
+        &'lys-shell;help;wallpaper;stop'= {
+        }
+        &'lys-shell;help;wallpaper;next'= {
+        }
+        &'lys-shell;help;wallpaper;previous'= {
+        }
+        &'lys-shell;help;wallpaper;info'= {
+        }
+        &'lys-shell;help;wallpaper;theming-monitor'= {
+        }
+        &'lys-shell;help;idle'= {
+            cand on 'Enable idle inhibition'
+            cand off 'Disable idle inhibition'
+            cand duration 'Adjust timer duration (upper limit)'
+            cand remaining 'Adjust remaining time on active timer'
+            cand status 'Show current idle inhibit status'
+            cand toggle 'Toggle idle inhibition on/off'
+        }
+        &'lys-shell;help;idle;on'= {
+        }
+        &'lys-shell;help;idle;off'= {
+        }
+        &'lys-shell;help;idle;duration'= {
+        }
+        &'lys-shell;help;idle;remaining'= {
+        }
+        &'lys-shell;help;idle;status'= {
+        }
+        &'lys-shell;help;idle;toggle'= {
+        }
+        &'lys-shell;help;launcher'= {
+        }
+        &'lys-shell;help;lock'= {
+        }
+        &'lys-shell;help;vpn'= {
+            cand sso-callback 'Hand a browser sign-in callback to the running shell'
+        }
+        &'lys-shell;help;vpn;sso-callback'= {
+        }
+        &'lys-shell;help;recorder'= {
+            cand start 'Start recording'
+            cand stop 'Stop recording'
+            cand toggle 'Toggle recording on/off'
+            cand pause 'Pause the active recording'
+            cand resume 'Resume a paused recording'
+            cand status 'Show current recorder status'
+        }
+        &'lys-shell;help;recorder;start'= {
+        }
+        &'lys-shell;help;recorder;stop'= {
+        }
+        &'lys-shell;help;recorder;toggle'= {
+        }
+        &'lys-shell;help;recorder;pause'= {
+        }
+        &'lys-shell;help;recorder;resume'= {
+        }
+        &'lys-shell;help;recorder;status'= {
+        }
+        &'lys-shell;help;screenshot'= {
+            cand region 'Capture a drag-selected region'
+            cand output 'Capture a whole output (the focused output when NAME is omitted)'
+            cand window 'Capture the active window'
+        }
+        &'lys-shell;help;screenshot;region'= {
+        }
+        &'lys-shell;help;screenshot;output'= {
+        }
+        &'lys-shell;help;screenshot;window'= {
+        }
+        &'lys-shell;help;widget'= {
+            cand update 'Push an output update to a bar widget by its config id'
+        }
+        &'lys-shell;help;widget;update'= {
+        }
+        &'lys-shell;help;toast'= {
+        }
+        &'lys-shell;help;portal'= {
+            cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)'
+            cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
+        }
+        &'lys-shell;help;portal;run'= {
+        }
+        &'lys-shell;help;portal;share-picker'= {
+        }
+        &'lys-shell;help;portal;show'= {
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+        }
+        &'lys-shell;help;portal;show;file-chooser'= {
+        }
+        &'lys-shell;help;portal;show;screenshot'= {
+        }
+        &'lys-shell;help;portal;show;color'= {
+        }
+        &'lys-shell;help;portal;show;print'= {
+        }
+        &'lys-shell;help;portal;show;screen-cast'= {
+        }
+        &'lys-shell;help;portal;show;access'= {
+        }
+        &'lys-shell;help;portal;show;account'= {
+        }
+        &'lys-shell;help;portal;show;app-chooser'= {
+        }
+        &'lys-shell;help;portal;show;dynamic-launcher'= {
+        }
+        &'lys-shell;help;portal;show;wallpaper'= {
+        }
+        &'lys-shell;help;shell'= {
+        }
+        &'lys-shell;help;completions'= {
+        }
+        &'lys-shell;help;help'= {
+        }
+    ]
+    $completions[$command]
+}

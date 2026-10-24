@@ -1,8 +1,8 @@
 // Package wallpaper renders the wallpaper service natively
-// (crates/wayle-shell/src/shell/wallpaper, bootstrap/wallpaper.rs, and
+// (crates/lys-shell/src/shell/wallpaper, bootstrap/wallpaper.rs, and
 // the hotplug half of watchers/wallpaper.rs): one Background layer
 // surface per output, reconciled against the service's per-monitor
-// state, each swapping images with the wallpaper transition. wayle is
+// state, each swapping images with the wallpaper transition. lys-shell is
 // the wallpaper provider; no swww or other tool is involved.
 package wallpaper
 
@@ -13,20 +13,20 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/imagedecode"
-	"github.com/stubbedev/wayle/service/wallpaper"
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 // frameInterval paces transition steps.
 const frameInterval = 16 * time.Millisecond
 
 // Shell owns the wallpaper service and its surfaces. Its methods run
-// on the gelm loop goroutine.
+// on the lys-ui loop goroutine.
 type Shell struct {
 	app      *app.Application
 	svc      *wallpaper.Service
@@ -38,7 +38,7 @@ type Shell struct {
 
 // Start builds the service from config (build_wallpaper_service),
 // registers the outputs that have a connector name, serves
-// com.wayle.Wallpaper1 on conn, and starts the cycling and extraction
+// dev.stubbe.lys.Wallpaper1 on conn, and starts the cycling and extraction
 // loops and the surfaces. It fails like the Rust service init when
 // the D-Bus name is taken (another shell is running): no wallpaper is
 // drawn then. The returned stop function ends the loops and releases
@@ -279,7 +279,7 @@ func (s *Shell) newSurface(name string, out *app.Output) (*surface, error) {
 		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardNone,
-		Namespace:     "wayle-wallpaper",
+		Namespace:     "lys-shell-wallpaper",
 		Root:          surf.view,
 		Background:    backdrop,
 		OnClosed: func() {

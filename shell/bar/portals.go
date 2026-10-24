@@ -8,25 +8,25 @@ import (
 	"path/filepath"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/desktopentry"
-	"github.com/stubbedev/wayle/internal/ipp"
-	"github.com/stubbedev/wayle/internal/mime"
-	"github.com/stubbedev/wayle/internal/xdg"
-	"github.com/stubbedev/wayle/shell/filechooser"
-	"github.com/stubbedev/wayle/shell/portaldialogs"
-	"github.com/stubbedev/wayle/shell/printdialog"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/shell/filechooser"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
 // servePortalHosts hosts the shell's halves of the portal backend on
-// one session bus connection: com.wayle.PortalDialogs1 (access,
+// one session bus connection: dev.stubbe.lys.PortalDialogs1 (access,
 // account, app chooser, dynamic launcher and the wallpaper preview;
-// services/portal_dialogs), com.wayle.FileChooser1 (services/
-// file_chooser) and com.wayle.Print1 (services/print, spooling over
+// services/portal_dialogs), dev.stubbe.lys.FileChooser1 (services/
+// file_chooser) and dev.stubbe.lys.Print1 (services/print, spooling over
 // CUPS' IPP). A bus failure leaves the portal answering those requests
 // "other".
 func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, font render.Font, sheet *widget.Stylesheet) {

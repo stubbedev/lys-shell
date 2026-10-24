@@ -1,0 +1,6 @@
+List all available media players
+
+Usage: lys-shell media list
+
+Options:
+  -h, --help  Print help

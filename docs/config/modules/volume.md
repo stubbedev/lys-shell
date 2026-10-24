@@ -86,7 +86,7 @@ label-color = "status-error"
 |---|---|---|---|
 | `left-click` | [`ClickAction`](/config/types#click-action) | `"dropdown:audio"` | Action on left click. Default opens the audio dropdown. |
 | `right-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on right click. |
-| `middle-click` | [`ClickAction`](/config/types#click-action) | `"wayle audio output-mute"` | Action on middle click. Default toggles mute. |
+| `middle-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell audio output-mute"` | Action on middle click. Default toggles mute. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
 
@@ -118,7 +118,7 @@ label-max-length = 0
 button-bg-color = "bg-surface-elevated"
 left-click = "dropdown:audio"
 right-click = ""
-middle-click = "wayle audio output-mute"
+middle-click = "lys-shell audio output-mute"
 scroll-up = ""
 scroll-down = ""
 dropdown-app-icons = "mapped"

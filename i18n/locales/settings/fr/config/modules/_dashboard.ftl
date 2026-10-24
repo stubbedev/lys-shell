@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Tableau de bord
+### Configuration lys-shell - Module Tableau de bord
 
 ## Configuration du module Tableau de bord
 

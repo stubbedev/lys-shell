@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/mime"
 )
 
 // testDB is a shared-mime-info fixture with the types the filter tests

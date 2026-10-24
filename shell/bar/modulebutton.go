@@ -3,11 +3,11 @@ package bar
 import (
 	"strings"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // barButton is the port of the Rust BarButton
@@ -51,7 +51,7 @@ type barButton struct {
 	ownClasses []string
 }
 
-// barToggle is the button.toggle node: a gelm Button that stays the hit
+// barToggle is the button.toggle node: a lys-ui Button that stays the hit
 // leaf and routes the non-primary bindings to its bar button.
 type barToggle struct {
 	*widget.Button
@@ -367,7 +367,7 @@ func (r *buttonRef) thresholds(value float64, entries []config.ThresholdEntry) {
 
 // inlineDecls strips a `selector { ... }` rule down to its declaration
 // list: the Rust per-widget providers are `* { ... }` rules, which in
-// gelm are the widget's inline declarations.
+// lys-ui are the widget's inline declarations.
 func inlineDecls(rule string) string {
 	open, end := strings.IndexByte(rule, '{'), strings.LastIndexByte(rule, '}')
 	if open < 0 || end < open {

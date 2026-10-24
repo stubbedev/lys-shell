@@ -1,4 +1,4 @@
-### Wayle Configuration - Power Module
+### lys-shell Configuration - Power Module
 
 ## Power Module Configuration
 

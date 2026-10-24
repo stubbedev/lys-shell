@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // AnyConnect (Cisco) gateway authentication, spoken natively over HTTPS

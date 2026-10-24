@@ -15,11 +15,11 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // clientName is the application.name the Rust backend's context used.
-const clientName = "wayle-pulse"
+const clientName = "lys-shell-pulse"
 
 // subscriptionMask is backend/events's interest set.
 const subscriptionMask = native.MaskSink | native.MaskSource | native.MaskSinkInput |

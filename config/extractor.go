@@ -3,12 +3,12 @@ package config
 import "reflect"
 
 // ColorExtractorConfig is the slice of [styling] that drives wallpaper
-// color extraction (crates/wayle-shell/src/watchers/color_extractor.rs):
+// color extraction (crates/lys-shell/src/watchers/color_extractor.rs):
 // the provider, the theming monitor, and the matugen-/wallust-/pywal-
 // tool parameters. It is an inline group: its keys sit directly in
 // [styling].
 type ColorExtractorConfig struct {
-	// Theme provider (wayle, matugen, pywal, wallust).
+	// Theme provider (lys-shell, matugen, pywal, wallust).
 	ThemeProvider ThemeProvider `cfg:"theme-provider"`
 	// Monitor whose wallpaper drives color extraction. Empty uses the first available.
 	ThemingMonitor string `cfg:"theming-monitor"`
@@ -45,7 +45,7 @@ type ColorExtractorConfig struct {
 // DefaultsColorExtractor returns the schema defaults.
 func DefaultsColorExtractor() ColorExtractorConfig {
 	return ColorExtractorConfig{
-		ThemeProvider:        ThemeProviderWayle,
+		ThemeProvider:        ThemeProviderLysShell,
 		MatugenScheme:        MatugenSchemeTonalSpot,
 		WallustPalette:       WallustPaletteDark16,
 		WallustCheckContrast: true,

@@ -5,109 +5,109 @@ Every command and subcommand takes `--help`.
 Panel lifecycle and visibility:
 
 ```sh
-wayle panel start
-wayle panel stop
-wayle panel restart
-wayle panel status
-wayle panel settings
-wayle panel inspect
+lys-shell panel start
+lys-shell panel stop
+lys-shell panel restart
+lys-shell panel status
+lys-shell panel settings
+lys-shell panel inspect
 
 # Per-monitor visibility (omit the connector to affect all monitors)
-wayle panel hide DP-1
-wayle panel show DP-1
-wayle panel toggle
+lys-shell panel hide DP-1
+lys-shell panel show DP-1
+lys-shell panel toggle
 ```
 
 Read and edit config values from the command line:
 
 ```sh
-wayle config get bar.scale
-wayle config set bar.scale 1.25
-wayle config reset bar.scale
+lys-shell config get bar.scale
+lys-shell config set bar.scale 1.25
+lys-shell config reset bar.scale
 
 # Emit the JSON schema, default TOML, or markdown docs
-wayle config schema --stdout
-wayle config default --stdout
-wayle config docs --out docs/config
+lys-shell config schema --stdout
+lys-shell config default --stdout
+lys-shell config docs --out docs/config
 ```
 
 Audio controls. Volume takes an absolute level (`0-100`) or a relative
 adjustment (`+5`, `-10`):
 
 ```sh
-wayle audio output-volume +5
-wayle audio output-mute
-wayle audio input-volume 50
-wayle audio input-mute
-wayle audio sinks
-wayle audio sources
-wayle audio status
+lys-shell audio output-volume +5
+lys-shell audio output-mute
+lys-shell audio input-volume 50
+lys-shell audio input-mute
+lys-shell audio sinks
+lys-shell audio sources
+lys-shell audio status
 ```
 
 Media player control. Most subcommands take an optional player id (a number or
 partial name match); omit it to target the active player:
 
 ```sh
-wayle media list
-wayle media play-pause
-wayle media next
-wayle media previous
-wayle media shuffle on
-wayle media loop track
-wayle media active spotify
-wayle media info
+lys-shell media list
+lys-shell media play-pause
+lys-shell media next
+lys-shell media previous
+lys-shell media shuffle on
+lys-shell media loop track
+lys-shell media active spotify
+lys-shell media info
 ```
 
 Idle inhibition:
 
 ```sh
-wayle idle on            # use the default duration
-wayle idle on 30         # inhibit for 30 minutes
-wayle idle on --indefinite
-wayle idle off
-wayle idle toggle
-wayle idle duration +15  # +N / -N / N adjusts the upper limit
-wayle idle remaining -5  # +N / -N / N adjusts the active timer
-wayle idle status
+lys-shell idle on            # use the default duration
+lys-shell idle on 30         # inhibit for 30 minutes
+lys-shell idle on --indefinite
+lys-shell idle off
+lys-shell idle toggle
+lys-shell idle duration +15  # +N / -N / N adjusts the upper limit
+lys-shell idle remaining -5  # +N / -N / N adjusts the active timer
+lys-shell idle status
 ```
 
 Power profiles:
 
 ```sh
-wayle power status
-wayle power set balanced  # power-saver, balanced, performance
-wayle power cycle
-wayle power list
+lys-shell power status
+lys-shell power set balanced  # power-saver, balanced, performance
+lys-shell power cycle
+lys-shell power list
 ```
 
 Notifications:
 
 ```sh
-wayle notify list
-wayle notify dismiss 42
-wayle notify dismiss-all
-wayle notify dnd          # toggle Do Not Disturb
-wayle notify status
+lys-shell notify list
+lys-shell notify dismiss 42
+lys-shell notify dismiss-all
+lys-shell notify dnd          # toggle Do Not Disturb
+lys-shell notify status
 ```
 
 System tray:
 
 ```sh
-wayle systray list
-wayle systray activate <id>
-wayle systray status
+lys-shell systray list
+lys-shell systray activate <id>
+lys-shell systray status
 ```
 
 Wallpapers. Set a single image, or cycle through a directory:
 
 ```sh
-wayle wallpaper set ~/Pictures/wall.png --fit fill --monitor DP-1
-wayle wallpaper cycle ~/Pictures/walls --interval 300 --mode sequential
-wayle wallpaper stop
-wayle wallpaper next
-wayle wallpaper previous
-wayle wallpaper info --monitor DP-1
-wayle wallpaper theming-monitor DP-1
+lys-shell wallpaper set ~/Pictures/wall.png --fit fill --monitor DP-1
+lys-shell wallpaper cycle ~/Pictures/walls --interval 300 --mode sequential
+lys-shell wallpaper stop
+lys-shell wallpaper next
+lys-shell wallpaper previous
+lys-shell wallpaper info --monitor DP-1
+lys-shell wallpaper theming-monitor DP-1
 ```
 
 `--fit` accepts `fill`, `fit`, `center`, `tile`, `stretch`; `--mode` accepts
@@ -116,35 +116,35 @@ wayle wallpaper theming-monitor DP-1
 Screen recorder:
 
 ```sh
-wayle recorder start
-wayle recorder stop
-wayle recorder toggle
-wayle recorder pause
-wayle recorder resume
-wayle recorder status
+lys-shell recorder start
+lys-shell recorder stop
+lys-shell recorder toggle
+lys-shell recorder pause
+lys-shell recorder resume
+lys-shell recorder status
 ```
 
 Screenshots:
 
 ```sh
-wayle screenshot region        # drag-select a region
-wayle screenshot output DP-1   # whole output (focused output if omitted)
-wayle screenshot window        # the active window
+lys-shell screenshot region        # drag-select a region
+lys-shell screenshot output DP-1   # whole output (focused output if omitted)
+lys-shell screenshot window        # the active window
 ```
 
 Icons. Install bundled assets, pull from a CDN source, import local SVGs, or
 sync everything referenced in your config:
 
 ```sh
-wayle icons setup
-wayle icons sources
-wayle icons install tabler home settings bell
-wayle icons import ~/Downloads/my-icon.svg my-icon
-wayle icons list --source tb --interactive
-wayle icons remove tb-home-symbolic
-wayle icons export ~/exported-icons
-wayle icons open
-wayle icons sync --dry-run
+lys-shell icons setup
+lys-shell icons sources
+lys-shell icons install tabler home settings bell
+lys-shell icons import ~/Downloads/my-icon.svg my-icon
+lys-shell icons list --source tb --interactive
+lys-shell icons remove tb-home-symbolic
+lys-shell icons export ~/exported-icons
+lys-shell icons open
+lys-shell icons sync --dry-run
 ```
 
 Push a runtime update to a custom module by its `id`. The payload is parsed
@@ -152,7 +152,7 @@ exactly like the module's own command output, so it drives the label, icon, and
 colors (see [custom modules](/guide/custom-modules)):
 
 ```sh
-wayle widget update gpu '{"text":"72°C","alt":"hot","percentage":90}'
+lys-shell widget update gpu '{"text":"72°C","alt":"hot","percentage":90}'
 ```
 
 Show a custom on-screen toast. It reuses the OSD styling and position; add
@@ -161,22 +161,22 @@ to override the OSD dismiss time, `--preset` to base it on a configured preset,
 and `--class` for a custom CSS class:
 
 ```sh
-wayle toast "Build finished"
-wayle toast "Volume" --icon audio-volume-high-symbolic --percentage 65
-wayle toast "Syncing…" --duration 5000
+lys-shell toast "Build finished"
+lys-shell toast "Volume" --icon audio-volume-high-symbolic --percentage 65
+lys-shell toast "Syncing…" --duration 5000
 ```
 
 Run the desktop shell in the foreground:
 
 ```sh
-wayle shell
+lys-shell shell
 ```
 
 Shell completions for any clap-supported shell (bash, fish, zsh, …):
 
 ```sh
-wayle completions fish > ~/.config/fish/completions/wayle.fish
+lys-shell completions fish > ~/.config/fish/completions/lys-shell.fish
 ```
 
-> `wayle share-picker` exists for the xdg-desktop-portal screencast flow and is
+> `lys-shell share-picker` exists for the xdg-desktop-portal screencast flow and is
 > invoked by the portal, not by hand.

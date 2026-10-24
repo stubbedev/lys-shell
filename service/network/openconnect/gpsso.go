@@ -18,12 +18,12 @@ import (
 //
 // A SAML gateway answers prelogin with saml-auth-method and
 // saml-request instead of field labels. Completing that is a browser's
-// job, not a form's. wayle does not embed one (webkitgtk is a very large
+// job, not a form's. lys-shell does not embed one (webkitgtk is a very large
 // dependency for one sign-in flow); it does what recent GlobalProtect
 // clients do: the portal hands the sign-in to the real browser and takes
 // the answer back through a custom URI scheme, globalprotectcallback:.
-// wayle registers a handler for that scheme, the browser hands the
-// payload to `wayle vpn sso-callback`, and it reaches the waiting
+// lys-shell registers a handler for that scheme, the browser hands the
+// payload to `lys-shell vpn sso-callback`, and it reaches the waiting
 // sign-in over the shell's D-Bus interface (DeliverSSOCallback).
 //
 // Not verified, because it needs a real SAML portal: the callback
@@ -31,7 +31,7 @@ import (
 // the payload, so parseCallback reads all three shapes the values are
 // known to travel in — header lines, XML elements, and HTML <meta> tags
 // — rather than betting on one. Nothing here runs unless the profile
-// asks for it (wayle-sso).
+// asks for it (lys-shell-sso).
 
 // samlMethod is how the portal wants the SAML request delivered.
 type samlMethod int
@@ -313,7 +313,7 @@ func browserURL(request samlRequest) (string, error) {
 // user to the identity provider; it is nobody else's business on a
 // shared machine.
 func writeRequestDocument(html string) (string, error) {
-	name := fmt.Sprintf("wayle-gp-saml-%d-%d.html", os.Getpid(), time.Now().UnixNano())
+	name := fmt.Sprintf("lys-shell-gp-saml-%d-%d.html", os.Getpid(), time.Now().UnixNano())
 	path := filepath.Join(os.TempDir(), name)
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // a name this process made up, in the temp directory
 	if err != nil {

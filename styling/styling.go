@@ -1,4 +1,4 @@
-// Package styling resolves wayle's design tokens to concrete colors:
+// Package styling resolves lys-shell's design tokens to concrete colors:
 // the Go counterpart of crates/wayle-styling. The palette is the
 // runtime source of truth; every token is a color-mix derivation from
 // it, ported exactly from scss/tokens/_index.scss so a resolved token
@@ -8,9 +8,9 @@ package styling
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/lys-ui/render"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // RemBase is the rem the SCSS base values multiply: styling.rs's
@@ -250,7 +250,7 @@ func RoundingRadiusPx(level config.RoundingLevel, scale float64) int {
 }
 
 // HexRGBA renders a premultiplied color as the straight-alpha #rrggbbaa
-// (or #rrggbb when opaque) form gelm stylesheets parse.
+// (or #rrggbb when opaque) form lys-ui stylesheets parse.
 func HexRGBA(c render.Color) string {
 	a := uint8(uint32(c) >> 24)
 	hex := func(v uint8) string {

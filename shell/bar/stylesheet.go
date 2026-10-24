@@ -1,6 +1,6 @@
 package bar
 
-import "github.com/stubbedev/wayle/config"
+import "github.com/stubbedev/lys-shell/config"
 
 // locationClass is Location::css_class: the root's location class.
 func locationClass(location config.Location) string { return string(location) }

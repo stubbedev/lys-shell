@@ -1,7 +1,7 @@
-### Chaînes principales de l'interface Wayle - Français
+### Chaînes principales de l'interface lys-shell - Français
 
 ## Application
-app-name = Wayle
+app-name = lys-shell
 
 ## Interface commune
 common-ok = OK

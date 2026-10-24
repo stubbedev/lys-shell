@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/wayle/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // DeviceType is input (source) or output (sink) (types/device.rs).

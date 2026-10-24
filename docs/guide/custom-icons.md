@@ -1,11 +1,11 @@
 # Custom icons
 
-Config fields like `icon-name = "tb-home-symbolic"` resolve against the Wayle icon theme installed at `~/.local/share/wayle/icons/`. The `wayle icons` subcommand populates that directory from CDN sources or local SVG files.
+Config fields like `icon-name = "tb-home-symbolic"` resolve against the lys-shell icon theme installed at `~/.local/share/lys-shell/icons/`. The `lys-shell icons` subcommand populates that directory from CDN sources or local SVG files.
 
 ## List available sources
 
 ```sh
-wayle icons sources
+lys-shell icons sources
 ```
 
 Five sources ship in-tree. Slug names come directly from the upstream catalogues, linked below.
@@ -21,13 +21,13 @@ Five sources ship in-tree. Slug names come directly from the upstream catalogues
 ## Install from a CDN source
 
 ```sh
-wayle icons install <source> <slug> [<slug>...]
+lys-shell icons install <source> <slug> [<slug>...]
 ```
 
 Example:
 
 ```sh
-wayle icons install tabler home settings bell
+lys-shell icons install tabler home settings bell
 ```
 
 This downloads the three Tabler icons and installs them as `tb-home-symbolic`, `tb-settings-symbolic`, and `tb-bell-symbolic`. The source name determines the prefix; the slug is the icon's name on the upstream site.
@@ -35,7 +35,7 @@ This downloads the three Tabler icons and installs them as `tb-home-symbolic`, `
 Brand logos work the same way:
 
 ```sh
-wayle icons install simple-icons firefox spotify
+lys-shell icons install simple-icons firefox spotify
 ```
 
 Produces `si-firefox-symbolic` and `si-spotify-symbolic`.
@@ -43,13 +43,13 @@ Produces `si-firefox-symbolic` and `si-spotify-symbolic`.
 ## Import a local SVG
 
 ```sh
-wayle icons import <path> [name]
+lys-shell icons import <path> [name]
 ```
 
 For a single file, pass a name. The icon is installed with the `cm-` prefix:
 
 ```sh
-wayle icons import ~/Downloads/my-logo.svg my-logo
+lys-shell icons import ~/Downloads/my-logo.svg my-logo
 ```
 
 Installs as `cm-my-logo-symbolic`.
@@ -57,7 +57,7 @@ Installs as `cm-my-logo-symbolic`.
 For a directory, omit the name. Every SVG is imported; files already starting with a known prefix (`tb-`, `tbf-`, `si-`, `md-`, `ld-`, `cm-`) keep their name, and anything else gets `cm-` added.
 
 ```sh
-wayle icons import ~/exported-icons/
+lys-shell icons import ~/exported-icons/
 ```
 
 Imported SVGs are transformed into GTK symbolic icons so they pick up theme colours.
@@ -65,8 +65,8 @@ Imported SVGs are transformed into GTK symbolic icons so they pick up theme colo
 ## List and remove
 
 ```sh
-wayle icons list
-wayle icons list --source tb
+lys-shell icons list
+lys-shell icons list --source tb
 ```
 
 `--source` filters by prefix. Add `--interactive` for an fzf-backed search if `fzf` is on `$PATH`.
@@ -74,7 +74,7 @@ wayle icons list --source tb
 To remove icons, pass their full names:
 
 ```sh
-wayle icons remove tb-home-symbolic si-firefox-symbolic
+lys-shell icons remove tb-home-symbolic si-firefox-symbolic
 ```
 
 ## Referencing icons in config

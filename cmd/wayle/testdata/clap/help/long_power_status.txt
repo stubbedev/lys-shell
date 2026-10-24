@@ -1,6 +1,0 @@
-Show current power profile
-
-Usage: wayle power status
-
-Options:
-  -h, --help  Print help

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // Generate writes every page under dir: one per section (bar modules
@@ -67,8 +67,8 @@ func writePage(path, content string) error {
 func indexPage(sections []config.DocSection) string {
 	var b strings.Builder
 	b.WriteString("---\ntitle: Config reference\noutline: [2]\n---\n\n<div v-pre>\n\n# Config reference\n\n")
-	b.WriteString("Every config file lives at `~/.config/wayle/config.toml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.\n\n")
-	b.WriteString("::: tip\nEditor intellisense via JSON Schema. Install [Tombi](https://marketplace.visualstudio.com/items?itemName=tombi-toml.tombi) for VSCode or the `tombi` LSP for Neovim, Helix, or Zed. The schema is written to `~/.config/wayle/schema.json` on startup.\n:::\n\n")
+	b.WriteString("Every config file lives at `~/.config/lys-shell/config.toml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.\n\n")
+	b.WriteString("::: tip\nEditor intellisense via JSON Schema. Install [Tombi](https://marketplace.visualstudio.com/items?itemName=tombi-toml.tombi) for VSCode or the `tombi` LSP for Neovim, Helix, or Zed. The schema is written to `~/.config/lys-shell/schema.json` on startup.\n:::\n\n")
 	b.WriteString("## Top-level sections\n\n| Section | What it controls |\n|---|---|\n")
 	for _, sec := range sections {
 		if sec.LayoutID == "" {

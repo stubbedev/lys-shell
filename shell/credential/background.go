@@ -10,13 +10,13 @@ import (
 	"math"
 	"os"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 	_ "golang.org/x/image/bmp"  // background decoders
 	_ "golang.org/x/image/tiff" // background decoders
 	_ "golang.org/x/image/webp" // background decoders
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // HexFill converts a config color to a premultiplied fill.

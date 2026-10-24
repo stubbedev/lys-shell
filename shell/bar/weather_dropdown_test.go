@@ -6,20 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/weather"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/weather"
 )
 
 func TestWeatherSettingsMapsTheConfig(t *testing.T) {
-	t.Setenv("WAYLE_TEST_WEATHER_KEY", "s3cret")
+	t.Setenv("LYS_SHELL_TEST_WEATHER_KEY", "s3cret")
 	cfg := config.Defaults().Weather
 	cfg.Location = "52.5,13.4"
 	cfg.Provider = config.WeatherProviderWeatherApi
-	ref := "$WAYLE_TEST_WEATHER_KEY"
+	ref := "$LYS_SHELL_TEST_WEATHER_KEY"
 	cfg.WeatherapiKey = &ref
 	cfg.RefreshIntervalSeconds = 90
 	s := weatherSettings(cfg)
@@ -27,14 +27,14 @@ func TestWeatherSettingsMapsTheConfig(t *testing.T) {
 		t.Errorf("settings = %+v", s)
 	}
 	if s.WeatherAPIKey != "s3cret" {
-		t.Errorf("weatherapi key = %q, want the resolved $WAYLE_TEST_WEATHER_KEY", s.WeatherAPIKey)
+		t.Errorf("weatherapi key = %q, want the resolved $LYS_SHELL_TEST_WEATHER_KEY", s.WeatherAPIKey)
 	}
 	if s.VisualCrossingKey != "" {
 		t.Errorf("an unset key resolved to %q", s.VisualCrossingKey)
 	}
 	// An unset variable leaves the key empty (the provider then reports
 	// the missing key) rather than sending "$NAME" as the key.
-	missing := "$WAYLE_TEST_WEATHER_UNSET"
+	missing := "$LYS_SHELL_TEST_WEATHER_UNSET"
 	cfg.WeatherapiKey = &missing
 	if got := weatherSettings(cfg).WeatherAPIKey; got != "" {
 		t.Errorf("unset variable key = %q", got)

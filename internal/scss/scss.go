@@ -1,4 +1,4 @@
-// Package scss compiles the SCSS users write for wayle style overrides
+// Package scss compiles the SCSS users write for lys-shell style overrides
 // into plain CSS. It stands in for the grass compiler the Rust shell
 // runs over <config dir>/styles/index.scss
 // (crates/wayle-styling/src/lib.rs, try_user_css): the Go port is pure

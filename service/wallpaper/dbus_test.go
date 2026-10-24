@@ -12,7 +12,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 // privateBus starts a throwaway dbus-daemon and returns its address.

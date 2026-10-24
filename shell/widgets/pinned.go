@@ -1,15 +1,15 @@
 package widgets
 
 import (
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // Pinned holds a child at an exact size on each non-zero axis, the
 // extent GTK reaches with a size request where the content measures
 // smaller and a clip where it measures larger: the file chooser's
 // resizable columns and HiDPI thumbnails, a portal header image. A zero
-// axis keeps the child's natural extent. (Minimum sizes are gelm's
+// axis keeps the child's natural extent. (Minimum sizes are lys-ui's
 // SetSizeRequest; this is for boxes that must not grow.)
 type Pinned struct {
 	widget.Base

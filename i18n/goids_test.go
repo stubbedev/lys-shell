@@ -52,7 +52,7 @@ func scanGoUsage(t *testing.T) goUsage {
 		}
 		imports := false
 		for _, imp := range file.Imports {
-			if imp.Path.Value == `"github.com/stubbedev/wayle/i18n"` {
+			if imp.Path.Value == `"github.com/stubbedev/lys-shell/i18n"` {
 				imports = true
 			}
 		}
@@ -98,7 +98,7 @@ func TestGoMessageIDsResolveInEveryLocale(t *testing.T) {
 	if len(use.calls) == 0 {
 		t.Fatal("found no i18n.T call sites; the scanner is broken")
 	}
-	assets := trees["wayle-shell-core"]
+	assets := trees["lys-shell-core"]
 	bundleFor := func(lang string) *bundle {
 		src, err := assets.Source(lang)
 		if err != nil {

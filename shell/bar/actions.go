@@ -4,14 +4,14 @@ import (
 	"context"
 	"log"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/spawn"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/spawn"
 )
 
 // runClickAction dispatches one binding, the Go counterpart of
 // dropdown_registry.rs's dispatch_action: dropdown panels open through
 // the registry (not ported yet, so they log), brightness steps and
-// toggles drive every backlight natively, wayle builtins run
+// toggles drive every backlight natively, lys-shell builtins run
 // in-process, and everything else shells out.
 func runClickAction(ctx ModuleContext, action config.ClickAction) {
 	switch action.Kind {
@@ -30,7 +30,7 @@ func runClickAction(ctx ModuleContext, action config.ClickAction) {
 	}
 }
 
-// runShellBuiltin handles the `wayle …` verbs in-process (the Rust
+// runShellBuiltin handles the `lys-shell …` verbs in-process (the Rust
 // try_builtin path), falling back to a real subprocess for anything
 // else.
 func runShellBuiltin(ctx ModuleContext, cmd string) {
@@ -52,10 +52,10 @@ func runShellBuiltin(ctx ModuleContext, cmd string) {
 	}
 }
 
-// splitBuiltin reports the verb of a `wayle <area> <verb> …` command,
+// splitBuiltin reports the verb of a `lys-shell <area> <verb> …` command,
 // empty when the command is not one.
 func splitBuiltin(cmd string) (string, string) {
-	const prefix = "wayle "
+	const prefix = "lys-shell "
 	if len(cmd) < len(prefix) || cmd[:len(prefix)] != prefix {
 		return "", cmd
 	}

@@ -16,18 +16,18 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/feed"
-	"github.com/stubbedev/wayle/internal/glob"
-	"github.com/stubbedev/wayle/internal/version"
-	"github.com/stubbedev/wayle/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // D-Bus identity and server information.
 const (
 	Interface     = "org.freedesktop.Notifications"
 	ObjPath       = "/org/freedesktop/Notifications"
-	ServerName    = "wayle"
-	ServerVendor  = "wayle"
+	ServerName    = "lys-shell"
+	ServerVendor  = "lys-shell"
 	ServerVersion = version.Version
 	SpecVersion   = "1.2"
 )
@@ -558,7 +558,7 @@ func globMatch(pattern, name string) bool {
 	return glob.Match(pattern, name)
 }
 
-// StateDir is the DND flag's directory, wayle's state dir.
+// StateDir is the DND flag's directory, lys-shell's state dir.
 func StateDir() (string, bool) { return xdg.StateDir() }
 
 // loadDND restores the sticky flag; anything but "on" reads off.
@@ -567,7 +567,7 @@ func loadDND() bool {
 	if !ok {
 		return false
 	}
-	body, err := os.ReadFile(filepath.Join(dir, "dnd")) //nolint:gosec // the path is wayle's own state dir
+	body, err := os.ReadFile(filepath.Join(dir, "dnd")) //nolint:gosec // the path is lys-shell's own state dir
 	if err != nil {
 		return false
 	}

@@ -15,9 +15,9 @@ func TestFormatErrorForMethods(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"service unknown", dbus.Error{Name: "org.freedesktop.DBus.Error.ServiceUnknown"}, "Screenshot service not running. Start wayle shell first."},
-		{"by pointer", &dbus.Error{Name: "org.freedesktop.DBus.Error.ServiceUnknown"}, "Screenshot service not running. Start wayle shell first."},
-		{"wrapped", fmt.Errorf("call: %w", dbus.Error{Name: "org.freedesktop.DBus.Error.ServiceUnknown"}), "Screenshot service not running. Start wayle shell first."},
+		{"service unknown", dbus.Error{Name: "org.freedesktop.DBus.Error.ServiceUnknown"}, "Screenshot service not running. Start lys-shell shell first."},
+		{"by pointer", &dbus.Error{Name: "org.freedesktop.DBus.Error.ServiceUnknown"}, "Screenshot service not running. Start lys-shell shell first."},
+		{"wrapped", fmt.Errorf("call: %w", dbus.Error{Name: "org.freedesktop.DBus.Error.ServiceUnknown"}), "Screenshot service not running. Start lys-shell shell first."},
 		// A method error is a MethodError: only ServiceUnknown is special.
 		{"no owner is a plain failure", dbus.Error{Name: "org.freedesktop.DBus.Error.NameHasNoOwner"}, "Failed to capture screenshot: org.freedesktop.DBus.Error.NameHasNoOwner"},
 		{"message shown", dbus.Error{Name: "org.freedesktop.DBus.Error.Failed", Body: []any{"no outputs available"}}, "Failed to capture screenshot: no outputs available"},
@@ -37,7 +37,7 @@ func TestFormatErrorForProperties(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"no owner", dbus.Error{Name: "org.freedesktop.DBus.Error.NameHasNoOwner"}, "Audio service not running. Start wayle shell first."},
+		{"no owner", dbus.Error{Name: "org.freedesktop.DBus.Error.NameHasNoOwner"}, "Audio service not running. Start lys-shell shell first."},
 		{"no reply", dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}, "get volume timed out - service not responding"},
 		{"timeout", dbus.Error{Name: "org.freedesktop.DBus.Error.Timeout"}, "get volume timed out - service not responding"},
 		{"fdo error names itself", dbus.Error{Name: "org.freedesktop.DBus.Error.UnknownProperty", Body: []any{"nope"}}, "Failed to get volume: org.freedesktop.DBus.Error.UnknownProperty: nope"},

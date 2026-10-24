@@ -3,12 +3,12 @@ package settings
 import (
 	"strconv"
 
-	"github.com/stubbedev/gelm/highlight"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/highlight"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 )
 
 // tomlEditor is TomlEditorControl: the field as a TOML document under

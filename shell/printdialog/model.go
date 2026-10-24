@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/ipp"
-	"github.com/stubbedev/wayle/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // paper is one size the form offers: its label, GTK's paper name (the

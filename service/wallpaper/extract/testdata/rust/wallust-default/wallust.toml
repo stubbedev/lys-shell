@@ -5,4 +5,4 @@ check_contrast = true
 dynamic_threshold = true
 
 [templates]
-colors = { template = "colors.json", target = "@ROOT@/cache/wayle/wallust-colors.json" }
+colors = { template = "colors.json", target = "@ROOT@/cache/lys-shell/wallust-colors.json" }

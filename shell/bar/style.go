@@ -3,10 +3,10 @@ package bar
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/lys-ui/render"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // borderWidths is a per-side border width set resolved from a
@@ -15,7 +15,7 @@ type borderWidths struct {
 	left, top, right, bottom int
 }
 
-// insets converts the widths to gelm's per-side insets.
+// insets converts the widths to lys-ui's per-side insets.
 func (b borderWidths) insets() render.Insets {
 	return render.Insets{Top: b.top, Right: b.right, Bottom: b.bottom, Left: b.left}
 }

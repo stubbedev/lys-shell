@@ -7,19 +7,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
 // The compositor-in-the-loop half: real captures against a private
 // headless compositor (sway on the pixman renderer). It runs only with
-// WAYLE_CAPTURE_HEADLESS=1 and WAYLAND_DISPLAY/XDG_RUNTIME_DIR pointing
+// LYS_SHELL_CAPTURE_HEADLESS=1 and WAYLAND_DISPLAY/XDG_RUNTIME_DIR pointing
 // at that private session - it must never capture a developer's
 // screen.
 func requireHeadless(t *testing.T) {
 	t.Helper()
-	if os.Getenv("WAYLE_CAPTURE_HEADLESS") == "" {
-		t.Skip("WAYLE_CAPTURE_HEADLESS is not set")
+	if os.Getenv("LYS_SHELL_CAPTURE_HEADLESS") == "" {
+		t.Skip("LYS_SHELL_CAPTURE_HEADLESS is not set")
 	}
 }
 

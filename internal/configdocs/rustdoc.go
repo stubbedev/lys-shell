@@ -1,5 +1,5 @@
-// Package configdocs renders the config reference pages (`wayle config
-// docs`, wayle/src/docs): one VitePress page per documented schema, the
+// Package configdocs renders the config reference pages (`lys-shell config
+// docs`, lys-shell/src/docs): one VitePress page per documented schema, the
 // shared types page, and the index, from config.DocSections.
 package configdocs
 

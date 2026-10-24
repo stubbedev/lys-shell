@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
-	"github.com/stubbedev/wayle/service/network/openconnect/openconnecttest"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/openconnect/openconnecttest"
 )
 
 // The agent's withdrawal and budget contracts against the real
@@ -16,7 +16,7 @@ import (
 
 func serveNative(t *testing.T, budget time.Duration) *agentFixture {
 	t.Helper()
-	// The sign-in caches passwords under $XDG_STATE_HOME/wayle/vpn.
+	// The sign-in caches passwords under $XDG_STATE_HOME/lys-shell/vpn.
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	f := startFakeNM(t)
 	conn := f.client()

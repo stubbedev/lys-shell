@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 func TestParseHex(t *testing.T) {
@@ -48,7 +48,7 @@ func TestPushHistory(t *testing.T) {
 }
 
 func TestHistoryPersistence(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "wayle", "color-history")
+	path := filepath.Join(t.TempDir(), "lys-shell", "color-history")
 	saveHistory(path, []RGB{{1, 2, 3}, {255, 255, 255}})
 	if got := loadHistory(path); len(got) != 2 || got[0] != (RGB{1, 2, 3}) {
 		t.Fatalf("round trip = %v", got)
@@ -67,12 +67,12 @@ func TestHistoryPersistence(t *testing.T) {
 
 func TestHistoryPath(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "/data")
-	if got := HistoryPath(); got != "/data/wayle/color-history" {
+	if got := HistoryPath(); got != "/data/lys-shell/color-history" {
 		t.Errorf("xdg = %q", got)
 	}
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got := HistoryPath(); got != "/home/u/.local/share/wayle/color-history" {
+	if got := HistoryPath(); got != "/home/u/.local/share/lys-shell/color-history" {
 		t.Errorf("home = %q", got)
 	}
 	t.Setenv("HOME", "")

@@ -1,4 +1,4 @@
-### Wayle Configuration - Brightness Module
+### lys-shell Configuration - Brightness Module
 
 ## Brightness Module Configuration
 

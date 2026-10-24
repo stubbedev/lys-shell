@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestParseOSRelease(t *testing.T) {

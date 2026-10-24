@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/treeman"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/treeman"
 )
 
 // treemanMaxLabelChars is MAX_LABEL_CHARS: the natural-width cap for

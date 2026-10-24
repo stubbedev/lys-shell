@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // nineTags is methods.rs's nine_tags as a mango frame fragment.

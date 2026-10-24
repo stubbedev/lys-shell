@@ -1,4 +1,4 @@
-// Package greeter is wayle-greeter: a greetd greeter sharing the lock
+// Package greeter is lys-greeter: a greetd greeter sharing the lock
 // screen's credential prompt. It runs as the single client of a kiosk
 // compositor (cage) that greetd spawns, drives the login over the
 // greetd IPC socket, and exits when greetd starts the chosen session.
@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // The discovery defaults sddm and gdm read, highest precedence first.
@@ -20,11 +20,11 @@ var (
 
 // defaultStatePath is the last resort for the remembered session when
 // neither --state, XDG_STATE_HOME, nor HOME yields a location.
-const defaultStatePath = "/var/lib/wayle-greeter/last-session"
+const defaultStatePath = "/var/lib/lys-greeter/last-session"
 
 // Options are the parsed command line (config.rs Options).
 type Options struct {
-	// ConfigPath is the wayle config the greeter themes from.
+	// ConfigPath is the lys-shell config the greeter themes from.
 	ConfigPath string
 	// SessionDirs and XSessionDirs are scanned for session files.
 	SessionDirs, XSessionDirs []string
@@ -41,7 +41,7 @@ type Options struct {
 type UsageError struct{ detail string }
 
 func (e UsageError) Error() string {
-	return e.detail + "\nusage: wayle-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... " +
+	return e.detail + "\nusage: lys-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... " +
 		"[--state PATH] [--env KEY=VAL]... [-- <session argv...>]"
 }
 
@@ -101,16 +101,16 @@ func ParseOptions(args []string) (Options, error) {
 	return o, nil
 }
 
-// defaultStateFile: $XDG_STATE_HOME/wayle-greeter/last-session, else
-// $HOME/.local/state/..., else /var/lib/wayle-greeter/last-session.
+// defaultStateFile: $XDG_STATE_HOME/lys-greeter/last-session, else
+// $HOME/.local/state/..., else /var/lib/lys-greeter/last-session.
 // greetd's greeter user has an unusual HOME, so an explicit --state is
 // the robust choice.
 func defaultStateFile() string {
 	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
-		return filepath.Join(dir, "wayle-greeter", "last-session")
+		return filepath.Join(dir, "lys-greeter", "last-session")
 	}
 	if home := os.Getenv("HOME"); home != "" {
-		return filepath.Join(home, ".local", "state", "wayle-greeter", "last-session")
+		return filepath.Join(home, ".local", "state", "lys-greeter", "last-session")
 	}
 	return defaultStatePath
 }

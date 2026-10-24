@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 // fakeHost answers every dialog from fixed replies and records what it

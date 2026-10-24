@@ -5,19 +5,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // TestStaticCSSIsFresh pins the embedded stylesheet to the SCSS it was
 // compiled from: an SCSS edit without `just css` fails here, naming
-// the fix. WAYLE_UPDATE_STATIC_CSS=1 (set by the recipe, right after
+// the fix. LYS_SHELL_UPDATE_STATIC_CSS=1 (set by the recipe, right after
 // grass rewrote static.css) records the new tree hash.
 func TestStaticCSSIsFresh(t *testing.T) {
 	sum, err := scssTreeHash(scssDir)
 	if err != nil {
 		t.Fatalf("hash the SCSS tree: %v", err)
 	}
-	if os.Getenv("WAYLE_UPDATE_STATIC_CSS") == "1" {
+	if os.Getenv("LYS_SHELL_UPDATE_STATIC_CSS") == "1" {
 		if err := os.WriteFile(staticSumFile, []byte(sum+"\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +78,7 @@ func TestStaticCSSIsTheCompiledBundle(t *testing.T) {
 }
 
 // TestStaticCSSParsesClean pins engine completeness: the compiled
-// stylesheet goes through gelm's CSS engine with zero parse warnings.
+// stylesheet goes through lys-ui's CSS engine with zero parse warnings.
 // Every declaration the engine cannot honor warns — a property the
 // SCSS starts using before the engine grows it, or a rule regression —
 // so this fails naming it instead of silently rendering wrong.

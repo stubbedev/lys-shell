@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/sni"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/sni"
 )
 
 // fakeTray records the tray calls and serves a scripted menu.
@@ -370,7 +370,7 @@ func TestSystrayMenuShortcutsFire(t *testing.T) {
 	}
 	for _, s := range [][]string{{"Control", "Shift", "q"}, {"Alt", "F5"}} {
 		if _, err := app.ParseAccel(trayAccelSpec([][]string{s})); err != nil {
-			t.Errorf("gelm cannot parse %q: %v", trayAccelSpec([][]string{s}), err)
+			t.Errorf("lys-ui cannot parse %q: %v", trayAccelSpec([][]string{s}), err)
 		}
 	}
 	if trayAccelSpec([][]string{{"Hyper", "Super", "F5"}}) != "<Super>F5" || trayAccelSpec(nil) != "" {

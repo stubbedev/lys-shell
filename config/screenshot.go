@@ -5,7 +5,7 @@ package config
 // Screenshot capture button.
 //
 // Click the bar button to capture a region, output, or window. Controllable
-// from the CLI / RPC socket: `wayle screenshot region|output|window`.
+// from the CLI / RPC socket: `lys-shell screenshot region|output|window`.
 type ScreenshotConfig struct {
 	// Bar button icon.
 	Icon string `cfg:"icon"`
@@ -67,9 +67,9 @@ func DefaultsScreenshot() ScreenshotConfig {
 		LabelColor:      mustColor("accent"),
 		LabelMaxLength:  0,
 		ButtonBgColor:   mustColor("bg-surface-elevated"),
-		LeftClick:       ParseClickAction("wayle screenshot region"),
-		RightClick:      ParseClickAction("wayle screenshot output"),
-		MiddleClick:     ParseClickAction("wayle screenshot window"),
+		LeftClick:       ParseClickAction("lys-shell screenshot region"),
+		RightClick:      ParseClickAction("lys-shell screenshot output"),
+		MiddleClick:     ParseClickAction("lys-shell screenshot window"),
 		ScrollUp:        ClickAction{},
 		ScrollDown:      ClickAction{},
 	}

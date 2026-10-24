@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/launcheripc"
-	engine "github.com/stubbedev/wayle/service/launcher"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeLoop is the UI loop: Invoke queues, pump runs on the test
@@ -194,7 +194,7 @@ func TestDmenuSessionFiltersAndAccepts(t *testing.T) {
 		t.Fatalf("windows = %d", len(h.windows))
 	}
 	w := h.windows[0]
-	if w.cfg.Namespace != "wayle-launcher" || w.cfg.Keyboard != app.KeyboardOnDemand || w.cfg.Anchor != 0 || w.cfg.Layer != app.LayerOverlay {
+	if w.cfg.Namespace != "lys-shell-launcher" || w.cfg.Keyboard != app.KeyboardOnDemand || w.cfg.Anchor != 0 || w.cfg.Layer != app.LayerOverlay {
 		t.Errorf("layer = %+v", w.cfg)
 	}
 	if w.focused != widget.Widget(h.s.cur.views.entry) || h.s.sel != 0 {

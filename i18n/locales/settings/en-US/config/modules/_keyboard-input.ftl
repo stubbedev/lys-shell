@@ -1,4 +1,4 @@
-### Wayle Configuration - Keyboard Input Module
+### lys-shell Configuration - Keyboard Input Module
 
 ## Keyboard Input Module Configuration
 

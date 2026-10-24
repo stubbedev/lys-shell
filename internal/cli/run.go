@@ -36,7 +36,7 @@ func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code)
 // Run parses args (without argv[0]) against root, runs the matched
 // command, and returns the process exit status: 0 on success and for
 // help/version, 2 for a usage error (clap's), 1 when the handler fails
-// (printed as "Error: <err>", as wayle's main.rs does).
+// (printed as "Error: <err>", as lys-shell's main.rs does).
 func Run(root *Command, args []string, out Output) int {
 	c := build(root, nil, false)
 	m, perr := parse(c, args)

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/glob"
 )
 
 // The user app-icon-map prefixes: title: matches the window title,

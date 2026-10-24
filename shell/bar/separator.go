@@ -3,13 +3,13 @@ package bar
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
-// separator module: a vertical line sized by the config, in the wayle
+// separator module: a vertical line sized by the config, in the lys-shell
 // margin model.
 type separatorModule struct {
 	paint *separator

@@ -2,12 +2,12 @@
 // theming: wallust, matugen, or pywal over the theming monitor's
 // wallpaper (crates/wayle-wallpaper/src/types/color_extractor).
 //
-// wayle does not compute palettes itself. It invokes the configured
+// lys-shell does not compute palettes itself. It invokes the configured
 // tool with exactly the arguments (and, for wallust, exactly the
 // generated config and template) the Rust shell does, so the tool
 // writes the same palette to the same cache file:
 //
-//	matugen -> MatugenColorsPath (the tool's --json stdout, saved by wayle)
+//	matugen -> MatugenColorsPath (the tool's --json stdout, saved by lys-shell)
 //	wallust -> WallustColorsPath (written by wallust through the template)
 //	pywal   -> PywalColorsPath   (pywal's own ~/.cache/wal/colors.json)
 //
@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // matugenMaxSourceColor clamps --source-color-index (MATUGEN_MAX_SOURCE_COLOR).
@@ -100,7 +100,7 @@ func (e *FailedError) Error() string {
 	return fmt.Sprintf("color extractor `%s` failed: %s", e.Tool, e.Stderr)
 }
 
-// PathError is a wayle data/cache path that could not be resolved or
+// PathError is a lys-shell data/cache path that could not be resolved or
 // written (ConfigPathError).
 type PathError struct {
 	Context string
@@ -232,7 +232,7 @@ const wallustTemplate = `{
 }
 `
 
-// wallustConfig renders wayle's wallust.toml, byte for byte the Rust
+// wallustConfig renders lys-shell's wallust.toml, byte for byte the Rust
 // write_config format.
 func wallustConfig(cfg Config, colorsOutput string) string {
 	saturation := ""
@@ -251,11 +251,11 @@ colors = { template = "colors.json", target = "%s" }
 }
 
 // extractWallust writes the generated config and template under the
-// wayle data dir, then runs a single wallust extraction against them.
+// lys-shell data dir, then runs a single wallust extraction against them.
 func extractWallust(ctx context.Context, cfg Config, image string) error {
 	dataDir, err := dataDir()
 	if err != nil {
-		return &PathError{Context: "wayle data directory", Err: err}
+		return &PathError{Context: "lys-shell data directory", Err: err}
 	}
 	wallustDir := filepath.Join(dataDir, "wallust")
 	templatesDir := filepath.Join(wallustDir, "templates")
@@ -268,7 +268,7 @@ func extractWallust(ctx context.Context, cfg Config, image string) error {
 		return &PathError{Context: "wallust colors output path", Err: err}
 	}
 	if err := os.WriteFile(configPath, []byte(wallustConfig(cfg, colorsOutput)), 0o644); err != nil { //nolint:gosec // a config wallust reads
-		return &PathError{Context: "writing wayle wallust config", Err: err}
+		return &PathError{Context: "writing lys-shell wallust config", Err: err}
 	}
 	if err := os.WriteFile(filepath.Join(templatesDir, "colors.json"), []byte(wallustTemplate), 0o644); err != nil { //nolint:gosec // a template wallust reads
 		return &PathError{Context: "writing colors.json template", Err: err}

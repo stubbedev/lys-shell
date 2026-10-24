@@ -1,0 +1,24 @@
+Install icons from a CDN source
+
+Usage: lys-shell icons install <SOURCE> <SLUGS>...
+
+Arguments:
+  <SOURCE>
+          Source name (run 'lys-shell icons sources' to see available sources)
+
+  <SLUGS>...
+          Icon slugs to install (e.g., home settings bell)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+    lys-shell icons install tabler home settings bell
+        -> tb-home-symbolic, tb-settings-symbolic, tb-bell-symbolic
+
+    lys-shell icons install simple-icons firefox spotify
+        -> si-firefox-symbolic, si-spotify-symbolic
+
+Run 'lys-shell icons sources' to see all available icon sources.
+Icons are saved to ~/.local/share/lys-shell/icons/ as GTK symbolic icons.

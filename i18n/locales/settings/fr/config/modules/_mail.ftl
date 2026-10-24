@@ -1,4 +1,4 @@
-### Wayle Configuration - Module Courrier
+### lys-shell Configuration - Module Courrier
 
 ## Configuration du module Courrier
 

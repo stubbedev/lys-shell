@@ -1,4 +1,4 @@
-### Wayle Configuration - Recorder Module
+### lys-shell Configuration - Recorder Module
 
 ## Recorder Module Configuration
 

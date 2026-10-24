@@ -22,7 +22,7 @@ func writeFile(t *testing.T, dir, name, content string) string {
 }
 
 func TestLoadFileMissingCreatesTheStub(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "wayle", "config.toml")
+	path := filepath.Join(t.TempDir(), "lys-shell", "config.toml")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("missing file: %v", err)
@@ -31,7 +31,7 @@ func TestLoadFileMissingCreatesTheStub(t *testing.T) {
 		t.Errorf("missing file: want defaults, got %+v", cfg.Bar)
 	}
 	data, err := os.ReadFile(path)
-	if err != nil || string(data) != "# Wayle configuration file\n" {
+	if err != nil || string(data) != "# lys-shell configuration file\n" {
 		t.Errorf("stub = %q, %v", data, err)
 	}
 }
@@ -189,12 +189,12 @@ func TestDiscoverMainPrefersYAML(t *testing.T) {
 
 func TestDirFollowsXDG(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/xdg")
-	if got, err := Dir(); err != nil || got != "/xdg/wayle" {
+	if got, err := Dir(); err != nil || got != "/xdg/lys-shell" {
 		t.Errorf("xdg: %q %v", got, err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got, err := Dir(); err != nil || got != "/home/u/.config/wayle" {
+	if got, err := Dir(); err != nil || got != "/home/u/.config/lys-shell" {
 		t.Errorf("home: %q %v", got, err)
 	}
 	t.Setenv("HOME", "")

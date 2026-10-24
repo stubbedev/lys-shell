@@ -13,13 +13,13 @@ import (
 	"unicode/utf8"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/portal"
-	"github.com/stubbedev/wayle/service/network"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/portal"
+	"github.com/stubbedev/lys-shell/service/network"
 )
 
 // This file is the network dropdown's VPNs: the section listing NM's
@@ -27,7 +27,7 @@ import (
 // its tunnel and opening it in the editor, and the editor itself
 // (vpn_form), the dropdown's second page. The form is built from the
 // picked kind's fields rather than drawn per VPN type, so a plugin
-// wayle has never heard of still gets the free-form key = value
+// lys-shell has never heard of still gets the free-form key = value
 // editor and lands in NetworkManager the same way.
 
 // vpnControl is the VPN profiles the dropdown drives
@@ -100,7 +100,7 @@ func vpnRowCaption(row network.VPN) string {
 	return vpnStateLabel(row.State)
 }
 
-// sentence capitalises a reason for its own line (vpn_item.rs): wayle's
+// sentence capitalises a reason for its own line (vpn_item.rs): lys-shell's
 // errors are written lowercase to read mid-sentence in a log; only the
 // first letter is touched.
 func sentence(reason string) string {
@@ -128,7 +128,7 @@ func vpnSlug(key string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// vpnTranslated is the shell's string for id, or fallback when wayle
+// vpnTranslated is the shell's string for id, or fallback when lys-shell
 // ships none: what keeps an unknown plugin's vocabulary usable.
 func vpnTranslated(id, fallback string) string {
 	if i18n.Shell().Has(id) {
@@ -155,7 +155,7 @@ func vpnSectionHeading(section string) string {
 	return vpnTranslated("dropdown-network-vpn-section-"+section, section)
 }
 
-// vpnChoiceLabel is choice_label: a choice wayle cannot sign into says
+// vpnChoiceLabel is choice_label: a choice lys-shell cannot sign into says
 // so before it is picked.
 func vpnChoiceLabel(c network.VPNChoice) string {
 	if c.NativeSignIn {

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
 )
 
 // This file is what kinds of VPN this machine can run and what each
@@ -182,7 +182,7 @@ type VPNChoice struct {
 	Value string
 	// Label is what the picker calls it.
 	Label string
-	// NativeSignIn says whether wayle signs into this choice itself;
+	// NativeSignIn says whether lys-shell signs into this choice itself;
 	// the form says so while the choice is made, instead of the first
 	// connect failing with "no native sign-in".
 	NativeSignIn bool
@@ -303,7 +303,7 @@ func SecretKeys(service string) []string {
 func IsSecret(service, key string) bool { return slices.Contains(SecretKeys(service), key) }
 
 // fieldsForPlugin is the typed form for a known plugin, nil for one
-// wayle has no form for. Every key is the plugin's own, read out of its
+// lys-shell has no form for. Every key is the plugin's own, read out of its
 // source: a key the plugin does not know is silently ignored, so a form
 // built on guesses would save happily and fail to connect. The keys are
 // a useful subset; the tuning knobs stay reachable through the raw
@@ -473,9 +473,9 @@ func dhGroups(forwardSecrecy bool) []VPNChoice {
 }
 
 // openconnectProtocols are the openconnect protocols as picker
-// choices, each marked with whether wayle signs into it. A free-text
+// choices, each marked with whether lys-shell signs into it. A free-text
 // box meant typing a protocol name from memory and finding out at
-// connect time whether wayle can sign into it.
+// connect time whether lys-shell can sign into it.
 func openconnectProtocols() []VPNChoice {
 	out := make([]VPNChoice, 0, len(openconnect.Protocols))
 	for _, p := range openconnect.Protocols {
@@ -484,7 +484,7 @@ func openconnectProtocols() []VPNChoice {
 	return out
 }
 
-// displayLabel names a plugin in the type picker: the ones wayle
+// displayLabel names a plugin in the type picker: the ones lys-shell
 // recognises after what they connect to, anything else in the plugin's
 // own wording.
 func displayLabel(service, pluginName string) string {

@@ -1,6 +1,0 @@
-List available audio sources (inputs)
-
-Usage: wayle audio sources
-
-Options:
-  -h, --help  Print help

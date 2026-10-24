@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Zone de notification
+### Configuration lys-shell - Module Zone de notification
 
 ## Configuration du module Zone de notification
 

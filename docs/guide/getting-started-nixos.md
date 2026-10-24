@@ -4,7 +4,7 @@ title: Getting started on NixOS
 
 # Getting started on NixOS
 
-Requires NixOS unstable or 25.11. Note that Wayle was added only recently, so update to the latest version before trying to install it.
+Requires NixOS unstable or 25.11. Note that lys-shell was added only recently, so update to the latest version before trying to install it.
 
 ## Install from this flake
 
@@ -14,7 +14,7 @@ package, add the flake as an input and use the modules it exports.
 ```nix
 # flake.nix
 {
-  inputs.wayle.url = "github:stubbedev/wayle";
+  inputs.lys-shell.url = "github:stubbedev/lys-shell";
 }
 ```
 
@@ -23,12 +23,12 @@ NixOS:
 ```nix
 { inputs, ... }:
 {
-  imports = [ inputs.wayle.nixosModules.default ];
-  programs.wayle.enable = true;
-  # optional: run `wayle shell` as a user service in the graphical session
-  programs.wayle.systemd.enable = true;
+  imports = [ inputs.lys-shell.nixosModules.default ];
+  programs.lys-shell.enable = true;
+  # optional: run `lys-shell shell` as a user service in the graphical session
+  programs.lys-shell.systemd.enable = true;
   # optional: enable backing services (UPower, BlueZ) + wl-clipboard/xdg-utils
-  programs.wayle.autoInstallDependencies = true;
+  programs.lys-shell.autoInstallDependencies = true;
 }
 ```
 
@@ -37,14 +37,14 @@ home-manager:
 ```nix
 { inputs, ... }:
 {
-  imports = [ inputs.wayle.homeManagerModules.default ];
-  programs.wayle = {
-    enable = true; # installs wayle + wayle-settings, runs it as a user service
+  imports = [ inputs.lys-shell.homeManagerModules.default ];
+  programs.lys-shell = {
+    enable = true; # installs lys-shell + lys-settings, runs it as a user service
     # install user-space soft deps implied by the config (theme-provider tool,
     # wl-clipboard, xdg-utils)
     autoInstallDependencies = true;
     settings = {
-      # written to ~/.config/wayle/config.toml
+      # written to ~/.config/lys-shell/config.toml
       bar.layout = [
         {
           monitor = "*";
@@ -58,8 +58,8 @@ home-manager:
 ```
 
 You can also use the package directly
-(`inputs.wayle.packages.${system}.default`) or apply
-`inputs.wayle.overlays.default` to get `pkgs.wayle`.
+(`inputs.lys-shell.packages.${system}.default`) or apply
+`inputs.lys-shell.overlays.default` to get `pkgs.lys-shell`.
 
 > Soft dependencies (NetworkManager, bluez, upower, power-profiles-daemon,
 > pipewire/wireplumber, and theming tools like wallust/matugen) are not pulled
@@ -67,17 +67,17 @@ You can also use the package directly
 
 ## Install package
 
-Wayle is available as `pkgs.wayle` package, but if you use home-manager there is a module so you don't have to install the package manually.
+lys-shell is available as `pkgs.lys-shell` package, but if you use home-manager there is a module so you don't have to install the package manually.
 
 ## home-manager usage
 
 ```nix
 # put this directly into your home-manager config or into a home-manager import
 {
-  programs.wayle = {
+  programs.lys-shell = {
     enable = true;
 
-    # Whether to automatically install soft dependencies used by wayle that
+    # Whether to automatically install soft dependencies used by lys-shell that
     # will be required based on your config (theme-provider tool, wl-clipboard,
     # xdg-utils, and notmuch when the mail module is used).
     autoInstallDependencies = true;
@@ -87,7 +87,7 @@ Wayle is available as `pkgs.wayle` package, but if you use home-manager there is
     settings = {
       bar = {
         layout = [
-          # add more attribute sets with different monitors if wayle should
+          # add more attribute sets with different monitors if lys-shell should
           # have different layouts on each
           {
             monitor = "DP-1"; # replace "DP-1" with "*" for all monitors
@@ -125,7 +125,7 @@ Wayle is available as `pkgs.wayle` package, but if you use home-manager there is
         theme-provider = "wallust";
       };
       # the following wallpaper options can be omitted if you're not using
-      # wayle's built-in wallpaper engine. Setting cycling-directory enables
+      # lys-shell's built-in wallpaper engine. Setting cycling-directory enables
       # cycling through that folder.
       wallpaper = {
         cycling-directory = "/home/horsey/Pictures/Backgrounds/1/";
@@ -139,17 +139,17 @@ Wayle is available as `pkgs.wayle` package, but if you use home-manager there is
 ## Settings GUI
 
 ```sh
-wayle panel settings
+lys-shell panel settings
 ```
 
-This launches `wayle-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
+This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
 
 > [!WARNING]
 > If you configured theming using matugen/wallust/pywal, do not forget to install these dependencies! With `autoInstallDependencies = true` the home-manager module installs the matching theme-provider tool for you.
 
-After configuring Wayle using GUI, there should be a new `.config/wayle/runtime.toml` file. To automatically convert it to Nix, run
+After configuring lys-shell using GUI, there should be a new `.config/lys-shell/runtime.toml` file. To automatically convert it to Nix, run
 ```sh
-cd ~/.config/wayle
+cd ~/.config/lys-shell
 nix-instantiate --eval --expr '(builtins.fromTOML (builtins.readFile ./config.toml)) // (builtins.fromTOML (builtins.readFile ./runtime.toml))' | nixfmt
 ```
 If one of those files does not exist run the following command, replacing `config.toml` with `runtime.toml` if appropriate.
@@ -157,7 +157,7 @@ If one of those files does not exist run the following command, replacing `confi
 nix-instantiate --eval --expr 'builtins.fromTOML (builtins.readFile ./config.toml)' | nixfmt
 ```
 
-Then you can copy-paste this into the `services.wayle.settings` option provided by the home-manager module.
+Then you can copy-paste this into the `services.lys-shell.settings` option provided by the home-manager module.
 
 ## Configuration
 

@@ -1,0 +1,6 @@
+Stop recording
+
+Usage: lys-shell recorder stop
+
+Options:
+  -h, --help  Print help

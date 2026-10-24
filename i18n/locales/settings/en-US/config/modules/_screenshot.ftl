@@ -1,4 +1,4 @@
-### Wayle Configuration - Screenshot Module
+### lys-shell Configuration - Screenshot Module
 
 ## Screenshot Module Configuration
 

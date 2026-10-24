@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // TestRefresherOrdersAndCoalesces pins the reader every dropdown goes

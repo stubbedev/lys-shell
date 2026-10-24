@@ -4,16 +4,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/wayle/service/sharepreview"
+	"github.com/stubbedev/lys-shell/service/sharepreview"
 )
 
 // Real previews against a private headless compositor; runs only with
-// WAYLE_CAPTURE_HEADLESS=1 and the session variables pointing at it.
+// LYS_SHELL_CAPTURE_HEADLESS=1 and the session variables pointing at it.
 func TestHeadlessPreviews(t *testing.T) {
-	if os.Getenv("WAYLE_CAPTURE_HEADLESS") == "" {
-		t.Skip("WAYLE_CAPTURE_HEADLESS is not set")
+	if os.Getenv("LYS_SHELL_CAPTURE_HEADLESS") == "" {
+		t.Skip("LYS_SHELL_CAPTURE_HEADLESS is not set")
 	}
 	c, err := capture.Connect()
 	if err != nil {

@@ -1,5 +1,5 @@
 // Package cava is the Go port of the audio spectrum analyzer behind
-// wayle's cava bar module: crates/wayle-cava's vendored cavacore.c
+// lys-shell's cava bar module: crates/wayle-cava's vendored cavacore.c
 // translated algorithm-for-algorithm. The plan distributes bars across
 // the frequency range on a log scale (with the bass split onto a
 // double-size FFT), Execute turns PCM frames into 0..1 bar heights with

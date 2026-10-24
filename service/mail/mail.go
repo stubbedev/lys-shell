@@ -15,10 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/feed"
-	"github.com/stubbedev/wayle/internal/fswatch"
-	"github.com/stubbedev/wayle/internal/icons"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/icons"
 )
 
 // Debounce coalesces a maildir-sync burst into one re-query.
@@ -241,8 +241,8 @@ func renderNotification(format string, m newMail) string {
 	).Replace(format)
 }
 
-// notifyIconArg resolves an icon name to its SVG in wayle's icon
-// registry (notification daemons do not search wayle's private icon
+// notifyIconArg resolves an icon name to its SVG in lys-shell's icon
+// registry (notification daemons do not search lys-shell's private icon
 // dir by name), else the bare name for system-themed icons.
 func notifyIconArg(icon string) string {
 	registry, err := icons.NewRegistry()

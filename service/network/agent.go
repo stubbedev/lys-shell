@@ -11,22 +11,22 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/feed"
-	"github.com/stubbedev/wayle/service/network/openconnect"
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
-// This file is wayle as NetworkManager's secret agent (agent/mod.rs).
+// This file is lys-shell as NetworkManager's secret agent (agent/mod.rs).
 //
 // NM does not store every credential: a VPN password can be marked
 // not-saved, a 2FA challenge is new each time, and an OpenConnect
 // session cookie is not something a user could type. For those NM asks
 // a registered secret agent, and with none registered the activation
 // fails with "no secrets". Registering here closes that hole: NM asks
-// wayle, wayle asks the user in the network dropdown, and the answer
+// lys-shell, lys-shell asks the user in the network dropdown, and the answer
 // goes back over the same call.
 //
-// Coexistence is deliberate. Anything wayle cannot answer comes back as
+// Coexistence is deliberate. Anything lys-shell cannot answer comes back as
 // NoSecrets, NM's cue to try the next agent rather than give up, so
 // running beside nm-applet degrades to "whoever knows the answer wins".
 
@@ -34,9 +34,9 @@ const (
 	// AgentPath is where NM expects the agent object: its agent manager
 	// builds its proxy against this exact path.
 	AgentPath = dbus.ObjectPath("/org/freedesktop/NetworkManager/SecretAgent")
-	// AgentID is the identifier wayle registers under; NM requires it
+	// AgentID is the identifier lys-shell registers under; NM requires it
 	// be formatted like a bus name.
-	AgentID    = "com.wayle.network"
+	AgentID    = "dev.stubbe.lys.network"
 	agentIface = "org.freedesktop.NetworkManager.SecretAgent"
 
 	// capabilityVPNHints is NM_SECRET_AGENT_CAPABILITY_VPN_HINTS:
@@ -365,7 +365,7 @@ func (o *agentObject) CancelGetSecrets(connectionPath dbus.ObjectPath, settingNa
 	return nil
 }
 
-// SaveSecrets asks agents to persist secrets they own. wayle owns
+// SaveSecrets asks agents to persist secrets they own. lys-shell owns
 // none: everything it collects goes back for NM's own store to keep.
 func (o *agentObject) SaveSecrets(ConnectionDict, dbus.ObjectPath) *dbus.Error { return nil }
 
@@ -445,7 +445,7 @@ func (o *agentObject) vpnSecrets(ctx context.Context, vpn openconnect.Profile, s
 		o.agent.setFailure(nil)
 		return replyMap(setting, res.values), nil
 	}
-	// A gateway wayle could not follow is not a failed sign-in:
+	// A gateway lys-shell could not follow is not a failed sign-in:
 	// NoSecrets hands the request to the plugin's own auth dialog, so
 	// claiming a protocol natively never leaves a VPN worse off.
 	if _, unsupported := errors.AsType[*secrets.ProtocolUnsupportedError](res.err); unsupported {
@@ -481,7 +481,7 @@ func replyMap(setting string, values map[string]string) ConnectionDict {
 // registration lives in NM's process, so a restart silently drops it,
 // and a silently unregistered agent looks exactly like a VPN that asks
 // for nothing and fails). A failure to register is logged, not fatal:
-// wayle still works without answering secrets, and NM may not be up
+// lys-shell still works without answering secrets, and NM may not be up
 // yet. The watch ends with ctx.
 func ServeAgent(ctx context.Context, conn *dbus.Conn, agent *Agent, signIn SignIn) error {
 	return serveAgent(ctx, conn, agent, signIn, RequestBudget)

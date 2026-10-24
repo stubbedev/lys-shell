@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stages the built binaries and their resources into the release archive
-# wayle-<version>-<arch>-linux.tar.gz.
+# lys-shell-<version>-<arch>-linux.tar.gz.
 set -euo pipefail
 
 if [[ $# -ne 3 ]]; then
@@ -16,27 +16,27 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_DIR"
 
-STAGING="wayle-${VERSION}-${ARCH}-linux"
+STAGING="lys-shell-${VERSION}-${ARCH}-linux"
 rm -rf "${STAGING}"
 mkdir -p "${STAGING}/icons" "${STAGING}/completions"
 
-for bin in wayle wayle-greeter wayle-lock wayle-settings; do
+for bin in lys-shell lys-greeter lys-lock lys-settings; do
 	cp "${BIN_DIR}/${bin}" "${STAGING}/"
 done
-"${BIN_DIR}/wayle" completions bash >"${STAGING}/completions/completions.bash"
-"${BIN_DIR}/wayle" completions zsh >"${STAGING}/completions/_wayle"
-"${BIN_DIR}/wayle" completions fish >"${STAGING}/completions/wayle.fish"
+"${BIN_DIR}/lys-shell" completions bash >"${STAGING}/completions/completions.bash"
+"${BIN_DIR}/lys-shell" completions zsh >"${STAGING}/completions/_lys_shell"
+"${BIN_DIR}/lys-shell" completions fish >"${STAGING}/completions/lys-shell.fish"
 
 cp LICENSE "${STAGING}/"
 cp -r resources/icons/hicolor "${STAGING}/icons/"
-cp resources/wayle.service \
-	resources/com.wayle.settings.desktop \
-	resources/com.wayle.vpn-sso-callback.desktop \
-	resources/wayle-settings.svg \
-	resources/dev.stubbe.wayle.greeter.policy \
-	resources/wayle.portal \
-	resources/org.freedesktop.impl.portal.desktop.wayle.service \
-	resources/xdg-desktop-portal-wayle.service \
-	resources/wayle-portals.conf \
+cp resources/lys-shell.service \
+	resources/dev.stubbe.lys.settings.desktop \
+	resources/dev.stubbe.lys.vpn-sso-callback.desktop \
+	resources/lys-settings.svg \
+	resources/dev.stubbe.lys.greeter.policy \
+	resources/lys-shell.portal \
+	resources/org.freedesktop.impl.portal.desktop.lys.service \
+	resources/xdg-desktop-portal-lys-shell.service \
+	resources/lys-shell-portals.conf \
 	"${STAGING}/"
 tar czf "${STAGING}.tar.gz" "${STAGING}"

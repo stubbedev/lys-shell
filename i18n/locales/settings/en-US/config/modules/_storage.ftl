@@ -1,4 +1,4 @@
-### Wayle Configuration - Storage Module
+### lys-shell Configuration - Storage Module
 
 ## Storage Module Configuration
 

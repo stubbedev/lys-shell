@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/hyprsunset"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/hyprsunset"
 )
 
 // fakeSunset is a scripted sunsetEnv: a fake filter, a settable clock,

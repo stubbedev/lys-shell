@@ -1,0 +1,1675 @@
+
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
+Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $commandElements = $commandAst.CommandElements
+    $command = @(
+        'lys-shell'
+        for ($i = 1; $i -lt $commandElements.Count; $i++) {
+            $element = $commandElements[$i]
+            if ($element -isnot [StringConstantExpressionAst] -or
+                $element.StringConstantType -ne [StringConstantType]::BareWord -or
+                $element.Value.StartsWith('-') -or
+                $element.Value -eq $wordToComplete) {
+                break
+        }
+        $element.Value
+    }) -join ';'
+
+    $completions = @(switch ($command) {
+        'lys-shell' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('audio', 'audio', [CompletionResultType]::ParameterValue, 'Audio control commands')
+            [CompletionResult]::new('config', 'config', [CompletionResultType]::ParameterValue, 'Configuration management commands')
+            [CompletionResult]::new('icons', 'icons', [CompletionResultType]::ParameterValue, 'Icon management commands')
+            [CompletionResult]::new('media', 'media', [CompletionResultType]::ParameterValue, 'Media player control commands')
+            [CompletionResult]::new('notify', 'notify', [CompletionResultType]::ParameterValue, 'Notification control commands')
+            [CompletionResult]::new('panel', 'panel', [CompletionResultType]::ParameterValue, 'Panel management commands')
+            [CompletionResult]::new('power', 'power', [CompletionResultType]::ParameterValue, 'Power profile commands')
+            [CompletionResult]::new('systray', 'systray', [CompletionResultType]::ParameterValue, 'System tray commands')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper control commands')
+            [CompletionResult]::new('idle', 'idle', [CompletionResultType]::ParameterValue, 'Idle inhibit control commands')
+            [CompletionResult]::new('launcher', 'launcher', [CompletionResultType]::ParameterValue, 'Application launcher / dmenu with rofi-compatible flags')
+            [CompletionResult]::new('lock', 'lock', [CompletionResultType]::ParameterValue, 'Lock the session via lys-shell''s lock screen')
+            [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
+            [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
+            [CompletionResult]::new('widget', 'widget', [CompletionResultType]::ParameterValue, 'Widget control commands')
+            [CompletionResult]::new('toast', 'toast', [CompletionResultType]::ParameterValue, 'Show a custom on-screen toast')
+            [CompletionResult]::new('portal', 'portal', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer')
+            [CompletionResult]::new('shell', 'shell', [CompletionResultType]::ParameterValue, 'Run the desktop shell in the foreground')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;audio' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('output-volume', 'output-volume', [CompletionResultType]::ParameterValue, 'Get or set output volume level')
+            [CompletionResult]::new('output-mute', 'output-mute', [CompletionResultType]::ParameterValue, 'Toggle output mute state')
+            [CompletionResult]::new('input-volume', 'input-volume', [CompletionResultType]::ParameterValue, 'Get or set input volume level')
+            [CompletionResult]::new('input-mute', 'input-mute', [CompletionResultType]::ParameterValue, 'Toggle input mute state')
+            [CompletionResult]::new('sinks', 'sinks', [CompletionResultType]::ParameterValue, 'List available audio sinks (outputs)')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available audio sources (inputs)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current audio status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;audio;output-volume' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;output-mute' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;input-volume' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;input-mute' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;sinks' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;sources' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;audio;help' {
+            [CompletionResult]::new('output-volume', 'output-volume', [CompletionResultType]::ParameterValue, 'Get or set output volume level')
+            [CompletionResult]::new('output-mute', 'output-mute', [CompletionResultType]::ParameterValue, 'Toggle output mute state')
+            [CompletionResult]::new('input-volume', 'input-volume', [CompletionResultType]::ParameterValue, 'Get or set input volume level')
+            [CompletionResult]::new('input-mute', 'input-mute', [CompletionResultType]::ParameterValue, 'Toggle input mute state')
+            [CompletionResult]::new('sinks', 'sinks', [CompletionResultType]::ParameterValue, 'List available audio sinks (outputs)')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available audio sources (inputs)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current audio status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;audio;help;output-volume' {
+            break
+        }
+        'lys-shell;audio;help;output-mute' {
+            break
+        }
+        'lys-shell;audio;help;input-volume' {
+            break
+        }
+        'lys-shell;audio;help;input-mute' {
+            break
+        }
+        'lys-shell;audio;help;sinks' {
+            break
+        }
+        'lys-shell;audio;help;sources' {
+            break
+        }
+        'lys-shell;audio;help;status' {
+            break
+        }
+        'lys-shell;audio;help;help' {
+            break
+        }
+        'lys-shell;config' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get the value of a configuration path')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set the value of a configuration path')
+            [CompletionResult]::new('reset', 'reset', [CompletionResultType]::ParameterValue, 'Reset a configuration path to its default value')
+            [CompletionResult]::new('schema', 'schema', [CompletionResultType]::ParameterValue, 'Output JSON Schema for the configuration (for editor intellisense)')
+            [CompletionResult]::new('default', 'default', [CompletionResultType]::ParameterValue, 'Output the default configuration as TOML')
+            [CompletionResult]::new('docs', 'docs', [CompletionResultType]::ParameterValue, 'Generate markdown reference pages for every registered schema')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;config;get' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;config;set' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;config;reset' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;config;schema' {
+            [CompletionResult]::new('--stdout', '--stdout', [CompletionResultType]::ParameterName, 'Print to stdout instead of writing to config directory')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;config;default' {
+            [CompletionResult]::new('--stdout', '--stdout', [CompletionResultType]::ParameterName, 'Print to stdout instead of writing config.toml.example')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;config;docs' {
+            [CompletionResult]::new('--out', '--out', [CompletionResultType]::ParameterName, 'Output directory for the generated pages')
+            [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Regenerate only the named module')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;config;help' {
+            [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get the value of a configuration path')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set the value of a configuration path')
+            [CompletionResult]::new('reset', 'reset', [CompletionResultType]::ParameterValue, 'Reset a configuration path to its default value')
+            [CompletionResult]::new('schema', 'schema', [CompletionResultType]::ParameterValue, 'Output JSON Schema for the configuration (for editor intellisense)')
+            [CompletionResult]::new('default', 'default', [CompletionResultType]::ParameterValue, 'Output the default configuration as TOML')
+            [CompletionResult]::new('docs', 'docs', [CompletionResultType]::ParameterValue, 'Generate markdown reference pages for every registered schema')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;config;help;get' {
+            break
+        }
+        'lys-shell;config;help;set' {
+            break
+        }
+        'lys-shell;config;help;reset' {
+            break
+        }
+        'lys-shell;config;help;schema' {
+            break
+        }
+        'lys-shell;config;help;default' {
+            break
+        }
+        'lys-shell;config;help;docs' {
+            break
+        }
+        'lys-shell;config;help;help' {
+            break
+        }
+        'lys-shell;icons' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Install bundled icons required by lys-shell components')
+            [CompletionResult]::new('install', 'install', [CompletionResultType]::ParameterValue, 'Install icons from a CDN source')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Import local SVG file(s) as icons')
+            [CompletionResult]::new('remove', 'remove', [CompletionResultType]::ParameterValue, 'Remove installed icons')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available icon sources')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List installed icons')
+            [CompletionResult]::new('open', 'open', [CompletionResultType]::ParameterValue, 'Open the icons directory in file manager')
+            [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export all installed icons to a directory')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Install any icons referenced in config but not yet on disk')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;icons;setup' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;icons;install' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;icons;import' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;icons;remove' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;icons;sources' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;icons;list' {
+            [CompletionResult]::new('-s', '-s', [CompletionResultType]::ParameterName, 'Filter by source prefix (e.g., tb, si, md)')
+            [CompletionResult]::new('--source', '--source', [CompletionResultType]::ParameterName, 'Filter by source prefix (e.g., tb, si, md)')
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Interactive fuzzy search (requires fzf)')
+            [CompletionResult]::new('--interactive', '--interactive', [CompletionResultType]::ParameterName, 'Interactive fuzzy search (requires fzf)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;icons;open' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;icons;export' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;icons;sync' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview what would be installed without making changes')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;icons;help' {
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Install bundled icons required by lys-shell components')
+            [CompletionResult]::new('install', 'install', [CompletionResultType]::ParameterValue, 'Install icons from a CDN source')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Import local SVG file(s) as icons')
+            [CompletionResult]::new('remove', 'remove', [CompletionResultType]::ParameterValue, 'Remove installed icons')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available icon sources')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List installed icons')
+            [CompletionResult]::new('open', 'open', [CompletionResultType]::ParameterValue, 'Open the icons directory in file manager')
+            [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export all installed icons to a directory')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Install any icons referenced in config but not yet on disk')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;icons;help;setup' {
+            break
+        }
+        'lys-shell;icons;help;install' {
+            break
+        }
+        'lys-shell;icons;help;import' {
+            break
+        }
+        'lys-shell;icons;help;remove' {
+            break
+        }
+        'lys-shell;icons;help;sources' {
+            break
+        }
+        'lys-shell;icons;help;list' {
+            break
+        }
+        'lys-shell;icons;help;open' {
+            break
+        }
+        'lys-shell;icons;help;export' {
+            break
+        }
+        'lys-shell;icons;help;sync' {
+            break
+        }
+        'lys-shell;icons;help;help' {
+            break
+        }
+        'lys-shell;media' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all available media players')
+            [CompletionResult]::new('play-pause', 'play-pause', [CompletionResultType]::ParameterValue, 'Toggle play/pause for a media player')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next track')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go to previous track')
+            [CompletionResult]::new('shuffle', 'shuffle', [CompletionResultType]::ParameterValue, 'Toggle or set shuffle mode')
+            [CompletionResult]::new('loop', 'loop', [CompletionResultType]::ParameterValue, 'Set loop/repeat mode')
+            [CompletionResult]::new('active', 'active', [CompletionResultType]::ParameterValue, 'Get or set the active media player')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display detailed information about a media player')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;media;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;media;play-pause' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;media;next' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;media;previous' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;media;shuffle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;media;loop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;media;active' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;media;info' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;media;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all available media players')
+            [CompletionResult]::new('play-pause', 'play-pause', [CompletionResultType]::ParameterValue, 'Toggle play/pause for a media player')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next track')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go to previous track')
+            [CompletionResult]::new('shuffle', 'shuffle', [CompletionResultType]::ParameterValue, 'Toggle or set shuffle mode')
+            [CompletionResult]::new('loop', 'loop', [CompletionResultType]::ParameterValue, 'Set loop/repeat mode')
+            [CompletionResult]::new('active', 'active', [CompletionResultType]::ParameterValue, 'Get or set the active media player')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display detailed information about a media player')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;media;help;list' {
+            break
+        }
+        'lys-shell;media;help;play-pause' {
+            break
+        }
+        'lys-shell;media;help;next' {
+            break
+        }
+        'lys-shell;media;help;previous' {
+            break
+        }
+        'lys-shell;media;help;shuffle' {
+            break
+        }
+        'lys-shell;media;help;loop' {
+            break
+        }
+        'lys-shell;media;help;active' {
+            break
+        }
+        'lys-shell;media;help;info' {
+            break
+        }
+        'lys-shell;media;help;help' {
+            break
+        }
+        'lys-shell;notify' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all notifications')
+            [CompletionResult]::new('dismiss', 'dismiss', [CompletionResultType]::ParameterValue, 'Dismiss a notification by ID')
+            [CompletionResult]::new('dismiss-all', 'dismiss-all', [CompletionResultType]::ParameterValue, 'Dismiss all notifications')
+            [CompletionResult]::new('dnd', 'dnd', [CompletionResultType]::ParameterValue, 'Toggle Do Not Disturb mode')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show notification status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;notify;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;notify;dismiss' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;notify;dismiss-all' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;notify;dnd' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;notify;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;notify;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all notifications')
+            [CompletionResult]::new('dismiss', 'dismiss', [CompletionResultType]::ParameterValue, 'Dismiss a notification by ID')
+            [CompletionResult]::new('dismiss-all', 'dismiss-all', [CompletionResultType]::ParameterValue, 'Dismiss all notifications')
+            [CompletionResult]::new('dnd', 'dnd', [CompletionResultType]::ParameterValue, 'Toggle Do Not Disturb mode')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show notification status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;notify;help;list' {
+            break
+        }
+        'lys-shell;notify;help;dismiss' {
+            break
+        }
+        'lys-shell;notify;help;dismiss-all' {
+            break
+        }
+        'lys-shell;notify;help;dnd' {
+            break
+        }
+        'lys-shell;notify;help;status' {
+            break
+        }
+        'lys-shell;notify;help;help' {
+            break
+        }
+        'lys-shell;panel' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
+            [CompletionResult]::new('restart', 'restart', [CompletionResultType]::ParameterValue, 'Restart the panel daemon')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check panel status')
+            [CompletionResult]::new('settings', 'settings', [CompletionResultType]::ParameterValue, 'Open panel settings')
+            [CompletionResult]::new('inspect', 'inspect', [CompletionResultType]::ParameterValue, 'Open the widget inspector for debugging')
+            [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;panel;start' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;restart' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;settings' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;inspect' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;hide' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;show' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;toggle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;panel;help' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
+            [CompletionResult]::new('restart', 'restart', [CompletionResultType]::ParameterValue, 'Restart the panel daemon')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check panel status')
+            [CompletionResult]::new('settings', 'settings', [CompletionResultType]::ParameterValue, 'Open panel settings')
+            [CompletionResult]::new('inspect', 'inspect', [CompletionResultType]::ParameterValue, 'Open the widget inspector for debugging')
+            [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;panel;help;start' {
+            break
+        }
+        'lys-shell;panel;help;stop' {
+            break
+        }
+        'lys-shell;panel;help;restart' {
+            break
+        }
+        'lys-shell;panel;help;status' {
+            break
+        }
+        'lys-shell;panel;help;settings' {
+            break
+        }
+        'lys-shell;panel;help;inspect' {
+            break
+        }
+        'lys-shell;panel;help;hide' {
+            break
+        }
+        'lys-shell;panel;help;show' {
+            break
+        }
+        'lys-shell;panel;help;toggle' {
+            break
+        }
+        'lys-shell;panel;help;help' {
+            break
+        }
+        'lys-shell;power' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current power profile')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set power profile')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Cycle to next power profile')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List available power profiles')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;power;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;power;set' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;power;cycle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;power;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;power;help' {
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current power profile')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set power profile')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Cycle to next power profile')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List available power profiles')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;power;help;status' {
+            break
+        }
+        'lys-shell;power;help;set' {
+            break
+        }
+        'lys-shell;power;help;cycle' {
+            break
+        }
+        'lys-shell;power;help;list' {
+            break
+        }
+        'lys-shell;power;help;help' {
+            break
+        }
+        'lys-shell;systray' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all system tray items')
+            [CompletionResult]::new('activate', 'activate', [CompletionResultType]::ParameterValue, 'Activate a tray item by ID')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show system tray status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;systray;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;systray;activate' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;systray;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;systray;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all system tray items')
+            [CompletionResult]::new('activate', 'activate', [CompletionResultType]::ParameterValue, 'Activate a tray item by ID')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show system tray status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;systray;help;list' {
+            break
+        }
+        'lys-shell;systray;help;activate' {
+            break
+        }
+        'lys-shell;systray;help;status' {
+            break
+        }
+        'lys-shell;systray;help;help' {
+            break
+        }
+        'lys-shell;wallpaper' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set wallpaper from an image file')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Start cycling wallpapers from a directory')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop wallpaper cycling')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next wallpaper')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go back to previous wallpaper')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display current wallpaper information')
+            [CompletionResult]::new('theming-monitor', 'theming-monitor', [CompletionResultType]::ParameterValue, 'Set which monitor to use for color extraction')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;wallpaper;set' {
+            [CompletionResult]::new('-f', '-f', [CompletionResultType]::ParameterName, 'Image fit mode')
+            [CompletionResult]::new('--fit', '--fit', [CompletionResultType]::ParameterName, 'Image fit mode')
+            [CompletionResult]::new('--monitor', '--monitor', [CompletionResultType]::ParameterName, 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, applies to all monitors')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;wallpaper;cycle' {
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Interval in seconds between changes')
+            [CompletionResult]::new('--interval', '--interval', [CompletionResultType]::ParameterName, 'Interval in seconds between changes')
+            [CompletionResult]::new('-m', '-m', [CompletionResultType]::ParameterName, 'Cycling mode')
+            [CompletionResult]::new('--mode', '--mode', [CompletionResultType]::ParameterName, 'Cycling mode')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;wallpaper;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;wallpaper;next' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;wallpaper;previous' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;wallpaper;info' {
+            [CompletionResult]::new('--monitor', '--monitor', [CompletionResultType]::ParameterName, 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, shows global state')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;wallpaper;theming-monitor' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;wallpaper;help' {
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set wallpaper from an image file')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Start cycling wallpapers from a directory')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop wallpaper cycling')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next wallpaper')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go back to previous wallpaper')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display current wallpaper information')
+            [CompletionResult]::new('theming-monitor', 'theming-monitor', [CompletionResultType]::ParameterValue, 'Set which monitor to use for color extraction')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;wallpaper;help;set' {
+            break
+        }
+        'lys-shell;wallpaper;help;cycle' {
+            break
+        }
+        'lys-shell;wallpaper;help;stop' {
+            break
+        }
+        'lys-shell;wallpaper;help;next' {
+            break
+        }
+        'lys-shell;wallpaper;help;previous' {
+            break
+        }
+        'lys-shell;wallpaper;help;info' {
+            break
+        }
+        'lys-shell;wallpaper;help;theming-monitor' {
+            break
+        }
+        'lys-shell;wallpaper;help;help' {
+            break
+        }
+        'lys-shell;idle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('on', 'on', [CompletionResultType]::ParameterValue, 'Enable idle inhibition')
+            [CompletionResult]::new('off', 'off', [CompletionResultType]::ParameterValue, 'Disable idle inhibition')
+            [CompletionResult]::new('duration', 'duration', [CompletionResultType]::ParameterValue, 'Adjust timer duration (upper limit)')
+            [CompletionResult]::new('remaining', 'remaining', [CompletionResultType]::ParameterValue, 'Adjust remaining time on active timer')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current idle inhibit status')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle idle inhibition on/off')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;idle;on' {
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Force indefinite mode (ignore default duration)')
+            [CompletionResult]::new('--indefinite', '--indefinite', [CompletionResultType]::ParameterName, 'Force indefinite mode (ignore default duration)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;idle;off' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;idle;duration' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;idle;remaining' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;idle;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;idle;toggle' {
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Use indefinite mode when enabling')
+            [CompletionResult]::new('--indefinite', '--indefinite', [CompletionResultType]::ParameterName, 'Use indefinite mode when enabling')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;idle;help' {
+            [CompletionResult]::new('on', 'on', [CompletionResultType]::ParameterValue, 'Enable idle inhibition')
+            [CompletionResult]::new('off', 'off', [CompletionResultType]::ParameterValue, 'Disable idle inhibition')
+            [CompletionResult]::new('duration', 'duration', [CompletionResultType]::ParameterValue, 'Adjust timer duration (upper limit)')
+            [CompletionResult]::new('remaining', 'remaining', [CompletionResultType]::ParameterValue, 'Adjust remaining time on active timer')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current idle inhibit status')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle idle inhibition on/off')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;idle;help;on' {
+            break
+        }
+        'lys-shell;idle;help;off' {
+            break
+        }
+        'lys-shell;idle;help;duration' {
+            break
+        }
+        'lys-shell;idle;help;remaining' {
+            break
+        }
+        'lys-shell;idle;help;status' {
+            break
+        }
+        'lys-shell;idle;help;toggle' {
+            break
+        }
+        'lys-shell;idle;help;help' {
+            break
+        }
+        'lys-shell;launcher' {
+            break
+        }
+        'lys-shell;lock' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;vpn' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('sso-callback', 'sso-callback', [CompletionResultType]::ParameterValue, 'Hand a browser sign-in callback to the running shell')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;vpn;sso-callback' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;vpn;help' {
+            [CompletionResult]::new('sso-callback', 'sso-callback', [CompletionResultType]::ParameterValue, 'Hand a browser sign-in callback to the running shell')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;vpn;help;sso-callback' {
+            break
+        }
+        'lys-shell;vpn;help;help' {
+            break
+        }
+        'lys-shell;recorder' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle recording on/off')
+            [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
+            [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;recorder;start' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;toggle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;pause' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;resume' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;help' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle recording on/off')
+            [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
+            [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;recorder;help;start' {
+            break
+        }
+        'lys-shell;recorder;help;stop' {
+            break
+        }
+        'lys-shell;recorder;help;toggle' {
+            break
+        }
+        'lys-shell;recorder;help;pause' {
+            break
+        }
+        'lys-shell;recorder;help;resume' {
+            break
+        }
+        'lys-shell;recorder;help;status' {
+            break
+        }
+        'lys-shell;recorder;help;help' {
+            break
+        }
+        'lys-shell;screenshot' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
+            [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;screenshot;region' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;screenshot;output' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;screenshot;window' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;screenshot;help' {
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
+            [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;screenshot;help;region' {
+            break
+        }
+        'lys-shell;screenshot;help;output' {
+            break
+        }
+        'lys-shell;screenshot;help;window' {
+            break
+        }
+        'lys-shell;screenshot;help;help' {
+            break
+        }
+        'lys-shell;widget' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Push an output update to a bar widget by its config id')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;widget;update' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'lys-shell;widget;help' {
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Push an output update to a bar widget by its config id')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;widget;help;update' {
+            break
+        }
+        'lys-shell;widget;help;help' {
+            break
+        }
+        'lys-shell;toast' {
+            [CompletionResult]::new('--icon', '--icon', [CompletionResultType]::ParameterName, 'Icon name shown beside the text')
+            [CompletionResult]::new('--percentage', '--percentage', [CompletionResultType]::ParameterName, 'Progress percentage (0-100); shows a progress bar when set')
+            [CompletionResult]::new('--duration', '--duration', [CompletionResultType]::ParameterName, 'Auto-dismiss duration in milliseconds (toast config default when unset)')
+            [CompletionResult]::new('--preset', '--preset', [CompletionResultType]::ParameterName, 'Preset id from `[[toasts.presets]]` to base this toast on')
+            [CompletionResult]::new('--class', '--class', [CompletionResultType]::ParameterName, 'Extra CSS class applied to the toast for custom styling')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)')
+            [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;portal;run' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;share-picker' {
+            [CompletionResult]::new('--allow-token', '--allow-token', [CompletionResultType]::ParameterName, 'Pre-check the "allow restore token" box')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;portal;show;file-chooser' {
+            [CompletionResult]::new('--save', '--save', [CompletionResultType]::ParameterName, 'Show the save dialog instead of the open dialog')
+            [CompletionResult]::new('--multiple', '--multiple', [CompletionResultType]::ParameterName, 'Allow selecting multiple files (open only)')
+            [CompletionResult]::new('--directory', '--directory', [CompletionResultType]::ParameterName, 'Select a directory instead of files (open only)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;screenshot' {
+            [CompletionResult]::new('--mode', '--mode', [CompletionResultType]::ParameterName, 'Capture mode: `region`, `output`, `screen`, or `window`')
+            [CompletionResult]::new('--target', '--target', [CompletionResultType]::ParameterName, 'Output connector name (used by `output` mode)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;color' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;print' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;screen-cast' {
+            [CompletionResult]::new('--allow-token', '--allow-token', [CompletionResultType]::ParameterName, 'Pre-check the "allow restore token" box')
+            [CompletionResult]::new('--multiple', '--multiple', [CompletionResultType]::ParameterName, 'Allow selecting multiple sources')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;access' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;account' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;app-chooser' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;dynamic-launcher' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;wallpaper' {
+            [CompletionResult]::new('--uri', '--uri', [CompletionResultType]::ParameterName, '`file://` image URI to preview (defaults to a placeholder)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;show;help' {
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;portal;show;help;file-chooser' {
+            break
+        }
+        'lys-shell;portal;show;help;screenshot' {
+            break
+        }
+        'lys-shell;portal;show;help;color' {
+            break
+        }
+        'lys-shell;portal;show;help;print' {
+            break
+        }
+        'lys-shell;portal;show;help;screen-cast' {
+            break
+        }
+        'lys-shell;portal;show;help;access' {
+            break
+        }
+        'lys-shell;portal;show;help;account' {
+            break
+        }
+        'lys-shell;portal;show;help;app-chooser' {
+            break
+        }
+        'lys-shell;portal;show;help;dynamic-launcher' {
+            break
+        }
+        'lys-shell;portal;show;help;wallpaper' {
+            break
+        }
+        'lys-shell;portal;show;help;help' {
+            break
+        }
+        'lys-shell;portal;help' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)')
+            [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;portal;help;run' {
+            break
+        }
+        'lys-shell;portal;help;share-picker' {
+            break
+        }
+        'lys-shell;portal;help;show' {
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            break
+        }
+        'lys-shell;portal;help;show;file-chooser' {
+            break
+        }
+        'lys-shell;portal;help;show;screenshot' {
+            break
+        }
+        'lys-shell;portal;help;show;color' {
+            break
+        }
+        'lys-shell;portal;help;show;print' {
+            break
+        }
+        'lys-shell;portal;help;show;screen-cast' {
+            break
+        }
+        'lys-shell;portal;help;show;access' {
+            break
+        }
+        'lys-shell;portal;help;show;account' {
+            break
+        }
+        'lys-shell;portal;help;show;app-chooser' {
+            break
+        }
+        'lys-shell;portal;help;show;dynamic-launcher' {
+            break
+        }
+        'lys-shell;portal;help;show;wallpaper' {
+            break
+        }
+        'lys-shell;portal;help;help' {
+            break
+        }
+        'lys-shell;shell' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;completions' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;help' {
+            [CompletionResult]::new('audio', 'audio', [CompletionResultType]::ParameterValue, 'Audio control commands')
+            [CompletionResult]::new('config', 'config', [CompletionResultType]::ParameterValue, 'Configuration management commands')
+            [CompletionResult]::new('icons', 'icons', [CompletionResultType]::ParameterValue, 'Icon management commands')
+            [CompletionResult]::new('media', 'media', [CompletionResultType]::ParameterValue, 'Media player control commands')
+            [CompletionResult]::new('notify', 'notify', [CompletionResultType]::ParameterValue, 'Notification control commands')
+            [CompletionResult]::new('panel', 'panel', [CompletionResultType]::ParameterValue, 'Panel management commands')
+            [CompletionResult]::new('power', 'power', [CompletionResultType]::ParameterValue, 'Power profile commands')
+            [CompletionResult]::new('systray', 'systray', [CompletionResultType]::ParameterValue, 'System tray commands')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper control commands')
+            [CompletionResult]::new('idle', 'idle', [CompletionResultType]::ParameterValue, 'Idle inhibit control commands')
+            [CompletionResult]::new('launcher', 'launcher', [CompletionResultType]::ParameterValue, 'Application launcher / dmenu with rofi-compatible flags')
+            [CompletionResult]::new('lock', 'lock', [CompletionResultType]::ParameterValue, 'Lock the session via lys-shell''s lock screen')
+            [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
+            [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
+            [CompletionResult]::new('widget', 'widget', [CompletionResultType]::ParameterValue, 'Widget control commands')
+            [CompletionResult]::new('toast', 'toast', [CompletionResultType]::ParameterValue, 'Show a custom on-screen toast')
+            [CompletionResult]::new('portal', 'portal', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer')
+            [CompletionResult]::new('shell', 'shell', [CompletionResultType]::ParameterValue, 'Run the desktop shell in the foreground')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;help;audio' {
+            [CompletionResult]::new('output-volume', 'output-volume', [CompletionResultType]::ParameterValue, 'Get or set output volume level')
+            [CompletionResult]::new('output-mute', 'output-mute', [CompletionResultType]::ParameterValue, 'Toggle output mute state')
+            [CompletionResult]::new('input-volume', 'input-volume', [CompletionResultType]::ParameterValue, 'Get or set input volume level')
+            [CompletionResult]::new('input-mute', 'input-mute', [CompletionResultType]::ParameterValue, 'Toggle input mute state')
+            [CompletionResult]::new('sinks', 'sinks', [CompletionResultType]::ParameterValue, 'List available audio sinks (outputs)')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available audio sources (inputs)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current audio status')
+            break
+        }
+        'lys-shell;help;audio;output-volume' {
+            break
+        }
+        'lys-shell;help;audio;output-mute' {
+            break
+        }
+        'lys-shell;help;audio;input-volume' {
+            break
+        }
+        'lys-shell;help;audio;input-mute' {
+            break
+        }
+        'lys-shell;help;audio;sinks' {
+            break
+        }
+        'lys-shell;help;audio;sources' {
+            break
+        }
+        'lys-shell;help;audio;status' {
+            break
+        }
+        'lys-shell;help;config' {
+            [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get the value of a configuration path')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set the value of a configuration path')
+            [CompletionResult]::new('reset', 'reset', [CompletionResultType]::ParameterValue, 'Reset a configuration path to its default value')
+            [CompletionResult]::new('schema', 'schema', [CompletionResultType]::ParameterValue, 'Output JSON Schema for the configuration (for editor intellisense)')
+            [CompletionResult]::new('default', 'default', [CompletionResultType]::ParameterValue, 'Output the default configuration as TOML')
+            [CompletionResult]::new('docs', 'docs', [CompletionResultType]::ParameterValue, 'Generate markdown reference pages for every registered schema')
+            break
+        }
+        'lys-shell;help;config;get' {
+            break
+        }
+        'lys-shell;help;config;set' {
+            break
+        }
+        'lys-shell;help;config;reset' {
+            break
+        }
+        'lys-shell;help;config;schema' {
+            break
+        }
+        'lys-shell;help;config;default' {
+            break
+        }
+        'lys-shell;help;config;docs' {
+            break
+        }
+        'lys-shell;help;icons' {
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Install bundled icons required by lys-shell components')
+            [CompletionResult]::new('install', 'install', [CompletionResultType]::ParameterValue, 'Install icons from a CDN source')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Import local SVG file(s) as icons')
+            [CompletionResult]::new('remove', 'remove', [CompletionResultType]::ParameterValue, 'Remove installed icons')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available icon sources')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List installed icons')
+            [CompletionResult]::new('open', 'open', [CompletionResultType]::ParameterValue, 'Open the icons directory in file manager')
+            [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export all installed icons to a directory')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Install any icons referenced in config but not yet on disk')
+            break
+        }
+        'lys-shell;help;icons;setup' {
+            break
+        }
+        'lys-shell;help;icons;install' {
+            break
+        }
+        'lys-shell;help;icons;import' {
+            break
+        }
+        'lys-shell;help;icons;remove' {
+            break
+        }
+        'lys-shell;help;icons;sources' {
+            break
+        }
+        'lys-shell;help;icons;list' {
+            break
+        }
+        'lys-shell;help;icons;open' {
+            break
+        }
+        'lys-shell;help;icons;export' {
+            break
+        }
+        'lys-shell;help;icons;sync' {
+            break
+        }
+        'lys-shell;help;media' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all available media players')
+            [CompletionResult]::new('play-pause', 'play-pause', [CompletionResultType]::ParameterValue, 'Toggle play/pause for a media player')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next track')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go to previous track')
+            [CompletionResult]::new('shuffle', 'shuffle', [CompletionResultType]::ParameterValue, 'Toggle or set shuffle mode')
+            [CompletionResult]::new('loop', 'loop', [CompletionResultType]::ParameterValue, 'Set loop/repeat mode')
+            [CompletionResult]::new('active', 'active', [CompletionResultType]::ParameterValue, 'Get or set the active media player')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display detailed information about a media player')
+            break
+        }
+        'lys-shell;help;media;list' {
+            break
+        }
+        'lys-shell;help;media;play-pause' {
+            break
+        }
+        'lys-shell;help;media;next' {
+            break
+        }
+        'lys-shell;help;media;previous' {
+            break
+        }
+        'lys-shell;help;media;shuffle' {
+            break
+        }
+        'lys-shell;help;media;loop' {
+            break
+        }
+        'lys-shell;help;media;active' {
+            break
+        }
+        'lys-shell;help;media;info' {
+            break
+        }
+        'lys-shell;help;notify' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all notifications')
+            [CompletionResult]::new('dismiss', 'dismiss', [CompletionResultType]::ParameterValue, 'Dismiss a notification by ID')
+            [CompletionResult]::new('dismiss-all', 'dismiss-all', [CompletionResultType]::ParameterValue, 'Dismiss all notifications')
+            [CompletionResult]::new('dnd', 'dnd', [CompletionResultType]::ParameterValue, 'Toggle Do Not Disturb mode')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show notification status')
+            break
+        }
+        'lys-shell;help;notify;list' {
+            break
+        }
+        'lys-shell;help;notify;dismiss' {
+            break
+        }
+        'lys-shell;help;notify;dismiss-all' {
+            break
+        }
+        'lys-shell;help;notify;dnd' {
+            break
+        }
+        'lys-shell;help;notify;status' {
+            break
+        }
+        'lys-shell;help;panel' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
+            [CompletionResult]::new('restart', 'restart', [CompletionResultType]::ParameterValue, 'Restart the panel daemon')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check panel status')
+            [CompletionResult]::new('settings', 'settings', [CompletionResultType]::ParameterValue, 'Open panel settings')
+            [CompletionResult]::new('inspect', 'inspect', [CompletionResultType]::ParameterValue, 'Open the widget inspector for debugging')
+            [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            break
+        }
+        'lys-shell;help;panel;start' {
+            break
+        }
+        'lys-shell;help;panel;stop' {
+            break
+        }
+        'lys-shell;help;panel;restart' {
+            break
+        }
+        'lys-shell;help;panel;status' {
+            break
+        }
+        'lys-shell;help;panel;settings' {
+            break
+        }
+        'lys-shell;help;panel;inspect' {
+            break
+        }
+        'lys-shell;help;panel;hide' {
+            break
+        }
+        'lys-shell;help;panel;show' {
+            break
+        }
+        'lys-shell;help;panel;toggle' {
+            break
+        }
+        'lys-shell;help;power' {
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current power profile')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set power profile')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Cycle to next power profile')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List available power profiles')
+            break
+        }
+        'lys-shell;help;power;status' {
+            break
+        }
+        'lys-shell;help;power;set' {
+            break
+        }
+        'lys-shell;help;power;cycle' {
+            break
+        }
+        'lys-shell;help;power;list' {
+            break
+        }
+        'lys-shell;help;systray' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all system tray items')
+            [CompletionResult]::new('activate', 'activate', [CompletionResultType]::ParameterValue, 'Activate a tray item by ID')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show system tray status')
+            break
+        }
+        'lys-shell;help;systray;list' {
+            break
+        }
+        'lys-shell;help;systray;activate' {
+            break
+        }
+        'lys-shell;help;systray;status' {
+            break
+        }
+        'lys-shell;help;wallpaper' {
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set wallpaper from an image file')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Start cycling wallpapers from a directory')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop wallpaper cycling')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next wallpaper')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go back to previous wallpaper')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display current wallpaper information')
+            [CompletionResult]::new('theming-monitor', 'theming-monitor', [CompletionResultType]::ParameterValue, 'Set which monitor to use for color extraction')
+            break
+        }
+        'lys-shell;help;wallpaper;set' {
+            break
+        }
+        'lys-shell;help;wallpaper;cycle' {
+            break
+        }
+        'lys-shell;help;wallpaper;stop' {
+            break
+        }
+        'lys-shell;help;wallpaper;next' {
+            break
+        }
+        'lys-shell;help;wallpaper;previous' {
+            break
+        }
+        'lys-shell;help;wallpaper;info' {
+            break
+        }
+        'lys-shell;help;wallpaper;theming-monitor' {
+            break
+        }
+        'lys-shell;help;idle' {
+            [CompletionResult]::new('on', 'on', [CompletionResultType]::ParameterValue, 'Enable idle inhibition')
+            [CompletionResult]::new('off', 'off', [CompletionResultType]::ParameterValue, 'Disable idle inhibition')
+            [CompletionResult]::new('duration', 'duration', [CompletionResultType]::ParameterValue, 'Adjust timer duration (upper limit)')
+            [CompletionResult]::new('remaining', 'remaining', [CompletionResultType]::ParameterValue, 'Adjust remaining time on active timer')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current idle inhibit status')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle idle inhibition on/off')
+            break
+        }
+        'lys-shell;help;idle;on' {
+            break
+        }
+        'lys-shell;help;idle;off' {
+            break
+        }
+        'lys-shell;help;idle;duration' {
+            break
+        }
+        'lys-shell;help;idle;remaining' {
+            break
+        }
+        'lys-shell;help;idle;status' {
+            break
+        }
+        'lys-shell;help;idle;toggle' {
+            break
+        }
+        'lys-shell;help;launcher' {
+            break
+        }
+        'lys-shell;help;lock' {
+            break
+        }
+        'lys-shell;help;vpn' {
+            [CompletionResult]::new('sso-callback', 'sso-callback', [CompletionResultType]::ParameterValue, 'Hand a browser sign-in callback to the running shell')
+            break
+        }
+        'lys-shell;help;vpn;sso-callback' {
+            break
+        }
+        'lys-shell;help;recorder' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle recording on/off')
+            [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
+            [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            break
+        }
+        'lys-shell;help;recorder;start' {
+            break
+        }
+        'lys-shell;help;recorder;stop' {
+            break
+        }
+        'lys-shell;help;recorder;toggle' {
+            break
+        }
+        'lys-shell;help;recorder;pause' {
+            break
+        }
+        'lys-shell;help;recorder;resume' {
+            break
+        }
+        'lys-shell;help;recorder;status' {
+            break
+        }
+        'lys-shell;help;screenshot' {
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
+            [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            break
+        }
+        'lys-shell;help;screenshot;region' {
+            break
+        }
+        'lys-shell;help;screenshot;output' {
+            break
+        }
+        'lys-shell;help;screenshot;window' {
+            break
+        }
+        'lys-shell;help;widget' {
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Push an output update to a bar widget by its config id')
+            break
+        }
+        'lys-shell;help;widget;update' {
+            break
+        }
+        'lys-shell;help;toast' {
+            break
+        }
+        'lys-shell;help;portal' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)')
+            [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
+            break
+        }
+        'lys-shell;help;portal;run' {
+            break
+        }
+        'lys-shell;help;portal;share-picker' {
+            break
+        }
+        'lys-shell;help;portal;show' {
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            break
+        }
+        'lys-shell;help;portal;show;file-chooser' {
+            break
+        }
+        'lys-shell;help;portal;show;screenshot' {
+            break
+        }
+        'lys-shell;help;portal;show;color' {
+            break
+        }
+        'lys-shell;help;portal;show;print' {
+            break
+        }
+        'lys-shell;help;portal;show;screen-cast' {
+            break
+        }
+        'lys-shell;help;portal;show;access' {
+            break
+        }
+        'lys-shell;help;portal;show;account' {
+            break
+        }
+        'lys-shell;help;portal;show;app-chooser' {
+            break
+        }
+        'lys-shell;help;portal;show;dynamic-launcher' {
+            break
+        }
+        'lys-shell;help;portal;show;wallpaper' {
+            break
+        }
+        'lys-shell;help;shell' {
+            break
+        }
+        'lys-shell;help;completions' {
+            break
+        }
+        'lys-shell;help;help' {
+            break
+        }
+    })
+
+    $completions.Where{ $_.CompletionText -like "$wordToComplete*" } |
+        Sort-Object -Property ListItemText
+}

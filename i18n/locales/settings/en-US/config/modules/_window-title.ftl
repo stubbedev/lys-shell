@@ -1,4 +1,4 @@
-### Wayle Configuration - Window Title Module
+### lys-shell Configuration - Window Title Module
 
 ## Window Title Module Configuration
 

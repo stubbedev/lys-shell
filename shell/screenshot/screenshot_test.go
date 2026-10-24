@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/colorpicker"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/colorpicker"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
 func solid(w, h int, c color.RGBA) *image.RGBA {

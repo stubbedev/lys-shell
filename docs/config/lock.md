@@ -7,10 +7,10 @@ outline: [2, 3]
 
 <div v-pre>
 
-Lock screen: a secure session lock rendered by Wayle via `ext-session-lock-v1`.
+Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`.
 
-When `enabled`, Wayle locks the session in response to the logind `Lock`
-signal (`loginctl lock-session`), the `wayle lock` CLI, or the shell IPC
+When `enabled`, lys-shell locks the session in response to the logind `Lock`
+signal (`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC
 `lock()` method. The lock surface grabs all input and survives client
 crashes (the compositor shows a solid color), unlike a layer-shell overlay.
 
@@ -18,7 +18,7 @@ crashes (the compositor shows a solid color), unlike a layer-shell overlay.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | bool | `true` | Let Wayle handle session locking. When off, lock requests are ignored and an external locker (e.g. hyprlock) stays responsible. |
+| `enabled` | bool | `true` | Let lys-shell handle session locking. When off, lock requests are ignored and an external locker (e.g. hyprlock) stays responsible. |
 | `lock-on-start` | bool | `false` | Lock the session as soon as the shell starts. For autologin setups (e.g. greetd with no password at boot) where the lock screen is the access gate: the session comes up locked and requires the password before use. Off by default — a normal login has already authenticated. |
 | `background-mode` | [`LockBackground`](/config/types#lock-background) | `"color"` | How the background is drawn: solid color, an image, or the wallpaper. |
 | `background-image` | string | `""` | Background image path (used when `background-mode = "image"`). |

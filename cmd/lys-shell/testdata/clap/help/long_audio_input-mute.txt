@@ -1,0 +1,6 @@
+Toggle input mute state
+
+Usage: lys-shell audio input-mute
+
+Options:
+  -h, --help  Print help

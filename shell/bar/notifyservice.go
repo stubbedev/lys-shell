@@ -3,8 +3,8 @@ package bar
 import (
 	"log"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 // startNotifications builds the notification service the way the Rust

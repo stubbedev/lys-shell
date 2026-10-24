@@ -115,7 +115,7 @@ label-color = "status-error"
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `left-click` | [`ClickAction`](/config/types#click-action) | `"dropdown:notification"` | Action on left click. |
-| `right-click` | [`ClickAction`](/config/types#click-action) | `"wayle notify dnd"` | Action on right click. Default toggles Do Not Disturb. |
+| `right-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell notify dnd"` | Action on right click. Default toggles Do Not Disturb. |
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
@@ -138,7 +138,7 @@ label-color = "green"
 label-max-length = 0
 button-bg-color = "bg-surface-elevated"
 left-click = "dropdown:notification"
-right-click = "wayle notify dnd"
+right-click = "lys-shell notify dnd"
 middle-click = ""
 scroll-up = ""
 scroll-down = ""

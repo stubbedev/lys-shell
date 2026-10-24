@@ -9,8 +9,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // email is org.freedesktop.impl.portal.Email (email.rs): the user's
@@ -106,7 +106,7 @@ func copyAttachments(options Vardict) []string {
 	fds, _ := options["attachment_fds"].Value().([]dbus.UnixFD)
 	var paths []string
 	for i, fd := range fds {
-		path := filepath.Join(os.TempDir(), fmt.Sprintf("wayle-email-%d-%d", os.Getpid(), i))
+		path := filepath.Join(os.TempDir(), fmt.Sprintf("lys-shell-email-%d-%d", os.Getpid(), i))
 		if err := copyFd(fd, path); err != nil {
 			warnf("email: attachment %d: %v", i, err)
 			continue

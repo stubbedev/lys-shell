@@ -4,10 +4,10 @@ import (
 	"image"
 	"math"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/service/wallpaper"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
 // target is the device-pixel box a wallpaper is prepared for and the
@@ -57,7 +57,7 @@ func prepare(img image.Image, fit wallpaper.FitMode, box target) image.Image {
 	return render.Resample(img, src, dst.W, dst.H)
 }
 
-// widgetScale is the gelm policy for an image that could not be
+// widgetScale is the lys-ui policy for an image that could not be
 // prepared (the output size is unknown): the closest live equivalent.
 func widgetScale(fit wallpaper.FitMode) widget.ImageScale {
 	switch fit {

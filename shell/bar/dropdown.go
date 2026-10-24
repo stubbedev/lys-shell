@@ -5,12 +5,12 @@ import (
 	"math"
 	"sync"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // dropdownRegistry maps the `dropdown:<name>` actions to content
@@ -419,7 +419,7 @@ func roundMarginRem(rem, scale float64) int {
 // chain (popover.dropdown > contents .dropdown gets the surface, the
 // shadow and position classes the shadow's direction), and the Rust
 // registry's surface margins around it. The theme reaches it through
-// the bar button it opens from: gelm styles a popover as a child of
+// the bar button it opens from: lys-ui styles a popover as a child of
 // its anchor, as GTK's popover CSS node is, so it inherits the bar
 // window's fonts and :root variables. w x h is the dropdown's size, the
 // Rust popover's width and height requests: a floor for the whole

@@ -8,9 +8,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // rig is a backend serving on a private bus, with a client connection
@@ -80,7 +80,7 @@ func TestSettingsReadAllServesAppearance(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := all[AppearanceNS]
-	// The default palette is the dark wayle theme with a #e0947a accent.
+	// The default palette is the dark lys-shell theme with a #e0947a accent.
 	if got[keyColorScheme].Value() != uint32(1) || got[keyContrast].Value() != uint32(0) || got[keyReducedMotion].Value() != uint32(0) {
 		t.Errorf("appearance = %v", got)
 	}

@@ -11,9 +11,9 @@ import (
 
 // D-Bus identity (dbus/mod.rs, dbus.md).
 const (
-	ServiceName = "com.wayle.Wallpaper1"
-	ServicePath = dbus.ObjectPath("/com/wayle/Wallpaper")
-	Interface   = "com.wayle.Wallpaper1"
+	ServiceName = "dev.stubbe.lys.Wallpaper1"
+	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/Wallpaper")
+	Interface   = "dev.stubbe.lys.Wallpaper1"
 )
 
 const (
@@ -30,7 +30,7 @@ func invalidArgs(err error) *dbus.Error {
 	return &dbus.Error{Name: errInvalidArgs, Body: []any{err.Error()}}
 }
 
-// Daemon serves a Service as com.wayle.Wallpaper1 (dbus/server.rs). An
+// Daemon serves a Service as dev.stubbe.lys.Wallpaper1 (dbus/server.rs). An
 // empty monitor argument targets every monitor.
 type Daemon struct {
 	svc *Service

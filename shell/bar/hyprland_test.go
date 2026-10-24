@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/hyprland"
 )
 
 func occupiedHypr(id int, monitor string) hyprland.Workspace {

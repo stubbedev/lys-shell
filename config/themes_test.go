@@ -13,8 +13,8 @@ func TestBuiltinThemesTable(t *testing.T) {
 	if len(themes) != 45 {
 		t.Fatalf("builtins = %d, want the 45 Rust themes", len(themes))
 	}
-	if themes[0].Name != "wayle" || themes[0].Palette != wayleTheme {
-		t.Errorf("first builtin = %+v, want the wayle theme", themes[0])
+	if themes[0].Name != "lys-shell" || themes[0].Palette != lysShellTheme {
+		t.Errorf("first builtin = %+v, want the lys-shell theme", themes[0])
 	}
 	seen := map[string]bool{}
 	for _, theme := range themes {
@@ -107,13 +107,13 @@ blue = "#00000a"
 extra = "ignored"
 `
 	for name, body := range map[string]string{
-		"mine.toml":    full,
-		"wayle.toml":   full,                                                     // a builtin's name: skipped
-		"broken.toml":  "bg = ",                                                  // unparsable: skipped
-		"partial.toml": strings.Replace(full, "fg_muted = \"#000005\"\n", "", 1), // missing field: skipped
-		"kebab.toml":   strings.Replace(full, "fg_muted", "fg-muted", 1),         // wrong key spelling: skipped
-		"readme.txt":   full,                                                     // not a theme file: ignored
-		"dir.toml/x":   "",                                                       // a directory named .toml: unreadable, skipped
+		"mine.toml":      full,
+		"lys-shell.toml": full,                                                     // a builtin's name: skipped
+		"broken.toml":    "bg = ",                                                  // unparsable: skipped
+		"partial.toml":   strings.Replace(full, "fg_muted = \"#000005\"\n", "", 1), // missing field: skipped
+		"kebab.toml":     strings.Replace(full, "fg_muted", "fg-muted", 1),         // wrong key spelling: skipped
+		"readme.txt":     full,                                                     // not a theme file: ignored
+		"dir.toml/x":     "",                                                       // a directory named .toml: unreadable, skipped
 	} {
 		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
@@ -133,11 +133,11 @@ extra = "ignored"
 	if mine.Name != "mine" || mine.Builtin || mine.Palette != want {
 		t.Errorf("user theme = %+v, want mine with the file's palette", mine)
 	}
-	if themes[0].Palette != wayleTheme {
-		t.Error("a user wayle.toml replaced the builtin; duplicates must be skipped")
+	if themes[0].Palette != lysShellTheme {
+		t.Error("a user lys-shell.toml replaced the builtin; duplicates must be skipped")
 	}
 	if len(skipped) != 5 {
-		t.Fatalf("skipped = %v, want wayle, broken, partial, kebab, dir", skipped)
+		t.Fatalf("skipped = %v, want lys-shell, broken, partial, kebab, dir", skipped)
 	}
 	joined := errors.Join(skipped...).Error()
 	for _, want := range []string{"already exists", "broken.toml", `missing field "fg_muted"`, "kebab.toml", "dir.toml"} {

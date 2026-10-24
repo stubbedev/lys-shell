@@ -1,6 +1,6 @@
 // Package screenshot is the screenshot host
-// (crates/wayle-shell/src/shell/screenshot) behind the
-// com.wayle.Screenshot1 D-Bus service: it resolves the capture target
+// (crates/lys-shell/src/shell/screenshot) behind the
+// dev.stubbe.lys.Screenshot1 D-Bus service: it resolves the capture target
 // (opening the freeze-frame region overlay for region mode), captures
 // a full-resolution image, saves a PNG, optionally copies it to the
 // clipboard and fires a desktop notification, and replies with the
@@ -19,10 +19,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/desktopnotify"
-	"github.com/stubbedev/wayle/shell/colorpicker"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/shell/colorpicker"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
 // The capture modes of Capture: a drag-selected region, one output
@@ -36,7 +36,7 @@ const (
 )
 
 // Host performs captures. The capture half runs on the caller's
-// goroutine (a D-Bus handler); the overlays marshal onto the gelm loop
+// goroutine (a D-Bus handler); the overlays marshal onto the lys-ui loop
 // themselves.
 type Host struct {
 	// Config is the [modules.screenshot] section in effect, read at
@@ -123,7 +123,7 @@ func (h *Host) save(img *image.RGBA) (string, error) {
 			h.Notify(path)
 		} else {
 			// The saved PNG doubles as the notification icon.
-			desktopnotify.Notify("Wayle", "Screenshot saved", path, path)
+			desktopnotify.Notify("lys-shell", "Screenshot saved", path, path)
 		}
 	}
 	return path, nil

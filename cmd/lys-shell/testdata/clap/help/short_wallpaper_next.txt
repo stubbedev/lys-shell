@@ -1,0 +1,6 @@
+Skip to next wallpaper
+
+Usage: lys-shell wallpaper next
+
+Options:
+  -h, --help  Print help

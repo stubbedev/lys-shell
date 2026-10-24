@@ -18,7 +18,7 @@ type ButtonColors struct {
 }
 
 // ButtonConfig is one module's bar-button keys plus their schema
-// defaults (resolve_color's fallback under a non-wayle provider).
+// defaults (resolve_color's fallback under a non-lys-shell provider).
 type ButtonConfig struct {
 	BorderShow     bool
 	IconShow       bool

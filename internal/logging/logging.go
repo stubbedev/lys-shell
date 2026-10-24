@@ -1,5 +1,5 @@
-// Package logging is wayle's log setup (wayle/src/core/tracing.rs and
-// wayle-shell's tracing_init): a daily file in the state directory,
+// Package logging is lys-shell's log setup (lys-shell/src/core/tracing.rs and
+// lys-shell's tracing_init): a daily file in the state directory,
 // "<prefix>.<YYYY-MM-DD>.log", keeping the newest seven, behind the
 // standard log package. The CLI logs to the file only, so its output
 // stays clean; the shell also echoes to a console writer.
@@ -21,17 +21,17 @@ import (
 // daysToKeep is tracing.rs's DAYS_TO_KEEP.
 const daysToKeep = 7
 
-// Dir is ConfigPaths::log_dir: $XDG_STATE_HOME/wayle, or
-// ~/.local/state/wayle.
+// Dir is ConfigPaths::log_dir: $XDG_STATE_HOME/lys-shell, or
+// ~/.local/state/lys-shell.
 func Dir() (string, error) {
 	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
-		return filepath.Join(dir, "wayle"), nil
+		return filepath.Join(dir, "lys-shell"), nil
 	}
 	home := os.Getenv("HOME")
 	if home == "" {
 		return "", errors.New("neither XDG_STATE_HOME nor HOME environment variable found")
 	}
-	return filepath.Join(home, ".local", "state", "wayle"), nil
+	return filepath.Join(home, ".local", "state", "lys-shell"), nil
 }
 
 // Setup routes the standard logger to prefix's daily file in Dir, and
@@ -60,10 +60,10 @@ func Setup(prefix string, console io.Writer) (io.Closer, error) {
 	return w, nil
 }
 
-// Library is the logger handed to gelm (app.SetLogger): its warnings
+// Library is the logger handed to lys-ui (app.SetLogger): its warnings
 // (an optional protocol that failed to bind) and errors (the
-// compositor's fatal protocol error) land beside wayle's own lines,
-// where GTK prints its own. gelm stays silent without one.
+// compositor's fatal protocol error) land beside lys-shell's own lines,
+// where GTK prints its own. lys-ui stays silent without one.
 func Library() *slog.Logger {
 	return slog.New(slog.NewTextHandler(log.Writer(), &slog.HandlerOptions{Level: slog.LevelWarn}))
 }

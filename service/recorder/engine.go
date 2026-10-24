@@ -8,8 +8,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/portal"
-	"github.com/stubbedev/wayle/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/portal"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // GstEngine is the production Engine: the ScreenCast portal on the
@@ -29,7 +29,7 @@ func (p portalSession) Cast() Cast {
 func (p portalSession) Close() { p.s.Close() }
 
 // OpenSession implements Engine: one monitor through the portal, the
-// restore token in wayle's state dir.
+// restore token in lys-shell's state dir.
 func (e GstEngine) OpenSession(ctx context.Context, showCursor bool) (Session, error) {
 	dir, _ := xdg.StateDir()
 	s, err := portal.OpenScreenCast(ctx, e.Conn, showCursor, dir)

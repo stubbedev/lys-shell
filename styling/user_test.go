@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/scss"
+	"github.com/stubbedev/lys-shell/internal/scss"
 )
 
 // captureLog redirects the standard logger for the test.
@@ -121,13 +121,13 @@ func TestUserStylesDir(t *testing.T) {
 }
 
 func TestEnsureUserStylesScaffoldCreatesTheTemplate(t *testing.T) {
-	config := filepath.Join(t.TempDir(), "wayle")
+	config := filepath.Join(t.TempDir(), "lys-shell")
 	EnsureUserStylesScaffold(config)
 	got, err := os.ReadFile(filepath.Join(config, "styles", "index.scss"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "// Custom Wayle styles. Anything here overrides the built-in styling.\n" +
+	const want = "// Custom lys-shell styles. Anything here overrides the built-in styling.\n" +
 		"// Use @import \"name\" to bring in _name.scss from this folder.\n"
 	if string(got) != want {
 		t.Errorf("template = %q, want %q", got, want)

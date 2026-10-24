@@ -10,7 +10,7 @@ import (
 
 // logind integration (shell/lock/logind.rs): the session's Lock and
 // Unlock signals drive the lock screen, so `loginctl lock-session`, idle
-// daemons, and `wayle lock` all end up here; SetLockedHint reports the
+// daemons, and `lys-shell lock` all end up here; SetLockedHint reports the
 // state back, and LockedHint - kept by logind across our restarts - says
 // whether a dead predecessor held the lock.
 

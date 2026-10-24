@@ -1,4 +1,4 @@
-### Wayle Configuration - Niri Workspaces Module
+### lys-shell Configuration - Niri Workspaces Module
 
 ## Niri Workspaces Module Configuration
 

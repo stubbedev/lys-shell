@@ -120,7 +120,7 @@ func TestInputsRejectBadArguments(t *testing.T) {
 // name.
 func writeVisArea(t *testing.T, running bool, rate uint32, fill func(i int) int16) string {
 	t.Helper()
-	name := "/wayle-cava-test-" + strconv.Itoa(os.Getpid()) + "-" + strings.ReplaceAll(t.Name(), "/", "-")
+	name := "/lys-shell-cava-test-" + strconv.Itoa(os.Getpid()) + "-" + strings.ReplaceAll(t.Name(), "/", "-")
 	area := make([]byte, visSize)
 	binary.LittleEndian.PutUint32(area[visBufSizeOff:], visBufSamples)
 	if running {
@@ -172,9 +172,9 @@ func TestShmemInputIsSilentWhileStopped(t *testing.T) {
 }
 
 func TestShmemInputMissingSource(t *testing.T) {
-	in, _ := NewShmemInput("/wayle-cava-no-such-area", 1, 4096)
+	in, _ := NewShmemInput("/lys-shell-cava-no-such-area", 1, 4096)
 	err := in.Start()
-	if err == nil || !strings.Contains(err.Error(), "could not open source '/wayle-cava-no-such-area'") {
+	if err == nil || !strings.Contains(err.Error(), "could not open source '/lys-shell-cava-no-such-area'") {
 		t.Errorf("err = %v, want the could-not-open error", err)
 	}
 }

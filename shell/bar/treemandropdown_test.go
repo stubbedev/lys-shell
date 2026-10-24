@@ -7,22 +7,22 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/treeman"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/treeman"
 )
 
 func treemanFixture() *treeman.Status {
 	return &treeman.Status{Total: 3, Stable: 2, Failed: 1, Repos: []treeman.Repo{
-		{Repo: "wayle", Total: 2, Worktrees: []treeman.Worktree{
-			{Branch: "master", Slug: "wayle-master", State: "ready", Bucket: "stable", IsMain: true, Path: "/w/wayle"},
-			{Branch: "feat", Slug: "wayle-feat", State: "error", Bucket: "failed", Path: "/w/feat"},
+		{Repo: "lys-shell", Total: 2, Worktrees: []treeman.Worktree{
+			{Branch: "master", Slug: "lys-shell-master", State: "ready", Bucket: "stable", IsMain: true, Path: "/w/lys-shell"},
+			{Branch: "feat", Slug: "lys-shell-feat", State: "error", Bucket: "failed", Path: "/w/feat"},
 		}},
-		{Repo: "gelm", Total: 1, Worktrees: []treeman.Worktree{
-			{Branch: "main", State: "ready", Bucket: "stable", IsMain: true, Path: "/w/gelm"},
+		{Repo: "lys-ui", Total: 1, Worktrees: []treeman.Worktree{
+			{Branch: "main", State: "ready", Bucket: "stable", IsMain: true, Path: "/w/lys-ui"},
 		}},
 	}}
 }
@@ -73,10 +73,10 @@ func TestTreemanDropdownListAndCollapse(t *testing.T) {
 	fold := card.Children()[1].(*widget.Revealer)
 	rows := fold.Child().(*widget.Box)
 	if len(rows.Children()) != 2 || !fold.Revealed() {
-		t.Fatalf("wayle rows = %d revealed %v", len(rows.Children()), fold.Revealed())
+		t.Fatalf("lys-shell rows = %d revealed %v", len(rows.Children()), fold.Revealed())
 	}
 	header.OnClick()
-	if fold.Revealed() || !v.collapsed["wayle"] {
+	if fold.Revealed() || !v.collapsed["lys-shell"] {
 		t.Error("the header did not fold the card")
 	}
 	// The fold survives a status refresh.
@@ -98,7 +98,7 @@ func TestTreemanDropdownListAndCollapse(t *testing.T) {
 	if !under.HasClass("treeman-wt") {
 		t.Error("the overlay does not wrap the treeman-wt row")
 	}
-	if under.TooltipText() != "/w/gelm" {
+	if under.TooltipText() != "/w/lys-ui" {
 		t.Errorf("tooltip = %q", under.TooltipText())
 	}
 	if cluster, ok := row.Children()[1].(*widget.Box); !ok || !cluster.HasClass("treeman-actions") {

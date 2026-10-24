@@ -3,9 +3,9 @@ package reveal
 import (
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestTransitionCoversEveryStyle(t *testing.T) {

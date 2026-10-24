@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 )
 
 // sessionCardTree walks the section into its named boxes and buttons.
@@ -49,7 +49,7 @@ func sessionCardTree(t *testing.T, card widget.Widget) (row, info, avatar, meta,
 // (avatar tile over user-meta/user-name) with the actions pinned to the
 // row's end, the buttons in the IconButton shape.
 func TestUserSessionMatchesTheRustTree(t *testing.T) {
-	t.Setenv("USER", "wayle")
+	t.Setenv("USER", "lys-shell")
 	t.Setenv("HOME", t.TempDir()) // no ~/.face: the user glyph
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
@@ -75,7 +75,7 @@ func TestUserSessionMatchesTheRustTree(t *testing.T) {
 	if len(meta.Children()) != 1 || !isLabel || !name.HasClass("user-name") {
 		t.Fatalf("user-meta = %v, want the user-name label", meta.Children())
 	}
-	if got := name.Text(); got != "wayle" {
+	if got := name.Text(); got != "lys-shell" {
 		t.Errorf("username = %q, want $USER", got)
 	}
 	if got := name.Color(); got != 0 {
@@ -122,7 +122,7 @@ func TestUserSessionMatchesTheRustTree(t *testing.T) {
 // builds one button with that action's tooltip, and an empty list
 // builds none.
 func TestUserSessionButtonsFollowTheConfig(t *testing.T) {
-	t.Setenv("USER", "wayle")
+	t.Setenv("USER", "lys-shell")
 	t.Setenv("HOME", t.TempDir())
 	cfg := config.Defaults()
 	cfg.Dashboard.UserSession.Actions = []config.SessionAction{config.SessionActionLock}
@@ -170,7 +170,7 @@ func writeFace(t *testing.T, home string) {
 // shows.
 func TestUserSessionAvatarTakesTheFaceAsItsBackground(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("USER", "wayle")
+	t.Setenv("USER", "lys-shell")
 	t.Setenv("HOME", home)
 	writeFace(t, home)
 	cfg := config.Defaults()

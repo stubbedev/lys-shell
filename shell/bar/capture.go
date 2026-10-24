@@ -6,16 +6,16 @@ import (
 	"slices"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/shell/colorpicker"
-	"github.com/stubbedev/wayle/shell/regionoverlay"
-	"github.com/stubbedev/wayle/shell/screenshot"
-	"github.com/stubbedev/wayle/shell/sharepicker"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/shell/colorpicker"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // overlayLabelPx is the region overlay's size-label face size; the
@@ -23,8 +23,8 @@ import (
 const overlayLabelPx = 14
 
 // captureServices is the shell's capture side: the region overlay, the
-// color picker, the screenshot host behind com.wayle.Screenshot1, and
-// the share picker behind com.wayle.SharePicker1
+// color picker, the screenshot host behind dev.stubbe.lys.Screenshot1, and
+// the share picker behind dev.stubbe.lys.SharePicker1
 // (bootstrap's screenshot and share picker service starts).
 type captureServices struct {
 	host    *screenshot.Host
@@ -79,7 +79,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 	return s
 }
 
-// trigger is the `wayle screenshot ...` builtin: a fire-and-forget
+// trigger is the `lys-shell screenshot ...` builtin: a fire-and-forget
 // capture whose reply nobody awaits, like the Rust trigger's dropped
 // oneshot.
 func (s *captureServices) trigger(mode, target string) {

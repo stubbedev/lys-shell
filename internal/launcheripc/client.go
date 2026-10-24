@@ -30,7 +30,7 @@ func Open(options SessionOptions, replace bool) (*Client, error) {
 	path := SocketPath()
 	conn, err := net.Dial("unix", path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to wayle launcher socket at %s: %w", path, err)
+		return nil, fmt.Errorf("cannot connect to lys-shell launcher socket at %s: %w", path, err)
 	}
 	c := &Client{conn: conn, reader: bufio.NewReaderSize(conn, 64*1024)}
 	if err := c.send(ClientFrame{Type: FrameOpen, Options: &options, Replace: replace}); err != nil {

@@ -1,6 +1,0 @@
-Stop wallpaper cycling
-
-Usage: wayle wallpaper stop
-
-Options:
-  -h, --help  Print help

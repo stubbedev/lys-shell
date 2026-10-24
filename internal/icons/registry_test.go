@@ -13,16 +13,16 @@ import (
 func TestDefaultPath(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "/data")
 	t.Setenv("HOME", "/home/u")
-	if got, _ := DefaultPath(); got != "/data/wayle/icons" {
+	if got, _ := DefaultPath(); got != "/data/lys-shell/icons" {
 		t.Errorf("with XDG_DATA_HOME: %q", got)
 	}
 	// Set but empty is taken as given, as std::env::var does.
 	t.Setenv("XDG_DATA_HOME", "")
-	if got, _ := DefaultPath(); got != "wayle/icons" {
-		t.Errorf("with an empty XDG_DATA_HOME: %q, want the relative wayle/icons", got)
+	if got, _ := DefaultPath(); got != "lys-shell/icons" {
+		t.Errorf("with an empty XDG_DATA_HOME: %q, want the relative lys-shell/icons", got)
 	}
 	_ = os.Unsetenv("XDG_DATA_HOME")
-	if got, _ := DefaultPath(); got != "/home/u/.local/share/wayle/icons" {
+	if got, _ := DefaultPath(); got != "/home/u/.local/share/lys-shell/icons" {
 		t.Errorf("from HOME: %q", got)
 	}
 	_ = os.Unsetenv("HOME")
@@ -63,7 +63,7 @@ func TestEnsureSetup(t *testing.T) {
 
 func TestThemeSearchPaths(t *testing.T) {
 	data := t.TempDir()
-	system := filepath.Join(data, "wayle", "icons")
+	system := filepath.Join(data, "lys-shell", "icons")
 	if err := os.MkdirAll(system, 0o700); err != nil {
 		t.Fatal(err)
 	}

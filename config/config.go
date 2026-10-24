@@ -1,4 +1,4 @@
-// Package config loads wayle's user configuration: the same files the
+// Package config loads lys-shell's user configuration: the same files the
 // Rust shell reads, with the same discovery order, imports, key names,
 // defaults, layering (defaults < config file < runtime overrides), and
 // failure behavior. The schema is declared once on the Go types
@@ -16,7 +16,7 @@ import (
 
 // Config is the loaded user configuration.
 //
-// Main configuration structure for Wayle.
+// Main configuration structure for lys-shell.
 //
 // Represents the complete configuration schema that can be loaded
 // from TOML files. All fields have sensible defaults.
@@ -30,7 +30,7 @@ type Config struct {
 	// imports = ["themes.toml", "modules/clock.toml"]
 	// ```
 	Imports []string `cfg:"imports,nolayer"`
-	// General Wayle settings.
+	// General lys-shell settings.
 	General GeneralConfig `cfg:"general"`
 	// Bar layout and module placement.
 	Bar BarConfig `cfg:"bar"`
@@ -75,18 +75,18 @@ func Defaults() *Config {
 	}
 }
 
-// Dir returns the wayle configuration directory:
-// $XDG_CONFIG_HOME/wayle, or ~/.config/wayle when XDG_CONFIG_HOME is
+// Dir returns the lys-shell configuration directory:
+// $XDG_CONFIG_HOME/lys-shell, or ~/.config/lys-shell when XDG_CONFIG_HOME is
 // unset. Both variables unset is an error — there is nowhere to look.
 func Dir() (string, error) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "wayle"), nil
+		return filepath.Join(xdg, "lys-shell"), nil
 	}
 	home := os.Getenv("HOME")
 	if home == "" {
 		return "", errors.New("config: neither XDG_CONFIG_HOME nor HOME is set")
 	}
-	return filepath.Join(home, ".config", "wayle"), nil
+	return filepath.Join(home, ".config", "lys-shell"), nil
 }
 
 // DiscoverMain resolves the user's main config file inside dir,

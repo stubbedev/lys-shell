@@ -14,7 +14,7 @@ import (
 
 // Service is the live configuration: the defaults, the config file
 // layer, and the runtime override layer (runtime.toml, written by
-// `wayle config set` and the settings GUI), resolved into immutable
+// `lys-shell config set` and the settings GUI), resolved into immutable
 // *Config snapshots that subscribers receive on every effective change
 // (crates/wayle-config/src/infrastructure/{service,persistence}.rs).
 // Snapshots are never mutated; a reload publishes a new one.

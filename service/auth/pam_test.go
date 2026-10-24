@@ -99,7 +99,7 @@ func answering(answer string, seen *[]Prompt) Ask {
 }
 
 func newTestPAM(f *fakePAM, unlocked *[]string) *PAM {
-	return &PAM{Service: "wayle", lib: f, unlockKeyring: func(pw string) { *unlocked = append(*unlocked, pw) }}
+	return &PAM{Service: "lys-shell", lib: f, unlockKeyring: func(pw string) { *unlocked = append(*unlocked, pw) }}
 }
 
 // TestPAMConversationHandling pins the conversation: an echo-off
@@ -136,7 +136,7 @@ func TestPAMConversationHandling(t *testing.T) {
 	if f.replies[1][0].set || !f.replies[1][1].set || f.replies[1][1].text != "hunter2" {
 		t.Errorf("replies = %+v: an error message answers NULL, the prompt the password", f.replies[1])
 	}
-	if f.user != "alice" || f.service != "wayle" {
+	if f.user != "alice" || f.service != "lys-shell" {
 		t.Errorf("transaction opened for %q on %q", f.user, f.service)
 	}
 	if got := strings.Join(f.calls, ","); got != "authenticate,acct_mgmt,end" || f.endStatus != pamSuccess {
@@ -258,7 +258,7 @@ func realPAM(t *testing.T, service, rules string) *PAM {
 // TestRealPAMPermitAndDeny drives real modules through the purego
 // callback: pam_permit authenticates without a prompt, pam_deny fails.
 func TestRealPAMPermitAndDeny(t *testing.T) {
-	permit := realPAM(t, "wayle-test", "auth required pam_permit.so\naccount required pam_permit.so\n")
+	permit := realPAM(t, "lys-shell-test", "auth required pam_permit.so\naccount required pam_permit.so\n")
 	var seen []Prompt
 	if err := permit.Run("nobody", answering("", &seen)); err != nil {
 		t.Fatalf("pam_permit: %v", err)
@@ -266,7 +266,7 @@ func TestRealPAMPermitAndDeny(t *testing.T) {
 	if len(seen) != 0 {
 		t.Errorf("pam_permit prompted: %+v", seen)
 	}
-	deny := realPAM(t, "wayle-test", "auth required pam_deny.so\naccount required pam_permit.so\n")
+	deny := realPAM(t, "lys-shell-test", "auth required pam_deny.so\naccount required pam_permit.so\n")
 	if err := deny.Run("nobody", answering("", &seen)); err == nil {
 		t.Fatal("pam_deny authenticated")
 	}
@@ -276,18 +276,18 @@ func TestRealPAMPermitAndDeny(t *testing.T) {
 // end: pam_echo's text reaches the UI as info, and pam_unix's password
 // prompt reaches it as a secret whose answer PAM then judges.
 func TestRealPAMConversationCallback(t *testing.T) {
-	echo := realPAM(t, "wayle-test", "auth optional pam_echo.so wayle-conversation-probe\nauth required pam_permit.so\naccount required pam_permit.so\n")
+	echo := realPAM(t, "lys-shell-test", "auth optional pam_echo.so lys-shell-conversation-probe\nauth required pam_permit.so\naccount required pam_permit.so\n")
 	var seen []Prompt
 	if err := echo.Run("nobody", answering("", &seen)); err != nil {
 		t.Fatalf("pam_echo + pam_permit: %v", err)
 	}
-	if len(seen) != 1 || seen[0].Kind != PromptInfo || seen[0].Text != "wayle-conversation-probe" {
+	if len(seen) != 1 || seen[0].Kind != PromptInfo || seen[0].Text != "lys-shell-conversation-probe" {
 		t.Fatalf("prompts = %+v, want the pam_echo text as info", seen)
 	}
 
-	unix := realPAM(t, "wayle-test", "auth required pam_unix.so nodelay\naccount required pam_permit.so\n")
+	unix := realPAM(t, "lys-shell-test", "auth required pam_unix.so nodelay\naccount required pam_permit.so\n")
 	seen = nil
-	err := unix.Run("wayle-no-such-user", answering("not-the-password", &seen))
+	err := unix.Run("lys-shell-no-such-user", answering("not-the-password", &seen))
 	if err == nil {
 		t.Fatal("pam_unix accepted a nonexistent user")
 	}
@@ -296,7 +296,7 @@ func TestRealPAMConversationCallback(t *testing.T) {
 	}
 
 	seen = nil
-	cancelled := unix.Run("wayle-no-such-user", func(p Prompt) (string, bool) {
+	cancelled := unix.Run("lys-shell-no-such-user", func(p Prompt) (string, bool) {
 		seen = append(seen, p)
 		return "", false
 	})

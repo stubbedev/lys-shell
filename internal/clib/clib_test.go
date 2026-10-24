@@ -20,7 +20,7 @@ func TestGoString(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	if _, err := Open([]string{"libwayle-does-not-exist.so.9"}); err == nil {
+	if _, err := Open([]string{"liblysshell-does-not-exist.so.9"}); err == nil {
 		t.Error("a missing library opened")
 	}
 	if _, err := Open(SystemCandidates("libc.so.6")); err != nil {

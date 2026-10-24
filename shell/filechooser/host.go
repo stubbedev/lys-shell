@@ -10,15 +10,15 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/internal/mime"
-	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/shell/widgets"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // The sheet's geometry (shell/file_chooser: the surface's size
@@ -89,7 +89,7 @@ type Deps struct {
 	Screen func() (w, h int, ok bool)
 }
 
-// Chooser is the com.wayle.FileChooser1 host: one overlay showing the
+// Chooser is the dev.stubbe.lys.FileChooser1 host: one overlay showing the
 // latest request; a request arriving while one is open answers the
 // older one with nothing. Open and Save may be called from any
 // goroutine; the rest runs on the loop.
@@ -659,7 +659,7 @@ func (c *Chooser) show() {
 		Margin:        c.margin,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardExclusive,
-		Namespace:     "wayle-file-chooser",
+		Namespace:     "lys-shell-file-chooser",
 		Root:          u.root,
 		OnKey:         func(r *widget.Router, keycode uint32, _ app.Mods) { c.key(r, keycode) },
 		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestBarsAffected(t *testing.T) {

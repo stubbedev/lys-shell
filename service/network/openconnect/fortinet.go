@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // Fortinet SSL VPN sign-in (fortinet.rs). The wire shapes come from
@@ -154,7 +154,7 @@ func fortiRequestBody(answers fortiAnswers, challenge *fortiChallenge) string {
 
 // parseForti reads the gateway's answer: done (nil, nil), a challenge,
 // or an error. A 401 with an HTML body is openconnect's HTML-form 2FA,
-// which wayle does not do; handing that back as a refusal would blame
+// which lys-shell does not do; handing that back as a refusal would blame
 // the user's password for it, so it is unsupported instead.
 func parseForti(body, cookie string, status int) (*fortiChallenge, error) {
 	// The cookie settles it whatever else the body says.
@@ -162,7 +162,7 @@ func parseForti(body, cookie string, status int) (*fortiChallenge, error) {
 		return nil, nil
 	}
 	if status == http.StatusUnauthorized {
-		return nil, unsupported("this FortiGate wants an HTML sign-in form, which wayle cannot do")
+		return nil, unsupported("this FortiGate wants an HTML sign-in form, which lys-shell cannot do")
 	}
 	if status < 200 || status >= 300 {
 		return nil, unsupported("the gateway answered " + statusText(status) + " to a Fortinet authentication")

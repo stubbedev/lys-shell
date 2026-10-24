@@ -3,7 +3,7 @@ package modes
 import (
 	"context"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // Keys lists the launcher's own keybindings (keys.rs). Read-only: the

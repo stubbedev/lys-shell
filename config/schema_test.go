@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/config/internal/schemadoc"
+	"github.com/stubbedev/lys-shell/config/internal/schemadoc"
 )
 
 // notPortedSections are the root keys of the Rust schema the Go config
@@ -21,7 +21,7 @@ var notPortedSections = map[string]bool{}
 
 func loadRustSchema(t *testing.T) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile("../schema/wayle-config.schema.json")
+	data, err := os.ReadFile("../schema/lys-shell-config.schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}

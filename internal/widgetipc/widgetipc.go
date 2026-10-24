@@ -1,5 +1,5 @@
 // Package widgetipc is the widget socket: the shell's JSON-RPC
-// listener for out-of-process pushes (`wayle toast`, `wayle widget
+// listener for out-of-process pushes (`lys-shell toast`, `lys-shell widget
 // update`) and the client half those CLIs drive. It ports
 // wayle-ipc/src/widget_socket.rs (protocol and client) and
 // wayle-shell-core/src/services/widget_ipc.rs (the listener).
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/stubbedev/wayle/internal/rusterr"
+	"github.com/stubbedev/lys-shell/internal/rusterr"
 )
 
 // Methods.
@@ -25,13 +25,13 @@ const (
 	MethodWidgetUpdate = "widget.update"
 )
 
-// SocketPath mirrors wayle-ipc's lookup: $XDG_RUNTIME_DIR/wayle/
-// widget.sock, falling back to /tmp/wayle-widget.sock.
+// SocketPath mirrors wayle-ipc's lookup: $XDG_RUNTIME_DIR/lys-shell/
+// widget.sock, falling back to /tmp/lys-shell-widget.sock.
 func SocketPath() string {
 	if dir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
-		return filepath.Join(dir, "wayle", "widget.sock")
+		return filepath.Join(dir, "lys-shell", "widget.sock")
 	}
-	return "/tmp/wayle-widget.sock"
+	return "/tmp/lys-shell-widget.sock"
 }
 
 // ToastRequest is one toast.show payload (ToastShowParams).
@@ -231,7 +231,7 @@ func send(ctx context.Context, method string, params any) error {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", path)
 	if err != nil {
-		return &ClientError{msg: "cannot connect to wayle widget socket at " + path + ": " + rusterr.IO(err), err: err}
+		return &ClientError{msg: "cannot connect to lys-shell widget socket at " + path + ": " + rusterr.IO(err), err: err}
 	}
 	defer func() { _ = conn.Close() }()
 	body, err := json.Marshal(params)

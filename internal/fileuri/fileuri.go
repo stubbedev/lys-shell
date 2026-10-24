@@ -1,5 +1,5 @@
 // Package fileuri is the percent-encoding and file:// URI handling
-// wayle's portal, clipboard and VPN code share.
+// lys-shell's portal, clipboard and VPN code share.
 package fileuri
 
 import (

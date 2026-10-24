@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/wallpaper"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
 func TestReloadAppliesTheGlobalFitModeOnlyWhenItChanged(t *testing.T) {

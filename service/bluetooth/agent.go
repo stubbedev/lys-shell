@@ -9,9 +9,9 @@ import (
 )
 
 // agentPath is where the pairing agent lives on the bus (service.rs).
-const agentPath = dbus.ObjectPath("/com/wayle/BluetoothAgent")
+const agentPath = dbus.ObjectPath("/dev/stubbe/lys/BluetoothAgent")
 
-// agentCapability is the IO capability wayle registers: it can show a
+// agentCapability is the IO capability lys-shell registers: it can show a
 // code and ask yes/no, and the dropdown also takes PIN/passkey entry.
 const agentCapability = CapabilityDisplayYesNo
 
@@ -192,7 +192,7 @@ func (a *agent) Cancel() *dbus.Error {
 
 // registerAgent exports the agent and registers it with BlueZ as the
 // default agent (service.rs: RegisterAgent with DisplayYesNo). The
-// default-agent request is best effort: pairing started from wayle
+// default-agent request is best effort: pairing started from lys-shell
 // still reaches the agent without it.
 func (s *Service) registerAgent() error {
 	if err := s.conn.Export(&agent{s: s}, agentPath, agentIface); err != nil {

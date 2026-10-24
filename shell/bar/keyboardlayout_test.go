@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/service/mango"
-	"github.com/stubbedev/wayle/service/niri"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/mango"
+	"github.com/stubbedev/lys-shell/service/niri"
 )
 
 func TestMainKeyboardLayoutPicksMainNonVirtual(t *testing.T) {

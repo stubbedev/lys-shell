@@ -1,4 +1,4 @@
-### Wayle Configuration - Bluetooth Module
+### lys-shell Configuration - Bluetooth Module
 
 ## Bluetooth Module Configuration
 

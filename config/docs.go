@@ -6,7 +6,7 @@ import (
 	"sort"
 )
 
-// The config reference pages (`wayle config docs`) document every
+// The config reference pages (`lys-shell config docs`) document every
 // schema the Rust crate registers with register_module!: a section's
 // own schema (schema_for! of its type), the groups its fields are laid
 // out in, and its defaults. This file is that registry over the Go

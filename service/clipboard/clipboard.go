@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 )
 
 // Clipboard is the session's clipboard history, kept current: it
@@ -37,7 +37,7 @@ type pendingRead struct {
 	done bool
 }
 
-// selectionDevice is what the service needs from gelm's data-control
+// selectionDevice is what the service needs from lys-ui's data-control
 // device, narrowed so tests drive it with fakes.
 type selectionDevice interface {
 	// watch calls fn on every regular-selection change, nil when the
@@ -194,7 +194,7 @@ func (c *Clipboard) flushReads() {
 	}
 }
 
-// dataControl adapts gelm's device to selectionDevice.
+// dataControl adapts lys-ui's device to selectionDevice.
 type dataControl struct{ dc *app.DataControl }
 
 func (d dataControl) watch(fn func(selectionOffer)) {

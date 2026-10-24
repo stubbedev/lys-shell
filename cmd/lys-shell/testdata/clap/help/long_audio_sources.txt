@@ -1,0 +1,6 @@
+List available audio sources (inputs)
+
+Usage: lys-shell audio sources
+
+Options:
+  -h, --help  Print help

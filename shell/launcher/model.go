@@ -3,8 +3,8 @@ package launcher
 import (
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/pango"
-	engine "github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/internal/pango"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // matchModel is match_model.rs: the mode's rows and the matcher's

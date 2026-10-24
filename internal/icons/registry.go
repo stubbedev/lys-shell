@@ -8,17 +8,17 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/wayle/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/fswatch"
 )
 
 // This file ports registry.rs minus the GTK IconTheme wiring: the icon
 // directory layout, index.theme, and the system icon paths.
 
-const systemIconsPath = "/usr/share/wayle/icons"
+const systemIconsPath = "/usr/share/lys-shell/icons"
 
 const indexThemeContent = `[Icon Theme]
-Name=Wayle Icons
-Comment=Icons installed by Wayle
+Name=lys-shell Icons
+Comment=Icons installed by lys-shell
 Directories=hicolor/scalable/actions
 
 [hicolor/scalable/actions]
@@ -28,7 +28,7 @@ MaxSize=512
 Type=Scalable
 `
 
-// Registry locates wayle's icon theme directory.
+// Registry locates lys-shell's icon theme directory.
 type Registry struct{ base string }
 
 // NewRegistry uses the default directory.
@@ -43,7 +43,7 @@ func NewRegistry() (*Registry, error) {
 // RegistryAt uses base as the theme root.
 func RegistryAt(base string) *Registry { return &Registry{base: base} }
 
-// DefaultPath is $XDG_DATA_HOME/wayle/icons or ~/.local/share/wayle/icons.
+// DefaultPath is $XDG_DATA_HOME/lys-shell/icons or ~/.local/share/lys-shell/icons.
 // As in Rust, a set-but-empty XDG_DATA_HOME is taken as given.
 func DefaultPath() (string, error) {
 	dataHome, ok := os.LookupEnv("XDG_DATA_HOME")
@@ -54,7 +54,7 @@ func DefaultPath() (string, error) {
 		}
 		dataHome = filepath.Join(home, ".local", "share")
 	}
-	return filepath.Join(dataHome, "wayle", "icons"), nil
+	return filepath.Join(dataHome, "lys-shell", "icons"), nil
 }
 
 // BasePath is the theme root.
@@ -132,15 +132,15 @@ func (r *Registry) Watch(onChange func()) (stop func(), err error) {
 	return func() { _ = w.Close() }, nil
 }
 
-// SystemIconPaths are the existing <XDG_DATA_DIRS>/wayle/icons roots,
-// then /usr/share/wayle/icons.
+// SystemIconPaths are the existing <XDG_DATA_DIRS>/lys-shell/icons roots,
+// then /usr/share/lys-shell/icons.
 func SystemIconPaths() []string {
 	var out []string
 	for d := range strings.SplitSeq(os.Getenv("XDG_DATA_DIRS"), ":") {
 		if d == "" {
 			continue
 		}
-		p := filepath.Join(d, "wayle/icons")
+		p := filepath.Join(d, "lys-shell/icons")
 		if exists(p) {
 			out = append(out, p)
 		}

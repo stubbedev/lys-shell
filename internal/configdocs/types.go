@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 const typeSectionDepth = 2

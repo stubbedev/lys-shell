@@ -56,7 +56,7 @@ func getSignature(t reflect.Type, depth *depthCounter) (sig string) {
 		}
 	}()
 	if t == fileType {
-		return "h" // wayle patch (wayle_file_reply.go)
+		return "h" // lys-shell patch (lys_shell_file_reply.go)
 	}
 	// handle simple types first
 	switch t.Kind() {

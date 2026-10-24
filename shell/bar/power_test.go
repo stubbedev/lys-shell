@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/powermenu"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/powermenu"
 )
 
 func TestLoadFileAppliesPower(t *testing.T) {

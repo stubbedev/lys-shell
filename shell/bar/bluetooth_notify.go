@@ -8,8 +8,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/desktopnotify"
-	"github.com/stubbedev/wayle/service/bluetooth"
+	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
 
 // The pairing card lives inside the dropdown, so a request that arrives
@@ -141,14 +141,14 @@ func (n *btPairingNotifier) notify(req bluetooth.PairingRequest, display deviceD
 	body := btNotifyBody(req, display)
 	respond := btNotifyResponder(n.src, req)
 	if respond == nil {
-		if _, err := n.sender.Send(ctx, "Wayle", title, body, "ld-bluetooth-symbolic"); err != nil {
+		if _, err := n.sender.Send(ctx, "lys-shell", title, body, "ld-bluetooth-symbolic"); err != nil {
 			log.Printf("bluetooth: pairing notification: %v", err)
 		}
 		return
 	}
 	ctx, cancel := context.WithTimeout(ctx, btAgentTimeout+5*time.Second)
 	defer cancel()
-	key, ok, err := n.sender.Ask(ctx, "Wayle", title, body, "ld-bluetooth-symbolic", []desktopnotify.Action{
+	key, ok, err := n.sender.Ask(ctx, "lys-shell", title, body, "ld-bluetooth-symbolic", []desktopnotify.Action{
 		{Key: "deny", Label: btText("dropdown-bluetooth-deny")},
 		{Key: "allow", Label: btText("dropdown-bluetooth-allow")},
 	}, btAgentTimeout)

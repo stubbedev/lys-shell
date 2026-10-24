@@ -4,8 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/stubbedev/wayle/service/clipboard"
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // ClipboardHistory is what the clipboard mode needs from the session's

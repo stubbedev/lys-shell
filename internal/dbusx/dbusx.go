@@ -1,4 +1,4 @@
-// Package dbusx holds the session-bus plumbing wayle's daemons share:
+// Package dbusx holds the session-bus plumbing lys-shell's daemons share:
 // exporting an interface under a well-known name the way zbus's
 // object_server().at + request_name does, and serving zbus-style
 // #[zbus(property)] getters (computed on every read) over
@@ -72,7 +72,7 @@ func (p *properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error)
 	return out, nil
 }
 
-// Set rejects writes: every wayle daemon property is read-only.
+// Set rejects writes: every lys-shell daemon property is read-only.
 func (p *properties) Set(_, name string, _ dbus.Variant) *dbus.Error {
 	return dbus.NewError(ErrPropertyRO, []any{"Property '" + name + "' is read-only"})
 }

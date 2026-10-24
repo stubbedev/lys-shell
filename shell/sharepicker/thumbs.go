@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"image"
 
-	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/wayle/service/sharepreview"
+	"github.com/stubbedev/lys-shell/service/sharepreview"
 )
 
 // fallbackToplevels enumerates windows through

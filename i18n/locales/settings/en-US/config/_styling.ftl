@@ -1,4 +1,4 @@
-### Wayle Configuration - Styling Settings
+### lys-shell Configuration - Styling Settings
 
 ## Styling Configuration
 
@@ -12,7 +12,7 @@ settings-styling-appearance = Appearance
     .description = Light/dark mode. Auto follows the palette/provider; Light/Dark force it
 
 settings-styling-theme-provider = Theme Provider
-    .description = Source for color palette (wayle, matugen, pywal, wallust)
+    .description = Source for color palette (lys-shell, matugen, pywal, wallust)
 
 settings-styling-theming-monitor = Theming Monitor
     .description = Monitor whose wallpaper drives color extraction
@@ -104,7 +104,7 @@ enum-appearance-light = Light
 enum-appearance-dark = Dark
 
 ## ThemeProvider variants
-enum-theme-provider-wayle = Wayle
+enum-theme-provider-lys-shell = lys-shell
 enum-theme-provider-matugen = Matugen
 enum-theme-provider-pywal = Pywal
 enum-theme-provider-wallust = Wallust

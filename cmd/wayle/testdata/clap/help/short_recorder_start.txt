@@ -1,6 +1,0 @@
-Start recording
-
-Usage: wayle recorder start
-
-Options:
-  -h, --help  Print help

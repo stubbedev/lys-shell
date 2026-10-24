@@ -13,12 +13,12 @@ import (
 
 func TestDirFollowsXDGStateHome(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", "/xdg/state")
-	if got, _ := Dir(); got != "/xdg/state/wayle" {
+	if got, _ := Dir(); got != "/xdg/state/lys-shell" {
 		t.Errorf("Dir = %q", got)
 	}
 	t.Setenv("XDG_STATE_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got, _ := Dir(); got != "/home/u/.local/state/wayle" {
+	if got, _ := Dir(); got != "/home/u/.local/state/lys-shell" {
 		t.Errorf("fallback = %q", got)
 	}
 	t.Setenv("HOME", "")
@@ -31,17 +31,17 @@ func TestDailyFileRollsAndPrunes(t *testing.T) {
 	dir := t.TempDir()
 	// Stale files: nine older days of this prefix and one of another.
 	for day := 1; day <= 9; day++ {
-		name := filepath.Join(dir, "wayle.2026-01-0"+string(rune('0'+day))+".log")
+		name := filepath.Join(dir, "lys-shell.2026-01-0"+string(rune('0'+day))+".log")
 		if err := os.WriteFile(name, nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	other := filepath.Join(dir, "wayle-shell.2026-01-01.log")
+	other := filepath.Join(dir, "lys-shell-cli.2026-01-01.log")
 	if err := os.WriteFile(other, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 9, 30, 23, 59, 0, 0, time.UTC)
-	w := &dailyFile{dir: dir, prefix: "wayle", now: func() time.Time { return now }}
+	w := &dailyFile{dir: dir, prefix: "lys-shell", now: func() time.Time { return now }}
 	defer w.Close()
 	if _, err := w.Write([]byte("one\n")); err != nil {
 		t.Fatal(err)
@@ -50,19 +50,19 @@ func TestDailyFileRollsAndPrunes(t *testing.T) {
 	if _, err := w.Write([]byte("two\n")); err != nil {
 		t.Fatal(err)
 	}
-	first, _ := os.ReadFile(filepath.Join(dir, "wayle.2026-09-30.log"))
-	second, _ := os.ReadFile(filepath.Join(dir, "wayle.2026-10-01.log"))
+	first, _ := os.ReadFile(filepath.Join(dir, "lys-shell.2026-09-30.log"))
+	second, _ := os.ReadFile(filepath.Join(dir, "lys-shell.2026-10-01.log"))
 	if string(first) != "one\n" || string(second) != "two\n" {
 		t.Errorf("files = %q, %q", first, second)
 	}
 	entries, _ := os.ReadDir(dir)
 	var ours []string
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "wayle.") {
+		if strings.HasPrefix(e.Name(), "lys-shell.") {
 			ours = append(ours, e.Name())
 		}
 	}
-	if len(ours) != daysToKeep || !slices.Contains(ours, "wayle.2026-10-01.log") {
+	if len(ours) != daysToKeep || !slices.Contains(ours, "lys-shell.2026-10-01.log") {
 		t.Errorf("kept %v", ours)
 	}
 	if _, err := os.Stat(other); err != nil {
@@ -74,14 +74,14 @@ func TestSetupRoutesTheStandardLogger(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	defer log.SetOutput(os.Stderr)
 	var console bytes.Buffer
-	closer, err := Setup("wayle-shell", &console)
+	closer, err := Setup("lys-shell", &console)
 	if err != nil {
 		t.Fatal(err)
 	}
 	log.Print("hello")
 	_ = closer.Close()
 	dir, _ := Dir()
-	files, _ := filepath.Glob(filepath.Join(dir, "wayle-shell.*.log"))
+	files, _ := filepath.Glob(filepath.Join(dir, "lys-shell.*.log"))
 	if len(files) != 1 {
 		t.Fatalf("files = %v", files)
 	}
@@ -92,7 +92,7 @@ func TestSetupRoutesTheStandardLogger(t *testing.T) {
 
 	// File-only (the CLI): nothing on the console.
 	console.Reset()
-	closer, err = Setup("wayle", nil)
+	closer, err = Setup("lys-shell", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestSetupRoutesTheStandardLogger(t *testing.T) {
 	}
 }
 
-// gelm's warnings and errors reach wayle's log; its debug chatter does
+// lys-ui's warnings and errors reach lys-shell's log; its debug chatter does
 // not.
 func TestLibraryLogsWarningsToTheLog(t *testing.T) {
 	var buf strings.Builder

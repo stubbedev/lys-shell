@@ -1,0 +1,7 @@
+Toggle idle inhibition on/off
+
+Usage: lys-shell idle toggle [OPTIONS]
+
+Options:
+  -i, --indefinite  Use indefinite mode when enabling
+  -h, --help        Print help

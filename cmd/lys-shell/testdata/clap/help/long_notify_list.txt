@@ -1,0 +1,6 @@
+List all notifications
+
+Usage: lys-shell notify list
+
+Options:
+  -h, --help  Print help

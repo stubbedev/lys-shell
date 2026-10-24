@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 // notificationLabel is helpers.rs's format_label: the count
@@ -74,7 +74,7 @@ func (m *notificationModule) refresh() {
 func (m *notificationModule) Root() widget.Widget { return m.root }
 
 // RunAction handles the dnd toggle the Rust module exposes through
-// `wayle notify dnd`; the shell command path routes here.
+// `lys-shell notify dnd`; the shell command path routes here.
 func (m *notificationModule) RunAction(action config.ClickAction) {
 	if action.Command == "toggle-dnd" {
 		m.src.ToggleDND()

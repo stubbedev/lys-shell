@@ -1,0 +1,6 @@
+List available icon sources
+
+Usage: lys-shell icons sources
+
+Options:
+  -h, --help  Print help

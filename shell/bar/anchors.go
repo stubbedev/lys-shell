@@ -1,9 +1,9 @@
 package bar
 
 import (
-	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // AnchorsFor maps a bar location onto layer-shell anchors the way the

@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stubbedev/wayle/config/internal/schemadoc"
+	"github.com/stubbedev/lys-shell/config/internal/schemadoc"
 )
 
 func main() {

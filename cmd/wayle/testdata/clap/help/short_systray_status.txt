@@ -1,6 +1,0 @@
-Show system tray status
-
-Usage: wayle systray status
-
-Options:
-  -h, --help  Print help

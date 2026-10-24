@@ -1,4 +1,4 @@
-### Wayle Configuration - Keybind Mode Module
+### lys-shell Configuration - Keybind Mode Module
 
 ## Keybind Mode Module Configuration
 

@@ -1,5 +1,5 @@
 // Package clib is the shared purego plumbing for the native libraries
-// wayle binds without cgo (libpam, libgstreamer): dlopen over a
+// lys-shell binds without cgo (libpam, libgstreamer): dlopen over a
 // candidate list and C string copies.
 package clib
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // Tool is the external program that extracts a palette from an image
@@ -65,7 +65,7 @@ type (
 )
 
 // ToolFor is the extractor a theme provider needs
-// (build_extractor_config): the static wayle provider extracts nothing.
+// (build_extractor_config): the static lys-shell provider extracts nothing.
 func ToolFor(p config.ThemeProvider) Tool {
 	switch p {
 	case config.ThemeProviderMatugen:

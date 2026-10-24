@@ -1,8 +1,8 @@
 // Package shellipc is the shell's own session-bus surface: the
-// com.wayle.Shell1 control interface (wayle-shell-core's shell_ipc:
+// dev.stubbe.lys.Shell1 control interface (wayle-shell-core's shell_ipc:
 // bar visibility per monitor, the lock and VPN sign-in hooks) and the
-// GApplication identity com.wayle.shell with its org.gtk.Actions
-// (quit, inspector), which `wayle panel` and single-instance checks use.
+// GApplication identity dev.stubbe.lys.shell with its org.gtk.Actions
+// (quit, inspector), which `lys-shell panel` and single-instance checks use.
 package shellipc
 
 import (
@@ -12,13 +12,13 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
-// com.wayle.Shell1 (wayle-ipc/src/shell_ipc.rs).
+// dev.stubbe.lys.Shell1 (wayle-ipc/src/shell_ipc.rs).
 const (
-	ServiceName = "com.wayle.Shell1"
-	ServicePath = dbus.ObjectPath("/com/wayle/Shell")
+	ServiceName = "dev.stubbe.lys.Shell1"
+	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/Shell")
 )
 
 // State is ShellIpcState: the connectors that have a bar and the
@@ -171,7 +171,7 @@ type Hooks struct {
 	VPNSSOCallback func(uri string) bool
 }
 
-// daemon is the com.wayle.Shell1 object (ShellIpcDaemon).
+// daemon is the dev.stubbe.lys.Shell1 object (ShellIpcDaemon).
 type daemon struct {
 	state *State
 	hooks Hooks
@@ -211,7 +211,7 @@ func (d *daemon) VpnSsoCallback(uri string) *dbus.Error {
 	return dbusx.Failed("no VPN browser sign-in is waiting for a callback")
 }
 
-// Serve exports com.wayle.Shell1 over state.
+// Serve exports dev.stubbe.lys.Shell1 over state.
 func Serve(conn *dbus.Conn, state *State, hooks Hooks) (func(), error) {
 	d := &daemon{state: state, hooks: hooks}
 	return dbusx.Serve(conn, dbusx.Service{

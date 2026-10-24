@@ -1,4 +1,4 @@
-### Wayle Configuration - Idle Inhibit Module
+### lys-shell Configuration - Idle Inhibit Module
 
 ## Idle Inhibit Module Configuration
 

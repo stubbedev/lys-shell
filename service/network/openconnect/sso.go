@@ -22,7 +22,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/stubbedev/wayle/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // AnyConnect single sign-on through the system browser (sso.rs): the
@@ -45,7 +45,7 @@ import (
 //  5. the token goes back as the value of the sso input, and the
 //     sign-in finishes like any other form.
 //
-// Opt-in per profile (wayle-sso): openconnect ships --no-external-auth
+// Opt-in per profile (lys-shell-sso): openconnect ships --no-external-auth
 // because a gateway that sees the capability can insist on a browser
 // where it would otherwise have served a form.
 

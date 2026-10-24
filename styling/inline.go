@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // The per-widget inline variable blocks. Each function returns the full
@@ -17,10 +17,10 @@ import (
 // ResolveColorCSS is a color field's CSS (resolve_color in
 // crates/wayle-widgets/src/styling.rs): tokens, transparent, and auto
 // pass through as CSS so a palette swap follows; a custom hex is used
-// under the wayle provider but falls back to the field's schema default
+// under the lys-shell provider but falls back to the field's schema default
 // under an extractor, where a fixed hex has no mapping.
 func ResolveColorCSS(value, fieldDefault config.ColorValue, provider config.ThemeProvider) string {
-	if value.Kind == config.ColorCustom && provider != config.ThemeProviderWayle {
+	if value.Kind == config.ColorCustom && provider != config.ThemeProviderLysShell {
 		return fieldDefault.ToCSS()
 	}
 	return value.ToCSS()
@@ -33,7 +33,7 @@ func ResolveColorCSS(value, fieldDefault config.ColorValue, provider config.Them
 // the block-prefix and icon-square chrome.
 func ResolveIconColor(b config.ButtonConfig, variant config.BarButtonVariant, provider config.ThemeProvider) string {
 	color := b.Colors.Icon
-	if color.Kind == config.ColorCustom && provider != config.ThemeProviderWayle {
+	if color.Kind == config.ColorCustom && provider != config.ThemeProviderLysShell {
 		color = b.Defaults.Icon
 	}
 	if !color.IsAuto() {
@@ -111,7 +111,7 @@ func borderSides(location config.BorderLocation, width int) (top, bottom, left, 
 	return 0, 0, 0, 0
 }
 
-// BarCSS is the bar's variable block (crates/wayle-shell/src/shell/bar/
+// BarCSS is the bar's variable block (crates/lys-shell/src/shell/bar/
 // styling.rs build_css): scale, colors, borders, the pixel-rounded
 // spacing, the button opacity and weight, the group chrome, and the
 // shadow.

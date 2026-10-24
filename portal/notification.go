@@ -6,8 +6,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 // NotificationIface turns portal notifications into

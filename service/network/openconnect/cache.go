@@ -16,15 +16,15 @@ import (
 //   - the password, so the only thing a routine connect asks for is the
 //     second factor.
 //
-// Neither belongs in NetworkManager's store: they are wayle's own
+// Neither belongs in NetworkManager's store: they are lys-shell's own
 // artifacts in a shape no other NM client can interpret. They live in
-// $XDG_STATE_HOME/wayle/vpn as <uuid>.cookie (three lines: cookie,
+// $XDG_STATE_HOME/lys-shell/vpn as <uuid>.cookie (three lines: cookie,
 // host, gwcert) and <uuid>.password (the password as typed), plain text
 // like the Rust's. The directory is created 0700 and the files written
 // 0600 through the open mode rather than a chmod afterwards, so there is
 // no window in which a session cookie is world-readable.
 
-// cacheDirectory is $XDG_STATE_HOME/wayle/vpn, or the default state
+// cacheDirectory is $XDG_STATE_HOME/lys-shell/vpn, or the default state
 // directory under $HOME. A relative XDG_STATE_HOME is ignored, as the
 // XDG spec says.
 func cacheDirectory() (string, bool) {
@@ -36,7 +36,7 @@ func cacheDirectory() (string, bool) {
 		}
 		base = filepath.Join(home, ".local/state")
 	}
-	return filepath.Join(base, "wayle/vpn"), true
+	return filepath.Join(base, "lys-shell/vpn"), true
 }
 
 // cachePath is where one of a profile's files lives. A UUID is the only

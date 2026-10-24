@@ -6,7 +6,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/icons/skpath"
+	"github.com/stubbedev/lys-shell/internal/icons/skpath"
 )
 
 // Tree is the converted document (usvg's Tree, trimmed to what the icon

@@ -7,14 +7,14 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
-// Wayle's own interface over the service, which `wayle power` drives
+// lys-shell's own interface over the service, which `lys-shell power` drives
 // (wayle-power-profiles/src/dbus).
 const (
-	ServiceName = "com.wayle.PowerProfiles1"
-	ServicePath = dbus.ObjectPath("/com/wayle/PowerProfiles")
+	ServiceName = "dev.stubbe.lys.PowerProfiles1"
+	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/PowerProfiles")
 )
 
 // profileName is PowerProfile's From<&str> + Display: the three known
@@ -54,7 +54,7 @@ func cycleNext(current string) string {
 	}
 }
 
-// Daemon is the com.wayle.PowerProfiles1 object (PowerProfilesDaemon).
+// Daemon is the dev.stubbe.lys.PowerProfiles1 object (PowerProfilesDaemon).
 type Daemon struct {
 	src Source
 }

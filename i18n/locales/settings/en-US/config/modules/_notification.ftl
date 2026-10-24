@@ -1,4 +1,4 @@
-### Wayle Configuration - Notifications Module
+### lys-shell Configuration - Notifications Module
 
 ## Notifications Module Configuration
 

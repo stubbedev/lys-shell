@@ -6,12 +6,12 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/shell/printdialog"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
 // printPortal is org.freedesktop.impl.portal.Print over the shell's
-// com.wayle.Print1 (print.rs): PreparePrint shows the dialog and
+// dev.stubbe.lys.Print1 (print.rs): PreparePrint shows the dialog and
 // replies the settings and a token, Print spools the document to the
 // printer prepared under it.
 type printPortal struct{ conn *dbus.Conn }

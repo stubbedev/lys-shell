@@ -3,10 +3,10 @@ package bar
 import (
 	"math"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // dropdownGeometry is a dropdown's built-in size, each Rust dropdown's
@@ -129,7 +129,7 @@ func (p *panelBox) clamp(monH int) {
 
 // walkPages visits w and everything under it, every page of a stack
 // included (the Rust walks follow GTK's child list, where a stack's
-// hidden pages are children too; a gelm Stack lists only its visible
+// hidden pages are children too; a lys-ui Stack lists only its visible
 // page).
 func walkPages(w widget.Widget, visit func(widget.Widget)) {
 	visit(w)

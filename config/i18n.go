@@ -6,7 +6,7 @@ import (
 )
 
 // i18nPrefixes are the settings label prefixes, by Rust schema name:
-// each #[wayle_config(i18n_prefix = "...")] struct. A field's label key
+// each #[lys_shell_config(i18n_prefix = "...")] struct. A field's label key
 // is its struct's prefix, a dash and its canonical key (wayle-derive
 // process_fields), the key the settings domain's FTL carries.
 var i18nPrefixes = map[string]string{

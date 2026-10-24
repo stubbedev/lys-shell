@@ -5,10 +5,10 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/widgetipc"
-	"github.com/stubbedev/wayle/service/keytoggles"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/widgetipc"
+	"github.com/stubbedev/lys-shell/service/keytoggles"
 )
 
 // kind is OsdEvent's variant.

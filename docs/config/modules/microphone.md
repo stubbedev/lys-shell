@@ -66,7 +66,7 @@ label-color = "status-error"
 |---|---|---|---|
 | `left-click` | [`ClickAction`](/config/types#click-action) | `"dropdown:audio"` | Action on left click. |
 | `right-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on right click. |
-| `middle-click` | [`ClickAction`](/config/types#click-action) | `"wayle audio input-mute"` | Action on middle click. Default toggles input mute. |
+| `middle-click` | [`ClickAction`](/config/types#click-action) | `"lys-shell audio input-mute"` | Action on middle click. Default toggles input mute. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
 
@@ -87,7 +87,7 @@ label-max-length = 0
 button-bg-color = "bg-surface-elevated"
 left-click = "dropdown:audio"
 right-click = ""
-middle-click = "wayle audio input-mute"
+middle-click = "lys-shell audio input-mute"
 scroll-up = ""
 scroll-down = ""
 thresholds = []

@@ -1,5 +1,5 @@
 // Package regionoverlay is the slurp-like region selection overlay
-// (crates/wayle-shell/src/shell/region_overlay): a layer surface on
+// (crates/lys-shell/src/shell/region_overlay): a layer surface on
 // every monitor, a dim wash with a transparent hole where the dragged
 // rectangle overlaps that monitor, an accent border, and a "W × H"
 // size label. The drag is tracked in global (compositor-layout)
@@ -15,9 +15,9 @@ import (
 	"log"
 	"math"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // Selection is a region the user dragged, in logical pixels relative
@@ -105,7 +105,7 @@ type result struct {
 }
 
 // Overlay is the overlay component. Request is its only entry point;
-// everything else runs on the gelm loop goroutine.
+// everything else runs on the lys-ui loop goroutine.
 type Overlay struct {
 	app     *app.Application
 	outputs func() []*app.Output
@@ -187,7 +187,7 @@ func (o *Overlay) open(frames map[string]*image.RGBA) {
 			Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 			ExclusiveZone: -1,
 			Keyboard:      app.KeyboardExclusive,
-			Namespace:     "wayle-region-overlay",
+			Namespace:     "lys-shell-region-overlay",
 			Root:          o.surfaceRoot(a),
 			OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 				if keycode == escapeKeycode {

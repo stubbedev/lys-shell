@@ -1,7 +1,7 @@
 # Icon transform goldens
 
 `symbolic/` holds SVGs and what the symbolic transform makes of each.
-The goldens were captured from wayle's original Rust transform (on usvg
+The goldens were captured from lys-shell's original Rust transform (on usvg
 0.46), which the Go port reproduces byte for byte, and are now the
 reference:
 
@@ -12,7 +12,7 @@ reference:
 
 `TestToSymbolicMatchesRust` holds the transform to both.
 
-The inputs are a sample of the four icon sets wayle installs from
+The inputs are a sample of the four icon sets lys-shell installs from
 (Simple Icons `si-`, CC0; Lucide `ld-`, ISC; Tabler outline `tb-` and
 filled `tbf-`, MIT; Material Symbols outlined `md-`, Apache-2.0), of
 Adwaita's symbolic icons (`adwaita-`, CC-BY-SA-3.0/LGPL-3.0), and

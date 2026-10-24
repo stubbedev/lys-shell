@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 // The wallpaper palette providers, ported from
@@ -194,7 +194,7 @@ func LoadWallust(path string, isLight bool) (config.Palette, error) {
 }
 
 // ResolvePalette is the active palette for the configured theme
-// provider (resolve_palette): the wayle provider is fallback itself, the
+// provider (resolve_palette): the lys-shell provider is fallback itself, the
 // extractors load the file extract.ColorsPath names for their tool, with
 // the forced appearance overriding the tool's own light setting. A
 // provider that fails yields fallback and the failure, which the caller

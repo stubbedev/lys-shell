@@ -1,6 +1,0 @@
-Show current recorder status
-
-Usage: wayle recorder status
-
-Options:
-  -h, --help  Print help

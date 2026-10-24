@@ -15,13 +15,13 @@ const day = 86_400
 
 // History is the persistent launch history, (mode, entry) -> uses and
 // last use, in the same sqlite file and schema the Rust shell writes
-// ($XDG_DATA_HOME/wayle/launcher.db), so an upgrade keeps it.
+// ($XDG_DATA_HOME/lys-shell/launcher.db), so an upgrade keeps it.
 type History struct {
 	db *sql.DB
 }
 
-// DataDir resolves wayle's data directory, $XDG_DATA_HOME/wayle or
-// ~/.local/share/wayle, creating it (wayle-core ConfigPaths::data_dir).
+// DataDir resolves lys-shell's data directory, $XDG_DATA_HOME/lys-shell or
+// ~/.local/share/lys-shell, creating it (wayle-core ConfigPaths::data_dir).
 func DataDir() (string, error) {
 	base := os.Getenv("XDG_DATA_HOME")
 	if base == "" {
@@ -31,7 +31,7 @@ func DataDir() (string, error) {
 		}
 		base = filepath.Join(home, ".local", "share")
 	}
-	dir := filepath.Join(base, "wayle")
+	dir := filepath.Join(base, "lys-shell")
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the shared data dir, as the Rust shell creates it
 		return "", err
 	}

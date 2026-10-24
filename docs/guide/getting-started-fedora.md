@@ -6,7 +6,7 @@ title: Getting started on Fedora
 
 ## Install dependencies
 
-Go, plus the libraries Wayle loads at runtime (GLib, GStreamer for the screen
+Go, plus the libraries lys-shell loads at runtime (GLib, GStreamer for the screen
 recorder, PAM for the lock screen, PipeWire and GBM for screen sharing):
 
 ```sh
@@ -31,10 +31,10 @@ at runtime. `go.mod` pins Go 1.27; an older `go` (1.21 or later) downloads that
 toolchain on its own.
 
 ```sh
-git clone https://github.com/stubbedev/wayle
-cd wayle
+git clone https://github.com/stubbedev/lys-shell
+cd lys-shell
 just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
-sudo install -Dm755 dist/wayle dist/wayle-settings dist/wayle-greeter dist/wayle-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-greeter dist/lys-lock -t /usr/local/bin
 ```
 
 ## Icon assets
@@ -43,7 +43,7 @@ The icons are built into the binary. Install them into your user data
 directory once:
 
 ```sh
-wayle icons setup
+lys-shell icons setup
 ```
 
 ## Run
@@ -51,25 +51,25 @@ wayle icons setup
 Start the panel in the background:
 
 ```sh
-wayle panel start
+lys-shell panel start
 ```
 
-Other lifecycle commands: `wayle panel status`, `wayle panel restart`, `wayle panel stop`.
+Other lifecycle commands: `lys-shell panel status`, `lys-shell panel restart`, `lys-shell panel stop`.
 
 For debugging, run the shell in the foreground so logs print to the terminal:
 
 ```sh
-wayle shell
+lys-shell shell
 ```
 
 ## Settings GUI
 
 ```sh
-wayle panel settings
+lys-shell panel settings
 ```
 
-This launches `wayle-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
+This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
 
 ## Configuration
 
-Wayle reads `$XDG_CONFIG_HOME/wayle/config.toml`, falling back to `~/.config/wayle/config.toml`. On first run, if no config exists, Wayle writes a default one. A JSON schema is written to `~/.config/wayle/schema.json` at startup, which editors with a TOML LSP can use for validation and completion.
+lys-shell reads `$XDG_CONFIG_HOME/lys-shell/config.toml`, falling back to `~/.config/lys-shell/config.toml`. On first run, if no config exists, lys-shell writes a default one. A JSON schema is written to `~/.config/lys-shell/schema.json` at startup, which editors with a TOML LSP can use for validation and completion.

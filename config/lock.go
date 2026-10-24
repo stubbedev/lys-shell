@@ -3,14 +3,14 @@ package config
 // LockConfig is the [lock] section
 // (crates/wayle-config/src/schemas/lock/mod.rs).
 //
-// Lock screen: a secure session lock rendered by Wayle via `ext-session-lock-v1`.
+// Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`.
 //
-// When `enabled`, Wayle locks the session in response to the logind `Lock`
-// signal (`loginctl lock-session`), the `wayle lock` CLI, or the shell IPC
+// When `enabled`, lys-shell locks the session in response to the logind `Lock`
+// signal (`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC
 // `lock()` method. The lock surface grabs all input and survives client
 // crashes (the compositor shows a solid color), unlike a layer-shell overlay.
 type LockConfig struct {
-	// Let Wayle handle session locking. When off, lock requests are ignored
+	// Let lys-shell handle session locking. When off, lock requests are ignored
 	// and an external locker (e.g. hyprlock) stays responsible.
 	Enabled bool `cfg:"enabled"`
 	// Lock the session as soon as the shell starts. For autologin setups

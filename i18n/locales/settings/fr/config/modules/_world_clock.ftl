@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Horloge mondiale
+### Configuration lys-shell - Module Horloge mondiale
 
 ## Configuration du module Horloge mondiale
 

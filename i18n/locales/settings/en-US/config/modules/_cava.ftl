@@ -1,4 +1,4 @@
-### Wayle Configuration - Cava Module
+### lys-shell Configuration - Cava Module
 
 ## Audio Processing
 

@@ -10,10 +10,10 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/service/wallpaper"
-	"github.com/stubbedev/wayle/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // fakeNotifyd is the shell's notification daemon.
@@ -129,7 +129,7 @@ func TestNotificationDefaults(t *testing.T) {
 	}
 }
 
-// fakeWallpaperd is the shell's com.wayle.Wallpaper1.
+// fakeWallpaperd is the shell's dev.stubbe.lys.Wallpaper1.
 type fakeWallpaperd struct{ set dbustest.Var[[]string] }
 
 func (f *fakeWallpaperd) SetWallpaper(path, monitor string) *dbus.Error {

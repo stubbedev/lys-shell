@@ -15,8 +15,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/feed"
-	"github.com/stubbedev/wayle/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/glob"
 )
 
 // D-Bus names of the MPRIS2 surface.

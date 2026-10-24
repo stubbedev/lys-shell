@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // fakeNotmuch serves counts by query and records calls.
@@ -307,7 +307,7 @@ func TestCLIWithoutADatabase(t *testing.T) {
 func TestNotifyIconArgPrefersTheRegistrySVG(t *testing.T) {
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
-	dir := filepath.Join(data, "wayle", "icons", "hicolor", "scalable", "actions")
+	dir := filepath.Join(data, "lys-shell", "icons", "hicolor", "scalable", "actions")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}

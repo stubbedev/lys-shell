@@ -8,8 +8,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/service/pulse/native"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // daemonFixture exports a daemon for a fixture service on a private
@@ -181,7 +181,7 @@ func TestDaemonProperties(t *testing.T) {
 	if err := obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`name="com.wayle.Audio1"`, `name="ListSinks"`, `type="a(uss)"`, `name="SinkCount"`} {
+	for _, want := range []string{`name="dev.stubbe.lys.Audio1"`, `name="ListSinks"`, `type="a(uss)"`, `name="SinkCount"`} {
 		if !strings.Contains(xml, want) {
 			t.Errorf("introspection lacks %s", want)
 		}

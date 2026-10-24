@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/internal/atomicfile"
+	"github.com/stubbedev/lys-shell/internal/atomicfile"
 )
 
 // embeddedIcons are the glyphs the greeter shows (the power buttons,
@@ -19,7 +19,7 @@ import (
 var embeddedIcons embed.FS
 
 // installIcons is install_icons: the embedded glyphs written to
-// $XDG_RUNTIME_DIR/wayle-greeter-icons (the temp dir without one) and
+// $XDG_RUNTIME_DIR/lys-greeter-icons (the temp dir without one) and
 // that directory put first on the icon search path, so the widgets load
 // them by name and recolor them as symbolic.
 func installIcons() error {
@@ -27,7 +27,7 @@ func installIcons() error {
 	if base == "" {
 		base = os.TempDir()
 	}
-	dir := filepath.Join(base, "wayle-greeter-icons")
+	dir := filepath.Join(base, "lys-greeter-icons")
 	if err := writeIcons(dir); err != nil {
 		return err
 	}

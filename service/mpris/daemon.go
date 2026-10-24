@@ -9,20 +9,20 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/rusterr"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/rusterr"
 )
 
-// Wayle's own interface over the media service, which `wayle media`
+// lys-shell's own interface over the media service, which `lys-shell media`
 // drives (wayle-media/src/dbus).
 const (
-	DaemonName = "com.wayle.Media1"
-	DaemonPath = dbus.ObjectPath("/com/wayle/Media")
+	DaemonName = "dev.stubbe.lys.Media1"
+	DaemonPath = dbus.ObjectPath("/dev/stubbe/lys/Media")
 )
 
 const daemonTimeout = 25 * time.Second
 
-// Daemon is the com.wayle.Media1 object (dbus/server.rs MediaDaemon)
+// Daemon is the dev.stubbe.lys.Media1 object (dbus/server.rs MediaDaemon)
 // over the shell's media service.
 type Daemon struct {
 	s *Service

@@ -9,7 +9,7 @@ import (
 )
 
 // TestPagesMatchTheRustGenerator holds every generated page to
-// docs/config, which the Rust generator (`wayle config docs`) wrote from
+// docs/config, which the Rust generator (`lys-shell config docs`) wrote from
 // the same config: byte for byte, so the reference reads the same
 // whichever binary regenerates it.
 func TestPagesMatchTheRustGenerator(t *testing.T) {

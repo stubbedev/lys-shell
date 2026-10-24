@@ -7,10 +7,10 @@ outline: [2, 3]
 
 <div v-pre>
 
-Greeter (display manager): the pre-login screen `wayle-greeter` renders as
+Greeter (display manager): the pre-login screen `lys-greeter` renders as
 a greetd greeter.
 
-The greeter reads the system config (`/etc/wayle/config.toml`), so these
+The greeter reads the system config (`/etc/lys-shell/config.toml`), so these
 settings take effect there — copy or symlink your user config if you want
 the login screen to follow it.
 

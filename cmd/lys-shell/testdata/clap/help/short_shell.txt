@@ -1,0 +1,6 @@
+Run the desktop shell in the foreground
+
+Usage: lys-shell shell
+
+Options:
+  -h, --help  Print help

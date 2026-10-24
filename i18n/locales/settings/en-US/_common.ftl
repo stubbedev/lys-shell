@@ -1,7 +1,7 @@
-### Wayle Main UI Strings - English (US)
+### lys-shell Main UI Strings - English (US)
 
 ## Application
-app-name = Wayle
+app-name = lys-shell
 
 ## Common UI
 common-ok = OK

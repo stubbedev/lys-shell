@@ -10,7 +10,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestParseOptions(t *testing.T) {
@@ -44,18 +44,18 @@ func TestParseOptions(t *testing.T) {
 	for _, bad := range [][]string{{"--config"}, {"--env", "NOEQUALS"}, {"--bogus"}, {"--sessions"}, {"--state"}} {
 		_, err := ParseOptions(bad)
 		var usage UsageError
-		if !errors.As(err, &usage) || !strings.Contains(err.Error(), "usage: wayle-greeter") {
+		if !errors.As(err, &usage) || !strings.Contains(err.Error(), "usage: lys-greeter") {
 			t.Errorf("ParseOptions(%q) = %v, want a usage error", bad, err)
 		}
 	}
 
 	t.Setenv("XDG_STATE_HOME", "/state")
-	if o, _ := ParseOptions(nil); o.StatePath != "/state/wayle-greeter/last-session" {
+	if o, _ := ParseOptions(nil); o.StatePath != "/state/lys-greeter/last-session" {
 		t.Errorf("XDG_STATE_HOME default = %s", o.StatePath)
 	}
 	t.Setenv("XDG_STATE_HOME", "")
 	t.Setenv("HOME", "/var/lib/greetd")
-	if o, _ := ParseOptions(nil); o.StatePath != "/var/lib/greetd/.local/state/wayle-greeter/last-session" {
+	if o, _ := ParseOptions(nil); o.StatePath != "/var/lib/greetd/.local/state/lys-greeter/last-session" {
 		t.Errorf("HOME default = %s", o.StatePath)
 	}
 	t.Setenv("HOME", "")
@@ -164,12 +164,12 @@ func TestParsePasswd(t *testing.T) {
 
 func TestFindAvatar(t *testing.T) {
 	home := t.TempDir()
-	if findAvatar("wayle-no-such-user", home) != "" {
+	if findAvatar("lys-shell-no-such-user", home) != "" {
 		t.Error("an avatar found where none exists")
 	}
 	face := filepath.Join(home, ".face")
 	_ = os.WriteFile(face, []byte("x"), 0o600)
-	if got := findAvatar("wayle-no-such-user", home); got != face {
+	if got := findAvatar("lys-shell-no-such-user", home); got != face {
 		t.Errorf("~/.face = %q", got)
 	}
 }
@@ -265,7 +265,7 @@ func TestRecordCursor(t *testing.T) {
 	if err := RecordCursor(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(state, "wayle", recordFile)); err == nil {
+	if _, err := os.Stat(filepath.Join(state, "lys-shell", recordFile)); err == nil {
 		t.Error("a blank environment wrote a record (it would clobber a good one)")
 	}
 	t.Setenv("XCURSOR_THEME", "Bibata")
@@ -273,7 +273,7 @@ func TestRecordCursor(t *testing.T) {
 	if err := RecordCursor(); err != nil {
 		t.Fatal(err)
 	}
-	data, _ := os.ReadFile(filepath.Join(state, "wayle", recordFile))
+	data, _ := os.ReadFile(filepath.Join(state, "lys-shell", recordFile))
 	if string(data) != "theme=Bibata\nsize=28\n" {
 		t.Errorf("record = %q", data)
 	}

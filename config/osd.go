@@ -26,7 +26,7 @@ type OsdConfig struct {
 	// When `general.tearing-mode` is enabled, `overlay` is demoted to `top`
 	// to allow fullscreen tearing.
 	Layer Layer `cfg:"layer"`
-	// Reusable toast presets, each triggerable with `wayle toast --preset <id>`.
+	// Reusable toast presets, each triggerable with `lys-shell toast --preset <id>`.
 	Presets []ToastPreset `cfg:"presets"`
 }
 
@@ -104,7 +104,7 @@ var _ = registerEnum(OsdTextAlignStart, OsdTextAlignCenter, OsdTextAlignEnd)
 
 // ToastPreset is one [[osd.presets]] entry.
 //
-// A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.
+// A reusable toast preset, triggerable by id with `lys-shell toast --preset <id>`.
 //
 // A preset captures a toast's text and icon so it can be fired by name. The
 // label/icon can still be overridden per invocation, and runtime-only fields
@@ -119,11 +119,11 @@ var _ = registerEnum(OsdTextAlignStart, OsdTextAlignCenter, OsdTextAlignEnd)
 // label = "Saved"
 // icon = "ld-check-symbolic"
 //
-// # Fire it: wayle toast --preset saved
-// # With a progress bar: wayle toast --preset saved --percentage 80
+// # Fire it: lys-shell toast --preset saved
+// # With a progress bar: lys-shell toast --preset saved --percentage 80
 // ```
 type ToastPreset struct {
-	// Unique identifier. Trigger with `wayle toast --preset <id>`.
+	// Unique identifier. Trigger with `lys-shell toast --preset <id>`.
 	ID string `cfg:"id,required"`
 	// Toast text. An explicit label on the command line overrides this.
 	Label *string `cfg:"label,default"`

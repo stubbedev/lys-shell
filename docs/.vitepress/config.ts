@@ -1,13 +1,13 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  title: 'Wayle',
+  title: 'lys-shell',
   description: 'A configurable desktop shell for Wayland.',
   cleanUrls: true,
   lastUpdated: true,
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/wayle.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/lys-shell.svg' }],
   ],
 
   markdown: {
@@ -18,7 +18,7 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: '/wayle.svg',
+    logo: '/lys-shell.svg',
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started', activeMatch: '^/guide/' },
@@ -115,17 +115,17 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/stubbedev/wayle' },
+      { icon: 'github', link: 'https://github.com/stubbedev/lys-shell' },
       { icon: 'discord', link: 'https://discord.gg/GYRGnNMf2c' },
     ],
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright 2026 Wayle contributors',
+      copyright: 'Copyright 2026 lys-shell contributors',
     },
 
     editLink: {
-      pattern: 'https://github.com/stubbedev/wayle/edit/master/docs/:path',
+      pattern: 'https://github.com/stubbedev/lys-shell/edit/master/docs/:path',
       text: 'Edit this page on GitHub',
     },
 

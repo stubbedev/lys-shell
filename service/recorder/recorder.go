@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // Status is the lifecycle gate (state.rs's Status), updated
@@ -51,7 +51,7 @@ const (
 	savedIcon      = "ld-video-symbolic"
 	startToastMS   = 1000
 	stopToastMS    = 1500
-	notifyAppName  = "Wayle"
+	notifyAppName  = "lys-shell"
 	elapsedTick    = time.Second
 	outputDirPerms = 0o755
 )
@@ -434,14 +434,14 @@ func BuildOptions(cfg config.RecorderConfig, now time.Time) Options {
 	return opts
 }
 
-// OutputPath is output_path: wayle-<local timestamp>.<ext> in the
+// OutputPath is output_path: lys-shell-<local timestamp>.<ext> in the
 // configured directory, else the videos directory.
 func OutputPath(configuredDir string, format Format, now time.Time) string {
 	dir := configuredDir
 	if dir == "" {
 		dir = VideosDir()
 	}
-	return filepath.Join(dir, "wayle-"+now.Format("20060102-150405")+"."+format.Extension())
+	return filepath.Join(dir, "lys-shell-"+now.Format("20060102-150405")+"."+format.Extension())
 }
 
 // VideosDir is videos_dir: $XDG_VIDEOS_DIR, else $HOME/Videos.

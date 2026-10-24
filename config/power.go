@@ -22,7 +22,7 @@ type PowerConfig struct {
 	ScrollUp ClickAction `cfg:"scroll-up"`
 	// Action on scroll down.
 	ScrollDown ClickAction `cfg:"scroll-down"`
-	// Action on left click. Default opens wayle's native power menu (`:menu`).
+	// Action on left click. Default opens lys-shell's native power menu (`:menu`).
 	LeftClick ClickAction `cfg:"left-click"`
 	// Command run by the power menu's Lock button.
 	LockCommand string `cfg:"lock-command"`

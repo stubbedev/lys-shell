@@ -13,7 +13,7 @@ nix develop -c just lint    # golangci-lint fmt --diff + go vet + golangci-lint 
 nix develop -c just check   # lint + test + race + schema-check, run before every release
 ```
 
-After a `go.mod` change (a gelm bump), refresh `nix/wayle.nix`'s
+After a `go.mod` change (a lys-ui bump), refresh `nix/lys-shell.nix`'s
 `vendorHash` with `just vendor-hash`.
 
 ## Tests define behavior
@@ -32,8 +32,8 @@ the regression by reverting the change and watching it fail.
 
 Tests live in `_test.go` files next to the code they cover. Contracts across
 processes run the real binary or a private bus (see
-`cmd/wayle/launcher_session_test.go` for the launcher socket lifetime, and
+`cmd/lys-shell/launcher_session_test.go` for the launcher socket lifetime, and
 `internal/dbustest` for private session buses). The CLI's help, errors and
 completions are pinned byte for byte by the goldens under
-`cmd/wayle/testdata/clap`; a deliberate CLI change edits them in the same
+`cmd/lys-shell/testdata/clap`; a deliberate CLI change edits them in the same
 commit.

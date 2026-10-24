@@ -1,8 +1,8 @@
 // Package wallpaper ports crates/wayle-wallpaper: per-monitor wallpaper
 // state, fit modes, directory cycling (sequential or shuffled, shared
 // or per monitor, rescanned on directory changes), color extraction
-// for theming, and the com.wayle.Wallpaper1 D-Bus interface the
-// `wayle wallpaper` CLI drives.
+// for theming, and the dev.stubbe.lys.Wallpaper1 D-Bus interface the
+// `lys-shell wallpaper` CLI drives.
 //
 // The service only tracks state; the shell renders it (shell/wallpaper)
 // by subscribing to Changes and reading Monitors. The shell also feeds
@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/feed"
-	"github.com/stubbedev/wayle/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 // Options configure a Service (WallpaperServiceBuilder).

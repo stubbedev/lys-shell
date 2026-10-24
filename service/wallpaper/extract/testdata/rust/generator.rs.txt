@@ -1,5 +1,5 @@
 use std::path::Path;
-use wayle_wallpaper::{ColorExtractor, ColorExtractorConfig};
+use lys_shell_wallpaper::{ColorExtractor, ColorExtractorConfig};
 
 #[tokio::main]
 async fn main() {

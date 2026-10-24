@@ -8,7 +8,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 const (

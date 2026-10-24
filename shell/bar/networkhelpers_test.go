@@ -3,8 +3,8 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/network"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/network"
 )
 
 func TestSignalStrengthIcon(t *testing.T) {

@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/service/recorder"
 )
 
 // deviceSelect is DeviceSelectControl: a dropdown of devices writing
@@ -55,7 +55,7 @@ var cameraChoices = recorder.Cameras
 const microphoneQueryTimeout = 5 * time.Second
 
 // microphoneChoices asks the audio daemon for its sources
-// (com.wayle.Audio1 ListSources), monitors dropped by their name; with
+// (dev.stubbe.lys.Audio1 ListSources), monitors dropped by their name; with
 // no daemon the list is the default alone (a seam for tests).
 var microphoneChoices = func() []recorder.DeviceChoice {
 	conn, err := dbus.ConnectSessionBus()

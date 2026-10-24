@@ -1,0 +1,6 @@
+Open the icons directory in file manager
+
+Usage: lys-shell icons open
+
+Options:
+  -h, --help  Print help

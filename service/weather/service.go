@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // Settings is everything a poll depends on (the builder's fields and

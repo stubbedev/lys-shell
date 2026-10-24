@@ -1,0 +1,6 @@
+Disable idle inhibition
+
+Usage: lys-shell idle off
+
+Options:
+  -h, --help  Print help

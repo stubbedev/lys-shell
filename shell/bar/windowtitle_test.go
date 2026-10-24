@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/hyprland"
-	"github.com/stubbedev/wayle/service/mango"
-	"github.com/stubbedev/wayle/service/niri"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/mango"
+	"github.com/stubbedev/lys-shell/service/niri"
 )
 
 // startFakeEventStream serves one burst of socket2 lines and keeps the

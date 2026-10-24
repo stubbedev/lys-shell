@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/stubbedev/wayle/internal/appicons"
-	"github.com/stubbedev/wayle/service/mango"
-	"github.com/stubbedev/wayle/service/niri"
-	"github.com/stubbedev/wayle/service/sway"
+	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/service/mango"
+	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/sway"
 )
 
 // newSwayWorkspaces is the sway-workspaces factory.

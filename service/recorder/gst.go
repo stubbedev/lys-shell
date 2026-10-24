@@ -10,7 +10,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/stubbedev/wayle/internal/clib"
+	"github.com/stubbedev/lys-shell/internal/clib"
 )
 
 // The libgstreamer binding: dlopen through purego, so the binary stays

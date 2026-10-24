@@ -9,7 +9,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder"
 )
 
 // Engine is a fake recorder.Engine.

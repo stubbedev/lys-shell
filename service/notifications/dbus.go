@@ -6,11 +6,11 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // Server serves org.freedesktop.Notifications on the session bus and
-// wayle's com.wayle.Notifications1 extension beside it.
+// lys-shell's dev.stubbe.lys.Notifications1 extension beside it.
 type Server struct {
 	conn        *dbus.Conn
 	svc         *Service
@@ -36,7 +36,7 @@ func Serve(conn *dbus.Conn, svc *Service) (*Server, error) {
 	if reply != dbus.RequestNameReplyPrimaryOwner {
 		return nil, fmt.Errorf("notifications: %s is already owned", Interface)
 	}
-	release, err := ServeWayle(conn, svc)
+	release, err := ServeLysShell(conn, svc)
 	if err != nil {
 		_, _ = conn.ReleaseName(Interface)
 		return nil, err
@@ -76,48 +76,48 @@ func (s *Server) GetServerInformation() (string, string, string, string, *dbus.E
 	return ServerName, ServerVendor, ServerVersion, SpecVersion, nil
 }
 
-// wayle's control extension, which `wayle notify` drives
-// (wayle-notification/src/wayle_daemon.rs).
+// lys-shell's control extension, which `lys-shell notify` drives
+// (wayle-notification/src/lys_shell_daemon.rs).
 const (
-	WayleName = "com.wayle.Notifications1"
-	WaylePath = dbus.ObjectPath("/com/wayle/Notifications")
+	LysShellName = "dev.stubbe.lys.Notifications1"
+	LysShellPath = dbus.ObjectPath("/dev/stubbe/lys/Notifications")
 )
 
 // defaultPopupDuration is the service builder's popup_duration.
 const defaultPopupDuration = 5000
 
-// wayleDaemon is the com.wayle.Notifications1 object (WayleDaemon).
-type wayleDaemon struct {
+// lysShellDaemon is the dev.stubbe.lys.Notifications1 object (LysShellDaemon).
+type lysShellDaemon struct {
 	svc           *Service
 	popupDuration atomic.Uint32
 }
 
 // DismissAll empties the history.
-func (d *wayleDaemon) DismissAll() *dbus.Error {
+func (d *lysShellDaemon) DismissAll() *dbus.Error {
 	d.svc.DismissAll()
 	return nil
 }
 
 // Dismiss removes one notification as dismissed by the user.
-func (d *wayleDaemon) Dismiss(id uint32) *dbus.Error {
+func (d *lysShellDaemon) Dismiss(id uint32) *dbus.Error {
 	d.svc.Close(id, Dismissed)
 	return nil
 }
 
 // SetDnd sets do-not-disturb.
-func (d *wayleDaemon) SetDnd(enabled bool) *dbus.Error {
+func (d *lysShellDaemon) SetDnd(enabled bool) *dbus.Error {
 	d.svc.SetDND(enabled)
 	return nil
 }
 
 // ToggleDnd flips do-not-disturb.
-func (d *wayleDaemon) ToggleDnd() *dbus.Error {
+func (d *lysShellDaemon) ToggleDnd() *dbus.Error {
 	d.svc.ToggleDND()
 	return nil
 }
 
 // SetPopupDuration stores the popup duration the property reports.
-func (d *wayleDaemon) SetPopupDuration(ms uint32) *dbus.Error {
+func (d *lysShellDaemon) SetPopupDuration(ms uint32) *dbus.Error {
 	d.popupDuration.Store(ms)
 	return nil
 }
@@ -131,7 +131,7 @@ type ListRow struct {
 }
 
 // List snapshots the history.
-func (d *wayleDaemon) List() ([]ListRow, *dbus.Error) {
+func (d *lysShellDaemon) List() ([]ListRow, *dbus.Error) {
 	notifs := d.svc.Notifications()
 	rows := make([]ListRow, 0, len(notifs))
 	for _, n := range notifs {
@@ -140,14 +140,14 @@ func (d *wayleDaemon) List() ([]ListRow, *dbus.Error) {
 	return rows, nil
 }
 
-// ServeWayle exports com.wayle.Notifications1 over svc.
-func ServeWayle(conn *dbus.Conn, svc *Service) (func(), error) {
-	d := &wayleDaemon{svc: svc}
+// ServeLysShell exports dev.stubbe.lys.Notifications1 over svc.
+func ServeLysShell(conn *dbus.Conn, svc *Service) (func(), error) {
+	d := &lysShellDaemon{svc: svc}
 	d.popupDuration.Store(defaultPopupDuration)
 	return dbusx.Serve(conn, dbusx.Service{
-		Name:      WayleName,
-		Path:      WaylePath,
-		Interface: WayleName,
+		Name:      LysShellName,
+		Path:      LysShellPath,
+		Interface: LysShellName,
 		Methods:   d,
 		Properties: dbusx.Getters{
 			"Dnd":           func() any { return svc.DND() },

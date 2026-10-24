@@ -1,6 +1,6 @@
 package pulsetest
 
-import "github.com/stubbedev/wayle/service/pulse/native"
+import "github.com/stubbedev/lys-shell/service/pulse/native"
 
 // The fill functions are the server half of the wire layouts, written
 // from protocol-native.c (sink_fill_tagstruct and friends) with its

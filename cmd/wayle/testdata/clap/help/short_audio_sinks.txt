@@ -1,6 +1,0 @@
-List available audio sinks (outputs)
-
-Usage: wayle audio sinks
-
-Options:
-  -h, --help  Print help

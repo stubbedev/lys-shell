@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/network/openconnect"
+	"github.com/stubbedev/lys-shell/service/network/openconnect"
 )
 
 const openconnectDescriptor = "[VPN Connection]\n" +
@@ -227,7 +227,7 @@ func TestEveryTypedPluginAsksForItsGatewayFirstAndStaysShort(t *testing.T) {
 		}
 	}
 	if fieldsForPlugin("org.example.SomeVpnPlugin") != nil || SecretKeys("org.example.SomeVpnPlugin") != nil {
-		t.Error("a plugin wayle has never seen got a typed form or secrets")
+		t.Error("a plugin lys-shell has never seen got a typed form or secrets")
 	}
 }
 

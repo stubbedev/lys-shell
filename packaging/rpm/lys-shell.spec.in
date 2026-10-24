@@ -1,0 +1,107 @@
+# Prebuilt upstream binaries (stripped, static Go): no source to compile, so
+# no useful debuginfo can be produced. Disable debug_package to avoid an
+# empty subpackage.
+%global debug_package %{nil}
+%global _build_id_links none
+
+Name:           lys-shell
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Wayland Elements - A compositor agnostic shell with extensive customization
+License:        MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND CC0-1.0 AND blessing
+URL:            https://lys-shell.app/
+Source0:        https://github.com/stubbedev/lys-shell/releases/download/v%{version}/lys-shell-%{version}-%{_arch}-linux.tar.gz
+ExclusiveArch:  x86_64
+
+BuildRequires:  desktop-file-utils
+BuildRequires:  systemd-rpm-macros
+Requires:       hicolor-icon-theme
+# Loaded at runtime through purego, so rpm finds no ELF dependency on them.
+Requires:       glib2
+Requires:       gstreamer1
+Requires:       pam
+Requires:       pipewire-libs
+Requires:       mesa-libgbm
+Recommends:     xdg-desktop-portal
+Recommends:     pipewire-gstreamer
+Recommends:     gstreamer1-plugins-base
+Recommends:     gstreamer1-plugins-good
+Recommends:     gstreamer1-plugins-bad-free
+Recommends:     gstreamer1-plugins-ugly-free
+Recommends:     gstreamer1-plugin-libav
+Suggests:       pipewire-pulseaudio
+Suggests:       wireplumber
+Suggests:       NetworkManager
+Suggests:       bluez
+Suggests:       upower
+Suggests:       power-profiles-daemon
+
+%description
+Wayland Elements - A compositor agnostic shell with extensive customization
+
+%prep
+%setup -q -n lys-shell-%{version}-%{_arch}-linux
+
+%build
+# prebuilt upstream binary - nothing to build
+
+%install
+install -d %{buildroot}%{_bindir}
+install -m 0755 lys-shell lys-greeter lys-lock lys-settings %{buildroot}%{_bindir}/
+
+install -d %{buildroot}%{_userunitdir}
+install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service %{buildroot}%{_userunitdir}/
+
+install -d %{buildroot}%{_datadir}/xdg-desktop-portal/portals
+install -m 0644 lys-shell.portal %{buildroot}%{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
+install -m 0644 lys-shell-portals.conf %{buildroot}%{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
+install -d %{buildroot}%{_datadir}/dbus-1/services
+install -m 0644 org.freedesktop.impl.portal.desktop.lys.service %{buildroot}%{_datadir}/dbus-1/services/
+
+install -d %{buildroot}%{_datadir}/polkit-1/actions
+install -m 0644 dev.stubbe.lys.greeter.policy %{buildroot}%{_datadir}/polkit-1/actions/
+
+install -d %{buildroot}%{_datadir}/applications
+install -m 0644 dev.stubbe.lys.settings.desktop %{buildroot}%{_datadir}/applications/dev.stubbe.lys.settings.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/dev.stubbe.lys.settings.desktop
+install -m 0644 dev.stubbe.lys.vpn-sso-callback.desktop %{buildroot}%{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
+
+install -d %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
+install -m 0644 lys-settings.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/lys-settings.svg
+
+install -d %{buildroot}%{_datadir}/icons/hicolor/scalable/actions
+install -m 0644 icons/hicolor/scalable/actions/*.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/actions/
+
+install -d %{buildroot}%{_datadir}/bash-completion/completions
+install -m 0644 completions/completions.bash %{buildroot}%{_datadir}/bash-completion/completions/lys-shell
+
+install -d %{buildroot}%{_datadir}/zsh/site-functions
+install -m 0644 completions/_lys_shell %{buildroot}%{_datadir}/zsh/site-functions/_lys_shell
+
+install -d %{buildroot}%{_datadir}/fish/vendor_completions.d
+install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/lys-shell.fish
+
+%files
+%license LICENSE
+%{_bindir}/lys-shell
+%{_bindir}/lys-greeter
+%{_bindir}/lys-lock
+%{_bindir}/lys-settings
+%{_userunitdir}/lys-shell.service
+%{_userunitdir}/xdg-desktop-portal-lys-shell.service
+%{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
+%{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
+%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service
+%{_datadir}/polkit-1/actions/dev.stubbe.lys.greeter.policy
+%{_datadir}/applications/dev.stubbe.lys.settings.desktop
+%{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
+%{_datadir}/icons/hicolor/scalable/apps/lys-settings.svg
+%{_datadir}/icons/hicolor/scalable/actions/*.svg
+%{_datadir}/bash-completion/completions/lys-shell
+%{_datadir}/zsh/site-functions/_lys_shell
+%{_datadir}/fish/vendor_completions.d/lys-shell.fish
+
+%changelog
+* @DATE@ @MAINTAINER@ - @VERSION@-1
+- Packaged upstream binary release

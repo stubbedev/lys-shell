@@ -3,7 +3,7 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestFindLayoutExactMonitorBeatsStar(t *testing.T) {

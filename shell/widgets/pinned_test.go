@@ -3,8 +3,8 @@ package widgets
 import (
 	"testing"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 func TestPinnedSetSizeRepinsAndInvalidates(t *testing.T) {

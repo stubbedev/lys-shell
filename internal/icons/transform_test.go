@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/icons/usvg"
+	"github.com/stubbedev/lys-shell/internal/icons/usvg"
 )
 
 // TestToSymbolicMatchesRust holds ToSymbolic and usvg.Parse to what the

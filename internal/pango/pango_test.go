@@ -2,7 +2,7 @@ package pango
 
 import "testing"
 
-func TestTranslateCarriesWhatGelmCanRender(t *testing.T) {
+func TestTranslateCarriesWhatLysUICanRender(t *testing.T) {
 	for in, want := range map[string]string{
 		"Firefox <span weight='light' size='small'><i>(Web Browser)</i></span>": "Firefox <i>(Web Browser)</i>",
 		"<b>bold</b> and <span weight=\"bold\">heavy</span>":                    "<b>bold</b> and <b>heavy</b>",

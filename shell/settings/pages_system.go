@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // generalPage is pages/general.
@@ -80,7 +80,7 @@ func greeterApplyFooter(k *kit) widget.Widget {
 			label.SetText(greeterApplyFailed)
 			return
 		}
-		log.Printf("settings: greeter apply: launched pkexec wayle-greeter apply-config")
+		log.Printf("settings: greeter apply: launched pkexec lys-greeter apply-config")
 	}, "primary"), false, widget.AlignStart)
 	hint := k.label(greeterApplyHint, "settings-section-title")
 	hint.SetWrap(true)
@@ -89,7 +89,7 @@ func greeterApplyFooter(k *kit) widget.Widget {
 }
 
 // applyGreeter stages the [greeter] keys the login screen takes and
-// hands them to `pkexec wayle-greeter apply-config` (dispatch).
+// hands them to `pkexec lys-greeter apply-config` (dispatch).
 func applyGreeter(s store) error {
 	greeter := make(map[string]any, len(config.GreeterApplyKeys))
 	for _, key := range config.GreeterApplyKeys {
@@ -101,7 +101,7 @@ func applyGreeter(s store) error {
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(os.TempDir(), fmt.Sprintf("wayle-greeter-apply-%d.toml", os.Getpid()))
+	path := filepath.Join(os.TempDir(), fmt.Sprintf("lys-greeter-apply-%d.toml", os.Getpid()))
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		return fmt.Errorf("stage %s: %w", path, err)
 	}
@@ -109,9 +109,9 @@ func applyGreeter(s store) error {
 }
 
 // spawnGreeterApply starts pkexec without waiting: the polkit agent
-// asks, and wayle-greeter reports on its own (a test seam).
+// asks, and lys-greeter reports on its own (a test seam).
 var spawnGreeterApply = func(staged string) error {
-	cmd := exec.Command("pkexec", "wayle-greeter", "apply-config", staged) //nolint:gosec // fixed program, staged path
+	cmd := exec.Command("pkexec", "lys-greeter", "apply-config", staged) //nolint:gosec // fixed program, staged path
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("spawn pkexec: %w", err)
 	}

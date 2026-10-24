@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	engine "github.com/stubbedev/wayle/service/launcher"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // The engine actor (engine_actor.rs): one goroutine per session owns

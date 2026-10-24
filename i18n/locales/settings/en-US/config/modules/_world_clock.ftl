@@ -1,4 +1,4 @@
-### Wayle Configuration - World Clock Module
+### lys-shell Configuration - World Clock Module
 
 ## World Clock Module Configuration
 

@@ -1,4 +1,4 @@
-// Package i18n is wayle's Fluent localization: a port of the runtime
+// Package i18n is lys-shell's Fluent localization: a port of the runtime
 // the Rust crates get from i18n-embed 0.16 (FluentLanguageLoader),
 // fluent-bundle 0.16, fluent-syntax 0.12, and fluent-langneg 0.13.
 //
@@ -9,7 +9,7 @@
 //     Attr read it.
 //   - the settings domain (crates/wayle-i18n/src/lib.rs, t/t_attr): the
 //     settings GUI and config field labels. Settings returns it.
-//   - the greeter domain (crates/wayle-greeter/src/i18n.rs, t!): the
+//   - the greeter domain (crates/lys-greeter/src/i18n.rs, t!): the
 //     login screen's labels. Greeter returns it.
 //
 // Each domain negotiates the desktop locale (LANGUAGE, LC_ALL,
@@ -27,9 +27,9 @@ import (
 	"os"
 	"sync"
 
-	greeterlocales "github.com/stubbedev/wayle/i18n/locales/greeter"
-	settingslocales "github.com/stubbedev/wayle/i18n/locales/settings"
-	shelllocales "github.com/stubbedev/wayle/i18n/locales/shell"
+	greeterlocales "github.com/stubbedev/lys-shell/i18n/locales/greeter"
+	settingslocales "github.com/stubbedev/lys-shell/i18n/locales/settings"
+	shelllocales "github.com/stubbedev/lys-shell/i18n/locales/shell"
 )
 
 // domain lazily builds one loader from the desktop locale, like the
@@ -56,7 +56,7 @@ func (d *domain) get() *Loader {
 var (
 	shellDomain    = &domain{assets: NewAssets(shelllocales.FS)}
 	settingsDomain = &domain{assets: NewAssets(settingslocales.FS)}
-	greeterDomain  = &domain{assets: NewFileAssets(greeterlocales.FS, "wayle-greeter.ftl")}
+	greeterDomain  = &domain{assets: NewFileAssets(greeterlocales.FS, "lys-greeter.ftl")}
 )
 
 // Shell returns the shell-domain loader (wayle-shell-core's loader()).
@@ -65,7 +65,7 @@ func Shell() *Loader { return shellDomain.get() }
 // Settings returns the settings-domain loader (wayle-i18n's loader()).
 func Settings() *Loader { return settingsDomain.get() }
 
-// Greeter returns the greeter-domain loader (wayle-greeter's loader()).
+// Greeter returns the greeter-domain loader (lys-greeter's loader()).
 func Greeter() *Loader { return greeterDomain.get() }
 
 // T formats a shell message: wayle-shell-core's t!/td!.

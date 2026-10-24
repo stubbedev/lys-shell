@@ -76,7 +76,7 @@ Icon source for app volume entries in the dropdown.
 
 | Value | Meaning |
 |---|---|
-| `"mapped"` | Wayle's curated symbolic icons matched by app name. |
+| `"mapped"` | lys-shell's curated symbolic icons matched by app name. |
 | `"native"` | Native application icons reported by PulseAudio. |
 
 ## Appearance {#appearance}
@@ -106,7 +106,7 @@ Visual style variants for bar buttons.
 
 ## BarCount {#bar-count}
 
-Frequency bar count clamped to 1-256 (mirrors `wayle_cava::BarCount`).
+Frequency bar count clamped to 1-256.
 
 Number in `[1, 256]`.
 
@@ -424,7 +424,7 @@ Uses the existing `--weight-*` tokens defined in SCSS.
 
 ## Framerate {#framerate}
 
-Visualization framerate clamped to 1-360 fps (mirrors `wayle_cava::Framerate`).
+Visualization framerate clamped to 1-360 fps.
 
 Number in `[1, 360]`.
 
@@ -462,8 +462,8 @@ Source for resolving notification icons.
 
 | Value | Meaning |
 |---|---|
-| `"automatic"` | Use per-notification images when provided, otherwise Wayle's mapped icon. |
-| `"mapped"` | Always use Wayle's mapped icons regardless of what the app provides. |
+| `"automatic"` | Use per-notification images when provided, otherwise lys-shell's mapped icon. |
+| `"mapped"` | Always use lys-shell's mapped icons regardless of what the app provides. |
 | `"application"` | Use the full application icon chain, falling back to mapped if unavailable. |
 
 ## LabelStrategy {#label-strategy}
@@ -1026,7 +1026,7 @@ Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
 
 | Value | Meaning |
 |---|---|
-| `"wayle"` | Static theming using Wayle's built-in palettes. |
+| `"lys-shell"` | Static theming using lys-shell's built-in palettes. |
 | `"matugen"` | Dynamic theming via Matugen. |
 | `"pywal"` | Dynamic theming via Pywal. |
 | `"wallust"` | Dynamic theming via Wallust. |
@@ -1073,7 +1073,7 @@ Time display format.
 
 ## ToastPreset {#toast-preset}
 
-A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.
+A reusable toast preset, triggerable by id with `lys-shell toast --preset <id>`.
 
 A preset captures a toast's text and icon so it can be fired by name. The
 label/icon can still be overridden per invocation, and runtime-only fields
@@ -1088,13 +1088,13 @@ id = "saved"
 label = "Saved"
 icon = "ld-check-symbolic"
 
-# Fire it: wayle toast --preset saved
-# With a progress bar: wayle toast --preset saved --percentage 80
+# Fire it: lys-shell toast --preset saved
+# With a progress bar: lys-shell toast --preset saved --percentage 80
 ```
 
 | Field | Description |
 |---|---|
-| `id` | Unique identifier. Trigger with `wayle toast --preset <id>`. |
+| `id` | Unique identifier. Trigger with `lys-shell toast --preset <id>`. |
 | `label` | Toast text. An explicit label on the command line overrides this. |
 | `icon` | Symbolic icon name shown beside the text. |
 

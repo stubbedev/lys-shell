@@ -1,0 +1,6 @@
+Show notification status
+
+Usage: lys-shell notify status
+
+Options:
+  -h, --help  Print help

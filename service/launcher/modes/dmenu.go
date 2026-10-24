@@ -3,7 +3,7 @@ package modes
 import (
 	"context"
 
-	"github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // DmenuConfig is the part of the CLI's dmenu flags the engine needs.

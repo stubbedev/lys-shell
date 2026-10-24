@@ -145,7 +145,7 @@ func TestSelectStringsAndDefault(t *testing.T) {
 }
 
 func TestReferencesTermsAndAttributes(t *testing.T) {
-	l := enOnly(t, "-brand = Wayle\n    .short = W\n"+
+	l := enOnly(t, "-brand = lys-shell\n    .short = W\n"+
 		"about = About { -brand }\n"+
 		"ref = See { about }\n"+
 		"attr = Tip: { menu.tooltip }\n"+
@@ -155,8 +155,8 @@ func TestReferencesTermsAndAttributes(t *testing.T) {
 		"-leak = { $x }\n"+
 		"leak = { -leak }\n")
 	cases := map[string]string{
-		"about": "About Wayle",
-		"ref":   "See About Wayle",
+		"about": "About lys-shell",
+		"ref":   "See About lys-shell",
 		"attr":  "Tip: Open the menu",
 		"param": "Hello " + iso + "Bob" + pop,
 	}

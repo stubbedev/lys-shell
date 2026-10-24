@@ -17,7 +17,7 @@ import (
 //   - nothing arrives on stdin and no ROFI_* variables are exported;
 //   - the child is detached; the menu does not wait for it.
 //
-// Where rofi is inconsistent, wayle is not: rofi substitutes only for
+// Where rofi is inconsistent, lys-shell is not: rofi substitutes only for
 // -on-selection-changed and -on-entry-accepted and hands the others
 // their placeholders verbatim. Substituting everywhere is a superset of
 // what a rofi script can rely on.

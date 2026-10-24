@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/apptheme"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/auth"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
-// fakeLocker plays gelm's session lock: Lock builds one surface per
+// fakeLocker plays lys-ui's session lock: Lock builds one surface per
 // fake output right away, like LockSession covering every output.
 type fakeLocker struct {
 	available bool
@@ -228,7 +228,7 @@ func TestLockRefusals(t *testing.T) {
 // TestUnlockWithPassword: the typed password answers PAM's first
 // prompt, success unlocks, and the hint goes false.
 func TestUnlockWithPassword(t *testing.T) {
-	h := newHarness(t, func(l *config.LockConfig) { l.PamService = "wayle" })
+	h := newHarness(t, func(l *config.LockConfig) { l.PamService = "lys-shell" })
 	h.lock(t)
 	h.s.Submit("")
 	if len(h.convs) != 0 {
@@ -236,7 +236,7 @@ func TestUnlockWithPassword(t *testing.T) {
 	}
 	h.s.Submit("hunter2")
 	c := h.conv(t)
-	if c.service != "wayle" {
+	if c.service != "lys-shell" {
 		t.Errorf("conversation service = %q", c.service)
 	}
 	h.eachFace(t, func(f *face) {
@@ -428,7 +428,7 @@ func TestStaleConversationIgnored(t *testing.T) {
 func TestDeniedLock(t *testing.T) {
 	h := newHarness(t, nil)
 	h.s.Lock()
-	h.locker.active = false // gelm drops a finished lock
+	h.locker.active = false // lys-ui drops a finished lock
 	h.locker.cfg.OnFinished()
 	if len(h.s.faces) != 0 || h.loop.every[0] != nil {
 		t.Error("a denied lock left surfaces or the clock behind")
@@ -530,11 +530,11 @@ func TestSetConfigAppliesAReload(t *testing.T) {
 		t.Fatal("a reload disabling [lock] still locked")
 	}
 	next = config.Defaults()
-	next.Lock.PamService = "wayle-reloaded"
+	next.Lock.PamService = "lys-shell-reloaded"
 	h.s.SetConfig(next)
 	h.lock(t)
 	h.s.Submit("pw")
-	if c := h.conv(t); c.service != "wayle-reloaded" {
+	if c := h.conv(t); c.service != "lys-shell-reloaded" {
 		t.Errorf("PAM service = %q, want the reloaded one", c.service)
 	}
 }

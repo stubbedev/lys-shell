@@ -16,7 +16,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/stubbedev/wayle/internal/clib"
+	"github.com/stubbedev/lys-shell/internal/clib"
 )
 
 // The DRM modifiers every allocator understands: implicit (the

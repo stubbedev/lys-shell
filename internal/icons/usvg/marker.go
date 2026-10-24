@@ -4,7 +4,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/stubbedev/wayle/internal/icons/skpath"
+	"github.com/stubbedev/lys-shell/internal/icons/skpath"
 )
 
 // This file ports usvg's parser/marker.rs: marker-start, marker-mid and

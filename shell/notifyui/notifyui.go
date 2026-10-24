@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/appicons"
-	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 // FallbackIcon is the bell every unresolved notification shows.
@@ -126,7 +126,7 @@ func RelativeTime(now, ts time.Time) Age {
 }
 
 // BodyMarkup is the sanitized body (the Rust sanitize_markup): markup
-// gelm's parser accepts passes through with its tags intact, anything
+// lys-ui's parser accepts passes through with its tags intact, anything
 // else escapes to the literal characters.
 func BodyMarkup(body string) string {
 	if _, ok := widget.ParseMarkup(body); ok {

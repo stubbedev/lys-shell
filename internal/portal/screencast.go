@@ -142,7 +142,7 @@ func loadRestoreToken(stateDir string) string {
 	if stateDir == "" {
 		return ""
 	}
-	body, err := os.ReadFile(filepath.Join(stateDir, restoreTokenFile)) //nolint:gosec // wayle's own state dir
+	body, err := os.ReadFile(filepath.Join(stateDir, restoreTokenFile)) //nolint:gosec // lys-shell's own state dir
 	if err != nil {
 		return ""
 	}

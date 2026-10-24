@@ -1,4 +1,4 @@
-### Configuration Wayle - Paramètres de style
+### Configuration lys-shell - Paramètres de style
 
 ## Configuration du style
 
@@ -9,7 +9,7 @@ settings-styling-rounding = Arrondis
     .description = Arrondi des coins pour les menus déroulants, les fenêtres contextuelles et les dialogues
 
 settings-styling-theme-provider = Fournisseur de thème
-    .description = Source de la palette de couleurs (wayle, matugen, pywal, wallust)
+    .description = Source de la palette de couleurs (lys-shell, matugen, pywal, wallust)
 
 settings-styling-theming-monitor = Moniteur de thème
     .description = Moniteur dont le fond d'écran pilote l'extraction de couleurs
@@ -96,7 +96,7 @@ settings-palette-blue = Bleu
 
 
 ## Variantes de ThemeProvider
-enum-theme-provider-wayle = Wayle
+enum-theme-provider-lys-shell = lys-shell
 enum-theme-provider-matugen = Matugen
 enum-theme-provider-pywal = Pywal
 enum-theme-provider-wallust = Wallust

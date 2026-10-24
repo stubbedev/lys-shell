@@ -7,15 +7,15 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // The shell's application identity: the name and the org.gtk.Actions
-// object a GtkApplication exports through GIO, so `wayle panel` and
+// object a GtkApplication exports through GIO, so `lys-shell panel` and
 // gapplication(1) reach the shell the same way.
 const (
-	AppID         = "com.wayle.shell"
-	AppPath       = dbus.ObjectPath("/com/wayle/shell")
+	AppID         = "dev.stubbe.lys.shell"
+	AppPath       = dbus.ObjectPath("/dev/stubbe/lys/shell")
 	ActionsIface  = "org.gtk.Actions"
 	ActionQuit    = "quit"
 	ActionInspect = "inspector"
@@ -30,7 +30,7 @@ func IsRunning(conn *dbus.Conn) (bool, error) {
 }
 
 // Actions is what the two stateless actions run: Quit ends the shell,
-// Inspect opens gelm's inspector.
+// Inspect opens lys-ui's inspector.
 type Actions struct {
 	Quit    func()
 	Inspect func()

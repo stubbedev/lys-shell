@@ -191,7 +191,7 @@ func (conn *Conn) handleCall(msg *Message) {
 	}
 
 	ret, err := m.Call(args...)
-	// wayle patch: replied files are closed after the send below.
+	// lys-shell patch: replied files are closed after the send below.
 	defer closeReplyFiles(ret)
 	if err != nil {
 		conn.sendError(err, sender, serial)

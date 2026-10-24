@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestParseClickActionForms(t *testing.T) {
@@ -28,7 +28,7 @@ func TestParseClickActionForms(t *testing.T) {
 	if action := config.ParseClickAction("brightness:toggle"); action.Kind != config.ClickBrightnessToggle {
 		t.Errorf("toggle = %+v", action)
 	}
-	if action := config.ParseClickAction("wayle audio output-mute"); action.Kind != config.ClickShell || action.Command != "wayle audio output-mute" {
+	if action := config.ParseClickAction("lys-shell audio output-mute"); action.Kind != config.ClickShell || action.Command != "lys-shell audio output-mute" {
 		t.Errorf("shell = %+v", action)
 	}
 	// Round trip.
@@ -53,10 +53,10 @@ func TestModuleClickDefaultsMatchSchema(t *testing.T) {
 	if got := cfg.Brightness.Clicks().ScrollDown.String(); got != "brightness:-5" {
 		t.Errorf("brightness scroll-down = %q", got)
 	}
-	if got := cfg.Volume.Clicks().MiddleClick.String(); got != "wayle audio output-mute" {
+	if got := cfg.Volume.Clicks().MiddleClick.String(); got != "lys-shell audio output-mute" {
 		t.Errorf("volume middle-click = %q", got)
 	}
-	if got := cfg.Microphone.Clicks().MiddleClick.String(); got != "wayle audio input-mute" {
+	if got := cfg.Microphone.Clicks().MiddleClick.String(); got != "lys-shell audio input-mute" {
 		t.Errorf("microphone middle-click = %q", got)
 	}
 	if got := cfg.Clock.Clicks().RightClick.String(); got != "dropdown:weather" {
@@ -265,7 +265,7 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 	}
 }
 
-// The real input path: gelm's Router hit-tests the tree and drives the
+// The real input path: lys-ui's Router hit-tests the tree and drives the
 // hit leaf, so a routed left press must reach the binding and a hover
 // must shade the toggle.
 func TestBarButtonRoutesThroughTheRouter(t *testing.T) {

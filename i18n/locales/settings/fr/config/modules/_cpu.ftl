@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Processeur
+### Configuration lys-shell - Module Processeur
 
 ## Configuration du module Processeur
 

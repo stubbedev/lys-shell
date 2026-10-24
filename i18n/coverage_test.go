@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	settingslocales "github.com/stubbedev/wayle/i18n/locales/settings"
-	shelllocales "github.com/stubbedev/wayle/i18n/locales/shell"
+	settingslocales "github.com/stubbedev/lys-shell/i18n/locales/settings"
+	shelllocales "github.com/stubbedev/lys-shell/i18n/locales/shell"
 )
 
 var trees = map[string]Assets{
-	"wayle-shell-core": NewAssets(shelllocales.FS),
-	"wayle-i18n":       NewAssets(settingslocales.FS),
+	"lys-shell-core": NewAssets(shelllocales.FS),
+	"lys-shell-i18n": NewAssets(settingslocales.FS),
 }
 
 // Every partial in both trees parses without junk, and every
@@ -55,7 +55,7 @@ func TestDomainsInitialize(t *testing.T) {
 	if Shell() == nil || Settings() == nil {
 		t.Fatal("domain loaders are nil")
 	}
-	if got := Settings().Get("app-name"); got != "Wayle" && !strings.Contains(got, "Wayle") {
+	if got := Settings().Get("app-name"); got != "lys-shell" && !strings.Contains(got, "lys-shell") {
 		t.Errorf("app-name = %q", got)
 	}
 }
@@ -74,9 +74,9 @@ func TestEmbeddedMessagesResolve(t *testing.T) {
 		}
 		return l
 	}
-	shellEN := load("wayle-shell-core", "en-US")
-	shellFR := load("wayle-shell-core", "fr-FR")
-	settings := load("wayle-i18n")
+	shellEN := load("lys-shell-core", "en-US")
+	shellFR := load("lys-shell-core", "fr-FR")
+	settings := load("lys-shell-i18n")
 	cases := []struct {
 		got, want string
 	}{

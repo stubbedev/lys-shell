@@ -1,4 +1,4 @@
-### Configuration Wayle - Module personnalisé
+### Configuration lys-shell - Module personnalisé
 
 ## Variantes de ExecutionMode
 enum-execution-mode-poll = Interrogation

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // The fake gateways: the Go port of crates/wayle-network/tests/
@@ -322,7 +322,7 @@ func fakeAnyConnect(w http.ResponseWriter, _ *http.Request, body string) {
 	case !strings.Contains(body, "<config-auth"):
 		fakeReply(w, http.StatusBadRequest, "<html>not a gateway</html>")
 	case strings.Contains(body, `type="init"`):
-		// The cookie a gateway clears before there is a session: wayle
+		// The cookie a gateway clears before there is a session: lys-shell
 		// must not mistake it for one.
 		w.Header().Add("Set-Cookie", "webvpn=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/")
 		fakeReply(w, http.StatusOK, acMain)

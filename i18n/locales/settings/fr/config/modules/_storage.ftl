@@ -1,4 +1,4 @@
-### Configuration Wayle - Module Stockage
+### Configuration lys-shell - Module Stockage
 
 ## Configuration du module Stockage
 

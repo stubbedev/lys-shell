@@ -1,0 +1,6 @@
+Show current recorder status
+
+Usage: lys-shell recorder status
+
+Options:
+  -h, --help  Print help

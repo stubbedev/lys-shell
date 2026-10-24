@@ -1,0 +1,6 @@
+Account info sharing consent (`org.freedesktop.impl.portal.Account`)
+
+Usage: lys-shell portal show account
+
+Options:
+  -h, --help  Print help

@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/ipp"
-	"github.com/stubbedev/wayle/shell/treetest"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 type fakeWindow struct{ closed bool }
@@ -118,7 +118,7 @@ func document(t *testing.T, body string) *os.File {
 func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 	hs := newHarness(t)
 	got, c := hs.prepare(t)
-	if c.Namespace != "wayle-print" || c.Layer != app.LayerOverlay {
+	if c.Namespace != "lys-shell-print" || c.Layer != app.LayerOverlay {
 		t.Errorf("surface = %+v", c)
 	}
 	labels := treetest.Labels(c.Root)

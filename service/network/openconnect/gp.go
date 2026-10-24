@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/stubbedev/wayle/service/network/secrets"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
 
 // GlobalProtect gateway authentication, spoken natively over HTTPS
@@ -312,7 +312,7 @@ func parseGPLogin(r gpReply, gateway, computer, gwcert string) (session, *gpChal
 		// SAML portals need a browser; say so plainly rather than failing
 		// as "malformed".
 		if _, ok := xmlValue(body, "saml-auth-method"); ok || strings.Contains(body, "saml-request") {
-			return session{}, nil, authError("this gateway requires SAML sign-in, which wayle cannot do yet")
+			return session{}, nil, authError("this gateway requires SAML sign-in, which lys-shell cannot do yet")
 		}
 		return session{}, nil, gpRefusal(r)
 	}
@@ -380,7 +380,7 @@ func buildGPCookie(named map[string]string, computer string) string {
 func parseGPPrelogin(body string) (gpPrelogin, error) {
 	// Read before the status, because a SAML gateway answers Success:
 	// from its point of view nothing is wrong, it just wants a browser.
-	// Whether wayle can act on that is the caller's decision.
+	// Whether lys-shell can act on that is the caller's decision.
 	saml := parseSAMLRequest(body)
 
 	if status, ok := xmlValue(body, "status"); ok && !asciiEqualFold(status, "success") {
@@ -582,7 +582,7 @@ func (a *attempt) gpCredentials() (username, password string, typed bool, err er
 	}
 
 	// A SAML gateway wants a browser, not a form. With the profile's
-	// consent wayle hands the sign-in to the real browser and takes the
+	// consent lys-shell hands the sign-in to the real browser and takes the
 	// answer back through the globalprotectcallback: scheme; without it,
 	// the refusal is the one this has always given.
 	if prelogin.saml != nil {

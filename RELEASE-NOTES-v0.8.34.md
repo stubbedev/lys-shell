@@ -51,7 +51,7 @@ filter, and the unfiltered `list_dir` contract.
 
 VPN state had to be bolted on from outside: a `[[modules.custom]]` block driving
 a watch script that combined `inotify` on a marker file with `ip monitor link`.
-wayle already spoke NetworkManager's VPN surface and then dropped it on the
+lys-shell already spoke NetworkManager's VPN surface and then dropped it on the
 floor — and NM-only would not have replaced that script anyway, because
 openconnect-as-a-systemd-unit, `wg-quick@wg0` and `tailscaled` are all invisible
 to NM.
@@ -147,7 +147,7 @@ same config.
   signed so a positive x moves right regardless of which edge is anchored.
   Margins do nothing on a centered axis, so the CLI warns when offsets are
   passed with `-location 0` rather than silently ignoring them.
-- `-theme` / `-theme-str` now warn that wayle has no rasi themes and point at
+- `-theme` / `-theme-str` now warn that lys-shell has no rasi themes and point at
   `[styling]`, instead of the generic "not supported" line.
 
 Percent and character widths cannot be resolved at config level, so `UiSettings`

@@ -8,7 +8,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/service/bluetooth"
+	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
 
 // fakeBluetooth is a scripted bluetooth.Source: tests set the state and

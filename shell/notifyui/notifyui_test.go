@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/lys-ui/render"
 
-	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 func TestIconString(t *testing.T) {

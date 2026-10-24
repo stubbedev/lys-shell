@@ -4,7 +4,7 @@ package i18n
 type pluralRule func(operands) string
 
 // cardinalRules carries the intl_pluralrules 7.0.2 cardinal rules for
-// the languages wayle ships translations in. fluent-bundle picks a
+// the languages lys-shell ships translations in. fluent-bundle picks a
 // bundle's rule set by lookup-negotiating the bundle locale against
 // the rule table with "en" as the default; the coverage test asserts
 // every embedded locale resolves to its own rule set here, so adding a

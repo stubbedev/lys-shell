@@ -149,7 +149,7 @@
 // The region CTA is a shared `.primary` button (see primitives/buttons),
 // sized up for prominence in the otherwise-empty page. Background, colors,
 // roundness, hover and focus all come from the button primitive, so any
-// wayle-settings theme adjustment to button roundness/colors flows through
+// lys-settings theme adjustment to button roundness/colors flows through
 // automatically. Only the size and the hover lift are layered on here.
 .share-picker-region-button {
     min-height: calc(2.25rem * var(--global-scale));

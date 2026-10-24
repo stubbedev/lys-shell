@@ -73,7 +73,7 @@ var DefaultKeybindings = []Binding{
 
 // DefaultMouseBindings is rofi-keys(5)'s mouse table, with one
 // deliberate deviation: rofi accepts a row on MouseDPrimary (a double
-// click) and only selects on a single one. wayle has always accepted on
+// click) and only selects on a single one. lys-shell has always accepted on
 // a single click, so me-accept-entry keeps both; rofi's exact behavior
 // is one `-me-accept-entry MouseDPrimary` away.
 var DefaultMouseBindings = []Binding{

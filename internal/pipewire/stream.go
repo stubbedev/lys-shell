@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/wayle/internal/clib"
+	"github.com/stubbedev/lys-shell/internal/clib"
 )
 
 // Rect is a damaged region in buffer pixels.
@@ -118,7 +118,7 @@ func Start(cfg Config) (*Producer, error) {
 		cfg.FPS = 1
 	}
 	if cfg.Name == "" {
-		cfg.Name = "wayle-screencast"
+		cfg.Name = "lys-shell-screencast"
 	}
 	p := &Producer{
 		lib: l, cfg: cfg, ready: make(chan error, 1), start: time.Now(),
@@ -471,7 +471,7 @@ func (b binding) release() {
 
 // memfd is a size-byte sealed-size shared memory file, mapped.
 func memfd(size int) (int, []byte, error) {
-	fd, err := unix.MemfdCreate("wayle-screencast", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
+	fd, err := unix.MemfdCreate("lys-shell-screencast", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
 	if err != nil {
 		return -1, nil, err
 	}

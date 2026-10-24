@@ -1,4 +1,4 @@
-### Wayle Configuration - CPU Module
+### lys-shell Configuration - CPU Module
 
 ## CPU Module Configuration
 

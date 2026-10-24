@@ -7,7 +7,7 @@ type AppIconSource string
 
 // AppIconSource values.
 const (
-	// Wayle's curated symbolic icons matched by app name.
+	// lys-shell's curated symbolic icons matched by app name.
 	AppIconSourceMapped AppIconSource = "mapped"
 	// Native application icons reported by PulseAudio.
 	AppIconSourceNative AppIconSource = "native"
@@ -108,7 +108,7 @@ func DefaultsVolume() VolumeConfig {
 		ButtonBgColor:    mustColor("bg-surface-elevated"),
 		LeftClick:        ParseClickAction("dropdown:audio"),
 		RightClick:       ClickAction{},
-		MiddleClick:      ParseClickAction("wayle audio output-mute"),
+		MiddleClick:      ParseClickAction("lys-shell audio output-mute"),
 		ScrollUp:         ClickAction{},
 		ScrollDown:       ClickAction{},
 		DropdownAppIcons: AppIconSourceMapped,

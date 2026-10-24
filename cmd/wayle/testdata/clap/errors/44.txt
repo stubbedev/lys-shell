@@ -1,5 +1,0 @@
-args: --version extra
-code: 0
---- stdout
-wayle 0.8.54
---- stderr

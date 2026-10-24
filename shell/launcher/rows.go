@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/internal/pango"
-	engine "github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/lys-shell/internal/pango"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // rowDisplay is RowDisplay: which columns of a row show, split on what,

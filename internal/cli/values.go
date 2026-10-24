@@ -3,7 +3,7 @@ package cli
 import (
 	"strconv"
 
-	"github.com/stubbedev/wayle/internal/rustparse"
+	"github.com/stubbedev/lys-shell/internal/rustparse"
 )
 
 // ValueParser turns one raw command-line value into its typed form

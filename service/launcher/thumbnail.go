@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/internal/mime"
-	"github.com/stubbedev/wayle/internal/shlex"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/shlex"
 )
 
 // Thumbnails for row icons (rofi -preview-cmd and thumbnail://),
@@ -41,7 +41,7 @@ const ThumbnailScheme = "thumbnail://"
 
 // ThumbnailCacheDir is $XDG_CACHE_HOME/thumbnails/normal (an absolute
 // XDG_CACHE_HOME only), else ~/.cache/thumbnails/normal: the shared
-// spec directory, deliberately not a wayle-private one.
+// spec directory, deliberately not a lys-shell-private one.
 func ThumbnailCacheDir() string {
 	base := os.Getenv("XDG_CACHE_HOME")
 	if !filepath.IsAbs(base) {

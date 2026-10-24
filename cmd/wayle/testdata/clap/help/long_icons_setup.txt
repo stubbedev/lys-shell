@@ -1,6 +1,0 @@
-Install bundled icons required by Wayle components
-
-Usage: wayle icons setup
-
-Options:
-  -h, --help  Print help

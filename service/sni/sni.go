@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/stubbedev/wayle/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // Category describes the kind of application behind an item.

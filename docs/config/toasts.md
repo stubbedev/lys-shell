@@ -7,7 +7,7 @@ outline: [2, 3]
 
 <div v-pre>
 
-Toast overlays shown via `wayle toast`.
+Toast overlays shown via `lys-shell toast`.
 
 Toasts are independent of the OSD: they have their own screen position,
 monitor, layer, duration, alignment, and a list of reusable presets.
@@ -16,7 +16,7 @@ monitor, layer, duration, alignment, and a list of reusable presets.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | bool | `true` | Show toast overlays pushed via `wayle toast`. |
+| `enabled` | bool | `true` | Show toast overlays pushed via `lys-shell toast`. |
 | `position` | [`OsdPosition`](/config/types#osd-position) | `"bottom"` | Screen anchor position. |
 | `text-align` | [`OsdTextAlign`](/config/types#osd-text-align) | `"center"` | Horizontal alignment of toast content. |
 | `duration` | u32 | `2500` | Auto-dismiss delay in milliseconds. |
@@ -24,7 +24,7 @@ monitor, layer, duration, alignment, and a list of reusable presets.
 | `margin` | [`Size`](/config/types#size) | `150` | Margin from screen edges. Accepts a scale multiplier or pixels (e.g. `"150px"`). |
 | `border` | bool | `true` | Show a border around the toast. |
 | `layer` | [`Layer`](/config/types#layer) | `"overlay"` | Layer-shell layer toasts are placed on. |
-| `presets` | array of [`ToastPreset`](/config/types#toast-preset) | `[]` | Reusable toast presets, each triggerable with `wayle toast --preset <id>`. |
+| `presets` | array of [`ToastPreset`](/config/types#toast-preset) | `[]` | Reusable toast presets, each triggerable with `lys-shell toast --preset <id>`. |
 
 ## Default configuration
 

@@ -5,13 +5,13 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/shell/screenshot"
+	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
 // screenshotPortal bridges org.freedesktop.impl.portal.Screenshot to the
-// shell's com.wayle.Screenshot1, the service `wayle screenshot` uses
+// shell's dev.stubbe.lys.Screenshot1, the service `lys-shell screenshot` uses
 // (screenshot.rs): an interactive request selects a region, any other
 // grabs the whole multi-monitor screen as xdph's grim does.
 type screenshotPortal struct{ conn *dbus.Conn }

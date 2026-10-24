@@ -349,7 +349,7 @@ func alignment(t reflect.Type) int {
 	case interfacesType:
 		return 4
 	case fileType:
-		return 4 // wayle patch: an 'h'
+		return 4 // lys-shell patch: an 'h'
 	}
 	switch t.Kind() {
 	case reflect.Uint8:

@@ -1,10 +1,10 @@
 { self, ... }:
 {
   flake = {
-    # NixOS: `imports = [ wayle.nixosModules.default ]; programs.wayle.enable = true;`
+    # NixOS: `imports = [ lys-shell.nixosModules.default ]; programs.lys-shell.enable = true;`
     nixosModules.default = import ./nixos-module.nix self;
 
-    # home-manager: `imports = [ wayle.homeManagerModules.default ]; programs.wayle.enable = true;`
+    # home-manager: `imports = [ lys-shell.homeManagerModules.default ]; programs.lys-shell.enable = true;`
     homeManagerModules.default = import ./hm-module.nix self;
   };
 }

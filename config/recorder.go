@@ -6,7 +6,7 @@ package config
 //
 // Click the bar button to start/stop; the dropdown exposes the recording
 // options below. Controllable from the CLI / RPC socket:
-// `wayle recorder start|stop|toggle|pause|status`.
+// `lys-shell recorder start|stop|toggle|pause|status`.
 type RecorderConfig struct {
 	// Icon when idle (not recording).
 	IconIdle string `cfg:"icon-idle"`
@@ -112,7 +112,7 @@ func DefaultsRecorder() RecorderConfig {
 		LabelColor:       mustColor("red"),
 		LabelMaxLength:   0,
 		ButtonBgColor:    mustColor("bg-surface-elevated"),
-		LeftClick:        ParseClickAction("wayle recorder toggle"),
+		LeftClick:        ParseClickAction("lys-shell recorder toggle"),
 		RightClick:       ParseClickAction("dropdown:recorder"),
 		MiddleClick:      ClickAction{},
 		ScrollUp:         ClickAction{},

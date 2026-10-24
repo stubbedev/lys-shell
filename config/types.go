@@ -104,7 +104,7 @@ const (
 // sizePxMax is the largest absolute size (Size::px clamps to it).
 const sizePxMax = 10_000
 
-// Size is a wayle config size: a bare number is a multiplier, a string
+// Size is a lys-shell config size: a bare number is a multiplier, a string
 // like "4px" is absolute pixels
 // (crates/wayle-config/src/schemas/styling/types/validated/size.rs).
 // Like the Rust type it never fails to load: a negative multiplier

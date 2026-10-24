@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/lys-shell/service/pulse"
 )
 
 // sampleRate is cava's fixed capture rate (service.rs's

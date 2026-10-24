@@ -1,5 +1,5 @@
 // Package resources embeds the repository's bundled assets: the
-// symbolic icons `wayle icons setup` installs.
+// symbolic icons `lys-shell icons setup` installs.
 package resources
 
 import "embed"

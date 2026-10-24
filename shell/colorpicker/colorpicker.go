@@ -1,11 +1,11 @@
 // Package colorpicker is the magnifier-loupe color picker
-// (crates/wayle-shell/src/shell/color_picker): a frozen-frame layer
+// (crates/lys-shell/src/shell/color_picker): a frozen-frame layer
 // surface per monitor with a zoom loupe that follows the pointer - the
 // magnified pixels around it, a crosshair on the exact pixel a click
 // picks, a hex readout, and a row of recently picked swatches. A click
 // samples that pixel; Escape cancels. The screenshot host captures the
 // frames and hands them over (it owns the capture path), and the
-// portal's Screenshot.PickColor reaches it over com.wayle.Screenshot1.
+// portal's Screenshot.PickColor reaches it over dev.stubbe.lys.Screenshot1.
 package colorpicker
 
 import (
@@ -18,11 +18,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
-	"github.com/stubbedev/gelm/widget"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/wayle/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
 // Loupe geometry of color_picker/mod.rs.
@@ -73,7 +73,7 @@ type result struct {
 }
 
 // Picker is the picker component. Request is its entry point; the rest
-// runs on the gelm loop goroutine.
+// runs on the lys-ui loop goroutine.
 type Picker struct {
 	app     *app.Application
 	outputs func() []*app.Output
@@ -93,7 +93,7 @@ func New(a *app.Application, outputs func() []*app.Output, font render.Font, his
 }
 
 // HistoryPath is the persisted swatch file:
-// $XDG_DATA_HOME/wayle/color-history, else ~/.local/share/wayle/color-history.
+// $XDG_DATA_HOME/lys-shell/color-history, else ~/.local/share/lys-shell/color-history.
 // Empty when neither variable is set.
 func HistoryPath() string {
 	base := os.Getenv("XDG_DATA_HOME")
@@ -104,7 +104,7 @@ func HistoryPath() string {
 		}
 		base = filepath.Join(home, ".local", "share")
 	}
-	return filepath.Join(base, "wayle", "color-history")
+	return filepath.Join(base, "lys-shell", "color-history")
 }
 
 // Request opens the picker over the frozen frames (keyed by connector)
@@ -134,7 +134,7 @@ func (p *Picker) show(ch chan result, frames map[string]*image.RGBA) {
 			Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 			ExclusiveZone: -1,
 			Keyboard:      app.KeyboardExclusive,
-			Namespace:     "wayle-color-picker",
+			Namespace:     "lys-shell-color-picker",
 			Root:          l,
 			OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 				if keycode == escapeKeycode {

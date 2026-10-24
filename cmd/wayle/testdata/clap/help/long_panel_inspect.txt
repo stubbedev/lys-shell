@@ -1,6 +1,0 @@
-Open the widget inspector for debugging
-
-Usage: wayle panel inspect
-
-Options:
-  -h, --help  Print help

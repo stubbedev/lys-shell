@@ -95,7 +95,7 @@ func TestLoadGreeterLayersAndExplicitCursor(t *testing.T) {
 	if !g.ShowUserList {
 		t.Error("runtime.toml did not override config.toml")
 	}
-	// The whole runtime.toml is the runtime layer, as wayle-greeter's load.
+	// The whole runtime.toml is the runtime layer, as lys-greeter's load.
 	if cfg.Bar.Location != LocationBottom {
 		t.Errorf("runtime [bar] was not applied: %s", cfg.Bar.Location)
 	}
