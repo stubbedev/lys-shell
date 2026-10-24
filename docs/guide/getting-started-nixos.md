@@ -4,12 +4,11 @@ title: Getting started on NixOS
 
 # Getting started on NixOS
 
-Requires NixOS unstable or 25.11. Note that lys-shell was added only recently, so update to the latest version before trying to install it.
+lys-shell is not packaged in nixpkgs; install it from this repository's flake.
 
 ## Install from this flake
 
-To run this repository's build (for unreleased features) instead of the nixpkgs
-package, add the flake as an input and use the modules it exports.
+Add the flake as an input and use the modules it exports.
 
 ```nix
 # flake.nix
@@ -64,10 +63,6 @@ You can also use the package directly
 > Soft dependencies (NetworkManager, bluez, upower, power-profiles-daemon,
 > pipewire/wireplumber, and theming tools like wallust/matugen) are not pulled
 > in automatically — enable the ones your config uses.
-
-## Install package
-
-lys-shell is available as `pkgs.lys-shell` package, but if you use home-manager there is a module so you don't have to install the package manually.
 
 ## home-manager usage
 
@@ -157,7 +152,7 @@ If one of those files does not exist run the following command, replacing `confi
 nix-instantiate --eval --expr 'builtins.fromTOML (builtins.readFile ./config.toml)' | nixfmt
 ```
 
-Then you can copy-paste this into the `services.lys-shell.settings` option provided by the home-manager module.
+Then you can copy-paste this into the `programs.lys-shell.settings` option provided by the home-manager module.
 
 ## Configuration
 
