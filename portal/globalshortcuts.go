@@ -103,7 +103,32 @@ func (g *globalShortcuts) iface() dbusx.Interface {
 
 // shortcutKey ties a compositor registration to its route; the unit
 // separator keeps ("ab", "") apart from ("a", "b").
-func shortcutKey(appID, id string) string { return appID + "\x1f" + id }
+func shortcutKey(name, id string) string { return name + "\x1f" + id }
+
+// shortcutOwner is whose shortcuts a session binds. An identified app
+// owns them by its id: its sessions share the registrations and its
+// later sessions find them allowed. A caller the frontend could not
+// identify (app id "") has no identity to share or remember them under,
+// so its session alone owns them, under a name of its own, and the user
+// is asked each time.
+type shortcutOwner struct {
+	// appID is the app's id, "" for an unidentified caller.
+	appID string
+	// name is the app id the compositor registers the shortcuts under
+	// and the user binds them by.
+	name string
+}
+
+func ownerOf(s *session) shortcutOwner {
+	if s.appID != "" {
+		return shortcutOwner{appID: s.appID, name: s.appID}
+	}
+	parts := strings.Split(string(s.path), "/")
+	return shortcutOwner{name: "unidentified-" + strings.Join(parts[max(len(parts)-2, 0):], "-")}
+}
+
+// identified reports an owner with an app id to remember shortcuts by.
+func (o shortcutOwner) identified() bool { return o.appID != "" }
 
 // device starts the device once.
 func (g *globalShortcuts) device() (shortcutDevice, error) {
@@ -142,12 +167,12 @@ func (g *globalShortcuts) event(key string, pressed bool) {
 	}
 }
 
-// register binds the shortcuts for the session: an app's shortcut
-// registered for another session of it is shared, any other is
+// register binds the shortcuts for the session: an owner's shortcut
+// registered for another of its sessions is shared, any other is
 // registered with the compositor.
-func (g *globalShortcuts) register(dev shortcutDevice, session dbus.ObjectPath, appID string, shortcuts []shortcut) error {
+func (g *globalShortcuts) register(dev shortcutDevice, session dbus.ObjectPath, owner shortcutOwner, shortcuts []shortcut) error {
 	for _, s := range shortcuts {
-		key := shortcutKey(appID, s.ID)
+		key := shortcutKey(owner.name, s.ID)
 		g.mu.Lock()
 		reg, ok := g.regs[key]
 		if ok && !slices.Contains(reg.sessions, session) {
@@ -157,7 +182,7 @@ func (g *globalShortcuts) register(dev shortcutDevice, session dbus.ObjectPath, 
 		if ok {
 			continue
 		}
-		unregister, err := dev.register(key, s.ID, appID, stringOr(s.Props, "description", ""), stringOr(s.Props, "preferred_trigger", ""))
+		unregister, err := dev.register(key, s.ID, owner.name, stringOr(s.Props, "description", ""), stringOr(s.Props, "preferred_trigger", ""))
 		if err != nil {
 			return fmt.Errorf("register %s: %w", s.ID, err)
 		}
@@ -243,8 +268,12 @@ func (g *globalShortcuts) stored() (map[string][]storedShortcut, error) {
 	return all, nil
 }
 
-// remember keeps the app's bound shortcuts for its later sessions.
-func (g *globalShortcuts) remember(appID string, shortcuts []shortcut) error {
+// remember keeps an identified owner's bound shortcuts for its later
+// sessions; an unidentified one's are not kept.
+func (g *globalShortcuts) remember(owner shortcutOwner, shortcuts []shortcut) error {
+	if !owner.identified() {
+		return nil
+	}
 	if g.storePath == "" {
 		return errors.New("no state directory to keep the shortcuts in")
 	}
@@ -258,7 +287,7 @@ func (g *globalShortcuts) remember(appID string, shortcuts []shortcut) error {
 	for i, s := range shortcuts {
 		kept[i] = storedShortcut{ID: s.ID, Description: stringOr(s.Props, "description", "")}
 	}
-	all[appID] = kept
+	all[owner.appID] = kept
 	data, err := json.MarshalIndent(all, "", "  ")
 	if err != nil {
 		return err
@@ -269,16 +298,20 @@ func (g *globalShortcuts) remember(appID string, shortcuts []shortcut) error {
 	return atomicfile.Write(g.storePath, data, 0o600)
 }
 
-// boundBefore is the app's shortcuts from earlier sessions.
-func (g *globalShortcuts) boundBefore(appID string) ([]shortcut, error) {
+// boundBefore is an identified owner's shortcuts from earlier
+// sessions; an unidentified one has none.
+func (g *globalShortcuts) boundBefore(owner shortcutOwner) ([]shortcut, error) {
+	if !owner.identified() {
+		return nil, nil
+	}
 	g.storeMu.Lock()
 	all, err := g.stored()
 	g.storeMu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]shortcut, 0, len(all[appID]))
-	for _, s := range all[appID] {
+	out := make([]shortcut, 0, len(all[owner.appID]))
+	for _, s := range all[owner.appID] {
 		out = append(out, shortcut{ID: s.ID, Props: Vardict{"description": dbus.MakeVariant(s.Description)}})
 	}
 	return out, nil
@@ -287,19 +320,19 @@ func (g *globalShortcuts) boundBefore(appID string) ([]shortcut, error) {
 // triggerDescription tells the user how the shortcut is triggered: by
 // the bind they give it in the compositor's config, with Hyprland's
 // `global` dispatcher.
-func triggerDescription(appID, id string) string {
-	return "Bind in your compositor with global, " + appID + ":" + id
+func triggerDescription(name, id string) string {
+	return "Bind in your compositor with global, " + name + ":" + id
 }
 
 // described are the shortcuts as the results carry them: the
 // description and the trigger description, never the app's preferred
 // trigger, which the compositor's binds decide.
-func described(appID string, shortcuts []shortcut) []shortcut {
+func described(name string, shortcuts []shortcut) []shortcut {
 	out := make([]shortcut, len(shortcuts))
 	for i, s := range shortcuts {
 		out[i] = shortcut{ID: s.ID, Props: Vardict{
 			"description":         dbus.MakeVariant(stringOr(s.Props, "description", "")),
-			"trigger_description": dbus.MakeVariant(triggerDescription(appID, s.ID)),
+			"trigger_description": dbus.MakeVariant(triggerDescription(name, s.ID)),
 		}}
 	}
 	return out
@@ -325,12 +358,26 @@ func mergeShortcuts(existing, incoming []shortcut) []shortcut {
 }
 
 // shortcutLines lists shortcuts for a dialog, one per line.
-func shortcutLines(appID string, shortcuts []shortcut) string {
+func shortcutLines(name string, shortcuts []shortcut) string {
 	lines := make([]string, len(shortcuts))
 	for i, s := range shortcuts {
-		lines[i] = "• " + stringOr(s.Props, "description", s.ID) + ": " + triggerDescription(appID, s.ID)
+		lines[i] = "• " + stringOr(s.Props, "description", s.ID) + ": " + triggerDescription(name, s.ID)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// unidentifiedNote tells the user an unidentified app's shortcuts last
+// for this session only.
+const unidentifiedNote = "\n\nThis app could not be identified, so they last only until it closes this session."
+
+// consentBody lists the shortcuts to allow, noting when they will not
+// be remembered.
+func consentBody(owner shortcutOwner, shortcuts []shortcut) string {
+	body := shortcutLines(owner.name, shortcuts)
+	if !owner.identified() {
+		body += unidentifiedNote
+	}
+	return body
 }
 
 // globalShortcutsObject carries the interface's D-Bus methods.
@@ -365,7 +412,8 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 		warnf("global shortcuts: BindShortcuts: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	before, err := o.g.boundBefore(s.appID)
+	owner := ownerOf(s)
+	before, err := o.g.boundBefore(owner)
 	if err != nil {
 		warnf("global shortcuts: %v", err)
 		return ResponseOther, Vardict{}, nil
@@ -382,13 +430,13 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 	if len(fresh) > 0 {
 		allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 			Title: "Allow global shortcuts?", Subtitle: "They work while the app is in the background.",
-			Body: shortcutLines(s.appID, fresh), GrantLabel: "Allow", DenyLabel: "Deny", Icon: "preferences-desktop-keyboard-shortcuts-symbolic",
+			Body: consentBody(owner, fresh), GrantLabel: "Allow", DenyLabel: "Deny", Icon: "preferences-desktop-keyboard-shortcuts-symbolic",
 		})
 		if code := c.response("global shortcuts", allowed, err); code != ResponseSuccess {
 			return code, Vardict{}, nil
 		}
 	}
-	if err := o.g.register(dev, session, s.appID, shortcuts); err != nil {
+	if err := o.g.register(dev, session, owner, shortcuts); err != nil {
 		warnf("global shortcuts: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
@@ -397,10 +445,10 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 	s.shortcuts.shortcuts = mergeShortcuts(s.shortcuts.shortcuts, shortcuts)
 	merged := slices.Clone(s.shortcuts.shortcuts)
 	s.mu.Unlock()
-	if err := o.g.remember(s.appID, mergeShortcuts(before, shortcuts)); err != nil {
-		warnf("global shortcuts: keeping %s's shortcuts: %v", s.appID, err)
+	if err := o.g.remember(owner, mergeShortcuts(before, shortcuts)); err != nil {
+		warnf("global shortcuts: keeping %s's shortcuts: %v", owner.name, err)
 	}
-	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(described(s.appID, merged))}, nil
+	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(described(owner.name, merged))}, nil
 }
 
 // ListShortcuts replies the session's shortcuts once it bound some,
@@ -415,13 +463,14 @@ func (o globalShortcutsObject) ListShortcuts(_, session dbus.ObjectPath) (uint32
 	s.mu.Lock()
 	bound, list := s.shortcuts.bound, slices.Clone(s.shortcuts.shortcuts)
 	s.mu.Unlock()
+	owner := ownerOf(s)
 	if !bound {
-		if list, err = o.g.boundBefore(s.appID); err != nil {
+		if list, err = o.g.boundBefore(owner); err != nil {
 			warnf("global shortcuts: %v", err)
 			return ResponseOther, Vardict{}, nil
 		}
 	}
-	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(described(s.appID, list))}, nil
+	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(described(owner.name, list))}, nil
 }
 
 // ConfigureShortcuts shows the session's shortcuts and how to give
@@ -437,7 +486,7 @@ func (o globalShortcutsObject) ConfigureShortcuts(session dbus.ObjectPath, paren
 	s.mu.Unlock()
 	body := "This app has no shortcuts bound."
 	if len(list) > 0 {
-		body = shortcutLines(s.appID, list)
+		body = shortcutLines(ownerOf(s).name, list)
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), configureDialogTimeout)

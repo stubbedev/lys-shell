@@ -51,7 +51,14 @@ func props(desc string) Vardict { return Vardict{"description": dbus.MakeVariant
 
 func (r *rig) shortcutSession(t *testing.T, session dbus.ObjectPath) {
 	t.Helper()
-	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, session, "org.app", Vardict{}); code != ResponseSuccess {
+	r.shortcutSessionAs(t, session, "org.app")
+}
+
+// shortcutSessionAs opens a GlobalShortcuts session for appID, "" for
+// a caller the frontend could not identify.
+func (r *rig) shortcutSessionAs(t *testing.T, session dbus.ObjectPath, appID string) {
+	t.Helper()
+	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, session, appID, Vardict{}); code != ResponseSuccess {
 		t.Fatalf("CreateSession = %d", code)
 	}
 }
@@ -219,6 +226,47 @@ func TestGlobalShortcutsRememberTheBinds(t *testing.T) {
 	r.shortcutSession(t, sessC)
 	if code, _ := r.bind(t, sessC, shortcut{"other", props("Other")}); code != ResponseCancelled {
 		t.Errorf("a denied bind = %d, want cancelled", code)
+	}
+}
+
+// Callers the frontend could not identify (app id "") share nothing:
+// each session registers its shortcuts under a name of its own and
+// hears only its own presses, every bind asks and says the shortcuts
+// will not be kept, and none are remembered for a later session. An
+// identified app is untouched by them.
+func TestGlobalShortcutsUnidentifiedAppsShareNothing(t *testing.T) {
+	r, f, d := shortcutsRig(t, nil)
+	r.shortcutSessionAs(t, sessA, "")
+	r.shortcutSessionAs(t, sessB, "")
+	if code, bound := r.bind(t, sessA, shortcut{"toggle", props("A")}); code != ResponseSuccess ||
+		len(bound) != 1 || !strings.Contains(stringOr(bound[0].Props, "trigger_description", ""), "global, unidentified-1_2-a:toggle") {
+		t.Fatalf("bind = %d %v", code, bound)
+	}
+	if body := d.asked.Load()[0].(portaldialogs.AccessRequest).Body; !strings.Contains(body, unidentifiedNote) {
+		t.Errorf("an unidentified app's consent says %q", body)
+	}
+	r.bind(t, sessB, shortcut{"toggle", props("B")})
+	if got := f.registered.Load(); !slices.Equal(got, []string{"unidentified-1_2-a/toggle|A|", "unidentified-1_2-b/toggle|B|"}) {
+		t.Errorf("registered %v, want one per session", got)
+	}
+	if asked := len(d.callers.Load()); asked != 2 {
+		t.Errorf("asked %d times, want each unidentified bind asked", asked)
+	}
+	f.onEvent.Load()(shortcutKey("unidentified-1_2-a", "toggle"), true)
+	if s := r.shortcutSignals(t); len(s) != 1 || s[0].Body[0] != sessA {
+		t.Errorf("a press of A's shortcut signalled %v", s)
+	}
+
+	r.shortcutSessionAs(t, sessC, "")
+	if got := r.listShortcuts(t, sessC); len(got) != 0 {
+		t.Errorf("a later unidentified session lists %v", shortcutIDs(got))
+	}
+	r.bind(t, sessC, shortcut{"toggle", props("C")})
+	if asked := len(d.callers.Load()); asked != 3 {
+		t.Error("an unidentified bind was taken as allowed by an earlier one")
+	}
+	if all, err := r.backend.shortcuts.stored(); err != nil || len(all) != 0 {
+		t.Errorf("stored %v, %v: unidentified shortcuts were kept", all, err)
 	}
 }
 
