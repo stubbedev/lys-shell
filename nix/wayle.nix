@@ -56,7 +56,7 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a gelm bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-9BXA0753ba6j+8k9YkUKJsT3ze1GuFoUZBoyjKssB8g=";
+  vendorHash = "sha256-51ku3cs4jMBteTn+n0dkvMOaX/SJduKWEGj0gPULtgQ=";
 
   subPackages = [
     "cmd/wayle"
