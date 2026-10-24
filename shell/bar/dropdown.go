@@ -147,8 +147,8 @@ func (r *dropdownRegistry) instance(name string, build func(ModuleContext) widge
 	// The card tweens its height when a page of another size shows
 	// (watch_pages, dropdown_resize::animate_height): every stack
 	// sized to its visible page interpolates.
-	walkStacks(content, func(st *widget.Stack) {
-		if !st.Homogeneous() {
+	walkPages(content, func(w widget.Widget) {
+		if st, ok := w.(*widget.Stack); ok && !st.Homogeneous() {
 			st.SetInterpolateSize(true)
 		}
 	})
@@ -264,12 +264,11 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		return fmt.Errorf("dropdown %q has no content", name)
 	}
 	// The panel takes its [dropdowns.<name>] size (or the built-in base
-	// at the global scale), its content clamped to the monitor less the
-	// Rust registry's scrolled-content margin, the popover surface to
-	// the monitor less its own.
+	// at the global scale) as its surface floor, clamped to the monitor
+	// as the Rust registry's clamp_height does at every popup.
 	panel, _ := content.(*panelBox)
 	if panel != nil && monH > 0 {
-		panel.maxH = monH - 180
+		panel.clamp(monH)
 	}
 	cfg := dropdownPopover(r.cfg, bound, content, monH)
 	// The button's label holds still while its dropdown is open

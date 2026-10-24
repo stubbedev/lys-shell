@@ -23,11 +23,13 @@ func panelLayout(p *panelBox) (surface int, card render.Rect) {
 	return sz.H, p.child.(interface{ Bounds() render.Rect }).Bounds()
 }
 
-func TestPanelReservesTheTallestPageAndGrowsTheCard(t *testing.T) {
+// The card is its visible page's natural height, anchored at the top;
+// the surface reserves the tallest page.
+func TestPanelCardTakesItsPageAndTheSurfaceReservesTheTallest(t *testing.T) {
 	p, s := pagedPanel(300, widget.NewSpacer(10, 500))
 	surface, card := panelLayout(p)
-	if surface != 500 || card.H != 300 || card.Y != 0 {
-		t.Errorf("short page: surface %d card %+v, want 500 reserved and a 300 card at the top", surface, card)
+	if surface != 500 || card.H != 100 || card.Y != 0 {
+		t.Errorf("short page: surface %d card %+v, want 500 reserved and the 100 page's card at the top", surface, card)
 	}
 	s.Show("tall")
 	surface, card = panelLayout(p)
@@ -36,19 +38,35 @@ func TestPanelReservesTheTallestPageAndGrowsTheCard(t *testing.T) {
 	}
 }
 
-func TestPanelIgnoresPagesThatScroll(t *testing.T) {
-	p, s := pagedPanel(300, widget.NewScroll(widget.NewSpacer(10, 900)))
-	s.Show("tall")
+// The configured height is the popover's height request: it floors the
+// surface, never the card, which stays its content's height (the Rust
+// audio dropdown's 512 leaves a ~300px card and a transparent rest).
+func TestPanelConfiguredHeightFloorsOnlyTheSurface(t *testing.T) {
+	p, _ := pagedPanel(600, widget.NewSpacer(10, 500))
 	surface, card := panelLayout(p)
-	if surface != 300 || card.H != 300 {
-		t.Errorf("scrolling page: surface %d card %+v, want the floor (the list scrolls)", surface, card)
+	if surface != 600 || card.H != 100 {
+		t.Errorf("surface %d card %+v, want the 600 floor and the 100 card", surface, card)
 	}
-	// Beside a page that does need 500, the list still asks only for
-	// the floor: the surface reserves 500, the card stays 300.
-	s.Add("form", widget.NewSpacer(10, 500))
-	surface, card = panelLayout(p)
-	if surface != 500 || card.H != 300 {
-		t.Errorf("list beside a tall form: surface %d card %+v, want 500 reserved and the 300 card", surface, card)
+}
+
+// Clamped to a monitor, every scroll propagates its content's natural
+// height up to the scrolled cap (find_and_clamp_scrolled_windows): a
+// list sizes the card instead of scrolling inside a fixed one, and
+// scrolls only past the cap.
+func TestClampedPanelScrollsSizeTheCard(t *testing.T) {
+	list := widget.NewScroll(widget.NewSpacer(10, 400))
+	p, s := pagedPanel(300, list)
+	p.clamp(1000)
+	s.Show("tall")
+	if surface, card := panelLayout(p); card.H != 400 || surface != 400 {
+		t.Errorf("a 400px list: surface %d card %+v, want both 400", surface, card)
+	}
+	long := widget.NewScroll(widget.NewSpacer(10, 2000))
+	p, s = pagedPanel(300, long)
+	p.clamp(1000)
+	s.Show("tall")
+	if _, card := panelLayout(p); card.H != 1000-panelMonitorMargin-panelScrollMargin {
+		t.Errorf("a 2000px list: card %+v, want the scrolled cap", card)
 	}
 }
 

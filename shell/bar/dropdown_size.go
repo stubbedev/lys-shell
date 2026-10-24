@@ -76,25 +76,24 @@ func resolveDimension(override *config.Size, base, scale float64) int {
 	return int(math.Round(base * scale))
 }
 
-// panelBox gives a dropdown its panel: the card fills the width and the
-// configured height (h < 0: the content's natural height, a
-// content-sized dropdown). A page stack sized to its visible page (the
-// network VPN editor's) grows the card past that by however much the
-// visible page outgrows the room the stack gets, tweened by the stack's
-// interpolate-size (dropdown_resize::animate_height).
+// panelBox gives a dropdown its panel, the Rust registry's overlay: the
+// card fills the surface's width and takes its natural height, anchored
+// at the bar's edge (the revealer's valign Start over the spacer), so a
+// page switch resizes it, tweened by the stack's interpolate-size
+// (dropdown_resize::animate_height). The configured size floors the
+// surface (the popover's width and height requests), not the card.
 //
-// A mapped popup cannot resize mid-grab without flicker, so the panel
+// A mapped popup cannot resize mid-grab without flicker, so the surface
 // reserves, up front, the room every stack's tallest page needs
 // (dropdown_resize::measure, the worst stack, not the sum): the card
-// moves inside that fixed surface, anchored at the bar's edge, and the
-// transparent rest closes the dropdown on a click, as the Rust spacer's
-// gesture does.
+// moves inside that fixed surface, and the transparent rest closes the
+// dropdown on a click, as the Rust spacer's gesture does.
 type panelBox struct {
 	widget.Base
 	w, h  int
 	child widget.Widget
-	// maxH caps the card's height (the monitor less the Rust registry's
-	// scrolled-content margin); <= 0 takes the measure constraints.
+	// maxH caps the surface and the card (the monitor less 100, the
+	// registry's max_allowed_height); <= 0 takes the measure constraints.
 	maxH int
 	pop  popoverHandle
 	// dismiss closes with the exit animation; the registry sets it per
@@ -106,31 +105,66 @@ func newPanelBox(w, h int, child widget.Widget) *panelBox {
 	return &panelBox{w: w, h: h, child: child}
 }
 
-// layout is the card's height and the surface's at width w: the base
-// (the configured height, else the content's natural one) plus the
-// worst stack shortfall - its visible page's floor, then its neediest
-// page's, against the height the stack is given at the base.
+// The registry's clamp_height margins below the monitor height: the
+// surface's, and the scrolled content's within it.
+const (
+	panelMonitorMargin = 100
+	panelScrollMargin  = 80
+)
+
+// clamp is clamp_height for a monitor monH tall: the surface caps at
+// the monitor less its margin, and every scroll the content holds now
+// asks for its content's natural height up to the surface cap less the
+// scrolled margin (find_and_clamp_scrolled_windows), so a list sizes
+// the card instead of scrolling inside a fixed one.
+func (p *panelBox) clamp(monH int) {
+	p.maxH = monH - panelMonitorMargin
+	scrollMax := p.maxH - panelScrollMargin
+	walkPages(p.child, func(w widget.Widget) {
+		if s, ok := w.(*widget.Scroll); ok {
+			s.PropagateNaturalHeight = true
+			s.SetMaxContentHeight(scrollMax)
+		}
+	})
+}
+
+// walkPages visits w and everything under it, every page of a stack
+// included (the Rust walks follow GTK's child list, where a stack's
+// hidden pages are children too; a gelm Stack lists only its visible
+// page).
+func walkPages(w widget.Widget, visit func(widget.Widget)) {
+	visit(w)
+	if s, ok := w.(*widget.Stack); ok {
+		for _, name := range s.Order() {
+			walkPages(s.Page(name), visit)
+		}
+		return
+	}
+	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
+		for _, k := range c.Children() {
+			walkPages(k, visit)
+		}
+	}
+}
+
+// layout is the card's height and the surface's at width w: the card
+// is the content's natural height; the surface adds the worst stack's
+// shortfall - its neediest page against the height the stack is given
+// now (surface_height) - and floors at the configured height.
 func (p *panelBox) layout(w, maxH int) (card, surface int) {
 	if p.maxH > 0 {
 		maxH = min(maxH, p.maxH)
 	}
 	con := widget.Constraints{Min: widget.Size{W: w}, Max: widget.Size{W: w, H: maxH}}
-	base := p.h
-	if base < 0 {
-		base = p.child.Measure(con).H
-	}
-	base = min(base, maxH)
-	p.fit(w, base)
-	grow, reserve := 0, 0
-	walkStacks(p.child, func(s *widget.Stack) {
-		// A page needs its natural height less what it gives up (a
-		// scrolled list gives way): GTK's natural height, where a
-		// scrolled window asks for none.
-		given := s.Bounds().H
-		grow = max(grow, s.Measure(con).H-s.Shrinkable()-given)
-		reserve = max(reserve, s.PageFloor(con)-given)
+	card = min(p.child.Measure(con).H, maxH)
+	p.fit(w, card)
+	reserve := 0
+	walkPages(p.child, func(w widget.Widget) {
+		if s, ok := w.(*widget.Stack); ok {
+			reserve = max(reserve, s.PageFloor(con)-s.Bounds().H)
+		}
 	})
-	return min(base+grow, maxH), min(base+reserve, maxH)
+	return card, min(max(card+reserve, p.h), maxH)
 }
 
 // fit lays the content out in a w x h card at the origin.
@@ -147,19 +181,6 @@ func (p *panelBox) Measure(con widget.Constraints) widget.Size {
 	w = min(w, con.Max.W)
 	_, surface := p.layout(w, con.Max.H)
 	return widget.Size{W: w, H: surface}
-}
-
-// walkStacks visits every page stack under w (through each stack's
-// visible page).
-func walkStacks(w widget.Widget, visit func(*widget.Stack)) {
-	if s, ok := w.(*widget.Stack); ok {
-		visit(s)
-	}
-	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
-		for _, k := range c.Children() {
-			walkStacks(k, visit)
-		}
-	}
 }
 
 func (p *panelBox) Arrange(r render.Rect) {
