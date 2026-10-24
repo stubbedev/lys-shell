@@ -1,14 +1,14 @@
 # Wayle config JSON Schema
 
 `wayle-config.schema.json` is the JSON Schema for the complete Wayle
-configuration. It is generated from the Rust config types and kept current by
-CI (the `Config schema` job fails if this file drifts from the generated
-output).
+configuration. It is generated from the config types in `config/` and kept current by
+`just check` (its `schema-check` step fails if this file drifts from the
+generated output).
 
 Regenerate it after changing any config type:
 
 ```sh
-cargo run -p wayle -- config schema --stdout | jq -S . > schema/wayle-config.schema.json
+just schema
 ```
 
 ## Editor hints

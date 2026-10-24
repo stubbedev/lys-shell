@@ -10,7 +10,7 @@ layout: doc
 
 # Wayle Documentation
 
-A Wayland desktop shell with the bar, notifications, OSD, wallpaper, and device controls built in. Written in Rust with GTK4 and Relm4.
+A Wayland desktop shell with the bar, notifications, OSD, wallpaper, and device controls built in. Written in Go on [gelm](https://github.com/stubbedev/gelm), a pure-Go Wayland toolkit.
 
 
 <div style="display: flex; gap: 16px; align-items: center;">

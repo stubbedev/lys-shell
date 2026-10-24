@@ -5,8 +5,8 @@
 
 override_dh_auto_build:
 
-# The archive already contains built binaries, so there is no useful DWARF
-# multifile optimization for debhelper to perform here.
+# The archive already contains built (stripped, static Go) binaries, so
+# there is no useful DWARF multifile optimization for debhelper to perform.
 override_dh_dwz:
 
 # Do not emit a separate dbgsym package for repackaged upstream binaries.
@@ -15,11 +15,19 @@ override_dh_strip:
 
 override_dh_auto_install:
 	install -d debian/wayle/usr/bin
-	install -m 0755 wayle debian/wayle/usr/bin/wayle
-	install -m 0755 wayle-settings debian/wayle/usr/bin/wayle-settings
+	install -m 0755 wayle wayle-greeter wayle-lock wayle-settings debian/wayle/usr/bin/
 
 	install -d debian/wayle/usr/lib/systemd/user
-	install -m 0644 wayle.service debian/wayle/usr/lib/systemd/user/wayle.service
+	install -m 0644 wayle.service xdg-desktop-portal-wayle.service debian/wayle/usr/lib/systemd/user/
+
+	install -d debian/wayle/usr/share/xdg-desktop-portal/portals
+	install -m 0644 wayle.portal debian/wayle/usr/share/xdg-desktop-portal/portals/wayle.portal
+	install -m 0644 wayle-portals.conf debian/wayle/usr/share/xdg-desktop-portal/wayle-portals.conf
+	install -d debian/wayle/usr/share/dbus-1/services
+	install -m 0644 org.freedesktop.impl.portal.desktop.wayle.service debian/wayle/usr/share/dbus-1/services/
+
+	install -d debian/wayle/usr/share/polkit-1/actions
+	install -m 0644 dev.stubbe.wayle.greeter.policy debian/wayle/usr/share/polkit-1/actions/
 
 	install -d debian/wayle/usr/share/applications
 	install -m 0644 com.wayle.settings.desktop debian/wayle/usr/share/applications/com.wayle.settings.desktop

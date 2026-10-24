@@ -1,5 +1,6 @@
-# Prebuilt upstream binary: no source to compile, so no useful debuginfo
-# can be produced. Disable debug_package to avoid an empty subpackage.
+# Prebuilt upstream binaries (stripped, static Go): no source to compile, so
+# no useful debuginfo can be produced. Disable debug_package to avoid an
+# empty subpackage.
 %global debug_package %{nil}
 %global _build_id_links none
 
@@ -7,7 +8,7 @@ Name:           wayle
 Version:        @VERSION@
 Release:        1%{?dist}
 Summary:        Wayland Elements - A compositor agnostic shell with extensive customization
-License:        Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND CC0-1.0 AND CDLA-Permissive-2.0 AND ISC AND MIT AND OpenSSL AND Unicode-3.0 AND Zlib
+License:        MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND CC0-1.0 AND blessing
 URL:            https://wayle.app/
 Source0:        https://github.com/wayle-rs/wayle/releases/download/v%{version}/wayle-%{version}-%{_arch}-linux.tar.gz
 ExclusiveArch:  x86_64
@@ -15,6 +16,19 @@ ExclusiveArch:  x86_64
 BuildRequires:  desktop-file-utils
 BuildRequires:  systemd-rpm-macros
 Requires:       hicolor-icon-theme
+# Loaded at runtime through purego, so rpm finds no ELF dependency on them.
+Requires:       glib2
+Requires:       gstreamer1
+Requires:       pam
+Requires:       pipewire-libs
+Requires:       mesa-libgbm
+Recommends:     xdg-desktop-portal
+Recommends:     pipewire-gstreamer
+Recommends:     gstreamer1-plugins-base
+Recommends:     gstreamer1-plugins-good
+Recommends:     gstreamer1-plugins-bad-free
+Recommends:     gstreamer1-plugins-ugly-free
+Recommends:     gstreamer1-plugin-libav
 Suggests:       pipewire-pulseaudio
 Suggests:       wireplumber
 Suggests:       NetworkManager
@@ -33,11 +47,19 @@ Wayland Elements - A compositor agnostic shell with extensive customization
 
 %install
 install -d %{buildroot}%{_bindir}
-install -m 0755 wayle %{buildroot}%{_bindir}/wayle
-install -m 0755 wayle-settings %{buildroot}%{_bindir}/wayle-settings
+install -m 0755 wayle wayle-greeter wayle-lock wayle-settings %{buildroot}%{_bindir}/
 
 install -d %{buildroot}%{_userunitdir}
-install -m 0644 wayle.service %{buildroot}%{_userunitdir}/wayle.service
+install -m 0644 wayle.service xdg-desktop-portal-wayle.service %{buildroot}%{_userunitdir}/
+
+install -d %{buildroot}%{_datadir}/xdg-desktop-portal/portals
+install -m 0644 wayle.portal %{buildroot}%{_datadir}/xdg-desktop-portal/portals/wayle.portal
+install -m 0644 wayle-portals.conf %{buildroot}%{_datadir}/xdg-desktop-portal/wayle-portals.conf
+install -d %{buildroot}%{_datadir}/dbus-1/services
+install -m 0644 org.freedesktop.impl.portal.desktop.wayle.service %{buildroot}%{_datadir}/dbus-1/services/
+
+install -d %{buildroot}%{_datadir}/polkit-1/actions
+install -m 0644 dev.stubbe.wayle.greeter.policy %{buildroot}%{_datadir}/polkit-1/actions/
 
 install -d %{buildroot}%{_datadir}/applications
 install -m 0644 com.wayle.settings.desktop %{buildroot}%{_datadir}/applications/com.wayle.settings.desktop
@@ -63,8 +85,15 @@ install -m 0644 completions/wayle.fish %{buildroot}%{_datadir}/fish/vendor_compl
 %files
 %license LICENSE
 %{_bindir}/wayle
+%{_bindir}/wayle-greeter
+%{_bindir}/wayle-lock
 %{_bindir}/wayle-settings
 %{_userunitdir}/wayle.service
+%{_userunitdir}/xdg-desktop-portal-wayle.service
+%{_datadir}/xdg-desktop-portal/portals/wayle.portal
+%{_datadir}/xdg-desktop-portal/wayle-portals.conf
+%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.wayle.service
+%{_datadir}/polkit-1/actions/dev.stubbe.wayle.greeter.policy
 %{_datadir}/applications/com.wayle.settings.desktop
 %{_datadir}/applications/com.wayle.vpn-sso-callback.desktop
 %{_datadir}/icons/hicolor/scalable/apps/wayle-settings.svg

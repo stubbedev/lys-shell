@@ -7,9 +7,6 @@ on:
 permissions:
     contents: write
 
-env:
-    CARGO_TERM_COLOR: always
-
 jobs:
     changelog:
         name: Changelog
@@ -29,16 +26,16 @@ jobs:
                   tag: ${{ github.ref_name }}
                   excludeTypes: build,chore,style
 
-            - name: Verify tag matches Cargo.toml version
+            - name: Verify tag matches internal/version
               run: |
                   VERSION="${GITHUB_REF_NAME#v}"
-                  CARGO_VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-                  if [ -z "$CARGO_VERSION" ]; then
-                      echo "Failed to parse version from Cargo.toml"
+                  SOURCE="$(./scripts/ci/version.sh)"
+                  if [ -z "$SOURCE" ]; then
+                      echo "Failed to read the version from internal/version/version.go"
                       exit 1
                   fi
-                  if [ "$VERSION" != "$CARGO_VERSION" ]; then
-                      echo "Tag $VERSION does not match Cargo.toml version $CARGO_VERSION"
+                  if [ "$VERSION" != "$SOURCE" ]; then
+                      echo "Tag $VERSION does not match internal/version $SOURCE"
                       exit 1
                   fi
 
@@ -51,130 +48,83 @@ jobs:
                   draft: true
                   token: ${{ secrets.GITHUB_TOKEN }}
 
-    # There is no `build` job and no `nix` job here on purpose.
-    #
-    # `build` used to compile the release binaries a fourth time, in the Arch
-    # container, purely to produce the generic tar.gz. The Ubuntu job below
-    # already compiles the same binaries and builds the same archive on its way
-    # to the .deb — and links against an *older* glibc than Arch does, so its
-    # tarball runs on strictly more systems. It uploads the archive now.
-    #
-    # `nix` used to `nix build` + `xilo push` the tag. The tag always points at
-    # the `chore: release` commit on master (`just _release-checks` refuses
-    # anything else), and the push of that commit runs ci.yml's `nix` job, which
-    # builds the identical derivation and pushes the identical closure to xilo.
-    # Two ~15 min builds of the same store path, racing each other. The cache
-    # push lives in ci.yml; releasing does not repeat it.
-
-    ubuntu:
-        name: Package (Ubuntu ${{ matrix.arch }})
+    # The binaries are static Go (gelm dlopens what it needs), so one build
+    # serves the archive and both packages. The nix closure is not built
+    # here: the tag points at the release commit on master, whose push
+    # already ran ci.yml's nix job and pushed that closure to xilo.
+    archive:
+        name: Archive + deb
         needs: changelog
         runs-on: ubuntu-latest
-        container:
-            image: ghcr.io/stubbedev/wayle/ci-ubuntu:latest
-        strategy:
-            matrix:
-                arch: [x86_64]
-        env:
-            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Checkout repository
-              uses: actions/checkout@v7
+            - uses: actions/checkout@v7
+
+            - uses: cachix/install-nix-action@v31
               with:
-                  submodules: recursive
+                  extra_nix_config: |
+                      experimental-features = nix-command flakes
+                      extra-substituters = https://nix.stubbe.dev/c/default/default
+                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
 
-            - name: Fix Git ownership
-              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-            # Restore master's cargo cache, never save. A tag run's cache is
-            # scoped to the tag ref, so nothing can ever read it back — it is
-            # write-only, and it still counts against the repo's hard 10 GiB
-            # budget, evicting caches that runs on master can still use.
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  save-if: false
-
-            - name: Build release binaries
-              run: cargo build --release --locked
+            - name: Build binaries
+              run: nix develop --accept-flake-config -c just build
 
             - name: Build archive
-              run: ./scripts/ci/build-archive.sh target/release "${GITHUB_REF_NAME#v}" "${{ matrix.arch }}"
+              run: ./scripts/ci/build-archive.sh dist "${GITHUB_REF_NAME#v}" x86_64
 
-            - name: Build Ubuntu package
+            - name: Build Debian package
               run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends debhelper desktop-file-utils dpkg-dev
                   VERSION="${GITHUB_REF_NAME#v}"
-                  ./scripts/ci/build-packages.sh "wayle-${VERSION}-${{ matrix.arch }}-linux.tar.gz" "${VERSION}" deb
+                  ./scripts/ci/build-packages.sh "wayle-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" deb
 
-            # The generic tarball ships from here, not from a separate Arch
-            # build: same binaries, older glibc, one less full compile per tag.
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: archive
+                  path: wayle-*-x86_64-linux.tar.gz
+
             - name: Upload to release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   VERSION="${GITHUB_REF_NAME#v}"
                   gh release upload "${{ github.ref_name }}" \
-                    "wayle-${VERSION}-${{ matrix.arch }}-linux.tar.gz" \
+                    "wayle-${VERSION}-x86_64-linux.tar.gz" \
                     debbuild/DEBS/*/*.deb \
                     --clobber
 
-    fedora:
-        name: Package (Fedora ${{ matrix.arch }})
-        needs: changelog
+    rpm:
+        name: Package (Fedora)
+        needs: archive
         runs-on: ubuntu-latest
         container:
-            image: ghcr.io/stubbedev/wayle/ci-fedora:latest
-        strategy:
-            matrix:
-                arch: [x86_64]
-        env:
-            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
+            image: fedora:latest
         steps:
-            - name: Checkout repository
-              uses: actions/checkout@v7
+            - uses: actions/checkout@v7
+
+            - uses: actions/download-artifact@v4
               with:
-                  submodules: recursive
-
-            - name: Fix Git ownership
-              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-            - name: Install RPM build dependencies
-              run: |
-                  VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-                  DATE="$(LC_ALL=C date '+%a %b %d %Y')"
-                  sed \
-                    -e "s/@VERSION@/${VERSION}/g" \
-                    -e "s/@DATE@/${DATE}/g" \
-                    packaging/rpm/wayle.spec.in >/tmp/wayle.spec
-                  dnf -y --setopt=install_weak_deps=False builddep /tmp/wayle.spec
-
-            # Restore only — see the Ubuntu job for why a tag must not save.
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  save-if: false
-
-            - name: Build release binaries
-              run: cargo build --release --locked
-
-            - name: Build archive
-              run: ./scripts/ci/build-archive.sh target/release "${GITHUB_REF_NAME#v}" "${{ matrix.arch }}"
+                  name: archive
 
             - name: Build Fedora package
               run: |
+                  dnf -y --setopt=install_weak_deps=False install rpm-build desktop-file-utils systemd-rpm-macros gh
                   VERSION="${GITHUB_REF_NAME#v}"
-                  ./scripts/ci/build-packages.sh "wayle-${VERSION}-${{ matrix.arch }}-linux.tar.gz" "${VERSION}" rpm
+                  ./scripts/ci/build-packages.sh "wayle-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" rpm
 
             - name: Upload to release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  ARCH="${{ matrix.arch }}"
                   gh release upload "${{ github.ref_name }}" \
-                    rpmbuild/RPMS/${ARCH}/*.rpm \
+                    --repo "${{ github.repository }}" \
+                    rpmbuild/RPMS/x86_64/*.rpm \
                     --clobber
 
     checksums:
         name: Checksums
-        needs: [changelog, ubuntu, fedora]
+        needs: [changelog, archive, rpm]
         runs-on: ubuntu-latest
         steps:
             - name: Download assets

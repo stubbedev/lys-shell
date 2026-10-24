@@ -3,7 +3,7 @@ package i18n
 import (
 	"testing"
 
-	greeterlocales "github.com/stubbedev/wayle/crates/wayle-greeter/locales"
+	greeterlocales "github.com/stubbedev/wayle/i18n/locales/greeter"
 )
 
 // TestGreeterDomain pins the greeter's file-per-locale domain: the

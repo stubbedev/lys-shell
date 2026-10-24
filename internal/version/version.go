@@ -1,7 +1,7 @@
-// Package version carries the wayle release version the Go binary
-// reports; it tracks the workspace version in Cargo.toml while both
-// trees ship, and version_test.go holds the two together.
+// Package version is the wayle release version: what `wayle --version`
+// and the notification server report, and what nix/wayle.nix reads for
+// the package version. `just release-*` bumps it.
 package version
 
-// Version is the wayle release version (Cargo.toml workspace.package).
+// Version is the wayle release version.
 const Version = "0.8.54"

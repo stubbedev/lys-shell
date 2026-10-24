@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// oracleSignal is testdata/oracle.c's signal_at: a rising chirp on the
+// oracleSignal is the C driver's signal_at (testdata/README.md): a rising chirp on the
 // left, a falling one on the right, under a beating amplitude.
 func oracleSignal(ch int, i int64) float64 {
 	t := float64(i) / 44100.0
@@ -45,7 +45,7 @@ func readOracle(t *testing.T, name string) [][]float64 {
 	return frames
 }
 
-// runOracle replays oracle.c's driver on the Go plan: chunks of 512
+// runOracle replays the C driver on the Go plan: chunks of 512
 // interleaved frames, every fifth delivery empty.
 func runOracle(t *testing.T, p *Plan, channels, frames int) [][]float64 {
 	t.Helper()

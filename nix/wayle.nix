@@ -11,7 +11,7 @@
 let
   # GStreamer plugins the recorder's pipelines load at runtime
   # (pipewiresrc, v4l2src, x264enc, opusenc, mp4/matroska/webm mux,
-  # compositor), as in wayle-rust.nix.
+  # compositor).
   gstPlugins = (with gst_all_1; [
     gstreamer
     gst-plugins-base
@@ -21,9 +21,27 @@ let
     gst-libav
   ]) ++ [ pipewire ];
 
-  # Only the Go tree, so editing the Rust crates, docs or nix files does
-  # not rebuild it. The three locales packages live under crates/ and embed
-  # the Fluent files the Rust crates share.
+  # The libraries the binaries dlopen through purego: libgstreamer and
+  # libglib (recorder), libpam (lock screen), libpipewire (the ScreenCast
+  # portal) and libgbm (its dmabuf path).
+  libs = [
+    gst_all_1.gstreamer
+    glib
+    pam
+    pipewire
+    libgbm
+  ];
+
+  # internal/version is the one place the release version lives.
+  version =
+    let
+      line = lib.findFirst (lib.hasPrefix "const Version = ") (throw "internal/version/version.go declares no Version") (
+        lib.splitString "\n" (builtins.readFile ../internal/version/version.go)
+      );
+    in
+    lib.removeSuffix "\"" (lib.removePrefix "const Version = \"" line);
+
+  # Only the Go tree, so editing docs or nix files does not rebuild it.
   src = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [
@@ -42,16 +60,12 @@ let
       ../strftime
       ../styling
       ../third_party
-      ../crates/wayle-greeter/locales
-      ../crates/wayle-i18n/locales
-      ../crates/wayle-shell-core/locales
     ];
   };
 in
 buildGoModule {
   pname = "wayle";
-  version = "0.0.0-go";
-  inherit src;
+  inherit version src;
 
   # The module cache's hash: every go.mod change (a gelm bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
@@ -70,25 +84,22 @@ buildGoModule {
   env.CGO_ENABLED = "0";
   ldflags = [ "-s" "-w" ];
 
-  # The suite runs in `just go-check` (it needs a compositor and D-Bus).
+  # The suite runs in `just check` (it needs a compositor and D-Bus).
   doCheck = false;
 
   nativeBuildInputs = [ makeWrapper ];
 
-  # The binaries dlopen libgstreamer and libglib (recorder), libpam (lock
-  # screen) and libpipewire (the ScreenCast portal) through purego, and
-  # the recorder finds its GStreamer plugins on
-  # GST_PLUGIN_SYSTEM_PATH_1_0.
+  # The dlopened libraries on the loader path, and the recorder's
+  # GStreamer plugins on GST_PLUGIN_SYSTEM_PATH_1_0.
   postFixup = ''
     for bin in wayle wayle-greeter wayle-lock wayle-settings; do
       wrapProgram $out/bin/$bin \
-        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire libgbm ]}" \
+        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libs}" \
         --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
     done
   '';
 
-  # What wayle-rust.nix installs beside the binaries, which the NixOS and
-  # home-manager modules read from the package.
+  # What the NixOS and home-manager modules read from the package.
   postInstall = ''
     # Handler for the globalprotectcallback: URI scheme (GlobalProtect
     # SAML sign-in answers).
@@ -118,8 +129,11 @@ buildGoModule {
     install -Dm0644 resources/wayle-portals.conf -t $out/share/wayle
   '';
 
+  # The dev shell puts the same libraries and plugins on its paths.
+  passthru = { inherit libs gstPlugins; };
+
   meta = {
-    description = "Wayland desktop shell (the Go rewrite on gelm)";
+    description = "Wayland desktop shell";
     homepage = "https://github.com/stubbedev/wayle";
     license = lib.licenses.mit;
     mainProgram = "wayle";

@@ -14,9 +14,21 @@ Vcs-Browser: https://github.com/wayle-rs/wayle
 Package: wayle
 Architecture: amd64 arm64
 Depends:
- ${shlibs:Depends},
  ${misc:Depends},
- hicolor-icon-theme
+ hicolor-icon-theme,
+ libglib2.0-0t64 | libglib2.0-0,
+ libgstreamer1.0-0,
+ libpam0g,
+ libpipewire-0.3-0t64 | libpipewire-0.3-0,
+ libgbm1
+Recommends:
+ xdg-desktop-portal,
+ gstreamer1.0-pipewire,
+ gstreamer1.0-plugins-base,
+ gstreamer1.0-plugins-good,
+ gstreamer1.0-plugins-bad,
+ gstreamer1.0-plugins-ugly,
+ gstreamer1.0-libav
 Suggests:
  dbus-user-session,
  bluez,
@@ -27,4 +39,8 @@ Suggests:
  wireplumber
 Description: Wayland Elements desktop shell
  Wayland Elements is a compositor agnostic shell with extensive customization.
- It includes a bar, notifications, OSD, wallpaper, and device controls.
+ It includes a bar, notifications, OSD, wallpaper, a launcher, a lock screen,
+ a greetd greeter, an xdg-desktop-portal backend, and device controls.
+ .
+ The binaries are static Go; they load GLib, GStreamer, PAM, PipeWire and
+ GBM at runtime.

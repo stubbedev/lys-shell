@@ -9,7 +9,7 @@ import (
 )
 
 // TestStaticCSSIsFresh pins the embedded stylesheet to the SCSS it was
-// compiled from: an SCSS edit without `just go-css` fails here, naming
+// compiled from: an SCSS edit without `just css` fails here, naming
 // the fix. WAYLE_UPDATE_STATIC_CSS=1 (set by the recipe, right after
 // grass rewrote static.css) records the new tree hash.
 func TestStaticCSSIsFresh(t *testing.T) {
@@ -28,7 +28,7 @@ func TestStaticCSSIsFresh(t *testing.T) {
 		t.Fatalf("read %s: %v", staticSumFile, err)
 	}
 	if got := strings.TrimSpace(string(recorded)); got != sum {
-		t.Fatalf("styling/static.css is stale: the SCSS under %s changed (hash %s, compiled from %s); run `just go-css`", scssDir, sum, got)
+		t.Fatalf("styling/static.css is stale: the SCSS under %s changed (hash %s, compiled from %s); run `just css`", scssDir, sum, got)
 	}
 }
 

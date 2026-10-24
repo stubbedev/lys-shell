@@ -1,6 +1,5 @@
-// Package resources embeds the repository's bundled assets for the Go
-// binary: the symbolic icons `wayle icons setup` installs (the Rust CLI
-// reads the same directory through a compile-time path).
+// Package resources embeds the repository's bundled assets: the
+// symbolic icons `wayle icons setup` installs.
 package resources
 
 import "embed"

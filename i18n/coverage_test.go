@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	settingslocales "github.com/stubbedev/wayle/crates/wayle-i18n/locales"
-	shelllocales "github.com/stubbedev/wayle/crates/wayle-shell-core/locales"
+	settingslocales "github.com/stubbedev/wayle/i18n/locales/settings"
+	shelllocales "github.com/stubbedev/wayle/i18n/locales/shell"
 )
 
 var trees = map[string]Assets{

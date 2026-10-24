@@ -1,5 +1,5 @@
 {
-  description = "wayle — a Wayland desktop shell (Go on gelm; the Rust + GTK4 + Relm4 shell kept buildable during the rewrite)";
+  description = "wayle — a Wayland desktop shell";
 
   # Always use the self-hosted xilo cache for wayle builds (CI, releases, and
   # local dev via `nix build`). Read access is public; pushes are CI/release
@@ -16,9 +16,6 @@
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
-    # crane builds the 591 deps as a separate, Cargo.lock-keyed derivation so a
-    # source edit only recompiles wayle's own crates. See nix/wayle-rust.nix.
-    crane.url = "github:ipetkov/crane";
   };
 
   outputs =

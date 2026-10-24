@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["actions", "python"]
+        language: ["actions", "go"]
     permissions:
       actions: read
       contents: read
@@ -31,10 +31,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The Go build needs the toolchain go.mod pins, from the flake.
+      - if: matrix.language == 'go'
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
       - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           languages: ${{ matrix.language }}
-      - uses: github/codeql-action/autobuild@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+          build-mode: ${{ matrix.language == 'go' && 'manual' || 'none' }}
+      - if: matrix.language == 'go'
+        run: nix develop --accept-flake-config -c go build ./...
       - uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
 
   grype:
@@ -57,7 +65,7 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
 
-  cargo-audit:
+  govulncheck:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -65,10 +73,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+      - uses: cachix/install-nix-action@v31
         with:
-          tool: cargo-audit
-      - run: cargo audit 
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - run: nix develop --accept-flake-config -c go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   dependency-review:
     runs-on: ubuntu-latest

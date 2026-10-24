@@ -1,93 +1,31 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Run cargo directly — the flake dev shell (nix/shell.nix, loaded by direnv
-# through .envrc) provides the GTK/clang build env and the rust-toolchain.toml
-# nightly on PATH.
-cargo := "cargo"
+# The flake dev shell (nix/shell.nix, loaded by direnv through .envrc)
+# pins the Go toolchain go.mod names and adds the lint stack, fonts, and
+# a headless sway; a plain PATH `go` at that version works too.
+go := "go"
+
+# Where `just build` puts the binaries.
+dist := "dist"
 
 # Default — list recipes.
 default:
     @just --list --unsorted
 
-# ─────────────────────────── Go rewrite ───────────────────────────
-
-# Go toolchain: the dev shell pins go_1_27 (`nix develop -c just go-check`);
-# a plain PATH `go` at 1.27 works too, the shell only adds the lint stack,
-# fonts, and a headless sway.
-go := "go"
-
-# Go release gate: format, lint, test — the mirror of `just check`.
-go-check: go-fmt go-lint go-test go-race
-
-# Lint every Go package; settings live in .golangci.yml (gelm parity).
-go-lint:
-    {{go}} vet ./...
-    golangci-lint run
-
-# Test every Go package.
-go-test:
-    {{go}} test ./...
-
-# Test every Go package under the race detector. It needs cgo (a C
-# toolchain), which the shipped CGO_ENABLED=0 build never does.
-go-race:
-    CGO_ENABLED=1 {{go}} test -race ./...
-
-# Format every Go package in place (gofumpt via golangci-lint).
-go-fmt:
-    golangci-lint fmt
-
-# Recompile the Rust SCSS into the Go shell's embedded stylesheet
-# (styling/static.css) with grass, the compiler wayle-styling's build.rs
-# uses, and record the source hash the freshness test checks.
-go-css:
-    grass --load-path crates/wayle-styling/scss crates/wayle-styling/scss/main.scss > styling/static.css
-    WAYLE_UPDATE_STATIC_CSS=1 {{go}} test ./styling -run TestStaticCSSIsFresh -count=1
-
 # ─────────────────────────── Build & Run ───────────────────────────
 
-# Build the release binary.
+# Build the release binaries into dist/: pure Go (gelm dlopens what it
+# needs through purego), stripped.
 build:
-    {{cargo}} build --release --locked
+    CGO_ENABLED=0 {{go}} build -trimpath -ldflags "-s -w" -o {{dist}}/ ./cmd/wayle ./cmd/wayle-greeter ./cmd/wayle-lock ./cmd/wayle-settings
 
-# Run the wayle binary (debug). Extra args pass through: `just run -- --help`.
+# Run the wayle binary. Extra args pass through: `just run config get bar.location`.
 run *args:
-    {{cargo}} run --bin wayle -- {{args}}
+    {{go}} run ./cmd/wayle {{args}}
 
-# Debug logging for the dev recipes below. RUST_LOG drives the console, and
-# WAYLE_FILE_LOG the rolling file in `just logs` — both default to `warn` and
-# `warn,wayle_=info` otherwise, which hides the debug! lines that explain
-# popover/dropdown behaviour. Exporting either variable yourself wins.
-dev_log := 'RUST_LOG="${RUST_LOG:-warn,wayle_=debug}" WAYLE_FILE_LOG="${WAYLE_FILE_LOG:-warn,wayle_=debug}"'
-
-# Run the settings GUI with SCSS hot-reload — for rapidly iterating on the
-# settings/widget CSS. WAYLE_DEV=1 makes the app watch
-# crates/wayle-styling/scss/** and recompile + reload live on save (~100ms),
-# no restart. Edit the SCSS, watch the open window repaint.
-dev-settings *args:
-    {{dev_log}} WAYLE_DEV=1 {{cargo}} run --bin wayle-settings -- {{args}}
-
-# Like dev-settings, plus the GTK inspector — pick any widget to see its CSS
-# node names + classes so you know which selector to target. (Ctrl+Shift+D
-# toggles the inspector in-app too.)
-inspect-settings *args:
-    {{dev_log}} WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle-settings -- {{args}}
-
-# Run the shell with SCSS hot-reload (watches crates/wayle-styling/scss/**).
-# Pass the subcommand: `just dev shell`.
-dev *args:
-    {{dev_log}} WAYLE_DEV=1 {{cargo}} run --bin wayle -- {{args}}
-
-# Like dev, plus the GTK inspector for the bar/overlays — pick any widget to see
-# its CSS node names + classes. (Ctrl+Shift+D toggles the inspector in-app too.)
-# Pass the subcommand: `just inspect shell`.
-inspect *args:
-    {{dev_log}} WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle -- {{args}}
-
-# Tail today's shell log. The dev recipes above write debug! lines here, so this
-# is where to look after reproducing a bug — `just logs 200` for more backlog.
-logs lines="80":
-    tail -n {{lines}} -f "${XDG_STATE_HOME:-$HOME/.local/state}/wayle/wayle-shell.$(date +%F).log"
+# Run the settings app.
+run-settings *args:
+    {{go}} run ./cmd/wayle-settings {{args}}
 
 # Stop the packaged shell so a dev build can take over (only one instance may
 # hold the com.wayle.shell bus name), run it, then restore the service on exit.
@@ -97,60 +35,92 @@ dev-shell *args:
     was_active=$(systemctl --user is-active wayle.service || true)
     if [ "$was_active" = "active" ]; then systemctl --user stop wayle.service; fi
     trap '[ "$was_active" = "active" ] && systemctl --user start wayle.service' EXIT
-    just inspect shell {{args}}
+    {{go}} run ./cmd/wayle shell {{args}}
 
 # Run the greeter as a window on your current session for UI iteration: your
 # user config for theming, throwaway state in /tmp. Login attempts only show an
 # error unless a real greetd socket is around ($GREETD_SOCK), which is fine for
-# visuals. WAYLE_GREETER_DEBUG=popup opens the session dropdown after 1s;
-# WAYLE_GREETER_DEBUG=login=user:pass auto-submits (see app.rs).
+# visuals.
 dev-greeter *args:
-    {{cargo}} run --bin wayle-greeter -- --config ~/.config/wayle/config.toml --state /tmp/wayle-greeter-dev/last-session {{args}}
+    {{go}} run ./cmd/wayle-greeter --config ~/.config/wayle/config.toml --state /tmp/wayle-greeter-dev/last-session {{args}}
 
-# Remove target/ build artifacts.
+# Tail today's shell log — `just logs 200` for more backlog.
+logs lines="80":
+    tail -n {{lines}} -f "${XDG_STATE_HOME:-$HOME/.local/state}/wayle/wayle-shell.$(date +%F).log"
+
+# Remove the build output.
 clean:
-    {{cargo}} clean
+    rm -rf {{dist}}
 
-# ─────────────────────────── Format & Lint ───────────────────────────
+# ─────────────────────────── Check ───────────────────────────
 
-# Format the workspace in place.
+# Format every package in place (gofumpt and gci via golangci-lint).
 fmt:
-    {{cargo}} fmt --all
+    golangci-lint fmt
 
-# Format, then lint with clippy (warnings are errors).
-lint: fmt
-    {{cargo}} clippy --workspace --all-targets -- -D warnings
+# Lint without changing anything: formatting, vet, and golangci-lint
+# (settings in .golangci.yml).
+lint:
+    golangci-lint fmt --diff
+    {{go}} vet ./...
+    golangci-lint run
 
-# Strict read-only check — same logic CI runs, for local pre-push.
-# Fails if formatting would change or any lint fires.
-lint-check:
-    {{cargo}} fmt --all --check
-    {{cargo}} clippy --workspace --all-targets -- -D warnings
-
-# Run the test suite (nextest — parallel, per-test process, readable output).
-# nextest does not run doctests; `just test-doc` covers those.
+# Run the test suite.
 test *args:
-    {{cargo}} nextest run --workspace --no-fail-fast {{args}}
+    {{go}} test ./... {{args}}
 
-# Run the doctests. Separate because nextest cannot run them, and they are not
-# worth recompiling on every filtered `just test`.
-test-doc:
-    {{cargo}} test --doc --workspace
+# Run the test suite under the race detector. It needs cgo (a C
+# toolchain), which the shipped CGO_ENABLED=0 build never does.
+race:
+    CGO_ENABLED=1 {{go}} test -race ./...
 
-# Format, lint and test. Run before every release.
-check: lint test test-doc
+# The committed config schema must be what the binary generates.
+schema-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    got=$(mktemp)
+    trap 'rm -f "$got"' EXIT
+    {{go}} run ./cmd/wayle config schema --stdout | jq -S . > "$got"
+    if ! diff -u schema/wayle-config.schema.json "$got"; then
+        echo "Config schema is out of date: run \`just schema\`." >&2
+        exit 1
+    fi
 
-# Regenerate the committed config JSON schema from the Rust types. The schema's
-# $id embeds the workspace version, so this must be re-run after a version bump
-# (the release flow does this automatically) — CI fails if it drifts.
+# Lint, test, race, and the schema check. Run before every release.
+check: lint test race schema-check
+
+# ─────────────────────────── Generated files ───────────────────────────
+
+# Regenerate the committed config JSON schema. Its $id embeds the version,
+# so the release flow rewrites it on every bump.
 schema:
-    {{cargo}} run -q -p wayle -- config schema --stdout | jq -S . > schema/wayle-config.schema.json
+    {{go}} run ./cmd/wayle config schema --stdout | jq -S . > schema/wayle-config.schema.json
 
-# ─────────────────────────── Dependencies ───────────────────────────
+# Recompile styling/scss into the embedded stylesheet (styling/static.css)
+# with grass, and record the source hash the freshness test checks.
+css:
+    grass --load-path styling/scss styling/scss/main.scss > styling/static.css
+    WAYLE_UPDATE_STATIC_CSS=1 {{go}} test ./styling -run TestStaticCSSIsFresh -count=1
 
-# Update Cargo.lock to the latest semver-compatible versions.
+# Recompute nix/wayle.nix's vendorHash after a go.mod change (a gelm
+# bump): the vendor derivation is fixed-output, so a stale hash reuses
+# the old module set instead of reporting the new one. Needs nix.
+vendor-hash:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    file=nix/wayle.nix
+    sed -i 's|vendorHash = "sha256-[^"]*";|vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";|' "$file"
+    # The build fails by design (the fake hash); its report is the point.
+    got=$( (nix build .#wayle --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
+    if [ -z "$got" ]; then echo "no hash reported" >&2; exit 1; fi
+    sed -i "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$got\";|" "$file"
+    echo "vendorHash = $got"
+
+# Update the Go dependencies to their latest versions, then the vendor hash.
 update:
-    {{cargo}} update --workspace
+    {{go}} get -u ./...
+    {{go}} mod tidy
+    just vendor-hash
 
 # ─────────────────────────── Nix cache ───────────────────────────
 
@@ -161,9 +131,9 @@ update:
 #
 # --url is passed explicitly because the cache is a property of this project,
 # not of the machine: with no profile and no XILO_URL, xilo falls back to
-# localhost:8080 and the push dies with "no server configured" — after the
-# 10-minute build. Credentials stay the machine's business; the check below
-# only refuses to start that build when there are none to be found.
+# localhost:8080 and the push dies with "no server configured" after the
+# build. Credentials stay the machine's business; the check below only
+# refuses to start that build when there are none to be found.
 cache-push:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -173,8 +143,10 @@ cache-push:
         echo "  xilo login https://nix.stubbe.dev --token <tok> --cache default/default" >&2
         exit 1
     fi
-    nix build '.?submodules=1#wayle' -L --accept-flake-config
+    nix build .#wayle -L --accept-flake-config
     xilo push default/default ./result --url https://nix.stubbe.dev
+
+# ─────────────────────────── Release ───────────────────────────
 
 release-preview:
     #!/usr/bin/env bash
@@ -191,12 +163,8 @@ release-preview:
     echo "  release-patch: v${MAJOR}.${MINOR}.$((PATCH + 1))"
 
 # Refuse to release a commit CI has already judged broken, without waiting on
-# anything. CI's `check` job runs the same fmt + clippy + nextest + doctests +
-# schema check on every master push, so a local `just check` here would be a
-# second pass over work already done — three compiles of the workspace for zero
-# new information. But this recipe does not block either: one status read, no
-# polling, no `gh run watch`. A run that is still in flight (or has not started,
-# or never will because HEAD is unpushed) is not an error — the tag pushed below
+# anything: one status read, no polling. A run still in flight (or not started,
+# or never, because HEAD is unpushed) is not an error — the tag pushed below
 # gets its own CI run, which is the real verification. WAYLE_RELEASE_NO_CI=1
 # checks locally instead (offline, or CI is down).
 _reject-red-ci:
@@ -254,35 +222,21 @@ _release bump:
         patch) NEW="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
         *) echo "unknown bump kind: {{bump}}"; exit 1 ;;
     esac
-    # Bump the workspace version BEFORE tagging. The release workflow
-    # verifies the tag matches [workspace.package].version in Cargo.toml
-    # and refuses to publish on a mismatch, so this must land first.
-    sed -i -E '/\[workspace\.package\]/,/^\[/{s|^(version = )"[^"]*"|\1"'"$NEW"'"|}' Cargo.toml
-    # Refresh Cargo.lock so `cargo build --locked` in CI sees the new version.
-    cargo update --workspace
-    # The schema $id embeds the version, and a version bump changes nothing
-    # else in the schema — CI's schema check already proved the committed file
-    # matches what the binary generates at HEAD. So rewrite that one line
-    # instead of compiling the whole workspace to print it (`just schema`
-    # builds the wayle bin). If the $id doesn't carry the version we expect,
-    # regenerate for real rather than guess — a stale $id here is what broke
-    # the CI schema check on v0.7.3.
-    if grep -q "\"\$id\": \"wayle-config-${CURRENT_VERSION}\"" schema/wayle-config.schema.json; then
-        sed -i "s|\"\$id\": \"wayle-config-${CURRENT_VERSION}\"|\"\$id\": \"wayle-config-${NEW}\"|" schema/wayle-config.schema.json
-    else
-        just schema
-    fi
-    # Both branches must land the new version in the $id. A silent sed miss here
-    # is exactly the v0.7.3 failure: the tag builds, then CI's schema check
-    # rejects it.
+    # The release workflow refuses a tag that does not match
+    # internal/version, so the bump lands first.
+    sed -i -E 's|^const Version = "[^"]*"$|const Version = "'"$NEW"'"|' internal/version/version.go
+    grep -qx "const Version = \"${NEW}\"" internal/version/version.go || {
+        echo "Error: internal/version/version.go does not read ${NEW} after the bump." >&2
+        exit 1
+    }
+    # The schema $id embeds the version; regenerate it from the bumped binary.
+    just schema
     grep -q "\"\$id\": \"wayle-config-${NEW}\"" schema/wayle-config.schema.json || {
         echo "Error: schema \$id is not wayle-config-${NEW} after the bump." >&2
         exit 1
     }
-    if [ -n "$(git status --porcelain Cargo.toml Cargo.lock schema/wayle-config.schema.json)" ]; then
-        git add Cargo.toml Cargo.lock schema/wayle-config.schema.json
-        git commit -m "chore: release v${NEW}"
-    fi
+    git add internal/version/version.go schema/wayle-config.schema.json
+    git commit -m "chore: release v${NEW}"
     git tag -a "v${NEW}" -m "v${NEW}"
     git push origin HEAD
     git push origin "v${NEW}"
@@ -294,38 +248,3 @@ _release bump:
 release-patch: (_release "patch")
 release-minor: (_release "minor")
 release-major: (_release "major")
-
-# ─────────────────────────── VPN mock gateway ───────────────────────────
-
-# Run the VPN sign-in tests that need a gateway to talk to.
-#
-# They are `#[ignore]`d in the normal suite because they speak the real
-# protocol over a real TLS connection — which is the only way to cover the
-# `gwcert` certificate pin — against the mock gateways in
-# `crates/wayle-network/tests/mock-gateway`. No real VPN is involved.
-test-gateway:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mock="crates/wayle-network/tests/mock-gateway"
-    docker compose -f "$mock/compose.yaml" up -d
-    trap 'docker compose -f "$mock/compose.yaml" down' EXIT
-    for _ in $(seq 30); do
-        (exec 3<>/dev/tcp/127.0.0.1/8447) 2>/dev/null && break
-        sleep 0.5
-    done
-    {{cargo}} nextest run -p wayle-network --run-ignored all -E 'test(mock::)'
-
-# Recompute nix/wayle.nix's vendorHash after a go.mod change (a gelm
-# bump): the vendor derivation is fixed-output, so a stale hash reuses
-# the old module set instead of reporting the new one. Run outside the
-# Go shell; needs nix.
-go-vendor-hash:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    file=nix/wayle.nix
-    sed -i 's|vendorHash = "sha256-[^"]*";|vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";|' "$file"
-    # The build fails by design (the fake hash); its report is the point.
-    got=$( (nix build .#wayle --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
-    if [ -z "$got" ]; then echo "no hash reported" >&2; exit 1; fi
-    sed -i "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$got\";|" "$file"
-    echo "vendorHash = $got"

@@ -1,16 +1,14 @@
 # minijinja oracle corpus
 
 `corpus.jsonl` holds one case per line: a template `t` and its context
-`c`. `corpus.golden.jsonl` holds what minijinja 2.15.1 — the version
-and feature set (`builtins`, `serde`, default features off) the Rust
-shell builds with — renders for each: `{"ok": "<output>"}`, or
+`c`. `corpus.golden.jsonl` holds what minijinja 2.15.1 (features `builtins`
+and `serde`, default features off), the engine wayle's templates were
+written against, renders for each: `{"ok": "<output>"}`, or
 `{"err": true}` where it fails. `TestMatchesMinijinja` replays the
 corpus through this package and compares.
 
 To add cases, append to `corpus.jsonl` and regenerate the golden file
-with this program (a standalone Cargo package; `cargo build --offline`
-works from the workspace's vendored registry, with the repo's
-`rust-toolchain.toml` and `Cargo.lock` copied next to it):
+with this program, a standalone Cargo package outside the repo:
 
 `Cargo.toml`:
 

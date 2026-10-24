@@ -4,26 +4,19 @@ title: Getting started on Fedora
 
 # Getting started on Fedora
 
-Requires Fedora 42 or later. Fedora 41 reached EOL on 2025-11-19.
-
 ## Install dependencies
 
-Install Rust via [rustup](https://rustup.rs), then the system libraries:
+Go, plus the libraries Wayle loads at runtime (GLib, GStreamer for the screen
+recorder, PAM for the lock screen, PipeWire and GBM for screen sharing):
 
 ```sh
-sudo dnf install git cmake pkgconf-pkg-config gtk4-devel gtk4-layer-shell-devel \
-  gtksourceview5-devel pulseaudio-libs-devel fftw-devel pipewire-devel \
-  systemd-devel clang gcc \
-  gstreamer1-devel gstreamer1-plugins-base-devel gstreamer1-plugins-good \
-  gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free gstreamer1-libav
+sudo dnf install golang git just glib2 gstreamer1 pam pipewire-libs \
+  mesa-libgbm gstreamer1-plugins-base gstreamer1-plugins-good \
+  gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
+  gstreamer1-plugin-libav pipewire-gstreamer
 ```
 
-The `gstreamer1*-devel` packages are required to build, and the
-`gstreamer1-plugins-*` packages back the screen recorder at runtime.
-`gstreamer1-plugins-ugly-free` and `gstreamer1-libav` come from
-[RPM Fusion](https://rpmfusion.org).
-
-Fedora Workstation already ships the runtime daemons for battery, bluetooth, network, power, and audio. Minimal and Server installs need:
+Fedora Workstation already ships the runtime daemons. Minimal and Server installs need:
 
 ```sh
 sudo dnf install pipewire-pulseaudio wireplumber NetworkManager bluez upower \
@@ -33,16 +26,21 @@ sudo systemctl enable --now bluetooth NetworkManager upower power-profiles-daemo
 
 ## Build
 
+The build needs only Go: the binaries are static, and load the libraries above
+at runtime. `go.mod` pins Go 1.27; an older `go` (1.21 or later) downloads that
+toolchain on its own.
+
 ```sh
 git clone https://github.com/stubbedev/wayle
 cd wayle
-cargo install --path wayle
-cargo install --path crates/wayle-settings
+just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
+sudo install -Dm755 dist/wayle dist/wayle-settings dist/wayle-greeter dist/wayle-lock -t /usr/local/bin
 ```
 
 ## Icon assets
 
-Wayle ships icons as source files that get copied into your user data directory on first setup. Run this from the cloned repo, **before** deleting it:
+The icons are built into the binary. Install them into your user data
+directory once:
 
 ```sh
 wayle icons setup

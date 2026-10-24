@@ -2,21 +2,19 @@
 
 ## Build and test
 
-Cargo needs the nix dev shell for system libs (wayland, gtk4, gstreamer):
+The nix dev shell pins the Go toolchain `go.mod` names and carries the lint
+stack, fonts, and the sway, dbus and pipewire the tests start private
+instances of:
 
 ```sh
-nix develop -c cargo check --workspace
-just test          # cargo nextest run --workspace --no-fail-fast
-just lint          # fmt + clippy -D warnings
-just check         # lint + test, run before every release
+nix develop -c just build   # static binaries into dist/
+nix develop -c just test    # go test ./...
+nix develop -c just lint    # golangci-lint fmt --diff + go vet + golangci-lint run
+nix develop -c just check   # lint + test + race + schema-check, run before every release
 ```
 
-The Go rewrite (`go-rewrite` branch) runs in the same shell, which also
-carries the pinned Go toolchain:
-
-```sh
-nix develop -c just go-check   # gofmt/gofumpt + vet + golangci-lint + test + test -race
-```
+After a `go.mod` change (a gelm bump), refresh `nix/wayle.nix`'s
+`vendorHash` with `just vendor-hash`.
 
 ## Tests define behavior
 
@@ -32,7 +30,10 @@ assertions:
 A fix without a test that fails before it is not a fix. Prove the test catches
 the regression by reverting the change and watching it fail.
 
-Unit tests live in a `mod tests` next to the code they cover; cross-process or
-cross-crate contracts go in `<crate>/tests/*.rs` (see
-`wayle/tests/launcher_session.rs` for the launcher socket lifetime, and
-`crates/wayle-config/tests/deprecated_alias.rs`).
+Tests live in `_test.go` files next to the code they cover. Contracts across
+processes run the real binary or a private bus (see
+`cmd/wayle/launcher_session_test.go` for the launcher socket lifetime, and
+`internal/dbustest` for private session buses). The CLI's help, errors and
+completions are pinned byte for byte by the goldens under
+`cmd/wayle/testdata/clap`; a deliberate CLI change edits them in the same
+commit.

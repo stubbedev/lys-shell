@@ -11,19 +11,16 @@ import (
 	"strings"
 )
 
-// StaticCSS is the Rust shell's compiled stylesheet: crates/wayle-styling/
-// scss/main.scss through grass, the compiler and version wayle-styling's
-// build.rs uses, so the Go shell loads byte-for-byte the CSS the Rust
-// shell embeds as STATIC_CSS (lib.rs). It is a checked-in build
-// artifact rather than a build step because the Go build is pure Go:
-// `just go-css` regenerates it, and TestStaticCSSIsFresh fails when the
-// SCSS moved on without it.
+// StaticCSS is the compiled stylesheet: scss/main.scss through grass.
+// It is a checked-in build artifact rather than a build step because
+// the build is pure Go: `just css` regenerates it, and
+// TestStaticCSSIsFresh fails when the SCSS moved on without it.
 //
 //go:embed static.css
 var StaticCSS string
 
 // scssDir is the SCSS source tree, relative to this package.
-const scssDir = "../crates/wayle-styling/scss"
+const scssDir = "scss"
 
 // staticSumFile records the SCSS tree hash StaticCSS was compiled from.
 const staticSumFile = "static.css.sum"

@@ -1,38 +1,38 @@
 "area:shell":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-shell/**"
+          - any-glob-to-any-file: "shell/**"
 
-"area:widgets":
+"area:services":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-widgets/**"
+          - any-glob-to-any-file: "service/**"
 
 "area:styling":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-styling/**"
+          - any-glob-to-any-file: "styling/**"
 
 "area:config":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-config/**"
+          - any-glob-to-any-file: ["config/**", "schema/**"]
 
 "area:icons":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-icons/**"
+          - any-glob-to-any-file: ["internal/icons/**", "resources/icons/**"]
 
 "area:i18n":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-i18n/**"
+          - any-glob-to-any-file: "i18n/**"
 
-"area:ipc":
+"area:portal":
     - changed-files:
-          - any-glob-to-any-file: "crates/wayle-ipc/**"
+          - any-glob-to-any-file: "portal/**"
+
+"area:greeter":
+    - changed-files:
+          - any-glob-to-any-file: "greeter/**"
 
 "area:cli":
     - changed-files:
-          - any-glob-to-any-file: "wayle/**"
-
-"area:derive":
-    - changed-files:
-          - any-glob-to-any-file: "crates/wayle-derive/**"
+          - any-glob-to-any-file: "cmd/**"
 
 "area:ci":
     - changed-files:

@@ -4,27 +4,16 @@ title: Getting started on Arch
 
 # Getting started on Arch Linux
 
-## Prebuilt (fastest path)
-
-`wayle-bin` from the AUR ships both binaries prebuilt. If you take this route, skip the build step below and jump straight to [Run](#run).
-
-```sh
-yay -S wayle-bin
-```
-
 ## Install dependencies
 
-Install Rust via [rustup](https://rustup.rs), then the system libraries:
+Go, plus the libraries Wayle loads at runtime (GLib, GStreamer for the screen
+recorder, PAM for the lock screen, PipeWire and GBM for screen sharing):
 
 ```sh
-sudo pacman -S --needed git gtk4 gtk4-layer-shell gtksourceview5 \
-  libpulse fftw libpipewire systemd-libs clang base-devel \
-  gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
-  gst-plugins-ugly gst-libav
+sudo pacman -S --needed go git just glib2 gstreamer pam libpipewire mesa \
+  gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
+  gst-libav gst-plugin-pipewire
 ```
-
-The `gstreamer` packages are required to build, and the plugin packages back
-the screen recorder at runtime.
 
 If you want the battery, bluetooth, network, power, or audio modules, install their daemons (skip any you don't need):
 
@@ -36,16 +25,21 @@ sudo systemctl enable --now bluetooth NetworkManager upower power-profiles-daemo
 
 ## Build
 
+The build needs only Go: the binaries are static, and load the libraries above
+at runtime. `go.mod` pins Go 1.27; an older `go` (1.21 or later) downloads that
+toolchain on its own.
+
 ```sh
 git clone https://github.com/stubbedev/wayle
 cd wayle
-cargo install --path wayle
-cargo install --path crates/wayle-settings
+just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
+sudo install -Dm755 dist/wayle dist/wayle-settings dist/wayle-greeter dist/wayle-lock -t /usr/local/bin
 ```
 
 ## Icon assets
 
-Wayle ships icons as source files that get copied into your user data directory on first setup. Run this from the cloned repo, **before** deleting it:
+The icons are built into the binary. Install them into your user data
+directory once:
 
 ```sh
 wayle icons setup

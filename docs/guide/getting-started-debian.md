@@ -4,29 +4,22 @@ title: Getting started on Debian / Ubuntu
 
 # Getting started on Debian / Ubuntu
 
-::: warning Ubuntu 24.04 LTS
-
-`libgtk4-layer-shell-dev` first appears in Ubuntu 25.04 (plucky). On 24.04 you either need Debian 13 (trixie), Ubuntu 25.04+, or to build [gtk4-layer-shell](https://github.com/wmww/gtk4-layer-shell) from source first.
-
-:::
-
 ## Install dependencies
 
-Install Rust via [rustup](https://rustup.rs), then the system libraries:
+Go, plus the libraries Wayle loads at runtime (GLib, GStreamer for the screen
+recorder, PAM for the lock screen, PipeWire and GBM for screen sharing):
 
 ```sh
-sudo apt install git pkg-config cmake libgtk-4-dev libgtk4-layer-shell-dev \
-  libgtksourceview-5-dev libpulse-dev libfftw3-dev libpipewire-0.3-dev \
-  libudev-dev clang build-essential \
-  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-  gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-  gstreamer1.0-plugins-ugly gstreamer1.0-libav
+sudo apt install golang-go git just libglib2.0-0t64 libgstreamer1.0-0 \
+  libpam0g libpipewire-0.3-0t64 libgbm1 \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+  gstreamer1.0-pipewire
 ```
 
-The `libgstreamer*-dev` packages are required to build, and the
-`gstreamer1.0-plugins-*` packages back the screen recorder at runtime.
+On releases before the 64-bit time transition, drop the `t64` suffixes.
 
-If you want the battery, bluetooth, network, power, or audio modules, install their daemons (skip any you don't need):
+Runtime daemons for the battery, bluetooth, network, power, and audio modules (skip any you don't need):
 
 ```sh
 sudo apt install dbus-user-session bluez network-manager \
@@ -36,16 +29,21 @@ sudo systemctl enable --now bluetooth NetworkManager upower power-profiles-daemo
 
 ## Build
 
+The build needs only Go: the binaries are static, and load the libraries above
+at runtime. `go.mod` pins Go 1.27; an older `go` (1.21 or later) downloads that
+toolchain on its own.
+
 ```sh
 git clone https://github.com/stubbedev/wayle
 cd wayle
-cargo install --path wayle
-cargo install --path crates/wayle-settings
+just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
+sudo install -Dm755 dist/wayle dist/wayle-settings dist/wayle-greeter dist/wayle-lock -t /usr/local/bin
 ```
 
 ## Icon assets
 
-Wayle ships icons as source files that get copied into your user data directory on first setup. Run this from the cloned repo, **before** deleting it:
+The icons are built into the binary. Install them into your user data
+directory once:
 
 ```sh
 wayle icons setup

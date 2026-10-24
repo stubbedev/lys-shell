@@ -1,14 +1,16 @@
-# Icon transform oracle
+# Icon transform goldens
 
-`symbolic/` holds SVGs and what the Rust `wayle-icons` transform
-(`crates/wayle-icons/src/transform.rs`, on usvg 0.46) makes of each:
+`symbolic/` holds SVGs and what the symbolic transform makes of each.
+The goldens were captured from wayle's original Rust transform (on usvg
+0.46), which the Go port reproduces byte for byte, and are now the
+reference:
 
 - `<name>.svg.golden`: `to_symbolic`'s output, or `NONE` when it gives
   up;
-- `<name>.svg.parse`: `OK`, or `ERR: ` and the error
-  `usvg::Tree::from_str` rejects the file with.
+- `<name>.svg.parse`: `OK`, or `ERR: ` and the error the parser rejects
+  the file with.
 
-`TestToSymbolicMatchesRust` holds the Go port to both, byte for byte.
+`TestToSymbolicMatchesRust` holds the transform to both.
 
 The inputs are a sample of the four icon sets wayle installs from
 (Simple Icons `si-`, CC0; Lucide `ld-`, ISC; Tabler outline `tb-` and
@@ -22,15 +24,5 @@ and `edge-xml-` cases for the XML layer (roxmltree): every error it
 reports, entities (markup, loops, attribute normalization),
 namespaces, and the text `<style>` is read from.
 
-To regenerate after changing the Rust transform, or to check the port
-against a larger corpus (the full npm packages of the four sets agree
-too, 14800 files at the time of writing):
-
-```sh
-cp Cargo.lock internal/icons/testdata/symgold/
-nix develop -c cargo run --release --offline \
-  --manifest-path internal/icons/testdata/symgold/Cargo.toml -- \
-  internal/icons/testdata/symbolic
-# a larger corpus: generate its goldens the same way, then
-SYMBOLIC_CORPUS=/path/to/corpus nix develop -c go test ./internal/icons/ -run TestToSymbolicMatchesRust
-```
+A change to the transform's output is a behavior change: review the
+diff of the affected goldens and update them in the same commit.

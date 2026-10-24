@@ -1,9 +1,0 @@
-max_width = 100
-tab_spaces = 4
-edition = "2024"
-
-fn_single_line = false
-brace_style = "SameLineWhere"
-
-imports_granularity = "Crate"
-group_imports = "StdExternalCrate"
