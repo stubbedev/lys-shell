@@ -97,12 +97,6 @@ check: lint test race schema-check
 schema:
     {{go}} run ./cmd/lys-shell config schema --stdout | jq -S . > schema/lys-shell-config.schema.json
 
-# Recompile styling/scss into the embedded stylesheet (styling/static.css)
-# with grass, and record the source hash the freshness test checks.
-css:
-    grass --load-path styling/scss styling/scss/main.scss > styling/static.css
-    LYS_SHELL_UPDATE_STATIC_CSS=1 {{go}} test ./styling -run TestStaticCSSIsFresh -count=1
-
 # Recompute nix/lys-shell.nix's vendorHash after a go.mod change (a lys-ui
 # bump): the vendor derivation is fixed-output, so a stale hash reuses
 # the old module set instead of reporting the new one. Needs nix.

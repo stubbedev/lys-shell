@@ -87,7 +87,7 @@ func TestLabelOrigin(t *testing.T) {
 
 // harness drives one area headlessly: the overlay has no application
 // and no surfaces, only the reply channel a request would carry.
-// accentCSS gives the area its accent the way _region_overlay.scss
+// accentCSS gives the area its accent the way region_overlay.css
 // does.
 const accentCSS = `.region-overlay-window .region-overlay-area { color: #b4befe; }`
 

@@ -126,7 +126,7 @@ type Screen struct {
 
 // New builds the screen over its collaborators.
 // The prompt shapes text with font; sheet (the shell's stylesheet)
-// styles the surfaces through the _lock.scss rules.
+// styles the surfaces through the lock.css rules.
 func New(cfg *config.Config, font render.Font, sheet *widget.Stylesheet, d Deps) *Screen {
 	return &Screen{cfg: cfg.Lock, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, font: font, sheet: sheet, d: d}
 }

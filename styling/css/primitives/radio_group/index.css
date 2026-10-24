@@ -1,0 +1,36 @@
+checkbutton radio {
+  all: unset;
+  min-width: calc(0.875rem * var(--global-scale));
+  min-height: calc(0.875rem * var(--global-scale));
+  border: 2px solid var(--fg-muted);
+  border-radius: var(--radius-full);
+  transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
+  -gtk-icon-size: 0;
+}
+checkbutton:hover radio {
+  border-color: var(--fg-default);
+  background: var(--bg-hover);
+}
+checkbutton:checked radio {
+  background: transparent;
+  border-color: var(--accent);
+  color: var(--accent);
+  -gtk-icon-source: -gtk-icontheme("tbf-circle-symbolic");
+}
+checkbutton:checked:hover radio {
+  background: var(--bg-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-hover);
+  -gtk-icon-source: -gtk-icontheme("tbf-circle-symbolic");
+}
+checkbutton:focus-visible radio {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+checkbutton:disabled {
+  opacity: 0.5;
+}
+
+checkbutton.grouped:not(:last-child) {
+  margin-right: var(--space-md);
+}

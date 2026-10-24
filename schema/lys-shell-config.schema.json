@@ -2369,7 +2369,7 @@
       ]
     },
     "FontWeightClass": {
-      "description": "Font weight class for typography.\n\nMaps to CSS classes like `.weight-normal`, `.weight-bold`, etc.\nUses the existing `--weight-*` tokens defined in SCSS.",
+      "description": "Font weight class for typography.\n\nMaps to CSS classes like `.weight-normal`, `.weight-bold`, etc.\nUses the existing `--weight-*` tokens defined in the stylesheet.",
       "oneOf": [
         {
           "const": "normal",

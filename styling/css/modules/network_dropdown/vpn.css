@@ -1,0 +1,115 @@
+.network-secret-message {
+  font-size: var(--text-base);
+  color: var(--fg-subtle);
+  margin: var(--space-xs) var(--space-xs) 0;
+}
+
+.network-secret-label {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--fg-subtle);
+  margin: var(--space-sm) var(--space-xs) 0;
+}
+
+.network-vpn-section {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: var(--space-md) var(--space-xs) var(--space-2xs);
+}
+
+.network-secret-fields {
+  margin-top: calc(-1 * var(--space-xs));
+}
+
+.network-vpn-form-scroll {
+  background: transparent;
+}
+.network-vpn-form-scroll > viewport {
+  background: transparent;
+}
+
+.network-secret-label.required {
+  color: var(--fg-default);
+}
+
+.network-vpn-form entry.network-password-input.error {
+  border-color: var(--status-error);
+}
+.network-vpn-form entry.network-password-input.error:focus-within {
+  border-color: var(--status-error);
+}
+
+.network-vpn-raw {
+  background: var(--bg-surface);
+  border-radius: var(--rounding-element);
+  padding: var(--space-sm);
+  margin-top: var(--space-sm);
+  font-size: var(--text-base);
+  color: var(--fg-default);
+  min-height: 6em;
+}
+
+.network-vpn-kind {
+  margin-top: var(--space-sm);
+}
+
+button.network-vpn-import image {
+  -gtk-icon-size: var(--icon-sm);
+  color: var(--fg-subtle);
+}
+
+button.network-vpn-import:hover image {
+  color: var(--fg-default);
+}
+
+button.network-vpn-delete label {
+  color: var(--status-error);
+}
+
+button.network-vpn-edit {
+  border-radius: var(--rounding-element);
+  margin-left: var(--space-sm);
+}
+button.network-vpn-edit image {
+  -gtk-icon-size: var(--icon-sm);
+  color: var(--fg-subtle);
+}
+button.network-vpn-edit:hover image {
+  color: var(--fg-default);
+}
+
+.network-item.vpn-add.separated {
+  border-top: 1px solid var(--border-subtle);
+}
+.network-item.vpn-add image.network-item-signal {
+  color: var(--fg-subtle);
+}
+.network-item.vpn-add label.network-item-name {
+  color: var(--fg-subtle);
+}
+.network-item.vpn-add:hover image.network-item-signal,
+.network-item.vpn-add:hover label.network-item-name {
+  color: var(--fg-default);
+}
+
+.network-vpn-public-key {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  color: var(--fg-muted);
+  margin: var(--space-2xs) var(--space-xs) 0;
+}
+
+.network-password-card.network-vpn-form {
+  margin-top: var(--space-lg);
+}
+
+.dropdown-content > .network-secret-card:not(:first-child) {
+  margin-top: var(--space-lg);
+}
+
+.vpn-item .network-item-security.failed {
+  color: var(--status-error);
+}

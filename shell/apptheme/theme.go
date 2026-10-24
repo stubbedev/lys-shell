@@ -33,8 +33,8 @@ const Priority = widget.StylePriorityUser + 100
 // provider does.
 const ComponentPriority = widget.StylePriorityUser + 200
 
-// Theme owns the stylesheet: the Rust bundle — the compiled SCSS, the
-// theme's :root variables, and the user's styles/index.scss — attached
+// Theme owns the stylesheet: the bundle — the built-in CSS, the
+// theme's :root variables, and the user's styles/index.css — attached
 // to the roots that take it (the Go-painted surfaces keep their
 // programmatic styling), plus the resolved palette the Go-painted
 // surfaces read.
@@ -126,11 +126,11 @@ func (t *Theme) Attach(root interface{ AttachStylesheet(*widget.Stylesheet) }) {
 	root.AttachStylesheet(t.Sheet)
 }
 
-// WatchUserStyles reloads the bundle when a .scss or .css file under
-// the user styles tree changed (watcher.rs): the tree is watched on the
-// loop (app.WatchFiles), and the stamp filters out changes to other
-// files. Without inotify it polls once a second. A failed compile keeps
-// the stylesheet running: UserCSS logs and contributes nothing.
+// WatchUserStyles reloads the bundle when the user stylesheet changed:
+// the styles directory is watched on the loop (app.WatchFiles), and the
+// stamp filters out changes to other files. Without inotify it polls
+// once a second. A failed read keeps the stylesheet running: UserCSS
+// logs and contributes nothing.
 func (t *Theme) WatchUserStyles(application *app.Application) {
 	t.watchStyles(application.WatchFiles, func(fn func()) { application.Every(time.Second, fn) })
 }
@@ -145,7 +145,7 @@ func (t *Theme) watchStyles(watch func(paths []string, recursive bool, fn func()
 	}
 	if dir, err := config.Dir(); err == nil {
 		if styles, ok := styling.UserStylesDir(dir); ok {
-			if _, err := watch([]string{styles}, true, check); err == nil {
+			if _, err := watch([]string{styles}, false, check); err == nil {
 				return
 			}
 		}
@@ -153,9 +153,9 @@ func (t *Theme) watchStyles(watch func(paths []string, recursive bool, fn func()
 	poll(check)
 }
 
-// userStylesStamp fingerprints every stylesheet under the user styles
-// directory by path, size, and modification time; empty when there is
-// none.
+// userStylesStamp fingerprints the files UserCSS reads, the stylesheet
+// and the legacy SCSS entry it rejects, by path, size, and modification
+// time; empty when there is neither.
 func userStylesStamp() string {
 	dir, err := config.Dir()
 	if err != nil {
@@ -166,23 +166,18 @@ func userStylesStamp() string {
 		return ""
 	}
 	var b strings.Builder
-	_ = filepath.WalkDir(styles, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return nil
+	for _, name := range []string{styling.UserStylesFile, styling.LegacyUserStylesFile} {
+		info, err := os.Stat(filepath.Join(styles, name))
+		if err != nil {
+			continue
 		}
-		if ext := filepath.Ext(path); ext != ".scss" && ext != ".css" {
-			return nil
-		}
-		if info, err := d.Info(); err == nil {
-			b.WriteString(path)
-			b.WriteByte(0)
-			b.WriteString(info.ModTime().String())
-			b.WriteByte(0)
-			b.WriteString(strconv.FormatInt(info.Size(), 10))
-			b.WriteByte(0)
-		}
-		return nil
-	})
+		b.WriteString(name)
+		b.WriteByte(0)
+		b.WriteString(info.ModTime().String())
+		b.WriteByte(0)
+		b.WriteString(strconv.FormatInt(info.Size(), 10))
+		b.WriteByte(0)
+	}
 	return b.String()
 }
 

@@ -20,8 +20,8 @@ import (
 const cwsBlinkInterval = 500 * time.Millisecond
 
 const (
-	// cwsSpaceLgRem is tokens.scss's $base-space-lg, the .workspace
-	// min-width/min-height (--bar-space-lg).
+	// cwsSpaceLgRem is tokens/index.css's --bar-space-lg base, the .workspace
+	// min-width/min-height.
 	cwsSpaceLgRem = 1.5
 )
 

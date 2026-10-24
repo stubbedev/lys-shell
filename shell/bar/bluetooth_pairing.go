@@ -91,7 +91,7 @@ type cardSection struct {
 func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	font, px := dropdownFont(ctx)
 	c := &btPairingCard{}
-	// Rust's boxes are spacing-0; the card SCSS's margins carry the gaps
+	// Rust's boxes are spacing-0; the card CSS margins carry the gaps
 	// (pairing_card/mod.rs:47-101).
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("bluetooth-pairing-card")

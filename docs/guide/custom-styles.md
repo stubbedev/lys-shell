@@ -1,6 +1,6 @@
 # Custom styles
 
-`~/.config/lys-shell/styles/index.scss` is an escape hatch for CSS tweaks that aren't exposed through `config.yaml` or the settings GUI. The file is created with a starter comment the first time lys-shell runs. Anything written into it is layered on top of the built-in stylesheet, and saved changes apply to the running shell automatically.
+`~/.config/lys-shell/styles/index.css` is an escape hatch for CSS tweaks that aren't exposed through `config.yaml` or the settings GUI. The file is created with a starter comment the first time lys-shell runs. Anything written into it is layered on top of the built-in stylesheet, and saved changes apply to the running shell automatically.
 
 For things the config already covers (palette, fonts, global scale, rounding, bar layout, module visibility), use the normal config or the settings GUI. This file is for the rest: per-instance module styling, animation behavior, padding and spacing tweaks, hover and focus state changes, custom keyframe animations.
 
@@ -18,12 +18,12 @@ bar:
         - clock
 ```
 
-The class is added to that module's root widget. The selector to target it from `index.scss` is `menubutton.bar-button.primary-clock` (every module is a `menubutton.bar-button`; the custom class is appended).
+The class is added to that module's root widget. The selector to target it from `index.css` is `menubutton.bar-button.primary-clock` (every module is a `menubutton.bar-button`; the custom class is appended).
 
 The robust way to change appearance on that one instance is to override the CSS variables it consumes. The built-in rules read from variables like `--bar-btn-bg`, `--bar-btn-label-color`, `--bar-btn-icon-size`, and `--bar-btn-label-weight`. Redefining one of those inside the per-instance selector replaces it for that widget only:
 
-```scss
-// ~/.config/lys-shell/styles/index.scss
+```css
+/* ~/.config/lys-shell/styles/index.css */
 menubutton.bar-button.primary-clock {
   --bar-btn-bg: var(--palette-primary);
   --bar-btn-label-color: var(--palette-bg);
@@ -37,7 +37,7 @@ The same `class` field can be applied to any item in `left`, `center`, or `right
 
 ## Finding selectors and variables
 
-The built-in stylesheet is the reference for selectors and variables: its sources live in [`styling/scss`](https://github.com/stubbedev/lys-shell/tree/master/styling/scss), one partial per bar module and dropdown. Every rule there reads its colors, sizes and spacing from CSS variables, and overriding a variable inside a narrower selector is the robust way to change one thing.
+The built-in stylesheet is the reference for selectors and variables: its sources live in [`styling/css`](https://github.com/stubbedev/lys-shell/tree/master/styling/css), one plain CSS file per bar module and dropdown. Every rule there reads its colors, sizes and spacing from CSS variables, and overriding a variable inside a narrower selector is the robust way to change one thing.
 
 To see which widget sits where, open the inspector on the running shell:
 
@@ -60,24 +60,10 @@ Open the dropdown, then run `lys-shell panel inspect`. Re-enable autohide afterw
 
 lys-shell renders with [lys-ui](https://github.com/stubbedev/lys-ui), which implements GTK4's CSS dialect: a subset of web CSS. See [docs.gtk.org/gtk4/css-overview.html](https://docs.gtk.org/gtk4/css-overview.html) for the reference.
 
-## Sass features
+## Plain CSS
 
-The styles directory is treated as a Sass project. `@use`, `@forward`, `@import`, mixins, variables, math, and color functions all work. Partials (`_name.scss`) can be imported from `index.scss` by basename:
-
-```scss
-// ~/.config/lys-shell/styles/index.scss
-@import "modules";
-```
-
-```scss
-// ~/.config/lys-shell/styles/_modules.scss
-menubutton.bar-button.primary-clock {
-  --bar-btn-bg: var(--palette-primary);
-}
-```
-
-Any `.scss` or `.css` change anywhere in the directory triggers a reload.
+The file is plain CSS, read as written, with no preprocessor. CSS nesting (`&`) works; `@import` does not, so everything goes in `index.css`. Saving the file applies the change. A `styles/index.scss` left from earlier versions is no longer read; lys-shell logs an error naming it until its rules move to `index.css` and the file is deleted.
 
 ## Disable user styles
 
-Empty the contents of `~/.config/lys-shell/styles/index.scss` to revert to defaults.
+Empty the contents of `~/.config/lys-shell/styles/index.css` to revert to defaults.

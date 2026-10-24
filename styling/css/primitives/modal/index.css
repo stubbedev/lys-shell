@@ -1,0 +1,63 @@
+.modal {
+  all: unset;
+  background: var(--bg-surface);
+  min-width: calc(29rem * var(--global-scale));
+}
+.modal .modal-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.modal .modal-header .modal-icon {
+  min-width: var(--icon-3xl);
+  min-height: var(--icon-3xl);
+  border-radius: var(--rounding-element);
+  margin-right: var(--space-sm);
+}
+.modal .modal-header .modal-icon image {
+  -gtk-icon-size: var(--icon-lg);
+}
+.modal .modal-header .modal-icon.warning {
+  background: var(--status-warning-subtle);
+}
+.modal .modal-header .modal-icon.warning image {
+  color: var(--status-warning);
+}
+.modal .modal-header .modal-icon.error {
+  background: var(--status-error-subtle);
+}
+.modal .modal-header .modal-icon.error image {
+  color: var(--status-error);
+}
+.modal .modal-header .modal-icon.success {
+  background: var(--status-success-subtle);
+}
+.modal .modal-header .modal-icon.success image {
+  color: var(--status-success);
+}
+.modal .modal-header .modal-icon.info {
+  background: var(--accent-subtle);
+}
+.modal .modal-header .modal-icon.info image {
+  color: var(--accent);
+}
+.modal .modal-header .modal-header-content {
+  margin-left: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.modal .modal-header .modal-header-content .modal-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold2);
+  color: var(--fg-default);
+  margin-bottom: var(--space-xs);
+}
+.modal .modal-header .modal-header-content .modal-description {
+  margin-top: var(--space-sm);
+  font-size: var(--text-md);
+  color: var(--fg-muted);
+}
+.modal .modal-footer {
+  padding: var(--space-md);
+}
+.modal .modal-footer > button + button {
+  margin-left: var(--space-sm);
+}

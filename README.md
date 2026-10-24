@@ -116,7 +116,7 @@ modules:
 
 - [Editing config](docs/guide/editing-config.md): file layout, live reload, imports, CLI edits
 - [Bars and layouts](docs/guide/bars-and-layouts.md): per-monitor layouts, groups, classes
-- [Themes](docs/guide/themes.md) and [custom styles](docs/guide/custom-styles.md): palettes, theme providers, your own SCSS
+- [Themes](docs/guide/themes.md) and [custom styles](docs/guide/custom-styles.md): palettes, theme providers, your own CSS
 - [Custom modules](docs/guide/custom-modules.md) and [custom icons](docs/guide/custom-icons.md)
 - [Greeter](docs/guide/greeter.md): the greetd login screen
 - [CLI](docs/guide/cli.md): every subcommand

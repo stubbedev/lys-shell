@@ -497,7 +497,7 @@ func TestMediaPickerChrome(t *testing.T) {
 }
 
 // The transport buttons carry no programmatic padding (button.media-control
-// paints the box, static.css:6057-6071): each measures as a button of
+// paints the box, modules/media_dropdown/player_view.css): each measures as a button of
 // its classes built with none. They get the pointer cursor every button
 // gets.
 func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {

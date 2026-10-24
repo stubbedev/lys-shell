@@ -1,7 +1,7 @@
 // Package styling resolves lys-shell's design tokens to concrete colors:
 // the Go counterpart of crates/wayle-styling. The palette is the
 // runtime source of truth; every token is a color-mix derivation from
-// it, ported exactly from scss/tokens/_index.scss so a resolved token
+// it, ported exactly from css/tokens/index.css so a resolved token
 // here matches what the Rust shell's compiled CSS produces.
 package styling
 
@@ -13,7 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// RemBase is the rem the SCSS base values multiply: styling.rs's
+// RemBase is the rem the stylesheet's base values multiply: styling.rs's
 // REM_BASE.
 const RemBase = 16.0
 
@@ -27,7 +27,7 @@ type Palette struct {
 	Green, Blue           render.Color
 }
 
-// Default returns the palette compiled into _palette.scss: the Catppuccin
+// Default returns the palette in css/palette.css: the Catppuccin
 // Mocha set the Rust shell falls back to when no theme file overrides it.
 func Default() *Palette {
 	return &Palette{
@@ -72,7 +72,7 @@ func ColorMix(a, b render.Color, pct int) render.Color {
 }
 
 // Token resolves one design token against the palette. The percentages
-// are the tokens.scss color-mix table, one entry per token; a token
+// are the css/tokens/index.css color-mix table, one entry per token; a token
 // without a mix is a palette color passed through.
 func (p *Palette) Token(t config.CssToken) (render.Color, bool) {
 	switch t {
@@ -229,7 +229,7 @@ func rgbaStraight(r, g, b, a uint8) render.Color {
 }
 
 // RoundingRadiusPx resolves a rounding level to corner pixels: the
-// --radius-* table (tokens.scss $base-radius-*) times the scale, with
+// --radius-* table (css/tokens/index.css) times the scale, with
 // full pinned at 9999px unscaled.
 func RoundingRadiusPx(level config.RoundingLevel, scale float64) int {
 	if level == config.RoundingFull {

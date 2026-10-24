@@ -495,7 +495,7 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 }
 
 // buildRoot assembles one bar the way bar/mod.rs's view does, so the
-// compiled bar SCSS styles it:
+// bar CSS styles it:
 //
 //	window.bar.<location>.<connector>[.floating]   (the --bar-* variables inline)
 //	└ centerbox
@@ -505,7 +505,7 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 //
 // The window's CSS margins carry the insets and the shadow margin, its
 // border and background the bar chrome; the sections' margins carry the
-// padding (bar/_container.scss).
+// padding (bar/container.css).
 func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) widget.Widget {
 	cfg := ctx.Config
 	axis := widget.Row

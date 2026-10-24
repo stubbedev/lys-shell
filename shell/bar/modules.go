@@ -273,7 +273,7 @@ func Create(name string, ctx ModuleContext) (Module, error) {
 // group's carrying the bar-group class and the group name as its id,
 // each module inside classed `module` plus its per-instance class. The
 // gaps between items and grouped modules are the stylesheet's margins
-// (bar/_layout.scss), not box spacing.
+// (bar/layout.css), not box spacing.
 //
 // A module that cannot be built (its service is unavailable on this
 // system, its compositor is not running) is logged and left out, like

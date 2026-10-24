@@ -1,0 +1,37 @@
+entry.password {
+  all: unset;
+  background-color: var(--bg-overlay);
+  border: 1px solid transparent;
+  border-radius: var(--rounding-element);
+  padding: 0px var(--space-md);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+entry.password > text {
+  padding: var(--space-md) var(--space-xs);
+  margin-left: var(--space-sm);
+  margin-right: var(--space-sm);
+  color: var(--fg-default);
+}
+entry.password > text > placeholder {
+  color: var(--fg-subtle);
+}
+entry.password > text > selection {
+  background-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+entry.password:focus-within {
+  border-color: var(--accent);
+}
+entry.password > image.left,
+entry.password > image.right {
+  color: var(--fg-subtle);
+  -gtk-icon-size: var(--icon-md);
+}
+entry.password:disabled {
+  opacity: 0.5;
+}
+entry.password > image {
+  color: var(--fg-subtle);
+  -gtk-icon-size: var(--icon-md);
+}

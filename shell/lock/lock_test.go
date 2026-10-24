@@ -539,7 +539,7 @@ func TestSetConfigAppliesAReload(t *testing.T) {
 	}
 }
 
-// The surface is the Rust lock window's tree, styled by _lock.scss:
+// The surface is the Rust lock window's tree, styled by lock.css:
 // window.lock-window over the background, the .lock-center card with
 // its lock-* nodes, and the .lock-scrim; nothing pins an ink the
 // stylesheet should set.

@@ -1,0 +1,168 @@
+.media-header {
+  padding: calc(var(--space-sm) * 1.1) var(--space-md);
+  border-bottom: 1px solid var(--border-default);
+  border-spacing: var(--space-sm);
+  border-top-left-radius: var(--rounding-container);
+  border-top-right-radius: var(--rounding-container);
+  background: var(--bg-surface);
+}
+.media-header .media-header-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--fg-default);
+}
+
+button.media-source-button {
+  border-radius: var(--rounding-element);
+  transition: color var(--duration-fast);
+  color: var(--fg-muted);
+  border-spacing: var(--space-xs);
+}
+button.media-source-button:hover {
+  color: var(--fg-default);
+}
+button.media-source-button image.media-source-icon {
+  -gtk-icon-size: var(--icon-md);
+}
+button.media-source-button .media-source-name {
+  margin-left: var(--space-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+button.media-source-button image.media-source-chevron {
+  -gtk-icon-size: var(--icon-sm);
+}
+
+.media-artwork {
+  background-color: var(--bg-overlay);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 calc(-0.375rem * var(--global-scale)) calc(0.375rem * var(--global-scale)) calc(-0.25rem * var(--global-scale)) var(--bg-elevated);
+}
+
+.media-artwork-placeholder {
+  border-radius: var(--rounding-container);
+  background: var(--bg-hover);
+}
+.media-artwork-placeholder image.media-artwork-placeholder-icon {
+  -gtk-icon-size: var(--icon-xl);
+  margin: var(--icon-xl);
+  color: var(--accent);
+}
+
+.media-info {
+  padding: var(--space-md) var(--space-md) var(--space-xs);
+}
+.media-info .media-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--fg-default);
+}
+.media-info .media-title.placeholder {
+  color: var(--fg-subtle);
+  font-style: italic;
+}
+.media-info .media-artist {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-default);
+  margin-top: var(--space-sm);
+}
+.media-info .media-artist.placeholder {
+  color: var(--fg-subtle);
+  font-style: italic;
+}
+.media-info .media-album {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-subtle);
+  margin: var(--space-sm) 0;
+}
+.media-info .media-album.placeholder {
+  font-style: italic;
+}
+
+.media-progress {
+  padding: 0 calc(var(--space-md) + var(--space-xs));
+}
+
+scale.media-seek-slider trough {
+  min-height: var(--space-sm);
+  background: var(--bg-hover);
+  border-radius: var(--rounding-element);
+}
+scale.media-seek-slider trough highlight {
+  min-height: var(--space-sm);
+  background: var(--accent);
+  border-radius: var(--rounding-element);
+}
+scale.media-seek-slider trough slider {
+  all: unset;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  margin: calc(var(--space-md) / -2);
+  border-radius: var(--radius-full);
+  background: var(--fg-default);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+scale.media-seek-slider:hover trough slider {
+  opacity: 1;
+}
+
+.media-progress-times {
+  margin-top: var(--space-xs);
+}
+.media-progress-times .media-time {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-subtle);
+}
+
+.media-controls {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  border-spacing: var(--space-xs);
+}
+
+button.media-control {
+  all: unset;
+  border-radius: var(--radius-full);
+  color: var(--fg-muted);
+  transition: background var(--duration-fast), color var(--duration-fast);
+  margin-bottom: var(--space-sm);
+}
+button.media-control:hover {
+  background: var(--bg-overlay);
+  color: var(--fg-default);
+}
+button.media-control image {
+  -gtk-icon-size: var(--icon-md);
+  margin: var(--space-md);
+}
+button.media-control.main {
+  background: var(--accent);
+  color: var(--fg-on-accent);
+  margin-left: var(--space-sm);
+  margin-right: var(--space-sm);
+}
+button.media-control.main:hover {
+  background: var(--accent-hover);
+}
+button.media-control.main image {
+  -gtk-icon-size: var(--icon-xl);
+  margin: calc(var(--space-sm) + var(--space-xs));
+}
+button.media-control.secondary {
+  color: var(--fg-muted);
+}
+button.media-control.secondary image {
+  -gtk-icon-size: var(--icon-sm);
+  margin: calc(var(--space-xs) + var(--space-xs));
+}
+button.media-control.secondary.active {
+  color: var(--accent);
+}
+button.media-control:disabled {
+  opacity: 0.4;
+}

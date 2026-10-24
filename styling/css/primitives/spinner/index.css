@@ -1,0 +1,19 @@
+spinner {
+  all: unset;
+  opacity: 0;
+  -gtk-icon-source: -gtk-icontheme("tb-loader-2-symbolic");
+  -gtk-icon-size: var(--icon-xl);
+}
+spinner:checked {
+  opacity: 1;
+  animation: spin var(--cfg-anim-spin, 1s) linear infinite;
+}
+spinner:checked:disabled {
+  opacity: 0.5;
+}
+spinner.sm {
+  -gtk-icon-size: var(--icon-md);
+}
+spinner.lg {
+  -gtk-icon-size: var(--icon-2xl);
+}

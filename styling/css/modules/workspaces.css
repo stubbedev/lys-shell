@@ -1,0 +1,120 @@
+.workspaces {
+  all: unset;
+  border-radius: calc(var(--bar-button-rounding-element) * 1.2);
+  background-color: color-mix(in srgb, var(--ws-container-bg-color) var(--bar-button-bg-opacity), transparent);
+}
+.workspaces.border-all {
+  box-shadow: inset 0 0 0 var(--ws-border-width) var(--ws-border-color);
+}
+.workspaces.border-top {
+  box-shadow: inset 0 var(--ws-border-width) 0 0 var(--ws-border-color);
+}
+.workspaces.border-bottom {
+  box-shadow: inset 0 calc(-1 * var(--ws-border-width)) 0 0 var(--ws-border-color);
+}
+.workspaces.border-left {
+  box-shadow: inset var(--ws-border-width) 0 0 0 var(--ws-border-color);
+}
+.workspaces.border-right {
+  box-shadow: inset calc(-1 * var(--ws-border-width)) 0 0 0 var(--ws-border-color);
+}
+
+.workspace {
+  all: unset;
+  min-width: var(--bar-space-lg);
+  min-height: var(--bar-space-lg);
+  border-radius: var(--bar-button-rounding-element);
+  transition: background-color var(--duration-fast), border-color var(--duration-fast);
+}
+.workspace.indicator-background.active {
+  background-color: var(--ws-override-color, var(--ws-active-color));
+}
+.workspace.indicator-background.active-other-monitor {
+  background-color: var(--ws-override-color, var(--ws-active-other-monitor-color));
+}
+.workspace.indicator-underline.active {
+  background-image: linear-gradient(to top, var(--ws-override-color, var(--ws-active-color)) 2px, transparent 2px);
+}
+.workspace.indicator-underline.active.vertical {
+  background-image: linear-gradient(to right, var(--ws-override-color, var(--ws-active-color)) 2px, transparent 2px);
+}
+.workspace.indicator-underline.active-other-monitor {
+  background-image: linear-gradient(to top, var(--ws-override-color, var(--ws-active-other-monitor-color)) 2px, transparent 2px);
+}
+.workspace.indicator-underline.active-other-monitor.vertical {
+  background-image: linear-gradient(to right, var(--ws-override-color, var(--ws-active-other-monitor-color)) 2px, transparent 2px);
+}
+.workspace.active .workspace-label,
+.workspace.active .workspace-icon,
+.workspace.active .workspace-custom-icon,
+.workspace.active .workspace-divider {
+  color: var(--ws-override-color, var(--ws-active-color));
+}
+.workspace.active.indicator-background .workspace-label,
+.workspace.active.indicator-background .workspace-icon,
+.workspace.active.indicator-background .workspace-custom-icon,
+.workspace.active.indicator-background .workspace-divider {
+  color: var(--fg-on-accent);
+}
+.workspace.active-other-monitor .workspace-label,
+.workspace.active-other-monitor .workspace-icon,
+.workspace.active-other-monitor .workspace-custom-icon,
+.workspace.active-other-monitor .workspace-divider {
+  color: var(--ws-override-color, var(--ws-active-other-monitor-color));
+}
+.workspace.active-other-monitor.indicator-background .workspace-label,
+.workspace.active-other-monitor.indicator-background .workspace-icon,
+.workspace.active-other-monitor.indicator-background .workspace-custom-icon,
+.workspace.active-other-monitor.indicator-background .workspace-divider {
+  color: var(--fg-on-accent);
+}
+.workspace.occupied:not(.active) .workspace-label,
+.workspace.occupied:not(.active) .workspace-icon,
+.workspace.occupied:not(.active) .workspace-custom-icon,
+.workspace.occupied:not(.active) .workspace-divider {
+  color: var(--ws-override-color, var(--ws-occupied-color));
+}
+.workspace.empty .workspace-label,
+.workspace.empty .workspace-custom-icon,
+.workspace.empty .workspace-divider {
+  color: var(--ws-override-color, var(--ws-empty-color));
+}
+.workspace.empty .workspace-icon-empty {
+  color: var(--ws-override-color, var(--ws-empty-color));
+}
+.workspace.urgent:not(.urgent-application) {
+  opacity: 0.5;
+}
+.workspace.special {
+  opacity: 0.8;
+}
+.workspace:hover:not(.active) {
+  background-color: color-mix(in srgb, var(--ws-active-color) 15%, transparent);
+}
+
+.workspace-content {
+  margin: calc(var(--ws-margin-vertical-px) * 1px) calc(var(--ws-margin-horizontal-px) * 1px);
+}
+
+.workspace-label {
+  font-family: var(--font-sans);
+  font-size: calc(var(--ws-label-size-px) * 1px);
+  font-weight: var(--weight-bold);
+}
+
+.workspace-custom-icon {
+  -gtk-icon-size: calc(var(--ws-icon-size-px) * 1px);
+}
+
+.workspace-icon {
+  -gtk-icon-size: calc(var(--ws-icon-size-px) * 1px);
+}
+.workspace-icon.urgent {
+  opacity: 0.5;
+}
+
+.workspace-divider {
+  font-family: var(--font-sans);
+  font-size: calc(var(--ws-label-size-px) * 1px);
+  font-weight: var(--weight-bold);
+}

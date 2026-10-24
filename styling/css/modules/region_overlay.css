@@ -1,0 +1,10 @@
+.region-overlay-window {
+  background: transparent;
+}
+.region-overlay-window .region-overlay-area {
+  color: var(--palette-primary);
+}
+
+.color-picker-window {
+  background: transparent;
+}

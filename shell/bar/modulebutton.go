@@ -12,7 +12,7 @@ import (
 
 // barButton is the port of the Rust BarButton
 // (crates/wayle-widgets/src/components/bar_buttons/component.rs): the
-// same widget tree and classes, so the compiled bar-button SCSS styles
+// same widget tree and classes, so the bar-button CSS styles
 // it as it styles the GTK one —
 //
 //	menubutton.bar-button.<variant>[.icon-only][.label-only][.vertical][.border-*][.icon-end]

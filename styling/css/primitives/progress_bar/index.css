@@ -1,0 +1,36 @@
+.progress-bar {
+  all: unset;
+}
+.progress-bar trough {
+  background: var(--bg-active);
+  border-radius: var(--rounding-element);
+  min-height: calc(0.5rem * var(--global-scale));
+  border: none;
+}
+.progress-bar trough progress {
+  border: none;
+  background: var(--accent);
+  border-radius: var(--rounding-element);
+  min-height: calc(0.5rem * var(--global-scale));
+}
+.progress-bar.sm trough {
+  min-height: calc(0.25rem * var(--global-scale));
+}
+.progress-bar.sm trough progress {
+  min-height: calc(0.25rem * var(--global-scale));
+}
+.progress-bar.lg trough {
+  min-height: calc(0.75rem * var(--global-scale));
+}
+.progress-bar.lg trough progress {
+  min-height: calc(0.75rem * var(--global-scale));
+}
+.progress-bar.success trough progress {
+  background: var(--status-success);
+}
+.progress-bar.warning trough progress {
+  background: var(--status-warning);
+}
+.progress-bar.error trough progress {
+  background: var(--status-error);
+}

@@ -6,7 +6,7 @@ import "fmt"
 // are the config strings ("bg-surface", "border-accent", ...). The
 // palette-side resolution lives in the styling package; the numeric mix
 // percentages each token resolves through live in styling/tokens.go,
-// ported from crates/wayle-styling/scss/tokens
+// ported from styling/css/tokens
 // (crates/wayle-config/src/schemas/styling/types/color.rs CssToken).
 type CssToken string
 

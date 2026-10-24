@@ -83,7 +83,7 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	}
 
 	// The module label size: pixels are literal; multipliers scale the
-	// SCSS base ($base-btn-label-size: 1.04rem) by the bar scale and the
+	// stylesheet base (--bar-btn-label-size: 1.04rem) by the bar scale and the
 	// configured multiplier.
 	labelSize := bar.ButtonLabelSize
 	var labelPx float64
@@ -109,7 +109,7 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	}
 }
 
-// buttonLabelBaseRem is tokens.scss's $base-btn-label-size, the base
+// buttonLabelBaseRem is tokens/index.css's --bar-btn-label-size base,
 // the button-label-size multiplier scales.
 const buttonLabelBaseRem = 1.04
 

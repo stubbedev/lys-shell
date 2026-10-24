@@ -1,0 +1,25 @@
+.empty-state {
+  all: unset;
+}
+.empty-state .icon {
+  color: var(--fg-subtle);
+  -gtk-icon-size: var(--icon-4xl);
+}
+.empty-state .icon.sm {
+  -gtk-icon-size: var(--icon-2xl);
+}
+.empty-state .icon.lg {
+  -gtk-icon-size: var(--icon-6xl);
+}
+.empty-state .title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--fg-muted);
+  margin-top: var(--space-sm);
+}
+.empty-state .description {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  margin-top: var(--space-sm);
+  color: var(--fg-subtle);
+}

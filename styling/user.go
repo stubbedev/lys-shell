@@ -1,47 +1,58 @@
 package styling
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
-
-	"github.com/stubbedev/lys-shell/internal/scss"
 )
 
-// userStylesTemplate is the starter index.scss, byte for byte the one
-// ensure_user_styles_scaffold writes.
-const userStylesTemplate = "// Custom lys-shell styles. Anything here overrides the built-in styling.\n" +
-	"// Use @import \"name\" to bring in _name.scss from this folder.\n"
+// userStylesTemplate is the starter index.css.
+const userStylesTemplate = "/* Custom lys-shell styles. Anything here overrides the built-in styling. */\n"
 
-// UserCSS compiles the user's optional overrides at
-// <configDir>/styles/index.scss: lib.rs's user_css. An absent entry
-// file is no overrides; a read or compile failure is logged and yields
-// "" too, so a broken user stylesheet leaves the rest of the bundle
-// intact.
+// UserStylesFile is the user's stylesheet under <configDir>/styles/.
+const UserStylesFile = "index.css"
+
+// LegacyUserStylesFile is the SCSS entry lys-shell read before its
+// styles became plain CSS.
+const LegacyUserStylesFile = "index.scss"
+
+// UserCSS is the user's optional overrides at
+// <configDir>/styles/index.css. A failure is logged and yields "", so
+// a broken user stylesheet leaves the rest of the bundle intact.
 func UserCSS(configDir string) string {
 	css, err := TryUserCSS(configDir)
 	if err != nil {
-		log.Printf("styling: user styles compilation failed: %v", err)
+		log.Printf("styling: user styles: %v", err)
 		return ""
 	}
 	return css
 }
 
-// TryUserCSS is UserCSS surfacing the failure: lib.rs's try_user_css.
-// ("", nil) means the entry file does not exist. <configDir>/styles/ is
-// the load path, so index.scss can @import or @use sibling partials.
+// TryUserCSS is UserCSS surfacing the failure. ("", nil) means the file
+// does not exist. A leftover styles/index.scss is an error naming the
+// CSS file that replaces it, so its rules never silently stop applying.
 func TryUserCSS(configDir string) (string, error) {
 	stylesDir := filepath.Join(configDir, "styles")
-	entry := filepath.Join(stylesDir, "index.scss")
-	if _, err := os.Stat(entry); err != nil {
-		// Path::exists: any stat failure reads as absent.
+	legacy := filepath.Join(stylesDir, LegacyUserStylesFile)
+	if _, err := os.Stat(legacy); err == nil {
+		return "", fmt.Errorf("%s is SCSS, which lys-shell no longer reads: move its rules, as plain CSS, to %s",
+			legacy, filepath.Join(stylesDir, UserStylesFile))
+	}
+	entry := filepath.Join(stylesDir, UserStylesFile)
+	data, err := os.ReadFile(entry) //nolint:gosec // the user's own stylesheet
+	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil
 	}
-	return scss.Compile(entry, stylesDir)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", entry, err)
+	}
+	return string(data), nil
 }
 
-// UserStylesDir returns <configDir>/styles/ when it is a directory:
-// lib.rs's user_styles_dir.
+// UserStylesDir returns <configDir>/styles/ when it is a directory.
 func UserStylesDir(configDir string) (string, bool) {
 	dir := filepath.Join(configDir, "styles")
 	if info, err := os.Stat(dir); err == nil && info.IsDir() {
@@ -51,21 +62,20 @@ func UserStylesDir(configDir string) (string, bool) {
 }
 
 // EnsureUserStylesScaffold creates <configDir>/styles/ and a starter
-// index.scss when either is missing: lib.rs's
-// ensure_user_styles_scaffold. It is a no-op once both exist, and never
-// overwrites the user's file; failures are logged, not returned, so
-// scaffolding never blocks startup.
+// index.css when either is missing. It is a no-op once both exist, and
+// never overwrites the user's file; failures are logged, not returned,
+// so scaffolding never blocks startup.
 func EnsureUserStylesScaffold(configDir string) {
 	stylesDir := filepath.Join(configDir, "styles")
-	if err := os.MkdirAll(stylesDir, 0o755); err != nil { //nolint:gosec // the config dir is the user's own, as in the Rust shell
+	if err := os.MkdirAll(stylesDir, 0o755); err != nil { //nolint:gosec // the config dir is the user's own
 		log.Printf("styling: cannot create user styles directory %s: %v", stylesDir, err)
 		return
 	}
-	entry := filepath.Join(stylesDir, "index.scss")
+	entry := filepath.Join(stylesDir, UserStylesFile)
 	if _, err := os.Stat(entry); err == nil {
 		return
 	}
 	if err := os.WriteFile(entry, []byte(userStylesTemplate), 0o644); err != nil { //nolint:gosec // a user-editable stylesheet, readable like the rest of the config
-		log.Printf("styling: cannot create user styles/index.scss %s: %v", entry, err)
+		log.Printf("styling: cannot create user styles/%s %s: %v", UserStylesFile, entry, err)
 	}
 }

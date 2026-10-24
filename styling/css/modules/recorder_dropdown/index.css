@@ -1,0 +1,190 @@
+@keyframes recorder-prepare-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+.recorder-preparing .icon-container {
+  animation: recorder-prepare-pulse var(--cfg-anim-pulse, 0.6s) ease-in-out infinite alternate;
+}
+
+@keyframes recorder-status-blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.25;
+  }
+}
+.recorder-status {
+  border-spacing: var(--space-sm);
+}
+.recorder-status .recorder-status-dot {
+  min-width: var(--space-sm);
+  min-height: var(--space-sm);
+  border-radius: 9999px;
+  background: var(--status-error);
+  animation: recorder-status-blink 1s ease-in-out infinite alternate;
+}
+.recorder-status .recorder-status-dot.paused {
+  background: var(--fg-subtle);
+  animation: none;
+}
+.recorder-status .recorder-status-time {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  font-feature-settings: "tnum";
+  color: var(--fg-default);
+}
+
+.recorder-dropdown-content .recorder-controls {
+  margin-bottom: var(--space-sm);
+}
+.recorder-dropdown-content .recorder-controls > button {
+  min-height: calc(2rem * var(--global-scale));
+}
+.recorder-dropdown-content .recorder-controls > button > box {
+  margin: var(--space-sm) var(--space-md);
+}
+.recorder-dropdown-content .recorder-controls > button > box image {
+  -gtk-icon-size: var(--icon-sm);
+}
+.recorder-dropdown-content .recorder-controls .recorder-pause-button {
+  min-width: calc(2rem * var(--global-scale));
+}
+.recorder-dropdown-content .recorder-controls .recorder-pause-button image {
+  -gtk-icon-size: var(--icon-sm);
+}
+.recorder-dropdown-content .recorder-section-header {
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-sm);
+}
+.recorder-dropdown-content .recorder-section-header > image {
+  -gtk-icon-size: var(--icon-sm);
+  color: var(--fg-subtle);
+}
+.recorder-dropdown-content .recorder-section-header > image,
+.recorder-dropdown-content .recorder-section-header > .section-label {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.recorder-dropdown-content .recorder-position-preview {
+  border-radius: var(--rounding-element);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-strong);
+}
+.recorder-dropdown-content .recorder-position-cam {
+  border-radius: var(--rounding-element);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  opacity: 0.85;
+  transition: opacity var(--duration-fast);
+}
+.recorder-dropdown-content .recorder-position-cam:hover {
+  opacity: 1;
+}
+.recorder-dropdown-content .recorder-card {
+  padding: 0;
+}
+.recorder-dropdown-content .recorder-card .recorder-row + .recorder-row {
+  border-top: 1px solid var(--border-subtle);
+}
+.recorder-dropdown-content .recorder-row {
+  min-height: calc(2.25rem * var(--global-scale));
+  padding: var(--space-sm) var(--space-md);
+}
+.recorder-dropdown-content .recorder-row > label {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--fg-default);
+}
+.recorder-dropdown-content .recorder-row > switch {
+  margin: var(--space-xs) 0;
+  min-height: calc(1rem * var(--global-scale));
+  min-width: calc(3.5rem * var(--global-scale));
+}
+.recorder-dropdown-content .recorder-row > switch slider {
+  min-width: calc(0.8rem * var(--global-scale));
+  min-height: calc(0.8rem * var(--global-scale));
+}
+.recorder-dropdown-content .recorder-row > dropdown,
+.recorder-dropdown-content .recorder-row > spinbutton {
+  min-width: calc(8rem * var(--global-scale));
+  color: var(--fg-default);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--rounding-element);
+  transition: border-color var(--duration-fast);
+}
+.recorder-dropdown-content .recorder-row > dropdown:focus-within,
+.recorder-dropdown-content .recorder-row > spinbutton:focus-within {
+  border-color: var(--accent);
+}
+.recorder-dropdown-content .recorder-row > dropdown > button {
+  all: unset;
+}
+.recorder-dropdown-content .recorder-row > dropdown > button > * {
+  margin: var(--space-xs) var(--space-sm);
+}
+.recorder-dropdown-content .recorder-row > dropdown > button arrow {
+  -gtk-icon-size: var(--icon-xs);
+  color: var(--fg-subtle);
+}
+.recorder-dropdown-content .recorder-row > dropdown popover > contents {
+  padding: var(--space-xs);
+}
+.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rounding-element);
+  color: var(--fg-muted);
+  transition: background-color var(--duration-fast);
+}
+.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row:not(:last-child) {
+  margin-bottom: var(--space-xs);
+}
+.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row:hover {
+  background-color: var(--bg-hover);
+  color: var(--fg-default);
+}
+.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row:selected {
+  background-color: var(--accent-subtle);
+  color: var(--accent);
+}
+.recorder-dropdown-content .recorder-row > spinbutton > text {
+  min-height: 0;
+  padding: var(--space-xs) var(--space-sm);
+}
+.recorder-dropdown-content .recorder-row > spinbutton button {
+  all: unset;
+  color: var(--fg-muted);
+  padding: 0 var(--space-xs);
+  transition: color var(--duration-fast);
+}
+.recorder-dropdown-content .recorder-row > spinbutton button:hover {
+  color: var(--fg-default);
+}
+
+.webcam-preview-window {
+  background: transparent;
+}
+.webcam-preview-window .webcam-preview-picture {
+  border-radius: var(--rounding-element);
+  border: 2px solid var(--accent);
+  background: rgba(0, 0, 0, 0.4);
+}
+.webcam-preview-window .webcam-preview-done {
+  margin: var(--space-xs);
+  min-width: calc(1.75rem * var(--global-scale));
+  min-height: calc(1.75rem * var(--global-scale));
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--fg-on-accent);
+  opacity: 0.9;
+}
+.webcam-preview-window .webcam-preview-done:hover {
+  opacity: 1;
+}

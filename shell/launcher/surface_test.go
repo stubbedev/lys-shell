@@ -611,7 +611,7 @@ func TestMessageMarkupFallsBackToTheLiteral(t *testing.T) {
 
 // Every label takes its ink from the stylesheet, so a selected row
 // reads --fg-on-accent and urgent and active rows their colors
-// (_launcher.scss): nothing in the open surface pins one.
+// (launcher.css): nothing in the open surface pins one.
 func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 	h := newHarness(t)
 	h.open(dmenu(), false, "alpha", "beta")

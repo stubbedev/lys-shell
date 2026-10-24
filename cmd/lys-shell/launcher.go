@@ -68,7 +68,7 @@ Local commands: -help, -version, -dump-config, -dump-theme, -list-keybindings`
 // launcherDumpTheme is the -dump-theme answer: there are no rasi
 // themes.
 const launcherDumpTheme = `# lys-shell does not use rasi themes; the launcher is styled by the
-# lys-shell palette/SCSS system. See ` + "`lys-settings`" + ` (Launcher page)
+# lys-shell palette/CSS system. See ` + "`lys-settings`" + ` (Launcher page)
 # and the styling config section.`
 
 // runLauncher is `lys-shell launcher` (and the whole argv of a `rofi`

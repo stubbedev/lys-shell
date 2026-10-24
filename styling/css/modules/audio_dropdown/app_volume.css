@@ -1,0 +1,61 @@
+.app-volumes-scroll {
+  background: transparent;
+}
+
+.app-volumes-inner {
+  padding: 0;
+}
+
+.audio-app-list {
+  background: var(--bg-elevated);
+  border-radius: var(--rounding-element);
+}
+
+.audio-app-item {
+  padding: var(--space-sm);
+}
+.audio-app-item .audio-app-header {
+  border-spacing: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+.audio-app-item .audio-app-icon {
+  background: var(--bg-overlay);
+  border-radius: var(--rounding-element);
+}
+.audio-app-item .audio-app-icon image.audio-app-icon-img {
+  -gtk-icon-size: var(--icon-md);
+  color: var(--fg-muted);
+  margin: var(--space-xs);
+}
+.audio-app-item .audio-app-name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-default);
+}
+.audio-app-item .audio-app-value {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-muted);
+}
+.audio-app-item .audio-app-slider {
+  padding-left: var(--space-xs);
+  margin-top: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+.audio-app-item .audio-app-scale trough {
+  border-radius: var(--radius-xl);
+}
+.audio-app-item .audio-app-scale trough slider {
+  min-width: calc(var(--space-sm) * 1.5);
+  min-height: calc(var(--space-sm) * 1.5);
+}
+.audio-app-item.audio-muted .audio-app-name {
+  color: var(--fg-subtle);
+}
+.audio-app-item.audio-muted .audio-app-scale trough highlight {
+  background: var(--fg-subtle);
+}
+
+.audio-app-item + .audio-app-item {
+  border-top: 1px solid var(--border-subtle);
+}

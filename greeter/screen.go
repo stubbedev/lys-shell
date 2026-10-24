@@ -102,7 +102,7 @@ type userButton struct {
 }
 
 // newScreen builds the greeter view (app.rs init): font shapes the
-// text and sheet styles the window through the _lock.scss rules the
+// text and sheet styles the window through the lock.css rules the
 // greeter shares with the lock screen.
 func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *screen {
 	s := &screen{init: init, d: d}

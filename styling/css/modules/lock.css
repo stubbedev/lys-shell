@@ -1,0 +1,131 @@
+.lock-window {
+  background: transparent;
+}
+.lock-window .lock-bg {
+  background: transparent;
+}
+.lock-window .lock-bg-scrim {
+  background: rgba(0, 0, 0, 0.45);
+}
+.lock-window .lock-center {
+  padding: 2rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.lock-window .lock-clock {
+  color: var(--palette-fg);
+  font-size: 4rem;
+  font-weight: 700;
+}
+.lock-window .lock-date {
+  color: var(--palette-fg-muted);
+  font-size: 1.25rem;
+}
+.lock-window .lock-entry {
+  margin-top: 1rem;
+}
+.lock-window .lock-entry text {
+  letter-spacing: 0.15em;
+}
+.lock-window .lock-error {
+  margin-top: 0.5rem;
+  color: var(--palette-red);
+}
+.lock-window .lock-users {
+  margin-top: 1rem;
+}
+.lock-window .lock-users .lock-user-button {
+  background: transparent;
+  padding: 0.5rem;
+  border-radius: 12px;
+}
+.lock-window .lock-users .lock-user-button:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+.lock-window .lock-users .lock-user-button.selected {
+  background: rgba(0, 0, 0, 0.5);
+}
+.lock-window .lock-users .lock-avatar {
+  border-radius: 50%;
+}
+.lock-window .lock-users .lock-avatar-fallback {
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--palette-fg);
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+.lock-window .lock-users .lock-user-name {
+  color: var(--palette-fg-muted);
+  font-size: 0.9rem;
+}
+.lock-window .lock-user {
+  margin-top: 1rem;
+}
+.lock-window .lock-caps {
+  margin-top: 0.5rem;
+  color: var(--palette-yellow);
+  font-size: 0.9rem;
+}
+.lock-window .lock-session {
+  margin-top: 1rem;
+}
+.lock-window .lock-session > button {
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--palette-fg);
+  border: none;
+  box-shadow: none;
+  border-radius: var(--rounding-element);
+  padding: 0.4rem 1rem;
+}
+.lock-window .lock-session > button:hover, .lock-window .lock-session > button:focus-visible {
+  background: rgba(0, 0, 0, 0.55);
+}
+.lock-window .lock-session > button arrow {
+  -gtk-icon-source: -gtk-icontheme("ld-chevron-down-symbolic");
+  -gtk-icon-size: 1rem;
+  min-width: 1rem;
+  min-height: 1rem;
+  margin-left: 0.5rem;
+  color: var(--palette-fg-muted);
+}
+.lock-window .lock-session > popover > contents {
+  padding: 0.375rem;
+  border-radius: var(--rounding-container);
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-hover);
+  box-shadow: var(--shadow);
+}
+.lock-window .lock-session > popover listview {
+  background: transparent;
+}
+.lock-window .lock-session > popover listview > row {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--rounding-element);
+  color: var(--fg-default);
+}
+.lock-window .lock-session > popover listview > row:hover {
+  background: var(--bg-overlay);
+}
+.lock-window .lock-session > popover listview > row:selected {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.lock-window .lock-session > popover listview > row image {
+  margin-left: 0.75rem;
+}
+.lock-window .lock-power {
+  margin-bottom: 2rem;
+}
+.lock-window .lock-power .lock-power-button {
+  color: var(--palette-fg-muted);
+  background: transparent;
+  padding: 0.75rem;
+  border-radius: 12px;
+}
+.lock-window .lock-power .lock-power-button:hover {
+  color: var(--palette-fg);
+  background: rgba(0, 0, 0, 0.35);
+}
+.lock-window .lock-scrim {
+  background: #000000;
+}

@@ -1,0 +1,103 @@
+.bluetooth-device-list {
+  border-radius: var(--rounding-element);
+  padding: 0;
+}
+.bluetooth-device-list .bluetooth-device + .bluetooth-device {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.bluetooth-device {
+  padding: var(--space-sm);
+  color: var(--fg-muted);
+  transition: background var(--duration-fast);
+}
+.bluetooth-device.available:hover {
+  background: var(--bg-hover);
+}
+.bluetooth-device:first-child {
+  border-top-left-radius: var(--rounding-element);
+  border-top-right-radius: var(--rounding-element);
+}
+.bluetooth-device:last-child {
+  border-bottom-left-radius: var(--rounding-element);
+  border-bottom-right-radius: var(--rounding-element);
+}
+
+.bluetooth-device-icon {
+  border-radius: var(--rounding-element);
+  background: var(--bg-overlay);
+  margin-right: var(--space-sm);
+}
+.bluetooth-device-icon image.bluetooth-icon {
+  -gtk-icon-size: var(--icon-lg);
+  margin: var(--space-sm);
+  color: var(--fg-muted);
+}
+.bluetooth-device-icon.paired image.bluetooth-icon {
+  color: var(--fg-muted);
+}
+.bluetooth-device-icon.connected {
+  background: var(--accent-subtle);
+}
+.bluetooth-device-icon.connected image.bluetooth-icon {
+  color: var(--accent);
+}
+
+.bluetooth-device-info {
+  min-width: 0;
+}
+
+.bluetooth-device-name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-default);
+}
+
+.bluetooth-device-detail-row image.bluetooth-battery-icon {
+  -gtk-icon-size: var(--icon-md);
+  color: var(--fg-subtle);
+}
+
+.bluetooth-detail-separator {
+  font-size: var(--text-base);
+  color: var(--fg-subtle);
+  margin-left: var(--space-sm);
+  margin-right: var(--space-xs);
+}
+
+.bluetooth-device-detail {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--fg-subtle);
+}
+
+.bluetooth-hover-stack {
+  margin-left: var(--space-xs);
+}
+
+.bluetooth-device-status {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--fg-subtle);
+  margin-left: 0;
+  margin-right: var(--space-sm);
+}
+.bluetooth-device-status.pending {
+  color: var(--fg-muted);
+}
+
+.bluetooth-device-actions {
+  margin-left: 0;
+  margin-right: var(--space-sm);
+}
+.bluetooth-device-actions button {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+.bluetooth-device-actions button > box {
+  margin: var(--space-xs) var(--space-sm);
+}
+
+button.bluetooth-forget:hover {
+  color: var(--status-error);
+}

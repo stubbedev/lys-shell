@@ -17,7 +17,6 @@
           gofumpt # the formatter behind `golangci-lint fmt`
           gopls
           delve
-          grass-sass # SCSS compiler for `just css`
 
           just
 

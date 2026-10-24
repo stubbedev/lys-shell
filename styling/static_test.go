@@ -1,86 +1,94 @@
 package styling
 
 import (
-	"os"
+	"io/fs"
+	"path"
+	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stubbedev/lys-ui/widget"
 )
 
-// TestStaticCSSIsFresh pins the embedded stylesheet to the SCSS it was
-// compiled from: an SCSS edit without `just css` fails here, naming
-// the fix. LYS_SHELL_UPDATE_STATIC_CSS=1 (set by the recipe, right after
-// grass rewrote static.css) records the new tree hash.
-func TestStaticCSSIsFresh(t *testing.T) {
-	sum, err := scssTreeHash(scssDir)
-	if err != nil {
-		t.Fatalf("hash the SCSS tree: %v", err)
-	}
-	if os.Getenv("LYS_SHELL_UPDATE_STATIC_CSS") == "1" {
-		if err := os.WriteFile(staticSumFile, []byte(sum+"\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		return
-	}
-	recorded, err := os.ReadFile(staticSumFile)
-	if err != nil {
-		t.Fatalf("read %s: %v", staticSumFile, err)
-	}
-	if got := strings.TrimSpace(string(recorded)); got != sum {
-		t.Fatalf("styling/static.css is stale: the SCSS under %s changed (hash %s, compiled from %s); run `just css`", scssDir, sum, got)
+// TestSheetOrderCoversEveryFile pins sheetOrder to the css/ tree: a
+// file left out of the order would never load, and a listed file that
+// is gone would panic at startup.
+func TestSheetOrderCoversEveryFile(t *testing.T) {
+	if gaps := orderGaps(sheets, "css", sheetOrder); gaps != nil {
+		t.Errorf("sheetOrder against css/: %v", gaps)
 	}
 }
 
-func TestScssTreeHashTracksEdits(t *testing.T) {
-	dir := t.TempDir()
-	write := func(name, body string) {
-		t.Helper()
-		if err := os.WriteFile(dir+"/"+name, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
+func TestOrderGapsNamesEachMismatch(t *testing.T) {
+	fsys := fstest.MapFS{
+		"css/a.css":     {},
+		"css/sub/b.css": {},
+		"css/notes.txt": {},
 	}
-	write("a.scss", ".a { color: red; }")
-	write("notes.txt", "ignored")
-	base, err := scssTreeHash(dir)
-	if err != nil {
-		t.Fatal(err)
+	if gaps := orderGaps(fsys, "css", []string{"a.css", "sub/b.css"}); gaps != nil {
+		t.Errorf("a matching order reported %v", gaps)
 	}
-	write("notes.txt", "still ignored")
-	if again, _ := scssTreeHash(dir); again != base {
-		t.Error("a non-SCSS file moved the hash")
-	}
-	write("a.scss", ".a { color: blue; }")
-	if edited, _ := scssTreeHash(dir); edited == base {
-		t.Error("an SCSS edit did not move the hash")
-	}
-	if _, err := scssTreeHash(dir + "/missing"); err == nil {
-		t.Error("a missing tree hashed")
+	gaps := orderGaps(fsys, "css", []string{"a.css", "a.css", "gone.css"})
+	want := []string{"listed twice: a.css", "listed but absent: gone.css", "not listed: sub/b.css"}
+	if !slices.Equal(gaps, want) {
+		t.Errorf("gaps = %q, want %q", gaps, want)
 	}
 }
 
-// TestStaticCSSIsTheCompiledBundle spot-checks the artifact: the global
-// reset, the token block, and the bar rules the Go bar relies on.
-func TestStaticCSSIsTheCompiledBundle(t *testing.T) {
+// orderGaps lists every way order disagrees with the .css files under
+// root in fsys, nil when it lists each exactly once.
+func orderGaps(fsys fs.FS, root string, order []string) []string {
+	files := map[string]bool{}
+	_ = fs.WalkDir(fsys, root, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && path.Ext(p) == ".css" {
+			files[strings.TrimPrefix(p, root+"/")] = true
+		}
+		return err
+	})
+	var gaps []string
+	seen := map[string]bool{}
+	for _, name := range order {
+		switch {
+		case seen[name]:
+			gaps = append(gaps, "listed twice: "+name)
+		case !files[name]:
+			gaps = append(gaps, "listed but absent: "+name)
+		}
+		seen[name] = true
+	}
+	var unlisted []string
+	for name := range files {
+		if !seen[name] {
+			unlisted = append(unlisted, "not listed: "+name)
+		}
+	}
+	slices.Sort(unlisted)
+	return append(gaps, unlisted...)
+}
+
+// TestStaticCSSIsTheBundle spot-checks the concatenation: the global
+// reset first, then the token block and the bar rules the Go bar
+// relies on.
+func TestStaticCSSIsTheBundle(t *testing.T) {
+	if !strings.HasPrefix(StaticCSS, "* {\n  all: unset;\n}") {
+		t.Errorf("StaticCSS does not open with the reset: %.40q", StaticCSS)
+	}
 	for _, want := range []string{
-		"* {\n  all: unset;\n}",
 		"--bg-surface-elevated: color-mix(in srgb, var(--palette-surface) 93%, var(--palette-fg));",
 		"menubutton.bar-button > button.toggle {",
 		".bar-group {",
 	} {
 		if !strings.Contains(StaticCSS, want) {
-			t.Errorf("static.css lacks %q", want)
+			t.Errorf("StaticCSS lacks %q", want)
 		}
-	}
-	if strings.Contains(StaticCSS, "$") || strings.Contains(StaticCSS, "@import") {
-		t.Error("static.css still carries SCSS syntax: it is not compiled output")
 	}
 }
 
-// TestStaticCSSParsesClean pins engine completeness: the compiled
+// TestStaticCSSParsesClean pins engine completeness: the built-in
 // stylesheet goes through lys-ui's CSS engine with zero parse warnings.
 // Every declaration the engine cannot honor warns — a property the
-// SCSS starts using before the engine grows it, or a rule regression —
+// stylesheet starts using before the engine grows it, or a rule regression —
 // so this fails naming it instead of silently rendering wrong.
 func TestStaticCSSParsesClean(t *testing.T) {
 	var warns []string
@@ -90,7 +98,7 @@ func TestStaticCSSParsesClean(t *testing.T) {
 	if len(warns) == 0 {
 		return
 	}
-	t.Fatalf("the compiled stylesheet trips the CSS engine %d times:", len(warns))
+	t.Fatalf("the built-in stylesheet trips the CSS engine %d times:", len(warns))
 	for _, w := range warns {
 		t.Errorf("  %s", w)
 	}

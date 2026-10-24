@@ -1,0 +1,12 @@
+.bar.top .bar-section .bar-item + .bar-item, .bar.bottom .bar-section .bar-item + .bar-item {
+  margin-left: calc(var(--bar-module-gap-px) * 1px);
+}
+.bar.top .bar-group > .module + .module, .bar.bottom .bar-group > .module + .module {
+  margin-left: calc(var(--bar-group-module-gap-px) * 1px);
+}
+.bar.left .bar-section .bar-item + .bar-item, .bar.right .bar-section .bar-item + .bar-item {
+  margin-top: calc(var(--bar-module-gap-px) * 1px);
+}
+.bar.left .bar-group > .module + .module, .bar.right .bar-group > .module + .module {
+  margin-top: calc(var(--bar-group-module-gap-px) * 1px);
+}

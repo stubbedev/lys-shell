@@ -1,3 +1,0 @@
-@function scaled($value) {
-    @return calc(#{$value} * var(--global-scale));
-}

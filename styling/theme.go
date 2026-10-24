@@ -18,7 +18,7 @@ func formatF32(v float32) string { return strconv.FormatFloat(float64(v), 'f', -
 func formatF64(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
 // pxOverride is one bar-button size override declaration: a pixel size
-// sets "<name>: <n>px;" so the SCSS var(--…-override, calc(…)) prefers
+// sets "<name>: <n>px;" so the stylesheet's var(--…-override, calc(…)) prefers
 // it; a scale size emits nothing and the calc fallback applies
 // (lib.rs px_override).
 func pxOverride(name string, size config.Size) string {

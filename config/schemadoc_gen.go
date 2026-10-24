@@ -425,7 +425,7 @@ var schemaDocs = map[string]string{
 	"FitMode=fill":                                           "Scale to cover entire display, cropping excess.",
 	"FitMode=fit":                                            "Scale to fit within display, letterboxing if needed.",
 	"FitMode=stretch":                                        "Stretch to exactly fill, ignoring aspect ratio.",
-	"FontWeightClass":                                        "Font weight class for typography.\n\nMaps to CSS classes like `.weight-normal`, `.weight-bold`, etc.\nUses the existing `--weight-*` tokens defined in SCSS.",
+	"FontWeightClass":                                        "Font weight class for typography.\n\nMaps to CSS classes like `.weight-normal`, `.weight-bold`, etc.\nUses the existing `--weight-*` tokens defined in the stylesheet.",
 	"FontWeightClass=bold":                                   "Bold weight (--weight-bold: 700).",
 	"FontWeightClass=medium":                                 "Medium weight (--weight-medium: 500).",
 	"FontWeightClass=normal":                                 "Normal weight (--weight-normal: 400).",

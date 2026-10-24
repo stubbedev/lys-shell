@@ -31,7 +31,7 @@ func TestColorMixInterpolatesPremultipliedChannels(t *testing.T) {
 	}
 }
 
-func TestTokenTableMatchesTokensSCSS(t *testing.T) {
+func TestTokenTableMatchesTheTokensCSS(t *testing.T) {
 	p := Default()
 	for _, tc := range []struct {
 		token config.CssToken
@@ -44,7 +44,7 @@ func TestTokenTableMatchesTokensSCSS(t *testing.T) {
 		{config.TokenFgDefault, p.Fg},
 		{config.TokenFgMuted, p.FgMuted},
 		{config.TokenAccent, p.Primary},
-		// color-mix tokens, one per percentage used in tokens.scss.
+		// color-mix tokens, one per percentage used in css/tokens/index.css.
 		{config.TokenBgSurfaceElevated, ColorMix(p.Surface, p.Fg, 93)},
 		{config.TokenBgOverlay, ColorMix(p.Elevated, p.Fg, 92)},
 		{config.TokenBgHover, ColorMix(p.Elevated, p.Fg, 88)},

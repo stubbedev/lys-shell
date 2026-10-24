@@ -1,0 +1,66 @@
+menubutton.bar-button.icon-only .bar-button-label {
+  margin: 0rem;
+}
+menubutton.bar-button.weight-normal .bar-button-label {
+  font-weight: var(--weight-normal);
+}
+menubutton.bar-button.weight-medium .bar-button-label {
+  font-weight: var(--weight-medium);
+}
+menubutton.bar-button.weight-semibold .bar-button-label {
+  font-weight: var(--weight-semibold);
+}
+menubutton.bar-button.weight-bold .bar-button-label {
+  font-weight: var(--weight-bold);
+}
+menubutton.bar-button.radius-none > button.toggle {
+  border-radius: var(--radius-none);
+}
+menubutton.bar-button.radius-sm > button.toggle {
+  border-radius: var(--bar-radius-sm);
+}
+menubutton.bar-button.radius-md > button.toggle {
+  border-radius: var(--bar-radius-md);
+}
+menubutton.bar-button.radius-lg > button.toggle {
+  border-radius: var(--bar-radius-lg);
+}
+menubutton.bar-button.radius-xl > button.toggle {
+  border-radius: var(--bar-radius-xl);
+}
+menubutton.bar-button.radius-full > button.toggle {
+  border-radius: var(--radius-full);
+}
+menubutton.bar-button.border-top > button.toggle {
+  box-shadow: inset 0 var(--bar-btn-border-width) 0 0 var(--bar-btn-border-color);
+}
+menubutton.bar-button.border-bottom > button.toggle {
+  box-shadow: inset 0 calc(-1 * var(--bar-btn-border-width)) 0 0 var(--bar-btn-border-color);
+}
+menubutton.bar-button.border-left > button.toggle {
+  box-shadow: inset var(--bar-btn-border-width) 0 0 0 var(--bar-btn-border-color);
+}
+menubutton.bar-button.border-right > button.toggle {
+  box-shadow: inset calc(-1 * var(--bar-btn-border-width)) 0 0 0 var(--bar-btn-border-color);
+}
+menubutton.bar-button.border-all > button.toggle {
+  box-shadow: inset 0 0 0 var(--bar-btn-border-width) var(--bar-btn-border-color);
+}
+
+.media-disc menubutton.bar-button .icon-container image {
+  animation: media-spin var(--cfg-anim-media-spin, 2s) steps(20) infinite;
+  animation-play-state: paused;
+}
+
+.media-spinning menubutton.bar-button .icon-container image {
+  animation-play-state: running;
+}
+
+@keyframes media-spin {
+  from {
+    -gtk-icon-transform: rotate(0deg);
+  }
+  to {
+    -gtk-icon-transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,426 @@
+window.fontchooser {
+  background: var(--bg-surface);
+  border: none;
+  min-height: calc(31rem * var(--global-scale));
+  min-width: calc(25rem * var(--global-scale));
+}
+window.fontchooser headerbar {
+  background: var(--bg-surface);
+  border-bottom: 0.5px solid var(--border-subtle);
+  min-height: calc(2.5rem * var(--global-scale));
+  padding: var(--space-sm);
+}
+window.fontchooser headerbar label {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-default);
+}
+window.fontchooser headerbar button {
+  all: unset;
+  border-radius: var(--rounding-element);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  background: transparent;
+  color: var(--fg-muted);
+}
+window.fontchooser headerbar button image {
+  -gtk-icon-size: var(--icon-md);
+}
+window.fontchooser headerbar button:hover {
+  transition: background var(--duration-fast);
+}
+window.fontchooser headerbar button:hover {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+}
+window.fontchooser headerbar button:disabled {
+  opacity: 0.5;
+}
+window.fontchooser headerbar button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--fg-muted);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.fontchooser headerbar button label {
+  color: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+window.fontchooser headerbar button:active {
+  background: var(--bg-active);
+}
+window.fontchooser headerbar .suggested-action {
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.fontchooser headerbar .suggested-action:hover {
+  background: var(--accent-hover);
+}
+window.fontchooser headerbar .suggested-action:disabled {
+  opacity: 0.5;
+}
+window.fontchooser headerbar .suggested-action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.fontchooser headerbar .suggested-action label {
+  color: var(--fg-on-accent);
+}
+window.fontchooser fontchooser {
+  padding: var(--space-sm);
+}
+window.fontchooser box.linked {
+  border-radius: var(--rounding-element);
+}
+window.fontchooser box.linked > menubutton > button.toggle {
+  margin-left: var(--space-md);
+}
+window.fontchooser entry.search {
+  all: unset;
+  background-color: var(--bg-overlay);
+  border: 1px solid transparent;
+  border-radius: var(--rounding-element);
+  padding: 0px var(--space-md);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  min-height: calc(2.25rem * var(--global-scale));
+}
+window.fontchooser entry.search > text {
+  padding: var(--space-md) var(--space-xs);
+  margin-left: var(--space-sm);
+  margin-right: var(--space-sm);
+  color: var(--fg-default);
+}
+window.fontchooser entry.search > text > placeholder {
+  color: var(--fg-subtle);
+}
+window.fontchooser entry.search > text > selection {
+  background-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.fontchooser entry.search:focus-within {
+  border-color: var(--accent);
+}
+window.fontchooser entry.search > image.left,
+window.fontchooser entry.search > image.right {
+  color: var(--fg-subtle);
+  -gtk-icon-size: var(--icon-md);
+}
+window.fontchooser entry.search:disabled {
+  opacity: 0.5;
+}
+window.fontchooser entry.search > text {
+  padding: var(--space-sm) var(--space-xs);
+}
+window.fontchooser entry.search > text placeholder {
+  color: var(--fg-subtle);
+}
+window.fontchooser entry.search image {
+  -gtk-icon-size: var(--icon-md);
+  color: var(--fg-subtle);
+  margin: 0 var(--space-xs);
+}
+window.fontchooser menubutton {
+  all: unset;
+}
+window.fontchooser menubutton > button.toggle {
+  all: unset;
+  background: var(--bg-overlay);
+  padding: var(--space-sm);
+  min-height: calc(2.25rem * var(--global-scale));
+  min-width: calc(2.25rem * var(--global-scale));
+  transition: background var(--duration-fast);
+}
+window.fontchooser menubutton > button.toggle:hover {
+  background: var(--bg-hover);
+}
+window.fontchooser menubutton > button.toggle:checked {
+  background: var(--bg-active);
+}
+window.fontchooser menubutton > button.toggle image {
+  -gtk-icon-size: var(--icon-md);
+  color: var(--fg-muted);
+}
+window.fontchooser menubutton > button.toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(-0.125rem * var(--global-scale));
+}
+window.fontchooser scrolledwindow.frame {
+  background: var(--bg-overlay);
+  border-radius: var(--rounding-container);
+  border: 1px solid var(--border-default);
+}
+window.fontchooser scrolledwindow.frame listview {
+  background: transparent;
+}
+window.fontchooser scrolledwindow.frame listview > row {
+  transition: background var(--duration-fast);
+}
+window.fontchooser scrolledwindow.frame listview > row:hover {
+  background: var(--bg-hover);
+}
+window.fontchooser scrolledwindow.frame listview > row:selected {
+  background: var(--bg-selected);
+}
+window.fontchooser scrolledwindow.frame listview > row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(-0.125rem * var(--global-scale));
+}
+window.fontchooser scrolledwindow.frame listview > row label {
+  color: var(--fg-default);
+  font-size: var(--text-md);
+}
+window.fontchooser entry {
+  all: unset;
+  background-color: var(--bg-overlay);
+  border: 1px solid transparent;
+  border-radius: var(--rounding-element);
+  padding: 0px var(--space-md);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  min-height: calc(2.5rem * var(--global-scale));
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+}
+window.fontchooser entry > text {
+  padding: var(--space-md) var(--space-xs);
+  margin-left: var(--space-sm);
+  margin-right: var(--space-sm);
+  color: var(--fg-default);
+}
+window.fontchooser entry > text > placeholder {
+  color: var(--fg-subtle);
+}
+window.fontchooser entry > text > selection {
+  background-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.fontchooser entry:focus-within {
+  border-color: var(--accent);
+}
+window.fontchooser entry > image.left,
+window.fontchooser entry > image.right {
+  color: var(--fg-subtle);
+  -gtk-icon-size: var(--icon-md);
+}
+window.fontchooser entry:disabled {
+  opacity: 0.5;
+}
+window.fontchooser entry > text {
+  padding: var(--space-sm) var(--space-md);
+  color: var(--fg-default);
+  font-size: var(--text-md);
+}
+window.fontchooser entry > text placeholder {
+  color: var(--fg-subtle);
+}
+window.fontchooser entry > text selection {
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.fontchooser entry:focus-within {
+  border-color: transparent;
+}
+window.fontchooser label {
+  color: var(--fg-muted);
+  font-size: var(--text-md);
+}
+window.fontchooser scale {
+  all: unset;
+}
+window.fontchooser scale trough {
+  background: var(--bg-active);
+  border-radius: calc(0.25rem * var(--global-scale));
+  min-height: calc(0.5rem * var(--global-scale));
+  min-width: calc(10rem * var(--global-scale));
+  border: none;
+}
+window.fontchooser scale trough highlight {
+  border: none;
+  background: var(--accent);
+  border-radius: calc(0.25rem * var(--global-scale));
+}
+window.fontchooser scale trough slider {
+  background: var(--fg-default);
+  border-radius: var(--radius-full);
+  min-width: calc(1rem * var(--global-scale));
+  min-height: calc(1rem * var(--global-scale));
+  margin: calc(-0.3125rem * var(--global-scale));
+  border: none;
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+window.fontchooser scale marks {
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+window.fontchooser scale marks mark indicator {
+  background: var(--fg-subtle);
+  min-width: calc(0.125rem * var(--global-scale));
+  min-height: calc(0.5rem * var(--global-scale));
+}
+window.fontchooser scale marks mark label {
+  color: var(--fg-subtle);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+window.fontchooser scale.marks-after marks.bottom {
+  margin-top: var(--space-xs);
+}
+window.fontchooser scale.marks-before marks.top {
+  margin-bottom: var(--space-xs);
+}
+window.fontchooser scale:hover trough slider {
+  background: var(--fg-default);
+  opacity: 1;
+}
+window.fontchooser scale:disabled {
+  opacity: 0.5;
+}
+window.fontchooser scale:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.fontchooser spinbutton {
+  all: unset;
+  background: var(--bg-overlay);
+  border-radius: var(--rounding-element);
+  border: 1px solid var(--border-default);
+  min-width: calc(4rem * var(--global-scale));
+}
+window.fontchooser spinbutton > text {
+  padding: var(--space-sm) var(--space-sm);
+  color: var(--fg-default);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  min-width: calc(2rem * var(--global-scale));
+}
+window.fontchooser spinbutton button {
+  all: unset;
+  padding: var(--space-xs);
+  color: var(--fg-muted);
+  transition: background var(--duration-fast);
+}
+window.fontchooser spinbutton button:hover {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+}
+window.fontchooser spinbutton button:active {
+  background: var(--bg-active);
+}
+window.fontchooser spinbutton button image {
+  -gtk-icon-size: var(--icon-sm);
+}
+window.fontchooser spinbutton:focus-within {
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--accent);
+  border-color: transparent;
+}
+window.fontchooser spinbutton:disabled {
+  opacity: 0.5;
+}
+window.fontchooser grid.dim-label image {
+  -gtk-icon-size: var(--icon-4xl);
+  color: var(--fg-subtle);
+}
+window.fontchooser grid.dim-label label {
+  color: var(--fg-subtle);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+window.fontchooser popover {
+  background: transparent;
+}
+window.fontchooser popover > arrow {
+  min-width: 0;
+  min-height: 0;
+  border: none;
+  background: none;
+}
+window.fontchooser popover > contents {
+  background: var(--bg-elevated);
+  border-radius: var(--rounding-container);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow);
+  padding: var(--space-sm);
+}
+window.fontchooser popover .title-4 {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-default);
+  margin-bottom: var(--space-sm);
+}
+window.fontchooser popover checkbutton {
+  padding: var(--space-xs) 0;
+}
+window.fontchooser popover checkbutton check {
+  min-width: calc(1.125rem * var(--global-scale));
+  min-height: calc(1.125rem * var(--global-scale));
+  border-radius: var(--rounding-element);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-strong);
+  transition: background var(--duration-fast);
+}
+window.fontchooser popover checkbutton check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.fontchooser popover checkbutton label {
+  color: var(--fg-default);
+  font-size: var(--text-md);
+}
+window.fontchooser popover checkbutton:hover check {
+  background: var(--bg-hover);
+}
+window.fontchooser popover checkbutton:hover check:checked {
+  background: var(--accent-hover);
+}
+window.fontchooser popover checkbutton:focus-visible check {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.fontchooser popover frame {
+  background: transparent;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  margin-left: calc(-1rem * var(--global-scale));
+  margin-right: calc(-0.25rem * var(--global-scale));
+}
+window.fontchooser popover frame entry.search {
+  min-height: calc(2rem * var(--global-scale));
+  margin-bottom: var(--space-sm);
+}
+window.fontchooser popover frame scrolledwindow {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  min-height: calc(12rem * var(--global-scale));
+  margin-left: 0;
+}
+window.fontchooser popover frame scrolledwindow listview {
+  background: transparent;
+  padding: var(--space-xs);
+  padding: var(--space-sm);
+}
+window.fontchooser popover frame scrolledwindow listview > row {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rounding-element);
+  min-height: calc(1.75rem * var(--global-scale));
+  transition: background var(--duration-fast);
+}
+window.fontchooser popover frame scrolledwindow listview > row:hover {
+  background: var(--bg-hover);
+}
+window.fontchooser popover frame scrolledwindow listview > row:selected {
+  background: var(--bg-selected);
+}
+window.fontchooser popover frame scrolledwindow listview > row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(-0.125rem * var(--global-scale));
+}
+window.fontchooser popover frame scrolledwindow listview > row label {
+  color: var(--fg-default);
+  font-size: var(--text-sm);
+}
+window.fontchooser .dialog-vbox.vertical {
+  padding: var(--space-sm);
+}

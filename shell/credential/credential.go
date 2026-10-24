@@ -2,7 +2,7 @@
 // greeter share (wayle-widgets' credential_box.rs): clock, date, an
 // optional username entry, the secret entry, and the error line in the
 // centered .lock-center card. Both screens build it the same way and
-// style it with the same _lock.scss rules, so they render identically.
+// style it with the same lock.css rules, so they render identically.
 package credential
 
 import (

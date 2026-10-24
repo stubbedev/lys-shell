@@ -304,7 +304,7 @@ func (s ShadowPreset) CSSShadow(loc Location) string {
 // Font weight class for typography.
 //
 // Maps to CSS classes like `.weight-normal`, `.weight-bold`, etc.
-// Uses the existing `--weight-*` tokens defined in SCSS.
+// Uses the existing `--weight-*` tokens defined in the stylesheet.
 type FontWeightClass string
 
 // Font weights.

@@ -137,7 +137,7 @@ func (m *cwsView) resolve(cv config.ColorValue) render.Color {
 	return color
 }
 
-// cwsColors is one button's resolved _workspaces.scss cascade.
+// cwsColors is one button's resolved workspaces.css cascade.
 type cwsColors struct {
 	bg, hoverBg render.Color
 	underline   render.Color
@@ -148,7 +148,7 @@ type cwsColors struct {
 	opacity     float64
 }
 
-// cwsResolveColors walks the _workspaces.scss rules for one button's
+// cwsResolveColors walks the workspaces.css rules for one button's
 // classes: the override color stands in for every state color, the
 // indicator decides between a filled and an underlined active state,
 // and urgency without urgent-application halves the opacity.

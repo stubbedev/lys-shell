@@ -1,0 +1,6 @@
+.weather-scroll {
+  background: transparent;
+}
+.weather-scroll scrollbar range trough {
+  background: transparent;
+}

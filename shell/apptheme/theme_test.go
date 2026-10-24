@@ -26,7 +26,7 @@ func TestBundleCarriesStaticThemeAndUserCSS(t *testing.T) {
 	theme := New(cfg)
 	bundle := theme.Bundle()
 	if !strings.HasPrefix(bundle, styling.StaticCSS) {
-		t.Error("the bundle does not open with the compiled SCSS")
+		t.Error("the bundle does not open with the built-in CSS")
 	}
 	if !strings.Contains(bundle, ":root {\n    --palette-bg: ") {
 		t.Error("the bundle lacks the theme :root block")
@@ -42,21 +42,21 @@ func TestBundleCarriesStaticThemeAndUserCSS(t *testing.T) {
 	}
 	cfg.Animations.Indicators = true
 	// The scaffold was created, and a user rule lands last.
-	if _, err := os.Stat(filepath.Join(dir, "styles", "index.scss")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "styles", "index.css")); err != nil {
 		t.Fatalf("scaffold: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "styles", "index.css"), []byte(".bar .x { color: red; }"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b := theme.Bundle(); !strings.HasSuffix(b, "\n.bar .x { color: red; }") {
+		t.Errorf("the user CSS is not the bundle tail: %q", b[max(0, len(b)-80):])
+	}
+	// A failing user stylesheet drops only the user part.
 	if err := os.WriteFile(filepath.Join(dir, "styles", "index.scss"), []byte(".bar { .x { color: red; } }"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if b := theme.Bundle(); !strings.HasSuffix(strings.TrimSpace(b), "}") || !strings.Contains(b, ".bar .x") {
-		t.Errorf("user SCSS did not compile into the bundle tail: %q", b[max(0, len(b)-80):])
-	}
-	// A broken user stylesheet drops only the user part.
-	if err := os.WriteFile(filepath.Join(dir, "styles", "index.scss"), []byte(".bar { color: red"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	if b := theme.Bundle(); !strings.HasPrefix(b, styling.StaticCSS) || strings.Contains(b, ".bar .x") {
-		t.Error("a broken user stylesheet broke the bundle")
+		t.Error("a rejected user stylesheet broke the bundle or still applied")
 	}
 }
 
@@ -69,21 +69,30 @@ func TestUserStylesStampFollowsEdits(t *testing.T) {
 	if err := os.MkdirAll(styles, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(styles, "index.scss"), []byte("a {}"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(styles, "index.css"), []byte("a {}"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	first := userStylesStamp()
-	if err := os.WriteFile(filepath.Join(styles, "notes.txt"), []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
+	for _, other := range []string{"notes.txt", "other.css"} {
+		if err := os.WriteFile(filepath.Join(styles, other), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if userStylesStamp() != first {
-		t.Error("a non-stylesheet file moved the stamp")
+		t.Error("a file UserCSS never reads moved the stamp")
 	}
-	if err := os.WriteFile(filepath.Join(styles, "_part.scss"), []byte("b { }"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(styles, "index.css"), []byte("a { b: c; }"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if userStylesStamp() == first {
-		t.Error("a new partial did not move the stamp")
+	edited := userStylesStamp()
+	if edited == first {
+		t.Error("an index.css edit did not move the stamp")
+	}
+	if err := os.WriteFile(filepath.Join(styles, "index.scss"), []byte("a {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if userStylesStamp() == edited {
+		t.Error("a legacy index.scss appearing did not move the stamp")
 	}
 }
 
@@ -99,15 +108,15 @@ func TestUserStylesReloadOnAWatchedChange(t *testing.T) {
 	polled := false
 	theme.watchStyles(func(paths []string, recursive bool, fn func()) (func(), error) {
 		watched, changed = paths, fn
-		if !recursive {
-			t.Error("the styles tree is watched flat")
+		if recursive {
+			t.Error("the styles directory is watched recursively; only its top-level files load")
 		}
 		return func() {}, nil
 	}, func(func()) { polled = true })
 	if len(watched) != 1 || watched[0] != styles || polled {
-		t.Fatalf("watched %v polled %v, want the styles tree watched", watched, polled)
+		t.Fatalf("watched %v polled %v, want the styles directory watched", watched, polled)
 	}
-	if err := os.WriteFile(filepath.Join(styles, "index.scss"), []byte(".bar .x { color: red; }"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(styles, "index.css"), []byte(".bar .x { color: red; }"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	before := theme.userStamp

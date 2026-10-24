@@ -1,0 +1,19 @@
+.status-dot {
+  all: unset;
+  min-width: calc(0.55rem * var(--global-scale));
+  min-height: calc(0.55rem * var(--global-scale));
+  border-radius: var(--radius-full);
+  background: var(--fg-subtle);
+}
+.status-dot.success {
+  background: var(--status-success);
+}
+.status-dot.warning {
+  background: var(--status-warning);
+}
+.status-dot.error {
+  background: var(--status-error);
+}
+.status-dot.info {
+  background: var(--accent);
+}

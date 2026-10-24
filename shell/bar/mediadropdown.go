@@ -166,7 +166,7 @@ func mediaEmptyState(ctx ModuleContext) *widget.Box {
 
 // controlButton builds one transport button: button.media-control
 // paints it (the ink, the hover fill, the sizes, and the icon margins
-// static.css:6057-6071), so nothing is set here — no padding, the
+// modules/media_dropdown/player_view.css), so nothing is set here — no padding, the
 // pointer cursor every button carries.
 func (v *mediaView) controlButton(icon *widget.Icon, class string, onClick func()) *widget.Button {
 	b := widget.NewButton(icon, 0, 0)

@@ -1,0 +1,189 @@
+window.colorchooser {
+  background: var(--bg-surface);
+  border: none;
+  min-height: calc(34rem * var(--global-scale));
+  min-width: calc(36rem * var(--global-scale));
+}
+window.colorchooser button {
+  all: unset;
+  border-radius: var(--rounding-element);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  background: transparent;
+  color: var(--fg-muted);
+}
+window.colorchooser button image {
+  -gtk-icon-size: var(--icon-md);
+}
+window.colorchooser button:hover {
+  transition: background var(--duration-fast);
+}
+window.colorchooser button:hover {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+}
+window.colorchooser button:disabled {
+  opacity: 0.5;
+}
+window.colorchooser button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--fg-muted);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.colorchooser button label {
+  color: inherit;
+  font-size: var(--text-lg);
+}
+window.colorchooser button:active {
+  background: var(--bg-active);
+}
+window.colorchooser headerbar {
+  background: var(--bg-surface);
+  border-bottom: 0.5px solid var(--border-subtle);
+  min-height: calc(2.5rem * var(--global-scale));
+  padding: var(--space-sm);
+}
+window.colorchooser headerbar label {
+  font-size: var(--text-lg);
+}
+window.colorchooser headerbar .suggested-action {
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.colorchooser headerbar .suggested-action:hover {
+  background: var(--accent-hover);
+}
+window.colorchooser headerbar .suggested-action:disabled {
+  opacity: 0.5;
+}
+window.colorchooser headerbar .suggested-action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.colorchooser headerbar .suggested-action label {
+  color: var(--fg-on-accent);
+}
+window.colorchooser colorswatch {
+  border-radius: var(--rounding-element);
+  transition: transform var(--duration-fast);
+  min-height: calc(3.75rem * var(--global-scale));
+  min-width: calc(3.6rem * var(--global-scale));
+  margin-bottom: var(--space-xs);
+}
+window.colorchooser colorswatch:hover {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-sm);
+}
+window.colorchooser colorswatch:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.colorchooser colorswatch overlay {
+  border: none;
+  box-shadow: none;
+}
+window.colorchooser #add-color-button,
+window.colorchooser colorswatch#add-color-button {
+  background: var(--bg-overlay);
+  border: 1px dashed var(--border-default);
+  transition: background var(--duration-fast);
+}
+window.colorchooser #add-color-button overlay,
+window.colorchooser colorswatch#add-color-button overlay {
+  background: transparent;
+}
+window.colorchooser #add-color-button overlay image,
+window.colorchooser colorswatch#add-color-button overlay image {
+  -gtk-icon-size: var(--icon-md);
+  color: var(--fg-subtle);
+}
+window.colorchooser #add-color-button:hover,
+window.colorchooser colorswatch#add-color-button:hover {
+  background: var(--bg-hover);
+  border-style: solid;
+}
+window.colorchooser #add-color-button:focus-visible,
+window.colorchooser colorswatch#add-color-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(0.125rem * var(--global-scale));
+}
+window.colorchooser entry {
+  all: unset;
+  background: var(--bg-overlay);
+  border-radius: var(--rounding-element);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-md);
+  min-width: calc(5rem * var(--global-scale));
+  border: 1px solid var(--border-default);
+}
+window.colorchooser entry > text {
+  all: unset;
+  color: var(--fg-default);
+  padding: var(--space-xs);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+window.colorchooser entry > text placeholder {
+  color: var(--fg-subtle);
+}
+window.colorchooser entry > text selection {
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+window.colorchooser entry:focus-within {
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--accent);
+  border-color: transparent;
+}
+window.colorchooser scale.vertical {
+  min-width: calc(1.5rem * var(--global-scale));
+}
+window.colorchooser scale.vertical trough {
+  min-width: calc(2.5rem * var(--global-scale));
+  border-radius: 0px;
+}
+window.colorchooser scale.vertical slider {
+  min-width: calc(2.5rem * var(--global-scale));
+  min-height: calc(0.5rem * var(--global-scale));
+  margin-left: calc(-0.125rem * var(--global-scale));
+  margin-right: calc(-0.125rem * var(--global-scale));
+  border-radius: 0px;
+  box-shadow: var(--shadow-sm);
+  border: 2px solid var(--accent);
+  background: var(--fg-on-accent);
+}
+window.colorchooser scale.horizontal trough {
+  min-height: calc(0.75rem * var(--global-scale));
+  border-radius: 0px;
+}
+window.colorchooser scale.horizontal slider {
+  min-width: calc(0.5rem * var(--global-scale));
+  min-height: calc(2rem * var(--global-scale));
+  background: var(--bg-elevated);
+  border-radius: 0px;
+  box-shadow: var(--shadow-sm);
+  border: 2px solid var(--accent);
+  background: var(--fg-on-accent);
+}
+window.colorchooser scale:focus-visible slider {
+  outline: var(--focus-ring-width) solid var(--accent);
+}
+window.colorchooser #sv {
+  min-width: calc(25rem * var(--global-scale));
+  min-height: calc(22rem * var(--global-scale));
+}
+window.colorchooser overlay {
+  border-radius: var(--rounding-element);
+}
+window.colorchooser image {
+  -gtk-icon-size: var(--icon-lg);
+}
+window.colorchooser label {
+  color: var(--fg-muted);
+  font-size: var(--text-md);
+}
+window.colorchooser .dialog-vbox.vertical {
+  min-width: calc(36.25rem * var(--global-scale));
+}
+window.colorchooser #editor-color-sample {
+  min-height: calc(2.5rem * var(--global-scale));
+  min-width: calc(4rem * var(--global-scale));
+}

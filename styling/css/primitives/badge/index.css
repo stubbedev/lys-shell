@@ -1,0 +1,51 @@
+.badge {
+  all: unset;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  padding: calc(var(--space-xs) * 0.5) var(--space-xs);
+  border-radius: var(--rounding-element);
+  background: var(--bg-active);
+  color: var(--fg-default);
+}
+.badge.success {
+  background: var(--status-success);
+  color: var(--fg-on-accent);
+}
+.badge.warning {
+  background: var(--status-warning);
+  color: var(--fg-on-accent);
+}
+.badge.error {
+  background: var(--status-error);
+  color: var(--fg-on-accent);
+}
+.badge.info {
+  background: var(--status-info);
+  color: var(--fg-on-accent);
+}
+
+.badge-subtle {
+  all: unset;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  padding: calc(var(--space-xs) * 0.5) var(--space-xs);
+  border-radius: var(--rounding-element);
+  background: var(--bg-active);
+  color: var(--fg-muted);
+}
+.badge-subtle.success {
+  background: var(--status-success-subtle);
+  color: var(--status-success);
+}
+.badge-subtle.warning {
+  background: var(--status-warning-subtle);
+  color: var(--status-warning);
+}
+.badge-subtle.error {
+  background: var(--status-error-subtle);
+  color: var(--status-error);
+}
+.badge-subtle.info {
+  background: var(--status-info-subtle);
+  color: var(--status-info);
+}

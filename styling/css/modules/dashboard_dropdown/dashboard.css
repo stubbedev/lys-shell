@@ -1,0 +1,39 @@
+.dashboard-dropdown > contents > .dropdown {
+  min-width: 0;
+}
+.dashboard-dropdown .dropdown-content {
+  border-spacing: var(--space-sm);
+}
+.dashboard-dropdown .dashboard-content-box {
+  border-spacing: var(--space-sm);
+}
+.dashboard-dropdown .dashboard-scroll {
+  background: transparent;
+}
+.dashboard-dropdown .dashboard-scroll scrollbar range trough {
+  background: transparent;
+}
+.dashboard-dropdown .dashboard-card {
+  border-radius: var(--rounding-element);
+  min-width: 0;
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
+}
+.dashboard-dropdown .dashboard-info-row {
+  border-spacing: var(--space-sm);
+}
+.dashboard-dropdown .card-header {
+  margin-bottom: var(--space-sm);
+}
+.dashboard-dropdown .card-title {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-spacing: var(--space-xs);
+}
+.dashboard-dropdown .card-title image {
+  -gtk-icon-size: var(--icon-md);
+  margin-right: var(--space-sm);
+}
