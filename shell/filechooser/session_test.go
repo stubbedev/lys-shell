@@ -1,6 +1,7 @@
 package filechooser
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -17,7 +18,9 @@ func tree(t *testing.T) string {
 
 func open(t *testing.T, mode Mode, folder string, filters []Filter) *session {
 	t.Helper()
-	return newSession(mode, folder, filters, testDB(t), "/nonexistent-home", defaultView)
+	s := newSession(mode, folder, filters, testDB(t), "/nonexistent-home", defaultView)
+	s.refresh()
+	return s
 }
 
 func TestSessionStartsInTheRequestedFolderElseHome(t *testing.T) {
@@ -277,5 +280,52 @@ func TestOpenModeAndConfirmLabel(t *testing.T) {
 	}
 	if ModeSave.confirmLabel() != "Save" {
 		t.Error("save label")
+	}
+}
+
+// Hidden is GTK's rule: dot names, ~ backups, and the names the
+// folder's .hidden lists; the toggle shows them all.
+func TestSessionHiddenRules(t *testing.T) {
+	root := t.TempDir()
+	touch(t, root, "keep.txt", "notes.txt~", ".dot", "secret.txt", "build/")
+	if err := os.WriteFile(filepath.Join(root, ".hidden"), []byte("secret.txt\nbuild\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := open(t, ModeOpenFile, root, nil)
+	if got := names(s.entries); !slices.Equal(got, []string{"keep.txt"}) {
+		t.Errorf("shown %v, want only keep.txt", got)
+	}
+	s.hidden = true
+	s.refresh()
+	if got := names(s.entries); len(got) != 6 {
+		t.Errorf("with hidden files shown %v", got)
+	}
+}
+
+// A listing handed over late lands only for the folder still awaited;
+// a reload keeps showing the old listing until the new one lands.
+func TestSessionListingArrivesLate(t *testing.T) {
+	root := tree(t)
+	s := newSession(ModeOpenFile, root, nil, testDB(t), "/nonexistent-home", defaultView)
+	var asked []string
+	s.request = func(dir string) { asked = append(asked, dir) }
+	s.refresh()
+	if !s.loading || len(s.entries) != 0 || !slices.Equal(asked, []string{root}) {
+		t.Fatalf("loading %v, entries %v, asked %v", s.loading, names(s.entries), asked)
+	}
+	early := s.read(root)
+	s.goTo(filepath.Join(root, "docs"))
+	if s.setListing(root, early) {
+		t.Error("a superseded listing landed")
+	}
+	if !s.setListing(filepath.Join(root, "docs"), s.read(filepath.Join(root, "docs"))) || s.loading {
+		t.Error("the awaited listing did not land")
+	}
+	s.goTo(root)
+	s.setListing(root, s.read(root))
+	before := names(s.entries)
+	s.reload()
+	if !s.loading || !slices.Equal(names(s.entries), before) {
+		t.Errorf("a reload showed %v while reading, want %v", names(s.entries), before)
 	}
 }

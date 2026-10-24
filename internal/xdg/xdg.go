@@ -19,15 +19,29 @@ func CacheDir() (string, bool) { return baseDir("XDG_CACHE_HOME", ".cache") }
 // ~/.local/share/lys-shell; false when neither variable is set.
 func DataDir() (string, bool) { return baseDir("XDG_DATA_HOME", ".local/share") }
 
+// CacheHome is the user's cache directory itself, $XDG_CACHE_HOME or
+// ~/.cache, where caches shared across apps live (the thumbnails);
+// false when neither variable is set.
+func CacheHome() (string, bool) { return home("XDG_CACHE_HOME", ".cache") }
+
 // baseDir is lys-shell's directory under the base directory env names,
 // else under home's fallback.
 func baseDir(env, fallback string) (string, bool) {
-	if dir := os.Getenv(env); dir != "" {
-		return filepath.Join(dir, "lys-shell"), true
-	}
-	home := os.Getenv("HOME")
-	if home == "" {
+	dir, ok := home(env, fallback)
+	if !ok {
 		return "", false
 	}
-	return filepath.Join(home, fallback, "lys-shell"), true
+	return filepath.Join(dir, "lys-shell"), true
+}
+
+// home is the base directory env names, else home's fallback.
+func home(env, fallback string) (string, bool) {
+	if dir := os.Getenv(env); dir != "" {
+		return dir, true
+	}
+	h := os.Getenv("HOME")
+	if h == "" {
+		return "", false
+	}
+	return filepath.Join(h, fallback), true
 }

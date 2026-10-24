@@ -20,11 +20,18 @@ type session struct {
 	active  int
 
 	// all is the unfiltered listing of listed, re-read only when the
-	// directory changes: every other repaint partitions it in memory;
-	// listErr is why it could not be read.
-	all     []Entry
-	listed  string
-	listErr error
+	// directory changes (or changed on disk): every other repaint
+	// partitions it in memory; hiddenNames are the names its .hidden
+	// lists, listErr is why it could not be read, and loading is set
+	// while the listing is being read.
+	all         []Entry
+	hiddenNames map[string]bool
+	listed      string
+	listErr     error
+	loading     bool
+	// request reads dir's listing and hands it to setListing, at once
+	// or later (the host reads off the loop).
+	request func(dir string)
 	// recentFile is the recently-used list the Recent place reads.
 	recentFile string
 
@@ -41,11 +48,13 @@ type session struct {
 	back, forward []string
 }
 
-// newSession starts at folder when it is a directory, else home, else /.
+// newSession starts at folder when it is a directory, else home, else
+// /. Nothing is listed until the first refresh; listings are read at
+// once until request is replaced.
 func newSession(mode Mode, folder string, filters []Filter, db *mime.Database, home string, v view) *session {
 	s := &session{mode: mode, db: db, filters: withAllFiles(filters), view: v}
+	s.request = func(dir string) { s.setListing(dir, s.read(dir)) }
 	s.dir = startDir(folder, home)
-	s.refresh()
 	return s
 }
 
@@ -66,24 +75,68 @@ func startDir(folder, home string) string {
 func (s *session) searching() bool { return s.recursive && s.search != "" }
 
 // refresh recomputes entries: the cached listing (or the recursive
-// matches) through the hidden toggle, the type filter (files only)
-// and the search text, then sorted by the column, or by relevance
-// while searching.
+// matches) through the hidden rules, the type filter (files only) and
+// the search text, then sorted by the column, or by relevance while
+// searching. A folder not listed yet is requested, and shows nothing
+// until its listing arrives.
 func (s *session) refresh() {
-	var source []Entry
+	if !s.searching() && s.listed != s.dir {
+		s.listed, s.all, s.hiddenNames, s.listErr, s.loading = s.dir, nil, nil, nil, true
+		s.entries = s.entries[:0]
+		s.request(s.dir)
+		return
+	}
+	s.partition()
+}
+
+// reload reads the folder shown again (it changed on disk), showing
+// the listing it has until the new one arrives.
+func (s *session) reload() {
+	s.loading = true
+	s.request(s.dir)
+}
+
+// listing is one folder read: its entries, the names its .hidden
+// lists, and why it could not be read.
+type listing struct {
+	entries []Entry
+	hidden  map[string]bool
+	err     error
+}
+
+// read lists dir, or the Recent files; safe off the loop.
+func (s *session) read(dir string) listing {
+	if dir == recentLocation {
+		entries, err := ListRecent(s.recentFile, s.mode)
+		return listing{entries: entries, err: err}
+	}
+	entries, err := ListDir(dir, s.mode)
+	return listing{entries: entries, hidden: hiddenNames(dir), err: err}
+}
+
+// setListing takes dir's listing when dir is still the folder awaited;
+// false for one superseded.
+func (s *session) setListing(dir string, l listing) bool {
+	if dir != s.listed || !s.loading {
+		return false
+	}
+	s.all, s.hiddenNames, s.listErr, s.loading = l.entries, l.hidden, l.err, false
+	s.partition()
+	return true
+}
+
+// partition filters and sorts the listing (or the matches) into
+// entries.
+func (s *session) partition() {
+	source := s.all
 	if s.searching() {
 		source = s.found
-	} else {
-		if s.listed != s.dir || s.all == nil {
-			s.all, s.listed = s.list(), s.dir
-		}
-		source = s.all
 	}
 	match := newTextFilter(s.search)
 	s.entries = s.entries[:0]
 	for _, e := range source {
 		name := e.Name()
-		if !s.hidden && strings.HasPrefix(name, ".") {
+		if !s.hidden && hiddenName(name, s.hiddenNames) {
 			continue
 		}
 		if !e.IsDir && !MatchesFilter(s.db, name, s.filters, s.active) {
@@ -100,19 +153,6 @@ func (s *session) refresh() {
 	} else {
 		SortEntries(s.entries, s.view.sort, s.view.asc)
 	}
-}
-
-// list reads the folder shown, or the Recent files, keeping the error.
-func (s *session) list() []Entry {
-	var entries []Entry
-	var err error
-	if s.dir == recentLocation {
-		entries, err = ListRecent(s.recentFile, s.mode)
-	} else {
-		entries, err = ListDir(s.dir, s.mode)
-	}
-	s.listErr = err
-	return entries
 }
 
 // displayName is a row's label: the basename, or the path below dir

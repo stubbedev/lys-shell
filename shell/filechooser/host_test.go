@@ -1,12 +1,18 @@
 package filechooser
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
+	"hash/crc32"
 	"image"
 	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -60,7 +66,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	hs.queue = make(chan func(), 256)
 	go func() {
 		for fn := range hs.queue {
-			hs.do(fn)
+			hs.run(fn)
 		}
 	}()
 	t.Cleanup(func() {
@@ -111,10 +117,35 @@ func (hs *harness) invoke(fn func()) {
 	}
 }
 
-func (hs *harness) do(fn func()) {
+// run runs fn as the loop: the dialog's work and the test's gestures
+// take turns, as on the one UI goroutine.
+func (hs *harness) run(fn func()) {
 	treetest.Loop.Lock()
 	defer treetest.Loop.Unlock()
 	fn()
+}
+
+// do runs a gesture as the loop and waits for what it set off to
+// settle: a folder listing being read lands before the test goes on.
+func (hs *harness) do(fn func()) {
+	hs.run(fn)
+	hs.settle()
+}
+
+// settle waits until no listing is being read and the loop ran what
+// that queued.
+func (hs *harness) settle() {
+	for deadline := time.Now().Add(treetest.Liveness); ; time.Sleep(time.Millisecond) {
+		var loading bool
+		hs.run(func() { loading = hs.c.s != nil && hs.c.s.loading })
+		if !loading {
+			hs.flush()
+			return
+		}
+		if time.Now().After(deadline) {
+			hs.t.Fatal("a listing never arrived")
+		}
+	}
 }
 
 // ask starts a request and waits for its surface.
@@ -127,6 +158,7 @@ func (hs *harness) ask(t *testing.T, fn func() []string) chan []string {
 	case <-time.After(treetest.Liveness):
 		t.Fatal("no chooser opened")
 	}
+	hs.settle()
 	return got
 }
 
@@ -501,10 +533,29 @@ func TestOpenFailureAnswersNothing(t *testing.T) {
 	}
 }
 
+// waitThumb waits until the thumbnail lookup for path at px ended.
+func (hs *harness) waitThumb(t *testing.T, path string, px int) {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		var ok bool
+		hs.do(func() { _, ok = hs.c.thumbs[thumbKey{path, px}] })
+		if ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the thumbnail lookup never ended")
+		}
+	}
+}
+
+// A row shows its type's icon until its thumbnail is found, then the
+// thumbnail; a rebuilt row shows it at once, and a file with none keeps
+// the icon.
 func TestImageRowsGetThumbnails(t *testing.T) {
 	hs := newHarness(t, "")
 	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
-	f, err := os.Create(filepath.Join(hs.root, "pics", "real.png"))
+	real := filepath.Join(hs.root, "pics", "real.png")
+	f, err := os.Create(real)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,31 +565,79 @@ func TestImageRowsGetThumbnails(t *testing.T) {
 	_ = f.Close()
 	hs.open(t, OpenRequest{CurrentFolder: filepath.Join(hs.root, "pics")})
 	var row widget.Widget
-	hs.do(func() { row = rows{hs.c, false}.Row(slices.Index(names(hs.c.s.entries), "real.png")) })
-	thumb := treetest.First[*widget.Image](t, row)
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		var ok bool
-		hs.do(func() { _, ok = hs.c.thumbs[thumbKey{filepath.Join(hs.root, "pics", "real.png"), rowIconPx}] })
-		if ok {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the thumbnail never arrived")
-		}
-		time.Sleep(5 * time.Millisecond)
+	hs.run(func() { row = rows{hs.c, false}.Row(slices.Index(names(hs.c.s.entries), "real.png")) })
+	hs.waitThumb(t, real, rowIconPx)
+	if thumbs := treetest.All[*widget.Image](row); len(thumbs) != 1 || !thumbs[0].Loaded() {
+		t.Errorf("the waiting row holds %d images, want its filled thumbnail", len(thumbs))
 	}
-	if !thumb.Loaded() {
-		t.Error("the waiting row's image was not filled")
-	}
-	// A row rebuilt later reuses the decoded thumbnail at once; the
-	// empty a.png cannot decode and keeps a blank square.
 	hs.do(func() {
-		again := treetest.First[*widget.Image](t, rows{hs.c, false}.Row(slices.Index(names(hs.c.s.entries), "real.png")))
-		if !again.Loaded() {
-			t.Error("a rebuilt row decoded again")
+		again := treetest.All[*widget.Image](rows{hs.c, false}.Row(slices.Index(names(hs.c.s.entries), "real.png")))
+		if len(again) != 1 || !again[0].Loaded() {
+			t.Error("a rebuilt row looked the thumbnail up again")
 		}
 	})
+	// The empty a.png cannot decode: its row keeps the icon.
+	broken := filepath.Join(hs.root, "pics", "a.png")
+	hs.run(func() { row = rows{hs.c, false}.Row(slices.Index(names(hs.c.s.entries), "a.png")) })
+	hs.waitThumb(t, broken, rowIconPx)
+	if len(treetest.All[*widget.Image](row)) != 0 || len(treetest.All[*widget.Icon](row)) == 0 {
+		t.Error("an undecodable image lost its icon")
+	}
+}
+
+// A file with a thumbnail in the freedesktop cache gets it while its
+// Thumb::MTime matches; a stale one is no thumbnail.
+func TestThumbnailFromTheCache(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	doc := filepath.Join(t.TempDir(), "report.pdf")
+	if err := os.WriteFile(doc, []byte("%PDF"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	put := func(mtime int64) {
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 8, 8))); err != nil {
+			t.Fatal(err)
+		}
+		withText := insertText(t, buf.Bytes(), "Thumb::MTime", strconv.FormatInt(mtime, 10))
+		sum := md5.Sum([]byte(fileuri.FromPath(doc)))
+		path := filepath.Join(cache, "thumbnails", "large", hex.EncodeToString(sum[:])+".png")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, withText, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(info.ModTime().Unix())
+	if got, err := thumbnail(doc, 48); err != nil || got.Bounds().Dx() != 48 {
+		t.Errorf("a cached thumbnail = %v, %v", got, err)
+	}
+	put(info.ModTime().Unix() - 60)
+	if _, err := thumbnail(doc, 48); !errors.Is(err, errNoThumb) {
+		t.Errorf("a stale cached thumbnail = %v, want none", err)
+	}
+	if got := pngText([]byte("not a png"), "Thumb::MTime"); got != "" {
+		t.Errorf("garbage carries %q", got)
+	}
+}
+
+// insertText puts a tEXt chunk right after a PNG's header chunk.
+func insertText(t *testing.T, data []byte, key, value string) []byte {
+	t.Helper()
+	const ihdrEnd = 8 + 8 + 13 + 4
+	body := append([]byte(key+"\x00"), value...)
+	chunk := binary.BigEndian.AppendUint32(nil, uint32(len(body)))
+	chunk = append(chunk, "tEXt"...)
+	chunk = append(chunk, body...)
+	chunk = binary.BigEndian.AppendUint32(chunk, crc32.ChecksumIEEE(append([]byte("tEXt"), body...)))
+	out := append([]byte{}, data[:ihdrEnd]...)
+	out = append(out, chunk...)
+	return append(out, data[ihdrEnd:]...)
 }
 
 func TestColumnGripResizesAndRelaysRows(t *testing.T) {
@@ -868,6 +967,7 @@ func (hs *harness) askResult(t *testing.T, fn func() Result) chan Result {
 	case <-time.After(treetest.Liveness):
 		t.Fatal("no chooser opened")
 	}
+	hs.settle()
 	return got
 }
 
@@ -1279,4 +1379,88 @@ func TestDropSelectsTheFile(t *testing.T) {
 	if uris := answer(t, got); !slices.Equal(uris, []string{hs.uri("pics/a.png")}) {
 		t.Errorf("answered %v", uris)
 	}
+}
+
+// A file appearing in the folder shown is listed without navigating,
+// the selection kept; a change after the dialog moved on lists nothing.
+func TestListingFollowsTheFolder(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	hs.pick(t, "b.txt")
+	if err := os.WriteFile(filepath.Join(hs.root, "c.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(treetest.Liveness); !slices.Contains(hs.shown(), "c.txt"); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the new file never listed: %v", hs.shown())
+		}
+	}
+	var sel Entry
+	var ok bool
+	hs.do(func() { sel, ok = hs.c.selected() })
+	if !ok || sel.Name() != "b.txt" {
+		t.Errorf("after the reload %v %v is selected, want b.txt", sel.Name(), ok)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// A mount coming or going rebuilds Locations; the watch stops with the
+// dialog.
+func TestLocationsFollowTheMounts(t *testing.T) {
+	hs := newHarness(t, "")
+	var changed func()
+	stopped := 0
+	locations := []Place{{"Computer", "/", "drive-harddisk-symbolic"}}
+	hs.c.d.Locations = func() []Place { return locations }
+	hs.c.d.WatchLocations = func(c func()) func() {
+		changed = c
+		return func() { stopped++ }
+	}
+	got := hs.open(t, OpenRequest{})
+	if hasButton(hs.cfg.Root, "USB stick") {
+		t.Fatal("a mount listed before it came")
+	}
+	locations = append(locations, Place{"USB stick", "/run/media/u/stick", "drive-removable-media-symbolic"})
+	changed()
+	hs.settle()
+	if !hasButton(hs.cfg.Root, "USB stick") {
+		t.Error("the new mount was not listed")
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+	if stopped != 1 {
+		t.Errorf("the mount watch stopped %d times", stopped)
+	}
+}
+
+// The real mount watch starts and stops without leaking its reader.
+func TestWatchMountsStops(t *testing.T) {
+	stop := WatchMounts(func() {})
+	done := make(chan struct{})
+	go func() { stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stopping the mount watch hung")
+	}
+}
+
+// A folder still being read says so, not "No items".
+func TestListingShowsLoading(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	var empty string
+	var visible bool
+	hs.run(func() {
+		hs.c.s.request = func(string) {}
+		hs.c.goTo(filepath.Join(hs.root, "docs"))
+		empty, visible = hs.c.ui.empty.Text(), hs.c.ui.empty.Visible()
+		hs.c.s.loading = false
+	})
+	if empty != "Loading…" || !visible {
+		t.Errorf("a folder being read shows %q (%v)", empty, visible)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
 }

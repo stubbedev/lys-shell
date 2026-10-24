@@ -30,3 +30,20 @@ func TestBaseDirs(t *testing.T) {
 		}
 	}
 }
+
+// The cache home is the variable's directory itself, else ~/.cache.
+func TestCacheHome(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", "/c")
+	if got, ok := CacheHome(); !ok || got != "/c" {
+		t.Errorf("CacheHome = %q, %v", got, ok)
+	}
+	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("HOME", "/home/u")
+	if got, ok := CacheHome(); !ok || got != "/home/u/.cache" {
+		t.Errorf("CacheHome under HOME = %q, %v", got, ok)
+	}
+	t.Setenv("HOME", "")
+	if _, ok := CacheHome(); ok {
+		t.Error("a cache home with neither")
+	}
+}

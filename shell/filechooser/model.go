@@ -117,6 +117,28 @@ func ListDir(dir string, mode Mode) ([]Entry, error) {
 	return entries, nil
 }
 
+// hiddenNames are the names dir's .hidden file lists, one a line, which
+// GTK hides with the dot files; none without one.
+func hiddenNames(dir string) map[string]bool {
+	data, err := os.ReadFile(filepath.Join(dir, ".hidden")) //nolint:gosec // a folder's own .hidden list
+	if err != nil {
+		return nil
+	}
+	names := map[string]bool{}
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			names[line] = true
+		}
+	}
+	return names
+}
+
+// hiddenName is GTK's rule for a name in a folder whose .hidden lists
+// listed: a dot name, a ~ backup, or one listed.
+func hiddenName(name string, listed map[string]bool) bool {
+	return strings.HasPrefix(name, ".") || strings.HasSuffix(name, "~") || listed[name]
+}
+
 // searchEntries stats a recursive search's matches.
 func searchEntries(paths []string, mode Mode) []Entry {
 	var entries []Entry
@@ -138,10 +160,10 @@ const (
 
 // WalkSearch walks root depth first, handing every path whose name
 // matches query to emit in batches as they are found, and returns the
-// match count. Dot entries are skipped, and their subtrees not
-// entered, unless showHidden; symlinked directories are not entered,
-// which keeps the walk out of loops. A cancelled ctx stops the walk,
-// mid-directory too.
+// match count. Hidden entries (GTK's rule) are skipped, and their
+// subtrees not entered, unless showHidden; symlinked directories are
+// not entered, which keeps the walk out of loops. A cancelled ctx
+// stops the walk, mid-directory too.
 func WalkSearch(ctx context.Context, root, query string, showHidden bool, emit func([]string)) int {
 	match := newTextFilter(query)
 	var batch []string
@@ -161,12 +183,16 @@ walk:
 		if err != nil {
 			continue
 		}
+		var listed map[string]bool
+		if !showHidden {
+			listed = hiddenNames(dir)
+		}
 		for _, de := range des {
 			if ctx.Err() != nil {
 				return found
 			}
 			name := de.Name()
-			if !showHidden && strings.HasPrefix(name, ".") {
+			if !showHidden && hiddenName(name, listed) {
 				continue
 			}
 			path := filepath.Join(dir, name)

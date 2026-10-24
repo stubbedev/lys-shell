@@ -19,6 +19,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
@@ -92,8 +93,12 @@ type Deps struct {
 	// Home is where a request without a folder starts and what the
 	// breadcrumbs shorten to Home.
 	Home string
-	// Places and Locations fill the sidebar for each request.
+	// Places and Locations fill the sidebar for each request;
+	// WatchLocations calls changed (off the loop) whenever the
+	// locations may have changed (a mount came or went) until its stop
+	// is called; nil watches nothing.
 	Places, Locations func() []Place
+	WatchLocations    func(changed func()) (stop func())
 	// ViewFile persists the sort and layout; "" keeps them in memory.
 	ViewFile string
 	// RecentFile is the recently-used list the Recent place lists
@@ -133,6 +138,16 @@ type Chooser struct {
 	columns [3]int
 
 	stopWalk context.CancelFunc
+	// watcher follows the folder shown on disk, stopMounts the
+	// locations; reloading marks a listing read again for a change, which
+	// keeps the scroll and the selection.
+	watcher    *fswatch.Watcher
+	stopMounts func()
+	reloading  bool
+	// reloadKeep is the path selected when the reload started, and
+	// selectNext the path to select once the coming listing lands (a
+	// dropped file).
+	reloadKeep, selectNext string
 	// navigating is set while one gesture's activations are being
 	// applied: after the first descended, the rest index a listing
 	// that is gone.
@@ -147,8 +162,10 @@ type Chooser struct {
 	placed   bool
 	placedOn string
 
+	// thumbs are the thumbnails found (nil for a file without one),
+	// waiting the slots each lookup in flight fills.
 	thumbs  map[thumbKey]image.Image
-	waiting map[thumbKey][]*widget.Image
+	waiting map[thumbKey][]func(image.Image)
 	workers chan struct{}
 }
 
@@ -222,6 +239,11 @@ func (c *Chooser) ask(caller portalreq.Caller, r request) Result {
 // exit, and shows the next request waiting.
 func (c *Chooser) finish(uris []string) {
 	c.cancelWalk()
+	c.unwatch()
+	if c.stopMounts != nil {
+		c.stopMounts()
+		c.stopMounts = nil
+	}
 	if c.reply == nil {
 		return
 	}
@@ -240,16 +262,80 @@ func (c *Chooser) finish(uris []string) {
 }
 
 func (c *Chooser) begin(r request) {
-	c.thumbs, c.waiting = map[thumbKey]image.Image{}, map[thumbKey][]*widget.Image{}
+	c.thumbs, c.waiting = map[thumbKey]image.Image{}, map[thumbKey][]func(image.Image){}
 	c.replacing = ""
 	c.s = newSession(r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
 	c.s.hidden, c.s.recursive, c.s.recentFile = c.hidden, c.recursive, c.d.RecentFile
+	c.s.request = c.requestListing
 	if r.currentFilter > 0 && int(r.currentFilter) < len(c.s.filters) {
 		c.s.active = int(r.currentFilter)
 	}
-	c.s.refresh()
 	c.build(r)
+	c.s.refresh()
+	c.relist()
 	c.show()
+	if c.d.WatchLocations != nil {
+		c.stopMounts = c.d.WatchLocations(func() { c.d.Invoke(c.refreshLocations) })
+	}
+}
+
+// requestListing reads dir off the loop and lists it once read, unless
+// the dialog moved on; it starts following dir on disk.
+func (c *Chooser) requestListing(dir string) {
+	s := c.s
+	go func() {
+		l := s.read(dir)
+		c.d.Invoke(func() {
+			if c.s != s || !s.setListing(dir, l) {
+				return
+			}
+			if c.reloading {
+				c.reloading = false
+				c.relistKeeping(c.reloadKeep)
+				return
+			}
+			c.relist()
+			c.applySelectNext()
+		})
+	}()
+	c.watch(dir)
+}
+
+// watch follows dir on disk, reloading its listing when it changes;
+// Recent and a folder that cannot be watched are not followed.
+func (c *Chooser) watch(dir string) {
+	c.unwatch()
+	if dir == recentLocation {
+		return
+	}
+	w, err := fswatch.New(fswatch.Changes, false)
+	if err != nil {
+		log.Printf("file chooser: cannot follow %s: %v", dir, err)
+		return
+	}
+	if err := w.Add(dir); err != nil {
+		_ = w.Close()
+		return
+	}
+	c.watcher = w
+	s := c.s
+	go func() {
+		for range w.Changed() {
+			c.d.Invoke(func() {
+				if c.s == s && c.watcher == w && s.dir == dir && !s.loading {
+					c.reloading, c.reloadKeep = true, c.selectedPath()
+					s.reload()
+				}
+			})
+		}
+	}()
+}
+
+func (c *Chooser) unwatch() {
+	if c.watcher != nil {
+		_ = c.watcher.Close()
+		c.watcher = nil
+	}
 }
 
 // --- the tree -------------------------------------------------------
@@ -290,6 +376,8 @@ type ui struct {
 	// newFolder is the row naming a folder to create.
 	newFolder     *widget.Box
 	newFolderName *widget.Entry
+	// locations is the sidebar's Locations list.
+	locations *widget.Box
 }
 
 func (c *Chooser) label(text, class string) *widget.Label {
@@ -398,7 +486,7 @@ func (c *Chooser) build(r request) {
 	// Body: sidebar, the file views, the preview pane.
 	body := widget.NewBox(widget.Row, 0, 0)
 	body.AddClass("file-chooser-body")
-	body.Append(c.sidebar(), false)
+	body.Append(c.sidebar(u), false)
 	body.Append(c.views(u), true)
 	var card *widget.Box
 	card, u.pvIcon, u.pvName, u.pvInfo = c.previewCard("file-chooser-preview", 22)
@@ -525,36 +613,24 @@ func viewIcon(grid bool) string {
 }
 
 // sidebar is Favorites (the user's places) and Locations (/ and the
-// mounts).
-func (c *Chooser) sidebar() widget.Widget {
+// mounts, which refreshLocations rebuilds).
+func (c *Chooser) sidebar(u *ui) widget.Widget {
 	box := widget.NewBox(widget.Column, 2, 0)
 	box.AddClass("file-chooser-sidebar")
-	section := func(title string, places []Place) {
+	section := func(title string, places []Place) *widget.Box {
 		box.Append(c.label(title, "file-chooser-sidebar-header"), false)
 		list := widget.NewBox(widget.Column, 0, 0)
 		list.AddClass("file-chooser-places")
-		for _, p := range places {
-			row := widget.NewBox(widget.Row, 8, 0)
-			icon := widget.NewThemeIcon(p.Icon, navIconPx)
-			icon.AddClass("file-chooser-place-icon")
-			row.Append(icon, false)
-			l := c.label(p.Label, "")
-			l.SetEllipsize(widget.EllipsizeEnd)
-			row.Append(l, true)
-			b := widget.NewButton(row, 0, 0)
-			b.SetElement("row")
-			path := p.Path
-			b.OnClick = func() { c.goTo(path) }
-			list.Append(b, false)
-		}
+		c.fillPlaces(list, places)
 		box.Append(list, false)
+		return list
 	}
 	favorites := c.d.Places()
 	if c.d.RecentFile != "" && (c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple) {
 		favorites = append([]Place{{"Recent", recentLocation, "document-open-recent-symbolic"}}, favorites...)
 	}
 	section("Favorites", favorites)
-	section("Locations", c.d.Locations())
+	u.locations = section("Locations", c.d.Locations())
 	box.Append(widget.NewSpacer(0, 0), true)
 	scroll := widget.NewScroll(box)
 	// Filled, so the sections pack at the top instead of floating mid-view.
@@ -562,6 +638,32 @@ func (c *Chooser) sidebar() widget.Widget {
 	scroll.AddClass("file-chooser-sidebar-scroll")
 	scroll.SetSizeRequest(sidebarW, 0)
 	return scroll
+}
+
+// fillPlaces lists places in list, a button each.
+func (c *Chooser) fillPlaces(list *widget.Box, places []Place) {
+	list.Clear()
+	for _, p := range places {
+		row := widget.NewBox(widget.Row, 8, 0)
+		icon := widget.NewThemeIcon(p.Icon, navIconPx)
+		icon.AddClass("file-chooser-place-icon")
+		row.Append(icon, false)
+		l := c.label(p.Label, "")
+		l.SetEllipsize(widget.EllipsizeEnd)
+		row.Append(l, true)
+		b := widget.NewButton(row, 0, 0)
+		b.SetElement("row")
+		path := p.Path
+		b.OnClick = func() { c.goTo(path) }
+		list.Append(b, false)
+	}
+}
+
+// refreshLocations rebuilds Locations: a mount came or went.
+func (c *Chooser) refreshLocations() {
+	if c.reply != nil && c.ui != nil {
+		c.fillPlaces(c.ui.locations, c.d.Locations())
+	}
 }
 
 // views is the column header over the list and grid, with the empty
@@ -710,52 +812,63 @@ func (c *Chooser) gridCell(e Entry) widget.Widget {
 	return cell
 }
 
-// entryIcon is a thumbnail for a raster image, the folder glyph, or
-// the type's themed icon.
+// entryIcon is the folder glyph, or a file's thumbnail (the cached
+// one any app made, or a raster image decoded) over its type's themed
+// icon until one is ready, or for good when there is none.
 func (c *Chooser) entryIcon(e Entry, px int) widget.Widget {
-	switch {
-	case e.IsDir:
+	if e.IsDir {
 		return widget.NewThemeIcon("folder-symbolic", px)
-	case isRaster(e.Path):
-		return c.thumb(e.Path, px)
 	}
-	return widget.NewThemeIcon(c.d.MIME.GenericIcon(c.d.MIME.TypeByName(e.Name())), px)
+	return c.thumb(e.Path, px, widget.NewThemeIcon(c.d.MIME.GenericIcon(c.d.MIME.TypeByName(e.Name())), px))
 }
 
-// thumb is a px square that fills with the image's thumbnail once one
-// of the bounded workers decoded it (at twice the size, for HiDPI);
-// each image is decoded once per request however often its row is
+// thumb is a px square showing fallback until one of the bounded
+// workers found the file's thumbnail (at twice the size, for HiDPI);
+// each file is looked up once per request however often its row is
 // rebuilt.
-func (c *Chooser) thumb(path string, px int) widget.Widget {
-	img := widget.NewImage(nil)
-	img.SetScale(widget.ImageCover)
-	img.AddClass("file-chooser-thumb")
+func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widget {
+	slot := widget.NewBox(widget.Row, 0, 0)
+	slot.SetHAlign(widget.AlignCenter)
+	slot.SetVAlign(widget.AlignCenter)
+	show := func(done image.Image) {
+		img := widget.NewImage(done)
+		img.SetScale(widget.ImageCover)
+		img.AddClass("file-chooser-thumb")
+		slot.Clear()
+		slot.Append(widgets.NewPinned(img, px, px), false)
+	}
 	key := thumbKey{path, px}
 	if done, ok := c.thumbs[key]; ok {
-		img.SetImage(done)
-	} else {
-		if _, pending := c.waiting[key]; !pending {
-			thumbs, waiting := c.thumbs, c.waiting
-			go func() {
-				c.workers <- struct{}{}
-				done, err := thumbnail(path, 2*px)
-				<-c.workers
-				c.d.Invoke(func() {
-					imgs := waiting[key]
-					delete(waiting, key)
-					if err != nil {
-						return
-					}
-					thumbs[key] = done
-					for _, w := range imgs {
-						w.SetImage(done)
-					}
-				})
-			}()
+		if done != nil {
+			show(done)
+		} else {
+			slot.Append(fallback, false)
 		}
-		c.waiting[key] = append(c.waiting[key], img)
+		return slot
 	}
-	return widgets.NewPinned(img, px, px)
+	slot.Append(fallback, false)
+	if _, pending := c.waiting[key]; !pending {
+		thumbs, waiting := c.thumbs, c.waiting
+		go func() {
+			c.workers <- struct{}{}
+			done, err := thumbnail(path, 2*px)
+			<-c.workers
+			c.d.Invoke(func() {
+				shows := waiting[key]
+				delete(waiting, key)
+				if err != nil {
+					thumbs[key] = nil
+					return
+				}
+				thumbs[key] = done
+				for _, show := range shows {
+					show(done)
+				}
+			})
+		}()
+	}
+	c.waiting[key] = append(c.waiting[key], show)
+	return slot
 }
 
 // --- surface --------------------------------------------------------
@@ -960,13 +1073,38 @@ func (c *Chooser) relist() {
 	u.list.Reset()
 	u.grid.Reset()
 	empty := "No items"
-	if c.s.listErr != nil && !c.s.searching() {
+	switch {
+	case c.s.loading:
+		empty = "Loading…"
+	case c.s.listErr != nil && !c.s.searching():
 		empty = "Cannot read this folder: " + errorText(c.s.listErr)
 	}
 	u.empty.SetText(empty)
 	u.empty.SetVisible(len(c.s.entries) == 0)
 	u.quicklook.SetVisible(false)
 	c.refreshPreview()
+}
+
+// relistKeeping repaints a listing read again where it stands: the
+// scroll stays, and the entry selected (the first, in a multiple
+// pick: the list sets one at a time) stays selected where it still
+// is. kept is the path selected before the listing changed.
+func (c *Chooser) relistKeeping(kept string) {
+	view := c.activeView()
+	u := c.ui
+	u.list.Refresh()
+	u.grid.Refresh()
+	u.empty.SetVisible(len(c.s.entries) == 0)
+	view.Select(slices.IndexFunc(c.s.entries, func(e Entry) bool { return e.Path == kept }))
+	c.refreshPreview()
+}
+
+// selectedPath is the path of the first entry selected, "" for none.
+func (c *Chooser) selectedPath() string {
+	if e, ok := c.selected(); ok {
+		return e.Path
+	}
+	return ""
 }
 
 // truncate shortens s to n runes with an ellipsis.
@@ -998,11 +1136,22 @@ func (c *Chooser) step(back bool) {
 // dropped opens a dropped folder, or the folder of a dropped file with
 // the file selected.
 func (c *Chooser) dropped(path string) {
+	c.selectNext = path
 	c.s.dropped(path)
 	c.afterNavigate()
-	if i := slices.IndexFunc(c.s.entries, func(e Entry) bool { return e.Path == path }); i >= 0 {
-		c.activeView().Select(i)
+	if !c.s.loading {
+		c.applySelectNext()
 	}
+}
+
+// applySelectNext selects the entry waiting to be, once listed.
+func (c *Chooser) applySelectNext() {
+	if c.selectNext == "" {
+		return
+	}
+	c.activeView().Select(slices.IndexFunc(c.s.entries, func(e Entry) bool { return e.Path == c.selectNext }))
+	c.selectNext = ""
+	c.refreshPreview()
 }
 
 // typeAhead is the type-ahead of the file views: / or ~ typed with a
