@@ -91,7 +91,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// reach (OSD, popups, dropdowns) paint from the same resolved palette.
 	theme := apptheme.New(cfg)
 	theme.WatchUserStyles(application)
-	defer apptheme.Setup()()
+	defer apptheme.Setup(application)()
 	// rt is what the bars are built from; a config reload or a new
 	// palette re-derives it and rebuilds them.
 	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}

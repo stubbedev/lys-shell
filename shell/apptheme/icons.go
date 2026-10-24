@@ -3,6 +3,7 @@ package apptheme
 import (
 	"log"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/internal/icons"
@@ -44,10 +45,12 @@ func initIcons(r *icons.Registry, search iconSearch) (stop func()) {
 }
 
 // Setup is the process-wide half of a surface's start: the stylesheet
-// fonts resolve through the system store, and wayle's icons join the
-// icon search path. The returned function stops the icons watch.
-func Setup() (stop func()) {
+// fonts resolve through the system store, rem follows the desktop font
+// (FollowDesktopFontSize), and wayle's icons join the icon search
+// path. The returned function stops the icons watch.
+func Setup(a *app.Application) (stop func()) {
 	widget.SetFaceResolver(FontResolver)
+	FollowDesktopFontSize(a)
 	registry, err := icons.NewRegistry()
 	if err != nil {
 		log.Printf("wayle: icon registry init failed: %v", err)

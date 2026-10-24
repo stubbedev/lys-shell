@@ -103,6 +103,15 @@ func (t *Theme) RenderPalette() *styling.Palette {
 	return p
 }
 
+// FollowDesktopFontSize makes 1rem what it is in a GTK app on this
+// desktop - the desktop font's size, GTK's "Sans 10" without one - now
+// and on every change: the bundle sizes its text in rem, and every
+// Rust surface resolved it through GTK.
+func FollowDesktopFontSize(a *app.Application) {
+	widget.SetRootFontSize(a.DesktopFontSize())
+	a.OnDesktopFontSizeChange(widget.SetRootFontSize)
+}
+
 // Attach styles one root.
 func (t *Theme) Attach(root interface{ AttachStylesheet(*widget.Stylesheet) }) {
 	root.AttachStylesheet(t.Sheet)

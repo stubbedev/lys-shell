@@ -37,6 +37,7 @@ func Run(init Init) error {
 	}
 	defer sess.Close()
 	a := app.NewApplication(sess)
+	apptheme.FollowDesktopFontSize(a)
 
 	family := init.Config.General.FontSans
 	base, err := app.Font(family, 16)

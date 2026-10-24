@@ -52,7 +52,7 @@ func Run() error {
 	defer sess.Close()
 
 	application := app.NewApplication(sess)
-	defer apptheme.Setup()()
+	defer apptheme.Setup(application)()
 	cfg := svc.Config()
 	theme := apptheme.New(cfg)
 	theme.WatchUserStyles(application)
