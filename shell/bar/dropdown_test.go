@@ -326,17 +326,47 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 	ctx := styledContext(t, cfg)
 	full := computeStyle(cfg, ctx.Style.palette)
 	ctx.Style = &full
-	root, _ := dropdownTree(calendarDropdown(ctx), cfg, ctx.Theme)
-	root.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 900}})
-	root.Arrange(render.Rect{W: 600, H: 900})
-	labels := treetest.All[*widget.Label](root)
-	if len(labels) == 0 {
-		t.Fatal("no labels in the panel")
-	}
-	for _, l := range labels {
-		if widget.CascadeColor(l) == 0 {
-			t.Errorf("label %q has no ink from the theme", l.Text())
+	bar := widget.NewBox(widget.Row, 0, 0)
+	ctx.Theme.Attach(bar)
+	anchor := widget.NewBox(widget.Row, 0, 0)
+	bar.Append(anchor, false)
+	bar.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 40}})
+	bar.Arrange(render.Rect{W: 600, H: 40})
+	root, _ := dropdownTree(calendarDropdown(ctx), cfg)
+	arrange := func() []*widget.Label {
+		root.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 900}})
+		root.Arrange(render.Rect{W: 600, H: 900})
+		labels := treetest.All[*widget.Label](root)
+		if len(labels) == 0 {
+			t.Fatal("no labels in the panel")
 		}
+		return labels
+	}
+	for _, l := range arrange() {
+		if widget.CascadeColor(l) != 0 {
+			t.Fatalf("label %q has ink before the popover is anchored: the tree carries a theme of its own", l.Text())
+		}
+	}
+	widget.SetStyleAnchor(root, anchor)
+	for _, l := range arrange() {
+		if widget.CascadeColor(l) == 0 {
+			t.Errorf("label %q has no ink from the bar's theme", l.Text())
+		}
+	}
+	// The view is the Dropdown template's .dropdown box under the
+	// popover's contents node: popover.dropdown > contents .dropdown
+	// paints it the dropdown surface.
+	var view widget.Widget
+	treetest.Walk(root, func(w widget.Widget) {
+		if view == nil && widget.HasClass(w, "calendar-dropdown") {
+			view = w
+		}
+	})
+	if view == nil {
+		t.Fatal("no calendar view in the tree")
+	}
+	if widget.StyleBackground(view) == 0 {
+		t.Error("the dropdown view paints no surface: popover.dropdown > contents .dropdown did not match")
 	}
 }
 

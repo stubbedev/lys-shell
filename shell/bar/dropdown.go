@@ -10,7 +10,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/reveal"
 )
 
@@ -280,7 +279,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		cfg.OnClosed = f.thawLabel
 	}
 	var rev *widget.Revealer
-	cfg.Content, rev = dropdownTree(content, r.cfg, r.ctx.Theme)
+	cfg.Content, rev = dropdownTree(content, r.cfg)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -419,18 +418,15 @@ func roundMarginRem(rem, scale float64) int {
 // card enters through (animate_in), the card carrying the GTK class
 // chain (popover.dropdown > contents .dropdown gets the surface, the
 // shadow and position classes the shadow's direction), and the Rust
-// registry's surface margins around it. The popover is its own tree,
-// so the theme attaches at its root: :root, where the theme declares
-// its variables, matches only there.
-func dropdownTree(content widget.Widget, cfg *config.Config, theme *apptheme.Theme) (*widget.Box, *widget.Revealer) {
+// registry's surface margins around it. The theme reaches it through
+// the bar button it opens from: gelm styles a popover as a child of
+// its anchor, as GTK's popover CSS node is, so it inherits the bar
+// window's fonts and :root variables.
+func dropdownTree(content widget.Widget, cfg *config.Config) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
 	card := popoverCard(rev, dropdownGravity(cfg.Bar.Location), cfg.Bar.DropdownShadow)
-	root := withDropdownMargins(card, cfg)
-	if theme != nil {
-		theme.Attach(root)
-	}
-	return root, rev
+	return withDropdownMargins(card, cfg), rev
 }
 
 func withDropdownMargins(card widget.Widget, cfg *config.Config) *widget.Box {

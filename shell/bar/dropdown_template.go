@@ -29,7 +29,7 @@ func popoverCard(content widget.Widget, gravity app.Gravity, shadow bool) *widge
 	classes = append(classes, positionClass(gravity))
 	card.AddClass(classes...)
 	contents := widget.NewBox(widget.Column, 0, 0)
-	contents.AddClass("contents")
+	contents.SetElement("contents")
 	card.Append(contents, true)
 	contents.Append(content, true)
 	return card
