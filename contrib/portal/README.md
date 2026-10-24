@@ -27,7 +27,6 @@ Implemented natively by `lys-shell portal`:
 | `Clipboard` | `zwlr_data_control` (read/own the Wayland selection for RemoteDesktop sessions) |
 | `Background` | autostart `.desktop` entries + permission |
 | `Usb` | device-access permission grant (enumeration is frontend-side) |
-| `InputCapture` | output zones from `wl_output`; capture itself unsupported (see below) |
 | `FileChooser` | the shell's native `gtk::FileDialog` via `dev.stubbe.lys.FileChooser1` |
 | `Email` | builds a `mailto:` and launches the default mail handler |
 | `Access` | native GTK `AlertDialog` (grant/deny) via `dev.stubbe.lys.PortalDialogs1` |
@@ -42,11 +41,11 @@ interface itself, using GTK's own widgets (`FileDialog`, `PrintUnixDialog`,
 `AlertDialog`) inside the shell, never the `xdg-desktop-portal-gtk` package. The
 backend has no other portal as a dependency or fallback.
 
-`InputCapture` is declared and answers `GetZones` from the live output layout,
-but reports **zero capabilities** and performs no grab: real input capture
-needs the compositor to redirect local input to the portal, which wlroots
-compositors and niri do not expose (only KWin/Mutter back it). Clients detect
-the zero capabilities and fall back cleanly.
+`InputCapture` is not offered: real input capture needs the compositor to
+redirect local input to the portal, which wlroots compositors and niri do not
+expose (only KWin/Mutter back it). With no backend advertising it, the frontend
+does not export the portal, and clients see it is unavailable instead of
+creating sessions that can never capture.
 
 ## Previewing dialogs
 
@@ -118,9 +117,9 @@ NixOS / home-manager module alongside the shell.
 - **RemoteDesktop touch injection**: there is no virtual-touchscreen protocol on
   wlroots, so touch events are accepted but dropped. Pointer + keyboard (incl.
   keysym + EIS) are fully injected.
-- **InputCapture grab**: real input capture needs the compositor to redirect
-  local input to the portal, which wlroots/niri do not expose (only KWin/Mutter
-  do). The interface reports zero capabilities and answers `GetZones`.
+- **InputCapture**: real input capture needs the compositor to redirect local
+  input to the portal, which wlroots/niri do not expose (only KWin/Mutter do),
+  so the interface is not advertised.
 - **ScreenCast dmabuf**: frames are copied through SHM. dmabuf zero-copy is a
   performance optimization (needs GPU/gbm), not a missing feature — capture
   works on every GPU today.

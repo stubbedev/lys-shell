@@ -78,3 +78,17 @@ func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
 		t.Error("portals.conf must default to lys-shell and delegate nothing to gtk")
 	}
 }
+
+// InputCapture cannot capture on any compositor lys-shell targets, so it
+// is neither declared nor mounted: the frontend then reports the portal
+// unavailable instead of routing apps to sessions that never capture.
+func TestInputCaptureIsNotOffered(t *testing.T) {
+	if slices.Contains(mounted(), "InputCapture") {
+		t.Error("InputCapture is mounted")
+	}
+	for _, manifest := range []string{"lys-shell.portal", "lys-shell-portals.conf"} {
+		if strings.Contains(readResource(t, manifest), implPrefix+"InputCapture") {
+			t.Errorf("%s declares InputCapture", manifest)
+		}
+	}
+}

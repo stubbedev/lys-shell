@@ -37,8 +37,6 @@ type Backend struct {
 	notifier    *notifier
 	clipboard   *clipboardBridge
 	shortcuts   *globalShortcuts
-	// zones reads the output layout (outputZones; a fake in tests).
-	zones func() []zone
 	// sizes is the running streams' sizes, ScreenCast's for RemoteDesktop.
 	sizes      *streamSizes
 	screenCast *screenCast
@@ -51,7 +49,6 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
 		settings: &settings{cfg: cfg, gtk: hostGTKSettings, getenv: os.Getenv},
 		spawn:    detach, inhibitLock: logindLock, notifier: newNotifier(conn),
-		zones: outputZones,
 	}
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
@@ -79,7 +76,6 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		printIface(b.conn),
 		b.clipboard.iface(),
 		b.shortcuts.iface(),
-		inputCapture{b.sessions, b.zones}.iface(),
 		b.screenCast.iface(),
 		b.remote.iface(),
 		b.notifier.iface(),
