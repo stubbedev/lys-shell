@@ -147,6 +147,9 @@ func interactiveCases() []interactiveCase {
 			return code(r, "org.freedesktop.impl.portal.Print.PreparePrint", handle, "org.app", "", "Doc", Vardict{}, Vardict{}, Vardict{})
 		}},
 		{"Screenshot", shooter, func(r *rig) (uint32, error) {
+			return code(r, "org.freedesktop.impl.portal.Screenshot.Screenshot", handle, "org.app", "", Vardict{"interactive": dbus.MakeVariant(true), "target": dbus.MakeVariant(targetArea)})
+		}},
+		{"Screenshot.Chooser", dialogs, func(r *rig) (uint32, error) {
 			return code(r, "org.freedesktop.impl.portal.Screenshot.Screenshot", handle, "org.app", "", Vardict{"interactive": dbus.MakeVariant(true)})
 		}},
 		{"PickColor", shooter, func(r *rig) (uint32, error) {

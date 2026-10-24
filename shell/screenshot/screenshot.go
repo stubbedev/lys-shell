@@ -67,9 +67,9 @@ type Host struct {
 	Notify func(path string)
 
 	// now and frozen stand in for the clock and the all-outputs
-	// capture in tests.
+	// capture (with the pointer or not) in tests.
 	now    func() time.Time
-	frozen func() ([]frozenOutput, error)
+	frozen func(pointer bool) ([]frozenOutput, error)
 
 	// interactive is the request handle and the cancel of the overlay
 	// open for a portal request, so Dismiss can take it down.
@@ -85,7 +85,7 @@ type Host struct {
 // where [modules.screenshot] says, then copied and announced as it
 // says.
 func (h *Host) Capture(c portalreq.Caller, mode, target string) (string, error) {
-	img, ok, err := h.grab(c, mode, target)
+	img, ok, err := h.grab(c, mode, target, false)
 	if err != nil || !ok {
 		return "", err
 	}
@@ -94,9 +94,10 @@ func (h *Host) Capture(c portalreq.Caller, mode, target string) (string, error) 
 
 // CapturePrivate takes a screenshot for an app: saved to a file of its
 // own in lys-shell's cache, with none of the user's save, clipboard or
-// notification settings applied. "" is a cancelled selection.
-func (h *Host) CapturePrivate(c portalreq.Caller, mode, target string) (string, error) {
-	img, ok, err := h.grab(c, mode, target)
+// notification settings applied, the pointer composited in when
+// pointer is set. "" is a cancelled selection.
+func (h *Host) CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, error) {
+	img, ok, err := h.grab(c, mode, target, pointer)
 	if err != nil || !ok {
 		return "", err
 	}
@@ -130,28 +131,28 @@ func overlay[T any](h *Host, c portalreq.Caller, cancel func(), request func() (
 	return request()
 }
 
-// grab captures the image for a mode; ok is false for a cancelled
-// region.
-func (h *Host) grab(c portalreq.Caller, mode, target string) (*image.RGBA, bool, error) {
+// grab captures the image for a mode, with the pointer when pointer is
+// set; ok is false for a cancelled region.
+func (h *Host) grab(c portalreq.Caller, mode, target string, pointer bool) (*image.RGBA, bool, error) {
 	switch mode {
 	case ModeRegion:
-		return h.captureRegion(c)
+		return h.captureRegion(c, pointer)
 	case ModeOutput:
 		name := target
 		if name == "" && h.Focus != nil {
 			name, _ = h.Focus.FocusedOutput()
 		}
-		img, err := captureOutput(name)
+		img, err := captureOutput(name, pointer)
 		return img, err == nil, err
 	case ModeScreen:
-		img, err := h.captureFullScreen()
+		img, err := h.captureFullScreen(pointer)
 		return img, err == nil, err
 	case ModeWindow:
 		t := windowTarget{identifier: target}
 		if target == "" && h.Focus != nil {
 			t = h.Focus.ActiveWindow()
 		}
-		img, err := captureWindow(t)
+		img, err := captureWindow(t, pointer)
 		return img, err == nil, err
 	}
 	return nil, false, fmt.Errorf("unknown screenshot mode: %s", mode)
@@ -192,11 +193,11 @@ func (h *Host) clock() time.Time {
 	return time.Now()
 }
 
-func (h *Host) captureAll() ([]frozenOutput, error) {
+func (h *Host) captureAll(pointer bool) ([]frozenOutput, error) {
 	if h.frozen != nil {
-		return h.frozen()
+		return h.frozen(pointer)
 	}
-	return captureAllOutputs()
+	return captureAllOutputs(pointer)
 }
 
 // logical maps each connector to its logical geometry.
@@ -215,8 +216,8 @@ func (h *Host) logical() map[string]regionoverlay.Monitor {
 // before the overlay maps (so transient popups survive), show the
 // overlay over those frames, and crop the selection out of the frame
 // of its output. Not ok means the user cancelled.
-func (h *Host) captureRegion(c portalreq.Caller) (*image.RGBA, bool, error) {
-	frozen, err := h.captureAll()
+func (h *Host) captureRegion(c portalreq.Caller, pointer bool) (*image.RGBA, bool, error) {
+	frozen, err := h.captureAll(pointer)
 	if err != nil {
 		return nil, false, err
 	}
@@ -248,8 +249,8 @@ func (h *Host) captureRegion(c portalreq.Caller) (*image.RGBA, bool, error) {
 
 // captureFullScreen composites every output into one image spanning
 // the layout's bounding box, grim's whole-screen grab.
-func (h *Host) captureFullScreen() (*image.RGBA, error) {
-	frozen, err := h.captureAll()
+func (h *Host) captureFullScreen(pointer bool) (*image.RGBA, error) {
+	frozen, err := h.captureAll(pointer)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +276,7 @@ func (h *Host) captureFullScreen() (*image.RGBA, error) {
 // the loupe, returning sRGB channels in [0, 1]; picked is false when
 // the user cancelled, and an error is a failure.
 func (h *Host) PickColor(caller portalreq.Caller) (color [3]float64, picked bool, err error) {
-	frozen, err := h.captureAll()
+	frozen, err := h.captureAll(false)
 	if err != nil {
 		return color, false, err
 	}

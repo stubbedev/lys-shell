@@ -2,12 +2,14 @@ package portal
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -28,7 +30,10 @@ func (f *fakeShooter) Capture(portalreq.Caller, string, string) (string, *dbus.E
 	return "/home/u/Pictures/user.png", nil
 }
 
-func (f *fakeShooter) CapturePrivate(c portalreq.Caller, mode, target string) (string, *dbus.Error) {
+func (f *fakeShooter) CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, *dbus.Error) {
+	if pointer {
+		target += "+pointer"
+	}
 	f.modes.Update(func(m []string) []string { return append(m, mode+"|"+target) })
 	if f.enter(c) {
 		return "", nil
@@ -80,19 +85,17 @@ func TestScreenshotProperties(t *testing.T) {
 }
 
 // An app's screenshot is the private capture, replied as a file URI;
-// without a target, interactive selects an area and anything else takes
-// the screen; PickColor replies the color.
+// without a target it takes the screen; PickColor replies the color.
 func TestScreenshotRepliesTheFileURI(t *testing.T) {
 	r := newRig(t, nil)
 	f := &fakeShooter{path: "/home/u/.cache/lys-shell/portal-screenshots/Shot 1#.png"}
 	serveShooter(t, r, f)
-	code, res := r.interactive(t, screenshotCall, handle, "org.app", "", Vardict{"interactive": dbus.MakeVariant(true)})
+	code, res := r.interactive(t, screenshotCall, handle, "org.app", "", Vardict{})
 	if code != ResponseSuccess || res["uri"].Value() != "file:///home/u/.cache/lys-shell/portal-screenshots/Shot%201%23.png" {
-		t.Errorf("interactive = %d %v", code, res)
+		t.Errorf("Screenshot = %d %v", code, res)
 	}
-	r.interactive(t, screenshotCall, handle, "org.app", "", Vardict{})
-	if got := f.modes.Load(); len(got) != 2 || got[0] != "region|" || got[1] != "screen|" {
-		t.Errorf("modes = %v: interactive selects a region, else the whole screen", got)
+	if got := f.modes.Load(); len(got) != 1 || got[0] != "screen|" {
+		t.Errorf("modes = %v: no target takes the whole screen", got)
 	}
 	if f.userShots.Load() != 0 {
 		t.Error("an app's screenshot took the user's capture, with its save, clipboard and notification")
@@ -138,6 +141,55 @@ func TestScreenshotTargets(t *testing.T) {
 	p.reply.Store("/screen:DP-1")
 	if code, _ := r.interactive(t, screenshotCall, handle, "org.app", "", target(targetPickedWindow)); code != ResponseOther {
 		t.Errorf("an output for a window pick = %d, want other", code)
+	}
+}
+
+// An interactive request without a target asks what to capture first:
+// the screen, an area, or a window the user then picks, with or
+// without the pointer. A declined chooser captures nothing; an answer
+// it did not offer fails; a request with a target is not asked.
+func TestScreenshotInteractiveChooser(t *testing.T) {
+	r := newRig(t, nil)
+	f := &fakeShooter{path: "/c/shot.png"}
+	serveShooter(t, r, f)
+	interactive := Vardict{"interactive": dbus.MakeVariant(true)}
+	if code, _ := r.interactive(t, screenshotCall, handle, "org.app", "", interactive); code != ResponseOther {
+		t.Errorf("no shell to ask = %d, want other", code)
+	}
+	d := serveDialogs(t, r, true)
+	serveSharePicker(t, r, "/window:id-7")
+	for _, answers := range []map[string]string{
+		nil,
+		{choiceGrab: "area", choicePointer: "true"},
+		{choiceGrab: "window"},
+	} {
+		d.answers.Store(answers)
+		if code, res := r.interactive(t, screenshotCall, handle, "org.app", "", interactive); code != ResponseSuccess || res["uri"].Value() != "file:///c/shot.png" {
+			t.Errorf("chose %v = %d %v", answers, code, res)
+		}
+	}
+	if want := []string{"screen|", "region|+pointer", "window|id-7"}; !slices.Equal(f.modes.Load(), want) {
+		t.Errorf("captured %v, want %v", f.modes.Load(), want)
+	}
+	if asked := d.asked.Load()[0].(portaldialogs.AccessRequest); asked.Title != "Take a screenshot" || len(asked.Choices) != 2 {
+		t.Errorf("the chooser asked %+v", asked)
+	}
+	d.answers.Store(map[string]string{choiceGrab: "everything"})
+	if code, _ := r.interactive(t, screenshotCall, handle, "org.app", "", interactive); code != ResponseOther {
+		t.Errorf("an answer not offered = %d, want other", code)
+	}
+	d.yes.Store(false)
+	if code, res := r.interactive(t, screenshotCall, handle, "org.app", "", interactive); code != ResponseCancelled || len(res) != 0 {
+		t.Errorf("declined = %d %v, want cancelled", code, res)
+	}
+	asked := len(d.callers.Load())
+	interactive["target"] = dbus.MakeVariant(targetArea)
+	r.interactive(t, screenshotCall, handle, "org.app", "", interactive)
+	if len(d.callers.Load()) != asked {
+		t.Error("a request with a target was asked what to capture")
+	}
+	if got := f.modes.Load(); len(got) != 4 || got[3] != "region|" {
+		t.Errorf("captured %v after the targeted request", got)
 	}
 }
 

@@ -346,6 +346,9 @@ type fakeDialogs struct {
 	// updated is the last UpdateChoices; it finds only handle open.
 	updated dbustest.Var[[]any]
 	edit    dbustest.Var[*portaldialogs.AccountInfo]
+	// answers are Access choices' values by choice id, each one's start
+	// value when unset.
+	answers dbustest.Var[map[string]string]
 }
 
 // answer records a dialog and gives the configured verdict, no when
@@ -360,8 +363,13 @@ func (f *fakeDialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) 
 		return false, nil
 	}
 	picked := make([]portalreq.Selection, 0, len(r.Choices))
+	answers := f.answers.Load()
 	for _, ch := range r.Choices {
-		picked = append(picked, portalreq.Selection{ID: ch.ID, Value: ch.Start()})
+		value, ok := answers[ch.ID]
+		if !ok {
+			value = ch.Start()
+		}
+		picked = append(picked, portalreq.Selection{ID: ch.ID, Value: value})
 	}
 	return true, picked
 }

@@ -19,7 +19,7 @@ const (
 // capturer is what the daemon serves: the Host, or a fake in tests.
 type capturer interface {
 	Capture(c portalreq.Caller, mode, target string) (string, error)
-	CapturePrivate(c portalreq.Caller, mode, target string) (string, error)
+	CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, error)
 	PickColor(c portalreq.Caller) (color [3]float64, picked bool, err error)
 	Dismiss(handle string)
 }
@@ -63,9 +63,9 @@ func (d *Daemon) Capture(c portalreq.Caller, mode, target string) (string, *dbus
 
 // CapturePrivate captures a screenshot for an app as Capture does, to
 // a private file and with none of the user's save, clipboard or
-// notification settings.
-func (d *Daemon) CapturePrivate(c portalreq.Caller, mode, target string) (string, *dbus.Error) {
-	path, err := d.host.CapturePrivate(c, mode, target)
+// notification settings; pointer composites the pointer in.
+func (d *Daemon) CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, *dbus.Error) {
+	path, err := d.host.CapturePrivate(c, mode, target, pointer)
 	if err != nil {
 		return "", dbus.MakeFailedError(err)
 	}
@@ -110,9 +110,9 @@ func (c *Client) Capture(ctx context.Context, caller portalreq.Caller, mode, tar
 
 // CapturePrivate asks the shell for an app's screenshot; see
 // Daemon.CapturePrivate.
-func (c *Client) CapturePrivate(ctx context.Context, caller portalreq.Caller, mode, target string) (string, error) {
+func (c *Client) CapturePrivate(ctx context.Context, caller portalreq.Caller, mode, target string, pointer bool) (string, error) {
 	var path string
-	err := c.obj.CallWithContext(ctx, iface+".CapturePrivate", 0, caller, mode, target).Store(&path)
+	err := c.obj.CallWithContext(ctx, iface+".CapturePrivate", 0, caller, mode, target, pointer).Store(&path)
 	return path, err
 }
 

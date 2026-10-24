@@ -19,8 +19,8 @@ func (s *switchCapturer) Capture(c portalreq.Caller, mode, target string) (strin
 	return fakeCapturer{err: s.err.Load()}.Capture(c, mode, target)
 }
 
-func (s *switchCapturer) CapturePrivate(c portalreq.Caller, mode, target string) (string, error) {
-	return fakeCapturer{err: s.err.Load()}.CapturePrivate(c, mode, target)
+func (s *switchCapturer) CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, error) {
+	return fakeCapturer{err: s.err.Load()}.CapturePrivate(c, mode, target, pointer)
 }
 
 func (s *switchCapturer) PickColor(c portalreq.Caller) ([3]float64, bool, error) {
@@ -48,8 +48,11 @@ func TestDaemonOverTheBus(t *testing.T) {
 	if err != nil || !picked || color != [3]float64{0.5, 0.25, 1} {
 		t.Fatalf("PickColor = %v %v %v", color, picked, err)
 	}
-	if path, err := c.CapturePrivate(context.Background(), portalreq.Caller{}, "window", "id-1"); err != nil || path != "/private/windowid-1" {
+	if path, err := c.CapturePrivate(context.Background(), portalreq.Caller{}, "window", "id-1", false); err != nil || path != "/private/windowid-1" {
 		t.Fatalf("CapturePrivate = %q %v", path, err)
+	}
+	if path, err := c.CapturePrivate(context.Background(), portalreq.Caller{}, "screen", "", true); err != nil || path != "/private/screen+pointer" {
+		t.Fatalf("CapturePrivate with the pointer = %q %v", path, err)
 	}
 
 	// A second daemon cannot steal the name.

@@ -26,23 +26,23 @@ func requireHeadless(t *testing.T) {
 
 func TestHeadlessCaptureOutput(t *testing.T) {
 	requireHeadless(t)
-	img, err := captureOutput("")
+	img, err := captureOutput("", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if b := img.Bounds(); b.Dx() <= 0 || b.Dy() <= 0 {
 		t.Fatalf("empty capture %v", b)
 	}
-	if _, err := captureOutput("NOPE-1"); err == nil || !strings.Contains(err.Error(), "output NOPE-1 not found") {
+	if _, err := captureOutput("NOPE-1", false); err == nil || !strings.Contains(err.Error(), "output NOPE-1 not found") {
 		t.Fatalf("a missing output = %v", err)
 	}
-	frozen, err := captureAllOutputs()
+	frozen, err := captureAllOutputs(false)
 	if err != nil || len(frozen) == 0 || frozen[0].connector == "" {
 		t.Fatalf("captureAllOutputs = %v %v", frozen, err)
 	}
 	// sway offers ext toplevel capture, and no window matches an
 	// identity nothing carries.
-	if _, err := captureWindow(windowTarget{appID: "no.such.app", hasAppID: true}); err == nil ||
+	if _, err := captureWindow(windowTarget{appID: "no.such.app", hasAppID: true}, false); err == nil ||
 		!strings.Contains(err.Error(), "could not find the target window") {
 		t.Fatalf("captureWindow = %v", err)
 	}
@@ -50,7 +50,7 @@ func TestHeadlessCaptureOutput(t *testing.T) {
 
 func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 	requireHeadless(t)
-	frozen, err := captureAllOutputs()
+	frozen, err := captureAllOutputs(false)
 	if err != nil {
 		t.Fatal(err)
 	}

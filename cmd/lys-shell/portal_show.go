@@ -82,7 +82,7 @@ func showScreenshot(m *cli.Matches) error {
 	mode, _ := cli.Value[string](m, "mode")
 	target, _ := cli.Value[string](m, "target")
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-		path, err := screenshot.NewClient(conn).CapturePrivate(ctx, portalreq.Caller{}, mode, target)
+		path, err := screenshot.NewClient(conn).CapturePrivate(ctx, portalreq.Caller{}, mode, target, false)
 		return orCancelled(path), "Screenshot", "capture screenshot", err
 	})(m)
 }

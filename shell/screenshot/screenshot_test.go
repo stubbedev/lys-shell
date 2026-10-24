@@ -219,7 +219,7 @@ func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
 		Copy:   func(image.Image) error { copies++; return nil },
 		Notify: func(p string) { notified = append(notified, p) },
 		now:    func() time.Time { return time.Date(2026, 9, 30, 12, 34, 56, 0, time.Local) },
-		frozen: func() ([]frozenOutput, error) {
+		frozen: func(bool) ([]frozenOutput, error) {
 			return []frozenOutput{{"DP-1", solid(200, 100, red)}, {"DP-2", solid(100, 50, green)}}, nil
 		},
 	}
@@ -368,7 +368,7 @@ func TestHostPickColor(t *testing.T) {
 	if _, picked, err := h.PickColor(portalreq.Caller{}); err != nil || picked {
 		t.Fatalf("cancel = %v, %v; want no pick and no error", picked, err)
 	}
-	h.frozen = func() ([]frozenOutput, error) { return nil, nil }
+	h.frozen = func(bool) ([]frozenOutput, error) { return nil, nil }
 	if _, _, err := h.PickColor(portalreq.Caller{}); err == nil || err.Error() != "no outputs available" {
 		t.Fatalf("no outputs err = %v", err)
 	}
@@ -380,11 +380,11 @@ func TestHostCapturePrivate(t *testing.T) {
 	cache := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", cache)
 	h, notified, copies := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
-	first, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/1"}, ModeRegion, "")
+	first, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/1"}, ModeRegion, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/2"}, ModeRegion, "")
+	second, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/2"}, ModeRegion, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,8 +401,36 @@ func TestHostCapturePrivate(t *testing.T) {
 	if _, err := os.Stat(h.Config().OutputDirectory); !errors.Is(err, os.ErrNotExist) {
 		t.Error("an app's capture went to the user's screenshot directory")
 	}
-	if path, err := (&Host{Region: &fakeRegion{}, frozen: h.frozen, Monitors: h.Monitors}).CapturePrivate(portalreq.Caller{}, ModeRegion, ""); err != nil || path != "" {
+	if path, err := (&Host{Region: &fakeRegion{}, frozen: h.frozen, Monitors: h.Monitors}).CapturePrivate(portalreq.Caller{}, ModeRegion, "", false); err != nil || path != "" {
 		t.Errorf("a cancelled private capture = %q, %v", path, err)
+	}
+}
+
+// The pointer is composited in only into an app's capture that asks
+// for it: the frames are taken with it then, never for the user's own
+// capture or a color pick.
+func TestHostCapturesThePointerOnlyWhenAsked(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
+	frozen := h.frozen
+	var asked []bool
+	h.frozen = func(pointer bool) ([]frozenOutput, error) {
+		asked = append(asked, pointer)
+		return frozen(pointer)
+	}
+	for _, capture := range []func() error{
+		func() error { _, err := h.CapturePrivate(portalreq.Caller{}, ModeScreen, "", true); return err },
+		func() error { _, err := h.CapturePrivate(portalreq.Caller{}, ModeRegion, "", true); return err },
+		func() error { _, err := h.CapturePrivate(portalreq.Caller{}, ModeScreen, "", false); return err },
+		func() error { _, err := h.Capture(portalreq.Caller{}, ModeScreen, ""); return err },
+		func() error { _, _, err := h.PickColor(portalreq.Caller{}); return err },
+	} {
+		if err := capture(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if want := []bool{true, true, false, false, false}; !slices.Equal(asked, want) {
+		t.Errorf("frames taken with the pointer %v, want %v", asked, want)
 	}
 }
 
@@ -477,9 +505,12 @@ func (f fakeCapturer) Capture(_ portalreq.Caller, mode, target string) (string, 
 	return "/p/" + mode + target, nil
 }
 
-func (f fakeCapturer) CapturePrivate(_ portalreq.Caller, mode, target string) (string, error) {
+func (f fakeCapturer) CapturePrivate(_ portalreq.Caller, mode, target string, pointer bool) (string, error) {
 	if f.err != nil {
 		return "", f.err
+	}
+	if pointer {
+		mode += "+pointer"
 	}
 	return "/private/" + mode + target, nil
 }
@@ -498,7 +529,7 @@ func TestDaemonMethods(t *testing.T) {
 	if picked, r, g, b, err := d.PickColor(portalreq.Caller{}); err != nil || !picked || r != 0.5 || g != 0.25 || b != 1 {
 		t.Fatalf("PickColor = %v %v %v %v %v", picked, r, g, b, err)
 	}
-	if p, err := d.CapturePrivate(portalreq.Caller{}, "window", "id-1"); err != nil || p != "/private/windowid-1" {
+	if p, err := d.CapturePrivate(portalreq.Caller{}, "window", "id-1", false); err != nil || p != "/private/windowid-1" {
 		t.Fatalf("CapturePrivate = %q %v", p, err)
 	}
 	d = &Daemon{host: fakeCapturer{err: errors.New("no outputs available")}}

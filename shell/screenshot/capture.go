@@ -45,11 +45,11 @@ type windowTarget struct {
 }
 
 // captureAllOutputs captures every named output for the freeze-frame
-// flows. Run it before any overlay maps, so transient popups on screen
+// flows, the pointer composited in when pointer is set. Run it before any overlay maps, so transient popups on screen
 // are baked into the frames. The copies run sequentially on one
 // connection; the conversions (format + transform) fan out one
 // goroutine per output.
-func captureAllOutputs() ([]frozenOutput, error) {
+func captureAllOutputs(pointer bool) ([]frozenOutput, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
@@ -65,7 +65,7 @@ func captureAllOutputs() ([]frozenOutput, error) {
 		if o.Name == "" {
 			continue
 		}
-		f, err := c.CaptureOutput(o, capture.Options{})
+		f, err := c.CaptureOutput(o, capture.Options{Cursor: pointer})
 		if err != nil {
 			return nil, fmt.Errorf("output capture failed: %w", err)
 		}
@@ -92,8 +92,8 @@ func captureAllOutputs() ([]frozenOutput, error) {
 }
 
 // captureOutput captures one output by connector name, or the first
-// output when name is empty.
-func captureOutput(name string) (*image.RGBA, error) {
+// output when name is empty, with the pointer when pointer is set.
+func captureOutput(name string, pointer bool) (*image.RGBA, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
@@ -113,7 +113,7 @@ func captureOutput(name string) (*image.RGBA, error) {
 	default:
 		return nil, errors.New("no outputs available")
 	}
-	f, err := c.CaptureOutput(target, capture.Options{})
+	f, err := c.CaptureOutput(target, capture.Options{Cursor: pointer})
 	if err != nil {
 		return nil, fmt.Errorf("output capture failed: %w", err)
 	}
@@ -126,8 +126,8 @@ func captureOutput(name string) (*image.RGBA, error) {
 
 // captureWindow captures the target window: Hyprland's toplevel-export
 // when a handle is known and the protocol is there, else the generic
-// ext path.
-func captureWindow(t windowTarget) (*image.RGBA, error) {
+// ext path; with the pointer when pointer is set.
+func captureWindow(t windowTarget, pointer bool) (*image.RGBA, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
@@ -135,7 +135,7 @@ func captureWindow(t windowTarget) (*image.RGBA, error) {
 	defer func() { _ = c.Close() }()
 	var f *capture.Frame
 	if t.identifier == "" && t.hasHandle && c.HasHyprlandExport() {
-		f, err = c.CaptureHyprlandWindow(t.hyprlandHandle, capture.Options{})
+		f, err = c.CaptureHyprlandWindow(t.hyprlandHandle, capture.Options{Cursor: pointer})
 		if err != nil {
 			return nil, fmt.Errorf("window capture failed: %w", err)
 		}
@@ -157,7 +157,7 @@ func captureWindow(t windowTarget) (*image.RGBA, error) {
 		if idx < 0 {
 			return nil, errors.New("could not find the target window to capture")
 		}
-		f, err = c.CaptureToplevel(tls[idx], capture.Options{})
+		f, err = c.CaptureToplevel(tls[idx], capture.Options{Cursor: pointer})
 		if err != nil {
 			return nil, fmt.Errorf("window capture failed: %w", err)
 		}

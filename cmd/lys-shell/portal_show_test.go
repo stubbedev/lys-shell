@@ -95,7 +95,7 @@ func (f fakeShot) Capture(_ portalreq.Caller, mode, target string) (string, *dbu
 	return "user:" + mode, nil
 }
 
-func (f fakeShot) CapturePrivate(_ portalreq.Caller, mode, target string) (string, *dbus.Error) {
+func (f fakeShot) CapturePrivate(_ portalreq.Caller, mode, target string, _ bool) (string, *dbus.Error) {
 	return f.path + ":" + mode + ":" + target, nil
 }
 
