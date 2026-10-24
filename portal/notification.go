@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/render"
@@ -57,16 +58,21 @@ type shown struct {
 }
 
 // notifier is the interface's state: the daemon notifications it
-// created, both ways.
+// created, both ways, and the ones it shows to ask the user something,
+// each waiting for its answer.
 type notifier struct {
 	conn     *dbus.Conn
 	mu       sync.Mutex
 	byDaemon map[uint32]shown
 	byKey    map[portalKey]uint32
+	asks     map[uint32]chan string
+	// listening is whether the daemon's signals reach handle; without
+	// them no ask could be answered.
+	listening atomic.Bool
 }
 
 func newNotifier(conn *dbus.Conn) *notifier {
-	return &notifier{conn: conn, byDaemon: map[uint32]shown{}, byKey: map[portalKey]uint32{}}
+	return &notifier{conn: conn, byDaemon: map[uint32]shown{}, byKey: map[portalKey]uint32{}, asks: map[uint32]chan string{}}
 }
 
 func (n *notifier) iface() dbusx.Interface {
@@ -111,6 +117,7 @@ func (n *notifier) forward() (stop func(), err error) {
 	}
 	signals := make(chan *dbus.Signal, 16)
 	n.conn.Signal(signals)
+	n.listening.Store(true)
 	// godbus closes the channel itself when the connection goes, so the
 	// loop ends on quit or that, and stop never closes it.
 	quit, done := make(chan struct{}), make(chan struct{})
@@ -130,6 +137,7 @@ func (n *notifier) forward() (stop func(), err error) {
 		}
 	}()
 	return func() {
+		n.listening.Store(false)
 		_ = n.conn.RemoveMatchSignal(match...)
 		n.conn.RemoveSignal(signals)
 		close(quit)
@@ -145,6 +153,9 @@ func (n *notifier) handle(s *dbus.Signal) {
 		}
 		id, _ := s.Body[0].(uint32)
 		key, _ := s.Body[1].(string)
+		if n.answer(id, key) {
+			return
+		}
 		n.mu.Lock()
 		sh, ok := n.byDaemon[id]
 		action, known := sh.actions[key]
@@ -162,9 +173,64 @@ func (n *notifier) handle(s *dbus.Signal) {
 			return
 		}
 		if id, ok := s.Body[0].(uint32); ok {
+			n.answer(id, "")
 			n.forget(id)
 		}
 	}
+}
+
+// answer hands key to the ask waiting on daemon notification id;
+// false when no ask is.
+func (n *notifier) answer(id uint32, key string) bool {
+	n.mu.Lock()
+	ch, ok := n.asks[id]
+	delete(n.asks, id)
+	n.mu.Unlock()
+	if ok {
+		ch <- key
+	}
+	return ok
+}
+
+// ask shows a persistent notification for appID offering actions
+// ([key, label, ...]) and waits for the user: the key of the action
+// they pick, "" when the notification closes unanswered. When ctx ends
+// first the notification is withdrawn and ctx's error returned.
+func (n *notifier) ask(ctx context.Context, appID, title, body string, actions []string) (string, error) {
+	if !n.listening.Load() {
+		return "", errors.New("not subscribed to the notification daemon's signals")
+	}
+	answer := make(chan string, 1)
+	notifyCtx, cancel := context.WithTimeout(ctx, shellCallTimeout)
+	defer cancel()
+	hints := map[string]dbus.Variant{"desktop-entry": dbus.MakeVariant(appID)}
+	var id uint32
+	// The lock spans the call so the answer cannot arrive before the
+	// ask is registered under its id.
+	n.mu.Lock()
+	err := n.daemon().CallWithContext(notifyCtx, notifications.Interface+".Notify", 0,
+		appID, uint32(0), "", title, body, actions, hints, int32(0)).Store(&id)
+	if err == nil {
+		n.asks[id] = answer
+	}
+	n.mu.Unlock()
+	if err != nil {
+		return "", fmt.Errorf("show the notification: %w", err)
+	}
+	select {
+	case key := <-answer:
+		return key, nil
+	case <-ctx.Done():
+	}
+	n.mu.Lock()
+	delete(n.asks, id)
+	n.mu.Unlock()
+	closeCtx, cancelClose := context.WithTimeout(context.Background(), shellCallTimeout)
+	defer cancelClose()
+	if err := n.daemon().CallWithContext(closeCtx, notifications.Interface+".CloseNotification", 0, id).Err; err != nil {
+		warnf("notification: withdrawing %d: %v", id, err)
+	}
+	return "", ctx.Err()
 }
 
 // notificationObject carries the interface's D-Bus methods.

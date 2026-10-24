@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/toplevels"
 )
 
 // BusName is the backend's well-known name (lys-shell.portal's DBusName).
@@ -41,6 +42,8 @@ type Backend struct {
 	sizes      *streamSizes
 	screenCast *screenCast
 	remote     *remoteDesktop
+	// windows is the compositor's window list (a fake in tests).
+	windows windowSource
 }
 
 // New builds the backend over a session-bus connection and the config.
@@ -51,6 +54,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
+	b.windows = &windowList{conn: conn, watch: toplevels.Watch}
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
 	b.sizes = &streamSizes{sizes: map[uint32][2]int32{}}
@@ -69,7 +73,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 	return append([]dbusx.Interface{
 		b.settings.iface(),
 		lockdown{b.cfg}.iface(),
-		backgroundIface(b.conn),
+		background{b.conn, b.notifier, b.windows}.iface(),
 		usbIface(b.conn),
 		emailIface(b.conn, b.spawn),
 		secretIface(b.conn),
@@ -112,6 +116,7 @@ func (b *Backend) Serve() (stop func(), err error) {
 		unwatch()
 		unforward()
 		b.sessions.clearAll()
+		b.windows.close()
 		b.logind.close()
 		release()
 	}, nil

@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 
@@ -57,55 +56,6 @@ func spawnRig(t *testing.T, fail ...string) (*rig, *spawned) {
 }
 
 const handle = dbus.ObjectPath("/org/freedesktop/portal/desktop/request/1_2/t")
-
-func TestBackgroundAllowsAndAutostarts(t *testing.T) {
-	cfgHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", cfgHome)
-	r := newRig(t, nil)
-	const iface = "org.freedesktop.impl.portal.Background"
-	code, res := r.interactive(t, iface+".NotifyBackground", handle, "org.app", "App")
-	if code != ResponseSuccess || res["result"].Value() != uint32(1) {
-		t.Errorf("NotifyBackground = %d %v, want allow", code, res)
-	}
-	var state map[string]dbus.Variant
-	if err := r.obj.Call(iface+".GetAppState", 0).Store(&state); err != nil || len(state) != 0 {
-		t.Errorf("GetAppState = %v, %v", state, err)
-	}
-
-	var enabled bool
-	if err := r.obj.Call(iface+".EnableAutostart", 0, "org.app", true, []string{"my-app", "--gapless"}, uint32(1)).Store(&enabled); err != nil || !enabled {
-		t.Fatalf("EnableAutostart on = %v, %v", enabled, err)
-	}
-	entry := filepath.Join(cfgHome, "autostart", "org.app.desktop")
-	got, err := os.ReadFile(entry)
-	want := "[Desktop Entry]\nType=Application\nName=org.app\nExec=my-app --gapless\nX-Flatpak=org.app\nDBusActivatable=true\nX-GNOME-Autostart-enabled=true\n"
-	if err != nil || string(got) != want {
-		t.Errorf("entry = %q, %v", got, err)
-	}
-	// Without the activatable flag there is no DBusActivatable line.
-	_ = r.obj.Call(iface+".EnableAutostart", 0, "org.app", true, []string{"app"}, uint32(0)).Store(&enabled)
-	if got, _ := os.ReadFile(entry); strings.Contains(string(got), "DBusActivatable") {
-		t.Errorf("a plain app's entry = %q", got)
-	}
-	if err := r.obj.Call(iface+".EnableAutostart", 0, "org.app", false, []string{}, uint32(0)).Store(&enabled); err != nil || enabled {
-		t.Errorf("EnableAutostart off = %v, %v", enabled, err)
-	}
-	if _, err := os.Stat(entry); !os.IsNotExist(err) {
-		t.Error("disabling left the entry")
-	}
-}
-
-func TestAutostartPath(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Setenv("HOME", "/home/u")
-	if p, ok := autostartPath("org.app"); !ok || p != "/home/u/.config/autostart/org.app.desktop" {
-		t.Errorf("path = %q, %v", p, ok)
-	}
-	_ = os.Unsetenv("HOME")
-	if _, ok := autostartPath("org.app"); ok {
-		t.Error("a path without HOME or XDG_CONFIG_HOME")
-	}
-}
 
 const acquireDevices = "org.freedesktop.impl.portal.Usb.AcquireDevices"
 

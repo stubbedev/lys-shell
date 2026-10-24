@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -36,8 +37,9 @@ type notifyCall struct {
 // fakeNotifyd is the shell's notification daemon; fail makes Notify
 // refuse.
 type fakeNotifyd struct {
-	conn   *dbus.Conn
-	next   uint32
+	conn *dbus.Conn
+	// next is the id the last new notification got.
+	next   atomic.Uint32
 	calls  dbustest.Var[[]notifyCall]
 	closed dbustest.Var[[]uint32]
 	fail   dbustest.Var[bool]
@@ -53,8 +55,7 @@ func (f *fakeNotifyd) Notify(appName string, replaces uint32, icon, summary, bod
 	if replaces != 0 {
 		return replaces, nil
 	}
-	f.next++
-	return f.next, nil
+	return f.next.Add(1), nil
 }
 
 func (f *fakeNotifyd) CloseNotification(id uint32) *dbus.Error {
@@ -73,7 +74,8 @@ func (f *fakeNotifyd) last(t *testing.T) notifyCall {
 
 func serveNotifyd(t *testing.T, r *rig) *fakeNotifyd {
 	t.Helper()
-	f := &fakeNotifyd{conn: r.bus.Conn(t), next: 40}
+	f := &fakeNotifyd{conn: r.bus.Conn(t)}
+	f.next.Store(40)
 	if err := f.conn.Export(f, notifications.ObjPath, notifications.Interface); err != nil {
 		t.Fatal(err)
 	}

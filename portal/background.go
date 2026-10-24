@@ -1,91 +1,167 @@
 package portal
 
 import (
-	"os"
-	"path/filepath"
-	"strings"
+	"sync"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/toplevels"
 )
 
-// autostartDBusActivatable is EnableAutostart's flag for an app that
-// is D-Bus activatable.
-const autostartDBusActivatable = 1
+// BackgroundIface is org.freedesktop.impl.portal.Background.
+const BackgroundIface = "org.freedesktop.impl.portal.Background"
+
+// GetAppState's states for an app with a window; one with none is
+// background (0), which the frontend assumes for an app not listed.
+const (
+	appRunning uint32 = 1
+	appActive  uint32 = 2
+)
+
+// NotifyBackground's results.
+const (
+	backgroundForbid    uint32 = 0
+	backgroundAllow     uint32 = 1
+	backgroundAllowOnce uint32 = 2
+)
+
+// The actions the background notification offers, [key, label, ...],
+// and the result each key stands for.
+var (
+	backgroundActions = []string{"forbid", "Forbid", "allow", "Allow", "allow-once", "Allow once"}
+	backgroundResults = map[string]uint32{"forbid": backgroundForbid, "allow": backgroundAllow, "allow-once": backgroundAllowOnce}
+)
 
 // background is org.freedesktop.impl.portal.Background (background.rs):
-// apps may always keep running, and autostart is an entry under
-// $XDG_CONFIG_HOME/autostart.
-type background struct{ conn *dbus.Conn }
+// the apps' states come from the compositor's windows, and an app the
+// frontend finds running with none is the user's call, asked in a
+// notification.
+type background struct {
+	conn     *dbus.Conn
+	notifier *notifier
+	windows  windowSource
+}
 
-func backgroundIface(conn *dbus.Conn) dbusx.Interface {
+// windowSource is the compositor's open windows, followed until close.
+type windowSource interface {
+	windows() ([]toplevels.Window, error)
+	close()
+}
+
+func (b background) iface() dbusx.Interface {
 	return dbusx.Interface{
-		Name:       "org.freedesktop.impl.portal.Background",
-		Methods:    background{conn},
+		Name:       BackgroundIface,
+		Methods:    b,
 		Properties: dbusx.Getters{"version": func() any { return uint32(2) }},
 	}
 }
 
-// GetAppState reports no per-app state: windows are not tracked.
-func (background) GetAppState() (Vardict, *dbus.Error) { return Vardict{}, nil }
+// GetAppState reports every app with a window: running, or active
+// when one of its windows is the activated one. No window list is an error, never an empty one: the frontend would take
+// every app for a background one.
+func (b background) GetAppState() (Vardict, *dbus.Error) {
+	windows, err := b.windows.windows()
+	if err != nil {
+		return nil, dbusx.Failed("background: no window list: " + err.Error())
+	}
+	states := Vardict{}
+	for id, state := range appStates(windows) {
+		states[id] = dbus.MakeVariant(state)
+	}
+	return states, nil
+}
 
-// NotifyBackground allows the app to keep running (result 1).
-func (b background) NotifyBackground(handle dbus.ObjectPath, appID, _ string) (uint32, Vardict, *dbus.Error) {
+// appStates folds the windows into each app id's state; windows with
+// no app id name no app.
+func appStates(windows []toplevels.Window) map[string]uint32 {
+	states := map[string]uint32{}
+	for _, w := range windows {
+		if w.AppID == "" {
+			continue
+		}
+		state := appRunning
+		if w.Activated {
+			state = appActive
+		}
+		states[w.AppID] = max(states[w.AppID], state)
+	}
+	return states
+}
+
+// NotifyBackground asks the user, in a notification, whether the app
+// may keep running with no window, and replies their answer once they
+// give it: Forbid, Allow, or Allow once. A notification dismissed
+// unanswered allows this instance only, so nothing permanent is decided
+// without the user. The frontend closing the request withdraws it.
+func (b background) NotifyBackground(handle dbus.ObjectPath, appID, name string) (uint32, Vardict, *dbus.Error) {
 	c, ok := beginOr(b.conn, handle, appID, "", nil)
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
-	return ResponseSuccess, Vardict{"result": dbus.MakeVariant(uint32(1))}, nil
+	if name == "" {
+		name = appID
+	}
+	key, err := b.notifier.ask(c.ctx, appID, name+" is running in the background",
+		"It has no open window. Allow it to keep running?", backgroundActions)
+	if c.closed() {
+		return ResponseCancelled, Vardict{}, nil
+	}
+	if err != nil {
+		warnf("background: asking about %s: %v", appID, err)
+		return ResponseOther, Vardict{}, nil
+	}
+	result, answered := backgroundResults[key]
+	if !answered {
+		result = backgroundAllowOnce
+	}
+	return ResponseSuccess, Vardict{"result": dbus.MakeVariant(result)}, nil
 }
 
-// EnableAutostart writes or removes the app's autostart entry and
-// replies whether autostart is now enabled.
-func (background) EnableAutostart(appID string, enable bool, commandline []string, flags uint32) (bool, *dbus.Error) {
-	path, ok := autostartPath(appID)
-	if !ok {
-		warnf("background: no autostart directory (XDG_CONFIG_HOME/HOME unset)")
-		return false, nil
-	}
-	if !enable {
-		_ = os.Remove(path)
-		return false, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // ~/.config/autostart is a normal readable config dir
-		warnf("background: cannot create autostart dir: %v", err)
-		return false, nil
-	}
-	if err := os.WriteFile(path, []byte(autostartDesktop(appID, commandline, flags&autostartDBusActivatable != 0)), 0o644); err != nil { //nolint:gosec // an autostart entry is world-readable like any desktop file
-		warnf("background: cannot write autostart entry: %v", err)
-		return false, nil
-	}
-	return true, nil
+// windowList follows the compositor's windows from the first ask on,
+// announcing changes as RunningApplicationsChanged; a compositor that
+// went away is reconnected on the next ask.
+type windowList struct {
+	conn  *dbus.Conn
+	watch func(changed func()) (*toplevels.Watcher, error)
+	mu    sync.Mutex
+	w     *toplevels.Watcher
 }
 
-// autostartPath is $XDG_CONFIG_HOME/autostart/<app_id>.desktop, or
-// under ~/.config.
-func autostartPath(appID string) (string, bool) {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		home, ok := os.LookupEnv("HOME")
-		if !ok {
-			return "", false
+func (l *windowList) windows() ([]toplevels.Window, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.w != nil {
+		select {
+		case <-l.w.Ended():
+			warnf("background: the window list ended: %v", l.w.Err())
+			l.w = nil
+		default:
 		}
-		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "autostart", appID+".desktop"), true
+	if l.w == nil {
+		w, err := l.watch(l.changed)
+		if err != nil {
+			return nil, err
+		}
+		l.w = w
+	}
+	return l.w.Windows(), nil
 }
 
-func autostartDesktop(appID string, commandline []string, dbusActivatable bool) string {
-	var b strings.Builder
-	b.WriteString("[Desktop Entry]\nType=Application\n")
-	b.WriteString("Name=" + appID + "\n")
-	b.WriteString("Exec=" + strings.Join(commandline, " ") + "\n")
-	b.WriteString("X-Flatpak=" + appID + "\n")
-	if dbusActivatable {
-		b.WriteString("DBusActivatable=true\n")
+func (l *windowList) changed() {
+	if err := l.conn.Emit(ObjectPath, BackgroundIface+".RunningApplicationsChanged"); err != nil {
+		warnf("background: RunningApplicationsChanged: %v", err)
 	}
-	b.WriteString("X-GNOME-Autostart-enabled=true\n")
-	return b.String()
+}
+
+// close stops following the windows.
+func (l *windowList) close() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.w != nil {
+		l.w.Close()
+		l.w = nil
+	}
 }
