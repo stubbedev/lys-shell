@@ -97,11 +97,16 @@ func (v *dashboardView) button(child widget.Widget, class string, onClick func()
 
 // quickActionTile is a quick action's column: the icon tile over the
 // label, spacing-0 — .quick-action-label's CSS margin-top carries the
-// gap (quick_actions/mod.rs:138-142).
+// gap (quick_actions/mod.rs:138-142). The column centers in the
+// button, and the tile and label center in the column (the halign and
+// valign Center the Rust boxes set), so the tile stays its icon's
+// square instead of stretching across the cell.
 func quickActionTile(icon *widget.Icon, label widget.Widget) *widget.Box {
 	col := widget.NewBox(widget.Column, 0, 0)
-	col.Append(iconTile(icon, "", "quick-action-icon"), false)
-	col.Append(label, false)
+	col.SetHAlign(widget.AlignCenter)
+	col.SetVAlign(widget.AlignCenter)
+	col.AppendAligned(iconTile(icon, "", "quick-action-icon"), false, widget.AlignCenter)
+	col.AppendAligned(label, false, widget.AlignCenter)
 	return col
 }
 
@@ -589,9 +594,13 @@ func dashboardProfile(active string) (label, icon string) {
 }
 
 // battery is battery_section: icon, percent, gauge, time left, and the
-// power profile, tinted by the dashboard's battery thresholds.
+// power profile, tinted by the dashboard's battery thresholds. The card
+// shows only while a battery is present (the Rust dashboard builds it
+// only for a present device): a desktop's UPower display device, or
+// none at all, leaves the network card the row.
 func (v *dashboardView) battery() widget.Widget {
 	card := v.card("ld-battery-full-symbolic", i18n.T("dropdown-dashboard-battery"))
+	card.SetVisible(false)
 	cfg := v.ctx.Config.Dashboard
 	status := widget.NewBox(widget.Row, 8, 0)
 	status.AddClass("battery-status")
@@ -620,7 +629,8 @@ func (v *dashboardView) battery() widget.Widget {
 	bctx := context.Background()
 	v.refreshers = append(v.refreshers, func() {
 		dev, err := v.ctx.Battery.Read(bctx)
-		if err != nil {
+		card.SetVisible(err == nil && dev.IsPresent)
+		if !card.Visible() {
 			return
 		}
 		pct := dev.Percentage

@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/treeman"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func treemanFixture() *treeman.Status {
@@ -51,6 +52,16 @@ func TestTreemanDropdownEmpty(t *testing.T) {
 	defer v.dropdownClosed()
 	if _, ok := v.list.Children()[0].(*widget.Box); !ok || len(v.list.Children()) != 1 {
 		t.Error("no repos: want only the empty state")
+	}
+	// views.rs empty_state wraps its description; the title stays one
+	// line.
+	for _, l := range treetest.All[*widget.Label](v.list) {
+		switch {
+		case l.HasClass("description") && !l.Wrap():
+			t.Error("the empty description does not wrap")
+		case l.HasClass("title") && l.Wrap():
+			t.Error("the empty title wraps")
+		}
 	}
 }
 

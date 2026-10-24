@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestDashboardBatteryHelpers(t *testing.T) {
@@ -498,5 +499,57 @@ func TestDashboardSpacingSitesAreZero(t *testing.T) {
 	grid, _ := findByClass(v, "quick-actions").(*widget.Grid)
 	if grid == nil || grid.ColumnSpacing() != 8 || grid.RowSpacing() != 4 {
 		t.Errorf("quick-actions grid spacing = %v, want the Rust 8/4", grid)
+	}
+}
+
+// The battery card shows only for a present battery (the Rust
+// dashboard builds it only then): a desktop's UPower display device
+// reports none, and the card follows a battery arriving or leaving.
+func TestDashboardBatteryCardFollowsPresence(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	bat := newFakeBattery(upower.Device{Percentage: 50, IsPresent: false})
+	ctx.Battery = bat
+	v := dashboardDropdown(ctx).(*dashboardView)
+	card := func() *widget.Box {
+		for _, c := range findByClass(v, "dashboard-info-row").(*widget.Box).Children() {
+			if b, ok := c.(*widget.Box); ok && len(treetest.WithClass(b, "battery-status")) > 0 {
+				return b
+			}
+		}
+		t.Fatal("no battery card in the info row")
+		return nil
+	}
+	if card().Visible() {
+		t.Error("the battery card shows with no battery present")
+	}
+	bat.update(func(d *upower.Device) { d.IsPresent = true })
+	v.refreshAll()
+	if !card().Visible() {
+		t.Error("the battery card stays hidden once a battery is present")
+	}
+}
+
+// A quick action's tile and label center in the cell at their natural
+// size: the colored icon tile stays a square, it never stretches.
+func TestDashboardQuickActionTileCenters(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	icon := widget.NewThemeIcon("ld-wifi-symbolic", 16)
+	label := widget.NewLabel(ctx.Font, 12, "WiFi", 0)
+	col := quickActionTile(icon, label)
+	b := dropdownButton(col, "quick-action", func() {})
+	ctx.Theme.Attach(b)
+	b.Measure(widgetConstraintsMax(200, 120))
+	b.Arrange(render.Rect{W: 200, H: 120})
+	tile := col.Children()[0]
+	nat := widget.MeasureAsChild(tile, widgetConstraintsMax(200, 120))
+	tb := boundsOf(tile)
+	if tb.W != nat.W {
+		t.Errorf("the icon tile spans %dpx, want its natural %dpx", tb.W, nat.W)
+	}
+	if d := midX(tb) - 100; d < -1 || d > 1 {
+		t.Errorf("the icon tile sits %dpx off the cell's center", d)
+	}
+	if d := midX(boundsOf(label)) - 100; d < -1 || d > 1 {
+		t.Errorf("the label sits %dpx off the cell's center", d)
 	}
 }
