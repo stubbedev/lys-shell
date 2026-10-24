@@ -23,6 +23,15 @@ type Source interface {
 	Fill(dst []byte) (damage []Rect, ok bool)
 }
 
+// Resizable is a Source whose frames change size (a window being
+// resized): Size is the layout of the frames it has now. When that
+// differs from the stream's, the producer offers the new size and
+// holds frames back until the consumer has renegotiated.
+type Resizable interface {
+	Source
+	Size() (width, height, stride uint32)
+}
+
 // DmabufSource is a Source that also fills GPU buffers: the producer
 // offers its modifier's format first and, when the consumer takes it,
 // binds one buffer from AllocDmabuf to each PipeWire buffer for the
@@ -82,6 +91,12 @@ type Producer struct {
 	useDmabuf bool
 	bound     map[*cSpaData]binding
 
+	// resizable is the source's size when it can change; renegotiating
+	// holds frames back from a size change until the consumer took the
+	// new format (loop only).
+	resizable     Resizable
+	renegotiating bool
+
 	start       time.Time
 	minInterval time.Duration
 	last        time.Time
@@ -128,6 +143,7 @@ func Start(cfg Config) (*Producer, error) {
 	}
 	p.last = p.start.Add(-p.minInterval)
 	p.dmabuf, _ = cfg.Source.(DmabufSource)
+	p.resizable, _ = cfg.Source.(Resizable)
 	p.bound = map[*cSpaData]binding{}
 	producersMu.Lock()
 	nextHandle++
@@ -263,12 +279,16 @@ func paramTrampoline(data uintptr, id uint32, param unsafe.Pointer) {
 	if p == nil || param == nil || id != paramFormat {
 		return
 	}
+	size := *(*uint32)(param)
+	format := unsafe.Slice((*byte)(param), 8+size) //nolint:gosec // audited: the pod is 8 + size bytes
+	if w, h, ok := formatSize(format); ok && w == p.cfg.Width && h == p.cfg.Height {
+		p.renegotiating = false
+	}
 	pods := bufferPods(p.cfg.Stride, p.cfg.Height)
 	if p.dmabuf != nil {
 		// Producer-allocated: a dmabuf when the consumer took the
 		// modifier's format, else a memfd.
-		size := *(*uint32)(param)
-		p.useDmabuf = objectHas(unsafe.Slice((*byte)(param), 8+size), formatVideoModifier) //nolint:gosec // audited: the pod is 8 + size bytes
+		p.useDmabuf = objectProp(format, formatVideoModifier) != nil
 		data := uint32(1 << dataMemFd)
 		if p.useDmabuf {
 			data = 1 << dataDmaBuf
@@ -292,6 +312,15 @@ func (p *Producer) process() {
 	now := time.Now()
 	if now.Sub(p.last) < p.minInterval {
 		return
+	}
+	if p.resizable != nil {
+		if w, h, stride := p.resizable.Size(); w != p.cfg.Width || h != p.cfg.Height || stride != p.cfg.Stride {
+			p.renegotiate(w, h, stride)
+			return
+		}
+		if p.renegotiating {
+			return
+		}
 	}
 	raw := p.lib.streamDequeue(p.stream)
 	if raw == nil {
@@ -336,6 +365,17 @@ func (p *Producer) process() {
 	p.last = now
 	d.chunk.size = min(p.cfg.Stride*p.cfg.Height, d.maxsize)
 	p.stamp(buf, now, damage)
+}
+
+// renegotiate offers the source's new size in place of the old one;
+// the consumer answers with a format of it (param_changed), and frames
+// wait until then.
+func (p *Producer) renegotiate(width, height, stride uint32) {
+	p.cfg.Width, p.cfg.Height, p.cfg.Stride = width, height, stride
+	p.renegotiating = true
+	withPods([][]byte{formatPod(width, height, p.cfg.FPS, p.cfg.Format, nil)}, func(params unsafe.Pointer, n uint32) int32 {
+		return p.lib.streamUpdate(p.stream, params, n)
+	})
 }
 
 // stamp writes the metas the consumer negotiated.

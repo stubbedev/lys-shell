@@ -4,6 +4,7 @@ import (
 	"context"
 	"image"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/capture"
@@ -39,7 +40,7 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	p.snapshot()
 	p.queue.Enqueue("/r/test", func() {}, func() {})
 	p.reply, p.allowToken, p.multiple = ch, allowToken, multiple
-	p.root = p.build(nil)
+	p.root = p.build(nil, AllSources)
 	return p, ch
 }
 
@@ -192,11 +193,44 @@ func TestWindowCardsRunInReverseWithTheirTitles(t *testing.T) {
 	}
 }
 
+// Only the pages of the sources offered are built; the configured
+// default page opens when it is one of them, else the first.
+func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {
+	cfg := config.DefaultsSharePicker()
+	cfg.DefaultPage = config.SharePickerWindows
+	p, _ := testPicker(t, cfg, false, false)
+	tabs := func(nb *widget.Notebook) []string {
+		var out []string
+		for _, name := range []string{pageWindows, pageOutputs, pageRegion} {
+			if nb.TabLabel(name) != nil {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		sources  Sources
+		tabs     []string
+		selected string
+	}{
+		{AllSources, []string{pageWindows, pageOutputs, pageRegion}, pageWindows},
+		{SourceOutputs | SourceRegions, []string{pageOutputs, pageRegion}, pageOutputs},
+		{SourceWindows, []string{pageWindows}, pageWindows},
+		{SourceRegions, []string{pageRegion}, pageRegion},
+	} {
+		p.root = p.build(nil, tc.sources)
+		nb := treetest.First[*widget.Notebook](t, p.root)
+		if got := tabs(nb); !slices.Equal(got, tc.tabs) || nb.SelectedTab() != tc.selected {
+			t.Errorf("sources %#x: tabs %v on %q, want %v on %q", tc.sources, got, nb.SelectedTab(), tc.tabs, tc.selected)
+		}
+	}
+}
+
 func TestEmptyPagesShowPlaceholders(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	p.outputs = func() []outputInfo { return nil }
-	p.root = p.build(nil)
+	p.root = p.build(nil, AllSources)
 	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-placeholder")) + len(treetest.WithClass(p.outputsPage(), "share-picker-placeholder")); n != 2 {
 		t.Fatalf("%d placeholders, want 2", n)
 	}
@@ -243,8 +277,8 @@ func TestMonitorAreaPlacement(t *testing.T) {
 
 type fakePicker struct{ reply string }
 
-func (f fakePicker) Pick(c portalreq.Caller, list string, token, multi bool) string {
-	return f.reply + "|" + c.Handle + "|" + list + "|" + boolStr(token) + boolStr(multi)
+func (f fakePicker) Pick(c portalreq.Caller, r Request) string {
+	return f.reply + "|" + c.Handle + "|" + r.WindowList + "|" + boolStr(r.AllowToken) + boolStr(r.Multiple) + "|" + strconv.Itoa(int(r.Sources))
 }
 
 func (fakePicker) Dismiss(string) {}
@@ -265,9 +299,13 @@ func TestDaemonOverTheBus(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer release()
-	got, err := NewClient(client).Pick(context.Background(), portalreq.Caller{Handle: "/r/1"}, "1[HC>]a[HT>]b[HE>]", true, false)
-	if err != nil || got != "/screen:DP-1|/r/1|1[HC>]a[HT>]b[HE>]|tf" {
+	got, err := NewClient(client).Pick(context.Background(), portalreq.Caller{Handle: "/r/1"}, Request{WindowList: "1[HC>]a[HT>]b[HE>]", Sources: SourceWindows, AllowToken: true})
+	if err != nil || got != "/screen:DP-1|/r/1|1[HC>]a[HT>]b[HE>]|tf|2" {
 		t.Fatalf("Pick = %q %v", got, err)
+	}
+	// A request offering nothing to pick is refused, not shown empty.
+	if got, err := NewClient(client).Pick(context.Background(), portalreq.Caller{Handle: "/r/2"}, Request{}); err == nil {
+		t.Fatalf("Pick with no sources = %q", got)
 	}
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {
 		t.Fatal("a second daemon claimed the owned name")
@@ -336,7 +374,7 @@ func TestPickerNamesTheRequester(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.d.Describe = func(appID string) (string, string) { return "Meet " + appID, "" }
 	p.requester = p.describe(portalreq.Caller{Handle: "/r/9", AppID: "org.meet"})
-	p.root = p.build(nil)
+	p.root = p.build(nil, AllSources)
 	if labels := treetest.Labels(p.root); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
 		t.Errorf("labels = %q", labels)
 	}

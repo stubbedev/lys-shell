@@ -95,7 +95,7 @@ var showColor = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string,
 func showScreenCast(m *cli.Matches) error {
 	return showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
 		// No window list: the picker with no pre-seeded sources.
-		selection, err := sharepicker.NewClient(conn).Pick(ctx, portalreq.Caller{}, "", m.Flag("allow_token"), m.Flag("multiple"))
+		selection, err := sharepicker.NewClient(conn).Pick(ctx, portalreq.Caller{}, sharepicker.Request{Sources: sharepicker.AllSources, AllowToken: m.Flag("allow_token"), Multiple: m.Flag("multiple")})
 		return orCancelled(selection), "SharePicker", "show share picker", err
 	})(m)
 }

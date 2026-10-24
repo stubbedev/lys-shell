@@ -10,19 +10,35 @@ import (
 	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 )
 
-func TestObjectHasFindsTheModifier(t *testing.T) {
+func TestObjectPropFindsTheModifier(t *testing.T) {
 	mod := uint64(0x00ffffffffffffff)
-	if !objectHas(formatPod(8, 8, 30, VideoBGRx, &mod), formatVideoModifier) {
+	if objectProp(formatPod(8, 8, 30, VideoBGRx, &mod), formatVideoModifier) == nil {
 		t.Error("a dmabuf format lost its modifier")
 	}
-	if objectHas(formatPod(8, 8, 30, VideoBGRx, nil), formatVideoModifier) {
+	if objectProp(formatPod(8, 8, 30, VideoBGRx, nil), formatVideoModifier) != nil {
 		t.Error("a plain format claims a modifier")
 	}
-	if !objectHas(formatPod(8, 8, 30, VideoBGRx, nil), formatVideoRate) {
+	if objectProp(formatPod(8, 8, 30, VideoBGRx, nil), formatVideoRate) == nil {
 		t.Error("the last property was not found")
 	}
-	if objectHas([]byte{1, 2, 3}, formatVideoModifier) || objectHas(podInt(1).bytes(), formatVideoModifier) {
+	if objectProp([]byte{1, 2, 3}, formatVideoModifier) != nil || objectProp(podInt(1).bytes(), formatVideoModifier) != nil {
 		t.Error("garbage or a non-object carries a modifier")
+	}
+}
+
+// A format's size reads back as written; a pod without one has none.
+func TestFormatSize(t *testing.T) {
+	if w, h, ok := formatSize(formatPod(640, 360, 30, VideoBGRx, nil)); !ok || w != 640 || h != 360 {
+		t.Errorf("formatSize = %d x %d, %v", w, h, ok)
+	}
+	// Fixation leaves the size a None choice of one rectangle.
+	fixated := pod{typeChoice, append(append(le32(choiceNone), le32(0)...), append(append(le32(8), le32(typeRectangle)...), append(le32(1280), le32(720)...)...)...)}
+	if w, h, ok := formatSize(object(objectFormat, paramFormat, prop{key: formatVideoSize, value: fixated})); !ok || w != 1280 || h != 720 {
+		t.Errorf("a fixated size = %d x %d, %v", w, h, ok)
+	}
+	noSize := object(objectFormat, paramFormat, prop{key: formatVideoFormat, value: podID(uint32(VideoBGRx))})
+	if _, _, ok := formatSize(noSize); ok {
+		t.Error("a format without a size has one")
 	}
 }
 

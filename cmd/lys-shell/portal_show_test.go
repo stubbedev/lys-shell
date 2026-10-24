@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // fakeChooser answers every dialog with uris and records the request.
@@ -196,8 +197,8 @@ func TestPortalShowPrintScreenCastAndScreenshot(t *testing.T) {
 	if stdout, _, code := show(t, "screen-cast", "--allow-token", "--multiple"); code != 0 || stdout != "monitor:DP-1\n" {
 		t.Errorf("screen-cast: code %d stdout %q", code, stdout)
 	}
-	if args := got.Load(); len(args) != 3 || args[0] != "" || args[1] != true || args[2] != true {
-		t.Errorf("Pick args = %v, want no window list and both flags", args)
+	if args := got.Load(); len(args) != 1 || args[0] != (sharepicker.Request{Sources: sharepicker.AllSources, AllowToken: true, Multiple: true}) {
+		t.Errorf("Pick args = %v, want no window list, every source and both flags", args)
 	}
 
 	conn := dbustest.SessionConn(t)

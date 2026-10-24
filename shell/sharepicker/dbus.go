@@ -16,9 +16,30 @@ const (
 	iface       = "dev.stubbe.lys.SharePicker1"
 )
 
+// Sources are the kinds of source a request may pick, a bit set.
+type Sources uint32
+
+// The kinds of source; a region is part of an output.
+const (
+	SourceOutputs Sources = 1 << iota
+	SourceWindows
+	SourceRegions
+	AllSources = SourceOutputs | SourceWindows | SourceRegions
+)
+
+// Request is one pick, (subb): the XDPH window list ("" without one),
+// the kinds of source offered, whether a restore token may be granted,
+// and whether several sources may be picked.
+type Request struct {
+	WindowList string
+	Sources    Sources
+	AllowToken bool
+	Multiple   bool
+}
+
 // picker is what the daemon serves: the Picker, or a fake in tests.
 type picker interface {
-	Pick(c portalreq.Caller, windowList string, allowToken, multiple bool) string
+	Pick(portalreq.Caller, Request) string
 	Dismiss(handle string)
 }
 
@@ -49,8 +70,12 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 // Pick shows the picker and blocks until the user selects or cancels,
 // replying the XDPH selection suffix (printed after `[SELECTION]`), or
 // an empty string on cancel.
-func (d *Daemon) Pick(c portalreq.Caller, windowList string, allowToken, multiple bool) (string, *dbus.Error) {
-	return d.picker.Pick(c, windowList, allowToken, multiple), nil
+// A request offering no kind of source is refused.
+func (d *Daemon) Pick(c portalreq.Caller, r Request) (string, *dbus.Error) {
+	if r.Sources&AllSources == 0 {
+		return "", dbus.MakeFailedError(fmt.Errorf("share picker: no kind of source to offer in %#x", uint32(r.Sources)))
+	}
+	return d.picker.Pick(c, r), nil
 }
 
 // Dismiss cancels the picker showing for the request at handle.
@@ -71,9 +96,9 @@ func NewClient(conn *dbus.Conn) *Client {
 }
 
 // Pick asks the shell to show the picker; see Daemon.Pick.
-func (c *Client) Pick(ctx context.Context, caller portalreq.Caller, windowList string, allowToken, multiple bool) (string, error) {
+func (c *Client) Pick(ctx context.Context, caller portalreq.Caller, r Request) (string, error) {
 	var selection string
-	err := c.obj.CallWithContext(ctx, iface+".Pick", 0, caller, windowList, allowToken, multiple).Store(&selection)
+	err := c.obj.CallWithContext(ctx, iface+".Pick", 0, caller, r).Store(&selection)
 	return selection, err
 }
 

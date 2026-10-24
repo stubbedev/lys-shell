@@ -19,6 +19,8 @@ import (
 type waylandLoop struct {
 	mu sync.Mutex
 	a  *app.Application
+	// sess lists the outputs (the loop's session); read on the loop.
+	sess interface{ Outputs() []*app.Output }
 	// ended closes when the loop stops: nothing runs queued work after
 	// that.
 	ended chan struct{}
@@ -69,7 +71,7 @@ func (w *waylandLoop) start() (*app.Application, chan struct{}, error) {
 			warnf("wayland loop ended: %v", err)
 		}
 		w.mu.Lock()
-		w.a = nil
+		w.a, w.sess = nil, nil
 		fns := slices.Clone(w.endFns)
 		w.mu.Unlock()
 		close(ended)
@@ -77,6 +79,28 @@ func (w *waylandLoop) start() (*app.Application, chan struct{}, error) {
 			fn()
 		}
 	}()
-	w.a, w.ended = a, ended
+	w.a, w.sess, w.ended = a, sess, ended
 	return a, ended, nil
+}
+
+// outputGeometry is an output's place in the compositor's logical
+// space: xdg-output's position and size.
+type outputGeometry struct {
+	name                string
+	x, y, width, height int32
+}
+
+// outputs is every output's logical geometry, read on the loop.
+func (w *waylandLoop) outputs() ([]outputGeometry, error) {
+	var out []outputGeometry
+	err := w.do(func(*app.Application) error {
+		w.mu.Lock()
+		sess := w.sess
+		w.mu.Unlock()
+		for _, o := range sess.Outputs() {
+			out = append(out, outputGeometry{name: o.Name, x: o.LogicalX, y: o.LogicalY, width: o.LogicalW, height: o.LogicalH})
+		}
+		return nil
+	})
+	return out, err
 }

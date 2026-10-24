@@ -105,15 +105,16 @@ func New(a *app.Application, d Deps, region *regionoverlay.Overlay) *Picker {
 }
 
 // Pick shows the picker for one portal request and blocks until the
-// user selects or cancels. windowList is the raw
-// XDPH_WINDOW_SHARING_LIST; allowToken seeds the restore-token box;
-// multiple enables multi-select. A request arriving while one is open
-// waits its turn. Call it from any goroutine but the loop's.
-func (p *Picker) Pick(c portalreq.Caller, windowList string, allowToken, multiple bool) string {
+// user selects or cancels. The request's window list is the raw
+// XDPH_WINDOW_SHARING_LIST; its sources are the pages shown; its token
+// flag seeds the restore-token box; multiple enables multi-select. A
+// request arriving while one is open waits its turn. Call it from any
+// goroutine but the loop's.
+func (p *Picker) Pick(c portalreq.Caller, r Request) string {
 	ch := make(chan string, 1)
-	toplevels := sharepreview.ParseList(windowList)
+	toplevels := sharepreview.ParseList(r.WindowList)
 	p.invoke(func() {
-		p.queue.Enqueue(c.Handle, func() { p.show(c, ch, toplevels, allowToken, multiple) }, func() { ch <- "" })
+		p.queue.Enqueue(c.Handle, func() { p.show(c, ch, toplevels, r) }, func() { ch <- "" })
 	})
 	return <-ch
 }
@@ -135,11 +136,11 @@ func (p *Picker) Dismiss(handle string) {
 
 // show re-reads the config and maps the surface for one request with
 // its enter transition.
-func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []sharepreview.Toplevel, allowToken, multiple bool) {
+func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []sharepreview.Toplevel, r Request) {
 	p.snapshot()
-	p.reply, p.allowToken, p.multiple, p.pending = ch, allowToken, multiple, nil
+	p.reply, p.allowToken, p.multiple, p.pending = ch, r.AllowToken, r.Multiple, nil
 	p.requester = p.describe(c)
-	p.root = p.build(toplevels)
+	p.root = p.build(toplevels, r.Sources)
 	if err := p.mapSurface(); err != nil {
 		log.Printf("share picker: %v", err)
 		p.answer("")
@@ -296,24 +297,39 @@ func regionPayload(sel regionoverlay.Selection) string {
 //	window.background.share-picker-window
 //	└ revealer
 //	  └ box.share-picker-surface (vertical, the configured size request)
-//	    ├ notebook.share-picker-notebook (Windows, Outputs, Region)
+//	    ├ notebook.share-picker-notebook (the pages of the sources
+//	    │   offered: Windows, Outputs, Region)
 //	    ├ checkbutton.share-picker-restore-button > label
 //	    └ button.share-picker-confirm-button (multi-select only)
-func (p *Picker) build(toplevels []sharepreview.Toplevel) widget.Widget {
+//
+// The configured default page opens when it is offered, else the first
+// page offered.
+func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widget.Widget {
 	nb := widget.NewNotebook(p.d.Font)
 	nb.AddClass("share-picker-notebook")
 	nb.SetVExpand(true)
-	p.appendPage(nb, pageWindows, p.windowsPage(toplevels))
-	p.appendPage(nb, pageOutputs, p.outputsPage())
-	p.appendPage(nb, pageRegion, p.regionPage())
-	switch p.cfg.DefaultPage {
-	case config.SharePickerOutputs:
-		nb.SelectTab(pageOutputs)
-	case config.SharePickerRegion:
-		nb.SelectTab(pageRegion)
-	default:
-		nb.SelectTab(pageWindows)
+	var pages []string
+	for _, page := range []struct {
+		name   string
+		source Sources
+		build  func() widget.Widget
+	}{
+		{pageWindows, SourceWindows, func() widget.Widget { return p.windowsPage(toplevels) }},
+		{pageOutputs, SourceOutputs, p.outputsPage},
+		{pageRegion, SourceRegions, p.regionPage},
+	} {
+		if sources&page.source != 0 {
+			p.appendPage(nb, page.name, page.build())
+			pages = append(pages, page.name)
+		}
 	}
+	wanted := map[config.SharePickerPage]string{
+		config.SharePickerWindows: pageWindows, config.SharePickerOutputs: pageOutputs, config.SharePickerRegion: pageRegion,
+	}[p.cfg.DefaultPage]
+	if !slices.Contains(pages, wanted) {
+		wanted = pages[0]
+	}
+	nb.SelectTab(wanted)
 	surface := widget.NewBox(widget.Column, 0, 0)
 	surface.AddClass("share-picker-surface")
 	surface.SetSizeRequest(p.width(), p.height())

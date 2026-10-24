@@ -61,7 +61,9 @@ func runSharePicker(m *cli.Matches) error {
 	}
 	defer func() { _ = conn.Close() }()
 	// The legacy single-select path: never multi-select.
-	selection, err := sharepicker.NewClient(conn).Pick(context.Background(), portalreq.Caller{}, os.Getenv("XDPH_WINDOW_SHARING_LIST"), m.Flag("allow_token"), false)
+	selection, err := sharepicker.NewClient(conn).Pick(context.Background(), portalreq.Caller{}, sharepicker.Request{
+		WindowList: os.Getenv("XDPH_WINDOW_SHARING_LIST"), Sources: sharepicker.AllSources, AllowToken: m.Flag("allow_token"),
+	})
 	if err != nil {
 		_, _ = fmt.Fprintln(m.Stderr(), dbusError("SharePicker", "open share picker", err, false))
 		return cli.ExitError{Code: 1}

@@ -155,25 +155,50 @@ func rects(damage []capture.Rect) []pipewire.Rect {
 	return out
 }
 
-// snapshotSource captures a fresh frame on every fill.
+// snapshotSource captures a fresh frame on every fill. Its frames may
+// change size (a resized window): Size reports the newest layout, and
+// the producer renegotiates the stream to it.
 type snapshotSource struct {
-	grab   func(dst []byte) (*capture.Frame, error)
-	stride int
-	height int
-	buf    []byte
-	watch  *vanishWatch
+	grab                  func(dst []byte) (*capture.Frame, error)
+	width, height, stride int
+	buf                   []byte
+	watch                 *vanishWatch
+	// failing is whether the captures fail, logged when that starts
+	// and when it stops rather than per frame.
+	failing bool
+}
+
+func newSnapshotSource(grab func([]byte) (*capture.Frame, error), first *capture.Frame, watch *vanishWatch) *snapshotSource {
+	return &snapshotSource{grab: grab, width: first.Width, height: first.Height, stride: first.Stride, buf: first.Data, watch: watch}
+}
+
+// Size is the newest frame's layout.
+func (s *snapshotSource) Size() (width, height, stride uint32) {
+	return uint32(s.width), uint32(s.height), uint32(s.stride)
 }
 
 func (s *snapshotSource) Fill(dst []byte) ([]pipewire.Rect, bool) {
 	f, err := s.grab(s.buf)
 	if err != nil {
+		if !s.failing {
+			warnf("screencast: capture failing: %v", err)
+			s.failing = true
+		}
 		s.watch.failed()
 		return nil, false
 	}
+	if s.failing {
+		warnf("screencast: capture recovered")
+		s.failing = false
+	}
 	s.buf = f.Data
-	// A frame whose layout changed (a resized window) does not fit the
-	// negotiated buffers; it is skipped rather than streamed torn.
-	if f.Stride != s.stride || f.Height != s.height || len(dst) < s.stride*s.height {
+	// A frame of a new layout does not fit the negotiated buffers: it
+	// is skipped, and Size makes the producer renegotiate.
+	if f.Width != s.width || f.Height != s.height || f.Stride != s.stride {
+		s.width, s.height, s.stride = f.Width, f.Height, f.Stride
+		return nil, false
+	}
+	if len(dst) < s.stride*s.height {
 		return nil, false
 	}
 	copyRows(dst, f)
@@ -236,7 +261,7 @@ func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenS
 		return nil, fmt.Errorf("initial capture failed: %w", err)
 	}
 	watch := newVanishWatch(gone)
-	src := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data, watch: watch}
+	src := newSnapshotSource(grab, first, watch)
 	return startProducer(producerGeometry{
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, refresh), transform: uint32(transform),
@@ -306,7 +331,7 @@ func startGPUStream(output string, cursor bool, fps uint32) (screenStream, error
 		return fail(err)
 	}
 	watch := newVanishWatch(outputGone(c, output))
-	shm := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data, watch: watch}
+	shm := newSnapshotSource(grab, first, watch)
 	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, o, cursor, first)
 	if err != nil {
 		dev.Close()

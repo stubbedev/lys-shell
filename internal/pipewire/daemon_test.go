@@ -71,6 +71,12 @@ func newConsumer(t *testing.T, loop *loopThread, width, height uint32) *consumer
 // the plain one when nil.
 func newConsumerOf(t *testing.T, loop *loopThread, width, height uint32, modifier *uint64) *consumer {
 	t.Helper()
+	return newConsumerOfFormat(t, loop, formatPod(width, height, 30, VideoBGRx, modifier))
+}
+
+// newConsumerOfFormat is a consumer offering one EnumFormat pod.
+func newConsumerOfFormat(t *testing.T, loop *loopThread, format []byte) *consumer {
+	t.Helper()
 	l, err := load()
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +138,7 @@ func newConsumerOf(t *testing.T, loop *loopThread, width, height uint32, modifie
 	loop.do(func() {
 		props := l.propertiesNew("media.type=Video media.category=Capture node.name=test-consumer")
 		c.stream = l.streamNewSimple(loop.loop, "test-consumer", props, unsafe.Pointer(events), consumerHandle)
-		rc = withPods([][]byte{formatPod(width, height, 30, VideoBGRx, modifier)}, func(params unsafe.Pointer, n uint32) int32 {
+		rc = withPods([][]byte{format}, func(params unsafe.Pointer, n uint32) int32 {
 			return l.streamConnect(c.stream, 0 /* input */, idAny, flagMapBuffers, params, n)
 		})
 	})
@@ -213,6 +219,106 @@ func TestProducerFeedsALinkedConsumer(t *testing.T) {
 	for i := 1; i < len(frames); i++ {
 		if frames[i].seq <= frames[i-1].seq {
 			t.Errorf("header seq %d after %d: not increasing", frames[i].seq, frames[i-1].seq)
+		}
+	}
+}
+
+// podSizeRange is a consumer's Choice of Range over Rectangles: any
+// size from 1x1 to 4096x4096, as real consumers offer.
+func podSizeRange(defW, defH uint32) pod {
+	body := append(le32(choiceRange), le32(0)...)
+	body = append(body, append(le32(8), le32(typeRectangle)...)...)
+	for _, v := range [][2]uint32{{defW, defH}, {1, 1}, {4096, 4096}} {
+		body = append(body, append(le32(v[0]), le32(v[1])...)...)
+	}
+	return pod{typeChoice, body}
+}
+
+// growing is a Resizable source: frames of its current size, filled
+// with one byte per size.
+type growing struct {
+	mu                    sync.Mutex
+	width, height, stride uint32
+	fill                  byte
+}
+
+func (g *growing) resize(width, height, stride uint32, fill byte) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.width, g.height, g.stride, g.fill = width, height, stride, fill
+}
+
+func (g *growing) Size() (width, height, stride uint32) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.width, g.height, g.stride
+}
+
+func (g *growing) Fill(dst []byte) ([]Rect, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if uint32(len(dst)) < g.stride*g.height {
+		return nil, false
+	}
+	for i := range dst[:g.stride*g.height] {
+		dst[i] = g.fill
+	}
+	return nil, true
+}
+
+// A source that changes size renegotiates the stream: the consumer gets
+// frames of the new size, and none of the old size's layout after it.
+func TestProducerRenegotiatesAResizedSource(t *testing.T) {
+	pwtest.Start(t)
+	src := &growing{width: 64, height: 32, stride: 256, fill: 0x11}
+	p, err := Start(Config{Width: 64, Height: 32, Stride: 256, Format: VideoBGRx, FPS: 30, Source: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Close()
+	l, _ := load()
+	loop, err := startLoop(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer loop.stop()
+	c := newConsumerOfFormat(t, loop, object(objectFormat, paramEnumFormat,
+		prop{key: formatMediaType, value: podID(mediaTypeVideo)},
+		prop{key: formatMediaSubtype, value: podID(mediaSubtypeRaw)},
+		prop{key: formatVideoFormat, value: podID(uint32(VideoBGRx))},
+		prop{key: formatVideoSize, value: podSizeRange(64, 32)},
+		prop{key: formatVideoRate, value: podFraction(30, 1)},
+	))
+	defer loop.do(func() {
+		l.streamDisconnect(c.stream)
+		l.streamDestroy(c.stream)
+	})
+	link(t)
+	next := func(want func(consumed) bool) consumed {
+		t.Helper()
+		deadline := time.After(5 * time.Second)
+		for {
+			select {
+			case f := <-c.frames:
+				if f.size > 0 && want(f) {
+					return f
+				}
+			case <-deadline:
+				t.Fatal("no such frame")
+			}
+		}
+	}
+	if f := next(func(f consumed) bool { return true }); f.size != 256*32 || f.first != 0x11 {
+		t.Fatalf("first frame = %+v", f)
+	}
+	src.resize(128, 48, 512, 0x22)
+	f := next(func(f consumed) bool { return f.first == 0x22 })
+	if f.size != 512*48 {
+		t.Errorf("a resized frame is %d bytes, want %d", f.size, 512*48)
+	}
+	for range 3 {
+		if f := next(func(consumed) bool { return true }); f.size != 512*48 || f.first != 0x22 {
+			t.Errorf("after the resize a frame = %+v", f)
 		}
 	}
 }

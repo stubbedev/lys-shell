@@ -57,10 +57,10 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b.windows = &windowList{conn: conn, watch: toplevels.Watch}
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
-	b.sizes = &streamSizes{sizes: map[uint32][2]int32{}}
-	b.screenCast = newScreenCast(conn, b.sessions, b.sizes, startScreenStream)
-	b.remote = newRemoteDesktop(conn, b.sessions, b.sizes, dialInput)
 	loop := &waylandLoop{}
+	b.sizes = &streamSizes{sizes: map[uint32][2]int32{}}
+	b.screenCast = newScreenCast(conn, b.sessions, b.sizes, startScreenStream, loop.outputs)
+	b.remote = newRemoteDesktop(conn, b.sessions, b.sizes, dialInput)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, waylandShortcutsStarter(loop))
 	loop.onEnd(b.clipboard.loopEnded)

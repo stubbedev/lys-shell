@@ -85,6 +85,7 @@ const (
 )
 
 const (
+	choiceNone        = 0
 	choiceRange       = 1
 	propFlagMandatory = 1 << 3
 )
@@ -199,20 +200,35 @@ func bufferPodsOf(stride, height, dataTypes uint32) [][]byte {
 	}
 }
 
-// objectHas reports whether the spa_pod_object in b carries the
-// property key: a negotiated format with the modifier is a dmabuf one.
-func objectHas(b []byte, key uint32) bool {
+// objectProp is the value pod (header and body) of the property key
+// of the spa_pod_object in b, nil when it has none: a negotiated
+// format with the modifier is a dmabuf one.
+func objectProp(b []byte, key uint32) []byte {
 	u32 := func(i int) uint32 { return binary.LittleEndian.Uint32(b[i:]) }
 	if len(b) < 16 || u32(4) != typeObject {
-		return false
+		return nil
 	}
 	end := min(len(b), 8+int(u32(0)))
 	for i := 16; i+16 <= end; {
-		if u32(i) == key {
-			return true
-		}
 		size := int(u32(i + 8))
+		if u32(i) == key {
+			return b[i+8 : min(end, i+16+size)]
+		}
 		i += 16 + (size+7)&^7
 	}
-	return false
+	return nil
+}
+
+// formatSize is a negotiated format's video size, a Rectangle or the
+// None choice of one fixation leaves; false without one.
+func formatSize(b []byte) (width, height uint32, ok bool) {
+	v := objectProp(b, formatVideoSize)
+	u32 := func(i int) uint32 { return binary.LittleEndian.Uint32(v[i:]) }
+	switch {
+	case len(v) >= 16 && u32(4) == typeRectangle:
+		return u32(8), u32(12), true
+	case len(v) >= 32 && u32(4) == typeChoice && u32(8) == choiceNone && u32(20) == typeRectangle:
+		return u32(24), u32(28), true
+	}
+	return 0, 0, false
 }

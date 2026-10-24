@@ -19,8 +19,8 @@ type fakePicker struct {
 	got       *dbustest.Var[[]any]
 }
 
-func (f fakePicker) Pick(_ portalreq.Caller, windowList string, allowToken, multiple bool) (string, *dbus.Error) {
-	f.got.Store([]any{windowList, allowToken, multiple})
+func (f fakePicker) Pick(_ portalreq.Caller, r sharepicker.Request) (string, *dbus.Error) {
+	f.got.Store([]any{r})
 	return f.selection, nil
 }
 
@@ -45,8 +45,9 @@ func TestSharePickerPrintsOnlyTheSelection(t *testing.T) {
 	if code != 0 || stdout != "[SELECTION]window:1\n" || stderr != "" {
 		t.Fatalf("code %d stdout %q stderr %q", code, stdout, stderr)
 	}
-	if args := got.Load(); len(args) != 3 || args[0] != "1[HC>]kitty[HT>]~[HE>]" || args[1] != true || args[2] != false {
-		t.Errorf("Pick args = %v: the window list, the token flag, never multiple", args)
+	want := sharepicker.Request{WindowList: "1[HC>]kitty[HT>]~[HE>]", Sources: sharepicker.AllSources, AllowToken: true}
+	if args := got.Load(); len(args) != 1 || args[0] != want {
+		t.Errorf("Pick args = %v: the window list, every source, the token flag, never multiple", args)
 	}
 }
 

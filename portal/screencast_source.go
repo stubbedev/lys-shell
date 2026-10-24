@@ -2,27 +2,43 @@ package portal
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// Source types of ScreenCast (the AvailableSourceTypes bits).
+// Source types of ScreenCast (the AvailableSourceTypes bits). Virtual
+// (4), a new virtual monitor, is not offered: there are none to make.
 const (
 	sourceMonitor uint32 = 1
 	sourceWindow  uint32 = 2
-	sourceVirtual uint32 = 4
+
+	availableSources = sourceMonitor | sourceWindow
 )
 
-// Cursor modes of ScreenCast (AvailableCursorModes bits).
+// Cursor modes of ScreenCast (AvailableCursorModes bits). Metadata (4)
+// is not offered: the streams carry no cursor meta.
 const (
 	cursorHidden   uint32 = 1
 	cursorEmbedded uint32 = 2
-	cursorMetadata uint32 = 4
+
+	availableCursorModes = cursorHidden | cursorEmbedded
 )
 
-// showCursor reports whether a cursor_mode puts the pointer in the
-// frames: embedded, or metadata (unsupported, so embedded instead).
-func showCursor(mode uint32) bool { return mode&(cursorEmbedded|cursorMetadata) != 0 }
+// pickerSources is what the share picker offers for the source types:
+// a monitor is a whole output or a region of one.
+func pickerSources(types uint32) sharepicker.Sources {
+	var s sharepicker.Sources
+	if types&sourceMonitor != 0 {
+		s |= sharepicker.SourceOutputs | sharepicker.SourceRegions
+	}
+	if types&sourceWindow != 0 {
+		s |= sharepicker.SourceWindows
+	}
+	return s
+}
 
 // captureKind is what a captureTarget names.
 type captureKind uint8
@@ -44,15 +60,31 @@ type captureTarget struct {
 	x, y, width, height int32
 }
 
-// sourceType is the target's AvailableSourceTypes bit.
+// sourceType is the target's AvailableSourceTypes bit: a region is
+// part of a monitor.
 func (t captureTarget) sourceType() uint32 {
-	switch t.kind {
-	case targetWindow:
+	if t.kind == targetWindow {
 		return sourceWindow
-	case targetRegion:
-		return sourceVirtual
 	}
 	return sourceMonitor
+}
+
+// geometry is the target's place in the compositor's logical space: an
+// output's, or a region's within its output; false for a window, whose
+// place the capture does not know, or an output not listed.
+func (t captureTarget) geometry(outputs []outputGeometry) (x, y, width, height int32, ok bool) {
+	if t.kind == targetWindow {
+		return 0, 0, 0, 0, false
+	}
+	i := slices.IndexFunc(outputs, func(o outputGeometry) bool { return o.name == t.name })
+	if i < 0 {
+		return 0, 0, 0, 0, false
+	}
+	o := outputs[i]
+	if t.kind == targetRegion {
+		return o.x + t.x, o.y + t.y, t.width, t.height, true
+	}
+	return o.x, o.y, o.width, o.height, true
 }
 
 // payload is the target as the share picker writes it (and a restore
@@ -106,14 +138,31 @@ func parsePickerReply(reply string) (allowToken bool, targets []captureTarget, o
 	if reply == "" || !found {
 		return false, nil, false
 	}
+	targets, ok = parseTargets(payload)
+	return strings.Contains(flags, "r"), targets, ok
+}
+
+// parseTargets reads `<payload>[;<payload>...]`; any malformed piece
+// rejects them all.
+func parseTargets(payload string) ([]captureTarget, bool) {
+	var targets []captureTarget
 	for piece := range strings.SplitSeq(payload, ";") {
 		t, ok := parseTarget(piece)
 		if !ok {
-			return false, nil, false
+			return nil, false
 		}
 		targets = append(targets, t)
 	}
-	return strings.Contains(flags, "r"), targets, true
+	return targets, true
+}
+
+// joinTargets writes targets as parseTargets reads them.
+func joinTargets(targets []captureTarget) string {
+	pieces := make([]string, len(targets))
+	for i, t := range targets {
+		pieces[i] = t.payload()
+	}
+	return strings.Join(pieces, ";")
 }
 
 // effectiveFPS clamps the requested rate to the output's refresh
