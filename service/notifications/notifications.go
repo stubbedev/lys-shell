@@ -18,6 +18,7 @@ import (
 
 	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/internal/glob"
+	"github.com/stubbedev/wayle/internal/version"
 	"github.com/stubbedev/wayle/internal/xdg"
 )
 
@@ -27,7 +28,7 @@ const (
 	ObjPath       = "/org/freedesktop/Notifications"
 	ServerName    = "wayle"
 	ServerVendor  = "wayle"
-	ServerVersion = "0.8.53"
+	ServerVersion = version.Version
 	SpecVersion   = "1.2"
 )
 

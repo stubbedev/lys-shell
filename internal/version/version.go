@@ -4,4 +4,4 @@
 package version
 
 // Version is the wayle release version (Cargo.toml workspace.package).
-const Version = "0.8.53"
+const Version = "0.8.54"

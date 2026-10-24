@@ -12,7 +12,7 @@ import (
 )
 
 // The goldens under testdata/clap were captured from the Rust wayle
-// 0.8.53 binary (clap 4.5): every command's -h and --help, a battery
+// 0.8.53 binary (clap 4.5; the version lines re-captured from 0.8.54): every command's -h and --help, a battery
 // of parse errors with their exit codes, colored (tty) renderings, and
 // the five completion scripts. The Go tree must reproduce them byte
 // for byte.
