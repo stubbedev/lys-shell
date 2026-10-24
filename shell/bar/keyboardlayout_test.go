@@ -239,10 +239,38 @@ func TestKeyboardLayoutFollowsSwayInputEvents(t *testing.T) {
 	// An input event re-reads the inputs.
 	events <- `[{"type":"keyboard","xkb_active_layout_name":"English (US)"}]`
 	waitLabel(t, label, "English (US)")
-	// A keyboard without a layout blanks the label rather than keeping
-	// the stale one.
+	// A keyboard without a layout shows the unknown layout
+	// (component.rs UNKNOWN_LAYOUT) rather than keeping the stale one.
 	events <- `[{"type":"keyboard"}]`
-	waitLabel(t, label, "")
+	waitLabel(t, label, "?")
+}
+
+// A session without a keyboard starts on the unknown layout, through
+// the format and alias map like any layout.
+func TestKeyboardLayoutStartsUnknownWithoutAKeyboard(t *testing.T) {
+	events := make(chan string, 1)
+	t.Cleanup(func() { close(events) })
+	fakeSwayInputs(t, `[{"type":"pointer"}]`, events)
+	cfg := config.Defaults()
+	cfg.KeyboardInput.Format = "KB {{ alias }}"
+	cfg.KeyboardInput.LayoutAliasMap = map[string]string{"?": "none"}
+	if got := newTestKeyboardLayout(t, cfg).Text(); got != "KB none" {
+		t.Errorf("label = %q, want the unknown layout through format and alias", got)
+	}
+}
+
+// A first read that fails builds the module on the unknown layout
+// (the Rust snapshot warns and shows "?") instead of dropping it.
+func TestKeyboardLayoutSurvivesAFailedFirstRead(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Hyprland = newFakeDevicesConn(t, `{"keyboards": not json`)
+	module, err := Create("keyboard-input", ctx)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if got := findLabel(module.Root()).Text(); got != "?" {
+		t.Errorf("label = %q, want the unknown layout", got)
+	}
 }
 
 // fakeNiriLayouts answers KeyboardLayouts with the current index and,
@@ -291,9 +319,9 @@ func TestKeyboardLayoutFollowsNiriLayoutSwitches(t *testing.T) {
 	}
 	switches <- 1
 	waitLabel(t, label, "German")
-	// An index past the names is no layout.
+	// An index past the names is no layout: the unknown one.
 	switches <- 5
-	waitLabel(t, label, "")
+	waitLabel(t, label, "?")
 }
 
 func TestKeyboardLayoutFollowsMangosActiveMonitor(t *testing.T) {

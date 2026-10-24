@@ -25,6 +25,10 @@ const (
 	errorKeymap = "error"
 )
 
+// unknownLayout is component.rs's UNKNOWN_LAYOUT: the layout shown
+// while the source knows none, or could not be read at start.
+const unknownLayout = "?"
+
 // mainKeyboardLayout picks the active layout: the main non-virtual
 // keyboard's keymap, else the first non-virtual keyboard with a real
 // keymap. Empty string when no keyboard qualifies.
@@ -169,8 +173,8 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.root = assembleModule(ctx, moduleIcon(ctx, ctx.Config.KeyboardInput.Icon()), m.label)
 	if err := m.refresh(); err != nil {
-		source.close()
-		return nil, err
+		log.Printf("keyboard-input: %v", err)
+		m.show(unknownLayout)
 	}
 	ticks, stop, err := source.subscribe(ctx)
 	if err != nil {
@@ -190,19 +194,28 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 	return m, nil
 }
 
-// refresh re-reads the layout and updates the label.
+// refresh re-reads the layout and shows it; on a read error the label
+// keeps the last known layout.
 func (m *keyboardLayout) refresh() error {
 	layout, err := m.source.read()
 	if err != nil {
 		return err
 	}
+	if layout == "" {
+		layout = unknownLayout
+	}
+	m.show(layout)
+	return nil
+}
+
+// show renders layout into the label.
+func (m *keyboardLayout) show(layout string) {
 	cfg := m.ctx.Config.KeyboardInput
 	label := ""
-	if cfg.LabelShow && layout != "" {
+	if cfg.LabelShow {
 		label = keyboardLayoutLabel(layout, cfg.Format, cfg.LayoutAliasMap)
 	}
 	m.label.SetText(label)
-	return nil
 }
 
 func (m *keyboardLayout) Root() widget.Widget { return m.root }
