@@ -42,7 +42,7 @@ dev-shell *args:
 # error unless a real greetd socket is around ($GREETD_SOCK), which is fine for
 # visuals.
 dev-greeter *args:
-    {{go}} run ./cmd/lys-greeter --config ~/.config/lys-shell/config.toml --state /tmp/lys-greeter-dev/last-session {{args}}
+    {{go}} run ./cmd/lys-greeter --config ~/.config/lys-shell/config.yaml --state /tmp/lys-greeter-dev/last-session {{args}}
 
 # Tail today's shell log — `just logs 200` for more backlog.
 logs lines="80":

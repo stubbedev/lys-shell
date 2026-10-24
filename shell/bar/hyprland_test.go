@@ -516,27 +516,27 @@ func TestHyprlandModuleIsUnwrapped(t *testing.T) {
 }
 
 func TestLoadFileAppliesHyprlandWorkspaces(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
+	path := filepath.Join(t.TempDir(), "config.yaml")
 	content := `
-[modules.hyprland-workspaces]
-display-mode = "icon"
-active-color = "#89b4fa"
-numbering = "relative"
-min-workspace-count = 5
-label-use-name = true
-show-special = false
-highlight-active-on-other-monitor = false
-active-on-other-monitor-color = "#123456"
-urgent-mode = "application"
-app-icons-show = true
-workspace-ignore = ["1?"]
-left-click = "focus:last"
-
-[modules.hyprland-workspaces.workspace-map.-98]
-color = "#f38ba8"
-
-[modules.hyprland-workspaces.workspace-map.10]
-label = "ten"
+modules:
+  hyprland-workspaces:
+    display-mode: icon
+    active-color: "#89b4fa"
+    numbering: relative
+    min-workspace-count: 5
+    label-use-name: true
+    show-special: false
+    highlight-active-on-other-monitor: false
+    active-on-other-monitor-color: "#123456"
+    urgent-mode: application
+    app-icons-show: true
+    workspace-ignore: ["1?"]
+    left-click: "focus:last"
+    workspace-map:
+      "-98":
+        color: "#f38ba8"
+      "10":
+        label: ten
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -564,16 +564,16 @@ label = "ten"
 
 func TestLoadFileRejectsBadHyprlandWorkspaces(t *testing.T) {
 	for _, content := range []string{
-		"display-mode = \"text\"",
-		"active-indicator = \"glow\"",
-		"numbering = \"roman\"",
-		"min-workspace-count = 300",
-		"active-color = \"not-a-token\"",
-		"urgent-mode = \"loud\"",
-		"[modules.hyprland-workspaces.workspace-map.web]\ncolor = \"#fff\"",
+		"display-mode: text",
+		"active-indicator: glow",
+		"numbering: roman",
+		"min-workspace-count: 300",
+		"active-color: not-a-token",
+		"urgent-mode: loud",
+		"workspace-map:\n  web:\n    color: \"#fff\"",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
-		body := "[modules.hyprland-workspaces]\n" + content + "\n"
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		body := "modules:\n  hyprland-workspaces:\n    " + strings.ReplaceAll(content, "\n", "\n    ") + "\n"
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}

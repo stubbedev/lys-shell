@@ -1,6 +1,6 @@
 package config
 
-// BarConfig is the [bar] section
+// BarConfig is the `bar` section
 // (crates/wayle-config/src/schemas/bar/mod.rs).
 //
 // Bar chrome: per-monitor layout, spacing, colors, and button styling.
@@ -11,17 +11,16 @@ type BarConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[bar.layout]]
-	// monitor = "*"
-	// left = ["dashboard"]
-	// center = ["clock"]
-	// right = ["battery", "network", "volume", "systray"]
-	//
-	// [[bar.layout]]
-	// monitor = "HDMI-1"
-	// extends = "*"
-	// right = ["volume", "systray"]
+	// ```yaml
+	// bar:
+	//   layout:
+	//     - monitor: "*"
+	//       left: [dashboard]
+	//       center: [clock]
+	//       right: [battery, network, volume, systray]
+	//     - monitor: HDMI-1
+	//       extends: "*"
+	//       right: [volume, systray]
 	// ```
 	Layout []BarLayout `cfg:"layout"`
 	// Bar-specific scale multiplier for spacing, radius, and other bar elements.
@@ -219,7 +218,7 @@ func (l BarLayout) ExtendsName() (string, bool) {
 }
 
 func (BarLayout) configDescription() string {
-	return "Layout configuration for a bar on a specific monitor.\n\n## Examples\n\n```toml\n# Single modules\n[[bar.layout]]\nmonitor = \"*\"\nleft = [\"dashboard\"]\ncenter = [\"clock\"]\nright = [\"systray\"]\n\n# Module with custom CSS class for per-instance styling\n[[bar.layout]]\nmonitor = \"DP-1\"\nleft = [{ module = \"clock\", class = \"primary-clock\" }, \"clock\"]\ncenter = [\"media\"]\n\n# Grouped modules (share a visual container, CSS-targetable by name)\n[[bar.layout]]\nmonitor = \"DP-2\"\nleft = [{ name = \"status\", modules = [\"battery\", \"network\"] }]\n\n# Groups can also contain classed modules\n[[bar.layout]]\nmonitor = \"DP-3\"\nleft = [{ name = \"clocks\", modules = [\n  { module = \"clock\", class = \"local\" },\n  { module = \"world-clock\", class = \"remote\" }\n]}]\n\n# Inherit from another layout\n[[bar.layout]]\nmonitor = \"*\"\nleft = [\"dashboard\"]\ncenter = [\"clock\"]\nright = [\"systray\"]\n\n[[bar.layout]]\nmonitor = \"HDMI-1\"\nextends = \"*\"\nright = [\"volume\", \"systray\"]  # Override just this section\n\n# Hide bar on a specific monitor\n[[bar.layout]]\nmonitor = \"HDMI-2\"\nshow = false\n```"
+	return "Layout configuration for a bar on a specific monitor.\n\n## Examples\n\n```yaml\n# Single modules\nbar:\n  layout:\n    - monitor: \"*\"\n      left: [dashboard]\n      center: [clock]\n      right: [systray]\n\n    # Module with custom CSS class for per-instance styling\n    - monitor: DP-1\n      left:\n        - {module: clock, class: primary-clock}\n        - clock\n      center: [media]\n\n    # Grouped modules (share a visual container, CSS-targetable by name)\n    - monitor: DP-2\n      left:\n        - {name: status, modules: [battery, network]}\n\n    # Groups can also contain classed modules\n    - monitor: DP-3\n      left:\n        - name: clocks\n          modules:\n            - {module: clock, class: local}\n            - {module: world-clock, class: remote}\n\n    # Inherit from another layout\n    - monitor: \"*\"\n      left: [dashboard]\n      center: [clock]\n      right: [systray]\n    - monitor: HDMI-1\n      extends: \"*\"\n      right: [volume, systray]  # Override just this section\n\n    # Hide bar on a specific monitor\n    - monitor: HDMI-2\n      show: false\n```"
 }
 
 // BarButtonVariant is the bar button structure.

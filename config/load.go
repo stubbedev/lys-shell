@@ -9,15 +9,13 @@ import (
 	"strings"
 )
 
-// File loading with imports, ported from
-// crates/wayle-config/src/infrastructure/loading: a config file may
-// list `imports = [...]` (paths relative to the importing file, a bare
-// name trying .yaml, .yml, then .toml); imports merge in order and the
-// importing file wins; import cycles are an error naming the chain.
+// File loading with imports: a config file may list `imports: [...]`
+// (YAML paths relative to the importing file, a bare name trying .yaml,
+// then .yml); imports merge in order and the importing file wins;
+// import cycles are an error naming the chain.
 
 // LoadError is a whole-file failure: the file (or an import) could not
-// be read or parsed. Its message matches the Rust Error display; the
-// cause is available through errors.Unwrap.
+// be read or parsed. The cause is available through errors.Unwrap.
 type LoadError struct {
 	msg string
 	err error
@@ -26,12 +24,16 @@ type LoadError struct {
 func (e *LoadError) Error() string { return e.msg }
 func (e *LoadError) Unwrap() error { return e.err }
 
-// loadTree reads path with its imports resolved into one merged tree
-// (Config::load_toml_with_imports). A missing main file is created
-// with the Rust stub contents first, so fresh installs have a file to
-// edit and to watch.
+// loadTree reads path with its imports resolved into one merged tree.
+// A missing main file is created with a stub first, so fresh installs
+// have a file to edit and to watch, unless a TOML config from before
+// the YAML switch sits beside it: that is an error until the user
+// converts it, never silently replaced by an empty config.
 func loadTree(path string) (any, error) {
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		if err := legacyTOMLError(filepath.Join(filepath.Dir(path), "config.toml"), path); err != nil {
+			return nil, err
+		}
 		if err := createDefaultConfigFile(path); err != nil {
 			return nil, err
 		}
@@ -47,11 +49,25 @@ func loadTree(path string) (any, error) {
 	return loadMerged(canonical, path, &chain)
 }
 
+// legacyTOMLError reports a TOML file left from before lys-shell read
+// YAML only, naming the YAML file that replaces it; nil when there is
+// none.
+func legacyTOMLError(legacy, replacement string) error {
+	if _, err := os.Stat(legacy); err != nil {
+		return nil
+	}
+	return &LoadError{msg: fmt.Sprintf("%s is TOML, which lys-shell no longer reads: convert it to %s", legacy, replacement)}
+}
+
+// defaultConfigStub is a fresh config file: the schema modeline the
+// YAML language server reads for completion and validation.
+const defaultConfigStub = "# yaml-language-server: $schema=./schema.json\n# lys-shell configuration file\n"
+
 func createDefaultConfigFile(path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // the config dir is user-owned and world-readable, like the Rust create_dir_all
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // the config dir is user-owned and world-readable
 		return &LoadError{msg: "cannot create directory", err: err}
 	}
-	if err := os.WriteFile(path, []byte("# lys-shell configuration file\n"), 0o644); err != nil { //nolint:gosec // config files are not secret; the Rust fs::write default mode
+	if err := os.WriteFile(path, []byte(defaultConfigStub), 0o644); err != nil { //nolint:gosec // config files are not secret
 		return &LoadError{msg: "cannot write file", err: err}
 	}
 	return nil
@@ -77,18 +93,19 @@ func loadMerged(path, importBase string, chain *[]string) (any, error) {
 }
 
 // mergeWithImports parses one file, loads its imports, then merges the
-// file itself on top. The Rust loader reads the import list with a
-// first parse, so a syntax error is reported by that parse, without
-// the path (TomlParseInline); one parse here yields the same message.
+// file itself on top.
 func mergeWithImports(data []byte, path, importBase string, chain *[]string) (any, error) {
-	main, err := parseDocument(data, path)
+	main, err := parseYAML(data)
 	if err != nil {
-		return nil, &LoadError{msg: err.Error(), err: err}
+		return nil, &LoadError{msg: fmt.Sprintf("%s: %v", path, err), err: err}
 	}
 	importPaths := importList(main)
 	imported := make([]any, 0, len(importPaths))
 	for _, imp := range importPaths {
 		resolved := resolveImport(importBase, imp)
+		if !isYAMLPath(resolved) {
+			return nil, &LoadError{msg: fmt.Sprintf("cannot import '%s': imports must be YAML (.yaml or .yml)", resolved)}
+		}
 		canonical, err := filepath.EvalSymlinks(resolved)
 		if err == nil {
 			canonical, err = filepath.Abs(canonical)
@@ -125,7 +142,7 @@ func loadImport(path string, chain *[]string) (any, error) {
 }
 
 // detectCycle errors when path is already on the import chain, naming
-// the chain by file names: "a.toml -> b.toml -> a.toml".
+// the chain by file names: "a.yaml -> b.yaml -> a.yaml".
 func detectCycle(chain []string, path string) error {
 	for _, p := range chain {
 		if p != path {
@@ -156,9 +173,8 @@ func importList(tree any) []string {
 }
 
 // resolveImport resolves an import against the importing file's
-// directory (an absolute import stands alone, as with Path::join).
-// With no extension an existing .yaml, .yml, or .toml sibling is
-// taken, in that order, falling back to .toml.
+// directory (an absolute import stands alone). With no extension an
+// existing .yml sibling is taken, otherwise the .yaml one.
 func resolveImport(base, imp string) string {
 	dir := filepath.Dir(base)
 	join := func(p string) string {
@@ -170,11 +186,22 @@ func resolveImport(base, imp string) string {
 	if filepath.Ext(imp) != "" {
 		return join(imp)
 	}
-	for _, ext := range []string{".yaml", ".yml", ".toml"} {
-		candidate := join(imp + ext)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
+	if candidate := join(imp + ".yml"); fileExists(candidate) && !fileExists(join(imp+".yaml")) {
+		return candidate
 	}
-	return join(imp + ".toml")
+	return join(imp + ".yaml")
+}
+
+// isYAMLPath reports whether path names a YAML file (.yaml/.yml).
+func isYAMLPath(path string) bool {
+	switch filepath.Ext(path) {
+	case ".yaml", ".yml":
+		return true
+	}
+	return false
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

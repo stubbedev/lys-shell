@@ -1,6 +1,6 @@
 package config
 
-// OsdConfig is the [osd] section
+// OsdConfig is the `osd` section
 // (crates/wayle-config/src/schemas/osd/mod.rs).
 //
 // On-screen display overlay for transient events like volume and brightness.
@@ -102,7 +102,7 @@ const (
 
 var _ = registerEnum(OsdTextAlignStart, OsdTextAlignCenter, OsdTextAlignEnd)
 
-// ToastPreset is one [[osd.presets]] entry.
+// ToastPreset is one `osd.presets` entry.
 //
 // A reusable toast preset, triggerable by id with `lys-shell toast --preset <id>`.
 //
@@ -113,11 +113,8 @@ var _ = registerEnum(OsdTextAlignStart, OsdTextAlignCenter, OsdTextAlignEnd)
 //
 // ## Example
 //
-// ```toml
-// [[osd.presets]]
-// id = "saved"
-// label = "Saved"
-// icon = "ld-check-symbolic"
+// ```yaml
+// osd: {presets: [{id: saved, label: Saved, icon: ld-check-symbolic}]}
 //
 // # Fire it: lys-shell toast --preset saved
 // # With a progress bar: lys-shell toast --preset saved --percentage 80

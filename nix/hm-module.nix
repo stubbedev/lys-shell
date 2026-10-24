@@ -7,12 +7,12 @@ self:
 }:
 let
   cfg = config.programs.lys-shell;
-  tomlFormat = pkgs.formats.toml { };
+  yamlFormat = pkgs.formats.yaml { };
 
   # A self-contained launch wrapper for the greeter: `cage -s -- lys-greeter`
   # with the render env baked in, passing any extra args straight through. Point
   # your (non-NixOS) greetd at this one path — or, for GPU acceleration, wrap it
-  # with nixGL: `nixGLIntel lys-greeter-session --config /etc/lys-shell/config.toml
+  # with nixGL: `nixGLIntel lys-greeter-session --config /etc/lys-shell/config.yaml
   # --state /var/lib/lys-greeter/last-session`. `renderer = "software"` bakes
   # the driver-free pixman/cairo path so it runs without nixGL at all.
   # cage's own cursor (shown until the greeter maps) follows XCURSOR_*; mirror
@@ -79,7 +79,7 @@ in
     };
 
     settings = lib.mkOption {
-      type = tomlFormat.type;
+      type = yamlFormat.type;
       default = { };
       example = lib.literalExpression ''
         {
@@ -96,7 +96,7 @@ in
       '';
       description = ''
         lys-shell configuration written to
-        {file}`$XDG_CONFIG_HOME/lys-shell/config.toml`. Leave empty to manage the
+        {file}`$XDG_CONFIG_HOME/lys-shell/config.yaml`. Leave empty to manage the
         file yourself.
       '';
     };
@@ -188,7 +188,7 @@ in
       };
 
       settings = lib.mkOption {
-        type = tomlFormat.type;
+        type = yamlFormat.type;
         default = { };
         example = lib.literalExpression ''
           {
@@ -199,10 +199,10 @@ in
         '';
         description = ''
           Theme/background/clock config written to
-          {file}`$XDG_CONFIG_HOME/lys-shell/greeter.toml`. The greeter runs as the
+          {file}`$XDG_CONFIG_HOME/lys-shell/greeter.yaml`. The greeter runs as the
           greetd user, so copy this somewhere that user can read (e.g.
-          {file}`/etc/lys-shell/config.toml`) and point greetd's command at it:
-          {command}`cage -s -- lys-greeter --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session`.
+          {file}`/etc/lys-shell/config.yaml`) and point greetd's command at it:
+          {command}`cage -s -- lys-greeter --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session`.
           The greeter discovers Wayland sessions from the standard
           {file}`wayland-sessions` dirs; add `--sessions DIR` to override.
         '';
@@ -227,14 +227,14 @@ in
         `lys-greeter-session` wrapper, but cannot configure greetd (a system
         service). On NixOS use programs.lys-shell.greeter in the system module;
         otherwise enable greetd yourself and point its command at the wrapper:
-          lys-greeter-session --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session
+          lys-greeter-session --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session
         For GPU acceleration on a non-NixOS host, wrap it with nixGL:
-          nixGLIntel lys-greeter-session --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session
+          nixGLIntel lys-greeter-session --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session
         (or set greeter.renderer = "software" to run driver-free without nixGL).
         The greeter discovers Wayland sessions from the standard
         wayland-sessions dirs and remembers the last pick under --state (make
         that dir writable by the greetd user). It runs as the greetd user, so
-        place the config where that user can read it (e.g. /etc/lys-shell/config.toml).
+        place the config where that user can read it (e.g. /etc/lys-shell/config.yaml).
       ''
       # PAM is root-owned (/etc/pam.d); home-manager cannot create it. Point the
       # consumer at the manual step the system module does automatically.
@@ -261,12 +261,12 @@ in
         system module's programs.lys-shell.lock, which provisions it for you.
       '';
 
-    xdg.configFile."lys-shell/greeter.toml" = lib.mkIf (cfg.greeter.enable && cfg.greeter.settings != { }) {
-      source = tomlFormat.generate "lys-greeter-config.toml" cfg.greeter.settings;
+    xdg.configFile."lys-shell/greeter.yaml" = lib.mkIf (cfg.greeter.enable && cfg.greeter.settings != { }) {
+      source = yamlFormat.generate "lys-greeter-config.yaml" cfg.greeter.settings;
     };
 
-    xdg.configFile."lys-shell/config.toml" = lib.mkIf (cfg.settings != { }) {
-      source = tomlFormat.generate "lys-shell-config.toml" cfg.settings;
+    xdg.configFile."lys-shell/config.yaml" = lib.mkIf (cfg.settings != { }) {
+      source = yamlFormat.generate "lys-shell-config.yaml" cfg.settings;
     };
 
     systemd.user.services.lys-shell = lib.mkIf cfg.systemd.enable {
@@ -299,7 +299,7 @@ in
     # User-level xdg-desktop-portal backend: discovery (.portal), D-Bus
     # activation, routing, and the activated service. The frontend reads these
     # from $XDG_DATA_HOME / $XDG_CONFIG_HOME. Per-key form so these merge with
-    # the `lys-shell/config.toml` entry above.
+    # the `lys-shell/config.yaml` entry above.
     xdg.dataFile."xdg-desktop-portal/portals/lys-shell.portal" = lib.mkIf cfg.portal.enable {
       source = "${cfg.package}/share/xdg-desktop-portal/portals/lys-shell.portal";
     };

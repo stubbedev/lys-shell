@@ -51,9 +51,9 @@ func TestConfigSetterPersists(t *testing.T) {
 	if got := svc.Config().Recorder.MicrophoneDevice; got != "mic0" {
 		t.Errorf("live value = %q", got)
 	}
-	body, err := os.ReadFile(filepath.Join(dir, "runtime.toml"))
-	if err != nil || !strings.Contains(string(body), `microphone-device = "mic0"`) {
-		t.Errorf("runtime.toml = %q (%v)", body, err)
+	body, err := os.ReadFile(filepath.Join(dir, "runtime.yaml"))
+	if err != nil || !strings.Contains(string(body), "microphone-device: mic0\n") {
+		t.Errorf("runtime.yaml = %q (%v)", body, err)
 	}
 	// A bad path is logged and leaves everything as it was.
 	set("modules.recorder.nope", true)

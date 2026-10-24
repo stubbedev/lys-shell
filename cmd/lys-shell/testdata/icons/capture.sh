@@ -14,7 +14,7 @@ trap 'rm -rf -- "${root:?}"' EXIT
 export HOME=$root/home XDG_DATA_HOME=$root/data XDG_CONFIG_HOME=$root/config XDG_DATA_DIRS=
 mkdir -p "$HOME" "$XDG_CONFIG_HOME/lys-shell"
 cp -r "$here/input" "$root/input"
-cp "$here/config.toml" "$XDG_CONFIG_HOME/lys-shell/config.toml"
+cp "$here/config.yaml" "$XDG_CONFIG_HOME/lys-shell/config.yaml"
 
 steps=$here/steps.txt
 n=0

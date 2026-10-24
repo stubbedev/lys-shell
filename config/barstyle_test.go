@@ -134,17 +134,17 @@ func TestBarStylingKeysDefaultsAndDecode(t *testing.T) {
 		t.Errorf("bar styling defaults = %+v", d)
 	}
 	path := writeConfig(t, `
-[bar]
-shadow = "drop"
-button-variant = "icon-square"
-button-opacity = 80
-button-bg-opacity = 50
-button-icon-size = "20px"
-button-label-weight = "bold"
-button-gap = 2
-button-icon-position = "end"
-dropdown-shadow = false
-dropdown-opacity = 85
+bar:
+  shadow: drop
+  button-variant: icon-square
+  button-opacity: 80
+  button-bg-opacity: 50
+  button-icon-size: 20px
+  button-label-weight: bold
+  button-gap: 2
+  button-icon-position: end
+  dropdown-shadow: false
+  dropdown-opacity: 85
 `)
 	cfg, err := LoadFile(path)
 	if err != nil {
@@ -157,14 +157,14 @@ dropdown-opacity = 85
 		b.DropdownShadow || b.DropdownOpacity != 85 {
 		t.Errorf("decoded bar styling = %+v", b)
 	}
-	// A [bar] table without exclusive keeps the schema default (true).
+	// A bar table without exclusive keeps the schema default (true).
 	if !b.Exclusive {
-		t.Error("exclusive flipped to false by a [bar] table that does not set it")
+		t.Error("exclusive flipped to false by a bar table that does not set it")
 	}
 }
 
 func TestClockTableWithoutFormatKeepsTheDefault(t *testing.T) {
-	path := writeConfig(t, "[modules.clock]\nlabel-color = \"red\"\n")
+	path := writeConfig(t, "modules:\n  clock:\n    label-color: red\n")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)

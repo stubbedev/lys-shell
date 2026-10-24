@@ -19,13 +19,13 @@ func TestLockDefaults(t *testing.T) {
 }
 
 func TestLockSectionLoads(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", `[lock]
-lock-on-start = true
-background-mode = "image"
-background-image = "/srv/lock.png"
-background-color = "#1e1e2e80"
-clock-format = "%I:%M"
-pam-service = "login"
+	path := writeFile(t, t.TempDir(), "config.yaml", `lock:
+  lock-on-start: true
+  background-mode: image
+  background-image: /srv/lock.png
+  background-color: "#1e1e2e80"
+  clock-format: "%I:%M"
+  pam-service: login
 `)
 	cfg, err := LoadFile(path)
 	if err != nil {
@@ -41,11 +41,11 @@ pam-service = "login"
 // A bad value is a diagnostic for its field alone: the field keeps its
 // default and the rest of the section applies (apply_config_layer).
 func TestLockBadValuesKeepTheirDefaults(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", `[lock]
-background-color = "#12345g"
-clock-format = "%Q"
-background-mode = "mirror"
-pam-service = "login"
+	path := writeFile(t, t.TempDir(), "config.yaml", `lock:
+  background-color: "#12345g"
+  clock-format: "%Q"
+  background-mode: mirror
+  pam-service: login
 `)
 	cfg, err := LoadFile(path)
 	if err == nil {
@@ -79,8 +79,8 @@ func TestBackgroundImagePath(t *testing.T) {
 
 func TestLoadGreeterLayersAndExplicitCursor(t *testing.T) {
 	dir := t.TempDir()
-	path := writeFile(t, dir, "config.toml", "[greeter]\ncursor-theme = \"Adwaita\"\nshow-user-list = false\n")
-	writeFile(t, dir, "runtime.toml", "[greeter]\nshow-user-list = true\n[bar]\nlocation = \"bottom\"\n")
+	path := writeFile(t, dir, "config.yaml", "greeter:\n  cursor-theme: Adwaita\n  show-user-list: false\n")
+	writeFile(t, dir, "runtime.yaml", "greeter:\n  show-user-list: true\nbar:\n  location: bottom\n")
 	cfg, err := LoadGreeter(path, func(Diagnostic) {})
 	if err != nil {
 		t.Fatal(err)
@@ -93,17 +93,32 @@ func TestLoadGreeterLayersAndExplicitCursor(t *testing.T) {
 		t.Errorf("cursor size = %d explicit=%v, want the unset default", g.CursorSize, g.CursorSizeExplicit)
 	}
 	if !g.ShowUserList {
-		t.Error("runtime.toml did not override config.toml")
+		t.Error("runtime.yaml did not override config.yaml")
 	}
-	// The whole runtime.toml is the runtime layer, as lys-greeter's load.
+	// The whole runtime.yaml is the runtime layer, as lys-greeter's load.
 	if cfg.Bar.Location != LocationBottom {
-		t.Errorf("runtime [bar] was not applied: %s", cfg.Bar.Location)
+		t.Errorf("runtime bar was not applied: %s", cfg.Bar.Location)
 	}
 }
 
 func TestLoadGreeterWithoutFilesRenders(t *testing.T) {
-	cfg, err := LoadGreeter(filepath.Join(t.TempDir(), "missing", "config.toml"), func(Diagnostic) {})
+	cfg, err := LoadGreeter(filepath.Join(t.TempDir(), "missing", "config.yaml"), func(Diagnostic) {})
 	if cfg == nil || cfg.Greeter.CursorSize != 24 {
 		t.Fatalf("no config: cfg %+v err %v", cfg, err)
+	}
+}
+
+// A system runtime.toml from before the YAML switch is reported, not
+// silently dropped.
+func TestLoadGreeterReportsALegacyRuntimeTOML(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "config.yaml", "greeter:\n  show-clock: false\n")
+	legacy := writeFile(t, dir, "runtime.toml", "[greeter]\nshow-clock = true\n")
+	cfg, err := LoadGreeter(path, func(Diagnostic) {})
+	if err == nil || !strings.Contains(err.Error(), legacy+" is TOML, which lys-shell no longer reads") {
+		t.Errorf("legacy runtime.toml: %v", err)
+	}
+	if cfg.Greeter.ShowClock {
+		t.Error("the TOML runtime layer applied")
 	}
 }

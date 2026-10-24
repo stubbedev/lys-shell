@@ -64,9 +64,9 @@ func DefaultsLock() LockConfig {
 type Background struct {
 	// How the background is drawn: solid color, an image, or the wallpaper.
 	Mode LockBackground `cfg:"background-mode"`
-	// Background image path (used when `background-mode = "image"`).
+	// Background image path (used when `background-mode: image`).
 	Image string `cfg:"background-image"`
-	// Background fill color (used when `background-mode = "color"`).
+	// Background fill color (used when `background-mode: color`).
 	Color HexColor `cfg:"background-color"`
 }
 

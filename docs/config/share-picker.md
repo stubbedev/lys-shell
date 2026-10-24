@@ -29,20 +29,20 @@ window, output, or region to capture.
 
 ## Default configuration
 
-```toml
-[share-picker]
-default-page = "windows"
-hide-token-restore = false
-width = 1.0
-height = 1.0
-resize-size = 640
-widget-size = 1.0
-windows-spacing = 1.0
-windows-min-per-row = 3
-windows-max-per-row = 4
-outputs-spacing = 1.0
-outputs-show-label = false
-outputs-respect-scaling = true
+```yaml
+share-picker:
+  default-page: windows
+  hide-token-restore: false
+  width: 1.0
+  height: 1.0
+  resize-size: 640
+  widget-size: 1.0
+  windows-spacing: 1.0
+  windows-min-per-row: 3
+  windows-max-per-row: 4
+  outputs-spacing: 1.0
+  outputs-show-label: false
+  outputs-respect-scaling: true
 ```
 
 

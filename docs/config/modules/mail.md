@@ -15,10 +15,11 @@ while the count is zero when `hide-when-zero` is set.
 
 Add it to your layout with `mail`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["mail"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [mail]
 ```
 
 ## General
@@ -93,30 +94,31 @@ the per-account queries.
 
 ## Default configuration
 
-```toml
-[modules.mail]
-format = "{{ count }}"
-query = "tag:unread"
-accounts = []
-hide-when-zero = true
-notify = false
-notify-summary = "{{ sender }}"
-notify-body = "{{ subject }}"
-icon-name = "ld-mail-symbolic"
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "bg-surface-elevated"
-label-show = true
-label-color = "auto"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:mail"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  mail:
+    format: '{{ count }}'
+    query: tag:unread
+    accounts: []
+    hide-when-zero: true
+    notify: false
+    notify-summary: '{{ sender }}'
+    notify-body: '{{ subject }}'
+    icon-name: ld-mail-symbolic
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: bg-surface-elevated
+    label-show: true
+    label-color: auto
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:mail
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

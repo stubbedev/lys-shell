@@ -11,10 +11,11 @@ Hyprland workspace indicators with click-to-switch.
 
 Add it to your layout with `hyprland-workspaces`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["hyprland-workspaces"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [hyprland-workspaces]
 ```
 
 ## General
@@ -102,8 +103,8 @@ button pulses until you switch to it.
 
 ::: details More about `label-use-name`
 
-Only applies when `display-mode = "label"` or as fallback for unmapped
-workspaces in `display-mode = "icon"`.
+Only applies when `display-mode: label` or as fallback for unmapped
+workspaces in `display-mode: icon`.
 
 :::
 
@@ -217,10 +218,12 @@ Keys are workspace IDs (use negative for special workspaces).
 
 #### Example
 
-```toml
-[modules.hyprland-workspaces.workspace-map]
-1 = { icon = "ld-globe-symbolic", color = "#4a90d9" }
-2 = { icon = "ld-terminal-symbolic" }
+```yaml
+modules:
+  hyprland-workspaces:
+    workspace-map:
+      "1": {icon: ld-globe-symbolic, color: "#4a90d9"}
+      "2": {icon: ld-terminal-symbolic}
 ```
 
 :::
@@ -236,54 +239,55 @@ User mappings are merged with built-in defaults for common applications.
 
 #### Example
 
-```toml
-[modules.hyprland-workspaces.app-icon-map]
-"*firefox*" = "ld-globe-symbolic"
-"title:*YouTube*" = "ld-youtube-symbolic"
+```yaml
+modules:
+  hyprland-workspaces:
+    app-icon-map:
+      "*firefox*": ld-globe-symbolic
+      "title:*YouTube*": ld-youtube-symbolic
 ```
 
 :::
 
 ## Default configuration
 
-```toml
-[modules.hyprland-workspaces]
-min-workspace-count = 0
-monitor-specific = true
-show-special = true
-urgent-show = true
-urgent-mode = "workspace"
-display-mode = "label"
-label-use-name = false
-numbering = "absolute"
-divider = " "
-app-icons-show = false
-app-icons-dedupe = true
-app-icons-fallback = "ld-app-window-symbolic"
-app-icons-empty = "tb-minus-symbolic"
-icon-gap = 0.30000001192092896
-workspace-padding = 0.5
-icon-size = 1.0
-label-size = 1.0
-workspace-ignore = []
-active-indicator = "background"
-highlight-active-on-other-monitor = true
-active-color = "accent"
-occupied-color = "fg-muted"
-empty-color = "fg-subtle"
-container-bg-color = "bg-surface-elevated"
-border-show = false
-border-color = "border-default"
-active-on-other-monitor-color = "accent"
-left-click = "focus:this"
-middle-click = ""
-right-click = ""
-scroll-up = "focus:previous"
-scroll-down = "focus:next"
-
-[modules.hyprland-workspaces.workspace-map]
-
-[modules.hyprland-workspaces.app-icon-map]
+```yaml
+modules:
+  hyprland-workspaces:
+    min-workspace-count: 0
+    monitor-specific: true
+    show-special: true
+    urgent-show: true
+    urgent-mode: workspace
+    display-mode: label
+    label-use-name: false
+    numbering: absolute
+    divider: ' '
+    app-icons-show: false
+    app-icons-dedupe: true
+    app-icons-fallback: ld-app-window-symbolic
+    app-icons-empty: tb-minus-symbolic
+    icon-gap: 0.30000001192092896
+    workspace-padding: 0.5
+    icon-size: 1.0
+    label-size: 1.0
+    workspace-ignore: []
+    active-indicator: background
+    highlight-active-on-other-monitor: true
+    active-color: accent
+    occupied-color: fg-muted
+    empty-color: fg-subtle
+    container-bg-color: bg-surface-elevated
+    border-show: false
+    border-color: border-default
+    active-on-other-monitor-color: accent
+    workspace-map: {}
+    app-icon-map: {}
+    left-click: focus:this
+    middle-click: ""
+    right-click: ""
+    scroll-up: focus:previous
+    scroll-down: focus:next
 ```
 
 

@@ -30,8 +30,8 @@ func TestIdleInhibitLabel(t *testing.T) {
 }
 
 func TestLoadFileAppliesIdleInhibit(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.idle-inhibit]\nformat = \"[{{ state }}]\"\nstartup-duration = 30\nicon-active = \"tb-eye-symbolic\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  idle-inhibit:\n    format: \"[{{ state }}]\"\n    startup-duration: 30\n    icon-active: tb-eye-symbolic\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestLoadFileAppliesIdleInhibit(t *testing.T) {
 		t.Errorf("icon-inactive default changed: %q", got)
 	}
 
-	if err := osWrite(path, "[modules.idle-inhibit]\nformat = \"\"\n"); err != nil {
+	if err := osWrite(path, "modules:\n  idle-inhibit:\n    format: \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	// The schema puts no constraint on the format string.

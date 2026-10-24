@@ -72,8 +72,8 @@ body:
       id: config
       attributes:
           label: Relevant config
-          description: The relevant section of `~/.config/lys-shell/config.toml`, if applicable.
-          render: toml
+          description: The relevant section of `~/.config/lys-shell/config.yaml`, if applicable.
+          render: yaml
       validations:
           required: false
 

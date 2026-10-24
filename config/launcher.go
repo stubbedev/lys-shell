@@ -50,7 +50,7 @@ type LauncherConfig struct {
 	// Keep the list height fixed at `lines` rows.
 	FixedNumLines bool `cfg:"fixed-num-lines"`
 	// Per-mode display-name overrides (rofi `display-{mode}`), e.g.
-	// `drun = "apps"`.
+	// `drun: apps`.
 	DisplayNames map[string]string `cfg:"display-names"`
 	// Custom script modes: name → executable (rofi `name:script`).
 	Scripts map[string]string `cfg:"scripts"`

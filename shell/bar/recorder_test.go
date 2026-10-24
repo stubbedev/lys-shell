@@ -84,8 +84,8 @@ func TestRecorderPreparingClass(t *testing.T) {
 }
 
 func TestLoadFileAppliesRecorder(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.recorder]\noutput-format = \"mp4\"\nmicrophone = true\nstart-delay-ms = 0\nicon-recording = \"tb-circle-dot-symbolic\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  recorder:\n    output-format: mp4\n    microphone: true\n    start-delay-ms: 0\n    icon-recording: tb-circle-dot-symbolic\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestLoadFileAppliesRecorder(t *testing.T) {
 		t.Errorf("icon-recording = %q", got)
 	}
 
-	if err := osWrite(path, "[modules.recorder]\noutput-format = \"avi\"\n"); err != nil {
+	if err := osWrite(path, "modules:\n  recorder:\n    output-format: avi\n"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(path); err == nil {

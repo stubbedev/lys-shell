@@ -64,8 +64,8 @@ func TestNewMicrophoneRequiresSource(t *testing.T) {
 }
 
 func TestLoadFileAppliesMicrophone(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.microphone]\nicon-muted = \"m-off\"\nlabel-show = false\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  microphone:\n    icon-muted: m-off\n    label-show: false\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}

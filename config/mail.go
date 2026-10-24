@@ -27,18 +27,15 @@ var _ = registerEnum(MailProviderGeneric, MailProviderGmail, MailProviderOutlook
 
 // MailAccount is ported from crates/wayle-config/src/schemas/modules/mail/account.rs.
 //
-// One mail account in the `[modules.mail]` per-account breakdown.
+// One mail account in the `modules.mail` per-account breakdown.
 //
 // Each account has its own notmuch query; the dropdown shows the per-account
 // unread counts and the bar shows their sum.
 //
 // ## Example
 //
-// ```toml
-// [[modules.mail.accounts]]
-// name = "Work"
-// query = "folder:work/INBOX and tag:unread"
-// provider = "gmail"
+// ```yaml
+// modules: {mail: {accounts: [{name: Work, query: "folder:work/INBOX and tag:unread", provider: gmail}]}}
 // ```
 type MailAccount struct {
 	// Display name shown in the dropdown.

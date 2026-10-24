@@ -222,8 +222,8 @@ func rustIntName(t reflect.Type) string {
 type absent struct{}
 
 // encodeValue serializes a typed value into the encoded tree: structs
-// as ordered tables in field order, nil pointers omitted (serde skips
-// None in TOML), maps by sorted key.
+// as ordered tables in field order, nil pointers omitted, maps by
+// sorted key.
 func encodeValue(v reflect.Value) any { return encodeValueMode(v, false) }
 
 // encodeValueMode is encodeValue; keepNone keeps None as absent{}
@@ -296,8 +296,8 @@ func encodeValueMode(v reflect.Value, keepNone bool) any {
 	panic(fmt.Sprintf("config: no encoder for %s", t))
 }
 
-// Encode serializes a config (or any schema value) into its TOML/YAML
-// shape: the Rust Serialize output.
+// Encode serializes a config (or any schema value) into its file
+// shape.
 func encode(v any) any {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Pointer {

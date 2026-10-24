@@ -11,10 +11,11 @@ Network connection status with a dropdown for switching connections.
 
 Add it to your layout with `network`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["network"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [network]
 ```
 
 ## General
@@ -74,39 +75,39 @@ the key changes nothing on a machine with no VPN.
 
 ## Default configuration
 
-```toml
-[modules.network]
-wifi-disabled-icon = "cm-wireless-disabled-symbolic"
-wifi-acquiring-icon = "cm-wireless-acquiring-symbolic"
-wifi-offline-icon = "cm-wireless-offline-symbolic"
-wifi-connected-icon = "cm-wireless-connected-symbolic"
-wifi-signal-icons = [
-    "cm-wireless-signal-weak-symbolic",
-    "cm-wireless-signal-ok-symbolic",
-    "cm-wireless-signal-good-symbolic",
-    "cm-wireless-signal-excellent-symbolic",
-]
-wired-connected-icon = "cm-wired-symbolic"
-wired-acquiring-icon = "cm-wired-acquiring-symbolic"
-wired-disconnected-icon = "cm-wired-disconnected-symbolic"
-border-show = false
-border-color = "accent"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "accent"
-label-show = true
-label-color = "accent"
-label-max-length = 15
-button-bg-color = "bg-surface-elevated"
-vpn-connected-icon = "ld-lock-symbolic"
-vpn-connecting-icon = "ld-refresh-cw-symbolic"
-vpn-disconnected-icon = "ld-unplug-symbolic"
-vpn-show = "auto"
-left-click = "dropdown:network"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  network:
+    wifi-disabled-icon: cm-wireless-disabled-symbolic
+    wifi-acquiring-icon: cm-wireless-acquiring-symbolic
+    wifi-offline-icon: cm-wireless-offline-symbolic
+    wifi-connected-icon: cm-wireless-connected-symbolic
+    wifi-signal-icons:
+      - cm-wireless-signal-weak-symbolic
+      - cm-wireless-signal-ok-symbolic
+      - cm-wireless-signal-good-symbolic
+      - cm-wireless-signal-excellent-symbolic
+    wired-connected-icon: cm-wired-symbolic
+    wired-acquiring-icon: cm-wired-acquiring-symbolic
+    wired-disconnected-icon: cm-wired-disconnected-symbolic
+    border-show: false
+    border-color: accent
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: accent
+    label-show: true
+    label-color: accent
+    label-max-length: 15
+    button-bg-color: bg-surface-elevated
+    vpn-connected-icon: ld-lock-symbolic
+    vpn-connecting-icon: ld-refresh-cw-symbolic
+    vpn-disconnected-icon: ld-unplug-symbolic
+    vpn-show: auto
+    left-click: dropdown:network
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

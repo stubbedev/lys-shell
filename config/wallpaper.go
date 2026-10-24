@@ -7,7 +7,7 @@ import (
 	"slices"
 )
 
-// WallpaperConfig is the [wallpaper] section
+// WallpaperConfig is the `wallpaper` section
 // (crates/wayle-config/src/schemas/wallpaper): what each monitor shows
 // and how. Resolution order: a cycling directory, else the single
 // Wallpaper image; Monitors entries apply on top.
@@ -18,7 +18,7 @@ type WallpaperConfig struct {
 	// to use cycling and/or per-monitor overrides instead.
 	Wallpaper string `cfg:"wallpaper"`
 	// How the wallpaper is scaled to the screen. Per-monitor entries in
-	// `[[wallpaper.monitors]]` override this.
+	// `wallpaper.monitors` override this.
 	FitMode FitMode `cfg:"fit-mode"`
 	// Directory of images to cycle through. Set it to enable cycling; leave
 	// empty to disable. Takes precedence over the single `wallpaper` image.
@@ -36,16 +36,15 @@ type WallpaperConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[wallpaper.monitors]]
-	// name = "DP-1"
-	// wallpaper = "/home/me/pictures/wall-primary.png"
-	// fit-mode = "fill"
-	//
-	// [[wallpaper.monitors]]
-	// name = "HDMI-1"
-	// wallpaper = "/home/me/pictures/wall-secondary.png"
-	// fit-mode = "fit"
+	// ```yaml
+	// wallpaper:
+	//   monitors:
+	//     - name: DP-1
+	//       wallpaper: /home/me/pictures/wall-primary.png
+	//       fit-mode: fill
+	//     - name: HDMI-1
+	//       wallpaper: /home/me/pictures/wall-secondary.png
+	//       fit-mode: fit
 	// ```
 	Monitors []MonitorWallpaperConfig `cfg:"monitors"`
 }
@@ -69,7 +68,7 @@ func (w WallpaperConfig) Monitor(name string) (MonitorWallpaperConfig, bool) {
 	return w.Monitors[i], true
 }
 
-// MonitorWallpaperConfig is one [[wallpaper.monitors]] entry, keyed by
+// MonitorWallpaperConfig is one `wallpaper.monitors` entry, keyed by
 // connector name.
 //
 // Per-monitor wallpaper configuration.

@@ -27,8 +27,8 @@ func TestHyprsunsetLabel(t *testing.T) {
 }
 
 func TestLoadFileAppliesHyprsunset(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.hyprsunset]\ntemperature = 3500\ngamma = 80\nformat = \"{{ status }}\"\nicon-on = \"ld-moon-symbolic\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  hyprsunset:\n    temperature: 3500\n    gamma: 80\n    format: \"{{ status }}\"\n    icon-on: ld-moon-symbolic\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -49,9 +49,9 @@ func TestLoadFileAppliesHyprsunset(t *testing.T) {
 	for _, bad := range []string{
 		// The documented ranges are not enforced (plain u32/f64 in the
 		// Rust schema); a wrong type is.
-		"[modules.hyprsunset]\ntemperature = \"warm\"\n",
-		"[modules.hyprsunset]\nlatitude = true\n",
-		"[modules.hyprsunset]\ngamma = -1\n",
+		"modules:\n  hyprsunset:\n    temperature: warm\n",
+		"modules:\n  hyprsunset:\n    latitude: true\n",
+		"modules:\n  hyprsunset:\n    gamma: -1\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

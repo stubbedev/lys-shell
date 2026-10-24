@@ -2,7 +2,7 @@
 
 `lys-greeter` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
 display-manager login screen that can replace sddm/gdm for Wayland sessions. It
-shares the lys-shell theme (colors, fonts) and has its own `[greeter]` config
+shares the lys-shell theme (colors, fonts) and has its own `greeter` config
 section for appearance: background, clock, cursor, user list, and power
 buttons — editable under **Greeter → Login Screen** in `lys-settings`.
 
@@ -27,14 +27,14 @@ Features:
 
 ## Configuration
 
-The greeter reads the `[greeter]` section of its config file (see below for
+The greeter reads the `greeter` section of its config file (see below for
 where that file lives per setup):
 
 | Key | Default | What it does |
 | --- | --- | --- |
 | `background-mode` | `"color"` | `color`, `image`, or `wallpaper` (reuses `wallpaper.wallpaper`). |
-| `background-image` | `""` | Image path for `background-mode = "image"`. |
-| `background-color` | `"#000000"` | Fill color for `background-mode = "color"`. |
+| `background-image` | `""` | Image path for `background-mode: image`. |
+| `background-color` | `"#000000"` | Fill color for `background-mode: color`. |
 | `show-clock` | `true` | Show the clock above the login form. |
 | `clock-format` / `date-format` | `"%H:%M"` / `"%A, %B %-d"` | strftime formats. |
 | `show-user-list` | `true` | Clickable avatars for login users. |
@@ -70,13 +70,13 @@ home is readable by the greetd user (e.g. `chmod o+x` on `$HOME`); otherwise the
 > in the greetd command.
 
 These options live under **Greeter → Login Screen** in `lys-settings`. The
-greeter reads the *system* config (`/etc/lys-shell/config.toml` plus a
-`runtime.toml` overlay beside it), not your user config. The **Apply to login
+greeter reads the *system* config (`/etc/lys-shell/config.yaml` plus a
+`runtime.yaml` overlay beside it), not your user config. The **Apply to login
 screen** button on that page pushes the current greeter values to the system via
 `pkexec lys-greeter apply-config` (bundled polkit action
 `dev.stubbe.lys.greeter.apply-config`, admin auth), writing only greeter keys
-to `/etc/lys-shell/runtime.toml` — so any user can set the login-screen background
-without hand-editing root-owned files, and a hand-written `config.toml` is never
+to `/etc/lys-shell/runtime.yaml` — so any user can set the login-screen background
+without hand-editing root-owned files, and a hand-written `config.yaml` is never
 clobbered.
 
 ## How it runs
@@ -129,12 +129,12 @@ Point greetd's `default_session` at the greeter, hosted by cage:
 ```toml
 # /etc/greetd/config.toml
 [default_session]
-command = "cage -s -- lys-greeter --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session"
+command = "cage -s -- lys-greeter --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session"
 user = "greeter"
 ```
 
 - The greeter runs pre-login as the greetd user (no `$HOME`), so its theme
-  config lives at a system path — `/etc/lys-shell/config.toml` by default.
+  config lives at a system path — `/etc/lys-shell/config.yaml` by default.
 - Create the state dir and make it writable by the greetd user:
   `install -d -o greeter -g greeter -m 0700 /var/lib/lys-greeter`.
 - Sessions are discovered from `/usr/local/share/wayland-sessions` and
@@ -157,7 +157,7 @@ On non-NixOS hosts running the nix-built package, GPU acceleration needs
 [nixGL](https://github.com/nix-community/nixGL) wrapping the whole launch:
 
 ```
-nixGLIntel lys-greeter-session --config /etc/lys-shell/config.toml --state /var/lib/lys-greeter/last-session
+nixGLIntel lys-greeter-session --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session
 ```
 
 ## CLI reference
@@ -168,7 +168,7 @@ lys-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... [--state PA
 
 | Flag | Default | What it does |
 | --- | --- | --- |
-| `--config PATH` | `/etc/lys-shell/config.toml` | lys-shell config used for theming. |
+| `--config PATH` | `/etc/lys-shell/config.yaml` | lys-shell config used for theming. |
 | `--sessions DIR` | `/usr/{local/,}share/wayland-sessions` | Wayland session `.desktop` dir (repeatable; overrides defaults). |
 | `--xsessions DIR` | `/usr/{local/,}share/xsessions` | X11 session `.desktop` dir (repeatable; launched via `startx`). |
 | `--state PATH` | `$XDG_STATE_HOME/lys-greeter/last-session` | File the last session id is remembered in (username in a `last-user` sibling). |

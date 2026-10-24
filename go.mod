@@ -3,7 +3,6 @@ module github.com/stubbedev/lys-shell
 go 1.27.1
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/ebitengine/purego v0.11.1
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/rivo/uniseg v0.4.7

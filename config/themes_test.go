@@ -94,26 +94,29 @@ func TestLoadThemesDiscoversUserThemes(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	full := `bg = "#000001"
-surface = "#000002"
-elevated = "#000003"
-fg = "#000004"
-fg_muted = "#000005"
-primary = "#000006"
-red = "#000007"
-yellow = "#000008"
-green = "#000009"
-blue = "#00000a"
-extra = "ignored"
+	full := `bg: "#000001"
+surface: "#000002"
+elevated: "#000003"
+fg: "#000004"
+fg_muted: "#000005"
+primary: "#000006"
+red: "#000007"
+yellow: "#000008"
+green: "#000009"
+blue: "#00000a"
+extra: ignored
 `
+	toml := strings.ReplaceAll(strings.ReplaceAll(full, ": ", " = "), "ignored", `"ignored"`)
 	for name, body := range map[string]string{
-		"mine.toml":      full,
-		"lys-shell.toml": full,                                                     // a builtin's name: skipped
-		"broken.toml":    "bg = ",                                                  // unparsable: skipped
-		"partial.toml":   strings.Replace(full, "fg_muted = \"#000005\"\n", "", 1), // missing field: skipped
-		"kebab.toml":     strings.Replace(full, "fg_muted", "fg-muted", 1),         // wrong key spelling: skipped
-		"readme.txt":     full,                                                     // not a theme file: ignored
-		"dir.toml/x":     "",                                                       // a directory named .toml: unreadable, skipped
+		"mine.yaml":      full,
+		"also.yml":       full,
+		"lys-shell.yaml": full,                                                    // a builtin's name: skipped
+		"broken.yaml":    "bg: [",                                                 // unparsable: skipped
+		"partial.yaml":   strings.Replace(full, "fg_muted: \"#000005\"\n", "", 1), // missing field: skipped
+		"kebab.yaml":     strings.Replace(full, "fg_muted", "fg-muted", 1),        // wrong key spelling: skipped
+		"legacy.toml":    toml,                                                    // TOML is no theme file: ignored
+		"readme.txt":     full,                                                    // not a theme file: ignored
+		"dir.yaml/x":     "",                                                      // a directory named .yaml: unreadable, skipped
 	} {
 		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
@@ -125,22 +128,23 @@ extra = "ignored"
 	}
 	themes, skipped := LoadThemes(dir)
 	builtins := len(BuiltinThemes())
-	if len(themes) != builtins+1 {
-		t.Fatalf("themes = %d, want the builtins plus mine", len(themes))
+	if len(themes) != builtins+2 {
+		t.Fatalf("themes = %d, want the builtins plus also and mine", len(themes))
 	}
-	mine := themes[builtins]
 	want := Palette{"#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008", "#000009", "#00000a"}
-	if mine.Name != "mine" || mine.Builtin || mine.Palette != want {
-		t.Errorf("user theme = %+v, want mine with the file's palette", mine)
+	for i, name := range []string{"also", "mine"} {
+		if got := themes[builtins+i]; got.Name != name || got.Builtin || got.Palette != want {
+			t.Errorf("user theme %d = %+v, want %s with the file's palette", i, got, name)
+		}
 	}
 	if themes[0].Palette != lysShellTheme {
-		t.Error("a user lys-shell.toml replaced the builtin; duplicates must be skipped")
+		t.Error("a user lys-shell.yaml replaced the builtin; duplicates must be skipped")
 	}
 	if len(skipped) != 5 {
 		t.Fatalf("skipped = %v, want lys-shell, broken, partial, kebab, dir", skipped)
 	}
 	joined := errors.Join(skipped...).Error()
-	for _, want := range []string{"already exists", "broken.toml", `missing field "fg_muted"`, "kebab.toml", "dir.toml"} {
+	for _, want := range []string{"already exists", "broken.yaml", `missing field "fg_muted"`, "kebab.yaml", "dir.yaml"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("skipped errors lack %q:\n%s", want, joined)
 		}

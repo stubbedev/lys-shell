@@ -347,8 +347,8 @@ func TestKeyboardLayoutHidesWithLabelShowOff(t *testing.T) {
 }
 
 func TestLoadFileAppliesKeyboardLayout(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.keyboard-input]\nformat = \"KB {{ layout }}\"\nlabel-show = false\n\n[modules.keyboard-input.layout-alias-map]\nus = \"EN\"\nde = \"DE\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  keyboard-input:\n    format: \"KB {{ layout }}\"\n    label-show: false\n    layout-alias-map:\n      us: EN\n      de: DE\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -366,9 +366,9 @@ func TestLoadFileAppliesKeyboardLayout(t *testing.T) {
 
 func TestLoadFileRejectsBadKeyboardLayout(t *testing.T) {
 	for _, content := range []string{
-		"[modules.keyboard-input]\n[modules.keyboard-input.layout-alias-map]\nus = 3\n",
+		"modules:\n  keyboard-input:\n    layout-alias-map:\n      us: 3\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

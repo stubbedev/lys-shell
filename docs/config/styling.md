@@ -62,40 +62,39 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 
 ## Default configuration
 
-```toml
-[styling]
-scale = 1.0099999904632568
-rounding = "sm"
-appearance = "auto"
-theme-provider = "lys-shell"
-theming-monitor = ""
-matugen-scheme = "tonal-spot"
-matugen-contrast = 0.0
-matugen-source-color = 0
-matugen-light = false
-wallust-palette = "dark16"
-wallust-saturation = 0
-wallust-check-contrast = true
-wallust-backend = "fastresize"
-wallust-colorspace = "labmixed"
-wallust-apply-globally = true
-pywal-saturation = 0.05
-pywal-contrast = 3.0
-pywal-light = false
-pywal-apply-globally = true
-palette_base_theme = ""
-
-[styling.palette]
-bg = "#141420"
-surface = "#1c1c2c"
-elevated = "#262638"
-fg = "#d4d6e8"
-fg-muted = "#8a8ca4"
-primary = "#e0947a"
-red = "#e46870"
-yellow = "#e0b870"
-green = "#68c898"
-blue = "#78a0e0"
+```yaml
+styling:
+  scale: 1.0099999904632568
+  rounding: sm
+  appearance: auto
+  theme-provider: lys-shell
+  theming-monitor: ""
+  matugen-scheme: tonal-spot
+  matugen-contrast: 0.0
+  matugen-source-color: 0
+  matugen-light: false
+  wallust-palette: dark16
+  wallust-saturation: 0
+  wallust-check-contrast: true
+  wallust-backend: fastresize
+  wallust-colorspace: labmixed
+  wallust-apply-globally: true
+  pywal-saturation: 0.05
+  pywal-contrast: 3.0
+  pywal-light: false
+  pywal-apply-globally: true
+  palette:
+    bg: '#141420'
+    surface: '#1c1c2c'
+    elevated: '#262638'
+    fg: '#d4d6e8'
+    fg-muted: '#8a8ca4'
+    primary: '#e0947a'
+    red: '#e46870'
+    yellow: '#e0b870'
+    green: '#68c898'
+    blue: '#78a0e0'
+  palette_base_theme: ""
 ```
 
 

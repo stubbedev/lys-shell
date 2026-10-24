@@ -50,8 +50,8 @@ func TestParseEventSubmap(t *testing.T) {
 }
 
 func TestLoadFileAppliesKeybindMode(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.keybind-mode]\nformat = \"[{plugin}] {{ mode }}\"\nauto-hide = true\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  keybind-mode:\n    format: \"[{plugin}] {{ mode }}\"\n    auto-hide: true\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestLoadFileAppliesKeybindMode(t *testing.T) {
 		t.Errorf("icon = %+v", c.KeybindMode.Icon())
 	}
 
-	if err := osWrite(path, "[modules.keybind-mode]\nformat = \"\"\n"); err != nil {
+	if err := osWrite(path, "modules:\n  keybind-mode:\n    format: \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	// The schema puts no constraint on the format string.

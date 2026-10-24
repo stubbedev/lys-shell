@@ -107,8 +107,8 @@ func (b BarItem) MarshalConfig() any {
 }
 
 const (
-	barItemDoc   = "One entry in a bar layout section (`left`, `center`, or `right`).\n\nThree shapes are accepted, all interchangeable in the same array:\n\n- A plain module name: `\"clock\"`\n- A module with a CSS class for per-instance styling: `{ module = \"clock\", class = \"primary\" }`\n- A named group that wraps several modules in a shared container, addressable by CSS ID\n\n## Examples\n\n```toml\n[[bar.layout]]\nmonitor = \"*\"\n\n# Plain module\nleft = [\"dashboard\"]\n\n# Mix of plain and classed modules on the same side\ncenter = [\"clock\", { module = \"clock\", class = \"secondary\" }]\n\n# Named group (renders inside a GTK container with CSS ID `#status`)\nright = [{ name = \"status\", modules = [\"battery\", \"network\", \"volume\"] }]\n\n# Groups can hold classed modules too\n[[bar.layout]]\nmonitor = \"DP-2\"\nleft = [{ name = \"clocks\", modules = [\n  { module = \"clock\", class = \"local\" },\n  { module = \"world-clock\", class = \"remote\" }\n]}]\n```"
-	moduleRefDoc = "Reference to a module, optionally with a custom CSS class.\n\n## Examples\n\n```toml\n# Plain module (just the name)\nleft = [\"clock\"]\n\n# Module with custom CSS class\nleft = [{ module = \"clock\", class = \"primary-clock\" }]\n```"
+	barItemDoc   = "One entry in a bar layout section (`left`, `center`, or `right`).\n\nThree shapes are accepted, all interchangeable in the same list:\n\n- A plain module name: `clock`\n- A module with a CSS class for per-instance styling: `{module: clock, class: primary}`\n- A named group that wraps several modules in a shared container, addressable by CSS ID\n\n## Examples\n\n```yaml\nbar:\n  layout:\n    - monitor: \"*\"\n\n      # Plain module\n      left: [dashboard]\n\n      # Mix of plain and classed modules on the same side\n      center:\n        - clock\n        - {module: clock, class: secondary}\n\n      # Named group (renders inside a GTK container with CSS ID `#status`)\n      right:\n        - {name: status, modules: [battery, network, volume]}\n\n    # Groups can hold classed modules too\n    - monitor: DP-2\n      left:\n        - name: clocks\n          modules:\n            - {module: clock, class: local}\n            - {module: world-clock, class: remote}\n```"
+	moduleRefDoc = "Reference to a module, optionally with a custom CSS class.\n\n## Examples\n\n```yaml\n# Plain module (just the name)\nleft: [clock]\n\n# Module with custom CSS class\nleft:\n  - {module: clock, class: primary-clock}\n```"
 )
 
 func (BarItem) configSchema(g *schemaGen) Schema {
@@ -159,7 +159,7 @@ func withDescription(s Schema, desc string) Schema {
 }
 
 // BarModule names a bar module: a built-in, or `custom-<id>` for a
-// [[modules.custom]] definition.
+// `modules.custom` definition.
 type BarModule string
 
 // The built-in modules the layout accepts (BUILTIN_MODULES).
@@ -216,7 +216,7 @@ var BuiltinModules = []BarModule{
 
 const customModulePrefix = "custom-"
 
-// CustomID is the [[modules.custom]] id of a custom-<id> module.
+// CustomID is the `modules.custom` id of a custom-<id> module.
 func (m BarModule) CustomID() (string, bool) {
 	return strings.CutPrefix(string(m), customModulePrefix)
 }

@@ -11,10 +11,11 @@ Now-playing title and playback controls for the active MPRIS player.
 
 Add it to your layout with `media`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["media"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [media]
 ```
 
 ## General
@@ -41,11 +42,13 @@ matched.
 
 #### Example
 
-```toml
-[modules.media.player-icons]
-"*spotify*" = "si-spotify-symbolic"
-"*firefox*" = "ld-globe-symbolic"
-"*.mpv" = "ld-play-circle-symbolic"
+```yaml
+modules:
+  media:
+    player-icons:
+      "*spotify*": si-spotify-symbolic
+      "*firefox*": ld-globe-symbolic
+      "*.mpv": ld-play-circle-symbolic
 ```
 
 :::
@@ -54,9 +57,10 @@ matched.
 
 #### Example
 
-```toml
-[modules.media]
-players-ignored = ["*chromium*", "*discord*"]
+```yaml
+modules:
+  media:
+    players-ignored: ["*chromium*", "*discord*"]
 ```
 
 :::
@@ -69,9 +73,10 @@ If no pattern matches, the first playing player is selected.
 
 #### Example
 
-```toml
-[modules.media]
-player-priority = ["*spotify*", "*firefox*"]
+```yaml
+modules:
+  media:
+    player-priority: ["*spotify*", "*firefox*"]
 ```
 
 :::
@@ -116,30 +121,30 @@ player-priority = ["*spotify*", "*firefox*"]
 
 ## Default configuration
 
-```toml
-[modules.media]
-icon-type = "application-mapped"
-players-ignored = []
-player-priority = []
-format = "{{ title }} - {{ artist }}"
-icon-name = "ld-music-symbolic"
-spinning-disc-icon = "ld-disc-3-symbolic"
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "blue"
-label-show = true
-label-color = "blue"
-label-max-length = 35
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:media"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-
-[modules.media.player-icons]
+```yaml
+modules:
+  media:
+    icon-type: application-mapped
+    player-icons: {}
+    players-ignored: []
+    player-priority: []
+    format: '{{ title }} - {{ artist }}'
+    icon-name: ld-music-symbolic
+    spinning-disc-icon: ld-disc-3-symbolic
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: blue
+    label-show: true
+    label-color: blue
+    label-max-length: 35
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:media
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

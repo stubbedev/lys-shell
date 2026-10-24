@@ -66,16 +66,16 @@ type RamConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.ram.thresholds]]
-	// above = 80
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
-	//
-	// [[modules.ram.thresholds]]
-	// above = 95
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   ram:
+	//     thresholds:
+	//       - above: 80
+	//         icon-color: status-warning
+	//         label-color: status-warning
+	//       - above: 95
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

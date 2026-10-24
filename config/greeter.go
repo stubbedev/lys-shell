@@ -12,7 +12,7 @@ import (
 // Greeter (display manager): the pre-login screen `lys-greeter` renders as
 // a greetd greeter.
 //
-// The greeter reads the system config (`/etc/lys-shell/config.toml`), so these
+// The greeter reads the system config (`/etc/lys-shell/config.yaml`), so these
 // settings take effect there — copy or symlink your user config if you want
 // the login screen to follow it.
 type GreeterConfig struct {
@@ -56,17 +56,17 @@ func DefaultsGreeter() GreeterConfig {
 
 // GreeterConfigPath is the system config the greeter reads when no
 // --config is given: pre-login there is no $HOME to discover from.
-const GreeterConfigPath = "/etc/lys-shell/config.toml"
+const GreeterConfigPath = "/etc/lys-shell/config.yaml"
 
-// RuntimeOverlayPath is the runtime.toml beside a config file: where
-// `lys-greeter apply-config` writes the settings GUI's overrides so
-// they never clobber a hand-written config.toml.
+// RuntimeOverlayPath is the runtime.yaml beside a config file: where
+// `config set`, the settings GUI, and `lys-greeter apply-config` write
+// overrides so they never clobber a hand-written config.yaml.
 func RuntimeOverlayPath(configPath string) string {
-	return filepath.Join(filepath.Dir(configPath), "runtime.toml")
+	return filepath.Join(filepath.Dir(configPath), "runtime.yaml")
 }
 
-// LoadGreeter is lys-greeter's config::load: the file at path with
-// its imports on the config layer, the sibling runtime.toml on the
+// LoadGreeter is lys-greeter's config load: the file at path with
+// its imports on the config layer, the sibling runtime.yaml on the
 // runtime layer. A file that fails to load leaves its layer out (the
 // errors come back joined beside a usable config), so the greeter
 // always renders.

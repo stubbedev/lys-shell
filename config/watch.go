@@ -18,7 +18,7 @@ import (
 // real parent of a symlinked main config (never the /nix/store root).
 // Events debounce for 100ms, capped at 2s after the first pending one
 // so a continuous stream still flushes; a flush reloads what changed:
-// .env files, themes/, runtime.toml alone, or everything.
+// .env files, themes/, runtime.yaml alone, or everything.
 
 const (
 	debounceDelay    = 100 * time.Millisecond
@@ -211,7 +211,7 @@ func (w *watcher) close() {
 func (s *Service) reloadPaths(paths []string) error {
 	themes := filepath.Join(s.dir, "themes")
 	runtime := s.RuntimePath()
-	runtimeTmp := strings.TrimSuffix(runtime, ".toml") + ".tmp"
+	runtimeTmp := strings.TrimSuffix(runtime, filepath.Ext(runtime)) + ".tmp"
 	var env, theme, runtimeOnly, main bool
 	for _, p := range paths {
 		switch {

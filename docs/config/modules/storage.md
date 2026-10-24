@@ -11,10 +11,11 @@ Disk usage for a mount point.
 
 Add it to your layout with `storage`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["storage"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [storage]
 ```
 
 ## General
@@ -71,16 +72,16 @@ color slot. Use `above` for high-value warnings (e.g., disk nearly full).
 
 #### Example
 
-```toml
-[[modules.storage.thresholds]]
-above = 70
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.storage.thresholds]]
-above = 90
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  storage:
+    thresholds:
+      - above: 70
+        icon-color: status-warning
+        label-color: status-warning
+      - above: 90
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -107,27 +108,28 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.storage]
-poll-interval-ms = 30000
-mount-point = "/"
-format = "{{ percent }}%"
-icon-name = "ld-hard-drive-symbolic"
-border-show = false
-border-color = "yellow"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "yellow"
-label-show = true
-label-color = "yellow"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-thresholds = []
+```yaml
+modules:
+  storage:
+    poll-interval-ms: 30000
+    mount-point: /
+    format: '{{ percent }}%'
+    icon-name: ld-hard-drive-symbolic
+    border-show: false
+    border-color: yellow
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: yellow
+    label-show: true
+    label-color: yellow
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    thresholds: []
 ```
 
 

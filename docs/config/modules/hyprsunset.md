@@ -11,10 +11,11 @@ Toggle for Hyprland's blue-light filter.
 
 Add it to your layout with `hyprsunset`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["hyprsunset"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [hyprsunset]
 ```
 
 ## General
@@ -82,30 +83,31 @@ sunset, after which the schedule resumes.
 
 ## Default configuration
 
-```toml
-[modules.hyprsunset]
-format = "{{ status }}"
-temperature = 5000
-gamma = 100
-auto-schedule = false
-latitude = 0.0
-longitude = 0.0
-icon-off = "ld-sun-symbolic"
-icon-on = "ld-moon-symbolic"
-border-show = false
-border-color = "yellow"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "yellow"
-label-show = true
-label-color = "yellow"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ":toggle"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  hyprsunset:
+    format: '{{ status }}'
+    temperature: 5000
+    gamma: 100
+    auto-schedule: false
+    latitude: 0.0
+    longitude: 0.0
+    icon-off: ld-sun-symbolic
+    icon-on: ld-moon-symbolic
+    border-show: false
+    border-color: yellow
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: yellow
+    label-show: true
+    label-color: yellow
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: :toggle
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

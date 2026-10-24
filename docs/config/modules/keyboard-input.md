@@ -11,10 +11,11 @@ Active keyboard layout indicator.
 
 Add it to your layout with `keyboard-input`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["keyboard-input"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [keyboard-input]
 ```
 
 ## General
@@ -47,10 +48,12 @@ right = ["keyboard-input"]
 
 #### Example
 
-```toml
-[modules.keyboard-input.layout-alias-map]
-"English (US)" = "EN"
-"Czech (QWERTY)" = "Czech"
+```yaml
+modules:
+  keyboard-input:
+    layout-alias-map:
+      English (US): EN
+      Czech (QWERTY): Czech
 ```
 
 :::
@@ -77,26 +80,26 @@ right = ["keyboard-input"]
 
 ## Default configuration
 
-```toml
-[modules.keyboard-input]
-format = "{{ alias }}"
-icon-name = "ld-keyboard-symbolic"
-border-show = false
-border-color = "yellow"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "yellow"
-label-show = true
-label-color = "yellow"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-
-[modules.keyboard-input.layout-alias-map]
+```yaml
+modules:
+  keyboard-input:
+    format: '{{ alias }}'
+    icon-name: ld-keyboard-symbolic
+    border-show: false
+    border-color: yellow
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: yellow
+    label-show: true
+    label-color: yellow
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    layout-alias-map: {}
 ```
 
 

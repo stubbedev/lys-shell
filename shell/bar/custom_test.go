@@ -275,8 +275,8 @@ func TestCustomDefinitionLookup(t *testing.T) {
 }
 
 func TestApplyCustomDefinitionsValidates(t *testing.T) {
-	path := t.TempDir() + "/config.toml"
-	good := "[[modules.custom]]\nid = \"x\"\ncommand = \"echo hi\"\ninterval-ms = 100\nhide-if-empty = true\n"
+	path := t.TempDir() + "/config.yaml"
+	good := "modules:\n  custom:\n    - id: x\n      command: echo hi\n      interval-ms: 100\n      hide-if-empty: true\n"
 	if err := os.WriteFile(path, []byte(good), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -288,10 +288,10 @@ func TestApplyCustomDefinitionsValidates(t *testing.T) {
 		t.Errorf("custom = %+v", c.Custom)
 	}
 	for _, bad := range []string{
-		"[[modules.custom]]\ncommand = \"echo hi\"\n",
-		"[[modules.custom]]\nid = \"a\"\nmode = \"stream\"\n",
-		"[[modules.custom]]\nid = \"a\"\ninterval-ms = -5\n",
-		"[[modules.custom]]\nid = \"a\"\nlabel-max-length = -1\n",
+		"modules:\n  custom:\n    - command: echo hi\n",
+		"modules:\n  custom:\n    - id: a\n      mode: stream\n",
+		"modules:\n  custom:\n    - id: a\n      interval-ms: -5\n",
+		"modules:\n  custom:\n    - id: a\n      label-max-length: -1\n",
 	} {
 		if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
 			t.Fatal(err)

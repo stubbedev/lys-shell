@@ -69,16 +69,16 @@ type CpuConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.cpu.thresholds]]
-	// above = 70
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
-	//
-	// [[modules.cpu.thresholds]]
-	// above = 90
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   cpu:
+	//     thresholds:
+	//       - above: 70
+	//         icon-color: status-warning
+	//         label-color: status-warning
+	//       - above: 90
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

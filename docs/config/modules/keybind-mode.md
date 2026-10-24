@@ -11,10 +11,11 @@ Current keybind-mode indicator for modal compositors.
 
 Add it to your layout with `keybind-mode`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["keybind-mode"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [keybind-mode]
 ```
 
 ## General
@@ -65,25 +66,26 @@ right = ["keybind-mode"]
 
 ## Default configuration
 
-```toml
-[modules.keybind-mode]
-format = "{{ mode }}"
-icon-name = "ld-layers-symbolic"
-auto-hide = false
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "blue"
-label-show = true
-label-color = "blue"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  keybind-mode:
+    format: '{{ mode }}'
+    icon-name: ld-layers-symbolic
+    auto-hide: false
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: blue
+    label-show: true
+    label-color: blue
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

@@ -200,8 +200,8 @@ func TestVolumeIconNameSelection(t *testing.T) {
 }
 
 func TestLoadFileAppliesVolume(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.volume]\nformat = \"S {{ percent }}\"\nlabel-show = false\nicon-muted = \"ld-x-symbolic\"\nlevel-icons = [\"a\", \"b\"]\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  volume:\n    format: \"S {{ percent }}\"\n    label-show: false\n    icon-muted: ld-x-symbolic\n    level-icons: [a, b]\n"
 	if err := osWrite(path, content); err != nil {
 		t.Fatal(err)
 	}
@@ -222,9 +222,9 @@ func TestLoadFileAppliesVolume(t *testing.T) {
 
 func TestLoadFileRejectsBadVolume(t *testing.T) {
 	for _, content := range []string{
-		"[modules.volume]\n[[modules.volume.thresholds]]\nbelow = 10\nicon-color = \"bogus\"\n",
+		"modules:\n  volume:\n    thresholds:\n      - below: 10\n        icon-color: bogus\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

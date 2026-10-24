@@ -15,10 +15,11 @@ power-profiles-daemon D-Bus interface as `powerprofilesctl`.
 
 Add it to your layout with `power-profiles`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["power-profiles"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [power-profiles]
 ```
 
 ## General
@@ -77,29 +78,30 @@ Overridden per active profile by the `color-*` fields.
 
 ## Default configuration
 
-```toml
-[modules.power-profiles]
-format = "{{ profile }}"
-icon-power-saver = "ld-leaf-symbolic"
-icon-balanced = "ld-scale-symbolic"
-icon-performance = "ld-rocket-symbolic"
-color-power-saver = "green"
-color-balanced = "blue"
-color-performance = "red"
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "bg-surface-elevated"
-label-show = false
-label-color = "auto"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ":cycle"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  power-profiles:
+    format: '{{ profile }}'
+    icon-power-saver: ld-leaf-symbolic
+    icon-balanced: ld-scale-symbolic
+    icon-performance: ld-rocket-symbolic
+    color-power-saver: green
+    color-balanced: blue
+    color-performance: red
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: bg-surface-elevated
+    label-show: false
+    label-color: auto
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: :cycle
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

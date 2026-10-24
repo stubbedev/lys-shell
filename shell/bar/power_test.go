@@ -11,8 +11,8 @@ import (
 )
 
 func TestLoadFileAppliesPower(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.power]\nlock-command = \"swaylock\"\nshutdown-command = \"\"\nreboot-command = \"\"\nlogout-command = \"loginctl kill-session\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  power:\n    lock-command: swaylock\n    shutdown-command: \"\"\n    reboot-command: \"\"\n    logout-command: loginctl kill-session\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}

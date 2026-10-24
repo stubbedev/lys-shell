@@ -11,10 +11,11 @@ A vertical rule between bar modules.
 
 Add it to your layout with `separator`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["separator"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [separator]
 ```
 
 ## General
@@ -27,11 +28,12 @@ right = ["separator"]
 
 ## Default configuration
 
-```toml
-[modules.separator]
-size = 1
-length = 1.5
-color = "fg-subtle"
+```yaml
+modules:
+  separator:
+    size: 1
+    length: 1.5
+    color: fg-subtle
 ```
 
 

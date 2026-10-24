@@ -9,7 +9,7 @@ settings-color-auto = Auto
 settings-color-transparent = Transparent
 settings-color-custom = Custom...
 settings-custom-modules-editor = Custom Modules
-    .description = Define custom modules using TOML syntax
+    .description = Define custom modules using YAML syntax
 settings-theme-preset = Theme Preset
     .description = Overwrite the current palette with a predefined theme
 settings-theme-preset-apply = Browse presets
@@ -82,11 +82,11 @@ settings-layout-hidden = Bar hidden on this monitor
 
 ## Source badges
 settings-source-config = config
-    .description = Set in config.toml
+    .description = Set in config.yaml
 settings-source-custom = custom
-    .description = Changed via GUI (not in config.toml)
+    .description = Changed via GUI (not in config.yaml)
 settings-source-override = override
-    .description = GUI overriding config.toml value
+    .description = GUI overriding config.yaml value
 settings-source-unsaved = unsaved
     .description = Press Enter to apply
 

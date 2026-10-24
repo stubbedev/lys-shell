@@ -15,10 +15,11 @@ options below. Controllable from the CLI / RPC socket:
 
 Add it to your layout with `recorder`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["recorder"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [recorder]
 ```
 
 ## General
@@ -78,39 +79,40 @@ right = ["recorder"]
 
 ## Default configuration
 
-```toml
-[modules.recorder]
-icon-idle = "ld-video-symbolic"
-icon-recording = "ld-circle-dot-symbolic"
-icon-paused = "ld-circle-pause-symbolic"
-format = "{{ elapsed }}"
-microphone = false
-microphone-device = ""
-system-audio = true
-framerate = 60
-webcam-enabled = false
-webcam-device = ""
-webcam-x = 100
-webcam-y = 100
-webcam-size = 20
-output-directory = ""
-output-format = "mkv"
-show-cursor = true
-start-delay-ms = 1400
-border-show = false
-border-color = "red"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "red"
-label-show = true
-label-color = "red"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "lys-shell recorder toggle"
-right-click = "dropdown:recorder"
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  recorder:
+    icon-idle: ld-video-symbolic
+    icon-recording: ld-circle-dot-symbolic
+    icon-paused: ld-circle-pause-symbolic
+    format: '{{ elapsed }}'
+    microphone: false
+    microphone-device: ""
+    system-audio: true
+    framerate: 60
+    webcam-enabled: false
+    webcam-device: ""
+    webcam-x: 100
+    webcam-y: 100
+    webcam-size: 20
+    output-directory: ""
+    output-format: mkv
+    show-cursor: true
+    start-delay-ms: 1400
+    border-show: false
+    border-color: red
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: red
+    label-show: true
+    label-color: red
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: lys-shell recorder toggle
+    right-click: dropdown:recorder
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

@@ -11,10 +11,11 @@ Backlight control bar module.
 
 Add it to your layout with `brightness`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["brightness"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [brightness]
 ```
 
 ## General
@@ -74,11 +75,13 @@ color slot. Use `below` for low-brightness warnings.
 
 #### Example
 
-```toml
-[[modules.brightness.thresholds]]
-below = 20
-icon-color = "status-warning"
-label-color = "status-warning"
+```yaml
+modules:
+  brightness:
+    thresholds:
+      - below: 20
+        icon-color: status-warning
+        label-color: status-warning
 ```
 
 :::
@@ -105,31 +108,31 @@ label-color = "status-warning"
 
 ## Default configuration
 
-```toml
-[modules.brightness]
-level-icons = [
-    "ld-sun-dim-symbolic",
-    "ld-sun-medium-symbolic",
-    "ld-sun-symbolic",
-]
-border-show = false
-border-color = "yellow"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "yellow"
-label-show = true
-label-color = "yellow"
-format = "{{ percent }}%"
-label-max-length = 0
-min-brightness = 1
-enable-external = true
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:brightness"
-right-click = ""
-middle-click = ""
-scroll-up = "brightness:5"
-scroll-down = "brightness:-5"
-thresholds = []
+```yaml
+modules:
+  brightness:
+    level-icons:
+      - ld-sun-dim-symbolic
+      - ld-sun-medium-symbolic
+      - ld-sun-symbolic
+    border-show: false
+    border-color: yellow
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: yellow
+    label-show: true
+    label-color: yellow
+    format: '{{ percent }}%'
+    label-max-length: 0
+    min-brightness: 1
+    enable-external: true
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:brightness
+    right-click: ""
+    middle-click: ""
+    scroll-up: brightness:5
+    scroll-down: brightness:-5
+    thresholds: []
 ```
 
 

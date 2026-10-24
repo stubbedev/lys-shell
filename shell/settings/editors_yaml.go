@@ -11,11 +11,10 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 )
 
-// tomlEditor is TomlEditorControl: the field as a TOML document under
-// key, edited in a highlighted code view and applied as a whole; a
+// yamlEditor is the field as a YAML document under key, edited in a highlighted code view and applied as a whole; a
 // document that does not parse, or a value the config refuses, marks
 // the view instead of writing.
-type tomlEditor struct {
+type yamlEditor struct {
 	*widget.Box
 	k      *kit
 	slot   slot
@@ -28,8 +27,8 @@ type tomlEditor struct {
 	shown string
 }
 
-func newTOMLEditor(k *kit, s slot, key string, minLines int) *tomlEditor {
-	c := &tomlEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s, key: key}
+func newYAMLEditor(k *kit, s slot, key string, minLines int) *yamlEditor {
+	c := &yamlEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s, key: key}
 	c.badge = k.label(i18n.Settings().Get("settings-source-unsaved"), "badge-subtle", "warning")
 	c.badge.SetVisible(false)
 	c.area = widget.NewTextArea(k.mono, 14, 0)
@@ -40,9 +39,9 @@ func newTOMLEditor(k *kit, s slot, key string, minLines int) *tomlEditor {
 	c.area.OnChanged = func() { c.badge.SetVisible(true) }
 	c.scroll = widget.NewScroll(c.area)
 	c.scroll.VerticalOnly, c.scroll.FillX, c.scroll.ShowBars = true, true, true
-	c.scroll.AddClass("toml-editor")
+	c.scroll.AddClass("yaml-editor")
 	if minLines > 0 {
-		c.scroll.AddClass("toml-editor-lines-" + strconv.Itoa(minLines))
+		c.scroll.AddClass("yaml-editor-lines-" + strconv.Itoa(minLines))
 	}
 	apply := k.button(k.label(i18n.Settings().Get("settings-apply")), c.apply, "primary")
 	c.Append(c.scroll, true)
@@ -51,11 +50,11 @@ func newTOMLEditor(k *kit, s slot, key string, minLines int) *tomlEditor {
 	return c
 }
 
-func (c *tomlEditor) dirtyBadge() *widget.Label { return c.badge }
+func (c *yamlEditor) dirtyBadge() *widget.Label { return c.badge }
 
 // document renders the stored value under the key.
-func (c *tomlEditor) document() string {
-	text, err := config.TOMLDocument(map[string]any{c.key: c.slot.get()})
+func (c *yamlEditor) document() string {
+	text, err := config.YAMLDocument(map[string]any{c.key: c.slot.get()})
 	if err != nil {
 		return ""
 	}
@@ -64,8 +63,8 @@ func (c *tomlEditor) document() string {
 
 // refresh (on_refresh) shows the stored value when it moved, and
 // recolors from the palette.
-func (c *tomlEditor) refresh() {
-	c.area.SetHighlighter(highlight.TOML{}, paletteScheme(c.k.store.svc.Config().Styling.Palette))
+func (c *yamlEditor) refresh() {
+	c.area.SetHighlighter(highlight.YAML{}, paletteScheme(c.k.store.svc.Config().Styling.Palette))
 	doc := c.document()
 	if doc == c.shown {
 		return
@@ -76,8 +75,8 @@ func (c *tomlEditor) refresh() {
 }
 
 // apply (on_save) parses the document and writes the key's value.
-func (c *tomlEditor) apply() {
-	doc, err := config.ParseTOML(c.area.Text())
+func (c *yamlEditor) apply() {
+	doc, err := config.ParseYAML(c.area.Text())
 	v, ok := doc[c.key]
 	if err != nil || !ok || c.slot.set(v) != nil {
 		c.scroll.AddClass("error")
@@ -87,12 +86,12 @@ func (c *tomlEditor) apply() {
 	c.badge.SetVisible(false)
 }
 
-// tomlRow is toml_editor_sized for a row: the document under key, at
+// yamlRow is the YAML editor for a row: the document under key, at
 // least minLines tall.
-func tomlRow(key string, minLines int) rowOpt {
+func yamlRow(key string, minLines int) rowOpt {
 	return func(r *rowSpec) {
 		r.fullWidth = true
-		r.editor = func(k *kit, s slot, _ config.FieldMeta) control { return newTOMLEditor(k, s, key, minLines) }
+		r.editor = func(k *kit, s slot, _ config.FieldMeta) control { return newYAMLEditor(k, s, key, minLines) }
 	}
 }
 

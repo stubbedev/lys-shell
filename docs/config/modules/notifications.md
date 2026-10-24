@@ -11,10 +11,11 @@ Notification center: icon in the bar, dropdown with history, DND toggle.
 
 Add it to your layout with `notifications`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["notifications"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [notifications]
 ```
 
 ## General
@@ -86,16 +87,16 @@ notifications).
 
 #### Example
 
-```toml
-[[modules.notifications.thresholds]]
-above = 5
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.notifications.thresholds]]
-above = 20
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  notifications:
+    thresholds:
+      - above: 5
+        icon-color: status-warning
+        label-color: status-warning
+      - above: 20
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -122,42 +123,43 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.notifications]
-enabled = true
-icon-name = "ld-bell-symbolic"
-icon-unread = "ld-bell-dot-symbolic"
-icon-dnd = "ld-bell-off-symbolic"
-border-show = false
-border-color = "green"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "green"
-label-show = true
-label-color = "green"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:notification"
-right-click = "lys-shell notify dnd"
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-blocklist = []
-icon-source = "automatic"
-popup-position = "top-right"
-popup-max-visible = 5
-popup-stacking-order = "newest-first"
-popup-duration = 5000
-popup-hover-pause = true
-popup-margin-x = 0.0
-popup-margin-y = 0.0
-popup-gap = 1.0
-popup-monitor = "primary"
-popup-layer = "overlay"
-popup-close-behavior = "dismiss"
-popup-shadow = true
-popup-urgency-bar = "low"
-thresholds = []
+```yaml
+modules:
+  notifications:
+    enabled: true
+    icon-name: ld-bell-symbolic
+    icon-unread: ld-bell-dot-symbolic
+    icon-dnd: ld-bell-off-symbolic
+    border-show: false
+    border-color: green
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: green
+    label-show: true
+    label-color: green
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:notification
+    right-click: lys-shell notify dnd
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    blocklist: []
+    icon-source: automatic
+    popup-position: top-right
+    popup-max-visible: 5
+    popup-stacking-order: newest-first
+    popup-duration: 5000
+    popup-hover-pause: true
+    popup-margin-x: 0.0
+    popup-margin-y: 0.0
+    popup-gap: 1.0
+    popup-monitor: primary
+    popup-layer: overlay
+    popup-close-behavior: dismiss
+    popup-shadow: true
+    popup-urgency-bar: low
+    thresholds: []
 ```
 
 

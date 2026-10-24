@@ -10,17 +10,17 @@ outline: [2, 3]
 Settings for user session the in dashboard
 ## Examples
 
-```toml
-[modules.dashboard.user-session]
-actions = [ "lock", "log-out", "reboot", "power-off" ]
+```yaml
+modules: {dashboard: {user-session: {actions: [lock, log-out, reboot, power-off]}}}
 ```
 
 Add it to your layout with `user-session`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["user-session"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [user-session]
 ```
 
 ## General
@@ -31,14 +31,14 @@ right = ["user-session"]
 
 ## Default configuration
 
-```toml
-[modules.dropdown-dashboard-user-session]
-actions = [
-    "lock",
-    "log-out",
-    "reboot",
-    "power-off",
-]
+```yaml
+modules:
+  dropdown-dashboard-user-session:
+    actions:
+      - lock
+      - log-out
+      - reboot
+      - power-off
 ```
 
 

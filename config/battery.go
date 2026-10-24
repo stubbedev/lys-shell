@@ -64,15 +64,15 @@ type BatteryConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.battery.thresholds]]
-	// below = 40
-	// icon-color = "status-warning"
-	//
-	// [[modules.battery.thresholds]]
-	// below = 20
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   battery:
+	//     thresholds:
+	//       - below: 40
+	//         icon-color: status-warning
+	//       - below: 20
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

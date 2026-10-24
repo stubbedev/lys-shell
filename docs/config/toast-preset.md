@@ -16,11 +16,8 @@ stored on the preset. Duration always follows the OSD config.
 
 ## Example
 
-```toml
-[[osd.presets]]
-id = "saved"
-label = "Saved"
-icon = "ld-check-symbolic"
+```yaml
+osd: {presets: [{id: saved, label: Saved, icon: ld-check-symbolic}]}
 
 # Fire it: lys-shell toast --preset saved
 # With a progress bar: lys-shell toast --preset saved --percentage 80

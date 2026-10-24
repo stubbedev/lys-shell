@@ -12,7 +12,7 @@
     pkexec use THIS action (instead of the generic org.freedesktop.policykit.exec)
     when the target program is /usr/bin/lys-greeter, so it carries this
     action's admin-auth policy and message. apply-config only ever writes
-    allowlisted greeter keys to <config-dir>/runtime.toml.
+    allowlisted greeter keys to <config-dir>/runtime.yaml.
   -->
   <action id="dev.stubbe.lys.greeter.apply-config">
     <description>Change the lys-shell login screen</description>

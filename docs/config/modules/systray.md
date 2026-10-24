@@ -11,10 +11,11 @@ System tray icons via the StatusNotifierItem protocol.
 
 Add it to your layout with `systray`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["systray"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [systray]
 ```
 
 ## General
@@ -48,27 +49,30 @@ Example: `["*discord*", "Steam"]`
 
 First matching override wins. Supports glob patterns.
 
-```toml
-[[module.systray.overrides]]
-name = "*discord*"
-icon = "si-discord-symbolic"
-color = "blue"
+```yaml
+modules:
+  systray:
+    overrides:
+      - name: "*discord*"
+        icon: si-discord-symbolic
+        color: blue
 ```
 
 :::
 
 ## Default configuration
 
-```toml
-[modules.systray]
-icon-scale = 1.0
-item-gap = 0.25
-internal-padding = 0.5
-blacklist = []
-overrides = []
-border-show = false
-border-color = "border-accent"
-button-bg-color = "bg-surface-elevated"
+```yaml
+modules:
+  systray:
+    icon-scale: 1.0
+    item-gap: 0.25
+    internal-padding: 0.5
+    blacklist: []
+    overrides: []
+    border-show: false
+    border-color: border-accent
+    button-bg-color: bg-surface-elevated
 ```
 
 

@@ -13,10 +13,11 @@ Full walkthrough with examples in `docs/guide/custom-modules.md`.
 
 Add it to your layout with `custom-<id>`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["custom-<id>"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [custom-<id>]
 ```
 
 ## General
@@ -44,12 +45,13 @@ all custom module definitions.
 
 #### Example
 
-```toml
-[[modules.custom]]
-id = "gpu-temp"
+```yaml
+modules:
+  custom:
+    - id: gpu-temp
 
 # Reference in layout:
-# layout = ["custom-gpu-temp", "clock"]
+# layout: [custom-gpu-temp, clock]
 ```
 
 :::
@@ -125,9 +127,9 @@ If JSON output contains a `tooltip` field, it overrides this format.
 
 #### Example
 
-```toml
-format = "{{ percentage }}%"
-tooltip-format = "Volume: {{ percentage }}% on {{ device }}"
+```yaml
+format: "{{ percentage }}%"
+tooltip-format: "Volume: {{ percentage }}% on {{ device }}"
 ```
 
 :::
@@ -148,8 +150,8 @@ Combined with the `class` field from JSON output (if present).
 
 #### Example
 
-```toml
-class-format = "volume-{{ alt }}"
+```yaml
+class-format: "volume-{{ alt }}"
 # Output: {"alt": "muted"} → adds class "volume-muted"
 ```
 
@@ -172,9 +174,11 @@ static color of the same name.
 
 #### Example
 
-```toml
-icon-map = { muted = "audio-volume-muted-symbolic" }
-color-map = { muted = { icon-color = "red" }, default = { icon-color = "green" } }
+```yaml
+icon-map: {muted: audio-volume-muted-symbolic}
+color-map:
+  muted: {icon-color: red}
+  default: {icon-color: green}
 
 # Output: {"percentage": 50, "alt": "muted"}
 # Result: muted icon rendered in red
@@ -190,14 +194,13 @@ waiting for the next poll interval.
 
 #### Example
 
-```toml
+```yaml
 # Volume control with immediate feedback
-scroll-up = "pactl set-sink-volume @DEFAULT_SINK@ +5%"
-scroll-down = "pactl set-sink-volume @DEFAULT_SINK@ -5%"
-on-action = '''
-vol=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\d+(?=%)' | head -1)
-echo "{\"percentage\": $vol}"
-'''
+scroll-up: pactl set-sink-volume @DEFAULT_SINK@ +5%
+scroll-down: pactl set-sink-volume @DEFAULT_SINK@ -5%
+on-action: |
+  vol=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\d+(?=%)' | head -1)
+  echo "{\"percentage\": $vol}"
 ```
 
 :::
@@ -279,8 +282,8 @@ Should be a symbolic icon name from the icon theme (e.g., `"ld-gpu-symbolic"`).
 
 #### Example
 
-```toml
-icon-name = "ld-temperature-symbolic"
+```yaml
+icon-name: ld-temperature-symbolic
 ```
 
 :::
@@ -299,14 +302,13 @@ For N icons, icon at index `floor(percentage * N / 101)` is selected:
 
 #### Example
 
-```toml
-icon-names = [
-  "battery-empty-symbolic",
-  "battery-caution-symbolic",
-  "battery-low-symbolic",
-  "battery-good-symbolic",
-  "battery-full-symbolic"
-]
+```yaml
+icon-names:
+  - battery-empty-symbolic
+  - battery-caution-symbolic
+  - battery-low-symbolic
+  - battery-good-symbolic
+  - battery-full-symbolic
 ```
 
 :::
@@ -321,10 +323,10 @@ allowing state-specific icons to override percentage-based icons.
 
 #### Example
 
-```toml
+```yaml
 # Volume with muted state override
-icon-names = ["vol-0", "vol-33", "vol-66", "vol-100"]
-icon-map = { "muted" = "audio-volume-muted-symbolic" }
+icon-names: [vol-0, vol-33, vol-66, vol-100]
+icon-map: {muted: audio-volume-muted-symbolic}
 
 # Output: {"percentage": 50, "alt": "muted"}
 # Result: Uses "audio-volume-muted-symbolic" (alt match beats percentage)
@@ -367,29 +369,30 @@ Delay increases exponentially on rapid failures, capped at 30 seconds.
 
 Required fields (must be set in your config): `id`.
 
-```toml
-[[modules.custom]]
-mode = "poll"
-interval-ms = 5000
-restart-policy = "never"
-restart-interval-ms = 1000
-format = "{{ output }}"
-hide-if-empty = false
-icon-name = ""
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "auto"
-label-show = true
-label-color = "auto"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-border-show = false
-border-color = "auto"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  custom:
+    - mode: poll
+      interval-ms: 5000
+      restart-policy: never
+      restart-interval-ms: 1000
+      format: '{{ output }}'
+      hide-if-empty: false
+      icon-name: ""
+      icon-show: true
+      icon-color: auto
+      icon-bg-color: auto
+      label-show: true
+      label-color: auto
+      label-max-length: 0
+      button-bg-color: bg-surface-elevated
+      border-show: false
+      border-color: auto
+      left-click: ""
+      right-click: ""
+      middle-click: ""
+      scroll-up: ""
+      scroll-down: ""
 ```
 
 

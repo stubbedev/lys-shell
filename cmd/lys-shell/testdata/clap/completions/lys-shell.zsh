@@ -164,7 +164,7 @@ _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
 '--help[Print help]' \
 ':path -- The configuration path to set (e.g., "modules.battery.enabled"):_default' \
-':value -- The value to set (use JSON format for complex types):_default' \
+':value -- The value to set, as YAML (e.g. true, 5, \[a, b\]); anything else is a string:_default' \
 && ret=0
 ;;
 (reset)
@@ -183,7 +183,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (default)
 _arguments "${_arguments_options[@]}" : \
-'--stdout[Print to stdout instead of writing config.toml.example]' \
+'--stdout[Print to stdout instead of writing config.yaml.example]' \
 '-h[Print help]' \
 '--help[Print help]' \
 && ret=0
@@ -2470,7 +2470,7 @@ _lys-shell__config_commands() {
 'set:Set the value of a configuration path' \
 'reset:Reset a configuration path to its default value' \
 'schema:Output JSON Schema for the configuration (for editor intellisense)' \
-'default:Output the default configuration as TOML' \
+'default:Output the default configuration as YAML' \
 'docs:Generate markdown reference pages for every registered schema' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -2498,7 +2498,7 @@ _lys-shell__config__help_commands() {
 'set:Set the value of a configuration path' \
 'reset:Reset a configuration path to its default value' \
 'schema:Output JSON Schema for the configuration (for editor intellisense)' \
-'default:Output the default configuration as TOML' \
+'default:Output the default configuration as YAML' \
 'docs:Generate markdown reference pages for every registered schema' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -2641,7 +2641,7 @@ _lys-shell__help__config_commands() {
 'set:Set the value of a configuration path' \
 'reset:Reset a configuration path to its default value' \
 'schema:Output JSON Schema for the configuration (for editor intellisense)' \
-'default:Output the default configuration as TOML' \
+'default:Output the default configuration as YAML' \
 'docs:Generate markdown reference pages for every registered schema' \
     )
     _describe -t commands 'lys-shell help config commands' commands "$@"

@@ -70,8 +70,8 @@ func TestTreemanLabel(t *testing.T) {
 }
 
 func TestLoadFileAppliesTreeman(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.treeman]\nformat = \"[{{ total }}]\"\nhide-if-empty = true\nicon-failed = \"tb-x-symbolic\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  treeman:\n    format: \"[{{ total }}]\"\n    hide-if-empty: true\n    icon-failed: tb-x-symbolic\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestLoadFileAppliesTreeman(t *testing.T) {
 		t.Errorf("icon-preparing default changed: %q", got)
 	}
 
-	if err := osWrite(path, "[modules.treeman]\nformat = \"\"\n"); err != nil {
+	if err := osWrite(path, "modules:\n  treeman:\n    format: \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	// The schema puts no constraint on the format string.

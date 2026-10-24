@@ -20,7 +20,7 @@ type SwayWorkspacesConfig struct {
 	// - `icon`: show an icon from `workspace-map` (falls back to label if unmapped)
 	// - `none`: show nothing — only app icons visible (if enabled)
 	DisplayMode DisplayMode `cfg:"display-mode"`
-	// How to compose the workspace label when `display-mode = "label"`.
+	// How to compose the workspace label when `display-mode: label`.
 	//
 	// - `index`: number only (`"1"`, `"2"`)
 	// - `name-or-index` (default): name when set, number otherwise
@@ -85,10 +85,12 @@ type SwayWorkspacesConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.sway-workspaces.workspace-map]
-	// web = { icon = "ld-globe-symbolic", color = "#4a90d9" }
-	// terminal = { icon = "ld-terminal-symbolic" }
+	// ```yaml
+	// modules:
+	//   sway-workspaces:
+	//     workspace-map:
+	//       web: {icon: ld-globe-symbolic, color: "#4a90d9"}
+	//       terminal: {icon: ld-terminal-symbolic}
 	// ```
 	WorkspaceMap NamedWorkspaceMap `cfg:"workspace-map"`
 	// Application icon mapping with glob pattern support.
@@ -100,10 +102,12 @@ type SwayWorkspacesConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.sway-workspaces.app-icon-map]
-	// "*firefox*" = "ld-globe-symbolic"
-	// "title:*YouTube*" = "ld-youtube-symbolic"
+	// ```yaml
+	// modules:
+	//   sway-workspaces:
+	//     app-icon-map:
+	//       "*firefox*": ld-globe-symbolic
+	//       "title:*YouTube*": ld-youtube-symbolic
 	// ```
 	AppIconMap map[string]string `cfg:"app-icon-map"`
 	// Action on left click.

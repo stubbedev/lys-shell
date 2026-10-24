@@ -1,22 +1,23 @@
 package config
 
 import (
-	"errors"
-	"io/fs"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/stubbedev/lys-shell/internal/version"
 )
 
-// Helpers behind `lys-shell config` (lys-shell/src/cli/config), kept here so
-// the output forms live next to the tree they format.
+// Helpers behind `lys-shell config`, kept here so the output forms live
+// next to the tree they format.
 
 // FormatGetValue renders a `lys-shell config get` result: scalars bare
-// (strings unquoted, floats in Rust's f64 Display), tables as a pretty
-// TOML document, arrays inline.
+// (strings unquoted, floats in their shortest form), tables as a YAML
+// document, arrays inline.
 func FormatGetValue(v any) string {
 	switch t := v.(type) {
 	case string:
@@ -31,81 +32,69 @@ func FormatGetValue(v any) string {
 		return rustFloat(float64(t), 32)
 	case bool:
 		return strconv.FormatBool(t)
-	case datetime:
-		return string(t)
 	}
-	if s, err := tomlPretty(v); err == nil {
-		return s
+	if s, err := yamlDocument(v); err == nil {
+		return strings.TrimSuffix(s, "\n")
 	}
-	return TOMLInline(v)
+	return YAMLInline(v)
 }
 
-// ParseCLIValue reads a `lys-shell config set` value as a TOML value
-// ("true", "5", "[1, 2]", "{ a = 1 }", "\"quoted\""); anything that is
-// not valid TOML is taken as a plain string.
+// ParseCLIValue reads a `lys-shell config set` value as a YAML value
+// ("true", "5", "[1, 2]", "{module: clock}", "'quoted'"). Anything that
+// is not valid YAML, is empty or null, or reads as a mapping without
+// being written as a flow mapping ("Now: playing") is taken as a plain
+// string.
 func ParseCLIValue(raw string) any {
-	tree, err := parseTOML([]byte("value = " + raw))
-	if err != nil {
+	v, err := parseYAMLValue([]byte(raw))
+	if err != nil || v == nil {
 		return raw
 	}
-	if v, ok := lookup(tree, "value"); ok {
-		return v
+	if _, ok := v.(map[string]any); ok && !strings.HasPrefix(strings.TrimSpace(raw), "{") {
+		return raw
 	}
-	return raw
+	return v
 }
 
-// DefaultTOML renders the default configuration as pretty TOML (the
-// `lys-shell config default` output).
-func DefaultTOML() string {
-	out, _ := tomlPretty(encode(Defaults()))
-	return out
+// parseYAMLValue parses one YAML value of any kind; an empty document
+// is nil.
+func parseYAMLValue(data []byte) (any, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	if doc.Kind == 0 || len(doc.Content) == 0 {
+		return nil, nil
+	}
+	return yamlValue(doc.Content[0])
 }
 
-// ExamplePath is config.toml.example in dir.
-func ExamplePath(dir string) string { return filepath.Join(dir, "config.toml.example") }
+// DefaultYAML renders the default configuration as a YAML document
+// (the `lys-shell config default` output).
+func DefaultYAML() (string, error) {
+	out, err := yamlDocument(encode(Defaults()))
+	if err != nil {
+		return "", fmt.Errorf("render the default config: %w", err)
+	}
+	return out, nil
+}
 
-// SchemaPath is schema.json in dir.
+// ExamplePath is config.yaml.example in dir.
+func ExamplePath(dir string) string { return filepath.Join(dir, "config.yaml.example") }
+
+// SchemaPath is schema.json in dir, which the config stub's
+// yaml-language-server modeline points editors at.
 func SchemaPath(dir string) string { return filepath.Join(dir, "schema.json") }
 
-// TombiPath is tombi.toml in dir.
-func TombiPath(dir string) string { return filepath.Join(dir, "tombi.toml") }
-
-// tombiConfig associates the generated schemas with the config files
-// for Taplo/tombi editors (schema.rs TOMBI_CONFIG).
-const tombiConfig = `toml-version = "v1.1.0"
-
-[schema]
-enabled = true
-
-[[schemas]]
-path = "./schema.json"
-include = ["config.toml", "runtime.toml"]
-
-[[schemas]]
-path = "./themes/schema.json"
-include = ["themes/*.toml"]
-`
-
 // EnsureSchemaCurrent writes schema.json when it is missing or from
-// another version, and tombi.toml when it differs (ensure_schema_current).
+// another version.
 func EnsureSchemaCurrent(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the user's config dir
 		return err
 	}
 	schemaPath := SchemaPath(dir)
 	existing, err := os.ReadFile(schemaPath) //nolint:gosec // schema.json in the config dir
-	if err != nil || !strings.Contains(string(existing), "lys-shell-config-"+version.Version) {
-		if err := os.WriteFile(schemaPath, []byte(GenerateSchema()), 0o644); err != nil { //nolint:gosec // an editor schema, not secret
-			return err
-		}
-	}
-	tombi := TombiPath(dir)
-	current, err := os.ReadFile(tombi) //nolint:gosec // tombi.toml in the config dir
-	if err == nil && string(current) == tombiConfig {
+	if err == nil && strings.Contains(string(existing), "lys-shell-config-"+version.Version) {
 		return nil
 	}
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return os.WriteFile(tombi, []byte(tombiConfig), 0o644) //nolint:gosec // an editor config, not secret
+	return os.WriteFile(schemaPath, []byte(GenerateSchema()), 0o644) //nolint:gosec // an editor schema, not secret
 }

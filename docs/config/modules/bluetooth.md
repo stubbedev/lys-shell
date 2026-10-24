@@ -11,10 +11,11 @@ Bluetooth connection status with a dropdown for pairing and managing devices.
 
 Add it to your layout with `bluetooth`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["bluetooth"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [bluetooth]
 ```
 
 ## General
@@ -52,26 +53,27 @@ right = ["bluetooth"]
 
 ## Default configuration
 
-```toml
-[modules.bluetooth]
-disabled-icon = "ld-bluetooth-off-symbolic"
-disconnected-icon = "ld-bluetooth-symbolic"
-connected-icon = "ld-bluetooth-connected-symbolic"
-searching-icon = "ld-bluetooth-searching-symbolic"
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "blue"
-label-show = true
-label-color = "blue"
-label-max-length = 15
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:bluetooth"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  bluetooth:
+    disabled-icon: ld-bluetooth-off-symbolic
+    disconnected-icon: ld-bluetooth-symbolic
+    connected-icon: ld-bluetooth-connected-symbolic
+    searching-icon: ld-bluetooth-searching-symbolic
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: blue
+    label-show: true
+    label-color: blue
+    label-max-length: 15
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:bluetooth
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

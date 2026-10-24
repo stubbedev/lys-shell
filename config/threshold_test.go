@@ -106,15 +106,17 @@ func TestResolveOr(t *testing.T) {
 
 func TestThresholdDecodeEveryKey(t *testing.T) {
 	path := writeConfig(t, `
-[[modules.volume.thresholds]]
-above = 70
-below = 90.5
-icon-color = "status-warning"
-label-color = "#ff0000"
-icon-bg-color = "transparent"
-button-bg-color = "bg-hover"
-border-color = "auto"
-unknown = "ignored"
+modules:
+  volume:
+    thresholds:
+      - above: 70
+        below: 90.5
+        icon-color: status-warning
+        label-color: "#ff0000"
+        icon-bg-color: transparent
+        button-bg-color: bg-hover
+        border-color: auto
+        unknown: ignored
 `)
 	cfg, err := LoadFile(path)
 	if err != nil {
@@ -135,14 +137,14 @@ unknown = "ignored"
 
 func TestThresholdDecodeRejectsBadEntries(t *testing.T) {
 	for _, tc := range []struct{ body, want string }{
-		{"above = 5\nlabel-color = \"nope\"", "label-color"},
-		{"above = 5\nborder-color = 3", "border-color"},
-		{"above = \"high\"", "above"},
+		{"above: 5\n        label-color: nope", "label-color"},
+		{"above: 5\n        border-color: 3", "border-color"},
+		{"above: high", "above"},
 	} {
 		// Every module shares the one decoder; cpu goes through the
 		// sysinfo path, battery through its own table.
 		for _, module := range []string{"battery", "cpu", "volume", "brightness", "notifications"} {
-			path := writeConfig(t, "[[modules."+module+".thresholds]]\n"+tc.body+"\n")
+			path := writeConfig(t, "modules:\n  "+module+":\n    thresholds:\n      - "+tc.body+"\n")
 			_, err := LoadFile(path)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("%s %q: err = %v, want %q", module, tc.body, err, tc.want)

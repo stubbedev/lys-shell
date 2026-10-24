@@ -88,7 +88,7 @@ func greeterApplyFooter(k *kit) widget.Widget {
 	return box
 }
 
-// applyGreeter stages the [greeter] keys the login screen takes and
+// applyGreeter stages the greeter keys the login screen takes and
 // hands them to `pkexec lys-greeter apply-config` (dispatch).
 func applyGreeter(s store) error {
 	greeter := make(map[string]any, len(config.GreeterApplyKeys))
@@ -97,11 +97,11 @@ func applyGreeter(s store) error {
 			greeter[key] = v
 		}
 	}
-	body, err := config.TOMLDocument(map[string]any{"greeter": greeter})
+	body, err := config.YAMLDocument(map[string]any{"greeter": greeter})
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(os.TempDir(), fmt.Sprintf("lys-greeter-apply-%d.toml", os.Getpid()))
+	path := filepath.Join(os.TempDir(), fmt.Sprintf("lys-greeter-apply-%d.yaml", os.Getpid()))
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		return fmt.Errorf("stage %s: %w", path, err)
 	}

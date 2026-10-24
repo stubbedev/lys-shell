@@ -106,8 +106,8 @@ func TestMailLabel(t *testing.T) {
 }
 
 func TestLoadFileAppliesMailAccounts(t *testing.T) {
-	path := t.TempDir() + "/config.toml"
-	good := "[[modules.mail.accounts]]\nname = \"Work\"\nquery = \"folder:work and tag:unread\"\nprovider = \"gmail\"\n\n[modules.mail]\nformat = \"{{ count }} new\"\nhide-when-zero = false\n"
+	path := t.TempDir() + "/config.yaml"
+	good := "modules:\n  mail:\n    accounts:\n      - name: Work\n        query: \"folder:work and tag:unread\"\n        provider: gmail\n    format: \"{{ count }} new\"\n    hide-when-zero: false\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -127,8 +127,8 @@ func TestLoadFileAppliesMailAccounts(t *testing.T) {
 	}
 
 	for _, bad := range []string{
-		"[[modules.mail.accounts]]\nquery = \"tag:unread\"\n",
-		"[[modules.mail.accounts]]\nname = \"Work\"\n",
+		"modules:\n  mail:\n    accounts:\n      - query: \"tag:unread\"\n",
+		"modules:\n  mail:\n    accounts:\n      - name: Work\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

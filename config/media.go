@@ -19,11 +19,13 @@ type MediaConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.media.player-icons]
-	// "*spotify*" = "si-spotify-symbolic"
-	// "*firefox*" = "ld-globe-symbolic"
-	// "*.mpv" = "ld-play-circle-symbolic"
+	// ```yaml
+	// modules:
+	//   media:
+	//     player-icons:
+	//       "*spotify*": si-spotify-symbolic
+	//       "*firefox*": ld-globe-symbolic
+	//       "*.mpv": ld-play-circle-symbolic
 	// ```
 	PlayerIcons map[string]string `cfg:"player-icons"`
 	// Player bus name patterns to exclude from discovery. Requires a restart
@@ -31,9 +33,10 @@ type MediaConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.media]
-	// players-ignored = ["*chromium*", "*discord*"]
+	// ```yaml
+	// modules:
+	//   media:
+	//     players-ignored: ["*chromium*", "*discord*"]
 	// ```
 	PlayersIgnored []string `cfg:"players-ignored"`
 	// Preferred player priority order as glob patterns matching bus names.
@@ -44,9 +47,10 @@ type MediaConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.media]
-	// player-priority = ["*spotify*", "*firefox*"]
+	// ```yaml
+	// modules:
+	//   media:
+	//     player-priority: ["*spotify*", "*firefox*"]
 	// ```
 	PlayerPriority []string `cfg:"player-priority"`
 	// Format string for the label.

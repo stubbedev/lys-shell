@@ -17,10 +17,11 @@ This module uses `upower` (D-Bus) for battery information. Ensure `upower` daemo
 
 Add it to your layout with `battery`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["battery"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [battery]
 ```
 
 ## General
@@ -63,15 +64,15 @@ color slot. Use `below` for low-value warnings (e.g., low battery).
 
 #### Example
 
-```toml
-[[modules.battery.thresholds]]
-below = 40
-icon-color = "status-warning"
-
-[[modules.battery.thresholds]]
-below = 20
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  battery:
+    thresholds:
+      - below: 40
+        icon-color: status-warning
+      - below: 20
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -98,36 +99,36 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.battery]
-level-icons = [
-    "md-battery_android_0-symbolic",
-    "md-battery_android_frame_1-symbolic",
-    "md-battery_android_frame_2-symbolic",
-    "md-battery_android_frame_3-symbolic",
-    "md-battery_android_frame_4-symbolic",
-    "md-battery_android_frame_5-symbolic",
-    "md-battery_android_frame_6-symbolic",
-    "md-battery_android_frame_full-symbolic",
-]
-charging-icon = "md-battery_android_frame_bolt-symbolic"
-alert-icon = "md-battery_android_alert-symbolic"
-border-show = false
-border-color = "yellow"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "yellow"
-label-show = true
-label-color = "yellow"
-format = "{{ percent }}%"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:battery"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-thresholds = []
+```yaml
+modules:
+  battery:
+    level-icons:
+      - md-battery_android_0-symbolic
+      - md-battery_android_frame_1-symbolic
+      - md-battery_android_frame_2-symbolic
+      - md-battery_android_frame_3-symbolic
+      - md-battery_android_frame_4-symbolic
+      - md-battery_android_frame_5-symbolic
+      - md-battery_android_frame_6-symbolic
+      - md-battery_android_frame_full-symbolic
+    charging-icon: md-battery_android_frame_bolt-symbolic
+    alert-icon: md-battery_android_alert-symbolic
+    border-show: false
+    border-color: yellow
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: yellow
+    label-show: true
+    label-color: yellow
+    format: '{{ percent }}%'
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:battery
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    thresholds: []
 ```
 
 

@@ -11,10 +11,11 @@ Clock module configuration.
 
 Add it to your layout with `clock`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["clock"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [clock]
 ```
 
 ## General
@@ -81,26 +82,27 @@ right = ["clock"]
 
 ## Default configuration
 
-```toml
-[modules.clock]
-format = "%a %b %d %I:%M %p"
-icon-name = "tb-calendar-time-symbolic"
-border-show = false
-border-color = "border-accent"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "accent"
-label-show = true
-label-color = "accent"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:calendar"
-right-click = "dropdown:weather"
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-dropdown-show-seconds = false
-calendar-weekday-start = "sunday"
+```yaml
+modules:
+  clock:
+    format: '%a %b %d %I:%M %p'
+    icon-name: tb-calendar-time-symbolic
+    border-show: false
+    border-color: border-accent
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: accent
+    label-show: true
+    label-color: accent
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:calendar
+    right-click: dropdown:weather
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    dropdown-show-seconds: false
+    calendar-weekday-start: sunday
 ```
 
 

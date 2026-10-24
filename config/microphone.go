@@ -43,16 +43,16 @@ type MicrophoneConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.microphone.thresholds]]
-	// above = 70
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
-	//
-	// [[modules.microphone.thresholds]]
-	// above = 90
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   microphone:
+	//     thresholds:
+	//       - above: 70
+	//         icon-color: status-warning
+	//         label-color: status-warning
+	//       - above: 90
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

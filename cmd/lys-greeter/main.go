@@ -5,7 +5,7 @@
 //
 //	lys-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]...
 //	              [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
-//	lys-greeter apply-config [--config PATH] <STAGED.toml>
+//	lys-greeter apply-config [--config PATH] <STAGED.yaml>
 package main
 
 import (

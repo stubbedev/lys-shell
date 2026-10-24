@@ -11,10 +11,11 @@ Output volume control with a dropdown for device and app volumes.
 
 Add it to your layout with `volume`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["volume"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [volume]
 ```
 
 ## General
@@ -56,16 +57,16 @@ color slot. Use `above` for high-value warnings (e.g., boosted volume).
 
 #### Example
 
-```toml
-[[modules.volume.thresholds]]
-above = 100
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.volume.thresholds]]
-above = 130
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  volume:
+    thresholds:
+      - above: 100
+        icon-color: status-warning
+        label-color: status-warning
+      - above: 130
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -98,31 +99,31 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.volume]
-level-icons = [
-    "ld-volume-symbolic",
-    "ld-volume-1-symbolic",
-    "ld-volume-2-symbolic",
-]
-icon-muted = "ld-volume-x-symbolic"
-border-show = false
-border-color = "red"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "red"
-label-show = true
-label-color = "red"
-format = "{{ percent }}%"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:audio"
-right-click = ""
-middle-click = "lys-shell audio output-mute"
-scroll-up = ""
-scroll-down = ""
-dropdown-app-icons = "mapped"
-thresholds = []
+```yaml
+modules:
+  volume:
+    level-icons:
+      - ld-volume-symbolic
+      - ld-volume-1-symbolic
+      - ld-volume-2-symbolic
+    icon-muted: ld-volume-x-symbolic
+    border-show: false
+    border-color: red
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: red
+    label-show: true
+    label-color: red
+    format: '{{ percent }}%'
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:audio
+    right-click: ""
+    middle-click: lys-shell audio output-mute
+    scroll-up: ""
+    scroll-down: ""
+    dropdown-app-icons: mapped
+    thresholds: []
 ```
 
 

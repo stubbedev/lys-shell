@@ -63,8 +63,8 @@ func TestPowerProfilesLabel(t *testing.T) {
 }
 
 func TestLoadFileAppliesPowerProfiles(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.power-profiles]\nformat = \"P: {{ profile }}\"\nlabel-show = true\nicon-performance = \"ld-zap-symbolic\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  power-profiles:\n    format: \"P: {{ profile }}\"\n    label-show: true\n    icon-performance: ld-zap-symbolic\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestLoadFileAppliesPowerProfiles(t *testing.T) {
 		t.Errorf("left-click = %q", c.PowerProfiles.Clicks().LeftClick.String())
 	}
 
-	if err := osWrite(path, "[modules.power-profiles]\nformat = \"\"\n"); err != nil {
+	if err := osWrite(path, "modules:\n  power-profiles:\n    format: \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	// The schema puts no constraint on the format string.

@@ -11,10 +11,11 @@ Audio frequency bars visualising the output stream.
 
 Add it to your layout with `cava`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["cava"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [cava]
 ```
 
 ## General
@@ -48,32 +49,33 @@ right = ["cava"]
 
 ## Default configuration
 
-```toml
-[modules.cava]
-bars = 20
-framerate = 60
-stereo = false
-noise-reduction = 0.65
-monstercat = 0.0
-waves = 0
-low-cutoff = 50
-high-cutoff = 17000
-input = "pipe-wire"
-source = "auto"
-style = "bars"
-direction = "normal"
-color = "accent"
-button-bg-color = "bg-surface-elevated"
-bar-width = 6
-bar-gap = 1
-internal-padding = 0.5
-border-show = false
-border-color = "border-accent"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  cava:
+    bars: 20
+    framerate: 60
+    stereo: false
+    noise-reduction: 0.65
+    monstercat: 0.0
+    waves: 0
+    low-cutoff: 50
+    high-cutoff: 17000
+    input: pipe-wire
+    source: auto
+    style: bars
+    direction: normal
+    color: accent
+    button-bg-color: bg-surface-elevated
+    bar-width: 6
+    bar-gap: 1
+    internal-padding: 0.5
+    border-show: false
+    border-color: border-accent
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

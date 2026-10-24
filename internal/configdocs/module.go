@@ -38,7 +38,7 @@ func modulePage(sec config.DocSection, known map[string]bool) string {
 	b.WriteString(rehostRustdoc(strings.TrimSpace(description), pageH1Depth))
 	b.WriteByte('\n')
 	if id := sec.LayoutID; id != "" {
-		fmt.Fprintf(&b, "Add it to your layout with `%s`:\n\n```toml\n[[bar.layout]]\nmonitor = \"*\"\nright = [\"%s\"]\n```\n\n", id, id)
+		fmt.Fprintf(&b, "Add it to your layout with `%s`:\n\n```yaml\nbar:\n  layout:\n    - monitor: \"*\"\n      right: [%s]\n```\n\n", id, id)
 	}
 	for i, g := range sec.Groups {
 		if len(buckets[i]) > 0 {
@@ -287,14 +287,14 @@ func renderGroup(b *strings.Builder, g config.DocGroup, fields []field) {
 	}
 }
 
-// renderDefaults is render_default_toml.
+// renderDefaults is the page's default configuration block.
 func renderDefaults(b *strings.Builder, sec config.DocSection) {
 	props, _ := sec.Schema["properties"].(config.Schema)
 	if len(config.PropertyOrder(props)) == 0 {
 		return
 	}
-	toml := sec.DefaultsTOML()
-	if toml == "" && len(sec.Required) == 0 {
+	defaults := sec.DefaultsYAML()
+	if defaults == "" && len(sec.Required) == 0 {
 		return
 	}
 	b.WriteString("## Default configuration\n\n")
@@ -305,12 +305,12 @@ func renderDefaults(b *strings.Builder, sec config.DocSection) {
 		}
 		fmt.Fprintf(b, "Required fields (must be set in your config): %s.\n\n", strings.Join(names, ", "))
 	}
-	if toml == "" {
+	if defaults == "" {
 		return
 	}
-	b.WriteString("```toml\n")
-	b.WriteString(toml)
-	if !strings.HasSuffix(toml, "\n") {
+	b.WriteString("```yaml\n")
+	b.WriteString(defaults)
+	if !strings.HasSuffix(defaults, "\n") {
 		b.WriteByte('\n')
 	}
 	b.WriteString("```\n\n")

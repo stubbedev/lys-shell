@@ -11,10 +11,11 @@ CPU usage, frequency, and temperature.
 
 Add it to your layout with `cpu`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["cpu"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [cpu]
 ```
 
 ## General
@@ -72,16 +73,16 @@ color slot. Use `above` for high-value warnings (e.g., high CPU usage).
 
 #### Example
 
-```toml
-[[modules.cpu.thresholds]]
-above = 70
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.cpu.thresholds]]
-above = 90
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  cpu:
+    thresholds:
+      - above: 70
+        icon-color: status-warning
+        label-color: status-warning
+      - above: 90
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -108,27 +109,28 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.cpu]
-poll-interval-ms = 2000
-temp-sensor = "auto"
-format = "{{ percent }}%"
-icon-name = "ld-cpu-symbolic"
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "blue"
-label-show = true
-label-color = "blue"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-thresholds = []
+```yaml
+modules:
+  cpu:
+    poll-interval-ms: 2000
+    temp-sensor: auto
+    format: '{{ percent }}%'
+    icon-name: ld-cpu-symbolic
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: blue
+    label-show: true
+    label-color: blue
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    thresholds: []
 ```
 
 

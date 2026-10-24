@@ -8,7 +8,7 @@ import (
 )
 
 // configSetter is ModuleContext.SetConfig over a config service: the
-// runtime override, then runtime.toml.
+// runtime override, then runtime.yaml.
 func configSetter(svc *config.Service) func(path string, value any) {
 	return func(path string, value any) {
 		if err := svc.SetByPath(path, value); err != nil {

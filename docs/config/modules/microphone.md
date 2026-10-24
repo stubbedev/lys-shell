@@ -11,10 +11,11 @@ Microphone input level and mute toggle.
 
 Add it to your layout with `microphone`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["microphone"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [microphone]
 ```
 
 ## General
@@ -36,16 +37,16 @@ color slot. Use `above` for high-value warnings (e.g., high input gain).
 
 #### Example
 
-```toml
-[[modules.microphone.thresholds]]
-above = 70
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.microphone.thresholds]]
-above = 90
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  microphone:
+    thresholds:
+      - above: 70
+        icon-color: status-warning
+        label-color: status-warning
+      - above: 90
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -72,25 +73,26 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.microphone]
-icon-active = "ld-mic-symbolic"
-icon-muted = "ld-mic-off-symbolic"
-border-show = false
-border-color = "red"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "red"
-label-show = true
-label-color = "red"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:audio"
-right-click = ""
-middle-click = "lys-shell audio input-mute"
-scroll-up = ""
-scroll-down = ""
-thresholds = []
+```yaml
+modules:
+  microphone:
+    icon-active: ld-mic-symbolic
+    icon-muted: ld-mic-off-symbolic
+    border-show: false
+    border-color: red
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: red
+    label-show: true
+    label-color: red
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:audio
+    right-click: ""
+    middle-click: lys-shell audio input-mute
+    scroll-up: ""
+    scroll-down: ""
+    thresholds: []
 ```
 
 

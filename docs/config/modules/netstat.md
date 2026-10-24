@@ -11,10 +11,11 @@ Network traffic counters (up/down rates).
 
 Add it to your layout with `netstat`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["netstat"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [netstat]
 ```
 
 ## General
@@ -93,26 +94,27 @@ interface name like `"eth0"` or `"wlan0"`.
 
 ## Default configuration
 
-```toml
-[modules.netstat]
-poll-interval-ms = 2000
-interface = "auto"
-format = "{{ down_auto }} {{ up_auto }}"
-icon-name = "ld-activity-symbolic"
-border-show = false
-border-color = "red"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "red"
-label-show = true
-label-color = "red"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  netstat:
+    poll-interval-ms: 2000
+    interface: auto
+    format: '{{ down_auto }} {{ up_auto }}'
+    icon-name: ld-activity-symbolic
+    border-show: false
+    border-color: red
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: red
+    label-show: true
+    label-color: red
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

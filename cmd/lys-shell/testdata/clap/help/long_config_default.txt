@@ -1,7 +1,7 @@
-Output the default configuration as TOML
+Output the default configuration as YAML
 
 Usage: lys-shell config default [OPTIONS]
 
 Options:
-      --stdout  Print to stdout instead of writing config.toml.example
+      --stdout  Print to stdout instead of writing config.yaml.example
   -h, --help    Print help

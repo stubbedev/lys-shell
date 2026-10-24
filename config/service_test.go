@@ -26,8 +26,8 @@ func collectDiags() (DiagnosticSink, func() []Diagnostic) {
 
 func TestRuntimeLayerOverridesConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "config.toml", "[bar]\nlocation = \"bottom\"\n")
-	writeFile(t, dir, "runtime.toml", "[bar]\nlocation = \"left\"\n")
+	writeFile(t, dir, "config.yaml", "bar:\n  location: bottom\n")
+	writeFile(t, dir, "runtime.yaml", "bar:\n  location: left\n")
 	svc := Load(dir, DiscardDiagnostics)
 	if got := svc.Config().Bar.Location; got != LocationLeft {
 		t.Errorf("runtime > config: location = %q", got)
@@ -56,14 +56,14 @@ func TestSetSavesAndReadsBack(t *testing.T) {
 	if err := svc.Save(); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "runtime.toml"))
+	data, err := os.ReadFile(filepath.Join(dir, "runtime.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// f32 values widen like toml::Value::try_from; tables in field order.
-	want := "[bar]\npadding = 0.3499999940395355\n\n[modules.clock]\nformat = \"%H:%M\"\n"
+	// f32 values widen to f64; tables in field order.
+	want := "bar:\n  padding: 0.3499999940395355\nmodules:\n  clock:\n    format: '%H:%M'\n"
 	if string(data) != want {
-		t.Errorf("runtime.toml =\n%s\nwant\n%s", data, want)
+		t.Errorf("runtime.yaml =\n%s\nwant\n%s", data, want)
 	}
 	reloaded := Load(dir, DiscardDiagnostics)
 	if reloaded.Config().Clock.Format != "%H:%M" {
@@ -130,7 +130,7 @@ func TestResetByPathErrors(t *testing.T) {
 
 func TestRuntimeStopsAtTheFirstBadValue(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "runtime.toml", "[bar]\nlocation = \"left\"\nlayer = \"nope\"\nbg = \"red\"\n")
+	writeFile(t, dir, "runtime.yaml", "bar:\n  location: left\n  layer: nope\n  bg: red\n")
 	svc := Load(dir, DiscardDiagnostics)
 	cfg := svc.Config()
 	if cfg.Bar.Location != LocationLeft {
@@ -167,7 +167,7 @@ func TestSubscribersSeeChangesOnly(t *testing.T) {
 
 func TestReloadWarnsWhenRuntimeShadowsConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "config.toml", "[bar]\nlocation = \"bottom\"\n")
+	writeFile(t, dir, "config.yaml", "bar:\n  location: bottom\n")
 	sink, diags := collectDiags()
 	svc := Load(dir, sink)
 	if err := svc.SetByPath("bar.location", "left"); err != nil {
@@ -176,7 +176,7 @@ func TestReloadWarnsWhenRuntimeShadowsConfig(t *testing.T) {
 	if err := svc.Save(); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, dir, "config.toml", "[bar]\nlocation = \"right\"\n")
+	writeFile(t, dir, "config.yaml", "bar:\n  location: right\n")
 	if err := svc.reloadMain(); err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestReloadWarnsWhenRuntimeShadowsConfig(t *testing.T) {
 		t.Error("the runtime override must still win")
 	}
 	// A broken main file keeps everything.
-	writeFile(t, dir, "config.toml", "[bar\n")
+	writeFile(t, dir, "config.yaml", "bar: [unclosed\n")
 	if err := svc.reloadMain(); err == nil {
 		t.Error("broken config: want an error")
 	}
@@ -202,9 +202,37 @@ func TestReloadWarnsWhenRuntimeShadowsConfig(t *testing.T) {
 	}
 }
 
+// Overrides left in a runtime.toml from before the YAML switch are
+// reported instead of silently dropped, and the next save writes
+// runtime.yaml.
+func TestLegacyRuntimeTOMLIsReported(t *testing.T) {
+	dir := t.TempDir()
+	legacy := writeFile(t, dir, "runtime.toml", "[bar]\nlocation = \"left\"\n")
+	if _, err := readRuntime(filepath.Join(dir, "runtime.yaml")); err == nil ||
+		!strings.Contains(err.Error(), legacy+" is TOML, which lys-shell no longer reads: convert it to "+filepath.Join(dir, "runtime.yaml")) {
+		t.Errorf("legacy runtime.toml: %v", err)
+	}
+	svc := Load(dir, DiscardDiagnostics)
+	if svc.Config().Bar.Location != LocationTop {
+		t.Error("the TOML overrides applied")
+	}
+	if err := svc.SetByPath("bar.location", "right"); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, "runtime.yaml")); string(data) != "bar:\n  location: right\n" {
+		t.Errorf("runtime.yaml = %q", data)
+	}
+	if _, err := readRuntime(filepath.Join(dir, "runtime.yaml")); err != nil {
+		t.Errorf("with runtime.yaml present the TOML file is irrelevant: %v", err)
+	}
+}
+
 func TestResetAllRuntime(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "runtime.toml", "[bar]\nlocation = \"left\"\n")
+	writeFile(t, dir, "runtime.yaml", "bar:\n  location: left\n")
 	svc := Load(dir, DiscardDiagnostics)
 	if err := svc.ResetAllRuntime(); err != nil {
 		t.Fatal(err)
@@ -212,8 +240,8 @@ func TestResetAllRuntime(t *testing.T) {
 	if svc.Config().Bar.Location != LocationTop {
 		t.Error("overrides survived")
 	}
-	if _, err := os.Stat(filepath.Join(dir, "runtime.toml")); err == nil {
-		t.Error("runtime.toml survived")
+	if _, err := os.Stat(filepath.Join(dir, "runtime.yaml")); err == nil {
+		t.Error("runtime.yaml survived")
 	}
 	if err := svc.ResetAllRuntime(); err != nil {
 		t.Errorf("no file: %v", err)
@@ -222,7 +250,7 @@ func TestResetAllRuntime(t *testing.T) {
 
 func TestWatcherReloadsAfterTheDebounce(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "config.toml", "[bar]\nlocation = \"bottom\"\n")
+	writeFile(t, dir, "config.yaml", "bar:\n  location: bottom\n")
 	svc := Load(dir, DiscardDiagnostics)
 	if err := svc.startWatcher(); err != nil {
 		t.Fatal(err)
@@ -230,7 +258,7 @@ func TestWatcherReloadsAfterTheDebounce(t *testing.T) {
 	defer svc.Close()
 	changed := make(chan Location, 4)
 	Watch(svc, func(c *Config) Location { return c.Bar.Location }, func(l Location) { changed <- l })
-	writeFile(t, dir, "config.toml", "[bar]\nlocation = \"left\"\n")
+	writeFile(t, dir, "config.yaml", "bar:\n  location: left\n")
 	select {
 	case l := <-changed:
 		if l != LocationLeft {
@@ -239,14 +267,14 @@ func TestWatcherReloadsAfterTheDebounce(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("no reload after a config write")
 	}
-	writeFile(t, dir, "runtime.toml", "[bar]\nlocation = \"right\"\n")
+	writeFile(t, dir, "runtime.yaml", "bar:\n  location: right\n")
 	select {
 	case l := <-changed:
 		if l != LocationRight {
 			t.Errorf("runtime reload = %q", l)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("no reload after a runtime.toml write")
+		t.Fatal("no reload after a runtime.yaml write")
 	}
 }
 

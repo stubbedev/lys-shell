@@ -331,7 +331,7 @@ func parseLauncherArgs(args []string, stderr io.Writer) (launcherInvocation, err
 			fmt.Fprintf(stderr, "lys-shell launcher: -%s is ignored — lys-shell has no plugin ABI; use a script mode (-modes 'name:/path/to/script' or [launcher.scripts])\n", flag)
 		case "theme", "theme-str":
 			_, _ = value(flag)
-			fmt.Fprintf(stderr, "lys-shell launcher: -%s is ignored — lys-shell has no rasi themes; style the launcher with [styling] in config.toml\n", flag)
+			fmt.Fprintf(stderr, "lys-shell launcher: -%s is ignored — lys-shell has no rasi themes; style the launcher with the styling section of config.yaml\n", flag)
 
 		default:
 			switch {

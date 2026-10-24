@@ -259,9 +259,9 @@ func TestSystrayFollowsTheStore(t *testing.T) {
 }
 
 func TestLoadFileAppliesSystray(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.systray]\nicon-scale = 1.5\nitem-gap = \"6px\"\nblacklist = [\"*steam*\"]\n" +
-		"[[modules.systray.overrides]]\nname = \"*discord*\"\nicon = \"discord-symbolic\"\ncolor = \"red\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  systray:\n    icon-scale: 1.5\n    item-gap: 6px\n    blacklist: [\"*steam*\"]\n" +
+		"    overrides:\n      - name: \"*discord*\"\n        icon: discord-symbolic\n        color: red\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -277,8 +277,8 @@ func TestLoadFileAppliesSystray(t *testing.T) {
 		t.Errorf("overrides = %+v", s.Overrides)
 	}
 	for _, bad := range []string{
-		"[[modules.systray.overrides]]\nicon = \"x\"\n",
-		"[[modules.systray.overrides]]\nname = \"x\"\ncolor = \"bogus\"\n",
+		"modules:\n  systray:\n    overrides:\n      - icon: x\n",
+		"modules:\n  systray:\n    overrides:\n      - name: x\n        color: bogus\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

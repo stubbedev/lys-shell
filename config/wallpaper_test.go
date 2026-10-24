@@ -6,15 +6,14 @@ import (
 )
 
 func TestWallpaperSectionLoads(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", `[wallpaper]
-wallpaper = "/w/a.png"
-fit-mode = "center"
-cycling-mode = "shuffle"
-cycling-interval-mins = 30
-
-[[wallpaper.monitors]]
-name = "DP-1"
-wallpaper = "/w/dp.png"
+	path := writeFile(t, t.TempDir(), "config.yaml", `wallpaper:
+  wallpaper: /w/a.png
+  fit-mode: center
+  cycling-mode: shuffle
+  cycling-interval-mins: 30
+  monitors:
+    - name: DP-1
+      wallpaper: /w/dp.png
 `)
 	cfg, err := LoadFile(path)
 	if err != nil {
@@ -34,7 +33,7 @@ wallpaper = "/w/dp.png"
 }
 
 func TestWallpaperIntervalClampsToItsFloor(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", "[wallpaper]\ncycling-interval-mins = 0\n")
+	path := writeFile(t, t.TempDir(), "config.yaml", "wallpaper:\n  cycling-interval-mins: 0\n")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("a clamp is a warning, not an error: %v", err)
@@ -45,12 +44,11 @@ func TestWallpaperIntervalClampsToItsFloor(t *testing.T) {
 }
 
 func TestWallpaperBadValuesAreFieldDiagnostics(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", `[wallpaper]
-fit-mode = "tile"
-wallpaper = "/w/a.png"
-
-[[wallpaper.monitors]]
-wallpaper = "/w/nameless.png"
+	path := writeFile(t, t.TempDir(), "config.yaml", `wallpaper:
+  fit-mode: tile
+  wallpaper: /w/a.png
+  monitors:
+    - wallpaper: /w/nameless.png
 `)
 	cfg, err := LoadFile(path)
 	if err == nil || !strings.Contains(err.Error(), "wallpaper.fit-mode") || !strings.Contains(err.Error(), "missing field `name`") {

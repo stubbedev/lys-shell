@@ -37,8 +37,8 @@ func TestNotificationIconPriority(t *testing.T) {
 }
 
 func TestLoadFileAppliesNotification(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.notifications]\nicon-unread = \"ld-bell-ring-symbolic\"\n\n[[modules.notifications.thresholds]]\nabove = 5\nicon-color = \"status-warning\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  notifications:\n    icon-unread: ld-bell-ring-symbolic\n    thresholds:\n      - above: 5\n        icon-color: status-warning\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}

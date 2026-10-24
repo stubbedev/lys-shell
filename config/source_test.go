@@ -7,8 +7,8 @@ import (
 
 func TestSourceFollowsTheLayers(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "config.toml", "[bar]\nlocation = \"bottom\"\n[osd]\nduration = 1500\n")
-	writeFile(t, dir, "runtime.toml", "[bar]\nlocation = \"left\"\n")
+	writeFile(t, dir, "config.yaml", "bar:\n  location: bottom\nosd:\n  duration: 1500\n")
+	writeFile(t, dir, "runtime.yaml", "bar:\n  location: left\n")
 	svc := Load(dir, DiscardDiagnostics)
 	for path, want := range map[string]ValueSource{
 		"bar.location": SourceRuntime,

@@ -11,10 +11,11 @@ Current conditions with hourly and daily forecasts in a dropdown.
 
 Add it to your layout with `weather`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["weather"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [weather]
 ```
 
 ## General
@@ -79,29 +80,30 @@ right = ["weather"]
 
 ## Default configuration
 
-```toml
-[modules.weather]
-provider = "open-meteo"
-location = "San Francisco"
-units = "metric"
-format = "{{ temp }}{{ temp_unit }}"
-time-format = "12h"
-refresh-interval-seconds = 1800
-icon-name = "ld-sun-symbolic"
-border-show = false
-border-color = "border-accent"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "accent"
-label-show = true
-label-color = "accent"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:weather"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  weather:
+    provider: open-meteo
+    location: San Francisco
+    units: metric
+    format: '{{ temp }}{{ temp_unit }}'
+    time-format: 12h
+    refresh-interval-seconds: 1800
+    icon-name: ld-sun-symbolic
+    border-show: false
+    border-color: border-accent
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: accent
+    label-show: true
+    label-color: accent
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:weather
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

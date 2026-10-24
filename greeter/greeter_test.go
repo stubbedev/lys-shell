@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BurntSushi/toml"
-
 	"github.com/stubbedev/lys-shell/config"
 )
 
@@ -26,13 +24,13 @@ func TestParseOptions(t *testing.T) {
 	}
 
 	o, err = ParseOptions([]string{
-		"--config", "/tmp/c.toml", "--env", "XDG_SESSION_TYPE=wayland",
+		"--config", "/tmp/c.yaml", "--env", "XDG_SESSION_TYPE=wayland",
 		"--sessions", "/a", "--sessions", "/b", "--xsessions", "/x", "--state", "/run/g/last", "--", "sway",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if o.ConfigPath != "/tmp/c.toml" || !reflect.DeepEqual(o.Env, []string{"XDG_SESSION_TYPE=wayland"}) ||
+	if o.ConfigPath != "/tmp/c.yaml" || !reflect.DeepEqual(o.Env, []string{"XDG_SESSION_TYPE=wayland"}) ||
 		!reflect.DeepEqual(o.SessionDirs, []string{"/a", "/b"}) || !reflect.DeepEqual(o.XSessionDirs, []string{"/x"}) ||
 		o.StatePath != "/run/g/last" || !reflect.DeepEqual(o.Command, []string{"sway"}) {
 		t.Errorf("full parse: %+v", o)
@@ -284,8 +282,12 @@ func TestRecordCursor(t *testing.T) {
 
 func readRuntime(t *testing.T, path string) map[string]any {
 	t.Helper()
-	var out map[string]any
-	if _, err := toml.DecodeFile(path, &out); err != nil {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := config.ParseYAML(string(data))
+	if err != nil {
 		t.Fatal(err)
 	}
 	return out
@@ -295,10 +297,10 @@ func directRead(read func() ([]byte, error)) ([]byte, error) { return read() }
 
 func TestApplyConfigAllowlist(t *testing.T) {
 	dir := t.TempDir()
-	staged := filepath.Join(dir, "staged.toml")
-	_ = os.WriteFile(staged, []byte("[greeter]\nbackground-color = \"#123456\"\nevil = \"x\"\n[general]\nfoo = 1\n"), 0o600)
-	cfg := filepath.Join(dir, "config.toml")
-	_ = os.WriteFile(filepath.Join(dir, "runtime.toml"), []byte("[styling]\ntheme = \"kept\"\n"), 0o600)
+	staged := filepath.Join(dir, "staged.yaml")
+	_ = os.WriteFile(staged, []byte("greeter:\n  background-color: \"#123456\"\n  evil: x\ngeneral:\n  foo: 1\n"), 0o600)
+	cfg := filepath.Join(dir, "config.yaml")
+	_ = os.WriteFile(filepath.Join(dir, "runtime.yaml"), []byte("styling:\n  theme: kept\n"), 0o600)
 	dest, err := applyConfig(staged, cfg, directRead)
 	if err != nil {
 		t.Fatal(err)
@@ -306,23 +308,27 @@ func TestApplyConfigAllowlist(t *testing.T) {
 	out := readRuntime(t, dest)
 	g := out["greeter"].(map[string]any)
 	if g["background-color"] != "#123456" || g["evil"] != nil || out["general"] != nil {
-		t.Errorf("runtime.toml = %v", out)
+		t.Errorf("runtime.yaml = %v", out)
 	}
 	if out["styling"].(map[string]any)["theme"] != "kept" {
-		t.Error("other runtime.toml tables must survive")
+		t.Error("other runtime.yaml tables must survive")
 	}
 	if _, err := os.Stat(cfg); err == nil {
-		t.Error("apply-config touched config.toml")
+		t.Error("apply-config touched config.yaml")
 	}
 
-	_ = os.WriteFile(staged, []byte("[general]\nfoo = 1\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("general:\n  foo: 1\n"), 0o600)
 	if _, err := applyConfig(staged, cfg, directRead); err == nil {
 		t.Error("a file without greeter keys applied")
 	}
-	_ = os.WriteFile(staged, []byte("show-clock = false\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("show-clock: false\n"), 0o600)
 	dest, err = applyConfig(staged, cfg, directRead)
 	if err != nil || readRuntime(t, dest)["greeter"].(map[string]any)["show-clock"] != false {
 		t.Errorf("bare top-level keys: %v", err)
+	}
+	_ = os.WriteFile(staged, []byte("[greeter]\nshow-clock = false\n"), 0o600)
+	if _, err := applyConfig(staged, cfg, directRead); err == nil || !strings.Contains(err.Error(), "invalid YAML in "+staged) {
+		t.Errorf("a TOML staged file: %v", err)
 	}
 }
 
@@ -333,9 +339,9 @@ func TestApplyConfigCopiesImage(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "wall.png")
 	_ = os.WriteFile(src, []byte("PNGDATA"), 0o600)
-	staged := filepath.Join(dir, "staged.toml")
-	_ = os.WriteFile(staged, []byte("[greeter]\nbackground-mode = \"image\"\nbackground-image = \""+src+"\"\n"), 0o600)
-	cfg := filepath.Join(dir, "config.toml")
+	staged := filepath.Join(dir, "staged.yaml")
+	_ = os.WriteFile(staged, []byte("greeter:\n  background-mode: image\n  background-image: \""+src+"\"\n"), 0o600)
+	cfg := filepath.Join(dir, "config.yaml")
 	reads := 0
 	dest, err := applyConfig(staged, cfg, func(read func() ([]byte, error)) ([]byte, error) {
 		reads++
@@ -355,7 +361,7 @@ func TestApplyConfigCopiesImage(t *testing.T) {
 		t.Errorf("copy mode = %v, want world-readable", fi.Mode().Perm())
 	}
 
-	_ = os.WriteFile(staged, []byte("[greeter]\nbackground-mode = \"color\"\nbackground-image = \"/home/nobody/x.png\"\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("greeter:\n  background-mode: color\n  background-image: /home/nobody/x.png\n"), 0o600)
 	reads = 0
 	dest, err = applyConfig(staged, cfg, func(read func() ([]byte, error)) ([]byte, error) { reads++; return read() })
 	if err != nil || reads != 0 {
@@ -365,7 +371,7 @@ func TestApplyConfigCopiesImage(t *testing.T) {
 		t.Errorf("color mode rewrote the path: %v", got)
 	}
 
-	_ = os.WriteFile(staged, []byte("[greeter]\nbackground-mode = \"image\"\nbackground-image = \"/root/secret\"\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("greeter:\n  background-mode: image\n  background-image: /root/secret\n"), 0o600)
 	if _, err := applyConfig(staged, cfg, func(func() ([]byte, error)) ([]byte, error) {
 		return nil, os.ErrPermission
 	}); err == nil {
@@ -383,11 +389,11 @@ func TestRunApplyConfigUsage(t *testing.T) {
 		t.Errorf("two staged files: %d %q", code, errOut.String())
 	}
 	dir := t.TempDir()
-	staged := filepath.Join(dir, "s.toml")
-	_ = os.WriteFile(staged, []byte("show-clock = true\n"), 0o600)
+	staged := filepath.Join(dir, "s.yaml")
+	_ = os.WriteFile(staged, []byte("show-clock: true\n"), 0o600)
 	out.Reset()
-	if code := RunApplyConfig([]string{"--config", filepath.Join(dir, "config.toml"), staged}, &out, &errOut); code != 0 ||
-		out.String() != "wrote "+filepath.Join(dir, "runtime.toml")+"\n" {
+	if code := RunApplyConfig([]string{"--config", filepath.Join(dir, "config.yaml"), staged}, &out, &errOut); code != 0 ||
+		out.String() != "wrote "+filepath.Join(dir, "runtime.yaml")+"\n" {
 		t.Errorf("apply: %d %q", code, out.String())
 	}
 }

@@ -7,7 +7,7 @@ self:
 }:
 let
   cfg = config.programs.lys-shell;
-  tomlFormat = pkgs.formats.toml { };
+  yamlFormat = pkgs.formats.yaml { };
 
   # Directory the greeter remembers the last-selected session in. Must be
   # writable by the greetd user (`greeter`); the tmpfiles rule below creates it.
@@ -64,7 +64,7 @@ let
   # lys-shell greeter. The greeter discovers Wayland sessions from `session.dirs`,
   # lets the user pick one, and remembers the choice under `greeterStateDir`.
   # cage's `-s` allows VT switching. The greeter reads its theme from
-  # /etc/lys-shell/config.toml (written below from `greeter.settings`).
+  # /etc/lys-shell/config.yaml (written below from `greeter.settings`).
   #
   # Layering, outermost first: [graphicsWrapper] env[software vars] cage → greeter.
   # The graphicsWrapper (e.g. nixGL) must wrap the whole thing so it injects the
@@ -97,7 +97,7 @@ let
         + " ";
     in
     "${wrapperPrefix}${envPrefix}${cageExe} -s -- "
-    + "${greeterExe} --config /etc/lys-shell/config.toml "
+    + "${greeterExe} --config /etc/lys-shell/config.yaml "
     + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${xsessionDirArgs} ${envArgs} ${fallback}";
 in
 {
@@ -273,7 +273,7 @@ in
       };
 
       settings = lib.mkOption {
-        type = tomlFormat.type;
+        type = yamlFormat.type;
         default = { };
         example = lib.literalExpression ''
           {
@@ -283,7 +283,7 @@ in
           }
         '';
         description = ''
-          Theme/background/clock config written to {file}`/etc/lys-shell/config.toml`
+          Theme/background/clock config written to {file}`/etc/lys-shell/config.yaml`
           and read by the greeter. Uses the full lys-shell config schema; the
           greeter honours `styling`, `greeter.*` (background, clock, cursor,
           user list, power buttons), and `wallpaper`. Leave empty to use the
@@ -389,14 +389,14 @@ in
 
       # The greeter runs as the greetd user with no $HOME, so its theme config
       # lives system-wide. environment.etc files are world-readable (0444).
-      environment.etc."lys-shell/config.toml" = lib.mkIf (cfg.greeter.settings != { }) {
-        source = tomlFormat.generate "lys-greeter-config.toml" cfg.greeter.settings;
+      environment.etc."lys-shell/config.yaml" = lib.mkIf (cfg.greeter.settings != { }) {
+        source = yamlFormat.generate "lys-greeter-config.yaml" cfg.greeter.settings;
       };
 
       # Let any local user push their greeter (login-screen) choices from
       # lys-settings to the system config via `pkexec lys-greeter
-      # apply-config` (writes only greeter keys to /etc/lys-shell/runtime.toml,
-      # which the greeter overlays on config.toml). Admin auth is required.
+      # apply-config` (writes only greeter keys to /etc/lys-shell/runtime.yaml,
+      # which the greeter overlays on config.yaml). Admin auth is required.
       security.polkit.enable = true;
       environment.etc."polkit-1/actions/dev.stubbe.lys.greeter.policy".source =
         "${cfg.greeter.package}/share/polkit-1/actions/dev.stubbe.lys.greeter.policy";

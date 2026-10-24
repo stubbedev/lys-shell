@@ -20,9 +20,9 @@ Enter/exit and change animations for transient surfaces.
 | `exit` | [`AnimationType`](/config/types#animation-type) or null | `null` | Global exit transition. Unset → `transition`. |
 | `enter-duration` | u32 or null | `null` | Global enter duration in ms. Unset → `duration`. |
 | `exit-duration` | u32 or null | `null` | Global exit duration in ms. Unset → `duration`. |
-| `interaction-duration` | u32 | `150` | Duration in ms for in-place dropdown transitions: hover highlights and the page/stack crossfades inside dropdowns. `enabled = false` removes them entirely. |
-| `ui-duration` | u32 | `250` | Base duration in ms for general UI micro-transitions (hover, focus, and color fades) driven by the CSS `--duration-*` token family. Fast, normal, and slow speeds are derived from this. `enabled = false` zeroes them for an instant UI. |
-| `indicators` | bool | `true` | Run looping status indicators: spinners, network/bluetooth scan animations, the recording pulse, and the clock blink. Disable (or set `enabled = false`) for a fully static UI. |
+| `interaction-duration` | u32 | `150` | Duration in ms for in-place dropdown transitions: hover highlights and the page/stack crossfades inside dropdowns. `enabled: false` removes them entirely. |
+| `ui-duration` | u32 | `250` | Base duration in ms for general UI micro-transitions (hover, focus, and color fades) driven by the CSS `--duration-*` token family. Fast, normal, and slow speeds are derived from this. `enabled: false` zeroes them for an instant UI. |
+| `indicators` | bool | `true` | Run looping status indicators: spinners, network/bluetooth scan animations, the recording pulse, and the clock blink. Disable (or set `enabled: false`) for a fully static UI. |
 | `notifications` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for notification popup cards. |
 | `osd` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the OSD (volume/brightness/toggle/toast). |
 | `dropdown` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for bar widget dropdown foldouts. |
@@ -37,14 +37,14 @@ Enter/exit and change animations for transient surfaces.
 
 ## Default configuration
 
-```toml
-[animations]
-enabled = true
-duration = 200
-transition = "fade"
-interaction-duration = 150
-ui-duration = 250
-indicators = true
+```yaml
+animations:
+  enabled: true
+  duration: 200
+  transition: fade
+  interaction-duration: 150
+  ui-duration: 250
+  indicators: true
 ```
 
 

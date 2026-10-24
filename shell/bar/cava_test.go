@@ -226,10 +226,10 @@ func TestNewCavaRejectsAnUnsupportedInput(t *testing.T) {
 	}
 }
 
-// writeCavaConfig loads one config.toml snippet.
+// writeCavaConfig loads one config.yaml snippet.
 func writeCavaConfig(t *testing.T, content string) *config.Config {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "config.toml")
+	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -242,16 +242,17 @@ func writeCavaConfig(t *testing.T, content string) *config.Config {
 
 func TestLoadFileAppliesCavaModule(t *testing.T) {
 	c := writeCavaConfig(t, `
-[modules.cava]
-bars = 12
-bar-width = 4
-color = "#a6e3a1"
-direction = "mirror"
-framerate = 30
-noise-reduction = 0.5
-monstercat = 1.5
-internal-padding = "3px"
-source = "alsa_output.monitor"
+modules:
+  cava:
+    bars: 12
+    bar-width: 4
+    color: "#a6e3a1"
+    direction: mirror
+    framerate: 30
+    noise-reduction: 0.5
+    monstercat: 1.5
+    internal-padding: 3px
+    source: alsa_output.monitor
 `)
 	cava := c.Cava
 	if cava.Bars != 12 || cava.BarWidth != 4 {
@@ -283,11 +284,11 @@ func TestLoadFileCavaDefaults(t *testing.T) {
 
 func TestLoadFileRejectsBadCava(t *testing.T) {
 	for _, content := range []string{
-		"[modules.cava]\nstyle = \"spikes\"\n",
-		"[modules.cava]\ndirection = \"sideways\"\n",
-		"[modules.cava]\ncolor = \"not-a-token\"\n",
+		"modules:\n  cava:\n    style: spikes\n",
+		"modules:\n  cava:\n    direction: sideways\n",
+		"modules:\n  cava:\n    color: not-a-token\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

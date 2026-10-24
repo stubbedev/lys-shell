@@ -622,10 +622,10 @@ func systrayPage(*config.Config) pageSpec {
 	}}
 }
 
-// customPage is pages/modules/custom: the [[modules.custom]] list as
-// a TOML document.
+// customPage is pages/modules/custom: the modules.custom list as
+// a YAML document.
 func customPage(*config.Config) pageSpec {
 	return pageSpec{id: "custom", navKey: "settings-nav-custom", icon: "ld-code-symbolic", header: "settings-page-custom", sections: []sectionSpec{
-		{title: "settings-section-general", rows: []rowSpec{field("modules.custom", withKey("settings-custom-modules-editor"), tomlRow("custom", 40))}},
+		{title: "settings-section-general", rows: []rowSpec{field("modules.custom", withKey("settings-custom-modules-editor"), yamlRow("custom", 40))}},
 	}}
 }

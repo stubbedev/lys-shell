@@ -99,8 +99,8 @@ func TestWeatherFormatLabel(t *testing.T) {
 }
 
 func TestLoadFileAppliesWeatherAndWorldClock(t *testing.T) {
-	path := t.TempDir() + "/config.toml"
-	good := "[modules.weather]\nlocation = \"Oslo\"\nunits = \"imperial\"\nrefresh-interval-seconds = 60\n\n[modules.world-clock]\nformat = \"{{ tz('Europe/Oslo', '%H:%M') }}\"\n"
+	path := t.TempDir() + "/config.yaml"
+	good := "modules:\n  weather:\n    location: Oslo\n    units: imperial\n    refresh-interval-seconds: 60\n  world-clock:\n    format: \"{{ tz('Europe/Oslo', '%H:%M') }}\"\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -116,8 +116,8 @@ func TestLoadFileAppliesWeatherAndWorldClock(t *testing.T) {
 	}
 
 	for _, bad := range []string{
-		"[modules.weather]\nunits = \"kelvin\"\n",
-		"[modules.weather]\nrefresh-interval-seconds = -1\n",
+		"modules:\n  weather:\n    units: kelvin\n",
+		"modules:\n  weather:\n    refresh-interval-seconds: -1\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

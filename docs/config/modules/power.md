@@ -11,10 +11,11 @@ Shutdown, reboot, and logout menu.
 
 Add it to your layout with `power`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["power"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [power]
 ```
 
 ## General
@@ -54,28 +55,29 @@ right = ["power"]
 
 ## Default configuration
 
-```toml
-[modules.power]
-icon-name = "ld-power-symbolic"
-border-show = false
-border-color = "red"
-icon-color = "auto"
-icon-bg-color = "red"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-left-click = ":menu"
-lock-command = "loginctl lock-session"
-logout-command = "loginctl terminate-session $XDG_SESSION_ID"
-suspend-command = "systemctl suspend"
-reboot-command = "systemctl reboot"
-shutdown-command = "systemctl poweroff"
-show-lock = true
-show-logout = true
-show-suspend = true
-show-reboot = true
-show-shutdown = true
+```yaml
+modules:
+  power:
+    icon-name: ld-power-symbolic
+    border-show: false
+    border-color: red
+    icon-color: auto
+    icon-bg-color: red
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    left-click: :menu
+    lock-command: loginctl lock-session
+    logout-command: loginctl terminate-session $XDG_SESSION_ID
+    suspend-command: systemctl suspend
+    reboot-command: systemctl reboot
+    shutdown-command: systemctl poweroff
+    show-lock: true
+    show-logout: true
+    show-suspend: true
+    show-reboot: true
+    show-shutdown: true
 ```
 
 

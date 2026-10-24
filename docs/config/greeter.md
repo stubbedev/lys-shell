@@ -10,7 +10,7 @@ outline: [2, 3]
 Greeter (display manager): the pre-login screen `lys-greeter` renders as
 a greetd greeter.
 
-The greeter reads the system config (`/etc/lys-shell/config.toml`), so these
+The greeter reads the system config (`/etc/lys-shell/config.yaml`), so these
 settings take effect there — copy or symlink your user config if you want
 the login screen to follow it.
 
@@ -19,8 +19,8 @@ the login screen to follow it.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `background-mode` | [`LockBackground`](/config/types#lock-background) | `"color"` | How the background is drawn: solid color, an image, or the wallpaper. |
-| `background-image` | string | `""` | Background image path (used when `background-mode = "image"`). |
-| `background-color` | [`HexColor`](/config/types#hex-color) | `"#000000"` | Background fill color (used when `background-mode = "color"`). |
+| `background-image` | string | `""` | Background image path (used when `background-mode: image`). |
+| `background-color` | [`HexColor`](/config/types#hex-color) | `"#000000"` | Background fill color (used when `background-mode: color`). |
 | `show-clock` | bool | `true` | Show a clock above the login form. |
 | `clock-format` | string | `"%H:%M"` | `strftime` format for the greeter time. |
 | `date-format` | string | `"%A, %B %-d"` | `strftime` format for the greeter date. |
@@ -31,18 +31,18 @@ the login screen to follow it.
 
 ## Default configuration
 
-```toml
-[greeter]
-background-mode = "color"
-background-image = ""
-background-color = "#000000"
-show-clock = true
-clock-format = "%H:%M"
-date-format = "%A, %B %-d"
-show-user-list = true
-show-power-buttons = true
-cursor-theme = ""
-cursor-size = 24
+```yaml
+greeter:
+  background-mode: color
+  background-image: ""
+  background-color: '#000000'
+  show-clock: true
+  clock-format: '%H:%M'
+  date-format: '%A, %B %-d'
+  show-user-list: true
+  show-power-buttons: true
+  cursor-theme: ""
+  cursor-size: 24
 ```
 
 

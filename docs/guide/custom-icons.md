@@ -1,6 +1,6 @@
 # Custom icons
 
-Config fields like `icon-name = "tb-home-symbolic"` resolve against the lys-shell icon theme installed at `~/.local/share/lys-shell/icons/`. The `lys-shell icons` subcommand populates that directory from CDN sources or local SVG files.
+Config fields like `icon-name: tb-home-symbolic` resolve against the lys-shell icon theme installed at `~/.local/share/lys-shell/icons/`. The `lys-shell icons` subcommand populates that directory from CDN sources or local SVG files.
 
 ## List available sources
 
@@ -81,12 +81,12 @@ lys-shell icons remove tb-home-symbolic si-firefox-symbolic
 
 Any module field that takes an icon name accepts installed icons directly:
 
-```toml
-[modules.clock]
-icon-name = "ld-clock-symbolic"
-
-[modules.network]
-icon-name = "tb-wifi-symbolic"
+```yaml
+modules:
+  clock:
+    icon-name: ld-clock-symbolic
+  network:
+    icon-name: tb-wifi-symbolic
 ```
 
 The value is the full icon name, prefix included. If the icon is missing from the theme, the module falls back to its default.

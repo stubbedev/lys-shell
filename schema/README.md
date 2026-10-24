@@ -13,29 +13,21 @@ just schema
 
 ## Editor hints
 
-The same schema works for both YAML and TOML configs — it gives autocomplete,
-inline docs, and validation in editors that speak the Language Server Protocol.
+The schema gives autocomplete, inline docs, and validation for `config.yaml` in
+editors running the YAML language server (the Red Hat "YAML" extension in VS
+Code, `yaml-language-server` in Neovim, Helix, or Zed).
 
-### YAML (`config.yaml`)
+lys-shell writes the schema for the installed version to `schema.json` in the
+config directory (see `lys-shell config schema`), and the stub `config.yaml` it
+creates starts with a modeline pointing at it. Add the same line to the top of
+your own file:
 
-Add a `yaml-language-server` modeline at the top of the file:
+```yaml
+# yaml-language-server: $schema=./schema.json
+```
+
+Or point at the published copy:
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/stubbedev/lys-shell/master/schema/lys-shell-config.schema.json
-```
-
-Or point at a local checkout:
-
-```yaml
-# yaml-language-server: $schema=./schema/lys-shell-config.schema.json
-```
-
-### TOML (`config.toml`)
-
-lys-shell already writes a `tombi.toml` into the config directory that associates
-`config.toml` with the generated `schema.json` (see `lys-shell config schema`).
-Editors using Taplo can instead add a directive at the top of the file:
-
-```toml
-#:schema https://raw.githubusercontent.com/stubbedev/lys-shell/master/schema/lys-shell-config.schema.json
 ```

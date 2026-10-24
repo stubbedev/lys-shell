@@ -13,10 +13,9 @@ import (
 )
 
 // Service is the live configuration: the defaults, the config file
-// layer, and the runtime override layer (runtime.toml, written by
+// layer, and the runtime override layer (runtime.yaml, written by
 // `lys-shell config set` and the settings GUI), resolved into immutable
-// *Config snapshots that subscribers receive on every effective change
-// (crates/wayle-config/src/infrastructure/{service,persistence}.rs).
+// *Config snapshots that subscribers receive on every effective change.
 // Snapshots are never mutated; a reload publishes a new one.
 type Service struct {
 	dir  string
@@ -40,10 +39,10 @@ type Service struct {
 }
 
 // Open loads the user's configuration from the platform directory and
-// starts hot reload: config.toml (or .yaml) with its imports on the
-// config layer, runtime.toml on the runtime layer. A file-level failure
-// logs and keeps the defaults for that layer, as the Rust service does;
-// bad values are reported as diagnostics on stderr.
+// starts hot reload: config.yaml with its imports on the config layer,
+// runtime.yaml on the runtime layer. A file-level failure logs and
+// keeps the defaults for that layer; bad values are reported as
+// diagnostics on stderr.
 func Open() (*Service, error) {
 	dir, err := Dir()
 	if err != nil {
@@ -57,7 +56,7 @@ func Open() (*Service, error) {
 }
 
 // Load builds a service over dir without watching it (the CLI's
-// one-shot ConfigService::load).
+// one-shot load).
 func Load(dir string, sink DiagnosticSink) *Service {
 	s := &Service{
 		dir:         dir,
@@ -70,17 +69,17 @@ func Load(dir string, sink DiagnosticSink) *Service {
 	LoadEnvFiles(dir)
 	tree, err := loadTree(s.MainPath())
 	if err != nil {
-		log.Printf("config: using defaults, config.toml failed:\n%v", err)
+		log.Printf("config: using defaults, %s failed:\n%v", filepath.Base(s.MainPath()), err)
 		tree = nil
 	}
 	s.tree = tree
 	runtimeTree, err := readRuntime(s.RuntimePath())
 	if err != nil {
-		log.Printf("config: runtime.toml failed:\n%v", err)
+		log.Printf("config: runtime.yaml failed:\n%v", err)
 	}
 	cfg, staged, rerr := build(tree, runtimeTree, nil, sink)
 	if rerr != nil {
-		log.Printf("config: invalid runtime.toml value:\n%v", rerr)
+		log.Printf("config: invalid runtime.yaml value:\n%v", rerr)
 	}
 	s.cfg, s.staged, s.configSet = cfg, staged, configLeaves(tree)
 	return s
@@ -89,8 +88,10 @@ func Load(dir string, sink DiagnosticSink) *Service {
 // MainPath is the discovered main config file.
 func (s *Service) MainPath() string { return DiscoverMain(s.dir) }
 
-// RuntimePath is runtime.toml in the config directory.
-func (s *Service) RuntimePath() string { return filepath.Join(s.dir, "runtime.toml") }
+// RuntimePath is runtime.yaml in the config directory.
+func (s *Service) RuntimePath() string {
+	return RuntimeOverlayPath(filepath.Join(s.dir, "config.yaml"))
+}
 
 // Dir is the config directory the service reads.
 func (s *Service) Dir() string { return s.dir }
@@ -170,29 +171,35 @@ func build(configTree, runtimeTree any, warn *table, sink DiagnosticSink) (*Conf
 	return cfg, ra.staged, err
 }
 
-// readRuntime parses runtime.toml (always TOML).
+// readRuntime parses runtime.yaml. A missing one beside a runtime.toml
+// from before the YAML switch is an error naming the file to convert,
+// so the old overrides are not dropped without a word.
 func readRuntime(path string) (any, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // runtime.toml in the config dir
+	data, err := os.ReadFile(path) //nolint:gosec // runtime.yaml in the config dir
+	if errors.Is(err, fs.ErrNotExist) {
+		if legacy := legacyTOMLError(filepath.Join(filepath.Dir(path), "runtime.toml"), path); legacy != nil {
+			return nil, legacy
+		}
+	}
 	if err != nil {
 		return nil, &LoadError{msg: "cannot read file", err: err}
 	}
-	tree, err := parseTOML(data)
+	tree, err := parseYAML(data)
 	if err != nil {
-		return nil, &LoadError{msg: err.Error() + "\n  --> " + path, err: err}
+		return nil, &LoadError{msg: fmt.Sprintf("%s: %v", path, err), err: err}
 	}
 	return tree, nil
 }
 
-// Value is the effective config as toml::Value::try_from serializes it,
-// in the parsed shape: map[string]any tables (canonical keys), []any
-// arrays, string, bool, int64 and float64 leaves.
+// Value is the effective config as it serializes, in the parsed shape:
+// map[string]any tables (canonical keys), []any arrays, string, bool,
+// int64 and float64 leaves.
 func (s *Service) Value() any {
 	return toPlain(encode(s.Config()))
 }
 
 // GetByPath returns the effective value at a dot path, as the config
-// serializes (canonical keys; f32 values widened to f64 the way
-// toml::Value::try_from widens them).
+// serializes (canonical keys; f32 values widened to f64).
 func (s *Service) GetByPath(path string) (any, error) {
 	v := widenFloats(encode(s.Config()))
 	for seg := range strings.SplitSeq(path, ".") {
@@ -242,7 +249,7 @@ func (s *Service) ResetByPath(path string) (cleared bool, err error) {
 }
 
 // ResetAllRuntime drops every runtime override and removes
-// runtime.toml; a missing file is not an error.
+// runtime.yaml; a missing file is not an error.
 func (s *Service) ResetAllRuntime() error {
 	s.mu.Lock()
 	tree := s.tree
@@ -256,19 +263,21 @@ func (s *Service) ResetAllRuntime() error {
 	return err
 }
 
-// RuntimeTOML renders the runtime overrides as runtime.toml content.
-func (s *Service) RuntimeTOML() string {
+// RuntimeYAML renders the runtime overrides as runtime.yaml content.
+func (s *Service) RuntimeYAML() (string, error) {
 	s.mu.Lock()
 	staged := s.staged
 	s.mu.Unlock()
-	out, _ := tomlPretty(widenFloats(staged))
-	return out
+	return yamlDocument(widenFloats(staged))
 }
 
-// Save persists the runtime overrides to runtime.toml atomically:
+// Save persists the runtime overrides to runtime.yaml atomically:
 // write runtime.tmp, fsync, rename over, fsync the directory.
 func (s *Service) Save() error {
-	content := s.RuntimeTOML()
+	content, err := s.RuntimeYAML()
+	if err != nil {
+		return &LoadError{msg: "cannot render the runtime overrides", err: err}
+	}
 	path := s.RuntimePath()
 	tmp := strings.TrimSuffix(path, filepath.Ext(path)) + ".tmp"
 	persistErr := func(p string, err error) error {
@@ -303,10 +312,9 @@ func (s *Service) Save() error {
 	return nil
 }
 
-// reloadMain re-reads the main config and runtime.toml after a file
-// change (watcher.rs reload_main_config). A broken main file leaves
-// everything as it was; an unreadable runtime.toml drops the runtime
-// layer.
+// reloadMain re-reads the main config and runtime.yaml after a file
+// change. A broken main file leaves everything as it was; an
+// unreadable runtime.yaml drops the runtime layer.
 func (s *Service) reloadMain() error {
 	tree, err := loadTree(s.MainPath())
 	if err != nil {
@@ -321,8 +329,8 @@ func (s *Service) reloadMain() error {
 	return nil
 }
 
-// reloadRuntime re-reads only runtime.toml; an unreadable file keeps
-// the current overrides (reload_runtime_only).
+// reloadRuntime re-reads only runtime.yaml; an unreadable file keeps
+// the current overrides.
 func (s *Service) reloadRuntime() {
 	runtimeTree, err := readRuntime(s.RuntimePath())
 	if err != nil {

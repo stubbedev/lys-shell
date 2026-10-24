@@ -68,11 +68,13 @@ type BrightnessConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.brightness.thresholds]]
-	// below = 20
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
+	// ```yaml
+	// modules:
+	//   brightness:
+	//     thresholds:
+	//       - below: 20
+	//         icon-color: status-warning
+	//         label-color: status-warning
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

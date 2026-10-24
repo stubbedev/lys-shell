@@ -32,17 +32,17 @@ to allow fullscreen tearing.
 
 ## Default configuration
 
-```toml
-[osd]
-enabled = true
-position = "bottom"
-text-align = "center"
-duration = 2500
-monitor = "primary"
-margin = 1.0
-border = true
-layer = "overlay"
-presets = []
+```yaml
+osd:
+  enabled: true
+  position: bottom
+  text-align: center
+  duration: 2500
+  monitor: primary
+  margin: 1.0
+  border: true
+  layer: overlay
+  presets: []
 ```
 
 

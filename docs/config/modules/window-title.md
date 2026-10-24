@@ -11,10 +11,11 @@ Active window title with optional app-icon prefix.
 
 Add it to your layout with `window-title`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["window-title"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [window-title]
 ```
 
 ## General
@@ -51,11 +52,13 @@ set. User mappings are checked before built-in mappings.
 
 #### Example
 
-```toml
-[modules.window-title.icon-mappings]
-"*firefox*" = "ld-globe-symbolic"
-"org.mozilla.*" = "ld-globe-symbolic"
-"title:*YouTube*" = "ld-youtube-symbolic"
+```yaml
+modules:
+  window-title:
+    icon-mappings:
+      "*firefox*": ld-globe-symbolic
+      "org.mozilla.*": ld-globe-symbolic
+      "title:*YouTube*": ld-youtube-symbolic
 ```
 
 :::
@@ -82,26 +85,26 @@ set. User mappings are checked before built-in mappings.
 
 ## Default configuration
 
-```toml
-[modules.window-title]
-format = "{{ title }}"
-icon-name = "ld-app-window-symbolic"
-border-show = false
-border-color = "blue"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "blue"
-label-show = true
-label-color = "blue"
-label-max-length = 50
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-
-[modules.window-title.icon-mappings]
+```yaml
+modules:
+  window-title:
+    format: '{{ title }}'
+    icon-name: ld-app-window-symbolic
+    icon-mappings: {}
+    border-show: false
+    border-color: blue
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: blue
+    label-show: true
+    label-color: blue
+    label-max-length: 50
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

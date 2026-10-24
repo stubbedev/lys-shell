@@ -188,8 +188,8 @@ func TestNewNetworkRequiresSource(t *testing.T) {
 }
 
 func TestLoadFileAppliesNetwork(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.network]\nlabel-show = false\nwifi-offline-icon = \"wifi-x\"\nwired-connected-icon = \"lan\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  network:\n    label-show: false\n    wifi-offline-icon: wifi-x\n    wired-connected-icon: lan\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestLoadFileAppliesNetwork(t *testing.T) {
 
 func TestLoadFileRejectsBadNetwork(t *testing.T) {
 	for _, content := range []string{} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

@@ -77,9 +77,9 @@ func TestDashboardModuleIsTheIcon(t *testing.T) {
 }
 
 func TestLoadFileAppliesDashboard(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	good := "[modules.dashboard]\nicon-override = \"x\"\ndropdown-lock-command = \"swaylock\"\nusage-error = 90\n" +
-		"right-click = \"dropdown:calendar\"\n[modules.dashboard.user-session]\nactions = [\"reboot\", \"lock\"]\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	good := "modules:\n  dashboard:\n    icon-override: x\n    dropdown-lock-command: swaylock\n    usage-error: 90\n" +
+		"    right-click: \"dropdown:calendar\"\n    user-session:\n      actions: [reboot, lock]\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -108,9 +108,9 @@ func TestLoadFileAppliesDashboard(t *testing.T) {
 	}
 
 	for _, bad := range []string{
-		"[modules.dashboard.user-session]\nactions = [\"logout\"]\n",
-		"[modules.dashboard]\nusage-warning = \"high\"\n",
-		"[modules.dashboard]\nleft-click = 3\n",
+		"modules:\n  dashboard:\n    user-session:\n      actions: [logout]\n",
+		"modules:\n  dashboard:\n    usage-warning: high\n",
+		"modules:\n  dashboard:\n    left-click: 3\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

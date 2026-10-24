@@ -11,10 +11,11 @@ treeman worktree health across all registered repos, in a dropdown.
 
 Add it to your layout with `treeman`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["treeman"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [treeman]
 ```
 
 ## General
@@ -71,28 +72,29 @@ right = ["treeman"]
 
 ## Default configuration
 
-```toml
-[modules.treeman]
-format = "{{ total }}"
-icon-name = "ld-layers-symbolic"
-icon-preparing = "tb-loader-2-symbolic"
-icon-tearing-down = "ld-trash-2-symbolic"
-icon-failed = "tb-alert-triangle-symbolic"
-hide-if-empty = false
-border-show = false
-border-color = "border-accent"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "accent"
-label-show = true
-label-color = "accent"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "dropdown:treeman"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  treeman:
+    format: '{{ total }}'
+    icon-name: ld-layers-symbolic
+    icon-preparing: tb-loader-2-symbolic
+    icon-tearing-down: ld-trash-2-symbolic
+    icon-failed: tb-alert-triangle-symbolic
+    hide-if-empty: false
+    border-show: false
+    border-color: border-accent
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: accent
+    label-show: true
+    label-color: accent
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: dropdown:treeman
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

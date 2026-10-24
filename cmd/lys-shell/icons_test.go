@@ -25,14 +25,14 @@ func TestIconsCLIMatchesRust(t *testing.T) {
 	if err := os.CopyFS(filepath.Join(root, "input"), os.DirFS("testdata/icons/input")); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := os.ReadFile("testdata/icons/config.toml")
+	cfg, err := os.ReadFile("testdata/icons/config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(root, "config", "lys-shell"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "config", "lys-shell", "config.toml"), cfg, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "config", "lys-shell", "config.yaml"), cfg, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	steps, err := os.ReadFile("testdata/icons/steps.txt")
@@ -111,8 +111,8 @@ func TestIconsInstallAndSync(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	cfg := "[modules.clock]\nicon-name = \"ld-bell-symbolic\"\n[modules.cpu]\nicon-name = \"tb-home-symbolic\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(cfg), 0o600); err != nil {
+	cfg := "modules:\n  clock:\n    icon-name: ld-bell-symbolic\n  cpu:\n    icon-name: tb-home-symbolic\n"
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	before := len(cdn.Requested())

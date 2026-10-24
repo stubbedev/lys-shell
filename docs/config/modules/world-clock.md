@@ -11,10 +11,11 @@ Multiple timezones shown together in a dropdown.
 
 Add it to your layout with `world-clock`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["world-clock"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [world-clock]
 ```
 
 ## General
@@ -65,24 +66,25 @@ Anything outside a placeholder stays as literal text.
 
 ## Default configuration
 
-```toml
-[modules.world-clock]
-format = "{{ tz('UTC', '%H:%M %Z') }}"
-icon-name = "ld-globe-symbolic"
-border-show = false
-border-color = "yellow"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "yellow"
-label-show = true
-label-color = "yellow"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  world-clock:
+    format: '{{ tz(''UTC'', ''%H:%M %Z'') }}'
+    icon-name: ld-globe-symbolic
+    border-show: false
+    border-color: yellow
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: yellow
+    label-show: true
+    label-color: yellow
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

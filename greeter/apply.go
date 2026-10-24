@@ -1,7 +1,6 @@
 package greeter
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -10,13 +9,11 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/BurntSushi/toml"
-
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// allowedKeys are the [greeter] keys lys-settings may push to the
-// system config (apply.rs ALLOWED_KEYS).
+// allowedKeys are the greeter keys lys-settings may push to the
+// system config.
 var allowedKeys = func() map[string]bool {
 	m := make(map[string]bool, len(config.GreeterApplyKeys))
 	for _, k := range config.GreeterApplyKeys {
@@ -26,9 +23,9 @@ var allowedKeys = func() map[string]bool {
 }()
 
 // RunApplyConfig is `lys-greeter apply-config [--config PATH]
-// <STAGED.toml>`, run as root through pkexec by lys-settings: it
-// copies only the allowlisted [greeter] keys of the staged file into
-// runtime.toml beside the system config, never touching config.toml.
+// <STAGED.yaml>`, run as root through pkexec by lys-settings: it
+// copies only the allowlisted greeter keys of the staged file into
+// runtime.yaml beside the system config, never touching config.yaml.
 // It returns the exit code and writes its messages to stdout/stderr.
 func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 	configPath := config.GreeterConfigPath
@@ -50,7 +47,7 @@ func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if staged == "" {
-		return applyFail(stderr, "usage: lys-greeter apply-config [--config PATH] <STAGED.toml>")
+		return applyFail(stderr, "usage: lys-greeter apply-config [--config PATH] <STAGED.yaml>")
 	}
 	dest, err := applyConfig(staged, configPath, asPkexecCaller)
 	if err != nil {
@@ -65,7 +62,7 @@ func applyFail(stderr io.Writer, msg string) int {
 	return 1
 }
 
-// applyConfig merges the staged greeter keys into runtime.toml and
+// applyConfig merges the staged greeter keys into runtime.yaml and
 // returns its path. readAsCaller performs the one privileged read a
 // user controls - the background image - with the caller's rights.
 func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, error)) ([]byte, error)) (string, error) {
@@ -73,11 +70,11 @@ func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, er
 	if err != nil {
 		return "", fmt.Errorf("cannot read %s: %w", staged, err)
 	}
-	var table map[string]any
-	if _, err := toml.Decode(string(text), &table); err != nil {
-		return "", fmt.Errorf("invalid TOML: %w", err)
+	table, err := config.ParseYAML(string(text))
+	if err != nil {
+		return "", fmt.Errorf("invalid YAML in %s: %w", staged, err)
 	}
-	// Accept a [greeter] table or the bare keys at top level.
+	// Accept a greeter table or the bare keys at top level.
 	source := table
 	if inner, ok := table["greeter"].(map[string]any); ok {
 		source = inner
@@ -98,19 +95,19 @@ func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, er
 	dest := config.RuntimeOverlayPath(configPath)
 	root := map[string]any{}
 	if existing, err := os.ReadFile(dest); err == nil { //nolint:gosec // the system runtime overlay
-		if _, err := toml.Decode(string(existing), &root); err != nil {
+		if root, err = config.ParseYAML(string(existing)); err != nil {
 			return "", fmt.Errorf("existing %s is invalid: %w", dest, err)
 		}
 	}
 	root["greeter"] = greeter
-	var out bytes.Buffer
-	if err := toml.NewEncoder(&out).Encode(root); err != nil {
-		return "", fmt.Errorf("serialize failed: %w", err)
+	out, err := config.YAMLDocument(root)
+	if err != nil {
+		return "", fmt.Errorf("serialize %s: %w", dest, err)
 	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil { //nolint:gosec // /etc/lys-shell is world-readable config
 		return "", fmt.Errorf("cannot create %s: %w", filepath.Dir(dest), err)
 	}
-	if err := os.WriteFile(dest, out.Bytes(), 0o644); err != nil { //nolint:gosec // the greeter user reads it
+	if err := os.WriteFile(dest, []byte(out), 0o644); err != nil { //nolint:gosec // the greeter user reads it
 		return "", fmt.Errorf("cannot write %s: %w", dest, err)
 	}
 	return dest, nil

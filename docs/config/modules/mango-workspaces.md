@@ -11,10 +11,11 @@ MangoWM tag switcher module configuration.
 
 Add it to your layout with `mango-workspaces`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["mango-workspaces"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [mango-workspaces]
 ```
 
 ## General
@@ -64,10 +65,12 @@ patterns matched against its title. Values are symbolic icon names.
 
 #### Example
 
-```toml
-[modules.mango-workspaces.app-icon-map]
-"*firefox*" = "ld-globe-symbolic"
-"title:*YouTube*" = "si-youtube-symbolic"
+```yaml
+modules:
+  mango-workspaces:
+    app-icon-map:
+      "*firefox*": ld-globe-symbolic
+      "title:*YouTube*": si-youtube-symbolic
 ```
 
 :::
@@ -76,53 +79,54 @@ patterns matched against its title. Values are symbolic icon names.
 
 #### Example
 
-```toml
-[modules.mango-workspaces.tag-map.1]
-label = "web"
-icon = "ld-globe-symbolic"
-color = "#4a90d9"
-
-[modules.mango-workspaces.tag-map.2]
-label = "term"
-icon = "ld-terminal-symbolic"
+```yaml
+modules:
+  mango-workspaces:
+    tag-map:
+      "1":
+        label: web
+        icon: ld-globe-symbolic
+        color: "#4a90d9"
+      "2":
+        label: term
+        icon: ld-terminal-symbolic
 ```
 
 :::
 
 ## Default configuration
 
-```toml
-[modules.mango-workspaces]
-hide-empty = true
-min-tag-count = 0
-display-mode = "label"
-divider = " "
-app-icons-show = false
-app-icons-dedupe = true
-app-icons-fallback = "ld-app-window-symbolic"
-app-icons-empty = "tb-minus-symbolic"
-urgent-show = true
-urgent-mode = "workspace"
-active-indicator = "background"
-tag-padding = 0.5
-icon-gap = 0.30000001192092896
-icon-size = 1.0
-label-size = 1.0
-active-color = "accent"
-occupied-color = "fg-muted"
-empty-color = "fg-subtle"
-container-bg-color = "bg-surface-elevated"
-border-show = false
-border-color = "border-default"
-left-click = "focus:this"
-middle-click = ""
-right-click = ""
-scroll-up = "focus:previous"
-scroll-down = "focus:next"
-
-[modules.mango-workspaces.app-icon-map]
-
-[modules.mango-workspaces.tag-map]
+```yaml
+modules:
+  mango-workspaces:
+    hide-empty: true
+    min-tag-count: 0
+    display-mode: label
+    divider: ' '
+    app-icons-show: false
+    app-icons-dedupe: true
+    app-icons-fallback: ld-app-window-symbolic
+    app-icons-empty: tb-minus-symbolic
+    urgent-show: true
+    urgent-mode: workspace
+    active-indicator: background
+    tag-padding: 0.5
+    icon-gap: 0.30000001192092896
+    icon-size: 1.0
+    label-size: 1.0
+    active-color: accent
+    occupied-color: fg-muted
+    empty-color: fg-subtle
+    container-bg-color: bg-surface-elevated
+    border-show: false
+    border-color: border-default
+    app-icon-map: {}
+    tag-map: {}
+    left-click: focus:this
+    middle-click: ""
+    right-click: ""
+    scroll-up: focus:previous
+    scroll-down: focus:next
 ```
 
 

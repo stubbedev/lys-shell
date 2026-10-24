@@ -148,8 +148,8 @@ func TestNewBluetoothRequiresSource(t *testing.T) {
 }
 
 func TestLoadFileAppliesBluetooth(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.bluetooth]\nlabel-show = false\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  bluetooth:\n    label-show: false\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}

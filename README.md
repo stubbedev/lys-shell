@@ -39,7 +39,7 @@ lys-shell runs on any compositor with `wlr-layer-shell`; it does not need lys-wm
 
 **Networking.** NetworkManager Wi-Fi and wired control, and VPNs signed in from the network dropdown, including GlobalProtect SAML through openconnect.
 
-**Configuration.** TOML or YAML with imports and live reload, a [JSON schema](schema/lys-shell-config.schema.json) for editor completion, the `lys-settings` GUI, and the `lys-shell config` CLI. Every size takes a scale or exact pixels. Themes come from built-in palettes or from Matugen, Pywal and Wallust.
+**Configuration.** YAML with imports and live reload, a [JSON schema](schema/lys-shell-config.schema.json) for editor completion, the `lys-settings` GUI, and the `lys-shell config` CLI. Every size takes a scale or exact pixels. Themes come from built-in palettes or from Matugen, Pywal and Wallust.
 
 **Scriptable.** Custom bar modules backed by any command, with icon and colour maps keyed on their output; a JSON-RPC socket and `lys-shell widget update` to push updates to a widget; `lys-shell toast` for one-off messages.
 
@@ -95,21 +95,20 @@ The guides for [Arch](docs/guide/getting-started-arch.md), [Debian and Ubuntu](d
 
 ## Configure
 
-lys-shell reads `~/.config/lys-shell/config.toml` (or `config.yaml`) and applies changes on save:
+lys-shell reads `~/.config/lys-shell/config.yaml` and applies changes on save:
 
-```toml
-[bar]
-location = "top"
-scale = 1.25
-
-[[bar.layout]]
-monitor = "*"
-left = ["dashboard", "hyprland-workspaces"]
-center = ["clock"]
-right = ["volume", "network", "bluetooth", "battery"]
-
-[modules.clock]
-format = "%H:%M"
+```yaml
+bar:
+  location: top
+  scale: 1.25
+  layout:
+    - monitor: "*"
+      left: [dashboard, hyprland-workspaces]
+      center: [clock]
+      right: [volume, network, bluetooth, battery]
+modules:
+  clock:
+    format: "%H:%M"
 ```
 
 `lys-shell panel settings` opens the same config in the GUI. Start with the guides:

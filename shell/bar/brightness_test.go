@@ -157,8 +157,8 @@ func TestNewBrightnessRequiresSource(t *testing.T) {
 }
 
 func TestLoadFileAppliesBrightness(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.brightness]\nformat = \"L {{ percent }}\"\nmin-brightness = 5\nenable-external = false\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  brightness:\n    format: \"L {{ percent }}\"\n    min-brightness: 5\n    enable-external: false\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -173,9 +173,9 @@ func TestLoadFileAppliesBrightness(t *testing.T) {
 
 func TestLoadFileRejectsBadBrightness(t *testing.T) {
 	for _, content := range []string{
-		"[modules.brightness]\nmin-brightness = -1\n",
+		"modules:\n  brightness:\n    min-brightness: -1\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

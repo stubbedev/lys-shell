@@ -72,16 +72,16 @@ type StorageConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.storage.thresholds]]
-	// above = 70
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
-	//
-	// [[modules.storage.thresholds]]
-	// above = 90
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   storage:
+	//     thresholds:
+	//       - above: 70
+	//         icon-color: status-warning
+	//         label-color: status-warning
+	//       - above: 90
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

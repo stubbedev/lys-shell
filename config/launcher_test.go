@@ -8,40 +8,32 @@ import (
 
 func TestLauncherSectionApplies(t *testing.T) {
 	cfg, err := LoadFile(writeConfig(t, `
-[launcher]
-location = "north-east"
-width = "800px"
-lines = 6
-modes = ["drun", "clip"]
-matching = "fuzzy"
-sort = true
-sorting-method = "fzf"
-case = "smart"
-fixed-num-lines = false
-
-[launcher.scripts]
-clip = "~/bin/clip.sh"
-
-[launcher.keybindings]
-cancel = "Control+q"
-
-[launcher.mouse-bindings]
-me-accept-entry = "MouseDPrimary"
-
-[launcher.styles]
-compact = ".launcher-row { padding: 0; }"
-
-[launcher.history]
-max-size = 5
-
-[launcher.drun]
-match-fields = ["name", "comment"]
-
-[launcher.window]
-match-fields = ["desktop"]
-
-[launcher.filebrowser]
-sorting-method = "mtime"
+launcher:
+  location: north-east
+  width: 800px
+  lines: 6
+  modes: [drun, clip]
+  matching: fuzzy
+  sort: true
+  sorting-method: fzf
+  case: smart
+  fixed-num-lines: false
+  scripts:
+    clip: ~/bin/clip.sh
+  keybindings:
+    cancel: Control+q
+  mouse-bindings:
+    me-accept-entry: MouseDPrimary
+  styles:
+    compact: ".launcher-row { padding: 0; }"
+  history:
+    max-size: 5
+  drun:
+    match-fields: [name, comment]
+  window:
+    match-fields: [desktop]
+  filebrowser:
+    sorting-method: mtime
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -75,17 +67,17 @@ sorting-method = "mtime"
 // keeps its default and the rest of the section still applies.
 func TestLauncherBadValuesAreFieldDiagnostics(t *testing.T) {
 	for name, tc := range map[string]struct{ body, path string }{
-		"location":           {`location = "middle"`, "launcher.location"},
-		"matching":           {`matching = "exact"`, "launcher.matching"},
-		"sorting-method":     {`sorting-method = "normal"`, "launcher.sorting-method"},
-		"case":               {`case = "upper"`, "launcher.case"},
-		"negative lines":     {`lines = -1`, "launcher.lines"},
-		"drun match field":   {"[launcher.drun]\nmatch-fields = [\"name\", \"icon\"]", "launcher.drun.match-fields"},
-		"window match field": {"[launcher.window]\nmatch-fields = [\"all\"]", "launcher.window.match-fields"},
-		"file sort":          {"[launcher.filebrowser]\nsorting-method = \"size\"", "launcher.filebrowser.sorting-method"},
+		"location":           {"location: middle", "launcher.location"},
+		"matching":           {"matching: exact", "launcher.matching"},
+		"sorting-method":     {"sorting-method: normal", "launcher.sorting-method"},
+		"case":               {"case: upper", "launcher.case"},
+		"negative lines":     {"lines: -1", "launcher.lines"},
+		"drun match field":   {"drun:\n    match-fields: [name, icon]", "launcher.drun.match-fields"},
+		"window match field": {"window:\n    match-fields: [all]", "launcher.window.match-fields"},
+		"file sort":          {"filebrowser:\n    sorting-method: size", "launcher.filebrowser.sorting-method"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := LoadFile(writeConfig(t, "[launcher]\nterminal = \"foot\"\n"+tc.body+"\n"))
+			cfg, err := LoadFile(writeConfig(t, "launcher:\n  terminal: foot\n  "+tc.body+"\n"))
 			if err == nil || !strings.Contains(err.Error(), tc.path) {
 				t.Fatalf("diagnostics %v, want one for %s", err, tc.path)
 			}
@@ -117,5 +109,5 @@ func TestLauncherLocationFromRofi(t *testing.T) {
 
 func writeConfig(t *testing.T, body string) string {
 	t.Helper()
-	return writeFile(t, t.TempDir(), "config.toml", body)
+	return writeFile(t, t.TempDir(), "config.yaml", body)
 }

@@ -17,7 +17,7 @@ import (
 //
 // Tag grammar: `cfg:"key[,option...]"`.
 //
-//	key               the canonical TOML/YAML key (serde rename)
+//	key               the canonical YAML key (serde rename)
 //	alias=<k>         an extra key accepted on read (serde alias)
 //	deprecated=<k>    a legacy key accepted on read with a warning
 //	                  (#[lys-shell(deprecated_alias)])

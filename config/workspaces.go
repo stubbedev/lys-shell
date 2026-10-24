@@ -113,33 +113,26 @@ type WorkspaceClicks struct {
 }
 
 // WorkspaceMap is hyprland's workspace-map: styles keyed by numeric
-// workspace id, the TOML string keys parsed as i32.
+// workspace id, the string keys parsed as i32.
 //
 // Per-workspace icon and color overrides, keyed by workspace ID.
 //
-// TOML table keys are always strings, so `"1"` parses into the workspace
+// Keys are written as strings, so `"1"` parses into the workspace
 // with ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys
 // that don't appear in the map fall back to the default behaviour set by
 // [`HyprlandWorkspacesConfig::display_mode`].
 //
 // ## Examples
 //
-// ```toml
-// [modules.hyprland-workspaces.workspace-map]
-// # Whole entry on one line with an inline table
-// 1 = { label = "Web", icon = "ld-globe-symbolic", color = "#4a90d9" }
-// 2 = { icon = "ld-terminal-symbolic" }
-// 3 = { icon = "ld-code-symbolic", color = "accent" }
-//
-// # Or spread the entry across its own subtable
-// [modules.hyprland-workspaces.workspace-map.4]
-// label = "Chat"
-// icon = "ld-message-square-symbolic"
-// color = "status-success"
+// ```yaml
+// # under modules.hyprland-workspaces.workspace-map
+// "1": {label: Web, icon: ld-globe-symbolic, color: "#4a90d9"}
+// "2": {icon: ld-terminal-symbolic}
+// "3": {icon: ld-code-symbolic, color: accent}
+// "4": {label: Chat, icon: ld-message-square-symbolic, color: status-success}
 //
 // # Negative IDs target Hyprland special workspaces
-// [modules.hyprland-workspaces.workspace-map.-99]
-// icon = "ld-scratch-symbolic"
+// "-99": {icon: ld-scratch-symbolic}
 // ```
 type WorkspaceMap map[int32]WorkspaceStyle
 

@@ -92,9 +92,8 @@ func (c DashboardConfig) Clicks() ClickConfig {
 // Settings for user session the in dashboard
 // ## Examples
 //
-// ```toml
-// [modules.dashboard.user-session]
-// actions = [ "lock", "log-out", "reboot", "power-off" ]
+// ```yaml
+// modules: {dashboard: {user-session: {actions: [lock, log-out, reboot, power-off]}}}
 // ```
 type UserSessionConfig struct {
 	// Session actions to show on dashboard

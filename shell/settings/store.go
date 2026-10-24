@@ -1,5 +1,5 @@
 // Package settings is lys-settings: the GUI over the config, every
-// change a runtime override persisted to runtime.toml as it lands.
+// change a runtime override persisted to runtime.yaml as it lands.
 // Pages are data (page.go): rows name config paths, and the editor for
 // each comes from the field's type (config.Field) unless the page asks
 // for another.
@@ -132,7 +132,7 @@ func (s store) reset(path string) {
 }
 
 // unset clears an optional field (a None). A leaf's runtime override
-// drops, which is where Rust's runtime None lands once runtime.toml
+// drops, which is where a runtime None lands once runtime.yaml
 // (which cannot hold one) is read back; a value struct's field leaves
 // the struct.
 func (s store) unset(path string) {

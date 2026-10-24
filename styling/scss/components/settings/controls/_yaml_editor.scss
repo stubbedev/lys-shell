@@ -1,4 +1,4 @@
-.toml-editor {
+.yaml-editor {
     background-color: var(--bg-overlay);
     border: 1px solid var(--border-default);
     border-radius: var(--rounding-element);
@@ -8,24 +8,24 @@
     min-height: calc(13rem * var(--global-scale));
 }
 
-.toml-editor:focus-within {
+.yaml-editor:focus-within {
     border-color: var(--accent);
 }
 
-.toml-editor text {
+.yaml-editor text {
     background-color: transparent;
     color: var(--fg-default);
 }
 
-.toml-editor text selection {
+.yaml-editor text selection {
     background-color: var(--accent-subtle);
     color: var(--fg-default);
 }
 
-.toml-editor.toml-editor-lines-40 {
+.yaml-editor.yaml-editor-lines-40 {
     min-height: calc(30rem * var(--global-scale));
 }
 
-.toml-editor + button {
+.yaml-editor + button {
     margin-top: var(--space-sm);
 }

@@ -2,7 +2,7 @@ package config
 
 import "reflect"
 
-// ModulesConfig is the [modules] table, one section per bar module
+// ModulesConfig is the `modules` mapping, one section per bar module
 // (crates/wayle-config/src/schemas/modules/mod.rs). Config embeds it,
 // so cfg.Battery reads cfg.ModulesConfig.Battery.
 //
@@ -82,17 +82,16 @@ type ModulesConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.custom]]
-	// id = "gpu-temp"
-	// command = "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
-	// interval-ms = 5000
-	// icon-name = "ld-thermometer-symbolic"
-	//
-	// [[modules.custom]]
-	// id = "weather"
-	// command = "curl -s wttr.in/?format=%t"
-	// interval-ms = 600000
+	// ```yaml
+	// modules:
+	//   custom:
+	//     - id: gpu-temp
+	//       command: nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader
+	//       interval-ms: 5000
+	//       icon-name: ld-thermometer-symbolic
+	//     - id: weather
+	//       command: curl -s wttr.in/?format=%t
+	//       interval-ms: 600000
 	// ```
 	Custom []CustomModuleDefinition `cfg:"custom"`
 }

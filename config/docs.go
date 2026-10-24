@@ -80,7 +80,7 @@ type DocSection struct {
 	Required []string
 
 	// defaults are the fields with one, each as its encoded tree, for
-	// the TOML block.
+	// the YAML block.
 	defaults []docDefault
 }
 
@@ -231,13 +231,12 @@ func sectionSchema(v reflect.Value, entry bool) Schema {
 	return schema
 }
 
-// DefaultsTOML is the page's defaults block (render_default_toml's
-// table): each default as schemars put it in the schema (f32 widened to
-// f64) converted to TOML, under [name], [modules.name], or
-// [[modules.name]]. A None default is skipped, and one holding a None
-// anywhere inside is left out, as serde_json's null has no TOML form.
-// "" when nothing remains.
-func (s DocSection) DefaultsTOML() string {
+// DefaultsYAML is the page's defaults block: each default as the
+// schema states it (f32 widened to f64) as YAML, under name,
+// modules.name, or a one-entry modules.name list. A None default is
+// skipped, and one holding a None anywhere inside is left out, as the
+// file has no null. "" when nothing remains.
+func (s DocSection) DefaultsYAML() string {
 	section := newTable()
 	for _, d := range s.defaults {
 		if !hasAbsent(d.value) {
@@ -260,7 +259,7 @@ func (s DocSection) DefaultsTOML() string {
 	default:
 		root.set(s.Name, section)
 	}
-	out, err := tomlPretty(root)
+	out, err := yamlDocument(root)
 	if err != nil {
 		return ""
 	}

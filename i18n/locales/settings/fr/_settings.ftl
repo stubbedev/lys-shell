@@ -9,7 +9,7 @@ settings-color-auto = Auto
 settings-color-transparent = Transparent
 settings-color-custom = Personnalisé…
 settings-custom-modules-editor = Modules personnalisés
-    .description = Définir des modules personnalisés en syntaxe TOML
+    .description = Définir des modules personnalisés en syntaxe YAML
 settings-theme-preset = Thème prédéfini
     .description = Remplacer la palette actuelle par un thème prédéfini
 settings-theme-preset-apply = Parcourir les thèmes
@@ -59,11 +59,11 @@ settings-page-dropdowns = Menus déroulants
 
 ## Badges de source
 settings-source-config = config
-    .description = Défini dans config.toml
+    .description = Défini dans config.yaml
 settings-source-custom = personnalisé
-    .description = Modifié via l'interface (pas dans config.toml)
+    .description = Modifié via l'interface (pas dans config.yaml)
 settings-source-override = remplacement
-    .description = L'interface remplace la valeur de config.toml
+    .description = L'interface remplace la valeur de config.yaml
 settings-source-unsaved = non enregistré
     .description = Appuyez sur Entrée pour appliquer
 

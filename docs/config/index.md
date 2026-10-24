@@ -7,10 +7,10 @@ outline: [2]
 
 # Config reference
 
-Every config file lives at `~/.config/lys-shell/config.toml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.
+Every config file lives at `~/.config/lys-shell/config.yaml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.
 
 ::: tip
-Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visualstudio.com/items?itemName=tombi-toml.tombi) for VSCode or the `tombi` LSP for Neovim, Helix, or Zed. The schema is written to `~/.config/lys-shell/schema.json` on startup.
+Editor intellisense via JSON Schema. Install the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) for VSCode or `yaml-language-server` for Neovim, Helix, or Zed. The schema is written to `~/.config/lys-shell/schema.json` on startup, and the config file lys-shell creates starts with the `# yaml-language-server: $schema=./schema.json` modeline that points the server at it.
 :::
 
 ## Top-level sections
@@ -24,7 +24,7 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 | [`greeter`](/config/greeter) | Greeter (display manager): the pre-login screen `lys-greeter` renders as |
 | [`launcher`](/config/launcher) | Application launcher / dmenu (rofi replacement). |
 | [`lock`](/config/lock) | Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`. |
-| [`mail-account`](/config/mail-account) | One mail account in the `[modules.mail]` per-account breakdown. |
+| [`mail-account`](/config/mail-account) | One mail account in the `modules.mail` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
 | [`share-picker`](/config/share-picker) | Screen-share picker shown by xdg-desktop-portal when an app requests a |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
@@ -33,7 +33,7 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 
 ## Bar modules
 
-Modules appear inside `[[bar.layout]]` arrays. Each row links to the full reference.
+Modules appear inside the `bar.layout` list. Each row links to the full reference.
 
 | Module | Purpose |
 |---|---|

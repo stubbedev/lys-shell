@@ -119,8 +119,8 @@ type HyprlandWorkspacesConfig struct {
 	DisplayMode DisplayMode `cfg:"display-mode"`
 	// Use workspace name instead of number when displaying labels.
 	//
-	// Only applies when `display-mode = "label"` or as fallback for unmapped
-	// workspaces in `display-mode = "icon"`.
+	// Only applies when `display-mode: label` or as fallback for unmapped
+	// workspaces in `display-mode: icon`.
 	LabelUseName bool `cfg:"label-use-name"`
 	// How workspace numbers are displayed.
 	//
@@ -212,10 +212,12 @@ type HyprlandWorkspacesConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.hyprland-workspaces.workspace-map]
-	// 1 = { icon = "ld-globe-symbolic", color = "#4a90d9" }
-	// 2 = { icon = "ld-terminal-symbolic" }
+	// ```yaml
+	// modules:
+	//   hyprland-workspaces:
+	//     workspace-map:
+	//       "1": {icon: ld-globe-symbolic, color: "#4a90d9"}
+	//       "2": {icon: ld-terminal-symbolic}
 	// ```
 	WorkspaceMap WorkspaceMap `cfg:"workspace-map"`
 	// Application icon mapping with glob pattern support.
@@ -229,10 +231,12 @@ type HyprlandWorkspacesConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.hyprland-workspaces.app-icon-map]
-	// "*firefox*" = "ld-globe-symbolic"
-	// "title:*YouTube*" = "ld-youtube-symbolic"
+	// ```yaml
+	// modules:
+	//   hyprland-workspaces:
+	//     app-icon-map:
+	//       "*firefox*": ld-globe-symbolic
+	//       "title:*YouTube*": ld-youtube-symbolic
 	// ```
 	AppIconMap map[string]string `cfg:"app-icon-map"`
 	// Action on left-clicking a workspace. Default focuses it.

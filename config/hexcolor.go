@@ -7,7 +7,7 @@ import (
 
 // HexColor is a validated GTK4 CSS hex color: #rgb, #rgba, #rrggbb, or
 // #rrggbbaa (wayle-config's styling HexColor). Construct it through
-// ParseHexColor or TOML decoding; the zero value reads as opaque black.
+// ParseHexColor or config decoding; the zero value reads as opaque black.
 type HexColor struct {
 	s string
 }

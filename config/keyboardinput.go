@@ -50,10 +50,12 @@ type KeyboardInputConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.keyboard-input.layout-alias-map]
-	// "English (US)" = "EN"
-	// "Czech (QWERTY)" = "Czech"
+	// ```yaml
+	// modules:
+	//   keyboard-input:
+	//     layout-alias-map:
+	//       English (US): EN
+	//       Czech (QWERTY): Czech
 	// ```
 	LayoutAliasMap map[string]string `cfg:"layout-alias-map"`
 }

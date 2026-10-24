@@ -22,7 +22,7 @@ func writeFile(t *testing.T, dir, name, content string) string {
 }
 
 func TestLoadFileMissingCreatesTheStub(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "lys-shell", "config.toml")
+	path := filepath.Join(t.TempDir(), "lys-shell", "config.yaml")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("missing file: %v", err)
@@ -31,34 +31,71 @@ func TestLoadFileMissingCreatesTheStub(t *testing.T) {
 		t.Errorf("missing file: want defaults, got %+v", cfg.Bar)
 	}
 	data, err := os.ReadFile(path)
-	if err != nil || string(data) != "# lys-shell configuration file\n" {
+	if err != nil || string(data) != defaultConfigStub {
 		t.Errorf("stub = %q, %v", data, err)
 	}
-}
-
-func TestYAMLAndTOMLLoadTheSameConfig(t *testing.T) {
-	dir := t.TempDir()
-	toml := writeFile(t, dir, "a/config.toml", "[bar]\nlocation = \"bottom\"\nexclusive = false\n\n[modules.clock]\nformat = \"%H\"\n")
-	yml := writeFile(t, dir, "b/config.yaml", "bar:\n  location: bottom\n  exclusive: false\nmodules:\n  clock:\n    format: \"%H\"\n")
-	a, errA := LoadFile(toml)
-	b, errB := LoadFile(yml)
-	if errA != nil || errB != nil {
-		t.Fatalf("load: %v / %v", errA, errB)
+	if !strings.HasPrefix(string(data), "# yaml-language-server: $schema=./schema.json\n") {
+		t.Errorf("stub %q lacks the schema modeline", data)
 	}
-	if a.Bar.Location != LocationBottom || a.Bar.Exclusive || a.Clock.Format != "%H" {
-		t.Errorf("toml = %+v", a.Bar)
-	}
-	if b.Bar.Location != a.Bar.Location || b.Bar.Exclusive != a.Bar.Exclusive || b.Clock.Format != a.Clock.Format {
-		t.Errorf("yaml %+v differs from toml %+v", b.Bar, a.Bar)
+	if again, err := LoadFile(path); err != nil || again.Bar.Location != LocationTop {
+		t.Errorf("the stub does not load back: %v", err)
 	}
 }
 
-func TestYAMLNullAndSyntaxErrorsFailTheFile(t *testing.T) {
+// A config.toml from before the YAML switch is an error naming the file
+// to convert, and no empty config.yaml is written over the user's
+// settings; with a config.yaml present it is ignored.
+func TestLegacyTOMLConfigIsAnErrorNotAStub(t *testing.T) {
 	dir := t.TempDir()
+	legacy := writeFile(t, dir, "config.toml", "[bar]\nlocation = \"bottom\"\n")
+	path := filepath.Join(dir, "config.yaml")
+	cfg, err := LoadFile(path)
+	if err == nil || !strings.Contains(err.Error(), legacy+" is TOML, which lys-shell no longer reads: convert it to "+path) {
+		t.Fatalf("legacy config.toml: %v", err)
+	}
+	if cfg.Bar.Location != LocationTop {
+		t.Errorf("location = %q, want the defaults while the file is unconverted", cfg.Bar.Location)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a stub config.yaml was written beside the TOML file: %v", err)
+	}
+	writeFile(t, dir, "config.yaml", "bar:\n  location: left\n")
+	if cfg, err := LoadFile(path); err != nil || cfg.Bar.Location != LocationLeft {
+		t.Errorf("with config.yaml present: %q, %v", cfg.Bar.Location, err)
+	}
+}
+
+// Every config file is YAML whatever its name: TOML syntax does not
+// parse.
+func TestTOMLSyntaxDoesNotParse(t *testing.T) {
+	_, err := LoadFile(writeFile(t, t.TempDir(), "config.yaml", "[bar]\nlocation = \"bottom\"\n"))
+	if err == nil {
+		t.Fatal("a TOML document loaded as YAML")
+	}
+}
+
+func TestYAMLLoadsSectionsAndModules(t *testing.T) {
+	cfg, err := LoadFile(writeFile(t, t.TempDir(), "config.yaml", "bar:\n  location: bottom\n  exclusive: false\nmodules:\n  clock:\n    format: \"%H\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Bar.Location != LocationBottom || cfg.Bar.Exclusive || cfg.Clock.Format != "%H" {
+		t.Errorf("loaded %+v, clock %q", cfg.Bar, cfg.Clock.Format)
+	}
+}
+
+// A document of nothing but comments is an empty config; a null value,
+// a duplicate key, or a syntax error fails the file.
+func TestYAMLNullsDuplicatesAndSyntaxErrorsFailTheFile(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := LoadFile(writeFile(t, dir, "comments.yaml", "# nothing yet\n")); err != nil {
+		t.Errorf("a comment-only file: %v", err)
+	}
 	for name, content := range map[string]string{
-		"null.yaml":   "bar:\n  location: ~\n",
-		"empty.yaml":  "",
-		"broken.yaml": "a: : :\n  - broken",
+		"null.yaml":      "bar:\n  location: ~\n",
+		"duplicate.yaml": "bar:\n  location: left\nbar:\n  location: right\n",
+		"broken.yaml":    "a: : :\n  - broken",
+		"scalar.yaml":    "just a string\n",
 	} {
 		cfg, err := LoadFile(writeFile(t, dir, name, content))
 		if err == nil {
@@ -68,10 +105,14 @@ func TestYAMLNullAndSyntaxErrorsFailTheFile(t *testing.T) {
 			t.Errorf("%s: want the defaults back", name)
 		}
 	}
+	_, err := LoadFile(writeFile(t, dir, "null-line.yaml", "bar:\n  location: ~\n"))
+	if err == nil || !strings.Contains(err.Error(), "line 2: a null is not a config value") {
+		t.Errorf("null error = %v, want it to name the line", err)
+	}
 }
 
 func TestBadValueKeepsItsDefaultAndTheRestApplies(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", "[bar]\nlocation = \"sideways\"\nexclusive = false\n")
+	path := writeFile(t, t.TempDir(), "config.yaml", "bar:\n  location: sideways\n  exclusive: false\n")
 	cfg, err := LoadFile(path)
 	if err == nil {
 		t.Fatal("invalid location: want a diagnostic error")
@@ -90,7 +131,7 @@ func TestBadValueKeepsItsDefaultAndTheRestApplies(t *testing.T) {
 }
 
 func TestTypeMismatchUsesSerdeWording(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", "[bar]\nborder-width = 300\nscale = \"big\"\n")
+	path := writeFile(t, t.TempDir(), "config.yaml", "bar:\n  border-width: 300\n  scale: big\n")
 	_, err := LoadFile(path)
 	if err == nil {
 		t.Fatal("want errors")
@@ -104,19 +145,19 @@ func TestTypeMismatchUsesSerdeWording(t *testing.T) {
 }
 
 func TestUnknownKeysAndNonTableSectionsAreIgnored(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", "osd = 5\n[bar]\nnot-in-the-schema = 3\n[modules.clock]\nalso-unknown = 1\n")
+	path := writeFile(t, t.TempDir(), "config.yaml", "osd: 5\nbar:\n  not-in-the-schema: 3\nmodules:\n  clock:\n    also-unknown: 1\n")
 	if _, err := LoadFile(path); err != nil {
 		t.Fatalf("unknown keys: %v", err)
 	}
 }
 
 func TestDeprecatedAliasApplies(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", "[modules.notification]\nicon-name = \"legacy\"\n")
+	path := writeFile(t, t.TempDir(), "config.yaml", "modules:\n  notification:\n    icon-name: legacy\n")
 	cfg, err := LoadFile(path)
 	if err != nil || cfg.Notification.IconName != "legacy" {
-		t.Fatalf("[modules.notification] alias: %q, %v", cfg.Notification.IconName, err)
+		t.Fatalf("modules.notification alias: %q, %v", cfg.Notification.IconName, err)
 	}
-	path = writeFile(t, t.TempDir(), "config.toml", "[modules.notifications]\nicon-name = \"plural\"\n")
+	path = writeFile(t, t.TempDir(), "config.yaml", "modules:\n  notifications:\n    icon-name: plural\n")
 	cfg, _ = LoadFile(path)
 	if cfg.Notification.IconName != "plural" {
 		t.Errorf("canonical key: %q", cfg.Notification.IconName)
@@ -125,9 +166,9 @@ func TestDeprecatedAliasApplies(t *testing.T) {
 
 func TestImportsMergeInOrderAndTheFileWins(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "one.toml", "[modules.clock]\nformat = \"one\"\n[bar]\nlocation = \"left\"\n")
+	writeFile(t, dir, "one.yml", "modules:\n  clock:\n    format: one\nbar:\n  location: left\n")
 	writeFile(t, dir, "two.yaml", "modules:\n  clock:\n    format: two\n")
-	main := writeFile(t, dir, "config.toml", "imports = [\"one.toml\", \"two\"]\n[bar]\nexclusive = false\n")
+	main := writeFile(t, dir, "config.yaml", "imports: [one.yml, two]\nbar:\n  exclusive: false\n")
 	cfg, err := LoadFile(main)
 	if err != nil {
 		t.Fatal(err)
@@ -137,27 +178,37 @@ func TestImportsMergeInOrderAndTheFileWins(t *testing.T) {
 	}
 }
 
-func TestImportCycleAndMissingImportFail(t *testing.T) {
+func TestImportCycleMissingAndNonYAMLImportsFail(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "a.toml", "imports = [\"b.toml\"]\n")
-	writeFile(t, dir, "b.toml", "imports = [\"a.toml\"]\n")
-	main := writeFile(t, dir, "config.toml", "imports = [\"a.toml\"]\n")
+	writeFile(t, dir, "a.yaml", "imports: [b.yaml]\n")
+	writeFile(t, dir, "b.yaml", "imports: [a.yaml]\n")
+	main := writeFile(t, dir, "config.yaml", "imports: [a.yaml]\n")
 	_, err := LoadFile(main)
-	if err == nil || !strings.Contains(err.Error(), "circular import detected: config.toml -> a.toml -> b.toml -> a.toml") {
+	if err == nil || !strings.Contains(err.Error(), "circular import detected: config.yaml -> a.yaml -> b.yaml -> a.yaml") {
 		t.Errorf("cycle: %v", err)
 	}
-	missing := writeFile(t, dir, "m.toml", "imports = [\"ghost.toml\"]\n")
+	missing := writeFile(t, dir, "m.yaml", "imports: [ghost.yaml]\n")
 	_, err = LoadFile(missing)
-	if err == nil || !strings.Contains(err.Error(), "cannot import '"+filepath.Join(dir, "ghost.toml")+"'") {
+	if err == nil || !strings.Contains(err.Error(), "cannot import '"+filepath.Join(dir, "ghost.yaml")+"'") {
 		t.Errorf("missing import: %v", err)
+	}
+	writeFile(t, dir, "old.toml", "[bar]\nlocation = \"left\"\n")
+	toml := writeFile(t, dir, "t.yaml", "imports: [old.toml]\n")
+	_, err = LoadFile(toml)
+	if err == nil || !strings.Contains(err.Error(), "cannot import '"+filepath.Join(dir, "old.toml")+"': imports must be YAML") {
+		t.Errorf("a TOML import: %v", err)
 	}
 }
 
 func TestResolveImportPrefersYAMLForBareNames(t *testing.T) {
 	dir := t.TempDir()
-	base := filepath.Join(dir, "config.toml")
-	if got := resolveImport(base, "theme"); got != filepath.Join(dir, "theme.toml") {
-		t.Errorf("no sibling: %q, want the .toml fallback", got)
+	base := filepath.Join(dir, "config.yaml")
+	if got := resolveImport(base, "theme"); got != filepath.Join(dir, "theme.yaml") {
+		t.Errorf("no sibling: %q, want the .yaml fallback", got)
+	}
+	writeFile(t, dir, "theme.toml", "a = 1\n")
+	if got := resolveImport(base, "theme"); got != filepath.Join(dir, "theme.yaml") {
+		t.Errorf("a toml sibling: %q, want the .yaml fallback", got)
 	}
 	writeFile(t, dir, "theme.yml", "a: 1\n")
 	if got := resolveImport(base, "theme"); got != filepath.Join(dir, "theme.yml") {
@@ -167,15 +218,19 @@ func TestResolveImportPrefersYAMLForBareNames(t *testing.T) {
 	if got := resolveImport(base, "theme"); got != filepath.Join(dir, "theme.yaml") {
 		t.Errorf("yaml sibling: %q, want .yaml before .yml", got)
 	}
-	if got := resolveImport(base, "/abs/x.toml"); got != "/abs/x.toml" {
+	if got := resolveImport(base, "/abs/x.yaml"); got != "/abs/x.yaml" {
 		t.Errorf("absolute import: %q", got)
 	}
 }
 
-func TestDiscoverMainPrefersYAML(t *testing.T) {
+func TestDiscoverMainIsYAMLOnly(t *testing.T) {
 	dir := t.TempDir()
-	if got := DiscoverMain(dir); got != filepath.Join(dir, "config.toml") {
+	if got := DiscoverMain(dir); got != filepath.Join(dir, "config.yaml") {
 		t.Errorf("empty dir: %q", got)
+	}
+	writeFile(t, dir, "config.toml", "")
+	if got := DiscoverMain(dir); got != filepath.Join(dir, "config.yaml") {
+		t.Errorf("a config.toml was discovered: %q", got)
 	}
 	writeFile(t, dir, "config.yml", "")
 	if got := DiscoverMain(dir); got != filepath.Join(dir, "config.yml") {
@@ -204,8 +259,8 @@ func TestDirFollowsXDG(t *testing.T) {
 }
 
 func TestClampedNewtypesWarnAndClamp(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml",
-		"[bar]\nbackground-opacity = 150\nscale = 9\npadding = \"nope\"\n[modules.cava]\nbars = 0\n")
+	path := writeFile(t, t.TempDir(), "config.yaml",
+		"bar:\n  background-opacity: 150\n  scale: 9\n  padding: nope\nmodules:\n  cava:\n    bars: 0\n")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("clamping is not an error: %v", err)
@@ -219,10 +274,11 @@ func TestClampedNewtypesWarnAndClamp(t *testing.T) {
 }
 
 func TestBarLayoutItemsFollowTheUntaggedOrder(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.toml", `
-[[bar.layout]]
-monitor = "DP-1"
-left = ["clock", { module = "clock", class = "primary" }, { name = "g", modules = ["battery"] }]
+	path := writeFile(t, t.TempDir(), "config.yaml", `
+bar:
+  layout:
+    - monitor: DP-1
+      left: [clock, {module: clock, class: primary}, {name: g, modules: [battery]}]
 `)
 	cfg, err := LoadFile(path)
 	if err != nil {
@@ -237,7 +293,7 @@ left = ["clock", { module = "clock", class = "primary" }, { name = "g", modules 
 	if right := cfg.Bar.Layout[0].Right; len(right) != 5 {
 		t.Errorf("right = %+v, want the default layout's right section", right)
 	}
-	bad := writeFile(t, t.TempDir(), "config.toml", "[[bar.layout]]\nleft = [\"nope\"]\n")
+	bad := writeFile(t, t.TempDir(), "config.yaml", "bar:\n  layout:\n    - left: [nope]\n")
 	cfg, err = LoadFile(bad)
 	if err == nil || !strings.Contains(err.Error(), "data did not match any variant of untagged enum BarItem") {
 		t.Errorf("unknown module: %v", err)
@@ -248,7 +304,7 @@ left = ["clock", { module = "clock", class = "primary" }, { name = "g", modules 
 }
 
 func TestLoadErrorUnwraps(t *testing.T) {
-	_, err := LoadFile(writeFile(t, t.TempDir(), "config.toml", "[bar\n"))
+	_, err := LoadFile(writeFile(t, t.TempDir(), "config.yaml", "bar: [unclosed\n"))
 	if _, ok := errors.AsType[*LoadError](err); !ok {
 		t.Fatalf("syntax error = %T %v, want a LoadError", err, err)
 	}
@@ -257,7 +313,7 @@ func TestLoadErrorUnwraps(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chmod(dir, 0o700) }()
-	if _, err := LoadFile(filepath.Join(dir, "sub", "config.toml")); err == nil || errors.Is(err, fs.ErrNotExist) {
+	if _, err := LoadFile(filepath.Join(dir, "sub", "config.yaml")); err == nil || errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("unwritable dir: %v", err)
 	}
 }

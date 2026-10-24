@@ -73,16 +73,16 @@ type VolumeConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.volume.thresholds]]
-	// above = 100
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
-	//
-	// [[modules.volume.thresholds]]
-	// above = 130
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   volume:
+	//     thresholds:
+	//       - above: 100
+	//         icon-color: status-warning
+	//         label-color: status-warning
+	//       - above: 130
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

@@ -125,7 +125,7 @@ func (a *layerApply) applyLeaf(dst reflect.Value, v any, path string) error {
 			setStaged(a.staged, path, encodeValue(dst))
 		}
 		if a.overridden != nil && a.overridden(path) {
-			d := Diagnostic{Kind: DiagnosticWarning, Title: "config.toml change ignored"}.
+			d := Diagnostic{Kind: DiagnosticWarning, Title: "config file change ignored"}.
 				field("Field", path).
 				field("Reason", "runtime override active")
 			d.Hint = "lys-shell config reset " + path
@@ -135,10 +135,10 @@ func (a *layerApply) applyLeaf(dst reflect.Value, v any, path string) error {
 	return nil
 }
 
-// formatDiagnosticValue is property/config.rs format_toml_value: the
-// pretty TOML of a table, else the value's Debug form.
+// formatDiagnosticValue is the YAML document of a table, else the
+// value's debug form.
 func formatDiagnosticValue(v any) string {
-	if s, err := tomlPretty(v); err == nil {
+	if s, err := yamlDocument(v); err == nil {
 		return strings.TrimSpace(s)
 	}
 	return debugValue(v)

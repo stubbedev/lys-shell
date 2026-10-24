@@ -11,10 +11,11 @@ Memory and swap usage.
 
 Add it to your layout with `ram`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["ram"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [ram]
 ```
 
 ## General
@@ -66,16 +67,16 @@ color slot. Use `above` for high-value warnings (e.g., high memory usage).
 
 #### Example
 
-```toml
-[[modules.ram.thresholds]]
-above = 80
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.ram.thresholds]]
-above = 95
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+modules:
+  ram:
+    thresholds:
+      - above: 80
+        icon-color: status-warning
+        label-color: status-warning
+      - above: 95
+        icon-color: status-error
+        label-color: status-error
 ```
 
 :::
@@ -102,26 +103,27 @@ label-color = "status-error"
 
 ## Default configuration
 
-```toml
-[modules.ram]
-poll-interval-ms = 5000
-format = "{{ percent }}%"
-icon-name = "ld-memory-stick-symbolic"
-border-show = false
-border-color = "green"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "green"
-label-show = true
-label-color = "green"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = ""
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-thresholds = []
+```yaml
+modules:
+  ram:
+    poll-interval-ms: 5000
+    format: '{{ percent }}%'
+    icon-name: ld-memory-stick-symbolic
+    border-show: false
+    border-color: green
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: green
+    label-show: true
+    label-color: green
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: ""
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    thresholds: []
 ```
 
 

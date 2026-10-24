@@ -19,15 +19,15 @@ import (
 // Main configuration structure for lys-shell.
 //
 // Represents the complete configuration schema that can be loaded
-// from TOML files. All fields have sensible defaults.
+// from YAML files. All fields have sensible defaults.
 type Config struct {
-	// TOML files to import and merge before this config.
+	// YAML files to import and merge before this config.
 	//
 	// Paths are relative to the config file.
 	// Imported values are overridden by values in this file.
 	//
-	// ```toml
-	// imports = ["themes.toml", "modules/clock.toml"]
+	// ```yaml
+	// imports: [themes.yaml, modules/clock.yaml]
 	// ```
 	Imports []string `cfg:"imports,nolayer"`
 	// General lys-shell settings.
@@ -89,24 +89,21 @@ func Dir() (string, error) {
 	return filepath.Join(home, ".config", "lys-shell"), nil
 }
 
-// DiscoverMain resolves the user's main config file inside dir,
-// preferring YAML over TOML: config.yaml, config.yml, then config.toml.
-// When no config file exists yet, the config.toml path is returned, so
-// fresh installs and explicit missing-file handling agree on one path.
+// DiscoverMain resolves the user's main config file inside dir:
+// config.yaml, else an existing config.yml. When neither exists yet,
+// the config.yaml path is returned, so fresh installs and explicit
+// missing-file handling agree on one path.
 func DiscoverMain(dir string) string {
-	for _, name := range []string{"config.yaml", "config.yml"} {
-		candidate := filepath.Join(dir, name)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
+	main := filepath.Join(dir, "config.yaml")
+	if yml := filepath.Join(dir, "config.yml"); !fileExists(main) && fileExists(yml) {
+		return yml
 	}
-	return filepath.Join(dir, "config.toml")
+	return main
 }
 
 // LoadFile loads one main config file with its imports onto the
 // defaults. A file-level failure (unreadable, unparseable, a broken
-// import) returns the defaults with that error — the Rust shell's
-// "using defaults, config.toml failed". A bad value in one field keeps
+// import) returns the defaults with that error. A bad value in one field keeps
 // that field's default and applies the rest; those field errors are
 // returned joined, as diagnostics.
 func LoadFile(path string) (*Config, error) {

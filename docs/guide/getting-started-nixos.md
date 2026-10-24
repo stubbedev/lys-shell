@@ -43,7 +43,7 @@ home-manager:
     # wl-clipboard, xdg-utils)
     autoInstallDependencies = true;
     settings = {
-      # written to ~/.config/lys-shell/config.toml
+      # written to ~/.config/lys-shell/config.yaml
       bar.layout = [
         {
           monitor = "*";
@@ -77,8 +77,8 @@ You can also use the package directly
     # xdg-utils, and notmuch when the mail module is used).
     autoInstallDependencies = true;
 
-    # tip: you can automatically translate your TOML config to Nix by running
-    # nix-instantiate --eval --expr 'builtins.fromTOML (builtins.readFile ./config.toml)' | nixfmt
+    # tip: you can automatically translate your YAML config to Nix by running
+    # nix-instantiate --eval --strict --argstr json "$(yq -o json config.yaml)" --expr '{ json }: builtins.fromJSON json' | nixfmt
     settings = {
       bar = {
         layout = [
@@ -137,23 +137,23 @@ You can also use the package directly
 lys-shell panel settings
 ```
 
-This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
+This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
 
 > [!WARNING]
 > If you configured theming using matugen/wallust/pywal, do not forget to install these dependencies! With `autoInstallDependencies = true` the home-manager module installs the matching theme-provider tool for you.
 
-After configuring lys-shell using GUI, there should be a new `.config/lys-shell/runtime.toml` file. To automatically convert it to Nix, run
+After configuring lys-shell using GUI, there should be a new `.config/lys-shell/runtime.yaml` file. To automatically convert it to Nix, merge it over `config.yaml` with [yq](https://github.com/mikefarah/yq) (`nixpkgs#yq-go`) and run
 ```sh
 cd ~/.config/lys-shell
-nix-instantiate --eval --expr '(builtins.fromTOML (builtins.readFile ./config.toml)) // (builtins.fromTOML (builtins.readFile ./runtime.toml))' | nixfmt
+nix-instantiate --eval --strict --argstr json "$(yq eval-all -o json '. as $f ireduce ({}; . * $f)' config.yaml runtime.yaml)" --expr '{ json }: builtins.fromJSON json' | nixfmt
 ```
-If one of those files does not exist run the following command, replacing `config.toml` with `runtime.toml` if appropriate.
+If one of those files does not exist run the following command, replacing `config.yaml` with `runtime.yaml` if appropriate.
 ```sh
-nix-instantiate --eval --expr 'builtins.fromTOML (builtins.readFile ./config.toml)' | nixfmt
+nix-instantiate --eval --strict --argstr json "$(yq -o json config.yaml)" --expr '{ json }: builtins.fromJSON json' | nixfmt
 ```
 
 Then you can copy-paste this into the `programs.lys-shell.settings` option provided by the home-manager module.
 
 ## Configuration
 
-If you want to edit the raw `config.toml`, refer to the [Editing config](/guide/editing-config) page (note that Tombi doesn't work when config is symlinked to `/nix/store`, you need to create a normal file first).
+If you want to edit the raw `config.yaml`, refer to the [Editing config](/guide/editing-config) page.

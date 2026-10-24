@@ -8,18 +8,13 @@ package config
 // At least one of `above` or `below` must be set. When both are set,
 // both conditions must be satisfied (AND logic).
 //
-// ## TOML Example
+// ## YAML Example
 //
-// ```toml
-// [[modules.cpu.thresholds]]
-// above = 70
-// icon-color = "status-warning"
-// label-color = "status-warning"
-//
-// [[modules.cpu.thresholds]]
-// above = 90
-// icon-color = "status-error"
-// label-color = "status-error"
+// ```yaml
+// # under modules.cpu
+// thresholds:
+// - {above: 70, icon-color: status-warning, label-color: status-warning}
+// - {above: 90, icon-color: status-error, label-color: status-error}
 // ```
 type ThresholdEntry struct {
 	// Activate when metric value >= this threshold.

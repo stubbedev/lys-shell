@@ -11,10 +11,11 @@ Quick-access button with a distro icon; opens the dashboard dropdown.
 
 Add it to your layout with `dashboard`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["dashboard"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [dashboard]
 ```
 
 ## General
@@ -60,36 +61,35 @@ right = ["dashboard"]
 
 ## Default configuration
 
-```toml
-[modules.dashboard]
-icon-override = ""
-border-show = false
-border-color = "yellow"
-icon-color = "auto"
-icon-bg-color = "yellow"
-right-click = ""
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
-left-click = "dropdown:dashboard"
-dropdown-lock-command = "loginctl lock-session"
-dropdown-logout-command = "loginctl terminate-session $XDG_SESSION_ID"
-dropdown-reboot-command = "systemctl reboot"
-dropdown-poweroff-command = "systemctl poweroff"
-usage-warning = 60.0
-usage-error = 85.0
-temp-warning = 65.0
-temp-error = 85.0
-battery-warning = 30.0
-battery-critical = 15.0
-
-[modules.dashboard.user-session]
-actions = [
-    "lock",
-    "log-out",
-    "reboot",
-    "power-off",
-]
+```yaml
+modules:
+  dashboard:
+    icon-override: ""
+    border-show: false
+    border-color: yellow
+    icon-color: auto
+    icon-bg-color: yellow
+    right-click: ""
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
+    left-click: dropdown:dashboard
+    dropdown-lock-command: loginctl lock-session
+    dropdown-logout-command: loginctl terminate-session $XDG_SESSION_ID
+    dropdown-reboot-command: systemctl reboot
+    dropdown-poweroff-command: systemctl poweroff
+    usage-warning: 60.0
+    usage-error: 85.0
+    temp-warning: 65.0
+    temp-error: 85.0
+    battery-warning: 30.0
+    battery-critical: 15.0
+    user-session:
+      actions:
+        - lock
+        - log-out
+        - reboot
+        - power-off
 ```
 
 

@@ -13,10 +13,11 @@ Controllable from the CLI: `lys-shell idle on|off|duration|remaining|status`.
 
 Add it to your layout with `idle-inhibit`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["idle-inhibit"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [idle-inhibit]
 ```
 
 ## General
@@ -70,26 +71,27 @@ right = ["idle-inhibit"]
 
 ## Default configuration
 
-```toml
-[modules.idle-inhibit]
-startup-duration = 60
-icon-inactive = "tb-coffee-off-symbolic"
-icon-active = "tb-coffee-symbolic"
-format = "{{ state }}"
-border-show = false
-border-color = "green"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "green"
-label-show = true
-label-color = "green"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "lys-shell idle toggle --indefinite"
-right-click = "lys-shell idle toggle"
-middle-click = ""
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  idle-inhibit:
+    startup-duration: 60
+    icon-inactive: tb-coffee-off-symbolic
+    icon-active: tb-coffee-symbolic
+    format: '{{ state }}'
+    border-show: false
+    border-color: green
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: green
+    label-show: true
+    label-color: green
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: lys-shell idle toggle --indefinite
+    right-click: lys-shell idle toggle
+    middle-click: ""
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

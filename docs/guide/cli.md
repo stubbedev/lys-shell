@@ -25,7 +25,7 @@ lys-shell config get bar.scale
 lys-shell config set bar.scale 1.25
 lys-shell config reset bar.scale
 
-# Emit the JSON schema, default TOML, or markdown docs
+# Emit the JSON schema, default YAML, or markdown docs
 lys-shell config schema --stdout
 lys-shell config default --stdout
 lys-shell config docs --out docs/config

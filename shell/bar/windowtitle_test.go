@@ -150,8 +150,8 @@ func TestNewWindowTitleNeedsACompositor(t *testing.T) {
 }
 
 func TestLoadFileAppliesWindowTitle(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.window-title]\nformat = \"{{ app }} | {{ title }}\"\nlabel-max-length = 12\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  window-title:\n    format: \"{{ app }} | {{ title }}\"\n    label-max-length: 12\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestLoadFileAppliesWindowTitle(t *testing.T) {
 		t.Errorf("config = %+v", c.WindowTitle)
 	}
 
-	if err := os.WriteFile(path, []byte("[modules.window-title]\nlabel-max-length = -3\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("modules:\n  window-title:\n    label-max-length: -3\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(path); err == nil {

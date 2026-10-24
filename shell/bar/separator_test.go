@@ -71,8 +71,8 @@ func TestSeparatorMeasureIsNatural(t *testing.T) {
 type widgetPoint = struct{ X, Y int }
 
 func TestLoadFileAppliesSeparator(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.separator]\ncolor = \"#f38ba8\"\nlength = \"12px\"\nsize = 2\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  separator:\n    color: \"#f38ba8\"\n    length: 12px\n    size: 2\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -94,9 +94,9 @@ func TestLoadFileAppliesSeparator(t *testing.T) {
 
 func TestLoadFileRejectsBadSeparator(t *testing.T) {
 	for _, content := range []string{
-		"[modules.separator]\ncolor = \"not-a-token\"\n",
+		"modules:\n  separator:\n    color: not-a-token\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

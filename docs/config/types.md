@@ -125,34 +125,38 @@ Named group of modules. The name becomes a CSS ID selector.
 
 One entry in a bar layout section (`left`, `center`, or `right`).
 
-Three shapes are accepted, all interchangeable in the same array:
+Three shapes are accepted, all interchangeable in the same list:
 
-- A plain module name: `"clock"`
-- A module with a CSS class for per-instance styling: `{ module = "clock", class = "primary" }`
+- A plain module name: `clock`
+- A module with a CSS class for per-instance styling: `{module: clock, class: primary}`
 - A named group that wraps several modules in a shared container, addressable by CSS ID
 
 ### Examples
 
-```toml
-[[bar.layout]]
-monitor = "*"
+```yaml
+bar:
+  layout:
+    - monitor: "*"
 
-# Plain module
-left = ["dashboard"]
+      # Plain module
+      left: [dashboard]
 
-# Mix of plain and classed modules on the same side
-center = ["clock", { module = "clock", class = "secondary" }]
+      # Mix of plain and classed modules on the same side
+      center:
+        - clock
+        - {module: clock, class: secondary}
 
-# Named group (renders inside a GTK container with CSS ID `#status`)
-right = [{ name = "status", modules = ["battery", "network", "volume"] }]
+      # Named group (renders inside a GTK container with CSS ID `#status`)
+      right:
+        - {name: status, modules: [battery, network, volume]}
 
-# Groups can hold classed modules too
-[[bar.layout]]
-monitor = "DP-2"
-left = [{ name = "clocks", modules = [
-  { module = "clock", class = "local" },
-  { module = "world-clock", class = "remote" }
-]}]
+    # Groups can hold classed modules too
+    - monitor: DP-2
+      left:
+        - name: clocks
+          modules:
+            - {module: clock, class: local}
+            - {module: world-clock, class: remote}
 ```
 
 ## BarLayout {#bar-layout}
@@ -161,49 +165,47 @@ Layout configuration for a bar on a specific monitor.
 
 ### Examples
 
-```toml
+```yaml
 # Single modules
-[[bar.layout]]
-monitor = "*"
-left = ["dashboard"]
-center = ["clock"]
-right = ["systray"]
+bar:
+  layout:
+    - monitor: "*"
+      left: [dashboard]
+      center: [clock]
+      right: [systray]
 
-# Module with custom CSS class for per-instance styling
-[[bar.layout]]
-monitor = "DP-1"
-left = [{ module = "clock", class = "primary-clock" }, "clock"]
-center = ["media"]
+    # Module with custom CSS class for per-instance styling
+    - monitor: DP-1
+      left:
+        - {module: clock, class: primary-clock}
+        - clock
+      center: [media]
 
-# Grouped modules (share a visual container, CSS-targetable by name)
-[[bar.layout]]
-monitor = "DP-2"
-left = [{ name = "status", modules = ["battery", "network"] }]
+    # Grouped modules (share a visual container, CSS-targetable by name)
+    - monitor: DP-2
+      left:
+        - {name: status, modules: [battery, network]}
 
-# Groups can also contain classed modules
-[[bar.layout]]
-monitor = "DP-3"
-left = [{ name = "clocks", modules = [
-  { module = "clock", class = "local" },
-  { module = "world-clock", class = "remote" }
-]}]
+    # Groups can also contain classed modules
+    - monitor: DP-3
+      left:
+        - name: clocks
+          modules:
+            - {module: clock, class: local}
+            - {module: world-clock, class: remote}
 
-# Inherit from another layout
-[[bar.layout]]
-monitor = "*"
-left = ["dashboard"]
-center = ["clock"]
-right = ["systray"]
+    # Inherit from another layout
+    - monitor: "*"
+      left: [dashboard]
+      center: [clock]
+      right: [systray]
+    - monitor: HDMI-1
+      extends: "*"
+      right: [volume, systray]  # Override just this section
 
-[[bar.layout]]
-monitor = "HDMI-1"
-extends = "*"
-right = ["volume", "systray"]  # Override just this section
-
-# Hide bar on a specific monitor
-[[bar.layout]]
-monitor = "HDMI-2"
-show = false
+    # Hide bar on a specific monitor
+    - monitor: HDMI-2
+      show: false
 ```
 
 | Field | Description |
@@ -669,18 +671,15 @@ How the lock screen background is rendered.
 
 ## MailAccount {#mail-account}
 
-One mail account in the `[modules.mail]` per-account breakdown.
+One mail account in the `modules.mail` per-account breakdown.
 
 Each account has its own notmuch query; the dropdown shows the per-account
 unread counts and the bar shows their sum.
 
 ### Example
 
-```toml
-[[modules.mail.accounts]]
-name = "Work"
-query = "folder:work/INBOX and tag:unread"
-provider = "gmail"
+```yaml
+modules: {mail: {accounts: [{name: Work, query: "folder:work/INBOX and tag:unread", provider: gmail}]}}
 ```
 
 | Field | Description |
@@ -737,12 +736,13 @@ Reference to a module, optionally with a custom CSS class.
 
 ### Examples
 
-```toml
+```yaml
 # Plain module (just the name)
-left = ["clock"]
+left: [clock]
 
 # Module with custom CSS class
-left = [{ module = "clock", class = "primary-clock" }]
+left:
+  - {module: clock, class: primary-clock}
 ```
 
 ## MonitorWallpaperConfig {#monitor-wallpaper-config}
@@ -1038,18 +1038,13 @@ A threshold entry that maps a numeric value range to color overrides.
 At least one of `above` or `below` must be set. When both are set,
 both conditions must be satisfied (AND logic).
 
-### TOML Example
+### YAML Example
 
-```toml
-[[modules.cpu.thresholds]]
-above = 70
-icon-color = "status-warning"
-label-color = "status-warning"
-
-[[modules.cpu.thresholds]]
-above = 90
-icon-color = "status-error"
-label-color = "status-error"
+```yaml
+# under modules.cpu
+thresholds:
+- {above: 70, icon-color: status-warning, label-color: status-warning}
+- {above: 90, icon-color: status-error, label-color: status-error}
 ```
 
 | Field | Description |
@@ -1082,11 +1077,8 @@ stored on the preset. Duration always follows the OSD config.
 
 ### Example
 
-```toml
-[[osd.presets]]
-id = "saved"
-label = "Saved"
-icon = "ld-check-symbolic"
+```yaml
+osd: {presets: [{id: saved, label: Saved, icon: ld-check-symbolic}]}
 
 # Fire it: lys-shell toast --preset saved
 # With a progress bar: lys-shell toast --preset saved --percentage 80
@@ -1138,9 +1130,8 @@ Falls back to `workspace` when app icons are disabled. |
 Settings for user session the in dashboard
 ### Examples
 
-```toml
-[modules.dashboard.user-session]
-actions = [ "lock", "log-out", "reboot", "power-off" ]
+```yaml
+modules: {dashboard: {user-session: {actions: [lock, log-out, reboot, power-off]}}}
 ```
 
 | Field | Description |
@@ -1245,29 +1236,22 @@ String.
 
 Per-workspace icon and color overrides, keyed by workspace ID.
 
-TOML table keys are always strings, so `"1"` parses into the workspace
+Keys are written as strings, so `"1"` parses into the workspace
 with ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys
 that don't appear in the map fall back to the default behaviour set by
 [`HyprlandWorkspacesConfig::display_mode`].
 
 ### Examples
 
-```toml
-[modules.hyprland-workspaces.workspace-map]
-# Whole entry on one line with an inline table
-1 = { label = "Web", icon = "ld-globe-symbolic", color = "#4a90d9" }
-2 = { icon = "ld-terminal-symbolic" }
-3 = { icon = "ld-code-symbolic", color = "accent" }
-
-# Or spread the entry across its own subtable
-[modules.hyprland-workspaces.workspace-map.4]
-label = "Chat"
-icon = "ld-message-square-symbolic"
-color = "status-success"
+```yaml
+# under modules.hyprland-workspaces.workspace-map
+"1": {label: Web, icon: ld-globe-symbolic, color: "#4a90d9"}
+"2": {icon: ld-terminal-symbolic}
+"3": {icon: ld-code-symbolic, color: accent}
+"4": {label: Chat, icon: ld-message-square-symbolic, color: status-success}
 
 # Negative IDs target Hyprland special workspaces
-[modules.hyprland-workspaces.workspace-map.-99]
-icon = "ld-scratch-symbolic"
+"-99": {icon: ld-scratch-symbolic}
 ```
 
 ## WorkspaceStyle {#workspace-style}

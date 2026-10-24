@@ -249,19 +249,17 @@ func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
 }
 
 func TestLoadFileAppliesBattery(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
+	path := filepath.Join(t.TempDir(), "config.yaml")
 	content := `
-[modules.battery]
-format = "Bat {{ percent }}"
-label-show = false
-
-[[modules.battery.thresholds]]
-below = 15
-icon-color = "status-error"
-
-[[modules.battery.thresholds]]
-above = 90
-icon-color = "status-success"
+modules:
+  battery:
+    format: "Bat {{ percent }}"
+    label-show: false
+    thresholds:
+      - below: 15
+        icon-color: status-error
+      - above: 90
+        icon-color: status-success
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -286,11 +284,11 @@ icon-color = "status-success"
 
 func TestLoadFileRejectsBadBattery(t *testing.T) {
 	for _, content := range []string{
-		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nicon-color = \"nope\"\n",
-		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = \"low\"\n",
-		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nlabel-color = \"nope\"\n",
+		"modules:\n  battery:\n    thresholds:\n      - below: 10\n        icon-color: nope\n",
+		"modules:\n  battery:\n    thresholds:\n      - below: low\n",
+		"modules:\n  battery:\n    thresholds:\n      - below: 10\n        label-color: nope\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

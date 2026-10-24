@@ -33,17 +33,16 @@ Bar chrome: per-monitor layout, spacing, colors, and button styling.
 
 #### Example
 
-```toml
-[[bar.layout]]
-monitor = "*"
-left = ["dashboard"]
-center = ["clock"]
-right = ["battery", "network", "volume", "systray"]
-
-[[bar.layout]]
-monitor = "HDMI-1"
-extends = "*"
-right = ["volume", "systray"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      left: [dashboard]
+      center: [clock]
+      right: [battery, network, volume, systray]
+    - monitor: HDMI-1
+      extends: "*"
+      right: [volume, systray]
 ```
 
 :::
@@ -129,49 +128,49 @@ dropdown anchored in place.
 
 ## Default configuration
 
-```toml
-[bar]
-scale = 1.0
-inset-edge = 0.0
-inset-ends = 0.0
-padding = 0.3499999940395355
-padding-ends = 0.5
-module-gap = 0.5
-location = "top"
-exclusive = true
-layer = "top"
-bg = "bg-surface"
-background-opacity = 100
-border-location = "none"
-border-width = 1
-border-color = "border-accent"
-rounding = "none"
-shadow = "none"
-button-variant = "block-prefix"
-button-opacity = 100
-button-bg-opacity = 100
-button-icon-size = 1.0
-button-icon-padding = 1.0
-button-label-size = 1.0
-button-label-weight = "semibold"
-button-label-padding = 1.0
-button-rounding = "sm"
-button-gap = 1.0
-button-icon-position = "start"
-button-border-location = "all"
-button-border-width = 1
-button-group-border-location = "none"
-button-group-border-width = 1
-button-group-padding = 0.0
-button-group-module-gap = 0.25
-button-group-background = "bg-elevated"
-button-group-opacity = 100
-button-group-border-color = "border-accent"
-button-group-rounding = "sm"
-dropdown-shadow = true
-dropdown-opacity = 100
-dropdown-autohide = true
-dropdown-freeze-label = true
+```yaml
+bar:
+  scale: 1.0
+  inset-edge: 0.0
+  inset-ends: 0.0
+  padding: 0.3499999940395355
+  padding-ends: 0.5
+  module-gap: 0.5
+  location: top
+  exclusive: true
+  layer: top
+  bg: bg-surface
+  background-opacity: 100
+  border-location: none
+  border-width: 1
+  border-color: border-accent
+  rounding: none
+  shadow: none
+  button-variant: block-prefix
+  button-opacity: 100
+  button-bg-opacity: 100
+  button-icon-size: 1.0
+  button-icon-padding: 1.0
+  button-label-size: 1.0
+  button-label-weight: semibold
+  button-label-padding: 1.0
+  button-rounding: sm
+  button-gap: 1.0
+  button-icon-position: start
+  button-border-location: all
+  button-border-width: 1
+  button-group-border-location: none
+  button-group-border-width: 1
+  button-group-padding: 0.0
+  button-group-module-gap: 0.25
+  button-group-background: bg-elevated
+  button-group-opacity: 100
+  button-group-border-color: border-accent
+  button-group-rounding: sm
+  dropdown-shadow: true
+  dropdown-opacity: 100
+  dropdown-autohide: true
+  dropdown-freeze-label: true
 ```
 
 

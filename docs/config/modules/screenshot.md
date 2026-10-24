@@ -14,10 +14,11 @@ from the CLI / RPC socket: `lys-shell screenshot region|output|window`.
 
 Add it to your layout with `screenshot`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["screenshot"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [screenshot]
 ```
 
 ## General
@@ -57,28 +58,29 @@ right = ["screenshot"]
 
 ## Default configuration
 
-```toml
-[modules.screenshot]
-icon = "ld-camera-symbolic"
-output-directory = ""
-filename-format = "Screenshot_%Y-%m-%d_%H-%M-%S.png"
-copy-to-clipboard = true
-notify = true
-border-show = false
-border-color = "accent"
-icon-show = true
-icon-color = "auto"
-icon-bg-color = "accent"
-label = ""
-label-show = false
-label-color = "accent"
-label-max-length = 0
-button-bg-color = "bg-surface-elevated"
-left-click = "lys-shell screenshot region"
-right-click = "lys-shell screenshot output"
-middle-click = "lys-shell screenshot window"
-scroll-up = ""
-scroll-down = ""
+```yaml
+modules:
+  screenshot:
+    icon: ld-camera-symbolic
+    output-directory: ""
+    filename-format: Screenshot_%Y-%m-%d_%H-%M-%S.png
+    copy-to-clipboard: true
+    notify: true
+    border-show: false
+    border-color: accent
+    icon-show: true
+    icon-color: auto
+    icon-bg-color: accent
+    label: ""
+    label-show: false
+    label-color: accent
+    label-max-length: 0
+    button-bg-color: bg-surface-elevated
+    left-click: lys-shell screenshot region
+    right-click: lys-shell screenshot output
+    middle-click: lys-shell screenshot window
+    scroll-up: ""
+    scroll-down: ""
 ```
 
 

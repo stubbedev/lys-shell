@@ -31,7 +31,7 @@ Accepts the common rofi option surface (-p, -mesg, -multi-select, -matching,
 -theme-str) are accepted but ignored — style via lys-settings instead.
 Exit codes match rofi: 0 accept, 1 cancel, 10-28 for kb-custom-N.
 
-GEOMETRY (per invocation, overriding [launcher] in config.toml):
+GEOMETRY (per invocation, overriding launcher in config.yaml):
     -width 60        percent of the monitor's width
     -width -30       width in characters
     -width 600px     width in pixels
@@ -41,7 +41,7 @@ GEOMETRY (per invocation, overriding [launcher] in config.toml):
 
 APPEARANCE (per invocation):
     -font 'Inter 12'   font, as a Pango description
-    -style <name>      a named look from [launcher.styles] in config.toml
+    -style <name>      a named look from launcher.styles in config.yaml
 
 EVENT HOOKS (a command, run detached; {input} {entry} {mode} {error} are
 substituted, one placeholder per argument, and no shell is involved):
@@ -69,7 +69,7 @@ Local commands: -help, -version, -dump-config, -dump-theme, -list-keybindings`
 // themes.
 const launcherDumpTheme = `# lys-shell does not use rasi themes; the launcher is styled by the
 # lys-shell palette/SCSS system. See ` + "`lys-settings`" + ` (Launcher page)
-# and the [styling] config section.`
+# and the styling config section.`
 
 // runLauncher is `lys-shell launcher` (and the whole argv of a `rofi`
 // symlink): rofi's flag surface against the shell's launcher socket.
@@ -112,7 +112,7 @@ func runLauncherLocal(local launcherLocal, stdout io.Writer) error {
 		}
 		v, err := svc.GetByPath("launcher")
 		if err != nil {
-			return fmt.Errorf("failed to read [launcher]: %w", err)
+			return fmt.Errorf("failed to read the launcher config: %w", err)
 		}
 		_, err = fmt.Fprintln(stdout, config.FormatGetValue(v))
 		return err

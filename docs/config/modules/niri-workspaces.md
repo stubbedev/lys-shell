@@ -11,10 +11,11 @@ Niri workspace indicators with click-to-switch.
 
 Add it to your layout with `niri-workspaces`:
 
-```toml
-[[bar.layout]]
-monitor = "*"
-right = ["niri-workspaces"]
+```yaml
+bar:
+  layout:
+    - monitor: "*"
+      right: [niri-workspaces]
 ```
 
 ## General
@@ -24,7 +25,7 @@ right = ["niri-workspaces"]
 | `monitor-specific` | bool | `true` | Show only workspaces on this bar's monitor. |
 | `hide-trailing-empty` | bool | `true` | Hide niri's auto-allocated trailing empty workspace. |
 | `display-mode` | [`DisplayMode`](/config/types#display-mode) | `"label"` | What identifies each workspace button. |
-| `label-strategy` | [`LabelStrategy`](/config/types#label-strategy) | `"name-or-index"` | How to compose the workspace label when `display-mode = "label"`. |
+| `label-strategy` | [`LabelStrategy`](/config/types#label-strategy) | `"name-or-index"` | How to compose the workspace label when `display-mode: label`. |
 | `urgent-show` | bool | `true` | Pulse animation on workspaces with urgent windows. |
 | `urgent-mode` | [`UrgentMode`](/config/types#urgent-mode) | `"workspace"` | Where the urgent pulse is applied. |
 | `active-indicator` | [`ActiveIndicator`](/config/types#active-indicator) | `"background"` | Visual indicator for the active workspace. |
@@ -123,10 +124,12 @@ In `background` indicator mode, also used as the button background.
 
 #### Example
 
-```toml
-[modules.niri-workspaces.workspace-map]
-web = { icon = "ld-globe-symbolic", color = "#4a90d9" }
-terminal = { icon = "ld-terminal-symbolic" }
+```yaml
+modules:
+  niri-workspaces:
+    workspace-map:
+      web: {icon: ld-globe-symbolic, color: "#4a90d9"}
+      terminal: {icon: ld-terminal-symbolic}
 ```
 
 :::
@@ -140,50 +143,51 @@ Maps window `app_id` or title to symbolic icon names. Supports:
 
 #### Example
 
-```toml
-[modules.niri-workspaces.app-icon-map]
-"*firefox*" = "ld-globe-symbolic"
-"title:*YouTube*" = "ld-youtube-symbolic"
+```yaml
+modules:
+  niri-workspaces:
+    app-icon-map:
+      "*firefox*": ld-globe-symbolic
+      "title:*YouTube*": ld-youtube-symbolic
 ```
 
 :::
 
 ## Default configuration
 
-```toml
-[modules.niri-workspaces]
-monitor-specific = true
-hide-trailing-empty = true
-display-mode = "label"
-label-strategy = "name-or-index"
-urgent-show = true
-urgent-mode = "workspace"
-active-indicator = "background"
-divider = " "
-app-icons-show = false
-app-icons-dedupe = true
-app-icons-fallback = "ld-app-window-symbolic"
-app-icons-empty = "tb-minus-symbolic"
-icon-gap = 0.30000001192092896
-workspace-padding = 0.5
-icon-size = 1.0
-label-size = 1.0
-workspace-ignore = []
-active-color = "accent"
-occupied-color = "fg-muted"
-empty-color = "fg-subtle"
-container-bg-color = "bg-surface-elevated"
-border-show = false
-border-color = "border-default"
-left-click = "focus:this"
-middle-click = ""
-right-click = ""
-scroll-up = "focus:previous"
-scroll-down = "focus:next"
-
-[modules.niri-workspaces.workspace-map]
-
-[modules.niri-workspaces.app-icon-map]
+```yaml
+modules:
+  niri-workspaces:
+    monitor-specific: true
+    hide-trailing-empty: true
+    display-mode: label
+    label-strategy: name-or-index
+    urgent-show: true
+    urgent-mode: workspace
+    active-indicator: background
+    divider: ' '
+    app-icons-show: false
+    app-icons-dedupe: true
+    app-icons-fallback: ld-app-window-symbolic
+    app-icons-empty: tb-minus-symbolic
+    icon-gap: 0.30000001192092896
+    workspace-padding: 0.5
+    icon-size: 1.0
+    label-size: 1.0
+    workspace-ignore: []
+    active-color: accent
+    occupied-color: fg-muted
+    empty-color: fg-subtle
+    container-bg-color: bg-surface-elevated
+    border-show: false
+    border-color: border-default
+    workspace-map: {}
+    app-icon-map: {}
+    left-click: focus:this
+    middle-click: ""
+    right-click: ""
+    scroll-up: focus:previous
+    scroll-down: focus:next
 ```
 
 

@@ -1,35 +1,25 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"maps"
 	"math"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/BurntSushi/toml"
 	"go.yaml.in/yaml/v3"
 )
 
-// The layer tree is the format-agnostic value model every config file
-// parses into, like the Rust loader's toml::Value: YAML and TOML files
-// both become it, so imports, merging, and the layers never care which
-// format a file was. Parsed values are:
+// The layer tree is the value model every config file parses into, so
+// imports, merging, and the layers work on one shape. Parsed values
+// are:
 //
-//	string | int64 | float64 | bool | datetime | []any | map[string]any
+//	string | int64 | float64 | bool | []any | map[string]any
 //
 // Trees produced by encoding typed values additionally hold *table (an
-// insertion-ordered table, the Rust preserve_order map), float32
-// (serde's f32, kept so pretty output prints 0.35 rather than its
-// widened f64), and uint64 above the int64 range.
-
-// datetime is a TOML date-time literal carried verbatim; no config key
-// takes one, so it only ever reaches an "invalid type" diagnostic.
-type datetime string
+// insertion-ordered table), float32 (kept so output prints 0.35 rather
+// than its widened f64), and uint64 above the int64 range.
 
 // table is an insertion-ordered string-keyed table.
 type table struct {
@@ -103,85 +93,54 @@ func isTable(v any) bool {
 	return false
 }
 
-// isYAMLPath reports whether path is parsed as YAML (.yaml/.yml);
-// anything else is TOML (loading/mod.rs is_yaml_path).
-func isYAMLPath(path string) bool {
-	switch filepath.Ext(path) {
-	case ".yaml", ".yml":
-		return true
-	}
-	return false
-}
+// ParseYAML parses a YAML document into the tree shapes SetByPath
+// takes (the loader's own parse). The root must be a mapping.
+func ParseYAML(text string) (map[string]any, error) { return parseYAML([]byte(text)) }
 
-// parseDocument parses one config file into the layer tree, picking the
-// format from the extension.
-func parseDocument(data []byte, path string) (any, error) {
-	if isYAMLPath(path) {
-		return parseYAML(data)
-	}
-	return parseTOML(data)
-}
-
-// ParseTOML parses a TOML document into the tree shapes SetByPath
-// takes (the loader's own parse).
-func ParseTOML(text string) (map[string]any, error) {
-	v, err := parseTOML([]byte(text))
-	if err != nil {
-		return nil, err
-	}
-	m, _ := v.(map[string]any)
-	return m, nil
-}
-
-func parseTOML(data []byte) (any, error) {
-	var doc map[string]any
-	if _, err := toml.Decode(string(data), &doc); err != nil {
-		return nil, err
-	}
-	return normalizeTOML(doc), nil
-}
-
-// normalizeTOML maps BurntSushi's decoded shapes onto the tree kinds.
-func normalizeTOML(v any) any {
-	switch t := v.(type) {
-	case map[string]any:
-		for k, child := range t {
-			t[k] = normalizeTOML(child)
-		}
-		return t
-	case []map[string]any:
-		out := make([]any, len(t))
-		for i, child := range t {
-			out[i] = normalizeTOML(child)
-		}
-		return out
-	case []any:
-		for i, child := range t {
-			t[i] = normalizeTOML(child)
-		}
-		return t
-	case time.Time:
-		return datetime(t.Format(time.RFC3339Nano))
-	case string, int64, float64, bool:
-		return t
-	}
-	return datetime(fmt.Sprint(v))
-}
-
-// parseYAML reads a YAML document into the tree the way serde_yaml
-// deserializes into toml::Value: mappings become tables (keys taken as
-// strings), sequences arrays, and scalars resolve by the YAML core
-// schema. TOML has no null, so a null anywhere — including an empty
-// document — is the same error serde reports.
-func parseYAML(data []byte) (any, error) {
+// parseYAML reads a config document into the tree: mappings become
+// tables (keys taken as strings), sequences arrays, and scalars resolve
+// by the YAML core schema. The root must be a mapping of sections; an
+// empty document (nothing but comments) is an empty table. A null
+// anywhere has no config meaning and is an error naming its line.
+func parseYAML(data []byte) (map[string]any, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
 	if doc.Kind == 0 || len(doc.Content) == 0 {
-		return nil, errors.New("invalid type: unit value, expected any valid TOML value")
+		return map[string]any{}, nil
 	}
-	return yamlValue(doc.Content[0])
+	root := doc.Content[0]
+	for root.Kind == yaml.AliasNode {
+		root = root.Alias
+	}
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("line %d: %w", root.Line, errNotADocument)
+	}
+	return yamlMapping(root)
+}
+
+func yamlMapping(n *yaml.Node) (map[string]any, error) {
+	out := make(map[string]any, len(n.Content)/2)
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		keyNode := n.Content[i]
+		for keyNode.Kind == yaml.AliasNode {
+			keyNode = keyNode.Alias
+		}
+		if keyNode.Kind != yaml.ScalarNode {
+			return nil, fmt.Errorf("line %d: invalid type: map key must be a string", keyNode.Line)
+		}
+		key := keyNode.Value
+		if _, dup := out[key]; dup {
+			return nil, fmt.Errorf("line %d: duplicate key: `%s`", keyNode.Line, key)
+		}
+		val, err := yamlValue(n.Content[i+1])
+		if err != nil {
+			return nil, err
+		}
+		out[key] = val
+	}
+	return out, nil
 }
 
 func yamlValue(n *yaml.Node) (any, error) {
@@ -189,26 +148,7 @@ func yamlValue(n *yaml.Node) (any, error) {
 	case yaml.AliasNode:
 		return yamlValue(n.Alias)
 	case yaml.MappingNode:
-		out := make(map[string]any, len(n.Content)/2)
-		for i := 0; i+1 < len(n.Content); i += 2 {
-			keyNode := n.Content[i]
-			for keyNode.Kind == yaml.AliasNode {
-				keyNode = keyNode.Alias
-			}
-			if keyNode.Kind != yaml.ScalarNode {
-				return nil, fmt.Errorf("line %d: invalid type: map key must be a string", keyNode.Line)
-			}
-			key := keyNode.Value
-			if _, dup := out[key]; dup {
-				return nil, fmt.Errorf("line %d: duplicate key: `%s`", keyNode.Line, key)
-			}
-			val, err := yamlValue(n.Content[i+1])
-			if err != nil {
-				return nil, err
-			}
-			out[key] = val
-		}
-		return out, nil
+		return yamlMapping(n)
 	case yaml.SequenceNode:
 		out := make([]any, 0, len(n.Content))
 		for _, child := range n.Content {
@@ -228,7 +168,7 @@ func yamlValue(n *yaml.Node) (any, error) {
 func yamlScalar(n *yaml.Node) (any, error) {
 	switch n.ShortTag() {
 	case "!!null":
-		return nil, fmt.Errorf("line %d: invalid type: unit value, expected any valid TOML value", n.Line)
+		return nil, fmt.Errorf("line %d: a null is not a config value; remove the key to keep its default", n.Line)
 	case "!!bool":
 		var b bool
 		if err := n.Decode(&b); err != nil {
@@ -279,8 +219,7 @@ func mergeTrees(base, overlay any) any {
 	return merged
 }
 
-// mergeAll folds the imports in order, then the importing file on top
-// (merge_toml_configs).
+// mergeAll folds the imports in order, then the importing file on top.
 func mergeAll(imports []any, main any) any {
 	var acc any = map[string]any{}
 	for _, imp := range imports {
@@ -322,7 +261,7 @@ func (e *InvalidFieldError) Error() string {
 }
 
 // insertPath sets value at a dot-separated path, creating intermediate
-// tables (toml_path.rs insert). An empty path inserts the "" key, like
+// tables. An empty path inserts the "" key, like
 // the Rust split on '.'.
 func insertPath(root map[string]any, path string, value any) error {
 	segments := strings.Split(path, ".")
@@ -346,10 +285,10 @@ func insertPath(root map[string]any, path string, value any) error {
 	return nil
 }
 
-// widenFloats converts every float32 in an encoded tree to float64,
-// the way toml::Value::try_from turns an f32 into an f64 (0.35f32 is
-// then 0.3499999940395355). The CLI's get/set output and runtime.toml
-// see values through that conversion; `config default` does not.
+// widenFloats converts every float32 in an encoded tree to float64
+// (0.35f32 is then 0.3499999940395355). The CLI's get/set output and
+// runtime.yaml see values through that conversion; `config default`
+// does not.
 func widenFloats(v any) any {
 	switch t := v.(type) {
 	case float32:
@@ -397,8 +336,9 @@ func toPlain(v any) any {
 	return v
 }
 
-// debugValue renders a tree value the way Rust's Debug prints a
-// toml::Value, used for scalar values in diagnostics.
+// debugValue renders a tree value in a typed debug form
+// (String("x"), Integer(1), Table({...})), used for scalar values in
+// diagnostics.
 func debugValue(v any) string {
 	switch t := v.(type) {
 	case string:
@@ -413,8 +353,6 @@ func debugValue(v any) string {
 		return "Float(" + rustFloatDebug(float64(t), 32) + ")"
 	case bool:
 		return "Boolean(" + strconv.FormatBool(t) + ")"
-	case datetime:
-		return "Datetime(" + string(t) + ")"
 	case []any:
 		parts := make([]string, len(t))
 		for i, child := range t {

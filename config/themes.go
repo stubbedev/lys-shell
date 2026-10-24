@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"go.yaml.in/yaml/v3"
 )
 
 // Palette is a theme's ten colors as the CSS generation consumes them
@@ -193,20 +193,20 @@ func ThemesDir(configDir string) string { return filepath.Join(configDir, "theme
 // the Rust Palette deserializes without defaults; note fg_muted is the
 // serde field name, not kebab-case.
 type themeFileDoc struct {
-	Bg       *string `toml:"bg"`
-	Surface  *string `toml:"surface"`
-	Elevated *string `toml:"elevated"`
-	Fg       *string `toml:"fg"`
-	FgMuted  *string `toml:"fg_muted"`
-	Primary  *string `toml:"primary"`
-	Red      *string `toml:"red"`
-	Yellow   *string `toml:"yellow"`
-	Green    *string `toml:"green"`
-	Blue     *string `toml:"blue"`
+	Bg       *string `yaml:"bg"`
+	Surface  *string `yaml:"surface"`
+	Elevated *string `yaml:"elevated"`
+	Fg       *string `yaml:"fg"`
+	FgMuted  *string `yaml:"fg_muted"`
+	Primary  *string `yaml:"primary"`
+	Red      *string `yaml:"red"`
+	Yellow   *string `yaml:"yellow"`
+	Green    *string `yaml:"green"`
+	Blue     *string `yaml:"blue"`
 }
 
 // LoadThemes discovers the selectable themes: the built-ins first, then
-// every <dir>/*.toml theme file named by its file stem. A missing or
+// every <dir>/*.yaml (or .yml) theme file named by its file stem. A missing or
 // unreadable directory yields the built-ins alone. A file that cannot be
 // read or parsed, or whose name is already taken, is skipped; each skip
 // comes back in skipped for the caller to log, as load_themes logs them
@@ -218,7 +218,7 @@ func LoadThemes(dir string) (themes []ThemeEntry, skipped []error) {
 		return themes, nil
 	}
 	for _, entry := range entries {
-		if filepath.Ext(entry.Name()) != ".toml" {
+		if !isYAMLPath(entry.Name()) {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
@@ -252,7 +252,7 @@ func loadThemeFile(path string) (ThemeEntry, error) {
 		return ThemeEntry{}, fmt.Errorf("config: cannot load theme %s: %w", path, err)
 	}
 	var doc themeFileDoc
-	if _, err := toml.Decode(string(data), &doc); err != nil {
+	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return ThemeEntry{}, fmt.Errorf("config: cannot load theme %s: %w", path, err)
 	}
 	var p Palette

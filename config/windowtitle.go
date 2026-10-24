@@ -26,11 +26,13 @@ type WindowTitleConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.window-title.icon-mappings]
-	// "*firefox*" = "ld-globe-symbolic"
-	// "org.mozilla.*" = "ld-globe-symbolic"
-	// "title:*YouTube*" = "ld-youtube-symbolic"
+	// ```yaml
+	// modules:
+	//   window-title:
+	//     icon-mappings:
+	//       "*firefox*": ld-globe-symbolic
+	//       "org.mozilla.*": ld-globe-symbolic
+	//       "title:*YouTube*": ld-youtube-symbolic
 	// ```
 	IconMappings map[string]string `cfg:"icon-mappings"`
 	// Display border around button.

@@ -56,25 +56,29 @@ type MangoWorkspacesConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.mango-workspaces.app-icon-map]
-	// "*firefox*" = "ld-globe-symbolic"
-	// "title:*YouTube*" = "si-youtube-symbolic"
+	// ```yaml
+	// modules:
+	//   mango-workspaces:
+	//     app-icon-map:
+	//       "*firefox*": ld-globe-symbolic
+	//       "title:*YouTube*": si-youtube-symbolic
 	// ```
 	AppIconMap map[string]string `cfg:"app-icon-map"`
 	// Per-tag icon and color overrides, keyed by one-based tag index.
 	//
 	// ## Example
 	//
-	// ```toml
-	// [modules.mango-workspaces.tag-map.1]
-	// label = "web"
-	// icon = "ld-globe-symbolic"
-	// color = "#4a90d9"
-	//
-	// [modules.mango-workspaces.tag-map.2]
-	// label = "term"
-	// icon = "ld-terminal-symbolic"
+	// ```yaml
+	// modules:
+	//   mango-workspaces:
+	//     tag-map:
+	//       "1":
+	//         label: web
+	//         icon: ld-globe-symbolic
+	//         color: "#4a90d9"
+	//       "2":
+	//         label: term
+	//         icon: ld-terminal-symbolic
 	// ```
 	TagMap map[string]WorkspaceStyle `cfg:"tag-map"`
 	// Action for a left click on a tag.

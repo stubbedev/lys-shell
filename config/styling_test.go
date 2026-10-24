@@ -8,18 +8,17 @@ import (
 
 func TestLoadFileAppliesStylingSection(t *testing.T) {
 	path := writeConfig(t, `
-[styling]
-scale = 1.5
-rounding = "lg"
-appearance = "dark"
-palette_base_theme = "nord"
-theme-provider = "matugen"
-matugen-contrast = 3
-
-[styling.palette]
-bg = "#000000"
-fg-muted = "#abc"
-blue = "#11223344"
+styling:
+  scale: 1.5
+  rounding: lg
+  appearance: dark
+  palette_base_theme: nord
+  theme-provider: matugen
+  matugen-contrast: 3
+  palette:
+    bg: "#000000"
+    fg-muted: "#abc"
+    blue: "#11223344"
 `)
 	cfg, err := LoadFile(path)
 	if err != nil {
@@ -35,17 +34,17 @@ blue = "#11223344"
 	}
 }
 
-// Each bad [styling] value is a diagnostic for its own key; that key
+// Each bad styling value is a diagnostic for its own key; that key
 // keeps its default.
 func TestStylingBadValuesAreFieldDiagnostics(t *testing.T) {
 	for _, tc := range []struct{ body, path string }{
-		{"[styling]\nrounding = \"xl\"", "styling.rounding"},
-		{"[styling]\nappearance = \"sepia\"", "styling.appearance"},
-		{"[styling]\nscale = \"big\"", "styling.scale"},
-		{"[styling]\ntheme-provider = \"base16\"", "styling.theme-provider"},
-		{"[styling.palette]\nbg = \"141420\"", "styling.palette.bg"},
-		{"[styling.palette]\nprimary = \"#12345\"", "styling.palette.primary"},
-		{"[styling.palette]\nred = \"red\"", "styling.palette.red"},
+		{"styling:\n  rounding: xl", "styling.rounding"},
+		{"styling:\n  appearance: sepia", "styling.appearance"},
+		{"styling:\n  scale: big", "styling.scale"},
+		{"styling:\n  theme-provider: base16", "styling.theme-provider"},
+		{"styling:\n  palette:\n    bg: \"141420\"", "styling.palette.bg"},
+		{"styling:\n  palette:\n    primary: \"#12345\"", "styling.palette.primary"},
+		{"styling:\n  palette:\n    red: red", "styling.palette.red"},
 	} {
 		cfg, err := LoadFile(writeConfig(t, tc.body+"\n"))
 		if err == nil || !strings.Contains(err.Error(), tc.path) {

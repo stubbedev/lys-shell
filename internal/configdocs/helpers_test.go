@@ -16,7 +16,7 @@ func TestRehostRustdoc(t *testing.T) {
 	if got := rehostRustdoc("###### Already at six", 3); !strings.Contains(got, "###### Already at six") || strings.Contains(got, "####### ") {
 		t.Errorf("depth cap = %q", got)
 	}
-	if got := rehostRustdoc("summary\n\n```toml\n## not a heading\n```", 3); !strings.Contains(got, "\n## not a heading\n") {
+	if got := rehostRustdoc("summary\n\n```yaml\n## not a heading\n```", 3); !strings.Contains(got, "\n## not a heading\n") {
 		t.Errorf("fenced code was rewritten: %q", got)
 	}
 	if _, _, ok := parseATXHeading("##Foo"); ok {

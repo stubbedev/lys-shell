@@ -7,18 +7,15 @@ outline: [2, 3]
 
 <div v-pre>
 
-One mail account in the `[modules.mail]` per-account breakdown.
+One mail account in the `modules.mail` per-account breakdown.
 
 Each account has its own notmuch query; the dropdown shows the per-account
 unread counts and the bar shows their sum.
 
 ## Example
 
-```toml
-[[modules.mail.accounts]]
-name = "Work"
-query = "folder:work/INBOX and tag:unread"
-provider = "gmail"
+```yaml
+modules: {mail: {accounts: [{name: Work, query: "folder:work/INBOX and tag:unread", provider: gmail}]}}
 ```
 
 ## General
@@ -34,9 +31,10 @@ provider = "gmail"
 
 Required fields (must be set in your config): `name`, `query`.
 
-```toml
-[[modules.mail-account]]
-provider = "generic"
+```yaml
+modules:
+  mail-account:
+    - provider: generic
 ```
 
 

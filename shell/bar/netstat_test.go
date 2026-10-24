@@ -33,8 +33,8 @@ func TestNetstatLabelPlaceholders(t *testing.T) {
 }
 
 func TestLoadFileAppliesNetstat(t *testing.T) {
-	path := t.TempDir() + "/config.toml"
-	good := "[modules.netstat]\ninterface = \"eth0\"\nformat = \"{{ down_mib }} down\"\npoll-interval-ms = 5000\n"
+	path := t.TempDir() + "/config.yaml"
+	good := "modules:\n  netstat:\n    interface: eth0\n    format: \"{{ down_mib }} down\"\n    poll-interval-ms: 5000\n"
 	if err := osWrite(path, good); err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestLoadFileAppliesNetstat(t *testing.T) {
 		t.Errorf("netstat = %+v", c.Netstat)
 	}
 
-	if err := osWrite(path, "[modules.netstat]\npoll-interval-ms = -1\n"); err != nil {
+	if err := osWrite(path, "modules:\n  netstat:\n    poll-interval-ms: -1\n"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(path); err == nil {

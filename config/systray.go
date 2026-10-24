@@ -22,11 +22,13 @@ type SystrayConfig struct {
 	//
 	// First matching override wins. Supports glob patterns.
 	//
-	// ```toml
-	// [[module.systray.overrides]]
-	// name = "*discord*"
-	// icon = "si-discord-symbolic"
-	// color = "blue"
+	// ```yaml
+	// modules:
+	//   systray:
+	//     overrides:
+	//       - name: "*discord*"
+	//         icon: si-discord-symbolic
+	//         color: blue
 	// ```
 	Overrides []TrayItemOverride `cfg:"overrides"`
 	// Display border around container.

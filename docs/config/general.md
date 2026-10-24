@@ -26,11 +26,11 @@ are demoted to `top`, allowing fullscreen games to use direct scanout.
 
 ## Default configuration
 
-```toml
-[general]
-font-sans = "Inter"
-font-mono = "JetBrains Mono"
-tearing-mode = false
+```yaml
+general:
+  font-sans: Inter
+  font-mono: JetBrains Mono
+  tearing-mode: false
 ```
 
 

@@ -14,7 +14,7 @@ Wallpaper rendering, cycling, and per-monitor overrides.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `wallpaper` | string | `""` | A single image file to use as the wallpaper on all monitors. Leave empty to use cycling and/or per-monitor overrides instead. |
-| `fit-mode` | [`FitMode`](/config/types#fit-mode) | `"fill"` | How the wallpaper is scaled to the screen. Per-monitor entries in `[[wallpaper.monitors]]` override this. |
+| `fit-mode` | [`FitMode`](/config/types#fit-mode) | `"fill"` | How the wallpaper is scaled to the screen. Per-monitor entries in `wallpaper.monitors` override this. |
 
 ## Cycling
 
@@ -35,31 +35,30 @@ Wallpaper rendering, cycling, and per-monitor overrides.
 
 #### Example
 
-```toml
-[[wallpaper.monitors]]
-name = "DP-1"
-wallpaper = "/home/me/pictures/wall-primary.png"
-fit-mode = "fill"
-
-[[wallpaper.monitors]]
-name = "HDMI-1"
-wallpaper = "/home/me/pictures/wall-secondary.png"
-fit-mode = "fit"
+```yaml
+wallpaper:
+  monitors:
+    - name: DP-1
+      wallpaper: /home/me/pictures/wall-primary.png
+      fit-mode: fill
+    - name: HDMI-1
+      wallpaper: /home/me/pictures/wall-secondary.png
+      fit-mode: fit
 ```
 
 :::
 
 ## Default configuration
 
-```toml
-[wallpaper]
-wallpaper = ""
-fit-mode = "fill"
-cycling-directory = ""
-cycling-mode = "sequential"
-cycling-interval-mins = 15
-cycling-same-image = false
-monitors = []
+```yaml
+wallpaper:
+  wallpaper: ""
+  fit-mode: fill
+  cycling-directory: ""
+  cycling-mode: sequential
+  cycling-interval-mins: 15
+  cycling-same-image: false
+  monitors: []
 ```
 
 

@@ -240,8 +240,8 @@ func TestBarButtonHidesAnEmptyLabelContainer(t *testing.T) {
 }
 
 func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
-	path := t.TempDir() + "/config.toml"
-	content := "[modules.battery]\nleft-click = \"brightness:toggle\"\nscroll-down = \"dropdown:battery\"\n"
+	path := t.TempDir() + "/config.yaml"
+	content := "modules:\n  battery:\n    left-click: \"brightness:toggle\"\n    scroll-down: \"dropdown:battery\"\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 		t.Errorf("scroll-down = %+v", c.Battery.Clicks().ScrollDown)
 	}
 
-	if err := os.WriteFile(path, []byte("[modules.battery]\nscroll-up = \"brightness:sideways\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("modules:\n  battery:\n    scroll-up: \"brightness:sideways\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	// Every string parses: a bad delta is no action (click_action.rs).

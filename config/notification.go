@@ -97,16 +97,16 @@ type NotificationConfig struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.notifications.thresholds]]
-	// above = 5
-	// icon-color = "status-warning"
-	// label-color = "status-warning"
-	//
-	// [[modules.notifications.thresholds]]
-	// above = 20
-	// icon-color = "status-error"
-	// label-color = "status-error"
+	// ```yaml
+	// modules:
+	//   notifications:
+	//     thresholds:
+	//       - above: 5
+	//         icon-color: status-warning
+	//         label-color: status-warning
+	//       - above: 20
+	//         icon-color: status-error
+	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }

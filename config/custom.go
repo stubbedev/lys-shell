@@ -13,12 +13,13 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// [[modules.custom]]
-	// id = "gpu-temp"
+	// ```yaml
+	// modules:
+	//   custom:
+	//     - id: gpu-temp
 	//
 	// # Reference in layout:
-	// # layout = ["custom-gpu-temp", "clock"]
+	// # layout: [custom-gpu-temp, clock]
 	// ```
 	Id string `cfg:"id,required"`
 	// Shell command to execute.
@@ -101,9 +102,9 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// format = "{{ percentage }}%"
-	// tooltip-format = "Volume: {{ percentage }}% on {{ device }}"
+	// ```yaml
+	// format: "{{ percentage }}%"
+	// tooltip-format: "Volume: {{ percentage }}% on {{ device }}"
 	// ```
 	TooltipFormat *string `cfg:"tooltip-format,default"`
 	// Hide module when output is empty, "0", or "false".
@@ -118,8 +119,8 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// icon-name = "ld-temperature-symbolic"
+	// ```yaml
+	// icon-name: ld-temperature-symbolic
 	// ```
 	IconName string `cfg:"icon-name,default"`
 	// Array of icon names indexed by percentage (0-100).
@@ -136,14 +137,13 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// icon-names = [
-	//   "battery-empty-symbolic",
-	//   "battery-caution-symbolic",
-	//   "battery-low-symbolic",
-	//   "battery-good-symbolic",
-	//   "battery-full-symbolic"
-	// ]
+	// ```yaml
+	// icon-names:
+	//   - battery-empty-symbolic
+	//   - battery-caution-symbolic
+	//   - battery-low-symbolic
+	//   - battery-good-symbolic
+	//   - battery-full-symbolic
 	// ```
 	IconNames *[]string `cfg:"icon-names,default"`
 	// Map of icon names keyed by the `alt` field value.
@@ -156,10 +156,10 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
+	// ```yaml
 	// # Volume with muted state override
-	// icon-names = ["vol-0", "vol-33", "vol-66", "vol-100"]
-	// icon-map = { "muted" = "audio-volume-muted-symbolic" }
+	// icon-names: [vol-0, vol-33, vol-66, vol-100]
+	// icon-map: {muted: audio-volume-muted-symbolic}
 	//
 	// # Output: {"percentage": 50, "alt": "muted"}
 	// # Result: Uses "audio-volume-muted-symbolic" (alt match beats percentage)
@@ -177,8 +177,8 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// class-format = "volume-{{ alt }}"
+	// ```yaml
+	// class-format: "volume-{{ alt }}"
 	// # Output: {"alt": "muted"} → adds class "volume-muted"
 	// ```
 	ClassFormat *string `cfg:"class-format,default"`
@@ -213,9 +213,11 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
-	// icon-map = { muted = "audio-volume-muted-symbolic" }
-	// color-map = { muted = { icon-color = "red" }, default = { icon-color = "green" } }
+	// ```yaml
+	// icon-map: {muted: audio-volume-muted-symbolic}
+	// color-map:
+	//   muted: {icon-color: red}
+	//   default: {icon-color: green}
 	//
 	// # Output: {"percentage": 50, "alt": "muted"}
 	// # Result: muted icon rendered in red
@@ -260,14 +262,13 @@ type CustomModuleDefinition struct {
 	//
 	// ## Example
 	//
-	// ```toml
+	// ```yaml
 	// # Volume control with immediate feedback
-	// scroll-up = "pactl set-sink-volume @DEFAULT_SINK@ +5%"
-	// scroll-down = "pactl set-sink-volume @DEFAULT_SINK@ -5%"
-	// on-action = '''
-	// vol=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\d+(?=%)' | head -1)
-	// echo "{\"percentage\": $vol}"
-	// '''
+	// scroll-up: pactl set-sink-volume @DEFAULT_SINK@ +5%
+	// scroll-down: pactl set-sink-volume @DEFAULT_SINK@ -5%
+	// on-action: |
+	//   vol=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\d+(?=%)' | head -1)
+	//   echo "{\"percentage\": $vol}"
 	// ```
 	OnAction *string `cfg:"on-action,default"`
 }
@@ -367,7 +368,7 @@ func (c *CustomModuleDefinition) setDefaults() { *c = DefaultsCustomModuleDefini
 
 func (CustomModuleDefinition) noStructDefault() {}
 
-// CustomByID finds one [[modules.custom]] definition by id.
+// CustomByID finds one `modules.custom` definition by id.
 func (c *Config) CustomByID(id string) (CustomModuleDefinition, bool) {
 	for _, def := range c.Custom {
 		if def.Id == id {

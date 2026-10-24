@@ -67,15 +67,15 @@ func writePage(path, content string) error {
 func indexPage(sections []config.DocSection) string {
 	var b strings.Builder
 	b.WriteString("---\ntitle: Config reference\noutline: [2]\n---\n\n<div v-pre>\n\n# Config reference\n\n")
-	b.WriteString("Every config file lives at `~/.config/lys-shell/config.toml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.\n\n")
-	b.WriteString("::: tip\nEditor intellisense via JSON Schema. Install [Tombi](https://marketplace.visualstudio.com/items?itemName=tombi-toml.tombi) for VSCode or the `tombi` LSP for Neovim, Helix, or Zed. The schema is written to `~/.config/lys-shell/schema.json` on startup.\n:::\n\n")
+	b.WriteString("Every config file lives at `~/.config/lys-shell/config.yaml`. Each page below covers one section. Every field has a default; start with an empty file and add only what you want to change.\n\n")
+	b.WriteString("::: tip\nEditor intellisense via JSON Schema. Install the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) for VSCode or `yaml-language-server` for Neovim, Helix, or Zed. The schema is written to `~/.config/lys-shell/schema.json` on startup, and the config file lys-shell creates starts with the `# yaml-language-server: $schema=./schema.json` modeline that points the server at it.\n:::\n\n")
 	b.WriteString("## Top-level sections\n\n| Section | What it controls |\n|---|---|\n")
 	for _, sec := range sections {
 		if sec.LayoutID == "" {
 			fmt.Fprintf(&b, "| [`%s`](/config/%s) | %s |\n", sec.Name, sec.Name, hook(sec))
 		}
 	}
-	b.WriteString("\n## Bar modules\n\nModules appear inside `[[bar.layout]]` arrays. Each row links to the full reference.\n\n")
+	b.WriteString("\n## Bar modules\n\nModules appear inside the `bar.layout` list. Each row links to the full reference.\n\n")
 	b.WriteString("| Module | Purpose |\n|---|---|\n")
 	for _, sec := range sections {
 		if sec.LayoutID != "" {

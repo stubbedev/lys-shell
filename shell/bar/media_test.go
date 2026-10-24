@@ -217,10 +217,10 @@ func TestNewMediaRequiresSource(t *testing.T) {
 }
 
 func TestLoadFileAppliesMedia(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.media]\nformat = \"{{ artist }}: {{ title }}\"\nlabel-max-length = 20\nlabel-show = false\n" +
-		"icon-type = \"spinning-disc\"\nplayers-ignored = [\"chromium\"]\nplayer-priority = [\"*spotify*\"]\n" +
-		"[modules.media.player-icons]\n\"*zzz*\" = \"z\"\n\"*aaa*\" = \"a\"\n"
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "modules:\n  media:\n    format: \"{{ artist }}: {{ title }}\"\n    label-max-length: 20\n    label-show: false\n" +
+		"    icon-type: spinning-disc\n    players-ignored: [chromium]\n    player-priority: [\"*spotify*\"]\n" +
+		"    player-icons:\n      \"*zzz*\": z\n      \"*aaa*\": a\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -246,11 +246,11 @@ func TestLoadFileAppliesMedia(t *testing.T) {
 
 func TestLoadFileRejectsBadMedia(t *testing.T) {
 	for _, content := range []string{
-		"[modules.media]\nlabel-max-length = -1\n",
-		"[modules.media]\nicon-type = \"spinning\"\n",
-		"[modules.media]\nplayers-ignored = \"chromium\"\n",
+		"modules:\n  media:\n    label-max-length: -1\n",
+		"modules:\n  media:\n    icon-type: spinning\n",
+		"modules:\n  media:\n    players-ignored: chromium\n",
 	} {
-		path := filepath.Join(t.TempDir(), "config.toml")
+		path := filepath.Join(t.TempDir(), "config.yaml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

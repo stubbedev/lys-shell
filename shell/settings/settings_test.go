@@ -23,13 +23,13 @@ import (
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// testKit is a kit over a config directory holding configTOML, its
+// testKit is a kit over a config directory holding configYAML, its
 // loop invoke running inline.
-func testKit(t *testing.T, configTOML string) *kit {
+func testKit(t *testing.T, configYAML string) *kit {
 	t.Helper()
 	dir := t.TempDir()
-	if configTOML != "" {
-		if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(configTOML), 0o600); err != nil {
+	if configYAML != "" {
+		if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(configYAML), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -45,7 +45,7 @@ func testKit(t *testing.T, configTOML string) *kit {
 	return &kit{face: face, mono: face, store: store{svc}, invoke: func(fn func()) { fn() }}
 }
 
-// runtimeFile is runtime.toml's content.
+// runtimeFile is runtime.yaml's content.
 func runtimeFile(t *testing.T, k *kit) string {
 	t.Helper()
 	b, err := os.ReadFile(k.store.svc.RuntimePath())
@@ -55,8 +55,28 @@ func runtimeFile(t *testing.T, k *kit) string {
 	return string(b)
 }
 
+// runtimeValue is the value runtime.yaml holds at a dot path.
+func runtimeValue(t *testing.T, k *kit, path string) (any, bool) {
+	t.Helper()
+	doc, err := config.ParseYAML(runtimeFile(t, k))
+	if err != nil {
+		t.Fatalf("runtime.yaml: %v", err)
+	}
+	var v any = doc
+	for seg := range strings.SplitSeq(path, ".") {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		if v, ok = m[seg]; !ok {
+			return nil, false
+		}
+	}
+	return v, true
+}
+
 func TestSourceBadges(t *testing.T) {
-	k := testKit(t, "[bar]\ndropdown-shadow = false\ndropdown-autohide = true\n")
+	k := testKit(t, "bar:\n  dropdown-shadow: false\n  dropdown-autohide: true\n")
 	t.Run("default shows nothing", func(t *testing.T) {
 		if got := sourceOf(k.store, "bar.dropdown-freeze-label"); got != (sourceInfo{}) {
 			t.Errorf("default = %+v, want no badge", got)
@@ -99,8 +119,8 @@ func TestToggleWritesAndPersistsAndRefreshesSilently(t *testing.T) {
 	if v := k.store.value("bar.dropdown-shadow"); v != false {
 		t.Errorf("value after toggling = %v, want false", v)
 	}
-	if !strings.Contains(runtimeFile(t, k), "dropdown-shadow = false") {
-		t.Errorf("runtime.toml = %q, want the override saved", runtimeFile(t, k))
+	if v, ok := runtimeValue(t, k, "bar.dropdown-shadow"); !ok || v != false {
+		t.Errorf("runtime.yaml = %q, want the override saved", runtimeFile(t, k))
 	}
 	// An external reset refreshes the switch without writing back.
 	k.store.reset("bar.dropdown-shadow")
@@ -249,8 +269,8 @@ func TestRowResetButtonFollowsTheOverride(t *testing.T) {
 	if row.reset.Enabled() || k.store.svc.Source("bar.dropdown-shadow") != config.SourceDefault || !row.ctl.(*toggle).On() {
 		t.Error("reset did not clear the override and refresh the control")
 	}
-	if !strings.Contains(runtimeFile(t, k), "") || strings.Contains(runtimeFile(t, k), "dropdown-shadow") {
-		t.Errorf("runtime.toml still holds the reset value: %q", runtimeFile(t, k))
+	if _, ok := runtimeValue(t, k, "bar.dropdown-shadow"); ok {
+		t.Errorf("runtime.yaml still holds the reset value: %q", runtimeFile(t, k))
 	}
 }
 
@@ -361,7 +381,7 @@ func TestSidebarSectionsCollapse(t *testing.T) {
 }
 
 func TestSidebarDragIsClampedToTheScaledLimit(t *testing.T) {
-	k := testKit(t, "[styling]\nscale = 2.0\n")
+	k := testKit(t, "styling:\n  scale: 2.0\n")
 	w := newWindow(k, k.store.svc.Config(), (&fakeAfter{}).after)
 	if got := w.sidebarLimit(); got != 800 {
 		t.Fatalf("limit = %d, want 25rem at scale 2 (800)", got)
@@ -434,14 +454,14 @@ func TestResetAllConfirmation(t *testing.T) {
 		t.Error("reset-all kept an override")
 	}
 	if _, err := os.Stat(k.store.svc.RuntimePath()); !os.IsNotExist(err) {
-		t.Errorf("runtime.toml survived reset-all: %v", err)
+		t.Errorf("runtime.yaml survived reset-all: %v", err)
 	}
 }
 
 // A field of a value struct writes, reads, unsets and resets through
 // its leaf (Rust's field projections).
 func TestValueStructFields(t *testing.T) {
-	k := testKit(t, "[animations.osd]\nenter = \"zoom\"\n")
+	k := testKit(t, "animations:\n  osd:\n    enter: zoom\n")
 	if got := k.store.value("animations.osd.enter"); got != "zoom" {
 		t.Fatalf("enter = %v, want the config's zoom", got)
 	}
@@ -473,11 +493,11 @@ func TestValueStructFields(t *testing.T) {
 	}
 	// A field reset with no runtime value writes nothing.
 	k.store.reset("animations.lock.enter")
-	if strings.Contains(runtimeFile(t, k), "animations.lock") {
+	if _, ok := runtimeValue(t, k, "animations.lock"); ok {
 		t.Error("a reset without an override wrote one")
 	}
-	if !strings.Contains(runtimeFile(t, k), "[animations.osd]") {
-		t.Errorf("runtime.toml = %q, want the struct saved", runtimeFile(t, k))
+	if _, ok := runtimeValue(t, k, "animations.osd"); !ok {
+		t.Errorf("runtime.yaml = %q, want the struct saved", runtimeFile(t, k))
 	}
 }
 
@@ -686,11 +706,18 @@ func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
 	if err := applyGreeter(k.store); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(staged, "[greeter]") || !strings.Contains(staged, "cursor-size = 32") || !strings.Contains(staged, "show-clock = ") {
+	doc, err := config.ParseYAML(staged)
+	if err != nil {
+		t.Fatalf("staged %q: %v", staged, err)
+	}
+	greeter, _ := doc["greeter"].(map[string]any)
+	if len(doc) != 1 || greeter["cursor-size"] != int64(32) || greeter["show-clock"] == nil {
 		t.Errorf("staged:\n%s", staged)
 	}
-	if strings.Contains(staged, "cursor-theme-explicit") {
-		t.Error("a key outside the allowlist was staged")
+	for key := range greeter {
+		if !slices.Contains(config.GreeterApplyKeys, key) {
+			t.Errorf("%s is outside the allowlist but was staged", key)
+		}
 	}
 	// A failed spawn shows on the button.
 	spawnGreeterApply = func(string) error { return errors.New("no pkexec") }
@@ -1170,7 +1197,7 @@ func TestCyclingRevealFollowsTheDirectory(t *testing.T) {
 	}
 
 	// A directory already set shows the options at once.
-	k2 := testKit(t, "[wallpaper]\ncycling-directory = \"/walls\"\n")
+	k2 := testKit(t, "wallpaper:\n  cycling-directory: /walls\n")
 	g2 := fieldControl(k2, spec).(*revealGroup)
 	if !g2.Revealed() || g2.Progress() != 1 {
 		t.Errorf("set directory: revealed %v at %v, want shown at once", g2.Revealed(), g2.Progress())
@@ -1422,7 +1449,7 @@ func TestModulePagesFollowTheRustOrder(t *testing.T) {
 }
 
 func TestDeviceSelect(t *testing.T) {
-	k := testKit(t, "[modules.recorder]\nwebcam-device = \"/dev/video9\"\n")
+	k := testKit(t, "modules:\n  recorder:\n    webcam-device: /dev/video9\n")
 	cameraChoices = func() []recorder.DeviceChoice {
 		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Integrated"}}
 	}
@@ -1555,13 +1582,13 @@ func TestMailAccountCards(t *testing.T) {
 	}
 }
 
-func TestTOMLEditor(t *testing.T) {
-	k := testKit(t, "[[modules.custom]]\nid = \"cpu\"\ncommand = \"echo 1\"\n")
-	c := fieldControl(k, field("modules.custom", tomlRow("custom", 40))).(*tomlEditor)
-	if !strings.Contains(c.area.Text(), "[[custom]]") || !strings.Contains(c.area.Text(), `id = "cpu"`) {
-		t.Fatalf("document %q, want the module under [[custom]]", c.area.Text())
+func TestYAMLEditor(t *testing.T) {
+	k := testKit(t, "modules:\n  custom:\n    - id: cpu\n      command: echo 1\n")
+	c := fieldControl(k, field("modules.custom", yamlRow("custom", 40))).(*yamlEditor)
+	if !strings.HasPrefix(c.area.Text(), "custom:\n  - ") || !strings.Contains(c.area.Text(), "id: cpu") {
+		t.Fatalf("document %q, want the module under custom", c.area.Text())
 	}
-	if !c.scroll.HasClass("toml-editor") || !c.scroll.HasClass("toml-editor-lines-40") || !c.area.LineNumbers() || !c.area.AutoIndent() || c.area.Indent() != 2 {
+	if !c.scroll.HasClass("yaml-editor") || !c.scroll.HasClass("yaml-editor-lines-40") || !c.area.LineNumbers() || !c.area.AutoIndent() || c.area.Indent() != 2 {
 		t.Error("the code view lacks its classes, line numbers or indent")
 	}
 	if c.badge.Visible() {
@@ -1579,19 +1606,19 @@ func TestTOMLEditor(t *testing.T) {
 		t.Error("a refresh for another field dropped the edit")
 	}
 	// A broken document marks the view and writes nothing.
-	c.area.SetText("[[custom]\nid = ")
+	c.area.SetText("custom: [unclosed\n")
 	c.apply()
 	if !c.scroll.HasClass("error") || len(k.store.svc.Config().Custom) != 1 {
 		t.Errorf("a broken document: error %v, modules %d", c.scroll.HasClass("error"), len(k.store.svc.Config().Custom))
 	}
 	// A value the config refuses marks it too.
-	c.area.SetText("custom = \"nope\"\n")
+	c.area.SetText("custom: nope\n")
 	c.apply()
 	if !c.scroll.HasClass("error") {
 		t.Error("a refused value left no error")
 	}
 	// A good document writes and clears the marks.
-	c.area.SetText("[[custom]]\nid = \"a\"\ncommand = \"true\"\n\n[[custom]]\nid = \"b\"\ncommand = \"false\"\n")
+	c.area.SetText("custom:\n  - id: a\n    command: \"true\"\n  - id: b\n    command: \"false\"\n")
 	c.apply()
 	if c.scroll.HasClass("error") || c.badge.Visible() {
 		t.Error("a good apply kept the error or the badge")
@@ -1602,7 +1629,7 @@ func TestTOMLEditor(t *testing.T) {
 	// An outside change shows the new value.
 	_ = k.store.set("modules.custom", []any{map[string]any{"id": "z", "command": "x"}})
 	c.refresh()
-	if !strings.Contains(c.area.Text(), `id = "z"`) || c.badge.Visible() {
+	if !strings.Contains(c.area.Text(), "id: z") || c.badge.Visible() {
 		t.Errorf("outside change: %q (badge %v)", c.area.Text(), c.badge.Visible())
 	}
 }
@@ -1617,27 +1644,28 @@ func TestPaletteScheme(t *testing.T) {
 	if c := s["def:comment"]; !c.Italic {
 		t.Error("comments are not italic")
 	}
-	// The TOML highlighter's number styles reach def:number.
+	// The highlighters' number styles reach def:number.
 	if _, ok := s.Style("def:decimal"); !ok {
 		t.Error("def:decimal finds no style")
 	}
 }
 
-const layoutTOML = `[[bar.layout]]
-monitor = "*"
-show = true
-left = ["clock", { name = "sys", modules = ["cpu", "ram"] }]
-center = []
-right = ["battery", "volume"]
-
-[[modules.custom]]
-id = "gpu"
-command = "true"
+const layoutYAML = `bar:
+  layout:
+    - monitor: "*"
+      show: true
+      left: [clock, {name: sys, modules: [cpu, ram]}]
+      center: []
+      right: [battery, volume]
+modules:
+  custom:
+    - id: gpu
+      command: "true"
 `
 
 func newTestLayout(t *testing.T) (*kit, *layoutEditor) {
 	t.Helper()
-	k := testKit(t, layoutTOML)
+	k := testKit(t, layoutYAML)
 	k.pickers = &fakePickers{}
 	return k, fieldControl(k, field("bar.layout", layoutRow)).(*layoutEditor)
 }

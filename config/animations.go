@@ -27,17 +27,17 @@ type AnimationsConfig struct {
 	// Global exit duration in ms. Unset → `duration`.
 	ExitDuration *uint32 `cfg:"exit-duration"`
 	// Duration in ms for in-place dropdown transitions: hover highlights and
-	// the page/stack crossfades inside dropdowns. `enabled = false` removes
+	// the page/stack crossfades inside dropdowns. `enabled: false` removes
 	// them entirely.
 	InteractionDuration uint32 `cfg:"interaction-duration"`
 	// Base duration in ms for general UI micro-transitions (hover, focus, and
 	// color fades) driven by the CSS `--duration-*` token family. Fast,
-	// normal, and slow speeds are derived from this. `enabled = false` zeroes
+	// normal, and slow speeds are derived from this. `enabled: false` zeroes
 	// them for an instant UI.
 	UIDuration uint32 `cfg:"ui-duration"`
 	// Run looping status indicators: spinners, network/bluetooth scan
 	// animations, the recording pulse, and the clock blink. Disable (or set
-	// `enabled = false`) for a fully static UI.
+	// `enabled: false`) for a fully static UI.
 	Indicators bool `cfg:"indicators"`
 	// Per-surface override for notification popup cards.
 	Notifications SurfaceAnimation `cfg:"notifications"`

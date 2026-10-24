@@ -71,8 +71,8 @@ lys-shell shell
 lys-shell panel settings
 ```
 
-This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
+This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
 
 ## Configuration
 
-lys-shell reads `$XDG_CONFIG_HOME/lys-shell/config.toml`, falling back to `~/.config/lys-shell/config.toml`. On first run, if no config exists, lys-shell writes a default one. A JSON schema is written to `~/.config/lys-shell/schema.json` at startup, which editors with a TOML LSP can use for validation and completion.
+lys-shell reads `$XDG_CONFIG_HOME/lys-shell/config.yaml`, falling back to `~/.config/lys-shell/config.yaml`. On first run, if no config exists, lys-shell writes a default one. A JSON schema is written to `~/.config/lys-shell/schema.json` at startup, which editors running the YAML language server can use for validation and completion (see [Editor setup](/guide/editing-config#editor-setup)).
