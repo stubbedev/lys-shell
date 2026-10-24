@@ -26,19 +26,21 @@ type dialogs struct{ conn *dbus.Conn }
 func (d dialogs) client() *portaldialogs.Client { return portaldialogs.NewClient(d.conn) }
 
 func dialogIfaces(conn *dbus.Conn, cfg *config.Service) []dbusx.Interface {
-	version := func(v uint32) dbusx.Getters { return dbusx.Getters{"version": func() any { return v }} }
 	d := dialogs{conn}
-	launcher := version(1)
-	launcher["SupportedLauncherTypes"] = func() any { return launcherApplication | launcherWebApp }
+	// Of the four, only DynamicLauncher's spec has a version.
+	launcher := dbusx.Getters{
+		"version":                func() any { return uint32(1) },
+		"SupportedLauncherTypes": func() any { return launcherApplication | launcherWebApp },
+	}
 	return []dbusx.Interface{
-		{Name: "org.freedesktop.impl.portal.Access", Methods: accessMethods{d}, Properties: version(1)},
-		{Name: "org.freedesktop.impl.portal.Account", Methods: accountMethods{d}, Properties: version(1)},
-		{Name: "org.freedesktop.impl.portal.AppChooser", Methods: appChooserMethods{d}, Properties: version(2)},
+		{Name: "org.freedesktop.impl.portal.Access", Methods: accessMethods{d}},
+		{Name: "org.freedesktop.impl.portal.Account", Methods: accountMethods{d}},
+		{Name: "org.freedesktop.impl.portal.AppChooser", Methods: appChooserMethods{d}},
 		{Name: "org.freedesktop.impl.portal.DynamicLauncher", Methods: launcherMethods{d, cfg}, Properties: launcher},
 	}
 }
 
-// accessMethods is org.freedesktop.impl.portal.Access (access.rs).
+// accessMethods is org.freedesktop.impl.portal.Access.
 type accessMethods struct{ dialogs }
 
 // AccessDialog shows a grant/deny prompt.
@@ -72,7 +74,7 @@ func (a accessMethods) AccessDialog(handle dbus.ObjectPath, appID, parent, title
 	return ResponseSuccess, results, nil
 }
 
-// accountMethods is org.freedesktop.impl.portal.Account (account.rs).
+// accountMethods is org.freedesktop.impl.portal.Account.
 type accountMethods struct{ dialogs }
 
 // GetUserInformation offers the user's login name, real name and
@@ -101,8 +103,7 @@ func (a accountMethods) GetUserInformation(handle dbus.ObjectPath, appID, parent
 	return ResponseSuccess, results, nil
 }
 
-// appChooserMethods is org.freedesktop.impl.portal.AppChooser
-// (appchooser.rs).
+// appChooserMethods is org.freedesktop.impl.portal.AppChooser.
 type appChooserMethods struct{ dialogs }
 
 // ChooseApplication lets the user pick the handler: the frontend's
@@ -148,8 +149,7 @@ func (a appChooserMethods) UpdateChoices(handle dbus.ObjectPath, choices []strin
 	return nil
 }
 
-// launcherMethods is org.freedesktop.impl.portal.DynamicLauncher
-// (dynamiclauncher.rs).
+// launcherMethods is org.freedesktop.impl.portal.DynamicLauncher.
 type launcherMethods struct {
 	dialogs
 	cfg *config.Service

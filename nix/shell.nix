@@ -40,6 +40,10 @@
         # The binaries dlopen these through purego; the EIS tests add libei.
         LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.lys-shell.libs ++ [ pkgs.libei ]);
 
+        # The real xdg-desktop-portal frontend the portal contract tests
+        # route through to the backend.
+        XDG_DESKTOP_PORTAL = "${pkgs.xdg-desktop-portal}/libexec/xdg-desktop-portal";
+
         # The recorder's GStreamer pipeline finds its plugins via this path.
         GST_PLUGIN_SYSTEM_PATH_1_0 = self'.packages.lys-shell.gstPluginPath;
 

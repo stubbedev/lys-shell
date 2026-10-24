@@ -12,16 +12,15 @@ import (
 )
 
 // printPortal is org.freedesktop.impl.portal.Print over the shell's
-// dev.stubbe.lys.Print1 (print.rs): PreparePrint shows the dialog and
+// dev.stubbe.lys.Print1: PreparePrint shows the dialog and
 // replies the settings and a token, Print spools the document to the
 // printer prepared under it.
 type printPortal struct{ conn *dbus.Conn }
 
 func printIface(conn *dbus.Conn) dbusx.Interface {
 	return dbusx.Interface{
-		Name:       "org.freedesktop.impl.portal.Print",
-		Methods:    printPortal{conn},
-		Properties: dbusx.Getters{"version": func() any { return uint32(1) }},
+		Name:    "org.freedesktop.impl.portal.Print",
+		Methods: printPortal{conn},
 	}
 }
 

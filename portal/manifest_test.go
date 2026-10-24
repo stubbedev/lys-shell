@@ -36,7 +36,7 @@ func readResource(t *testing.T, name string) string {
 
 // TestManifestsMatchTheMountedInterfaces pins lys-shell.portal (what the
 // frontend discovers) and lys-shell-portals.conf (how it routes) to what
-// the backend mounts, as manifest.rs does: a drifted list silently
+// the backend mounts: a drifted list silently
 // drops an interface at runtime.
 func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
 	want := slices.Sorted(slices.Values(append(mounted(), pendingInterfaces...)))
@@ -89,6 +89,20 @@ func TestInputCaptureIsNotOffered(t *testing.T) {
 	for _, manifest := range []string{"lys-shell.portal", "lys-shell-portals.conf"} {
 		if strings.Contains(readResource(t, manifest), implPrefix+"InputCapture") {
 			t.Errorf("%s declares InputCapture", manifest)
+		}
+	}
+}
+
+// TestVersionOnlyWhereTheSpecDefinesOne pins the version property to
+// the impl interfaces whose XML defines it (xdg-desktop-portal 1.22):
+// the others must not export one the frontend never reads.
+func TestVersionOnlyWhereTheSpecDefinesOne(t *testing.T) {
+	versioned := []string{"Clipboard", "DynamicLauncher", "GlobalShortcuts", "Notification", "RemoteDesktop", "ScreenCast", "Screenshot", "Secret", "Settings", "Usb"}
+	for _, iface := range New(nil, config.Load("", config.DiscardDiagnostics)).interfaces() {
+		name := strings.TrimPrefix(iface.Name, implPrefix)
+		_, has := iface.Properties["version"]
+		if want := slices.Contains(versioned, name); has != want {
+			t.Errorf("%s exports version: %v, want %v", name, has, want)
 		}
 	}
 }

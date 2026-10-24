@@ -21,7 +21,7 @@ import (
 
 // wallpaperPortal maps SetWallpaperURI onto the shell's
 // dev.stubbe.lys.Wallpaper1 (every monitor) and the lock screen's
-// background; only file:// URIs are supported (wallpaper.rs).
+// background; only file:// URIs are supported.
 type wallpaperPortal struct {
 	conn *dbus.Conn
 	cfg  *config.Service
@@ -35,9 +35,8 @@ func wallpaperIface(conn *dbus.Conn, cfg *config.Service, dataDir string) dbusx.
 		w.dir = filepath.Join(dataDir, "wallpapers")
 	}
 	return dbusx.Interface{
-		Name:       "org.freedesktop.impl.portal.Wallpaper",
-		Methods:    w,
-		Properties: dbusx.Getters{"version": func() any { return uint32(1) }},
+		Name:    "org.freedesktop.impl.portal.Wallpaper",
+		Methods: w,
 	}
 }
 

@@ -24,7 +24,7 @@ const (
 )
 
 // screenshotPortal bridges org.freedesktop.impl.portal.Screenshot to the
-// shell's dev.stubbe.lys.Screenshot1 (screenshot.rs): an app's capture is
+// shell's dev.stubbe.lys.Screenshot1: an app's capture is
 // saved to a private file, none of the user's save, clipboard or
 // notification settings applied.
 type screenshotPortal struct{ conn *dbus.Conn }

@@ -33,7 +33,7 @@ var (
 	backgroundResults = map[string]uint32{"forbid": backgroundForbid, "allow": backgroundAllow, "allow-once": backgroundAllowOnce}
 )
 
-// background is org.freedesktop.impl.portal.Background (background.rs):
+// background is org.freedesktop.impl.portal.Background:
 // the apps' states come from the compositor's windows, and an app the
 // frontend finds running with none is the user's call, asked in a
 // notification.
@@ -51,9 +51,8 @@ type windowSource interface {
 
 func (b background) iface() dbusx.Interface {
 	return dbusx.Interface{
-		Name:       BackgroundIface,
-		Methods:    b,
-		Properties: dbusx.Getters{"version": func() any { return uint32(2) }},
+		Name:    BackgroundIface,
+		Methods: b,
 	}
 }
 

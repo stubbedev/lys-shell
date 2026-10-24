@@ -11,8 +11,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/pipewire"
 )
 
-// The zero-copy path (wayle-share-preview dmabuf.rs, pipewire.rs's
-// run_loop_dmabuf): a whole output's screencopy frames land straight in
+// The zero-copy path: a whole output's screencopy frames land straight in
 // gbm buffers, one bound to each PipeWire buffer for the stream's life,
 // which the consumer imports as dmabufs. Everything is best effort: no
 // render node, a format the compositor offers only as shm, an

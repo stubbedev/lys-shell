@@ -20,8 +20,8 @@ import (
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// RemoteDesktopIface lets a session drive the pointer and keyboard
-// (remotedesktop/mod.rs): after the user consents, the Notify* methods
+// RemoteDesktopIface lets a session drive the pointer and keyboard:
+// after the user consents, the Notify* methods
 // and an EIS connection are replayed onto a virtual pointer and
 // keyboard. Touch is not supported.
 const RemoteDesktopIface = "org.freedesktop.impl.portal.RemoteDesktop"

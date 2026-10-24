@@ -9,8 +9,8 @@ import (
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// ScreenCastIface is org.freedesktop.impl.portal.ScreenCast
-// (screencast/mod.rs): SelectSources records the options, Start shows
+// ScreenCastIface is org.freedesktop.impl.portal.ScreenCast:
+// SelectSources records the options, Start shows
 // the shell's share picker (unless a restore token already names the
 // source), starts a PipeWire producer per picked source and replies
 // their node ids. The selection never leaves lys-shell, so it works on any

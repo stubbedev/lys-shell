@@ -49,10 +49,9 @@ const (
 	targetRegion
 )
 
-// captureTarget is one source the user picked (source.rs
-// CaptureTarget): an output by connector name, a window by its
-// ext-foreign-toplevel identifier, or a region of an output in its
-// logical coordinates.
+// captureTarget is one source the user picked: an output by connector
+// name, a window by its ext-foreign-toplevel identifier, or a region of
+// an output in its logical coordinates.
 type captureTarget struct {
 	kind captureKind
 	// name is the output connector, or the window identifier.

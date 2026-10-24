@@ -24,7 +24,7 @@ import (
 
 // GlobalShortcutsIface bridges org.freedesktop.impl.portal.GlobalShortcuts
 // to the compositor's hyprland-global-shortcuts-v1, as
-// xdg-desktop-portal-hyprland does (globalshortcuts/mod.rs): shortcuts
+// xdg-desktop-portal-hyprland does: shortcuts
 // the user allows are registered there, and their presses come back as
 // Activated / Deactivated. The compositor owns the triggers: the user
 // binds each shortcut in its config (Hyprland's `global` dispatcher).

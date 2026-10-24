@@ -9,11 +9,10 @@ import (
 )
 
 // Vardict is a portal a{sv}: every interactive method's options and
-// results (dbus_util.rs).
+// results.
 type Vardict = map[string]dbus.Variant
 
-// Response codes of an interactive method's (u, a{sv}) reply
-// (response.rs).
+// Response codes of an interactive method's (u, a{sv}) reply.
 const (
 	ResponseSuccess   uint32 = 0
 	ResponseCancelled uint32 = 1

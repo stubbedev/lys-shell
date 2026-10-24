@@ -73,9 +73,8 @@ func newInhibitor(conn *dbus.Conn, sessions *sessions, lg *logind) *inhibitor {
 
 func (i *inhibitor) iface() dbusx.Interface {
 	return dbusx.Interface{
-		Name:       InhibitIface,
-		Methods:    i,
-		Properties: dbusx.Getters{"version": func() any { return uint32(3) }},
+		Name:    InhibitIface,
+		Methods: i,
 	}
 }
 

@@ -19,15 +19,14 @@ import (
 )
 
 // fileChooser is org.freedesktop.impl.portal.FileChooser over the
-// shell's dev.stubbe.lys.FileChooser1 (filechooser.rs): OpenFile,
+// shell's dev.stubbe.lys.FileChooser1: OpenFile,
 // SaveFile, and SaveFiles as a folder pick.
 type fileChooser struct{ conn *dbus.Conn }
 
 func fileChooserIface(conn *dbus.Conn) dbusx.Interface {
 	return dbusx.Interface{
-		Name:       "org.freedesktop.impl.portal.FileChooser",
-		Methods:    fileChooser{conn},
-		Properties: dbusx.Getters{"version": func() any { return uint32(3) }},
+		Name:    "org.freedesktop.impl.portal.FileChooser",
+		Methods: fileChooser{conn},
 	}
 }
 

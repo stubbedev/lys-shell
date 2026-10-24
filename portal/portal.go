@@ -1,9 +1,8 @@
-// Package portal is lys-shell's xdg-desktop-portal backend
-// (crates/lys-shell-portal): the org.freedesktop.impl.portal.* interfaces
-// the compositor-independent xdg-desktop-portal frontend routes
-// sandboxed apps' requests to, served as one object under the
-// org.freedesktop.impl.portal.desktop.lys name that `lys-shell portal`
-// claims. Interactive interfaces delegate their dialogs to the running
+// Package portal is lys-shell's xdg-desktop-portal backend: the
+// org.freedesktop.impl.portal.* interfaces the compositor-independent
+// xdg-desktop-portal frontend routes sandboxed apps' requests to,
+// served as one object under the org.freedesktop.impl.portal.desktop.lys
+// name that `lys-shell portal` claims. Interactive interfaces delegate their dialogs to the running
 // shell over its own D-Bus services.
 package portal
 

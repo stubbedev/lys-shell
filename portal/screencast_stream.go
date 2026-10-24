@@ -65,7 +65,7 @@ func (s *pipewireStream) Close() {
 }
 
 // startScreenStream opens the capture for target and its PipeWire
-// producer (pipewire.rs start_stream). A whole output streams from an
+// producer. A whole output streams from an
 // ext-image-copy session (damage-driven: a static screen sends
 // nothing new); a compositor without it, a region, and a window take
 // one screencopy or toplevel capture per frame.
@@ -109,7 +109,7 @@ func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{
 }
 
 // videoFormat maps the wl_shm format the compositor returned; an
-// exotic one is offered as BGRx, as the Rust producer does.
+// exotic one is offered as BGRx.
 func videoFormat(f capture.Format) pipewire.VideoFormat {
 	switch f {
 	case capture.FormatARGB8888:

@@ -12,7 +12,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
-// usb is org.freedesktop.impl.portal.Usb (usb.rs): the frontend
+// usb is org.freedesktop.impl.portal.Usb: the frontend
 // enumerates devices and the backend asks the user which of the ones
 // an app requests it may open. The frontend remembers every grant as a
 // lasting permission, so nothing is granted without the user's answer.

@@ -11,7 +11,7 @@ import (
 )
 
 // ClipboardIface bridges the Wayland selection to clipboard-enabled
-// RemoteDesktop sessions (clipboard/mod.rs): they read the current
+// RemoteDesktop sessions: they read the current
 // selection, become its owner, and serve its data on demand.
 const ClipboardIface = "org.freedesktop.impl.portal.Clipboard"
 
