@@ -37,7 +37,6 @@ func (w *fakeWindow) SetMargin(m app.Margins) error {
 // test's gestures take turns, as on the one UI goroutine.
 type harness struct {
 	t       *testing.T
-	loop    sync.Mutex
 	mu      sync.Mutex
 	c       *Chooser
 	root    string
@@ -111,8 +110,8 @@ func (hs *harness) invoke(fn func()) {
 }
 
 func (hs *harness) do(fn func()) {
-	hs.loop.Lock()
-	defer hs.loop.Unlock()
+	treetest.Loop.Lock()
+	defer treetest.Loop.Unlock()
 	fn()
 }
 

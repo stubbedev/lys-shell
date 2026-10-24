@@ -27,7 +27,6 @@ func (w *fakeWindow) Close() { w.closed = true }
 // on the asking goroutine, and Open hands the tree to the test.
 type harness struct {
 	mu       sync.Mutex
-	loop     sync.Mutex
 	cfg      *config.Config
 	h        *Dialogs
 	opened   chan app.LayerConfig
@@ -72,8 +71,8 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 // do runs fn as the loop: the dialog's work and the test's clicks
 // take turns, as on the one UI goroutine.
 func (hs *harness) do(fn func()) {
-	hs.loop.Lock()
-	defer hs.loop.Unlock()
+	treetest.Loop.Lock()
+	defer treetest.Loop.Unlock()
 	fn()
 }
 

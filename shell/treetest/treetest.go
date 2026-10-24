@@ -3,12 +3,20 @@
 package treetest
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 	"golang.org/x/image/font/gofont/goregular"
 )
+
+// Loop stands in for the process's one UI goroutine in the surface
+// harnesses: gelm keeps its style and layout scratch per process, so
+// every harness in a test binary runs its widget work under this one
+// lock, never a lock of its own (a finished test's harness can still be
+// draining while the next one builds).
+var Loop sync.Mutex
 
 // Walk visits w and every descendant, depth first.
 func Walk(w widget.Widget, visit func(widget.Widget)) {

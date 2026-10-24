@@ -31,7 +31,6 @@ type spooled struct {
 }
 
 type harness struct {
-	loop     sync.Mutex
 	mu       sync.Mutex
 	h        *Dialog
 	opened   chan app.LayerConfig
@@ -76,8 +75,8 @@ func newHarness(t *testing.T) *harness {
 }
 
 func (hs *harness) do(fn func()) {
-	hs.loop.Lock()
-	defer hs.loop.Unlock()
+	treetest.Loop.Lock()
+	defer treetest.Loop.Unlock()
 	fn()
 }
 
