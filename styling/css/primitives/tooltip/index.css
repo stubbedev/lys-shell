@@ -1,9 +1,0 @@
-tooltip {
-  background: var(--bg-active);
-  border-radius: var(--rounding-container);
-}
-tooltip label {
-  color: var(--fg-default);
-  font-size: var(--text-md);
-  margin: var(--space-xs) var(--space-sm);
-}

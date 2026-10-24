@@ -1,9 +1,0 @@
-separator {
-  background: var(--border-default);
-}
-separator.horizontal {
-  min-height: 1px;
-}
-separator.vertical {
-  min-width: 1px;
-}
