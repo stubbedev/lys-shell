@@ -382,28 +382,29 @@ func TestSessionCloseRunsCleanupOnce(t *testing.T) {
 	var closes dbustest.Var[int]
 	first, second := dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_1/a"), dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_1/b")
 	for _, p := range []dbus.ObjectPath{first, second} {
-		if err := reg.mount(p, func() { closes.Update(func(n int) int { return n + 1 }) }); err != nil {
+		s, err := reg.create(p, kindScreenCast, "org.app")
+		if err != nil {
 			t.Fatal(err)
 		}
+		s.onClose(func() { closes.Update(func(n int) int { return n + 1 }) })
 	}
 	signals := make(chan *dbus.Signal, 4)
 	_ = client.AddMatchSignal(dbus.WithMatchInterface(SessionIface))
 	client.Signal(signals)
 
 	obj := client.Object(server.Names()[0], first)
-	if v, err := obj.GetProperty(SessionIface + ".version"); err != nil || v.Value() != uint32(2) {
+	if v, err := obj.GetProperty(SessionIface + ".version"); err != nil || v.Value() != uint32(1) {
 		t.Errorf("version = %v, %v", v, err)
 	}
+	// The app's Close ends the session without Closed, which the
+	// interface reserves for closes the implementation makes.
 	if err := obj.Call(SessionIface+".Close", 0).Err; err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case s := <-signals:
-		if s.Path != first || s.Name != SessionIface+".Closed" {
-			t.Errorf("signal = %v", s)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("Close emitted no Closed")
+		t.Errorf("the app's Close emitted %v", s)
+	case <-time.After(100 * time.Millisecond):
 	}
 	if closes.Load() != 1 {
 		t.Errorf("cleanups after Close = %d", closes.Load())
@@ -411,35 +412,56 @@ func TestSessionCloseRunsCleanupOnce(t *testing.T) {
 	if err := obj.Call(SessionIface+".Close", 0).Err; err == nil {
 		t.Error("a closed session still answers")
 	}
-	// Shutdown cleans up the live session only, and only once.
+	// Shutdown closes the live session only, once, and says so.
 	reg.clearAll()
 	reg.clearAll()
 	if closes.Load() != 2 {
 		t.Errorf("cleanups after shutdown = %d, want 2", closes.Load())
 	}
-	// The app closing a session shutdown already cleaned up runs nothing.
-	if err := client.Object(server.Names()[0], second).Call(SessionIface+".Close", 0).Err; err != nil {
-		t.Fatal(err)
+	select {
+	case s := <-signals:
+		if s.Path != second || s.Name != SessionIface+".Closed" {
+			t.Errorf("signal = %v", s)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("shutdown emitted no Closed")
 	}
-	if closes.Load() != 2 {
-		t.Errorf("cleanups after a late Close = %d, want 2", closes.Load())
+	// A cleanup registered on a closed session runs at once.
+	late, _ := reg.create("/org/freedesktop/portal/desktop/session/1_1/c", kindScreenCast, "org.app")
+	reg.close(late)
+	ran := false
+	late.onClose(func() { ran = true })
+	if !ran {
+		t.Error("a cleanup on a closed session never ran")
 	}
 }
 
-func TestStore(t *testing.T) {
-	s := newStore[int]()
-	p := dbus.ObjectPath("/s/1")
-	s.set(p, 7)
-	s.update(p, func(v *int) { *v++ })
-	if v, ok := s.get(p); !ok || v != 8 {
-		t.Errorf("get = %d, %v", v, ok)
+// A session answers only to the interfaces and the app that own it.
+func TestSessionLookupChecksKindAndApp(t *testing.T) {
+	bus := dbustest.Start(t)
+	reg := newSessions(bus.Conn(t))
+	path := dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_1/a")
+	if _, err := reg.create(path, kindRemoteDesktop, "org.app"); err != nil {
+		t.Fatal(err)
 	}
-	s.update("/s/missing", func(*int) { t.Error("update ran for a missing session") })
-	if v, ok := s.remove(p); !ok || v != 8 {
-		t.Errorf("remove = %d, %v", v, ok)
+	if _, err := reg.lookup(path, "org.app", kindScreenCast, kindRemoteDesktop); err != nil {
+		t.Errorf("own kind: %v", err)
 	}
-	if _, ok := s.get(p); ok {
-		t.Error("removed state still present")
+	if _, err := reg.create(path, kindScreenCast, "org.app"); err == nil {
+		t.Error("a second session took a live path")
+	}
+	for _, tc := range []struct {
+		path  dbus.ObjectPath
+		app   string
+		kinds []sessionKind
+	}{
+		{path, "org.app", []sessionKind{kindScreenCast}},
+		{path, "org.other", []sessionKind{kindRemoteDesktop}},
+		{"/org/freedesktop/portal/desktop/session/1_1/missing", "org.app", []sessionKind{kindRemoteDesktop}},
+	} {
+		if _, err := reg.lookup(tc.path, tc.app, tc.kinds...); err == nil {
+			t.Errorf("lookup %s for %s as %v succeeded", tc.path, tc.app, tc.kinds)
+		}
 	}
 }
 

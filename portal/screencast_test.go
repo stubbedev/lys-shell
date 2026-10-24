@@ -42,15 +42,19 @@ func serveSharePicker(t *testing.T, r *rig, reply string) *fakeSharePicker {
 	return f
 }
 
-// fakeStream is a started stream.
+// fakeStream is a started stream; vanish ends it as a closed window
+// would.
 type fakeStream struct {
 	node   uint32
 	closed dbustest.Var[bool]
+	ended  chan struct{}
 }
 
-func (s *fakeStream) NodeID() uint32       { return s.node }
-func (s *fakeStream) Size() (int32, int32) { return 1920, 1080 }
-func (s *fakeStream) Close()               { s.closed.Store(true) }
+func (s *fakeStream) NodeID() uint32         { return s.node }
+func (s *fakeStream) Size() (int32, int32)   { return 1920, 1080 }
+func (s *fakeStream) Ended() <-chan struct{} { return s.ended }
+func (s *fakeStream) Close()                 { s.closed.Store(true) }
+func (s *fakeStream) vanish()                { close(s.ended) }
 
 // fakeStarts records stream starts; fail names payloads that will not
 // start.
@@ -67,7 +71,7 @@ func (f *fakeStarts) start(t captureTarget, cursor bool, fps uint32) (screenStre
 	if f.fail[t.payload()] {
 		return nil, errors.New("gone")
 	}
-	s := &fakeStream{node: uint32(40 + len(f.streams.Load()))}
+	s := &fakeStream{node: uint32(40 + len(f.streams.Load())), ended: make(chan struct{})}
 	f.streams.Update(func(all []*fakeStream) []*fakeStream { return append(all, s) })
 	_ = fps
 	return s, nil
@@ -296,5 +300,118 @@ func TestEffectiveFPS(t *testing.T) {
 	}
 	if !showCursor(cursorEmbedded) || !showCursor(cursorMetadata) || showCursor(cursorHidden) {
 		t.Error("showCursor")
+	}
+}
+
+// waitClosed waits for the backend's Closed on path.
+func (r *rig) waitClosed(t *testing.T, path dbus.ObjectPath) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case s := <-r.signals:
+			if s.Name == SessionIface+".Closed" && s.Path == path {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("no Closed for %s", path)
+		}
+	}
+}
+
+// A stream whose source vanishes ends its session: Closed goes out, the
+// other streams stop and the session's state is gone.
+func TestScreenCastSourceLossClosesTheSession(t *testing.T) {
+	r, f := castRig(t)
+	if err := r.client.AddMatchSignal(dbus.WithMatchInterface(SessionIface)); err != nil {
+		t.Fatal(err)
+	}
+	serveSharePicker(t, r, "/screen:DP-1;window:w1")
+	r.castSession(t, Vardict{"multiple": dbus.MakeVariant(true)})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	streams := f.streams.Load()
+	streams[1].vanish()
+	r.waitClosed(t, sessA)
+	if !streams[0].closed.Load() || !streams[1].closed.Load() {
+		t.Error("streams outlived their session")
+	}
+	if _, ok := r.backend.sizes.get(streams[0].node); ok {
+		t.Error("a closed session's stream size stayed registered")
+	}
+	if _, live := r.backend.sessions.get(sessA); live {
+		t.Error("the session stayed live")
+	}
+	if code, _ := r.castStart(t); code != ResponseOther {
+		t.Errorf("Start on the closed session = %d, want other", code)
+	}
+}
+
+// A stream the session stops on purpose ends nothing else.
+func TestScreenCastClosingIsNotSourceLoss(t *testing.T) {
+	r, _ := castRig(t)
+	if err := r.client.AddMatchSignal(dbus.WithMatchInterface(SessionIface)); err != nil {
+		t.Fatal(err)
+	}
+	serveSharePicker(t, r, "/screen:DP-1")
+	r.castSession(t, Vardict{})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case s := <-r.signals:
+		if s.Name == SessionIface+".Closed" {
+			t.Errorf("the app's own close was announced as a backend close: %v", s)
+		}
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+// Sessions answer only to their own interface: ScreenCast.Start on a
+// RemoteDesktop session, RemoteDesktop on a ScreenCast session, and
+// either on an unknown or another app's session fail.
+func TestSessionsRefuseOtherInterfaces(t *testing.T) {
+	r, _ := castRig(t)
+	if code, _ := r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{}); code != ResponseSuccess {
+		t.Fatal("RemoteDesktop CreateSession failed")
+	}
+	if code, _ := r.interactive(t, ScreenCastIface+".CreateSession", handle, sessB, "org.app", Vardict{}); code != ResponseSuccess {
+		t.Fatal("ScreenCast CreateSession failed")
+	}
+	for _, tc := range []struct {
+		name string
+		call func() uint32
+	}{
+		{"ScreenCast.Start on a RemoteDesktop session", func() uint32 {
+			code, _ := r.interactive(t, ScreenCastIface+".Start", handle, sessA, "org.app", "", Vardict{})
+			return code
+		}},
+		{"RemoteDesktop.SelectDevices on a ScreenCast session", func() uint32 {
+			code, _ := r.interactive(t, RemoteDesktopIface+".SelectDevices", handle, sessB, "org.app", Vardict{})
+			return code
+		}},
+		{"ScreenCast.SelectSources on an unknown session", func() uint32 {
+			code, _ := r.interactive(t, ScreenCastIface+".SelectSources", handle, sessC, "org.app", Vardict{})
+			return code
+		}},
+		{"ScreenCast.SelectSources for another app", func() uint32 {
+			code, _ := r.interactive(t, ScreenCastIface+".SelectSources", handle, sessB, "org.other", Vardict{})
+			return code
+		}},
+	} {
+		if code := tc.call(); code != ResponseOther {
+			t.Errorf("%s = %d, want other", tc.name, code)
+		}
+	}
+	// A RemoteDesktop session may pick screens to share.
+	if code, _ := r.interactive(t, ScreenCastIface+".SelectSources", handle, sessA, "org.app", Vardict{}); code != ResponseSuccess {
+		t.Errorf("SelectSources on a RemoteDesktop session = %d", code)
+	}
+	if err := r.obj.Call(RemoteDesktopIface+".NotifyPointerMotion", 0, sessB, Vardict{}, 1.0, 1.0).Err; err == nil {
+		t.Error("RemoteDesktop input on a ScreenCast session was accepted")
 	}
 }

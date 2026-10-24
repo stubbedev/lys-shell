@@ -125,8 +125,11 @@ func TestGlobalShortcutsBindAndActivate(t *testing.T) {
 	if s := r.shortcutSignal(t); s != nil {
 		t.Errorf("a closed session's key signalled %v", s)
 	}
-	if got := r.listShortcuts(t, sessA); len(got) != 0 {
-		t.Errorf("a closed session lists %v", got)
+	if code, _ := r.interactive(t, GlobalShortcutsIface+".ListShortcuts", handle, sessA); code != ResponseOther {
+		t.Errorf("a closed session's ListShortcuts = %d, want other", code)
+	}
+	if code, _ := r.interactive(t, GlobalShortcutsIface+".BindShortcuts", handle, sessA, []shortcut{{"x", props("X")}}, "", Vardict{}); code != ResponseOther {
+		t.Errorf("a closed session's BindShortcuts = %d, want other", code)
 	}
 }
 
@@ -148,5 +151,30 @@ func TestGlobalShortcutsWithoutTheProtocol(t *testing.T) {
 func TestShortcutKeySeparates(t *testing.T) {
 	if shortcutKey("a", "b") == shortcutKey("ab", "") {
 		t.Error("distinct pairs share a key")
+	}
+}
+
+// When the compositor connection ends, the registrations die with it:
+// every GlobalShortcuts session closes, and nothing is unregistered on
+// the dead connection.
+func TestGlobalShortcutsCloseWhenTheLoopEnds(t *testing.T) {
+	r, f := shortcutsRig(t, nil)
+	if err := r.client.AddMatchSignal(dbus.WithMatchInterface(SessionIface)); err != nil {
+		t.Fatal(err)
+	}
+	opts := Vardict{"shortcuts": dbus.MakeVariant([]shortcut{{"mic", props("Mic")}})}
+	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, sessA, "org.app", opts); code != ResponseSuccess {
+		t.Fatal("CreateSession failed")
+	}
+	r.backend.shortcuts.loopEnded()
+	r.waitClosed(t, sessA)
+	if got := f.unregistered.Load(); len(got) != 0 {
+		t.Errorf("unregistered %v on a dead connection", got)
+	}
+	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, sessB, "org.app", opts); code != ResponseSuccess {
+		t.Fatal("a session after the loop ended failed")
+	}
+	if got := f.registered.Load(); len(got) != 2 {
+		t.Errorf("registered %v: the next session did not reach a fresh device", got)
 	}
 }

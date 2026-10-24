@@ -49,7 +49,7 @@ func (f *fakeClip) read(mime string) (*os.File, error) {
 func clipRig(t *testing.T, startErr error) (*rig, *fakeClip) {
 	f := &fakeClip{data: "copied"}
 	r := newRig(t, func(b *Backend) {
-		b.clipboard = newClipboardBridge(b.conn, func(owner func()) (clipDevice, error) {
+		b.clipboard = newClipboardBridge(b.conn, b.sessions, func(owner func()) (clipDevice, error) {
 			f.starts.Update(func(n int) int { return n + 1 })
 			if startErr != nil {
 				return nil, startErr
@@ -58,6 +58,12 @@ func clipRig(t *testing.T, startErr error) (*rig, *fakeClip) {
 			return f, nil
 		})
 	})
+	// The clipboard belongs to RemoteDesktop sessions.
+	for _, sess := range []dbus.ObjectPath{sessA, sessB} {
+		if code, _ := r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sess, "org.app", Vardict{}); code != ResponseSuccess {
+			t.Fatalf("CreateSession %s = %d", sess, code)
+		}
+	}
 	return r, f
 }
 
@@ -96,6 +102,7 @@ func (r *rig) noClipSignal(t *testing.T) {
 const (
 	sessA = dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_2/a")
 	sessB = dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_2/b")
+	sessC = dbus.ObjectPath("/org/freedesktop/portal/desktop/session/1_2/c")
 )
 
 func TestClipboardReadsAndFollowsTheSelection(t *testing.T) {
@@ -194,6 +201,30 @@ func TestClipboardServesTheSessionsSelection(t *testing.T) {
 	}
 }
 
+// The clipboard is a RemoteDesktop session's, and only while it lives:
+// another kind of session, or a closed one, cannot use it.
+func TestClipboardBelongsToLiveRemoteSessions(t *testing.T) {
+	r, _ := clipRig(t, nil)
+	if code, _ := r.interactive(t, ScreenCastIface+".CreateSession", handle, sessC, "org.app", Vardict{}); code != ResponseSuccess {
+		t.Fatal("ScreenCast CreateSession failed")
+	}
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessC, Vardict{}).Err; err == nil {
+		t.Error("a ScreenCast session enabled the clipboard")
+	}
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
+		t.Error("a closed session read the clipboard")
+	}
+	if got := r.backend.clipboard.enabledSessions(); len(got) != 0 {
+		t.Errorf("enabled sessions after close: %v", got)
+	}
+}
+
 func TestClipboardWithoutDataControl(t *testing.T) {
 	r, f := clipRig(t, errors.New("no data-control"))
 	_ = r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err
@@ -201,10 +232,29 @@ func TestClipboardWithoutDataControl(t *testing.T) {
 	if f.starts.Load() != 2 {
 		t.Errorf("a failed start is not retried: %d", f.starts.Load())
 	}
-	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_type": dbus.MakeVariant("text/plain")}).Err; err != nil {
-		t.Error(err)
+	if err := r.obj.Call(ClipboardIface+".SetSelection", 0, sessA, Vardict{"mime_type": dbus.MakeVariant("text/plain")}).Err; err == nil {
+		t.Error("a session without the clipboard set the selection")
 	}
 	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
 		t.Error("read without a device")
+	}
+}
+
+// When the compositor connection ends the device goes with it: sessions
+// must request the clipboard again, which starts a fresh device.
+func TestClipboardRestartsAfterTheLoopEnds(t *testing.T) {
+	r, f := clipRig(t, nil)
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	r.backend.clipboard.loopEnded()
+	if err := r.obj.Call(ClipboardIface+".SelectionRead", 0, sessA, "text/plain").Err; err == nil {
+		t.Error("a read after the device died")
+	}
+	if err := r.obj.Call(ClipboardIface+".RequestClipboard", 0, sessA, Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	if f.starts.Load() != 2 {
+		t.Errorf("device starts = %d, want a fresh one", f.starts.Load())
 	}
 }

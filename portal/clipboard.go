@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
@@ -25,22 +26,23 @@ type clipDevice interface {
 	read(mime string) (*os.File, error)
 }
 
-// clipboardBridge is the interface's state.
+// clipboardBridge is the interface's state; which sessions enabled the
+// clipboard lives on their records.
 type clipboardBridge struct {
-	conn *dbus.Conn
+	conn     *dbus.Conn
+	sessions *sessions
 	// start brings the device up, calling ownerChanged on every
 	// selection change; it runs on first RequestClipboard.
 	start func(ownerChanged func()) (clipDevice, error)
 
 	mu        sync.Mutex
 	dev       clipDevice
-	enabled   map[dbus.ObjectPath]bool
 	serial    uint32
 	transfers map[uint32]*os.File
 }
 
-func newClipboardBridge(conn *dbus.Conn, start func(func()) (clipDevice, error)) *clipboardBridge {
-	return &clipboardBridge{conn: conn, start: start, enabled: map[dbus.ObjectPath]bool{}, transfers: map[uint32]*os.File{}}
+func newClipboardBridge(conn *dbus.Conn, s *sessions, start func(func()) (clipDevice, error)) *clipboardBridge {
+	return &clipboardBridge{conn: conn, sessions: s, start: start, transfers: map[uint32]*os.File{}}
 }
 
 func (c *clipboardBridge) iface() dbusx.Interface {
@@ -74,19 +76,51 @@ func (c *clipboardBridge) ensure() bool {
 	return true
 }
 
-// sessions is every clipboard-enabled session.
-func (c *clipboardBridge) sessions() []dbus.ObjectPath {
+// loopEnded drops the device, which died with the compositor
+// connection, and the pending transfers; the sessions keep their
+// remote control but must request the clipboard again.
+func (c *clipboardBridge) loopEnded() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	out := make([]dbus.ObjectPath, 0, len(c.enabled))
-	for s := range c.enabled {
-		out = append(out, s)
+	c.dev = nil
+	c.mu.Unlock()
+	c.dropTransfers()
+	for _, s := range c.sessions.each(func(*session) bool { return true }) {
+		s.mu.Lock()
+		s.clipboard = false
+		s.mu.Unlock()
+	}
+}
+
+// enabledSessions is every live session that enabled the clipboard.
+func (c *clipboardBridge) enabledSessions() []dbus.ObjectPath {
+	var out []dbus.ObjectPath
+	for _, s := range c.sessions.each(func(s *session) bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.clipboard
+	}) {
+		out = append(out, s.path)
 	}
 	return out
 }
 
+// checkEnabled fails unless the live session at path enabled the
+// clipboard.
+func (c *clipboardBridge) checkEnabled(path dbus.ObjectPath) error {
+	s, ok := c.sessions.get(path)
+	if !ok || s.kind != kindRemoteDesktop {
+		return fmt.Errorf("no remote-desktop session at %s", path)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.clipboard {
+		return fmt.Errorf("session %s did not enable the clipboard", path)
+	}
+	return nil
+}
+
 func (c *clipboardBridge) ownerChanged() {
-	for _, s := range c.sessions() {
+	for _, s := range c.enabledSessions() {
 		_ = c.conn.Emit(ObjectPath, ClipboardIface+".SelectionOwnerChanged", s, Vardict{})
 	}
 }
@@ -99,7 +133,7 @@ func (c *clipboardBridge) transfer(mime string, pipe *os.File) {
 	serial := c.serial
 	c.transfers[serial] = pipe
 	c.mu.Unlock()
-	for _, s := range c.sessions() {
+	for _, s := range c.enabledSessions() {
 		_ = c.conn.Emit(ObjectPath, ClipboardIface+".SelectionTransfer", s, mime, serial)
 	}
 }
@@ -119,18 +153,25 @@ func (c *clipboardBridge) dropTransfers() {
 // clipboardObject carries the interface's D-Bus methods.
 type clipboardObject struct{ c *clipboardBridge }
 
-// RequestClipboard enables clipboard access for a session.
+// RequestClipboard enables clipboard access for a RemoteDesktop session.
 func (o clipboardObject) RequestClipboard(session dbus.ObjectPath, _ Vardict) *dbus.Error {
+	s, ok := o.c.sessions.get(session)
+	if !ok || s.kind != kindRemoteDesktop {
+		return dbusx.Failed(fmt.Sprintf("no remote-desktop session at %s", session))
+	}
 	if o.c.ensure() {
-		o.c.mu.Lock()
-		o.c.enabled[session] = true
-		o.c.mu.Unlock()
+		s.mu.Lock()
+		s.clipboard = true
+		s.mu.Unlock()
 	}
 	return nil
 }
 
 // SetSelection makes the session the owner of the given mime types.
-func (o clipboardObject) SetSelection(_ dbus.ObjectPath, options Vardict) *dbus.Error {
+func (o clipboardObject) SetSelection(session dbus.ObjectPath, options Vardict) *dbus.Error {
+	if err := o.c.checkEnabled(session); err != nil {
+		return dbusx.Failed(err.Error())
+	}
 	dev := o.c.device()
 	if dev == nil {
 		return nil
@@ -148,7 +189,10 @@ func (o clipboardObject) SetSelection(_ dbus.ObjectPath, options Vardict) *dbus.
 
 // SelectionWrite hands over the pipe of a pending transfer, for the
 // app to fill; godbus closes our copy once the reply is out.
-func (o clipboardObject) SelectionWrite(_ dbus.ObjectPath, serial uint32) (*os.File, *dbus.Error) {
+func (o clipboardObject) SelectionWrite(session dbus.ObjectPath, serial uint32) (*os.File, *dbus.Error) {
+	if err := o.c.checkEnabled(session); err != nil {
+		return nil, dbusx.Failed(err.Error())
+	}
 	o.c.mu.Lock()
 	f, ok := o.c.transfers[serial]
 	delete(o.c.transfers, serial)
@@ -166,7 +210,10 @@ func (clipboardObject) SelectionWriteDone(_ dbus.ObjectPath, _ uint32, _ bool) *
 }
 
 // SelectionRead streams the current selection under mime.
-func (o clipboardObject) SelectionRead(_ dbus.ObjectPath, mime string) (*os.File, *dbus.Error) {
+func (o clipboardObject) SelectionRead(session dbus.ObjectPath, mime string) (*os.File, *dbus.Error) {
+	if err := o.c.checkEnabled(session); err != nil {
+		return nil, dbusx.Failed(err.Error())
+	}
 	dev := o.c.device()
 	if dev == nil {
 		return nil, dbusx.Failed("no clipboard selection")

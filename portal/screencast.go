@@ -24,11 +24,14 @@ const (
 	restoreVersion = uint32(1)
 )
 
-// castConfig is a session's options, gathered across the calls.
-type castConfig struct {
+// castState is a session's screen sharing: the options gathered across
+// the calls and the streams Start runs. It lives on the session,
+// guarded by its mu.
+type castState struct {
 	cursorMode, persistMode uint32
 	multiple                bool
 	restore                 *captureTarget
+	streams                 []startedStream
 }
 
 // streamSizes maps a running stream's node id to its size, shared with
@@ -57,33 +60,30 @@ func (s *streamSizes) get(node uint32) ([2]int32, bool) {
 	return size, ok
 }
 
-// screenCast is the interface's state.
+// screenCast is the interface: its sessions' state lives on the
+// session records.
 type screenCast struct {
 	conn     *dbus.Conn
 	sessions *sessions
 	sizes    *streamSizes
 	// start runs one stream (startScreenStream; a fake in tests).
 	start func(target captureTarget, cursor bool, fps uint32) (screenStream, error)
-
-	mu      sync.Mutex
-	configs map[dbus.ObjectPath]*castConfig
-	streams map[dbus.ObjectPath][]startedStream
 }
 
-// startedStream is a running stream and what Start reported of it.
+// startedStream is a running stream and what Start reported of it;
+// stopped closes when the session stops it on purpose, so its end is
+// not taken for the source vanishing.
 type startedStream struct {
-	stream screenStream
-	node   uint32
-	width  int32
-	height int32
-	source uint32
+	stream  screenStream
+	node    uint32
+	width   int32
+	height  int32
+	source  uint32
+	stopped chan struct{}
 }
 
 func newScreenCast(conn *dbus.Conn, s *sessions, sizes *streamSizes, start func(captureTarget, bool, uint32) (screenStream, error)) *screenCast {
-	return &screenCast{
-		conn: conn, sessions: s, sizes: sizes, start: start,
-		configs: map[dbus.ObjectPath]*castConfig{}, streams: map[dbus.ObjectPath][]startedStream{},
-	}
+	return &screenCast{conn: conn, sessions: s, sizes: sizes, start: start}
 }
 
 func (c *screenCast) iface() dbusx.Interface {
@@ -102,31 +102,41 @@ func (c *screenCast) iface() dbusx.Interface {
 	}
 }
 
-// closeSession stops the session's streams and forgets it.
-func (c *screenCast) closeSession(session dbus.ObjectPath) {
-	c.mu.Lock()
-	delete(c.configs, session)
-	streams := c.streams[session]
-	delete(c.streams, session)
-	c.mu.Unlock()
-	c.stopStreams(streams)
+// sharing gives a session its castState, once, with the cleanup that
+// stops its streams when the session closes.
+func (c *screenCast) sharing(s *session) {
+	s.mu.Lock()
+	fresh := s.cast == nil
+	if fresh {
+		s.cast = &castState{}
+	}
+	s.mu.Unlock()
+	if fresh {
+		s.onClose(func() {
+			s.mu.Lock()
+			streams := s.cast.streams
+			s.cast.streams = nil
+			s.mu.Unlock()
+			c.stopStreams(streams)
+		})
+	}
 }
 
 func (c *screenCast) stopStreams(streams []startedStream) {
 	for _, s := range streams {
+		close(s.stopped)
 		c.sizes.drop(s.node)
 		s.stream.Close()
 	}
 }
 
-// config is a copy of the session's options (zero for an unknown one).
-func (c *screenCast) config(session dbus.ObjectPath) castConfig {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if cfg, ok := c.configs[session]; ok {
-		return *cfg
-	}
-	return castConfig{}
+// config is a copy of the session's options.
+func (c *screenCast) config(s *session) castState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cfg := *s.cast
+	cfg.streams = nil
+	return cfg
 }
 
 // pick asks the share picker, giving up when the request is closed;
@@ -152,8 +162,9 @@ func (c *screenCast) pick(cancelled <-chan struct{}, allowToken, multiple bool) 
 }
 
 // begin starts a stream per target; one that fails stops the ones this
-// call started, so a partial set never runs.
-func (c *screenCast) begin(session dbus.ObjectPath, targets []captureTarget, cursorMode uint32) ([]startedStream, error) {
+// call started, so a partial set never runs. A stream that ends by
+// itself (its window closed, its output unplugged) ends the session.
+func (c *screenCast) begin(session *session, targets []captureTarget, cursorMode uint32) ([]startedStream, error) {
 	var started []startedStream
 	for _, t := range targets {
 		s, err := c.start(t, showCursor(cursorMode), defaultFPS)
@@ -162,15 +173,32 @@ func (c *screenCast) begin(session dbus.ObjectPath, targets []captureTarget, cur
 			return nil, err
 		}
 		w, h := s.Size()
-		started = append(started, startedStream{stream: s, node: s.NodeID(), width: w, height: h, source: t.sourceType()})
+		started = append(started, startedStream{stream: s, node: s.NodeID(), width: w, height: h, source: t.sourceType(), stopped: make(chan struct{})})
 	}
 	for _, s := range started {
 		c.sizes.set(s.node, s.width, s.height)
+		go c.watch(session, s)
 	}
-	c.mu.Lock()
-	c.streams[session] = append(c.streams[session], started...)
-	c.mu.Unlock()
+	session.mu.Lock()
+	session.cast.streams = append(session.cast.streams, started...)
+	session.mu.Unlock()
 	return started, nil
+}
+
+// watch closes the session when st ends without the session stopping
+// it.
+func (c *screenCast) watch(s *session, st startedStream) {
+	select {
+	case <-st.stopped:
+	case <-st.stream.Ended():
+		select {
+		case <-st.stopped:
+			return
+		default:
+		}
+		warnf("screencast: stream %d of %s ended; closing the session", st.node, s.path)
+		c.sessions.close(s)
+	}
 }
 
 // castSize is a stream's (ii) size.
@@ -214,21 +242,27 @@ func decodeRestore(v dbus.Variant) (captureTarget, bool) {
 type screenCastObject struct{ c *screenCast }
 
 // CreateSession opens a session.
-func (o screenCastObject) CreateSession(_, session dbus.ObjectPath, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	if err := o.c.sessions.mount(session, func() { o.c.closeSession(session) }); err != nil {
+func (o screenCastObject) CreateSession(_, session dbus.ObjectPath, appID string, _ Vardict) (uint32, Vardict, *dbus.Error) {
+	s, err := o.c.sessions.create(session, kindScreenCast, appID)
+	if err != nil {
 		warnf("screencast: cannot mount session object: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	o.c.mu.Lock()
-	o.c.configs[session] = &castConfig{}
-	o.c.mu.Unlock()
+	o.c.sharing(s)
 	return ResponseSuccess, Vardict{}, nil
 }
 
-// SelectSources records the options and decodes a replayed token. An
+// SelectSources records the options and decodes a replayed token, for
+// a ScreenCast session or a RemoteDesktop one sharing its screens. An
 // omitted cursor_mode is embedded, not hidden: many clients send none
 // and expect the pointer; one that wants it hidden says so.
-func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, _ string, options Vardict) (uint32, Vardict, *dbus.Error) {
+func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	s, err := o.c.sessions.lookup(session, appID, kindScreenCast, kindRemoteDesktop)
+	if err != nil {
+		warnf("screencast: SelectSources: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
+	o.c.sharing(s)
 	cursor, ok := optU32(options, "cursor_mode")
 	if !ok {
 		cursor = cursorEmbedded
@@ -241,19 +275,23 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, _ string, op
 			restore = &t
 		}
 	}
-	o.c.mu.Lock()
-	if cfg, ok := o.c.configs[session]; ok {
-		*cfg = castConfig{cursorMode: cursor, persistMode: persist, multiple: multiple, restore: restore}
-	}
-	o.c.mu.Unlock()
+	s.mu.Lock()
+	streams := s.cast.streams
+	*s.cast = castState{cursorMode: cursor, persistMode: persist, multiple: multiple, restore: restore, streams: streams}
+	s.mu.Unlock()
 	return ResponseSuccess, Vardict{}, nil
 }
 
 // Start picks the sources (or replays the token), starts their streams
 // and replies them. A restored source that is gone re-prompts once
 // (xdph's restore validation) rather than failing the request.
-func (o screenCastObject) Start(handle, session dbus.ObjectPath, _, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	cfg := o.c.config(session)
+func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
+	s, err := o.c.sessions.lookup(session, appID, kindScreenCast)
+	if err != nil {
+		warnf("screencast: Start: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
+	cfg := o.c.config(s)
 	var cancelled <-chan struct{}
 	if req, err := mountRequest(o.c.conn, handle); err == nil {
 		defer req.end()
@@ -269,14 +307,14 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, _, _ string, _ 
 			return ResponseCancelled, Vardict{}, nil
 		}
 	}
-	streams, err := o.c.begin(session, targets, cfg.cursorMode)
+	streams, err := o.c.begin(s, targets, cfg.cursorMode)
 	if err != nil && restoring {
 		warnf("screencast: restored target unavailable, re-prompting: %v", err)
 		var ok bool
 		if allowToken, targets, ok = o.c.pick(cancelled, cfg.persistMode > 0, cfg.multiple); !ok {
 			return ResponseCancelled, Vardict{}, nil
 		}
-		streams, err = o.c.begin(session, targets, cfg.cursorMode)
+		streams, err = o.c.begin(s, targets, cfg.cursorMode)
 	}
 	if err != nil {
 		warnf("screencast: failed to start stream: %v", err)

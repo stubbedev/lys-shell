@@ -63,16 +63,12 @@ type inhibitor struct {
 	holdIdle    func(app, reason string) (release func(), err error)
 	screensaver screensaver
 
-	mu       sync.Mutex
-	monitors map[dbus.ObjectPath]bool
-	unwatch  func()
+	mu      sync.Mutex
+	unwatch func()
 }
 
 func newInhibitor(conn *dbus.Conn, sessions *sessions, lg *logind) *inhibitor {
-	return &inhibitor{
-		conn: conn, sessions: sessions, lock: lg.lock, holdIdle: shellIdleHold(conn), screensaver: lg,
-		monitors: map[dbus.ObjectPath]bool{},
-	}
+	return &inhibitor{conn: conn, sessions: sessions, lock: lg.lock, holdIdle: shellIdleHold(conn), screensaver: lg}
 }
 
 func (i *inhibitor) iface() dbusx.Interface {
@@ -195,12 +191,13 @@ func inhibitWhat(flags uint32) string {
 // right after the reply, and again whenever the screen locks or
 // unlocks, until it closes.
 func (i *inhibitor) CreateMonitor(_, session dbus.ObjectPath, appID, _ string) (uint32, *dbus.Error) {
-	if err := i.sessions.mount(session, func() { i.dropMonitor(session) }); err != nil {
+	s, err := i.sessions.create(session, kindInhibitMonitor, appID)
+	if err != nil {
 		warnf("inhibit: cannot mount monitor session for %s: %v", appID, err)
 		return ResponseOther, nil
 	}
+	s.onClose(i.dropMonitor)
 	i.mu.Lock()
-	i.monitors[session] = true
 	if i.unwatch == nil {
 		unwatch, err := i.screensaver.watchScreensaver(i.broadcast)
 		if err != nil {
@@ -223,11 +220,19 @@ func (i *inhibitor) CreateMonitor(_, session dbus.ObjectPath, appID, _ string) (
 // QueryEndResponse acknowledges a Query End this backend never sends.
 func (i *inhibitor) QueryEndResponse(dbus.ObjectPath) *dbus.Error { return nil }
 
-func (i *inhibitor) dropMonitor(session dbus.ObjectPath) {
+// monitors is every live monitor session.
+func (i *inhibitor) monitors() []*session {
+	return i.sessions.each(func(s *session) bool { return s.kind == kindInhibitMonitor })
+}
+
+// dropMonitor stops the screensaver watch once no monitor is left.
+func (i *inhibitor) dropMonitor() {
+	if len(i.monitors()) > 0 {
+		return
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	delete(i.monitors, session)
-	if len(i.monitors) == 0 && i.unwatch != nil {
+	if i.unwatch != nil {
 		i.unwatch()
 		i.unwatch = nil
 	}
@@ -235,22 +240,13 @@ func (i *inhibitor) dropMonitor(session dbus.ObjectPath) {
 
 // broadcast sends every live monitor the new screensaver state.
 func (i *inhibitor) broadcast(active bool) {
-	i.mu.Lock()
-	live := make([]dbus.ObjectPath, 0, len(i.monitors))
-	for s := range i.monitors {
-		live = append(live, s)
-	}
-	i.mu.Unlock()
-	for _, s := range live {
-		i.emitState(s, active)
+	for _, s := range i.monitors() {
+		i.emitState(s.path, active)
 	}
 }
 
 func (i *inhibitor) emitState(session dbus.ObjectPath, active bool) {
-	i.mu.Lock()
-	live := i.monitors[session]
-	i.mu.Unlock()
-	if !live {
+	if s, ok := i.sessions.get(session); !ok || s.kind != kindInhibitMonitor {
 		return
 	}
 	state := Vardict{"screensaver-active": dbus.MakeVariant(active), "session-state": dbus.MakeVariant(uint32(sessionRunning))}

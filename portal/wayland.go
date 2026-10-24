@@ -2,6 +2,7 @@ package portal
 
 import (
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/stubbedev/lys-ui/app"
@@ -12,13 +13,24 @@ import (
 // waylandLoop is the portal's one Wayland connection: a headless lys-ui
 // loop, started on first use by the interfaces that need the
 // compositor (Clipboard's data-control device, GlobalShortcuts). It
-// maps no surface; Hold keeps it running without one.
+// maps no surface; Hold keeps it running without one. When it stops
+// (the compositor went away) the interfaces built on it hear so, and
+// the next use connects afresh.
 type waylandLoop struct {
 	mu sync.Mutex
 	a  *app.Application
-	// ended closes when the loop stops (the compositor went away):
-	// nothing runs queued work after that.
+	// ended closes when the loop stops: nothing runs queued work after
+	// that.
 	ended chan struct{}
+	// endFns run each time a loop stops.
+	endFns []func()
+}
+
+// onEnd registers fn to run whenever the loop stops.
+func (w *waylandLoop) onEnd(fn func()) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.endFns = append(w.endFns, fn)
 }
 
 // do runs fn on the loop goroutine, starting the loop first, and waits
@@ -53,9 +65,16 @@ func (w *waylandLoop) start() (*app.Application, chan struct{}, error) {
 	a.Hold()
 	ended := make(chan struct{})
 	go func() {
-		defer close(ended)
 		if err := a.Run(); err != nil && !errors.Is(err, app.ErrClosed) {
 			warnf("wayland loop ended: %v", err)
+		}
+		w.mu.Lock()
+		w.a = nil
+		fns := slices.Clone(w.endFns)
+		w.mu.Unlock()
+		close(ended)
+		for _, fn := range fns {
+			fn()
 		}
 	}()
 	w.a, w.ended = a, ended

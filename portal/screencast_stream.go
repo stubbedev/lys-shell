@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"sync"
 
 	"github.com/stubbedev/lys-ui/capture"
 
@@ -16,10 +17,12 @@ import (
 // ones.
 const defaultFPS = 60
 
-// screenStream is one running ScreenCast stream.
+// screenStream is one running ScreenCast stream. Ended closes when
+// the stream can no longer produce: its source vanished.
 type screenStream interface {
 	NodeID() uint32
 	Size() (width, height int32)
+	Ended() <-chan struct{}
 	Close()
 }
 
@@ -27,11 +30,34 @@ type screenStream interface {
 type pipewireStream struct {
 	producer      *pipewire.Producer
 	width, height int32
+	ended         <-chan struct{}
 	closeSource   func()
 }
 
 func (s *pipewireStream) NodeID() uint32              { return s.producer.NodeID() }
 func (s *pipewireStream) Size() (width, height int32) { return s.width, s.height }
+func (s *pipewireStream) Ended() <-chan struct{}      { return s.ended }
+
+// vanishWatch closes ended the first time a failed capture finds its
+// target gone: a closed window or an unplugged output ends the stream,
+// a transient copy failure does not.
+type vanishWatch struct {
+	gone  func() bool
+	once  sync.Once
+	ended chan struct{}
+}
+
+func newVanishWatch(gone func() bool) *vanishWatch {
+	return &vanishWatch{gone: gone, ended: make(chan struct{})}
+}
+
+// failed checks the target after a failed capture; a source without a
+// watch never ends by itself.
+func (v *vanishWatch) failed() {
+	if v != nil && v.gone() {
+		v.once.Do(func() { close(v.ended) })
+	}
+}
 
 func (s *pipewireStream) Close() {
 	s.producer.Close()
@@ -55,7 +81,7 @@ func startScreenStream(target captureTarget, cursor bool, fps uint32) (screenStr
 			return startProducer(producerGeometry{
 				width: info.Width, height: info.Height, stride: info.Stride, format: info.Format,
 				fps: effectiveFPS(fps, info.RefreshMHz), transform: uint32(info.Transform),
-			}, &extSource{stream: s}, func() { _ = s.Close() })
+			}, &extSource{stream: s}, s.Done(), func() { _ = s.Close() })
 		} else if !errors.Is(err, capture.ErrUnsupported) {
 			return nil, err
 		}
@@ -70,7 +96,7 @@ type producerGeometry struct {
 	fps, transform        uint32
 }
 
-func startProducer(g producerGeometry, src pipewire.Source, closeSource func()) (screenStream, error) {
+func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{}, closeSource func()) (screenStream, error) {
 	p, err := pipewire.Start(pipewire.Config{
 		Width: uint32(g.width), Height: uint32(g.height), Stride: uint32(g.stride),
 		Format: videoFormat(g.format), FPS: g.fps, Transform: g.transform, Source: src,
@@ -79,7 +105,7 @@ func startProducer(g producerGeometry, src pipewire.Source, closeSource func()) 
 		closeSource()
 		return nil, err
 	}
-	return &pipewireStream{producer: p, width: int32(g.width), height: int32(g.height), closeSource: closeSource}, nil
+	return &pipewireStream{producer: p, width: int32(g.width), height: int32(g.height), ended: ended, closeSource: closeSource}, nil
 }
 
 // videoFormat maps the wl_shm format the compositor returned; an
@@ -135,11 +161,13 @@ type snapshotSource struct {
 	stride int
 	height int
 	buf    []byte
+	watch  *vanishWatch
 }
 
 func (s *snapshotSource) Fill(dst []byte) ([]pipewire.Rect, bool) {
 	f, err := s.grab(s.buf)
 	if err != nil {
+		s.watch.failed()
 		return nil, false
 	}
 	s.buf = f.Data
@@ -172,6 +200,7 @@ func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenS
 	}
 	opts := capture.Options{Cursor: cursor}
 	var grab func([]byte) (*capture.Frame, error)
+	var gone func() bool
 	var refresh int32
 	var transform capture.Transform
 	switch target.kind {
@@ -181,6 +210,7 @@ func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenS
 			_ = c.Close()
 			return nil, fmt.Errorf("output '%s' is gone", target.name)
 		}
+		gone = outputGone(c, target.name)
 		refresh, transform = o.RefreshMHz, o.Transform
 		if target.kind == targetOutput {
 			grab = outputGrab(c, o, cursor)
@@ -198,17 +228,24 @@ func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenS
 			return nil, fmt.Errorf("window '%s' is gone", target.name)
 		}
 		grab = func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureToplevel(t, opts) }
+		gone = func() bool { _, ok := findToplevel(c, target.name); return !ok }
 	}
 	first, err := grab(nil)
 	if err != nil {
 		_ = c.Close()
 		return nil, fmt.Errorf("initial capture failed: %w", err)
 	}
-	src := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data}
+	watch := newVanishWatch(gone)
+	src := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data, watch: watch}
 	return startProducer(producerGeometry{
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, refresh), transform: uint32(transform),
-	}, src, func() { _ = c.Close() })
+	}, src, watch.ended, func() { _ = c.Close() })
+}
+
+// outputGone reports, on each call, whether the output left.
+func outputGone(c *capture.Client, name string) func() bool {
+	return func() bool { _, ok := findOutput(c, name); return !ok }
 }
 
 func findOutput(c *capture.Client, name string) (capture.Output, bool) {
@@ -268,16 +305,18 @@ func startGPUStream(output string, cursor bool, fps uint32) (screenStream, error
 	if err != nil {
 		return fail(err)
 	}
-	shm := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data}
+	watch := newVanishWatch(outputGone(c, output))
+	shm := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data, watch: watch}
 	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, o, cursor, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)
 	}
+	src.watch = watch
 	return startProducer(producerGeometry{
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, o.RefreshMHz), transform: uint32(o.Transform),
-	}, src, func() {
+	}, src, watch.ended, func() {
 		dev.Close()
 		_ = c.Close()
 	})

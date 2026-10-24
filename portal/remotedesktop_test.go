@@ -79,7 +79,9 @@ func remoteRig(t *testing.T, dialErr error) (*rig, *fakeSink) {
 
 func (r *rig) remoteStart(t *testing.T, options Vardict) (uint32, map[string]dbus.Variant) {
 	t.Helper()
-	r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})
+	if _, live := r.backend.sessions.get(sessA); !live {
+		r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})
+	}
 	r.interactive(t, RemoteDesktopIface+".SelectDevices", handle, sessA, "org.app", options)
 	return r.interactive(t, RemoteDesktopIface+".Start", handle, sessA, "org.app", "", Vardict{})
 }
@@ -103,7 +105,9 @@ func TestRemoteDesktopAsksFirst(t *testing.T) {
 	if got := d.asked.Load(); len(got) == 0 {
 		t.Error("no consent asked")
 	}
-	r.notify(t, "NotifyPointerMotion", 1.0, 2.0)
+	if err := r.obj.Call(RemoteDesktopIface+".NotifyPointerMotion", 0, sessA, Vardict{}, 1.0, 2.0).Err; err == nil {
+		t.Error("input before an allowed Start was accepted")
+	}
 	if len(sink.events.Load()) != 0 {
 		t.Error("input before an allowed Start")
 	}
@@ -177,7 +181,7 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 	var fd dbus.UnixFD
 	err := r.obj.Call(RemoteDesktopIface+".ConnectToEIS", 0, sessA, "org.app", Vardict{}).Store(&fd)
 	var de dbus.Error
-	if !errors.As(err, &de) || de.Body[0] != "no active remote-desktop session" {
+	if !errors.As(err, &de) || !strings.Contains(de.Body[0].(string), "is not started") {
 		t.Errorf("ConnectToEIS before Start = %v", err)
 	}
 	r.interactive(t, RemoteDesktopIface+".Start", handle, sessA, "org.app", "", Vardict{})
@@ -198,7 +202,10 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 	}
 
 	// The handler replays onto the session's devices.
-	in := r.backend.remote.input(sessA)
+	in, err := r.backend.remote.input(sessA)
+	if err != nil {
+		t.Fatal(err)
+	}
 	e := eisInput{in}
 	e.ScrollDiscrete(-120, 240)
 	e.ScrollDiscrete(0, 0)

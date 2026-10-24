@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 
@@ -111,24 +112,25 @@ func keysymTable(keymap []byte) map[uint32]keysymKey {
 	return table
 }
 
-// remoteDesktop is the interface's state.
+// remoteState is a RemoteDesktop session's device types and, once
+// started, its devices; it lives on the session, guarded by its mu.
+type remoteState struct {
+	types uint32
+	input *remoteInput
+}
+
+// remoteDesktop is the interface: its sessions' state lives on the
+// session records.
 type remoteDesktop struct {
 	conn     *dbus.Conn
 	sessions *sessions
 	sizes    *streamSizes
 	// dial creates a session's devices (dialInput; a fake in tests).
 	dial func() (inputSink, error)
-
-	mu      sync.Mutex
-	devices map[dbus.ObjectPath]uint32
-	inputs  map[dbus.ObjectPath]*remoteInput
 }
 
 func newRemoteDesktop(conn *dbus.Conn, s *sessions, sizes *streamSizes, dial func() (inputSink, error)) *remoteDesktop {
-	return &remoteDesktop{
-		conn: conn, sessions: s, sizes: sizes, dial: dial,
-		devices: map[dbus.ObjectPath]uint32{}, inputs: map[dbus.ObjectPath]*remoteInput{},
-	}
+	return &remoteDesktop{conn: conn, sessions: s, sizes: sizes, dial: dial}
 }
 
 func (r *remoteDesktop) iface() dbusx.Interface {
@@ -142,59 +144,83 @@ func (r *remoteDesktop) iface() dbusx.Interface {
 	}
 }
 
-// input is the session's devices, nil before Start.
-func (r *remoteDesktop) input(session dbus.ObjectPath) *remoteInput {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.inputs[session]
+// session is the live RemoteDesktop session at path.
+func (r *remoteDesktop) session(path dbus.ObjectPath) (*session, error) {
+	s, ok := r.sessions.get(path)
+	if !ok || s.kind != kindRemoteDesktop {
+		return nil, fmt.Errorf("no remote-desktop session at %s", path)
+	}
+	return s, nil
 }
 
-func (r *remoteDesktop) closeSession(session dbus.ObjectPath) {
-	r.mu.Lock()
-	in := r.inputs[session]
-	delete(r.inputs, session)
-	delete(r.devices, session)
-	r.mu.Unlock()
-	if in != nil {
-		in.sink.Close()
+// input is the started session's devices; an unknown or unstarted
+// session is an error.
+func (r *remoteDesktop) input(path dbus.ObjectPath) (*remoteInput, error) {
+	s, err := r.session(path)
+	if err != nil {
+		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.remote.input == nil {
+		return nil, fmt.Errorf("remote-desktop session %s is not started", path)
+	}
+	return s.remote.input, nil
 }
 
 // remoteDesktopObject carries the interface's D-Bus methods.
 type remoteDesktopObject struct{ r *remoteDesktop }
 
 // CreateSession opens a session.
-func (o remoteDesktopObject) CreateSession(_, session dbus.ObjectPath, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	if err := o.r.sessions.mount(session, func() { o.r.closeSession(session) }); err != nil {
+func (o remoteDesktopObject) CreateSession(_, session dbus.ObjectPath, appID string, _ Vardict) (uint32, Vardict, *dbus.Error) {
+	s, err := o.r.sessions.create(session, kindRemoteDesktop, appID)
+	if err != nil {
 		warnf("remotedesktop: cannot mount session: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	o.r.mu.Lock()
-	o.r.devices[session] = 0
-	o.r.mu.Unlock()
+	s.mu.Lock()
+	s.remote = &remoteState{}
+	s.mu.Unlock()
+	s.onClose(func() {
+		s.mu.Lock()
+		in := s.remote.input
+		s.remote.input = nil
+		s.mu.Unlock()
+		if in != nil {
+			in.sink.Close()
+		}
+	})
 	return ResponseSuccess, Vardict{}, nil
 }
 
 // SelectDevices records the device types (both when none are named).
-func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, _ string, options Vardict) (uint32, Vardict, *dbus.Error) {
+func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	s, err := o.r.sessions.lookup(session, appID, kindRemoteDesktop)
+	if err != nil {
+		warnf("remotedesktop: SelectDevices: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
 	types, ok := optU32(options, "types")
 	if !ok {
 		types = deviceKeyboard | devicePointer
 	}
-	o.r.mu.Lock()
-	if _, ok := o.r.devices[session]; ok {
-		o.r.devices[session] = types
-	}
-	o.r.mu.Unlock()
+	s.mu.Lock()
+	s.remote.types = types
+	s.mu.Unlock()
 	return ResponseSuccess, Vardict{}, nil
 }
 
 // Start asks the user to allow control, then creates the devices and
 // replies the granted types.
-func (o remoteDesktopObject) Start(_, session dbus.ObjectPath, _, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	o.r.mu.Lock()
-	types := o.r.devices[session]
-	o.r.mu.Unlock()
+func (o remoteDesktopObject) Start(_, session dbus.ObjectPath, appID, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
+	s, err := o.r.sessions.lookup(session, appID, kindRemoteDesktop)
+	if err != nil {
+		warnf("remotedesktop: Start: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
+	s.mu.Lock()
+	types := s.remote.types
+	s.mu.Unlock()
 	granted := deviceKeyboard | devicePointer
 	if types != 0 {
 		granted = types & (deviceKeyboard | devicePointer)
@@ -214,20 +240,24 @@ func (o remoteDesktopObject) Start(_, session dbus.ObjectPath, _, _ string, _ Va
 		warnf("remotedesktop: cannot start virtual input: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	o.r.mu.Lock()
-	if old := o.r.inputs[session]; old != nil {
+	s.mu.Lock()
+	old := s.remote.input
+	s.remote.input = &remoteInput{sink: sink}
+	s.mu.Unlock()
+	if old != nil {
 		old.sink.Close()
 	}
-	o.r.inputs[session] = &remoteInput{sink: sink}
-	o.r.mu.Unlock()
 	return ResponseSuccess, Vardict{"devices": dbus.MakeVariant(granted)}, nil
 }
 
-// with runs fn on the session's devices, nothing before Start.
+// with runs fn on the started session's devices; an unknown or
+// unstarted session is an error.
 func (o remoteDesktopObject) with(session dbus.ObjectPath, fn func(*remoteInput)) *dbus.Error {
-	if in := o.r.input(session); in != nil {
-		fn(in)
+	in, err := o.r.input(session)
+	if err != nil {
+		return dbusx.Failed(err.Error())
 	}
+	fn(in)
 	return nil
 }
 
@@ -335,9 +365,9 @@ func (e eisInput) ScrollDiscrete(dx, dy int32) {
 // which libei clients prefer to the Notify* calls; godbus closes this
 // end's copy once the reply is out.
 func (o remoteDesktopObject) ConnectToEIS(session dbus.ObjectPath, _ string, _ Vardict) (*os.File, *dbus.Error) {
-	in := o.r.input(session)
-	if in == nil {
-		return nil, dbusx.Failed("no active remote-desktop session")
+	in, err := o.r.input(session)
+	if err != nil {
+		return nil, dbusx.Failed(err.Error())
 	}
 	f, err := eis.Pair(eisInput{in})
 	if err != nil {

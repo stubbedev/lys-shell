@@ -60,6 +60,8 @@ type gpuSource struct {
 	video           pipewire.VideoFormat
 	width, height   uint32
 	modifier        uint64
+	// watch ends the stream when a failed copy finds the output gone.
+	watch *vanishWatch
 }
 
 // gpuBuffer is one bound buffer: the gbm allocation and the
@@ -117,6 +119,9 @@ func (s *gpuSource) FillDmabuf(d pipewire.Dmabuf) ([]pipewire.Rect, bool) {
 	}
 	// A plain copy reports no damage: the whole frame changed.
 	if err := s.cap.CopyInto(s.output, s.cursor, b.imported); err != nil {
+		if s.watch != nil {
+			s.watch.failed()
+		}
 		return nil, false
 	}
 	return nil, true

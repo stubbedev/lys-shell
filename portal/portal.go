@@ -57,8 +57,10 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b.screenCast = newScreenCast(conn, b.sessions, b.sizes, startScreenStream)
 	b.remote = newRemoteDesktop(conn, b.sessions, b.sizes, dialInput)
 	loop := &waylandLoop{}
-	b.clipboard = newClipboardBridge(conn, waylandClipboardStarter(loop))
+	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, waylandShortcutsStarter(loop))
+	loop.onEnd(b.clipboard.loopEnded)
+	loop.onEnd(b.shortcuts.loopEnded)
 	return b
 }
 

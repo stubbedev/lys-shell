@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -36,12 +37,14 @@ type shortcutRoute struct {
 	id      string
 }
 
-type shortcutSession struct {
-	appID     string
+// shortcutState is a GlobalShortcuts session's bound shortcuts; it
+// lives on the session, guarded by its mu.
+type shortcutState struct {
 	shortcuts []shortcut
 }
 
-// globalShortcuts is the interface's state.
+// globalShortcuts is the interface: the compositor registrations and
+// their routes; each session's binds live on its record.
 type globalShortcuts struct {
 	conn     *dbus.Conn
 	sessions *sessions
@@ -51,7 +54,6 @@ type globalShortcuts struct {
 
 	mu      sync.Mutex
 	dev     shortcutDevice
-	data    map[dbus.ObjectPath]*shortcutSession
 	routes  map[string]shortcutRoute
 	objects map[string]func()
 }
@@ -59,7 +61,7 @@ type globalShortcuts struct {
 func newGlobalShortcuts(conn *dbus.Conn, s *sessions, start func(func(string, bool, uint64)) (shortcutDevice, error)) *globalShortcuts {
 	return &globalShortcuts{
 		conn: conn, sessions: s, start: start,
-		data: map[dbus.ObjectPath]*shortcutSession{}, routes: map[string]shortcutRoute{}, objects: map[string]func(){},
+		routes: map[string]shortcutRoute{}, objects: map[string]func(){},
 	}
 }
 
@@ -136,10 +138,9 @@ func (g *globalShortcuts) register(session dbus.ObjectPath, appID string, shortc
 	}
 }
 
-// closeSession forgets the session's shortcuts and unregisters them.
+// closeSession unregisters the session's shortcuts.
 func (g *globalShortcuts) closeSession(session dbus.ObjectPath) {
 	g.mu.Lock()
-	delete(g.data, session)
 	var stale []func()
 	for key, r := range g.routes {
 		if r.session == session {
@@ -156,15 +157,33 @@ func (g *globalShortcuts) closeSession(session dbus.ObjectPath) {
 	}
 }
 
-// shortcutsOf is the session's bound shortcuts, none for an unknown
-// session.
-func (g *globalShortcuts) shortcutsOf(session dbus.ObjectPath) []shortcut {
+// loopEnded drops the device and its registrations, which died with
+// the compositor connection, and closes every session bound on them.
+func (g *globalShortcuts) loopEnded() {
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	if d, ok := g.data[session]; ok {
-		return append([]shortcut{}, d.shortcuts...)
+	g.dev = nil
+	g.routes = map[string]shortcutRoute{}
+	g.objects = map[string]func(){}
+	g.mu.Unlock()
+	for _, s := range g.sessions.each(func(s *session) bool { return s.kind == kindGlobalShortcuts }) {
+		g.sessions.close(s)
 	}
-	return []shortcut{}
+}
+
+// session is the live GlobalShortcuts session at path.
+func (g *globalShortcuts) session(path dbus.ObjectPath) (*session, error) {
+	s, ok := g.sessions.get(path)
+	if !ok || s.kind != kindGlobalShortcuts {
+		return nil, fmt.Errorf("no global-shortcuts session at %s", path)
+	}
+	return s, nil
+}
+
+// shortcutsOf is the session's bound shortcuts.
+func shortcutsOf(s *session) []shortcut {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]shortcut{}, s.shortcuts.shortcuts...)
 }
 
 // mergeShortcuts replaces the props of ids already present, in place,
@@ -192,7 +211,8 @@ type globalShortcutsObject struct{ g *globalShortcuts }
 // CreateSession opens a session and registers the shortcuts its
 // options carry (xdph does too).
 func (o globalShortcutsObject) CreateSession(_, session dbus.ObjectPath, appID string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	if err := o.g.sessions.mount(session, func() { o.g.closeSession(session) }); err != nil {
+	s, err := o.g.sessions.create(session, kindGlobalShortcuts, appID)
+	if err != nil {
 		warnf("global shortcuts: cannot mount session: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
@@ -202,32 +222,36 @@ func (o globalShortcutsObject) CreateSession(_, session dbus.ObjectPath, appID s
 			shortcuts = nil
 		}
 	}
-	o.g.mu.Lock()
-	o.g.data[session] = &shortcutSession{appID: appID, shortcuts: shortcuts}
-	o.g.mu.Unlock()
+	s.mu.Lock()
+	s.shortcuts = &shortcutState{shortcuts: shortcuts}
+	s.mu.Unlock()
+	s.onClose(func() { o.g.closeSession(session) })
 	o.g.register(session, appID, shortcuts)
 	return ResponseSuccess, Vardict{}, nil
 }
 
 // BindShortcuts registers shortcuts and replies the session's merged
-// set.
+// set; an unknown session fails.
 func (o globalShortcutsObject) BindShortcuts(_, session dbus.ObjectPath, shortcuts []shortcut, _ string, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	o.g.mu.Lock()
-	appID := ""
-	if d, ok := o.g.data[session]; ok {
-		appID = d.appID
+	s, err := o.g.session(session)
+	if err != nil {
+		warnf("global shortcuts: BindShortcuts: %v", err)
+		return ResponseOther, Vardict{}, nil
 	}
-	o.g.mu.Unlock()
-	o.g.register(session, appID, shortcuts)
-	o.g.mu.Lock()
-	if d, ok := o.g.data[session]; ok {
-		d.shortcuts = mergeShortcuts(d.shortcuts, shortcuts)
-	}
-	o.g.mu.Unlock()
-	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(o.g.shortcutsOf(session))}, nil
+	o.g.register(session, s.appID, shortcuts)
+	s.mu.Lock()
+	s.shortcuts.shortcuts = mergeShortcuts(s.shortcuts.shortcuts, shortcuts)
+	s.mu.Unlock()
+	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(shortcutsOf(s))}, nil
 }
 
-// ListShortcuts replies the session's bound shortcuts.
+// ListShortcuts replies the session's bound shortcuts; an unknown
+// session fails.
 func (o globalShortcutsObject) ListShortcuts(_, session dbus.ObjectPath) (uint32, Vardict, *dbus.Error) {
-	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(o.g.shortcutsOf(session))}, nil
+	s, err := o.g.session(session)
+	if err != nil {
+		warnf("global shortcuts: ListShortcuts: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
+	return ResponseSuccess, Vardict{"shortcuts": dbus.MakeVariant(shortcutsOf(s))}, nil
 }
