@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/mime"
 )
 
@@ -375,21 +376,25 @@ func TestWalkSearchStreamsBatchesAndCaps(t *testing.T) {
 func TestListDirReturnsEverythingButHonorsFolderMode(t *testing.T) {
 	root := t.TempDir()
 	touch(t, root, "sub/", "visible.txt", ".hidden.txt")
-	got := names(ListDir(root, ModeOpenFile))
+	all, err := ListDir(root, ModeOpenFile)
+	got := names(all)
 	slices.Sort(got)
-	if !slices.Equal(got, []string{".hidden.txt", "sub", "visible.txt"}) {
-		t.Errorf("listing = %v, want everything", got)
+	if err != nil || !slices.Equal(got, []string{".hidden.txt", "sub", "visible.txt"}) {
+		t.Errorf("listing = %v, %v; want everything", got, err)
 	}
-	if got := names(ListDir(root, ModeFolder)); !slices.Equal(got, []string{"sub"}) {
+	folders, _ := ListDir(root, ModeFolder)
+	if got := names(folders); !slices.Equal(got, []string{"sub"}) {
 		t.Errorf("folder mode = %v, want only folders", got)
 	}
-	if got := ListDir(filepath.Join(root, "missing"), ModeOpenFile); got != nil {
-		t.Errorf("an unreadable directory = %v, want none", got)
+	if got, err := ListDir(filepath.Join(root, "missing"), ModeOpenFile); got != nil || err == nil {
+		t.Errorf("an unreadable directory = %v, %v; want none and the error", got, err)
 	}
 }
 
 func TestUserPlacesListsHomeAndExistingDirs(t *testing.T) {
 	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	touch(t, home, "Documents/", "Pictures/", "Music")
 	var got []string
 	for _, p := range UserPlaces(home) {
@@ -562,5 +567,66 @@ func TestFilterExt(t *testing.T) {
 	}
 	if got := withExtension("", Filter{Rules: []Rule{{RuleGlob, "*.txt"}}}); got != "" {
 		t.Errorf("an empty name took %q", got)
+	}
+}
+
+// The user directories are where user-dirs.dirs puts them, under their
+// localized names; one it points at home is left out; the GTK
+// bookmarks follow, the local folders that exist.
+func TestUserPlacesFollowUserDirsAndBookmarks(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	config := filepath.Join(home, ".config")
+	t.Setenv("XDG_CONFIG_HOME", config)
+	touch(t, home, "Dokumente/", "Bilder/", "Projects/", "Music/")
+	touch(t, config, "user-dirs.dirs", "gtk-3.0/bookmarks")
+	write := func(rel, body string) {
+		if err := os.WriteFile(filepath.Join(config, rel), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("user-dirs.dirs", "XDG_DOCUMENTS_DIR=\"$HOME/Dokumente\"\nXDG_PICTURES_DIR=\"$HOME/Bilder\"\nXDG_MUSIC_DIR=\"$HOME/\"\n")
+	write("gtk-3.0/bookmarks", fileuri.FromPath(filepath.Join(home, "Projects"))+" Work\nsftp://host/x Remote\n"+fileuri.FromPath(filepath.Join(home, "gone"))+"\n")
+	var got []string
+	for _, p := range UserPlaces(home) {
+		got = append(got, p.Label+"="+p.Path)
+	}
+	want := []string{"Home=" + home, "Dokumente=" + filepath.Join(home, "Dokumente"), "Bilder=" + filepath.Join(home, "Bilder"), "Work=" + filepath.Join(home, "Projects")}
+	if !slices.Equal(got, want) {
+		t.Errorf("places = %v, want %v", got, want)
+	}
+}
+
+// Recent lists the used local files that still exist, newest first,
+// and a missing list none.
+func TestListRecent(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, dir, "old.txt", "new.txt", "sub/")
+	xbelPath := filepath.Join(dir, "recently-used.xbel")
+	body := `<?xml version="1.0"?><xbel version="1.0">
+<bookmark href="` + fileuri.FromPath(filepath.Join(dir, "old.txt")) + `" modified="2026-01-01T00:00:00Z"/>
+<bookmark href="` + fileuri.FromPath(filepath.Join(dir, "new.txt")) + `" modified="2026-10-01T00:00:00Z"/>
+<bookmark href="` + fileuri.FromPath(filepath.Join(dir, "gone.txt")) + `" modified="2026-10-02T00:00:00Z"/>
+<bookmark href="` + fileuri.FromPath(filepath.Join(dir, "sub")) + `" modified="2026-10-03T00:00:00Z"/>
+<bookmark href="https://example.org/x" modified="2026-10-04T00:00:00Z"/>
+</xbel>`
+	if err := os.WriteFile(xbelPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := ListRecent(xbelPath, ModeOpenFile)
+	if got := names(entries); err != nil || !slices.Equal(got, []string{"new.txt", "old.txt"}) {
+		t.Errorf("recent = %v, %v", got, err)
+	}
+	if entries, err := ListRecent(filepath.Join(dir, "none.xbel"), ModeOpenFile); err != nil || len(entries) != 0 {
+		t.Errorf("a missing list = %v, %v", entries, err)
+	}
+	if err := os.WriteFile(xbelPath, []byte("<xbel"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ListRecent(xbelPath, ModeOpenFile); err == nil {
+		t.Error("a broken list read without an error")
+	}
+	if crumbs := Crumbs(recentLocation, "/home/u"); len(crumbs) != 1 || crumbs[0].Label != "Recent" {
+		t.Errorf("Recent crumbs = %v", crumbs)
 	}
 }

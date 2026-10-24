@@ -20,9 +20,13 @@ type session struct {
 	active  int
 
 	// all is the unfiltered listing of listed, re-read only when the
-	// directory changes: every other repaint partitions it in memory.
-	all    []Entry
-	listed string
+	// directory changes: every other repaint partitions it in memory;
+	// listErr is why it could not be read.
+	all     []Entry
+	listed  string
+	listErr error
+	// recentFile is the recently-used list the Recent place reads.
+	recentFile string
 
 	search    string
 	recursive bool
@@ -71,7 +75,7 @@ func (s *session) refresh() {
 		source = s.found
 	} else {
 		if s.listed != s.dir || s.all == nil {
-			s.all, s.listed = ListDir(s.dir, s.mode), s.dir
+			s.all, s.listed = s.list(), s.dir
 		}
 		source = s.all
 	}
@@ -96,6 +100,19 @@ func (s *session) refresh() {
 	} else {
 		SortEntries(s.entries, s.view.sort, s.view.asc)
 	}
+}
+
+// list reads the folder shown, or the Recent files, keeping the error.
+func (s *session) list() []Entry {
+	var entries []Entry
+	var err error
+	if s.dir == recentLocation {
+		entries, err = ListRecent(s.recentFile, s.mode)
+	} else {
+		entries, err = ListDir(s.dir, s.mode)
+	}
+	s.listErr = err
+	return entries
 }
 
 // displayName is a row's label: the basename, or the path below dir
@@ -157,10 +174,10 @@ func (s *session) step(back bool) bool {
 	return true
 }
 
-// up goes to the parent; false at the root.
+// up goes to the parent; false at the root, and in Recent.
 func (s *session) up() bool {
 	parent := filepath.Dir(s.dir)
-	if parent == s.dir {
+	if parent == s.dir || s.dir == recentLocation {
 		return false
 	}
 	s.goTo(parent)

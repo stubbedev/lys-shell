@@ -291,7 +291,7 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	if !hs.c.ui.filterPopup.Visible() {
 		t.Fatal("the filter button did not open the popup")
 	}
-	hs.do(func() { hs.cfg.OnKey(nil, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
 	pending(t, got)
 	if hs.c.ui.filterPopup.Visible() {
 		t.Error("Escape left the filter popup open")
@@ -301,9 +301,9 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	if !hs.c.ui.quicklook.Visible() {
 		t.Fatal("space did not open quick look")
 	}
-	hs.do(func() { hs.cfg.OnKey(nil, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
 	pending(t, got)
-	hs.do(func() { hs.cfg.OnKey(nil, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
 	if uris := answer(t, got); uris != nil {
 		t.Errorf("Escape answered %v", uris)
 	}
@@ -1038,4 +1038,245 @@ func TestSaveFilterSetsTheExtension(t *testing.T) {
 	}
 	hs.click(t, "Cancel")
 	answer(t, got)
+}
+
+// key presses a key on the dialog with focus on focused (none for nil).
+func (hs *harness) key(keycode uint32, mods app.Mods, focused widget.Widget) {
+	hs.do(func() {
+		r := &widget.Router{Root: hs.cfg.Root}
+		if focused != nil {
+			r.SetFocus(focused)
+		}
+		hs.cfg.OnKey(r, keycode, mods)
+	})
+}
+
+// dir is the folder shown.
+func (hs *harness) dir() string {
+	var d string
+	hs.do(func() { d = hs.c.s.dir })
+	return d
+}
+
+// GTK's chooser keys: Backspace and Alt+Up go up (not while typing),
+// Alt+Left and Alt+Right walk the history, Ctrl+H shows hidden files,
+// Ctrl+L the location entry, Ctrl+F the search; Space opens quick look
+// only without modifiers.
+func TestChooserKeys(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{CurrentFolder: filepath.Join(hs.root, "docs")})
+	hs.key(keyBackspace, 0, hs.c.ui.search)
+	if hs.dir() != filepath.Join(hs.root, "docs") {
+		t.Error("Backspace in the search box went up")
+	}
+	hs.key(keyBackspace, 0, nil)
+	if hs.dir() != hs.root {
+		t.Errorf("Backspace left %s, want the parent", hs.dir())
+	}
+	hs.key(keyLeft, app.ModAlt, nil)
+	if hs.dir() != filepath.Join(hs.root, "docs") {
+		t.Errorf("Alt+Left left %s, want back in docs", hs.dir())
+	}
+	hs.key(keyRight, app.ModAlt, nil)
+	hs.key(keyUp, app.ModAlt, nil)
+	if hs.dir() != filepath.Dir(hs.root) {
+		t.Errorf("Alt+Right then Alt+Up left %s", hs.dir())
+	}
+	hs.do(func() { hs.c.goTo(hs.root) })
+	hs.key(keyH, app.ModCtrl, nil)
+	if shown := hs.shown(); !slices.Contains(shown, ".dot.txt") {
+		t.Errorf("Ctrl+H left %v", shown)
+	}
+	hs.key(keyL, app.ModCtrl, nil)
+	var locating bool
+	hs.do(func() { locating = hs.c.ui.location.Visible() && !hs.c.ui.crumbs.Visible() })
+	if !locating || hs.windows[0].focus != hs.c.ui.location {
+		t.Error("Ctrl+L did not open the focused location entry")
+	}
+	hs.key(keyF, app.ModCtrl, nil)
+	if hs.windows[0].focus != hs.c.ui.search {
+		t.Error("Ctrl+F did not focus the search")
+	}
+	hs.pick(t, "a.png")
+	hs.key(keySpace, app.ModCtrl, nil)
+	var ql bool
+	hs.do(func() { ql = hs.c.ui.quicklook.Visible() })
+	if ql {
+		t.Error("Ctrl+Space opened quick look")
+	}
+	hs.key(keySpace, 0, nil)
+	hs.do(func() { ql = hs.c.ui.quicklook.Visible() })
+	if !ql {
+		t.Error("Space did not open quick look")
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// Typing into a file view searches; / or ~ starts a path in the
+// location entry, whose Enter opens a folder, answers a file, or warns.
+func TestTypeAheadAndLocation(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	// A click on the list lands on the wrapper, which takes the typing.
+	var hit widget.Widget
+	hs.do(func() {
+		hs.cfg.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 800}})
+		hs.cfg.Root.Arrange(render.Rect{W: 1280, H: 800})
+		b := hs.c.ui.list.Bounds()
+		hit = hs.c.ui.listView.HitTest(widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2})
+	})
+	if hit != widget.Widget(hs.c.ui.listView) {
+		t.Errorf("a click on the list hits %T, want the type-ahead view", hit)
+	}
+	hs.do(func() { hs.c.ui.listView.InsertRune('b') })
+	if shown := hs.shown(); !slices.Equal(shown, []string{"b.txt"}) || hs.windows[0].focus != hs.c.ui.search {
+		t.Errorf("typing b showed %v, focus %v", shown, hs.windows[0].focus)
+	}
+	hs.do(func() { hs.c.ui.listView.InsertRune('~') })
+	var text string
+	hs.do(func() { text = hs.c.ui.location.Text() })
+	if text != "~" {
+		t.Errorf("typing ~ seeded the location with %q", text)
+	}
+	hs.do(func() { hs.c.goToLocation("~/pics") })
+	if hs.dir() != filepath.Join(hs.root, "pics") {
+		t.Errorf("~/pics opened %s", hs.dir())
+	}
+	hs.do(func() { hs.c.goToLocation("../nope") })
+	var notice string
+	hs.do(func() { notice = hs.c.ui.noticeLabel.Text() })
+	if notice != "No folder or file at "+filepath.Join(hs.root, "nope")+"." {
+		t.Errorf("a missing path noticed %q", notice)
+	}
+	hs.do(func() { hs.c.goToLocation("a.png") })
+	if uris := answer(t, got); !slices.Equal(uris, []string{hs.uri("pics/a.png")}) {
+		t.Errorf("a typed file answered %v", uris)
+	}
+	// Saving, a typed path is the folder and the name.
+	got = hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+	hs.do(func() { hs.c.goToLocation("docs/report.odt") })
+	hs.do(func() { text = hs.c.ui.name.Text() })
+	if hs.dir() != filepath.Join(hs.root, "docs") || text != "report.odt" {
+		t.Errorf("a typed save path left %s with %q", hs.dir(), text)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// Create Folder makes the folder in the one shown and opens it; a name
+// taken or not a name warns. Opening files offers no Create Folder.
+func TestCreateFolder(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+	if !hasButton(hs.cfg.Root, "Create Folder") {
+		t.Error("a save offers no Create Folder")
+	}
+	hs.do(func() { hs.c.showNewFolder(); hs.c.ui.newFolderName.SetText("Invoices") })
+	hs.do(func() { hs.c.createFolder() })
+	if hs.dir() != filepath.Join(hs.root, "Invoices") {
+		t.Errorf("creating left %s", hs.dir())
+	}
+	if info, err := os.Stat(filepath.Join(hs.root, "Invoices")); err != nil || !info.IsDir() {
+		t.Errorf("no folder created: %v", err)
+	}
+	var notice string
+	for name, want := range map[string]string{"..": "“..” is not a folder name.", "a/b": "“a/b” is not a folder name."} {
+		hs.do(func() { hs.c.showNewFolder(); hs.c.ui.newFolderName.SetText(name); hs.c.createFolder() })
+		hs.do(func() { notice = hs.c.ui.noticeLabel.Text() })
+		if notice != want {
+			t.Errorf("%q noticed %q", name, notice)
+		}
+	}
+	hs.do(func() {
+		hs.c.goTo(hs.root)
+		hs.c.showNewFolder()
+		hs.c.ui.newFolderName.SetText("docs")
+		hs.c.createFolder()
+	})
+	hs.do(func() { notice = hs.c.ui.noticeLabel.Text() })
+	if notice != "Cannot create “docs”: file exists" {
+		t.Errorf("a taken name noticed %q", notice)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+	got = hs.open(t, OpenRequest{})
+	if hasButton(hs.cfg.Root, "Create Folder") {
+		t.Error("an open dialog offers Create Folder")
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// hasButton reports a button named name (its label or tooltip) in
+// the tree.
+func hasButton(root widget.Widget, name string) bool {
+	found := false
+	treetest.Walk(root, func(w widget.Widget) {
+		if _, ok := w.(*widget.Button); ok && widget.Describe(w).Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
+// Recent lists the recently used files, offered when opening files;
+// a folder that cannot be read says so instead of "No items".
+func TestRecentAndListingErrors(t *testing.T) {
+	hs := newHarness(t, "")
+	recent := filepath.Join(t.TempDir(), "recently-used.xbel")
+	body := `<xbel><bookmark href="` + hs.uri("b.txt") + `" modified="2026-10-01T00:00:00Z"/></xbel>`
+	if err := os.WriteFile(recent, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hs.c.d.RecentFile = recent
+	got := hs.open(t, OpenRequest{})
+	if !hasButton(hs.cfg.Root, "Recent") {
+		t.Fatal("no Recent place")
+	}
+	hs.do(func() { hs.c.goTo(recentLocation) })
+	if shown := hs.shown(); !slices.Equal(shown, []string{"b.txt"}) {
+		t.Errorf("Recent shows %v", shown)
+	}
+	var up bool
+	hs.do(func() { up = hs.c.s.up() })
+	if up {
+		t.Error("Recent has a parent")
+	}
+	locked := filepath.Join(hs.root, "locked")
+	if err := os.Mkdir(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })
+	hs.do(func() { hs.c.goTo(locked) })
+	var empty string
+	hs.do(func() { empty = hs.c.ui.empty.Text() })
+	if os.Geteuid() != 0 && empty != "Cannot read this folder: permission denied" {
+		t.Errorf("an unreadable folder shows %q", empty)
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+	got = hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
+	if hasButton(hs.cfg.Root, "Recent") {
+		t.Error("a save offers Recent")
+	}
+	hs.click(t, "Cancel")
+	answer(t, got)
+}
+
+// A dropped file opens its folder with it selected.
+func TestDropSelectsTheFile(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{CurrentFolder: filepath.Join(hs.root, "docs")})
+	hs.do(func() { hs.c.dropped(filepath.Join(hs.root, "pics", "a.png")) })
+	var sel Entry
+	var ok bool
+	hs.do(func() { sel, ok = hs.c.selected() })
+	if hs.dir() != filepath.Join(hs.root, "pics") || !ok || sel.Name() != "a.png" {
+		t.Errorf("drop left %s selecting %v %v", hs.dir(), sel.Name(), ok)
+	}
+	hs.click(t, "Open")
+	if uris := answer(t, got); !slices.Equal(uris, []string{hs.uri("pics/a.png")}) {
+		t.Errorf("answered %v", uris)
+	}
 }

@@ -3,7 +3,9 @@ package filechooser
 import (
 	"bufio"
 	"context"
+	"errors"
 	"image"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -51,10 +53,17 @@ const (
 // The keys and buttons the chooser binds: evdev keycodes and the
 // mouse's thumb buttons.
 const (
-	keyEscape  = 1
-	keySpace   = 57
-	btnBack    = 0x113 // BTN_SIDE
-	btnForward = 0x114 // BTN_EXTRA
+	keyEscape    = 1
+	keyBackspace = 14
+	keyF         = 33
+	keyH         = 35
+	keyL         = 38
+	keySpace     = 57
+	keyUp        = 103
+	keyLeft      = 105
+	keyRight     = 106
+	btnBack      = 0x113 // BTN_SIDE
+	btnForward   = 0x114 // BTN_EXTRA
 )
 
 // uriListMime is what a file drag offers.
@@ -87,6 +96,9 @@ type Deps struct {
 	Places, Locations func() []Place
 	// ViewFile persists the sort and layout; "" keeps them in memory.
 	ViewFile string
+	// RecentFile is the recently-used list the Recent place lists
+	// (RecentFile(home)); "" offers no Recent.
+	RecentFile string
 	// Target is the output a dialog maps on (the focused one, else the
 	// first) with its logical size, which the sheet is centred on; false
 	// while none is known, when the compositor places it.
@@ -231,7 +243,7 @@ func (c *Chooser) begin(r request) {
 	c.thumbs, c.waiting = map[thumbKey]image.Image{}, map[thumbKey][]*widget.Image{}
 	c.replacing = ""
 	c.s = newSession(r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
-	c.s.hidden, c.s.recursive = c.hidden, c.recursive
+	c.s.hidden, c.s.recursive, c.s.recentFile = c.hidden, c.recursive, c.d.RecentFile
 	if r.currentFilter > 0 && int(r.currentFilter) < len(c.s.filters) {
 		c.s.active = int(r.currentFilter)
 	}
@@ -250,6 +262,7 @@ type ui struct {
 	search                  *widget.SearchEntry
 	name                    *widget.Entry
 	list, grid              *widget.List
+	listView, gridView      *typeAhead
 	colHeader               *widget.Box
 	sortButtons             [4]*widget.Button
 	sortLabels              [4]*widget.Label
@@ -272,6 +285,11 @@ type ui struct {
 	notice      *widget.Box
 	noticeLabel *widget.Label
 	replace     *widget.Button
+	// location is the typed path entry (Ctrl+L) the crumbs give way to.
+	location *widget.Entry
+	// newFolder is the row naming a folder to create.
+	newFolder     *widget.Box
+	newFolderName *widget.Entry
 }
 
 func (c *Chooser) label(text, class string) *widget.Label {
@@ -334,6 +352,9 @@ func (c *Chooser) build(r request) {
 	// sheet's drag handle.
 	headerRow := widget.NewBox(widget.Row, 2, 0)
 	headerRow.Append(c.iconButton("go-up-symbolic", "Up", c.goUp), false)
+	if s.mode == ModeSave || s.mode.folders() {
+		headerRow.Append(c.iconButton("folder-new-symbolic", "Create Folder", c.showNewFolder), false)
+	}
 	headerRow.Append(widget.NewSpacer(0, 0), true)
 	u.viewToggle, u.viewIcon = c.swappableIconButton(viewIcon(c.view.grid), "Toggle grid view", c.toggleView)
 	u.previewToggle = c.iconToggle("view-paged-symbolic", "Preview pane", false, c.togglePreview)
@@ -356,6 +377,13 @@ func (c *Chooser) build(r request) {
 	u.crumbs = widget.NewBox(widget.Row, 2, 0)
 	u.crumbs.AddClass("file-chooser-crumbs")
 	crumbBar.Append(u.crumbs, true)
+	u.location = widget.NewEntry(c.d.Font, 13, 0)
+	u.location.AddClass("file-chooser-location")
+	u.location.SetPlaceholder("Type a path")
+	u.location.OnActivate = c.goToLocation
+	u.location.OnEscape = func() bool { c.hideLocation(); return true }
+	u.location.SetVisible(false)
+	crumbBar.Append(u.location, true)
 	// gtk::SearchEntry with no debounce: filtering the cached listing
 	// is an in-memory scan, and a recursive walk is cancelled by its
 	// generation instead.
@@ -400,6 +428,18 @@ func (c *Chooser) build(r request) {
 	u.notice.Append(u.replace, false)
 	u.notice.SetVisible(false)
 
+	// The new folder row: a name and Create.
+	u.newFolder = widget.NewBox(widget.Row, 8, 0)
+	u.newFolder.AddClass("file-chooser-new-folder")
+	u.newFolderName = widget.NewEntry(c.d.Font, 13, 0)
+	u.newFolderName.SetPlaceholder("Folder name")
+	u.newFolderName.OnActivate = func(string) { c.createFolder() }
+	u.newFolderName.OnEscape = func() bool { c.ui.newFolder.SetVisible(false); return true }
+	u.newFolder.Append(u.newFolderName, true)
+	create, _ := c.textButton("Create", "file-chooser-create-folder", c.createFolder)
+	u.newFolder.Append(create, false)
+	u.newFolder.SetVisible(false)
+
 	choiceRows, readChoices := widgets.ChoiceRows(c.d.Font, r.choices, "file-chooser-choice")
 	c.readChoices = readChoices
 
@@ -437,6 +477,7 @@ func (c *Chooser) build(r request) {
 	surface.AddClass("file-chooser-surface")
 	surface.Append(header, false)
 	surface.Append(crumbBar, false)
+	surface.Append(u.newFolder, false)
 	surface.Append(body, true)
 	surface.Append(u.name, false)
 	surface.Append(u.notice, false)
@@ -508,7 +549,11 @@ func (c *Chooser) sidebar() widget.Widget {
 		}
 		box.Append(list, false)
 	}
-	section("Favorites", c.d.Places())
+	favorites := c.d.Places()
+	if c.d.RecentFile != "" && (c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple) {
+		favorites = append([]Place{{"Recent", recentLocation, "document-open-recent-symbolic"}}, favorites...)
+	}
+	section("Favorites", favorites)
 	section("Locations", c.d.Locations())
 	box.Append(widget.NewSpacer(0, 0), true)
 	scroll := widget.NewScroll(box)
@@ -543,6 +588,7 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	u.grid = widget.NewList[widget.Widget](rows{c, true}, gridCellH)
 	u.grid.AddClass("file-chooser-grid")
 	u.grid.SetCellWidth(gridCellW)
+	u.listView, u.gridView = &typeAhead{List: u.list, typed: c.typeAhead}, &typeAhead{List: u.grid, typed: c.typeAhead}
 	mode := widget.SelectionSingle
 	if c.s.mode.multiple() {
 		mode = widget.SelectionMultiple
@@ -558,8 +604,8 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	u.quicklook.SetVisible(false)
 
 	stack := widget.NewOverlay()
-	stack.Append(u.list)
-	stack.Append(u.grid)
+	stack.Append(u.listView)
+	stack.Append(u.gridView)
 	stack.Append(newPlace(u.empty, alignCenter, alignCenter))
 	stack.Append(newPlace(u.quicklook, alignCenter, alignCenter))
 
@@ -755,7 +801,7 @@ func (c *Chooser) show() {
 		Keyboard:      keyboard,
 		Namespace:     "lys-shell-file-chooser",
 		Root:          u.root,
-		OnKey:         func(r *widget.Router, keycode uint32, _ app.Mods) { c.key(r, keycode) },
+		OnKey:         c.key,
 		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
 	})
 	if err != nil {
@@ -767,7 +813,7 @@ func (c *Chooser) show() {
 	if c.s.mode == ModeSave {
 		win.SetFocus(u.name)
 	} else {
-		win.SetFocus(c.activeView())
+		win.SetFocus(c.focusView())
 	}
 	reveal.Show(c.rev, c.d.Config().Animations, config.AnimFileChooser)
 }
@@ -786,22 +832,40 @@ func (c *Chooser) hide() {
 	})
 }
 
-// key: Escape closes the filter popup, then quick look, then cancels;
-// space toggles quick look unless a text field has it.
-func (c *Chooser) key(r *widget.Router, keycode uint32) {
+// key binds GTK's chooser keys: Escape closes the filter popup, then
+// quick look, then cancels; plain Space toggles quick look, Backspace
+// and Alt+Up go up, Alt+Left and Alt+Right walk the history (none of
+// these while a text field has the key); Ctrl+H shows hidden files,
+// Ctrl+L the location entry, Ctrl+F the search.
+func (c *Chooser) key(r *widget.Router, keycode uint32, mods app.Mods) {
 	if c.reply == nil {
 		return
 	}
-	switch keycode {
-	case keyEscape:
+	typing := false
+	switch r.Focused().(type) {
+	case *widget.Entry, *widget.SearchEntry:
+		typing = true
+	}
+	ctrl, alt := mods&app.ModCtrl != 0, mods&app.ModAlt != 0
+	plain := mods&(app.ModCtrl|app.ModAlt|app.ModSuper|app.ModShift) == 0
+	switch {
+	case keycode == keyEscape:
 		c.escape()
-	case keySpace:
-		switch r.Focused().(type) {
-		case *widget.Entry, *widget.SearchEntry:
-			// Space types into a text field.
-		default:
-			c.toggleQuicklook()
-		}
+	case keycode == keySpace && plain && !typing:
+		c.toggleQuicklook()
+	case keycode == keyBackspace && plain && !typing, keycode == keyUp && alt:
+		c.goUp()
+	case keycode == keyLeft && alt:
+		c.step(true)
+	case keycode == keyRight && alt:
+		c.step(false)
+	case keycode == keyH && ctrl:
+		// The toggle's handler applies it.
+		c.ui.hiddenTg.SetActive(!c.hidden)
+	case keycode == keyL && ctrl:
+		c.showLocation("")
+	case keycode == keyF && ctrl:
+		c.win.SetFocus(c.ui.search)
 	}
 }
 
@@ -863,6 +927,14 @@ func (c *Chooser) activeView() *widget.List {
 	return c.ui.list
 }
 
+// focusView is the active view's focus target, which takes typing.
+func (c *Chooser) focusView() widget.Widget {
+	if c.s.view.grid {
+		return c.ui.gridView
+	}
+	return c.ui.listView
+}
+
 // relist repaints after the entries changed: the breadcrumbs, both
 // views from the top, the empty label, the preview.
 func (c *Chooser) relist() {
@@ -887,6 +959,11 @@ func (c *Chooser) relist() {
 	u.grid.SetVisible(grid)
 	u.list.Reset()
 	u.grid.Reset()
+	empty := "No items"
+	if c.s.listErr != nil && !c.s.searching() {
+		empty = "Cannot read this folder: " + errorText(c.s.listErr)
+	}
+	u.empty.SetText(empty)
 	u.empty.SetVisible(len(c.s.entries) == 0)
 	u.quicklook.SetVisible(false)
 	c.refreshPreview()
@@ -918,9 +995,111 @@ func (c *Chooser) step(back bool) {
 	}
 }
 
+// dropped opens a dropped folder, or the folder of a dropped file with
+// the file selected.
 func (c *Chooser) dropped(path string) {
 	c.s.dropped(path)
 	c.afterNavigate()
+	if i := slices.IndexFunc(c.s.entries, func(e Entry) bool { return e.Path == path }); i >= 0 {
+		c.activeView().Select(i)
+	}
+}
+
+// typeAhead is the type-ahead of the file views: / or ~ typed with a
+// view focused starts a path in the location entry, any other
+// character a search for it.
+func (c *Chooser) typeAhead(r rune) {
+	if c.reply == nil {
+		return
+	}
+	if r == '/' || r == '~' {
+		c.showLocation(string(r))
+		return
+	}
+	c.win.SetFocus(c.ui.search)
+	c.ui.search.SetText(c.ui.search.Text() + string(r))
+}
+
+// showLocation swaps the crumbs for the location entry, seeded with
+// text (GTK opens it on Ctrl+L, and on typing / or ~).
+func (c *Chooser) showLocation(text string) {
+	u := c.ui
+	u.crumbs.SetVisible(false)
+	u.location.SetVisible(true)
+	u.location.SetText(text)
+	c.win.SetFocus(u.location)
+}
+
+func (c *Chooser) hideLocation() {
+	c.ui.location.SetVisible(false)
+	c.ui.crumbs.SetVisible(true)
+	c.win.SetFocus(c.focusView())
+}
+
+// goToLocation goes where the location entry names: a folder opens; a
+// file opens (or, saving, becomes the name in its folder); anything
+// else warns.
+func (c *Chooser) goToLocation(text string) {
+	base := c.s.dir
+	if base == recentLocation {
+		base = c.d.Home
+	}
+	path := (&session{dir: base}).savePath(strings.TrimSpace(text), c.d.Home)
+	if path == "" {
+		return
+	}
+	info, err := os.Stat(path)
+	switch {
+	case err == nil && info.IsDir():
+		c.hideLocation()
+		c.goTo(path)
+	case c.s.mode == ModeSave:
+		c.hideLocation()
+		c.goTo(filepath.Dir(path))
+		c.ui.name.SetText(filepath.Base(path))
+		c.win.SetFocus(c.ui.name)
+	case err == nil && !c.s.mode.folders():
+		c.finish([]string{fileuri.FromPath(path)})
+	default:
+		c.warn("No folder or file at " + path + ".")
+	}
+}
+
+// showNewFolder opens the row naming a folder to create.
+func (c *Chooser) showNewFolder() {
+	u := c.ui
+	u.newFolderName.SetText("")
+	u.newFolder.SetVisible(true)
+	c.win.SetFocus(u.newFolderName)
+}
+
+// createFolder creates the named folder in the one shown and opens
+// it; a name that is taken or cannot be made warns.
+func (c *Chooser) createFolder() {
+	name := strings.TrimSpace(c.ui.newFolderName.Text())
+	if name == "" || c.s.dir == recentLocation {
+		return
+	}
+	if name == "." || name == ".." || strings.Contains(name, "/") {
+		c.warn("“" + name + "” is not a folder name.")
+		return
+	}
+	path := filepath.Join(c.s.dir, name)
+	if err := os.Mkdir(path, 0o755); err != nil { //nolint:gosec // a folder the user creates, as any file manager does
+		c.warn("Cannot create “" + name + "”: " + errorText(err))
+		return
+	}
+	c.ui.newFolder.SetVisible(false)
+	c.clearNotice()
+	c.goTo(path)
+}
+
+// errorText is an error's last, human part (the path is shown apart).
+func errorText(err error) string {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
+		return pe.Err.Error()
+	}
+	return err.Error()
 }
 
 // afterNavigate empties the search box (the session already dropped
@@ -987,6 +1166,9 @@ func (c *Chooser) toggleView() {
 	c.saveView()
 	setIcon(c.ui.viewIcon, viewIcon(c.s.view.grid))
 	c.relist()
+	if c.win != nil {
+		c.win.SetFocus(c.focusView())
+	}
 }
 
 func (c *Chooser) togglePreview(on bool) {
@@ -1209,4 +1391,25 @@ func (s *sheet) Drop(_ string, data []byte, _ widget.Point) {
 	if p, ok := droppedPath(data); ok {
 		s.onDrop(p)
 	}
+}
+
+// typeAhead is a file view that hands characters typed into it to
+// typed: the view keeps every other key.
+type typeAhead struct {
+	*widget.List
+	typed func(rune)
+}
+
+// InsertRune implements widget.RuneHandler: / or ~ starts a typed
+// path, any other character a search.
+func (t *typeAhead) InsertRune(r rune) { t.typed(r) }
+
+// HitTest answers the view itself as the wrapper, so a click focuses
+// what takes the typing.
+func (t *typeAhead) HitTest(p widget.Point) widget.Widget {
+	w := t.List.HitTest(p)
+	if w == widget.Widget(t.List) {
+		return t
+	}
+	return w
 }

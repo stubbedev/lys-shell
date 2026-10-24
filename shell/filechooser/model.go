@@ -4,16 +4,21 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // Mode is what the chooser is doing.
@@ -96,11 +101,12 @@ func statEntry(path string, mode Mode) (Entry, bool) {
 
 // ListDir lists dir in full. Only the mode rule applies here, because
 // it cannot change while the listing is cached; the hidden toggle, the
-// type filter and the search text partition the cached listing.
-func ListDir(dir string, mode Mode) []Entry {
+// type filter and the search text partition the cached listing. A
+// directory that cannot be read is an error.
+func ListDir(dir string, mode Mode) ([]Entry, error) {
 	des, err := os.ReadDir(dir)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	entries := make([]Entry, 0, len(des))
 	for _, de := range des {
@@ -108,7 +114,7 @@ func ListDir(dir string, mode Mode) []Entry {
 			entries = append(entries, e)
 		}
 	}
-	return entries
+	return entries, nil
 }
 
 // searchEntries stats a recursive search's matches.
@@ -534,29 +540,141 @@ type Place struct {
 	Label, Path, Icon string
 }
 
-// userPlaceDirs are the home subdirectories offered when present.
-var userPlaceDirs = []struct{ name, icon string }{
-	{"Desktop", "user-desktop-symbolic"},
-	{"Documents", "folder-documents-symbolic"},
-	{"Downloads", "folder-download-symbolic"},
-	{"Music", "folder-music-symbolic"},
-	{"Pictures", "folder-pictures-symbolic"},
-	{"Videos", "folder-videos-symbolic"},
+// userPlaceDirs are the user directories offered when present: the
+// user-dirs.dirs key, the name under home when it sets none, the icon.
+var userPlaceDirs = []struct{ key, name, icon string }{
+	{"DESKTOP", "Desktop", "user-desktop-symbolic"},
+	{"DOCUMENTS", "Documents", "folder-documents-symbolic"},
+	{"DOWNLOAD", "Downloads", "folder-download-symbolic"},
+	{"MUSIC", "Music", "folder-music-symbolic"},
+	{"PICTURES", "Pictures", "folder-pictures-symbolic"},
+	{"VIDEOS", "Videos", "folder-videos-symbolic"},
 }
 
-// UserPlaces is Home plus the standard subdirectories that exist.
+// UserPlaces is Home, the user directories that exist (where
+// user-dirs.dirs puts them, under their localized names), then the GTK
+// bookmarks.
 func UserPlaces(home string) []Place {
 	if home == "" {
 		return nil
 	}
 	places := []Place{{"Home", home, "user-home-symbolic"}}
 	for _, d := range userPlaceDirs {
-		path := filepath.Join(home, d.name)
+		path, ok := xdg.UserDir(d.key)
+		if !ok {
+			path = filepath.Join(home, d.name)
+		}
+		// user-dirs.dirs points a directory it disables at home.
+		if path == home {
+			continue
+		}
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			places = append(places, Place{d.name, path, d.icon})
+			places = append(places, Place{filepath.Base(path), path, d.icon})
 		}
 	}
+	if f, err := os.Open(gtkBookmarksPath(home)); err == nil {
+		defer func() { _ = f.Close() }()
+		places = append(places, Bookmarks(f)...)
+	}
 	return places
+}
+
+// gtkBookmarksPath is GTK 3's bookmarks file, which GTK 4 reads too.
+func gtkBookmarksPath(home string) string {
+	config := os.Getenv("XDG_CONFIG_HOME")
+	if config == "" {
+		config = filepath.Join(home, ".config")
+	}
+	return filepath.Join(config, "gtk-3.0", "bookmarks")
+}
+
+// Bookmarks are the local folders a GTK bookmarks file lists, one
+// "<uri> [label]" a line, labelled by their label else their name;
+// remote ones and folders that are gone are left out.
+func Bookmarks(r io.Reader) []Place {
+	var places []Place
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		uri, label, _ := strings.Cut(strings.TrimSpace(sc.Text()), " ")
+		path, ok := fileuri.Path(uri)
+		if !ok {
+			continue
+		}
+		if info, err := os.Stat(path); err != nil || !info.IsDir() {
+			continue
+		}
+		if label = strings.TrimSpace(label); label == "" {
+			label = filepath.Base(path)
+		}
+		places = append(places, Place{label, path, "folder-symbolic"})
+	}
+	return places
+}
+
+// recentLocation is the Recent place's directory: not a path, the
+// listing of the recently used files.
+const recentLocation = "recent:"
+
+// maxRecent bounds the Recent listing to the newest files.
+const maxRecent = 100
+
+// RecentFile is the recently-used list GTK writes,
+// $XDG_DATA_HOME/recently-used.xbel; "" without a home.
+func RecentFile(home string) string {
+	data := os.Getenv("XDG_DATA_HOME")
+	if data == "" {
+		if home == "" {
+			return ""
+		}
+		data = filepath.Join(home, ".local", "share")
+	}
+	return filepath.Join(data, "recently-used.xbel")
+}
+
+// xbel is the part of a recently-used.xbel the listing reads.
+type xbel struct {
+	Bookmarks []xbelBookmark `xml:"bookmark"`
+}
+
+// xbelBookmark is one used file: its URI and when it was last used
+// (an ISO 8601 UTC stamp, which sorts as text).
+type xbelBookmark struct {
+	Href     string `xml:"href,attr"`
+	Modified string `xml:"modified,attr"`
+}
+
+// ListRecent lists the recently used local files that still exist,
+// the newest maxRecent of them; an unreadable list lists none.
+func ListRecent(path string, mode Mode) ([]Entry, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // the user's recently-used list
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	var doc xbel
+	if err := xml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	slices.SortStableFunc(doc.Bookmarks, func(a, b xbelBookmark) int { return strings.Compare(b.Modified, a.Modified) })
+	var entries []Entry
+	for _, b := range doc.Bookmarks {
+		p, ok := fileuri.Path(b.Href)
+		if !ok {
+			continue
+		}
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+		if e, ok := statEntry(p, mode); ok && !e.IsDir {
+			entries = append(entries, e)
+			if len(entries) == maxRecent {
+				break
+			}
+		}
+	}
+	return entries, nil
 }
 
 // OtherLocations is Computer (/) plus the user-visible mounts in a
@@ -632,8 +750,12 @@ const maxCrumbTail = 3
 
 // Crumbs is dir's breadcrumb trail: Home for the home directory (else
 // /), its named segments, and past maxCrumbTail of them a … crumb
-// standing for (and jumping to) the deepest collapsed one.
+// standing for (and jumping to) the deepest collapsed one. Recent is
+// one crumb.
 func Crumbs(dir, home string) []Crumb {
+	if dir == recentLocation {
+		return []Crumb{{"Recent", recentLocation, true}}
+	}
 	base, baseLabel := "/", "/"
 	rest := strings.TrimPrefix(dir, "/")
 	if home != "" && (dir == home || strings.HasPrefix(dir, strings.TrimSuffix(home, "/")+"/")) {

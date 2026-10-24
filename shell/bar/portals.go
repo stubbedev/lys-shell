@@ -44,17 +44,18 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		viewFile = filepath.Join(dir, "file-chooser-view")
 	}
 	chooser := filechooser.New(filechooser.Deps{
-		Config:    current,
-		Open:      layerOpener[filechooser.Window](application),
-		Invoke:    application.Invoke,
-		Font:      font,
-		Sheet:     sheet,
-		MIME:      mime.System(),
-		Home:      home,
-		Places:    func() []filechooser.Place { return filechooser.UserPlaces(home) },
-		Locations: filechooser.SystemLocations(home),
-		ViewFile:  viewFile,
-		Target:    func() (*app.Output, int, int, bool) { return dialogOutput(outputs(), focused) },
+		Config:     current,
+		Open:       layerOpener[filechooser.Window](application),
+		Invoke:     application.Invoke,
+		Font:       font,
+		Sheet:      sheet,
+		MIME:       mime.System(),
+		Home:       home,
+		Places:     func() []filechooser.Place { return filechooser.UserPlaces(home) },
+		Locations:  filechooser.SystemLocations(home),
+		ViewFile:   viewFile,
+		RecentFile: filechooser.RecentFile(home),
+		Target:     func() (*app.Output, int, int, bool) { return dialogOutput(outputs(), focused) },
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)
