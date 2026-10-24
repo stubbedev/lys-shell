@@ -42,6 +42,11 @@ type Theme struct {
 	cfg     *config.Config
 	Sheet   *widget.Stylesheet
 	palette config.Palette
+	// scope keeps Sheet attached from the first reload on: lys-ui
+	// installs a stylesheet loaded with no attachment process-wide, so
+	// a reload before any root took the bundle, or after every root
+	// went away, would style the Go-painted surfaces too.
+	scope *widget.Box
 	// userStamp fingerprints the user styles tree for the hot-reload
 	// poll.
 	userStamp string
@@ -83,6 +88,10 @@ func (t *Theme) Bundle() string {
 // Reload recompiles the bundle into the attached stylesheet: every
 // root restyles on the next frame.
 func (t *Theme) Reload() {
+	if t.scope == nil {
+		t.scope = widget.NewBox(widget.Row, 0, 0)
+		t.scope.AttachStylesheet(t.Sheet)
+	}
 	t.Sheet.Load(t.Bundle())
 }
 

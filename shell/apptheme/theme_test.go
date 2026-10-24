@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-ui/widget"
+
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -119,5 +121,38 @@ func TestUserStylesReloadOnAWatchedChange(t *testing.T) {
 		func(func()) { polled = true })
 	if !polled {
 		t.Error("a failed watch did not fall back to polling")
+	}
+}
+
+// spacedWidth is the natural width of a .list-control-button box of two
+// 10px spacers, which the bundle pads, under whatever stylesheets reach
+// it.
+func spacedWidth(attach func(*widget.Box)) int {
+	box := widget.NewBox(widget.Row, 0, 0)
+	box.AddClass("list-control-button")
+	box.Append(widget.NewSpacer(10, 10), false)
+	box.Append(widget.NewSpacer(10, 10), false)
+	attach(box)
+	widget.CollectDamage(box)
+	return box.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}}).W
+}
+
+// The bundle styles only the roots it is attached to: reloading a theme
+// no root took yet never installs it process-wide over every surface.
+func TestReloadStylesOnlyAttachedRoots(t *testing.T) {
+	isolateConfigDir(t)
+	bare := spacedWidth(func(*widget.Box) {})
+	theme := New(config.Defaults())
+	theme.Reload()
+	if got := spacedWidth(func(*widget.Box) {}); got != bare {
+		t.Errorf("an unattached root measures %d after a reload, want its unstyled %d: the bundle went global", got, bare)
+	}
+	styled := spacedWidth(func(b *widget.Box) { theme.Attach(b) })
+	if styled == bare {
+		t.Fatalf("an attached root measures its unstyled %d: the bundle does not reach it", bare)
+	}
+	theme.Reload()
+	if got := spacedWidth(func(b *widget.Box) { theme.Attach(b) }); got != styled {
+		t.Errorf("an attached root measures %d after a reload, want %d", got, styled)
 	}
 }

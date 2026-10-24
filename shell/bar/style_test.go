@@ -54,11 +54,20 @@ func isolateConfigDir(t *testing.T) string {
 	return filepath.Join(dir, "lys-shell")
 }
 
+// newTestContext is a headless module context whose generation
+// retires when the test ends, under headlessLoop: a module's
+// goroutines never touch widgets once the next test runs.
 func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
 	t.Helper()
 	style := computeStyle(cfg, styling.Default()).forModules()
 	face := treetest.Font(t)
-	return ModuleContext{Config: cfg, Font: face, Style: &style}
+	gen := newMountGen()
+	t.Cleanup(func() {
+		headlessLoop.Lock()
+		defer headlessLoop.Unlock()
+		gen.retire()
+	})
+	return ModuleContext{Config: cfg, Font: face, Style: &style, gen: gen}
 }
 
 // styledContext is newTestContext with the bar stylesheet attached, as

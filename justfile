@@ -65,14 +65,15 @@ lint:
     {{go}} vet ./...
     golangci-lint run
 
-# Run the test suite.
+# Run the test suite in a random order, so a test that leans on state an
+# earlier one left behind fails instead of passing by declaration order.
 test *args:
-    {{go}} test ./... {{args}}
+    {{go}} test -shuffle=on ./... {{args}}
 
 # Run the test suite under the race detector. It needs cgo (a C
 # toolchain), which the shipped CGO_ENABLED=0 build never does.
 race:
-    CGO_ENABLED=1 {{go}} test -race ./...
+    CGO_ENABLED=1 {{go}} test -race -shuffle=on ./...
 
 # The committed config schema must be what the binary generates.
 schema-check:
