@@ -13,12 +13,13 @@ import (
 	"github.com/godbus/dbus/v5/prop"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeSocket answers hyprsunset's two queries like the real daemon.
 func fakeSocket(t *testing.T, replies map[string]string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), ".hyprsunset.sock")
+	path := filepath.Join(sockdir.Dir(t), ".hyprsunset.sock")
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +45,7 @@ func TestQueryState(t *testing.T) {
 		t.Errorf("state = %+v, %v; want the rounded 4500K at 80%%", st, ok)
 	}
 	// No daemon: off.
-	if _, ok := QueryState(filepath.Join(t.TempDir(), "none.sock")); ok {
+	if _, ok := QueryState(filepath.Join(sockdir.Dir(t), "none.sock")); ok {
 		t.Error("a missing socket reported a running filter")
 	}
 	// A garbage reply is not a state.

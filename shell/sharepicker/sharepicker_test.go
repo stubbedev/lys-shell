@@ -1,17 +1,14 @@
 package sharepicker
 
 import (
-	"bufio"
 	"context"
-	"os/exec"
-	"strings"
 	"testing"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/capture"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -218,33 +215,9 @@ func boolStr(b bool) string {
 }
 
 func TestDaemonOverTheBus(t *testing.T) {
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("no dbus-daemon")
-	}
-	cmd := exec.Command(bin, "--session", "--nofork", "--print-address=1")
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	addr, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatal(err)
-	}
-	server, err := dbus.Connect(strings.TrimSpace(addr))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.Close()
-	client, err := dbus.Connect(strings.TrimSpace(addr))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
+	bus := dbustest.Start(t)
+	server := bus.Conn(t)
+	client := bus.Conn(t)
 	release, err := (&Daemon{picker: fakePicker{reply: "/screen:DP-1"}}).Export(server)
 	if err != nil {
 		t.Fatal(err)

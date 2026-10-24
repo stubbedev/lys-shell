@@ -9,12 +9,13 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // serveUnix accepts on a fresh socket and hands each connection to fn.
 func serveUnix(t *testing.T, name string, fn func(net.Conn)) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), name)
+	path := filepath.Join(sockdir.Dir(t), name)
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)

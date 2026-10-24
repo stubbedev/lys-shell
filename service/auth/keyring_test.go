@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeKeyring serves one control-socket exchange: it captures the
 // request bytes and answers with the given result (and length).
 func fakeKeyring(t *testing.T, length, result uint32) (path string, got <-chan []byte) {
 	t.Helper()
-	path = filepath.Join(t.TempDir(), "control")
+	path = filepath.Join(sockdir.Dir(t), "control")
 	l, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +75,7 @@ func TestKeyringUnlockFailures(t *testing.T) {
 			t.Errorf("result %d/len %d: err = %v, want %q", tc.result, tc.length, err, tc.want)
 		}
 	}
-	if err := keyringUnlock(filepath.Join(t.TempDir(), "absent"), "pw"); err == nil {
+	if err := keyringUnlock(filepath.Join(sockdir.Dir(t), "absent"), "pw"); err == nil {
 		t.Error("a missing daemon socket reported success")
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 func TestMessageRoundTrips(t *testing.T) {
@@ -118,7 +120,7 @@ func TestClientListsPrinters(t *testing.T) {
 }
 
 func TestClientPrintsOverTheDomainSocket(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "cups.sock")
+	sock := filepath.Join(sockdir.Dir(t), "cups.sock")
 	l, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +165,7 @@ func TestClientReportsAFailedStatus(t *testing.T) {
 	if IsNotFound(&StatusError{Code: 0x0400}) || IsNotFound(io.EOF) {
 		t.Error("IsNotFound claimed another error")
 	}
-	if _, err := NewClient(filepath.Join(t.TempDir(), "none.sock")).Printers(context.Background()); err == nil {
+	if _, err := NewClient(filepath.Join(sockdir.Dir(t), "none.sock")).Printers(context.Background()); err == nil {
 		t.Error("a missing socket listed printers")
 	}
 }
@@ -176,11 +178,11 @@ func TestDefaultServer(t *testing.T) {
 	t.Setenv("CUPS_SERVER", "")
 	saved := defaultSockets
 	defer func() { defaultSockets = saved }()
-	defaultSockets = []string{filepath.Join(t.TempDir(), "absent.sock")}
+	defaultSockets = []string{filepath.Join(sockdir.Dir(t), "absent.sock")}
 	if got := DefaultServer(); got != "localhost:631" {
 		t.Errorf("no socket = %q, want localhost:631", got)
 	}
-	present := filepath.Join(t.TempDir(), "cups.sock")
+	present := filepath.Join(sockdir.Dir(t), "cups.sock")
 	if l, err := net.Listen("unix", present); err == nil {
 		defer func() { _ = l.Close() }()
 	}

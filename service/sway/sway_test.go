@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeSway speaks the i3-ipc protocol: canned GET_WORKSPACES and
@@ -28,7 +30,7 @@ type fakeSway struct {
 
 func newFakeSway(t *testing.T, workspaces []Workspace, tree string) *fakeSway {
 	t.Helper()
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	path := filepath.Join(dir, "sway-ipc.sock")
 	ln, err := net.Listen("unix", path)
 	if err != nil {

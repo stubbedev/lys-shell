@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
@@ -77,7 +78,7 @@ func TestKeyboardLayoutLabelMatchesRustAssertions(t *testing.T) {
 // plus an (empty) event socket the module can subscribe to.
 func newFakeDevicesConn(t *testing.T, devicesJSON string) *hyprland.Connection {
 	t.Helper()
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	commandPath := filepath.Join(dir, ".socket.sock")
 	eventPath := filepath.Join(dir, ".socket2.sock")
 	ln, err := net.Listen("unix", commandPath)

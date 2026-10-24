@@ -17,6 +17,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/styling"
@@ -1880,7 +1881,7 @@ func TestLayoutEditorRefresh(t *testing.T) {
 // instead of opening another window; once the first is gone, a launch
 // is the primary again.
 func TestSettingsIsSingleInstance(t *testing.T) {
-	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
 	first, primary, err := claimInstance(app.Invocation{}, func() {})
 	if err != nil || !primary {
 		t.Fatalf("first launch: primary %v, %v", primary, err)

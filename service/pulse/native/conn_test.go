@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 )
@@ -112,7 +113,7 @@ func TestDialReportsAuthFailure(t *testing.T) {
 
 func TestDialTriesEachServer(t *testing.T) {
 	srv := pulsetest.New(t)
-	missing := "unix:" + filepath.Join(t.TempDir(), "absent")
+	missing := "unix:" + filepath.Join(sockdir.Dir(t), "absent")
 	c, err := native.Dial(context.Background(), native.Options{Server: missing + " " + srv.Addr()})
 	if err != nil {
 		t.Fatalf("Dial with a dead first server: %v", err)
@@ -285,7 +286,7 @@ func TestUnknownServerPacketsAreIgnored(t *testing.T) {
 func TestMalformedReplyFailsOnlyThatRequest(t *testing.T) {
 	// A hand-rolled server answers SET_CLIENT_NAME, then replies to the
 	// next request with a body that does not decode as a sink list.
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	path := filepath.Join(dir, "native")
 	ln, err := net.Listen("unix", path)
 	if err != nil {
@@ -332,7 +333,7 @@ func TestMalformedReplyFailsOnlyThatRequest(t *testing.T) {
 }
 
 func TestRequestTimesOut(t *testing.T) {
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	path := filepath.Join(dir, "native")
 	ln, err := net.Listen("unix", path)
 	if err != nil {

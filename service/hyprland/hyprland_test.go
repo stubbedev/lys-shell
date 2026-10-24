@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeHyprland is a scriptable IPC server: it answers command-socket
@@ -21,7 +23,7 @@ type fakeHyprland struct {
 
 func startFake(t *testing.T, replies map[string]string) *fakeHyprland {
 	t.Helper()
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	f := &fakeHyprland{
 		commandPath: filepath.Join(dir, ".socket.sock"),
 		eventPath:   filepath.Join(dir, ".socket2.sock"),

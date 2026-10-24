@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
@@ -18,7 +19,7 @@ import (
 // connection open.
 func startFakeEventStream(t *testing.T, lines []string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), ".socket2.sock")
+	path := filepath.Join(sockdir.Dir(t), ".socket2.sock")
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)

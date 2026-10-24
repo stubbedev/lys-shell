@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeGreetd plays greetd over one end of a pipe: it records every
@@ -223,7 +225,7 @@ func TestGreetdFromEnv(t *testing.T) {
 	if _, err := NewGreetdFromEnv(nil, nil); err == nil || !strings.Contains(err.Error(), "not running under greetd") {
 		t.Errorf("unset GREETD_SOCK = %v", err)
 	}
-	path := filepath.Join(t.TempDir(), "greetd.sock")
+	path := filepath.Join(sockdir.Dir(t), "greetd.sock")
 	l, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)

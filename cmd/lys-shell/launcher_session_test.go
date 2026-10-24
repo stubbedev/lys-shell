@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // The launcher socket's lifetime contract (lys-shell/tests/
@@ -31,12 +33,7 @@ type fakeDaemon struct {
 
 func bindDaemon(t *testing.T) *fakeDaemon {
 	t.Helper()
-	// Short path on purpose: a unix socket path must fit in SUN_LEN.
-	dir, err := os.MkdirTemp("", "wl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	dir := sockdir.Dir(t)
 	if err := os.MkdirAll(filepath.Join(dir, "lys-shell"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +218,7 @@ func TestADmenuSessionStaysOpenAfterItsRowsAreDone(t *testing.T) {
 // Negative: no shell running is a clean failure, not a hang.
 func TestNoShellIsExitOne(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "launcher", "-show", "drun")
-	cmd.Env = append(os.Environ(), "LYS_SHELL_TEST_CLI=1", "XDG_RUNTIME_DIR="+t.TempDir())
+	cmd.Env = append(os.Environ(), "LYS_SHELL_TEST_CLI=1", "XDG_RUNTIME_DIR="+sockdir.Dir(t))
 	stderr := &strings.Builder{}
 	cmd.Stderr = stderr
 	err := cmd.Run()

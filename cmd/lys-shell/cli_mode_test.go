@@ -4,13 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 func TestCLIModeLogsToFileAndEnsuresConfigDir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
-	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
 
 	// A handler run (it fails to reach a shell, which is fine) sets up
 	// the file log and the config directory.

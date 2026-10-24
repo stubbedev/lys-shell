@@ -1,10 +1,8 @@
 package wallpaper
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,32 +10,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
-
-// privateBus starts a throwaway dbus-daemon and returns its address.
-func privateBus(t *testing.T) string {
-	t.Helper()
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("dbus-daemon not installed")
-	}
-	addr := "unix:path=" + filepath.Join(t.TempDir(), "bus")
-	cmd := exec.Command(bin, "--session", "--nofork", "--nopidfile", "--print-address=1", "--address="+addr)
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Skipf("dbus-daemon: %v", err)
-	}
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	line, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatalf("dbus-daemon printed no address: %v", err)
-	}
-	return strings.TrimSpace(line)
-}
 
 func dial(t *testing.T, addr string) *dbus.Conn {
 	t.Helper()
@@ -50,7 +25,7 @@ func dial(t *testing.T, addr string) *dbus.Conn {
 }
 
 func TestDaemonRoundTrip(t *testing.T) {
-	addr := privateBus(t)
+	addr := dbustest.Start(t).Address
 	svc := New(Options{Extractor: extract.Config{Tool: extract.None}, Rand: seeded()})
 	svc.RegisterMonitor("DP-1")
 	svc.RegisterMonitor("DP-2")
@@ -149,7 +124,7 @@ func TestDaemonRoundTrip(t *testing.T) {
 }
 
 func TestDaemonEmitsColorsExtracted(t *testing.T) {
-	addr := privateBus(t)
+	addr := dbustest.Start(t).Address
 	svc := New(Options{Extractor: extract.Config{Tool: extract.None}, Rand: seeded()})
 	release, err := Export(dial(t, addr), svc)
 	if err != nil {
@@ -176,7 +151,7 @@ func TestDaemonEmitsColorsExtracted(t *testing.T) {
 }
 
 func TestExportRefusesAnOwnedName(t *testing.T) {
-	addr := privateBus(t)
+	addr := dbustest.Start(t).Address
 	release, err := Export(dial(t, addr), New(Options{}))
 	if err != nil {
 		t.Fatal(err)

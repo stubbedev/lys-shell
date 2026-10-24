@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 )
 
@@ -233,7 +234,7 @@ type fakeHypr struct {
 
 func startFakeHypr(t *testing.T, replies map[string]string) (*fakeHypr, *hyprland.Connection) {
 	t.Helper()
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	f := &fakeHypr{replies: replies, events: make(chan net.Conn, 1)}
 	cmdPath, evPath := filepath.Join(dir, ".socket.sock"), filepath.Join(dir, ".socket2.sock")
 	serve := func(path string, fn func(net.Conn)) {

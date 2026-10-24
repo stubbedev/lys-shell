@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
 )
 
 func TestWidgetUpdateReachesTheShell(t *testing.T) {
-	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
 	srv := widgetipc.NewServer()
 	stop, err := srv.Listen()
 	if err != nil {
@@ -32,7 +33,7 @@ func TestWidgetUpdateReachesTheShell(t *testing.T) {
 }
 
 func TestWidgetUpdateWithoutShellFails(t *testing.T) {
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	t.Setenv("XDG_RUNTIME_DIR", dir)
 	_, stderr, code := runCaptured(t, false, "widget", "update", "gpu", "42")
 	want := "Error: cannot connect to lys-shell widget socket at " + filepath.Join(dir, "lys-shell", "widget.sock") + ": No such file or directory (os error 2)\n"
@@ -42,7 +43,7 @@ func TestWidgetUpdateWithoutShellFails(t *testing.T) {
 }
 
 func TestToastNeedsLabelOrPreset(t *testing.T) {
-	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
 	srv := widgetipc.NewServer()
 	stop, err := srv.Listen()
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // daemonConf is a private PipeWire daemon: the native protocol, the
@@ -53,11 +55,7 @@ func Start(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("pipewire not on PATH: %v", err)
 	}
-	dir, err := os.MkdirTemp("", "pwt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	dir := sockdir.Dir(t)
 	conf := filepath.Join(dir, "test.conf")
 	if err := os.WriteFile(conf, []byte(daemonConf), 0o600); err != nil {
 		t.Fatal(err)

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // dialRaw connects the socket without sending an open frame.
@@ -131,7 +133,7 @@ func (h *recordingHandler) ClientGone(id uint64) { h.gone <- id }
 
 func serve(t *testing.T) *recordingHandler {
 	t.Helper()
-	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
 	h := newRecordingHandler()
 	stop, err := NewServer(h).Listen()
 	if err != nil {

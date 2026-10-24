@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // monitorsFrame is types.rs's ALL_MONITORS_FRAME fixture.
@@ -24,7 +26,7 @@ type fakeMango struct {
 
 func newFakeMango(t *testing.T) *fakeMango {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "mango.sock")
+	path := filepath.Join(sockdir.Dir(t), "mango.sock")
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)

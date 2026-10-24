@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 func TestWorstBucket(t *testing.T) {
@@ -56,7 +57,7 @@ func TestSocketPathLookup(t *testing.T) {
 // arguments exit 2.
 func fakeTreemanBin(t *testing.T, outputs ...string) string {
 	t.Helper()
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	lines := filepath.Join(dir, "outputs")
 	if err := os.WriteFile(lines, []byte(strings.Join(outputs, "\n")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -95,7 +96,7 @@ func waitStatus(t *testing.T, s *System, ticks <-chan struct{}, total uint32) {
 }
 
 func TestStatusComesFromTheJSONStatusCommand(t *testing.T) {
-	t.Setenv("TREEMAN_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	t.Setenv("TREEMAN_SOCKET", filepath.Join(sockdir.Dir(t), "absent.sock"))
 	s := New(fakeTreemanBin(t, `{"total":3,"stable":1,"up":1,"down":0,"failed":1,"class":"failed"}`))
 	defer s.Stop()
 	if s.Status() != nil {
@@ -153,7 +154,7 @@ func TestAFailedRunKeepsTheLastStatus(t *testing.T) {
 
 // With the daemon down the service polls the CLI every retry.
 func TestPollsWithoutTheDaemon(t *testing.T) {
-	t.Setenv("TREEMAN_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	t.Setenv("TREEMAN_SOCKET", filepath.Join(sockdir.Dir(t), "absent.sock"))
 	s := New(fakeTreemanBin(t, `{"total":1}`, `{"total":2}`))
 	s.retry = 20 * time.Millisecond
 	defer s.Stop()
@@ -166,7 +167,7 @@ func TestPollsWithoutTheDaemon(t *testing.T) {
 }
 
 func TestDaemonEventsRefetch(t *testing.T) {
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	sock := filepath.Join(dir, "treeman.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
@@ -209,7 +210,7 @@ func TestDaemonEventsRefetch(t *testing.T) {
 // Every subscriber sees every change (one bar per output), and Stop
 // returns and closes them all.
 func TestEverySubscriberTicksAndStopClosesThem(t *testing.T) {
-	t.Setenv("TREEMAN_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	t.Setenv("TREEMAN_SOCKET", filepath.Join(sockdir.Dir(t), "absent.sock"))
 	s := New("true")
 	a, _, err := s.Subscribe(context.Background())
 	if err != nil {
@@ -253,7 +254,7 @@ func TestActionArgs(t *testing.T) {
 }
 
 func TestRunActionReportsStderr(t *testing.T) {
-	dir := t.TempDir()
+	dir := sockdir.Dir(t)
 	log := filepath.Join(dir, "args")
 	bin := filepath.Join(dir, "treeman")
 	script := "#!/bin/sh\necho \"$@\" > " + log + "\nif [ \"$1\" = db ]; then echo 'no such worktree' >&2; exit 3; fi\n"

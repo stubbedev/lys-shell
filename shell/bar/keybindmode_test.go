@@ -8,6 +8,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 )
 
@@ -87,7 +88,7 @@ func TestKeybindModeModuleFollowsSubmaps(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	eventLn := startFakeEventStream(t, []string{"submap>>resize\n"})
-	ctx.Hyprland = hyprland.ConnectTo(filepath.Join(t.TempDir(), "unused.sock"), eventLn)
+	ctx.Hyprland = hyprland.ConnectTo(filepath.Join(sockdir.Dir(t), "unused.sock"), eventLn)
 
 	module, err := Create("keybind-mode", ctx)
 	if err != nil {

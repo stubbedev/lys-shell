@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeNiri answers the JSON-lines protocol: canned workspace/window
@@ -28,7 +30,7 @@ type fakeNiri struct {
 
 func newFakeNiri(t *testing.T, workspaces, windows string) *fakeNiri {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "niri.sock")
+	path := filepath.Join(sockdir.Dir(t), "niri.sock")
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
