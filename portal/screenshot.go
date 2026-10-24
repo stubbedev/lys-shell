@@ -31,6 +31,7 @@ func (s screenshotPortal) Screenshot(handle dbus.ObjectPath, appID, parent strin
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
+	c.modal(options)
 	mode := "screen"
 	if interactive, _ := optBool(options, "interactive"); interactive {
 		mode = "region"

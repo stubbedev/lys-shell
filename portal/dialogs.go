@@ -47,6 +47,7 @@ func (a accessMethods) AccessDialog(handle dbus.ObjectPath, appID, parent, title
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
+	c.modal(options)
 	granted, err := client.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 		Title: title, Subtitle: subtitle, Body: body,
 		GrantLabel: stringOr(options, "grant_label", "Allow"),

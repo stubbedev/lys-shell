@@ -3,6 +3,7 @@ package sharepicker
 import (
 	"context"
 	"image"
+	"slices"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/capture"
@@ -36,7 +37,8 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	}
 	ch := make(chan string, 1)
 	p.snapshot()
-	p.reply, p.handle, p.allowToken, p.multiple = ch, "/r/test", allowToken, multiple
+	p.queue.Enqueue("/r/test", func() {}, func() {})
+	p.reply, p.allowToken, p.multiple = ch, allowToken, multiple
 	p.root = p.build(nil)
 	return p, ch
 }
@@ -60,6 +62,12 @@ func TestDismissCancelsItsRequestOnly(t *testing.T) {
 	p.Dismiss("/r/other")
 	if p.reply == nil {
 		t.Fatal("another request's dismissal answered this one")
+	}
+	queued := make(chan string, 1)
+	p.queue.Enqueue("/r/next", func() { t.Error("a dismissed waiting request showed") }, func() { queued <- "" })
+	p.Dismiss("/r/next")
+	if got := <-queued; got != "" {
+		t.Errorf("a dismissed waiting request replied %q", got)
 	}
 	p.selecting = true
 	p.Dismiss("/r/test")
@@ -321,4 +329,15 @@ func isLabeledCheck(w widget.Widget, text string) bool {
 	}
 	l, ok := c.Child().(*widget.Label)
 	return ok && l.Text() == text
+}
+
+// The picker names the app asking to share.
+func TestPickerNamesTheRequester(t *testing.T) {
+	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
+	p.d.Describe = func(appID string) (string, string) { return "Meet " + appID, "" }
+	p.requester = p.describe(portalreq.Caller{Handle: "/r/9", AppID: "org.meet"})
+	p.root = p.build(nil)
+	if labels := treetest.Labels(p.root); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
+		t.Errorf("labels = %q", labels)
+	}
 }

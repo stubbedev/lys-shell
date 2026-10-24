@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
@@ -85,24 +86,27 @@ type Deps struct {
 	Places, Locations func() []Place
 	// ViewFile persists the sort and layout; "" keeps them in memory.
 	ViewFile string
-	// Screen is the first output's logical size, which the sheet is
-	// first centred on; false while none is known.
-	Screen func() (w, h int, ok bool)
+	// Target is the output a dialog maps on (the focused one, else the
+	// first) with its logical size, which the sheet is centred on; false
+	// while none is known, when the compositor places it.
+	Target func() (output *app.Output, w, h int, ok bool)
 }
 
-// Chooser is the dev.stubbe.lys.FileChooser1 host: one overlay showing the
-// latest request; a request arriving while one is open answers the
-// older one with nothing. Open and Save may be called from any
-// goroutine; the rest runs on the loop.
+// Chooser is the dev.stubbe.lys.FileChooser1 host: one overlay showing one
+// request; requests arriving meanwhile wait their turn, and dismissing
+// a request answers it with nothing, showing or waiting. Open and Save
+// may be called from any goroutine; the rest runs on the loop.
 type Chooser struct {
 	d       Deps
 	win     Window
 	rev     *widget.Revealer
 	closing bool
 	reply   func([]string)
-	handle  string
-	s       *session
-	ui      *ui
+	queue   dialogqueue.Queue
+	// modal is whether the request showing holds the keyboard.
+	modal bool
+	s     *session
+	ui    *ui
 
 	// view, hidden and recursive stick across requests.
 	view              view
@@ -118,10 +122,12 @@ type Chooser struct {
 	// drag is the sheet size a resize started from.
 	drag struct{ w, h int }
 	// margin places the sheet: the window is anchored top left. It
-	// sticks across requests, as the Rust window does; placed is false
-	// until the first request centres it.
-	margin app.Margins
-	placed bool
+	// sticks across requests on one output, as the Rust window does;
+	// placed is false until the first request, and placedOn is the
+	// output it was centred on.
+	margin   app.Margins
+	placed   bool
+	placedOn string
 
 	thumbs  map[thumbKey]image.Image
 	waiting map[thumbKey][]*widget.Image
@@ -154,42 +160,42 @@ func (c *Chooser) Save(caller portalreq.Caller, r SaveRequest) []string {
 	return c.ask(caller, r.Title, ModeSave, r.Filters, r.CurrentFolder, r.CurrentName)
 }
 
-// Dismiss cancels, and takes down, the dialog showing for the request
-// at handle; another request's dialog stays.
+// Dismiss answers the request at handle with nothing: the dialog
+// showing for it is taken down, a waiting one never shows. Another
+// request's dialog stays.
 func (c *Chooser) Dismiss(handle string) {
 	c.d.Invoke(func() {
-		if c.reply != nil && handle != "" && c.handle == handle {
+		if c.queue.Dismiss(handle) {
 			c.finish(nil)
 		}
 	})
 }
 
-// ask shows a request on the loop and waits for its answer.
+// ask queues a request on the loop and waits for its answer.
 func (c *Chooser) ask(caller portalreq.Caller, title string, mode Mode, filters []Filter, folder, name string) []string {
 	ch := make(chan []string, 1)
 	c.d.Invoke(func() {
-		c.settle(nil)
-		c.reply = func(uris []string) { ch <- uris }
-		c.handle = caller.Handle
-		c.begin(title, mode, filters, folder, name)
+		c.queue.Enqueue(caller.Handle, func() {
+			c.reply = func(uris []string) { ch <- uris }
+			c.modal = caller.Modal
+			c.begin(title, mode, filters, folder, name)
+		}, func() { ch <- nil })
 	})
 	return <-ch
 }
 
-// settle answers the open request, if any, and stops its search.
-func (c *Chooser) settle(uris []string) {
-	c.cancelWalk()
-	if c.reply != nil {
-		reply := c.reply
-		c.reply, c.handle = nil, ""
-		reply(uris)
-	}
-}
-
-// finish answers and plays the exit.
+// finish answers the request showing, stops its search, plays the
+// exit, and shows the next request waiting.
 func (c *Chooser) finish(uris []string) {
-	c.settle(uris)
+	c.cancelWalk()
+	if c.reply == nil {
+		return
+	}
+	reply := c.reply
+	c.reply = nil
+	reply(uris)
 	c.hide()
+	c.queue.Done()
 }
 
 func (c *Chooser) begin(title string, mode Mode, filters []Filter, folder, name string) {
@@ -661,17 +667,31 @@ func (c *Chooser) show() {
 		u.root.AttachStylesheet(c.d.Sheet)
 	}
 	u.root.Append(c.rev, true)
+	var output *app.Output
+	if c.d.Target != nil {
+		if out, w, h, ok := c.d.Target(); ok {
+			output = out
+			if !c.placed || out.Name != c.placedOn {
+				c.margin, c.placed, c.placedOn = centerMargins(w, h, sheetW, sheetH), true, out.Name
+			}
+		}
+	}
 	if !c.placed {
-		c.margin, c.placed = centerMargins(c.d.Screen, sheetW, sheetH), true
+		c.margin, c.placed = app.Margins{Left: 200, Top: 150}, true
+	}
+	keyboard := app.KeyboardExclusive
+	if !c.modal {
+		keyboard = app.KeyboardOnDemand
 	}
 	// Anchored top left and placed by the margins, sized to the sheet,
 	// so the header drag moves the window and the grip resizes it.
 	win, err := c.d.Open(app.LayerConfig{
+		Output:        output,
 		Layer:         app.LayerOverlay,
 		Anchor:        app.AnchorTop | app.AnchorLeft,
 		Margin:        c.margin,
 		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardExclusive,
+		Keyboard:      keyboard,
 		Namespace:     "lys-shell-file-chooser",
 		Root:          u.root,
 		OnKey:         func(r *widget.Router, keycode uint32, _ app.Mods) { c.key(r, keycode) },
@@ -679,7 +699,7 @@ func (c *Chooser) show() {
 	})
 	if err != nil {
 		log.Printf("file chooser: cannot map the overlay: %v", err)
-		c.settle(nil)
+		c.finish(nil)
 		return
 	}
 	c.win = win
@@ -762,15 +782,9 @@ func (c *Chooser) move(dx, dy int) {
 	}
 }
 
-// centerMargins is center_margins: the margins that centre a w x h
-// sheet on the first output, a fixed offset without one.
-func centerMargins(screen func() (int, int, bool), w, h int) app.Margins {
-	if screen != nil {
-		if sw, sh, ok := screen(); ok {
-			return app.Margins{Left: int32(max((sw-w)/2, 0)), Top: int32(max((sh-h)/2, 0))}
-		}
-	}
-	return app.Margins{Left: 200, Top: 150}
+// centerMargins centres a w x h sheet on an sw x sh output.
+func centerMargins(sw, sh, w, h int) app.Margins {
+	return app.Margins{Left: int32(max((sw-w)/2, 0)), Top: int32(max((sh-h)/2, 0))}
 }
 
 func (c *Chooser) startResize() {

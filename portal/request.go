@@ -76,7 +76,7 @@ func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, 
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &call{
-		ctx: ctx, caller: portalreq.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow},
+		ctx: ctx, caller: portalreq.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow, Modal: true},
 		req: req, cancel: cancel, done: make(chan struct{}),
 	}
 	c.watching.Go(func() {
@@ -95,6 +95,14 @@ func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, 
 		}
 	})
 	return c, nil
+}
+
+// modal takes the app's modal option onto the caller; absent, the
+// dialog stays modal.
+func (c *call) modal(options Vardict) {
+	if modal, ok := optBool(options, "modal"); ok {
+		c.caller.Modal = modal
+	}
 }
 
 // closed reports whether the app closed the request.

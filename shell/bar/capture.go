@@ -71,7 +71,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 	} else {
 		log.Printf("screenshot: daemon: %v", err)
 	}
-	picker := sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet}, region)
+	picker := sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, region)
 	if release, err := sharepicker.NewDaemon(picker).Export(conn); err == nil {
 		s.release = append(s.release, release)
 	} else {

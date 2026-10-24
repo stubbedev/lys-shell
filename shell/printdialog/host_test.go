@@ -225,7 +225,7 @@ func TestSheetIsTheRustLayout(t *testing.T) {
 	}
 }
 
-func TestCancelEscapeAndPreemption(t *testing.T) {
+func TestCancelEscapeAndQueueing(t *testing.T) {
 	hs := newHarness(t)
 	got, c := hs.prepare(t)
 	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
@@ -237,17 +237,31 @@ func TestCancelEscapeAndPreemption(t *testing.T) {
 	if r := <-got; r.ok {
 		t.Errorf("escape = %+v", r)
 	}
-	first, _ := hs.prepare(t)
-	second, c := hs.prepare(t)
+	// A second prepare waits for the first instead of cancelling it.
+	first, c := hs.prepare(t)
+	second := make(chan prepareResult, 1)
+	go func() {
+		ok, s, tok := hs.h.Prepare(portalreq.Caller{Handle: "/r/second"}, "Doc 2")
+		second <- prepareResult{ok, s, tok}
+	}()
 	select {
 	case r := <-first:
-		if r.ok {
-			t.Errorf("a preempted prepare answered %+v", r)
-		}
-	case <-time.After(treetest.Liveness):
-		t.Fatal("a preempted prepare was never answered")
+		t.Fatalf("a second prepare answered the first %+v", r)
+	case <-hs.opened:
+		t.Fatal("the second dialog mapped over the first")
+	case <-time.After(50 * time.Millisecond):
 	}
 	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
+	if r := <-first; !r.ok {
+		t.Error("the first prepare lost its answer")
+	}
+	var next app.LayerConfig
+	select {
+	case next = <-hs.opened:
+	case <-time.After(treetest.Liveness):
+		t.Fatal("the waiting prepare never showed")
+	}
+	hs.do(func() { treetest.Button(t, next.Root, "Print").OnClick() })
 	if r := <-second; !r.ok {
 		t.Error("the second prepare did not answer")
 	}

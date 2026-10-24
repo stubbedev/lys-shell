@@ -199,3 +199,20 @@ func TestPrintCancelAndFailure(t *testing.T) {
 		t.Errorf("an unsent job = %d", code)
 	}
 }
+
+// The app's modal option reaches the shell; absent, the dialog stays
+// modal.
+func TestFileChooserPassesModal(t *testing.T) {
+	r := newRig(t, nil)
+	f := serveChooser(t, r, "file:///x")
+	for _, tc := range []struct {
+		options Vardict
+		want    bool
+	}{{Vardict{}, true}, {Vardict{"modal": dbus.MakeVariant(false)}, false}} {
+		r.interactive(t, fileChooserIfaceName+"OpenFile", handle, "org.app", "", "Open", tc.options)
+		callers := f.callers.Load()
+		if got := callers[len(callers)-1]; got.Modal != tc.want {
+			t.Errorf("options %v: modal %v, want %v", tc.options, got.Modal, tc.want)
+		}
+	}
+}

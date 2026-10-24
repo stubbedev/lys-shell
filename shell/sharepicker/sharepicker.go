@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -55,6 +56,9 @@ type Deps struct {
 	// Font shapes the labels; Sheet styles the surface.
 	Font  render.Font
 	Sheet *widget.Stylesheet
+	// Describe names the app asking to share (desktopentry.Describe);
+	// nil for a request no portal app makes (the XDPH plugin).
+	Describe func(appID string) (name, icon string)
 }
 
 // Picker is the share picker component. Pick is its entry point; the
@@ -74,7 +78,8 @@ type Picker struct {
 	scale float64
 
 	reply      chan string
-	handle     string
+	queue      dialogqueue.Queue
+	requester  string
 	selecting  bool
 	allowToken bool
 	multiple   bool
@@ -103,20 +108,22 @@ func New(a *app.Application, d Deps, region *regionoverlay.Overlay) *Picker {
 // user selects or cancels. windowList is the raw
 // XDPH_WINDOW_SHARING_LIST; allowToken seeds the restore-token box;
 // multiple enables multi-select. A request arriving while one is open
-// answers the older one with an empty (cancelled) reply. Call it from
-// any goroutine but the loop's.
+// waits its turn. Call it from any goroutine but the loop's.
 func (p *Picker) Pick(c portalreq.Caller, windowList string, allowToken, multiple bool) string {
 	ch := make(chan string, 1)
 	toplevels := sharepreview.ParseList(windowList)
-	p.invoke(func() { p.show(c, ch, toplevels, allowToken, multiple) })
+	p.invoke(func() {
+		p.queue.Enqueue(c.Handle, func() { p.show(c, ch, toplevels, allowToken, multiple) }, func() { ch <- "" })
+	})
 	return <-ch
 }
 
-// Dismiss cancels the picker showing for the request at handle, the
-// region overlay it opened included; another request's picker stays.
+// Dismiss cancels the request at handle: the picker showing for it,
+// with the region overlay it opened, is taken down; a waiting one never
+// shows. Another request's picker stays.
 func (p *Picker) Dismiss(handle string) {
 	p.invoke(func() {
-		if p.reply == nil || handle == "" || p.handle != handle {
+		if !p.queue.Dismiss(handle) {
 			return
 		}
 		if p.selecting {
@@ -126,12 +133,12 @@ func (p *Picker) Dismiss(handle string) {
 	})
 }
 
-// show replaces any open request, re-reads the config, and maps the
-// surface with its enter transition.
+// show re-reads the config and maps the surface for one request with
+// its enter transition.
 func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []sharepreview.Toplevel, allowToken, multiple bool) {
-	p.answer("")
 	p.snapshot()
-	p.reply, p.handle, p.allowToken, p.multiple, p.pending = ch, c.Handle, allowToken, multiple, nil
+	p.reply, p.allowToken, p.multiple, p.pending = ch, allowToken, multiple, nil
+	p.requester = p.describe(c)
 	p.root = p.build(toplevels)
 	if err := p.mapSurface(); err != nil {
 		log.Printf("share picker: %v", err)
@@ -139,6 +146,16 @@ func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []shareprevi
 		return
 	}
 	reveal.Show(p.rev, p.anims, config.AnimSharePicker)
+}
+
+// describe is the line naming the app a request comes from, "" without
+// a describer.
+func (p *Picker) describe(c portalreq.Caller) string {
+	if p.d.Describe == nil {
+		return ""
+	}
+	name, _ := p.d.Describe(c.AppID)
+	return name + " wants to share your screen"
 }
 
 // snapshot reads the request's config.
@@ -201,14 +218,17 @@ func (p *Picker) dismiss() {
 	reveal.Hide(p.rev, p.anims, config.AnimSharePicker, layer.Close)
 }
 
-// answer replies to the open request (once) and dismisses the
-// surface.
+// answer replies to the open request (once), dismisses the surface,
+// and shows the next request waiting.
 func (p *Picker) answer(s string) {
-	if p.reply != nil {
-		p.reply <- s
-		p.reply, p.handle = nil, ""
+	if p.reply == nil {
+		p.dismiss()
+		return
 	}
+	p.reply <- s
+	p.reply = nil
 	p.dismiss()
+	p.queue.Done()
 }
 
 // prefix is the reply's flag segment: `r` asks the portal for a
@@ -297,6 +317,11 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel) widget.Widget {
 	surface := widget.NewBox(widget.Column, 0, 0)
 	surface.AddClass("share-picker-surface")
 	surface.SetSizeRequest(p.width(), p.height())
+	if p.requester != "" {
+		requester := p.label(p.requester)
+		requester.AddClass("share-picker-requester")
+		surface.Append(requester, false)
+	}
 	surface.Append(nb, true)
 	if !p.cfg.HideTokenRestore {
 		check := widget.NewCheckButton(p.allowToken)

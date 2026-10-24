@@ -454,3 +454,18 @@ func walkFlat(dirs []string) []entryFile {
 	}
 	return out
 }
+
+// Describe names the app a desktop-portal request comes from, for the
+// dialogs asking on its behalf: the desktop entry's display name and
+// icon for appID (a desktop id without ".desktop"), the bare id when no
+// entry matches, and "An application" for a host app (no id).
+func Describe(dirs []string, appID string) (name, icon string) {
+	if appID == "" {
+		return "An application", ""
+	}
+	app, ok := FindApp(dirs, appID+".desktop")
+	if !ok {
+		return appID, ""
+	}
+	return app.DisplayName(), app.Icon()
+}

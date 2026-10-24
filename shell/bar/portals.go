@@ -29,7 +29,7 @@ import (
 // file_chooser) and dev.stubbe.lys.Print1 (services/print, spooling over
 // CUPS' IPP). A bus failure leaves the portal answering those requests
 // "other".
-func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, font render.Font, sheet *widget.Stylesheet) {
+func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("portal hosts: session bus: %v", err)
@@ -44,6 +44,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		Candidates: portaldialogs.CandidateApps,
 		SetDefault: desktopentry.SetDefault,
 		Avatar:     portaldialogs.LocalAvatar,
+		Describe:   describeApp,
 	})
 	exported := 0
 	if _, err := portaldialogs.NewDaemon(dialogs).Export(conn); err != nil {
@@ -68,13 +69,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		Places:    func() []filechooser.Place { return filechooser.UserPlaces(home) },
 		Locations: filechooser.SystemLocations(home),
 		ViewFile:  viewFile,
-		Screen: func() (int, int, bool) {
-			outs := outputs()
-			if len(outs) == 0 || outs[0].LogicalW <= 0 || outs[0].LogicalH <= 0 {
-				return 0, 0, false
-			}
-			return int(outs[0].LogicalW), int(outs[0].LogicalH), true
-		},
+		Target:    func() (*app.Output, int, int, bool) { return dialogOutput(outputs(), focused) },
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)
@@ -101,6 +96,32 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	if exported == 0 {
 		_ = conn.Close()
 	}
+}
+
+// dialogOutput is the output a portal dialog maps on: the focused one,
+// as the app asking is normally the one focused, else the first, with
+// its logical size; false while no output has one.
+func dialogOutput(outs []*app.Output, focused func() (string, bool)) (*app.Output, int, int, bool) {
+	pick := func(o *app.Output) (*app.Output, int, int, bool) {
+		return o, int(o.LogicalW), int(o.LogicalH), o.LogicalW > 0 && o.LogicalH > 0
+	}
+	if name, ok := focused(); ok {
+		for _, o := range outs {
+			if o.Name == name {
+				return pick(o)
+			}
+		}
+	}
+	if len(outs) == 0 {
+		return nil, 0, 0, false
+	}
+	return pick(outs[0])
+}
+
+// describeApp names the app a portal request comes from, from its
+// desktop entry.
+func describeApp(appID string) (name, icon string) {
+	return desktopentry.Describe(desktopentry.ApplicationDirs(), appID)
 }
 
 // currentUser names print jobs' owner: $USER, else the account.

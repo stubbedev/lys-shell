@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -281,7 +282,7 @@ func TestHistoryButtonsAndUp(t *testing.T) {
 	}
 }
 
-func TestCancelEscapeAndPreemption(t *testing.T) {
+func TestCancelEscapeAndQueueing(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}}})
 	// Escape closes the filter popup first, then quick look, then the
@@ -307,10 +308,21 @@ func TestCancelEscapeAndPreemption(t *testing.T) {
 		t.Errorf("Escape answered %v", uris)
 	}
 
+	// A second request waits for the first rather than cancelling it.
 	first := hs.open(t, OpenRequest{})
-	second := hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"}) })
+	second := make(chan []string, 1)
+	go func() {
+		second <- hs.c.Save(portalreq.Caller{Handle: "/r/second", Modal: true}, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"})
+	}()
+	pending(t, first)
+	hs.click(t, "Cancel")
 	if uris := answer(t, first); uris != nil {
-		t.Errorf("a preempted request answered %v", uris)
+		t.Errorf("Cancel answered %v", uris)
+	}
+	select {
+	case hs.cfg = <-hs.opened:
+	case <-time.After(treetest.Liveness):
+		t.Fatal("the waiting request never showed")
 	}
 	hs.click(t, "Cancel")
 	if uris := answer(t, second); uris != nil {
@@ -375,7 +387,7 @@ func TestFolderPickAnswersTheFolder(t *testing.T) {
 func TestFiltersHiddenAndSort(t *testing.T) {
 	viewFile := filepath.Join(t.TempDir(), "state", "file-chooser-view")
 	hs := newHarness(t, viewFile)
-	hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}}})
+	filtered := hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}}})
 	if got := hs.shown(); !slices.Equal(got, []string{"docs", "pics", "a.png"}) {
 		t.Errorf("filtered = %v", got)
 	}
@@ -415,6 +427,8 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 		t.Errorf("reloaded view = %+v", again.c.view)
 	}
 	// And the hidden toggle sticks to the next request.
+	hs.click(t, "Cancel")
+	answer(t, filtered)
 	got := hs.open(t, OpenRequest{})
 	if !slices.Contains(hs.shown(), ".dot.txt") || !hs.c.ui.hiddenTg.Active() {
 		t.Error("the hidden toggle did not stick")
@@ -597,15 +611,26 @@ func TestSheetSizesItself(t *testing.T) {
 	}
 }
 
-// The window is anchored top left, first centred on the output by its
-// margins; a header drag moves the margins (never below zero), and the
-// place sticks across requests.
+// The window maps on the target output (the focused one), anchored top
+// left and first centred there by its margins; a header drag moves the
+// margins (never below zero), and the place sticks across requests on
+// that output. Another output re-centres it there.
 func TestSheetWindowIsPlacedByItsMargins(t *testing.T) {
 	hs := newHarness(t, "")
-	hs.c.d.Screen = func() (int, int, bool) { return 1920, 1080, true }
+	dp1, dp2 := &app.Output{Name: "DP-1"}, &app.Output{Name: "DP-2"}
+	target := dp1
+	hs.c.d.Target = func() (*app.Output, int, int, bool) {
+		if target == dp1 {
+			return dp1, 1920, 1080, true
+		}
+		return dp2, 2560, 1440, true
+	}
 	got := hs.open(t, OpenRequest{})
 	c := hs.cfg
 	want := app.Margins{Left: (1920 - sheetW) / 2, Top: (1080 - sheetH) / 2}
+	if c.Output != dp1 {
+		t.Errorf("mapped on %v, want the target output", c.Output)
+	}
 	if c.Anchor != app.AnchorTop|app.AnchorLeft || c.Margin != want || c.Width != 0 || c.Height != 0 {
 		t.Errorf("layer anchor %v margin %+v size %dx%d, want top-left at %+v sized to the sheet", c.Anchor, c.Margin, c.Width, c.Height, want)
 	}
@@ -623,9 +648,67 @@ func TestSheetWindowIsPlacedByItsMargins(t *testing.T) {
 	}
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
-	hs.open(t, OpenRequest{})
+	got = hs.open(t, OpenRequest{})
 	if hs.cfg.Margin != win.margins[1] {
 		t.Errorf("the next request opened at %+v, want the dragged %+v", hs.cfg.Margin, win.margins[1])
+	}
+	hs.do(func() { hs.c.finish(nil) })
+	answer(t, got)
+	target = dp2
+	hs.open(t, OpenRequest{})
+	if want := (app.Margins{Left: (2560 - sheetW) / 2, Top: (1440 - sheetH) / 2}); hs.cfg.Output != dp2 || hs.cfg.Margin != want {
+		t.Errorf("on another output: %v at %+v, want DP-2 at %+v", hs.cfg.Output, hs.cfg.Margin, want)
+	}
+}
+
+// A modal request holds the keyboard; a request with modal off takes it
+// only on demand.
+func TestModalDecidesTheKeyboard(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.ask(t, func() []string {
+		return hs.c.Open(portalreq.Caller{Handle: "/r/m", Modal: true}, OpenRequest{CurrentFolder: hs.root})
+	})
+	if hs.cfg.Keyboard != app.KeyboardExclusive {
+		t.Errorf("modal keyboard = %v, want exclusive", hs.cfg.Keyboard)
+	}
+	hs.do(func() { hs.c.finish(nil) })
+	answer(t, got)
+	hs.ask(t, func() []string {
+		return hs.c.Open(portalreq.Caller{Handle: "/r/n", Modal: false}, OpenRequest{CurrentFolder: hs.root})
+	})
+	if hs.cfg.Keyboard != app.KeyboardOnDemand {
+		t.Errorf("non-modal keyboard = %v, want on demand", hs.cfg.Keyboard)
+	}
+}
+
+// Two requests at once both get answered: the second waits its turn.
+func TestConcurrentRequestsBothGetAnswers(t *testing.T) {
+	hs := newHarness(t, "")
+	first := hs.open(t, OpenRequest{})
+	second := make(chan []string, 1)
+	go func() {
+		second <- hs.c.Open(portalreq.Caller{Handle: "/r/2"}, OpenRequest{CurrentFolder: hs.root})
+	}()
+	select {
+	case uris := <-first:
+		t.Fatalf("a second request answered the first with %v", uris)
+	case <-hs.opened:
+		t.Fatal("the second request mapped over the first")
+	case <-time.After(50 * time.Millisecond):
+	}
+	want := fileuri.FromPath(filepath.Join(hs.root, "a"))
+	hs.do(func() { hs.c.finish([]string{want}) })
+	if uris := answer(t, first); len(uris) != 1 || uris[0] != want {
+		t.Errorf("first = %v", uris)
+	}
+	select {
+	case hs.cfg = <-hs.opened:
+	case <-time.After(treetest.Liveness):
+		t.Fatal("the second request never showed")
+	}
+	hs.do(func() { hs.c.finish([]string{want + "2"}) })
+	if uris := answer(t, second); len(uris) != 1 || uris[0] != want+"2" {
+		t.Errorf("second = %v", uris)
 	}
 }
 
@@ -755,7 +838,7 @@ func TestLayoutWidgetsReportTheirChildToTheFocusRing(t *testing.T) {
 }
 
 // testCaller is the request the tests' dialogs serve.
-var testCaller = portalreq.Caller{Handle: "/r/test", AppID: "org.app"}
+var testCaller = portalreq.Caller{Handle: "/r/test", AppID: "org.app", Modal: true}
 
 // Dismissing the request the chooser shows answers it with nothing and
 // takes it down; another request's dismissal leaves it up.

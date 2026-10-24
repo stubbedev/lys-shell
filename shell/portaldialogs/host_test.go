@@ -65,6 +65,12 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 			return nil
 		},
 		Avatar: func() string { return "" },
+		Describe: func(appID string) (string, string) {
+			if appID == "" {
+				return "An application", ""
+			}
+			return "App " + appID, ""
+		},
 	})
 	return hs
 }
@@ -131,32 +137,73 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 	}
 }
 
-func TestEscapeAndPreemption(t *testing.T) {
+// A request arriving while a dialog shows waits its turn instead of
+// cancelling it, and shows once the first is answered; Escape answers
+// no. Each dialog names the app asking.
+func TestRequestsQueueAndEscape(t *testing.T) {
 	hs := newHarness(t, nil)
 	first := make(chan bool, 1)
-	go func() { first <- hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/test"}, "App", "") }()
+	go func() { first <- hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/1", AppID: "org.one"}, "App", "") }()
 	c := hs.open(t)
-	if l := treetest.Labels(c.Root); !slices.Contains(l, "Install “App”?") {
+	if l := treetest.Labels(c.Root); !slices.Contains(l, "Install “App”?") || !slices.Contains(l, "App org.one") {
 		t.Errorf("labels = %q", l)
 	}
-	// A second request answers the first no.
 	second := make(chan bool, 1)
-	go func() { second <- hs.h.Account(portalreq.Caller{Handle: "/r/test"}, "") }()
+	go func() { second <- hs.h.Account(portalreq.Caller{Handle: "/r/2", AppID: "org.two"}, "") }()
 	select {
 	case r := <-first:
-		if r {
-			t.Error("a preempted request answered yes")
-		}
-	case <-time.After(treetest.Liveness):
-		t.Fatal("a preempted request was never answered")
+		t.Fatalf("a second request answered the first %v", r)
+	case <-hs.opened:
+		t.Fatal("the second dialog mapped over the first")
+	case <-time.After(50 * time.Millisecond):
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Install").OnClick() })
+	if r := <-first; !r {
+		t.Error("the first dialog's answer was lost")
 	}
 	c = hs.open(t)
-	if l := treetest.Labels(c.Root); !slices.Contains(l, "An application is requesting your name and avatar.") {
+	if l := treetest.Labels(c.Root); !slices.Contains(l, "An application is requesting your name and avatar.") || !slices.Contains(l, "App org.two") {
 		t.Errorf("account labels = %q", l)
 	}
 	hs.do(func() { c.OnKey(nil, escapeKeycode, 0) })
 	if r := <-second; r {
 		t.Error("Escape answered yes")
+	}
+}
+
+// A waiting request that is dismissed is answered no and never shows;
+// the one showing stays.
+func TestDismissingAWaitingRequest(t *testing.T) {
+	hs := newHarness(t, nil)
+	first := make(chan bool, 1)
+	go func() { first <- hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/1"}, "file:///a.png") }()
+	c := hs.open(t)
+	second := make(chan bool, 1)
+	go func() { second <- hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/2"}, "file:///b.png") }()
+	deadline := time.Now().Add(treetest.Liveness)
+	for {
+		var waiting int
+		hs.do(func() { waiting = hs.h.queue.Len() })
+		if waiting == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the second request never queued")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	hs.h.Dismiss("/r/2")
+	if r := <-second; r {
+		t.Error("a dismissed waiting request answered yes")
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Set wallpaper").OnClick() })
+	if r := <-first; !r {
+		t.Error("the showing dialog lost its answer")
+	}
+	select {
+	case <-hs.opened:
+		t.Error("a dismissed request showed")
+	case <-time.After(50 * time.Millisecond):
 	}
 }
 

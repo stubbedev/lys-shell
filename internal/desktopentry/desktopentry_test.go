@@ -195,3 +195,20 @@ func TestLaunchRunsTheExecDetached(t *testing.T) {
 		return err == nil && string(data) == path+"\n"
 	})
 }
+
+// A portal request names its app by the entry's name and icon; an
+// unknown id stands for itself, and no id is a host app.
+func TestDescribe(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "applications/org.example.Viewer.desktop", "[Desktop Entry]\nType=Application\nName=Viewer\nIcon=viewer-icon\nExec=true\n")
+	dirs := []string{filepath.Join(dir, "applications")}
+	if name, icon := Describe(dirs, "org.example.Viewer"); name != "Viewer" || icon != "viewer-icon" {
+		t.Errorf("known app = %q %q", name, icon)
+	}
+	if name, icon := Describe(dirs, "org.unknown.App"); name != "org.unknown.App" || icon != "" {
+		t.Errorf("unknown app = %q %q", name, icon)
+	}
+	if name, _ := Describe(dirs, ""); name != "An application" {
+		t.Errorf("host app = %q", name)
+	}
+}

@@ -33,6 +33,7 @@ func (f fileChooser) OpenFile(handle dbus.ObjectPath, appID, parent, title strin
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
+	c.modal(options)
 	multiple, _ := optBool(options, "multiple")
 	directory, _ := optBool(options, "directory")
 	uris, err := client.Open(c.ctx, c.caller, filechooser.OpenRequest{
@@ -50,6 +51,7 @@ func (f fileChooser) SaveFile(handle dbus.ObjectPath, appID, parent, title strin
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
+	c.modal(options)
 	uris, err := client.Save(c.ctx, c.caller, filechooser.SaveRequest{
 		Title: title, CurrentName: stringOr(options, "current_name", ""),
 		Filters: fileFilters(options), CurrentFolder: currentFolder(options),
@@ -67,6 +69,7 @@ func (f fileChooser) SaveFiles(handle dbus.ObjectPath, appID, parent, title stri
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
+	c.modal(options)
 	picked, err := client.Open(c.ctx, c.caller, filechooser.OpenRequest{
 		Title: title, Directory: true, CurrentFolder: currentFolder(options),
 	})

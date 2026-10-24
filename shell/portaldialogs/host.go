@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
@@ -50,20 +51,25 @@ type Deps struct {
 	Candidates func(choices []string, contentType string) []desktopentry.App
 	SetDefault func(id, contentType string) error
 	Avatar     func() string
+	// Describe names the app a request comes from: its display name
+	// and icon (desktopentry.Describe).
+	Describe func(appID string) (name, icon string)
 }
 
 // Dialogs is the dev.stubbe.lys.PortalDialogs1 host: one overlay showing
-// the latest request; a request arriving while one is open answers the
-// older one no (or "" for an app chooser), and so does dismissing the
-// request it shows. Its Host methods may be called from any goroutine;
-// the rest runs on the loop.
+// one request, naming the app that asks; requests arriving meanwhile
+// wait their turn, and dismissing a request answers it no (or "" for
+// an app chooser), showing or waiting. Its Host methods may be called
+// from any goroutine; the rest runs on the loop.
 type Dialogs struct {
 	d       Deps
 	win     Window
 	rev     *widget.Revealer
 	answer  func(confirmed bool, choice string)
-	handle  string
+	queue   dialogqueue.Queue
 	closing bool
+	// app and appIcon name the requester of the dialog showing.
+	app, appIcon string
 }
 
 // New builds the host; nothing maps until a request.
@@ -77,38 +83,38 @@ func (h *Dialogs) ask(c portalreq.Caller, build func(answer func(bool, string)) 
 	}
 	ch := make(chan result, 1)
 	h.d.Invoke(func() {
-		h.settle(false, "")
-		h.answer = func(ok bool, choice string) { ch <- result{ok, choice} }
-		h.handle = c.Handle
-		h.show(build(h.finish))
+		h.queue.Enqueue(c.Handle, func() {
+			h.answer = func(ok bool, choice string) { ch <- result{ok, choice} }
+			h.app, h.appIcon = h.d.Describe(c.AppID)
+			h.show(build(h.finish))
+		}, func() { ch <- result{} })
 	})
 	r := <-ch
 	return r.ok, r.choice
 }
 
-// Dismiss answers no to, and takes down, the dialog showing for the
-// request at handle; another request's dialog stays.
+// Dismiss answers no to the request at handle: the dialog showing for
+// it is taken down, a waiting one never shows. Another request's
+// dialog stays.
 func (h *Dialogs) Dismiss(handle string) {
 	h.d.Invoke(func() {
-		if h.answer != nil && handle != "" && h.handle == handle {
+		if h.queue.Dismiss(handle) {
 			h.finish(false, "")
 		}
 	})
 }
 
-// settle answers the open request, if any.
-func (h *Dialogs) settle(ok bool, choice string) {
-	if h.answer != nil {
-		answer := h.answer
-		h.answer, h.handle = nil, ""
-		answer(ok, choice)
-	}
-}
-
-// finish answers and plays the exit.
+// finish answers the dialog showing, plays its exit, and shows the
+// next request waiting.
 func (h *Dialogs) finish(ok bool, choice string) {
-	h.settle(ok, choice)
+	if h.answer == nil {
+		return
+	}
+	answer := h.answer
+	h.answer = nil
+	answer(ok, choice)
 	h.hide()
+	h.queue.Done()
 }
 
 // Access is the grant/deny prompt: the permission's icon above the
@@ -217,10 +223,25 @@ func (h *Dialogs) headerFile(path string, px int) widget.Widget {
 	return widgets.NewPinned(img, px, px)
 }
 
-// surface wraps the dialog's rows in the styled panel.
+// requester is the row naming the app that asks: its icon and name.
+func (h *Dialogs) requester() widget.Widget {
+	row := widget.NewBox(widget.Row, 6, 0)
+	row.AddClass("portal-dialog-requester-row")
+	if icon := h.icon(h.appIcon, 16); icon != nil {
+		row.Append(icon, false)
+	}
+	l := h.label(h.app, "portal-dialog-requester")
+	l.SetWrap(false)
+	row.Append(l, false)
+	return row
+}
+
+// surface wraps the dialog's rows in the styled panel, under the row
+// naming the requester.
 func (h *Dialogs) surface(rows ...widget.Widget) widget.Widget {
 	box := widget.NewBox(widget.Column, 12, 0)
 	box.AddClass("portal-dialog-surface")
+	box.Append(h.requester(), false)
 	for _, r := range rows {
 		if r != nil {
 			box.Append(r, false)
@@ -371,7 +392,7 @@ func (h *Dialogs) show(tree widget.Widget) {
 	})
 	if err != nil {
 		log.Printf("portal dialogs: cannot map the overlay: %v", err)
-		h.settle(false, "")
+		h.finish(false, "")
 		return
 	}
 	h.win = win

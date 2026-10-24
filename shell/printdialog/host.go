@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
@@ -66,15 +67,17 @@ type prepared struct {
 	form    form
 }
 
-// Dialog is the dev.stubbe.lys.Print1 host. Prepare and Print may be called
-// from any goroutine; the UI runs on the loop.
+// Dialog is the dev.stubbe.lys.Print1 host: one dialog showing one
+// request; requests arriving meanwhile wait their turn, and dismissing
+// a request cancels it, showing or waiting. Prepare and Print may be
+// called from any goroutine; the UI runs on the loop.
 type Dialog struct {
 	d       Deps
 	win     Window
 	rev     *widget.Revealer
 	closing bool
 	answer  func(p prepared, ok bool)
-	handle  string
+	queue   dialogqueue.Queue
 
 	mu   sync.Mutex
 	jobs map[uint32]prepared
@@ -92,16 +95,17 @@ func (h *Dialog) Prepare(c portalreq.Caller, title string) (bool, []Setting, uin
 		p  prepared
 		ok bool
 	}, 1)
+	reply := func(p prepared, ok bool) {
+		ch <- struct {
+			p  prepared
+			ok bool
+		}{p, ok}
+	}
 	h.d.Invoke(func() {
-		h.settle(prepared{}, false)
-		h.answer = func(p prepared, ok bool) {
-			ch <- struct {
-				p  prepared
-				ok bool
-			}{p, ok}
-		}
-		h.handle = c.Handle
-		h.show(h.build(queues))
+		h.queue.Enqueue(c.Handle, func() {
+			h.answer = reply
+			h.show(h.build(queues))
+		}, func() { reply(prepared{}, false) })
 	})
 	r := <-ch
 	if !r.ok {
@@ -115,11 +119,12 @@ func (h *Dialog) Prepare(c portalreq.Caller, title string) (bool, []Setting, uin
 	return true, r.p.form.settings(r.p.printer), token
 }
 
-// Dismiss cancels, and takes down, the dialog showing for the request
-// at handle; another request's dialog stays.
+// Dismiss cancels the request at handle: the dialog showing for it is
+// taken down, a waiting one never shows. Another request's dialog
+// stays.
 func (h *Dialog) Dismiss(handle string) {
 	h.d.Invoke(func() {
-		if h.answer != nil && handle != "" && h.handle == handle {
+		if h.queue.Dismiss(handle) {
 			h.finish(prepared{}, false)
 		}
 	})
@@ -184,19 +189,17 @@ func (h *Dialog) queues() []queue {
 	return append(out, queue{fileQueue, ""})
 }
 
-// settle answers the open request, if any.
-func (h *Dialog) settle(p prepared, ok bool) {
-	if h.answer != nil {
-		answer := h.answer
-		h.answer, h.handle = nil, ""
-		answer(p, ok)
-	}
-}
-
-// finish answers and plays the exit.
+// finish answers the request showing, plays the exit, and shows the
+// next request waiting.
 func (h *Dialog) finish(p prepared, ok bool) {
-	h.settle(p, ok)
+	if h.answer == nil {
+		return
+	}
+	answer := h.answer
+	h.answer = nil
+	answer(p, ok)
 	h.hide()
+	h.queue.Done()
 }
 
 func (h *Dialog) label(text, class string) *widget.Label {
@@ -348,7 +351,7 @@ func (h *Dialog) show(tree widget.Widget) {
 	})
 	if err != nil {
 		log.Printf("print: cannot map the overlay: %v", err)
-		h.settle(prepared{}, false)
+		h.finish(prepared{}, false)
 		return
 	}
 	h.win = win

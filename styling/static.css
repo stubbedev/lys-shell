@@ -7136,6 +7136,13 @@ button.file-chooser-filter:checked {
   color: var(--fg-muted);
 }
 
+.portal-dialog-requester,
+.share-picker-requester {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-muted);
+}
+
 .portal-dialog-app-list,
 .file-chooser-list,
 .print-printer-list {

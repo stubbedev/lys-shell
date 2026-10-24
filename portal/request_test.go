@@ -174,7 +174,7 @@ func TestRequestCloseDismissesEveryDialog(t *testing.T) {
 				done <- c
 			}()
 			g.waitOpen(t, handle)
-			if got := g.callers.Load(); len(got) != 1 || got[0] != (portalreq.Caller{Handle: string(handle), AppID: "org.app"}) {
+			if got := g.callers.Load(); len(got) != 1 || got[0] != (portalreq.Caller{Handle: string(handle), AppID: "org.app", Modal: true}) {
 				t.Errorf("the shell was told %+v", got)
 			}
 			req := r.client.Object(BusName, handle)
