@@ -2,14 +2,19 @@ package portal
 
 import (
 	"log"
+	"os"
 	"os/exec"
 )
 
-// detach starts argv with its output discarded and reaps it on a
+// detach starts argv with env ("KEY=value" entries) added to the
+// portal's environment, its output discarded, and reaps it on a
 // goroutine: the portal never waits on the program it hands off to (a
 // mail client, a URI handler). The error is a failure to start.
-func detach(argv []string) error {
+func detach(argv, env []string) error {
 	cmd := exec.Command(argv[0], argv[1:]...) //nolint:gosec // fixed programs; the arguments are the request's own
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}

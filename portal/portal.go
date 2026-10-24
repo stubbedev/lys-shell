@@ -30,7 +30,7 @@ type Backend struct {
 	sessions *sessions
 	// spawn starts a program the portal hands off to (detach; a
 	// recorder in tests).
-	spawn func(argv []string) error
+	spawn func(argv, env []string) error
 	// inhibitLock takes a logind lock (logindLock; a fake in tests).
 	inhibitLock func(what string) (*os.File, error)
 	notifier    *notifier

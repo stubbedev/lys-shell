@@ -1,10 +1,6 @@
 package portal
 
 import (
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -13,34 +9,52 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
-// email is org.freedesktop.impl.portal.Email (email.rs): the user's
-// mail client opens a pre-filled compose window, through `xdg-email
-// --attach` when there are attachments and a mailto: URI handed to
-// xdg-open otherwise (or when xdg-email will not start).
-type email struct{ spawn func([]string) error }
+// email is org.freedesktop.impl.portal.Email: the user's mail client
+// opens a pre-filled compose window, through `xdg-email --attach` when
+// there are attachments and a mailto: URI handed to xdg-open otherwise.
+// The frontend turns the app's attachment_fds into the attachments
+// list of paths it passes here; a mail client that cannot take them is
+// a failure, never a compose window silently missing the files.
+type email struct {
+	spawn func(argv, env []string) error
+}
 
-func emailIface(spawn func([]string) error) dbusx.Interface {
+func emailIface(spawn func(argv, env []string) error) dbusx.Interface {
 	return dbusx.Interface{
-		Name:       "org.freedesktop.impl.portal.Email",
-		Methods:    email{spawn},
-		Properties: dbusx.Getters{"version": func() any { return uint32(3) }},
+		Name:    "org.freedesktop.impl.portal.Email",
+		Methods: email{spawn},
 	}
 }
 
 // ComposeEmail opens the compose window.
 func (e email) ComposeEmail(_ dbus.ObjectPath, _, _ string, options Vardict) (uint32, Vardict, *dbus.Error) {
-	if attachments := copyAttachments(options); len(attachments) > 0 {
-		err := e.spawn(xdgEmailArgv(options, attachments))
-		if err == nil {
-			return ResponseSuccess, Vardict{}, nil
-		}
-		warnf("email: xdg-email failed, falling back to mailto (attachments dropped): %v", err)
+	var env []string
+	if token, ok := optString(options, "activation_token"); ok && token != "" {
+		env = []string{"XDG_ACTIVATION_TOKEN=" + token}
 	}
-	if err := e.spawn([]string{"xdg-open", mailto(options)}); err != nil {
-		warnf("email: cannot launch xdg-open: %v", err)
+	argv := []string{"xdg-open", mailto(options)}
+	if attachments := attachmentPaths(options); len(attachments) > 0 {
+		argv = xdgEmailArgv(options, attachments)
+	}
+	if err := e.spawn(argv, env); err != nil {
+		warnf("email: cannot launch %s: %v", argv[0], err)
 		return ResponseOther, Vardict{}, nil
 	}
 	return ResponseSuccess, Vardict{}, nil
+}
+
+// attachmentPaths reads the attachments option: paths, or file:// URIs
+// as the interface describes them.
+func attachmentPaths(options Vardict) []string {
+	list := stringList(options, "attachments")
+	paths := make([]string, 0, len(list))
+	for _, a := range list {
+		if path, ok := fileuri.Path(a); ok {
+			a = path
+		}
+		paths = append(paths, a)
+	}
+	return paths
 }
 
 // recipients is the addresses list plus the single address.
@@ -97,36 +111,4 @@ func mailto(options Vardict) string {
 func stringList(options Vardict, key string) []string {
 	list, _ := options[key].Value().([]string)
 	return list
-}
-
-// copyAttachments copies each attachment_fds fd into a temp file and
-// returns the paths: the fds are only valid during the call, and the
-// files are left for the mail client to read.
-func copyAttachments(options Vardict) []string {
-	fds, _ := options["attachment_fds"].Value().([]dbus.UnixFD)
-	var paths []string
-	for i, fd := range fds {
-		path := filepath.Join(os.TempDir(), fmt.Sprintf("lys-shell-email-%d-%d", os.Getpid(), i))
-		if err := copyFd(fd, path); err != nil {
-			warnf("email: attachment %d: %v", i, err)
-			continue
-		}
-		paths = append(paths, path)
-	}
-	return paths
-}
-
-func copyFd(fd dbus.UnixFD, path string) error {
-	src := os.NewFile(uintptr(fd), "attachment")
-	defer func() { _ = src.Close() }()
-	_, _ = src.Seek(0, io.SeekStart)
-	dst, err := os.Create(path) //nolint:gosec // a fixed temp name
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(dst, src)
-	if cerr := dst.Close(); err == nil {
-		err = cerr
-	}
-	return err
 }
