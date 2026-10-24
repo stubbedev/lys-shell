@@ -197,9 +197,12 @@ func pending(t *testing.T, got chan []string) {
 	}
 }
 
+// click finds the named button as the loop, which owns the tree a
+// listing may be rebuilding, and clicks it.
 func (hs *harness) click(t *testing.T, name string) {
 	t.Helper()
-	b := treetest.Button(t, hs.cfg.Root, name)
+	var b *widget.Button
+	hs.run(func() { b = treetest.Button(t, hs.cfg.Root, name) })
 	hs.do(b.OnClick)
 }
 
@@ -234,7 +237,9 @@ func TestOpenAnswersTheSelectedFile(t *testing.T) {
 	if hs.cfg.Layer != app.LayerOverlay || hs.cfg.Namespace != "lys-shell-file-chooser" || hs.cfg.Keyboard != app.KeyboardExclusive {
 		t.Errorf("surface = %+v", hs.cfg)
 	}
-	if l := treetest.Labels(hs.cfg.Root); !slices.Contains(l, "Pick one") {
+	var l []string
+	hs.run(func() { l = treetest.Labels(hs.cfg.Root) })
+	if !slices.Contains(l, "Pick one") {
 		t.Errorf("no title in %q", l)
 	}
 	if got := hs.shown(); !slices.Equal(got, []string{"docs", "pics", "a.png", "b.txt"}) {
@@ -278,10 +283,12 @@ func TestActivatingAFileOpensItAndAFolderEntersIt(t *testing.T) {
 	if got := hs.shown(); !slices.Equal(got, []string{"a.png"}) {
 		t.Fatalf("after entering pics = %v", got)
 	}
-	crumbs := treetest.WithClass(hs.cfg.Root, "file-chooser-crumb")
-	if last := crumbs[len(crumbs)-1]; widget.Describe(last).Name != "pics" || !widget.HasClass(last, "current") {
-		t.Errorf("last crumb = %q, want the current pics", widget.Describe(last).Name)
-	}
+	hs.run(func() {
+		crumbs := treetest.WithClass(hs.cfg.Root, "file-chooser-crumb")
+		if last := crumbs[len(crumbs)-1]; widget.Describe(last).Name != "pics" || !widget.HasClass(last, "current") {
+			t.Errorf("last crumb = %q, want the current pics", widget.Describe(last).Name)
+		}
+	})
 	// One gesture's later activations index the listing that is gone.
 	hs.do(func() {
 		hs.c.activate(0)
@@ -1276,7 +1283,7 @@ func TestTypeAheadAndLocation(t *testing.T) {
 func TestCreateFolder(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
-	if !hasButton(hs.cfg.Root, "Create Folder") {
+	if !hs.hasButton("Create Folder") {
 		t.Error("a save offers no Create Folder")
 	}
 	hs.do(func() { hs.c.showNewFolder(); hs.c.ui.newFolderName.SetText("Invoices") })
@@ -1308,7 +1315,7 @@ func TestCreateFolder(t *testing.T) {
 	hs.click(t, "Cancel")
 	answer(t, got)
 	got = hs.open(t, OpenRequest{})
-	if hasButton(hs.cfg.Root, "Create Folder") {
+	if hs.hasButton("Create Folder") {
 		t.Error("an open dialog offers Create Folder")
 	}
 	hs.click(t, "Cancel")
@@ -1316,13 +1323,15 @@ func TestCreateFolder(t *testing.T) {
 }
 
 // hasButton reports a button named name (its label or tooltip) in
-// the tree.
-func hasButton(root widget.Widget, name string) bool {
+// the chooser's tree, walked as the loop.
+func (hs *harness) hasButton(name string) bool {
 	found := false
-	treetest.Walk(root, func(w widget.Widget) {
-		if _, ok := w.(*widget.Button); ok && widget.Describe(w).Name == name {
-			found = true
-		}
+	hs.run(func() {
+		treetest.Walk(hs.cfg.Root, func(w widget.Widget) {
+			if _, ok := w.(*widget.Button); ok && widget.Describe(w).Name == name {
+				found = true
+			}
+		})
 	})
 	return found
 }
@@ -1338,7 +1347,7 @@ func TestRecentAndListingErrors(t *testing.T) {
 	}
 	hs.c.d.RecentFile = recent
 	got := hs.open(t, OpenRequest{})
-	if !hasButton(hs.cfg.Root, "Recent") {
+	if !hs.hasButton("Recent") {
 		t.Fatal("no Recent place")
 	}
 	hs.do(func() { hs.c.goTo(recentLocation) })
@@ -1364,7 +1373,7 @@ func TestRecentAndListingErrors(t *testing.T) {
 	hs.click(t, "Cancel")
 	answer(t, got)
 	got = hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
-	if hasButton(hs.cfg.Root, "Recent") {
+	if hs.hasButton("Recent") {
 		t.Error("a save offers Recent")
 	}
 	hs.click(t, "Cancel")
@@ -1380,7 +1389,7 @@ func TestTrashPlace(t *testing.T) {
 	trashed := writeTrashed(t, trash, "notes.txt.2", trashInfo("/home/u/notes.txt"))
 	hs.c.d.TrashDirs = func() []string { return []string{trash} }
 	got := hs.open(t, OpenRequest{})
-	if !hasButton(hs.cfg.Root, "Trash") {
+	if !hs.hasButton("Trash") {
 		t.Fatal("no Trash place")
 	}
 	hs.do(func() { hs.c.goTo(trashLocation) })
@@ -1399,13 +1408,13 @@ func TestTrashPlace(t *testing.T) {
 	}
 
 	got = hs.ask(t, func() []string { return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root}).URIs })
-	if hasButton(hs.cfg.Root, "Trash") {
+	if hs.hasButton("Trash") {
 		t.Error("a save offers Trash")
 	}
 	hs.click(t, "Cancel")
 	answer(t, got)
 	got = hs.open(t, OpenRequest{Directory: true})
-	if hasButton(hs.cfg.Root, "Trash") {
+	if hs.hasButton("Trash") {
 		t.Error("a folder pick offers Trash")
 	}
 	hs.click(t, "Cancel")
@@ -1466,13 +1475,13 @@ func TestLocationsFollowTheMounts(t *testing.T) {
 		return func() { stopped++ }
 	}
 	got := hs.open(t, OpenRequest{})
-	if hasButton(hs.cfg.Root, "USB stick") {
+	if hs.hasButton("USB stick") {
 		t.Fatal("a mount listed before it came")
 	}
 	locations = append(locations, Place{"USB stick", "/run/media/u/stick", "drive-removable-media-symbolic"})
 	changed()
 	hs.settle()
-	if !hasButton(hs.cfg.Root, "USB stick") {
+	if !hs.hasButton("USB stick") {
 		t.Error("the new mount was not listed")
 	}
 	hs.click(t, "Cancel")
