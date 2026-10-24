@@ -1,14 +1,15 @@
 package bar
 
 import (
+	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/internal/useraccount"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 )
 
@@ -47,13 +48,18 @@ func sessionUsername() string {
 	return "user"
 }
 
-// facePath is ~/.face; empty without $HOME.
+// currentAccount is the user the dashboard shows (a seam for tests).
+var currentAccount = useraccount.Current
+
+// facePath is the user's avatar (the AccountsService icon, else
+// ~/.face), looked up afresh; "" for none.
 func facePath() string {
-	home := os.Getenv("HOME")
-	if home == "" {
+	acct, err := currentAccount()
+	if err != nil {
+		log.Printf("dashboard: %v", err)
 		return ""
 	}
-	return filepath.Join(home, ".face")
+	return useraccount.FindAvatar(acct.Name, acct.Home)
 }
 
 // setAvatar paints the face onto the tile as its background image —
@@ -65,15 +71,12 @@ func setAvatar(tile *widget.Box) {
 	if path == "" {
 		return
 	}
-	if _, err := os.Stat(path); err != nil {
-		return
-	}
 	tile.SetInlineStylePriority("background-image: url('"+path+"');", apptheme.ComponentPriority)
 }
 
 // userSessionSection is the dashboard's user-session card
 // (user_session/mod.rs): the card over the session row — the avatar
-// (~/.face, else the user glyph) and the username in .user-info, one
+// (the account's avatar, else the user glyph) and the username in .user-info, one
 // icon button per configured action in .session-actions pinned to the
 // row's end. The face is read when the dropdown opens, which is when
 // the Rust watcher's change would next be seen. The stylesheet inks

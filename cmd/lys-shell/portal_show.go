@@ -121,7 +121,8 @@ var showAccess = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string
 })
 
 var showAccount = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
-	shared, err := portaldialogs.NewClient(conn).Account(ctx, portalreq.Caller{}, "This is a preview of the account-sharing consent prompt.")
+	shared, _, err := portaldialogs.NewClient(conn).Account(ctx, portalreq.Caller{}, "This is a preview of the account-sharing consent prompt.",
+		portaldialogs.AccountInfo{Name: "Preview User"})
 	return verdict(shared, "shared", "declined"), "Account", "show account prompt", err
 })
 

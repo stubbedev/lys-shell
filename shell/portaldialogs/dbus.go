@@ -31,14 +31,19 @@ type AccessRequest struct {
 	Choices []portalreq.Choice
 }
 
+// AccountInfo is what the Account dialog shares, (ss): the name and an
+// avatar image path ("" for none).
+type AccountInfo struct{ Name, Image string }
+
 // Host shows the dialogs; each call blocks until the user answers or
 // the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
 	// Access replies whether the user granted and, when granted, what
 	// they picked for each choice.
 	Access(portalreq.Caller, AccessRequest) (bool, []portalreq.Selection)
-	// Account replies whether the user shares their account info.
-	Account(c portalreq.Caller, reason string) bool
+	// Account offers info for sharing and replies whether the user
+	// shares it, and what they left of it after editing.
+	Account(c portalreq.Caller, reason string, info AccountInfo) (bool, AccountInfo)
 	// ConfirmWallpaper previews a file:// image and replies whether to
 	// set it.
 	ConfirmWallpaper(c portalreq.Caller, uri string) bool
@@ -74,8 +79,9 @@ func (d *Daemon) Access(c portalreq.Caller, title, subtitle, body, grantLabel, d
 }
 
 // Account is the account-info consent.
-func (d *Daemon) Account(c portalreq.Caller, reason string) (bool, *dbus.Error) {
-	return d.host.Account(c, reason), nil
+func (d *Daemon) Account(c portalreq.Caller, reason string, info AccountInfo) (bool, AccountInfo, *dbus.Error) {
+	shared, edited := d.host.Account(c, reason, info)
+	return shared, edited, nil
 }
 
 // ConfirmWallpaper is the wallpaper preview confirmation.
@@ -120,10 +126,10 @@ func (c *Client) Access(ctx context.Context, caller portalreq.Caller, r AccessRe
 	return granted, picked, err
 }
 
-// Account asks to share the account info.
-func (c *Client) Account(ctx context.Context, caller portalreq.Caller, reason string) (shared bool, err error) {
-	err = c.call(ctx, "Account", &shared, caller, reason)
-	return shared, err
+// Account asks to share info, which the user may edit first.
+func (c *Client) Account(ctx context.Context, caller portalreq.Caller, reason string, info AccountInfo) (shared bool, edited AccountInfo, err error) {
+	err = c.obj.CallWithContext(ctx, iface+".Account", 0, caller, reason, info).Store(&shared, &edited)
+	return shared, edited, err
 }
 
 // ConfirmWallpaper previews uri and asks to set it.

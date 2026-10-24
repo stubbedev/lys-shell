@@ -160,18 +160,6 @@ func TestParsePasswd(t *testing.T) {
 	}
 }
 
-func TestFindAvatar(t *testing.T) {
-	home := t.TempDir()
-	if findAvatar("lys-shell-no-such-user", home) != "" {
-		t.Error("an avatar found where none exists")
-	}
-	face := filepath.Join(home, ".face")
-	_ = os.WriteFile(face, []byte("x"), 0o600)
-	if got := findAvatar("lys-shell-no-such-user", home); got != face {
-		t.Errorf("~/.face = %q", got)
-	}
-}
-
 func TestCursorParsers(t *testing.T) {
 	c, sources := parseHyprland("monitor=,preferred,auto,1\nenv = XCURSOR_THEME,Bibata-Modern-Ice # my cursor\nenv=XCURSOR_SIZE,20\nsource = ~/.config/hypr/extra.conf\n")
 	if c != (Cursor{"Bibata-Modern-Ice", 20}) || !reflect.DeepEqual(sources, []string{"~/.config/hypr/extra.conf"}) {

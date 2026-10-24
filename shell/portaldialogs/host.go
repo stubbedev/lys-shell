@@ -2,7 +2,6 @@ package portaldialogs
 
 import (
 	"log"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -48,10 +47,13 @@ type Deps struct {
 	Sheet *widget.Stylesheet
 	// Candidates are the apps offered for a type (desktopentry's
 	// RecommendedFor, else every app); SetDefault records the
-	// "always use" choice. Avatar is the ~/.face path, "" for none.
+	// "always use" choice.
 	Candidates func(choices []string, contentType string) []desktopentry.App
 	SetDefault func(id, contentType string) error
-	Avatar     func() string
+	// PickImage lets the user choose an image file (the shell's file
+	// chooser) and calls chosen with its path on the loop; never on a
+	// cancel. It returns at once.
+	PickImage func(chosen func(path string))
 	// Describe names the app a request comes from: its display name
 	// and icon (desktopentry.Describe).
 	Describe func(appID string) (name, icon string)
@@ -186,14 +188,53 @@ func (h *Dialogs) choices(choices []portalreq.Choice) ([]widget.Widget, func() [
 }
 
 // Account asks to share the user's name and avatar, previewing it.
-func (h *Dialogs) Account(c portalreq.Caller, reason string) bool {
+func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (bool, AccountInfo) {
+	shared := info
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		if reason == "" {
 			reason = "An application is requesting your name and avatar."
 		}
-		return h.confirm(answer, h.headerFile(h.d.Avatar(), headerPx), "Share account information?", reason, "Cancel", "Share")
+		picture := widget.NewBox(widget.Column, 0, 0)
+		var image string
+		setImage := func(path string) {
+			image = path
+			picture.Clear()
+			if header := h.headerFile(path, headerPx); header != nil {
+				picture.Append(header, false)
+			} else {
+				picture.Append(h.headerIcon("avatar-default-symbolic"), false)
+			}
+		}
+		setImage(info.Image)
+		name := widget.NewEntry(h.d.Font, 13, 0)
+		name.AddClass("portal-dialog-entry")
+		name.SetText(info.Name)
+		choose := h.button("Choose picture…", "portal-dialog-picture", func() {
+			if h.d.PickImage != nil {
+				h.d.PickImage(setImage)
+			}
+		})
+		remove := h.button("Remove picture", "portal-dialog-picture", func() { setImage("") })
+		share := func(ok bool, s string) {
+			if ok {
+				shared = AccountInfo{Name: strings.TrimSpace(name.Text()), Image: image}
+				if shared.Name == "" {
+					shared.Name = info.Name
+				}
+			}
+			answer(ok, s)
+		}
+		pictureRow := widget.NewBox(widget.Row, 8, 0)
+		pictureRow.Append(widget.NewSpacer(0, 0), true)
+		pictureRow.Append(choose, false)
+		pictureRow.Append(remove, false)
+		pictureRow.Append(widget.NewSpacer(0, 0), true)
+		return h.confirm(share, picture, "Share account information?", reason, "Cancel", "Share", name, pictureRow)
 	})
-	return ok
+	if !ok {
+		return false, AccountInfo{}
+	}
+	return true, shared
 }
 
 // ConfirmWallpaper previews a file:// image before it is set.
@@ -493,17 +534,4 @@ func CandidateApps(choices []string, contentType string) []desktopentry.App {
 		}
 	}
 	return all
-}
-
-// LocalAvatar is ~/.face when it exists.
-func LocalAvatar() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	face := filepath.Join(home, ".face")
-	if _, err := os.Stat(face); err != nil {
-		return ""
-	}
-	return face
 }

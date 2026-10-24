@@ -33,7 +33,10 @@ func (f *fakeHost) Access(c portalreq.Caller, r AccessRequest) (bool, []portalre
 	return true, []portalreq.Selection{{ID: "picked", Value: "x"}}
 }
 
-func (f *fakeHost) Account(c portalreq.Caller, reason string) bool { f.record(c, reason); return f.yes }
+func (f *fakeHost) Account(c portalreq.Caller, reason string, info AccountInfo) (bool, AccountInfo) {
+	f.record(c, reason, info)
+	return f.yes, AccountInfo{Name: info.Name + " (edited)", Image: info.Image}
+}
 
 func (f *fakeHost) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	f.record(c, uri)
@@ -72,8 +75,9 @@ func TestDialogsRoundTrip(t *testing.T) {
 		if yes && !reflect.DeepEqual(picked, []portalreq.Selection{{ID: "picked", Value: "x"}}) || !yes && len(picked) != 0 {
 			t.Errorf("Access picked %v", picked)
 		}
-		if got, err := c.Account(ctx, caller, "why"); err != nil || got != yes || host.asked.Load()[0] != "why" {
-			t.Errorf("Account = %v, %v", got, err)
+		got, edited, err := c.Account(ctx, caller, "why", AccountInfo{Name: "Ada", Image: "/a.png"})
+		if err != nil || got != yes || host.asked.Load()[0] != "why" || edited != (AccountInfo{Name: "Ada (edited)", Image: "/a.png"}) {
+			t.Errorf("Account = %v, %+v, %v", got, edited, err)
 		}
 		if got, err := c.ConfirmWallpaper(ctx, caller, "file:///a.png"); err != nil || got != yes {
 			t.Errorf("ConfirmWallpaper = %v, %v", got, err)

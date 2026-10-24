@@ -332,11 +332,13 @@ func (f *fakeWallpaperd) SetWallpaper(path, monitor string) *dbus.Error {
 	return nil
 }
 
-// fakeDialogs answers every dialog with yes or no.
+// fakeDialogs answers every dialog with yes or no; edit, when set, is
+// what the user changed the account info to.
 type fakeDialogs struct {
 	gate
 	yes   dbustest.Var[bool]
 	asked dbustest.Var[[]any]
+	edit  dbustest.Var[*portaldialogs.AccountInfo]
 }
 
 // answer records a dialog and gives the configured verdict, no when
@@ -357,7 +359,15 @@ func (f *fakeDialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) 
 	return true, picked
 }
 
-func (f *fakeDialogs) Account(c portalreq.Caller, reason string) bool { return f.answer(c, reason) }
+func (f *fakeDialogs) Account(c portalreq.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
+	if !f.answer(c, reason, info) {
+		return false, portaldialogs.AccountInfo{}
+	}
+	if edit := f.edit.Load(); edit != nil {
+		return true, *edit
+	}
+	return true, info
+}
 
 func (f *fakeDialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 	return f.answer(c, uri)

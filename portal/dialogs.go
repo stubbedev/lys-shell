@@ -1,14 +1,11 @@
 package portal
 
 import (
-	"os"
-	"os/user"
-	"path/filepath"
-	"strconv"
-
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/useraccount"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
@@ -73,49 +70,30 @@ func (a accessMethods) AccessDialog(handle dbus.ObjectPath, appID, parent, title
 // accountMethods is org.freedesktop.impl.portal.Account (account.rs).
 type accountMethods struct{ dialogs }
 
-// GetUserInformation returns the user's id, real name and avatar once
-// they agree to share them.
+// GetUserInformation offers the user's login name, real name and
+// avatar for sharing; the user may edit the name and the picture
+// first. The id is always the passwd login name.
 func (a accountMethods) GetUserInformation(handle dbus.ObjectPath, appID, parent string, options Vardict) (uint32, Vardict, *dbus.Error) {
+	acct, err := useraccount.Current()
+	if err != nil {
+		warnf("account: %v", err)
+		return ResponseOther, Vardict{}, nil
+	}
 	client := a.client()
 	c, ok := beginOr(a.conn, handle, appID, parent, client.Dismiss)
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
-	shared, err := client.Account(c.ctx, c.caller, stringOr(options, "reason", ""))
+	shared, info, err := client.Account(c.ctx, c.caller, stringOr(options, "reason", ""), portaldialogs.AccountInfo{Name: acct.RealName, Image: acct.Avatar})
 	if code := c.response("account", shared, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
-	info := currentUser()
-	results := Vardict{"id": dbus.MakeVariant(info.id), "name": dbus.MakeVariant(info.name)}
-	if info.image != "" {
-		results["image"] = dbus.MakeVariant(info.image)
+	results := Vardict{"id": dbus.MakeVariant(acct.Name), "name": dbus.MakeVariant(info.Name)}
+	if info.Image != "" {
+		results["image"] = dbus.MakeVariant(fileuri.FromPath(info.Image))
 	}
 	return ResponseSuccess, results, nil
-}
-
-type userInfo struct{ id, name, image string }
-
-// currentUser is $USER (else the passwd login), the GECOS real name
-// (else the id), and ~/.face as a file:// URI when it exists.
-func currentUser() userInfo {
-	info := userInfo{id: os.Getenv("USER")}
-	if u, err := user.LookupId(strconv.Itoa(os.Getuid())); err == nil {
-		if info.id == "" {
-			info.id = u.Username
-		}
-		info.name = u.Name
-	}
-	if info.name == "" {
-		info.name = info.id
-	}
-	if home, ok := os.LookupEnv("HOME"); ok {
-		face := filepath.Join(home, ".face")
-		if _, err := os.Stat(face); err == nil {
-			info.image = "file://" + face
-		}
-	}
-	return info
 }
 
 // appChooserMethods is org.freedesktop.impl.portal.AppChooser

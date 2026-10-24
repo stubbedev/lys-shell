@@ -34,6 +34,8 @@ type harness struct {
 	windows  []*fakeWindow
 	openErr  error
 	defaults []string
+	// picked is the picture the file chooser answers, "" for a cancel.
+	picked string
 }
 
 func newHarness(t *testing.T, apps []desktopentry.App) *harness {
@@ -64,7 +66,14 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 			hs.defaults = append(hs.defaults, id+"="+mime)
 			return nil
 		},
-		Avatar: func() string { return "" },
+		PickImage: func(chosen func(string)) {
+			hs.mu.Lock()
+			picked := hs.picked
+			hs.mu.Unlock()
+			if picked != "" {
+				chosen(picked)
+			}
+		},
 		Describe: func(appID string) (string, string) {
 			if appID == "" {
 				return "An application", ""
@@ -150,7 +159,10 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 		t.Errorf("labels = %q", l)
 	}
 	second := make(chan bool, 1)
-	go func() { second <- hs.h.Account(portalreq.Caller{Handle: "/r/2", AppID: "org.two"}, "") }()
+	go func() {
+		ok, _ := hs.h.Account(portalreq.Caller{Handle: "/r/2", AppID: "org.two"}, "", AccountInfo{Name: "Ada"})
+		second <- ok
+	}()
 	select {
 	case r := <-first:
 		t.Fatalf("a second request answered the first %v", r)
@@ -449,5 +461,55 @@ func TestAccessChoices(t *testing.T) {
 		if !r.ok || !slices.Equal(r.picked, want) {
 			t.Errorf("grant = %+v, want %+v", r, want)
 		}
+	}
+}
+
+// The account dialog offers the name and picture for editing: the
+// shared info is what the user left, a removed picture is none, a
+// chosen one replaces it, and a cleared name keeps the original.
+func TestAccountEditsBeforeSharing(t *testing.T) {
+	hs := newHarness(t, nil)
+	type answer struct {
+		ok   bool
+		info AccountInfo
+	}
+	run := func(edit func(c app.LayerConfig)) answer {
+		t.Helper()
+		got := make(chan answer, 1)
+		go func() {
+			ok, info := hs.h.Account(portalreq.Caller{Handle: "/r/a", AppID: "org.app"}, "why", AccountInfo{Name: "Ada Lovelace", Image: "/home/ada/.face"})
+			got <- answer{ok, info}
+		}()
+		c := hs.open(t)
+		edit(c)
+		hs.do(func() { treetest.Button(t, c.Root, "Share").OnClick() })
+		return <-got
+	}
+	entry := func(c app.LayerConfig) *widget.Entry { return treetest.First[*widget.Entry](t, c.Root) }
+
+	r := run(func(c app.LayerConfig) {
+		if e := entry(c); e.Text() != "Ada Lovelace" {
+			t.Errorf("name entry = %q", e.Text())
+		}
+		hs.do(func() {
+			entry(c).SetText("  Ada  ")
+			treetest.Button(t, c.Root, "Remove picture").OnClick()
+		})
+	})
+	if !r.ok || r.info != (AccountInfo{Name: "Ada"}) {
+		t.Errorf("edited = %+v", r)
+	}
+	hs.mu.Lock()
+	hs.picked = "/pics/cat.png"
+	hs.mu.Unlock()
+	r = run(func(c app.LayerConfig) {
+		hs.do(func() {
+			entry(c).SetText("")
+			treetest.Button(t, c.Root, "Remove picture").OnClick()
+			treetest.Button(t, c.Root, "Choose picture…").OnClick()
+		})
+	})
+	if !r.ok || r.info != (AccountInfo{Name: "Ada Lovelace", Image: "/pics/cat.png"}) {
+		t.Errorf("chosen = %+v", r)
 	}
 }

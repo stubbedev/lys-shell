@@ -14,8 +14,10 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
@@ -35,24 +37,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		log.Printf("portal hosts: session bus: %v", err)
 		return
 	}
-	dialogs := portaldialogs.New(portaldialogs.Deps{
-		Config:     current,
-		Open:       layerOpener[portaldialogs.Window](application),
-		Invoke:     application.Invoke,
-		Font:       font,
-		Sheet:      sheet,
-		Candidates: portaldialogs.CandidateApps,
-		SetDefault: desktopentry.SetDefault,
-		Avatar:     portaldialogs.LocalAvatar,
-		Describe:   describeApp,
-	})
 	exported := 0
-	if _, err := portaldialogs.NewDaemon(dialogs).Export(conn); err != nil {
-		log.Printf("portal dialogs: daemon: %v", err)
-	} else {
-		exported++
-	}
-
 	home, _ := os.UserHomeDir()
 	viewFile := ""
 	if dir, ok := xdg.StateDir(); ok {
@@ -73,6 +58,22 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)
+	} else {
+		exported++
+	}
+	dialogs := portaldialogs.New(portaldialogs.Deps{
+		Config:     current,
+		Open:       layerOpener[portaldialogs.Window](application),
+		Invoke:     application.Invoke,
+		Font:       font,
+		Sheet:      sheet,
+		Candidates: portaldialogs.CandidateApps,
+		SetDefault: desktopentry.SetDefault,
+		PickImage:  func(chosen func(string)) { pickImage(application, chooser, chosen) },
+		Describe:   describeApp,
+	})
+	if _, err := portaldialogs.NewDaemon(dialogs).Export(conn); err != nil {
+		log.Printf("portal dialogs: daemon: %v", err)
 	} else {
 		exported++
 	}
@@ -116,6 +117,22 @@ func dialogOutput(outs []*app.Output, focused func() (string, bool)) (*app.Outpu
 		return nil, 0, 0, false
 	}
 	return pick(outs[0])
+}
+
+// pickImage lets the user choose a picture with the file chooser, for a
+// dialog that offers to change one, and hands the path to chosen on the
+// loop. The chooser waits on the user, so it runs off the loop.
+func pickImage(application *app.Application, chooser *filechooser.Chooser, chosen func(string)) {
+	images := filechooser.Filter{Name: "Images", Rules: []filechooser.Rule{{Kind: filechooser.RuleMIME, Value: "image/*"}}}
+	go func() {
+		uris := chooser.Open(portalreq.Caller{Modal: true}, filechooser.OpenRequest{Title: "Choose a picture", Filters: []filechooser.Filter{images}})
+		if len(uris) == 0 {
+			return
+		}
+		if path, ok := fileuri.Path(uris[0]); ok {
+			application.Invoke(func() { chosen(path) })
+		}
+	}()
 }
 
 // describeApp names the app a portal request comes from, from its

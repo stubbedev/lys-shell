@@ -185,6 +185,7 @@ func TestUserSessionSectionRendersConfiguredActions(t *testing.T) {
 func TestUserSessionUsesTheFaceImage(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	accountAt(t, home)
 	img := image.NewNRGBA(image.Rect(0, 0, 64, 48))
 	for i := range img.Pix {
 		img.Pix[i] = 0xff

@@ -2,9 +2,10 @@ package portal
 
 import (
 	"os"
-	"path/filepath"
+	"os/user"
 	"reflect"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -99,28 +100,36 @@ func TestAccessDialogChoicesRoundTrip(t *testing.T) {
 	}
 }
 
+// The account offered is the passwd entry's, whatever $USER says; what
+// is shared is what the user left after editing, with the picture as a
+// file:// URI, and none when they removed it.
 func TestAccountSharesTheUser(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USER", "ada")
+	want, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Skipf("uid not in the passwd file: %v", err)
+	}
+	t.Setenv("USER", "mallory")
 	r := newRig(t, nil)
 	d := serveDialogs(t, r, true)
 	_, res := r.interactive(t, userInfoCall, handle, "org.app", "", Vardict{"reason": dbus.MakeVariant("to greet you")})
-	if d.asked.Load()[0] != "to greet you" {
-		t.Errorf("reason = %v", d.asked.Load())
+	asked := d.asked.Load()
+	if asked[0] != "to greet you" {
+		t.Errorf("reason = %v", asked)
 	}
-	if res["id"].Value() != "ada" || res["name"].Value() == "" {
-		t.Errorf("results = %v", res)
+	if offered := asked[1].(portaldialogs.AccountInfo); offered.Name == "" {
+		t.Errorf("offered %+v, want the real name", offered)
 	}
-	if _, ok := res["image"]; ok {
-		t.Error("an image without ~/.face")
+	if res["id"].Value() != want.Username {
+		t.Errorf("id = %v, want the passwd login %s", res["id"], want.Username)
 	}
-	face := filepath.Join(home, ".face")
-	if err := os.WriteFile(face, nil, 0o600); err != nil {
-		t.Fatal(err)
+	d.edit.Store(&portaldialogs.AccountInfo{Name: "Ada", Image: "/pics/a b.png"})
+	_, res = r.interactive(t, userInfoCall, handle, "org.app", "", Vardict{})
+	if res["name"].Value() != "Ada" || res["image"].Value() != "file:///pics/a%20b.png" {
+		t.Errorf("edited results = %v", res)
 	}
-	if _, res = r.interactive(t, userInfoCall, handle, "org.app", "", Vardict{}); res["image"].Value() != "file://"+face {
-		t.Errorf("image = %v", res["image"])
+	d.edit.Store(&portaldialogs.AccountInfo{Name: "Ada"})
+	if _, res = r.interactive(t, userInfoCall, handle, "org.app", "", Vardict{}); res["image"] != (dbus.Variant{}) {
+		t.Errorf("a removed picture was shared: %v", res["image"])
 	}
 }
 

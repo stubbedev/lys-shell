@@ -45,9 +45,9 @@ func (f fakeDialogs) Access(_ portalreq.Caller, r portaldialogs.AccessRequest) (
 	return f.yes.Load(), nil
 }
 
-func (f fakeDialogs) Account(_ portalreq.Caller, reason string) bool {
+func (f fakeDialogs) Account(_ portalreq.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
 	f.got.Store([]any{reason})
-	return f.yes.Load()
+	return f.yes.Load(), info
 }
 
 func (f fakeDialogs) ConfirmWallpaper(_ portalreq.Caller, uri string) bool {

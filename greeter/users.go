@@ -2,10 +2,11 @@ package greeter
 
 import (
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-shell/internal/useraccount"
 )
 
 // uidMin and uidMax bound the regular-user range offered in the user
@@ -14,9 +15,6 @@ const (
 	uidMin = 1000
 	uidMax = 59999
 )
-
-// accountsServiceIcons is where gdm and sddm read avatars from.
-const accountsServiceIcons = "/var/lib/AccountsService/icons"
 
 // User is one login account offered in the user list (users.rs).
 type User struct {
@@ -35,7 +33,7 @@ func LoadUsers() []User {
 	data, _ := os.ReadFile("/etc/passwd")
 	users := parsePasswd(string(data))
 	for i := range users {
-		users[i].Icon = findAvatar(users[i].Name, users[i].Home)
+		users[i].Icon = useraccount.FindAvatar(users[i].Name, users[i].Home)
 	}
 	return users
 }
@@ -71,16 +69,4 @@ func parsePasswd(text string) []User {
 func isLoginShell(shell string) bool {
 	return shell != "" && !strings.HasSuffix(shell, "nologin") &&
 		!strings.HasSuffix(shell, "/false") && shell != "/bin/sync"
-}
-
-// findAvatar returns the first readable avatar: the AccountsService
-// icon, then ~/.face.
-func findAvatar(name, home string) string {
-	for _, candidate := range []string{filepath.Join(accountsServiceIcons, name), filepath.Join(home, ".face")} {
-		if f, err := os.Open(candidate); err == nil { //nolint:gosec // avatar lookup
-			_ = f.Close()
-			return candidate
-		}
-	}
-	return ""
 }

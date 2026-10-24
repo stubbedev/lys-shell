@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/useraccount"
 )
 
 // sessionCardTree walks the section into its named boxes and buttons.
@@ -172,6 +173,7 @@ func TestUserSessionAvatarTakesTheFaceAsItsBackground(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("USER", "lys-shell")
 	t.Setenv("HOME", home)
+	accountAt(t, home)
 	writeFace(t, home)
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
@@ -188,4 +190,14 @@ func TestUserSessionAvatarTakesTheFaceAsItsBackground(t *testing.T) {
 	if avatar.InlineStyle() != "" {
 		t.Errorf("without a face the tile carries %q", avatar.InlineStyle())
 	}
+}
+
+// accountAt makes the dashboard's user one whose home is home.
+func accountAt(t *testing.T, home string) {
+	t.Helper()
+	prev := currentAccount
+	currentAccount = func() (useraccount.Account, error) {
+		return useraccount.Account{Name: "lys-shell-test", RealName: "Test", Home: home}, nil
+	}
+	t.Cleanup(func() { currentAccount = prev })
 }
