@@ -4,7 +4,7 @@ layout: doc
 ---
  
 <div style="display: flex; gap: 16px; align-items: center;">
-<img src="/lys-shell.svg" alt="lys-shell settings GUI" style="float: left; width: 150px; height: auto;">
+<img src="/lys-shell.svg" alt="lys-shell logo" style="float: left; width: 150px; height: auto;">
 </div>
 
 
