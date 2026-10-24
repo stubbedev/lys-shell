@@ -69,14 +69,6 @@ func (t *fakeTxn) acctMgmt() int32 {
 	return t.f.acctRC
 }
 
-func (t *fakeTxn) setcred(flags int32) int32 {
-	t.f.calls = append(t.f.calls, "setcred")
-	if flags != pamDeleteCred {
-		t.f.calls = append(t.f.calls, "setcred-wrong-flags")
-	}
-	return 0
-}
-
 func (t *fakeTxn) end(status int32) {
 	t.f.calls = append(t.f.calls, "end")
 	t.f.endStatus = status
@@ -113,8 +105,8 @@ func newTestPAM(f *fakePAM, unlocked *[]string) *PAM {
 // TestPAMConversationHandling pins the conversation: an echo-off
 // prompt reaches the UI as a secret, text-info and error messages are
 // shown without failing the batch (answered NULL), the verified
-// password unlocks the keyring, and the transaction always ends with
-// setcred(DELETE_CRED) then pam_end.
+// password unlocks the keyring, and the transaction ends with pam_end
+// carrying the last status, setting no credentials.
 func TestPAMConversationHandling(t *testing.T) {
 	f := &fakePAM{
 		password: "hunter2",
@@ -147,8 +139,8 @@ func TestPAMConversationHandling(t *testing.T) {
 	if f.user != "alice" || f.service != "wayle" {
 		t.Errorf("transaction opened for %q on %q", f.user, f.service)
 	}
-	if got := strings.Join(f.calls, ","); got != "authenticate,acct_mgmt,setcred,end" {
-		t.Errorf("calls = %s", got)
+	if got := strings.Join(f.calls, ","); got != "authenticate,acct_mgmt,end" || f.endStatus != pamSuccess {
+		t.Errorf("calls = %s, end status %d", got, f.endStatus)
 	}
 	if len(unlocked) != 1 || unlocked[0] != "hunter2" {
 		t.Errorf("keyring unlocks = %q, want the verified password once", unlocked)
@@ -166,8 +158,8 @@ func TestPAMWrongPasswordFailsWithoutKeyring(t *testing.T) {
 	if len(unlocked) != 0 {
 		t.Error("a failed authentication unlocked the keyring")
 	}
-	if got := strings.Join(f.calls, ","); got != "authenticate,setcred,end" {
-		t.Errorf("calls = %s: a failure must still drop credentials and end", got)
+	if got := strings.Join(f.calls, ","); got != "authenticate,end" || f.endStatus != fakeAuthErr {
+		t.Errorf("calls = %s, end status %d: a failure ends with its status", got, f.endStatus)
 	}
 }
 
@@ -176,8 +168,11 @@ func TestPAMAccountCheckFailure(t *testing.T) {
 	var unlocked []string
 	var seen []Prompt
 	err := newTestPAM(f, &unlocked).Run("alice", answering("pw", &seen))
-	if err == nil || !strings.Contains(err.Error(), "expired") {
-		t.Fatalf("Run = %v, want the account failure", err)
+	if err == nil || err.Error() != "account check failed: User account has expired" {
+		t.Fatalf("Run = %v, want the account check failure", err)
+	}
+	if f.endStatus != fakeAcctErr {
+		t.Errorf("end status %d, want the account check's", f.endStatus)
 	}
 	if len(unlocked) != 0 {
 		t.Error("an expired account unlocked the keyring")

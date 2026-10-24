@@ -49,7 +49,6 @@ type libpam struct {
 	startConfdir func(service, user string, conv unsafe.Pointer, confdir string, pamh *uintptr) int32
 	authenticate func(pamh uintptr, flags int32) int32
 	acctMgmt     func(pamh uintptr, flags int32) int32
-	setcred      func(pamh uintptr, flags int32) int32
 	end          func(pamh uintptr, status int32) int32
 	strerror     func(pamh uintptr, code int32) string
 	calloc       func(n, size uintptr) unsafe.Pointer
@@ -83,7 +82,6 @@ func bindLibpam() (*libpam, error) {
 	purego.RegisterLibFunc(&l.start, pam, "pam_start")
 	purego.RegisterLibFunc(&l.authenticate, pam, "pam_authenticate")
 	purego.RegisterLibFunc(&l.acctMgmt, pam, "pam_acct_mgmt")
-	purego.RegisterLibFunc(&l.setcred, pam, "pam_setcred")
 	purego.RegisterLibFunc(&l.end, pam, "pam_end")
 	purego.RegisterLibFunc(&l.strerror, pam, "pam_strerror")
 	// pam_start_confdir (Linux-PAM 1.4+) is optional: only the tests
@@ -213,9 +211,8 @@ type systemTxn struct {
 	conv   unsafe.Pointer
 }
 
-func (t *systemTxn) authenticate() int32   { return t.l.authenticate(t.handle, 0) }
-func (t *systemTxn) acctMgmt() int32       { return t.l.acctMgmt(t.handle, 0) }
-func (t *systemTxn) setcred(f int32) int32 { return t.l.setcred(t.handle, f) }
+func (t *systemTxn) authenticate() int32 { return t.l.authenticate(t.handle, 0) }
+func (t *systemTxn) acctMgmt() int32     { return t.l.acctMgmt(t.handle, 0) }
 
 func (t *systemTxn) strerror(code int32) string { return t.l.strerror(t.handle, code) }
 

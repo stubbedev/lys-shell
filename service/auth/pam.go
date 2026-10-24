@@ -7,12 +7,11 @@ import (
 	"runtime"
 )
 
-// PAM return codes and flags the backend uses (security/_pam_types.h).
+// PAM return codes the backend uses (security/_pam_types.h).
 const (
-	pamSuccess    = 0
-	pamBufErr     = 5
-	pamConvErr    = 19
-	pamDeleteCred = 0x0004
+	pamSuccess = 0
+	pamBufErr  = 5
+	pamConvErr = 19
 )
 
 // PAM message styles (security/_pam_types.h).
@@ -49,7 +48,6 @@ type pamLib interface {
 type pamTxn interface {
 	authenticate() int32
 	acctMgmt() int32
-	setcred(flags int32) int32
 	end(status int32)
 	strerror(code int32) string
 }
@@ -75,9 +73,9 @@ func NewPAM(service string) *PAM {
 
 // Run implements Conversation. The transaction opens for username (the
 // session user when empty), authenticates, then checks the account
-// (pam_authenticate + pam_acct_mgmt, the pam crate's authenticate),
-// and always ends with pam_setcred(DELETE_CRED) and pam_end. On
-// success the last secret answered unlocks the gnome-keyring login
+// (pam_authenticate + pam_acct_mgmt), and always ends with pam_end
+// carrying the last call's status, as nonstick's transaction does; it
+// sets no credentials, an unlock needs none. On success the last secret answered unlocks the gnome-keyring login
 // collection, best effort.
 func (p *PAM) Run(username string, ask Ask) error {
 	if username == "" {
@@ -95,17 +93,16 @@ func (p *PAM) Run(username string, ask Ask) error {
 		log.Printf("auth: could not start PAM transaction for %s: %v", p.Service, err)
 		return fmt.Errorf("could not start PAM transaction: %w", err)
 	}
-	// The pam crate's teardown: drop the credentials, then end the
-	// transaction with that call's status.
-	defer func() { txn.end(txn.setcred(pamDeleteCred)) }()
+	var last int32 = pamSuccess
+	defer func() { txn.end(last) }()
 
-	if status := txn.authenticate(); status != pamSuccess {
-		log.Printf("auth: PAM authentication failed for %s: %s", p.Service, txn.strerror(status))
-		return fmt.Errorf("authentication failed: %s", txn.strerror(status))
+	if last = txn.authenticate(); last != pamSuccess {
+		log.Printf("auth: PAM authentication failed for %s: %s", p.Service, txn.strerror(last))
+		return fmt.Errorf("authentication failed: %s", txn.strerror(last))
 	}
-	if status := txn.acctMgmt(); status != pamSuccess {
-		log.Printf("auth: PAM account check failed for %s: %s", p.Service, txn.strerror(status))
-		return fmt.Errorf("authentication failed: %s", txn.strerror(status))
+	if last = txn.acctMgmt(); last != pamSuccess {
+		log.Printf("auth: PAM account check failed for %s: %s", p.Service, txn.strerror(last))
+		return fmt.Errorf("account check failed: %s", txn.strerror(last))
 	}
 	if conv.secret != "" && p.unlockKeyring != nil {
 		p.unlockKeyring(conv.secret)
