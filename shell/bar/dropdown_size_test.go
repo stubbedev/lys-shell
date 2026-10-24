@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/render"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // pagedPanel is a panel over a 200px-wide column holding one expanding
@@ -47,14 +49,14 @@ func TestPanelCardTakesItsPageAndTheSurfaceReservesTheTallest(t *testing.T) {
 // list sizes the card instead of scrolling inside a fixed one, and
 // scrolls only past the cap.
 func TestClampedPanelScrollsSizeTheCard(t *testing.T) {
-	list := widget.NewScroll(widget.NewSpacer(10, 400))
+	list := dropdownScroll(widget.NewSpacer(10, 400), "")
 	p, s := pagedPanel(list)
 	p.clamp(1000)
 	s.Show("tall")
 	if surface, card := panelLayout(p); card.H != 400 || surface != 400 {
 		t.Errorf("a 400px list: surface %d card %+v, want both 400", surface, card)
 	}
-	long := widget.NewScroll(widget.NewSpacer(10, 2000))
+	long := dropdownScroll(widget.NewSpacer(10, 2000), "")
 	p, s = pagedPanel(long)
 	p.clamp(1000)
 	s.Show("tall")
@@ -138,5 +140,33 @@ func TestDropdownSizeFloorsThePopoverAroundItsMargins(t *testing.T) {
 	apptheme.New(cfg).Attach(root)
 	if sz := widget.MeasureAsChild(root, con); sz.W != 500+m.start+m.end {
 		t.Errorf("popover width %d, want the 500px content plus the margins", sz.W)
+	}
+}
+
+// A panel is as wide as its request or its content's preferred width,
+// GTK's popover sizing: long wrapping text wraps inside the request,
+// while text that cannot narrow (an ellipsizing device name keeps its
+// natural width) widens the popover past it.
+func TestPanelWidthIsRequestOrPreferredWidth(t *testing.T) {
+	face := treetest.Font(t)
+	long := strings.Repeat("worktree daemon ", 8)
+	panelWith := func(label *widget.Label) *panelBox {
+		col := widget.NewBox(widget.Column, 0, 0)
+		col.Append(label, false)
+		return newPanelBox(col)
+	}
+	con := widget.Constraints{Min: widget.Size{W: 300}, Max: widget.Size{W: 2000, H: 2000}}
+
+	wrapping := widget.NewLabel(face, 13, long, 0)
+	wrapping.SetWrap(true)
+	if w := panelWith(wrapping).Measure(con).W; w != 300 {
+		t.Errorf("a wrapping sentence widened the panel to %d, want the 300px request", w)
+	}
+
+	name := widget.NewLabel(face, 13, long, 0)
+	name.SetEllipsize(widget.EllipsizeEnd)
+	nat := name.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 100}}).W
+	if w := panelWith(name).Measure(con).W; w != nat || w <= 300 {
+		t.Errorf("an ellipsizing name sized the panel %d, want its %dpx natural width past the request", w, nat)
 	}
 }

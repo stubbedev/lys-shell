@@ -20,7 +20,6 @@ import (
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 	"github.com/stubbedev/lys-shell/service/upower"
 	"github.com/stubbedev/lys-shell/shell/widgets"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // dashboardPoll paces what has no change signal while the dashboard is
@@ -789,17 +788,12 @@ func dashboardThresholdClass(value, warning, errorAt float32) string {
 func (v *dashboardView) systemStats() widget.Widget {
 	card := v.card("ld-activity-symbolic", i18n.T("dropdown-dashboard-system"))
 	cfg := v.ctx.Config.Dashboard
-	scale := float64(v.ctx.Config.Styling.Scale)
-	if scale <= 0 {
-		scale = 1
-	}
-	size := int(math.Round(4 * styling.RemBase * scale))
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("system-stats-inline")
 	ring := func(labelID string) *progressRing {
 		// ProgressRing: the canvas paints from its cascade; the variant
 		// class recolors it.
-		r, overlay := newProgressRing(size, "lg", v.font, v.px*0.85)
+		r, overlay := newProgressRing("lg", v.font, v.px*0.85)
 		col := widget.NewBox(widget.Column, 4, 0)
 		col.AddClass("stat-inline")
 		col.Append(overlay, false)

@@ -10,10 +10,9 @@ import (
 // progressRing is ProgressRing: a DrawingArea-classed canvas whose
 // cascade paints it — the stroke is the computed border width, the ink
 // the computed color (a success/warning/error class recolors it) —
-// over a centered ring-text label.
+// under the ring-text label the overlay centers on it.
 type progressRing struct {
 	widget.Base
-	size     int
 	fraction float64
 	variant  string
 	label    *widget.Label
@@ -22,17 +21,18 @@ type progressRing struct {
 // ringVariants is every variant class the ring's cascade recolors by.
 var ringVariants = []string{"success", "warning", "error"}
 
-// newProgressRing builds the canvas at the size class inside its
-// progress-ring overlay.
-func newProgressRing(size int, sizeClass string, font render.Font, px float64) (*progressRing, *widget.Box) {
-	r := &progressRing{size: size}
+// newProgressRing builds the ring's gtk::Overlay: the canvas fills it
+// and the label sits centered on top, and the overlay's .progress-ring
+// size class sets its min-width and min-height, the ring's diameter.
+func newProgressRing(sizeClass string, font render.Font, px float64) (*progressRing, *widget.Overlay) {
+	r := &progressRing{}
 	r.AddClass("progress-ring-canvas", sizeClass)
 	r.label = widget.NewLabel(font, px, "", 0)
 	r.label.AddClass("ring-text")
-	overlay := widget.NewBox(widget.Column, 0, 0)
+	overlay := widget.NewOverlay()
 	overlay.AddClass("progress-ring", sizeClass)
-	overlay.Append(r, false)
-	overlay.Append(r.label, false)
+	overlay.Append(r)
+	overlay.AppendAligned(r.label, widget.AlignCenter, widget.AlignCenter)
 	return r, overlay
 }
 
@@ -55,16 +55,11 @@ func (r *progressRing) set(fraction float64, label string, variant string) {
 // the Rust draw reads off the style context.
 func (r *progressRing) stroke() int { return widget.CascadeBorder(r).Top }
 
-func (r *progressRing) Measure(widget.Constraints) widget.Size {
-	return widget.Size{W: r.size, H: r.size}
-}
+// Measure wants nothing of its own: the canvas fills the overlay, which
+// the stylesheet sizes.
+func (r *progressRing) Measure(widget.Constraints) widget.Size { return widget.Size{} }
 
-func (r *progressRing) Arrange(rect render.Rect) {
-	r.ArrangeSelf(rect)
-	widget.SetParents(r, r.label)
-	sz := r.label.Measure(widget.Constraints{Max: widget.Size{W: rect.W, H: rect.H}})
-	r.label.Arrange(render.Rect{X: rect.X + (rect.W-sz.W)/2, Y: rect.Y + (rect.H-sz.H)/2, W: sz.W, H: sz.H})
-}
+func (r *progressRing) Arrange(rect render.Rect) { r.ArrangeSelf(rect) }
 
 // Paint is draw_ring: a quarter-alpha track and the fraction clockwise
 // from twelve o'clock, round-capped, both in the computed color.
@@ -81,11 +76,7 @@ func (r *progressRing) Paint(cv *render.Canvas) {
 			cv.Arc(cx, cy, radius, stroke, -math.Pi/2, 2*math.Pi*r.fraction, ink)
 		}
 	}
-	widget.PaintChild(cv, r.label)
 }
-
-// Children exposes the label to the tree walks.
-func (r *progressRing) Children() []widget.Widget { return []widget.Widget{r.label} }
 
 func (r *progressRing) HitTest(widget.Point) widget.Widget { return nil }
 

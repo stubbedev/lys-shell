@@ -173,10 +173,11 @@ func (p *panelBox) fit(w, h int) {
 }
 
 func (p *panelBox) Measure(con widget.Constraints) widget.Size {
-	// The Rust registry sizes the surface to the card's natural width;
-	// the configured width floors the popover around it.
-	nat := p.child.Measure(widget.Constraints{Max: widget.Size{W: con.Max.W}})
-	w := min(max(con.Min.W, nat.W), con.Max.W)
+	// GTK sizes a popover to its request or its content's preferred
+	// width, whichever is wider: the configured width floors it,
+	// unbroken content (a long device name) widens it, and wrapping
+	// text wraps inside it instead.
+	w := min(max(con.Min.W, widget.PreferredWidth(p.child)), con.Max.W)
 	_, surface := p.layout(w, con.Max.H)
 	return widget.Size{W: w, H: surface}
 }

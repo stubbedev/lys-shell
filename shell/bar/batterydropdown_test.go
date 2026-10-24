@@ -296,15 +296,15 @@ func TestBatterySectionsKeepRustsZeroSpacing(t *testing.T) {
 		t.Errorf("no CSS gap between the hero pct and the meta: %v then %v", pct, meta)
 	}
 	gauge, details := v.gauge.Bounds(), alignedBounds(t, treetest.WithClass(v, "battery-details")[0])
-	// Bounds are margin boxes: the gauge's own CSS margin-bottom rides
-	// in its height (the 8px trough plus space-md), and the details'
-	// box starts exactly where that margin box ends — the margin is
-	// the gap, with no constructor spacing doubling it.
-	if gauge.H <= 8 {
-		t.Errorf("gauge margin box %v, want the CSS margin-bottom riding in it", gauge)
+	// The gauge's border box is its trough's height, and its CSS
+	// margin-bottom (space-md, wider than the trough's space-sm) is
+	// the whole gap to the details: no constructor spacing adds to it.
+	gap := details.Y - (gauge.Y + gauge.H)
+	if gap <= gauge.H {
+		t.Errorf("gauge %v then details at %d: a %dpx gap, want the CSS margin-bottom, wider than the trough", gauge, details.Y, gap)
 	}
-	if gauge.Y+gauge.H != details.Y {
-		t.Errorf("gauge %v then details at %d, want adjacent margin boxes", gauge, details.Y)
+	if spacing := v.gauge.Parent().(*widget.Box).Spacing(); spacing != 0 {
+		t.Errorf("the gauge's box adds %dpx of constructor spacing", spacing)
 	}
 
 	hero := alignedBounds(t, treetest.WithClass(v, "battery-hero")[0])
@@ -368,20 +368,19 @@ func TestBatteryProfileSegmentsEqualWidth(t *testing.T) {
 		}
 	}
 	// The seg lays the segments out equal: one shared width, the
-	// widest child's.
+	// widest child's, give or take the remainder pixel GTK hands to
+	// the first children so the row ends flush.
 	arrangeDropdown(t, seg, hi*3+8, 60)
-	seen := map[int]bool{}
+	narrow, wide := 1<<30, 0
 	for _, p := range batteryProfiles {
 		w := v.profileButtons[p.name].Bounds().W
-		seen[w] = true
+		narrow, wide = min(narrow, w), max(wide, w)
 	}
-	if len(seen) != 1 {
-		t.Errorf("the segments took %d widths (%v), want one shared size", len(seen), seen)
+	if wide-narrow > 1 {
+		t.Errorf("the segments span %d..%dpx, want one shared size within the remainder pixel", narrow, wide)
 	}
-	for w := range seen {
-		if w < hi {
-			t.Errorf("the shared width %d is under the widest natural %d", w, hi)
-		}
+	if narrow < hi {
+		t.Errorf("the shared width %d is under the widest natural %d", narrow, hi)
 	}
 }
 
