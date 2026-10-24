@@ -593,3 +593,29 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 		t.Errorf("picker rows = %d, want 3", got)
 	}
 }
+
+// The device-name button hugs its name (volume_section/mod.rs: the
+// label does not expand, the button is halign Start): in a row wider
+// than natural the chevron sits right after the name instead of at the
+// row's far end.
+func TestAudioChevronFollowsTheDeviceName(t *testing.T) {
+	_, svc := audioFixture(t)
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Pulse = svc
+	v := audioDropdown(ctx).(*audioView)
+	defer v.dropdownClosed()
+	trig := findByClass(v.output, "audio-device-trigger").(*widget.Box)
+	nat := trig.Measure(widgetConstraintsMax(2000, 200))
+	trig.Measure(widgetConstraintsMax(nat.W+300, 200))
+	trig.Arrange(render.Rect{W: nat.W + 300, H: nat.H})
+	chevron := v.output.nameRow.Children()[1]
+	name := boundsOf(v.output.name)
+	if gap := boundsOf(chevron).X - (name.X + name.W); gap < 0 || gap > 12 {
+		t.Errorf("chevron %dpx after the name, want it right after", gap)
+	}
+	info := findByClass(v.output, "audio-device-info").(*widget.Box)
+	btn := info.Children()[1]
+	if boundsOf(btn).W >= boundsOf(info).W-100 {
+		t.Errorf("the name button spans %dpx of its %dpx column, want it hugging the name", boundsOf(btn).W, boundsOf(info).W)
+	}
+}

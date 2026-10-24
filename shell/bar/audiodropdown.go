@@ -390,18 +390,20 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 	}
 	label := widget.NewLabel(v.font, v.px*0.85, title, 0)
 	label.AddClass("audio-device-label")
-	info.Append(label, false)
+	info.AppendAligned(label, false, widget.AlignStart)
 	nameRow := widget.NewBox(widget.Row, 0, 0)
 	nameRow.AddClass("audio-device-name")
 	s.nameRow = nameRow
 	s.name = widget.NewLabel(v.font, v.px, "", 0)
 	s.name.AddClass("audio-device-name-text")
 	s.name.SetEllipsize(widget.EllipsizeEnd)
-	nameRow.Append(s.name, true)
+	nameRow.Append(s.name, false)
 	chevron := widget.NewThemeIcon("ld-chevron-right-symbolic", int(v.px*0.9))
 	chevron.AddClass("audio-device-chevron")
 	nameRow.Append(chevron, false)
-	info.Append(dropdownButton(nameRow, "audio-device-trigger-btn", func() { v.showPage(page) }), false)
+	// The button hugs its name (set_halign Start), so the chevron sits
+	// right after the device name, not at the row's far end.
+	info.AppendAligned(dropdownButton(nameRow, "audio-device-trigger-btn", func() { v.showPage(page) }), false, widget.AlignStart)
 	s.trigger.Append(info, true)
 	s.muteIcon = widget.NewThemeIcon("", int(v.px*1.1))
 	s.muteIcon.AddClass("audio-mute-icon")
