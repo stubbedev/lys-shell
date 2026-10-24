@@ -4,11 +4,14 @@
 package notifyui
 
 import (
+	"errors"
+	"log"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -183,4 +186,37 @@ func TimeLabel(age Age, domain string) string {
 		return i18n.T(domain+"-time-hours-ago", i18n.Str("hours", strconv.FormatInt(age.Hours, 10)))
 	}
 	return i18n.T(domain+"-time-minutes-ago", i18n.Str("minutes", strconv.FormatInt(age.Minutes, 10)))
+}
+
+// TokenMinter mints xdg-activation tokens from the latest input:
+// *app.Application.
+type TokenMinter interface {
+	RequestActivationToken(done func(token string, err error))
+}
+
+// Minter is the application as a TokenMinter; nil (no minting) for a
+// nil application.
+func Minter(a *app.Application) TokenMinter {
+	if a == nil {
+		return nil
+	}
+	return a
+}
+
+// WithActivationToken mints a token for an action press and hands it
+// to then, so the app the action reaches can raise its window: call it
+// from the press's handler, whose input the token vouches for. then
+// gets "" without a minter or xdg-activation on the compositor, and
+// after a failed request, which logs.
+func WithActivationToken(m TokenMinter, then func(token string)) {
+	if m == nil {
+		then("")
+		return
+	}
+	m.RequestActivationToken(func(token string, err error) {
+		if err != nil && !errors.Is(err, app.ErrActivationUnavailable) {
+			log.Printf("notifications: activation token for an action: %v", err)
+		}
+		then(token)
+	})
 }

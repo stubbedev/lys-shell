@@ -443,7 +443,9 @@ func (s *Service) DismissAll() {
 
 // InvokeAction emits ActionInvoked and, unless the notification is
 // resident, closes it with the closed reason (Notification::invoke).
-func (s *Service) InvokeAction(id uint32, key string) {
+// A token minted from the press goes first as ActivationToken, as the
+// spec orders them, so the app can raise its window; "" sends none.
+func (s *Service) InvokeAction(id uint32, key, token string) {
 	s.mu.Lock()
 	_, ok := s.owners[id]
 	n := s.findLocked(id)
@@ -454,6 +456,9 @@ func (s *Service) InvokeAction(id uint32, key string) {
 		return
 	}
 	if emit != nil {
+		if token != "" {
+			emit(Interface+".ActivationToken", id, token)
+		}
 		emit(Interface+".ActionInvoked", id, key)
 	}
 	if !resident {

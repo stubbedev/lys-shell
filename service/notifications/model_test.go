@@ -200,11 +200,11 @@ func TestInvokeActionResidentStays(t *testing.T) {
 	resident := s.NotifyHints("app", 0, "", "res", "", []string{"default", "Open"},
 		map[string]dbus.Variant{"resident": dbus.MakeVariant(true)}, 0)
 	collect(t, feed, 2)
-	s.InvokeAction(resident, "default")
+	s.InvokeAction(resident, "default", "")
 	if s.Count() != 2 || len(reasons) != 0 {
 		t.Fatalf("resident invoke closed it: count %d reasons %v", s.Count(), reasons)
 	}
-	s.InvokeAction(plain, "default")
+	s.InvokeAction(plain, "default", "")
 	if s.Count() != 1 || !slices.Equal(reasons, []ClosedReason{ClosedCall}) {
 		t.Errorf("plain invoke: count %d reasons %v, want closed", s.Count(), reasons)
 	}

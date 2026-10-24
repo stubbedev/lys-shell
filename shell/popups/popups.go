@@ -44,8 +44,10 @@ type Popups struct {
 	// surface maps on popup-monitor among them.
 	outputs func() []*app.Output
 	now     func() time.Time
-	mu      sync.Mutex
-	win     *app.LayerWindow
+	// minter mints the activation tokens action presses carry.
+	minter notifyui.TokenMinter
+	mu     sync.Mutex
+	win    *app.LayerWindow
 	// winOut is the output win is on.
 	winOut *app.Output
 	root   *widget.Box
@@ -86,6 +88,7 @@ func New(application *app.Application, svc *notifications.Service, cfg *config.C
 		sheet:   sheet,
 		outputs: outputs,
 		now:     time.Now,
+		minter:  notifyui.Minter(application),
 		cards:   make(map[uint32]*card),
 	}
 }
@@ -363,19 +366,24 @@ func (p *Popups) closeCard(id uint32) {
 }
 
 // invokeAction is an action button: the popup goes, the action is
-// invoked, and the notification is dismissed (build_action_button).
+// invoked with a token from the press, and the notification is
+// dismissed (build_action_button).
 func (p *Popups) invokeAction(id uint32, key string) {
-	p.svc.DismissPopup(id)
-	p.svc.InvokeAction(id, key)
-	p.svc.Close(id, notifications.Dismissed)
+	notifyui.WithActivationToken(p.minter, func(token string) {
+		p.svc.DismissPopup(id)
+		p.svc.InvokeAction(id, key, token)
+		p.svc.Close(id, notifications.Dismissed)
+	})
 }
 
-// invokeDefault is the card's click: the default action, then the
-// close behavior. Invoked first, while the notification still exists
-// for the service to emit ActionInvoked on.
+// invokeDefault is the card's click: the default action with a token
+// from the click, then the close behavior. Invoked first, while the
+// notification still exists for the service to emit ActionInvoked on.
 func (p *Popups) invokeDefault(id uint32) {
-	p.svc.InvokeAction(id, notifications.DefaultActionID)
-	p.closeCard(id)
+	notifyui.WithActivationToken(p.minter, func(token string) {
+		p.svc.InvokeAction(id, notifications.DefaultActionID, token)
+		p.closeCard(id)
+	})
 }
 
 // layoutLocked rebuilds the root from the stack, mapping the window for

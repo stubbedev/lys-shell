@@ -2,15 +2,18 @@ package bar
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -499,5 +502,48 @@ func TestNotificationItemDismissInsideADefaultActionRow(t *testing.T) {
 	waitHeadless(t, "the dismissal", func() bool { return len(svc.Notifications()) == 0 })
 	if pop.dismissed != 0 || len(invoked) != 0 {
 		t.Errorf("dismiss closed the dropdown (%d) or invoked %v", pop.dismissed, invoked)
+	}
+}
+
+// barMinter answers every token request with token and err.
+type barMinter struct {
+	token string
+	err   error
+}
+
+func (m barMinter) RequestActivationToken(done func(string, error)) { done(m.token, m.err) }
+
+// An action pressed in the dropdown carries the token minted from the
+// press, announced right before the ActionInvoked; without
+// xdg-activation the action goes alone.
+func TestNotificationItemActionCarriesItsToken(t *testing.T) {
+	svc := newNotifTestService(t)
+	var seen []string
+	svc.SetEmitter(func(member string, args ...any) {
+		if !strings.HasSuffix(member, ".NotificationClosed") {
+			seen = append(seen, strings.TrimPrefix(member, notifications.Interface+".")+fmt.Sprint(args...))
+		}
+	})
+	first := svc.Notify("chat", 0, "", "Ping", "", []string{"reply", "Reply"}, 0)
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Notifications = svc
+	v := notificationDropdown(ctx).(*notificationView)
+	defer v.dropdownClosed()
+	v.minter = barMinter{token: "tok-3"}
+	v.groups[0].items[0].invoke("reply")
+	waitHeadless(t, "the action", func() bool { return len(svc.Notifications()) == 0 })
+	if want := []string{"ActivationToken" + fmt.Sprint(first, "tok-3"), "ActionInvoked" + fmt.Sprint(first, "reply")}; !slices.Equal(seen, want) {
+		t.Errorf("signals = %q, want %q", seen, want)
+	}
+
+	seen = nil
+	second := svc.Notify("chat", 0, "", "Again", "", []string{"reply", "Reply"}, 0)
+	waitHeadless(t, "the new item", func() bool {
+		return len(v.groups) == 1 && len(v.groups[0].items) == 1 && v.groups[0].items[0].n.ID == second
+	})
+	v.minter = barMinter{err: app.ErrActivationUnavailable}
+	v.groups[0].items[0].invoke("reply")
+	if want := []string{"ActionInvoked" + fmt.Sprint(second, "reply")}; !slices.Equal(seen, want) {
+		t.Errorf("without xdg-activation: %q, want %q", seen, want)
 	}
 }

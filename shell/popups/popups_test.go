@@ -389,6 +389,51 @@ func TestCardActionsAndDefault(t *testing.T) {
 	}
 }
 
+// tokenMinter answers every token request with token and err.
+type tokenMinter struct {
+	token string
+	err   error
+}
+
+func (m tokenMinter) RequestActivationToken(done func(string, error)) { done(m.token, m.err) }
+
+// A press on the card or an action button mints a token, which goes
+// out as ActivationToken right before the ActionInvoked; on a
+// compositor without xdg-activation the action goes alone.
+func TestActionPressesCarryTheirToken(t *testing.T) {
+	p, svc := newTestPopups(t, config.DefaultsNotification())
+	p.minter = tokenMinter{token: "tok-9"}
+	var sig signals
+	svc.SetEmitter(sig.emit)
+	id := svc.Notify("chat", 0, "", "Ping", "", []string{"default", "Open", "reply", "Reply"}, 0)
+	p.sync()
+	c := cardOf(t, p, id)
+	click(c, c.title)
+	other := svc.Notify("chat", 0, "", "Again", "", []string{"reply", "Reply"}, 0)
+	p.sync()
+	oc := cardOf(t, p, other)
+	click(oc, oc.actions.Children()[0].(*widget.Box).Children()[0].(*widget.Button))
+	sig.mu.Lock()
+	seen := slices.DeleteFunc(slices.Clone(sig.seen), func(m string) bool { return strings.HasPrefix(m, "NotificationClosed") })
+	sig.mu.Unlock()
+	want := []string{
+		"ActivationToken" + fmt.Sprint(id, "tok-9"), "ActionInvoked" + fmt.Sprint(id, notifications.DefaultActionID),
+		"ActivationToken" + fmt.Sprint(other, "tok-9"), "ActionInvoked" + fmt.Sprint(other, "reply"),
+	}
+	if !slices.Equal(seen, want) {
+		t.Errorf("signals = %q, want %q", seen, want)
+	}
+
+	p.minter = tokenMinter{err: app.ErrActivationUnavailable}
+	last := svc.Notify("chat", 0, "", "Last", "", []string{"default", "Open"}, 0)
+	p.sync()
+	lc := cardOf(t, p, last)
+	click(lc, lc.title)
+	if sig.count("ActivationToken"+strconv.FormatUint(uint64(last), 10)) != 0 || sig.count("ActionInvoked"+fmt.Sprint(last, notifications.DefaultActionID)) != 1 {
+		t.Errorf("without xdg-activation: %v", sig.seen)
+	}
+}
+
 func TestPopupMargins(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.PopupMarginX = config.Scale(1)

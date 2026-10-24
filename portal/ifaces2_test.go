@@ -157,6 +157,23 @@ func TestNotificationShowsAndForwardsActions(t *testing.T) {
 		t.Errorf("button ActionInvoked = %v", body)
 	}
 
+	// The press's activation token, announced just before, follows the
+	// target as the platform-data; it serves that one press, and a
+	// token for another notification serves none of this one's.
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActivationToken", uint32(41), "tok-1")
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(41), "button-0")
+	body = nextActionInvoked(t, r)
+	params := body[3].([]dbus.Variant)
+	platform, _ := params[len(params)-1].Value().(map[string]dbus.Variant)
+	if len(params) != 2 || params[0].Value() != uint32(7) || platform["activation-token"].Value() != "tok-1" {
+		t.Errorf("ActionInvoked with a token = %v", body)
+	}
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActivationToken", uint32(99), "tok-other")
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", uint32(41), "default")
+	if params := nextActionInvoked(t, r)[3].([]dbus.Variant); len(params) != 1 || params[0].Value() != "inbox" {
+		t.Errorf("a press without its own token = %v, want the target alone", params)
+	}
+
 	// Remove closes the daemon's notification once; an unknown one is
 	// left alone.
 	for range 2 {

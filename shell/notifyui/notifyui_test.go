@@ -1,9 +1,11 @@
 package notifyui
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -135,5 +137,35 @@ func TestNewIcon(t *testing.T) {
 	}
 	if w := NewIcon(Icon{File: "/no/such.png"}, 16, tint); w.Name() != "" || w.Tint() != 0 {
 		t.Errorf("file icon: name %q tint %v", w.Name(), w.Tint())
+	}
+}
+
+// fakeMinter answers a token request with token and err.
+type fakeMinter struct {
+	token string
+	err   error
+}
+
+func (f fakeMinter) RequestActivationToken(done func(string, error)) { done(f.token, f.err) }
+
+// The press's token reaches the action; without a minter, without
+// xdg-activation, or after a failed request the action still runs,
+// with no token.
+func TestWithActivationToken(t *testing.T) {
+	for name, tc := range map[string]struct {
+		m    TokenMinter
+		want string
+	}{
+		"minted":        {fakeMinter{token: "tok-1"}, "tok-1"},
+		"no minter":     {nil, ""},
+		"no activation": {fakeMinter{err: app.ErrActivationUnavailable}, ""},
+		"failed":        {fakeMinter{err: errors.New("compositor said no")}, ""},
+		"nil app":       {Minter(nil), ""},
+	} {
+		ran, got := false, "unset"
+		WithActivationToken(tc.m, func(token string) { ran, got = true, token })
+		if !ran || got != tc.want {
+			t.Errorf("%s: ran %v with %q, want %q", name, ran, got, tc.want)
+		}
 	}
 }

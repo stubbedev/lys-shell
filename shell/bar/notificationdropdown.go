@@ -67,6 +67,8 @@ type notificationView struct {
 	font render.Font
 	px   float64
 	now  func() time.Time
+	// minter mints the activation tokens action presses carry.
+	minter notifyui.TokenMinter
 	popoverHook
 
 	*widget.Box
@@ -91,7 +93,7 @@ type notificationView struct {
 
 func notificationDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &notificationView{ctx: ctx, svc: ctx.Notifications, font: font, px: px, now: time.Now, stop: make(chan struct{})}
+	v := &notificationView{ctx: ctx, svc: ctx.Notifications, font: font, px: px, now: time.Now, minter: notifyui.Minter(ctx.App), stop: make(chan struct{})}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "notification-dropdown")
 
@@ -514,12 +516,15 @@ func (it *notifItem) actionRows() widget.Widget {
 	return box
 }
 
-// invoke runs an action and dismisses the notification, as the Rust
-// button does (invoke, then dismiss, resident or not).
+// invoke runs an action with a token from the press and dismisses the
+// notification, as the Rust button does (invoke, then dismiss,
+// resident or not).
 func (it *notifItem) invoke(key string) {
-	svc := it.view.svc
-	svc.InvokeAction(it.n.ID, key)
-	svc.Close(it.n.ID, notifications.Dismissed)
+	svc, id := it.view.svc, it.n.ID
+	notifyui.WithActivationToken(it.view.minter, func(token string) {
+		svc.InvokeAction(id, key, token)
+		svc.Close(id, notifications.Dismissed)
+	})
 }
 
 // invokeDefault closes the dropdown first: the default action usually

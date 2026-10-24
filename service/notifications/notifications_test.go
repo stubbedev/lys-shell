@@ -1,6 +1,7 @@
 package notifications
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -179,20 +180,39 @@ func TestDismissAll(t *testing.T) {
 	}
 }
 
+// An action press's token goes out as ActivationToken right before
+// ActionInvoked, as the spec orders them; without one only
+// ActionInvoked does; an unknown id emits nothing.
 func TestInvokeAction(t *testing.T) {
 	s := newTestService(t)
 	feed, _ := s.Subscribe()
 	var signals []string
-	s.SetEmitter(func(signal string, _ ...any) { signals = append(signals, signal) })
+	s.SetEmitter(func(signal string, args ...any) { signals = append(signals, sprint(signal, args)) })
 	id := s.Notify("app", 0, "", "hi", "", []string{"reply", "Reply"}, 0)
 	<-feed
-	s.InvokeAction(id, "reply")
-	if len(signals) == 0 || signals[0] != Interface+".ActionInvoked" {
-		t.Fatalf("signals = %v", signals)
+	s.InvokeAction(id, "reply", "tok-1")
+	want := []string{
+		sprint(Interface+".ActivationToken", []any{id, "tok-1"}),
+		sprint(Interface+".ActionInvoked", []any{id, "reply"}),
 	}
-	// Invoking an unknown id does nothing.
-	s.InvokeAction(9999, "nope")
+	if len(signals) < 2 || signals[0] != want[0] || signals[1] != want[1] {
+		t.Fatalf("signals = %v, want %v first", signals, want)
+	}
+	signals = nil
+	other := s.Notify("app", 0, "", "again", "", []string{"reply", "Reply"}, 0)
+	<-feed
+	s.InvokeAction(other, "reply", "")
+	if len(signals) == 0 || signals[0] != sprint(Interface+".ActionInvoked", []any{other, "reply"}) {
+		t.Fatalf("signals without a token = %v", signals)
+	}
+	signals = nil
+	s.InvokeAction(9999, "nope", "tok-2")
+	if len(signals) != 0 {
+		t.Errorf("an unknown id emitted %v", signals)
+	}
 }
+
+func sprint(signal string, args []any) string { return fmt.Sprint(signal, args) }
 
 func TestGlobMatch(t *testing.T) {
 	for _, tc := range []struct {
