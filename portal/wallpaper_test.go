@@ -145,9 +145,7 @@ func TestWallpaperFailsWithoutTheShellOrADataDir(t *testing.T) {
 	if code := newRig(t, nil).setWallpaper(t, uri, Vardict{}); code != ResponseOther {
 		t.Errorf("without the shell = %d", code)
 	}
-	t.Setenv("XDG_DATA_HOME", "")
-	t.Setenv("HOME", "")
-	r := newRig(t, nil)
+	r := newRig(t, func(b *Backend) { b.dataDir = "" })
 	w := serveWallpaperd(t, r)
 	if code := r.setWallpaper(t, uri, Vardict{}); code != ResponseOther || w.set.Load() != nil {
 		t.Errorf("without a data directory = %d, set %v", code, w.set.Load())

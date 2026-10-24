@@ -112,6 +112,19 @@ func interactiveCases() []interactiveCase {
 		{"DynamicLauncher", dialogs, func(r *rig) (uint32, error) {
 			return code(r, "org.freedesktop.impl.portal.DynamicLauncher.PrepareInstall", handle, "org.app", "", "App", dbus.MakeVariant(gicon{"bytes", dbus.MakeVariant([]byte{1})}), Vardict{})
 		}},
+		{"GlobalShortcuts", func(t *testing.T, r *rig) *gate {
+			held := dialogs(t, r)
+			g := r.backend.shortcuts
+			g.mu.Lock()
+			g.start = func(func(string, bool)) (shortcutDevice, error) { return &fakeShortcuts{}, nil }
+			g.mu.Unlock()
+			if c, err := code(r, GlobalShortcutsIface+".CreateSession", handle, sessB, "org.app", Vardict{}); err != nil || c != ResponseSuccess {
+				t.Fatalf("CreateSession = %d, %v", c, err)
+			}
+			return held
+		}, func(r *rig) (uint32, error) {
+			return code(r, GlobalShortcutsIface+".BindShortcuts", handle, sessB, []shortcut{{"mic", Vardict{}}}, "", Vardict{})
+		}},
 		{"Usb", dialogs, func(r *rig) (uint32, error) {
 			return code(r, acquireDevices, handle, "", "org.app", usbRequest, Vardict{})
 		}},

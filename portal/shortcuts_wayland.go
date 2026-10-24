@@ -6,13 +6,13 @@ import "github.com/stubbedev/lys-ui/app"
 // hyprland-global-shortcuts-v1 through the portal's Wayland loop.
 type waylandShortcuts struct {
 	loop    *waylandLoop
-	onEvent func(key string, pressed bool, sec uint64)
+	onEvent func(key string, pressed bool)
 }
 
 // waylandShortcutsStarter checks the protocol on loop; onEvent runs off
 // the loop for each press and release of a registered key.
-func waylandShortcutsStarter(loop *waylandLoop) func(func(string, bool, uint64)) (shortcutDevice, error) {
-	return func(onEvent func(key string, pressed bool, sec uint64)) (shortcutDevice, error) {
+func waylandShortcutsStarter(loop *waylandLoop) func(func(string, bool)) (shortcutDevice, error) {
+	return func(onEvent func(key string, pressed bool)) (shortcutDevice, error) {
 		err := loop.do(func(a *app.Application) error {
 			if !a.GlobalShortcutsAvailable() {
 				return app.ErrGlobalShortcutsUnavailable
@@ -30,8 +30,8 @@ func (w waylandShortcuts) register(key, id, appID, description, trigger string) 
 	var s *app.GlobalShortcut
 	err := w.loop.do(func(a *app.Application) error {
 		var err error
-		s, err = a.RegisterGlobalShortcut(id, appID, description, trigger, func(pressed bool, sec uint64) {
-			go w.onEvent(key, pressed, sec)
+		s, err = a.RegisterGlobalShortcut(id, appID, description, trigger, func(pressed bool, _ uint64) {
+			go w.onEvent(key, pressed)
 		})
 		return err
 	})

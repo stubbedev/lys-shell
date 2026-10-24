@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // BusName is the backend's well-known name (lys-shell.portal's DBusName).
@@ -42,6 +43,8 @@ type Backend struct {
 	remote     *remoteDesktop
 	// windows is the compositor's window list (a fake in tests).
 	windows windowSource
+	// dataDir is lys-shell's data directory, "" when none resolves.
+	dataDir string
 }
 
 // New builds the backend over a session-bus connection and the config.
@@ -52,6 +55,9 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
+	if dir, ok := xdg.DataDir(); ok {
+		b.dataDir = dir
+	}
 	b.windows = &windowList{conn: conn, watch: toplevels.Watch}
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
@@ -59,7 +65,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b.screenCast = newScreenCast(conn, b.sessions, startScreenStream, loop.outputs)
 	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
-	b.shortcuts = newGlobalShortcuts(conn, b.sessions, waylandShortcutsStarter(loop))
+	b.shortcuts = newGlobalShortcuts(conn, b.sessions, shortcutStorePath(), waylandShortcutsStarter(loop))
 	loop.onEnd(b.clipboard.loopEnded)
 	loop.onEnd(b.shortcuts.loopEnded)
 	return b
@@ -83,7 +89,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		b.screenCast.iface(),
 		b.remote.iface(),
 		b.notifier.iface(),
-		wallpaperIface(b.conn, b.cfg),
+		wallpaperIface(b.conn, b.cfg, b.dataDir),
 	}, dialogIfaces(b.conn, b.cfg)...)
 }
 

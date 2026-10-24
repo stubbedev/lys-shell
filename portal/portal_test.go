@@ -3,6 +3,7 @@ package portal
 import (
 	"errors"
 	"maps"
+	"os"
 	"slices"
 	"testing"
 	"time"
@@ -25,8 +26,19 @@ type rig struct {
 	signals chan *dbus.Signal
 }
 
+// processDataHome is XDG_DATA_HOME as the test process started with
+// it: a test that points it elsewhere keeps its own.
+var processDataHome = os.Getenv("XDG_DATA_HOME")
+
+// newRig serves a backend on a private bus, its state, cache and data
+// directories temporary ones so no test writes to the user's.
 func newRig(t *testing.T, edit func(*Backend)) *rig {
 	t.Helper()
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	if os.Getenv("XDG_DATA_HOME") == processDataHome {
+		t.Setenv("XDG_DATA_HOME", t.TempDir())
+	}
 	bus := dbustest.Start(t)
 	cfg := config.Load(t.TempDir(), config.DiscardDiagnostics)
 	client := bus.Conn(t)

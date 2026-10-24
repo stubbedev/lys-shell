@@ -15,7 +15,6 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
@@ -26,15 +25,14 @@ import (
 type wallpaperPortal struct {
 	conn *dbus.Conn
 	cfg  *config.Service
-	// dir is where the images are kept, "" when no data directory
-	// resolves.
+	// dir is where the images are kept, "" without a data directory.
 	dir string
 }
 
-func wallpaperIface(conn *dbus.Conn, cfg *config.Service) dbusx.Interface {
+func wallpaperIface(conn *dbus.Conn, cfg *config.Service, dataDir string) dbusx.Interface {
 	w := wallpaperPortal{conn: conn, cfg: cfg}
-	if dir, ok := xdg.DataDir(); ok {
-		w.dir = filepath.Join(dir, "wallpapers")
+	if dataDir != "" {
+		w.dir = filepath.Join(dataDir, "wallpapers")
 	}
 	return dbusx.Interface{
 		Name:       "org.freedesktop.impl.portal.Wallpaper",

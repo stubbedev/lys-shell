@@ -2,18 +2,21 @@ package portal
 
 import (
 	"errors"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // fakeShortcuts is the compositor's shortcut manager.
 type fakeShortcuts struct {
-	onEvent      dbustest.Var[func(string, bool, uint64)]
+	onEvent      dbustest.Var[func(string, bool)]
 	registered   dbustest.Var[[]string]
 	unregistered dbustest.Var[[]string]
 }
@@ -25,21 +28,45 @@ func (f *fakeShortcuts) register(key, id, appID, description, trigger string) (f
 	}, nil
 }
 
-func shortcutsRig(t *testing.T, startErr error) (*rig, *fakeShortcuts) {
+// shortcutsRig keeps the shortcuts store in a temporary file, the
+// clock at 1234 ms, and a consenting shell.
+func shortcutsRig(t *testing.T, startErr error) (*rig, *fakeShortcuts, *fakeDialogs) {
+	t.Helper()
 	f := &fakeShortcuts{}
+	store := filepath.Join(t.TempDir(), "portal-shortcuts.json")
 	r := newRig(t, func(b *Backend) {
-		b.shortcuts = newGlobalShortcuts(b.conn, b.sessions, func(on func(string, bool, uint64)) (shortcutDevice, error) {
+		b.shortcuts = newGlobalShortcuts(b.conn, b.sessions, store, func(on func(string, bool)) (shortcutDevice, error) {
 			if startErr != nil {
 				return nil, startErr
 			}
 			f.onEvent.Store(on)
 			return f, nil
 		})
+		b.shortcuts.now = func() uint64 { return 1234 }
 	})
-	return r, f
+	return r, f, serveDialogs(t, r, true)
 }
 
 func props(desc string) Vardict { return Vardict{"description": dbus.MakeVariant(desc)} }
+
+func (r *rig) shortcutSession(t *testing.T, session dbus.ObjectPath) {
+	t.Helper()
+	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, session, "org.app", Vardict{}); code != ResponseSuccess {
+		t.Fatalf("CreateSession = %d", code)
+	}
+}
+
+func (r *rig) bind(t *testing.T, session dbus.ObjectPath, shortcuts ...shortcut) (uint32, []shortcut) {
+	t.Helper()
+	code, res := r.interactive(t, GlobalShortcutsIface+".BindShortcuts", handle, session, shortcuts, "", Vardict{})
+	var bound []shortcut
+	if v, ok := res["shortcuts"]; ok {
+		if err := dbus.Store([]any{v.Value()}, &bound); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return code, bound
+}
 
 func (r *rig) listShortcuts(t *testing.T, session dbus.ObjectPath) []shortcut {
 	t.Helper()
@@ -59,39 +86,48 @@ func shortcutIDs(list []shortcut) []string {
 	return ids
 }
 
-func (r *rig) shortcutSignal(t *testing.T) *dbus.Signal {
+// shortcutSignals collects the Activated / Deactivated signals of a
+// short wait.
+func (r *rig) shortcutSignals(t *testing.T) []*dbus.Signal {
 	t.Helper()
-	deadline := time.After(500 * time.Millisecond)
+	var out []*dbus.Signal
+	deadline := time.After(200 * time.Millisecond)
 	for {
 		select {
 		case s := <-r.signals:
 			if s.Name == GlobalShortcutsIface+".Activated" || s.Name == GlobalShortcutsIface+".Deactivated" {
-				return s
+				out = append(out, s)
 			}
 		case <-deadline:
-			return nil
+			return out
 		}
 	}
 }
 
+// A bind asks the user, registers the shortcuts, and replies them with
+// a trigger description and without the app's preferred trigger; their
+// presses and releases come back with a millisecond timestamp.
 func TestGlobalShortcutsBindAndActivate(t *testing.T) {
-	r, f := shortcutsRig(t, nil)
-	opts := Vardict{"shortcuts": dbus.MakeVariant([]shortcut{
-		{"mic", Vardict{"description": dbus.MakeVariant("Toggle mic"), "preferred_trigger": dbus.MakeVariant("CTRL+M")}},
-	})}
-	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, sessA, "org.app", opts); code != ResponseSuccess {
-		t.Fatalf("CreateSession = %d", code)
+	r, f, d := shortcutsRig(t, nil)
+	r.shortcutSession(t, sessA)
+	mic := shortcut{"mic", Vardict{"description": dbus.MakeVariant("Toggle mic"), "preferred_trigger": dbus.MakeVariant("CTRL+M")}}
+	code, bound := r.bind(t, sessA, mic)
+	if code != ResponseSuccess || !slices.Equal(shortcutIDs(bound), []string{"mic=Toggle mic"}) {
+		t.Fatalf("bind = %d %v", code, bound)
+	}
+	if _, has := bound[0].Props["preferred_trigger"]; has || !strings.Contains(stringOr(bound[0].Props, "trigger_description", ""), "global, org.app:mic") {
+		t.Errorf("bound props %v", bound[0].Props)
 	}
 	if got := f.registered.Load(); !slices.Equal(got, []string{"org.app/mic|Toggle mic|CTRL+M"}) {
 		t.Errorf("registered %v", got)
 	}
+	if asked := d.asked.Load(); len(asked) == 0 || !strings.Contains(asked[0].(portaldialogs.AccessRequest).Body, "Toggle mic") {
+		t.Errorf("consent asked %v", asked)
+	}
 
 	// A re-bind of mic updates its props without a second registration.
-	_, res := r.interactive(t, GlobalShortcutsIface+".BindShortcuts", handle, sessA, []shortcut{{"mic", props("Mute")}, {"next", props("Next")}}, "", Vardict{})
-	var bound []shortcut
-	_ = dbus.Store([]any{res["shortcuts"].Value()}, &bound)
-	if got := shortcutIDs(bound); !slices.Equal(got, []string{"mic=Mute", "next=Next"}) {
-		t.Errorf("bound %v", got)
+	if _, bound = r.bind(t, sessA, shortcut{"mic", props("Mute")}, shortcut{"next", props("Next")}); !slices.Equal(shortcutIDs(bound), []string{"mic=Mute", "next=Next"}) {
+		t.Errorf("bound %v", bound)
 	}
 	if got := f.registered.Load(); len(got) != 2 || got[1] != "org.app/next|Next|" {
 		t.Errorf("registered %v", got)
@@ -101,17 +137,13 @@ func TestGlobalShortcutsBindAndActivate(t *testing.T) {
 	}
 
 	on := f.onEvent.Load()
-	on(shortcutKey("org.app", "next"), true, 42)
-	if s := r.shortcutSignal(t); s == nil || s.Name != GlobalShortcutsIface+".Activated" || s.Body[0] != sessA || s.Body[1] != "next" || s.Body[2] != uint64(42) {
-		t.Fatalf("press = %v", s)
-	}
-	on(shortcutKey("org.app", "next"), false, 43)
-	if s := r.shortcutSignal(t); s == nil || s.Name != GlobalShortcutsIface+".Deactivated" || s.Body[2] != uint64(43) {
-		t.Fatalf("release = %v", s)
-	}
-	on(shortcutKey("org.other", "next"), true, 1)
-	if s := r.shortcutSignal(t); s != nil {
-		t.Errorf("an unregistered key signalled %v", s)
+	on(shortcutKey("org.app", "next"), true)
+	on(shortcutKey("org.app", "next"), false)
+	on(shortcutKey("org.other", "next"), true)
+	signals := r.shortcutSignals(t)
+	if len(signals) != 2 || signals[0].Name != GlobalShortcutsIface+".Activated" || signals[0].Body[0] != sessA || signals[0].Body[1] != "next" ||
+		signals[0].Body[2] != uint64(1234) || signals[1].Name != GlobalShortcutsIface+".Deactivated" {
+		t.Fatalf("signals = %v", signals)
 	}
 
 	// Closing the session unregisters its shortcuts; their keys go quiet.
@@ -121,30 +153,105 @@ func TestGlobalShortcutsBindAndActivate(t *testing.T) {
 	if got := f.unregistered.Load(); len(got) != 2 {
 		t.Errorf("unregistered %v", got)
 	}
-	on(shortcutKey("org.app", "mic"), true, 2)
-	if s := r.shortcutSignal(t); s != nil {
+	on(shortcutKey("org.app", "mic"), true)
+	if s := r.shortcutSignals(t); len(s) != 0 {
 		t.Errorf("a closed session's key signalled %v", s)
 	}
 	if code, _ := r.interactive(t, GlobalShortcutsIface+".ListShortcuts", handle, sessA); code != ResponseOther {
 		t.Errorf("a closed session's ListShortcuts = %d, want other", code)
 	}
-	if code, _ := r.interactive(t, GlobalShortcutsIface+".BindShortcuts", handle, sessA, []shortcut{{"x", props("X")}}, "", Vardict{}); code != ResponseOther {
+	if code, _ := r.bind(t, sessA, shortcut{"x", props("X")}); code != ResponseOther {
 		t.Errorf("a closed session's BindShortcuts = %d, want other", code)
 	}
 }
 
+// Two sessions of one app share the compositor's registration: both
+// hear its presses, and closing one leaves the other bound.
+func TestGlobalShortcutsTwoSessionsOfOneApp(t *testing.T) {
+	r, f, _ := shortcutsRig(t, nil)
+	r.shortcutSession(t, sessA)
+	r.shortcutSession(t, sessB)
+	r.bind(t, sessA, shortcut{"mic", props("Mic")})
+	r.bind(t, sessB, shortcut{"mic", props("Mic")})
+	if got := f.registered.Load(); len(got) != 1 {
+		t.Fatalf("registered %v, want one shared registration", got)
+	}
+	f.onEvent.Load()(shortcutKey("org.app", "mic"), true)
+	var heard []dbus.ObjectPath
+	for _, s := range r.shortcutSignals(t) {
+		heard = append(heard, s.Body[0].(dbus.ObjectPath))
+	}
+	slices.Sort(heard)
+	if !slices.Equal(heard, []dbus.ObjectPath{sessA, sessB}) {
+		t.Errorf("heard by %v, want both sessions", heard)
+	}
+	if err := r.client.Object(BusName, sessA).Call(SessionIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	if got := f.unregistered.Load(); len(got) != 0 {
+		t.Errorf("closing one session unregistered %v", got)
+	}
+	f.onEvent.Load()(shortcutKey("org.app", "mic"), true)
+	if s := r.shortcutSignals(t); len(s) != 1 || s[0].Body[0] != sessB {
+		t.Errorf("after one closed: %v", s)
+	}
+}
+
+// Shortcuts bound once are listed for the app's next session, and
+// binding them again does not ask again; a new one does.
+func TestGlobalShortcutsRememberTheBinds(t *testing.T) {
+	r, _, d := shortcutsRig(t, nil)
+	r.shortcutSession(t, sessA)
+	r.bind(t, sessA, shortcut{"mic", props("Mic")})
+	r.shortcutSession(t, sessB)
+	if got := shortcutIDs(r.listShortcuts(t, sessB)); !slices.Equal(got, []string{"mic=Mic"}) {
+		t.Errorf("a fresh session lists %v, want the earlier bind", got)
+	}
+	asked := len(d.callers.Load())
+	if code, _ := r.bind(t, sessB, shortcut{"mic", props("Mic")}); code != ResponseSuccess || len(d.callers.Load()) != asked {
+		t.Errorf("re-binding a known shortcut = %d, asked %d more times", code, len(d.callers.Load())-asked)
+	}
+	r.bind(t, sessB, shortcut{"next", props("Next")})
+	if len(d.callers.Load()) != asked+1 {
+		t.Error("a new shortcut was bound without asking")
+	}
+	d.yes.Store(false)
+	r.shortcutSession(t, sessC)
+	if code, _ := r.bind(t, sessC, shortcut{"other", props("Other")}); code != ResponseCancelled {
+		t.Errorf("a denied bind = %d, want cancelled", code)
+	}
+}
+
+// Without the protocol nothing can be bound: the bind fails.
 func TestGlobalShortcutsWithoutTheProtocol(t *testing.T) {
-	r, _ := shortcutsRig(t, errors.New("no hyprland_global_shortcuts_manager_v1"))
-	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, sessA, "org.app", Vardict{"shortcuts": dbus.MakeVariant("garbled")}); code != ResponseSuccess {
-		t.Fatalf("CreateSession = %d", code)
+	r, _, _ := shortcutsRig(t, errors.New("no hyprland_global_shortcuts_manager_v1"))
+	r.shortcutSession(t, sessA)
+	if code, bound := r.bind(t, sessA, shortcut{"mic", props("Mic")}); code != ResponseOther || len(bound) != 0 {
+		t.Errorf("bind = %d %v, want other", code, bound)
 	}
 	if got := r.listShortcuts(t, sessA); len(got) != 0 {
-		t.Errorf("garbled shortcuts listed %v", got)
+		t.Errorf("listed %v after a failed bind", got)
 	}
-	// Binds are accepted and kept; nothing will ever activate them.
-	code, _ := r.interactive(t, GlobalShortcutsIface+".BindShortcuts", handle, sessA, []shortcut{{"mic", props("Mic")}}, "", Vardict{})
-	if got := shortcutIDs(r.listShortcuts(t, sessA)); code != ResponseSuccess || !slices.Equal(got, []string{"mic=Mic"}) {
-		t.Errorf("bind = %d, listed %v", code, got)
+}
+
+// ConfigureShortcuts shows the session's shortcuts and returns at once;
+// an unknown session fails.
+func TestGlobalShortcutsConfigure(t *testing.T) {
+	r, _, d := shortcutsRig(t, nil)
+	r.shortcutSession(t, sessA)
+	r.bind(t, sessA, shortcut{"mic", props("Mic")})
+	if err := r.obj.Call(GlobalShortcutsIface+".ConfigureShortcuts", 0, sessA, "", Vardict{}).Err; err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return len(d.callers.Load()) == 2 })
+	if body := d.asked.Load()[0].(portaldialogs.AccessRequest).Body; !strings.Contains(body, "Mic") || !strings.Contains(body, "global, org.app:mic") {
+		t.Errorf("configure shows %q", body)
+	}
+	if err := r.obj.Call(GlobalShortcutsIface+".ConfigureShortcuts", 0, sessC, "", Vardict{}).Err; err == nil {
+		t.Error("ConfigureShortcuts on an unknown session succeeded")
+	}
+	if v, err := r.obj.GetProperty(GlobalShortcutsIface + ".version"); err != nil || v.Value() != uint32(2) {
+		t.Errorf("version = %v, %v", v, err)
 	}
 }
 
@@ -158,23 +265,30 @@ func TestShortcutKeySeparates(t *testing.T) {
 // every GlobalShortcuts session closes, and nothing is unregistered on
 // the dead connection.
 func TestGlobalShortcutsCloseWhenTheLoopEnds(t *testing.T) {
-	r, f := shortcutsRig(t, nil)
+	r, f, _ := shortcutsRig(t, nil)
 	if err := r.client.AddMatchSignal(dbus.WithMatchInterface(SessionIface)); err != nil {
 		t.Fatal(err)
 	}
-	opts := Vardict{"shortcuts": dbus.MakeVariant([]shortcut{{"mic", props("Mic")}})}
-	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, sessA, "org.app", opts); code != ResponseSuccess {
-		t.Fatal("CreateSession failed")
-	}
+	r.shortcutSession(t, sessA)
+	r.bind(t, sessA, shortcut{"mic", props("Mic")})
 	r.backend.shortcuts.loopEnded()
 	r.waitClosed(t, sessA)
 	if got := f.unregistered.Load(); len(got) != 0 {
 		t.Errorf("unregistered %v on a dead connection", got)
 	}
-	if code, _ := r.interactive(t, GlobalShortcutsIface+".CreateSession", handle, sessB, "org.app", opts); code != ResponseSuccess {
-		t.Fatal("a session after the loop ended failed")
-	}
+	r.shortcutSession(t, sessB)
+	r.bind(t, sessB, shortcut{"mic", props("Mic")})
 	if got := f.registered.Load(); len(got) != 2 {
 		t.Errorf("registered %v: the next session did not reach a fresh device", got)
+	}
+}
+
+// waitFor polls cond until it holds, failing after two seconds.
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); !cond(); time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("condition never held")
+		}
 	}
 }
