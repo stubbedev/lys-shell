@@ -66,16 +66,21 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	conf.Animations.Enabled = false
 	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4)}
 	hs.queue = make(chan func(), 256)
+	drained := make(chan struct{})
 	go func() {
+		defer close(drained)
 		for fn := range hs.queue {
 			hs.run(fn)
 		}
 	}()
+	// The loop ends with the test: work already queued runs out before
+	// the next test touches the widget package's loop state.
 	t.Cleanup(func() {
 		hs.qmu.Lock()
-		defer hs.qmu.Unlock()
 		hs.stopped = true
 		close(hs.queue)
+		hs.qmu.Unlock()
+		<-drained
 	})
 	hs.c = New(Deps{
 		Config: func() *config.Config { return conf },

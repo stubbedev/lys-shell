@@ -57,9 +57,6 @@ type Theme struct {
 // no user CSS), the Rust shell's behavior.
 func New(cfg *config.Config) *Theme {
 	t := &Theme{cfg: cfg}
-	if dir, err := config.Dir(); err == nil {
-		styling.EnsureUserStylesScaffold(dir)
-	}
 	t.Sheet = widget.NewStylesheet(t.Bundle(), Priority)
 	t.userStamp = userStylesStamp()
 	return t

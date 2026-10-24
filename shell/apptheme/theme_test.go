@@ -41,9 +41,13 @@ func TestBundleCarriesStaticThemeAndUserCSS(t *testing.T) {
 		t.Error("indicators off did not freeze the looping animations")
 	}
 	cfg.Animations.Indicators = true
-	// The scaffold was created, and a user rule lands last.
-	if _, err := os.Stat(filepath.Join(dir, "styles", "index.css")); err != nil {
-		t.Fatalf("scaffold: %v", err)
+	// Building a theme writes nothing (the shell scaffolds at startup),
+	// and a user rule lands last.
+	if _, err := os.Stat(filepath.Join(dir, "styles")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("building a theme touched the config dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "styles"), 0o700); err != nil {
+		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "styles", "index.css"), []byte(".bar .x { color: red; }"), 0o600); err != nil {
 		t.Fatal(err)

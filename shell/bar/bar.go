@@ -90,8 +90,12 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if application.Clipboard() == nil {
 		application.SetClipboard(app.NewClipboard(sess))
 	}
-	// The bars load the Rust stylesheet bundle; the surfaces it does not
-	// reach (OSD, popups, dropdowns) paint from the same resolved palette.
+	// The bars load the stylesheet bundle; the surfaces it does not
+	// reach (OSD, popups, dropdowns) paint from the same resolved
+	// palette. The shell gives the user a starter stylesheet to edit.
+	if dir, err := config.Dir(); err == nil {
+		styling.EnsureUserStylesScaffold(dir)
+	}
 	theme := apptheme.New(cfg)
 	theme.WatchUserStyles(application)
 	defer apptheme.Setup(application)()
