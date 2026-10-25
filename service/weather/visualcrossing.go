@@ -2,6 +2,7 @@ package weather
 
 import (
 	"context"
+	"math"
 	"net/url"
 	"time"
 )
@@ -38,6 +39,10 @@ type vcDay struct {
 }
 
 type vcResponse struct {
+	// Timezone and Tzoffset (hours) name the location's zone, the one
+	// the naive timestamps are in.
+	Timezone          string       `json:"timezone"`
+	Tzoffset          float64      `json:"tzoffset"`
 	CurrentConditions vcConditions `json:"currentConditions"`
 	Days              []vcDay      `json:"days"`
 }
@@ -54,6 +59,7 @@ func fetchVisualCrossing(ctx context.Context, key string, q LocationQuery, resol
 }
 
 func parseVisualCrossing(data *vcResponse, resolved Location, now time.Time) (*Weather, error) {
+	zone := time.FixedZone(data.Timezone, int(math.Round(data.Tzoffset*3600)))
 	cur := data.CurrentConditions
 	current, err := vcHour(cur, cur.Sunrise, cur.Sunset)
 	if err != nil {
@@ -61,7 +67,7 @@ func parseVisualCrossing(data *vcResponse, resolved Location, now time.Time) (*W
 	}
 	var hourly []Hourly
 	for _, day := range data.Days {
-		date, err := parseLocal(visualCrossingProvider, "2006-01-02", day.Datetime)
+		date, err := parseLocal(visualCrossingProvider, "2006-01-02", day.Datetime, zone)
 		if err != nil {
 			return nil, err
 		}
@@ -90,13 +96,13 @@ func parseVisualCrossing(data *vcResponse, resolved Location, now time.Time) (*W
 	}
 	daily := make([]Daily, 0, min(len(data.Days), 7))
 	for _, day := range data.Days[:min(len(data.Days), 7)] {
-		d, err := vcDaily(day)
+		d, err := vcDaily(day, zone)
 		if err != nil {
 			return nil, err
 		}
 		daily = append(daily, d)
 	}
-	return buildWeather(current.current(), hourly, daily, resolved, now), nil
+	return buildWeather(current.current(), hourly, daily, resolved, zone, now), nil
 }
 
 func vcHour(c vcConditions, sunrise, sunset string) (Hourly, error) {
@@ -122,7 +128,7 @@ func vcHour(c vcConditions, sunrise, sunset string) (Hourly, error) {
 	return out, errs.err
 }
 
-func vcDaily(day vcDay) (Daily, error) {
+func vcDaily(day vcDay, zone *time.Location) (Daily, error) {
 	p := visualCrossingProvider
 	out := Daily{
 		Condition:   vcCondition(day.Icon),
@@ -140,7 +146,7 @@ func vcDaily(day vcDay) (Daily, error) {
 		return Daily{}, errs.err
 	}
 	var err error
-	if out.Date, err = parseLocal(p, "2006-01-02", day.Datetime); err != nil {
+	if out.Date, err = parseLocal(p, "2006-01-02", day.Datetime, zone); err != nil {
 		return Daily{}, err
 	}
 	if out.Sunrise, err = vcTime(day.Sunrise); err != nil {

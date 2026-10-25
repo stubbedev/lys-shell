@@ -3,6 +3,7 @@ package weather
 import (
 	"context"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -54,6 +55,13 @@ type waForecastDay struct {
 }
 
 type waResponse struct {
+	// Location carries the location's clock: its local wall time
+	// beside the same instant, the zone the naive timestamps are in.
+	Location struct {
+		TzID           string `json:"tz_id"`
+		Localtime      string `json:"localtime"`
+		LocaltimeEpoch int64  `json:"localtime_epoch"`
+	} `json:"location"`
 	Current  waHour `json:"current"`
 	Forecast struct {
 		Forecastday []waForecastDay `json:"forecastday"`
@@ -72,6 +80,10 @@ func fetchWeatherAPI(ctx context.Context, key string, q LocationQuery, resolved 
 }
 
 func parseWeatherAPI(data *waResponse, resolved Location, now time.Time) (*Weather, error) {
+	zone, err := waZone(data)
+	if err != nil {
+		return nil, err
+	}
 	current, err := waHourly(data.Current)
 	if err != nil {
 		return nil, err
@@ -82,7 +94,7 @@ func parseWeatherAPI(data *waResponse, resolved Location, now time.Time) (*Weath
 			if len(hourly) >= 24 {
 				break
 			}
-			at, err := parseLocal(weatherAPIProvider, "2006-01-02 15:04", h.Time)
+			at, err := parseLocal(weatherAPIProvider, "2006-01-02 15:04", h.Time, zone)
 			if err != nil {
 				return nil, err
 			}
@@ -103,13 +115,25 @@ func parseWeatherAPI(data *waResponse, resolved Location, now time.Time) (*Weath
 	days := data.Forecast.Forecastday[:min(len(data.Forecast.Forecastday), 7)]
 	daily := make([]Daily, 0, len(days))
 	for _, day := range days {
-		d, err := waDaily(day)
+		d, err := waDaily(day, zone)
 		if err != nil {
 			return nil, err
 		}
 		daily = append(daily, d)
 	}
-	return buildWeather(current.current(), hourly, daily, resolved, now), nil
+	return buildWeather(current.current(), hourly, daily, resolved, zone, now), nil
+}
+
+// waZone is the location's zone: the offset between its local wall time
+// and the instant it names, to the minute.
+func waZone(data *waResponse) (*time.Location, error) {
+	loc := data.Location
+	wall, err := time.ParseInLocation("2006-01-02 15:04", loc.Localtime, time.UTC)
+	if err != nil {
+		return nil, parseError(weatherAPIProvider, "location localtime "+strconv.Quote(loc.Localtime)+": "+err.Error())
+	}
+	offset := wall.Sub(time.Unix(loc.LocaltimeEpoch, 0)).Round(time.Minute)
+	return time.FixedZone(loc.TzID, int(offset/time.Second)), nil
 }
 
 func waHourly(h waHour) (Hourly, error) {
@@ -135,7 +159,7 @@ func waHourly(h waHour) (Hourly, error) {
 	return out, errs.err
 }
 
-func waDaily(fd waForecastDay) (Daily, error) {
+func waDaily(fd waForecastDay, zone *time.Location) (Daily, error) {
 	p := weatherAPIProvider
 	d := fd.Day
 	out := Daily{
@@ -154,7 +178,7 @@ func waDaily(fd waForecastDay) (Daily, error) {
 		return Daily{}, errs.err
 	}
 	var err error
-	if out.Date, err = parseLocal(p, "2006-01-02", fd.Date); err != nil {
+	if out.Date, err = parseLocal(p, "2006-01-02", fd.Date, zone); err != nil {
 		return Daily{}, err
 	}
 	if out.Sunrise, err = wa12h(fd.Astro.Sunrise); err != nil {

@@ -166,7 +166,7 @@ func TestWeatherModuleFollowsTheService(t *testing.T) {
 	if _, err := newWeather(ctx); err == nil {
 		t.Fatal("a weather module without the service was built")
 	}
-	svc := fixedWeather(&weather.Weather{Current: weather.Current{Temperature: 20, Condition: weather.CondClear, IsDay: false}}, nil)
+	svc := fixedWeather(&weather.Weather{Zone: time.Local, Current: weather.Current{Temperature: 20, Condition: weather.CondClear, IsDay: false}}, nil)
 	defer svc.Close()
 	ctx.Weather = svc
 	ctx.gen = newMountGen()
@@ -197,6 +197,7 @@ func TestWeatherDropdownShowsTheStatusPage(t *testing.T) {
 	}
 
 	ok := fixedWeather(&weather.Weather{
+		Zone:    time.Local,
 		Current: weather.Current{Temperature: 11, Condition: weather.CondRain},
 		Hourly:  make([]weather.Hourly, 8),
 		Daily:   []weather.Daily{{Date: time.Now(), TempLow: 4, TempHigh: 12}},
@@ -323,6 +324,7 @@ func TestWeatherRefetchShowsTheLoadingPage(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	w := &weather.Weather{
+		Zone:    time.Local,
 		Current: weather.Current{Temperature: 11, Condition: weather.CondRain},
 		Hourly:  make([]weather.Hourly, 8),
 		Daily:   []weather.Daily{{Date: time.Now(), TempLow: 4, TempHigh: 12}},
@@ -386,6 +388,7 @@ func TestWeatherHeaderAndDailyWrappers(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	svc := fixedWeather(&weather.Weather{
+		Zone:      time.Local,
 		Current:   weather.Current{Temperature: 11, Condition: weather.CondRain},
 		Hourly:    make([]weather.Hourly, 8),
 		Daily:     []weather.Daily{{Date: time.Now(), TempLow: 4, TempHigh: 12}},
@@ -493,6 +496,7 @@ func TestWeatherHeaderAndDailyWrappers(t *testing.T) {
 func TestWeatherDropdownTreesMatchRust(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ok := fixedWeather(&weather.Weather{
+		Zone:    time.Local,
 		Current: weather.Current{Temperature: 11, Condition: weather.CondRain},
 		Hourly:  []weather.Hourly{{Temperature: 13}, {Temperature: 12}},
 		Daily:   []weather.Daily{{Date: time.Now(), TempLow: 4, TempHigh: 12}},
@@ -528,5 +532,33 @@ func TestWeatherDropdownTreesMatchRust(t *testing.T) {
 	header := classedBox(t, v, "dropdown-title")
 	if icons := treetest.All[*widget.Icon](header); len(icons) != 1 || icons[0].Visible() {
 		t.Error("the weather header shows its icon; the Rust header leaves it hidden")
+	}
+}
+
+// "Today" is the location's today: for a location whose date is not the
+// viewer's, the day it is there carries the label and the viewer's own
+// date does not.
+func TestWeatherTodayIsTheLocations(t *testing.T) {
+	now := time.Now()
+	zone := time.FixedZone("UTC+14", 14*3600)
+	if now.In(zone).YearDay() == now.YearDay() {
+		zone = time.FixedZone("UTC-12", -12*3600)
+	}
+	there := now.In(zone)
+	midnight := func(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, zone) }
+	locToday := midnight(there)
+	other := midnight(now.In(time.Local))
+	w := &weather.Weather{Zone: zone, Daily: []weather.Daily{{Date: other}, {Date: locToday}}}
+	if other.Equal(locToday) {
+		w.Daily = w.Daily[1:]
+	}
+	v := weatherDropdown(newTestContext(t, config.Defaults())).(*weatherView)
+	days := treetest.WithClass(v.daily(w, false), "daily-day")
+	for i, d := range w.Daily {
+		got := days[i].(*widget.Label).Text()
+		isToday := d.Date.Equal(locToday)
+		if isToday != (got == i18n.T("dropdown-weather-today")) {
+			t.Errorf("day %v reads %q (location today %v)", d.Date, got, locToday)
+		}
 	}
 }

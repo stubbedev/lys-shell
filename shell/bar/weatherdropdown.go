@@ -388,7 +388,7 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		scale = 1
 	}
 	barPx := int(math.Round(weatherBarWidthRem * scale * styling.RemBase))
-	today := time.Now()
+	today := time.Now().In(w.Zone)
 	for _, d := range days {
 		isToday := d.Date.Year() == today.Year() && d.Date.YearDay() == today.YearDay()
 		name := weatherDayLabel(d.Date)

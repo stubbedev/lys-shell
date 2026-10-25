@@ -10,13 +10,15 @@ import (
 )
 
 // Weather is one fetch: the current conditions, the next 24 hours, the
-// next 7 days, the resolved location, and today's sunrise and sunset.
+// next 7 days, the resolved location, today's sunrise and sunset, and
+// the location's time zone, which every forecast time is in.
 type Weather struct {
 	Current   Current
 	Hourly    []Hourly
 	Daily     []Daily
 	Location  Location
 	Astronomy Astronomy
+	Zone      *time.Location
 	UpdatedAt time.Time
 }
 
@@ -38,7 +40,7 @@ type Current struct {
 	IsDay         bool
 }
 
-// Hourly is one forecast hour; Time is the location's local wall time.
+// Hourly is one forecast hour; Time is in the location's zone.
 type Hourly struct {
 	Time          time.Time
 	Temperature   Temperature
@@ -58,7 +60,8 @@ type Hourly struct {
 	IsDay         bool
 }
 
-// Daily is one forecast day; Date is midnight of that local date.
+// Daily is one forecast day; Date is midnight of that date in the
+// location's zone.
 type Daily struct {
 	Date             time.Time
 	Condition        Condition
@@ -339,10 +342,10 @@ func precipitation(provider string, mm float64) (Precipitation, error) {
 
 // buildWeather is provider/mod.rs build_weather: today's sun times come
 // from the first forecast day, 06:00/18:00 without one.
-func buildWeather(current Current, hourly []Hourly, daily []Daily, location Location, now time.Time) *Weather {
+func buildWeather(current Current, hourly []Hourly, daily []Daily, location Location, zone *time.Location, now time.Time) *Weather {
 	astro := Astronomy{Sunrise: TimeOfDay{Hour: 6}, Sunset: TimeOfDay{Hour: 18}}
 	if len(daily) > 0 {
 		astro = Astronomy{Sunrise: daily[0].Sunrise, Sunset: daily[0].Sunset}
 	}
-	return &Weather{Current: current, Hourly: hourly, Daily: daily, Location: location, Astronomy: astro, UpdatedAt: now}
+	return &Weather{Current: current, Hourly: hourly, Daily: daily, Location: location, Astronomy: astro, Zone: zone, UpdatedAt: now}
 }

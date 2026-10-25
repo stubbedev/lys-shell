@@ -67,6 +67,7 @@ func TestWorldClockDefaultsMatchSchema(t *testing.T) {
 
 func TestWeatherFormatLabel(t *testing.T) {
 	w := &weather.Weather{
+		Zone: time.Local,
 		Current: weather.Current{
 			Temperature:   18.4,
 			FeelsLike:     17.9,

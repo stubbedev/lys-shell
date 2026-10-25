@@ -22,8 +22,12 @@ const (
 // openMeteoResponse is open_meteo/types.rs ApiResponse: parallel arrays
 // per hour and per day.
 type openMeteoResponse struct {
-	Hourly openMeteoHourly `json:"hourly"`
-	Daily  openMeteoDaily  `json:"daily"`
+	// Timezone and UTCOffsetSeconds name the location's zone, the one
+	// the naive timestamps are in (timezone=auto).
+	Timezone         string          `json:"timezone"`
+	UTCOffsetSeconds int             `json:"utc_offset_seconds"`
+	Hourly           openMeteoHourly `json:"hourly"`
+	Daily            openMeteoDaily  `json:"daily"`
 }
 
 type openMeteoHourly struct {
@@ -82,8 +86,9 @@ func fetchOpenMeteo(ctx context.Context, resolved Location, now time.Time) (*Wea
 // parseOpenMeteo builds the model: the current conditions are the
 // hour in progress, the hourly forecast the 24 hours from it.
 func parseOpenMeteo(data *openMeteoResponse, resolved Location, now time.Time) (*Weather, error) {
+	zone := time.FixedZone(data.Timezone, data.UTCOffsetSeconds)
 	h := &data.Hourly
-	start := currentHourIndex(h.Time, now)
+	start := currentHourIndex(h.Time, now, zone)
 	current, err := openMeteoHour(h, start)
 	if err != nil {
 		return nil, err
@@ -95,16 +100,16 @@ func parseOpenMeteo(data *openMeteoResponse, resolved Location, now time.Time) (
 		if err != nil {
 			return nil, err
 		}
-		if hour.Time, err = parseLocal(openMeteoProvider, "2006-01-02T15:04", h.Time[i]); err != nil {
+		if hour.Time, err = parseLocal(openMeteoProvider, "2006-01-02T15:04", h.Time[i], zone); err != nil {
 			return nil, err
 		}
 		hourly = append(hourly, hour)
 	}
-	daily, err := openMeteoDays(data, 7)
+	daily, err := openMeteoDays(data, 7, zone)
 	if err != nil {
 		return nil, err
 	}
-	return buildWeather(current.current(), hourly, daily, resolved, now), nil
+	return buildWeather(current.current(), hourly, daily, resolved, zone, now), nil
 }
 
 // current drops the forecast-only fields.
@@ -119,10 +124,11 @@ func (h Hourly) current() Current {
 }
 
 // currentHourIndex is find_current_hour_index: the hour before the
-// first one still ahead of now, or 0 when the forecast lags behind.
-func currentHourIndex(times []string, now time.Time) int {
+// first one still ahead of now, or 0 when the forecast lags behind. The
+// stamps are wall times in zone, the location's.
+func currentHourIndex(times []string, now time.Time, zone *time.Location) int {
 	for i, stamp := range times {
-		t, err := time.ParseInLocation("2006-01-02T15:04", stamp, now.Location())
+		t, err := time.ParseInLocation("2006-01-02T15:04", stamp, zone)
 		if err == nil && t.After(now) {
 			return max(i-1, 0)
 		}
@@ -158,7 +164,7 @@ func openMeteoHour(h *openMeteoHourly, i int) (Hourly, error) {
 
 // openMeteoDays is build_daily: the first count days, each with its
 // sun times and the mean of the high and low.
-func openMeteoDays(data *openMeteoResponse, count int) ([]Daily, error) {
+func openMeteoDays(data *openMeteoResponse, count int, zone *time.Location) ([]Daily, error) {
 	d := &data.Daily
 	n := min(len(d.Time), count)
 	days := make([]Daily, 0, n)
@@ -180,7 +186,7 @@ func openMeteoDays(data *openMeteoResponse, count int) ([]Daily, error) {
 			return nil, r.err
 		}
 		var err error
-		if day.Date, err = parseLocal(openMeteoProvider, "2006-01-02", d.Time[i]); err != nil {
+		if day.Date, err = parseLocal(openMeteoProvider, "2006-01-02", d.Time[i], zone); err != nil {
 			return nil, err
 		}
 		if day.Sunrise, err = openMeteoTimeOfDay(d.Sunrise, i); err != nil {
@@ -198,16 +204,18 @@ func openMeteoTimeOfDay(values []string, i int) (TimeOfDay, error) {
 	if i >= len(values) {
 		return TimeOfDay{}, parseError(openMeteoProvider, "missing data")
 	}
-	t, err := parseLocal(openMeteoProvider, "2006-01-02T15:04", values[i])
+	// Only the wall clock is read, so the zone does not matter.
+	t, err := parseLocal(openMeteoProvider, "2006-01-02T15:04", values[i], time.UTC)
 	if err != nil {
 		return TimeOfDay{}, err
 	}
 	return TimeOfDay{Hour: t.Hour(), Minute: t.Minute()}, nil
 }
 
-// parseLocal parses a provider's naive local timestamp.
-func parseLocal(provider, layout, value string) (time.Time, error) {
-	t, err := time.ParseInLocation(layout, value, time.Local)
+// parseLocal parses a provider's naive timestamp, a wall time in the
+// location's zone.
+func parseLocal(provider, layout, value string, zone *time.Location) (time.Time, error) {
+	t, err := time.ParseInLocation(layout, value, zone)
 	if err != nil {
 		return time.Time{}, parseError(provider, err.Error())
 	}

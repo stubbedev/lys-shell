@@ -74,15 +74,25 @@ func TestCardinalBuckets(t *testing.T) {
 	}
 }
 
+// The stamps are the location's wall times: the hour in progress is
+// judged in its zone, whatever the viewer's.
 func TestCurrentHourIndexIsTheHourInProgress(t *testing.T) {
-	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.Local)
+	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.UTC)
 	times := []string{"2026-10-01T12:00", "2026-10-01T13:00", "2026-10-01T14:00", "2026-10-01T15:00"}
-	if got := currentHourIndex(times, now); got != 2 {
+	if got := currentHourIndex(times, now, time.UTC); got != 2 {
 		t.Errorf("index = %d, want 2 (14:00 is in progress)", got)
 	}
 	// A forecast entirely in the past falls back to 0.
-	if got := currentHourIndex(times[:2], now); got != 0 {
+	if got := currentHourIndex(times[:2], now, time.UTC); got != 0 {
 		t.Errorf("stale forecast index = %d, want the fallback 0", got)
+	}
+	// Two hours east of UTC, 14:30 UTC is 16:30 there: past every stamp.
+	if got := currentHourIndex(times, now, time.FixedZone("UTC+2", 2*3600)); got != 0 {
+		t.Errorf("east index = %d, want the stale fallback", got)
+	}
+	// Seven hours west, 14:30 UTC is 07:30 there: before the first stamp.
+	if got := currentHourIndex(times, now, time.FixedZone("UTC-7", -7*3600)); got != 0 {
+		t.Errorf("west index = %d, want 0 (no stamp has started)", got)
 	}
 }
 
@@ -97,7 +107,7 @@ func TestParseLocationCoordinatesOrCity(t *testing.T) {
 }
 
 // openMeteoFixture is a two-hour, one-day Open-Meteo reply.
-func openMeteoFixture(hours ...string) string {
+func openMeteoFixture(offset int, hours ...string) string {
 	n := len(hours)
 	arr := func(v float64) string {
 		parts := make([]string, n)
@@ -110,7 +120,7 @@ func openMeteoFixture(hours ...string) string {
 	for i, h := range hours {
 		quoted[i] = `"` + h + `"`
 	}
-	return `{"hourly":{"time":[` + strings.Join(quoted, ",") + `],` +
+	return fmt.Sprintf(`{"timezone":"Fixture","utc_offset_seconds":%d,`, offset) + `"hourly":{"time":[` + strings.Join(quoted, ",") + `],` +
 		`"temperature_2m":` + arr(21.5) + `,"relative_humidity_2m":` + arr(60) + `,"apparent_temperature":` + arr(20) +
 		`,"precipitation_probability":` + arr(30) + `,"precipitation":` + arr(0.2) + `,"weather_code":` + arr(61) +
 		`,"cloud_cover":` + arr(140) + `,"pressure_msl":` + arr(1013) + `,"visibility":` + arr(24000) +
@@ -142,8 +152,8 @@ func repoint(t *testing.T, target *string, url string) {
 }
 
 func TestOpenMeteoParsesAndClampsTheReadings(t *testing.T) {
-	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.Local)
-	repoint(t, &OpenMeteoURL, serveJSON(t, 200, openMeteoFixture("2026-10-01T14:00", "2026-10-01T15:00"), nil))
+	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.UTC)
+	repoint(t, &OpenMeteoURL, serveJSON(t, 200, openMeteoFixture(0, "2026-10-01T14:00", "2026-10-01T15:00"), nil))
 	w, err := fetchOpenMeteo(context.Background(), Location{City: "Berlin", Lat: 52.5, Lon: 13.4}, now)
 	if err != nil {
 		t.Fatal(err)
@@ -174,7 +184,7 @@ func TestOpenMeteoParsesAndClampsTheReadings(t *testing.T) {
 func TestOpenMeteoMissingDataIsAParseError(t *testing.T) {
 	body := `{"hourly":{"time":["2026-10-01T14:00"],"temperature_2m":[]},"daily":{"time":[]}}`
 	repoint(t, &OpenMeteoURL, serveJSON(t, 200, body, nil))
-	_, err := fetchOpenMeteo(context.Background(), Location{}, time.Date(2026, 10, 1, 14, 30, 0, 0, time.Local))
+	_, err := fetchOpenMeteo(context.Background(), Location{}, time.Date(2026, 10, 1, 14, 30, 0, 0, time.UTC))
 	var e *Error
 	if !errors.As(err, &e) || e.Kind != ErrOther || e.Retryable() || !strings.Contains(err.Error(), "missing data") {
 		t.Fatalf("err = %v, want a non-retryable missing-data parse error", err)
@@ -206,12 +216,12 @@ func TestHTTPStatusesMapToTheRustErrors(t *testing.T) {
 }
 
 func TestVisualCrossingSkipsPastHoursAndReadsIcons(t *testing.T) {
-	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.Local)
+	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.UTC)
 	hour := func(at, icon string) string {
 		return `{"datetime":"` + at + `","temp":10,"feelslike":9,"humidity":50,"dew":3,"windspeed":5,"winddir":90,` +
 			`"pressure":1000,"visibility":10,"cloudcover":20,"uvindex":1,"icon":"` + icon + `","precipprob":70}`
 	}
-	body := `{"currentConditions":{"datetime":"20:00:00","temp":11,"feelslike":10,"humidity":40,"dew":2,"windspeed":4,` +
+	body := `{"timezone":"UTC","tzoffset":0,"currentConditions":{"datetime":"20:00:00","temp":11,"feelslike":10,"humidity":40,"dew":2,"windspeed":4,` +
 		`"winddir":180,"pressure":1001,"visibility":9,"cloudcover":10,"uvindex":0,"icon":"clear-night","sunrise":"07:00:00","sunset":"19:00:00"},` +
 		`"days":[{"datetime":"2026-10-01","tempmax":15,"tempmin":5,"temp":10,"feelslike":9,"humidity":60,"dew":3,"windspeed":7,` +
 		`"winddir":0,"pressure":1002,"cloudcover":30,"visibility":10,"uvindex":3,"sunrise":"07:00:00","sunset":"19:00:00",` +
@@ -237,12 +247,12 @@ func TestVisualCrossingSkipsPastHoursAndReadsIcons(t *testing.T) {
 }
 
 func TestWeatherAPIParses12HourSunTimes(t *testing.T) {
-	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.Local)
+	now := time.Date(2026, 10, 1, 14, 30, 0, 0, time.UTC)
 	h := func(at string, code int) string {
 		return fmt.Sprintf(`{"time":%q,"temp_c":8,"is_day":1,"condition":{"code":%d},"wind_kph":3,"wind_degree":45,`+
 			`"pressure_mb":990,"precip_mm":0,"humidity":80,"cloud":90,"feelslike_c":6,"vis_km":5,"uv":2,"gust_kph":9,"dewpoint_c":4,"chance_of_rain":55}`, at, code)
 	}
-	body := `{"current":` + h("", 1009) + `,"forecast":{"forecastday":[{"date":"2026-10-01",` +
+	body := `{"location":{"tz_id":"UTC","localtime":"2026-10-01 14:30","localtime_epoch":` + fmt.Sprint(now.Unix()) + `},"current":` + h("", 1009) + `,"forecast":{"forecastday":[{"date":"2026-10-01",` +
 		`"day":{"maxtemp_c":10,"mintemp_c":2,"avgtemp_c":7,"maxwind_kph":15,"totalprecip_mm":3,"avghumidity":70,"daily_chance_of_rain":60,"condition":{"code":1195},"uv":2},` +
 		`"astro":{"sunrise":"06:58 AM","sunset":"06:41 pm"},"hour":[` + h("2026-10-01 14:00", 1183) + `,` + h("2026-10-01 15:00", 1279) + `]}]}}`
 	repoint(t, &WeatherAPIURL, serveJSON(t, 200, body, nil))
@@ -403,5 +413,63 @@ func TestFailedStatusCarriesTheProviderAndQuery(t *testing.T) {
 	}
 	if st := failedStatus(errors.New("plain")); st.Error != ErrOther {
 		t.Errorf("plain error status = %+v", st)
+	}
+}
+
+// A forecast for a location seven hours west of UTC reads in that
+// location's zone: at 21:30 UTC it is 14:30 there, so the current
+// conditions are its 14:00 hour and the days are its dates.
+func TestOpenMeteoReadsTheLocationsZone(t *testing.T) {
+	now := time.Date(2026, 10, 1, 21, 30, 0, 0, time.UTC)
+	repoint(t, &OpenMeteoURL, serveJSON(t, 200, openMeteoFixture(-7*3600, "2026-10-01T13:00", "2026-10-01T14:00", "2026-10-01T15:00"), nil))
+	w, err := fetchOpenMeteo(context.Background(), Location{City: "San Francisco"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(w.Hourly) != 2 || w.Hourly[0].Time.Hour() != 14 || !w.Hourly[0].Time.Equal(time.Date(2026, 10, 1, 21, 0, 0, 0, time.UTC)) {
+		t.Errorf("hourly starts %v, want the location's 14:00 (21:00 UTC)", w.Hourly[0].Time)
+	}
+	if _, off := now.In(w.Zone).Zone(); off != -7*3600 {
+		t.Errorf("zone offset %d, want -7h", off)
+	}
+	if d := w.Daily[0].Date; !d.Equal(time.Date(2026, 10, 1, 7, 0, 0, 0, time.UTC)) {
+		t.Errorf("day 0 is %v, want midnight Oct 1 there (07:00 UTC)", d)
+	}
+}
+
+// WeatherAPI's location clock gives the zone: its local wall time beside
+// the instant; Visual Crossing names its offset in hours.
+func TestKeyedProvidersReadTheLocationsZone(t *testing.T) {
+	now := time.Date(2026, 10, 1, 21, 30, 0, 0, time.UTC)
+	wa := `{"location":{"tz_id":"America/Los_Angeles","localtime":"2026-10-01 14:30","localtime_epoch":` + fmt.Sprint(now.Unix()) + `},` +
+		`"current":{"time":"","temp_c":8,"condition":{"code":1000}},"forecast":{"forecastday":[{"date":"2026-10-01",` +
+		`"day":{"maxtemp_c":10,"mintemp_c":2,"condition":{"code":1000}},"astro":{"sunrise":"07:00 AM","sunset":"06:40 PM"},"hour":[` +
+		`{"time":"2026-10-01 14:00","temp_c":8,"condition":{"code":1000}},{"time":"2026-10-01 15:00","temp_c":8,"condition":{"code":1000}}]}]}}`
+	repoint(t, &WeatherAPIURL, serveJSON(t, 200, wa, nil))
+	w, err := fetchWeatherAPI(context.Background(), "k", Coords(1, 2), Location{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, off := now.In(w.Zone).Zone(); off != -7*3600 {
+		t.Errorf("weatherapi zone offset %d, want -7h", off)
+	}
+	if len(w.Hourly) != 1 || w.Hourly[0].Time.Hour() != 15 {
+		t.Errorf("weatherapi hourly %+v, want only the location's 15:00 ahead of its 14:30", w.Hourly)
+	}
+	repoint(t, &WeatherAPIURL, serveJSON(t, 200, `{"location":{"localtime":"bogus"},"current":{},"forecast":{"forecastday":[]}}`, nil))
+	if _, err := fetchWeatherAPI(context.Background(), "k", Coords(1, 2), Location{}, now); err == nil || !strings.Contains(err.Error(), "localtime") {
+		t.Errorf("an unreadable location clock = %v, want a parse error naming it", err)
+	}
+
+	vc := `{"timezone":"America/Los_Angeles","tzoffset":-7.0,"currentConditions":{"datetime":"14:30:00","icon":"clear-day","sunrise":"07:00:00","sunset":"18:40:00"},` +
+		`"days":[{"datetime":"2026-10-01","tempmax":15,"tempmin":5,"icon":"clear-day","sunrise":"07:00:00","sunset":"18:40:00","hours":[` +
+		`{"datetime":"14:00:00","icon":"clear-day"},{"datetime":"15:00:00","icon":"clear-day"}]}]}`
+	repoint(t, &VisualCrossingURL, serveJSON(t, 200, vc, nil))
+	w, err = fetchVisualCrossing(context.Background(), "k", City("San Francisco"), Location{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(w.Hourly) != 1 || w.Hourly[0].Time.Hour() != 15 || !w.Hourly[0].Time.Equal(time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)) {
+		t.Errorf("visual crossing hourly %+v, want the location's 15:00 (22:00 UTC)", w.Hourly)
 	}
 }
