@@ -4,18 +4,9 @@
   background: transparent;
 }
 
-.portal-dialog-surface {
-  box-shadow: var(--shadow);
-}
-
+.portal-dialog-surface,
 .print-surface {
-  background: var(--bg-base);
-  color: var(--fg-default);
-  font-family: var(--font-sans);
-  border: 1px solid var(--border-default);
-  border-radius: var(--rounding-container);
   box-shadow: var(--shadow);
-  padding: var(--space-lg);
 }
 
 .file-chooser-surface {
@@ -307,8 +298,7 @@ button.file-chooser-filter:checked {
   background: var(--accent-hover);
 }
 
-.file-chooser-title,
-.print-title {
+.file-chooser-title {
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   color: var(--fg-default);
@@ -350,22 +340,6 @@ button.file-chooser-filter:checked {
 .portal-dialog-app-list row:selected .portal-dialog-app-name,
 .portal-dialog-app-list row:selected .portal-dialog-app-desc {
   color: var(--fg-on-accent);
-}
-
-.print-form-label {
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-}
-
-.print-printer-name {
-  font-weight: var(--weight-medium);
-  color: var(--fg-default);
-}
-
-.print-printer-detail {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
 }
 
 .print-printer-list row:selected .print-printer-name,

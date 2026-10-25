@@ -16,12 +16,14 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // The sheet's geometry (shell/print: the surface's width request, the
@@ -30,8 +32,6 @@ const (
 	surfaceWidth  = 460
 	listMinHeight = 64
 	listMaxHeight = 240
-	formColGap    = 12
-	formRowGap    = 8
 	escapeKeycode = 1
 )
 
@@ -290,23 +290,15 @@ func (h *Dialog) finish(p prepared, ok bool) {
 	h.queue.Done()
 }
 
-func (h *Dialog) label(text, class string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, 13, text, 0)
-	l.AddClass(class)
+// label is a one-line label at lys-ui's text size.
+func (h *Dialog) label(text string, classes ...string) *widget.Label {
+	l := widget.NewLabel(h.d.Font, widget.Current().TextSize, text, 0)
+	l.AddClass(classes...)
 	return l
 }
 
-func (h *Dialog) button(text, class string, onClick func()) *widget.Button {
-	l := h.label(text, class+"-label")
-	l.SetAlignment(render.AlignCenter)
-	b := widget.NewButton(l, 0, 0)
-	b.AddClass(class)
-	b.OnClick = onClick
-	return b
-}
-
 func (h *Dialog) dropdown(items []string) *widget.Dropdown {
-	return widget.NewDropdown(h.d.Font, 13, items, 0)
+	return widget.NewDropdown(h.d.Font, widget.Current().TextSize, items, 0)
 }
 
 // labelsOf is a choice list's labels.
@@ -318,14 +310,15 @@ func labelsOf[T comparable](items []T, label func(T) string) []string {
 	return out
 }
 
-// printerRow is printer_row: the name over the location and status,
-// inside the row's 6px/10px margins.
+// printerRow is printer_row: the name over the location and status as
+// a dim caption, inset by the theme's padding.
 func (h *Dialog) printerRow(q queue) widget.Widget {
+	th := widget.Current()
 	row := widget.NewBox(widget.Column, 0, 0)
-	row.SetMargin(render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10})
+	row.SetMargin(render.Insets{Top: th.Padding, Right: th.Padding + th.Padding/2, Bottom: th.Padding, Left: th.Padding + th.Padding/2})
 	row.Append(h.label(q.name, "print-printer-name"), false)
 	if q.detail != "" {
-		row.Append(h.label(q.detail, "print-printer-detail"), false)
+		row.Append(h.label(q.detail, "print-printer-detail", css.Caption, css.DimLabel), false)
 	}
 	return row
 }
@@ -369,7 +362,8 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 	printers.SetSizeRequest(0, listMinHeight)
 
 	initial := initialForm(r, queues[start].caps)
-	copies := widget.NewSpinButton(h.d.Font, 13, 0, minCopies, maxCopies, 1, 0)
+	th := widget.Current()
+	copies := widget.NewSpinButton(h.d.Font, th.TextSize, 0, minCopies, maxCopies, 1, 0)
 	copies.SetValue(float64(initial.copies))
 	pageKinds := []pagesKind{pagesAll}
 	if r.HasCurrentPage {
@@ -383,7 +377,7 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 		return [...]string{"All pages", "Current page", "Selection", "Range"}[k]
 	}}
 	pagesDrop.refill(pageKinds, initial.pages)
-	ranges := widget.NewEntry(h.d.Font, 13, 0)
+	ranges := widget.NewEntry(h.d.Font, th.TextSize, 0)
 	ranges.SetPlaceholder("e.g. 1-5, 8")
 	ranges.SetText(initial.ranges)
 	ranges.OnChanged = func(text string) {
@@ -413,7 +407,7 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 	}
 	offer(queues[start].caps, initial)
 
-	grid := widget.NewGrid(formColGap, formRowGap)
+	grid := widget.NewGrid(2*th.Spacing, th.Spacing)
 	grid.AddClass("print-form")
 	for i, row := range []struct {
 		label   string
@@ -431,7 +425,7 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 		{"Two-sided", sideDrop.drop},
 		{"Quality", qualityDrop.drop},
 	} {
-		grid.Attach(h.label(row.label, "print-form-label"), 0, i, 1, 1)
+		grid.Attach(h.label(row.label, "print-form-label", css.DimLabel), 0, i, 1, 1)
 		row.control.SetHExpand(true)
 		grid.Attach(row.control, 1, i, 1, 1)
 	}
@@ -442,7 +436,7 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 	}
 	output := SuggestedOutput(h.d.Home, outputFormat(r.OutputFormats))
 	outputLabel := h.label(output, "print-output-path")
-	replaceNote := h.label("", "print-output-replace")
+	replaceNote := widgets.DialogText(h.d.Font, "", "print-output-replace", css.Warning)
 	replaceNote.SetVisible(false)
 	confirmedReplace := false
 	setOutput := func(path string) {
@@ -450,10 +444,10 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 		outputLabel.SetText(path)
 		replaceNote.SetVisible(false)
 	}
-	outputRow := widget.NewBox(widget.Row, 8, 0)
+	outputRow := widget.NewBox(widget.Row, th.Spacing, 0)
 	outputRow.AddClass("print-output")
 	outputRow.Append(outputLabel, true)
-	outputRow.Append(h.button("Choose…", "print-output-choose", func() {
+	outputRow.Append(widgets.DialogButton(h.d.Font, "Choose…", "print-output-choose", css.Outline, func() {
 		if h.d.PickOutput != nil {
 			h.d.PickOutput(output, setOutput)
 		}
@@ -497,17 +491,13 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 		}
 		h.finish(prepared{printer: queues[sel].name, form: f}, true)
 	}
-	actions := widget.NewBox(widget.Row, 8, 0)
-	actions.Append(widget.NewSpacer(0, 0), true)
-	actions.Append(h.button("Cancel", "portal-dialog-cancel", func() { h.finish(prepared{}, false) }), false)
-	printButton := h.button(acceptLabel, "portal-dialog-confirm", confirm)
-	printButton.AddClass("suggested-action")
-	actions.Append(printButton, false)
+	actions := widgets.DialogActions(
+		widgets.DialogButton(h.d.Font, "Cancel", "portal-dialog-cancel", css.Outline, func() { h.finish(prepared{}, false) }),
+		widgets.DialogButton(h.d.Font, acceptLabel, "portal-dialog-confirm", css.SuggestedAction, confirm),
+	)
 
-	surface := widget.NewBox(widget.Column, 12, 0)
-	surface.AddClass("print-surface")
-	surface.SetSizeRequest(surfaceWidth, 0)
-	surface.Append(h.label("Print", "print-title"), false)
+	surface := widgets.DialogCard("print-surface", surfaceWidth)
+	surface.Append(widgets.DialogTitle(h.d.Font, "Print", "print-title"), false)
 	surface.Append(printers, false)
 	surface.Append(grid, false)
 	surface.Append(outputRow, false)

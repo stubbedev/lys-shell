@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
@@ -525,5 +526,40 @@ func TestDismissCancelsItsRequestOnly(t *testing.T) {
 		}
 	case <-time.After(treetest.Liveness):
 		t.Fatal("Dismiss left the dialog waiting")
+	}
+}
+
+// The sheet stands on lys-ui's parts, as the portal dialogs do: its
+// card, the heading title, the form's labels dim, a printer's detail a
+// dim caption, the replace note a warning, Cancel outline and Print the
+// suggested action.
+func TestSheetTakesLysUiParts(t *testing.T) {
+	hs := newHarness(t)
+	_, c := hs.prepare(t)
+	has := func(class string, want ...string) {
+		t.Helper()
+		ws := treetest.WithClass(c.Root, class)
+		if len(ws) == 0 {
+			t.Fatalf("no .%s", class)
+		}
+		for _, w := range ws {
+			for _, cl := range want {
+				if !widget.HasClass(w, cl) {
+					t.Errorf(".%s lacks .%s", class, cl)
+				}
+			}
+		}
+	}
+	has("print-surface", css.Card)
+	has("print-title", css.Heading)
+	has("print-form-label", css.DimLabel)
+	has("print-printer-detail", css.Caption, css.DimLabel)
+	has("print-output-replace", css.Warning)
+	has("portal-dialog-cancel", css.Outline)
+	has("portal-dialog-confirm", css.SuggestedAction)
+	for _, w := range treetest.WithClass(c.Root, "print-printer-name") {
+		if widget.HasClass(w, css.DimLabel) {
+			t.Error("a printer's name is dim")
+		}
 	}
 }

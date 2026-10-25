@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 type fakeWindow struct{ closed bool }
@@ -860,8 +861,8 @@ func TestDialogTakesLysUiParts(t *testing.T) {
 		t.Error("the requester is not a dim caption")
 	}
 	text := widget.Current().TextSize
-	if title := one("portal-dialog-title").(*widget.Label); !widget.HasClass(title, css.Heading) || title.SizePx() != text*titleScale {
-		t.Errorf("title %vpx, want a %vpx heading", title.SizePx(), text*titleScale)
+	if title := one("portal-dialog-title").(*widget.Label); !widget.HasClass(title, css.Heading) || title.SizePx() != text*widgets.DialogTitleScale {
+		t.Errorf("title %vpx, want a %vpx heading", title.SizePx(), text*widgets.DialogTitleScale)
 	}
 	if body := one("portal-dialog-body"); !widget.HasClass(body, css.DimLabel) || widget.HasClass(body, css.Heading) {
 		t.Error("the body is not dim text")

@@ -27,9 +27,8 @@ const (
 	surfaceWidth = 420
 	headerPx     = 64
 	// requesterIconPx is the requester's app icon, at the caption's
-	// size; titleScale steps a title over the text size.
+	// size.
 	requesterIconPx = 16
-	titleScale      = 1.125
 	wallpaperPx     = 180
 	appIconPx       = 32
 	appListHeight   = 360
@@ -176,15 +175,15 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 			}
 		}
 		setImage(info.Image)
-		name := widget.NewEntry(h.d.Font, h.textPx(), 0)
+		name := widget.NewEntry(h.d.Font, widget.Current().TextSize, 0)
 		name.AddClass("portal-dialog-entry")
 		name.SetText(info.Name)
-		choose := h.button("Choose picture…", "portal-dialog-picture", func() {
+		choose := widgets.DialogButton(h.d.Font, "Choose picture…", "portal-dialog-picture", css.Outline, func() {
 			if h.d.PickImage != nil {
 				h.d.PickImage(setImage)
 			}
 		})
-		remove := h.button("Remove picture", "portal-dialog-picture", func() { setImage("") })
+		remove := widgets.DialogButton(h.d.Font, "Remove picture", "portal-dialog-picture", css.Outline, func() { setImage("") })
 		share := func(ok bool, s string) {
 			if ok {
 				shared = AccountInfo{Name: strings.TrimSpace(name.Text()), Image: image}
@@ -263,7 +262,7 @@ func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, s
 		var entry *widget.Entry
 		if r.EditableName {
 			title = "Install launcher?"
-			entry = widget.NewEntry(h.d.Font, h.textPx(), 0)
+			entry = widget.NewEntry(h.d.Font, widget.Current().TextSize, 0)
 			entry.AddClass("portal-dialog-entry")
 			entry.SetText(r.Name)
 			extra = append(extra, entry)
@@ -328,27 +327,9 @@ func nonEmpty(parts ...string) []string {
 	return out
 }
 
-// textPx is lys-ui's text size, which every line of the dialogs takes.
-func (h *Dialogs) textPx() float64 { return widget.Current().TextSize }
-
 // label is a wrapping line at lys-ui's text size.
 func (h *Dialogs) label(text string, classes ...string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, h.textPx(), text, 0)
-	l.AddClass(classes...)
-	l.SetWrap(true)
-	return l
-}
-
-// button is a text button: lys-ui's look comes from the variant the
-// caller adds (outline, suggested action), the class names it.
-func (h *Dialogs) button(text, class string, onClick func()) *widget.Button {
-	l := h.label(text, class+"-label")
-	l.SetWrap(false)
-	l.SetAlignment(render.AlignCenter)
-	b := widget.NewButton(l, 0, 0)
-	b.AddClass(class)
-	b.OnClick = onClick
-	return b
+	return widgets.DialogText(h.d.Font, text, classes...)
 }
 
 // icon is a themed icon (or an icon file), nil for none.
@@ -413,30 +394,17 @@ func (h *Dialogs) requester() widget.Widget {
 	return row
 }
 
-// surface wraps the dialog's rows in lys-ui's card, spaced and padded
-// by the theme, under the row naming the requester.
+// surface wraps the dialog's rows in the dialog card, under the row
+// naming the requester.
 func (h *Dialogs) surface(rows ...widget.Widget) widget.Widget {
-	th := widget.Current()
-	box := widget.NewBox(widget.Column, 2*th.Spacing, 3*th.Padding)
-	box.AddClass(css.Card, "portal-dialog-surface")
+	box := widgets.DialogCard("portal-dialog-surface", surfaceWidth)
 	box.Append(h.requester(), false)
 	for _, r := range rows {
 		if r != nil {
 			box.Append(r, false)
 		}
 	}
-	box.SetSizeRequest(surfaceWidth, 0)
 	return box
-}
-
-// actions is the right-aligned button row.
-func (h *Dialogs) actions(buttons ...*widget.Button) widget.Widget {
-	row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
-	row.Append(widget.NewSpacer(0, 0), true)
-	for _, b := range buttons {
-		row.Append(b, false)
-	}
-	return row
 }
 
 // confirm is a yes/no dialog.
@@ -450,16 +418,13 @@ func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title
 		rows = append(rows, h.body(body))
 	}
 	rows = append(rows, extra...)
-	rows = append(rows, h.actions(h.cancel(cancel, answer), h.accept(confirm, func() { answer(true, "") })))
+	rows = append(rows, widgets.DialogActions(h.cancel(cancel, answer), h.accept(confirm, func() { answer(true, "") })))
 	return h.surface(rows...)
 }
 
-// title is a dialog's heading, a step over the text size.
+// title is a dialog's heading.
 func (h *Dialogs) title(text string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, h.textPx()*titleScale, text, 0)
-	l.AddClass("portal-dialog-title", css.Heading)
-	l.SetWrap(true)
-	return l
+	return widgets.DialogTitle(h.d.Font, text, "portal-dialog-title")
 }
 
 // body is a dialog's dim explanation under its title.
@@ -469,16 +434,12 @@ func (h *Dialogs) body(text string) *widget.Label {
 
 // cancel is the outline button that declines.
 func (h *Dialogs) cancel(text string, answer func(bool, string)) *widget.Button {
-	b := h.button(text, "portal-dialog-cancel", func() { answer(false, "") })
-	b.AddClass(css.Outline)
-	return b
+	return widgets.DialogButton(h.d.Font, text, "portal-dialog-cancel", css.Outline, func() { answer(false, "") })
 }
 
 // accept is the suggested action that confirms.
 func (h *Dialogs) accept(text string, onClick func()) *widget.Button {
-	b := h.button(text, "portal-dialog-confirm", onClick)
-	b.AddClass(css.SuggestedAction)
-	return b
+	return widgets.DialogButton(h.d.Font, text, "portal-dialog-confirm", css.SuggestedAction, onClick)
 }
 
 // chooser lists the request's apps in a ListBox of icon + name rows,
@@ -526,7 +487,7 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 	ac.refresh()
 	// gtk::SearchEntry: the list filters on search-changed, after the
 	// default delay.
-	search := widget.NewSearchEntry(h.d.Font, h.textPx(), "Search applications…")
+	search := widget.NewSearchEntry(h.d.Font, widget.Current().TextSize, "Search applications…")
 	search.AddClass("portal-dialog-search")
 	search.OnSearchChanged = func(q string) {
 		query = strings.ToLower(q)
@@ -554,7 +515,7 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 		search,
 		scroll,
 		rememberRow,
-		h.actions(h.cancel("Cancel", answer), open),
+		widgets.DialogActions(h.cancel("Cancel", answer), open),
 	)
 }
 
