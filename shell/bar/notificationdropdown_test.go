@@ -236,8 +236,8 @@ func TestNotificationGroupHeaderClickTargets(t *testing.T) {
 	v := notificationDropdown(ctx).(*notificationView)
 	defer v.dropdownClosed()
 	g := v.groups[0]
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 425, H: 725}})
-	v.Arrange(render.Rect{W: sz.W, H: sz.H})
+	v.Measure(widget.Constraints{Max: widget.Size{W: 425, H: 725}})
+	v.Arrange(render.Rect{W: 425, H: 725})
 
 	header := g.head
 	routeClick(v, header)
@@ -270,8 +270,8 @@ func TestNotificationMoreRowShowsAll(t *testing.T) {
 	v := notificationDropdown(ctx).(*notificationView)
 	defer v.dropdownClosed()
 	g := v.groups[0]
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 425, H: 725}})
-	v.Arrange(render.Rect{W: sz.W, H: sz.H})
+	v.Measure(widget.Constraints{Max: widget.Size{W: 425, H: 725}})
+	v.Arrange(render.Rect{W: 425, H: 725})
 
 	more, ok := findByClass(g, "notification-dropdown-group-more").(*widget.Button)
 	if !ok || !more.HasClass(css.Link) || !g.moreRow.Visible() {

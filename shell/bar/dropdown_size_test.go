@@ -197,3 +197,36 @@ func TestPanelWidthIsRequestOrPreferredWidth(t *testing.T) {
 		t.Errorf("an ellipsizing name sized the panel %d, want its %dpx natural width past the request", w, nat)
 	}
 }
+
+// A sized card is a floor: content that does not fit, with no scroll of
+// its own, grows the card rather than being cut off under its edge (the
+// network dropdown's wired card and VPN list).
+func TestDropdownSizeGrowsForContentThatCannotScroll(t *testing.T) {
+	cfg := config.Defaults()
+	isolateConfigDir(t)
+	root, _ := dropdownTree(newPanelBox(widget.NewSpacer(10, 690)), cfg, 382, 512)
+	apptheme.New(cfg).Attach(root)
+	if sz := widget.MeasureAsChild(root, widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}); sz.H < 690 {
+		t.Errorf("a card holding 690px that cannot scroll is %dpx tall, want it grown to fit", sz.H)
+	}
+}
+
+// A dropdown without a height grows to fit its content even when that
+// content sits in a scroll (the dashboard, mail): the scroll asks for
+// its content's height. A plain dropdown scroll would ask for none.
+func TestGrowingDropdownScrollAsksForItsContent(t *testing.T) {
+	cfg := config.Defaults()
+	isolateConfigDir(t)
+	con := widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}
+	list := func() widget.Widget { return widget.NewSpacer(10, 700) }
+	grown, _ := dropdownTree(newPanelBox(growingScroll(dropdownScroll(list(), ""))), cfg, 380, 0)
+	apptheme.New(cfg).Attach(grown)
+	if sz := widget.MeasureAsChild(grown, con); sz.H < 700 {
+		t.Errorf("a growing dropdown over a 700px scroll is %dpx tall, want its content's height", sz.H)
+	}
+	plain, _ := dropdownTree(newPanelBox(dropdownScroll(list(), "")), cfg, 380, 0)
+	apptheme.New(cfg).Attach(plain)
+	if sz := widget.MeasureAsChild(plain, con); sz.H >= 700 {
+		t.Errorf("a plain dropdown scroll asked for %dpx, want none of its content's height", sz.H)
+	}
+}

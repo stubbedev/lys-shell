@@ -118,6 +118,15 @@ func scrolledCard(card widget.Widget, class string) *widget.Scroll {
 	return dropdownScroll(atTop(card), class)
 }
 
+// growingScroll is a dropdownScroll for a dropdown that grows to fit
+// its content (no configured height): it asks for its content's
+// height, and scrolls only once the monitor's clamp holds it shorter.
+// A sized dropdown's scroll asks for none and fills the card instead.
+func growingScroll(s *widget.Scroll) *widget.Scroll {
+	s.PropagateNaturalHeight = true
+	return s
+}
+
 // itemCard is a list card: lys-ui's card around an ItemGroup, which
 // sets its rows apart with separators.
 func itemCard() (*widget.Box, *widget.ItemGroup) {

@@ -528,3 +528,19 @@ func TestDashboardQuickActionTileCenters(t *testing.T) {
 		t.Errorf("the label sits %dpx off the cell's center", d)
 	}
 }
+
+// The dashboard grows to fit its sections: the scroll over them asks
+// for their height, so a dropdown without a configured height does not
+// collapse to its header.
+func TestDashboardGrowsToItsSections(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	v := dashboardDropdown(ctx).(*dashboardView)
+	w, h, _ := dropdownDims("dashboard", ctx.Config)
+	card, _ := dropdownTree(v, ctx.Config, w, h)
+	ctx.Theme.Attach(card)
+	sz := widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: 2000, H: 4000}})
+	sections := widget.MeasureAsChild(treetest.WithClass(v, "dashboard-scroll")[0].(*widget.Scroll).Children()[0], widget.Constraints{Max: widget.Size{W: w, H: 4000}})
+	if h > 0 || sz.H < sections.H {
+		t.Errorf("the dashboard (height %d) measures %dpx over %dpx of sections, want it grown to fit them", h, sz.H, sections.H)
+	}
+}

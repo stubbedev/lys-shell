@@ -40,7 +40,7 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	card.AddClass("mail-dropdown-list")
 	v.list = list
 	v.pages = widget.NewStack()
-	v.pages.Add("accounts", scrolledCard(card, ""))
+	v.pages.Add("accounts", growingScroll(scrolledCard(card, "")))
 	v.pages.Add("empty", widgets.EmptyState(font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-empty"), ""))
 	content := dropdownContent()
 	content.Append(v.pages, true)

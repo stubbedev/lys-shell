@@ -418,16 +418,16 @@ func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 // surface in the dropdown's color). The theme reaches it through the
 // bar button it opens from: lys-ui styles a popover as a child of its
 // anchor, as GTK's popover CSS node is, so it inherits the bar window's
-// fonts and :root variables. w x h is the dropdown's size: w is a floor
-// that content which cannot narrow widens, as GTK's popover is, and h
-// is held exactly so a longer list scrolls inside the card (a zero or
-// negative axis leaves it to the content); the popover's gap and
-// shadow gutter keep it off the bar and the surface edges.
+// fonts and :root variables. w x h is the dropdown's size, a floor for
+// the card as GTK's popover size request is: content that cannot fit
+// grows it, while a scrolling list asks for no height of its own and
+// scrolls inside it (a zero or negative axis leaves it to the
+// content); the popover's gap and shadow gutter keep it off the bar
+// and the surface edges.
 func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
 	card := popoverCard(rev, cfg.Bar.DropdownShadow)
 	card.SetSizeRequest(w, h)
-	card.SetMaximumSize(0, h)
 	return card, rev
 }
