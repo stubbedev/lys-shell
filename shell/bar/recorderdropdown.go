@@ -282,15 +282,10 @@ func (v *recorderView) controls() widget.Widget {
 	return row
 }
 
-// sectionHeader is a section label led by its icon, in the label's
-// muted ink.
+// sectionHeader is the recorder's icon-led section label.
 func (v *recorderView) sectionHeader(icon, title string) *widget.Box {
-	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
+	row := iconSectionLabel(v.font, icon, title)
 	row.AddClass("recorder-section-header")
-	glyph := widget.NewThemeIcon(icon, sectionLabelPx)
-	glyph.AddClass(css.DimLabel)
-	row.AppendAligned(glyph, false, widget.AlignCenter)
-	row.AppendAligned(sectionLabel(v.font, title), true, widget.AlignCenter)
 	return row
 }
 

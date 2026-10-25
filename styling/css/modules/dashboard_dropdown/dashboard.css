@@ -1,33 +1,60 @@
-.dashboard-dropdown .dashboard-content-box {
-  border-spacing: var(--space-sm);
+.dashboard-dropdown button.quick-action .quick-action-icon {
+  border-radius: var(--radius-default);
+  background: var(--bg-overlay);
+  color: var(--fg-muted);
 }
-.dashboard-dropdown .dashboard-scroll {
-  background: transparent;
+.dashboard-dropdown button.quick-action.active .quick-action-icon {
+  background: var(--accent);
+  color: var(--fg-on-accent);
 }
-.dashboard-dropdown .dashboard-scroll scrollbar range trough {
-  background: transparent;
-}
-.dashboard-dropdown .dashboard-card {
-  border-radius: var(--rounding-element);
-  min-width: 0;
-  padding-left: var(--space-md);
-  padding-right: var(--space-md);
-}
-.dashboard-dropdown .dashboard-info-row {
-  border-spacing: var(--space-sm);
-}
-.dashboard-dropdown .card-header {
-  margin-bottom: var(--space-sm);
-}
-.dashboard-dropdown .card-title {
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+.dashboard-dropdown button.quick-action .quick-action-label {
   color: var(--fg-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-spacing: var(--space-xs);
 }
-.dashboard-dropdown .card-title image {
-  -gtk-icon-size: var(--icon-md);
-  margin-right: var(--space-sm);
+.dashboard-dropdown button.quick-action.active .quick-action-label {
+  color: var(--fg-default);
+}
+.dashboard-dropdown button.quick-action:disabled,
+.dashboard-dropdown .dashboard-slider-row:disabled {
+  opacity: 0.35;
+}
+
+.dashboard-dropdown .dashboard-media-art,
+.dashboard-dropdown .user-avatar {
+  border-radius: var(--radius-default);
+  background-color: var(--bg-overlay);
+  background-size: cover;
+  background-position: center;
+  color: var(--fg-muted);
+}
+
+.dashboard-dropdown image.battery-icon {
+  color: var(--status-success);
+}
+.dashboard-dropdown .battery-profile-icon {
+  color: var(--status-warning);
+}
+.dashboard-dropdown image.battery-icon.warning,
+.dashboard-dropdown .battery-percent.warning,
+.dashboard-dropdown .battery-detail.warning {
+  color: var(--status-warning);
+}
+.dashboard-dropdown image.battery-icon.critical,
+.dashboard-dropdown .battery-percent.critical,
+.dashboard-dropdown .battery-detail.critical {
+  color: var(--status-error);
+}
+
+.dashboard-dropdown .speed-stat.up image.speed-arrow {
+  color: var(--status-success);
+}
+.dashboard-dropdown .speed-stat.down image.speed-arrow {
+  color: var(--status-info);
+}
+.dashboard-dropdown .speed-stat.muted image.speed-arrow,
+.dashboard-dropdown .speed-value.muted {
+  color: var(--fg-subtle);
+}
+
+.dashboard-dropdown button.session-btn.danger:hover {
+  color: var(--status-error);
 }

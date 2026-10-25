@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestParseOSRelease(t *testing.T) {
@@ -143,42 +144,25 @@ func TestUserSessionSectionRendersConfiguredActions(t *testing.T) {
 	if !ok || !card.HasClass("card") || !card.HasClass("dashboard-card") {
 		t.Fatal("section is not the card dashboard-card")
 	}
-	row := card.Children()[0].(*widget.Box)
-	if !row.HasClass("dashboard-user-session") {
-		t.Fatalf("the card holds %v, want the session row", row.Classes())
+	row, ok := card.Children()[0].(*widget.Item)
+	if !ok || !row.HasClass("dashboard-user-session") {
+		t.Fatalf("the card holds %T, want the session Item", card.Children()[0])
 	}
-	// user-info: the avatar tile over user-meta, with the actions box
-	// pinned to the row's end behind an expanding filler.
-	kids := row.Children()
-	if len(kids) != 3 {
-		t.Fatalf("row children = %d, want user-info, filler, actions", len(kids))
-	}
-	info, ok := kids[0].(*widget.Box)
-	if !ok || !info.HasClass("user-info") {
-		t.Fatalf("row's first child = %T, want user-info", kids[0])
-	}
-	infoKids := info.Children()
-	if len(infoKids) != 2 {
-		t.Fatalf("user-info children = %d, want the avatar and user-meta", len(infoKids))
-	}
-	avatar, ok := infoKids[0].(*widget.Box)
-	if !ok || !avatar.HasClass("user-avatar") {
-		t.Fatalf("user-info's first child = %T, want the user-avatar tile", infoKids[0])
+	// The Item: the avatar tile as its bare media, the username as its
+	// title, and the configured actions as its buttons.
+	avatar, ok := findByClass(row, "user-avatar").(*widget.Box)
+	if !ok {
+		t.Fatal("no user-avatar tile")
 	}
 	// No ~/.face: the user glyph stands in.
 	if glyph, ok := avatar.Children()[0].(*widget.Icon); !ok || glyph.Name() != "ld-user-symbolic" {
 		t.Errorf("avatar = %T, want the ld-user-symbolic glyph", avatar.Children()[0])
 	}
-	meta, ok := infoKids[1].(*widget.Box)
-	if !ok {
-		t.Fatalf("user-info's second child = %T, want the user-meta box", infoKids[1])
+	if name := itemText(row, "title"); name != "alice" {
+		t.Errorf("username = %q, want alice", name)
 	}
-	if name := findLabel(meta); name == nil || name.Text() != "alice" {
-		t.Errorf("username label wrong")
-	}
-	actions, ok := kids[2].(*widget.Box)
-	if !ok || !actions.HasClass("session-actions") || len(actions.Children()) != 2 {
-		t.Fatalf("actions = %T, want two session-actions buttons", kids[2])
+	if n := len(treetest.WithClass(row, "session-btn")); n != 2 {
+		t.Fatalf("session buttons = %d, want the two configured actions", n)
 	}
 }
 

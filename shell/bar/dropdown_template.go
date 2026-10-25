@@ -199,6 +199,17 @@ func sectionLabel(font render.Font, text string) *widget.Label {
 	return l
 }
 
+// iconSectionLabel is a section label led by its icon, in the label's
+// muted ink.
+func iconSectionLabel(font render.Font, icon, title string) *widget.Box {
+	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
+	glyph := widget.NewThemeIcon(icon, sectionLabelPx)
+	glyph.AddClass(css.DimLabel)
+	row.AppendAligned(glyph, false, widget.AlignCenter)
+	row.AppendAligned(sectionLabel(font, title), true, widget.AlignCenter)
+	return row
+}
+
 // sectionLabelPx is lys-ui's caption size, which .caption-heading
 // also sets.
 const sectionLabelPx = 12

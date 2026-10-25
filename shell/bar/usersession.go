@@ -84,48 +84,30 @@ func setAvatar(tile *widget.Box) {
 // everything through the classes (user-avatar image, user-name,
 // button.icon.session-btn image), so nothing carries a tint here.
 func userSessionSection(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
+	font, _ := dropdownFont(ctx)
 	cfg := ctx.Config.Dashboard
 	card := widget.NewBox(widget.Column, 0, 0)
-	card.AddClass("card", "dashboard-card")
-	row := widget.NewBox(widget.Row, 0, 0)
+	card.AddClass(css.Card, "dashboard-card")
+	row := widget.NewItem(font, sessionUsername(), "")
+	row.SetSmall(true)
+	row.SetEllipsize(true)
 	row.AddClass("dashboard-user-session")
-
-	info := widget.NewBox(widget.Row, 0, 0)
-	info.AddClass("user-info")
 	tile := widget.NewBox(widget.Row, 0, 0)
 	tile.AddClass("user-avatar")
 	setAvatar(tile)
 	tile.Append(widget.NewThemeIcon("ld-user-symbolic", avatarPx), false)
-	info.AppendAligned(tile, false, widget.AlignStart)
-	meta := widget.NewBox(widget.Column, 0, 0)
-	name := widget.NewLabel(font, px, sessionUsername(), 0)
-	name.AddClass("user-name")
-	meta.Append(name, false)
-	info.AppendAligned(meta, false, widget.AlignCenter)
-	row.Append(info, false)
-
-	// session-actions is hexpand with halign End: the info keeps its
-	// natural size and the expanding filler pins the buttons to the
-	// row's end.
-	row.Append(widget.NewBox(widget.Row, 0, 0), true)
-	actions := widget.NewBox(widget.Row, 0, 0)
-	actions.AddClass("session-actions")
+	row.SetMedia(tile, true)
 	for _, action := range cfg.UserSession.Actions {
 		spec := sessionButtonFor(action, cfg)
-		glyph := widget.NewThemeIcon(spec.icon, int(px))
-		// button.icon.session-btn: the IconButton template's class
-		// carries the pointer cursor, the hover shade, and the glyph
-		// ink; no Go hover fills.
+		glyph := widget.NewThemeIcon(spec.icon, itemIconPx)
 		button := widget.NewButton(glyph, 0, 0)
-		button.AddClass(css.Secondary, css.Icon, "session-btn")
+		button.AddClass(css.Ghost, css.Icon, css.Small, "session-btn")
 		button.SetTooltip(spec.tooltip)
 		command := spec.command
 		// process::run_if_set: an empty command is a no-op.
 		button.OnClick = func() { _ = spawn.Quiet(command) }
-		actions.Append(button, false)
+		row.AddAction(button)
 	}
-	row.Append(actions, false)
 	card.Append(row, false)
 	return card
 }

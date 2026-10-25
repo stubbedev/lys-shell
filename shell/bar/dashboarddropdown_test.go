@@ -256,9 +256,9 @@ func TestDashboardContentPadsOutsideTheScroll(t *testing.T) {
 	if findByClass(inner, "quick-actions") == nil {
 		t.Error("the quick actions did not land in the inner content box")
 	}
-	// The inner box is spacing-0: its border-spacing is CSS.
-	if got := inner.Spacing(); got != 0 {
-		t.Errorf("dashboard-content-box spacing = %d, want 0", got)
+	// The cards sit the theme's spacing apart.
+	if got := inner.Spacing(); got != widget.Current().Spacing {
+		t.Errorf("dashboard-content-box spacing = %d, want the theme's %d", got, widget.Current().Spacing)
 	}
 }
 
@@ -456,46 +456,24 @@ func TestDashboardMediaEmptyStateArtAndLabels(t *testing.T) {
 	}
 }
 
-// The spacing-0 sites: the CSS rules carry every gap the Rust boxes
-// leave to the stylesheet.
-func TestDashboardSpacingSitesAreZero(t *testing.T) {
+// A quick action's tile is its icon on a square tile over the label,
+// and the grid sits its tiles the theme's spacing apart.
+func TestDashboardQuickActionTiles(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying})
 	v := dashboardDropdown(ctx).(*dashboardView)
-	for _, class := range []string{
-		"card-header", "card-title", "media-compact", "media-controls",
-		"media-progress", "network-speeds", "dashboard-controls",
-	} {
-		if got := classedBox(t, v, class).Spacing(); got != 0 {
-			t.Errorf("%s spacing = %d, want 0", class, got)
-		}
-	}
-	var stat *widget.Box
-	walkTree(v, func(w widget.Widget) bool {
-		if b, ok := w.(*widget.Box); ok && b.HasClass("speed-stat") {
-			stat = b
-		}
-		return true
-	})
-	if stat == nil || stat.Spacing() != 0 {
-		t.Errorf("speed-stat spacing = %v, want 0", stat)
-	}
-	// Negative: the quick-action tile keeps no gap — the label's CSS
-	// margin-top carries it — while the grid keeps its Rust literals.
 	tile := quickActionTile(widget.NewThemeIcon("ld-wifi-symbolic", 16), widget.NewLabel(ctx.Font, 12, "Wifi", 0))
-	if tile.Spacing() != 0 {
-		t.Errorf("the quick-action tile spacing = %d, want 0", tile.Spacing())
-	}
 	if got := len(tile.Children()); got != 2 {
-		t.Errorf("the tile children = %d, want the icon tile over the label", got)
+		t.Fatalf("the tile children = %d, want the icon tile over the label", got)
 	}
-	if iconTileBox, ok := tile.Children()[0].(*widget.Box); !ok || !iconTileBox.HasClass("quick-action-icon") {
-		t.Errorf("the tile's first child = %T, want the quick-action-icon tile", tile.Children()[0])
+	square, ok := tile.Children()[0].(*widget.Box)
+	if !ok || !square.HasClass("quick-action-icon") || square.SizeRequest() != (widget.Size{W: quickActionTilePx, H: quickActionTilePx}) {
+		t.Errorf("the tile's first child = %T, want the square quick-action-icon tile", tile.Children()[0])
 	}
+	th := widget.Current()
 	grid, _ := findByClass(v, "quick-actions").(*widget.Grid)
-	if grid == nil || grid.ColumnSpacing() != 8 || grid.RowSpacing() != 4 {
-		t.Errorf("quick-actions grid spacing = %v, want the Rust 8/4", grid)
+	if grid == nil || grid.ColumnSpacing() != th.Spacing || grid.RowSpacing() != th.Spacing {
+		t.Errorf("quick-actions grid spacing = %v, want the theme's %d", grid, th.Spacing)
 	}
 }
 
