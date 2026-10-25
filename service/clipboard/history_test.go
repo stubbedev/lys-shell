@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/stubbedev/lys-ui/transfer"
 )
 
 const textMime = "text/plain;charset=utf-8"
@@ -350,5 +352,26 @@ func TestATextMimeOutsideTheKnownListStillLeadsItsOwnOffer(t *testing.T) {
 
 	if mimes[0] != "text/html" || len(mimes) != len(TextMimes)+1 {
 		t.Fatalf("mimes = %v", mimes)
+	}
+}
+
+// A secret is offered as text under every text mime and carries the
+// password manager hint, so the history refuses it; plain text does
+// not.
+func TestSecretContentIsTextTheHistoryRefuses(t *testing.T) {
+	c := SecretContent("hunter2")
+	if !IsSensitive(c.Mimes) {
+		t.Errorf("secret mimes %v are not sensitive", c.Mimes)
+	}
+	for _, m := range []string{textMime, "text/plain", "UTF8_STRING"} {
+		if b, err := c.Bytes(m); err != nil || string(b) != "hunter2" {
+			t.Errorf("%s = %q, %v", m, b, err)
+		}
+	}
+	if b, _ := c.Bytes("x-kde-passwordManagerHint"); string(b) != "secret" {
+		t.Errorf("hint = %q", b)
+	}
+	if IsSensitive(transfer.Text("hunter2").Mimes) {
+		t.Error("plain text counts as sensitive")
 	}
 }

@@ -162,6 +162,7 @@ func buttonColorsOf(section reflect.Value) ButtonColors {
 // use the accent.
 var moduleAutoIconColors = map[string]CssToken{
 	"battery":        TokenYellow,
+	"bitwarden":      TokenBlue,
 	"bluetooth":      TokenBlue,
 	"brightness":     TokenYellow,
 	"cpu":            TokenBlue,

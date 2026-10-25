@@ -50,6 +50,16 @@ type dropdownRegistry struct {
 // empty), not only when it is built.
 type dropdownOpener interface{ dropdownOpened() }
 
+// dropdownFocuser is content with an input that takes the keyboard as
+// its popover opens (GTK focusing a popover's first entry); nil when
+// none.
+type dropdownFocuser interface{ dropdownFocus() widget.Widget }
+
+// dropdownHider is content that acts each time its popover closes,
+// while its instance stays cached: the vault forgets what was typed
+// into its secret boxes.
+type dropdownHider interface{ dropdownHidden() }
+
 // labelFreezer is an anchor whose label holds still while its dropdown
 // is open (BarButtonInput::FreezeSize/ThawSize).
 type labelFreezer interface {
@@ -273,9 +283,14 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	cfg := dropdownPopover(r.cfg, bound, content, monH)
 	// The button's label holds still while its dropdown is open
 	// (dropdown-freeze-label), so the popover stays anchored.
+	var thaw func()
 	if f, ok := anchor.(labelFreezer); ok && r.cfg.Bar.DropdownFreezeLabel {
 		f.freezeLabel()
-		cfg.OnClosed = f.thawLabel
+		thaw = f.thawLabel
+	}
+	cfg.OnClosed = onDropdownHidden(thaw, content)
+	if f, ok := content.(dropdownFocuser); ok {
+		cfg.Focus = f.dropdownFocus()
 	}
 	var rev *widget.Revealer
 	w, h, _ := dropdownDims(name, r.cfg)
@@ -305,6 +320,22 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	r.openName[connector] = name
 	r.mu.Unlock()
 	return nil
+}
+
+// onDropdownHidden is what runs as a dropdown's popover closes: the
+// anchor's frozen label thaws (thaw, nil when it froze nothing) and
+// content that acts on each close does; nil when neither.
+func onDropdownHidden(thaw func(), content widget.Widget) func() {
+	h, hides := content.(dropdownHider)
+	if !hides {
+		return thaw
+	}
+	return func() {
+		if thaw != nil {
+			thaw()
+		}
+		h.dropdownHidden()
+	}
 }
 
 // closeAll dismisses every open dropdown, each playing its exit.

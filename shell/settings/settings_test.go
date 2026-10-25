@@ -1443,7 +1443,7 @@ func TestModulePagesFollowTheRustOrder(t *testing.T) {
 		ids = append(ids, p.id)
 	}
 	want := []string{
-		"battery", "bluetooth", "brightness", "cava", "clock", "cpu", "custom", "dashboard", "hyprland-workspaces",
+		"battery", "bitwarden", "bluetooth", "brightness", "cava", "clock", "cpu", "custom", "dashboard", "hyprland-workspaces",
 		"hyprsunset", "idle-inhibit", "keybind-mode", "keyboard-input", "mail", "mango-workspaces", "media", "microphone",
 		"netstat", "network", "niri-workspaces", "notification", "power", "power-profiles", "ram", "recorder", "screenshot",
 		"separator", "storage", "sway-workspaces", "systray", "treeman", "volume", "weather", "window-title", "world-clock",

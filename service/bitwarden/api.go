@@ -20,18 +20,28 @@ type Server struct {
 	API, Identity string
 }
 
-// The official clouds.
-var (
-	ServerUS = Server{API: "https://api.bitwarden.com", Identity: "https://identity.bitwarden.com"}
-	ServerEU = Server{API: "https://api.bitwarden.eu", Identity: "https://identity.bitwarden.eu"}
+// The official clouds, by the names ParseServer takes.
+const (
+	CloudUS = "bitwarden.com"
+	CloudEU = "bitwarden.eu"
 )
 
-// SelfHosted is a self-hosted server (or Vaultwarden) at base: its API
-// under /api and its identity server under /identity.
-func SelfHosted(base string) (Server, error) {
-	u, err := url.Parse(strings.TrimRight(base, "/"))
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return Server{}, fmt.Errorf("bitwarden: server URL %q is not an http(s) URL", base)
+var clouds = map[string]Server{
+	CloudUS: {API: "https://api.bitwarden.com", Identity: "https://identity.bitwarden.com"},
+	CloudEU: {API: "https://api.bitwarden.eu", Identity: "https://identity.bitwarden.eu"},
+}
+
+// ParseServer resolves where an account lives: an official cloud by
+// its name, or a self-hosted server (or Vaultwarden) by its http(s)
+// base URL, its API under /api and its identity server under
+// /identity.
+func ParseServer(s string) (Server, error) {
+	if cloud, ok := clouds[s]; ok {
+		return cloud, nil
+	}
+	u, err := url.Parse(strings.TrimRight(s, "/"))
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+		return Server{}, fmt.Errorf("bitwarden: server %q is neither %s, %s nor an http(s) base URL", s, CloudUS, CloudEU)
 	}
 	b := u.String()
 	return Server{API: b + "/api", Identity: b + "/identity"}, nil

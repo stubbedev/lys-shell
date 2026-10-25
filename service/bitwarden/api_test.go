@@ -196,15 +196,18 @@ func TestSync(t *testing.T) {
 	}
 }
 
-// A self-hosted base URL puts the API and identity under it; anything
-// that is not an http(s) URL is refused.
-func TestSelfHosted(t *testing.T) {
-	s, err := SelfHosted("https://vault.example.com/")
+// The clouds resolve by name; a self-hosted base URL puts the API and
+// identity under it; anything else is refused.
+func TestParseServer(t *testing.T) {
+	if s, err := ParseServer(CloudEU); err != nil || s.API != "https://api.bitwarden.eu" || s.Identity != "https://identity.bitwarden.eu" {
+		t.Errorf("EU cloud = %+v, %v", s, err)
+	}
+	s, err := ParseServer("https://vault.example.com/")
 	if err != nil || s.API != "https://vault.example.com/api" || s.Identity != "https://vault.example.com/identity" {
 		t.Errorf("self-hosted = %+v, %v", s, err)
 	}
-	for _, bad := range []string{"vault.example.com", "ftp://x", ""} {
-		if _, err := SelfHosted(bad); err == nil {
+	for _, bad := range []string{"vault.example.com", "ftp://x", "", "https://x/?a=b", "bitwarden.org"} {
+		if _, err := ParseServer(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
 	}

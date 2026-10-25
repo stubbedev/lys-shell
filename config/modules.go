@@ -32,6 +32,8 @@ type ModulesConfig struct {
 	KeybindMode KeybindModeConfig `cfg:"keybind-mode"`
 	// Keyboard input module.
 	KeyboardInput KeyboardInputConfig `cfg:"keyboard-input"`
+	// Bitwarden vault module.
+	Bitwarden BitwardenConfig `cfg:"bitwarden"`
 	// Unread mail count module.
 	Mail MailConfig `cfg:"mail"`
 	// MangoWM tag switcher module.
@@ -123,6 +125,7 @@ func (m *ModulesConfig) ModuleClicks(name string) (ClickConfig, bool) {
 func DefaultsModules() ModulesConfig {
 	return ModulesConfig{
 		Battery:            DefaultsBattery(),
+		Bitwarden:          DefaultsBitwarden(),
 		Bluetooth:          DefaultsBluetooth(),
 		Brightness:         DefaultsBrightness(),
 		Cava:               DefaultsCava(),

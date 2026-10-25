@@ -158,6 +158,8 @@ func actionChoices(module string) []actionChoice {
 		}
 	case "battery":
 		return []actionChoice{dropdown("Open battery panel", "battery")}
+	case "bitwarden":
+		return []actionChoice{dropdown("Open vault panel", "bitwarden")}
 	case "bluetooth":
 		return []actionChoice{dropdown("Open bluetooth panel", "bluetooth")}
 	case "brightness":

@@ -382,3 +382,36 @@ func TestDropdownScrollPacksShortContentAtTheTop(t *testing.T) {
 		t.Errorf("the first child sits at y=%d, want the top", y)
 	}
 }
+
+// hidingContent counts the closes of its popover.
+type hidingContent struct {
+	*widget.Box
+	hidden int
+}
+
+func (h *hidingContent) dropdownHidden() { h.hidden++ }
+
+// A popover's close thaws the anchor's label and reaches content that
+// acts on each close, through a sized panel too; other content gets
+// only the thaw, and nothing at all is nil.
+func TestOnDropdownHidden(t *testing.T) {
+	thawed := 0
+	thaw := func() { thawed++ }
+	content := &hidingContent{Box: widget.NewBox(widget.Column, 0, 0)}
+	onDropdownHidden(thaw, content)()
+	if thawed != 1 || content.hidden != 1 {
+		t.Errorf("hiding content: thawed %d, hidden %d", thawed, content.hidden)
+	}
+	onDropdownHidden(nil, newPanelBox(content))()
+	if content.hidden != 2 {
+		t.Errorf("through a panel: hidden %d", content.hidden)
+	}
+	plain := widget.NewBox(widget.Column, 0, 0)
+	onDropdownHidden(thaw, plain)()
+	if thawed != 2 {
+		t.Errorf("plain content: thawed %d", thawed)
+	}
+	if onDropdownHidden(nil, plain) != nil {
+		t.Error("nothing to run is not nil")
+	}
+}

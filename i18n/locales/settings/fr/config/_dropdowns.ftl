@@ -4,6 +4,9 @@ settings-dropdowns-audio = Audio
 settings-dropdowns-battery = Batterie
     .description = Taille du panneau du menu batterie (remplacement largeur/hauteur)
 
+settings-dropdowns-bitwarden = Bitwarden
+    .description = Taille du panneau du menu Bitwarden (remplacement largeur/hauteur)
+
 settings-dropdowns-bluetooth = Bluetooth
     .description = Taille du panneau du menu Bluetooth (remplacement largeur/hauteur)
 

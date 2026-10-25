@@ -167,6 +167,7 @@ const (
 	ModuleBattery            BarModule = "battery"
 	ModuleBluetooth          BarModule = "bluetooth"
 	ModuleBrightness         BarModule = "brightness"
+	ModuleBitwarden          BarModule = "bitwarden"
 	ModuleCava               BarModule = "cava"
 	ModuleClock              BarModule = "clock"
 	ModuleCPU                BarModule = "cpu"
@@ -203,7 +204,7 @@ const (
 
 // BuiltinModules is the built-in module list in schema order.
 var BuiltinModules = []BarModule{
-	ModuleBattery, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
+	ModuleBattery, ModuleBitwarden, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
 	ModuleCPU, ModuleDashboard, ModuleHyprlandWorkspaces, ModuleHyprsunset,
 	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleMail,
 	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleNetstat,

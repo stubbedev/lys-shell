@@ -144,6 +144,7 @@ func docSpecs() []docSpec {
 			value: field(func(c *Config) any { return &c.Dashboard.UserSession }),
 		},
 		m("battery", bar, func(c *Config) any { return &c.Battery }),
+		m("bitwarden", bar, func(c *Config) any { return &c.Bitwarden }),
 		m("bluetooth", bar, func(c *Config) any { return &c.Bluetooth }),
 		m("brightness", bar, func(c *Config) any { return &c.Brightness }),
 		m("cava", docStandard, func(c *Config) any { return &c.Cava }),

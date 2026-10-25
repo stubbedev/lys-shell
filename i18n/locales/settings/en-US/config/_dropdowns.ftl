@@ -4,6 +4,9 @@ settings-dropdowns-audio = Audio
 settings-dropdowns-battery = Battery
     .description = Battery dropdown panel size (width/height override)
 
+settings-dropdowns-bitwarden = Bitwarden
+    .description = Bitwarden dropdown panel size (width/height override)
+
 settings-dropdowns-bluetooth = Bluetooth
     .description = Bluetooth dropdown panel size (width/height override)
 

@@ -18,6 +18,7 @@ the built-in default (scaled by the global scale).
 |---|---|---|---|
 | `audio` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Audio dropdown panel size. |
 | `battery` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Battery dropdown panel size. |
+| `bitwarden` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Bitwarden dropdown panel size. |
 | `bluetooth` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Bluetooth dropdown panel size. |
 | `brightness` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Brightness dropdown panel size. Height grows to fit content. |
 | `calendar` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Calendar dropdown panel size. Height grows to fit content. |

@@ -7,6 +7,7 @@ import "github.com/stubbedev/lys-shell/config"
 func modulePages(cfg *config.Config) []pageSpec {
 	return []pageSpec{
 		batteryPage(cfg),
+		bitwardenPage(cfg),
 		bluetoothPage(cfg),
 		brightnessPage(cfg),
 		cavaPage(cfg),
@@ -57,6 +58,26 @@ func batteryPage(*config.Config) pageSpec {
 		barDisplaySection("modules.battery"),
 		colorsSection("modules.battery"),
 		actionsSection("modules.battery", actionChoices("battery")),
+	}}
+}
+
+// bitwardenPage is pages/modules/bitwarden.
+func bitwardenPage(*config.Config) pageSpec {
+	const m = "modules.bitwarden"
+	return pageSpec{id: "bitwarden", navKey: "settings-nav-bitwarden", icon: "ld-shield-check-symbolic", header: "settings-page-bitwarden", sections: []sectionSpec{
+		{title: "settings-section-general", rows: []rowSpec{
+			field(m + ".server"),
+			field(m + ".email"),
+			field(m + ".lock-after"),
+			field(m + ".clipboard-clear"),
+			field(m + ".sync-interval"),
+			field(m + ".format"),
+			field(m+".icon-locked", iconRow),
+			field(m+".icon-unlocked", iconRow),
+		}},
+		barDisplaySection(m),
+		colorsSection(m),
+		actionsSection(m, actionChoices("bitwarden")),
 	}}
 }
 

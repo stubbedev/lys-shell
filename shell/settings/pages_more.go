@@ -95,7 +95,7 @@ func notificationsPage(*config.Config) pageSpec {
 func dropdownsPage(*config.Config) pageSpec {
 	var sections []sectionSpec
 	for _, d := range []string{
-		"audio", "battery", "bluetooth", "brightness", "calendar", "dashboard", "media",
+		"audio", "battery", "bitwarden", "bluetooth", "brightness", "calendar", "dashboard", "media",
 		"network", "notification", "treeman", "weather",
 	} {
 		path := "dropdowns." + d

@@ -17,6 +17,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/stubbedev/lys-ui/transfer"
+
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
@@ -55,6 +57,14 @@ var SensitiveMimes = []string{
 	"org.kde.passwordManagerHint",
 	"password",
 	"x-lys-shell-no-history",
+}
+
+// SecretContent is text offered as a password manager offers it: the
+// text under every text mime, marked with x-kde-passwordManagerHint so
+// a clipboard history (this one included) does not keep it.
+func SecretContent(text string) transfer.Content {
+	hint := SensitiveMimes[0]
+	return transfer.Merge(transfer.Text(text), transfer.Payloads([]string{hint}, map[string][]byte{hint: []byte("secret")}))
 }
 
 // Kind is what a remembered selection is, for labelling and for

@@ -25,6 +25,7 @@ var dropdownGeometries = map[string]dropdownGeometry{
 	"volume":       {382, 512, func(d *config.DropdownsConfig) config.DropdownSize { return d.Audio }},
 	"microphone":   {382, 512, func(d *config.DropdownsConfig) config.DropdownSize { return d.Audio }},
 	"battery":      {382, 312, func(d *config.DropdownsConfig) config.DropdownSize { return d.Battery }},
+	"bitwarden":    {382, 512, func(d *config.DropdownsConfig) config.DropdownSize { return d.Bitwarden }},
 	"bluetooth":    {382, 512, func(d *config.DropdownsConfig) config.DropdownSize { return d.Bluetooth }},
 	"brightness":   {320, 0, func(d *config.DropdownsConfig) config.DropdownSize { return d.Brightness }},
 	"calendar":     {340, 0, func(d *config.DropdownsConfig) config.DropdownSize { return d.Calendar }},
@@ -222,6 +223,21 @@ func (p *panelBox) ClickAt(widget.Point) {
 func (p *panelBox) dropdownClosed() {
 	if c, ok := p.child.(dropdownCloser); ok {
 		c.dropdownClosed()
+	}
+}
+
+// dropdownFocus forwards the content's initial focus.
+func (p *panelBox) dropdownFocus() widget.Widget {
+	if f, ok := p.child.(dropdownFocuser); ok {
+		return f.dropdownFocus()
+	}
+	return nil
+}
+
+// dropdownHidden forwards each close of the popover to the content.
+func (p *panelBox) dropdownHidden() {
+	if h, ok := p.child.(dropdownHider); ok {
+		h.dropdownHidden()
 	}
 }
 

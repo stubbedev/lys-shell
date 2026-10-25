@@ -20,6 +20,20 @@ func (c RecorderConfig) Icons() map[string]IconConfig {
 	}
 }
 
+// Bitwarden vault states: a logged-out vault shows as locked.
+const (
+	BitwardenLocked   = "locked"
+	BitwardenUnlocked = "unlocked"
+)
+
+// Icons maps each vault state to its icon.
+func (c BitwardenConfig) Icons() map[string]IconConfig {
+	return map[string]IconConfig{
+		BitwardenLocked:   IconWith(c.IconShow, c.IconLocked, c.IconColor),
+		BitwardenUnlocked: IconWith(c.IconShow, c.IconUnlocked, c.IconColor),
+	}
+}
+
 // Idle-inhibit states.
 const (
 	IdleInhibitActive   = "active"

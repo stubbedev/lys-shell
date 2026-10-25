@@ -57,6 +57,7 @@ type ModuleContext struct {
 	Notifications *notifications.Service
 	Recorder      *recorder.State
 	Mail          *mail.Service
+	Bitwarden     *bitwardenHost
 	SNI           *sni.Store
 	Weather       *weather.Service
 	// SetConfig writes a runtime override and persists it (the Rust
@@ -231,6 +232,7 @@ var factories = map[string]Factory{
 	"world-clock":         newWorldClock,
 	"netstat":             newNetstat,
 	"mail":                newMail,
+	"bitwarden":           newBitwarden,
 	"power":               newPower,
 	"dashboard":           newDashboard,
 	"keybind-mode":        newKeybindMode,

@@ -244,6 +244,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	stopMail := startMail(&baseCtx)
 	defer stopMail()
+	bwLife, stopBitwarden := context.WithCancel(context.Background())
+	defer stopBitwarden()
+	baseCtx.Bitwarden = newBitwardenHost(bwLife, application, current.Load)
 	sniHost, err := sni.NewHost(sniStore)
 	if err == nil {
 		defer func() { _ = sniHost.Close() }()

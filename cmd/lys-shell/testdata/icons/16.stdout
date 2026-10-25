@@ -1,4 +1,4 @@
-Would install 68 icons:
+Would install 69 icons:
   cm-gone-symbolic (no auto-install: import manually)
   cm-wired-acquiring-symbolic (no auto-install: import manually)
   cm-wired-disconnected-symbolic (no auto-install: import manually)
@@ -29,6 +29,7 @@ Would install 68 icons:
   ld-keyboard-symbolic (from lucide)
   ld-layers-symbolic (from lucide)
   ld-leaf-symbolic (from lucide)
+  ld-lock-open-symbolic (from lucide)
   ld-lock-symbolic (from lucide)
   ld-mail-symbolic (from lucide)
   ld-memory-stick-symbolic (from lucide)

@@ -801,6 +801,7 @@
         {
           "enum": [
             "battery",
+            "bitwarden",
             "bluetooth",
             "brightness",
             "cava",
@@ -954,6 +955,126 @@
         }
       },
       "type": "object"
+    },
+    "BitwardenConfig": {
+      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe shell keeps only the session (the server, the email and the\nrefresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the\nmaster password, a key or an item. Copied secrets are marked so\nclipboard managers, the shell's own history included, do not keep\nthem.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "clipboard-clear": {
+          "$ref": "#/$defs/uint32",
+          "default": 30,
+          "description": "Clear a copied secret from the clipboard after this many seconds,\nunless something else was copied since. 0 leaves it there."
+        },
+        "email": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Email the login form starts with."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ count }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of items in the open vault (empty while\n  locked)\n\n## Examples\n\n- `\"{{ count }}\"` - \"142\""
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-locked": {
+          "$ref": "#/$defs/string",
+          "default": "ld-lock-symbolic",
+          "description": "Icon while the vault is locked or logged out."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "icon-unlocked": {
+          "$ref": "#/$defs/string",
+          "default": "ld-lock-open-symbolic",
+          "description": "Icon while the vault is open."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "dropdown:bitwarden",
+          "description": "Action on left click. Defaults to opening the vault dropdown."
+        },
+        "lock-after": {
+          "$ref": "#/$defs/uint32",
+          "default": 15,
+          "description": "Lock the vault after this many minutes without a copy. 0 keeps it\nopen until locked by hand."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        },
+        "server": {
+          "$ref": "#/$defs/BitwardenServer",
+          "default": "bitwarden.com",
+          "description": "Server the login form logs in to. A logged-in account keeps the\nserver it logged in to."
+        },
+        "sync-interval": {
+          "$ref": "#/$defs/uint32",
+          "default": 30,
+          "description": "Sync the open vault every this many minutes. 0 syncs only on\nunlock and by hand."
+        }
+      },
+      "type": "object"
+    },
+    "BitwardenServer": {
+      "description": "",
+      "type": "string"
     },
     "BluetoothConfig": {
       "description": "Bluetooth connection status with a dropdown for pairing and managing devices.",
@@ -2208,6 +2329,14 @@
             "width": null
           },
           "description": "Battery dropdown panel size."
+        },
+        "bitwarden": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Bitwarden dropdown panel size."
         },
         "bluetooth": {
           "$ref": "#/$defs/DropdownSize",
@@ -4592,6 +4721,34 @@
             "thresholds": []
           },
           "description": "Battery status module."
+        },
+        "bitwarden": {
+          "$ref": "#/$defs/BitwardenConfig",
+          "default": {
+            "border-color": "blue",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "clipboard-clear": 30,
+            "email": "",
+            "format": "{{ count }}",
+            "icon-bg-color": "blue",
+            "icon-color": "auto",
+            "icon-locked": "ld-lock-symbolic",
+            "icon-show": true,
+            "icon-unlocked": "ld-lock-open-symbolic",
+            "label-color": "blue",
+            "label-max-length": 0,
+            "label-show": false,
+            "left-click": "dropdown:bitwarden",
+            "lock-after": 15,
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": "",
+            "server": "bitwarden.com",
+            "sync-interval": 30
+          },
+          "description": "Bitwarden vault module."
         },
         "bluetooth": {
           "$ref": "#/$defs/BluetoothConfig",
@@ -9144,6 +9301,10 @@
           "height": null,
           "width": null
         },
+        "bitwarden": {
+          "height": null,
+          "width": null
+        },
         "bluetooth": {
           "height": null,
           "width": null
@@ -9362,6 +9523,30 @@
           "scroll-down": "",
           "scroll-up": "",
           "thresholds": []
+        },
+        "bitwarden": {
+          "border-color": "blue",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "clipboard-clear": 30,
+          "email": "",
+          "format": "{{ count }}",
+          "icon-bg-color": "blue",
+          "icon-color": "auto",
+          "icon-locked": "ld-lock-symbolic",
+          "icon-show": true,
+          "icon-unlocked": "ld-lock-open-symbolic",
+          "label-color": "blue",
+          "label-max-length": 0,
+          "label-show": false,
+          "left-click": "dropdown:bitwarden",
+          "lock-after": 15,
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": "",
+          "server": "bitwarden.com",
+          "sync-interval": 30
         },
         "bluetooth": {
           "border-color": "blue",

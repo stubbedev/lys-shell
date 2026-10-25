@@ -14,6 +14,8 @@ type DropdownsConfig struct {
 	Audio DropdownSize `cfg:"audio"`
 	// Battery dropdown panel size.
 	Battery DropdownSize `cfg:"battery"`
+	// Bitwarden dropdown panel size.
+	Bitwarden DropdownSize `cfg:"bitwarden"`
 	// Bluetooth dropdown panel size.
 	Bluetooth DropdownSize `cfg:"bluetooth"`
 	// Brightness dropdown panel size. Height grows to fit content.
@@ -45,6 +47,8 @@ func (d DropdownsConfig) ByName(name string) (DropdownSize, bool) {
 		return d.Audio, true
 	case "battery":
 		return d.Battery, true
+	case "bitwarden":
+		return d.Bitwarden, true
 	case "bluetooth":
 		return d.Bluetooth, true
 	case "brightness":
