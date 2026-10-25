@@ -203,9 +203,11 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	return v
 }
 
-func (v *batteryView) label(text string, scale float64, class string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*scale, text, 0)
-	l.AddClass(class)
+// label is an empty label at the dropdown's size; its classes (the
+// lys-ui typography among them) set the rest.
+func (v *batteryView) label(classes ...string) *widget.Label {
+	l := widget.NewLabel(v.font, v.px, "", 0)
+	l.AddClass(classes...)
 	return l
 }
 
@@ -236,17 +238,13 @@ func (v *batteryView) batterySection() widget.Widget {
 
 	hero := widget.NewBox(widget.Row, 2*th.Spacing, 0)
 	hero.AddClass("battery-hero")
-	v.heroPct = v.label("", 2.4, "battery-hero-pct")
-	v.heroPct.AddClass(css.H1, css.Numeric)
+	v.heroPct = v.label("battery-hero-pct", css.H1, css.Numeric)
 	hero.Append(v.heroPct, false)
 	meta := widget.NewBox(widget.Column, th.Spacing/2, 0)
 	meta.AddClass("battery-hero-meta")
-	v.heroState = v.label("", 1, "battery-hero-state")
-	v.heroState.AddClass(css.Heading)
-	v.heroTime = v.label("", 1, "battery-hero-time")
-	v.heroTime.AddClass(css.DimLabel)
-	v.heroInput = v.label("", 1, "battery-hero-time")
-	v.heroInput.AddClass(css.DimLabel)
+	v.heroState = v.label("battery-hero-state", css.Heading)
+	v.heroTime = v.label("battery-hero-time", css.DimLabel)
+	v.heroInput = v.label("battery-hero-time", css.DimLabel)
 	meta.Append(v.heroState, false)
 	meta.Append(v.heroTime, false)
 	meta.Append(v.heroInput, false)
@@ -283,10 +281,8 @@ func (v *batteryView) batterySection() widget.Widget {
 // detailLabels is one detail's value, in the heading weight, and its
 // caption.
 func (v *batteryView) detailLabels() (value, label *widget.Label) {
-	value = v.label("", 1, "battery-detail-value")
-	value.AddClass(css.Heading)
-	label = v.label("", 1, "battery-detail-label")
-	label.AddClass(css.Caption, css.DimLabel)
+	value = v.label("battery-detail-value", css.Heading)
+	label = v.label("battery-detail-label", css.Caption, css.DimLabel)
 	return value, label
 }
 
