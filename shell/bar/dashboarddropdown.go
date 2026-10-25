@@ -51,17 +51,13 @@ type dashboardView struct {
 
 func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	// The Dropdown template box is spacing-0: the header strip and the
-	// .dropdown-content rules carry every gap.
 	v := &dashboardView{ctx: ctx, font: font, px: px, stop: make(chan struct{})}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "dashboard-dropdown")
 	v.Append(v.header(), false)
-	// The DropdownContent template's padding box sits outside the
-	// scroll: .dropdown-content > .dashboard-scroll >
-	// .dashboard-content-box (dashboard/mod.rs).
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	// The content's inset sits outside the scroll: .dropdown-content >
+	// .dashboard-scroll > .dashboard-content-box (dashboard/mod.rs).
+	content := dropdownContent()
 	sections := widget.NewBox(widget.Column, 0, 0)
 	sections.AddClass("dashboard-content-box")
 	sections.Append(v.quickActions(), false)
@@ -134,7 +130,7 @@ func (v *dashboardView) header() widget.Widget {
 	}, css.Ghost, css.Icon)
 	settings.AddClass("dashboard-settings-btn")
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))
-	return dropdownHeader(v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
+	return dropdownHeader(v.font, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
 }
 
 // quickActionsState is what the quick actions cannot read back from a
@@ -475,10 +471,8 @@ func (v *dashboardView) media() widget.Widget {
 	player.Append(progress, false)
 
 	// The empty state is expand with align Center (the EmptyState
-	// template) and its glyph in the sm class; the page fills the
-	// stack and centers it.
-	empty, emptyIcon := emptyStateIcon(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
-	emptyIcon.AddClass("sm")
+	// template); the page fills the stack and centers it.
+	empty := emptyState(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
 	emptyPage := vcentered(widget.NewBox(widget.Column, 0, 0), empty)
 	body := widget.NewStack()
 	body.Add("player", player)

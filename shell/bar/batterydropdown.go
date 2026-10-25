@@ -183,14 +183,10 @@ type batteryView struct {
 func batteryDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &batteryView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 0, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "battery-dropdown")
-	v.Append(dropdownHeader(font, px, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
-	// DropdownContent: the sheet's .dropdown-content wraps both
-	// sections and carries the .section-label rules. Spacing stays 0 —
-	// the cascade's margins own every gap.
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	v.Append(dropdownHeader(font, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
+	content := dropdownContent()
 	v.body = widget.NewStack()
 	empty := emptyState(font, px, "ld-unplug-symbolic",
 		i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description"))
@@ -265,7 +261,7 @@ func (v *batteryView) batterySection() widget.Widget {
 	details.AddClass("battery-details")
 	col.Append(details, false)
 
-	col.Append(v.label(i18n.T("dropdown-battery-charge-limit"), 0.85, "section-label"), false)
+	col.Append(sectionLabel(v.font, i18n.T("dropdown-battery-charge-limit")), false)
 	v.chargeCard = widget.NewBox(widget.Row, 0, 0)
 	v.chargeCard.AddClass("charge-limit")
 	info := widget.NewBox(widget.Column, 0, 0)
@@ -334,7 +330,7 @@ func (v *batteryView) infoNote(class, iconClass, textClass, text string) *widget
 // segments, and the daemon-missing note.
 func (v *batteryView) profileSection() widget.Widget {
 	col := widget.NewBox(widget.Column, 0, 0)
-	col.Append(v.label(i18n.T("dropdown-battery-power-profile"), 0.85, "section-label"), false)
+	col.Append(sectionLabel(v.font, i18n.T("dropdown-battery-power-profile")), false)
 	seg := widget.NewBox(widget.Row, 0, 0)
 	seg.AddClass("profile-seg")
 	// set_homogeneous (power_profile/mod.rs:49): the segments equalize

@@ -264,22 +264,20 @@ type audioView struct {
 func audioDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &audioView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 0, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "audio-dropdown")
-	v.Append(dropdownHeader(font, px, "ld-volume-2-symbolic", i18n.T("dropdown-audio-title")), false)
+	v.Append(dropdownHeader(font, "ld-volume-2-symbolic", i18n.T("dropdown-audio-title")), false)
 
 	v.output = newVolumeSection(v, audioOutput)
 	v.input = newVolumeSection(v, audioInput)
 	v.apps = newAppVolumes(v)
-	content := widget.NewBox(widget.Column, 0, 0)
+	content := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	devices := widget.NewBox(widget.Column, 0, 0)
 	devices.AddClass("audio-fixed", "audio-devices")
 	devices.Append(v.output, false)
 	devices.Append(v.input, false)
 	content.Append(devices, false)
-	appLabel := widget.NewLabel(font, px*0.85, i18n.T("dropdown-audio-app-volume"), 0)
-	appLabel.AddClass("section-label")
-	content.Append(appLabel, false)
+	content.Append(sectionLabel(font, i18n.T("dropdown-audio-app-volume")), false)
 	content.Append(v.apps, true)
 	v.main = widget.NewStack()
 	v.main.Add("devices", content)
@@ -288,13 +286,14 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	v.pickers[audioOutput] = newDevicePicker(v, audioOutput, i18n.T("dropdown-audio-output-devices"))
 	v.pickers[audioInput] = newDevicePicker(v, audioInput, i18n.T("dropdown-audio-input-devices"))
 	v.pages = widget.NewStack()
-	v.pages.AddClass("dropdown-content")
 	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("main", v.main)
 	v.pages.Add("output", v.pickers[audioOutput])
 	v.pages.Add("input", v.pickers[audioInput])
 	v.pages.Show("main")
-	v.Append(v.pages, true)
+	page := dropdownContent()
+	page.Append(v.pages, true)
+	v.Append(page, true)
 
 	if ctx.Pulse != nil {
 		v.apply(readAudioState(context.Background(), ctx.Pulse))
@@ -540,11 +539,7 @@ func newAppVolumes(v *audioView) *appVolumes {
 	inner.Append(a.list, false)
 	scroll := dropdownScroll(inner, "app-volumes-scroll")
 	a.Add("apps", scroll)
-	// The no-apps state's icon carries the sm size modifier
-	// (app_volumes/mod.rs:66).
-	empty, glyph := emptyStateIcon(v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), "")
-	glyph.AddClass("sm")
-	a.Add("empty", empty)
+	a.Add("empty", emptyState(v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), ""))
 	return a
 }
 

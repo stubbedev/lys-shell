@@ -134,8 +134,8 @@ func TestTreemanDropdownDetailAndActions(t *testing.T) {
 	defer v.dropdownClosed()
 
 	v.openDetail("/w/feat")
-	if v.pages.Visible() != "detail" || v.title.Text() != "feat" || !v.back.Visible() {
-		t.Fatalf("detail: page %q title %q back %v", v.pages.Visible(), v.title.Text(), v.back.Visible())
+	if v.pages.Visible() != "detail" || itemTitle(v.title) != "feat" || !v.back.Visible() {
+		t.Fatalf("detail: page %q title %q back %v", v.pages.Visible(), itemTitle(v.title), v.back.Visible())
 	}
 	fields := v.details.Children()[1].(*widget.Box).Children()
 	if len(fields) != 4 {
@@ -182,7 +182,7 @@ func TestTreemanDropdownDetailAndActions(t *testing.T) {
 	src.setStatus(next)
 	src.ticks <- struct{}{}
 	waitHeadless(t, "back to the list", func() bool { return v.pages.Visible() == "list" })
-	if v.title.Text() != i18n.T("dropdown-treeman-title") || v.back.Visible() {
+	if itemTitle(v.title) != i18n.T("dropdown-treeman-title") || v.back.Visible() {
 		t.Error("the header kept the detail state")
 	}
 }
@@ -264,4 +264,9 @@ func TestTreemanDotsAndBadgesDoNotStretch(t *testing.T) {
 	if headBadge.Bounds().H >= head.Bounds().H {
 		t.Errorf("the detail badge stretched to %d of %d", headBadge.Bounds().H, head.Bounds().H)
 	}
+}
+
+// itemTitle is the text of an item's title label.
+func itemTitle(it *widget.Item) string {
+	return treetest.WithClass(it, "title")[0].(*widget.Label).Text()
 }

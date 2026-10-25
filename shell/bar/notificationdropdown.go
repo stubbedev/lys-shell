@@ -80,8 +80,8 @@ type notificationView struct {
 	clearBox *widget.Box
 	dnd      *widget.Switch
 	syncing  bool
-	// body is the DropdownContent: the empty state and the list swap
-	// by visibility, no Stack (the Rust tree sets visible in place).
+	// body is the content: the empty state and the list swap by
+	// visibility, no Stack (the Rust tree sets visible in place).
 	body   *widget.Box
 	empty  *widget.StatusPage
 	scroll *widget.Scroll
@@ -107,7 +107,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	v.clearBox = clearBox
 	v.clearAll = dropdownButton(clearBox, v.dismissAll, "notification-dropdown-clear-all")
 	v.clearAll.AddClass(css.Ghost)
-	header, headerIcon := dropdownHeaderIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
+	header, headerIcon := dropdownHeaderIcon(font, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
 	v.headerIcon = headerIcon
 	v.Append(header, false)
 
@@ -128,8 +128,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	v.list.AddClass("notification-dropdown-groups")
 	scroll := dropdownScroll(v.list, "notification-dropdown-scroll")
 	v.scroll = scroll
-	v.body = widget.NewBox(widget.Column, 0, 0)
-	v.body.AddClass("dropdown-content", "notification-dropdown-content")
+	v.body = dropdownContent("notification-dropdown-content")
 	v.body.Append(empty, false)
 	v.body.Append(scroll, true)
 	v.Append(v.body, true)

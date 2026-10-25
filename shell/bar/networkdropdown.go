@@ -159,9 +159,8 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	life, cancel := context.WithCancel(context.Background()) //nolint:gosec // dropdownClosed cancels it
 	v.life, v.cancel = life, cancel
 	v.reads = newRefresher(ctx, life, v.read, v.apply)
-	// The popover frame (Popover.dropdown.network-dropdown > Dropdown):
-	// spacing-0, the header strip full width, .dropdown-content on the
-	// content wrapper (network/mod.rs:63-183).
+	// The popover frame: the header strip full width over the content
+	// (network/mod.rs:63-183).
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "network-dropdown")
 
@@ -170,25 +169,22 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.scanBtn.AddClass(css.Ghost, css.Icon)
 	v.wifiSwitch = widget.NewSwitch(false)
 	v.wifiSwitch.OnChanged = v.wifiToggled
-	header, icon, _ := dropdownHeaderParts(font, px, "tb-wifi-symbolic", i18n.T("dropdown-network-title"), v.scanBtn, v.wifiSwitch)
+	header, icon, _ := dropdownHeaderParts(font, "tb-wifi-symbolic", i18n.T("dropdown-network-title"), v.scanBtn, v.wifiSwitch)
 	v.headerIcon = icon
 
 	v.active = newNetActive(v)
 	v.secret = newNetSecretForm(v)
 
-	// The content wrapper carries .dropdown-content: its stylesheet
-	// padding owns the hand margins, and the header strip runs full
-	// width. It wraps the active connections, the secret form, and the
-	// body stack (network/mod.rs:129-183).
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content", "network-content")
+	// The content wraps the active connections, the secret form, and
+	// the body stack (network/mod.rs:129-183).
+	content := dropdownContent("network-content")
 	content.Append(v.active, false)
 	content.Append(v.secret, false)
 
 	browse := widget.NewBox(widget.Column, 0, 0)
 	v.vpns = newNetVPNs(v)
 	browse.Append(v.vpns, false)
-	v.availLabel = v.sectionLabel(i18n.T("dropdown-network-available"))
+	v.availLabel = sectionLabel(v.font, i18n.T("dropdown-network-available"))
 	browse.Append(v.availLabel, false)
 	v.password = newNetPasswordForm(v)
 	browse.Append(v.password, false)
@@ -197,12 +193,10 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.listCard.AddClass("card", "network-list")
 	v.listCard.Append(dropdownScroll(v.list, "network-list-scroll"), true)
 	browse.Append(v.listCard, true)
-	noNetworks, noNetworksIcon := emptyStateIcon(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
+	noNetworks := emptyState(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
 	v.noNetworks = noNetworks
-	noNetworksIcon.AddClass("sm")
-	noAdapter, noAdapterIcon := emptyStateIcon(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
+	noAdapter := emptyState(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
 	v.noAdapter = noAdapter
-	noAdapterIcon.AddClass("sm")
 	browse.AppendAligned(v.noNetworks, true, widget.AlignCenter)
 	browse.AppendAligned(v.noAdapter, true, widget.AlignCenter)
 	// Two pages rather than a form hiding the lists in place: the editor
@@ -223,12 +217,6 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.scanIfEmpty()
 	v.follow()
 	return v
-}
-
-func (v *networkView) sectionLabel(text string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*0.85, text, 0)
-	l.AddClass("section-label")
-	return l
 }
 
 // wifi is the wireless device, nil without one.
@@ -573,7 +561,7 @@ type netActive struct {
 
 func newNetActive(v *networkView) *netActive {
 	a := &netActive{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
-	a.label = v.sectionLabel("")
+	a.label = sectionLabel(v.font, "")
 	a.Append(a.label, false)
 	group := widget.NewBox(widget.Column, 0, 0)
 	group.AddClass("card", "network-connections-group")

@@ -148,8 +148,6 @@ type weatherView struct {
 
 func weatherDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	// The Dropdown template box is spacing-0: the header strip and the
-	// .dropdown-content rules carry every gap.
 	v := &weatherView{ctx: ctx, svc: ctx.Weather, font: font, px: px, stop: make(chan struct{})}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "weather-dropdown")
@@ -167,10 +165,7 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 	// the content's height instead of scrolling at the base height.
 	scroll.PropagateNaturalHeight = true
 	v.pages.Add("loaded", scroll)
-	// DropdownContent: the content box the stylesheet's .dropdown-content
-	// rules hang off (default ink, the section-label family).
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	content := dropdownContent()
 	content.Append(v.pages, true)
 	v.Append(content, true)
 	v.refresh()
@@ -203,7 +198,7 @@ func (v *weatherView) header() widget.Widget {
 	refresh.AddClass(css.Ghost, css.Icon)
 	refresh.OnClick = v.svc.Refresh
 	refresh.SetTooltip(i18n.T("dropdown-weather-refresh"))
-	row, glyph := dropdownHeaderIcon(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
+	row, glyph := dropdownHeaderIcon(v.font, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
 	glyph.SetVisible(false)
 	return row
 }
@@ -350,7 +345,7 @@ func (v *weatherView) centeredLabel(text string, scale float64, class string) *w
 func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.TimeFormat) widget.Widget {
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("weather-section")
-	col.Append(v.label(i18n.T("dropdown-weather-hourly"), 0.9, "section-label"), false)
+	col.Append(sectionLabel(v.font, i18n.T("dropdown-weather-hourly")), false)
 	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("hourly-forecast")
 	row.SetHomogeneous(true)
@@ -378,7 +373,7 @@ func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.Ti
 func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("weather-section")
-	col.Append(v.label(i18n.T("dropdown-weather-daily"), 0.9, "section-label"), false)
+	col.Append(sectionLabel(v.font, i18n.T("dropdown-weather-daily")), false)
 	list := widget.NewBox(widget.Column, 0, 0)
 	list.AddClass("daily-forecast")
 	days := w.Daily[:min(len(w.Daily), weatherDailyDays)]

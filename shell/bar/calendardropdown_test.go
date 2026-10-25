@@ -138,12 +138,9 @@ func TestCalendarSpacingIsCSSCarried(t *testing.T) {
 	v := calendarDropdown(ctx).(*calendarView)
 	sites := map[string]func() int{
 		"dropdown root": func() int { return v.Spacing() },
-		"dropdown-content": func() int {
-			return classedBox(t, v, "dropdown-content").Spacing()
-		},
-		"clock-hero":  func() int { return classedBox(t, v, "clock-hero").Spacing() },
-		"cal-section": func() int { return classedBox(t, v, "cal-section").Spacing() },
-		"cal-header":  func() int { return classedBox(t, v, "cal-header").Spacing() },
+		"clock-hero":    func() int { return classedBox(t, v, "clock-hero").Spacing() },
+		"cal-section":   func() int { return classedBox(t, v, "cal-section").Spacing() },
+		"cal-header":    func() int { return classedBox(t, v, "cal-header").Spacing() },
 	}
 	for what, get := range sites {
 		if got := get(); got != 0 {

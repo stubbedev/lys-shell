@@ -99,19 +99,18 @@ func (r *btDropdownRoot) dropdownClosed() {
 // state alone, and nothing follows a service.
 func btNoAdapterDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("dropdown-content", "bluetooth-content")
+	col := dropdownContent("bluetooth-content")
 	empty := emptyState(font, px, "ld-bluetooth-off-symbolic",
 		btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
 	col.AppendAligned(empty, true, widget.AlignCenter)
-	return btShell(font, px, "ld-bluetooth-off-symbolic", dropdownScroll(col, "bluetooth-scroll"))
+	return btShell(font, "ld-bluetooth-off-symbolic", dropdownScroll(col, "bluetooth-scroll"))
 }
 
 // btShell is the frame the two entries share: the header over the
 // scrolled content (mod.rs:55-72); the registry gives it the popover's
 // size, as for every dropdown.
-func btShell(font render.Font, px float64, icon string, scroll widget.Widget) widget.Widget {
-	header, _, _ := dropdownHeaderParts(font, px, icon, btText("dropdown-bluetooth-title"))
+func btShell(font render.Font, icon string, scroll widget.Widget) widget.Widget {
+	header, _, _ := dropdownHeaderParts(font, icon, btText("dropdown-bluetooth-title"))
 	frame := widget.NewBox(widget.Column, 0, 0)
 	frame.AddClass("dropdown", "bluetooth-dropdown")
 	frame.Append(header, false)
@@ -155,30 +154,23 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	d.scanBtn.OnClick = d.onScan
 	d.toggle = widget.NewSwitch(false)
 	d.toggle.OnChanged = d.onToggle
-	header, glyph, _ := dropdownHeaderParts(font, px, "ld-bluetooth-symbolic", btText("dropdown-bluetooth-title"), d.scanBtn, d.toggle)
+	header, glyph, _ := dropdownHeaderParts(font, "ld-bluetooth-symbolic", btText("dropdown-bluetooth-title"), d.scanBtn, d.toggle)
 	d.headerIcon = glyph
 
-	// The content (DropdownContent + the scrolled column). Rust's box is
-	// spacing-0: the CSS margins between the sections carry the gaps.
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("dropdown-content", "bluetooth-content")
+	// The content column, scrolled.
+	col := dropdownContent("bluetooth-content")
 	d.card = newBtPairingCard(ctx)
 	d.card.onOutput = d.onPairingOutput
 	col.Append(d.card.root, false)
 
-	sectionLabel := func(key string) *widget.Label {
-		l := widget.NewLabel(font, px*0.9, btText(key), 0)
-		l.AddClass("section-label")
-		return l
-	}
-	d.myLabel = sectionLabel("dropdown-bluetooth-my-devices")
+	d.myLabel = sectionLabel(font, btText("dropdown-bluetooth-my-devices"))
 	col.Append(d.myLabel, false)
 	d.myList = widget.NewBox(widget.Column, 0, 0)
 	d.myCard = widget.NewBox(widget.Column, 0, 0)
 	d.myCard.AddClass("card", "bluetooth-device-list")
 	d.myCard.Append(d.myList, false)
 	col.Append(d.myCard, false)
-	d.availLabel = sectionLabel("dropdown-bluetooth-available-devices")
+	d.availLabel = sectionLabel(font, btText("dropdown-bluetooth-available-devices"))
 	col.Append(d.availLabel, false)
 	d.availList = widget.NewBox(widget.Column, 0, 0)
 	d.availCard = widget.NewBox(widget.Column, 0, 0)

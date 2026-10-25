@@ -53,7 +53,7 @@ type treemanView struct {
 	px   float64
 
 	*widget.Box
-	title   *widget.Label
+	title   *widget.Item
 	back    *widget.Button
 	pages   *widget.Stack
 	list    *widget.Box
@@ -75,7 +75,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	backIcon := widget.NewThemeIcon("ld-arrow-left-symbolic", int(px))
 	v.back = dropdownButton(backIcon, func() { v.openDetail("") }, css.Ghost, css.Icon)
 	v.back.SetTooltip(i18n.T("dropdown-treeman-back"))
-	header, _, title := dropdownHeaderParts(font, px, "ld-layers-symbolic", i18n.T("dropdown-treeman-title"), v.back)
+	header, _, title := dropdownHeaderParts(font, "ld-layers-symbolic", i18n.T("dropdown-treeman-title"), v.back)
 	v.title = title
 	v.Append(header, false)
 
@@ -88,10 +88,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.Add("list", v.list)
 	v.pages.Add("detail", v.details)
 	scroll := dropdownScroll(v.pages, "treeman-scroll")
-	// DropdownContent: the content box the stylesheet's .dropdown-content
-	// rules hang off (default ink, the section-label family).
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	content := dropdownContent()
 	content.Append(scroll, true)
 	v.Append(content, true)
 
@@ -125,7 +122,7 @@ func (v *treemanView) openDetail(path string) {
 func (v *treemanView) syncPage() {
 	if v.detail != "" && v.status != nil {
 		if repo, wt, ok := v.status.FindWorktree(v.detail); ok {
-			v.title.SetText(wt.Branch)
+			v.title.SetTitle(wt.Branch)
 			v.back.SetVisible(true)
 			v.renderDetail(repo, wt)
 			v.pages.Show("detail")
@@ -133,7 +130,7 @@ func (v *treemanView) syncPage() {
 		}
 	}
 	v.detail = ""
-	v.title.SetText(i18n.T("dropdown-treeman-title"))
+	v.title.SetTitle(i18n.T("dropdown-treeman-title"))
 	v.back.SetVisible(false)
 	v.pages.Show("list")
 }

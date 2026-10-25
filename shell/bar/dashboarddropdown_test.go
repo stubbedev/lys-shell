@@ -380,10 +380,7 @@ func TestDashboardMediaEmptyStateArtAndLabels(t *testing.T) {
 	if !ok {
 		t.Fatal("no empty-state")
 	}
-	icon, isIcon := findByClass(empty, "sm").(*widget.Icon)
-	if !isIcon {
-		t.Fatal("the empty state's glyph lacks the sm class")
-	}
+	icon := treetest.First[*widget.Icon](t, empty)
 	arrangeDropdown(t, v, 400, 600)
 	card, isBox := empty.Parent().(*widget.Box)
 	if !isBox {

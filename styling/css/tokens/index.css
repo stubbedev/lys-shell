@@ -47,7 +47,6 @@
   --bar-group-rounding-element: var(--cfg-bar-group-rounding-element);
   --shadow-color: rgba(0, 0, 0, 0.5);
   --shadow-color-soft: rgba(0, 0, 0, 0.3);
-  --shadow-ring: rgba(255, 255, 255, 0.04);
   --shadow-xs: 0 2px 4px var(--shadow-color);
   --shadow-sm: 0 2px 8px var(--shadow-color);
   --shadow: 0 8px 32px var(--shadow-color);

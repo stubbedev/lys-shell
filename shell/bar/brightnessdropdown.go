@@ -99,20 +99,17 @@ type brightnessView struct {
 func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &brightnessView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 0, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "brightness-dropdown")
-	v.Append(dropdownHeader(font, px, brightnessDeviceIcon, i18n.T("dropdown-brightness-title")), false)
+	v.Append(dropdownHeader(font, brightnessDeviceIcon, i18n.T("dropdown-brightness-title")), false)
 	v.list = widget.NewBox(widget.Column, 0, 0)
 	v.list.AddClass("brightness-devices")
-	empty, emptyIcon := emptyStateIcon(font, px, brightnessDeviceIcon,
+	empty := emptyState(font, px, brightnessDeviceIcon,
 		i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
-	emptyIcon.AddClass("sm")
 	empty.AddClass("brightness-empty")
-	// DropdownContent: the sheet wraps the device list and the empty
-	// state in it. No ScrolledWindow — Rust shows the list bare and the
-	// panel grows.
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	// The content holds the device list and the empty state. No
+	// scroll: the list shows bare and the panel grows.
+	content := dropdownContent()
 	v.body = widget.NewStack()
 	v.body.Add("devices", v.list)
 	v.body.Add("empty", empty)

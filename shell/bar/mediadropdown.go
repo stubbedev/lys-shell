@@ -145,7 +145,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 		return mediaEmptyState(ctx)
 	}
 	v := &mediaView{ctx: ctx, src: ctx.Media, stop: make(chan struct{})}
-	v.Box = widget.NewBox(widget.Column, 0, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "media-dropdown")
 	v.main = widget.NewStack()
 	v.sources = widget.NewBox(widget.Column, 0, 0)

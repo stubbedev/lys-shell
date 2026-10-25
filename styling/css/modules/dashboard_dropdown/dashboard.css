@@ -1,9 +1,3 @@
-.dashboard-dropdown > contents > .dropdown {
-  min-width: 0;
-}
-.dashboard-dropdown .dropdown-content {
-  border-spacing: var(--space-sm);
-}
 .dashboard-dropdown .dashboard-content-box {
   border-spacing: var(--space-sm);
 }

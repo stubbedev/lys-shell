@@ -5,14 +5,6 @@
   background: transparent;
 }
 
-.bluetooth-content .section-label {
-  margin-top: 0;
-}
-
-.bluetooth-content .card + .section-label {
-  margin-top: var(--space-lg);
-}
-
 button.bluetooth-scan-btn {
   margin-right: var(--space-sm);
 }

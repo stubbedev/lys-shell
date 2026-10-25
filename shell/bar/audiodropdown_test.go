@@ -438,12 +438,6 @@ func TestAudioEmptyStatesCenterVertically(t *testing.T) {
 			t.Errorf("%s content sits %dpx from the top and %dpx from the bottom, want it centered", tc.what, top, bottom)
 		}
 	}
-	if treetest.First[*widget.Icon](t, findByClass(v.main, "empty-state")).HasClass("sm") {
-		t.Error("the main empty-state icon carries the sm modifier")
-	}
-	if !treetest.First[*widget.Icon](t, findByClass(v.apps, "empty-state")).HasClass("sm") {
-		t.Error("the app empty-state icon misses the sm modifier")
-	}
 }
 
 // The no-device row is one centered icon+label pair: no spacers, the

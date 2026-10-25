@@ -67,10 +67,9 @@ func TestBrightnessListIsNotInAScroll(t *testing.T) {
 	}
 }
 
-// The empty state follows mod.rs:96-111: the icon carries the sm size
-// class, and the description wraps, centers, and caps at 32
-// characters — only the description; the title stays as the template
-// builds it.
+// The empty state follows mod.rs:96-111: the description wraps,
+// centers, and caps at 32 characters — only the description; the
+// title stays as the template builds it.
 func TestBrightnessEmptyStateIconAndDescription(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Brightness = &fakeBrightnessSource{}
@@ -84,14 +83,11 @@ func TestBrightnessEmptyStateIconAndDescription(t *testing.T) {
 		t.Fatalf("empty state classes = %v, want brightness-empty + empty-state",
 			len(empty))
 	}
-	if icon := treetest.First[*widget.Icon](t, empty[0]); !icon.HasClass("sm") {
-		t.Error("the empty icon lacks the sm size class")
-	}
-	desc := brightnessOne[*widget.Label](t, v, "description")
+	desc := brightnessOne[*widget.Label](t, empty[0], "description")
 	if !desc.Wrap() || desc.Alignment() != render.AlignCenter {
 		t.Errorf("description wrap=%v align=%v, want wrapped and centered", desc.Wrap(), desc.Alignment())
 	}
-	if title := brightnessOne[*widget.Label](t, v, "title"); title.Wrap() {
+	if title := brightnessOne[*widget.Label](t, empty[0], "title"); title.Wrap() {
 		t.Error("the title wraps")
 	}
 }

@@ -130,18 +130,21 @@ func TestDropdownSizeFloorsThePopoverAroundItsMargins(t *testing.T) {
 		t.Fatalf("popover %+v, want the 382x512 request", sz)
 	}
 	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
-	if got := p.child.(interface{ Bounds() render.Rect }).Bounds(); got.W != 382-m.start-m.end || got.H != 100 {
-		t.Errorf("card %+v, want %d wide (the request less the margins) and its 100px content tall", got, 382-m.start-m.end)
+	if got, want := p.child.(interface{ Bounds() render.Rect }).Bounds(), 382-m.start-m.end-2*popoverBorder; got.W != want || got.H != 100 {
+		t.Errorf("card content %+v, want %d wide (the request less the margins and the popover's border) and its 100px content tall", got, want)
 	}
 
 	wide := widget.NewBox(widget.Row, 0, 0)
 	wide.Append(widget.NewSpacer(500, 20), false)
 	root, _ = dropdownTree(newPanelBox(wide), cfg, 382, 0)
 	apptheme.New(cfg).Attach(root)
-	if sz := widget.MeasureAsChild(root, con); sz.W != 500+m.start+m.end {
-		t.Errorf("popover width %d, want the 500px content plus the margins", sz.W)
+	if sz := widget.MeasureAsChild(root, con); sz.W != 500+m.start+m.end+2*popoverBorder {
+		t.Errorf("popover width %d, want the 500px content plus the margins and the popover's border", sz.W)
 	}
 }
+
+// popoverBorder is lys-ui's popover surface border width.
+const popoverBorder = 1
 
 // A panel is as wide as its request or its content's preferred width,
 // GTK's popover sizing: long wrapping text wraps inside the request,

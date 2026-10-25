@@ -20,7 +20,6 @@ var sheetOrder = []string{
 	"primitives/badge/index.css",
 	"primitives/buttons/index.css",
 	"primitives/dropdown/index.css",
-	"primitives/empty_state/index.css",
 	"primitives/progress_ring/index.css",
 	"primitives/status-dot/index.css",
 	"components/bar/container.css",

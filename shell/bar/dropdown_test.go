@@ -352,20 +352,19 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 			t.Errorf("the title has ink %#x, want the bar theme's %#x", uint32(c), uint32(want))
 		}
 	}
-	// The view is the Dropdown template's .dropdown box under the
-	// popover's contents node: popover.dropdown > contents .dropdown
-	// paints it the dropdown surface.
-	var view widget.Widget
+	// The popover card paints the dropdown surface: popover.dropdown
+	// takes the palette's dropdown color over lys-ui's popover fill.
+	var card widget.Widget
 	treetest.Walk(root, func(w widget.Widget) {
-		if view == nil && widget.HasClass(w, "calendar-dropdown") {
-			view = w
+		if card == nil && widget.HasClass(w, "dropdown") && widget.HasClass(w, "shadow") {
+			card = w
 		}
 	})
-	if view == nil {
-		t.Fatal("no calendar view in the tree")
+	if card == nil {
+		t.Fatal("no popover card in the tree")
 	}
-	if widget.StyleBackground(view) == 0 {
-		t.Error("the dropdown view paints no surface: popover.dropdown > contents .dropdown did not match")
+	if got, want := widget.StyleBackground(card), ctx.Theme.RenderPalette().Surface; got != want {
+		t.Errorf("the popover card paints %#x, want the dropdown surface %#x", uint32(got), uint32(want))
 	}
 }
 

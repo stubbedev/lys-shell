@@ -32,18 +32,14 @@ type mailView struct {
 func mailDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &mailView{ctx: ctx, font: font, px: px, stop: make(chan struct{})}
-	// The popover frame: spacing-0, the header strip full width; the
-	// content wrapper carries .dropdown-content and with it the padding
+	// The popover frame: the header strip full width over the content
 	// (mail/mod.rs:36-78).
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "mail-dropdown")
-	v.Append(dropdownHeader(font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-title")), false)
+	v.Append(dropdownHeader(font, "ld-mail-symbolic", i18n.T("dropdown-mail-title")), false)
 	v.list = widget.NewBox(widget.Column, 4, 0)
 	v.list.AddClass("mail-dropdown-list")
-	// The DropdownContent template's box: the stylesheet's default ink
-	// and padding for everything the list does not class itself.
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	content := dropdownContent()
 	content.Append(dropdownScroll(v.list, ""), true)
 	v.Append(content, true)
 	v.rebuild()

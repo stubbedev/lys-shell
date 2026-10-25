@@ -202,7 +202,7 @@ func TestDropdownHeaderActionsKeepTheirHeight(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	sw := widget.NewSwitch(true)
 	scan := dropdownButton(widget.NewThemeIcon("tb-refresh-symbolic", 16), nil, css.Ghost, css.Icon)
-	header := dropdownHeader(ctx.Font, 14, "ld-bluetooth-symbolic", "Bluetooth", scan, sw)
+	header := dropdownHeader(ctx.Font, "ld-bluetooth-symbolic", "Bluetooth", scan, sw)
 	ctx.Theme.Attach(header)
 	natural := widget.MeasureAsChild(sw, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
 	sz := header.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 400}})

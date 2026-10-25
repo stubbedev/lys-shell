@@ -323,7 +323,7 @@ type netVPNs struct {
 
 func newNetVPNs(v *networkView) *netVPNs {
 	s := &netVPNs{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
-	s.Append(v.sectionLabel(i18n.T("dropdown-network-vpn")), false)
+	s.Append(sectionLabel(v.font, i18n.T("dropdown-network-vpn")), false)
 	card := widget.NewBox(widget.Column, 0, 0)
 	card.AddClass("card", "network-list")
 	s.rows = widget.NewBox(widget.Column, 0, 0)

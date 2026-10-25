@@ -6,91 +6,91 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// popoverCard is the popover root the stylesheet styles through: the
-// popover element carrying GTK's dropdown classes, a contents node
-// under it (popover.dropdown > contents .dropdown takes the surface
-// color), and the card inside. gravity picks the shadow-direction
-// class the position rules read; shadow gates the shadow class, the
-// bar's dropdown-shadow config (default on).
-func popoverCard(content widget.Widget, gravity app.Gravity, shadow bool) *widget.Box {
+// popoverCard is the popover root: lys-ui's popover surface (its fill,
+// border and radius), the shell's stylesheet painting only the
+// dropdown's surface color and, when shadow is set (the bar's
+// dropdown-shadow), its shadow.
+func popoverCard(content widget.Widget, shadow bool) *widget.Box {
 	card := widget.NewBox(widget.Column, 0, 0)
 	card.SetElement("popover")
-	classes := []string{"dropdown"}
+	card.AddClass("dropdown")
 	if shadow {
-		classes = append(classes, "shadow")
+		card.AddClass("shadow")
 	}
-	classes = append(classes, positionClass(gravity))
-	card.AddClass(classes...)
-	contents := widget.NewBox(widget.Column, 0, 0)
-	contents.SetElement("contents")
-	card.Append(contents, true)
-	contents.Append(content, true)
+	card.Append(content, true)
 	return card
 }
 
-// positionClass names the popover's opened-toward edge, GTK's
-// position-* classes: a bar at the bottom opens its dropdown upward.
-func positionClass(gravity app.Gravity) string {
-	switch gravity {
-	case app.GravityTop:
-		return "position-top"
-	case app.GravityLeft:
-		return "position-left"
-	case app.GravityRight:
-		return "position-right"
-	}
-	return "position-bottom"
-}
-
-// dropdownHeader is the DropdownHeader template: the icon, the title
-// (taking the free width), and any trailing actions.
-func dropdownHeader(font render.Font, px float64, icon, title string, actions ...widget.Widget) *widget.Box {
-	row, _ := dropdownHeaderIcon(font, px, icon, title, actions...)
+// dropdownHeader is the dropdown's title strip: the icon, the title,
+// and any trailing actions.
+func dropdownHeader(font render.Font, icon, title string, actions ...widget.Widget) *widget.Box {
+	row, _, _ := dropdownHeaderParts(font, icon, title, actions...)
 	return row
 }
 
 // dropdownHeaderIcon is dropdownHeader that also hands back its icon,
 // for headers whose icon follows state.
-func dropdownHeaderIcon(font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon) {
-	row, glyph, _ := dropdownHeaderParts(font, px, icon, title, actions...)
+func dropdownHeaderIcon(font render.Font, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon) {
+	row, glyph, _ := dropdownHeaderParts(font, icon, title, actions...)
 	return row, glyph
 }
 
-// dropdownHeaderParts is dropdownHeader with its icon and title label,
-// for headers whose icon or title follows state. The tree carries the
-// stylesheet's classes: .dropdown-header paints the strip (padding,
-// elevated background, bottom border) and .dropdown-title paints the
-// label (size, weight, ink) and its image (accent, size, right
-// margin), so nothing here colors itself. The title's natural width
-// caps at 24 characters (the Rust header's max-width-chars) and the
-// actions box exists even when empty, the node tree the CSS expects.
-func dropdownHeaderParts(font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon, *widget.Label) {
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("dropdown-header")
-	titleBox := widget.NewBox(widget.Row, 0, 0)
-	titleBox.AddClass("dropdown-title")
-	glyph := widget.NewThemeIcon(icon, int(px*1.2))
-	titleBox.Append(glyph, false)
-	label := widget.NewLabel(font, px*1.1, title, 0)
-	label.SetEllipsize(widget.EllipsizeEnd)
-	label.SetMaxWidthChars(24)
-	titleBox.Append(label, true)
-	row.Append(titleBox, true)
-	acts := widget.NewBox(widget.Row, 0, 0)
-	acts.AddClass("dropdown-actions")
+// dropdownHeaderParts is dropdownHeader with its icon and title item,
+// for headers whose icon or title follows state. The strip is lys-ui's
+// small Item, the icon its bare media and the actions its own, over a
+// separator: the shell sets no spacing of its own, and its stylesheet
+// only inks the icon (.dropdown-icon).
+func dropdownHeaderParts(font render.Font, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon, *widget.Item) {
+	item := widget.NewItem(font, title, "")
+	item.SetSmall(true)
+	item.SetEllipsize(true)
+	glyph := widget.NewThemeIcon(icon, dropdownHeaderIconPx)
+	glyph.AddClass("dropdown-icon")
+	item.SetMedia(glyph, true)
 	for _, a := range actions {
-		acts.AppendAligned(a, false, widget.AlignCenter)
+		item.AddAction(a)
 	}
-	row.Append(acts, false)
-	return row, glyph, label
+	header := widget.NewBox(widget.Column, 0, 0)
+	header.AddClass("dropdown-header")
+	header.Append(item, false)
+	header.Append(widget.NewSeparator(widget.Horizontal), false)
+	return header, glyph, item
 }
+
+// dropdownHeaderIconPx is the header icon's size, lys-ui's icon size
+// beside an item's 14px title.
+const dropdownHeaderIconPx = 18
+
+// dropdownContent is a dropdown's content column under lys-ui's layout
+// metrics: the theme's spacing between its sections, and an inset of
+// twice the theme's padding, which lines the content up with the
+// header's icon. It carries .dropdown-content and the given classes.
+func dropdownContent(classes ...string) *widget.Box {
+	t := widget.Current()
+	inset := 2 * t.Padding
+	content := widget.NewBox(widget.Column, t.Spacing, inset)
+	content.AddClass(append([]string{"dropdown-content"}, classes...)...)
+	return content
+}
+
+// sectionLabel is a heading over a dropdown section, lys-ui's muted
+// caption heading.
+func sectionLabel(font render.Font, text string) *widget.Label {
+	l := widget.NewLabel(font, sectionLabelPx, text, 0)
+	l.AddClass("section-label", css.CaptionHeading, css.DimLabel)
+	return l
+}
+
+// sectionLabelPx is lys-ui's caption size, which .caption-heading
+// also sets.
+const sectionLabelPx = 12
 
 // emptyState is the EmptyState template on lys-ui's StatusPage: the
 // icon on its muted tile over the title and the wrapped description,
@@ -101,8 +101,7 @@ func emptyState(font render.Font, px float64, icon, title, description string) *
 }
 
 // emptyStateIcon is emptyState that also hands back its icon, for
-// pages whose glyph follows state; a class on the icon (the "sm" size)
-// reaches the stylesheet's empty-state rules.
+// pages whose glyph follows state.
 func emptyStateIcon(font render.Font, px float64, icon, title, description string) (*widget.StatusPage, *widget.Icon) {
 	page := widget.NewStatusPage(font, "", title, description)
 	page.AddClass("empty-state")

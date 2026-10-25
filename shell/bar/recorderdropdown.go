@@ -199,7 +199,7 @@ type recorderView struct {
 func recorderDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &recorderView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 0, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "recorder-dropdown")
 	cfg := ctx.Config.Recorder
 
@@ -211,13 +211,12 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.time.AddClass("recorder-status-time")
 	v.status.Append(v.statusDot, false)
 	v.status.Append(v.time, false)
-	v.Append(dropdownHeader(font, px, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
+	v.Append(dropdownHeader(font, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
 
-	// The DropdownContent template: everything below the header; its
-	// classes let the stylesheet's `.recorder-dropdown-content` rules
-	// reach the rows, cards, and section headers.
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content", "recorder-dropdown-content")
+	// The content: everything below the header; its class lets the
+	// stylesheet's `.recorder-dropdown-content` rules reach the rows,
+	// cards, and section headers.
+	content := dropdownContent("recorder-dropdown-content")
 	v.Append(content, true)
 
 	content.Append(v.controls(), false)
@@ -301,9 +300,7 @@ func (v *recorderView) sectionHeader(icon, title string) *widget.Box {
 	row.AddClass("recorder-section-header")
 	glyph := widget.NewThemeIcon(icon, int(v.px))
 	row.Append(glyph, false)
-	label := widget.NewLabel(v.font, v.px, title, 0)
-	label.AddClass("section-label")
-	row.Append(label, true)
+	row.Append(sectionLabel(v.font, title), true)
 	return row
 }
 

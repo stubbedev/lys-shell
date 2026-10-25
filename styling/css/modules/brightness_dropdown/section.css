@@ -51,10 +51,3 @@ image.brightness-device-icon-img {
   color: var(--fg-default);
   min-width: calc(var(--space-lg) * 2);
 }
-
-.brightness-dropdown .empty-state.brightness-empty .title {
-  font-size: var(--text-md);
-}
-.brightness-dropdown .empty-state.brightness-empty .description {
-  font-size: var(--text-base);
-}

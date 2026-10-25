@@ -97,16 +97,11 @@ type calendarView struct {
 
 func calendarDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	// The Dropdown template box is spacing-0: the header strip and the
-	// .dropdown-content rules carry every gap.
 	v := &calendarView{ctx: ctx, font: font, px: px, stop: make(chan struct{}), now: time.Now}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "calendar-dropdown")
-	v.Append(dropdownHeader(font, px, "tb-calendar-time-symbolic", i18n.T("dropdown-calendar-title")), false)
-	// DropdownContent: the content box the stylesheet's .dropdown-content
-	// rules hang off (default ink, the section-label family).
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.AddClass("dropdown-content")
+	v.Append(dropdownHeader(font, "tb-calendar-time-symbolic", i18n.T("dropdown-calendar-title")), false)
+	content := dropdownContent()
 	content.Append(v.hero(), false)
 	content.Append(v.calendar(), false)
 	v.Append(content, false)

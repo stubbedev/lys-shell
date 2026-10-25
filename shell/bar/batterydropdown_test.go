@@ -272,7 +272,7 @@ func TestBatterySectionsKeepRustsZeroSpacing(t *testing.T) {
 		t.Errorf("root spacing = %d, want 0", got)
 	}
 	for _, class := range []string{
-		"dropdown-content", "battery-hero", "battery-hero-meta",
+		"battery-hero", "battery-hero-meta",
 		"battery-detail", "charge-limit", "charge-limit-not-supported",
 	} {
 		ws := treetest.WithClass(v, class)
@@ -385,7 +385,7 @@ func TestBatteryProfileSegmentsEqualWidth(t *testing.T) {
 }
 
 // The battery empty state is the shared StatusPage: the description
-// wraps and the icon carries no size modifier.
+// wraps.
 func TestBatteryEmptyStateMatchesTheTemplate(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	v := batteryDropdown(ctx).(*batteryView)
@@ -393,12 +393,8 @@ func TestBatteryEmptyStateMatchesTheTemplate(t *testing.T) {
 	if v.body.Visible() != "empty" {
 		t.Fatalf("page %q, want empty", v.body.Visible())
 	}
-	if desc := brightnessOne[*widget.Label](t, v, "description"); !desc.Wrap() {
+	if desc := brightnessOne[*widget.Label](t, findByClass(v, "empty-state"), "description"); !desc.Wrap() {
 		t.Error("the battery empty description does not wrap")
-	}
-	icon := treetest.First[*widget.Icon](t, findByClass(v, "empty-state"))
-	if icon.HasClass("sm") {
-		t.Error("the battery empty icon carries brightness's sm size class")
 	}
 }
 

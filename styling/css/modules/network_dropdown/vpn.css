@@ -122,10 +122,6 @@ button.network-vpn-edit:hover image {
   margin-top: var(--space-lg);
 }
 
-.dropdown-content > .network-secret-card:not(:first-child) {
-  margin-top: var(--space-lg);
-}
-
 .vpn-item.failed .description {
   color: var(--status-error);
 }

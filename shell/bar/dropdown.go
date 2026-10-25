@@ -446,10 +446,9 @@ func roundMarginRem(rem, scale float64) int {
 // Rust registry sets them on the popover child at every show, so the
 // card floats inside the surface away from its edges.
 // dropdownTree is the popover's tree around content: the revealer the
-// card enters through (animate_in), the card carrying the GTK class
-// chain (popover.dropdown > contents .dropdown gets the surface, the
-// shadow and position classes the shadow's direction), and the Rust
-// registry's surface margins around it. The theme reaches it through
+// card enters through (animate_in), the card (lys-ui's popover surface
+// in the dropdown's color), and the Rust registry's surface margins
+// around it. The theme reaches it through
 // the bar button it opens from: lys-ui styles a popover as a child of
 // its anchor, as GTK's popover CSS node is, so it inherits the bar
 // window's fonts and :root variables. w x h is the dropdown's size, the
@@ -459,7 +458,7 @@ func roundMarginRem(rem, scale float64) int {
 func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
-	card := popoverCard(rev, dropdownGravity(cfg.Bar.Location), cfg.Bar.DropdownShadow)
+	card := popoverCard(rev, cfg.Bar.DropdownShadow)
 	root := withDropdownMargins(card, cfg)
 	root.SetSizeRequest(w, h)
 	return root, rev

@@ -527,9 +527,6 @@ func TestNetworkEmptyStatesCarryTheSmIcon(t *testing.T) {
 		if icon == nil {
 			t.Fatal("the empty state has no icon")
 		}
-		if !icon.HasClass("sm") {
-			t.Error("the empty state icon lacks the sm class")
-		}
 	}
 }
 

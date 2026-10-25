@@ -529,8 +529,8 @@ func TestWeatherDropdownTreesMatchRust(t *testing.T) {
 			t.Errorf(".%s = %q, want the bare number", class, l.Text())
 		}
 	}
-	header := classedBox(t, v, "dropdown-title")
-	if icons := treetest.All[*widget.Icon](header); len(icons) != 1 || icons[0].Visible() {
+	header := classedBox(t, v, "dropdown-header")
+	if icons := treetest.WithClass(header, "dropdown-icon"); len(icons) != 1 || icons[0].(*widget.Icon).Visible() {
 		t.Error("the weather header shows its icon; the Rust header leaves it hidden")
 	}
 }
