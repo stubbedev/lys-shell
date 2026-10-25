@@ -17,7 +17,7 @@ func (m stubModule) Root() widget.Widget { return m.root }
 
 // An unavailable module is left out of its row and the rest of the
 // section still builds: one missing daemon never takes the bar down.
-func TestCreateAllSkipsModuleThatFailsToBuild(t *testing.T) {
+func TestAppendItemsSkipsModuleThatFailsToBuild(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ok := stubModule{root: widget.NewBox(widget.Row, 0, 0)}
 	factories["test-ok"] = func(ModuleContext) (Module, error) { return ok, nil }
@@ -27,7 +27,7 @@ func TestCreateAllSkipsModuleThatFailsToBuild(t *testing.T) {
 	defer delete(factories, "test-ok")
 	defer delete(factories, "test-missing")
 
-	row := CreateAll([]config.BarItem{{Module: "test-missing"}, {Module: "test-ok"}}, ctx)
+	row := itemsZone([]config.BarItem{{Module: "test-missing"}, {Module: "test-ok"}}, ctx)
 
 	items := row.Children()
 	if len(items) != 2 {
@@ -43,9 +43,9 @@ func TestCreateAllSkipsModuleThatFailsToBuild(t *testing.T) {
 
 // An unknown module name is logged and skipped the same way, instead
 // of failing the whole bar.
-func TestCreateAllSkipsUnknownModule(t *testing.T) {
+func TestAppendItemsSkipsUnknownModule(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
-	row := CreateAll([]config.BarItem{{Module: "no-such-module"}}, ctx)
+	row := itemsZone([]config.BarItem{{Module: "no-such-module"}}, ctx)
 	if got := len(row.Children()[0].(*widget.Box).Children()); got != 0 {
 		t.Fatalf("unknown module's bar-item children = %d, want 0", got)
 	}
@@ -59,7 +59,7 @@ func TestUnimplementedSchemaModuleIsSkipped(t *testing.T) {
 	if _, err := Create("updates", ctx); err == nil || !strings.Contains(err.Error(), "not implemented") {
 		t.Fatalf("updates: %v, want a not-implemented error", err)
 	}
-	items := CreateAll([]config.BarItem{{Module: "updates"}, {Module: "clock"}}, ctx).Children()
+	items := itemsZone([]config.BarItem{{Module: "updates"}, {Module: "clock"}}, ctx).Children()
 	if len(items[0].(*widget.Box).Children()) != 0 || len(items[1].(*widget.Box).Children()) != 1 {
 		t.Error("want the updates item empty and the clock built")
 	}
@@ -92,4 +92,11 @@ func TestModulesCarryTheirIcons(t *testing.T) {
 	if b.icon != icon || b.label != nil || !widget.HasClass(b.iconBox, "icon-container") || len(b.iconBox.Children()) != 1 {
 		t.Errorf("icon root: icon %v label %v, want the icon in .icon-container and no label", b.icon, b.label)
 	}
+}
+
+// itemsZone is a bar zone holding items.
+func itemsZone(items []config.BarItem, ctx ModuleContext) *widget.Box {
+	zone := widget.NewBox(widget.Row, 0, 0)
+	appendItems(zone, items, ctx)
+	return zone
 }

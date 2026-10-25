@@ -53,9 +53,11 @@ type barStyle struct {
 
 	// fg is the default ink. Bar modules get a copy with fg zero (unset,
 	// so the stylesheet's --bar-btn-label-color applies).
-	fg        render.Color
-	moduleGap int
-	labelPx   float64
+	fg render.Color
+	// moduleGap spaces the items of a bar zone, groupGap the modules
+	// of a group.
+	moduleGap, groupGap int
+	labelPx             float64
 
 	buttonBgHover  render.Color
 	buttonBgActive render.Color
@@ -103,6 +105,7 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 		palette:        palette,
 		fg:             resolve(mustToken(config.TokenFgDefault)),
 		moduleGap:      int(math.Round(bar.ModuleGap.ResolvePx(styling.RemBase, scale))),
+		groupGap:       int(math.Round(bar.ButtonGroupModuleGap.ResolvePx(styling.RemBase, scale))),
 		labelPx:        labelPx,
 		buttonBgHover:  styling.ColorMix(hoverBase, buttonBg, 50),
 		buttonBgActive: styling.ColorMix(activeBase, buttonBg, 80),

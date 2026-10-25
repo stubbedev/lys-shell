@@ -147,7 +147,7 @@ func TestUnboundBarButtonConsumesScroll(t *testing.T) {
 func TestModuleWrapsTheButtonInModuleClasses(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	row := CreateAll([]config.BarItem{{Module: "clock"}}, ctx)
+	row := itemsZone([]config.BarItem{{Module: "clock"}}, ctx)
 	item := row.Children()[0].(*widget.Box).Children()[0].(*widget.Box)
 	if !item.HasClass("module") || !item.HasClass("clock") {
 		t.Fatalf("wrapper classes %v, want module + clock above the button", item.Classes())

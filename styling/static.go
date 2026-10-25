@@ -23,7 +23,6 @@ var sheetOrder = []string{
 	"primitives/progress_ring/index.css",
 	"primitives/status-dot/index.css",
 	"components/bar/container.css",
-	"components/bar/layout.css",
 	"components/bar_button/base.css",
 	"components/bar_button/block_prefix.css",
 	"components/bar_button/icon_square.css",

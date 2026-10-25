@@ -319,7 +319,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
-	// openBar builds one output's bar layer; `lys-shell panel show` and a
+	// openBar shows one output's bar; `lys-shell panel show` and a
 	// reload reopen bars through it.
 	openBar := func(output *app.Output, layout config.BarLayout) (barLayer, error) {
 		ctx := rt.ctx
@@ -328,21 +328,19 @@ func run(cfg *config.Config, svc *config.Service) error {
 		// Each bar is its own generation: closing it (panel hide, a
 		// reload) ends its modules.
 		ctx.gen = newMountGen()
-		lc := layerConfigFor(ctx, layout, output.Name, logicalSize(output))
-		lc.Output = output
-		layer, err := application.NewLayer(*lc)
+		window, err := application.NewBar(barConfigFor(ctx, layout, output))
 		if err != nil {
 			ctx.gen.retire()
 			return nil, err
 		}
 		for _, a := range *ctx.Attachers {
-			a.Attach(layer)
+			a.Attach(window)
 		}
-		rt.ctx.Dropdowns.attachHost(output.Name, layer, logicalSize(output).H)
+		rt.ctx.Dropdowns.attachHost(output.Name, window, logicalSize(output).H)
 		if holder != nil {
-			holder.add(layer)
+			holder.add(window)
 		}
-		return barWindow{layer, ctx.gen, holder}, nil
+		return barWindow{window, ctx.gen, holder}, nil
 	}
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
@@ -515,111 +513,60 @@ func connectAudio() *pulse.Service {
 	return audio
 }
 
-// layerConfigFor measures the tree for one output (its logical size)
-// and maps it onto a layer surface config: anchors from the location,
-// margins from the insets, the exclusive zone from the bar's thickness
-// (the Rust shell's auto exclusive zone), and the lys-shell-bar namespace.
-// The compositor stretches only the doubly anchored axis, so a top or
-// bottom bar sizes its height and a side bar its width. The caller pins
-// the output.
-func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string, output widget.Size) *app.LayerConfig {
-	root := buildRoot(ctx, layout, connector)
-	// The surface is transparent and carries no layer margins: the
-	// window's CSS margins (insets and the shadow margin) sit inside it
-	// and the stylesheet paints the bar, as GTK sizes a layer window by
-	// its margin box.
-	vertical := ctx.Config.Bar.Location.IsVertical()
-	thickness := measureThickness(root, output, vertical)
-	var width, height uint32
-	if vertical {
-		width = uint32(thickness)
-	} else {
-		height = uint32(thickness)
-	}
-	return &app.LayerConfig{
-		Layer:         layering.For(ctx.Config.General, ctx.Config.Bar.Layer),
-		Anchor:        AnchorsFor(ctx.Config.Bar.Location),
-		Width:         width,
-		Height:        height,
-		ExclusiveZone: exclusiveZone(ctx.Config.Bar.Exclusive, thickness),
-		Namespace:     "lys-shell-bar-" + connector,
-		Root:          root,
+// barConfigFor shows one output's bar on lys-ui's bar window: anchored
+// to the configured edge and stretched along it, as thick as the bar's
+// content, reserving that thickness when the bar is exclusive. The
+// window keeps no layer margins: the bar's CSS margins (the insets and
+// the shadow margin) sit inside it, as GTK sizes a layer window by its
+// margin box.
+func barConfigFor(ctx ModuleContext, layout config.BarLayout, output *app.Output) app.BarConfig {
+	return app.BarConfig{
+		Output:    output,
+		Bar:       buildRoot(ctx, layout, output.Name),
+		Layer:     layering.For(ctx.Config.General, ctx.Config.Bar.Layer),
+		Exclusive: ctx.Config.Bar.Exclusive,
+		Namespace: "lys-shell-bar-" + output.Name,
 	}
 }
 
-// buildRoot assembles one bar the way bar/mod.rs's view does, so the
-// bar CSS styles it:
+// buildRoot assembles one bar on lys-ui's Bar, so the bar CSS styles
+// it:
 //
-//	window.bar.<location>.<connector>[.floating]   (the --bar-* variables inline)
-//	└ centerbox
-//	  ├ box.bar-section.bar-left
-//	  ├ box.bar-section.bar-center
-//	  └ box.bar-section.bar-right
+//	bar.<edge>.<connector>[.floating]   (the --bar-* variables inline)
+//	├ box.start
+//	├ box.center
+//	└ box.end
 //
-// The window's CSS margins carry the insets and the shadow margin, its
-// border and background the bar chrome; the sections' margins carry the
-// padding (bar/container.css).
-func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) widget.Widget {
+// The bar's CSS margins carry the insets and the shadow margin, its
+// border, background and padding the bar chrome; each zone spaces its
+// items by the module gap.
+func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) *widget.Bar {
 	cfg := ctx.Config
-	axis := widget.Row
-	if cfg.Bar.Location.IsVertical() {
-		axis = widget.Column
-	}
-	root := widget.NewBox(axis, 0, 0)
-	root.SetElement("window")
-	root.AddClass(rootClasses(connector, cfg)...)
-	root.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
+	bar := widget.NewBar(barEdge(cfg.Bar.Location))
+	bar.AddClass(rootClasses(connector, cfg)...)
+	bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
 	if ctx.Theme != nil {
-		ctx.Theme.Attach(root)
+		ctx.Theme.Attach(bar)
 	}
-	section := func(class string, items []config.BarItem) widget.Widget {
-		s := CreateAll(items, ctx)
-		s.AddClass("bar-section", class)
-		return s
-	}
-	center := widget.NewCenterBox(section("bar-left", layout.Left), section("bar-center", layout.Center), section("bar-right", layout.Right))
-	center.SetElement("centerbox")
-	center.SetOrientation(axis)
-	root.Append(center, true)
-	return root
+	appendItems(bar.Start(), layout.Left, ctx)
+	appendItems(bar.Center(), layout.Center, ctx)
+	appendItems(bar.End(), layout.Right, ctx)
+	return bar
 }
 
-// measureThickness resolves the bar's content-driven thickness: the
-// natural height of the tree at the output's width, or for a side bar
-// the natural width at the output's height. A priming arrange runs
-// first: lys-ui links a widget to its container at arrange time, and the
-// bar stylesheet (attached to the root) reaches a widget only through
-// those links, so the unprimed tree would measure unstyled.
-func measureThickness(root widget.Widget, output widget.Size, vertical bool) int {
-	con := widget.Constraints{Max: widget.Size{W: output.W, H: 1 << 16}}
-	if vertical {
-		con = widget.Constraints{Max: widget.Size{W: 1 << 16, H: output.H}}
+// barEdge is the lys-ui edge a bar at location runs along.
+func barEdge(location config.Location) widget.BarEdge {
+	switch location {
+	case config.LocationTop:
+		return widget.BarTop
+	case config.LocationBottom:
+		return widget.BarBottom
+	case config.LocationLeft:
+		return widget.BarLeft
+	case config.LocationRight:
+		return widget.BarRight
 	}
-	size := root.Measure(con)
-	if vertical {
-		root.Arrange(render.Rect{W: size.W, H: output.H})
-	} else {
-		root.Arrange(render.Rect{W: output.W, H: size.H})
-	}
-	// The links drop the children's measure caches but not the root's.
-	if inv, ok := root.(interface{ InvalidateLayout() }); ok {
-		inv.InvalidateLayout()
-	}
-	size = root.Measure(con)
-	if vertical {
-		return size.W
-	}
-	return size.H
-}
-
-// exclusiveZone mirrors gtk4-layer-shell's auto exclusive zone: an
-// exclusive bar reserves its own thickness along the docked edge, a
-// non-exclusive one reserves nothing.
-func exclusiveZone(exclusive bool, thickness int) int32 {
-	if !exclusive {
-		return 0
-	}
-	return int32(thickness)
+	panic(fmt.Sprintf("bar: location %q has no edge", location))
 }
 
 // logicalSize converts an output's current mode to logical pixels at
@@ -694,7 +641,7 @@ func barLayoutFor(cfg *config.Config, connector string) (config.BarLayout, bool)
 // barWindow is an open bar: closing it closes the layer and ends the
 // generation its modules run in.
 type barWindow struct {
-	layer  *app.LayerWindow
+	layer  *app.BarWindow
 	gen    *mountGen
 	holder *idleHolder
 }

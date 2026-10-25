@@ -2,14 +2,11 @@ package bar
 
 import "github.com/stubbedev/lys-shell/config"
 
-// locationClass is Location::css_class: the root's location class.
-func locationClass(location config.Location) string { return string(location) }
-
-// rootClasses are apply_css_classes (bar/methods.rs): bar, the
-// connector, the location, and floating when an inset pulls the bar
-// off its edges.
+// rootClasses are apply_css_classes (bar/methods.rs) beyond the bar
+// element and its edge, which lys-ui's Bar carries: the connector, and
+// floating when an inset pulls the bar off its edges.
 func rootClasses(connector string, cfg *config.Config) []string {
-	classes := []string{"bar", locationClass(cfg.Bar.Location)}
+	var classes []string
 	if connector != "" {
 		classes = append(classes, connector)
 	}

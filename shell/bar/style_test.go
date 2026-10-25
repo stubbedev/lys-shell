@@ -85,7 +85,7 @@ func styledContext(t *testing.T, cfg *config.Config) ModuleContext {
 func paintBar(t *testing.T, ctx ModuleContext, layout config.BarLayout, w int) ([]byte, int, widget.Widget) {
 	t.Helper()
 	root := buildRoot(ctx, layout, "DP-1")
-	h := measureThickness(root, widget.Size{W: w}, false)
+	h := barThickness(root, widget.Size{W: w, H: 1 << 16})
 	root.Measure(widgetConstraintsMax(w, h))
 	root.Arrange(render.Rect{W: w, H: h})
 	widget.CollectDamage(root)
@@ -113,13 +113,7 @@ func TestBarCenterSectionIsCentered(t *testing.T) {
 	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
 	root.Measure(widget.Constraints{Max: widget.Size{W: 1600, H: 60}})
 	root.Arrange(render.Rect{W: 1600, H: 60})
-	var center *widget.Box
-	treetest.Walk(root, func(w widget.Widget) {
-		if widget.HasClass(w, "bar-center") {
-			center = w.(*widget.Box)
-		}
-	})
-	b := center.Bounds()
+	b := root.Center().Bounds()
 	if mid := b.X + b.W/2; mid < 795 || mid > 805 {
 		t.Errorf("center section %+v, midpoint %d, want the bar's 800", b, mid)
 	}
@@ -130,7 +124,7 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock", Class: "mine"}}}
 	ctx := newTestContext(t, cfg)
 	root := buildRoot(ctx, layout, "DP-1")
-	for _, c := range []string{"bar", "top", "DP-1"} {
+	for _, c := range []string{"top", "DP-1"} {
 		if !widget.HasClass(root, c) {
 			t.Errorf("root misses %q", c)
 		}
@@ -138,28 +132,16 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	if widget.HasClass(root, "floating") {
 		t.Error("an inset-free bar is floating")
 	}
-	box := root.(*widget.Box)
-	if box.Element() != "window" {
-		t.Errorf("root element = %q, want window", box.Element())
+	if root.Element() != "bar" {
+		t.Errorf("root element = %q, want bar", root.Element())
 	}
-	if !strings.Contains(box.InlineStyle(), "--bar-padding-px: 6") {
-		t.Errorf("root inline vars = %q, want the build_css block", box.InlineStyle())
+	if !strings.Contains(root.InlineStyle(), "--bar-padding-px: 6") {
+		t.Errorf("root inline vars = %q, want the build_css block", root.InlineStyle())
 	}
-	center, ok := box.Children()[0].(*widget.CenterBox)
-	if !ok || center.Element() != "centerbox" {
-		t.Fatalf("window child %T, want the centerbox", box.Children()[0])
+	if n := len(root.Start().Children()) + len(root.End().Children()); n != 0 {
+		t.Errorf("the empty start and end zones hold %d items", n)
 	}
-	var sections []*widget.Box
-	for _, k := range center.Children() {
-		if widget.HasClass(k, "bar-section") {
-			sections = append(sections, k.(*widget.Box))
-		}
-	}
-	if len(sections) != 3 || !widget.HasClass(sections[0], "bar-left") ||
-		!widget.HasClass(sections[1], "bar-center") || !widget.HasClass(sections[2], "bar-right") {
-		t.Fatalf("sections = %d, want left/center/right always present", len(sections))
-	}
-	items := sections[1].Children()
+	items := root.Center().Children()
 	if len(items) != 1 || !widget.HasClass(items[0], "bar-item") {
 		t.Fatalf("center items = %v, want one bar-item", items)
 	}
@@ -197,8 +179,7 @@ func TestGroupsAreBarItemsWithModules(t *testing.T) {
 		Name: "g1", Modules: []config.BarItem{{Module: "clock"}, {Module: "clock"}},
 	}}}}
 	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
-	left := root.(*widget.Box).Children()[0].(*widget.CenterBox).Children()[0].(*widget.Box)
-	group := left.Children()[0].(*widget.Box)
+	group := root.Start().Children()[0].(*widget.Box)
 	if !group.HasClass("bar-item") || !group.HasClass("bar-group") || group.ID() != "g1" {
 		t.Errorf("group box classes %v id %q", group.Classes(), group.ID())
 	}
@@ -260,43 +241,56 @@ func TestBarInsetsAreWindowMargins(t *testing.T) {
 	if got := pixelAt(data, 200, 100, 11); got != palette.Surface {
 		t.Errorf("below the margin = %#08x, want the bar", uint32(got))
 	}
-	lc := layerConfigFor(ctx, config.BarLayout{Monitor: "*"}, "DP-1", widget.Size{W: 200, H: 100})
-	if lc.Margin != (app.Margins{}) || lc.Height != uint32(h) {
-		t.Errorf("layer margins %+v height %d, want none and the full %d", lc.Margin, lc.Height, h)
+	if bc := barConfigFor(ctx, config.BarLayout{Monitor: "*"}, &app.Output{Name: "DP-1"}); bc.Margin != 0 {
+		t.Errorf("layer margin %d, want none: the insets are the bar's own", bc.Margin)
 	}
 }
 
-// A side bar is anchored top and bottom, so the compositor stretches
-// its height and the bar sizes only its width; a top bar the other way
-// round. Setting the stretched axis, or leaving the free axis zero, is
-// a layer-shell protocol error.
-func TestLayerConfigSizesOnlyTheFreeAxis(t *testing.T) {
+// A bar is as thick as its content across its edge, a side bar's
+// width and a top or bottom bar's height, not the output's extent
+// along it; the side bar lays out as a column.
+func TestBarIsAsThickAsItsContent(t *testing.T) {
 	out := widget.Size{W: 1280, H: 800}
+	for _, loc := range []config.Location{config.LocationTop, config.LocationBottom, config.LocationLeft, config.LocationRight} {
+		cfg := config.Defaults()
+		cfg.Bar.Location = loc
+		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		if thick := barThickness(bar, out); thick == 0 || thick >= min(out.W, out.H) {
+			t.Errorf("%s: thickness %d, want the content's", loc, thick)
+		}
+		if widget.HasClass(bar, "vertical") != loc.IsVertical() {
+			t.Errorf("%s: vertical class %v", loc, widget.HasClass(bar, "vertical"))
+		}
+	}
+}
+
+// The bar's padding insets its zones across the bar and its
+// padding-ends along it, turned with the bar on a side edge; at zero
+// the zones run flush with the bar's box.
+func TestBarPaddingInsetsTheZones(t *testing.T) {
 	for _, tc := range []struct {
-		loc      config.Location
-		vertical bool
+		loc           config.Location
+		padding, ends int
 	}{
-		{config.LocationTop, false},
-		{config.LocationBottom, false},
-		{config.LocationLeft, true},
-		{config.LocationRight, true},
+		{config.LocationTop, 10, 15},
+		{config.LocationLeft, 10, 15},
+		{config.LocationTop, 0, 0},
 	} {
 		cfg := config.Defaults()
 		cfg.Bar.Location = tc.loc
-		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-		lc := layerConfigFor(styledContext(t, cfg), layout, "DP-1", out)
-		thick, stretched := lc.Height, lc.Width
-		if tc.vertical {
-			thick, stretched = lc.Width, lc.Height
+		cfg.Bar.Padding = config.Size{Value: float32(tc.padding), Unit: config.SizePixels}
+		cfg.Bar.PaddingEnds = config.Size{Value: float32(tc.ends), Unit: config.SizePixels}
+		layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}}}
+		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		settleBar(bar, widget.Size{W: 1000, H: 1000})
+		start := bar.Start().Bounds()
+		wantX, wantY := tc.ends, tc.padding
+		if tc.loc.IsVertical() {
+			wantX, wantY = tc.padding, tc.ends
 		}
-		if thick == 0 || thick >= uint32(min(out.W, out.H)) {
-			t.Errorf("%s: free-axis size %d, want the content's thickness", tc.loc, thick)
-		}
-		if stretched != 0 {
-			t.Errorf("%s: stretched-axis size %d, want 0 (the compositor fills it)", tc.loc, stretched)
-		}
-		if lc.ExclusiveZone != int32(thick) {
-			t.Errorf("%s: exclusive zone %d, want the thickness %d", tc.loc, lc.ExclusiveZone, thick)
+		if start.X != wantX || start.Y != wantY {
+			t.Errorf("%s padding %d ends %d: start zone at (%d,%d), want (%d,%d)", tc.loc, tc.padding, tc.ends, start.X, start.Y, wantX, wantY)
 		}
 	}
 }

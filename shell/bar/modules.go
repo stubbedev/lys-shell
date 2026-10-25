@@ -270,28 +270,29 @@ func Create(name string, ctx ModuleContext) (Module, error) {
 	return factory(ctx)
 }
 
-// CreateAll builds every item of one layout section into a row: one
-// box.bar-item per layout item (bar/factory.rs BarItemFactory), a
-// group's carrying the bar-group class and the group name as its id,
-// each module inside classed `module` plus its per-instance class. The
-// gaps between items and grouped modules are the stylesheet's margins
-// (bar/layout.css), not box spacing.
+// appendItems builds every item of one layout section into a bar
+// zone: one box.bar-item per layout item (bar/factory.rs
+// BarItemFactory), a group's carrying the bar-group class and the
+// group name as its id, each module inside classed `module` plus its
+// per-instance class. The zone spaces its items by the module gap and
+// a group its modules by the group module gap: box gaps, not margins.
 //
 // A module that cannot be built (its service is unavailable on this
 // system, its compositor is not running) is logged and left out, like
 // module_registry.rs require_service: one missing daemon never takes
 // the bar down.
-func CreateAll(items []config.BarItem, ctx ModuleContext) *widget.Box {
+func appendItems(zone *widget.Box, items []config.BarItem, ctx ModuleContext) {
 	axis := widget.Row
-	if ctx.Config != nil && ctx.Config.Bar.Location.IsVertical() {
+	if ctx.Config.Bar.Location.IsVertical() {
 		axis = widget.Column
 	}
-	row := widget.NewBox(axis, 0, 0)
+	zone.SetSpacing(ctx.Style.moduleGap)
 	for _, item := range items {
 		box := widget.NewBox(axis, 0, 0)
 		box.AddClass("bar-item")
 		modules := []config.BarItem{item}
 		if item.IsGroup() {
+			box.SetSpacing(ctx.Style.groupGap)
 			box.AddClass("bar-group")
 			box.SetID(item.Group.Name)
 			modules = item.Group.Modules
@@ -301,9 +302,8 @@ func CreateAll(items []config.BarItem, ctx ModuleContext) *widget.Box {
 				log.Printf("bar: module %q will not appear: %v", inner.Module, err)
 			}
 		}
-		row.Append(box, false)
+		zone.Append(box, false)
 	}
-	return row
 }
 
 func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error {
