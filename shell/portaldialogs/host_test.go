@@ -22,7 +22,6 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 type fakeWindow struct{ closed bool }
@@ -854,18 +853,16 @@ func TestDialogTakesLysUiParts(t *testing.T) {
 		}
 		return ws[0]
 	}
-	if !widget.HasClass(one("portal-dialog-surface"), css.Card) {
-		t.Error("the surface is not lys-ui's card")
+	card := treetest.First[*widget.Card](t, c.Root)
+	if !widget.HasClass(card, "portal-dialog-surface") || card.Title() != "Camera" || card.Description() != "Use it?" {
+		t.Errorf("the surface is card %q / %q with classes %v, want lys-ui's card titled by the request", card.Title(), card.Description(), card.Classes())
 	}
-	if r := one("portal-dialog-requester"); !widget.HasClass(r, css.Caption) || !widget.HasClass(r, css.DimLabel) {
+	r := one("portal-dialog-requester")
+	if !widget.HasClass(r, css.Caption) || !widget.HasClass(r, css.DimLabel) {
 		t.Error("the requester is not a dim caption")
 	}
-	text := widget.Current().TextSize
-	if title := one("portal-dialog-title").(*widget.Label); !widget.HasClass(title, css.Heading) || title.SizePx() != text*widgets.DialogTitleScale {
-		t.Errorf("title %vpx, want a %vpx heading", title.SizePx(), text*widgets.DialogTitleScale)
-	}
-	if body := one("portal-dialog-body"); !widget.HasClass(body, css.DimLabel) || widget.HasClass(body, css.Heading) {
-		t.Error("the body is not dim text")
+	if action := card.Action(); action == nil || len(treetest.WithClass(action, "portal-dialog-requester")) != 1 {
+		t.Error("the requester is not at the card header's end")
 	}
 	cancel, confirm := one("portal-dialog-cancel"), one("portal-dialog-confirm")
 	if !widget.HasClass(cancel, css.Outline) || widget.HasClass(cancel, css.SuggestedAction) {

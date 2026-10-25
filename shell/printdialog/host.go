@@ -491,18 +491,10 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 		}
 		h.finish(prepared{printer: queues[sel].name, form: f}, true)
 	}
-	actions := widgets.DialogActions(
-		widgets.DialogButton(h.d.Font, "Cancel", "portal-dialog-cancel", css.Outline, func() { h.finish(prepared{}, false) }),
-		widgets.DialogButton(h.d.Font, acceptLabel, "portal-dialog-confirm", css.SuggestedAction, confirm),
-	)
-
-	surface := widgets.DialogCard("print-surface", surfaceWidth)
-	surface.Append(widgets.DialogTitle(h.d.Font, "Print", "print-title"), false)
-	surface.Append(printers, false)
-	surface.Append(grid, false)
-	surface.Append(outputRow, false)
-	surface.Append(replaceNote, false)
-	surface.Append(actions, false)
+	surface := widgets.DialogCard(h.d.Font, "Print", "print-surface", surfaceWidth)
+	surface.SetContent(widgets.DialogBody(printers, grid, outputRow, replaceNote))
+	surface.AppendFooter(widgets.DialogButton(h.d.Font, "Cancel", "portal-dialog-cancel", css.Outline, func() { h.finish(prepared{}, false) }))
+	surface.AppendFooter(widgets.DialogButton(h.d.Font, acceptLabel, "portal-dialog-confirm", css.SuggestedAction, confirm))
 	return surface
 }
 

@@ -550,8 +550,9 @@ func TestSheetTakesLysUiParts(t *testing.T) {
 			}
 		}
 	}
-	has("print-surface", css.Card)
-	has("print-title", css.Heading)
+	if card := treetest.First[*widget.Card](t, c.Root); !widget.HasClass(card, "print-surface") || card.Title() != "Print" {
+		t.Errorf("the surface is card %q with classes %v, want lys-ui's card titled Print", card.Title(), card.Classes())
+	}
 	has("print-form-label", css.DimLabel)
 	has("print-printer-detail", css.Caption, css.DimLabel)
 	has("print-output-replace", css.Warning)

@@ -470,7 +470,7 @@ func (c *Chooser) build(r request) {
 	}
 	headerStack := widget.NewOverlay()
 	headerStack.Append(headerRow)
-	titleLabel := widget.NewLabel(c.d.Font, th.TextSize*widgets.DialogTitleScale, title, 0)
+	titleLabel := widget.NewLabel(c.d.Font, th.TitleSize(), title, 0)
 	titleLabel.AddClass("file-chooser-title", css.Heading)
 	headerStack.Append(newPlace(titleLabel, alignCenter, alignCenter))
 	header := section(widget.Column, "file-chooser-header")

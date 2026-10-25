@@ -29,10 +29,13 @@ const (
 	// requesterIconPx is the requester's app icon, at the caption's
 	// size.
 	requesterIconPx = 16
-	wallpaperPx     = 180
-	appIconPx       = 32
-	appListHeight   = 360
-	escapeKeycode   = 1
+	// requesterChars caps the requester's name in the card header, so a
+	// long one ellipsizes instead of squeezing the title.
+	requesterChars = 24
+	wallpaperPx    = 180
+	appIconPx      = 32
+	appListHeight  = 360
+	escapeKeycode  = 1
 )
 
 // Window is the overlay surface the dialog maps (app.LayerWindow).
@@ -390,46 +393,36 @@ func (h *Dialogs) requester() widget.Widget {
 	}
 	l := h.label(h.app, "portal-dialog-requester", css.Caption, css.DimLabel)
 	l.SetWrap(false)
+	l.SetEllipsize(widget.EllipsizeEnd)
+	l.SetMaxWidthChars(requesterChars)
 	row.AppendAligned(l, false, widget.AlignCenter)
 	return row
 }
 
-// surface wraps the dialog's rows in the dialog card, under the row
-// naming the requester.
-func (h *Dialogs) surface(rows ...widget.Widget) widget.Widget {
-	box := widgets.DialogCard("portal-dialog-surface", surfaceWidth)
-	box.Append(h.requester(), false)
-	for _, r := range rows {
-		if r != nil {
-			box.Append(r, false)
-		}
+// surface is the dialog card: the title over the muted body ("" for
+// none) with the requester at the header's end, the rows as its content
+// and the buttons in its footer.
+func (h *Dialogs) surface(title, body string, rows []widget.Widget, buttons ...*widget.Button) widget.Widget {
+	card := widgets.DialogCard(h.d.Font, title, "portal-dialog-surface", surfaceWidth)
+	card.SetDescription(body)
+	card.SetAction(h.requester())
+	if content := widgets.DialogBody(rows...); len(content.Children()) > 0 {
+		card.SetContent(content)
 	}
-	return box
+	for _, b := range buttons {
+		card.AppendFooter(b)
+	}
+	return card
 }
 
 // confirm is a yes/no dialog.
 func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title, body, cancel, confirm string, extra ...widget.Widget) widget.Widget {
-	rows := []widget.Widget{}
+	var rows []widget.Widget
 	if header != nil {
 		rows = append(rows, widgets.Center(header))
 	}
-	rows = append(rows, h.title(title))
-	if body != "" {
-		rows = append(rows, h.body(body))
-	}
 	rows = append(rows, extra...)
-	rows = append(rows, widgets.DialogActions(h.cancel(cancel, answer), h.accept(confirm, func() { answer(true, "") })))
-	return h.surface(rows...)
-}
-
-// title is a dialog's heading.
-func (h *Dialogs) title(text string) *widget.Label {
-	return widgets.DialogTitle(h.d.Font, text, "portal-dialog-title")
-}
-
-// body is a dialog's dim explanation under its title.
-func (h *Dialogs) body(text string) *widget.Label {
-	return h.label(text, "portal-dialog-body", css.DimLabel)
+	return h.surface(title, body, rows, h.cancel(cancel, answer), h.accept(confirm, func() { answer(true, "") }))
 }
 
 // cancel is the outline button that declines.
@@ -497,26 +490,20 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 	scroll.FillX, scroll.FillY = true, true
 	scroll.SetSizeRequest(0, appListHeight)
 	scroll.SetMaxContentHeight(appListHeight)
-	var rememberRow, target widget.Widget
+	var rememberRow widget.Widget
 	if contentType != "" {
 		rememberRow = remember
 	}
+	target := ""
 	if ac.req.Target != "" {
-		target = h.body("Choose an application to open “" + ac.req.Target + "”.")
+		target = "Choose an application to open “" + ac.req.Target + "”."
 	}
 	open := h.accept("Open", func() {
 		if i := list.Selected(); i >= 0 {
 			list.OnActivate(i)
 		}
 	})
-	return h.surface(
-		h.title("Open With"),
-		target,
-		search,
-		scroll,
-		rememberRow,
-		widgets.DialogActions(h.cancel("Cancel", answer), open),
-	)
+	return h.surface("Open With", target, []widget.Widget{search, scroll, rememberRow}, h.cancel("Cancel", answer), open)
 }
 
 // appRow is app_row: the app icon and its name over the ellipsized

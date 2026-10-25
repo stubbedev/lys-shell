@@ -29,7 +29,6 @@ import (
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 type fakeWindow struct {
@@ -1659,7 +1658,7 @@ func TestSheetTakesLysUiParts(t *testing.T) {
 			t.Errorf("%d separators, want the 3 between the bands", n)
 		}
 		title := treetest.WithClass(root, "file-chooser-title")[0].(*widget.Label)
-		if want := widget.Current().TextSize * widgets.DialogTitleScale; title.SizePx() != want {
+		if want := widget.Current().TitleSize(); title.SizePx() != want {
 			t.Errorf("title %vpx, want %vpx", title.SizePx(), want)
 		}
 		if widget.HasClass(treetest.WithClass(root, "file-chooser-cancel")[0], css.SuggestedAction) {
