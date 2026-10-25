@@ -70,8 +70,8 @@ type networkView struct {
 	password    *netPasswordForm
 	listCard    *widget.Box
 	list        *widget.Box
-	noNetworks  *widget.Box
-	noAdapter   *widget.Box
+	noNetworks  *widget.StatusPage
+	noAdapter   *widget.StatusPage
 	state       netListState
 	cur         netState
 	cache       []apSnapshot

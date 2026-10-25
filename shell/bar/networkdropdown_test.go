@@ -516,10 +516,10 @@ func TestNetworkScanButtonGhostIcon(t *testing.T) {
 // mod.rs:114,137).
 func TestNetworkEmptyStatesCarryTheSmIcon(t *testing.T) {
 	v, _, _ := newNetTestView(t, network.Snapshot{}, netDeps{})
-	for _, empty := range []*widget.Box{v.noAdapter, v.noNetworks} {
+	for _, empty := range []*widget.StatusPage{v.noAdapter, v.noNetworks} {
 		var icon *widget.Icon
 		walkTree(empty, func(w widget.Widget) bool {
-			if i, ok := w.(*widget.Icon); ok && i.HasClass("icon") {
+			if i, ok := w.(*widget.Icon); ok {
 				icon = i
 			}
 			return icon == nil

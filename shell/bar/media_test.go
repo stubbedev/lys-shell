@@ -572,10 +572,10 @@ func TestMediaSeekResetsOnPlayerSwitch(t *testing.T) {
 	}
 }
 
-// With no player the card keeps the player's height: the player and
-// the empty state are pages of one homogeneous stack (the relm4
-// if/else's gtk::Stack), so a player appearing or leaving never
-// resizes the dropdown.
+// The card keeps one height whichever page shows: the player and the
+// empty state are pages of one homogeneous stack (the relm4 if/else's
+// gtk::Stack), so a player appearing or leaving never resizes the
+// dropdown.
 func TestMediaEmptyStateKeepsThePlayersHeight(t *testing.T) {
 	source := newFakeMedia()
 	ctx := newTestContext(t, config.Defaults())
@@ -586,12 +586,13 @@ func TestMediaEmptyStateKeepsThePlayersHeight(t *testing.T) {
 		t.Fatalf("mode %q page %q, want the empty state", v.mode, v.main.Visible())
 	}
 	con := widgetConstraintsMax(380, 900)
-	empty := v.main.Measure(con).H
+	page := v.main.Measure(con).H
 	player := v.player.Measure(con).H
-	if bare := v.empty.Measure(con).H; bare >= player {
-		t.Fatalf("the bare empty state (%d) is not shorter than the player (%d): the test proves nothing", bare, player)
+	bare := v.empty.Measure(con).H
+	if bare == player {
+		t.Fatalf("the empty state and the player are both %dpx: the test proves nothing", bare)
 	}
-	if empty != player {
-		t.Errorf("the empty main page is %dpx, want the player's %dpx", empty, player)
+	if page != max(bare, player) {
+		t.Errorf("the empty main page is %dpx, want the taller page's %dpx", page, max(bare, player))
 	}
 }

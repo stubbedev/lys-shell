@@ -376,7 +376,7 @@ func TestDashboardMediaEmptyStateArtAndLabels(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	v := dashboardDropdown(ctx).(*dashboardView)
-	empty, ok := findByClass(v, "empty-state").(*widget.Box)
+	empty, ok := findByClass(v, "empty-state").(*widget.StatusPage)
 	if !ok {
 		t.Fatal("no empty-state")
 	}

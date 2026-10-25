@@ -184,10 +184,7 @@ func (v *treemanView) mainBadge() *widget.Label {
 func (v *treemanView) renderList() {
 	v.list.Clear()
 	if v.status == nil || len(v.status.Repos) == 0 {
-		// views.rs empty_state: the description wraps, centered.
-		empty, _, desc := templateEmptyState(v.font, v.px, "ld-layers-symbolic", nil, i18n.T("dropdown-treeman-empty-title"), i18n.T("dropdown-treeman-empty-desc"))
-		desc.SetWrap(true)
-		v.list.Append(empty, false)
+		v.list.Append(emptyState(v.font, v.px, "ld-layers-symbolic", i18n.T("dropdown-treeman-empty-title"), i18n.T("dropdown-treeman-empty-desc")), false)
 		return
 	}
 	v.list.Append(v.summary(), false)

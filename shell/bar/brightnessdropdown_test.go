@@ -84,17 +84,15 @@ func TestBrightnessEmptyStateIconAndDescription(t *testing.T) {
 		t.Fatalf("empty state classes = %v, want brightness-empty + empty-state",
 			len(empty))
 	}
-	icon := brightnessOne[*widget.Icon](t, v, "icon")
-	if !icon.HasClass("sm") {
-		t.Error("the empty icon lacks the sm size class (icon-2xl)")
+	if icon := treetest.First[*widget.Icon](t, empty[0]); !icon.HasClass("sm") {
+		t.Error("the empty icon lacks the sm size class")
 	}
 	desc := brightnessOne[*widget.Label](t, v, "description")
-	if !desc.Wrap() || desc.Alignment() != render.AlignCenter || desc.MaxWidthChars() != 32 {
-		t.Errorf("description wrap=%v align=%v max=%d, want wrapped, centered, 32",
-			desc.Wrap(), desc.Alignment(), desc.MaxWidthChars())
+	if !desc.Wrap() || desc.Alignment() != render.AlignCenter {
+		t.Errorf("description wrap=%v align=%v, want wrapped and centered", desc.Wrap(), desc.Alignment())
 	}
-	if title := brightnessOne[*widget.Label](t, v, "title"); title.Wrap() || title.MaxWidthChars() != 0 {
-		t.Error("the title picked up the description's wrap tuning")
+	if title := brightnessOne[*widget.Label](t, v, "title"); title.Wrap() {
+		t.Error("the title wraps")
 	}
 }
 

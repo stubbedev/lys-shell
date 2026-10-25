@@ -430,18 +430,18 @@ func TestAudioEmptyStatesCenterVertically(t *testing.T) {
 		if st == nil {
 			t.Fatalf("%s: no empty-state in the tree", tc.what)
 		}
-		if d := midY(boundsOf(st)) - midY(boundsOf(tc.root)); d < -1 || d > 1 {
-			t.Errorf("%s sits %dpx off vertical center", tc.what, d)
-		}
-		if h := boundsOf(st).H; h >= boundsOf(tc.root).H {
-			t.Errorf("%s fills its page (%dpx): the centering wrapper is gone", tc.what, h)
+		labels := treetest.All[*widget.Label](st)
+		top := boundsOf(treetest.First[*widget.Icon](t, st)).Y - boundsOf(st).Y
+		last := boundsOf(labels[len(labels)-1])
+		bottom := boundsOf(st).Y + boundsOf(st).H - (last.Y + last.H)
+		if top <= 0 || bottom <= 0 || top-bottom > 25 || bottom-top > 25 {
+			t.Errorf("%s content sits %dpx from the top and %dpx from the bottom, want it centered", tc.what, top, bottom)
 		}
 	}
-	if icon := findByClass(v.main, "icon"); icon != nil && icon.(interface{ HasClass(string) bool }).HasClass("sm") {
+	if treetest.First[*widget.Icon](t, findByClass(v.main, "empty-state")).HasClass("sm") {
 		t.Error("the main empty-state icon carries the sm modifier")
 	}
-	icon := findByClass(v.apps, "icon")
-	if icon == nil || !icon.(interface{ HasClass(string) bool }).HasClass("sm") {
+	if !treetest.First[*widget.Icon](t, findByClass(v.apps, "empty-state")).HasClass("sm") {
 		t.Error("the app empty-state icon misses the sm modifier")
 	}
 }

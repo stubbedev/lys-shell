@@ -692,7 +692,7 @@ func TestBtNoAdapterDropdownKeepsTheHeader(t *testing.T) {
 	if findBox(content, "dropdown-header") == nil {
 		t.Error("the no-adapter dropdown dropped the header")
 	}
-	empty := findBox(content, "empty-state")
+	empty := findByClass(content, "empty-state")
 	if empty == nil {
 		t.Fatal("the no-adapter dropdown lost its empty state")
 	}

@@ -92,51 +92,23 @@ func dropdownHeaderParts(font render.Font, px float64, icon, title string, actio
 	return row, glyph, label
 }
 
-// emptyState is the EmptyState template: a muted icon over the title
-// and the wrapped description, spacing-0 with the CSS margins carrying
-// the gaps (the Rust template sets none). An empty description still
-// renders its (empty) label: the node the stylesheet margins.
-func emptyState(font render.Font, px float64, icon, title, description string) *widget.Box {
-	col, _ := emptyStateIcon(font, px, icon, title, description)
-	return col
+// emptyState is the EmptyState template on lys-ui's StatusPage: the
+// icon on its muted tile over the title and the wrapped description,
+// centered in whatever page holds it.
+func emptyState(font render.Font, px float64, icon, title, description string) *widget.StatusPage {
+	page, _ := emptyStateIcon(font, px, icon, title, description)
+	return page
 }
 
-// emptyStateIcon is emptyState that also hands back its icon. The
-// stylesheet paints it: .empty-state .icon colors and sizes the glyph,
-// .title and .description ink the text.
-func emptyStateIcon(font render.Font, px float64, icon, title, description string) (*widget.Box, *widget.Icon) {
-	col, glyph, _ := templateEmptyState(font, px, icon, nil, title, description)
-	return col, glyph
-}
-
-// templateEmptyState is the EmptyState template with its parts handed
-// back: the icon for state swaps, the description label for callers
-// that tune it (the brightness dropdown wraps it). iconExtra carries the icon's extra
-// classes (the "sm" size); the gaps are the .title/.description
-// margin-top rules. The box expands and centers at its natural size
-// (the template's set_expand and set_align), so it sits in the middle
-// of whatever page holds it, its icon and text centered in it as GTK
-// centers a fill-width label's text.
-func templateEmptyState(font render.Font, px float64, icon string, iconExtra []string, title, description string) (*widget.Box, *widget.Icon, *widget.Label) {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("empty-state")
-	col.SetHExpand(true)
-	col.SetVExpand(true)
-	col.SetHAlign(widget.AlignCenter)
-	col.SetVAlign(widget.AlignCenter)
-	glyph := widget.NewThemeIcon(icon, int(px*2))
-	glyph.AddClass("icon")
-	glyph.AddClass(iconExtra...)
-	col.AppendAligned(glyph, false, widget.AlignCenter)
-	titleLbl := widget.NewLabel(font, px*1.1, title, 0)
-	titleLbl.AddClass("title")
-	titleLbl.SetAlignment(render.AlignCenter)
-	col.Append(titleLbl, false)
-	desc := widget.NewLabel(font, px*0.9, description, 0)
-	desc.AddClass("description")
-	desc.SetAlignment(render.AlignCenter)
-	col.Append(desc, false)
-	return col, glyph, desc
+// emptyStateIcon is emptyState that also hands back its icon, for
+// pages whose glyph follows state; a class on the icon (the "sm" size)
+// reaches the stylesheet's empty-state rules.
+func emptyStateIcon(font render.Font, px float64, icon, title, description string) (*widget.StatusPage, *widget.Icon) {
+	page := widget.NewStatusPage(font, "", title, description)
+	page.AddClass("empty-state")
+	glyph := widget.NewThemeIcon(icon, int(px*1.7))
+	page.SetIcon(glyph)
+	return page, glyph
 }
 
 // refresher is a view's reader: every refresh of the view goes through

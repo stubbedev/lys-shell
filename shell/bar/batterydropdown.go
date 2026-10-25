@@ -192,7 +192,7 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	content := widget.NewBox(widget.Column, 0, 0)
 	content.AddClass("dropdown-content")
 	v.body = widget.NewStack()
-	empty, _, _ := templateEmptyState(font, px, "ld-unplug-symbolic", nil,
+	empty := emptyState(font, px, "ld-unplug-symbolic",
 		i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description"))
 	v.body.Add("empty", empty)
 	v.body.Add("battery", v.batterySection())

@@ -50,7 +50,7 @@ func TestTreemanDropdownEmpty(t *testing.T) {
 	ctx.Treeman = &fakeTreeman{status: &treeman.Status{}}
 	v = treemanDropdown(ctx).(*treemanView)
 	defer v.dropdownClosed()
-	if _, ok := v.list.Children()[0].(*widget.Box); !ok || len(v.list.Children()) != 1 {
+	if _, ok := v.list.Children()[0].(*widget.StatusPage); !ok || len(v.list.Children()) != 1 {
 		t.Error("no repos: want only the empty state")
 	}
 	// views.rs empty_state wraps its description; the title stays one

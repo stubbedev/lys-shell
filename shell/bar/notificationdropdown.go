@@ -83,7 +83,7 @@ type notificationView struct {
 	// body is the DropdownContent: the empty state and the list swap
 	// by visibility, no Stack (the Rust tree sets visible in place).
 	body   *widget.Box
-	empty  *widget.Box
+	empty  *widget.StatusPage
 	scroll *widget.Scroll
 	list   *widget.Box
 	groups []*notifGroup

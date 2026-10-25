@@ -102,7 +102,7 @@ type mediaView struct {
 	main    *widget.Stack
 	sources *widget.Box
 	player  *widget.Box
-	empty   *widget.Box
+	empty   *widget.StatusPage
 	mode    string
 
 	identity   *widget.Label
@@ -164,7 +164,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 }
 
 // mediaEmptyState is the EmptyState template with the media strings.
-func mediaEmptyState(ctx ModuleContext) *widget.Box {
+func mediaEmptyState(ctx ModuleContext) *widget.StatusPage {
 	font, px := dropdownFont(ctx)
 	return emptyState(font, px, "ld-play-symbolic",
 		i18n.T("dropdown-media-no-player-title"), i18n.T("dropdown-media-no-player-description"))
