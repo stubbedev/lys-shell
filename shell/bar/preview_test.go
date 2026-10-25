@@ -205,6 +205,9 @@ func paintPreview(ctx ModuleContext, content widget.Widget, name string) ([]byte
 	rev.Finish()
 	widget.SetStyleAnchor(root, anchor)
 	limit := widget.Constraints{Max: widget.Size{W: 800, H: 1000}}
+	if w > 0 {
+		limit.Max.W = w
+	}
 	sz := root.Measure(limit)
 	root.Arrange(render.Rect{W: sz.W, H: sz.H})
 	widget.CollectDamage(root)

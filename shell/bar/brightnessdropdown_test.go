@@ -218,3 +218,21 @@ func TestBrightnessDropdownFollowsLevels(t *testing.T) {
 		t.Fatal("a tick after close rebuilt the closed dropdown")
 	}
 }
+
+// The device card hugs its rows: the page stack sizes each page on its
+// own, so the card does not grow to the empty state's height.
+func TestBrightnessCardHugsItsRows(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	ctx.Brightness = &fakeBrightnessSource{devices: []brightness.Device{
+		{Name: "ddcci5", Type: brightness.TypeDDC, Brightness: 10, Max: 100},
+	}}
+	v := brightnessDropdown(ctx).(*brightnessView)
+	defer v.dropdownClosed()
+	ctx.Theme.Attach(v)
+	arrangeDropdown(t, v, 320, 600)
+	card := treetest.WithClass(v, "brightness-devices")[0]
+	rows := treetest.WithClass(v.list, "brightness-device")[0]
+	if extra := boundsOf(card).H - boundsOf(rows).H; extra > 2 {
+		t.Errorf("the card is %dpx taller than its one row", extra)
+	}
+}

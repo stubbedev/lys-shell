@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/mail"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // staticNotmuch answers every query with one count and has no
@@ -139,124 +139,36 @@ func TestLoadFileAppliesMailAccounts(t *testing.T) {
 	}
 }
 
-// The mail rows paint from the stylesheet: .mail-account-name and
-// .mail-account-count (dim at zero) take the cascade's ink, and only
-// the provider icon, which no rule covers, keeps its tint.
-func TestMailDropdownPaintsFromTheStylesheet(t *testing.T) {
-	cfg := config.Defaults()
-	ctx := styledContext(t, cfg)
-	mc := cfg.Mail
-	mc.Accounts = []config.MailAccount{{Name: "Work", Query: "tag:work"}}
-	ctx.Mail = seededMail(t, mc, 0)
-	v := mailDropdown(ctx).(*mailView)
-
-	row := v.list.Children()[0].(*widget.Box)
-	var icon *widget.Icon
-	var labels []*widget.Label
-	walkTree(row, func(w widget.Widget) bool {
-		switch w := w.(type) {
-		case *widget.Icon:
-			icon = w
-		case *widget.Label:
-			labels = append(labels, w)
-		}
-		return true
-	})
-	if icon == nil || len(labels) != 2 {
-		t.Fatalf("row = icon %v, %d labels; want an icon, a name, and a count", icon, len(labels))
-	}
-	if got := labels[0].Color(); got != 0 {
-		t.Errorf("the account name carries a programmatic color %#08x", uint32(got))
-	}
-	count := labels[1]
-	if got := count.Color(); got != 0 || !count.HasClass("dim") {
-		t.Errorf("the zero count = color %#08x dim %v; want uncolored and dim", uint32(count.Color()), count.HasClass("dim"))
-	}
-	if icon.Tint() != 0 {
-		t.Error("the provider icon carries a programmatic tint; the cascade inks it")
-	}
-
-	// The empty text is uncolored; .mail-dropdown-empty inks it muted.
-	empty := mailDropdown(newTestContext(t, config.Defaults())).(*mailView)
-	if l, ok := empty.list.Children()[0].(*widget.Label); !ok || l.Color() != 0 || !l.HasClass("mail-dropdown-empty") {
-		t.Errorf("the empty state = %#v, want an uncolored mail-dropdown-empty label", empty.list.Children()[0])
-	}
-}
-
 func TestMailDropdownRowsAndEmptyState(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	v := mailDropdown(ctx).(*mailView)
-	if len(v.list.Children()) != 1 {
-		t.Fatalf("no service: %d rows, want the empty text", len(v.list.Children()))
+	if v.pages.Visible() != "empty" || len(mailRows(v)) != 0 {
+		t.Fatalf("no service: page %q, %d rows; want the empty state", v.pages.Visible(), len(mailRows(v)))
 	}
-	if l, ok := v.list.Children()[0].(*widget.Label); !ok || l.Text() != i18n.T("dropdown-mail-empty") {
-		t.Errorf("empty = %#v", v.list.Children()[0])
+	if itemText(v.pages, "title") != i18n.T("dropdown-mail-empty") {
+		t.Errorf("the empty state reads %q", itemText(v.pages, "title"))
 	}
 	mc := cfg.Mail
 	mc.Accounts = []config.MailAccount{{Name: "Work", Query: "tag:work"}, {Name: "Home", Query: "tag:home"}}
 	ctx.Mail = seededMail(t, mc, 0)
 	v = mailDropdown(ctx).(*mailView)
-	if got := len(v.list.Children()); got != 2 {
-		t.Fatalf("rows = %d, want one per account", got)
+	rows := mailRows(v)
+	if v.pages.Visible() != "accounts" || len(rows) != 2 {
+		t.Fatalf("page %q, rows = %d, want one per account", v.pages.Visible(), len(rows))
 	}
-	row := v.list.Children()[0].(*widget.Box)
-	count := row.Children()[2].(*widget.Label)
-	if count.Text() != "0" || !count.HasClass("dim") {
-		t.Errorf("zero count = %q dim %v", count.Text(), count.HasClass("dim"))
+	count := treetest.First[*widget.Badge](t, rows[0])
+	if count.Text() != "0" || count.Variant() != widget.BadgeSecondary {
+		t.Errorf("zero count = %q variant %v, want the secondary badge", count.Text(), count.Variant())
+	}
+	ctx.Mail = seededMail(t, mc, 3)
+	v = mailDropdown(ctx).(*mailView)
+	if count := treetest.First[*widget.Badge](t, mailRows(v)[0]); count.Text() != "3" || count.Variant() == widget.BadgeSecondary {
+		t.Errorf("unread count = %q variant %v, want the default badge", count.Text(), count.Variant())
 	}
 }
 
-// The frame is spacing-0 with no hand padding: .dropdown-content sits
-// on the content wrapper under the full-width header strip, and the
-// stylesheet's padding insets the list only (mail/mod.rs:46-48).
-func TestMailDropdownContentCarriesThePadding(t *testing.T) {
-	cfg := config.Defaults()
-	ctx := styledContext(t, cfg)
-	v := mailDropdown(ctx).(*mailView)
-	if widget.HasClass(v.Box, "dropdown-content") {
-		t.Error("the frame wears .dropdown-content")
-	}
-	kids := v.Children()
-	if len(kids) != 2 {
-		t.Fatalf("frame children = %d, want the header and the content wrapper", len(kids))
-	}
-	header, ok := kids[0].(*widget.Box)
-	if !ok || !widget.HasClass(header, "dropdown-header") {
-		t.Fatalf("first child = %T, want the header strip", kids[0])
-	}
-	content, ok := kids[1].(*widget.Box)
-	if !ok || !widget.HasClass(content, "dropdown-content") {
-		t.Fatalf("second child = %T, want the dropdown-content wrapper", kids[1])
-	}
-
-	// Laid out under the stylesheet: the header strip sits at the
-	// frame's own edge (the frame carries no hand padding — the
-	// regression is a padded root), and the list is inset by the
-	// content's CSS padding.
-	restore := widget.SetAnimationsInstant(true)
-	t.Cleanup(restore)
-	ctx.Theme.Attach(v)
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 600}})
-	v.Arrange(render.Rect{X: 0, Y: 0, W: sz.W, H: 600})
-	frame := v.Bounds()
-	strip := header.Bounds()
-	wrapper := content.Bounds()
-	if strip.X-frame.X > 2 || wrapper.X-frame.X > 2 {
-		t.Errorf("the frame carries hand padding: header +%d wrapper +%d", strip.X-frame.X, wrapper.X-frame.X)
-	}
-	var scroll *widget.Scroll
-	walkTree(content, func(w widget.Widget) bool {
-		if s, ok := w.(*widget.Scroll); ok {
-			scroll = s
-		}
-		return scroll == nil
-	})
-	if scroll == nil {
-		t.Fatal("no scrolled list under the content wrapper")
-	}
-	inner := widget.Boundser(scroll).Bounds()
-	if inner.X <= strip.X {
-		t.Errorf("the list is not inset by the content padding: list %v header %v", inner, strip)
-	}
+// mailRows is the dropdown's account rows in order.
+func mailRows(v *mailView) []*widget.Item {
+	return treetest.All[*widget.Item](v.list)
 }

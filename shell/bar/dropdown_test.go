@@ -308,12 +308,27 @@ func TestDropdownInstanceStacksInterpolate(t *testing.T) {
 func TestDropdownPopoverFollowsAutohide(t *testing.T) {
 	cfg := config.Defaults()
 	anchor := widget.NewBox(widget.Row, 0, 0)
-	if pc := dropdownPopover(cfg, anchor, anchor, 1000); pc.NoAutohide || pc.MaxHeight != 900 {
+	if pc := dropdownPopover(cfg, anchor, anchor, 1000, 0); pc.NoAutohide || pc.MaxHeight != 900 {
 		t.Errorf("autohide on: %+v, want a grabbing popover capped at 900", pc)
 	}
 	cfg.Bar.DropdownAutohide = false
-	if pc := dropdownPopover(cfg, anchor, anchor, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
+	if pc := dropdownPopover(cfg, anchor, anchor, 0, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
 		t.Errorf("autohide off: %+v, want a no-grab popover", pc)
+	}
+}
+
+// A sized dropdown's popover caps at its configured width, so lys-ui's
+// fill-width rows take the dropdown's width instead of the output's; an
+// unsized one keeps the default ceiling.
+func TestDropdownPopoverCapsAtItsWidth(t *testing.T) {
+	cfg := config.Defaults()
+	anchor := widget.NewBox(widget.Row, 0, 0)
+	w, _, _ := dropdownDims("mail", cfg)
+	if pc := dropdownPopover(cfg, anchor, anchor, 1000, w); pc.MaxWidth != w || w <= 0 {
+		t.Errorf("mail popover max width = %d, want its %d width", pc.MaxWidth, w)
+	}
+	if pc := dropdownPopover(cfg, anchor, anchor, 1000, 0); pc.MaxWidth != 0 {
+		t.Errorf("an unsized popover caps at %d, want the default ceiling", pc.MaxWidth)
 	}
 }
 

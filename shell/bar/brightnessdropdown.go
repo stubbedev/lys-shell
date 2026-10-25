@@ -113,7 +113,7 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	// scroll: the list shows bare and the panel grows.
 	content := dropdownContent()
 	v.body = widget.NewStack()
-	v.body.Add("devices", card)
+	v.body.Add("devices", atTop(card))
 	v.body.Add("empty", empty)
 	content.Append(v.body, true)
 	v.Append(content, true)

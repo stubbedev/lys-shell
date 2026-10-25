@@ -94,12 +94,18 @@ func dropdownSection(label *widget.Label, body ...widget.Widget) *widget.Box {
 	return dropdownGroup(append([]widget.Widget{label}, body...)...)
 }
 
+// atTop is a column holding w at its natural height at the top, for a
+// page that fills more height than w needs: the card hugs its rows.
+func atTop(w widget.Widget) *widget.Box {
+	col := widget.NewBox(widget.Column, 0, 0)
+	col.Append(w, false)
+	return col
+}
+
 // scrolledCard is a scroll over card that keeps the card at its
 // content's height: the scroll fills the page, the card hugs its rows.
 func scrolledCard(card widget.Widget, class string) *widget.Scroll {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.Append(card, false)
-	return dropdownScroll(col, class)
+	return dropdownScroll(atTop(card), class)
 }
 
 // itemCard is a list card: lys-ui's card around an ItemGroup, which

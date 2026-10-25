@@ -11,19 +11,17 @@ import (
 	"github.com/stubbedev/lys-shell/service/mail"
 )
 
-// mailRowIconPx is ROW_ICON_SIZE.
-const mailRowIconPx = 20
-
-// mailView is the mail dropdown: one row per account (its icon, name,
-// and unread count, dimmed at zero), or the empty text, rebuilt as the
-// service changes while open.
+// mailView is the mail dropdown: an item card of the accounts (each
+// one's icon, name, and unread count as a badge, secondary at zero),
+// or the empty state, rebuilt as the service changes while open.
 type mailView struct {
 	ctx  ModuleContext
 	font render.Font
 	px   float64
 
 	*widget.Box
-	list *widget.Box
+	pages *widget.Stack
+	list  *widget.ItemGroup
 
 	once sync.Once
 	stop chan struct{}
@@ -37,10 +35,14 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "mail-dropdown")
 	v.Append(dropdownHeader(font, "ld-mail-symbolic", i18n.T("dropdown-mail-title")), false)
-	v.list = widget.NewBox(widget.Column, 4, 0)
-	v.list.AddClass("mail-dropdown-list")
+	card, list := itemCard()
+	card.AddClass("mail-dropdown-list")
+	v.list = list
+	v.pages = widget.NewStack()
+	v.pages.Add("accounts", scrolledCard(card, ""))
+	v.pages.Add("empty", emptyState(font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-empty"), ""))
 	content := dropdownContent()
-	content.Append(dropdownScroll(v.list, ""), true)
+	content.Append(v.pages, true)
 	v.Append(content, true)
 	v.rebuild()
 	v.follow()
@@ -59,36 +61,30 @@ func (v *mailView) rebuild() {
 	v.list.Clear()
 	accounts := v.accounts()
 	if len(accounts) == 0 {
-		// .mail-dropdown-empty inks it muted.
-		empty := widget.NewLabel(v.font, v.px, i18n.T("dropdown-mail-empty"), 0)
-		empty.AddClass("mail-dropdown-empty")
-		empty.SetWrap(true)
-		v.list.Append(empty, false)
+		v.pages.Show("empty")
 		return
 	}
 	for _, a := range accounts {
-		v.list.Append(v.row(a), false)
+		v.list.Append(v.row(a))
 	}
+	v.pages.Show("accounts")
 }
 
-// row is account_row.
-func (v *mailView) row(a mail.AccountUnread) widget.Widget {
-	row := widget.NewBox(widget.Row, 8, 0)
+// row is account_row on lys-ui's Item: the provider icon as the
+// media, the account's name, and the unread count as a badge, the
+// secondary one at zero.
+func (v *mailView) row(a mail.AccountUnread) *widget.Item {
+	row := widget.NewItem(v.font, a.Name, "")
+	row.SetSmall(true)
+	row.SetEllipsize(true)
 	row.AddClass("mail-dropdown-row")
-	icon := widget.NewThemeIcon(a.Icon, mailRowIconPx)
-	row.Append(icon, false)
-	// .mail-account-name inks it fg-default.
-	name := widget.NewLabel(v.font, v.px, a.Name, 0)
-	name.AddClass("mail-account-name")
-	name.SetEllipsize(widget.EllipsizeEnd)
-	row.Append(name, true)
-	// .mail-account-count inks it fg-default, .dim muted.
-	count := widget.NewLabel(v.font, v.px, strconv.FormatUint(uint64(a.Count), 10), 0)
+	row.SetMedia(widget.NewThemeIcon(a.Icon, itemIconPx), false)
+	count := widget.NewBadge(v.font, strconv.FormatUint(uint64(a.Count), 10))
 	count.AddClass("mail-account-count")
 	if a.Count == 0 {
-		count.AddClass("dim")
+		count.SetVariant(widget.BadgeSecondary)
 	}
-	row.Append(count, false)
+	row.AddAction(count)
 	return row
 }
 

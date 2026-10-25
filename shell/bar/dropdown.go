@@ -280,7 +280,8 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if panel != nil && monH > 0 {
 		panel.clamp(monH)
 	}
-	cfg := dropdownPopover(r.cfg, bound, content, monH)
+	w, h, _ := dropdownDims(name, r.cfg)
+	cfg := dropdownPopover(r.cfg, bound, content, monH, w)
 	// The button's label holds still while its dropdown is open
 	// (dropdown-freeze-label), so the popover stays anchored.
 	var thaw func()
@@ -293,7 +294,6 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		cfg.Focus = f.dropdownFocus()
 	}
 	var rev *widget.Revealer
-	w, h, _ := dropdownDims(name, r.cfg)
 	cfg.Content, rev = dropdownTree(content, r.cfg, w, h)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
@@ -362,9 +362,12 @@ func (r *dropdownRegistry) closeAll() {
 
 // dropdownPopover declares a dropdown's popover (apply_style,
 // clamp_height): opening away from the bar's edge, clamped to the
-// monitor less 100, and with dropdown-autohide off a no-grab popover
-// that a click elsewhere leaves open.
-func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, monH int) app.PopoverConfig {
+// monitor less 100, as wide as its configured width at most (width > 0),
+// and with dropdown-autohide off a no-grab popover that a click
+// elsewhere leaves open. The width caps as well as floors: lys-ui's
+// rows fill whatever width they are offered, and a popover offers the
+// widest output.
+func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, monH, width int) app.PopoverConfig {
 	pc := app.PopoverConfig{
 		Anchor:     anchor,
 		Gravity:    dropdownGravity(cfg.Bar.Location),
@@ -373,6 +376,9 @@ func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.
 	}
 	if monH > 0 {
 		pc.MaxHeight = monH - 100
+	}
+	if width > 0 {
+		pc.MaxWidth = width
 	}
 	return pc
 }
