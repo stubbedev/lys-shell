@@ -479,11 +479,24 @@ func (s *Service) StartTimedDiscovery(ctx context.Context, d time.Duration) erro
 		return err
 	}
 	time.AfterFunc(d, func() {
+		// Powering the adapter off, or another client, may have ended
+		// the scan already: then there is nothing left to stop.
+		if !s.discovering(a.Path) {
+			return
+		}
 		if err := a.StopDiscovery(context.Background()); err != nil {
 			log.Printf("bluetooth: cannot stop timed discovery: %v", err)
 		}
 	})
 	return nil
+}
+
+// discovering reports whether the adapter at path is scanning now.
+func (s *Service) discovering(path dbus.ObjectPath) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.adapterLocked(path)
+	return a != nil && a.Discovering
 }
 
 // StopDiscovery ends the primary adapter's discovery session.

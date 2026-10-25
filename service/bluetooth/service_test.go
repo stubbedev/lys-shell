@@ -349,6 +349,23 @@ func TestTimedDiscoveryStopsItself(t *testing.T) {
 	}
 }
 
+// Powering the adapter off ends its scan, so the timer finds nothing
+// to stop and asks BlueZ for nothing (which would answer NotReady).
+func TestTimedDiscoveryEndedEarlyIsNotStopped(t *testing.T) {
+	f := populated(t)
+	s := f.service()
+	if err := s.StartTimedDiscovery(context.Background(), 80*time.Millisecond); err != nil {
+		t.Fatalf("StartTimedDiscovery: %v", err)
+	}
+	waitFor(t, "discovering", func() bool { return s.State().Primary.Discovering })
+	f.update(hci1, adapterIface, map[string]dbus.Variant{"Powered": dbus.MakeVariant(false), "Discovering": dbus.MakeVariant(false)})
+	waitFor(t, "the scan ending", func() bool { return !s.State().Primary.Discovering })
+	time.Sleep(150 * time.Millisecond)
+	if f.called("StopDiscovery " + string(hci1)) {
+		t.Error("the timer stopped a scan that had already ended")
+	}
+}
+
 func TestStartDiscoveryFailureSkipsTheTimer(t *testing.T) {
 	f := populated(t)
 	s := f.service()
