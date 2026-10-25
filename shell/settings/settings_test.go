@@ -569,8 +569,6 @@ func TestSizeEditorModes(t *testing.T) {
 type fakePickers struct {
 	anchor, content widget.Widget
 	closed          int
-	colorIn         render.Color
-	colorFn         func(render.Color)
 	fileFn          func(string)
 	fontIn          string
 	fontMono        bool
@@ -580,10 +578,6 @@ type fakePickers struct {
 func (f *fakePickers) popover(anchor, content widget.Widget) func() {
 	f.anchor, f.content = anchor, content
 	return func() { f.closed++ }
-}
-
-func (f *fakePickers) color(initial render.Color, fn func(render.Color)) {
-	f.colorIn, f.colorFn = initial, fn
 }
 
 func (f *fakePickers) openFile(fn func(string)) { f.fileFn = fn }
@@ -651,30 +645,82 @@ func TestFontRowsPickTheirKind(t *testing.T) {
 	}
 }
 
-func TestColorEditorWritesTheDialogsPick(t *testing.T) {
-	k := testKit(t, "")
-	f := &fakePickers{}
-	k.pickers = f
+// popoverHost is the surface host of a test tree: it records the
+// popovers its widgets open and closes them on cue.
+type popoverHost struct {
+	opened []widget.Widget
+	closed int
+}
+
+func (h *popoverHost) OpenMenu(widget.Boundser, render.Font, float64, []widget.MenuItem, widget.MenuOptions) {
+}
+
+func (h *popoverHost) OpenPopover(_ widget.Boundser, content widget.Widget, opts widget.PopoverOptions) func() {
+	h.opened = append(h.opened, content)
+	return func() {
+		h.closed++
+		if opts.OnClosed != nil {
+			opts.OnClosed()
+		}
+	}
+}
+
+func (h *popoverHost) Focus(widget.Widget) {}
+
+// hosted puts w in a root the returned host serves.
+func hosted(w widget.Widget) (*widget.Box, *popoverHost) {
+	root := widget.NewBox(widget.Row, 0, 0)
+	root.Append(w, false)
+	h := &popoverHost{}
+	widget.SetSurfaceHost(root, h)
+	return root, h
+}
+
+// click presses and releases the left button on target in root.
+func click(root widget.Widget, target widget.Boundser) {
+	r, p := treetest.Pointer(root, target, 600, 600)
+	r.Press(widget.BTNLeft, p, 0)
+	r.Release(widget.BTNLeft, p)
+}
+
+// The color editor is lys-ui's color button: a click opens its swatch
+// picker at the stored color, a swatch's pick is written as hex and
+// closes it, a chooser edit with alpha is written as #rrggbbaa, and a
+// refresh shows the stored color without writing it back.
+func TestColorEditorWritesThePickersPick(t *testing.T) {
+	k := testKit(t, "lock:\n  background-color: \"#336699\"\n")
 	c := newColorEditor(k, pathSlot(k.store, "lock.background-color"))
-	c.ClickAt(widget.Point{})
-	if f.colorFn == nil {
-		t.Fatal("no dialog opened")
+	root, host := hosted(c)
+	if c.Color() != render.RGB(0x33, 0x66, 0x99) {
+		t.Fatalf("shows %#08x, want the stored #336699", uint32(c.Color()))
 	}
-	cur, _ := k.store.value("lock.background-color").(string)
-	if want, _ := styling.ParseHex(cur); f.colorIn != want {
-		t.Errorf("dialog opened at %#08x, want the current %s", uint32(f.colorIn), cur)
+	click(root, c)
+	if len(host.opened) != 1 {
+		t.Fatalf("a click opened %d popovers, want the picker", len(host.opened))
 	}
-	f.colorFn(render.RGB(0x12, 0x34, 0x56))
-	if v := k.store.value("lock.background-color"); v != "#123456" {
-		t.Errorf("opaque pick wrote %v", v)
+	pickers := treetest.All[*widget.SwatchPicker](host.opened[0])
+	if len(pickers) != 1 || pickers[0].Color() != render.RGB(0x33, 0x66, 0x99) {
+		t.Fatalf("the popover holds %d swatch pickers, want one at the stored color", len(pickers))
 	}
-	f.colorFn(render.RGBA(0xff, 0, 0, 0x80))
+	swatches := treetest.WithClass(host.opened[0], "swatch")
+	if len(swatches) != len(widget.DefaultSwatches()) {
+		t.Fatalf("the picker offers %d swatches, want the %d presets", len(swatches), len(widget.DefaultSwatches()))
+	}
+	click(host.opened[0], swatches[4].(*widget.Button))
+	if want := styling.HexRGBA(widget.DefaultSwatches()[4]); k.store.value("lock.background-color") != want || host.closed != 1 {
+		t.Errorf("a swatch pick wrote %v (closed %d), want %s and the picker closed", k.store.value("lock.background-color"), host.closed, want)
+	}
+	click(root, c)
+	pickers = treetest.All[*widget.SwatchPicker](host.opened[1])
+	pickers[0].OnEdited(render.RGBA(0xff, 0, 0, 0x80))
 	if v := k.store.value("lock.background-color"); v != "#ff000080" {
-		t.Errorf("translucent pick wrote %v, want #rrggbbaa", v)
+		t.Errorf("a translucent edit wrote %v, want #rrggbbaa", v)
 	}
+	before := runtimeFile(t, k)
+	c.SetColor(render.RGB(1, 2, 3))
 	c.refresh()
-	if !strings.Contains(c.swatch.InlineStyle(), "#ff000080") {
-		t.Errorf("swatch style %q", c.swatch.InlineStyle())
+	if c.Color() != render.RGBA(0xff, 0, 0, 0x80) || runtimeFile(t, k) != before {
+		t.Errorf("refresh shows %#08x and wrote %v, want the stored color, nothing written", uint32(c.Color()), runtimeFile(t, k) != before)
 	}
 }
 
@@ -779,6 +825,63 @@ func TestColorValueEditor(t *testing.T) {
 	c.picked(slices.Index(c.ids, ""))
 	if k.store.value(path) != before {
 		t.Error("a header row wrote")
+	}
+}
+
+// listedSwatches opens the color-value dropdown and returns the colors
+// of the swatches leading its rows.
+func listedSwatches(t *testing.T, c *colorValueEditor) []render.Color {
+	t.Helper()
+	root, host := hosted(c)
+	click(root, c.drop)
+	if len(host.opened) != 1 {
+		t.Fatalf("a click opened %d popovers, want the list", len(host.opened))
+	}
+	c.drop.Close()
+	var out []render.Color
+	for _, sw := range treetest.All[*widget.ColorSwatch](host.opened[0]) {
+		out = append(out, sw.Color())
+	}
+	return out
+}
+
+// Each token row leads with a swatch of the token's color in the
+// palette, transparent with a clear one; a palette change re-tints
+// them, and a refresh over the same palette leaves the rows alone.
+func TestColorValueRowsLeadWithTheirTokensSwatch(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.clock.icon-color"
+	c := fieldControl(k, field(path)).(*colorValueEditor)
+	p := k.palette()
+	want := []render.Color{0}
+	for _, tok := range config.CssTokens() {
+		col, _ := p.Token(tok)
+		want = append(want, col)
+	}
+	if got := listedSwatches(t, c); !slices.Equal(got, want) {
+		t.Fatalf("the rows lead with %d swatches %x, want transparent and every token's color %x", len(got), got, want)
+	}
+	selected := c.drop.Selected()
+	root, _ := hosted(c)
+	click(root, c.drop)
+	c.refresh()
+	if !c.drop.Opened() {
+		t.Error("a refresh over the same palette rebuilt the rows, closing the open list")
+	}
+	c.drop.Close()
+	if got := listedSwatches(t, c); !slices.Equal(got, want) || c.drop.Selected() != selected {
+		t.Error("a refresh over the same palette changed the rows")
+	}
+	if err := k.store.set("styling.palette.red", "#123456"); err != nil {
+		t.Fatal(err)
+	}
+	c.refresh()
+	red := slices.Index(config.CssTokens(), config.TokenRed) + 1
+	if got := listedSwatches(t, c); got[red] != render.RGB(0x12, 0x34, 0x56) {
+		t.Errorf("after the palette's red changed, the red row's swatch is %#08x", uint32(got[red]))
+	}
+	if c.drop.Selected() != selected {
+		t.Error("re-tinting the rows moved the selection")
 	}
 }
 
@@ -1967,7 +2070,7 @@ func TestColorEditorShowsItsColor(t *testing.T) {
 	slot.AttachStylesheet(widget.NewStylesheet(styling.BundleCSS(cfg, cfg.Styling.ActivePalette(), styling.Default()), 200))
 	sz := slot.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 100}})
 	slot.Arrange(render.Rect{W: sz.W, H: sz.H})
-	b := c.swatch.Bounds()
+	b := c.Bounds()
 	if b.W < 20 || b.H < 12 {
 		t.Fatalf("the swatch is %v, want a visible size", b)
 	}

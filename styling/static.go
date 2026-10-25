@@ -32,7 +32,6 @@ var sheetOrder = []string{
 	"components/settings/window.css",
 	"components/settings/sidebar.css",
 	"components/settings/row.css",
-	"components/settings/controls/color_value.css",
 	"components/settings/controls/yaml_editor.css",
 	"components/settings/controls/bar_layout.css",
 	"components/settings/controls/theme_selector.css",

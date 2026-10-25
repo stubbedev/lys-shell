@@ -26,7 +26,7 @@ import (
 const Priority = widget.StylePriorityUser + 100
 
 // ComponentPriority is a widget's own dynamic CSS - an album art or
-// avatar background, a color swatch - above the bundle, so no bundle
+// avatar background - above the bundle, so no bundle
 // rule overrides it (wayle-styling's COMPONENT_CSS_PRIORITY, GTK
 // priority 1000). A widget's plain inline
 // style sits at user priority, under the bundle, as a GTK per-widget

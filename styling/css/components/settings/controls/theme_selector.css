@@ -14,9 +14,9 @@ image.theme-preset-button-icon {
   background-color: var(--bg-hover);
 }
 
-.theme-preset-swatch {
-  border-radius: 2px;
-  border: 1px solid var(--border-subtle);
+.theme-preset-swatches colorswatch {
+  min-width: 12px;
+  min-height: 12px;
 }
 
 .theme-preset-name {

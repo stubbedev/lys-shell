@@ -13,20 +13,17 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/icons"
-	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The editors that open a picker (editors/font, editors/color).
 
 // pickers opens what an editor picks from: a popover beside an anchor,
-// the color dialog and the font dialog. The window provides it; tests
+// the font dialog and the file chooser. The window provides it; tests
 // fake it.
 type pickers interface {
 	// popover shows content beside anchor; close dismisses it.
 	popover(anchor widget.Widget, content widget.Widget) (close func())
-	// color asks for a color, calling fn with the pick.
-	color(initial render.Color, fn func(render.Color))
 	// font asks for a font family, initially family, monospace ones
 	// only when monospace, calling fn with the pick.
 	font(family string, monospace bool, fn func(family string))
@@ -209,43 +206,38 @@ func (r pickerRows) Len() int { return len(r.p.shown) }
 
 func (r pickerRows) Row(i int) widget.Widget { return r.p.spec.row(r.p.k, r.p.shown[i]) }
 
-// colorEditor is ColorControl: a swatch button opening the color
-// dialog; a pick writes the hex (rgba_to_hex: #rrggbb, #rrggbbaa
-// with alpha).
+// colorEditor is ColorControl: lys-ui's color button, its swatch
+// picker's pick written as hex (rgba_to_hex: #rrggbb, #rrggbbaa with
+// alpha).
 type colorEditor struct {
-	*widget.Button
-	k      *kit
-	slot   slot
-	swatch *widget.Box
-	value  render.Color
+	*widget.ColorButton
+	slot slot
 }
 
 func newColorEditor(k *kit, s slot) *colorEditor {
-	c := &colorEditor{k: k, slot: s, swatch: widget.NewBox(widget.Row, 0, 0)}
-	c.swatch.AddClass("color-swatch")
-	c.Button = k.button(c.swatch, c.open)
-	c.SetElement("colorswatch")
+	c := colorButton(k, s)
 	c.refresh()
 	return c
 }
 
+// colorButton is the editor before it read its value: the color-value
+// control shows it only over a hex.
+func colorButton(k *kit, s slot) *colorEditor {
+	c := &colorEditor{ColorButton: widget.NewColorButton(k.face, k.textPx(), 0), slot: s}
+	c.OnColorSet = func(col render.Color) { _ = c.slot.set(styling.HexRGBA(col)) }
+	return c
+}
+
+// refresh shows the stored hex; a value that is no hex color is
+// logged, the button keeping what it showed.
 func (c *colorEditor) refresh() {
 	s, _ := c.slot.get().(string)
 	col, ok := styling.ParseHex(s)
 	if !ok {
+		log.Printf("settings: color editor: %q is no hex color", s)
 		return
 	}
-	c.value = col
-	c.swatch.SetInlineStylePriority("background-color: "+s+";", apptheme.ComponentPriority)
-}
-
-func (c *colorEditor) open() {
-	if c.k.pickers == nil {
-		return
-	}
-	c.k.pickers.color(c.value, func(col render.Color) {
-		_ = c.slot.set(styling.HexRGBA(col))
-	})
+	c.SetColor(col)
 }
 
 // fileEditor is FilePickerControl: the path entry (committing on
@@ -389,9 +381,6 @@ var iconRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
 // styling scale).
 const themeListPx = 384
 
-// themeSwatchPx is a theme row's color swatch edge.
-const themeSwatchPx = 8
-
 // paletteKeys are the [styling.palette] keys a theme sets, in the
 // palette's order.
 var paletteKeys = []string{"bg", "surface", "elevated", "fg", "fg-muted", "primary", "red", "yellow", "green", "blue"}
@@ -471,11 +460,12 @@ func (c *themeSelector) row(name string) widget.Widget {
 	if th, ok := c.theme(name); ok {
 		p := th.Palette
 		for _, hex := range []string{p.Bg, p.Primary, p.Red, p.Yellow, p.Green, p.Blue} {
-			sw := widget.NewBox(widget.Row, 0, 0)
-			sw.AddClass("theme-preset-swatch")
-			sw.SetSizeRequest(themeSwatchPx, themeSwatchPx)
-			sw.SetInlineStylePriority("background-color: "+hex+"; background-image: none;", apptheme.ComponentPriority)
-			swatches.AppendAligned(sw, false, widget.AlignCenter)
+			col, ok := styling.ParseHex(hex)
+			if !ok {
+				log.Printf("settings: theme %s: %q is no hex color", name, hex)
+				continue
+			}
+			swatches.AppendAligned(widget.NewColorSwatch(col), false, widget.AlignCenter)
 		}
 	}
 	content.AppendAligned(swatches, false, widget.AlignCenter)

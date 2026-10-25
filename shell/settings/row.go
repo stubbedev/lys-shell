@@ -1,12 +1,15 @@
 package settings
 
 import (
+	"log"
+
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // hiddenPriority puts the reset button's hidden opacity above every
@@ -50,12 +53,23 @@ func async[T any](k *kit, work func() T, done func(T)) {
 	})
 }
 
-// label is a styled label; color, size and weight come from the
-// stylesheet.
+// palette is the render palette the stored styling resolves to, the
+// colors the token swatches show; a provider that fails is logged and
+// leaves the configured palette.
+func (k *kit) palette() styling.Palette {
+	p, err := styling.ConfigPalette(k.store.svc.Config().Styling)
+	if err != nil {
+		log.Printf("settings: palette: %v", err)
+	}
+	return *p
+}
+
 // textPx is lys-ui's text size, which every label and control of the
 // window takes.
 func (k *kit) textPx() float64 { return widget.Current().TextSize }
 
+// label is a styled label; color, size and weight come from the
+// stylesheet.
 func (k *kit) label(text string, classes ...string) *widget.Label {
 	l := widget.NewLabel(k.face, k.textPx(), text, 0)
 	l.AddClass(classes...)

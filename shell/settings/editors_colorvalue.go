@@ -4,21 +4,25 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
-// colorValueEditor is ColorValueControl: the swatch (custom colors
-// only) and the dropdown of auto, transparent, custom and the palette
-// tokens grouped under headers.
+// colorValueEditor is ColorValueControl: the color button (custom
+// colors only) and the dropdown of auto, transparent, custom and the
+// palette tokens grouped under headers, each token led by a swatch of
+// its color in the palette the rows were built for.
 type colorValueEditor struct {
 	*widget.Box
 	k       *kit
 	slot    slot
 	drop    *widget.Dropdown
 	swatch  *colorEditor
+	palette styling.Palette
 	ids     []string // each row's config value; "" for a header
 	syncing bool
 }
@@ -31,15 +35,12 @@ const (
 )
 
 func newColorValueEditor(k *kit, s slot) *colorValueEditor {
-	c := &colorValueEditor{Box: widget.NewBox(widget.Row, widget.Current().Spacing, 0), k: k, slot: s}
-	c.AddClass("color-value-control")
-	rows, ids := colorValueRows()
+	c := &colorValueEditor{Box: widget.NewBox(widget.Row, widget.Current().Spacing, 0), k: k, slot: s, palette: k.palette()}
+	rows, ids := colorValueRows(c.palette)
 	c.ids = ids
 	c.drop = widget.NewDropdownRows(k.face, k.textPx(), rows, 0)
-	c.drop.AddClass("color-value-dropdown")
 	c.drop.OnSelect = c.picked
-	c.swatch = newColorEditor(k, s)
-	c.swatch.AddClass("color-value-swatch")
+	c.swatch = colorButton(k, s)
 	c.AppendAligned(c.swatch, false, widget.AlignCenter)
 	c.AppendAligned(c.drop, false, widget.AlignCenter)
 	c.refresh()
@@ -47,20 +48,17 @@ func newColorValueEditor(k *kit, s slot) *colorValueEditor {
 }
 
 // colorValueRows are build_items: auto, transparent, custom, then each
-// token group under its header, a dot styled as the token.
-func colorValueRows() ([]widget.DropdownRow, []string) {
+// token group under its header, a swatch of the token's color in p
+// leading it.
+func colorValueRows(p styling.Palette) ([]widget.DropdownRow, []string) {
 	t := i18n.Settings()
-	dot := func(classes ...string) func() *widget.Icon {
-		return func() *widget.Icon {
-			ic := widget.NewThemeIcon("", 10)
-			ic.AddClass(append([]string{"color-value-dot"}, classes...)...)
-			return ic
-		}
+	swatch := func(c render.Color) func() widget.Widget {
+		return func() widget.Widget { return widget.NewColorSwatch(c) }
 	}
 	rows := []widget.DropdownRow{
 		{Label: t.Get("settings-color-auto")},
-		{Label: t.Get("settings-color-transparent"), Icon: dot("transparent")},
-		{Label: t.Get("settings-color-custom"), Icon: dot("custom")},
+		{Label: t.Get("settings-color-transparent"), Leading: swatch(0)},
+		{Label: t.Get("settings-color-custom")},
 	}
 	ids := []string{colorAuto, colorTransparent, colorCustom}
 	group := ""
@@ -71,14 +69,18 @@ func colorValueRows() ([]widget.DropdownRow, []string) {
 			rows = append(rows, widget.DropdownRow{Label: group, Header: true})
 			ids = append(ids, "")
 		}
-		rows = append(rows, widget.DropdownRow{Label: meta.label, Icon: dot("token-" + string(tok))})
+		col, ok := p.Token(tok)
+		if !ok {
+			panic("settings: config token " + string(tok) + " has no color")
+		}
+		rows = append(rows, widget.DropdownRow{Label: meta.label, Leading: swatch(col)})
 		ids = append(ids, string(tok))
 	}
 	return rows, ids
 }
 
 // picked writes the chosen row: a token or keyword as it is, custom
-// as white, with the swatch shown for it.
+// as white, with the color button shown for it.
 func (c *colorValueEditor) picked(i int) {
 	if c.syncing || i < 0 || i >= len(c.ids) || c.ids[i] == "" {
 		return
@@ -93,17 +95,28 @@ func (c *colorValueEditor) picked(i int) {
 	_ = c.slot.set(v)
 }
 
+// refresh selects the stored value's row, the token swatches rebuilt
+// when the palette changed.
 func (c *colorValueEditor) refresh() {
 	v, _ := c.slot.get().(string)
 	id := v
 	if strings.HasPrefix(v, "#") {
 		id = colorCustom
 	}
+	selected := max(slices.Index(c.ids, id), 0)
 	c.syncing = true
-	c.drop.SetSelected(max(slices.Index(c.ids, id), 0))
+	if p := c.k.palette(); p != c.palette {
+		c.palette = p
+		rows, _ := colorValueRows(p)
+		c.drop.SetRows(rows, selected)
+	} else {
+		c.drop.SetSelected(selected)
+	}
 	c.syncing = false
 	c.swatch.SetVisible(id == colorCustom)
-	c.swatch.refresh()
+	if id == colorCustom {
+		c.swatch.refresh()
+	}
 }
 
 // cssTokenMeta is token_meta: each token's label and group in the

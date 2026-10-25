@@ -10,7 +10,6 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-ui/app"
-	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -154,13 +153,6 @@ func (p windowPickers) popover(anchor, content widget.Widget) (closePopover func
 		return func() {}
 	}
 	return pop.Dismiss
-}
-
-// color opens the color dialog at initial (ColorDialogButton).
-func (p windowPickers) color(initial render.Color, fn func(render.Color)) {
-	if _, err := p.app.ColorChooserDialog(p.win, initial, fn); err != nil {
-		log.Printf("settings: color dialog: %v", err)
-	}
 }
 
 // font opens lys-ui's font dialog for families alone (FontButton's
