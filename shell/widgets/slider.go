@@ -4,6 +4,7 @@ package widgets
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-ui/render"
@@ -29,8 +30,16 @@ type DebouncedSlider struct {
 	Format func(float64) string
 	invoke func(func())
 
-	// OnCommit hears the throttled user commits.
+	// OnCommit hears the throttled user commits on the loop.
 	OnCommit func(float64)
+	// Write turns a committed value, on the loop, into the backend write
+	// that applies it (nil writes nothing), run off the loop one at a
+	// time, the latest commit's replacing any queued while one runs;
+	// outside values are ignored until the last write has landed and
+	// the release grace has passed after it. A slow backend (a display
+	// over DDC/CI) otherwise lands concurrent writes out of order and
+	// echoes stale values onto the slider.
+	Write func(float64) func()
 	// OnValue sees every value change, the user's and set's alike
 	// (the value-changed notify a #[watch] reads).
 	OnValue      func(float64)
@@ -40,6 +49,15 @@ type DebouncedSlider struct {
 	lastCommit   time.Time
 	trailing     *time.Timer
 	now          func() time.Time
+
+	// wmu guards the write queue: want is the latest commit's write,
+	// queued whether it awaits running, writing whether a drain runs.
+	// landed is when the last drain finished (loop only).
+	wmu     sync.Mutex
+	want    func()
+	queued  bool
+	writing bool
+	landed  time.Time
 }
 
 // pressSlider routes the press protocol to its owner.
@@ -137,6 +155,48 @@ func (d *DebouncedSlider) commit(v float64) {
 	if d.OnCommit != nil {
 		d.OnCommit(v)
 	}
+	if d.Write != nil {
+		if write := d.Write(v); write != nil {
+			d.enqueue(write)
+		}
+	}
+}
+
+// enqueue queues write, starting a drain when none runs.
+func (d *DebouncedSlider) enqueue(write func()) {
+	d.wmu.Lock()
+	d.want, d.queued = write, true
+	start := !d.writing
+	d.writing = true
+	d.wmu.Unlock()
+	if start {
+		go d.drain()
+	}
+}
+
+// drain runs the latest queued write until none is left, then marks
+// the writes landed on the loop.
+func (d *DebouncedSlider) drain() {
+	for {
+		d.wmu.Lock()
+		if !d.queued {
+			d.writing = false
+			d.wmu.Unlock()
+			d.invoke(func() { d.landed = d.now() })
+			return
+		}
+		write := d.want
+		d.want, d.queued = nil, false
+		d.wmu.Unlock()
+		write()
+	}
+}
+
+// writePending reports whether a write runs or awaits.
+func (d *DebouncedSlider) writePending() bool {
+	d.wmu.Lock()
+	defer d.wmu.Unlock()
+	return d.writing || d.queued
 }
 
 func (d *DebouncedSlider) cancelTrailing() {
@@ -146,9 +206,17 @@ func (d *DebouncedSlider) cancelTrailing() {
 	}
 }
 
-// interacting is user_is_interacting: held, or released under 150ms ago.
+// interacting is user_is_interacting: held, writing, or released (or
+// its last write landed) under 150ms ago.
 func (d *DebouncedSlider) interacting() bool {
-	return d.dragging || !d.dragEnded.IsZero() && d.now().Sub(d.dragEnded) < sliderGrace
+	if d.dragging || d.writePending() {
+		return true
+	}
+	since := d.dragEnded
+	if d.landed.After(since) {
+		since = d.landed
+	}
+	return !since.IsZero() && d.now().Sub(since) < sliderGrace
 }
 
 // Set is set_value_external: an outside value, ignored while the user

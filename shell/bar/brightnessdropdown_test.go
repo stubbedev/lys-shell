@@ -236,3 +236,23 @@ func TestBrightnessCardHugsItsRows(t *testing.T) {
 		t.Errorf("the card is %dpx taller than its one row", extra)
 	}
 }
+
+// A slow display's stale level, read while the slider's write is still
+// running, does not snap the slider back: the write lands first, and
+// only then does the device's level count again.
+func TestBrightnessSliderHoldsWhileItsWriteRuns(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	gate := make(chan struct{})
+	source := &fakeBrightnessSource{devices: []brightness.Device{{Name: "ddcci5", Type: brightness.TypeDDC, Brightness: 50, Max: 100}}, gate: gate}
+	ctx.Brightness = source
+	v := brightnessDropdown(ctx).(*brightnessView)
+	defer v.dropdownClosed()
+	slider := v.sliders["ddcci5"]
+	onHeadlessLoop(func() bool { slider.Knob.SetValue(70); return true })
+	waitHeadless(t, "the write to start", func() bool { return len(source.recorded()) == 1 })
+	onHeadlessLoop(func() bool { v.apply(v.read(t.Context())); return true })
+	if got := onHeadlessLoop(slider.Value); got != 70 {
+		t.Errorf("the display's stale level moved the slider to %v while its write ran", got)
+	}
+	close(gate)
+}

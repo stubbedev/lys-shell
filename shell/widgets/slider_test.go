@@ -143,3 +143,91 @@ func TestRangedSliderBoundsAndFormat(t *testing.T) {
 		t.Error("a fontless slider has a label")
 	}
 }
+
+// Write runs one write at a time off the loop, the latest commit
+// replacing the ones queued behind a slow write; outside values stay
+// out until the last write has landed and the release grace after it
+// has passed.
+func TestDebouncedSliderWritesInOrderLatestWins(t *testing.T) {
+	loop := &testLoop{}
+	d, _, clock := newTestSliderOn(t, loop)
+	var mu sync.Mutex
+	var writes []float64
+	inflight, most := 0, 0
+	gate := make(chan struct{})
+	var write func(float64)
+	d.Write = func(v float64) func() { return func() { write(v) } }
+	write = func(v float64) {
+		mu.Lock()
+		writes = append(writes, v)
+		inflight++
+		most = max(most, inflight)
+		mu.Unlock()
+		<-gate
+		mu.Lock()
+		inflight--
+		mu.Unlock()
+	}
+	written := func() []float64 {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(writes)
+	}
+	waitWrites := func(want ...float64) {
+		t.Helper()
+		deadline := time.Now().Add(time.Second)
+		for !slices.Equal(written(), want) {
+			if time.Now().After(deadline) {
+				t.Fatalf("writes = %v, want %v", written(), want)
+			}
+			time.Sleep(2 * time.Millisecond)
+		}
+	}
+
+	loop.mu.Lock()
+	d.Knob.SetPressed(true)
+	d.Knob.SetValue(60)
+	loop.mu.Unlock()
+	waitWrites(60)
+
+	loop.mu.Lock()
+	*clock = clock.Add(150 * time.Millisecond)
+	d.Knob.SetValue(70)
+	*clock = clock.Add(150 * time.Millisecond)
+	d.Knob.SetValue(80)
+	d.Knob.SetPressed(false)
+	loop.mu.Unlock()
+
+	time.Sleep(50 * time.Millisecond)
+	if got := written(); !slices.Equal(got, []float64{60}) {
+		t.Fatalf("writes = %v while the first was still running, want it alone", got)
+	}
+
+	loop.mu.Lock()
+	*clock = clock.Add(time.Second)
+	d.Set(10)
+	if d.Value() != 80 {
+		t.Error("an outside value landed while a write was pending")
+	}
+	loop.mu.Unlock()
+
+	gate <- struct{}{}
+	waitWrites(60, 80)
+	gate <- struct{}{}
+	loop.wait(t, "the writes to land", func() bool { return !d.writePending() && !d.landed.IsZero() })
+	if most != 1 {
+		t.Errorf("%d writes ran at once, want one at a time", most)
+	}
+
+	loop.mu.Lock()
+	d.Set(10)
+	if d.Value() != 80 {
+		t.Error("an outside value landed inside the grace after the last write")
+	}
+	*clock = clock.Add(200 * time.Millisecond)
+	d.Set(10)
+	if d.Value() != 10 {
+		t.Error("an outside value after the grace did not land")
+	}
+	loop.mu.Unlock()
+}

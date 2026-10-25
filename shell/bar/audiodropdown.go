@@ -325,15 +325,23 @@ func (v *audioView) showPage(name string) { v.pages.Show(name) }
 // write runs a service control off the loop, as the Rust command
 // futures do; the follow loop picks up the result.
 func (v *audioView) write(what string, fn func(context.Context, pulse.Source) error) {
+	if call := v.call(what, fn); call != nil {
+		go call()
+	}
+}
+
+// call is fn against the audio source as one blocking write, its
+// failure logged; nil without a source.
+func (v *audioView) call(what string, fn func(context.Context, pulse.Source) error) func() {
 	src := v.ctx.Pulse
 	if src == nil {
-		return
+		return nil
 	}
-	go func() {
+	return func() {
 		if err := fn(context.Background(), src); err != nil {
 			log.Printf("audio: %s: %v", what, err)
 		}
-	}()
+	}
 }
 
 func (v *audioView) follow() {
@@ -387,7 +395,7 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 
 	s.slider = widgets.NewDebouncedSlider(0, v.font, v.px, 0, v.ctx.Invoke)
 	s.slider.ValueLabel().AddClass("audio-slider-value", css.Numeric)
-	s.slider.OnCommit = s.commitVolume
+	s.slider.Write = s.volumeWrite
 	s.slider.OnValue = func(float64) { s.syncMuteIcon() }
 	s.sliderRow = itemBody()
 	s.sliderRow.Append(s.slider, false)
@@ -439,13 +447,14 @@ func (s *volumeSection) syncMuteIcon() {
 	s.muteIcon.SetThemeName(audioVolumeIcon(s.slider.Value(), muted))
 }
 
-// commitVolume is commit_volume.
-func (s *volumeSection) commitVolume(pct float64) {
+// volumeWrite is commit_volume: the device write the slider runs off
+// the loop, nil without a device.
+func (s *volumeSection) volumeWrite(pct float64) func() {
 	if s.device == nil {
-		return
+		return nil
 	}
 	key, volume := s.device.key, pulse.VolumeFromPercentage(pct, s.device.volume.Channels())
-	s.view.write("set volume", func(ctx context.Context, src pulse.Source) error {
+	return s.view.call("set volume", func(ctx context.Context, src pulse.Source) error {
 		return src.SetDeviceVolume(ctx, key, volume)
 	})
 }
@@ -579,7 +588,7 @@ func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
 
 	it.slider = widgets.NewDebouncedSlider(r.vol.AveragePercentage(), nil, 0, 0, v.ctx.Invoke)
 	it.slider.AddClass("audio-app-slider")
-	it.slider.OnCommit = it.commitVolume
+	it.slider.Write = it.volumeWrite
 	it.slider.OnValue = func(float64) { it.sync() }
 	body := itemBody()
 	body.Append(it.slider, false)
@@ -609,10 +618,11 @@ func (it *appVolumeItem) sync() {
 	}
 }
 
-// commitVolume is commit_app_volume.
-func (it *appVolumeItem) commitVolume(pct float64) {
+// volumeWrite is commit_app_volume: the stream write the slider runs
+// off the loop.
+func (it *appVolumeItem) volumeWrite(pct float64) func() {
 	key, volume := it.row.key, pulse.VolumeFromPercentage(pct, it.row.vol.Channels())
-	it.view.write("set app volume", func(ctx context.Context, src pulse.Source) error {
+	return it.view.call("set app volume", func(ctx context.Context, src pulse.Source) error {
 		return src.SetStreamVolume(ctx, key, volume)
 	})
 }

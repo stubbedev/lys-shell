@@ -45,6 +45,8 @@ type fakeBrightnessSource struct {
 	devices []brightness.Device
 	ticks   chan struct{}
 	sets    []brightnessSet
+	// gate, when set, holds each Set until it receives: a slow display.
+	gate chan struct{}
 }
 
 // brightnessSet is one recorded Set call.
@@ -72,7 +74,11 @@ func (f *fakeBrightnessSource) Subscribe(context.Context) (<-chan struct{}, func
 func (f *fakeBrightnessSource) Set(_ context.Context, name string, percent float64) error {
 	f.mu.Lock()
 	f.sets = append(f.sets, brightnessSet{name, percent})
+	gate := f.gate
 	f.mu.Unlock()
+	if gate != nil {
+		<-gate
+	}
 	return nil
 }
 

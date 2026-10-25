@@ -320,12 +320,12 @@ func (v *dashboardView) controls() widget.Widget {
 	row.AppendAligned(mute, false, widget.AlignCenter)
 	slider := widgets.NewDebouncedSlider(0, v.font, v.px, 0, v.ctx.Invoke)
 	slider.ValueLabel().AddClass("dashboard-slider-value", css.Numeric)
-	slider.OnCommit = func(pct float64) {
-		go func() {
+	slider.Write = func(pct float64) func() {
+		return func() {
 			if err := v.ctx.Pulse.SetVolume(bctx, pct); err != nil {
 				log.Printf("dashboard: volume set failed: %v", err)
 			}
-		}()
+		}
 	}
 	row.Append(slider, true)
 	controls.Append(row, false)

@@ -177,7 +177,7 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px, 0, v.ctx.Invoke)
 	slider.ValueLabel().AddClass("brightness-slider-value", css.Numeric)
 	name := d.Name
-	slider.OnCommit = func(pct float64) { v.commit(name, pct) }
+	slider.Write = func(pct float64) func() { return v.write(name, pct) }
 	v.sliders[name] = slider
 	body := itemBody()
 	body.Append(slider, false)
@@ -185,15 +185,15 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	return card
 }
 
-// commit is commit_brightness: the write runs off the loop, as the
-// Rust command future does.
-func (v *brightnessView) commit(name string, pct float64) {
+// write is commit_brightness: the device write the slider runs off
+// the loop, one at a time.
+func (v *brightnessView) write(name string, pct float64) func() {
 	src := v.ctx.Brightness
-	go func() {
+	return func() {
 		if err := src.Set(context.Background(), name, pct); err != nil {
 			log.Printf("brightness: set %s: %v", name, err)
 		}
-	}()
+	}
 }
 
 // follow re-reads the devices on every service tick until the
