@@ -23,9 +23,7 @@ mkdir -p "${STAGING}/icons" "${STAGING}/completions"
 for bin in lys-shell lys-greeter lys-lock lys-settings; do
 	cp "${BIN_DIR}/${bin}" "${STAGING}/"
 done
-"${BIN_DIR}/lys-shell" completions bash >"${STAGING}/completions/completions.bash"
-"${BIN_DIR}/lys-shell" completions zsh >"${STAGING}/completions/_lys-shell"
-"${BIN_DIR}/lys-shell" completions fish >"${STAGING}/completions/lys-shell.fish"
+cp "${BIN_DIR}/completions/completions.bash" "${BIN_DIR}/completions/_lys-shell" "${BIN_DIR}/completions/lys-shell.fish" "${STAGING}/completions/"
 
 cp LICENSE "${STAGING}/"
 cp -r resources/icons/hicolor "${STAGING}/icons/"

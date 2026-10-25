@@ -7,9 +7,9 @@
 Name:           lys-shell
 Version:        @VERSION@
 Release:        1%{?dist}
-Summary:        Wayland Elements - A compositor agnostic shell with extensive customization
+Summary:        Wayland desktop shell
 License:        MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND CC0-1.0 AND blessing
-URL:            https://lys-shell.app/
+URL:            https://github.com/stubbedev/lys-shell
 Source0:        https://github.com/stubbedev/lys-shell/releases/download/v%{version}/lys-shell-%{version}-%{_arch}-linux.tar.gz
 ExclusiveArch:  x86_64
 
@@ -37,7 +37,7 @@ Suggests:       upower
 Suggests:       power-profiles-daemon
 
 %description
-Wayland Elements - A compositor agnostic shell with extensive customization
+lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns, launcher, notifications, OSD, lock screen, greeter and an xdg-desktop-portal backend, configured in YAML or through the lys-settings GUI.
 
 %prep
 %setup -q -n lys-shell-%{version}-%{_arch}-linux

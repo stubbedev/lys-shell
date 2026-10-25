@@ -8,8 +8,8 @@ fi
 
 ARCHIVE="$(readlink -f "$1")"
 VERSION="$2"
-DEB_FULLNAME="${DEBFULLNAME:-Jas Singh}"
-DEB_EMAIL="${DEBEMAIL:-jaskiratpal.singh@outlook.com}"
+DEB_FULLNAME="${DEBFULLNAME:-Alexander Bugge Stage}"
+DEB_EMAIL="${DEBEMAIL:-abs@stubbe.dev}"
 MAINTAINER="${DEB_FULLNAME} <${DEB_EMAIL}>"
 MAINTAINER_SED="$(printf '%s' "${MAINTAINER}" | sed 's/[&\\|]/\\&/g')"
 

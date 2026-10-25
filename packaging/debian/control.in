@@ -7,7 +7,7 @@ Build-Depends:
  desktop-file-utils
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
-Homepage: https://lys-shell.app/
+Homepage: https://github.com/stubbedev/lys-shell
 Vcs-Git: https://github.com/stubbedev/lys-shell.git
 Vcs-Browser: https://github.com/stubbedev/lys-shell
 
@@ -37,10 +37,10 @@ Suggests:
  power-profiles-daemon,
  pipewire-pulse,
  wireplumber
-Description: Wayland Elements desktop shell
- Wayland Elements is a compositor agnostic shell with extensive customization.
- It includes a bar, notifications, OSD, wallpaper, a launcher, a lock screen,
- a greetd greeter, an xdg-desktop-portal backend, and device controls.
+Description: Wayland desktop shell
+ lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns,
+ launcher, notifications, OSD, lock screen, greeter and an xdg-desktop-portal
+ backend, configured in YAML or through the lys-settings GUI.
  .
- The binaries are static Go; they load GLib, GStreamer, PAM, PipeWire and
- GBM at runtime.
+ The binaries are Go with no cgo; they load GLib, GStreamer, PAM, PipeWire
+ and GBM at runtime.
