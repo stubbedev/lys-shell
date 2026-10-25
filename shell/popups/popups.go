@@ -6,12 +6,14 @@ package popups
 import (
 	"log"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -25,7 +27,11 @@ import (
 const (
 	cardMaxWidthChars = 40
 	cardBodyLines     = 3
-	cardIconPx        = 32
+	// cardWidthPx is the card's width at scale 1, cardIconPx a file
+	// picture's size and cardGlyphPx a themed glyph's on its tile.
+	cardWidthPx = 340
+	cardIconPx  = 32
+	cardGlyphPx = 16
 	// popupGapBasePx and popupMarginBasePx are the bases the popup-gap
 	// and popup-margin-x/y multipliers scale (POPUP_GAP_BASE_REM 0.5,
 	// POPUP_MARGIN_BASE_REM 0.75, at 16px a rem).
@@ -57,18 +63,16 @@ type Popups struct {
 	stack []*card
 }
 
-// card is one popup (NotificationPopupCard): the icon, the app and
-// age over the summary and the body, the close button, and the action
-// rows.
+// card is one popup (NotificationPopupCard): the notification as
+// lys-ui's Item (the icon, the summary over the app, the age and the
+// close button), the body, and the action rows.
 type card struct {
 	id uint32
 	// rev plays the card's enter and exit (the LysShellRevealer around it).
 	rev     *widget.Revealer
 	root    *widget.Box
-	iconBox *widget.Box
-	app     *widget.Label
+	head    *widget.Item
 	time    *widget.Label
-	title   *widget.Label
 	body    *widget.RichLabel
 	close   *widget.Button
 	actions *widget.Box
@@ -204,24 +208,22 @@ func (p *Popups) dropCard(c *card) {
 	p.layoutLocked()
 }
 
-// newCard builds one card, the view! of card/mod.rs and its init:
-//
-//	box.notification-popup-card.<urgency>[.shadow][.urgency-bar]
-//	├ box.notification-popup-content
-//	│ ├ box.notification-popup-icon[.file-icon] > image.notification-popup-icon-img
-//	│ ├ box.notification-popup-text (hexpand)
-//	│ │ ├ box.notification-popup-header > label.notification-popup-app, label.notification-popup-time
-//	│ │ ├ label.notification-popup-title
-//	│ │ └ label.notification-popup-body
-//	│ └ button.notification-popup-close > image
-//	└ box.notification-popup-actions > box.notification-popup-action-row > button.notification-popup-action-btn
-//
-// Every box is spacing 0: the stylesheet spaces them.
+// newCard builds one card (card/mod.rs) on lys-ui's parts: a card
+// holding the notification as an Item, over the body and the action
+// rows inset in line with it.
 func (p *Popups) newCard(n *notifications.Notification) *card {
 	cfg := p.cfg.Notification
+	scale := float64(p.cfg.Styling.Scale)
+	if scale <= 0 {
+		scale = 1
+	}
+	px := widget.Current().TextSize * scale
 	c := &card{id: n.ID}
 	c.root = widget.NewBox(widget.Column, 0, 0)
-	c.root.AddClass("notification-popup-card", notifyui.UrgencyClass(n.Urgency))
+	c.root.AddClass(css.Card, "notification-popup-card", notifyui.UrgencyClass(n.Urgency))
+	// The card is its width exactly, lys-ui's explicit width for
+	// content that fills it: the Item would otherwise fill the output.
+	c.root.SetInlineStyle("width: " + strconv.Itoa(int(cardWidthPx*scale)) + "px; box-sizing: border-box;")
 	if cfg.PopupShadow {
 		c.root.AddClass("shadow")
 	}
@@ -229,77 +231,58 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 		c.root.AddClass("urgency-bar")
 	}
 
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("notification-popup-content")
-	icon := notifyui.ResolveIcon(cfg.IconSource, n)
-	c.iconBox = widget.NewBox(widget.Row, 0, 0)
-	c.iconBox.AddClass("notification-popup-icon")
-	c.iconBox.SetHAlign(widget.AlignCenter)
-	c.iconBox.SetVAlign(widget.AlignStart)
-	if notifyui.IsFileIcon(icon) {
-		c.iconBox.AddClass("file-icon")
-	}
-	glyph := notifyui.NewIcon(icon, cardIconPx, 0)
-	glyph.AddClass("notification-popup-icon-img")
-	glyph.SetHAlign(widget.AlignCenter)
-	glyph.SetVAlign(widget.AlignCenter)
-	c.iconBox.Append(glyph, false)
-	row.Append(c.iconBox, false)
-
-	text := widget.NewBox(widget.Column, 0, 0)
-	text.AddClass("notification-popup-text")
-	text.SetHExpand(true)
-	header := widget.NewBox(widget.Row, 0, 0)
-	header.AddClass("notification-popup-header")
 	appName := n.AppName
 	if appName == "" {
 		appName = i18n.T("notification-popup-unknown-app")
 	}
-	c.app = widget.NewLabel(p.font, 11, appName, 0)
-	c.app.AddClass("notification-popup-app")
-	c.app.SetHAlign(widget.AlignStart)
-	c.app.SetHExpand(true)
-	c.app.SetEllipsize(widget.EllipsizeEnd)
-	header.Append(c.app, false)
-	c.time = widget.NewLabel(p.font, 11, notifyui.TimeLabel(notifyui.RelativeTime(p.now(), n.Added), "notification-popup"), 0)
-	c.time.AddClass("notification-popup-time")
-	c.time.SetHAlign(widget.AlignEnd)
-	header.Append(c.time, false)
-	text.Append(header, false)
-	c.title = widget.NewLabel(p.font, 14, n.Summary, 0)
-	c.title.AddClass("notification-popup-title")
-	c.title.SetHAlign(widget.AlignStart)
-	c.title.SetEllipsize(widget.EllipsizeEnd)
-	c.title.SetMaxWidthChars(cardMaxWidthChars)
-	text.Append(c.title, false)
-	c.body = widget.NewRichLabel(p.font, 12, notifyui.BodyMarkup(n.Body), 0)
+	c.head = widget.NewItem(p.font, n.Summary, appName)
+	c.head.SetSmall(true)
+	c.head.SetEllipsize(true)
+	c.head.AddClass("notification-popup-content")
+	icon := notifyui.ResolveIcon(cfg.IconSource, n)
+	size := cardGlyphPx
+	if notifyui.IsFileIcon(icon) {
+		size = cardIconPx
+	}
+	glyph := notifyui.NewIcon(icon, size, 0)
+	glyph.AddClass("notification-popup-icon")
+	if notifyui.IsFileIcon(icon) {
+		glyph.AddClass("file-icon")
+	}
+	c.head.SetMedia(glyph, notifyui.IsFileIcon(icon))
+	c.time = widget.NewLabel(p.font, px, notifyui.TimeLabel(notifyui.RelativeTime(p.now(), n.Added), "notification-popup"), 0)
+	c.time.AddClass("notification-popup-time", css.Caption, css.DimLabel)
+	c.head.AddAction(c.time)
+	c.close = widget.NewButton(widget.NewThemeIcon("window-close-symbolic", cardGlyphPx), 0, 0)
+	c.close.AddClass("notification-popup-close", css.Ghost, css.Icon, css.Small)
+	id := n.ID
+	c.close.OnClick = func() { p.closeCard(id) }
+	c.head.AddAction(c.close)
+	c.root.Append(c.head, false)
+
+	th := widget.Current()
+	body := widget.NewBox(widget.Column, th.Spacing, 0)
+	body.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	c.body = widget.NewRichLabel(p.font, px, notifyui.BodyMarkup(n.Body), 0)
 	c.body.SetVariants(app.FontVariantsOf(p.font))
-	c.body.AddClass("notification-popup-body")
-	c.body.SetHAlign(widget.AlignStart)
+	c.body.AddClass("notification-popup-body", css.DimLabel)
 	c.body.SetWrap(true)
 	c.body.SetMaxWidthChars(cardMaxWidthChars)
 	c.body.SetMaxLines(cardBodyLines)
 	c.body.SetEllipsize(widget.EllipsizeEnd)
 	c.body.SetVisible(n.Body != "")
-	text.Append(c.body, false)
-	row.Append(text, false)
-
-	x := widget.NewThemeIcon("window-close-symbolic", 16)
-	c.close = widget.NewButton(x, 0, 0)
-	c.close.AddClass("notification-popup-close")
-	c.close.SetVAlign(widget.AlignStart)
-	id := n.ID
-	c.close.OnClick = func() { p.closeCard(id) }
-	row.Append(c.close, false)
-	c.root.Append(row, false)
-
-	c.actions = p.actionRows(n)
-	c.root.Append(c.actions, false)
+	body.Append(c.body, false)
+	c.actions = p.actionRows(n, px)
+	body.Append(c.actions, false)
+	body.SetVisible(c.body.Visible() || c.actions.Visible())
+	c.root.Append(body, false)
 
 	// A default action opens the card on a click anywhere its buttons
-	// do not take (setup_default_action's gesture on the root).
+	// do not take (setup_default_action's gesture on the root): the
+	// Item's own activation, and the root's click for the body under it.
 	if _, ok := n.DefaultAction(); ok {
 		c.root.SetCursorName("pointer")
+		c.head.SetOnActivate(func() { p.invokeDefault(id) })
 		c.root.SetOnClickWithin(func() { p.invokeDefault(id) })
 	}
 	if cfg.PopupHoverPause {
@@ -328,23 +311,24 @@ func popupAtTop(position config.PopupPosition) bool {
 	return false
 }
 
-// actionRows is setup_action_buttons: the non-default actions, three
-// to a row, each row homogeneous so its buttons split its width evenly
-// (GTK's homogeneous box divides the allocation); hidden without any.
-func (p *Popups) actionRows(n *notifications.Notification) *widget.Box {
-	box := widget.NewBox(widget.Column, 0, 0)
+// actionRows is setup_action_buttons: the non-default actions as
+// lys-ui's small outline buttons, three to a row, each row homogeneous
+// so its buttons split its width evenly; hidden without any.
+func (p *Popups) actionRows(n *notifications.Notification, px float64) *widget.Box {
+	gap := widget.Current().Spacing / 2
+	box := widget.NewBox(widget.Column, gap, 0)
 	box.AddClass("notification-popup-actions")
 	actions := notifyui.VisibleActions(n)
 	box.SetVisible(len(actions) > 0)
 	for start := 0; start < len(actions); start += notifyui.ActionsPerRow {
-		row := widget.NewBox(widget.Row, 0, 0)
+		row := widget.NewBox(widget.Row, gap, 0)
 		row.AddClass("notification-popup-action-row")
 		row.SetHomogeneous(true)
 		for _, a := range actions[start:min(start+notifyui.ActionsPerRow, len(actions))] {
-			label := widget.NewLabel(p.font, 12, a.Label, 0)
+			label := widget.NewLabel(p.font, px, a.Label, 0)
 			label.SetAlignment(render.AlignCenter)
 			b := widget.NewButton(label, 0, 0)
-			b.AddClass("notification-popup-action-btn")
+			b.AddClass("notification-popup-action-btn", css.Outline, css.Small)
 			id, key := n.ID, a.ID
 			b.OnClick = func() { p.invokeAction(id, key) }
 			row.Append(b, true)

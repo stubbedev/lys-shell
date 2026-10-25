@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -230,7 +231,7 @@ func TestHoverPausesTheCountdown(t *testing.T) {
 	p.sync()
 	c := cardOf(t, p, id)
 	r := &widget.Router{Root: c.root}
-	b := c.title.Bounds()
+	b := c.titleLabel().Bounds()
 	clock.Advance(10 * time.Millisecond)
 	r.Move(widget.Point{X: b.X + 1, Y: b.Y + 1})
 	clock.Advance(time.Hour)
@@ -257,7 +258,7 @@ func TestHoverPauseOffKeepsCounting(t *testing.T) {
 	p.sync()
 	c := cardOf(t, p, id)
 	r := &widget.Router{Root: c.root}
-	b := c.title.Bounds()
+	b := c.titleLabel().Bounds()
 	r.Move(widget.Point{X: b.X + 1, Y: b.Y + 1})
 	clock.Advance(30 * time.Millisecond)
 	if got := len(svc.Popups()); got != 0 {
@@ -276,8 +277,8 @@ func TestCardContent(t *testing.T) {
 	bare := svc.Notify("", 0, "", "No app", "", nil, 0)
 	p.sync()
 	c := cardOf(t, p, full)
-	if c.app.Text() != "firefox" || c.title.Text() != "Download done" || c.body.Text() != "a & b" || !c.body.Visible() {
-		t.Errorf("card = %q / %q / %q", c.app.Text(), c.title.Text(), c.body.Text())
+	if c.appLabel().Text() != "firefox" || c.titleLabel().Text() != "Download done" || c.body.Text() != "a & b" || !c.body.Visible() {
+		t.Errorf("card = %q / %q / %q", c.appLabel().Text(), c.titleLabel().Text(), c.body.Text())
 	}
 	if c.time.Text() != i18n.T("notification-popup-time-minutes-ago", i18n.Str("minutes", "5")) {
 		t.Errorf("time = %q", c.time.Text())
@@ -292,8 +293,8 @@ func TestCardContent(t *testing.T) {
 		t.Error("an action row without actions")
 	}
 	b := cardOf(t, p, bare)
-	if b.app.Text() != i18n.T("notification-popup-unknown-app") || b.body.Visible() {
-		t.Errorf("bare card: app %q body visible %v", b.app.Text(), b.body.Visible())
+	if b.appLabel().Text() != i18n.T("notification-popup-unknown-app") || b.body.Visible() {
+		t.Errorf("bare card: app %q body visible %v", b.appLabel().Text(), b.body.Visible())
 	}
 	if b.root.HasClass("urgency-bar") || !b.root.HasClass("normal") {
 		t.Errorf("a normal card under the default threshold: %v", b.root.Classes())
@@ -340,7 +341,7 @@ func TestCardCloseBehavior(t *testing.T) {
 		open := svc.Notify("app", 0, "", "Open me", "", []string{"default", "Open"}, 0)
 		p.sync()
 		oc := cardOf(t, p, open)
-		click(oc, oc.title)
+		click(oc, oc.titleLabel())
 		if sig.count("ActionInvoked"+fmt.Sprint(open, notifications.DefaultActionID)) != 1 {
 			t.Errorf("%s: default action not invoked: %v", tc.behavior, sig.seen)
 		}
@@ -362,13 +363,13 @@ func TestCardActionsAndDefault(t *testing.T) {
 		t.Fatalf("action rows = %d, want 3 + 1 without the default", len(rows))
 	}
 	// A click on plain text invokes the default action.
-	click(c, c.title)
+	click(c, c.titleLabel())
 	if sig.count("ActionInvoked"+fmt.Sprint(id, notifications.DefaultActionID)) != 1 || len(svc.Popups()) != 1 {
 		t.Errorf("default: %v, popups %d", sig.seen, len(svc.Popups()))
 	}
 	// No default action: a click on the card does nothing.
 	pc := cardOf(t, p, plain)
-	click(pc, pc.title)
+	click(pc, pc.titleLabel())
 	if sig.count("ActionInvoked"+strconv.FormatUint(uint64(plain), 10)) != 0 {
 		t.Error("a card without a default action invoked one")
 	}
@@ -408,7 +409,7 @@ func TestActionPressesCarryTheirToken(t *testing.T) {
 	id := svc.Notify("chat", 0, "", "Ping", "", []string{"default", "Open", "reply", "Reply"}, 0)
 	p.sync()
 	c := cardOf(t, p, id)
-	click(c, c.title)
+	click(c, c.titleLabel())
 	other := svc.Notify("chat", 0, "", "Again", "", []string{"reply", "Reply"}, 0)
 	p.sync()
 	oc := cardOf(t, p, other)
@@ -428,7 +429,7 @@ func TestActionPressesCarryTheirToken(t *testing.T) {
 	last := svc.Notify("chat", 0, "", "Last", "", []string{"default", "Open"}, 0)
 	p.sync()
 	lc := cardOf(t, p, last)
-	click(lc, lc.title)
+	click(lc, lc.titleLabel())
 	if sig.count("ActivationToken"+strconv.FormatUint(uint64(last), 10)) != 0 || sig.count("ActionInvoked"+fmt.Sprint(last, notifications.DefaultActionID)) != 1 {
 		t.Errorf("without xdg-activation: %v", sig.seen)
 	}
@@ -505,31 +506,31 @@ func TestSetConfigRebuildsTheStackWithTheNewLimits(t *testing.T) {
 // testCardWidth is the width the card tests lay a card out at.
 const testCardWidth = 380
 
-// The card is card/mod.rs's tree: spacing-0 boxes the stylesheet
-// spaces, the GTK classes, homogeneous action rows, and the pointer
-// over a card with a default action only.
-func TestCardMatchesTheRustTree(t *testing.T) {
+// The card is lys-ui's card holding the notification as an Item, its
+// actions small outline buttons in one homogeneous row; the labels take
+// their ink from the stylesheet, and only a default action brings the
+// pointer.
+func TestCardIsAnItemInACard(t *testing.T) {
 	p, svc := newTestPopups(t, config.DefaultsNotification())
 	plain := svc.Notify("app", 0, "", "Plain", "", nil, 0)
 	acting := svc.Notify("app", 0, "", "Acting", "body", []string{"default", "Open", "a", "A", "b", "B"}, 0)
 	p.sync()
 	c := cardOf(t, p, acting)
+	if !c.root.HasClass(css.Card) {
+		t.Error("the card is not lys-ui's card")
+	}
 	for _, l := range treetest.All[*widget.Label](c.root) {
 		if l.Color() != 0 {
 			t.Errorf("label %q pins ink %#08x over the stylesheet", l.Text(), uint32(l.Color()))
-		}
-	}
-	for _, b := range treetest.All[*widget.Box](c.root) {
-		if b.Spacing() != 0 {
-			t.Errorf("box %v has spacing %d, want 0", b.Classes(), b.Spacing())
 		}
 	}
 	rows := treetest.WithClass(c.root, "notification-popup-action-row")
 	if len(rows) != 1 || !rows[0].(*widget.Box).Homogeneous() {
 		t.Errorf("action rows %v, want one homogeneous row", rows)
 	}
-	if got := len(treetest.WithClass(c.root, "notification-popup-action-btn")); got != 2 {
-		t.Errorf("%d action buttons, want the two non-default actions", got)
+	buttons := treetest.WithClass(c.root, "notification-popup-action-btn")
+	if len(buttons) != 2 || !widget.HasClass(buttons[0], css.Outline) {
+		t.Errorf("%d action buttons, want the two non-default actions as outline buttons", len(buttons))
 	}
 	if widget.CursorNameOf(c.root) != "pointer" {
 		t.Error("a card with a default action shows the pointer")
@@ -537,9 +538,28 @@ func TestCardMatchesTheRustTree(t *testing.T) {
 	if widget.CursorNameOf(cardOf(t, p, plain).root) != "" {
 		t.Error("a card without a default action shows the pointer")
 	}
-	for _, class := range []string{"notification-popup-content", "notification-popup-icon", "notification-popup-text", "notification-popup-header", "notification-popup-close"} {
-		if len(treetest.WithClass(c.root, class)) != 1 {
-			t.Errorf("no %s node", class)
-		}
+}
+
+// titleLabel is the card's summary, its Item's title.
+func (c *card) titleLabel() *widget.Label {
+	return treetest.WithClass(c.head, "title")[0].(*widget.Label)
+}
+
+// appLabel is the card's app name, its Item's description.
+func (c *card) appLabel() *widget.Label {
+	return treetest.WithClass(c.head, "description")[0].(*widget.Label)
+}
+
+// A card is its configured width whatever room the surface offers:
+// the Item inside fills only the card.
+func TestCardKeepsItsWidth(t *testing.T) {
+	p, svc := newTestPopups(t, config.DefaultsNotification())
+	id := svc.Notify("app", 0, "", "Ping", "body", nil, 0)
+	p.sync()
+	c := cardOf(t, p, id)
+	sz := widget.MeasureAsChild(c.rev, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	want := int(cardWidthPx * float64(p.cfg.Styling.Scale))
+	if sz.W != want {
+		t.Errorf("the card measures %dpx wide in a 1920px surface, want %d", sz.W, want)
 	}
 }

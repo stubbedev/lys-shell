@@ -51,7 +51,6 @@ var sheetOrder = []string{
 	"modules/launcher.css",
 	"modules/lock.css",
 	"modules/notification_popup/content.css",
-	"modules/notification_popup/actions.css",
 	"modules/notification_popup/index.css",
 	"modules/osd/index.css",
 	"modules/systray.css",
