@@ -455,3 +455,52 @@ func TestNotificationItemActionCarriesItsToken(t *testing.T) {
 		t.Errorf("without xdg-activation: %q, want %q", seen, want)
 	}
 }
+
+// A body with no spaces to wrap at (a file path) wraps and ellipsizes
+// inside its item instead of running out past the card.
+func TestNotificationLongBodyStaysInItsItem(t *testing.T) {
+	restore := widget.SetAnimationsInstant(true)
+	defer restore()
+	ctx := styledContext(t, config.Defaults())
+	svc := newNotifTestService(t)
+	ctx.Notifications = svc
+	svc.Notify("shot", 0, "", "Screenshot saved", "/home/stubbe/Pictures/Screenshot_2026-10-25_16-04-33_with_a_long_unbroken_name.png", nil, 0)
+	v := notificationDropdown(ctx).(*notificationView)
+	defer v.dropdownClosed()
+	waitHeadless(t, "the item", func() bool { return v.scroll.Visible() })
+	card, rev := dropdownTree(v, ctx.Config, 425, 400)
+	rev.SetRevealed(true)
+	ctx.Theme.Attach(card)
+	onHeadlessLoop(func() bool {
+		widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: 425, H: 400}})
+		widget.ArrangeAsChild(card, render.Rect{W: 425, H: 400})
+		item := treetest.WithClass(card, "notification-dropdown-item")[0].(widget.Boundser).Bounds()
+		label := treetest.WithClass(card, "notification-dropdown-item-body")[0]
+		body := label.(widget.Boundser).Bounds()
+		if body.X+body.W > item.X+item.W {
+			t.Errorf("the body %+v runs past its item %+v", body, item)
+		}
+		const W, H = 425, 400
+		data := make([]byte, render.Stride(W)*H)
+		label.Paint(render.NewScaled(data, render.Stride(W), W, H, 1, 1))
+		inked, outside := 0, 0
+		for y := range H {
+			for x := range W {
+				if data[(y*W+x)*4+3] == 0 {
+					continue
+				}
+				inked++
+				if x >= body.X+body.W {
+					outside++
+				}
+			}
+		}
+		if inked == 0 {
+			t.Fatal("the body painted nothing")
+		}
+		if outside != 0 {
+			t.Errorf("the body inked %d pixels past its right edge x=%d", outside, body.X+body.W)
+		}
+		return true
+	})
+}
