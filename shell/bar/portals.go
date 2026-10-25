@@ -44,6 +44,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		viewFile = filepath.Join(dir, "file-chooser-view")
 	}
 	chooser := filechooser.New(filechooser.Deps{
+		Config:         current,
 		Open:           layerOpener[filechooser.Window](application),
 		Invoke:         application.Invoke,
 		Font:           font,

@@ -18,11 +18,13 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 	"golang.org/x/sys/unix"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
@@ -78,6 +80,8 @@ type Window interface {
 
 // Deps are the chooser's collaborators.
 type Deps struct {
+	// Config is the live config (the chooser's reveal animation).
+	Config func() *config.Config
 	// Open maps the overlay; Invoke runs on the UI loop.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
@@ -114,10 +118,14 @@ type Deps struct {
 // a request answers it with nothing, showing or waiting. Open and Save
 // may be called from any goroutine; the rest runs on the loop.
 type Chooser struct {
-	d     Deps
-	win   Window
-	reply func(Result)
-	queue dialogqueue.Queue
+	d   Deps
+	win Window
+	// rev reveals the panel on the overlay; closing is set while it
+	// hides before the overlay closes.
+	rev     *widget.Revealer
+	closing bool
+	reply   func(Result)
+	queue   dialogqueue.Queue
 	// readChoices reads the request's choices as the user left them.
 	readChoices func() []portalreq.Selection
 	// replacing is the existing file a save asked to replace, which a
@@ -908,8 +916,9 @@ func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widg
 func (c *Chooser) show() {
 	if c.win != nil {
 		c.win.Close()
-		c.win = nil
+		c.win, c.closing = nil, false
 	}
+	c.rev = widget.NewRevealer(c.ui.root)
 	var output *app.Output
 	if c.d.Target != nil {
 		output = c.d.Target()
@@ -925,7 +934,7 @@ func (c *Chooser) show() {
 		keyboard = app.KeyboardOnDemand
 	}
 	// The overlay spans the output and the panel floats on it, taking
-	// input only over itself.
+	// input only over itself through the revealer.
 	win, err := c.d.Open(app.LayerConfig{
 		Output:        output,
 		Layer:         app.LayerOverlay,
@@ -933,7 +942,7 @@ func (c *Chooser) show() {
 		ExclusiveZone: -1,
 		Keyboard:      keyboard,
 		Namespace:     "lys-shell-file-chooser",
-		Root:          c.ui.root,
+		Root:          c.rev,
 		OnKey:         c.key,
 		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
 	})
@@ -943,6 +952,7 @@ func (c *Chooser) show() {
 		return
 	}
 	c.win = win
+	reveal.Show(c.rev, c.d.Config().Animations, config.AnimFileChooser)
 	if c.s.mode == ModeSave {
 		win.SetFocus(c.ui.name)
 	} else {
@@ -959,11 +969,17 @@ func outputName(o *app.Output) string {
 }
 
 func (c *Chooser) hide() {
-	if c.win == nil {
+	if c.win == nil || c.closing {
 		return
 	}
-	c.win.Close()
-	c.win = nil
+	c.closing = true
+	win := c.win
+	reveal.Hide(c.rev, c.d.Config().Animations, config.AnimFileChooser, func() {
+		win.Close()
+		if c.win == win {
+			c.win, c.rev, c.closing = nil, nil, false
+		}
+	})
 }
 
 // key binds GTK's chooser keys: Escape closes the filter popup, then

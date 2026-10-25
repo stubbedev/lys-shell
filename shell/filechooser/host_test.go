@@ -28,6 +28,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -53,14 +54,14 @@ func drag(r *widget.Router, from, to widget.Point) {
 	r.Release(widget.BTNLeft, to)
 }
 
-// panel is the request's floating panel, the overlay's root.
+// panel is the request's floating panel, which the overlay's root
+// reveals.
 func (hs *harness) panel(t *testing.T) *widget.FloatingPanel {
 	t.Helper()
-	p, ok := hs.cfg.Root.(*widget.FloatingPanel)
-	if !ok {
-		t.Fatalf("root %T, want the floating panel", hs.cfg.Root)
+	if _, ok := hs.cfg.Root.(*widget.Revealer); !ok {
+		t.Fatalf("root %T, want the revealer around the panel", hs.cfg.Root)
 	}
-	return p
+	return treetest.First[*widget.FloatingPanel](t, hs.cfg.Root)
 }
 
 // holds reports whether w is root or under it.
@@ -87,6 +88,8 @@ type harness struct {
 	windows []*fakeWindow
 	openErr error
 	cfg     app.LayerConfig
+	// conf is the live config; the chooser animates as it says.
+	conf    *config.Config
 	queue   chan func()
 	qmu     sync.Mutex
 	stopped bool
@@ -96,7 +99,8 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	t.Helper()
 	face := treetest.Font(t)
 	conf := config.Defaults()
-	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4)}
+	conf.Animations.Enabled = false
+	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4), conf: conf}
 	hs.queue = make(chan func(), 256)
 	drained := make(chan struct{})
 	go func() {
@@ -115,6 +119,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		<-drained
 	})
 	hs.c = New(Deps{
+		Config: func() *config.Config { return hs.conf },
 		Open: func(c app.LayerConfig) (Window, error) {
 			hs.mu.Lock()
 			defer hs.mu.Unlock()
@@ -835,13 +840,13 @@ func TestPanelFloatsOnTheOutput(t *testing.T) {
 	var r *widget.Router
 	var grab, up widget.Point
 	hs.run(func() {
-		r, grab = treetest.Pointer(panel, treetest.WithClass(panel, "file-chooser-title")[0].(widget.Boundser), 1920, 1080)
+		r, grab = treetest.Pointer(hs.cfg.Root, treetest.WithClass(panel, "file-chooser-title")[0].(widget.Boundser), 1920, 1080)
 		up = center(treetest.Button(t, panel, "Up"))
 		if p := panel.PanelRect(); p != centred {
 			t.Errorf("panel at %v, want centred at %v", p, centred)
 		}
-		if reg := panel.InputRegion(); len(reg) != 1 || reg[0] != centred {
-			t.Errorf("input region %v, want the panel alone", reg)
+		if reg, ok := widget.InputRegionOf(hs.cfg.Root); !ok || len(reg) != 1 || reg[0] != centred {
+			t.Errorf("the overlay's input region %v (found %v), want the panel alone through its revealer", reg, ok)
 		}
 		if hit := panel.HitTest(widget.Point{X: 5, Y: 5}); hit != nil {
 			t.Errorf("a press beside the panel hit %T, want it passed through", hit)
@@ -1805,4 +1810,39 @@ func TestChooserTakesLysUiParts(t *testing.T) {
 	})
 	hs.click(t, "Cancel")
 	answer(t, got)
+}
+
+// The chooser reveals its panel with the file-chooser animation and
+// keeps the overlay until the panel has hidden; with animations off
+// the overlay closes as the dialog answers.
+func TestPanelRevealsAndHidesWithItsAnimation(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.conf.Animations.Enabled = true
+	got := hs.open(t, OpenRequest{})
+	rev, ok := hs.cfg.Root.(*widget.Revealer)
+	if !ok {
+		t.Fatalf("root %T, want the revealer around the panel", hs.cfg.Root)
+	}
+	want := reveal.Transition(hs.conf.Animations.TransitionFor(config.AnimFileChooser, false))
+	if !rev.Revealed() || rev.Transition() != want {
+		t.Errorf("revealed %v with %v, want revealed with the file chooser's %v", rev.Revealed(), rev.Transition(), want)
+	}
+	win := hs.windows[len(hs.windows)-1]
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
+	answer(t, got)
+	if rev.Revealed() {
+		t.Error("cancelling left the panel revealed")
+	}
+	if win.closed {
+		t.Error("the overlay closed before its panel hid")
+	}
+
+	hs.conf.Animations.Enabled = false
+	got = hs.open(t, OpenRequest{})
+	win = hs.windows[len(hs.windows)-1]
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
+	answer(t, got)
+	if !win.closed {
+		t.Error("with animations off the overlay outlived the answer")
+	}
 }
