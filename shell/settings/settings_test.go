@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -2076,5 +2077,35 @@ func TestCardAndListEditorsTakeLysUiParts(t *testing.T) {
 		if !widget.HasClass(b, css.Ghost) || widget.HasClass(b, css.Outline) {
 			t.Error("a chip's remove is not a ghost button")
 		}
+	}
+}
+
+// An idle window owes no frame: once a frame has drained, laying it out
+// and painting it again unchanged damages nothing, so the window stops
+// repainting instead of spinning a core. A real change still damages it.
+func TestIdleWindowOwesNoFrame(t *testing.T) {
+	k := testKit(t, "")
+	cfg := k.store.svc.Config()
+	w := newWindow(k, cfg, (&fakeAfter{}).after)
+	apptheme.New(cfg).Attach(w.root)
+	const W, H = 1200, 900
+	data := make([]byte, render.Stride(W)*H)
+	frame := func() {
+		w.root.Measure(widget.Constraints{Max: widget.Size{W: W, H: H}})
+		w.root.Arrange(render.Rect{W: W, H: H})
+		w.root.Paint(render.New(data, render.Stride(W), W, H))
+		widget.CollectDamage(w.root)
+	}
+	frame()
+	frame()
+	gen := widget.DamageGeneration()
+	frame()
+	if got := widget.DamageGeneration(); got != gen {
+		t.Errorf("an unchanged frame moved the damage generation %d -> %d: the window repaints itself forever", gen, got)
+	}
+	w.show("clock")
+	frame()
+	if got := widget.DamageGeneration(); got == gen {
+		t.Error("switching the page damaged nothing")
 	}
 }
