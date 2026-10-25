@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/stubbedev/lys-ui/app"
-	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 )
 
 // alertSpec is the gtk::AlertDialog the dropdowns build for a
@@ -23,50 +23,32 @@ const (
 	alertAccept = "accept"
 )
 
-// alertDialog declares spec as a modal dialog (modal(true)): Enter
-// and Esc both answer cancel, so only a click on accept goes ahead.
-// answer hears true for accept, false for anything else.
+// alertDialog declares spec as lys-ui's modal alert (modal(true)):
+// the message as the title over the muted, wrapped detail, cancel
+// plain and accept destructive. Enter and Esc both answer cancel, so
+// only a click on accept goes ahead. answer hears true for accept,
+// false for anything else.
 func alertDialog(ctx ModuleContext, spec alertSpec, answer func(accepted bool)) app.DialogConfig {
 	px := 14.0
 	if ctx.Style != nil && ctx.Style.labelPx > 0 {
 		px = ctx.Style.labelPx
 	}
-	body := widget.NewBox(widget.Column, 0, 8)
-	message := widget.NewLabel(headingFont(ctx, px*1.15), px*1.15, spec.message, 0)
-	message.SetWrap(true)
-	message.AddClass("heading")
-	body.Append(message, false)
-	if spec.detail != "" {
-		detail := widget.NewLabel(ctx.Font, px, spec.detail, 0)
-		detail.SetWrap(true)
-		detail.AddClass("body")
-		body.Append(detail, false)
-	}
+	detail := widget.NewLabel(ctx.Font, px, spec.detail, 0)
+	detail.SetWrap(true)
+	detail.AddClass(css.DimLabel)
 	return app.DialogConfig{
+		Title:   spec.message,
 		Width:   400,
-		Content: body,
+		Content: detail,
 		Buttons: []app.DialogButton{
-			{Label: spec.cancel, Response: alertCancel},
-			{Label: spec.accept, Response: alertAccept},
+			{Label: spec.cancel, Response: alertCancel, Role: app.ButtonRoleCancel, Appearance: app.AppearancePlain},
+			{Label: spec.accept, Response: alertAccept, Appearance: app.AppearanceDestructive},
 		},
 		DefaultResponse: alertCancel,
 		CancelResponse:  alertCancel,
 		Modal:           true,
 		OnResponse:      func(r string) { answer(r == alertAccept) },
 	}
-}
-
-// headingFont is the message's bold face, the context's own when the
-// sans family cannot be loaded (headless construction).
-func headingFont(ctx ModuleContext, px float64) render.Font {
-	if ctx.App == nil || ctx.Config == nil {
-		return ctx.Font
-	}
-	face, err := app.FontWeighted(ctx.Config.General.FontSans, px, 700, false)
-	if err != nil {
-		return ctx.Font
-	}
-	return app.FontFallback(face)
 }
 
 // showAlert asks spec in a modal dialog and answers once. The open

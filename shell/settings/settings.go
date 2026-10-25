@@ -96,7 +96,7 @@ func Run() error {
 		ins.Bind(application)
 	}
 	k.pickers = windowPickers{app: application, win: win, theme: theme}
-	w.onResetAll = func() { confirmResetAll(application, win, k, theme) }
+	w.onResetAll = func() { confirmResetAll(application, win, k) }
 
 	// A change from any source - a row, the reset buttons, the config
 	// file, another lys-shell - restyles the window and refreshes the page.
@@ -112,34 +112,9 @@ func Run() error {
 
 // confirmResetAll asks, then drops every runtime override
 // (ConfirmResetAll, ExecuteResetAll).
-func confirmResetAll(application *app.Application, parent *app.Window, k *kit, theme *apptheme.Theme) {
-	var d *app.Dialog
-	respond := func(r string) {
-		if d != nil {
-			d.Respond(r)
-		}
-	}
-	content := confirmContent(k, resetAllConfirm(), respond)
-	theme.Attach(content)
-	d, err := application.NewDialog(parent, resetAllDialog(k, content, theme.RenderPalette().Surface))
-	if err != nil {
+func confirmResetAll(application *app.Application, parent *app.Window, k *kit) {
+	if _, err := application.NewDialog(parent, resetAllDialog(k)); err != nil {
 		log.Printf("settings: reset-all dialog: %v", err)
-	}
-}
-
-// resetAllDialog declares the reset-all confirm: modal like
-// ConfirmModal (set_modal), Esc cancelling, only the confirm response
-// resetting.
-func resetAllDialog(k *kit, content widget.Widget, background render.Color) app.DialogConfig {
-	return app.DialogConfig{
-		Title: resetAllConfirm().title, Content: content, Bare: true, Background: background,
-		Modal:          true,
-		CancelResponse: responseCancel,
-		OnResponse: func(r string) {
-			if r == responseConfirm {
-				k.store.resetAll()
-			}
-		},
 	}
 }
 

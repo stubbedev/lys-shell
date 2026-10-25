@@ -414,37 +414,26 @@ func TestSidebarDragIsClampedToTheScaledLimit(t *testing.T) {
 	}
 }
 
+// The reset-all confirm is lys-ui's modal alert: Esc and cancel keep
+// the overrides, Enter answers nothing, and only the destructive
+// confirm drops them.
 func TestResetAllConfirmation(t *testing.T) {
 	k := testKit(t, "")
 	_ = k.store.set("osd.enabled", false)
-	var got []string
-	content := confirmContent(k, resetAllConfirm(), func(r string) { got = append(got, r) })
-	var buttons []*widget.Button
-	var walk func(widget.Widget)
-	walk = func(w widget.Widget) {
-		if b, ok := w.(*widget.Button); ok {
-			buttons = append(buttons, b)
-		}
-		if c, ok := w.(interface{ Children() []widget.Widget }); ok {
-			for _, kid := range c.Children() {
-				walk(kid)
-			}
-		}
+	cfg := resetAllDialog(k)
+	if !cfg.Modal || cfg.Bare || cfg.CancelResponse != responseCancel || cfg.DefaultResponse != "" {
+		t.Errorf("dialog modal %v bare %v cancel %q default %q, want a modal alert Esc cancels and Enter leaves alone",
+			cfg.Modal, cfg.Bare, cfg.CancelResponse, cfg.DefaultResponse)
 	}
-	walk(content)
-	if len(buttons) != 2 || !buttons[0].HasClass(css.Secondary) || !buttons[1].HasClass(css.DestructiveAction) {
-		t.Fatalf("buttons %v, want cancel then the danger confirm", buttons)
+	if cfg.Title != i18n.Settings().Get("settings-reset-all-title") {
+		t.Errorf("title %q", cfg.Title)
 	}
-	buttons[0].ClickAt(widget.Point{})
-	buttons[1].ClickAt(widget.Point{})
-	if len(got) != 2 || got[0] != responseCancel || got[1] != responseConfirm {
-		t.Errorf("responses %v", got)
+	want := []app.DialogButton{
+		{Label: i18n.Settings().Get("settings-reset-all-cancel"), Response: responseCancel, Role: app.ButtonRoleCancel, Appearance: app.AppearancePlain},
+		{Label: i18n.Settings().Get("settings-reset-all-confirm"), Response: responseConfirm, Appearance: app.AppearanceDestructive},
 	}
-	// The dialog is modal (ConfirmModal's set_modal) and Esc cancels;
-	// cancelling keeps the overrides, only confirming drops them.
-	cfg := resetAllDialog(k, content, 0)
-	if !cfg.Modal || cfg.CancelResponse != responseCancel || !cfg.Bare {
-		t.Errorf("dialog modal %v cancel %q bare %v, want a modal bare dialog Esc cancels", cfg.Modal, cfg.CancelResponse, cfg.Bare)
+	if !slices.Equal(cfg.Buttons, want) {
+		t.Errorf("buttons %+v, want cancel then the destructive confirm, neither on Enter", cfg.Buttons)
 	}
 	cfg.OnResponse(responseCancel)
 	if k.store.svc.Source("osd.enabled") == config.SourceDefault {

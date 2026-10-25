@@ -3,6 +3,8 @@ package bar
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-ui/app"
+
 	"github.com/stubbedev/lys-shell/config"
 )
 
@@ -17,9 +19,10 @@ func (f *fakeAlert) ask(spec alertSpec, answer func(bool)) {
 	f.answers = append(f.answers, answer)
 }
 
-// The alert is gtk::AlertDialog's shape: modal, [cancel, accept], and
+// The alert is gtk::AlertDialog's shape in lys-ui's look: modal, the
+// message as the title, [cancel, accept] with accept destructive, and
 // cancel both the default and the cancel button - Enter and Esc never
-// accept.
+// accept, and the default response does not take the primary fill.
 func TestAlertDialogIsModalAndDefaultsToCancel(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	var got []bool
@@ -33,6 +36,12 @@ func TestAlertDialogIsModalAndDefaultsToCancel(t *testing.T) {
 	}
 	if cfg.DefaultResponse != cfg.Buttons[0].Response || cfg.CancelResponse != cfg.Buttons[0].Response {
 		t.Errorf("default %q cancel %q, want both the cancel button", cfg.DefaultResponse, cfg.CancelResponse)
+	}
+	if cfg.Title != "Delete Corp?" {
+		t.Errorf("title = %q, want the message", cfg.Title)
+	}
+	if cfg.Buttons[0].Appearance != app.AppearancePlain || cfg.Buttons[1].Appearance != app.AppearanceDestructive {
+		t.Errorf("appearances = %v, %v, want cancel plain and accept destructive", cfg.Buttons[0].Appearance, cfg.Buttons[1].Appearance)
 	}
 	cfg.OnResponse(cfg.Buttons[0].Response)
 	cfg.OnResponse(cfg.Buttons[1].Response)
