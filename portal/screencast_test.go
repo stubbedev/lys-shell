@@ -70,9 +70,13 @@ type fakeStarts struct {
 	streams   dbustest.Var[[]*fakeStream]
 	fail      map[string]bool
 	noOutputs dbustest.Var[bool]
+	// slowOutputs delays the layout query, as a compositor round trip
+	// does.
+	slowOutputs dbustest.Var[time.Duration]
 }
 
 func (f *fakeStarts) outputs() ([]outputGeometry, error) {
+	time.Sleep(f.slowOutputs.Load())
 	if f.noOutputs.Load() {
 		return nil, errors.New("no compositor")
 	}

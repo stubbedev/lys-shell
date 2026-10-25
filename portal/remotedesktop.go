@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -253,11 +254,26 @@ func (r *remoteDesktop) iface() dbusx.Interface {
 	return dbusx.Interface{
 		Name:    RemoteDesktopIface,
 		Methods: remoteDesktopObject{r},
+		Ordered: inputMethods(),
 		Properties: dbusx.Getters{
 			"AvailableDeviceTypes": func() any { return availableDevices },
 			"version":              func() any { return uint32(2) },
 		},
 	}
+}
+
+// inputMethods are the interface's Notify* methods: xdg-desktop-portal
+// forwards input without waiting for each reply, so they run in
+// arrival order, or a click could land before the motion that placed
+// it.
+func inputMethods() []string {
+	var out []string
+	for m := range reflect.TypeFor[remoteDesktopObject]().Methods() {
+		if strings.HasPrefix(m.Name, "Notify") {
+			out = append(out, m.Name)
+		}
+	}
+	return out
 }
 
 // session is the live RemoteDesktop session at path.

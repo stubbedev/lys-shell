@@ -54,6 +54,9 @@ type Conn struct {
 
 	eavesdropped    chan<- *Message
 	eavesdroppedLck sync.Mutex
+
+	// lys-shell patch: the methods dispatched in arrival order.
+	ordered orderedLanes
 }
 
 // SessionBus returns a shared connection to the session bus, connecting to it
@@ -432,7 +435,8 @@ func (conn *Conn) inWorker() {
 		case TypeSignal:
 			conn.handleSignal(sequence, msg)
 		case TypeMethodCall:
-			go conn.handleCall(msg)
+			// lys-shell patch: a method may run in arrival order.
+			conn.dispatchCall(msg)
 		}
 
 	}

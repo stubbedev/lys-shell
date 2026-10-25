@@ -24,3 +24,11 @@ upstream decodes fd arrays.
   bare UnixFD had no safe moment to close its copy, since the reply goes
   out after it returns. The portal's clipboard pipes and PipeWire remote
   ride on this. Pinned by `TestAFileReplyIsSentThenClosed`.
+- `lys_shell_ordered.go` (with `conn.go`'s read loop): `DispatchInOrder`
+  runs an interface's named methods one at a time in arrival order on one
+  goroutine, through a queue bounded at 256 that holds back the read loop
+  when full; every other call still runs on a goroutine of its own.
+  Upstream dispatches each call on its own goroutine, so calls a sender
+  does not wait on race: xdg-desktop-portal forwards RemoteDesktop input
+  that way, and a click could land before the motion that placed it.
+  Pinned by `TestOrderedCallsRunInArrivalOrder`.

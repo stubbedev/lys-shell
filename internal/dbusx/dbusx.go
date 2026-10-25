@@ -98,6 +98,10 @@ type Interface struct {
 	Name       string
 	Methods    any
 	Properties Getters
+	// Ordered are the methods whose calls run one at a time in arrival
+	// order (dbus.Conn.DispatchInOrder), for a caller that does not wait
+	// for each reply.
+	Ordered []string
 }
 
 // Export puts ifaces at path on conn, with one Properties object serving
@@ -115,6 +119,9 @@ func Export(conn *dbus.Conn, path dbus.ObjectPath, ifaces ...Interface) (unexpor
 	for _, iface := range ifaces {
 		if err := conn.Export(iface.Methods, path, iface.Name); err != nil {
 			return nil, fmt.Errorf("export %s: %w", iface.Name, err)
+		}
+		if len(iface.Ordered) > 0 {
+			conn.DispatchInOrder(iface.Name, iface.Ordered...)
 		}
 		names = append(names, iface.Name)
 		props.ifaces[iface.Name] = iface.Properties

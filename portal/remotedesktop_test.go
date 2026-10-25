@@ -78,6 +78,13 @@ xkb_symbols "test" {
 // remoteRig has the fake virtual input, the fake streams over a
 // 2x-scaled DP-1 left of a 1x DP-2, and a fake clipboard device.
 func remoteRig(t *testing.T, dialErr error) (*rig, *fakeSink) {
+	r, sink, _ := remoteRigStarts(t, dialErr)
+	return r, sink
+}
+
+// remoteRigStarts is remoteRig with its fake streams, for a test that
+// steers them.
+func remoteRigStarts(t *testing.T, dialErr error) (*rig, *fakeSink, *fakeStarts) {
 	sink := &fakeSink{keymap: []byte(testKeymap)}
 	starts := &fakeStarts{fail: map[string]bool{}}
 	r := newRig(t, func(b *Backend) {
@@ -92,7 +99,7 @@ func remoteRig(t *testing.T, dialErr error) (*rig, *fakeSink) {
 			return &fakeClip{data: "copied"}, nil
 		})
 	})
-	return r, sink
+	return r, sink, starts
 }
 
 func (r *rig) remoteStart(t *testing.T, options Vardict) (uint32, map[string]dbus.Variant) {
@@ -465,5 +472,43 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 	want := []string{"discrete wheel 0 30 2", "discrete wheel 1 -15 -1", "axis finger 1 1", "key 42 true", "key 30 true"}
 	if got := sink.events.Load(); !slices.Equal(got, want) {
 		t.Errorf("replayed %q, want %q", got, want)
+	}
+}
+
+// Input reaches the devices in the order it was sent even when the
+// sender does not wait for replies, as xdg-desktop-portal forwards it:
+// a button and a scroll sent after an absolute motion whose layout
+// query is slow do not overtake it.
+func TestRemoteInputKeepsItsOrder(t *testing.T) {
+	r, sink, starts := remoteRigStarts(t, nil)
+	serveDialogs(t, r, true)
+	r.startSharing(t, "/screen:DP-2", Vardict{})
+	starts.slowOutputs.Store(100 * time.Millisecond)
+	send := func(method string, args ...any) {
+		r.obj.Go(RemoteDesktopIface+"."+method, dbus.FlagNoReplyExpected, nil, append([]any{sessA, Vardict{}}, args...)...)
+	}
+	send("NotifyPointerMotionAbsolute", uint32(40), 0.0, 0.0)
+	send("NotifyPointerButton", int32(0x110), uint32(1))
+	send("NotifyPointerAxis", 0.0, 3.0)
+	want := []string{"abs 327680 0 819200 276480", "button 272 true", "axis finger 0 3"}
+	waitFor(t, func() bool { return len(sink.events.Load()) >= len(want) })
+	if got := sink.events.Load(); !slices.Equal(got, want) {
+		t.Errorf("input = %q, want %q", got, want)
+	}
+}
+
+// The input methods run in order, and only they: Start waits on the
+// user, so ordering it would hold every session's input behind it.
+func TestOnlyInputMethodsAreOrdered(t *testing.T) {
+	got := inputMethods()
+	for _, m := range []string{"NotifyPointerMotion", "NotifyPointerMotionAbsolute", "NotifyPointerButton", "NotifyPointerAxis", "NotifyPointerAxisDiscrete", "NotifyKeyboardKeycode", "NotifyKeyboardKeysym", "NotifyTouchDown", "NotifyTouchMotion", "NotifyTouchUp"} {
+		if !slices.Contains(got, m) {
+			t.Errorf("%s is not ordered", m)
+		}
+	}
+	for _, m := range []string{"CreateSession", "SelectDevices", "Start"} {
+		if slices.Contains(got, m) {
+			t.Errorf("%s is ordered", m)
+		}
 	}
 }
