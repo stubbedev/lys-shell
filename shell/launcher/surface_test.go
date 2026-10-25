@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // fakeLoop is the UI loop: Invoke queues, pump runs on the test
@@ -657,5 +658,28 @@ func TestRowIconFallsBackAlongTheName(t *testing.T) {
 	}
 	if ink := treetest.Ink(rowIcon(engine.IconName("unrelated-app"), 24)); ink != 0 {
 		t.Error("a name with no present form drew an icon")
+	}
+}
+
+// The message line sits inside its CSS padding, aligned with the prompt
+// and the rows instead of flush with the surface (a RichLabel once
+// ignored its padding).
+func TestMessageLineKeepsItsPadding(t *testing.T) {
+	h := newHarness(t)
+	mesg := "A <b>script</b> mode"
+	opts := dmenu()
+	opts.Mesg = &mesg
+	h.open(opts, false, "alpha")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 1 })
+	h.loop.pump()
+	v := h.s.cur.views
+	cfg := config.Defaults()
+	v.root.AttachStylesheet(widget.NewStylesheet(styling.BundleCSS(cfg, cfg.Styling.ActivePalette(), styling.Default()), 200))
+	layout(v.root, 600, 400)
+	bare := widget.NewRichLabel(h.s.d.Font, fontPx, v.message.Markup(), 0)
+	natural := widget.MeasureAsChild(bare, widget.Constraints{Max: widget.Size{W: 600, H: 400}})
+	got := widget.MeasureAsChild(v.message, widget.Constraints{Max: widget.Size{W: 600, H: 400}})
+	if got.W <= natural.W || got.H <= natural.H {
+		t.Errorf("the message measures %v around %v of text, want its padding added", got, natural)
 	}
 }

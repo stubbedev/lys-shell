@@ -537,3 +537,22 @@ func TestBatteryDropdownProfiles(t *testing.T) {
 		t.Errorf("a click on the active segment wrote: %v", got)
 	}
 }
+
+// The details row's values and labels get their full height inside the
+// padded row (a CenterBox once measured without its padding and clipped
+// them to nothing).
+func TestBatteryDetailsShowTheirText(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	ctx.Battery = newFakeBattery(upower.Device{Percentage: 64, State: upower.StateDischarging, IsPresent: true, EnergyRate: 9.4, Capacity: 92})
+	v := batteryDropdown(ctx).(*batteryView)
+	defer v.dropdownClosed()
+	waitHeadless(t, "the battery page", func() bool { return v.body.Visible() == "battery" })
+	ctx.Theme.Attach(v)
+	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 2000}})
+	v.Arrange(render.Rect{W: 400, H: sz.H})
+	for _, l := range treetest.All[*widget.Label](findByClass(v, "battery-details")) {
+		if natural := widget.MeasureAsChild(l, widget.Constraints{Max: widget.Size{W: 400, H: 400}}).H; l.Bounds().H < natural {
+			t.Errorf("detail %q is %dpx tall, want its %dpx", l.Text(), l.Bounds().H, natural)
+		}
+	}
+}
