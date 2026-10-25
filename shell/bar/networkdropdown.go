@@ -311,65 +311,45 @@ func (v *networkView) rebuildList() {
 	v.noAdapter.SetVisible(!wifiAvail)
 }
 
-// row is NetworkItem: a plain box carrying the whole row's click
-// (GestureClick on the root, network_item.rs:181-190) and the pointer
-// cursor — the lock, the name, the forget button, every part of the row
-// selects; the forget button, being a button, keeps its own click.
-func (v *networkView) row(ap apSnapshot) widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("network-item")
-	row.SetCursorName("pointer")
+// row is NetworkItem on lys-ui's Item: the signal icon as the media,
+// the name over the security, and on a saved network the forget
+// button, shown while hovered, as the action. Activating the row - any
+// part of it but the forget button, which keeps its own click - selects
+// the network (network_item.rs:181-190).
+func (v *networkView) row(ap apSnapshot) *widget.Item {
+	ssid := ap.ssid
+	row := widget.NewItem(v.font, ap.ssid, rowSecurityLabel(ap))
+	row.SetSmall(true)
+	row.SetEllipsize(true)
+	row.AddClass("network-ap")
 	if ap.stale {
 		row.AddClass("stale")
 	}
-	ssid := ap.ssid
-	row.SetOnClickWithin(func() { v.selectNetwork(ssid) })
-
+	row.SetOnActivate(func() { v.selectNetwork(ssid) })
 	signal := widget.NewThemeIcon(signalStrengthIcon(ap.strength), int(v.px*1.1))
 	signal.AddClass("network-item-signal")
-	row.AppendAligned(signal, false, widget.AlignCenter)
-	info := widget.NewBox(widget.Column, 0, 0)
-	info.AddClass("network-item-info")
-	name := widget.NewLabel(v.font, v.px, ap.ssid, 0)
-	name.AddClass("network-item-name")
-	name.SetEllipsize(widget.EllipsizeEnd)
-	info.Append(name, false)
-	sec := widget.NewLabel(v.font, v.px*0.8, rowSecurityLabel(ap), 0)
-	sec.AddClass("network-item-security")
-	info.Append(sec, false)
-	row.Append(info, true)
+	row.SetMedia(signal, false)
 
-	secured := ap.security.RequiresPassword()
-	if secured || ap.known {
+	if ap.known {
+		forget := widget.NewLabel(v.font, v.px*0.85, i18n.T("dropdown-network-forget"), 0)
+		// GhostButton + network-item-forget (network_item.rs:115-123).
+		forgetBtn := dropdownButton(forget, func() { v.forget(ssid) }, css.Ghost, css.Small, "network-item-forget")
+		// The forget button shows while the row is hovered; the empty
+		// page keeps its width so hovering never shifts the row.
 		trailing := widget.NewStack()
 		trailing.AddClass("network-item-trailing")
 		trailing.SetTransition(widget.StackCrossfade, hoverTransition)
-		lock := widget.NewBox(widget.Row, 0, 0)
-		if secured {
-			icon := widget.NewThemeIcon("ld-lock-symbolic", int(v.px*0.9))
-			icon.AddClass("network-item-lock")
-			lock.Append(icon, false)
-		}
-		trailing.Add("lock", lock)
-		if ap.known {
-			actions := widget.NewBox(widget.Row, 0, 0)
-			actions.AddClass("network-item-actions")
-			forget := widget.NewLabel(v.font, v.px*0.85, i18n.T("dropdown-network-forget"), 0)
-			// GhostButton + network-item-forget (network_item.rs:115-123).
-			forgetBtn := dropdownButton(forget, func() { v.forget(ssid) }, css.Ghost)
-			forgetBtn.AddClass("network-item-forget")
-			actions.Append(forgetBtn, false)
-			trailing.Add("actions", actions)
-			row.SetOnHoverWithin(func(on bool) {
-				if on {
-					trailing.Show("actions")
-				} else {
-					trailing.Show("lock")
-				}
-			})
-		}
-		trailing.Show("lock")
-		row.AppendAligned(trailing, false, widget.AlignCenter)
+		trailing.Add("idle", widget.NewBox(widget.Row, 0, 0))
+		trailing.Add("actions", forgetBtn)
+		trailing.Show("idle")
+		row.SetOnHoverWithin(func(on bool) {
+			if on {
+				trailing.Show("actions")
+			} else {
+				trailing.Show("idle")
+			}
+		})
+		row.AddAction(trailing)
 	}
 	return row
 }

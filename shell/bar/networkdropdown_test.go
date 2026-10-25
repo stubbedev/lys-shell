@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // clickAt presses and releases through a Router on target, arranged
@@ -360,12 +361,11 @@ func TestNetworkSecretForm(t *testing.T) {
 	}
 }
 
-// The wifi rows are the plain boxes Rust's GestureClick lands on
-// (network_item.rs:49-190): not buttons, pointer cursor, and the click
-// hits anywhere in the row — the trailing lock icon included. A known
-// row's hover swaps the lock for the actions, and then the forget
-// button — a button — keeps its own click and does not select the row.
-func TestNetworkRowIsAClickableBoxNotAButton(t *testing.T) {
+// The wifi rows are lys-ui's activatable Items (network_item.rs:49-190):
+// a click anywhere in the row selects it. A saved row's hover reveals
+// the forget button, which keeps its own click and does not select the
+// row; an unsaved one has no forget slot.
+func TestNetworkRowsActivateAndForget(t *testing.T) {
 	wifi := &fakeWifiCtl{
 		aps: []network.AccessPoint{
 			netAP("cafe", 60, network.SecurityWPA2, "/ap/2"),
@@ -378,39 +378,36 @@ func TestNetworkRowIsAClickableBoxNotAButton(t *testing.T) {
 		t.Fatalf("rows = %d, want cafe and saved", len(v.list.Children()))
 	}
 	// Strongest first: the saved network outranks the unknown one.
-	saved, ok := v.list.Children()[0].(*widget.Box)
+	saved, ok := v.list.Children()[0].(*widget.Item)
 	if !ok {
-		t.Fatalf("row = %T, want a plain box", v.list.Children()[0])
+		t.Fatalf("row = %T, want lys-ui's Item", v.list.Children()[0])
 	}
-	cafe, ok := v.list.Children()[1].(*widget.Box)
+	cafe, ok := v.list.Children()[1].(*widget.Item)
 	if !ok {
-		t.Fatalf("row = %T, want a plain box", v.list.Children()[1])
+		t.Fatalf("row = %T, want lys-ui's Item", v.list.Children()[1])
 	}
-	if _, isButton := any(cafe).(*widget.Button); isButton {
-		t.Fatal("the row is a button element")
-	}
-	if !cafe.HasClass("network-item") || widget.HasClass(cafe, "network-item-pick") {
-		t.Error("the row is not the network-item box")
-	}
-	if widget.CursorNameOf(cafe) != "pointer" {
-		t.Error("the row does not carry the pointer cursor")
+	if !cafe.HasClass("network-ap") {
+		t.Error("the row lacks its network-ap class")
 	}
 
-	// The trailing lock icon is a plain widget: clicking it selects; a
+	// The security line is the row's text: clicking it selects, and a
 	// secured unknown network asks for its password, focused.
-	var lock widget.Widget
+	var security widget.Widget
 	walkTree(cafe, func(w widget.Widget) bool {
-		if i, ok := w.(*widget.Icon); ok && i.HasClass("network-item-lock") {
-			lock = i
+		if l, ok := w.(*widget.Label); ok && l.HasClass("description") {
+			security = l
 		}
-		return lock == nil
+		return security == nil
 	})
-	if lock == nil {
-		t.Fatal("no lock icon in the row")
+	if security == nil {
+		t.Fatal("no security line in the row")
 	}
-	clickAt(t, cafe, lock)
+	if len(treetest.WithClass(cafe, "network-item-trailing")) != 0 {
+		t.Error("an unsaved network carries the forget slot")
+	}
+	clickAt(t, cafe, security)
 	if v.state != netPasswordEntry || pop.focused != v.password.secret.entry {
-		t.Errorf("a click on the trailing icon did not select: state %d focus %v", v.state, pop.focused)
+		t.Errorf("a click on the security line did not select: state %d focus %v", v.state, pop.focused)
 	}
 
 	// The forget button on the saved row forgets; it does not select the
@@ -442,7 +439,7 @@ func TestNetworkRowIsAClickableBoxNotAButton(t *testing.T) {
 	// The saved row's name still selects the row itself.
 	var name widget.Widget
 	walkTree(saved, func(w widget.Widget) bool {
-		if l, ok := w.(*widget.Label); ok && l.HasClass("network-item-name") {
+		if l, ok := w.(*widget.Label); ok && l.HasClass("title") {
 			name = l
 		}
 		return name == nil
