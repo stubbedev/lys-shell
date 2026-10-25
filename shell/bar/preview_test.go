@@ -171,7 +171,17 @@ func TestDropdownPreviews(t *testing.T) {
 			ctx.Config, ctx.SetConfig, ctx.Recorder = rc.Config, rc.SetConfig, rc.Recorder
 			return newPanelBox(recorderDropdown(*ctx))
 		}},
-		{"treeman", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget { return newPanelBox(treemanDropdown(*ctx)) }},
+		{"treeman", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			ctx.Treeman = &fakeTreeman{status: treemanFixture()}
+			return newPanelBox(treemanDropdown(*ctx))
+		}},
+		{"treeman-detail", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			ctx.Treeman = &fakeTreeman{status: treemanFixture()}
+			v := treemanDropdown(*ctx).(*treemanView)
+			v.pages.SetTransition(widget.StackNone, 0)
+			v.openDetail("/w/feat")
+			return newPanelBox(v)
+		}},
 	} {
 		t.Run(p.name, func(t *testing.T) {
 			cfg := config.Defaults()

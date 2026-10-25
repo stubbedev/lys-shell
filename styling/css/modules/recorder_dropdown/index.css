@@ -19,7 +19,6 @@
   }
 }
 .recorder-status .recorder-status-dot {
-  border-radius: 9999px;
   background: var(--status-error);
   animation: recorder-status-blink 1s ease-in-out infinite alternate;
 }

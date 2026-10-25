@@ -72,48 +72,71 @@ func TestTreemanDropdownListAndCollapse(t *testing.T) {
 	v := treemanDropdown(ctx).(*treemanView)
 	defer v.dropdownClosed()
 
-	kids := v.list.Children()
-	if len(kids) != 3 {
-		t.Fatalf("list = %d children, want the summary and two repo cards", len(kids))
-	}
-	if chips := kids[0].(*widget.Box).Children(); len(chips) != 2 {
+	if chips := treetest.WithClass(v.list, "treeman-stat"); len(chips) != 2 {
 		t.Errorf("summary chips = %d, want ready and failed only", len(chips))
 	}
-	card := kids[1].(*widget.Box)
-	header := card.Children()[0].(*widget.Button)
-	fold := card.Children()[1].(*widget.Revealer)
-	rows := fold.Child().(*widget.Box)
-	if len(rows.Children()) != 2 || !fold.Revealed() {
-		t.Fatalf("lys-shell rows = %d revealed %v", len(rows.Children()), fold.Revealed())
+	cards := treetest.WithClass(v.list, "treeman-repo")
+	if len(cards) != 2 {
+		t.Fatalf("repo cards = %d, want two", len(cards))
 	}
-	header.OnClick()
+	card := cards[0]
+	header := treetest.WithClass(card, "treeman-repo-header")[0].(*widget.Item)
+	fold := treetest.First[*widget.Revealer](t, card)
+	if n := len(treetest.WithClass(fold, "treeman-wt")); n != 2 || !fold.Revealed() {
+		t.Fatalf("lys-shell rows = %d revealed %v", n, fold.Revealed())
+	}
+	// A fresh card shows its open fold at once: a status refresh
+	// rebuilds every card, so an animated fold would slide in on each.
+	if p := fold.Progress(); p != 1 {
+		t.Errorf("a fresh card's fold is at %v, want fully open", p)
+	}
+	header.ClickAt(widget.Point{})
 	if fold.Revealed() || !v.collapsed["lys-shell"] {
 		t.Error("the header did not fold the card")
 	}
 	// The fold survives a status refresh.
 	src.ticks <- struct{}{}
-	waitHeadless(t, "the refresh", func() bool { return v.list.Children()[1] != card })
-	refreshed := v.list.Children()[1].(*widget.Box).Children()[1].(*widget.Revealer)
-	if refreshed.Revealed() {
+	waitHeadless(t, "the refresh", func() bool { return treetest.WithClass(v.list, "treeman-repo")[0] != card })
+	if treetest.First[*widget.Revealer](t, treetest.WithClass(v.list, "treeman-repo")[0]).Revealed() {
 		t.Error("a refresh reopened the folded card")
 	}
 
-	// A row is the classed overlay over its treeman-wt row, with the
-	// action cluster floating at the trailing edge.
-	wtRows := v.list.Children()[2].(*widget.Box).Children()[1].(*widget.Revealer).Child().(*widget.Box)
-	row := wtRows.Children()[0].(*widget.Overlay)
-	if !row.HasClass("treeman-wt-overlay") {
-		t.Errorf("row classes %v", row.Classes())
+	// A row is the worktree's Item, its path as the tooltip and its
+	// trailing slot showing the state badge at rest.
+	row := treetest.WithClass(treetest.WithClass(v.list, "treeman-repo")[1], "treeman-wt")[0].(*widget.Item)
+	if row.TooltipText() != "/w/lys-ui" {
+		t.Errorf("tooltip = %q", row.TooltipText())
 	}
-	under := row.Children()[0].(*widget.Box)
-	if !under.HasClass("treeman-wt") {
-		t.Error("the overlay does not wrap the treeman-wt row")
+	slot := treetest.First[*widget.Stack](t, row)
+	if slot.Visible() != "state" {
+		t.Errorf("the trailing slot shows %q at rest, want the state", slot.Visible())
 	}
-	if under.TooltipText() != "/w/lys-ui" {
-		t.Errorf("tooltip = %q", under.TooltipText())
+}
+
+// Hovering a worktree row swaps its state badge for the action cluster;
+// leaving it brings the badge back.
+func TestTreemanRowHoverSwapsTheActions(t *testing.T) {
+	restore := widget.SetAnimationsInstant(true)
+	t.Cleanup(restore)
+	ctx := styledContext(t, config.Defaults())
+	ctx.Treeman = &fakeTreeman{status: treemanFixture()}
+	v := treemanDropdown(ctx).(*treemanView)
+	defer v.dropdownClosed()
+	ctx.Theme.Attach(v)
+	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 440, H: 2000}})
+	v.Arrange(render.Rect{W: 440, H: sz.H})
+
+	row := treetest.WithClass(v.list, "treeman-wt")[0].(*widget.Item)
+	slot := treetest.First[*widget.Stack](t, row)
+	r := &widget.Router{Root: v}
+	b := row.Bounds()
+	r.Move(widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2})
+	if slot.Visible() != "actions" {
+		t.Errorf("hovered, the slot shows %q, want the actions", slot.Visible())
 	}
-	if cluster, ok := row.Children()[1].(*widget.Box); !ok || !cluster.HasClass("treeman-actions") {
-		t.Errorf("the overlay's floating child = %v", row.Children()[1])
+	r.Leave()
+	if slot.Visible() != "state" {
+		t.Errorf("after leaving, the slot shows %q, want the state", slot.Visible())
 	}
 }
 
@@ -137,7 +160,7 @@ func TestTreemanDropdownDetailAndActions(t *testing.T) {
 	if v.pages.Visible() != "detail" || itemText(v.title, "title") != "feat" || !v.back.Visible() {
 		t.Fatalf("detail: page %q title %q back %v", v.pages.Visible(), itemText(v.title, "title"), v.back.Visible())
 	}
-	fields := v.details.Children()[1].(*widget.Box).Children()
+	fields := treetest.WithClass(v.details, "treeman-detail-field")
 	if len(fields) != 4 {
 		t.Errorf("fields = %d, want repo, bucket, slug, path", len(fields))
 	}
@@ -184,84 +207,5 @@ func TestTreemanDropdownDetailAndActions(t *testing.T) {
 	waitHeadless(t, "back to the list", func() bool { return v.pages.Visible() == "list" })
 	if itemText(v.title, "title") != i18n.T("dropdown-treeman-title") || v.back.Visible() {
 		t.Error("the header kept the detail state")
-	}
-}
-
-func TestTreemanRowHoverPaints(t *testing.T) {
-	restore := widget.SetAnimationsInstant(true)
-	t.Cleanup(restore)
-	ctx := styledContext(t, config.Defaults())
-	ctx.Treeman = &fakeTreeman{status: treemanFixture()}
-	v := treemanDropdown(ctx).(*treemanView)
-	defer v.dropdownClosed()
-	ctx.Theme.Attach(v)
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 440, H: 2000}})
-	v.Arrange(render.Rect{W: 440, H: sz.H})
-
-	row := v.list.Children()[1].(*widget.Box).Children()[1].(*widget.Revealer).Child().(*widget.Box).Children()[0].(*widget.Overlay)
-	under := row.Children()[0].(*widget.Box)
-	r := &widget.Router{Root: v}
-	b := row.Bounds()
-	// At rest the row paints no background; hovered, the
-	// .treeman-wt-overlay:hover rule's bg-elevated reaches it.
-	if got := widget.StyleBackground(under); got != 0 {
-		t.Errorf("the row at rest paints %#08x", uint32(got))
-	}
-	r.Move(widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2})
-	if got := widget.StyleBackground(under); got == 0 {
-		t.Error("the hovered row got no background from the overlay hover rule")
-	}
-	// Leaving the pointer drops the hover again.
-	r.Leave()
-	if got := widget.StyleBackground(under); got != 0 {
-		t.Errorf("the row after leave paints %#08x", uint32(got))
-	}
-}
-
-// TestTreemanDotsAndBadgesDoNotStretch pins the valign centers: the
-// status dots and the badges keep their natural cross size inside
-// their rows (AppendAligned Center), the dots staying compact
-// circles.
-func TestTreemanDotsAndBadgesDoNotStretch(t *testing.T) {
-	restore := widget.SetAnimationsInstant(true)
-	t.Cleanup(restore)
-	ctx := styledContext(t, config.Defaults())
-	ctx.Treeman = &fakeTreeman{status: treemanFixture()}
-	v := treemanDropdown(ctx).(*treemanView)
-	defer v.dropdownClosed()
-	ctx.Theme.Attach(v)
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 440, H: 2000}})
-	v.Arrange(render.Rect{W: 440, H: sz.H})
-
-	// A worktree row: the dot and the state badge are shorter than the
-	// row (the branch line's text sets the height).
-	rows := v.list.Children()[1].(*widget.Box).Children()[1].(*widget.Revealer).Child().(*widget.Box)
-	row := rows.Children()[0].(*widget.Overlay).Children()[0].(*widget.Box)
-	dot := row.Children()[0].(*widget.Box)
-	badge := row.Children()[2].(*widget.Badge)
-	if dot.Bounds().H >= row.Bounds().H {
-		t.Errorf("the row dot stretched to %d of %d", dot.Bounds().H, row.Bounds().H)
-	}
-	if badge.Bounds().H >= row.Bounds().H {
-		t.Errorf("the state badge stretched to %d of %d", badge.Bounds().H, row.Bounds().H)
-	}
-	// The summary chips: the dot stays a compact circle centered in
-	// the chip.
-	chip := v.list.Children()[0].(*widget.Box).Children()[0].(*widget.Box)
-	chipDot := chip.Children()[0].(*widget.Box)
-	if chipDot.Bounds().H >= chip.Bounds().H && chip.Bounds().H > 0 {
-		t.Errorf("the chip dot stretched to %d of %d", chipDot.Bounds().H, chip.Bounds().H)
-	}
-	// The detail page: the head dot and the badge stay compact too.
-	v.openDetail("/w/feat")
-	sz = v.Measure(widget.Constraints{Max: widget.Size{W: 440, H: 2000}})
-	v.Arrange(render.Rect{W: 440, H: sz.H})
-	head := v.details.Children()[0].(*widget.Box)
-	if headDot := head.Children()[0].(*widget.Box); headDot.Bounds().H >= head.Bounds().H {
-		t.Errorf("the detail dot stretched to %d of %d", headDot.Bounds().H, head.Bounds().H)
-	}
-	headBadge := head.Children()[2].(*widget.Badge)
-	if headBadge.Bounds().H >= head.Bounds().H {
-		t.Errorf("the detail badge stretched to %d of %d", headBadge.Bounds().H, head.Bounds().H)
 	}
 }

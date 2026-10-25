@@ -221,8 +221,8 @@ func TestBatteryHealthDotIsAClassedBoxTheCSSPaints(t *testing.T) {
 	// The size request gives the empty box extent, and the stylesheet's
 	// variant fills it with the status color, clipped round.
 	batteryArrangeStyled(t, ctx, v, 320)
-	if sz := widget.MeasureAsChild(dot, widget.Constraints{Max: widget.Size{W: 64, H: 64}}); sz != (widget.Size{W: healthDotPx, H: healthDotPx}) {
-		t.Errorf("dot measure = %+v, want the %dpx request", sz, healthDotPx)
+	if sz := widget.MeasureAsChild(dot, widget.Constraints{Max: widget.Size{W: 64, H: 64}}); sz != (widget.Size{W: statusDotPx, H: statusDotPx}) {
+		t.Errorf("dot measure = %+v, want the %dpx request", sz, statusDotPx)
 	}
 	palette := ctx.Theme.RenderPalette()
 	fillOf := func(c render.Color) bool { return c.A() > 200 }

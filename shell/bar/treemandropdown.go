@@ -14,10 +14,6 @@ import (
 	"github.com/stubbedev/lys-shell/service/treeman"
 )
 
-// treemanMaxLabelChars is MAX_LABEL_CHARS: the natural-width cap for
-// branch, slug, and path labels.
-const treemanMaxLabelChars = 20
-
 // treemanBucketLabel is bucket_label.
 func treemanBucketLabel(b treeman.Bucket) string {
 	switch b {
@@ -79,9 +75,10 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.title = title
 	v.Append(header, false)
 
-	v.list = widget.NewBox(widget.Column, 0, 0)
+	th := widget.Current()
+	v.list = widget.NewBox(widget.Column, 2*th.Spacing, 0)
 	v.list.AddClass("treeman-list")
-	v.details = widget.NewBox(widget.Column, 0, 0)
+	v.details = widget.NewBox(widget.Column, 2*th.Spacing, 0)
 	v.details.AddClass("treeman-list", "treeman-detail")
 	v.pages = widget.NewStack()
 	pageSlide(v.pages, ctx.Config)
@@ -135,20 +132,6 @@ func (v *treemanView) syncPage() {
 	v.pages.Show("list")
 }
 
-// dot is a status-dot: the empty classed box whose variant rule
-// paints the circle (.status-dot.info/.warning/.error/.success).
-func (v *treemanView) dot(b treeman.Bucket) *widget.Box {
-	d := widget.NewBox(widget.Row, 0, 0)
-	d.AddClass("status-dot", treemanVariant(b))
-	return d
-}
-
-// dotIn appends a status-dot to a row centered across it, GTK's
-// set_valign Center, so the dot keeps its compact circle.
-func (v *treemanView) dotIn(row *widget.Box, b treeman.Bucket) {
-	row.AppendAligned(v.dot(b), false, widget.AlignCenter)
-}
-
 // badge is lys-ui's Badge: the quiet secondary fill, or with a status
 // variant the status color's fill.
 func (v *treemanView) badge(text, variant string) *widget.Badge {
@@ -161,20 +144,28 @@ func (v *treemanView) badge(text, variant string) *widget.Badge {
 	return b
 }
 
-// capped is a label whose natural width cannot widen the popover
-// (cap_natural_width); its ink comes from the class's rule.
-func (v *treemanView) capped(text string, scale float64, class string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*scale, text, 0)
-	l.AddClass(class)
-	l.SetEllipsize(widget.EllipsizeEnd)
-	l.SetMaxWidthChars(treemanMaxLabelChars)
-	return l
-}
-
-func (v *treemanView) mainBadge() *widget.Label {
-	b := widget.NewLabel(v.font, v.px*0.75, i18n.T("dropdown-treeman-main"), 0)
+// mainBadge marks the repository's main worktree: lys-ui's outline
+// badge.
+func (v *treemanView) mainBadge() *widget.Badge {
+	b := widget.NewBadge(v.font, i18n.T("dropdown-treeman-main"))
+	b.SetVariant(widget.BadgeOutline)
 	b.AddClass("treeman-badge", "main")
 	return b
+}
+
+// worktreeItem is a worktree as lys-ui's Item: its status dot as the
+// bare media, its branch as the one-line title, the main badge when it
+// is the main worktree.
+func (v *treemanView) worktreeItem(wt treeman.Worktree) *widget.Item {
+	bucket := treeman.ParseBucket(wt.Bucket)
+	it := widget.NewItem(v.font, wt.Branch, "")
+	it.SetSmall(true)
+	it.SetEllipsize(true)
+	it.SetMedia(statusDot(treemanVariant(bucket)), true)
+	if wt.IsMain {
+		it.AddAction(v.mainBadge())
+	}
+	return it
 }
 
 // renderList is render_list.
@@ -192,7 +183,8 @@ func (v *treemanView) renderList() {
 
 // summary is the per-bucket chip row; empty buckets are left out.
 func (v *treemanView) summary() widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, 2*th.Spacing, 0)
 	row.AddClass("treeman-summary")
 	s := v.status
 	for _, c := range []struct {
@@ -202,25 +194,26 @@ func (v *treemanView) summary() widget.Widget {
 		if c.n == 0 {
 			continue
 		}
-		chip := widget.NewBox(widget.Row, 0, 0)
+		chip := widget.NewBox(widget.Row, th.Spacing/2, 0)
 		chip.AddClass("treeman-stat")
-		v.dotIn(chip, c.b)
-		label := widget.NewLabel(v.font, v.px*0.85, strconv.FormatUint(uint64(c.n), 10)+" "+treemanBucketLabel(c.b), 0)
-		label.AddClass("treeman-stat-label")
-		chip.Append(label, false)
+		chip.AppendAligned(statusDot(treemanVariant(c.b)), false, widget.AlignCenter)
+		label := widget.NewLabel(v.font, v.px, strconv.FormatUint(uint64(c.n), 10)+" "+treemanBucketLabel(c.b), 0)
+		label.AddClass("treeman-stat-label", css.Caption, css.DimLabel)
+		chip.AppendAligned(label, false, widget.AlignCenter)
 		row.Append(chip, false)
 	}
 	return row
 }
 
-// repoCard is repo_card: a header folding its worktree rows into a
+// repoCard is repo_card: lys-ui's card whose header Item (the chevron,
+// the repo, its worktree count) folds the worktree rows into a
 // slide-down revealer, the fold kept across status refreshes.
 func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 	card := widget.NewBox(widget.Column, 0, 0)
-	card.AddClass("card", "treeman-repo")
-	rows := widget.NewBox(widget.Column, 0, 0)
+	card.AddClass(css.Card, "treeman-repo")
+	rows := widget.NewItemGroup()
 	for _, wt := range repo.Worktrees {
-		rows.Append(v.worktreeRow(wt), false)
+		rows.Append(v.worktreeRow(wt))
 	}
 	expanded := !v.collapsed[repo.Repo]
 	// The accordion: a revealer sliding the rows in and out, the Rust
@@ -228,15 +221,18 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 	fold := widget.NewRevealer(rows)
 	fold.SetTransition(widget.RevealSlideDown)
 	fold.SetRevealed(expanded)
+	// A fresh card shows its fold as it stands; only a click slides it.
+	fold.Finish()
 
-	head := widget.NewBox(widget.Row, 0, 0)
-	chevron := widget.NewThemeIcon(treemanChevron(expanded), int(v.px))
-	chevron.AddClass("treeman-repo-chevron")
-	head.Append(chevron, false)
-	head.Append(v.capped(repo.Repo, 1, "treeman-repo-name"), true)
-	head.AppendAligned(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""), false, widget.AlignCenter)
+	head := widget.NewItem(v.font, repo.Repo, "")
+	head.SetSmall(true)
+	head.SetEllipsize(true)
+	head.AddClass("treeman-repo-header")
+	chevron := widget.NewThemeIcon(treemanChevron(expanded), itemIconPx)
+	head.SetMedia(chevron, true)
+	head.AddAction(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""))
 	name := repo.Repo
-	header := dropdownButton(head, func() {
+	head.SetOnActivate(func() {
 		open := !fold.Revealed()
 		fold.SetRevealed(open)
 		chevron.SetThemeName(treemanChevron(open))
@@ -245,8 +241,8 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 		} else {
 			v.collapsed[name] = true
 		}
-	}, "treeman-repo-header")
-	card.Append(header, false)
+	})
+	card.Append(head, false)
 	card.Append(fold, false)
 	return card
 }
@@ -258,49 +254,46 @@ func treemanChevron(expanded bool) string {
 	return "ld-chevron-right-symbolic"
 }
 
-// worktreeRow is worktree_row: the dot, branch, main badge, and state
-// badge under a treeman-wt-overlay: an Overlay whose second child is
-// the action cluster, floating at the trailing edge (halign end,
-// valign center). It reserves no width at rest and hits only inside
-// its own rect; the hover rules — the row background, the cluster's
-// opacity/translateX slide-in, the badge fade — are the stylesheet's
-// .treeman-wt-overlay:hover paints, no Go swap.
-func (v *treemanView) worktreeRow(wt treeman.Worktree) widget.Widget {
+// worktreeRow is worktree_row: the worktree's Item, whose trailing
+// slot shows its state badge at rest and, while hovered, its action
+// cluster in the badge's place.
+func (v *treemanView) worktreeRow(wt treeman.Worktree) *widget.Item {
 	bucket := treeman.ParseBucket(wt.Bucket)
-	row := widget.NewBox(widget.Row, 0, 0)
+	row := v.worktreeItem(wt)
 	row.AddClass("treeman-wt")
-	v.dotIn(row, bucket)
-	line := widget.NewBox(widget.Row, 0, 0)
-	line.AddClass("treeman-wt-info")
-	line.Append(v.capped(wt.Branch, 1, "treeman-branch"), true)
-	if wt.IsMain {
-		line.AppendAligned(v.mainBadge(), false, widget.AlignCenter)
-	}
-	row.Append(line, true)
 	row.SetTooltip(wt.Path)
-	row.AppendAligned(v.badge(wt.State, treemanVariant(bucket)), false, widget.AlignCenter)
-
-	overlay := widget.NewOverlay()
-	overlay.AddClass("treeman-wt-overlay")
-	overlay.Append(row)
-	if wt.Path != "" {
-		cluster := v.actions(wt.Path)
-		cluster.InsertAt(0, v.ghostIcon("ld-info-symbolic", i18n.T("dropdown-treeman-action-info"), func() { v.openDetail(wt.Path) }), false)
-		overlay.AppendAligned(cluster, widget.AlignEnd, widget.AlignCenter)
+	state := v.badge(wt.State, treemanVariant(bucket))
+	if wt.Path == "" {
+		row.AddAction(state)
+		return row
 	}
-	return overlay
+	cluster := v.actions(wt.Path)
+	cluster.InsertAt(0, v.ghostIcon("ld-info-symbolic", i18n.T("dropdown-treeman-action-info"), func() { v.openDetail(wt.Path) }), false)
+	slot := widget.NewStack()
+	slot.SetTransition(widget.StackCrossfade, hoverTransition)
+	slot.Add("state", atEnd(state))
+	slot.Add("actions", cluster)
+	row.SetOnHoverWithin(func(on bool) {
+		if on {
+			slot.Show("actions")
+		} else {
+			slot.Show("state")
+		}
+	})
+	row.AddAction(slot)
+	return row
 }
 
 func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Button {
-	glyph := widget.NewThemeIcon(icon, int(v.px*0.9))
-	b := dropdownButton(glyph, onClick, css.Ghost, css.Icon)
+	glyph := widget.NewThemeIcon(icon, itemIconPx)
+	b := dropdownButton(glyph, onClick, css.Ghost, css.Icon, css.Small)
 	b.SetTooltip(tooltip)
 	return b
 }
 
 // actions is Actions::buttons: prepare, reset (confirmed), teardown.
 func (v *treemanView) actions(path string) *widget.Box {
-	row := widget.NewBox(widget.Row, 0, 0)
+	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	row.AddClass("treeman-actions")
 	row.Append(v.ghostIcon("tb-refresh-symbolic", i18n.T("dropdown-treeman-action-prepare"),
 		func() { v.run(treeman.ActionPrepare, path) }), false)
@@ -345,31 +338,27 @@ func (v *treemanView) confirmReset(path string) {
 	})
 }
 
-// renderDetail is detail_page.
+// renderDetail is detail_page: an item card with the worktree as its
+// subject (its dot, branch and badges) over a row per field, and the
+// actions under it at the end.
 func (v *treemanView) renderDetail(repo treeman.Repo, wt treeman.Worktree) {
 	v.details.Clear()
 	bucket := treeman.ParseBucket(wt.Bucket)
-	head := widget.NewBox(widget.Row, 0, 0)
+	card, group := itemCard()
+	card.AddClass("treeman-detail-fields")
+	head := v.worktreeItem(wt)
 	head.AddClass("treeman-detail-head")
-	v.dotIn(head, bucket)
-	head.Append(v.capped(wt.Branch, 1.05, "treeman-detail-branch"), true)
-	if wt.IsMain {
-		head.AppendAligned(v.mainBadge(), false, widget.AlignCenter)
-	}
-	head.AppendAligned(v.badge(wt.State, treemanVariant(bucket)), false, widget.AlignCenter)
-	v.details.Append(head, false)
-
-	fields := widget.NewBox(widget.Column, 0, 0)
-	fields.AddClass("card", "treeman-detail-fields")
-	fields.Append(v.field(i18n.T("dropdown-treeman-detail-repo"), repo.Repo, false), false)
-	fields.Append(v.field(i18n.T("dropdown-treeman-detail-bucket"), treemanBucketLabel(bucket), false), false)
+	head.AddAction(v.badge(wt.State, treemanVariant(bucket)))
+	group.Append(head)
+	group.Append(v.field(i18n.T("dropdown-treeman-detail-repo"), repo.Repo, false))
+	group.Append(v.field(i18n.T("dropdown-treeman-detail-bucket"), treemanBucketLabel(bucket), false))
 	if wt.Slug != "" {
-		fields.Append(v.field(i18n.T("dropdown-treeman-detail-slug"), wt.Slug, false), false)
+		group.Append(v.field(i18n.T("dropdown-treeman-detail-slug"), wt.Slug, false))
 	}
 	if wt.Path != "" {
-		fields.Append(v.field(i18n.T("dropdown-treeman-detail-path"), wt.Path, true), false)
+		group.Append(v.field(i18n.T("dropdown-treeman-detail-path"), wt.Path, true))
 	}
-	v.details.Append(fields, false)
+	v.details.Append(card, false)
 	if wt.Path != "" {
 		row := widget.NewBox(widget.Row, 0, 0)
 		row.AddClass("treeman-detail-actions")
@@ -379,23 +368,14 @@ func (v *treemanView) renderDetail(repo treeman.Repo, wt treeman.Worktree) {
 	}
 }
 
-// field is one key/value line; the path wraps instead of truncating.
-func (v *treemanView) field(key, value string, wrap bool) widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("treeman-detail-field")
-	k := widget.NewLabel(v.font, v.px*0.85, key, 0)
-	k.AddClass("treeman-detail-key")
-	row.Append(k, false)
-	val := widget.NewLabel(v.font, v.px*0.9, value, 0)
-	val.AddClass("treeman-detail-value")
-	val.SetMaxWidthChars(treemanMaxLabelChars)
-	if wrap {
-		val.SetWrap(true)
-	} else {
-		val.SetEllipsize(widget.EllipsizeEnd)
-	}
-	row.Append(val, true)
-	return row
+// field is one key/value row: the value over its key, as an Item's
+// title over its description; the path wraps instead of truncating.
+func (v *treemanView) field(key, value string, wrap bool) *widget.Item {
+	it := widget.NewItem(v.font, value, key)
+	it.SetSmall(true)
+	it.SetEllipsize(!wrap)
+	it.AddClass("treeman-detail-field")
+	return it
 }
 
 // follow re-renders on every status change until the dropdown closes.

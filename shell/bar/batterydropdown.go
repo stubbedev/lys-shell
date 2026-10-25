@@ -299,18 +299,13 @@ func (v *batteryView) detail(value, label *widget.Label, align render.Alignment)
 	return box
 }
 
-// healthDotPx is the health dot's diameter.
-const healthDotPx = 8
-
 // healthDetail is the end slot: the health dot, which the stylesheet
-// rounds and colors by its variant, beside the value, the label under,
+// colors by its variant, beside the value, the label under,
 // both end-aligned.
 func (v *batteryView) healthDetail() *widget.Box {
 	th := widget.Current()
 	health := widget.NewBox(widget.Row, th.Spacing/2, 0) // health_indicator
-	v.healthDot = widget.NewBox(widget.Row, 0, 0)
-	v.healthDot.AddClass("health-dot")
-	v.healthDot.SetSizeRequest(healthDotPx, healthDotPx)
+	v.healthDot = statusDot("health-dot")
 	var healthLabel *widget.Label
 	v.healthText, healthLabel = v.detailLabels()
 	healthLabel.SetText(i18n.T("dropdown-battery-health"))

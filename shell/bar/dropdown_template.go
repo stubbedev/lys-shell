@@ -102,6 +102,16 @@ func atTop(w widget.Widget) *widget.Box {
 	return col
 }
 
+// atEnd holds w at its natural size at the end and middle of the slot
+// it is given: a row's trailing status that a wider page sizes.
+func atEnd(w widget.Widget) *widget.Box {
+	box := widget.NewBox(widget.Row, 0, 0)
+	box.SetHAlign(widget.AlignEnd)
+	box.SetVAlign(widget.AlignCenter)
+	box.Append(w, false)
+	return box
+}
+
 // scrolledCard is a scroll over card that keeps the card at its
 // content's height: the scroll fills the page, the card hugs its rows.
 func scrolledCard(card widget.Widget, class string) *widget.Scroll {
@@ -164,6 +174,18 @@ func formActions(buttons ...*widget.Button) *widget.Box {
 	}
 	return row
 }
+
+// statusDot is a status circle: the stylesheet's .status-dot rounds
+// and fills it (its variant class picks the color), sized here.
+func statusDot(classes ...string) *widget.Box {
+	d := widget.NewBox(widget.Row, 0, 0)
+	d.AddClass(append([]string{"status-dot"}, classes...)...)
+	d.SetSizeRequest(statusDotPx, statusDotPx)
+	return d
+}
+
+// statusDotPx is a status dot's diameter.
+const statusDotPx = 8
 
 // itemIconPx is an item's media icon size, lys-ui's icon size on the
 // item's 32px media tile.

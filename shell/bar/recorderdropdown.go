@@ -205,9 +205,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	th := widget.Current()
 	v.status = widget.NewBox(widget.Row, th.Spacing, 0)
 	v.status.AddClass("recorder-status")
-	v.statusDot = widget.NewBox(widget.Row, 0, 0)
-	v.statusDot.AddClass("recorder-status-dot")
-	v.statusDot.SetSizeRequest(recorderDotPx, recorderDotPx)
+	v.statusDot = statusDot("recorder-status-dot")
 	v.time = widget.NewLabel(font, px, "", 0)
 	v.time.AddClass("recorder-status-time", css.Heading, css.Numeric)
 	v.status.AppendAligned(v.statusDot, false, widget.AlignCenter)
@@ -262,9 +260,6 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.follow()
 	return v
 }
-
-// recorderDotPx is the recording dot's diameter.
-const recorderDotPx = 8
 
 // controls is the record/stop toggle and the pause button.
 func (v *recorderView) controls() widget.Widget {
