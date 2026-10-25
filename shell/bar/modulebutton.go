@@ -83,6 +83,21 @@ func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *ba
 	return b
 }
 
+// holdOpen marks the button while its dropdown is open: :checked, as a
+// BarButton stays while its own popover is, and with freezeLabel
+// (dropdown-freeze-label) its label held still so the popover stays
+// anchored. The returned func ends both.
+func (b *barButton) holdOpen(freezeLabel bool) func() {
+	b.SetState(widget.StateChecked, true)
+	if freezeLabel {
+		b.freezeLabel()
+	}
+	return func() {
+		b.SetState(widget.StateChecked, false)
+		b.thawLabel()
+	}
+}
+
 // freezeLabel is FreezeSize: while the button's dropdown is open the
 // shown label stops following the module, so the button keeps its
 // width and the popover its anchor. A copy of the label stands in;

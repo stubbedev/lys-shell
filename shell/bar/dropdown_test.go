@@ -405,27 +405,28 @@ type hidingContent struct {
 
 func (h *hidingContent) dropdownHidden() { h.hidden++ }
 
-// A popover's close thaws the anchor's label and reaches content that
-// acts on each close, through a sized panel too; other content gets
-// only the thaw, and nothing at all is nil.
-func TestOnDropdownHidden(t *testing.T) {
-	thawed := 0
-	thaw := func() { thawed++ }
+// A dropdown holds its bar button open until its popover closes, and
+// the close reaches content that acts on each close, through a sized
+// panel too. An anchor that is no bar button holds nothing, and with
+// neither there is nothing to run.
+func TestHoldDropdown(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	btn := newBarButton(ctx, nil, widget.NewLabel(ctx.Font, 12, "12:30", 0))
 	content := &hidingContent{Box: widget.NewBox(widget.Column, 0, 0)}
-	onDropdownHidden(thaw, content)()
-	if thawed != 1 || content.hidden != 1 {
-		t.Errorf("hiding content: thawed %d, hidden %d", thawed, content.hidden)
+	closed := holdDropdown(btn, true, content)
+	if !btn.HasState(widget.StateChecked) || btn.frozen == nil {
+		t.Error("an open dropdown leaves its button unchecked or its label live")
 	}
-	onDropdownHidden(nil, newPanelBox(content))()
-	if content.hidden != 2 {
-		t.Errorf("through a panel: hidden %d", content.hidden)
+	closed()
+	if btn.HasState(widget.StateChecked) || btn.frozen != nil || content.hidden != 1 {
+		t.Errorf("closed: checked %v, frozen %v, content hidden %d", btn.HasState(widget.StateChecked), btn.frozen != nil, content.hidden)
 	}
 	plain := widget.NewBox(widget.Column, 0, 0)
-	onDropdownHidden(thaw, plain)()
-	if thawed != 2 {
-		t.Errorf("plain content: thawed %d", thawed)
+	holdDropdown(plain, true, newPanelBox(content))()
+	if content.hidden != 2 || plain.HasState(widget.StateChecked) {
+		t.Errorf("through a panel: hidden %d, plain anchor checked %v", content.hidden, plain.HasState(widget.StateChecked))
 	}
-	if onDropdownHidden(nil, plain) != nil {
+	if holdDropdown(plain, true, plain) != nil {
 		t.Error("nothing to run is not nil")
 	}
 }

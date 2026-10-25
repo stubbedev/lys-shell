@@ -59,11 +59,10 @@ type dropdownFocuser interface{ dropdownFocus() widget.Widget }
 // into its secret boxes.
 type dropdownHider interface{ dropdownHidden() }
 
-// labelFreezer is an anchor whose label holds still while its dropdown
-// is open (BarButtonInput::FreezeSize/ThawSize).
-type labelFreezer interface {
-	freezeLabel()
-	thawLabel()
+// dropdownAnchor is an anchor that shows its dropdown is open; the
+// returned func ends the hold as the dropdown closes.
+type dropdownAnchor interface {
+	holdOpen(freezeLabel bool) (release func())
 }
 
 // dropdownCloser is live dropdown content (a service subscription) that
@@ -281,14 +280,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	}
 	w, h, _ := dropdownDims(name, r.cfg)
 	cfg := dropdownPopover(r.cfg, bound, content, monH, w)
-	// The button's label holds still while its dropdown is open
-	// (dropdown-freeze-label), so the popover stays anchored.
-	var thaw func()
-	if f, ok := anchor.(labelFreezer); ok && r.cfg.Bar.DropdownFreezeLabel {
-		f.freezeLabel()
-		thaw = f.thawLabel
-	}
-	cfg.OnClosed = onDropdownHidden(thaw, content)
+	cfg.OnClosed = holdDropdown(anchor, r.cfg.Bar.DropdownFreezeLabel, content)
 	if f, ok := content.(dropdownFocuser); ok {
 		cfg.Focus = f.dropdownFocus()
 	}
@@ -321,17 +313,22 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	return nil
 }
 
-// onDropdownHidden is what runs as a dropdown's popover closes: the
-// anchor's frozen label thaws (thaw, nil when it froze nothing) and
+// holdDropdown marks anchor while content's dropdown is open (with
+// freezeLabel, dropdown-freeze-label, its label held still too) and
+// returns what runs as the popover closes: the anchor's hold ends and
 // content that acts on each close does; nil when neither.
-func onDropdownHidden(thaw func(), content widget.Widget) func() {
+func holdDropdown(anchor widget.Widget, freezeLabel bool, content widget.Widget) func() {
+	var release func()
+	if a, ok := anchor.(dropdownAnchor); ok {
+		release = a.holdOpen(freezeLabel)
+	}
 	h, hides := content.(dropdownHider)
 	if !hides {
-		return thaw
+		return release
 	}
 	return func() {
-		if thaw != nil {
-			thaw()
+		if release != nil {
+			release()
 		}
 		h.dropdownHidden()
 	}

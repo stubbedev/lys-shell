@@ -23,3 +23,6 @@ button.bar-button.basic .bar-button-content {
 button.bar-button:hover {
   filter: brightness(1.15);
 }
+button.bar-button:checked {
+  filter: brightness(0.95);
+}

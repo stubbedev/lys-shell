@@ -370,3 +370,33 @@ func TestBarButtonLabelFreezesUntilThaw(t *testing.T) {
 		t.Error("a stray thaw moved the label")
 	}
 }
+
+// While its dropdown is open the bar button is :checked and shaded, as
+// a BarButton is under its own popover, and with dropdown-freeze-label
+// its label holds still; the close ends both. Without the freeze the
+// label keeps following the module.
+func TestBarButtonHoldsOpenWhileItsDropdownIs(t *testing.T) {
+	for _, freeze := range []bool{true, false} {
+		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+		bar := buildRoot(styledContext(t, config.Defaults()), layout, "DP-1")
+		settleBar(bar, widget.Size{W: 1000, H: 100})
+		b := clockButton(bar)
+		lb := b.labelBox.Bounds()
+		at := widget.Point{X: lb.X + 1, Y: lb.Y + 1}
+		rest := paintedAt(bar, 1000, 100, at)
+		release := b.holdOpen(freeze)
+		if open := paintedAt(bar, 1000, 100, at); !b.HasState(widget.StateChecked) || open == rest {
+			t.Errorf("freeze %v: the open dropdown's button paints %#x, as at rest", freeze, uint32(open))
+		}
+		if frozen := b.labelBox.Children()[0] != widget.Widget(b.label); frozen != freeze {
+			t.Errorf("freeze %v: label frozen %v", freeze, frozen)
+		}
+		release()
+		if closed := paintedAt(bar, 1000, 100, at); b.HasState(widget.StateChecked) || closed != rest {
+			t.Errorf("freeze %v: the closed dropdown left the button checked, painting %#x", freeze, uint32(closed))
+		}
+		if b.labelBox.Children()[0] != widget.Widget(b.label) {
+			t.Errorf("freeze %v: the close left the label frozen", freeze)
+		}
+	}
+}
