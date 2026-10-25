@@ -22,12 +22,14 @@ import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 type fakeWindow struct {
@@ -1607,4 +1609,59 @@ func TestPlaceIconFallsBackAlongTheName(t *testing.T) {
 	if treetest.Ink(placeIcon(Place{"Odd", "/o", "unrelated"})) != 0 {
 		t.Error("an absent place icon drew something")
 	}
+}
+
+// The sheet stands on lys-ui's parts: its card cut into bands by
+// separators, ghost icon buttons in the header (never the old flat
+// ones), a heading title a step over the text size, ghost crumbs and
+// places, caption headings over the sidebar sections, dim cells, an
+// outline Cancel and the suggested confirm.
+func TestSheetTakesLysUiParts(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	hs.run(func() {
+		root := hs.cfg.Root
+		all := func(class string, want ...string) {
+			t.Helper()
+			ws := treetest.WithClass(root, class)
+			if len(ws) == 0 {
+				t.Fatalf("no .%s", class)
+			}
+			for _, w := range ws {
+				for _, cl := range want {
+					if !widget.HasClass(w, cl) {
+						t.Errorf(".%s lacks .%s", class, cl)
+					}
+				}
+				if widget.HasClass(w, "flat") {
+					t.Errorf(".%s is still a flat button", class)
+				}
+			}
+		}
+		all("file-chooser-surface", css.Card)
+		all("file-chooser-nav", css.Ghost, css.Icon)
+		all("file-chooser-title", css.Heading)
+		all("file-chooser-crumb", css.Ghost)
+		all("file-chooser-place", css.Ghost)
+		all("file-chooser-sidebar-header", css.CaptionHeading, css.DimLabel)
+		for _, cell := range treetest.WithClass(hs.c.fileRow(hs.c.s.entries[0]), "file-chooser-cell") {
+			if !widget.HasClass(cell, css.DimLabel) {
+				t.Error("a row's cell is not dim")
+			}
+		}
+		all("file-chooser-cancel", css.Outline)
+		all("file-chooser-confirm", css.SuggestedAction)
+		if n := len(treetest.All[*widget.Separator](root)); n != 3 {
+			t.Errorf("%d separators, want the 3 between the bands", n)
+		}
+		title := treetest.WithClass(root, "file-chooser-title")[0].(*widget.Label)
+		if want := widget.Current().TextSize * widgets.DialogTitleScale; title.SizePx() != want {
+			t.Errorf("title %vpx, want %vpx", title.SizePx(), want)
+		}
+		if widget.HasClass(treetest.WithClass(root, "file-chooser-cancel")[0], css.SuggestedAction) {
+			t.Error("Cancel is the suggested action")
+		}
+	})
+	hs.click(t, "Cancel")
+	answer(t, got)
 }

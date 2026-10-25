@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -383,21 +384,32 @@ type ui struct {
 	locations *widget.Box
 }
 
-func (c *Chooser) label(text, class string) *widget.Label {
-	l := widget.NewLabel(c.d.Font, 13, text, 0)
-	if class != "" {
-		l.AddClass(class)
-	}
+// label is a one-line label at lys-ui's text size.
+func (c *Chooser) label(text string, classes ...string) *widget.Label {
+	l := widget.NewLabel(c.d.Font, widget.Current().TextSize, text, 0)
+	l.AddClass(classes...)
 	return l
 }
 
-func (c *Chooser) textButton(text, class string, onClick func()) (*widget.Button, *widget.Label) {
+// textButton is a text button in lys-ui's variant (css.Ghost,
+// css.Outline), carrying class and its label class+"-label".
+func (c *Chooser) textButton(text, class, variant string, onClick func()) (*widget.Button, *widget.Label) {
 	l := c.label(text, class+"-label")
 	l.SetAlignment(render.AlignCenter)
 	b := widget.NewButton(l, 0, 0)
-	b.AddClass(class)
+	b.AddClass(class, variant)
 	b.OnClick = onClick
 	return b, l
+}
+
+// section is a band of the sheet padded by the theme: a bar of
+// controls between the separators.
+func section(dir widget.Axis, class string) *widget.Box {
+	th := widget.Current()
+	b := widget.NewBox(dir, th.Spacing, 0)
+	b.SetPadding(render.Insets{Top: th.Padding, Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding})
+	b.AddClass(class)
+	return b
 }
 
 // iconToggle is a gtk::ToggleButton with an icon: on starts it
@@ -406,7 +418,7 @@ func (c *Chooser) iconToggle(icon, tooltip string, on bool, onToggled func(bool)
 	holder := widget.NewBox(widget.Row, 0, 0)
 	setIcon(holder, icon)
 	b := widget.NewToggleButton(widgets.Center(holder), 0, 0)
-	b.AddClass("toggle", "file-chooser-nav", "flat")
+	b.AddClass("toggle", "file-chooser-nav", css.Ghost, css.Icon, css.Small)
 	b.SetTooltip(tooltip)
 	b.SetActive(on)
 	b.OnToggled = onToggled
@@ -423,7 +435,7 @@ func (c *Chooser) swappableIconButton(icon, tooltip string, onClick func()) (*wi
 	holder := widget.NewBox(widget.Row, 0, 0)
 	setIcon(holder, icon)
 	b := widget.NewButton(widgets.Center(holder), 0, 0)
-	b.AddClass("file-chooser-nav", "flat")
+	b.AddClass("file-chooser-nav", css.Ghost, css.Icon, css.Small)
 	b.SetTooltip(tooltip)
 	b.OnClick = onClick
 	return b, holder
@@ -441,7 +453,8 @@ func (c *Chooser) build(r request) {
 
 	// Header: up, the centred title, the view toggles. The bar is the
 	// sheet's drag handle.
-	headerRow := widget.NewBox(widget.Row, 2, 0)
+	th := widget.Current()
+	headerRow := widget.NewBox(widget.Row, th.Spacing/4, 0)
 	headerRow.Append(c.iconButton("go-up-symbolic", "Up", c.goUp), false)
 	if s.mode == ModeSave || s.mode.folders() {
 		headerRow.Append(c.iconButton("folder-new-symbolic", "Create Folder", c.showNewFolder), false)
@@ -457,18 +470,18 @@ func (c *Chooser) build(r request) {
 	}
 	headerStack := widget.NewOverlay()
 	headerStack.Append(headerRow)
-	headerStack.Append(newPlace(c.label(title, "file-chooser-title"), alignCenter, alignCenter))
-	header := widget.NewBox(widget.Column, 0, 0)
-	header.AddClass("file-chooser-header")
+	titleLabel := widget.NewLabel(c.d.Font, th.TextSize*widgets.DialogTitleScale, title, 0)
+	titleLabel.AddClass("file-chooser-title", css.Heading)
+	headerStack.Append(newPlace(titleLabel, alignCenter, alignCenter))
+	header := section(widget.Column, "file-chooser-header")
 	header.Append(&dragArea{child: headerStack, cursor: "grab", onDrag: c.move}, false)
 
 	// Path bar: breadcrumbs and the search box.
-	crumbBar := widget.NewBox(widget.Row, 8, 0)
-	crumbBar.AddClass("file-chooser-crumbbar")
-	u.crumbs = widget.NewBox(widget.Row, 2, 0)
+	crumbBar := section(widget.Row, "file-chooser-crumbbar")
+	u.crumbs = widget.NewBox(widget.Row, th.Spacing/4, 0)
 	u.crumbs.AddClass("file-chooser-crumbs")
 	crumbBar.Append(u.crumbs, true)
-	u.location = widget.NewEntry(c.d.Font, 13, 0)
+	u.location = widget.NewEntry(c.d.Font, th.TextSize, 0)
 	u.location.AddClass("file-chooser-location")
 	u.location.SetPlaceholder("Type a path")
 	u.location.OnActivate = c.goToLocation
@@ -478,7 +491,7 @@ func (c *Chooser) build(r request) {
 	// gtk::SearchEntry with no debounce: filtering the cached listing
 	// is an in-memory scan, and a recursive walk is cancelled by its
 	// generation instead.
-	u.search = widget.NewSearchEntry(c.d.Font, 13, "Filter this folder")
+	u.search = widget.NewSearchEntry(c.d.Font, th.TextSize, "Filter this folder")
 	u.search.AddClass("file-chooser-search")
 	u.search.SetDelay(0)
 	u.search.OnSearchChanged = c.setSearch
@@ -500,8 +513,9 @@ func (c *Chooser) build(r request) {
 	u.preview.SetVisible(false)
 	body.Append(u.preview, false)
 
-	u.name = widget.NewEntry(c.d.Font, 13, 0)
+	u.name = widget.NewEntry(c.d.Font, th.TextSize, 0)
 	u.name.AddClass("file-chooser-name")
+	u.name.SetMargin(render.Insets{Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding})
 	u.name.SetPlaceholder("File name")
 	u.name.SetText(name)
 	u.name.OnActivate = func(string) { c.confirm() }
@@ -509,25 +523,22 @@ func (c *Chooser) build(r request) {
 	u.name.SetVisible(s.mode == ModeSave)
 
 	// The notice: a warning, or the replace prompt with its button.
-	u.notice = widget.NewBox(widget.Row, 8, 0)
-	u.notice.AddClass("file-chooser-notice")
-	u.noticeLabel = c.label("", "file-chooser-notice-label")
+	u.notice = section(widget.Row, "file-chooser-notice")
+	u.noticeLabel = c.label("", "file-chooser-notice-label", css.Warning)
 	u.noticeLabel.SetWrap(true)
 	u.notice.Append(u.noticeLabel, true)
-	u.replace, _ = c.textButton("Replace", "file-chooser-replace", c.confirm)
-	u.replace.AddClass("destructive-action")
+	u.replace, _ = c.textButton("Replace", "file-chooser-replace", css.DestructiveAction, c.confirm)
 	u.notice.Append(u.replace, false)
 	u.notice.SetVisible(false)
 
 	// The new folder row: a name and Create.
-	u.newFolder = widget.NewBox(widget.Row, 8, 0)
-	u.newFolder.AddClass("file-chooser-new-folder")
-	u.newFolderName = widget.NewEntry(c.d.Font, 13, 0)
+	u.newFolder = section(widget.Row, "file-chooser-new-folder")
+	u.newFolderName = widget.NewEntry(c.d.Font, th.TextSize, 0)
 	u.newFolderName.SetPlaceholder("Folder name")
 	u.newFolderName.OnActivate = func(string) { c.createFolder() }
 	u.newFolderName.OnEscape = func() bool { c.ui.newFolder.SetVisible(false); return true }
 	u.newFolder.Append(u.newFolderName, true)
-	create, _ := c.textButton("Create", "file-chooser-create-folder", c.createFolder)
+	create, _ := c.textButton("Create", "file-chooser-create-folder", css.SuggestedAction, c.createFolder)
 	u.newFolder.Append(create, false)
 	u.newFolder.SetVisible(false)
 
@@ -535,12 +546,11 @@ func (c *Chooser) build(r request) {
 	c.readChoices = readChoices
 
 	// Footer: the type filter, cancel, confirm.
-	footer := widget.NewBox(widget.Row, 8, 0)
-	footer.AddClass("file-chooser-footer")
+	footer := section(widget.Row, "file-chooser-footer")
 	u.filterLabel = c.label("", "file-chooser-filter-label")
 	u.filterLabel.SetAlignment(render.AlignCenter)
 	u.filterButton = widget.NewToggleButton(u.filterLabel, 0, 0)
-	u.filterButton.AddClass("toggle", "file-chooser-filter")
+	u.filterButton.AddClass("toggle", "file-chooser-filter", css.Outline)
 	u.filterButton.OnToggled = c.setFilterPopup
 	u.filterLabel.SetAlignment(render.AlignStart)
 	u.filterLabel.SetEllipsize(widget.EllipsizeEnd)
@@ -554,38 +564,39 @@ func (c *Chooser) build(r request) {
 		footer.Append(row, false)
 	}
 	footer.Append(widget.NewSpacer(0, 0), true)
-	cancel, _ := c.textButton("Cancel", "file-chooser-cancel", func() { c.finish(nil) })
+	cancel, _ := c.textButton("Cancel", "file-chooser-cancel", css.Outline, func() { c.finish(nil) })
 	accept := r.acceptLabel
 	if accept == "" {
 		accept = s.mode.confirmLabel()
 	}
-	confirm, _ := c.textButton(accept, "file-chooser-confirm", c.confirm)
-	confirm.AddClass("suggested-action")
+	confirm, _ := c.textButton(accept, "file-chooser-confirm", css.SuggestedAction, c.confirm)
 	footer.Append(cancel, false)
 	footer.Append(confirm, false)
 
 	surface := widget.NewBox(widget.Column, 0, 0)
-	surface.AddClass("file-chooser-surface")
+	surface.AddClass(css.Card, "file-chooser-surface")
 	surface.Append(header, false)
+	surface.Append(widget.NewSeparator(widget.Horizontal), false)
 	surface.Append(crumbBar, false)
 	surface.Append(u.newFolder, false)
+	surface.Append(widget.NewSeparator(widget.Horizontal), false)
 	surface.Append(body, true)
+	surface.Append(widget.NewSeparator(widget.Horizontal), false)
 	surface.Append(u.name, false)
 	surface.Append(u.notice, false)
 	surface.Append(footer, false)
 
 	// The filter popup sits in the sheet itself rather than an
 	// xdg_popup, which an exclusive overlay may not route input to.
-	u.filterPopup = widget.NewBox(widget.Column, 0, 0)
-	u.filterPopup.AddClass("file-chooser-filter-popup")
+	u.filterPopup = widget.NewBox(widget.Column, 0, th.Padding/2)
+	u.filterPopup.AddClass(css.Card, "file-chooser-filter-popup")
 	filterList := widget.NewBox(widget.Column, 0, 0)
 	filterList.AddClass("file-chooser-filter-list")
 	for i, f := range s.filters {
-		row, l := c.textButton(FilterLabel(f), "file-chooser-filter-row", func() { c.selectFilter(i) })
+		row, l := c.textButton(FilterLabel(f), "file-chooser-filter-row", css.Ghost, func() { c.selectFilter(i) })
 		l.SetAlignment(render.AlignStart)
 		l.SetEllipsize(widget.EllipsizeEnd)
 		l.SetMaxWidthChars(40)
-		row.SetElement("row")
 		filterList.Append(row, false)
 	}
 	u.filterPopup.Append(widget.NewScroll(filterList), true)
@@ -618,10 +629,13 @@ func viewIcon(grid bool) string {
 // sidebar is Favorites (the user's places) and Locations (/ and the
 // mounts, which refreshLocations rebuilds).
 func (c *Chooser) sidebar(u *ui) widget.Widget {
-	box := widget.NewBox(widget.Column, 2, 0)
+	th := widget.Current()
+	box := widget.NewBox(widget.Column, th.Spacing/4, th.Padding)
 	box.AddClass("file-chooser-sidebar")
 	section := func(title string, places []Place) *widget.Box {
-		box.Append(c.label(title, "file-chooser-sidebar-header"), false)
+		header := c.label(title, "file-chooser-sidebar-header", css.CaptionHeading, css.DimLabel)
+		header.SetMargin(render.Insets{Top: th.Padding / 2, Right: th.Padding, Bottom: th.Padding / 2, Left: th.Padding})
+		box.Append(header, false)
 		list := widget.NewBox(widget.Column, 0, 0)
 		list.AddClass("file-chooser-places")
 		c.fillPlaces(list, places)
@@ -660,13 +674,13 @@ func placeIcon(p Place) *widget.Icon {
 func (c *Chooser) fillPlaces(list *widget.Box, places []Place) {
 	list.Clear()
 	for _, p := range places {
-		row := widget.NewBox(widget.Row, 8, 0)
-		row.Append(placeIcon(p), false)
-		l := c.label(p.Label, "")
+		row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
+		row.AppendAligned(placeIcon(p), false, widget.AlignCenter)
+		l := c.label(p.Label)
 		l.SetEllipsize(widget.EllipsizeEnd)
-		row.Append(l, true)
+		row.AppendAligned(l, true, widget.AlignCenter)
 		b := widget.NewButton(row, 0, 0)
-		b.SetElement("row")
+		b.AddClass("file-chooser-place", css.Ghost)
 		path := p.Path
 		b.OnClick = func() { c.goTo(path) }
 		list.Append(b, false)
@@ -686,8 +700,9 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	u.colHeader = widget.NewBox(widget.Row, 0, 0)
 	u.colHeader.AddClass("file-chooser-colheader")
 	for col := range u.sortButtons {
-		b, l := c.textButton("", "file-chooser-col", func() { c.sortBy(SortColumn(col)) })
-		b.AddClass("flat")
+		b, l := c.textButton("", "file-chooser-col", css.Ghost, func() { c.sortBy(SortColumn(col)) })
+		b.AddClass(css.Small)
+		l.AddClass(css.Caption, css.DimLabel)
 		l.SetAlignment(render.AlignStart)
 		u.sortButtons[col], u.sortLabels[col] = b, l
 		if col == int(SortName) {
@@ -717,8 +732,9 @@ func (c *Chooser) views(u *ui) widget.Widget {
 		l.OnSelectionChanged = func([]int) { c.refreshPreview() }
 	}
 
-	u.empty = c.label("No items", "file-chooser-empty")
+	u.empty = c.label("No items", "file-chooser-empty", css.DimLabel)
 	u.quicklook, u.qlIcon, u.qlName, u.qlInfo = c.previewCard("file-chooser-quicklook", 32)
+	u.quicklook.AddClass(css.Card)
 	u.quicklook.SetVisible(false)
 
 	stack := widget.NewOverlay()
@@ -751,7 +767,8 @@ func (c *Chooser) columnGrip(i int) widget.Widget {
 // previewCard is an icon, a name and a detail line: the quick look
 // card and the preview pane.
 func (c *Chooser) previewCard(class string, nameChars int) (card, icon *widget.Box, name, info *widget.Label) {
-	card = widget.NewBox(widget.Column, 12, 0)
+	th := widget.Current()
+	card = widget.NewBox(widget.Column, th.Spacing, 2*th.Padding)
 	card.AddClass(class)
 	icon = widget.NewBox(widget.Row, 0, 0)
 	icon.AddClass(class + "-icon")
@@ -759,7 +776,7 @@ func (c *Chooser) previewCard(class string, nameChars int) (card, icon *widget.B
 	name.SetAlignment(render.AlignCenter)
 	name.SetWrap(true)
 	name.SetMaxWidthChars(nameChars)
-	info = c.label("", class+"-info")
+	info = c.label("", class+"-info", css.Caption, css.DimLabel)
 	info.SetAlignment(render.AlignCenter)
 	info.SetWrap(true)
 	card.Append(widgets.Center(icon), false)
@@ -788,10 +805,12 @@ func (m rows) Row(i int) widget.Widget {
 // fileRow is the name (icon and label) with the size, modified and
 // kind cells under their column headers.
 func (c *Chooser) fileRow(e Entry) widget.Widget {
-	row := widget.NewBox(widget.Row, 8, 0)
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, th.Spacing, 0)
+	row.SetPadding(render.Insets{Left: th.Padding, Right: th.Padding})
 	icon := c.entryIcon(e, rowIconPx)
 	row.Append(icon, false)
-	name := c.label(c.s.displayName(e), "")
+	name := c.label(c.s.displayName(e))
 	// A recursive match is a relative path: keep both ends in view.
 	if c.s.searching() {
 		name.SetEllipsize(widget.EllipsizeMiddle)
@@ -804,7 +823,7 @@ func (c *Chooser) fileRow(e Entry) widget.Widget {
 		size = HumanSize(e.Size)
 	}
 	for i, text := range []string{size, FormatTime(e.Modified), e.Kind()} {
-		cell := c.label(text, "file-chooser-cell")
+		cell := c.label(text, "file-chooser-cell", css.DimLabel)
 		cell.SetEllipsize(widget.EllipsizeEnd)
 		if i < 2 {
 			cell.SetAlignment(render.AlignEnd)
@@ -816,10 +835,11 @@ func (c *Chooser) fileRow(e Entry) widget.Widget {
 
 // gridCell is a large icon over a centred name.
 func (c *Chooser) gridCell(e Entry) widget.Widget {
-	cell := widget.NewBox(widget.Column, 6, 0)
+	th := widget.Current()
+	cell := widget.NewBox(widget.Column, th.Spacing/2, th.Padding/2)
 	cell.AddClass("file-chooser-grid-cell")
 	cell.Append(widgets.Center(c.entryIcon(e, gridIconPx)), false)
-	name := c.label(c.s.displayName(e), "")
+	name := c.label(c.s.displayName(e))
 	name.SetAlignment(render.AlignCenter)
 	name.SetWrap(true)
 	name.SetMaxLines(2)
@@ -1071,12 +1091,14 @@ func (c *Chooser) relist() {
 	u.crumbs.Clear()
 	for i, cr := range Crumbs(c.s.dir, c.d.Home) {
 		if i > 0 {
-			u.crumbs.Append(c.label("›", "file-chooser-crumb-sep"), false)
+			u.crumbs.AppendAligned(c.label("›", "file-chooser-crumb-sep", css.DimLabel), false, widget.AlignCenter)
 		}
-		b, _ := c.textButton(truncate(cr.Label, crumbMaxChars), "file-chooser-crumb", nil)
-		b.AddClass("flat")
+		b, l := c.textButton(truncate(cr.Label, crumbMaxChars), "file-chooser-crumb", css.Ghost, nil)
+		b.AddClass(css.Small)
 		if cr.Current {
 			b.AddClass("current")
+		} else {
+			l.AddClass(css.DimLabel)
 		}
 		path := cr.Path
 		b.OnClick = func() { c.goTo(path) }
