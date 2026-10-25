@@ -86,7 +86,7 @@ func dropdownHeaderParts(font render.Font, px float64, icon, title string, actio
 	acts := widget.NewBox(widget.Row, 0, 0)
 	acts.AddClass("dropdown-actions")
 	for _, a := range actions {
-		acts.Append(a, false)
+		acts.AppendAligned(a, false, widget.AlignCenter)
 	}
 	row.Append(acts, false)
 	return row, glyph, label

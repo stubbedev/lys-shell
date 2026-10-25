@@ -5,6 +5,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 )
@@ -191,5 +192,29 @@ func TestProgressRingIsAnOverlayTheStylesheetSizes(t *testing.T) {
 	lb, rb := r.label.Bounds(), r.Bounds()
 	if dx, dy := (lb.X+lb.W/2)-(rb.X+rb.W/2), (lb.Y+lb.H/2)-(rb.Y+rb.H/2); dx < -1 || dx > 1 || dy < -1 || dy > 1 {
 		t.Errorf("the label %+v sits off the ring's center %+v", lb, rb)
+	}
+}
+
+// A header action keeps its own height on the row's middle: a switch
+// beside the taller icon button stays a pill instead of stretching to
+// the row and drawing its knob as a ring.
+func TestDropdownHeaderActionsKeepTheirHeight(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	sw := widget.NewSwitch(true)
+	scan := dropdownButton(widget.NewThemeIcon("tb-refresh-symbolic", 16), nil, css.Ghost, css.Icon)
+	header := dropdownHeader(ctx.Font, 14, "ld-bluetooth-symbolic", "Bluetooth", scan, sw)
+	ctx.Theme.Attach(header)
+	natural := widget.MeasureAsChild(sw, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	sz := header.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	header.Arrange(render.Rect{W: 400, H: sz.H})
+	if scan.Bounds().H <= natural.H {
+		t.Fatalf("the icon button (%d) is no taller than the switch (%d): nothing to stretch against", scan.Bounds().H, natural.H)
+	}
+	b := sw.Bounds()
+	if b.H != natural.H {
+		t.Errorf("the switch spans %d of the %d row, want its own %d", b.H, scan.Bounds().H, natural.H)
+	}
+	if mid, rowMid := b.Y+b.H/2, scan.Bounds().Y+scan.Bounds().H/2; mid < rowMid-1 || mid > rowMid+1 {
+		t.Errorf("the switch's middle %d is off the row's %d", mid, rowMid)
 	}
 }
