@@ -78,9 +78,10 @@ func role(w widget.Widget) (widget.Role, bool) {
 }
 
 // fieldSized reports a control of the field height: an entry or a
-// spin, a dropdown, a button.
+// spin, a dropdown, a button (a color button among them).
 func fieldSized(w widget.Widget) bool {
-	if _, ok := w.(*widget.Button); ok {
+	switch w.(type) {
+	case *widget.Button, *widget.ColorButton:
 		return true
 	}
 	r, ok := role(w)
@@ -208,5 +209,29 @@ func TestCardFieldsLineUp(t *testing.T) {
 	})
 	if len(checked) != 3 {
 		t.Errorf("checked %v, want the battery, wallpaper and bar-general pages", checked)
+	}
+}
+
+// A custom color shows its color button beside the token dropdown at
+// the dropdown's height, on the row's centre line, the theme's spacing
+// apart: the button is lys-ui's outline icon button, not a bare swatch.
+func TestCustomColorButtonMatchesItsDropdown(t *testing.T) {
+	k := testKit(t, "modules:\n  clock:\n    icon-color: \"#123456\"\n")
+	c := fieldControl(k, field("modules.clock.icon-color")).(*colorValueEditor)
+	apptheme.New(k.store.svc.Config()).Attach(c.Box)
+	widget.MeasureAsChild(c.Box, widget.Constraints{Max: widget.Size{W: 600, H: 200}})
+	widget.ArrangeAsChild(c.Box, render.Rect{W: 600, H: 200})
+	if !c.swatch.Visible() {
+		t.Fatal("a custom color hides its color button")
+	}
+	b, d := c.swatch.Bounds(), c.drop.Bounds()
+	if b.H != d.H {
+		t.Errorf("the color button is %dpx tall beside the %dpx dropdown", b.H, d.H)
+	}
+	if b.Y+b.H/2 != d.Y+d.H/2 {
+		t.Errorf("the color button's centre y=%d is off the dropdown's y=%d", b.Y+b.H/2, d.Y+d.H/2)
+	}
+	if gap := d.X - (b.X + b.W); gap != widget.Current().Spacing {
+		t.Errorf("the dropdown sits %dpx after the color button, want the theme's %dpx", gap, widget.Current().Spacing)
 	}
 }

@@ -199,7 +199,6 @@ func (c *layoutEditor) card(i int) widget.Widget {
 // picker and the add-group button.
 func (c *layoutEditor) zoneRow(at zoneRef, labels *widget.SizeGroup) widget.Widget {
 	t := i18n.Settings()
-	th := widget.Current()
 	row := gapBox(widget.Row)
 	row.AddClass("layout-zone")
 	chips := widget.NewChipBox()
@@ -208,9 +207,7 @@ func (c *layoutEditor) zoneRow(at zoneRef, labels *widget.SizeGroup) widget.Widg
 		chips.Append(c.chip(item))
 	}
 	chips.OnMoved = func(src *widget.ChipBox, from, to int) { c.moved(src, from, chips, to) }
-	frame := widget.NewBox(widget.Row, 0, th.Padding)
-	frame.AddClass("layout-zone-items")
-	frame.AppendAligned(chips, true, widget.AlignCenter)
+	chips.AddClass("layout-zone-items")
 	var addModule *widget.Button
 	addModule = c.k.button(c.k.icon("ld-plus-symbolic"), func() {
 		c.pickModule(addModule, func(m config.BarModule) {
@@ -230,7 +227,7 @@ func (c *layoutEditor) zoneRow(at zoneRef, labels *widget.SizeGroup) widget.Widg
 	addGroup.SetTooltip(t.Get("settings-layout-add-group"))
 	zoneLabel := c.k.label(t.Get(zoneKeys[at.zone]), "layout-zone-label", css.CaptionHeading, css.DimLabel)
 	row.AppendAligned(labels.Add(zoneLabel), false, widget.AlignCenter)
-	row.Append(frame, true)
+	row.Append(chips, true)
 	row.AppendAligned(addModule, false, widget.AlignCenter)
 	row.AppendAligned(addGroup, false, widget.AlignCenter)
 	return row

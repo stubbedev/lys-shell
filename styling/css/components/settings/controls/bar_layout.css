@@ -7,6 +7,7 @@
 }
 
 .layout-zone-items {
+  padding: var(--space-sm);
   background-color: var(--bg-base);
   border: 2px dashed var(--border-subtle);
   border-radius: var(--rounding-container);
