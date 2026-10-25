@@ -1,26 +1,3 @@
-.network-list-scroll {
-  background: transparent;
-}
-
-.network-list {
-  padding: 0;
-}
-.network-list .network-ap + .network-ap,
-.network-list .vpn-item + .vpn-item {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.network-ap image.network-item-signal {
-  -gtk-icon-size: var(--icon-lg);
-  color: var(--fg-muted);
-}
-.network-ap .title {
-  font-size: var(--text-md);
-  color: var(--fg-default);
-}
-.network-ap .description {
-  font-size: var(--text-sm);
-}
 .network-ap.stale .media,
 .network-ap.stale .title,
 .network-ap.stale .description {

@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"image"
 	"image/png"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/service/network/secrets"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/recorder"
 )
@@ -113,6 +115,42 @@ func TestDropdownPreviews(t *testing.T) {
 				WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "mine", WifiStrength: 90, WifiFrequency: 5180, WifiIP4: "192.168.1.9",
 			}, ticks: make(chan struct{}, 2)}
 			return newPanelBox(newNetworkView(*ctx, netDeps{wifiCtl: wifi}))
+		}},
+		{"network-password", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			wifi := &fakeWifiCtl{aps: []network.AccessPoint{netAP("home", 80, network.SecurityWPA2, "/ap/1")}}
+			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{WifiEnabled: true, HasWifi: true}, ticks: make(chan struct{}, 2)}
+			v := newNetworkView(*ctx, netDeps{wifiCtl: wifi})
+			v.attachPopover(&fakePopover{})
+			v.selectNetwork("home")
+			return newPanelBox(v)
+		}},
+		{"network-secret", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			agent := &fakeAgent{req: &secrets.Request{
+				UUID: "u1", Name: "Work VPN", Setting: "vpn", Message: "Enter the code from your authenticator",
+				Fields: []secrets.Field{{Key: "password", Label: "Pass", Secret: true}, {Key: "otp", Label: "Code"}},
+			}}
+			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{}, ticks: make(chan struct{}, 2)}
+			v := newNetworkView(*ctx, netDeps{agent: agent})
+			v.attachPopover(&fakePopover{})
+			return newPanelBox(v)
+		}},
+		{"network-vpn", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			vpn := &fakeVPN{entries: []network.VPN{
+				{UUID: "u1", Name: "Work", State: network.VPNConnected},
+				{UUID: "u2", Name: "Home", State: network.VPNFailed, Detail: "wrong username or password"},
+			}}
+			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000, WiredIP4: "10.0.0.5"}, ticks: make(chan struct{}, 2)}
+			v := newNetworkView(*ctx, netDeps{vpn: vpn, vpnKinds: testKinds})
+			v.apply(v.read(context.Background()))
+			return newPanelBox(v)
+		}},
+		{"network-vpn-edit", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{}, ticks: make(chan struct{}, 2)}
+			v := newNetworkView(*ctx, netDeps{vpn: &fakeVPN{}, vpnKinds: testKinds})
+			v.attachPopover(&fakePopover{})
+			v.body.SetTransition(widget.StackNone, 0)
+			v.vpnAdd()
+			return newPanelBox(v)
 		}},
 		{"notification", "notification", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			svc := newNotifTestService(t)

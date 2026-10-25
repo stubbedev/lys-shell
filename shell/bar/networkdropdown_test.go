@@ -178,13 +178,13 @@ func TestNetworkDropdownWithoutWifi(t *testing.T) {
 	if v.headerIcon.Name() != "cm-wired-symbolic" || v.wifiSwitch.Visible() || v.scanBtn.Visible() {
 		t.Error("no wifi: want the wired icon, no switch, no scan")
 	}
-	if !v.noAdapter.Visible() || v.listCard.Visible() || v.availLabel.Visible() {
+	if !v.noAdapter.Visible() || v.listCard.Visible() || v.availSection.Visible() {
 		t.Error("no wifi: want the no-adapter state")
 	}
-	if !v.active.Visible() || !v.active.wired.Visible() || v.active.wiredDetail.Text() != "10.0.0.5 - 1 Gbps" {
-		t.Errorf("wired card: visible %v detail %q", v.active.wired.Visible(), v.active.wiredDetail.Text())
+	if detail := itemText(v.active.wired, "description"); !v.active.Visible() || !v.active.wired.Visible() || detail != "10.0.0.5 - 1 Gbps" {
+		t.Errorf("wired card: visible %v detail %q", v.active.wired.Visible(), detail)
 	}
-	if v.active.wifiCard.Visible() || v.active.label.Text() != i18n.T("dropdown-network-active-connection") {
+	if v.active.wifi.Visible() || v.active.label.Text() != i18n.T("dropdown-network-active-connection") {
 		t.Error("wifi card shows without wifi, or the label is plural")
 	}
 }
@@ -216,8 +216,8 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	if _, _, _, scans, _ := wifi.calls(); scans != 0 {
 		t.Error("a populated list scanned on reopen")
 	}
-	if v.active.wifiName.Text() != "mine" || v.active.wifiDetail.Text() != "192.168.1.9 - 5 GHz" || !v.active.wifiStatus.Visible() {
-		t.Errorf("wifi card = %q / %q", v.active.wifiName.Text(), v.active.wifiDetail.Text())
+	if name, detail := itemText(v.active.wifi, "title"), itemText(v.active.wifi, "description"); name != "mine" || detail != "192.168.1.9 - 5 GHz" || !v.active.wifiStatus.Visible() {
+		t.Errorf("wifi card = %q / %q", name, detail)
 	}
 
 	// A secured unknown network asks for its password, focused.
@@ -237,7 +237,7 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	}
 	v.password.secret.entry.SetText("hunter2")
 	v.password.connect()
-	if onHeadlessLoop(func() bool { return v.state != netConnecting || v.active.wifiName.Text() == "" }) {
+	if onHeadlessLoop(func() bool { return v.state != netConnecting || itemText(v.active.wifi, "title") == "" }) {
 		t.Error("connecting state not shown")
 	}
 	close(refuse)
@@ -263,8 +263,8 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	v.apply(v.read(context.Background()))
 	v.selectNetwork("cafe")
 	waitHeadless(t, "the failure", func() bool { return v.progress.err != "" })
-	if v.active.wifiDetail.Text() != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "cm-wireless-disabled-symbolic" {
-		t.Errorf("error card = %q badge %v", v.active.wifiDetail.Text(), v.active.badge.Visible())
+	if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "cm-wireless-disabled-symbolic" {
+		t.Errorf("error card = %q badge %v", detail, v.active.badge.Visible())
 	}
 	v.active.hovered = true
 	v.active.syncTrailing()
@@ -272,7 +272,7 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 		t.Errorf("hovered error card shows %q", v.active.trailing.Visible())
 	}
 	v.active.dismiss()
-	if v.progress.err != "" || v.active.wifiCard.Visible() {
+	if v.progress.err != "" || v.active.wifi.Visible() {
 		t.Error("dismiss kept the error")
 	}
 }
@@ -327,11 +327,11 @@ func TestNetworkSecretForm(t *testing.T) {
 	}}
 	v, _, pop := newNetTestView(t, network.Snapshot{}, netDeps{agent: agent})
 	f := v.secret
-	if !f.Visible() || f.name.Text() != "Work VPN" || !f.message.Visible() || len(f.entries) != 3 {
-		t.Fatalf("form: visible %v name %q entries %d", f.Visible(), f.name.Text(), len(f.entries))
+	if name := itemText(f.head, "title"); !f.Visible() || name != "Work VPN" || !f.message.Visible() || len(f.entries) != 3 {
+		t.Fatalf("form: visible %v name %q entries %d", f.Visible(), name, len(f.entries))
 	}
-	labels := f.fields.Children()
-	if labels[0].(*widget.Label).Text() != i18n.T("dropdown-network-secret-username") || labels[4].(*widget.Label).Text() != "Code" {
+	fields := treetest.All[*widget.Field](f.fields)
+	if itemText(fields[0], "title") != i18n.T("dropdown-network-secret-username") || itemText(fields[2], "title") != "Code" {
 		t.Error("field labels: want the dropdown's wording, else the service's")
 	}
 	if f.entries[1].entry.Echo() != widget.EchoPassword || f.entries[0].entry.Echo() != widget.EchoNormal {
@@ -374,18 +374,12 @@ func TestNetworkRowsActivateAndForget(t *testing.T) {
 		known: map[string]bool{"saved": true},
 	}
 	v, _, pop := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: wifi})
-	if len(v.list.Children()) != 2 {
-		t.Fatalf("rows = %d, want cafe and saved", len(v.list.Children()))
+	rows := treetest.All[*widget.Item](v.list)
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want cafe and saved", len(rows))
 	}
 	// Strongest first: the saved network outranks the unknown one.
-	saved, ok := v.list.Children()[0].(*widget.Item)
-	if !ok {
-		t.Fatalf("row = %T, want lys-ui's Item", v.list.Children()[0])
-	}
-	cafe, ok := v.list.Children()[1].(*widget.Item)
-	if !ok {
-		t.Fatalf("row = %T, want lys-ui's Item", v.list.Children()[1])
-	}
+	saved, cafe := rows[0], rows[1]
 	if !cafe.HasClass("network-ap") {
 		t.Error("the row lacks its network-ap class")
 	}
@@ -539,7 +533,7 @@ func TestNetworkWifiTileSwapsWifiForError(t *testing.T) {
 		v.active.apply(v.cur.snap, v.progress)
 		return true
 	})
-	if !v.active.wifiTile.HasClass("error") || v.active.wifiTile.HasClass("wifi") {
+	if !v.active.wifi.HasClass("error") || v.active.wifi.HasClass("wifi") {
 		t.Error("a failed join left the tile in its wifi state")
 	}
 	onHeadlessLoop(func() bool {
@@ -547,21 +541,35 @@ func TestNetworkWifiTileSwapsWifiForError(t *testing.T) {
 		v.active.apply(v.cur.snap, v.progress)
 		return true
 	})
-	if !v.active.wifiTile.HasClass("wifi") || v.active.wifiTile.HasClass("error") {
+	if !v.active.wifi.HasClass("wifi") || v.active.wifi.HasClass("error") {
 		t.Error("the tile did not return to its wifi state")
 	}
 }
 
-// The connection tiles carry network-connection-icon and their kind as
-// two classes, the selectors the tile rules use (a single
-// "network-connection-icon ethernet" class matched none of them).
-func TestNetworkConnectionTilesCarryTheirClasses(t *testing.T) {
+// The active rows carry network-active and their kind as two classes,
+// the selectors the stylesheet's accent rules use.
+func TestNetworkActiveRowsCarryTheirClasses(t *testing.T) {
 	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: &fakeWifiCtl{}})
-	wired := v.active.wired.Children()[0].(*widget.Box)
-	if !wired.HasClass("network-connection-icon") || !wired.HasClass("ethernet") {
-		t.Errorf("wired tile classes %v, want network-connection-icon and ethernet", wired.Classes())
+	if !v.active.wired.HasClass("network-active") || !v.active.wired.HasClass("ethernet") || v.active.wired.HasClass("wifi") {
+		t.Errorf("wired row classes %v, want network-active and ethernet", v.active.wired.Classes())
 	}
-	if !v.active.wifiTile.HasClass("network-connection-icon") {
-		t.Errorf("wifi tile classes %v, want network-connection-icon", v.active.wifiTile.Classes())
+	if !v.active.wifi.HasClass("network-active") || !v.active.wifi.HasClass("wifi") || v.active.wifi.HasClass("ethernet") {
+		t.Errorf("wifi row classes %v, want network-active and wifi", v.active.wifi.Classes())
+	}
+}
+
+// The active card holds only the connections that show: one leaves no
+// separator over a hidden row, both are set apart by one.
+func TestNetworkActiveCardSeparatesOnlyShownRows(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000}, netDeps{})
+	if n := len(treetest.All[*widget.Separator](v.active.group)); n != 0 {
+		t.Errorf("wired alone: %d separators, want none", n)
+	}
+	onHeadlessLoop(func() bool {
+		v.active.apply(network.Snapshot{HasWired: true, Wired: network.StatusConnected, Wifi: network.StatusConnected, WifiSSID: "mine"}, netProgress{})
+		return true
+	})
+	if n := len(treetest.All[*widget.Separator](v.active.group)); n != 1 {
+		t.Errorf("wired and wifi: %d separators, want one", n)
 	}
 }

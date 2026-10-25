@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
@@ -82,32 +81,17 @@ type cardSection struct {
 	variants []pairingVariant
 }
 
-// newBtPairingCard builds the card on lys-ui's parts: a card holding
-// the device as an Item with the close action over a body the theme
-// spaces and insets in line with the item, the passkey as an
-// InputOTP, and the dim, title and monospace classes for the text
-// (pairing_card/mod.rs:47-101).
+// newBtPairingCard builds the card on lys-ui's parts: the form card with
+// the device as its subject, the passkey as an InputOTP, and the dim,
+// title and monospace classes for the text (pairing_card/mod.rs:47-101).
 func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	font, px := dropdownFont(ctx)
 	c := &btPairingCard{}
 	th := widget.Current()
-	card := widget.NewBox(widget.Column, 0, 0)
-	card.AddClass(css.Card, "bluetooth-pairing-card")
-	col := widget.NewBox(widget.Column, th.Spacing, 0)
-	col.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
-
-	c.device = widget.NewItem(font, "", "")
-	c.device.SetSmall(true)
-	c.device.SetEllipsize(true)
-	c.icon = widget.NewThemeIcon("ld-bluetooth-symbolic", itemIconPx)
+	card := newFormCard(font, px, "ld-bluetooth-symbolic", func() { c.emit(pairingOutput{kind: outputCancelled}) }, "bluetooth-pairing-card")
+	c.device, c.icon = card.head, card.icon
 	c.icon.AddClass("bluetooth-icon")
-	c.device.SetMedia(c.icon, false)
-	closeBtn := dropdownButton(widget.NewThemeIcon("ld-x-symbolic", int(px)), nil, css.Ghost, css.Icon, css.Small)
-	closeBtn.AddClass("bluetooth-pairing-close")
-	closeBtn.OnClick = func() { c.emit(pairingOutput{kind: outputCancelled}) }
-	c.device.AddAction(closeBtn)
-	card.Append(c.device, false)
-	card.Append(col, false)
+	col := card.body
 
 	message := func(key string) *widget.Label {
 		l := widget.NewLabel(font, px, btText(key), 0)
@@ -169,25 +153,18 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	hint.AddClass("bluetooth-pin-hint", css.Caption, css.DimLabel)
 	add(hint, variantRequestPinCode)
 
-	// The actions: reject/cancel on the left, the confirm on the right,
-	// splitting the width.
-	actions := widget.NewBox(widget.Row, th.Spacing, 0)
-	actions.AddClass("bluetooth-pairing-actions")
+	// The actions: reject or cancel, then the confirm.
 	c.leftLabel = widget.NewLabel(font, px, "", 0)
-	left := dropdownButton(c.leftLabel, nil, css.Outline)
-	left.OnClick = func() { c.emit(c.rejectOutput()) }
-	actions.Append(left, true)
+	left := dropdownButton(c.leftLabel, func() { c.emit(c.rejectOutput()) }, css.Outline)
 	c.rightLabel = widget.NewLabel(font, px, "", 0)
-	c.right = dropdownButton(c.rightLabel, nil, css.SuggestedAction)
-	c.right.OnClick = func() {
+	c.right = dropdownButton(c.rightLabel, func() {
 		if out, ok := c.confirmOutput(); ok {
 			c.emit(out)
 		}
-	}
-	actions.Append(c.right, true)
-	col.Append(actions, false)
+	}, css.SuggestedAction)
+	col.Append(formActions(left, c.right), false)
 
-	c.root = card
+	c.root = card.Box
 	c.apply()
 	return c
 }

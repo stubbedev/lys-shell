@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/portal"
 	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeVPN is a scripted vpnControl.
@@ -292,16 +293,16 @@ func TestVPNSection(t *testing.T) {
 	}
 	vpn := &fakeVPN{}
 	v, _ := newVPNTestView(t, vpn, nil)
-	if !v.vpns.Visible() || len(v.vpns.rows.Children()) != 0 || v.vpns.add.HasClass("separated") {
-		t.Error("no profiles: want the section with only the add row, unseparated")
+	if rows := vpnRows(v); !v.vpns.Visible() || len(rows) != 1 || rows[0] != v.vpns.add {
+		t.Error("no profiles: want the section with only the add row")
 	}
 	vpn.entries = []network.VPN{
 		{UUID: "u1", Name: "Work", State: network.VPNConnected},
 		{UUID: "u2", Name: "Home", State: network.VPNFailed, Detail: "wrong username or password"},
 	}
 	v.apply(v.read(context.Background()))
-	if len(v.vpns.rows.Children()) != 2 || !v.vpns.add.HasClass("separated") {
-		t.Fatalf("rows = %d", len(v.vpns.rows.Children()))
+	if rows := vpnRows(v); len(rows) != 3 || rows[2] != v.vpns.add {
+		t.Fatalf("rows = %d, want the two profiles over the add row", len(rows))
 	}
 	v.vpnToggle("u2")
 	waitHeadless(t, "the toggle", func() bool { _, _, _, tg := vpn.writes(); return slices.Equal(tg, []string{"u2"}) })
@@ -322,20 +323,17 @@ func TestVPNRowsActivate(t *testing.T) {
 	}
 	v, _ := newVPNTestView(t, vpn, nil)
 	v.apply(v.read(context.Background()))
-	row, ok := v.vpns.rows.Children()[0].(*widget.Item)
-	if !ok {
-		t.Fatalf("row = %T, want lys-ui's Item", v.vpns.rows.Children()[0])
-	}
+	row := vpnRows(v)[0]
 	if !row.HasClass("vpn-item") || row.HasClass("failed") || row.TooltipText() != "" {
 		t.Error("an idle profile is not a plain vpn-item")
 	}
-	failed := v.vpns.rows.Children()[1].(*widget.Item)
+	failed := vpnRows(v)[1]
 	if !failed.HasClass("failed") || failed.TooltipText() != "wrong username or password" {
 		t.Errorf("the failed profile: failed %v tooltip %q", failed.HasClass("failed"), failed.TooltipText())
 	}
 	var icon widget.Widget
 	walkTree(row, func(w widget.Widget) bool {
-		if i, ok := w.(*widget.Icon); ok && i.HasClass("network-item-signal") {
+		if i, ok := w.(*widget.Icon); ok && i.HasClass("vpn-state-icon") {
 			icon = i
 		}
 		return icon == nil
@@ -366,7 +364,7 @@ func TestVPNFormCreates(t *testing.T) {
 	if v.body.Visible() != netPageEdit || pop.focused != f.name {
 		t.Fatalf("page %q focus %v", v.body.Visible(), pop.focused)
 	}
-	if !f.kindSlot.Visible() || f.deleteBtn.Visible() || !f.importBtn.Visible() || f.title.Text() != i18n.T("dropdown-network-vpn-new") {
+	if !f.kindField.Visible() || f.deleteBtn.Visible() || !f.importBtn.Visible() || itemText(f.head, "title") != i18n.T("dropdown-network-vpn-new") {
 		t.Error("creating: want the type picker and import, no delete")
 	}
 	// No name: refused, nothing written.
@@ -452,7 +450,7 @@ func TestVPNFormEditsAndDeletes(t *testing.T) {
 	f := v.vpnForm
 	v.vpnEdit("u1")
 	waitHeadless(t, "the edit page", func() bool { return v.body.Visible() == netPageEdit })
-	if f.kindSlot.Visible() || !f.deleteBtn.Visible() || f.name.Text() != "Corp" || f.title.Text() != i18n.T("dropdown-network-vpn-new") {
+	if f.kindField.Visible() || !f.deleteBtn.Visible() || f.name.Text() != "Corp" || itemText(f.head, "title") != i18n.T("dropdown-network-vpn-new") {
 		t.Error("editing: want no type picker, delete, the name, the shared New VPN title")
 	}
 	if typedEntry(t, f, "gateway").Text() != "vpn.example.com" || f.pickers[0].picker.Selected() != 1 {
@@ -545,12 +543,9 @@ func TestVPNFormWireGuard(t *testing.T) {
 	v.vpnAdd()
 	// The private key's generate button and live public key.
 	priv := typedEntry(t, f, wireGuardPrivateKey)
-	readout := f.fields.Children()
 	var pub *widget.RichLabel
-	for _, w := range readout {
-		if l, ok := w.(*widget.RichLabel); ok && l.HasClass("network-vpn-public-key") {
-			pub = l
-		}
+	for _, w := range treetest.WithClass(f.fields, "network-vpn-public-key") {
+		pub, _ = w.(*widget.RichLabel)
 	}
 	if pub == nil || pub.Text() != i18n.T("dropdown-network-vpn-public-key-empty") {
 		t.Fatal("no empty public-key readout")
@@ -591,4 +586,9 @@ func TestVPNFormWireGuard(t *testing.T) {
 	if f.errLabel.Visible() || f.name.Text() != "Mine" {
 		t.Error("a dismissed chooser reported a failure")
 	}
+}
+
+// vpnRows is the VPN section's rows in order, the add row last.
+func vpnRows(v *networkView) []*widget.Item {
+	return treetest.All[*widget.Item](v.vpns.rows)
 }

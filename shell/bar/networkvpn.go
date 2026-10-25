@@ -317,59 +317,52 @@ func readWgQuick(path string) (map[string]string, bool) {
 type netVPNs struct {
 	*widget.Box
 	v    *networkView
-	rows *widget.Box
+	rows *widget.ItemGroup
 	add  *widget.Item
 }
 
 func newNetVPNs(v *networkView) *netVPNs {
-	s := &netVPNs{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
-	s.Append(sectionLabel(v.font, i18n.T("dropdown-network-vpn")), false)
-	card := widget.NewBox(widget.Column, 0, 0)
-	card.AddClass("card", "network-list")
-	s.rows = widget.NewBox(widget.Column, 0, 0)
-	card.Append(s.rows, false)
+	s := &netVPNs{v: v}
+	card, rows := itemCard()
+	card.AddClass("network-list")
+	s.rows = rows
+	s.Box = dropdownSection(sectionLabel(v.font, i18n.T("dropdown-network-vpn")), card)
 	// The add row activates as a whole (vpn_connections/mod.rs:75-107).
 	s.add = widget.NewItem(v.font, i18n.T("dropdown-network-vpn-add"), "")
 	s.add.SetSmall(true)
 	s.add.AddClass("vpn-item", "vpn-add")
 	s.add.SetOnActivate(v.vpnAdd)
-	plus := widget.NewThemeIcon("ld-plus-symbolic", int(v.px*1.1))
-	plus.AddClass("network-item-signal")
-	s.add.SetMedia(plus, false)
-	card.Append(s.add, false)
-	s.Append(card, false)
+	s.add.SetMedia(widget.NewThemeIcon("ld-plus-symbolic", itemIconPx), false)
+	s.rows.Append(s.add)
 	s.SetVisible(v.vpn != nil)
 	return s
 }
 
-// apply rebuilds the rows from one read of the profiles.
+// apply rebuilds the rows from one read of the profiles, the add row
+// last.
 func (s *netVPNs) apply(rows []network.VPN) {
 	s.rows.Clear()
 	for _, row := range rows {
-		s.rows.Append(s.row(row), false)
+		s.rows.Append(s.row(row))
 	}
-	if len(rows) > 0 {
-		s.add.AddClass("separated")
-	} else {
-		s.add.RemoveClass("separated")
-	}
+	s.rows.Append(s.add)
 }
 
 // row is VpnItem on lys-ui's Item: the state glyph as the media, the
 // name over the state or the gateway's reason, and the edit button as
 // the action. Activating the row toggles the tunnel (vpn_item.rs:
-// 190-197); the edit button keeps its own click. A reason is a
-// sentence: the stylesheet clamps it to three lines, the tooltip
-// holding the rest.
+// 190-197); the edit button keeps its own click. The name and a
+// reason keep to one line each, the tooltip holding the reason whole.
 func (s *netVPNs) row(r network.VPN) *widget.Item {
 	v := s.v
 	uuid := r.UUID
 	row := widget.NewItem(v.font, r.Name, vpnRowCaption(r))
 	row.SetSmall(true)
+	row.SetEllipsize(true)
 	row.AddClass("vpn-item")
 	row.SetOnActivate(func() { v.vpnToggle(uuid) })
-	icon := widget.NewThemeIcon(vpnStateIcon(r.State), int(v.px*1.1))
-	icon.AddClass("network-item-signal")
+	icon := widget.NewThemeIcon(vpnStateIcon(r.State), itemIconPx)
+	icon.AddClass("vpn-state-icon")
 	switch r.State {
 	case network.VPNConnected:
 		row.AddClass("connected")
@@ -412,10 +405,10 @@ type netVPNForm struct {
 	kinds      []network.VPNKind
 	selected   int
 	editing    string // the profile's UUID; "" creates one
-	title      *widget.Label
+	head       *widget.Item
 	importBtn  *widget.Button
 	name       *widget.Entry
-	kindLabel  *widget.Label
+	kindField  *widget.Field
 	kindSlot   *widget.Box
 	kindPicker *widget.Dropdown
 	fields     *widget.Box
@@ -428,7 +421,6 @@ type netVPNForm struct {
 	rawTyped   bool // the kind has a typed form; the raw editor is extra
 	rawOpen    bool
 	errLabel   *widget.Label
-	actions    *widget.Box
 	deleteBtn  *widget.Button
 	// confirming is confirming_delete: the alert is up, a second
 	// Delete click asks nothing more.
@@ -436,46 +428,38 @@ type netVPNForm struct {
 }
 
 func newNetVPNForm(v *networkView) *netVPNForm {
+	th := widget.Current()
 	f := &netVPNForm{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
-	f.AddClass("card", "network-password-card", "network-vpn-form")
+	f.AddClass(css.Card, "network-vpn-form")
 
-	header := widget.NewBox(widget.Row, 0, 0)
-	header.AddClass("network-password-header")
-	back := widget.NewThemeIcon("ld-arrow-left-symbolic", int(v.px))
-	backBtn := dropdownButton(back, f.cancel, "network-vpn-back")
-	backBtn.AddClass(css.Ghost, css.Icon)
+	// The header goes back, names the page, and imports. Its title is
+	// always "New VPN" (vpn_form/mod.rs:341-346): creating and editing
+	// share it.
+	f.head = widget.NewItem(v.font, i18n.T("dropdown-network-vpn-new"), "")
+	f.head.SetSmall(true)
+	backBtn := dropdownButton(widget.NewThemeIcon("ld-arrow-left-symbolic", int(v.px)), f.cancel, "network-vpn-back", css.Ghost, css.Icon, css.Small)
 	backBtn.SetTooltip(i18n.T("dropdown-network-vpn-back"))
-	header.Append(backBtn, false)
-	// The header title is always "New VPN" (vpn_form/mod.rs:341-346):
-	// creating and editing share it.
-	f.title = widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-vpn-new"), 0)
-	f.title.AddClass("network-password-name")
-	header.Append(f.title, true)
-	folder := widget.NewThemeIcon("ld-folder-open-symbolic", int(v.px))
-	f.importBtn = dropdownButton(folder, f.importFile, "network-vpn-import")
-	f.importBtn.AddClass(css.Ghost, css.Icon)
+	f.head.SetMedia(backBtn, true)
+	f.importBtn = dropdownButton(widget.NewThemeIcon("ld-folder-open-symbolic", int(v.px)), f.importFile, "network-vpn-import", css.Ghost, css.Icon, css.Small)
 	f.importBtn.SetTooltip(i18n.T("dropdown-network-vpn-import"))
-	header.Append(f.importBtn, false)
-	f.Append(header, false)
+	f.head.AddAction(f.importBtn)
+	f.Append(f.head, false)
 
-	body := widget.NewBox(widget.Column, 0, 0)
-	body.Append(f.fieldLabel(i18n.T("dropdown-network-vpn-name")), false)
+	body := widget.NewBox(widget.Column, th.Spacing, 0)
 	f.name = widget.NewEntry(v.font, v.px, 0)
 	f.name.AddClass("network-password-input")
-	body.Append(f.name, false)
-	f.kindLabel = f.fieldLabel(i18n.T("dropdown-network-vpn-type"))
-	body.Append(f.kindLabel, false)
+	body.Append(widget.NewField(v.font, i18n.T("dropdown-network-vpn-name"), f.name), false)
 	f.kindSlot = widget.NewBox(widget.Column, 0, 0)
-	body.Append(f.kindSlot, false)
-	f.fields = widget.NewBox(widget.Column, 0, 0)
-	f.fields.AddClass("network-secret-fields")
+	f.kindField = widget.NewField(v.font, i18n.T("dropdown-network-vpn-type"), f.kindSlot)
+	body.Append(f.kindField, false)
+	f.fields = widget.NewBox(widget.Column, th.Spacing, 0)
 	body.Append(f.fields, false)
-	f.advLabel = widget.NewLabel(v.font, v.px*0.85, "", 0)
-	f.advLabel.AddClass("network-secret-label")
-	f.advanced = dropdownButton(f.advLabel, f.toggleAdvanced, "network-vpn-advanced")
-	f.advanced.AddClass(css.Ghost)
+	f.advLabel = widget.NewLabel(v.font, v.px, "", 0)
+	f.advanced = dropdownButton(f.advLabel, f.toggleAdvanced, "network-vpn-advanced", css.Ghost, css.Small)
+	f.advanced.SetHAlign(widget.AlignStart)
 	body.Append(f.advanced, false)
-	f.rawHint = f.fieldLabel("")
+	f.rawHint = widget.NewLabel(v.font, v.px, "", 0)
+	f.rawHint.AddClass(css.Caption, css.DimLabel)
 	f.rawHint.SetWrap(true)
 	body.Append(f.rawHint, false)
 	f.raw = widget.NewTextArea(monoFont(v.ctx, v.font, v.px), v.px*0.9, 0)
@@ -483,20 +467,19 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	body.Append(f.raw, false)
 	scroll := dropdownScroll(body, "network-vpn-form-scroll")
 	scroll.SetMaxContentHeight(vpnFieldsMaxHeight)
-	f.Append(scroll, true)
 
+	foot := widget.NewBox(widget.Column, th.Spacing, 0)
+	foot.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	foot.Append(scroll, true)
 	f.errLabel = v.errorLabel()
-	f.Append(f.errLabel, false)
-
-	f.actions = widget.NewBox(widget.Row, 0, 0)
-	f.actions.AddClass("network-password-actions")
-	f.actions.Append(widget.NewSpacer(0, 0), true)
+	foot.Append(f.errLabel, false)
 	f.deleteBtn = v.ghostText(i18n.T("dropdown-network-vpn-delete"), "network-vpn-delete", f.askDelete)
-	f.actions.Append(f.deleteBtn, false)
-	f.actions.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-password-cancel", f.cancel), false)
-	f.actions.Append(v.primaryText(i18n.T("dropdown-network-vpn-save"), "network-password-connect", f.save), false)
-	f.Append(f.actions, false)
-
+	foot.Append(formActions(
+		f.deleteBtn,
+		v.outlineText(i18n.T("dropdown-network-cancel"), "network-password-cancel", f.cancel),
+		v.primaryText(i18n.T("dropdown-network-vpn-save"), "network-password-connect", f.save),
+	), false)
+	f.Append(foot, true)
 	return f
 }
 
@@ -511,12 +494,6 @@ func monoFont(ctx ModuleContext, fallback render.Font, px float64) render.Font {
 		return fallback
 	}
 	return app.FontFallback(face)
-}
-
-func (f *netVPNForm) fieldLabel(text string) *widget.Label {
-	l := widget.NewLabel(f.v.font, f.v.px*0.85, text, 0)
-	l.AddClass("network-secret-label")
-	return l
 }
 
 // kind is the picked kind.
@@ -543,13 +520,11 @@ func (f *netVPNForm) open(uuid, name, kind string, values map[string]string) {
 		labels[i] = k.Label
 	}
 	f.kindPicker = widget.NewDropdown(f.v.font, f.v.px, labels, f.selected)
-	f.kindPicker.AddClass("network-vpn-kind")
 	f.kindPicker.OnSelect = f.kindSelected
 	f.kindSlot.Clear()
 	f.kindSlot.Append(f.kindPicker, false)
 	creating := uuid == ""
-	f.kindLabel.SetVisible(creating)
-	f.kindSlot.SetVisible(creating)
+	f.kindField.SetVisible(creating)
 	f.deleteBtn.SetVisible(!creating)
 	f.rebuild(values)
 }
@@ -597,22 +572,21 @@ func (f *netVPNForm) rebuild(values map[string]string) {
 	section := ""
 	for _, field := range kind.Fields {
 		if field.Section != "" && field.Section != section {
-			heading := widget.NewLabel(f.v.font, f.v.px*0.9, vpnSectionHeading(field.Section), 0)
-			heading.AddClass("network-vpn-section")
-			f.fields.Append(heading, false)
+			f.fields.Append(sectionLabel(f.v.font, vpnSectionHeading(field.Section)), false)
 			section = field.Section
 		}
-		label := f.fieldLabel(vpnFieldLabel(field))
-		if field.Required {
-			label.AddClass("required")
-		}
-		f.fields.Append(label, false)
 		current, has := values[field.Key]
+		var control widget.Widget
 		if len(field.Choices) > 0 {
-			f.fields.Append(f.picker(field, current, has), false)
-			continue
+			control = f.picker(field, current, has)
+		} else {
+			control = f.entry(kind, field, current)
 		}
-		f.entry(kind, field, current)
+		row := widget.NewField(f.v.font, vpnFieldLabel(field), control)
+		if !field.Required {
+			row.AddClass("optional")
+		}
+		f.fields.Append(row, false)
 	}
 	f.syncRaw(kind, ok)
 }
@@ -630,15 +604,14 @@ func (f *netVPNForm) picker(field network.VPNField, current string, has bool) *w
 		selected = i
 	}
 	p := widget.NewDropdown(f.v.font, f.v.px, labels, selected)
-	p.AddClass("network-vpn-kind")
 	f.pickers = append(f.pickers, vpnPicker{key: field.Key, picker: p, values: values})
 	return p
 }
 
 // entry draws a typed box: masked with the reveal toggle when secret,
 // and for WireGuard's private key with the generate button and the
-// public key it derives.
-func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current string) {
+// public key it derives under it.
+func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current string) widget.Widget {
 	var entry *widget.Entry
 	if field.Secret {
 		entry = newSecretEntry(f.v.font, f.v.px).entry
@@ -646,12 +619,11 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 		entry = widget.NewEntry(f.v.font, f.v.px, 0)
 	}
 	entry.AddClass("network-password-input")
-	input := widget.NewBox(widget.Row, 0, 0)
-	input.Append(entry, true)
+	input := widget.NewBox(widget.Column, widget.Current().Spacing/2, 0)
+	input.Append(entry, false)
 	entry.SetPlaceholder(field.Placeholder)
 	entry.SetText(current)
 	entry.OnActivate = func(string) { f.save() }
-	f.fields.Append(input, false)
 	var readout *widget.RichLabel
 	// WireGuard's key generation is the entry's primary icon in Rust
 	if kind.ID == network.WireGuard && field.Key == wireGuardPrivateKey {
@@ -663,10 +635,10 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 		})
 		readout = widget.NewRichLabel(f.v.font, f.v.px*0.85, publicKeyReadout(current), 0)
 		readout.SetVariants(app.FontVariantsOf(f.v.font))
-		readout.AddClass("network-vpn-public-key", "network-secret-label")
+		readout.AddClass("network-vpn-public-key", css.Caption, css.DimLabel, css.Monospace)
 		readout.SetWrap(true)
 		readout.SetSelectable(true)
-		f.fields.Append(readout, false)
+		input.Append(readout, false)
 	}
 	// A box stops being wrong the moment it is edited.
 	entry.OnChanged = func(text string) {
@@ -676,6 +648,7 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 		}
 	}
 	f.entries = append(f.entries, vpnEntry{key: field.Key, entry: entry})
+	return input
 }
 
 // syncRaw shows the raw editor's parts for the current state.

@@ -1,80 +1,17 @@
-.network-connections-group {
-  border-radius: var(--rounding-element);
-  padding: 0;
-}
-.network-connections-group .network-connection-card + .network-connection-card {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.network-connection-card {
-  padding: var(--space-sm);
-}
-
-.network-connection-icon {
-  border-radius: var(--rounding-element);
-  margin-right: var(--space-sm);
-}
-.network-connection-icon image {
-  -gtk-icon-size: var(--icon-sm);
-}
-.network-connection-icon.ethernet {
+.network-active .media {
   background: var(--accent-subtle);
 }
-.network-connection-icon.ethernet image {
-  margin: calc(var(--space-sm) + var(--space-xs));
-  -gtk-icon-size: var(--icon-md);
+.network-active image {
   color: var(--accent);
 }
-.network-connection-icon.wifi {
-  background: var(--accent-subtle);
-}
-.network-connection-icon.wifi image {
-  margin: calc(var(--space-sm) + var(--space-xs));
-  -gtk-icon-size: var(--icon-md);
-  color: var(--accent);
-}
-
-.network-connection-name {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold);
-  color: var(--fg-default);
-}
-
-.network-connection-detail {
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  color: var(--fg-subtle);
-}
-.network-connection-detail.error {
-  color: var(--status-error);
-}
-
-.network-connection-icon.error {
+.network-active.error .media {
   background: var(--status-error-subtle);
 }
-.network-connection-icon.error image {
-  margin: calc(var(--space-sm) + var(--space-xs));
+.network-active.error image {
   color: var(--status-error);
 }
-
-.network-connection-status {
-  margin-right: var(--space-sm);
-}
-
-.network-hover-stack {
-  margin-left: var(--space-xs);
-}
-
-.network-connection-actions {
-  margin-left: 0;
-  margin-right: var(--space-sm);
-}
-.network-connection-actions button {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-}
-.network-connection-actions button > box {
-  margin: var(--space-xs) var(--space-sm);
+.network-active.error .description {
+  color: var(--status-error);
 }
 
 button.network-action-forget:hover {

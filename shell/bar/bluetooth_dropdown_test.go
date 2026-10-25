@@ -773,7 +773,7 @@ func TestBtGhostClassesAreExact(t *testing.T) {
 			t.Errorf("the scan button lacks %s", class)
 		}
 	}
-	closeBtn := findButton(d.card.root, "bluetooth-pairing-close")
+	closeBtn := findButton(d.card.root, "form-close")
 	if closeBtn == nil {
 		t.Fatal("no pairing close button")
 	}

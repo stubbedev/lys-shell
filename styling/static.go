@@ -84,7 +84,6 @@ var sheetOrder = []string{
 	"modules/media_dropdown/source_picker.css",
 	"modules/network_dropdown/active_connection.css",
 	"modules/network_dropdown/network_list.css",
-	"modules/network_dropdown/password_form.css",
 	"modules/network_dropdown/vpn.css",
 	"modules/network_dropdown/index.css",
 	"modules/notification_dropdown/group.css",

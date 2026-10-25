@@ -1,14 +1,3 @@
-button.network-scan-btn {
-  margin-right: var(--space-sm);
-}
-button.network-scan-btn image {
-  -gtk-icon-size: var(--icon-md);
-  color: var(--fg-muted);
-  margin: 0 var(--space-sm);
-}
-button.network-scan-btn:hover image {
-  color: var(--fg-default);
-}
 button.network-scan-btn.scanning image {
   animation: network-scan-spin var(--cfg-anim-scan, 1s) steps(20) infinite;
 }

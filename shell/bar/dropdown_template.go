@@ -101,6 +101,45 @@ func itemCard() (*widget.Box, *widget.ItemGroup) {
 	return card, group
 }
 
+// formCard is a prompt card: lys-ui's card holding a small Item (the
+// subject, its icon on the media tile, a close action) over a body the
+// theme spaces and insets in line with the item.
+type formCard struct {
+	*widget.Box
+	head *widget.Item
+	icon *widget.Icon
+	body *widget.Box
+}
+
+func newFormCard(font render.Font, px float64, icon string, onClose func(), classes ...string) *formCard {
+	th := widget.Current()
+	f := &formCard{Box: widget.NewBox(widget.Column, 0, 0)}
+	f.AddClass(append([]string{css.Card}, classes...)...)
+	f.head = widget.NewItem(font, "", "")
+	f.head.SetSmall(true)
+	f.head.SetEllipsize(true)
+	f.icon = widget.NewThemeIcon(icon, itemIconPx)
+	f.head.SetMedia(f.icon, false)
+	closeBtn := dropdownButton(widget.NewThemeIcon("ld-x-symbolic", int(px)), onClose, css.Ghost, css.Icon, css.Small, "form-close")
+	f.head.AddAction(closeBtn)
+	f.Append(f.head, false)
+	f.body = widget.NewBox(widget.Column, th.Spacing, 0)
+	f.body.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	f.Append(f.body, false)
+	return f
+}
+
+// formActions is a form's button row: the buttons at the end, the
+// theme's spacing apart, as lys-ui's dialogs place theirs.
+func formActions(buttons ...*widget.Button) *widget.Box {
+	row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
+	row.Append(widget.NewSpacer(0, 0), true)
+	for _, b := range buttons {
+		row.Append(b, false)
+	}
+	return row
+}
+
 // itemIconPx is an item's media icon size, lys-ui's icon size on the
 // item's 32px media tile.
 const itemIconPx = 16
