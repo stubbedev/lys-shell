@@ -6,69 +6,88 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 )
 
-func TestSeparatorPaintsCenteredLine(t *testing.T) {
-	const (
-		w, h = 10, 30
-	)
+// separatorBar is a styled bar at loc with one separator between two
+// clocks, settled within size; it returns the bar and the separator.
+func separatorBar(t *testing.T, cfg *config.Config, loc config.Location, size widget.Size) (*widget.Bar, *widget.BarSeparator) {
+	t.Helper()
+	cfg.Bar.Location = loc
+	layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}, {Module: "separator"}, {Module: "clock"}}}
+	bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+	settleBar(bar, size)
+	item := bar.Start().Children()[1].(*widget.Box).Children()[0]
+	sep, ok := item.(*widget.BarSeparator)
+	if !ok {
+		t.Fatalf("the separator's bar item holds %T, want the BarSeparator itself", item)
+	}
+	return bar, sep
+}
+
+// The separator is a rule, not a module button: it sits in its bar
+// item bare, so no button chrome (the basic variant's pill) wraps it.
+func TestSeparatorIsABarSeparatorNotAButton(t *testing.T) {
 	cfg := config.Defaults()
-	ctx := newTestContext(t, cfg)
-	module, err := Create("separator", ctx)
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	s := module.Root().(*separator)
-	if s.length != 24 { // 1.5 * 16
-		t.Fatalf("length = %d, want 24", s.length)
-	}
-	s.Measure(widgetConstraintsMax(100, 100))
-	s.Arrange(render.Rect{X: 0, Y: 0, W: w, H: h})
-
-	data := make([]byte, render.Stride(w)*h)
-	cv := render.New(data, render.Stride(w), w, h)
-	cv.Clear(cv.Rect(), render.RGB(0, 0, 0))
-	s.Paint(cv)
-
-	pixel := func(x, y int) render.Color {
-		start := y*render.Stride(w) + x*4
-		return render.ColorFromBytes(data[start : start+4])
-	}
-	// The line is 1px wide, centered in the 10px box (x=4), and 24px
-	// tall centered in the 30px box (y=3..27).
-	if got := pixel(4, 15); got>>16&0xFF == 0 && got>>8&0xFF == 0 {
-		t.Errorf("line center = %#08x, want the fg-subtle color", got)
-	}
-	if got := pixel(0, 15); got != render.RGB(0, 0, 0) {
-		t.Errorf("left of the line = %#08x, want black", got)
-	}
-	if got := pixel(4, 0); got != render.RGB(0, 0, 0) {
-		t.Errorf("above the line = %#08x, want black", got)
+	cfg.Bar.ButtonVariant = config.ButtonBasic
+	bar, sep := separatorBar(t, cfg, config.LocationTop, widget.Size{W: 1000, H: 1000})
+	walkTree(bar.Start().Children()[1], func(w widget.Widget) bool {
+		switch w.(type) {
+		case *widget.BarButton, *barButton:
+			t.Errorf("a %T wraps the separator", w)
+		}
+		return true
+	})
+	if !widget.HasClass(sep, "module") {
+		t.Error("the separator misses the module class")
 	}
 }
 
-func TestSeparatorMeasureIsNatural(t *testing.T) {
-	cfg := config.Defaults()
-	ctx := newTestContext(t, cfg)
-	module, err := Create("separator", ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := module.Root().(*separator)
-	if got := s.MinSize(); got.W != 1 || got.H != 24 {
-		t.Errorf("min size = %+v, want 1x24", got)
-	}
-	if got := s.Measure(widgetConstraintsMax(2, 2)); got.W != 1 || got.H != 2 {
-		t.Errorf("clamped measure = %+v, want {1 2} (clamp caps, never grows)", got)
-	}
-	if got := s.HitTest(widgetPoint{X: 0, Y: 0}); got != nil {
-		t.Errorf("HitTest = %v, want nil (separators are not interactive)", got)
+// size is the rule's thickness and length its extent across the bar:
+// a vertical line in a top bar, a horizontal one in a side bar, in the
+// configured color.
+func TestSeparatorRunsAcrossTheBar(t *testing.T) {
+	pink := render.RGB(0xf3, 0x8b, 0xa8)
+	for _, loc := range []config.Location{config.LocationTop, config.LocationLeft} {
+		cfg := config.Defaults()
+		cfg.Separator.Size = 3
+		cfg.Separator.Length = config.Size{Value: 12, Unit: config.SizePixels}
+		cfg.Separator.Color, _ = config.ParseColorValue("#f38ba8")
+		bar, sep := separatorBar(t, cfg, loc, widget.Size{W: 1000, H: 1000})
+		size := settleBar(bar, widget.Size{W: 1000, H: 1000})
+		w, h := 1000, size.H
+		if loc.IsVertical() {
+			w, h = size.W, 1000
+		}
+		bar.Measure(widgetConstraintsMax(w, h))
+		bar.Arrange(render.Rect{W: w, H: h})
+		data := make([]byte, render.Stride(w)*h)
+		cv := render.New(data, render.Stride(w), w, h)
+		cv.Clear(cv.Rect(), render.RGB(0, 0, 0))
+		bar.Paint(cv)
+		r := sep.Bounds()
+		cx, cy := r.X+r.W/2, r.Y+r.H/2
+		run := func(x, y, dx, dy int) int {
+			n := 0
+			for x, y = x-dx*50, y-dy*50; x < w && y < h; x, y = x+dx, y+dy {
+				if x >= 0 && y >= 0 && pixelAt(data, w, x, y) == pink {
+					n++
+				}
+			}
+			return n
+		}
+		across, along := run(cx, cy, 1, 0), run(cx, cy, 0, 1)
+		if loc.IsVertical() {
+			across, along = along, across
+		}
+		if across != 3 || along != 12 {
+			t.Errorf("%s bar: the rule paints %dpx thick and %dpx long in %#08x, want the size 3 and the length 12 in the configured color",
+				loc, across, along, uint32(pink))
+		}
 	}
 }
-
-type widgetPoint = struct{ X, Y int }
 
 func TestLoadFileAppliesSeparator(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")

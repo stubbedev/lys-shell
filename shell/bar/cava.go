@@ -377,3 +377,11 @@ func resolveModuleColor(ctx ModuleContext, cv config.ColorValue) render.Color {
 	}
 	return color
 }
+
+// clampSize confines s to the constraint box.
+func clampSize(s widget.Size, con widget.Constraints) widget.Size {
+	return widget.Size{
+		W: min(max(s.W, con.Min.W), con.Max.W),
+		H: min(max(s.H, con.Min.H), con.Max.H),
+	}
+}
