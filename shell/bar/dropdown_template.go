@@ -69,16 +69,41 @@ func dropdownHeaderParts(font render.Font, icon, title string, actions ...widget
 const dropdownHeaderIconPx = 18
 
 // dropdownContent is a dropdown's content column under lys-ui's layout
-// metrics: the theme's spacing between its sections, and an inset of
+// metrics: its sections twice the theme's spacing apart, inset by
 // twice the theme's padding, which lines the content up with the
 // header's icon. It carries .dropdown-content and the given classes.
 func dropdownContent(classes ...string) *widget.Box {
 	t := widget.Current()
-	inset := 2 * t.Padding
-	content := widget.NewBox(widget.Column, t.Spacing, inset)
+	content := widget.NewBox(widget.Column, 2*t.Spacing, 2*t.Padding)
 	content.AddClass(append([]string{"dropdown-content"}, classes...)...)
 	return content
 }
+
+// dropdownSection is a titled section of a dropdown's content: the
+// label over the body, the theme's spacing apart, so a section's parts
+// sit closer together than the sections do.
+func dropdownSection(label *widget.Label, body ...widget.Widget) *widget.Box {
+	section := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
+	section.Append(label, false)
+	for _, w := range body {
+		section.Append(w, false)
+	}
+	return section
+}
+
+// itemCard is a list card: lys-ui's card around an ItemGroup, which
+// sets its rows apart with separators.
+func itemCard() (*widget.Box, *widget.ItemGroup) {
+	group := widget.NewItemGroup()
+	card := widget.NewBox(widget.Column, 0, 0)
+	card.AddClass(css.Card)
+	card.Append(group, false)
+	return card, group
+}
+
+// itemIconPx is an item's media icon size, lys-ui's icon size on the
+// item's 32px media tile.
+const itemIconPx = 16
 
 // sectionLabel is a heading over a dropdown section, lys-ui's muted
 // caption heading.

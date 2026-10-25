@@ -1,56 +1,8 @@
-.bluetooth-device-list {
-  border-radius: var(--rounding-element);
-  padding: 0;
-}
-.bluetooth-device-list .bluetooth-device + .bluetooth-device {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.bluetooth-device:first-child {
-  border-top-left-radius: var(--rounding-element);
-  border-top-right-radius: var(--rounding-element);
-}
-.bluetooth-device:last-child {
-  border-bottom-left-radius: var(--rounding-element);
-  border-bottom-right-radius: var(--rounding-element);
-}
-
-.bluetooth-device image.bluetooth-icon {
-  -gtk-icon-size: var(--icon-lg);
-  color: var(--fg-muted);
-}
 .bluetooth-device.connected .media {
   background: var(--accent-subtle);
 }
 .bluetooth-device.connected image.bluetooth-icon {
   color: var(--accent);
-}
-
-.bluetooth-device .title {
-  font-size: var(--text-md);
-}
-.bluetooth-device .description {
-  font-size: var(--text-base);
-}
-
-.bluetooth-hover-stack {
-  margin-left: var(--space-xs);
-}
-
-.bluetooth-device-status {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--fg-subtle);
-  margin-left: 0;
-  margin-right: var(--space-sm);
-}
-.bluetooth-device-status.pending {
-  color: var(--fg-muted);
-}
-
-.bluetooth-device-actions {
-  margin-left: 0;
-  margin-right: var(--space-sm);
 }
 
 button.bluetooth-forget:hover {

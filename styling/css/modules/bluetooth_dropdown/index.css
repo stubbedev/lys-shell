@@ -1,30 +1,5 @@
-.bluetooth-scroll {
-  background: transparent;
-}
-.bluetooth-scroll scrollbar range trough {
-  background: transparent;
-}
-
-button.bluetooth-scan-btn {
-  margin-right: var(--space-sm);
-}
-button.bluetooth-scan-btn image {
-  margin: 0 var(--space-sm);
-  -gtk-icon-size: var(--icon-md);
-  color: var(--fg-muted);
-}
-button.bluetooth-scan-btn:hover image {
-  color: var(--fg-default);
-}
 button.bluetooth-scan-btn.scanning image {
   animation: bt-scan-spin var(--cfg-anim-scan, 1s) steps(20) infinite;
-}
-
-.bluetooth-no-new-devices {
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  color: var(--fg-subtle);
-  padding: var(--space-sm) var(--space-xs);
 }
 
 @keyframes bt-scan-spin {

@@ -51,13 +51,13 @@ type btDropdown struct {
 	toggle     *widget.Switch
 	card       *btPairingCard
 
-	myLabel, availLabel *widget.Label
-	myCard, availCard   *widget.Box
-	myList, availList   *widget.Box
-	scanningHint        *widget.Label
-	emptyNoDevices      widget.Widget
-	emptyOff            widget.Widget
-	emptyNoAdapter      widget.Widget
+	mySection, availSection *widget.Box
+	myCard, availCard       *widget.Box
+	myList, availList       *widget.ItemGroup
+	scanningHint            *widget.Label
+	emptyNoDevices          widget.Widget
+	emptyOff                widget.Widget
+	emptyNoAdapter          widget.Widget
 
 	// enabled and available are the dropdown's view, set optimistically
 	// by the switch and overwritten when the service's value changes.
@@ -163,24 +163,14 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	d.card.onOutput = d.onPairingOutput
 	col.Append(d.card.root, false)
 
-	d.myLabel = sectionLabel(font, btText("dropdown-bluetooth-my-devices"))
-	col.Append(d.myLabel, false)
-	d.myList = widget.NewBox(widget.Column, 0, 0)
-	d.myCard = widget.NewBox(widget.Column, 0, 0)
-	d.myCard.AddClass("card", "bluetooth-device-list")
-	d.myCard.Append(d.myList, false)
-	col.Append(d.myCard, false)
-	d.availLabel = sectionLabel(font, btText("dropdown-bluetooth-available-devices"))
-	col.Append(d.availLabel, false)
-	d.availList = widget.NewBox(widget.Column, 0, 0)
-	d.availCard = widget.NewBox(widget.Column, 0, 0)
-	d.availCard.AddClass("card", "bluetooth-device-list")
-	d.availCard.Append(d.availList, false)
-	col.Append(d.availCard, false)
-
+	d.myCard, d.myList = itemCard()
+	d.mySection = dropdownSection(sectionLabel(font, btText("dropdown-bluetooth-my-devices")), d.myCard)
+	col.Append(d.mySection, false)
+	d.availCard, d.availList = itemCard()
 	d.scanningHint = widget.NewLabel(font, px, btText("dropdown-bluetooth-no-new"), 0)
-	d.scanningHint.AddClass("bluetooth-no-new-devices")
-	col.Append(d.scanningHint, false)
+	d.scanningHint.AddClass(css.DimLabel)
+	d.availSection = dropdownSection(sectionLabel(font, btText("dropdown-bluetooth-available-devices")), d.availCard, d.scanningHint)
+	col.Append(d.availSection, false)
 	d.emptyNoDevices = emptyState(font, px, "ld-bluetooth-searching-symbolic",
 		btText("dropdown-bluetooth-no-devices-title"), btText("dropdown-bluetooth-no-devices-description"))
 	d.emptyOff = emptyState(font, px, "ld-bluetooth-off-symbolic",
@@ -199,7 +189,6 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	frame.Append(header, false)
 	frame.Append(scroll, true)
 	d.root = &btDropdownRoot{Box: frame, d: d}
-	d.card.focus = func(w widget.Widget) { d.root.focus(w) }
 	d.sync()
 	return d
 }
@@ -290,7 +279,7 @@ func (d *btDropdown) settlePending(lists ...[]deviceSnapshot) {
 // rebuildList re-renders a list when a row's view changed (the Rust
 // reconcile keeps rows; here unchanged lists keep theirs, so RSSI churn
 // does not reset a hovered row).
-func (d *btDropdown) rebuildList(list *widget.Box, snaps []deviceSnapshot, old []string) []string {
+func (d *btDropdown) rebuildList(list *widget.ItemGroup, snaps []deviceSnapshot, old []string) []string {
 	keys := make([]string, len(snaps))
 	for i, s := range snaps {
 		keys[i] = fmt.Sprintf("%s|%s|%s|%s|%v|%v|%v|%d|%d", s.path, s.name, s.icon, s.typeKey,
@@ -301,7 +290,7 @@ func (d *btDropdown) rebuildList(list *widget.Box, snaps []deviceSnapshot, old [
 	}
 	list.Clear()
 	for _, s := range snaps {
-		list.Append(d.buildRow(s), false)
+		list.Append(d.buildRow(s))
 	}
 	list.InvalidateLayout()
 	return keys
@@ -344,17 +333,14 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	row.onClick = func() { d.onDeviceClick(s) }
 	row.SetOnActivate(func() { row.onClick() })
 	row.SetOnHoverWithin(func(bool) { row.syncSlot() })
-	icon := widget.NewThemeIcon(s.icon, int(px*1.4))
+	icon := widget.NewThemeIcon(s.icon, itemIconPx)
 	icon.AddClass("bluetooth-icon")
 	row.SetMedia(icon, false)
 
 	// The trailing slot: status, or the actions while hovered.
 	if s.category != categoryAvailable || pending != 0 {
 		status := widget.NewLabel(font, px*0.85, statusLabel(s, pending), 0)
-		status.AddClass("bluetooth-device-status")
-		if pending != 0 {
-			status.AddClass("pending")
-		}
+		status.AddClass("bluetooth-device-status", css.Caption, css.DimLabel)
 		row.statusShown = s.connected || s.paired || pending != 0
 		row.status = status
 		// The status page sits at the slot's end and middle (the
@@ -365,7 +351,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		statusPage.SetVAlign(widget.AlignCenter)
 		statusPage.Append(status, false)
 
-		actions := widget.NewBox(widget.Row, 0, 0)
+		actions := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 		actions.AddClass("bluetooth-device-actions")
 		// Icon buttons named by their tooltips: the slot reserves the
 		// actions' width beside the status, so text buttons would cost
@@ -384,7 +370,6 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		// The hover stack crossfades between them (HOVER_TRANSITION_MS),
 		// as wide as the wider page so hovering never shifts the row.
 		row.slot = widget.NewStack()
-		row.slot.AddClass("bluetooth-hover-stack")
 		row.slot.SetTransition(widget.StackCrossfade, hoverTransition)
 		row.slot.Add(btSlotStatus, statusPage)
 		row.slot.Add(btSlotActions, actions)
@@ -445,9 +430,8 @@ func (d *btDropdown) render() {
 	d.toggle.SetVisible(d.available)
 
 	haveMine, haveAvail := len(d.myKeys) > 0, len(d.availKeys) > 0
-	d.myLabel.SetVisible(d.enabled && haveMine)
-	d.myCard.SetVisible(d.enabled && haveMine)
-	d.availLabel.SetVisible(d.enabled && (haveAvail || d.scanning))
+	d.mySection.SetVisible(d.enabled && haveMine)
+	d.availSection.SetVisible(d.enabled && (haveAvail || d.scanning))
 	d.availCard.SetVisible(d.enabled && haveAvail)
 	none := !haveMine && !haveAvail
 	d.scanningHint.SetVisible(d.enabled && d.scanning && none)

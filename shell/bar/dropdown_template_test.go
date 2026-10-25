@@ -46,7 +46,7 @@ func TestEmptyStateCentersInItsPage(t *testing.T) {
 }
 
 // A dropdown's content takes lys-ui's metrics under the stylesheet:
-// its sections sit the theme's spacing apart, inset by twice its
+// its sections sit twice the theme's spacing apart, inset by twice its
 // padding, and no shell rule replaces either.
 func TestDropdownContentTakesTheThemeMetrics(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
@@ -62,8 +62,8 @@ func TestDropdownContentTakesTheThemeMetrics(t *testing.T) {
 	if b := boundsOf(first); b.X != inset || b.Y != inset {
 		t.Errorf("the first section sits at %d,%d, want the %dpx inset", b.X, b.Y, inset)
 	}
-	if gap := boundsOf(second).Y - (boundsOf(first).Y + boundsOf(first).H); gap != th.Spacing {
-		t.Errorf("the sections sit %dpx apart, want the theme's %d", gap, th.Spacing)
+	if gap := boundsOf(second).Y - (boundsOf(first).Y + boundsOf(first).H); gap != 2*th.Spacing {
+		t.Errorf("the sections sit %dpx apart, want twice the theme's %d", gap, th.Spacing)
 	}
 	if !widget.HasClass(content, "dropdown-content") || !widget.HasClass(content, "x-content") {
 		t.Error("the content lacks .dropdown-content or its own class")

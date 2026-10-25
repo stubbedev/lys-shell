@@ -51,19 +51,19 @@ func visible(w widget.Widget) bool {
 	return !ok || v.Visible()
 }
 
-func rows(list *widget.Box) []*btDeviceRow {
+func rows(list *widget.ItemGroup) []*btDeviceRow {
 	var out []*btDeviceRow
-	for _, kid := range list.Children() {
-		if r, ok := kid.(*btDeviceRow); ok {
+	treetest.Walk(list, func(w widget.Widget) {
+		if r, ok := w.(*btDeviceRow); ok {
 			out = append(out, r)
 		}
-	}
+	})
 	return out
 }
 
 // itemText is the text of the item's part labelled class (title,
 // description).
-func itemText(it *btDeviceRow, class string) string {
+func itemText(it widget.Widget, class string) string {
 	for _, w := range treetest.WithClass(it, class) {
 		if l, ok := w.(*widget.Label); ok {
 			return l.Text()
@@ -74,7 +74,7 @@ func itemText(it *btDeviceRow, class string) string {
 
 func rowNamed(t *testing.T, d *btDropdown, name string) *btDeviceRow {
 	t.Helper()
-	for _, list := range []*widget.Box{d.myList, d.availList} {
+	for _, list := range []*widget.ItemGroup{d.myList, d.availList} {
 		for _, r := range rows(list) {
 			if itemText(r, "title") == name {
 				return r
@@ -98,7 +98,7 @@ func TestBtDropdownListsDevices(t *testing.T) {
 	if got := mine[1].status.Text(); got != "Paired" {
 		t.Errorf("second row status = %q", got)
 	}
-	if !visible(d.myLabel) || !visible(d.myCard) || !visible(d.availLabel) || !visible(d.availCard) {
+	if !visible(d.mySection) || !visible(d.availSection) || !visible(d.availCard) {
 		t.Error("the device sections are hidden")
 	}
 	for _, empty := range []widget.Widget{d.emptyNoDevices, d.emptyOff, d.emptyNoAdapter, d.scanningHint} {
@@ -155,7 +155,7 @@ func TestBtDropdownScan(t *testing.T) {
 	if !d.scanning || d.scanBtn.Enabled() || !widget.HasClass(d.scanBtn, "scanning") {
 		t.Error("the scan button is not held in its scanning state")
 	}
-	if !visible(d.scanningHint) || !visible(d.availLabel) || visible(d.emptyNoDevices) {
+	if !visible(d.scanningHint) || !visible(d.availSection) || visible(d.availCard) || visible(d.emptyNoDevices) {
 		t.Error("scanning with no devices: want the no-new hint under the available label")
 	}
 	// A second press while scanning does nothing.
@@ -166,6 +166,25 @@ func TestBtDropdownScan(t *testing.T) {
 	d.finishScan(d.scanGen)
 	if d.scanning || !d.scanBtn.Enabled() || widget.HasClass(d.scanBtn, "scanning") {
 		t.Error("the scan did not complete")
+	}
+}
+
+// A section shows only with devices to list: no paired device hides
+// My Devices, and a powered-off adapter hides both sections behind
+// its empty state.
+func TestBtDropdownSectionsFollowTheirDevices(t *testing.T) {
+	st := btWorld()
+	st.Devices = st.Devices[:1]
+	d, src := newTestBtDropdown(t, st)
+	if visible(d.mySection) || !visible(d.availSection) {
+		t.Errorf("only an unpaired device: my devices %v, available %v; want only available", visible(d.mySection), visible(d.availSection))
+	}
+	off := btWorld()
+	off.Enabled = false
+	src.setState(off)
+	d.sync()
+	if visible(d.mySection) || visible(d.availSection) || !visible(d.emptyOff) {
+		t.Errorf("powered off: my devices %v, available %v, off state %v; want only the off state", visible(d.mySection), visible(d.availSection), visible(d.emptyOff))
 	}
 }
 
@@ -333,8 +352,8 @@ func TestBtPairingConfirmation(t *testing.T) {
 	if !visible(c.root) || c.variant != variantRequestConfirmation {
 		t.Fatal("the card does not show the confirmation")
 	}
-	if c.deviceName.Text() != "Headset" || c.deviceType.Text() != "Headphones" || c.icon.Name() != "ld-headphones-symbolic" {
-		t.Errorf("header = %q %q %q", c.deviceName.Text(), c.deviceType.Text(), c.icon.Name())
+	if name, kind := itemText(c.device, "title"), itemText(c.device, "description"); name != "Headset" || kind != "Headphones" || c.icon.Name() != "ld-headphones-symbolic" {
+		t.Errorf("header = %q %q %q", name, kind, c.icon.Name())
 	}
 	if c.pinCode[1].Text() != "000042" {
 		t.Errorf("code = %q, want the zero-padded passkey", c.pinCode[1].Text())
@@ -393,19 +412,10 @@ func TestBtPairingPasskeyEntry(t *testing.T) {
 	if len(src.Calls()) != 0 {
 		t.Errorf("an empty passkey was sent: %v", src.Calls())
 	}
-	// Six single-digit boxes, digits only.
-	if len(c.pinDigits) != passkeyTotal {
-		t.Fatalf("digit boxes = %d, want %d", len(c.pinDigits), passkeyTotal)
-	}
-	c.pinDigits[0].SetText("12a3456789")
-	if got := c.pinDigits[0].Text(); got != "1" {
-		t.Errorf("a digit box took %q, want one digit", got)
-	}
-	for i, digit := range []string{"2", "3", "4", "5", "6"} {
-		c.pinDigits[i+1].SetText(digit)
-	}
-	if got := c.passkeyText(); got != "123456" {
-		t.Errorf("passkey = %q, want the six digits", got)
+	// The code input takes digits only, six at most.
+	c.passkey.SetCode("12a3456789")
+	if got := c.passkey.Code(); got != "123456" {
+		t.Errorf("passkey = %q, want the first six digits", got)
 	}
 	c.right.OnClick()
 	if !slices.Equal(src.Calls(), []string{"passkey 123456"}) {
@@ -418,7 +428,7 @@ func TestBtPairingPasskeyEntry(t *testing.T) {
 	src.setState(st)
 	d.sync()
 	c = d.card
-	c.pinDigits[0].SetText("9")
+	c.passkey.SetCode("9")
 	c.right.OnClick()
 	if !slices.Contains(src.Calls(), "passkey 9") {
 		t.Errorf("a partial passkey is not submitted: %v", src.Calls())
@@ -502,8 +512,8 @@ func TestBtPairingUnknownDevice(t *testing.T) {
 	st := btWorld()
 	st.Pairing = bluetooth.RequestAuthorization{Device: "/org/bluez/hci0/dev_NEW"}
 	d, _ := newTestBtDropdown(t, st)
-	if d.card.deviceName.Text() != "-" || d.card.deviceType.Text() != "Bluetooth device" {
-		t.Errorf("unknown device header = %q %q", d.card.deviceName.Text(), d.card.deviceType.Text())
+	if name, kind := itemText(d.card.device, "title"), itemText(d.card.device, "description"); name != "-" || kind != "Bluetooth device" {
+		t.Errorf("unknown device header = %q %q", name, kind)
 	}
 }
 
@@ -714,44 +724,32 @@ func TestBtNoAdapterDropdownKeepsTheHeader(t *testing.T) {
 	}
 }
 
-// The passkey prompt is six single-digit boxes (pairing_card/mod.rs:
-// 147-190), classed entry.bluetooth-pin-digit, in a centered row that
-// only the RequestPasskey variant shows.
-func TestBtPairingCardDigitBoxes(t *testing.T) {
+// The passkey prompt is lys-ui's code input of six digit slots
+// (pairing_card/mod.rs:147-190), which only the RequestPasskey variant
+// shows; the legacy PIN is a plain entry.
+func TestBtPairingCardPasskeyInput(t *testing.T) {
 	st := btWorld()
 	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
 	d, src := newTestBtDropdown(t, st)
 	c := d.card
-	if len(c.pinDigits) != passkeyTotal {
-		t.Fatalf("digit boxes = %d, want %d", len(c.pinDigits), passkeyTotal)
+	if c.passkey.Len() != passkeyTotal || !visible(c.passkey) {
+		t.Fatalf("code input = %d slots (visible %v), want %d showing", c.passkey.Len(), visible(c.passkey), passkeyTotal)
 	}
-	for i, digit := range c.pinDigits {
-		if !digit.HasClass("bluetooth-pin-digit") {
-			t.Errorf("digit box %d lost bluetooth-pin-digit", i)
-		}
-		if _, maxChars := digit.WidthChars(); maxChars != 1 {
-			t.Errorf("digit box %d max width = %d chars, want 1", i, maxChars)
-		}
+	if visible(c.legacyPinEntry) {
+		t.Error("the legacy PIN entry shows for a passkey prompt")
 	}
-	if !visible(c.pinRow) || len(c.pinRow.Children()) != passkeyTotal {
-		t.Error("the pin row is not the six boxes")
-	}
-	// The legacy PIN box is not a digit box, and the row hides for the
-	// other variants.
-	if c.legacyPinEntry.HasClass("bluetooth-pin-digit") {
-		t.Error("the legacy PIN entry wears the digit class")
-	}
+	c.passkey.SetCode("12")
 	st.Pairing = bluetooth.RequestConfirmation{Device: pathSpeaker, Passkey: 1}
 	src.setState(st)
 	d.sync()
-	if visible(c.pinRow) {
-		t.Error("the digit boxes show for a confirmation prompt")
+	if visible(c.passkey) {
+		t.Error("the code input shows for a confirmation prompt")
 	}
 	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
 	src.setState(st)
 	d.sync()
-	if !visible(c.pinRow) {
-		t.Error("the digit boxes stayed hidden for a passkey prompt")
+	if !visible(c.passkey) || c.passkey.Code() != "" {
+		t.Errorf("a new passkey prompt: visible %v, code %q, want an empty input showing", visible(c.passkey), c.passkey.Code())
 	}
 }
 
@@ -766,24 +764,8 @@ func plain(s string) string {
 	}, s)
 }
 
-// The progress dots box rides in the display-passkey code block
-// (pairing_card/mod.rs:229-230): an empty box the stylesheet spaces,
-// with no dot children of its own.
-func TestBtPairingCardProgressDots(t *testing.T) {
-	st := btWorld()
-	st.Pairing = bluetooth.DisplayPasskey{Device: pathHeadset, Passkey: 7, Entered: 2}
-	d, _ := newTestBtDropdown(t, st)
-	dots := findBox(d.card.root, "bluetooth-progress-dots")
-	if dots == nil {
-		t.Fatal("no bluetooth-progress-dots box")
-	}
-	if n := len(dots.Children()); n != 0 {
-		t.Errorf("the dots box has %d children, want none (the Rust box is empty)", n)
-	}
-}
-
-// Icon buttons are lys-ui's ghost icon square; text buttons are ghost
-// without the icon size (mod.rs:95-121, pairing_card/mod.rs:94-100).
+// Icon buttons are lys-ui's ghost icon square (mod.rs:95-121,
+// pairing_card/mod.rs:94-100).
 func TestBtGhostClassesAreExact(t *testing.T) {
 	d, _ := newTestBtDropdown(t, btWorld())
 	for _, class := range []string{css.Ghost, css.Icon, "bluetooth-scan-btn"} {
@@ -812,81 +794,6 @@ func TestBtGhostClassesAreExact(t *testing.T) {
 	}
 	if !widget.HasClass(mouse.actions.Children()[1], "bluetooth-forget") {
 		t.Error("the forget action lacks its class")
-	}
-}
-
-// A typed digit steps the keyboard to the next box (handle_pin_key's
-// grab_focus), through the popover handle.
-func TestBtPairingDigitBoxesStepTheFocus(t *testing.T) {
-	st := btWorld()
-	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
-	d, _ := newTestBtDropdown(t, st)
-	pop := &fakePopover{}
-	d.root.attachPopover(pop)
-	c := d.card
-	c.pinDigits[2].SetText("4")
-	if pop.focused != c.pinDigits[3] {
-		t.Error("typing a digit did not move to the next box")
-	}
-	// The last box has no next.
-	pop.focused = nil
-	c.pinDigits[5].SetText("1")
-	if pop.focused != nil {
-		t.Error("the last digit box stepped past itself")
-	}
-	// A filtered-out keystroke does not step.
-	pop.focused = nil
-	c.pinDigits[0].SetText("")
-	c.pinDigits[0].SetText("x")
-	if pop.focused != nil {
-		t.Error("a rejected keystroke stepped the focus")
-	}
-}
-
-// Backspace on the digit row is the Rust key controller
-// (handle_pin_key): on an empty box it clears and focuses the previous
-// one, on a filled box it clears it, and the entry never sees it.
-func TestBtPairingPinBackspaceSteps(t *testing.T) {
-	st := btWorld()
-	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
-	d, _ := newTestBtDropdown(t, st)
-	c := d.card
-	arrangeDropdown(t, c.root, 320, 400)
-	// The popover's focus handle: the test wires it to the router, the
-	// attach does in the app.
-	router := &widget.Router{Root: c.root}
-	c.focus = func(w widget.Widget) { router.SetFocus(w) }
-	focused := c.pinDigits[2]
-	router.SetFocus(focused)
-	if router.Focused() != widget.Widget(focused) {
-		t.Fatal("the middle digit box did not take focus")
-	}
-	// A filled box's backspace clears it in place; focus stays.
-	focused.SetText("7")
-	router.KeyAction(widget.KeyBackspace, 0)
-	if focused.Text() != "" {
-		t.Errorf("backspace on a filled box left %q", focused.Text())
-	}
-	if router.Focused() != widget.Widget(focused) {
-		t.Error("a filled box's backspace moved focus")
-	}
-	// An empty box's backspace clears and focuses the previous one.
-	router.SetFocus(c.pinDigits[1])
-	c.pinDigits[0].SetText("9")
-	router.KeyAction(widget.KeyBackspace, 0)
-	if c.pinDigits[0].Text() != "" {
-		t.Errorf("the previous box kept %q", c.pinDigits[0].Text())
-	}
-	if router.Focused() != widget.Widget(c.pinDigits[0]) {
-		t.Error("the previous box did not take focus")
-	}
-	// Other actions reach the entry: a delete at the end of the text
-	// deletes nothing forward.
-	router.SetFocus(c.pinDigits[1])
-	c.pinDigits[1].SetText("5")
-	router.KeyAction(widget.KeyDelete, 0)
-	if c.pinDigits[1].Text() != "5" {
-		t.Errorf("the delete deleted backward: %q", c.pinDigits[1].Text())
 	}
 }
 

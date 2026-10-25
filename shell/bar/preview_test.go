@@ -60,6 +60,21 @@ func TestDropdownPreviews(t *testing.T) {
 		{"bluetooth", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(btWorld())).root)
 		}},
+		{"bluetooth-passkey", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			st := btWorld()
+			st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
+			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(st)).root)
+		}},
+		{"bluetooth-confirm", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			st := btWorld()
+			st.Pairing = bluetooth.RequestConfirmation{Device: pathHeadset, Passkey: 42}
+			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(st)).root)
+		}},
+		{"bluetooth-pin", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			st := btWorld()
+			st.Pairing = bluetooth.RequestPinCode{Device: pathSpeaker}
+			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(st)).root)
+		}},
 		{"bluetooth-off", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(btOff)).root)
 		}},
