@@ -1,12 +1,3 @@
-.cal-section {
-  border-top: 1px solid var(--border-default);
-}
-
-.cal-header {
-  margin: var(--space-sm) 0 0;
-  padding: 0 var(--space-xs);
-}
-
 .calendar-dropdown calendar .weekend {
   color: color-mix(in srgb, var(--accent) 50%, var(--fg-muted));
 }

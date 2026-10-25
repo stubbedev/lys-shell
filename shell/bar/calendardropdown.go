@@ -103,6 +103,7 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 	v.Append(dropdownHeader(font, "tb-calendar-time-symbolic", i18n.T("dropdown-calendar-title")), false)
 	content := dropdownContent()
 	content.Append(v.hero(), false)
+	content.Append(widget.NewSeparator(widget.Horizontal), false)
 	content.Append(v.calendar(), false)
 	v.Append(content, false)
 	v.tick()
@@ -116,37 +117,40 @@ func (v *calendarView) label(text string, scale float64) *widget.Label {
 	return widget.NewLabel(v.font, v.px*scale, text, 0)
 }
 
-// hero is the clock-hero: HH:MM[:SS][ AM] over "Weekday, Month D, YYYY".
+// clockTimeScale is the hero clock's display size over the dropdown's
+// text size.
+const clockTimeScale = 4.5
+
+// hero is the clock-hero: HH:MM[:SS][ AM] in the display size over
+// "Weekday, Month D, YYYY", the day in the heading weight and the rest
+// dimmed.
 func (v *calendarView) hero() widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
+	th := widget.Current()
+	col := widget.NewBox(widget.Column, th.Spacing/2, 0)
 	col.AddClass("clock-hero")
 	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("clock-time-row")
 	v.timeRow = row
-	big := 2.6
-	timeLabel := func() *widget.Label {
-		l := v.label("", big)
-		l.AddClass("clock-time")
+	timeLabel := func(text string, classes ...string) *widget.Label {
+		l := v.label(text, clockTimeScale)
+		l.AddClass(append([]string{"clock-time", css.Numeric}, classes...)...)
 		return l
 	}
-	v.hours, v.minutes, v.seconds = timeLabel(), timeLabel(), timeLabel()
-	sep := func() *widget.Label {
-		l := v.label(":", big)
-		l.AddClass("clock-time", "clock-separator")
-		return l
-	}
-	v.secSep = sep()
-	v.ampm = v.label("", 1.1)
-	v.ampm.AddClass("clock-ampm")
-	for _, w := range []widget.Widget{v.hours, sep(), v.minutes, v.secSep, v.seconds, v.ampm} {
-		row.Append(w, false)
+	v.hours, v.minutes, v.seconds = timeLabel(""), timeLabel(""), timeLabel("")
+	v.secSep = timeLabel(":", "clock-separator")
+	v.ampm = v.label("", 1)
+	v.ampm.AddClass("clock-ampm", css.Heading, css.DimLabel)
+	// The time and the ampm share the row's text baseline.
+	for _, w := range []widget.Widget{v.hours, timeLabel(":", "clock-separator"), v.minutes, v.secSep, v.seconds, v.ampm} {
+		row.AppendAligned(w, false, widget.AlignBaseline)
 	}
 	col.AppendAligned(row, false, widget.AlignCenter)
 	date := widget.NewBox(widget.Row, 0, 0)
 	date.AddClass("clock-date")
 	v.dayName = v.label("", 1)
-	v.dayName.AddClass("clock-date-day")
+	v.dayName.AddClass("clock-date-day", css.Heading)
 	v.dateRest = v.label("", 1)
+	v.dateRest.AddClass(css.DimLabel)
 	date.Append(v.dayName, false)
 	date.Append(v.dateRest, false)
 	col.AppendAligned(date, false, widget.AlignCenter)
@@ -157,11 +161,11 @@ func (v *calendarView) hero() widget.Widget {
 // month grid, which carries the month title and its navigation. Today
 // opens picked, so it wears the accent until another day is picked.
 func (v *calendarView) calendar() widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
+	col := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	col.AddClass("cal-section")
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("cal-header")
-	today := dropdownButton(v.label(i18n.T("cal-today"), 0.85), v.goToToday, css.Ghost, css.Small, "cal-today-btn")
+	today := dropdownButton(v.label(i18n.T("cal-today"), 1), v.goToToday, css.Ghost, css.Small, "cal-today-btn")
 	header.Append(widget.NewSpacer(0, 0), true)
 	header.Append(today, false)
 	col.Append(header, false)
@@ -193,10 +197,8 @@ func (v *calendarView) tick() {
 	v.seconds.SetVisible(clock.DropdownShowSeconds)
 	v.secSep.SetVisible(clock.DropdownShowSeconds)
 	v.ampm.SetVisible(use12h)
-	// The row's state classes: use-12h indents the row, show-seconds
-	// stops the separator blink.
+	// show-seconds stops the separator blink.
 	setClass(v.timeRow, "show-seconds", clock.DropdownShowSeconds)
-	setClass(v.timeRow, "use-12h", use12h)
 	v.dayName.SetText(i18n.T(calendarDayIDs[now.Weekday()]))
 	v.dateRest.SetText(i18n.T("cal-clock-date-rest",
 		i18n.Str("month", i18n.T(calendarMonthIDs[now.Month()-1])),

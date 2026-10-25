@@ -101,50 +101,21 @@ func TestCalendarSectionIsTheLysUICalendar(t *testing.T) {
 	}
 }
 
-// The clock row's state classes follow the clock config: use-12h
-// indents the row, show-seconds stops the separator blink.
+// The clock row's show-seconds class follows the clock config and
+// stops the separator blink; the ampm shows only in 12h.
 func TestCalendarClockRowCarriesTheStateClasses(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Clock.Format = "%I:%M %p"
 	cfg.Clock.DropdownShowSeconds = true
 	ctx := newTestContext(t, cfg)
 	v := calendarDropdown(ctx).(*calendarView)
-	if !v.timeRow.HasClass("use-12h") || !v.timeRow.HasClass("show-seconds") {
-		t.Errorf("12h with seconds: classes = %v, want use-12h and show-seconds", v.timeRow.Classes())
+	if !v.timeRow.HasClass("show-seconds") || !v.ampm.Visible() {
+		t.Errorf("12h with seconds: classes = %v, ampm %v; want show-seconds and the ampm", v.timeRow.Classes(), v.ampm.Visible())
 	}
-	// 24h without seconds drops both.
 	cfg.Clock.Format = "%H:%M"
 	cfg.Clock.DropdownShowSeconds = false
 	v.tick()
-	if v.timeRow.HasClass("use-12h") || v.timeRow.HasClass("show-seconds") {
-		t.Errorf("24h without seconds: classes = %v, want neither", v.timeRow.Classes())
-	}
-	if v.ampm.Visible() {
-		t.Error("24h renders the ampm")
-	}
-	// Seconds come back alone; use-12h waits for the format.
-	cfg.Clock.DropdownShowSeconds = true
-	v.tick()
-	if !v.timeRow.HasClass("show-seconds") || v.timeRow.HasClass("use-12h") {
-		t.Errorf("24h with seconds: classes = %v, want show-seconds only", v.timeRow.Classes())
-	}
-}
-
-// The Rust boxes are spacing-0 — the stylesheet's border-spacing and
-// margins carry every gap — so the constructors leave no additive
-// spacing behind.
-func TestCalendarSpacingIsCSSCarried(t *testing.T) {
-	ctx := newTestContext(t, config.Defaults())
-	v := calendarDropdown(ctx).(*calendarView)
-	sites := map[string]func() int{
-		"dropdown root": func() int { return v.Spacing() },
-		"clock-hero":    func() int { return classedBox(t, v, "clock-hero").Spacing() },
-		"cal-section":   func() int { return classedBox(t, v, "cal-section").Spacing() },
-		"cal-header":    func() int { return classedBox(t, v, "cal-header").Spacing() },
-	}
-	for what, get := range sites {
-		if got := get(); got != 0 {
-			t.Errorf("%s spacing = %d, want 0 (the CSS carries it)", what, got)
-		}
+	if v.timeRow.HasClass("show-seconds") || v.ampm.Visible() {
+		t.Errorf("24h without seconds: classes = %v, ampm %v; want neither", v.timeRow.Classes(), v.ampm.Visible())
 	}
 }
