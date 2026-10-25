@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // The empty state is lys-ui's StatusPage: its icon sits on the page's
@@ -17,7 +18,7 @@ import (
 func TestEmptyStateCentersInItsPage(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	font, px := dropdownFont(ctx)
-	state, glyph := emptyStateIcon(font, px, "ld-play-symbolic", "No Media Playing", "Start playing media in any app to control it here, or pick a player from the list")
+	state, glyph := widgets.EmptyStateIcon(font, px, "ld-play-symbolic", "No Media Playing", "Start playing media in any app to control it here, or pick a player from the list")
 	page := widget.NewBox(widget.Column, 0, 0)
 	page.Append(state, true)
 	ctx.Theme.Attach(page)

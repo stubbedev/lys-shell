@@ -214,24 +214,6 @@ func iconSectionLabel(font render.Font, icon, title string) *widget.Box {
 // also sets.
 const sectionLabelPx = 12
 
-// emptyState is the EmptyState template on lys-ui's StatusPage: the
-// icon on its muted tile over the title and the wrapped description,
-// centered in whatever page holds it.
-func emptyState(font render.Font, px float64, icon, title, description string) *widget.StatusPage {
-	page, _ := emptyStateIcon(font, px, icon, title, description)
-	return page
-}
-
-// emptyStateIcon is emptyState that also hands back its icon, for
-// pages whose glyph follows state.
-func emptyStateIcon(font render.Font, px float64, icon, title, description string) (*widget.StatusPage, *widget.Icon) {
-	page := widget.NewStatusPage(font, "", title, description)
-	page.AddClass("empty-state")
-	glyph := widget.NewThemeIcon(icon, int(px*1.7))
-	page.SetIcon(glyph)
-	return page, glyph
-}
-
 // refresher is a view's reader: every refresh of the view goes through
 // it, reads run off the loop one at a time, and requests made while a
 // read runs coalesce into one more read after it. Results apply on the

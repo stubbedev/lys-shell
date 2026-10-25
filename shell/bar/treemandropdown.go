@@ -12,6 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/treeman"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // treemanBucketLabel is bucket_label.
@@ -172,7 +173,7 @@ func (v *treemanView) worktreeItem(wt treeman.Worktree) *widget.Item {
 func (v *treemanView) renderList() {
 	v.list.Clear()
 	if v.status == nil || len(v.status.Repos) == 0 {
-		v.list.Append(emptyState(v.font, v.px, "ld-layers-symbolic", i18n.T("dropdown-treeman-empty-title"), i18n.T("dropdown-treeman-empty-desc")), false)
+		v.list.Append(widgets.EmptyState(v.font, v.px, "ld-layers-symbolic", i18n.T("dropdown-treeman-empty-title"), i18n.T("dropdown-treeman-empty-desc")), false)
 		return
 	}
 	v.list.Append(v.summary(), false)

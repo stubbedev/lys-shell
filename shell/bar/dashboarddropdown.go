@@ -477,7 +477,7 @@ func (v *dashboardView) media() widget.Widget {
 
 	// The empty state is expand with align Center (the EmptyState
 	// template); the page fills the stack and centers it.
-	empty := emptyState(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
+	empty := widgets.EmptyState(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
 	emptyPage := vcentered(widget.NewBox(widget.Column, 0, 0), empty)
 	body := widget.NewStack()
 	// Each page is its own height: the player does not take the empty

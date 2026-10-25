@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // bitwardenListMax caps the rows the vault page builds: a vault holds
@@ -351,7 +352,7 @@ func (v *bitwardenView) follow() {
 // showError replaces the pages with why there is no vault.
 func (v *bitwardenView) showError(err error) {
 	log.Printf("bitwarden: %v", err)
-	v.pages.Add(bwPageError, emptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-unavailable"), err.Error()))
+	v.pages.Add(bwPageError, widgets.EmptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-unavailable"), err.Error()))
 	v.pages.Show(bwPageError)
 	v.syncBtn.SetVisible(false)
 	v.lockBtn.SetVisible(false)
@@ -485,7 +486,7 @@ func (v *bitwardenView) buildVault() widget.Widget {
 	v.list = list
 	v.listSt = widget.NewStack()
 	v.listSt.Add("items", scrolledCard(card, ""))
-	v.listSt.Add("empty", emptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-no-items"), ""))
+	v.listSt.Add("empty", widgets.EmptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-no-items"), ""))
 	page.Append(v.listSt, true)
 	v.more = v.caption(css.DimLabel)
 	page.Append(v.more, false)

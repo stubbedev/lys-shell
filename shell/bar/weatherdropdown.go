@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/weather"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -217,7 +218,7 @@ func vcentered(col *widget.Box, kids ...widget.Widget) *widget.Box {
 
 // loadingPage is the status page the fetch shows.
 func (v *weatherView) loadingPage() widget.Widget {
-	page := emptyState(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-loading"), "")
+	page := widgets.EmptyState(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-loading"), "")
 	page.AddClass("loading-weather")
 	return vcentered(widget.NewBox(widget.Column, 0, 0), page)
 }
@@ -225,7 +226,7 @@ func (v *weatherView) loadingPage() widget.Widget {
 // errorPage is the failure's status page: its reason and a retry as
 // the page's child.
 func (v *weatherView) errorPage() widget.Widget {
-	page := emptyState(v.font, v.px, "ld-info-symbolic", i18n.T("dropdown-weather-error-title"), "")
+	page := widgets.EmptyState(v.font, v.px, "ld-info-symbolic", i18n.T("dropdown-weather-error-title"), "")
 	page.AddClass("error-weather")
 	v.errorText = v.label("", 1, "error-text")
 	v.errorText.AddClass(css.DimLabel)

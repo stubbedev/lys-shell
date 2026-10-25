@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/service/bluetooth"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // The bluetooth dropdown, ported from
@@ -100,7 +101,7 @@ func (r *btDropdownRoot) dropdownClosed() {
 func btNoAdapterDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	col := dropdownContent("bluetooth-content")
-	empty := emptyState(font, px, "ld-bluetooth-off-symbolic",
+	empty := widgets.EmptyState(font, px, "ld-bluetooth-off-symbolic",
 		btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
 	col.AppendAligned(empty, true, widget.AlignCenter)
 	return btShell(font, "ld-bluetooth-off-symbolic", dropdownScroll(col, "bluetooth-scroll"))
@@ -171,11 +172,11 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	d.scanningHint.AddClass(css.DimLabel)
 	d.availSection = dropdownSection(sectionLabel(font, btText("dropdown-bluetooth-available-devices")), d.availCard, d.scanningHint)
 	col.Append(d.availSection, false)
-	d.emptyNoDevices = emptyState(font, px, "ld-bluetooth-searching-symbolic",
+	d.emptyNoDevices = widgets.EmptyState(font, px, "ld-bluetooth-searching-symbolic",
 		btText("dropdown-bluetooth-no-devices-title"), btText("dropdown-bluetooth-no-devices-description"))
-	d.emptyOff = emptyState(font, px, "ld-bluetooth-off-symbolic",
+	d.emptyOff = widgets.EmptyState(font, px, "ld-bluetooth-off-symbolic",
 		btText("dropdown-bluetooth-off-title"), btText("dropdown-bluetooth-off-description"))
-	d.emptyNoAdapter = emptyState(font, px, "ld-bluetooth-off-symbolic",
+	d.emptyNoAdapter = widgets.EmptyState(font, px, "ld-bluetooth-off-symbolic",
 		btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
 	// The EmptyState template expands and centers itself
 	// (empty_state/mod.rs:13-14).

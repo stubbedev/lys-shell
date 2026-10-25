@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/mail"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // mailView is the mail dropdown: an item card of the accounts (each
@@ -40,7 +41,7 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	v.list = list
 	v.pages = widget.NewStack()
 	v.pages.Add("accounts", scrolledCard(card, ""))
-	v.pages.Add("empty", emptyState(font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-empty"), ""))
+	v.pages.Add("empty", widgets.EmptyState(font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-empty"), ""))
 	content := dropdownContent()
 	content.Append(v.pages, true)
 	v.Append(content, true)

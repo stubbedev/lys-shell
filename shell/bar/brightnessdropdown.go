@@ -106,7 +106,7 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	card, list := itemCard()
 	card.AddClass("brightness-devices")
 	v.list = list
-	empty := emptyState(font, px, brightnessDeviceIcon,
+	empty := widgets.EmptyState(font, px, brightnessDeviceIcon,
 		i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
 	empty.AddClass("brightness-empty")
 	// The content holds the device list and the empty state. No

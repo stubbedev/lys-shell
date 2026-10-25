@@ -282,7 +282,7 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(apps, true)
 	v.main = widget.NewStack()
 	v.main.Add("devices", content)
-	v.main.Add("empty", emptyState(font, px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-devices-title"), i18n.T("dropdown-audio-no-devices-description")))
+	v.main.Add("empty", widgets.EmptyState(font, px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-devices-title"), i18n.T("dropdown-audio-no-devices-description")))
 
 	v.pickers[audioOutput] = newDevicePicker(v, audioOutput, i18n.T("dropdown-audio-output-devices"))
 	v.pickers[audioInput] = newDevicePicker(v, audioInput, i18n.T("dropdown-audio-input-devices"))
@@ -512,7 +512,7 @@ func newAppVolumes(v *audioView) *appVolumes {
 	card.AddClass("audio-app-list")
 	a.list = list
 	a.Add("apps", scrolledCard(card, "app-volumes-scroll"))
-	a.Add("empty", emptyState(v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), ""))
+	a.Add("empty", widgets.EmptyState(v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), ""))
 	return a
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/notifyui"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // Notification dropdown constants (notification_group/methods.rs,
@@ -110,7 +111,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	dnd.AddAction(v.dnd)
 	dndGroup.Append(dnd)
 
-	empty, emptyIcon := emptyStateIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-empty-title"), i18n.T("notification-dropdown-empty-description"))
+	empty, emptyIcon := widgets.EmptyStateIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-empty-title"), i18n.T("notification-dropdown-empty-description"))
 	v.emptyIcon = emptyIcon
 	v.empty = empty
 	v.list = widget.NewBox(widget.Column, widget.Current().Spacing, 0)

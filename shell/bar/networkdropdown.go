@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // netScanTimeout is SCAN_TIMEOUT.
@@ -191,9 +192,9 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.listCard.Append(dropdownScroll(v.list, "network-list-scroll"), true)
 	v.availSection = dropdownSection(sectionLabel(v.font, i18n.T("dropdown-network-available")), v.password, v.listCard)
 	browse.Append(v.availSection, true)
-	noNetworks := emptyState(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
+	noNetworks := widgets.EmptyState(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
 	v.noNetworks = noNetworks
-	noAdapter := emptyState(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
+	noAdapter := widgets.EmptyState(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
 	v.noAdapter = noAdapter
 	browse.AppendAligned(v.noNetworks, true, widget.AlignCenter)
 	browse.AppendAligned(v.noAdapter, true, widget.AlignCenter)

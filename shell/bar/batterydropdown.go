@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // batteryCharging is battery_section/methods.rs's is_charging.
@@ -190,7 +191,7 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	v.Append(dropdownHeader(font, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
 	content := dropdownContent()
 	v.body = widget.NewStack()
-	empty := emptyState(font, px, "ld-unplug-symbolic",
+	empty := widgets.EmptyState(font, px, "ld-unplug-symbolic",
 		i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description"))
 	v.body.Add("empty", empty)
 	v.body.Add("battery", v.batterySection())

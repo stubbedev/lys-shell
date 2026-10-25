@@ -166,7 +166,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 // mediaEmptyState is the EmptyState template with the media strings.
 func mediaEmptyState(ctx ModuleContext) *widget.StatusPage {
 	font, px := dropdownFont(ctx)
-	return emptyState(font, px, "ld-play-symbolic",
+	return widgets.EmptyState(font, px, "ld-play-symbolic",
 		i18n.T("dropdown-media-no-player-title"), i18n.T("dropdown-media-no-player-description"))
 }
 
