@@ -13,9 +13,11 @@ import (
 // Window geometry and the page switch (app/mod.rs, app/window.rs).
 const (
 	defaultSidebarWidth = 220
-	windowWidth         = 900
-	windowHeight        = 650
-	pageTransition      = 100 * time.Millisecond
+	// minSidebarWidth is the narrowest the sidebar drags to.
+	minSidebarWidth = 160
+	windowWidth     = 900
+	windowHeight    = 650
+	pageTransition  = 100 * time.Millisecond
 	// pageCleanup is how long after a switch the old page is dropped:
 	// the transition plus a buffer (TRANSITION_CLEANUP_BUFFER_MS).
 	pageCleanup = pageTransition + 50*time.Millisecond
@@ -29,8 +31,7 @@ const (
 type window struct {
 	k        *kit
 	root     *widget.Box
-	paned    *widget.Paned
-	sidebar  *sidebar
+	sidebar  *widget.Sidebar
 	stack    *widget.Stack
 	sections []navSection
 	page     *settingsPage
@@ -51,13 +52,6 @@ func newWindow(k *kit, cfg *config.Config, after func(time.Duration, func())) *w
 	w.stack = widget.NewStack()
 	w.stack.SetTransition(widget.StackCrossfade, pageTransition)
 	first := firstPage(w.sections)
-	w.sidebar = newSidebar(k, w.sections, first)
-	w.sidebar.onNavigate = w.show
-	w.sidebar.onResetAll = func() {
-		if w.onResetAll != nil {
-			w.onResetAll()
-		}
-	}
 
 	t := i18n.Settings()
 	closeBtn := k.button(k.icon("ld-x-symbolic"), func() {
@@ -68,21 +62,25 @@ func newWindow(k *kit, cfg *config.Config, after func(time.Duration, func())) *w
 	closeBtn.SetTooltip(t.Get("settings-close"))
 	content := widget.NewOverlay().Append(w.stack).AppendAligned(closeBtn, widget.AlignEnd, widget.AlignStart)
 
-	w.paned = widget.NewPaned(widget.Row, w.sidebar, content)
-	w.paned.SetPosition(defaultSidebarWidth)
-	w.paned.SetMaxPosition(w.sidebarLimit())
+	w.sidebar = newSidebar(k, w.sections, first, content, w.show, func() {
+		if w.onResetAll != nil {
+			w.onResetAll()
+		}
+	})
+	w.sidebar.SetWidth(defaultSidebarWidth)
+	w.sidebar.SetResizable(minSidebarWidth, w.sidebarLimit())
 	w.root = widget.NewBox(widget.Column, 0, 0)
 	w.root.SetElement("window")
 	w.root.AddClass("settings-window")
-	w.root.Append(w.paned, true)
+	w.root.Append(w.sidebar, true)
 	if first != "" {
 		w.show(first)
 	}
 	return w
 }
 
-// sidebarLimit is setup_paned_clamp's bound: 25rem at the current
-// styling scale.
+// sidebarLimit is setup_paned_clamp's bound on the sidebar's width:
+// 25rem at the current styling scale.
 func (w *window) sidebarLimit() int {
 	return int(maxSidebarRem*basePxPerRem*float64(w.k.store.svc.Config().Styling.Scale) + 0.5)
 }
@@ -123,7 +121,11 @@ func (w *window) dropStalePages(keep string) {
 // refresh re-reads the open page and the sidebar cap after a config
 // change.
 func (w *window) refresh() {
-	w.paned.SetMaxPosition(w.sidebarLimit())
+	limit := w.sidebarLimit()
+	w.sidebar.SetResizable(minSidebarWidth, limit)
+	if w.sidebar.Width() > limit {
+		w.sidebar.SetWidth(limit)
+	}
 	if w.page != nil {
 		w.page.refresh()
 	}

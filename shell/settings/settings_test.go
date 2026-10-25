@@ -331,29 +331,31 @@ func (f *fakeAfter) run() {
 	}
 }
 
+// sidebarItem is the sidebar's row for the page labelled navKey.
+func sidebarItem(t *testing.T, w *window, navKey string) *widget.Button {
+	t.Helper()
+	return treetest.Button(t, w.sidebar, i18n.Settings().Get(navKey))
+}
+
 func TestWindowNavigatesAndDropsOldPages(t *testing.T) {
 	k := testKit(t, "")
 	f := &fakeAfter{}
 	w := newWindow(k, k.store.svc.Config(), f.after)
 	first := w.pageID
-	if first == "" || !w.sidebar.items[first].HasClass("active") {
+	firstSpec, _ := pageByID(w.sections, first)
+	if first == "" || !sidebarItem(t, w, firstSpec.navKey).HasState(widget.StateChecked) {
 		t.Fatalf("opened on %q, want the first page active", first)
 	}
-	// Two pages, so a switch has somewhere to go.
-	w.sections = append(w.sections, navSection{key: "settings-nav-system", pages: []pageSpec{{
-		id: "extra", navKey: "settings-nav-general", header: "settings-page-general",
-		sections: []sectionSpec{{title: "settings-section-general", rows: fields("osd.enabled")}},
-	}}})
-	w.sidebar.items["extra"] = widget.NewButton(widget.NewSpacer(0, 0), 0, 0)
-	w.sidebar.navigate("extra")
-	if w.pageID != "extra" || !w.sidebar.items["extra"].HasClass("active") || w.sidebar.items[first].HasClass("active") {
+	second := w.sections[0].pages[1]
+	sidebarItem(t, w, second.navKey).ClickAt(widget.Point{})
+	if w.pageID != second.id || !sidebarItem(t, w, second.navKey).HasState(widget.StateChecked) || sidebarItem(t, w, firstSpec.navKey).HasState(widget.StateChecked) {
 		t.Fatalf("navigate: page %q", w.pageID)
 	}
 	if len(w.names) != 2 {
 		t.Fatalf("stack pages %v, want both during the cross-fade", w.names)
 	}
 	// Back before the cleanup: the stale cleanups keep the current page.
-	w.sidebar.navigate(first)
+	sidebarItem(t, w, firstSpec.navKey).ClickAt(widget.Point{})
 	f.run()
 	if len(w.names) != 1 || w.stack.Visible() != w.names[0] || w.pageID != first {
 		t.Errorf("after cleanup pages %v visible %q", w.names, w.stack.Visible())
@@ -366,51 +368,51 @@ func TestWindowNavigatesAndDropsOldPages(t *testing.T) {
 	}
 }
 
+// Each nav section is a collapsible group: its label folds the pages
+// and unfolds them again.
 func TestSidebarSectionsCollapse(t *testing.T) {
 	k := testKit(t, "")
-	s := newSidebar(k, layout(k.store.svc.Config()), "")
-	key := "settings-nav-bar-section"
-	s.toggleSection(key)
-	if v := s.sections[key]; v.items.Visible() || !v.header.HasClass("collapsed") {
+	w := newWindow(k, k.store.svc.Config(), (&fakeAfter{}).after)
+	w.root.Measure(widget.Constraints{Max: widget.Size{W: windowWidth, H: windowHeight}})
+	w.root.Arrange(render.Rect{W: windowWidth, H: windowHeight})
+	sec := w.sections[0]
+	head := treetest.Button(t, w.sidebar, i18n.Settings().Get(sec.key))
+	item := sidebarItem(t, w, sec.pages[0].navKey)
+	if !widget.IsVisible(item) {
+		t.Fatal("a section opens folded")
+	}
+	head.ClickAt(widget.Point{})
+	if widget.IsVisible(item) {
 		t.Error("a toggled section stayed open")
 	}
-	s.toggleSection(key)
-	if v := s.sections[key]; !v.items.Visible() || v.header.HasClass("collapsed") {
+	head.ClickAt(widget.Point{})
+	if !widget.IsVisible(item) {
 		t.Error("a second toggle did not reopen it")
 	}
-	s.toggleSection("nope") // unknown: ignored
 }
 
+// The sidebar resizes up to 25rem at the styling scale, the cap
+// following a scale change and pulling a wider sidebar in.
 func TestSidebarDragIsClampedToTheScaledLimit(t *testing.T) {
 	k := testKit(t, "styling:\n  scale: 2.0\n")
 	w := newWindow(k, k.store.svc.Config(), (&fakeAfter{}).after)
 	if got := w.sidebarLimit(); got != 800 {
 		t.Fatalf("limit = %d, want 25rem at scale 2 (800)", got)
 	}
-	frame := func() {
-		w.paned.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 600}})
-		w.paned.Arrange(render.Rect{W: 2000, H: 600})
+	if got := w.sidebar.Width(); got != defaultSidebarWidth {
+		t.Errorf("opens %d wide, want %d", got, defaultSidebarWidth)
 	}
-	frame()
-	w.paned.SetPosition(1200)
-	frame()
-	if w.paned.Position() > 800 {
-		t.Errorf("position %d past the limit", w.paned.Position())
+	w.sidebar.SetWidth(600)
+	w.refresh()
+	if got := w.sidebar.Width(); got != 600 {
+		t.Errorf("width %d, want 600 kept under the limit", got)
 	}
-	w.paned.SetPosition(300)
-	frame()
-	if w.paned.Position() != 300 {
-		t.Errorf("position %d, want 300 kept under the limit", w.paned.Position())
-	}
-	// A new scale moves the cap.
 	if err := k.store.set("styling.scale", 1.0); err != nil {
 		t.Fatal(err)
 	}
 	w.refresh()
-	w.paned.SetPosition(1200)
-	frame()
-	if w.paned.Position() != 400 {
-		t.Errorf("position %d after the scale fell to 1, want the 400 cap", w.paned.Position())
+	if got := w.sidebar.Width(); got != 400 {
+		t.Errorf("width %d after the scale fell to 1, want the 400 cap", got)
 	}
 }
 

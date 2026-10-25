@@ -11,9 +11,6 @@ popover.background {
   padding: 0;
 }
 
-button:where(:not(.suggested-action):not(.destructive-action):not(.secondary):not(.outline)) {
-  background-color: transparent;
-}
 popover.background > arrow {
   min-width: 0;
   min-height: 0;

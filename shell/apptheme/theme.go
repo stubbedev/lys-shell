@@ -66,7 +66,7 @@ func New(cfg *config.Config) *Theme {
 
 // installWidgetTheme gives lys-ui's widgets the resolved palette.
 func (t *Theme) installWidgetTheme() {
-	widget.SetTheme(WidgetTheme(t.RenderPalette(), t.cfg))
+	InstallWidgetTheme(t.RenderPalette(), t.cfg)
 }
 
 // Bundle builds init_css_provider's CSS (bootstrap.rs): static, theme,

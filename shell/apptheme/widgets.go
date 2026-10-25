@@ -1,6 +1,8 @@
 package apptheme
 
 import (
+	"sync"
+
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -59,4 +61,20 @@ func WidgetTheme(p *styling.Palette, cfg *config.Config) *widget.Theme {
 func isLight(c widget.Color) bool {
 	luma := 0.2126*float64(c.R()) + 0.7152*float64(c.G()) + 0.0722*float64(c.B())
 	return luma > 127.5
+}
+
+// plainButtonCSS rests a plain button transparent. It sits at lys-ui's
+// theme priority, where specificity decides: every variant (.secondary,
+// .ghost, ...) and every widget's state rule (a sidebar item while
+// checked) outranks it, where the shell's own stylesheet, above the
+// theme, would override them all.
+const plainButtonCSS = "button { background-color: transparent; }"
+
+var plainButtons sync.Once
+
+// InstallWidgetTheme installs WidgetTheme(p, cfg) and, the first time,
+// the shell's theme-level button rule.
+func InstallWidgetTheme(p *styling.Palette, cfg *config.Config) {
+	widget.SetTheme(WidgetTheme(p, cfg))
+	plainButtons.Do(func() { widget.AddStylesheet(plainButtonCSS, widget.StylePriorityTheme) })
 }

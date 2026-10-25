@@ -151,6 +151,6 @@ func Stylesheet(cfg *config.Config) *widget.Stylesheet {
 		log.Printf("greeter: palette: %v", err)
 		p = styling.Default()
 	}
-	widget.SetTheme(apptheme.WidgetTheme(p, cfg))
+	apptheme.InstallWidgetTheme(p, cfg)
 	return widget.NewStylesheet(styling.BundleCSS(cfg, palette, p), apptheme.Priority)
 }
