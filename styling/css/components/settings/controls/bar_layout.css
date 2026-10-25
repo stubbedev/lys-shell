@@ -12,32 +12,6 @@
   border-radius: var(--rounding-container);
 }
 
-.module-chip {
-  background-color: var(--bg-overlay);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--rounding-element);
-}
-
-.group-chip {
-  background-color: var(--bg-surface-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--rounding-element);
-}
-
-.chip-dragging {
-  opacity: 0.3;
-}
-
-.layout-zone-items flowboxchild.drop-before > .module-chip,
-.layout-zone-items flowboxchild.drop-before > .group-chip {
-  box-shadow: -3px 0 0 var(--accent);
-}
-
-.layout-zone-items flowboxchild.drop-after > .module-chip,
-.layout-zone-items flowboxchild.drop-after > .group-chip {
-  box-shadow: 3px 0 0 var(--accent);
-}
-
 .module-picker-list row {
   border-radius: var(--rounding-element);
 }

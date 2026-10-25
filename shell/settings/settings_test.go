@@ -1825,12 +1825,62 @@ func TestLayoutEditorCards(t *testing.T) {
 	}
 }
 
+// zoneChips is card i's zone z, laid out in a hosted root at a width
+// that keeps each zone's chips on one line.
+func zoneChips(t *testing.T, root widget.Widget, c *layoutEditor, i, z int) *widget.ChipBox {
+	t.Helper()
+	root.Measure(widget.Constraints{Max: widget.Size{W: 1200, H: 800}})
+	root.Arrange(render.Rect{W: 1200, H: 800})
+	boxes := treetest.All[*widget.ChipBox](c.list.Children()[i])
+	if len(boxes) != zoneCount {
+		t.Fatalf("card %d holds %d chip boxes, want one per zone", i, len(boxes))
+	}
+	return boxes[z]
+}
+
+// texts are the chips' texts.
+func texts(b *widget.ChipBox) []string {
+	var out []string
+	for _, ch := range b.Chips() {
+		out = append(out, ch.Text())
+	}
+	return out
+}
+
+// dragChip drags chip onto box at p as a drag and drop would: the
+// chip's payload, the box's enter and drop, then the drag's end.
+func dragChip(t *testing.T, chip *widget.Chip, box *widget.ChipBox, p widget.Point) {
+	t.Helper()
+	content := chip.DragContent()
+	if content == nil {
+		t.Fatalf("chip %q offers no drag", chip.Text())
+	}
+	var buf strings.Builder
+	if err := content.Write(content.Mimes[0], &buf); err != nil {
+		t.Fatal(err)
+	}
+	if box.DragEnter(content.Mimes, p) == "" {
+		t.Fatalf("the zone refused chip %q", chip.Text())
+	}
+	box.Drop(content.Mimes[0], []byte(buf.String()), p)
+	content.OnDone(transfer.ActionMove)
+}
+
+// leftHalf is a point on the left half of w, where a drop lands
+// before it.
+func leftHalf(w widget.Boundser) widget.Point {
+	b := w.Bounds()
+	return widget.Point{X: b.X + 1, Y: b.Y + b.H/2}
+}
+
+// Modules come from the picker, a group renames from its entry, and
+// each chip's dismiss button, clicked, takes its item out.
 func TestLayoutEditorModulesAndGroups(t *testing.T) {
 	k, c := newTestLayout(t)
+	root, _ := hosted(c)
 	if names := c.moduleNames(); !slices.Contains(names, "clock") || names[len(names)-1] != "custom-gpu" {
 		t.Errorf("picker modules end %v", names[len(names)-3:])
 	}
-	// Picking a module appends it to the zone.
 	p := c.pickModule(nil, func(m config.BarModule) {
 		items := c.zone(0, zoneCenter)
 		*items = append(*items, config.BarItem{Module: m})
@@ -1844,131 +1894,96 @@ func TestLayoutEditorModulesAndGroups(t *testing.T) {
 	if len(storedLayouts(k)[0].Center) != 1 {
 		t.Error("an unknown name was added")
 	}
-	// The group chip: rename, remove a module.
-	zone := layoutZoneOf(c, 0, zoneLeft)
-	group := zone.ChildAt(1).Child().(*layoutChip)
-	if !group.HasClass("group-chip") {
-		t.Fatal("the second left item is not the group chip")
-	}
-	name := group.Children()[0].(*widget.Entry)
+	c.layouts = c.stored()
+	c.rebuild()
+	left := zoneChips(t, root, c, 0, zoneLeft)
+	group := left.ChipAt(1)
+	name := treetest.First[*widget.Entry](t, group)
 	if mn, mx := name.WidthChars(); mn != groupNameChars || mx != groupNameMaxChars {
 		t.Errorf("group name width %d/%d", mn, mx)
 	}
 	name.Insert("!")
-	if g := storedLayouts(k)[0].Left[1].Group; g == nil || g.Name != "sys!" {
-		t.Errorf("group %+v", g)
+	if g := storedLayouts(k)[0].Left[1].Group; g == nil || g.Name != "sys!" || group.Text() != "sys!" {
+		t.Errorf("group %+v, chip %q", g, group.Text())
 	}
-	cpu := group.Children()[1].(*widget.Box)
-	cpu.Children()[1].(*widget.Button).ClickAt(widget.Point{})
+	click(root, treetest.Button(t, group, "Remove cpu"))
 	if g := storedLayouts(k)[0].Left[1].Group; len(g.Modules) != 1 || g.Modules[0].Module != "ram" {
 		t.Errorf("after removing cpu: %+v", g)
 	}
-	// A module chip's remove takes the item out.
-	zone = layoutZoneOf(c, 0, zoneLeft)
-	clock := zone.ChildAt(0).Child().(*layoutChip)
-	clock.Children()[1].(*widget.Button).ClickAt(widget.Point{})
+	click(root, treetest.Button(t, zoneChips(t, root, c, 0, zoneLeft), "Remove clock"))
 	if got := storedLayouts(k)[0].Left; len(got) != 1 || got[0].Group == nil {
 		t.Errorf("left after removing clock: %+v", got)
 	}
-	// The add-group button appends a named group.
+	if got := texts(zoneChips(t, root, c, 0, zoneLeft)); len(got) != 1 {
+		t.Errorf("the left zone shows %v after the remove", got)
+	}
 	row := c.list.Children()[0].(*widget.Box).Children()[2].(*widget.Box).Children()[zoneRight].(*widget.Box)
-	row.Children()[3].(*widget.Button).ClickAt(widget.Point{})
+	click(root, row.Children()[3].(*widget.Button))
 	if got := storedLayouts(k)[0].Right; len(got) != 3 || got[2].Group == nil || got[2].Group.Name != i18n.Settings().Get("settings-layout-default-group") {
 		t.Errorf("right after add group: %+v", got)
 	}
 }
 
-// layoutZoneOf finds card i's zone z.
-func layoutZoneOf(c *layoutEditor, i, z int) *layoutZone {
-	body := treetest.WithClass(c.list.Children()[i], "layout-card-body")[0].(*widget.Box)
-	row := body.Children()[z].(*widget.Box)
-	frame := row.Children()[1].(*widget.Box)
-	return frame.Children()[0].(*layoutZone)
-}
-
-func TestLayoutEditorDragAndDrop(t *testing.T) {
+// A dragged chip moves within its zone or into another, the chip boxes
+// moving the widgets and the editor only the config: the cards are not
+// rebuilt, and a chip's controls after the move act on the item's new
+// place. A foreign drag or payload moves nothing.
+func TestLayoutEditorChipsMoveByDrag(t *testing.T) {
 	k, c := newTestLayout(t)
-	if p, ok := decodePayload(dragPayload{0, zoneRight, 1}.encode()); !ok || p != (dragPayload{0, zoneRight, 1}) {
-		t.Errorf("payload round trip %v %v", p, ok)
+	root, _ := hosted(c)
+	card := c.list.Children()[0]
+	right := zoneChips(t, root, c, 0, zoneRight)
+	dragChip(t, right.ChipAt(1), right, leftHalf(right.ChipAt(0)))
+	if got := modules(storedLayouts(k)[0].Right); !slices.Equal(got, []string{"volume", "battery"}) {
+		t.Errorf("right after the reorder: %v", got)
 	}
-	for _, bad := range []string{"", "0:middle:1", "x:left:1", "0:left"} {
-		if _, ok := decodePayload(bad); ok {
-			t.Errorf("%q decoded", bad)
-		}
+	if got := texts(right); !slices.Equal(got, []string{"volume", "battery"}) {
+		t.Errorf("the zone shows %v after the reorder", got)
 	}
-	// The chip offers its origin and marks itself while dragged.
-	zone := layoutZoneOf(c, 0, zoneRight)
-	chip := zone.ChildAt(1).Child().(*layoutChip)
-	content := chip.DragContent()
-	var buf strings.Builder
-	_ = content.Write(layoutDragMime, &buf)
-	if buf.String() != "0:right:1" || !chip.HasClass("chip-dragging") {
-		t.Errorf("payload %q, dragging %v", buf.String(), chip.HasClass("chip-dragging"))
+	left := zoneChips(t, root, c, 0, zoneLeft)
+	center := zoneChips(t, root, c, 0, zoneCenter)
+	group := left.ChipAt(1)
+	dragChip(t, group, center, widget.Point{X: center.Bounds().X + 1, Y: center.Bounds().Y + 1})
+	if l := storedLayouts(k)[0]; !slices.Equal(modules(l.Left), []string{"clock"}) || !slices.Equal(modules(l.Center), []string{"group"}) {
+		t.Errorf("after moving the group to the center: left %v, center %v", modules(l.Left), modules(l.Center))
 	}
-	content.OnDone(transfer.ActionMove)
-	if chip.HasClass("chip-dragging") {
-		t.Error("the mark outlived the drag")
+	if c.list.Children()[0] != card || center.ChipAt(0) != group {
+		t.Error("a move rebuilt the cards instead of keeping the moved chip")
 	}
-	// A cancelled drag clears the mark too.
-	chip.DragContent().OnDone(transfer.ActionNone)
-	if chip.HasClass("chip-dragging") {
-		t.Error("the mark outlived a cancelled drag")
+	treetest.First[*widget.Entry](t, group).Insert("!")
+	if g := storedLayouts(k)[0].Center[0].Group; g == nil || g.Name != "sys!" {
+		t.Errorf("renaming the moved group wrote %+v", g)
 	}
-	// Lay the zone out to aim drops by position.
-	zone.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 100}})
-	zone.Arrange(render.Rect{W: 400, H: 100})
-	b0, b1 := zone.ChildAt(0).Bounds(), zone.ChildAt(1).Bounds()
-	if zone.DragEnter([]string{"text/uri-list"}, widget.Point{}) != "" {
+	click(root, treetest.Button(t, right, "Remove volume"))
+	if got := modules(storedLayouts(k)[0].Right); !slices.Equal(got, []string{"battery"}) {
+		t.Errorf("removing the reordered volume left %v", got)
+	}
+
+	before := config.Encode(storedLayouts(k))
+	right = zoneChips(t, root, c, 0, zoneRight)
+	if right.DragEnter([]string{"text/uri-list"}, leftHalf(right.ChipAt(0))) != "" {
 		t.Error("a foreign drag was accepted")
 	}
-	if zone.DragEnter([]string{layoutDragMime}, widget.Point{X: b0.X + 1, Y: b0.Y + 1}) != layoutDragMime || !zone.ChildAt(0).HasClass("drop-before") {
-		t.Error("hovering the first chip's left half does not mark before it")
-	}
-	zone.DragHover(widget.Point{X: b1.X + b1.W - 1, Y: b1.Y + 1})
-	if zone.ChildAt(0).HasClass("drop-before") || !zone.ChildAt(1).HasClass("drop-after") {
-		t.Error("hovering the last chip's right half does not mark after it")
-	}
-	if zone.dropPosition(widget.Point{X: b1.X + b1.W + 50, Y: b1.Y + 1}) != 2 || zone.dropPosition(widget.Point{X: 5, Y: 90}) != 2 {
-		t.Error("past the line's end or below it is the end")
-	}
-	if zone.dropPosition(widget.Point{X: 5, Y: b0.Y - 1}) != 0 {
-		t.Error("above the line is the start")
-	}
-	zone.DragLeave()
-	if zone.ChildAt(1).HasClass("drop-after") {
-		t.Error("the mark outlived the leave")
-	}
-	// Dropping volume (right 1) before battery (right 0) reorders.
-	zone.Drop(layoutDragMime, []byte("0:right:1"), widget.Point{X: b0.X + 1, Y: b0.Y + 1})
-	if got := storedLayouts(k)[0].Right; got[0].Module != "volume" || got[1].Module != "battery" {
-		t.Errorf("right after the drop: %+v", got)
-	}
-	// Within one zone a later position shifts for the removal: battery
-	// dropped before clock lands just before it.
-	c.layouts[0].Right = append(c.layouts[0].Right, config.BarItem{Module: "clock"})
-	c.commit()
-	c.move(dragPayload{0, zoneRight, 0}, 0, zoneRight, 2)
-	if got := modules(storedLayouts(k)[0].Right); !slices.Equal(got, []string{"battery", "volume", "clock"}) {
-		t.Errorf("same-zone move: %v", got)
-	}
-	// Another zone's later position does not shift.
-	c.move(dragPayload{0, zoneLeft, 0}, 0, zoneRight, 1)
-	if got := modules(storedLayouts(k)[0].Right); !slices.Equal(got, []string{"battery", "clock", "volume", "clock"}) {
-		t.Errorf("cross-zone move: %v", got)
-	}
-	// Across zones: the group moves into the empty center.
-	c.move(dragPayload{0, zoneLeft, 0}, 0, zoneCenter, 0)
-	if l := storedLayouts(k)[0]; len(l.Left) != 0 || len(l.Center) != 1 || l.Center[0].Group == nil {
-		t.Errorf("cross-zone move: %+v", l)
-	}
-	// A stale payload moves nothing.
-	before := config.Encode(storedLayouts(k))
-	c.move(dragPayload{0, zoneLeft, 9}, 0, zoneRight, 0)
-	c.move(dragPayload{3, zoneLeft, 0}, 0, zoneRight, 0)
-	zone = layoutZoneOf(c, 0, zoneRight)
-	zone.Drop(layoutDragMime, []byte("junk"), widget.Point{})
+	content := right.ChipAt(0).DragContent()
+	right.DragEnter(content.Mimes, leftHalf(right.ChipAt(0)))
+	right.Drop(content.Mimes[0], []byte("junk"), leftHalf(right.ChipAt(0)))
+	content.OnDone(transfer.ActionNone)
 	if !reflect.DeepEqual(before, config.Encode(storedLayouts(k))) {
-		t.Error("a stale or broken payload changed the layout")
+		t.Error("a foreign payload changed the layout")
+	}
+}
+
+// The editor edits its own copy: a config snapshot taken before an
+// edit keeps what it held.
+func TestLayoutEditorLeavesSnapshotsAlone(t *testing.T) {
+	k, c := newTestLayout(t)
+	root, _ := hosted(c)
+	snap := k.store.svc.Config()
+	left := zoneChips(t, root, c, 0, zoneLeft)
+	treetest.First[*widget.Entry](t, left.ChipAt(1)).Insert("x")
+	click(root, treetest.Button(t, left, "Remove clock"))
+	if l := snap.Bar.Layout[0].Left; l[0].Module != "clock" || l[1].Group.Name != "sys" {
+		t.Errorf("the old snapshot changed: %+v %+v", l[0], l[1].Group)
 	}
 }
 
@@ -1982,20 +1997,6 @@ func modules(items []config.BarItem) []string {
 		}
 	}
 	return out
-}
-
-// The editor edits its own copy: a config snapshot taken before an
-// edit keeps what it held.
-func TestLayoutEditorLeavesSnapshotsAlone(t *testing.T) {
-	k, c := newTestLayout(t)
-	snap := k.store.svc.Config()
-	zone := layoutZoneOf(c, 0, zoneLeft)
-	group := zone.ChildAt(1).Child().(*layoutChip)
-	group.Children()[0].(*widget.Entry).Insert("x")
-	zone.ChildAt(0).Child().(*layoutChip).Children()[1].(*widget.Button).ClickAt(widget.Point{})
-	if l := snap.Bar.Layout[0].Left; l[0].Module != "clock" || l[1].Group.Name != "sys" {
-		t.Errorf("the old snapshot changed: %+v %+v", l[0], l[1].Group)
-	}
 }
 
 func TestLayoutEditorRefresh(t *testing.T) {
@@ -2150,7 +2151,8 @@ func TestWindowTakesLysUiParts(t *testing.T) {
 
 // A card list's card is lys-ui's card, its header split from its body
 // by a separator, its labels dim caption headings; the list's add is an
-// outline icon button and a row's buttons ghost ones.
+// outline icon button, and the layout's items are lys-ui's dismissible
+// chips.
 func TestCardAndListEditorsTakeLysUiParts(t *testing.T) {
 	k := testKit(t, "")
 	cfg := k.store.svc.Config()
@@ -2176,9 +2178,13 @@ func TestCardAndListEditorsTakeLysUiParts(t *testing.T) {
 			t.Error("a list's add is not an outline button")
 		}
 	}
-	for _, b := range treetest.WithClass(w.root, "chip-remove") {
-		if !widget.HasClass(b, css.Ghost) || widget.HasClass(b, css.Outline) {
-			t.Error("a chip's remove is not a ghost button")
+	chips := treetest.All[*widget.Chip](w.root)
+	if len(chips) == 0 {
+		t.Error("the layout's zones hold no lys-ui chips")
+	}
+	for _, ch := range chips {
+		if !ch.HasClass("dismissible") {
+			t.Errorf("chip %q has no dismiss button", ch.Text())
 		}
 	}
 }

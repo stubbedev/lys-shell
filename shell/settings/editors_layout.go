@@ -2,14 +2,10 @@ package settings
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/stubbedev/lys-ui/render"
-	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
@@ -30,15 +26,8 @@ const (
 	zoneCount
 )
 
-// zoneNames are the zones' ids (ZoneId's Display), the drag payload's
-// middle field.
-var zoneNames = [zoneCount]string{"left", "center", "right"}
-
 // zoneKeys are the zones' labels.
 var zoneKeys = [zoneCount]string{"settings-layout-zone-left", "settings-layout-zone-center", "settings-layout-zone-right"}
-
-// layoutDragMime is the chips' drag payload type (a GLib string).
-const layoutDragMime = "text/plain;charset=utf-8"
 
 // Group name entry width (chip/helpers: GROUP_NAME_WIDTH_CHARS,
 // GROUP_NAME_MAX_WIDTH_CHARS).
@@ -57,7 +46,13 @@ type layoutEditor struct {
 	slot    slot
 	list    *widget.Box
 	layouts []config.BarLayout
+	// zones are the cards' chip boxes and the zone each one shows,
+	// rebuilt with the cards.
+	zones map[*widget.ChipBox]zoneRef
 }
+
+// zoneRef names layout card's zone.
+type zoneRef struct{ card, zone int }
 
 func newLayoutEditor(k *kit, s slot) *layoutEditor {
 	c := &layoutEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s}
@@ -124,6 +119,7 @@ func (c *layoutEditor) zone(i, z int) *[]config.BarItem {
 
 func (c *layoutEditor) rebuild() {
 	c.list.Clear()
+	c.zones = map[*widget.ChipBox]zoneRef{}
 	for i := range c.layouts {
 		c.list.Append(c.card(i), false)
 	}
@@ -196,8 +192,9 @@ func (c *layoutEditor) card(i int) widget.Widget {
 		hidden.SetAlignment(render.AlignCenter)
 		body.Append(hidden, false)
 	} else {
+		labels := widget.NewSizeGroup(widget.SizeGroupHorizontal)
 		for z := range zoneCount {
-			body.Append(c.zoneRow(i, z), false)
+			body.Append(c.zoneRow(zoneRef{i, z}, labels), false)
 		}
 	}
 	root.Append(header, false)
@@ -206,40 +203,42 @@ func (c *layoutEditor) card(i int) widget.Widget {
 	return root
 }
 
-// zoneRow is build_zone_row: the label, the chips (the drop target),
-// the add-module picker and the add-group button.
-func (c *layoutEditor) zoneRow(i, z int) widget.Widget {
+// zoneRow is build_zone_row: the label, sized with the card's other
+// zone labels, the zone's chips (the drop target), the add-module
+// picker and the add-group button.
+func (c *layoutEditor) zoneRow(at zoneRef, labels *widget.SizeGroup) widget.Widget {
 	t := i18n.Settings()
 	th := widget.Current()
 	row := widget.NewBox(widget.Row, th.Spacing, 0)
 	row.AddClass("layout-zone")
-	chips := &layoutZone{FlowBox: widget.NewFlowBox(th.Spacing/2, th.Spacing/2), ed: c, card: i, zone: z}
-	for k, item := range *c.zone(i, z) {
-		chips.Append(c.chip(i, z, k, item))
+	chips := widget.NewChipBox()
+	c.zones[chips] = at
+	for _, item := range *c.zone(at.card, at.zone) {
+		chips.Append(c.chip(item))
 	}
+	chips.OnMoved = func(src *widget.ChipBox, from, to int) { c.moved(src, from, chips, to) }
 	frame := widget.NewBox(widget.Row, 0, th.Padding)
 	frame.AddClass("layout-zone-items")
-	frame.AppendAligned(chips, false, widget.AlignCenter)
+	frame.AppendAligned(chips, true, widget.AlignCenter)
 	var addModule *widget.Button
 	addModule = c.k.button(c.k.icon("ld-plus-symbolic"), func() {
 		c.pickModule(addModule, func(m config.BarModule) {
-			items := c.zone(i, z)
+			items := c.zone(at.card, at.zone)
 			*items = append(*items, config.BarItem{Module: m})
 			c.commit()
 			c.rebuild()
 		})
-	}, "zone-add-btn", css.Outline, css.Icon, css.Small)
+	}, "zone-add-btn", css.Outline, css.Icon)
 	addModule.SetTooltip(t.Get("settings-layout-add-module"))
 	addGroup := c.k.button(c.k.icon("ld-layers-symbolic"), func() {
-		items := c.zone(i, z)
+		items := c.zone(at.card, at.zone)
 		*items = append(*items, config.BarItem{Group: &config.BarGroup{Name: t.Get("settings-layout-default-group")}})
 		c.commit()
 		c.rebuild()
-	}, "zone-add-btn", css.Outline, css.Icon, css.Small)
+	}, "zone-add-btn", css.Outline, css.Icon)
 	addGroup.SetTooltip(t.Get("settings-layout-add-group"))
-	zoneLabel := c.k.label(t.Get(zoneKeys[z]), "layout-zone-label", css.CaptionHeading, css.DimLabel)
-	zoneLabel.SetSizeRequest(zoneLabelPx, 0)
-	row.AppendAligned(zoneLabel, false, widget.AlignCenter)
+	zoneLabel := c.k.label(t.Get(zoneKeys[at.zone]), "layout-zone-label", css.CaptionHeading, css.DimLabel)
+	row.AppendAligned(labels.Add(zoneLabel), false, widget.AlignCenter)
 	row.Append(frame, true)
 	row.AppendAligned(addModule, false, widget.AlignCenter)
 	row.AppendAligned(addGroup, false, widget.AlignCenter)
@@ -247,73 +246,96 @@ func (c *layoutEditor) zoneRow(i, z int) widget.Widget {
 }
 
 // chip is Chip: a module's name, or a group's name entry with its
-// modules, either removable and dragged by its body.
-func (c *layoutEditor) chip(i, z, k int, item config.BarItem) widget.Widget {
-	root := &layoutChip{Box: chipBox(), payload: dragPayload{i, z, k}}
-	removeItem := func() {
-		items := c.zone(i, z)
-		*items = slices.Delete(*items, k, k+1)
-		c.commit()
-		c.rebuild()
-	}
+// modules' chips, either dismissible and dragged by its body.
+func (c *layoutEditor) chip(item config.BarItem) *widget.Chip {
 	if item.Group == nil {
-		root.AddClass("module-chip")
-		root.AppendAligned(c.k.label(string(item.Module)), false, widget.AlignCenter)
-		root.AppendAligned(c.chipButton("ld-x-symbolic", "chip-remove", removeItem), false, widget.AlignCenter)
-		return root
+		chip := widget.NewChip(c.k.face, string(item.Module))
+		chip.SetOnDismiss(func() { c.removeItem(chip) })
+		return chip
 	}
-	root.AddClass("group-chip")
+	th := widget.Current()
+	chip := widget.NewChip(c.k.face, item.Group.Name)
+	content := widget.NewBox(widget.Row, th.Spacing/2, 0)
 	name := c.k.entry()
 	name.AddClass("group-name-entry")
 	name.SetWidthChars(groupNameChars, groupNameMaxChars)
 	name.SetText(item.Group.Name)
 	name.OnChanged = func(text string) {
-		if g := (*c.zone(i, z))[k].Group; g != nil && g.Name != text {
+		if g := c.group(chip); g.Name != text {
 			g.Name = text
+			chip.SetText(text)
 			c.commit()
 		}
 	}
-	root.AppendAligned(name, false, widget.AlignCenter)
+	content.AppendAligned(name, false, widget.AlignCenter)
 	for m, mod := range item.Group.Modules {
-		sub := chipBox()
-		sub.AddClass("module-chip")
-		sub.AppendAligned(c.k.label(string(mod.Module)), false, widget.AlignCenter)
-		sub.AppendAligned(c.chipButton("ld-x-symbolic", "chip-remove", func() {
-			g := (*c.zone(i, z))[k].Group
+		sub := widget.NewChip(c.k.face, string(mod.Module))
+		sub.SetOnDismiss(func() {
+			g := c.group(chip)
 			g.Modules = slices.Delete(g.Modules, m, m+1)
 			c.commit()
 			c.rebuild()
-		}), false, widget.AlignCenter)
-		root.AppendAligned(sub, false, widget.AlignCenter)
+		})
+		content.AppendAligned(sub, false, widget.AlignCenter)
 	}
 	var add *widget.Button
-	add = c.chipButton("ld-plus-symbolic", "chip-add", func() {
+	add = c.k.button(c.k.icon("ld-plus-symbolic"), func() {
 		c.pickModule(add, func(mod config.BarModule) {
-			g := (*c.zone(i, z))[k].Group
+			g := c.group(chip)
 			g.Modules = append(g.Modules, config.BarItem{Module: mod})
 			c.commit()
 			c.rebuild()
 		})
-	})
-	root.AppendAligned(add, false, widget.AlignCenter)
-	root.AppendAligned(c.chipButton("ld-x-symbolic", "chip-remove", removeItem), false, widget.AlignCenter)
-	return root
+	}, "chip-add", css.Ghost, css.Icon, css.Small)
+	add.SetTooltip(i18n.Settings().Get("settings-layout-add-module"))
+	content.AppendAligned(add, false, widget.AlignCenter)
+	chip.SetContent(content)
+	chip.SetOnDismiss(func() { c.removeItem(chip) })
+	return chip
 }
 
-func (c *layoutEditor) chipButton(icon, class string, onClick func()) *widget.Button {
-	return c.k.button(c.k.icon(icon), onClick, class, css.Ghost, css.Icon, css.Small)
+// locate is where chip sits now: its zone and index there. A chip of
+// no card's zone is a caller bug.
+func (c *layoutEditor) locate(chip *widget.Chip) (zoneRef, int) {
+	for box, at := range c.zones {
+		if i := box.IndexOf(chip); i >= 0 {
+			return at, i
+		}
+	}
+	panic(fmt.Sprintf("settings: layout chip %q is in no zone", chip.Text()))
 }
 
-// chipBox is a chip's row, inset by a fraction of the theme's padding.
-func chipBox() *widget.Box {
-	th := widget.Current()
-	b := widget.NewBox(widget.Row, th.Spacing/2, 0)
-	b.SetPadding(render.Insets{Top: th.Padding / 4, Right: th.Padding / 2, Bottom: th.Padding / 4, Left: th.Padding})
-	return b
+// group is the group a group chip shows.
+func (c *layoutEditor) group(chip *widget.Chip) *config.BarGroup {
+	at, i := c.locate(chip)
+	return (*c.zone(at.card, at.zone))[i].Group
 }
 
-// zoneLabelPx is the zones' label column.
-const zoneLabelPx = 56
+// removeItem takes chip's item out of its zone.
+func (c *layoutEditor) removeItem(chip *widget.Chip) {
+	at, i := c.locate(chip)
+	items := c.zone(at.card, at.zone)
+	*items = slices.Delete(*items, i, i+1)
+	c.commit()
+	c.rebuild()
+}
+
+// moved is handle_drop after the chip boxes moved the chip: the item
+// leaves src's zone at from and enters dst's at to, where the chip now
+// is. A box of no card is a caller bug.
+func (c *layoutEditor) moved(src *widget.ChipBox, from int, dst *widget.ChipBox, to int) {
+	srcAt, ok := c.zones[src]
+	if !ok {
+		panic("settings: a chip moved in from a box no layout card holds")
+	}
+	dstAt := c.zones[dst]
+	items := c.zone(srcAt.card, srcAt.zone)
+	item := (*items)[from]
+	*items = slices.Delete(*items, from, from+1)
+	items = c.zone(dstAt.card, dstAt.zone)
+	*items = slices.Insert(*items, to, item)
+	c.commit()
+}
 
 // moduleNames are the picker's modules: the built-ins, then a
 // custom-<id> per custom module (all_module_names).
@@ -345,141 +367,6 @@ func (c *layoutEditor) pickModule(anchor widget.Widget, pick func(config.BarModu
 			pick(m)
 		}
 	})
-}
-
-// dragPayload is DragPayload: where a dragged chip came from.
-type dragPayload struct{ card, zone, item int }
-
-// encode is DragPayload::encode: card:zone:item.
-func (p dragPayload) encode() string {
-	return fmt.Sprintf("%d:%s:%d", p.card, zoneNames[p.zone], p.item)
-}
-
-// decodePayload is DragPayload::decode.
-func decodePayload(s string) (dragPayload, bool) {
-	parts := strings.SplitN(s, ":", 3)
-	if len(parts) != 3 {
-		return dragPayload{}, false
-	}
-	card, err1 := strconv.Atoi(parts[0])
-	item, err2 := strconv.Atoi(parts[2])
-	zone := slices.Index(zoneNames[:], parts[1])
-	if err1 != nil || err2 != nil || zone < 0 {
-		return dragPayload{}, false
-	}
-	return dragPayload{card, zone, item}, true
-}
-
-// layoutChip is a chip's root: the drag source (attach_drag_source),
-// marked chip-dragging while it travels.
-type layoutChip struct {
-	*widget.Box
-	payload dragPayload
-}
-
-// DragContent implements widget.DragSource.
-func (c *layoutChip) DragContent() *widget.DragContent {
-	c.AddClass("chip-dragging")
-	return &widget.DragContent{
-		Mimes: []string{layoutDragMime},
-		Write: func(_ string, w io.Writer) error {
-			_, err := io.WriteString(w, c.payload.encode())
-			return err
-		},
-		OnDone: func(transfer.Action) { c.RemoveClass("chip-dragging") },
-	}
-}
-
-// layoutZone is a zone's chips, the drop target (attach_drop_target):
-// hovering marks where the chip would land, dropping moves it there.
-type layoutZone struct {
-	*widget.FlowBox
-	ed         *layoutEditor
-	card, zone int
-}
-
-// DragEnter implements widget.DragEnterer: a chip's payload is taken.
-func (z *layoutZone) DragEnter(mimes []string, p widget.Point) string {
-	if !slices.Contains(mimes, layoutDragMime) {
-		return ""
-	}
-	z.DragHover(p)
-	return layoutDragMime
-}
-
-// DragHover implements widget.DragHoverer (highlight_drop_position).
-func (z *layoutZone) DragHover(p widget.Point) {
-	z.clearMarks()
-	pos := z.dropPosition(p)
-	if c := z.ChildAt(pos); c != nil {
-		c.AddClass("drop-before")
-	} else if c := z.ChildAt(z.Len() - 1); c != nil {
-		c.AddClass("drop-after")
-	}
-}
-
-// DragLeave implements widget.DragLeaver.
-func (z *layoutZone) DragLeave() { z.clearMarks() }
-
-func (z *layoutZone) clearMarks() {
-	for i := range z.Len() {
-		z.ChildAt(i).RemoveClass("drop-before", "drop-after")
-	}
-}
-
-// Drop implements widget.Dropper.
-func (z *layoutZone) Drop(_ string, data []byte, p widget.Point) {
-	z.clearMarks()
-	from, ok := decodePayload(string(data))
-	if !ok {
-		return
-	}
-	z.ed.move(from, z.card, z.zone, z.dropPosition(p))
-}
-
-// dropPosition is compute_drop_position: before or after the chip
-// under p by its center, else after the last chip of p's line, else
-// the start when p is above every line.
-func (z *layoutZone) dropPosition(p widget.Point) int {
-	if i := z.IndexAt(p); i >= 0 {
-		b := z.ChildAt(i).Bounds()
-		if p.X < b.X+b.W/2 {
-			return i
-		}
-		return i + 1
-	}
-	// Lines run top to bottom: the last chip starting at or above p
-	// ends p's line.
-	last := -1
-	for i := range z.Len() {
-		if z.ChildAt(i).Bounds().Y <= p.Y {
-			last = i
-		}
-	}
-	return last + 1
-}
-
-// move is handle_drop: take the item out of its zone and insert it at
-// position in the target zone, a later position in the same zone
-// shifting for the removal.
-func (c *layoutEditor) move(from dragPayload, card, zone, position int) {
-	if from.card < 0 || from.card >= len(c.layouts) || card < 0 || card >= len(c.layouts) {
-		return
-	}
-	src := c.zone(from.card, from.zone)
-	if from.item < 0 || from.item >= len(*src) {
-		return
-	}
-	item := (*src)[from.item]
-	*src = slices.Delete(*src, from.item, from.item+1)
-	if from.card == card && from.zone == zone && from.item < position {
-		position--
-	}
-	dst := c.zone(card, zone)
-	position = min(max(position, 0), len(*dst))
-	*dst = slices.Insert(*dst, position, item)
-	c.commit()
-	c.rebuild()
 }
 
 // layoutRow is bar_layout for a row.
