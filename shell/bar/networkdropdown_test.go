@@ -558,18 +558,28 @@ func TestNetworkActiveRowsCarryTheirClasses(t *testing.T) {
 	}
 }
 
-// The active card holds only the connections that show: one leaves no
-// separator over a hidden row, both are set apart by one.
+// The active card sets apart only the connections that show: one
+// leaves no separator over a hidden row, both are set apart by one.
 func TestNetworkActiveCardSeparatesOnlyShownRows(t *testing.T) {
 	v, _, _ := newNetTestView(t, network.Snapshot{HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000}, netDeps{})
-	if n := len(treetest.All[*widget.Separator](v.active.group)); n != 0 {
-		t.Errorf("wired alone: %d separators, want none", n)
+	shown := func() int {
+		arrangeDropdown(t, v, 380, 600)
+		n := 0
+		for _, sep := range treetest.All[*widget.Separator](v.active) {
+			if sep.Visible() {
+				n++
+			}
+		}
+		return n
+	}
+	if n := shown(); n != 0 {
+		t.Errorf("wired alone: %d separators shown, want none", n)
 	}
 	onHeadlessLoop(func() bool {
 		v.active.apply(network.Snapshot{HasWired: true, Wired: network.StatusConnected, Wifi: network.StatusConnected, WifiSSID: "mine"}, netProgress{})
 		return true
 	})
-	if n := len(treetest.All[*widget.Separator](v.active.group)); n != 1 {
-		t.Errorf("wired and wifi: %d separators, want one", n)
+	if n := shown(); n != 1 {
+		t.Errorf("wired and wifi: %d separators shown, want one", n)
 	}
 }

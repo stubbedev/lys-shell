@@ -541,7 +541,6 @@ type netActive struct {
 	*widget.Box
 	v                  *networkView
 	label              *widget.Label
-	group              *widget.ItemGroup
 	wired              *widget.Item
 	wifi               *widget.Item
 	wifiIcon           *widget.Icon
@@ -558,7 +557,6 @@ func newNetActive(v *networkView) *netActive {
 	a.label = sectionLabel(v.font, "")
 	card, group := itemCard()
 	card.AddClass("network-connections-group")
-	a.group = group
 	a.Box = dropdownSection(a.label, card)
 
 	a.wired = widget.NewItem(v.font, i18n.T("dropdown-network-ethernet"), "")
@@ -567,6 +565,7 @@ func newNetActive(v *networkView) *netActive {
 	a.wired.AddClass("network-active", "ethernet")
 	a.wired.SetMedia(widget.NewThemeIcon("cm-wired-symbolic", itemIconPx), false)
 	a.wired.AddAction(v.statusLabel())
+	group.Append(a.wired)
 
 	a.wifi = widget.NewItem(v.font, "", "")
 	a.wifi.SetSmall(true)
@@ -595,6 +594,7 @@ func newNetActive(v *networkView) *netActive {
 		a.hovered = on
 		a.syncTrailing()
 	})
+	group.Append(a.wifi)
 	return a
 }
 
@@ -647,17 +647,7 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 		a.label.SetText(i18n.T("dropdown-network-active-connection"))
 	}
 
-	wired, wifi := s.Wired == network.StatusConnected, s.Wifi == network.StatusConnected || connecting || p.err != ""
-	// The group holds only the rows that show, so no separator is left
-	// over a hidden one.
-	a.group.Clear()
-	if wired {
-		a.group.Append(a.wired)
-	}
-	if wifi {
-		a.group.Append(a.wifi)
-	}
-	a.wired.SetVisible(wired)
+	a.wired.SetVisible(s.Wired == network.StatusConnected)
 	speed := ""
 	if s.WiredSpeed > 0 {
 		speed = formatWiredSpeed(s.WiredSpeed)
@@ -667,7 +657,7 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 	}
 	a.wired.SetDescription(speed)
 
-	a.wifi.SetVisible(wifi)
+	a.wifi.SetVisible(s.Wifi == network.StatusConnected || connecting || p.err != "")
 	if a.wifiErr {
 		// The row swaps wifi for error, it never wears both
 		// (active_connections/methods.rs:100-110).
