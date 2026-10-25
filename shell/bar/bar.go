@@ -99,6 +99,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	theme := apptheme.New(cfg)
 	theme.WatchUserStyles(application)
 	defer apptheme.Setup(application)()
+	apptheme.ReportMissingIcons(cfg, config.StderrDiagnostics)
 	// rt is what the bars are built from; a config reload or a new
 	// palette re-derives it and rebuilds them.
 	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}
@@ -411,6 +412,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		cancel := svc.Subscribe(func(old, next *config.Config) {
 			application.Invoke(func() {
 				current.Store(next)
+				apptheme.ReportMissingIcons(next, config.StderrDiagnostics)
 				theme.SetConfig(next)
 				if barsAffected(old, next) {
 					restyle(next)

@@ -6,6 +6,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/icons"
 )
 
@@ -57,4 +58,39 @@ func Setup(a *app.Application) (stop func()) {
 		return func() {}
 	}
 	return initIcons(registry, lysUIIcons)
+}
+
+// missingIconDiagnostics warns, in name order, about each lys-shell
+// icon cfg names that exists cannot find, rather than letting it paint
+// nothing unexplained: one a CDN source serves points at `lys-shell
+// icons sync`, a user-imported cm- one at `lys-shell icons import`.
+func missingIconDiagnostics(cfg *config.Config, exists func(string) bool) []config.Diagnostic {
+	referenced := map[string]bool{}
+	icons.ScanValue(config.Encode(cfg), referenced)
+	found := make(map[string]bool, len(referenced))
+	for name := range referenced {
+		found[name] = exists(name)
+	}
+	missing := icons.FindMissing(referenced, found)
+	out := make([]config.Diagnostic, 0, len(missing))
+	for _, icon := range missing {
+		d := config.Diagnostic{Kind: config.DiagnosticWarning, Title: "icon not found", Fields: [][2]string{{"Icon", icon.Name}}}
+		if icon.Source == "" {
+			d.Fields = append(d.Fields, [2]string{"Source", "user-imported"})
+			d.Hint = "lys-shell icons import <file.svg> " + icon.Slug
+		} else {
+			d.Fields = append(d.Fields, [2]string{"Source", icon.Source})
+			d.Hint = "lys-shell icons sync"
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// ReportMissingIcons sends sink a warning for each lys-shell icon cfg
+// names that the icon theme Setup joined does not provide.
+func ReportMissingIcons(cfg *config.Config, sink config.DiagnosticSink) {
+	for _, d := range missingIconDiagnostics(cfg, widget.ThemeIconExists) {
+		sink(d)
+	}
 }

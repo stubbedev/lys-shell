@@ -89,4 +89,6 @@ modules:
     icon-name: tb-wifi-symbolic
 ```
 
-The value is the full icon name, prefix included. If the icon is missing from the theme, the module falls back to its default.
+The value is the full icon name, prefix included. An icon no theme provides draws nothing, so the shell warns about each one at startup and on every config reload, naming the icon and how to get it: `lys-shell icons sync` for a CDN prefix, `lys-shell icons import` for a `cm-` icon.
+
+lys-shell bundles [Lucide](https://lucide.dev/icons) (`ld-`) for its own glyphs and [Simple Icons](https://simpleicons.org) (`si-`) for brand logos. A config written against an older release may name Tabler (`tb-`) or Material (`md-`) icons that are no longer bundled; `lys-shell icons sync` fetches them, or switch to the `ld-` equivalent.

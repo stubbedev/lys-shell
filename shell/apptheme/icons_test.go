@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/icons"
 )
 
@@ -100,5 +103,80 @@ func TestInitIconsFailureLeavesSearchAlone(t *testing.T) {
 	initIcons(icons.RegistryAt(file), fake.search())()
 	if paths, refreshes := fake.state(); !slices.Equal(paths, []string{"/usr/share/icons"}) || refreshes != 0 {
 		t.Errorf("a registry that cannot be set up touched the search path: %v, %d refreshes", paths, refreshes)
+	}
+}
+
+// bundledHicolorIndex declares the bundled icons' one directory, as
+// the hicolor theme an installed lys-shell extends does.
+const bundledHicolorIndex = "[Icon Theme]\nName=Hicolor\nDirectories=scalable/actions\n\n" +
+	"[scalable/actions]\nSize=48\nMinSize=16\nMaxSize=512\nType=Scalable\n"
+
+// useBundledIcons resolves theme icons from the repository's bundled
+// set alone, laid out as the hicolor theme an installed lys-shell
+// extends, so icons the machine has installed elsewhere cannot answer.
+func useBundledIcons(t *testing.T) {
+	t.Helper()
+	bundled, err := filepath.Abs(filepath.Join("..", "..", "resources", "icons", "hicolor", "scalable"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := t.TempDir()
+	hicolor := filepath.Join(base, "hicolor")
+	if err := os.Mkdir(hicolor, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hicolor, "index.theme"), []byte(bundledHicolorIndex), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(bundled, filepath.Join(hicolor, "scalable")); err != nil {
+		t.Fatal(err)
+	}
+	prev := widget.IconSearchPaths()
+	widget.SetIconSearchPaths([]string{base})
+	widget.RefreshIcons()
+	t.Cleanup(func() {
+		widget.SetIconSearchPaths(prev)
+		widget.RefreshIcons()
+	})
+}
+
+func reportedIcons(cfg *config.Config) []config.Diagnostic {
+	var got []config.Diagnostic
+	ReportMissingIcons(cfg, func(d config.Diagnostic) { got = append(got, d) })
+	return got
+}
+
+// Every icon the defaults name resolves from the bundled set, so a
+// stock config warns about nothing.
+func TestDefaultIconsAreBundled(t *testing.T) {
+	useBundledIcons(t)
+	for _, d := range reportedIcons(config.Defaults()) {
+		t.Errorf("a default icon is not bundled: %s", d.Field("Icon"))
+	}
+}
+
+// An icon a user config names that no theme provides, such as one from
+// the Tabler and Material sets lys-shell no longer bundles, is a
+// warning naming it and how to get it, not a silently blank glyph; a
+// user-imported cm- icon cannot be fetched, so it points at import.
+func TestAMissingConfigIconIsReported(t *testing.T) {
+	useBundledIcons(t)
+	cfg := config.Defaults()
+	cfg.Battery.ChargingIcon = "md-battery_android_frame_bolt-symbolic"
+	cfg.Network.WiredConnectedIcon = "cm-wired-symbolic"
+	cfg.Clock.IconName = "ld-clock-symbolic"
+	got := reportedIcons(cfg)
+	want := []struct{ icon, source, hint string }{
+		{"cm-wired-symbolic", "user-imported", "lys-shell icons import <file.svg> wired"},
+		{"md-battery_android_frame_bolt-symbolic", "material", "lys-shell icons sync"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("reported %d icons, want %d: %v", len(got), len(want), got)
+	}
+	for i, w := range want {
+		d := got[i]
+		if d.Kind != config.DiagnosticWarning || d.Field("Icon") != w.icon || d.Field("Source") != w.source || d.Hint != w.hint {
+			t.Errorf("diagnostic %d = %+v, want a warning for %s from %s hinting %q", i, d, w.icon, w.source, w.hint)
+		}
 	}
 }
