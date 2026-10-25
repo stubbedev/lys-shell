@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 )
@@ -167,5 +168,52 @@ func TestConfigPalette(t *testing.T) {
 	}
 	if *p != *configured {
 		t.Errorf("after the provider failed = %+v, want the configured palette", p)
+	}
+}
+
+// TokensCSS declares every config token as Palette.Token resolves it,
+// translucent ones with their alpha, and nothing else.
+func TestTokensCSSIsTheTokenTable(t *testing.T) {
+	p := Default()
+	css := TokensCSS(p)
+	for _, tok := range config.CssTokens() {
+		c, _ := p.Token(tok)
+		if want := "--" + string(tok) + ": " + cssColor(c) + ";"; !strings.Contains(css, want) {
+			t.Errorf("TokensCSS lacks %q", want)
+		}
+	}
+	if got, want := strings.Count(css, ";"), len(config.CssTokens()); got != want {
+		t.Errorf("TokensCSS declares %d properties, want the %d tokens", got, want)
+	}
+	if subtle, _ := p.Token(config.TokenFgSubtle); !strings.Contains(css, "--fg-subtle: "+cssColor(subtle)+";") || len(cssColor(subtle)) != 9 {
+		t.Errorf("the translucent fg-subtle lost its alpha: %q", cssColor(subtle))
+	}
+}
+
+// The bundle parses clean and a rule reading a token paints the
+// token's resolved color, so the stylesheet and the Go table cannot
+// drift.
+func TestBundleTokensPaintTheTokenColor(t *testing.T) {
+	cfg := config.Defaults()
+	p := Default()
+	var warns []string
+	widget.SetParseWarn(func(msg string) { warns = append(warns, msg) })
+	sheet := widget.NewStylesheet(BundleCSS(cfg, cfg.Styling.ActivePalette(), p)+"\n.token-probe { background-color: var(--bg-overlay); }", 200)
+	widget.SetParseWarn(nil)
+	if len(warns) > 0 {
+		t.Fatalf("the bundle trips the CSS engine: %v", warns)
+	}
+	box := widget.NewBox(widget.Row, 0, 0)
+	box.AddClass("token-probe")
+	box.SetSizeRequest(10, 10)
+	box.AttachStylesheet(sheet)
+	box.Measure(widget.Constraints{Max: widget.Size{W: 10, H: 10}})
+	box.Arrange(render.Rect{W: 10, H: 10})
+	data := make([]byte, render.Stride(10)*10)
+	box.Paint(render.NewScaled(data, render.Stride(10), 10, 10, 1, 1))
+	i := 5*render.Stride(10) + 5*4
+	got := render.RGB(data[i+2], data[i+1], data[i])
+	if want, _ := p.Token(config.TokenBgOverlay); got != want {
+		t.Errorf("var(--bg-overlay) paints %#08x, want the token's %#08x", uint32(got), uint32(want))
 	}
 }

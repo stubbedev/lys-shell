@@ -136,3 +136,37 @@ func ConfigPalette(s config.StylingConfig) (*Palette, error) {
 	}
 	return p, resolveErr
 }
+
+// TokensCSS declares every palette token (--bg-overlay, --accent, ...)
+// as the color Palette.Token resolves for p: the Go table is the one
+// definition the stylesheet, lys-ui's theme and the settings swatches
+// all read.
+func TokensCSS(p *Palette) string {
+	var b strings.Builder
+	b.WriteString(":root {\n")
+	for _, tok := range config.CssTokens() {
+		c, ok := p.Token(tok)
+		if !ok {
+			panic("styling: config token " + string(tok) + " has no resolution")
+		}
+		b.WriteString("    --" + string(tok) + ": " + cssColor(c) + ";\n")
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
+// cssColor writes c as #rrggbb, or #rrggbbaa when translucent.
+func cssColor(c render.Color) string {
+	s := c.Straight()
+	if s[3] == 0xff {
+		return fmt.Sprintf("#%02x%02x%02x", s[0], s[1], s[2])
+	}
+	return fmt.Sprintf("#%02x%02x%02x%02x", s[0], s[1], s[2], s[3])
+}
+
+// BundleCSS is the built-in stylesheet under cfg's theme: the static
+// rules, the palette and config block for palette, and the tokens
+// resolved from p, the same palette as render colors.
+func BundleCSS(cfg *config.Config, palette config.Palette, p *Palette) string {
+	return StaticCSS + "\n" + ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling) + "\n" + TokensCSS(p)
+}

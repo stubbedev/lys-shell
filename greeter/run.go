@@ -146,11 +146,11 @@ func (s *screen) applyDebugOps(spec string, after func(time.Duration, func())) {
 // pre-login there is no user.
 func Stylesheet(cfg *config.Config) *widget.Stylesheet {
 	palette := cfg.Styling.ActivePalette()
-	if p, err := styling.PaletteFromHex(palette); err == nil {
-		widget.SetTheme(apptheme.WidgetTheme(p, cfg))
-	} else {
+	p, err := styling.PaletteFromHex(palette)
+	if err != nil {
 		log.Printf("greeter: palette: %v", err)
+		p = styling.Default()
 	}
-	theme := styling.ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling)
-	return widget.NewStylesheet(styling.StaticCSS+"\n"+theme, apptheme.Priority)
+	widget.SetTheme(apptheme.WidgetTheme(p, cfg))
+	return widget.NewStylesheet(styling.BundleCSS(cfg, palette, p), apptheme.Priority)
 }

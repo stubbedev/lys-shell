@@ -9,6 +9,8 @@ import (
 	"testing/fstest"
 
 	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // TestSheetOrderCoversEveryFile pins sheetOrder to the css/ tree: a
@@ -67,19 +69,26 @@ func orderGaps(fsys fs.FS, root string, order []string) []string {
 	return append(gaps, unlisted...)
 }
 
-// TestStaticCSSIsTheBundle spot-checks the concatenation: the palette
-// first, then the token block and the bar rules the Go bar relies on.
-// No rule resets every node: lys-ui's theme layer styles the widgets
-// the shell does not, and a universal `all: unset` would erase it.
+// TestStaticCSSIsTheBundle spot-checks the concatenation: the
+// non-color tokens and the bar rules the Go bar relies on, and no
+// palette or color token, which ThemeCSS and TokensCSS declare from the
+// configured palette. No rule resets every node: lys-ui's theme layer
+// styles the widgets the shell does not, and a universal `all: unset`
+// would erase it.
 func TestStaticCSSIsTheBundle(t *testing.T) {
-	if !strings.HasPrefix(StaticCSS, ":root {\n  --palette-bg:") {
-		t.Errorf("StaticCSS does not open with the palette: %.40q", StaticCSS)
+	if strings.Contains(StaticCSS, "--palette-bg:") {
+		t.Error("StaticCSS declares a palette of its own")
+	}
+	for _, tok := range config.CssTokens() {
+		if strings.Contains(StaticCSS, "--"+string(tok)+":") {
+			t.Errorf("StaticCSS restates the %s token", tok)
+		}
 	}
 	if strings.Contains(StaticCSS, "* {\n  all: unset;") {
 		t.Error("StaticCSS resets every node, erasing lys-ui's theme layer")
 	}
 	for _, want := range []string{
-		"--bg-surface-elevated: color-mix(in srgb, var(--palette-surface) 93%, var(--palette-fg));",
+		"--space-sm: calc(0.5rem * var(--global-scale));",
 		"menubutton.bar-button > button.toggle {",
 		".bar-group {",
 	} {

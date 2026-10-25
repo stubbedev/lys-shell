@@ -11,11 +11,10 @@ import (
 var sheets embed.FS
 
 // sheetOrder is the cascade order of the files under css/: later files
-// override earlier ones at equal specificity, so the palette and the
-// tokens come first and the surfaces after the primitives they build
-// on. TestSheetOrderCoversEveryFile pins it to the tree.
+// override earlier ones at equal specificity, so the tokens come first
+// and the surfaces after the primitives they build on (the palette and
+// color tokens come from ThemeCSS and TokensCSS). TestSheetOrderCoversEveryFile pins it to the tree.
 var sheetOrder = []string{
-	"palette.css",
 	"tokens/index.css",
 	"base/index.css",
 	"primitives/badge/index.css",

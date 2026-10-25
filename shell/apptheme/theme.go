@@ -79,14 +79,13 @@ func (t *Theme) Bundle() string {
 		log.Printf("styling: %v", err)
 	}
 	t.palette = palette
-	theme := styling.ThemeCSS(palette, t.cfg.General, t.cfg.Bar, t.cfg.Styling)
 	user := ""
 	if dir, err := config.Dir(); err == nil {
 		user = styling.UserCSS(dir)
 	} else {
 		log.Printf("styling: cannot resolve config dir; user styles disabled: %v", err)
 	}
-	return styling.StaticCSS + "\n" + theme + "\n" + t.cfg.Animations.CSSOverrides() + "\n" + user
+	return styling.BundleCSS(t.cfg, palette, t.RenderPalette()) + "\n" + t.cfg.Animations.CSSOverrides() + "\n" + user
 }
 
 // Reload recompiles the bundle into the attached stylesheet and

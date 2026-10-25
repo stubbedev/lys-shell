@@ -1,8 +1,8 @@
 // Package styling resolves lys-shell's design tokens to concrete colors:
 // the Go counterpart of crates/wayle-styling. The palette is the
-// runtime source of truth; every token is a color-mix derivation from
-// it, ported exactly from css/tokens/index.css so a resolved token
-// here matches what the Rust shell's compiled CSS produces.
+// runtime source of truth and every token is a color-mix derivation
+// from it, defined once in Palette.Token: TokensCSS hands the
+// stylesheet the same colors lys-ui's theme and the painters use.
 package styling
 
 import (
@@ -27,21 +27,18 @@ type Palette struct {
 	Green, Blue           render.Color
 }
 
-// Default returns the palette in css/palette.css: the Catppuccin
-// Mocha set the Rust shell falls back to when no theme file overrides it.
+// Default is the built-in catppuccin-mocha palette, the set the shell
+// falls back to when a palette cannot be resolved.
 func Default() *Palette {
-	return &Palette{
-		Bg:       render.RGB(0x11, 0x11, 0x1b),
-		Surface:  render.RGB(0x18, 0x18, 0x25),
-		Elevated: render.RGB(0x1e, 0x1e, 0x2e),
-		Fg:       render.RGB(0xcd, 0xd6, 0xf4),
-		FgMuted:  render.RGB(0xba, 0xc2, 0xde),
-		Primary:  render.RGB(0xb4, 0xbe, 0xfe),
-		Red:      render.RGB(0xf3, 0x8b, 0xa8),
-		Yellow:   render.RGB(0xf9, 0xe2, 0xaf),
-		Green:    render.RGB(0xa6, 0xe3, 0xa1),
-		Blue:     render.RGB(0x74, 0xc7, 0xec),
+	hex, ok := config.PaletteByName("catppuccin-mocha")
+	if !ok {
+		panic("styling: no built-in catppuccin-mocha theme")
 	}
+	p, err := PaletteFromHex(hex)
+	if err != nil {
+		panic("styling: built-in catppuccin-mocha: " + err.Error())
+	}
+	return p
 }
 
 var (
@@ -71,9 +68,9 @@ func ColorMix(a, b render.Color, pct int) render.Color {
 	return render.Color(out)
 }
 
-// Token resolves one design token against the palette. The percentages
-// are the css/tokens/index.css color-mix table, one entry per token; a token
-// without a mix is a palette color passed through.
+// Token resolves one design token against the palette: the color-mix
+// table, one entry per token; a token without a mix is a palette color
+// passed through. It is the only definition of the tokens.
 func (p *Palette) Token(t config.CssToken) (render.Color, bool) {
 	switch t {
 	case config.TokenBgBase:
