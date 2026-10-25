@@ -294,3 +294,88 @@ func TestBarPaddingInsetsTheZones(t *testing.T) {
 		}
 	}
 }
+
+// button-gap is the content box's gap between the icon and the label,
+// along the bar and down a side bar's stacked content; the block-prefix
+// variant pads its label container instead and keeps no gap.
+func TestBarButtonGapSeparatesIconAndLabel(t *testing.T) {
+	for _, tc := range []struct {
+		variant config.BarButtonVariant
+		loc     config.Location
+		want    int
+	}{
+		{config.ButtonBasic, config.LocationTop, 20},
+		{config.ButtonIconSquare, config.LocationTop, 20},
+		{config.ButtonBasic, config.LocationLeft, 20},
+		{config.ButtonBlockPrefix, config.LocationTop, 0},
+	} {
+		cfg := config.Defaults()
+		cfg.Bar.Location = tc.loc
+		cfg.Bar.ButtonVariant = tc.variant
+		cfg.Bar.ButtonGap = config.Size{Value: 20, Unit: config.SizePixels}
+		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		settleBar(bar, widget.Size{W: 1000, H: 1000})
+		btn := bar.Center().Children()[0].(*widget.Box).Children()[0].(*widget.Box).Children()[0].(*barButton)
+		icon, label := btn.iconBox.Bounds(), btn.labelBox.Bounds()
+		gap := label.X - (icon.X + icon.W)
+		if tc.loc.IsVertical() {
+			gap = label.Y - (icon.Y + icon.H)
+		}
+		if gap != tc.want {
+			t.Errorf("%s on the %s: icon and label %dpx apart, want %d", tc.variant, tc.loc, gap, tc.want)
+		}
+	}
+}
+
+// Inside a side bar lys-ui marks the module button vertical; along the
+// top it does not.
+func TestBarButtonFollowsTheBarsOrientation(t *testing.T) {
+	for _, loc := range []config.Location{config.LocationTop, config.LocationLeft} {
+		cfg := config.Defaults()
+		cfg.Bar.Location = loc
+		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		settleBar(bar, widget.Size{W: 1000, H: 1000})
+		btn := clockButton(bar)
+		if btn.HasClass("vertical") != loc.IsVertical() {
+			t.Errorf("%s: the module button's vertical class is %v", loc, btn.HasClass("vertical"))
+		}
+	}
+}
+
+// clockButton is the module button of a bar whose center holds one
+// clock.
+func clockButton(bar *widget.Bar) *barButton {
+	return bar.Center().Children()[0].(*widget.Box).Children()[0].(*widget.Box).Children()[0].(*barButton)
+}
+
+// paintedAt lays bar out within w x h, paints it and returns the
+// pixel at p.
+func paintedAt(bar *widget.Bar, w, h int, p widget.Point) render.Color {
+	size := settleBar(bar, widget.Size{W: w, H: h})
+	widget.CollectDamage(bar)
+	data := make([]byte, render.Stride(size.W)*size.H)
+	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
+	return pixelAt(data, size.W, p.X, p.Y)
+}
+
+// A module button lightens under the pointer and returns to its
+// configured background once the pointer leaves.
+func TestBarButtonShadesUnderThePointer(t *testing.T) {
+	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+	bar := buildRoot(styledContext(t, config.Defaults()), layout, "DP-1")
+	settleBar(bar, widget.Size{W: 1000, H: 100})
+	b := clockButton(bar)
+	lb := b.labelBox.Bounds()
+	at := widget.Point{X: lb.X + 1, Y: lb.Y + 1}
+	rest := paintedAt(bar, 1000, 100, at)
+	router, _ := treetest.Pointer(bar, b, 1000, 100)
+	if hovered := paintedAt(bar, 1000, 100, at); hovered == rest {
+		t.Errorf("the hovered button paints %#x, as at rest", uint32(hovered))
+	}
+	router.Move(widget.Point{X: 1, Y: 1})
+	if left := paintedAt(bar, 1000, 100, at); left != rest {
+		t.Errorf("the button paints %#x after the pointer left, want its rest %#x", uint32(left), uint32(rest))
+	}
+}

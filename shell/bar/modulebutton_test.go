@@ -98,7 +98,7 @@ func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 
 	// The primary fires on the press, the Rust GestureClick's
 	// connect_pressed; the release fires nothing more.
-	router, p := treetest.Pointer(button, button.toggle, 200, 40)
+	router, p := treetest.Pointer(button, button, 200, 40)
 	router.Press(widget.BTNLeft, p, 0)
 	router.Release(widget.BTNLeft, p)
 	router.Press(widget.BTNMiddle, p, 0)
@@ -126,7 +126,7 @@ func TestUnboundBarButtonConsumesScroll(t *testing.T) {
 	behind.Append(button, false)
 	reached := 0
 	behind.SetOnScroll(func(widget.ScrollEvent) bool { reached++; return true })
-	router, p := treetest.Pointer(behind, button.toggle, 200, 40)
+	router, p := treetest.Pointer(behind, button, 200, 40)
 	// Scroll steps are always consumed (the Rust helper's
 	// Propagation::Stop); the unbound action no-ops in run.
 	router.Axis(0, 1, 0)
@@ -142,8 +142,9 @@ func TestUnboundBarButtonConsumesScroll(t *testing.T) {
 }
 
 // The module wrapper: `module` plus the module's own type class sit on
-// a box ABOVE the menubutton, so ancestor selectors like
-// `.media-disc menubutton ... image` match, the Rust factory's shape.
+// a box ABOVE the bar button, so ancestor selectors like
+// `.media-disc button.bar-button ... image` match, the Rust factory's
+// shape.
 func TestModuleWrapsTheButtonInModuleClasses(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
@@ -165,9 +166,11 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	icon := widget.NewThemeIcon("x-symbolic", 16)
 	b := newBarButton(ctx, icon, label)
 	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
-	b.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
-	if b.Element() != "menubutton" || b.toggle.Element() != "button" || !b.toggle.HasClass("toggle") {
-		t.Fatal("the menubutton > button.toggle spine")
+	host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
+	host.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
+	host.Arrange(render.Rect{W: 400, H: 40})
+	if b.Element() != "button" || !b.HasClass("bar-button") {
+		t.Fatalf("the module button is %q %v, not lys-ui's button.bar-button", b.Element(), b.Classes())
 	}
 	if !b.content.HasClass("bar-button-content") || !b.iconBox.HasClass("icon-container") ||
 		!b.labelBox.HasClass("label-container") || !label.HasClass("bar-button-label") || icon.Element() != "image" {
@@ -191,7 +194,8 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	}
 
 	// The modifiers follow the config: variant, hidden label/icon, the
-	// border class, the icon position, and a vertical bar.
+	// border class, the icon position; a vertical bar stacks the
+	// content.
 	cfg.Bar.ButtonVariant = config.ButtonBlockPrefix
 	cfg.Bar.ButtonIconPosition = config.IconEnd
 	cfg.Bar.Location = config.LocationLeft
@@ -199,13 +203,16 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	bc.LabelShow, bc.IconShow, bc.BorderShow = false, false, true
 	v := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "x", 0))
 	v.configure(bc, config.ClickConfig{}, nil)
-	for _, c := range []string{"block-prefix", "icon-only", "label-only", "vertical", "icon-end", "border-all"} {
+	for _, c := range []string{"block-prefix", "icon-only", "label-only", "icon-end", "border-all"} {
 		if !v.HasClass(c) {
 			t.Errorf("modified button misses %q in %v", c, v.Classes())
 		}
 	}
 	if v.content.Children()[0] != v.labelBox {
 		t.Error("icon-end did not put the label container first")
+	}
+	if v.content.Axis() != widget.Column {
+		t.Error("a vertical bar's button lays its content out as a row")
 	}
 	if !strings.Contains(v.InlineStyle(), "--bar-btn-icon-color: var(--fg-on-accent)") {
 		t.Errorf("block-prefix auto icon color = %q, want fg-on-accent", v.InlineStyle())
@@ -275,7 +282,7 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 
 // The real input path: lys-ui's Router hit-tests the tree and drives the
 // hit leaf, so a routed left press must reach the binding and a hover
-// must shade the toggle.
+// must shade the button.
 func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
 	binding := config.ClickConfig{LeftClick: config.ParseClickAction("left")}
 	button, rec := newWrappedModule(t, binding)
@@ -284,12 +291,12 @@ func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
 	router := &widget.Router{Root: button}
 	p := widget.Point{X: 10, Y: 10}
 	router.Move(p)
-	if !button.toggle.Hovered {
-		t.Fatal("routed hover did not reach the toggle")
+	if !button.Hovered {
+		t.Fatal("routed hover did not reach the button")
 	}
 	router.Press(widget.BTNLeft, p, 0)
-	if !button.toggle.Pressed {
-		t.Fatal("routed press did not reach the toggle")
+	if !button.Pressed {
+		t.Fatal("routed press did not reach the button")
 	}
 	router.Release(widget.BTNLeft, p)
 	if len(rec.actions) != 1 || rec.actions[0].Command != "left" {
@@ -322,19 +329,19 @@ func TestBarButtonKeepsTheModulesClasses(t *testing.T) {
 	}
 }
 
-// The bar toggle is named by its label for assistive technology, as
+// The bar button is named by its label for assistive technology, as
 // GTK names the Rust shell's menu button; a button with no label has
 // no name to give.
-func TestBarToggleAccessibleNameIsItsLabel(t *testing.T) {
+func TestBarButtonAccessibleNameIsItsLabel(t *testing.T) {
 	cfg := config.Defaults()
 	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "12:30", 0))
-	st := widget.Describe(b.toggle)
+	st := widget.Describe(b)
 	if st.Role != widget.RoleButton || st.Name != "12:30" {
-		t.Errorf("toggle = %s %q, want a button named by its label", st.Role, st.Name)
+		t.Errorf("button = %s %q, want a button named by its label", st.Role, st.Name)
 	}
 	bare := newBarButtonAround(newTestContext(t, cfg), widget.NewBox(widget.Row, 0, 0))
-	if got := widget.Describe(bare.toggle).Name; got != "" {
-		t.Errorf("label-less toggle name = %q, want none", got)
+	if got := widget.Describe(bare).Name; got != "" {
+		t.Errorf("label-less button name = %q, want none", got)
 	}
 }
 

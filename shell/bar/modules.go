@@ -328,7 +328,7 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	// builds: `module`, the module's own type class (battery, clock,
 	// media, ... — the layout name, overridable by the module), and the
 	// layout entry's instance class, so ancestor selectors like
-	// `.media-disc menubutton ...` reach the button.
+	// `.media-disc button.bar-button ...` reach the button.
 	wrap := widget.NewBox(widget.Row, 0, 0)
 	wrap.AddClass("module", string(item.Module))
 	if t, ok := module.(interface{ typeClass() string }); ok {

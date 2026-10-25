@@ -89,7 +89,7 @@ func TestStaticCSSIsTheBundle(t *testing.T) {
 	}
 	for _, want := range []string{
 		"--space-sm: calc(0.5rem * var(--global-scale));",
-		"menubutton.bar-button > button.toggle {",
+		"button.bar-button {",
 		".bar-group {",
 	} {
 		if !strings.Contains(StaticCSS, want) {

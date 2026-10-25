@@ -18,14 +18,16 @@ bar:
         - clock
 ```
 
-The class is added to that module's root widget. The selector to target it from `index.css` is `menubutton.bar-button.primary-clock` (every module is a `menubutton.bar-button`; the custom class is appended).
+The class is added to the box around that module. The selector to target its button from `index.css` is `.primary-clock button.bar-button` (every module button is a `button.bar-button` inside its module box).
 
-The robust way to change appearance on that one instance is to override the CSS variables it consumes. The built-in rules read from variables like `--bar-btn-bg`, `--bar-btn-label-color`, `--bar-btn-icon-size`, and `--bar-btn-label-weight`. Redefining one of those inside the per-instance selector replaces it for that widget only:
+The robust way to change appearance on that one instance is to override the CSS variables it consumes. The built-in rules read from variables like `--bar-btn-label-color`, `--bar-btn-icon-color`, `--bar-btn-icon-size`, and `--bar-btn-label-weight`. The config sets a button's color variables on the button itself, so redefine them on its content, `.bar-button-content`, and set the button's own background directly:
 
 ```css
 /* ~/.config/lys-shell/styles/index.css */
-menubutton.bar-button.primary-clock {
-  --bar-btn-bg: var(--palette-primary);
+.primary-clock button.bar-button {
+  background-color: var(--palette-primary);
+}
+.primary-clock .bar-button-content {
   --bar-btn-label-color: var(--palette-bg);
   --bar-btn-label-weight: 700;
 }

@@ -10,24 +10,27 @@ import (
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// barButton is the port of the Rust BarButton
-// (crates/wayle-widgets/src/components/bar_buttons/component.rs): the
-// same widget tree and classes, so the bar-button CSS styles
-// it as it styles the GTK one —
+// barButton is a module's button: lys-ui's BarButton carrying the
+// Rust BarButton's content (crates/wayle-widgets/src/components/
+// bar_buttons/component.rs) as its leading widget, so the bar-button
+// CSS styles it —
 //
-//	menubutton.bar-button.<variant>[.icon-only][.label-only][.vertical][.border-*][.icon-end]
-//	└ button.toggle
+//	button.bar-button.<variant>[.icon-only][.label-only][.vertical][.border-*][.icon-end]
+//	└ box
 //	  └ box.bar-button-content
 //	    ├ box.icon-container > image
 //	    └ box.label-container > label.bar-button-label
 //
 // with the module's colors injected as the per-button custom
-// properties (styling.ButtonCSS) on the menubutton. The five click and
-// scroll bindings route through the toggle, the router's hit leaf.
+// properties (styling.ButtonCSS) on the button. The content is
+// lys-shell's own rather than BarButton's icon and label: those sit a
+// fixed theme gap apart with the icon always first, which neither
+// button-gap nor button-icon-position could change. The button is the
+// router's hit leaf, so the five click and scroll bindings route
+// through it.
 type barButton struct {
-	*widget.Box // menubutton.bar-button
+	*widget.BarButton
 
-	toggle   *barToggle
 	content  *widget.Box
 	iconBox  *widget.Box
 	labelBox *widget.Box
@@ -51,20 +54,12 @@ type barButton struct {
 	ownClasses []string
 }
 
-// barToggle is the button.toggle node: a lys-ui Button that stays the hit
-// leaf and fires the primary binding on the press.
-type barToggle struct {
-	*widget.Button
-	owner *barButton
-}
-
 // newBarButton builds the bar-button tree around a module's icon and
 // label (either may be nil). The label hands its color to the
 // stylesheet: the programmatic ink a module constructed it with would
 // otherwise outrank the per-button --bar-btn-label-color.
 func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *barButton {
 	b := newBarButtonShell(ctx)
-	b.font = ctx.Font
 	b.iconBox = widget.NewBox(widget.Row, 0, 0)
 	b.iconBox.AddClass("icon-container")
 	if icon != nil {
@@ -93,7 +88,7 @@ func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *ba
 // width and the popover its anchor. A copy of the label stands in;
 // the module keeps updating its own, hidden one.
 func (b *barButton) freezeLabel() {
-	if b.label == nil || b.frozen != nil || b.font == nil {
+	if b.label == nil || b.frozen != nil {
 		return
 	}
 	f := widget.NewLabel(b.font, b.label.SizePx(), b.label.Text(), b.label.Color())
@@ -127,10 +122,10 @@ func newBarButtonAround(ctx ModuleContext, content widget.Widget) *barButton {
 	return b
 }
 
-// newBarButtonShell builds the menubutton > button.toggle >
-// box.bar-button-content spine.
+// newBarButtonShell builds the lys-ui bar button around an empty
+// box.bar-button-content.
 func newBarButtonShell(ctx ModuleContext) *barButton {
-	b := &barButton{cfg: ctx.Config}
+	b := &barButton{cfg: ctx.Config, font: ctx.Font}
 	if ctx.Config != nil {
 		b.vertical = ctx.Config.Bar.Location.IsVertical()
 		b.button = config.ButtonConfig{IconShow: true, LabelShow: true, AutoIconColor: config.TokenFgDefault}
@@ -141,14 +136,9 @@ func newBarButtonShell(ctx ModuleContext) *barButton {
 	}
 	b.content = widget.NewBox(axis, 0, 0)
 	b.content.AddClass("bar-button-content")
-	b.toggle = &barToggle{Button: widget.NewButton(b.content, 0, 0), owner: b}
-	b.toggle.SetElement("button")
-	b.toggle.AddClass("toggle")
-	b.toggle.SetOnPointer(b.pointer)
-	b.toggle.SetOnScroll(b.scroll)
-	b.Box = widget.NewBox(widget.Row, 0, 0)
-	b.SetElement("menubutton")
-	b.Append(b.toggle, true)
+	b.BarButton = widget.NewBarButton(ctx.Font, b.content, "")
+	b.SetOnPointer(b.pointer)
+	b.SetOnScroll(b.scroll)
 	b.refresh()
 	return b
 }
@@ -231,18 +221,16 @@ func (b *barButton) refresh() {
 	b.syncVisibility()
 }
 
-// classes is BarButton::css_classes: base, variant, and the modifiers.
+// classes is BarButton::css_classes beyond lys-ui's bar-button and
+// vertical: the variant and the modifiers.
 func (b *barButton) classes() []string {
 	bar := b.cfg.Bar
-	out := []string{"bar-button", bar.ButtonVariant.CSSClass()}
+	out := []string{bar.ButtonVariant.CSSClass()}
 	if !b.button.LabelShow {
 		out = append(out, "icon-only")
 	}
 	if !b.button.IconShow {
 		out = append(out, "label-only")
-	}
-	if b.vertical {
-		out = append(out, "vertical")
 	}
 	if b.button.BorderShow {
 		if c, ok := bar.ButtonBorderLocation.CSSClass(); ok {
@@ -271,7 +259,7 @@ func (b *barButton) syncVisibility() {
 // text directly, and an emptied label must drop its container.
 func (b *barButton) Measure(con widget.Constraints) widget.Size {
 	b.syncVisibility()
-	return b.Box.Measure(con)
+	return b.BarButton.Measure(con)
 }
 
 // run dispatches one binding; unbound (ClickNone) actions do nothing.
@@ -292,29 +280,30 @@ func (b *barButton) bound() bool {
 		c.ScrollDown.Kind != config.ClickNone
 }
 
-// HitTest keeps the toggle the hit leaf, so the router drives its hover,
-// press, and click, and the non-primary hooks below.
-func (t *barToggle) HitTest(p widget.Point) widget.Widget {
-	if t.Button.HitTest(p) != nil {
-		return t
+// HitTest keeps the bar button the hit leaf, so the router drives its
+// hover, press, and click, and the non-primary hooks below.
+func (b *barButton) HitTest(p widget.Point) widget.Widget {
+	if b.BarButton.HitTest(p) != nil {
+		return b
 	}
 	return nil
 }
 
-// SetPressed opens on the press, the Rust GestureClick's
-// connect_pressed: the dropdown appears under the button-down, and a
-// press that slides off before the release still opened it. OnClick
-// stays unset, so the release cannot fire a second time.
-func (t *barToggle) SetPressed(on bool) {
-	was := t.Pressed
-	t.Button.SetPressed(on)
+// SetPressed fires the primary binding on the press, the Rust
+// GestureClick's connect_pressed: the dropdown appears under the
+// button-down, and a press that slides off before the release still
+// opened it. The release's click opens nothing: the button has no
+// popover of its own, the binding opens the dropdown.
+func (b *barButton) SetPressed(on bool) {
+	was := b.Pressed
+	b.BarButton.SetPressed(on)
 	if on && !was {
-		t.owner.run(t.owner.binding.LeftClick, false)
+		b.run(b.binding.LeftClick, false)
 	}
 }
 
 // pointer runs the middle and right bindings and consumes those
-// presses; the primary goes on to the toggle's press.
+// presses; the primary goes on to the button's press.
 func (b *barButton) pointer(e widget.PointerEvent) bool {
 	switch e.Button {
 	case widget.BTNMiddle:

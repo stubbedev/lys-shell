@@ -2,62 +2,24 @@
   opacity: var(--bar-button-opacity);
 }
 
-menubutton.bar-button {
-  all: unset;
-}
-menubutton.bar-button > button.toggle {
-  all: unset;
+button.bar-button {
+  padding: 0;
   background-color: color-mix(in srgb, var(--bar-btn-bg) var(--bar-button-bg-opacity), transparent);
   border-radius: var(--bar-button-rounding-element);
 }
-menubutton.bar-button:hover > button.toggle {
-  filter: brightness(1.15);
-}
-menubutton.bar-button:checked > button.toggle {
-  filter: brightness(0.95);
-}
-menubutton.bar-button:focus-visible > button.toggle {
-  outline: var(--focus-ring-width) solid var(--fg-muted);
-  outline-offset: calc(0.125rem * var(--bar-scale));
-}
-menubutton.bar-button .bar-button-label {
+button.bar-button .bar-button-label {
   color: var(--bar-btn-label-color);
   font-size: var(--bar-btn-label-size);
   font-weight: var(--bar-btn-label-weight);
 }
-menubutton.bar-button > button.toggle image {
-  all: unset;
+button.bar-button image {
   color: var(--bar-btn-icon-color);
   -gtk-icon-size: var(--bar-btn-icon-size);
 }
-menubutton.bar-button.basic .bar-button-content {
-  margin: var(--bar-btn-label-padding);
+button.bar-button.basic .bar-button-content {
+  padding: var(--bar-btn-label-padding);
+  border-spacing: var(--bar-btn-gap);
 }
-menubutton.bar-button.basic .bar-button-label {
-  margin-left: var(--bar-btn-gap);
-}
-menubutton.bar-button.basic.label-only .bar-button-label {
-  margin-left: 0;
-}
-menubutton.bar-button.basic.vertical .bar-button-label {
-  margin-left: 0;
-  margin-top: var(--bar-btn-gap);
-}
-menubutton.bar-button.basic.vertical.label-only .bar-button-label {
-  margin-top: 0;
-}
-menubutton.bar-button.basic.icon-end .bar-button-label {
-  margin-left: 0;
-  margin-right: var(--bar-btn-gap);
-}
-menubutton.bar-button.basic.icon-end.label-only .bar-button-label {
-  margin-right: 0;
-}
-menubutton.bar-button.basic.icon-end.vertical .bar-button-label {
-  margin-right: 0;
-  margin-top: 0;
-  margin-bottom: var(--bar-btn-gap);
-}
-menubutton.bar-button.basic.icon-end.vertical.label-only .bar-button-label {
-  margin-bottom: 0;
+button.bar-button:hover {
+  filter: brightness(1.15);
 }

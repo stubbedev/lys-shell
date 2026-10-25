@@ -132,8 +132,8 @@ type mediaModule struct {
 	icon   *widget.Icon
 	root   widget.Widget
 	// chrome is the module box around the button: the disc classes are
-	// ancestor selectors (`.media-disc menubutton ... image`), so they
-	// must sit above the menubutton, on the wrapper.
+	// ancestor selectors (`.media-disc button.bar-button ... image`), so they
+	// must sit above the bar button, on the wrapper.
 	chrome classer
 }
 
