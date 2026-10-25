@@ -74,6 +74,32 @@ func ContainerCSS(c config.ContainerConfig, bar config.BarConfig, provider confi
 		"}"
 }
 
+// WorkspacesCSS is a workspaces module's variable block, the colors
+// workspaces.css reads: the state colors, the container background,
+// and the border-show border at the bar's button border width, zero
+// while border-show is off. otherMonitor is hyprland's
+// active-on-other-monitor color, nil for the other compositors.
+func WorkspacesCSS(c config.CompositorWorkspacesConfig, otherMonitor *config.ColorValue, bar config.BarConfig) string {
+	width := 0
+	if c.BorderShow {
+		width = int(bar.ButtonBorderWidth)
+	}
+	var b strings.Builder
+	decl := func(name, value string) { b.WriteString(name + ": " + value + "; ") }
+	b.WriteString("* { ")
+	decl("--ws-active-color", c.ActiveColor.ToCSS())
+	if otherMonitor != nil {
+		decl("--ws-active-other-monitor-color", otherMonitor.ToCSS())
+	}
+	decl("--ws-occupied-color", c.OccupiedColor.ToCSS())
+	decl("--ws-empty-color", c.EmptyColor.ToCSS())
+	decl("--ws-container-bg-color", c.ContainerBgColor.ToCSS())
+	decl("--ws-border-color", c.BorderColor.ToCSS())
+	decl("--ws-border-width", strconv.Itoa(width)+"px")
+	b.WriteString("}")
+	return b.String()
+}
+
 // barRemBase is the bar's px per rem (bar/styling.rs REM_BASE).
 const barRemBase float32 = 16
 

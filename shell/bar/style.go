@@ -9,40 +9,6 @@ import (
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// borderWidths is a per-side border width set resolved from a
-// BorderLocation.
-type borderWidths struct {
-	left, top, right, bottom int
-}
-
-// insets converts the widths to lys-ui's per-side insets.
-func (b borderWidths) insets() render.Insets {
-	return render.Insets{Top: b.top, Right: b.right, Bottom: b.bottom, Left: b.left}
-}
-
-// any reports whether any edge carries width.
-func (b borderWidths) any() bool {
-	return b.left > 0 || b.top > 0 || b.right > 0 || b.bottom > 0
-}
-
-// fromLocation maps a BorderLocation onto edges the way bar/styling.rs
-// expands it: none means no edge, all means every edge.
-func (b borderWidths) fromLocation(location config.BorderLocation, width int) borderWidths {
-	switch location {
-	case config.BorderTop:
-		return borderWidths{top: width}
-	case config.BorderBottom:
-		return borderWidths{bottom: width}
-	case config.BorderLeft:
-		return borderWidths{left: width}
-	case config.BorderRight:
-		return borderWidths{right: width}
-	case config.BorderAll:
-		return borderWidths{left: width, top: width, right: width, bottom: width}
-	}
-	return borderWidths{}
-}
-
 // barStyle is what the Go-painted surfaces (the dropdown panels, the
 // workspace buttons, the popups) read to match the bar: the resolved
 // palette, the text ink and size, and the dropdown button shades. The

@@ -104,8 +104,8 @@ func TestSwayBackendMapsTheSnapshot(t *testing.T) {
 	if !chat.ws.active || chat.ws.hasWindows {
 		t.Errorf("chat = %+v, want visible (active) but empty", chat.ws)
 	}
-	if m.root.buttons()[0].model.label != "1" {
-		t.Errorf("label = %q", m.root.buttons()[0].model.label)
+	if m.shown[0].label != "1" {
+		t.Errorf("label = %q", m.shown[0].label)
 	}
 }
 

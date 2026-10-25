@@ -168,7 +168,7 @@ func TestMangoClicksDispatch(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MangoWorkspaces.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
 	m := newTestMango(t, cfg, "DP-1")
-	b := m.root.buttons()[0]
+	b := m.segs.Segment(0)
 	expect := func(want string) {
 		t.Helper()
 		select {

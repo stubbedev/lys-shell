@@ -392,9 +392,22 @@ func TestHyprlandActiveOnOtherMonitor(t *testing.T) {
 	if three == nil || !hasClass(three.classes, "active-other-monitor") {
 		t.Fatalf("workspace 3 (DP-2's active) = %+v", three)
 	}
-	colors := m.cwsResolveColors(*three)
-	if colors.bg != m.resolve(m.hcfg.ActiveOnOtherMonitorColor) {
-		t.Errorf("other-monitor bg = %#x", colors.bg)
+	var seg *widget.Button
+	for i, model := range m.shown {
+		if model.ws.num == 3 {
+			seg = m.segs.Segment(i)
+		}
+	}
+	if seg == nil || !widget.HasClass(seg, "active-other-monitor") || widget.HasClass(seg, "active") {
+		t.Fatal("workspace 3's segment is not marked active on another monitor alone")
+	}
+	want := "--ws-active-other-monitor-color: " + m.hcfg.ActiveOnOtherMonitorColor.ToCSS() + ";"
+	if !strings.Contains(m.root.InlineStyle(), want) {
+		t.Errorf("row style %q misses %q", m.root.InlineStyle(), want)
+	}
+	niri := newTestCws(t, config.DefaultsNiriWorkspaces().View(), newFakeCws(nil, nil))
+	if strings.Contains(niri.root.InlineStyle(), "--ws-active-other-monitor-color") {
+		t.Error("a compositor without the state declares its color")
 	}
 }
 
@@ -490,7 +503,7 @@ func TestHyprlandClicksDispatch(t *testing.T) {
 		t.Fatalf("dispatches = %v, want %d", f.dispatched(), n)
 		return nil
 	}
-	buttons := m.root.buttons()
+	buttons := []*widget.Button{m.segs.Segment(0), m.segs.Segment(1), m.segs.Segment(2)}
 	buttons[2].ClickAt(widget.Point{})
 	if got := wait(1); got[0] != "hl.dsp.focus({workspace = 2})" {
 		t.Errorf("focus = %q", got[0])

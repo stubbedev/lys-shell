@@ -19,12 +19,6 @@ import (
 // cwsBlinkInterval is BLINK_INTERVAL: the urgent pulse half-period.
 const cwsBlinkInterval = 500 * time.Millisecond
 
-const (
-	// cwsSpaceLgRem is tokens/index.css's --bar-space-lg base, the .workspace
-	// min-width/min-height.
-	cwsSpaceLgRem = 1.5
-)
-
 // cwsBackend is one compositor's side of the module: the snapshot,
 // the focus actions the click bindings map to, and the event stream.
 type cwsBackend interface {
@@ -45,19 +39,25 @@ type cwsActions struct {
 	last     func(ctx context.Context) error
 }
 
-// cwsView is what the container and button widgets read: the module
-// context and shared config, the resolved face, and the actions. The
-// sway/niri/mango module and the hyprland module each carry one.
+// cwsView is what the segments read: the module context and shared
+// config, the resolved face, and the actions. The sway/niri/mango
+// module and the hyprland module each carry one.
 type cwsView struct {
 	ctx      ModuleContext
 	cfg      config.CompositorWorkspacesConfig
 	kind     string
 	flavor   cwsFlavor
 	boldFace render.Font
-	root     *cwsContainer
+	root     *widget.Box
+	segs     *widget.SegmentIndicator
 	actions  cwsActions
-	// otherMonitor is hyprland's active-on-other-monitor-color.
-	otherMonitor config.ColorValue
+	// otherMonitor is hyprland's active-on-other-monitor-color, nil for
+	// the other compositors.
+	otherMonitor *config.ColorValue
+	// shown are the models the segments show, in order; segClasses the
+	// classes each segment took from its model.
+	shown      []cwsButtonModel
+	segClasses [][]string
 }
 
 // cwsModule is the sway/niri/mango workspaces component: the container,
@@ -83,7 +83,7 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 	m := &cwsModule{ctx: ctx, cfg: cfg, kind: kind, flavor: flavor, backend: backend}
 	m.actions = cwsActions{focus: backend.focus, next: backend.focusNext, previous: backend.focusPrevious, last: backend.focusLast}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
-	m.root = newCwsContainer(&m.cwsView)
+	newCwsRow(&m.cwsView)
 	if err := m.refresh(); err != nil {
 		backend.close()
 		return nil, err
@@ -140,7 +140,7 @@ func (m *cwsModule) rebuild() {
 		displayed[i] = model.ws
 	}
 	m.urgentSeen = m.cfg.UrgentShow && cwsAnyUrgent(displayed, m.windows)
-	m.root.setButtons(m.models)
+	m.setSegments(m.models)
 }
 
 // syncBlink is sync_blink: the pulse runs exactly while something

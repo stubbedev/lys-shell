@@ -1,5 +1,4 @@
 .workspaces {
-  all: unset;
   border-radius: calc(var(--bar-button-rounding-element) * 1.2);
   background-color: color-mix(in srgb, var(--ws-container-bg-color) var(--bar-button-bg-opacity), transparent);
 }
@@ -20,11 +19,10 @@
 }
 
 .workspace {
-  all: unset;
   min-width: var(--bar-space-lg);
   min-height: var(--bar-space-lg);
-  border-radius: var(--bar-button-rounding-element);
-  transition: background-color var(--duration-fast), border-color var(--duration-fast);
+  background-color: transparent;
+  transition: background-color var(--duration-fast);
 }
 .workspace.indicator-background.active {
   background-color: var(--ws-override-color, var(--ws-active-color));
@@ -92,29 +90,6 @@
   background-color: color-mix(in srgb, var(--ws-active-color) 15%, transparent);
 }
 
-.workspace-content {
-  margin: calc(var(--ws-margin-vertical-px) * 1px) calc(var(--ws-margin-horizontal-px) * 1px);
-}
-
-.workspace-label {
-  font-family: var(--font-sans);
-  font-size: calc(var(--ws-label-size-px) * 1px);
-  font-weight: var(--weight-bold);
-}
-
-.workspace-custom-icon {
-  -gtk-icon-size: calc(var(--ws-icon-size-px) * 1px);
-}
-
-.workspace-icon {
-  -gtk-icon-size: calc(var(--ws-icon-size-px) * 1px);
-}
 .workspace-icon.urgent {
   opacity: 0.5;
-}
-
-.workspace-divider {
-  font-family: var(--font-sans);
-  font-size: calc(var(--ws-label-size-px) * 1px);
-  font-weight: var(--weight-bold);
 }

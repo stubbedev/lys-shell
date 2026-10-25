@@ -1,246 +1,101 @@
 package bar
 
 import (
-	"math"
+	"slices"
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// cwsContainer is the `.workspaces.<kind>` box: the buttons in a row
-// (a column on a side bar), over the container background at the
-// button bg opacity, with the border-show strips on top.
-type cwsContainer struct {
-	widget.Base
-	m       *cwsView
-	box     *widget.Box
-	bg      render.Color
-	radius  int
-	borders borderWidths
-	border  render.Color
-}
-
-func newCwsContainer(m *cwsView) *cwsContainer {
+// newCwsRow builds the workspaces row, lys-ui's SegmentIndicator in
+// the container box workspaces.css paints, which a SegmentIndicator
+// does not paint itself —
+//
+//	box.workspaces.<kind>[.border-*]          (the --ws-* variables inline)
+//	└ segments
+//	  └ button.segment.workspace.<state>[...]  (--ws-override-color inline)
+//	    └ box (workspace-padding)
+//	      └ box.workspace-content
+//	        ├ box: label.workspace-label, the mapped icon, label.workspace-divider
+//	        └ box.workspace-icons > image.workspace-icon...
+//
+// lys-ui stacks the segments down a side bar. A primary click on a
+// segment is OnSelect; the middle and right clicks and the wheel bind
+// on each segment.
+func newCwsRow(m *cwsView) {
+	m.segs = widget.NewSegmentIndicator(0)
+	m.segs.OnSelect = func(i int) { m.dispatchClick(m.cfg.Click.LeftClick, m.shown[i].ws) }
 	axis := widget.Row
 	if m.vertical() {
 		axis = widget.Column
 	}
-	c := &cwsContainer{m: m, box: widget.NewBox(axis, 0, 0)}
-	c.AddClass("workspaces")
+	m.root = widget.NewBox(axis, 0, 0)
+	m.root.AddClass("workspaces")
 	if m.kind != "" {
-		c.AddClass(m.kind)
+		m.root.AddClass(m.kind)
 	}
-	palette := m.palette()
-	if base, ok := styling.ResolveColor(m.cfg.ContainerBgColor, palette); ok {
-		opacity := 100
-		if m.ctx.Config != nil {
-			opacity = int(m.ctx.Config.Bar.ButtonBGOpacity)
+	bar := m.ctx.Config.Bar
+	if c, ok := bar.ButtonBorderLocation.CSSClass(); ok && m.cfg.BorderShow {
+		m.root.AddClass(c)
+	}
+	m.root.SetInlineStyle(inlineDecls(styling.WorkspacesCSS(m.cfg, m.otherMonitor, bar)))
+	m.root.Append(m.segs, false)
+}
+
+// setSegments shows one segment per model: the active one through
+// SetActive, its occupancy and urgency through SetSegmentState, then
+// the model's classes (an urgent segment keeps its occupied state
+// class beside lys-ui's urgent one), the workspace-map color, and its
+// content.
+func (m *cwsView) setSegments(models []cwsButtonModel) {
+	s := m.segs
+	s.SetCount(len(models))
+	for len(m.segClasses) < len(models) {
+		m.segClasses = append(m.segClasses, nil)
+	}
+	active := -1
+	for i, model := range models {
+		seg := s.Segment(i)
+		seg.RemoveClass(m.segClasses[i]...)
+		s.SetSegmentState(i, cwsSegmentState(model))
+		m.segClasses[i] = slices.DeleteFunc(slices.Clone(model.classes), func(c string) bool { return c == "active" })
+		seg.AddClass(m.segClasses[i]...)
+		if hasClass(model.classes, "active") {
+			active = i
 		}
-		c.bg = styling.ColorMix(base, transparentColor, opacity)
-	}
-	// border-radius: calc(var(--bar-button-rounding-element) * 1.2)
-	c.radius = int(math.Round(float64(m.buttonRadius()) * 1.2))
-	if m.cfg.BorderShow && m.ctx.Config != nil {
-		loc := m.ctx.Config.Bar.ButtonBorderLocation
-		c.borders = borderWidths{}.fromLocation(loc, int(m.ctx.Config.Bar.ButtonBorderWidth))
-		if loc != config.BorderNone {
-			c.AddClass("border-" + string(loc))
+		override := ""
+		if color, ok := cwsOverrideColor(model.classes, m.cfg.WorkspaceMap); ok {
+			override = "--ws-override-color: " + color.ToCSS() + ";"
 		}
-		c.border, _ = styling.ResolveColor(m.cfg.BorderColor, palette)
+		seg.SetInlineStyle(override)
+		seg.SetOnPointer(func(e widget.PointerEvent) bool { return m.pointer(i, e) })
+		seg.SetOnScroll(m.scroll)
+		s.SetSegmentContent(i, m.segmentContent(model))
 	}
-	return c
+	s.SetActive(active)
+	m.shown = models
 }
 
-// setButtons swaps in one button per model.
-func (c *cwsContainer) setButtons(models []cwsButtonModel) {
-	c.box.Clear()
-	for _, model := range models {
-		c.box.Append(newCwsButton(c.m, model), false)
-	}
-	c.box.InvalidateLayout()
-	c.InvalidateLayout()
-}
-
-// buttons exposes the current buttons (tests, click routing).
-func (c *cwsContainer) buttons() []*cwsButton {
-	kids := c.box.Children()
-	out := make([]*cwsButton, 0, len(kids))
-	for _, k := range kids {
-		if b, ok := k.(*cwsButton); ok {
-			out = append(out, b)
-		}
-	}
-	return out
-}
-
-func (c *cwsContainer) Measure(con widget.Constraints) widget.Size { return c.box.Measure(con) }
-
-func (c *cwsContainer) Arrange(r render.Rect) {
-	c.Base.Arrange(r)
-	c.box.Arrange(r)
-	widget.SetParents(c, c.box)
-}
-
-func (c *cwsContainer) ArrangeRoot(r render.Rect) { c.Arrange(r) }
-
-func (c *cwsContainer) Paint(cv *render.Canvas) {
-	r := c.Bounds()
-	if c.bg != 0 {
-		cv.RoundedRect(r, c.radius, c.bg)
-	}
-	widget.PaintChild(cv, c.box)
-	if c.borders.any() {
-		// The border-show edges, rounded with the container.
-		cv.RoundedBorder(r, render.UniformCorners(c.radius), c.borders.insets(), c.border)
-	}
-}
-
-func (c *cwsContainer) HitTest(p widget.Point) widget.Widget {
-	if hit := c.box.HitTest(p); hit != nil {
-		return hit
-	}
-	return c.HitLeaf(c, p)
-}
-
-func (c *cwsContainer) Children() []widget.Widget { return []widget.Widget{c.box} }
-
-// The pixel resolvers the widgets share.
-
-func (m *cwsView) palette() *styling.Palette {
-	if m.ctx.Style != nil && m.ctx.Style.palette != nil {
-		return m.ctx.Style.palette
-	}
-	return styling.Default()
-}
-
-// buttonRadius is --bar-button-rounding-element.
-func (m *cwsView) buttonRadius() int {
-	if m.ctx.Config == nil {
-		return styling.RoundingRadiusPx(config.RoundingSm, 1)
-	}
-	return styling.RoundingRadiusPx(m.ctx.Config.Bar.ButtonRounding, m.scale())
-}
-
-// fg is the inherited foreground a rule-less child paints with.
-func (m *cwsView) fg() render.Color {
-	if m.ctx.Style != nil {
-		return m.ctx.Style.fg
-	}
-	return m.palette().Fg
-}
-
-func (m *cwsView) resolve(cv config.ColorValue) render.Color {
-	color, _ := styling.ResolveColor(cv, m.palette())
-	return color
-}
-
-// cwsColors is one button's resolved workspaces.css cascade.
-type cwsColors struct {
-	bg, hoverBg render.Color
-	underline   render.Color
-	label       render.Color // .workspace-label, .workspace-divider
-	icon        render.Color // .workspace-icon (app icons; sway/niri/mango mapped icons)
-	custom      render.Color // .workspace-custom-icon (hyprland's mapped icon)
-	emptyIcon   render.Color // .workspace-icon-empty
-	opacity     float64
-}
-
-// cwsResolveColors walks the workspaces.css rules for one button's
-// classes: the override color stands in for every state color, the
-// indicator decides between a filled and an underlined active state,
-// and urgency without urgent-application halves the opacity.
-func (m *cwsView) cwsResolveColors(model cwsButtonModel) cwsColors {
-	override, hasOverride := cwsOverrideColor(model.classes, m.cfg.WorkspaceMap)
-	pick := func(cv config.ColorValue) render.Color {
-		if hasOverride {
-			return m.resolve(override)
-		}
-		return m.resolve(cv)
-	}
-	active := hasClass(model.classes, "active")
-	fg := m.fg()
-	out := cwsColors{label: fg, icon: fg, custom: fg, emptyIcon: fg, opacity: 1}
-	background := m.cfg.ActiveIndicator == config.ActiveBackground
-	// The active and active-other-monitor rules differ only in the
-	// state color.
-	highlighted := func(cv config.ColorValue) {
-		if background {
-			out.bg = pick(cv)
-			onAccent := m.resolve(mustToken(config.TokenFgOnAccent))
-			out.label, out.icon, out.custom = onAccent, onAccent, onAccent
-			return
-		}
-		c := pick(cv)
-		out.underline = c
-		out.label, out.icon, out.custom = c, c, c
-	}
+// cwsSegmentState is the segment state a model's classes mark: urgent
+// while its urgency shows, else occupied in the occupied state.
+func cwsSegmentState(model cwsButtonModel) widget.SegmentState {
 	switch {
-	case active:
-		highlighted(m.cfg.ActiveColor)
-	case hasClass(model.classes, "active-other-monitor"):
-		highlighted(m.otherMonitor)
+	case hasClass(model.classes, "urgent"):
+		return widget.SegmentUrgent
 	case hasClass(model.classes, "occupied"):
-		c := pick(m.cfg.OccupiedColor)
-		out.label, out.icon, out.custom = c, c, c
-	case hasClass(model.classes, "empty"):
-		// .workspace-icon is not in the empty rule; the custom icon and
-		// the empty placeholder are.
-		c := pick(m.cfg.EmptyColor)
-		out.label, out.custom, out.emptyIcon = c, c, c
+		return widget.SegmentOccupied
 	}
-	// &:hover:not(.active): the plain active color at 15%, never the
-	// override.
-	out.hoverBg = out.bg
-	if !active {
-		out.hoverBg = styling.ColorMix(m.resolve(m.cfg.ActiveColor), transparentColor, 15)
-	}
-	// .urgent:not(.urgent-application) outranks .special.
-	switch {
-	case hasClass(model.classes, "urgent") && !hasClass(model.classes, "urgent-application"):
-		out.opacity = 0.5
-	case hasClass(model.classes, "special"):
-		out.opacity = 0.8
-	}
-	return out
+	return widget.SegmentEmpty
 }
 
-// cwsButton is one `.workspace` button: a lys-ui Button with literal
-// state backgrounds (BgExplicit: transparent at rest, the hover fill on
-// hover), the content box centered in it, the active underline and
-// inactive opacity painted around it, and the five input bindings
-// routed from the hit leaf.
-type cwsButton struct {
-	*widget.Button
-	m       *cwsView
-	model   cwsButtonModel
-	colors  cwsColors
-	content *widget.Box
-	minPx   int
-}
-
-func newCwsButton(m *cwsView, model cwsButtonModel) *cwsButton {
-	b := &cwsButton{m: m, model: model}
-	b.colors = m.cwsResolveColors(model)
-	b.minPx = int(math.Round(cwsSpaceLgRem * styling.RemBase * m.scale()))
-	b.content = b.buildContent()
-	b.Button = widget.NewButton(b.content, 0, m.buttonRadius())
-	b.BgExplicit = true
-	b.Bg, b.BgHover, b.BgPressed = b.colors.bg, b.colors.hoverBg, b.colors.hoverBg
-	b.OnClick = func() { m.dispatchClick(m.cfg.Click.LeftClick, model.ws) }
-	b.SetOnPointer(b.pointer)
-	b.SetOnScroll(b.scroll)
-	b.AddClass(model.classes...)
-	return b
-}
-
-// buildContent is the button view!: the identity row (label, mapped
-// icon, divider) and the app-icon box, inside the workspace-content
-// margins.
-func (b *cwsButton) buildContent() *widget.Box {
-	m, cfg := b.m, b.m.cfg
+// segmentContent is the button view!: the identity row (label, mapped
+// icon, divider) and the app-icon box, padded by workspace-padding
+// along the bar and centered in the segment. Their colors are the
+// stylesheet's.
+func (m *cwsView) segmentContent(model cwsButtonModel) widget.Widget {
+	cfg := m.cfg
 	vertical := m.vertical()
 	axis := widget.Row
 	if vertical {
@@ -250,26 +105,24 @@ func (b *cwsButton) buildContent() *widget.Box {
 	content.AddClass("workspace-content")
 
 	labelPx := m.labelPx()
-	if b.model.showLabel(cfg.DisplayMode) || b.model.showIcon(cfg.DisplayMode) || b.model.showDivider(cfg) {
+	if model.showLabel(cfg.DisplayMode) || model.showIcon(cfg.DisplayMode) || model.showDivider(cfg) {
 		identity := widget.NewBox(widget.Row, 0, 0)
-		if b.model.showLabel(cfg.DisplayMode) {
-			label := widget.NewLabel(m.boldFace, labelPx, b.model.label, b.colors.label)
+		if model.showLabel(cfg.DisplayMode) {
+			label := widget.NewLabel(m.boldFace, labelPx, model.label, 0)
 			label.AddClass("workspace-label")
 			identity.Append(label, false)
 		}
-		if b.model.showIcon(cfg.DisplayMode) {
-			icon := widget.NewThemeIcon(b.model.icon, m.iconPx())
-			if b.model.flavor == cwsHyprland {
-				icon.SetTint(b.colors.custom)
+		if model.showIcon(cfg.DisplayMode) {
+			icon := widget.NewThemeIcon(model.icon, m.iconPx())
+			if model.flavor == cwsHyprland {
 				icon.AddClass("workspace-custom-icon")
 			} else {
-				icon.SetTint(b.colors.icon)
 				icon.AddClass("workspace-icon")
 			}
 			identity.Append(icon, false)
 		}
-		if b.model.showDivider(cfg) {
-			divider := widget.NewLabel(m.boldFace, labelPx, cfg.Divider, b.colors.label)
+		if model.showDivider(cfg) {
+			divider := widget.NewLabel(m.boldFace, labelPx, cfg.Divider, 0)
 			divider.AddClass("workspace-divider")
 			identity.Append(divider, false)
 		}
@@ -278,29 +131,25 @@ func (b *cwsButton) buildContent() *widget.Box {
 	if cfg.AppIconsShow {
 		icons := widget.NewBox(axis, m.iconGapPx(), 0)
 		icons.AddClass("workspace-icons")
-		if len(b.model.appIcons) == 0 {
+		if len(model.appIcons) == 0 {
 			icon := widget.NewThemeIcon(cfg.AppIconsEmpty, m.iconPx())
-			icon.SetTint(b.colors.emptyIcon)
 			icon.AddClass("workspace-icon", "workspace-icon-empty")
 			icons.Append(icon, false)
 		}
-		for _, app := range b.model.appIcons {
+		for _, app := range model.appIcons {
 			icon := widget.NewThemeIcon(app.name, m.iconPx())
-			icon.SetTint(b.colors.icon)
 			icon.AddClass("workspace-icon")
-			var w widget.Widget = icon
 			if app.urgent {
 				icon.AddClass("urgent")
-				fader := widget.NewFader(icon)
-				fader.SetOpacity(0.5)
-				w = fader
 			}
-			icons.Append(w, false)
+			icons.Append(icon, false)
 		}
 		content.Append(icons, false)
 	}
 	pad := m.paddingPx()
 	padded := widget.NewBox(widget.Row, 0, 0)
+	padded.SetHExpand(true)
+	padded.SetHAlign(widget.AlignCenter)
 	padded.Append(content, true)
 	if vertical {
 		padded.SetPadding(render.Insets{Top: pad, Bottom: pad})
@@ -310,61 +159,14 @@ func (b *cwsButton) buildContent() *widget.Box {
 	return padded
 }
 
-// Measure is the button grown to the --bar-space-lg minimum.
-func (b *cwsButton) Measure(con widget.Constraints) widget.Size {
-	sz := b.Button.Measure(con)
-	return widget.Size{W: min(max(sz.W, b.minPx), con.Max.W), H: min(max(sz.H, b.minPx), con.Max.H)}
-}
-
-// Arrange centers the content in the button rect.
-func (b *cwsButton) Arrange(r render.Rect) {
-	b.Button.Arrange(r)
-	sz := b.content.Measure(widget.Constraints{Max: widget.Size{W: r.W, H: r.H}})
-	b.content.Arrange(render.Rect{
-		X: r.X + (r.W-sz.W)/2,
-		Y: r.Y + (r.H-sz.H)/2,
-		W: sz.W,
-		H: sz.H,
-	})
-}
-
-func (b *cwsButton) ArrangeRoot(r render.Rect) { b.Arrange(r) }
-
-func (b *cwsButton) Paint(cv *render.Canvas) {
-	if b.colors.opacity < 1 {
-		prev := cv.PushAlpha(b.colors.opacity)
-		defer cv.PopAlpha(prev)
-	}
-	b.Button.Paint(cv)
-	r := b.Bounds()
-	if b.colors.underline != 0 {
-		// linear-gradient(to top|right, color 2px, transparent 2px)
-		if b.m.vertical() {
-			cv.FillRect(render.Rect{X: r.X, Y: r.Y, W: 2, H: r.H}, b.colors.underline)
-		} else {
-			cv.FillRect(render.Rect{X: r.X, Y: r.Y + r.H - 2, W: r.W, H: 2}, b.colors.underline)
-		}
-	}
-}
-
-// HitTest keeps the workspace button the hit leaf, so the router's
-// hover, click (OnClick: connect_clicked's LeftClick(id)), and
-// pointer hooks land here.
-func (b *cwsButton) HitTest(p widget.Point) widget.Widget {
-	if b.Button.HitTest(p) != nil {
-		return b
-	}
-	return nil
-}
-
-// pointer is the middle/right GestureClick pair; the primary goes on
-// to OnClick.
-func (b *cwsButton) pointer(e widget.PointerEvent) bool {
+// pointer is segment i's middle/right GestureClick pair; the primary
+// goes on to OnSelect.
+func (m *cwsView) pointer(i int, e widget.PointerEvent) bool {
 	switch e.Button {
 	case widget.BTNMiddle:
-		b.m.dispatchClick(b.m.cfg.Click.MiddleClick, b.model.ws)
+		m.dispatchClick(m.cfg.Click.MiddleClick, m.shown[i].ws)
 	case widget.BTNRight:
-		b.m.dispatchClick(b.m.cfg.Click.RightClick, b.model.ws)
+		m.dispatchClick(m.cfg.Click.RightClick, m.shown[i].ws)
 	default:
 		return false
 	}
@@ -373,12 +175,12 @@ func (b *cwsButton) pointer(e widget.PointerEvent) bool {
 
 // scroll is attach_scroll: discrete vertical steps, always consumed
 // (Propagation::Stop).
-func (b *cwsButton) scroll(e widget.ScrollEvent) bool {
+func (m *cwsView) scroll(e widget.ScrollEvent) bool {
 	switch {
 	case e.DY > 0:
-		b.m.dispatchScroll(b.m.cfg.Click.ScrollDown)
+		m.dispatchScroll(m.cfg.Click.ScrollDown)
 	case e.DY < 0:
-		b.m.dispatchScroll(b.m.cfg.Click.ScrollUp)
+		m.dispatchScroll(m.cfg.Click.ScrollUp)
 	}
 	return true
 }

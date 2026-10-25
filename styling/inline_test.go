@@ -171,6 +171,27 @@ func TestResolveIconColor(t *testing.T) {
 	}
 }
 
+func TestWorkspacesCSS(t *testing.T) {
+	d := config.Defaults()
+	ws := config.DefaultsNiriWorkspaces().View()
+	want := "* { --ws-active-color: var(--accent); --ws-occupied-color: var(--fg-muted); --ws-empty-color: var(--fg-subtle); " +
+		"--ws-container-bg-color: var(--bg-surface-elevated); --ws-border-color: var(--border-default); --ws-border-width: 0px; }"
+	if got := WorkspacesCSS(ws, nil, d.Bar); got != want {
+		t.Errorf("WorkspacesCSS defaults =\n%s\nwant\n%s", got, want)
+	}
+	ws.BorderShow = true
+	ws.ActiveColor = color(t, "#123456")
+	bar := d.Bar
+	bar.ButtonBorderWidth = 3
+	other := color(t, "#abcdef")
+	got := WorkspacesCSS(ws, &other, bar)
+	for _, decl := range []string{"--ws-active-color: #123456;", "--ws-active-other-monitor-color: #abcdef;", "--ws-border-width: 3px;"} {
+		if !contains(got, decl) {
+			t.Errorf("WorkspacesCSS =\n%s\nmisses %q", got, decl)
+		}
+	}
+}
+
 func TestContainerCSS(t *testing.T) {
 	d := config.Defaults()
 	c, _ := d.ModuleContainer("cava")

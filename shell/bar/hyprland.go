@@ -294,7 +294,7 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	}
 	hcfg := ctx.Config.HyprlandWorkspaces
 	m := &hyprlandWorkspaces{
-		ctx: ctx, cfg: hcfg.View(), flavor: cwsHyprland, otherMonitor: hcfg.ActiveOnOtherMonitorColor,
+		ctx: ctx, cfg: hcfg.View(), flavor: cwsHyprland, otherMonitor: &hcfg.ActiveOnOtherMonitorColor,
 		hcfg:   hcfg,
 		conn:   ctx.Hyprland,
 		urgent: map[string]bool{},
@@ -310,7 +310,7 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 		},
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
-	m.root = newCwsContainer(&m.cwsView)
+	newCwsRow(&m.cwsView)
 	if err := m.query(); err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ func (m *hyprlandWorkspaces) render() {
 		model.classes = m.classes(ws.id, hyprState(model.ws.active, m.activeAny[ws.id], windows[ws.id]), model.urgent)
 		m.models = append(m.models, model)
 	}
-	m.root.setButtons(m.models)
+	m.setSegments(m.models)
 }
 
 // classes is compute_static_css_classes + collect_button_css_classes.
