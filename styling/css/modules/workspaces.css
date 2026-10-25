@@ -24,6 +24,10 @@
   background-color: transparent;
   transition: background-color var(--duration-fast);
 }
+segments.workspaces button.segment.workspace {
+  align-self: stretch;
+  border-radius: var(--bar-button-rounding-element);
+}
 .workspace.indicator-background.active {
   background-color: var(--ws-override-color, var(--ws-active-color));
 }

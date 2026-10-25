@@ -525,9 +525,9 @@ func TestCwsSegmentMinSize(t *testing.T) {
 	}
 }
 
-// Down a side bar, as wide as its widest module, the segments stand
-// centered across it and each workspace's label centered in its
-// segment.
+// Down a side bar, as wide as its widest module, the segments span
+// the row's width, as they span its height across a top bar, and each
+// workspace's label sits centered in its segment.
 func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Bar.Location = config.LocationLeft
@@ -548,8 +548,8 @@ func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	data := make([]byte, render.Stride(size.W)*size.H)
 	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
 	box, seg := m.segs.Bounds(), m.segs.Segment(1).Bounds()
-	if mid, segMid := box.X+box.W/2, seg.X+seg.W/2; seg.W >= box.W || abs(mid-segMid) > 1 {
-		t.Errorf("segment %v in the row %v: want it narrower and centered across the bar", seg, box)
+	if seg.X != box.X || seg.W != box.W {
+		t.Errorf("segment %v in the row %v: want it spanning the row's width", seg, box)
 	}
 	occupied, _ := styling.ResolveColor(wcfg.OccupiedColor, palette)
 	left, right := seg.X+seg.W, seg.X
@@ -753,6 +753,35 @@ func TestCwsFactoriesRequireTheirCompositor(t *testing.T) {
 	for _, name := range []string{"sway-workspaces", "niri-workspaces"} {
 		if _, err := Create(name, ctx); err == nil {
 			t.Errorf("%s without its compositor: want an error", name)
+		}
+	}
+}
+
+// The active workspace's fill covers its whole segment, the row's full
+// height with the bar buttons' rounding, not a pill inside it: a point
+// a quarter in from the left, a pixel under the top edge, is the same
+// fill as the segment's middle.
+func TestCwsActiveFillCoversTheSegment(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	ctx.Connector = "DP-1"
+	active := occupiedWS(1, 1, "DP-1")
+	active.active, active.focused = true, true
+	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1")}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bar, size := cwsBar(t, ctx, m)
+	_, rest := paintCwsBar(m, bar, size)
+	data := make([]byte, render.Stride(size.W)*size.H)
+	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
+	seg, row := m.segs.Segment(0).Bounds(), m.segs.Bounds()
+	if seg.Y != row.Y || seg.H != row.H {
+		t.Errorf("the active segment %v, want the row's full height %v", seg, row)
+	}
+	fill := rest(0)
+	for _, p := range []widget.Point{{X: seg.X + seg.W/4, Y: seg.Y + 1}, {X: seg.X + seg.W/4, Y: seg.Y + seg.H - 2}} {
+		if got := pixelAt(data, size.W, p.X, p.Y); got != fill {
+			t.Errorf("at %v the segment paints %#08x, want its fill %#08x", p, uint32(got), uint32(fill))
 		}
 	}
 }
