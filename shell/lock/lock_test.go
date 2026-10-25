@@ -464,6 +464,11 @@ func TestBackgroundModes(t *testing.T) {
 	if len(loaded) != 1 || loaded[0] != "/srv/lock.png" || h.s.bg == nil {
 		t.Errorf("image mode loaded %q (decoded once for every output)", loaded)
 	}
+	// The decoded image lives only as long as the lock.
+	h.locker.cfg.OnFinished()
+	if h.s.bg != nil {
+		t.Error("the background outlived the lock")
+	}
 
 	h = newHarness(t, nil)
 	h.s.d.LoadImage = func(string, uint32) (image.Image, error) {

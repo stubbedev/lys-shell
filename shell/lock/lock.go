@@ -101,7 +101,8 @@ type Screen struct {
 
 	faces []*face
 	// bg is the background decoded once per lock, shared by every
-	// output's surface; nil draws the color.
+	// output's surface and dropped when the lock ends; nil draws the
+	// color.
 	bg image.Image
 	// attempts counts failures in this lock session.
 	attempts uint32
@@ -265,6 +266,7 @@ func (s *Screen) onFinished() {
 	s.stopTimers()
 	s.resetAuth()
 	s.faces = nil
+	s.bg = nil
 	s.attempts = 0
 	s.lockedAt = time.Time{}
 }
