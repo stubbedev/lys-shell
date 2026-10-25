@@ -18,10 +18,13 @@ const monitorsFrame = `{"monitors":[{"name":"eDP-1","active":true,"x":0,"y":0,"w
 const clientsFrame = `{"clients":[{"id":42,"title":"nvim","appid":"foot","monitor":"eDP-1","tags":[1,3],"is_urgent":false,"is_focused":true},{"id":7,"title":"","appid":"","monitor":"eDP-1","tags":[2],"is_urgent":true,"is_focused":false}]}`
 
 // fakeMango answers dispatches (recorded; "dispatch bad" is rejected)
-// and streams one frame per watch subscription.
+// and, on each watch subscription, streams that stream's frames once
+// the test sends them, holding the stream open until the test ends.
 type fakeMango struct {
 	mu       sync.Mutex
 	commands []string
+	gates    map[string]chan struct{}
+	done     chan struct{}
 }
 
 func newFakeMango(t *testing.T) *fakeMango {
@@ -33,7 +36,11 @@ func newFakeMango(t *testing.T) *fakeMango {
 	}
 	t.Cleanup(func() { _ = ln.Close() })
 	t.Setenv(SocketEnv, path)
-	f := &fakeMango{}
+	f := &fakeMango{
+		gates: map[string]chan struct{}{watchMonitors: make(chan struct{}), watchClients: make(chan struct{})},
+		done:  make(chan struct{}),
+	}
+	t.Cleanup(func() { close(f.done) })
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -46,6 +53,9 @@ func newFakeMango(t *testing.T) *fakeMango {
 	return f
 }
 
+// send releases one watch stream's frames.
+func (f *fakeMango) send(sub string) { close(f.gates[sub]) }
+
 func (f *fakeMango) serve(conn net.Conn) {
 	defer conn.Close()
 	line, err := bufio.NewReader(conn).ReadString('\n')
@@ -55,11 +65,9 @@ func (f *fakeMango) serve(conn net.Conn) {
 	line = line[:len(line)-1]
 	switch line {
 	case watchMonitors:
-		_, _ = conn.Write([]byte("not json\n" + monitorsFrame + "\n"))
-		time.Sleep(time.Second)
+		f.stream(conn, line, "not json\n"+monitorsFrame+"\n")
 	case watchClients:
-		_, _ = conn.Write([]byte(clientsFrame + "\n"))
-		time.Sleep(time.Second)
+		f.stream(conn, line, clientsFrame+"\n")
 	default:
 		f.mu.Lock()
 		f.commands = append(f.commands, line)
@@ -69,6 +77,28 @@ func (f *fakeMango) serve(conn net.Conn) {
 			return
 		}
 		_, _ = conn.Write([]byte(`{"ok":true}` + "\n"))
+	}
+}
+
+// stream writes sub's frames once the test sends them and keeps the
+// stream open until the test ends.
+func (f *fakeMango) stream(conn net.Conn, sub, frames string) {
+	select {
+	case <-f.gates[sub]:
+	case <-f.done:
+		return
+	}
+	_, _ = conn.Write([]byte(frames))
+	<-f.done
+}
+
+// awaitTick waits for the watcher's tick after an applied frame.
+func awaitTick(t *testing.T, w *Watcher) {
+	t.Helper()
+	select {
+	case <-w.Ticks():
+	case <-time.After(2 * time.Second):
+		t.Fatal("no frame applied")
 	}
 }
 
@@ -114,7 +144,7 @@ func TestDispatchRejected(t *testing.T) {
 }
 
 func TestWatchAppliesFramesAndSkipsGarbage(t *testing.T) {
-	newFakeMango(t)
+	f := newFakeMango(t)
 	w, err := Watch()
 	if err != nil {
 		t.Fatal(err)
@@ -123,30 +153,35 @@ func TestWatchAppliesFramesAndSkipsGarbage(t *testing.T) {
 	if w.Ready() {
 		t.Fatal("ready before any frame")
 	}
-	deadline := time.After(2 * time.Second)
-	for {
-		if w.Ready() {
-			monitors, clients := w.State()
-			if len(monitors) != 1 || len(clients) != 2 {
-				t.Fatalf("ready with %d monitors / %d clients", len(monitors), len(clients))
-			}
-			m := monitors[0]
-			if m.Name != "eDP-1" || !m.IsActive || len(m.Tags) != 2 || !m.Tags[1].IsUrgent || m.Tags[0].ClientCount != 2 {
-				t.Fatalf("monitor = %+v", m)
-			}
-			if !clients[0].HasAppID || clients[0].AppID != "foot" || len(clients[0].Tags) != 2 {
-				t.Fatalf("client 42 = %+v", clients[0])
-			}
-			if clients[1].HasTitle || clients[1].HasAppID {
-				t.Fatalf("client 7 = %+v, want empty strings read as unset", clients[1])
-			}
-			return
-		}
-		select {
-		case <-w.Ticks():
-		case <-deadline:
-			t.Fatal("frames never applied")
-		}
+
+	f.send(watchMonitors)
+	awaitTick(t, w)
+	if w.Ready() {
+		t.Fatal("ready with only the monitor stream's frame")
+	}
+	monitors, clients := w.State()
+	if len(monitors) != 1 || len(clients) != 0 {
+		t.Fatalf("after the monitor frame: %d monitors / %d clients", len(monitors), len(clients))
+	}
+	m := monitors[0]
+	if m.Name != "eDP-1" || !m.IsActive || len(m.Tags) != 2 || !m.Tags[1].IsUrgent || m.Tags[0].ClientCount != 2 {
+		t.Fatalf("monitor = %+v", m)
+	}
+
+	f.send(watchClients)
+	awaitTick(t, w)
+	if !w.Ready() {
+		t.Fatal("not ready after both streams' frames")
+	}
+	_, clients = w.State()
+	if len(clients) != 2 {
+		t.Fatalf("ready with %d clients", len(clients))
+	}
+	if !clients[0].HasAppID || clients[0].AppID != "foot" || len(clients[0].Tags) != 2 {
+		t.Fatalf("client 42 = %+v", clients[0])
+	}
+	if clients[1].HasTitle || clients[1].HasAppID {
+		t.Fatalf("client 7 = %+v, want empty strings read as unset", clients[1])
 	}
 }
 
@@ -165,24 +200,16 @@ func TestKeyboardLayoutIsTheActiveMonitors(t *testing.T) {
 }
 
 func TestWatchDecodesTheKeyboardLayout(t *testing.T) {
-	newFakeMango(t)
+	f := newFakeMango(t)
 	w, err := Watch()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	deadline := time.After(2 * time.Second)
-	for {
-		if monitors, _ := w.State(); len(monitors) == 1 {
-			if got := KeyboardLayout(monitors); got != "English (US)" {
-				t.Fatalf("layout = %q, want English (US)", got)
-			}
-			return
-		}
-		select {
-		case <-w.Ticks():
-		case <-deadline:
-			t.Fatal("frames never applied")
-		}
+	f.send(watchMonitors)
+	awaitTick(t, w)
+	monitors, _ := w.State()
+	if got := KeyboardLayout(monitors); got != "English (US)" {
+		t.Fatalf("layout = %q, want English (US)", got)
 	}
 }
