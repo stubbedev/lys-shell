@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/user"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -236,6 +237,16 @@ func TestRequestInstallTokenFollowsTheAllowlist(t *testing.T) {
 	for _, id := range []string{"org.app", ""} {
 		if code := token(id); code == ResponseSuccess {
 			t.Errorf("%q got an install token", id)
+		}
+	}
+}
+
+// The consent dialogs' icons are glyphs the shell installs, so they
+// draw on any icon theme.
+func TestConsentIconsAreBundled(t *testing.T) {
+	for _, name := range []string{screenshotIcon, remoteDesktopIcon, shortcutsIcon} {
+		if _, err := os.Stat(filepath.Join("..", "resources", "icons", "hicolor", "scalable", "actions", name+".svg")); err != nil {
+			t.Errorf("consent icon %q is not bundled: %v", name, err)
 		}
 	}
 }

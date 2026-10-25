@@ -15,6 +15,15 @@ import (
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
+// The consent dialogs' header icons: glyphs the shell installs
+// (resources/icons), so the header never shows an empty square on a
+// desktop whose icon theme lacks the freedesktop names.
+const (
+	screenshotIcon    = "ld-camera-symbolic"
+	remoteDesktopIcon = "ld-mouse-symbolic"
+	shortcutsIcon     = "ld-keyboard-symbolic"
+)
+
 // The interfaces whose whole job is one of the shell's native dialogs
 // (dev.stubbe.lys.PortalDialogs1): Access, Account, AppChooser and
 // DynamicLauncher. No xdg-desktop-portal-gtk.

@@ -89,7 +89,7 @@ var grabTargets = map[string]uint32{"screen": targetScreen, "window": targetPick
 // the user then picks, or an area, and whether to show the pointer.
 var screenshotChooser = portaldialogs.AccessRequest{
 	Title: "Take a screenshot", Subtitle: "Choose what to capture.",
-	GrantLabel: "Take Screenshot", DenyLabel: "Cancel", Icon: "applets-screenshooter-symbolic",
+	GrantLabel: "Take Screenshot", DenyLabel: "Cancel", Icon: screenshotIcon,
 	Choices: []portalreq.Choice{
 		{ID: choiceGrab, Label: "Grab", Initial: "screen", Options: []portalreq.Option{
 			{ID: "screen", Label: "Whole screen"}, {ID: "window", Label: "A window"}, {ID: "area", Label: "An area"},

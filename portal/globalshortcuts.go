@@ -430,7 +430,7 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 	if len(fresh) > 0 {
 		allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 			Title: "Allow global shortcuts?", Subtitle: "They work while the app is in the background.",
-			Body: consentBody(owner, fresh), GrantLabel: "Allow", DenyLabel: "Deny", Icon: "preferences-desktop-keyboard-shortcuts-symbolic",
+			Body: consentBody(owner, fresh), GrantLabel: "Allow", DenyLabel: "Deny", Icon: shortcutsIcon,
 		})
 		if code := c.response("global shortcuts", allowed, err); code != ResponseSuccess {
 			return code, Vardict{}, nil
@@ -493,7 +493,7 @@ func (o globalShortcutsObject) ConfigureShortcuts(session dbus.ObjectPath, paren
 		defer cancel()
 		_, _, err := portaldialogs.NewClient(o.g.conn).Access(ctx, portalreq.Caller{AppID: s.appID, ParentWindow: parent}, portaldialogs.AccessRequest{
 			Title: "Global shortcuts", Subtitle: "Their keys are set in your compositor's binds.",
-			Body: body, GrantLabel: "Done", DenyLabel: "Close", Icon: "preferences-desktop-keyboard-shortcuts-symbolic",
+			Body: body, GrantLabel: "Done", DenyLabel: "Close", Icon: shortcutsIcon,
 		})
 		if err != nil {
 			warnf("global shortcuts: configure dialog: %v", err)

@@ -390,7 +390,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		}
 		allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
 			Title: "Allow remote control?", Body: body,
-			GrantLabel: "Allow", DenyLabel: "Deny", Icon: "input-keyboard-symbolic",
+			GrantLabel: "Allow", DenyLabel: "Deny", Icon: remoteDesktopIcon,
 		})
 		if code := c.response("remotedesktop", allowed, err); code != ResponseSuccess {
 			return ResponseCancelled, Vardict{}, nil
