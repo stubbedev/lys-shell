@@ -133,13 +133,13 @@ var batteryVariants = []string{"crit", "warn", "good", "fair", "poor", "unknown"
 
 // batteryProfile is one segment of the power-profile control.
 type batteryProfile struct {
-	name, icon, label string
+	name, label string
 }
 
 var batteryProfiles = []batteryProfile{
-	{powerprofiles.ProfilePowerSaver, "ld-leaf-symbolic", "dropdown-battery-profile-saver"},
-	{powerprofiles.ProfileBalanced, "ld-scale-symbolic", "dropdown-battery-profile-balanced"},
-	{powerprofiles.ProfilePerformance, "ld-rocket-symbolic", "dropdown-battery-profile-performance"},
+	{powerprofiles.ProfilePowerSaver, "dropdown-battery-profile-saver"},
+	{powerprofiles.ProfileBalanced, "dropdown-battery-profile-balanced"},
+	{powerprofiles.ProfilePerformance, "dropdown-battery-profile-performance"},
 }
 
 // batteryView is the battery dropdown: the battery section (hero,
@@ -343,7 +343,8 @@ func (v *batteryView) profileSection() widget.Widget {
 	v.profileButtons = make(map[string]*widget.ToggleButton, len(batteryProfiles))
 	var first *widget.ToggleButton
 	for _, p := range batteryProfiles {
-		content := widget.NewButtonContent(v.font, v.px, p.icon, i18n.T(p.label))
+		content := widget.NewLabel(v.font, v.px, i18n.T(p.label), 0)
+		content.SetAlignment(render.AlignCenter)
 		name := p.name
 		// Grouped gtk::ToggleButtons: activating one releases the
 		// others, and the toggled handler selects on activation only.

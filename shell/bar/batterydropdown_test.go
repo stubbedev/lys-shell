@@ -502,3 +502,21 @@ func TestBatteryDetailsShowTheirText(t *testing.T) {
 		}
 	}
 }
+
+// The profile segments fit the dropdown's width: none is cut off at
+// the card's edge.
+func TestBatteryProfileSegmentsFitTheDropdown(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	v := batteryDropdown(ctx).(*batteryView)
+	defer v.dropdownClosed()
+	w, _, _ := dropdownDims("battery", ctx.Config)
+	batteryArrangeStyled(t, ctx, v, w)
+	seg := treetest.WithClass(v, "profile-seg")[0]
+	end := boundsOf(seg).X + boundsOf(seg).W
+	for _, p := range batteryProfiles {
+		b := v.profileButtons[p.name].Bounds()
+		if b.X+b.W > end || widget.MeasureAsChild(v.profileButtons[p.name], widget.Constraints{Max: widget.Size{W: 1 << 14, H: 100}}).W > b.W {
+			t.Errorf("%s spans %+v, cut off in its %d-wide row", p.name, b, end)
+		}
+	}
+}

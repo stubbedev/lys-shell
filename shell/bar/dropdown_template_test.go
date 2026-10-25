@@ -117,3 +117,39 @@ func isUnder(w, root widget.Widget) bool {
 	treetest.Walk(root, func(x widget.Widget) { found = found || x == w })
 	return found
 }
+
+// The dropdowns' text is lys-ui's text size times the styling scale,
+// whatever size the bar's own labels take.
+func TestDropdownFontIsTheToolkitTextSize(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	if _, px := dropdownFont(ctx); px != widget.Current().TextSize {
+		t.Errorf("default text = %vpx, want lys-ui's %v", px, widget.Current().TextSize)
+	}
+	ctx.Style.labelPx *= 2
+	if _, px := dropdownFont(ctx); px != widget.Current().TextSize {
+		t.Errorf("a larger bar label moved the dropdown text to %vpx", px)
+	}
+	cfg.Styling.Scale = 1.5
+	if _, px := dropdownFont(ctx); px != widget.Current().TextSize*1.5 {
+		t.Errorf("scale 1.5 text = %vpx, want %v", px, widget.Current().TextSize*1.5)
+	}
+}
+
+// A dropdown button's label keeps the text size it was built at: no
+// shell rule resizes button text over lys-ui's.
+func TestDropdownButtonTextKeepsItsSize(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	font, px := dropdownFont(ctx)
+	label := widget.NewLabel(font, px, "Clear All", 0)
+	content := dropdownContent()
+	content.Append(dropdownButton(label, nil, css.Ghost, css.Small), false)
+	ctx.Theme.Attach(content)
+	content.Measure(widgetConstraintsMax(400, 200))
+	content.Arrange(render.Rect{W: 400, H: 200})
+	bare := widget.NewLabel(font, px, "Clear All", 0)
+	big := widget.Constraints{Max: widget.Size{W: 400, H: 200}}
+	if got, want := widget.MeasureAsChild(label, big).W, bare.Measure(big).W; got != want {
+		t.Errorf("the button's label measures %dpx wide, want its own %dpx", got, want)
+	}
+}

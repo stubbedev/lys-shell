@@ -28,10 +28,13 @@ func dropdownBuilders() map[string]func(ctx ModuleContext) widget.Widget {
 	}
 }
 
-// dropdownFont resolves the card's label size from the bar style.
+// dropdownFont is the dropdowns' face and text size: lys-ui's text
+// size, which its own components set, times the styling scale, so a
+// dropdown's labels match the lys-ui parts around them.
 func dropdownFont(ctx ModuleContext) (render.Font, float64) {
-	if ctx.Style != nil {
-		return ctx.Font, ctx.Style.labelPx
+	px := widget.Current().TextSize
+	if ctx.Config != nil && ctx.Config.Styling.Scale > 0 {
+		px *= float64(ctx.Config.Styling.Scale)
 	}
-	return ctx.Font, 14
+	return ctx.Font, px
 }
