@@ -15,7 +15,7 @@ import (
 // The rows carry class and their labels class+"-label".
 func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]widget.Widget, func() []portalreq.Selection) {
 	label := func(text string) *widget.Label {
-		l := widget.NewLabel(font, 13, text, 0)
+		l := widget.NewLabel(font, widget.Current().TextSize, text, 0)
 		l.AddClass(class + "-label")
 		return l
 	}
@@ -42,9 +42,9 @@ func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]w
 				start = i
 			}
 		}
-		drop := widget.NewDropdown(font, 13, labels, start)
+		drop := widget.NewDropdown(font, widget.Current().TextSize, labels, start)
 		drop.AddClass(class)
-		row := widget.NewBox(widget.Row, 8, 0)
+		row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 		row.Append(label(c.Label), true)
 		row.Append(drop, false)
 		rows = append(rows, row)

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
@@ -830,4 +831,48 @@ func TestDialogIconFallsBackAlongTheName(t *testing.T) {
 	if h.icon("", 24) != nil {
 		t.Error("no name built an icon")
 	}
+}
+
+// A dialog stands on lys-ui's parts: the surface is its card, the
+// requester a dim caption, the title a heading a step over the text
+// size and the body dim text, Cancel an outline button and the confirm
+// the suggested action; neither button takes the other's look.
+func TestDialogTakesLysUiParts(t *testing.T) {
+	hs := newHarness(t, nil)
+	done := make(chan struct{})
+	go func() {
+		hs.h.Access(portalreq.Caller{Handle: "/r/p"}, AccessRequest{Title: "Camera", Body: "Use it?", GrantLabel: "Allow", DenyLabel: "Deny"})
+		close(done)
+	}()
+	c := hs.open(t)
+	one := func(class string) widget.Widget {
+		t.Helper()
+		ws := treetest.WithClass(c.Root, class)
+		if len(ws) != 1 {
+			t.Fatalf("%d .%s, want 1", len(ws), class)
+		}
+		return ws[0]
+	}
+	if !widget.HasClass(one("portal-dialog-surface"), css.Card) {
+		t.Error("the surface is not lys-ui's card")
+	}
+	if r := one("portal-dialog-requester"); !widget.HasClass(r, css.Caption) || !widget.HasClass(r, css.DimLabel) {
+		t.Error("the requester is not a dim caption")
+	}
+	text := widget.Current().TextSize
+	if title := one("portal-dialog-title").(*widget.Label); !widget.HasClass(title, css.Heading) || title.SizePx() != text*titleScale {
+		t.Errorf("title %vpx, want a %vpx heading", title.SizePx(), text*titleScale)
+	}
+	if body := one("portal-dialog-body"); !widget.HasClass(body, css.DimLabel) || widget.HasClass(body, css.Heading) {
+		t.Error("the body is not dim text")
+	}
+	cancel, confirm := one("portal-dialog-cancel"), one("portal-dialog-confirm")
+	if !widget.HasClass(cancel, css.Outline) || widget.HasClass(cancel, css.SuggestedAction) {
+		t.Error("Cancel is not lys-ui's outline button")
+	}
+	if !widget.HasClass(confirm, css.SuggestedAction) || widget.HasClass(confirm, css.Outline) {
+		t.Error("the confirm is not the suggested action")
+	}
+	hs.do(func() { cancel.(*widget.Button).OnClick() })
+	<-done
 }

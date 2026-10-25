@@ -4,7 +4,10 @@
   background: transparent;
 }
 
-.portal-dialog-surface,
+.portal-dialog-surface {
+  box-shadow: var(--shadow);
+}
+
 .print-surface {
   background: var(--bg-base);
   color: var(--fg-default);
@@ -304,52 +307,11 @@ button.file-chooser-filter:checked {
   background: var(--accent-hover);
 }
 
-.portal-dialog-cancel,
-.portal-dialog-confirm {
-  min-height: 0;
-  min-width: 0;
-  padding: var(--space-xs) var(--space-lg);
-  border-radius: var(--rounding-element);
-  border: none;
-  box-shadow: none;
-  font-weight: var(--weight-medium);
-}
-
-.portal-dialog-cancel {
-  background: var(--bg-hover);
-  color: var(--fg-default);
-}
-.portal-dialog-cancel:hover {
-  background: var(--bg-active);
-}
-
-.portal-dialog-confirm {
-  background: var(--accent);
-  color: var(--fg-on-accent);
-  font-weight: var(--weight-semibold);
-}
-.portal-dialog-confirm:hover {
-  background: var(--accent-hover);
-}
-
-.portal-dialog-title,
 .file-chooser-title,
 .print-title {
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   color: var(--fg-default);
-}
-
-.portal-dialog-body {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-
-.portal-dialog-requester,
-.share-picker-requester {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-muted);
 }
 
 .portal-dialog-app-list,
@@ -385,45 +347,9 @@ button.file-chooser-filter:checked {
   margin: 0 var(--space-md) var(--space-sm);
 }
 
-.portal-dialog-image {
-  border-radius: var(--rounding-container);
-}
-
-.portal-dialog-search {
-  min-height: 0;
-  padding: 0 var(--space-xs);
-  border-radius: var(--rounding-element);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  color: var(--fg-default);
-}
-.portal-dialog-search text {
-  min-height: 0;
-  padding: var(--space-xs) 0;
-}
-.portal-dialog-search image {
-  color: var(--fg-muted);
-  min-height: 0;
-}
-
-.portal-dialog-app-name {
-  font-weight: var(--weight-medium);
-  color: var(--fg-default);
-}
-
-.portal-dialog-app-desc {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-
 .portal-dialog-app-list row:selected .portal-dialog-app-name,
 .portal-dialog-app-list row:selected .portal-dialog-app-desc {
   color: var(--fg-on-accent);
-}
-
-.portal-dialog-remember {
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
 }
 
 .print-form-label {

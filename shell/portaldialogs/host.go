@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
@@ -23,12 +24,16 @@ import (
 // The surface's sizes (shell/portal_dialogs: set_width_request,
 // pixel sizes, the app list's min-content-height).
 const (
-	surfaceWidth  = 420
-	headerPx      = 64
-	wallpaperPx   = 180
-	appIconPx     = 32
-	appListHeight = 360
-	escapeKeycode = 1
+	surfaceWidth = 420
+	headerPx     = 64
+	// requesterIconPx is the requester's app icon, at the caption's
+	// size; titleScale steps a title over the text size.
+	requesterIconPx = 16
+	titleScale      = 1.125
+	wallpaperPx     = 180
+	appIconPx       = 32
+	appListHeight   = 360
+	escapeKeycode   = 1
 )
 
 // Window is the overlay surface the dialog maps (app.LayerWindow).
@@ -171,7 +176,7 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 			}
 		}
 		setImage(info.Image)
-		name := widget.NewEntry(h.d.Font, 13, 0)
+		name := widget.NewEntry(h.d.Font, h.textPx(), 0)
 		name.AddClass("portal-dialog-entry")
 		name.SetText(info.Name)
 		choose := h.button("Choose picture…", "portal-dialog-picture", func() {
@@ -189,7 +194,7 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 			}
 			answer(ok, s)
 		}
-		pictureRow := widget.NewBox(widget.Row, 8, 0)
+		pictureRow := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 		pictureRow.Append(widget.NewSpacer(0, 0), true)
 		pictureRow.Append(choose, false)
 		pictureRow.Append(remove, false)
@@ -258,7 +263,7 @@ func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, s
 		var entry *widget.Entry
 		if r.EditableName {
 			title = "Install launcher?"
-			entry = widget.NewEntry(h.d.Font, 13, 0)
+			entry = widget.NewEntry(h.d.Font, h.textPx(), 0)
 			entry.AddClass("portal-dialog-entry")
 			entry.SetText(r.Name)
 			extra = append(extra, entry)
@@ -323,13 +328,19 @@ func nonEmpty(parts ...string) []string {
 	return out
 }
 
-func (h *Dialogs) label(text, class string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, 13, text, 0)
-	l.AddClass(class)
+// textPx is lys-ui's text size, which every line of the dialogs takes.
+func (h *Dialogs) textPx() float64 { return widget.Current().TextSize }
+
+// label is a wrapping line at lys-ui's text size.
+func (h *Dialogs) label(text string, classes ...string) *widget.Label {
+	l := widget.NewLabel(h.d.Font, h.textPx(), text, 0)
+	l.AddClass(classes...)
 	l.SetWrap(true)
 	return l
 }
 
+// button is a text button: lys-ui's look comes from the variant the
+// caller adds (outline, suggested action), the class names it.
 func (h *Dialogs) button(text, class string, onClick func()) *widget.Button {
 	l := h.label(text, class+"-label")
 	l.SetWrap(false)
@@ -391,22 +402,23 @@ func (h *Dialogs) headerFile(path string, px int) widget.Widget {
 
 // requester is the row naming the app that asks: its icon and name.
 func (h *Dialogs) requester() widget.Widget {
-	row := widget.NewBox(widget.Row, 6, 0)
+	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	row.AddClass("portal-dialog-requester-row")
-	if icon := h.icon(h.appIcon, 16); icon != nil {
-		row.Append(icon, false)
+	if icon := h.icon(h.appIcon, requesterIconPx); icon != nil {
+		row.AppendAligned(icon, false, widget.AlignCenter)
 	}
-	l := h.label(h.app, "portal-dialog-requester")
+	l := h.label(h.app, "portal-dialog-requester", css.Caption, css.DimLabel)
 	l.SetWrap(false)
-	row.Append(l, false)
+	row.AppendAligned(l, false, widget.AlignCenter)
 	return row
 }
 
-// surface wraps the dialog's rows in the styled panel, under the row
-// naming the requester.
+// surface wraps the dialog's rows in lys-ui's card, spaced and padded
+// by the theme, under the row naming the requester.
 func (h *Dialogs) surface(rows ...widget.Widget) widget.Widget {
-	box := widget.NewBox(widget.Column, 12, 0)
-	box.AddClass("portal-dialog-surface")
+	th := widget.Current()
+	box := widget.NewBox(widget.Column, 2*th.Spacing, 3*th.Padding)
+	box.AddClass(css.Card, "portal-dialog-surface")
 	box.Append(h.requester(), false)
 	for _, r := range rows {
 		if r != nil {
@@ -419,7 +431,7 @@ func (h *Dialogs) surface(rows ...widget.Widget) widget.Widget {
 
 // actions is the right-aligned button row.
 func (h *Dialogs) actions(buttons ...*widget.Button) widget.Widget {
-	row := widget.NewBox(widget.Row, 8, 0)
+	row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 	row.Append(widget.NewSpacer(0, 0), true)
 	for _, b := range buttons {
 		row.Append(b, false)
@@ -433,18 +445,40 @@ func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title
 	if header != nil {
 		rows = append(rows, widgets.Center(header))
 	}
-	rows = append(rows, h.label(title, "portal-dialog-title"))
+	rows = append(rows, h.title(title))
 	if body != "" {
-		rows = append(rows, h.label(body, "portal-dialog-body"))
+		rows = append(rows, h.body(body))
 	}
 	rows = append(rows, extra...)
-	confirmButton := h.button(confirm, "portal-dialog-confirm", func() { answer(true, "") })
-	confirmButton.AddClass("suggested-action")
-	rows = append(rows, h.actions(
-		h.button(cancel, "portal-dialog-cancel", func() { answer(false, "") }),
-		confirmButton,
-	))
+	rows = append(rows, h.actions(h.cancel(cancel, answer), h.accept(confirm, func() { answer(true, "") })))
 	return h.surface(rows...)
+}
+
+// title is a dialog's heading, a step over the text size.
+func (h *Dialogs) title(text string) *widget.Label {
+	l := widget.NewLabel(h.d.Font, h.textPx()*titleScale, text, 0)
+	l.AddClass("portal-dialog-title", css.Heading)
+	l.SetWrap(true)
+	return l
+}
+
+// body is a dialog's dim explanation under its title.
+func (h *Dialogs) body(text string) *widget.Label {
+	return h.label(text, "portal-dialog-body", css.DimLabel)
+}
+
+// cancel is the outline button that declines.
+func (h *Dialogs) cancel(text string, answer func(bool, string)) *widget.Button {
+	b := h.button(text, "portal-dialog-cancel", func() { answer(false, "") })
+	b.AddClass(css.Outline)
+	return b
+}
+
+// accept is the suggested action that confirms.
+func (h *Dialogs) accept(text string, onClick func()) *widget.Button {
+	b := h.button(text, "portal-dialog-confirm", onClick)
+	b.AddClass(css.SuggestedAction)
+	return b
 }
 
 // chooser lists the request's apps in a ListBox of icon + name rows,
@@ -476,7 +510,7 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 	}
 	remember := widget.NewCheckButton(false)
 	remember.AddClass("portal-dialog-remember")
-	remember.SetChild(widget.NewLabel(h.d.Font, 13, "Always use for this file type", 0))
+	remember.SetChild(h.label("Always use for this file type", "portal-dialog-remember-label", css.DimLabel))
 	list.OnActivate = func(i int) {
 		if remember.Checked() && contentType != "" {
 			if err := h.d.SetDefault(apps[i].ID, contentType); err != nil {
@@ -492,7 +526,7 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 	ac.refresh()
 	// gtk::SearchEntry: the list filters on search-changed, after the
 	// default delay.
-	search := widget.NewSearchEntry(h.d.Font, 13, "Search applications…")
+	search := widget.NewSearchEntry(h.d.Font, h.textPx(), "Search applications…")
 	search.AddClass("portal-dialog-search")
 	search.OnSearchChanged = func(q string) {
 		query = strings.ToLower(q)
@@ -507,29 +541,29 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 		rememberRow = remember
 	}
 	if ac.req.Target != "" {
-		target = h.label("Choose an application to open “"+ac.req.Target+"”.", "portal-dialog-body")
+		target = h.body("Choose an application to open “" + ac.req.Target + "”.")
 	}
-	open := h.button("Open", "portal-dialog-confirm", func() {
+	open := h.accept("Open", func() {
 		if i := list.Selected(); i >= 0 {
 			list.OnActivate(i)
 		}
 	})
-	open.AddClass("suggested-action")
 	return h.surface(
-		h.label("Open With", "portal-dialog-title"),
+		h.title("Open With"),
 		target,
 		search,
 		scroll,
 		rememberRow,
-		h.actions(h.button("Cancel", "portal-dialog-cancel", func() { answer(false, "") }), open),
+		h.actions(h.cancel("Cancel", answer), open),
 	)
 }
 
 // appRow is app_row: the app icon and its name over the ellipsized
-// description, inset 6px by 10px.
+// description, inset by the theme's padding.
 func (h *Dialogs) appRow(a desktopentry.App) widget.Widget {
-	row := widget.NewBox(widget.Row, 10, 0)
-	row.SetMargin(render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10})
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, th.Spacing, 0)
+	row.SetMargin(render.Insets{Top: th.Padding, Right: th.Padding + th.Padding/2, Bottom: th.Padding, Left: th.Padding + th.Padding/2})
 	icon := h.icon(a.Icon(), appIconPx)
 	if icon == nil {
 		icon = widget.NewThemeIcon("application-x-executable-symbolic", appIconPx)
@@ -544,7 +578,7 @@ func (h *Dialogs) appRow(a desktopentry.App) widget.Widget {
 	if desc := a.Comment(); desc != "" {
 		// The GTK scrolled window keeps a long description from
 		// widening the dialog: it ellipsizes at the width it is given.
-		d := h.label(desc, "portal-dialog-app-desc")
+		d := h.label(desc, "portal-dialog-app-desc", css.Caption, css.DimLabel)
 		d.SetWrap(false)
 		d.SetEllipsize(widget.EllipsizeEnd)
 		d.SetMaxWidthChars(1)
