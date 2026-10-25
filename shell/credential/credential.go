@@ -8,14 +8,15 @@ package credential
 import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 )
 
-// The prompt's fixed metrics: GTK's defaults the stylesheet starts
-// from, not styling.
+// The prompt's metrics over lys-ui's text size: the entries'
+// width-chars, and the clock's and the date's display scales.
 const (
-	columnSpacing = 12 // the credential column's spacing
-	entryChars    = 24 // the entries' width-chars
-	textPx        = 16 // the labels' size before the stylesheet's
+	entryChars = 24
+	clockScale = 4
+	dateScale  = 1.25
 )
 
 // The PasswordEntry peek icons (GtkPasswordEntry show-peek-icon): the
@@ -65,11 +66,12 @@ type Prompt struct {
 // Build assembles a prompt (CredentialBox::build); onSubmit fires with
 // the secret entry's text each time the user presses Enter in it.
 func Build(o Options, onSubmit func(string)) *Prompt {
+	textPx := widget.Current().TextSize
 	p := &Prompt{
-		Clock: label(o.Font, "lock-clock"),
-		Date:  label(o.Font, "lock-date"),
+		Clock: label(o.Font, textPx*clockScale, "lock-clock", css.Heading, css.Numeric),
+		Date:  label(o.Font, textPx*dateScale, "lock-date"),
 		Entry: widget.NewEntry(o.Font, textPx, 0),
-		Error: label(o.Font, "lock-error"),
+		Error: label(o.Font, textPx, "lock-error", css.Error),
 	}
 	p.Clock.SetVisible(o.ShowClock)
 	p.Date.SetVisible(o.ShowClock)
@@ -80,8 +82,9 @@ func Build(o Options, onSubmit func(string)) *Prompt {
 	p.Entry.OnActivate = onSubmit
 	p.Error.SetVisible(false)
 
-	center := widget.NewBox(widget.Column, columnSpacing, 0)
-	center.AddClass("lock-center")
+	th := widget.Current()
+	center := widget.NewBox(widget.Column, th.Spacing, 4*th.Padding)
+	center.AddClass(css.Card, "lock-center")
 	center.SetHAlign(widget.AlignCenter)
 	center.SetVAlign(widget.AlignCenter)
 	center.Append(p.Clock, false).Append(p.Date, false)
@@ -114,9 +117,9 @@ func Build(o Options, onSubmit func(string)) *Prompt {
 
 // label is a GtkLabel in the column: it fills the row, its text
 // centered (GTK's default xalign 0.5).
-func label(font render.Font, class string) *widget.Label {
-	l := widget.NewLabel(font, textPx, "", 0)
-	l.AddClass(class)
+func label(font render.Font, px float64, classes ...string) *widget.Label {
+	l := widget.NewLabel(font, px, "", 0)
+	l.AddClass(classes...)
 	l.SetAlignment(render.AlignCenter)
 	return l
 }

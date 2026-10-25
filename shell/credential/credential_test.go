@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -56,6 +57,28 @@ func TestBuildShape(t *testing.T) {
 	lock := Build(Options{Font: treetest.Font(t)}, func(string) {})
 	if lock.Username != nil || lock.Clock.Visible() {
 		t.Error("the lock-screen prompt has no username entry, and ShowClock false hides the clock")
+	}
+}
+
+// TestBuildTakesLysUiParts pins the prompt on lys-ui's parts: the
+// column is lys-ui's card, the clock a numeric heading at the display
+// scale of the theme's text size, the error line lys-ui's error text;
+// only the clock is a heading.
+func TestBuildTakesLysUiParts(t *testing.T) {
+	p := Build(Options{Font: treetest.Font(t), ShowClock: true}, func(string) {})
+	cards := treetest.WithClass(p.Reveal, "lock-center")
+	if len(cards) != 1 || len(treetest.WithClass(cards[0], css.Card)) != 1 {
+		t.Fatal("the credential column must be lys-ui's card")
+	}
+	text := widget.Current().TextSize
+	if p.Clock.SizePx() != text*clockScale || !slices.Contains(p.Clock.Classes(), css.Heading) || !slices.Contains(p.Clock.Classes(), css.Numeric) {
+		t.Errorf("clock = %vpx %v, want %vpx numeric heading", p.Clock.SizePx(), p.Clock.Classes(), text*clockScale)
+	}
+	if p.Date.SizePx() != text*dateScale || slices.Contains(p.Date.Classes(), css.Heading) {
+		t.Errorf("date = %vpx %v, want %vpx, no heading", p.Date.SizePx(), p.Date.Classes(), text*dateScale)
+	}
+	if !slices.Contains(p.Error.Classes(), css.Error) || slices.Contains(p.Error.Classes(), css.Heading) {
+		t.Errorf("error line classes = %v", p.Error.Classes())
 	}
 }
 

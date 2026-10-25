@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -33,13 +33,9 @@ const maxListedUsers = 8
 
 // The greeter's fixed metrics: GTK widget properties, not styling.
 const (
-	avatarPx    = 64 // the avatar's size request
-	userRowGap  = 12 // the user row's spacing
-	userColGap  = 6  // the avatar column's spacing
-	powerGap    = 12 // the power row's spacing
+	avatarPx    = 64 // the avatar's size
 	powerIconPx = 16
 	nameChars   = 14 // the user name's max-width-chars
-	textPx      = 16 // the labels' size before the stylesheet's
 )
 
 // Init is what the greeter starts from (app.rs GreeterInit).
@@ -107,6 +103,8 @@ type userButton struct {
 func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *screen {
 	s := &screen{init: init, d: d}
 	g := init.Config.Greeter
+	th := widget.Current()
+	textPx := th.TextSize
 
 	names := make([]string, len(init.Sessions))
 	for i, sess := range init.Sessions {
@@ -126,13 +124,13 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 	}
 	s.drop.SetVisible(len(init.Sessions) > 1)
 	s.caps = widget.NewLabel(font, textPx, t("greeter-caps-lock"), 0)
-	s.caps.AddClass("lock-caps")
+	s.caps.AddClass("lock-caps", css.Warning)
 	s.caps.SetAlignment(render.AlignCenter)
 	s.caps.SetVisible(false)
-	below := widget.NewBox(widget.Column, 0, 0)
+	below := widget.NewBox(widget.Column, th.Spacing, 0)
 	below.Append(s.caps, false).Append(s.drop, false)
 
-	users := widget.NewBox(widget.Row, userRowGap, 0)
+	users := widget.NewBox(widget.Row, th.Spacing, 0)
 	users.AddClass("lock-users")
 	users.SetHAlign(widget.AlignCenter)
 	if g.ShowUserList && len(init.Users) > 0 && len(init.Users) <= maxListedUsers {
@@ -192,17 +190,19 @@ func (s *screen) background() image.Image {
 // in the .lock-users row; a click fills the username, marks the button
 // selected, and focuses the password.
 func (s *screen) populateUsers(row *widget.Box, font render.Font) {
+	th := widget.Current()
 	for _, u := range s.init.Users {
 		ub := &userButton{user: u}
-		name := widget.NewLabel(font, textPx, u.DisplayName, 0)
-		name.AddClass("lock-user-name")
+		name := widget.NewLabel(font, th.TextSize, u.DisplayName, 0)
+		name.AddClass("lock-user-name", css.DimLabel)
 		name.SetEllipsize(widget.EllipsizeEnd)
 		name.SetMaxWidthChars(nameChars)
-		col := widget.NewBox(widget.Column, userColGap, 0)
+		name.SetAlignment(render.AlignCenter)
+		col := widget.NewBox(widget.Column, th.Spacing/2, th.Padding)
 		col.SetHAlign(widget.AlignCenter)
-		col.Append(s.avatar(u, font), false).Append(name, false)
+		col.AppendAligned(s.avatar(u, font), false, widget.AlignCenter).Append(name, false)
 		ub.button = widget.NewButton(col, 0, 0)
-		ub.button.AddClass("lock-user-button", "flat")
+		ub.button.AddClass("lock-user-button", css.Ghost)
 		if u.Name == s.init.LastUser {
 			ub.button.AddClass("selected")
 		}
@@ -221,35 +221,25 @@ func (s *screen) pickUser(picked *userButton) {
 	s.d.focus(s.prompt.Entry)
 }
 
-// avatar is build_user_button's avatar: the image scaled to cover, or
-// the initial letter (.lock-avatar-fallback) when there is no readable
-// image, at the 64px size request.
-func (s *screen) avatar(u User, font render.Font) widget.Widget {
+// avatar is build_user_button's avatar: lys-ui's Avatar, the user's
+// image when it reads, their initials otherwise.
+func (s *screen) avatar(u User, font render.Font) *widget.Avatar {
+	a := widget.NewAvatar(font, avatarPx, u.DisplayName)
+	a.AddClass("lock-avatar")
 	if u.Icon != "" {
 		if img, err := s.d.loadAvatar(u.Icon); err == nil {
-			pic := widget.NewImage(img)
-			pic.SetScale(widget.ImageCover)
-			pic.AddClass("lock-avatar")
-			pic.SetSizeRequest(avatarPx, avatarPx)
-			return pic
+			a.SetImage(img)
 		}
 	}
-	initial := ""
-	for _, r := range u.DisplayName {
-		initial = string(unicode.ToUpper(r))
-		break
-	}
-	letter := widget.NewLabel(font, textPx, initial, 0)
-	letter.AddClass("lock-avatar", "lock-avatar-fallback")
-	letter.SetAlignment(render.AlignCenter)
-	letter.SetSizeRequest(avatarPx, avatarPx)
-	return letter
+	return a
 }
 
 // powerRow is build_power_box: shutdown and reboot in the .lock-power
 // row at the bottom center.
 func (s *screen) powerRow() widget.Widget {
-	row := widget.NewBox(widget.Row, powerGap, 0)
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, th.Spacing, 0)
+	row.SetMargin(render.Insets{Bottom: 4 * th.Padding})
 	row.AddClass("lock-power")
 	row.SetHAlign(widget.AlignCenter)
 	row.SetVAlign(widget.AlignEnd)
@@ -259,7 +249,7 @@ func (s *screen) powerRow() widget.Widget {
 		verb    string
 	}{{"ld-power-symbolic", t("greeter-shutdown"), "poweroff"}, {"ld-rotate-ccw-symbolic", t("greeter-restart"), "reboot"}} {
 		btn := widget.NewButton(widget.NewThemeIcon(b.icon, powerIconPx), 0, 0)
-		btn.AddClass("lock-power-button", "flat")
+		btn.AddClass("lock-power-button", css.Ghost, css.Icon, css.Large)
 		btn.SetTooltip(b.tooltip)
 		verb := b.verb
 		btn.OnClick = func() { s.d.power(verb) }

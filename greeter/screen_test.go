@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/auth"
@@ -252,6 +253,27 @@ func TestGreeterUserRowAndPower(t *testing.T) {
 	if !slices.Equal(r.power, []string{"poweroff", "reboot"}) {
 		t.Errorf("power verbs = %v", r.power)
 	}
+	for _, b := range buttons {
+		if !slices.Contains(b.Classes(), css.Ghost) || !slices.Contains(b.Classes(), css.Icon) || slices.Contains(b.Classes(), "flat") {
+			t.Errorf("power button classes = %v, want lys-ui's ghost icon button", b.Classes())
+		}
+	}
+}
+
+// TestGreeterUserButtonsAreLysUi pins the user row on lys-ui's parts:
+// each user is a ghost button, never the old flat one, and the avatar
+// is lys-ui's Avatar with the user's initials.
+func TestGreeterUserButtonsAreLysUi(t *testing.T) {
+	r := newRig(t, nil)
+	for i, ub := range r.s.users {
+		if !slices.Contains(ub.button.Classes(), css.Ghost) || slices.Contains(ub.button.Classes(), "flat") {
+			t.Errorf("user %d button classes = %v", i, ub.button.Classes())
+		}
+		want := ub.user.DisplayName[:1]
+		if got := r.s.avatar(ub.user, treetest.Font(t)).Initials(); got != want {
+			t.Errorf("user %d avatar initials = %q, want %q", i, got, want)
+		}
+	}
 }
 
 func TestGreeterSessionPickerAndCaps(t *testing.T) {
@@ -263,7 +285,7 @@ func TestGreeterSessionPickerAndCaps(t *testing.T) {
 		t.Error("two sessions hide the picker")
 	}
 	r.s.setCapsLock(true)
-	if !r.s.caps.Visible() || r.s.caps.Text() != "Caps Lock is on" {
+	if !r.s.caps.Visible() || r.s.caps.Text() != "Caps Lock is on" || !slices.Contains(r.s.caps.Classes(), css.Warning) {
 		t.Error("caps lock on shows the warning")
 	}
 	r.s.setCapsLock(false)
