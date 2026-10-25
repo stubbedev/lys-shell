@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -167,6 +168,22 @@ func TestRowIsHomogeneousAndUnpinned(t *testing.T) {
 	for _, l := range treetest.All[*widget.Label](root) {
 		if l.Color() != 0 {
 			t.Errorf("label %q pins ink %#08x", l.Text(), uint32(l.Color()))
+		}
+	}
+}
+
+// The surface is lys-ui's card and each action lys-ui's outline button,
+// a square tile of the menu's own size.
+func TestActionsAreOutlineTilesInACard(t *testing.T) {
+	h := newHarness(t)
+	h.m.Show()
+	root := h.opened[0].Root
+	if surface := treetest.WithClass(root, "power-menu-surface"); len(surface) != 1 || !widget.HasClass(surface[0], css.Card) {
+		t.Error("the surface is not lys-ui's card")
+	}
+	for _, b := range h.buttons(t) {
+		if !b.HasClass(css.Outline) || b.SizeRequest() != (widget.Size{W: buttonPx, H: buttonPx}) {
+			t.Errorf("an action button = classes %v size %v, want a %dpx outline tile", b.Classes(), b.SizeRequest(), buttonPx)
 		}
 	}
 }

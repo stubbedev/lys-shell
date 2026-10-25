@@ -13,14 +13,15 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
-// iconPx is the button icon size (--icon-lg).
-const iconPx = 32
+// iconPx is an action glyph's size.
+const iconPx = 24
 
 // escape dismisses the menu.
 var escape, _ = app.ParseAccel("Escape")
@@ -77,8 +78,9 @@ func (m *Menu) Show() {
 		return
 	}
 	cfg := m.d.Config()
-	row := widget.NewBox(widget.Row, 12, 0)
-	row.AddClass("power-menu-surface")
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, th.Spacing, 3*th.Padding)
+	row.AddClass(css.Card, "power-menu-surface")
 	row.SetHomogeneous(true)
 	for _, a := range actions {
 		if !a.visible(cfg.Power) {
@@ -116,19 +118,24 @@ func (m *Menu) Show() {
 	reveal.Show(m.rev, cfg.Animations, config.AnimPower)
 }
 
-// button is one action: icon over label, its command re-read on click.
+// buttonPx is an action tile's side.
+const buttonPx = 80
+
+// button is one action: lys-ui's outline button, a square tile with
+// the icon over the label, its command re-read on click.
 func (m *Menu) button(a action) widget.Widget {
 	icon := widget.NewThemeIcon(a.icon, iconPx)
 	icon.AddClass("power-menu-icon")
-	label := widget.NewLabel(m.d.Font, 13, a.label, 0)
-	label.AddClass("power-menu-label")
+	label := widget.NewLabel(m.d.Font, widget.Current().TextSize, a.label, 0)
+	label.AddClass("power-menu-label", css.DimLabel)
 	label.SetAlignment(render.AlignCenter)
-	content := widget.NewBox(widget.Column, 6, 0)
+	content := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	content.SetVExpand(true)
-	content.Append(icon, false)
+	content.AppendAligned(icon, false, widget.AlignCenter)
 	content.Append(label, false)
 	b := widget.NewButton(widgets.Center(content), 0, 0)
-	b.AddClass("power-menu-button")
+	b.AddClass("power-menu-button", css.Outline)
+	b.SetSizeRequest(buttonPx, buttonPx)
 	b.OnClick = func() { m.Run(a.command(m.d.Config().Power)) }
 	return b
 }
