@@ -49,6 +49,7 @@ func waitFor(t *testing.T, what string, ok func() bool) {
 }
 
 func TestQuietRunsTheCommand(t *testing.T) {
+	onBus(t, nil)
 	marker := filepath.Join(t.TempDir(), "ran")
 	if err := Quiet("echo hello > " + marker); err != nil {
 		t.Fatal(err)
@@ -60,6 +61,7 @@ func TestQuietRunsTheCommand(t *testing.T) {
 }
 
 func TestQuietLogsFailures(t *testing.T) {
+	onBus(t, nil)
 	logs := captureLog(t)
 	if err := Quiet("echo oops >&2; exit 3"); err != nil {
 		t.Fatal(err)

@@ -6,7 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
+
+	"github.com/stubbedev/lys-shell/internal/spawn"
 )
 
 // RunShell spawns `sh -c command`, detached (spawn.rs run_shell).
@@ -16,7 +17,7 @@ func RunShell(command string) {
 	if strings.TrimSpace(command) == "" {
 		return
 	}
-	if err := detach(exec.Command("sh", "-c", command)); err != nil { //nolint:gosec // the user's own launcher command
+	if err := spawn.Detached(exec.Command("sh", "-c", command), strings.Fields(command)[0]); err != nil { //nolint:gosec // the user's own launcher command
 		log.Printf("launcher: spawn %q failed: %v", command, err)
 	}
 }
@@ -26,21 +27,9 @@ func RunArgv(argv []string) {
 	if len(argv) == 0 {
 		return
 	}
-	if err := detach(exec.Command(argv[0], argv[1:]...)); err != nil { //nolint:gosec // an argv the user configured
+	if err := spawn.Detached(exec.Command(argv[0], argv[1:]...), argv[0]); err != nil { //nolint:gosec // an argv the user configured
 		log.Printf("launcher: spawn %q failed: %v", argv, err)
 	}
-}
-
-// detach starts cmd with no stdio, in its own session so it outlives
-// the shell's process group, and reaps it in the background.
-func detach(cmd *exec.Cmd) error {
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go func() { _ = cmd.Wait() }()
-	return nil
 }
 
 // terminalFallbacks are tried in order when neither the config nor

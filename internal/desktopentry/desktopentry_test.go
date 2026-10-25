@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/stubbedev/lys-shell/internal/dbustest"
 )
 
 func write(t *testing.T, dir, rel, body string) string {
@@ -174,6 +176,7 @@ func TestLinks(t *testing.T) {
 }
 
 func TestLaunchRunsTheExecDetached(t *testing.T) {
+	dbustest.Session(t)
 	bin := t.TempDir()
 	marker := filepath.Join(t.TempDir(), "ran")
 	script := filepath.Join(bin, "marktool")

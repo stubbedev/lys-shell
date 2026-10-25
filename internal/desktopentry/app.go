@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/shlex"
+	"github.com/stubbedev/lys-shell/internal/spawn"
 )
 
 // App is one application desktop entry, the GDesktopAppInfo a gio
@@ -397,12 +397,7 @@ func (a App) spawn(execLine string) error {
 		cmd.Dir = dir
 	}
 	cmd.Env = append(os.Environ(), "GIO_LAUNCHED_DESKTOP_FILE="+a.Path)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go func() { _ = cmd.Wait() }()
-	return nil
+	return spawn.Detached(cmd, strings.TrimSuffix(a.ID, ".desktop"))
 }
 
 // errNotActivatable is an id with no D-Bus name form.
