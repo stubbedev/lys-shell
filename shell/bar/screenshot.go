@@ -14,26 +14,23 @@ import (
 // static label whose bindings run `lys-shell screenshot region|output|window`
 // (in-process through the builtin) by default.
 type screenshotModule struct {
-	root widget.Widget
+	btn *barButton
 }
 
 func newScreenshot(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.Screenshot
-	var label *widget.Label
-	if cfg.LabelShow && cfg.Label != "" {
-		label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, cfg.Label, ctx.Style.fg)
+	label := ""
+	if cfg.LabelShow {
+		label = cfg.Label
 	}
 	icon := moduleIcon(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor))
-	switch {
-	case icon == nil && label == nil:
+	if icon == nil && label == "" {
 		return nil, errors.New("screenshot: neither the icon nor a label is shown")
-	case label == nil:
-		return &screenshotModule{root: icon}, nil
 	}
-	return &screenshotModule{root: assembleModule(ctx, icon, label)}, nil
+	return &screenshotModule{btn: newBarButton(ctx, icon, label)}, nil
 }
 
-func (m *screenshotModule) Root() widget.Widget { return m.root }
+func (m *screenshotModule) Root() widget.Widget { return m.btn }
 
 // screenshotBuiltin reads a `screenshot [mode [target]]` builtin verb
 // the way dropdown_registry.rs's try_screenshot does: the mode defaults

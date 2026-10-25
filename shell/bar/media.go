@@ -128,9 +128,8 @@ type mediaModule struct {
 	ctx    ModuleContext
 	source mpris.Source
 	env    mediaIconEnv
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 	// chrome is the module box around the button: the disc classes are
 	// ancestor selectors (`.media-disc button.bar-button ... image`), so they
 	// must sit above the bar button, on the wrapper.
@@ -151,9 +150,8 @@ func newMedia(ctx ModuleContext) (Module, error) {
 // build assembles the icon+label tree and paints the first state.
 func (m *mediaModule) build() {
 	cfg := m.ctx.Config.Media
-	m.label = widget.NewLabel(m.ctx.Font, m.ctx.Style.labelPx, "", m.ctx.Style.fg)
 	m.icon = moduleIcon(m.ctx, cfg.Icon())
-	m.root = assembleModule(m.ctx, m.icon, m.label)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	m.refresh()
 }
 
@@ -180,7 +178,7 @@ func (m *mediaModule) refresh() {
 	if !cfg.LabelShow {
 		label = ""
 	}
-	m.label.SetText(label)
+	m.btn.SetLabel(label)
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
 	}
@@ -213,4 +211,4 @@ func setClass(w classer, class string, on bool) {
 	w.RemoveClass(class)
 }
 
-func (m *mediaModule) Root() widget.Widget { return m.root }
+func (m *mediaModule) Root() widget.Widget { return m.btn }

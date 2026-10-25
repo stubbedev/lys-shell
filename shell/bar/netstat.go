@@ -26,8 +26,7 @@ func netstatLabel(format string, rate sysinfo.Rate) string {
 // netstat is the module: per-interface traffic rates.
 type netstatModule struct {
 	ctx     ModuleContext
-	label   *widget.Label
-	root    widget.Widget
+	btn     *barButton
 	cancel  context.CancelFunc
 	prev    map[string]sysinfo.NetTotals
 	current sysinfo.Rate
@@ -38,8 +37,8 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("netstat: requires the application loop")
 	}
 	cfg := ctx.Config.Netstat
-	m := &netstatModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.root = assembleModule(ctx, moduleIcon(ctx, cfg.Icon()), m.label)
+	m := &netstatModule{ctx: ctx}
+	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	if int(cfg.PollIntervalMs) > 0 {
@@ -70,14 +69,14 @@ func (m *netstatModule) sample(elapsed time.Duration) {
 	}
 	name, ok := sysinfo.SelectInterface(totals, cfg.Interface)
 	if !ok {
-		m.ctx.Invoke(func() { m.label.SetText("") })
+		m.ctx.Invoke(func() { m.btn.SetLabel("") })
 		return
 	}
 	now := totals[name]
 	prev, seen := m.prev[name]
 	m.prev = totals
 	if !seen {
-		m.ctx.Invoke(func() { m.label.SetText("") })
+		m.ctx.Invoke(func() { m.btn.SetLabel("") })
 		return
 	}
 	rate, err := sysinfo.NetRate(name, prev, now, elapsed.Seconds())
@@ -90,11 +89,11 @@ func (m *netstatModule) sample(elapsed time.Duration) {
 		if cfg.LabelShow {
 			text = netstatLabel(cfg.Format, rate)
 		}
-		m.label.SetText(text)
+		m.btn.SetLabel(text)
 	})
 }
 
-func (m *netstatModule) Root() widget.Widget { return m.root }
+func (m *netstatModule) Root() widget.Widget { return m.btn }
 
 // Stop ends the sampling loop.
 func (m *netstatModule) Stop() { m.cancel() }

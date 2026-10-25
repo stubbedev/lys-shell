@@ -44,11 +44,11 @@ func TestHyprsunsetToggleFlipsTheFilterAndIcon(t *testing.T) {
 	cfg := sunsetConfig(false)
 	fake := &fakeSunset{clock: sunsetDay}
 	m := newHyprsunsetWith(newTestContext(t, cfg), fake.env(t))
-	if m.enabled || m.icon.Name() != cfg.Hyprsunset.IconOff || m.label.Text() != "Off" {
-		t.Fatalf("resting = enabled %v icon %q label %q", m.enabled, m.icon.Name(), m.label.Text())
+	if m.enabled || m.icon.Name() != cfg.Hyprsunset.IconOff || m.btn.Label().Text() != "Off" {
+		t.Fatalf("resting = enabled %v icon %q label %q", m.enabled, m.icon.Name(), m.btn.Label().Text())
 	}
 	m.RunAction(config.ParseClickAction(":toggle"))
-	if !fake.running || !m.enabled || m.icon.Name() != "ld-moon-symbolic" || m.label.Text() != "On" {
+	if !fake.running || !m.enabled || m.icon.Name() != "ld-moon-symbolic" || m.btn.Label().Text() != "On" {
 		t.Fatalf("after toggle = running %v enabled %v icon %q", fake.running, m.enabled, m.icon.Name())
 	}
 	m.RunAction(config.ParseClickAction(":toggle"))

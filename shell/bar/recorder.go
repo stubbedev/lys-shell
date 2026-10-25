@@ -43,11 +43,10 @@ func recorderIconName(cfg config.RecorderConfig, snap recorder.Change) string {
 // recorderModule is the screen-recorder bell: state and elapsed clock
 // from the shared recorder service.
 type recorderModule struct {
-	ctx   ModuleContext
-	src   *recorder.State
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
+	ctx  ModuleContext
+	src  *recorder.State
+	btn  *barButton
+	icon *widget.Icon
 	// chrome is the module root the preparing class goes on.
 	chrome moduleChrome
 }
@@ -56,9 +55,9 @@ func newRecorder(ctx ModuleContext) (Module, error) {
 	if ctx.Recorder == nil {
 		return nil, errors.New("recorder: no recorder service available")
 	}
-	m := &recorderModule{ctx: ctx, src: ctx.Recorder, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &recorderModule{ctx: ctx, src: ctx.Recorder}
 	m.icon = moduleIcon(ctx, ctx.Config.Recorder.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.refresh()
 	// Follow the shared state; headless construction refreshes inline.
 	changes, stop := m.src.Changes()
@@ -74,7 +73,7 @@ func (m *recorderModule) refresh() {
 	if cfg.LabelShow {
 		text = recorderLabel(cfg.Format, snap.Active, snap.Paused, snap.ElapsedSecs)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(recorderIconName(cfg, snap))
 	}
@@ -88,4 +87,4 @@ func (m *recorderModule) setChrome(c moduleChrome) {
 	m.refresh()
 }
 
-func (m *recorderModule) Root() widget.Widget { return m.root }
+func (m *recorderModule) Root() widget.Widget { return m.btn }

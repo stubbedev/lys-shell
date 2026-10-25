@@ -160,8 +160,7 @@ func hyprlandLayoutSource(conn *hyprland.Connection) layoutSource {
 type keyboardLayout struct {
 	ctx    ModuleContext
 	source layoutSource
-	label  *widget.Label
-	root   widget.Widget
+	btn    *barButton
 }
 
 func newKeyboardLayout(ctx ModuleContext) (Module, error) {
@@ -170,8 +169,7 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 		return nil, err
 	}
 	m := &keyboardLayout{ctx: ctx, source: source}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.root = assembleModule(ctx, moduleIcon(ctx, ctx.Config.KeyboardInput.Icon()), m.label)
+	m.btn = newBarButton(ctx, moduleIcon(ctx, ctx.Config.KeyboardInput.Icon()), "")
 	if err := m.refresh(); err != nil {
 		log.Printf("keyboard-input: %v", err)
 		m.show(unknownLayout)
@@ -215,7 +213,7 @@ func (m *keyboardLayout) show(layout string) {
 	if cfg.LabelShow {
 		label = keyboardLayoutLabel(layout, cfg.Format, cfg.LayoutAliasMap)
 	}
-	m.label.SetText(label)
+	m.btn.SetLabel(label)
 }
 
-func (m *keyboardLayout) Root() widget.Widget { return m.root }
+func (m *keyboardLayout) Root() widget.Widget { return m.btn }

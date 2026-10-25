@@ -22,13 +22,11 @@ func powerProfilesLabel(format, profile string) string {
 // powerProfiles is the module: the active power profile, cycling on
 // the `:cycle` binding.
 type powerProfilesModule struct {
-	ctx   ModuleContext
-	src   powerprofiles.Source
-	label *widget.Label
-	icon  *widget.Icon
+	ctx  ModuleContext
+	src  powerprofiles.Source
+	icon *widget.Icon
 	// btn takes the active profile's color as threshold colors.
 	btn  *barButton
-	root widget.Widget
 	snap powerprofiles.Snapshot
 	stop func()
 }
@@ -37,10 +35,9 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	if ctx.PowerProfiles == nil {
 		return nil, errors.New("power-profiles: no power-profiles-daemon available")
 	}
-	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles}
 	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons()[config.ProfileBalanced])
-	m.btn = newBarButton(ctx, m.icon, m.label)
-	m.root = m.btn
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -70,7 +67,7 @@ func (m *powerProfilesModule) refresh() error {
 	if cfg.LabelShow && snap.Available {
 		text = powerProfilesLabel(cfg.Format, snap.Active)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	profile := profileOf(snap.Active)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(cfg.Icons()[profile].Name)
@@ -111,7 +108,7 @@ func (m *powerProfilesModule) cycle() {
 	}
 }
 
-func (m *powerProfilesModule) Root() widget.Widget { return m.root }
+func (m *powerProfilesModule) Root() widget.Widget { return m.btn }
 
 // Stop releases the subscription.
 func (m *powerProfilesModule) Stop() {

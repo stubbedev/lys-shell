@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/widget"
-
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
@@ -55,22 +53,22 @@ func TestBluetoothModuleLabel(t *testing.T) {
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	m.refresh()
-	if got := m.label.Text(); got != "Headset" {
+	if got := m.btn.Label().Text(); got != "Headset" {
 		t.Errorf("label = %q, want the alias", got)
 	}
-	if m.label.Color() != 0 {
-		t.Errorf("connected ink = %#08x, want the stylesheet's", m.label.Color())
+	if m.btn.Label().Color() != 0 {
+		t.Errorf("connected ink = %#08x, want the stylesheet's", m.btn.Label().Color())
 	}
 
 	source.setState(btState())
 	m.refresh()
-	if got := m.label.Text(); got != i18n.T("bar-bluetooth-disconnected") {
+	if got := m.btn.Label().Text(); got != i18n.T("bar-bluetooth-disconnected") {
 		t.Errorf("idle label = %q", got)
 	}
-	if m.label.Color() != 0 {
-		t.Errorf("idle ink = %#08x, want the stylesheet's", m.label.Color())
+	if m.btn.Label().Color() != 0 {
+		t.Errorf("idle ink = %#08x, want the stylesheet's", m.btn.Label().Color())
 	}
 }
 
@@ -79,8 +77,8 @@ func TestBluetoothStateIcon(t *testing.T) {
 	style := computeStyle(cfg, styling.Default())
 	source := newFakeBluetooth(btState("Headset"))
 	m := &bluetoothModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(m.ctx, cfg.Bluetooth.Icon())
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if m.icon == nil {
 		t.Fatal("the bluetooth icon defaults on")
 	}
@@ -116,8 +114,8 @@ func TestMicrophoneStateIcon(t *testing.T) {
 	style := computeStyle(cfg, styling.Default())
 	source := &fakePulseSource{dev: pulse.Device{Volume: pct(40)}}
 	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(m.ctx, cfg.Microphone.Icon())
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if m.icon == nil {
 		t.Fatal("the microphone icon defaults on")
 	}

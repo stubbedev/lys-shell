@@ -183,13 +183,13 @@ func TestMediaModuleRenders(t *testing.T) {
 	m.setChrome(widget.NewBox(widget.Row, 0, 0))
 	// The text is whole; label-max-length caps the button's label width
 	// (max-width-chars) once appendModule configures it.
-	if got := m.label.Text(); got != strings.Repeat("t", 50)+" - Band" {
+	if got := m.btn.Label().Text(); got != strings.Repeat("t", 50)+" - Band" {
 		t.Errorf("label = %q, want the whole default format", got)
 	}
-	root := m.root.(*barButton)
+	root := m.btn
 	root.configure(moduleButton("media", cfg), config.ClickConfig{}, nil)
-	if root.label.MaxWidthChars() != int(cfg.Media.LabelMaxLength) || root.label.Ellipsize() != widget.EllipsizeEnd {
-		t.Errorf("label cap = %d chars, ellipsize %v; want %d, end", root.label.MaxWidthChars(), root.label.Ellipsize(), cfg.Media.LabelMaxLength)
+	if root.Label().MaxWidthChars() != int(cfg.Media.LabelMaxLength) || root.Label().Ellipsize() != widget.EllipsizeEnd {
+		t.Errorf("label cap = %d chars, ellipsize %v; want %d, end", root.Label().MaxWidthChars(), root.Label().Ellipsize(), cfg.Media.LabelMaxLength)
 	}
 	if m.chrome == nil || !widget.HasClass(m.chrome.(widget.Widget), "media-disc") || !widget.HasClass(m.chrome.(widget.Widget), "media-spinning") {
 		t.Error("a playing player in disc mode misses media-disc/media-spinning on the module wrapper")
@@ -198,8 +198,8 @@ func TestMediaModuleRenders(t *testing.T) {
 	// No player: the "--" label, icon-name, and no disc classes.
 	source.active = -1
 	m.refresh()
-	if m.label.Text() != mediaNoPlayerLabel {
-		t.Errorf("no-player label = %q, want --", m.label.Text())
+	if m.btn.Label().Text() != mediaNoPlayerLabel {
+		t.Errorf("no-player label = %q, want --", m.btn.Label().Text())
 	}
 	if m.icon.Name() != cfg.Media.IconName {
 		t.Errorf("no-player icon = %q, want icon-name", m.icon.Name())

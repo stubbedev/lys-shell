@@ -47,9 +47,8 @@ func bluetoothIconName(cfg config.BluetoothConfig, snap bluetooth.Snapshot) stri
 type bluetoothModule struct {
 	ctx    ModuleContext
 	source bluetooth.Source
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 }
 
 func newBluetooth(ctx ModuleContext) (Module, error) {
@@ -60,9 +59,8 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("bluetooth: no BlueZ source available")
 	}
 	m := &bluetoothModule{ctx: ctx, source: ctx.Bluetooth}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Bluetooth.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.refresh()
 	// The module lives as long as the bar; the subscription ends with
 	// the service.
@@ -79,10 +77,10 @@ func (m *bluetoothModule) refresh() {
 	if cfg.LabelShow {
 		label = bluetoothLabel(snap)
 	}
-	m.label.SetText(label)
+	m.btn.SetLabel(label)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(bluetoothIconName(cfg, snap))
 	}
 }
 
-func (m *bluetoothModule) Root() widget.Widget { return m.root }
+func (m *bluetoothModule) Root() widget.Widget { return m.btn }

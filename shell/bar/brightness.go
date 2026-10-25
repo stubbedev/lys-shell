@@ -34,12 +34,10 @@ func brightnessIcon(levels []string, percent float64) string {
 // brightnessModule is the bar button: the mean percentage across
 // backlights with its level icon, refreshed on sysfs changes.
 type brightnessModule struct {
-	buttonRef
 	ctx    ModuleContext
 	source brightness.Source
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 }
 
 func newBrightness(ctx ModuleContext) (Module, error) {
@@ -47,9 +45,9 @@ func newBrightness(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("brightness: no backlight source available")
 	}
 	cfg := ctx.Config.Brightness
-	m := &brightnessModule{ctx: ctx, source: ctx.Brightness, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &brightnessModule{ctx: ctx, source: ctx.Brightness}
 	m.icon = moduleIcon(ctx, config.IconWith(cfg.IconShow, brightnessIcon(cfg.LevelIcons, 0), cfg.IconColor))
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -75,13 +73,13 @@ func (m *brightnessModule) refresh() error {
 	cfg := m.ctx.Config.Brightness
 	percent, ok := brightness.AveragePercentage(devices)
 	if !ok {
-		m.label.SetText(brightnessNoDevice)
+		m.btn.SetLabel(brightnessNoDevice)
 		m.setIcon(brightnessIcon(cfg.LevelIcons, 0))
 		return nil
 	}
-	m.label.SetText(brightnessLabel(cfg.Format, percent))
+	m.btn.SetLabel(brightnessLabel(cfg.Format, percent))
 	m.setIcon(brightnessIcon(cfg.LevelIcons, percent))
-	m.thresholds(percent, cfg.Thresholds)
+	m.btn.applyThresholds(percent, cfg.Thresholds)
 	return nil
 }
 
@@ -91,4 +89,4 @@ func (m *brightnessModule) setIcon(name string) {
 	}
 }
 
-func (m *brightnessModule) Root() widget.Widget { return m.root }
+func (m *brightnessModule) Root() widget.Widget { return m.btn }

@@ -45,10 +45,9 @@ func worldClockRender(format string, now time.Time) string {
 
 // worldClock is the module: the format re-renders every second.
 type worldClockModule struct {
-	ctx   ModuleContext
-	label *widget.Label
-	root  widget.Widget
-	stop  func()
+	ctx  ModuleContext
+	btn  *barButton
+	stop func()
 }
 
 func newWorldClock(ctx ModuleContext) (Module, error) {
@@ -56,8 +55,8 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("world-clock: requires the application loop")
 	}
 	cfg := ctx.Config.WorldClock
-	m := &worldClockModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.root = assembleModule(ctx, moduleIcon(ctx, cfg.Icon()), m.label)
+	m := &worldClockModule{ctx: ctx}
+	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
 	m.apply(cfg.Format)
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.stop = cancel
@@ -83,10 +82,10 @@ func (m *worldClockModule) apply(format string) {
 	if m.ctx.Config.WorldClock.LabelShow {
 		text = worldClockRender(format, time.Now())
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 }
 
-func (m *worldClockModule) Root() widget.Widget { return m.root }
+func (m *worldClockModule) Root() widget.Widget { return m.btn }
 
 // Stop ends the render ticker.
 func (m *worldClockModule) Stop() { m.stop() }

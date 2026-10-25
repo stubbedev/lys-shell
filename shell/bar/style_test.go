@@ -295,35 +295,39 @@ func TestBarPaddingInsetsTheZones(t *testing.T) {
 	}
 }
 
-// button-gap is the content box's gap between the icon and the label,
-// along the bar and down a side bar's stacked content; the block-prefix
-// variant pads its label container instead and keeps no gap.
+// button-gap is exactly the gap between the icon and the label, wider
+// or narrower than lys-ui's own, on whichever side button-icon-position
+// puts the icon; the block-prefix variant pads its label instead and
+// keeps no gap.
 func TestBarButtonGapSeparatesIconAndLabel(t *testing.T) {
 	for _, tc := range []struct {
 		variant config.BarButtonVariant
-		loc     config.Location
+		at      config.IconPosition
+		gap     float32
 		want    int
 	}{
-		{config.ButtonBasic, config.LocationTop, 20},
-		{config.ButtonIconSquare, config.LocationTop, 20},
-		{config.ButtonBasic, config.LocationLeft, 20},
-		{config.ButtonBlockPrefix, config.LocationTop, 0},
+		{config.ButtonBasic, config.IconStart, 20, 20},
+		{config.ButtonBasic, config.IconStart, 2, 2},
+		{config.ButtonBasic, config.IconEnd, 20, 20},
+		{config.ButtonIconSquare, config.IconStart, 20, 20},
+		{config.ButtonBlockPrefix, config.IconStart, 20, 0},
+		{config.ButtonBlockPrefix, config.IconEnd, 20, 0},
 	} {
 		cfg := config.Defaults()
-		cfg.Bar.Location = tc.loc
 		cfg.Bar.ButtonVariant = tc.variant
-		cfg.Bar.ButtonGap = config.Size{Value: 20, Unit: config.SizePixels}
+		cfg.Bar.ButtonIconPosition = tc.at
+		cfg.Bar.ButtonGap = config.Size{Value: tc.gap, Unit: config.SizePixels}
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
 		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
 		settleBar(bar, widget.Size{W: 1000, H: 1000})
-		btn := bar.Center().Children()[0].(*widget.Box).Children()[0].(*widget.Box).Children()[0].(*barButton)
-		icon, label := btn.iconBox.Bounds(), btn.labelBox.Bounds()
+		btn := clockButton(bar)
+		icon, label := shownIcon(btn).Bounds(), btn.Label().Bounds()
 		gap := label.X - (icon.X + icon.W)
-		if tc.loc.IsVertical() {
-			gap = label.Y - (icon.Y + icon.H)
+		if tc.at == config.IconEnd {
+			gap = icon.X - (label.X + label.W)
 		}
 		if gap != tc.want {
-			t.Errorf("%s on the %s: icon and label %dpx apart, want %d", tc.variant, tc.loc, gap, tc.want)
+			t.Errorf("%s, icon %s, button-gap %vpx: icon and label %dpx apart, want %d", tc.variant, tc.at, tc.gap, gap, tc.want)
 		}
 	}
 }
@@ -367,7 +371,7 @@ func TestBarButtonShadesUnderThePointer(t *testing.T) {
 	bar := buildRoot(styledContext(t, config.Defaults()), layout, "DP-1")
 	settleBar(bar, widget.Size{W: 1000, H: 100})
 	b := clockButton(bar)
-	lb := b.labelBox.Bounds()
+	lb := b.Label().Bounds()
 	at := widget.Point{X: lb.X + 1, Y: lb.Y + 1}
 	rest := paintedAt(bar, 1000, 100, at)
 	router, _ := treetest.Pointer(bar, b, 1000, 100)

@@ -185,9 +185,8 @@ func hyprlandFocusSource(conn *hyprland.Connection) focusSource {
 type windowTitleModule struct {
 	ctx    ModuleContext
 	source focusSource
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 	window focusedWindow
 }
 
@@ -197,9 +196,8 @@ func newWindowTitle(ctx ModuleContext) (Module, error) {
 		return nil, err
 	}
 	m := &windowTitleModule{ctx: ctx, source: source}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.WindowTitle.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		source.close()
 		return nil, err
@@ -240,10 +238,10 @@ func (m *windowTitleModule) render() {
 	if cfg.LabelShow {
 		text = windowTitleLabel(cfg.Format, m.window.title, m.window.appID)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if m.icon != nil {
 		m.icon.SetThemeName(windowTitleIcon(cfg, m.window.title, m.window.appID))
 	}
 }
 
-func (m *windowTitleModule) Root() widget.Widget { return m.root }
+func (m *windowTitleModule) Root() widget.Widget { return m.btn }

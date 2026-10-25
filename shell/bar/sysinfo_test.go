@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/widget"
-
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/jinja"
@@ -54,27 +52,25 @@ func TestSysinfoThresholdColors(t *testing.T) {
 	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
 	c := cfg.CPU
 	m := &pollModule{ctx: ctx, cfg: pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}}
-	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(ctx, cfg.CPU.Icon())
-	btn := newBarButton(ctx, m.icon, m.label)
-	m.setButton(btn)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 
 	m.render(reading{vars: cpuContext(sysinfo.CPU{UsagePercent: 50}), value: 50, ok: true})
-	if strings.Contains(btn.InlineStyle(), cv.ToCSS()) {
-		t.Errorf("50 below the threshold recolored the button: %q", btn.InlineStyle())
+	if strings.Contains(m.btn.InlineStyle(), cv.ToCSS()) {
+		t.Errorf("50 below the threshold recolored the button: %q", m.btn.InlineStyle())
 	}
 	m.render(reading{vars: cpuContext(sysinfo.CPU{UsagePercent: 95}), value: 95, ok: true})
-	if got := m.label.Text(); got != "95%" {
+	if got := m.btn.Label().Text(); got != "95%" {
 		t.Errorf("label = %q, want the rendered default format", got)
 	}
 	// A reading with nothing to show (no mount point) keeps the label.
 	m.render(reading{})
-	if got := m.label.Text(); got != "95%" {
+	if got := m.btn.Label().Text(); got != "95%" {
 		t.Errorf("an empty reading changed the label to %q", got)
 	}
 	for _, slot := range []string{"--bar-btn-label-color: ", "--bar-btn-icon-color: "} {
-		if !strings.Contains(btn.InlineStyle(), slot+cv.ToCSS()) {
-			t.Errorf("at 95 the button vars = %q, want %sstatus-error", btn.InlineStyle(), slot)
+		if !strings.Contains(m.btn.InlineStyle(), slot+cv.ToCSS()) {
+			t.Errorf("at 95 the button vars = %q, want %sstatus-error", m.btn.InlineStyle(), slot)
 		}
 	}
 }

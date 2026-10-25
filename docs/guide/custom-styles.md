@@ -20,14 +20,14 @@ bar:
 
 The class is added to the box around that module. The selector to target its button from `index.css` is `.primary-clock button.bar-button` (every module button is a `button.bar-button` inside its module box).
 
-The robust way to change appearance on that one instance is to override the CSS variables it consumes. The built-in rules read from variables like `--bar-btn-label-color`, `--bar-btn-icon-color`, `--bar-btn-icon-size`, and `--bar-btn-label-weight`. The config sets a button's color variables on the button itself, so redefine them on its content, `.bar-button-content`, and set the button's own background directly:
+The robust way to change appearance on that one instance is to override the CSS variables it consumes. The built-in rules read from variables like `--bar-btn-label-color`, `--bar-btn-icon-color`, `--bar-btn-icon-size`, and `--bar-btn-label-weight`. The config sets a button's color variables on the button itself, so redefine them on its content, the `box` inside it, and set the button's own background directly:
 
 ```css
 /* ~/.config/lys-shell/styles/index.css */
 .primary-clock button.bar-button {
   background-color: var(--palette-primary);
 }
-.primary-clock .bar-button-content {
+.primary-clock button.bar-button > box {
   --bar-btn-label-color: var(--palette-bg);
   --bar-btn-label-weight: 700;
 }

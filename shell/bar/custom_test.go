@@ -171,12 +171,11 @@ func newTestCustom(t *testing.T, def config.CustomModuleDefinition) *customModul
 	ctx.gen = newMountGen()
 	t.Cleanup(ctx.gen.retire)
 	m := &customModule{ctx: ctx, def: def}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = widget.NewThemeIcon("x", 16)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.life, m.stop = context.WithCancel(ctx.Life())
 	t.Cleanup(m.Stop)
 	ctx.CustomUpdates.register(m)
-	m.setButton(newBarButton(ctx, m.icon, m.label))
 	return m
 }
 
@@ -186,13 +185,16 @@ func TestCustomCommandOutputApplies(t *testing.T) {
 	m := newTestCustom(t, def)
 	m.runCommand(`printf '{"text":"hi","class":"c1"}'; exit 3`)
 	// A nonzero exit still delivers its output (tokio output()).
-	waitForText(t, m.label, "hi")
+	waitForText(t, m.btn.Label(), "hi")
 	waitHeadless(t, "the JSON class", func() bool { return m.btn.HasClass("c1") })
 	m.runCommand(`printf plain`)
-	waitForText(t, m.label, "plain")
+	waitForText(t, m.btn.Label(), "plain")
 	waitHeadless(t, "the old class to go", func() bool { return !m.btn.HasClass("c1") })
 	// The output outlives the module: a rebuilt one starts from it.
-	if got := m.lastOutput(); got != "plain" {
+	m.ctx.CustomUpdates.mu.Lock()
+	got := m.ctx.CustomUpdates.last[m.def.Id]
+	m.ctx.CustomUpdates.mu.Unlock()
+	if got != "plain" {
 		t.Errorf("remembered = %q", got)
 	}
 }
@@ -218,12 +220,12 @@ func TestCustomOnActionFollowsShellBindingsOnly(t *testing.T) {
 	m := newTestCustom(t, def)
 	m.followAction(config.ClickAction{Kind: config.ClickDropdown, Dropdown: "x"}, false)
 	time.Sleep(50 * time.Millisecond)
-	if got := onHeadlessLoop(m.label.Text); got == "done" {
+	if got := onHeadlessLoop(m.btn.Label().Text); got == "done" {
 		t.Fatal("a dropdown binding ran on-action")
 	}
 	m.followAction(config.ClickAction{Kind: config.ClickShell, Command: "true"}, true)
 	m.followAction(config.ClickAction{Kind: config.ClickShell, Command: "true"}, true)
-	waitForText(t, m.label, "done")
+	waitForText(t, m.btn.Label(), "done")
 }
 
 func TestCustomUpdatesReachEveryInstance(t *testing.T) {
@@ -234,11 +236,11 @@ func TestCustomUpdatesReachEveryInstance(t *testing.T) {
 	b.ctx.CustomUpdates = a.ctx.CustomUpdates
 	a.ctx.CustomUpdates.register(b)
 	a.ctx.CustomUpdates.dispatch("shared", "pushed")
-	if a.label.Text() != "pushed" || b.label.Text() != "pushed" {
-		t.Errorf("a = %q, b = %q; both bars show the push", a.label.Text(), b.label.Text())
+	if a.btn.Label().Text() != "pushed" || b.btn.Label().Text() != "pushed" {
+		t.Errorf("a = %q, b = %q; both bars show the push", a.btn.Label().Text(), b.btn.Label().Text())
 	}
 	a.ctx.CustomUpdates.dispatch("other", "nope")
-	if a.label.Text() != "pushed" {
+	if a.btn.Label().Text() != "pushed" {
 		t.Error("an update for another id applied")
 	}
 }

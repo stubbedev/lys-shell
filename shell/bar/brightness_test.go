@@ -9,8 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/widget"
-
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/styling"
@@ -105,28 +103,26 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
-	btn := newBarButton(m.ctx, nil, m.label)
-	m.setButton(btn)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
-	if got := m.label.Text(); got != "50%" {
+	if got := m.btn.Label().Text(); got != "50%" {
 		t.Errorf("label = %q, want 50%%", got)
 	}
-	if strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
-		t.Errorf("the threshold colored the button at 50%%: %q", btn.InlineStyle())
+	if strings.Contains(m.btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("the threshold colored the button at 50%%: %q", m.btn.InlineStyle())
 	}
 
 	source.setDevices([]brightness.Device{{Brightness: 9000, Max: 10000}})
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "90%" {
+	if got := m.btn.Label().Text(); got != "90%" {
 		t.Errorf("label = %q, want 90%%", got)
 	}
-	if !strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
-		t.Errorf("at 90%% the button vars = %q, want the status-warning threshold", btn.InlineStyle())
+	if !strings.Contains(m.btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("at 90%% the button vars = %q, want the status-warning threshold", m.btn.InlineStyle())
 	}
 }
 
@@ -138,11 +134,11 @@ func TestBrightnessNoDevicesShowsDashes(t *testing.T) {
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "--%" {
+	if got := m.btn.Label().Text(); got != "--%" {
 		t.Errorf("label = %q, want --%%", got)
 	}
 }
@@ -205,7 +201,7 @@ func TestBrightnessModuleIconFollowsTheLevel(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if m.icon.Name() != "low" || m.label.Text() != "--%" {
-		t.Errorf("no device: icon %q label %q", m.icon.Name(), m.label.Text())
+	if m.icon.Name() != "low" || m.btn.Label().Text() != "--%" {
+		t.Errorf("no device: icon %q label %q", m.icon.Name(), m.btn.Label().Text())
 	}
 }

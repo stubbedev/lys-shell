@@ -11,7 +11,7 @@ import (
 // clock renders the time through the configured strftime format and
 // keeps itself current once a second, beside the clock icon.
 type clock struct {
-	root widget.Widget
+	btn *barButton
 }
 
 func newClock(ctx ModuleContext) (Module, error) {
@@ -19,11 +19,11 @@ func newClock(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	label := widget.NewLabel(ctx.Font, ctx.Style.labelPx, layout.Format(time.Now()), ctx.Style.fg)
+	btn := newBarButton(ctx, moduleIcon(ctx, ctx.Config.Clock.Icon()), layout.Format(time.Now()))
 	ctx.Every(time.Second, func() {
-		label.SetText(layout.Format(time.Now()))
+		btn.SetLabel(layout.Format(time.Now()))
 	})
-	return &clock{root: assembleModule(ctx, moduleIcon(ctx, ctx.Config.Clock.Icon()), label)}, nil
+	return &clock{btn: btn}, nil
 }
 
-func (c *clock) Root() widget.Widget { return c.root }
+func (c *clock) Root() widget.Widget { return c.btn }

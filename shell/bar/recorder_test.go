@@ -72,7 +72,7 @@ func TestRecorderPreparingClass(t *testing.T) {
 	// The gate holds the session open: the recorder stays preparing.
 	ctx.Recorder.Start()
 	waitHeadless(t, "the preparing class", func() bool { return widget.HasClass(chrome, "recorder-preparing") })
-	if ink := onHeadlessLoop(func() bool { return m.label.Color() == 0 }); !ink {
+	if ink := onHeadlessLoop(func() bool { return m.btn.Label().Color() == 0 }); !ink {
 		t.Error("preparing pinned the label ink")
 	}
 	close(gate)

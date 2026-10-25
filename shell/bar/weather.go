@@ -183,20 +183,19 @@ func resolvedSecret(value *string) string {
 // weatherModule is the bar button: the formatted conditions and their
 // icon, re-rendered on every service change.
 type weatherModule struct {
-	ctx   ModuleContext
-	svc   *weather.Service
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
+	ctx  ModuleContext
+	svc  *weather.Service
+	btn  *barButton
+	icon *widget.Icon
 }
 
 func newWeather(ctx ModuleContext) (Module, error) {
 	if ctx.Weather == nil {
 		return nil, errors.New("weather: no weather service")
 	}
-	m := &weatherModule{ctx: ctx, svc: ctx.Weather, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "--", ctx.Style.fg)}
+	m := &weatherModule{ctx: ctx, svc: ctx.Weather}
 	m.icon = moduleIcon(ctx, ctx.Config.Weather.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "--")
 	changes, stop := m.svc.Subscribe()
 	m.render()
 	follow(ctx, changes, stop, func(struct{}) { m.render() })
@@ -214,7 +213,7 @@ func (m *weatherModule) render() {
 		return
 	}
 	if cfg.LabelShow {
-		m.label.SetText(weatherFormatLabel(cfg.Format, w, cfg.Units == config.TemperatureUnitImperial))
+		m.btn.SetLabel(weatherFormatLabel(cfg.Format, w, cfg.Units == config.TemperatureUnitImperial))
 	}
 	m.setIcon(weatherConditionIcon(w.Current.Condition, w.Current.IsDay))
 }
@@ -225,4 +224,4 @@ func (m *weatherModule) setIcon(name string) {
 	}
 }
 
-func (m *weatherModule) Root() widget.Widget { return m.root }
+func (m *weatherModule) Root() widget.Widget { return m.btn }

@@ -130,10 +130,9 @@ type networkModule struct {
 	ctx    ModuleContext
 	source network.Source
 	// vpn is the VPN service the icon overlays; nil without NM.
-	vpn   *network.VPNService
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
+	vpn  *network.VPNService
+	btn  *barButton
+	icon *widget.Icon
 }
 
 func newNetwork(ctx ModuleContext) (Module, error) {
@@ -147,9 +146,8 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	if ctx.Networking != nil {
 		m.vpn = ctx.Networking.VPN
 	}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -189,11 +187,11 @@ func (m *networkModule) refresh() error {
 	if !cfg.LabelShow {
 		label = ""
 	}
-	m.label.SetText(label)
+	m.btn.SetLabel(label)
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
 	}
 	return nil
 }
 
-func (m *networkModule) Root() widget.Widget { return m.root }
+func (m *networkModule) Root() widget.Widget { return m.btn }

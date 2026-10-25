@@ -48,7 +48,7 @@ func TestMailModuleShowsTheServiceTotal(t *testing.T) {
 	}
 	mm := m.(*mailModule)
 	defer mm.Stop()
-	if got := mm.label.Text(); got != "7" {
+	if got := mm.btn.Label().Text(); got != "7" {
 		t.Errorf("label = %q, want the service's 7", got)
 	}
 	// A bar button with the mail icon, as the Rust BarButton is.
@@ -76,13 +76,13 @@ func TestMailHidesWhenZero(t *testing.T) {
 		t.Error("zero unread under hide-when-zero is shown")
 	}
 	onHeadlessLoop(func() bool { mm.apply(2); return true })
-	if !onHeadlessLoop(func() bool { return chrome.Visible() }) || mm.label.Text() != "2" {
-		t.Errorf("two unread: visible %v label %q", chrome.Visible(), mm.label.Text())
+	if !onHeadlessLoop(func() bool { return chrome.Visible() }) || mm.btn.Label().Text() != "2" {
+		t.Errorf("two unread: visible %v label %q", chrome.Visible(), mm.btn.Label().Text())
 	}
 	cfg.Mail.HideWhenZero = false
 	onHeadlessLoop(func() bool { mm.apply(0); return true })
-	if !onHeadlessLoop(func() bool { return chrome.Visible() }) || mm.label.Text() != "0" {
-		t.Errorf("zero without hide-when-zero: visible %v label %q", chrome.Visible(), mm.label.Text())
+	if !onHeadlessLoop(func() bool { return chrome.Visible() }) || mm.btn.Label().Text() != "0" {
+		t.Errorf("zero without hide-when-zero: visible %v label %q", chrome.Visible(), mm.btn.Label().Text())
 	}
 }
 

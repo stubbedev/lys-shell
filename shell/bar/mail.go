@@ -43,9 +43,8 @@ func mailLabel(format string, count uint32) string {
 // button, the module root hidden at zero under hide-when-zero.
 type mailModule struct {
 	ctx    ModuleContext
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 	chrome moduleChrome
 	count  uint32
 	stop   func()
@@ -57,9 +56,9 @@ func newMail(ctx ModuleContext) (Module, error) {
 	if ctx.Mail == nil {
 		return nil, errMailNoService
 	}
-	m := &mailModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &mailModule{ctx: ctx}
 	m.icon = moduleIcon(ctx, ctx.Config.Mail.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.apply(ctx.Mail.State().Total)
 	ticks, unsubscribe := ctx.Mail.Subscribe()
 	done := make(chan struct{})
@@ -89,7 +88,7 @@ func (m *mailModule) apply(count uint32) {
 	if cfg.LabelShow {
 		text = mailLabel(cfg.Format, count)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	m.showChrome()
 }
 
@@ -105,7 +104,7 @@ func (m *mailModule) setChrome(c moduleChrome) {
 	m.showChrome()
 }
 
-func (m *mailModule) Root() widget.Widget { return m.root }
+func (m *mailModule) Root() widget.Widget { return m.btn }
 
 // Stop unsubscribes from the service.
 func (m *mailModule) Stop() {

@@ -50,12 +50,11 @@ func treemanDisplay(cfg config.TreemanConfig, status *treeman.Status) treemanBut
 
 // treeman is the module: the worktree health aggregate.
 type treemanModule struct {
-	ctx   ModuleContext
-	src   treeman.Source
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
-	stop  func()
+	ctx  ModuleContext
+	src  treeman.Source
+	btn  *barButton
+	icon *widget.Icon
+	stop func()
 	// chrome is the module root the severity class and visibility go
 	// on; view is what was last shown, applied when the chrome arrives.
 	chrome moduleChrome
@@ -63,9 +62,9 @@ type treemanModule struct {
 }
 
 func newTreeman(ctx ModuleContext) (Module, error) {
-	m := &treemanModule{ctx: ctx, src: ctx.Treeman, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &treemanModule{ctx: ctx, src: ctx.Treeman}
 	m.icon = moduleIcon(ctx, ctx.Config.Treeman.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.refresh()
 	if ctx.App == nil {
 		// Headless construction renders the resting state; no loop to
@@ -93,7 +92,7 @@ func (m *treemanModule) refresh() {
 	if !cfg.LabelShow {
 		text = ""
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if m.icon != nil {
 		m.icon.SetThemeName(v.icon)
 	}
@@ -126,7 +125,7 @@ func (m *treemanModule) setChrome(c moduleChrome) {
 	m.show(v)
 }
 
-func (m *treemanModule) Root() widget.Widget { return m.root }
+func (m *treemanModule) Root() widget.Widget { return m.btn }
 
 // Stop releases the event subscription.
 func (m *treemanModule) Stop() {

@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/widget"
-
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/styling"
@@ -99,28 +97,26 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
-	btn := newBarButton(m.ctx, nil, m.label)
-	m.setButton(btn)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
-	if got := m.label.Text(); got != "42%" {
+	if got := m.btn.Label().Text(); got != "42%" {
 		t.Errorf("label = %q, want 42%%", got)
 	}
-	if strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
-		t.Errorf("below the threshold the button vars = %q, want no override", btn.InlineStyle())
+	if strings.Contains(m.btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("below the threshold the button vars = %q, want no override", m.btn.InlineStyle())
 	}
 
 	source.dev.Volume = pct(100)
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "100%" {
+	if got := m.btn.Label().Text(); got != "100%" {
 		t.Errorf("label = %q, want 100%%", got)
 	}
-	if !strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
-		t.Errorf("at 100 the button vars = %q, want the status-error threshold", btn.InlineStyle())
+	if !strings.Contains(m.btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("at 100 the button vars = %q, want the status-error threshold", m.btn.InlineStyle())
 	}
 }
 
@@ -131,10 +127,8 @@ func newVolumeForTest(t *testing.T, cfg *config.Config, source *fakePulseSource)
 	style := computeStyle(cfg, styling.Default())
 	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
 	m := &volumeModule{ctx: ctx, source: source}
-	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(ctx, cfg.Volume.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
-	m.setButton(m.root.(*barButton))
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
@@ -145,19 +139,16 @@ func TestVolumeMutedSwapsTheIconInTheTree(t *testing.T) {
 	cfg := config.Defaults()
 	source := &fakePulseSource{dev: pulse.Device{Volume: pct(42), Muted: true}}
 	m := newVolumeForTest(t, cfg, source)
-	btn, ok := m.root.(*barButton)
-	if !ok || btn.iconBox == nil || len(btn.iconBox.Children()) != 1 {
-		t.Fatalf("root = %T, want the icon+label bar button", m.root)
-	}
-	icon, ok := btn.iconBox.Children()[0].(*widget.Icon)
-	if !ok || icon != m.icon {
+	btn := m.btn
+	icon := shownIcon(btn)
+	if icon == nil || icon != m.icon {
 		t.Fatal("the icon the module updates is not the one in the tree")
 	}
 	if icon.Name() != cfg.Volume.IconMuted {
 		t.Errorf("muted icon = %q, want icon-muted %q", icon.Name(), cfg.Volume.IconMuted)
 	}
 	// Mute keeps the percent label and sets no color override.
-	if got := m.label.Text(); got != "42%" {
+	if got := m.btn.Label().Text(); got != "42%" {
 		t.Errorf("muted label = %q, want the percent", got)
 	}
 	if got := btn.InlineStyle(); strings.Contains(got, "--bar-btn-label-color: var(--status") {

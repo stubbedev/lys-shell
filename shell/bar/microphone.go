@@ -19,12 +19,10 @@ func microphoneLabel(percent float64) string {
 
 // microphone is the module: the default input's level.
 type microphoneModule struct {
-	buttonRef
 	ctx    ModuleContext
 	source pulse.Source
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 }
 
 func newMicrophone(ctx ModuleContext) (Module, error) {
@@ -35,9 +33,8 @@ func newMicrophone(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("microphone: no audio source available")
 	}
 	m := &microphoneModule{ctx: ctx, source: ctx.Pulse}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -67,8 +64,8 @@ func (m *microphoneModule) refresh() error {
 	}
 	// The thresholds read the unrounded average, as the Rust watcher
 	// does (the volume module rounds first).
-	m.thresholds(dev.Volume.AveragePercentage(), cfg.Thresholds)
-	m.label.SetText(label)
+	m.btn.applyThresholds(dev.Volume.AveragePercentage(), cfg.Thresholds)
+	m.btn.SetLabel(label)
 	if setter := m.icon; setter != nil {
 		name := cfg.IconActive
 		if dev.Muted {
@@ -79,4 +76,4 @@ func (m *microphoneModule) refresh() error {
 	return nil
 }
 
-func (m *microphoneModule) Root() widget.Widget { return m.root }
+func (m *microphoneModule) Root() widget.Widget { return m.btn }

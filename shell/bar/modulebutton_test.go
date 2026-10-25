@@ -78,8 +78,7 @@ func newWrappedModule(t *testing.T, binding config.ClickConfig) (*barButton, *re
 	rec := &recordedActions{}
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
-	button := asBarButton(ctx, label)
+	button := newBarButton(ctx, nil, "x")
 	button.configure(batteryButton(cfg), binding, func(action config.ClickAction, _ bool) {
 		rec.actions = append(rec.actions, action)
 	})
@@ -159,12 +158,30 @@ func TestModuleWrapsTheButtonInModuleClasses(t *testing.T) {
 	}
 }
 
+// shownIcon is the module icon a bar button shows in its tree, nil
+// for none. The button lays out again where it is (at its natural size
+// when it never was), which links its current parts to it.
+func shownIcon(b *barButton) *widget.Icon {
+	r := b.Bounds()
+	if r.Empty() {
+		size := b.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}})
+		r = render.Rect{W: size.W, H: size.H}
+	}
+	b.Arrange(r)
+	if b.icon == nil || (!widget.DescendsFrom(b.icon, b) && !widget.DescendsFrom(b.icon, &b.Button)) {
+		return nil
+	}
+	return b.icon
+}
+
+// The module button is lys-ui's BarButton, its icon and label the
+// button's own: the image beside the label in the button's row, each
+// carrying the class the bar-button CSS styles.
 func TestBarButtonTreeAndClasses(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	label := widget.NewLabel(testFont(t), 12, "42%", 0xFF112233)
 	icon := widget.NewThemeIcon("x-symbolic", 16)
-	b := newBarButton(ctx, icon, label)
+	b := newBarButton(ctx, icon, "42%")
 	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
 	host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
 	host.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
@@ -172,12 +189,15 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	if b.Element() != "button" || !b.HasClass("bar-button") {
 		t.Fatalf("the module button is %q %v, not lys-ui's button.bar-button", b.Element(), b.Classes())
 	}
-	if !b.content.HasClass("bar-button-content") || !b.iconBox.HasClass("icon-container") ||
-		!b.labelBox.HasClass("label-container") || !label.HasClass("bar-button-label") || icon.Element() != "image" {
-		t.Fatal("content, containers, image, and label classes")
+	if shownIcon(b) != icon || !icon.HasClass("bar-button-icon") || icon.Element() != "image" {
+		t.Error("the module's icon is not the button's image.bar-button-icon")
 	}
-	if label.Color() != 0 {
-		t.Error("the label kept its programmatic ink over --bar-btn-label-color")
+	if label := b.Label(); label.Text() != "42%" || !label.HasClass("bar-button-label") || label.Color() != 0 {
+		t.Errorf("label %q %v ink %#08x, want the module's text as label.bar-button-label in the stylesheet's ink",
+			label.Text(), label.Classes(), uint32(label.Color()))
+	}
+	if ib, lb := icon.Bounds(), b.Label().Bounds(); ib.X >= lb.X {
+		t.Errorf("icon at %d, label at %d: want the icon first", ib.X, lb.X)
 	}
 	for _, c := range []string{"bar-button", cfg.Bar.ButtonVariant.CSSClass()} {
 		if !b.HasClass(c) {
@@ -194,34 +214,96 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	}
 
 	// The modifiers follow the config: variant, hidden label/icon, the
-	// border class, the icon position; a vertical bar stacks the
-	// content.
+	// border class, the icon position.
 	cfg.Bar.ButtonVariant = config.ButtonBlockPrefix
 	cfg.Bar.ButtonIconPosition = config.IconEnd
-	cfg.Bar.Location = config.LocationLeft
 	bc := batteryButton(cfg)
 	bc.LabelShow, bc.IconShow, bc.BorderShow = false, false, true
-	v := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "x", 0))
+	v := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), "x")
 	v.configure(bc, config.ClickConfig{}, nil)
 	for _, c := range []string{"block-prefix", "icon-only", "label-only", "icon-end", "border-all"} {
 		if !v.HasClass(c) {
 			t.Errorf("modified button misses %q in %v", c, v.Classes())
 		}
 	}
-	if v.content.Children()[0] != v.labelBox {
-		t.Error("icon-end did not put the label container first")
-	}
-	if v.content.Axis() != widget.Column {
-		t.Error("a vertical bar's button lays its content out as a row")
-	}
 	if !strings.Contains(v.InlineStyle(), "--bar-btn-icon-color: var(--fg-on-accent)") {
 		t.Errorf("block-prefix auto icon color = %q, want fg-on-accent", v.InlineStyle())
 	}
 }
 
+// button-icon-position end puts the label before the icon; start, the
+// default, the icon before the label.
+func TestBarButtonIconPosition(t *testing.T) {
+	for _, at := range []config.IconPosition{config.IconStart, config.IconEnd} {
+		cfg := config.Defaults()
+		cfg.Bar.ButtonIconPosition = at
+		icon := widget.NewThemeIcon("x", 16)
+		b := newBarButton(newTestContext(t, cfg), icon, "12:30")
+		host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
+		host.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
+		host.Arrange(render.Rect{W: 400, H: 40})
+		iconFirst := icon.Bounds().X < b.Label().Bounds().X
+		if iconFirst != (at == config.IconStart) {
+			t.Errorf("icon position %s: icon first %v", at, iconFirst)
+		}
+	}
+}
+
+// icon-show and label-show drop the icon and the label from the button;
+// a blank label shows none either, and a label with text shows again.
+func TestBarButtonShowsOnlyWhatTheConfigShows(t *testing.T) {
+	cfg := config.Defaults()
+	icon := widget.NewThemeIcon("x", 16)
+	b := newBarButton(newTestContext(t, cfg), icon, " ")
+	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	if b.Label().Visible() {
+		t.Error("a blank label shows")
+	}
+	b.SetLabel("50%")
+	if !b.Label().Visible() || b.Label().Text() != "50%" {
+		t.Errorf("a label with text shows %q visible %v", b.Label().Text(), b.Label().Visible())
+	}
+	if shownIcon(b) != icon {
+		t.Error("icon-show on dropped the icon")
+	}
+	hidden := batteryButton(cfg)
+	hidden.IconShow, hidden.LabelShow = false, false
+	b.configure(hidden, config.ClickConfig{}, nil)
+	if shownIcon(b) != nil || b.Label().Visible() {
+		t.Errorf("icon-show and label-show off: icon shown %v, label visible %v", shownIcon(b) != nil, b.Label().Visible())
+	}
+	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	if shownIcon(b) != icon || b.Label().Text() != "50%" {
+		t.Error("turning icon-show and label-show back on did not restore the icon and the label")
+	}
+	bare := newBarButton(newTestContext(t, cfg), nil, "x")
+	if shownIcon(bare) != nil {
+		t.Error("a button without an icon shows one")
+	}
+}
+
+// label-max-length caps the label at that many characters with an
+// ellipsis; zero leaves it whole.
+func TestBarButtonLabelMaxLength(t *testing.T) {
+	cfg := config.Defaults()
+	b := newBarButton(newTestContext(t, cfg), nil, strings.Repeat("w", 40))
+	capped := batteryButton(cfg)
+	capped.LabelMaxLength = 4
+	b.configure(capped, config.ClickConfig{}, nil)
+	short := b.Label().Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 100}}).W
+	if b.Label().MaxWidthChars() != 4 || b.Label().Ellipsize() != widget.EllipsizeEnd {
+		t.Errorf("capped: %d chars, ellipsize %v; want 4, end", b.Label().MaxWidthChars(), b.Label().Ellipsize())
+	}
+	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	whole := b.Label().Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 100}}).W
+	if b.Label().Ellipsize() != widget.EllipsizeNone || whole <= short {
+		t.Errorf("uncapped: ellipsize %v, %dpx against the capped %dpx", b.Label().Ellipsize(), whole, short)
+	}
+}
+
 func TestBarButtonThresholdsOverrideTheColors(t *testing.T) {
 	cfg := config.Defaults()
-	b := newBarButton(newTestContext(t, cfg), nil, widget.NewLabel(testFont(t), 12, "x", 0))
+	b := newBarButton(newTestContext(t, cfg), nil, "x")
 	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
 	before := b.InlineStyle()
 	red := mustToken(config.TokenRed)
@@ -232,25 +314,6 @@ func TestBarButtonThresholdsOverrideTheColors(t *testing.T) {
 	b.SetThresholds(config.ThresholdColors{})
 	if b.InlineStyle() != before {
 		t.Error("clearing the thresholds did not restore the config colors")
-	}
-}
-
-func TestBarButtonHidesAnEmptyLabelContainer(t *testing.T) {
-	cfg := config.Defaults()
-	label := widget.NewLabel(testFont(t), 12, "", 0)
-	b := newBarButton(newTestContext(t, cfg), nil, label)
-	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
-	b.Measure(widgetConstraintsMax(200, 50))
-	if b.labelBox.Visible() {
-		t.Error("an empty label kept its container (and its gap margin)")
-	}
-	label.SetText("50%")
-	b.Measure(widgetConstraintsMax(200, 50))
-	if !b.labelBox.Visible() {
-		t.Error("a label with text stayed hidden")
-	}
-	if b.iconBox.Visible() {
-		t.Error("a button without an icon shows the icon container")
 	}
 }
 
@@ -314,7 +377,7 @@ func batteryButton(cfg *config.Config) config.ButtonConfig {
 // itself derives; a class the module put on its button stays.
 func TestBarButtonKeepsTheModulesClasses(t *testing.T) {
 	cfg := config.Defaults()
-	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "x", 0))
+	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), "x")
 	b.AddClass("media-disc")
 	b.configure(config.ButtonConfig{IconShow: true, LabelShow: false}, config.ClickConfig{}, nil)
 	if !b.HasClass("media-disc") || !b.HasClass("bar-button") || !b.HasClass("icon-only") {
@@ -334,7 +397,7 @@ func TestBarButtonKeepsTheModulesClasses(t *testing.T) {
 // no name to give.
 func TestBarButtonAccessibleNameIsItsLabel(t *testing.T) {
 	cfg := config.Defaults()
-	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "12:30", 0))
+	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), "12:30")
 	st := widget.Describe(b)
 	if st.Role != widget.RoleButton || st.Name != "12:30" {
 		t.Errorf("button = %s %q, want a button named by its label", st.Role, st.Name)
@@ -345,58 +408,39 @@ func TestBarButtonAccessibleNameIsItsLabel(t *testing.T) {
 	}
 }
 
-// While its dropdown is open the button's label holds still
-// (FreezeSize); the module's updates land on thaw (pending_label).
-func TestBarButtonLabelFreezesUntilThaw(t *testing.T) {
-	cfg := config.Defaults()
-	label := widget.NewLabel(testFont(t), 12, "12:30", 0)
-	b := newBarButton(newTestContext(t, cfg), nil, label)
-	b.freezeLabel()
-	label.SetText("12:31")
-	shown := b.labelBox.Children()
-	if len(shown) != 1 || shown[0] == widget.Widget(label) || shown[0].(*widget.Label).Text() != "12:30" {
-		t.Fatalf("frozen: shows %v, want the held 12:30", shown)
-	}
-	if !shown[0].(*widget.Label).HasClass("bar-button-label") {
-		t.Error("the held label lost its class")
-	}
-	b.thawLabel()
-	if shown = b.labelBox.Children(); len(shown) != 1 || shown[0] != widget.Widget(label) || label.Text() != "12:31" {
-		t.Errorf("thawed: shows %v, want the live label at 12:31", shown)
-	}
-	// Thaw without a freeze changes nothing.
-	b.thawLabel()
-	if shown = b.labelBox.Children(); len(shown) != 1 || shown[0] != widget.Widget(label) {
-		t.Error("a stray thaw moved the label")
-	}
-}
-
 // While its dropdown is open the bar button is :checked and shaded, as
 // a BarButton is under its own popover, and with dropdown-freeze-label
-// its label holds still; the close ends both. Without the freeze the
-// label keeps following the module.
+// its label holds still (FreezeSize), the module's updates landing on
+// the close (pending_label); the close ends both. Without the freeze
+// the label keeps following the module.
 func TestBarButtonHoldsOpenWhileItsDropdownIs(t *testing.T) {
 	for _, freeze := range []bool{true, false} {
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
 		bar := buildRoot(styledContext(t, config.Defaults()), layout, "DP-1")
-		settleBar(bar, widget.Size{W: 1000, H: 100})
 		b := clockButton(bar)
-		lb := b.labelBox.Bounds()
+		b.SetLabel("12:30")
+		settleBar(bar, widget.Size{W: 1000, H: 100})
+		lb := b.Label().Bounds()
 		at := widget.Point{X: lb.X + 1, Y: lb.Y + 1}
 		rest := paintedAt(bar, 1000, 100, at)
 		release := b.holdOpen(freeze)
 		if open := paintedAt(bar, 1000, 100, at); !b.HasState(widget.StateChecked) || open == rest {
 			t.Errorf("freeze %v: the open dropdown's button paints %#x, as at rest", freeze, uint32(open))
 		}
-		if frozen := b.labelBox.Children()[0] != widget.Widget(b.label); frozen != freeze {
-			t.Errorf("freeze %v: label frozen %v", freeze, frozen)
+		b.SetLabel("12:31")
+		want := "12:31"
+		if freeze {
+			want = "12:30"
+		}
+		if got := b.Label().Text(); got != want {
+			t.Errorf("freeze %v: the open button shows %q, want %q", freeze, got, want)
 		}
 		release()
 		if closed := paintedAt(bar, 1000, 100, at); b.HasState(widget.StateChecked) || closed != rest {
 			t.Errorf("freeze %v: the closed dropdown left the button checked, painting %#x", freeze, uint32(closed))
 		}
-		if b.labelBox.Children()[0] != widget.Widget(b.label) {
-			t.Errorf("freeze %v: the close left the label frozen", freeze)
+		if got := b.Label().Text(); got != "12:31" {
+			t.Errorf("freeze %v: the closed button shows %q, want the module's latest 12:31", freeze, got)
 		}
 	}
 }

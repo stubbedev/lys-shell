@@ -150,8 +150,8 @@ func TestPowerProfilesColorsAndUnknown(t *testing.T) {
 		if th.IconColor == nil || th.LabelColor == nil || *th.IconColor != color || *th.LabelColor != color {
 			t.Errorf("%s: thresholds %+v, want icon and label %v", profile, th, color)
 		}
-		if pp.icon.Name() != icon || pp.label.Color() != 0 {
-			t.Errorf("%s: icon %q ink %#08x, want %q in the stylesheet's ink", profile, pp.icon.Name(), pp.label.Color(), icon)
+		if pp.icon.Name() != icon || pp.btn.Label().Color() != 0 {
+			t.Errorf("%s: icon %q ink %#08x, want %q in the stylesheet's ink", profile, pp.icon.Name(), pp.btn.Label().Color(), icon)
 		}
 	}
 	check("performance", cfg.PowerProfiles.ColorPerformance, cfg.PowerProfiles.Icons()[config.ProfilePerformance].Name)

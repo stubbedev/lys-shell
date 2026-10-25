@@ -188,9 +188,8 @@ func bitwardenLabel(format string, st bitwarden.Status) string {
 type bitwardenModule struct {
 	ctx   ModuleContext
 	vault vault
-	label *widget.Label
+	btn   *barButton
 	icon  *widget.Icon
-	root  widget.Widget
 }
 
 var errBitwardenNoHost = errors.New("bitwarden: requires the shared vault host")
@@ -203,9 +202,9 @@ func newBitwarden(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &bitwardenModule{ctx: ctx, vault: v, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &bitwardenModule{ctx: ctx, vault: v}
 	m.icon = moduleIcon(ctx, ctx.Config.Bitwarden.Icons()[config.BitwardenLocked])
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.render()
 	ticks, stop := v.Subscribe()
 	follow(ctx, ticks, stop, func(struct{}) { m.render() })
@@ -220,7 +219,7 @@ func (m *bitwardenModule) render() {
 	if cfg.LabelShow {
 		text = bitwardenLabel(cfg.Format, st)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if m.icon == nil {
 		return
 	}
@@ -231,4 +230,4 @@ func (m *bitwardenModule) render() {
 	m.icon.SetThemeName(cfg.Icons()[state].Name)
 }
 
-func (m *bitwardenModule) Root() widget.Widget { return m.root }
+func (m *bitwardenModule) Root() widget.Widget { return m.btn }

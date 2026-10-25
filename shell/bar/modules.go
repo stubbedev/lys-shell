@@ -369,26 +369,21 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 			follower.followAction(action, scroll)
 		}
 	})
-	if r, ok := module.(interface{ setButton(*barButton) }); ok {
-		r.setButton(btn)
-	}
 	wrap.Append(btn, false)
 	row.Append(wrap, false)
 	return nil
 }
 
 // asBarButton returns the module root as a bar button: the one the
-// module assembled, a bare label or icon given its container (the
-// label-less icon buttons: power, dashboard), or any other content
-// wrapped in the button chrome.
+// module assembled, a bare icon as the button's icon (the label-less
+// icon buttons: power, dashboard), or any other content wrapped in the
+// button chrome.
 func asBarButton(ctx ModuleContext, root widget.Widget) *barButton {
 	switch r := root.(type) {
 	case *barButton:
 		return r
-	case *widget.Label:
-		return newBarButton(ctx, nil, r)
 	case *widget.Icon:
-		return newBarButton(ctx, r, nil)
+		return newBarButton(ctx, r, "")
 	}
 	return newBarButtonAround(ctx, root)
 }

@@ -7,8 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/widget"
-
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/network"
@@ -69,7 +67,7 @@ func newTestNetworkModule(t *testing.T, cfg *config.Config, snap network.Snapsho
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: &fakeNetworkSource{snap: snap, ticks: make(chan struct{}, 2)},
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	return m
 }
 
@@ -165,15 +163,15 @@ func TestNetworkModuleLabel(t *testing.T) {
 	if err := offline.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := offline.label.Text(); got != i18n.T("bar-network-offline") || offline.label.Color() != 0 {
-		t.Errorf("offline label %q ink %#08x, want the offline text in the stylesheet's ink", got, offline.label.Color())
+	if got := offline.btn.Label().Text(); got != i18n.T("bar-network-offline") || offline.btn.Label().Color() != 0 {
+		t.Errorf("offline label %q ink %#08x, want the offline text in the stylesheet's ink", got, offline.btn.Label().Color())
 	}
 	cfg.Network.LabelShow = false
 	hidden := newTestNetworkModule(t, cfg, network.Snapshot{Primary: network.ConnectionWifi, WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "x"})
 	if err := hidden.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := hidden.label.Text(); got != "" {
+	if got := hidden.btn.Label().Text(); got != "" {
 		t.Errorf("label-show off: %q", got)
 	}
 }

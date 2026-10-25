@@ -23,14 +23,6 @@ func moduleIcon(_ ModuleContext, icon config.IconConfig) *widget.Icon {
 	return widget.NewThemeIcon(icon.Name, iconPx)
 }
 
-// assembleModule builds the module's bar button around its icon (nil
-// when it shows none) and its label. The icon is the caller's own
-// instance, so state-icon swaps (SetThemeName) land on the widget in
-// the tree.
-func assembleModule(ctx ModuleContext, ic *widget.Icon, label *widget.Label) widget.Widget {
-	return newBarButton(ctx, ic, label)
-}
-
 // levelIndexFloor is battery helpers.rs's level math: the percentage
 // divided evenly across n icons from the top, empty first.
 func levelIndexFloor(percent float64, n int) int {

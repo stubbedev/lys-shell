@@ -29,8 +29,7 @@ func keybindModeVisible(submap string, autoHide bool) bool {
 // keybindMode is the module: the active Hyprland submap.
 type keybindModeModule struct {
 	ctx    ModuleContext
-	root   widget.Widget
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
 	chrome moduleChrome
 	submap string
@@ -40,9 +39,9 @@ func newKeybindMode(ctx ModuleContext) (Module, error) {
 	if ctx.Hyprland == nil {
 		return nil, errors.New("keybind-mode: the compositor is not Hyprland")
 	}
-	m := &keybindModeModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &keybindModeModule{ctx: ctx}
 	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.render()
 	events, err := ctx.Hyprland.Events(ctx.Life())
 	if err != nil {
@@ -66,7 +65,7 @@ func (m *keybindModeModule) render() {
 	if cfg.LabelShow {
 		text = keybindModeLabel(cfg.Format, m.submap)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if m.chrome != nil {
 		m.chrome.SetVisible(keybindModeVisible(m.submap, cfg.AutoHide))
 	}
@@ -77,4 +76,4 @@ func (m *keybindModeModule) setChrome(c moduleChrome) {
 	m.render()
 }
 
-func (m *keybindModeModule) Root() widget.Widget { return m.root }
+func (m *keybindModeModule) Root() widget.Widget { return m.btn }

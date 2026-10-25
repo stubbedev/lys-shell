@@ -43,12 +43,10 @@ func resolveOverride(cv *config.ColorValue, palette *styling.Palette) (render.Co
 // battery is the module: a label fed from the UPower device snapshot,
 // refreshed on PropertiesChanged.
 type battery struct {
-	buttonRef
 	ctx    ModuleContext
 	source upower.Source
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 	cancel context.CancelFunc
 }
 
@@ -61,9 +59,8 @@ func newBattery(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("battery: no battery source available")
 	}
 	m := &battery{ctx: ctx, source: ctx.Battery}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -84,8 +81,8 @@ func (m *battery) refresh() error {
 	if cfg.LabelShow {
 		label = batteryLabel(cfg.Format, dev.Percentage, dev.IsPresent)
 	}
-	m.thresholds(dev.Percentage, cfg.Thresholds)
-	m.label.SetText(label)
+	m.btn.applyThresholds(dev.Percentage, cfg.Thresholds)
+	m.btn.SetLabel(label)
 	m.setIcon(cfg, dev)
 	return nil
 }
@@ -125,4 +122,4 @@ func (m *battery) subscribe() error {
 	return nil
 }
 
-func (m *battery) Root() widget.Widget { return m.root }
+func (m *battery) Root() widget.Widget { return m.btn }

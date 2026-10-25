@@ -67,7 +67,7 @@ func TestUnimplementedSchemaModuleIsSkipped(t *testing.T) {
 
 // Modules that show an icon in Rust carry it: the clock assembles its
 // icon-name beside the time, and a bare icon root (power, dashboard)
-// becomes an icon-only button with the icon in .icon-container.
+// becomes an icon-only button with the icon as its .bar-button-icon.
 func TestModulesCarryTheirIcons(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
@@ -76,21 +76,21 @@ func TestModulesCarryTheirIcons(t *testing.T) {
 		t.Fatal(err)
 	}
 	btn, ok := m.Root().(*barButton)
-	if !ok || btn.icon == nil || btn.icon.Name() != cfg.Clock.IconName || btn.label == nil {
+	if !ok || shownIcon(btn) == nil || shownIcon(btn).Name() != cfg.Clock.IconName || btn.Label().Text() == "" {
 		t.Fatalf("clock root %T, want a bar button with %q and the time", m.Root(), cfg.Clock.IconName)
 	}
 	cfg.Clock.IconShow = false
 	if m, err = Create("clock", ctx); err != nil {
 		t.Fatal(err)
 	}
-	if btn := m.Root().(*barButton); btn.icon != nil {
+	if btn := m.Root().(*barButton); shownIcon(btn) != nil {
 		t.Error("icon-show off kept the clock icon")
 	}
 
 	icon := widget.NewThemeIcon("ld-power-symbolic", 16)
 	b := asBarButton(ctx, icon)
-	if b.icon != icon || b.label != nil || !widget.HasClass(b.iconBox, "icon-container") || len(b.iconBox.Children()) != 1 {
-		t.Errorf("icon root: icon %v label %v, want the icon in .icon-container and no label", b.icon, b.label)
+	if shownIcon(b) != icon || !icon.HasClass("bar-button-icon") || b.Label().Visible() {
+		t.Errorf("icon root: icon shown %v, label visible %v, want the button's own icon.bar-button-icon and no label", shownIcon(b) == icon, b.Label().Visible())
 	}
 }
 

@@ -1,27 +1,21 @@
-button.bar-button.block-prefix .icon-container {
+button.bar-button.block-prefix > box {
+  border-spacing: 0;
+}
+button.bar-button.block-prefix .bar-button-icon {
   padding: var(--bar-btn-icon-padding);
   background-color: var(--bar-btn-icon-bg);
   border-top-left-radius: var(--bar-button-rounding-element);
   border-bottom-left-radius: var(--bar-button-rounding-element);
 }
-button.bar-button.block-prefix .label-container {
+button.bar-button.block-prefix .bar-button-label {
   padding: var(--bar-btn-label-padding);
 }
-button.bar-button.block-prefix.vertical .icon-container {
-  border-radius: 0;
-  border-top-left-radius: var(--bar-button-rounding-element);
-  border-top-right-radius: var(--bar-button-rounding-element);
-}
-button.bar-button.block-prefix.icon-end .icon-container {
+button.bar-button.block-prefix.icon-end .bar-button-icon {
   border-radius: 0;
   border-top-right-radius: var(--bar-button-rounding-element);
   border-bottom-right-radius: var(--bar-button-rounding-element);
 }
-button.bar-button.block-prefix.icon-end.vertical .icon-container {
-  border-radius: 0;
-  border-bottom-left-radius: var(--bar-button-rounding-element);
-  border-bottom-right-radius: var(--bar-button-rounding-element);
-}
-button.bar-button.block-prefix.icon-only .icon-container {
+button.bar-button.block-prefix.icon-only .bar-button-icon,
+button.bar-button.block-prefix.vertical .bar-button-icon {
   border-radius: var(--bar-button-rounding-element);
 }

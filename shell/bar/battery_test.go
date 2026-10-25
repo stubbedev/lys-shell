@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-ui/render"
-	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -161,18 +160,16 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 
 	// The refresh path itself is App-independent; drive it directly.
 	m := &battery{ctx: ctx, source: source}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, cfg.Battery.Icon())
-	btn := newBarButton(ctx, m.icon, m.label)
-	m.setButton(btn)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
-	if got := m.label.Text(); got != "75%" {
+	if got := m.btn.Label().Text(); got != "75%" {
 		t.Errorf("label = %q, want 75%%", got)
 	}
-	if strings.Contains(btn.InlineStyle(), "--bar-btn-icon-color: "+cv.ToCSS()) {
-		t.Errorf("the threshold colored the button at 75%%: %q", btn.InlineStyle())
+	if strings.Contains(m.btn.InlineStyle(), "--bar-btn-icon-color: "+cv.ToCSS()) {
+		t.Errorf("the threshold colored the button at 75%%: %q", m.btn.InlineStyle())
 	}
 
 	// Drop below the threshold: same template, error color.
@@ -180,19 +177,19 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "12%" {
+	if got := m.btn.Label().Text(); got != "12%" {
 		t.Errorf("label = %q, want 12%%", got)
 	}
-	if !strings.Contains(btn.InlineStyle(), "--bar-btn-icon-color: "+cv.ToCSS()) {
-		t.Errorf("at 12%% the button vars = %q, want the status-error threshold", btn.InlineStyle())
+	if !strings.Contains(m.btn.InlineStyle(), "--bar-btn-icon-color: "+cv.ToCSS()) {
+		t.Errorf("at 12%% the button vars = %q, want the status-error threshold", m.btn.InlineStyle())
 	}
 	// Back above: the defaults return.
 	source.update(func(d *upower.Device) { d.Percentage = 60 })
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(btn.InlineStyle(), cv.ToCSS()) {
-		t.Errorf("above the bound: button vars = %q, want the threshold gone", btn.InlineStyle())
+	if strings.Contains(m.btn.InlineStyle(), cv.ToCSS()) {
+		t.Errorf("above the bound: button vars = %q, want the threshold gone", m.btn.InlineStyle())
 	}
 }
 
@@ -202,8 +199,8 @@ func TestBatteryStateIcon(t *testing.T) {
 	style := computeStyle(cfg, styling.Default())
 	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}
 	m := &battery{ctx: ctx, source: source}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, cfg.Battery.Icon())
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if m.icon == nil {
 		t.Fatal("the battery icon defaults on")
 	}
@@ -239,11 +236,11 @@ func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
 	source := newFakeBattery(upower.Device{})
 	style := computeStyle(cfg, styling.Default())
 	m := &battery{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}, source: source}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != i18n.T("bar-battery-unavailable") {
+	if got := m.btn.Label().Text(); got != i18n.T("bar-battery-unavailable") {
 		t.Errorf("label = %q, want N/A", got)
 	}
 }

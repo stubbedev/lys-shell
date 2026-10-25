@@ -79,11 +79,10 @@ func liveSunsetEnv() sunsetEnv {
 // hyprsunsetModule is the night-light toggle with the solar
 // auto-schedule (hyprsunset/mod.rs).
 type hyprsunsetModule struct {
-	ctx   ModuleContext
-	env   sunsetEnv
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
+	ctx  ModuleContext
+	env  sunsetEnv
+	btn  *barButton
+	icon *widget.Icon
 
 	enabled bool
 	temp    int
@@ -111,9 +110,8 @@ func newHyprsunset(ctx ModuleContext) (Module, error) {
 func newHyprsunsetWith(ctx ModuleContext, env sunsetEnv) *hyprsunsetModule {
 	cfg := ctx.Config.Hyprsunset
 	m := &hyprsunsetModule{ctx: ctx, env: env, temp: int(cfg.Temperature), gamma: int(cfg.Gamma)}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, cfg.IconOffView())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 
 	// The filter dies with the shell, so a manual toggle is replayed
 	// rather than lost to the schedule.
@@ -187,7 +185,7 @@ func (m *hyprsunsetModule) render() {
 	if cfg.LabelShow {
 		text = hyprsunsetLabel(cfg.Format, m.enabled, m.temp, m.gamma, int(cfg.Temperature), int(cfg.Gamma))
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if m.icon != nil {
 		icon := cfg.IconOffView()
 		if m.enabled {
@@ -306,4 +304,4 @@ func (m *hyprsunsetModule) stopFilter() {
 	m.render()
 }
 
-func (m *hyprsunsetModule) Root() widget.Widget { return m.root }
+func (m *hyprsunsetModule) Root() widget.Widget { return m.btn }

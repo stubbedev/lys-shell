@@ -44,9 +44,8 @@ func idleInhibitLabel(format string, active bool, durationMins uint32, remaining
 type idleInhibitModule struct {
 	ctx   ModuleContext
 	state *idleinhibit.State
-	label *widget.Label
+	btn   *barButton
 	icon  *widget.Icon
-	root  widget.Widget
 }
 
 func newIdleInhibit(ctx ModuleContext) (Module, error) {
@@ -54,9 +53,9 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 	if state == nil {
 		state = idleinhibit.NewState(ctx.Config.IdleInhibit.StartupDuration)
 	}
-	m := &idleInhibitModule{ctx: ctx, state: state, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &idleInhibitModule{ctx: ctx, state: state}
 	m.icon = moduleIcon(ctx, ctx.Config.IdleInhibit.Icons()[config.IdleInhibitInactive])
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.render()
 	changes, stop := state.Changes()
 	follow(m.ctx, changes, stop, func(struct{}) { m.render() })
@@ -71,7 +70,7 @@ func (m *idleInhibitModule) render() {
 	if cfg.LabelShow {
 		text = idleInhibitLabel(cfg.Format, snap.Active, snap.DurationMins, snap.RemainingS)
 	}
-	m.label.SetText(text)
+	m.btn.SetLabel(text)
 	if setter := m.icon; setter != nil {
 		icon := cfg.Icons()[config.IdleInhibitInactive]
 		if snap.Active {
@@ -81,7 +80,7 @@ func (m *idleInhibitModule) render() {
 	}
 }
 
-func (m *idleInhibitModule) Root() widget.Widget { return m.root }
+func (m *idleInhibitModule) Root() widget.Widget { return m.btn }
 
 // idleHolder keeps one Wayland idle inhibitor alive while the shared
 // state inhibits (the user's toggle or an app's hold), bound to an open

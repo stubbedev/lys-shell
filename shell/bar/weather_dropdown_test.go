@@ -176,7 +176,7 @@ func TestWeatherModuleFollowsTheService(t *testing.T) {
 		t.Fatal(err)
 	}
 	wm := m.(*weatherModule)
-	waitForText(t, wm.label, "20°C")
+	waitForText(t, wm.btn.Label(), "20°C")
 	waitHeadless(t, "the night icon", func() bool { return wm.icon.Name() == "ld-moon-symbolic" })
 }
 

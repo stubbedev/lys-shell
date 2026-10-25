@@ -14,13 +14,13 @@
     opacity: 0.4;
   }
 }
-.treeman.preparing .icon-container image {
+.treeman.preparing .bar-button-icon {
   animation: treeman-spin var(--cfg-anim-spin, 1s) linear infinite;
 }
-.treeman.tearing-down .icon-container {
+.treeman.tearing-down .bar-button-icon {
   animation: treeman-pulse var(--cfg-anim-pulse, 0.8s) ease-in-out infinite alternate;
 }
-.treeman.failed .icon-container {
+.treeman.failed .bar-button-icon {
   color: var(--status-error);
 }
 

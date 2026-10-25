@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/widget"
-
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/styling"
@@ -33,15 +31,15 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
-	if got := m.label.Text(); got != "65%" {
+	if got := m.btn.Label().Text(); got != "65%" {
 		t.Errorf("label = %q, want 65%%", got)
 	}
-	if m.label.Color() != 0 {
-		t.Errorf("active ink = %#08x, want the stylesheet's", m.label.Color())
+	if m.btn.Label().Color() != 0 {
+		t.Errorf("active ink = %#08x, want the stylesheet's", m.btn.Label().Color())
 	}
 
 	// Muted changes the icon only; the label keeps label-color.
@@ -49,8 +47,8 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if m.label.Color() != 0 {
-		t.Errorf("muted ink = %#08x, want the stylesheet's", m.label.Color())
+	if m.btn.Label().Color() != 0 {
+		t.Errorf("muted ink = %#08x, want the stylesheet's", m.btn.Label().Color())
 	}
 }
 
@@ -91,18 +89,18 @@ func TestMicrophoneThresholds(t *testing.T) {
 	style := computeStyle(cfg, styling.Default()).forModules()
 	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
 	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if m.pending.LabelColor == nil || *m.pending.LabelColor != warn || m.pending.IconColor == nil {
-		t.Errorf("at 65%%: thresholds %+v, want the warning colors", m.pending)
+	if got := m.btn.thresholds; got.LabelColor == nil || *got.LabelColor != warn || got.IconColor == nil {
+		t.Errorf("at 65%%: thresholds %+v, want the warning colors", got)
 	}
 	source.dev.Volume = pct(30)
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if !m.pending.IsEmpty() {
-		t.Errorf("at 30%%: thresholds %+v, want none", m.pending)
+	if !m.btn.thresholds.IsEmpty() {
+		t.Errorf("at 30%%: thresholds %+v, want none", m.btn.thresholds)
 	}
 }

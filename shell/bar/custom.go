@@ -294,12 +294,10 @@ func (c *customUpdates) dispatch(id, output string) {
 
 // customModule is one [[modules.custom]] definition on a bar.
 type customModule struct {
-	buttonRef
-	ctx   ModuleContext
-	def   config.CustomModuleDefinition
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
+	ctx  ModuleContext
+	def  config.CustomModuleDefinition
+	btn  *barButton
+	icon *widget.Icon
 
 	life    context.Context
 	stop    context.CancelFunc
@@ -324,9 +322,8 @@ func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, er
 		return nil, errors.New("custom: requires the application loop")
 	}
 	m := &customModule{ctx: ctx, def: def}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, formatCustomLabel(def, parsedOutput{}), ctx.Style.fg)
 	m.icon = moduleIcon(ctx, def.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, formatCustomLabel(def, parsedOutput{}))
 	m.life, m.stop = context.WithCancel(ctx.Life())
 	initial := ""
 	if ctx.CustomUpdates != nil {
@@ -347,22 +344,6 @@ func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, er
 		}
 	}
 	return m, nil
-}
-
-// setButton receives the module's bar button; the pending threshold
-// colors, the tooltip, the classes, and the visibility land on it.
-func (m *customModule) setButton(b *barButton) {
-	m.buttonRef.setButton(b)
-	m.apply(m.lastOutput())
-}
-
-func (m *customModule) lastOutput() string {
-	if m.ctx.CustomUpdates == nil {
-		return ""
-	}
-	m.ctx.CustomUpdates.mu.Lock()
-	defer m.ctx.CustomUpdates.mu.Unlock()
-	return m.ctx.CustomUpdates.last[m.def.Id]
 }
 
 // poll is spawn_command_poller: the command every interval, the first
@@ -501,14 +482,11 @@ func (m *customModule) apply(output string) {
 		m.ctx.CustomUpdates.remember(m.def.Id, output)
 	}
 	p := parseCustomOutput(output)
-	m.label.SetText(formatCustomLabel(m.def, p))
+	m.btn.SetLabel(formatCustomLabel(m.def, p))
 	if m.icon != nil {
 		m.icon.SetThemeName(resolveCustomIcon(m.def, p))
 	}
 	btn := m.btn
-	if btn == nil {
-		return
-	}
 	if tip, ok := formatCustomTooltip(m.def, p); ok {
 		btn.SetTooltip(tip)
 	} else {
@@ -524,7 +502,7 @@ func (m *customModule) apply(output string) {
 	m.classes = classes
 }
 
-func (m *customModule) Root() widget.Widget { return m.root }
+func (m *customModule) Root() widget.Widget { return m.btn }
 
 // Stop ends the commands and the update registration.
 func (m *customModule) Stop() {

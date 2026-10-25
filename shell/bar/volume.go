@@ -28,12 +28,10 @@ func volumePercent(dev pulse.Device) float64 {
 // volume is the module: the default sink's volume label, refreshed on
 // PulseAudio events, scroll to adjust.
 type volumeModule struct {
-	buttonRef
 	ctx    ModuleContext
 	source pulse.Source
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 }
 
 func newVolume(ctx ModuleContext) (Module, error) {
@@ -44,9 +42,8 @@ func newVolume(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("volume: no audio source available")
 	}
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -75,8 +72,8 @@ func (m *volumeModule) refresh() error {
 	if cfg.LabelShow {
 		label = volumeLabel(cfg.Format, volumePercent(dev))
 	}
-	m.label.SetText(label)
-	m.thresholds(volumePercent(dev), cfg.Thresholds)
+	m.btn.SetLabel(label)
+	m.btn.applyThresholds(volumePercent(dev), cfg.Thresholds)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(volumeIconName(cfg, dev))
 	}
@@ -94,4 +91,4 @@ func volumeIconName(cfg config.VolumeConfig, dev pulse.Device) string {
 	return cfg.LevelIcons[levelIndexSpan(int(volumePercent(dev)), len(cfg.LevelIcons))]
 }
 
-func (m *volumeModule) Root() widget.Widget { return m.root }
+func (m *volumeModule) Root() widget.Widget { return m.btn }

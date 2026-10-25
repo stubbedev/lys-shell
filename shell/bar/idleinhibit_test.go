@@ -114,9 +114,9 @@ func TestIdleInhibitKeepsTheStylesheetInk(t *testing.T) {
 	for _, on := range []bool{false, true} {
 		if on {
 			state.Enable(true)
-			waitForText(t, m.label, i18n.T("bar-idle-inhibit-on"))
+			waitForText(t, m.btn.Label(), i18n.T("bar-idle-inhibit-on"))
 		}
-		if ink, tint := onHeadlessLoop(func() render.Color { return m.label.Color() }), onHeadlessLoop(func() render.Color { return m.icon.Tint() }); ink != 0 || tint != 0 {
+		if ink, tint := onHeadlessLoop(func() render.Color { return m.btn.Label().Color() }), onHeadlessLoop(func() render.Color { return m.icon.Tint() }); ink != 0 || tint != 0 {
 			t.Errorf("active %v: label ink %#08x icon tint %#08x, want the stylesheet's", on, ink, tint)
 		}
 	}

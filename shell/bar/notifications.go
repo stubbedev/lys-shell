@@ -31,21 +31,19 @@ func notificationIconName(cfg config.NotificationConfig, count int, dnd bool) st
 // notificationModule is the bell: count and dnd from the shared
 // notification service.
 type notificationModule struct {
-	buttonRef
-	ctx   ModuleContext
-	src   *notifications.Service
-	label *widget.Label
-	icon  *widget.Icon
-	root  widget.Widget
+	ctx  ModuleContext
+	src  *notifications.Service
+	btn  *barButton
+	icon *widget.Icon
 }
 
 func newNotification(ctx ModuleContext) (Module, error) {
-	m := &notificationModule{ctx: ctx, src: ctx.Notifications, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m := &notificationModule{ctx: ctx, src: ctx.Notifications}
 	if m.src == nil {
 		return nil, errors.New("notifications: no notification service available")
 	}
 	m.icon = moduleIcon(ctx, ctx.Config.Notification.Icon())
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, "")
 	m.refresh()
 	// Follow the service's change feed (subscribed before returning, so
 	// no event after construction is missed). Headless construction
@@ -64,14 +62,14 @@ func (m *notificationModule) refresh() {
 	if cfg.LabelShow {
 		text = notificationLabel(count)
 	}
-	m.label.SetText(text)
-	m.thresholds(float64(count), cfg.Thresholds)
+	m.btn.SetLabel(text)
+	m.btn.applyThresholds(float64(count), cfg.Thresholds)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(notificationIconName(cfg, count, dnd))
 	}
 }
 
-func (m *notificationModule) Root() widget.Widget { return m.root }
+func (m *notificationModule) Root() widget.Widget { return m.btn }
 
 // RunAction handles the dnd toggle the Rust module exposes through
 // `lys-shell notify dnd`; the shell command path routes here.

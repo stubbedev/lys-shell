@@ -51,8 +51,8 @@ func TestScreenshotModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := m.Root().(*widget.Icon); !ok {
-		t.Fatalf("default root %T, want the lone icon", m.Root())
+	if btn, ok := m.Root().(*barButton); !ok || shownIcon(btn) == nil || btn.Label().Visible() {
+		t.Fatalf("default root %T, want an icon-only bar button", m.Root())
 	}
 	cfg.Screenshot.Label, cfg.Screenshot.LabelShow, cfg.Screenshot.LabelMaxLength = "Capture", true, 4
 	m, err = newScreenshot(newTestContext(t, cfg))
@@ -60,18 +60,18 @@ func TestScreenshotModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	btn, ok := m.Root().(*barButton)
-	if !ok || btn.icon == nil || btn.label == nil {
+	if !ok || shownIcon(btn) == nil {
 		t.Fatalf("labelled root %T, want the icon + label bar button", m.Root())
 	}
 	btn.configure(moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
-	if got := btn.label.Text(); got != "Capture" || btn.label.MaxWidthChars() != 4 || btn.label.Ellipsize() != widget.EllipsizeEnd {
-		t.Fatalf("label %q capped at %d, want Capture capped at 4 chars", got, btn.label.MaxWidthChars())
+	if got := btn.Label().Text(); got != "Capture" || btn.Label().MaxWidthChars() != 4 || btn.Label().Ellipsize() != widget.EllipsizeEnd {
+		t.Fatalf("label %q capped at %d, want Capture capped at 4 chars", got, btn.Label().MaxWidthChars())
 	}
 	// No label-max-length: no cap, no ellipsis.
 	cfg.Screenshot.LabelMaxLength = 0
 	btn.configure(moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
-	if btn.label.MaxWidthChars() != 0 || btn.label.Ellipsize() != widget.EllipsizeNone {
-		t.Fatalf("uncapped label: %d chars, ellipsize %v", btn.label.MaxWidthChars(), btn.label.Ellipsize())
+	if btn.Label().MaxWidthChars() != 0 || btn.Label().Ellipsize() != widget.EllipsizeNone {
+		t.Fatalf("uncapped label: %d chars, ellipsize %v", btn.Label().MaxWidthChars(), btn.Label().Ellipsize())
 	}
 	cfg.Screenshot.LabelMaxLength = 4
 	cfg.Screenshot.IconShow, cfg.Screenshot.LabelShow = false, false
@@ -83,7 +83,7 @@ func TestScreenshotModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if btn, ok := m.Root().(*barButton); !ok || btn.icon != nil || btn.label == nil {
+	if btn, ok := m.Root().(*barButton); !ok || shownIcon(btn) != nil || btn.Label().Text() != "Capture" {
 		t.Fatalf("label-only root %T, want a bar button with only a label", m.Root())
 	}
 }

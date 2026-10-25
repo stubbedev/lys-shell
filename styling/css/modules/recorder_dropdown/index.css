@@ -6,7 +6,7 @@
     opacity: 0.35;
   }
 }
-.recorder-preparing .icon-container {
+.recorder-preparing .bar-button-icon {
   animation: recorder-prepare-pulse var(--cfg-anim-pulse, 0.6s) ease-in-out infinite alternate;
 }
 

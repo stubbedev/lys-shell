@@ -109,12 +109,10 @@ type reading struct {
 // pollModule is the shared poll loop of cpu/ram/storage: read on an
 // interval, render the format, and apply the threshold colors.
 type pollModule struct {
-	buttonRef
 	ctx    ModuleContext
 	cfg    pollConfig
-	label  *widget.Label
+	btn    *barButton
 	icon   *widget.Icon
-	root   widget.Widget
 	read   func() (reading, error)
 	cancel context.CancelFunc
 }
@@ -132,9 +130,8 @@ func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func(
 		return nil, errors.New("poll: requires the application loop")
 	}
 	m := &pollModule{ctx: ctx, cfg: cfg, read: read}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, initial, ctx.Style.fg)
 	m.icon = moduleIcon(ctx, cfg.icon)
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, initial)
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	if cfg.pollMs == 0 {
@@ -162,7 +159,7 @@ func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func(
 }
 
 // Root is the icon beside the label (the label alone without an icon).
-func (m *pollModule) Root() widget.Widget { return m.root }
+func (m *pollModule) Root() widget.Widget { return m.btn }
 
 // Stop ends the poll loop.
 func (m *pollModule) Stop() {
@@ -177,8 +174,8 @@ func (m *pollModule) render(r reading) {
 	if !r.ok {
 		return
 	}
-	m.label.SetText(jinja.RenderOr(m.cfg.format, r.vars))
-	m.thresholds(r.value, m.cfg.thresholds)
+	m.btn.SetLabel(jinja.RenderOr(m.cfg.format, r.vars))
+	m.btn.applyThresholds(r.value, m.cfg.thresholds)
 }
 
 // newCpu builds the cpu module (polling/cpu.rs and helpers.rs).
