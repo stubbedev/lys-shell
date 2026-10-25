@@ -26,11 +26,6 @@
   color: var(--accent);
 }
 
-.bluetooth-device .title,
-.bluetooth-device .description {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
 .bluetooth-device .title {
   font-size: var(--text-md);
 }

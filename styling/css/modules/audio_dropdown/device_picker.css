@@ -27,47 +27,22 @@ button.picker-back image {
   background: transparent;
   padding: var(--space-sm) 0;
 }
-.audio-device-list .audio-device-option {
-  border-radius: var(--rounding-element);
-  transition: background var(--duration-fast);
-}
-.audio-device-list .audio-device-option:hover {
-  background: var(--bg-overlay);
-}
-.audio-device-list .audio-device-option:focus-visible {
-  background: var(--bg-overlay);
-  outline: var(--focus-ring-width) solid var(--accent);
-  outline-offset: calc(-0.125rem * var(--global-scale));
-}
-.audio-device-list .audio-device-option .audio-device-option-content {
-  padding: var(--space-xs) var(--space-sm);
-  min-height: calc(2.5rem * var(--global-scale));
-  border-spacing: var(--space-md);
-}
-.audio-device-list .audio-device-option .audio-device-option-icon {
-  min-width: var(--icon-2xl);
-  min-height: var(--icon-2xl);
-  border-radius: var(--rounding-element);
-  background: var(--bg-overlay);
-}
-.audio-device-list .audio-device-option .audio-device-option-icon image {
+.audio-device-list .audio-device-option image {
   -gtk-icon-size: var(--icon-lg);
   color: var(--fg-muted);
 }
-.audio-device-list .audio-device-option.selected .audio-device-option-icon {
+.audio-device-list .audio-device-option.selected .media {
   background: var(--accent-subtle);
 }
-.audio-device-list .audio-device-option.selected .audio-device-option-icon image {
+.audio-device-list .audio-device-option.selected .media image {
   color: var(--accent);
 }
-.audio-device-list .audio-device-option .audio-device-option-name {
+.audio-device-list .audio-device-option .title,
+.audio-device-list .audio-device-option .description {
   font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  color: var(--fg-default);
 }
-.audio-device-list .audio-device-option .audio-device-option-subtitle {
-  font-size: var(--text-md);
-  color: var(--fg-subtle);
+.audio-device-list .audio-device-option .title {
+  color: var(--fg-default);
 }
 .audio-device-list .audio-device-option .audio-device-option-check {
   -gtk-icon-size: var(--icon-md);

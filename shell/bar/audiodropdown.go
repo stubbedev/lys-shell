@@ -716,50 +716,29 @@ func (p *devicePicker) apply(devices []audioDevice, def *audioDevice) {
 	}
 }
 
-// optionContent builds the row's content (device_item.rs:34): the
-// icon tile as a CenterBox (its CSS class paints it, the image inside
-// has none), the name (and subtitle) column, and the active check.
-func (p *devicePicker) optionContent(d audioDevice, active bool) *widget.Box {
-	v := p.view
-	content := widget.NewBox(widget.Row, 0, 0)
-	content.AddClass("audio-device-option-content")
-	icon := widget.NewThemeIcon(d.icon, int(v.px*1.2))
-	tile := widget.NewCenterBox(nil, icon, nil)
-	tile.AddClass("audio-device-option-icon")
-	content.Append(tile, false)
-	info := widget.NewBox(widget.Column, 0, 0)
-	name := widget.NewLabel(v.font, v.px, d.description, 0)
-	name.AddClass("audio-device-option-name")
-	name.SetEllipsize(widget.EllipsizeEnd)
-	info.Append(name, false)
-	if d.subtitle != "" {
-		sub := widget.NewLabel(v.font, v.px*0.85, d.subtitle, 0)
-		sub.AddClass("audio-device-option-subtitle")
-		sub.SetEllipsize(widget.EllipsizeEnd)
-		info.Append(sub, false)
-	}
-	content.AppendAligned(info, true, widget.AlignCenter)
-	if active {
-		check := widget.NewThemeIcon("tb-check-symbolic", int(v.px))
-		check.AddClass("audio-device-option-check")
-		content.Append(check, false)
-	}
-	return content
-}
-
-// row is DeviceOptionItem; a click returns to the main page and makes
-// the device the default (select_device).
-func (p *devicePicker) row(d audioDevice, active bool) widget.Widget {
+// row is DeviceOptionItem on lys-ui's Item: the device icon as the
+// media, the description over the subtitle, the check on the active
+// one. Activating it returns to the main page and makes the device the
+// default (select_device).
+func (p *devicePicker) row(d audioDevice, active bool) *widget.Item {
 	v := p.view
 	key := d.key
-	b := dropdownButton(p.optionContent(d, active), func() {
+	it := widget.NewItem(v.font, d.description, d.subtitle)
+	it.SetSmall(true)
+	it.SetEllipsize(true)
+	it.AddClass("audio-device-option")
+	it.SetMedia(widget.NewThemeIcon(d.icon, int(v.px*1.2)), false)
+	if active {
+		it.AddClass("selected")
+		check := widget.NewThemeIcon("tb-check-symbolic", int(v.px))
+		check.AddClass("audio-device-option-check")
+		it.AddAction(check)
+	}
+	it.SetOnActivate(func() {
 		v.showPage("main")
 		v.write("set default device", func(ctx context.Context, src pulse.Source) error {
 			return src.SetDefault(ctx, key)
 		})
-	}, "audio-device-option")
-	if active {
-		b.AddClass("selected")
-	}
-	return b
+	})
+	return it
 }

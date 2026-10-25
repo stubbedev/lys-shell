@@ -324,8 +324,9 @@ func batteryText(battery *uint8) string {
 
 // buildRow is DeviceItem's view for one snapshot, on lys-ui's Item:
 // the device icon as the media, the name over the type and battery,
-// and the status or actions slot as the row's action. Activating the
-// row is the device click.
+// and the status or actions slot as the row's action. The text
+// ellipsizes so a long name never holds the row past the dropdown;
+// activating the row is the device click.
 func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	font, px := d.font, d.px
 	pending := d.pending[s.path]
@@ -335,6 +336,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	}
 	row := &btDeviceRow{Item: widget.NewItem(font, s.name, detail), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
 	row.SetSmall(true)
+	row.SetEllipsize(true)
 	row.AddClass("bluetooth-device")
 	switch s.category {
 	case categoryAvailable:

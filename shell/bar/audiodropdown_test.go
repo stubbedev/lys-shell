@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestAudioVolumeAndInputIcons(t *testing.T) {
@@ -213,7 +214,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	}
 	selected := 0
 	for _, c := range v.pickers[audioOutput].list.Children() {
-		if c.(*widget.Button).HasClass("selected") {
+		if c.(*widget.Item).HasClass("selected") {
 			selected++
 		}
 	}
@@ -258,13 +259,13 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 
 	// Picking the headset returns to main and changes the default.
 	v.showPage("output")
-	var headsetRow *widget.Button
+	var headsetRow *widget.Item
 	for _, c := range v.pickers[audioOutput].list.Children() {
-		if b := c.(*widget.Button); !b.HasClass("selected") {
-			headsetRow = b
+		if it := c.(*widget.Item); !it.HasClass("selected") {
+			headsetRow = it
 		}
 	}
-	headsetRow.OnClick()
+	headsetRow.ClickAt(widget.Point{})
 	if v.pages.Visible() != "main" {
 		t.Errorf("after pick page = %q", v.pages.Visible())
 	}
@@ -316,8 +317,6 @@ func TestAudioBoxesKeepRustZeroSpacing(t *testing.T) {
 	v := audioDropdown(ctx).(*audioView)
 	defer v.dropdownClosed()
 
-	st := readAudioState(context.Background(), svc)
-	optionContent := v.pickers[audioOutput].optionContent(st.outputs[0], true)
 	boxes := []struct {
 		what string
 		w    widget.Widget
@@ -335,8 +334,6 @@ func TestAudioBoxesKeepRustZeroSpacing(t *testing.T) {
 		{"picker root", v.pickers[audioOutput].Box},
 		{"picker header", findByClass(v.pickers[audioOutput], "picker-header")},
 		{"picker list", v.pickers[audioOutput].list},
-		{"option content", optionContent},
-		{"option info", optionContent.Children()[1]},
 	}
 	for _, b := range boxes {
 		spaced, ok := b.w.(interface{ Spacing() int })
@@ -410,9 +407,6 @@ func TestAudioRowsValignCenterTheRustWidgets(t *testing.T) {
 	header := findByClass(v.apps.list, "audio-app-header").(*widget.Box)
 	centered("the app icon tile", header, header.Children()[0])
 	centered("the app mute button", header, header.Children()[3])
-	st := readAudioState(context.Background(), svc)
-	option := v.pickers[audioOutput].optionContent(st.outputs[0], false)
-	centered("the option info column", option, option.Children()[1])
 }
 
 // Both empty states sit centered in their stack page (the Rust
@@ -480,10 +474,11 @@ func TestAudioNoDeviceRowCentersWithItsLabel(t *testing.T) {
 	}
 }
 
-// The picker's back button is the GhostIconButton (ghost-icon beside
-// picker-back) and the option tile is the CenterBox the Rust factory
-// builds — the image inside carries no invented class.
-func TestAudioPickerBackAndOptionIconClasses(t *testing.T) {
+// The picker's back button is the GhostIconButton (icon-sized beside
+// picker-back), and an option is lys-ui's Item with the device icon as
+// its media: the check rides only the active one, and activating it
+// goes back to the main page.
+func TestAudioPickerBackAndOptionItems(t *testing.T) {
 	v := audioDropdown(newTestContext(t, config.Defaults())).(*audioView)
 	found := findByClass(v.pickers[audioOutput], "picker-back")
 	back, ok := found.(*widget.Button)
@@ -493,17 +488,19 @@ func TestAudioPickerBackAndOptionIconClasses(t *testing.T) {
 	if !back.HasClass(css.Icon) {
 		t.Error("the back button is not icon-sized")
 	}
-	if findByClass(v.pickers[audioOutput], "audio-device-option-icon-img") != nil {
-		t.Error("the option image carries the invented icon-img class")
+	speakers := audioDevice{description: "Speakers", subtitle: "Built-in", icon: "tb-device-speaker-symbolic"}
+	idle := v.pickers[audioOutput].row(speakers, false)
+	if len(treetest.WithClass(idle, "media")) != 1 || len(treetest.WithClass(idle, "audio-device-option-check")) != 0 {
+		t.Error("an idle option lacks its media tile or carries the check")
 	}
-	content := v.pickers[audioOutput].optionContent(
-		audioDevice{description: "Speakers", icon: "tb-device-speaker-symbolic"}, false)
-	tile, ok := content.Children()[0].(*widget.CenterBox)
-	if !ok {
-		t.Fatalf("option tile = %T, want the CenterBox", content.Children()[0])
+	active := v.pickers[audioOutput].row(speakers, true)
+	if !active.HasClass("selected") || len(treetest.WithClass(active, "audio-device-option-check")) != 1 {
+		t.Error("the active option lacks the selected class or the check")
 	}
-	if !tile.HasClass("audio-device-option-icon") {
-		t.Error("the option tile misses audio-device-option-icon")
+	v.showPage("output")
+	active.ClickAt(widget.Point{})
+	if v.pages.Visible() != "main" {
+		t.Errorf("activating an option left page %q, want main", v.pages.Visible())
 	}
 }
 
@@ -618,5 +615,21 @@ func TestAudioChevronFollowsTheDeviceName(t *testing.T) {
 	btn := info.Children()[1]
 	if boundsOf(btn).W >= boundsOf(info).W-100 {
 		t.Errorf("the name button spans %dpx of its %dpx column, want it hugging the name", boundsOf(btn).W, boundsOf(info).W)
+	}
+}
+
+// A device whose name is one long token still fits a narrow picker:
+// the option's text ellipsizes, so the check stays inside the row.
+func TestAudioOptionFitsANarrowPicker(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	v := audioDropdown(ctx).(*audioView)
+	row := v.pickers[audioOutput].row(audioDevice{description: "alsa_output.pci-0000_00_1f.3.analog-stereo", icon: "tb-device-speaker-symbolic"}, true)
+	ctx.Theme.Attach(row)
+	const w = 240
+	sz := row.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})
+	row.Arrange(render.Rect{W: w, H: sz.H})
+	check := treetest.WithClass(row, "audio-device-option-check")[0].(*widget.Icon)
+	if end := check.Bounds().X + check.Bounds().W; end > w {
+		t.Errorf("the check ends at %d, past the %d row", end, w)
 	}
 }
