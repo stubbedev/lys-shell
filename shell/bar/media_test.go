@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeMediaSource is a scripted mpris.Source recording the controls.
@@ -402,32 +403,15 @@ func TestMediaDropdownPaintsFromTheStylesheet(t *testing.T) {
 		t.Error("the placeholder state does not follow the raw fields")
 	}
 
-	// The picker is a classed list of option buttons with no Go fills;
-	// the active player's option is the selected state.
+	// The picker is an item card of options; the active player's
+	// option is the selected state.
 	v.showPicker()
-	var option *widget.Button
-	list := false
-	walkTree(v.sources, func(w widget.Widget) bool {
-		switch w := w.(type) {
-		case *widget.Button:
-			if w.HasClass("media-source-option") {
-				option = w
-			}
-		case *widget.Box:
-			if w.HasClass("media-source-list") {
-				list = true
-			}
-		}
-		return true
-	})
-	if option == nil || !list {
-		t.Fatalf("the picker = option %v, list %v; want a classed option in a media-source-list", option, list)
+	options := treetest.WithClass(v.sources, "media-source-option")
+	if len(options) != 1 || len(treetest.WithClass(v.sources, "media-source-list")) != 1 {
+		t.Fatalf("the picker = %d options; want the one player in a media-source-list", len(options))
 	}
-	if option.BgHover != 0 || option.BgPressed != 0 {
-		t.Error("the source option carries Go hover fills")
-	}
-	if !option.HasClass("selected") {
-		t.Error("the active player's option is not selected")
+	if _, isItem := options[0].(*widget.Item); !isItem || !widget.HasClass(options[0], "selected") {
+		t.Errorf("the active player's option is %T, selected %v; want a selected Item", options[0], widget.HasClass(options[0], "selected"))
 	}
 }
 
@@ -478,7 +462,7 @@ func TestMediaPickerChrome(t *testing.T) {
 	}
 
 	// Negative: only the back button wears the ghost chrome — the
-	// option rows are plain classed buttons.
+	// option rows are Items.
 	var ghost *widget.Button
 	walkTree(v.sources, func(w widget.Widget) bool {
 		if b, ok := w.(*widget.Button); ok && b != back && b.HasClass(css.Icon) {
@@ -512,11 +496,11 @@ func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
 		glyph string
 		px    float64
 	}{
-		{v.shuffle, "ld-shuffle-symbolic", px},
-		{v.previous, "ld-skip-back-symbolic", px},
-		{v.playPause, "ld-play-symbolic", px * 1.4},
-		{v.next, "ld-skip-forward-symbolic", px},
-		{v.loop, "ld-repeat-symbolic", px},
+		{v.shuffle, "ld-shuffle-symbolic", mediaControlPx},
+		{v.previous, "ld-skip-back-symbolic", mediaControlPx},
+		{v.playPause, "ld-play-symbolic", mediaPlayPx},
+		{v.next, "ld-skip-forward-symbolic", mediaControlPx},
+		{v.loop, "ld-repeat-symbolic", mediaControlPx},
 	} {
 		bare := widget.NewButton(widget.NewThemeIcon(tc.glyph, int(tc.px)), 0, 0)
 		bare.AddClass(tc.b.Classes()...)

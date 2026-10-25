@@ -170,60 +170,61 @@ func mediaEmptyState(ctx ModuleContext) *widget.StatusPage {
 		i18n.T("dropdown-media-no-player-title"), i18n.T("dropdown-media-no-player-description"))
 }
 
-// controlButton builds one transport button: button.media-control
-// paints it (the ink, the hover fill, the sizes, and the icon margins
-// modules/media_dropdown/player_view.css), so nothing is set here — no padding, the
-// pointer cursor every button carries.
-func (v *mediaView) controlButton(icon *widget.Icon, class string, onClick func()) *widget.Button {
-	b := widget.NewButton(icon, 0, 0)
-	b.AddClass("media-control")
-	if class != "" {
-		b.AddClass(class)
+// mediaControlPx and mediaPlayPx are the transport glyphs' sizes:
+// the minor and skip buttons', and play/pause's on its accent button.
+const (
+	mediaControlPx = 16
+	mediaPlayPx    = 20
+)
+
+// controlButton builds one transport button on lys-ui's icon buttons:
+// a ghost one, or with classes beyond media-control (the accent
+// play/pause) those.
+func (v *mediaView) controlButton(icon *widget.Icon, onClick func(), classes ...string) *widget.Button {
+	if len(classes) == 0 {
+		classes = []string{css.Ghost}
 	}
+	b := widget.NewButton(icon, 0, 0)
+	b.AddClass(append([]string{"media-control", css.Icon}, classes...)...)
 	b.OnClick = onClick
 	return b
 }
 
-// buildPlayer assembles the player view once; refresh fills it in.
+// buildPlayer assembles the player view once; refresh fills it in: the
+// dropdown header with the source button as its action, over the
+// artwork, the track, the seek bar and the transport, the theme
+// spacing them.
 func (v *mediaView) buildPlayer(font render.Font, px float64) {
+	th := widget.Current()
 	v.player = widget.NewBox(widget.Column, 0, 0)
 
-	header := widget.NewBox(widget.Row, 0, 0)
-	header.AddClass("media-header")
-	title := widget.NewLabel(font, px, i18n.T("dropdown-media-title"), 0)
-	title.AddClass("media-header-title")
-	header.Append(title, true)
-	v.sourceIcon = widget.NewThemeIcon("ld-music-symbolic", int(px))
+	v.sourceIcon = widget.NewThemeIcon("ld-music-symbolic", itemIconPx)
 	v.sourceIcon.AddClass("media-source-icon")
-	v.identity = widget.NewLabel(font, px*0.9, "", 0)
+	v.identity = widget.NewLabel(font, px, "", 0)
 	v.identity.AddClass("media-source-name")
 	v.identity.SetEllipsize(widget.EllipsizeEnd)
-	chevron := widget.NewThemeIcon("ld-chevron-right-symbolic", int(px))
-	chevron.AddClass("media-source-chevron")
-	source := widget.NewBox(widget.Row, 0, 0)
-	source.Append(v.sourceIcon, false)
-	source.Append(v.identity, false)
-	source.Append(chevron, false)
-	sourceButton := widget.NewButton(source, 0, 0)
-	sourceButton.AddClass("media-source-button")
-	sourceButton.OnClick = v.showPicker
-	header.Append(sourceButton, false)
-	v.player.Append(header, false)
+	source := widget.NewBox(widget.Row, th.Spacing/2, 0)
+	source.AppendAligned(v.sourceIcon, false, widget.AlignCenter)
+	source.AppendAligned(v.identity, false, widget.AlignCenter)
+	source.AppendAligned(widget.NewThemeIcon("ld-chevron-right-symbolic", itemIconPx), false, widget.AlignCenter)
+	sourceButton := dropdownButton(source, v.showPicker, "media-source-button", css.Ghost, css.Small)
+	v.player.Append(dropdownHeader(font, "ld-disc-3-symbolic", i18n.T("dropdown-media-title"), sourceButton), false)
 
-	// The artwork vexpands into the panel's leftover height (player_view
-	// mod.rs:123-127); its floor is whatever the classes give it.
+	body := dropdownContent("media-player")
+	// The artwork takes the panel's leftover height (player_view
+	// mod.rs:123-127).
 	v.art = widget.NewBox(widget.Row, 0, 0)
 	v.art.AddClass("media-artwork")
-	v.player.Append(v.art, true)
+	body.Append(v.art, true)
 
-	info := widget.NewBox(widget.Column, 0, 0)
+	info := widget.NewBox(widget.Column, th.Spacing/2, 0)
 	info.AddClass("media-info")
-	v.title = widget.NewLabel(font, px*1.2, "", 0)
-	v.title.AddClass("media-title")
+	v.title = widget.NewLabel(font, px, "", 0)
+	v.title.AddClass("media-title", css.LargeText)
 	v.artist = widget.NewLabel(font, px, "", 0)
 	v.artist.AddClass("media-artist")
-	v.album = widget.NewLabel(font, px*0.9, "", 0)
-	v.album.AddClass("media-album")
+	v.album = widget.NewLabel(font, px, "", 0)
+	v.album.AddClass("media-album", css.DimLabel)
 	// The info rows fill the panel and ellipsize at its edge, centered
 	// text (xalign 0.5) like player_view mod.rs:158-184.
 	for _, l := range []*widget.Label{v.title, v.artist, v.album} {
@@ -231,40 +232,43 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 		l.SetAlignment(render.AlignCenter)
 		info.Append(l, false)
 	}
-	v.player.Append(info, false)
+	body.Append(info, false)
 
-	// The seek bar is a DebouncedSlider without its value label; the
-	// scale carries the class the slider rules target.
+	// The seek bar is a DebouncedSlider without its value label.
 	v.seek = widgets.NewDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
 	v.seek.Knob.AddClass("media-seek-slider")
 	v.seek.OnCommit = v.seekTo
 	times := widget.NewBox(widget.Row, 0, 0)
 	times.AddClass("media-progress-times")
-	v.position = widget.NewLabel(font, px*0.85, "0:00", 0)
-	v.position.AddClass("media-time")
-	v.length = widget.NewLabel(font, px*0.85, "0:00", 0)
-	v.length.AddClass("media-time")
+	v.position = widget.NewLabel(font, px, "0:00", 0)
+	v.length = widget.NewLabel(font, px, "0:00", 0)
+	for _, l := range []*widget.Label{v.position, v.length} {
+		l.AddClass("media-time", css.Caption, css.DimLabel, css.Numeric)
+	}
 	times.Append(v.position, true)
 	times.Append(v.length, false)
-	progress := widget.NewBox(widget.Column, 0, 0)
+	progress := widget.NewBox(widget.Column, th.Spacing/2, 0)
 	progress.AddClass("media-progress")
 	progress.Append(v.seek, false)
 	progress.Append(times, false)
-	v.player.Append(progress, false)
+	body.Append(progress, false)
 
-	controls := widget.NewBox(widget.Row, 0, 0)
+	controls := widget.NewBox(widget.Row, th.Spacing, 0)
 	controls.AddClass("media-controls")
-	v.shuffle = v.controlButton(widget.NewThemeIcon("ld-shuffle-symbolic", int(px)), "minor", func() { v.fire("toggle shuffle", v.src.ToggleShuffle) })
-	v.previous = v.controlButton(widget.NewThemeIcon("ld-skip-back-symbolic", int(px)), "", func() { v.fire("previous track", v.src.Previous) })
-	v.playIcon = widget.NewThemeIcon("ld-play-symbolic", int(px*1.4))
-	v.playPause = v.controlButton(v.playIcon, "main", func() { v.fire("play/pause", v.src.PlayPause) })
-	v.next = v.controlButton(widget.NewThemeIcon("ld-skip-forward-symbolic", int(px)), "", func() { v.fire("next track", v.src.Next) })
-	v.loopIcon = widget.NewThemeIcon("ld-repeat-symbolic", int(px))
-	v.loop = v.controlButton(v.loopIcon, "minor", func() { v.fire("toggle loop", v.src.ToggleLoop) })
+	v.shuffle = v.controlButton(widget.NewThemeIcon("ld-shuffle-symbolic", mediaControlPx), func() { v.fire("toggle shuffle", v.src.ToggleShuffle) })
+	v.shuffle.AddClass("minor")
+	v.previous = v.controlButton(widget.NewThemeIcon("ld-skip-back-symbolic", mediaControlPx), func() { v.fire("previous track", v.src.Previous) })
+	v.playIcon = widget.NewThemeIcon("ld-play-symbolic", mediaPlayPx)
+	v.playPause = v.controlButton(v.playIcon, func() { v.fire("play/pause", v.src.PlayPause) }, css.SuggestedAction, css.Large, "main")
+	v.next = v.controlButton(widget.NewThemeIcon("ld-skip-forward-symbolic", mediaControlPx), func() { v.fire("next track", v.src.Next) })
+	v.loopIcon = widget.NewThemeIcon("ld-repeat-symbolic", mediaControlPx)
+	v.loop = v.controlButton(v.loopIcon, func() { v.fire("toggle loop", v.src.ToggleLoop) })
+	v.loop.AddClass("minor")
 	for _, b := range []*widget.Button{v.shuffle, v.previous, v.playPause, v.next, v.loop} {
 		controls.AppendAligned(b, false, widget.AlignCenter)
 	}
-	v.player.AppendAligned(controls, false, widget.AlignCenter)
+	body.AppendAligned(controls, false, widget.AlignCenter)
+	v.player.Append(body, true)
 }
 
 // fire runs one transport command off the loop; failures log, as the
@@ -362,16 +366,14 @@ func lengthText(length time.Duration) string {
 // setArt swaps the cover when the art URL changes: a file:// path or
 // an http(s) URL fills the panel, anything else is the disc
 // placeholder centered in it (the art resolver's
-// Ready/NeedsDownload/Unresolvable). The icon's constructor px is only
-// the fallback: the .media-artwork-placeholder-icon rules size it.
+// Ready/NeedsDownload/Unresolvable).
 func (v *mediaView) setArt(url string) {
 	if url == v.artURL && len(v.art.Children()) > 0 {
 		return
 	}
 	v.artURL = url
-	_, px := dropdownFont(v.ctx)
 	v.art.Clear()
-	art := mediaArt(url, "ld-disc-3-symbolic", "media-artwork-placeholder", "media-artwork-placeholder-icon", int(px))
+	art := mediaArt(url, "ld-disc-3-symbolic", "media-artwork-placeholder", "media-artwork-placeholder-icon", mediaArtGlyphPx)
 	if _, isImage := art.(*widget.Image); isImage {
 		v.art.Append(art, true)
 		return
@@ -384,6 +386,9 @@ func (v *mediaView) setArt(url string) {
 	row.Append(widget.NewSpacer(0, 0), true)
 	v.art.AppendAligned(row, true, widget.AlignCenter)
 }
+
+// mediaArtGlyphPx is the placeholder disc's size on its tile.
+const mediaArtGlyphPx = 48
 
 // mediaArt is a player's cover: the art at a file or http(s) URL scaled
 // to cover, else the placeholder glyph in its tile box (boxClass, whose
@@ -418,58 +423,48 @@ func (v *mediaView) showPicker() {
 	v.buildPicker()
 }
 
-// buildPicker lists every player; picking one makes it active and
-// returns to the player view (source_picker/mod.rs: the .picker-header
-// row with the ghost icon back button over the .picker-body scroll).
+// buildPicker lists every player as an Item in an item card under the
+// back and title row; picking one makes it active and returns to the
+// player view (source_picker/mod.rs).
 func (v *mediaView) buildPicker() {
 	font, px := dropdownFont(v.ctx)
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("media-source-picker")
-	header := widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	col := dropdownContent("media-source-picker")
+	header := widget.NewBox(widget.Row, th.Spacing, 0)
 	header.AddClass("picker-header")
-	back := dropdownButton(widget.NewThemeIcon("ld-arrow-left-symbolic", int(px)), func() { v.mode = ""; v.refresh() }, "picker-back")
-	back.AddClass(css.Ghost, css.Icon)
-	header.Append(back, false)
+	back := dropdownButton(widget.NewThemeIcon("ld-arrow-left-symbolic", itemIconPx), func() { v.mode = ""; v.refresh() }, "picker-back", css.Ghost, css.Icon, css.Small)
+	header.AppendAligned(back, false, widget.AlignCenter)
 	headerLabel := widget.NewLabel(font, px, i18n.T("dropdown-media-sources"), 0)
-	headerLabel.AddClass("picker-title")
-	header.Append(headerLabel, true)
+	headerLabel.AddClass("picker-title", css.Heading)
+	header.AppendAligned(headerLabel, true, widget.AlignCenter)
 	col.Append(header, false)
-	list := widget.NewBox(widget.Column, 0, 0)
-	list.AddClass("media-source-list")
-	col.Append(dropdownScroll(list, "picker-body"), true)
+	card, list := itemCard()
+	card.AddClass("media-source-list")
+	col.Append(scrolledCard(card, "picker-body"), true)
 	active, _ := v.src.Active()
 	v.check = nil
 	for _, p := range v.src.Players() {
-		// The row shows the identity as-is (methods.rs:39); CSS paints
-		// the option (radius, padding, border-spacing).
-		row := widget.NewBox(widget.Row, 0, 0)
-		row.AddClass("media-source-option-content")
-		icon := widget.NewThemeIcon(mediaSourceIcon(p), int(px))
-		tile := widget.NewCenterBox(nil, icon, nil)
-		tile.AddClass("media-source-option-icon")
-		row.AppendAligned(tile, false, widget.AlignCenter)
-		name := widget.NewLabel(font, px, p.Identity, 0)
-		name.AddClass("media-source-option-name")
-		name.SetEllipsize(widget.EllipsizeEnd)
-		row.AppendAligned(name, true, widget.AlignCenter)
+		// The row shows the identity as-is (methods.rs:39).
+		row := widget.NewItem(font, p.Identity, "")
+		row.SetSmall(true)
+		row.SetEllipsize(true)
+		row.AddClass("media-source-option")
+		row.SetMedia(widget.NewThemeIcon(mediaSourceIcon(p), itemIconPx), false)
+		setClass(row, "selected", p.BusName == active.BusName)
 		if p.BusName == active.BusName {
-			check := widget.NewThemeIcon("tb-check-symbolic", int(px))
-			check.AddClass("media-source-option-check")
-			row.Append(check, false)
-			v.check = check
+			v.check = widget.NewThemeIcon("tb-check-symbolic", itemIconPx)
+			v.check.AddClass("media-source-option-check")
+			row.AddAction(v.check)
 		}
-		b := widget.NewButton(row, 0, 0)
-		b.AddClass("media-source-option")
-		setClass(b, "selected", p.BusName == active.BusName)
 		bus := p.BusName
-		b.OnClick = func() {
+		row.SetOnActivate(func() {
 			if err := v.src.SetActive(bus); err != nil {
 				log.Printf("media: select %s: %v", bus, err)
 			}
 			v.mode = ""
 			v.refresh()
-		}
-		list.Append(b, false)
+		})
+		list.Append(row)
 	}
 	v.sources.Clear()
 	v.sources.Append(col, true)

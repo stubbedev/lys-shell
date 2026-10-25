@@ -117,6 +117,15 @@ func TestDropdownPreviews(t *testing.T) {
 			})
 			return newPanelBox(mediaDropdown(*ctx))
 		}},
+		{"media-picker", "media", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			ctx.Media = newFakeMedia(
+				mpris.Player{BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC", State: mpris.StatePlaying},
+				mpris.Player{BusName: "org.mpris.MediaPlayer2.mpv", Identity: "mpv"},
+			)
+			v := mediaDropdown(*ctx).(*mediaView)
+			v.showPicker()
+			return newPanelBox(v)
+		}},
 		{"network", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			wifi := &fakeWifiCtl{aps: []network.AccessPoint{
 				netAP("home", 80, network.SecurityWPA2, "/ap/1"), netAP("cafe", 60, network.SecurityNone, "/ap/2"),
