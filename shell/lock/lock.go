@@ -71,6 +71,10 @@ type Deps struct {
 	SetLockedHint func(locked bool)
 	// LoadImage decodes (and blurs) the background image.
 	LoadImage func(path string, blur uint32) (image.Image, error)
+	// OnLocked runs on the loop each time the compositor confirms a
+	// lock, for what locks with the session (the vault); nil for
+	// nothing.
+	OnLocked func()
 }
 
 // authHandle is the running conversation's reply side.
@@ -240,6 +244,9 @@ func (s *Screen) dropFace(f *face) {
 func (s *Screen) onLocked() {
 	s.confirmed = true
 	s.setLockedHint(true)
+	if s.d.OnLocked != nil {
+		s.d.OnLocked()
+	}
 	log.Printf("lock: session locked (%d monitors)", len(s.faces))
 }
 

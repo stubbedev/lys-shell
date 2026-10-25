@@ -11,6 +11,9 @@ settings-modules-bitwarden-email = E-mail
 settings-modules-bitwarden-lock-after = Verrouiller après (minutes)
     .description = Verrouiller le coffre après ce nombre de minutes sans copie. 0 le laisse ouvert jusqu'au verrouillage manuel
 
+settings-modules-bitwarden-lock-with-session = Verrouiller avec la session
+    .description = Verrouiller le coffre lorsque la session se verrouille
+
 settings-modules-bitwarden-clipboard-clear = Vider le presse-papiers après (secondes)
     .description = Effacer un secret copié après ce nombre de secondes, sauf si autre chose a été copié. 0 le laisse
 

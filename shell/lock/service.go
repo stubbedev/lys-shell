@@ -50,7 +50,7 @@ func (l appLocker) Focus(w widget.Widget) {
 // triggers, lock-on-start, and the LockedHint restart recovery. The
 // shell serves `lys-shell lock` by handing Screen.Lock to its
 // dev.stubbe.lys.Shell1 hooks. The returned stop ends the logind listener.
-func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widget.Stylesheet) (*Screen, func()) {
+func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widget.Stylesheet, onLocked func()) (*Screen, func()) {
 	ld := systemLogind()
 	deps := Deps{
 		Locker: appLocker{a: a},
@@ -64,6 +64,7 @@ func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widg
 			return auth.Spawn(auth.NewPAM(service), auth.CurrentUsername(), onEvent)
 		},
 		LoadImage: func(path string, blur uint32) (image.Image, error) { return credential.LoadImage(path, blur) },
+		OnLocked:  onLocked,
 	}
 	if ld != nil {
 		deps.SetLockedHint = func(locked bool) {

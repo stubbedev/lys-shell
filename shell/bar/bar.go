@@ -427,7 +427,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 	go osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness)
 	// The ext-session-lock screen and its triggers (logind, and `lys-shell
 	// lock` through Shell1).
-	lockScreen, stopLock := lock.Start(application, current.Load(), font, theme.Sheet)
+	lockScreen, stopLock := lock.Start(application, current.Load(), font, theme.Sheet, func() {
+		if current.Load().Bitwarden.LockWithSession {
+			baseCtx.Bitwarden.lockIfOpen()
+		}
+	})
 	defer stopLock()
 	defer serveShellIPC(application, bars, func() bool {
 		application.Invoke(lockScreen.Lock)

@@ -77,6 +77,8 @@ type BitwardenConfig struct {
 	// Lock the vault after this many minutes without a copy. 0 keeps it
 	// open until locked by hand.
 	LockAfter uint32 `cfg:"lock-after"`
+	// Lock the vault when the session locks.
+	LockWithSession bool `cfg:"lock-with-session"`
 	// Clear a copied secret from the clipboard after this many seconds,
 	// unless something else was copied since. 0 leaves it there.
 	ClipboardClear uint32 `cfg:"clipboard-clear"`
@@ -131,28 +133,29 @@ type BitwardenConfig struct {
 // DefaultsBitwarden returns the schema defaults.
 func DefaultsBitwarden() BitwardenConfig {
 	return BitwardenConfig{
-		Server:         mustBitwardenServer(bitwarden.CloudUS),
-		Email:          "",
-		LockAfter:      15,
-		ClipboardClear: 30,
-		SyncInterval:   30,
-		Format:         "{{ count }}",
-		IconLocked:     "ld-lock-symbolic",
-		IconUnlocked:   "ld-lock-open-symbolic",
-		BorderShow:     false,
-		BorderColor:    mustColor("blue"),
-		IconShow:       true,
-		IconColor:      mustColor("auto"),
-		IconBgColor:    mustColor("blue"),
-		LabelShow:      false,
-		LabelColor:     mustColor("blue"),
-		LabelMaxLength: 0,
-		ButtonBgColor:  mustColor("bg-surface-elevated"),
-		LeftClick:      ParseClickAction("dropdown:bitwarden"),
-		RightClick:     ClickAction{},
-		MiddleClick:    ClickAction{},
-		ScrollUp:       ClickAction{},
-		ScrollDown:     ClickAction{},
+		Server:          mustBitwardenServer(bitwarden.CloudUS),
+		Email:           "",
+		LockAfter:       15,
+		LockWithSession: true,
+		ClipboardClear:  30,
+		SyncInterval:    30,
+		Format:          "{{ count }}",
+		IconLocked:      "ld-lock-symbolic",
+		IconUnlocked:    "ld-lock-open-symbolic",
+		BorderShow:      false,
+		BorderColor:     mustColor("blue"),
+		IconShow:        true,
+		IconColor:       mustColor("auto"),
+		IconBgColor:     mustColor("blue"),
+		LabelShow:       false,
+		LabelColor:      mustColor("blue"),
+		LabelMaxLength:  0,
+		ButtonBgColor:   mustColor("bg-surface-elevated"),
+		LeftClick:       ParseClickAction("dropdown:bitwarden"),
+		RightClick:      ClickAction{},
+		MiddleClick:     ClickAction{},
+		ScrollUp:        ClickAction{},
+		ScrollDown:      ClickAction{},
 	}
 }
 

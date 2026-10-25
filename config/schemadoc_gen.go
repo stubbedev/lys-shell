@@ -150,6 +150,7 @@ var schemaDocs = map[string]string{
 	"BitwardenConfig.LabelShow":                              "Display label.",
 	"BitwardenConfig.LeftClick":                              "Action on left click. Defaults to opening the vault dropdown.",
 	"BitwardenConfig.LockAfter":                              "Lock the vault after this many minutes without a copy. 0 keeps it\nopen until locked by hand.",
+	"BitwardenConfig.LockWithSession":                        "Lock the vault when the session locks.",
 	"BitwardenConfig.MiddleClick":                            "Action on middle click.",
 	"BitwardenConfig.RightClick":                             "Action on right click.",
 	"BitwardenConfig.ScrollDown":                             "Action on scroll down.",

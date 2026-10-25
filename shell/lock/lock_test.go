@@ -93,6 +93,7 @@ type harness struct {
 	loop   *fakeLoop
 	convs  []*fakeAuth
 	hints  []bool
+	locked int
 	now    time.Time
 	timers []*timer
 }
@@ -133,6 +134,7 @@ func newHarness(t *testing.T, edit func(*config.LockConfig)) *harness {
 		LoadImage: func(string, uint32) (image.Image, error) {
 			return image.NewRGBA(image.Rect(0, 0, 4, 4)), nil
 		},
+		OnLocked: func() { h.locked++ },
 	})
 	return h
 }
@@ -189,6 +191,9 @@ func TestLockCoversOutputsAndReportsTheHint(t *testing.T) {
 	}
 	if len(h.hints) != 1 || !h.hints[0] {
 		t.Errorf("LockedHint calls = %v, want [true] once locked", h.hints)
+	}
+	if h.locked != 1 {
+		t.Errorf("what locks with the session ran %d times, want once", h.locked)
 	}
 	if len(h.loop.every) != 1 {
 		t.Errorf("clock timers = %d, want 1", len(h.loop.every))
@@ -435,6 +440,9 @@ func TestDeniedLock(t *testing.T) {
 	}
 	if len(h.hints) != 0 {
 		t.Errorf("a denied lock touched LockedHint: %v", h.hints)
+	}
+	if h.locked != 0 {
+		t.Errorf("a denied lock locked what locks with the session %d times", h.locked)
 	}
 }
 

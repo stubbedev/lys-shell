@@ -55,6 +55,9 @@ type bitwardenHost struct {
 	// replaced (0 keeps it); loop goroutine only.
 	copy  func(content transfer.Content, ttl time.Duration) error
 	vault func() (vault, error)
+
+	mu     sync.Mutex
+	opened vault
 }
 
 // newBitwardenHost is the host over the session clipboard, the vault
@@ -80,10 +83,24 @@ func newBitwardenHost(life context.Context, application *app.Application, curren
 		if err != nil {
 			return nil, err
 		}
+		h.mu.Lock()
+		h.opened = svc
+		h.mu.Unlock()
 		go h.keep(svc)
 		return svc, nil
 	})
 	return h
+}
+
+// lockIfOpen locks the vault with the session; a vault never opened
+// stays unopened.
+func (h *bitwardenHost) lockIfOpen() {
+	h.mu.Lock()
+	v := h.opened
+	h.mu.Unlock()
+	if v != nil {
+		v.Lock()
+	}
 }
 
 // keep runs the upkeep every tick until the shell exits.

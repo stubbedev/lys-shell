@@ -1039,6 +1039,11 @@
           "default": 15,
           "description": "Lock the vault after this many minutes without a copy. 0 keeps it\nopen until locked by hand."
         },
+        "lock-with-session": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Lock the vault when the session locks."
+        },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
@@ -4741,6 +4746,7 @@
             "label-show": false,
             "left-click": "dropdown:bitwarden",
             "lock-after": 15,
+            "lock-with-session": true,
             "middle-click": "",
             "right-click": "",
             "scroll-down": "",
@@ -9541,6 +9547,7 @@
           "label-show": false,
           "left-click": "dropdown:bitwarden",
           "lock-after": 15,
+          "lock-with-session": true,
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",

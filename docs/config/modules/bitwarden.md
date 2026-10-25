@@ -33,6 +33,7 @@ bar:
 | `server` | [`BitwardenServer`](/config/types#bitwarden-server) | `"bitwarden.com"` | Server the login form logs in to. A logged-in account keeps the server it logged in to. |
 | `email` | string | `""` | Email the login form starts with. |
 | `lock-after` | u32 | `15` | Lock the vault after this many minutes without a copy. 0 keeps it open until locked by hand. |
+| `lock-with-session` | bool | `true` | Lock the vault when the session locks. |
 | `clipboard-clear` | u32 | `30` | Clear a copied secret from the clipboard after this many seconds, unless something else was copied since. 0 leaves it there. |
 | `sync-interval` | u32 | `30` | Sync the open vault every this many minutes. 0 syncs only on unlock and by hand. |
 | `format` | string | `"{{ count }}"` | Format string for the label. |
@@ -84,6 +85,7 @@ modules:
     server: bitwarden.com
     email: ""
     lock-after: 15
+    lock-with-session: true
     clipboard-clear: 30
     sync-interval: 30
     format: '{{ count }}'

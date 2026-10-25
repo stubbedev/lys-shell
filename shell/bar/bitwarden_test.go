@@ -641,3 +641,32 @@ func TestBitwardenInitialFocus(t *testing.T) {
 		t.Errorf("plain content in a panel focuses %T", got)
 	}
 }
+
+// The session lock leaves a vault the shell never opened unopened (no
+// state directory appears) and reaches the vault once it is open.
+func TestBitwardenLocksWithTheSession(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", state)
+	life, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	cfg := config.Defaults()
+	h := newBitwardenHost(life, nil, func() *config.Config { return cfg })
+	h.lockIfOpen()
+	if _, err := os.Stat(filepath.Join(state, "lys-shell", "bitwarden")); !os.IsNotExist(err) {
+		t.Fatalf("locking an unopened vault opened it: %v", err)
+	}
+	v, err := h.vault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.mu.Lock()
+	opened := h.opened
+	h.mu.Unlock()
+	if opened != v {
+		t.Fatalf("the session lock does not reach the opened vault: %v", opened)
+	}
+	h.lockIfOpen()
+	if st := v.Status().State; st != bitwarden.StateLoggedOut {
+		t.Errorf("a logged-out vault locked into %v", st)
+	}
+}

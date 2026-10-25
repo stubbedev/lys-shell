@@ -11,6 +11,9 @@ settings-modules-bitwarden-email = Email
 settings-modules-bitwarden-lock-after = Lock After (minutes)
     .description = Lock the vault after this many minutes without a copy. 0 keeps it open until locked by hand
 
+settings-modules-bitwarden-lock-with-session = Lock With the Session
+    .description = Lock the vault when the session locks
+
 settings-modules-bitwarden-clipboard-clear = Clear Clipboard After (seconds)
     .description = Clear a copied secret after this many seconds unless something else was copied. 0 leaves it
 
