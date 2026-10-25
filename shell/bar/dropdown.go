@@ -366,7 +366,7 @@ func (r *dropdownRegistry) closeAll() {
 func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, monH, width int) app.PopoverConfig {
 	pc := app.PopoverConfig{
 		Anchor:     anchor,
-		Gravity:    dropdownGravity(cfg.Bar.Location),
+		Gravity:    app.GravityOf(barEdge(cfg.Bar.Location).PopoverSide()),
 		Content:    content,
 		Gap:        widget.PopoverGap,
 		NoAutohide: !cfg.Bar.DropdownAutohide,
@@ -430,18 +430,4 @@ func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.
 	card.SetSizeRequest(w, h)
 	card.SetMaximumSize(0, h)
 	return card, rev
-}
-
-// dropdownGravity is detect_popover_position: dropdowns open away from
-// the bar's screen edge.
-func dropdownGravity(location config.Location) app.Gravity {
-	switch location {
-	case config.LocationBottom:
-		return app.GravityTop
-	case config.LocationLeft:
-		return app.GravityRight
-	case config.LocationRight:
-		return app.GravityLeft
-	}
-	return app.GravityBottom
 }

@@ -112,8 +112,11 @@ func TestDropdownGravityOpensAwayFromTheEdge(t *testing.T) {
 		config.LocationTop: app.GravityBottom, config.LocationBottom: app.GravityTop,
 		config.LocationLeft: app.GravityRight, config.LocationRight: app.GravityLeft,
 	} {
-		if got := dropdownGravity(loc); got != want {
-			t.Errorf("dropdownGravity(%s) = %v, want %v", loc, got, want)
+		cfg := config.Defaults()
+		cfg.Bar.Location = loc
+		anchor := widget.NewBox(widget.Row, 0, 0)
+		if got := dropdownPopover(cfg, anchor, anchor, 0, 0).Gravity; got != want {
+			t.Errorf("a %s bar's dropdown opens toward %v, want %v", loc, got, want)
 		}
 	}
 }
