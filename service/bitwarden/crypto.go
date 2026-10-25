@@ -357,13 +357,18 @@ func Unlock(in UnlockInput) (*Keyring, error) {
 		return nil, err
 	}
 	defer mk.wipe()
-	user, err := unwrapUserKey(mk, in.UserKey)
+	return unlockWith(mk, in.UserKey, in.PrivateKey, in.OrgKeys)
+}
+
+// unlockWith opens the hierarchy under an already derived master key.
+func unlockWith(mk *masterKey, userKey, privateKey string, orgKeys map[string]string) (*Keyring, error) {
+	user, err := unwrapUserKey(mk, userKey)
 	if err != nil {
 		return nil, err
 	}
 	kr := &Keyring{User: user, Orgs: map[string]SymmetricKey{}}
-	if in.PrivateKey != "" {
-		der, err := user.DecryptString(in.PrivateKey)
+	if privateKey != "" {
+		der, err := user.DecryptString(privateKey)
 		if err != nil {
 			kr.Wipe()
 			return nil, fmt.Errorf("bitwarden: private key: %w", err)
@@ -381,30 +386,48 @@ func Unlock(in UnlockInput) (*Keyring, error) {
 		}
 		kr.private = rk
 	}
-	for id, wrapped := range in.OrgKeys {
-		if kr.private == nil {
-			kr.Wipe()
-			return nil, errors.New("bitwarden: organization keys without a private key")
+	if err := kr.SetOrgKeys(orgKeys); err != nil {
+		kr.Wipe()
+		return nil, err
+	}
+	return kr, nil
+}
+
+// SetOrgKeys replaces the organization keys with orgKeys, each opened
+// with the private key: a sync after a membership change brings new
+// ones and drops old ones. On an error the previous keys stay.
+func (k *Keyring) SetOrgKeys(orgKeys map[string]string) error {
+	next := make(map[string]SymmetricKey, len(orgKeys))
+	fail := func(err error) error {
+		for _, o := range next {
+			o.Wipe()
+		}
+		return err
+	}
+	for id, wrapped := range orgKeys {
+		if k.private == nil {
+			return fail(errors.New("bitwarden: organization keys without a private key"))
 		}
 		e, err := ParseEncString(wrapped)
 		if err != nil {
-			kr.Wipe()
-			return nil, fmt.Errorf("bitwarden: organization %s key: %w", id, err)
+			return fail(fmt.Errorf("bitwarden: organization %s key: %w", id, err))
 		}
-		raw, err := decryptRSA(kr.private, e)
+		raw, err := decryptRSA(k.private, e)
 		if err != nil {
-			kr.Wipe()
-			return nil, fmt.Errorf("bitwarden: organization %s key: %w", id, err)
+			return fail(fmt.Errorf("bitwarden: organization %s key: %w", id, err))
 		}
 		org, err := symmetricKeyFrom(raw)
 		wipe(raw)
 		if err != nil {
-			kr.Wipe()
-			return nil, fmt.Errorf("bitwarden: organization %s key: %w", id, err)
+			return fail(fmt.Errorf("bitwarden: organization %s key: %w", id, err))
 		}
-		kr.Orgs[id] = org
+		next[id] = org
 	}
-	return kr, nil
+	for _, o := range k.Orgs {
+		o.Wipe()
+	}
+	k.Orgs = next
+	return nil
 }
 
 // unwrapUserKey opens the user key: a type 2 wrapping with the
