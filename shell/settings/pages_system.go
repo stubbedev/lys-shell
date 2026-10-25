@@ -19,7 +19,7 @@ func generalPage(*config.Config) pageSpec {
 		id: "general", navKey: "settings-nav-general", icon: "ld-settings-symbolic",
 		header: "settings-page-general",
 		sections: []sectionSpec{
-			{title: "settings-section-fonts", rows: []rowSpec{field("general.font-sans", fontRow), field("general.font-mono", fontRow)}},
+			{title: "settings-section-fonts", rows: []rowSpec{field("general.font-sans", fontRow), field("general.font-mono", monoFontRow)}},
 			{title: "settings-section-scale-rounding", rows: fields("styling.scale", "styling.rounding")},
 			{title: "settings-section-display", rows: fields("general.tearing-mode")},
 		},

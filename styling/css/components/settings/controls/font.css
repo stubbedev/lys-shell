@@ -11,34 +11,3 @@ menubutton.font > button {
 .font-picker-label {
   color: var(--fg-default);
 }
-
-.font-picker-popover contents {
-  padding: var(--space-md);
-}
-
-.font-picker-popover entry {
-  border-spacing: 0;
-}
-
-.font-picker-popover entry > text {
-  margin-left: 0;
-  padding-left: 0;
-}
-
-.font-picker-scroll {
-  margin-top: var(--space-sm);
-  min-width: calc(16rem * var(--global-scale));
-  min-height: calc(18rem * var(--global-scale));
-}
-
-.font-picker-list row {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--fg-muted);
-  border-radius: var(--rounding-element);
-}
-
-.font-picker-list row:hover {
-  background-color: var(--bg-hover);
-}

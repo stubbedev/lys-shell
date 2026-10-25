@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
@@ -20,44 +19,39 @@ import (
 
 // The editors that open a picker (editors/font, editors/color).
 
-// pickers opens what an editor picks from: a popover beside an anchor
-// and the color dialog. The window provides it; tests fake it.
+// pickers opens what an editor picks from: a popover beside an anchor,
+// the color dialog and the font dialog. The window provides it; tests
+// fake it.
 type pickers interface {
 	// popover shows content beside anchor; close dismisses it.
 	popover(anchor widget.Widget, content widget.Widget) (close func())
 	// color asks for a color, calling fn with the pick.
 	color(initial render.Color, fn func(render.Color))
+	// font asks for a font family, initially family, monospace ones
+	// only when monospace, calling fn with the pick.
+	font(family string, monospace bool, fn func(family string))
 	// openFile asks the file chooser for one file, calling fn on the
 	// loop with its path; a dismissed chooser calls nothing.
 	openFile(fn func(path string))
 }
 
-// fontFamilies lists the families a font picker offers (a seam for
-// tests).
-var fontFamilies = app.FontFamilies
-
 // fontPickerLabelChars caps the face's label (FontControl).
 const fontPickerLabelChars = 20
 
-// fontPickerListPx is the family list's height: .font-picker-scroll's
-// 18rem at the settings window's 1.1 global scale, the scrolled
-// window's size in Rust.
-const fontPickerListPx = 18 * remBasePx * 1.1
-
 // fontEditor is FontControl: a menu button showing the family that
-// opens the searchable family list.
+// opens lys-ui's font dialog for families alone, monospace ones only
+// for the monospace field.
 type fontEditor struct {
 	*widget.Box
-	k     *kit
-	slot  slot
-	label *widget.Label
-	btn   *widget.Button
-	// picker is the open (or last) picker.
-	picker *searchPicker
+	k         *kit
+	slot      slot
+	monospace bool
+	label     *widget.Label
+	btn       *widget.Button
 }
 
-func newFontEditor(k *kit, s slot) *fontEditor {
-	c := &fontEditor{Box: widget.NewBox(widget.Row, 0, 0), k: k, slot: s}
+func newFontEditor(k *kit, s slot, monospace bool) *fontEditor {
+	c := &fontEditor{Box: widget.NewBox(widget.Row, 0, 0), k: k, slot: s, monospace: monospace}
 	c.SetElement("menubutton")
 	c.AddClass("font")
 	c.label = k.label("", "font-picker-label")
@@ -74,25 +68,13 @@ func (c *fontEditor) refresh() {
 	c.label.SetText(s)
 }
 
-// open shows the picker (FontPicker): a search entry over the family
-// list; a pick writes the family and closes it.
+// open asks the font dialog; a pick writes the family.
 func (c *fontEditor) open() {
 	if c.k.pickers == nil {
 		return
 	}
-	families, err := fontFamilies()
-	if err != nil {
-		log.Printf("settings: font families: %v", err)
-	}
-	c.picker = openSearchPicker(c.k, c.btn, families, pickerSpec{
-		class: "font-picker-popover", listClass: "font-picker-list", scrollClass: "font-picker-scroll",
-		placeholder: "settings-font-search", maxH: int(math.Round(fontPickerListPx)), searchEntry: true,
-		row: func(k *kit, name string) widget.Widget {
-			l := k.label(name, "font-picker-item")
-			l.SetEllipsize(widget.EllipsizeEnd)
-			return l
-		},
-	}, func(family string) { _ = c.slot.set(family) })
+	current, _ := c.slot.get().(string)
+	c.k.pickers.font(current, c.monospace, func(family string) { _ = c.slot.set(family) })
 }
 
 // pickerSpec shapes a searchPicker: the CSS classes, the search
@@ -303,8 +285,12 @@ func (c *fileEditor) browse() {
 // filePath is file_picker::file_path for a row.
 var filePath = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFileEditor(k, s) })
 
-// fontRow is font::font for a row.
-var fontRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFontEditor(k, s) })
+// fontRow is font::font for a row; monoFontRow offers monospace
+// families only.
+var (
+	fontRow     = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFontEditor(k, s, false) })
+	monoFontRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFontEditor(k, s, true) })
+)
 
 // Icon picker sizes (editors/icon: PREVIEW_SIZE, the scroller's
 // minimum content size, and the 2rem cell at the 1.1 global scale plus

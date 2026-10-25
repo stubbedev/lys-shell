@@ -23,7 +23,6 @@ settings-layout-extends-none = none
 settings-layout-default-group = group
 settings-layout-search = Search modules...
 settings-layout-count = { $count } layouts
-settings-font-search = Search fonts...
 settings-unit-scale = scale
 settings-inherit = Inherit (default)
 settings-override = Override the default

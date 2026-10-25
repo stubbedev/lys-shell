@@ -165,6 +165,17 @@ func (p windowPickers) color(initial render.Color, fn func(render.Color)) {
 	}
 }
 
+// font opens lys-ui's font dialog for families alone (FontButton's
+// family-only level), monospace ones only when monospace.
+func (p windowPickers) font(family string, monospace bool, fn func(string)) {
+	if _, err := p.app.FontChooserDialog(p.win, app.FontChooserConfig{
+		Family: family, FamilyOnly: true, MonospaceOnly: monospace,
+		OnFont: func(picked string, _ float64) { fn(picked) },
+	}); err != nil {
+		log.Printf("settings: font dialog: %v", err)
+	}
+}
+
 // openFile asks the file chooser portal on the session bus, off the
 // loop, and hands the pick back on it (FileDialog.open).
 func (p windowPickers) openFile(fn func(path string)) {

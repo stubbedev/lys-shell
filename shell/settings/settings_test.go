@@ -571,6 +571,9 @@ type fakePickers struct {
 	colorIn         render.Color
 	colorFn         func(render.Color)
 	fileFn          func(string)
+	fontIn          string
+	fontMono        bool
+	fontFn          func(string)
 }
 
 func (f *fakePickers) popover(anchor, content widget.Widget) func() {
@@ -584,56 +587,66 @@ func (f *fakePickers) color(initial render.Color, fn func(render.Color)) {
 
 func (f *fakePickers) openFile(fn func(string)) { f.fileFn = fn }
 
+func (f *fakePickers) font(family string, monospace bool, fn func(string)) {
+	f.fontIn, f.fontMono, f.fontFn = family, monospace, fn
+}
+
+// The font button opens lys-ui's font dialog at the configured family,
+// limited to monospace families for the monospace field only, and the
+// dialog's pick is written and shown.
 func TestFontEditorPicksAFamily(t *testing.T) {
-	// The search is a gtk::SearchEntry; its search-changed delay runs
-	// instantly here.
-	defer widget.SetAnimationsInstant(true)()
 	k := testKit(t, "")
 	f := &fakePickers{}
 	k.pickers = f
-	prev := fontFamilies
-	fontFamilies = func() ([]string, error) { return []string{"Cantarell", "DejaVu Sans", "Noto Sans"}, nil }
-	t.Cleanup(func() { fontFamilies = prev })
-	c := newFontEditor(k, pathSlot(k.store, "general.font-sans"))
-	if want, _ := k.store.value("general.font-sans").(string); c.label.Text() != want {
+	c := newFontEditor(k, pathSlot(k.store, "general.font-sans"), false)
+	want, _ := k.store.value("general.font-sans").(string)
+	if c.label.Text() != want {
 		t.Fatalf("label %q, want the configured family %q", c.label.Text(), want)
 	}
 	c.btn.ClickAt(widget.Point{})
-	if f.anchor != widget.Widget(c.btn) || f.content == nil {
-		t.Fatal("the button opened no picker")
+	if f.fontFn == nil || f.fontIn != want || f.fontMono {
+		t.Fatalf("dialog opened at %q mono %v, want %q for every family", f.fontIn, f.fontMono, want)
 	}
-	picker := f.content.(*widget.Box)
-	// The picker's search narrows the list case-insensitively.
-	p := c.picker
-	if p == nil || p.root != picker {
-		t.Fatal("the picker tree is not the popover content")
-	}
-	// The font picker searches through a gtk::SearchEntry, the icon
-	// picker through a plain entry (font/picker.rs, icon/mod.rs).
-	if !p.spec.searchEntry || len(treetest.All[*widget.SearchEntry](picker)) != 1 {
-		t.Error("the font picker's search is not a search entry")
-	}
-	// A new filter resets the list (rows, scroll and selection).
-	p.list.Select(2)
-	p.search.Insert("sans")
-	if p.list.Selected() != -1 {
-		t.Error("filtering kept the stale list")
-	}
-	if len(p.shown) != 2 || p.shown[0] != "DejaVu Sans" {
-		t.Errorf("filtered %v, want the two Sans families", p.shown)
-	}
-	p.list.OnActivate(1)
-	if v := k.store.value("general.font-sans"); v != "Noto Sans" || f.closed != 1 {
-		t.Errorf("picked %v (closed %d), want Noto Sans and the popover closed", v, f.closed)
+	f.fontFn("Noto Sans")
+	if v := k.store.value("general.font-sans"); v != "Noto Sans" {
+		t.Errorf("picked %v, want Noto Sans", v)
 	}
 	c.refresh()
 	if c.label.Text() != "Noto Sans" {
 		t.Errorf("label %q after the pick", c.label.Text())
 	}
-	p.search.SelectAll()
-	p.search.Backspace()
-	if len(p.shown) != 3 {
-		t.Errorf("an empty search shows %d, want all", len(p.shown))
+	mono := newFontEditor(k, pathSlot(k.store, "general.font-mono"), true)
+	mono.btn.ClickAt(widget.Point{})
+	if !f.fontMono {
+		t.Error("the monospace field's dialog offers every family")
+	}
+}
+
+// The monospace font row is the one whose dialog lists monospace
+// families; the sans row is not.
+func TestFontRowsPickTheirKind(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	rows := map[string]rowSpec{}
+	for _, sec := range layout(k.store.svc.Config()) {
+		for _, page := range sec.pages {
+			for _, ps := range page.sections {
+				for _, r := range ps.rows {
+					rows[r.path] = r
+				}
+			}
+		}
+	}
+	for path, mono := range map[string]bool{"general.font-sans": false, "general.font-mono": true} {
+		spec, ok := rows[path]
+		if !ok {
+			t.Fatalf("no settings row for %s", path)
+		}
+		ed := fieldControl(k, spec).(*fontEditor)
+		if ed.monospace != mono {
+			t.Errorf("%s editor monospace %v, want %v", path, ed.monospace, mono)
+		}
 	}
 }
 
