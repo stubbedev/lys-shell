@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/recorder/recordertest"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestPreviewGeometryAndPercent(t *testing.T) {
@@ -162,7 +163,8 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 	}
 
 	// Switches and pickers write their keys.
-	micSwitch := v.Children()[1].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Box).Children()[1].(*widget.Switch)
+	micRow := v.Children()[1].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Item)
+	micSwitch := treetest.First[*widget.Switch](t, micRow)
 	micSwitch.SetOn(!micSwitch.On())
 	if log.get(recorderPathMic) != micSwitch.On() {
 		t.Errorf("microphone write = %v", log.get(recorderPathMic))
@@ -195,9 +197,10 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 }
 
 // The recorder tree is spacing-0 wherever Rust's boxes are (mod.rs sets
-// no spacing on the root, the status, the cards, and the rows — the CSS
-// padding and the .recorder-row + .recorder-row border-top carry the
-// layout); the boxes Rust does space keep their gaps.
+// no spacing on the root, the status and the cards — the CSS padding
+// and the .recorder-row + .recorder-row border-top carry the layout),
+// the setting rows are lys-ui's Items, and the boxes Rust does space
+// keep their gaps.
 func TestRecorderSpacingIsZero(t *testing.T) {
 	ctx, _, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
@@ -215,12 +218,8 @@ func TestRecorderSpacingIsZero(t *testing.T) {
 	if got := card.(*widget.Box).Spacing(); got != 0 {
 		t.Errorf("card spacing = %d, want 0", got)
 	}
-	row := findByClass(v, "recorder-row")
-	if row == nil {
-		t.Fatal("no recorder row")
-	}
-	if got := row.(*widget.Box).Spacing(); got != 0 {
-		t.Errorf("row spacing = %d, want 0", got)
+	if _, ok := findByClass(v, "recorder-row").(*widget.Item); !ok {
+		t.Fatal("the setting rows are not lys-ui's Items")
 	}
 
 	// Negative: the boxes Rust itself spaces keep their gaps — zeroing
@@ -240,17 +239,7 @@ func TestRecorderSpacingIsZero(t *testing.T) {
 			t.Errorf("%s spacing = %d, want %d (the Rust set_spacing)", tc.class, got, tc.want)
 		}
 	}
-	var position *widget.Box
-	walkTree(v, func(w widget.Widget) bool {
-		b, ok := w.(*widget.Box)
-		if !ok || !b.HasClass("recorder-row") || len(b.Children()) == 0 {
-			return true
-		}
-		if l, ok := b.Children()[0].(*widget.Label); ok && l.Text() == i18n.T("dropdown-recorder-position") {
-			position = b
-		}
-		return true
-	})
+	position, _ := findByClass(v, "recorder-position").(*widget.Box)
 	if position == nil || position.Spacing() != 6 {
 		t.Errorf("position row = %v, want spacing 6 (the Rust set_spacing)", position)
 	}

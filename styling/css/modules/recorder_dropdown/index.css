@@ -91,79 +91,11 @@
 .recorder-dropdown-content .recorder-card .recorder-row + .recorder-row {
   border-top: 1px solid var(--border-subtle);
 }
-.recorder-dropdown-content .recorder-row {
-  min-height: calc(2.25rem * var(--global-scale));
-  padding: var(--space-sm) var(--space-md);
-}
-.recorder-dropdown-content .recorder-row > label {
+.recorder-dropdown-content .recorder-row .title,
+.recorder-dropdown-content .recorder-position > label {
   font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  color: var(--fg-default);
 }
-.recorder-dropdown-content .recorder-row > switch {
-  margin: var(--space-xs) 0;
-  min-height: calc(1rem * var(--global-scale));
-  min-width: calc(3.5rem * var(--global-scale));
-}
-.recorder-dropdown-content .recorder-row > switch slider {
-  min-width: calc(0.8rem * var(--global-scale));
-  min-height: calc(0.8rem * var(--global-scale));
-}
-.recorder-dropdown-content .recorder-row > dropdown,
-.recorder-dropdown-content .recorder-row > spinbutton {
-  min-width: calc(8rem * var(--global-scale));
-  color: var(--fg-default);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  background: var(--bg-overlay);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--rounding-element);
-  transition: border-color var(--duration-fast);
-}
-.recorder-dropdown-content .recorder-row > dropdown:focus-within,
-.recorder-dropdown-content .recorder-row > spinbutton:focus-within {
-  border-color: var(--accent);
-}
-.recorder-dropdown-content .recorder-row > dropdown > button {
-  all: unset;
-}
-.recorder-dropdown-content .recorder-row > dropdown > button > * {
-  margin: var(--space-xs) var(--space-sm);
-}
-.recorder-dropdown-content .recorder-row > dropdown > button arrow {
-  -gtk-icon-size: var(--icon-xs);
-  color: var(--fg-subtle);
-}
-.recorder-dropdown-content .recorder-row > dropdown popover > contents {
-  padding: var(--space-xs);
-}
-.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row {
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--rounding-element);
-  color: var(--fg-muted);
-  transition: background-color var(--duration-fast);
-}
-.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row:not(:last-child) {
-  margin-bottom: var(--space-xs);
-}
-.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row:hover {
-  background-color: var(--bg-hover);
-  color: var(--fg-default);
-}
-.recorder-dropdown-content .recorder-row > dropdown popover > contents listview row:selected {
-  background-color: var(--accent-subtle);
-  color: var(--accent);
-}
-.recorder-dropdown-content .recorder-row > spinbutton > text {
-  min-height: 0;
-  padding: var(--space-xs) var(--space-sm);
-}
-.recorder-dropdown-content .recorder-row > spinbutton button {
-  all: unset;
-  color: var(--fg-muted);
-  padding: 0 var(--space-xs);
-  transition: color var(--duration-fast);
-}
-.recorder-dropdown-content .recorder-row > spinbutton button:hover {
-  color: var(--fg-default);
+.recorder-dropdown-content .recorder-position {
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--border-subtle);
 }
