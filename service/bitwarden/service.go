@@ -100,6 +100,8 @@ type Service struct {
 	accessExp time.Time
 	kr        *Keyring
 	vault     Vault
+	gate      passwordGate
+	lastUse   time.Time
 	status    Status
 	ticks     *feed.Tick
 }
@@ -238,7 +240,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) error {
 	if err != nil {
 		return s.fail(err)
 	}
-	return s.open(ctx, c, &session{Server: req.Server, Email: req.Email, RefreshToken: tok.RefreshToken, ClientID: clientID}, tok, mk)
+	return s.open(ctx, c, &session{Server: req.Server, Email: req.Email, RefreshToken: tok.RefreshToken, ClientID: clientID}, tok, pre, mk)
 }
 
 // SendLoginEmail asks the server to email the second-factor code for a
@@ -286,7 +288,7 @@ func (s *Service) LoginAPIKey(ctx context.Context, req APIKeyRequest) error {
 		return s.fail(err)
 	}
 	defer mk.wipe()
-	return s.open(ctx, c, &session{Server: req.Server, Email: req.Email, RefreshToken: tok.RefreshToken, ClientID: req.ClientID}, tok, mk)
+	return s.open(ctx, c, &session{Server: req.Server, Email: req.Email, RefreshToken: tok.RefreshToken, ClientID: req.ClientID}, tok, pre, mk)
 }
 
 // Unlock opens a locked vault with the master password: a fresh token,
@@ -318,12 +320,12 @@ func (s *Service) Unlock(ctx context.Context, password string) error {
 		return s.fail(err)
 	}
 	defer mk.wipe()
-	return s.open(ctx, c, sess, tok, mk)
+	return s.open(ctx, c, sess, tok, pre, mk)
 }
 
 // open syncs under tok, opens the keys with the master key, and makes
 // the vault current; the session is saved only once the vault opened.
-func (s *Service) open(ctx context.Context, c *Client, sess *session, tok Token, mk *masterKey) error {
+func (s *Service) open(ctx context.Context, c *Client, sess *session, tok Token, pre Prelogin, mk *masterKey) error {
 	s.update(func() { s.status.Syncing = true })
 	sync, err := c.Sync(ctx, tok.AccessToken)
 	if err != nil {
@@ -345,6 +347,8 @@ func (s *Service) open(ctx context.Context, c *Client, sess *session, tok Token,
 	s.update(func() {
 		s.wipeLocked()
 		s.sess, s.kr, s.vault = sess, kr, v
+		s.gate = passwordGate{kdf: pre.Kdf, salt: pre.Salt, userKey: sync.Profile.Key}
+		s.lastUse = now
 		s.access, s.accessExp = tok.AccessToken, tok.Expires
 		s.status = Status{State: StateUnlocked, Email: sess.Email, LastSync: now, Items: len(v.Items)}
 	})
@@ -441,6 +445,7 @@ func (s *Service) Sync(ctx context.Context) error {
 		}
 		s.vault.Wipe()
 		s.sess, s.vault = sess, v
+		s.gate.userKey = sync.Profile.Key
 		s.access, s.accessExp = tok.AccessToken, tok.Expires
 		s.status = Status{State: StateUnlocked, Email: sess.Email, LastSync: now, Items: len(v.Items)}
 	})
@@ -448,13 +453,70 @@ func (s *Service) Sync(ctx context.Context) error {
 }
 
 // Lock wipes the keys and the plaintext; the session stays for Unlock.
-func (s *Service) Lock() {
-	s.update(func() {
-		s.wipeLocked()
-		if s.sess != nil {
-			s.status = Status{State: StateLocked, Email: s.sess.Email}
-		}
-	})
+func (s *Service) Lock() { s.update(s.lockLocked) }
+
+// lockLocked is Lock under mu.
+func (s *Service) lockLocked() {
+	s.wipeLocked()
+	if s.sess != nil {
+		s.status = Status{State: StateLocked, Email: s.sess.Email}
+	}
+}
+
+// Touch marks the open vault used now, restarting LockIdle's clock.
+func (s *Service) Touch() {
+	s.mu.Lock()
+	s.lastUse = s.now()
+	s.mu.Unlock()
+}
+
+// LockIdle locks an open vault unused for idle or longer: since it
+// opened, or since the last Touch. It reports whether it locked.
+func (s *Service) LockIdle(idle time.Duration) bool {
+	s.mu.Lock()
+	stale := s.kr != nil && !s.now().Before(s.lastUse.Add(idle))
+	if stale {
+		s.lockLocked()
+	}
+	s.mu.Unlock()
+	if stale {
+		feed.Notify(s.ticks)
+	}
+	return stale
+}
+
+// passwordGate is what VerifyPassword checks a master password against:
+// the account's KDF and salt and the user key as the server wraps it
+// under the master key. None of it is secret.
+type passwordGate struct {
+	kdf           Kdf
+	salt, userKey string
+}
+
+// VerifyPassword checks the master password against the open vault's
+// account, as the master password reprompt does before a protected
+// item's secrets: ErrWrongPassword when it does not open the user key.
+// It derives the key, so it is as slow as an unlock and runs off the
+// UI loop.
+func (s *Service) VerifyPassword(password string) error {
+	s.mu.Lock()
+	gate, open := s.gate, s.kr != nil
+	s.mu.Unlock()
+	if !open {
+		return errors.New("bitwarden: verifying the master password needs an open vault")
+	}
+	mk, err := deriveMasterKey(password, gate.salt, gate.kdf)
+	if err != nil {
+		return err
+	}
+	defer mk.wipe()
+	key, err := unwrapUserKey(mk, gate.userKey)
+	if err != nil {
+		return err
+	}
+	key.Wipe()
+	s.Touch()
+	return nil
 }
 
 // Logout locks and forgets the session.
@@ -481,5 +543,6 @@ func (s *Service) wipeLocked() {
 		s.kr = nil
 	}
 	s.vault.Wipe()
+	s.gate = passwordGate{}
 	s.access, s.accessExp = "", time.Time{}
 }

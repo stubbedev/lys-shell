@@ -283,3 +283,55 @@ func TestLogout(t *testing.T) {
 		t.Error("a reopened service still has the session")
 	}
 }
+
+// An open vault locks once it has gone unused for the idle time, and a
+// Touch restarts the clock; a locked vault has nothing to lock.
+func TestLockIdle(t *testing.T) {
+	a := newAccount(t)
+	s, _ := Open(t.TempDir(), "lys-shell")
+	clock := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return clock }
+	if err := s.Login(context.Background(), login(a)); err != nil {
+		t.Fatal(err)
+	}
+	clock = clock.Add(10 * time.Minute)
+	s.Touch()
+	clock = clock.Add(14 * time.Minute)
+	if s.LockIdle(15*time.Minute) || s.Status().State != StateUnlocked {
+		t.Fatalf("locked 14 minutes after a touch: %+v", s.Status())
+	}
+	ticks, stop := s.Subscribe()
+	defer stop()
+	clock = clock.Add(time.Minute)
+	if !s.LockIdle(15*time.Minute) || s.Status().State != StateLocked || s.Items() != nil {
+		t.Fatalf("still open 15 minutes after a touch: %+v", s.Status())
+	}
+	select {
+	case <-ticks:
+	default:
+		t.Error("an idle lock did not announce itself")
+	}
+	if s.LockIdle(0) {
+		t.Error("a locked vault locked again")
+	}
+}
+
+// The reprompt accepts the master password of the open account and
+// refuses another; a locked vault verifies nothing.
+func TestVerifyPassword(t *testing.T) {
+	a := newAccount(t)
+	s, _ := Open(t.TempDir(), "lys-shell")
+	if err := s.Login(context.Background(), login(a)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.VerifyPassword("asdfasdfasdf"); err != nil {
+		t.Errorf("the master password = %v", err)
+	}
+	if err := s.VerifyPassword("asdfasdfasdg"); !errors.Is(err, ErrWrongPassword) {
+		t.Errorf("a wrong password = %v", err)
+	}
+	s.Lock()
+	if err := s.VerifyPassword("asdfasdfasdf"); err == nil {
+		t.Error("a locked vault verified a password")
+	}
+}
