@@ -110,9 +110,10 @@ func TestPanelCapsAtTheMonitorCeiling(t *testing.T) {
 	}
 }
 
-// The configured size is the card's own size request: content smaller
-// than it leaves the card at the request, its content the request less
-// the popover's border; content wider than it widens the card. No
+// The configured size is the card's own size: content smaller than it
+// leaves the card at the size, its content the size less the popover's
+// border; content wider than it widens the card, while a taller list
+// scrolls inside the configured height. No
 // margins ride around the card: the popover's gap and shadow gutter
 // keep it off the bar.
 func TestDropdownSizeFloorsTheCard(t *testing.T) {
@@ -133,6 +134,28 @@ func TestDropdownSizeFloorsTheCard(t *testing.T) {
 	}
 	if got := root.Margin(); got != (render.Insets{}) {
 		t.Errorf("card margins %+v, want none", got)
+	}
+
+	// A list taller than the height scrolls inside the card instead of
+	// growing it past the dropdown's height.
+	tall := widget.NewBox(widget.Column, 0, 0)
+	tall.Append(widget.NewSpacer(10, 2000), false)
+	scroll := dropdownScroll(tall, "")
+	root, _ = dropdownTree(newPanelBox(scroll), cfg, 382, 512)
+	apptheme.New(cfg).Attach(root)
+	sz = widget.MeasureAsChild(root, con)
+	if sz.H != 512 {
+		t.Errorf("a card holding a 2000px list is %dpx tall, want its 512px height", sz.H)
+	}
+	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
+	if b := scroll.Bounds(); b.Y+b.H > sz.H {
+		t.Errorf("the list's viewport %+v reaches past the %dpx card", b, sz.H)
+	}
+	// With no height the card grows to its content.
+	root, _ = dropdownTree(newPanelBox(widget.NewSpacer(10, 700)), cfg, 382, 0)
+	apptheme.New(cfg).Attach(root)
+	if sz := widget.MeasureAsChild(root, con); sz.H < 700 {
+		t.Errorf("a card without a height is %dpx tall, want at least its 700px content", sz.H)
 	}
 
 	wide := widget.NewBox(widget.Row, 0, 0)
