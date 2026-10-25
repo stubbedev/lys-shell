@@ -382,18 +382,8 @@ func setCaption(l *widget.Label, text string) {
 	l.SetVisible(text != "")
 }
 
-// actionRow is a form's buttons, right-aligned.
-func actionRow(buttons ...widget.Widget) *widget.Box {
-	row := widget.NewBox(widget.Row, 8, 0)
-	row.Append(widget.NewSpacer(0, 0), true)
-	for _, b := range buttons {
-		row.Append(b, false)
-	}
-	return row
-}
-
 func (v *bitwardenView) buildLogin() widget.Widget {
-	page := widget.NewBox(widget.Column, 8, 0)
+	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	v.server = widget.NewLabel(v.font, v.px*0.85, "", 0)
 	v.server.AddClass(css.DimLabel)
 	v.server.SetEllipsize(widget.EllipsizeEnd)
@@ -423,7 +413,7 @@ func (v *bitwardenView) buildLogin() widget.Widget {
 	v.loginForm.OnSubmit = v.login
 	page.Append(v.loginForm, false)
 	v.apiLabel = widget.NewLabel(v.font, v.px*0.85, "", 0)
-	page.Append(actionRow(dropdownButton(v.apiLabel, v.toggleAPIKey, css.Link), v.textButton(i18n.T("dropdown-bitwarden-login"), v.loginForm.Submit, css.SuggestedAction)), false)
+	page.Append(formActions(dropdownButton(v.apiLabel, v.toggleAPIKey, css.Link), v.textButton(i18n.T("dropdown-bitwarden-login"), v.loginForm.Submit, css.SuggestedAction)), false)
 	v.setAPIKey(false)
 	return page
 }
@@ -455,7 +445,7 @@ func (v *bitwardenView) setAPIKey(on bool) {
 }
 
 func (v *bitwardenView) buildChallenge() widget.Widget {
-	page := widget.NewBox(widget.Column, 8, 0)
+	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	v.codeTitle = widget.NewLabel(v.font, v.px, "", 0)
 	v.codeTitle.AddClass(css.Heading)
 	page.Append(v.codeTitle, false)
@@ -468,12 +458,12 @@ func (v *bitwardenView) buildChallenge() widget.Widget {
 	v.code.OnActivate = func(string) { v.submitCode() }
 	page.Append(v.code, false)
 	v.sendEmail = v.textButton(i18n.T("dropdown-bitwarden-send-code"), v.sendCode, css.Link)
-	page.Append(actionRow(v.sendEmail, v.textButton(i18n.T("dropdown-bitwarden-back"), v.back, css.Ghost), v.textButton(i18n.T("dropdown-bitwarden-verify"), v.submitCode, css.SuggestedAction)), false)
+	page.Append(formActions(v.sendEmail, v.textButton(i18n.T("dropdown-bitwarden-back"), v.back, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-verify"), v.submitCode, css.SuggestedAction)), false)
 	return page
 }
 
 func (v *bitwardenView) buildUnlock() widget.Widget {
-	page := widget.NewBox(widget.Column, 8, 0)
+	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	v.account = widget.NewLabel(v.font, v.px*0.85, "", 0)
 	v.account.AddClass(css.DimLabel)
 	v.account.SetEllipsize(widget.EllipsizeEnd)
@@ -482,18 +472,19 @@ func (v *bitwardenView) buildUnlock() widget.Widget {
 	v.unlockPw.entry.SetPlaceholder(i18n.T("dropdown-bitwarden-master-password"))
 	v.unlockPw.entry.OnActivate = func(string) { v.unlock() }
 	page.Append(v.unlockPw.entry, false)
-	page.Append(actionRow(v.textButton(i18n.T("dropdown-bitwarden-unlock"), v.unlock, css.SuggestedAction)), false)
+	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-unlock"), v.unlock, css.SuggestedAction)), false)
 	return page
 }
 
 func (v *bitwardenView) buildVault() widget.Widget {
-	page := widget.NewBox(widget.Column, 8, 0)
+	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	v.search = widget.NewSearchEntry(v.font, v.px, i18n.T("dropdown-bitwarden-search"))
 	v.search.OnSearchChanged = func(string) { v.rebuildList() }
 	page.Append(v.search, false)
-	v.list = widget.NewItemGroup()
+	card, list := itemCard()
+	v.list = list
 	v.listSt = widget.NewStack()
-	v.listSt.Add("items", dropdownScroll(v.list, ""))
+	v.listSt.Add("items", scrolledCard(card, ""))
 	v.listSt.Add("empty", emptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-no-items"), ""))
 	page.Append(v.listSt, true)
 	v.more = v.caption(css.DimLabel)
@@ -504,7 +495,7 @@ func (v *bitwardenView) buildVault() widget.Widget {
 }
 
 func (v *bitwardenView) buildReprompt() widget.Widget {
-	page := widget.NewBox(widget.Column, 8, 0)
+	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	title := widget.NewLabel(v.font, v.px, i18n.T("dropdown-bitwarden-reprompt-title"), 0)
 	title.AddClass(css.Heading)
 	page.Append(title, false)
@@ -516,7 +507,7 @@ func (v *bitwardenView) buildReprompt() widget.Widget {
 	v.repromptPw.entry.SetPlaceholder(i18n.T("dropdown-bitwarden-master-password"))
 	v.repromptPw.entry.OnActivate = func(string) { v.confirmReprompt() }
 	page.Append(v.repromptPw.entry, false)
-	page.Append(actionRow(v.textButton(i18n.T("dropdown-bitwarden-cancel"), v.cancelReprompt, css.Ghost), v.textButton(i18n.T("dropdown-bitwarden-copy"), v.confirmReprompt, css.SuggestedAction)), false)
+	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-cancel"), v.cancelReprompt, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-copy"), v.confirmReprompt, css.SuggestedAction)), false)
 	return page
 }
 

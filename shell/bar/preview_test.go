@@ -69,6 +69,12 @@ func TestDropdownPreviews(t *testing.T) {
 			widget.SetSurfaceHost(view.Box, focusHost{})
 			return newPanelBox(view)
 		}},
+		{"bitwarden-login", "bitwarden", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
+			ctx.Bitwarden = testBitwardenHost(&fakeVault{}, ctx.Config, &[]copied{})
+			view := bitwardenDropdown(*ctx).(*bitwardenView)
+			widget.SetSurfaceHost(view.Box, focusHost{})
+			return newPanelBox(view)
+		}},
 		{"bluetooth", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(btWorld())).root)
 		}},
