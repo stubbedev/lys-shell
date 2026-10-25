@@ -375,16 +375,15 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 
 		actions := widget.NewBox(widget.Row, 0, 0)
 		actions.AddClass("bluetooth-device-actions")
-		toggleKey := "dropdown-bluetooth-connect"
+		// Icon buttons named by their tooltips: the slot reserves the
+		// actions' width beside the status, so text buttons would cost
+		// the device's name and detail that width on every row.
+		toggleKey, toggleIcon := "dropdown-bluetooth-connect", "ld-plug-zap-symbolic"
 		if s.connected {
-			toggleKey = "dropdown-bluetooth-disconnect"
+			toggleKey, toggleIcon = "dropdown-bluetooth-disconnect", "ld-unplug-symbolic"
 		}
-		toggle := dropdownButton(widget.NewLabel(font, px*0.85, btText(toggleKey), 0), nil, css.Ghost, css.Small)
-		toggle.AddClass("bluetooth-action-toggle")
-		toggle.OnClick = func() { d.onDeviceClick(s) }
-		forget := dropdownButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), 0), nil, css.Ghost, css.Small)
-		forget.AddClass("bluetooth-forget")
-		forget.OnClick = func() { d.onForget(s) }
+		toggle := btActionButton(px, toggleIcon, btText(toggleKey), func() { d.onDeviceClick(s) }, "bluetooth-action-toggle")
+		forget := btActionButton(px, "ld-trash-2-symbolic", btText("dropdown-bluetooth-forget"), func() { d.onForget(s) }, "bluetooth-forget")
 		toggle.SetEnabled(pending == 0)
 		forget.SetEnabled(pending == 0)
 		actions.Append(toggle, false)
@@ -401,6 +400,15 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		row.syncSlot()
 	}
 	return row
+}
+
+// btActionButton is a row action: a small ghost icon button whose
+// tooltip and accessible name are its label.
+func btActionButton(px float64, icon, label string, onClick func(), class string) *widget.Button {
+	b := dropdownButton(widget.NewThemeIcon(icon, int(px)), onClick, css.Ghost, css.Icon, css.Small, class)
+	b.SetTooltip(label)
+	b.SetAccessibleName(label)
+	return b
 }
 
 // statusLabel is status_label: the pending action, else connected or

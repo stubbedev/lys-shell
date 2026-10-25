@@ -798,14 +798,20 @@ func TestBtGhostClassesAreExact(t *testing.T) {
 	if !widget.HasClass(closeBtn, css.Ghost) || !widget.HasClass(closeBtn, css.Icon) {
 		t.Error("the close button is not a ghost icon button")
 	}
-	// The row actions are text GhostButtons: ghost, not icon-sized.
+	// The row actions are small ghost icon buttons named by their
+	// tooltips, so the slot they size stays narrow.
 	mouse := rowNamed(t, d, "Mouse")
-	forget := mouse.actions.Children()[1].(*widget.Button)
-	if !widget.HasClass(forget, css.Ghost) || !widget.HasClass(forget, "bluetooth-forget") {
-		t.Error("the forget button is not the ghost template")
+	for i, want := range []string{btText("dropdown-bluetooth-connect"), btText("dropdown-bluetooth-forget")} {
+		b := mouse.actions.Children()[i].(*widget.Button)
+		if !widget.HasClass(b, css.Ghost) || !widget.HasClass(b, css.Icon) || !widget.HasClass(b, css.Small) {
+			t.Errorf("row action %d is not a small ghost icon button", i)
+		}
+		if b.TooltipText() != want {
+			t.Errorf("row action %d tooltip = %q, want %q", i, b.TooltipText(), want)
+		}
 	}
-	if widget.HasClass(forget, css.Icon) {
-		t.Error("the forget button is icon-sized")
+	if !widget.HasClass(mouse.actions.Children()[1], "bluetooth-forget") {
+		t.Error("the forget action lacks its class")
 	}
 }
 
@@ -908,7 +914,7 @@ func TestBluetoothRowsAreInThePanel(t *testing.T) {
 // box's halign End), so a short "Paired" never floats mid-row.
 func TestBtDeviceStatusSitsAtTheRowsEnd(t *testing.T) {
 	d, _ := newTestBtDropdown(t, btWorld())
-	row := rowNamed(t, d, "Headset")
+	row := rowNamed(t, d, "Mouse")
 	row.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
 	row.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
 	slot, status := boundsOf(row.slot), boundsOf(row.status)
@@ -941,5 +947,21 @@ func TestBtRowFitsANarrowDropdown(t *testing.T) {
 		if one := widget.MeasureAsChild(l, widget.Constraints{Max: widget.Size{W: 1000, H: 400}}).H; l.Bounds().H != one {
 			t.Errorf("the name spans %dpx, want one %dpx line", l.Bounds().H, one)
 		}
+	}
+}
+
+// At a dropdown's usual width a device's detail shows in full: the
+// slot the actions reserve is two small icon buttons, not two text
+// buttons' width taken from the text.
+func TestBtRowDetailFitsTheUsualWidth(t *testing.T) {
+	d, _ := newTestBtDropdown(t, btWorld())
+	r := rowNamed(t, d, "Headset")
+	styledContext(t, d.ctx.Config).Theme.Attach(r)
+	const w = 360
+	sz := r.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})
+	r.Arrange(render.Rect{W: w, H: sz.H})
+	desc := treetest.WithClass(r, "description")[0].(*widget.Label)
+	if natural := widget.MeasureAsChild(desc, widget.Constraints{Max: widget.Size{W: 2000, H: 400}}).W; desc.Bounds().W < natural {
+		t.Errorf("the detail %q gets %dpx of its %dpx", desc.Text(), desc.Bounds().W, natural)
 	}
 }

@@ -52,13 +52,6 @@
   margin-left: 0;
   margin-right: var(--space-sm);
 }
-.bluetooth-device-actions button {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-}
-.bluetooth-device-actions button > box {
-  margin: var(--space-xs) var(--space-sm);
-}
 
 button.bluetooth-forget:hover {
   color: var(--status-error);
