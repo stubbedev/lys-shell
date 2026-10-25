@@ -1977,3 +1977,13 @@ func TestColorEditorShowsItsColor(t *testing.T) {
 		t.Errorf("the swatch paints %#08x, want #336699", uint32(got))
 	}
 }
+
+// An editor's popover opens at lys-ui's popover gap from the editor.
+func TestPickerPopoverGap(t *testing.T) {
+	anchor := widget.NewBox(widget.Row, 0, 0)
+	content := widget.NewBox(widget.Column, 0, 0)
+	pc := pickerPopoverConfig(anchor, content)
+	if pc.Gap != widget.PopoverGap || pc.Anchor != widget.Boundser(anchor) || pc.Content != widget.Widget(content) {
+		t.Errorf("popover %+v, want the editor's content at gap %d", pc, widget.PopoverGap)
+	}
+}

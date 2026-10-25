@@ -429,3 +429,22 @@ func TestOnDropdownHidden(t *testing.T) {
 		t.Error("nothing to run is not nil")
 	}
 }
+
+// A tray menu opens at lys-ui's popover gap from its button, while a
+// bar dropdown keeps no gap: its configured dropdown margins already
+// set its distance from the bar.
+func TestPopoverGaps(t *testing.T) {
+	anchor := widget.NewBox(widget.Row, 0, 0)
+	closed := 0
+	tray := trayMenuConfig(anchor, testFont(t), 14, nil, func() { closed++ })
+	if tray.Gap != widget.PopoverGap || tray.Anchor != widget.Boundser(anchor) {
+		t.Errorf("tray menu gap %d, want %d from its button", tray.Gap, widget.PopoverGap)
+	}
+	tray.OnClosed()
+	if closed != 1 {
+		t.Error("the tray menu's OnClosed is not the one given")
+	}
+	if pc := dropdownPopover(config.Defaults(), anchor, anchor, 1000, 0); pc.Gap != 0 {
+		t.Errorf("dropdown gap %d, want 0 on top of the dropdown margins", pc.Gap)
+	}
+}

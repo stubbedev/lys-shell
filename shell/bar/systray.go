@@ -488,16 +488,10 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 	feed, stop := m.tray.WatchMenu(key)
 	// Submenus open as their own popovers beside their rows, as the
 	// Rust tray's PopoverMenu with the NESTED flag does.
-	pop, err := m.ctx.App.OpenMenuPopover(m.host, app.MenuPopoverConfig{
-		Anchor: e.button,
-		Face:   font,
-		SizePx: px,
-		Items:  rows,
-		OnClosed: func() {
-			stop()
-			m.unbindAccels()
-		},
-	})
+	pop, err := m.ctx.App.OpenMenuPopover(m.host, trayMenuConfig(e.button, font, px, rows, func() {
+		stop()
+		m.unbindAccels()
+	}))
 	if err != nil {
 		stop()
 		log.Printf("systray: %s menu: %v", e.item.ID, err)
@@ -694,3 +688,16 @@ func trayAccel(shortcut [][]string) string {
 }
 
 func (m *systrayModule) Root() widget.Widget { return m.root }
+
+// trayMenuConfig is a tray item's menu: it opens from the item's button
+// at lys-ui's popover gap.
+func trayMenuConfig(anchor widget.Boundser, font render.Font, px float64, rows []widget.MenuItem, onClosed func()) app.MenuPopoverConfig {
+	return app.MenuPopoverConfig{
+		Anchor:   anchor,
+		Face:     font,
+		SizePx:   px,
+		Items:    rows,
+		Gap:      widget.PopoverGap,
+		OnClosed: onClosed,
+	}
+}

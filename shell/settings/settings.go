@@ -148,9 +148,7 @@ func (p windowPickers) popover(anchor, content widget.Widget) (closePopover func
 	if root, ok := content.(interface{ AttachStylesheet(*widget.Stylesheet) }); ok {
 		p.theme.Attach(root)
 	}
-	pop, err := p.app.OpenPopover(p.win, app.PopoverConfig{
-		Anchor: bound, Content: content,
-	})
+	pop, err := p.app.OpenPopover(p.win, pickerPopoverConfig(bound, content))
 	if err != nil {
 		log.Printf("settings: popover: %v", err)
 		return func() {}
@@ -195,4 +193,10 @@ func (p windowPickers) openFile(fn func(path string)) {
 		}
 		p.app.Invoke(func() { fn(path) })
 	}()
+}
+
+// pickerPopoverConfig is an editor's popover: it opens from the editor
+// at lys-ui's popover gap.
+func pickerPopoverConfig(anchor widget.Boundser, content widget.Widget) app.PopoverConfig {
+	return app.PopoverConfig{Anchor: anchor, Content: content, Gap: widget.PopoverGap}
 }
