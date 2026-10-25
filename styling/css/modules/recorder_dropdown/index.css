@@ -18,12 +18,7 @@
     opacity: 0.25;
   }
 }
-.recorder-status {
-  border-spacing: var(--space-sm);
-}
 .recorder-status .recorder-status-dot {
-  min-width: var(--space-sm);
-  min-height: var(--space-sm);
   border-radius: 9999px;
   background: var(--status-error);
   animation: recorder-status-blink 1s ease-in-out infinite alternate;
@@ -32,44 +27,7 @@
   background: var(--fg-subtle);
   animation: none;
 }
-.recorder-status .recorder-status-time {
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  font-feature-settings: "tnum";
-  color: var(--fg-default);
-}
 
-.recorder-dropdown-content .recorder-controls {
-  margin-bottom: var(--space-sm);
-}
-.recorder-dropdown-content .recorder-controls > button {
-  min-height: calc(2rem * var(--global-scale));
-}
-.recorder-dropdown-content .recorder-controls > button > box {
-  margin: var(--space-sm) var(--space-md);
-}
-.recorder-dropdown-content .recorder-controls > button > box image {
-  -gtk-icon-size: var(--icon-sm);
-}
-.recorder-dropdown-content .recorder-controls .recorder-pause-button {
-  min-width: calc(2rem * var(--global-scale));
-}
-.recorder-dropdown-content .recorder-controls .recorder-pause-button image {
-  -gtk-icon-size: var(--icon-sm);
-}
-.recorder-dropdown-content .recorder-section-header {
-  margin-top: var(--space-lg);
-  margin-bottom: var(--space-sm);
-}
-.recorder-dropdown-content .recorder-section-header > image {
-  -gtk-icon-size: var(--icon-sm);
-  color: var(--fg-subtle);
-}
-.recorder-dropdown-content .recorder-section-header > image,
-.recorder-dropdown-content .recorder-section-header > .section-label {
-  margin-top: 0;
-  margin-bottom: 0;
-}
 .recorder-dropdown-content .recorder-position-preview {
   border-radius: var(--rounding-element);
   background: var(--bg-overlay);
@@ -84,18 +42,4 @@
 }
 .recorder-dropdown-content .recorder-position-cam:hover {
   opacity: 1;
-}
-.recorder-dropdown-content .recorder-card {
-  padding: 0;
-}
-.recorder-dropdown-content .recorder-card .recorder-row + .recorder-row {
-  border-top: 1px solid var(--border-subtle);
-}
-.recorder-dropdown-content .recorder-row .title,
-.recorder-dropdown-content .recorder-position > label {
-  font-size: var(--text-md);
-}
-.recorder-dropdown-content .recorder-position {
-  padding: var(--space-sm) var(--space-md);
-  border-top: 1px solid var(--border-subtle);
 }

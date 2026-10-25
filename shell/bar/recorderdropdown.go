@@ -176,21 +176,20 @@ type recorderView struct {
 	px   float64
 
 	*widget.Box
-	status      *widget.Box
-	statusDot   *widget.Box
-	time        *widget.Label
-	record      *widget.Button
-	recordIcon  *widget.Icon
-	recordLabel *widget.Label
-	pause       *widget.Button
-	pauseIcon   *widget.Icon
+	status     *widget.Box
+	statusDot  *widget.Box
+	time       *widget.Label
+	record     *widget.Button
+	recordFace *widget.ButtonContent
+	pause      *widget.Button
+	pauseIcon  *widget.Icon
 	// micSlot holds the microphone picker, swapped when the device
 	// list changes.
-	micSlot              *widget.Box
-	micPicker            *widget.Dropdown
-	mics, cams           []recorder.DeviceChoice
-	webcamHeader, webcam *widget.Box
-	preview              *webcamPreview
+	micSlot    *widget.Box
+	micPicker  *widget.Dropdown
+	mics, cams []recorder.DeviceChoice
+	webcam     *widget.Box
+	preview    *webcamPreview
 
 	once   sync.Once
 	cancel context.CancelFunc
@@ -203,14 +202,16 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.AddClass("dropdown", "recorder-dropdown")
 	cfg := ctx.Config.Recorder
 
-	v.status = widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	v.status = widget.NewBox(widget.Row, th.Spacing, 0)
 	v.status.AddClass("recorder-status")
 	v.statusDot = widget.NewBox(widget.Row, 0, 0)
 	v.statusDot.AddClass("recorder-status-dot")
+	v.statusDot.SetSizeRequest(recorderDotPx, recorderDotPx)
 	v.time = widget.NewLabel(font, px, "", 0)
-	v.time.AddClass("recorder-status-time")
-	v.status.Append(v.statusDot, false)
-	v.status.Append(v.time, false)
+	v.time.AddClass("recorder-status-time", css.Heading, css.Numeric)
+	v.status.AppendAligned(v.statusDot, false, widget.AlignCenter)
+	v.status.AppendAligned(v.time, false, widget.AlignCenter)
 	v.Append(dropdownHeader(font, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
 
 	// The content: everything below the header; its class lets the
@@ -221,45 +222,40 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 
 	content.Append(v.controls(), false)
 
-	content.Append(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), false)
-	audio := v.card()
-	audio.Append(v.switchRow(i18n.T("dropdown-recorder-microphone"), cfg.Microphone, recorderPathMic), false)
+	audioCard, audio := itemCard()
+	audioCard.AddClass("recorder-card")
+	audio.Append(v.switchRow(i18n.T("dropdown-recorder-microphone"), cfg.Microphone, recorderPathMic))
 	v.mics = microphoneSources(ctx.Pulse)
 	micRow := v.row(i18n.T("dropdown-recorder-microphone-device"))
 	v.micPicker = v.picker(v.mics, cfg.MicrophoneDevice, recorderPathMicDevice, func() []recorder.DeviceChoice { return v.mics })
 	v.micSlot = widget.NewBox(widget.Row, 0, 0)
 	v.micSlot.Append(v.micPicker, false)
 	micRow.AddAction(v.micSlot)
-	audio.Append(micRow, false)
-	audio.Append(v.switchRow(i18n.T("dropdown-recorder-system-audio"), cfg.SystemAudio, recorderPathSystem), false)
-	content.Append(audio, false)
+	audio.Append(micRow)
+	audio.Append(v.switchRow(i18n.T("dropdown-recorder-system-audio"), cfg.SystemAudio, recorderPathSystem))
+	content.Append(dropdownGroup(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), audioCard), false)
 
 	v.cams = recorderCameras()
-	v.webcamHeader = v.sectionHeader("ld-camera-symbolic", i18n.T("dropdown-recorder-section-webcam"))
-	v.webcam = v.card()
-	v.webcam.Append(v.switchRow(i18n.T("dropdown-recorder-webcam"), cfg.WebcamEnabled, recorderPathWebcam), false)
+	webcamCard, webcam := itemCard()
+	webcamCard.AddClass("recorder-card")
+	webcam.Append(v.switchRow(i18n.T("dropdown-recorder-webcam"), cfg.WebcamEnabled, recorderPathWebcam))
 	camRow := v.row(i18n.T("dropdown-recorder-webcam-device"))
 	camRow.AddAction(v.picker(v.cams, cfg.WebcamDevice, recorderPathCamDevice, func() []recorder.DeviceChoice { return v.cams }))
-	v.webcam.Append(camRow, false)
-	position := widget.NewBox(widget.Column, 6, 0)
+	webcam.Append(camRow)
+	position := v.row(i18n.T("dropdown-recorder-position"))
 	position.AddClass("recorder-position")
-	position.Append(widget.NewLabel(font, px, i18n.T("dropdown-recorder-position"), 0), false)
+	webcam.Append(position)
 	width := int32(360)
 	if w, _, ok := dropdownDims("recorder", ctx.Config); ok {
 		width = int32(w)
 	}
 	v.preview = newWebcamPreview(width, uint8(cfg.WebcamSize), uint8(cfg.WebcamX), uint8(cfg.WebcamY))
 	v.preview.onMove = v.webcamMoved
-	centered := widget.NewBox(widget.Row, 0, 0)
-	centered.Append(widget.NewSpacer(0, 0), true)
-	centered.Append(v.preview, false)
-	centered.Append(widget.NewSpacer(0, 0), true)
-	position.Append(centered, false)
-	v.webcam.Append(position, false)
-	hasCamera := len(v.cams) > 1
-	v.webcamHeader.SetVisible(hasCamera)
-	v.webcam.SetVisible(hasCamera)
-	content.Append(v.webcamHeader, false)
+	preview := itemBody()
+	preview.AppendAligned(v.preview, false, widget.AlignCenter)
+	webcam.Append(preview)
+	v.webcam = dropdownGroup(v.sectionHeader("ld-camera-symbolic", i18n.T("dropdown-recorder-section-webcam")), webcamCard)
+	v.webcam.SetVisible(len(v.cams) > 1)
 	content.Append(v.webcam, false)
 
 	v.applyState(v.snapshot())
@@ -267,18 +263,15 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	return v
 }
 
+// recorderDotPx is the recording dot's diameter.
+const recorderDotPx = 8
+
 // controls is the record/stop toggle and the pause button.
 func (v *recorderView) controls() widget.Widget {
-	row := widget.NewBox(widget.Row, 8, 0)
+	row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 	row.AddClass("recorder-controls")
-	content := widget.NewBox(widget.Row, 8, 0)
-	v.recordIcon = widget.NewThemeIcon("ld-circle-dot-symbolic", int(v.px))
-	v.recordLabel = widget.NewLabel(v.font, v.px, "", 0)
-	content.Append(widget.NewSpacer(0, 0), true)
-	content.Append(v.recordIcon, false)
-	content.Append(v.recordLabel, false)
-	content.Append(widget.NewSpacer(0, 0), true)
-	v.record = dropdownButton(content, func() {
+	v.recordFace = widget.NewButtonContent(v.font, v.px, "ld-circle-dot-symbolic", "")
+	v.record = dropdownButton(v.recordFace, func() {
 		if v.ctx.Recorder != nil {
 			v.ctx.Recorder.Toggle()
 		}
@@ -289,25 +282,21 @@ func (v *recorderView) controls() widget.Widget {
 		if r := v.ctx.Recorder; r != nil {
 			r.SetPaused(!r.Snapshot().Paused)
 		}
-	}, "recorder-pause-button")
-	v.pause.AddClass(css.Secondary)
+	}, "recorder-pause-button", css.Secondary, css.Icon)
 	row.Append(v.pause, false)
 	return row
 }
 
+// sectionHeader is a section label led by its icon, in the label's
+// muted ink.
 func (v *recorderView) sectionHeader(icon, title string) *widget.Box {
-	row := widget.NewBox(widget.Row, 6, 0)
+	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	row.AddClass("recorder-section-header")
-	glyph := widget.NewThemeIcon(icon, int(v.px))
-	row.Append(glyph, false)
-	row.Append(sectionLabel(v.font, title), true)
+	glyph := widget.NewThemeIcon(icon, sectionLabelPx)
+	glyph.AddClass(css.DimLabel)
+	row.AppendAligned(glyph, false, widget.AlignCenter)
+	row.AppendAligned(sectionLabel(v.font, title), true, widget.AlignCenter)
 	return row
-}
-
-func (v *recorderView) card() *widget.Box {
-	c := widget.NewBox(widget.Column, 0, 10)
-	c.AddClass("card", "recorder-card")
-	return c
 }
 
 // row is a setting row on lys-ui's Item: the title, the control added
@@ -367,12 +356,12 @@ func (v *recorderView) applyState(c recorder.Change) {
 	v.record.RemoveClass(css.DestructiveAction, css.SuggestedAction)
 	if c.Active {
 		v.record.AddClass(css.DestructiveAction)
-		v.recordIcon.SetThemeName("ld-square-symbolic")
-		v.recordLabel.SetText(i18n.T("dropdown-recorder-stop"))
+		v.recordFace.SetIconName("ld-square-symbolic")
+		v.recordFace.SetLabel(i18n.T("dropdown-recorder-stop"))
 	} else {
 		v.record.AddClass(css.SuggestedAction)
-		v.recordIcon.SetThemeName("ld-circle-dot-symbolic")
-		v.recordLabel.SetText(i18n.T("dropdown-recorder-record"))
+		v.recordFace.SetIconName("ld-circle-dot-symbolic")
+		v.recordFace.SetLabel(i18n.T("dropdown-recorder-record"))
 	}
 	v.pause.SetEnabled(c.Active)
 	if c.Paused {

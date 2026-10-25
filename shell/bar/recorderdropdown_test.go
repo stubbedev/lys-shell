@@ -122,16 +122,16 @@ func TestRecorderDropdownStateAndControls(t *testing.T) {
 	ctx, _, engine := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
-	if v.status.Visible() || v.pause.Enabled() || !v.record.HasClass(css.SuggestedAction) || v.recordLabel.Text() != i18n.T("dropdown-recorder-record") {
+	if v.status.Visible() || v.pause.Enabled() || !v.record.HasClass(css.SuggestedAction) || recordText(v) != i18n.T("dropdown-recorder-record") {
 		t.Error("idle: want the record button, no status, pause disabled")
 	}
-	if v.webcam.Visible() || v.webcamHeader.Visible() {
+	if v.webcam.Visible() {
 		t.Error("no camera: the webcam card shows")
 	}
 
 	v.record.OnClick()
 	waitHeadless(t, "recording", func() bool { return v.status.Visible() })
-	if !v.record.HasClass(css.DestructiveAction) || v.record.HasClass(css.SuggestedAction) || v.recordLabel.Text() != i18n.T("dropdown-recorder-stop") || !v.pause.Enabled() {
+	if !v.record.HasClass(css.DestructiveAction) || v.record.HasClass(css.SuggestedAction) || recordText(v) != i18n.T("dropdown-recorder-stop") || !v.pause.Enabled() {
 		t.Error("recording: want stop, danger, pause enabled")
 	}
 	v.pause.OnClick()
@@ -163,7 +163,7 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 	}
 
 	// Switches and pickers write their keys.
-	micRow := v.Children()[1].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Item)
+	micRow := treetest.WithClass(v, "recorder-row")[0]
 	micSwitch := treetest.First[*widget.Switch](t, micRow)
 	micSwitch.SetOn(!micSwitch.On())
 	if log.get(recorderPathMic) != micSwitch.On() {
@@ -196,51 +196,31 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 	}
 }
 
-// The recorder tree is spacing-0 wherever Rust's boxes are (mod.rs sets
-// no spacing on the root, the status and the cards — the CSS padding
-// and the .recorder-row + .recorder-row border-top carry the layout),
-// the setting rows are lys-ui's Items, and the boxes Rust does space
-// keep their gaps.
-func TestRecorderSpacingIsZero(t *testing.T) {
+// The recorder's settings are lys-ui Items in item cards, each section
+// a group under its icon-led label, and the record button is lys-ui's
+// icon-and-label content.
+func TestRecorderSettingsAreItemCards(t *testing.T) {
 	ctx, _, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
-	if got := v.Spacing(); got != 0 {
-		t.Errorf("root spacing = %d, want 0", got)
+	cards := treetest.WithClass(v, "recorder-card")
+	if len(cards) != 2 {
+		t.Fatalf("recorder cards = %d, want audio and webcam", len(cards))
 	}
-	if got := v.status.Spacing(); got != 0 {
-		t.Errorf("status spacing = %d, want 0", got)
+	for _, c := range cards {
+		if !widget.HasClass(c, css.Card) || len(treetest.All[*widget.ItemGroup](c)) != 1 {
+			t.Error("a recorder card is not lys-ui's card around an item group")
+		}
 	}
-	card := findByClass(v, "recorder-card")
-	if card == nil {
-		t.Fatal("no recorder card")
+	if n := len(treetest.WithClass(cards[0], "recorder-row")); n != 3 {
+		t.Errorf("audio rows = %d, want microphone, its device, and system audio", n)
 	}
-	if got := card.(*widget.Box).Spacing(); got != 0 {
-		t.Errorf("card spacing = %d, want 0", got)
+	if _, ok := any(v.recordFace).(*widget.ButtonContent); !ok || recordText(v) != i18n.T("dropdown-recorder-record") {
+		t.Errorf("the record button reads %q", recordText(v))
 	}
-	if _, ok := findByClass(v, "recorder-row").(*widget.Item); !ok {
-		t.Fatal("the setting rows are not lys-ui's Items")
-	}
+}
 
-	// Negative: the boxes Rust itself spaces keep their gaps — zeroing
-	// those would be the same bug the other way.
-	for _, tc := range []struct {
-		class string
-		want  int
-	}{
-		{"recorder-controls", 8},
-		{"recorder-section-header", 6},
-	} {
-		w := findByClass(v, tc.class)
-		if w == nil {
-			t.Fatalf("no %s", tc.class)
-		}
-		if got := w.(*widget.Box).Spacing(); got != tc.want {
-			t.Errorf("%s spacing = %d, want %d (the Rust set_spacing)", tc.class, got, tc.want)
-		}
-	}
-	position, _ := findByClass(v, "recorder-position").(*widget.Box)
-	if position == nil || position.Spacing() != 6 {
-		t.Errorf("position row = %v, want spacing 6 (the Rust set_spacing)", position)
-	}
+// recordText is the record button's label.
+func recordText(v *recorderView) string {
+	return treetest.All[*widget.Label](v.recordFace)[0].Text()
 }
