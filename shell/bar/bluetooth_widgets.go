@@ -4,15 +4,12 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 )
 
-// btDeviceRow is one device row (device_item): the row box carries the
-// classes and the stylesheet paints it — the available :hover, the
-// padding, the first-child radii. The whole row is the click target
-// (SetOnClickWithin; the action buttons are clicking descendants and
-// keep their own), and hovering swaps the status label for the actions
-// (SetOnHoverWithin; the buttons are descendants, so moving onto one
-// holds the swap).
+// btDeviceRow is one device row (device_item) on lys-ui's Item: the
+// whole row activates (the action buttons keep their own clicks), and
+// hovering swaps the status label for the actions (SetOnHoverWithin;
+// the buttons are descendants, so moving onto one holds the swap).
 type btDeviceRow struct {
-	*widget.Box
+	*widget.Item
 	// status and actions are the hover stack's two pages.
 	slot   *widget.Stack
 	status *widget.Label

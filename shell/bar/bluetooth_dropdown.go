@@ -322,61 +322,37 @@ func batteryText(battery *uint8) string {
 	return btText("dropdown-bluetooth-battery", "percent", *battery)
 }
 
-// buildRow is DeviceItem's view for one snapshot.
+// buildRow is DeviceItem's view for one snapshot, on lys-ui's Item:
+// the device icon as the media, the name over the type and battery,
+// and the status or actions slot as the row's action. Activating the
+// row is the device click.
 func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	font, px := d.font, d.px
 	pending := d.pending[s.path]
-	// Every box here is spacing-0 in Rust; the stylesheet's margins and
-	// paddings carry the gaps.
-	row := &btDeviceRow{Box: widget.NewBox(widget.Row, 0, 0), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
+	detail := btText(s.typeKey)
+	if s.battery != nil {
+		detail += " " + btDetailSeparator + " " + batteryText(s.battery)
+	}
+	row := &btDeviceRow{Item: widget.NewItem(font, s.name, detail), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
+	row.SetSmall(true)
 	row.AddClass("bluetooth-device")
-	if s.category == categoryAvailable {
+	switch s.category {
+	case categoryAvailable:
 		row.AddClass("available")
+	case categoryConnected:
+		row.AddClass("connected")
+	case categoryPaired:
+		row.AddClass("paired")
 	}
 	if pending != 0 {
 		row.AddClass("pending")
 	}
 	row.onClick = func() { d.onDeviceClick(s) }
-	row.SetOnClickWithin(func() { row.onClick() })
+	row.SetOnActivate(func() { row.onClick() })
 	row.SetOnHoverWithin(func(bool) { row.syncSlot() })
-	row.SetCursorName("pointer")
-
 	icon := widget.NewThemeIcon(s.icon, int(px*1.4))
-	// The icon tile (device_item's icon_container): the box paints the
-	// well (overlay, or accent-subtle while connected), the image the ink.
-	well := iconTile(icon, "bluetooth-icon", "bluetooth-device-icon")
-	switch s.category {
-	case categoryConnected:
-		well.AddClass("connected")
-	case categoryPaired:
-		well.AddClass("paired")
-	}
-	row.Append(well, false)
-
-	info := widget.NewBox(widget.Column, 0, 0)
-	info.AddClass("bluetooth-device-info")
-	name := widget.NewLabel(font, px, s.name, 0)
-	name.SetEllipsize(widget.EllipsizeEnd)
-	name.AddClass("bluetooth-device-name")
-	info.Append(name, false)
-	detail := widget.NewBox(widget.Row, 0, 0)
-	detail.AddClass("bluetooth-device-detail-row")
-	typeLabel := widget.NewLabel(font, px*0.9, btText(s.typeKey), 0)
-	typeLabel.AddClass("bluetooth-device-detail")
-	detail.Append(typeLabel, false)
-	if s.battery != nil {
-		sep := widget.NewLabel(font, px*0.9, btDetailSeparator, 0)
-		sep.AddClass("bluetooth-detail-separator")
-		detail.Append(sep, false)
-		bat := widget.NewThemeIcon(batteryLevelIcon(*s.battery), int(px))
-		bat.AddClass("bluetooth-battery-icon")
-		detail.Append(bat, false)
-		pct := widget.NewLabel(font, px*0.9, batteryText(s.battery), 0)
-		pct.AddClass("bluetooth-device-detail")
-		detail.Append(pct, false)
-	}
-	info.Append(detail, false)
-	row.AppendAligned(info, true, widget.AlignCenter)
+	icon.AddClass("bluetooth-icon")
+	row.SetMedia(icon, false)
 
 	// The trailing slot: status, or the actions while hovered.
 	if s.category != categoryAvailable || pending != 0 {
@@ -401,10 +377,10 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		if s.connected {
 			toggleKey = "dropdown-bluetooth-disconnect"
 		}
-		toggle := ghostButton(widget.NewLabel(font, px*0.85, btText(toggleKey), 0))
+		toggle := dropdownButton(widget.NewLabel(font, px*0.85, btText(toggleKey), 0), nil, css.Ghost, css.Small)
 		toggle.AddClass("bluetooth-action-toggle")
 		toggle.OnClick = func() { d.onDeviceClick(s) }
-		forget := ghostButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), 0))
+		forget := dropdownButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), 0), nil, css.Ghost, css.Small)
 		forget.AddClass("bluetooth-forget")
 		forget.OnClick = func() { d.onForget(s) }
 		toggle.SetEnabled(pending == 0)
@@ -419,7 +395,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		row.slot.SetTransition(widget.StackCrossfade, hoverTransition)
 		row.slot.Add(btSlotStatus, statusPage)
 		row.slot.Add(btSlotActions, actions)
-		row.AppendAligned(row.slot, false, widget.AlignCenter)
+		row.AddAction(row.slot)
 		row.syncSlot()
 	}
 	return row

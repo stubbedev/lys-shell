@@ -61,12 +61,22 @@ func rows(list *widget.Box) []*btDeviceRow {
 	return out
 }
 
+// itemText is the text of the item's part labelled class (title,
+// description).
+func itemText(it *btDeviceRow, class string) string {
+	for _, w := range treetest.WithClass(it, class) {
+		if l, ok := w.(*widget.Label); ok {
+			return l.Text()
+		}
+	}
+	return ""
+}
+
 func rowNamed(t *testing.T, d *btDropdown, name string) *btDeviceRow {
 	t.Helper()
 	for _, list := range []*widget.Box{d.myList, d.availList} {
 		for _, r := range rows(list) {
-			info := r.Children()[1].(*widget.Box)
-			if info.Children()[0].(*widget.Label).Text() == name {
+			if itemText(r, "title") == name {
 				return r
 			}
 		}
@@ -96,16 +106,12 @@ func TestBtDropdownListsDevices(t *testing.T) {
 			t.Error("an empty state shows beside devices")
 		}
 	}
-	// The battery detail: separator, icon, percent.
-	detail := mine[0].Children()[1].(*widget.Box).Children()[1].(*widget.Box)
-	if n := len(detail.Children()); n != 4 {
-		t.Fatalf("headset detail has %d parts, want type, separator, icon, percent", n)
+	// The description: the type, then the battery behind the separator.
+	if got := plain(itemText(mine[0], "description")); got != "Headphones "+btDetailSeparator+" 64%" {
+		t.Errorf("headset description = %q, want type and battery", got)
 	}
-	if got := plain(detail.Children()[3].(*widget.Label).Text()); got != "64%" {
-		t.Errorf("battery = %q", got)
-	}
-	if got := detail.Children()[0].(*widget.Label).Text(); got != "Headphones" {
-		t.Errorf("type = %q", got)
+	if got := plain(itemText(mine[1], "description")); strings.Contains(got, "%") {
+		t.Errorf("a device without a battery reads %q", got)
 	}
 	// Available rows carry no status/actions slot and no hover swap.
 	if avail[0].actions != nil || avail[0].hoverSwaps {
@@ -210,7 +216,7 @@ func TestBtDropdownConnectAvailableDevice(t *testing.T) {
 		t.Fatalf("calls = %v, want %v", src.Calls(), want)
 	}
 	row := rowNamed(t, d, "Speaker")
-	if !row.pending || row.status == nil || row.status.Text() != "Connecting..." || !widget.HasClass(row.Box, "pending") {
+	if !row.pending || row.status == nil || row.status.Text() != "Connecting..." || !row.HasClass("pending") {
 		t.Error("a connecting row does not show its pending state")
 	}
 	// A click while pending does nothing.
@@ -703,7 +709,7 @@ func TestBtNoAdapterDropdownKeepsTheHeader(t *testing.T) {
 	if findBox(d.root, "dropdown-header") == nil {
 		t.Error("the live dropdown lost its header")
 	}
-	if findBox(content, "bluetooth-device") != nil {
+	if len(treetest.WithClass(content, "bluetooth-device")) != 0 {
 		t.Error("the no-adapter state shows a device row")
 	}
 }
@@ -914,5 +920,26 @@ func TestBtDeviceStatusSitsAtTheRowsEnd(t *testing.T) {
 	}
 	if d := midY(status) - midY(slot); d < -1 || d > 1 {
 		t.Errorf("the status sits %dpx off the slot's middle", d)
+	}
+}
+
+// A device row fits a narrow dropdown: the name and detail ellipsize
+// on one line instead of holding the row open, so the status slot
+// stays inside it.
+func TestBtRowFitsANarrowDropdown(t *testing.T) {
+	d, _ := newTestBtDropdown(t, btWorld())
+	r := rows(d.myList)[0]
+	styledContext(t, d.ctx.Config).Theme.Attach(r)
+	const w = 280
+	sz := r.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})
+	r.Arrange(render.Rect{W: w, H: sz.H})
+	if end := r.slot.Bounds().X + r.slot.Bounds().W; end > w {
+		t.Errorf("the status slot ends at %d, past the %d row", end, w)
+	}
+	for _, part := range treetest.WithClass(r, "title") {
+		l := part.(*widget.Label)
+		if one := widget.MeasureAsChild(l, widget.Constraints{Max: widget.Size{W: 1000, H: 400}}).H; l.Bounds().H != one {
+			t.Errorf("the name spans %dpx, want one %dpx line", l.Bounds().H, one)
+		}
 	}
 }
