@@ -11,20 +11,10 @@ jobs:
     changelog:
         name: Changelog
         runs-on: ubuntu-latest
-        outputs:
-            changelog: ${{ steps.changelog.outputs.changes }}
         steps:
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
-
-            - name: Generate changelog
-              id: changelog
-              uses: requarks/changelog-action@v1
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  tag: ${{ github.ref_name }}
-                  excludeTypes: build,chore,style
 
             - name: Verify tag matches internal/version
               run: |
@@ -39,12 +29,22 @@ jobs:
                       exit 1
                   fi
 
+            - uses: cachix/install-nix-action@v31
+              with:
+                  extra_nix_config: |
+                      experimental-features = nix-command flakes
+                      extra-substituters = https://nix.stubbe.dev/c/default/default
+                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
+
+            - name: Generate release notes
+              run: nix develop --accept-flake-config -c go run ./internal/tools/releasenotes "${GITHUB_REF_NAME}" > release-notes.md
+
             - name: Create GitHub release
               uses: ncipollo/release-action@v1
               with:
                   tag: ${{ github.ref_name }}
                   name: ${{ github.ref_name }}
-                  body: ${{ steps.changelog.outputs.changes }}
+                  bodyFile: release-notes.md
                   draft: true
                   token: ${{ secrets.GITHUB_TOKEN }}
 
