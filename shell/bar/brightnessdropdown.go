@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/brightness"
@@ -84,7 +85,7 @@ type brightnessView struct {
 
 	*widget.Box
 	body    *widget.Stack
-	list    *widget.Box
+	list    *widget.ItemGroup
 	devices []brightness.Device
 	sliders map[string]*widgets.DebouncedSlider
 
@@ -102,8 +103,9 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "brightness-dropdown")
 	v.Append(dropdownHeader(font, brightnessDeviceIcon, i18n.T("dropdown-brightness-title")), false)
-	v.list = widget.NewBox(widget.Column, 0, 0)
-	v.list.AddClass("brightness-devices")
+	card, list := itemCard()
+	card.AddClass("brightness-devices")
+	v.list = list
 	empty := emptyState(font, px, brightnessDeviceIcon,
 		i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
 	empty.AddClass("brightness-empty")
@@ -111,7 +113,7 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	// scroll: the list shows bare and the panel grows.
 	content := dropdownContent()
 	v.body = widget.NewStack()
-	v.body.Add("devices", v.list)
+	v.body.Add("devices", card)
 	v.body.Add("empty", empty)
 	content.Append(v.body, true)
 	v.Append(content, true)
@@ -154,44 +156,32 @@ func (v *brightnessView) apply(devices []brightness.Device) {
 	}
 	multi := len(devices) > 1
 	for _, d := range devices {
-		v.list.Append(v.item(d, multi), false)
+		v.list.Append(v.item(d, multi))
 	}
 	v.body.Show("devices")
 }
 
-// item is BrightnessDeviceItem: the icon, the name over the optional
-// subtitle, and the labeled slider committing to the device. Spacing
-// stays 0 — the cascade's border-spacing and margins own the gaps.
+// item is BrightnessDeviceItem: the device as lys-ui's Item (the icon,
+// the name over the optional subtitle) over the labeled slider
+// committing to it.
 func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	card := widget.NewBox(widget.Column, 0, 0)
 	card.AddClass("brightness-device")
-	header := widget.NewBox(widget.Row, 0, 0)
-	header.AddClass("brightness-device-header")
-	icon := widget.NewThemeIcon(brightnessDeviceIcon, int(v.px*1.2))
-	header.AppendAligned(iconTile(icon, "brightness-device-icon-img", "brightness-device-icon"), false, widget.AlignCenter) // set_valign Center
-	info := widget.NewBox(widget.Column, 0, 0)
-	info.AddClass("brightness-device-info")
-	title := widget.NewLabel(v.font, v.px, friendlyDeviceName(d.Name, d.Type), 0)
-	title.AddClass("brightness-device-name")
-	title.SetEllipsize(widget.EllipsizeEnd)
-	info.Append(title, false)
-	if sub, ok := deviceSubtitle(d.Name, d.Type, multi); ok {
-		meta := widget.NewLabel(v.font, v.px*0.85, sub, 0)
-		meta.AddClass("brightness-device-meta")
-		meta.SetEllipsize(widget.EllipsizeEnd)
-		info.Append(meta, false)
-	}
-	header.AppendAligned(info, true, widget.AlignCenter) // set_valign Center
-	card.Append(header, false)
+	sub, _ := deviceSubtitle(d.Name, d.Type, multi)
+	head := widget.NewItem(v.font, friendlyDeviceName(d.Name, d.Type), sub)
+	head.SetSmall(true)
+	head.SetEllipsize(true)
+	head.SetMedia(widget.NewThemeIcon(brightnessDeviceIcon, itemIconPx), false)
+	card.Append(head, false)
 
-	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px*0.9, 0, v.ctx.Invoke)
-	slider.AddClass("brightness-slider-row")
-	slider.Knob.AddClass("brightness-slider")
-	slider.ValueLabel().AddClass("brightness-slider-value")
+	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px, 0, v.ctx.Invoke)
+	slider.ValueLabel().AddClass("brightness-slider-value", css.Numeric)
 	name := d.Name
 	slider.OnCommit = func(pct float64) { v.commit(name, pct) }
 	v.sliders[name] = slider
-	card.Append(slider, false)
+	body := itemBody()
+	body.Append(slider, false)
+	card.Append(body, false)
 	return card
 }
 

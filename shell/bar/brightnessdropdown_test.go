@@ -28,20 +28,6 @@ func brightnessOne[T widget.Widget](t *testing.T, root widget.Widget, class stri
 	return zero
 }
 
-// brightnessArrangeStyled attaches the bar stylesheet and lays the
-// dropdown out at w, so the cascade's margins, paddings, and
-// border-spacing take part in the bounds the assertions read.
-func brightnessArrangeStyled(t *testing.T, ctx ModuleContext, v styledRoot, w int) {
-	t.Helper()
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: w, H: 1 << 14}})
-	v.Arrange(render.Rect{W: w, H: max(sz.H, 1)})
-	ctx.Theme.Attach(v)
-	restore := widget.SetAnimationsInstant(true)
-	t.Cleanup(restore)
-	sz = v.Measure(widget.Constraints{Max: widget.Size{W: w, H: 1 << 14}})
-	v.Arrange(render.Rect{W: max(sz.W, 1), H: max(sz.H, 1)})
-}
-
 // The device list sits bare in the stack — Rust has no
 // ScrolledWindow; the panel grows instead.
 func TestBrightnessListIsNotInAScroll(t *testing.T) {
@@ -58,11 +44,7 @@ func TestBrightnessListIsNotInAScroll(t *testing.T) {
 	if n := len(treetest.All[*widget.Scroll](v)); n != 0 {
 		t.Errorf("%d scrolled windows in the tree; the Rust list is bare", n)
 	}
-	pages := treetest.WithClass(v, "brightness-devices")
-	if len(pages) != 1 || pages[0] != widget.Widget(v.list) {
-		t.Fatal("the devices page is not the classed list box itself")
-	}
-	if n := len(v.list.Children()); n != 1 {
+	if n := len(brightnessCards(v)); n != 1 {
 		t.Errorf("the list holds %d items, want the one device", n)
 	}
 }
@@ -89,63 +71,6 @@ func TestBrightnessEmptyStateIconAndDescription(t *testing.T) {
 	}
 	if title := brightnessOne[*widget.Label](t, empty[0], "title"); title.Wrap() {
 		t.Error("the title wraps")
-	}
-}
-
-// The device card keeps Rust's spacing-0 boxes — the header's gap is
-// the cascade's border-spacing — and its children ride valign center
-// at their natural heights.
-func TestBrightnessDeviceHeaderSpacingAndValign(t *testing.T) {
-	ctx := styledContext(t, config.Defaults())
-	source := &fakeBrightnessSource{devices: []brightness.Device{
-		{Name: "intel_backlight", Type: brightness.TypeFirmware, Brightness: 50, Max: 100},
-		{Name: "ddcci5", Type: brightness.TypeDDC, Brightness: 10, Max: 100},
-	}}
-	ctx.Brightness = source
-	v := brightnessDropdown(ctx).(*brightnessView)
-	defer v.dropdownClosed()
-	brightnessArrangeStyled(t, ctx, v, 320)
-
-	if got := v.Spacing(); got != 0 {
-		t.Errorf("root spacing = %d, want 0", got)
-	}
-	for _, class := range []string{
-		"brightness-devices", "brightness-device", "brightness-device-header",
-		"brightness-device-info",
-	} {
-		ws := treetest.WithClass(v, class)
-		if len(ws) == 0 {
-			t.Fatalf("no .%s in the tree", class)
-		}
-		for _, w := range ws {
-			if got := w.(*widget.Box).Spacing(); got != 0 {
-				t.Errorf(".%s spacing = %d, want 0 (CSS owns the gaps)", class, got)
-			}
-		}
-	}
-
-	header := brightnessOne[*widget.Box](t, v, "brightness-device-header")
-	kids := header.Children()
-	if len(kids) != 2 {
-		t.Fatalf("header children = %d, want the tile and the info", len(kids))
-	}
-	hb, tile, info := header.Bounds(), alignedBounds(t, kids[0]), alignedBounds(t, kids[1])
-	if tile.X+tile.W >= info.X {
-		t.Errorf("no border-spacing gap between the icon tile and the info: %v then %v", tile, info)
-	}
-	mid := hb.Y + hb.H/2
-	big := widget.Constraints{Max: widget.Size{W: 1 << 14, H: 1 << 14}}
-	for name, k := range map[string]widget.Widget{"icon tile": kids[0], "info": kids[1]} {
-		r := alignedBounds(t, k)
-		if d := alignDelta(r.Y+r.H/2, mid); d > 1 {
-			t.Errorf("%s midpoint off by %d (header mid %d)", name, d, mid)
-		}
-		// A plain append would stretch the child over the row; valign
-		// center keeps its natural height.
-		if nat := k.Measure(big).H; hb.H > nat+1 && r.H != nat {
-			t.Errorf("%s stretched to %d in a %d header, want its natural %d",
-				name, r.H, hb.H, nat)
-		}
 	}
 }
 
@@ -196,12 +121,15 @@ func TestDeviceSubtitleOnlyWithSeveralDevices(t *testing.T) {
 	}
 }
 
+// brightnessCards is the device cards in the list, in order.
+func brightnessCards(v *brightnessView) []widget.Widget {
+	return treetest.WithClass(v.list, "brightness-device")
+}
+
 // brightnessItemMeta reports whether a device card carries the
 // subtitle line.
 func brightnessItemMeta(card widget.Widget) bool {
-	header := card.(*widget.Box).Children()[0].(*widget.Box)
-	info := header.Children()[1].(*widget.Box)
-	return len(info.Children()) == 2
+	return itemText(card, "description") != ""
 }
 
 func TestBrightnessDropdownEmptyWithoutDevices(t *testing.T) {
@@ -213,8 +141,8 @@ func TestBrightnessDropdownEmptyWithoutDevices(t *testing.T) {
 	ctx.Brightness = &fakeBrightnessSource{}
 	v = brightnessDropdown(ctx).(*brightnessView)
 	defer v.dropdownClosed()
-	if v.body.Visible() != "empty" || len(v.list.Children()) != 0 {
-		t.Errorf("no devices: page %q, %d items", v.body.Visible(), len(v.list.Children()))
+	if v.body.Visible() != "empty" || len(brightnessCards(v)) != 0 {
+		t.Errorf("no devices: page %q, %d items", v.body.Visible(), len(brightnessCards(v)))
 	}
 }
 
@@ -226,10 +154,10 @@ func TestBrightnessDropdownItemsSubtitlesAndCommit(t *testing.T) {
 	ctx.Brightness = source
 	v := brightnessDropdown(ctx).(*brightnessView)
 	defer v.dropdownClosed()
-	if v.body.Visible() != "devices" || len(v.list.Children()) != 1 {
-		t.Fatalf("page %q with %d items, want one device", v.body.Visible(), len(v.list.Children()))
+	if v.body.Visible() != "devices" || len(brightnessCards(v)) != 1 {
+		t.Fatalf("page %q with %d items, want one device", v.body.Visible(), len(brightnessCards(v)))
 	}
-	if brightnessItemMeta(v.list.Children()[0]) {
+	if brightnessItemMeta(brightnessCards(v)[0]) {
 		t.Error("a lone device shows a subtitle")
 	}
 	slider := v.sliders["intel_backlight"]
@@ -247,7 +175,7 @@ func TestBrightnessDropdownItemsSubtitlesAndCommit(t *testing.T) {
 		{Name: "ddcci5", Type: brightness.TypeDDC, Brightness: 10, Max: 100},
 	})
 	v.apply(v.read(t.Context()))
-	if len(v.list.Children()) != 2 || !brightnessItemMeta(v.list.Children()[0]) {
+	if cards := brightnessCards(v); len(cards) != 2 || !brightnessItemMeta(cards[0]) {
 		t.Error("two devices: want two items with subtitles")
 	}
 }
