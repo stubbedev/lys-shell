@@ -57,7 +57,7 @@ type zoneRef struct{ card, zone int }
 func newLayoutEditor(k *kit, s slot) *layoutEditor {
 	c := &layoutEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s}
 	c.AddClass("bar-layout-control")
-	c.list = widget.NewBox(widget.Column, widget.Current().Spacing, 0)
+	c.list = gapBox(widget.Column)
 	c.list.AddClass("bar-layout-list")
 	c.Append(c.list, false)
 	add := listButton(k, "ld-plus-symbolic", "settings-layout-add", "list-control-add", func() {
@@ -130,12 +130,7 @@ func (c *layoutEditor) rebuild() {
 func (c *layoutEditor) card(i int) widget.Widget {
 	t := i18n.Settings()
 	l := &c.layouts[i]
-	th := widget.Current()
-	band := render.Insets{Top: th.Padding, Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding}
-	root := widget.NewBox(widget.Column, 0, 0)
-	root.AddClass(css.Card, "layout-card")
-	header := widget.NewBox(widget.Row, th.Spacing, 0)
-	header.SetPadding(band)
+	header := gapBox(widget.Row)
 	header.AddClass("layout-card-header")
 	monitor := c.k.entry()
 	monitor.AddClass("layout-monitor-input")
@@ -184,8 +179,7 @@ func (c *layoutEditor) card(i int) widget.Widget {
 	header.Append(widget.NewSpacer(0, 0), true)
 	header.AppendAligned(show, false, widget.AlignCenter)
 	header.AppendAligned(remove, false, widget.AlignCenter)
-	body := widget.NewBox(widget.Column, th.Spacing, 0)
-	body.SetPadding(band)
+	body := gapBox(widget.Column)
 	body.AddClass("layout-card-body")
 	if !l.Show {
 		hidden := c.k.label(t.Get("settings-layout-hidden"), "layout-hidden-label", css.DimLabel)
@@ -197,10 +191,7 @@ func (c *layoutEditor) card(i int) widget.Widget {
 			body.Append(c.zoneRow(zoneRef{i, z}, labels), false)
 		}
 	}
-	root.Append(header, false)
-	root.Append(widget.NewSeparator(widget.Horizontal), false)
-	root.Append(body, false)
-	return root
+	return sectionCard(header, body, "layout-card")
 }
 
 // zoneRow is build_zone_row: the label, sized with the card's other
@@ -209,7 +200,7 @@ func (c *layoutEditor) card(i int) widget.Widget {
 func (c *layoutEditor) zoneRow(at zoneRef, labels *widget.SizeGroup) widget.Widget {
 	t := i18n.Settings()
 	th := widget.Current()
-	row := widget.NewBox(widget.Row, th.Spacing, 0)
+	row := gapBox(widget.Row)
 	row.AddClass("layout-zone")
 	chips := widget.NewChipBox()
 	c.zones[chips] = at
@@ -253,9 +244,8 @@ func (c *layoutEditor) chip(item config.BarItem) *widget.Chip {
 		chip.SetOnDismiss(func() { c.removeItem(chip) })
 		return chip
 	}
-	th := widget.Current()
 	chip := widget.NewChip(c.k.face, item.Group.Name)
-	content := widget.NewBox(widget.Row, th.Spacing/2, 0)
+	content := gapBox(widget.Row)
 	name := c.k.entry()
 	name.AddClass("group-name-entry")
 	name.SetWidthChars(groupNameChars, groupNameMaxChars)
@@ -286,7 +276,7 @@ func (c *layoutEditor) chip(item config.BarItem) *widget.Chip {
 			c.commit()
 			c.rebuild()
 		})
-	}, "chip-add", css.Ghost, css.Icon, css.Small)
+	}, "chip-add", css.Ghost, css.Icon)
 	add.SetTooltip(i18n.Settings().Get("settings-layout-add-module"))
 	content.AppendAligned(add, false, widget.AlignCenter)
 	chip.SetContent(content)

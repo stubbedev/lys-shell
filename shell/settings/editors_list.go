@@ -50,10 +50,9 @@ type listEditor struct {
 }
 
 func newListEditor(k *kit, s slot, spec listSpec) *listEditor {
-	th := widget.Current()
-	c := &listEditor{Box: widget.NewBox(widget.Column, th.Spacing, 0), k: k, slot: s, spec: spec}
+	c := &listEditor{Box: gapBox(widget.Column), k: k, slot: s, spec: spec}
 	c.AddClass(append([]string{"string-list-editor"}, spec.classes...)...)
-	c.rows = widget.NewBox(widget.Column, th.Spacing/2, 0)
+	c.rows = gapBox(widget.Column)
 	listCls := spec.listCls
 	if listCls == "" {
 		listCls = "string-list"
@@ -75,7 +74,7 @@ func newListEditor(k *kit, s slot, spec listSpec) *listEditor {
 
 // listButton is list_controls' add/remove button.
 func listButton(k *kit, icon, tooltipKey, class string, onClick func()) *widget.Button {
-	b := k.button(k.icon(icon), onClick, "list-control-button", class, css.Outline, css.Icon, css.Small)
+	b := k.button(k.icon(icon), onClick, "list-control-button", class, css.Outline, css.Icon)
 	b.SetTooltip(i18n.Settings().Get(tooltipKey))
 	return b
 }
@@ -116,7 +115,7 @@ func (c *listEditor) rebuild(values []any) {
 
 func (c *listEditor) appendRow(v any) {
 	item := c.spec.item(c.k, v, c.commit)
-	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
+	row := gapBox(widget.Row)
 	row.AddClass(c.spec.rowClass)
 	row.Append(item, true)
 	if c.spec.reorder {
@@ -129,7 +128,7 @@ func (c *listEditor) appendRow(v any) {
 }
 
 func (c *listEditor) rowButton(icon string, onClick func()) *widget.Button {
-	return c.k.button(c.k.icon(icon), onClick, "string-list-button", css.Ghost, css.Icon, css.Small)
+	return c.k.button(c.k.icon(icon), onClick, "string-list-button", css.Ghost, css.Icon)
 }
 
 func (c *listEditor) remove(item listItem) {
@@ -275,7 +274,7 @@ var stringMap = listRow(func(config.FieldMeta) listSpec {
 		addKey: "settings-map-add", rowClass: "string-map-row", blank: [2]string{}, classes: []string{"string-map-editor"}, listCls: "string-map",
 		item: func(k *kit, v any, changed func()) listItem {
 			pair, _ := v.([2]string)
-			row := mapItem{Box: widget.NewBox(widget.Row, 4, 0), key: k.entry(), value: k.entry()}
+			row := mapItem{Box: gapBox(widget.Row), key: k.entry(), value: k.entry()}
 			row.key.SetPlaceholder(t.Get("settings-map-key-placeholder"))
 			row.value.SetPlaceholder(t.Get("settings-map-value-placeholder"))
 			row.key.SetText(pair[0])

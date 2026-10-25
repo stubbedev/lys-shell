@@ -733,7 +733,7 @@ func TestFileEditorBrowses(t *testing.T) {
 	if !c.entry.badge.Visible() {
 		t.Fatal("typing did not raise the unsaved badge")
 	}
-	c.browse()
+	click(c, c.browse)
 	f.fileFn("/home/me/wall.png")
 	if v := k.store.value("lock.background-image"); v != "/home/me/wall.png" || c.entry.badge.Visible() {
 		t.Errorf("browse wrote %v (badge %v)", v, c.entry.badge.Visible())
@@ -1334,7 +1334,7 @@ func TestMonitorWallpaperCards(t *testing.T) {
 		t.Error("the monitor card lacks its own chrome")
 	}
 	header := card.Children()[0].(*widget.Box)
-	if l := header.Children()[0].(*widget.Label); !l.HasClass("monitor-card-label") || l.HasClass("card-form-label") {
+	if l := treetest.First[*widget.Label](t, header); !l.HasClass("monitor-card-label") || l.HasClass("card-form-label") {
 		t.Error("the identity label lacks the list's label class")
 	}
 	remove := header.Children()[len(header.Children())-1].(*widget.Button)
@@ -1374,7 +1374,7 @@ func TestMonitorWallpaperCards(t *testing.T) {
 	bodyRow := c.list.Children()[0].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Box)
 	bodyRow.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 400}})
 	bodyRow.Arrange(render.Rect{W: 600, H: 40})
-	if label := bodyRow.Children()[0].(*widget.Label).Bounds(); label.W > 200 || body.Bounds().W < 400 {
+	if label := treetest.First[*widget.Label](t, bodyRow).Bounds(); label.W > 200 || body.Bounds().W < 400 {
 		t.Errorf("label %v and body %v share the row; the body should fill it", label, body.Bounds())
 	}
 	add := c.Children()[1].(*widget.Button)

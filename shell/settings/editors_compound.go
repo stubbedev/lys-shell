@@ -75,7 +75,7 @@ type optionalNumber struct {
 }
 
 func newOptionalNumber(k *kit, s slot, lo, hi, step, fallback float64) *optionalNumber {
-	c := &optionalNumber{Box: widget.NewBox(widget.Row, 8, 0), k: k, slot: s}
+	c := &optionalNumber{Box: gapBox(widget.Row), k: k, slot: s}
 	c.on = widget.NewSwitch(false)
 	c.on.AddClass("inherit-switch")
 	c.on.SetTooltip(i18n.Settings().Get("settings-override"))
@@ -149,7 +149,7 @@ type sizeEditor struct {
 
 func newSizeEditor(k *kit, s slot, baseRem float64) *sizeEditor {
 	t := i18n.Settings()
-	c := &sizeEditor{Box: widget.NewBox(widget.Row, 8, 0), k: k, slot: s, basePx: baseRem * remBasePx}
+	c := &sizeEditor{Box: gapBox(widget.Row), k: k, slot: s, basePx: baseRem * remBasePx}
 	c.mode = widget.NewDropdown(k.face, k.textPx(), []string{t.Get("settings-size-scale"), t.Get("settings-size-px")}, sizeScale)
 	c.spin = widget.NewSpinButton(k.face, k.textPx(), 0, 0, 10000, 0.05, 2)
 	c.AppendAligned(c.mode, false, widget.AlignCenter)
@@ -255,7 +255,7 @@ type optionalSize struct {
 }
 
 func newOptionalSize(k *kit, s slot, baseRem float64) *optionalSize {
-	c := &optionalSize{Box: widget.NewBox(widget.Row, 8, 0), slot: s}
+	c := &optionalSize{Box: gapBox(widget.Row), slot: s}
 	c.on = widget.NewSwitch(false)
 	c.on.AddClass("inherit-switch")
 	c.on.SetTooltip(i18n.Settings().Get("settings-override"))

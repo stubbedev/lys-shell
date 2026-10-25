@@ -91,6 +91,23 @@ func (k *kit) icon(name string, classes ...string) *widget.Icon {
 	return ic
 }
 
+// gapBox lines widgets up along axis a theme's spacing apart, the one
+// gap between the controls of a group, the fields of a form and the
+// rows of a list.
+func gapBox(axis widget.Axis) *widget.Box {
+	return widget.NewBox(axis, widget.Current().Spacing, 0)
+}
+
+// browseButton is the outline folder button asking the file chooser,
+// pick getting the chosen path.
+func (k *kit) browseButton(pick func(path string)) *widget.Button {
+	return k.button(k.icon("ld-folder-open-symbolic"), func() {
+		if k.pickers != nil {
+			k.pickers.openFile(pick)
+		}
+	}, "browse", css.Outline, css.Icon)
+}
+
 // button wraps child in a plain button carrying classes.
 func (k *kit) button(child widget.Widget, onClick func(), classes ...string) *widget.Button {
 	b := widget.NewButton(child, 0, 0)
@@ -140,9 +157,9 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 		axis = widget.Column
 	}
 	th := widget.Current()
-	r := &settingRow{kit: k, path: spec.path, ctl: ctl, action: spec.action, Box: widget.NewBox(axis, th.Spacing, 0)}
-	r.SetPadding(render.Insets{Top: th.Padding + th.Padding/2, Right: 2 * th.Padding, Bottom: th.Padding + th.Padding/2, Left: 2 * th.Padding})
-	r.AddClass("setting-row")
+	r := &settingRow{kit: k, path: spec.path, ctl: ctl, action: spec.action, Box: gapBox(axis)}
+	r.SetElement("item")
+	r.AddClass(css.Small, "setting-row")
 
 	info := widget.NewBox(widget.Column, th.Spacing/4, 0)
 	labelRow := widget.NewBox(widget.Row, th.Spacing/2, 0)
@@ -166,7 +183,7 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 		info.Append(dl, false)
 	}
 
-	r.reset = k.button(k.icon("ld-rotate-ccw-symbolic"), func() { k.store.reset(spec.path) }, "setting-reset", css.Ghost, css.Icon, css.Small)
+	r.reset = k.button(k.icon("ld-rotate-ccw-symbolic"), func() { k.store.reset(spec.path) }, "setting-reset", css.Ghost, css.Icon)
 	slot := widget.NewBox(widget.Row, 0, 0)
 	slot.AddClass("setting-control")
 	slot.AppendAligned(ctl, spec.fullWidth, widget.AlignCenter)

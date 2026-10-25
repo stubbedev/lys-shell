@@ -39,7 +39,7 @@ var trayOverrideList = listRow(func(config.FieldMeta) listSpec {
 		addKey: "settings-map-add", rowClass: "string-map-row", blank: trayOverride{}, listCls: "string-map",
 		item: func(k *kit, v any, changed func()) listItem {
 			o, _ := v.(trayOverride)
-			r := trayOverrideItem{Box: widget.NewBox(widget.Row, 4, 0), name: k.entry(), icon: k.entry(), value: &o}
+			r := trayOverrideItem{Box: gapBox(widget.Row), name: k.entry(), icon: k.entry(), value: &o}
 			r.name.SetPlaceholder(t.Get("settings-tray-name-placeholder"))
 			r.icon.SetPlaceholder(t.Get("settings-tray-icon-placeholder"))
 			r.name.SetText(o.name)

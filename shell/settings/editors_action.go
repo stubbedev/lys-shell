@@ -35,7 +35,7 @@ type actionEditor struct {
 }
 
 func newActionEditor(k *kit, s slot, choices []actionChoice) *actionEditor {
-	c := &actionEditor{Box: widget.NewBox(widget.Column, 4, 0), k: k, slot: s, choices: choices}
+	c := &actionEditor{Box: gapBox(widget.Column), k: k, slot: s, choices: choices}
 	labels := make([]string, 0, len(choices)+2)
 	for _, ch := range choices {
 		labels = append(labels, ch.label)

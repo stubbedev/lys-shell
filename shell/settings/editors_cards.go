@@ -40,7 +40,7 @@ type cardChrome struct {
 
 var cardFormChrome = cardChrome{
 	card: "card-form-card", header: "card-form-header", body: "card-form-body",
-	remove: []string{"list-control-button", "list-control-remove", css.Ghost, css.Icon, css.Small}, removeKey: "settings-list-remove",
+	remove: []string{"list-control-button", "list-control-remove", css.Ghost, css.Icon}, removeKey: "settings-list-remove",
 }
 
 // cardSpec shapes a card list: the card's header (a title for the
@@ -84,10 +84,9 @@ type card struct {
 }
 
 func newCardList(k *kit, s slot, spec cardSpec) *cardList {
-	th := widget.Current()
-	c := &cardList{Box: widget.NewBox(widget.Column, th.Spacing, 0), k: k, slot: s, spec: spec}
+	c := &cardList{Box: gapBox(widget.Column), k: k, slot: s, spec: spec}
 	c.AddClass(append([]string{"card-form-editor"}, spec.classes...)...)
-	c.list = widget.NewBox(widget.Column, th.Spacing, 0)
+	c.list = gapBox(widget.Column)
 	c.list.AddClass(spec.listCls)
 	c.Append(c.list, false)
 	addKey := spec.addKey
@@ -174,23 +173,24 @@ func (c *cardList) rebuild() {
 	c.validate()
 }
 
-// appendCard is card or card_titled with the fields in its body.
+// appendCard is card or card_titled with the fields in its body, every
+// field label of the card, the identity's too, sized alike so the
+// controls line up.
 func (c *cardList) appendCard(i int) {
 	t := i18n.Settings()
 	chrome := cardFormChrome
 	if c.spec.chrome != nil {
 		chrome = *c.spec.chrome
 	}
-	th := widget.Current()
-	band := render.Insets{Top: th.Padding, Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding}
-	root := widget.NewBox(widget.Column, 0, 0)
-	root.AddClass(css.Card, chrome.card)
-	header := widget.NewBox(widget.Row, th.Spacing, 0)
-	header.SetPadding(band)
+	labels := widget.NewSizeGroup(widget.SizeGroupHorizontal)
+	formLabel := func(key string) widget.Widget {
+		return labels.Add(c.k.label(t.Get(key), c.spec.labelCls, css.CaptionHeading, css.DimLabel))
+	}
+	header := gapBox(widget.Row)
 	header.AddClass(chrome.header)
 	cd := &card{}
 	if id := c.spec.identity; id != nil {
-		header.AppendAligned(c.formLabel(t.Get(id.label)), false, widget.AlignCenter)
+		header.AppendAligned(formLabel(id.label), false, widget.AlignCenter)
 		cd.identity = id.editor(c.k, c.fieldSlot(i, id.key))
 		header.AppendAligned(cd.identity, true, widget.AlignCenter)
 	} else {
@@ -208,8 +208,7 @@ func (c *cardList) appendCard(i int) {
 		remove.SetTooltip(t.Get(chrome.removeKey))
 	}
 	header.AppendAligned(remove, false, widget.AlignCenter)
-	body := widget.NewBox(widget.Column, th.Spacing/2, 0)
-	body.SetPadding(band)
+	body := gapBox(widget.Column)
 	body.AddClass(chrome.body)
 	for _, f := range c.spec.fields {
 		var ctl control
@@ -218,31 +217,33 @@ func (c *cardList) appendCard(i int) {
 		} else {
 			ctl = f.editor(c.k, c.fieldSlot(i, f.key))
 		}
-		row := widget.NewBox(widget.Row, th.Spacing, 0)
+		row := gapBox(widget.Row)
 		row.AddClass(c.spec.rowClass)
-		row.AppendAligned(c.formLabel(t.Get(f.label)), !f.fill, widget.AlignCenter)
+		row.AppendAligned(formLabel(f.label), !f.fill, widget.AlignCenter)
 		row.AppendAligned(ctl, f.fill, widget.AlignCenter)
 		body.Append(row, false)
 		cd.controls = append(cd.controls, ctl)
 	}
-	root.Append(header, false)
-	root.Append(widget.NewSeparator(widget.Horizontal), false)
-	root.Append(body, false)
-	c.list.Append(root, false)
+	c.list.Append(sectionCard(header, body, chrome.card), false)
 	c.cards = append(c.cards, cd)
 	c.retitle(i)
 }
 
-// formLabel is a field's label in a card: a dim caption heading at
-// least cardFormLabelPx wide, so the fields line up.
-func (c *cardList) formLabel(text string) *widget.Label {
-	l := c.k.label(text, c.spec.labelCls, css.CaptionHeading, css.DimLabel)
-	l.SetSizeRequest(cardFormLabelPx, 0)
-	return l
+// sectionCard is a list's card: lys-ui's card, header over body split
+// by a separator, each inset a padding from the card's edges and two
+// from its sides.
+func sectionCard(header, body *widget.Box, class string) *widget.Box {
+	th := widget.Current()
+	band := render.Insets{Top: th.Padding, Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding}
+	header.SetPadding(band)
+	body.SetPadding(band)
+	root := widget.NewBox(widget.Column, 0, 0)
+	root.AddClass(css.Card, class)
+	root.Append(header, false)
+	root.Append(widget.NewSeparator(widget.Horizontal), false)
+	root.Append(body, false)
+	return root
 }
-
-// cardFormLabelPx is the card fields' label column.
-const cardFormLabelPx = 68
 
 func (c *cardList) retitle(i int) {
 	if i < len(c.cards) && c.cards[i].title != nil && c.spec.title != nil {

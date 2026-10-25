@@ -48,7 +48,7 @@ func workspaceStyleMap(numeric bool) rowOpt {
 			classes: []string{"workspace-style-editor"}, listCls: "string-map",
 			item: func(k *kit, v any, changed func()) listItem {
 				style, _ := v.(workspaceStyle)
-				w := workspaceStyleItem{Box: widget.NewBox(widget.Row, 4, 0), key: k.entry(), label: k.entry(), style: &style}
+				w := workspaceStyleItem{Box: gapBox(widget.Row), key: k.entry(), label: k.entry(), style: &style}
 				w.key.SetPlaceholder(t.Get("settings-workspace-key-placeholder"))
 				w.label.SetPlaceholder(t.Get("settings-workspace-label-placeholder"))
 				w.key.SetText(style.key)

@@ -91,20 +91,16 @@ type monitorBody struct {
 func newMonitorBody(k *kit, field func(key string) slot) control {
 	wallpaper := field("wallpaper")
 	c := &monitorBody{
-		Box:  widget.NewBox(widget.Row, widget.Current().Spacing/2, 0),
+		Box:  gapBox(widget.Row),
 		path: newLiveText(k, wallpaper, i18n.Settings().Get("settings-wallpaper-path-placeholder")),
 		fit:  newEnumSelect(k, field("fit-mode"), config.MetaOf[config.FitMode]()),
 	}
 	c.path.AddClass("monitor-wallpaper-entry")
 	c.fit.AddClass("monitor-fit-dropdown")
-	c.browse = k.button(k.icon("ld-folder-open-symbolic"), func() {
-		if k.pickers != nil {
-			k.pickers.openFile(func(file string) {
-				_ = wallpaper.set(file)
-				c.path.refresh()
-			})
-		}
-	}, css.Outline, css.Icon)
+	c.browse = k.browseButton(func(file string) {
+		_ = wallpaper.set(file)
+		c.path.refresh()
+	})
 	c.AppendAligned(c.path, true, widget.AlignCenter)
 	c.AppendAligned(c.browse, false, widget.AlignCenter)
 	c.AppendAligned(c.fit, false, widget.AlignCenter)

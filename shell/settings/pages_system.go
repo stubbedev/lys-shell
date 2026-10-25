@@ -72,7 +72,7 @@ const (
 // greeterApplyFooter is build_footer: the button pushing the greeter
 // settings to the login screen, and its hint.
 func greeterApplyFooter(k *kit) widget.Widget {
-	box := widget.NewBox(widget.Column, 6, 0)
+	box := gapBox(widget.Column)
 	box.AddClass("settings-section")
 	label := k.label(greeterApplyLabel)
 	box.AppendAligned(k.button(label, func() {

@@ -126,7 +126,7 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	p := &searchPicker{k: k, all: names, shown: names, spec: spec, pick: pick}
 	p.root = widget.NewBox(widget.Column, 0, 0)
 	p.root.AddClass(spec.class)
-	contents := widget.NewBox(widget.Column, 8, 0)
+	contents := gapBox(widget.Column)
 	contents.SetElement("contents")
 	var searchField widget.Widget
 	if spec.searchEntry {
@@ -149,7 +149,7 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 			}
 		}
 	}
-	searchRow := widget.NewBox(widget.Row, 4, 0)
+	searchRow := gapBox(widget.Row)
 	searchRow.Append(searchField, true)
 	if spec.trailing != nil {
 		searchRow.AppendAligned(spec.trailing(k, p.pick), false, widget.AlignCenter)
@@ -245,34 +245,25 @@ func (c *colorEditor) refresh() {
 // chooser portal; a pick writes the path.
 type fileEditor struct {
 	*widget.Box
-	entry *text
-	k     *kit
-	slot  slot
+	entry  *text
+	browse *widget.Button
 }
 
 func newFileEditor(k *kit, s slot) *fileEditor {
-	c := &fileEditor{Box: widget.NewBox(widget.Row, 0, 0), entry: newText(k, s, false), k: k, slot: s}
-	c.AddClass("file-picker")
-	browse := k.button(k.icon("ld-folder-open-symbolic"), c.browse, css.Secondary, css.Icon)
+	c := &fileEditor{Box: gapBox(widget.Row), entry: newText(k, s, false)}
+	c.browse = k.browseButton(func(file string) {
+		if s.set(file) == nil {
+			c.entry.badge.SetVisible(false)
+		}
+	})
 	c.AppendAligned(c.entry, true, widget.AlignCenter)
-	c.AppendAligned(browse, false, widget.AlignCenter)
+	c.AppendAligned(c.browse, false, widget.AlignCenter)
 	return c
 }
 
 func (c *fileEditor) dirtyBadge() *widget.Badge { return c.entry.badge }
 
 func (c *fileEditor) refresh() { c.entry.refresh() }
-
-func (c *fileEditor) browse() {
-	if c.k.pickers == nil {
-		return
-	}
-	c.k.pickers.openFile(func(file string) {
-		if c.slot.set(file) == nil {
-			c.entry.badge.SetVisible(false)
-		}
-	})
-}
 
 // filePath is file_picker::file_path for a row.
 var filePath = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFileEditor(k, s) })
@@ -325,7 +316,7 @@ func newIconEditor(k *kit, s slot) *iconEditor {
 	c.icon = k.icon("ld-image-symbolic")
 	c.label = k.label("")
 	c.label.SetEllipsize(widget.EllipsizeEnd)
-	face := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
+	face := gapBox(widget.Row)
 	face.AppendAligned(c.icon, false, widget.AlignCenter)
 	face.AppendAligned(c.label, true, widget.AlignCenter)
 	c.btn = k.button(face, c.open, css.Outline)
@@ -410,7 +401,7 @@ type themeSelector struct {
 func newThemeSelector(k *kit) *themeSelector {
 	t := i18n.Settings()
 	c := &themeSelector{Box: widget.NewBox(widget.Row, 0, 0), k: k}
-	content := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
+	content := gapBox(widget.Row)
 	content.AppendAligned(k.icon("ld-palette-symbolic", "theme-preset-button-icon"), false, widget.AlignCenter)
 	content.AppendAligned(k.label(t.Get("settings-theme-preset-apply"), "theme-preset-button-label"), false, widget.AlignCenter)
 	content.AppendAligned(k.icon("ld-chevron-down-symbolic", "theme-preset-button-chevron", css.DimLabel), false, widget.AlignCenter)
@@ -453,7 +444,7 @@ func (c *themeSelector) row(name string) widget.Widget {
 	th := widget.Current()
 	row := widget.NewBox(widget.Row, 0, th.Padding)
 	row.AddClass("theme-preset-entry")
-	content := widget.NewBox(widget.Row, th.Spacing, 0)
+	content := gapBox(widget.Row)
 	content.AddClass("theme-preset-row")
 	swatches := widget.NewBox(widget.Row, th.Spacing/2, 0)
 	swatches.AddClass("theme-preset-swatches")

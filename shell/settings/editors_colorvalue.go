@@ -35,7 +35,7 @@ const (
 )
 
 func newColorValueEditor(k *kit, s slot) *colorValueEditor {
-	c := &colorValueEditor{Box: widget.NewBox(widget.Row, widget.Current().Spacing, 0), k: k, slot: s, palette: k.palette()}
+	c := &colorValueEditor{Box: gapBox(widget.Row), k: k, slot: s, palette: k.palette()}
 	rows, ids := colorValueRows(c.palette)
 	c.ids = ids
 	c.drop = widget.NewDropdownRows(k.face, k.textPx(), rows, 0)

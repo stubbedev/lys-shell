@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
@@ -99,10 +98,9 @@ func buildPage(k *kit, spec pageSpec) *settingsPage {
 	content.Append(widget.NewSeparator(widget.Horizontal), false)
 	p := &settingsPage{}
 	for _, s := range spec.sections {
-		section := widget.NewBox(widget.Column, th.Spacing, 0)
+		section := gapBox(widget.Column)
 		section.AddClass("settings-section")
 		title := k.label(t.Get(s.title), "settings-section-title", css.CaptionHeading, css.DimLabel)
-		title.SetMargin(render.Insets{Left: th.Padding / 2})
 		section.Append(title, false)
 		rows := widget.NewItemGroup()
 		group := widget.NewBox(widget.Column, 0, 0)
