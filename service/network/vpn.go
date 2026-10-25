@@ -15,6 +15,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
@@ -154,7 +155,7 @@ func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, 
 	for _, match := range [][]dbus.MatchOption{
 		{dbus.WithMatchObjectPath(nmPath), dbus.WithMatchInterface(properties), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, nmIface)},
 		{dbus.WithMatchInterface(activeIface), dbus.WithMatchMember("StateChanged")},
-		{dbus.WithMatchInterface(busName), dbus.WithMatchMember("NameOwnerChanged"), dbus.WithMatchArg(0, nmName)},
+		dbusx.OwnerMatch(BusName),
 		{dbus.WithMatchObjectPath(login1Path), dbus.WithMatchInterface(login1Iface), dbus.WithMatchMember("PrepareForSleep")},
 	} {
 		if err := n.conn.AddMatchSignalContext(ctx, match...); err != nil {
@@ -575,8 +576,8 @@ func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepR
 				sleep.prepareForSleep(ctx, start)
 			}
 		}
-	case busName + ".NameOwnerChanged":
-		if oldOwner, newOwner, ok := nameOwnerChange(sig, nmName); ok {
+	default:
+		if oldOwner, newOwner, ok := dbusx.NameOwnerChange(sig, BusName); ok {
 			restart.ownerChanged(ctx, oldOwner != "", newOwner != "")
 		}
 	}

@@ -167,9 +167,9 @@ func New(conn *dbus.Conn) (*Service, error) {
 
 func matchRules() [][]dbus.MatchOption {
 	return [][]dbus.MatchOption{
-		{dbus.WithMatchSender(bluezName), dbus.WithMatchInterface(objectManager), dbus.WithMatchObjectPath(objectManagerAt)},
-		{dbus.WithMatchSender(bluezName), dbus.WithMatchInterface(propertiesIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchPathNamespace(bluezRoot)},
-		{dbus.WithMatchSender(bluezName), dbus.WithMatchInterface(deviceIface), dbus.WithMatchMember("Disconnected"), dbus.WithMatchPathNamespace(bluezRoot)},
+		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(objectManager), dbus.WithMatchObjectPath(objectManagerAt)},
+		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(propertiesIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchPathNamespace(bluezRoot)},
+		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(deviceIface), dbus.WithMatchMember("Disconnected"), dbus.WithMatchPathNamespace(bluezRoot)},
 	}
 }
 
@@ -201,7 +201,7 @@ type managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
 // the first adapter is stable.
 func (s *Service) discover() error {
 	var objects managedObjects
-	obj := s.conn.Object(bluezName, objectManagerAt)
+	obj := s.conn.Object(BusName, objectManagerAt)
 	if err := obj.Call(objectManager+".GetManagedObjects", 0).Store(&objects); err != nil {
 		return fmt.Errorf("bluetooth: cannot discover bluetooth objects: %w", err)
 	}
@@ -522,7 +522,7 @@ func (s *Service) SetTrusted(ctx context.Context, device dbus.ObjectPath, truste
 // the model may not have folded the pairing's signals in yet.
 func (s *Service) TrustPaired(ctx context.Context, device dbus.ObjectPath) error {
 	var props map[string]dbus.Variant
-	call := s.conn.Object(bluezName, device).CallWithContext(ctx, propertiesIface+".GetAll", 0, deviceIface)
+	call := s.conn.Object(BusName, device).CallWithContext(ctx, propertiesIface+".GetAll", 0, deviceIface)
 	if call.Err != nil {
 		return &OperationError{Operation: "read device", Err: call.Err}
 	}

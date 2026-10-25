@@ -58,7 +58,8 @@ type Snapshot struct {
 }
 
 const (
-	daemonName  = "org.freedesktop.UPower.PowerProfiles"
+	// BusName is power-profiles-daemon's well-known name on the system bus.
+	BusName     = "org.freedesktop.UPower.PowerProfiles"
 	daemonPath  = "/org/freedesktop/UPower/PowerProfiles"
 	daemonIface = "org.freedesktop.UPower.PowerProfiles"
 	properties  = "org.freedesktop.DBus.Properties"
@@ -100,7 +101,7 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 	defer s.mu.Unlock()
 
 	snap := Snapshot{Active: ProfileBalanced}
-	obj := s.conn.Object(daemonName, daemonPath)
+	obj := s.conn.Object(BusName, daemonPath)
 	var active string
 	if err := obj.CallWithContext(ctx, properties+".Get", 0, daemonIface, "ActiveProfile").Store(&active); err != nil {
 		return snap, nil
@@ -127,7 +128,7 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 func (s *System) SetActive(ctx context.Context, profile string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	obj := s.conn.Object(daemonName, daemonPath)
+	obj := s.conn.Object(BusName, daemonPath)
 	return obj.CallWithContext(ctx, properties+".Set", 0, daemonIface, "ActiveProfile",
 		dbus.MakeVariant(profile)).Err
 }
@@ -137,7 +138,7 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 	if err := s.conn.AddMatchSignal(
 		dbus.WithMatchInterface(properties),
 		dbus.WithMatchArg(0, daemonIface),
-		dbus.WithMatchSender(daemonName),
+		dbus.WithMatchSender(BusName),
 	); err != nil {
 		return nil, nil, fmt.Errorf("powerprofiles: match properties: %w", err)
 	}

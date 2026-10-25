@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	nmName      = "org.freedesktop.NetworkManager"
+	// BusName is NetworkManager's well-known name on the system bus.
+	BusName     = "org.freedesktop.NetworkManager"
 	nmPath      = "/org/freedesktop/NetworkManager"
 	nmIface     = "org.freedesktop.NetworkManager"
 	properties  = "org.freedesktop.DBus.Properties"
@@ -144,7 +145,7 @@ func NewSystem() (*System, error) {
 func (s *System) Close() error { return s.conn.Close() }
 
 func (s *System) prop(ctx context.Context, iface, name string, out any) error {
-	obj := s.conn.Object(nmName, dbus.ObjectPath(nmPath))
+	obj := s.conn.Object(BusName, dbus.ObjectPath(nmPath))
 	return obj.CallWithContext(ctx, properties+".Get", 0, iface, name).Store(out)
 }
 
@@ -164,12 +165,12 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 	snap.Primary = connectionTypeOf(primary)
 
 	var devices []dbus.ObjectPath
-	obj := s.conn.Object(nmName, dbus.ObjectPath(nmPath))
+	obj := s.conn.Object(BusName, dbus.ObjectPath(nmPath))
 	if err := obj.CallWithContext(ctx, nmIface+".GetDevices", 0).Store(&devices); err != nil {
 		return snap, fmt.Errorf("network: GetDevices: %w", err)
 	}
 	for _, devicePath := range devices {
-		dev := s.conn.Object(nmName, devicePath)
+		dev := s.conn.Object(BusName, devicePath)
 		var deviceType uint32
 		if err := dev.CallWithContext(ctx, properties+".Get", 0, deviceIface, "DeviceType").Store(&deviceType); err != nil {
 			continue
@@ -200,7 +201,7 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 			if err := dev.CallWithContext(ctx, properties+".Get", 0, wirelessIface, "ActiveAccessPoint").Store(&ap); err != nil || ap == "/" {
 				continue
 			}
-			apObj := s.conn.Object(nmName, ap)
+			apObj := s.conn.Object(BusName, ap)
 			var ssidBytes []byte
 			var strength uint8
 			if err := apObj.CallWithContext(ctx, properties+".Get", 0, apIface, "Ssid").Store(&ssidBytes); err != nil {

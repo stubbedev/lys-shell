@@ -198,7 +198,7 @@ func (s *Service) registerAgent() error {
 	if err := s.conn.Export(&agent{s: s}, agentPath, agentIface); err != nil {
 		return fmt.Errorf("bluetooth: cannot register bluetooth agent: export: %w", err)
 	}
-	manager := s.conn.Object(bluezName, bluezRoot)
+	manager := s.conn.Object(BusName, bluezRoot)
 	if err := manager.Call(agentManager+".RegisterAgent", 0, agentPath, agentCapability.String()).Err; err != nil {
 		return fmt.Errorf("bluetooth: cannot register bluetooth agent: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/service/network/openconnect"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
@@ -492,57 +493,22 @@ func serveAgent(ctx context.Context, conn *dbus.Conn, agent *Agent, signIn SignI
 	if err := conn.Export(obj, AgentPath, agentIface); err != nil {
 		return fmt.Errorf("network: export secret agent: %w", err)
 	}
-	signals := make(chan *dbus.Signal, 16)
-	conn.Signal(signals)
-	if err := conn.AddMatchSignalContext(ctx,
-		dbus.WithMatchInterface(busName), dbus.WithMatchMember("NameOwnerChanged"), dbus.WithMatchArg(0, nmName),
-	); err != nil {
-		conn.RemoveSignal(signals)
-		return fmt.Errorf("network: watch NetworkManager: %w", err)
+	// Only a new owner is interesting; NM going away takes the
+	// registration with it and there is nothing to redo.
+	if err := dbusx.WatchOwner(ctx, conn, BusName, func() { register(ctx, conn) }); err != nil {
+		return fmt.Errorf("network: %w", err)
 	}
 	register(ctx, conn)
-	go func() {
-		defer conn.RemoveSignal(signals)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sig, ok := <-signals:
-				if !ok {
-					return
-				}
-				// Only a new owner is interesting; NM going away takes
-				// the registration with it and there is nothing to redo.
-				if _, owner, isNM := nameOwnerChange(sig, nmName); isNM && owner != "" {
-					register(ctx, conn)
-				}
-			}
-		}
-	}()
 	return nil
 }
 
 // register announces the agent to NM's agent manager.
 func register(ctx context.Context, conn *dbus.Conn) {
-	err := conn.Object(nmName, agentManagerPath).CallWithContext(ctx,
+	err := conn.Object(BusName, agentManagerPath).CallWithContext(ctx,
 		agentManagerIface+".RegisterWithCapabilities", 0, AgentID, capabilityVPNHints).Err
 	if err != nil {
 		log.Printf("network: cannot register as secret agent; VPN prompts will not appear: %v", err)
 		return
 	}
 	log.Printf("network: registered as NetworkManager secret agent")
-}
-
-// nameOwnerChange reads a NameOwnerChanged signal about name: the old
-// and new owners ("" for none), and whether the signal is that one.
-func nameOwnerChange(sig *dbus.Signal, name string) (oldOwner, newOwner string, ok bool) {
-	if sig.Name != busName+".NameOwnerChanged" || len(sig.Body) != 3 {
-		return "", "", false
-	}
-	if n, _ := sig.Body[0].(string); n != name {
-		return "", "", false
-	}
-	oldOwner, _ = sig.Body[1].(string)
-	newOwner, _ = sig.Body[2].(string)
-	return oldOwner, newOwner, true
 }

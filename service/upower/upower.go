@@ -134,7 +134,8 @@ func deviceFromProps(props map[string]dbus.Variant) Device {
 const DisplayDevicePath = "/org/freedesktop/UPower/devices/DisplayDevice"
 
 const (
-	busName             = "org.freedesktop.UPower"
+	// BusName is UPower's well-known name on the system bus.
+	BusName             = "org.freedesktop.UPower"
 	deviceInterface     = "org.freedesktop.UPower.Device"
 	propertiesInterface = "org.freedesktop.DBus.Properties"
 )
@@ -179,7 +180,7 @@ func (s *System) Close() error { return s.conn.Close() }
 // Read fetches every DisplayDevice property in one GetAll.
 func (s *System) Read(ctx context.Context) (Device, error) {
 	var props map[string]dbus.Variant
-	err := s.conn.Object(busName, s.path).
+	err := s.conn.Object(BusName, s.path).
 		CallWithContext(ctx, propertiesInterface+".GetAll", 0, deviceInterface).Store(&props)
 	if err != nil {
 		return Device{}, fmt.Errorf("upower: GetAll: %w", err)
@@ -189,7 +190,7 @@ func (s *System) Read(ctx context.Context) (Device, error) {
 
 // EnableChargeThreshold calls the device's EnableChargeThreshold.
 func (s *System) EnableChargeThreshold(ctx context.Context, enabled bool) error {
-	call := s.conn.Object(busName, s.path).CallWithContext(ctx, deviceInterface+".EnableChargeThreshold", 0, enabled)
+	call := s.conn.Object(BusName, s.path).CallWithContext(ctx, deviceInterface+".EnableChargeThreshold", 0, enabled)
 	if call.Err != nil {
 		return fmt.Errorf("upower: EnableChargeThreshold: %w", call.Err)
 	}

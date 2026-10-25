@@ -8,7 +8,8 @@ import (
 
 // BlueZ names (types/mod.rs).
 const (
-	bluezName        = "org.bluez"
+	// BusName is BlueZ's well-known name on the system bus.
+	BusName          = "org.bluez"
 	bluezRoot        = "/org/bluez"
 	objectManagerAt  = "/"
 	adapterIface     = "org.bluez.Adapter1"

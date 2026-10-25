@@ -40,8 +40,8 @@ func serveDevice(t *testing.T, bus *dbustest.Bus, props map[string]dbus.Variant)
 	if err := conn.ExportMethodTable(map[string]any{"EnableChargeThreshold": f.EnableChargeThreshold}, path, deviceInterface); err != nil {
 		t.Fatal(err)
 	}
-	if reply, err := conn.RequestName(busName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
-		t.Fatalf("own %s: %v %v", busName, reply, err)
+	if reply, err := conn.RequestName(BusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("own %s: %v %v", BusName, reply, err)
 	}
 	return f
 }

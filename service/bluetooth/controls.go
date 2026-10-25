@@ -21,7 +21,7 @@ func (s *Service) Adapter(path dbus.ObjectPath) AdapterRef {
 
 // call runs one Adapter1 method, wrapping a failure as operation.
 func (a AdapterRef) call(ctx context.Context, operation, method string, args ...any) *dbus.Call {
-	call := a.conn.Object(bluezName, a.Path).CallWithContext(ctx, adapterIface+"."+method, 0, args...)
+	call := a.conn.Object(BusName, a.Path).CallWithContext(ctx, adapterIface+"."+method, 0, args...)
 	if call.Err != nil {
 		call.Err = &OperationError{Operation: operation, Err: call.Err}
 	}
@@ -131,7 +131,7 @@ func (s *Service) Device(path dbus.ObjectPath) DeviceRef {
 }
 
 func (d DeviceRef) call(ctx context.Context, operation, method string, args ...any) *dbus.Call {
-	call := d.conn.Object(bluezName, d.Path).CallWithContext(ctx, deviceIface+"."+method, 0, args...)
+	call := d.conn.Object(BusName, d.Path).CallWithContext(ctx, deviceIface+"."+method, 0, args...)
 	if call.Err != nil {
 		call.Err = &OperationError{Operation: operation, Err: call.Err}
 	}
@@ -216,7 +216,7 @@ func (d DeviceRef) SetPreferredBearer(ctx context.Context, bearer PreferredBeare
 // the Adapter property live.
 func (d DeviceRef) Forget(ctx context.Context) error {
 	var adapter dbus.ObjectPath
-	call := d.conn.Object(bluezName, d.Path).CallWithContext(ctx, propertiesIface+".Get", 0, deviceIface, "Adapter")
+	call := d.conn.Object(BusName, d.Path).CallWithContext(ctx, propertiesIface+".Get", 0, deviceIface, "Adapter")
 	if call.Err != nil {
 		return &OperationError{Operation: "forget", Err: call.Err}
 	}
@@ -228,7 +228,7 @@ func (d DeviceRef) Forget(ctx context.Context) error {
 
 // setProperty writes one BlueZ property through org.freedesktop.DBus.Properties.
 func setProperty(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath, iface, operation, name string, value any) error {
-	call := conn.Object(bluezName, path).CallWithContext(ctx, propertiesIface+".Set", 0, iface, name, dbus.MakeVariant(value))
+	call := conn.Object(BusName, path).CallWithContext(ctx, propertiesIface+".Set", 0, iface, name, dbus.MakeVariant(value))
 	if call.Err != nil {
 		return &OperationError{Operation: operation, Err: call.Err}
 	}

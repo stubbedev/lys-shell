@@ -113,7 +113,7 @@ func (f *fakeNM) own() {
 	}})
 	must(f.t, err)
 	f.exportWifi()
-	reply, err := f.conn.RequestName(nmName, dbus.NameFlagDoNotQueue)
+	reply, err := f.conn.RequestName(BusName, dbus.NameFlagDoNotQueue)
 	must(f.t, err)
 	if reply != dbus.RequestNameReplyPrimaryOwner {
 		f.t.Fatalf("fake NM: name reply %v", reply)

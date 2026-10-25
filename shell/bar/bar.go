@@ -153,6 +153,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 		defer func() { _ = audio.Close() }()
 		baseCtx.Pulse = audio
 	}
+	// lateStarts are the clients that could not start without their
+	// service; each starts when the service appears.
+	lateStarts := map[string]lateStart{}
 	if bt, err := bluetooth.NewSystem(); err == nil {
 		defer func() { _ = bt.Close() }()
 		baseCtx.Bluetooth = bt
@@ -160,6 +163,18 @@ func run(cfg *config.Config, svc *config.Service) error {
 		// dropdown's pairing watcher runs whether or not a bluetooth
 		// module is placed: a request still reaches the user.
 		startBtPairingNotifier(bt)
+	} else {
+		log.Printf("bluetooth: %v", err)
+		lateStarts[bluetooth.BusName] = func() (func(*ModuleContext), func(), error) {
+			bt, err := bluetooth.NewSystem()
+			if err != nil {
+				return nil, nil, err
+			}
+			return func(c *ModuleContext) {
+				c.Bluetooth = bt
+				startBtPairingNotifier(bt)
+			}, func() { _ = bt.Close() }, nil
+		}
 	}
 	if nm, err := network.NewSystem(); err == nil {
 		defer func() { _ = nm.Close() }()
@@ -170,6 +185,13 @@ func run(cfg *config.Config, svc *config.Service) error {
 		baseCtx.Networking = svc
 	} else {
 		log.Printf("network: %v", err)
+		lateStarts[network.BusName] = func() (func(*ModuleContext), func(), error) {
+			svc, stop, err := startNetworkService()
+			if err != nil {
+				return nil, nil, err
+			}
+			return func(c *ModuleContext) { c.Networking = svc }, stop, nil
+		}
 	}
 	if pp, err := powerprofiles.NewSystem(); err == nil {
 		defer func() { _ = pp.Close() }()
@@ -361,6 +383,26 @@ func run(cfg *config.Config, svc *config.Service) error {
 		}
 		rt.mount(application, cfg)
 		bars.reload(func(connector string) (config.BarLayout, bool) { return barLayoutFor(cfg, connector) })
+	}
+	// A service that starts after the shell (or restarts) brings its
+	// modules back: its client starts if it could not before, and the
+	// bars rebuild around it.
+	if sysConn, err := dbus.ConnectSystemBus(); err != nil {
+		log.Printf("bar: system bus: %v; modules of services that start later will not appear", err)
+	} else {
+		defer func() { _ = sysConn.Close() }()
+		late := &lateServices{}
+		defer late.stop()
+		lateCtx, stopLate := context.WithCancel(context.Background())
+		defer stopLate()
+		if err := late.watch(lateCtx, sysConn, lateStarts, application.Invoke, func(apply func(*ModuleContext)) {
+			if apply != nil {
+				apply(&rt.ctx)
+			}
+			restyle(current.Load())
+		}); err != nil {
+			log.Printf("bar: %v; modules of services that start later will not appear", err)
+		}
 	}
 	// lockScreen starts below; a reload reaches it once it exists.
 	var lockScreen *lock.Screen

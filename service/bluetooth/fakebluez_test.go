@@ -60,7 +60,7 @@ func startFakeBlueZ(t *testing.T) *fakeBlueZ {
 	t.Helper()
 	bus := dbustest.Start(t)
 	conn := bus.Conn(t)
-	if reply, err := conn.RequestName(bluezName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+	if reply, err := conn.RequestName(BusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
 		t.Fatalf("own org.bluez: %v %v", reply, err)
 	}
 	f := &fakeBlueZ{

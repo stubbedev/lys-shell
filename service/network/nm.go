@@ -18,7 +18,6 @@ const (
 	agentManagerPath  = "/org/freedesktop/NetworkManager/AgentManager"
 	agentManagerIface = "org.freedesktop.NetworkManager.AgentManager"
 	wirelessIface     = "org.freedesktop.NetworkManager.Device.Wireless"
-	busName           = "org.freedesktop.DBus"
 	busPath           = "/org/freedesktop/DBus"
 	rootPath          = dbus.ObjectPath("/")
 )
@@ -82,9 +81,9 @@ type nm struct {
 	conn *dbus.Conn
 }
 
-func (n nm) manager() dbus.BusObject { return n.conn.Object(nmName, nmPath) }
+func (n nm) manager() dbus.BusObject { return n.conn.Object(BusName, nmPath) }
 
-func (n nm) object(path dbus.ObjectPath) dbus.BusObject { return n.conn.Object(nmName, path) }
+func (n nm) object(path dbus.ObjectPath) dbus.BusObject { return n.conn.Object(BusName, path) }
 
 // prop reads one property of an NM object.
 func (n nm) prop(ctx context.Context, path dbus.ObjectPath, iface, name string, out any) error {
