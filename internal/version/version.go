@@ -4,4 +4,4 @@
 package version
 
 // Version is the lys-shell release version.
-const Version = "0.8.54"
+const Version = "0.1.0"

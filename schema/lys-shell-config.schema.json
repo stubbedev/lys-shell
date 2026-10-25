@@ -9143,7 +9143,7 @@
       "type": "integer"
     }
   },
-  "$id": "lys-shell-config-0.8.54",
+  "$id": "lys-shell-config-0.1.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for lys-shell.\n\nRepresents the complete configuration schema that can be loaded\nfrom YAML files. All fields have sensible defaults.",
   "properties": {
