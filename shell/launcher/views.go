@@ -3,7 +3,9 @@ package launcher
 import (
 	"math"
 
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -48,13 +50,18 @@ func (s *Surface) buildViews(a *active) *views {
 	if ui.css != "" {
 		v.root.AttachStylesheet(widget.NewStylesheet(ui.css, s.d.SheetPriority+sessionCSSPriority))
 	}
+	// The surface is lys-ui's command palette: the command element and
+	// its .input and .item parts take the palette's look.
+	th := widget.Current()
 	v.surface = widget.NewBox(widget.Column, 0, 0)
+	v.surface.SetElement("command")
 	v.surface.AddClass("launcher-surface")
 	v.rev = widget.NewRevealer(v.surface)
 	v.root.Append(v.rev, true)
 
-	v.inputRow = widget.NewBox(widget.Row, 0, 0)
-	v.inputRow.AddClass("launcher-input")
+	v.inputRow = widget.NewBox(widget.Row, th.Spacing, 0)
+	v.inputRow.SetPadding(render.Insets{Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
+	v.inputRow.AddClass("input", "launcher-input")
 	v.prompt = widget.NewLabel(s.d.Font, fontPx, "", 0)
 	v.prompt.AddClass("launcher-prompt")
 	v.inputRow.Append(v.prompt, false)
@@ -75,7 +82,8 @@ func (s *Surface) buildViews(a *active) *views {
 	v.surface.Append(v.inputRow, false)
 
 	v.message = widget.NewRichLabel(s.d.Font, fontPx, "", 0)
-	v.message.AddClass("launcher-message")
+	v.message.AddClass("launcher-message", css.DimLabel)
+	v.message.SetMargin(render.Insets{Top: th.Padding, Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
 	v.message.SetVariants(s.d.Variants)
 	v.message.SetWrap(true)
 	v.surface.Append(v.message, false)
@@ -88,13 +96,15 @@ func (s *Surface) buildViews(a *active) *views {
 	v.list.visibleRows = max(ui.lines, 1)
 	v.list.fixed = ui.fixedNumLines
 	v.list.onScroll = s.listScrolled
-	v.frame = widget.NewBox(widget.Column, 0, 0)
+	v.frame = widget.NewBox(widget.Column, 0, th.Padding/2)
 	v.frame.AddClass("launcher-list")
 	v.frame.Append(v.list, true)
 	v.surface.Append(v.frame, true)
 
 	v.tabs = widget.NewBox(widget.Row, 0, 0)
+	v.tabs.SetElement("togglegroup")
 	v.tabs.AddClass("launcher-tabs")
+	v.tabs.SetMargin(render.Insets{Left: th.Padding, Right: th.Padding, Bottom: th.Padding})
 	v.tabs.SetHomogeneous(true)
 	v.tabs.SetVisible(ui.sidebar)
 	v.surface.Append(v.tabs, false)

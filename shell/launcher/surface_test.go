@@ -683,3 +683,23 @@ func TestMessageLineKeepsItsPadding(t *testing.T) {
 		t.Errorf("the message measures %v around %v of text, want its padding added", got, natural)
 	}
 }
+
+// The surface is lys-ui's command palette: the command element, its
+// .input row, and .item rows carrying the selected state, so the
+// palette's own rules style them.
+func TestSurfaceIsTheCommandPalette(t *testing.T) {
+	h := newHarness(t)
+	h.open(dmenu(), false, "alpha", "beta")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 2 })
+	v := h.s.cur.views
+	if v.surface.Element() != "command" || !v.inputRow.HasClass("input") {
+		t.Errorf("surface element %q, input row classes %v; want the command palette's", v.surface.Element(), v.inputRow.Classes())
+	}
+	row := buildRow(0, engine.Item{Display: "alpha"}, true, rowStyle{font: treetest.Font(t), px: 14}, nil, 0)
+	if !row.content.HasClass("item") || !row.content.HasState(widget.StateSelected) {
+		t.Error("a selected row is not a selected .item")
+	}
+	if idle := buildRow(1, engine.Item{Display: "beta"}, false, rowStyle{font: treetest.Font(t), px: 14}, nil, 1); idle.content.HasState(widget.StateSelected) {
+		t.Error("an unselected row carries the selected state")
+	}
+}

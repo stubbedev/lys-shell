@@ -756,6 +756,7 @@ func (s *Surface) rebuildTabs(names []string, activeMode int) {
 		b.AddClass("launcher-tab")
 		if i == activeMode {
 			b.AddClass("active")
+			b.SetState(widget.StateChecked, true)
 		}
 		index := i
 		b.OnClick = func() { s.send(cmdModeTo{index: index}) }
