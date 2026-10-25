@@ -169,7 +169,7 @@ func bitwardenTestView(t *testing.T, v *fakeVault, cfg *config.Config) (*bitward
 // focusHost hosts a headless tree whose forms move the focus.
 type focusHost struct{}
 
-func (focusHost) OpenMenu(widget.Boundser, render.Font, float64, []widget.MenuItem) {}
+func (focusHost) OpenMenu(widget.Boundser, render.Font, float64, []widget.MenuItem, func()) {}
 
 func (focusHost) OpenPopover(widget.Boundser, widget.Widget, widget.PopoverOptions) func() {
 	return func() {}

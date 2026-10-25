@@ -137,10 +137,23 @@ func TestShellSheetKeepsTheButtonVariantFills(t *testing.T) {
 	if got, _ := center(suggested); got != p.Primary {
 		t.Errorf("a suggested action paints %#08x, want the primary %#08x", uint32(got), uint32(p.Primary))
 	}
-	if got, _ := center(destructive); got != errColor {
-		t.Errorf("a destructive action paints %#08x, want status-error %#08x", uint32(got), uint32(errColor))
+	if got, alpha := center(destructive); !nearPremultiplied(got, alpha, errColor, destructiveAlpha) {
+		t.Errorf("a destructive action paints %#08x at alpha %d, want status-error %#08x at lys-ui's dark %d", uint32(got), alpha, uint32(errColor), destructiveAlpha)
 	}
 	if got, _ := center(secondary); got != overlay {
 		t.Errorf("a secondary button paints %#08x, want the control fill %#08x", uint32(got), uint32(overlay))
 	}
+}
+
+// destructiveAlpha is lys-ui's dark-theme destructive fill, 60% of the
+// destructive color.
+const destructiveAlpha = 153
+
+// nearPremultiplied reports whether a pixel painted over transparency
+// (premultiplied rgb, alpha) is c at alpha a, within rounding.
+func nearPremultiplied(rgb widget.Color, alpha byte, c widget.Color, a byte) bool {
+	near := func(x, y int) bool { return x-y <= 1 && y-x <= 1 }
+	scale := func(v uint8) int { return (int(v)*int(a) + 127) / 255 }
+	return near(int(alpha), int(a)) &&
+		near(int(rgb.R()), scale(c.R())) && near(int(rgb.G()), scale(c.G())) && near(int(rgb.B()), scale(c.B()))
 }
