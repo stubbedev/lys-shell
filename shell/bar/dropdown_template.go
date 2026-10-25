@@ -79,16 +79,19 @@ func dropdownContent(classes ...string) *widget.Box {
 	return content
 }
 
-// dropdownSection is a titled section of a dropdown's content: the
-// label over the body, the theme's spacing apart, so a section's parts
-// sit closer together than the sections do.
-func dropdownSection(label *widget.Label, body ...widget.Widget) *widget.Box {
-	section := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
-	section.Append(label, false)
-	for _, w := range body {
-		section.Append(w, false)
+// dropdownGroup is a group of a dropdown's content: its parts the
+// theme's spacing apart, closer together than the groups are.
+func dropdownGroup(parts ...widget.Widget) *widget.Box {
+	group := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
+	for _, w := range parts {
+		group.Append(w, false)
 	}
-	return section
+	return group
+}
+
+// dropdownSection is a titled group: the label over the body.
+func dropdownSection(label *widget.Label, body ...widget.Widget) *widget.Box {
+	return dropdownGroup(append([]widget.Widget{label}, body...)...)
 }
 
 // scrolledCard is a scroll over card that keeps the card at its

@@ -1,33 +1,5 @@
-.battery-details {
-  padding: var(--space-sm) 0;
-  margin-bottom: var(--space-sm);
-  margin-left: var(--space-md);
-  margin-right: var(--space-md);
-}
-
-.battery-detail {
-  min-width: 0;
-}
-
-label.battery-detail-label {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-subtle);
-  text-transform: uppercase;
-}
-
-label.battery-detail-value {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold);
-  color: var(--fg-default);
-}
-
 .health-dot {
-  all: unset;
-  min-width: var(--space-sm);
-  min-height: var(--space-sm);
   border-radius: 9999px;
-  margin-right: var(--space-xs);
 }
 .health-dot.good {
   background: var(--status-success);
@@ -40,4 +12,18 @@ label.battery-detail-value {
 }
 .health-dot.unknown {
   background: var(--fg-subtle);
+}
+
+levelbar.battery-gauge.good block.filled {
+  background: var(--status-success);
+}
+levelbar.battery-gauge.warn block.filled {
+  background: var(--status-warning);
+}
+levelbar.battery-gauge.crit block.filled {
+  background: var(--status-error);
+}
+
+levelbar.battery-gauge trough {
+  background: var(--bg-hover);
 }

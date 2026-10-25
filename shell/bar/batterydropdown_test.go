@@ -192,8 +192,9 @@ func TestBatteryDetailsCenterTheCapacityColumn(t *testing.T) {
 	}
 }
 
-// The health indicator is an empty classed box — no text glyph child;
-// the CSS paints the circle (min sizes, round clip, variant fill).
+// The health indicator is an empty classed box — no text glyph child —
+// sized by its request; the CSS paints the circle (round clip, variant
+// fill).
 func TestBatteryHealthDotIsAClassedBoxTheCSSPaints(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	src := newFakeBattery(presentBattery()) // capacity 91 → good
@@ -217,12 +218,11 @@ func TestBatteryHealthDotIsAClassedBoxTheCSSPaints(t *testing.T) {
 		t.Errorf("dot classes = %v, want health-dot + good", dot.Classes())
 	}
 
-	// The stylesheet paints it: min sizes give the empty box extent and
-	// the variant fills it with the status color, clipped round.
+	// The size request gives the empty box extent, and the stylesheet's
+	// variant fills it with the status color, clipped round.
 	batteryArrangeStyled(t, ctx, v, 320)
-	sz := dot.Measure(widget.Constraints{Max: widget.Size{W: 64, H: 64}})
-	if sz.H < 8 || sz.W < sz.H {
-		t.Errorf("dot measure = %+v, want the CSS min sizes (space-sm tall)", sz)
+	if sz := widget.MeasureAsChild(dot, widget.Constraints{Max: widget.Size{W: 64, H: 64}}); sz != (widget.Size{W: healthDotPx, H: healthDotPx}) {
+		t.Errorf("dot measure = %+v, want the %dpx request", sz, healthDotPx)
 	}
 	palette := ctx.Theme.RenderPalette()
 	fillOf := func(c render.Color) bool { return c.A() > 200 }
@@ -257,79 +257,29 @@ func TestBatteryHealthDotIsAClassedBoxTheCSSPaints(t *testing.T) {
 	}
 }
 
-// Every box Rust builds spacing-0 reports 0 — the cascade's margins
-// and border-spacing own the gaps, and lys-ui adds them to the
-// constructor spacing. valign Center rides along: the meta column and
-// the charge switch sit on their rows' middles.
-func TestBatterySectionsKeepRustsZeroSpacing(t *testing.T) {
+// The hero sets its percentage apart from the meta column, which sits
+// on the row's middle (valign Center), and the gauge sits apart from
+// the details: the group's spacing, lys-ui's.
+func TestBatteryHeroAndGaugeKeepTheirGaps(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	src := newFakeBattery(presentBattery())
 	ctx.Battery = src
 	v := batteryDropdown(ctx).(*batteryView)
 	defer v.dropdownClosed()
-
-	if got := v.Spacing(); got != 0 {
-		t.Errorf("root spacing = %d, want 0", got)
-	}
-	for _, class := range []string{
-		"battery-hero", "battery-hero-meta",
-		"battery-detail", "charge-limit", "charge-limit-not-supported",
-	} {
-		ws := treetest.WithClass(v, class)
-		if len(ws) == 0 {
-			t.Fatalf("no .%s in the tree", class)
-		}
-		for _, w := range ws {
-			if got := w.(*widget.Box).Spacing(); got != 0 {
-				t.Errorf(".%s spacing = %d, want 0 (CSS owns the gaps)", class, got)
-			}
-		}
-	}
-
-	// Zero constructor spacing is not zero gap: the cascade still
-	// separates the hero pct from the meta column and the gauge from
-	// the details.
 	batteryArrangeStyled(t, ctx, v, 320)
+
 	pct, metaBox := v.heroPct.Bounds(), treetest.WithClass(v, "battery-hero-meta")[0]
 	meta := alignedBounds(t, metaBox)
 	if pct.X+pct.W >= meta.X {
-		t.Errorf("no CSS gap between the hero pct and the meta: %v then %v", pct, meta)
+		t.Errorf("no gap between the hero pct and the meta: %v then %v", pct, meta)
 	}
 	gauge, details := v.gauge.Bounds(), alignedBounds(t, treetest.WithClass(v, "battery-details")[0])
-	// The gauge's border box is its trough's height, and its CSS
-	// margin-bottom (space-md, wider than the trough's space-sm) is
-	// the whole gap to the details: no constructor spacing adds to it.
-	gap := details.Y - (gauge.Y + gauge.H)
-	if gap <= gauge.H {
-		t.Errorf("gauge %v then details at %d: a %dpx gap, want the CSS margin-bottom, wider than the trough", gauge, details.Y, gap)
+	if gap := details.Y - (gauge.Y + gauge.H); gap != widget.Current().Spacing {
+		t.Errorf("gauge %v then details at %d: a %dpx gap, want the theme's spacing", gauge, details.Y, gap)
 	}
-	if spacing := v.gauge.Parent().(*widget.Box).Spacing(); spacing != 0 {
-		t.Errorf("the gauge's box adds %dpx of constructor spacing", spacing)
-	}
-
 	hero := alignedBounds(t, treetest.WithClass(v, "battery-hero")[0])
-	heroMid := hero.Y + hero.H/2
-	// The meta's own bottom margin shifts its margin-box center; the
-	// visual column still centers within that slack.
-	if d := alignDelta(meta.Y+meta.H/2, heroMid); d > 8 {
-		t.Errorf("hero meta midpoint off by %d (%d vs %d)", d, meta.Y+meta.H/2, heroMid)
-	}
-	// Observable only while the meta is the shorter side; a plain
-	// append would pin it to the top edge.
-	big := widget.Constraints{Max: widget.Size{W: 1 << 14, H: 1 << 14}}
-	metaNat := metaBox.Measure(big).H
-	if hero.H > metaNat+1 && meta.Y <= hero.Y {
-		t.Errorf("hero meta pinned at %d in a %d row; valign center missing", meta.Y, hero.Y)
-	}
-	card, sw := v.chargeCard.Bounds(), v.chargeSwitch.Bounds()
-	swNat := v.chargeSwitch.Measure(big).H
-	if card.H > swNat+1 {
-		if d := alignDelta(sw.Y+sw.H/2, card.Y+card.H/2); d > 1 {
-			t.Errorf("charge switch midpoint off by %d", d)
-		}
-		if sw.Y <= card.Y {
-			t.Errorf("charge switch pinned at %d in a %d card; valign center missing", sw.Y, card.Y)
-		}
+	if d := alignDelta(meta.Y+meta.H/2, hero.Y+hero.H/2); d > 1 {
+		t.Errorf("hero meta midpoint off by %d", d)
 	}
 }
 
@@ -444,8 +394,8 @@ func TestBatteryDropdownSection(t *testing.T) {
 	if !v.chargeCard.Visible() || v.chargeUnsupported.Visible() || !v.chargeSwitch.On() {
 		t.Error("supported threshold: want the card, switched on")
 	}
-	if v.chargeSubtitle.Text() != i18n.T("dropdown-battery-resumes-at", i18n.Str("threshold", "75")) {
-		t.Errorf("resume = %q", v.chargeSubtitle.Text())
+	if got := itemText(v.charge, "description"); got != i18n.T("dropdown-battery-resumes-at", i18n.Str("threshold", "75")) {
+		t.Errorf("resume = %q", got)
 	}
 	if calls := src.thresholdCalls(); len(calls) != 0 {
 		t.Errorf("a backend state change wrote the threshold: %v", calls)
