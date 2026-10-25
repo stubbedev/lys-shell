@@ -8,45 +8,12 @@ import (
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/strftime"
 )
-
-// calendarGridCells is GRID_CELLS: six weeks, every month.
-const calendarGridCells = 42
-
-// calendarCell is one day of the grid (helpers.rs DayCell).
-type calendarCell struct {
-	date                         time.Time
-	currentMonth, today, weekend bool
-	selected                     bool
-}
-
-// calendarGrid is build_month_grid: 42 days from the week containing
-// the 1st, starting on weekStart.
-func calendarGrid(month, today time.Time, selected *time.Time, weekStart time.Weekday) []calendarCell {
-	first := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, month.Location())
-	leading := (int(first.Weekday()) - int(weekStart) + 7) % 7
-	start := first.AddDate(0, 0, -leading)
-	cells := make([]calendarCell, calendarGridCells)
-	for i := range cells {
-		d := start.AddDate(0, 0, i)
-		cells[i] = calendarCell{
-			date:         d,
-			currentMonth: d.Month() == first.Month(),
-			today:        sameDay(d, today),
-			weekend:      d.Weekday() == time.Saturday || d.Weekday() == time.Sunday,
-			selected:     selected != nil && sameDay(d, *selected),
-		}
-	}
-	return cells
-}
-
-func sameDay(a, b time.Time) bool {
-	return a.Year() == b.Year() && a.YearDay() == b.YearDay()
-}
 
 // calendarWeekStart maps calendar-weekday-start.
 func calendarWeekStart(w config.WeekStart) time.Weekday {
@@ -76,9 +43,21 @@ var (
 	}
 )
 
-// calendarMonthLabel is format_month_label over cal-month-year.
-func calendarMonthLabel(d time.Time) string {
-	return i18n.T("cal-month-year", i18n.Str("month", i18n.T(calendarMonthIDs[d.Month()-1])), i18n.Str("year", strconv.Itoa(d.Year())))
+// calendarNames gives widget.Calendar the shell's localized month and
+// weekday names and its configured week start.
+type calendarNames struct{ weekStart time.Weekday }
+
+func (calendarNames) MonthName(m time.Month) string { return i18n.T(calendarMonthIDs[m-1]) }
+
+func (calendarNames) WeekdayName(w time.Weekday) string { return i18n.T(calendarWeekdayIDs[w]) }
+
+func (n calendarNames) FirstWeekday() time.Weekday { return n.weekStart }
+
+func (calendarNames) FormatDate(d widget.Date) string {
+	return i18n.T("cal-clock-date-rest",
+		i18n.Str("month", i18n.T(calendarMonthIDs[d.Month-1])),
+		i18n.Str("day", strconv.Itoa(d.Day)),
+		i18n.Str("year", strconv.Itoa(d.Year)))
 }
 
 // calendarIs12h is is_12h_format: the clock format uses %I or %p.
@@ -105,13 +84,11 @@ type calendarView struct {
 	hours, minutes, seconds, ampm *widget.Label
 	secSep                        *widget.Label
 	dayName, dateRest             *widget.Label
-	monthLabel                    *widget.Label
-	grid                          *widget.Box
+	cal                           *widget.Calendar
+	names                         calendarNames
 	timeRow                       *widget.Box
 
-	month, today time.Time
-	selected     *time.Time
-	weekStart    time.Weekday
+	today widget.Date
 
 	once sync.Once
 	stop chan struct{}
@@ -136,12 +113,6 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 	v.tick()
 	v.follow()
 	return v
-}
-
-// icon sizes a theme icon; its ink follows the cascade color, and the
-// stylesheet's -gtk-icon-size overrides the constructor size.
-func (v *calendarView) icon(name string, scale float64) *widget.Icon {
-	return widget.NewThemeIcon(name, int(v.px*scale))
 }
 
 // label paints with the constructor ink unset (0): the cascade's
@@ -187,135 +158,29 @@ func (v *calendarView) hero() widget.Widget {
 	return col
 }
 
-// centered pads a row with expanding fillers on both sides.
-func centered(w widget.Widget) widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.Append(widget.NewBox(widget.Row, 0, 0), true)
-	row.Append(w, false)
-	row.Append(widget.NewBox(widget.Row, 0, 0), true)
-	return row
-}
-
-// calendar is the Calendar component: month label, today and month
-// navigation, the weekday header, and the 42-day grid.
+// calendar is the Calendar component: the Today button over lys-ui's
+// month grid, which carries the month title and its navigation. Today
+// opens picked, so it wears the accent until another day is picked.
 func (v *calendarView) calendar() widget.Widget {
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("cal-section")
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("cal-header")
-	v.monthLabel = v.label("", 1)
-	v.monthLabel.AddClass("cal-month")
-	header.Append(v.monthLabel, true)
-	// cal-nav is hexpand with halign End: the month label takes the
-	// free width, so the plain nav row lands on the row's end.
-	nav := widget.NewBox(widget.Row, 0, 0)
-	nav.AddClass("cal-nav")
-	navBtn := func(child widget.Widget, onClick func()) *widget.Button {
-		b := widget.NewButton(child, 0, 0)
-		b.AddClass("cal-nav-btn")
-		// No programmatic pressed shade: .cal-nav-btn is all:unset and
-		// the stylesheet paints the hover.
-		b.OnClick = onClick
-		return b
-	}
-	today := navBtn(v.label(i18n.T("cal-today"), 0.85), v.goToToday)
-	today.AddClass("cal-today-btn")
-	nav.Append(today, false)
-	nav.Append(navBtn(v.icon("ld-chevron-left-symbolic", 1), func() { v.step(-1) }), false)
-	nav.Append(navBtn(v.icon("ld-chevron-right-symbolic", 1), func() { v.step(1) }), false)
-	header.Append(nav, false)
+	today := dropdownButton(v.label(i18n.T("cal-today"), 0.85), v.goToToday, css.Ghost, css.Small, "cal-today-btn")
+	header.Append(widget.NewSpacer(0, 0), true)
+	header.Append(today, false)
 	col.Append(header, false)
-	// cal-grid-wrap paints the elevated panel; the grid's border-spacing
-	// comes from the stylesheet's .cal-grid-wrap grid rule, which needs
-	// the GTK grid element name.
-	wrap := widget.NewBox(widget.Column, 0, 0)
-	wrap.AddClass("cal-grid-wrap")
-	v.grid = widget.NewBox(widget.Column, 0, 0)
-	v.grid.AddClass("cal-grid")
-	v.grid.SetElement("grid")
-	wrap.Append(v.grid, false)
-	col.Append(wrap, false)
-	now := v.now()
-	v.today = now
-	v.month = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	v.weekStart = calendarWeekStart(v.ctx.Config.Clock.CalendarWeekdayStart)
-	v.rebuild()
+	v.today = widget.DateOf(v.now())
+	v.cal = widget.NewCalendar(v.font, v.px, v.today)
+	v.names = calendarNames{weekStart: calendarWeekStart(v.ctx.Config.Clock.CalendarWeekdayStart)}
+	v.cal.SetNames(v.names)
+	v.cal.SetToday(v.today)
+	col.AppendAligned(v.cal, false, widget.AlignCenter)
 	return col
 }
 
-// step moves the displayed month (PrevMonth/NextMonth).
-func (v *calendarView) step(months int) {
-	v.month = v.month.AddDate(0, months, 0)
-	v.rebuild()
-}
-
-// goToToday is GoToToday: back to this month, the selection cleared.
-func (v *calendarView) goToToday() {
-	this := time.Date(v.today.Year(), v.today.Month(), 1, 0, 0, 0, 0, v.today.Location())
-	if v.month.Equal(this) {
-		return
-	}
-	v.month, v.selected = this, nil
-	v.rebuild()
-}
-
-// click is DayClicked: today clears the selection, another day takes
-// it.
-func (v *calendarView) click(d time.Time) {
-	if sameDay(d, v.today) {
-		v.selected = nil
-	} else {
-		v.selected = &d
-	}
-	v.rebuild()
-}
-
-// rebuild is rebuild_grid: the weekday header and the day cells.
-func (v *calendarView) rebuild() {
-	v.monthLabel.SetText(calendarMonthLabel(v.month))
-	v.grid.Clear()
-	header := widget.NewBox(widget.Row, 0, 0)
-	for col := range 7 {
-		wd := time.Weekday((int(v.weekStart) + col) % 7)
-		wdLabel := v.label(i18n.T(calendarWeekdayIDs[wd]), 0.8)
-		wdLabel.AddClass("cal-weekday")
-		setClass(wdLabel, "weekend", wd == time.Saturday || wd == time.Sunday)
-		header.Append(centered(wdLabel), true)
-	}
-	v.grid.Append(header, false)
-	cells := calendarGrid(v.month, v.today, v.selected, v.weekStart)
-	for row := range 6 {
-		week := widget.NewBox(widget.Row, 0, 0)
-		for _, cell := range cells[row*7 : row*7+7] {
-			week.Append(v.dayCell(cell), true)
-		}
-		v.grid.Append(week, false)
-	}
-}
-
-// dayCell is one cal-day: the label fills its cell and the stylesheet
-// paints it (today on the accent, the selection on bg-selected, other
-// months faded, weekends tinted, hover on the overlay). The cell box
-// only forwards the click — labels don't click, and a button here would
-// take the hover the label's :hover rule needs.
-func (v *calendarView) dayCell(c calendarCell) widget.Widget {
-	number := v.label(strconv.Itoa(c.date.Day()), 0.9)
-	number.AddClass("cal-day")
-	number.SetAlignment(render.AlignCenter)
-	setClass(number, "today", c.today)
-	setClass(number, "selected", c.selected)
-	setClass(number, "other", !c.currentMonth)
-	setClass(number, "weekend", c.weekend)
-	cell := widget.NewBox(widget.Row, 0, 0)
-	cell.Append(number, true)
-	if c.currentMonth {
-		d := c.date
-		cell.SetOnClickWithin(func() { v.click(d) })
-	} else {
-		cell.SetEnabled(false)
-	}
-	return cell
-}
+// goToToday is GoToToday: back to this month, today picked.
+func (v *calendarView) goToToday() { v.cal.Select(v.today) }
 
 // tick is TimeTick: the hero's fields and, across midnight, today.
 func (v *calendarView) tick() {
@@ -342,9 +207,9 @@ func (v *calendarView) tick() {
 		i18n.Str("month", i18n.T(calendarMonthIDs[now.Month()-1])),
 		i18n.Str("day", strconv.Itoa(now.Day())),
 		i18n.Str("year", strconv.Itoa(now.Year()))))
-	if !sameDay(now, v.today) {
-		v.today = now
-		v.rebuild()
+	if today := widget.DateOf(now); today != v.today {
+		v.today = today
+		v.cal.SetToday(today)
 	}
 }
 

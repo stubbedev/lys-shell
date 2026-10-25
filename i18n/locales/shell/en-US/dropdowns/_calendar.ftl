@@ -19,9 +19,6 @@ cal-clock-date-rest = , { $month } { $day }, { $year }
 
 cal-today = Today
 
-# { $month } - localized month name, { $year } - four-digit year
-cal-month-year = { $month } { $year }
-
 cal-weekday-sun = Su
 cal-weekday-mon = Mo
 cal-weekday-tue = Tu

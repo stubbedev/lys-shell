@@ -5,157 +5,99 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 )
 
-// build_month_grid: six weeks from the week holding the 1st, starting
-// on the configured weekday, with the day states marked.
-func TestCalendarGrid(t *testing.T) {
-	month := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC) // a Thursday
-	today := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)
-	sel := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
-	cells := calendarGrid(month, today, &sel, time.Sunday)
-	if len(cells) != 42 {
-		t.Fatalf("cells = %d", len(cells))
+// The calendar speaks the shell's catalog and week start: month and
+// weekday names come from the cal-* messages, the first column from
+// calendar-weekday-start.
+func TestCalendarNamesAreTheShells(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Clock.CalendarWeekdayStart = config.WeekStartMonday
+	v := calendarDropdown(newTestContext(t, cfg)).(*calendarView)
+	names := v.names
+	if got := names.MonthName(time.October); got != i18n.T("cal-month-october") {
+		t.Errorf("October = %q, want the catalog's", got)
 	}
-	// Sunday-first: the grid opens on Sunday September 27.
-	if first := cells[0].date; first.Month() != time.September || first.Day() != 27 || cells[0].currentMonth {
-		t.Errorf("first cell = %v current %v", first, cells[0].currentMonth)
+	if got := names.WeekdayName(time.Saturday); got != i18n.T("cal-weekday-sat") {
+		t.Errorf("Saturday = %q, want the catalog's", got)
 	}
-	if !cells[4].currentMonth || cells[4].date.Day() != 1 {
-		t.Errorf("cell 4 = %v, want October 1", cells[4].date)
+	if names.FirstWeekday() != time.Monday {
+		t.Errorf("first weekday = %v, want the configured Monday", names.FirstWeekday())
 	}
-	var todays, selecteds int
-	for _, c := range cells {
-		if c.today {
-			todays++
-			if c.date.Day() != 14 {
-				t.Error("today on the wrong day")
-			}
-		}
-		if c.selected {
-			selecteds++
-		}
-		if c.weekend != (c.date.Weekday() == time.Saturday || c.date.Weekday() == time.Sunday) {
-			t.Errorf("%v weekend = %v", c.date, c.weekend)
-		}
-	}
-	if todays != 1 || selecteds != 1 {
-		t.Errorf("today %d selected %d", todays, selecteds)
-	}
-	// Monday-first: the grid opens on Monday September 28.
-	if first := calendarGrid(month, today, nil, time.Monday)[0].date; first.Day() != 28 || first.Weekday() != time.Monday {
-		t.Errorf("monday-first opens on %v", first)
-	}
-	// A month starting on the week's first day has no leading days.
-	june := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC) // a Monday
-	if c := calendarGrid(june, today, nil, time.Monday)[0]; c.date.Day() != 1 || !c.currentMonth {
-		t.Errorf("june monday-first opens on %v", c.date)
+	def := calendarDropdown(newTestContext(t, config.Defaults())).(*calendarView)
+	if n := def.names; n.FirstWeekday() != time.Sunday {
+		t.Errorf("the default week starts %v, want Sunday", n.FirstWeekday())
 	}
 }
 
+// The calendar opens on today's month with today picked; Today brings
+// both back after a month step and another pick.
 func TestCalendarViewNavigatesAndSelects(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Clock.Format = "%I:%M %p"
 	cfg.Clock.DropdownShowSeconds = false
-	ctx := newTestContext(t, cfg)
-	v := calendarDropdown(ctx).(*calendarView)
-	thisMonth := calendarMonthLabel(time.Now())
-	if got := v.monthLabel.Text(); got != thisMonth {
-		t.Errorf("month = %q, want %q", got, thisMonth)
+	v := calendarDropdown(newTestContext(t, cfg)).(*calendarView)
+	today := widget.DateOf(time.Now())
+	if v.cal.Selection() != today || v.cal.Shown() != today.FirstOfMonth() {
+		t.Errorf("opens on %v picking %v, want today %v", v.cal.Shown(), v.cal.Selection(), today)
 	}
 	if !v.ampm.Visible() || v.seconds.Visible() {
 		t.Error("12h without seconds: the AM/PM shows and the seconds hide")
 	}
-	v.step(1)
-	if v.monthLabel.Text() == thisMonth {
-		t.Error("next month did not move")
-	}
-	day := time.Now().AddDate(0, 0, 3)
-	v.click(day)
-	if v.selected == nil {
-		t.Fatal("a click did not select")
-	}
+	v.cal.ShowMonth(today.AddMonths(2))
+	v.cal.Select(today.AddMonths(2))
 	v.goToToday()
-	if v.monthLabel.Text() != thisMonth || v.selected != nil {
-		t.Error("today did not come back and clear the selection")
-	}
-	// Clicking today clears a selection.
-	v.click(day)
-	v.click(time.Now())
-	if v.selected != nil {
-		t.Error("clicking today kept a selection")
+	if v.cal.Shown() != today.FirstOfMonth() || v.cal.Selection() != today {
+		t.Errorf("Today left %v picking %v, want today's month and today", v.cal.Shown(), v.cal.Selection())
 	}
 	if got := v.dayName.Text(); got != i18n.T(calendarDayIDs[time.Now().Weekday()]) {
 		t.Errorf("day name = %q", got)
 	}
 }
 
-// The calendar matches the Rust tree: the nav buttons sit in a
-// .cal-nav box on the header's end and the grid rides in a
-// .cal-grid-wrap panel under the grid element name.
-func TestCalendarWrapsTheNavAndTheGrid(t *testing.T) {
-	ctx := newTestContext(t, config.Defaults())
-	v := calendarDropdown(ctx).(*calendarView)
-	section, ok := findByClass(v, "cal-section").(*widget.Box)
-	if !ok {
-		t.Fatal("no cal-section")
+// Across midnight the tick moves today; within a day it leaves it.
+func TestCalendarTodayFollowsTheClock(t *testing.T) {
+	v := calendarDropdown(newTestContext(t, config.Defaults())).(*calendarView)
+	start := v.today
+	v.tick()
+	if v.today != start {
+		t.Errorf("a same-day tick moved today to %v", v.today)
 	}
-	var header, wrap *widget.Box
-	for _, c := range section.Children() {
-		if b, isBox := c.(*widget.Box); isBox {
-			switch {
-			case b.HasClass("cal-header"):
-				header = b
-			case b.HasClass("cal-grid-wrap"):
-				wrap = b
-			}
-		}
-		// Negative: the grid hangs off the wrap, not the bare section.
-		if h, hasClass := c.(interface{ HasClass(string) bool }); hasClass && h.HasClass("cal-grid") {
-			t.Error("the cal-grid is a direct child of cal-section")
-		}
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	v.now = func() time.Time { return tomorrow }
+	v.tick()
+	if v.today != widget.DateOf(tomorrow) {
+		t.Errorf("after midnight today = %v, want %v", v.today, widget.DateOf(tomorrow))
 	}
-	if header == nil || wrap == nil {
-		t.Fatalf("cal-section children missing the header or the wrap (%v, %v)", header, wrap)
-	}
-	nav, _ := findByClass(header, "cal-nav").(*widget.Box)
-	if nav == nil {
-		t.Fatal("no cal-nav box: the nav buttons ride the bare header row")
-	}
-	var navBtns []*widget.Button
-	walkTree(nav, func(w widget.Widget) bool {
-		if b, isBtn := w.(*widget.Button); isBtn && b.HasClass("cal-nav-btn") {
-			navBtns = append(navBtns, b)
+}
+
+// The section is the Today button over lys-ui's Calendar, which owns
+// the month title, the navigation and the grid: no hand-built grid.
+func TestCalendarSectionIsTheLysUICalendar(t *testing.T) {
+	v := calendarDropdown(newTestContext(t, config.Defaults())).(*calendarView)
+	section := classedBox(t, v, "cal-section")
+	var cals int
+	walkTree(section, func(w widget.Widget) bool {
+		if _, ok := w.(*widget.Calendar); ok {
+			cals++
 		}
 		return true
 	})
-	if len(navBtns) != 3 {
-		t.Fatalf("cal-nav buttons = %d, want today and the two chevrons", len(navBtns))
+	if cals != 1 {
+		t.Fatalf("cal-section holds %d calendars, want one", cals)
 	}
-	// The nav buttons paint from the stylesheet (.cal-nav-btn is
-	// all:unset): no programmatic pressed shade.
-	for _, b := range navBtns {
-		if b.BgPressed != 0 {
-			t.Errorf("a cal-nav button carries a pressed fill %#08x", uint32(b.BgPressed))
+	for _, gone := range []string{"cal-grid", "cal-grid-wrap", "cal-day", "cal-nav"} {
+		if findByClass(v, gone) != nil {
+			t.Errorf("the hand-built %s survived", gone)
 		}
 	}
-	// The month label sits beside the nav, not inside it.
-	for _, c := range nav.Children() {
-		if l, isLabel := c.(*widget.Label); isLabel && l.HasClass("cal-month") {
-			t.Error("the month label landed in the cal-nav box")
-		}
-	}
-	// The grid rides in the wrap under the grid element name, so the
-	// stylesheet's .cal-grid-wrap grid rules reach it.
-	grid, isBox := wrap.Children()[0].(*widget.Box)
-	if len(wrap.Children()) != 1 || !isBox || !grid.HasClass("cal-grid") {
-		t.Fatalf("cal-grid-wrap children = %v, want the cal-grid", wrap.Children())
-	}
-	if grid.Element() != "grid" {
-		t.Errorf("cal-grid element = %q, want grid", grid.Element())
+	today := findButton(section, "cal-today-btn")
+	if today == nil || !today.HasClass(css.Ghost) || !today.HasClass(css.Small) {
+		t.Error("the Today button is not a small ghost button")
 	}
 }
 
@@ -199,22 +141,13 @@ func TestCalendarSpacingIsCSSCarried(t *testing.T) {
 		"dropdown-content": func() int {
 			return classedBox(t, v, "dropdown-content").Spacing()
 		},
-		"clock-hero":    func() int { return classedBox(t, v, "clock-hero").Spacing() },
-		"cal-section":   func() int { return classedBox(t, v, "cal-section").Spacing() },
-		"cal-header":    func() int { return classedBox(t, v, "cal-header").Spacing() },
-		"cal-nav":       func() int { return classedBox(t, v, "cal-nav").Spacing() },
-		"cal-grid-wrap": func() int { return classedBox(t, v, "cal-grid-wrap").Spacing() },
-		"cal-grid":      func() int { return classedBox(t, v, "cal-grid").Spacing() },
+		"clock-hero":  func() int { return classedBox(t, v, "clock-hero").Spacing() },
+		"cal-section": func() int { return classedBox(t, v, "cal-section").Spacing() },
+		"cal-header":  func() int { return classedBox(t, v, "cal-header").Spacing() },
 	}
 	for what, get := range sites {
 		if got := get(); got != 0 {
 			t.Errorf("%s spacing = %d, want 0 (the CSS carries it)", what, got)
-		}
-	}
-	grid := classedBox(t, v, "cal-grid")
-	for _, row := range grid.Children() {
-		if b, isBox := row.(*widget.Box); isBox && b.Spacing() != 0 {
-			t.Errorf("a cal-grid row carries spacing %d", b.Spacing())
 		}
 	}
 }

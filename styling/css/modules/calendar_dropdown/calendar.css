@@ -3,92 +3,10 @@
 }
 
 .cal-header {
-  margin: var(--space-sm) 0;
+  margin: var(--space-sm) 0 0;
   padding: 0 var(--space-xs);
-  border-spacing: 0;
 }
 
-label.cal-month {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold);
-  color: var(--fg-default);
-}
-
-.cal-nav {
-  border-spacing: var(--space-xs);
-}
-
-button.cal-nav-btn {
-  all: unset;
-  min-width: var(--space-xl);
-  min-height: var(--space-xl);
-  border-radius: var(--rounding-element);
-  color: var(--fg-muted);
-}
-button.cal-nav-btn:hover {
-  background: var(--bg-overlay);
-  color: var(--fg-default);
-}
-button.cal-nav-btn image {
-  -gtk-icon-size: var(--space-md);
-}
-button.cal-nav-btn.cal-today-btn {
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  padding: 0 var(--space-md);
-  min-width: 0;
-}
-
-.cal-grid-wrap {
-  background: var(--bg-elevated);
-  border-radius: var(--rounding-element);
-  padding: var(--space-sm);
-}
-.cal-grid-wrap grid {
-  border-spacing: var(--space-xs);
-}
-
-label.cal-weekday {
-  padding: var(--space-md) 0;
-  font-size: var(--text-lg);
-  color: var(--fg-subtle);
-  font-weight: var(--weight-semibold);
-}
-label.cal-weekday.weekend {
-  color: var(--accent);
-  opacity: 0.75;
-}
-
-label.cal-day {
-  padding: calc(var(--space-sm) * 1.15) var(--space-md);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-muted);
-  border-radius: var(--rounding-element);
-}
-label.cal-day:hover {
-  background: var(--bg-overlay);
-  color: var(--fg-default);
-}
-label.cal-day.other {
-  color: var(--bg-active);
-}
-label.cal-day.other:hover {
-  color: var(--fg-subtle);
-}
-label.cal-day.weekend:not(.other):not(.today) {
+.calendar-dropdown calendar .weekend {
   color: color-mix(in srgb, var(--accent) 50%, var(--fg-muted));
-}
-label.cal-day.today {
-  background: var(--accent);
-  color: var(--fg-on-accent);
-  font-weight: var(--weight-semibold);
-}
-label.cal-day.today:hover {
-  background: var(--accent-hover);
-}
-label.cal-day.selected:not(.today) {
-  background: var(--bg-selected);
-  color: var(--accent);
-  font-weight: var(--weight-medium);
 }
