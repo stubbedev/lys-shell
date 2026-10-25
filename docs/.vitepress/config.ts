@@ -1,4 +1,13 @@
+import { readdirSync } from 'node:fs'
 import { defineConfig } from 'vitepress'
+
+const pages = (dir: string, skip: string[] = []) =>
+  readdirSync(new URL(`../config/${dir}`, import.meta.url))
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => f.slice(0, -3))
+    .filter((name) => !skip.includes(name))
+    .sort()
+    .map((name) => ({ text: name, link: `/config/${dir}${name}` }))
 
 export default defineConfig({
   title: 'lys-shell',
@@ -70,48 +79,11 @@ export default defineConfig({
         },
         {
           text: 'Top-level',
-          items: [
-            { text: 'bar', link: '/config/bar' },
-            { text: 'styling', link: '/config/styling' },
-            { text: 'general', link: '/config/general' },
-            { text: 'osd', link: '/config/osd' },
-            { text: 'wallpaper', link: '/config/wallpaper' },
-            { text: 'portal', link: '/config/portal' },
-          ],
+          items: pages('', ['index', 'types']),
         },
         {
           text: 'Modules',
-          items: [
-            { text: 'battery', link: '/config/modules/battery' },
-            { text: 'bluetooth', link: '/config/modules/bluetooth' },
-            { text: 'brightness', link: '/config/modules/brightness' },
-            { text: 'cava', link: '/config/modules/cava' },
-            { text: 'clock', link: '/config/modules/clock' },
-            { text: 'cpu', link: '/config/modules/cpu' },
-            { text: 'custom', link: '/config/modules/custom' },
-            { text: 'dashboard', link: '/config/modules/dashboard' },
-            { text: 'hyprland-workspaces', link: '/config/modules/hyprland-workspaces' },
-            { text: 'hyprsunset', link: '/config/modules/hyprsunset' },
-            { text: 'idle-inhibit', link: '/config/modules/idle-inhibit' },
-            { text: 'keybind-mode', link: '/config/modules/keybind-mode' },
-            { text: 'keyboard-input', link: '/config/modules/keyboard-input' },
-            { text: 'mango-workspaces', link: '/config/modules/mango-workspaces' },
-            { text: 'media', link: '/config/modules/media' },
-            { text: 'microphone', link: '/config/modules/microphone' },
-            { text: 'netstat', link: '/config/modules/netstat' },
-            { text: 'network', link: '/config/modules/network' },
-            { text: 'niri-workspaces', link: '/config/modules/niri-workspaces' },
-            { text: 'notifications', link: '/config/modules/notifications' },
-            { text: 'power', link: '/config/modules/power' },
-            { text: 'ram', link: '/config/modules/ram' },
-            { text: 'separator', link: '/config/modules/separator' },
-            { text: 'storage', link: '/config/modules/storage' },
-            { text: 'systray', link: '/config/modules/systray' },
-            { text: 'volume', link: '/config/modules/volume' },
-            { text: 'weather', link: '/config/modules/weather' },
-            { text: 'window-title', link: '/config/modules/window-title' },
-            { text: 'world-clock', link: '/config/modules/world-clock' },
-          ],
+          items: pages('modules/'),
         },
       ],
     },
