@@ -2,15 +2,17 @@ package osd
 
 import (
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
-// iconPx is the icons' size before the stylesheet's -gtk-icon-size.
-const iconPx = 24
+// iconPx is the icons' size.
+const iconPx = 20
 
-// labelPx is the labels' size before the stylesheet's font-size.
-const labelPx = 14
+// widthPx is the OSD card's width at scale 1.
+const widthPx = 288
 
 // build is the OSD's view! tree:
 //
@@ -28,6 +30,7 @@ func (o *Osd) build() *face {
 	f.sliderLabel.SetHAlign(widget.AlignStart)
 	f.sliderLabel.SetEllipsize(widget.EllipsizeEnd)
 	f.value = o.label("osd-value")
+	f.value.AddClass(css.Heading, css.Numeric)
 	f.sliderHeader = header(f.sliderIcon, f.sliderLabel, f.value)
 
 	f.toggleIcon = o.icon()
@@ -37,7 +40,9 @@ func (o *Osd) build() *face {
 	f.bar = widget.NewProgressBar(0)
 	f.bar.AddClass("osd-bar")
 
-	f.container = widget.NewBox(widget.Column, 0, 0)
+	th := widget.Current()
+	f.container = widget.NewBox(widget.Column, th.Spacing, 2*th.Padding)
+	f.container.SetInlineStyle(styling.WidthStyle(int(widthPx * o.scale())))
 	f.container.Append(f.sliderHeader, false)
 	f.container.Append(f.toggleHeader, false)
 	f.container.Append(f.bar, false)
@@ -58,6 +63,14 @@ func (f *face) root(sheet *widget.Stylesheet) widget.Widget {
 	return root
 }
 
+// scale is the styling scale, 1 when unset.
+func (o *Osd) scale() float64 {
+	if s := float64(o.cfg.Styling.Scale); s > 0 {
+		return s
+	}
+	return 1
+}
+
 func (o *Osd) icon() *widget.Icon {
 	icon := widget.NewThemeIcon("", iconPx)
 	icon.AddClass("osd-icon")
@@ -66,14 +79,14 @@ func (o *Osd) icon() *widget.Icon {
 }
 
 func (o *Osd) label(class string) *widget.Label {
-	l := widget.NewLabel(o.d.Font, labelPx, "", 0)
+	l := widget.NewLabel(o.d.Font, widget.Current().TextSize*o.scale(), "", 0)
 	l.AddClass(class)
 	l.SetVAlign(widget.AlignCenter)
 	return l
 }
 
 func header(children ...widget.Widget) *widget.Box {
-	b := widget.NewBox(widget.Row, 0, 0)
+	b := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 	b.AddClass("osd-header")
 	for _, c := range children {
 		b.Append(c, false)
@@ -85,7 +98,7 @@ func header(children ...widget.Widget) *widget.Box {
 // slider header and the bar, everything else the toggle header placed
 // by osd.text-align.
 func (f *face) apply(ev Event, cfg config.OsdConfig) {
-	f.container.SetClasses(classes(ev, cfg.Border)...)
+	f.container.SetClasses(append(classes(ev, cfg.Border), css.Card)...)
 	f.sliderHeader.SetVisible(ev.bar)
 	f.bar.SetVisible(ev.bar)
 	f.toggleHeader.SetVisible(!ev.bar)

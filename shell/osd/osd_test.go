@@ -8,6 +8,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
@@ -218,7 +219,7 @@ func TestViewFollowsTheEvent(t *testing.T) {
 			t.Errorf("label %v pins ink %#08x over the stylesheet", l.Classes(), uint32(l.Color()))
 		}
 	}
-	if !slices.Equal(f.container.Classes(), []string{"osd", "muted", "bordered"}) {
+	if !slices.Equal(f.container.Classes(), []string{"osd", "muted", "bordered", css.Card}) {
 		t.Errorf("slider classes %v", f.container.Classes())
 	}
 	if !f.sliderHeader.Visible() || !f.bar.Visible() || f.toggleHeader.Visible() {
@@ -229,7 +230,7 @@ func TestViewFollowsTheEvent(t *testing.T) {
 	}
 
 	h.osd.Show(toggleEvent(keytoggles.Event{Key: keytoggles.CapsLock}))
-	if !slices.Equal(f.container.Classes(), []string{"osd", "toggle-off", "bordered"}) {
+	if !slices.Equal(f.container.Classes(), []string{"osd", "toggle-off", "bordered", css.Card}) {
 		t.Errorf("toggle classes %v", f.container.Classes())
 	}
 	if f.sliderHeader.Visible() || f.bar.Visible() || !f.toggleHeader.Visible() {
@@ -240,7 +241,7 @@ func TestViewFollowsTheEvent(t *testing.T) {
 	}
 
 	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("Done"), Class: new("success")})
-	if !slices.Equal(f.container.Classes(), []string{"osd", "bordered", "success"}) {
+	if !slices.Equal(f.container.Classes(), []string{"osd", "bordered", "success", css.Card}) {
 		t.Errorf("toast classes %v", f.container.Classes())
 	}
 	if f.toggleIcon.Visible() || f.toggleLabel.Text() != "Done" {
@@ -346,5 +347,17 @@ func TestBrightnessEventsAverageAndDedupe(t *testing.T) {
 	src.devices = nil
 	if _, ok := b.next(context.Background(), src); ok {
 		t.Error("no backlights flashed")
+	}
+}
+
+// The OSD card is its width exactly at any surface: its progress bar
+// fills only the card, not the output.
+func TestOsdKeepsItsWidth(t *testing.T) {
+	cfg := quietConfig()
+	h := readyHarness(t, cfg)
+	h.osd.Show(Slider("Speakers", VolumeIcon(40, false), 40, false))
+	sz := widget.MeasureAsChild(h.osd.face.container, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	if want := int(widthPx * float64(cfg.Styling.Scale)); sz.W != want {
+		t.Errorf("the OSD measures %dpx wide in a 1920px surface, want %d", sz.W, want)
 	}
 }

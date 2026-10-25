@@ -6,7 +6,6 @@ package popups
 import (
 	"log"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/layering"
 	"github.com/stubbedev/lys-shell/shell/notifyui"
 	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // Card geometry (templates.rs, card/methods.rs).
@@ -223,7 +223,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	c.root.AddClass(css.Card, "notification-popup-card", notifyui.UrgencyClass(n.Urgency))
 	// The card is its width exactly, lys-ui's explicit width for
 	// content that fills it: the Item would otherwise fill the output.
-	c.root.SetInlineStyle("width: " + strconv.Itoa(int(cardWidthPx*scale)) + "px; box-sizing: border-box;")
+	c.root.SetInlineStyle(styling.WidthStyle(int(cardWidthPx * scale)))
 	if cfg.PopupShadow {
 		c.root.AddClass("shadow")
 	}

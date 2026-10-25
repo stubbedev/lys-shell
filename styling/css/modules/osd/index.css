@@ -3,78 +3,36 @@ window.background.osd-host {
 }
 
 .osd {
-  all: unset;
   background: var(--bg-elevated);
-  border-radius: var(--rounding-element);
   box-shadow: 0 calc(0.25rem * var(--global-scale)) calc(1rem * var(--global-scale)) var(--shadow-color-soft);
   margin: var(--space-md);
-  padding: var(--space-md);
-  min-width: calc(var(--space-lg) * 12);
 }
 
 image.osd-icon {
-  -gtk-icon-size: var(--icon-lg);
   color: var(--accent);
-  margin-right: var(--space-sm);
 }
-
 label.osd-label {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold);
   color: var(--fg-muted);
-  margin-right: var(--space-sm);
 }
 
-label.osd-value {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold2);
-  color: var(--fg-default);
-  min-width: calc(var(--space-xl) * 2);
-  margin-right: calc(var(--space-sm) * -1.5);
-}
-
-progressbar.osd-bar {
-  all: unset;
-  margin-top: var(--space-md);
-  min-width: calc(var(--space-lg) * 12);
-}
-progressbar.osd-bar trough {
-  background: var(--bg-active);
-  border-radius: var(--rounding-element);
-  min-height: calc(0.5rem * var(--global-scale));
-  border: none;
-}
-progressbar.osd-bar trough progress {
-  border: none;
-  background: var(--accent);
-  border-radius: var(--rounding-element);
-  min-height: calc(0.5rem * var(--global-scale));
-}
-
-.osd.muted image.osd-icon {
+.osd.muted image.osd-icon,
+.osd.toggle-off image.osd-icon,
+.osd.toggle-off label.osd-label {
   color: var(--fg-subtle);
 }
 .osd.muted progressbar.osd-bar trough progress {
   background: var(--fg-subtle);
 }
 
-.osd.toggle-off image.osd-icon,
-.osd.toggle-off label.osd-label {
-  color: var(--fg-subtle);
-}
-
-.osd.bordered {
-  border: 1px solid var(--border-default);
+.osd:not(.bordered) {
+  border-color: transparent;
 }
 
 .osd.success {
   background: color-mix(in srgb, var(--status-success) 12%, var(--bg-elevated));
-  border: 1px solid color-mix(in srgb, var(--status-success) 30%, transparent);
-  border-left: calc(0.18rem * var(--global-scale)) solid var(--status-success);
+  border-color: color-mix(in srgb, var(--status-success) 30%, transparent);
 }
-.osd.success image.osd-icon {
-  color: var(--status-success);
-}
+.osd.success image.osd-icon,
 .osd.success label.osd-label {
   color: var(--status-success);
 }
@@ -85,13 +43,10 @@ progressbar.osd-bar trough progress {
 .osd.error,
 .osd.danger {
   background: color-mix(in srgb, var(--status-error) 12%, var(--bg-elevated));
-  border: 1px solid color-mix(in srgb, var(--status-error) 30%, transparent);
-  border-left: calc(0.18rem * var(--global-scale)) solid var(--status-error);
+  border-color: color-mix(in srgb, var(--status-error) 30%, transparent);
 }
 .osd.error image.osd-icon,
-.osd.danger image.osd-icon {
-  color: var(--status-error);
-}
+.osd.danger image.osd-icon,
 .osd.error label.osd-label,
 .osd.danger label.osd-label {
   color: var(--status-error);
@@ -103,12 +58,9 @@ progressbar.osd-bar trough progress {
 
 .osd.warning {
   background: color-mix(in srgb, var(--status-warning) 12%, var(--bg-elevated));
-  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
-  border-left: calc(0.18rem * var(--global-scale)) solid var(--status-warning);
+  border-color: color-mix(in srgb, var(--status-warning) 30%, transparent);
 }
-.osd.warning image.osd-icon {
-  color: var(--status-warning);
-}
+.osd.warning image.osd-icon,
 .osd.warning label.osd-label {
   color: var(--status-warning);
 }
@@ -118,12 +70,9 @@ progressbar.osd-bar trough progress {
 
 .osd.info {
   background: color-mix(in srgb, var(--status-info) 12%, var(--bg-elevated));
-  border: 1px solid color-mix(in srgb, var(--status-info) 30%, transparent);
-  border-left: calc(0.18rem * var(--global-scale)) solid var(--status-info);
+  border-color: color-mix(in srgb, var(--status-info) 30%, transparent);
 }
-.osd.info image.osd-icon {
-  color: var(--status-info);
-}
+.osd.info image.osd-icon,
 .osd.info label.osd-label {
   color: var(--status-info);
 }

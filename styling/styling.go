@@ -7,6 +7,7 @@ package styling
 
 import (
 	"math"
+	"strconv"
 
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
@@ -224,6 +225,14 @@ func rgbaStraight(r, g, b, a uint8) render.Color {
 		return uint8(math.Round(float64(c) * af))
 	}
 	return render.Color(uint32(a)<<24 | uint32(pre(r))<<16 | uint32(pre(g))<<8 | uint32(pre(b)))
+}
+
+// WidthStyle is the inline style that makes a widget exactly px wide,
+// its border included: lys-ui's explicit width for content that fills
+// whatever width it is offered (an Item, a progress bar), on a surface
+// that would otherwise offer it the whole output.
+func WidthStyle(px int) string {
+	return "width: " + strconv.Itoa(px) + "px; box-sizing: border-box;"
 }
 
 // ToolkitRadiusPx is lys-ui's default corner radius, what the default
