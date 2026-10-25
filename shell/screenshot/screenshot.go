@@ -56,7 +56,7 @@ type Host struct {
 		Cancel()
 	}
 	Picker interface {
-		Request(frames map[string]*image.RGBA) (colorpicker.RGB, bool)
+		Request(frames map[string]*image.RGBA) (colorpicker.RGB, bool, error)
 		Cancel()
 	}
 	// Focus resolves the focused output and the active window.
@@ -287,7 +287,15 @@ func (h *Host) PickColor(caller portalreq.Caller) (color [3]float64, picked bool
 	if len(frames) == 0 {
 		return color, false, errors.New("no outputs available")
 	}
-	c, ok := overlay(h, caller, h.Picker.Cancel, func() (colorpicker.RGB, bool) { return h.Picker.Request(frames) })
+	var pickErr error
+	c, ok := overlay(h, caller, h.Picker.Cancel, func() (colorpicker.RGB, bool) {
+		c, ok, err := h.Picker.Request(frames)
+		pickErr = err
+		return c, ok
+	})
+	if pickErr != nil {
+		return color, false, pickErr
+	}
 	if !ok {
 		return color, false, nil
 	}

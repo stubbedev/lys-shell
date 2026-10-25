@@ -5,8 +5,10 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -167,5 +169,21 @@ func TestLoupePaints(t *testing.T) {
 	}
 	if got := at(w-1, h-1); got.A() != 0 {
 		t.Fatal("the card painted past the cursor corner")
+	}
+}
+
+// Frames that match no monitor leave nothing to pick from: the request
+// fails naming both, instead of passing for the user's cancel, and is
+// answered.
+func TestNoMatchingFrameFails(t *testing.T) {
+	p := &Picker{outputs: func() []*app.Output { return []*app.Output{{Name: "DP-1"}} }}
+	ch := make(chan result, 1)
+	p.show(ch, map[string]*image.RGBA{"HDMI-A-1": gradient()})
+	r := <-ch
+	if r.ok || r.err == nil || !strings.Contains(r.err.Error(), "HDMI-A-1") || !strings.Contains(r.err.Error(), "DP-1") {
+		t.Fatalf("unmatched frames answered %+v, want an error naming the frame and the output", r)
+	}
+	if p.reply != nil {
+		t.Error("the failed request stayed open")
 	}
 }

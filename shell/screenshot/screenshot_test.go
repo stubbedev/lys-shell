@@ -191,12 +191,15 @@ func (f *fakeRegion) Cancel() {
 }
 
 type fakePicker struct {
-	c  colorpicker.RGB
-	ok bool
+	c   colorpicker.RGB
+	ok  bool
+	err error
 }
 
-func (f fakePicker) Request(map[string]*image.RGBA) (colorpicker.RGB, bool) { return f.c, f.ok }
-func (fakePicker) Cancel()                                                  {}
+func (f fakePicker) Request(map[string]*image.RGBA) (colorpicker.RGB, bool, error) {
+	return f.c, f.ok, f.err
+}
+func (fakePicker) Cancel() {}
 
 // fixed is a Config that never reloads.
 func fixed(cfg config.ScreenshotConfig) func() config.ScreenshotConfig {
@@ -357,7 +360,7 @@ func TestHostSaveFailure(t *testing.T) {
 }
 
 // A pick replies its color, a cancel no color and no error, and a
-// failure an error.
+// failure - no outputs, or a picker with nothing to show - an error.
 func TestHostPickColor(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{})
 	c, picked, err := h.PickColor(portalreq.Caller{})
@@ -367,6 +370,10 @@ func TestHostPickColor(t *testing.T) {
 	h.Picker = fakePicker{ok: false}
 	if _, picked, err := h.PickColor(portalreq.Caller{}); err != nil || picked {
 		t.Fatalf("cancel = %v, %v; want no pick and no error", picked, err)
+	}
+	h.Picker = fakePicker{err: errors.New("color picker: no captured frame matches an output")}
+	if _, picked, err := h.PickColor(portalreq.Caller{}); err == nil || picked {
+		t.Fatalf("a picker failure = %v, %v; want its error, not a cancel", picked, err)
 	}
 	h.frozen = func(bool) ([]frozenOutput, error) { return nil, nil }
 	if _, _, err := h.PickColor(portalreq.Caller{}); err == nil || err.Error() != "no outputs available" {

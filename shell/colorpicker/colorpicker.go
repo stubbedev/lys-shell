@@ -12,8 +12,10 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -58,10 +60,11 @@ func (c RGB) Float() (r, g, b float64) {
 	return float64(c.R) / 255, float64(c.G) / 255, float64(c.B) / 255
 }
 
-// result is one request's answer.
+// result is one request's answer: a pick, a cancel, or a failure.
 type result struct {
 	color RGB
 	ok    bool
+	err   error
 }
 
 // Picker is the picker component. Request is its entry point; the rest
@@ -101,13 +104,14 @@ func HistoryPath() string {
 
 // Request opens the picker over the frozen frames (keyed by connector)
 // and blocks until a click picks a pixel (ok) or the user cancels. A
-// monitor without a frame gets no surface; no surface at all cancels
-// at once. Call it from any goroutine but the loop's.
-func (p *Picker) Request(frames map[string]*image.RGBA) (RGB, bool) {
+// monitor without a frame gets no surface; when no frame matches any
+// monitor there is nothing to pick from, and that is an error naming
+// both, not a cancel. Call it from any goroutine but the loop's.
+func (p *Picker) Request(frames map[string]*image.RGBA) (RGB, bool, error) {
 	ch := make(chan result, 1)
 	p.app.Invoke(func() { p.show(ch, frames) })
 	r := <-ch
-	return r.color, r.ok
+	return r.color, r.ok, r.err
 }
 
 // Cancel answers the open request, if any, as cancelled and takes the
@@ -146,9 +150,12 @@ func (p *Picker) show(ch chan result, frames map[string]*image.RGBA) {
 		}
 		p.surfaces = append(p.surfaces, layer)
 	}
-	// No frame matched any monitor: nothing to pick from.
 	if len(p.surfaces) == 0 {
-		p.finish(RGB{}, false)
+		names := make([]string, 0, len(p.outputs()))
+		for _, out := range p.outputs() {
+			names = append(names, out.Name)
+		}
+		p.answer(result{err: fmt.Errorf("color picker: no captured frame matches an output (frames %v, outputs %v)", slices.Sorted(maps.Keys(frames)), names)})
 	}
 }
 
@@ -159,8 +166,14 @@ func (p *Picker) finish(c RGB, ok bool) {
 		p.history = pushHistory(p.history, c)
 		saveHistory(p.historyPath, p.history)
 	}
+	p.answer(result{color: c, ok: ok})
+}
+
+// answer replies to the open request, if any, and tears the surfaces
+// down.
+func (p *Picker) answer(r result) {
 	if p.reply != nil {
-		p.reply <- result{color: c, ok: ok}
+		p.reply <- r
 		p.reply = nil
 	}
 	for _, s := range p.surfaces {

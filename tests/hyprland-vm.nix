@@ -6,9 +6,12 @@
 #
 # The script asserts what the compositor reports (the bar's layer on
 # every output with its exclusive zone, the launcher and popup layers
-# coming and going, the session lock taking the outputs and releasing
-# them on a typed password, the lock surviving a shell restart) and
-# leaves a screenshot of every state in the result for review.
+# coming and going, the OSD and popups on the configured output, the
+# portal's answers - screenshot, colour pick, a global shortcut bound
+# and activated through the compositor - the hyprsunset filter started
+# from the bar, the session lock taking the outputs and releasing them
+# on a typed password, the lock surviving a shell restart) and leaves a
+# screenshot of every state in the result for review.
 #
 # Build: nix build .#checks.<system>.lys-shell-hyprland-vm -L
 {
@@ -77,6 +80,14 @@ let
     flakeIgnore = [ "E501" ];
   } (builtins.readFile ./portal-client.py);
 
+  # The portal client's app id: the frontend lets a host app use
+  # GlobalShortcuts once it registered one with a desktop entry.
+  testApp = pkgs.makeDesktopItem {
+    name = "dev.stubbe.lys.VmTest";
+    desktopName = "lys-shell VM test";
+    exec = "portal-client globalshortcuts";
+  };
+
   shellConfig = (pkgs.formats.yaml { }).generate "config.yaml" {
     lock = {
       enabled = true;
@@ -94,6 +105,7 @@ let
           "keybind-mode"
           "keyboard-input"
           "notifications"
+          "hyprsunset"
         ];
       }
     ];
@@ -175,9 +187,11 @@ pkgs.testers.nixosTest {
 
       environment.systemPackages = [
         portalClient
+        testApp
         vmclick
         pkgs.hyprland
         pkgs.foot
+        pkgs.hyprsunset
         pkgs.libnotify
         pkgs.dbus
       ];
@@ -196,8 +210,8 @@ pkgs.testers.nixosTest {
             if check():
                 return
             time.sleep(pause)
-        print(machine.execute("cat /tmp/lys/*.log | grep -v aquamarine | tail -n 80")[1])
-        print(machine.execute("journalctl _UID=${toString uid} --no-pager -n 80 | grep -v aquamarine")[1])
+        print(machine.execute("tail -n 40 /tmp/lys/*.json; cat /tmp/lys/*.log | grep -v aquamarine | tail -n 80")[1])
+        print(machine.execute("journalctl _UID=${toString uid} --no-pager | grep -v aquamarine | grep -i 'lys\\|portal' | tail -n 60")[1])
         raise Exception("timed out waiting for " + what)
 
     wait("Hyprland's socket", lambda: machine.execute("ls ${runtimeDir}/hypr/*/.socket.sock")[0] == 0, tries=90)
@@ -352,6 +366,86 @@ pkgs.testers.nixosTest {
     machine.screenshot("06d-region-overlay")
     machine.send_key("esc")
     wait("the region overlay to close", lambda: "lys-shell-region-overlay" not in namespaces())
+
+    # The OSD and a notification popup map on the focused output.
+    def monitors_of(namespace):
+        return [
+            name
+            for name, mon in hypr_json("layers").items()
+            for level in mon["levels"].values()
+            if any(found["namespace"] == namespace for found in level)
+        ]
+
+    # The OSD and notification popups land on the primary output
+    # whichever output has the focus, and on the connector the config
+    # names once it names one.
+    def toast_and_notify(word):
+        shell(f"toast --duration 4000 {word}")
+        machine.succeed(f"su - ${user} -c '{env} notify-send {word}'")
+
+    hypr("dispatch focusmonitor HEADLESS-2")
+    toast_and_notify("Primary")
+    wait("the OSD", lambda: "lys-shell-osd" in namespaces())
+    wait("the popup", lambda: "lys-shell-notification-popup" in namespaces())
+    if monitors_of("lys-shell-osd") != ["Virtual-1"] or "Virtual-1" not in monitors_of("lys-shell-notification-popup"):
+        raise Exception(f"default placement: OSD on {monitors_of('lys-shell-osd')}, popups on {monitors_of('lys-shell-notification-popup')}, want the primary Virtual-1")
+    machine.screenshot("06e-osd-and-popup-on-primary")
+    wait("the OSD to time out", lambda: "lys-shell-osd" not in namespaces(), tries=15)
+    shell("config set osd.monitor HEADLESS-2")
+    shell("config set modules.notifications.popup-monitor HEADLESS-2")
+    toast_and_notify("Configured")
+    wait("the OSD on the configured output", lambda: monitors_of("lys-shell-osd") == ["HEADLESS-2"])
+    wait("a popup on the configured output", lambda: "HEADLESS-2" in monitors_of("lys-shell-notification-popup"))
+    machine.screenshot("06e-osd-and-popup-on-configured-output")
+    shell("config reset osd.monitor")
+    shell("config reset modules.notifications.popup-monitor")
+    hypr("dispatch focusmonitor Virtual-1")
+
+    # The colour picker answers the portal's PickColor with the colour
+    # under the click.
+    machine.succeed(f"su - ${user} -c '{env} portal-client pickcolor > /tmp/lys/color.json 2>&1 &'")
+    wait("the colour picker", lambda: "lys-shell-color-picker" in namespaces())
+    time.sleep(1)
+    machine.screenshot("06f-color-picker")
+    click(400, 400)
+    wait("the picked colour", lambda: machine.execute("grep -q code /tmp/lys/color.json")[0] == 0, tries=30)
+    picked = json.loads(machine.succeed("cat /tmp/lys/color.json"))
+    color = picked["results"].get("color")
+    if picked["code"] != 0 or not color or len(color) != 3:
+        raise Exception(f"PickColor answered {picked}")
+
+    # A global shortcut: the app binds it through the portal, the user
+    # allows it, the compositor lists it, and its trigger reaches the
+    # app as Activated.
+    machine.succeed(f"su - ${user} -c '{env} portal-client globalshortcuts > /tmp/lys/shortcuts.json 2>&1 &'")
+    wait("the shortcut consent dialog", lambda: "lys-shell-portal-dialog" in namespaces())
+    time.sleep(1)
+    machine.screenshot("06g-shortcut-consent")
+    dialog = layer("lys-shell-portal-dialog")
+    click(dialog["x"] + dialog["w"] - 60, dialog["y"] + dialog["h"] - 32)
+    wait("the bound shortcut", lambda: machine.execute("grep -q bound /tmp/lys/shortcuts.json")[0] == 0, tries=30)
+    bound = json.loads(machine.succeed("head -n1 /tmp/lys/shortcuts.json"))
+    if bound["bound"] != 0:
+        raise Exception(f"BindShortcuts answered {bound}")
+    listed = [line.split(" -> ")[0].strip() for line in hypr("globalshortcuts").splitlines() if "lys-vm-test" in line]
+    if len(listed) != 1:
+        raise Exception(f"the compositor lists {listed} for the bound shortcut")
+    hypr(f"dispatch global {listed[0]}")
+    wait("the shortcut's activation", lambda: machine.execute("grep -q activated /tmp/lys/shortcuts.json")[0] == 0, tries=30)
+
+    # The hyprsunset module, the bar's last, starts the filter on a click
+    # and stops it on the next.
+    def sunset_running():
+        return machine.execute("pgrep -x hyprsunset")[0] == 0
+
+    if sunset_running():
+        raise Exception("hyprsunset runs before the bar started it")
+    click(1262, 22)
+    wait("hyprsunset started from the bar", sunset_running, tries=30)
+    wait("hyprsunset's socket", lambda: machine.execute(f"ls ${runtimeDir}/hypr/{sig}/.hyprsunset.sock")[0] == 0, tries=30)
+    machine.screenshot("06h-hyprsunset-on")
+    click(1262, 22)
+    wait("hyprsunset stopped from the bar", lambda: not sunset_running(), tries=30)
 
     # The session lock covers every output and a typed password lifts it.
     def logged(log, line):
