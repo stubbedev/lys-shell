@@ -258,8 +258,9 @@ type surface struct {
 	hasCursor        bool
 
 	// bright is the frame resampled to the device rect, built on first
-	// paint.
-	bright *image.RGBA
+	// paint and never changed after: still, so a GPU renderer uploads it
+	// once rather than on every pointer move.
+	bright render.StillImage
 }
 
 func (l *surface) Measure(con widget.Constraints) widget.Size { return con.Max }
@@ -296,8 +297,8 @@ func (l *surface) ClickAt(p widget.Point) {
 func (l *surface) Paint(cv *render.Canvas) {
 	b := l.Bounds()
 	dev := cv.MapRect(b)
-	if l.bright == nil || l.bright.Bounds().Dx() != dev.W || l.bright.Bounds().Dy() != dev.H {
-		l.bright = render.Resample(l.frame, l.frame.Bounds(), dev.W, dev.H)
+	if l.bright.RGBA == nil || l.bright.Bounds().Dx() != dev.W || l.bright.Bounds().Dy() != dev.H {
+		l.bright = render.StillImage{RGBA: render.Resample(l.frame, l.frame.Bounds(), dev.W, dev.H)}
 	}
 	cv.DrawImageDevice(l.bright, dev.X, dev.Y)
 	if l.hasCursor {

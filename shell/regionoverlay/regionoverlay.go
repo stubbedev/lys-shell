@@ -334,8 +334,10 @@ type area struct {
 	frame *image.RGBA
 
 	// bright and dim are the frame resampled to the device rect and
-	// its washed copy, built on first paint at that size.
-	bright, dim *image.RGBA
+	// its washed copy, built on first paint at that size and never
+	// changed after: still, so a GPU renderer uploads them once rather
+	// than on every drag motion.
+	bright, dim render.StillImage
 }
 
 func (a *area) Measure(con widget.Constraints) widget.Size { return con.Max }
@@ -443,9 +445,9 @@ func (a *area) magnifying() bool {
 // bright one: the wash-then-hole composite of the Rust overlay, whose
 // transparent drawing area sits over the frame picture.
 func (a *area) paintFrozen(cv *render.Canvas, dev, selDev render.Rect, selected bool) {
-	if a.bright == nil || a.bright.Bounds().Dx() != dev.W || a.bright.Bounds().Dy() != dev.H {
-		a.bright = render.Resample(a.frame, a.frame.Bounds(), dev.W, dev.H)
-		a.dim = wash(a.bright)
+	if a.bright.RGBA == nil || a.bright.Bounds().Dx() != dev.W || a.bright.Bounds().Dy() != dev.H {
+		a.bright = render.StillImage{RGBA: render.Resample(a.frame, a.frame.Bounds(), dev.W, dev.H)}
+		a.dim = render.StillImage{RGBA: wash(a.bright.RGBA)}
 	}
 	cv.DrawImageDevice(a.dim, dev.X, dev.Y)
 	if selected && !selDev.Empty() {
