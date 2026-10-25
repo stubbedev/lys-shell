@@ -18,6 +18,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/internal/spawn"
 )
 
 // Custom module limits (watchers/command.rs, events.rs, helpers.rs).
@@ -392,7 +393,7 @@ func (m *customModule) runCommand(command string) {
 	m.mu.Unlock()
 	go func() {
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "sh", "-c", command) //nolint:gosec // the command comes from the user's own config
+		cmd := spawn.Owned(ctx, command)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		if err := cmd.Run(); err != nil {
@@ -450,7 +451,7 @@ func (m *customModule) supervise(command string) {
 // watchOnce runs the command once, streaming its lines; ran is false
 // when it could not start.
 func (m *customModule) watchOnce(command string) (exitErr error, ran bool) {
-	cmd := exec.CommandContext(m.life, "sh", "-c", command) //nolint:gosec // the command comes from the user's own config
+	cmd := spawn.Owned(m.life, command)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Printf("custom %s: watch command started without stdout: %v", m.def.Id, err)

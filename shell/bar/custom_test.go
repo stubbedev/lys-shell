@@ -3,8 +3,11 @@ package bar
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -312,4 +315,31 @@ func TestCustomLabelMaxLengthCapsTheButton(t *testing.T) {
 	if got := def.Button().LabelMaxLength; got != 3 {
 		t.Errorf("button label-max-length = %d, want the definition's 3", got)
 	}
+}
+
+// A watch command's script stops whole with its module: the children
+// it started run while the module does and stop when it goes, so a bar
+// rebuild leaves no watcher behind.
+func TestCustomWatchStopsItsScriptWithTheModule(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "child")
+	def := config.DefaultsCustomModuleDefinition()
+	def.Id = "w"
+	m := newTestCustom(t, def)
+	go m.supervise("sleep 30 & echo $! > " + pidFile + "; wait")
+	var child int
+	waitHeadless(t, "the script's child", func() bool {
+		data, _ := os.ReadFile(pidFile)
+		child, _ = strconv.Atoi(strings.TrimSpace(string(data)))
+		return child > 0
+	})
+	t.Cleanup(func() { _ = syscall.Kill(child, syscall.SIGKILL) })
+	running := func() bool {
+		stat, err := os.ReadFile("/proc/" + strconv.Itoa(child) + "/stat")
+		return err == nil && !strings.Contains(string(stat), ") Z ")
+	}
+	if !running() {
+		t.Fatal("the watch script's child is not running while the module is")
+	}
+	m.Stop()
+	waitHeadless(t, "the script's child to stop with the module", func() bool { return !running() })
 }
