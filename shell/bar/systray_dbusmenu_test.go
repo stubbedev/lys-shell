@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"slices"
 	"strconv"
 	"testing"
 
@@ -27,17 +28,27 @@ type echoMenuNode struct {
 // echoMenu is a DBusMenu of numbered rows. With echo set it is an app
 // that rebuilds its menu on demand: every AboutToShow adds a row and
 // sends LayoutUpdated, as a menu that grows each time it is asked to
-// show. It counts its AboutToShow and GetLayout calls.
+// show. With subRows set, row 1 is a submenu of that many rows, which
+// its own AboutToShow grows by one and answers with needUpdate (no
+// signal). It counts its AboutToShow and GetLayout calls and records
+// the ids shown.
 type echoMenu struct {
-	conn  *dbus.Conn
-	echo  bool
-	rows  dbustest.Var[int32]
-	shown dbustest.Var[int]
-	reads dbustest.Var[int]
+	conn    *dbus.Conn
+	echo    bool
+	rows    dbustest.Var[int32]
+	subRows dbustest.Var[int32]
+	shown   dbustest.Var[int]
+	shownID dbustest.Var[[]int32]
+	reads   dbustest.Var[int]
 }
 
-func (m *echoMenu) AboutToShow(int32) (bool, *dbus.Error) {
+func (m *echoMenu) AboutToShow(id int32) (bool, *dbus.Error) {
 	m.shown.Update(func(n int) int { return n + 1 })
+	m.shownID.Update(func(ids []int32) []int32 { return append(slices.Clone(ids), id) })
+	if id != 0 && m.subRows.Load() > 0 {
+		m.subRows.Update(func(n int32) int32 { return n + 1 })
+		return true, nil
+	}
 	if !m.echo {
 		return false, nil
 	}
@@ -60,7 +71,14 @@ func (m *echoMenu) GetLayout(int32, int32, []string) (uint32, echoMenuNode, *dbu
 	rows := make([]dbus.Variant, 0, n)
 	for id := range n {
 		label := "row " + strconv.Itoa(int(id))
-		rows = append(rows, dbus.MakeVariant(echoMenuNode{id + 1, map[string]dbus.Variant{"label": dbus.MakeVariant(label)}, []dbus.Variant{}}))
+		node := echoMenuNode{id + 1, map[string]dbus.Variant{"label": dbus.MakeVariant(label)}, []dbus.Variant{}}
+		if sub := m.subRows.Load(); id == 0 && sub > 0 {
+			node.Props["children-display"] = dbus.MakeVariant("submenu")
+			for sid := range sub {
+				node.Children = append(node.Children, dbus.MakeVariant(echoMenuNode{100 + sid, map[string]dbus.Variant{"label": dbus.MakeVariant("sub " + strconv.Itoa(int(sid)))}, []dbus.Variant{}}))
+			}
+		}
+		rows = append(rows, dbus.MakeVariant(node))
 	}
 	return uint32(n), echoMenuNode{0, map[string]dbus.Variant{"children-display": dbus.MakeVariant("submenu")}, rows}, nil
 }
@@ -153,4 +171,32 @@ func TestSystrayMenuLayoutUpdateSkipsAboutToShow(t *testing.T) {
 	if n := menu.shown.Load(); n != 1 {
 		t.Errorf("AboutToShow calls = %d, want only the opening's", n)
 	}
+}
+
+// Opening the menu is AboutToShow for the root alone; a submenu sends
+// its own as it opens, and when the app answers that it needs an
+// update the layout is read again, so the submenu shows its new rows.
+func TestSystraySubmenuOpenSendsItsAboutToShow(t *testing.T) {
+	m, menu, key := startEchoTray(t, false)
+	menu.subRows.Store(1)
+	openTrayMenu(t, m, key)
+	waitHeadless(t, "the submenu row", func() bool {
+		return m.menu != nil && len(m.menu.items) == 1 && len(m.menu.items[0].Items) == 1
+	})
+	if ids := menu.shownID.Load(); !slices.Equal(ids, []int32{0}) {
+		t.Fatalf("opening the menu sent AboutToShow for %v, want the root alone", ids)
+	}
+	onHeadlessLoop(func() bool {
+		if open := m.menu.items[0].OnOpen; open != nil {
+			open()
+		}
+		return true
+	})
+	waitHeadless(t, "the submenu's AboutToShow", func() bool { return len(menu.shownID.Load()) == 2 })
+	if ids := menu.shownID.Load(); ids[1] != 1 {
+		t.Errorf("the submenu sent AboutToShow for %d, want its row's id 1", ids[1])
+	}
+	waitHeadless(t, "the submenu's new rows", func() bool {
+		return m.menu != nil && len(m.menu.items[0].Items) == 2
+	})
 }

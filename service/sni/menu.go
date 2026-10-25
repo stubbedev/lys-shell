@@ -2,6 +2,7 @@ package sni
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -144,12 +145,26 @@ func (a *Actions) menuObject(it Item) (dbus.BusObject, error) {
 // layout. The spec calls AboutToShow once per showing, so a menu
 // already open re-reads with MenuLayout instead.
 func (a *Actions) OpenMenu(ctx context.Context, it Item) (MenuItem, error) {
+	if _, err := a.AboutToShow(ctx, it, 0); err != nil {
+		if _, ok := errors.AsType[dbus.Error](err); !ok {
+			return MenuItem{}, err
+		}
+	}
+	return a.MenuLayout(ctx, it)
+}
+
+// AboutToShow tells the app the (sub)menu id is about to show, the
+// spec's once per showing; needUpdate is the app asking for its layout
+// to be read again before it shows.
+func (a *Actions) AboutToShow(ctx context.Context, it Item, id int32) (needUpdate bool, err error) {
 	obj, err := a.menuObject(it)
 	if err != nil {
-		return MenuItem{}, err
+		return false, err
 	}
-	_ = obj.CallWithContext(ctx, MenuIface+".AboutToShow", 0, int32(0)).Err
-	return a.MenuLayout(ctx, it)
+	if err := obj.CallWithContext(ctx, MenuIface+".AboutToShow", 0, id).Store(&needUpdate); err != nil {
+		return false, fmt.Errorf("sni: %s AboutToShow %d: %w", it.Key(), id, err)
+	}
+	return needUpdate, nil
 }
 
 // MenuLayout reads the full layout (GetLayout) without AboutToShow:

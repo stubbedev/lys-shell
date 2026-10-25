@@ -59,6 +59,13 @@ func (f *fakeTray) MenuLayout(_ context.Context, it sni.Item) (sni.MenuItem, err
 	return f.serveMenu("menu-layout " + it.ID)
 }
 
+func (f *fakeTray) SubmenuOpening(_ context.Context, it sni.Item, id int32) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "submenu "+it.ID+" "+strconv.Itoa(int(id)))
+	return false, f.err
+}
+
 func (f *fakeTray) serveMenu(call string) (sni.MenuItem, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -50,6 +50,9 @@ type TrayService interface {
 	OpenMenu(ctx context.Context, it sni.Item) (sni.MenuItem, error)
 	// MenuLayout re-reads an open menu's layout without AboutToShow.
 	MenuLayout(ctx context.Context, it sni.Item) (sni.MenuItem, error)
+	// SubmenuOpening is AboutToShow for a submenu as it opens; true asks
+	// for the layout to be read again.
+	SubmenuOpening(ctx context.Context, it sni.Item, id int32) (bool, error)
 	MenuClicked(ctx context.Context, it sni.Item, id int32) error
 	// WatchMenu ticks on the item's menu changes until stop, which
 	// closes the feed and may be called more than once.
@@ -84,6 +87,10 @@ func (t hostTray) OpenMenu(ctx context.Context, it sni.Item) (sni.MenuItem, erro
 
 func (t hostTray) MenuLayout(ctx context.Context, it sni.Item) (sni.MenuItem, error) {
 	return t.a.MenuLayout(ctx, it)
+}
+
+func (t hostTray) SubmenuOpening(ctx context.Context, it sni.Item, id int32) (bool, error) {
+	return t.a.AboutToShow(ctx, it, id)
 }
 
 func (t hostTray) MenuClicked(ctx context.Context, it sni.Item, id int32) error {
@@ -505,23 +512,49 @@ func (m *systrayModule) followMenu(open *trayMenu, it sni.Item, feed <-chan stru
 				return
 			}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
-		fresh, err := m.tray.MenuLayout(ctx, it)
-		cancel()
-		if err != nil {
-			log.Printf("systray: %s menu layout: %v", it.ID, err)
-			continue
+		m.reread(open, it)
+	}
+}
+
+// reread reads the open menu's layout again and shows it, unless
+// another menu replaced it meanwhile.
+func (m *systrayModule) reread(open *trayMenu, it sni.Item) {
+	ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
+	fresh, err := m.tray.MenuLayout(ctx, it)
+	cancel()
+	if err != nil {
+		log.Printf("systray: %s menu layout: %v", it.ID, err)
+		return
+	}
+	m.ctx.Invoke(func() {
+		if m.menu != open {
+			return
 		}
-		m.ctx.Invoke(func() {
-			if m.menu != open {
+		open.items = m.menuRows(it, fresh.Children)
+		if open.pop != nil {
+			open.pop.SetItems(open.items...)
+		}
+		m.bindAccels(it, fresh.Children)
+	})
+}
+
+// submenuOpener is a submenu row's OnOpen: AboutToShow for that
+// submenu, and the layout read again when the app asks for it.
+func (m *systrayModule) submenuOpener(it sni.Item, id int32) func() {
+	return func() {
+		open := m.menu
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
+			need, err := m.tray.SubmenuOpening(ctx, it, id)
+			cancel()
+			if err != nil {
+				log.Printf("systray: %s submenu %d: %v", it.ID, id, err)
 				return
 			}
-			open.items = m.menuRows(it, fresh.Children)
-			if open.pop != nil {
-				open.pop.SetItems(open.items...)
+			if need {
+				m.reread(open, it)
 			}
-			m.bindAccels(it, fresh.Children)
-		})
+		}()
 	}
 }
 
@@ -566,6 +599,7 @@ func (m *systrayModule) menuRows(it sni.Item, nodes []sni.MenuItem) []widget.Men
 		}
 		if len(n.Children) > 0 {
 			row.Items = m.menuRows(it, n.Children)
+			row.OnOpen = m.submenuOpener(it, n.ID)
 			rows = append(rows, row)
 			continue
 		}
