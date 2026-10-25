@@ -85,7 +85,7 @@ func TestLoadFileAppliesTreeman(t *testing.T) {
 	if got := c.Treeman.IconFailed; got != "tb-x-symbolic" {
 		t.Errorf("icon-failed = %q", got)
 	}
-	if got := c.Treeman.IconPreparing; got != "tb-loader-2-symbolic" {
+	if got := c.Treeman.IconPreparing; got != "ld-loader-circle-symbolic" {
 		t.Errorf("icon-preparing default changed: %q", got)
 	}
 

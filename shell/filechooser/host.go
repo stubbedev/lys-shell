@@ -457,15 +457,15 @@ func (c *Chooser) build(r request) {
 	// panel's drag handle.
 	th := widget.Current()
 	headerRow := widget.NewBox(widget.Row, th.Spacing/4, 0)
-	headerRow.Append(c.iconButton("go-up-symbolic", "Up", c.goUp), false)
+	headerRow.Append(c.iconButton("ld-arrow-up-symbolic", "Up", c.goUp), false)
 	if s.mode == ModeSave || s.mode.folders() {
-		headerRow.Append(c.iconButton("folder-new-symbolic", "Create Folder", c.showNewFolder), false)
+		headerRow.Append(c.iconButton("ld-folder-plus-symbolic", "Create Folder", c.showNewFolder), false)
 	}
 	headerRow.Append(widget.NewSpacer(0, 0), true)
 	u.viewToggle, u.viewIcon = c.swappableIconButton(viewIcon(c.view.grid), "Toggle grid view", c.toggleView)
-	u.previewToggle = c.iconToggle("view-paged-symbolic", "Preview pane", false, c.togglePreview)
-	u.hiddenTg = c.iconToggle("view-reveal-symbolic", "Show hidden files", c.hidden, c.toggleHidden)
-	u.recursiveToggle = c.iconToggle("folder-saved-search-symbolic", "Search subfolders", c.recursive, c.toggleRecursive)
+	u.previewToggle = c.iconToggle("ld-panel-right-symbolic", "Preview pane", false, c.togglePreview)
+	u.hiddenTg = c.iconToggle("ld-eye-symbolic", "Show hidden files", c.hidden, c.toggleHidden)
+	u.recursiveToggle = c.iconToggle("ld-folder-search-symbolic", "Search subfolders", c.recursive, c.toggleRecursive)
 	headerRow.Append(u.viewToggle, false)
 	for _, b := range []*widget.ToggleButton{u.previewToggle, u.hiddenTg, u.recursiveToggle} {
 		headerRow.Append(b, false)
@@ -625,9 +625,9 @@ func (c *Chooser) build(r request) {
 
 func viewIcon(grid bool) string {
 	if grid {
-		return "view-list-symbolic"
+		return "ld-list-symbolic"
 	}
-	return "view-grid-symbolic"
+	return "ld-layout-grid-symbolic"
 }
 
 // sidebar is Favorites (the user's places) and Locations (/ and the
@@ -650,10 +650,10 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	// Recent and Trash list files to open, never a folder to save in.
 	opening := c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple
 	if c.d.RecentFile != "" && opening {
-		favorites = append([]Place{{"Recent", recentLocation, "document-open-recent-symbolic"}}, favorites...)
+		favorites = append([]Place{{"Recent", recentLocation, "ld-history-symbolic"}}, favorites...)
 	}
 	if c.d.TrashDirs != nil && opening {
-		favorites = append(favorites, Place{"Trash", trashLocation, "user-trash-symbolic"})
+		favorites = append(favorites, Place{"Trash", trashLocation, "ld-trash-2-symbolic"})
 	}
 	section("Favorites", favorites)
 	u.locations = section("Locations", c.d.Locations())
@@ -857,9 +857,9 @@ func (c *Chooser) gridCell(e Entry) widget.Widget {
 // icon until one is ready, or for good when there is none.
 func (c *Chooser) entryIcon(e Entry, px int) widget.Widget {
 	if e.IsDir {
-		return widget.NewThemeIcon("folder-symbolic", px)
+		return widget.NewThemeIcon("ld-folder-symbolic", px)
 	}
-	return c.thumb(e.Path, px, widget.NewThemeIconFallback(c.d.MIME.GenericIcon(c.d.MIME.TypeByName(e.Name())), px))
+	return c.thumb(e.Path, px, widget.NewThemeIcon(c.d.MIME.FileIcon(c.d.MIME.TypeByName(e.Name())), px))
 }
 
 // thumb is a px square showing fallback until one of the bounded

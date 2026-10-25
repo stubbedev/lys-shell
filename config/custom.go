@@ -120,7 +120,7 @@ type CustomModuleDefinition struct {
 	// ## Example
 	//
 	// ```yaml
-	// icon-name: ld-temperature-symbolic
+	// icon-name: ld-thermometer-symbolic
 	// ```
 	IconName string `cfg:"icon-name,default"`
 	// Array of icon names indexed by percentage (0-100).
@@ -139,11 +139,10 @@ type CustomModuleDefinition struct {
 	//
 	// ```yaml
 	// icon-names:
-	//   - battery-empty-symbolic
-	//   - battery-caution-symbolic
-	//   - battery-low-symbolic
-	//   - battery-good-symbolic
-	//   - battery-full-symbolic
+	//   - ld-battery-symbolic
+	//   - ld-battery-low-symbolic
+	//   - ld-battery-medium-symbolic
+	//   - ld-battery-full-symbolic
 	// ```
 	IconNames *[]string `cfg:"icon-names,default"`
 	// Map of icon names keyed by the `alt` field value.
@@ -159,10 +158,10 @@ type CustomModuleDefinition struct {
 	// ```yaml
 	// # Volume with muted state override
 	// icon-names: [vol-0, vol-33, vol-66, vol-100]
-	// icon-map: {muted: audio-volume-muted-symbolic}
+	// icon-map: {muted: ld-volume-x-symbolic}
 	//
 	// # Output: {"percentage": 50, "alt": "muted"}
-	// # Result: Uses "audio-volume-muted-symbolic" (alt match beats percentage)
+	// # Result: Uses "ld-volume-x-symbolic" (alt match beats percentage)
 	//
 	// # Output: {"percentage": 50}
 	// # Result: Uses "vol-33" (percentage-based, no alt)
@@ -214,7 +213,7 @@ type CustomModuleDefinition struct {
 	// ## Example
 	//
 	// ```yaml
-	// icon-map: {muted: audio-volume-muted-symbolic}
+	// icon-map: {muted: ld-volume-x-symbolic}
 	// color-map:
 	//   muted: {icon-color: red}
 	//   default: {icon-color: green}

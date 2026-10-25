@@ -34,7 +34,7 @@ bar:
 | `app-icons-show` | bool | `false` | Show application icons for windows in each workspace. |
 | `app-icons-dedupe` | bool | `true` | Deduplicate application icons within a workspace. |
 | `app-icons-fallback` | string | `"ld-app-window-symbolic"` | Fallback icon for applications not matched by `app-icon-map`. |
-| `app-icons-empty` | string | `"tb-minus-symbolic"` | Icon shown for empty workspaces when `app-icons-show` is enabled. |
+| `app-icons-empty` | string | `"ld-minus-symbolic"` | Icon shown for empty workspaces when `app-icons-show` is enabled. |
 | `icon-gap` | [`Size`](/config/types#size) | `0.3` | Gap between app icons within a workspace button. |
 | `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `icon-size` | [`Size`](/config/types#size) | `1` | Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
@@ -266,7 +266,7 @@ modules:
     app-icons-show: false
     app-icons-dedupe: true
     app-icons-fallback: ld-app-window-symbolic
-    app-icons-empty: tb-minus-symbolic
+    app-icons-empty: ld-minus-symbolic
     icon-gap: 0.30000001192092896
     workspace-padding: 0.5
     icon-size: 1.0

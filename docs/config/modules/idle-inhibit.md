@@ -25,8 +25,8 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `startup-duration` | u32 | `60` | Duration in minutes when service starts. 0 means indefinite. |
-| `icon-inactive` | string | `"tb-coffee-off-symbolic"` | Icon when idle inhibitor is inactive. |
-| `icon-active` | string | `"tb-coffee-symbolic"` | Icon when idle inhibitor is active. |
+| `icon-inactive` | string | `"ld-bed-symbolic"` | Icon when idle inhibitor is inactive. |
+| `icon-active` | string | `"ld-coffee-symbolic"` | Icon when idle inhibitor is active. |
 | `format` | string | `"{{ state }}"` | Format string for the label. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
@@ -75,8 +75,8 @@ bar:
 modules:
   idle-inhibit:
     startup-duration: 60
-    icon-inactive: tb-coffee-off-symbolic
-    icon-active: tb-coffee-symbolic
+    icon-inactive: ld-bed-symbolic
+    icon-active: ld-coffee-symbolic
     format: '{{ state }}'
     border-show: false
     border-color: green

@@ -118,7 +118,7 @@ var showAccess = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string
 		Body:       "This is a preview of the generic access prompt.",
 		GrantLabel: "Allow",
 		DenyLabel:  "Deny",
-		Icon:       "dialog-password-symbolic",
+		Icon:       "ld-key-round-symbolic",
 	})
 	return verdict(granted, "granted", "denied"), "Access", "show access prompt", err
 })

@@ -417,7 +417,7 @@ func TestMediaDropdownPaintsFromTheStylesheet(t *testing.T) {
 
 // The picker's chrome is the Rust tree: the header is the ghost-icon
 // picker-back chain over the title, the rows scroll in a .picker-body,
-// and the active row checks with tb-check-symbolic while the others
+// and the active row checks with ld-check-symbolic while the others
 // carry none (source_item.rs:75, source_picker/mod.rs:36-65).
 func TestMediaPickerChrome(t *testing.T) {
 	source := newFakeMedia(
@@ -454,11 +454,11 @@ func TestMediaPickerChrome(t *testing.T) {
 	if body == nil {
 		t.Error("the rows do not scroll in a .picker-body")
 	}
-	// The active row checks with tb-check-symbolic (source_item.rs:75);
+	// The active row checks with ld-check-symbolic (source_item.rs:75);
 	// buttons hide their subtrees from the walks, so the view carries
 	// the icon.
-	if v.check == nil || v.check.Name() != "tb-check-symbolic" || !v.check.HasClass("media-source-option-check") {
-		t.Errorf("check icon = %v, want the tb-check-symbolic media-source-option-check", v.check)
+	if v.check == nil || v.check.Name() != "ld-check-symbolic" || !v.check.HasClass("media-source-option-check") {
+		t.Errorf("check icon = %v, want the ld-check-symbolic media-source-option-check", v.check)
 	}
 
 	// Negative: only the back button wears the ghost chrome — the

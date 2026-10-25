@@ -250,7 +250,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	c.time = widget.NewLabel(p.font, px, notifyui.TimeLabel(notifyui.RelativeTime(p.now(), n.Added), "notification-popup"), 0)
 	c.time.AddClass("notification-popup-time", css.Caption, css.DimLabel)
 	c.head.AddAction(c.time)
-	c.close = widget.NewButton(widget.NewThemeIcon("window-close-symbolic", cardGlyphPx), 0, 0)
+	c.close = widget.NewButton(widget.NewThemeIcon("ld-x-symbolic", cardGlyphPx), 0, 0)
 	c.close.AddClass("notification-popup-close", css.Ghost, css.Icon, css.Small)
 	id := n.ID
 	c.close.OnClick = func() { p.closeCard(id) }

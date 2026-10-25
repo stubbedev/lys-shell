@@ -210,7 +210,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := icon.Name(); got != "md-battery_android_frame_6-symbolic" {
+	if got := icon.Name(); got != "ld-battery-full-symbolic" {
 		t.Errorf("icon at 75%% = %q", got)
 	}
 	// Charging overrides the level list.

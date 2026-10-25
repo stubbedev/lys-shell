@@ -174,7 +174,7 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 			if header := h.headerFile(path, headerPx); header != nil {
 				picture.Append(header, false)
 			} else {
-				picture.Append(h.headerIcon("avatar-default-symbolic"), false)
+				picture.Append(h.headerIcon("ld-circle-user-round-symbolic"), false)
 			}
 		}
 		setImage(info.Image)
@@ -245,7 +245,7 @@ func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []s
 			}
 			answer(ok, s)
 		}
-		return h.confirm(allow, h.headerIcon("drive-removable-media-symbolic"), "Allow access to USB devices?",
+		return h.confirm(allow, h.headerIcon("ld-usb-symbolic"), "Allow access to USB devices?",
 			"The app can use the devices you leave checked until you revoke it.", "Deny", "Allow", rows...)
 	})
 	if !ok {
@@ -514,7 +514,7 @@ func (h *Dialogs) appRow(a desktopentry.App) widget.Widget {
 	row.SetMargin(render.Insets{Top: th.Padding, Right: th.Padding + th.Padding/2, Bottom: th.Padding, Left: th.Padding + th.Padding/2})
 	icon := h.icon(a.Icon(), appIconPx)
 	if icon == nil {
-		icon = widget.NewThemeIcon("application-x-executable-symbolic", appIconPx)
+		icon = widget.NewThemeIcon("ld-app-window-symbolic", appIconPx)
 	}
 	icon.AddClass("portal-dialog-app-icon")
 	row.Append(icon, false)

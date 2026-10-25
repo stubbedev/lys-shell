@@ -296,7 +296,7 @@ func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Bu
 func (v *treemanView) actions(path string) *widget.Box {
 	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	row.AddClass("treeman-actions")
-	row.Append(v.ghostIcon("tb-refresh-symbolic", i18n.T("dropdown-treeman-action-prepare"),
+	row.Append(v.ghostIcon("ld-refresh-cw-symbolic", i18n.T("dropdown-treeman-action-prepare"),
 		func() { v.run(treeman.ActionPrepare, path) }), false)
 	row.Append(v.ghostIcon("ld-rotate-ccw-symbolic", i18n.T("dropdown-treeman-action-reset"),
 		func() { v.confirmReset(path) }), false)
@@ -317,7 +317,7 @@ func (v *treemanView) run(action treeman.Action, path string) {
 		if err := src.RunAction(context.Background(), action, path); err != nil {
 			log.Printf("treeman: action failed: %v", err)
 			if v.ctx.Toast != nil {
-				v.ctx.Toast(i18n.T("dropdown-treeman-action-failed")+": "+err.Error(), "tb-alert-triangle-symbolic")
+				v.ctx.Toast(i18n.T("dropdown-treeman-action-failed")+": "+err.Error(), "ld-alert-triangle-symbolic")
 			}
 		}
 	}()

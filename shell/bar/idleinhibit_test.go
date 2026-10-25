@@ -46,7 +46,7 @@ func TestLoadFileAppliesIdleInhibit(t *testing.T) {
 	if got := c.IdleInhibit.Icons()[config.IdleInhibitActive].Name; got != "tb-eye-symbolic" {
 		t.Errorf("icon-active = %q", got)
 	}
-	if got := c.IdleInhibit.Icons()[config.IdleInhibitInactive].Name; got != "tb-coffee-off-symbolic" {
+	if got := c.IdleInhibit.Icons()[config.IdleInhibitInactive].Name; got != "ld-bed-symbolic" {
 		t.Errorf("icon-inactive default changed: %q", got)
 	}
 

@@ -175,7 +175,7 @@ func newNetTestView(t *testing.T, snap network.Snapshot, deps netDeps) (*network
 
 func TestNetworkDropdownWithoutWifi(t *testing.T) {
 	v, _, _ := newNetTestView(t, network.Snapshot{HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000, WiredIP4: "10.0.0.5"}, netDeps{})
-	if v.headerIcon.Name() != "cm-wired-symbolic" || v.wifiSwitch.Visible() || v.scanBtn.Visible() {
+	if v.headerIcon.Name() != "ld-ethernet-port-symbolic" || v.wifiSwitch.Visible() || v.scanBtn.Visible() {
 		t.Error("no wifi: want the wired icon, no switch, no scan")
 	}
 	if !v.noAdapter.Visible() || v.listCard.Visible() || v.availSection.Visible() {
@@ -201,7 +201,7 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	snap := network.Snapshot{WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "mine", WifiStrength: 90, WifiFrequency: 5180, WifiIP4: "192.168.1.9"}
 	v, src, pop := newNetTestView(t, snap, netDeps{wifiCtl: wifi})
 
-	if v.headerIcon.Name() != "tb-wifi-symbolic" || !v.wifiSwitch.On() || !v.scanBtn.Visible() {
+	if v.headerIcon.Name() != "ld-wifi-symbolic" || !v.wifiSwitch.On() || !v.scanBtn.Visible() {
 		t.Error("wifi header")
 	}
 	if got := len(v.cache); got != 2 {
@@ -269,7 +269,7 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	waitHeadless(t, "the failure", func() bool { return v.progress.err != "" })
 	settleNetReads(t, v)
 	onHeadlessLoop(func() bool {
-		if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "cm-wireless-disabled-symbolic" {
+		if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "ld-wifi-off-symbolic" {
 			t.Errorf("error card = %q badge %v", detail, v.active.badge.Visible())
 		}
 		v.active.hovered = true

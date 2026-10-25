@@ -91,7 +91,7 @@ type ClockConfig struct {
 func DefaultsClock() ClockConfig {
 	return ClockConfig{
 		Format:               "%a %b %d %I:%M %p",
-		IconName:             "tb-calendar-time-symbolic",
+		IconName:             "ld-calendar-clock-symbolic",
 		BorderShow:           false,
 		BorderColor:          mustColor("border-accent"),
 		IconShow:             true,

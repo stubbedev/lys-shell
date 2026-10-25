@@ -247,8 +247,8 @@ func findThumbnailer(mimeType string) (XDGThumbnailer, bool) {
 }
 
 // MimeIcon is the icon-theme name for a file with no thumbnail: its
-// mimetype's generic icon.
+// mimetype's file glyph.
 func MimeIcon(file string) string {
 	db := mime.System()
-	return db.GenericIcon(db.TypeByName(file))
+	return db.FileIcon(db.TypeByName(file))
 }

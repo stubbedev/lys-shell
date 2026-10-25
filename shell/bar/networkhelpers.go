@@ -7,6 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/network"
 )
@@ -23,19 +24,14 @@ type apSnapshot struct {
 	stale bool
 }
 
-// signalStrengthIcon is signal_strength_icon.
+// wifiSignalIcons are the dropdown's signal glyphs, weakest first: the
+// network module's default ladder.
+var wifiSignalIcons = config.DefaultsNetwork().WifiSignalIcons
+
+// signalStrengthIcon is the glyph for a signal percentage, on the
+// quarters the network module maps its icons onto.
 func signalStrengthIcon(strength uint8) string {
-	switch {
-	case strength < 20:
-		return "cm-wireless-signal-none-symbolic"
-	case strength < 40:
-		return "cm-wireless-signal-weak-symbolic"
-	case strength < 60:
-		return "cm-wireless-signal-ok-symbolic"
-	case strength < 80:
-		return "cm-wireless-signal-good-symbolic"
-	}
-	return "cm-wireless-signal-excellent-symbolic"
+	return wifiSignalIcons[network.SignalIndex(strength, len(wifiSignalIcons))]
 }
 
 // frequencyBand is frequency_to_band; "" when unknown.

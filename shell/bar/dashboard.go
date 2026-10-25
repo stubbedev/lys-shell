@@ -9,9 +9,9 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// dashboardFallbackIcon is the lys-shell glyph shown when no distro icon
+// dashboardFallbackIcon is the dashboard glyph shown when no distro icon
 // resolves (dashboard helpers.rs FALLBACK_ICON).
-const dashboardFallbackIcon = "cm-lys-shell-symbolic"
+const dashboardFallbackIcon = "ld-layout-dashboard-symbolic"
 
 // osReleasePaths are read in order; the first readable one wins.
 var osReleasePaths = []string{"/etc/os-release", "/usr/lib/os-release"}
@@ -98,7 +98,7 @@ var bundledDistroIcons = map[string]string{
 
 // dashboardIcon is helpers.rs build_icon: the override when set;
 // otherwise the bundled distro icon, the os-release LOGO, then
-// distributor-logo-<id>, each only when the theme has it; the lys-shell
+// distributor-logo-<id>, each only when the theme has it; the dashboard
 // glyph last.
 func dashboardIcon(override string, distro func() (distroInfo, bool), exists func(string) bool) string {
 	if override != "" {

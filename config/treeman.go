@@ -64,9 +64,9 @@ func DefaultsTreeman() TreemanConfig {
 	return TreemanConfig{
 		Format:          "{{ total }}",
 		IconName:        "ld-layers-symbolic",
-		IconPreparing:   "tb-loader-2-symbolic",
+		IconPreparing:   "ld-loader-circle-symbolic",
 		IconTearingDown: "ld-trash-2-symbolic",
-		IconFailed:      "tb-alert-triangle-symbolic",
+		IconFailed:      "ld-alert-triangle-symbolic",
 		HideIfEmpty:     false,
 		BorderShow:      false,
 		BorderColor:     mustColor("border-accent"),

@@ -102,7 +102,7 @@ func (f *FileBrowser) state() launcher.ModeState {
 	items := make([]launcher.Item, 0, len(entries)+1)
 	if parent := filepath.Dir(f.current); !f.cfg.Recursive && parent != f.current {
 		f.entries = append(f.entries, fileEntry{kind: entryParent, path: parent})
-		items = append(items, launcher.Item{Display: "..", MatchText: "..", Icon: launcher.IconName("folder-symbolic")})
+		items = append(items, launcher.Item{Display: "..", MatchText: "..", Icon: launcher.IconName("ld-folder-symbolic")})
 	}
 	for _, e := range entries {
 		items = append(items, entryItem(e, f.current, f.cfg.Recursive))
@@ -285,7 +285,7 @@ func entryItem(e listed, base string, recursive bool) launcher.Item {
 			name = rel
 		}
 	}
-	var icon launcher.Icon = launcher.IconName("folder-symbolic")
+	var icon launcher.Icon = launcher.IconName("ld-folder-symbolic")
 	if !e.isDir {
 		icon = launcher.IconThumbnail{Path: e.path, Fallback: launcher.MimeIcon(e.path)}
 	}

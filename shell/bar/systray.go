@@ -32,7 +32,7 @@ const (
 	// trayPixmapTarget is the size select_best_pixmap aims for.
 	trayPixmapTarget = 24
 	// trayFallbackIcon is the glyph for an item with no icon at all.
-	trayFallbackIcon = "application-x-executable-symbolic"
+	trayFallbackIcon = "ld-app-window-symbolic"
 	trayCallTimeout  = 5 * time.Second
 )
 

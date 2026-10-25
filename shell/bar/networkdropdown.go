@@ -165,12 +165,12 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "network-dropdown")
 
-	scanIcon := widget.NewThemeIcon("tb-refresh-symbolic", int(px))
+	scanIcon := widget.NewThemeIcon("ld-refresh-cw-symbolic", int(px))
 	v.scanBtn = dropdownButton(scanIcon, v.startScan, "network-scan-btn")
 	v.scanBtn.AddClass(css.Ghost, css.Icon)
 	v.wifiSwitch = widget.NewSwitch(false)
 	v.wifiSwitch.OnChanged = v.wifiToggled
-	header, icon, _ := dropdownHeaderParts(font, "tb-wifi-symbolic", i18n.T("dropdown-network-title"), v.scanBtn, v.wifiSwitch)
+	header, icon, _ := dropdownHeaderParts(font, "ld-wifi-symbolic", i18n.T("dropdown-network-title"), v.scanBtn, v.wifiSwitch)
 	v.headerIcon = icon
 
 	v.active = newNetActive(v)
@@ -192,9 +192,9 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.listCard.Append(dropdownScroll(v.list, "network-list-scroll"), true)
 	v.availSection = dropdownSection(sectionLabel(v.font, i18n.T("dropdown-network-available")), v.password, v.listCard)
 	browse.Append(v.availSection, true)
-	noNetworks := widgets.EmptyState(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
+	noNetworks := widgets.EmptyState(font, px, "ld-wifi-off-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
 	v.noNetworks = noNetworks
-	noAdapter := widgets.EmptyState(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
+	noAdapter := widgets.EmptyState(font, px, "ld-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
 	v.noAdapter = noAdapter
 	browse.AppendAligned(v.noNetworks, true, widget.AlignCenter)
 	browse.AppendAligned(v.noAdapter, true, widget.AlignCenter)
@@ -247,9 +247,9 @@ func (v *networkView) apply(s netState) {
 	v.cur = s
 	wifiAvail := v.wifi() != nil
 	if wifiAvail {
-		v.headerIcon.SetThemeName("tb-wifi-symbolic")
+		v.headerIcon.SetThemeName("ld-wifi-symbolic")
 	} else {
-		v.headerIcon.SetThemeName("cm-wired-symbolic")
+		v.headerIcon.SetThemeName("ld-ethernet-port-symbolic")
 	}
 	v.syncing = true
 	v.wifiSwitch.SetOn(s.snap.WifiEnabled)
@@ -564,7 +564,7 @@ func newNetActive(v *networkView) *netActive {
 	a.wired.SetSmall(true)
 	a.wired.SetEllipsize(true)
 	a.wired.AddClass("network-active", "ethernet")
-	a.wired.SetMedia(widget.NewThemeIcon("cm-wired-symbolic", itemIconPx), false)
+	a.wired.SetMedia(widget.NewThemeIcon("ld-ethernet-port-symbolic", itemIconPx), false)
 	a.wired.AddAction(v.statusLabel())
 	group.Append(a.wired)
 
@@ -662,7 +662,7 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 	if a.wifiErr {
 		// The row swaps wifi for error, it never wears both
 		// (active_connections/methods.rs:100-110).
-		a.wifiIcon.SetThemeName("cm-wireless-disabled-symbolic")
+		a.wifiIcon.SetThemeName("ld-wifi-off-symbolic")
 		a.wifi.RemoveClass("wifi")
 		a.wifi.AddClass("error")
 	} else {

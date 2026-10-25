@@ -851,7 +851,7 @@
       "properties": {
         "alert-icon": {
           "$ref": "#/$defs/string",
-          "default": "md-battery_android_alert-symbolic",
+          "default": "ld-battery-warning-symbolic",
           "description": "Icon shown when battery is not present or in an error state."
         },
         "border-color": {
@@ -871,7 +871,7 @@
         },
         "charging-icon": {
           "$ref": "#/$defs/string",
-          "default": "md-battery_android_frame_bolt-symbolic",
+          "default": "ld-battery-charging-symbolic",
           "description": "Icon shown when battery is charging."
         },
         "format": {
@@ -917,14 +917,10 @@
         "level-icons": {
           "$ref": "#/$defs/Array_of_string",
           "default": [
-            "md-battery_android_0-symbolic",
-            "md-battery_android_frame_1-symbolic",
-            "md-battery_android_frame_2-symbolic",
-            "md-battery_android_frame_3-symbolic",
-            "md-battery_android_frame_4-symbolic",
-            "md-battery_android_frame_5-symbolic",
-            "md-battery_android_frame_6-symbolic",
-            "md-battery_android_frame_full-symbolic"
+            "ld-battery-symbolic",
+            "ld-battery-low-symbolic",
+            "ld-battery-medium-symbolic",
+            "ld-battery-full-symbolic"
           ],
           "description": "Icons for battery levels from empty to full.\n\nThe percentage is divided evenly among icons. With 5 icons:\n0-20% uses icons\\[0\\], 21-40% uses icons\\[1\\], etc."
         },
@@ -1604,7 +1600,7 @@
         },
         "icon-name": {
           "$ref": "#/$defs/string",
-          "default": "tb-calendar-time-symbolic",
+          "default": "ld-calendar-clock-symbolic",
           "description": "Symbolic icon name."
         },
         "icon-show": {
@@ -1971,7 +1967,7 @@
             "$ref": "#/$defs/StateColors"
           },
           "default": null,
-          "description": "Map of per-state color overrides keyed by the `alt` field value.\n\nMirrors `icon-map`: the `alt` value from JSON output is looked up in\nthis map and the colors set for that state override the module's\nstatic colors, letting a single widget cycle its colors alongside its\nicon as its state changes. Use `\"default\"` as a fallback key. Any\ncolor left unset for the matched state falls back to the module's\nstatic color of the same name.\n\n## Example\n\n```yaml\nicon-map: {muted: audio-volume-muted-symbolic}\ncolor-map:\n  muted: {icon-color: red}\n  default: {icon-color: green}\n\n# Output: {\"percentage\": 50, \"alt\": \"muted\"}\n# Result: muted icon rendered in red\n```",
+          "description": "Map of per-state color overrides keyed by the `alt` field value.\n\nMirrors `icon-map`: the `alt` value from JSON output is looked up in\nthis map and the colors set for that state override the module's\nstatic colors, letting a single widget cycle its colors alongside its\nicon as its state changes. Use `\"default\"` as a fallback key. Any\ncolor left unset for the matched state falls back to the module's\nstatic color of the same name.\n\n## Example\n\n```yaml\nicon-map: {muted: ld-volume-x-symbolic}\ncolor-map:\n  muted: {icon-color: red}\n  default: {icon-color: green}\n\n# Output: {\"percentage\": 50, \"alt\": \"muted\"}\n# Result: muted icon rendered in red\n```",
           "type": [
             "object",
             "null"
@@ -2010,7 +2006,7 @@
             "type": "string"
           },
           "default": null,
-          "description": "Map of icon names keyed by the `alt` field value.\n\nRequires JSON output with an `alt` field. The `alt` value is looked up\nin this map. Use `\"default\"` as a fallback key.\n\n**Priority**: `icon-map[alt]` takes precedence over `icon-names[percentage]`,\nallowing state-specific icons to override percentage-based icons.\n\n## Example\n\n```yaml\n# Volume with muted state override\nicon-names: [vol-0, vol-33, vol-66, vol-100]\nicon-map: {muted: audio-volume-muted-symbolic}\n\n# Output: {\"percentage\": 50, \"alt\": \"muted\"}\n# Result: Uses \"audio-volume-muted-symbolic\" (alt match beats percentage)\n\n# Output: {\"percentage\": 50}\n# Result: Uses \"vol-33\" (percentage-based, no alt)\n```",
+          "description": "Map of icon names keyed by the `alt` field value.\n\nRequires JSON output with an `alt` field. The `alt` value is looked up\nin this map. Use `\"default\"` as a fallback key.\n\n**Priority**: `icon-map[alt]` takes precedence over `icon-names[percentage]`,\nallowing state-specific icons to override percentage-based icons.\n\n## Example\n\n```yaml\n# Volume with muted state override\nicon-names: [vol-0, vol-33, vol-66, vol-100]\nicon-map: {muted: ld-volume-x-symbolic}\n\n# Output: {\"percentage\": 50, \"alt\": \"muted\"}\n# Result: Uses \"ld-volume-x-symbolic\" (alt match beats percentage)\n\n# Output: {\"percentage\": 50}\n# Result: Uses \"vol-33\" (percentage-based, no alt)\n```",
           "type": [
             "object",
             "null"
@@ -2018,12 +2014,12 @@
         },
         "icon-name": {
           "default": "",
-          "description": "Static symbolic icon name.\n\nUsed when `icon-names` and `icon-map` don't provide a match.\nShould be a symbolic icon name from the icon theme (e.g., `\"ld-gpu-symbolic\"`).\n\n## Example\n\n```yaml\nicon-name: ld-temperature-symbolic\n```",
+          "description": "Static symbolic icon name.\n\nUsed when `icon-names` and `icon-map` don't provide a match.\nShould be a symbolic icon name from the icon theme (e.g., `\"ld-gpu-symbolic\"`).\n\n## Example\n\n```yaml\nicon-name: ld-thermometer-symbolic\n```",
           "type": "string"
         },
         "icon-names": {
           "default": null,
-          "description": "Array of icon names indexed by percentage (0-100).\n\nRequires JSON output with a `percentage` field (0-100).\nThe array is divided evenly across the percentage range.\n\n## Resolution\n\nFor N icons, icon at index `floor(percentage * N / 101)` is selected:\n\n- 4 icons: 0-24% → [0], 25-49% → [1], 50-74% → [2], 75-100% → [3]\n- 5 icons: 0-19% → [0], 20-39% → [1], 40-59% → [2], 60-79% → [3], 80-100% → [4]\n\n## Example\n\n```yaml\nicon-names:\n  - battery-empty-symbolic\n  - battery-caution-symbolic\n  - battery-low-symbolic\n  - battery-good-symbolic\n  - battery-full-symbolic\n```",
+          "description": "Array of icon names indexed by percentage (0-100).\n\nRequires JSON output with a `percentage` field (0-100).\nThe array is divided evenly across the percentage range.\n\n## Resolution\n\nFor N icons, icon at index `floor(percentage * N / 101)` is selected:\n\n- 4 icons: 0-24% → [0], 25-49% → [1], 50-74% → [2], 75-100% → [3]\n- 5 icons: 0-19% → [0], 20-39% → [1], 40-59% → [2], 60-79% → [3], 80-100% → [4]\n\n## Example\n\n```yaml\nicon-names:\n  - ld-battery-symbolic\n  - ld-battery-low-symbolic\n  - ld-battery-medium-symbolic\n  - ld-battery-full-symbolic\n```",
           "items": {
             "type": "string"
           },
@@ -2652,7 +2648,7 @@
         },
         "app-icons-empty": {
           "$ref": "#/$defs/string",
-          "default": "tb-minus-symbolic",
+          "default": "ld-minus-symbolic",
           "description": "Icon shown for empty workspaces when `app-icons-show` is enabled.\n\nWhen a workspace has no windows but is displayed (via `min-workspace-count`),\nthis icon appears as a placeholder."
         },
         "app-icons-fallback": {
@@ -2974,7 +2970,7 @@
         },
         "icon-active": {
           "$ref": "#/$defs/string",
-          "default": "tb-coffee-symbolic",
+          "default": "ld-coffee-symbolic",
           "description": "Icon when idle inhibitor is active."
         },
         "icon-bg-color": {
@@ -2989,7 +2985,7 @@
         },
         "icon-inactive": {
           "$ref": "#/$defs/string",
-          "default": "tb-coffee-off-symbolic",
+          "default": "ld-bed-symbolic",
           "description": "Icon when idle inhibitor is inactive."
         },
         "icon-show": {
@@ -4267,7 +4263,7 @@
         },
         "app-icons-empty": {
           "$ref": "#/$defs/string",
-          "default": "tb-minus-symbolic",
+          "default": "ld-minus-symbolic",
           "description": "Icon shown when a tag has no clients."
         },
         "app-icons-fallback": {
@@ -4696,11 +4692,11 @@
         "battery": {
           "$ref": "#/$defs/BatteryConfig",
           "default": {
-            "alert-icon": "md-battery_android_alert-symbolic",
+            "alert-icon": "ld-battery-warning-symbolic",
             "border-color": "yellow",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
-            "charging-icon": "md-battery_android_frame_bolt-symbolic",
+            "charging-icon": "ld-battery-charging-symbolic",
             "format": "{{ percent }}%",
             "icon-bg-color": "yellow",
             "icon-color": "auto",
@@ -4710,14 +4706,10 @@
             "label-show": true,
             "left-click": "dropdown:battery",
             "level-icons": [
-              "md-battery_android_0-symbolic",
-              "md-battery_android_frame_1-symbolic",
-              "md-battery_android_frame_2-symbolic",
-              "md-battery_android_frame_3-symbolic",
-              "md-battery_android_frame_4-symbolic",
-              "md-battery_android_frame_5-symbolic",
-              "md-battery_android_frame_6-symbolic",
-              "md-battery_android_frame_full-symbolic"
+              "ld-battery-symbolic",
+              "ld-battery-low-symbolic",
+              "ld-battery-medium-symbolic",
+              "ld-battery-full-symbolic"
             ],
             "middle-click": "",
             "right-click": "",
@@ -4850,7 +4842,7 @@
             "format": "%a %b %d %I:%M %p",
             "icon-bg-color": "accent",
             "icon-color": "auto",
-            "icon-name": "tb-calendar-time-symbolic",
+            "icon-name": "ld-calendar-clock-symbolic",
             "icon-show": true,
             "label-color": "accent",
             "label-max-length": 0,
@@ -4935,7 +4927,7 @@
             "active-on-other-monitor-color": "accent",
             "app-icon-map": {},
             "app-icons-dedupe": true,
-            "app-icons-empty": "tb-minus-symbolic",
+            "app-icons-empty": "ld-minus-symbolic",
             "app-icons-fallback": "ld-app-window-symbolic",
             "app-icons-show": false,
             "border-color": "border-default",
@@ -5002,10 +4994,10 @@
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
             "format": "{{ state }}",
-            "icon-active": "tb-coffee-symbolic",
+            "icon-active": "ld-coffee-symbolic",
             "icon-bg-color": "green",
             "icon-color": "auto",
-            "icon-inactive": "tb-coffee-off-symbolic",
+            "icon-inactive": "ld-bed-symbolic",
             "icon-show": true,
             "label-color": "green",
             "label-max-length": 0,
@@ -5100,7 +5092,7 @@
             "active-indicator": "background",
             "app-icon-map": {},
             "app-icons-dedupe": true,
-            "app-icons-empty": "tb-minus-symbolic",
+            "app-icons-empty": "ld-minus-symbolic",
             "app-icons-fallback": "ld-app-window-symbolic",
             "app-icons-show": false,
             "border-color": "border-default",
@@ -5222,19 +5214,19 @@
             "vpn-connecting-icon": "ld-refresh-cw-symbolic",
             "vpn-disconnected-icon": "ld-unplug-symbolic",
             "vpn-show": "auto",
-            "wifi-acquiring-icon": "cm-wireless-acquiring-symbolic",
-            "wifi-connected-icon": "cm-wireless-connected-symbolic",
-            "wifi-disabled-icon": "cm-wireless-disabled-symbolic",
-            "wifi-offline-icon": "cm-wireless-offline-symbolic",
+            "wifi-acquiring-icon": "ld-wifi-sync-symbolic",
+            "wifi-connected-icon": "ld-wifi-symbolic",
+            "wifi-disabled-icon": "ld-wifi-off-symbolic",
+            "wifi-offline-icon": "ld-wifi-zero-symbolic",
             "wifi-signal-icons": [
-              "cm-wireless-signal-weak-symbolic",
-              "cm-wireless-signal-ok-symbolic",
-              "cm-wireless-signal-good-symbolic",
-              "cm-wireless-signal-excellent-symbolic"
+              "ld-wifi-zero-symbolic",
+              "ld-wifi-low-symbolic",
+              "ld-wifi-high-symbolic",
+              "ld-wifi-symbolic"
             ],
-            "wired-acquiring-icon": "cm-wired-acquiring-symbolic",
-            "wired-connected-icon": "cm-wired-symbolic",
-            "wired-disconnected-icon": "cm-wired-disconnected-symbolic"
+            "wired-acquiring-icon": "ld-loader-circle-symbolic",
+            "wired-connected-icon": "ld-ethernet-port-symbolic",
+            "wired-disconnected-icon": "ld-unplug-symbolic"
           },
           "description": "Network connection module."
         },
@@ -5245,7 +5237,7 @@
             "active-indicator": "background",
             "app-icon-map": {},
             "app-icons-dedupe": true,
-            "app-icons-empty": "tb-minus-symbolic",
+            "app-icons-empty": "ld-minus-symbolic",
             "app-icons-fallback": "ld-app-window-symbolic",
             "app-icons-show": false,
             "border-color": "border-default",
@@ -5495,7 +5487,7 @@
             "active-indicator": "background",
             "app-icon-map": {},
             "app-icons-dedupe": true,
-            "app-icons-empty": "tb-minus-symbolic",
+            "app-icons-empty": "ld-minus-symbolic",
             "app-icons-fallback": "ld-app-window-symbolic",
             "app-icons-show": false,
             "border-color": "border-default",
@@ -5548,9 +5540,9 @@
             "hide-if-empty": false,
             "icon-bg-color": "accent",
             "icon-color": "auto",
-            "icon-failed": "tb-alert-triangle-symbolic",
+            "icon-failed": "ld-alert-triangle-symbolic",
             "icon-name": "ld-layers-symbolic",
-            "icon-preparing": "tb-loader-2-symbolic",
+            "icon-preparing": "ld-loader-circle-symbolic",
             "icon-show": true,
             "icon-tearing-down": "ld-trash-2-symbolic",
             "label-color": "accent",
@@ -5884,47 +5876,47 @@
         },
         "wifi-acquiring-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wireless-acquiring-symbolic",
+          "default": "ld-wifi-sync-symbolic",
           "description": "WiFi icon when connecting."
         },
         "wifi-connected-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wireless-connected-symbolic",
+          "default": "ld-wifi-symbolic",
           "description": "WiFi icon when connected but signal strength unavailable."
         },
         "wifi-disabled-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wireless-disabled-symbolic",
+          "default": "ld-wifi-off-symbolic",
           "description": "WiFi icon when disabled."
         },
         "wifi-offline-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wireless-offline-symbolic",
+          "default": "ld-wifi-zero-symbolic",
           "description": "WiFi icon when disconnected."
         },
         "wifi-signal-icons": {
           "$ref": "#/$defs/Array_of_string",
           "default": [
-            "cm-wireless-signal-weak-symbolic",
-            "cm-wireless-signal-ok-symbolic",
-            "cm-wireless-signal-good-symbolic",
-            "cm-wireless-signal-excellent-symbolic"
+            "ld-wifi-zero-symbolic",
+            "ld-wifi-low-symbolic",
+            "ld-wifi-high-symbolic",
+            "ld-wifi-symbolic"
           ],
           "description": "WiFi signal strength icons from weak to excellent.\n\nThe signal percentage maps to icons: 0-25% uses icons\\[0\\], 26-50% uses\nicons\\[1\\], etc."
         },
         "wired-acquiring-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wired-acquiring-symbolic",
+          "default": "ld-loader-circle-symbolic",
           "description": "Wired icon when connecting."
         },
         "wired-connected-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wired-symbolic",
+          "default": "ld-ethernet-port-symbolic",
           "description": "Wired icon when connected."
         },
         "wired-disconnected-icon": {
           "$ref": "#/$defs/string",
-          "default": "cm-wired-disconnected-symbolic",
+          "default": "ld-unplug-symbolic",
           "description": "Wired icon when disconnected."
         }
       },
@@ -5955,7 +5947,7 @@
         },
         "app-icons-empty": {
           "$ref": "#/$defs/string",
-          "default": "tb-minus-symbolic",
+          "default": "ld-minus-symbolic",
           "description": "Icon shown when a workspace has no application windows."
         },
         "app-icons-fallback": {
@@ -7830,7 +7822,7 @@
         },
         "app-icons-empty": {
           "$ref": "#/$defs/string",
-          "default": "tb-minus-symbolic",
+          "default": "ld-minus-symbolic",
           "description": "Icon shown when a workspace has no application windows."
         },
         "app-icons-fallback": {
@@ -8246,7 +8238,7 @@
         },
         "icon-failed": {
           "$ref": "#/$defs/string",
-          "default": "tb-alert-triangle-symbolic",
+          "default": "ld-alert-triangle-symbolic",
           "description": "Icon shown when any worktree's last finalize errored."
         },
         "icon-name": {
@@ -8256,7 +8248,7 @@
         },
         "icon-preparing": {
           "$ref": "#/$defs/string",
-          "default": "tb-loader-2-symbolic",
+          "default": "ld-loader-circle-symbolic",
           "description": "Icon shown while any worktree is being prepared."
         },
         "icon-show": {
@@ -9506,11 +9498,11 @@
       "$ref": "#/$defs/ModulesConfig",
       "default": {
         "battery": {
-          "alert-icon": "md-battery_android_alert-symbolic",
+          "alert-icon": "ld-battery-warning-symbolic",
           "border-color": "yellow",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
-          "charging-icon": "md-battery_android_frame_bolt-symbolic",
+          "charging-icon": "ld-battery-charging-symbolic",
           "format": "{{ percent }}%",
           "icon-bg-color": "yellow",
           "icon-color": "auto",
@@ -9520,14 +9512,10 @@
           "label-show": true,
           "left-click": "dropdown:battery",
           "level-icons": [
-            "md-battery_android_0-symbolic",
-            "md-battery_android_frame_1-symbolic",
-            "md-battery_android_frame_2-symbolic",
-            "md-battery_android_frame_3-symbolic",
-            "md-battery_android_frame_4-symbolic",
-            "md-battery_android_frame_5-symbolic",
-            "md-battery_android_frame_6-symbolic",
-            "md-battery_android_frame_full-symbolic"
+            "ld-battery-symbolic",
+            "ld-battery-low-symbolic",
+            "ld-battery-medium-symbolic",
+            "ld-battery-full-symbolic"
           ],
           "middle-click": "",
           "right-click": "",
@@ -9640,7 +9628,7 @@
           "format": "%a %b %d %I:%M %p",
           "icon-bg-color": "accent",
           "icon-color": "auto",
-          "icon-name": "tb-calendar-time-symbolic",
+          "icon-name": "ld-calendar-clock-symbolic",
           "icon-show": true,
           "label-color": "accent",
           "label-max-length": 0,
@@ -9709,7 +9697,7 @@
           "active-on-other-monitor-color": "accent",
           "app-icon-map": {},
           "app-icons-dedupe": true,
-          "app-icons-empty": "tb-minus-symbolic",
+          "app-icons-empty": "ld-minus-symbolic",
           "app-icons-fallback": "ld-app-window-symbolic",
           "app-icons-show": false,
           "border-color": "border-default",
@@ -9768,10 +9756,10 @@
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
           "format": "{{ state }}",
-          "icon-active": "tb-coffee-symbolic",
+          "icon-active": "ld-coffee-symbolic",
           "icon-bg-color": "green",
           "icon-color": "auto",
-          "icon-inactive": "tb-coffee-off-symbolic",
+          "icon-inactive": "ld-bed-symbolic",
           "icon-show": true,
           "label-color": "green",
           "label-max-length": 0,
@@ -9850,7 +9838,7 @@
           "active-indicator": "background",
           "app-icon-map": {},
           "app-icons-dedupe": true,
-          "app-icons-empty": "tb-minus-symbolic",
+          "app-icons-empty": "ld-minus-symbolic",
           "app-icons-fallback": "ld-app-window-symbolic",
           "app-icons-show": false,
           "border-color": "border-default",
@@ -9956,26 +9944,26 @@
           "vpn-connecting-icon": "ld-refresh-cw-symbolic",
           "vpn-disconnected-icon": "ld-unplug-symbolic",
           "vpn-show": "auto",
-          "wifi-acquiring-icon": "cm-wireless-acquiring-symbolic",
-          "wifi-connected-icon": "cm-wireless-connected-symbolic",
-          "wifi-disabled-icon": "cm-wireless-disabled-symbolic",
-          "wifi-offline-icon": "cm-wireless-offline-symbolic",
+          "wifi-acquiring-icon": "ld-wifi-sync-symbolic",
+          "wifi-connected-icon": "ld-wifi-symbolic",
+          "wifi-disabled-icon": "ld-wifi-off-symbolic",
+          "wifi-offline-icon": "ld-wifi-zero-symbolic",
           "wifi-signal-icons": [
-            "cm-wireless-signal-weak-symbolic",
-            "cm-wireless-signal-ok-symbolic",
-            "cm-wireless-signal-good-symbolic",
-            "cm-wireless-signal-excellent-symbolic"
+            "ld-wifi-zero-symbolic",
+            "ld-wifi-low-symbolic",
+            "ld-wifi-high-symbolic",
+            "ld-wifi-symbolic"
           ],
-          "wired-acquiring-icon": "cm-wired-acquiring-symbolic",
-          "wired-connected-icon": "cm-wired-symbolic",
-          "wired-disconnected-icon": "cm-wired-disconnected-symbolic"
+          "wired-acquiring-icon": "ld-loader-circle-symbolic",
+          "wired-connected-icon": "ld-ethernet-port-symbolic",
+          "wired-disconnected-icon": "ld-unplug-symbolic"
         },
         "niri-workspaces": {
           "active-color": "accent",
           "active-indicator": "background",
           "app-icon-map": {},
           "app-icons-dedupe": true,
-          "app-icons-empty": "tb-minus-symbolic",
+          "app-icons-empty": "ld-minus-symbolic",
           "app-icons-fallback": "ld-app-window-symbolic",
           "app-icons-show": false,
           "border-color": "border-default",
@@ -10189,7 +10177,7 @@
           "active-indicator": "background",
           "app-icon-map": {},
           "app-icons-dedupe": true,
-          "app-icons-empty": "tb-minus-symbolic",
+          "app-icons-empty": "ld-minus-symbolic",
           "app-icons-fallback": "ld-app-window-symbolic",
           "app-icons-show": false,
           "border-color": "border-default",
@@ -10234,9 +10222,9 @@
           "hide-if-empty": false,
           "icon-bg-color": "accent",
           "icon-color": "auto",
-          "icon-failed": "tb-alert-triangle-symbolic",
+          "icon-failed": "ld-alert-triangle-symbolic",
           "icon-name": "ld-layers-symbolic",
-          "icon-preparing": "tb-loader-2-symbolic",
+          "icon-preparing": "ld-loader-circle-symbolic",
           "icon-show": true,
           "icon-tearing-down": "ld-trash-2-symbolic",
           "label-color": "accent",

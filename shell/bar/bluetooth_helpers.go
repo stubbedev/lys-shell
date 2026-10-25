@@ -9,6 +9,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
@@ -127,7 +128,7 @@ func avIcon(minor uint32) string {
 	case 0x05, 0x07, 0x08, 0x0A:
 		return "ld-speaker-symbolic"
 	case 0x09, 0x0B:
-		return "tb-device-tv-symbolic"
+		return "ld-tv-symbolic"
 	case 0x0C, 0x0D:
 		return "ld-camera-symbolic"
 	case 0x0E, 0x0F, 0x10:
@@ -154,19 +155,14 @@ func peripheralIcon(minor uint32) string {
 	return "ld-bluetooth-symbolic"
 }
 
-// batteryLevelIcon is battery_level_icon.
+// batteryLevelIcons are a device battery's glyphs, emptiest first: the
+// battery module's default ladder.
+var batteryLevelIcons = config.DefaultsBattery().LevelIcons
+
+// batteryLevelIcon is the glyph for a device's battery percentage, on
+// the steps the battery module maps its icons onto.
 func batteryLevelIcon(percent uint8) string {
-	switch {
-	case percent <= 5:
-		return "tb-battery-vertical-symbolic"
-	case percent <= 25:
-		return "tb-battery-vertical-1-symbolic"
-	case percent <= 50:
-		return "tb-battery-vertical-2-symbolic"
-	case percent <= 75:
-		return "tb-battery-vertical-3-symbolic"
-	}
-	return "tb-battery-vertical-4-symbolic"
+	return batteryLevelIcons[levelIndexFloor(float64(percent), len(batteryLevelIcons))]
 }
 
 // deviceTypeKey is device_type_key: the Fluent key naming the device's

@@ -186,16 +186,56 @@ func (db *Database) TypeByName(path string) string {
 	return best.mime
 }
 
-// GenericIcon names the generic icon for a mimetype: the database's
+// fileGlyphs maps the freedesktop generic icons shared-mime-info names
+// onto lys-shell's Lucide file glyphs.
+var fileGlyphs = map[string]string{
+	"application-x-addon":      "ld-file-box-symbolic",
+	"application-x-executable": "ld-file-terminal-symbolic",
+	"audio-x-generic":          "ld-file-music-symbolic",
+	"emblem-mail":              "ld-mail-symbolic",
+	"emblem-symbolic-link":     "ld-file-symlink-symbolic",
+	"folder":                   "ld-folder-symbolic",
+	"font-x-generic":           "ld-file-type-symbolic",
+	"image-x-generic":          "ld-file-image-symbolic",
+	"media-floppy":             "ld-save-symbolic",
+	"media-optical":            "ld-disc-3-symbolic",
+	"package-x-generic":        "ld-file-archive-symbolic",
+	"security-high":            "ld-file-key-symbolic",
+	"text-html":                "ld-file-code-symbolic",
+	"text-x-generic":           "ld-file-text-symbolic",
+	"text-x-generic-template":  "ld-file-text-symbolic",
+	"text-x-script":            "ld-file-code-symbolic",
+	"user-home":                "ld-house-symbolic",
+	"video-x-generic":          "ld-file-play-symbolic",
+	"x-office-address-book":    "ld-file-user-symbolic",
+	"x-office-calendar":        "ld-calendar-symbolic",
+	"x-office-document":        "ld-file-text-symbolic",
+	"x-office-presentation":    "ld-presentation-symbolic",
+	"x-office-spreadsheet":     "ld-file-spreadsheet-symbolic",
+}
+
+// plainFileGlyph is the file glyph for a generic icon fileGlyphs lacks.
+const plainFileGlyph = "ld-file-symbolic"
+
+// FileIcon names the Lucide glyph for a file of mimeType: the glyph of
+// its generic icon, the plain file for a generic icon without one.
+func (db *Database) FileIcon(mimeType string) string {
+	if glyph, ok := fileGlyphs[db.genericIcon(mimeType)]; ok {
+		return glyph
+	}
+	return plainFileGlyph
+}
+
+// genericIcon names the generic icon for a mimetype: the database's
 // generic-icons entry, else `<media>-x-generic` (image-x-generic,
-// text-x-generic), which is gio's rule.
-func (db *Database) GenericIcon(mimeType string) string {
+// text-x-generic), which is gio's rule; empty for a malformed type.
+func (db *Database) genericIcon(mimeType string) string {
 	if icon, ok := db.icons[mimeType]; ok {
 		return icon
 	}
 	media, _, ok := strings.Cut(mimeType, "/")
 	if !ok || media == "" {
-		return "text-x-generic-symbolic"
+		return ""
 	}
 	return media + "-x-generic"
 }

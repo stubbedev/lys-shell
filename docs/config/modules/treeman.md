@@ -24,9 +24,9 @@ bar:
 |---|---|---|---|
 | `format` | string | `"{{ total }}"` | Format string for the label. |
 | `icon-name` | string | `"ld-layers-symbolic"` | Module icon (shown when every worktree is resting-ready). |
-| `icon-preparing` | string | `"tb-loader-2-symbolic"` | Icon shown while any worktree is being prepared. |
+| `icon-preparing` | string | `"ld-loader-circle-symbolic"` | Icon shown while any worktree is being prepared. |
 | `icon-tearing-down` | string | `"ld-trash-2-symbolic"` | Icon shown while any worktree is being torn down. |
-| `icon-failed` | string | `"tb-alert-triangle-symbolic"` | Icon shown when any worktree's last finalize errored. |
+| `icon-failed` | string | `"ld-alert-triangle-symbolic"` | Icon shown when any worktree's last finalize errored. |
 | `hide-if-empty` | bool | `false` | Collapse the module entirely when there are no active worktrees. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
@@ -77,9 +77,9 @@ modules:
   treeman:
     format: '{{ total }}'
     icon-name: ld-layers-symbolic
-    icon-preparing: tb-loader-2-symbolic
+    icon-preparing: ld-loader-circle-symbolic
     icon-tearing-down: ld-trash-2-symbolic
-    icon-failed: tb-alert-triangle-symbolic
+    icon-failed: ld-alert-triangle-symbolic
     hide-if-empty: false
     border-show: false
     border-color: border-accent

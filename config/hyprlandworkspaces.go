@@ -266,7 +266,7 @@ func DefaultsHyprlandWorkspaces() HyprlandWorkspacesConfig {
 		AppIconsShow:                  false,
 		AppIconsDedupe:                true,
 		AppIconsFallback:              "ld-app-window-symbolic",
-		AppIconsEmpty:                 "tb-minus-symbolic",
+		AppIconsEmpty:                 "ld-minus-symbolic",
 		IconGap:                       Size{Value: 0.3, Unit: SizeMultiplier},
 		WorkspacePadding:              Size{Value: 0.5, Unit: SizeMultiplier},
 		IconSize:                      Size{Value: 1, Unit: SizeMultiplier},

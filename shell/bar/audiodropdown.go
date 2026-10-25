@@ -113,54 +113,54 @@ func appDisplayName(applicationName, streamName string) string {
 func outputDeviceIcon(name, description string, props map[string]string) string {
 	switch props[paFormFactor] {
 	case "internal", "speaker", "hifi":
-		return "tb-device-speaker-symbolic"
+		return "ld-speaker-symbolic"
 	case "headphone":
-		return "tb-headphones-symbolic"
+		return "ld-headphones-symbolic"
 	case "headset":
-		return "tb-headset-symbolic"
+		return "ld-headset-symbolic"
 	case "phone":
-		return "tb-device-mobile-symbolic"
+		return "ld-smartphone-symbolic"
 	case "portable":
-		return "tb-radio-symbolic"
+		return "ld-radio-symbolic"
 	case "car":
-		return "tb-car-symbolic"
+		return "ld-car-symbolic"
 	case "computer":
-		return "tb-device-desktop-symbolic"
+		return "ld-monitor-symbolic"
 	}
 	haystack := strings.ToLower(name + " " + description)
 	switch {
 	case strings.Contains(haystack, "hdmi"), strings.Contains(haystack, "displayport"), strings.Contains(haystack, "monitor"):
-		return "tb-device-tv-symbolic"
+		return "ld-tv-symbolic"
 	case strings.Contains(haystack, "headset"), strings.Contains(haystack, "airpods"):
-		return "tb-headset-symbolic"
+		return "ld-headset-symbolic"
 	case strings.Contains(haystack, "headphone"), strings.Contains(haystack, "bluetooth"):
-		return "tb-headphones-symbolic"
+		return "ld-headphones-symbolic"
 	}
-	return "tb-device-speaker-symbolic"
+	return "ld-speaker-symbolic"
 }
 
 // inputDeviceIcon is input_device_icon.
 func inputDeviceIcon(name, description string, props map[string]string) string {
 	switch props[paFormFactor] {
 	case "internal", "microphone":
-		return "tb-microphone-symbolic"
+		return "ld-mic-symbolic"
 	case "headset":
-		return "tb-headset-symbolic"
+		return "ld-headset-symbolic"
 	case "webcam":
-		return "tb-device-computer-camera-symbolic"
+		return "ld-webcam-symbolic"
 	case "phone":
-		return "tb-device-mobile-symbolic"
+		return "ld-smartphone-symbolic"
 	}
 	haystack := strings.ToLower(name + " " + description)
 	switch {
 	case strings.Contains(haystack, "headset"), strings.Contains(haystack, "airpods"):
-		return "tb-headset-symbolic"
+		return "ld-headset-symbolic"
 	case strings.Contains(haystack, "bluetooth"):
-		return "tb-headphones-symbolic"
+		return "ld-headphones-symbolic"
 	case strings.Contains(haystack, "webcam"), strings.Contains(haystack, "camera"):
-		return "tb-device-computer-camera-symbolic"
+		return "ld-webcam-symbolic"
 	}
-	return "tb-microphone-symbolic"
+	return "ld-mic-symbolic"
 }
 
 // activePortDescription is active_port_description; "" when the device
@@ -404,7 +404,7 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 	s.noDevice = widget.NewItem(v.font, i18n.T("dropdown-audio-no-device"), title)
 	s.noDevice.SetSmall(true)
 	s.noDevice.AddClass("audio-no-device")
-	s.noDevice.SetMedia(widget.NewThemeIcon("tb-alert-triangle-symbolic", itemIconPx), false)
+	s.noDevice.SetMedia(widget.NewThemeIcon("ld-alert-triangle-symbolic", itemIconPx), false)
 	s.Append(s.noDevice, false)
 	return s
 }
@@ -706,7 +706,7 @@ func (p *devicePicker) row(d audioDevice, active bool) *widget.Item {
 	it.SetMedia(widget.NewThemeIcon(d.icon, itemIconPx), false)
 	if active {
 		it.AddClass("selected")
-		check := widget.NewThemeIcon("tb-check-symbolic", itemIconPx)
+		check := widget.NewThemeIcon("ld-check-symbolic", itemIconPx)
 		check.AddClass("audio-device-option-check")
 		it.AddAction(check)
 	}

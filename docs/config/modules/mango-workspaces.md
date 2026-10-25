@@ -29,7 +29,7 @@ bar:
 | `app-icons-show` | bool | `false` | Show an application icon per client on each tag. |
 | `app-icons-dedupe` | bool | `true` | Collapse clients that share an application to a single icon. |
 | `app-icons-fallback` | string | `"ld-app-window-symbolic"` | Icon for clients not matched by `app-icon-map`. |
-| `app-icons-empty` | string | `"tb-minus-symbolic"` | Icon shown when a tag has no clients. |
+| `app-icons-empty` | string | `"ld-minus-symbolic"` | Icon shown when a tag has no clients. |
 | `urgent-show` | bool | `true` | Highlight tags whose clients requested attention. |
 | `urgent-mode` | [`UrgentMode`](/config/types#urgent-mode) | `"workspace"` | Whether urgency is tracked per tag or per application. |
 | `active-indicator` | [`ActiveIndicator`](/config/types#active-indicator) | `"background"` | How the active tag is marked. |
@@ -106,7 +106,7 @@ modules:
     app-icons-show: false
     app-icons-dedupe: true
     app-icons-fallback: ld-app-window-symbolic
-    app-icons-empty: tb-minus-symbolic
+    app-icons-empty: ld-minus-symbolic
     urgent-show: true
     urgent-mode: workspace
     active-indicator: background

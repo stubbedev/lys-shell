@@ -5,12 +5,12 @@ package config
 // matching the window class wins, after the user's icon-mappings.
 var WindowTitleBuiltinIcons = []IconMapping{
 	{"*brave*", "si-brave-symbolic"},
-	{"*chromium*", "tb-brand-chrome-symbolic"},
+	{"*chromium*", "si-googlechrome-symbolic"},
 	{"*firefox*", "si-firefox-symbolic"},
 	{"*floorp*", "si-floorp-symbolic"},
 	{"*google-chrome*", "si-googlechrome-symbolic"},
 	{"*librewolf*", "si-librewolf-symbolic"},
-	{"*microsoft-edge*", "tb-brand-edge-symbolic"},
+	{"*microsoft-edge*", "ld-globe-symbolic"},
 	{"*opera*", "si-opera-symbolic"},
 	{"*thorium*", "si-googlechrome-symbolic"},
 	{"*tor*", "si-torbrowser-symbolic"},
@@ -26,7 +26,7 @@ var WindowTitleBuiltinIcons = []IconMapping{
 	{"*konsole*", "ld-terminal-symbolic"},
 	{"*wezterm*", "si-wezterm-symbolic"},
 	{"*xterm*", "ld-terminal-symbolic"},
-	{"*code*", "tb-brand-vscode-symbolic"},
+	{"*code*", "ld-code-symbolic"},
 	{"*emacs*", "si-gnuemacs-symbolic"},
 	{"*jetbrains*", "si-jetbrains-symbolic"},
 	{"*neovide*", "si-neovim-symbolic"},

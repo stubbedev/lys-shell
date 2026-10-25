@@ -60,8 +60,8 @@ type IdleInhibitConfig struct {
 func DefaultsIdleInhibit() IdleInhibitConfig {
 	return IdleInhibitConfig{
 		StartupDuration: 60,
-		IconInactive:    "tb-coffee-off-symbolic",
-		IconActive:      "tb-coffee-symbolic",
+		IconInactive:    "ld-bed-symbolic",
+		IconActive:      "ld-coffee-symbolic",
 		Format:          "{{ state }}",
 		BorderShow:      false,
 		BorderColor:     mustColor("green"),

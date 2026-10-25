@@ -23,7 +23,7 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `format` | string | `"%a %b %d %I:%M %p"` | Format string using strftime syntax. |
-| `icon-name` | string | `"tb-calendar-time-symbolic"` | Symbolic icon name. |
+| `icon-name` | string | `"ld-calendar-clock-symbolic"` | Symbolic icon name. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display text label. |
@@ -86,7 +86,7 @@ bar:
 modules:
   clock:
     format: '%a %b %d %I:%M %p'
-    icon-name: tb-calendar-time-symbolic
+    icon-name: ld-calendar-clock-symbolic
     border-show: false
     border-color: border-accent
     icon-show: true

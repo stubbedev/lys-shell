@@ -81,17 +81,13 @@ type BatteryConfig struct {
 func DefaultsBattery() BatteryConfig {
 	return BatteryConfig{
 		LevelIcons: []string{
-			"md-battery_android_0-symbolic",
-			"md-battery_android_frame_1-symbolic",
-			"md-battery_android_frame_2-symbolic",
-			"md-battery_android_frame_3-symbolic",
-			"md-battery_android_frame_4-symbolic",
-			"md-battery_android_frame_5-symbolic",
-			"md-battery_android_frame_6-symbolic",
-			"md-battery_android_frame_full-symbolic",
+			"ld-battery-symbolic",
+			"ld-battery-low-symbolic",
+			"ld-battery-medium-symbolic",
+			"ld-battery-full-symbolic",
 		},
-		ChargingIcon:   "md-battery_android_frame_bolt-symbolic",
-		AlertIcon:      "md-battery_android_alert-symbolic",
+		ChargingIcon:   "ld-battery-charging-symbolic",
+		AlertIcon:      "ld-battery-warning-symbolic",
 		BorderShow:     false,
 		BorderColor:    mustColor("yellow"),
 		IconShow:       true,

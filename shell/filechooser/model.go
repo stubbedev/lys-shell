@@ -578,12 +578,12 @@ type Place struct {
 // userPlaceDirs are the user directories offered when present: the
 // user-dirs.dirs key, the name under home when it sets none, the icon.
 var userPlaceDirs = []struct{ key, name, icon string }{
-	{"DESKTOP", "Desktop", "user-desktop-symbolic"},
-	{"DOCUMENTS", "Documents", "folder-documents-symbolic"},
-	{"DOWNLOAD", "Downloads", "folder-download-symbolic"},
-	{"MUSIC", "Music", "folder-music-symbolic"},
-	{"PICTURES", "Pictures", "folder-pictures-symbolic"},
-	{"VIDEOS", "Videos", "folder-videos-symbolic"},
+	{"DESKTOP", "Desktop", "ld-monitor-symbolic"},
+	{"DOCUMENTS", "Documents", "ld-file-text-symbolic"},
+	{"DOWNLOAD", "Downloads", "ld-download-symbolic"},
+	{"MUSIC", "Music", "ld-music-symbolic"},
+	{"PICTURES", "Pictures", "ld-image-symbolic"},
+	{"VIDEOS", "Videos", "ld-video-symbolic"},
 }
 
 // UserPlaces is Home, the user directories that exist (where
@@ -593,7 +593,7 @@ func UserPlaces(home string) []Place {
 	if home == "" {
 		return nil
 	}
-	places := []Place{{"Home", home, "user-home-symbolic"}}
+	places := []Place{{"Home", home, "ld-house-symbolic"}}
 	for _, d := range userPlaceDirs {
 		path, ok := xdg.UserDir(d.key)
 		if !ok {
@@ -641,7 +641,7 @@ func Bookmarks(r io.Reader) []Place {
 		if label = strings.TrimSpace(label); label == "" {
 			label = filepath.Base(path)
 		}
-		places = append(places, Place{label, path, "folder-symbolic"})
+		places = append(places, Place{label, path, "ld-folder-symbolic"})
 	}
 	return places
 }
@@ -714,9 +714,9 @@ func ListRecent(path string, mode Mode) ([]Entry, error) {
 // mounts, those under /media, /run/media/<user> and the home
 // directory (not hidden ones).
 func OtherLocations(mounts io.Reader, home, user string) []Place {
-	locations := []Place{{"Computer", "/", "drive-harddisk-symbolic"}}
+	locations := []Place{{"Computer", "/", "ld-hard-drive-symbolic"}}
 	for _, path := range VisibleMounts(mounts, home, user) {
-		locations = append(locations, Place{filepath.Base(path), path, "drive-removable-media-symbolic"})
+		locations = append(locations, Place{filepath.Base(path), path, "ld-usb-symbolic"})
 	}
 	return locations
 }
@@ -762,7 +762,7 @@ func NetworkLocations(runtimeDir string) []Place {
 	var places []Place
 	for _, de := range des {
 		if de.IsDir() {
-			places = append(places, Place{gvfsLabel(de.Name()), filepath.Join(dir, de.Name()), "folder-remote-symbolic"})
+			places = append(places, Place{gvfsLabel(de.Name()), filepath.Join(dir, de.Name()), "ld-server-symbolic"})
 		}
 	}
 	return places

@@ -61,7 +61,7 @@ func TestStreamIcon(t *testing.T) {
 	}{
 		{map[string]string{paAppIconName: "firefox"}, mapped, "si-firefox-symbolic"},
 		{map[string]string{}, mapped, ""},
-		{map[string]string{paAppName: "Microsoft Edge", paAppIconName: "microsoft-edge"}, mapped, "tb-brand-edge-symbolic"},
+		{map[string]string{paAppName: "Microsoft Edge", paAppIconName: "microsoft-edge"}, mapped, "ld-globe-symbolic"},
 		{map[string]string{paAppIconName: "xyzzy-unknown"}, mapped, "xyzzy-unknown-symbolic"},
 		{map[string]string{paAppIconName: "my-app-symbolic"}, mapped, "my-app-symbolic"},
 		{map[string]string{paAppIconName: "firefox"}, native, "firefox"},
@@ -94,13 +94,13 @@ func TestDeviceIcons(t *testing.T) {
 		props      map[string]string
 		want       string
 	}{
-		{"alsa_output.pci", "Built-in Audio", map[string]string{paFormFactor: "speaker"}, "tb-device-speaker-symbolic"},
-		{"alsa_output.pci", "Something", map[string]string{paFormFactor: "headphone"}, "tb-headphones-symbolic"},
-		{"alsa_output.hdmi", "HDMI", none, "tb-device-tv-symbolic"},
-		{"bluez_output", "AirPods Pro", none, "tb-headset-symbolic"},
-		{"alsa_output.pci", "Built-in Audio", none, "tb-device-speaker-symbolic"},
+		{"alsa_output.pci", "Built-in Audio", map[string]string{paFormFactor: "speaker"}, "ld-speaker-symbolic"},
+		{"alsa_output.pci", "Something", map[string]string{paFormFactor: "headphone"}, "ld-headphones-symbolic"},
+		{"alsa_output.hdmi", "HDMI", none, "ld-tv-symbolic"},
+		{"bluez_output", "AirPods Pro", none, "ld-headset-symbolic"},
+		{"alsa_output.pci", "Built-in Audio", none, "ld-speaker-symbolic"},
 		// An unknown form factor falls through to the name.
-		{"alsa_output.hdmi", "x", map[string]string{paFormFactor: "toaster"}, "tb-device-tv-symbolic"},
+		{"alsa_output.hdmi", "x", map[string]string{paFormFactor: "toaster"}, "ld-tv-symbolic"},
 	} {
 		if got := outputDeviceIcon(tc.name, tc.desc, tc.props); got != tc.want {
 			t.Errorf("outputDeviceIcon(%q, %q) = %q, want %q", tc.name, tc.desc, got, tc.want)
@@ -111,9 +111,9 @@ func TestDeviceIcons(t *testing.T) {
 		props      map[string]string
 		want       string
 	}{
-		{"bluez_input", "Headset", map[string]string{paFormFactor: "headset"}, "tb-headset-symbolic"},
-		{"v4l2_input", "USB Webcam", none, "tb-device-computer-camera-symbolic"},
-		{"alsa_input.pci", "Built-in Audio", none, "tb-microphone-symbolic"},
+		{"bluez_input", "Headset", map[string]string{paFormFactor: "headset"}, "ld-headset-symbolic"},
+		{"v4l2_input", "USB Webcam", none, "ld-webcam-symbolic"},
+		{"alsa_input.pci", "Built-in Audio", none, "ld-mic-symbolic"},
 	} {
 		if got := inputDeviceIcon(tc.name, tc.desc, tc.props); got != tc.want {
 			t.Errorf("inputDeviceIcon(%q, %q) = %q, want %q", tc.name, tc.desc, got, tc.want)
@@ -197,7 +197,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	if v.main.Visible() != "devices" {
 		t.Fatalf("main = %q", v.main.Visible())
 	}
-	if name := itemText(v.output.item, "title"); name != "Speakers" || v.output.icon.Name() != "tb-device-speaker-symbolic" {
+	if name := itemText(v.output.item, "title"); name != "Speakers" || v.output.icon.Name() != "ld-speaker-symbolic" {
 		t.Errorf("output = %q %q", name, v.output.icon.Name())
 	}
 	if v.output.slider.Value() != 50 || v.output.muteIcon.Name() != "ld-volume-1-symbolic" {
@@ -273,7 +273,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	if sink, _ := srv.Defaults(); sink != "bt" {
 		t.Errorf("default sink = %q", sink)
 	}
-	if v.output.icon.Name() != "tb-headset-symbolic" {
+	if v.output.icon.Name() != "ld-headset-symbolic" {
 		t.Errorf("headset icon = %q", v.output.icon.Name())
 	}
 
@@ -352,7 +352,7 @@ func TestAudioPickerBackAndOptionItems(t *testing.T) {
 	if !back.HasClass(css.Icon) {
 		t.Error("the back button is not icon-sized")
 	}
-	speakers := audioDevice{description: "Speakers", subtitle: "Built-in", icon: "tb-device-speaker-symbolic"}
+	speakers := audioDevice{description: "Speakers", subtitle: "Built-in", icon: "ld-speaker-symbolic"}
 	idle := v.pickers[audioOutput].row(speakers, false)
 	if len(treetest.WithClass(idle, "media")) != 1 || len(treetest.WithClass(idle, "audio-device-option-check")) != 0 {
 		t.Error("an idle option lacks its media tile or carries the check")
@@ -461,7 +461,7 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 func TestAudioOptionFitsANarrowPicker(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	v := audioDropdown(ctx).(*audioView)
-	row := v.pickers[audioOutput].row(audioDevice{description: "alsa_output.pci-0000_00_1f.3.analog-stereo", icon: "tb-device-speaker-symbolic"}, true)
+	row := v.pickers[audioOutput].row(audioDevice{description: "alsa_output.pci-0000_00_1f.3.analog-stereo", icon: "ld-speaker-symbolic"}, true)
 	ctx.Theme.Attach(row)
 	const w = 240
 	sz := row.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})

@@ -22,8 +22,8 @@ const (
 // The PasswordEntry peek icons (GtkPasswordEntry show-peek-icon): the
 // eye reveals masked text, the crossed eye masks it again.
 const (
-	peekReveal  = "view-reveal-symbolic"
-	peekConceal = "view-conceal-symbolic"
+	peekReveal  = "ld-eye-symbolic"
+	peekConceal = "ld-eye-off-symbolic"
 )
 
 // Options configure one prompt.

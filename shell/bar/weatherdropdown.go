@@ -195,7 +195,7 @@ func (v *weatherView) label(text string, scale float64, class string) *widget.La
 // the one header that leaves the template's icon hidden (weather/mod.rs
 // never sets it visible).
 func (v *weatherView) header() widget.Widget {
-	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1), 0, 0)
+	refresh := widget.NewButton(v.icon("ld-refresh-cw-symbolic", 1), 0, 0)
 	refresh.AddClass(css.Ghost, css.Icon)
 	refresh.OnClick = v.svc.Refresh
 	refresh.SetTooltip(i18n.T("dropdown-weather-refresh"))

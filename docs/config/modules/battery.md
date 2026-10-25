@@ -29,8 +29,8 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `level-icons` | array of string | `[...]` | Icons for battery levels from empty to full. |
-| `charging-icon` | string | `"md-battery_android_frame_bolt-symbolic"` | Icon shown when battery is charging. |
-| `alert-icon` | string | `"md-battery_android_alert-symbolic"` | Icon shown when battery is not present or in an error state. |
+| `charging-icon` | string | `"ld-battery-charging-symbolic"` | Icon shown when battery is charging. |
+| `alert-icon` | string | `"ld-battery-warning-symbolic"` | Icon shown when battery is not present or in an error state. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display percentage label. |
@@ -103,16 +103,12 @@ modules:
 modules:
   battery:
     level-icons:
-      - md-battery_android_0-symbolic
-      - md-battery_android_frame_1-symbolic
-      - md-battery_android_frame_2-symbolic
-      - md-battery_android_frame_3-symbolic
-      - md-battery_android_frame_4-symbolic
-      - md-battery_android_frame_5-symbolic
-      - md-battery_android_frame_6-symbolic
-      - md-battery_android_frame_full-symbolic
-    charging-icon: md-battery_android_frame_bolt-symbolic
-    alert-icon: md-battery_android_alert-symbolic
+      - ld-battery-symbolic
+      - ld-battery-low-symbolic
+      - ld-battery-medium-symbolic
+      - ld-battery-full-symbolic
+    charging-icon: ld-battery-charging-symbolic
+    alert-icon: ld-battery-warning-symbolic
     border-show: false
     border-color: yellow
     icon-show: true

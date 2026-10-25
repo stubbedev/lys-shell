@@ -148,7 +148,7 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	// The header (DropdownHeader): icon, title, scan button, switch. The
 	// template's `.dropdown-title` box lets the stylesheet ink the icon
 	// and title.
-	d.scanIcon = widget.NewThemeIcon("tb-refresh-symbolic", int(px))
+	d.scanIcon = widget.NewThemeIcon("ld-refresh-cw-symbolic", int(px))
 	// GhostIconButton: lys-ui's ghost icon square (mod.rs:95-121).
 	d.scanBtn = dropdownButton(d.scanIcon, nil, css.Ghost, css.Icon)
 	d.scanBtn.AddClass("bluetooth-scan-btn")

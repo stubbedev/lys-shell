@@ -103,7 +103,7 @@ func DefaultsMangoWorkspaces() MangoWorkspacesConfig {
 		AppIconsShow:     false,
 		AppIconsDedupe:   true,
 		AppIconsFallback: "ld-app-window-symbolic",
-		AppIconsEmpty:    "tb-minus-symbolic",
+		AppIconsEmpty:    "ld-minus-symbolic",
 		UrgentShow:       true,
 		UrgentMode:       UrgentWorkspace,
 		ActiveIndicator:  ActiveBackground,

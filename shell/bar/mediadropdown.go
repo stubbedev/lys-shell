@@ -122,7 +122,7 @@ type mediaView struct {
 	next       *widget.Button
 	loop       *widget.Button
 	loopIcon   *widget.Icon
-	// check is the active row's tb-check glyph in the source picker
+	// check is the active row's check glyph in the source picker
 	// (buttons hide their subtrees from the tree walks, so the view
 	// carries it, like every other stateful widget here).
 	check *widget.Icon
@@ -452,7 +452,7 @@ func (v *mediaView) buildPicker() {
 		row.SetMedia(widget.NewThemeIcon(mediaSourceIcon(p), itemIconPx), false)
 		setClass(row, "selected", p.BusName == active.BusName)
 		if p.BusName == active.BusName {
-			v.check = widget.NewThemeIcon("tb-check-symbolic", itemIconPx)
+			v.check = widget.NewThemeIcon("ld-check-symbolic", itemIconPx)
 			v.check.AddClass("media-source-option-check")
 			row.AddAction(v.check)
 		}

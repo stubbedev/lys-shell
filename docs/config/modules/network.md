@@ -22,14 +22,14 @@ bar:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `wifi-disabled-icon` | string | `"cm-wireless-disabled-symbolic"` | WiFi icon when disabled. |
-| `wifi-acquiring-icon` | string | `"cm-wireless-acquiring-symbolic"` | WiFi icon when connecting. |
-| `wifi-offline-icon` | string | `"cm-wireless-offline-symbolic"` | WiFi icon when disconnected. |
-| `wifi-connected-icon` | string | `"cm-wireless-connected-symbolic"` | WiFi icon when connected but signal strength unavailable. |
+| `wifi-disabled-icon` | string | `"ld-wifi-off-symbolic"` | WiFi icon when disabled. |
+| `wifi-acquiring-icon` | string | `"ld-wifi-sync-symbolic"` | WiFi icon when connecting. |
+| `wifi-offline-icon` | string | `"ld-wifi-zero-symbolic"` | WiFi icon when disconnected. |
+| `wifi-connected-icon` | string | `"ld-wifi-symbolic"` | WiFi icon when connected but signal strength unavailable. |
 | `wifi-signal-icons` | array of string | `[...]` | WiFi signal strength icons from weak to excellent. |
-| `wired-connected-icon` | string | `"cm-wired-symbolic"` | Wired icon when connected. |
-| `wired-acquiring-icon` | string | `"cm-wired-acquiring-symbolic"` | Wired icon when connecting. |
-| `wired-disconnected-icon` | string | `"cm-wired-disconnected-symbolic"` | Wired icon when disconnected. |
+| `wired-connected-icon` | string | `"ld-ethernet-port-symbolic"` | Wired icon when connected. |
+| `wired-acquiring-icon` | string | `"ld-loader-circle-symbolic"` | Wired icon when connecting. |
+| `wired-disconnected-icon` | string | `"ld-unplug-symbolic"` | Wired icon when disconnected. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display connection label (SSID for WiFi, "Wired" for ethernet). |
@@ -78,18 +78,18 @@ the key changes nothing on a machine with no VPN.
 ```yaml
 modules:
   network:
-    wifi-disabled-icon: cm-wireless-disabled-symbolic
-    wifi-acquiring-icon: cm-wireless-acquiring-symbolic
-    wifi-offline-icon: cm-wireless-offline-symbolic
-    wifi-connected-icon: cm-wireless-connected-symbolic
+    wifi-disabled-icon: ld-wifi-off-symbolic
+    wifi-acquiring-icon: ld-wifi-sync-symbolic
+    wifi-offline-icon: ld-wifi-zero-symbolic
+    wifi-connected-icon: ld-wifi-symbolic
     wifi-signal-icons:
-      - cm-wireless-signal-weak-symbolic
-      - cm-wireless-signal-ok-symbolic
-      - cm-wireless-signal-good-symbolic
-      - cm-wireless-signal-excellent-symbolic
-    wired-connected-icon: cm-wired-symbolic
-    wired-acquiring-icon: cm-wired-acquiring-symbolic
-    wired-disconnected-icon: cm-wired-disconnected-symbolic
+      - ld-wifi-zero-symbolic
+      - ld-wifi-low-symbolic
+      - ld-wifi-high-symbolic
+      - ld-wifi-symbolic
+    wired-connected-icon: ld-ethernet-port-symbolic
+    wired-acquiring-icon: ld-loader-circle-symbolic
+    wired-disconnected-icon: ld-unplug-symbolic
     border-show: false
     border-color: accent
     icon-show: true

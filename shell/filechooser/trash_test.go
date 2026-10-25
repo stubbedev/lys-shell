@@ -149,9 +149,9 @@ func TestNetworkLocations(t *testing.T) {
 		got = append(got, p.Label+"="+filepath.Base(p.Path)+"|"+p.Icon)
 	}
 	want := []string{
-		"cloud.example.com=dav:host=cloud.example.com,ssl=true|folder-remote-symbolic",
-		"me@example.com=sftp:host=example.com,user=me|folder-remote-symbolic",
-		"media on nas=smb-share:server=nas,share=media|folder-remote-symbolic",
+		"cloud.example.com=dav:host=cloud.example.com,ssl=true|ld-server-symbolic",
+		"me@example.com=sftp:host=example.com,user=me|ld-server-symbolic",
+		"media on nas=smb-share:server=nas,share=media|ld-server-symbolic",
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("network locations =\n%q\nwant\n%q", got, want)

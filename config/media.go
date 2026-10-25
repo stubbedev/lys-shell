@@ -178,7 +178,7 @@ var MediaBuiltinIcons = []IconMapping{
 	{"*brave*", "si-brave-symbolic"},
 	{"*vivaldi*", "si-vivaldi-symbolic"},
 	{"*opera*", "si-opera-symbolic"},
-	{"*edge*", "tb-brand-edge-symbolic"},
+	{"*edge*", "ld-globe-symbolic"},
 	{"*tor*", "si-torbrowser-symbolic"},
 	{"*helium*", "si-heliumbrowser-symbolic"},
 }

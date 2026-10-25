@@ -31,7 +31,7 @@ func TestDeviceIconMatchesRust(t *testing.T) {
 		{nil, classOf(majorComputer, 0x03), "ld-laptop-symbolic"},
 		{nil, classOf(majorPhone, 0), "ld-smartphone-symbolic"},
 		{nil, classOf(majorAV, 0x06), "ld-headphones-symbolic"},
-		{nil, classOf(majorAV, 0x09), "tb-device-tv-symbolic"},
+		{nil, classOf(majorAV, 0x09), "ld-tv-symbolic"},
 		{nil, classOf(majorAV, 0x05), "ld-speaker-symbolic"},
 		{nil, classOf(majorAV, 0x04), "ld-mic-symbolic"},
 		{nil, classOf(majorPeripheral, 0x01<<4), "ld-keyboard-symbolic"},
@@ -85,13 +85,14 @@ func TestDeviceTypeKeyMatchesRust(t *testing.T) {
 	}
 }
 
+// A device's battery glyph steps through Lucide's battery in quarters,
+// as the battery module's default icons do.
 func TestBatteryLevelIcon(t *testing.T) {
 	for percent, want := range map[uint8]string{
-		0: "tb-battery-vertical-symbolic", 5: "tb-battery-vertical-symbolic",
-		6: "tb-battery-vertical-1-symbolic", 25: "tb-battery-vertical-1-symbolic",
-		26: "tb-battery-vertical-2-symbolic", 50: "tb-battery-vertical-2-symbolic",
-		51: "tb-battery-vertical-3-symbolic", 75: "tb-battery-vertical-3-symbolic",
-		76: "tb-battery-vertical-4-symbolic", 100: "tb-battery-vertical-4-symbolic",
+		0: "ld-battery-symbolic", 24: "ld-battery-symbolic",
+		25: "ld-battery-low-symbolic", 49: "ld-battery-low-symbolic",
+		50: "ld-battery-medium-symbolic", 74: "ld-battery-medium-symbolic",
+		75: "ld-battery-full-symbolic", 100: "ld-battery-full-symbolic", 255: "ld-battery-full-symbolic",
 	} {
 		if got := batteryLevelIcon(percent); got != want {
 			t.Errorf("%d%% = %q, want %q", percent, got, want)

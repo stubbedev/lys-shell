@@ -175,7 +175,7 @@ static color of the same name.
 #### Example
 
 ```yaml
-icon-map: {muted: audio-volume-muted-symbolic}
+icon-map: {muted: ld-volume-x-symbolic}
 color-map:
   muted: {icon-color: red}
   default: {icon-color: green}
@@ -283,7 +283,7 @@ Should be a symbolic icon name from the icon theme (e.g., `"ld-gpu-symbolic"`).
 #### Example
 
 ```yaml
-icon-name: ld-temperature-symbolic
+icon-name: ld-thermometer-symbolic
 ```
 
 :::
@@ -304,11 +304,10 @@ For N icons, icon at index `floor(percentage * N / 101)` is selected:
 
 ```yaml
 icon-names:
-  - battery-empty-symbolic
-  - battery-caution-symbolic
-  - battery-low-symbolic
-  - battery-good-symbolic
-  - battery-full-symbolic
+  - ld-battery-symbolic
+  - ld-battery-low-symbolic
+  - ld-battery-medium-symbolic
+  - ld-battery-full-symbolic
 ```
 
 :::
@@ -326,10 +325,10 @@ allowing state-specific icons to override percentage-based icons.
 ```yaml
 # Volume with muted state override
 icon-names: [vol-0, vol-33, vol-66, vol-100]
-icon-map: {muted: audio-volume-muted-symbolic}
+icon-map: {muted: ld-volume-x-symbolic}
 
 # Output: {"percentage": 50, "alt": "muted"}
-# Result: Uses "audio-volume-muted-symbolic" (alt match beats percentage)
+# Result: Uses "ld-volume-x-symbolic" (alt match beats percentage)
 
 # Output: {"percentage": 50}
 # Result: Uses "vol-33" (percentage-based, no alt)

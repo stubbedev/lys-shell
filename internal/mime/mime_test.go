@@ -61,16 +61,29 @@ func TestTypeByName(t *testing.T) {
 	}
 }
 
-func TestGenericIcon(t *testing.T) {
+// A file's glyph is the Lucide glyph of its type's generic icon: the
+// database's entry, else gio's <media>-x-generic.
+func TestFileIcon(t *testing.T) {
 	db := fixture(t)
-	if got := db.GenericIcon("image/png"); got != "image-x-generic" {
-		t.Errorf("listed icon = %q", got)
+	for mimeType, want := range map[string]string{
+		"image/png":  "ld-file-image-symbolic",
+		"text/plain": "ld-file-text-symbolic",
+		"video/mp4":  "ld-file-play-symbolic",
+	} {
+		if got := db.FileIcon(mimeType); got != want {
+			t.Errorf("FileIcon(%q) = %q, want %q", mimeType, got, want)
+		}
 	}
-	if got := db.GenericIcon("text/plain"); got != "text-x-generic" {
-		t.Errorf("unlisted type falls back to <media>-x-generic, got %q", got)
-	}
-	if got := db.GenericIcon("garbage"); got != "text-x-generic-symbolic" {
-		t.Errorf("a malformed type = %q", got)
+}
+
+// A type whose generic icon has no glyph, or no type at all, is the
+// plain file, never a freedesktop name another theme must provide.
+func TestFileIconOfAnUnmappedTypeIsThePlainFile(t *testing.T) {
+	db := fixture(t)
+	for _, mimeType := range []string{"model/stl", "garbage", ""} {
+		if got := db.FileIcon(mimeType); got != plainFileGlyph {
+			t.Errorf("FileIcon(%q) = %q, want %q", mimeType, got, plainFileGlyph)
+		}
 	}
 }
 

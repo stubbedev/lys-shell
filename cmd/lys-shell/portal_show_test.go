@@ -155,7 +155,7 @@ func TestPortalShowDialogs(t *testing.T) {
 	}{
 		{[]string{"access"}, "granted\n", "denied\n", func(a []any) bool {
 			r, _ := a[0].(portaldialogs.AccessRequest)
-			return r.Title == "Preview: Access" && r.GrantLabel == "Allow" && r.Icon == "dialog-password-symbolic"
+			return r.Title == "Preview: Access" && r.GrantLabel == "Allow" && r.Icon == "ld-key-round-symbolic"
 		}},
 		{[]string{"account"}, "shared\n", "declined\n", func(a []any) bool {
 			return strings.Contains(a[0].(string), "account-sharing")
