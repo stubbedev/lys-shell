@@ -103,20 +103,17 @@ const (
 	// dimAlpha is the wash: rgba(0, 0, 0, 0.35).
 	dimAlpha    = 89
 	borderWidth = 2
-	labelPx     = 14.0
-	labelPad    = 6
 	labelGap    = 4
 	// handleSize is the edge of the square handles on the corners and
 	// edge midpoints of a selection up for adjustment.
 	handleSize = 7
-	hintPx     = 13.0
 	hintMargin = 24
 )
 
 // hintText tells how to finish once a selection is up for adjustment.
 const hintText = "Drag to adjust · Enter or double-click to confirm · Esc to cancel"
 
-// labelBacking is the size label's dark box, rgba(0, 0, 0, 0.75).
+// labelBacking is the pills' dark backing, rgba(0, 0, 0, 0.75).
 var labelBacking = render.Color(191 << 24)
 
 // The evdev codes of the overlay's keys.
@@ -483,14 +480,36 @@ func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
 	if a.o.font == nil {
 		return
 	}
-	text := labelText(sel.W, sel.H)
-	shaped := a.o.font.Shape(text, labelPx)
-	boxW := int(math.Ceil(shaped.Advance())) + labelPad*2
+	p := a.pill(labelText(sel.W, sel.H))
+	bx, by := labelOrigin(sel, p.h)
+	p.paint(cv, bx, by, accent)
+}
+
+// pill is text shaped at lys-ui's text size on a dark backing padded
+// and rounded by the theme.
+type pill struct {
+	font   render.Font
+	shaped *render.ShapedText
+	ascent int
+	pad    int
+	radius int
+	w, h   int
+}
+
+func (a *area) pill(text string) pill {
+	th := widget.Current()
+	shaped := a.o.font.Shape(text, th.TextSize)
 	ascent := int(math.Ceil(shaped.Ascent()))
-	boxH := ascent + labelPad*2
-	bx, by := labelOrigin(sel, boxH)
-	cv.FillRect(render.Rect{X: bx, Y: by, W: boxW, H: boxH}, labelBacking)
-	a.o.font.Draw(cv, shaped, bx+labelPad, by+labelPad+ascent, accent)
+	return pill{
+		font: a.o.font, shaped: shaped, ascent: ascent, pad: th.Padding, radius: th.Radius,
+		w: int(math.Ceil(shaped.Advance())) + 2*th.Padding,
+		h: ascent + 2*th.Padding,
+	}
+}
+
+func (p pill) paint(cv *render.Canvas, x, y int, ink render.Color) {
+	cv.RoundedRect(render.Rect{X: x, Y: y, W: p.w, H: p.h}, p.radius, labelBacking)
+	p.font.Draw(cv, p.shaped, x+p.pad, y+p.pad+p.ascent, ink)
 }
 
 // handleRects are the handles' squares: the four corners, then the
@@ -521,13 +540,8 @@ func (a *area) paintHint(cv *render.Canvas, b render.Rect) {
 	if a.o.font == nil {
 		return
 	}
-	shaped := a.o.font.Shape(hintText, hintPx)
-	w := int(math.Ceil(shaped.Advance())) + labelPad*2
-	ascent := int(math.Ceil(shaped.Ascent()))
-	h := ascent + labelPad*2
-	x, y := b.X+(b.W-w)/2, b.Y+b.H-hintMargin-h
-	cv.FillRect(render.Rect{X: x, Y: y, W: w, H: h}, labelBacking)
-	a.o.font.Draw(cv, shaped, x+labelPad, y+labelPad+ascent, widget.CascadeColor(a))
+	p := a.pill(hintText)
+	p.paint(cv, b.X+(b.W-p.w)/2, b.Y+b.H-hintMargin-p.h, widget.CascadeColor(a))
 }
 
 // labelText is the size label in logical pixels.

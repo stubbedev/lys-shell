@@ -3,11 +3,14 @@ package regionoverlay
 import (
 	"image"
 	"image/color"
+	"math"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 var mons = []Monitor{
@@ -309,5 +312,32 @@ func TestMagnifier(t *testing.T) {
 	live.HoverMove(widget.Point{X: 5, Y: 5})
 	if live.magnifying() {
 		t.Error("a magnifier over the live screen")
+	}
+}
+
+// The size label and the hint are pills on lys-ui's theme: the text at
+// its text size, padded by its padding, the backing rounded by its
+// radius so the corner stays clear while the edge is backed.
+func TestPillTakesTheTheme(t *testing.T) {
+	th := *widget.DarkTheme()
+	th.Padding, th.Radius, th.TextSize = 10, 8, 20
+	widget.SetTheme(&th)
+	t.Cleanup(func() { widget.SetTheme(nil) })
+	o, a, _ := harness(nil)
+	o.font = treetest.Font(t)
+	p := a.pill("8 × 8")
+	ref := o.font.Shape("8 × 8", th.TextSize)
+	if p.pad != th.Padding || p.radius != th.Radius || p.h != int(math.Ceil(ref.Ascent()))+2*th.Padding || p.w != int(math.Ceil(ref.Advance()))+2*th.Padding {
+		t.Fatalf("pill %dx%d pad %d radius %d, want the theme's metrics", p.w, p.h, p.pad, p.radius)
+	}
+	const w, h = 200, 80
+	data := make([]byte, render.Stride(w)*h)
+	p.paint(render.New(data, render.Stride(w), w, h), 0, 0, render.RGB(0xff, 0xff, 0xff))
+	at := func(x, y int) render.Color { return render.ColorFromBytes(data[y*render.Stride(w)+x*4:]) }
+	if got := at(0, 0); got != 0 {
+		t.Errorf("corner %#x, want the rounding to leave it clear", uint32(got))
+	}
+	if got := at(p.w/2, 0); got.A() == 0 {
+		t.Error("the top edge is not backed")
 	}
 }
