@@ -86,12 +86,6 @@ var sheetOrder = []string{
 	"modules/recorder_dropdown/index.css",
 	"modules/region_overlay.css",
 	"modules/share_picker.css",
-	"modules/weather_dropdown/header.css",
-	"modules/weather_dropdown/stats.css",
-	"modules/weather_dropdown/hourly.css",
-	"modules/weather_dropdown/daily.css",
-	"modules/weather_dropdown/sun_times.css",
-	"modules/weather_dropdown/states.css",
 	"modules/weather_dropdown/index.css",
 }
 

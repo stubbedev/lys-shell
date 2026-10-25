@@ -156,7 +156,7 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.SetTransition(widget.StackCrossfade, gtkStackDuration)
 	v.pages.Add("loading", v.loadingPage())
 	v.pages.Add("error", v.errorPage())
-	v.loaded = widget.NewBox(widget.Column, 0, 0)
+	v.loaded = widget.NewBox(widget.Column, 2*widget.Current().Spacing, 0)
 	// The loaded child is vexpand inside the scroll (weather/mod.rs):
 	// the sections fill the viewport, top-anchored.
 	scroll := dropdownScroll(v.loaded, "weather-scroll")
@@ -215,27 +215,28 @@ func vcentered(col *widget.Box, kids ...widget.Widget) *widget.Box {
 	return col
 }
 
+// loadingPage is the status page the fetch shows.
 func (v *weatherView) loadingPage() widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("loading-weather")
-	text := v.label(i18n.T("dropdown-weather-loading"), 1, "loading-text")
-	text.SetEllipsize(widget.EllipsizeEnd)
-	vcentered(col, v.icon("ld-sun-symbolic", 2.5, "loading-icon"), text)
-	return col
+	page := emptyState(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-loading"), "")
+	page.AddClass("loading-weather")
+	return vcentered(widget.NewBox(widget.Column, 0, 0), page)
 }
 
+// errorPage is the failure's status page: its reason and a retry as
+// the page's child.
 func (v *weatherView) errorPage() widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("error-weather")
-	title := v.label(i18n.T("dropdown-weather-error-title"), 1.1, "error-title")
-	title.SetEllipsize(widget.EllipsizeEnd)
-	v.errorText = v.label("", 0.95, "error-text")
-	v.errorText.SetEllipsize(widget.EllipsizeEnd)
-	retry := widget.NewButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-weather-retry"), 0), 0, 0)
-	retry.AddClass("weather-retry-btn")
-	retry.OnClick = v.svc.Refresh
-	vcentered(col, v.icon("ld-info-symbolic", 2.5, "error-icon"), title, v.errorText, retry)
-	return col
+	page := emptyState(v.font, v.px, "ld-info-symbolic", i18n.T("dropdown-weather-error-title"), "")
+	page.AddClass("error-weather")
+	v.errorText = v.label("", 1, "error-text")
+	v.errorText.AddClass(css.DimLabel)
+	v.errorText.SetAlignment(render.AlignCenter)
+	v.errorText.SetWrap(true)
+	retry := dropdownButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-weather-retry"), 0), v.svc.Refresh, "weather-retry-btn", css.Outline)
+	child := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
+	child.Append(v.errorText, false)
+	child.AppendAligned(retry, false, widget.AlignCenter)
+	page.SetChild(child)
+	return vcentered(widget.NewBox(widget.Column, 0, 0), page)
 }
 
 // refresh shows the status's page and rebuilds the loaded sections
@@ -265,39 +266,77 @@ func (v *weatherView) refresh() {
 	v.loaded.Append(v.sunTimes(w, cfg.TimeFormat), false)
 }
 
-// currentHeader is weather_header: the condition icon, temperature,
-// and condition inside .weather-current, with the place and data age
-// in .weather-location on the right. Every label and the icon carry
-// the class whose rule paints them.
+// condIcon is a condition's glyph at scale times the text size,
+// colored by its condition class.
+func (v *weatherView) condIcon(c weather.Condition, isDay bool, scale float64) *widget.Icon {
+	return v.icon(weatherConditionIcon(c, isDay), scale, "weather-cond", weatherConditionClass(c))
+}
+
+// currentHeader is weather_header: the condition icon, the
+// temperature in the display size over the condition, and the place
+// and the data's age on the right.
 func (v *weatherView) currentHeader(w *weather.Weather, imperial bool) widget.Widget {
+	th := widget.Current()
 	c := w.Current
-	row := widget.NewBox(widget.Row, 0, 0)
+	row := widget.NewBox(widget.Row, 2*th.Spacing, 0)
 	row.AddClass("weather-header")
-	current := widget.NewBox(widget.Row, 0, 0)
-	current.AddClass("weather-current")
-	current.Append(v.icon(weatherConditionIcon(c.Condition, c.IsDay), 3, "weather-icon", weatherConditionClass(c.Condition)), false)
+	row.AppendAligned(v.condIcon(c.Condition, c.IsDay, 3), false, widget.AlignCenter)
 	temps := widget.NewBox(widget.Column, 0, 0)
-	temps.AddClass("weather-temp-group")
-	temp := widget.NewBox(widget.Row, 2, 0)
-	temp.Append(v.label(weatherTemp(c.Temperature, imperial), 2.4, "weather-temp"), false)
-	temp.Append(v.label(weatherUnitSymbol(imperial), 1.2, "weather-temp-unit"), false)
+	temp := widget.NewBox(widget.Row, th.Spacing/4, 0)
+	temp.AppendAligned(v.label(weatherTemp(c.Temperature, imperial), 2.4, "weather-temp"), false, widget.AlignBaseline)
+	unit := v.label(weatherUnitSymbol(imperial), 1, "weather-temp-unit")
+	unit.AddClass(css.DimLabel)
+	temp.AppendAligned(unit, false, widget.AlignBaseline)
 	temps.Append(temp, false)
-	temps.Append(v.label(weatherConditionLabel(c.Condition), 1, "weather-condition"), false)
-	current.Append(temps, false)
-	row.Append(current, false)
-	// weather-location is hexpand, valign Center: it takes the free
-	// width and its right-aligned labels sit mid-height.
+	cond := v.label(weatherConditionLabel(c.Condition), 1, "weather-condition")
+	cond.AddClass(css.DimLabel)
+	temps.Append(cond, false)
+	row.AppendAligned(temps, false, widget.AlignCenter)
+	// The place takes the free width; its right-aligned labels sit
+	// mid-height.
 	place := widget.NewBox(widget.Column, 0, 0)
 	place.AddClass("weather-location")
 	city := v.label(weatherLocationDisplay(w.Location), 1, "weather-city")
+	city.AddClass(css.Heading)
 	city.SetEllipsize(widget.EllipsizeEnd)
 	city.SetAlignment(render.AlignEnd)
 	place.Append(city, false)
-	ago := v.label(weatherUpdatedAgo(w.UpdatedAt, time.Now()), 0.85, "weather-updated")
+	ago := v.label(weatherUpdatedAgo(w.UpdatedAt, time.Now()), 1, "weather-updated")
+	ago.AddClass(css.Caption, css.DimLabel)
 	ago.SetAlignment(render.AlignEnd)
 	place.Append(ago, false)
 	row.AppendAligned(place, true, widget.AlignCenter)
 	return row
+}
+
+// tileRow is a card around a homogeneous row (carrying class) of equal
+// cells: the stats and the hourly forecast.
+func tileRow(class string, cells ...widget.Widget) widget.Widget {
+	row := widget.NewBox(widget.Row, 0, widget.Current().Padding)
+	row.AddClass(class)
+	row.SetHomogeneous(true)
+	for _, c := range cells {
+		row.Append(c, true)
+	}
+	card := widget.NewBox(widget.Column, 0, 0)
+	card.AddClass(css.Card)
+	card.Append(row, false)
+	return card
+}
+
+// tile is one tileRow cell: its parts stacked the theme's half
+// spacing apart and centered, the labels centering their text.
+func tile(class string, parts ...widget.Widget) *widget.Box {
+	th := widget.Current()
+	cell := widget.NewBox(widget.Column, th.Spacing/2, th.Padding)
+	cell.AddClass(class)
+	for _, p := range parts {
+		if l, ok := p.(*widget.Label); ok {
+			l.SetAlignment(render.AlignCenter)
+		}
+		cell.AppendAligned(p, false, widget.AlignCenter)
+	}
+	return cell
 }
 
 // statsGrid is stats_grid: humidity, wind, UV, and today's rain chance.
@@ -306,12 +345,6 @@ func (v *weatherView) statsGrid(w *weather.Weather, imperial bool) widget.Widget
 	if len(w.Daily) > 0 {
 		rain = strconv.Itoa(int(w.Daily[0].RainChance)) + "%"
 	}
-	// stats_grid: a homogeneous spacing-0 row whose 1px gaps are the
-	// rule's border-spacing over its background; each cell's image and
-	// labels fill the column and render centered, as GTK's do.
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("weather-stats")
-	row.SetHomogeneous(true)
 	stats := []struct {
 		icon, value, label, class string
 	}{
@@ -320,62 +353,43 @@ func (v *weatherView) statsGrid(w *weather.Weather, imperial bool) widget.Widget
 		{"ld-sun-symbolic", strconv.Itoa(int(w.Current.UVIndex)), "dropdown-weather-uv", "uv"},
 		{"ld-cloud-rain-symbolic", rain, "dropdown-weather-rain", "rain"},
 	}
-	for i, s := range stats {
-		cell := widget.NewBox(widget.Column, 0, 0)
-		cell.AddClass("weather-stat")
-		setClass(cell, "stat-first", i == 0)
-		setClass(cell, "stat-last", i == len(stats)-1)
-		cell.AppendAligned(v.icon(s.icon, 1.3, "weather-stat-icon", s.class), false, widget.AlignCenter)
-		cell.Append(v.centeredLabel(s.value, 1, "weather-stat-value"), false)
-		cell.Append(v.centeredLabel(i18n.T(s.label), 0.8, "weather-stat-label"), false)
-		row.Append(cell, true)
+	cells := make([]widget.Widget, 0, len(stats))
+	for _, s := range stats {
+		value := v.label(s.value, 1, "weather-stat-value")
+		value.AddClass(css.Heading)
+		name := v.label(i18n.T(s.label), 1, "weather-stat-label")
+		name.AddClass(css.Caption, css.DimLabel)
+		cells = append(cells, tile("weather-stat", v.icon(s.icon, 1.3, "weather-stat-icon", s.class), value, name))
 	}
-	return row
-}
-
-// centeredLabel is a label that fills its column and centers its text,
-// a GTK label's default xalign.
-func (v *weatherView) centeredLabel(text string, scale float64, class string) *widget.Label {
-	l := v.label(text, scale, class)
-	l.SetAlignment(render.AlignCenter)
-	return l
+	return tileRow("weather-stats", cells...)
 }
 
 // hourly is hourly_forecast: "Now" then the next four hours.
 func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.TimeFormat) widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("weather-section")
-	col.Append(sectionLabel(v.font, i18n.T("dropdown-weather-hourly")), false)
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("hourly-forecast")
-	row.SetHomogeneous(true)
+	var cells []widget.Widget
 	for i, h := range w.Hourly[:min(len(w.Hourly), weatherHourlyItems)] {
 		when := i18n.T("dropdown-weather-now")
 		if i > 0 {
 			when = weatherHourLabel(h.Time, format)
 		}
-		item := widget.NewBox(widget.Column, 0, 0)
-		item.AddClass("hourly-item")
-		item.Append(v.centeredLabel(when, 0.85, "hourly-time"), false)
-		item.AppendAligned(v.icon(weatherConditionIcon(h.Condition, h.IsDay), 1.4, "hourly-icon", weatherConditionClass(h.Condition)), false, widget.AlignCenter)
-		item.Append(v.centeredLabel(weatherTemp(h.Temperature, imperial), 1, "hourly-temp"), false)
-		row.Append(item, true)
+		at := v.label(when, 1, "hourly-time")
+		at.AddClass(css.Caption, css.DimLabel)
+		temp := v.label(weatherTemp(h.Temperature, imperial), 1, "hourly-temp")
+		temp.AddClass(css.Heading)
+		cells = append(cells, tile("hourly-item", at, v.condIcon(h.Condition, h.IsDay, 1.4), temp))
 	}
-	col.Append(row, false)
-	return col
+	return dropdownSection(sectionLabel(v.font, i18n.T("dropdown-weather-hourly")), tileRow("hourly-forecast", cells...))
 }
 
-// daily is daily_forecast: five days in the .daily-forecast list, each
-// with its span on the week's temperature range. The span is a
+// daily is daily_forecast: five days in an item card, each day an Item
+// (its condition icon, the day over the condition) with its span on
+// the week's temperature range and its high and low. The span is a
 // .daily-bar track with a .daily-bar-fill the stylesheet paints; the
 // fill's offset and width are per-day geometry, the Rust
 // set_margin_start/set_width_request pair.
 func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.AddClass("weather-section")
-	col.Append(sectionLabel(v.font, i18n.T("dropdown-weather-daily")), false)
-	list := widget.NewBox(widget.Column, 0, 0)
-	list.AddClass("daily-forecast")
+	card, list := itemCard()
+	card.AddClass("daily-forecast")
 	days := w.Daily[:min(len(w.Daily), weatherDailyDays)]
 	lo, hi := weatherTempRange(days)
 	scale := float64(v.ctx.Config.Styling.Scale)
@@ -390,59 +404,55 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		if isToday {
 			name = i18n.T("dropdown-weather-today")
 		}
-		row := widget.NewBox(widget.Row, 0, 0)
+		row := widget.NewItem(v.font, name, weatherConditionLabel(d.Condition))
+		row.SetSmall(true)
+		row.SetEllipsize(true)
 		row.AddClass("daily-item")
 		setClass(row, "today", isToday)
-		row.Append(v.label(name, 1, "daily-day"), false)
-		row.Append(v.icon(weatherConditionIcon(d.Condition, true), 1.2, "daily-icon", weatherConditionClass(d.Condition)), false)
-		cond := v.label(weatherConditionLabel(d.Condition), 0.9, "daily-condition")
-		cond.SetEllipsize(widget.EllipsizeEnd)
-		row.Append(cond, true)
+		row.SetMedia(v.condIcon(d.Condition, true, 1.2), true)
 		left, width := weatherBarOffsets(d.TempLow.Celsius(), d.TempHigh.Celsius(), lo, hi)
 		leftPx := int(left / 100 * float32(barPx))
 		fillPx := min(int(max(width/100*float32(barPx), 3)), barPx-leftPx)
 		bar := widget.NewBox(widget.Row, 0, 0)
 		bar.AddClass("daily-bar")
-		bar.SetSizeRequest(barPx, 0)
+		bar.SetSizeRequest(barPx, weatherBarPx)
 		fill := widget.NewBox(widget.Row, 0, 0)
 		fill.AddClass("daily-bar-fill")
 		fill.SetMargin(render.Insets{Left: leftPx})
-		fill.SetSizeRequest(fillPx, 0)
+		fill.SetSizeRequest(fillPx, weatherBarPx)
 		bar.Append(fill, false)
-		row.AppendAligned(bar, false, widget.AlignCenter)
-		temps := widget.NewBox(widget.Row, 0, 0)
-		temps.AddClass("daily-temps")
-		temps.Append(v.label(weatherTemp(d.TempHigh, imperial), 1, "daily-high"), false)
-		temps.Append(v.label(weatherTemp(d.TempLow, imperial), 1, "daily-low"), false)
-		row.Append(temps, false)
-		list.Append(row, false)
+		row.AddAction(bar)
+		high := v.label(weatherTemp(d.TempHigh, imperial), 1, "daily-high")
+		high.AddClass(css.Heading, css.Numeric)
+		low := v.label(weatherTemp(d.TempLow, imperial), 1, "daily-low")
+		low.AddClass(css.DimLabel, css.Numeric)
+		row.AddAction(high)
+		row.AddAction(low)
+		list.Append(row)
 	}
-	col.Append(list, false)
-	return col
+	return dropdownSection(sectionLabel(v.font, i18n.T("dropdown-weather-daily")), card)
 }
 
-// sunTimes is sun_times: today's sunrise and sunset.
+// weatherBarPx is the temperature span bar's thickness.
+const weatherBarPx = 4
+
+// sunTimes is sun_times: today's sunrise and sunset, two tiles.
 func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("sun-times")
-	for i, s := range []struct {
+	var cells []widget.Widget
+	for _, s := range []struct {
 		icon, label, class string
 		at                 weather.TimeOfDay
 	}{
 		{"ld-sunrise-symbolic", "dropdown-weather-sunrise", "sunrise", w.Astronomy.Sunrise},
 		{"ld-sunset-symbolic", "dropdown-weather-sunset", "sunset", w.Astronomy.Sunset},
 	} {
-		cell := widget.NewBox(widget.Row, 0, 0)
-		cell.AddClass("sun-time")
-		cell.Append(v.icon(s.icon, 1.4, "sun-icon", s.class), false)
-		info := widget.NewBox(widget.Column, 0, 0)
-		info.AddClass("sun-info")
-		info.Append(v.label(i18n.T(s.label), 0.8, "sun-label"), false)
-		info.Append(v.label(weatherSunTime(s.at, format), 1, "sun-value"), false)
-		cell.Append(info, false)
-		row.Append(cell, i == 0)
+		at := v.label(weatherSunTime(s.at, format), 1, "sun-value")
+		at.AddClass(css.Heading)
+		name := v.label(i18n.T(s.label), 1, "sun-label")
+		name.AddClass(css.Caption, css.DimLabel)
+		cells = append(cells, tile("sun-time", v.icon(s.icon, 1.4, "sun-icon", s.class), at, name))
 	}
-	return row
+	return tileRow("sun-times", cells...)
 }
 
 // follow keeps the view current while open: service changes rebuild

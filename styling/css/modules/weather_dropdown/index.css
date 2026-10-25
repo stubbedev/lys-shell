@@ -1,6 +1,45 @@
-.weather-scroll {
-  background: transparent;
+image.weather-cond {
+  color: var(--fg-muted);
 }
-.weather-scroll scrollbar range trough {
-  background: transparent;
+image.weather-cond.sunny {
+  color: var(--status-warning);
+}
+image.weather-cond.cloudy {
+  color: var(--fg-subtle);
+}
+image.weather-cond.rainy {
+  color: var(--status-info);
+}
+image.weather-cond.stormy {
+  color: var(--accent);
+}
+image.weather-cond.snowy {
+  color: var(--fg-default);
+}
+
+image.weather-stat-icon.humidity,
+image.weather-stat-icon.rain {
+  color: var(--status-info);
+}
+image.weather-stat-icon.wind {
+  color: var(--fg-muted);
+}
+image.weather-stat-icon.uv,
+image.sun-icon.sunrise {
+  color: var(--status-warning);
+}
+image.sun-icon.sunset {
+  color: var(--accent);
+}
+
+.daily-item.today .title {
+  color: var(--accent);
+}
+.daily-bar {
+  background: var(--bg-hover);
+  border-radius: 9999px;
+}
+.daily-bar-fill {
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--status-info), var(--status-warning));
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/network/secrets"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/weather"
 )
 
 // previewDirEnv names the directory TestDropdownPreviews writes each
@@ -38,6 +39,9 @@ const previewBackdrop = 0xff
 // set to a directory each one is written there as a PNG, the offscreen
 // check for surfaces the harness cannot fill (devices, notifications).
 func TestDropdownPreviews(t *testing.T) {
+	// A preview is a still: every transition lands at once.
+	restore := widget.SetAnimationsInstant(true)
+	t.Cleanup(restore)
 	dir := os.Getenv(previewDirEnv)
 	btOff := bluetooth.State{Available: true, Primary: &bluetooth.Adapter{}}
 	for _, p := range []struct {
@@ -51,7 +55,6 @@ func TestDropdownPreviews(t *testing.T) {
 		{"audio-picker", "audio", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			_, ctx.Pulse = audioFixture(t)
 			v := audioDropdown(*ctx).(*audioView)
-			v.pages.SetTransition(widget.StackNone, 0)
 			v.showPage("output")
 			return newPanelBox(v)
 		}},
@@ -155,7 +158,6 @@ func TestDropdownPreviews(t *testing.T) {
 			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{}, ticks: make(chan struct{}, 2)}
 			v := newNetworkView(*ctx, netDeps{vpn: &fakeVPN{}, vpnKinds: testKinds})
 			v.attachPopover(&fakePopover{})
-			v.body.SetTransition(widget.StackNone, 0)
 			v.vpnAdd()
 			return newPanelBox(v)
 		}},
@@ -171,6 +173,27 @@ func TestDropdownPreviews(t *testing.T) {
 			ctx.Config, ctx.SetConfig, ctx.Recorder = rc.Config, rc.SetConfig, rc.Recorder
 			return newPanelBox(recorderDropdown(*ctx))
 		}},
+		{"weather", "weather", func(t *testing.T, ctx *ModuleContext) widget.Widget {
+			now := time.Now()
+			hourly := make([]weather.Hourly, 8)
+			for i := range hourly {
+				hourly[i] = weather.Hourly{Time: now.Add(time.Duration(i) * time.Hour), Temperature: weather.Temperature(13 - i/2), Condition: weather.CondClear}
+			}
+			daily := make([]weather.Daily, 5)
+			for i := range daily {
+				daily[i] = weather.Daily{Date: now.AddDate(0, 0, i), TempLow: 11, TempHigh: weather.Temperature(18 + i%3), Condition: weather.CondCloudy}
+			}
+			svc := fixedWeather(&weather.Weather{
+				Zone: time.Local, UpdatedAt: now, Location: weather.Location{City: "San Francisco", Region: "California"},
+				Astronomy: weather.Astronomy{Sunrise: weather.TimeOfDay{Hour: 7, Minute: 28}, Sunset: weather.TimeOfDay{Hour: 18, Minute: 18}},
+				Current:   weather.Current{Temperature: 13, Condition: weather.CondClear, Humidity: 62, WindSpeed: 9},
+				Hourly:    hourly, Daily: daily,
+			}, nil)
+			t.Cleanup(svc.Close)
+			ctx.Weather = svc
+			waitHeadless(t, "the loaded weather", func() bool { return svc.Status().Kind == weather.Loaded })
+			return newPanelBox(weatherDropdown(*ctx))
+		}},
 		{"treeman", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Treeman = &fakeTreeman{status: treemanFixture()}
 			return newPanelBox(treemanDropdown(*ctx))
@@ -178,7 +201,6 @@ func TestDropdownPreviews(t *testing.T) {
 		{"treeman-detail", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Treeman = &fakeTreeman{status: treemanFixture()}
 			v := treemanDropdown(*ctx).(*treemanView)
-			v.pages.SetTransition(widget.StackNone, 0)
 			v.openDetail("/w/feat")
 			return newPanelBox(v)
 		}},

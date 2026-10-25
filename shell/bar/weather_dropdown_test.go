@@ -213,8 +213,7 @@ func TestWeatherDropdownShowsTheStatusPage(t *testing.T) {
 	if got := len(v.loaded.Children()); got != 5 {
 		t.Errorf("loaded sections = %d, want 5", got)
 	}
-	hourly := v.loaded.Children()[2].(*widget.Box).Children()[1].(*widget.Box)
-	if got := len(hourly.Children()); got != weatherHourlyItems {
+	if got := len(treetest.WithClass(v.loaded, "hourly-item")); got != weatherHourlyItems {
 		t.Errorf("hourly items = %d, want %d of 8", got, weatherHourlyItems)
 	}
 }
@@ -260,8 +259,8 @@ func abs(n int) int {
 	return n
 }
 
-// The loading and error pages fill the stack and center their
-// content; the loaded page keeps its sections at the top.
+// The loading and error pages fill the stack and center their status
+// page; the error page's child carries the reason and the retry.
 func TestWeatherPagesCenterTheirContent(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
@@ -277,43 +276,26 @@ func TestWeatherPagesCenterTheirContent(t *testing.T) {
 		t.Fatalf("page = %q, want loading", got)
 	}
 	arrangeDropdown(t, v, 400, 600)
-	page := classedBox(t, v, "loading-weather")
-	icon, isIcon := classedWidget(t, v, "loading-icon").(*widget.Icon)
-	if !isIcon {
-		t.Fatal("the loading icon is not an icon")
+	centered := func(class string) {
+		t.Helper()
+		pb, sb := boundsOf(classedWidget(t, v, class)), boundsOf(v.pages)
+		if abs((pb.Y+pb.H/2)-(sb.Y+sb.H/2)) > 3 {
+			t.Errorf("the %s status page centers at %d, the stack at %d", class, pb.Y+pb.H/2, sb.Y+sb.H/2)
+		}
 	}
-	text := classedWidget(t, v, "loading-text").(*widget.Label)
-	pb := page.Bounds()
-	// The icon-over-text group centers; the icon alone sits half the
-	// text above the middle.
-	ib := icon.Bounds()
-	group := ib.Y + (text.Bounds().Y+text.Bounds().H-ib.Y)/2
-	if abs(group-(pb.Y+pb.H/2)) > 3 {
-		t.Errorf("the loading group centers at %d, the page at %d", group, pb.Y+pb.H/2)
-	}
-	// The loading text ellipsizes like the Rust label.
-	if text.Ellipsize() != widget.EllipsizeEnd {
-		t.Error("the loading text does not ellipsize")
-	}
+	centered("loading-weather")
 
-	// The error page centers its group and the retry button.
 	fail := fixedWeather(nil, &weather.Error{Kind: weather.ErrLocationNotFound, Query: "Atlantis"})
 	defer fail.Close()
 	waitHeadless(t, "the failed status", func() bool { return fail.Status().Kind == weather.Failed })
 	ctx.Weather = fail
 	v = weatherDropdown(ctx).(*weatherView)
 	arrangeDropdown(t, v, 400, 600)
-	page = classedBox(t, v, "error-weather")
+	centered("error-weather")
+	page := classedWidget(t, v, "error-weather")
 	retry, isBtn := classedWidget(t, v, "weather-retry-btn").(*widget.Button)
-	if !isBtn {
-		t.Fatal("no retry button")
-	}
-	rb := retry.Bounds()
-	if center := rb.X + rb.W/2; abs(center-(page.Bounds().X+page.Bounds().W/2)) > 3 {
-		t.Errorf("the retry centers at %d, the page at %d", center, page.Bounds().X+page.Bounds().W/2)
-	}
-	if l := classedWidget(t, v, "error-title").(*widget.Label); l.Ellipsize() != widget.EllipsizeEnd {
-		t.Error("the error title does not ellipsize")
+	if !isBtn || !isUnder(retry, page) || !isUnder(v.errorText, page) {
+		t.Error("the reason and the retry are not the error page's own")
 	}
 }
 
@@ -382,9 +364,9 @@ func TestWeatherRefetchShowsTheLoadingPage(t *testing.T) {
 }
 
 // The header's refresh carries its i18n tooltip, the current weather
-// rides in the weather-current/weather-temp-group wrappers, and the
-// daily list wraps its items' high and low in daily-temps.
-func TestWeatherHeaderAndDailyWrappers(t *testing.T) {
+// reads the temperature beside its unit over the condition, and a daily
+// row is an Item whose actions are its span and its high and low.
+func TestWeatherHeaderAndDailyRows(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	svc := fixedWeather(&weather.Weather{
@@ -406,93 +388,36 @@ func TestWeatherHeaderAndDailyWrappers(t *testing.T) {
 		}
 		return true
 	})
-	if refresh == nil {
-		t.Fatal("no refresh button")
+	if refresh == nil || refresh.TooltipText() != i18n.T("dropdown-weather-refresh") {
+		t.Fatal("no refresh button with its tooltip")
 	}
-	if got := refresh.TooltipText(); got != i18n.T("dropdown-weather-refresh") {
-		t.Errorf("refresh tooltip = %q, want %q", got, i18n.T("dropdown-weather-refresh"))
-	}
-
 	header := classedBox(t, v, "weather-header")
-	if got := len(header.Children()); got != 2 {
-		t.Fatalf("weather-header children = %d, want the current group and the location", got)
+	if temp := classedWidget(t, header, "weather-temp").(*widget.Label); temp.Text() != "11" {
+		t.Errorf("the temperature reads %q", temp.Text())
 	}
-	current, _ := header.Children()[0].(*widget.Box)
-	if current == nil || !current.HasClass("weather-current") {
-		t.Fatalf("weather-header's first child %v lacks weather-current", header.Children()[0])
+	if len(treetest.WithClass(header, "weather-temp-unit")) != 1 || len(treetest.WithClass(header, "weather-condition")) != 1 {
+		t.Error("the header lacks the unit or the condition")
 	}
-	var tempGroup *widget.Box
-	for _, c := range current.Children() {
-		if b, isBox := c.(*widget.Box); isBox && b.HasClass("weather-temp-group") {
-			tempGroup = b
+	rows := treetest.WithClass(v.loaded, "daily-item")
+	if len(rows) != 1 {
+		t.Fatalf("daily rows = %d, want 1", len(rows))
+	}
+	row, isItem := rows[0].(*widget.Item)
+	if !isItem {
+		t.Fatalf("the daily row is %T, want lys-ui's Item", rows[0])
+	}
+	for _, class := range []string{"daily-bar", "daily-high", "daily-low"} {
+		if len(treetest.WithClass(row, class)) != 1 {
+			t.Errorf("the daily row lacks its %s", class)
 		}
-		// Negative: the temp labels ride the temp group, not the bare
-		// current row.
-		if l, isLabel := c.(*widget.Label); isLabel && l.HasClass("weather-temp") {
-			t.Error("the temperature label is a bare child of weather-current")
-		}
-	}
-	if tempGroup == nil {
-		t.Fatal("no weather-temp-group wrapper")
-	}
-
-	list, ok := findByClass(v, "daily-forecast").(*widget.Box)
-	if !ok {
-		t.Fatal("no daily-forecast list: the daily items hang off the section")
-	}
-	if len(list.Children()) != 1 {
-		t.Fatalf("daily items = %d, want 1", len(list.Children()))
-	}
-	item, _ := list.Children()[0].(*widget.Box)
-	var temps *widget.Box
-	for _, c := range item.Children() {
-		if b, isBox := c.(*widget.Box); isBox && b.HasClass("daily-temps") {
-			temps = b
-		}
-		if l, isLabel := c.(*widget.Label); isLabel && (l.HasClass("daily-high") || l.HasClass("daily-low")) {
-			t.Error("a daily temperature is a bare child of the daily item")
-		}
-	}
-	if temps == nil {
-		t.Fatal("no daily-temps wrapper")
-	}
-	if got := len(temps.Children()); got != 2 {
-		t.Errorf("daily-temps children = %d, want the high and the low", got)
-	}
-
-	// The spacing-0 sites: the CSS rules carry the gaps.
-	for _, tc := range []struct {
-		what string
-		got  int
-	}{
-		{"sun-times", classedBox(t, v, "sun-times").Spacing()},
-		{"weather-header", header.Spacing()},
-		{"weather-current", current.Spacing()},
-		{"weather-temp-group", tempGroup.Spacing()},
-		{"daily-forecast", list.Spacing()},
-		{"daily-item", item.Spacing()},
-	} {
-		if tc.got != 0 {
-			t.Errorf("%s spacing = %d, want 0", tc.what, tc.got)
-		}
-	}
-	// Negative: the temp row keeps the Rust literal spacing of 2.
-	var tempRow *widget.Box
-	for _, c := range tempGroup.Children() {
-		if b, isBox := c.(*widget.Box); isBox && findByClass(b, "weather-temp") != nil {
-			tempRow = b
-		}
-	}
-	if tempRow == nil || tempRow.Spacing() != 2 {
-		t.Errorf("the temp row spacing = %v, want the literal 2", tempRow)
 	}
 }
 
-// The loaded trees are the Rust ones: the stats and hourly rows are
-// homogeneous and spacing-0 (the stylesheet owns the gaps), the cells
-// center their image and text as GTK's fill-width image and labels
-// do, the header leaves its icon hidden, and the forecast temperatures
-// carry no degree sign (format_temp_value).
+// The loaded trees: the stats and hourly rows are homogeneous with no
+// gaps between their cells, the cells center their image and text as
+// GTK's fill-width image and labels do, the header leaves its icon
+// hidden, and the forecast temperatures carry no degree sign
+// (format_temp_value).
 func TestWeatherDropdownTreesMatchRust(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ok := fixedWeather(&weather.Weather{
@@ -515,9 +440,6 @@ func TestWeatherDropdownTreesMatchRust(t *testing.T) {
 	}
 	for _, class := range []string{"weather-stat", "hourly-item"} {
 		cell := classedBox(t, v.loaded, class)
-		if cell.Spacing() != 0 {
-			t.Errorf(".%s spacing %d, want 0", class, cell.Spacing())
-		}
 		for _, l := range treetest.All[*widget.Label](cell) {
 			if l.Alignment() != render.AlignCenter {
 				t.Errorf(".%s label %q aligns %v, want centered", class, l.Text(), l.Alignment())
@@ -553,9 +475,9 @@ func TestWeatherTodayIsTheLocations(t *testing.T) {
 		w.Daily = w.Daily[1:]
 	}
 	v := weatherDropdown(newTestContext(t, config.Defaults())).(*weatherView)
-	days := treetest.WithClass(v.daily(w, false), "daily-day")
+	days := treetest.WithClass(v.daily(w, false), "daily-item")
 	for i, d := range w.Daily {
-		got := days[i].(*widget.Label).Text()
+		got := itemText(days[i], "title")
 		isToday := d.Date.Equal(locToday)
 		if isToday != (got == i18n.T("dropdown-weather-today")) {
 			t.Errorf("day %v reads %q (location today %v)", d.Date, got, locToday)
