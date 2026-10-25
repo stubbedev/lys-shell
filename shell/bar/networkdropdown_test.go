@@ -235,45 +235,66 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 		<-refuse
 		return &network.ConnectError{Failure: network.FailureAuth}
 	}
-	v.password.secret.entry.SetText("hunter2")
-	v.password.connect()
+	onHeadlessLoop(func() bool {
+		v.password.secret.entry.SetText("hunter2")
+		v.password.connect()
+		return true
+	})
 	if onHeadlessLoop(func() bool { return v.state != netConnecting || itemText(v.active.wifi, "title") == "" }) {
 		t.Error("connecting state not shown")
 	}
 	close(refuse)
 	waitHeadless(t, "the re-prompt", func() bool { return v.state == netPasswordEntry && v.password.errLabel.Visible() })
 	<-stepped
-	if v.password.errLabel.Text() != i18n.T("dropdown-network-error-wrong-password") {
-		t.Errorf("error = %q", v.password.errLabel.Text())
+	settleNetReads(t, v)
+	if got := onHeadlessLoop(v.password.errLabel.Text); got != i18n.T("dropdown-network-error-wrong-password") {
+		t.Errorf("error = %q", got)
 	}
 	if c, _, _, _, _ := wifi.calls(); len(c) != 1 || c[0].path != "/ap/1" || c[0].password != "hunter2" {
 		t.Errorf("connect = %+v", c)
 	}
-	if v.password.secret.entry.Text() != "" {
+	if onHeadlessLoop(v.password.secret.entry.Text) != "" {
 		t.Error("the refused password stayed in the box")
 	}
 
 	// An open network connects straight away; a timeout shows the error
 	// on the wifi card, which the dismiss clears.
-	v.password.cancel()
 	wifi.connectFn = func(func(network.DeviceState)) error {
 		return &network.ConnectError{Failure: network.FailureTimeout}
 	}
+	onHeadlessLoop(func() bool { v.password.cancel(); return true })
 	src.setSnap(network.Snapshot{WifiEnabled: true})
-	v.apply(v.read(context.Background()))
-	v.selectNetwork("cafe")
+	settleNetReads(t, v)
+	onHeadlessLoop(func() bool { v.selectNetwork("cafe"); return true })
 	waitHeadless(t, "the failure", func() bool { return v.progress.err != "" })
-	if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "cm-wireless-disabled-symbolic" {
-		t.Errorf("error card = %q badge %v", detail, v.active.badge.Visible())
-	}
-	v.active.hovered = true
-	v.active.syncTrailing()
-	if v.active.trailing.Visible() != "error-actions" {
-		t.Errorf("hovered error card shows %q", v.active.trailing.Visible())
-	}
-	v.active.dismiss()
-	if v.progress.err != "" || v.active.wifi.Visible() {
-		t.Error("dismiss kept the error")
+	settleNetReads(t, v)
+	onHeadlessLoop(func() bool {
+		if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "cm-wireless-disabled-symbolic" {
+			t.Errorf("error card = %q badge %v", detail, v.active.badge.Visible())
+		}
+		v.active.hovered = true
+		v.active.syncTrailing()
+		if v.active.trailing.Visible() != "error-actions" {
+			t.Errorf("hovered error card shows %q", v.active.trailing.Visible())
+		}
+		v.active.dismiss()
+		if v.progress.err != "" || v.active.wifi.Visible() {
+			t.Error("dismiss kept the error")
+		}
+		return true
+	})
+}
+
+// settleNetReads waits until every read the view requested so far has
+// applied: a read requested now starts after them and applies last.
+func settleNetReads(t *testing.T, v *networkView) {
+	t.Helper()
+	settled := make(chan struct{})
+	v.reads.requestThen(func() { close(settled) })
+	select {
+	case <-settled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the view's reads to settle")
 	}
 }
 
