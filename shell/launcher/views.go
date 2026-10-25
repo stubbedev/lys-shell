@@ -173,11 +173,5 @@ func (v *views) height(width int) int {
 
 // iconPx is -gtk-icon-size: 1.5rem at the styling scale.
 func iconPx(d Deps) int {
-	scale := 1.0
-	if d.Config != nil {
-		if cfg := d.Config(); cfg != nil && cfg.Styling.Scale > 0 {
-			scale = float64(cfg.Styling.Scale)
-		}
-	}
-	return int(math.Round(1.5 * styling.RemBase * scale))
+	return int(math.Round(1.5 * styling.RemBase * float64(d.Config().Styling.Scale)))
 }

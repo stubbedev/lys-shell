@@ -192,12 +192,7 @@ func (m *cwsView) vertical() bool {
 	return loc == config.LocationLeft || loc == config.LocationRight
 }
 
-func (m *cwsView) scale() float64 {
-	if m.ctx.Config == nil || m.ctx.Config.Bar.Scale <= 0 {
-		return 1
-	}
-	return float64(m.ctx.Config.Bar.Scale)
-}
+func (m *cwsView) scale() float64 { return float64(m.ctx.Config.Bar.Scale) }
 
 // labelPx is label-size resolved against LABEL_BASE_REM.
 func (m *cwsView) labelPx() float64 {

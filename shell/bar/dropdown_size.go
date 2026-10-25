@@ -51,9 +51,6 @@ func dropdownDims(name string, cfg *config.Config) (w, h int, ok bool) {
 		return 0, 0, false
 	}
 	scale := float64(cfg.Styling.Scale)
-	if scale <= 0 {
-		scale = 1
-	}
 	var size config.DropdownSize
 	if g.size != nil {
 		size = g.size(&cfg.Dropdowns)

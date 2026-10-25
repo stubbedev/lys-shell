@@ -32,9 +32,5 @@ func dropdownBuilders() map[string]func(ctx ModuleContext) widget.Widget {
 // size, which its own components set, times the styling scale, so a
 // dropdown's labels match the lys-ui parts around them.
 func dropdownFont(ctx ModuleContext) (render.Font, float64) {
-	px := widget.Current().TextSize
-	if ctx.Config != nil && ctx.Config.Styling.Scale > 0 {
-		px *= float64(ctx.Config.Styling.Scale)
-	}
-	return ctx.Font, px
+	return ctx.Font, widget.Current().TextSize * float64(ctx.Config.Styling.Scale)
 }

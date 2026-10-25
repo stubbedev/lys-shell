@@ -393,11 +393,7 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 	card.AddClass("daily-forecast")
 	days := w.Daily[:min(len(w.Daily), weatherDailyDays)]
 	lo, hi := weatherTempRange(days)
-	scale := float64(v.ctx.Config.Styling.Scale)
-	if scale <= 0 {
-		scale = 1
-	}
-	barPx := int(math.Round(weatherBarWidthRem * scale * styling.RemBase))
+	barPx := int(math.Round(weatherBarWidthRem * float64(v.ctx.Config.Styling.Scale) * styling.RemBase))
 	today := time.Now().In(w.Zone)
 	for _, d := range days {
 		isToday := d.Date.Year() == today.Year() && d.Date.YearDay() == today.YearDay()

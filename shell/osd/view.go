@@ -63,13 +63,8 @@ func (f *face) root(sheet *widget.Stylesheet) widget.Widget {
 	return root
 }
 
-// scale is the styling scale, 1 when unset.
-func (o *Osd) scale() float64 {
-	if s := float64(o.cfg.Styling.Scale); s > 0 {
-		return s
-	}
-	return 1
-}
+// scale is the styling scale.
+func (o *Osd) scale() float64 { return float64(o.cfg.Styling.Scale) }
 
 func (o *Osd) icon() *widget.Icon {
 	icon := widget.NewThemeIcon("", iconPx)

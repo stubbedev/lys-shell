@@ -47,11 +47,7 @@ func WidgetTheme(p *styling.Palette, cfg *config.Config) *widget.Theme {
 	t.Error = p.Red
 	t.Warning = p.Yellow
 	t.Success = p.Green
-	scale := float64(cfg.Styling.Scale)
-	if scale <= 0 {
-		scale = 1
-	}
-	t.Radius = styling.RoundingRadiusPx(cfg.Styling.Rounding, scale)
+	t.Radius = styling.RoundingRadiusPx(cfg.Styling.Rounding, float64(cfg.Styling.Scale))
 	t.Animations = cfg.Animations.Enabled
 	return t
 }

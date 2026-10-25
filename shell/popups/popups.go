@@ -214,9 +214,6 @@ func (p *Popups) dropCard(c *card) {
 func (p *Popups) newCard(n *notifications.Notification) *card {
 	cfg := p.cfg.Notification
 	scale := float64(p.cfg.Styling.Scale)
-	if scale <= 0 {
-		scale = 1
-	}
 	px := widget.Current().TextSize * scale
 	c := &card{id: n.ID}
 	c.root = widget.NewBox(widget.Column, 0, 0)
