@@ -35,12 +35,8 @@ import (
 // escapeKeycode is the evdev code of Escape.
 const escapeKeycode = 1
 
-// labelPx and spinnerPx size the text and the loading spinner before
-// the stylesheet's rules.
-const (
-	labelPx   = 13
-	spinnerPx = 24
-)
+// spinnerPx sizes the cards' loading spinner.
+const spinnerPx = 24
 
 // The page names, which are also the notebook tab labels.
 const (
@@ -331,19 +327,22 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 		wanted = pages[0]
 	}
 	nb.SelectTab(wanted)
-	surface := widget.NewBox(widget.Column, 0, 0)
-	surface.AddClass("share-picker-surface")
+	th := widget.Current()
+	surface := widget.NewBox(widget.Column, 2*th.Spacing, 3*th.Padding)
+	surface.AddClass(css.Card, "share-picker-surface")
 	surface.SetSizeRequest(p.width(), p.height())
 	if p.requester != "" {
 		requester := p.label(p.requester)
-		requester.AddClass("share-picker-requester")
+		requester.AddClass("share-picker-requester", css.Heading)
 		surface.Append(requester, false)
 	}
 	surface.Append(nb, true)
 	if !p.cfg.HideTokenRestore {
 		check := widget.NewCheckButton(p.allowToken)
 		check.AddClass("share-picker-restore-button")
-		check.SetChild(p.label("Allow a restore token"))
+		hint := p.label("Allow a restore token")
+		hint.AddClass(css.DimLabel)
+		check.SetChild(hint)
 		check.OnChanged = func(on bool) { p.allowToken = on }
 		surface.Append(check, false)
 	}
@@ -352,7 +351,7 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 		p.confirmLbl = p.label(confirmLabel(0))
 		p.confirmLbl.SetAlignment(render.AlignCenter)
 		p.confirm = widget.NewButton(p.confirmLbl, 0, 0)
-		p.confirm.AddClass("share-picker-confirm-button")
+		p.confirm.AddClass(css.SuggestedAction, "share-picker-confirm-button")
 		p.confirm.SetEnabled(false)
 		p.confirm.OnClick = p.confirmPending
 		surface.Append(p.confirm, false)
@@ -368,26 +367,29 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 	return root
 }
 
+// label is a line at lys-ui's text size, scaled.
 func (p *Picker) label(text string) *widget.Label {
-	return widget.NewLabel(p.d.Font, labelPx, text, 0)
+	return widget.NewLabel(p.d.Font, widget.Current().TextSize*p.scale, text, 0)
 }
 
-// page is a notebook page: the content in a .share-picker-page scroll.
+// page is a notebook page: the content in a .share-picker-page scroll
+// that scrolls vertically only, so its content takes the page's width.
 func page(content widget.Widget) *widget.Scroll {
 	sc := widget.NewScroll(content)
 	sc.AddClass("share-picker-page")
 	sc.FillX, sc.FillY = true, true
+	sc.VerticalOnly = true
 	return sc
 }
 
-// placeholder is an empty page's centered, expanding message.
-func (p *Picker) placeholder(text string) widget.Widget {
-	l := p.label(text)
-	l.AddClass("share-picker-placeholder")
-	l.SetAlignment(render.AlignCenter)
-	l.SetHExpand(true)
-	l.SetVExpand(true)
-	return page(widgets.Center(l))
+// placeholder is an empty page's lys-ui empty state, centered in the
+// page.
+func (p *Picker) placeholder(icon, text string) widget.Widget {
+	empty := widgets.EmptyState(p.d.Font, widget.Current().TextSize*p.scale, icon, text, "")
+	empty.AddClass("share-picker-placeholder")
+	empty.SetHExpand(true)
+	empty.SetVExpand(true)
+	return page(widgets.Center(empty))
 }
 
 // appendPage adds a page under its page_label: a centered
@@ -402,11 +404,20 @@ func (p *Picker) appendPage(nb *widget.Notebook, name string, page widget.Widget
 	nb.SetTabLabel(name, l)
 }
 
+// card is a source card: lys-ui's card at the theme's padding and half
+// its spacing, loading until its preview lands.
+func (p *Picker) card() *widget.Box {
+	th := widget.Current()
+	card := widget.NewBox(widget.Column, th.Spacing/2, th.Padding)
+	card.AddClass(css.Card, "share-picker-card", "share-picker-card-loading")
+	return card
+}
+
 // cardLabel is a card's one-line caption (max-width-chars 1: it takes
 // the card's width and ellipsizes).
-func (p *Picker) cardLabel(text, class string) *widget.Label {
+func (p *Picker) cardLabel(text string, classes ...string) *widget.Label {
 	l := p.label(text)
-	l.AddClass(class)
+	l.AddClass(classes...)
 	l.SetEllipsize(widget.EllipsizeEnd)
 	l.SetMaxWidthChars(1)
 	return l
@@ -425,7 +436,7 @@ func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 		toplevels = enumerate()
 	}
 	if len(toplevels) == 0 {
-		return p.placeholder("No windows available")
+		return p.placeholder("ld-app-window-symbolic", "No windows available")
 	}
 	spacing := p.px(p.cfg.WindowsSpacing, config.SharePickerWindowsSpacingBaseRem)
 	cols := gridColumns(len(toplevels), int(p.cfg.WindowsMinPerRow), int(p.cfg.WindowsMaxPerRow))
@@ -444,9 +455,10 @@ func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 	return page(grid)
 }
 
-// windowCard is build_window_card: the preview (a spinner over it until
-// the capture lands), the title (the class when the title is blank),
-// and the class, the whole card clickable.
+// windowCard is build_window_card: lys-ui's card around the preview (a
+// spinner over it until the capture lands), the title (the class when
+// the title is blank), and the class as a caption, the whole card
+// clickable.
 func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	preview := widget.NewImage(nil)
 	preview.AddClass("share-picker-image")
@@ -457,12 +469,11 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	spinner := widget.NewSpinner(spinnerPx)
 	spinner.SetSpinning(true)
 	shot := widget.NewOverlay().Append(preview).Append(widgets.Center(spinner))
-	card := widget.NewBox(widget.Column, 0, 0)
-	card.AddClass("share-picker-card", "share-picker-card-loading")
+	card := p.card()
 	card.SetVAlign(widget.AlignStart)
 	card.Append(shot, false)
 	card.Append(p.cardLabel(cardTitle(tl), "share-picker-image-label"), false)
-	card.Append(p.cardLabel(tl.Class, "share-picker-image-class-label"), false)
+	card.Append(p.cardLabel(tl.Class, "share-picker-image-class-label", css.Caption, css.DimLabel), false)
 	child := widget.NewBox(widget.Column, 0, 0)
 	child.SetElement("flowboxchild")
 	child.Append(card, false)
@@ -522,7 +533,7 @@ func (p *Picker) outputsPage() widget.Widget {
 	}
 	infos := list()
 	if len(infos) == 0 {
-		return p.placeholder("No outputs available")
+		return p.placeholder("ld-monitor-symbolic", "No outputs available")
 	}
 	if p.cfg.OutputsRespectScaling {
 		applyScaling(infos)
@@ -549,13 +560,13 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 	preview.AddClass("share-picker-image")
 	preview.SetScale(widget.ImageStretch)
 	preview.SetVExpand(true)
-	card := widget.NewBox(widget.Column, 0, 0)
-	card.AddClass("share-picker-card", "share-picker-card-loading")
+	card := p.card()
 	card.Append(preview, true)
 	if p.cfg.OutputsShowLabel {
 		card.Append(p.cardLabel(o.name, "share-picker-image-label"), false)
 	}
 	button := widget.NewButton(card, 0, 0)
+	button.AddClass(css.Flat, "share-picker-output-button")
 	button.SetCursorName("pointer")
 	payload := "screen:" + o.name
 	button.OnClick = func() { p.selectPayload(payload) }

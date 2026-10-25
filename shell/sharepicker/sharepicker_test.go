@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbustest"
@@ -377,5 +379,51 @@ func TestPickerNamesTheRequester(t *testing.T) {
 	p.root = p.build(nil, AllSources)
 	if labels := treetest.Labels(p.root); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
 		t.Errorf("labels = %q", labels)
+	}
+}
+
+// The picker stands on lys-ui's parts: the surface and the source
+// cards are its cards, a class line its dim caption, Share its
+// suggested action, and an empty page its status page laid out inside
+// the page rather than across an unbounded width.
+func TestPickerTakesLysUiParts(t *testing.T) {
+	p, _ := testPicker(t, config.DefaultsSharePicker(), false, true)
+	if s := treetest.WithClass(p.root, "share-picker-surface"); len(s) != 1 || !widget.HasClass(s[0], css.Card) {
+		t.Fatal("the surface is not lys-ui's card")
+	}
+	cards := treetest.WithClass(p.windowsPage(nil), "share-picker-card")
+	if len(cards) != 2 {
+		t.Fatalf("%d window cards, want 2", len(cards))
+	}
+	for _, c := range cards {
+		if !widget.HasClass(c, css.Card) {
+			t.Error("a window card is not lys-ui's card")
+		}
+	}
+	for _, l := range treetest.WithClass(p.windowsPage(nil), "share-picker-image-class-label") {
+		if !widget.HasClass(l, css.Caption) || !widget.HasClass(l, css.DimLabel) {
+			t.Error("a class line is not a dim caption")
+		}
+	}
+	for _, l := range treetest.WithClass(p.windowsPage(nil), "share-picker-image-label") {
+		if widget.HasClass(l, css.Caption) {
+			t.Error("a title line is a caption")
+		}
+	}
+	if p.confirm == nil || !widget.HasClass(p.confirm, css.SuggestedAction) {
+		t.Error("Share is not the suggested action")
+	}
+
+	p.windows = func() []sharepreview.Toplevel { return nil }
+	empty := p.windowsPage(nil)
+	const w, h = 600, 400
+	empty.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
+	empty.Arrange(render.Rect{W: w, H: h})
+	pages := treetest.All[*widget.StatusPage](empty)
+	if len(pages) != 1 {
+		t.Fatalf("%d status pages on the empty page, want 1", len(pages))
+	}
+	if b := pages[0].Bounds(); b.X < 0 || b.X+b.W > w || b.W == 0 {
+		t.Errorf("empty state laid out at %v, outside the %dpx page", b, w)
 	}
 }
