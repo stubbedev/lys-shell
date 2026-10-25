@@ -53,11 +53,13 @@ type RoundingLevel string
 
 // Rounding levels.
 const (
+	// The toolkit's own rounding (lys-ui's corner radius).
+	RoundingDefault RoundingLevel = "default"
 	// Sharp corners (no rounding).
 	RoundingNone RoundingLevel = "none"
 	// Subtle rounding.
 	RoundingSm RoundingLevel = "sm"
-	// Moderate rounding (default).
+	// Moderate rounding.
 	RoundingMd RoundingLevel = "md"
 	// Pronounced rounding.
 	RoundingLg RoundingLevel = "lg"
@@ -65,7 +67,7 @@ const (
 	RoundingFull RoundingLevel = "full"
 )
 
-var _ = registerEnum(RoundingNone, RoundingSm, RoundingMd, RoundingLg, RoundingFull)
+var _ = registerEnum(RoundingDefault, RoundingNone, RoundingSm, RoundingMd, RoundingLg, RoundingFull)
 
 // BorderLocation is the placement of a border: one edge, all edges,
 // or none.

@@ -929,9 +929,10 @@ Global rounding preference for UI components.
 
 | Value | Meaning |
 |---|---|
+| `"default"` | The toolkit's own rounding (lys-ui's corner radius). |
 | `"none"` | Sharp corners (no rounding). |
 | `"sm"` | Subtle rounding. |
-| `"md"` | Moderate rounding (default). |
+| `"md"` | Moderate rounding. |
 | `"lg"` | Pronounced rounding. |
 | `"full"` | Pill shape (fully rounded ends). |
 

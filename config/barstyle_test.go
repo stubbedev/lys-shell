@@ -73,6 +73,11 @@ func TestRoundingCSSValues(t *testing.T) {
 		global, bar, barElems RoundingCSSValues
 	}{
 		{
+			RoundingDefault,
+			r("--radius-default", "--radius-default"), r("--bar-radius-default", "--bar-radius-default"),
+			r("--bar-button-radius-default", "--bar-button-radius-default"),
+		},
+		{
 			RoundingNone,
 			r("--radius-none", "--radius-none"), r("--radius-none", "--radius-none"), r("--radius-none", "--radius-none"),
 		},

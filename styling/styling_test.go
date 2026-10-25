@@ -1,6 +1,7 @@
 package styling
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/render"
@@ -142,6 +143,8 @@ func TestRoundingRadiusPx(t *testing.T) {
 		scale float64
 		want  int
 	}{
+		{config.RoundingDefault, 1, ToolkitRadiusPx()},
+		{config.RoundingDefault, 1.5, int(math.Round(float64(ToolkitRadiusPx()) * 1.5))},
 		{config.RoundingNone, 1, 0},
 		{config.RoundingSm, 1, 6},  // 0.375rem
 		{config.RoundingMd, 1, 10}, // 0.625rem

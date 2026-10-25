@@ -33,6 +33,7 @@
   --font-sans: var(--cfg-font-sans);
   --font-mono: var(--cfg-font-mono);
   --radius-none: 0;
+  --radius-default: calc(var(--toolkit-radius) * var(--global-scale));
   --radius-sm: calc(0.375rem * var(--global-scale));
   --radius-md: calc(0.625rem * var(--global-scale));
   --radius-lg: calc(0.875rem * var(--global-scale));
@@ -88,10 +89,12 @@
   --bar-icon-md: calc(1.25rem * var(--bar-scale));
   --bar-icon-lg: calc(1.6rem * var(--bar-scale));
   --bar-icon-xl: calc(2rem * var(--bar-scale));
+  --bar-radius-default: calc(var(--toolkit-radius) * var(--bar-scale));
   --bar-radius-sm: calc(0.375rem * var(--bar-scale));
   --bar-radius-md: calc(0.625rem * var(--bar-scale));
   --bar-radius-lg: calc(0.875rem * var(--bar-scale));
   --bar-radius-xl: calc(1.125rem * var(--bar-scale));
+  --bar-button-radius-default: calc(var(--toolkit-radius) * var(--bar-scale));
   --bar-button-radius-sm: calc(0.375rem * var(--bar-scale));
   --bar-button-radius-md: calc(0.625rem * var(--bar-scale));
   --bar-button-radius-lg: calc(0.875rem * var(--bar-scale));

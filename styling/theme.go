@@ -83,6 +83,7 @@ func ThemeCSS(p config.Palette, general config.GeneralConfig, bar config.BarConf
 	b.WriteString(pxOverride("--bar-btn-label-padding-override", bar.ButtonLabelPadding))
 	b.WriteString(pxOverride("--bar-btn-gap-override", bar.ButtonGap))
 	b.WriteString("\n")
+	decl("--toolkit-radius", strconv.Itoa(ToolkitRadiusPx())+"px")
 	decl("--cfg-rounding-element", global.Element)
 	decl("--cfg-rounding-container", global.Container)
 	decl("--cfg-bar-rounding-element", barValues.Element)

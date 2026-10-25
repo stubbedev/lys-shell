@@ -44,7 +44,8 @@ type RoundingCSSValues struct {
 }
 
 // CSSValues maps the level to the global --radius-* tokens; containers
-// round one step larger for perceptual consistency (to_css_values).
+// round one step larger for perceptual consistency (to_css_values),
+// except at the toolkit's radius, which surfaces and controls share.
 func (r RoundingLevel) CSSValues() RoundingCSSValues {
 	switch r {
 	case RoundingSm:
@@ -55,6 +56,8 @@ func (r RoundingLevel) CSSValues() RoundingCSSValues {
 		return RoundingCSSValues{"var(--radius-lg)", "var(--radius-xl)"}
 	case RoundingFull:
 		return RoundingCSSValues{"var(--radius-full)", "var(--radius-xl)"}
+	case RoundingDefault:
+		return RoundingCSSValues{"var(--radius-default)", "var(--radius-default)"}
 	default: // none
 		return RoundingCSSValues{"var(--radius-none)", "var(--radius-none)"}
 	}
@@ -74,7 +77,7 @@ func (r RoundingLevel) BarElementCSSValues() RoundingCSSValues {
 
 // scopedCSSValues is the shared shape of the bar rounding tables: none
 // and full use the global tokens, the steps use prefix's, containers
-// one step larger.
+// one step larger; the toolkit's radius is prefix's default for both.
 func (r RoundingLevel) scopedCSSValues(prefix string) RoundingCSSValues {
 	step := func(size string) string { return "var(" + prefix + size + ")" }
 	switch r {
@@ -86,6 +89,8 @@ func (r RoundingLevel) scopedCSSValues(prefix string) RoundingCSSValues {
 		return RoundingCSSValues{step("lg"), step("xl")}
 	case RoundingFull:
 		return RoundingCSSValues{"var(--radius-full)", "var(--radius-full)"}
+	case RoundingDefault:
+		return RoundingCSSValues{step("default"), step("default")}
 	default: // none
 		return RoundingCSSValues{"var(--radius-none)", "var(--radius-none)"}
 	}

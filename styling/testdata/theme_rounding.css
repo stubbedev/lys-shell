@@ -22,6 +22,7 @@
     --bar-btn-label-padding-scale: 1;
     --bar-btn-gap-scale: 1;
 
+    --toolkit-radius: 8px;
     --cfg-rounding-element: var(--radius-full);
     --cfg-rounding-container: var(--radius-xl);
     --cfg-bar-rounding-element: var(--bar-radius-lg);

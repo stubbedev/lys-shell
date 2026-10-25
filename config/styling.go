@@ -33,8 +33,8 @@ type StylingConfig struct {
 // DefaultsStyling returns the schema defaults.
 func DefaultsStyling() StylingConfig {
 	return StylingConfig{
-		Scale:          1.01,
-		Rounding:       RoundingSm,
+		Scale:          1,
+		Rounding:       RoundingDefault,
 		Appearance:     AppearanceAuto,
 		ColorExtractor: DefaultsColorExtractor(),
 		Palette:        paletteConfigOf(lysShellTheme),

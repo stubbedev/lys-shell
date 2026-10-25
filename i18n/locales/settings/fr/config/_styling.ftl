@@ -158,6 +158,7 @@ enum-font-weight-class-semibold = Semi-gras
 enum-font-weight-class-bold = Gras
 
 ## Variantes de RoundingLevel
+enum-rounding-level-default = Par défaut
 enum-rounding-level-none = Aucun
 enum-rounding-level-sm = Petit
 enum-rounding-level-md = Moyen

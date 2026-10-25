@@ -7114,6 +7114,11 @@
       "description": "Global rounding preference for UI components.",
       "oneOf": [
         {
+          "const": "default",
+          "description": "The toolkit's own rounding (lys-ui's corner radius).",
+          "type": "string"
+        },
+        {
           "const": "none",
           "description": "Sharp corners (no rounding).",
           "type": "string"
@@ -7125,7 +7130,7 @@
         },
         {
           "const": "md",
-          "description": "Moderate rounding (default).",
+          "description": "Moderate rounding.",
           "type": "string"
         },
         {
@@ -7699,12 +7704,12 @@
         },
         "rounding": {
           "$ref": "#/$defs/RoundingLevel",
-          "default": "sm",
+          "default": "default",
           "description": "Corner rounding for dropdowns, popovers, and dialogs."
         },
         "scale": {
           "$ref": "#/$defs/ScaleFactor",
-          "default": 1.0099999904632568,
+          "default": 1.0,
           "description": "Scale multiplier for dropdowns, popovers, and dialogs."
         },
         "theme-provider": {
@@ -10410,8 +10415,8 @@
         "pywal-contrast": 3.0,
         "pywal-light": false,
         "pywal-saturation": 0.05,
-        "rounding": "sm",
-        "scale": 1.0099999904632568,
+        "rounding": "default",
+        "scale": 1.0,
         "theme-provider": "lys-shell",
         "theming-monitor": "",
         "wallust-apply-globally": true,

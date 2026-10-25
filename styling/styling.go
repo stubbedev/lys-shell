@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 )
@@ -225,6 +226,10 @@ func rgbaStraight(r, g, b, a uint8) render.Color {
 	return render.Color(uint32(a)<<24 | uint32(pre(r))<<16 | uint32(pre(g))<<8 | uint32(pre(b)))
 }
 
+// ToolkitRadiusPx is lys-ui's default corner radius, what the default
+// rounding level resolves to.
+func ToolkitRadiusPx() int { return widget.DarkTheme().Radius }
+
 // RoundingRadiusPx resolves a rounding level to corner pixels: the
 // --radius-* table (css/tokens/index.css) times the scale, with
 // full pinned at 9999px unscaled.
@@ -234,6 +239,8 @@ func RoundingRadiusPx(level config.RoundingLevel, scale float64) int {
 	}
 	var rem float64
 	switch level {
+	case config.RoundingDefault:
+		return int(math.Round(float64(ToolkitRadiusPx()) * scale))
 	case config.RoundingSm:
 		rem = 0.375
 	case config.RoundingMd:

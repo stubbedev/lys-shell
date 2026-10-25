@@ -43,8 +43,13 @@ func TestWidgetThemeIsThePalette(t *testing.T) {
 			t.Errorf("%s = %#08x, want the palette's %#08x", name, uint32(got[0]), uint32(got[1]))
 		}
 	}
-	if want := styling.RoundingRadiusPx(cfg.Styling.Rounding, float64(cfg.Styling.Scale)); th.Radius != want {
-		t.Errorf("Radius = %d, want the global rounding %d", th.Radius, want)
+	if want := widget.DarkTheme().Radius; th.Radius != want {
+		t.Errorf("Radius = %d with the default rounding and scale, want lys-ui's %d", th.Radius, want)
+	}
+	cfg.Styling.Rounding = config.RoundingLg
+	cfg.Styling.Scale = 2
+	if got, want := WidgetTheme(p, cfg).Radius, styling.RoundingRadiusPx(config.RoundingLg, 2); got != want || got == widget.DarkTheme().Radius {
+		t.Errorf("Radius = %d with rounding lg at scale 2, want the override %d", got, want)
 	}
 	if !th.Animations {
 		t.Error("animations off with the config's on")

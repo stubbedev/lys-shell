@@ -13,8 +13,8 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1.01` | Scale multiplier for dropdowns, popovers, and dialogs. |
-| `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"sm"` | Corner rounding for dropdowns, popovers, and dialogs. |
+| `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for dropdowns, popovers, and dialogs. |
+| `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"default"` | Corner rounding for dropdowns, popovers, and dialogs. |
 | `appearance` | [`Appearance`](/config/types#appearance) | `"auto"` | Light/dark appearance mode. `Auto` follows each provider / the configured palette; `Light`/`Dark` force the mode (static palettes swap to their built-in light/dark variant when one exists). |
 | `high-contrast` | bool | `false` | Ask apps for higher contrast: the `contrast` preference the desktop portal tells GTK, Qt and Chromium apps. |
 | `theming-monitor` | string | `""` | Monitor whose wallpaper drives color extraction. Empty uses the first available. |
@@ -65,8 +65,8 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 
 ```yaml
 styling:
-  scale: 1.0099999904632568
-  rounding: sm
+  scale: 1.0
+  rounding: default
   appearance: auto
   high-contrast: false
   theme-provider: lys-shell
