@@ -2,7 +2,6 @@ package bar
 
 import (
 	"fmt"
-	"math"
 	"sync"
 
 	"github.com/stubbedev/lys-ui/app"
@@ -372,6 +371,7 @@ func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.
 		Anchor:     anchor,
 		Gravity:    dropdownGravity(cfg.Bar.Location),
 		Content:    content,
+		Gap:        widget.PopoverGap,
 		NoAutohide: !cfg.Bar.DropdownAutohide,
 	}
 	if monH > 0 {
@@ -416,69 +416,21 @@ func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 	r.ctx.Config = cfg
 }
 
-// dropdownMargins is the Rust registry's DropdownMargins: a narrow gap
-// toward the bar's edge, the wide one everywhere else, rounded to
-// whole pixels at the bar scale.
-type dropdownMargins struct{ top, bottom, start, end int }
-
-const (
-	marginsGapRem     = 0.275
-	marginsContentRem = 1.0
-	marginsRemPx      = 16.0
-)
-
-func newDropdownMargins(scale float64, location config.Location) dropdownMargins {
-	gap := roundMarginRem(marginsGapRem, scale)
-	content := roundMarginRem(marginsContentRem, scale)
-	m := dropdownMargins{content, content, content, content}
-	switch location {
-	case config.LocationTop:
-		m.top = gap
-	case config.LocationBottom:
-		m.bottom = gap
-	case config.LocationLeft:
-		m.start = gap
-	case config.LocationRight:
-		m.end = gap
-	}
-	return m
-}
-
-func roundMarginRem(rem, scale float64) int {
-	return int(math.Round(rem * marginsRemPx * scale))
-}
-
-// withDropdownMargins wraps the popover card in the margins box: the
-// Rust registry sets them on the popover child at every show, so the
-// card floats inside the surface away from its edges.
 // dropdownTree is the popover's tree around content: the revealer the
-// card enters through (animate_in), the card (lys-ui's popover surface
-// in the dropdown's color), and the Rust registry's surface margins
-// around it. The theme reaches it through
-// the bar button it opens from: lys-ui styles a popover as a child of
-// its anchor, as GTK's popover CSS node is, so it inherits the bar
-// window's fonts and :root variables. w x h is the dropdown's size, the
-// Rust popover's width and height requests: a floor for the whole
-// popover, margins included, so the card is that less the margins (a
-// zero or negative axis leaves it to the content).
+// card enters through (animate_in) inside the card (lys-ui's popover
+// surface in the dropdown's color). The theme reaches it through the
+// bar button it opens from: lys-ui styles a popover as a child of its
+// anchor, as GTK's popover CSS node is, so it inherits the bar window's
+// fonts and :root variables. w x h is the dropdown's size, a floor for
+// the card (a zero or negative axis leaves it to the content); the
+// popover's gap and shadow gutter keep it off the bar and the surface
+// edges.
 func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
 	card := popoverCard(rev, cfg.Bar.DropdownShadow)
-	root := withDropdownMargins(card, cfg)
-	root.SetSizeRequest(w, h)
-	return root, rev
-}
-
-func withDropdownMargins(card *widget.Box, cfg *config.Config) *widget.Box {
-	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
-	// Widget margins, as the registry's set_margin_*: a stylesheet
-	// padding rule replaces a programmatic padding, never a widget's
-	// margin.
-	card.SetMargin(render.Insets{Top: m.top, Bottom: m.bottom, Left: m.start, Right: m.end})
-	box := widget.NewBox(widget.Column, 0, 0)
-	box.Append(card, true)
-	return box
+	card.SetSizeRequest(w, h)
+	return card, rev
 }
 
 // dropdownGravity is detect_popover_position: dropdowns open away from

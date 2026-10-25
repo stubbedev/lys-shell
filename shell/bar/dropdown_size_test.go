@@ -110,36 +110,37 @@ func TestPanelCapsAtTheMonitorCeiling(t *testing.T) {
 	}
 }
 
-// The configured size is the popover's own size request, margins
-// included (the Rust popover's width and height requests around the
-// registry's margins): content smaller than it leaves the card at the
-// request less the margins and a transparent rest; content wider than
-// it widens the popover.
-func TestDropdownSizeFloorsThePopoverAroundItsMargins(t *testing.T) {
+// The configured size is the card's own size request: content smaller
+// than it leaves the card at the request, its content the request less
+// the popover's border; content wider than it widens the card. No
+// margins ride around the card: the popover's gap and shadow gutter
+// keep it off the bar.
+func TestDropdownSizeFloorsTheCard(t *testing.T) {
 	cfg := config.Defaults()
-	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
 	con := widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}
 
 	p, _ := pagedPanel(widget.NewSpacer(10, 50))
 	root, _ := dropdownTree(p, cfg, 382, 512)
-	// The bundle's rules must not take the margins with them.
 	isolateConfigDir(t)
 	apptheme.New(cfg).Attach(root)
 	sz := widget.MeasureAsChild(root, con)
 	if sz != (widget.Size{W: 382, H: 512}) {
-		t.Fatalf("popover %+v, want the 382x512 request", sz)
+		t.Fatalf("card %+v, want the 382x512 request", sz)
 	}
 	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
-	if got, want := p.child.(interface{ Bounds() render.Rect }).Bounds(), 382-m.start-m.end-2*popoverBorder; got.W != want || got.H != 100 {
-		t.Errorf("card content %+v, want %d wide (the request less the margins and the popover's border) and its 100px content tall", got, want)
+	if got, want := p.child.(interface{ Bounds() render.Rect }).Bounds(), 382-2*popoverBorder; got.W != want || got.H != 100 {
+		t.Errorf("card content %+v, want %d wide (the request less the popover's border) and its 100px content tall", got, want)
+	}
+	if got := root.Margin(); got != (render.Insets{}) {
+		t.Errorf("card margins %+v, want none", got)
 	}
 
 	wide := widget.NewBox(widget.Row, 0, 0)
 	wide.Append(widget.NewSpacer(500, 20), false)
 	root, _ = dropdownTree(newPanelBox(wide), cfg, 382, 0)
 	apptheme.New(cfg).Attach(root)
-	if sz := widget.MeasureAsChild(root, con); sz.W != 500+m.start+m.end+2*popoverBorder {
-		t.Errorf("popover width %d, want the 500px content plus the margins and the popover's border", sz.W)
+	if sz := widget.MeasureAsChild(root, con); sz.W != 500+2*popoverBorder {
+		t.Errorf("card width %d, want the 500px content plus the popover's border", sz.W)
 	}
 }
 
