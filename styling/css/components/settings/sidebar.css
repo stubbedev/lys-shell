@@ -1,34 +1,3 @@
-.sidebar-header {
-  padding: var(--space-md) var(--space-sm) var(--space-sm);
-}
-
-image.sidebar-icon {
-  -gtk-icon-size: var(--icon-md);
-  margin-right: var(--space-sm);
-}
-
-.sidebar-title {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-}
-
-sidebar button.item label {
-  font-size: var(--text-md);
-}
-
-sidebar .group-label {
-  font-size: var(--text-xs);
-}
-
-image.sidebar-item-icon,
-image.sidebar-reset-icon {
-  -gtk-icon-size: var(--icon-sm);
-}
-
-button.sidebar-reset-all {
-  font-size: var(--text-sm);
-}
-
 button.sidebar-reset-all:hover {
   color: var(--status-error);
 }

@@ -137,12 +137,12 @@ func TestUserStylesReloadOnAWatchedChange(t *testing.T) {
 	}
 }
 
-// spacedWidth is the natural width of a .list-control-button box of two
-// 10px spacers, which the bundle pads, under whatever stylesheets reach
-// it.
+// spacedWidth is the natural width of a .file-picker box of two 10px
+// spacers, which the bundle spaces apart, under whatever stylesheets
+// reach it.
 func spacedWidth(attach func(*widget.Box)) int {
 	box := widget.NewBox(widget.Row, 0, 0)
-	box.AddClass("list-control-button")
+	box.AddClass("file-picker")
 	box.Append(widget.NewSpacer(10, 10), false)
 	box.Append(widget.NewSpacer(10, 10), false)
 	attach(box)

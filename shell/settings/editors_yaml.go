@@ -32,7 +32,7 @@ func newYAMLEditor(k *kit, s slot, key string, minLines int) *yamlEditor {
 	c := &yamlEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s, key: key}
 	c.badge = k.badge(i18n.Settings().Get("settings-source-unsaved"), "warning")
 	c.badge.SetVisible(false)
-	c.area = widget.NewTextArea(k.mono, 14, 0)
+	c.area = widget.NewTextArea(k.mono, k.textPx(), 0)
 	c.area.SetLineNumbers(true)
 	c.area.SetIndent(2)
 	c.area.SetAutoIndent(true)

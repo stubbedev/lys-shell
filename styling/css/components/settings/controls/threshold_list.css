@@ -1,8 +1,0 @@
-.threshold-editor .threshold-row + .threshold-row {
-  margin-top: var(--space-xs);
-}
-.threshold-editor .threshold-row .threshold-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  color: var(--fg-subtle);
-}

@@ -17,10 +17,11 @@ func newSidebar(k *kit, sections []navSection, active string, content widget.Wid
 	s.SetCollapse(widget.SidebarNone)
 	s.SetNarrowWidth(0)
 
-	header := widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	header := widget.NewBox(widget.Row, th.Spacing, th.Padding)
 	header.AddClass("sidebar-header")
-	header.Append(k.icon("ld-settings-symbolic", "sidebar-icon"), false)
-	header.Append(k.label(t.Get("settings-title"), "sidebar-title"), false)
+	header.AppendAligned(k.icon("ld-settings-symbolic", "sidebar-icon"), false, widget.AlignCenter)
+	header.AppendAligned(k.label(t.Get("settings-title"), "sidebar-title", css.LargeText), false, widget.AlignCenter)
 	s.SetHeader(header)
 
 	for _, sec := range sections {
@@ -38,9 +39,9 @@ func newSidebar(k *kit, sections []navSection, active string, content widget.Wid
 		s.AddCollapsibleGroup(t.Get(sec.key), true, items...)
 	}
 
-	reset := widget.NewBox(widget.Row, 0, 0)
-	reset.Append(k.icon("ld-rotate-ccw-symbolic", "sidebar-reset-icon"), false)
-	reset.Append(k.label(t.Get("settings-reset-all"), "sidebar-reset-label"), true)
+	reset := widget.NewBox(widget.Row, th.Spacing, 0)
+	reset.AppendAligned(k.icon("ld-rotate-ccw-symbolic", "sidebar-reset-icon"), false, widget.AlignCenter)
+	reset.AppendAligned(k.label(t.Get("settings-reset-all"), "sidebar-reset-label"), true, widget.AlignCenter)
 	s.SetFooter(k.button(reset, onResetAll, css.Ghost, "sidebar-reset-all"))
 	return s
 }

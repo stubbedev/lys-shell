@@ -57,7 +57,7 @@ func newFontEditor(k *kit, s slot, monospace bool) *fontEditor {
 	c.label = k.label("", "font-picker-label")
 	c.label.SetEllipsize(widget.EllipsizeEnd)
 	c.label.SetMaxWidthChars(fontPickerLabelChars)
-	c.btn = k.button(c.label, c.open)
+	c.btn = k.button(c.label, c.open, css.Outline)
 	c.Append(c.btn, false)
 	c.refresh()
 	return c
@@ -133,7 +133,7 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	contents.SetElement("contents")
 	var searchField widget.Widget
 	if spec.searchEntry {
-		se := widget.NewSearchEntry(k.face, 14, i18n.Settings().Get(spec.placeholder))
+		se := widget.NewSearchEntry(k.face, k.textPx(), i18n.Settings().Get(spec.placeholder))
 		// The stylesheet inks it, as k.entry's.
 		se.SetColor(0)
 		se.SetTextWidth(widget.GTKTextWidth)
@@ -333,10 +333,10 @@ func newIconEditor(k *kit, s slot) *iconEditor {
 	c.icon = k.icon("ld-image-symbolic")
 	c.label = k.label("")
 	c.label.SetEllipsize(widget.EllipsizeEnd)
-	face := widget.NewBox(widget.Row, 8, 0)
+	face := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 	face.AppendAligned(c.icon, false, widget.AlignCenter)
 	face.AppendAligned(c.label, true, widget.AlignCenter)
-	c.btn = k.button(face, c.open)
+	c.btn = k.button(face, c.open, css.Outline)
 	c.Append(c.btn, false)
 	c.refresh()
 	return c
@@ -363,14 +363,14 @@ func (c *iconEditor) open() {
 		class: "icon-picker-popover", placeholder: "settings-icon-search",
 		cellW: iconPickerCell, maxH: iconPickerH, minW: iconPickerW, pickTyped: true,
 		row: func(k *kit, name string) widget.Widget {
-			cell := widget.NewBox(widget.Row, 0, 0)
+			cell := widget.NewBox(widget.Row, 0, widget.Current().Padding/2)
 			cell.AddClass("icon-picker-cell")
 			cell.SetTooltip(name)
 			cell.AppendAligned(widget.NewThemeIcon(name, iconPreviewPx), true, widget.AlignCenter)
 			return cell
 		},
 		trailing: func(k *kit, pick func(string)) widget.Widget {
-			clear := k.button(k.icon("ld-x-circle-symbolic"), func() { pick("") }, "flat", "icon-picker-clear")
+			clear := k.button(k.icon("ld-x-circle-symbolic"), func() { pick("") }, "icon-picker-clear", css.Ghost, css.Icon)
 			clear.SetTooltip(i18n.Settings().Get("settings-icon-clear"))
 			return clear
 		},
@@ -388,6 +388,9 @@ var iconRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
 // Theme selector sizes (theme_selector: BASE_MAX_HEIGHT at the
 // styling scale).
 const themeListPx = 384
+
+// themeSwatchPx is a theme row's color swatch edge.
+const themeSwatchPx = 8
 
 // paletteKeys are the [styling.palette] keys a theme sets, in the
 // palette's order.
@@ -418,11 +421,11 @@ type themeSelector struct {
 func newThemeSelector(k *kit) *themeSelector {
 	t := i18n.Settings()
 	c := &themeSelector{Box: widget.NewBox(widget.Row, 0, 0), k: k}
-	content := widget.NewBox(widget.Row, 0, 0)
+	content := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	content.AppendAligned(k.icon("ld-palette-symbolic", "theme-preset-button-icon"), false, widget.AlignCenter)
 	content.AppendAligned(k.label(t.Get("settings-theme-preset-apply"), "theme-preset-button-label"), false, widget.AlignCenter)
-	content.AppendAligned(k.icon("ld-chevron-down-symbolic", "theme-preset-button-chevron"), false, widget.AlignCenter)
-	c.btn = k.button(content, c.open, "theme-preset-button")
+	content.AppendAligned(k.icon("ld-chevron-down-symbolic", "theme-preset-button-chevron", css.DimLabel), false, widget.AlignCenter)
+	c.btn = k.button(content, c.open, "theme-preset-button", css.Outline)
 	c.Append(c.btn, false)
 	c.badge = k.badge("")
 	c.refresh()
@@ -458,17 +461,19 @@ func (c *themeSelector) open() {
 // row is build_theme_row: the swatches (bg, primary, red, yellow,
 // green, blue) and the name.
 func (c *themeSelector) row(name string) widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, 0, th.Padding)
 	row.AddClass("theme-preset-entry")
-	content := widget.NewBox(widget.Row, 0, 0)
+	content := widget.NewBox(widget.Row, th.Spacing, 0)
 	content.AddClass("theme-preset-row")
-	swatches := widget.NewBox(widget.Row, 0, 0)
+	swatches := widget.NewBox(widget.Row, th.Spacing/2, 0)
 	swatches.AddClass("theme-preset-swatches")
 	if th, ok := c.theme(name); ok {
 		p := th.Palette
 		for _, hex := range []string{p.Bg, p.Primary, p.Red, p.Yellow, p.Green, p.Blue} {
 			sw := widget.NewBox(widget.Row, 0, 0)
 			sw.AddClass("theme-preset-swatch")
+			sw.SetSizeRequest(themeSwatchPx, themeSwatchPx)
 			sw.SetInlineStylePriority("background-color: "+hex+"; background-image: none;", apptheme.ComponentPriority)
 			swatches.AppendAligned(sw, false, widget.AlignCenter)
 		}

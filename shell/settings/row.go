@@ -3,6 +3,7 @@ package settings
 import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
@@ -51,8 +52,12 @@ func async[T any](k *kit, work func() T, done func(T)) {
 
 // label is a styled label; color, size and weight come from the
 // stylesheet.
+// textPx is lys-ui's text size, which every label and control of the
+// window takes.
+func (k *kit) textPx() float64 { return widget.Current().TextSize }
+
 func (k *kit) label(text string, classes ...string) *widget.Label {
-	l := widget.NewLabel(k.face, 14, text, 0)
+	l := widget.NewLabel(k.face, k.textPx(), text, 0)
 	l.AddClass(classes...)
 	return l
 }
@@ -60,7 +65,7 @@ func (k *kit) label(text string, classes ...string) *widget.Label {
 // entry is a text field sized the way a GtkEntry is: a fixed width
 // the text pans inside, whatever it holds.
 func (k *kit) entry() *widget.Entry {
-	e := widget.NewEntry(k.face, 14, 0)
+	e := widget.NewEntry(k.face, k.textPx(), 0)
 	e.SetTextWidth(widget.GTKTextWidth)
 	return e
 }
@@ -120,14 +125,16 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 	if spec.fullWidth {
 		axis = widget.Column
 	}
-	r := &settingRow{kit: k, path: spec.path, ctl: ctl, action: spec.action, Box: widget.NewBox(axis, 0, 0)}
+	th := widget.Current()
+	r := &settingRow{kit: k, path: spec.path, ctl: ctl, action: spec.action, Box: widget.NewBox(axis, th.Spacing, 0)}
+	r.SetPadding(render.Insets{Top: th.Padding + th.Padding/2, Right: 2 * th.Padding, Bottom: th.Padding + th.Padding/2, Left: 2 * th.Padding})
 	r.AddClass("setting-row")
 
-	info := widget.NewBox(widget.Column, 0, 0)
-	labelRow := widget.NewBox(widget.Row, 0, 0)
-	labelRow.Append(k.label(t.Get(spec.labelKey()), "setting-label"), false)
+	info := widget.NewBox(widget.Column, th.Spacing/4, 0)
+	labelRow := widget.NewBox(widget.Row, th.Spacing/2, 0)
+	labelRow.AppendAligned(k.label(t.Get(spec.labelKey()), "setting-label"), false, widget.AlignCenter)
 	if spec.unit != "" {
-		labelRow.Append(k.label("("+spec.unit+")", "setting-unit"), false)
+		labelRow.AppendAligned(k.label("("+spec.unit+")", "setting-unit", css.Caption, css.DimLabel, css.Monospace), false, widget.AlignCenter)
 	}
 	r.badge = k.badge("")
 	labelRow.Append(r.badge, false)
@@ -136,7 +143,7 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 	}
 	info.Append(labelRow, false)
 	if desc := t.Attr(spec.labelKey(), "description"); desc != "" {
-		dl := k.label(desc, "setting-description")
+		dl := k.label(desc, "setting-description", css.Caption, css.DimLabel)
 		dl.SetEllipsize(widget.EllipsizeEnd)
 		dl.SetMaxWidthChars(descriptionMaxChars)
 		if len(desc) > descriptionTooltipMinChars {
@@ -145,7 +152,7 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 		info.Append(dl, false)
 	}
 
-	r.reset = k.button(k.icon("ld-rotate-ccw-symbolic"), func() { k.store.reset(spec.path) }, "setting-reset")
+	r.reset = k.button(k.icon("ld-rotate-ccw-symbolic"), func() { k.store.reset(spec.path) }, "setting-reset", css.Ghost, css.Icon, css.Small)
 	slot := widget.NewBox(widget.Row, 0, 0)
 	slot.AddClass("setting-control")
 	slot.AppendAligned(ctl, spec.fullWidth, widget.AlignCenter)

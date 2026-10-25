@@ -41,7 +41,7 @@ type optionalEnum struct {
 
 func newOptionalEnum(k *kit, s slot, meta config.FieldMeta) *optionalEnum {
 	labels := append([]string{i18n.Settings().Get("settings-inherit")}, enumLabels(meta)...)
-	c := &optionalEnum{Dropdown: widget.NewDropdown(k.face, 14, labels, 0), k: k, slot: s, variants: meta.Variants}
+	c := &optionalEnum{Dropdown: widget.NewDropdown(k.face, k.textPx(), labels, 0), k: k, slot: s, variants: meta.Variants}
 	c.OnSelect = func(i int) {
 		switch {
 		case c.syncing:
@@ -79,7 +79,7 @@ func newOptionalNumber(k *kit, s slot, lo, hi, step, fallback float64) *optional
 	c.on = widget.NewSwitch(false)
 	c.on.AddClass("inherit-switch")
 	c.on.SetTooltip(i18n.Settings().Get("settings-override"))
-	c.spin = widget.NewSpinButton(k.face, 14, 0, lo, hi, step, 0)
+	c.spin = widget.NewSpinButton(k.face, k.textPx(), 0, lo, hi, step, 0)
 	c.spin.SetValue(fallback)
 	c.AppendAligned(c.on, false, widget.AlignCenter)
 	c.AppendAligned(c.spin, false, widget.AlignCenter)
@@ -150,8 +150,8 @@ type sizeEditor struct {
 func newSizeEditor(k *kit, s slot, baseRem float64) *sizeEditor {
 	t := i18n.Settings()
 	c := &sizeEditor{Box: widget.NewBox(widget.Row, 8, 0), k: k, slot: s, basePx: baseRem * remBasePx}
-	c.mode = widget.NewDropdown(k.face, 14, []string{t.Get("settings-size-scale"), t.Get("settings-size-px")}, sizeScale)
-	c.spin = widget.NewSpinButton(k.face, 14, 0, 0, 10000, 0.05, 2)
+	c.mode = widget.NewDropdown(k.face, k.textPx(), []string{t.Get("settings-size-scale"), t.Get("settings-size-px")}, sizeScale)
+	c.spin = widget.NewSpinButton(k.face, k.textPx(), 0, 0, 10000, 0.05, 2)
 	c.AppendAligned(c.mode, false, widget.AlignCenter)
 	c.AppendAligned(c.spin, false, widget.AlignCenter)
 	c.mode.OnSelect = func(i int) {

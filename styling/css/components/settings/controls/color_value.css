@@ -10,10 +10,6 @@
   border-radius: var(--rounding-element);
 }
 
-.color-value-control {
-  border-spacing: var(--space-sm);
-}
-
 .color-value-swatch {
   border: 1px solid var(--border-default);
   border-radius: var(--rounding-element);
@@ -26,10 +22,6 @@
   border-radius: var(--rounding-element);
   min-width: calc(1.25rem * var(--global-scale));
   min-height: calc(1.25rem * var(--global-scale));
-}
-
-.setting-control dropdown.color-value-dropdown button {
-  padding: 0;
 }
 
 .color-value-dot {
@@ -184,17 +176,4 @@
 .color-value-dot.custom {
   background-image: linear-gradient(135deg, var(--green), var(--red), var(--blue));
   border: none;
-}
-
-window.colorchooser {
-  font-size: var(--text-sm);
-}
-
-window.colorchooser headerbar {
-  min-height: calc(2rem * var(--global-scale));
-  padding: var(--space-xs) var(--space-sm);
-}
-
-window.colorchooser headerbar button {
-  padding: var(--space-xs) var(--space-md);
 }

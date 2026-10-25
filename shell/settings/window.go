@@ -4,7 +4,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -58,7 +60,9 @@ func newWindow(k *kit, cfg *config.Config, after func(time.Duration, func())) *w
 		if w.onClose != nil {
 			w.onClose()
 		}
-	}, "settings-close")
+	}, "settings-close", css.Ghost, css.Icon)
+	th := widget.Current()
+	closeBtn.SetMargin(render.Insets{Top: 2 * th.Padding, Right: 2 * th.Padding})
 	closeBtn.SetTooltip(t.Get("settings-close"))
 	content := widget.NewOverlay().Append(w.stack).AppendAligned(closeBtn, widget.AlignEnd, widget.AlignStart)
 

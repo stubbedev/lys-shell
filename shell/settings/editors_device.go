@@ -24,7 +24,7 @@ type deviceSelect struct {
 }
 
 func newDeviceSelect(k *kit, s slot, choices []recorder.DeviceChoice) *deviceSelect {
-	c := &deviceSelect{Dropdown: widget.NewDropdown(k.face, 14, nil, 0), slot: s}
+	c := &deviceSelect{Dropdown: widget.NewDropdown(k.face, k.textPx(), nil, 0), slot: s}
 	c.OnSelect = func(i int) {
 		if !c.syncing && i >= 0 && i < len(c.choices) {
 			_ = c.slot.set(c.choices[i].ID)

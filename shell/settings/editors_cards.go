@@ -5,7 +5,9 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -38,7 +40,7 @@ type cardChrome struct {
 
 var cardFormChrome = cardChrome{
 	card: "card-form-card", header: "card-form-header", body: "card-form-body",
-	remove: []string{"list-control-button", "list-control-remove"}, removeKey: "settings-list-remove",
+	remove: []string{"list-control-button", "list-control-remove", css.Ghost, css.Icon, css.Small}, removeKey: "settings-list-remove",
 }
 
 // cardSpec shapes a card list: the card's header (a title for the
@@ -82,9 +84,10 @@ type card struct {
 }
 
 func newCardList(k *kit, s slot, spec cardSpec) *cardList {
-	c := &cardList{Box: widget.NewBox(widget.Column, 8, 0), k: k, slot: s, spec: spec}
+	th := widget.Current()
+	c := &cardList{Box: widget.NewBox(widget.Column, th.Spacing, 0), k: k, slot: s, spec: spec}
 	c.AddClass(append([]string{"card-form-editor"}, spec.classes...)...)
-	c.list = widget.NewBox(widget.Column, 8, 0)
+	c.list = widget.NewBox(widget.Column, th.Spacing, 0)
 	c.list.AddClass(spec.listCls)
 	c.Append(c.list, false)
 	addKey := spec.addKey
@@ -178,17 +181,20 @@ func (c *cardList) appendCard(i int) {
 	if c.spec.chrome != nil {
 		chrome = *c.spec.chrome
 	}
+	th := widget.Current()
+	band := render.Insets{Top: th.Padding, Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding}
 	root := widget.NewBox(widget.Column, 0, 0)
-	root.AddClass(chrome.card)
-	header := widget.NewBox(widget.Row, 8, 0)
+	root.AddClass(css.Card, chrome.card)
+	header := widget.NewBox(widget.Row, th.Spacing, 0)
+	header.SetPadding(band)
 	header.AddClass(chrome.header)
 	cd := &card{}
 	if id := c.spec.identity; id != nil {
-		header.AppendAligned(c.k.label(t.Get(id.label), c.spec.labelCls), false, widget.AlignCenter)
+		header.AppendAligned(c.formLabel(t.Get(id.label)), false, widget.AlignCenter)
 		cd.identity = id.editor(c.k, c.fieldSlot(i, id.key))
 		header.AppendAligned(cd.identity, true, widget.AlignCenter)
 	} else {
-		cd.title = c.k.label("", "card-form-title")
+		cd.title = c.k.label("", "card-form-title", css.Heading)
 		header.AppendAligned(cd.title, true, widget.AlignCenter)
 	}
 	remove := c.k.button(c.k.icon("ld-trash-2-symbolic"), func() {
@@ -202,7 +208,8 @@ func (c *cardList) appendCard(i int) {
 		remove.SetTooltip(t.Get(chrome.removeKey))
 	}
 	header.AppendAligned(remove, false, widget.AlignCenter)
-	body := widget.NewBox(widget.Column, 0, 0)
+	body := widget.NewBox(widget.Column, th.Spacing/2, 0)
+	body.SetPadding(band)
 	body.AddClass(chrome.body)
 	for _, f := range c.spec.fields {
 		var ctl control
@@ -211,19 +218,31 @@ func (c *cardList) appendCard(i int) {
 		} else {
 			ctl = f.editor(c.k, c.fieldSlot(i, f.key))
 		}
-		row := widget.NewBox(widget.Row, 8, 0)
+		row := widget.NewBox(widget.Row, th.Spacing, 0)
 		row.AddClass(c.spec.rowClass)
-		row.AppendAligned(c.k.label(t.Get(f.label), c.spec.labelCls), !f.fill, widget.AlignCenter)
+		row.AppendAligned(c.formLabel(t.Get(f.label)), !f.fill, widget.AlignCenter)
 		row.AppendAligned(ctl, f.fill, widget.AlignCenter)
 		body.Append(row, false)
 		cd.controls = append(cd.controls, ctl)
 	}
 	root.Append(header, false)
+	root.Append(widget.NewSeparator(widget.Horizontal), false)
 	root.Append(body, false)
 	c.list.Append(root, false)
 	c.cards = append(c.cards, cd)
 	c.retitle(i)
 }
+
+// formLabel is a field's label in a card: a dim caption heading at
+// least cardFormLabelPx wide, so the fields line up.
+func (c *cardList) formLabel(text string) *widget.Label {
+	l := c.k.label(text, c.spec.labelCls, css.CaptionHeading, css.DimLabel)
+	l.SetSizeRequest(cardFormLabelPx, 0)
+	return l
+}
+
+// cardFormLabelPx is the card fields' label column.
+const cardFormLabelPx = 68
 
 func (c *cardList) retitle(i int) {
 	if i < len(c.cards) && c.cards[i].title != nil && c.spec.title != nil {

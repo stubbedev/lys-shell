@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -49,9 +50,10 @@ type listEditor struct {
 }
 
 func newListEditor(k *kit, s slot, spec listSpec) *listEditor {
-	c := &listEditor{Box: widget.NewBox(widget.Column, 8, 0), k: k, slot: s, spec: spec}
+	th := widget.Current()
+	c := &listEditor{Box: widget.NewBox(widget.Column, th.Spacing, 0), k: k, slot: s, spec: spec}
 	c.AddClass(append([]string{"string-list-editor"}, spec.classes...)...)
-	c.rows = widget.NewBox(widget.Column, 4, 0)
+	c.rows = widget.NewBox(widget.Column, th.Spacing/2, 0)
 	listCls := spec.listCls
 	if listCls == "" {
 		listCls = "string-list"
@@ -73,7 +75,7 @@ func newListEditor(k *kit, s slot, spec listSpec) *listEditor {
 
 // listButton is list_controls' add/remove button.
 func listButton(k *kit, icon, tooltipKey, class string, onClick func()) *widget.Button {
-	b := k.button(k.icon(icon), onClick, "list-control-button", class)
+	b := k.button(k.icon(icon), onClick, "list-control-button", class, css.Outline, css.Icon, css.Small)
 	b.SetTooltip(i18n.Settings().Get(tooltipKey))
 	return b
 }
@@ -114,7 +116,7 @@ func (c *listEditor) rebuild(values []any) {
 
 func (c *listEditor) appendRow(v any) {
 	item := c.spec.item(c.k, v, c.commit)
-	row := widget.NewBox(widget.Row, 4, 0)
+	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	row.AddClass(c.spec.rowClass)
 	row.Append(item, true)
 	if c.spec.reorder {
@@ -127,7 +129,7 @@ func (c *listEditor) appendRow(v any) {
 }
 
 func (c *listEditor) rowButton(icon string, onClick func()) *widget.Button {
-	return c.k.button(c.k.icon(icon), onClick, "string-list-button")
+	return c.k.button(c.k.icon(icon), onClick, "string-list-button", css.Ghost, css.Icon, css.Small)
 }
 
 func (c *listEditor) remove(item listItem) {
@@ -237,7 +239,7 @@ var enumList = listRow(func(meta config.FieldMeta) listSpec {
 		addKey: "settings-list-add", rowClass: "string-list-row", reorder: true, blank: blank,
 		item: func(k *kit, v any, changed func()) listItem {
 			s, _ := v.(string)
-			d := widget.NewDropdown(k.face, 14, enumLabels(elem), max(slices.Index(elem.Variants, s), 0))
+			d := widget.NewDropdown(k.face, k.textPx(), enumLabels(elem), max(slices.Index(elem.Variants, s), 0))
 			d.OnSelect = func(int) { changed() }
 			return enumItem{d, elem.Variants}
 		},

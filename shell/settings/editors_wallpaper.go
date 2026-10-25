@@ -91,7 +91,7 @@ type monitorBody struct {
 func newMonitorBody(k *kit, field func(key string) slot) control {
 	wallpaper := field("wallpaper")
 	c := &monitorBody{
-		Box:  widget.NewBox(widget.Row, 0, 0),
+		Box:  widget.NewBox(widget.Row, widget.Current().Spacing/2, 0),
 		path: newLiveText(k, wallpaper, i18n.Settings().Get("settings-wallpaper-path-placeholder")),
 		fit:  newEnumSelect(k, field("fit-mode"), config.MetaOf[config.FitMode]()),
 	}
@@ -104,7 +104,7 @@ func newMonitorBody(k *kit, field func(key string) slot) control {
 				c.path.refresh()
 			})
 		}
-	}, "icon")
+	}, css.Outline, css.Icon)
 	c.AppendAligned(c.path, true, widget.AlignCenter)
 	c.AppendAligned(c.browse, false, widget.AlignCenter)
 	c.AppendAligned(c.fit, false, widget.AlignCenter)

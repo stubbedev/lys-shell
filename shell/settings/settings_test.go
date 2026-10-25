@@ -1267,7 +1267,7 @@ func TestMonitorWallpaperCards(t *testing.T) {
 		t.Errorf("refresh shows fit %q path %q, want the stored stretch /c.png", body.fit.Selection(), body.path.Text())
 	}
 	// The body takes the row's spare width, not its label.
-	bodyRow := c.list.Children()[0].(*widget.Box).Children()[1].(*widget.Box).Children()[0].(*widget.Box)
+	bodyRow := c.list.Children()[0].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Box)
 	bodyRow.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 400}})
 	bodyRow.Arrange(render.Rect{W: 600, H: 40})
 	if label := bodyRow.Children()[0].(*widget.Label).Bounds(); label.W > 200 || body.Bounds().W < 400 {
@@ -1704,7 +1704,7 @@ func TestLayoutEditorCards(t *testing.T) {
 	if storedLayouts(k)[0].Show {
 		t.Error("the show switch did not write")
 	}
-	body := c.list.Children()[0].(*widget.Box).Children()[1].(*widget.Box)
+	body := c.list.Children()[0].(*widget.Box).Children()[2].(*widget.Box)
 	if l, ok := body.Children()[0].(*widget.Label); !ok || !l.HasClass("layout-hidden-label") || len(body.Children()) != 1 {
 		t.Error("a hidden layout shows its zones")
 	}
@@ -1767,7 +1767,7 @@ func TestLayoutEditorModulesAndGroups(t *testing.T) {
 		t.Errorf("left after removing clock: %+v", got)
 	}
 	// The add-group button appends a named group.
-	row := c.list.Children()[0].(*widget.Box).Children()[1].(*widget.Box).Children()[zoneRight].(*widget.Box)
+	row := c.list.Children()[0].(*widget.Box).Children()[2].(*widget.Box).Children()[zoneRight].(*widget.Box)
 	row.Children()[3].(*widget.Button).ClickAt(widget.Point{})
 	if got := storedLayouts(k)[0].Right; len(got) != 3 || got[2].Group == nil || got[2].Group.Name != i18n.Settings().Get("settings-layout-default-group") {
 		t.Errorf("right after add group: %+v", got)
@@ -1776,7 +1776,7 @@ func TestLayoutEditorModulesAndGroups(t *testing.T) {
 
 // layoutZoneOf finds card i's zone z.
 func layoutZoneOf(c *layoutEditor, i, z int) *layoutZone {
-	body := c.list.Children()[i].(*widget.Box).Children()[1].(*widget.Box)
+	body := treetest.WithClass(c.list.Children()[i], "layout-card-body")[0].(*widget.Box)
 	row := body.Children()[z].(*widget.Box)
 	frame := row.Children()[1].(*widget.Box)
 	return frame.Children()[0].(*layoutZone)
@@ -1985,5 +1985,96 @@ func TestPickerPopoverGap(t *testing.T) {
 	pc := pickerPopoverConfig(anchor, content)
 	if pc.Gap != widget.PopoverGap || pc.Anchor != widget.Boundser(anchor) || pc.Content != widget.Widget(content) {
 		t.Errorf("popover %+v, want the editor's content at gap %d", pc, widget.PopoverGap)
+	}
+}
+
+// The window stands on lys-ui's parts: a page's header is a dim
+// caption breadcrumb over an h4 title, each section a dim caption
+// heading over lys-ui's card holding an item group of the rows, each
+// row's description a dim caption and its reset a ghost icon button,
+// and the close button a ghost icon button. Every page of the window
+// keeps to the window beside the sidebar.
+func TestWindowTakesLysUiParts(t *testing.T) {
+	k := testKit(t, "")
+	cfg := k.store.svc.Config()
+	w := newWindow(k, cfg, func(_ time.Duration, fn func()) { fn() })
+	w.show("clock")
+	has := func(class string, want ...string) {
+		t.Helper()
+		ws := treetest.WithClass(w.root, class)
+		if len(ws) == 0 {
+			t.Fatalf("no .%s", class)
+		}
+		for _, x := range ws {
+			for _, cl := range want {
+				if !widget.HasClass(x, cl) {
+					t.Errorf(".%s lacks .%s", class, cl)
+				}
+			}
+		}
+	}
+	has("settings-breadcrumb", css.Caption, css.DimLabel)
+	has("settings-page-title", css.H4)
+	has("settings-section-title", css.CaptionHeading, css.DimLabel)
+	has("settings-group", css.Card)
+	has("setting-description", css.Caption, css.DimLabel)
+	has("setting-reset", css.Ghost, css.Icon)
+	has("settings-close", css.Ghost, css.Icon)
+	for _, g := range treetest.WithClass(w.root, "settings-group") {
+		if len(treetest.All[*widget.ItemGroup](g)) != 1 {
+			t.Error("a section's card holds no item group of its rows")
+		}
+	}
+	for _, l := range treetest.WithClass(w.root, "setting-label") {
+		if widget.HasClass(l, css.DimLabel) {
+			t.Error("a setting's label is dim")
+		}
+	}
+
+	const winW, winH = 900, 650
+	for _, sec := range w.sections {
+		for _, p := range sec.pages {
+			w.show(p.id)
+			w.root.Measure(widget.Constraints{Min: widget.Size{W: winW, H: winH}, Max: widget.Size{W: winW, H: winH}})
+			w.root.Arrange(render.Rect{W: winW, H: winH})
+			if b := w.page.Bounds(); b.X+b.W > winW {
+				t.Errorf("page %s runs to x=%d past the %dpx window", p.id, b.X+b.W, winW)
+			}
+		}
+	}
+}
+
+// A card list's card is lys-ui's card, its header split from its body
+// by a separator, its labels dim caption headings; the list's add is an
+// outline icon button and a row's buttons ghost ones.
+func TestCardAndListEditorsTakeLysUiParts(t *testing.T) {
+	k := testKit(t, "")
+	cfg := k.store.svc.Config()
+	w := newWindow(k, cfg, func(_ time.Duration, fn func()) { fn() })
+	w.show("bar-general")
+	for _, card := range treetest.WithClass(w.root, "layout-card") {
+		if !widget.HasClass(card, css.Card) || len(treetest.All[*widget.Separator](card)) == 0 {
+			t.Error("a layout card is not lys-ui's card cut by a separator")
+		}
+	}
+	for _, b := range treetest.WithClass(w.root, "zone-add-btn") {
+		if !widget.HasClass(b, css.Outline) || !widget.HasClass(b, css.Icon) {
+			t.Error("a zone's add button is not an outline icon button")
+		}
+	}
+	for _, l := range treetest.WithClass(w.root, "layout-zone-label") {
+		if !widget.HasClass(l, css.CaptionHeading) || !widget.HasClass(l, css.DimLabel) {
+			t.Error("a zone label is not a dim caption heading")
+		}
+	}
+	for _, b := range treetest.WithClass(w.root, "list-control-add") {
+		if !widget.HasClass(b, css.Outline) {
+			t.Error("a list's add is not an outline button")
+		}
+	}
+	for _, b := range treetest.WithClass(w.root, "chip-remove") {
+		if !widget.HasClass(b, css.Ghost) || widget.HasClass(b, css.Outline) {
+			t.Error("a chip's remove is not a ghost button")
+		}
 	}
 }

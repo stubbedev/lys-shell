@@ -88,7 +88,7 @@ type enumSelect struct {
 }
 
 func newEnumSelect(k *kit, s slot, meta config.FieldMeta) *enumSelect {
-	c := &enumSelect{Dropdown: widget.NewDropdown(k.face, 14, enumLabels(meta), 0), k: k, slot: s, variants: meta.Variants}
+	c := &enumSelect{Dropdown: widget.NewDropdown(k.face, k.textPx(), enumLabels(meta), 0), k: k, slot: s, variants: meta.Variants}
 	c.OnSelect = func(i int) {
 		if !c.syncing && i >= 0 && i < len(c.variants) {
 			_ = c.slot.set(c.variants[i])
@@ -118,7 +118,7 @@ type number struct {
 }
 
 func newNumber(k *kit, s slot, lo, hi, step float64, digits int) *number {
-	c := &number{SpinButton: widget.NewSpinButton(k.face, 14, 0, lo, hi, step, digits), k: k, slot: s, whole: digits == 0}
+	c := &number{SpinButton: widget.NewSpinButton(k.face, k.textPx(), 0, lo, hi, step, digits), k: k, slot: s, whole: digits == 0}
 	c.OnValueChanged = func(v float64) {
 		if c.whole {
 			_ = c.slot.set(int64(math.Round(v)))
@@ -218,7 +218,7 @@ type slider struct {
 }
 
 func newSlider(k *kit, s slot, lo, hi float64, whole bool, format func(float64) string) *slider {
-	c := &slider{DebouncedSlider: widgets.NewRangedSlider(lo, hi, lo, k.face, 14, 0, k.invoke), k: k, slot: s}
+	c := &slider{DebouncedSlider: widgets.NewRangedSlider(lo, hi, lo, k.face, k.textPx(), 0, k.invoke), k: k, slot: s}
 	c.SetFormat(format)
 	c.OnCommit = func(v float64) {
 		if whole {

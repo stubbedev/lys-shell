@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
@@ -61,7 +62,7 @@ type layoutEditor struct {
 func newLayoutEditor(k *kit, s slot) *layoutEditor {
 	c := &layoutEditor{Box: widget.NewBox(widget.Column, 0, 0), k: k, slot: s}
 	c.AddClass("bar-layout-control")
-	c.list = widget.NewBox(widget.Column, 0, 0)
+	c.list = widget.NewBox(widget.Column, widget.Current().Spacing, 0)
 	c.list.AddClass("bar-layout-list")
 	c.Append(c.list, false)
 	add := listButton(k, "ld-plus-symbolic", "settings-layout-add", "list-control-add", func() {
@@ -133,9 +134,12 @@ func (c *layoutEditor) rebuild() {
 func (c *layoutEditor) card(i int) widget.Widget {
 	t := i18n.Settings()
 	l := &c.layouts[i]
+	th := widget.Current()
+	band := render.Insets{Top: th.Padding, Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding}
 	root := widget.NewBox(widget.Column, 0, 0)
-	root.AddClass("layout-card")
-	header := widget.NewBox(widget.Row, 0, 0)
+	root.AddClass(css.Card, "layout-card")
+	header := widget.NewBox(widget.Row, th.Spacing, 0)
+	header.SetPadding(band)
 	header.AddClass("layout-card-header")
 	monitor := c.k.entry()
 	monitor.AddClass("layout-monitor-input")
@@ -177,23 +181,27 @@ func (c *layoutEditor) card(i int) widget.Widget {
 		c.commit()
 		c.rebuild()
 	}, css.Ghost, css.Icon)
-	header.AppendAligned(c.k.label(t.Get("settings-layout-monitor-label"), "layout-extends-label"), false, widget.AlignCenter)
+	header.AppendAligned(c.k.label(t.Get("settings-layout-monitor-label"), "layout-extends-label", css.DimLabel), false, widget.AlignCenter)
 	header.AppendAligned(monitor, false, widget.AlignCenter)
-	header.AppendAligned(c.k.label(t.Get("settings-layout-extends-label"), "layout-extends-label"), false, widget.AlignCenter)
+	header.AppendAligned(c.k.label(t.Get("settings-layout-extends-label"), "layout-extends-label", css.DimLabel), false, widget.AlignCenter)
 	header.AppendAligned(extends, false, widget.AlignCenter)
 	header.Append(widget.NewSpacer(0, 0), true)
 	header.AppendAligned(show, false, widget.AlignCenter)
 	header.AppendAligned(remove, false, widget.AlignCenter)
-	body := widget.NewBox(widget.Column, 0, 0)
+	body := widget.NewBox(widget.Column, th.Spacing, 0)
+	body.SetPadding(band)
 	body.AddClass("layout-card-body")
 	if !l.Show {
-		body.Append(c.k.label(t.Get("settings-layout-hidden"), "layout-hidden-label"), false)
+		hidden := c.k.label(t.Get("settings-layout-hidden"), "layout-hidden-label", css.DimLabel)
+		hidden.SetAlignment(render.AlignCenter)
+		body.Append(hidden, false)
 	} else {
 		for z := range zoneCount {
 			body.Append(c.zoneRow(i, z), false)
 		}
 	}
 	root.Append(header, false)
+	root.Append(widget.NewSeparator(widget.Horizontal), false)
 	root.Append(body, false)
 	return root
 }
@@ -202,13 +210,14 @@ func (c *layoutEditor) card(i int) widget.Widget {
 // the add-module picker and the add-group button.
 func (c *layoutEditor) zoneRow(i, z int) widget.Widget {
 	t := i18n.Settings()
-	row := widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	row := widget.NewBox(widget.Row, th.Spacing, 0)
 	row.AddClass("layout-zone")
-	chips := &layoutZone{FlowBox: widget.NewFlowBox(4, 4), ed: c, card: i, zone: z}
+	chips := &layoutZone{FlowBox: widget.NewFlowBox(th.Spacing/2, th.Spacing/2), ed: c, card: i, zone: z}
 	for k, item := range *c.zone(i, z) {
 		chips.Append(c.chip(i, z, k, item))
 	}
-	frame := widget.NewBox(widget.Row, 0, 0)
+	frame := widget.NewBox(widget.Row, 0, th.Padding)
 	frame.AddClass("layout-zone-items")
 	frame.AppendAligned(chips, false, widget.AlignCenter)
 	var addModule *widget.Button
@@ -219,16 +228,18 @@ func (c *layoutEditor) zoneRow(i, z int) widget.Widget {
 			c.commit()
 			c.rebuild()
 		})
-	}, "zone-add-btn")
+	}, "zone-add-btn", css.Outline, css.Icon, css.Small)
 	addModule.SetTooltip(t.Get("settings-layout-add-module"))
 	addGroup := c.k.button(c.k.icon("ld-layers-symbolic"), func() {
 		items := c.zone(i, z)
 		*items = append(*items, config.BarItem{Group: &config.BarGroup{Name: t.Get("settings-layout-default-group")}})
 		c.commit()
 		c.rebuild()
-	}, "zone-add-btn")
+	}, "zone-add-btn", css.Outline, css.Icon, css.Small)
 	addGroup.SetTooltip(t.Get("settings-layout-add-group"))
-	row.AppendAligned(c.k.label(t.Get(zoneKeys[z]), "layout-zone-label"), false, widget.AlignCenter)
+	zoneLabel := c.k.label(t.Get(zoneKeys[z]), "layout-zone-label", css.CaptionHeading, css.DimLabel)
+	zoneLabel.SetSizeRequest(zoneLabelPx, 0)
+	row.AppendAligned(zoneLabel, false, widget.AlignCenter)
 	row.Append(frame, true)
 	row.AppendAligned(addModule, false, widget.AlignCenter)
 	row.AppendAligned(addGroup, false, widget.AlignCenter)
@@ -238,7 +249,7 @@ func (c *layoutEditor) zoneRow(i, z int) widget.Widget {
 // chip is Chip: a module's name, or a group's name entry with its
 // modules, either removable and dragged by its body.
 func (c *layoutEditor) chip(i, z, k int, item config.BarItem) widget.Widget {
-	root := &layoutChip{Box: widget.NewBox(widget.Row, 0, 0), payload: dragPayload{i, z, k}}
+	root := &layoutChip{Box: chipBox(), payload: dragPayload{i, z, k}}
 	removeItem := func() {
 		items := c.zone(i, z)
 		*items = slices.Delete(*items, k, k+1)
@@ -264,7 +275,7 @@ func (c *layoutEditor) chip(i, z, k int, item config.BarItem) widget.Widget {
 	}
 	root.AppendAligned(name, false, widget.AlignCenter)
 	for m, mod := range item.Group.Modules {
-		sub := widget.NewBox(widget.Row, 0, 0)
+		sub := chipBox()
 		sub.AddClass("module-chip")
 		sub.AppendAligned(c.k.label(string(mod.Module)), false, widget.AlignCenter)
 		sub.AppendAligned(c.chipButton("ld-x-symbolic", "chip-remove", func() {
@@ -290,8 +301,19 @@ func (c *layoutEditor) chip(i, z, k int, item config.BarItem) widget.Widget {
 }
 
 func (c *layoutEditor) chipButton(icon, class string, onClick func()) *widget.Button {
-	return c.k.button(c.k.icon(icon), onClick, class)
+	return c.k.button(c.k.icon(icon), onClick, class, css.Ghost, css.Icon, css.Small)
 }
+
+// chipBox is a chip's row, inset by a fraction of the theme's padding.
+func chipBox() *widget.Box {
+	th := widget.Current()
+	b := widget.NewBox(widget.Row, th.Spacing/2, 0)
+	b.SetPadding(render.Insets{Top: th.Padding / 4, Right: th.Padding / 2, Bottom: th.Padding / 4, Left: th.Padding})
+	return b
+}
+
+// zoneLabelPx is the zones' label column.
+const zoneLabelPx = 56
 
 // moduleNames are the picker's modules: the built-ins, then a
 // custom-<id> per custom module (all_module_names).

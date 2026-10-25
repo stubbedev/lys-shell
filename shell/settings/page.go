@@ -1,7 +1,9 @@
 package settings
 
 import (
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -86,23 +88,29 @@ type settingsPage struct {
 // buildPage lays out a page (pages/layout.rs).
 func buildPage(k *kit, spec pageSpec) *settingsPage {
 	t := i18n.Settings()
-	content := widget.NewBox(widget.Column, 0, 0)
+	th := widget.Current()
+	content := widget.NewBox(widget.Column, 3*th.Spacing, 3*th.Padding)
 	content.AddClass("settings-page")
-	header := widget.NewBox(widget.Column, 0, 0)
+	header := widget.NewBox(widget.Column, th.Spacing/2, 0)
 	header.AddClass("settings-page-header")
-	header.Append(k.label(t.Attr(spec.header, "breadcrumb"), "settings-breadcrumb"), false)
-	header.Append(k.label(t.Get(spec.header), "settings-page-title"), false)
+	header.Append(k.label(t.Attr(spec.header, "breadcrumb"), "settings-breadcrumb", css.Caption, css.DimLabel), false)
+	header.Append(k.label(t.Get(spec.header), "settings-page-title", css.H4), false)
 	content.Append(header, false)
+	content.Append(widget.NewSeparator(widget.Horizontal), false)
 	p := &settingsPage{}
 	for _, s := range spec.sections {
-		section := widget.NewBox(widget.Column, 0, 0)
+		section := widget.NewBox(widget.Column, th.Spacing, 0)
 		section.AddClass("settings-section")
-		section.Append(k.label(t.Get(s.title), "settings-section-title"), false)
+		title := k.label(t.Get(s.title), "settings-section-title", css.CaptionHeading, css.DimLabel)
+		title.SetMargin(render.Insets{Left: th.Padding / 2})
+		section.Append(title, false)
+		rows := widget.NewItemGroup()
 		group := widget.NewBox(widget.Column, 0, 0)
-		group.AddClass("settings-group")
+		group.AddClass(css.Card, "settings-group")
+		group.Append(rows, false)
 		for _, rs := range s.rows {
 			row := newSettingRow(k, rs, fieldControl(k, rs))
-			group.Append(row, false)
+			rows.Append(row)
 			p.rows = append(p.rows, row)
 		}
 		section.Append(group, false)
