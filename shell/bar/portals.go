@@ -44,7 +44,6 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		viewFile = filepath.Join(dir, "file-chooser-view")
 	}
 	chooser := filechooser.New(filechooser.Deps{
-		Config:         current,
 		Open:           layerOpener[filechooser.Window](application),
 		Invoke:         application.Invoke,
 		Font:           font,
@@ -57,7 +56,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		ViewFile:       viewFile,
 		RecentFile:     filechooser.RecentFile(),
 		TrashDirs:      filechooser.SystemTrashDirs(home),
-		Target:         func() (*app.Output, int, int, bool) { return dialogOutput(outputs(), focused) },
+		Target:         func() *app.Output { return dialogOutput(outputs(), focused) },
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)
@@ -104,23 +103,20 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 }
 
 // dialogOutput is the output a portal dialog maps on: the focused one,
-// as the app asking is normally the one focused, else the first, with
-// its logical size; false while no output has one.
-func dialogOutput(outs []*app.Output, focused func() (string, bool)) (*app.Output, int, int, bool) {
-	pick := func(o *app.Output) (*app.Output, int, int, bool) {
-		return o, int(o.LogicalW), int(o.LogicalH), o.LogicalW > 0 && o.LogicalH > 0
-	}
+// as the app asking is normally the one focused, else the first; nil
+// with no output.
+func dialogOutput(outs []*app.Output, focused func() (string, bool)) *app.Output {
 	if name, ok := focused(); ok {
 		for _, o := range outs {
 			if o.Name == name {
-				return pick(o)
+				return o
 			}
 		}
 	}
 	if len(outs) == 0 {
-		return nil, 0, 0, false
+		return nil
 	}
-	return pick(outs[0])
+	return outs[0]
 }
 
 // pickImage lets the user choose a picture with the file chooser, for a

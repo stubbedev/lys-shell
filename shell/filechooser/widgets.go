@@ -1,231 +1,68 @@
 package filechooser
 
 import (
+	"slices"
+
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 )
 
-// The chooser's layout pieces lys-ui has no widget for: a drag surface
-// (the title bar that moves the sheet, the column and corner grips)
-// and the free placement of a child inside a larger rect (the sheet on
-// the full-screen overlay, the cards over the file list).
-
-func clamp(s widget.Size, con widget.Constraints) widget.Size {
-	return widget.Size{
-		W: min(max(s.W, con.Min.W), con.Max.W),
-		H: min(max(s.H, con.Min.H), con.Max.H),
-	}
-}
-
-// dragArea reports a press-and-drag as the offset from the press
-// point. With a child (a title bar's buttons and title) presses on the
-// child's controls stay theirs and everything else is the drag; with
-// none it is a w x h grip.
-type dragArea struct {
-	widget.Base
-	child  widget.Widget
-	w, h   int
-	cursor string
-	// last is the hovered point, which the press anchors on: the
-	// router feeds no motion between the press and the first drag.
-	last, anchor widget.Point
-	onStart      func()
-	onDrag       func(dx, dy int)
-	onEnd        func()
-}
-
-func (d *dragArea) Measure(con widget.Constraints) widget.Size {
-	if d.child != nil {
-		return d.child.Measure(con)
-	}
-	return clamp(widget.Size{W: d.w, H: d.h}, con)
-}
-
-func (d *dragArea) Arrange(r render.Rect) {
-	d.ArrangeSelf(r)
-	if d.child != nil {
-		d.child.Arrange(r)
-		widget.SetParents(d, d.child)
-	}
-}
-
-func (d *dragArea) ArrangeRoot(r render.Rect) { d.Arrange(r) }
-
-func (d *dragArea) Paint(cv *render.Canvas) {
-	if d.child != nil {
-		widget.PaintChild(cv, d.child)
-	}
-}
-
-func (d *dragArea) HitTest(p widget.Point) widget.Widget {
-	if d.child != nil {
-		if hit := d.child.HitTest(p); hit != nil && widget.IsInteractive(hit) {
-			return hit
-		}
-	}
-	return d.HitLeaf(d, p)
-}
-
-func (d *dragArea) Children() []widget.Widget {
-	if d.child == nil {
-		return nil
-	}
-	return []widget.Widget{d.child}
-}
-
-// HoverMove tracks the point a press will anchor on.
-func (d *dragArea) HoverMove(p widget.Point) { d.last = p }
-
-// SetPressed anchors the drag.
-func (d *dragArea) SetPressed(on bool) {
-	if on {
-		d.anchor = d.last
-		if d.onStart != nil {
-			d.onStart()
-		}
-	}
-}
-
-// DragMove reports the offset from the anchor.
-func (d *dragArea) DragMove(p widget.Point) {
-	if d.onDrag != nil {
-		d.onDrag(p.X-d.anchor.X, p.Y-d.anchor.Y)
-	}
-}
-
-// PressEnd ends the drag.
-func (d *dragArea) PressEnd() {
-	if d.onEnd != nil {
-		d.onEnd()
-	}
-}
-
-// CursorName is the grip's pointer shape.
-func (d *dragArea) CursorName() string { return d.cursor }
-
-// align is a placement along one axis.
-type align uint8
-
-const (
-	alignStart align = iota
-	alignCenter
-	alignEnd
-)
-
-func (a align) offset(free int) int {
-	switch a {
-	case alignCenter:
-		return free / 2
-	case alignEnd:
-		return free
-	}
-	return 0
-}
-
-// place puts a child at its natural size inside its rect, aligned and
-// inset by margins, and is transparent around it: a card over the
-// list takes no input outside itself.
-type place struct {
-	widget.Base
-	child            widget.Widget
-	h, v             align
-	left, top, right int
-	bottom           int
-}
-
-func newPlace(child widget.Widget, h, v align) *place { return &place{child: child, h: h, v: v} }
-
-func (p *place) inner(r render.Rect) render.Rect {
-	return render.Rect{
-		X: r.X + p.left, Y: r.Y + p.top,
-		W: max(r.W-p.left-p.right, 0), H: max(r.H-p.top-p.bottom, 0),
-	}
-}
-
-func (p *place) Measure(con widget.Constraints) widget.Size {
-	mx, my := p.left+p.right, p.top+p.bottom
-	sz := p.child.Measure(widget.Constraints{Max: widget.Size{W: max(con.Max.W-mx, 0), H: max(con.Max.H-my, 0)}})
-	return clamp(widget.Size{W: sz.W + mx, H: sz.H + my}, con)
-}
-
-func (p *place) Arrange(r render.Rect) {
-	p.ArrangeSelf(r)
-	in := p.inner(r)
-	sz := p.child.Measure(widget.Constraints{Max: widget.Size{W: in.W, H: in.H}})
-	sz.W, sz.H = min(sz.W, in.W), min(sz.H, in.H)
-	p.child.Arrange(render.Rect{
-		X: in.X + p.h.offset(in.W-sz.W), Y: in.Y + p.v.offset(in.H-sz.H),
-		W: sz.W, H: sz.H,
-	})
-	widget.SetParents(p, p.child)
-}
-
-func (p *place) ArrangeRoot(r render.Rect) { p.Arrange(r) }
-
-func (p *place) Paint(cv *render.Canvas) {
-	if widget.IsVisible(p.child) {
-		widget.PaintChild(cv, p.child)
-	}
-}
-
-func (p *place) HitTest(pt widget.Point) widget.Widget {
-	if !widget.IsVisible(p.child) {
-		return nil
-	}
-	return p.child.HitTest(pt)
-}
-
-func (p *place) Children() []widget.Widget { return []widget.Widget{p.child} }
-
-// The sheet's size bounds: the floor keeps the sidebar and columns
-// usable, the ceiling a sane maximum on huge outputs.
-const (
-	sheetMinW, sheetMinH = 480, 320
-	sheetMaxW, sheetMaxH = 1600, 1100
-)
-
-// sheet is the chooser's movable, resizable panel on the full-screen
-// overlay: centred until moved, kept inside the output, and its top
-// left corner stays put while the corner grip resizes it.
-type sheet struct {
-	widget.Base
-	child widget.Widget
-	w, h  int
-	// onDrop receives the first path of a file dropped on the sheet.
+// dropZone is a box that takes a file dropped anywhere on it: onDrop
+// receives the first dropped path. Embedding the box keeps it the
+// parent its children's drop walk reaches.
+type dropZone struct {
+	*widget.Box
 	onDrop func(path string)
 }
 
-func newSheet(child widget.Widget, w, h int) *sheet {
-	s := &sheet{child: child}
-	s.resize(w, h)
-	return s
+// DragEnter accepts a file drag.
+func (z *dropZone) DragEnter(mimes []string, _ widget.Point) string {
+	if slices.Contains(mimes, uriListMime) {
+		return uriListMime
+	}
+	return ""
 }
 
-// Measure is the sheet's own size: the window, anchored top left and
-// placed by its margins, sizes itself to it.
-func (s *sheet) Measure(con widget.Constraints) widget.Size {
-	return clamp(widget.Size{W: s.w, H: s.h}, con)
+// Drop hands on the first dropped path.
+func (z *dropZone) Drop(_ string, data []byte, _ widget.Point) {
+	if p, ok := droppedPath(data); ok {
+		z.onDrop(p)
+	}
 }
 
-func (s *sheet) Arrange(r render.Rect) {
-	s.ArrangeSelf(r)
-	// Containers arrange from what they measured; nothing above
-	// measures the child at the sheet's size.
-	s.child.Measure(widget.Constraints{Min: widget.Size{W: r.W, H: r.H}, Max: widget.Size{W: r.W, H: r.H}})
-	s.child.Arrange(r)
-	widget.SetParents(s, s.child)
+// columnGrip is the column header's resize handle, colGripPx wide:
+// onStart hears a press, onDrag the horizontal offset from it, onEnd
+// the release.
+type columnGrip struct {
+	widget.Base
+	anchor  widget.Point
+	onStart func()
+	onDrag  func(dx int)
+	onEnd   func()
 }
 
-func (s *sheet) ArrangeRoot(r render.Rect) { s.Arrange(r) }
-
-func (s *sheet) Paint(cv *render.Canvas) { widget.PaintChild(cv, s.child) }
-
-func (s *sheet) HitTest(p widget.Point) widget.Widget { return s.child.HitTest(p) }
-
-func (s *sheet) Children() []widget.Widget { return []widget.Widget{s.child} }
-
-// resize sets the size within the sheet's floor and ceiling.
-func (s *sheet) resize(w, h int) {
-	s.w, s.h = min(max(w, sheetMinW), sheetMaxW), min(max(h, sheetMinH), sheetMaxH)
-	s.InvalidateLayout()
+func newColumnGrip() *columnGrip {
+	g := &columnGrip{}
+	g.SetCursorName("col-resize")
+	return g
 }
+
+func (g *columnGrip) Measure(con widget.Constraints) widget.Size {
+	return widget.Size{W: min(max(colGripPx, con.Min.W), con.Max.W), H: con.Min.H}
+}
+
+func (g *columnGrip) Paint(*render.Canvas) {}
+
+func (g *columnGrip) HitTest(p widget.Point) widget.Widget { return g.HitLeaf(g, p) }
+
+// PressAt anchors the drag where the press landed.
+func (g *columnGrip) PressAt(p widget.Point) {
+	g.anchor = p
+	g.onStart()
+}
+
+// DragMove reports the offset from the press.
+func (g *columnGrip) DragMove(p widget.Point) { g.onDrag(p.X - g.anchor.X) }
+
+// PressEnd ends the drag.
+func (g *columnGrip) PressEnd() { g.onEnd() }

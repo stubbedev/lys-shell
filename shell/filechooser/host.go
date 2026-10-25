@@ -18,38 +18,37 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
-	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
-// The sheet's geometry (shell/file_chooser: the surface's size
-// request, column widths, icon sizes).
+// The panel's geometry (shell/file_chooser: its default size,
+// column widths, icon sizes). The panel's floor keeps the
+// sidebar and columns usable, its ceiling a sane maximum on huge
+// outputs.
 const (
-	sheetW, sheetH   = 760, 520
-	sidebarW         = 180
-	searchW          = 150
-	previewW         = 220
-	listRowH         = 34
-	gridCellW        = 112
-	gridCellH        = 104
-	rowIconPx        = 24
-	gridIconPx       = 48
-	previewIconPx    = 96
-	navIconPx        = 16
-	minColumnW       = 50
-	maxColumnW       = 400
-	crumbMaxChars    = 16
-	filterPopupLeft  = 16
-	filterPopupAbove = 56
-	gripPx           = 18
-	colGripPx        = 7
-	thumbWorkers     = 4
+	panelW, panelH       = 760, 520
+	panelMinW, panelMinH = 480, 320
+	panelMaxW, panelMaxH = 1600, 1100
+	sidebarW             = 180
+	searchW              = 150
+	previewW             = 220
+	listRowH             = 34
+	gridCellW            = 112
+	gridCellH            = 104
+	rowIconPx            = 24
+	gridIconPx           = 48
+	previewIconPx        = 96
+	navIconPx            = 16
+	minColumnW           = 50
+	maxColumnW           = 400
+	crumbMaxChars        = 16
+	colGripPx            = 7
+	thumbWorkers         = 4
 )
 
 // The keys and buttons the chooser binds: evdev keycodes and the
@@ -75,13 +74,10 @@ const uriListMime = "text/uri-list"
 type Window interface {
 	Close()
 	SetFocus(widget.Widget)
-	SetMargin(app.Margins) error
 }
 
 // Deps are the chooser's collaborators.
 type Deps struct {
-	// Config is the live config (the chooser animation).
-	Config func() *config.Config
 	// Open maps the overlay; Invoke runs on the UI loop.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
@@ -109,9 +105,8 @@ type Deps struct {
 	// (SystemTrashDirs); nil offers no Trash.
 	TrashDirs func() []string
 	// Target is the output a dialog maps on (the focused one, else the
-	// first) with its logical size, which the sheet is centred on; false
-	// while none is known, when the compositor places it.
-	Target func() (output *app.Output, w, h int, ok bool)
+	// first); nil while none is known, when the compositor picks one.
+	Target func() *app.Output
 }
 
 // Chooser is the dev.stubbe.lys.FileChooser1 host: one overlay showing one
@@ -119,12 +114,10 @@ type Deps struct {
 // a request answers it with nothing, showing or waiting. Open and Save
 // may be called from any goroutine; the rest runs on the loop.
 type Chooser struct {
-	d       Deps
-	win     Window
-	rev     *widget.Revealer
-	closing bool
-	reply   func(Result)
-	queue   dialogqueue.Queue
+	d     Deps
+	win   Window
+	reply func(Result)
+	queue dialogqueue.Queue
 	// readChoices reads the request's choices as the user left them.
 	readChoices func() []portalreq.Selection
 	// replacing is the existing file a save asked to replace, which a
@@ -156,14 +149,13 @@ type Chooser struct {
 	// applied: after the first descended, the rest index a listing
 	// that is gone.
 	navigating bool
-	// drag is the sheet size a resize started from.
-	drag struct{ w, h int }
-	// margin places the sheet: the window is anchored top left. It
-	// sticks across requests on one output, as the Rust window does;
-	// placed is false until the first request, and placedOn is the
-	// output it was centred on.
-	margin   app.Margins
-	placed   bool
+	// size is the panel's size as the user left it, kept across
+	// requests. at is where it was moved to on the output placedOn,
+	// which sticks across requests there, as the Rust window does;
+	// moved is false while it centres.
+	size     widget.Size
+	at       widget.Point
+	moved    bool
 	placedOn string
 
 	// thumbs are the thumbnails found (nil for a file without one),
@@ -180,7 +172,10 @@ type thumbKey struct {
 
 // New builds the host; nothing maps until a request.
 func New(d Deps) *Chooser {
-	c := &Chooser{d: d, view: defaultView, columns: [3]int{90, 150, 90}, workers: make(chan struct{}, thumbWorkers)}
+	c := &Chooser{
+		d: d, view: defaultView, columns: [3]int{90, 150, 90}, workers: make(chan struct{}, thumbWorkers),
+		size: widget.Size{W: panelW, H: panelH},
+	}
 	if d.ViewFile != "" {
 		if b, err := os.ReadFile(d.ViewFile); err == nil {
 			c.view = parseView(string(b))
@@ -346,8 +341,7 @@ func (c *Chooser) unwatch() {
 
 // ui holds the widgets a request updates.
 type ui struct {
-	root                    *widget.Box
-	sheet                   *sheet
+	root                    *widget.FloatingPanel
 	crumbs                  *widget.Box
 	search                  *widget.SearchEntry
 	name                    *widget.Entry
@@ -402,7 +396,7 @@ func (c *Chooser) textButton(text, class, variant string, onClick func()) (*widg
 	return b, l
 }
 
-// section is a band of the sheet padded by the theme: a bar of
+// section is a band of the panel padded by the theme: a bar of
 // controls between the separators.
 func section(dir widget.Axis, class string) *widget.Box {
 	th := widget.Current()
@@ -452,7 +446,7 @@ func (c *Chooser) build(r request) {
 	title, name := r.title, r.name
 
 	// Header: up, the centred title, the view toggles. The bar is the
-	// sheet's drag handle.
+	// panel's drag handle.
 	th := widget.Current()
 	headerRow := widget.NewBox(widget.Row, th.Spacing/4, 0)
 	headerRow.Append(c.iconButton("go-up-symbolic", "Up", c.goUp), false)
@@ -472,9 +466,9 @@ func (c *Chooser) build(r request) {
 	headerStack.Append(headerRow)
 	titleLabel := widget.NewLabel(c.d.Font, th.TitleSize(), title, 0)
 	titleLabel.AddClass("file-chooser-title", css.Heading)
-	headerStack.Append(newPlace(titleLabel, alignCenter, alignCenter))
+	headerStack.AppendAligned(titleLabel, widget.AlignCenter, widget.AlignCenter)
 	header := section(widget.Column, "file-chooser-header")
-	header.Append(&dragArea{child: headerStack, cursor: "grab", onDrag: c.move}, false)
+	header.Append(headerStack, false)
 
 	// Path bar: breadcrumbs and the search box.
 	crumbBar := section(widget.Row, "file-chooser-crumbbar")
@@ -573,21 +567,19 @@ func (c *Chooser) build(r request) {
 	footer.Append(cancel, false)
 	footer.Append(confirm, false)
 
-	surface := widget.NewBox(widget.Column, 0, 0)
-	surface.AddClass(css.Card, "file-chooser-surface")
-	surface.Append(header, false)
-	surface.Append(widget.NewSeparator(widget.Horizontal), false)
-	surface.Append(crumbBar, false)
-	surface.Append(u.newFolder, false)
-	surface.Append(widget.NewSeparator(widget.Horizontal), false)
-	surface.Append(body, true)
-	surface.Append(widget.NewSeparator(widget.Horizontal), false)
-	surface.Append(u.name, false)
-	surface.Append(u.notice, false)
-	surface.Append(footer, false)
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.Append(widget.NewSeparator(widget.Horizontal), false)
+	content.Append(crumbBar, false)
+	content.Append(u.newFolder, false)
+	content.Append(widget.NewSeparator(widget.Horizontal), false)
+	content.Append(body, true)
+	content.Append(widget.NewSeparator(widget.Horizontal), false)
+	content.Append(u.name, false)
+	content.Append(u.notice, false)
 
-	// The filter popup sits in the sheet itself rather than an
-	// xdg_popup, which an exclusive overlay may not route input to.
+	// The filter popup sits on the footer in the panel itself rather
+	// than an xdg_popup, which an exclusive overlay may not route input
+	// to, inset like the footer's filter button.
 	u.filterPopup = widget.NewBox(widget.Column, 0, th.Padding/2)
 	u.filterPopup.AddClass(css.Card, "file-chooser-filter-popup")
 	filterList := widget.NewBox(widget.Column, 0, 0)
@@ -601,18 +593,22 @@ func (c *Chooser) build(r request) {
 	}
 	u.filterPopup.Append(widget.NewScroll(filterList), true)
 	u.filterPopup.SetVisible(false)
-	popup := newPlace(u.filterPopup, alignStart, alignEnd)
-	popup.left, popup.bottom = filterPopupLeft, filterPopupAbove
+	u.filterPopup.SetMargin(render.Insets{Left: 2 * th.Padding})
+	above := widget.NewOverlay()
+	above.Append(content)
+	above.AppendAligned(u.filterPopup, widget.AlignStart, widget.AlignEnd)
 
-	grip := &dragArea{w: gripPx, h: gripPx, cursor: "se-resize", onStart: c.startResize, onDrag: c.resize}
-	grip.AddClass("file-chooser-resize-grip")
+	main := &dropZone{Box: widget.NewBox(widget.Column, 0, 0), onDrop: c.dropped}
+	main.Append(above, true)
+	main.Append(footer, false)
 
-	stack := widget.NewOverlay()
-	stack.Append(surface)
-	stack.Append(popup)
-	stack.Append(newPlace(grip, alignEnd, alignEnd))
-	u.sheet = newSheet(stack, sheetW, sheetH)
-	u.sheet.onDrop = c.dropped
+	u.root = widget.NewFloatingPanel(header, main)
+	u.root.SetSizeLimits(widget.Size{W: panelMinW, H: panelMinH}, widget.Size{W: panelMaxW, H: panelMaxH})
+	u.root.SetPanelSize(c.size.W, c.size.H)
+	u.root.OnGeometryChanged = c.placedAt
+	if c.d.Sheet != nil {
+		u.root.AttachStylesheet(c.d.Sheet)
+	}
 
 	c.ui = u
 	c.updateSortLabels()
@@ -740,8 +736,8 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	stack := widget.NewOverlay()
 	stack.Append(u.listView)
 	stack.Append(u.gridView)
-	stack.Append(newPlace(u.empty, alignCenter, alignCenter))
-	stack.Append(newPlace(u.quicklook, alignCenter, alignCenter))
+	stack.AppendAligned(u.empty, widget.AlignCenter, widget.AlignCenter)
+	stack.AppendAligned(u.quicklook, widget.AlignCenter, widget.AlignCenter)
 
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.Append(u.colHeader, false)
@@ -753,10 +749,10 @@ func (c *Chooser) views(u *ui) widget.Widget {
 // left edge: left grows it.
 func (c *Chooser) columnGrip(i int) widget.Widget {
 	var base int
-	g := &dragArea{w: colGripPx, cursor: "col-resize"}
+	g := newColumnGrip()
 	g.AddClass("file-chooser-col-grip")
 	g.onStart = func() { base = c.columns[i] }
-	g.onDrag = func(dx, _ int) {
+	g.onDrag = func(dx int) {
 		c.columns[i] = min(max(base-dx, minColumnW), maxColumnW)
 		widgets.Pin(c.ui.columns[i], c.columns[i], 0)
 	}
@@ -912,44 +908,32 @@ func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widg
 func (c *Chooser) show() {
 	if c.win != nil {
 		c.win.Close()
-		c.win, c.closing = nil, false
+		c.win = nil
 	}
-	u := c.ui
-	c.rev = widget.NewRevealer(u.sheet)
-	u.root = widget.NewBox(widget.Column, 0, 0)
-	u.root.SetElement("window")
-	u.root.AddClass("file-chooser-window")
-	if c.d.Sheet != nil {
-		u.root.AttachStylesheet(c.d.Sheet)
-	}
-	u.root.Append(c.rev, true)
 	var output *app.Output
 	if c.d.Target != nil {
-		if out, w, h, ok := c.d.Target(); ok {
-			output = out
-			if !c.placed || out.Name != c.placedOn {
-				c.margin, c.placed, c.placedOn = centerMargins(w, h, sheetW, sheetH), true, out.Name
-			}
-		}
+		output = c.d.Target()
 	}
-	if !c.placed {
-		c.margin, c.placed = app.Margins{Left: 200, Top: 150}, true
+	if name := outputName(output); name != c.placedOn {
+		c.moved, c.placedOn = false, name
+	}
+	if c.moved {
+		c.ui.root.SetPosition(c.at)
 	}
 	keyboard := app.KeyboardExclusive
 	if !c.modal {
 		keyboard = app.KeyboardOnDemand
 	}
-	// Anchored top left and placed by the margins, sized to the sheet,
-	// so the header drag moves the window and the grip resizes it.
+	// The overlay spans the output and the panel floats on it, taking
+	// input only over itself.
 	win, err := c.d.Open(app.LayerConfig{
 		Output:        output,
 		Layer:         app.LayerOverlay,
-		Anchor:        app.AnchorTop | app.AnchorLeft,
-		Margin:        c.margin,
+		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 		ExclusiveZone: -1,
 		Keyboard:      keyboard,
 		Namespace:     "lys-shell-file-chooser",
-		Root:          u.root,
+		Root:          c.ui.root,
 		OnKey:         c.key,
 		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
 	})
@@ -960,25 +944,26 @@ func (c *Chooser) show() {
 	}
 	c.win = win
 	if c.s.mode == ModeSave {
-		win.SetFocus(u.name)
+		win.SetFocus(c.ui.name)
 	} else {
 		win.SetFocus(c.focusView())
 	}
-	reveal.Show(c.rev, c.d.Config().Animations, config.AnimFileChooser)
+}
+
+// outputName names o, "" for the compositor's pick.
+func outputName(o *app.Output) string {
+	if o == nil {
+		return ""
+	}
+	return o.Name
 }
 
 func (c *Chooser) hide() {
-	if c.win == nil || c.closing {
+	if c.win == nil {
 		return
 	}
-	c.closing = true
-	win := c.win
-	reveal.Hide(c.rev, c.d.Config().Animations, config.AnimFileChooser, func() {
-		win.Close()
-		if c.win == win {
-			c.win, c.rev, c.closing = nil, nil, false
-		}
-	})
+	c.win.Close()
+	c.win = nil
 }
 
 // key binds GTK's chooser keys: Escape closes the filter popup, then
@@ -1042,30 +1027,11 @@ func (c *Chooser) press(button uint32) {
 	}
 }
 
-// move is setup_surface_move: each drag event's offset adds to the
-// live margins. The compositor reports the pointer against the moved
-// surface, so the offset settles toward zero instead of compounding.
-func (c *Chooser) move(dx, dy int) {
-	c.margin.Left = max(0, c.margin.Left+int32(dx))
-	c.margin.Top = max(0, c.margin.Top+int32(dy))
-	if c.win == nil {
-		return
-	}
-	if err := c.win.SetMargin(c.margin); err != nil {
-		log.Printf("file chooser: move: %v", err)
-	}
+// placedAt keeps the panel's size and place as a move or resize left
+// them, for the requests after.
+func (c *Chooser) placedAt(r render.Rect) {
+	c.size, c.at, c.moved = widget.Size{W: r.W, H: r.H}, widget.Point{X: r.X, Y: r.Y}, true
 }
-
-// centerMargins centres a w x h sheet on an sw x sh output.
-func centerMargins(sw, sh, w, h int) app.Margins {
-	return app.Margins{Left: int32(max((sw-w)/2, 0)), Top: int32(max((sh-h)/2, 0))}
-}
-
-func (c *Chooser) startResize() {
-	c.drag.w, c.drag.h = c.ui.sheet.w, c.ui.sheet.h
-}
-
-func (c *Chooser) resize(dx, dy int) { c.ui.sheet.resize(c.drag.w+dx, c.drag.h+dy) }
 
 // --- state changes --------------------------------------------------
 
@@ -1585,21 +1551,6 @@ func droppedPath(data []byte) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// DragEnter accepts a file drag.
-func (s *sheet) DragEnter(mimes []string, _ widget.Point) string {
-	if s.onDrop != nil && slices.Contains(mimes, uriListMime) {
-		return uriListMime
-	}
-	return ""
-}
-
-// Drop navigates to the first dropped path.
-func (s *sheet) Drop(_ string, data []byte, _ widget.Point) {
-	if p, ok := droppedPath(data); ok {
-		s.onDrop(p)
-	}
 }
 
 // typeAhead is a file view that hands characters typed into it to

@@ -1,12 +1,10 @@
 .portal-dialog-window,
-.file-chooser-window,
 .print-window {
   background: transparent;
 }
 
 .portal-dialog-surface,
 .print-surface,
-.file-chooser-surface,
 .file-chooser-filter-popup,
 .file-chooser-quicklook {
   box-shadow: var(--shadow);
@@ -49,17 +47,6 @@
 
 .file-chooser-col-grip:hover {
   background: var(--border-default);
-}
-
-.file-chooser-resize-grip {
-  margin: 0 2px 2px 0;
-  border-radius: 0 0 var(--rounding-container) 0;
-  background: linear-gradient(135deg, transparent 0%, transparent 55%, var(--fg-subtle) 55%, var(--fg-subtle) 65%, transparent 65%, transparent 78%, var(--fg-subtle) 78%, var(--fg-subtle) 88%, transparent 88%);
-  opacity: 0.4;
-}
-
-.file-chooser-resize-grip:hover {
-  opacity: 0.9;
 }
 
 .file-chooser-grid flowboxchild {

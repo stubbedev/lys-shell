@@ -32,16 +32,48 @@ import (
 )
 
 type fakeWindow struct {
-	closed  bool
-	focus   widget.Widget
-	margins []app.Margins
+	closed bool
+	focus  widget.Widget
 }
 
 func (w *fakeWindow) Close()                   { w.closed = true }
 func (w *fakeWindow) SetFocus(f widget.Widget) { w.focus = f }
-func (w *fakeWindow) SetMargin(m app.Margins) error {
-	w.margins = append(w.margins, m)
-	return nil
+
+// lay lays root out on a w x h output, as its window does.
+func lay(root widget.Widget, w, h int) {
+	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	root.Arrange(render.Rect{W: w, H: h})
+}
+
+// drag presses at from, moves to to and releases there.
+func drag(r *widget.Router, from, to widget.Point) {
+	r.Move(from)
+	r.Press(widget.BTNLeft, from, 0)
+	r.Move(to)
+	r.Release(widget.BTNLeft, to)
+}
+
+// panel is the request's floating panel, the overlay's root.
+func (hs *harness) panel(t *testing.T) *widget.FloatingPanel {
+	t.Helper()
+	p, ok := hs.cfg.Root.(*widget.FloatingPanel)
+	if !ok {
+		t.Fatalf("root %T, want the floating panel", hs.cfg.Root)
+	}
+	return p
+}
+
+// holds reports whether w is root or under it.
+func holds(root, w widget.Widget) bool {
+	found := false
+	treetest.Walk(root, func(k widget.Widget) { found = found || k == w })
+	return found
+}
+
+// center is the middle of w's bounds.
+func center(w widget.Boundser) widget.Point {
+	b := w.Bounds()
+	return widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
 }
 
 // harness runs the chooser with a lock-step loop: Invoke and the
@@ -64,7 +96,6 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	t.Helper()
 	face := treetest.Font(t)
 	conf := config.Defaults()
-	conf.Animations.Enabled = false
 	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4)}
 	hs.queue = make(chan func(), 256)
 	drained := make(chan struct{})
@@ -84,7 +115,6 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		<-drained
 	})
 	hs.c = New(Deps{
-		Config: func() *config.Config { return conf },
 		Open: func(c app.LayerConfig) (Window, error) {
 			hs.mu.Lock()
 			defer hs.mu.Unlock()
@@ -329,12 +359,44 @@ func TestHistoryButtonsAndUp(t *testing.T) {
 	}
 }
 
+// The filter popup opens on the footer, inset like the filter button,
+// and takes the press there; closed, the sidebar beneath takes it.
+func TestFilterPopupSitsOnTheFooter(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}, {"Text", []Rule{{RuleGlob, "*.txt"}}}}})
+	var at widget.Point
+	hs.run(func() {
+		lay(hs.cfg.Root, 1280, 720)
+		footer := treetest.WithClass(hs.cfg.Root, "file-chooser-footer")[0].(widget.Boundser).Bounds()
+		at = widget.Point{X: hs.c.ui.filterButton.Bounds().X + 4, Y: footer.Y - 4}
+		sidebar := treetest.WithClass(hs.cfg.Root, "file-chooser-sidebar-scroll")[0]
+		if hit := hs.cfg.Root.HitTest(at); hit == nil || !holds(sidebar, hit) {
+			t.Errorf("a press above the closed popup's button hit %T, want the sidebar", hit)
+		}
+	})
+	hs.do(hs.c.ui.filterButton.OnClick)
+	hs.run(func() {
+		lay(hs.cfg.Root, 1280, 720)
+		popup := hs.c.ui.filterPopup.Bounds()
+		footer := treetest.WithClass(hs.cfg.Root, "file-chooser-footer")[0].(widget.Boundser).Bounds()
+		if popup.Y+popup.H != footer.Y || popup.X != hs.c.ui.filterButton.Bounds().X {
+			t.Errorf("popup at %v, want it on the footer %v at the filter button's left %d", popup, footer, hs.c.ui.filterButton.Bounds().X)
+		}
+		if hit := hs.cfg.Root.HitTest(at); hit == nil || !holds(hs.c.ui.filterPopup, hit) {
+			t.Errorf("a press on the open popup hit %T, want the popup", hit)
+		}
+		if hit := hs.cfg.Root.HitTest(center(hs.c.ui.list)); hit == nil || !holds(hs.c.ui.listView, hit) {
+			t.Errorf("a press on the files beside the open popup hit %T, want the files", hit)
+		}
+	})
+}
+
 func TestCancelEscapeAndQueueing(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}}})
 	// Escape closes the filter popup first, then quick look, then the
 	// dialog.
-	hs.click(t, "Images")
+	hs.do(hs.c.ui.filterButton.OnClick)
 	if !hs.c.ui.filterPopup.Visible() {
 		t.Fatal("the filter button did not open the popup")
 	}
@@ -438,7 +500,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 	if got := hs.shown(); !slices.Equal(got, []string{"docs", "pics", "a.png"}) {
 		t.Errorf("filtered = %v", got)
 	}
-	hs.click(t, "Images")
+	hs.do(hs.c.ui.filterButton.OnClick)
 	hs.click(t, "All Files")
 	if got := hs.shown(); !slices.Equal(got, []string{"docs", "pics", "a.png", "b.txt"}) {
 		t.Errorf("all files = %v", got)
@@ -520,24 +582,51 @@ func TestRecursiveSearchStreamsMatchesForTheLiveQuery(t *testing.T) {
 	}
 }
 
+// A file dropped on the panel's body, over the files or the footer,
+// opens its folder; a drag without files, a remote file, or a drop
+// beside the panel does not.
 func TestDropNavigates(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.open(t, OpenRequest{})
-	s := hs.c.ui.sheet
-	if got := s.DragEnter([]string{"text/plain"}, widget.Point{}); got != "" {
-		t.Errorf("a text drag was accepted as %q", got)
+	var r *widget.Router
+	var body, footer, outside widget.Point
+	hs.run(func() {
+		r, body = treetest.Pointer(hs.cfg.Root, hs.c.ui.list, 1280, 720)
+		footer = center(treetest.WithClass(hs.cfg.Root, "file-chooser-footer")[0].(widget.Boundser))
+		outside = widget.Point{X: 2, Y: 2}
+	})
+	drop := func(p widget.Point, rel string) {
+		t.Helper()
+		hs.do(func() {
+			if got := r.DragEnter([]string{"text/plain"}, p); got != "" {
+				t.Errorf("a text drag at %v was accepted as %q", p, got)
+			}
+			if got := r.DragEnter([]string{"text/plain", uriListMime}, p); got != uriListMime {
+				t.Fatalf("a file drag at %v = %q", p, got)
+			}
+			r.Drop(uriListMime, []byte("# comment\r\n"+hs.uri(rel)+"\r\n"), p)
+		})
 	}
-	if got := s.DragEnter([]string{"text/plain", uriListMime}, widget.Point{}); got != uriListMime {
-		t.Errorf("a file drag = %q", got)
+	drop(body, "pics/a.png")
+	if hs.dir() != filepath.Join(hs.root, "pics") {
+		t.Errorf("a drop on the body navigated to %s", hs.dir())
 	}
-	hs.do(func() { s.Drop(uriListMime, []byte("# comment\r\n"+hs.uri("pics/a.png")+"\r\n"), widget.Point{}) })
-	if hs.c.s.dir != filepath.Join(hs.root, "pics") {
-		t.Errorf("drop navigated to %s", hs.c.s.dir)
+	drop(footer, "b.txt")
+	if hs.dir() != hs.root {
+		t.Errorf("a drop on the footer navigated to %s", hs.dir())
 	}
-	hs.do(func() { s.Drop(uriListMime, []byte("https://example.com/x\n"), widget.Point{}) })
-	if hs.c.s.dir != filepath.Join(hs.root, "pics") {
-		t.Errorf("a remote drop navigated to %s", hs.c.s.dir)
+	hs.do(func() {
+		r.DragEnter([]string{uriListMime}, body)
+		r.Drop(uriListMime, []byte("https://example.com/x\n"), body)
+	})
+	if hs.dir() != hs.root {
+		t.Errorf("a remote drop navigated to %s", hs.dir())
 	}
+	hs.run(func() {
+		if got := r.DragEnter([]string{uriListMime}, outside); got != "" {
+			t.Errorf("a file drag beside the panel was accepted as %q", got)
+		}
+	})
 }
 
 func TestOpenFailureAnswersNothing(t *testing.T) {
@@ -655,28 +744,25 @@ func insertText(t *testing.T, data []byte, key, value string) []byte {
 	return append(out, data[ihdrEnd:]...)
 }
 
+// A column's grip resizes it by its left edge through the pointer,
+// within the column bounds; hovering does not, and the rows re-lay on
+// release, not on every motion.
 func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.open(t, OpenRequest{})
-	grips := treetest.All[*dragArea](hs.cfg.Root)
-	var col *dragArea
-	for _, g := range grips {
-		if g.cursor == "col-resize" {
-			col = g
-		}
+	var grips []*columnGrip
+	hs.run(func() { grips = treetest.All[*columnGrip](hs.cfg.Root) })
+	if len(grips) != 3 {
+		t.Fatalf("%d column grips, want one before each of size, modified and kind", len(grips))
 	}
-	if col == nil {
-		t.Fatal("no column grip")
-	}
+	col := grips[2]
 	// paint renders the list's rows as they are cached, after laying
 	// out the whole surface as its window does, so the rows inherit
 	// the stylesheet's ink through their ancestors.
 	paint := func() []uint8 {
 		var px []uint8
 		hs.do(func() {
-			root := hs.c.ui.root
-			root.Measure(widget.Constraints{Max: widget.Size{W: 1200, H: 800}})
-			root.Arrange(render.Rect{W: 1200, H: 800})
+			lay(hs.cfg.Root, 1200, 800)
 			l := hs.c.ui.list
 			l.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 200}})
 			l.Arrange(render.Rect{W: 600, H: 200})
@@ -686,96 +772,167 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 		return px
 	}
 	before := paint()
+	var r *widget.Router
+	var at widget.Point
+	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, col, 1200, 800) })
+	if got := r.Hovered(); got != widget.Widget(col) {
+		t.Fatalf("the pointer rests on %T, want the kind column's grip", got)
+	}
+	hs.do(func() { r.Move(widget.Point{X: at.X - 30, Y: at.Y}) })
+	if hs.c.columns[2] != 90 {
+		t.Errorf("kind column = %d after hovering across its grip, want the 90 it had", hs.c.columns[2])
+	}
 	hs.do(func() {
-		col.HoverMove(widget.Point{X: 100})
-		col.SetPressed(true)
-		col.DragMove(widget.Point{X: 70})
+		r.Move(at)
+		r.Press(widget.BTNLeft, at, 0)
+		r.Move(widget.Point{X: at.X - 30, Y: at.Y + 9})
 	})
 	if hs.c.columns[2] != 120 {
 		t.Errorf("kind column = %d after dragging its edge 30px left, want 120", hs.c.columns[2])
 	}
 	paint()
-	if w := hs.c.ui.columns[2].(interface{ Bounds() render.Rect }).Bounds().W; w != 120 {
+	if w := hs.c.ui.columns[2].(widget.Boundser).Bounds().W; w != 120 {
 		t.Errorf("kind header = %dpx wide mid-drag, want the column's 120", w)
 	}
-	hs.do(func() { col.DragMove(widget.Point{X: -1000}) })
+	hs.do(func() { r.Move(widget.Point{X: at.X - 5000, Y: at.Y}) })
 	if hs.c.columns[2] != maxColumnW {
 		t.Errorf("kind column = %d, want clamped to %d", hs.c.columns[2], maxColumnW)
 	}
-	// The rows re-lay on release, not on every motion.
 	if !slices.Equal(paint(), before) {
 		t.Error("the rows re-laid mid-drag")
 	}
-	hs.do(col.PressEnd)
+	hs.do(func() { r.Release(widget.BTNLeft, widget.Point{X: at.X - 5000, Y: at.Y}) })
 	if slices.Equal(paint(), before) {
 		t.Error("releasing the grip left the rows at the old widths")
 	}
-	hs.do(func() { col.SetPressed(true); col.DragMove(widget.Point{X: 5000}) })
+	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, col, 1200, 800) })
+	hs.do(func() { drag(r, at, widget.Point{X: at.X + 5000, Y: at.Y}) })
 	if hs.c.columns[2] != minColumnW {
 		t.Errorf("kind column = %d, want clamped to %d", hs.c.columns[2], minColumnW)
 	}
 }
 
-// The sheet measures to its own size within its floor and ceiling, so
-// the window sizes to it.
-func TestSheetSizesItself(t *testing.T) {
-	s := newSheet(widget.NewSpacer(0, 0), 760, 520)
-	if got := s.Measure(widget.Constraints{Max: widget.Size{W: 4000, H: 4000}}); got != (widget.Size{W: 760, H: 520}) {
-		t.Errorf("measured %v, want its 760x520", got)
-	}
-	s.resize(10, 99999)
-	if got := s.Measure(widget.Constraints{Max: widget.Size{W: 4000, H: 4000}}); got != (widget.Size{W: sheetMinW, H: sheetMaxH}) {
-		t.Errorf("resized to %v, want the floor and the ceiling", got)
-	}
-}
-
-// The window maps on the target output (the focused one), anchored top
-// left and first centred there by its margins; a header drag moves the
-// margins (never below zero), and the place sticks across requests on
-// that output. Another output re-centres it there.
-func TestSheetWindowIsPlacedByItsMargins(t *testing.T) {
+// The overlay spans the target output (the focused one) and takes input
+// only over the panel, which centres there at its size, its content
+// filling it. The header drags it while the header's buttons keep
+// their presses, and its place sticks across requests on that output;
+// another output centres it again.
+func TestPanelFloatsOnTheOutput(t *testing.T) {
 	hs := newHarness(t, "")
 	dp1, dp2 := &app.Output{Name: "DP-1"}, &app.Output{Name: "DP-2"}
 	target := dp1
-	hs.c.d.Target = func() (*app.Output, int, int, bool) {
-		if target == dp1 {
-			return dp1, 1920, 1080, true
-		}
-		return dp2, 2560, 1440, true
-	}
+	hs.c.d.Target = func() *app.Output { return target }
 	got := hs.open(t, OpenRequest{})
 	c := hs.cfg
-	want := app.Margins{Left: (1920 - sheetW) / 2, Top: (1080 - sheetH) / 2}
 	if c.Output != dp1 {
 		t.Errorf("mapped on %v, want the target output", c.Output)
 	}
-	if c.Anchor != app.AnchorTop|app.AnchorLeft || c.Margin != want || c.Width != 0 || c.Height != 0 {
-		t.Errorf("layer anchor %v margin %+v size %dx%d, want top-left at %+v sized to the sheet", c.Anchor, c.Margin, c.Width, c.Height, want)
+	if all := app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight; c.Anchor != all || c.Margin != (app.Margins{}) || c.Width != 0 || c.Height != 0 {
+		t.Errorf("layer anchor %v margin %+v size %dx%d, want it spanning the output", c.Anchor, c.Margin, c.Width, c.Height)
 	}
-	if root, ok := c.Root.(*widget.Box); !ok || root.Element() != "window" {
-		t.Errorf("root %T, want the window node", c.Root)
+	panel := hs.panel(t)
+	centred := render.Rect{X: (1920 - panelW) / 2, Y: (1080 - panelH) / 2, W: panelW, H: panelH}
+	var r *widget.Router
+	var grab, up widget.Point
+	hs.run(func() {
+		r, grab = treetest.Pointer(panel, treetest.WithClass(panel, "file-chooser-title")[0].(widget.Boundser), 1920, 1080)
+		up = center(treetest.Button(t, panel, "Up"))
+		if p := panel.PanelRect(); p != centred {
+			t.Errorf("panel at %v, want centred at %v", p, centred)
+		}
+		if reg := panel.InputRegion(); len(reg) != 1 || reg[0] != centred {
+			t.Errorf("input region %v, want the panel alone", reg)
+		}
+		if hit := panel.HitTest(widget.Point{X: 5, Y: 5}); hit != nil {
+			t.Errorf("a press beside the panel hit %T, want it passed through", hit)
+		}
+		header := treetest.WithClass(panel, "file-chooser-header")[0].(widget.Boundser).Bounds()
+		footer := treetest.WithClass(panel, "file-chooser-footer")[0].(widget.Boundser).Bounds()
+		if header.Y != centred.Y || footer.Y+footer.H != centred.Y+centred.H || footer.W != centred.W {
+			t.Errorf("header %v and footer %v, want them spanning the panel %v", header, footer, centred)
+		}
+	})
+	dir := hs.dir()
+	hs.do(func() {
+		drag(r, up, widget.Point{X: up.X + 3, Y: up.Y})
+		lay(panel, 1920, 1080)
+	})
+	if p := panel.PanelRect(); p != centred || hs.dir() == dir {
+		t.Errorf("a press on Up left the panel at %v in %s, want it clicked and the panel unmoved", p, hs.dir())
 	}
-	hs.do(func() { hs.c.move(40, -30) })
-	hs.do(func() { hs.c.move(-5000, 0) })
-	hs.mu.Lock()
-	win := hs.windows[len(hs.windows)-1]
-	hs.mu.Unlock()
-	moved := app.Margins{Left: want.Left + 40, Top: want.Top - 30}
-	if len(win.margins) != 2 || win.margins[0] != moved || win.margins[1] != (app.Margins{Top: moved.Top}) {
-		t.Errorf("margins %+v, want %+v then clamped at the left edge", win.margins, moved)
+	moved := centred
+	moved.X, moved.Y = moved.X+40, moved.Y-30
+	hs.do(func() {
+		drag(r, grab, widget.Point{X: grab.X + 40, Y: grab.Y - 30})
+		lay(panel, 1920, 1080)
+	})
+	if p := panel.PanelRect(); p != moved {
+		t.Errorf("dragged the header to %v, want %v", p, moved)
 	}
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
 	got = hs.open(t, OpenRequest{})
-	if hs.cfg.Margin != win.margins[1] {
-		t.Errorf("the next request opened at %+v, want the dragged %+v", hs.cfg.Margin, win.margins[1])
+	hs.run(func() { lay(hs.cfg.Root, 1920, 1080) })
+	if p := hs.panel(t).PanelRect(); p != moved {
+		t.Errorf("the next request opened at %v, want the dragged %v", p, moved)
 	}
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
 	target = dp2
 	hs.open(t, OpenRequest{})
-	if want := (app.Margins{Left: (2560 - sheetW) / 2, Top: (1440 - sheetH) / 2}); hs.cfg.Output != dp2 || hs.cfg.Margin != want {
-		t.Errorf("on another output: %v at %+v, want DP-2 at %+v", hs.cfg.Output, hs.cfg.Margin, want)
+	hs.run(func() { lay(hs.cfg.Root, 2560, 1440) })
+	if want := (render.Rect{X: (2560 - panelW) / 2, Y: (1440 - panelH) / 2, W: panelW, H: panelH}); hs.cfg.Output != dp2 || hs.panel(t).PanelRect() != want {
+		t.Errorf("on another output: %v at %v, want DP-2 at %v", hs.cfg.Output, hs.panel(t).PanelRect(), want)
+	}
+}
+
+// The corner grip resizes the panel within its floor and ceiling, its
+// top left fixed, and the next request opens at the size it was left.
+func TestPanelSizeIsLimitedAndKept(t *testing.T) {
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	panel := hs.panel(t)
+	r := &widget.Router{Root: panel}
+	resize := func(dx, dy int) render.Rect {
+		var p render.Rect
+		hs.do(func() {
+			lay(panel, 3840, 2160)
+			p = panel.PanelRect()
+			corner := widget.Point{X: p.X + p.W - 4, Y: p.Y + p.H - 4}
+			drag(r, corner, widget.Point{X: corner.X + dx, Y: corner.Y + dy})
+			lay(panel, 3840, 2160)
+		})
+		return p
+	}
+	from := resize(5000, 5000)
+	if p := panel.PanelRect(); p != (render.Rect{X: from.X, Y: from.Y, W: panelMaxW, H: panelMaxH}) {
+		t.Errorf("grown to %v from %v, want the %dx%d ceiling at the same corner", p, from, panelMaxW, panelMaxH)
+	}
+	resize(-5000, -5000)
+	if p := panel.PanelRect(); p != (render.Rect{X: from.X, Y: from.Y, W: panelMinW, H: panelMinH}) {
+		t.Errorf("shrunk to %v from %v, want the %dx%d floor at the same corner", p, from, panelMinW, panelMinH)
+	}
+	resize(100, 60)
+	kept := panel.PanelRect()
+	if kept.W != panelMinW+100 || kept.H != panelMinH+60 {
+		t.Fatalf("resized to %v, want %dx%d", kept, panelMinW+100, panelMinH+60)
+	}
+	hs.do(func() { hs.c.finish(nil) })
+	answer(t, got)
+	hs.open(t, OpenRequest{})
+	hs.run(func() { lay(hs.cfg.Root, 3840, 2160) })
+	if p := hs.panel(t).PanelRect(); p != kept {
+		t.Errorf("the next request opened at %v, want the %v it was left at", p, kept)
+	}
+}
+
+// A new chooser opens at its default size, centred.
+func TestPanelOpensAtItsDefaultSize(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{})
+	hs.run(func() { lay(hs.cfg.Root, 1920, 1080) })
+	if p := hs.panel(t).PanelRect(); p != (render.Rect{X: (1920 - panelW) / 2, Y: (1080 - panelH) / 2, W: panelW, H: panelH}) {
+		t.Errorf("a new chooser opened at %v, want %dx%d centred", p, panelW, panelH)
 	}
 }
 
@@ -873,25 +1030,6 @@ func TestEnterOnSeveralFoldersEntersOnlyTheFirst(t *testing.T) {
 	}
 }
 
-// The sheet measures its child at its own size before arranging it: a
-// Box lays its children out from what it measured, and nothing else
-// measures the sheet's content.
-func TestSheetMeasuresItsChild(t *testing.T) {
-	fixed := widget.NewSpacer(30, 10)
-	box := widget.NewBox(widget.Row, 0, 0)
-	box.Append(fixed, false)
-	box.Append(widget.NewSpacer(0, 0), true)
-	s := newSheet(box, 600, 400)
-	sz := s.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 800}})
-	s.Arrange(render.Rect{X: 7, Y: 9, W: sz.W, H: sz.H})
-	if b := fixed.Bounds(); b.W != 30 || b.X != 7 || b.Y != 9 {
-		t.Errorf("the child's first cell = %+v, want 30px at the sheet's corner", b)
-	}
-	if b := box.Bounds(); b.W != 600 || b.H != 400 {
-		t.Errorf("the child = %+v, want the sheet's 600x400", b)
-	}
-}
-
 // The sidebar's sections pack at the top of its scroll, not mid-view.
 func TestSidebarPacksAtTheTop(t *testing.T) {
 	hs := newHarness(t, "")
@@ -933,26 +1071,26 @@ func TestLongNamesKeepTheColumnsAligned(t *testing.T) {
 	}
 }
 
-// The chooser's containers report their children to the focus ring.
+// The chooser's containers report a focused control to the focus ring,
+// in the header and in the body alike.
 func TestLayoutWidgetsReportTheirChildToTheFocusRing(t *testing.T) {
-	for name, wrap := range map[string]func(widget.Widget) widget.Widget{
-		"place":    func(c widget.Widget) widget.Widget { return newPlace(c, alignStart, alignStart) },
-		"sheet":    func(c widget.Widget) widget.Widget { return newSheet(c, 600, 400) },
-		"dragArea": func(c widget.Widget) widget.Widget { return &dragArea{child: c} },
-	} {
-		child := widget.NewSpacer(10, 10)
-		w := wrap(child)
-		w.Measure(widget.Constraints{Max: widget.Size{W: 800, H: 600}})
-		w.Arrange(render.Rect{W: 800, H: 600})
-		cv := render.New(make([]byte, render.Stride(800)*600), render.Stride(800), 800, 600)
-		drawn := false
-		cv.MarkFocus(child, func(*render.Canvas) { drawn = true })
-		w.Paint(cv)
-		if !drawn {
-			t.Errorf("%s did not report its child", name)
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{})
+	hs.run(func() {
+		root := hs.cfg.Root
+		for _, name := range []string{"Up", "Cancel"} {
+			b := treetest.Button(t, root, name)
+			lay(root, 800, 600)
+			cv := render.New(make([]byte, render.Stride(800)*600), render.Stride(800), 800, 600)
+			drawn := false
+			cv.MarkFocus(b, func(*render.Canvas) { drawn = true })
+			root.Paint(cv)
+			if !drawn {
+				t.Errorf("%s was not reported", name)
+			}
+			cv.FinishFocus()
 		}
-		cv.FinishFocus()
-	}
+	})
 }
 
 // testCaller is the request the tests' dialogs serve.
@@ -1614,12 +1752,12 @@ func TestPlaceIconFallsBackAlongTheName(t *testing.T) {
 	}
 }
 
-// The sheet stands on lys-ui's parts: its card cut into bands by
-// separators, ghost icon buttons in the header (never the old flat
+// The chooser stands on lys-ui's parts: a floating panel cut into bands
+// by separators, ghost icon buttons in the header (never the old flat
 // ones), a heading title a step over the text size, ghost crumbs and
 // places, caption headings over the sidebar sections, dim cells, an
 // outline Cancel and the suggested confirm.
-func TestSheetTakesLysUiParts(t *testing.T) {
+func TestChooserTakesLysUiParts(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{})
 	hs.run(func() {
@@ -1641,7 +1779,7 @@ func TestSheetTakesLysUiParts(t *testing.T) {
 				}
 			}
 		}
-		all("file-chooser-surface", css.Card)
+		hs.panel(t)
 		all("file-chooser-nav", css.Ghost, css.Icon)
 		all("file-chooser-title", css.Heading)
 		all("file-chooser-crumb", css.Ghost)
