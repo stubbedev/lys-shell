@@ -307,26 +307,31 @@ func TestVPNSection(t *testing.T) {
 	waitHeadless(t, "the toggle", func() bool { _, _, _, tg := vpn.writes(); return slices.Equal(tg, []string{"u2"}) })
 }
 
-// The VPN rows are plain boxes carrying the whole row's click
-// (vpn_item.rs:82-197): not buttons, pointer cursor, and the row's
-// state glyph — a plain icon — toggles the tunnel. The add row is the
-// same kind of box (vpn_connections/mod.rs:75-107).
-func TestVPNRowsAreClickableBoxes(t *testing.T) {
-	vpn := &fakeVPN{entries: []network.VPN{{UUID: "u1", Name: "Work", State: network.VPNDisconnected}}}
+// The VPN rows are lys-ui's activatable Items (vpn_item.rs:82-197): a
+// click on the row's state glyph toggles the tunnel, the edit button
+// keeps its own click, and a failed profile carries its reason as the
+// tooltip. The add row activates to open the editor
+// (vpn_connections/mod.rs:75-107).
+func TestVPNRowsActivate(t *testing.T) {
+	vpn := &fakeVPN{
+		entries: []network.VPN{
+			{UUID: "u1", Name: "Work", State: network.VPNDisconnected},
+			{UUID: "u2", Name: "Home", State: network.VPNFailed, Detail: "wrong username or password"},
+		},
+		settings: map[string]network.ConnectionDict{"u1": network.BuildProfile(testPlugin, "Work", "u1", map[string]string{"gateway": "vpn.example.com"})},
+	}
 	v, _ := newVPNTestView(t, vpn, nil)
 	v.apply(v.read(context.Background()))
-	row, ok := v.vpns.rows.Children()[0].(*widget.Box)
+	row, ok := v.vpns.rows.Children()[0].(*widget.Item)
 	if !ok {
-		t.Fatalf("row = %T, want a plain box", v.vpns.rows.Children()[0])
+		t.Fatalf("row = %T, want lys-ui's Item", v.vpns.rows.Children()[0])
 	}
-	if _, isButton := any(row).(*widget.Button); isButton {
-		t.Fatal("the row is a button element")
+	if !row.HasClass("vpn-item") || row.HasClass("failed") || row.TooltipText() != "" {
+		t.Error("an idle profile is not a plain vpn-item")
 	}
-	if !row.HasClass("network-item") || !row.HasClass("vpn-item") || widget.HasClass(row, "vpn-item-toggle") {
-		t.Error("the row is not the network-item vpn-item box")
-	}
-	if widget.CursorNameOf(row) != "pointer" {
-		t.Error("the row does not carry the pointer cursor")
+	failed := v.vpns.rows.Children()[1].(*widget.Item)
+	if !failed.HasClass("failed") || failed.TooltipText() != "wrong username or password" {
+		t.Errorf("the failed profile: failed %v tooltip %q", failed.HasClass("failed"), failed.TooltipText())
 	}
 	var icon widget.Widget
 	walkTree(row, func(w widget.Widget) bool {
@@ -340,14 +345,13 @@ func TestVPNRowsAreClickableBoxes(t *testing.T) {
 	}
 	clickAt(t, row, icon)
 	waitHeadless(t, "the row toggle", func() bool { _, _, _, tg := vpn.writes(); return slices.Equal(tg, []string{"u1"}) })
-
-	// The add row: a box, not a button; clicking it opens the editor.
-	if _, isButton := any(v.vpns.add).(*widget.Button); isButton {
-		t.Fatal("the add row is a button element")
+	edit := findButton(row, "network-vpn-edit")
+	clickAt(t, row, edit)
+	waitHeadless(t, "the editor", func() bool { return v.body.Visible() == netPageEdit })
+	if _, _, _, tg := vpn.writes(); len(tg) != 1 {
+		t.Errorf("the edit button also toggled: %v", tg)
 	}
-	if widget.CursorNameOf(v.vpns.add) != "pointer" {
-		t.Error("the add row does not carry the pointer cursor")
-	}
+	v.body.Show(netPageBrowse)
 	clickAt(t, v.vpns.add, v.vpns.add)
 	if v.body.Visible() != netPageEdit {
 		t.Error("clicking the add row did not open the editor")

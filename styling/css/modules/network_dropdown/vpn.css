@@ -80,18 +80,34 @@ button.network-vpn-edit:hover image {
   color: var(--fg-default);
 }
 
-.network-item.vpn-add.separated {
+.vpn-add.separated {
   border-top: 1px solid var(--border-subtle);
 }
-.network-item.vpn-add image.network-item-signal {
+.vpn-add image.network-item-signal,
+.vpn-add .title {
   color: var(--fg-subtle);
 }
-.network-item.vpn-add label.network-item-name {
-  color: var(--fg-subtle);
-}
-.network-item.vpn-add:hover image.network-item-signal,
-.network-item.vpn-add:hover label.network-item-name {
+.vpn-add:hover image.network-item-signal,
+.vpn-add:hover .title {
   color: var(--fg-default);
+}
+
+.vpn-item image.network-item-signal {
+  -gtk-icon-size: var(--icon-lg);
+  color: var(--fg-muted);
+}
+.vpn-item.connected image.network-item-signal {
+  color: var(--accent);
+}
+.vpn-item .title {
+  font-size: var(--text-md);
+  color: var(--fg-default);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.vpn-item .description {
+  font-size: var(--text-sm);
+  line-clamp: 3;
 }
 
 .network-vpn-public-key {
@@ -110,6 +126,6 @@ button.network-vpn-edit:hover image {
   margin-top: var(--space-lg);
 }
 
-.vpn-item .network-item-security.failed {
+.vpn-item.failed .description {
   color: var(--status-error);
 }

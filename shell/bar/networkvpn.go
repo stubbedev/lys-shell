@@ -318,7 +318,7 @@ type netVPNs struct {
 	*widget.Box
 	v    *networkView
 	rows *widget.Box
-	add  *widget.Box
+	add  *widget.Item
 }
 
 func newNetVPNs(v *networkView) *netVPNs {
@@ -328,18 +328,14 @@ func newNetVPNs(v *networkView) *netVPNs {
 	card.AddClass("card", "network-list")
 	s.rows = widget.NewBox(widget.Column, 0, 0)
 	card.Append(s.rows, false)
-	// The add row is a plain box the whole of which clicks
-	// (vpn_connections/mod.rs:75-107), not a button.
-	s.add = widget.NewBox(widget.Row, 0, 0)
-	s.add.AddClass("network-item", "vpn-item", "vpn-add")
-	s.add.SetCursorName("pointer")
-	s.add.SetOnClickWithin(v.vpnAdd)
+	// The add row activates as a whole (vpn_connections/mod.rs:75-107).
+	s.add = widget.NewItem(v.font, i18n.T("dropdown-network-vpn-add"), "")
+	s.add.SetSmall(true)
+	s.add.AddClass("vpn-item", "vpn-add")
+	s.add.SetOnActivate(v.vpnAdd)
 	plus := widget.NewThemeIcon("ld-plus-symbolic", int(v.px*1.1))
 	plus.AddClass("network-item-signal")
-	s.add.AppendAligned(plus, false, widget.AlignCenter)
-	label := widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-vpn-add"), 0)
-	label.AddClass("network-item-name")
-	s.add.Append(label, true)
+	s.add.SetMedia(plus, false)
 	card.Append(s.add, false)
 	s.Append(card, false)
 	s.SetVisible(v.vpn != nil)
@@ -359,50 +355,36 @@ func (s *netVPNs) apply(rows []network.VPN) {
 	}
 }
 
-// row is VpnItem: a plain box carrying the whole row's click
-// (GestureClick on the root, vpn_item.rs:190-197) and the pointer
-// cursor; the edit button, being a button, keeps its own.
-func (s *netVPNs) row(r network.VPN) widget.Widget {
+// row is VpnItem on lys-ui's Item: the state glyph as the media, the
+// name over the state or the gateway's reason, and the edit button as
+// the action. Activating the row toggles the tunnel (vpn_item.rs:
+// 190-197); the edit button keeps its own click. A reason is a
+// sentence: the stylesheet clamps it to three lines, the tooltip
+// holding the rest.
+func (s *netVPNs) row(r network.VPN) *widget.Item {
 	v := s.v
 	uuid := r.UUID
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.AddClass("network-item", "vpn-item")
-	row.SetCursorName("pointer")
-	row.SetOnClickWithin(func() { v.vpnToggle(uuid) })
+	row := widget.NewItem(v.font, r.Name, vpnRowCaption(r))
+	row.SetSmall(true)
+	row.AddClass("vpn-item")
+	row.SetOnActivate(func() { v.vpnToggle(uuid) })
 	icon := widget.NewThemeIcon(vpnStateIcon(r.State), int(v.px*1.1))
 	icon.AddClass("network-item-signal")
 	switch r.State {
 	case network.VPNConnected:
-		icon.AddClass("connected")
+		row.AddClass("connected")
 	case network.VPNConnecting:
-		icon.AddClass("connecting")
+		row.AddClass("connecting")
 	}
-	row.AppendAligned(icon, false, widget.AlignCenter)
-	info := widget.NewBox(widget.Column, 0, 0)
-	info.AddClass("network-item-info")
-	name := widget.NewLabel(v.font, v.px, r.Name, 0)
-	name.AddClass("network-item-name")
-	name.SetEllipsize(widget.EllipsizeEnd)
-	name.SetMaxWidthChars(24)
-	info.Append(name, false)
-	// A gateway's reason is a sentence: wrapped at the row's width, three
-	// lines at most, the tooltip holding the rest.
-	caption := widget.NewLabel(v.font, v.px*0.8, vpnRowCaption(r), 0)
-	caption.AddClass("network-item-security")
-	caption.SetWrap(true)
-	caption.SetMaxWidthChars(24)
-	caption.SetMaxLines(3)
+	row.SetMedia(icon, false)
 	if r.Detail != "" {
-		caption.AddClass("failed")
-		caption.SetTooltip(r.Detail)
+		row.AddClass("failed")
+		row.SetTooltip(r.Detail)
 	}
-	info.Append(caption, false)
-	row.Append(info, true)
 	gear := widget.NewThemeIcon("ld-settings-symbolic", int(v.px))
-	edit := dropdownButton(gear, func() { v.vpnEdit(uuid) }, "network-vpn-edit")
-	edit.AddClass(css.Ghost, css.Icon)
+	edit := dropdownButton(gear, func() { v.vpnEdit(uuid) }, "network-vpn-edit", css.Ghost, css.Icon, css.Small)
 	edit.SetTooltip(i18n.T("dropdown-network-vpn-edit"))
-	row.AppendAligned(edit, false, widget.AlignCenter)
+	row.AddAction(edit)
 	return row
 }
 

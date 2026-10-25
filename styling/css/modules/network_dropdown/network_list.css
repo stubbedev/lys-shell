@@ -5,8 +5,8 @@
 .network-list {
   padding: 0;
 }
-.network-list .network-item + .network-item,
-.network-list .network-ap + .network-ap {
+.network-list .network-ap + .network-ap,
+.network-list .vpn-item + .vpn-item {
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -25,33 +25,6 @@
 .network-ap.stale .title,
 .network-ap.stale .description {
   opacity: 0.55;
-}
-
-.network-item {
-  padding: var(--space-sm);
-  color: var(--fg-muted);
-  transition: background var(--duration-fast);
-}
-.network-item:hover {
-  background: var(--bg-overlay);
-}
-.network-item image.network-item-signal {
-  -gtk-icon-size: var(--icon-lg);
-  margin-right: var(--space-md);
-  margin-left: var(--space-sm);
-  color: var(--fg-muted);
-}
-
-.network-item-name {
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  color: var(--fg-default);
-}
-
-.network-item-security {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-subtle);
 }
 
 button.network-item-forget:hover {
