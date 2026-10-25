@@ -1,26 +1,4 @@
-.progress-ring {
-  all: unset;
+.stat-ring {
   min-width: calc(4rem * var(--global-scale));
   min-height: calc(4rem * var(--global-scale));
-}
-.progress-ring .ring-text {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold);
-  color: var(--fg-default);
-}
-
-.progress-ring-canvas {
-  border-style: solid;
-  border-color: transparent;
-  border-width: calc(4px * var(--global-scale));
-  color: var(--accent);
-}
-.progress-ring-canvas.success {
-  color: var(--status-success);
-}
-.progress-ring-canvas.warning {
-  color: var(--status-warning);
-}
-.progress-ring-canvas.error {
-  color: var(--status-error);
 }

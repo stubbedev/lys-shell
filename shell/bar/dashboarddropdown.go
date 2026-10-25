@@ -792,13 +792,11 @@ func (v *dashboardView) systemStats() widget.Widget {
 	cfg := v.ctx.Config.Dashboard
 	row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 	row.AddClass("system-stats-inline")
-	ring := func(labelID string) *progressRing {
-		// ProgressRing: the canvas paints from its cascade; the variant
-		// class recolors it.
-		r, overlay := newProgressRing(v.font, v.px)
+	ring := func(labelID string) *statRing {
+		r := newStatRing(v.label(""))
 		col := widget.NewBox(widget.Column, widget.Current().Spacing/2, 0)
 		col.AddClass("stat-inline")
-		col.AppendAligned(overlay, false, widget.AlignCenter)
+		col.AppendAligned(r.ring, false, widget.AlignCenter)
 		lbl := v.label(i18n.T(labelID))
 		lbl.AddClass("stat-label", css.Caption, css.DimLabel)
 		lbl.SetAlignment(render.AlignCenter)
@@ -808,7 +806,7 @@ func (v *dashboardView) systemStats() widget.Widget {
 	}
 	cpuRing, memRing, diskRing, tempRing := ring("dropdown-dashboard-cpu"), ring("dropdown-dashboard-ram"), ring("dropdown-dashboard-disk"), ring("dropdown-dashboard-temp")
 	card.Append(row, false)
-	usage := func(r *progressRing, pct float32) {
+	usage := func(r *statRing, pct float32) {
 		r.set(float64(pct/100), strconv.FormatFloat(float64(pct), 'f', 0, 32)+"%", dashboardThresholdClass(pct, cfg.UsageWarning, cfg.UsageError))
 	}
 	reader := &sysinfo.CPUReader{Sensor: v.ctx.Config.CPU.TempSensor}

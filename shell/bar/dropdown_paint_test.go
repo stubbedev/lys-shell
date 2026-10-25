@@ -122,36 +122,43 @@ func TestBatteryGaugePaintsFromTheLevelbarRules(t *testing.T) {
 	}
 }
 
-// The dashboard rings paint from their cascade: the canvas color
-// follows the variant class, and the stroke is the rule's border
-// width — no threshold tint survives.
-func TestDashboardRingPaintsFromTheCascade(t *testing.T) {
+// The dashboard rings are lys-ui's ring in the palette's colors: the
+// threshold variant recolors the sweep, and dropping the variant
+// returns it to the accent.
+func TestStatRingPaintsTheThresholdColor(t *testing.T) {
+	restore := widget.SetAnimationsInstant(true)
+	defer restore()
 	ctx := styledContext(t, config.Defaults())
-	r, overlay := newProgressRing(ctx.Font, 12)
-	ctx.Theme.Attach(overlay)
-	r.set(0.75, "75%", "success")
-	sz := overlay.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
-	overlay.Arrange(render.Rect{X: 0, Y: 0, W: sz.W, H: sz.H})
-
-	if got := widget.CascadeColor(r); got == 0 {
-		t.Error("the canvas cascade has no color: the .progress-ring-canvas rule did not reach it")
+	var r *statRing
+	fresh := func() {
+		r = newStatRing(widget.NewLabel(ctx.Font, 12, "", 0))
+		ctx.Theme.Attach(r.ring)
 	}
-	if stroke := r.stroke(); stroke <= 0 {
-		t.Fatalf("the ring stroke = %d, want the rule's border width", stroke)
-	}
+	fresh()
 	paintRing := func() []byte {
+		sz := r.ring.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
+		r.ring.Arrange(render.Rect{W: sz.W, H: sz.H})
 		data := make([]byte, render.Stride(100)*100)
 		cv := render.NewScaled(data, render.Stride(100), 100, 100, 1, 1)
 		cv.Clear(cv.Rect(), 0)
-		overlay.Paint(cv)
+		r.ring.Paint(cv)
 		return data
 	}
-	if n := countColor(paintRing(), func(c render.Color) bool { return c.G() > 150 && c.R() < 150 }); n == 0 {
+	green := func(c render.Color) bool { return c.A() > 200 && c.G() > 150 && c.R() < 150 }
+	red := func(c render.Color) bool { return c.A() > 200 && c.R() > 150 && c.G() < 150 }
+	r.set(0.75, "75%", "success")
+	if n := countColor(paintRing(), green); n == 0 {
 		t.Error("the success ring painted no green")
 	}
 	r.set(0.75, "75%", "error")
-	if n := countColor(paintRing(), func(c render.Color) bool { return c.R() > 150 && c.G() < 150 }); n == 0 {
+	if n := countColor(paintRing(), red); n == 0 {
 		t.Error("the error ring painted no red")
+	}
+	fresh()
+	r.set(0.75, "75%", "success")
+	r.set(0.75, "75%", "")
+	if n := countColor(paintRing(), green); n != 0 {
+		t.Errorf("the accent ring still painted %d green pixels", n)
 	}
 }
 
@@ -169,28 +176,23 @@ func spanOf(data []byte, h int, want func(render.Color) bool) (minX, maxX int) {
 	return minX, maxX
 }
 
-// The ring is a gtk::Overlay the stylesheet sizes: .progress-ring's
-// min size is its diameter (a ring outside the stylesheet has none),
-// the canvas fills it, and the label sits on the canvas's center
-// rather than under it.
-func TestProgressRingIsAnOverlayTheStylesheetSizes(t *testing.T) {
+// The stylesheet sizes the dashboard ring to 4rem, past lys-ui's
+// default diameter, and its value sits on the ring's centre.
+func TestStatRingTakesTheStylesheetDiameter(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
-	_, bare := newProgressRing(ctx.Font, 12)
-	if s := widget.MeasureAsChild(bare, widget.Constraints{Max: widget.Size{W: 400, H: 400}}); s.H >= 40 {
+	bare := newStatRing(widget.NewLabel(ctx.Font, 12, "", 0))
+	if s := widget.MeasureAsChild(bare.ring, widget.Constraints{Max: widget.Size{W: 400, H: 400}}); s.H >= 48 {
 		t.Fatalf("a ring outside the stylesheet measures %v: its size is not the stylesheet's", s)
 	}
-	r, overlay := newProgressRing(ctx.Font, 12)
-	ctx.Theme.Attach(overlay)
+	r := newStatRing(widget.NewLabel(ctx.Font, 12, "", 0))
+	ctx.Theme.Attach(r.ring)
 	r.set(0.5, "50%", "")
-	sz := widget.MeasureAsChild(overlay, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
-	if sz.W < 40 || sz.W != sz.H {
-		t.Fatalf("the ring measures %v, want the square .progress-ring min size", sz)
+	sz := widget.MeasureAsChild(r.ring, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	if sz.W < 60 || sz.W != sz.H {
+		t.Fatalf("the ring measures %v, want the square 4rem .stat-ring", sz)
 	}
-	widget.ArrangeAsChild(overlay, render.Rect{W: sz.W, H: sz.H})
-	if b := r.Bounds(); b.W != sz.W || b.H != sz.H {
-		t.Errorf("the canvas spans %+v, want the whole %v overlay", b, sz)
-	}
-	lb, rb := r.label.Bounds(), r.Bounds()
+	widget.ArrangeAsChild(r.ring, render.Rect{W: sz.W, H: sz.H})
+	lb, rb := r.label.Bounds(), r.ring.Bounds()
 	if dx, dy := (lb.X+lb.W/2)-(rb.X+rb.W/2), (lb.Y+lb.H/2)-(rb.Y+rb.H/2); dx < -1 || dx > 1 || dy < -1 || dy > 1 {
 		t.Errorf("the label %+v sits off the ring's center %+v", lb, rb)
 	}
