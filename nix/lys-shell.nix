@@ -6,6 +6,7 @@
   pam,
   pipewire,
   libgbm,
+  vulkan-loader,
   gst_all_1,
 }:
 let
@@ -28,13 +29,15 @@ let
 
   # The libraries the binaries dlopen through purego: libgstreamer and
   # libglib (recorder), libpam (lock screen), libpipewire (the ScreenCast
-  # portal) and libgbm (its dmabuf path).
+  # portal), libgbm (its dmabuf path) and libvulkan (lys-ui's GPU
+  # renderer, which falls back to the CPU without it).
   libs = [
     gst_all_1.gstreamer
     glib
     pam
     pipewire
     libgbm
+    vulkan-loader
   ];
 
   # internal/version is the one place the release version lives.
@@ -75,7 +78,7 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-U4M2aGzWip9oo0sM8MDZtn2oXhlnL8qNTtExPA34j/Q=";
+  vendorHash = "sha256-8xS2OigBrepMh1NhzU11uBlUQLCV0mpReKaG3phdmjo=";
 
   subPackages = [
     "cmd/lys-shell"

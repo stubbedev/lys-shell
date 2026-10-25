@@ -2,11 +2,27 @@
 {
   perSystem =
     { pkgs, lib, ... }:
+    let
+      pkg = self.packages.${pkgs.stdenv.hostPlatform.system}.lys-shell;
+    in
     {
-      checks = lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
-        # The shell on a live Hyprland in a NixOS VM (needs KVM); see
-        # tests/hyprland-vm.nix.
-        lys-shell-hyprland-vm = pkgs.callPackage ../tests/hyprland-vm.nix { inherit self; };
-      };
+      checks =
+        lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
+          # The shell on a live Hyprland in a NixOS VM (needs KVM); see
+          # tests/hyprland-vm.nix.
+          lys-shell-hyprland-vm = pkgs.callPackage ../tests/hyprland-vm.nix { inherit self; };
+        }
+        // {
+          # Every wrapped binary finds the Vulkan loader: lys-ui renders on
+          # the GPU through it and silently stays on the CPU without it, and
+          # NixOS has no global library path to fall back on.
+          lys-shell-wrapper-vulkan = pkgs.runCommand "lys-shell-wrapper-vulkan" { } ''
+            for bin in ${pkg}/bin/*; do
+              case "$bin" in */.*) continue ;; esac
+              grep -q "${lib.getLib pkgs.vulkan-loader}/lib" "$bin" || { echo "$bin lacks the Vulkan loader on its library path" >&2; exit 1; }
+            done
+            touch $out
+          '';
+        };
     };
 }
