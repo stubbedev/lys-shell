@@ -13,8 +13,8 @@ const rowPx = 40
 // viewport exist as widgets, so a ten-thousand-row dmenu costs a
 // viewport's worth. It owns the selection and the scroll offset; the
 // row widgets are the surface's (factory), styled by CSS classes. It is
-// a widget of its own rather than a lys-ui List because the launcher
-// binds every pointer button, click count, and wheel direction itself.
+// a widget of its own rather than a lys-ui List because it keeps rofi's
+// fixed row height and the selection apart from the scroll offset.
 type resultList struct {
 	widget.Base
 	count    int
@@ -27,8 +27,6 @@ type resultList struct {
 	// otherwise it is as tall as its rows, up to visibleRows.
 	fixed bool
 	rows  map[int]widget.Widget
-	// onScroll consumes a wheel step the bindings claim (true).
-	onScroll func(dy int) bool
 }
 
 func newResultList(factory func(i int) widget.Widget) *resultList {
@@ -169,16 +167,6 @@ func (l *resultList) HitTest(p widget.Point) widget.Widget {
 		}
 	}
 	return l.HitLeaf(l, p)
-}
-
-// ScrollInput gives the bindings the wheel first (ml-row-up/down move
-// the selection rather than the viewport); unclaimed, it scrolls the
-// viewport. Either way the step stops here.
-func (l *resultList) ScrollInput(dy int) bool {
-	if l.onScroll == nil || !l.onScroll(dy) {
-		l.ScrollBy(0, dy)
-	}
-	return true
 }
 
 // ScrollBy scrolls the viewport by whole rows.

@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func occupiedHypr(id int, monitor string) hyprland.Workspace {
@@ -502,12 +503,13 @@ func TestHyprlandClicksDispatch(t *testing.T) {
 		t.Errorf("special dispatches = %q", got[1:])
 	}
 	// Scroll down from active 1 walks to 2 in the displayed order.
-	buttons[1].ScrollInput(1)
+	router, p := treetest.Pointer(m.root, buttons[1], 500, 40)
+	router.Axis(0, 1, 0)
 	if got := wait(4); got[3] != "hl.dsp.focus({workspace = 2})" {
 		t.Errorf("next = %q", got[3])
 	}
 	m.cfg.Click.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
-	buttons[1].PointerButton(widget.BTNMiddle)
+	router.Press(widget.BTNMiddle, p, 0)
 	if got := wait(5); got[4] != "workspace previous" {
 		t.Errorf("last = %q", got[4])
 	}

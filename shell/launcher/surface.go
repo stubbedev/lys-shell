@@ -58,8 +58,6 @@ type Deps struct {
 	Vault func() engine.Mode
 	// Copy puts calc's result on the clipboard.
 	Copy func(text string)
-	// HeldMods are the modifiers held now, for pointer bindings.
-	HeldMods func() engine.MouseModifiers
 	// OpenHistory opens the launch history (a test seam).
 	OpenHistory func() (*engine.History, error)
 	// FireHook runs a -on-* hook (engine.FireHook; a test seam).
@@ -497,17 +495,17 @@ func (s *Surface) onMouse(action mouseAction, row int) {
 }
 
 // rowPressed runs the button bindings for a press on row pos.
-func (s *Surface) rowPressed(pos int, button engine.MouseButton, presses int) {
+func (s *Surface) rowPressed(pos int, button engine.MouseButton, presses int, mods engine.MouseModifiers) {
 	if s.cur == nil {
 		return
 	}
-	for _, act := range lookupButton(s.cur.mouse, button, presses, s.heldMods()) {
+	for _, act := range lookupButton(s.cur.mouse, button, presses, mods) {
 		s.onMouse(act, pos)
 	}
 }
 
 // listScrolled runs the wheel bindings; false lets the list scroll.
-func (s *Surface) listScrolled(dy int) bool {
+func (s *Surface) listScrolled(dy int, mods engine.MouseModifiers) bool {
 	if s.cur == nil || dy == 0 {
 		return false
 	}
@@ -515,18 +513,11 @@ func (s *Surface) listScrolled(dy int) bool {
 	if dy < 0 {
 		dir = engine.ScrollUp
 	}
-	actions := lookupScroll(s.cur.mouse, dir, s.heldMods())
+	actions := lookupScroll(s.cur.mouse, dir, mods)
 	for _, act := range actions {
 		s.onMouse(act, -1)
 	}
 	return len(actions) > 0
-}
-
-func (s *Surface) heldMods() engine.MouseModifiers {
-	if s.d.HeldMods == nil {
-		return 0
-	}
-	return s.d.HeldMods()
 }
 
 // keyCaptured is the capture-phase key path: a bound key acts, every

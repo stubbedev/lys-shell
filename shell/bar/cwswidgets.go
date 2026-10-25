@@ -230,6 +230,8 @@ func newCwsButton(m *cwsView, model cwsButtonModel) *cwsButton {
 	b.BgExplicit = true
 	b.Bg, b.BgHover, b.BgPressed = b.colors.bg, b.colors.hoverBg, b.colors.hoverBg
 	b.OnClick = func() { m.dispatchClick(m.cfg.Click.LeftClick, model.ws) }
+	b.SetOnPointer(b.pointer)
+	b.SetOnScroll(b.scroll)
 	b.AddClass(model.classes...)
 	return b
 }
@@ -347,7 +349,7 @@ func (b *cwsButton) Paint(cv *render.Canvas) {
 
 // HitTest keeps the workspace button the hit leaf, so the router's
 // hover, click (OnClick: connect_clicked's LeftClick(id)), and
-// pointer-button calls land here.
+// pointer hooks land here.
 func (b *cwsButton) HitTest(p widget.Point) widget.Widget {
 	if b.Button.HitTest(p) != nil {
 		return b
@@ -355,23 +357,27 @@ func (b *cwsButton) HitTest(p widget.Point) widget.Widget {
 	return nil
 }
 
-// PointerButton is the middle/right GestureClick pair.
-func (b *cwsButton) PointerButton(button uint32) {
-	switch button {
+// pointer is the middle/right GestureClick pair; the primary goes on
+// to OnClick.
+func (b *cwsButton) pointer(e widget.PointerEvent) bool {
+	switch e.Button {
 	case widget.BTNMiddle:
 		b.m.dispatchClick(b.m.cfg.Click.MiddleClick, b.model.ws)
 	case widget.BTNRight:
 		b.m.dispatchClick(b.m.cfg.Click.RightClick, b.model.ws)
+	default:
+		return false
 	}
+	return true
 }
 
-// ScrollInput is attach_scroll: discrete vertical steps, always
-// consumed (Propagation::Stop).
-func (b *cwsButton) ScrollInput(dy int) bool {
+// scroll is attach_scroll: discrete vertical steps, always consumed
+// (Propagation::Stop).
+func (b *cwsButton) scroll(e widget.ScrollEvent) bool {
 	switch {
-	case dy > 0:
+	case e.DY > 0:
 		b.m.dispatchScroll(b.m.cfg.Click.ScrollDown)
-	case dy < 0:
+	case e.DY < 0:
 		b.m.dispatchScroll(b.m.cfg.Click.ScrollUp)
 	}
 	return true

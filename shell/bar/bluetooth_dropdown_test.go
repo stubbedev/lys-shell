@@ -340,7 +340,7 @@ func (r *btDeviceRow) clickRow(t *testing.T) {
 	router := &widget.Router{Root: r}
 	p := widget.Point{X: 10, Y: 10}
 	router.Move(p)
-	router.Press(widget.BTNLeft, p)
+	router.Press(widget.BTNLeft, p, 0)
 	router.Release(widget.BTNLeft, p)
 }
 

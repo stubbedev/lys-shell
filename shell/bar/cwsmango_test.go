@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // nineTags is methods.rs's nine_tags as a mango frame fragment.
@@ -181,12 +182,13 @@ func TestMangoClicksDispatch(t *testing.T) {
 	}
 	b.ClickAt(widget.Point{})
 	expect("dispatch view,1")
-	b.ScrollInput(1)
+	router, p := treetest.Pointer(m.root, b, 500, 40)
+	router.Axis(0, 1, 0)
 	expect("dispatch viewtoright")
-	b.ScrollInput(-1)
+	router.Axis(0, -1, 0)
 	expect("dispatch viewtoleft")
 	// focus:last has no mango action: nothing is sent.
-	b.PointerButton(widget.BTNMiddle)
+	router.Press(widget.BTNMiddle, p, 0)
 	select {
 	case got := <-dispatched:
 		t.Fatalf("focus:last dispatched %q", got)

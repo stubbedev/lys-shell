@@ -51,7 +51,6 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 				}
 			}
 		},
-		HeldMods:    func() engine.MouseModifiers { return mouseMods(application.HeldMods()) },
 		OpenHistory: engine.OpenHistory,
 	}
 	if ctx.Clipboard != nil {
@@ -66,19 +65,4 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 		return func() {}
 	}
 	return stop
-}
-
-// mouseMods maps the held keyboard modifiers onto a pointer binding's.
-func mouseMods(m app.Mods) engine.MouseModifiers {
-	var out engine.MouseModifiers
-	if m&app.ModCtrl != 0 {
-		out |= engine.MouseControl
-	}
-	if m&app.ModShift != 0 {
-		out |= engine.MouseShift
-	}
-	if m&app.ModAlt != 0 {
-		out |= engine.MouseAlt
-	}
-	return out
 }

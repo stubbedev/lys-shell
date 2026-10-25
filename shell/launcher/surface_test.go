@@ -79,7 +79,6 @@ type harness struct {
 	// hookInputs are the typed text each hook was told.
 	hookInputs []string
 	copied     []string
-	mods       engine.MouseModifiers
 	nextID     uint64
 	// styled records the variant faces asked for: "b", "i", "bi".
 	styled []string
@@ -120,7 +119,6 @@ func newHarness(t *testing.T) *harness {
 		},
 		MonitorWidth: func() int { return 2000 },
 		Copy:         func(text string) { h.copied = append(h.copied, text) },
-		HeldMods:     func() engine.MouseModifiers { return h.mods },
 		FireHook: func(command string, ctx engine.HookContext) {
 			if command != "" {
 				h.hooks = append(h.hooks, command+":"+ctx.Entry)
@@ -168,6 +166,19 @@ func (h *harness) key(spec string) bool {
 		h.t.Fatal(err)
 	}
 	return h.s.keyCaptured(accel)
+}
+
+// pointAt lays the open surface out and returns a Router with the
+// pointer resting on list row pos, which only exists once laid out.
+func (h *harness) pointAt(pos int) (*widget.Router, widget.Point) {
+	h.t.Helper()
+	v := h.s.cur.views
+	treetest.Pointer(v.surface, v.list, 800, 600)
+	row, ok := v.list.rows[pos].(*launcherRow)
+	if !ok {
+		h.t.Fatalf("row %d is not laid out", pos)
+	}
+	return treetest.Pointer(v.surface, row, 800, 600)
 }
 
 // frame pumps the loop until the session's terminal frame arrives.
@@ -335,11 +346,13 @@ func TestRowClickAcceptsTheClickedRow(t *testing.T) {
 	_, reply := h.open(dmenu(), false, "alpha", "beta", "gamma")
 	h.until("the rows", func() bool { return h.s.model.len() == 3 })
 	// A middle click is bound to nothing.
-	h.s.rowPressed(2, engine.MouseMiddle, 1)
+	r, p := h.pointAt(2)
+	r.Press(widget.BTNMiddle, p, 0)
 	if h.s.sel != 0 {
 		t.Error("an unbound button moved the selection")
 	}
-	h.s.rowPressed(1, engine.MousePrimary, 1)
+	r, p = h.pointAt(1)
+	r.Press(widget.BTNLeft, p, 0)
 	if f := h.frame(reply); len(f.Selected) != 1 || f.Selected[0].Text != "beta" {
 		t.Errorf("click result = %+v", f)
 	}
@@ -349,16 +362,53 @@ func TestWheelMovesTheSelection(t *testing.T) {
 	h := newHarness(t)
 	h.open(dmenu(), false, "a", "b", "c")
 	h.until("the rows", func() bool { return h.s.model.len() == 3 })
-	if !h.s.listScrolled(1) || h.s.sel != 1 {
-		t.Errorf("wheel down: claimed and sel %d", h.s.sel)
+	r, _ := h.pointAt(0)
+	r.Axis(0, 1, 0)
+	if h.s.sel != 1 {
+		t.Errorf("wheel down: sel %d", h.s.sel)
 	}
-	h.s.listScrolled(-1)
+	r.Axis(0, -1, 0)
 	if h.s.sel != 0 {
 		t.Errorf("wheel up: sel %d", h.s.sel)
 	}
-	h.mods = engine.MouseAlt
-	if h.s.listScrolled(1) {
-		t.Error("Alt+wheel is not a bound scroll")
+	r.Axis(0, 1, widget.ModAlt)
+	if h.s.sel != 0 {
+		t.Errorf("Alt+wheel moved the selection to %d; it is not a bound scroll", h.s.sel)
+	}
+}
+
+// A press reaches the bindings with its click count and modifiers: a
+// double-press binding waits for the second press, and a modified one
+// fires only with its modifier held.
+func TestRowPressesCarryClicksAndModifiers(t *testing.T) {
+	h := newHarness(t)
+	_, reply := h.open(dmenu(), false, "alpha", "beta", "gamma")
+	h.until("the rows", func() bool { return h.s.model.len() == 3 })
+	h.s.cur.mouse = compileMouse([]engine.Binding{
+		{Action: "me-select-entry", Keys: "Control+MouseMiddle"},
+		{Action: "me-accept-entry", Keys: "MouseDPrimary"},
+	})
+	r, p := h.pointAt(2)
+	r.Press(widget.BTNMiddle, p, 0)
+	if h.s.sel != 0 {
+		t.Errorf("a bare middle press selected row %d", h.s.sel)
+	}
+	r.Press(widget.BTNMiddle, p, widget.ModCtrl)
+	if h.s.sel != 2 {
+		t.Errorf("Control+middle selected row %d, want 2", h.s.sel)
+	}
+	r, p = h.pointAt(1)
+	r.Press(widget.BTNLeft, p, 0)
+	r.Release(widget.BTNLeft, p)
+	h.loop.pump()
+	select {
+	case f := <-reply:
+		t.Fatalf("a single press accepted the double-press binding: %+v", f)
+	default:
+	}
+	r.Press(widget.BTNLeft, p, 0)
+	if f := h.frame(reply); len(f.Selected) != 1 || f.Selected[0].Text != "beta" {
+		t.Errorf("double press = %+v", f)
 	}
 }
 
@@ -496,7 +546,8 @@ func TestAcceptBindingAcceptsTheRowItLandedOn(t *testing.T) {
 	_, reply := h.open(dmenu(), false, "alpha", "beta", "gamma")
 	h.until("the rows", func() bool { return h.s.model.len() == 3 })
 	h.s.cur.mouse = compileMouse([]engine.Binding{{Action: "me-accept-entry", Keys: "MousePrimary"}})
-	h.s.rowPressed(2, engine.MousePrimary, 1)
+	r, p := h.pointAt(2)
+	r.Press(widget.BTNLeft, p, 0)
 	if f := h.frame(reply); len(f.Selected) != 1 || f.Selected[0].Text != "gamma" {
 		t.Errorf("accept-only click = %+v", f)
 	}

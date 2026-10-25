@@ -93,7 +93,7 @@ func (s *Surface) buildViews(a *active) *views {
 	v.list = newResultList(func(pos int) widget.Widget { return s.makeRow(a, pos, st) })
 	v.list.visibleRows = max(ui.lines, 1)
 	v.list.fixed = ui.fixedNumLines
-	v.list.onScroll = s.listScrolled
+	v.list.SetOnScroll(func(e widget.ScrollEvent) bool { return s.listScrolled(e.DY, mouseMods(e.Mods)) })
 	v.frame = widget.NewBox(widget.Column, 0, th.Padding/2)
 	v.frame.AddClass("launcher-list")
 	v.frame.Append(v.list, true)
@@ -124,7 +124,10 @@ func (s *Surface) makeRow(a *active, pos int, st rowStyle) widget.Widget {
 	it, _ := s.model.item(pos)
 	index, _ := s.model.itemIndex(pos)
 	row := buildRow(pos, it, pos == s.sel, st, &s.multi, index)
-	row.onButton = s.rowPressed
+	row.SetOnPointer(func(e widget.PointerEvent) bool {
+		s.rowPressed(pos, gdkButton(e.Button), e.Clicks, mouseMods(e.Mods))
+		return true
+	})
 	if path := thumbnailPending(it.Icon); path != "" && st.showIcons {
 		generateThumbnail(a.ctx, a.thumbs, path, func(made string) {
 			s.d.Invoke(func() {

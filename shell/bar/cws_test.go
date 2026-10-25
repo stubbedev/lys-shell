@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -401,21 +402,19 @@ func TestCwsClicksRouteThroughTheRouter(t *testing.T) {
 	if !second.Hovered {
 		t.Error("routed hover missed the button")
 	}
-	router.Press(widget.BTNLeft, p)
+	router.Press(widget.BTNLeft, p, 0)
 	router.Release(widget.BTNLeft, p)
 	f.expect(t, "focus:ws-id-2")
 
-	router.Press(widget.BTNMiddle, p)
+	router.Press(widget.BTNMiddle, p, 0)
 	f.expect(t, "last")
 	// Right click defaults to none.
-	router.Press(widget.BTNRight, p)
+	router.Press(widget.BTNRight, p, 0)
 	f.expectNone(t)
 
-	if !second.ScrollInput(1) {
-		t.Error("scroll was not consumed")
-	}
+	router.Axis(0, 1, 0)
 	f.expect(t, "next")
-	second.ScrollInput(-1)
+	router.Axis(0, -1, 0)
 	f.expect(t, "previous")
 }
 
@@ -425,9 +424,15 @@ func TestCwsScrollIgnoresFocusThis(t *testing.T) {
 	cfg.Click.ScrollDown = config.ParseWorkspaceClickAction("focus:this")
 	cfg.Click.ScrollUp = config.ParseWorkspaceClickAction("")
 	m := newTestCws(t, cfg, f)
-	b := m.root.buttons()[0]
-	if !b.ScrollInput(1) || !b.ScrollInput(-1) {
-		t.Error("scroll not consumed (Propagation::Stop) with inert bindings")
+	behind := widget.NewBox(widget.Row, 0, 0)
+	behind.Append(m.root, false)
+	reached := 0
+	behind.SetOnScroll(func(widget.ScrollEvent) bool { reached++; return true })
+	router, _ := treetest.Pointer(behind, m.root.buttons()[0], 500, 40)
+	router.Axis(0, 1, 0)
+	router.Axis(0, -1, 0)
+	if reached != 0 {
+		t.Errorf("%d scroll steps passed the button (want Propagation::Stop with inert bindings)", reached)
 	}
 	f.expectNone(t)
 }

@@ -204,50 +204,10 @@ func buildTrayIcon(src trayIconSource, px int) *widget.Icon {
 	return widget.NewThemeIconFallback(src.name, px)
 }
 
-// trayButton is one item: its icon in a button taking the three
-// clicks (item/mod.rs's root button plus the right/middle gestures).
-type trayButton struct {
-	widget.Base
-	inner    *widget.Button
-	onMiddle func()
-	onRight  func()
-}
-
-func (b *trayButton) Measure(con widget.Constraints) widget.Size { return b.inner.Measure(con) }
-
-func (b *trayButton) Arrange(r render.Rect) {
-	b.ArrangeSelf(r)
-	widget.SetParents(b, b.inner)
-	b.inner.Arrange(r)
-}
-
-func (b *trayButton) Paint(cv *render.Canvas) { widget.PaintChild(cv, b.inner) }
-
-func (b *trayButton) HitTest(p widget.Point) widget.Widget { return b.HitLeaf(b, p) }
-
-// SetHovered implements widget.HoverSetter.
-func (b *trayButton) SetHovered(on bool) { b.inner.SetHovered(on) }
-
-// SetPressed implements widget.PressSetter.
-func (b *trayButton) SetPressed(on bool) { b.inner.SetPressed(on) }
-
-// ClickAt implements widget.Clicker: the left click.
-func (b *trayButton) ClickAt(p widget.Point) { b.inner.ClickAt(p) }
-
-// PointerButton routes the middle and right presses.
-func (b *trayButton) PointerButton(button uint32) {
-	switch button {
-	case widget.BTNMiddle:
-		b.onMiddle()
-	case widget.BTNRight:
-		b.onRight()
-	}
-}
-
 // trayEntry is one rendered item.
 type trayEntry struct {
 	item   sni.Item
-	button *trayButton
+	button *widget.Button
 	slot   *widget.Box
 	icon   *widget.Icon
 	sig    string
@@ -377,19 +337,25 @@ func (m *systrayModule) newEntry(it sni.Item) *trayEntry {
 	px := m.iconPx()
 	e.slot = widget.NewBox(widget.Row, 0, 0)
 	widgets.Pin(e.slot, px, px)
-	inner := widget.NewButton(e.slot, 0, 0)
-	inner.AddClass("systray-item")
+	e.button = widget.NewButton(e.slot, 0, 0)
+	e.button.AddClass("systray-item")
 	if m.ctx.Style != nil {
-		inner.BgHover = m.ctx.Style.buttonBgHover
-		inner.BgPressed = m.ctx.Style.buttonBgActive
+		e.button.BgHover = m.ctx.Style.buttonBgHover
+		e.button.BgPressed = m.ctx.Style.buttonBgActive
 	}
 	key := it.Key()
-	inner.OnClick = func() { m.leftClick(key) }
-	e.button = &trayButton{
-		inner:    inner,
-		onMiddle: func() { m.middleClick(key) },
-		onRight:  func() { m.rightClick(key) },
-	}
+	e.button.OnClick = func() { m.leftClick(key) }
+	e.button.SetOnPointer(func(ev widget.PointerEvent) bool {
+		switch ev.Button {
+		case widget.BTNMiddle:
+			m.middleClick(key)
+		case widget.BTNRight:
+			m.rightClick(key)
+		default:
+			return false
+		}
+		return true
+	})
 	return e
 }
 

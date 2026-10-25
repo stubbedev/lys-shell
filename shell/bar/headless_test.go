@@ -96,6 +96,6 @@ func routeClick(root widget.Widget, w widget.Widget) {
 	p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
 	r := &widget.Router{Root: root}
 	r.Move(p)
-	r.Press(widget.BTNLeft, p)
+	r.Press(widget.BTNLeft, p, 0)
 	r.Release(widget.BTNLeft, p)
 }

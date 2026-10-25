@@ -33,7 +33,7 @@ func clickAt(t *testing.T, root, target widget.Widget) {
 		p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
 		router := &widget.Router{Root: root}
 		router.Move(p)
-		router.Press(widget.BTNLeft, p)
+		router.Press(widget.BTNLeft, p, 0)
 		router.Release(widget.BTNLeft, p)
 		return true
 	})

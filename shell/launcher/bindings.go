@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
@@ -206,14 +207,28 @@ func lookupScroll(table []mouseEntry, dir engine.ScrollDirection, mods engine.Mo
 // one rofi's bindings name: left 1, middle 2, right 3, and every other
 // button after the old 4-7 scroll slots (side 8, extra 9, ...).
 func gdkButton(code uint32) engine.MouseButton {
-	const btnLeft, btnRight, btnMiddle = 0x110, 0x111, 0x112
 	switch code {
-	case btnLeft:
+	case widget.BTNLeft:
 		return engine.MousePrimary
-	case btnMiddle:
+	case widget.BTNMiddle:
 		return engine.MouseMiddle
-	case btnRight:
+	case widget.BTNRight:
 		return engine.MouseSecondary
 	}
-	return engine.MouseButton(code - (btnLeft - 1) + 4)
+	return engine.MouseButton(code - (widget.BTNLeft - 1) + 4)
+}
+
+// mouseMods maps the held keyboard modifiers onto a pointer binding's.
+func mouseMods(m widget.Mods) engine.MouseModifiers {
+	var out engine.MouseModifiers
+	if m&widget.ModCtrl != 0 {
+		out |= engine.MouseControl
+	}
+	if m&widget.ModShift != 0 {
+		out |= engine.MouseShift
+	}
+	if m&widget.ModAlt != 0 {
+		out |= engine.MouseAlt
+	}
+	return out
 }

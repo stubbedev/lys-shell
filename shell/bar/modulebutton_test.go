@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestParseClickActionForms(t *testing.T) {
@@ -97,12 +98,13 @@ func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 
 	// The primary fires on the press, the Rust GestureClick's
 	// connect_pressed; the release fires nothing more.
-	button.toggle.SetPressed(true)
-	button.toggle.SetPressed(false)
-	button.toggle.PointerButton(widget.BTNMiddle)
-	button.toggle.PointerButton(widget.BTNRight)
-	button.toggle.ScrollInput(-120)
-	button.toggle.ScrollInput(120)
+	router, p := treetest.Pointer(button, button.toggle, 200, 40)
+	router.Press(widget.BTNLeft, p, 0)
+	router.Release(widget.BTNLeft, p)
+	router.Press(widget.BTNMiddle, p, 0)
+	router.Press(widget.BTNRight, p, 0)
+	router.Axis(0, -1, 0)
+	router.Axis(0, 1, 0)
 	if len(rec.actions) != 5 {
 		t.Fatalf("dispatched %+v, want five", rec.actions)
 	}
@@ -111,8 +113,8 @@ func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 			t.Errorf("action %d = %q, want %q", i, got, want)
 		}
 	}
-	// A declined scroll step (dy == 0) dispatches nothing.
-	button.toggle.ScrollInput(0)
+	// A horizontal step (dy == 0) dispatches nothing.
+	router.Axis(1, 0, 0)
 	if len(rec.actions) != 5 {
 		t.Errorf("dy=0 dispatched %+v", rec.actions)
 	}
@@ -120,14 +122,20 @@ func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 
 func TestUnboundBarButtonConsumesScroll(t *testing.T) {
 	button, rec := newWrappedModule(t, config.ClickConfig{})
+	behind := widget.NewBox(widget.Row, 0, 0)
+	behind.Append(button, false)
+	reached := 0
+	behind.SetOnScroll(func(widget.ScrollEvent) bool { reached++; return true })
+	router, p := treetest.Pointer(behind, button.toggle, 200, 40)
 	// Scroll steps are always consumed (the Rust helper's
 	// Propagation::Stop); the unbound action no-ops in run.
-	if !button.toggle.ScrollInput(1) {
+	router.Axis(0, 1, 0)
+	if reached != 0 {
 		t.Error("scroll passed through the bar button; content behind it scrolls")
 	}
-	button.toggle.PointerButton(widget.BTNRight)
-	button.toggle.SetPressed(true)
-	button.toggle.SetPressed(false)
+	router.Press(widget.BTNRight, p, 0)
+	router.Press(widget.BTNLeft, p, 0)
+	router.Release(widget.BTNLeft, p)
 	if len(rec.actions) != 0 || button.bound() {
 		t.Errorf("unbound button dispatched %+v", rec.actions)
 	}
@@ -279,7 +287,7 @@ func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
 	if !button.toggle.Hovered {
 		t.Fatal("routed hover did not reach the toggle")
 	}
-	router.Press(widget.BTNLeft, p)
+	router.Press(widget.BTNLeft, p, 0)
 	if !button.toggle.Pressed {
 		t.Fatal("routed press did not reach the toggle")
 	}

@@ -52,7 +52,7 @@ type barButton struct {
 }
 
 // barToggle is the button.toggle node: a lys-ui Button that stays the hit
-// leaf and routes the non-primary bindings to its bar button.
+// leaf and fires the primary binding on the press.
 type barToggle struct {
 	*widget.Button
 	owner *barButton
@@ -144,6 +144,8 @@ func newBarButtonShell(ctx ModuleContext) *barButton {
 	b.toggle = &barToggle{Button: widget.NewButton(b.content, 0, 0), owner: b}
 	b.toggle.SetElement("button")
 	b.toggle.AddClass("toggle")
+	b.toggle.SetOnPointer(b.pointer)
+	b.toggle.SetOnScroll(b.scroll)
 	b.Box = widget.NewBox(widget.Row, 0, 0)
 	b.SetElement("menubutton")
 	b.Append(b.toggle, true)
@@ -311,29 +313,30 @@ func (t *barToggle) SetPressed(on bool) {
 	}
 }
 
-// PointerButton routes middle and right presses; with no bindings the
-// hooks pass through unconsumed.
-func (t *barToggle) PointerButton(button uint32) {
-	switch button {
+// pointer runs the middle and right bindings and consumes those
+// presses; the primary goes on to the toggle's press.
+func (b *barButton) pointer(e widget.PointerEvent) bool {
+	switch e.Button {
 	case widget.BTNMiddle:
-		t.owner.run(t.owner.binding.MiddleClick, false)
+		b.run(b.binding.MiddleClick, false)
 	case widget.BTNRight:
-		t.owner.run(t.owner.binding.RightClick, false)
+		b.run(b.binding.RightClick, false)
+	default:
+		return false
 	}
+	return true
 }
 
-// ScrollInput maps vertical steps to the up/down bindings; positive dy
-// scrolls down, matching the wire convention Axis feeds ScrollBy. The
-// step is always consumed and the action always emitted, the Rust
-// helper's Propagation::Stop — an unbound action no-ops in run, and
-// content behind the bar never scrolls through a module.
-func (t *barToggle) ScrollInput(dy int) bool {
-	c := t.owner.binding
+// scroll maps vertical steps to the up/down bindings, positive DY
+// scrolling down. The step is always consumed, the Rust helper's
+// Propagation::Stop: an unbound action no-ops in run, and content
+// behind the bar never scrolls through a module.
+func (b *barButton) scroll(e widget.ScrollEvent) bool {
 	switch {
-	case dy > 0:
-		t.owner.run(c.ScrollDown, true)
-	case dy < 0:
-		t.owner.run(c.ScrollUp, true)
+	case e.DY > 0:
+		b.run(b.binding.ScrollDown, true)
+	case e.DY < 0:
+		b.run(b.binding.ScrollUp, true)
 	default:
 		return false
 	}

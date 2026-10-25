@@ -67,33 +67,16 @@ type rowStyle struct {
 
 // launcherRow is one list row: GTK's listview `row` element (selected
 // rows carry :selected) around the .launcher-row box. It is the hit
-// leaf, so every button and click count reaches the bindings.
+// leaf, so its pointer hook sees every press on it.
 type launcherRow struct {
 	*widget.Box
 	pos      int
 	content  *widget.Box
 	iconSlot *widget.Box
-	// onButton runs the pointer bindings for a press on the row.
-	onButton func(pos int, button engine.MouseButton, presses int)
 }
 
 // HitTest makes the row the leaf the pointer lands on.
 func (r *launcherRow) HitTest(p widget.Point) widget.Widget { return r.HitLeaf(r, p) }
-
-// ClickAt is a single primary click.
-func (r *launcherRow) ClickAt(widget.Point) { r.press(engine.MousePrimary, 1) }
-
-// DoubleClickAt is the second click of a double.
-func (r *launcherRow) DoubleClickAt(widget.Point) { r.press(engine.MousePrimary, 2) }
-
-// PointerButton is any other button.
-func (r *launcherRow) PointerButton(code uint32) { r.press(gdkButton(code), 1) }
-
-func (r *launcherRow) press(button engine.MouseButton, presses int) {
-	if r.onButton != nil {
-		r.onButton(r.pos, button, presses)
-	}
-}
 
 // buildRow is the factory's setup and bind for list position pos.
 func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiSelect, itemIndex uint32) *launcherRow {

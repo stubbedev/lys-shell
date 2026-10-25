@@ -195,7 +195,7 @@ func click(c *card, w interface{ Bounds() render.Rect }) {
 	at := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
 	r := &widget.Router{Root: c.root}
 	r.Move(at)
-	r.Press(widget.BTNLeft, at)
+	r.Press(widget.BTNLeft, at, 0)
 	r.Release(widget.BTNLeft, at)
 }
 

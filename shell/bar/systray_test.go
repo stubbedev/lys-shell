@@ -174,7 +174,8 @@ func TestSystrayClicksDriveTheItem(t *testing.T) {
 	}
 	m.entries[plain.Key()].button.ClickAt(widget.Point{})
 	m.entries[menuOnly.Key()].button.ClickAt(widget.Point{})
-	m.entries[plain.Key()].button.PointerButton(widget.BTNMiddle)
+	router, p := treetest.Pointer(m.root, m.entries[plain.Key()].button, 500, 40)
+	router.Press(widget.BTNMiddle, p, 0)
 	calls := waitTray(t, tray, 3)
 	want := map[string]bool{"activate plain": true, "context-menu menu-only": true, "secondary plain": true}
 	for _, c := range calls {

@@ -165,3 +165,16 @@ func Ink(w widget.Widget) int {
 	}
 	return n
 }
+
+// Pointer lays root out in a w x h rect and returns a Router over it
+// with the pointer resting on target's centre, and that point: the real
+// input path, hit testing and the pointer and scroll hooks included.
+func Pointer(root widget.Widget, target widget.Boundser, w, h int) (*widget.Router, widget.Point) {
+	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	root.Arrange(render.Rect{W: w, H: h})
+	b := target.Bounds()
+	p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+	r := &widget.Router{Root: root}
+	r.Move(p)
+	return r, p
+}
