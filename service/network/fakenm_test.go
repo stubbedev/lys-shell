@@ -275,10 +275,16 @@ func (f *fakeNM) cancelSecrets(agent string, path dbus.ObjectPath, setting strin
 	must(f.t, f.conn.Object(agent, AgentPath).Call(agentIface+".CancelGetSecrets", 0, path, setting).Err)
 }
 
-// waitFor polls cond for up to three seconds.
+// liveness is how long the network tests wait for something to
+// happen: a guard against a hang, not a speed bound. The race gate runs
+// every package at once, and a restore that is simply slow under that
+// load must not read as a lost one.
+const liveness = 10 * time.Second
+
+// waitFor polls cond for up to the liveness bound.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(liveness)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)

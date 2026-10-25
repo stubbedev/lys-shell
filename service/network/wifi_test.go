@@ -230,7 +230,7 @@ func TestConnectAndWaitReportsStepsUntilActivated(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(liveness):
 		t.Fatal("the connect never finished")
 	}
 	if !slices.Equal(steps, []DeviceState{DevicePrepare, DeviceIPConfig}) {

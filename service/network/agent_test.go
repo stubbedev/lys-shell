@@ -178,7 +178,7 @@ func await(t *testing.T, ch <-chan answer) answer {
 	select {
 	case a := <-ch:
 		return a
-	case <-time.After(3 * time.Second):
+	case <-time.After(liveness):
 		t.Fatal("the request never answered")
 	}
 	return answer{}
