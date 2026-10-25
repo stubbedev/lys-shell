@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -252,7 +253,7 @@ func TestWeatherAPIParses12HourSunTimes(t *testing.T) {
 		return fmt.Sprintf(`{"time":%q,"temp_c":8,"is_day":1,"condition":{"code":%d},"wind_kph":3,"wind_degree":45,`+
 			`"pressure_mb":990,"precip_mm":0,"humidity":80,"cloud":90,"feelslike_c":6,"vis_km":5,"uv":2,"gust_kph":9,"dewpoint_c":4,"chance_of_rain":55}`, at, code)
 	}
-	body := `{"location":{"tz_id":"UTC","localtime":"2026-10-01 14:30","localtime_epoch":` + fmt.Sprint(now.Unix()) + `},"current":` + h("", 1009) + `,"forecast":{"forecastday":[{"date":"2026-10-01",` +
+	body := `{"location":{"tz_id":"UTC","localtime":"2026-10-01 14:30","localtime_epoch":` + strconv.FormatInt(now.Unix(), 10) + `},"current":` + h("", 1009) + `,"forecast":{"forecastday":[{"date":"2026-10-01",` +
 		`"day":{"maxtemp_c":10,"mintemp_c":2,"avgtemp_c":7,"maxwind_kph":15,"totalprecip_mm":3,"avghumidity":70,"daily_chance_of_rain":60,"condition":{"code":1195},"uv":2},` +
 		`"astro":{"sunrise":"06:58 AM","sunset":"06:41 pm"},"hour":[` + h("2026-10-01 14:00", 1183) + `,` + h("2026-10-01 15:00", 1279) + `]}]}}`
 	repoint(t, &WeatherAPIURL, serveJSON(t, 200, body, nil))
@@ -441,7 +442,7 @@ func TestOpenMeteoReadsTheLocationsZone(t *testing.T) {
 // the instant; Visual Crossing names its offset in hours.
 func TestKeyedProvidersReadTheLocationsZone(t *testing.T) {
 	now := time.Date(2026, 10, 1, 21, 30, 0, 0, time.UTC)
-	wa := `{"location":{"tz_id":"America/Los_Angeles","localtime":"2026-10-01 14:30","localtime_epoch":` + fmt.Sprint(now.Unix()) + `},` +
+	wa := `{"location":{"tz_id":"America/Los_Angeles","localtime":"2026-10-01 14:30","localtime_epoch":` + strconv.FormatInt(now.Unix(), 10) + `},` +
 		`"current":{"time":"","temp_c":8,"condition":{"code":1000}},"forecast":{"forecastday":[{"date":"2026-10-01",` +
 		`"day":{"maxtemp_c":10,"mintemp_c":2,"condition":{"code":1000}},"astro":{"sunrise":"07:00 AM","sunset":"06:40 PM"},"hour":[` +
 		`{"time":"2026-10-01 14:00","temp_c":8,"condition":{"code":1000}},{"time":"2026-10-01 15:00","temp_c":8,"condition":{"code":1000}}]}]}}`
