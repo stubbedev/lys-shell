@@ -325,7 +325,7 @@ func TestCwsModuleBuildsOneSegmentPerDisplayedWorkspace(t *testing.T) {
 	if n := m.segs.Count(); n != 2 {
 		t.Fatalf("segments = %d, want 2", n)
 	}
-	if !widget.HasClass(m.root, "workspaces") || !widget.HasClass(m.root, "niri") {
+	if !widget.HasClass(m.segs, "workspaces") || !widget.HasClass(m.segs, "niri") {
 		t.Error("the row misses the workspaces/niri classes")
 	}
 	if m.segs.Active() != 0 || !widget.HasClass(m.segs.Segment(0), "active") || widget.HasClass(m.segs.Segment(1), "active") {
@@ -547,7 +547,7 @@ func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	bar.Arrange(render.Rect{W: size.W, H: size.H})
 	data := make([]byte, render.Stride(size.W)*size.H)
 	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
-	box, seg := m.root.Bounds(), m.segs.Segment(1).Bounds()
+	box, seg := m.segs.Bounds(), m.segs.Segment(1).Bounds()
 	if mid, segMid := box.X+box.W/2, seg.X+seg.W/2; seg.W >= box.W || abs(mid-segMid) > 1 {
 		t.Errorf("segment %v in the row %v: want it narrower and centered across the bar", seg, box)
 	}
@@ -619,7 +619,7 @@ func TestCwsClicksRouteThroughTheRouter(t *testing.T) {
 	cfg.Click.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
 	m := newTestCws(t, cfg, f)
 	second := m.segs.Segment(1)
-	router, p := treetest.Pointer(m.root, second, 500, 40)
+	router, p := treetest.Pointer(m.segs, second, 500, 40)
 	if !second.Hovered {
 		t.Error("routed hover missed the segment")
 	}
@@ -646,7 +646,7 @@ func TestCwsScrollIgnoresFocusThis(t *testing.T) {
 	cfg.Click.ScrollUp = config.ParseWorkspaceClickAction("")
 	m := newTestCws(t, cfg, f)
 	behind := widget.NewBox(widget.Row, 0, 0)
-	behind.Append(m.root, false)
+	behind.Append(m.segs, false)
 	reached := 0
 	behind.SetOnScroll(func(widget.ScrollEvent) bool { reached++; return true })
 	router, _ := treetest.Pointer(behind, m.segs.Segment(0), 500, 40)
@@ -722,13 +722,13 @@ func TestCwsUrgentPulseFadesTheSegment(t *testing.T) {
 func TestCwsBorderShowUsesTheButtonBorder(t *testing.T) {
 	cfg := config.DefaultsNiriWorkspaces().View()
 	m := newTestCws(t, cfg, newFakeCws(nil, nil))
-	if widget.HasClass(m.root, "border-all") || !strings.Contains(m.root.InlineStyle(), "--ws-border-width: 0px") {
-		t.Errorf("border-show off: classes %v, style %q; want no border", m.root.Classes(), m.root.InlineStyle())
+	if widget.HasClass(m.segs, "border-all") || !strings.Contains(m.segs.InlineStyle(), "--ws-border-width: 0px") {
+		t.Errorf("border-show off: classes %v, style %q; want no border", m.segs.Classes(), m.segs.InlineStyle())
 	}
 	cfg.BorderShow = true
 	m = newTestCws(t, cfg, newFakeCws(nil, nil))
-	if !widget.HasClass(m.root, "border-all") || !strings.Contains(m.root.InlineStyle(), "--ws-border-width: 1px") {
-		t.Errorf("border-show on: classes %v, style %q; want the button border at the default all location", m.root.Classes(), m.root.InlineStyle())
+	if !widget.HasClass(m.segs, "border-all") || !strings.Contains(m.segs.InlineStyle(), "--ws-border-width: 1px") {
+		t.Errorf("border-show on: classes %v, style %q; want the button border at the default all location", m.segs.Classes(), m.segs.InlineStyle())
 	}
 }
 
@@ -741,7 +741,7 @@ func TestCwsModuleIsNotWrappedInButtonChrome(t *testing.T) {
 	if err := appendModule(row, config.BarItem{Module: "test-cws"}, ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := row.Children()[0]; got != widget.Widget(m.root) {
+	if got := row.Children()[0]; got != widget.Widget(m.segs) {
 		t.Errorf("appended %T, want the container itself", got)
 	}
 }

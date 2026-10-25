@@ -9,17 +9,15 @@ import (
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// newCwsRow builds the workspaces row, lys-ui's SegmentIndicator in
-// the container box workspaces.css paints, which a SegmentIndicator
-// does not paint itself —
+// newCwsRow builds the workspaces row, lys-ui's SegmentIndicator,
+// which paints the box workspaces.css styles —
 //
-//	box.workspaces.<kind>[.border-*]          (the --ws-* variables inline)
-//	└ segments
-//	  └ button.segment.workspace.<state>[...]  (--ws-override-color inline)
-//	    └ box (workspace-padding)
-//	      └ box.workspace-content
-//	        ├ box: label.workspace-label, the mapped icon, label.workspace-divider
-//	        └ box.workspace-icons > image.workspace-icon...
+//	segments.workspaces.<kind>[.border-*]    (the --ws-* variables inline)
+//	└ button.segment.workspace.<state>[...]  (--ws-override-color inline)
+//	  └ box (workspace-padding)
+//	    └ box.workspace-content
+//	      ├ box: label.workspace-label, the mapped icon, label.workspace-divider
+//	      └ box.workspace-icons > image.workspace-icon...
 //
 // lys-ui stacks the segments down a side bar. A primary click on a
 // segment is OnSelect; the middle and right clicks and the wheel bind
@@ -27,28 +25,21 @@ import (
 func newCwsRow(m *cwsView) {
 	m.segs = widget.NewSegmentIndicator(0)
 	m.segs.OnSelect = func(i int) { m.dispatchClick(m.cfg.Click.LeftClick, m.shown[i].ws) }
-	axis := widget.Row
-	if m.vertical() {
-		axis = widget.Column
-	}
-	m.root = widget.NewBox(axis, 0, 0)
-	m.root.AddClass("workspaces")
+	m.segs.AddClass("workspaces")
 	if m.kind != "" {
-		m.root.AddClass(m.kind)
+		m.segs.AddClass(m.kind)
 	}
 	bar := m.ctx.Config.Bar
 	if c, ok := bar.ButtonBorderLocation.CSSClass(); ok && m.cfg.BorderShow {
-		m.root.AddClass(c)
+		m.segs.AddClass(c)
 	}
-	m.root.SetInlineStyle(inlineDecls(styling.WorkspacesCSS(m.cfg, m.otherMonitor, bar)))
-	m.root.Append(m.segs, false)
+	m.segs.SetInlineStyle(inlineDecls(styling.WorkspacesCSS(m.cfg, m.otherMonitor, bar)))
 }
 
 // setSegments shows one segment per model: the active one through
-// SetActive, its occupancy and urgency through SetSegmentState, then
-// the model's classes (an urgent segment keeps its occupied state
-// class beside lys-ui's urgent one), the workspace-map color, and its
-// content.
+// SetActive, its occupancy through SetSegmentState and its urgency
+// through SetSegmentUrgent, then the model's classes, the
+// workspace-map color, and its content.
 func (m *cwsView) setSegments(models []cwsButtonModel) {
 	s := m.segs
 	s.SetCount(len(models))
@@ -60,7 +51,8 @@ func (m *cwsView) setSegments(models []cwsButtonModel) {
 		seg := s.Segment(i)
 		seg.RemoveClass(m.segClasses[i]...)
 		s.SetSegmentState(i, cwsSegmentState(model))
-		m.segClasses[i] = slices.DeleteFunc(slices.Clone(model.classes), func(c string) bool { return c == "active" })
+		s.SetSegmentUrgent(i, hasClass(model.classes, "urgent"))
+		m.segClasses[i] = slices.DeleteFunc(slices.Clone(model.classes), segmentOwned)
 		seg.AddClass(m.segClasses[i]...)
 		if hasClass(model.classes, "active") {
 			active = i
@@ -78,13 +70,15 @@ func (m *cwsView) setSegments(models []cwsButtonModel) {
 	m.shown = models
 }
 
-// cwsSegmentState is the segment state a model's classes mark: urgent
-// while its urgency shows, else occupied in the occupied state.
+// segmentOwned reports a state class lys-ui's SegmentIndicator sets
+// itself from SetActive, SetSegmentState and SetSegmentUrgent.
+func segmentOwned(class string) bool {
+	return class == "active" || class == "occupied" || class == "urgent"
+}
+
+// cwsSegmentState is the occupancy a model's classes mark.
 func cwsSegmentState(model cwsButtonModel) widget.SegmentState {
-	switch {
-	case hasClass(model.classes, "urgent"):
-		return widget.SegmentUrgent
-	case hasClass(model.classes, "occupied"):
+	if hasClass(model.classes, "occupied") {
 		return widget.SegmentOccupied
 	}
 	return widget.SegmentEmpty
@@ -92,8 +86,8 @@ func cwsSegmentState(model cwsButtonModel) widget.SegmentState {
 
 // segmentContent is the button view!: the identity row (label, mapped
 // icon, divider) and the app-icon box, padded by workspace-padding
-// along the bar and centered in the segment. Their colors are the
-// stylesheet's.
+// along the bar; lys-ui centers it in the segment. Their colors are
+// the stylesheet's.
 func (m *cwsView) segmentContent(model cwsButtonModel) widget.Widget {
 	cfg := m.cfg
 	vertical := m.vertical()
@@ -148,8 +142,6 @@ func (m *cwsView) segmentContent(model cwsButtonModel) widget.Widget {
 	}
 	pad := m.paddingPx()
 	padded := widget.NewBox(widget.Row, 0, 0)
-	padded.SetHExpand(true)
-	padded.SetHAlign(widget.AlignCenter)
 	padded.Append(content, true)
 	if vertical {
 		padded.SetPadding(render.Insets{Top: pad, Bottom: pad})

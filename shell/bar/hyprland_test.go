@@ -376,7 +376,7 @@ func TestHyprlandModuleBuildsTheBarMonitorsRow(t *testing.T) {
 	if one.label != "1" || special.label != "magic" {
 		t.Errorf("labels = %q %q", one.label, special.label)
 	}
-	if !widget.HasClass(m.root, "workspaces") || widget.HasClass(m.root, "hyprland") {
+	if !widget.HasClass(m.segs, "workspaces") || widget.HasClass(m.segs, "hyprland") {
 		t.Error("the hyprland container is plain .workspaces")
 	}
 }
@@ -402,11 +402,11 @@ func TestHyprlandActiveOnOtherMonitor(t *testing.T) {
 		t.Fatal("workspace 3's segment is not marked active on another monitor alone")
 	}
 	want := "--ws-active-other-monitor-color: " + m.hcfg.ActiveOnOtherMonitorColor.ToCSS() + ";"
-	if !strings.Contains(m.root.InlineStyle(), want) {
-		t.Errorf("row style %q misses %q", m.root.InlineStyle(), want)
+	if !strings.Contains(m.segs.InlineStyle(), want) {
+		t.Errorf("row style %q misses %q", m.segs.InlineStyle(), want)
 	}
 	niri := newTestCws(t, config.DefaultsNiriWorkspaces().View(), newFakeCws(nil, nil))
-	if strings.Contains(niri.root.InlineStyle(), "--ws-active-other-monitor-color") {
+	if strings.Contains(niri.segs.InlineStyle(), "--ws-active-other-monitor-color") {
 		t.Error("a compositor without the state declares its color")
 	}
 }
@@ -516,7 +516,7 @@ func TestHyprlandClicksDispatch(t *testing.T) {
 		t.Errorf("special dispatches = %q", got[1:])
 	}
 	// Scroll down from active 1 walks to 2 in the displayed order.
-	router, p := treetest.Pointer(m.root, buttons[1], 500, 40)
+	router, p := treetest.Pointer(m.segs, buttons[1], 500, 40)
 	router.Axis(0, 1, 0)
 	if got := wait(4); got[3] != "hl.dsp.focus({workspace = 2})" {
 		t.Errorf("next = %q", got[3])

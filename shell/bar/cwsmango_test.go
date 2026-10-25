@@ -157,7 +157,7 @@ func TestMangoTagButtonsAndClients(t *testing.T) {
 	if !reflect.DeepEqual(one.classes, want) {
 		t.Errorf("classes = %v, want %v (no focused, tag-N)", one.classes, want)
 	}
-	if !widget.HasClass(m.root, "mango") {
+	if !widget.HasClass(m.segs, "mango") {
 		t.Error("container misses the mango class")
 	}
 }
@@ -182,7 +182,7 @@ func TestMangoClicksDispatch(t *testing.T) {
 	}
 	b.ClickAt(widget.Point{})
 	expect("dispatch view,1")
-	router, p := treetest.Pointer(m.root, b, 500, 40)
+	router, p := treetest.Pointer(m.segs, b, 500, 40)
 	router.Axis(0, 1, 0)
 	expect("dispatch viewtoright")
 	router.Axis(0, -1, 0)

@@ -48,7 +48,6 @@ type cwsView struct {
 	kind     string
 	flavor   cwsFlavor
 	boldFace render.Font
-	root     *widget.Box
 	segs     *widget.SegmentIndicator
 	actions  cwsActions
 	// otherMonitor is hyprland's active-on-other-monitor-color, nil for
@@ -242,7 +241,7 @@ func (m *cwsView) dispatchScroll(action config.WorkspaceClickAction) {
 		m.run(m.actions.last)
 	case config.WorkspaceClickDropdown:
 		if m.ctx.Dropdowns != nil {
-			if err := m.ctx.Dropdowns.open(m.ctx.Connector, action.Arg, m.root); err != nil {
+			if err := m.ctx.Dropdowns.open(m.ctx.Connector, action.Arg, m.segs); err != nil {
 				log.Printf("%s-workspaces: dropdown %q: %v", m.kind, action.Arg, err)
 			}
 		}
@@ -261,7 +260,7 @@ func (m *cwsView) run(fn func(context.Context) error) {
 	}()
 }
 
-func (m *cwsModule) Root() widget.Widget { return m.root }
+func (m *cwsModule) Root() widget.Widget { return m.segs }
 
 // ownsChrome opts out of the module-button wrapper: the workspaces
 // component is not a BarButton in the Rust shell.

@@ -750,7 +750,7 @@ func (m *hyprlandWorkspaces) navigate(direction int) error {
 	return m.switchTo(list[hyprNavigate(current, direction, len(list))].id)
 }
 
-func (m *hyprlandWorkspaces) Root() widget.Widget { return m.root }
+func (m *hyprlandWorkspaces) Root() widget.Widget { return m.segs }
 
 func (m *hyprlandWorkspaces) ownsChrome() {}
 

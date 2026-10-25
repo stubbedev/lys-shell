@@ -2,6 +2,7 @@ button.bar-button.block-prefix > box {
   border-spacing: 0;
 }
 button.bar-button.block-prefix .bar-button-icon {
+  align-self: stretch;
   padding: var(--bar-btn-icon-padding);
   background-color: var(--bar-btn-icon-bg);
   border-top-left-radius: var(--bar-button-rounding-element);

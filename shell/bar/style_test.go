@@ -383,3 +383,21 @@ func TestBarButtonShadesUnderThePointer(t *testing.T) {
 		t.Errorf("the button paints %#x after the pointer left, want its rest %#x", uint32(left), uint32(rest))
 	}
 }
+
+// A block-prefix icon block fills the button's height even when the
+// label is padded more than the icon, so the colored block reads as
+// one band beside the label.
+func TestBlockPrefixIconFillsTheButtonHeight(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bar.ButtonVariant = config.ButtonBlockPrefix
+	cfg.Bar.ButtonIconPadding = config.Scale(1)
+	cfg.Bar.ButtonLabelPadding = config.Scale(3)
+	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+	bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+	settleBar(bar, widget.Size{W: 1000, H: 1000})
+	btn := clockButton(bar)
+	icon, label := shownIcon(btn).Bounds(), btn.Label().Bounds()
+	if icon.Y != label.Y || icon.H != label.H {
+		t.Errorf("the icon block spans y=%d..%d beside the label's y=%d..%d, want the same band", icon.Y, icon.Y+icon.H, label.Y, label.Y+label.H)
+	}
+}
