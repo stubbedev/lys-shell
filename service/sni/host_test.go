@@ -160,12 +160,20 @@ func TestHostAsWatcherTracksItemsAndMenus(t *testing.T) {
 
 	// The menu: AboutToShow, then the parsed layout.
 	actions := host.Actions()
-	menu, err := actions.RefreshMenu(context.Background(), got)
+	menu, err := actions.OpenMenu(context.Background(), got)
 	if err != nil {
-		t.Fatalf("RefreshMenu: %v", err)
+		t.Fatalf("OpenMenu: %v", err)
 	}
 	if len(item.menu.shownCalls()) != 1 || item.menu.shownCalls()[0] != 0 {
 		t.Errorf("AboutToShow calls = %v, want the root", item.menu.shownCalls())
+	}
+	// A re-read is the layout alone: AboutToShow is for showing.
+	relaid, err := actions.MenuLayout(context.Background(), got)
+	if err != nil {
+		t.Fatalf("MenuLayout: %v", err)
+	}
+	if len(relaid.Children) != 4 || len(item.menu.shownCalls()) != 1 {
+		t.Errorf("MenuLayout: %d children, AboutToShow calls %v; want the layout and no AboutToShow", len(relaid.Children), item.menu.shownCalls())
 	}
 	if len(menu.Children) != 4 {
 		t.Fatalf("root children = %d, want 4", len(menu.Children))
@@ -206,10 +214,41 @@ func TestHostAsWatcherTracksItemsAndMenus(t *testing.T) {
 		t.Fatal("no menu tick for LayoutUpdated")
 	}
 	stop()
+	stop()
+	select {
+	case _, open := <-feed:
+		if open {
+			t.Error("a tick after stop")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("stop left the menu feed open")
+	}
 
 	// The item's connection leaving unregisters it.
 	_ = item.conn.Close()
 	waitItems(t, store, func(i []Item) bool { return len(i) == 0 })
+}
+
+// An item without a menu has none to open, read or click: each call
+// says so instead of calling an empty object path.
+func TestMenuCallsWithoutAMenuFail(t *testing.T) {
+	bus := dbustest.Start(t)
+	host, err := NewHostOn(bus.Conn(t), NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	actions := host.Actions()
+	bare := Item{Bus: ":1.1", Path: "/StatusNotifierItem"}
+	if _, err := actions.OpenMenu(context.Background(), bare); err == nil {
+		t.Error("OpenMenu on an item without a menu succeeded")
+	}
+	if _, err := actions.MenuLayout(context.Background(), bare); err == nil {
+		t.Error("MenuLayout on an item without a menu succeeded")
+	}
+	if err := actions.MenuClicked(context.Background(), bare, 1); err == nil {
+		t.Error("MenuClicked on an item without a menu succeeded")
+	}
 }
 
 func TestHostRecoversOrphanedItems(t *testing.T) {

@@ -46,8 +46,13 @@ type TrayService interface {
 	Activate(ctx context.Context, it sni.Item) error
 	SecondaryActivate(ctx context.Context, it sni.Item) error
 	ContextMenu(ctx context.Context, it sni.Item) error
-	RefreshMenu(ctx context.Context, it sni.Item) (sni.MenuItem, error)
+	// OpenMenu is AboutToShow and the layout, once per showing.
+	OpenMenu(ctx context.Context, it sni.Item) (sni.MenuItem, error)
+	// MenuLayout re-reads an open menu's layout without AboutToShow.
+	MenuLayout(ctx context.Context, it sni.Item) (sni.MenuItem, error)
 	MenuClicked(ctx context.Context, it sni.Item, id int32) error
+	// WatchMenu ticks on the item's menu changes until stop, which
+	// closes the feed and may be called more than once.
 	WatchMenu(key string) (<-chan struct{}, func())
 }
 
@@ -73,8 +78,12 @@ func (t hostTray) ContextMenu(ctx context.Context, it sni.Item) error {
 	return t.a.ContextMenu(ctx, it, 0, 0)
 }
 
-func (t hostTray) RefreshMenu(ctx context.Context, it sni.Item) (sni.MenuItem, error) {
-	return t.a.RefreshMenu(ctx, it)
+func (t hostTray) OpenMenu(ctx context.Context, it sni.Item) (sni.MenuItem, error) {
+	return t.a.OpenMenu(ctx, it)
+}
+
+func (t hostTray) MenuLayout(ctx context.Context, it sni.Item) (sni.MenuItem, error) {
+	return t.a.MenuLayout(ctx, it)
 }
 
 func (t hostTray) MenuClicked(ctx context.Context, it sni.Item, id int32) error {
@@ -229,15 +238,21 @@ type systrayModule struct {
 	chrome moduleChrome
 	shown  bool
 
-	// The open menu: its item key, popover, and stack.
-	menuKey string
-	menuPop *app.MenuPopover
-	// menuItems are the rows last built, kept headless (no popover).
-	menuItems []widget.MenuItem
+	// menu is the open menu, nil while none is.
+	menu *trayMenu
 	// accels binds the open menu's shortcuts (nil: the application);
 	// accelKeys are the bindings made, undone on refresh and close.
 	accels    accelBinder
 	accelKeys []string
+}
+
+// trayMenu is an open menu: its item key, its popover (nil headless),
+// the rows last built, and the release of its change feed.
+type trayMenu struct {
+	key   string
+	pop   *app.MenuPopover
+	items []widget.MenuItem
+	stop  func()
 }
 
 // accelBinder is the application accelerator table the tray menu's
@@ -307,7 +322,7 @@ func (m *systrayModule) refresh() {
 	for key := range m.entries {
 		if !live[key] {
 			delete(m.entries, key)
-			if key == m.menuKey {
+			if m.menu != nil && key == m.menu.key {
 				m.closeMenu()
 			}
 		}
@@ -415,9 +430,11 @@ func (m *systrayModule) middleClick(key string) {
 
 // rightClick is request_menu_show: a second right-click closes the
 // open menu; otherwise AboutToShow and a fresh layout, then the menu -
-// or the item's own ContextMenu when it publishes none.
+// or the item's own ContextMenu when it publishes none. The menu's
+// change feed starts before AboutToShow, so a layout the app changes in
+// answer to it still reaches the open menu.
 func (m *systrayModule) rightClick(key string) {
-	if m.menuKey == key && m.menuPop != nil && !m.menuPop.Closed() {
+	if m.menu != nil && m.menu.key == key && m.menu.pop != nil && !m.menu.pop.Closed() {
 		m.closeMenu()
 		return
 	}
@@ -427,71 +444,97 @@ func (m *systrayModule) rightClick(key string) {
 	}
 	it := e.item
 	go func() {
+		feed, stop := m.tray.WatchMenu(key)
+		open := &trayMenu{key: key, stop: stop}
 		ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
-		defer cancel()
-		menu, err := m.tray.RefreshMenu(ctx, it)
-		m.ctx.Invoke(func() { m.showMenu(key, menu, err) })
+		menu, err := m.tray.OpenMenu(ctx, it)
+		cancel()
+		m.ctx.Invoke(func() { m.showMenu(open, menu, err) })
+		m.followMenu(open, it, feed)
 	}()
 }
 
 // showMenu opens the popover over the item, or falls back to the
-// item's ContextMenu for an absent or empty menu.
-func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
-	e, ok := m.entries[key]
+// item's ContextMenu for an absent or empty menu, releasing the
+// menu's change feed.
+func (m *systrayModule) showMenu(open *trayMenu, menu sni.MenuItem, err error) {
+	e, ok := m.entries[open.key]
 	if !ok {
+		open.stop()
 		return
 	}
 	if err != nil || len(menu.Children) == 0 {
-		m.call("context menu", key, m.tray.ContextMenu)
-		return
-	}
-	font, px := dropdownFont(m.ctx)
-	rows := m.menuRows(e.item, menu.Children)
-	if m.ctx.App == nil || m.host == nil {
-		m.menuKey, m.menuItems = key, rows
-		m.bindAccels(e.item, menu.Children)
+		open.stop()
+		m.call("context menu", open.key, m.tray.ContextMenu)
 		return
 	}
 	m.closeMenu()
-	feed, stop := m.tray.WatchMenu(key)
-	// Submenus open as their own popovers beside their rows, as the
-	// Rust tray's PopoverMenu with the NESTED flag does.
-	pop, err := m.ctx.App.OpenMenuPopover(m.host, trayMenuConfig(e.button, font, px, rows, func() {
-		stop()
-		m.unbindAccels()
-	}))
-	if err != nil {
-		stop()
-		log.Printf("systray: %s menu: %v", e.item.ID, err)
-		return
-	}
-	m.menuKey, m.menuPop, m.menuItems = key, pop, rows
 	it := e.item
-	m.bindAccels(it, menu.Children)
-	go func() {
-		for range feed {
-			ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
-			fresh, err := m.tray.RefreshMenu(ctx, it)
-			cancel()
-			if err != nil {
-				continue
-			}
-			m.ctx.Invoke(func() {
-				if m.menuPop == pop {
-					pop.SetItems(m.menuRows(it, fresh.Children)...)
-					m.bindAccels(it, fresh.Children)
-				}
-			})
+	open.items = m.menuRows(it, menu.Children)
+	if m.ctx.App != nil && m.host != nil {
+		font, px := dropdownFont(m.ctx)
+		// Submenus open as their own popovers beside their rows, as the
+		// Rust tray's PopoverMenu with the NESTED flag does.
+		pop, err := m.ctx.App.OpenMenuPopover(m.host, trayMenuConfig(e.button, font, px, open.items, func() {
+			open.stop()
+			m.unbindAccels()
+		}))
+		if err != nil {
+			open.stop()
+			log.Printf("systray: %s menu: %v", it.ID, err)
+			return
 		}
-	}()
+		open.pop = pop
+	}
+	m.menu = open
+	m.bindAccels(it, menu.Children)
 }
 
-// closeMenu dismisses the open menu.
-func (m *systrayModule) closeMenu() {
-	if m.menuPop != nil {
-		m.menuPop.Dismiss()
+// followMenu re-reads the open menu's layout on each change until its
+// feed closes or the module retires. It never calls AboutToShow: the
+// menu is already shown, and an app that answers AboutToShow with
+// LayoutUpdated would keep it refreshing forever.
+func (m *systrayModule) followMenu(open *trayMenu, it sni.Item, feed <-chan struct{}) {
+	for {
+		select {
+		case <-m.ctx.gen.ended():
+			open.stop()
+			return
+		case _, ok := <-feed:
+			if !ok {
+				return
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
+		fresh, err := m.tray.MenuLayout(ctx, it)
+		cancel()
+		if err != nil {
+			log.Printf("systray: %s menu layout: %v", it.ID, err)
+			continue
+		}
+		m.ctx.Invoke(func() {
+			if m.menu != open {
+				return
+			}
+			open.items = m.menuRows(it, fresh.Children)
+			if open.pop != nil {
+				open.pop.SetItems(open.items...)
+			}
+			m.bindAccels(it, fresh.Children)
+		})
 	}
-	m.menuKey, m.menuPop, m.menuItems = "", nil, nil
+}
+
+// closeMenu dismisses the open menu and releases its change feed.
+func (m *systrayModule) closeMenu() {
+	if m.menu == nil {
+		return
+	}
+	if m.menu.pop != nil {
+		m.menu.pop.Dismiss()
+	}
+	m.menu.stop()
+	m.menu = nil
 }
 
 // menuRows is the gtk4 adapter's build_model: invisible rows drop,

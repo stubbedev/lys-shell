@@ -351,7 +351,8 @@ func (h *Host) forgetName(name string) {
 
 // WatchMenu returns a feed that ticks (debounced) whenever the item's
 // menu layout or properties change, for as long as a menu is open;
-// stop releases it.
+// stop releases it and closes the feed, once however often it is
+// called.
 func (h *Host) WatchMenu(key string) (<-chan struct{}, func()) {
 	raw := make(chan struct{}, 1)
 	out := make(chan struct{}, 1)
@@ -360,6 +361,7 @@ func (h *Host) WatchMenu(key string) (<-chan struct{}, func()) {
 	h.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
+		defer close(out)
 		var timer <-chan time.Time
 		for {
 			select {
@@ -376,7 +378,7 @@ func (h *Host) WatchMenu(key string) (<-chan struct{}, func()) {
 			}
 		}
 	}()
-	stop := func() {
+	stop := sync.OnceFunc(func() {
 		h.mu.Lock()
 		feeds := h.menus[key]
 		for i, ch := range feeds {
@@ -387,7 +389,7 @@ func (h *Host) WatchMenu(key string) (<-chan struct{}, func()) {
 		}
 		h.mu.Unlock()
 		close(done)
-	}
+	})
 	return out, stop
 }
 

@@ -51,9 +51,25 @@ func (f *fakeTray) ContextMenu(_ context.Context, it sni.Item) error {
 	return f.record("context-menu " + it.ID)
 }
 
-func (f *fakeTray) RefreshMenu(_ context.Context, it sni.Item) (sni.MenuItem, error) {
-	_ = f.record("refresh " + it.ID)
+func (f *fakeTray) OpenMenu(_ context.Context, it sni.Item) (sni.MenuItem, error) {
+	return f.serveMenu("open-menu " + it.ID)
+}
+
+func (f *fakeTray) MenuLayout(_ context.Context, it sni.Item) (sni.MenuItem, error) {
+	return f.serveMenu("menu-layout " + it.ID)
+}
+
+func (f *fakeTray) serveMenu(call string) (sni.MenuItem, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, call)
 	return f.menu, f.err
+}
+
+func (f *fakeTray) setMenu(menu sni.MenuItem) {
+	f.mu.Lock()
+	f.menu = menu
+	f.mu.Unlock()
 }
 
 func (f *fakeTray) MenuClicked(_ context.Context, it sni.Item, id int32) error {
@@ -61,7 +77,8 @@ func (f *fakeTray) MenuClicked(_ context.Context, it sni.Item, id int32) error {
 }
 
 func (f *fakeTray) WatchMenu(string) (<-chan struct{}, func()) {
-	return make(chan struct{}), func() {}
+	feed := make(chan struct{})
+	return feed, sync.OnceFunc(func() { close(feed) })
 }
 
 func waitTray(t *testing.T, f *fakeTray, n int) []string {
@@ -71,6 +88,14 @@ func waitTray(t *testing.T, f *fakeTray, n int) []string {
 		time.Sleep(2 * time.Millisecond)
 	}
 	return f.Calls()
+}
+
+// openTrayMenu right-clicks the item on the loop and waits for its
+// menu to open.
+func openTrayMenu(t *testing.T, m *systrayModule, key string) {
+	t.Helper()
+	onHeadlessLoop(func() bool { m.rightClick(key); return true })
+	waitHeadless(t, "the menu of "+key, func() bool { return m.menu != nil && m.menu.key == key })
 }
 
 func newTrayForTest(t *testing.T, cfg *config.Config, items ...*sni.Item) (*systrayModule, *fakeTray, *sni.Store) {
@@ -229,13 +254,17 @@ func TestSystrayRightClickFallsBackWithoutAMenu(t *testing.T) {
 	it := &sni.Item{Bus: ":1.1", Path: "/StatusNotifierItem", ID: "bare"}
 	m, tray, _ := newTrayForTest(t, cfg, it)
 	// An empty menu: the item's own ContextMenu.
-	m.showMenu(it.Key(), sni.MenuItem{}, nil)
-	if calls := waitTray(t, tray, 1); len(calls) != 1 || calls[0] != "context-menu bare" {
+	onHeadlessLoop(func() bool { m.rightClick(it.Key()); return true })
+	if calls := waitTray(t, tray, 2); len(calls) != 2 || calls[0] != "open-menu bare" || calls[1] != "context-menu bare" {
 		t.Errorf("calls = %v, want the context-menu fallback", calls)
 	}
+	if onHeadlessLoop(func() bool { return m.menu != nil }) {
+		t.Error("an empty menu opened")
+	}
 	// A real menu builds its rows (headless: no popover).
-	m.showMenu(it.Key(), sni.MenuItem{Children: []sni.MenuItem{{ID: 1, Label: "Open", Visible: true, Enabled: true}}}, nil)
-	if len(m.menuItems) != 1 || m.menuKey != it.Key() {
+	tray.setMenu(sni.MenuItem{Children: []sni.MenuItem{{ID: 1, Label: "Open", Visible: true, Enabled: true}}})
+	openTrayMenu(t, m, it.Key())
+	if onHeadlessLoop(func() int { return len(m.menu.items) }) != 1 {
 		t.Error("a published menu built no rows")
 	}
 }
@@ -345,11 +374,12 @@ func TestSystrayMenuShortcutsFire(t *testing.T) {
 		{ID: 5, Label: "Gone", Visible: false, Enabled: true, Shortcut: [][]string{{"Control", "g"}}},
 		{ID: 6, Label: "Taken", Visible: true, Enabled: true, Shortcut: [][]string{{"Alt", "x"}}},
 	}}
-	m.showMenu(it.Key(), menu, nil)
+	tray.setMenu(menu)
+	openTrayMenu(t, m, it.Key())
 	if !accels.press("<Control><Shift>q") {
 		t.Fatal("the nested Quit shortcut is not bound")
 	}
-	if calls := waitTray(t, tray, 1); len(calls) != 1 || calls[0] != "clicked app 3" {
+	if calls := waitTray(t, tray, 2); len(calls) != 2 || calls[1] != "clicked app 3" {
 		t.Errorf("calls = %v, want the clicked event for id 3", calls)
 	}
 	for _, keys := range []string{"<Control>d", "<Control>g", "<Alt>x"} {

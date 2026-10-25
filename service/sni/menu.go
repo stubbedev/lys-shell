@@ -130,19 +130,36 @@ func parseMenuNode(id int32, props map[string]dbus.Variant, children []dbus.Vari
 	return item
 }
 
-// menuObject is the item's DBusMenu object.
-func (a *Actions) menuObject(it Item) dbus.BusObject {
-	return a.conn.Object(it.Bus, dbus.ObjectPath(it.MenuPath))
+// menuObject is the item's DBusMenu object; an item without a menu
+// has none.
+func (a *Actions) menuObject(it Item) (dbus.BusObject, error) {
+	if it.MenuPath == "" {
+		return nil, fmt.Errorf("sni: %s has no menu", it.Key())
+	}
+	return a.conn.Object(it.Bus, dbus.ObjectPath(it.MenuPath)), nil
 }
 
-// RefreshMenu is refresh_menu: AboutToShow on the root (a failure is
-// fine - not every app implements it), then the full layout.
-func (a *Actions) RefreshMenu(ctx context.Context, it Item) (MenuItem, error) {
-	if it.MenuPath == "" {
-		return MenuItem{}, fmt.Errorf("sni: %s has no menu", it.Key())
+// OpenMenu is the menu about to be shown: AboutToShow on the root (a
+// failure is fine - not every app implements it), then the full
+// layout. The spec calls AboutToShow once per showing, so a menu
+// already open re-reads with MenuLayout instead.
+func (a *Actions) OpenMenu(ctx context.Context, it Item) (MenuItem, error) {
+	obj, err := a.menuObject(it)
+	if err != nil {
+		return MenuItem{}, err
 	}
-	obj := a.menuObject(it)
 	_ = obj.CallWithContext(ctx, MenuIface+".AboutToShow", 0, int32(0)).Err
+	return a.MenuLayout(ctx, it)
+}
+
+// MenuLayout reads the full layout (GetLayout) without AboutToShow:
+// the re-read after a LayoutUpdated or ItemsPropertiesUpdated, which an
+// app may itself send in answer to AboutToShow.
+func (a *Actions) MenuLayout(ctx context.Context, it Item) (MenuItem, error) {
+	obj, err := a.menuObject(it)
+	if err != nil {
+		return MenuItem{}, err
+	}
 	var revision uint32
 	var layout struct {
 		ID       int32
@@ -158,6 +175,10 @@ func (a *Actions) RefreshMenu(ctx context.Context, it Item) (MenuItem, error) {
 // MenuClicked sends the clicked event for a row (menu_event with
 // MenuEvent::Clicked, data 0, the Unix time).
 func (a *Actions) MenuClicked(ctx context.Context, it Item, id int32) error {
+	obj, err := a.menuObject(it)
+	if err != nil {
+		return err
+	}
 	ts := uint32(max(time.Now().Unix(), 0))
-	return a.menuObject(it).CallWithContext(ctx, MenuIface+".Event", dbus.FlagNoReplyExpected, id, "clicked", dbus.MakeVariant(int32(0)), ts).Err
+	return obj.CallWithContext(ctx, MenuIface+".Event", dbus.FlagNoReplyExpected, id, "clicked", dbus.MakeVariant(int32(0)), ts).Err
 }
