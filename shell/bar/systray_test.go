@@ -388,3 +388,43 @@ func TestTrayMenuIconFallsBackAlongTheName(t *testing.T) {
 		t.Error("a menu icon with a present dash-shortened form drew nothing")
 	}
 }
+
+// A tray icon sits in the middle of the bar's height, as the module
+// icons beside it do, while its slot keeps the icon size instead of
+// stretching to the bar.
+func TestSystrayIconIsVerticallyCentered(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	named := &sni.Item{Bus: ":1.1", Path: "/a", ID: "named", IconName: "steam"}
+	pixmap := &sni.Item{Bus: ":1.2", Path: "/b", ID: "pixmap", IconPixmap: []sni.Pixmap{{Width: 1, Height: 1, Data: []byte{0xff, 0xff, 0, 0}}}}
+	store := sni.NewStore()
+	store.Put(named)
+	store.Put(pixmap)
+	ctx.SNI, ctx.Tray = store, &fakeTray{}
+	ctx.Attachers = &[]interface{ Attach(app.Host) }{}
+	layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}, {Module: "systray"}}}
+	_, h, _ := paintBar(t, ctx, layout, 800)
+	var m *systrayModule
+	for _, a := range *ctx.Attachers {
+		if s, ok := a.(*systrayModule); ok {
+			m = s
+		}
+	}
+	if m == nil || len(m.entries) != 2 {
+		t.Fatalf("tray module = %v, want one with two items", m)
+	}
+	px := m.iconPx()
+	for _, key := range []string{named.Key(), pixmap.Key()} {
+		e := m.entries[key]
+		btn, slot, icon := e.button.Bounds(), e.slot.Bounds(), e.icon.Bounds()
+		if btn.H <= px {
+			t.Fatalf("%s: button height %d leaves no room to center a %dpx icon (bar %d)", key, btn.H, px, h)
+		}
+		if slot.W != px || slot.H != px {
+			t.Errorf("%s: slot = %+v, want %dx%d", key, slot, px, px)
+		}
+		if d := (2*icon.Y + icon.H) - (2*btn.Y + btn.H); d < -1 || d > 1 {
+			t.Errorf("%s: icon %+v is not centered in its button %+v", key, icon, btn)
+		}
+	}
+}
