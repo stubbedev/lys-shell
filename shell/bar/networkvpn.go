@@ -640,16 +640,14 @@ func (f *netVPNForm) picker(field network.VPNField, current string, has bool) *w
 // public key it derives.
 func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current string) {
 	var entry *widget.Entry
-	var input *widget.Box
 	if field.Secret {
-		s := newSecretEntry(f.v.ctx, f.v.font, f.v.px)
-		entry, input = s.entry, s.Box
+		entry = newSecretEntry(f.v.font, f.v.px).entry
 	} else {
 		entry = widget.NewEntry(f.v.font, f.v.px, 0)
-		entry.AddClass("network-password-input")
-		input = widget.NewBox(widget.Row, 0, 0)
-		input.Append(entry, true)
 	}
+	entry.AddClass("network-password-input")
+	input := widget.NewBox(widget.Row, 0, 0)
+	input.Append(entry, true)
 	entry.SetPlaceholder(field.Placeholder)
 	entry.SetText(current)
 	entry.OnActivate = func(string) { f.save() }

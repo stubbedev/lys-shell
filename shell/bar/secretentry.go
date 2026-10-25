@@ -11,24 +11,21 @@ const (
 	iconEyeOff = "ld-eye-off-symbolic"
 )
 
-// secretEntry is a masked Entry with the peek icon every secret box in
-// the network dropdown carries (attach_reveal_toggle): a mistyped key
-// or password is otherwise only fixable by retyping it. The eye is the
-// entry's trailing icon — the entry > image node, which the
-// stylesheet's fg-subtle rule colors, exactly the Rust peek.
+// secretEntry is a masked Entry with the peek icon every secret box
+// carries (attach_reveal_toggle): a mistyped key or password is
+// otherwise only fixable by retyping it. The eye is the entry's
+// trailing icon, the entry > image node. The entry itself goes into
+// the tree; the network forms add their own class to it.
 type secretEntry struct {
-	*widget.Box
 	entry *widget.Entry
+	px    float64
 	eye   bool
 }
 
-func newSecretEntry(_ ModuleContext, font render.Font, px float64) *secretEntry {
-	s := &secretEntry{Box: widget.NewBox(widget.Row, 4, 0)}
-	s.entry = widget.NewEntry(font, px, 0)
+func newSecretEntry(font render.Font, px float64) *secretEntry {
+	s := &secretEntry{entry: widget.NewEntry(font, px, 0), px: px}
 	s.entry.SetEcho(widget.EchoPassword)
-	s.entry.AddClass("network-password-input")
 	s.entry.SetTrailingIcon(iconEyeOff, px, s.toggle)
-	s.Append(s.entry, true)
 	return s
 }
 
@@ -37,9 +34,9 @@ func (s *secretEntry) toggle() {
 	s.eye = !s.eye
 	s.entry.EchoReveal(s.eye)
 	if s.eye {
-		s.entry.SetTrailingIcon(iconEye, 0, s.toggle)
+		s.entry.SetTrailingIcon(iconEye, s.px, s.toggle)
 	} else {
-		s.entry.SetTrailingIcon(iconEyeOff, 0, s.toggle)
+		s.entry.SetTrailingIcon(iconEyeOff, s.px, s.toggle)
 	}
 }
 
@@ -48,5 +45,5 @@ func (s *secretEntry) reset() {
 	s.entry.SetText("")
 	s.entry.EchoReveal(false)
 	s.eye = false
-	s.entry.SetTrailingIcon(iconEyeOff, 0, s.toggle)
+	s.entry.SetTrailingIcon(iconEyeOff, s.px, s.toggle)
 }

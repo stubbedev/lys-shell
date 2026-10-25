@@ -833,10 +833,11 @@ func newNetPasswordForm(v *networkView) *netPasswordForm {
 	pwClose.AddClass("network-password-close")
 	header.Append(pwClose, false)
 	f.Append(header, false)
-	f.secret = newSecretEntry(v.ctx, v.font, v.px)
+	f.secret = newSecretEntry(v.font, v.px)
+	f.secret.entry.AddClass("network-password-input")
 	f.secret.entry.SetPlaceholder(i18n.T("dropdown-network-password-placeholder"))
 	f.secret.entry.OnActivate = func(string) { f.connect() }
-	f.Append(f.secret, false)
+	f.Append(f.secret.entry, false)
 	f.errLabel = v.errorLabel()
 	f.Append(f.errLabel, false)
 	actions := widget.NewBox(widget.Row, 0, 0)
@@ -983,14 +984,12 @@ func (f *netSecretForm) apply(req secrets.Request, asking bool) {
 		f.fields.Append(label, false)
 		var entry *widget.Entry
 		if field.Secret {
-			s := newSecretEntry(f.v.ctx, f.v.font, f.v.px)
-			entry = s.entry
-			f.fields.Append(s, false)
+			entry = newSecretEntry(f.v.font, f.v.px).entry
 		} else {
 			entry = widget.NewEntry(f.v.font, f.v.px, 0)
-			entry.AddClass("network-password-input")
-			f.fields.Append(entry, false)
 		}
+		entry.AddClass("network-password-input")
+		f.fields.Append(entry, false)
 		entry.OnActivate = func(string) { f.submit() }
 		f.entries = append(f.entries, netSecretField{key: field.Key, entry: entry})
 	}
