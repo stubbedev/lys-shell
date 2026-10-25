@@ -468,8 +468,7 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	scroll := dropdownScroll(body, "network-vpn-form-scroll")
 	scroll.SetMaxContentHeight(vpnFieldsMaxHeight)
 
-	foot := widget.NewBox(widget.Column, th.Spacing, 0)
-	foot.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	foot := itemBody()
 	foot.Append(scroll, true)
 	f.errLabel = v.errorLabel()
 	foot.Append(f.errLabel, false)

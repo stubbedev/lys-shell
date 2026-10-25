@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // The dropdown panels paint from the stylesheet: a migrated label
@@ -22,7 +23,8 @@ func TestDropdownPanelsPaintFromTheStylesheet(t *testing.T) {
 	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 600}})
 	v.Arrange(render.Rect{W: sz.W, H: 600})
 
-	if got := v.output.name.Color(); got != 0 {
+	name := treetest.WithClass(v.output.item, "title")[0].(*widget.Label)
+	if got := name.Color(); got != 0 {
 		t.Errorf("the device name carries a programmatic color %#08x", uint32(got))
 	}
 	if v.output.mute.BgHover != 0 || v.output.mute.BgPressed != 0 {
@@ -35,7 +37,6 @@ func TestDropdownPanelsPaintFromTheStylesheet(t *testing.T) {
 	// The sheet demonstrably drives the ink: the same uncolored label
 	// paints differently under the panel's sheet (the cascade's
 	// fg-default) than alone (the widget theme's fallback).
-	name := v.output.name
 	name.SetText("Speakers")
 	withSheet := paintLabel(name)
 	bare := widget.NewLabel(ctx.Font, ctx.Style.labelPx, "Speakers", 0)

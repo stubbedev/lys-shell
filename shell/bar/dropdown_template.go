@@ -91,6 +91,14 @@ func dropdownSection(label *widget.Label, body ...widget.Widget) *widget.Box {
 	return section
 }
 
+// scrolledCard is a scroll over card that keeps the card at its
+// content's height: the scroll fills the page, the card hugs its rows.
+func scrolledCard(card widget.Widget, class string) *widget.Scroll {
+	col := widget.NewBox(widget.Column, 0, 0)
+	col.Append(card, false)
+	return dropdownScroll(col, class)
+}
+
 // itemCard is a list card: lys-ui's card around an ItemGroup, which
 // sets its rows apart with separators.
 func itemCard() (*widget.Box, *widget.ItemGroup) {
@@ -112,7 +120,6 @@ type formCard struct {
 }
 
 func newFormCard(font render.Font, px float64, icon string, onClose func(), classes ...string) *formCard {
-	th := widget.Current()
 	f := &formCard{Box: widget.NewBox(widget.Column, 0, 0)}
 	f.AddClass(append([]string{css.Card}, classes...)...)
 	f.head = widget.NewItem(font, "", "")
@@ -123,10 +130,19 @@ func newFormCard(font render.Font, px float64, icon string, onClose func(), clas
 	closeBtn := dropdownButton(widget.NewThemeIcon("ld-x-symbolic", int(px)), onClose, css.Ghost, css.Icon, css.Small, "form-close")
 	f.head.AddAction(closeBtn)
 	f.Append(f.head, false)
-	f.body = widget.NewBox(widget.Column, th.Spacing, 0)
-	f.body.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	f.body = itemBody()
 	f.Append(f.body, false)
 	return f
+}
+
+// itemBody is the column under an Item inside a card: the theme's
+// spacing between its parts, inset on the sides and below by twice the
+// theme's padding, in line with the item's own.
+func itemBody() *widget.Box {
+	th := widget.Current()
+	body := widget.NewBox(widget.Column, th.Spacing, 0)
+	body.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	return body
 }
 
 // formActions is a form's button row: the buttons at the end, the

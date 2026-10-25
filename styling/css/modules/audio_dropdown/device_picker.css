@@ -1,51 +1,6 @@
-.picker-header {
-  padding: 0;
-  padding-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--border-default);
-}
-
-button.picker-back {
-  border-radius: var(--rounding-element);
-}
-button.picker-back image {
-  -gtk-icon-size: var(--icon-md);
-  color: var(--fg-default);
-}
-
-.picker-title {
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-default);
-  margin-left: var(--space-sm);
-}
-
-.picker-body {
-  background: transparent;
-}
-
-.audio-device-list {
-  background: transparent;
-  padding: var(--space-sm) 0;
-}
-.audio-device-list .audio-device-option image {
-  -gtk-icon-size: var(--icon-lg);
-  color: var(--fg-muted);
-}
-.audio-device-list .audio-device-option.selected .media {
+.audio-device-option.selected .media {
   background: var(--accent-subtle);
 }
-.audio-device-list .audio-device-option.selected .media image {
+.audio-device-option.selected image {
   color: var(--accent);
-}
-.audio-device-list .audio-device-option .title,
-.audio-device-list .audio-device-option .description {
-  font-size: var(--text-md);
-}
-.audio-device-list .audio-device-option .title {
-  color: var(--fg-default);
-}
-.audio-device-list .audio-device-option .audio-device-option-check {
-  -gtk-icon-size: var(--icon-md);
-  color: var(--accent);
-  margin-left: var(--space-sm);
 }

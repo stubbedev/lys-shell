@@ -271,14 +271,15 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	v.output = newVolumeSection(v, audioOutput)
 	v.input = newVolumeSection(v, audioInput)
 	v.apps = newAppVolumes(v)
-	content := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
-	devices := widget.NewBox(widget.Column, 0, 0)
-	devices.AddClass("audio-fixed", "audio-devices")
-	devices.Append(v.output, false)
-	devices.Append(v.input, false)
+	content := widget.NewBox(widget.Column, 2*widget.Current().Spacing, 0)
+	devices, group := itemCard()
+	devices.AddClass("audio-devices")
+	group.Append(v.output)
+	group.Append(v.input)
 	content.Append(devices, false)
-	content.Append(sectionLabel(font, i18n.T("dropdown-audio-app-volume")), false)
-	content.Append(v.apps, true)
+	apps := dropdownSection(sectionLabel(font, i18n.T("dropdown-audio-app-volume")))
+	apps.Append(v.apps, true)
+	content.Append(apps, true)
 	v.main = widget.NewStack()
 	v.main.Add("devices", content)
 	v.main.Add("empty", emptyState(font, px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-devices-title"), i18n.T("dropdown-audio-no-devices-description")))
@@ -346,19 +347,20 @@ func (v *audioView) follow() {
 // dropdownClosed implements dropdownCloser.
 func (v *audioView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }
 
-// volumeSection is VolumeSection: the kind's label, the default
-// device's icon and name (opening the picker), its mute button and
-// labeled slider, or the no-device row.
+// volumeSection is VolumeSection: the default device as an Item (its
+// icon, its name over the kind, the row opening the picker, the mute
+// button) over its labeled slider, or the no-device row.
 type volumeSection struct {
 	*widget.Box
 	view *audioView
 	kind audioKind
 
-	trigger, nameRow, sliderRow, noDevice *widget.Box
-	icon, muteIcon                        *widget.Icon
-	name                                  *widget.Label
-	mute                                  *widget.Button
-	slider                                *widgets.DebouncedSlider
+	item           *widget.Item
+	sliderRow      *widget.Box
+	noDevice       *widget.Item
+	icon, muteIcon *widget.Icon
+	mute           *widget.Button
+	slider         *widgets.DebouncedSlider
 
 	device *audioDevice
 }
@@ -366,62 +368,36 @@ type volumeSection struct {
 func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 	s := &volumeSection{view: v, kind: kind, Box: widget.NewBox(widget.Column, 0, 0)}
 	s.AddClass("audio-device")
-
-	s.trigger = widget.NewBox(widget.Row, 0, 0)
-	s.trigger.AddClass("audio-device-trigger")
-	s.icon = widget.NewThemeIcon("", int(v.px*1.4))
-	s.trigger.AppendAligned(iconTile(s.icon, "audio-device-icon-img", "audio-device-icon"), false, widget.AlignCenter)
-	info := widget.NewBox(widget.Column, 0, 0)
-	info.AddClass("audio-device-info")
 	title := i18n.T("dropdown-audio-output")
 	page := "output"
 	if kind == audioInput {
 		title, page = i18n.T("dropdown-audio-input"), "input"
 	}
-	label := widget.NewLabel(v.font, v.px*0.85, title, 0)
-	label.AddClass("audio-device-label")
-	info.AppendAligned(label, false, widget.AlignStart)
-	nameRow := widget.NewBox(widget.Row, 0, 0)
-	nameRow.AddClass("audio-device-name")
-	s.nameRow = nameRow
-	s.name = widget.NewLabel(v.font, v.px, "", 0)
-	s.name.AddClass("audio-device-name-text")
-	s.name.SetEllipsize(widget.EllipsizeEnd)
-	nameRow.Append(s.name, false)
-	chevron := widget.NewThemeIcon("ld-chevron-right-symbolic", int(v.px*0.9))
-	chevron.AddClass("audio-device-chevron")
-	nameRow.Append(chevron, false)
-	// The button hugs its name (set_halign Start), so the chevron sits
-	// right after the device name, not at the row's far end.
-	info.AppendAligned(dropdownButton(nameRow, func() { v.showPage(page) }, "audio-device-trigger-btn"), false, widget.AlignStart)
-	s.trigger.Append(info, true)
-	s.muteIcon = widget.NewThemeIcon("", int(v.px*1.1))
-	s.muteIcon.AddClass("audio-mute-icon")
-	s.mute = dropdownButton(s.muteIcon, s.toggleMute, "audio-mute-btn")
-	s.trigger.AppendAligned(s.mute, false, widget.AlignCenter)
-	s.Append(s.trigger, false)
+	s.item = widget.NewItem(v.font, "", title)
+	s.item.SetSmall(true)
+	s.item.SetEllipsize(true)
+	s.icon = widget.NewThemeIcon("", itemIconPx)
+	s.item.SetMedia(s.icon, false)
+	s.item.SetOnActivate(func() { v.showPage(page) })
+	s.muteIcon = widget.NewThemeIcon("", itemIconPx)
+	s.mute = dropdownButton(s.muteIcon, s.toggleMute, "audio-mute-btn", css.Ghost, css.Icon, css.Small)
+	s.item.AddAction(s.mute)
+	s.item.AddAction(widget.NewThemeIcon("ld-chevron-right-symbolic", itemIconPx))
+	s.Append(s.item, false)
 
-	s.slider = widgets.NewDebouncedSlider(0, v.font, v.px*0.9, 0, v.ctx.Invoke)
-	s.slider.Knob.AddClass("audio-volume-slider")
-	s.slider.ValueLabel().AddClass("audio-slider-value")
+	s.slider = widgets.NewDebouncedSlider(0, v.font, v.px, 0, v.ctx.Invoke)
+	s.slider.ValueLabel().AddClass("audio-slider-value", css.Numeric)
 	s.slider.OnCommit = s.commitVolume
 	s.slider.OnValue = func(float64) { s.syncMuteIcon() }
-	s.sliderRow = widget.NewBox(widget.Row, 0, 0)
-	s.sliderRow.AddClass("audio-slider-row")
-	s.sliderRow.Append(s.slider, true)
+	s.sliderRow = itemBody()
+	s.sliderRow.Append(s.slider, false)
 	s.Append(s.sliderRow, false)
 
-	s.noDevice = widget.NewBox(widget.Row, 0, 0)
+	s.noDevice = widget.NewItem(v.font, i18n.T("dropdown-audio-no-device"), title)
+	s.noDevice.SetSmall(true)
 	s.noDevice.AddClass("audio-no-device")
-	alert := widget.NewThemeIcon("tb-alert-triangle-symbolic", int(v.px))
-	alert.AddClass("audio-no-device-icon")
-	s.noDevice.Append(alert, false)
-	noDeviceLabel := widget.NewLabel(v.font, v.px*0.9, i18n.T("dropdown-audio-no-device"), 0)
-	noDeviceLabel.AddClass("audio-no-device-label")
-	s.noDevice.Append(noDeviceLabel, false)
-	// set_halign Center (volume_section/mod.rs:121); the icon rule's
-	// margin-right spaces it from the label.
-	s.AppendAligned(s.noDevice, false, widget.AlignCenter)
+	s.noDevice.SetMedia(widget.NewThemeIcon("tb-alert-triangle-symbolic", itemIconPx), false)
+	s.Append(s.noDevice, false)
 	return s
 }
 
@@ -429,14 +405,14 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 // trigger or the no-device row; the default, when there is one, syncs
 // the name, icon, slider, and mute state.
 func (s *volumeSection) apply(dev *audioDevice, has bool) {
-	s.trigger.SetVisible(has)
+	s.item.SetVisible(has)
 	s.sliderRow.SetVisible(has)
 	s.noDevice.SetVisible(!has)
 	if dev == nil {
 		return
 	}
 	s.device = dev
-	s.name.SetText(dev.description)
+	s.item.SetTitle(dev.description)
 	s.icon.SetThemeName(dev.icon)
 	s.slider.Set(dev.volume.AveragePercentage())
 	s.setMuted(dev.muted)
@@ -525,20 +501,17 @@ func appVolumeRows(streams []pulse.AudioStream, source config.AppIconSource, exi
 type appVolumes struct {
 	*widget.Stack
 	view  *audioView
-	list  *widget.Box
+	list  *widget.ItemGroup
 	rows  []appVolume
 	items map[pulse.StreamKey]*appVolumeItem
 }
 
 func newAppVolumes(v *audioView) *appVolumes {
 	a := &appVolumes{view: v, Stack: widget.NewStack()}
-	a.list = widget.NewBox(widget.Column, 0, 0)
-	a.list.AddClass("audio-app-list")
-	inner := widget.NewBox(widget.Column, 0, 0)
-	inner.AddClass("app-volumes-inner")
-	inner.Append(a.list, false)
-	scroll := dropdownScroll(inner, "app-volumes-scroll")
-	a.Add("apps", scroll)
+	card, list := itemCard()
+	card.AddClass("audio-app-list")
+	a.list = list
+	a.Add("apps", scrolledCard(card, "app-volumes-scroll"))
 	a.Add("empty", emptyState(v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), ""))
 	return a
 }
@@ -563,7 +536,7 @@ func (a *appVolumes) apply(streams []pulse.AudioStream) {
 	for _, r := range rows {
 		item := newAppVolumeItem(a.view, r)
 		a.items[r.key] = item
-		a.list.Append(item, false)
+		a.list.Append(item)
 	}
 	if len(rows) == 0 {
 		a.Show("empty")
@@ -572,11 +545,13 @@ func (a *appVolumes) apply(streams []pulse.AudioStream) {
 	}
 }
 
-// appVolumeItem is AppVolumeItem: icon, name, value, mute, slider.
+// appVolumeItem is AppVolumeItem: the app as an Item (its icon, its
+// name, the value and the mute button) over its slider.
 type appVolumeItem struct {
 	*widget.Box
 	view     *audioView
 	row      appVolume
+	item     *widget.Item
 	value    *widget.Label
 	mute     *widget.Button
 	muteIcon *widget.Icon
@@ -586,33 +561,29 @@ type appVolumeItem struct {
 func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
 	it := &appVolumeItem{view: v, row: r, Box: widget.NewBox(widget.Column, 0, 0)}
 	it.AddClass("audio-app-item")
-	header := widget.NewBox(widget.Row, 0, 0)
-	header.AddClass("audio-app-header")
 	iconName := r.icon
 	if iconName == "" {
 		iconName = "ld-app-window-symbolic"
 	}
-	icon := widget.NewThemeIcon(iconName, int(v.px*1.2))
-	header.AppendAligned(iconTile(icon, "audio-app-icon-img", "audio-app-icon"), false, widget.AlignCenter)
-	name := widget.NewLabel(v.font, v.px, r.name, 0)
-	name.AddClass("audio-app-name")
-	name.SetEllipsize(widget.EllipsizeEnd)
-	header.Append(name, true)
-	it.value = widget.NewLabel(v.font, v.px*0.9, "", 0)
-	it.value.AddClass("audio-app-value")
-	header.Append(it.value, false)
-	it.muteIcon = widget.NewThemeIcon("", int(v.px))
-	it.muteIcon.AddClass("audio-mute-icon")
-	it.mute = dropdownButton(it.muteIcon, it.toggleMute, "audio-mute-btn")
-	header.AppendAligned(it.mute, false, widget.AlignCenter)
-	it.Append(header, false)
+	it.item = widget.NewItem(v.font, r.name, "")
+	it.item.SetSmall(true)
+	it.item.SetEllipsize(true)
+	it.item.SetMedia(widget.NewThemeIcon(iconName, itemIconPx), false)
+	it.value = widget.NewLabel(v.font, v.px, "", 0)
+	it.value.AddClass("audio-app-value", css.DimLabel, css.Numeric)
+	it.item.AddAction(it.value)
+	it.muteIcon = widget.NewThemeIcon("", itemIconPx)
+	it.mute = dropdownButton(it.muteIcon, it.toggleMute, "audio-mute-btn", css.Ghost, css.Icon, css.Small)
+	it.item.AddAction(it.mute)
+	it.Append(it.item, false)
 
 	it.slider = widgets.NewDebouncedSlider(r.vol.AveragePercentage(), nil, 0, 0, v.ctx.Invoke)
 	it.slider.AddClass("audio-app-slider")
-	it.slider.Knob.AddClass("audio-app-scale")
 	it.slider.OnCommit = it.commitVolume
 	it.slider.OnValue = func(float64) { it.sync() }
-	it.Append(it.slider, false)
+	body := itemBody()
+	body.Append(it.slider, false)
+	it.Append(body, false)
 	it.sync()
 	return it
 }
@@ -660,7 +631,7 @@ type devicePicker struct {
 	*widget.Box
 	view *audioView
 	kind audioKind
-	list *widget.Box
+	list *widget.ItemGroup
 	// built snapshots the rows the list shows and which is the
 	// default, so a tick that changed nothing skips the clear+rebuild
 	// and the row widgets (their hover state with them) survive.
@@ -670,21 +641,21 @@ type devicePicker struct {
 }
 
 func newDevicePicker(v *audioView, kind audioKind, title string) *devicePicker {
-	p := &devicePicker{view: v, kind: kind, Box: widget.NewBox(widget.Column, 0, 0)}
-	header := widget.NewBox(widget.Row, 0, 0)
+	th := widget.Current()
+	p := &devicePicker{view: v, kind: kind, Box: widget.NewBox(widget.Column, 2*th.Spacing, 0)}
+	header := widget.NewBox(widget.Row, th.Spacing, 0)
 	header.AddClass("picker-header")
 	back := widget.NewThemeIcon("ld-arrow-left-symbolic", int(v.px))
-	backBtn := dropdownButton(back, func() { v.showPage("main") }, "picker-back")
-	backBtn.AddClass(css.Ghost, css.Icon)
-	header.Append(backBtn, false)
-	titleLabel := widget.NewLabel(v.font, v.px*1.05, title, 0)
-	titleLabel.AddClass("picker-title")
-	header.Append(titleLabel, false) // natural width (device_picker/mod.rs:47)
+	backBtn := dropdownButton(back, func() { v.showPage("main") }, "picker-back", css.Ghost, css.Icon, css.Small)
+	header.AppendAligned(backBtn, false, widget.AlignCenter)
+	titleLabel := widget.NewLabel(v.font, v.px, title, 0)
+	titleLabel.AddClass("picker-title", css.Heading)
+	header.AppendAligned(titleLabel, false, widget.AlignCenter) // natural width (device_picker/mod.rs:47)
 	p.Append(header, false)
-	p.list = widget.NewBox(widget.Column, 0, 0)
-	p.list.AddClass("audio-device-list")
-	scroll := dropdownScroll(p.list, "picker-body")
-	p.Append(scroll, true)
+	card, list := itemCard()
+	card.AddClass("audio-device-list")
+	p.list = list
+	p.Append(scrolledCard(card, "picker-body"), true)
 	return p
 }
 
@@ -707,7 +678,7 @@ func (p *devicePicker) apply(devices []audioDevice, def *audioDevice) {
 	p.built, p.hasActive, p.active = devices, hasActive, active
 	p.list.Clear()
 	for _, d := range devices {
-		p.list.Append(p.row(d, def != nil && def.key == d.key), false)
+		p.list.Append(p.row(d, def != nil && def.key == d.key))
 	}
 }
 
@@ -722,10 +693,10 @@ func (p *devicePicker) row(d audioDevice, active bool) *widget.Item {
 	it.SetSmall(true)
 	it.SetEllipsize(true)
 	it.AddClass("audio-device-option")
-	it.SetMedia(widget.NewThemeIcon(d.icon, int(v.px*1.2)), false)
+	it.SetMedia(widget.NewThemeIcon(d.icon, itemIconPx), false)
 	if active {
 		it.AddClass("selected")
-		check := widget.NewThemeIcon("tb-check-symbolic", int(v.px))
+		check := widget.NewThemeIcon("tb-check-symbolic", itemIconPx)
 		check.AddClass("audio-device-option-check")
 		it.AddAction(check)
 	}

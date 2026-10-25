@@ -182,7 +182,7 @@ func TestAudioDropdownEmptyWithoutDevices(t *testing.T) {
 	if v.main.Visible() != "empty" || v.apps.Visible() != "empty" {
 		t.Errorf("no service: main %q apps %q", v.main.Visible(), v.apps.Visible())
 	}
-	if v.output.trigger.Visible() || !v.output.noDevice.Visible() {
+	if v.output.item.Visible() || v.output.sliderRow.Visible() || !v.output.noDevice.Visible() {
 		t.Error("no service: want the no-device row")
 	}
 }
@@ -197,24 +197,24 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	if v.main.Visible() != "devices" {
 		t.Fatalf("main = %q", v.main.Visible())
 	}
-	if v.output.name.Text() != "Speakers" || v.output.icon.Name() != "tb-device-speaker-symbolic" {
-		t.Errorf("output = %q %q", v.output.name.Text(), v.output.icon.Name())
+	if name := itemText(v.output.item, "title"); name != "Speakers" || v.output.icon.Name() != "tb-device-speaker-symbolic" {
+		t.Errorf("output = %q %q", name, v.output.icon.Name())
 	}
 	if v.output.slider.Value() != 50 || v.output.muteIcon.Name() != "ld-volume-1-symbolic" {
 		t.Errorf("output slider %v icon %q", v.output.slider.Value(), v.output.muteIcon.Name())
 	}
-	if v.input.name.Text() != "Microphone" || v.input.muteIcon.Name() != "ld-mic-symbolic" {
-		t.Errorf("input = %q %q", v.input.name.Text(), v.input.muteIcon.Name())
+	if name := itemText(v.input.item, "title"); name != "Microphone" || v.input.muteIcon.Name() != "ld-mic-symbolic" {
+		t.Errorf("input = %q %q", name, v.input.muteIcon.Name())
 	}
-	if got := len(v.pickers[audioInput].list.Children()); got != 1 {
+	if got := len(pickerRows(v.pickers[audioInput])); got != 1 {
 		t.Errorf("input picker rows = %d, want the monitor dropped", got)
 	}
-	if got := len(v.pickers[audioOutput].list.Children()); got != 2 {
+	if got := len(pickerRows(v.pickers[audioOutput])); got != 2 {
 		t.Errorf("output picker rows = %d", got)
 	}
 	selected := 0
-	for _, c := range v.pickers[audioOutput].list.Children() {
-		if c.(*widget.Item).HasClass("selected") {
+	for _, c := range pickerRows(v.pickers[audioOutput]) {
+		if widget.HasClass(c, "selected") {
 			selected++
 		}
 	}
@@ -260,7 +260,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	// Picking the headset returns to main and changes the default.
 	v.showPage("output")
 	var headsetRow *widget.Item
-	for _, c := range v.pickers[audioOutput].list.Children() {
+	for _, c := range pickerRows(v.pickers[audioOutput]) {
 		if it := c.(*widget.Item); !it.HasClass("selected") {
 			headsetRow = it
 		}
@@ -269,7 +269,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	if v.pages.Visible() != "main" {
 		t.Errorf("after pick page = %q", v.pages.Visible())
 	}
-	waitHeadless(t, "the new default", func() bool { return v.output.name.Text() == "Headset" })
+	waitHeadless(t, "the new default", func() bool { return itemText(v.output.item, "title") == "Headset" })
 	if sink, _ := srv.Defaults(); sink != "bt" {
 		t.Errorf("default sink = %q", sink)
 	}
@@ -307,108 +307,6 @@ func sameWidgets(a, b []widget.Widget) bool {
 	return true
 }
 
-// Every box the audio tree builds is constructor-spacing 0, as the
-// Rust view's boxes are: the gaps come from the stylesheet's
-// border-spacing and margins, never from the constructors.
-func TestAudioBoxesKeepRustZeroSpacing(t *testing.T) {
-	_, svc := audioFixture(t)
-	ctx := newTestContext(t, config.Defaults())
-	ctx.Pulse = svc
-	v := audioDropdown(ctx).(*audioView)
-	defer v.dropdownClosed()
-
-	boxes := []struct {
-		what string
-		w    widget.Widget
-	}{
-		{"root", v.Box},
-		{"devices page", findByClass(v.main, "audio-devices")},
-		{"volume section", v.output.Box},
-		{"device trigger", findByClass(v.output, "audio-device-trigger")},
-		{"device info", findByClass(v.output, "audio-device-info")},
-		{"device name row", v.output.nameRow},
-		{"no-device row", v.output.noDevice},
-		{"app list", v.apps.list},
-		{"app item", findByClass(v.apps.list, "audio-app-item")},
-		{"app item header", findByClass(v.apps.list, "audio-app-header")},
-		{"picker root", v.pickers[audioOutput].Box},
-		{"picker header", findByClass(v.pickers[audioOutput], "picker-header")},
-		{"picker list", v.pickers[audioOutput].list},
-	}
-	for _, b := range boxes {
-		spaced, ok := b.w.(interface{ Spacing() int })
-		if !ok {
-			t.Fatalf("%s = %T, want a box", b.what, b.w)
-		}
-		if got := spaced.Spacing(); got != 0 {
-			t.Errorf("%s constructor spacing = %d, want 0 (the gap is CSS's)", b.what, got)
-		}
-	}
-
-	// Bare of the stylesheet the trigger's children touch: with the
-	// constructor spacing re-added this gap would be non-zero.
-	sz := v.Measure(widgetConstraintsMax(420, 700))
-	v.Arrange(render.Rect{W: sz.W, H: 700})
-	trig := findByClass(v.output, "audio-device-trigger").(*widget.Box)
-	tile, info := boundsOf(trig.Children()[0]), boundsOf(trig.Children()[1])
-	if gap := info.X - (tile.X + tile.W); gap != 0 {
-		t.Errorf("bare trigger gap = %d, want 0", gap)
-	}
-}
-
-// Under the stylesheet the trigger gap is the rule's border-spacing:
-// CSS owns the gaps the Rust boxes leave unset.
-func TestAudioTriggerGapComesFromTheStylesheet(t *testing.T) {
-	_, svc := audioFixture(t)
-	ctx := styledContext(t, config.Defaults())
-	ctx.Pulse = svc
-	v := audioDropdown(ctx).(*audioView)
-	defer v.dropdownClosed()
-	ctx.Theme.Attach(v)
-	sz := v.Measure(widgetConstraintsMax(420, 700))
-	v.Arrange(render.Rect{W: sz.W, H: 700})
-	trig := findByClass(v.output, "audio-device-trigger").(*widget.Box)
-	tile, info := boundsOf(trig.Children()[0]), boundsOf(trig.Children()[1])
-	if gap := info.X - (tile.X + tile.W); gap <= 0 {
-		t.Errorf("styled trigger gap = %d, want the border-spacing", gap)
-	}
-}
-
-// The rows valign-center what the Rust view centers: the device icon
-// tile and mute button (volume_section/mod.rs:49,96), the app icon
-// tile and app mute button (app_volume_item.rs:56,82), and the
-// option's info column (device_item.rs:50).
-func TestAudioRowsValignCenterTheRustWidgets(t *testing.T) {
-	_, svc := audioFixture(t)
-	ctx := newTestContext(t, config.Defaults())
-	ctx.Pulse = svc
-	v := audioDropdown(ctx).(*audioView)
-	defer v.dropdownClosed()
-
-	// Arrange the row taller than natural: fill children span it,
-	// aligned ones keep their natural height and sit centered.
-	centered := func(what string, row *widget.Box, kids ...widget.Widget) {
-		t.Helper()
-		nat := row.Measure(widgetConstraintsMax(400, 200))
-		row.Arrange(render.Rect{W: nat.W, H: nat.H + 24})
-		for _, k := range kids {
-			if d := midY(boundsOf(k)) - midY(boundsOf(row)); d < -1 || d > 1 {
-				t.Errorf("%s sits %dpx off vertical center", what, d)
-			}
-			kn := k.Measure(widgetConstraintsMax(400, 200))
-			if h := boundsOf(k).H; h != kn.H {
-				t.Errorf("%s spans %dpx, want its natural %d (it fills the row)", what, h, kn.H)
-			}
-		}
-	}
-	trig := findByClass(v.output, "audio-device-trigger").(*widget.Box)
-	centered("the device icon tile", trig, trig.Children()[0])
-	centered("the device mute button", trig, v.output.mute)
-	header := findByClass(v.apps.list, "audio-app-header").(*widget.Box)
-	centered("the app icon tile", header, header.Children()[0])
-	centered("the app mute button", header, header.Children()[3])
-}
-
 // Both empty states sit centered in their stack page (the Rust
 // vexpand wrappers), the app one's icon carries the sm size modifier
 // and the main one does not (main_section/mod.rs has no modifier).
@@ -437,34 +335,6 @@ func TestAudioEmptyStatesCenterVertically(t *testing.T) {
 		if top <= 0 || bottom <= 0 || top-bottom > 25 || bottom-top > 25 {
 			t.Errorf("%s content sits %dpx from the top and %dpx from the bottom, want it centered", tc.what, top, bottom)
 		}
-	}
-}
-
-// The no-device row is one centered icon+label pair: no spacers, the
-// label carrying the audio-no-device-label class.
-func TestAudioNoDeviceRowCentersWithItsLabel(t *testing.T) {
-	v := audioDropdown(newTestContext(t, config.Defaults())).(*audioView)
-	row := v.output.noDevice
-	kids := row.Children()
-	if len(kids) != 2 {
-		t.Fatalf("no-device row children = %d, want the icon and the label", len(kids))
-	}
-	if !widget.HasClass(kids[0], "audio-no-device-icon") {
-		t.Error("no-device row misses the alert icon")
-	}
-	label, ok := kids[1].(*widget.Label)
-	if !ok || !label.HasClass("audio-no-device-label") {
-		t.Error("the no-device label misses audio-no-device-label")
-	}
-
-	nat := v.output.Measure(widgetConstraintsMax(420, 200))
-	v.output.Arrange(render.Rect{W: nat.W + 160, H: nat.H})
-	rb, sec := boundsOf(row), boundsOf(v.output)
-	if d := midX(rb) - midX(sec); d < -1 || d > 1 {
-		t.Errorf("the no-device row sits %dpx off horizontal center", d)
-	}
-	if rb.W >= sec.W {
-		t.Errorf("the row fills the section (%d >= %d): the spacer trick is back", rb.W, sec.W)
 	}
 }
 
@@ -524,7 +394,7 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 	v := audioDropdown(ctx).(*audioView)
 	defer v.dropdownClosed()
 	p := v.pickers[audioOutput]
-	rows := p.list.Children()
+	rows := pickerRows(p)
 
 	// The service learns of server mutations through its event loop,
 	// so each step waits until a read reflects it.
@@ -548,7 +418,7 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 		return len(st.outputs) == 2 && st.defaultOut != nil && st.defaultOut.key.Index == 1
 	})
 	v.ctx.Invoke(func() { p.apply(st.outputs, st.defaultOut) })
-	if !sameWidgets(rows, p.list.Children()) {
+	if !sameWidgets(rows, pickerRows(p)) {
 		t.Error("a no-op tick rebuilt the picker rows")
 	}
 
@@ -560,7 +430,7 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 		return len(st.outputs) == 2 && st.outputs[0].volume.AveragePercentage() < 50
 	})
 	v.ctx.Invoke(func() { p.apply(st.outputs, st.defaultOut) })
-	if !sameWidgets(rows, p.list.Children()) {
+	if !sameWidgets(rows, pickerRows(p)) {
 		t.Error("a volume-only tick rebuilt the picker rows")
 	}
 
@@ -570,7 +440,7 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 		return st.defaultOut != nil && st.defaultOut.key.Index == 3
 	})
 	v.ctx.Invoke(func() { p.apply(st.outputs, st.defaultOut) })
-	if sameWidgets(rows, p.list.Children()) {
+	if sameWidgets(rows, pickerRows(p)) {
 		t.Error("the new default did not rebuild the rows")
 	}
 	if !p.hasActive || p.active != st.defaultOut.key {
@@ -581,34 +451,8 @@ func TestAudioPickerRowsRebuildOnlyOnChange(t *testing.T) {
 	srv.PutSink(pulsetest.Sink(5, "usb", "USB DAC", 2))
 	st = await("the third sink", func(st audioState) bool { return len(st.outputs) == 3 })
 	v.ctx.Invoke(func() { p.apply(st.outputs, st.defaultOut) })
-	if got := len(p.list.Children()); got != 3 {
+	if got := len(pickerRows(p)); got != 3 {
 		t.Errorf("picker rows = %d, want 3", got)
-	}
-}
-
-// The device-name button hugs its name (volume_section/mod.rs: the
-// label does not expand, the button is halign Start): in a row wider
-// than natural the chevron sits right after the name instead of at the
-// row's far end.
-func TestAudioChevronFollowsTheDeviceName(t *testing.T) {
-	_, svc := audioFixture(t)
-	ctx := newTestContext(t, config.Defaults())
-	ctx.Pulse = svc
-	v := audioDropdown(ctx).(*audioView)
-	defer v.dropdownClosed()
-	trig := findByClass(v.output, "audio-device-trigger").(*widget.Box)
-	nat := trig.Measure(widgetConstraintsMax(2000, 200))
-	trig.Measure(widgetConstraintsMax(nat.W+300, 200))
-	trig.Arrange(render.Rect{W: nat.W + 300, H: nat.H})
-	chevron := v.output.nameRow.Children()[1]
-	name := boundsOf(v.output.name)
-	if gap := boundsOf(chevron).X - (name.X + name.W); gap < 0 || gap > 12 {
-		t.Errorf("chevron %dpx after the name, want it right after", gap)
-	}
-	info := findByClass(v.output, "audio-device-info").(*widget.Box)
-	btn := info.Children()[1]
-	if boundsOf(btn).W >= boundsOf(info).W-100 {
-		t.Errorf("the name button spans %dpx of its %dpx column, want it hugging the name", boundsOf(btn).W, boundsOf(info).W)
 	}
 }
 
@@ -625,5 +469,37 @@ func TestAudioOptionFitsANarrowPicker(t *testing.T) {
 	check := treetest.WithClass(row, "audio-device-option-check")[0].(*widget.Icon)
 	if end := check.Bounds().X + check.Bounds().W; end > w {
 		t.Errorf("the check ends at %d, past the %d row", end, w)
+	}
+}
+
+// pickerRows is a device picker's option rows in order.
+func pickerRows(p *devicePicker) []widget.Widget {
+	var out []widget.Widget
+	for _, it := range treetest.All[*widget.Item](p.list) {
+		out = append(out, it)
+	}
+	return out
+}
+
+// A volume section is lys-ui's Item: the device's name over its kind,
+// the whole row opening the kind's picker, and the mute button keeping
+// its own click, which mutes without leaving the main page.
+func TestAudioSectionIsAnItem(t *testing.T) {
+	srv, svc := audioFixture(t)
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Pulse = svc
+	v := audioDropdown(ctx).(*audioView)
+	defer v.dropdownClosed()
+	if kind := itemText(v.input.item, "description"); kind != i18n.T("dropdown-audio-input") {
+		t.Errorf("the input row's kind = %q", kind)
+	}
+	v.output.mute.OnClick()
+	if v.pages.Visible() != "main" {
+		t.Errorf("the mute button opened page %q, want main", v.pages.Visible())
+	}
+	waitHeadless(t, "the mute", func() bool { s, _ := srv.Sink(1); return s.Mute })
+	v.input.item.ClickAt(widget.Point{})
+	if v.pages.Visible() != "input" {
+		t.Errorf("activating the input row opened page %q, want input", v.pages.Visible())
 	}
 }

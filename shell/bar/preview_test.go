@@ -48,6 +48,13 @@ func TestDropdownPreviews(t *testing.T) {
 			_, ctx.Pulse = audioFixture(t)
 			return newPanelBox(audioDropdown(*ctx))
 		}},
+		{"audio-picker", "audio", func(t *testing.T, ctx *ModuleContext) widget.Widget {
+			_, ctx.Pulse = audioFixture(t)
+			v := audioDropdown(*ctx).(*audioView)
+			v.pages.SetTransition(widget.StackNone, 0)
+			v.showPage("output")
+			return newPanelBox(v)
+		}},
 		{"battery", "battery", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Battery = newFakeBattery(presentBattery())
 			return newPanelBox(batteryDropdown(*ctx))
