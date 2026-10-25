@@ -389,7 +389,8 @@ func (v *dashboardView) media() widget.Widget {
 	switchBtn.AddClass("media-switch-btn")
 	card := v.card("ld-disc-3-symbolic", i18n.T("dropdown-dashboard-now-playing"), switchBtn)
 	artPx := int(math.Round(v.px * 3.5))
-	art := newFixedBox(artPx, artPx, nil)
+	art := widget.NewBox(widget.Row, 0, 0)
+	widgets.Pin(art, artPx, artPx)
 	art.AddClass("dashboard-media-art")
 	// The per-instance class the Rust section hangs its cover rule on.
 	// The art itself is a cover-scaled image child rather than that
@@ -512,7 +513,8 @@ func (v *dashboardView) media() widget.Widget {
 		artist.SetText(current.Artist)
 		if current.ArtURL != artURL {
 			artURL = current.ArtURL
-			art.SetChild(mediaArt(artURL, "ld-music-symbolic", "dashboard-media-art-placeholder", "", int(v.px*1.4)))
+			art.Clear()
+			art.Append(widgets.Center(mediaArt(artURL, "ld-music-symbolic", "dashboard-media-art-placeholder", "", int(v.px*1.4))), true)
 		}
 		playIcon.SetThemeName(map[bool]string{true: "ld-pause-symbolic", false: "ld-play-symbolic"}[current.State == mpris.StatePlaying])
 		prev.SetEnabled(current.CanGoPrevious)

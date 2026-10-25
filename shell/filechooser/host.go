@@ -356,7 +356,7 @@ type ui struct {
 	colHeader               *widget.Box
 	sortButtons             [4]*widget.Button
 	sortLabels              [4]*widget.Label
-	columns                 [3]*widgets.Pinned
+	columns                 [3]widget.Widget
 	empty                   *widget.Label
 	quicklook               *widget.Box
 	qlIcon                  *widget.Box
@@ -710,7 +710,7 @@ func (c *Chooser) views(u *ui) widget.Widget {
 			continue
 		}
 		u.colHeader.Append(c.columnGrip(col-1), false)
-		u.columns[col-1] = widgets.NewPinned(b, c.columns[col-1], 0)
+		u.columns[col-1] = widgets.Pin(b, c.columns[col-1], 0)
 		u.colHeader.Append(u.columns[col-1], false)
 	}
 
@@ -758,7 +758,7 @@ func (c *Chooser) columnGrip(i int) widget.Widget {
 	g.onStart = func() { base = c.columns[i] }
 	g.onDrag = func(dx, _ int) {
 		c.columns[i] = min(max(base-dx, minColumnW), maxColumnW)
-		c.ui.columns[i].SetSize(c.columns[i], 0)
+		widgets.Pin(c.ui.columns[i], c.columns[i], 0)
 	}
 	g.onEnd = func() { c.ui.list.Refresh() }
 	return g
@@ -828,7 +828,7 @@ func (c *Chooser) fileRow(e Entry) widget.Widget {
 		if i < 2 {
 			cell.SetAlignment(render.AlignEnd)
 		}
-		row.Append(widgets.NewPinned(cell, c.columns[i], 0), false)
+		row.Append(widgets.Pin(cell, c.columns[i], 0), false)
 	}
 	return row
 }
@@ -871,7 +871,7 @@ func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widg
 		img.SetScale(widget.ImageCover)
 		img.AddClass("file-chooser-thumb")
 		slot.Clear()
-		slot.Append(widgets.NewPinned(img, px, px), false)
+		slot.Append(widgets.Pin(img, px, px), false)
 	}
 	key := thumbKey{path, px}
 	if done, ok := c.thumbs[key]; ok {

@@ -695,6 +695,10 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	if hs.c.columns[2] != 120 {
 		t.Errorf("kind column = %d after dragging its edge 30px left, want 120", hs.c.columns[2])
 	}
+	paint()
+	if w := hs.c.ui.columns[2].(interface{ Bounds() render.Rect }).Bounds().W; w != 120 {
+		t.Errorf("kind header = %dpx wide mid-drag, want the column's 120", w)
+	}
 	hs.do(func() { col.DragMove(widget.Point{X: -1000}) })
 	if hs.c.columns[2] != maxColumnW {
 		t.Errorf("kind column = %d, want clamped to %d", hs.c.columns[2], maxColumnW)

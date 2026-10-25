@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/service/sni"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -247,7 +248,7 @@ func (b *trayButton) PointerButton(button uint32) {
 type trayEntry struct {
 	item   sni.Item
 	button *trayButton
-	slot   *fixedBox
+	slot   *widget.Box
 	icon   *widget.Icon
 	sig    string
 }
@@ -374,7 +375,8 @@ func (m *systrayModule) setChrome(c moduleChrome) {
 func (m *systrayModule) newEntry(it sni.Item) *trayEntry {
 	e := &trayEntry{item: it}
 	px := m.iconPx()
-	e.slot = newFixedBox(px, px, nil)
+	e.slot = widget.NewBox(widget.Row, 0, 0)
+	widgets.Pin(e.slot, px, px)
 	inner := widget.NewButton(e.slot, 0, 0)
 	inner.AddClass("systray-item")
 	if m.ctx.Style != nil {
@@ -397,7 +399,8 @@ func (m *systrayModule) updateIcon(e *trayEntry) {
 	src := resolveTrayIcon(cfg, e.item)
 	if sig := src.signature(); sig != e.sig || e.icon == nil {
 		e.icon = buildTrayIcon(src, m.iconPx())
-		e.slot.SetChild(e.icon)
+		e.slot.Clear()
+		e.slot.Append(widgets.Center(e.icon), true)
 		e.sig = sig
 	}
 	var tint render.Color

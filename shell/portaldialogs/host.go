@@ -367,7 +367,7 @@ func (h *Dialogs) headerBytes(data []byte) widget.Widget {
 	}
 	img := widget.NewImage(decoded)
 	img.AddClass("portal-dialog-image")
-	return widgets.NewPinned(img, headerPx, headerPx)
+	return widgets.Pin(img, headerPx, headerPx)
 }
 
 // headerFile is the header image slot showing an image file fitted
@@ -378,7 +378,7 @@ func (h *Dialogs) headerFile(path string, px int) widget.Widget {
 	}
 	img := widget.NewFileImage(path)
 	img.AddClass("portal-dialog-image")
-	return widgets.NewPinned(img, px, px)
+	return widgets.Pin(img, px, px)
 }
 
 // requester is the row naming the app that asks: its icon and name.
