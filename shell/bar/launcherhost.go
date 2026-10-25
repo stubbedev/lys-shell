@@ -57,6 +57,9 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 	if ctx.Clipboard != nil {
 		deps.Clipboard = ctx.Clipboard
 	}
+	if ctx.Bitwarden != nil {
+		deps.Vault = func() engine.Mode { return newVaultMode(ctx.Bitwarden, application.Invoke, time.Now) }
+	}
 	stop, err := launcheripc.NewServer(launcher.New(deps)).Listen()
 	if err != nil {
 		log.Printf("launcher: the launcher socket is unavailable: %v", err)

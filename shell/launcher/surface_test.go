@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"sync"
@@ -75,9 +76,11 @@ type harness struct {
 	windows []*fakeWindow
 	timers  []*fakeTimer
 	hooks   []string
-	copied  []string
-	mods    engine.MouseModifiers
-	nextID  uint64
+	// hookInputs are the typed text each hook was told.
+	hookInputs []string
+	copied     []string
+	mods       engine.MouseModifiers
+	nextID     uint64
 	// styled records the variant faces asked for: "b", "i", "bi".
 	styled []string
 }
@@ -121,6 +124,7 @@ func newHarness(t *testing.T) *harness {
 		FireHook: func(command string, ctx engine.HookContext) {
 			if command != "" {
 				h.hooks = append(h.hooks, command+":"+ctx.Entry)
+				h.hookInputs = append(h.hookInputs, ctx.Input)
 			}
 		},
 	})
@@ -701,5 +705,53 @@ func TestSurfaceIsTheCommandPalette(t *testing.T) {
 	}
 	if idle := buildRow(1, engine.Item{Display: "beta"}, false, rowStyle{font: treetest.Font(t), px: 14}, nil, 1); idle.content.HasState(widget.StateSelected) {
 		t.Error("an unselected row carries the selected state")
+	}
+}
+
+// maskedMode asks for a secret until it is given one, then lists a row.
+type maskedMode struct{ secrets []string }
+
+func (*maskedMode) Name() string       { return VaultModeName }
+func (*maskedMode) AllowsCustom() bool { return true }
+
+func (m *maskedMode) Load(context.Context) engine.ModeState {
+	if len(m.secrets) > 0 {
+		return engine.ModeState{Items: []engine.Item{engine.NewItem("item")}, Prompt: VaultModeName}
+	}
+	return engine.ModeState{Prompt: "secret", Password: true}
+}
+
+func (m *maskedMode) Activate(ctx context.Context, _ engine.Target, _ engine.ActivateKind, input string) engine.Action {
+	m.secrets = append(m.secrets, input)
+	return engine.ActionReload{State: m.Load(ctx)}
+}
+
+// A mode asking for a secret dots the input and tells no hook what was
+// typed; once it lists rows again the input shows and is cleared.
+func TestMaskedModeKeepsTheSecretFromHooks(t *testing.T) {
+	h := newHarness(t)
+	mode := &maskedMode{}
+	h.s.d.Vault = func() engine.Mode { return mode }
+	accepted := "acc"
+	opts := launcheripc.SessionOptions{Modes: []string{VaultModeName}, OnEntryAccepted: &accepted}
+	h.open(opts, false)
+	h.until("the masked prompt", func() bool { return h.s.cur != nil && h.s.cur.views.entry.Echo() == widget.EchoPassword })
+	h.s.cur.views.entry.SetText("hunter2")
+	h.loop.pump()
+	h.key("Return")
+	h.until("the rows", func() bool { return h.s.model.len() == 1 })
+	if !slices.Equal(mode.secrets, []string{"hunter2"}) {
+		t.Fatalf("the mode got %q", mode.secrets)
+	}
+	for i, hook := range h.hooks {
+		if strings.Contains(hook, "hunter2") || strings.Contains(h.hookInputs[i], "hunter2") {
+			t.Errorf("hook %q (input %q) was told the secret", hook, h.hookInputs[i])
+		}
+	}
+	if len(h.hooks) == 0 {
+		t.Error("the accept fired no hook")
+	}
+	if e := h.s.cur.views.entry; e.Echo() != widget.EchoNormal || e.Text() != "" {
+		t.Errorf("after the secret: echo %v, text %q", e.Echo(), e.Text())
 	}
 }

@@ -10,13 +10,11 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-ui/render"
-	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
-	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
@@ -811,24 +809,13 @@ func (v *bitwardenView) copyField(it bitwarden.Item, f bwField) {
 	v.copyNow(it, f)
 }
 
-// copyNow puts the field on the clipboard: a secret marked and cleared
-// after clipboard-clear, the rest as plain text.
+// copyNow puts the field on the clipboard and says so.
 func (v *bitwardenView) copyNow(it bitwarden.Item, f bwField) {
-	value, err := f.value(it, v.now())
+	ttl, err := v.host.copyField(v.vault, it, f, v.now())
 	if err != nil {
 		v.setStatus(err)
 		return
 	}
-	content, ttl := transfer.Text(value), time.Duration(0)
-	if f.secret() {
-		content = clipboard.SecretContent(value)
-		ttl = time.Duration(v.host.config().ClipboardClear) * time.Second
-	}
-	if err := v.host.copy(content, ttl); err != nil {
-		v.setStatus(err)
-		return
-	}
-	v.vault.Touch()
 	msg := i18n.T("dropdown-bitwarden-copied", i18n.Str("field", f.name()))
 	if ttl > 0 {
 		msg = i18n.T("dropdown-bitwarden-copied-clears", i18n.Str("field", f.name()), i18n.Str("seconds", strconv.Itoa(int(ttl/time.Second))))

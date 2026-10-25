@@ -70,9 +70,7 @@ func (s *Surface) buildViews(a *active) *views {
 	if ui.filter != nil {
 		v.entry.SetText(*ui.filter)
 	}
-	if ui.password {
-		v.entry.SetEcho(widget.EchoPassword)
-	}
+	v.setMasked(ui.password)
 	v.entry.OnChanged = func(text string) {
 		if s.cur == a {
 			s.send(cmdSetQuery{query: text})
@@ -144,6 +142,15 @@ func (s *Surface) makeRow(a *active, pos int, st rowStyle) widget.Widget {
 }
 
 // setPrompt shows the prompt, hidden when empty.
+// setMasked shows the input as dots while it is a secret.
+func (v *views) setMasked(on bool) {
+	echo := widget.EchoNormal
+	if on {
+		echo = widget.EchoPassword
+	}
+	v.entry.SetEcho(echo)
+}
+
 func (v *views) setPrompt(text string) {
 	v.prompt.SetText(text)
 	v.prompt.SetVisible(text != "")

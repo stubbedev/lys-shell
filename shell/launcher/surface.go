@@ -54,6 +54,8 @@ type Deps struct {
 	MonitorWidth func() int
 	// Clipboard is the history the clipboard mode reads (nil: none).
 	Clipboard modes.ClipboardHistory
+	// Vault builds the vault mode for a session (nil: no vault mode).
+	Vault func() engine.Mode
 	// Copy puts calc's result on the clipboard.
 	Copy func(text string)
 	// HeldMods are the modifiers held now, for pointer bindings.
@@ -78,6 +80,9 @@ type active struct {
 	history    *engine.History
 	modePrompt string
 	modeName   string
+	// masked is the mode asking for a secret: the input shows as dots
+	// and hooks are not told it.
+	masked bool
 	// decided: the user accepted or cancelled, so tearing the list down
 	// fires no -on-selection-changed.
 	decided bool
@@ -140,7 +145,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 		s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
 	}
 	cfg := s.d.Config()
-	setup := buildSession(sess.Options, cfg, sess.Rows, setupDeps{clipboard: s.d.Clipboard, openHistory: s.d.OpenHistory})
+	setup := buildSession(sess.Options, cfg, sess.Rows, setupDeps{clipboard: s.d.Clipboard, vault: s.d.Vault, openHistory: s.d.OpenHistory})
 	dialog := setup.ui.errorMessage != nil
 	if len(setup.modes) == 0 && !dialog {
 		log.Printf("launcher: no usable modes in session request")
@@ -259,6 +264,8 @@ func (s *Surface) onState(st engineState) {
 		a.pending = pendingSelection{}
 	}
 	a.modePrompt = st.prompt
+	a.masked = st.password
+	a.views.setMasked(a.ui.password || st.password)
 	// A state arrives on every reload, so the hook fires on a change of
 	// mode, not on being told the mode again.
 	name := ""
@@ -266,7 +273,7 @@ func (s *Surface) onState(st engineState) {
 		name = st.modeNames[st.activeMode]
 	}
 	if name != "" && name != a.modeName {
-		s.d.FireHook(a.ui.hooks.ModeChanged, engine.HookContext{Input: a.views.entry.Text(), Mode: name})
+		s.d.FireHook(a.ui.hooks.ModeChanged, engine.HookContext{Input: a.hookInput(), Mode: name})
 	}
 	a.modeName = name
 	shown := st.prompt
@@ -350,7 +357,16 @@ func (s *Surface) fireSelectionHook() {
 		return
 	}
 	text := s.model.textAt(s.sel)
-	s.d.FireHook(a.ui.hooks.SelectionChanged, engine.HookContext{Input: a.views.entry.Text(), Entry: text, Mode: a.modeName})
+	s.d.FireHook(a.ui.hooks.SelectionChanged, engine.HookContext{Input: a.hookInput(), Entry: text, Mode: a.modeName})
+}
+
+// hookInput is the typed text a hook is told: nothing while the mode
+// asks for a secret.
+func (a *active) hookInput() string {
+	if a.masked {
+		return ""
+	}
+	return a.views.entry.Text()
 }
 
 // fireDecisionHook is fire_decision_hook: -on-entry-accepted and
@@ -361,7 +377,7 @@ func (s *Surface) fireDecisionHook(action keyAction) {
 		return
 	}
 	selected := s.model.textAt(s.sel)
-	typed := a.views.entry.Text()
+	typed := a.hookInput()
 	var command, entry string
 	decided := true
 	switch {

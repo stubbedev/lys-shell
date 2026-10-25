@@ -68,6 +68,12 @@ func (BitwardenServer) configSchema(*schemaGen) Schema {
 // master password, a key or an item. Copied secrets are marked so
 // clipboard managers, the shell's own history included, do not keep
 // them.
+//
+// The launcher's `vault` mode (`lys-shell launcher -show vault`) searches
+// the open vault from anywhere: Enter copies an item's password (or its
+// first field), Shift+Enter lists its fields to pick one. A locked vault
+// asks for the master password in the launcher's masked input, and a
+// protected item asks again before a secret is copied.
 type BitwardenConfig struct {
 	// Server the login form logs in to. A logged-in account keeps the
 	// server it logged in to.

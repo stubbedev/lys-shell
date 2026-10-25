@@ -25,19 +25,20 @@ import (
 // fakeVault records what the dropdown asks of the vault and answers
 // with the errors the test sets.
 type fakeVault struct {
-	mu       sync.Mutex
-	status   bitwarden.Status
-	items    []bitwarden.Item
-	logins   []bitwarden.LoginRequest
-	apiKeys  []bitwarden.APIKeyRequest
-	unlocks  []string
-	verifies []string
-	emails   int
-	syncs    int
-	touches  int
-	idle     []time.Duration
-	loginErr error
-	verifyOK string
+	mu        sync.Mutex
+	status    bitwarden.Status
+	items     []bitwarden.Item
+	logins    []bitwarden.LoginRequest
+	apiKeys   []bitwarden.APIKeyRequest
+	unlocks   []string
+	verifies  []string
+	emails    int
+	syncs     int
+	touches   int
+	idle      []time.Duration
+	loginErr  error
+	unlockErr error
+	verifyOK  string
 }
 
 func (f *fakeVault) Status() bitwarden.Status {
@@ -84,6 +85,10 @@ func (f *fakeVault) Unlock(_ context.Context, password string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.unlocks = append(f.unlocks, password)
+	if f.unlockErr != nil {
+		return f.unlockErr
+	}
+	f.status = bitwarden.Status{State: bitwarden.StateUnlocked, Email: f.status.Email}
 	return nil
 }
 

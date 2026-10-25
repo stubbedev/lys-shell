@@ -70,9 +70,14 @@ type sessionSetup struct {
 	history     *engine.History
 }
 
+// VaultModeName is the vault mode's name, which Deps.Vault builds.
+const VaultModeName = "vault"
+
 // setupDeps are the shell services a session's modes draw on.
 type setupDeps struct {
 	clipboard modes.ClipboardHistory
+	// vault builds the vault mode (nil: none, so the mode is unknown).
+	vault func() engine.Mode
 	// openHistory opens the history database (a test seam).
 	openHistory func() (*engine.History, error)
 }
@@ -219,6 +224,11 @@ func buildMode(name string, opts launcheripc.SessionOptions, cfg *config.Config,
 		return modes.NewClipboard(deps.clipboard)
 	case "emoji":
 		return modes.NewEmoji()
+	case VaultModeName:
+		if deps.vault == nil {
+			return nil
+		}
+		return deps.vault()
 	case "combi":
 		var children []engine.Mode
 		for _, child := range l.Combi.Modes {

@@ -50,3 +50,6 @@ dropdown-bitwarden-error-login-required = La session a expiré. Reconnectez-vous
 dropdown-bitwarden-error-unavailable = Le serveur est indisponible. Réessayez plus tard.
 dropdown-bitwarden-error-server = Le serveur a refusé : { $message }
 dropdown-bitwarden-error-network = Impossible de joindre le serveur.
+launcher-bitwarden-locked = Bitwarden est verrouillé. Saisissez votre mot de passe principal et appuyez sur Entrée.
+launcher-bitwarden-logged-out = Connectez-vous d'abord à Bitwarden depuis son menu dans la barre.
+launcher-bitwarden-hint = Entrée copie le mot de passe ou le premier champ d'un élément ; Maj+Entrée liste ses champs.

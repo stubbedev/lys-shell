@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
+	"github.com/stubbedev/lys-shell/service/clipboard"
 )
 
 // bitwardenDevice is the name the account's device list shows.
@@ -90,6 +91,27 @@ func newBitwardenHost(life context.Context, application *app.Application, curren
 		return svc, nil
 	})
 	return h
+}
+
+// copyField puts item it's field f on the clipboard, as its value at now: a
+// secret marked and cleared after clipboard-clear, the rest as plain
+// text. The copy counts as use of v. It returns the clear delay (0 for
+// none). Loop goroutine only.
+func (h *bitwardenHost) copyField(v vault, it bitwarden.Item, f bwField, now time.Time) (time.Duration, error) {
+	value, err := f.value(it, now)
+	if err != nil {
+		return 0, err
+	}
+	content, ttl := transfer.Text(value), time.Duration(0)
+	if f.secret() {
+		content = clipboard.SecretContent(value)
+		ttl = time.Duration(h.config().ClipboardClear) * time.Second
+	}
+	if err := h.copy(content, ttl); err != nil {
+		return 0, err
+	}
+	v.Touch()
+	return ttl, nil
 }
 
 // lockIfOpen locks the vault with the session; a vault never opened

@@ -50,3 +50,6 @@ dropdown-bitwarden-error-login-required = The session ended. Log in again.
 dropdown-bitwarden-error-unavailable = The server is unavailable. Try again later.
 dropdown-bitwarden-error-server = The server refused: { $message }
 dropdown-bitwarden-error-network = Could not reach the server.
+launcher-bitwarden-locked = Bitwarden is locked. Type your master password and press Enter.
+launcher-bitwarden-logged-out = Log in to Bitwarden from its dropdown in the bar first.
+launcher-bitwarden-hint = Enter copies an item's password or first field; Shift+Enter lists its fields.

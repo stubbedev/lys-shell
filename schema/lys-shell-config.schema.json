@@ -957,7 +957,7 @@
       "type": "object"
     },
     "BitwardenConfig": {
-      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe shell keeps only the session (the server, the email and the\nrefresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the\nmaster password, a key or an item. Copied secrets are marked so\nclipboard managers, the shell's own history included, do not keep\nthem.",
+      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe shell keeps only the session (the server, the email and the\nrefresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the\nmaster password, a key or an item. Copied secrets are marked so\nclipboard managers, the shell's own history included, do not keep\nthem.\n\nThe launcher's `vault` mode (`lys-shell launcher -show vault`) searches\nthe open vault from anywhere: Enter copies an item's password (or its\nfirst field), Shift+Enter lists its fields to pick one. A locked vault\nasks for the master password in the launcher's masked input, and a\nprotected item asks again before a secret is copied.",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",

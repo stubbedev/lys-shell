@@ -115,6 +115,9 @@ type ModeState struct {
 	// KeepFilter keeps the typed filter across a reload (script
 	// keep-filter).
 	KeepFilter bool
+	// Password masks the input: what is typed is a secret (a master
+	// password), so it shows as dots and no hook is told it.
+	Password bool
 }
 
 // Mode is one launch mode (drun, run, window, ssh, script, dmenu, ...).

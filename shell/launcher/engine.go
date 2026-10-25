@@ -53,6 +53,8 @@ type engineState struct {
 	keepFilter    bool
 	keepSelection bool
 	newSelection  *uint32
+	// password masks the input (ModeState.Password).
+	password bool
 }
 
 // engineMatches is a fresh match result.
@@ -129,7 +131,7 @@ func (a *actor) run(ctx context.Context, sess *engine.Session, initial int, sink
 		ev := engineState{
 			prompt: st.Prompt, message: st.Message, activeMode: sess.ActiveIndex(), modeNames: sess.ModeNames(),
 			multi: st.MultiSelect, afterActivate: afterActivate, keepFilter: st.KeepFilter,
-			keepSelection: st.KeepSelection, newSelection: st.NewSelection,
+			keepSelection: st.KeepSelection, newSelection: st.NewSelection, password: st.Password,
 		}
 		deliver(func() { sink.onState(ev) })
 	}
