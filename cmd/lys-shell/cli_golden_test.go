@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // The goldens under testdata/clap are the CLI's contract, first
@@ -16,7 +17,9 @@ import (
 // command's -h and --help, a battery of parse errors with their exit
 // codes, colored (tty) renderings, and the five completion scripts.
 // The binary must reproduce them byte for byte; a deliberate CLI
-// change edits them in the same commit.
+// change edits them in the same commit. {{ version }} in an error
+// golden stands for internal/version's release version, which a
+// release bumps.
 
 func runCaptured(t *testing.T, color bool, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
@@ -72,7 +75,7 @@ func readGolden(t *testing.T, file string) golden {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(raw)
+	text := strings.ReplaceAll(string(raw), "{{ version }}", version.Version)
 	head, rest, _ := strings.Cut(text, "\n")
 	g := golden{args: strings.Fields(strings.TrimPrefix(head, "args:"))}
 	codeLine, rest, _ := strings.Cut(rest, "\n")
