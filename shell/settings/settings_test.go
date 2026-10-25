@@ -1952,3 +1952,28 @@ func TestRowBadgeIsALysUIBadgeWithOneTint(t *testing.T) {
 		}
 	}
 }
+
+// The color control shows its color: under the settings stylesheet the
+// swatch has a size and paints the configured hex (it once collapsed to
+// nothing, its rules written for GTK's colorbutton tree).
+func TestColorEditorShowsItsColor(t *testing.T) {
+	k := testKit(t, "lock:\n  background-color: \"#336699\"\n")
+	c := newColorEditor(k, pathSlot(k.store, "lock.background-color"))
+	slot := widget.NewBox(widget.Row, 0, 0)
+	slot.AddClass("setting-control")
+	slot.Append(c, false)
+	cfg := config.Defaults()
+	slot.AttachStylesheet(widget.NewStylesheet(styling.BundleCSS(cfg, cfg.Styling.ActivePalette(), styling.Default()), 200))
+	sz := slot.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 100}})
+	slot.Arrange(render.Rect{W: sz.W, H: sz.H})
+	b := c.swatch.Bounds()
+	if b.W < 20 || b.H < 12 {
+		t.Fatalf("the swatch is %v, want a visible size", b)
+	}
+	data := make([]byte, render.Stride(sz.W)*sz.H)
+	slot.Paint(render.NewScaled(data, render.Stride(sz.W), sz.W, sz.H, 1, 1))
+	i := (b.Y+b.H/2)*render.Stride(sz.W) + (b.X+b.W/2)*4
+	if got := render.RGB(data[i+2], data[i+1], data[i]); got != render.RGB(0x33, 0x66, 0x99) {
+		t.Errorf("the swatch paints %#08x, want #336699", uint32(got))
+	}
+}
