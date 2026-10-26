@@ -36,8 +36,16 @@
           nerd-fonts.jetbrains-mono # the common Nerd Font a user config names
         ];
 
-        # The binaries dlopen these through purego; the EIS tests add libei.
-        LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.lys-shell.libs ++ [ pkgs.libei ]);
+        # The binaries dlopen these through purego; the EIS tests add libei,
+        # and the ScreenCast tests libpipewire, whose streams are the
+        # reference consumers the producer is checked against.
+        LD_LIBRARY_PATH = lib.makeLibraryPath (
+          self'.packages.lys-shell.libs
+          ++ [
+            pkgs.libei
+            pkgs.pipewire
+          ]
+        );
 
         # The real xdg-desktop-portal frontend the portal contract tests
         # route through to the backend.

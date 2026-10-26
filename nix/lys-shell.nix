@@ -27,15 +27,14 @@ let
   gstPluginPath = lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" gstPlugins;
 
   # The libraries the binaries dlopen through purego: libgstreamer and
-  # libglib (recorder), libpam (lock screen), libpipewire (the ScreenCast
-  # portal) and libvulkan (lys-ui's GPU renderer, which falls back to the
-  # CPU without it, and the portal's zero-copy dmabufs, which fall back
-  # to shared memory).
+  # libglib (recorder), libpam (lock screen) and libvulkan (lys-ui's GPU
+  # renderer, which falls back to the CPU without it, and the portal's
+  # zero-copy dmabufs, which fall back to shared memory). The portal
+  # speaks PipeWire's protocol itself and loads no libpipewire.
   libs = [
     gst_all_1.gstreamer
     glib
     pam
-    pipewire
     vulkan-loader
   ];
 
