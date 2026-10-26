@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -169,6 +170,41 @@ func VisibleActions(n *notifications.Notification) []notifications.Action {
 		}
 	}
 	return out
+}
+
+// Group is notifications sharing a key, newest first.
+type Group struct {
+	Key    string
+	Notifs []*notifications.Notification
+}
+
+// AppKey groups notifications by app name.
+func AppKey(n *notifications.Notification) string { return n.AppName }
+
+// GroupBy is group_by_app over any key: one group per key, each newest
+// first, the groups ordered by their newest notification; ties keep the
+// order of notifs.
+func GroupBy(notifs []*notifications.Notification, key func(*notifications.Notification) string) []Group {
+	index := map[string]int{}
+	var groups []Group
+	for _, n := range notifs {
+		k := key(n)
+		i, ok := index[k]
+		if !ok {
+			i = len(groups)
+			index[k] = i
+			groups = append(groups, Group{Key: k})
+		}
+		groups[i].Notifs = append(groups[i].Notifs, n)
+	}
+	newestFirst := func(a, b *notifications.Notification) int { return b.Added.Compare(a.Added) }
+	for i := range groups {
+		slices.SortStableFunc(groups[i].Notifs, newestFirst)
+	}
+	slices.SortStableFunc(groups, func(a, b Group) int {
+		return newestFirst(a.Notifs[0], b.Notifs[0])
+	})
+	return groups
 }
 
 // ActionsPerRow is how many action buttons share a row (MAX_PER_ROW).

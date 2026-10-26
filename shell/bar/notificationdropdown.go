@@ -27,36 +27,6 @@ const (
 	notifTimeTick        = 30 * time.Second
 )
 
-// notifGroupData is one app's notifications, newest first.
-type notifGroupData struct {
-	app    string
-	notifs []*notifications.Notification
-}
-
-// groupByApp is group_by_app: one group per app name, each newest
-// first, the groups ordered by their newest notification.
-func groupByApp(notifs []*notifications.Notification) []notifGroupData {
-	index := map[string]int{}
-	var groups []notifGroupData
-	for _, n := range notifs {
-		i, ok := index[n.AppName]
-		if !ok {
-			i = len(groups)
-			index[n.AppName] = i
-			groups = append(groups, notifGroupData{app: n.AppName})
-		}
-		groups[i].notifs = append(groups[i].notifs, n)
-	}
-	newestFirst := func(a, b *notifications.Notification) int { return b.Added.Compare(a.Added) }
-	for i := range groups {
-		slices.SortStableFunc(groups[i].notifs, newestFirst)
-	}
-	slices.SortStableFunc(groups, func(a, b notifGroupData) int {
-		return newestFirst(a.notifs[0], b.notifs[0])
-	})
-	return groups
-}
-
 // notifTimeLabel is time_to_string.
 func notifTimeLabel(age notifyui.Age) string { return notifyui.TimeLabel(age, "notification-dropdown") }
 
@@ -179,10 +149,10 @@ func (v *notificationView) rebuild() {
 		byApp[g.app] = g
 	}
 	next := make([]*notifGroup, 0, len(v.groups))
-	for _, data := range groupByApp(notifs) {
-		g, ok := byApp[data.app]
+	for _, data := range notifyui.GroupBy(notifs, notifyui.AppKey) {
+		g, ok := byApp[data.Key]
 		if ok {
-			g.update(data.notifs)
+			g.update(data.Notifs)
 		} else {
 			g = newNotifGroup(v, data)
 		}
@@ -262,11 +232,11 @@ type notifGroup struct {
 	moreLabel *widget.Label
 }
 
-func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
-	g := &notifGroup{view: v, app: data.app, expanded: true, Box: widget.NewBox(widget.Column, 0, 0)}
+func newNotifGroup(v *notificationView, data notifyui.Group) *notifGroup {
+	g := &notifGroup{view: v, app: data.Key, expanded: true, Box: widget.NewBox(widget.Column, 0, 0)}
 	g.AddClass(css.Card, "notification-dropdown-group")
 
-	appName := data.app
+	appName := data.Key
 	if appName == "" {
 		appName = i18n.T("notification-dropdown-unknown-app")
 	}
@@ -299,7 +269,7 @@ func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
 	g.itemsBox.Append(g.moreRow, false)
 	g.Append(g.itemsBox, false)
 
-	g.update(data.notifs)
+	g.update(data.Notifs)
 	return g
 }
 

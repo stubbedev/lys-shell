@@ -182,3 +182,24 @@ func TestNewIconFallsBackAlongTheName(t *testing.T) {
 		t.Error("an absent icon drew something")
 	}
 }
+
+func TestGroupBy(t *testing.T) {
+	base := time.Unix(1000, 0)
+	n := func(id uint32, app string, at int) *notifications.Notification {
+		return &notifications.Notification{ID: id, AppName: app, Added: base.Add(time.Duration(at) * time.Second)}
+	}
+	groups := GroupBy([]*notifications.Notification{n(1, "mail", 1), n(2, "chat", 5), n(3, "mail", 9), n(4, "", 3)}, AppKey)
+	var apps []string
+	for _, g := range groups {
+		apps = append(apps, g.Key)
+	}
+	if len(apps) != 3 || apps[0] != "mail" || apps[1] != "chat" || apps[2] != "" {
+		t.Fatalf("group order = %q, want by newest notification", apps)
+	}
+	if ids := groups[0].Notifs; ids[0].ID != 3 || ids[1].ID != 1 {
+		t.Errorf("mail group = %v, want newest first", ids)
+	}
+	if len(GroupBy(nil, AppKey)) != 0 {
+		t.Error("no notifications made groups")
+	}
+}

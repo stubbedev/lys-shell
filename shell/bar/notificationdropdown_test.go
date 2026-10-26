@@ -25,27 +25,6 @@ import (
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
-func TestGroupByApp(t *testing.T) {
-	base := time.Unix(1000, 0)
-	n := func(id uint32, app string, at int) *notifications.Notification {
-		return &notifications.Notification{ID: id, AppName: app, Added: base.Add(time.Duration(at) * time.Second)}
-	}
-	groups := groupByApp([]*notifications.Notification{n(1, "mail", 1), n(2, "chat", 5), n(3, "mail", 9), n(4, "", 3)})
-	var apps []string
-	for _, g := range groups {
-		apps = append(apps, g.app)
-	}
-	if len(apps) != 3 || apps[0] != "mail" || apps[1] != "chat" || apps[2] != "" {
-		t.Fatalf("group order = %q, want by newest notification", apps)
-	}
-	if ids := groups[0].notifs; ids[0].ID != 3 || ids[1].ID != 1 {
-		t.Errorf("mail group = %v, want newest first", ids)
-	}
-	if len(groupByApp(nil)) != 0 {
-		t.Error("no notifications made groups")
-	}
-}
-
 func TestNotifTimeLabel(t *testing.T) {
 	if got := notifTimeLabel(notifyui.Age{}); got != i18n.T("notification-dropdown-time-just-now") {
 		t.Errorf("just now = %q", got)
