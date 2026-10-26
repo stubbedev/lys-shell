@@ -1,6 +1,7 @@
 package popups
 
 import (
+	"bytes"
 	"fmt"
 	"slices"
 	"strconv"
@@ -197,10 +198,17 @@ func (s *surface) fill(c *card) [4]byte {
 
 // pixel is the surface's color at (x, y) as it paints now: RGBA.
 func (s *surface) pixel(x, y int) [4]byte {
-	data := make([]byte, render.Stride(surfaceW)*surfaceH)
-	s.host.Paint(render.NewScaled(data, render.Stride(surfaceW), surfaceW, surfaceH, 1, 1))
+	data := s.paint()
 	i := y*render.Stride(surfaceW) + x*4
 	return [4]byte{data[i+2], data[i+1], data[i], data[i+3]}
+}
+
+// paint is one full paint of the surface, premultiplied BGRA rows of
+// render.Stride(surfaceW) bytes.
+func (s *surface) paint() []byte {
+	data := make([]byte, render.Stride(surfaceW)*surfaceH)
+	s.host.Paint(render.NewScaled(data, render.Stride(surfaceW), surfaceW, surfaceH, 1, 1))
+	return data
 }
 
 // burst posts six notifications from two apps, alternating, and
@@ -294,6 +302,51 @@ func TestCollapsedStackPeeks(t *testing.T) {
 		f, pk = front.root.Bounds(), peek.root.Bounds()
 		if pk.W != f.W || (pk.Y > f.Y) != tc.down || pk.Y == f.Y {
 			t.Errorf("%s expanded: front %+v peek %+v, want a list of full-width cards from the front's end", tc.position, f, pk)
+		}
+	}
+}
+
+// A card mid-swipe darkens nothing outside itself: the frosted cards
+// below it paint exactly as they do with the swiped card at rest, its
+// fade and its backdrop blur staying on its own box.
+func TestASwipedCardLeavesTheOthersAlone(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	for range 3 {
+		s.notify("chat", "Chat")
+	}
+	s.sync()
+	ids := s.p.stacks[0].liveIDs()
+	swiped := s.card(ids[0])
+	s.hover(swiped.summary)
+	from := point(swiped.body)
+	s.r.Move(from)
+	s.r.Press(widget.BTNLeft, from, 0)
+	at := from
+	for i := 1; i <= 6; i++ {
+		time.Sleep(20 * time.Millisecond)
+		at = widget.Point{X: from.X + 7*i, Y: from.Y}
+		s.r.Move(at)
+		s.layout()
+	}
+	if swiped.swipe.Offset() == 0 {
+		t.Fatal("the card did not follow the drag")
+	}
+	dragged := s.paint()
+	s.r.Release(widget.BTNLeft, at)
+	s.layout()
+	if swiped.swipe.Offset() != 0 {
+		t.Fatalf("a 42px swipe left the card at %v, want it back at rest", swiped.swipe.Offset())
+	}
+	rest := s.paint()
+	stride := render.Stride(surfaceW)
+	for _, id := range ids[1:] {
+		b := s.card(id).root.Bounds()
+		for y := b.Y; y < b.Y+b.H; y++ {
+			row := y*stride + b.X*4
+			if !bytes.Equal(dragged[row:row+b.W*4], rest[row:row+b.W*4]) {
+				t.Errorf("card %d's row %d paints differently while the card above it is swiped", id, y-b.Y)
+				break
+			}
 		}
 	}
 }
