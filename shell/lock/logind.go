@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/service/logind"
 )
 
 // logind integration (shell/lock/logind.rs): the session's Lock and
@@ -14,12 +17,8 @@ import (
 // state back, and LockedHint - kept by logind across our restarts - says
 // whether a dead predecessor held the lock.
 
-const (
-	logindService   = "org.freedesktop.login1"
-	logindManager   = dbus.ObjectPath("/org/freedesktop/login1")
-	logindManagerIf = "org.freedesktop.login1.Manager"
-	logindSessionIf = "org.freedesktop.login1.Session"
-)
+// logindTimeout bounds resolving the session.
+const logindTimeout = 5 * time.Second
 
 // Logind is the caller's logind session on the system bus.
 type Logind struct {
@@ -27,14 +26,12 @@ type Logind struct {
 	path dbus.ObjectPath
 }
 
-// NewLogind resolves the caller's session object. logind emits
-// Lock/Unlock from the session's real path, not from the
-// /session/auto alias, so the alias is resolved once through
-// Manager.GetSession("auto") and every call and signal match uses the
-// real path.
+// NewLogind resolves the user's session object once (logind.Session);
+// every call and signal match uses its real path.
 func NewLogind(conn *dbus.Conn) (*Logind, error) {
-	var path dbus.ObjectPath
-	err := conn.Object(logindService, logindManager).Call(logindManagerIf+".GetSession", 0, "auto").Store(&path)
+	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
+	defer cancel()
+	path, err := logind.Session(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("logind: resolve session: %w", err)
 	}
@@ -46,12 +43,12 @@ func (l *Logind) Path() dbus.ObjectPath { return l.path }
 
 // SetLockedHint tells logind whether the session is locked.
 func (l *Logind) SetLockedHint(locked bool) error {
-	return l.conn.Object(logindService, l.path).Call(logindSessionIf+".SetLockedHint", 0, locked).Err
+	return l.conn.Object(logind.Service, l.path).Call(logind.SessionIf+".SetLockedHint", 0, locked).Err
 }
 
 // LockedHint reads the session's LockedHint property.
 func (l *Logind) LockedHint() (bool, error) {
-	v, err := l.conn.Object(logindService, l.path).GetProperty(logindSessionIf + ".LockedHint")
+	v, err := l.conn.Object(logind.Service, l.path).GetProperty(logind.SessionIf + ".LockedHint")
 	if err != nil {
 		return false, err
 	}
@@ -67,7 +64,7 @@ func (l *Logind) LockedHint() (bool, error) {
 func (l *Logind) Listen(ctx context.Context, onLock, onUnlock func()) error {
 	opts := []dbus.MatchOption{
 		dbus.WithMatchObjectPath(l.path),
-		dbus.WithMatchInterface(logindSessionIf),
+		dbus.WithMatchInterface(logind.SessionIf),
 	}
 	if err := l.conn.AddMatchSignal(opts...); err != nil {
 		return fmt.Errorf("logind: subscribe: %w", err)
@@ -88,9 +85,9 @@ func (l *Logind) Listen(ctx context.Context, onLock, onUnlock func()) error {
 				continue
 			}
 			switch sig.Name {
-			case logindSessionIf + ".Lock":
+			case logind.SessionIf + ".Lock":
 				onLock()
-			case logindSessionIf + ".Unlock":
+			case logind.SessionIf + ".Unlock":
 				onUnlock()
 			}
 		}

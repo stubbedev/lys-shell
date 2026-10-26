@@ -1127,6 +1127,12 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(logout)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
 (vpn)
 _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
@@ -2115,6 +2121,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(logout)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (vpn)
 _arguments "${_arguments_options[@]}" : \
 ":: :_lys-shell__help__vpn_commands" \
@@ -2343,6 +2353,7 @@ _lys-shell_commands() {
 'idle:Idle inhibit control commands' \
 'launcher:Application launcher / dmenu with rofi-compatible flags' \
 'lock:Lock the session via lys-shell'\''s lock screen' \
+'logout:Log out of the session through logind' \
 'vpn:VPN commands' \
 'recorder:Screen recorder control commands' \
 'screenshot:Screenshot capture commands' \
@@ -2569,6 +2580,7 @@ _lys-shell__help_commands() {
 'idle:Idle inhibit control commands' \
 'launcher:Application launcher / dmenu with rofi-compatible flags' \
 'lock:Lock the session via lys-shell'\''s lock screen' \
+'logout:Log out of the session through logind' \
 'vpn:VPN commands' \
 'recorder:Screen recorder control commands' \
 'screenshot:Screenshot capture commands' \
@@ -2792,6 +2804,11 @@ _lys-shell__help__launcher_commands() {
 _lys-shell__help__lock_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help lock commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__logout_commands] )) ||
+_lys-shell__help__logout_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help logout commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__media_commands] )) ||
 _lys-shell__help__media_commands() {
@@ -3457,6 +3474,11 @@ _lys-shell__launcher_commands() {
 _lys-shell__lock_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell lock commands' commands "$@"
+}
+(( $+functions[_lys-shell__logout_commands] )) ||
+_lys-shell__logout_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell logout commands' commands "$@"
 }
 (( $+functions[_lys-shell__media_commands] )) ||
 _lys-shell__media_commands() {

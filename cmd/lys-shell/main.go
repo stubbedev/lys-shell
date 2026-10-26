@@ -34,6 +34,7 @@ func rootCommand() *cli.Command {
 			idleCommand(),
 			launcherCommand(),
 			lockCommand(),
+			logoutCommand(),
 			vpnCommand(),
 			recorderCommand(),
 			screenshotCommand(),

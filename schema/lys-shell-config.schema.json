@@ -2175,7 +2175,7 @@
         },
         "dropdown-logout-command": {
           "$ref": "#/$defs/string",
-          "default": "loginctl terminate-session $XDG_SESSION_ID",
+          "default": "lys-shell logout",
           "description": "Shell command for the logout button in the dashboard dropdown."
         },
         "dropdown-poweroff-command": {
@@ -5040,7 +5040,7 @@
             "border-color": "yellow",
             "border-show": false,
             "dropdown-lock-command": "loginctl lock-session",
-            "dropdown-logout-command": "loginctl terminate-session $XDG_SESSION_ID",
+            "dropdown-logout-command": "lys-shell logout",
             "dropdown-poweroff-command": "systemctl poweroff",
             "dropdown-reboot-command": "systemctl reboot",
             "icon-bg-color": "yellow",
@@ -5499,7 +5499,7 @@
             "icon-name": "ld-power-symbolic",
             "left-click": ":menu",
             "lock-command": "loginctl lock-session",
-            "logout-command": "loginctl terminate-session $XDG_SESSION_ID",
+            "logout-command": "lys-shell logout",
             "middle-click": "",
             "reboot-command": "systemctl reboot",
             "right-click": "",
@@ -6832,7 +6832,7 @@
         },
         "logout-command": {
           "$ref": "#/$defs/string",
-          "default": "loginctl terminate-session $XDG_SESSION_ID",
+          "default": "lys-shell logout",
           "description": "Command run by the power menu's Log out button."
         },
         "middle-click": {
@@ -9879,7 +9879,7 @@
           "border-color": "yellow",
           "border-show": false,
           "dropdown-lock-command": "loginctl lock-session",
-          "dropdown-logout-command": "loginctl terminate-session $XDG_SESSION_ID",
+          "dropdown-logout-command": "lys-shell logout",
           "dropdown-poweroff-command": "systemctl poweroff",
           "dropdown-reboot-command": "systemctl reboot",
           "icon-bg-color": "yellow",
@@ -10278,7 +10278,7 @@
           "icon-name": "ld-power-symbolic",
           "left-click": ":menu",
           "lock-command": "loginctl lock-session",
-          "logout-command": "loginctl terminate-session $XDG_SESSION_ID",
+          "logout-command": "lys-shell logout",
           "middle-click": "",
           "reboot-command": "systemctl reboot",
           "right-click": "",

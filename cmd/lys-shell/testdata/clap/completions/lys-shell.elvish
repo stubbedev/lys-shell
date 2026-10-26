@@ -34,6 +34,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand idle 'Idle inhibit control commands'
             cand launcher 'Application launcher / dmenu with rofi-compatible flags'
             cand lock 'Lock the session via lys-shell''s lock screen'
+            cand logout 'Log out of the session through logind'
             cand vpn 'VPN commands'
             cand recorder 'Screen recorder control commands'
             cand screenshot 'Screenshot capture commands'
@@ -683,6 +684,10 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'lys-shell;logout'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'lys-shell;vpn'= {
             cand -h 'Print help'
             cand --help 'Print help'
@@ -1000,6 +1005,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand idle 'Idle inhibit control commands'
             cand launcher 'Application launcher / dmenu with rofi-compatible flags'
             cand lock 'Lock the session via lys-shell''s lock screen'
+            cand logout 'Log out of the session through logind'
             cand vpn 'VPN commands'
             cand recorder 'Screen recorder control commands'
             cand screenshot 'Screenshot capture commands'
@@ -1225,6 +1231,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;launcher'= {
         }
         &'lys-shell;help;lock'= {
+        }
+        &'lys-shell;help;logout'= {
         }
         &'lys-shell;help;vpn'= {
             cand sso-callback 'Hand a browser sign-in callback to the running shell'

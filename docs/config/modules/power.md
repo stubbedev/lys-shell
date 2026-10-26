@@ -25,7 +25,7 @@ bar:
 | `icon-name` | string | `"ld-power-symbolic"` | Icon name to display. |
 | `border-show` | bool | `false` | Display border around button. |
 | `lock-command` | string | `"loginctl lock-session"` | Command run by the power menu's Lock button. |
-| `logout-command` | string | `"loginctl terminate-session $XDG_SESSION_ID"` | Command run by the power menu's Log out button. |
+| `logout-command` | string | `"lys-shell logout"` | Command run by the power menu's Log out button. |
 | `suspend-command` | string | `"systemctl suspend"` | Command run by the power menu's Suspend button. |
 | `reboot-command` | string | `"systemctl reboot"` | Command run by the power menu's Reboot button. |
 | `shutdown-command` | string | `"systemctl poweroff"` | Command run by the power menu's Shut down button. |
@@ -69,7 +69,7 @@ modules:
     scroll-down: ""
     left-click: :menu
     lock-command: loginctl lock-session
-    logout-command: loginctl terminate-session $XDG_SESSION_ID
+    logout-command: lys-shell logout
     suspend-command: systemctl suspend
     reboot-command: systemctl reboot
     shutdown-command: systemctl poweroff

@@ -40,6 +40,9 @@ _lys-shell() {
             lys__shell,lock)
                 cmd="lys__shell__lock"
                 ;;
+            lys__shell,logout)
+                cmd="lys__shell__logout"
+                ;;
             lys__shell,media)
                 cmd="lys__shell__media"
                 ;;
@@ -192,6 +195,9 @@ _lys-shell() {
                 ;;
             lys__shell__help,lock)
                 cmd="lys__shell__help__lock"
+                ;;
+            lys__shell__help,logout)
+                cmd="lys__shell__help__logout"
                 ;;
             lys__shell__help,media)
                 cmd="lys__shell__help__media"
@@ -1067,7 +1073,7 @@ _lys-shell() {
 
     case "${cmd}" in
         lys__shell)
-            opts="-h -V --help --version audio config icons media notify panel power systray wallpaper idle launcher lock vpn recorder screenshot widget toast portal shell completions help"
+            opts="-h -V --help --version audio config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1551,7 +1557,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help)
-            opts="audio config icons media notify panel power systray wallpaper idle launcher lock vpn recorder screenshot widget toast portal shell completions help"
+            opts="audio config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2055,6 +2061,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__lock)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__logout)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -3617,6 +3637,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__lock)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__logout)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

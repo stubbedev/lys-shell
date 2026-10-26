@@ -10,17 +10,11 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	login1 "github.com/stubbedev/lys-shell/service/logind"
 )
 
 // logindTimeout bounds every call to logind.
 const logindTimeout = 5 * time.Second
-
-const (
-	logindName      = "org.freedesktop.login1"
-	logindPath      = dbus.ObjectPath("/org/freedesktop/login1")
-	logindManagerIf = "org.freedesktop.login1.Manager"
-	logindSessionIf = "org.freedesktop.login1.Session"
-)
 
 // logind is the backend's one system-bus link to systemd-logind,
 // connected on first use and shared by Inhibit's block locks and the
@@ -58,24 +52,22 @@ func (l *logind) lock(what, why string) (*os.File, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
 	defer cancel()
 	var fd dbus.UnixFD
-	err = conn.Object(logindName, logindPath).CallWithContext(ctx, logindManagerIf+".Inhibit", 0, what, "lys-shell portal", why, "block").Store(&fd)
+	err = conn.Object(login1.Service, login1.ManagerPath).CallWithContext(ctx, login1.ManagerIf+".Inhibit", 0, what, "lys-shell portal", why, "block").Store(&fd)
 	if err != nil {
 		return nil, fmt.Errorf("logind Inhibit %s: %w", what, err)
 	}
 	return dbusx.File(fd, "inhibit")
 }
 
-// session resolves the user's session object: the caller's, or (for a
-// portal started as a user service, outside any session) the user's
-// display session, which is what "auto" means to logind.
+// session resolves the user's session object (login1.Session).
 func (l *logind) session(ctx context.Context) (*dbus.Conn, dbus.ObjectPath, error) {
 	conn, err := l.bus()
 	if err != nil {
 		return nil, "", err
 	}
-	var path dbus.ObjectPath
-	if err := conn.Object(logindName, logindPath).CallWithContext(ctx, logindManagerIf+".GetSession", 0, "auto").Store(&path); err != nil {
-		return nil, "", fmt.Errorf("logind GetSession auto: %w", err)
+	path, err := login1.Session(ctx, conn)
+	if err != nil {
+		return nil, "", err
 	}
 	return conn, path, nil
 }
@@ -90,7 +82,7 @@ func (l *logind) screensaverActive() (bool, error) {
 		return false, err
 	}
 	var locked bool
-	if err := conn.Object(logindName, path).CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, logindSessionIf, "LockedHint").Store(&locked); err != nil {
+	if err := conn.Object(login1.Service, path).CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, login1.SessionIf, "LockedHint").Store(&locked); err != nil {
 		return false, fmt.Errorf("logind LockedHint: %w", err)
 	}
 	return locked, nil
@@ -122,7 +114,7 @@ func (l *logind) watchScreensaver(fn func(active bool)) (stop func(), err error)
 			case <-done:
 				return
 			case sig := <-signals:
-				if sig.Path != path || len(sig.Body) < 2 || sig.Body[0] != logindSessionIf {
+				if sig.Path != path || len(sig.Body) < 2 || sig.Body[0] != login1.SessionIf {
 					continue
 				}
 				changed, _ := sig.Body[1].(map[string]dbus.Variant)

@@ -46,6 +46,10 @@ type PowerConfig struct {
 	ShowShutdown bool `cfg:"show-shutdown"`
 }
 
+// DefaultLogoutCommand is the default command of the power menu's and
+// the dashboard's Log out buttons.
+const DefaultLogoutCommand = "lys-shell logout"
+
 // DefaultsPower returns the schema defaults.
 func DefaultsPower() PowerConfig {
 	return PowerConfig{
@@ -60,7 +64,7 @@ func DefaultsPower() PowerConfig {
 		ScrollDown:      ClickAction{},
 		LeftClick:       ParseClickAction(":menu"),
 		LockCommand:     "loginctl lock-session",
-		LogoutCommand:   "loginctl terminate-session $XDG_SESSION_ID",
+		LogoutCommand:   DefaultLogoutCommand,
 		SuspendCommand:  "systemctl suspend",
 		RebootCommand:   "systemctl reboot",
 		ShutdownCommand: "systemctl poweroff",

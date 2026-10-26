@@ -1,0 +1,6 @@
+Log out of the session through logind
+
+Usage: lys-shell logout
+
+Options:
+  -h, --help  Print help

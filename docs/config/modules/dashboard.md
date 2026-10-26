@@ -55,7 +55,7 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `dropdown-lock-command` | string | `"loginctl lock-session"` | Shell command for the lock button in the dashboard dropdown. |
-| `dropdown-logout-command` | string | `"loginctl terminate-session $XDG_SESSION_ID"` | Shell command for the logout button in the dashboard dropdown. |
+| `dropdown-logout-command` | string | `"lys-shell logout"` | Shell command for the logout button in the dashboard dropdown. |
 | `dropdown-reboot-command` | string | `"systemctl reboot"` | Shell command for the reboot button in the dashboard dropdown. |
 | `dropdown-poweroff-command` | string | `"systemctl poweroff"` | Shell command for the power-off button in the dashboard dropdown. |
 
@@ -75,7 +75,7 @@ modules:
     scroll-down: ""
     left-click: dropdown:dashboard
     dropdown-lock-command: loginctl lock-session
-    dropdown-logout-command: loginctl terminate-session $XDG_SESSION_ID
+    dropdown-logout-command: lys-shell logout
     dropdown-reboot-command: systemctl reboot
     dropdown-poweroff-command: systemctl poweroff
     usage-warning: 60.0

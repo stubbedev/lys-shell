@@ -62,7 +62,7 @@ func DefaultsDashboard() DashboardConfig {
 		ScrollDown:              ClickAction{},
 		LeftClick:               ParseClickAction("dropdown:dashboard"),
 		DropdownLockCommand:     "loginctl lock-session",
-		DropdownLogoutCommand:   "loginctl terminate-session $XDG_SESSION_ID",
+		DropdownLogoutCommand:   DefaultLogoutCommand,
 		DropdownRebootCommand:   "systemctl reboot",
 		DropdownPoweroffCommand: "systemctl poweroff",
 		UsageWarning:            60,

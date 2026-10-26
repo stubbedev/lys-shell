@@ -92,7 +92,7 @@ func TestLoadFileAppliesDashboard(t *testing.T) {
 	if d.IconOverride != "x" || d.DropdownLockCommand != "swaylock" || d.UsageError != 90 {
 		t.Errorf("dashboard = %+v", d)
 	}
-	if d.DropdownLogoutCommand != "loginctl terminate-session $XDG_SESSION_ID" || d.UsageWarning != 60 {
+	if d.DropdownLogoutCommand != config.DefaultLogoutCommand || d.UsageWarning != 60 {
 		t.Errorf("unset keys lost their defaults: %+v", d)
 	}
 	if len(d.UserSession.Actions) != 2 || d.UserSession.Actions[0] != config.SessionActionReboot || d.UserSession.Actions[1] != config.SessionActionLock {

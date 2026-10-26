@@ -37,6 +37,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('idle', 'idle', [CompletionResultType]::ParameterValue, 'Idle inhibit control commands')
             [CompletionResult]::new('launcher', 'launcher', [CompletionResultType]::ParameterValue, 'Application launcher / dmenu with rofi-compatible flags')
             [CompletionResult]::new('lock', 'lock', [CompletionResultType]::ParameterValue, 'Lock the session via lys-shell''s lock screen')
+            [CompletionResult]::new('logout', 'logout', [CompletionResultType]::ParameterValue, 'Log out of the session through logind')
             [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
             [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
             [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
@@ -847,6 +848,11 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'lys-shell;logout' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'lys-shell;vpn' {
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
@@ -1242,6 +1248,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('idle', 'idle', [CompletionResultType]::ParameterValue, 'Idle inhibit control commands')
             [CompletionResult]::new('launcher', 'launcher', [CompletionResultType]::ParameterValue, 'Application launcher / dmenu with rofi-compatible flags')
             [CompletionResult]::new('lock', 'lock', [CompletionResultType]::ParameterValue, 'Lock the session via lys-shell''s lock screen')
+            [CompletionResult]::new('logout', 'logout', [CompletionResultType]::ParameterValue, 'Log out of the session through logind')
             [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
             [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
             [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
@@ -1543,6 +1550,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;lock' {
+            break
+        }
+        'lys-shell;help;logout' {
             break
         }
         'lys-shell;help;vpn' {

@@ -9,6 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/service/logind"
 )
 
 // fakeLogindSession is the session object of a fake logind: the real
@@ -29,7 +30,7 @@ func (s *fakeLogindSession) SetLockedHint(locked bool) *dbus.Error {
 type fakeProps struct{ s *fakeLogindSession }
 
 func (p fakeProps) Get(iface, name string) (dbus.Variant, *dbus.Error) {
-	if iface != logindSessionIf || name != "LockedHint" {
+	if iface != logind.SessionIf || name != "LockedHint" {
 		return dbus.Variant{}, dbus.NewError("org.freedesktop.DBus.Error.UnknownProperty", nil)
 	}
 	p.s.mu.Lock()
@@ -59,16 +60,16 @@ func startFakeLogind(t *testing.T) (*dbustest.Bus, *dbus.Conn, *fakeLogindSessio
 		path dbus.ObjectPath
 		as   string
 	}{
-		{fakeManager{}, logindManager, logindManagerIf},
-		{sess, fakeSessionPath, logindSessionIf},
+		{fakeManager{}, logind.ManagerPath, logind.ManagerIf},
+		{sess, fakeSessionPath, logind.SessionIf},
 		{fakeProps{s: sess}, fakeSessionPath, "org.freedesktop.DBus.Properties"},
 	} {
 		if err := server.Export(e.v, e.path, e.as); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if reply, err := server.RequestName(logindService, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
-		t.Fatalf("claim %s: %v %v", logindService, reply, err)
+	if reply, err := server.RequestName(logind.Service, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("claim %s: %v %v", logind.Service, reply, err)
 	}
 	return bus, server, sess
 }
@@ -118,7 +119,7 @@ func TestLogindSignals(t *testing.T) {
 	// Let the match rule land before emitting.
 	time.Sleep(100 * time.Millisecond)
 	emit := func(path dbus.ObjectPath, member string) {
-		if err := server.Emit(path, logindSessionIf+"."+member); err != nil {
+		if err := server.Emit(path, logind.SessionIf+"."+member); err != nil {
 			t.Fatal(err)
 		}
 	}
