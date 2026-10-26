@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/sockdir"
+
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // serveUnix accepts on a fresh socket and hands each connection to fn.

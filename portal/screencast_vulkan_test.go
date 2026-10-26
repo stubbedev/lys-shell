@@ -12,9 +12,9 @@ import (
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabuf"
 	"github.com/stubbedev/lys-lib/gpu"
+	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 )
 

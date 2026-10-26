@@ -11,9 +11,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/prop"
+	"github.com/stubbedev/lys-lib/sockdir"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
-	"github.com/stubbedev/lys-shell/internal/sockdir"
 )
 
 // fakeSocket answers hyprsunset's two queries like the real daemon.

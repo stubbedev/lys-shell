@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 // fakeHyprland is a scriptable IPC server: it answers command-socket

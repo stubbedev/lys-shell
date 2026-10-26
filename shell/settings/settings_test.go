@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/sockdir"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"

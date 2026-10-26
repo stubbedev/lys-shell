@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 // monitorsFrame is types.rs's ALL_MONITORS_FRAME fixture.

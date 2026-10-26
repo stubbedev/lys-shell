@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/sockdir"
+
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/sockdir"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 // fakeGreetd plays greetd over one end of a pipe: it records every

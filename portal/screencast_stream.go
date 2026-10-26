@@ -7,8 +7,7 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-lib/capture"
-
-	"github.com/stubbedev/lys-shell/internal/pipewire"
+	"github.com/stubbedev/lys-lib/pipewire"
 )
 
 // defaultFPS is the advertised capture rate, clamped to the output's

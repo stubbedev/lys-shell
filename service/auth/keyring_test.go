@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 // fakeKeyring serves one control-socket exchange: it captures the

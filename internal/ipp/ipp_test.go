@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 func TestMessageRoundTrips(t *testing.T) {

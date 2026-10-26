@@ -5,8 +5,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/capture"
-
-	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
+	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 )
 
 // The real capture-to-PipeWire path against a private headless

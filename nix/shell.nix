@@ -22,30 +22,22 @@
 
           # Headless test sessions: fontconfig reads the generated config
           # (shellHook), sway is the headless compositor, dbus the private
-          # test buses (internal/dbustest), pipewire the private daemon and
-          # pw-link for the ScreenCast producer tests, and libei the C client
-          # the EIS server tests drive.
+          # test buses (internal/dbustest), and pipewire the private daemon
+          # and pw-link for the ScreenCast portal tests (lys-lib's pwtest).
           fontconfig
           sway
           dbus
           pipewire
-          libei
 
           inter # config default font-sans
           jetbrains-mono # config default font-mono
           nerd-fonts.jetbrains-mono # the common Nerd Font a user config names
         ];
 
-        # The binaries dlopen these through purego; the EIS tests add libei,
-        # and the ScreenCast tests libpipewire, whose streams are the
-        # reference consumers the producer is checked against.
-        LD_LIBRARY_PATH = lib.makeLibraryPath (
-          self'.packages.lys-shell.libs
-          ++ [
-            pkgs.libei
-            pkgs.pipewire
-          ]
-        );
+        # The binaries dlopen these through purego; the ScreenCast tests
+        # add libpipewire, whose streams are the reference consumers the
+        # portal is checked against.
+        LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.lys-shell.libs ++ [ pkgs.pipewire ]);
 
         # The real xdg-desktop-portal frontend the portal contract tests
         # route through to the backend.

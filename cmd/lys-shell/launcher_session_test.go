@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 // The launcher socket's lifetime contract (lys-shell/tests/

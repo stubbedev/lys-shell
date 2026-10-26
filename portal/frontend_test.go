@@ -15,9 +15,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/pipewire"
+	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 
-	"github.com/stubbedev/lys-shell/internal/pipewire"
-	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 

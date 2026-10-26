@@ -9,9 +9,8 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabuf"
+	"github.com/stubbedev/lys-lib/pipewire"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/pipewire"
 )
 
 // fakeDevice allocates memfds posing as GPU buffers.

@@ -13,8 +13,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-
-	"github.com/stubbedev/lys-shell/internal/sockdir"
+	"github.com/stubbedev/lys-lib/sockdir"
 )
 
 // config is a session-bus policy that lets every connection own any
