@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/gpu"
+	"github.com/stubbedev/lys-lib/media/opus"
 )
 
 // requireFFmpeg skips a test that needs ffmpeg and ffprobe without
@@ -320,4 +321,38 @@ func (w *fakeWall) tick(period time.Duration) {
 	for w.reads == before {
 		w.read.Wait()
 	}
+}
+
+// playPaused records on w at period: before frames, half a period
+// more, a pause through paused ticks of the video loop, then after
+// frames. It returns the times the frames fall due at on the
+// recording's clock, and the time it recorded.
+func (w *fakeWall) playPaused(rec Recording, period time.Duration, before, paused, after int) ([]time.Duration, time.Duration) {
+	want := make([]time.Duration, 0, before+after)
+	run := func(frames int, from time.Duration) {
+		for i := range frames {
+			w.advance(period)
+			w.tick(period)
+			want = append(want, from+time.Duration(i+1)*period)
+		}
+	}
+	run(before, 0)
+	w.advance(period / 2)
+	rec.SetPaused(true)
+	pausedAt := time.Duration(before)*period + period/2
+	for range paused {
+		w.advance(period)
+		w.tick(period)
+	}
+	rec.SetPaused(false)
+	run(after, pausedAt)
+	return want, pausedAt + time.Duration(after)*period
+}
+
+// lastAudioPacket is the time of the last Opus packet in a file that
+// recorded recorded: whole packets up to it, less the encoder's
+// pre-skip.
+func lastAudioPacket(recorded time.Duration) time.Duration {
+	preSkip := time.Duration(opus.PreSkip) * time.Second / audioRate
+	return time.Duration(int(recorded/audioFrameTime)-1)*audioFrameTime - preSkip
 }

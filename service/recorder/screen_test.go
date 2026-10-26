@@ -101,8 +101,8 @@ func feedRecords(recs []*pulsetest.Record, stop <-chan struct{}) {
 
 // On a real GPU behind a private sway: the picked output is remembered,
 // MP4 and Matroska each record the screen at its size with the desktop
-// and the microphone mixed in, a pause is cut, and every frame of the
-// file decodes.
+// and the microphone mixed in, every frame the clock makes due lands in
+// the file at its time with the pause cut, and every frame decodes.
 func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 	requireFFmpeg(t)
 	output := gpuSway(t)
@@ -113,6 +113,9 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 		t.Run(string(format), func(t *testing.T) {
 			p := &fakePicker{reply: "r/screen:" + output}
 			e := NewGPUEngine(p, audio, noLogical, stateDir)
+			period := time.Second / 30
+			wall := newFakeWall(time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC), period, audioFrameTime)
+			e.wall = wall
 			s, err := e.OpenSession(context.Background(), true)
 			if err != nil {
 				t.Fatal(err)
@@ -127,11 +130,7 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 			recs := srv.WaitRecords(t, 2)
 			stop := make(chan struct{})
 			go feedRecords(recs, stop)
-			time.Sleep(time.Second)
-			rec.SetPaused(true)
-			time.Sleep(500 * time.Millisecond)
-			rec.SetPaused(false)
-			time.Sleep(2 * time.Second)
+			frames, recorded := wall.playPaused(rec, period, 30, 15, 60)
 			err = rec.Stop()
 			close(stop)
 			if err != nil {
@@ -148,11 +147,15 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 				t.Fatalf("streams %+v, want h264 and opus", pr.Streams)
 			}
 			t.Logf("%s from %s: %ss, %s frames decoded, streams %+v", path, output, pr.Format.Duration, pr.Streams[0].Frames, pr.Streams)
-			if n, _ := strconv.Atoi(pr.Streams[0].Frames); n < 60 {
-				t.Errorf("%d frames decode from 3s at 30 fps", n)
+			if n, _ := strconv.Atoi(pr.Streams[0].Frames); n != len(frames) {
+				t.Errorf("%d frames decode, want the %d the clock made due", n, len(frames))
 			}
-			if d, _ := strconv.ParseFloat(pr.Format.Duration, 64); d < 2.8 || d > 3.4 {
-				t.Errorf("duration %vs, want about the 3s recorded with the pause cut", d)
+			if got := slices.Sorted(slices.Values(pr.ptsOf(0))); !slices.EqualFunc(got, frames, func(g float64, w time.Duration) bool { return approx(g, w.Seconds(), 0.001) }) {
+				t.Errorf("frames at %v, want each at its time on the clock, %v", got, frames)
+			}
+			lastAudio := lastAudioPacket(recorded)
+			if a := pr.ptsOf(1); len(a) == 0 || !approx(slices.Max(a), lastAudio.Seconds(), 0.001) {
+				t.Errorf("audio ends at %v, want its last packet at %v of %v recorded", a, lastAudio.Seconds(), recorded.Seconds())
 			}
 			if want := 1 - min(i, 1); len(p.asked) != want {
 				t.Errorf("asked the picker %d times, want %d: the first pick is remembered", len(p.asked), want)

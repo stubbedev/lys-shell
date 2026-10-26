@@ -58,6 +58,7 @@ type GPUEngine struct {
 	stateDir   string
 	logical    LogicalSize
 	openDevice func(uint64) (*gpu.Device, error)
+	wall       wallClock
 	picks      atomic.Uint64
 }
 
@@ -66,7 +67,7 @@ type GPUEngine struct {
 // sound), regions measured by logical, remembering the pick in stateDir
 // ("" remembers nothing).
 func NewGPUEngine(picker Picker, audio *pulse.Service, logical LogicalSize, stateDir string) *GPUEngine {
-	return &GPUEngine{picker: picker, audio: audio, logical: logical, stateDir: stateDir, openDevice: gpu.OpenNode}
+	return &GPUEngine{picker: picker, audio: audio, logical: logical, stateDir: stateDir, openDevice: gpu.OpenNode, wall: systemClock{}}
 }
 
 // OpenSession implements Engine: the remembered output or region, else
@@ -100,7 +101,7 @@ func (e *GPUEngine) session(s *screen, err error) (Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &gpuSession{screen: s, audio: e.audio}, nil
+	return &gpuSession{screen: s, audio: e.audio, wall: e.wall}, nil
 }
 
 // pick asks the share picker for one output or region. A cancelled ctx
@@ -176,6 +177,7 @@ func (e *GPUEngine) forgetSource() {
 type gpuSession struct {
 	screen *screen
 	audio  *pulse.Service
+	wall   wallClock
 }
 
 // Start implements Session: the encoder on the screen's GPU, the webcam
@@ -190,7 +192,7 @@ func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, e
 	if err != nil {
 		return nil, err
 	}
-	parts := recordingParts{video: video, audio: sources, fps: fps, wall: systemClock{}}
+	parts := recordingParts{video: video, audio: sources, fps: fps, wall: g.wall}
 	if opts.Webcam != nil {
 		size := g.screen.frameSize()
 		width, errW := intconv.Exact[int32](size.X)

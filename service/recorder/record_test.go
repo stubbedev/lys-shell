@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-lib/media/opus"
-
 	"github.com/stubbedev/lys-shell/config"
 )
 
@@ -107,37 +105,18 @@ func TestRecordingPauseCutsTheSpan(t *testing.T) {
 	period := time.Second / testFPS
 	wall := newFakeWall(time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC), period, audioFrameTime)
 	r, path, _ := startTest(t, recordingParts{video: video, audio: []startAudio{(&fakeAudio{}).start}, wall: wall}, config.RecorderFormatMkv)
-	var want []time.Duration
-	run := func(frames int, from time.Duration) {
-		for i := range frames {
-			wall.advance(period)
-			wall.tick(period)
-			want = append(want, from+time.Duration(i+1)*period)
-		}
-	}
-	run(9, 0)
-	wall.advance(period / 2)
-	r.SetPaused(true)
-	pausedAt := 9*period + period/2
-	for range 18 {
-		wall.advance(period)
-		wall.tick(period)
-	}
-	r.SetPaused(false)
-	run(9, pausedAt)
+	want, recorded := wall.playPaused(r, period, 9, 18, 9)
 	if err := r.Stop(); err != nil {
 		t.Fatal(err)
 	}
 	if got := video.frames(); !slices.Equal(got, want) {
 		t.Errorf("frames at %v, want %v: the paused span was not cut", got, want)
 	}
-	recorded := pausedAt + 9*period
 	p := ffprobe(t, path)
 	if v := p.ptsOf(0); len(v) == 0 || !approx(slices.Max(v), recorded.Seconds(), 0.002) {
 		t.Errorf("video ends at %v, want %v", v, recorded.Seconds())
 	}
-	preSkip := time.Duration(opus.PreSkip) * time.Second / audioRate
-	lastAudio := time.Duration(int(recorded/audioFrameTime)-1)*audioFrameTime - preSkip
+	lastAudio := lastAudioPacket(recorded)
 	if a := p.ptsOf(1); len(a) == 0 || !approx(slices.Max(a), lastAudio.Seconds(), 0.001) {
 		t.Errorf("audio ends at %v, want its last packet at %v of %v recorded", a, lastAudio.Seconds(), recorded.Seconds())
 	}
