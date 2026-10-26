@@ -43,13 +43,19 @@ func TestAbsentFailsOnlyWhenTheGPUIsAskedFor(t *testing.T) {
 // again between them (17 in a container with no display server).
 const reopens = 40
 
-// While Node's device is held, every device a test opens and closes on
-// the node is the GPU behind it, however many come and go: the drivers
-// stay loaded. Node hands every caller the same device.
-func TestDevicesOpenedAfterNodeStayOnTheGPU(t *testing.T) {
-	_, dev, held := Node(t)
-	if _, _, again := Node(t); again != held {
-		t.Errorf("a second Node opened another device %p, want the held %p", again, held)
+// With no device left open, every device opened and closed on the node
+// one after another is the GPU behind it, however many come and go: the
+// drivers stay loaded between them.
+func TestDevicesReopenedOnTheNodeStayOnTheGPU(t *testing.T) {
+	var dev uint64
+	var gpuName string
+	t.Run("node", func(t *testing.T) {
+		var d *gpu.Device
+		_, dev, d = Node(t)
+		gpuName = d.Name()
+	})
+	if gpuName == "" {
+		t.Skip("no GPU behind the render node")
 	}
 	for i := range reopens {
 		d, err := gpu.OpenNode(dev)
@@ -58,8 +64,8 @@ func TestDevicesOpenedAfterNodeStayOnTheGPU(t *testing.T) {
 		}
 		name := d.Name()
 		d.Close()
-		if name != held.Name() {
-			t.Fatalf("open %d of %d landed on %s, want %s", i+1, reopens, name, held.Name())
+		if name != gpuName {
+			t.Fatalf("open %d of %d landed on %s, want %s", i+1, reopens, name, gpuName)
 		}
 	}
 }
