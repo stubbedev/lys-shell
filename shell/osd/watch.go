@@ -73,11 +73,36 @@ func (b *brightnessEvents) next(ctx context.Context, src brightness.Source) (Eve
 	return Slider(i18n.T("osd-brightness"), BrightnessIcon, pct, false), true
 }
 
-// Watch follows the audio, brightness, and lock-key sources until ctx
-// ends (watchers.rs spawn). A nil source is skipped. The levels at
+// Layouts is the compositor's keyboard layout: Layout reads the active
+// one, and each tick from Subscribe is the cue to read it again.
+type Layouts interface {
+	Layout() (string, error)
+	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
+}
+
+// layoutEvents flashes a keyboard layout switch: the layout's name
+// when it differs from the last one read. An unreadable or unknown
+// layout is not a switch.
+type layoutEvents struct{ last string }
+
+func (l *layoutEvents) next(src Layouts) (Event, bool) {
+	name, err := src.Layout()
+	if err != nil {
+		log.Printf("osd: keyboard layout: %v", err)
+		return Event{}, false
+	}
+	if name == "" || name == l.last {
+		return Event{}, false
+	}
+	l.last = name
+	return layoutEvent(name), true
+}
+
+// Watch follows the audio, brightness, keyboard layout, and lock-key
+// sources until ctx ends (watchers.rs spawn). A nil source is skipped. The levels at
 // start seed the dedupe without flashing, as the Rust watchers' first
 // emission lands inside the quiet period.
-func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source) {
+func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source, layouts Layouts) {
 	if audio != nil {
 		if ticks, stop, err := audio.Subscribe(ctx); err == nil {
 			defer stop()
@@ -108,6 +133,24 @@ func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.So
 			}()
 		} else {
 			log.Printf("osd: brightness: %v", err)
+		}
+	}
+	if layouts != nil {
+		if ticks, stop, err := layouts.Subscribe(ctx); err == nil {
+			if stop != nil {
+				defer stop()
+			}
+			go func() {
+				var l layoutEvents
+				l.next(layouts)
+				for range ticks {
+					if ev, ok := l.next(layouts); ok {
+						o.Show(ev)
+					}
+				}
+			}()
+		} else {
+			log.Printf("osd: keyboard layout: %v", err)
 		}
 	}
 	defer keytoggles.Watch(func(e keytoggles.Event) { o.Show(toggleEvent(e)) })()

@@ -2,7 +2,9 @@ package osd
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -359,5 +361,98 @@ func TestOsdKeepsItsWidth(t *testing.T) {
 	sz := widget.MeasureAsChild(h.osd.face.container, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
 	if want := int(widthPx * float64(cfg.Styling.Scale)); sz.W != want {
 		t.Errorf("the OSD measures %dpx wide in a 1920px surface, want %d", sz.W, want)
+	}
+}
+
+// fakeLayouts scripts the compositor's keyboard layout.
+type fakeLayouts struct {
+	mu    sync.Mutex
+	name  string
+	err   error
+	ticks chan struct{}
+}
+
+func (f *fakeLayouts) set(name string, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.name, f.err = name, err
+}
+
+func (f *fakeLayouts) Layout() (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.name, f.err
+}
+
+func (f *fakeLayouts) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+	return f.ticks, nil, nil
+}
+
+// A layout switch flashes the new layout's name; the layout at start,
+// a re-read of the same layout, an unknown one, and a failed read do
+// not.
+func TestLayoutEventsFlashSwitchesOnly(t *testing.T) {
+	src := &fakeLayouts{name: "English (US)"}
+	var l layoutEvents
+	l.next(src)
+	if _, ok := l.next(src); ok {
+		t.Error("an unchanged layout flashed")
+	}
+	src.set("German", nil)
+	ev, ok := l.next(src)
+	if !ok || ev.kind != kindToast || ev.label != "German" || ev.icon != LayoutIcon || ev.bar {
+		t.Errorf("switching to German flashed %+v %v, want its name and the keyboard glyph", ev, ok)
+	}
+	src.set("", nil)
+	if _, ok := l.next(src); ok {
+		t.Error("an unknown layout flashed")
+	}
+	src.set("", errors.New("compositor gone"))
+	if _, ok := l.next(src); ok {
+		t.Error("a failed read flashed")
+	}
+	src.set("German", nil)
+	if _, ok := l.next(src); ok {
+		t.Error("re-reading the last shown layout after a gap flashed")
+	}
+}
+
+// Watch shows the layout a compositor switches to, and nothing for the
+// layout it starts on.
+func TestWatchShowsLayoutSwitches(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	calls := make(chan func(), 1)
+	h.osd.d.Invoke = func(fn func()) { calls <- fn }
+	src := &fakeLayouts{name: "English (US)", ticks: make(chan struct{})}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.osd.Watch(ctx, nil, nil, src)
+	}()
+	t.Cleanup(func() { cancel(); <-done })
+	tick := func() {
+		select {
+		case src.ticks <- struct{}{}:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Watch does not follow the layout")
+		}
+	}
+	tick()
+	src.set("German", nil)
+	tick()
+	select {
+	case fn := <-calls:
+		fn()
+	case <-time.After(5 * time.Second):
+		t.Fatal("switching the layout showed nothing")
+	}
+	if len(h.opened) != 1 || h.osd.face.toggleLabel.Text() != "German" || h.osd.face.toggleIcon.Name() != LayoutIcon {
+		t.Errorf("the switch showed %q, want German", h.osd.face.toggleLabel.Text())
+	}
+	select {
+	case <-calls:
+		t.Error("the layout the compositor started on was shown")
+	default:
 	}
 }

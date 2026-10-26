@@ -63,6 +63,14 @@ func toggleEvent(e keytoggles.Event) Event {
 	return Toggle(i18n.T("osd-caps-lock"), "ld-a-large-small-symbolic", e.Active)
 }
 
+// LayoutIcon is the keyboard layout notice's glyph.
+const LayoutIcon = "ld-keyboard-symbolic"
+
+// layoutEvent is the keyboard layout now active, shown by name.
+func layoutEvent(name string) Event {
+	return Event{kind: kindToast, label: name, icon: LayoutIcon}
+}
+
 // toastEvent is handle_show_toast: the named preset supplies the label
 // and icon, explicit request fields override them; percentage,
 // duration, and class are per invocation.

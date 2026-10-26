@@ -6316,7 +6316,7 @@
         "enabled": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Show OSD overlays for volume, brightness, and keyboard toggles."
+          "description": "Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group)."
         },
         "layer": {
           "$ref": "#/$defs/Layer",

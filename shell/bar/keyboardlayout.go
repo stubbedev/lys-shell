@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"errors"
 	"log"
 	"strings"
@@ -63,7 +64,7 @@ func keyboardLayoutLabel(layout, format string, aliasMap map[string]string) stri
 // each tick from subscribe is the cue to read again.
 type layoutSource struct {
 	read      func() (string, error)
-	subscribe func(ctx ModuleContext) (<-chan struct{}, func(), error)
+	subscribe func(ctx context.Context) (<-chan struct{}, func(), error)
 	close     func()
 }
 
@@ -87,7 +88,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 				name, _ := layouts.Current()
 				return name, nil
 			},
-			subscribe: func(ModuleContext) (<-chan struct{}, func(), error) { return niri.Subscribe() },
+			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return niri.Subscribe() },
 			close:     func() { _ = conn.Close() },
 		}, nil
 	case detectCompositor() == compositorMango:
@@ -100,7 +101,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 				monitors, _ := w.State()
 				return mango.KeyboardLayout(monitors), nil
 			},
-			subscribe: func(ModuleContext) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },
+			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },
 			close:     w.Close,
 		}, nil
 	case detectCompositor() == compositorSway:
@@ -116,11 +117,20 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 				}
 				return sway.KeyboardLayout(inputs), nil
 			},
-			subscribe: func(ModuleContext) (<-chan struct{}, func(), error) { return sway.SubscribeTo("input") },
+			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return sway.SubscribeTo("input") },
 			close:     func() { _ = conn.Close() },
 		}, nil
 	}
 	return layoutSource{}, errors.New("keyboard-input: unsupported compositor")
+}
+
+// Layout reads the active layout, as the OSD's osd.Layouts.
+func (s layoutSource) Layout() (string, error) { return s.read() }
+
+// Subscribe ticks on every cue to read the layout again until ctx
+// ends, as the OSD's osd.Layouts.
+func (s layoutSource) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
+	return s.subscribe(ctx)
 }
 
 // hyprlandLayoutSource reads hyprland's devices on every event: the
@@ -135,8 +145,8 @@ func hyprlandLayoutSource(conn *hyprland.Connection) layoutSource {
 			}
 			return mainKeyboardLayout(devices), nil
 		},
-		subscribe: func(ctx ModuleContext) (<-chan struct{}, func(), error) {
-			events, err := conn.Events(ctx.Life())
+		subscribe: func(ctx context.Context) (<-chan struct{}, func(), error) {
+			events, err := conn.Events(ctx)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -174,7 +184,7 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 		log.Printf("keyboard-input: %v", err)
 		m.show(unknownLayout)
 	}
-	ticks, stop, err := source.subscribe(ctx)
+	ticks, stop, err := source.subscribe(ctx.Life())
 	if err != nil {
 		source.close()
 		return nil, err

@@ -466,7 +466,16 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// (the Rust OsdEnabledChanged).
 	osdCtx, stopOsd := context.WithCancel(context.Background())
 	defer stopOsd()
-	go osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness)
+	go func() {
+		var layouts osd.Layouts
+		if source, err := keyboardLayoutSource(baseCtx); err == nil {
+			defer source.close()
+			layouts = source
+		} else {
+			log.Printf("osd: keyboard layout: %v", err)
+		}
+		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts)
+	}()
 	// The ext-session-lock screen and its triggers (logind, and `lys-shell
 	// lock` through Shell1).
 	lockScreen, stopLock := lock.Start(application, current.Load(), font, theme.Sheet, func() {
