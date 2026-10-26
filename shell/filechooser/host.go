@@ -587,9 +587,6 @@ func (c *Chooser) build(r request) {
 	u.root.SetSizeLimits(widget.Size{W: panelMinW, H: panelMinH}, widget.Size{W: panelMaxW, H: panelMaxH})
 	u.root.SetPanelSize(c.size.W, c.size.H)
 	u.root.OnGeometryChanged = c.placedAt
-	if c.d.Sheet != nil {
-		u.root.AttachStylesheet(c.d.Sheet)
-	}
 
 	c.ui = u
 	c.updateSortLabels()
@@ -780,14 +777,17 @@ func (m rows) Row(i int) widget.Widget {
 	if m.grid {
 		return m.c.gridCell(e)
 	}
-	return m.c.fileRow(e)
+	return m.c.fileRow(e, i%2 == 1)
 }
 
 // fileRow is the name (icon and label) with the size, modified and
-// kind cells under their column headers.
-func (c *Chooser) fileRow(e Entry) widget.Widget {
+// kind cells under their column headers; alt rows carry the zebra
+// tint, by model index so it holds while the list scrolls.
+func (c *Chooser) fileRow(e Entry, alt bool) widget.Widget {
 	th := widget.Current()
 	row := widget.NewBox(widget.Row, th.Spacing, 0)
+	row.AddClass("file-chooser-row")
+	row.SetClass("alt", alt)
 	row.SetPadding(render.Insets{Left: th.Padding, Right: th.Padding})
 	icon := c.entryIcon(e, rowIconPx)
 	row.Append(icon, false)
@@ -896,6 +896,9 @@ func (c *Chooser) show() {
 		c.win, c.closing = nil, false
 	}
 	c.rev = widget.NewRevealer(c.ui.root)
+	if c.d.Sheet != nil {
+		c.rev.AttachStylesheet(c.d.Sheet)
+	}
 	var output *app.Output
 	if c.d.Target != nil {
 		output = c.d.Target()

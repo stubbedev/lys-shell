@@ -93,7 +93,9 @@ type harness struct {
 	focusErr error
 	cfg      app.LayerConfig
 	// conf is the live config; the chooser animates as it says.
-	conf    *config.Config
+	conf *config.Config
+	// theme is the stylesheet and palette the chooser paints with.
+	theme   *apptheme.Theme
 	queue   chan func()
 	qmu     sync.Mutex
 	stopped bool
@@ -104,7 +106,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	face := treetest.Font(t)
 	conf := config.Defaults()
 	conf.Animations.Enabled = false
-	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4), conf: conf}
+	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4), conf: conf, theme: apptheme.New(conf)}
 	hs.queue = make(chan func(), 256)
 	drained := make(chan struct{})
 	go func() {
@@ -137,7 +139,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		},
 		Invoke:    hs.invoke,
 		Font:      face,
-		Sheet:     apptheme.New(conf).Sheet,
+		Sheet:     hs.theme.Sheet,
 		MIME:      testDB(t),
 		Home:      hs.root,
 		Places:    func() []Place { return []Place{{"Home", hs.root, "user-home-symbolic"}} },
@@ -1766,7 +1768,7 @@ func TestChooserTakesLysUiParts(t *testing.T) {
 		all("file-chooser-crumb", css.Ghost)
 		all("file-chooser-place", css.Ghost)
 		all("file-chooser-sidebar-header", css.CaptionHeading, css.DimLabel)
-		for _, cell := range treetest.WithClass(hs.c.fileRow(hs.c.s.entries[0]), "file-chooser-cell") {
+		for _, cell := range treetest.WithClass(hs.c.fileRow(hs.c.s.entries[0], false), "file-chooser-cell") {
 			if !widget.HasClass(cell, css.DimLabel) {
 				t.Error("a row's cell is not dim")
 			}
@@ -1820,5 +1822,79 @@ func TestPanelRevealsAndHidesWithItsAnimation(t *testing.T) {
 	answer(t, got)
 	if !win.closed {
 		t.Error("with animations off the overlay outlived the answer")
+	}
+}
+
+// frame paints the whole surface at w x h as its window does and reads
+// back its pixels.
+func (hs *harness) frame(w, h int) func(x, y int) render.Color {
+	px := make([]uint8, w*h*4)
+	hs.do(func() {
+		lay(hs.cfg.Root, w, h)
+		hs.cfg.Root.Paint(render.New(px, w*4, w, h))
+	})
+	return func(x, y int) render.Color {
+		i := (y*w + x) * 4
+		return render.RGBA(px[i+2], px[i+1], px[i], px[i+3])
+	}
+}
+
+// token is the palette color the stylesheet resolves var(--tok) to.
+func (hs *harness) token(t *testing.T, tok config.CssToken) render.Color {
+	t.Helper()
+	c, ok := hs.theme.RenderPalette().Token(tok)
+	if !ok {
+		t.Fatalf("no palette token %s", tok)
+	}
+	return c
+}
+
+// The list's rows paint the stylesheet's fills behind their cells: the
+// accent behind the selected row, the hover tint under the pointer,
+// and the zebra tint on every other row by model index, never on the
+// rows between.
+func TestListRowsPaintTheirFills(t *testing.T) {
+	hs := newHarness(t, "")
+	touch(t, hs.root, "c.txt", "d.txt")
+	hs.open(t, OpenRequest{})
+	hs.pick(t, "b.txt")
+	const W, H = 1200, 800
+	at := hs.frame(W, H)
+	var lb render.Rect
+	var sel int
+	hs.run(func() {
+		lb = hs.c.ui.list.Bounds()
+		sel = slices.Index(names(hs.c.s.entries), "b.txt")
+	})
+	x := lb.X + lb.W - 3
+	rowY := func(i int) int { return lb.Y + i*listRowH + listRowH/2 }
+	n := len(hs.shown())
+	blank := at(x, lb.Y+lb.H-2)
+	if got, want := at(x, rowY(sel)), hs.token(t, config.TokenAccent); got != want {
+		t.Errorf("selected row paints %v, want the accent %v", got, want)
+	}
+	for i := range n {
+		if i == sel {
+			continue
+		}
+		got := at(x, rowY(i))
+		if i%2 == 0 && got != blank {
+			t.Errorf("row %d paints %v, want the view's own %v", i, got, blank)
+		}
+		if i%2 == 1 && (got == blank || got != at(x, rowY(1))) {
+			t.Errorf("alt row %d paints %v, want the zebra tint row 1 has, over the view's %v", i, got, blank)
+		}
+	}
+	var r *widget.Router
+	hs.run(func() {
+		r = &widget.Router{Root: hs.cfg.Root}
+		r.Move(widget.Point{X: lb.X + lb.W/2, Y: rowY(0)})
+	})
+	at = hs.frame(W, H)
+	if got, want := at(x, rowY(0)), hs.token(t, config.TokenBgHover); got != want {
+		t.Errorf("hovered row paints %v, want the hover tint %v", got, want)
+	}
+	if got := at(x, rowY(2)); got != blank {
+		t.Errorf("row 2 paints %v with the pointer elsewhere, want the view's own %v", got, blank)
 	}
 }
