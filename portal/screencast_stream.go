@@ -7,9 +7,9 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/pipewire"
 
-	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 

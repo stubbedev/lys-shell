@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/gpu"
 
-	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 

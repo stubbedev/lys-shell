@@ -7,11 +7,10 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabuf"
+	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/pipewire"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 )
 
 // The zero-copy path: a whole output's screencopy frames land straight in
