@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -47,16 +48,20 @@ func (l *fakeLoop) pump() {
 	}
 }
 
-// fakeWindow records what the surface does to its layer.
+// fakeWindow records what the surface does to its layer. Focus goes
+// through a widget.Router over the surface's root, as on the real
+// layer, so a request it refuses (a widget outside the shown tree)
+// leaves nothing focused here too.
 type fakeWindow struct {
-	cfg     app.LayerConfig
-	closed  bool
-	focused widget.Widget
-	sizes   [][2]uint32
+	cfg    app.LayerConfig
+	closed bool
+	router *widget.Router
+	sizes  [][2]uint32
 }
 
 func (w *fakeWindow) Close()                   { w.closed = true }
-func (w *fakeWindow) SetFocus(f widget.Widget) { w.focused = f }
+func (w *fakeWindow) SetFocus(f widget.Widget) { w.router.SetFocus(f) }
+func (w *fakeWindow) focused() widget.Widget   { return w.router.Focused() }
 func (w *fakeWindow) SetSize(width, height uint32) error {
 	w.sizes = append(w.sizes, [2]uint32{width, height})
 	return nil
@@ -82,6 +87,8 @@ type harness struct {
 	nextID     uint64
 	// styled records the variant faces asked for: "b", "i", "bi".
 	styled []string
+	// openErr fails every Open, as a compositor refusing the layer.
+	openErr error
 }
 
 func newHarness(t *testing.T) *harness {
@@ -101,7 +108,10 @@ func newHarness(t *testing.T) *harness {
 		},
 		Config: func() *config.Config { return h.cfg },
 		Open: func(cfg app.LayerConfig) (Window, error) {
-			w := &fakeWindow{cfg: cfg}
+			if h.openErr != nil {
+				return nil, h.openErr
+			}
+			w := &fakeWindow{cfg: cfg, router: &widget.Router{Root: cfg.Root}}
 			h.windows = append(h.windows, w)
 			return w, nil
 		},
@@ -213,7 +223,7 @@ func TestDmenuSessionFiltersAndAccepts(t *testing.T) {
 	if w.cfg.Namespace != "lys-shell-launcher" || w.cfg.Keyboard != app.KeyboardOnDemand || w.cfg.Anchor != 0 || w.cfg.Layer != app.LayerOverlay {
 		t.Errorf("layer = %+v", w.cfg)
 	}
-	if w.focused != widget.Widget(h.s.cur.views.entry) || h.s.sel != 0 {
+	if w.focused() != widget.Widget(h.s.cur.views.entry) || h.s.sel != 0 {
 		t.Error("the entry is not focused or the first row not selected")
 	}
 	h.s.cur.views.entry.SetText("ga")
@@ -235,6 +245,50 @@ func TestDmenuSessionFiltersAndAccepts(t *testing.T) {
 	}
 	if h.key("Return") {
 		t.Error("a key reached a closed session")
+	}
+}
+
+func TestEntryTakesFocusOnEveryOpen(t *testing.T) {
+	for _, animated := range []bool{false, true} {
+		h := newHarness(t)
+		h.cfg.Animations.Enabled = animated
+		entryFocused := func(what string, w *fakeWindow) *active {
+			t.Helper()
+			h.until(what, func() bool { return h.s.cur != nil && h.s.cur.win == Window(w) })
+			if got := w.focused(); got != widget.Widget(h.s.cur.views.entry) {
+				t.Errorf("animated %v, %s: focus = %v, want the entry", animated, what, got)
+			}
+			return h.s.cur
+		}
+		_, first := h.open(dmenu(), false, "a")
+		h.until("the first surface", func() bool { return len(h.windows) == 1 })
+		was := entryFocused("the first open", h.windows[0])
+		h.key("Escape")
+		h.frame(first)
+		_, _ = h.open(dmenu(), false, "b")
+		h.until("the reopened surface", func() bool { return len(h.windows) == 2 })
+		reopened := entryFocused("the reopen after a hide", h.windows[1])
+		if h.windows[1].focused() == widget.Widget(was.views.entry) {
+			t.Errorf("animated %v: the reopened surface focuses the ended session's entry", animated)
+		}
+		_, _ = h.open(dmenu(), true, "c")
+		h.until("the replacing surface", func() bool { return len(h.windows) == 3 })
+		entryFocused("a -replace", h.windows[2])
+		if h.windows[2].focused() == widget.Widget(reopened.views.entry) {
+			t.Errorf("animated %v: the replacing surface focuses the displaced session's entry", animated)
+		}
+	}
+}
+
+func TestUnmappableSurfaceCancelsWithoutFocus(t *testing.T) {
+	h := newHarness(t)
+	h.openErr = errors.New("no layer shell")
+	_, reply := h.open(dmenu(), false, "a")
+	if f := h.frame(reply); f.Type != launcheripc.FrameCancelled || f.Code != 1 {
+		t.Errorf("an unmappable surface = %+v, want cancelled with code 1", f)
+	}
+	if len(h.windows) != 0 || h.s.cur != nil {
+		t.Errorf("windows = %d, session live %v; want nothing mapped or focused", len(h.windows), h.s.cur != nil)
 	}
 }
 

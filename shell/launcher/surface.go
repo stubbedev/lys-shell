@@ -633,8 +633,8 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 	s.sel = -1
 }
 
-// reveal maps the surface over the configured location and focuses the
-// entry.
+// reveal maps the surface over the configured location, shows it, then
+// focuses the entry in the shown tree.
 func (s *Surface) reveal(a *active) {
 	width := s.resolveWidth(a.ui)
 	anchor, margin := locationAnchors(a.ui.location, a.ui.offsetX, a.ui.offsetY)
@@ -665,8 +665,8 @@ func (s *Surface) reveal(a *active) {
 	}
 	a.win = win
 	a.views.width = width
-	win.SetFocus(a.views.entry)
 	reveal.Show(a.views.rev, s.d.Config().Animations, config.AnimLauncher)
+	win.SetFocus(a.views.entry)
 }
 
 // resize keeps the surface as tall as its content: the list grows to
