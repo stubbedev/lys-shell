@@ -17,7 +17,6 @@ import (
 const (
 	clientNodeFactory = "client-node"
 	clientNodeIface   = "PipeWire:Interface:ClientNode"
-	clientNodeVersion = 6
 
 	nodeMethodUpdate      = 2
 	nodeMethodPortUpdate  = 3
@@ -148,6 +147,7 @@ type target struct {
 type node struct {
 	k         *core
 	h         nodeHandler
+	abi       activationABI
 	direction uint32
 	props     []dictItem
 	portFlags uint64
@@ -182,7 +182,10 @@ type node struct {
 
 // newNode registers a node on k; export creates it on the server.
 func newNode(k *core, h nodeHandler, direction uint32, props []dictItem, portFlags uint64) *node {
-	n := &node{k: k, h: h, direction: direction, props: props, portFlags: portFlags, exported: make(chan struct{}), writeFd: -1}
+	k.mu.Lock()
+	abi := k.abi
+	k.mu.Unlock()
+	n := &node{k: k, h: h, abi: abi, direction: direction, props: props, portFlags: portFlags, exported: make(chan struct{}), writeFd: -1}
 	n.wake[0] = 1
 	k.newObject(func(id uint32) objectHandler {
 		n.id = id
@@ -194,7 +197,7 @@ func newNode(k *core, h nodeHandler, direction uint32, props []dictItem, portFla
 // export creates the node on the server and waits until the server has
 // registered it and handed over its transport.
 func (n *node) export(timeout time.Duration) error {
-	if err := n.k.createObject(clientNodeFactory, clientNodeIface, clientNodeVersion, n.props, n.id); err != nil {
+	if err := n.k.createObject(clientNodeFactory, clientNodeIface, n.abi.clientNode, n.props, n.id); err != nil {
 		return err
 	}
 	if err := n.update(); err != nil {
@@ -414,13 +417,15 @@ func (n *node) transport(m *message, f *podIter) error {
 		_ = unix.Close(writeFd)
 		return fmt.Errorf("pipewire: transport: %w", err)
 	}
-	if v := a.serverVersion.Load(); v < activationVersion {
-		act.unmap()
-		_ = rt.Close()
-		_ = unix.Close(writeFd)
-		return fmt.Errorf("pipewire: transport: activation version %d, older than %d", v, activationVersion)
+	if n.abi.v1() {
+		if v := a.serverVersion.Load(); v < activationVersion {
+			act.unmap()
+			_ = rt.Close()
+			_ = unix.Close(writeFd)
+			return fmt.Errorf("pipewire: transport: activation version %d from a server whose version promises %d", v, activationVersion)
+		}
+		a.clientVersion.Store(activationVersion)
 	}
-	a.clientVersion.Store(activationVersion)
 	n.mu.Lock()
 	n.act, n.activation, n.position = act, a, &a.position
 	n.mu.Unlock()
@@ -447,9 +452,9 @@ func (n *node) mapActivation(memID, off, size uint32) (mapping, *nodeActivation,
 	return act, a, nil
 }
 
-// setIO takes the position the node's driver publishes. The node then
-// tells the driver it follows it (active_driver_id), which a v1 client
-// does itself; until then the driver skips it.
+// setIO takes the position the node's driver publishes. With the v1
+// activation the node then tells the driver it follows it
+// (active_driver_id); until then the driver skips it.
 func (n *node) setIO(id, memID, off, size uint32) error {
 	if id != ioPositionID {
 		return nil
@@ -470,14 +475,15 @@ func (n *node) setIO(id, memID, off, size uint32) error {
 	defer n.mu.Unlock()
 	n.posMap.unmap()
 	n.posMap, n.position = pm, pos
-	if pos != nil && n.activation != nil {
+	if pos != nil && n.activation != nil && n.abi.v1() {
 		n.activation.activeDriverID.Store(pos.clock.id.Load())
 	}
 	return nil
 }
 
-// command starts or stops the node's cycles: a v6 client moves its
-// own activation out of INACTIVE when started and back when paused.
+// command starts or stops the node's cycles. With the v1 activation a
+// client-node v6 client moves its own activation out of INACTIVE when
+// started and back when paused; before, the server alone keeps it.
 func (n *node) command(cmd []byte) error {
 	typ, body, ok := podAt(cmd, 0)
 	if !ok || typ != typeObject || len(body) < 8 {
@@ -494,10 +500,10 @@ func (n *node) command(cmd []byte) error {
 	}
 	switch id {
 	case commandStart:
-		if !n.prepared {
+		if !n.prepared && n.abi.v1() {
 			n.activation.status.Store(activationFinished)
-			n.prepared = true
 		}
+		n.prepared = true
 	case commandPause, commandSuspend:
 		return n.unprepare()
 	}
@@ -511,11 +517,20 @@ func (n *node) unprepare() error {
 		return nil
 	}
 	n.prepared = false
+	if !n.abi.v1() {
+		return nil
+	}
 	old := n.activation.status.Swap(activationInactive)
-	if old <= activationAwake && n.activation.flags.Load()&activationFlagAsync == 0 {
+	if old <= activationAwake && !n.async() {
 		return n.triggerTargets(n.now())
 	}
 	return nil
+}
+
+// async is whether the driver resumes the node's peers itself, which
+// only a v1 activation can say.
+func (n *node) async() bool {
+	return n.abi.v1() && n.activation.flags.Load()&activationFlagAsync != 0
 }
 
 func (n *node) portSetParam(seq, dir, port, id uint32, param []byte) error {
@@ -824,26 +839,36 @@ func (n *node) realtime() {
 	}
 }
 
-// cycle is one process cycle, as libpipewire's process_node runs it
-// for a v1 activation: claim the trigger, process, mark the cycle
-// finished and, unless the driver schedules the node asynchronously,
-// wake its peers. It allocates nothing.
+// cycle is one process cycle, as libpipewire's process_node runs it:
+// with the v1 activation claim the trigger, process, mark the cycle
+// finished and, unless the driver resumes the node asynchronously, wake
+// its peers; before 1.2 a woken node always runs and wakes them. It
+// allocates nothing.
 func (n *node) cycle() error {
 	a := n.activation
-	if !a.status.CompareAndSwap(activationTriggered, activationAwake) {
+	v1 := n.abi.v1()
+	if v1 && !a.status.CompareAndSwap(activationTriggered, activationAwake) {
 		return nil
+	}
+	if !v1 {
+		a.status.Store(activationAwake)
 	}
 	a.awakeTime.Store(n.now())
 	a.bits.And(^uint32(activationBitPendingSync))
-	status := int32(statusNeedData)
+	status := int32(statusHaveData)
 	if n.prepared {
 		status = n.h.process(n)
 	}
 	a.state[0].status.Store(status)
 	now := n.now()
-	awake := a.status.CompareAndSwap(activationAwake, activationFinished)
+	finished := true
+	if v1 {
+		finished = a.status.CompareAndSwap(activationAwake, activationFinished)
+	} else {
+		a.status.Store(activationFinished)
+	}
 	a.finishTime.Store(now)
-	if awake && a.flags.Load()&activationFlagAsync == 0 {
+	if finished && !n.async() {
 		return n.triggerTargets(now)
 	}
 	return nil
@@ -864,7 +889,9 @@ func (n *node) triggerTargets(now uint64) error {
 		if t.activation.state[0].pending.Add(-1) != 0 {
 			continue
 		}
-		if !t.activation.status.CompareAndSwap(activationNotTriggered, activationTriggered) {
+		if !n.abi.v1() {
+			t.activation.status.Store(activationTriggered)
+		} else if !t.activation.status.CompareAndSwap(activationNotTriggered, activationTriggered) {
 			continue
 		}
 		t.activation.signalTime.Store(now)
@@ -876,7 +903,9 @@ func (n *node) triggerTargets(now uint64) error {
 }
 
 // cycleSlot is the io slot this cycle writes, by the driver's cycle
-// parity; false without a position.
+// parity; false without a position. Before 1.2 the cycle count is
+// padding, but such a server only hands out plain io, whose two slots
+// are one.
 func (n *node) cycleSlot() (int, bool) {
 	if n.position == nil {
 		return 0, false

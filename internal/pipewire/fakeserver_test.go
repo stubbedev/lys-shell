@@ -20,6 +20,7 @@ type fakeServer struct {
 	t   *testing.T
 	c   *conn
 	act []byte
+	abi activationABI
 }
 
 // serveFake listens where the client connects and returns the server
@@ -90,6 +91,10 @@ func (s *fakeServer) handshake(version string) {
 	seq := s.syncSeq()
 	s.info(version)
 	s.done(seq)
+	var err error
+	if s.abi, err = abiFor(version); err != nil {
+		s.t.Fatal(err)
+	}
 }
 
 // info is the server's core info, with its version.
@@ -118,7 +123,7 @@ func (s *fakeServer) createNode() {
 	s.t.Helper()
 	m := s.expect(coreID, coreMethodCreateObject)
 	f := structFields(m.body)
-	if factory, iface, version := f.string(), f.string(), f.int(); f.err != nil || factory != clientNodeFactory || iface != clientNodeIface || version != clientNodeVersion {
+	if factory, iface, version := f.string(), f.string(), f.int(); f.err != nil || factory != clientNodeFactory || iface != clientNodeIface || uint32(version) != s.abi.clientNode {
 		s.t.Fatalf("create_object %q %q %d: %v", factory, iface, version, f.err)
 	}
 	s.expect(firstObjectID, nodeMethodUpdate)
@@ -126,8 +131,18 @@ func (s *fakeServer) createNode() {
 }
 
 // exportNode registers the node and hands over its transport: an
-// activation in a memfd and two eventfds.
+// activation in a memfd, marked with the server's activation version,
+// and two eventfds.
 func (s *fakeServer) exportNode() {
+	s.t.Helper()
+	s.transport(s.abi.activation)
+	s.expect(firstObjectID, nodeMethodSetActive)
+	s.done(s.syncSeq())
+}
+
+// transport sends the node's transport with an activation claiming
+// version.
+func (s *fakeServer) transport(version uint32) {
 	s.t.Helper()
 	fd, mem, err := memfd(int(pageSize))
 	if err != nil {
@@ -136,7 +151,7 @@ func (s *fakeServer) exportNode() {
 	s.t.Cleanup(func() { _ = unix.Munmap(mem) })
 	s.act = mem
 	binary.LittleEndian.PutUint32(mem[0:], activationInactive)
-	binary.LittleEndian.PutUint32(mem[544:], activationVersion)
+	binary.LittleEndian.PutUint32(mem[544:], version)
 	binary.LittleEndian.PutUint32(mem[556:], activationFlagAsync)
 	rd, err := unix.Eventfd(0, unix.EFD_CLOEXEC|unix.EFD_NONBLOCK)
 	if err != nil {
@@ -152,8 +167,6 @@ func (s *fakeServer) exportNode() {
 	for _, f := range []int{fd, rd, wr} {
 		_ = unix.Close(f)
 	}
-	s.expect(firstObjectID, nodeMethodSetActive)
-	s.done(s.syncSeq())
 }
 
 // started is a Start running against the fake server.
@@ -208,16 +221,16 @@ func TestStartReportsTheServerRefusingTheNode(t *testing.T) {
 	}
 }
 
-// A server older than 1.2.0 is refused before the client creates
+// A server older than 1.0.0 is refused before the client creates
 // anything on it, with both versions named; Start fails with that.
 func TestStartRefusesAServerOlderThanTheActivationItSpeaks(t *testing.T) {
 	s, r := startAgainst(t, func(s *fakeServer) {
 		s.expect(coreID, coreMethodHello)
 		s.expect(clientID, clientMethodUpdateProperties)
 		s.syncSeq()
-		s.info("1.0.5")
+		s.info("0.3.85")
 	})
-	if want := "pipewire: server 1.0.5 is older than 1.2.0, the oldest whose node activation this client speaks"; r.p != nil || r.err == nil || r.err.Error() != want {
+	if want := "pipewire: server 0.3.85 is older than 1.0.0, the oldest whose node activation this client speaks"; r.p != nil || r.err == nil || r.err.Error() != want {
 		t.Fatalf("Start = %v, want %q", r.err, want)
 	}
 	if m, err := s.c.recv(); !errors.Is(err, errServerClosed) {
@@ -305,5 +318,32 @@ func TestAServerErrorMidStreamEndsTheStream(t *testing.T) {
 	var serverErr *ServerError
 	if !errors.As(r.p.Err(), &serverErr) || serverErr.Errno != unix.EIO || !strings.Contains(serverErr.Error(), "node broke") {
 		t.Errorf("Err = %v", r.p.Err())
+	}
+}
+
+// A 1.0 server gets the client-node v5 interface and an activation the
+// client leaves its version fields alone in, as they are padding there;
+// a 1.2 or later server whose activation claims no version is refused,
+// since its memory is not what its version promises.
+func TestAServerBefore12GetsTheVersion0Activation(t *testing.T) {
+	s, r := startAgainst(t, func(s *fakeServer) {
+		s.handshake("1.0.5")
+		s.createNode()
+		s.exportNode()
+	})
+	if r.err != nil {
+		t.Fatalf("a 1.0.5 server: %v", r.err)
+	}
+	if v := binary.LittleEndian.Uint32(s.act[540:]); v != 0 {
+		t.Errorf("the client wrote %d into a 1.0 activation's padding", v)
+	}
+
+	_, bad := startAgainst(t, func(s *fakeServer) {
+		s.handshake("1.6.9")
+		s.createNode()
+		s.transport(0)
+	})
+	if want := "pipewire: transport: activation version 0 from a server whose version promises 1"; bad.p != nil || bad.err == nil || !strings.Contains(bad.err.Error(), want) {
+		t.Errorf("a 1.6.9 server with a version 0 activation: %v", bad.err)
 	}
 }

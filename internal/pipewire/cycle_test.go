@@ -48,7 +48,7 @@ func newCycleRig(t testing.TB, src Source) *cycleRig {
 		cfg:    Config{Width: 64, Height: 32, Stride: 256, Format: VideoBGRx, FPS: 30, Transform: 3, Source: src},
 		damage: make([]Rect, 0, maxDamageRegions),
 	}
-	n := &node{h: p, direction: directionOutput, activation: act, position: &act.position, prepared: true}
+	n := &node{h: p, abi: abiV1, direction: directionOutput, activation: act, position: &act.position, prepared: true}
 	n.wake[0] = 1
 	for i := range uint32(2) {
 		b := buffer{id: i, meta: mapping{data: shared(1024)}, data: make([]byte, 256*32), fd: -1}
@@ -116,6 +116,19 @@ func TestACycleAllocatesNothing(t *testing.T) {
 	}
 }
 
+// The activations of a 1.2 and later server and of a 1.0 one.
+var (
+	abiV1 = activationABI{activation: activationVersion, clientNode: 6}
+	abiV0 = activationABI{activation: 0, clientNode: 5}
+)
+
+// version0 makes the rig a 1.0 server's: no cycle count, so one plain
+// io slot.
+func (r *cycleRig) version0() {
+	r.n.abi = abiV0
+	r.n.mixes[0].slots = [2]*cIOBuffers{&r.io[0], &r.io[0]}
+}
+
 // mallocs counts the heap allocations fn makes, its first call
 // included (testing.AllocsPerRun discards a warm-up run).
 func mallocs(fn func()) uint64 {
@@ -175,18 +188,25 @@ func TestCyclesHandOutFreeBuffersInTurn(t *testing.T) {
 
 // A node the driver schedules synchronously counts itself off each
 // target and wakes the one with nothing left pending; an asynchronous
-// node leaves its targets to the driver.
+// node leaves its targets to the driver. A 1.0 server has no
+// asynchronous nodes: whatever its flags hold, the node wakes its peers.
 func TestASynchronousCycleWakesItsPeers(t *testing.T) {
 	for name, tc := range map[string]struct {
+		abi            activationABI
 		flags, pending uint32
 		wantPending    int32
 		wantWoken      bool
 	}{
-		"synchronous, last dependency":  {0, 1, 0, true},
-		"synchronous, more outstanding": {0, 2, 1, false},
-		"asynchronous":                  {activationFlagAsync, 1, 1, false},
+		"synchronous, last dependency":  {abiV1, 0, 1, 0, true},
+		"synchronous, more outstanding": {abiV1, 0, 2, 1, false},
+		"asynchronous":                  {abiV1, activationFlagAsync, 1, 1, false},
+		"1.0, last dependency":          {abiV0, activationFlagAsync, 1, 0, true},
+		"1.0, more outstanding":         {abiV0, 0, 2, 1, false},
 	} {
 		r := newCycleRig(t, solid{1})
+		if tc.abi == abiV0 {
+			r.version0()
+		}
 		r.act.flags.Store(tc.flags)
 		peer, err := view[nodeActivation](shared(unsafe.Sizeof(nodeActivation{})), 0)
 		if err != nil {
@@ -289,5 +309,32 @@ func TestALinksIOSlotsFollowTheCycleParity(t *testing.T) {
 	f := structFields(m.body)
 	if id, seq, res, msg := f.uint(), f.uint(), f.int(), f.string(); m.opcode != coreMethodError || id != firstObjectID || seq != 9 || res != -int32(unix.ENOENT) || msg != "port_set_io on unknown mix 1.0.6" {
 		t.Errorf("unknown link: %d %d %d %d %q", m.opcode, id, seq, res, msg)
+	}
+}
+
+// A 1.0 server wakes a node without marking it triggered and keeps its
+// status itself: the node runs on every wake-up, into the one io slot,
+// and Start and Pause leave the status alone, where the 1.2 activation
+// would have refused the untriggered cycle.
+func TestAVersion0NodeRunsOnEveryWakeUp(t *testing.T) {
+	r := newCycleRig(t, solid{1})
+	r.version0()
+	for i := range 3 {
+		r.act.status.Store(activationNotTriggered)
+		if err := r.n.cycle(); err != nil {
+			t.Fatal(err)
+		}
+		if s := loadIO(&r.io[0]); s.status != statusHaveData || s.id != uint32(i%2) || r.act.status.Load() != activationFinished {
+			t.Errorf("wake-up %d: slot %+v, status %d", i, s, r.act.status.Load())
+		}
+	}
+	r.act.status.Store(activationNotTriggered)
+	for _, id := range []uint32{commandPause, commandStart} {
+		if err := r.n.command(object(commandTypeNode, id)); err != nil {
+			t.Fatal(err)
+		}
+		if st := r.act.status.Load(); st != activationNotTriggered {
+			t.Errorf("command %d moved the status to %d", id, st)
+		}
 	}
 }

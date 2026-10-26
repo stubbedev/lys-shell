@@ -9,7 +9,7 @@ title: Getting started on Debian / Ubuntu
 Go, plus the libraries lys-shell loads at runtime (GLib, GStreamer for the screen
 recorder, PAM for the lock screen, Vulkan for GPU rendering and zero-copy screen
 sharing). Screen sharing speaks to the PipeWire daemon directly and needs
-PipeWire 1.2 or newer:
+PipeWire 1.0 or newer:
 
 ```sh
 sudo apt install golang-go git just libglib2.0-0t64 libgstreamer1.0-0 \

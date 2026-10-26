@@ -47,11 +47,13 @@ const (
 	clientEventPermissions       = 1
 )
 
-// minServer is the oldest server whose node activation this client
-// speaks: 1.2.0 introduced the client and server activation versions,
-// compare-and-swap status changes and client-node v6, where a client
-// moves its own node out of INACTIVE.
-var minServer = serverVersion{1, 2, 0}
+// minServer is the oldest server this client was run against and
+// speaks the node activation of.
+var minServer = serverVersion{1, 0, 0}
+
+// activationV1Server is the first server with the version 1 activation
+// and client-node v6.
+var activationV1Server = serverVersion{1, 2, 0}
 
 // serverVersion is a server's major.minor.micro, from core info.
 type serverVersion [3]int
@@ -92,16 +94,19 @@ func parseServerVersion(s string) (serverVersion, error) {
 	return v, nil
 }
 
-// checkServer refuses a server older than minServer.
-func checkServer(version string) error {
+// abiFor is the activation a server of version speaks; a server older
+// than minServer is refused.
+func abiFor(version string) (activationABI, error) {
 	v, err := parseServerVersion(version)
-	if err != nil {
-		return err
+	switch {
+	case err != nil:
+		return activationABI{}, err
+	case v.less(minServer):
+		return activationABI{}, fmt.Errorf("pipewire: server %s is older than %s, the oldest whose node activation this client speaks", v, minServer)
+	case v.less(activationV1Server):
+		return activationABI{activation: 0, clientNode: 5}, nil
 	}
-	if v.less(minServer) {
-		return fmt.Errorf("pipewire: server %s is older than %s, the oldest whose node activation this client speaks", v, minServer)
-	}
-	return nil
+	return activationABI{activation: activationVersion, clientNode: 6}, nil
 }
 
 // ServerError is an error the server reported on one of the
@@ -144,6 +149,7 @@ type core struct {
 	stopped  chan struct{}
 	onStop   func(error)
 	infoSeen bool
+	abi      activationABI
 }
 
 // connectCore dials the server, says hello and checks its version.
@@ -397,11 +403,12 @@ func (k *core) info(f *podIter) error {
 	if f.err != nil {
 		return nil
 	}
-	if err := checkServer(version); err != nil {
+	abi, err := abiFor(version)
+	if err != nil {
 		return err
 	}
 	k.mu.Lock()
-	k.infoSeen = true
+	k.infoSeen, k.abi = true, abi
 	k.mu.Unlock()
 	return nil
 }

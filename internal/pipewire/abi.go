@@ -6,10 +6,12 @@ import "sync/atomic"
 // (src/pipewire/private.h): everything up to and including the
 // position, which is all a node reads or writes. The server's struct
 // continues past it; the transport's size must cover at least this
-// much. This and the other shared-memory mirrors here are ABI, stable
-// from PipeWire 1.2.0 (the oldest server this client accepts) to 1.6;
-// abi_test.go pins every offset against the C compiler's. The fields
-// the server and its clients share across processes are atomics.
+// much. This and the other shared-memory mirrors here lay out the same
+// bytes from PipeWire 1.0 to 1.6, abi_test.go pinning every offset
+// against the C compiler's; before 1.2 the versions, the driver ids and
+// the clock's cycle are padding, which activationABI says not to touch.
+// The fields the server and its clients share across processes are
+// atomics.
 type nodeActivation struct {
 	status         atomic.Uint32
 	bits           atomic.Uint32
@@ -55,11 +57,27 @@ const (
 	// activationFlagAsync marks a node the driver schedules
 	// asynchronously: it triggers no peers itself.
 	activationFlagAsync = 1 << 1
-	// activationVersion is PW_VERSION_NODE_ACTIVATION, the semantics
-	// this client speaks (status changes by compare-and-swap; a
-	// client-node v6 client moves itself out of INACTIVE).
+	// activationVersion is PW_VERSION_NODE_ACTIVATION from 1.2.0 on:
+	// status changes by compare-and-swap, and a client-node v6 client
+	// moves itself out of INACTIVE.
 	activationVersion = 1
 )
+
+// activationABI is how a server of a given version drives a node: the
+// activation's semantics and the client-node interface it speaks.
+type activationABI struct {
+	// activation is 0 before PipeWire 1.2.0: statuses are plain stores,
+	// a woken node always runs and always wakes its peers, and the
+	// activation carries no versions, driver ids or cycle count (the io
+	// is never double-buffered). It is activationVersion from 1.2.0:
+	// compare-and-swap, INACTIVE, nodes the driver resumes
+	// asynchronously, and a client that names the driver it follows.
+	activation uint32
+	clientNode uint32
+}
+
+// v1 is whether the server speaks the 1.2.0 activation.
+func (a activationABI) v1() bool { return a.activation >= activationVersion }
 
 // ioPosition is struct spa_io_position; only its clock is read.
 type ioPosition struct {
