@@ -45,9 +45,6 @@
         # route through to the backend.
         XDG_DESKTOP_PORTAL = "${pkgs.xdg-desktop-portal}/libexec/xdg-desktop-portal";
 
-        # The recorder's GStreamer pipeline finds its plugins via this path.
-        GST_PLUGIN_SYSTEM_PATH_1_0 = self'.packages.lys-shell.gstPluginPath;
-
         # lys-ui is pure Go by design; keep accidental cgo out (`just race`
         # re-enables it per invocation).
         CGO_ENABLED = "0";

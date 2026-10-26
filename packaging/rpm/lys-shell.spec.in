@@ -17,19 +17,11 @@ BuildRequires:  desktop-file-utils
 BuildRequires:  systemd-rpm-macros
 Requires:       hicolor-icon-theme
 # Loaded at runtime through purego, so rpm finds no ELF dependency on them.
-Requires:       glib2
-Requires:       gstreamer1
 Requires:       pam
 Requires:       pipewire-libs
 Recommends:     vulkan-loader
 Recommends:     mesa-vulkan-drivers
 Recommends:     xdg-desktop-portal
-Recommends:     pipewire-gstreamer
-Recommends:     gstreamer1-plugins-base
-Recommends:     gstreamer1-plugins-good
-Recommends:     gstreamer1-plugins-bad-free
-Recommends:     gstreamer1-plugins-ugly-free
-Recommends:     gstreamer1-plugin-libav
 Suggests:       pipewire-pulseaudio
 Suggests:       wireplumber
 Suggests:       NetworkManager

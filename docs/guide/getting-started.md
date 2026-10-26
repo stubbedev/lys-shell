@@ -35,13 +35,12 @@ lys-shell loads these libraries, so install them from your distribution:
 
 | Library   | Used by                                                    |
 | --------- | ---------------------------------------------------------- |
-| GLib 2    | the screen recorder                                        |
-| GStreamer | the screen recorder                                        |
 | PAM       | the lock screen and greeter                                |
 | PipeWire  | screen sharing (ScreenCast)                                |
-| Vulkan    | GPU rendering and zero-copy screen sharing (optional)      |
+| Vulkan    | GPU rendering, zero-copy screen sharing, the screen recorder |
 
-The screen recorder also loads GStreamer's base, good, bad, ugly, libav and
-PipeWire plugin sets.
+The screen recorder needs Vulkan and a GPU whose driver exposes an H.264
+video encoder (Vulkan Video); without one it reports that it cannot record.
+Everything else falls back to the CPU without Vulkan.
 
 </details>

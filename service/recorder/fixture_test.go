@@ -205,6 +205,9 @@ type probed struct {
 	Streams []struct {
 		CodecName string `json:"codec_name"`
 		CodecType string `json:"codec_type"`
+		Profile   string `json:"profile"`
+		Width     int    `json:"width"`
+		Height    int    `json:"height"`
 		Frames    string `json:"nb_read_frames"`
 	} `json:"streams"`
 	Packets []struct {
@@ -222,7 +225,7 @@ type probed struct {
 func ffprobe(t *testing.T, path string) probed {
 	t.Helper()
 	cmd := exec.Command("ffprobe", "-v", "error", "-count_frames", "-show_entries",
-		"stream=codec_name,codec_type,nb_read_frames:packet=stream_index,pts_time,flags:format=duration", "-of", "json", path)
+		"stream=codec_name,codec_type,profile,width,height,nb_read_frames:packet=stream_index,pts_time,flags:format=duration", "-of", "json", path)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

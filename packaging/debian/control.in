@@ -16,20 +16,12 @@ Architecture: amd64 arm64
 Depends:
  ${misc:Depends},
  hicolor-icon-theme,
- libglib2.0-0t64 | libglib2.0-0,
- libgstreamer1.0-0,
  libpam0g,
  libpipewire-0.3-0t64 | libpipewire-0.3-0
 Recommends:
  libvulkan1,
  mesa-vulkan-drivers,
- xdg-desktop-portal,
- gstreamer1.0-pipewire,
- gstreamer1.0-plugins-base,
- gstreamer1.0-plugins-good,
- gstreamer1.0-plugins-bad,
- gstreamer1.0-plugins-ugly,
- gstreamer1.0-libav
+ xdg-desktop-portal
 Suggests:
  dbus-user-session,
  bluez,
@@ -43,5 +35,6 @@ Description: Wayland desktop shell
  launcher, notifications, OSD, lock screen, greeter and an xdg-desktop-portal
  backend, configured in YAML or through the lys-settings GUI.
  .
- The binaries are Go with no cgo; they load GLib, GStreamer, PAM and PipeWire
- at runtime, and Vulkan when it is installed.
+ The binaries are Go with no cgo; they load PAM and PipeWire at runtime, and
+ Vulkan when it is installed (the screen recorder needs it, with a GPU that
+ encodes H.264).

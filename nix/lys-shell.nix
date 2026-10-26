@@ -2,38 +2,17 @@
   lib,
   buildGoModule,
   makeWrapper,
-  glib,
   pam,
-  pipewire,
   vulkan-loader,
-  gst_all_1,
 }:
 let
-  # GStreamer plugins the recorder's pipelines load at runtime
-  # (pipewiresrc, v4l2src, x264enc, opusenc, mp4/matroska/webm mux,
-  # compositor).
-  gstPlugins = (with gst_all_1; [
-    gstreamer
-    gst-plugins-base
-    gst-plugins-good
-    gst-plugins-bad
-    gst-plugins-ugly
-    gst-libav
-  ]) ++ [ pipewire ];
-
-  # Where GStreamer finds those plugins. getLib, not the default output:
-  # gstreamer's first output is -bin, which carries no plugins, so the
-  # core elements (filesink, queue) would go missing.
-  gstPluginPath = lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" gstPlugins;
-
-  # The libraries the binaries dlopen through purego: libgstreamer and
-  # libglib (recorder), libpam (lock screen) and libvulkan (lys-lib's GPU
-  # renderer, which falls back to the CPU without it, and the portal's
-  # zero-copy dmabufs, which fall back to shared memory). The portal
-  # speaks PipeWire's protocol itself and loads no libpipewire.
+  # The libraries the binaries dlopen through purego: libpam (lock
+  # screen) and libvulkan (lys-lib's GPU renderer, which falls back to the
+  # CPU without it, the portal's zero-copy dmabufs, which fall back to
+  # shared memory, and the recorder's capture and H.264 encoding, which
+  # have no fallback). The portal speaks PipeWire's protocol itself and
+  # loads no libpipewire.
   libs = [
-    gst_all_1.gstreamer
-    glib
     pam
     vulkan-loader
   ];
@@ -95,13 +74,11 @@ buildGoModule {
 
   nativeBuildInputs = [ makeWrapper ];
 
-  # The dlopened libraries on the loader path, and the recorder's
-  # GStreamer plugins on GST_PLUGIN_SYSTEM_PATH_1_0.
+  # The dlopened libraries on the loader path.
   postFixup = ''
     for bin in lys-shell lys-greeter lys-lock lys-settings; do
       wrapProgram $out/bin/$bin \
-        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libs}" \
-        --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${gstPluginPath}"
+        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libs}"
     done
   '';
 
@@ -135,8 +112,8 @@ buildGoModule {
     install -Dm0644 resources/lys-shell-portals.conf -t $out/share/lys-shell
   '';
 
-  # The dev shell puts the same libraries and plugins on its paths.
-  passthru = { inherit libs gstPluginPath; };
+  # The dev shell puts the same libraries on its loader path.
+  passthru = { inherit libs; };
 
   meta = {
     description = "Wayland desktop shell";

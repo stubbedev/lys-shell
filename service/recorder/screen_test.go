@@ -251,6 +251,7 @@ func TestNoH264EncoderIsTheDefinedError(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s encodes H.264, yet: %v", d.Name(), err)
 		}
+		t.Logf("%s encodes %v", d.Name(), d.Codecs())
 		return
 	}
 	if !errors.Is(err, ErrNoVideoEncoder) || !strings.Contains(err.Error(), d.Name()) {

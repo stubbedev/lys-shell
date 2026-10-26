@@ -110,6 +110,15 @@ hyprland-vm:
 # Lint, test, race, and the schema check. Run before every release.
 check: lint test race schema-check
 
+# Check the screen recorder on this machine's GPU (run it in the dev
+# shell): a private headless sway renders on the first render node with
+# Vulkan, the recorder records 3 s of it into MP4 and Matroska with
+# audio, and the log shows the Vulkan device, the modifier the capture
+# took, the codecs the device encodes, and ffprobe's reading of each
+# file. A GPU without an H.264 encoder says so instead.
+recorder-check:
+    {{go}} test -count=1 -v -run '^(TestNoH264EncoderIsTheDefinedError|TestRecordsAnOutputOnTheGPU|TestWebcamOverlayIsEncodedIntoTheFrame)$' ./service/recorder/
+
 # ─────────────────────────── Generated files ───────────────────────────
 
 # Regenerate the committed config JSON schema. Its $id embeds the version,
