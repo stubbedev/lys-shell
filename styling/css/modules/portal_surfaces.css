@@ -40,8 +40,12 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.file-chooser-colheader button.file-chooser-col {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .file-chooser-col-grip {
-  min-width: 7px;
   background: transparent;
 }
 

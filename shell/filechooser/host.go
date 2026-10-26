@@ -48,9 +48,9 @@ const (
 	previewIconPx        = 96
 	navIconPx            = 16
 	minColumnW           = 50
+	nameMinW             = 160
 	maxColumnW           = 400
 	crumbMaxChars        = 16
-	colGripPx            = 7
 	thumbWorkers         = 4
 )
 
@@ -357,6 +357,7 @@ type ui struct {
 	list, grid              *widget.List
 	listView, gridView      *typeAhead
 	colHeader               *widget.Box
+	colRow                  *columnRow
 	sortButtons             [4]*widget.Button
 	sortLabels              [4]*widget.Label
 	columns                 [3]widget.Widget
@@ -674,23 +675,16 @@ func (c *Chooser) refreshLocations() {
 // views is the column header over the list and grid, with the empty
 // label and the quick look card over them.
 func (c *Chooser) views(u *ui) widget.Widget {
-	u.colHeader = widget.NewBox(widget.Row, 0, 0)
-	u.colHeader.AddClass("file-chooser-colheader")
-	for col := range u.sortButtons {
-		sort := intconv.Clamp[SortColumn](col)
-		b, l := c.textButton("", "file-chooser-col", css.Ghost, func() { c.sortBy(sort) })
-		b.AddClass(css.Small)
-		l.AddClass(css.Caption, css.DimLabel)
-		l.SetAlignment(render.AlignStart)
-		u.sortButtons[col], u.sortLabels[col] = b, l
-		if col == int(SortName) {
-			u.colHeader.Append(b, true)
-			continue
-		}
-		u.colHeader.Append(c.columnGrip(col-1), false)
-		u.columns[col-1] = widgets.Pin(b, c.columns[col-1], 0)
-		u.colHeader.Append(u.columns[col-1], false)
+	th := widget.Current()
+	lead := c.sortButton(u, SortName)
+	var cols, grips [3]widget.Widget
+	for i := range cols {
+		grips[i], cols[i] = c.columnGrip(i), c.sortButton(u, intconv.Clamp[SortColumn](i+1))
 	}
+	u.columns = cols
+	u.colRow = newColumnRow(lead, cols, grips, c.columns, th.Spacing)
+	u.colHeader = rowBox("file-chooser-colheader", th.Padding/2+th.Padding)
+	u.colHeader.Append(u.colRow, true)
 
 	u.list = widget.NewList[widget.Widget](rows{c, false}, listRowH)
 	u.list.AddClass("file-chooser-list")
@@ -721,22 +715,55 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	stack.AppendAligned(u.empty, widget.AlignCenter, widget.AlignCenter)
 	stack.AppendAligned(u.quicklook, widget.AlignCenter, widget.AlignCenter)
 
+	inset := widget.NewBox(widget.Column, 0, 0)
+	inset.SetPadding(render.Insets{Top: th.Padding / 2, Right: th.Padding / 2, Bottom: th.Padding / 2, Left: th.Padding / 2})
+	inset.Append(stack, true)
+
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.Append(u.colHeader, false)
-	col.Append(stack, true)
+	col.Append(inset, true)
 	return col
 }
 
+// sortButton is col's header: its title, sorting by it on a click.
+func (c *Chooser) sortButton(u *ui, col SortColumn) *widget.Button {
+	b, l := c.textButton("", "file-chooser-col", css.Ghost, func() { c.sortBy(col) })
+	b.AddClass(css.Small)
+	l.AddClass(css.Caption, css.DimLabel)
+	l.SetAlignment(cellAlignment(col))
+	u.sortButtons[col], u.sortLabels[col] = b, l
+	return b
+}
+
+// rowBox is a row of the list view, or the header over them, inset by
+// pad on both sides: the header's pad adds the views' inset to the
+// rows', so both start their columns at one x.
+func rowBox(class string, pad int) *widget.Box {
+	b := widget.NewBox(widget.Row, 0, 0)
+	b.AddClass(class)
+	b.SetPadding(render.Insets{Left: pad, Right: pad})
+	return b
+}
+
+// cellAlignment aligns a column's header and cells: the numbers (size
+// and modified) to the end, the text to the start.
+func cellAlignment(col SortColumn) render.Alignment {
+	if col == SortSize || col == SortModified {
+		return render.AlignEnd
+	}
+	return render.AlignStart
+}
+
 // columnGrip resizes column i (size, modified, kind) by dragging its
-// left edge: left grows it.
+// left edge: left grows it, as far as the name column keeps its floor.
 func (c *Chooser) columnGrip(i int) widget.Widget {
 	var base int
 	g := newColumnGrip()
 	g.AddClass("file-chooser-col-grip")
 	g.onStart = func() { base = c.columns[i] }
 	g.onDrag = func(dx int) {
-		c.columns[i] = min(max(base-dx, minColumnW), maxColumnW)
-		widgets.Pin(c.ui.columns[i], c.columns[i], 0)
+		c.columns[i] = max(min(base-dx, maxColumnW, c.ui.colRow.room(i)), minColumnW)
+		c.ui.colRow.setWidths(c.columns)
 	}
 	g.onEnd = func() { c.ui.list.Refresh() }
 	return g
@@ -785,12 +812,8 @@ func (m rows) Row(i int) widget.Widget {
 // tint, by model index so it holds while the list scrolls.
 func (c *Chooser) fileRow(e Entry, alt bool) widget.Widget {
 	th := widget.Current()
-	row := widget.NewBox(widget.Row, th.Spacing, 0)
-	row.AddClass("file-chooser-row")
-	row.SetClass("alt", alt)
-	row.SetPadding(render.Insets{Left: th.Padding, Right: th.Padding})
-	icon := c.entryIcon(e, rowIconPx)
-	row.Append(icon, false)
+	lead := widget.NewBox(widget.Row, th.Spacing, 0)
+	lead.Append(c.entryIcon(e, rowIconPx), false)
 	name := c.label(c.s.displayName(e))
 	// A recursive match is a relative path: keep both ends in view.
 	if c.s.searching() {
@@ -798,19 +821,21 @@ func (c *Chooser) fileRow(e Entry, alt bool) widget.Widget {
 	} else {
 		name.SetEllipsize(widget.EllipsizeEnd)
 	}
-	row.Append(name, true)
+	lead.Append(name, true)
 	size := "--"
 	if !e.IsDir {
 		size = HumanSize(e.Size)
 	}
+	var cells [3]widget.Widget
 	for i, text := range []string{size, FormatTime(e.Modified), e.Kind()} {
 		cell := c.label(text, "file-chooser-cell", css.DimLabel)
 		cell.SetEllipsize(widget.EllipsizeEnd)
-		if i < 2 {
-			cell.SetAlignment(render.AlignEnd)
-		}
-		row.Append(widgets.Pin(cell, c.columns[i], 0), false)
+		cell.SetAlignment(cellAlignment(intconv.Clamp[SortColumn](i + 1)))
+		cells[i] = cell
 	}
+	row := rowBox("file-chooser-row", th.Padding)
+	row.SetClass("alt", alt)
+	row.Append(newColumnRow(lead, cells, [3]widget.Widget{}, c.columns, th.Spacing), true)
 	return row
 }
 

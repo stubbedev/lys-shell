@@ -732,7 +732,9 @@ func insertText(t *testing.T, data []byte, key, value string) []byte {
 // release, not on every motion.
 func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	hs := newHarness(t, "")
+	hs.c.size = widget.Size{W: panelMaxW, H: panelMaxH}
 	hs.open(t, OpenRequest{})
+	const W, H = 1800, 1200
 	var grips []*columnGrip
 	hs.run(func() { grips = treetest.All[*columnGrip](hs.cfg.Root) })
 	if len(grips) != 3 {
@@ -745,7 +747,7 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	paint := func() []uint8 {
 		var px []uint8
 		hs.do(func() {
-			lay(hs.cfg.Root, 1200, 800)
+			lay(hs.cfg.Root, W, H)
 			l := hs.c.ui.list
 			l.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 200}})
 			l.Arrange(render.Rect{W: 600, H: 200})
@@ -757,7 +759,7 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	before := paint()
 	var r *widget.Router
 	var at widget.Point
-	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, col, 1200, 800) })
+	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, col, W, H) })
 	if got := r.Hovered(); got != widget.Widget(col) {
 		t.Fatalf("the pointer rests on %T, want the kind column's grip", got)
 	}
@@ -788,10 +790,40 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	if slices.Equal(paint(), before) {
 		t.Error("releasing the grip left the rows at the old widths")
 	}
-	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, col, 1200, 800) })
+	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, col, W, H) })
 	hs.do(func() { drag(r, at, widget.Point{X: at.X + 5000, Y: at.Y}) })
 	if hs.c.columns[2] != minColumnW {
 		t.Errorf("kind column = %d, want clamped to %d", hs.c.columns[2], minColumnW)
+	}
+}
+
+// A column grows only as far as the name column keeps its floor: the
+// drag stops there instead of squeezing the name or hiding the column.
+func TestColumnGripKeepsTheNameFloor(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{})
+	const W, H = 1200, 800
+	var grips []*columnGrip
+	hs.run(func() { grips = treetest.All[*columnGrip](hs.cfg.Root) })
+	var r *widget.Router
+	var at widget.Point
+	hs.do(func() { settle(hs.cfg.Root, W, H) })
+	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, grips[2], W, H) })
+	hs.do(func() { drag(r, at, widget.Point{X: at.X - 300, Y: at.Y}) })
+	if hs.c.columns[2] >= maxColumnW {
+		t.Fatalf("kind column = %d, want held under %d by the name's floor", hs.c.columns[2], maxColumnW)
+	}
+	var name, kind render.Rect
+	hs.do(func() {
+		lay(hs.cfg.Root, W, H)
+		name = hs.c.ui.sortButtons[SortName].Bounds()
+		kind = hs.c.ui.sortButtons[SortKind].Bounds()
+	})
+	if !hs.c.ui.sortButtons[SortKind].Visible() || kind.W != hs.c.columns[2] {
+		t.Errorf("kind header shown=%v %dpx wide, want shown at the column's %d", hs.c.ui.sortButtons[SortKind].Visible(), kind.W, hs.c.columns[2])
+	}
+	if name.W != nameMinW {
+		t.Errorf("name header = %dpx wide, want held at its floor %d", name.W, nameMinW)
 	}
 }
 
@@ -1825,12 +1857,20 @@ func TestPanelRevealsAndHidesWithItsAnimation(t *testing.T) {
 	}
 }
 
-// frame paints the whole surface at w x h as its window does and reads
-// back its pixels.
+// settle lays root out twice, as its window does across the first two
+// frames: the first layout styles the tree, which invalidates it, and
+// the second lays it out as styled.
+func settle(root widget.Widget, w, h int) {
+	lay(root, w, h)
+	lay(root, w, h)
+}
+
+// frame paints the whole surface at w x h as its window does once its
+// layout settled, and reads back its pixels.
 func (hs *harness) frame(w, h int) func(x, y int) render.Color {
 	px := make([]uint8, w*h*4)
 	hs.do(func() {
-		lay(hs.cfg.Root, w, h)
+		settle(hs.cfg.Root, w, h)
 		hs.cfg.Root.Paint(render.New(px, w*4, w, h))
 	})
 	return func(x, y int) render.Color {
@@ -1896,5 +1936,92 @@ func TestListRowsPaintTheirFills(t *testing.T) {
 	}
 	if got := at(x, rowY(2)); got != blank {
 		t.Errorf("row 2 paints %v with the pointer elsewhere, want the view's own %v", got, blank)
+	}
+}
+
+// listRowCells lays the surface out and row i in its band of the list,
+// under the list as the list places it, and returns the row's icon and
+// its size, modified and kind cells.
+func (hs *harness) listRowCells(t *testing.T, i, w, h int) (widget.Widget, []widget.Widget) {
+	t.Helper()
+	hs.frame(w, h)
+	var icon widget.Widget
+	var cells []widget.Widget
+	hs.run(func() {
+		lb := hs.c.ui.list.Bounds()
+		row := rows{hs.c, false}.Row(i)
+		widget.SetParents(hs.c.ui.list, row)
+		band := render.Rect{X: lb.X, Y: lb.Y + i*listRowH, W: lb.W, H: listRowH}
+		row.Measure(widget.Constraints{Min: widget.Size{W: band.W, H: band.H}, Max: widget.Size{W: band.W, H: band.H}})
+		row.Arrange(band)
+		cells = treetest.WithClass(row, "file-chooser-cell")
+		icon = treetest.All[*columnRow](row)[0].lead.(*widget.Box).Children()[0]
+	})
+	return icon, cells
+}
+
+// Every column header sits over its values: the same span, the same
+// text alignment, the numbers flush right and the text flush left, and
+// the name header starts where the row's icon does.
+func TestColumnHeadersSitOverTheirValues(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{})
+	icon, cells := hs.listRowCells(t, 0, 1200, 800)
+	if len(cells) != 3 {
+		t.Fatalf("%d cells in a row, want size, modified and kind", len(cells))
+	}
+	hs.run(func() {
+		if hx, ix := hs.c.ui.sortLabels[SortName].Bounds().X, icon.(widget.Boundser).Bounds().X; hx != ix {
+			t.Errorf("name header text at x=%d, want the icon's x=%d", hx, ix)
+		}
+		for i, cell := range cells {
+			col := SortColumn(i + 1)
+			head := hs.c.ui.sortLabels[col]
+			hb, cb := head.Bounds(), cell.(widget.Boundser).Bounds()
+			if hb.X != cb.X || hb.W != cb.W {
+				t.Errorf("column %d header text spans x=%d+%d, want its cells' x=%d+%d", col, hb.X, hb.W, cb.X, cb.W)
+			}
+			if ha, ca := head.Alignment(), cell.(*widget.Label).Alignment(); ha != ca {
+				t.Errorf("column %d header aligns %v, want its cells' %v", col, ha, ca)
+			}
+		}
+		if a := hs.c.ui.sortLabels[SortSize].Alignment(); a != render.AlignEnd {
+			t.Errorf("size header aligns %v, want flush right over the numbers", a)
+		}
+		if a := hs.c.ui.sortLabels[SortKind].Alignment(); a != render.AlignStart {
+			t.Errorf("kind header aligns %v, want flush left over the text", a)
+		}
+	})
+}
+
+// With the preview open at the default size the name keeps its floor:
+// the columns give way from the kind on, header and rows alike, and
+// without the preview they all show again.
+func TestColumnsGiveWayToTheName(t *testing.T) {
+	hs := newHarness(t, "")
+	touch(t, hs.root, "a-file-name-long-enough-to-overflow-any-sane-name-column-width.txt")
+	hs.open(t, OpenRequest{})
+	shown := func() (head, cells [3]bool) {
+		_, cs := hs.listRowCells(t, 0, 1200, 800)
+		hs.run(func() {
+			for i := range head {
+				head[i] = hs.c.ui.sortButtons[i+1].Visible()
+				cells[i] = cs[i].(*widget.Label).Visible()
+			}
+		})
+		return head, cells
+	}
+	if head, cells := shown(); head != [3]bool{true, true, true} || cells != head {
+		t.Errorf("without the preview: header %v, cells %v; want every column", head, cells)
+	}
+	hs.do(func() { hs.c.togglePreview(true) })
+	head, cells := shown()
+	if want := [3]bool{false, true, false}; head != want || cells != want {
+		t.Errorf("size, modified, kind shown: header %v, cells %v; want %v", head, cells, want)
+	}
+	var name render.Rect
+	hs.run(func() { name = hs.c.ui.sortButtons[SortName].Bounds() })
+	if name.W < nameMinW {
+		t.Errorf("name column = %dpx, want at least %d", name.W, nameMinW)
 	}
 }
