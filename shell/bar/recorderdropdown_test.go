@@ -220,16 +220,18 @@ func TestRecorderSettingsAreItemCards(t *testing.T) {
 	}
 }
 
-// styledWebcamDropdown is the recorder dropdown with a camera, the
-// stylesheet attached, laid out at width w.
-func styledWebcamDropdown(t *testing.T, w int) *recorderView {
+// styledWebcamDropdown is the recorder dropdown with a camera named
+// camera, selected, the stylesheet attached, laid out at width w.
+func styledWebcamDropdown(t *testing.T, w int, camera string) *recorderView {
 	t.Helper()
 	prev := recorderCameras
 	recorderCameras = func() []recorder.DeviceChoice {
-		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}}
+		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: camera}}
 	}
 	t.Cleanup(func() { recorderCameras = prev })
-	ctx := styledContext(t, config.Defaults())
+	cfg := config.Defaults()
+	cfg.Recorder.WebcamDevice = "/dev/video0"
+	ctx := styledContext(t, cfg)
 	v := recorderDropdown(ctx).(*recorderView)
 	t.Cleanup(v.dropdownClosed)
 	ctx.Theme.Attach(v)
@@ -242,7 +244,7 @@ func styledWebcamDropdown(t *testing.T, w int) *recorderView {
 // and switch have from theirs, on every side.
 func TestRecorderPositionPickerInsetLikeTheRows(t *testing.T) {
 	for _, w := range []int{300, 360, 480} {
-		v := styledWebcamDropdown(t, w)
+		v := styledWebcamDropdown(t, w, "Cam")
 		card := treetest.WithClass(v, "recorder-card")[1]
 		switchRow := treetest.WithClass(card, "recorder-row")[0]
 		title := boundsOf(treetest.WithClass(switchRow, "title")[0])
@@ -272,7 +274,7 @@ func TestRecorderPositionPickerInsetLikeTheRows(t *testing.T) {
 // preview out of its card: the frame stays inside the card's content
 // and the webcam frame inside the screen frame, wherever it sits.
 func TestRecorderPositionPickerStaysInsideANarrowCard(t *testing.T) {
-	v := styledWebcamDropdown(t, 260)
+	v := styledWebcamDropdown(t, 260, "Cam")
 	cb := boundsOf(treetest.WithClass(v, "recorder-card")[1])
 	fb := v.preview.frame.Bounds()
 	if fb.X < cb.X || fb.X+fb.W > cb.X+cb.W || fb.Y+fb.H > cb.Y+cb.H {
@@ -284,6 +286,52 @@ func TestRecorderPositionPickerStaysInsideANarrowCard(t *testing.T) {
 		if cam := v.preview.cam.Bounds(); cam.X < fb.X || cam.Y < fb.Y || cam.X+cam.W > fb.X+fb.W || cam.Y+cam.H > fb.Y+fb.H {
 			t.Errorf("at %v the webcam frame %v leaves the screen frame %v", at, cam, fb)
 		}
+	}
+}
+
+// cameraSelect is the webcam card's camera picker and the right edge
+// of its rows' content, where the webcam switch ends.
+func cameraSelect(t *testing.T, v *recorderView) (*widget.Dropdown, int) {
+	t.Helper()
+	card := treetest.WithClass(v, "recorder-card")[1]
+	sw := boundsOf(treetest.First[*widget.Switch](t, card))
+	return treetest.First[*widget.Dropdown](t, card), sw.X + sw.W
+}
+
+// A camera named past the row's room narrows its select to the row:
+// the select ends where the switch above it ends, narrower than its
+// label wants, rather than running out of the card.
+func TestRecorderLongCameraSelectNarrowsToItsRow(t *testing.T) {
+	v := styledWebcamDropdown(t, 360, "Creative Live! Cam Sync 4K Analog Stereo")
+	d, edge := cameraSelect(t, v)
+	b := d.Bounds()
+	if b.X+b.W != edge {
+		t.Errorf("the select ends at %d, the rows' content at %d", b.X+b.W, edge)
+	}
+	if natural := d.Measure(widget.Constraints{Max: widget.Size{W: 1 << 12, H: 1 << 12}}).W; b.W >= natural {
+		t.Errorf("the select is %dpx, its label wants %dpx: it did not narrow", b.W, natural)
+	}
+
+	v.syncMics([]recorder.DeviceChoice{{ID: "", Label: "Default"}, {ID: "usb", Label: "Creative Live! Cam Sync 4K Analog Stereo"}})
+	arrangeDropdown(t, v, 360, 1000)
+	audio := treetest.WithClass(v, "recorder-card")[0]
+	sw := boundsOf(treetest.First[*widget.Switch](t, audio))
+	if mb := v.micPicker.Bounds(); mb.X+mb.W != sw.X+sw.W {
+		t.Errorf("the source select ends at %d, the rows' content at %d", mb.X+mb.W, sw.X+sw.W)
+	}
+}
+
+// A camera whose name fits keeps the select at its natural width, at
+// the rows' content edge: the row gives room, it does not squeeze.
+func TestRecorderShortCameraSelectKeepsItsWidth(t *testing.T) {
+	v := styledWebcamDropdown(t, 360, "Cam")
+	d, edge := cameraSelect(t, v)
+	b := d.Bounds()
+	if natural := d.Measure(widget.Constraints{Max: widget.Size{W: 1 << 12, H: 1 << 12}}).W; b.W != natural {
+		t.Errorf("the select is %dpx, its natural width %dpx", b.W, natural)
+	}
+	if b.X+b.W != edge {
+		t.Errorf("the select ends at %d, the rows' content at %d", b.X+b.W, edge)
 	}
 }
 
