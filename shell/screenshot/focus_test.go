@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/sway"
 )
 
@@ -56,5 +57,30 @@ func TestSwayWindows(t *testing.T) {
 	want := []image.Rectangle{image.Rect(10, 10, 20, 20), image.Rect(100, 0, 200, 100), image.Rect(0, 0, 100, 100)}
 	if got := swayWindows(wins); !slices.Equal(got, want) {
 		t.Errorf("sway windows = %v, want %v", got, want)
+	}
+}
+
+func TestLysWMWindows(t *testing.T) {
+	rect := func(x, y, w, h int) lyswm.Rect { return lyswm.Rect{X: x, Y: y, Width: w, Height: h} }
+	workspaces := []lyswm.Workspace{{ID: 1, Visible: true}, {ID: 2}, {ID: 3, Visible: true}}
+	wins := []lyswm.Window{
+		{ID: 1, Workspace: 1, Rect: rect(0, 0, 100, 100)},
+		{ID: 2, Workspace: 1, Floating: true, Rect: rect(10, 10, 20, 20)},
+		{ID: 3, Workspace: 2, Rect: rect(0, 0, 5, 5)},
+		{ID: 4, Workspace: 3, Rect: rect(100, 0, 100, 100)},
+		{ID: 5, Workspace: 1, Floating: true, Rect: rect(30, 30, 10, 10)},
+		{ID: 6, Workspace: 3, Fullscreen: true, Rect: rect(100, 0, 200, 200)},
+		{ID: 7, Workspace: 1, Rect: rect(0, 0, 0, 10)},
+		{ID: 8, Workspace: 9, Rect: rect(0, 0, 10, 10)},
+	}
+	want := []image.Rectangle{
+		image.Rect(100, 0, 300, 200),
+		image.Rect(30, 30, 40, 40),
+		image.Rect(10, 10, 30, 30),
+		image.Rect(100, 0, 200, 100),
+		image.Rect(0, 0, 100, 100),
+	}
+	if got := lysWMWindows(workspaces, wins); !slices.Equal(got, want) {
+		t.Errorf("lys-wm windows =\n%v\nwant\n%v", got, want)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -27,9 +28,10 @@ type Focus interface {
 	ActiveWindow() windowTarget
 }
 
-// CompositorFocus asks Hyprland (when Hyprland is set), then mango,
-// then niri - the Rust host's order. Sway reports nothing, as in Rust:
-// the output mode falls back to the first output there.
+// CompositorFocus asks Hyprland (when Hyprland is set), then lys-wm,
+// then mango, then niri - the Rust host's order with lys-wm added. Sway
+// reports nothing, as in Rust: the output mode falls back to the first
+// output there.
 type CompositorFocus struct {
 	Hyprland *hyprland.Connection
 }
@@ -44,6 +46,15 @@ func (f CompositorFocus) FocusedOutput() (string, bool) {
 			for _, m := range mons {
 				if m.Focused {
 					return m.Name, true
+				}
+			}
+		}
+	}
+	if lyswm.IsRunning() {
+		if outs, err := lyswm.Outputs(); err == nil {
+			for _, o := range outs {
+				if o.Focused {
+					return o.Name, true
 				}
 			}
 		}
@@ -66,6 +77,11 @@ func (f CompositorFocus) ActiveWindow() windowTarget {
 			if t, ok := parseHyprlandActiveWindow(raw); ok {
 				return t
 			}
+		}
+	}
+	if lyswm.IsRunning() {
+		if w, ok, err := lyswm.ActiveWindow(); err == nil && ok {
+			return windowTarget{appID: w.AppID, hasAppID: true, title: w.Title, hasTitle: true}
 		}
 	}
 	if niri.IsRunning() {
@@ -93,9 +109,9 @@ func (f CompositorFocus) ActiveWindow() windowTarget {
 }
 
 // Windows is what the region overlay's click picks from: the visible
-// windows' global logical rectangles, topmost first, from Hyprland or
-// sway; none from niri and mango, which report no window geometry, so
-// a click there picks the output.
+// windows' global logical rectangles, topmost first, from Hyprland,
+// lys-wm or sway; none from niri and mango, which report no window
+// geometry, so a click there picks the output.
 func (f CompositorFocus) Windows() []image.Rectangle {
 	if f.Hyprland != nil {
 		mons, err := f.Hyprland.Monitors()
@@ -107,6 +123,17 @@ func (f CompositorFocus) Windows() []image.Rectangle {
 			return nil
 		}
 		return hyprlandWindows(mons, clients)
+	}
+	if lyswm.IsRunning() {
+		workspaces, err := lyswm.Workspaces()
+		if err != nil {
+			return nil
+		}
+		wins, err := lyswm.Windows()
+		if err != nil {
+			return nil
+		}
+		return lysWMWindows(workspaces, wins)
 	}
 	if sway.SocketPath() == "" {
 		return nil
@@ -152,6 +179,32 @@ func hyprlandWindows(mons []hyprland.Monitor, clients []hyprland.Client) []image
 	rects := make([]image.Rectangle, len(visible))
 	for i, c := range visible {
 		rects[i] = image.Rect(c.At[0], c.At[1], c.At[0]+c.Size[0], c.At[1]+c.Size[1])
+	}
+	return rects
+}
+
+func lysWMWindows(workspaces []lyswm.Workspace, wins []lyswm.Window) []image.Rectangle {
+	shown := map[int]bool{}
+	for _, ws := range workspaces {
+		shown[ws.ID] = ws.Visible
+	}
+	rank := func(w lyswm.Window) int {
+		switch {
+		case w.Fullscreen:
+			return 0
+		case w.Floating:
+			return 1
+		}
+		return 2
+	}
+	visible := slices.DeleteFunc(slices.Clone(wins), func(w lyswm.Window) bool {
+		return !shown[w.Workspace] || w.Rect.Width <= 0 || w.Rect.Height <= 0
+	})
+	slices.Reverse(visible)
+	slices.SortStableFunc(visible, func(a, b lyswm.Window) int { return cmp.Compare(rank(a), rank(b)) })
+	rects := make([]image.Rectangle, len(visible))
+	for i, w := range visible {
+		rects[i] = image.Rect(w.Rect.X, w.Rect.Y, w.Rect.X+w.Rect.Width, w.Rect.Y+w.Rect.Height)
 	}
 	return rects
 }
