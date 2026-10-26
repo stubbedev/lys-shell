@@ -1,16 +1,19 @@
+// Package pipewire is the PipeWire video producer lys-shell's ScreenCast
+// portal streams through: a node exported over PipeWire's native
+// protocol (a client-node, as libpipewire's pw_stream exports one), fed
+// one captured frame per cycle the graph drives, stamped with the
+// header, transform and damage metas. The protocol, the shared memory
+// and the realtime cycle are spoken here in Go; no libpipewire.
 package pipewire
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/clib"
 )
 
 // Rect is a damaged region in buffer pixels.
@@ -71,31 +74,30 @@ type Config struct {
 	Source    Source
 }
 
-// Producer is one running PipeWire video output stream.
+// Producer is one running PipeWire video output stream. Its Source is
+// called from one goroutine at a time.
 type Producer struct {
-	lib    *libpw
-	cfg    Config
-	loop   *loopThread
-	stream uintptr
-	handle uintptr
-	events *cStreamEvents
-	pinner runtime.Pinner
+	k *core
+	n *node
 
-	ready chan error
-	once  sync.Once
+	done      chan struct{}
+	endOnce   sync.Once
+	errMu     sync.Mutex
+	err       error
+	closeOnce sync.Once
+	closing   chan struct{}
 
+	cfg Config
 	// dmabuf is the source's GPU side when it has one; useDmabuf is set
-	// once the consumer negotiated the modifier format, bound holds each
-	// PipeWire buffer's memory by its spa_data (loop only).
+	// once the consumer negotiated the modifier format.
 	dmabuf    DmabufSource
 	useDmabuf bool
-	bound     map[*cSpaData]binding
-
 	// resizable is the source's size when it can change; renegotiating
 	// holds frames back from a size change until the consumer took the
-	// new format (loop only).
+	// new format.
 	resizable     Resizable
 	renegotiating bool
+	format        []byte
 
 	start       time.Time
 	minInterval time.Duration
@@ -104,31 +106,12 @@ type Producer struct {
 	damage      []Rect
 }
 
-// producers routes the C event trampolines to their Producer by the
-// data handle each stream was created with.
-var (
-	producersMu sync.Mutex
-	producers   = map[uintptr]*Producer{}
-	nextHandle  uintptr
-)
-
-func producerOf(handle uintptr) *Producer {
-	producersMu.Lock()
-	defer producersMu.Unlock()
-	return producers[handle]
-}
-
-// connectTimeout bounds the wait for the server to export the node.
+// connectTimeout bounds each wait on the server while starting.
 const connectTimeout = 5 * time.Second
 
-// Start connects the stream and returns once the server exported its
-// node (the stream reached PAUSED: before that the node id is
-// SPA_ID_INVALID and no consumer could link to it).
+// Start exports the stream's node and returns once the server has
+// registered it, so a consumer can link to NodeID.
 func Start(cfg Config) (*Producer, error) {
-	l, err := load()
-	if err != nil {
-		return nil, err
-	}
 	if cfg.FPS == 0 {
 		cfg.FPS = 1
 	}
@@ -136,276 +119,292 @@ func Start(cfg Config) (*Producer, error) {
 		cfg.Name = "lys-shell-screencast"
 	}
 	p := &Producer{
-		lib: l, cfg: cfg, ready: make(chan error, 1), start: time.Now(),
-		// A consumer that free-runs past the advertised rate would drive
-		// a full-frame copy per cycle; captures are gated to 1/(1.2 fps).
+		cfg: cfg, done: make(chan struct{}), closing: make(chan struct{}), start: time.Now(),
 		minInterval: time.Second * 10 / time.Duration(cfg.FPS*12),
+		damage:      make([]Rect, 0, maxDamageRegions),
 	}
 	p.last = p.start.Add(-p.minInterval)
 	p.dmabuf, _ = cfg.Source.(DmabufSource)
 	p.resizable, _ = cfg.Source.(Resizable)
-	p.bound = map[*cSpaData]binding{}
-	producersMu.Lock()
-	nextHandle++
-	p.handle = nextHandle
-	producers[p.handle] = p
-	producersMu.Unlock()
-
-	p.loop, err = startLoop(l)
+	k, err := connectCore(connectTimeout, p.stopped)
 	if err != nil {
-		p.forget()
 		return nil, err
 	}
-	p.events = &cStreamEvents{version: 2, stateChanged: l.onState, paramChanged: l.onParam, process: l.onProcess}
-	formats, flags := [][]byte{formatPod(cfg.Width, cfg.Height, cfg.FPS, cfg.Format, nil)}, uint32(flagMapBuffers)
+	var portFlags uint64
 	if p.dmabuf != nil {
-		// The modifier's format first; the producer allocates every
-		// buffer, a gbm one or shared memory per what was negotiated.
-		mod := p.dmabuf.Modifier()
-		formats = append([][]byte{formatPod(cfg.Width, cfg.Height, cfg.FPS, p.dmabuf.DmabufVideoFormat(), &mod)}, formats...)
-		flags = flagAllocBuffers
-		p.events.addBuffer, p.events.removeBuffer = l.onAddBuffer, l.onRemoveBuffer
+		portFlags = portFlagCanAlloc
 	}
-	p.pinner.Pin(p.events)
-	var rc int32
-	p.loop.do(func() {
-		props := l.propertiesNew("media.type=Video media.category=Capture media.role=Screen node.name=" + cfg.Name)
-		p.stream = l.streamNewSimple(p.loop.loop, cfg.Name, props, unsafe.Pointer(p.events), p.handle) //nolint:gosec // audited: the events table is pinned for the stream's life
-		if p.stream == 0 {
-			rc = -1
-			return
-		}
-		rc = withPods(formats, func(params unsafe.Pointer, n uint32) int32 {
-			return l.streamConnect(p.stream, directionOutput, idAny, flags, params, n)
-		})
-	})
-	switch {
-	case p.stream == 0:
-		p.teardown()
-		return nil, errors.New("pipewire: cannot create the stream (is the PipeWire daemon running?)")
-	case rc < 0:
-		p.teardown()
-		return nil, fmt.Errorf("pipewire: connect the stream: %d", rc)
-	}
-
-	select {
-	case err := <-p.ready:
-		if err != nil {
-			p.teardown()
-			return nil, err
-		}
-	case <-time.After(connectTimeout):
-		p.teardown()
-		return nil, errors.New("pipewire: the server did not export the stream node")
+	p.k = k
+	p.n = newNode(k, p, directionOutput, []dictItem{
+		{"media.type", "Video"},
+		{"media.category", "Capture"},
+		{"media.role", "Screen"},
+		{"media.class", "Stream/Output/Video"},
+		{"media.name", cfg.Name},
+		{"node.name", cfg.Name},
+		{"node.async", "true"},
+		{"node.want-driver", "true"},
+		{"stream.is-live", "true"},
+	}, portFlags)
+	if err := p.n.export(connectTimeout); err != nil {
+		p.Close()
+		return nil, fmt.Errorf("pipewire: export the stream node: %w", err)
 	}
 	return p, nil
 }
 
 // NodeID is the node the consumer connects to.
-func (p *Producer) NodeID() uint32 {
-	var id uint32
-	p.loop.do(func() { id = p.lib.streamNodeID(p.stream) })
-	return id
+func (p *Producer) NodeID() uint32 { return p.n.global }
+
+// Done is closed once the stream has ended: closed, or cut off by the
+// server (Err says why).
+func (p *Producer) Done() <-chan struct{} { return p.done }
+
+// Err is why the stream ended by itself; nil while it runs and after
+// Close.
+func (p *Producer) Err() error {
+	p.errMu.Lock()
+	defer p.errMu.Unlock()
+	return p.err
 }
 
-// Close stops the stream and its loop.
-func (p *Producer) Close() { p.once.Do(p.teardown) }
+// stopped is the event loop's end: the server went away or broke the
+// protocol, or Close stopped it.
+func (p *Producer) stopped(err error) {
+	select {
+	case <-p.closing:
+	default:
+		p.errMu.Lock()
+		p.err = err
+		p.errMu.Unlock()
+	}
+	p.endOnce.Do(func() { close(p.done) })
+}
 
-func (p *Producer) teardown() {
-	if p.loop != nil {
-		if p.stream != 0 {
-			p.loop.do(func() {
-				p.lib.streamDisconnect(p.stream)
-				p.lib.streamDestroy(p.stream)
-				// What remove_buffer did not get to.
-				for d, b := range p.bound {
-					b.release()
-					delete(p.bound, d)
-				}
-			})
-			p.stream = 0
+// Close stops the stream and releases everything it holds.
+func (p *Producer) Close() {
+	p.closeOnce.Do(func() {
+		close(p.closing)
+		if err := p.n.deactivate(); err != nil {
+			p.k.abort(err)
 		}
-		p.loop.stop()
-		p.loop = nil
-	}
-	p.pinner.Unpin()
-	p.forget()
-}
-
-func (p *Producer) forget() {
-	producersMu.Lock()
-	delete(producers, p.handle)
-	producersMu.Unlock()
-}
-
-// withPods hands C an array of pointers to the pods, pinned for the
-// call (PipeWire copies the params).
-func withPods(pods [][]byte, call func(params unsafe.Pointer, n uint32) int32) int32 {
-	var pinner runtime.Pinner
-	defer pinner.Unpin()
-	ptrs := make([]unsafe.Pointer, len(pods))
-	for i, b := range pods {
-		pinner.Pin(&b[0])
-		ptrs[i] = unsafe.Pointer(&b[0]) //nolint:gosec // audited: pinned for the call
-	}
-	pinner.Pin(&ptrs[0])
-	return call(unsafe.Pointer(&ptrs[0]), uint32(len(ptrs))) //nolint:gosec // audited: pinned for the call
-}
-
-// stateTrampoline is pw_stream_events.state_changed.
-func stateTrampoline(data uintptr, _, state int32, msg *byte) {
-	p := producerOf(data)
-	if p == nil {
-		return
-	}
-	switch state {
-	case statePaused:
-		select {
-		case p.ready <- nil:
-		default:
-		}
-	case stateError:
-		select {
-		case p.ready <- fmt.Errorf("pipewire: stream error: %s", clib.GoString(msg)):
-		default:
-		}
-	}
-}
-
-// paramTrampoline is pw_stream_events.param_changed: once a format is
-// negotiated, declare the buffer layout and metas.
-func paramTrampoline(data uintptr, id uint32, param unsafe.Pointer) {
-	p := producerOf(data)
-	if p == nil || param == nil || id != paramFormat {
-		return
-	}
-	size := *(*uint32)(param)
-	format := unsafe.Slice((*byte)(param), 8+size) //nolint:gosec // audited: the pod is 8 + size bytes
-	if w, h, ok := formatSize(format); ok && w == p.cfg.Width && h == p.cfg.Height {
-		p.renegotiating = false
-	}
-	pods := bufferPods(p.cfg.Stride, p.cfg.Height)
-	if p.dmabuf != nil {
-		// Producer-allocated: a dmabuf when the consumer took the
-		// modifier's format, else a memfd.
-		p.useDmabuf = objectProp(format, formatVideoModifier) != nil
-		data := uint32(1 << dataMemFd)
-		if p.useDmabuf {
-			data = 1 << dataDmaBuf
-		}
-		pods = bufferPodsOf(p.cfg.Stride, p.cfg.Height, data)
-	}
-	withPods(pods, func(params unsafe.Pointer, n uint32) int32 {
-		return p.lib.streamUpdate(p.stream, params, n)
+		p.k.close()
+		p.n.release()
 	})
 }
 
-// processTrampoline is pw_stream_events.process: the consumer wants a
-// buffer.
-func processTrampoline(data uintptr) {
-	if p := producerOf(data); p != nil {
-		p.process()
+// portParams is the formats the stream offers and, once one is
+// negotiated, its buffer layout and metas. A DmabufSource's modifier
+// format comes first.
+func (p *Producer) portParams() []portParam {
+	var enum [][]byte
+	if p.dmabuf != nil {
+		mod := p.dmabuf.Modifier()
+		enum = append(enum, formatPod(p.cfg.Width, p.cfg.Height, p.cfg.FPS, p.dmabuf.DmabufVideoFormat(), &mod))
 	}
+	enum = append(enum, formatPod(p.cfg.Width, p.cfg.Height, p.cfg.FPS, p.cfg.Format, nil))
+	params := []portParam{
+		{id: paramEnumFormat, flags: paramInfoRead, pods: enum},
+		{id: paramMeta, flags: paramInfoRead, pods: [][]byte{busyMetaPod()}},
+		{id: paramFormat, flags: paramInfoWrite},
+		{id: paramBuffers},
+	}
+	if p.format == nil {
+		return params
+	}
+	layout := bufferPodsOf(p.cfg.Stride, p.cfg.Height, p.dataTypes())
+	params[1].pods = append(params[1].pods, layout[1:]...)
+	params[2] = portParam{id: paramFormat, flags: paramInfoRead | paramInfoWrite, pods: [][]byte{p.format}}
+	params[3] = portParam{id: paramBuffers, flags: paramInfoRead, pods: layout[:1]}
+	return params
 }
 
-func (p *Producer) process() {
+// dataTypes is the spa_data types the buffers' data comes in: a
+// DmabufSource allocates every buffer itself, a GPU buffer or a memfd
+// per the negotiated format; otherwise the server's shared memory.
+func (p *Producer) dataTypes() uint32 {
+	switch {
+	case p.dmabuf == nil:
+		return 1<<dataMemFd | 1<<dataMemPtr
+	case p.useDmabuf:
+		return 1 << dataDmaBuf
+	}
+	return 1 << dataMemFd
+}
+
+// setFormat takes the format the consumer and the server settled on,
+// which must be one the stream offers.
+func (p *Producer) setFormat(f []byte) error {
+	if f == nil {
+		p.format, p.useDmabuf = nil, false
+		return nil
+	}
+	if typ, v, ok := propValue(f, formatMediaType); !ok || typ != typeID || len(v) < 4 || binary.LittleEndian.Uint32(v) != mediaTypeVideo {
+		return errors.New("not a video format")
+	}
+	if typ, v, ok := propValue(f, formatMediaSubtype); !ok || typ != typeID || len(v) < 4 || binary.LittleEndian.Uint32(v) != mediaSubtypeRaw {
+		return errors.New("not raw video")
+	}
+	typ, v, ok := propValue(f, formatVideoFormat)
+	if !ok || typ != typeID || len(v) < 4 {
+		return errors.New("no video format")
+	}
+	video := VideoFormat(binary.LittleEndian.Uint32(v))
+	mtyp, mv, dmabuf := propValue(f, formatVideoModifier)
+	want := p.cfg.Format
+	if dmabuf {
+		if p.dmabuf == nil {
+			return errors.New("a dmabuf format, and the source has no GPU buffers")
+		}
+		if mtyp != typeLong || len(mv) < 8 || binary.LittleEndian.Uint64(mv) != p.dmabuf.Modifier() {
+			return fmt.Errorf("modifier is not the offered %#x", p.dmabuf.Modifier())
+		}
+		want = p.dmabuf.DmabufVideoFormat()
+	}
+	if video != want {
+		return fmt.Errorf("video format %d is not the offered %d", video, want)
+	}
+	w, h, ok := formatSize(f)
+	if !ok || w != p.cfg.Width || h != p.cfg.Height {
+		return fmt.Errorf("size %dx%d is not the offered %dx%d", w, h, p.cfg.Width, p.cfg.Height)
+	}
+	p.format, p.useDmabuf, p.renegotiating = append([]byte(nil), f...), dmabuf, false
+	return nil
+}
+
+// allocData gives a buffer its memory: a GPU buffer when the consumer
+// took the modifier format, else a memfd.
+func (p *Producer) allocData(b *buffer) error {
+	if p.useDmabuf {
+		d, err := p.dmabuf.AllocDmabuf()
+		if err != nil {
+			return err
+		}
+		b.dmabuf, b.fd = d, d.Fd()
+		b.dataType, b.dataFlags = dataDmaBuf, dataFlagReadable
+		b.maxsize = d.Stride() * p.cfg.Height
+		b.chunk.offset, b.chunk.stride, b.chunk.size = d.Offset(), int32(d.Stride()), 0
+		return nil
+	}
+	size := p.cfg.Stride * p.cfg.Height
+	fd, mem, err := memfd(int(size))
+	if err != nil {
+		return err
+	}
+	b.fd, b.data, b.maxsize = fd, mem, size
+	b.dataType, b.dataFlags = dataMemFd, dataFlagReadable|dataFlagMappable
+	return nil
+}
+
+func (p *Producer) releaseData(b *buffer) {
+	if b.dmabuf != nil {
+		b.dmabuf.Release()
+	} else {
+		_ = unix.Munmap(b.data)
+		_ = unix.Close(b.fd)
+	}
+	b.dmabuf, b.data, b.fd = nil, nil, -1
+}
+
+// process is one cycle of the stream: unless it is too early or the
+// source's size is being renegotiated, fill the next free buffer and
+// hand it to the links.
+func (p *Producer) process(n *node) int32 {
+	slot, ok := n.cycleSlot()
+	if !ok {
+		return statusNeedData
+	}
 	now := time.Now()
-	if now.Sub(p.last) < p.minInterval {
-		return
+	if now.Sub(p.last) < p.minInterval || !p.sizeSettled(n) {
+		n.idle(slot)
+		return statusNeedData
 	}
-	if p.resizable != nil {
-		if w, h, stride := p.resizable.Size(); w != p.cfg.Width || h != p.cfg.Height || stride != p.cfg.Stride {
-			p.renegotiate(w, h, stride)
-			return
-		}
-		if p.renegotiating {
-			return
-		}
+	b := n.dequeue()
+	if b == nil {
+		n.idle(slot)
+		return statusNeedData
 	}
-	raw := p.lib.streamDequeue(p.stream)
-	if raw == nil {
-		return
+	if !p.fill(b, now) {
+		b.release()
+		n.idle(slot)
+		return statusNeedData
 	}
-	defer p.lib.streamQueue(p.stream, raw)
-	buf := (*cPwBuffer)(raw).buffer
-	if buf == nil || buf.nDatas == 0 {
-		return
+	p.last = now
+	n.queue(slot, b)
+	return statusHaveData
+}
+
+// sizeSettled is whether frames of the stream's size may go out: a
+// resized source has the new size offered, and frames wait until the
+// consumer took it.
+func (p *Producer) sizeSettled(n *node) bool {
+	if p.resizable == nil {
+		return true
 	}
-	d := buf.datas
-	if d.chunk == nil {
-		return
+	if w, h, stride := p.resizable.Size(); w != p.cfg.Width || h != p.cfg.Height || stride != p.cfg.Stride {
+		p.cfg.Width, p.cfg.Height, p.cfg.Stride = w, h, stride
+		p.renegotiating = true
+		n.markPortChanged()
+	}
+	return !p.renegotiating
+}
+
+// fill writes one frame into b and stamps its metas; false leaves b
+// unsent (nothing new, or the capture failed).
+func (p *Producer) fill(b *buffer, now time.Time) bool {
+	if b.chunk == nil {
+		return false
 	}
 	var damage []Rect
 	var ok bool
-	if b, bound := p.bound[d]; bound && b.dmabuf != nil {
+	if b.dmabuf != nil {
 		damage, ok = p.dmabuf.FillDmabuf(b.dmabuf)
-		d.chunk.offset = b.dmabuf.Offset()
-		d.chunk.stride = int32(b.dmabuf.Stride())
+		b.chunk.offset, b.chunk.stride = b.dmabuf.Offset(), int32(b.dmabuf.Stride())
+		b.chunk.size = 0
 		if ok {
-			d.chunk.size = b.dmabuf.Stride() * p.cfg.Height
-			p.last = now
-			p.stamp(buf, now, damage)
-		} else {
-			d.chunk.size = 0
+			b.chunk.size = b.dmabuf.Stride() * p.cfg.Height
 		}
-		return
+	} else {
+		if b.data == nil {
+			return false
+		}
+		damage, ok = p.cfg.Source.Fill(b.data)
+		b.chunk.offset, b.chunk.stride = 0, int32(p.cfg.Stride)
+		b.chunk.size = 0
+		if ok {
+			b.chunk.size = min(p.cfg.Stride*p.cfg.Height, uint32(len(b.data)))
+		}
 	}
-	if d.data == nil {
-		return
-	}
-	dst := unsafe.Slice((*byte)(d.data), d.maxsize) //nolint:gosec // audited: the mapped buffer is maxsize bytes
-	damage, ok = p.cfg.Source.Fill(dst)
-	d.chunk.offset = 0
-	d.chunk.stride = int32(p.cfg.Stride)
 	if !ok {
-		// Queued empty: the consumer keeps its previous frame.
-		d.chunk.size = 0
-		return
+		return false
 	}
-	p.last = now
-	d.chunk.size = min(p.cfg.Stride*p.cfg.Height, d.maxsize)
-	p.stamp(buf, now, damage)
-}
-
-// renegotiate offers the source's new size in place of the old one;
-// the consumer answers with a format of it (param_changed), and frames
-// wait until then.
-func (p *Producer) renegotiate(width, height, stride uint32) {
-	p.cfg.Width, p.cfg.Height, p.cfg.Stride = width, height, stride
-	p.renegotiating = true
-	withPods([][]byte{formatPod(width, height, p.cfg.FPS, p.cfg.Format, nil)}, func(params unsafe.Pointer, n uint32) int32 {
-		return p.lib.streamUpdate(p.stream, params, n)
-	})
+	p.stamp(b, now, damage)
+	return true
 }
 
 // stamp writes the metas the consumer negotiated.
-func (p *Producer) stamp(buf *cSpaBuffer, now time.Time, damage []Rect) {
-	metas := unsafe.Slice(buf.metas, buf.nMetas) //nolint:gosec // audited: n_metas entries
-	for i := range metas {
-		m := &metas[i]
-		if m.data == nil {
-			continue
-		}
-		switch m.typ {
-		case metaHeader:
-			h := (*cMetaHeader)(m.data)
-			*h = cMetaHeader{pts: now.Sub(p.start).Nanoseconds(), seq: p.seq}
-			p.seq++
-		case metaVideoTransform:
-			*(*uint32)(m.data) = p.cfg.Transform
-		case metaVideoDamage:
-			p.damage = ClampDamage(p.damage[:0], damage, int(p.cfg.Width), int(p.cfg.Height), maxDamageRegions)
-			writeDamage(unsafe.Slice((*cMetaRegion)(m.data), m.size/metaRegionSize), p.damage) //nolint:gosec // audited: the meta holds size bytes of regions
-		}
+func (p *Producer) stamp(b *buffer, now time.Time, damage []Rect) {
+	if b.header != nil {
+		*b.header = cMetaHeader{pts: now.Sub(p.start).Nanoseconds(), seq: p.seq}
+		p.seq++
+	}
+	if b.transform != nil {
+		*b.transform = p.cfg.Transform
+	}
+	if b.damage != nil {
+		p.damage = ClampDamage(p.damage, damage, int(p.cfg.Width), int(p.cfg.Height), maxDamageRegions)
+		writeDamage(b.damage, p.damage)
 	}
 }
 
 // ClampDamage clips rects to the frame into out; none, none left, or
-// more than max collapse to the whole frame.
+// more than max collapse to the whole frame. It appends at most max
+// rects to out[:0], so an out of that capacity never grows.
 func ClampDamage(out, rects []Rect, width, height, max int) []Rect {
+	whole := Rect{0, 0, width, height}
 	out = out[:0]
 	if len(rects) == 0 || max == 0 {
-		return append(out, Rect{0, 0, width, height})
+		return append(out, whole)
 	}
 	for _, r := range rects {
 		if r.X < 0 || r.Y < 0 || r.X >= width || r.Y >= height {
@@ -415,10 +414,13 @@ func ClampDamage(out, rects []Rect, width, height, max int) []Rect {
 		if w <= 0 || h <= 0 {
 			continue
 		}
+		if len(out) == max {
+			return append(out[:0], whole)
+		}
 		out = append(out, Rect{r.X, r.Y, w, h})
 	}
-	if len(out) == 0 || len(out) > max {
-		return append(out[:0], Rect{0, 0, width, height})
+	if len(out) == 0 {
+		return append(out, whole)
 	}
 	return out
 }
@@ -437,92 +439,20 @@ func writeDamage(slots []cMetaRegion, rects []Rect) {
 	slots[i] = cMetaRegion{}
 }
 
-// binding is one producer-allocated PipeWire buffer's memory: a GPU
-// buffer, or a mapped memfd.
-type binding struct {
-	dmabuf Dmabuf
-	mem    []byte
-	fd     int
-}
-
-// addBufferTrampoline is pw_stream_events.add_buffer: allocate the new
-// buffer's memory (only with ALLOC_BUFFERS, a DmabufSource's stream).
-func addBufferTrampoline(data uintptr, raw unsafe.Pointer) {
-	if p := producerOf(data); p != nil {
-		p.addBuffer((*cPwBuffer)(raw))
-	}
-}
-
-// removeBufferTrampoline is pw_stream_events.remove_buffer.
-func removeBufferTrampoline(data uintptr, raw unsafe.Pointer) {
-	if p := producerOf(data); p != nil {
-		p.removeBuffer((*cPwBuffer)(raw))
-	}
-}
-
-func (p *Producer) addBuffer(pwb *cPwBuffer) {
-	if pwb == nil || pwb.buffer == nil || pwb.buffer.nDatas < 1 {
-		return
-	}
-	d := pwb.buffer.datas
-	size := p.cfg.Stride * p.cfg.Height
-	if p.useDmabuf {
-		b, err := p.dmabuf.AllocDmabuf()
-		if err != nil {
-			return // the buffer stays empty; process skips it
-		}
-		d.typ, d.flags = dataDmaBuf, dataFlagReadable
-		d.fd, d.mapoffset, d.maxsize, d.data = int64(b.Fd()), 0, b.Stride()*p.cfg.Height, nil
-		if d.chunk != nil {
-			d.chunk.offset, d.chunk.stride, d.chunk.size = b.Offset(), int32(b.Stride()), 0
-		}
-		p.bound[d] = binding{dmabuf: b, fd: -1}
-		return
-	}
-	fd, mem, err := memfd(int(size))
-	if err != nil {
-		return
-	}
-	d.typ, d.flags = dataMemFd, dataFlagReadable|dataFlagMappable
-	d.fd, d.mapoffset, d.maxsize, d.data = int64(fd), 0, size, unsafe.Pointer(&mem[0]) //nolint:gosec // audited: the memfd mapping outlives the buffer (removeBuffer clears it)
-	p.bound[d] = binding{mem: mem, fd: fd}
-}
-
-func (p *Producer) removeBuffer(pwb *cPwBuffer) {
-	if pwb == nil || pwb.buffer == nil || pwb.buffer.nDatas < 1 {
-		return
-	}
-	d := pwb.buffer.datas
-	if b, ok := p.bound[d]; ok {
-		b.release()
-		delete(p.bound, d)
-		d.data, d.fd = nil, -1
-	}
-}
-
-func (b binding) release() {
-	if b.dmabuf != nil {
-		b.dmabuf.Release()
-		return
-	}
-	_ = unix.Munmap(b.mem)
-	_ = unix.Close(b.fd)
-}
-
 // memfd is a size-byte sealed-size shared memory file, mapped.
 func memfd(size int) (int, []byte, error) {
 	fd, err := unix.MemfdCreate("lys-shell-screencast", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
 	if err != nil {
-		return -1, nil, err
+		return -1, nil, fmt.Errorf("memfd: %w", err)
 	}
 	if err := unix.Ftruncate(fd, int64(size)); err != nil {
 		_ = unix.Close(fd)
-		return -1, nil, err
+		return -1, nil, fmt.Errorf("memfd: size %d: %w", size, err)
 	}
 	mem, err := unix.Mmap(fd, 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		_ = unix.Close(fd)
-		return -1, nil, err
+		return -1, nil, fmt.Errorf("memfd: map %d bytes: %w", size, err)
 	}
 	return fd, mem, nil
 }

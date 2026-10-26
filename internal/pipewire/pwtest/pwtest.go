@@ -1,11 +1,14 @@
 // Package pwtest starts a private PipeWire daemon for tests, so
-// producers and consumers link without touching the user's session.
+// producers and consumers link without touching the user's session, and
+// runs libpipewire consumers against it as the reference a producer is
+// checked by.
 package pwtest
 
 import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -46,10 +49,16 @@ context.objects = [
 ]
 `
 
+// Daemon is a private pipewire a test runs.
+type Daemon struct {
+	cmd  *exec.Cmd
+	once sync.Once
+}
+
 // Start runs a private pipewire for the test and points the
 // client library at it. A missing pipewire fails the test: the dev
 // shell provides one.
-func Start(t *testing.T) string {
+func Start(t *testing.T) *Daemon {
 	t.Helper()
 	bin, err := exec.LookPath("pipewire")
 	if err != nil {
@@ -62,25 +71,29 @@ func Start(t *testing.T) string {
 	}
 	t.Setenv("PIPEWIRE_RUNTIME_DIR", dir)
 	t.Setenv("PIPEWIRE_REMOTE", "pipewire-0")
-	cmd := exec.Command(bin, "-c", conf) //nolint:gosec // the daemon from PATH, for a test
-	// The daemon alone gets the private runtime dir: the test keeps its
-	// own, where a headless compositor's socket may live.
+	cmd := exec.Command(bin, "-c", conf) //nolint:gosec
 	cmd.Env = append(os.Environ(), "XDG_RUNTIME_DIR="+dir)
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-	})
+	d := &Daemon{cmd: cmd}
+	t.Cleanup(d.Kill)
 	sock := filepath.Join(dir, "pipewire-0")
 	for range 100 {
 		if _, err := os.Stat(sock); err == nil {
-			return dir
+			return d
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("pipewire did not create its socket")
-	return ""
+	return nil
+}
+
+// Kill ends the daemon at once, as a crash would, and reaps it.
+func (d *Daemon) Kill() {
+	d.once.Do(func() {
+		_ = d.cmd.Process.Kill()
+		_ = d.cmd.Wait()
+	})
 }
