@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/pipewire"
 
+	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -385,7 +386,7 @@ func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screen
 	}
 	watch := newVanishWatch(outputGone(c, output))
 	shm := newSnapshotSource(grab, first, watch)
-	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, streamLayouts(offered.Modifiers, rendered, exported), o, cursor, first)
+	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, dmabufprobe.Layouts(offered.Modifiers, rendered, exported), o, cursor, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)

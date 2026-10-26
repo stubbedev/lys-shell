@@ -3,7 +3,6 @@ package portal
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/stubbedev/lys-lib/capture"
@@ -11,6 +10,8 @@ import (
 	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/pipewire"
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 )
 
 // The zero-copy path: a whole output's screencopy frames land straight in
@@ -21,40 +22,6 @@ import (
 // it, a format offered only as shm, no modifier both sides take, an
 // allocation or copy the compositor refuses: the stream stays on shared
 // memory (errNoDmabuf, logged by screenStreams.start).
-
-// streamLayout is one modifier the stream probes and how its buffers
-// are allocated: for rendering into, when the device renders the
-// modifier, or only for transfer and sampling, when it only exports it
-// (linear on NVIDIA).
-type streamLayout struct {
-	modifier uint64
-	render   bool
-}
-
-// streamLayouts orders the modifiers the stream probes, one at a time,
-// among the ones the compositor imports, in its order: linear first, the
-// layout every consumer imports, then the ones the device renders in,
-// then the ones it only exports. One at a time, because a compositor may
-// advertise a tiling it then fails to import (sway's Vulkan renderer on
-// NVIDIA), and a set would leave the pick to the driver. A consumer on
-// the same GPU imports the tilings; any other declines them for shared
-// memory.
-func streamLayouts(compositor, rendered, exported []uint64) []streamLayout {
-	var linear, drawn, exportOnly []streamLayout
-	for _, m := range compositor {
-		l := streamLayout{modifier: m, render: slices.Contains(rendered, m)}
-		switch {
-		case !l.render && !slices.Contains(exported, m):
-		case m == dmabuf.ModifierLinear:
-			linear = append(linear, l)
-		case l.render:
-			drawn = append(drawn, l)
-		default:
-			exportOnly = append(exportOnly, l)
-		}
-	}
-	return slices.Concat(linear, drawn, exportOnly)
-}
 
 // gpuAllocator is the device the source allocates from.
 type gpuAllocator interface {
@@ -224,15 +191,15 @@ func (s *gpuSource) DmabufVideoFormat() pipewire.VideoFormat { return s.video }
 
 // AllocDmabuf allocates and imports one buffer at the probed modifier.
 func (s *gpuSource) AllocDmabuf() (pipewire.Dmabuf, error) {
-	return s.alloc(streamLayout{modifier: s.modifier, render: s.render})
+	return s.alloc(dmabufprobe.Layout{Modifier: s.modifier, Render: s.render})
 }
 
-func (s *gpuSource) alloc(layout streamLayout) (*gpuBuffer, error) {
+func (s *gpuSource) alloc(layout dmabufprobe.Layout) (*gpuBuffer, error) {
 	allocate := s.dev.NewBuffer
-	if layout.render {
+	if layout.Render {
 		allocate = s.dev.NewTarget
 	}
-	t, err := allocate(int(s.width), int(s.height), s.fourcc, []uint64{layout.modifier})
+	t, err := allocate(int(s.width), int(s.height), s.fourcc, []uint64{layout.Modifier})
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +241,7 @@ var errNoDmabuf = errors.New("screencast: no dmabuf path")
 // dmabuf, and a buffer in the first of layouts that allocates, imports
 // and takes a frame sets the modifier the stream offers. Declining every
 // layout names why each failed.
-func probeGPUSource(shm pipewire.Source, dev gpuAllocator, c gpuCapturer, offered capture.DmabufFormat, layouts []streamLayout, o capture.Output, cursor bool, first *capture.Frame) (*gpuSource, error) {
+func probeGPUSource(shm pipewire.Source, dev gpuAllocator, c gpuCapturer, offered capture.DmabufFormat, layouts []dmabufprobe.Layout, o capture.Output, cursor bool, first *capture.Frame) (*gpuSource, error) {
 	// The size must match the stream's; the format may differ (a GPU
 	// compositor's shm is 24-bit, its dmabufs 32-bit) but must be one
 	// packed 32-bit layout.
@@ -282,28 +249,21 @@ func probeGPUSource(shm pipewire.Source, dev gpuAllocator, c gpuCapturer, offere
 	if offered.Width != first.Width || offered.Height != first.Height || format.BytesPerPixel() != 4 {
 		return nil, fmt.Errorf("%w: a %v %dx%d dmabuf for a %dx%d stream", errNoDmabuf, format, offered.Width, offered.Height, first.Width, first.Height)
 	}
-	if len(layouts) == 0 {
-		return nil, fmt.Errorf("%w: the compositor and the device share no modifier for %v", errNoDmabuf, format)
-	}
 	s := &gpuSource{
 		Source: shm, dev: dev, cap: c, output: o, cursor: cursor,
 		fourcc: offered.Fourcc, video: videoFormat(format), width: uint32(offered.Width), height: uint32(offered.Height),
 	}
-	declined := make([]error, 0, len(layouts))
-	for _, layout := range layouts {
-		modifier, err := s.probe(layout)
-		if err == nil {
-			s.modifier, s.render = modifier, layout.render
-			return s, nil
-		}
-		declined = append(declined, fmt.Errorf("modifier %#x: %w", layout.modifier, err))
+	modifier, layout, err := dmabufprobe.First(layouts, s.probe)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v: %w", errNoDmabuf, format, err)
 	}
-	return nil, fmt.Errorf("%w: %w", errNoDmabuf, errors.Join(declined...))
+	s.modifier, s.render = modifier, layout.Render
+	return s, nil
 }
 
 // probe allocates a buffer in layout and screencopies into it,
 // returning the modifier it was allocated in when the copy lands.
-func (s *gpuSource) probe(layout streamLayout) (uint64, error) {
+func (s *gpuSource) probe(layout dmabufprobe.Layout) (uint64, error) {
 	probe, err := s.alloc(layout)
 	if err != nil {
 		return 0, err

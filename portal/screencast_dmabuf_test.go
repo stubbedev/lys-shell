@@ -11,6 +11,8 @@ import (
 	"github.com/stubbedev/lys-lib/dmabuf"
 	"github.com/stubbedev/lys-lib/pipewire"
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 )
 
 // fakeDevice allocates memfds posing as GPU buffers.
@@ -59,51 +61,6 @@ func (f *fakeDevice) ExportModifiers(uint32) ([]uint64, error) { return linearOn
 func (f *fakeDevice) Close() {}
 
 var linearOnly = []uint64{dmabuf.ModifierLinear}
-
-// The stream probes the modifiers the compositor imports one at a time,
-// in its order: linear first, as a render target where the device
-// renders it and a plain buffer where it only exports it, then the ones
-// the device renders, then the ones it only exports; modifiers the
-// device has neither way, and a compositor naming none, leave nothing.
-func TestStreamLayoutsKeepTheCompositorsModifiers(t *testing.T) {
-	const tiledA, tiledB, tiledC, foreign = 0x300000000606015, 0x300000000606014, 0x300000000606012, 0x100000000000001
-	linear := dmabuf.ModifierLinear
-	for name, c := range map[string]struct {
-		compositor, rendered, exported []uint64
-		want                           []streamLayout
-	}{
-		"linear only exported, tilings rendered": {
-			[]uint64{tiledB, linear, foreign, tiledA},
-			[]uint64{tiledA, tiledB},
-			[]uint64{tiledA, tiledB, linear},
-			[]streamLayout{{modifier: linear}, {modifier: tiledB, render: true}, {modifier: tiledA, render: true}},
-		},
-		"linear rendered": {
-			[]uint64{linear, tiledA},
-			[]uint64{linear, tiledA},
-			[]uint64{linear, tiledA},
-			[]streamLayout{{modifier: linear, render: true}, {modifier: tiledA, render: true}},
-		},
-		"a tiling only exported": {
-			[]uint64{tiledC, tiledA},
-			[]uint64{tiledA},
-			[]uint64{tiledA, tiledC},
-			[]streamLayout{{modifier: tiledA, render: true}, {modifier: tiledC}},
-		},
-		"the compositor takes no linear": {
-			[]uint64{tiledA},
-			[]uint64{linear, tiledA},
-			[]uint64{linear, tiledA},
-			[]streamLayout{{modifier: tiledA, render: true}},
-		},
-		"nothing in common":         {[]uint64{foreign}, []uint64{tiledA}, []uint64{tiledA, linear}, nil},
-		"the compositor names none": {nil, []uint64{tiledA}, []uint64{tiledA}, nil},
-	} {
-		if got := streamLayouts(c.compositor, c.rendered, c.exported); !slices.Equal(got, c.want) {
-			t.Errorf("%s: streamLayouts = %+v, want %+v", name, got, c.want)
-		}
-	}
-}
 
 type fakeAllocation struct{ b dmabuf.Buffer }
 
@@ -159,7 +116,7 @@ func offer() capture.DmabufFormat {
 
 func TestProbeTakesTheModifierAndReleasesTheProbe(t *testing.T) {
 	dev, cp := &fakeDevice{}, &fakeCopy{}
-	src, err := probeGPUSource(nil, dev, cp, offer(), []streamLayout{{modifier: dmabuf.ModifierLinear}}, capture.Output{}, true, shmFrame)
+	src, err := probeGPUSource(nil, dev, cp, offer(), []dmabufprobe.Layout{{Modifier: dmabuf.ModifierLinear}}, capture.Output{}, true, shmFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +144,7 @@ func TestProbeDeclines(t *testing.T) {
 		"a rejected import": {offer(), &fakeDevice{}, &fakeCopy{rejectImport: true}},
 		"a failed copy":     {offer(), &fakeDevice{}, &fakeCopy{failCapture: true}},
 	} {
-		_, err := probeGPUSource(nil, c.dev, c.cp, c.offered, []streamLayout{{modifier: dmabuf.ModifierLinear}}, capture.Output{}, false, shmFrame)
+		_, err := probeGPUSource(nil, c.dev, c.cp, c.offered, []dmabufprobe.Layout{{Modifier: dmabuf.ModifierLinear}}, capture.Output{}, false, shmFrame)
 		if !errors.Is(err, errNoDmabuf) {
 			t.Errorf("%s: err = %v, want errNoDmabuf (stay on shm)", name, err)
 		}
@@ -208,7 +165,7 @@ func TestProbeDeclines(t *testing.T) {
 // layout fails, the error names each one and no buffer is left behind.
 func TestProbeFallsBackFromLinearToTheTiling(t *testing.T) {
 	const tiled = 0x300000000606012
-	layouts := []streamLayout{{modifier: dmabuf.ModifierLinear}, {modifier: tiled, render: true}}
+	layouts := []dmabufprobe.Layout{{Modifier: dmabuf.ModifierLinear}, {Modifier: tiled, Render: true}}
 	dev, cp := &fakeDevice{echo: true}, &fakeCopy{failCopies: 1}
 	src, err := probeGPUSource(nil, dev, cp, offer(), layouts, capture.Output{}, false, shmFrame)
 	if err != nil {
@@ -250,7 +207,7 @@ func (otherDmabuf) Release()       {}
 
 func TestGPUSourceAllocatesAtTheModifierAndFillsInPlace(t *testing.T) {
 	dev, cp := &fakeDevice{}, &fakeCopy{}
-	src, err := probeGPUSource(nil, dev, cp, offer(), []streamLayout{{modifier: dmabuf.ModifierLinear}}, capture.Output{}, false, shmFrame)
+	src, err := probeGPUSource(nil, dev, cp, offer(), []dmabufprobe.Layout{{Modifier: dmabuf.ModifierLinear}}, capture.Output{}, false, shmFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +251,7 @@ func TestScreencopyRejectsAForeignBuffer(t *testing.T) {
 func TestProbeTakesADmabufFormatOtherThanTheShmOne(t *testing.T) {
 	shm24 := &capture.Frame{Width: 64, Height: 32, Stride: 192, Format: capture.FormatBGR888}
 	offered := capture.DmabufFormat{Fourcc: uint32(capture.FormatABGR8888), Width: 64, Height: 32}
-	src, err := probeGPUSource(nil, &fakeDevice{}, &fakeCopy{}, offered, []streamLayout{{modifier: dmabuf.ModifierLinear}}, capture.Output{}, false, shm24)
+	src, err := probeGPUSource(nil, &fakeDevice{}, &fakeCopy{}, offered, []dmabufprobe.Layout{{Modifier: dmabuf.ModifierLinear}}, capture.Output{}, false, shm24)
 	if err != nil {
 		t.Fatal(err)
 	}

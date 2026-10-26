@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	"golang.org/x/sys/unix"
 
+	"github.com/stubbedev/lys-shell/internal/dmabufprobe"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -93,7 +94,7 @@ func TestVulkanBuffersAreLinearXRGBDmabufs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := probeGPUSource(nil, dev, cp, offer(), streamLayouts(mods, rendered, mods), capture.Output{}, false, shmFrame)
+	src, err := probeGPUSource(nil, dev, cp, offer(), dmabufprobe.Layouts(mods, rendered, mods), capture.Output{}, false, shmFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +136,7 @@ func TestVulkanBuffersAreLinearXRGBDmabufs(t *testing.T) {
 // naming both lists, with nothing left imported.
 func TestVulkanDeclinesWithoutASharedModifier(t *testing.T) {
 	dev, cp := realDevice(t), &fakeCopy{}
-	_, err := probeGPUSource(nil, dev, cp, offer(), []streamLayout{{modifier: dmabuf.ModifierInvalid, render: true}}, capture.Output{}, false, shmFrame)
+	_, err := probeGPUSource(nil, dev, cp, offer(), []dmabufprobe.Layout{{Modifier: dmabuf.ModifierInvalid, Render: true}}, capture.Output{}, false, shmFrame)
 	if !errors.Is(err, errNoDmabuf) || !strings.Contains(err.Error(), "none of the modifiers") {
 		t.Fatalf("err = %v, want errNoDmabuf naming the modifier lists", err)
 	}
