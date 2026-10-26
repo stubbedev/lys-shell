@@ -255,12 +255,14 @@ func TestNoH264EncoderIsTheDefinedError(t *testing.T) {
 		t.Logf("%s encodes %v", d.Name(), d.Codecs())
 		return
 	}
-	if !errors.Is(err, ErrNoVideoEncoder) || !strings.Contains(err.Error(), d.Name()) {
-		t.Errorf("%s without H.264: %v, want ErrNoVideoEncoder naming it", d.Name(), err)
+	_, encErr := d.NewEncoder(gpu.EncoderConfig{Codec: gpu.H264, Width: 64, Height: 64, FrameRate: 30, KeyInterval: 60, QP: videoQP})
+	if !errors.Is(encErr, ErrNoVideoEncoder) {
+		t.Fatalf("an encoder on %s: %v, want ErrNoVideoEncoder", d.Name(), encErr)
 	}
-	_, err = d.NewEncoder(gpu.EncoderConfig{Codec: gpu.H264, Width: 64, Height: 64, FrameRate: 30, KeyInterval: 60, QP: videoQP})
-	if !errors.Is(err, ErrNoVideoEncoder) {
-		t.Errorf("an encoder on %s: %v, want ErrNoVideoEncoder", d.Name(), err)
+	// The recorder's error is the device's whole reason, which the
+	// state shows, toasts and logs as it is.
+	if !errors.Is(err, ErrNoVideoEncoder) || err.Error() != "recorder: "+encErr.Error() || !strings.Contains(err.Error(), d.Name()) {
+		t.Errorf("%s without H.264: %q, want ErrNoVideoEncoder with the device's reason %q", d.Name(), err, encErr)
 	}
-	t.Logf("%s has no H.264 encoder: %v", d.Name(), err)
+	t.Logf("%s cannot record: %v", d.Name(), err)
 }

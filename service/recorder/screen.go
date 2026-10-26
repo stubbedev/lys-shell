@@ -110,12 +110,20 @@ func targetSource(target sharepicker.Target, logical LogicalSize, buffer image.P
 }
 
 // requireH264 is ErrNoVideoEncoder for a device whose video queue does
-// not encode H.264, or that has none.
+// not encode H.264, or that has none, with the reason the device gives:
+// the encoder it refuses to make says why (no video queue, a missing
+// extension, no queue family coding H.264), before anything is
+// allocated.
 func requireH264(d *gpu.Device) error {
-	if !slices.Contains(d.Codecs(), gpu.H264) {
-		return fmt.Errorf("recorder: %w: %s encodes no %s (it encodes %v)", ErrNoVideoEncoder, d.Name(), gpu.H264, d.Codecs())
+	if slices.Contains(d.Codecs(), gpu.H264) {
+		return nil
 	}
-	return nil
+	enc, err := d.NewEncoder(gpu.EncoderConfig{Codec: gpu.H264, Width: 16, Height: 16, FrameRate: 1, KeyInterval: 1, QP: videoQP})
+	if err == nil {
+		enc.Close()
+		return fmt.Errorf("recorder: %w: %s lists no %s among %v, yet made an encoder for it", ErrNoVideoEncoder, d.Name(), gpu.H264, d.Codecs())
+	}
+	return fmt.Errorf("recorder: %w", err)
 }
 
 type probedBuffer struct {
