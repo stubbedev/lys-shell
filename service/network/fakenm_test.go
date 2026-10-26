@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -35,6 +36,15 @@ type fakeNM struct {
 	deactivations []dbus.ObjectPath
 	added         []ConnectionDict
 	addAndActive  []ConnectionDict
+	// stopping refuses new calls while stop waits out the ones in flight.
+	stopping bool
+	// held, when set, holds ActivateConnection after it is recorded and
+	// before it answers, until the channel closes.
+	held chan struct{}
+
+	// calls is the method calls in flight, which emit on conn and so must
+	// finish before it closes.
+	calls sync.WaitGroup
 
 	manager *prop.Properties
 	// underlay is the primary connection's IPv4 config, whose addresses
@@ -76,11 +86,30 @@ func startFakeNM(t *testing.T) *fakeNM {
 	return f
 }
 
+// errStopping is what a call that reaches NM as it exits gets.
+var errStopping = dbus.NewError("org.freedesktop.DBus.Error.NoReply", []any{"NetworkManager is stopping"})
+
+// serve admits a method call that emits on the connection, counting it
+// in flight until done; a stopping NM refuses it.
+func (f *fakeNM) serve() (done func(), refused *dbus.Error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.stopping {
+		return nil, errStopping
+	}
+	f.calls.Add(1)
+	return f.calls.Done, nil
+}
+
 // own connects a fresh peer that exports NM and takes its name: the
 // start of the fake, and of a restarted one.
 func (f *fakeNM) own() {
 	f.t.Helper()
+	f.mu.Lock()
+	f.stopping = false
+	f.mu.Unlock()
 	f.conn = f.bus.Conn(f.t)
+	f.t.Cleanup(f.stop)
 	must(f.t, f.conn.Export(fakeManager{f}, nmPath, nmIface))
 	must(f.t, f.conn.Export(fakeSettings{f}, settingsPath, settingsIface))
 	must(f.t, f.conn.Export(fakeAgentManager{f}, agentManagerPath, agentManagerIface))
@@ -120,14 +149,21 @@ func (f *fakeNM) own() {
 	}
 }
 
-// stop takes NM off the bus, as a restart's first half does.
+// stop takes NM off the bus, as a restart's first half does: it refuses
+// new calls, waits out the ones in flight, and only then closes the
+// connection they emit on. A stopped NM stops again as a no-op, so the
+// test's cleanup stops whichever one is up.
 func (f *fakeNM) stop() {
 	f.t.Helper()
+	f.mu.Lock()
+	f.stopping = true
+	f.mu.Unlock()
+	f.calls.Wait()
 	f.mu.Lock()
 	f.active = make(map[dbus.ObjectPath]*fakeActive)
 	f.registrations = nil
 	f.mu.Unlock()
-	_ = f.conn.Close()
+	must(f.t, f.conn.Close())
 }
 
 func must(t *testing.T, err error) {
@@ -331,11 +367,23 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 type fakeManager struct{ f *fakeNM }
 
 func (m fakeManager) ActivateConnection(profile, _, _ dbus.ObjectPath) (dbus.ObjectPath, *dbus.Error) {
-	f := m.f
+	done, refused := m.f.serve()
+	if refused != nil {
+		return "", refused
+	}
+	defer done()
+	return m.f.activate(profile)
+}
+
+func (f *fakeNM) activate(profile dbus.ObjectPath) (dbus.ObjectPath, *dbus.Error) {
 	f.mu.Lock()
 	f.activations = append(f.activations, profile)
 	refused := f.activateErr
+	held := f.held
 	f.mu.Unlock()
+	if held != nil {
+		<-held
+	}
 	if refused != nil {
 		return "", refused
 	}
@@ -348,6 +396,11 @@ func (m fakeManager) ActivateConnection(profile, _, _ dbus.ObjectPath) (dbus.Obj
 
 func (m fakeManager) DeactivateConnection(active dbus.ObjectPath) *dbus.Error {
 	f := m.f
+	done, refused := f.serve()
+	if refused != nil {
+		return refused
+	}
+	defer done()
 	f.mu.Lock()
 	f.deactivations = append(f.deactivations, active)
 	_, ok := f.active[active]
@@ -373,8 +426,13 @@ func (m fakeManager) GetDevices() ([]dbus.ObjectPath, *dbus.Error) {
 	return devices, nil
 }
 
-func (m fakeManager) AddAndActivateConnection(dict ConnectionDict, device, specific dbus.ObjectPath) (dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+func (m fakeManager) AddAndActivateConnection(dict ConnectionDict, _, _ dbus.ObjectPath) (dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
 	f := m.f
+	done, refused := f.serve()
+	if refused != nil {
+		return "", "", refused
+	}
+	defer done()
 	f.mu.Lock()
 	f.addAndActive = append(f.addAndActive, dict)
 	f.mu.Unlock()
@@ -382,7 +440,7 @@ func (m fakeManager) AddAndActivateConnection(dict ConnectionDict, device, speci
 		dict["connection"]["uuid"] = dbus.MakeVariant(fmt.Sprintf("generated-%d", time.Now().UnixNano()))
 	}
 	path := f.addProfile(dict)
-	active, err := m.ActivateConnection(path, device, specific)
+	active, err := f.activate(path)
 	return path, active, err
 }
 
@@ -395,6 +453,11 @@ func (s fakeSettings) ListConnections() ([]dbus.ObjectPath, *dbus.Error) {
 }
 
 func (s fakeSettings) AddConnection(dict ConnectionDict) (dbus.ObjectPath, *dbus.Error) {
+	done, refused := s.f.serve()
+	if refused != nil {
+		return "", refused
+	}
+	defer done()
 	s.f.mu.Lock()
 	s.f.added = append(s.f.added, dict)
 	s.f.mu.Unlock()
@@ -415,6 +478,11 @@ func (c fakeConnection) GetSettings() (ConnectionDict, *dbus.Error) {
 }
 
 func (c fakeConnection) Update(dict ConnectionDict) *dbus.Error {
+	done, refused := c.f.serve()
+	if refused != nil {
+		return refused
+	}
+	defer done()
 	c.f.mu.Lock()
 	c.f.profiles[c.path] = dict
 	c.f.mu.Unlock()
@@ -425,6 +493,11 @@ func (c fakeConnection) Update(dict ConnectionDict) *dbus.Error {
 }
 
 func (c fakeConnection) Delete() *dbus.Error {
+	done, refused := c.f.serve()
+	if refused != nil {
+		return refused
+	}
+	defer done()
 	c.f.removeProfile(c.path)
 	return nil
 }
@@ -465,4 +538,67 @@ func wifiConnection(uuid, name string, ssid []byte) ConnectionDict {
 
 func settingPath(i int) dbus.ObjectPath {
 	return dbus.ObjectPath(fmt.Sprintf("%s/%d", settingsPath, i))
+}
+
+func TestStoppingNMLetsTheCallsInFlightFinishAndRefusesNewOnes(t *testing.T) {
+	f := startFakeNM(t)
+	profile := f.addProfile(vpnConnection("work", "Work", "org.freedesktop.NetworkManager.openconnect", nil))
+	held := make(chan struct{})
+	f.mu.Lock()
+	f.held = held
+	f.mu.Unlock()
+	client := f.client()
+	must(t, client.AddMatchSignal(dbus.WithMatchObjectPath(nmPath), dbus.WithMatchMember("PropertiesChanged")))
+	changes := make(chan *dbus.Signal, 16)
+	client.Signal(changes)
+	manager := client.Object(BusName, nmPath)
+	activate := func() <-chan *dbus.Call {
+		out := make(chan *dbus.Call, 1)
+		go func() { out <- manager.Call(nmIface+".ActivateConnection", 0, profile, rootPath, rootPath) }()
+		return out
+	}
+	inFlight := activate()
+	waitFor(t, "the activation in flight", func() bool {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return len(f.activations) == 1
+	})
+
+	stopped := make(chan struct{})
+	go func() {
+		f.stop()
+		close(stopped)
+	}()
+	waitFor(t, "NM to start stopping", func() bool {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return f.stopping
+	})
+	late := <-activate()
+	if dbusErr, ok := errors.AsType[dbus.Error](late.Err); !ok || dbusErr.Name != errStopping.Name {
+		t.Errorf("a call to a stopping NM = %v, want %s", late.Err, errStopping.Name)
+	}
+	select {
+	case <-stopped:
+		t.Fatal("NM closed its connection under a call in flight")
+	default:
+	}
+
+	close(held)
+	<-inFlight
+	<-stopped
+	select {
+	case sig := <-changes:
+		changed, _ := sig.Body[1].(map[string]dbus.Variant)
+		if listed, _ := changed["ActiveConnections"].Value().([]dbus.ObjectPath); len(listed) != 1 {
+			t.Errorf("the call in flight announced %v, want its one active connection", sig.Body)
+		}
+	case <-time.After(liveness):
+		t.Fatal("the call in flight never announced its active connection before NM went")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.activations) != 1 {
+		t.Errorf("activations = %v; the refused call must not activate", f.activations)
+	}
 }

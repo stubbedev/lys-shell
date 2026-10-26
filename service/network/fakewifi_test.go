@@ -91,6 +91,11 @@ func (x fakeWireless) GetAllAccessPoints() ([]dbus.ObjectPath, *dbus.Error) {
 }
 
 func (x fakeWireless) RequestScan(map[string]dbus.Variant) *dbus.Error {
+	done, refused := x.w.f.serve()
+	if refused != nil {
+		return refused
+	}
+	defer done()
 	x.w.mu.Lock()
 	x.w.scans++
 	n := x.w.scans
