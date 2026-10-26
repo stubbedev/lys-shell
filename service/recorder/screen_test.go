@@ -5,12 +5,16 @@ import (
 	"context"
 	"errors"
 	"image"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,6 +128,7 @@ func feedRecords(recs []*pulsetest.Record, stop <-chan struct{}) {
 func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 	requireFFmpeg(t)
 	output := gpuSway(t)
+	logged := teeLog(t)
 	srv, audio := audioServer(t)
 	stateDir := t.TempDir()
 	for i, format := range []config.RecorderFormat{config.RecorderFormatMp4, config.RecorderFormatMkv} {
@@ -157,6 +162,9 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 			if got := terms.all(); len(got) != 0 {
 				t.Errorf("reported %q", got)
 			}
+			if !encodingLogged.MatchString(logged.String()) {
+				t.Errorf("no recording announced its device and backend in:\n%s", logged.String())
+			}
 			pr := ffprobe(t, path)
 			if len(pr.Streams) != 2 || pr.Streams[0].CodecName != "h264" || pr.Streams[1].CodecName != "opus" {
 				t.Fatalf("streams %+v, want h264 and opus", pr.Streams)
@@ -175,6 +183,52 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 				t.Errorf("remembered %q (%v)", data, err)
 			}
 		})
+	}
+}
+
+// encodingLogged matches the line a recording announces its encoder
+// with, whichever backend the GPU encodes through.
+var encodingLogged = regexp.MustCompile(`(?m)recorder: encoding H\.264 on .+ through (Vulkan video|VA-API)$`)
+
+// syncBuffer is a log destination tests read while recordings write.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// teeLog copies the process log into a buffer for the test, still
+// writing it where it went.
+func teeLog(t *testing.T) *syncBuffer {
+	t.Helper()
+	buf := &syncBuffer{}
+	out := log.Writer()
+	log.SetOutput(io.MultiWriter(out, buf))
+	t.Cleanup(func() { log.SetOutput(out) })
+	return buf
+}
+
+// The encoder's log line names the device and the backend, the Vulkan
+// video queue or the VA-API driver.
+func TestEncodingLine(t *testing.T) {
+	for backend, want := range map[gpu.EncoderBackend]string{
+		gpu.VulkanVideo: "recorder: encoding H.264 on Intel(R) Graphics (LNL) through Vulkan video",
+		gpu.VAAPI:       "recorder: encoding H.264 on Intel(R) Graphics (LNL) through VA-API",
+	} {
+		if got := encodingLine("Intel(R) Graphics (LNL)", backend); got != want {
+			t.Errorf("%d: %q, want %q", backend, got, want)
+		}
 	}
 }
 

@@ -197,7 +197,15 @@ func newGPUVideo(s *screen, fps uint32) (*gpuVideo, error) {
 		enc.Close()
 		return nil, fmt.Errorf("recorder: the H.264 encoder on %s gave %d parameter sets, want an SPS and a PPS", s.dev.Name(), len(ps))
 	}
+	log.Print(encodingLine(s.dev.Name(), enc.Backend()))
 	return &gpuVideo{s: s, enc: enc}, nil
+}
+
+// encodingLine is the log line a recording's encoder announces itself
+// with: the device, and whether its Vulkan video queue or its VA-API
+// driver encodes.
+func encodingLine(device string, backend gpu.EncoderBackend) string {
+	return fmt.Sprintf("recorder: encoding %s on %s through %s", gpu.H264, device, backend)
 }
 
 func (v *gpuVideo) ParameterSets() (sps, pps []byte) {
