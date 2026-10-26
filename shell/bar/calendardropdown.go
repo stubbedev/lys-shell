@@ -174,7 +174,7 @@ func (v *calendarView) calendar() widget.Widget {
 	v.names = calendarNames{weekStart: calendarWeekStart(v.ctx.Config.Clock.CalendarWeekdayStart)}
 	v.cal.SetNames(v.names)
 	v.cal.SetToday(v.today)
-	col.AppendAligned(v.cal, false, widget.AlignCenter)
+	col.Append(v.cal, false)
 	return col
 }
 

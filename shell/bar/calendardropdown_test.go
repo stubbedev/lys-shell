@@ -4,11 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // The calendar speaks the shell's catalog and week start: month and
@@ -117,5 +119,26 @@ func TestCalendarClockRowCarriesTheStateClasses(t *testing.T) {
 	v.tick()
 	if v.timeRow.HasClass("show-seconds") || v.ampm.Visible() {
 		t.Errorf("24h without seconds: classes = %v, ampm %v; want neither", v.timeRow.Classes(), v.ampm.Visible())
+	}
+}
+
+// The month grid takes the whole width of its section, wider than the
+// grid's natural size, and never more than the section has.
+func TestCalendarFillsItsSection(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	v := calendarDropdown(ctx).(*calendarView)
+	w, h, _ := dropdownDims("calendar", ctx.Config)
+	card, _ := dropdownTree(v, ctx.Config, w, h)
+	ctx.Theme.Attach(card)
+	sz := widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: w, H: 4000}})
+	card.Arrange(render.Rect{W: sz.W, H: sz.H})
+	section := treetest.WithClass(v, "cal-section")[0].(*widget.Box).Bounds()
+	cal := v.cal.Bounds()
+	natural := widget.MeasureAsChild(v.cal, widget.Constraints{Max: widget.Size{W: 4000, H: 4000}})
+	if natural.W >= section.W {
+		t.Fatalf("the section (%dpx) leaves the grid (%dpx) no room to fill", section.W, natural.W)
+	}
+	if cal.X != section.X || cal.W != section.W {
+		t.Errorf("the grid spans x %d..%d, want the section's %d..%d", cal.X, cal.X+cal.W, section.X, section.X+section.W)
 	}
 }
