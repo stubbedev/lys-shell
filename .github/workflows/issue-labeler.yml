@@ -16,19 +16,21 @@ jobs:
     label:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
 
-            - uses: stefanbuck/github-issue-parser@v3
+            - uses: stefanbuck/github-issue-parser@cb6e97157cbf851e3a393ff8d57c93a484cc323f # v3.2.5
               id: bug
               with:
                   template-path: .github/ISSUE_TEMPLATE/bug_report.yml
 
-            - uses: stefanbuck/github-issue-parser@v3
+            - uses: stefanbuck/github-issue-parser@cb6e97157cbf851e3a393ff8d57c93a484cc323f # v3.2.5
               id: feature
               with:
                   template-path: .github/ISSUE_TEMPLATE/feature_request.yml
 
-            - uses: actions/github-script@v9
+            - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
               env:
                   BUG_AREA: ${{ steps.bug.outputs.issueparser_area }}
                   FEATURE_AREA: ${{ steps.feature.outputs.issueparser_area }}
