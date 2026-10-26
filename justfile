@@ -185,6 +185,15 @@ update:
     {{go}} mod tidy
     just vendor-hash
 
+# Move lys-ui and lys-lib to the heads of their main branches: go.mod's
+# pins straight from GitHub (the module proxy lags fresh commits), the
+# flake's lys-lib input for the dev shell's drivers, then the vendor hash.
+bump-lys:
+    GOPROXY=direct GOPRIVATE=github.com/stubbedev/* {{go}} get github.com/stubbedev/lys-ui@main github.com/stubbedev/lys-lib@main
+    {{go}} mod tidy
+    nix flake update lys-lib
+    just vendor-hash
+
 # ─────────────────────────── Nix cache ───────────────────────────
 
 # Build the flake package and push its closure to the self-hosted xilo
