@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -109,9 +108,9 @@ const sizePxMax = 10_000
 // Size is a lys-shell config size: a bare number is a multiplier, a string
 // like "4px" is absolute pixels
 // (crates/wayle-config/src/schemas/styling/types/validated/size.rs).
-// Like the Rust type it never fails to load: a negative multiplier
-// clamps to 0, pixels clamp to 0-10000, and an unparseable string
-// warns and falls back to the 1.0 multiplier.
+// A negative multiplier clamps to 0 and pixels clamp to 0-10000, as
+// the Rust type does; a string that is neither form fails to load,
+// where the Rust type fell back to the 1.0 multiplier.
 type Size struct {
 	Value float32
 	Unit  SizeUnit
@@ -173,8 +172,7 @@ func (s *Size) UnmarshalConfig(v any) error {
 	case string:
 		parsed, ok := ParseSize(t)
 		if !ok {
-			log.Printf("config: invalid size %q, falling back to scale 1.0", t)
-			parsed = Scale(1)
+			return fmt.Errorf("invalid value: %s, expected %s", unexpected(v), sizeExpected)
 		}
 		*s = parsed
 	default:
@@ -182,6 +180,9 @@ func (s *Size) UnmarshalConfig(v any) error {
 	}
 	return nil
 }
+
+// sizeExpected is what a Size error says it wants.
+const sizeExpected = `a scale multiplier like 1.5 or a pixel length like "24px"`
 
 // MarshalConfig implements Marshaler: a multiplier is a number, pixels
 // a string.

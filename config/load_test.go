@@ -288,7 +288,7 @@ func TestDirFollowsXDG(t *testing.T) {
 
 func TestClampedNewtypesWarnAndClamp(t *testing.T) {
 	path := writeFile(t, t.TempDir(), "config.yaml",
-		"bar:\n  background-opacity: 150\n  scale: 9\n  padding: nope\nmodules:\n  cava:\n    bars: 0\n")
+		"bar:\n  background-opacity: 150\n  scale: 9\nmodules:\n  cava:\n    bars: 0\n")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("clamping is not an error: %v", err)
@@ -296,8 +296,36 @@ func TestClampedNewtypesWarnAndClamp(t *testing.T) {
 	if cfg.Bar.BackgroundOpacity != 100 || cfg.Bar.Scale != 3 || cfg.Cava.Bars != 1 {
 		t.Errorf("clamped: opacity %d scale %v bars %d", cfg.Bar.BackgroundOpacity, cfg.Bar.Scale, cfg.Cava.Bars)
 	}
-	if cfg.Bar.Padding != Scale(1) {
-		t.Errorf("unparseable size = %+v, want the 1.0 fallback", cfg.Bar.Padding)
+}
+
+// A size is a multiplier or a pixel length: both load, and a string
+// that is neither is an error naming the key, the field keeping its
+// default instead of falling back to a 1.0 multiplier. Inside a value
+// struct the error names the struct's field.
+func TestSizeTakesAMultiplierOrPixels(t *testing.T) {
+	path := writeFile(t, t.TempDir(), "config.yaml", "bar:\n  padding: 24px\n  module-gap: 1.5\n")
+	cfg, err := LoadFile(path)
+	if err != nil || cfg.Bar.Padding != Px(24) || cfg.Bar.ModuleGap != Scale(1.5) {
+		t.Fatalf("padding %+v module-gap %+v: %v, want 24px and 1.5", cfg.Bar.Padding, cfg.Bar.ModuleGap, err)
+	}
+	const want = "invalid value: string \"nope\", expected a scale multiplier like 1.5 or a pixel length like \"24px\""
+	defaults := Defaults()
+	for doc, field := range map[string]string{
+		"bar:\n  padding: nope\n  scale: 2\n":       "bar.padding",
+		"dropdowns:\n  weather:\n    width: nope\n": "dropdowns.weather.width",
+	} {
+		cfg, err := LoadFile(writeFile(t, t.TempDir(), "config.yaml", doc))
+		var d Diagnostic
+		if !errors.As(err, &d) || d.Field("Field") != field || d.Field("Error") != want {
+			t.Errorf("%s: error %v, want %q at %s", field, err, want, field)
+		}
+		if cfg.Bar.Padding != defaults.Bar.Padding || cfg.Dropdowns.Weather != defaults.Dropdowns.Weather {
+			t.Errorf("%s: padding %+v weather %+v, want the defaults kept", field, cfg.Bar.Padding, cfg.Dropdowns.Weather)
+		}
+	}
+	cfg, _ = LoadFile(writeFile(t, t.TempDir(), "config.yaml", "bar:\n  padding: nope\n  scale: 2\n"))
+	if cfg.Bar.Scale != 2 {
+		t.Errorf("scale %v: the valid sibling of a bad size was not applied", cfg.Bar.Scale)
 	}
 }
 
