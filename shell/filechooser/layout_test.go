@@ -228,3 +228,41 @@ func TestSidebarKeepsItsWidth(t *testing.T) {
 		})
 	}
 }
+
+// The replace notice names the folder, not its path, as GTK does; a
+// long file name wraps the message inside the panel over Replace, and
+// a short one keeps it on one line.
+func TestReplaceNoticeWrapsInsideThePanel(t *testing.T) {
+	long := strings.Repeat("a-long-file-name ", 8) + ".txt"
+	for _, tc := range []struct{ case_, name string }{{"short", "b.txt"}, {"long", long}} {
+		name := tc.name
+		t.Run(tc.case_, func(t *testing.T) {
+			hs := newHarness(t, "")
+			touch(t, hs.root, name)
+			hs.ask(t, func() []string {
+				return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: name}).URIs
+			})
+			hs.do(hs.c.confirm)
+			hs.run(func() {
+				want := "“" + name + "” already exists in “" + filepath.Base(hs.root) + "”. Replace it?"
+				if got := hs.c.ui.noticeLabel.Text(); got != want {
+					t.Errorf("notice %q, want %q", got, want)
+				}
+				panel := hs.laidOut(t)
+				notice := hs.c.ui.notice.Bounds()
+				for what, b := range map[string]render.Rect{"notice": notice, "message": hs.c.ui.noticeLabel.Bounds(), "Replace": hs.c.ui.replace.Bounds()} {
+					if !inside(b, panel) {
+						t.Errorf("%s at %v, outside the panel %v", what, b, panel)
+					}
+				}
+				msg := hs.c.ui.noticeLabel
+				at := msg.Bounds()
+				line := msg.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}})
+				lines := msg.Measure(widget.Constraints{Max: widget.Size{W: at.W, H: 1 << 20}})
+				if wrapped := lines.H > line.H; wrapped != (name == long) || at.H < lines.H {
+					t.Errorf("the message for %q is %v, %dpx at its width and one line %d: wrapped %v", name, at, lines.H, line.H, wrapped)
+				}
+			})
+		})
+	}
+}

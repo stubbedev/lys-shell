@@ -1219,7 +1219,7 @@ func TestSaveAsksBeforeReplacing(t *testing.T) {
 	var notice string
 	var visible bool
 	hs.do(func() { notice, visible = hs.c.ui.noticeLabel.Text(), hs.c.ui.notice.Visible() })
-	if !visible || notice != "“b.txt” already exists in "+hs.root+". Replace it?" {
+	if !visible || notice != "“b.txt” already exists in “"+filepath.Base(hs.root)+"”. Replace it?" {
 		t.Errorf("notice %v %q", visible, notice)
 	}
 	hs.do(func() { hs.c.ui.name.SetText("b.txt ") })
