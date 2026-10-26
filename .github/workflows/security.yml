@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   codeql:
     runs-on: ubuntu-latest
     strategy:
@@ -60,16 +59,26 @@ jobs:
   govulncheck:
     runs-on: ubuntu-latest
     permissions:
+      security-events: write
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-      - run: nix develop --accept-flake-config -c go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+            extra-substituters = https://nix.stubbe.dev/c/default/default
+            extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
+      - name: Run govulncheck
+        run: |
+          nix develop --accept-flake-config -c sh -c 'go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -C . -format sarif ./... > results.sarif'
+      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: results.sarif
+      - name: Fail on reachable vulnerabilities
+        run: nix develop --accept-flake-config -c go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   dependency-review:
     runs-on: ubuntu-latest
@@ -83,3 +92,4 @@ jobs:
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: critical
+          allow-licenses: BSD-2-Clause, BSD-3-Clause, MIT, MIT-0, Apache-2.0, MPL-2.0, ISC, LicenseRef-scancode-google-patent-license-golang, Unlicense, CC-BY-4.0
