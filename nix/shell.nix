@@ -37,6 +37,9 @@
           sway
           dbus
           pipewire
+          # loginctl, which the default lock commands run against the fake
+          # logind on a private system bus (service/logind/logindtest).
+          systemd
           # ffprobe, which the recorder tests read their files back with.
           ffmpeg-headless
 

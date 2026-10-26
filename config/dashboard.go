@@ -61,7 +61,7 @@ func DefaultsDashboard() DashboardConfig {
 		ScrollUp:                ClickAction{},
 		ScrollDown:              ClickAction{},
 		LeftClick:               ParseClickAction("dropdown:dashboard"),
-		DropdownLockCommand:     "loginctl lock-session",
+		DropdownLockCommand:     DefaultLockCommand,
 		DropdownLogoutCommand:   DefaultLogoutCommand,
 		DropdownRebootCommand:   "systemctl reboot",
 		DropdownPoweroffCommand: "systemctl poweroff",

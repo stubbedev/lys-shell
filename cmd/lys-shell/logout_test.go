@@ -11,17 +11,6 @@ import (
 	"github.com/stubbedev/lys-shell/service/logind/logindtest"
 )
 
-// startUnitLogind is the shell under the systemd user unit: no
-// XDG_SESSION_ID, and logind on the system bus with the caller outside
-// any session.
-func startUnitLogind(t *testing.T, display dbus.ObjectPath) *logindtest.Logind {
-	t.Helper()
-	t.Setenv("XDG_SESSION_ID", "")
-	fake := logindtest.Start(t, display)
-	fake.Bus.UseAsSystemBus(t)
-	return fake
-}
-
 // The power menu's and the dashboard's default Log out commands end
 // the user's display session with no XDG_SESSION_ID to go on.
 func TestDefaultLogoutCommandsEndTheDisplaySession(t *testing.T) {
@@ -32,7 +21,7 @@ func TestDefaultLogoutCommandsEndTheDisplaySession(t *testing.T) {
 	} {
 		command := c.command
 		t.Run(c.name, func(t *testing.T) {
-			fake := startUnitLogind(t, display)
+			fake := logindtest.StartUnit(t, display)
 			argv := strings.Fields(command)
 			if len(argv) == 0 || argv[0] != "lys-shell" {
 				t.Fatalf("default logout command %q is not a lys-shell command", command)
@@ -50,7 +39,7 @@ func TestDefaultLogoutCommandsEndTheDisplaySession(t *testing.T) {
 
 // With no session to resolve, logout fails loudly and ends nothing.
 func TestLogoutWithoutASessionIsAnError(t *testing.T) {
-	fake := startUnitLogind(t, "")
+	fake := logindtest.StartUnit(t, "")
 	stdout, stderr, code := runCaptured(t, false, "logout")
 	want := "Error: log out: logind GetSession \"auto\": no session auto\n"
 	if code != 1 || stdout != "" || stderr != want {

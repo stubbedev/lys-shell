@@ -46,6 +46,12 @@ type PowerConfig struct {
 	ShowShutdown bool `cfg:"show-shutdown"`
 }
 
+// DefaultLockCommand is the default command of the power menu's and the
+// dashboard's Lock buttons. With no session argument loginctl locks
+// logind's "auto" session, which for the systemd user unit, outside any
+// session, is the user's display session.
+const DefaultLockCommand = "loginctl lock-session"
+
 // DefaultLogoutCommand is the default command of the power menu's and
 // the dashboard's Log out buttons.
 const DefaultLogoutCommand = "lys-shell logout"
@@ -63,7 +69,7 @@ func DefaultsPower() PowerConfig {
 		ScrollUp:        ClickAction{},
 		ScrollDown:      ClickAction{},
 		LeftClick:       ParseClickAction(":menu"),
-		LockCommand:     "loginctl lock-session",
+		LockCommand:     DefaultLockCommand,
 		LogoutCommand:   DefaultLogoutCommand,
 		SuspendCommand:  "systemctl suspend",
 		RebootCommand:   "systemctl reboot",
