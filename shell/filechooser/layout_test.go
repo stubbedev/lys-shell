@@ -1,12 +1,15 @@
 package filechooser
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -41,6 +44,88 @@ func (hs *harness) laidOut(t *testing.T) render.Rect {
 	t.Helper()
 	lay(hs.cfg.Root, outW, outH)
 	return hs.panel(t).PanelRect()
+}
+
+// classed is the one widget carrying class.
+func classed(t *testing.T, root widget.Widget, class string) widget.Boundser {
+	t.Helper()
+	ws := treetest.WithClass(root, class)
+	if len(ws) != 1 {
+		t.Fatalf("%d widgets carry %s, want one", len(ws), class)
+	}
+	return ws[0].(widget.Boundser)
+}
+
+// inside reports whether r lies within outer.
+func inside(r, outer render.Rect) bool {
+	return r.X >= outer.X && r.Y >= outer.Y && r.X+r.W <= outer.X+outer.W && r.Y+r.H <= outer.Y+outer.H
+}
+
+// crowded is a folder of n files, more than the panel shows.
+func crowded(t *testing.T, root string, n int) string {
+	t.Helper()
+	dir := filepath.Join(root, "crowded")
+	names := make([]string, n)
+	for i := range names {
+		names[i] = fmt.Sprintf("crowded/file-%02d.txt", i)
+	}
+	touch(t, root, names...)
+	return dir
+}
+
+// The footer stays in the panel whatever is above it: a folder of
+// more files than fit, the new folder row and the replace notice take
+// their room from the file list, which scrolls the rest. A short
+// folder leaves the footer at the panel's foot all the same.
+func TestFooterStaysInThePanel(t *testing.T) {
+	cases := []struct {
+		name  string
+		files int
+		show  func(hs *harness)
+	}{
+		{name: "few files", files: 0},
+		{name: "fifty files", files: 50},
+		{name: "new folder row", files: 14, show: func(hs *harness) { hs.do(hs.c.showNewFolder) }},
+		{name: "replace notice", files: 14, show: func(hs *harness) {
+			hs.do(func() { hs.c.ui.name.SetText("file-00.txt") })
+			hs.do(hs.c.confirm)
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			hs := newHarness(t, "")
+			dir := hs.root
+			if tc.files > 0 {
+				dir = crowded(t, hs.root, tc.files)
+			}
+			hs.ask(t, func() []string {
+				return hs.c.Save(portalreq.Caller{Handle: "/r/footer", Modal: true}, SaveRequest{CurrentFolder: dir, CurrentName: "new.txt"}).URIs
+			})
+			if tc.show != nil {
+				tc.show(hs)
+			}
+			hs.run(func() {
+				panel := hs.laidOut(t)
+				footer := classed(t, hs.cfg.Root, "file-chooser-footer").Bounds()
+				if !inside(footer, panel) || footer.Y+footer.H != panel.Y+panel.H {
+					t.Errorf("footer at %v, want it at the foot of the panel %v", footer, panel)
+				}
+				for _, class := range []string{"file-chooser-confirm", "file-chooser-cancel"} {
+					if b := classed(t, hs.cfg.Root, class).Bounds(); !inside(b, footer) {
+						t.Errorf("%s at %v, outside the footer %v", class, b, footer)
+					}
+				}
+				list := hs.c.ui.list.Bounds()
+				if list.Y+list.H > footer.Y {
+					t.Errorf("the file list at %v runs into the footer at %v", list, footer)
+				}
+				rows := len(hs.c.s.entries)
+				if fits := list.H/listRowH >= rows; tc.files >= 50 && fits {
+					t.Errorf("the list is %dpx, tall enough for all %d rows: it was never short of room", list.H, rows)
+				}
+			})
+		})
+	}
 }
 
 // The filter is a dropdown like the dialog's choices: closed, it is a
