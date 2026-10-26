@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // MenuIface is the DBusMenu interface tray items publish their menus
@@ -194,6 +196,6 @@ func (a *Actions) MenuClicked(ctx context.Context, it Item, id int32) error {
 	if err != nil {
 		return err
 	}
-	ts := uint32(max(time.Now().Unix(), 0))
+	ts := intconv.Clamp[uint32](time.Now().Unix())
 	return obj.CallWithContext(ctx, MenuIface+".Event", dbus.FlagNoReplyExpected, id, "clicked", dbus.MakeVariant(int32(0)), ts).Err
 }

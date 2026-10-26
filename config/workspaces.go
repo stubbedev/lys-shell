@@ -2,6 +2,8 @@ package config
 
 import (
 	"errors"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -172,14 +174,9 @@ func parseIntError(key string, err error) error {
 // MarshalConfig implements Marshaler: keys in numeric order, as the
 // Rust BTreeMap<i32, _> iterates them.
 func (m WorkspaceMap) MarshalConfig() any {
-	ids := make([]int, 0, len(m))
-	for id := range m {
-		ids = append(ids, int(id))
-	}
-	sort.Ints(ids)
 	out := newTable()
-	for _, id := range ids {
-		out.set(strconv.Itoa(id), encodeValue(valueOf(new(m[int32(id)]))))
+	for _, id := range slices.Sorted(maps.Keys(m)) {
+		out.set(strconv.Itoa(int(id)), encodeValue(valueOf(new(m[id]))))
 	}
 	return out
 }

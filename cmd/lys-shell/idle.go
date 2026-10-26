@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/rustparse"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 )
@@ -105,24 +106,32 @@ func (a idleAdjuster) run(m *cli.Matches, p *daemonProxy) error {
 		if value[0] == '+' {
 			digits = value[1:]
 		}
-		delta, err := rustparse.Int(digits, 32)
+		parsed, err := rustparse.Int(digits, 32)
 		if err != nil {
 			return cliMessage("Invalid delta: " + value)
 		}
-		if err := p.call("adjust "+a.noun, "Adjust"+a.member, nil, int32(delta)); err != nil {
+		delta, err := intconv.Exact[int32](parsed)
+		if err != nil {
+			return cliMessage("Invalid delta: " + value)
+		}
+		if err := p.call("adjust "+a.noun, "Adjust"+a.member, nil, delta); err != nil {
 			return err
 		}
 		if value[0] == '+' {
-			fmt.Fprintf(m.Stdout(), "Added %d minutes to %s\n", delta, a.noun)
+			fmt.Fprintf(m.Stdout(), "Added %d minutes to %s\n", parsed, a.noun)
 		} else {
-			fmt.Fprintf(m.Stdout(), "Subtracted %d minutes from %s\n", -delta, a.noun)
+			fmt.Fprintf(m.Stdout(), "Subtracted %d minutes from %s\n", -parsed, a.noun)
 		}
 	default:
-		minutes, err := rustparse.Uint(value, 32)
+		parsed, err := rustparse.Uint(value, 32)
 		if err != nil {
 			return cliMessage("Invalid minutes: " + value)
 		}
-		if err := p.call("set "+a.noun, "Set"+a.member, nil, uint32(minutes)); err != nil {
+		minutes, err := intconv.Exact[uint32](parsed)
+		if err != nil {
+			return cliMessage("Invalid minutes: " + value)
+		}
+		if err := p.call("set "+a.noun, "Set"+a.member, nil, minutes); err != nil {
 			return err
 		}
 		fmt.Fprintf(m.Stdout(), "Set %s to %d minutes\n", a.noun, minutes)

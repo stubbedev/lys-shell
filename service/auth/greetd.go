@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net"
 	"os"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // GreetdSockEnv names the IPC socket greetd hands its greeter.
@@ -150,10 +151,11 @@ func (g *Greetd) send(req any) error {
 	if err != nil {
 		return err
 	}
-	if len(payload) > math.MaxUint32 {
-		return errors.New("request too large")
+	size, err := intconv.Exact[uint32](len(payload))
+	if err != nil {
+		return fmt.Errorf("request too large: %w", err)
 	}
-	frame := binary.NativeEndian.AppendUint32(make([]byte, 0, 4+len(payload)), uint32(len(payload)))
+	frame := binary.NativeEndian.AppendUint32(make([]byte, 0, 4+len(payload)), size)
 	frame = append(frame, payload...)
 	_, err = g.conn.Write(frame)
 	return err

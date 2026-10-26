@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // TOTPAlgorithm is a code's HMAC; Steam is SHA-1 with Steam's alphabet.
@@ -112,7 +114,7 @@ func decodeBase32(s string) []byte {
 		bits += base32BitsPerChar
 		if bits >= 8 {
 			bits -= 8
-			out = append(out, byte(acc>>bits))
+			out = append(out, byte(acc>>bits&0xff))
 			acc &= 1<<bits - 1
 		}
 	}
@@ -124,7 +126,7 @@ func (t TOTP) Code(now time.Time) (string, time.Duration) {
 	period := int64(t.Period)
 	unix := now.Unix()
 	var counter [8]byte
-	binary.BigEndian.PutUint64(counter[:], uint64(unix/period))
+	binary.BigEndian.PutUint64(counter[:], intconv.Clamp[uint64](unix/period))
 	m := hmac.New(t.hash(), t.Secret)
 	m.Write(counter[:])
 	sum := m.Sum(nil)

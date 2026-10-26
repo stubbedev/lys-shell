@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/internal/spawn"
 )
@@ -339,7 +340,7 @@ func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, er
 		default:
 			m.runCommand(*def.Command)
 			if def.IntervalMs > 0 {
-				go m.poll(time.Duration(def.IntervalMs) * time.Millisecond)
+				go m.poll(intconv.Duration(def.IntervalMs, time.Millisecond))
 			}
 		}
 	}
@@ -406,7 +407,7 @@ func exitedWithOutput(err error) bool {
 // command is an output; on exit the restart policy decides, after
 // restart-interval-ms, whether it runs again.
 func (m *customModule) supervise(command string) {
-	delay := time.Duration(m.def.RestartIntervalMs) * time.Millisecond
+	delay := intconv.Duration(m.def.RestartIntervalMs, time.Millisecond)
 	for {
 		exitErr, ran := m.watchOnce(command)
 		if !ran || m.life.Err() != nil {

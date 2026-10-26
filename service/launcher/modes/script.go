@@ -360,9 +360,12 @@ func ParseRanges(raw string) []uint32 {
 		if start, end, isRange := strings.Cut(part, "-"); isRange {
 			a, errA := strconv.ParseUint(strings.TrimSpace(start), 10, 32)
 			b, errB := strconv.ParseUint(strings.TrimSpace(end), 10, 32)
-			if errA == nil && errB == nil {
-				for v := a; v <= b; v++ {
-					out = append(out, uint32(v))
+			if errA == nil && errB == nil && a <= b {
+				for v := uint32(a); ; v++ {
+					out = append(out, v)
+					if v == uint32(b) {
+						break
+					}
 				}
 			}
 			continue

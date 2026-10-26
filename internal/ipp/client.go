@@ -176,6 +176,9 @@ func (c *Client) Print(ctx context.Context, j Job) (int32, error) {
 // unsuccessful status is an error carrying status-message.
 func (c *Client) do(ctx context.Context, path string, m Message, doc io.Reader) (Message, error) {
 	m.RequestID = c.ids.Add(1)
+	if err := m.checkLengths(); err != nil {
+		return Message{}, err
+	}
 	body := io.Reader(bytes.NewReader(m.Encode()))
 	if doc != nil {
 		body = io.MultiReader(body, doc)

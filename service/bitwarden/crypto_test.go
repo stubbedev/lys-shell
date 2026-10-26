@@ -165,3 +165,15 @@ func TestParseEncString(t *testing.T) {
 		t.Errorf("a valid string = %+v, %v", e, err)
 	}
 }
+
+func TestArgon2idParametersPastTheirTypesAreRefused(t *testing.T) {
+	for _, k := range []Kdf{
+		{Type: KdfArgon2id, Iterations: 4, Memory: 32, Parallelism: 256},
+		{Type: KdfArgon2id, Iterations: 4, Memory: 4194304, Parallelism: 2},
+		{Type: KdfArgon2id, Iterations: 1 << 32, Memory: 32, Parallelism: 2},
+	} {
+		if _, err := deriveMasterKey("p", "e", k); err == nil {
+			t.Errorf("%+v derived a key", k)
+		}
+	}
+}

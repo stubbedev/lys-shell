@@ -17,6 +17,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/atomicfile"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
@@ -88,7 +89,7 @@ func newGlobalShortcuts(conn *dbus.Conn, s *sessions, storePath string, start fu
 	started := time.Now()
 	return &globalShortcuts{
 		conn: conn, sessions: s, start: start, storePath: storePath,
-		now:  func() uint64 { return uint64(time.Since(started).Milliseconds()) },
+		now:  func() uint64 { return intconv.Clamp[uint64](time.Since(started).Milliseconds()) },
 		regs: map[string]*registration{},
 	}
 }

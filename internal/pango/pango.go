@@ -160,7 +160,7 @@ func entity(body string) (rune, bool) {
 		num, base = hex, 16
 	}
 	v, err := strconv.ParseUint(num, base, 32)
-	if err != nil || !utf8.ValidRune(rune(v)) {
+	if err != nil || v > utf8.MaxRune || !utf8.ValidRune(rune(v)) {
 		return 0, false
 	}
 	return rune(v), true

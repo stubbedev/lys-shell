@@ -85,7 +85,11 @@ func (d *Daemon) Prepare(c portalreq.Caller, r PrepareRequest) (bool, []Setting,
 
 // Print spools document.
 func (d *Daemon) Print(c portalreq.Caller, title string, document dbus.UnixFD, token uint32) (bool, *dbus.Error) {
-	return d.host.Print(c, title, os.NewFile(uintptr(document), "document"), token), nil
+	f, err := dbusx.File(document, "document")
+	if err != nil {
+		return false, dbusx.InvalidArgs(err.Error())
+	}
+	return d.host.Print(c, title, f, token), nil
 }
 
 // Dismiss takes down the dialog showing for the request at handle.

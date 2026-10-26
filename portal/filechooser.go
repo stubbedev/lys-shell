@@ -14,6 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 )
@@ -47,7 +48,9 @@ func chooserOptions(options Vardict) (filters []filechooser.Filter, current int3
 		case len(filters) == 0:
 			filters = []filechooser.Filter{cf}
 		case i >= 0:
-			current = int32(i)
+			if current, err = intconv.Exact[int32](i); err != nil {
+				return nil, 0, nil, "", fmt.Errorf("current_filter index: %w", err)
+			}
 		default:
 			warnf("filechooser: current_filter %q is not one of the filters", cf.Name)
 		}

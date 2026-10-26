@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-lib/gpu"
 
 	"github.com/stubbedev/lys-shell/internal/atomicfile"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -192,7 +193,13 @@ func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, e
 	parts := recordingParts{video: video, audio: sources, fps: fps, now: time.Now}
 	if opts.Webcam != nil {
 		size := g.screen.frameSize()
-		parts.camRect = webcamRect(*opts.Webcam, int32(size.X), int32(size.Y))
+		width, errW := intconv.Exact[int32](size.X)
+		height, errH := intconv.Exact[int32](size.Y)
+		if err := errors.Join(errW, errH); err != nil {
+			video.Close()
+			return nil, fmt.Errorf("recorder: a %dx%d frame: %w", size.X, size.Y, err)
+		}
+		parts.camRect = webcamRect(*opts.Webcam, width, height)
 		cam, err := openWebcam(opts.Webcam.Device, parts.camRect.Size())
 		if err != nil {
 			video.Close()

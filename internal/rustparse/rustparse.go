@@ -6,9 +6,9 @@ package rustparse
 
 import (
 	"errors"
-	"math"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Error is a ParseIntError / ParseFloatError: its message is Rust's.
@@ -29,57 +29,9 @@ const (
 // Int parses a signed integer of the given bit size (i8..i64): an
 // optional '+' or '-', then ASCII digits only.
 func Int(s string, bits int) (int64, error) {
-	return parseInt(s, bits, true)
-}
-
-// Uint parses an unsigned integer of the given bit size (u8..u64): an
-// optional '+', then ASCII digits only; a '-' is an invalid digit.
-func Uint(s string, bits int) (uint64, error) {
-	v, err := parseInt(s, 64, false)
+	negative, err := checkDigits(s, true)
 	if err != nil {
-		if errors.Is(err, ErrIntHigh) {
-			return 0, ErrIntHigh
-		}
 		return 0, err
-	}
-	if bits < 64 && uint64(v) > uint64(1)<<bits-1 {
-		return 0, ErrIntHigh
-	}
-	return uint64(v), nil
-}
-
-func parseInt(s string, bits int, signed bool) (int64, error) {
-	if s == "" {
-		return 0, ErrIntEmpty
-	}
-	digits := s
-	negative := false
-	switch digits[0] {
-	case '+':
-		digits = digits[1:]
-	case '-':
-		if !signed {
-			return 0, ErrIntDigit
-		}
-		negative = true
-		digits = digits[1:]
-	}
-	if digits == "" {
-		return 0, ErrIntDigit
-	}
-	for _, r := range digits {
-		if r < '0' || r > '9' {
-			return 0, ErrIntDigit
-		}
-	}
-	if !signed {
-		v, err := strconv.ParseUint(digits, 10, 64)
-		if err != nil || v > math.MaxInt64 {
-			// Values past i64 are only reachable for u64; report them
-			// as too large, which callers range-check anyway.
-			return 0, ErrIntHigh
-		}
-		return int64(v), nil
 	}
 	v, err := strconv.ParseInt(s, 10, bits)
 	if err != nil {
@@ -89,6 +41,45 @@ func parseInt(s string, bits int, signed bool) (int64, error) {
 		return 0, ErrIntHigh
 	}
 	return v, nil
+}
+
+// Uint parses an unsigned integer of the given bit size (u8..u64): an
+// optional '+', then ASCII digits only; a '-' is an invalid digit.
+func Uint(s string, bits int) (uint64, error) {
+	if _, err := checkDigits(s, false); err != nil {
+		return 0, err
+	}
+	v, err := strconv.ParseUint(strings.TrimPrefix(s, "+"), 10, bits)
+	if err != nil {
+		return 0, ErrIntHigh
+	}
+	return v, nil
+}
+
+func checkDigits(s string, signed bool) (negative bool, err error) {
+	if s == "" {
+		return false, ErrIntEmpty
+	}
+	digits := s
+	switch digits[0] {
+	case '+':
+		digits = digits[1:]
+	case '-':
+		if !signed {
+			return false, ErrIntDigit
+		}
+		negative = true
+		digits = digits[1:]
+	}
+	if digits == "" {
+		return false, ErrIntDigit
+	}
+	for _, r := range digits {
+		if r < '0' || r > '9' {
+			return false, ErrIntDigit
+		}
+	}
+	return negative, nil
 }
 
 // floatGrammar is f64::from_str's: decimal digits with an optional

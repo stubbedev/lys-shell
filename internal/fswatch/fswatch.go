@@ -17,6 +17,8 @@ import (
 	"sync"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Changes is the event mask that counts as a change for a directory
@@ -58,6 +60,12 @@ func New(mask uint32, recursive bool) (*Watcher, error) {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("fswatch: eventfd: %w", err)
 	}
+	polls, err := pollIn(fd, wake)
+	if err != nil {
+		_ = unix.Close(wake)
+		_ = unix.Close(fd)
+		return nil, err
+	}
 	w := &Watcher{
 		fd:        fd,
 		wake:      wake,
@@ -67,7 +75,7 @@ func New(mask uint32, recursive bool) (*Watcher, error) {
 		ticks:     make(chan struct{}, 1),
 		done:      make(chan struct{}),
 	}
-	go w.loop()
+	go w.loop(polls)
 	return w, nil
 }
 
@@ -132,11 +140,22 @@ func (w *Watcher) Close() error {
 	return unix.Close(w.fd)
 }
 
-func (w *Watcher) loop() {
+func pollIn(fds ...int) ([]unix.PollFd, error) {
+	out := make([]unix.PollFd, len(fds))
+	for i, fd := range fds {
+		n, err := intconv.Exact[int32](fd)
+		if err != nil {
+			return nil, fmt.Errorf("fswatch: poll fd: %w", err)
+		}
+		out[i] = unix.PollFd{Fd: n, Events: unix.POLLIN}
+	}
+	return out, nil
+}
+
+func (w *Watcher) loop(fds []unix.PollFd) {
 	defer close(w.done)
 	defer close(w.ticks)
 	buf := make([]byte, 64*(unix.SizeofInotifyEvent+unix.NAME_MAX+1))
-	fds := []unix.PollFd{{Fd: int32(w.fd), Events: unix.POLLIN}, {Fd: int32(w.wake), Events: unix.POLLIN}}
 	for {
 		if _, err := unix.Poll(fds, -1); err != nil {
 			if errors.Is(err, unix.EINTR) {

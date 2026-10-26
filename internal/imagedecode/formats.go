@@ -9,6 +9,8 @@ import (
 	"image/color"
 	"io"
 	"strconv"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // maxPixels bounds a decoded image (16k x 16k): a corrupt header must
@@ -154,7 +156,7 @@ func decodePNM(r io.Reader) (image.Image, error) {
 		c, err := br.ReadByte()
 		return int(c), err
 	}
-	scale := func(v int) uint8 { return uint8(min(v, h.maxv) * 255 / h.maxv) }
+	scale := func(v int) uint8 { return intconv.Clamp[uint8](min(v, h.maxv) * 255 / h.maxv) }
 	for y := range h.h {
 		if h.magic == '4' {
 			// Packed bitmap rows, MSB first; 1 is black.
@@ -179,7 +181,7 @@ func decodePNM(r io.Reader) (image.Image, error) {
 					return nil, fmt.Errorf("imagedecode: PNM pixels: %w", err)
 				}
 				if h.magic == '1' {
-					rgb[c] = uint8(255 * (1 - min(v, 1))) // 1 is black
+					rgb[c] = intconv.Clamp[uint8](255 * (1 - min(v, 1))) // 1 is black
 				} else {
 					rgb[c] = scale(v)
 				}

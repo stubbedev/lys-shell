@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // DDC/CI over i2c-dev, the Go counterpart of backend/ddc.rs and the
@@ -97,8 +99,12 @@ func checksum(seed byte, data []byte) byte {
 // encodeCommand frames a command: sub-address, 0x80|length, the
 // payload, and a checksum seeded with the destination address 0x6E.
 func encodeCommand(payload []byte) []byte {
+	n, err := intconv.Exact[byte](len(payload))
+	if err != nil || n > 0x7f {
+		panic(fmt.Sprintf("ddc: a %d-byte payload exceeds the 7-bit length field", len(payload)))
+	}
 	packet := make([]byte, 0, len(payload)+3)
-	packet = append(packet, ddcSubAddress, 0x80|byte(len(payload)))
+	packet = append(packet, ddcSubAddress, 0x80|n)
 	packet = append(packet, payload...)
 	return append(packet, checksum(ddcAddress<<1, packet))
 }
@@ -209,7 +215,7 @@ func (h *ddcHandle) getVCP(code byte) (value vcpValue, err error) {
 func (h *ddcHandle) setVCP(code byte, value uint16) (err error) {
 	h.wait()
 	defer func() { h.settle(err) }()
-	_, err = h.bus.Write(encodeCommand([]byte{0x03, code, byte(value >> 8), byte(value)}))
+	_, err = h.bus.Write(encodeCommand([]byte{0x03, code, byte(value >> 8), byte(value & 0xff)}))
 	return err
 }
 
@@ -375,20 +381,20 @@ func (m *ddcManager) setRaw(name string, value uint32) error {
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrDDCUnavailable, name)
 	}
-	value = min(value, d.max, 0xffff)
+	level := intconv.Clamp[uint16](min(value, d.max))
 	d.io.Lock()
 	var err error
 	if d.closed {
 		err = ErrDDCUnavailable
 	} else {
-		err = withRetry(d.handle.sleep, func() error { return d.handle.setVCP(vcpLuminance, uint16(value)) })
+		err = withRetry(d.handle.sleep, func() error { return d.handle.setVCP(vcpLuminance, level) })
 	}
 	d.io.Unlock()
 	if err != nil {
 		return fmt.Errorf("brightness: DDC write to %s: %w", name, err)
 	}
 	m.mu.Lock()
-	d.current = value
+	d.current = uint32(level)
 	m.mu.Unlock()
 	return nil
 }

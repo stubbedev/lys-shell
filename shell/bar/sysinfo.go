@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
@@ -152,7 +153,7 @@ func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func(
 			if r, err := m.read(); err == nil {
 				m.ctx.Invoke(func() { m.render(r) })
 			}
-			timer.Reset(time.Duration(cfg.pollMs) * time.Millisecond)
+			timer.Reset(intconv.Duration(cfg.pollMs, time.Millisecond))
 		}
 	}()
 	return m, nil

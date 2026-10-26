@@ -614,7 +614,8 @@ func (s *stream) parseColor() (uint8, bool) {
 		case 3, 6:
 		case 4:
 			v, _ := strconv.ParseUint(hex[3:4], 16, 8)
-			alpha = uint8(v<<4 | v)
+			d := uint8(v)
+			alpha = d<<4 | d
 		case 8:
 			v, _ := strconv.ParseUint(hex[6:8], 16, 8)
 			alpha = uint8(v)

@@ -14,6 +14,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: notifications.db stays the Rust file
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // imageDataKeys are the inline image hints the store leaves out
@@ -136,14 +138,11 @@ func (st *Store) Load(now time.Time, removeExpired bool) ([]*Notification, error
 			raw["image-path"] = dbus.MakeVariant(imagePath.String)
 		}
 		h := decodeHints(raw, func(imageData) (string, bool) { return "", false })
-		expire := int32(-1)
-		if timeout.Valid {
-			expire = int32(timeout.Int64)
-		}
+		expire := storedInt(id, "expire_timeout", timeout, int32(-1))
 		n := &Notification{
 			ID:           id,
 			AppName:      appName.String,
-			ReplacesID:   uint32(replaces.Int64),
+			ReplacesID:   storedInt(id, "replaces_id", replaces, uint32(0)),
 			AppIcon:      appIcon.String,
 			Summary:      summary,
 			Body:         body.String,
@@ -274,21 +273,38 @@ func basicVariant(h storedHint) (dbus.Variant, bool) {
 	}
 	switch h.Signature {
 	case "y":
-		return dbus.MakeVariant(byte(i)), i >= 0 && i <= 0xff
+		return intVariant[byte](i)
 	case "n":
-		return dbus.MakeVariant(int16(i)), i >= -1<<15 && i < 1<<15
+		return intVariant[int16](i)
 	case "q":
-		return dbus.MakeVariant(uint16(i)), i >= 0 && i < 1<<16
+		return intVariant[uint16](i)
 	case "i":
-		return dbus.MakeVariant(int32(i)), i >= -1<<31 && i < 1<<31
+		return intVariant[int32](i)
 	case "u":
-		return dbus.MakeVariant(uint32(i)), i >= 0 && i < 1<<32
+		return intVariant[uint32](i)
 	case "x":
 		return dbus.MakeVariant(i), true
 	case "t":
-		return dbus.MakeVariant(uint64(i)), i >= 0
+		return intVariant[uint64](i)
 	}
 	return dbus.Variant{}, false
+}
+
+func intVariant[T intconv.Integer](i int64) (dbus.Variant, bool) {
+	v, err := intconv.Exact[T](i)
+	return dbus.MakeVariant(v), err == nil
+}
+
+func storedInt[T intconv.Integer](id uint32, column string, v sql.NullInt64, missing T) T {
+	if !v.Valid {
+		return missing
+	}
+	t, err := intconv.Exact[T](v.Int64)
+	if err != nil {
+		log.Printf("notifications: stored %s of %d: %v", column, id, err)
+		return missing
+	}
+	return t
 }
 
 func nullString(s string) sql.NullString { return sql.NullString{String: s, Valid: s != ""} }

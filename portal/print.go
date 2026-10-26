@@ -1,7 +1,6 @@
 package portal
 
 import (
-	"os"
 	"slices"
 	"strings"
 
@@ -99,7 +98,10 @@ func pageSetupDict(s printdialog.PageSetup) Vardict {
 // Print spools fd to the printer the app prepared under its token, or,
 // without one, through the dialog first; a job not sent is other.
 func (p printPortal) Print(handle dbus.ObjectPath, appID, parent, title string, fd dbus.UnixFD, options Vardict) (uint32, Vardict, *dbus.Error) {
-	doc := os.NewFile(uintptr(fd), "document")
+	doc, err := dbusx.File(fd, "document")
+	if err != nil {
+		return ResponseOther, Vardict{}, dbusx.InvalidArgs(err.Error())
+	}
 	defer func() { _ = doc.Close() }()
 	client := printdialog.NewClient(p.conn)
 	c, ok := beginOr(p.conn, handle, appID, parent, client.Dismiss)

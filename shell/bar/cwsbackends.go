@@ -2,10 +2,12 @@ package bar
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -259,7 +261,11 @@ func (b *mangoBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
 }
 
 func (b *mangoBackend) focus(_ context.Context, ws cwsWorkspace) error {
-	return mango.ViewTag(uint32(ws.id))
+	tag, err := intconv.Exact[uint32](ws.id)
+	if err != nil {
+		return fmt.Errorf("mango: tag %d: %w", ws.id, err)
+	}
+	return mango.ViewTag(tag)
 }
 func (b *mangoBackend) focusNext(context.Context) error     { return mango.ViewRight() }
 func (b *mangoBackend) focusPrevious(context.Context) error { return mango.ViewLeft() }

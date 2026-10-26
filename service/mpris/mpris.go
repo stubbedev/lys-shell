@@ -17,6 +17,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // D-Bus names of the MPRIS2 surface.
@@ -644,11 +645,11 @@ func variantMicros(v dbus.Variant) time.Duration {
 	switch value := v.Value().(type) {
 	case int64:
 		if value > 0 {
-			return time.Duration(value) * time.Microsecond
+			return intconv.Duration(value, time.Microsecond)
 		}
 	case uint64:
 		if value > 0 {
-			return time.Duration(value) * time.Microsecond
+			return intconv.Duration(value, time.Microsecond)
 		}
 	case int32:
 		if value > 0 {

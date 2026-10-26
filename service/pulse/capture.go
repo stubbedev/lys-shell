@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
@@ -68,6 +70,8 @@ type CaptureSpec struct {
 	FragmentFrames uint32
 }
 
+const maxFrameBytes = 4
+
 func (spec CaptureSpec) validate() error {
 	switch {
 	case spec.Rate == 0:
@@ -76,6 +80,8 @@ func (spec CaptureSpec) validate() error {
 		return fmt.Errorf("pulse: capture: %d channels (want 1 or 2)", spec.Channels)
 	case spec.FragmentFrames == 0:
 		return errors.New("pulse: capture: zero fragment size")
+	case spec.FragmentFrames > math.MaxUint32/maxFrameBytes:
+		return fmt.Errorf("pulse: capture: a fragment of %d frames exceeds %d", spec.FragmentFrames, math.MaxUint32/maxFrameBytes)
 	}
 	return nil
 }
@@ -94,7 +100,7 @@ func (spec CaptureSpec) params(source string) native.RecordParams {
 		SampleSpec: ss,
 		ChannelMap: channels,
 		Source:     source,
-		FragSize:   spec.FragmentFrames * uint32(ss.FrameSize()),
+		FragSize:   spec.FragmentFrames * intconv.Clamp[uint32](ss.FrameSize()),
 		Props:      props,
 	}
 }

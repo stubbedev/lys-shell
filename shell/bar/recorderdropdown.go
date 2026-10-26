@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/recorder"
 )
 
@@ -40,7 +41,7 @@ func pctFromPx(px, margin, travel int32) uint8 {
 	if travel <= 0 {
 		return 0
 	}
-	return uint8(min(max(px-margin, 0), travel) * 100 / travel)
+	return intconv.Clamp[uint8](min(max(px-margin, 0), travel) * 100 / travel)
 }
 
 // webcamPreview is the draggable position preview: the outer frame is
@@ -108,7 +109,7 @@ func (p *webcamPreview) percent() (uint8, uint8) {
 // from their cascades.
 func (p *webcamPreview) Arrange(rect render.Rect) {
 	p.Base.Arrange(rect)
-	p.pw, p.ph, p.cw, p.ch = previewGeometry(int32(rect.W), p.sizePct)
+	p.pw, p.ph, p.cw, p.ch = previewGeometry(intconv.Clamp[int32](rect.W), p.sizePct)
 	if !p.dragging {
 		p.reposition()
 	}
@@ -128,7 +129,7 @@ func (p *webcamPreview) layOut() {
 
 // Measure takes the whole width offered and the 16:9 height for it.
 func (p *webcamPreview) Measure(con widget.Constraints) widget.Size {
-	pw, ph, _, _ := previewGeometry(int32(con.Max.W), p.sizePct)
+	pw, ph, _, _ := previewGeometry(intconv.Clamp[int32](con.Max.W), p.sizePct)
 	return widget.Size{W: int(pw), H: int(ph)}
 }
 
@@ -151,8 +152,8 @@ func (p *webcamPreview) SetPressed(on bool) {
 	switch {
 	case on && !p.dragging:
 		p.dragging = true
-		p.grabX = int32(p.pointer.X-b.X) - p.camX
-		p.grabY = int32(p.pointer.Y-b.Y) - p.camY
+		p.grabX = intconv.Clamp[int32](p.pointer.X-b.X) - p.camX
+		p.grabY = intconv.Clamp[int32](p.pointer.Y-b.Y) - p.camY
 	case !on && p.dragging:
 		p.dragging = false
 		p.x, p.y = p.percent()
@@ -172,8 +173,8 @@ func (p *webcamPreview) DragMove(pt widget.Point) {
 	}
 	b := p.Bounds()
 	margin, tw, th := p.travel()
-	p.camX = min(max(int32(pt.X-b.X)-p.grabX, margin), margin+tw)
-	p.camY = min(max(int32(pt.Y-b.Y)-p.grabY, margin), margin+th)
+	p.camX = min(max(intconv.Clamp[int32](pt.X-b.X)-p.grabX, margin), margin+tw)
+	p.camY = min(max(intconv.Clamp[int32](pt.Y-b.Y)-p.grabY, margin), margin+th)
 	p.layOut()
 	p.Invalidate()
 }

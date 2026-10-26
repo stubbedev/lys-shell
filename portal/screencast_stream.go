@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/pipewire"
 
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -137,16 +138,25 @@ type producerGeometry struct {
 }
 
 func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{}, closeSource func()) (screenStream, error) {
+	width, errW := intconv.Exact[int32](g.width)
+	height, errH := intconv.Exact[int32](g.height)
+	uwidth, errUW := intconv.Exact[uint32](g.width)
+	uheight, errUH := intconv.Exact[uint32](g.height)
+	stride, errS := intconv.Exact[uint32](g.stride)
+	if err := errors.Join(errW, errH, errUW, errUH, errS); err != nil {
+		closeSource()
+		return nil, fmt.Errorf("screencast: a %dx%d stream of stride %d: %w", g.width, g.height, g.stride, err)
+	}
 	p, err := pipewire.Start(pipewire.Config{
 		Application: shellName, Name: screencastNode,
-		Width: uint32(g.width), Height: uint32(g.height), Stride: uint32(g.stride),
+		Width: uwidth, Height: uheight, Stride: stride,
 		Format: videoFormat(g.format), FPS: g.fps, Transform: g.transform, Source: src,
 	})
 	if err != nil {
 		closeSource()
 		return nil, err
 	}
-	return newPipewireStream(p, int32(g.width), int32(g.height), ended, closeSource), nil
+	return newPipewireStream(p, width, height, ended, closeSource), nil
 }
 
 // videoFormat maps the wl_shm format the compositor returned; an
@@ -215,7 +225,7 @@ func newSnapshotSource(grab func([]byte) (*capture.Frame, error), first *capture
 
 // Size is the newest frame's layout.
 func (s *snapshotSource) Size() (width, height, stride uint32) {
-	return uint32(s.width), uint32(s.height), uint32(s.stride)
+	return intconv.Clamp[uint32](s.width), intconv.Clamp[uint32](s.height), intconv.Clamp[uint32](s.stride)
 }
 
 func (s *snapshotSource) Fill(dst []byte) ([]pipewire.Rect, bool) {

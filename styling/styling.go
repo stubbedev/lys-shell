@@ -196,7 +196,7 @@ func parseHex(s string) (render.Color, bool) {
 		if hi < 0 || lo < 0 {
 			return 0, false
 		}
-		vals[i] = uint8(hi<<4 | lo)
+		vals[i] = uint8((hi<<4 | lo) & 0xff)
 	}
 	a := uint8(255)
 	if bytes == 4 {
@@ -271,12 +271,12 @@ func HexRGBA(c render.Color) string {
 		return string([]byte{digits[v>>4], digits[v&0xF]})
 	}
 	if a == 255 {
-		return "#" + hex(uint8(uint32(c)>>16)) + hex(uint8(uint32(c)>>8)) + hex(uint8(uint32(c)))
+		return "#" + hex(uint8(uint32(c)>>16&0xff)) + hex(uint8(uint32(c)>>8&0xff)) + hex(uint8(uint32(c)&0xff))
 	}
 	af := float64(a) / 255
 	unpre := func(v uint8) uint8 {
 		return uint8(math.Round(float64(v) / af))
 	}
-	return "#" + hex(unpre(uint8(uint32(c)>>16))) + hex(unpre(uint8(uint32(c)>>8))) +
-		hex(unpre(uint8(uint32(c)))) + hex(a)
+	return "#" + hex(unpre(uint8(uint32(c)>>16&0xff))) + hex(unpre(uint8(uint32(c)>>8&0xff))) +
+		hex(unpre(uint8(uint32(c)&0xff))) + hex(a)
 }

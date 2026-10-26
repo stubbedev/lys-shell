@@ -461,11 +461,11 @@ func wash(img *image.RGBA) *image.RGBA {
 	out := image.NewRGBA(img.Bounds())
 	const keep = 255 - dimAlpha
 	for i, v := range img.Pix {
-		out.Pix[i] = uint8((uint32(v)*keep + 127) / 255)
+		out.Pix[i] = uint8((uint32(v)*keep + 127) / 255 & 0xff)
 		if i%4 == 3 {
 			// Alpha: the black wash over opaque stays opaque; over a
 			// translucent pixel it adds its own coverage.
-			out.Pix[i] = uint8(dimAlpha + (uint32(v)*keep+127)/255)
+			out.Pix[i] = uint8((dimAlpha + (uint32(v)*keep+127)/255) & 0xff)
 		}
 	}
 	return out

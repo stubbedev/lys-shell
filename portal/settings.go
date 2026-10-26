@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/gtksettings"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // SettingsIface serves org.freedesktop.appearance from the live styling
@@ -116,8 +117,8 @@ func cursorSize(d desktop) (any, bool) {
 	if size, err := strconv.ParseInt(strings.TrimSpace(d.getenv("XCURSOR_SIZE")), 10, 32); err == nil && size > 0 {
 		return int32(size), true
 	}
-	if d.gtk.CursorSize > 0 {
-		return int32(d.gtk.CursorSize), true
+	if size, err := intconv.Exact[int32](d.gtk.CursorSize); err == nil && size > 0 {
+		return size, true
 	}
 	return nil, false
 }

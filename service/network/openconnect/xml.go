@@ -269,7 +269,7 @@ func numericEntity(entity string) (rune, bool) {
 		return 0, false
 	}
 	code, err := strconv.ParseUint(digits, base, 32)
-	if err != nil {
+	if err != nil || code > utf8.MaxRune {
 		return 0, false
 	}
 	character := rune(code)

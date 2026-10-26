@@ -40,14 +40,15 @@ type Frame struct {
 
 // WriteFrame writes one frame: the descriptor, then the payload.
 func WriteFrame(w io.Writer, f Frame) error {
-	if len(f.Payload) > maxFrameSize {
-		return fmt.Errorf("%w: frame of %d bytes exceeds %d", ErrProtocol, len(f.Payload), maxFrameSize)
+	n := len(f.Payload)
+	if n > maxFrameSize {
+		return fmt.Errorf("%w: frame of %d bytes exceeds %d", ErrProtocol, n, maxFrameSize)
 	}
-	buf := make([]byte, descriptorSize, descriptorSize+len(f.Payload))
-	binary.BigEndian.PutUint32(buf[0:], uint32(len(f.Payload)))
+	buf := make([]byte, descriptorSize, descriptorSize+n)
+	binary.BigEndian.PutUint32(buf[0:], uint32(n))
 	binary.BigEndian.PutUint32(buf[4:], f.Channel)
 	binary.BigEndian.PutUint32(buf[8:], uint32(f.Offset>>32))
-	binary.BigEndian.PutUint32(buf[12:], uint32(f.Offset))
+	binary.BigEndian.PutUint32(buf[12:], uint32(f.Offset&0xffffffff))
 	binary.BigEndian.PutUint32(buf[16:], f.Flags)
 	buf = append(buf, f.Payload...)
 	_, err := w.Write(buf)

@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // SocketPath reads $SWAYSOCK; empty when sway is not running.
@@ -50,14 +52,18 @@ type Workspace struct {
 // writeFrame sends one message: magic, little-endian length, type,
 // payload.
 func writeFrame(conn net.Conn, msgType uint32, payload []byte) error {
+	size, err := intconv.Exact[uint32](len(payload))
+	if err != nil {
+		return fmt.Errorf("sway: message type %d payload: %w", msgType, err)
+	}
 	head := make([]byte, 14)
 	copy(head, magic)
-	binary.LittleEndian.PutUint32(head[6:], uint32(len(payload)))
+	binary.LittleEndian.PutUint32(head[6:], size)
 	binary.LittleEndian.PutUint32(head[10:], msgType)
 	if _, err := conn.Write(head); err != nil {
 		return err
 	}
-	_, err := conn.Write(payload)
+	_, err = conn.Write(payload)
 	return err
 }
 

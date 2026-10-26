@@ -75,3 +75,15 @@ func TestFloat(t *testing.T) {
 		}
 	}
 }
+
+func TestUint64TakesTheWholeU64Range(t *testing.T) {
+	if got, err := Uint("18446744073709551615", 64); err != nil || got != math.MaxUint64 {
+		t.Errorf("u64::MAX -> %d %v", got, err)
+	}
+	if _, err := Uint("18446744073709551616", 64); !errors.Is(err, ErrIntHigh) {
+		t.Errorf("u64::MAX + 1: got %v, want %v", err, ErrIntHigh)
+	}
+	if _, err := Uint("-0", 64); !errors.Is(err, ErrIntDigit) {
+		t.Errorf("-0: got %v, want %v", err, ErrIntDigit)
+	}
+}

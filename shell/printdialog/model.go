@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/xdg"
 )
@@ -347,7 +348,7 @@ func (f form) jobAttrs() []ipp.Attr {
 		orientation = 4
 	}
 	attrs := []ipp.Attr{
-		ipp.Int("copies", int32(f.copies)),
+		ipp.Int("copies", intconv.Clamp[int32](f.copies)),
 		ipp.Enum("orientation-requested", orientation),
 		ipp.String(ipp.TagKeyword, "media", f.paper.media),
 		ipp.String(ipp.TagKeyword, "print-color-mode", f.color),

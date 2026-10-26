@@ -6,6 +6,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the
@@ -80,7 +81,7 @@ func (d *Daemon) serve(conn *dbus.Conn) (func(), error) {
 		Properties: dbusx.Getters{
 			"Active":     func() any { return d.state.Active() },
 			"Duration":   func() any { return d.state.Duration() },
-			"Remaining":  func() any { return uint32(max(d.state.Remaining(), 0)) },
+			"Remaining":  func() any { return intconv.Clamp[uint32](d.state.Remaining()) },
 			"Indefinite": func() any { return d.state.Duration() == 0 },
 		},
 	})

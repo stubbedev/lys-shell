@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
@@ -30,13 +31,22 @@ func WatchMounts(changed func()) (stop func()) {
 		log.Printf("file chooser: cannot follow the mounts: %v", err)
 		return func() {}
 	}
+	tableFd, errT := intconv.Exact[int32](table.Fd())
+	quitFd, errQ := intconv.Exact[int32](quitR.Fd())
+	if err := errors.Join(errT, errQ); err != nil {
+		_ = table.Close()
+		_ = quitR.Close()
+		_ = quitW.Close()
+		log.Printf("file chooser: cannot follow the mounts: %v", err)
+		return func() {}
+	}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		_, _ = io.Copy(io.Discard, table)
 		fds := []unix.PollFd{
-			{Fd: int32(table.Fd()), Events: unix.POLLPRI | unix.POLLERR},
-			{Fd: int32(quitR.Fd()), Events: unix.POLLIN},
+			{Fd: tableFd, Events: unix.POLLPRI | unix.POLLERR},
+			{Fd: quitFd, Events: unix.POLLIN},
 		}
 		for {
 			if _, err := unix.Poll(fds, -1); err != nil {

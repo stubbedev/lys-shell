@@ -4,6 +4,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // valueKind is the closed set of fluent-bundle FluentValue variants the
@@ -173,7 +175,7 @@ func unescape(raw string) string {
 			r := '\uFFFD'
 			if i+1+length <= len(raw) {
 				if cp, err := strconv.ParseUint(raw[i+1:i+1+length], 16, 32); err == nil && validRune(cp) {
-					r = rune(cp)
+					r = intconv.Clamp[rune](cp)
 				}
 			}
 			i += length

@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	"github.com/stubbedev/lys-shell/internal/pango"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
@@ -642,8 +643,8 @@ func (s *Surface) reveal(a *active) {
 		Layer:         app.LayerOverlay,
 		Anchor:        anchor,
 		Margin:        margin,
-		Width:         uint32(width),
-		Height:        uint32(max(h, 1)),
+		Width:         intconv.Clamp[uint32](width),
+		Height:        intconv.Clamp[uint32](max(h, 1)),
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
 		Namespace:     "lys-shell-launcher",
@@ -678,7 +679,7 @@ func (s *Surface) resize() {
 	h := a.views.height(a.views.width)
 	if h != a.views.lastH {
 		a.views.lastH = h
-		if err := a.win.SetSize(uint32(a.views.width), uint32(max(h, 1))); err != nil {
+		if err := a.win.SetSize(intconv.Clamp[uint32](a.views.width), intconv.Clamp[uint32](max(h, 1))); err != nil {
 			log.Printf("launcher: resize: %v", err)
 		}
 	}
@@ -735,16 +736,16 @@ func locationAnchors(loc config.LauncherLocation, x, y int) (app.Anchor, app.Mar
 	}
 	var m app.Margins
 	if anchor&app.AnchorLeft != 0 {
-		m.Left = int32(x)
+		m.Left = intconv.Clamp[int32](x)
 	}
 	if anchor&app.AnchorRight != 0 {
-		m.Right = int32(-x)
+		m.Right = intconv.Clamp[int32](-x)
 	}
 	if anchor&app.AnchorTop != 0 {
-		m.Top = int32(y)
+		m.Top = intconv.Clamp[int32](y)
 	}
 	if anchor&app.AnchorBottom != 0 {
-		m.Bottom = int32(-y)
+		m.Bottom = intconv.Clamp[int32](-y)
 	}
 	return anchor, m
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
@@ -287,7 +288,7 @@ func windowPayload(tl sharepreview.Toplevel) string {
 
 // regionPayload is a region selection's payload.
 func regionPayload(sel regionoverlay.Selection) string {
-	return Target{Kind: TargetRegion, Name: sel.Output, X: int32(sel.X), Y: int32(sel.Y), Width: int32(sel.Width), Height: int32(sel.Height)}.Payload()
+	return Target{Kind: TargetRegion, Name: sel.Output, X: intconv.Clamp[int32](sel.X), Y: intconv.Clamp[int32](sel.Y), Width: intconv.Clamp[int32](sel.Width), Height: intconv.Clamp[int32](sel.Height)}.Payload()
 }
 
 // build assembles the surface (the view!):

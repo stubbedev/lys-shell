@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
@@ -41,9 +42,9 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
-	if int(cfg.PollIntervalMs) > 0 {
+	if cfg.PollIntervalMs > 0 {
 		go func() {
-			interval := time.Duration(int(cfg.PollIntervalMs)) * time.Millisecond
+			interval := intconv.Duration(cfg.PollIntervalMs, time.Millisecond)
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
 			for {

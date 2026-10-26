@@ -1,6 +1,7 @@
 package idleinhibit
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -240,5 +241,27 @@ func TestDaemonHoldsFollowTheirCaller(t *testing.T) {
 	}
 	if state.Inhibiting() {
 		t.Error("a departed caller's hold kept idle inhibited")
+	}
+}
+
+func TestAdjustDurationSaturatesInsteadOfWrapping(t *testing.T) {
+	cases := []struct {
+		start uint32
+		delta int32
+		want  uint32
+	}{
+		{30, 15, 45},
+		{30, -10, 20},
+		{5, -10, 0},
+		{math.MaxInt32, 1, math.MaxInt32 + 1},
+		{math.MaxUint32, 1, math.MaxUint32},
+		{math.MaxUint32, -1, math.MaxUint32 - 1},
+	}
+	for _, c := range cases {
+		s := NewState(c.start)
+		s.AdjustDuration(c.delta)
+		if got := s.Duration(); got != c.want {
+			t.Errorf("%d%+d: got %d, want %d", c.start, c.delta, got, c.want)
+		}
 	}
 }

@@ -17,6 +17,7 @@ import (
 	_ "golang.org/x/image/webp" // background decoders
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // HexFill converts a config color to a premultiplied fill.
@@ -126,7 +127,7 @@ func boxPass(src, dst []uint8, w, h, stride, radius int, horizontal bool) {
 				sum += int(src[at(line, min(max(i, 0), length-1))+ch])
 			}
 			for i := range length {
-				dst[at(line, i)+ch] = uint8(sum / span)
+				dst[at(line, i)+ch] = intconv.Clamp[uint8](sum / span)
 				out := min(max(i-radius, 0), length-1)
 				in := min(max(i+radius+1, 0), length-1)
 				sum += int(src[at(line, in)+ch]) - int(src[at(line, out)+ch])

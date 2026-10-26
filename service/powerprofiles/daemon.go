@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // lys-shell's own interface over the service, which `lys-shell power` drives
@@ -118,7 +119,7 @@ func ServeDaemon(conn *dbus.Conn, src Source) (func(), error) {
 		Properties: dbusx.Getters{
 			"ActiveProfile":       func() any { return profileName(d.read().Active) },
 			"PerformanceDegraded": func() any { return degradedName(d.read().PerformanceDegraded) },
-			"ProfileCount":        func() any { return uint32(len(d.read().Profiles)) },
+			"ProfileCount":        func() any { return intconv.Clamp[uint32](len(d.read().Profiles)) },
 		},
 	})
 }

@@ -1,6 +1,10 @@
 package skpath
 
-import "math"
+import (
+	"math"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
+)
 
 // This file ports dash.rs (SkDashPath, SkContourMeasure).
 
@@ -323,10 +327,10 @@ func (c *contourMeasure) distanceToSegment(distance float32) (int, float32, bool
 }
 
 func findSegment(base []measureSegment, key float32) int32 {
-	lo := uint32(0)
-	hi := uint32(len(base) - 1)
+	lo := int32(0)
+	hi := intconv.Clamp[int32](len(base) - 1)
 	for lo < hi {
-		mid := (hi + lo) >> 1
+		mid := lo + (hi-lo)>>1
 		if base[mid].distance < key {
 			lo = mid + 1
 		} else {
@@ -339,7 +343,7 @@ func findSegment(base []measureSegment, key float32) int32 {
 	} else if key < base[hi].distance {
 		hi = ^hi
 	}
-	return int32(hi)
+	return hi
 }
 
 func interpf(a, b, t float32) float32 { return a + (b-a)*t }

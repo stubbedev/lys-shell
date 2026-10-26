@@ -1,6 +1,9 @@
 package pulsetest
 
-import "github.com/stubbedev/lys-shell/service/pulse/native"
+import (
+	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
+)
 
 // The fill functions are the server half of the wire layouts, written
 // from protocol-native.c (sink_fill_tagstruct and friends) with its
@@ -32,7 +35,7 @@ func fillDevice(w *native.Writer, v uint32, d native.DeviceInfo, isSink bool) {
 		w.U32(d.Card)
 	}
 	if v >= 16 {
-		w.U32(uint32(len(d.Ports)))
+		w.U32(intconv.Clamp[uint32](len(d.Ports)))
 		for _, p := range d.Ports {
 			w.String(p.Name)
 			w.OptString(p.Description)
@@ -52,7 +55,7 @@ func fillDevice(w *native.Writer, v uint32, d native.DeviceInfo, isSink bool) {
 		formatsVersion = 21
 	}
 	if v >= formatsVersion {
-		w.U8(uint8(len(d.Formats)))
+		w.U8(intconv.Clamp[uint8](len(d.Formats)))
 		for _, f := range d.Formats {
 			w.FormatInfo(f)
 		}

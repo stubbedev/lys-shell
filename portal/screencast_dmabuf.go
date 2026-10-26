@@ -11,6 +11,8 @@ import (
 	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/pipewire"
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // The zero-copy path: a whole output's screencopy frames land straight in
@@ -248,9 +250,14 @@ func probeGPUSource(shm pipewire.Source, dev gpuAllocator, c gpuCapturer, offere
 	if offered.Width != first.Width || offered.Height != first.Height || format.BytesPerPixel() != 4 {
 		return nil, fmt.Errorf("%w: a %v %dx%d dmabuf for a %dx%d stream", errNoDmabuf, format, offered.Width, offered.Height, first.Width, first.Height)
 	}
+	width, errW := intconv.Exact[uint32](offered.Width)
+	height, errH := intconv.Exact[uint32](offered.Height)
+	if err := errors.Join(errW, errH); err != nil {
+		return nil, fmt.Errorf("%w: a %dx%d dmabuf: %w", errNoDmabuf, offered.Width, offered.Height, err)
+	}
 	s := &gpuSource{
 		Source: shm, dev: dev, cap: c, output: o, cursor: cursor,
-		fourcc: offered.Fourcc, video: videoFormat(format), width: uint32(offered.Width), height: uint32(offered.Height),
+		fourcc: offered.Fourcc, video: videoFormat(format), width: width, height: height,
 	}
 	modifier, layout, err := dmabufprobe.First(layouts, s.probe)
 	if err != nil {

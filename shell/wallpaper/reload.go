@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
@@ -72,7 +73,7 @@ func applyWallpaperChange(svc *wallpaper.Service, old, next config.WallpaperConf
 }
 
 func cyclingInterval(cfg config.WallpaperConfig) time.Duration {
-	return time.Duration(cfg.CyclingIntervalMins) * time.Minute
+	return intconv.Duration(cfg.CyclingIntervalMins, time.Minute)
 }
 
 // applyMonitorEntry is apply_monitor_config_change: the entry's fit

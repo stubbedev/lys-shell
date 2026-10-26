@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // lys-shell's own interface over the tray, which `lys-shell systray` drives
@@ -84,7 +85,7 @@ func ServeDaemon(conn *dbus.Conn, store *Store, activator Activator, isWatcher b
 		Interface: DaemonName,
 		Methods:   d,
 		Properties: dbusx.Getters{
-			"Count":     func() any { return uint32(len(store.Items())) },
+			"Count":     func() any { return intconv.Clamp[uint32](len(store.Items())) },
 			"IsWatcher": func() any { return isWatcher },
 		},
 	})

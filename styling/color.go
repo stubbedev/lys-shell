@@ -113,7 +113,7 @@ func f32ToU8(x float32) uint8 {
 	if bits < c23 {
 		return 0
 	}
-	return uint8(bits - c23)
+	return uint8((bits - c23) & 0xff)
 }
 
 // rgbToHSL is palette's Hsl::from_color for an Rgb<f32>: the scalar

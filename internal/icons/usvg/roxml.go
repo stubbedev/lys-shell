@@ -74,7 +74,7 @@ func isXMLNameStart(c rune) bool {
 
 func isXMLName(c rune) bool {
 	if c <= 128 {
-		return c < 128 && isXMLNameByte(byte(c))
+		return c >= 0 && c < 128 && isXMLNameByte(byte(c))
 	}
 	return c == 0xB7 || (c >= 0xC0 && c <= 0xD6) || (c >= 0xD8 && c <= 0xF6) || (c >= 0xF8 && c <= 0x2FF) ||
 		(c >= 0x300 && c <= 0x36F) || (c >= 0x370 && c <= 0x37D) || (c >= 0x37F && c <= 0x1FFF) ||
@@ -85,7 +85,7 @@ func isXMLName(c rune) bool {
 
 func isXMLChar(c rune) bool {
 	if c < 0x20 {
-		return isXMLSpace(byte(c))
+		return c >= 0 && isXMLSpace(byte(c))
 	}
 	return c != 0xFFFF && c != 0xFFFE
 }
@@ -235,9 +235,9 @@ func (s *xmlStream) consumeReference() (xmlRef, bool) {
 		if err != nil {
 			return xmlRef{}, false
 		}
-		c := rune(n)
-		if n > utf8.MaxRune || (n >= 0xD800 && n <= 0xDFFF) {
-			c = utf8.RuneError // char::from_u32's None
+		c := utf8.RuneError
+		if n <= utf8.MaxRune && (n < 0xD800 || n > 0xDFFF) {
+			c = rune(n)
 		}
 		if !isXMLChar(c) {
 			return xmlRef{}, false

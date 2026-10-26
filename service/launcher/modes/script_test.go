@@ -146,3 +146,12 @@ func TestAMissingScriptIsAnEmptyList(t *testing.T) {
 		t.Errorf("state = %+v", st)
 	}
 }
+
+func TestParseRangesEndsARangeAtTheLargestIndex(t *testing.T) {
+	if got := ParseRanges("4294967293-4294967295"); !reflect.DeepEqual(got, []uint32{4294967293, 4294967294, 4294967295}) {
+		t.Errorf("range to u32::MAX: %v", got)
+	}
+	if got := ParseRanges("4294967295-4294967296"); got != nil {
+		t.Errorf("range past u32::MAX: %v", got)
+	}
+}

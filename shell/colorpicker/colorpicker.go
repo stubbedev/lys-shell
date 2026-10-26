@@ -238,7 +238,7 @@ func parseHex(line string) (RGB, bool) {
 	if err != nil {
 		return RGB{}, false
 	}
-	return RGB{uint8(v >> 16), uint8(v >> 8), uint8(v)}, true
+	return RGB{uint8(v >> 16 & 0xff), uint8(v >> 8 & 0xff), uint8(v & 0xff)}, true
 }
 
 // pixel reads img at frame coordinates as an opaque 8-bit color.

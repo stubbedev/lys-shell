@@ -10,6 +10,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // ErrMalformed is serialized data that does not fit its type.
@@ -145,7 +147,7 @@ func readOffset(b []byte, size int) int {
 	case 4:
 		return int(binary.LittleEndian.Uint32(b))
 	case 8:
-		return int(binary.LittleEndian.Uint64(b))
+		return intconv.Clamp[int](binary.LittleEndian.Uint64(b))
 	}
 	return 0
 }

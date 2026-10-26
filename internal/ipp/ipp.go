@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Operations.
@@ -141,8 +143,25 @@ type Message struct {
 	Groups    []Group
 }
 
+func (m Message) checkLengths() error {
+	for _, g := range m.Groups {
+		for _, a := range g.Attrs {
+			if _, err := intconv.Exact[uint16](len(a.Name)); err != nil {
+				return fmt.Errorf("ipp: attribute name of %d bytes: %w", len(a.Name), err)
+			}
+			for _, v := range a.Values {
+				if _, err := intconv.Exact[uint16](len(v.Text)); err != nil {
+					return fmt.Errorf("ipp: %s value of %d bytes: %w", a.Name, len(v.Text), err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // Encode writes the message: version 2.0, the code, the request id,
-// the groups, the end tag.
+// the groups, the end tag. It panics on a name or value longer than
+// 65535 bytes.
 func (m Message) Encode() []byte {
 	var b bytes.Buffer
 	b.Write([]byte{2, 0})
@@ -167,7 +186,11 @@ func (m Message) Encode() []byte {
 }
 
 func writeString(b *bytes.Buffer, s string) {
-	_ = binary.Write(b, binary.BigEndian, uint16(len(s)))
+	n, err := intconv.Exact[uint16](len(s))
+	if err != nil {
+		panic(fmt.Sprintf("ipp: encoding a string the 16-bit length field cannot hold: %v", err))
+	}
+	_ = binary.Write(b, binary.BigEndian, n)
 	b.WriteString(s)
 }
 

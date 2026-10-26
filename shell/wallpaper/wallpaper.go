@@ -131,7 +131,7 @@ func Bootstrap(svc *wallpaper.Service, cfg config.WallpaperConfig) {
 	svc.SetFitMode(cfg.FitMode, "")
 	cycling := false
 	if cfg.CyclingDirectory != "" {
-		interval := time.Duration(cfg.CyclingIntervalMins) * time.Minute
+		interval := cyclingInterval(cfg)
 		if err := svc.StartCycling(cfg.CyclingDirectory, interval, cfg.CyclingMode); err != nil {
 			log.Printf("wallpaper: could not start wallpaper cycling from config: %v", err)
 		} else {

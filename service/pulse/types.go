@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
@@ -267,7 +268,7 @@ func (e *StreamNotFoundError) Error() string {
 	return fmt.Sprintf("stream %d (%s) not found", e.Key.Index, e.Key.Type)
 }
 
-func usec(v uint64) time.Duration { return time.Duration(v) * time.Microsecond }
+func usec(v uint64) time.Duration { return intconv.Duration(v, time.Microsecond) }
 
 func fromDevice(d native.DeviceInfo, t DeviceType) Device {
 	ports := make([]DevicePort, len(d.Ports))

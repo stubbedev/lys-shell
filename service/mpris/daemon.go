@@ -10,6 +10,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/rusterr"
 )
 
@@ -235,7 +236,7 @@ func ServeDaemon(conn *dbus.Conn, s *Service) (func(), error) {
 		Methods:   d,
 		Properties: dbusx.Getters{
 			"ActivePlayer": func() any { return d.activeName() },
-			"PlayerCount":  func() any { return uint32(len(s.Players())) },
+			"PlayerCount":  func() any { return intconv.Clamp[uint32](len(s.Players())) },
 		},
 	})
 }

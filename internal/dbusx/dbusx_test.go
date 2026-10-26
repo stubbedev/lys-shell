@@ -2,7 +2,9 @@ package dbusx_test
 
 import (
 	"errors"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -152,5 +154,40 @@ func TestExportServesSeveralInterfacesOnOnePath(t *testing.T) {
 	}
 	if _, err := obj.GetProperty(iface + ".version"); err == nil {
 		t.Error("properties still answer after unexport")
+	}
+}
+
+func TestFileRefusesANegativeDescriptor(t *testing.T) {
+	if f, err := dbusx.File(-1, "doc"); err == nil {
+		_ = f.Close()
+		t.Fatal("fd -1 became a file")
+	}
+}
+
+func TestFileWrapsAReceivedDescriptor(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close() }()
+	fd, err := syscall.Dup(int(r.Fd()))
+	_ = r.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := dbusx.File(dbus.UnixFD(fd), "doc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := w.WriteString("x"); err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, 1)
+	if _, err := f.Read(b); err != nil || b[0] != 'x' {
+		t.Fatalf("read %q %v", b, err)
+	}
+	if f.Name() != "doc" {
+		t.Errorf("name %q", f.Name())
 	}
 }

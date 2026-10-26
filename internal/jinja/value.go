@@ -48,6 +48,9 @@ func normalize(v any) any {
 	case int32:
 		return int64(x)
 	case uint:
+		if x > math.MaxInt64 {
+			return float64(x)
+		}
 		return int64(x)
 	case uint8:
 		return int64(x)

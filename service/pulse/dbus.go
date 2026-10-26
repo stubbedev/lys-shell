@@ -7,6 +7,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // D-Bus identity (crates/wayle-audio/src/dbus/mod.rs).
@@ -304,9 +306,9 @@ func (p *audioProperties) value(name string) (any, bool) {
 	case "DefaultSource":
 		return in.Name, true
 	case "SinkCount":
-		return uint32(len(p.svc.OutputDevices())), true
+		return intconv.Clamp[uint32](len(p.svc.OutputDevices())), true
 	case "SourceCount":
-		return uint32(len(p.svc.InputDevices())), true
+		return intconv.Clamp[uint32](len(p.svc.InputDevices())), true
 	}
 	return nil, false
 }

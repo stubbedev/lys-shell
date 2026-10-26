@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // D-Bus identity.
@@ -186,9 +187,9 @@ func (s *State) SetDuration(minutes uint32) {
 // AdjustDuration shifts the stored duration; negative clamps at zero.
 func (s *State) AdjustDuration(deltaMinutes int32) {
 	s.mu.Lock()
-	current := max(int32(s.durationMins)+deltaMinutes, 0)
+	current := int64(s.durationMins) + int64(deltaMinutes)
 	s.mu.Unlock()
-	s.SetDuration(uint32(current))
+	s.SetDuration(intconv.Clamp[uint32](current))
 }
 
 // AdjustRemaining shifts the seconds left by minutes: a positive

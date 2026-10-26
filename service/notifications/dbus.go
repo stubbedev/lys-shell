@@ -7,6 +7,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Server serves org.freedesktop.Notifications on the session bus and
@@ -152,8 +153,8 @@ func ServeLysShell(conn *dbus.Conn, svc *Service) (func(), error) {
 		Properties: dbusx.Getters{
 			"Dnd":           func() any { return svc.DND() },
 			"PopupDuration": func() any { return d.popupDuration.Load() },
-			"Count":         func() any { return uint32(svc.Count()) },
-			"PopupCount":    func() any { return uint32(len(svc.Popups())) },
+			"Count":         func() any { return intconv.Clamp[uint32](svc.Count()) },
+			"PopupCount":    func() any { return intconv.Clamp[uint32](len(svc.Popups())) },
 		},
 	})
 }

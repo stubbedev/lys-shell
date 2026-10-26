@@ -900,8 +900,11 @@ func parseView(text string) view {
 		}
 		return ""
 	}
-	if i := slices.Index(sortNames[:], tok(0)); i >= 0 {
-		v.sort = SortColumn(i)
+	for col := range SortColumn(len(sortNames)) {
+		if sortNames[col] == tok(0) {
+			v.sort = col
+			break
+		}
 	}
 	v.asc = tok(1) != "desc"
 	v.grid = tok(2) == "grid"

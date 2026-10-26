@@ -19,10 +19,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // KdfType names the master-password key derivation.
@@ -103,8 +106,17 @@ func deriveMasterKey(password, email string, kdf Kdf) (*masterKey, error) {
 		}
 		return &masterKey{b: b}, nil
 	default:
+		iterations, errT := intconv.Exact[uint32](kdf.Iterations)
+		memoryMiB, errM := intconv.Exact[uint32](kdf.Memory)
+		parallelism, errP := intconv.Exact[uint8](kdf.Parallelism)
+		if err := errors.Join(errT, errM, errP); err != nil {
+			return nil, fmt.Errorf("bitwarden: Argon2id t=%d m=%dMiB p=%d: %w", kdf.Iterations, kdf.Memory, kdf.Parallelism, err)
+		}
+		if memoryMiB > math.MaxUint32/1024 {
+			return nil, fmt.Errorf("bitwarden: Argon2id memory of %dMiB exceeds %dMiB", kdf.Memory, math.MaxUint32/1024)
+		}
 		sum := sha256.Sum256(salt)
-		b := argon2.IDKey([]byte(password), sum[:], uint32(kdf.Iterations), uint32(kdf.Memory*1024), uint8(kdf.Parallelism), masterKeyLen)
+		b := argon2.IDKey([]byte(password), sum[:], iterations, memoryMiB*1024, parallelism, masterKeyLen)
 		return &masterKey{b: b}, nil
 	}
 }

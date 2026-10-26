@@ -151,7 +151,7 @@ func (c *CyclingInterval) UnmarshalConfig(v any) error {
 }
 
 // MarshalConfig implements Marshaler.
-func (c CyclingInterval) MarshalConfig() any { return int64(c) }
+func (c CyclingInterval) MarshalConfig() any { return encodeValue(reflect.ValueOf(uint64(c))) }
 
 func (CyclingInterval) configSchema(*schemaGen) Schema {
 	return rangedSchema(reflect.TypeFor[CyclingInterval](), int64(CyclingIntervalMin), nil)

@@ -29,12 +29,6 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
-    gosec:
-      excludes:
-        # Wayland wire values are int32 by protocol definition. lys-shell-go keeps
-        # them as Go ints for math and converts back at the boundary, so
-        # int -> int32 conversions round-trip protocol values.
-        - G115 # integer overflow conversion
     misspell:
       ignore-rules:
         # The freedesktop thumbnail spec's word (the `thumbnailers`
@@ -57,6 +51,20 @@ linters:
           - errcheck
           - gosec
           - unparam
+      # Two's-complement reinterpretation of a decoded or encoded wire
+      # word of the same width (s16 PCM, inotify wd, IPP integers, evdev
+      # values, PulseAudio 'r' fields): the bits are the value.
+      - path: ^(cava|internal/fswatch|internal/ipp|service/keytoggles|service/pulse/native)/
+        linters:
+          - gosec
+        text: "G115: integer overflow conversion (uint16 -> int16|uint32 -> int32|uint64 -> int64|int64 -> uint64)$"
+      # Workspace and window ids keep Rust's `as u64` mapping: a negative
+      # Hyprland special-workspace id stays a distinct id, and the
+      # ws-id-N CSS classes users style are derived from it.
+      - path: ^shell/bar/(cwsbackends|hyprland)\.go$
+        linters:
+          - gosec
+        text: "G115: integer overflow conversion int(64)? -> uint64$"
 
 issues:
   max-issues-per-linter: 0

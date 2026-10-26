@@ -38,7 +38,10 @@ func secretIface(conn *dbus.Conn) dbusx.Interface {
 // RetrieveSecret writes the app's secret to fd. A host app (no app id)
 // has no identity to key a secret by and is refused.
 func (s secret) RetrieveSecret(handle dbus.ObjectPath, appID string, fd dbus.UnixFD, _ Vardict) (uint32, Vardict, *dbus.Error) {
-	f := os.NewFile(uintptr(fd), "secret")
+	f, err := dbusx.File(fd, "secret")
+	if err != nil {
+		return ResponseOther, Vardict{}, dbusx.InvalidArgs(err.Error())
+	}
 	defer func() { _ = f.Close() }()
 	c, ok := beginOr(s.conn, handle, appID, "", nil)
 	if !ok {

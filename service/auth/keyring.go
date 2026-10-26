@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // keyringTimeout bounds the control-socket exchange: a locker must
@@ -62,10 +64,10 @@ func keyringUnlock(path, password string) error {
 	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(keyringTimeout))
 
-	if len(password) > math.MaxUint32-12 {
+	pwLen, err := intconv.Exact[uint32](len(password))
+	if err != nil || pwLen > math.MaxUint32-12 {
 		return errors.New("password too long")
 	}
-	pwLen := uint32(len(password))
 	msg := make([]byte, 0, 13+len(password))
 	msg = append(msg, 0)
 	msg = binary.BigEndian.AppendUint32(msg, 8+4+pwLen)

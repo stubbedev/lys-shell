@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Tag bytes (pulsecore/tagstruct.h's PA_TAG_*): every tagstruct field
@@ -302,12 +304,13 @@ func (w *Writer) OptString(s string) {
 
 // Arbitrary appends a 'x' blob.
 func (w *Writer) Arbitrary(b []byte) {
-	if len(b) > maxTagSize {
-		w.fail("arbitrary field of %d bytes exceeds %d", len(b), maxTagSize)
+	n := len(b)
+	if n > maxTagSize {
+		w.fail("arbitrary field of %d bytes exceeds %d", n, maxTagSize)
 		return
 	}
 	w.buf = append(w.buf, tagArbitrary)
-	w.raw32(uint32(len(b)))
+	w.raw32(uint32(n))
 	w.buf = append(w.buf, b...)
 }
 
@@ -319,11 +322,12 @@ func (w *Writer) SampleSpec(s SampleSpec) {
 
 // ChannelMap appends a 'm' field.
 func (w *Writer) ChannelMap(m ChannelMap) {
-	if len(m) > 255 {
+	n, err := intconv.Exact[byte](len(m))
+	if err != nil {
 		w.fail("channel map of %d channels", len(m))
 		return
 	}
-	w.buf = append(w.buf, tagChannelMap, byte(len(m)))
+	w.buf = append(w.buf, tagChannelMap, n)
 	for _, p := range m {
 		w.buf = append(w.buf, byte(p))
 	}
@@ -331,11 +335,12 @@ func (w *Writer) ChannelMap(m ChannelMap) {
 
 // CVolume appends a 'v' field.
 func (w *Writer) CVolume(v CVolume) {
-	if len(v) > 255 {
+	n, err := intconv.Exact[byte](len(v))
+	if err != nil {
 		w.fail("volume of %d channels", len(v))
 		return
 	}
-	w.buf = append(w.buf, tagCVolume, byte(len(v)))
+	w.buf = append(w.buf, tagCVolume, n)
 	for _, c := range v {
 		w.raw32(uint32(c))
 	}
@@ -355,7 +360,7 @@ func (w *Writer) PropList(p PropList) {
 	for _, key := range sortedKeys(p) {
 		value := append([]byte(p[key]), 0)
 		w.String(key)
-		w.U32(uint32(len(value)))
+		w.U32(intconv.Clamp[uint32](len(value)))
 		w.Arbitrary(value)
 	}
 	w.NullString()

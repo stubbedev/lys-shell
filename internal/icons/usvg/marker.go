@@ -456,6 +456,6 @@ func approxEqUlps(a, b float32) bool {
 	if math.Signbit(float64(a)) != math.Signbit(float64(b)) {
 		return false
 	}
-	diff := int32(math.Float32bits(a)) - int32(math.Float32bits(b))
-	return diff >= -4 && diff <= 4
+	x, y := math.Float32bits(a), math.Float32bits(b)
+	return max(x, y)-min(x, y) <= 4
 }

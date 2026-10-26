@@ -208,3 +208,21 @@ func TestDefaultServer(t *testing.T) {
 		t.Errorf("a bare host = %s, want the IPP port", c.base)
 	}
 }
+
+func TestAValueTooLongForItsLengthFieldIsRefused(t *testing.T) {
+	ok := Message{Groups: []Group{{Tag: tagOperation, Attrs: []Attr{String(TagName, "job-name", strings.Repeat("x", 65535))}}}}
+	if err := ok.checkLengths(); err != nil {
+		t.Errorf("a 65535-byte value: %v", err)
+	}
+	long := Message{Groups: []Group{{Tag: tagOperation, Attrs: []Attr{String(TagName, "job-name", strings.Repeat("x", 65536))}}}}
+	if err := long.checkLengths(); err == nil {
+		t.Error("a 65536-byte value passed")
+	}
+	name := Message{Groups: []Group{{Tag: tagOperation, Attrs: []Attr{String(TagKeyword, strings.Repeat("n", 65536), "v")}}}}
+	if err := name.checkLengths(); err == nil {
+		t.Error("a 65536-byte name passed")
+	}
+	if _, err := (&Client{}).do(context.Background(), "/", long, nil); err == nil {
+		t.Error("the client sent a message its length fields cannot hold")
+	}
+}

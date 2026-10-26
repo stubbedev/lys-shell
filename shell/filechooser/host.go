@@ -21,6 +21,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
@@ -704,7 +705,8 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	u.colHeader = widget.NewBox(widget.Row, 0, 0)
 	u.colHeader.AddClass("file-chooser-colheader")
 	for col := range u.sortButtons {
-		b, l := c.textButton("", "file-chooser-col", css.Ghost, func() { c.sortBy(SortColumn(col)) })
+		sort := intconv.Clamp[SortColumn](col)
+		b, l := c.textButton("", "file-chooser-col", css.Ghost, func() { c.sortBy(sort) })
 		b.AddClass(css.Small)
 		l.AddClass(css.Caption, css.DimLabel)
 		l.SetAlignment(render.AlignStart)

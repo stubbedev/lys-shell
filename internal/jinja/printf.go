@@ -4,6 +4,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // printf is the format filter: minijinja's printf_style formatter
@@ -163,12 +165,10 @@ func (s fmtSpec) format(v any) (string, error) {
 	case bool:
 		return s.formatBool(x)
 	case int64:
-		neg := x < 0
-		mag := uint64(x)
-		if neg {
-			mag = uint64(-(x + 1)) + 1
+		if x >= 0 {
+			return s.formatInteger(uint64(x), false)
 		}
-		return s.formatInteger(mag, neg)
+		return s.formatInteger(intconv.Clamp[uint64](-(x+1))+1, true)
 	case float64:
 		return s.formatFloat(x)
 	}

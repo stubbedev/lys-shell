@@ -7,6 +7,7 @@ package dbusx
 
 import (
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/godbus/dbus/v5"
@@ -180,4 +181,13 @@ func introspectProps(getters Getters) []introspect.Property {
 		})
 	}
 	return out
+}
+
+// File wraps a descriptor received over D-Bus; a negative one is an
+// error, not a file.
+func File(fd dbus.UnixFD, name string) (*os.File, error) {
+	if fd < 0 {
+		return nil, fmt.Errorf("%s: invalid file descriptor %d", name, fd)
+	}
+	return os.NewFile(uintptr(fd), name), nil
 }

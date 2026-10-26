@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/draw"
 	"io"
-	"os"
 	"slices"
 	"strconv"
 	"sync"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -388,7 +388,11 @@ func notificationHints(appID string, notification Vardict) map[string]dbus.Varia
 	if img, err := iconImage(notification); err != nil {
 		warnf("notification: icon for %s: %v", appID, err)
 	} else if img != nil {
-		hints["image-data"] = dbus.MakeVariant(imageDataOf(img))
+		if data, err := imageDataOf(img); err != nil {
+			warnf("notification: icon for %s: %v", appID, err)
+		} else {
+			hints["image-data"] = dbus.MakeVariant(data)
+		}
 	}
 	return hints
 }
@@ -433,7 +437,10 @@ func iconImage(notification Vardict) (image.Image, error) {
 		if !ok {
 			return nil, errors.New("a file-descriptor icon without a descriptor")
 		}
-		f := os.NewFile(uintptr(fd), "icon")
+		f, err := dbusx.File(fd, "icon")
+		if err != nil {
+			return nil, err
+		}
 		defer func() { _ = f.Close() }()
 		b, err := io.ReadAll(io.LimitReader(f, maxIconBytes+1))
 		if err != nil {
@@ -493,12 +500,18 @@ type imageData struct {
 	Data                     []byte
 }
 
-func imageDataOf(img image.Image) imageData {
+func imageDataOf(img image.Image) (imageData, error) {
 	b := img.Bounds()
 	nrgba := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 	draw.Draw(nrgba, nrgba.Bounds(), img, b.Min, draw.Src)
-	return imageData{
-		Width: int32(b.Dx()), Height: int32(b.Dy()), Rowstride: int32(nrgba.Stride),
-		HasAlpha: true, BitsPerSample: 8, Channels: 4, Data: nrgba.Pix,
+	width, errW := intconv.Exact[int32](b.Dx())
+	height, errH := intconv.Exact[int32](b.Dy())
+	stride, errS := intconv.Exact[int32](nrgba.Stride)
+	if err := errors.Join(errW, errH, errS); err != nil {
+		return imageData{}, fmt.Errorf("a %dx%d icon: %w", b.Dx(), b.Dy(), err)
 	}
+	return imageData{
+		Width: width, Height: height, Rowstride: stride,
+		HasAlpha: true, BitsPerSample: 8, Channels: 4, Data: nrgba.Pix,
+	}, nil
 }

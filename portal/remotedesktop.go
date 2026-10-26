@@ -17,6 +17,7 @@ import (
 	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -493,7 +494,7 @@ func (o remoteDesktopObject) NotifyPointerMotionAbsolute(session dbus.ObjectPath
 	return o.with(session, devicePointer, func(in *remoteInput) {
 		_ = in.sink.MotionAbsolute(
 			uint32((gx-float64(box.Min.X))*absoluteScale), uint32((gy-float64(box.Min.Y))*absoluteScale),
-			uint32(box.Dx()*absoluteScale), uint32(box.Dy()*absoluteScale))
+			intconv.Clamp[uint32](box.Dx()*absoluteScale), intconv.Clamp[uint32](box.Dy()*absoluteScale))
 	})
 }
 
@@ -509,7 +510,19 @@ func layoutBox(outputs []outputGeometry) image.Rectangle {
 
 // NotifyPointerButton presses or releases an evdev button.
 func (o remoteDesktopObject) NotifyPointerButton(session dbus.ObjectPath, _ Vardict, button int32, state uint32) *dbus.Error {
-	return o.with(session, devicePointer, func(in *remoteInput) { _ = in.sink.Button(uint32(button), state != 0) })
+	code, derr := inputCode("button", button)
+	if derr != nil {
+		return derr
+	}
+	return o.with(session, devicePointer, func(in *remoteInput) { _ = in.sink.Button(code, state != 0) })
+}
+
+func inputCode(what string, v int32) (uint32, *dbus.Error) {
+	code, err := intconv.Exact[uint32](v)
+	if err != nil {
+		return 0, dbusx.InvalidArgs(fmt.Sprintf("%s: %v", what, err))
+	}
+	return code, nil
 }
 
 // NotifyPointerAxis scrolls smoothly, vertical then horizontal, as a
@@ -564,12 +577,20 @@ func (o remoteDesktopObject) NotifyPointerAxisDiscrete(session dbus.ObjectPath, 
 
 // NotifyKeyboardKeycode presses or releases an evdev key.
 func (o remoteDesktopObject) NotifyKeyboardKeycode(session dbus.ObjectPath, _ Vardict, keycode int32, state uint32) *dbus.Error {
-	return o.with(session, deviceKeyboard, func(in *remoteInput) { _ = in.sink.Key(uint32(keycode), state != 0) })
+	code, derr := inputCode("keycode", keycode)
+	if derr != nil {
+		return derr
+	}
+	return o.with(session, deviceKeyboard, func(in *remoteInput) { _ = in.sink.Key(code, state != 0) })
 }
 
 // NotifyKeyboardKeysym types a keysym through the seat's keymap.
 func (o remoteDesktopObject) NotifyKeyboardKeysym(session dbus.ObjectPath, _ Vardict, keysym int32, state uint32) *dbus.Error {
-	return o.with(session, deviceKeyboard, func(in *remoteInput) { in.keysym(uint32(keysym), state != 0) })
+	sym, derr := inputCode("keysym", keysym)
+	if derr != nil {
+		return derr
+	}
+	return o.with(session, deviceKeyboard, func(in *remoteInput) { in.keysym(sym, state != 0) })
 }
 
 // NotifyTouchDown is unsupported.

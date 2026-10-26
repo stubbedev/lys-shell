@@ -10,6 +10,8 @@ import (
 	"syscall"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // systemd's user manager on the session bus.
@@ -64,11 +66,15 @@ func intoScope(pid int, name string) error {
 	if !running {
 		return nil
 	}
+	unitPID, err := intconv.Exact[uint32](pid)
+	if err != nil {
+		return fmt.Errorf("pid %d: %w", pid, err)
+	}
 	props := []struct {
 		Name  string
 		Value dbus.Variant
 	}{
-		{"PIDs", dbus.MakeVariant([]uint32{uint32(pid)})},
+		{"PIDs", dbus.MakeVariant([]uint32{unitPID})},
 		{"Slice", dbus.MakeVariant("app.slice")},
 		{"CollectMode", dbus.MakeVariant("inactive-or-failed")},
 	}

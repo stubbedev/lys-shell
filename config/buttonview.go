@@ -1,6 +1,10 @@
 package config
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
+)
 
 // Bar-button views: the bar_button key set (wayle-derive's
 // BAR_BUTTON fields) read from a module section by key, so every
@@ -133,7 +137,7 @@ func keyBool(section reflect.Value, key string, missing bool) bool {
 
 func keyInt(section reflect.Value, key string) int {
 	if f, ok := keyField(section, key); ok && f.CanUint() {
-		return int(f.Uint())
+		return intconv.Clamp[int](f.Uint())
 	}
 	return 0
 }

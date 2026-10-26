@@ -257,7 +257,7 @@ func lexString(s string) (string, int, error) {
 				if i+4 >= len(s) {
 					return "", 0, errorf("bad string escape")
 				}
-				n, err := strconv.ParseUint(s[i+1:i+5], 16, 32)
+				n, err := strconv.ParseUint(s[i+1:i+5], 16, 16)
 				if err != nil {
 					return "", 0, errorf("bad string escape")
 				}

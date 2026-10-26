@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Action is one notification button: Key is what Ask reports, Label
@@ -39,7 +41,7 @@ func (s *Sender) Ask(ctx context.Context, appName, summary, body, appIcon string
 	hints := iconHints(appIcon)
 	var id uint32
 	call := s.conn.Object(busName, path).CallWithContext(ctx, method, 0,
-		appName, uint32(0), appIcon, summary, body, flat, hints, int32(timeout.Milliseconds()))
+		appName, uint32(0), appIcon, summary, body, flat, hints, intconv.Clamp[int32](timeout.Milliseconds()))
 	if call.Err != nil {
 		return "", false, fmt.Errorf("desktopnotify: Notify: %w", call.Err)
 	}

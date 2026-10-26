@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/lys-shell/internal/dbusx"
 )
 
 // logindTimeout bounds every call to logind.
@@ -60,7 +62,7 @@ func (l *logind) lock(what, why string) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("logind Inhibit %s: %w", what, err)
 	}
-	return os.NewFile(uintptr(fd), "inhibit"), nil
+	return dbusx.File(fd, "inhibit")
 }
 
 // session resolves the user's session object: the caller's, or (for a

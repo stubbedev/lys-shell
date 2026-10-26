@@ -3,8 +3,10 @@ package cava
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 
+	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/pulse"
 )
 
@@ -134,10 +136,14 @@ func (s *Source) Start() error {
 	if s.capture != nil {
 		return errors.New("cava: source already running")
 	}
+	channels, err := intconv.Exact[uint8](s.channels)
+	if err != nil {
+		return fmt.Errorf("cava: channels: %w", err)
+	}
 	capture, err := s.capturer.Capture(s.target, pulse.CaptureSpec{
 		Name:           "cava",
 		Rate:           sampleRate,
-		Channels:       uint8(s.channels),
+		Channels:       channels,
 		FragmentFrames: fragmentFrames,
 	}, s.accumulate)
 	if err != nil {
