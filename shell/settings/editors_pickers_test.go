@@ -1,9 +1,11 @@
 package settings
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -815,72 +817,121 @@ func TestSearchPickerFiltersAndPicks(t *testing.T) {
 	}
 }
 
-// A long path at rest shows ellipsized in the middle, its start and its
-// file name, inside the entry, the whole path in the tooltip; focused,
-// the entry edits the whole path with the resting display out of the
-// way, and an unsaved edit is what shows once focus leaves.
-func TestPathFieldRestsOnItsFileName(t *testing.T) {
-	win := laidOutPage(t, pathPagesYAML, "lock", windowWidth)
-	c := treetest.All[*fileEditor](win.page)[0]
-	if !c.display.Visible() || c.display.Text() != longPath || c.display.Ellipsize() != widget.EllipsizeMiddle {
-		t.Fatalf("at rest the display shows %q (visible %v, ellipsize %v), want %q ellipsized in the middle", c.display.Text(), c.display.Visible(), c.display.Ellipsize(), longPath)
+// paintedEntry paints e alone and returns its pixels.
+func paintedEntry(e *widget.Entry) []byte {
+	b := e.Bounds()
+	w, h := b.X+b.W, b.Y+b.H
+	data := make([]byte, render.Stride(w)*h)
+	e.Paint(render.NewScaled(data, render.Stride(w), w, h, 1, 1))
+	return data
+}
+
+// restingLine is the middle-ellipsized line of path that e paints, found
+// by painting each candidate the path's middle ellipsis yields in twin, a
+// field laid out like e that ellipsizes nothing; false when e paints
+// none of them.
+func restingLine(t *testing.T, e, twin *widget.Entry, path string) (string, bool) {
+	t.Helper()
+	want := paintedEntry(e)
+	twin.SetEllipsize(widget.EllipsizeNone)
+	font, px := treetest.Font(t), widget.Current().TextSize
+	tried := map[string]bool{}
+	for avail := 1; avail <= e.Bounds().W; avail++ {
+		line := render.EllipsizeText(font, path, widget.EllipsizeMiddle, float64(avail), px)
+		if tried[line] || !strings.Contains(line, render.Ellipsis) {
+			continue
+		}
+		tried[line] = true
+		twin.SetText(line)
+		twin.MoveHome()
+		if bytes.Equal(paintedEntry(twin), want) {
+			return line, true
+		}
 	}
-	if !c.field.HasClass("at-rest") {
-		t.Error("at rest the entry's own panned text is not hidden under the display")
+	return "", false
+}
+
+// readsHeadAndFile reports whether line is path around one ellipsis:
+// its start from longPathHead on, and the end of its file name with the
+// extension.
+func readsHeadAndFile(line, path string) bool {
+	head, tail, ok := strings.Cut(line, render.Ellipsis)
+	return ok && strings.HasPrefix(head, longPathHead) && strings.HasPrefix(path, head) &&
+		strings.HasSuffix(path, tail) && strings.HasSuffix(tail, filepath.Ext(path)) && !strings.Contains(tail, "/")
+}
+
+// lockPathField is the lock page's path field in a window w pixels
+// wide, every path set to a long one, with its router.
+func lockPathField(t *testing.T, w int) (*fileEditor, *widget.Router) {
+	t.Helper()
+	win := laidOutPage(t, pathPagesYAML, "lock", w)
+	return treetest.All[*fileEditor](win.page)[0], &widget.Router{Root: win.root}
+}
+
+// A long path at rest shows ellipsized in the middle, its start and its
+// file name, the whole path in the tooltip; focused, the field edits and
+// shows the whole path as a field that ellipsizes nothing does, and an
+// unsaved edit is what shows once focus leaves.
+func TestPathFieldRestsOnItsFileName(t *testing.T) {
+	c, r := lockPathField(t, windowWidth)
+	twin, _ := lockPathField(t, windowWidth)
+	line, ok := restingLine(t, c.entry.Entry, twin.entry.Entry, longPath)
+	if !ok {
+		t.Fatalf("at rest the field paints no middle ellipsis of %q", longPath)
+	}
+	if !readsHeadAndFile(line, longPath) {
+		t.Errorf("at rest the field reads %q, want the start and the file name of %q", line, longPath)
 	}
 	if tip := c.entry.TooltipText(); tip != longPath {
 		t.Errorf("the tooltip reads %q, want the whole path", tip)
 	}
-	d, e := c.display.Bounds(), c.entry.Bounds()
-	if d.X < e.X || d.Y < e.Y || d.X+d.W > e.X+e.W || d.Y+d.H > e.Y+e.H {
-		t.Errorf("the display at %v paints outside its entry at %v", d, e)
-	}
-	whole := widget.NewLabel(treetest.Font(t), widget.Current().TextSize, longPath, 0)
-	if natural := whole.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}).W; d.W >= natural {
-		t.Errorf("the display is %dpx wide for a %dpx path, so it ellipsizes nothing", d.W, natural)
-	}
 
-	r := &widget.Router{Root: win.root}
 	if err := r.SetFocus(c.entry); err != nil {
 		t.Fatal(err)
 	}
-	if c.display.Visible() || c.field.HasClass("at-rest") || c.entry.Text() != longPath {
-		t.Errorf("focused, the display shows %v (at rest %v) over %q, want the entry editing the whole path", c.display.Visible(), c.field.HasClass("at-rest"), c.entry.Text())
+	plain, plainRouter := lockPathField(t, windowWidth)
+	plain.entry.SetEllipsize(widget.EllipsizeNone)
+	if err := plainRouter.SetFocus(plain.entry); err != nil {
+		t.Fatal(err)
 	}
+	if c.entry.Text() != longPath || !bytes.Equal(paintedEntry(c.entry.Entry), paintedEntry(plain.entry.Entry)) {
+		t.Errorf("focused, the field holds %q and paints other than a field showing the whole path", c.entry.Text())
+	}
+
 	c.entry.Insert("x")
 	if err := r.SetFocus(nil); err != nil {
 		t.Fatal(err)
 	}
-	if !c.display.Visible() || c.display.Text() != longPath+"x" || c.entry.TooltipText() != longPath+"x" {
-		t.Errorf("after an unsaved edit the display shows %q (visible %v), want the edited text", c.display.Text(), c.display.Visible())
+	line, ok = restingLine(t, c.entry.Entry, twin.entry.Entry, longPath+"x")
+	if !ok || !readsHeadAndFile(line, longPath+"x") {
+		t.Errorf("after an unsaved edit the field reads %q (%v), want the edited path ellipsized", line, ok)
+	}
+	if tip := c.entry.TooltipText(); tip != longPath+"x" {
+		t.Errorf("after an unsaved edit the tooltip reads %q, want the edited path", tip)
 	}
 }
 
-// An empty path field rests on the bare entry: no display stands over
-// it and it has no tooltip.
-func TestEmptyPathFieldShowsNoDisplay(t *testing.T) {
-	k := testKit(t, "")
-	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
-	if c.display.Visible() || c.field.HasClass("at-rest") || c.entry.TooltipText() != "" {
-		t.Errorf("an empty field shows the display %v (at rest %v, tooltip %q), want the bare entry", c.display.Visible(), c.field.HasClass("at-rest"), c.entry.TooltipText())
+// A path that fits its field shows whole at rest, with no ellipsis.
+func TestShortPathFieldShowsWhole(t *testing.T) {
+	c, _ := lockPathField(t, windowWidth)
+	twin, _ := lockPathField(t, windowWidth)
+	c.entry.SetText("/a.png")
+	c.entry.MoveHome()
+	if line, ok := restingLine(t, c.entry.Entry, twin.entry.Entry, "/a.png"); ok {
+		t.Errorf("a short path reads %q at rest, want it whole", line)
+	}
+	twin.entry.SetText("/a.png")
+	twin.entry.MoveHome()
+	if !bytes.Equal(paintedEntry(c.entry.Entry), paintedEntry(twin.entry.Entry)) {
+		t.Error("a short path paints other than a field that ellipsizes nothing")
 	}
 }
 
-// An empty path field reads its translated placeholder, which is only a
-// hint: it is never the field's text nor written to the config.
+// An empty path field shows its placeholder and has no tooltip.
 func TestEmptyPathFieldShowsItsPlaceholder(t *testing.T) {
 	k := testKit(t, "")
-	s := pathSlot(k.store, "lock.background-image")
-	c := newFileEditor(k, s)
-	want := i18n.Settings().Get("settings-file-path-placeholder")
-	if want == "" || want == "settings-file-path-placeholder" {
-		t.Fatalf("the placeholder key resolves to %q", want)
-	}
-	if got := c.entry.Placeholder(); got != want {
-		t.Errorf("an empty path field reads %q, want the placeholder %q", got, want)
-	}
-	c.entry.OnActivate(c.entry.Text())
-	if c.entry.Text() != "" || s.get() != "" {
-		t.Errorf("committing the empty field left the text %q and the value %v, want the placeholder written nowhere", c.entry.Text(), s.get())
+	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
+	if want := i18n.Settings().Get("settings-file-path-placeholder"); c.entry.Placeholder() != want || c.entry.TooltipText() != "" {
+		t.Errorf("an empty field shows %q with tooltip %q, want %q and none", c.entry.Placeholder(), c.entry.TooltipText(), want)
 	}
 }

@@ -236,8 +236,12 @@ func TestCustomColorButtonMatchesItsDropdown(t *testing.T) {
 	}
 }
 
-// longPath is a wallpaper path far longer than a path field.
-const longPath = "/home/someone/Pictures/wallpapers/landscapes/mountains-at-dawn-ultrawide.png"
+// longPath is a wallpaper path far longer than a path field, under
+// longPathHead.
+const (
+	longPathHead = "/home/"
+	longPath     = longPathHead + "someone/Pictures/wallpapers/landscapes/mountains-at-dawn-ultrawide.png"
+)
 
 // pathPagesYAML sets every path row of the wallpaper and lock pages to
 // a long path.
