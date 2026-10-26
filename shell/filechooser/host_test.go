@@ -1801,7 +1801,7 @@ func TestChooserTakesLysUiParts(t *testing.T) {
 		all("file-chooser-crumb", css.Ghost)
 		all("file-chooser-place", css.Ghost)
 		all("file-chooser-sidebar-header", css.CaptionHeading, css.DimLabel)
-		for _, cell := range treetest.WithClass(hs.c.fileRow(hs.c.s.entries[0], false), "file-chooser-cell") {
+		for _, cell := range treetest.WithClass(hs.c.fileRow(hs.c.s.entries[0]), "file-chooser-cell") {
 			if !widget.HasClass(cell, css.DimLabel) {
 				t.Error("a row's cell is not dim")
 			}
@@ -1885,7 +1885,7 @@ func (hs *harness) token(t *testing.T, tok config.CssToken) render.Color {
 // The list's rows paint the stylesheet's fills behind their cells: the
 // accent behind the selected row, the hover tint under the pointer,
 // and the zebra tint on every other row by model index, never on the
-// rows between.
+// rows between, however far the list scrolled.
 func TestListRowsPaintTheirFills(t *testing.T) {
 	hs := newHarness(t, "")
 	touch(t, hs.root, "c.txt", "d.txt")
@@ -1929,6 +1929,30 @@ func TestListRowsPaintTheirFills(t *testing.T) {
 	}
 	if got := at(x, rowY(2)); got != blank {
 		t.Errorf("row 2 paints %v with the pointer elsewhere, want the view's own %v", got, blank)
+	}
+
+	for i := range 40 {
+		touch(t, hs.root, "docs/f"+strconv.Itoa(100+i)+".txt")
+	}
+	hs.run(func() { r.Move(widget.Point{}) })
+	hs.do(func() { hs.c.goTo(filepath.Join(hs.root, "docs")) })
+	at = hs.frame(W, H)
+	plain, tint := at(x, rowY(0)), at(x, rowY(1))
+	if plain != blank || tint == blank {
+		t.Fatalf("rows 0 and 1 of the long listing paint %v and %v, want the view's %v and the zebra tint", plain, tint, blank)
+	}
+	for top := 1; top <= 3; top++ {
+		hs.run(func() { hs.c.ui.list.ScrollPixels(0, listRowH) })
+		at = hs.frame(W, H)
+		for k := range lb.H / listRowH {
+			want := plain
+			if (top+k)%2 == 1 {
+				want = tint
+			}
+			if got := at(x, rowY(k)); got != want {
+				t.Errorf("scrolled %d rows down, row %d (slot %d) paints %v, want %v", top, top+k, k, got, want)
+			}
+		}
 	}
 }
 

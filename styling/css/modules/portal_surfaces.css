@@ -18,7 +18,7 @@
   color: var(--accent);
 }
 
-.file-chooser-list row:not(:selected):not(:hover) > .file-chooser-row.alt {
+.file-chooser-list row:nth-child(even):not(:selected):not(:hover) > .file-chooser-row {
   border-radius: var(--rounding-element);
   background: color-mix(in srgb, var(--fg-default) 4%, transparent);
 }

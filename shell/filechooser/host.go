@@ -818,13 +818,12 @@ func (m rows) Row(i int) widget.Widget {
 	if m.grid {
 		return m.c.gridCell(e)
 	}
-	return m.c.fileRow(e, i%2 == 1)
+	return m.c.fileRow(e)
 }
 
 // fileRow is the name (icon and label) with the size, modified and
-// kind cells under their column headers; alt rows carry the zebra
-// tint, by model index so it holds while the list scrolls.
-func (c *Chooser) fileRow(e Entry, alt bool) widget.Widget {
+// kind cells under their column headers.
+func (c *Chooser) fileRow(e Entry) widget.Widget {
 	th := widget.Current()
 	lead := widget.NewBox(widget.Row, th.Spacing, 0)
 	lead.Append(c.entryIcon(e, rowIconPx), false)
@@ -848,7 +847,6 @@ func (c *Chooser) fileRow(e Entry, alt bool) widget.Widget {
 		cells[i] = cell
 	}
 	row := rowBox("file-chooser-row", th.Padding)
-	row.SetClass("alt", alt)
 	row.Append(newColumnRow(lead, cells, [3]widget.Widget{}, c.columns, th.Spacing), true)
 	return row
 }
