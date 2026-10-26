@@ -28,8 +28,8 @@ github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef h1:Ch6Q+AZUxDBCVqd
 github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef/go.mod h1:nXTWP6+gD5+LUJ8krVhhoeHjvHTutPxMYl5SvkcnJNE=
 github.com/stubbedev/lys-lib v0.1.1-0.20261026204547-c12a4ac52b17 h1:WP+HrxaA4Jo0xXgkzcVG5UR1wc8BjekODDxLVhREdQM=
 github.com/stubbedev/lys-lib v0.1.1-0.20261026204547-c12a4ac52b17/go.mod h1:k4Zmc59rhLpGpIhmOWccq7ko4Ko/60qFJ+l7pWj6Lzs=
-github.com/stubbedev/lys-ui v0.0.0-20261026205453-f241d2f69666 h1:By/UOgoMd5M7Ziw4h8Ppv6zsfzgPc7dE8WN91RhduBc=
-github.com/stubbedev/lys-ui v0.0.0-20261026205453-f241d2f69666/go.mod h1:jSxEPZ586rr/ha/wP+G4CxOswY6hDagV6YFDVptnLvg=
+github.com/stubbedev/lys-ui v0.0.0-20261026210936-64cc3ea4161e h1:7UNd1ISOTEfDTxhVQkJ2xEHJ68VXxWe5ZjNftK8qEwQ=
+github.com/stubbedev/lys-ui v0.0.0-20261026210936-64cc3ea4161e/go.mod h1:jSxEPZ586rr/ha/wP+G4CxOswY6hDagV6YFDVptnLvg=
 github.com/unxed/xkb-go v0.1.9 h1:t2lhW6bcPxzX/1DBf9jIRoo13KhMm9+XUPJT4o5a/Kw=
 github.com/unxed/xkb-go v0.1.9/go.mod h1:p0uH0w1PGo5GU/qxcyj65edin5qHssAhvJTjCZ8nxNU=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
