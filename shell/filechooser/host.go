@@ -367,9 +367,7 @@ type ui struct {
 	preview                 *widget.Box
 	pvIcon                  *widget.Box
 	pvName, pvInfo          *widget.Label
-	filterButton            *widget.ToggleButton
-	filterLabel             *widget.Label
-	filterPopup             *widget.Box
+	filter                  *widget.Dropdown
 	viewToggle              *widget.Button
 	viewIcon                *widget.Box
 	previewToggle, hiddenTg *widget.ToggleButton
@@ -550,19 +548,15 @@ func (c *Chooser) build(r request) {
 
 	// Footer: the type filter, cancel, confirm.
 	footer := section(widget.Row, "file-chooser-footer")
-	u.filterLabel = c.label("", "file-chooser-filter-label")
-	u.filterLabel.SetAlignment(render.AlignCenter)
-	u.filterButton = widget.NewToggleButton(u.filterLabel, 0, 0)
-	u.filterButton.AddClass("toggle", "file-chooser-filter", css.Outline)
-	u.filterButton.OnToggled = c.setFilterPopup
-	u.filterLabel.SetAlignment(render.AlignStart)
-	u.filterLabel.SetEllipsize(widget.EllipsizeEnd)
-	u.filterLabel.SetMaxWidthChars(28)
-	u.filterButton.SetVisible(len(s.filters) > 0)
-	if len(s.filters) > 0 {
-		u.filterLabel.SetText(FilterLabel(s.filters[s.active]))
+	labels := make([]string, len(s.filters))
+	for i, f := range s.filters {
+		labels[i] = FilterLabel(f)
 	}
-	footer.Append(u.filterButton, false)
+	u.filter = widget.NewDropdown(c.d.Font, th.TextSize, labels, s.active)
+	u.filter.AddClass("file-chooser-filter")
+	u.filter.OnSelect = c.selectFilter
+	u.filter.SetVisible(len(s.filters) > 0)
+	footer.Append(u.filter, false)
 	for _, row := range choiceRows {
 		footer.Append(row, false)
 	}
@@ -576,39 +570,15 @@ func (c *Chooser) build(r request) {
 	footer.Append(cancel, false)
 	footer.Append(confirm, false)
 
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.Append(widget.NewSeparator(widget.Horizontal), false)
-	content.Append(crumbBar, false)
-	content.Append(u.newFolder, false)
-	content.Append(widget.NewSeparator(widget.Horizontal), false)
-	content.Append(body, true)
-	content.Append(widget.NewSeparator(widget.Horizontal), false)
-	content.Append(u.name, false)
-	content.Append(u.notice, false)
-
-	// The filter popup sits on the footer in the panel itself rather
-	// than an xdg_popup, which an exclusive overlay may not route input
-	// to, inset like the footer's filter button.
-	u.filterPopup = widget.NewBox(widget.Column, 0, th.Padding/2)
-	u.filterPopup.AddClass(css.Card, "file-chooser-filter-popup")
-	filterList := widget.NewBox(widget.Column, 0, 0)
-	filterList.AddClass("file-chooser-filter-list")
-	for i, f := range s.filters {
-		row, l := c.textButton(FilterLabel(f), "file-chooser-filter-row", css.Ghost, func() { c.selectFilter(i) })
-		l.SetAlignment(render.AlignStart)
-		l.SetEllipsize(widget.EllipsizeEnd)
-		l.SetMaxWidthChars(40)
-		filterList.Append(row, false)
-	}
-	u.filterPopup.Append(widget.NewScroll(filterList), true)
-	u.filterPopup.SetVisible(false)
-	u.filterPopup.SetMargin(render.Insets{Left: 2 * th.Padding})
-	above := widget.NewOverlay()
-	above.Append(content)
-	above.AppendAligned(u.filterPopup, widget.AlignStart, widget.AlignEnd)
-
 	main := &dropZone{Box: widget.NewBox(widget.Column, 0, 0), onDrop: c.dropped}
-	main.Append(above, true)
+	main.Append(widget.NewSeparator(widget.Horizontal), false)
+	main.Append(crumbBar, false)
+	main.Append(u.newFolder, false)
+	main.Append(widget.NewSeparator(widget.Horizontal), false)
+	main.Append(body, true)
+	main.Append(widget.NewSeparator(widget.Horizontal), false)
+	main.Append(u.name, false)
+	main.Append(u.notice, false)
 	main.Append(footer, false)
 
 	u.root = widget.NewFloatingPanel(header, main)
@@ -987,8 +957,8 @@ func (c *Chooser) hide() {
 	})
 }
 
-// key binds GTK's chooser keys: Escape closes the filter popup, then
-// quick look, then cancels; plain Space toggles quick look, Backspace
+// key binds GTK's chooser keys: Escape closes quick look, then
+// cancels; plain Space toggles quick look, Backspace
 // and Alt+Up go up, Alt+Left and Alt+Right walk the history (none of
 // these while a text field has the key); Ctrl+H shows hidden files,
 // Ctrl+L the location entry, Ctrl+F the search.
@@ -1025,14 +995,11 @@ func (c *Chooser) key(r *widget.Router, keycode uint32, mods app.Mods) {
 }
 
 func (c *Chooser) escape() {
-	switch u := c.ui; {
-	case u.filterPopup.Visible():
-		c.setFilterPopup(false)
-	case u.quicklook.Visible():
-		u.quicklook.SetVisible(false)
-	default:
-		c.finish(nil)
+	if c.ui.quicklook.Visible() {
+		c.ui.quicklook.SetVisible(false)
+		return
 	}
+	c.finish(nil)
 }
 
 // press walks the history on the mouse's thumb buttons.
@@ -1391,19 +1358,10 @@ func (c *Chooser) updateSortLabels() {
 	}
 }
 
-// setFilterPopup shows or hides the filter list with the filter
-// toggle's state (set_active), from the toggle or a choice.
-func (c *Chooser) setFilterPopup(on bool) {
-	c.ui.filterPopup.SetVisible(on)
-	c.ui.filterButton.SetActive(on)
-}
-
-// selectFilter makes filter i the active one; a save name takes its
-// extension.
+// selectFilter makes filter i, picked in the filter dropdown, the
+// active one; a save name takes its extension.
 func (c *Chooser) selectFilter(i int) {
 	c.s.selectFilter(i)
-	c.ui.filterLabel.SetText(FilterLabel(c.s.filters[c.s.active]))
-	c.setFilterPopup(false)
 	if c.s.mode == ModeSave {
 		c.ui.name.SetText(withExtension(c.ui.name.Text(), c.s.filters[c.s.active]))
 	}

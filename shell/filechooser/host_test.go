@@ -73,13 +73,6 @@ func (hs *harness) panel(t *testing.T) *widget.FloatingPanel {
 	return treetest.First[*widget.FloatingPanel](t, hs.cfg.Root)
 }
 
-// holds reports whether w is root or under it.
-func holds(root, w widget.Widget) bool {
-	found := false
-	treetest.Walk(root, func(k widget.Widget) { found = found || k == w })
-	return found
-}
-
 // center is the middle of w's bounds.
 func center(w widget.Boundser) widget.Point {
 	b := w.Bounds()
@@ -375,52 +368,10 @@ func TestHistoryButtonsAndUp(t *testing.T) {
 	}
 }
 
-// The filter popup opens on the footer, inset like the filter button,
-// and takes the press there; closed, the sidebar beneath takes it.
-func TestFilterPopupSitsOnTheFooter(t *testing.T) {
-	hs := newHarness(t, "")
-	hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}, {"Text", []Rule{{RuleGlob, "*.txt"}}}}})
-	var at widget.Point
-	hs.run(func() {
-		lay(hs.cfg.Root, 1280, 720)
-		footer := treetest.WithClass(hs.cfg.Root, "file-chooser-footer")[0].(widget.Boundser).Bounds()
-		at = widget.Point{X: hs.c.ui.filterButton.Bounds().X + 4, Y: footer.Y - 4}
-		sidebar := treetest.WithClass(hs.cfg.Root, "file-chooser-sidebar-scroll")[0]
-		if hit := hs.cfg.Root.HitTest(at); hit == nil || !holds(sidebar, hit) {
-			t.Errorf("a press above the closed popup's button hit %T, want the sidebar", hit)
-		}
-	})
-	hs.do(hs.c.ui.filterButton.OnClick)
-	hs.run(func() {
-		lay(hs.cfg.Root, 1280, 720)
-		popup := hs.c.ui.filterPopup.Bounds()
-		footer := treetest.WithClass(hs.cfg.Root, "file-chooser-footer")[0].(widget.Boundser).Bounds()
-		if popup.Y+popup.H != footer.Y || popup.X != hs.c.ui.filterButton.Bounds().X {
-			t.Errorf("popup at %v, want it on the footer %v at the filter button's left %d", popup, footer, hs.c.ui.filterButton.Bounds().X)
-		}
-		if hit := hs.cfg.Root.HitTest(at); hit == nil || !holds(hs.c.ui.filterPopup, hit) {
-			t.Errorf("a press on the open popup hit %T, want the popup", hit)
-		}
-		if hit := hs.cfg.Root.HitTest(center(hs.c.ui.list)); hit == nil || !holds(hs.c.ui.listView, hit) {
-			t.Errorf("a press on the files beside the open popup hit %T, want the files", hit)
-		}
-	})
-}
-
 func TestCancelEscapeAndQueueing(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}}})
-	// Escape closes the filter popup first, then quick look, then the
-	// dialog.
-	hs.do(hs.c.ui.filterButton.OnClick)
-	if !hs.c.ui.filterPopup.Visible() {
-		t.Fatal("the filter button did not open the popup")
-	}
-	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
-	pending(t, got)
-	if hs.c.ui.filterPopup.Visible() {
-		t.Error("Escape left the filter popup open")
-	}
+	// Escape closes quick look first, then the dialog.
 	hs.pick(t, "a.png")
 	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keySpace, 0) })
 	if !hs.c.ui.quicklook.Visible() {
@@ -516,13 +467,12 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 	if got := hs.shown(); !slices.Equal(got, []string{"docs", "pics", "a.png"}) {
 		t.Errorf("filtered = %v", got)
 	}
-	hs.do(hs.c.ui.filterButton.OnClick)
-	hs.click(t, "All Files")
+	hs.do(func() { hs.c.ui.filter.SetSelected(1) })
 	if got := hs.shown(); !slices.Equal(got, []string{"docs", "pics", "a.png", "b.txt"}) {
 		t.Errorf("all files = %v", got)
 	}
-	if hs.c.ui.filterLabel.Text() != "All Files" || hs.c.ui.filterPopup.Visible() {
-		t.Errorf("filter label %q, popup open %v", hs.c.ui.filterLabel.Text(), hs.c.ui.filterPopup.Visible())
+	if got := hs.c.ui.filter.Selection(); got != "All Files" {
+		t.Errorf("filter shows %q", got)
 	}
 	hs.click(t, "Show hidden files")
 	if got := hs.shown(); !slices.Contains(got, ".dot.txt") {
@@ -1313,13 +1263,13 @@ func TestSaveFilterSetsTheExtension(t *testing.T) {
 	got := hs.ask(t, func() []string {
 		return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: "report.txt", Filters: []Filter{txtFilter, pngFilter}}).URIs
 	})
-	hs.do(func() { hs.c.selectFilter(1) })
+	hs.do(func() { hs.c.ui.filter.SetSelected(1) })
 	var text string
 	hs.do(func() { text = hs.c.ui.name.Text() })
 	if text != "report.png" {
 		t.Errorf("name = %q after the image filter", text)
 	}
-	hs.do(func() { hs.c.selectFilter(2) }) // All Files: no extension
+	hs.do(func() { hs.c.ui.filter.SetSelected(2) }) // All Files: no extension
 	hs.do(func() { text = hs.c.ui.name.Text() })
 	if text != "report.png" {
 		t.Errorf("name = %q after All Files", text)
