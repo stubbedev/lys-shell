@@ -1,6 +1,7 @@
 package toplevels
 
 import (
+	"errors"
 	"io"
 	"slices"
 	"sync"
@@ -86,7 +87,9 @@ func startProbe(t *testing.T, appID string) io.Closer {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_ = a.Run()
+		if err := a.Run(); err != nil && !errors.Is(err, app.ErrClosed) {
+			t.Errorf("the probe window %s stopped: %v", appID, err)
+		}
 	}()
 	var once sync.Once
 	stop := closer(func() {

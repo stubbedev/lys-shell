@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/capture"
 	"github.com/stubbedev/lys-ui/dmabuf"
+	"github.com/stubbedev/lys-ui/gpu"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
@@ -44,14 +45,29 @@ func deviceOf(t *testing.T, node string) uint64 {
 	return st.Rdev
 }
 
+// vulkanNode is the host's first render node and the Vulkan allocator
+// behind it. A host with no render node, or whose Vulkan drivers have no
+// device on it (CI, or Vulkan limited to lavapipe, which has no DRM
+// node), skips the test with the reason; any other failure to open it
+// fails.
+func vulkanNode(t *testing.T) (string, gpuAllocator) {
+	t.Helper()
+	node := firstRenderNode(t)
+	a, err := openVulkanAllocator(deviceOf(t, node))
+	switch {
+	case errors.Is(err, gpu.ErrNoVulkan), errors.Is(err, gpu.ErrNoDevice):
+		t.Skipf("no Vulkan device behind %s: %v", node, err)
+	case err != nil:
+		t.Fatalf("%s has a Vulkan device that fails to open: %v", node, err)
+	}
+	t.Cleanup(a.Close)
+	return node, a
+}
+
 // realDevice opens the Vulkan allocator on the host's first render node.
 func realDevice(t *testing.T) gpuAllocator {
 	t.Helper()
-	a, err := openVulkanAllocator(deviceOf(t, firstRenderNode(t)))
-	if err != nil {
-		t.Fatalf("a render node exists but opens no Vulkan device: %v", err)
-	}
-	t.Cleanup(a.Close)
+	_, a := vulkanNode(t)
 	return a
 }
 
@@ -156,7 +172,7 @@ func captureLog(t *testing.T) *lockedBuffer {
 // Vulkan device behind the named one it streams through shared memory,
 // and says so once, with the reason.
 func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
-	node := firstRenderNode(t)
+	node, _ := vulkanNode(t)
 	swaytest.Start(t, "WLR_RENDERER=vulkan", "WLR_RENDER_DRM_DEVICE="+node)
 	pwtest.Start(t)
 	c, err := capture.Connect()
@@ -178,13 +194,13 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	_ = c.Close()
 
 	logged := captureLog(t)
-	gpu := screenStreams{openDevice: openVulkanAllocator}
-	s, err := gpu.startGPU(output.name, false, 30)
+	streams := screenStreams{openDevice: openVulkanAllocator}
+	s, err := streams.startGPU(output.name, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}
 	s.Close()
-	s, err = gpu.start(output, false, 30)
+	s, err = streams.start(output, false, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
