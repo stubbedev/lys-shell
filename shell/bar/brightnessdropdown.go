@@ -112,7 +112,7 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	// The content holds the device list and the empty state. No
 	// scroll: the list shows bare and the panel grows.
 	content := dropdownContent()
-	v.body = widget.NewStack()
+	v.body = pageStack()
 	v.body.Add("devices", atTop(card))
 	v.body.Add("empty", empty)
 	content.Append(v.body, true)

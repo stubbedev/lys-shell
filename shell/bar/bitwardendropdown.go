@@ -300,7 +300,7 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	v.Append(dropdownHeader(font, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-title"), v.spinner, v.syncBtn, v.lockBtn, v.logoutBtn), false)
 	content := dropdownContent()
 	v.errLabel = v.caption(css.Error)
-	v.pages = widget.NewStack()
+	v.pages = pageStack()
 	v.pages.Add(bwPageLogin, v.buildLogin())
 	v.pages.Add(bwPageChallenge, v.buildChallenge())
 	v.pages.Add(bwPageUnlock, v.buildUnlock())
@@ -482,7 +482,7 @@ func (v *bitwardenView) buildVault() widget.Widget {
 	page.Append(v.search, false)
 	card, list := itemCard()
 	v.list = list
-	v.listSt = widget.NewStack()
+	v.listSt = pageStack()
 	v.listSt.Add("items", scrolledCard(card, ""))
 	v.listSt.Add("empty", widgets.EmptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-no-items"), ""))
 	page.Append(v.listSt, true)

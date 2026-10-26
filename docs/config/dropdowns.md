@@ -20,10 +20,10 @@ the built-in default (scaled by the global scale).
 | `battery` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Battery dropdown panel size. |
 | `bitwarden` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Bitwarden dropdown panel size. |
 | `bluetooth` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Bluetooth dropdown panel size. |
-| `brightness` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Brightness dropdown panel size. Height grows to fit content. |
-| `calendar` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Calendar dropdown panel size. Height grows to fit content. |
-| `dashboard` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Dashboard dropdown panel size. Height grows to fit content. |
-| `mail` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Mail dropdown panel size. Height grows to fit content. |
+| `brightness` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Brightness dropdown panel size. |
+| `calendar` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Calendar dropdown panel size. |
+| `dashboard` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Dashboard dropdown panel size. |
+| `mail` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Mail dropdown panel size. |
 | `media` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Media dropdown panel size. |
 | `network` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Network dropdown panel size. |
 | `notification` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Notification dropdown panel size. |

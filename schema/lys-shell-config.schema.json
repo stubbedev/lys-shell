@@ -2283,7 +2283,7 @@
       ]
     },
     "DropdownSize": {
-      "description": "Size override for a dropdown foldout panel.\n\nEach field is optional: when unset the dropdown keeps its built-in default\nsize (scaled by the global scale). A [`Size`] may be a scale multiplier of\nthe built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `\"480px\"`).",
+      "description": "Size override for a dropdown foldout panel.\n\nEach field is optional: when unset the dropdown keeps its built-in default\nwidth (scaled by the global scale) and the height of its content. A\n[`Size`] may be a scale multiplier of the built-in base (e.g. `1.5`) or an\nabsolute pixel length (e.g. `\"480px\"`).",
       "properties": {
         "height": {
           "anyOf": [
@@ -2295,7 +2295,7 @@
             }
           ],
           "default": null,
-          "description": "Panel height override. Unset uses the built-in default height. Has no\neffect on dropdowns whose height grows to fit their content."
+          "description": "Panel height cap in pixels: the height a panel grows to before its\nlists scroll. Shorter content keeps the panel at its own height. Unset\ngrows the panel to its content, up to the monitor. A multiplier has no\neffect: the height has no built-in base to scale."
         },
         "width": {
           "anyOf": [
@@ -2353,7 +2353,7 @@
             "height": null,
             "width": null
           },
-          "description": "Brightness dropdown panel size. Height grows to fit content."
+          "description": "Brightness dropdown panel size."
         },
         "calendar": {
           "$ref": "#/$defs/DropdownSize",
@@ -2361,7 +2361,7 @@
             "height": null,
             "width": null
           },
-          "description": "Calendar dropdown panel size. Height grows to fit content."
+          "description": "Calendar dropdown panel size."
         },
         "dashboard": {
           "$ref": "#/$defs/DropdownSize",
@@ -2369,7 +2369,7 @@
             "height": null,
             "width": null
           },
-          "description": "Dashboard dropdown panel size. Height grows to fit content."
+          "description": "Dashboard dropdown panel size."
         },
         "mail": {
           "$ref": "#/$defs/DropdownSize",
@@ -2377,7 +2377,7 @@
             "height": null,
             "width": null
           },
-          "description": "Mail dropdown panel size. Height grows to fit content."
+          "description": "Mail dropdown panel size."
         },
         "media": {
           "$ref": "#/$defs/DropdownSize",

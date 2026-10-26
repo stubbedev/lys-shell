@@ -123,15 +123,14 @@ func TestWeatherErrorTextNamesTheCause(t *testing.T) {
 	}
 }
 
+// A dropdown's width is its base at the global scale unless
+// overridden; its height is its content's unless a pixel height caps
+// it, a multiplier having no base height to scale.
 func TestDropdownDimsResolveTheOverrides(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Styling.Scale = 1
-	if w, h, ok := dropdownDims("weather", cfg); !ok || w != 395 || h != 695 {
-		t.Errorf("weather base = %d×%d %v", w, h, ok)
-	}
-	// A content-height dropdown has a natural height.
-	if _, h, _ := dropdownDims("calendar", cfg); h != -1 {
-		t.Errorf("calendar height = %d, want natural", h)
+	if w, h, ok := dropdownDims("weather", cfg); !ok || w != 395 || h != -1 {
+		t.Errorf("weather base = %d×%d %v, want 395 wide at its content's height", w, h, ok)
 	}
 	if _, _, ok := dropdownDims("power", cfg); ok {
 		t.Error("the power menu has no panel geometry")
@@ -143,7 +142,6 @@ func TestDropdownDimsResolveTheOverrides(t *testing.T) {
 	if w, h, _ := dropdownDims("weather", cfg); w != 1185 || h != 480 {
 		t.Errorf("weather override = %d×%d, want 1185×480", w, h)
 	}
-	// A scale height on a content-height dropdown has nothing to scale.
 	cfg.Dropdowns.Calendar = config.DropdownSize{Height: &scale}
 	if w, h, _ := dropdownDims("calendar", cfg); w != 680 || h != -1 {
 		t.Errorf("calendar = %d×%d, want 680×natural", w, h)

@@ -280,13 +280,13 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	apps := dropdownSection(sectionLabel(font, i18n.T("dropdown-audio-app-volume")))
 	apps.Append(v.apps, true)
 	content.Append(apps, true)
-	v.main = widget.NewStack()
+	v.main = pageStack()
 	v.main.Add("devices", content)
 	v.main.Add("empty", widgets.EmptyState(font, px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-devices-title"), i18n.T("dropdown-audio-no-devices-description")))
 
 	v.pickers[audioOutput] = newDevicePicker(v, audioOutput, i18n.T("dropdown-audio-output-devices"))
 	v.pickers[audioInput] = newDevicePicker(v, audioInput, i18n.T("dropdown-audio-input-devices"))
-	v.pages = widget.NewStack()
+	v.pages = pageStack()
 	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("main", v.main)
 	v.pages.Add("output", v.pickers[audioOutput])
@@ -516,7 +516,7 @@ type appVolumes struct {
 }
 
 func newAppVolumes(v *audioView) *appVolumes {
-	a := &appVolumes{view: v, Stack: widget.NewStack()}
+	a := &appVolumes{view: v, Stack: pageStack()}
 	card, list := itemCard()
 	card.AddClass("audio-app-list")
 	a.list = list

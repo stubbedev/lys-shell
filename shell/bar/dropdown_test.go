@@ -255,30 +255,11 @@ func TestDropdownInstancesAreCachedUntilReleased(t *testing.T) {
 		t.Error("the calendar panel was rebuilt")
 	}
 	inner := &countingContent{Box: widget.NewBox(widget.Column, 0, 0)}
-	p := newPanelBox(inner)
+	p := newPanelBox(inner, 0, 0)
 	p.dropdownOpened()
 	p.dropdownClosed()
 	if inner.opened != 1 || inner.closed != 1 {
 		t.Errorf("panel forwarded opened %d closed %d, want 1 each", inner.opened, inner.closed)
-	}
-}
-
-// A click on the panel's empty rest plays the exit when the registry
-// gave it one (dismiss_on_spacer_click), else closes at once.
-func TestDropdownPanelRestClickPlaysTheExit(t *testing.T) {
-	p := newPanelBox(widget.NewBox(widget.Column, 0, 0))
-	pop := &fakePopover{}
-	p.attachPopover(pop)
-	animated := 0
-	p.dismiss = func() { animated++ }
-	p.ClickAt(widget.Point{})
-	if animated != 1 || pop.dismissed != 0 {
-		t.Errorf("animated %d, instant %d; want the exit played", animated, pop.dismissed)
-	}
-	p.dismiss = nil
-	p.ClickAt(widget.Point{})
-	if pop.dismissed != 1 {
-		t.Error("without an exit the rest click did not close")
 	}
 }
 
@@ -350,7 +331,7 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 	bar.Append(anchor, false)
 	bar.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 40}})
 	bar.Arrange(render.Rect{W: 600, H: 40})
-	root, _ := dropdownTree(calendarDropdown(ctx), cfg, 0, 0)
+	root, _ := dropdownTree(calendarDropdown(ctx), cfg)
 	arrange := func() []*widget.Label {
 		root.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 900}})
 		root.Arrange(render.Rect{W: 600, H: 900})
@@ -425,7 +406,7 @@ func TestHoldDropdown(t *testing.T) {
 		t.Errorf("closed: checked %v, frozen %v, content hidden %d", btn.HasState(widget.StateChecked), btn.frozen, content.hidden)
 	}
 	plain := widget.NewBox(widget.Column, 0, 0)
-	holdDropdown(plain, true, newPanelBox(content))()
+	holdDropdown(plain, true, newPanelBox(content, 0, 0))()
 	if content.hidden != 2 || plain.HasState(widget.StateChecked) {
 		t.Errorf("through a panel: hidden %d, plain anchor checked %v", content.hidden, plain.HasState(widget.StateChecked))
 	}

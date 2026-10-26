@@ -127,8 +127,8 @@ func TestCalendarClockRowCarriesTheStateClasses(t *testing.T) {
 func TestCalendarFillsItsSection(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	v := calendarDropdown(ctx).(*calendarView)
-	w, h, _ := dropdownDims("calendar", ctx.Config)
-	card, _ := dropdownTree(v, ctx.Config, w, h)
+	w, _, _ := dropdownDims("calendar", ctx.Config)
+	card, _ := dropdownTree(dropdownPanel("calendar", ctx.Config, v), ctx.Config)
 	ctx.Theme.Attach(card)
 	sz := widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: w, H: 4000}})
 	card.Arrange(render.Rect{W: sz.W, H: sz.H})

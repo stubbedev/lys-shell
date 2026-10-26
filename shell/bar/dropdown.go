@@ -152,23 +152,29 @@ func (r *dropdownRegistry) instance(name string, build func(ModuleContext) widge
 	if content == nil {
 		return nil
 	}
-	// The card tweens its height when a page of another size shows
-	// (watch_pages, dropdown_resize::animate_height): every stack
-	// sized to its visible page interpolates.
-	walkPages(content, func(w widget.Widget) {
-		if st, ok := w.(*widget.Stack); ok && !st.Homogeneous() {
-			st.SetInterpolateSize(true)
-		}
-	})
-	if _, _, ok := dropdownDims(name, r.cfg); ok {
-		content = newPanelBox(content)
-	}
+	content = dropdownPanel(name, r.cfg, content)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if prev, raced := r.instances[name]; raced {
 		return prev
 	}
 	r.instances[name] = content
+	return content
+}
+
+// dropdownPanel readies name's built content for its popover: the card
+// tweens its height when a page of another size shows (watch_pages,
+// dropdown_resize::animate_height), so every stack sized to its visible
+// page interpolates, and a sized dropdown sits in its panel.
+func dropdownPanel(name string, cfg *config.Config, content widget.Widget) widget.Widget {
+	walkPages(content, func(w widget.Widget) {
+		if st, ok := w.(*widget.Stack); ok && !st.Homogeneous() {
+			st.SetInterpolateSize(true)
+		}
+	})
+	if w, h, ok := dropdownDims(name, cfg); ok {
+		return newPanelBox(content, w, h)
+	}
 	return content
 }
 
@@ -271,21 +277,19 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if content == nil {
 		return fmt.Errorf("dropdown %q has no content", name)
 	}
-	// The panel takes its [dropdowns.<name>] size (or the built-in base
-	// at the global scale) as its surface floor, clamped to the monitor
-	// as the Rust registry's clamp_height does at every popup.
-	panel, _ := content.(*panelBox)
-	if panel != nil && monH > 0 {
+	// The panel is clamped to the monitor as the Rust registry's
+	// clamp_height does at every popup.
+	if panel, ok := content.(*panelBox); ok && monH > 0 {
 		panel.clamp(monH)
 	}
-	w, h, _ := dropdownDims(name, r.cfg)
+	w, _, _ := dropdownDims(name, r.cfg)
 	cfg := dropdownPopover(r.cfg, bound, content, monH, w)
 	cfg.OnClosed = holdDropdown(anchor, r.cfg.Bar.DropdownFreezeLabel, content)
 	if f, ok := content.(dropdownFocuser); ok {
 		cfg.Focus = f.dropdownFocus()
 	}
 	var rev *widget.Revealer
-	cfg.Content, rev = dropdownTree(content, r.cfg, w, h)
+	cfg.Content, rev = dropdownTree(content, r.cfg)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -295,11 +299,6 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	}
 	if d, ok := content.(dropdownAttacher); ok {
 		d.attachPopover(pop)
-	}
-	if panel != nil {
-		// A click on the surface's empty rest plays the exit, as the
-		// re-click does (dismiss_on_spacer_click).
-		panel.dismiss = func() { dismissAnimated(pop, rev, r.cfg.Animations) }
 	}
 	if o, ok := content.(dropdownOpener); ok {
 		o.dropdownOpened()
@@ -418,16 +417,11 @@ func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 // surface in the dropdown's color). The theme reaches it through the
 // bar button it opens from: lys-ui styles a popover as a child of its
 // anchor, as GTK's popover CSS node is, so it inherits the bar window's
-// fonts and :root variables. w x h is the dropdown's size, a floor for
-// the card as GTK's popover size request is: content that cannot fit
-// grows it, while a scrolling list asks for no height of its own and
-// scrolls inside it (a zero or negative axis leaves it to the
-// content); the popover's gap and shadow gutter keep it off the bar
-// and the surface edges.
-func dropdownTree(content widget.Widget, cfg *config.Config, w, h int) (*widget.Box, *widget.Revealer) {
+// fonts and :root variables. The card is its content's size (a sized
+// dropdown's panelBox); the popover's gap and shadow gutter keep it off
+// the bar and the surface edges.
+func dropdownTree(content widget.Widget, cfg *config.Config) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
-	card := popoverCard(rev, cfg.Bar.DropdownShadow)
-	card.SetSizeRequest(w, h)
-	return card, rev
+	return popoverCard(rev, cfg.Bar.DropdownShadow), rev
 }

@@ -386,6 +386,16 @@ const (
 	hoverTransition  = 150 * time.Millisecond
 )
 
+// pageStack is a stack of a dropdown's pages or states, as tall as its
+// visible one (GTK's vhomogeneous off): a short page never takes a
+// taller hidden page's height, which would leave the card's foot
+// empty.
+func pageStack() *widget.Stack {
+	s := widget.NewStack()
+	s.SetHomogeneous(false)
+	return s
+}
+
 // pageSlide gives a dropdown's page stack its slide between pages at
 // the configured interaction-duration (zero, an instant switch, with
 // animations off).

@@ -640,10 +640,10 @@ func TestBitwardenInitialFocus(t *testing.T) {
 	if got := broken.dropdownFocus(); got != nil {
 		t.Errorf("no vault focuses %T", got)
 	}
-	if got := newPanelBox(open).dropdownFocus(); got != widget.Widget(open.search) {
+	if got := newPanelBox(open, 0, 0).dropdownFocus(); got != widget.Widget(open.search) {
 		t.Errorf("a sized panel forwards %T", got)
 	}
-	if got := newPanelBox(widget.NewBox(widget.Column, 0, 0)).dropdownFocus(); got != nil {
+	if got := newPanelBox(widget.NewBox(widget.Column, 0, 0), 0, 0).dropdownFocus(); got != nil {
 		t.Errorf("plain content in a panel focuses %T", got)
 	}
 }

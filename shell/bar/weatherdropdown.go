@@ -153,7 +153,7 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "weather-dropdown")
 	v.Append(v.header(), false)
-	v.pages = widget.NewStack()
+	v.pages = pageStack()
 	v.pages.SetTransition(widget.StackCrossfade, gtkStackDuration)
 	v.pages.Add("loading", v.loadingPage())
 	v.pages.Add("error", v.errorPage())

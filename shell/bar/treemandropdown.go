@@ -81,7 +81,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.list.AddClass("treeman-list")
 	v.details = widget.NewBox(widget.Column, 2*th.Spacing, 0)
 	v.details.AddClass("treeman-list", "treeman-detail")
-	v.pages = widget.NewStack()
+	v.pages = pageStack()
 	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("list", v.list)
 	v.pages.Add("detail", v.details)

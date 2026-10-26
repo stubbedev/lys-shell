@@ -43,85 +43,118 @@ func TestDropdownPreviews(t *testing.T) {
 	restore := widget.SetAnimationsInstant(true)
 	t.Cleanup(restore)
 	dir := os.Getenv(previewDirEnv)
+	for _, p := range dropdownFixtures() {
+		t.Run(p.name, func(t *testing.T) {
+			ctx := fixtureContext(t)
+			data, w, h, _ := paintPreview(ctx, p.build(t, &ctx), p.dropdown)
+			if !paintsBeyondBackdrop(data) {
+				t.Fatalf("the %s dropdown paints nothing over the backdrop", p.name)
+			}
+			if dir != "" {
+				writePreview(t, filepath.Join(dir, p.name+".png"), data, w, h)
+			}
+		})
+	}
+}
+
+// dropdownFixture is one dropdown state built from the test fakes:
+// dropdown names its registry entry (its configured size), build its
+// content as its builder returns it.
+type dropdownFixture struct {
+	name, dropdown string
+	build          func(*testing.T, *ModuleContext) widget.Widget
+}
+
+// fixtureContext is the styled context a fixture builds in, with the
+// full style the registry hands its dropdowns.
+func fixtureContext(t *testing.T) ModuleContext {
+	t.Helper()
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	full := computeStyle(cfg, ctx.Style.palette)
+	ctx.Style = &full
+	return ctx
+}
+
+// dropdownFixtures is every dropdown, and the pages and prompts of the
+// ones that have them, filled from the test fakes.
+func dropdownFixtures() []dropdownFixture {
 	btOff := bluetooth.State{Available: true, Primary: &bluetooth.Adapter{}}
-	for _, p := range []struct {
-		name, dropdown string
-		build          func(*testing.T, *ModuleContext) widget.Widget
-	}{
+	return []dropdownFixture{
 		{"audio", "audio", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			_, ctx.Pulse = audioFixture(t)
-			return newPanelBox(audioDropdown(*ctx))
+			return audioDropdown(*ctx)
 		}},
 		{"audio-picker", "audio", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			_, ctx.Pulse = audioFixture(t)
 			v := audioDropdown(*ctx).(*audioView)
 			v.showPage("output")
-			return newPanelBox(v)
+			return v
 		}},
 		{"battery", "battery", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Battery = newFakeBattery(presentBattery())
-			return newPanelBox(batteryDropdown(*ctx))
+			return batteryDropdown(*ctx)
 		}},
 		{"bitwarden-vault", "bitwarden", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked, Items: 2}, items: bitwardenPreviewItems()}
 			ctx.Bitwarden = testBitwardenHost(v, ctx.Config, &[]copied{})
 			view := bitwardenDropdown(*ctx).(*bitwardenView)
 			widget.SetSurfaceHost(view.Box, focusHost{})
-			return newPanelBox(view)
+			return view
 		}},
 		{"bitwarden-login", "bitwarden", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Bitwarden = testBitwardenHost(&fakeVault{}, ctx.Config, &[]copied{})
 			view := bitwardenDropdown(*ctx).(*bitwardenView)
 			widget.SetSurfaceHost(view.Box, focusHost{})
-			return newPanelBox(view)
+			return view
 		}},
 		{"bluetooth", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
-			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(btWorld())).root)
+			return newBtDropdown(*ctx, newFakeBluetooth(btWorld())).root
 		}},
 		{"bluetooth-passkey", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			st := btWorld()
 			st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
-			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(st)).root)
+			return newBtDropdown(*ctx, newFakeBluetooth(st)).root
 		}},
 		{"bluetooth-confirm", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			st := btWorld()
 			st.Pairing = bluetooth.RequestConfirmation{Device: pathHeadset, Passkey: 42}
-			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(st)).root)
+			return newBtDropdown(*ctx, newFakeBluetooth(st)).root
 		}},
 		{"bluetooth-pin", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			st := btWorld()
 			st.Pairing = bluetooth.RequestPinCode{Device: pathSpeaker}
-			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(st)).root)
+			return newBtDropdown(*ctx, newFakeBluetooth(st)).root
 		}},
 		{"bluetooth-off", "bluetooth", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
-			return newPanelBox(newBtDropdown(*ctx, newFakeBluetooth(btOff)).root)
+			return newBtDropdown(*ctx, newFakeBluetooth(btOff)).root
 		}},
 		{"brightness", "brightness", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Brightness = &fakeBrightnessSource{devices: []brightness.Device{
 				{Name: "intel_backlight", Type: brightness.TypeFirmware, Brightness: 50, Max: 100},
 				{Name: "ddcci5", Type: brightness.TypeDDC, Brightness: 10, Max: 100},
 			}}
-			return newPanelBox(brightnessDropdown(*ctx))
+			return brightnessDropdown(*ctx)
 		}},
-		{"calendar", "calendar", func(_ *testing.T, ctx *ModuleContext) widget.Widget { return newPanelBox(calendarDropdown(*ctx)) }},
+		{"calendar", "calendar", func(_ *testing.T, ctx *ModuleContext) widget.Widget { return calendarDropdown(*ctx) }},
 		{"dashboard", "dashboard", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Notifications = notifications.NewService()
 			ctx.IdleInhibit = idleinhibit.NewState(0)
 			ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
-			return newPanelBox(dashboardDropdown(*ctx))
+			return dashboardDropdown(*ctx)
 		}},
 		{"mail", "mail", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			mc := ctx.Config.Mail
 			mc.Accounts = []config.MailAccount{{Name: "Work", Query: "tag:work"}, {Name: "Personal", Query: "tag:me"}}
 			ctx.Mail = seededMail(t, mc, 3)
-			return newPanelBox(mailDropdown(*ctx))
+			return mailDropdown(*ctx)
 		}},
 		{"media", "media", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Media = newFakeMedia(mpris.Player{
 				BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC", Title: "Song", Artist: "Band", State: mpris.StatePlaying,
 				Length: time.Minute, CanGoNext: true, CanSeek: true,
 			})
-			return newPanelBox(mediaDropdown(*ctx))
+			return mediaDropdown(*ctx)
 		}},
 		{"media-picker", "media", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Media = newFakeMedia(
@@ -130,7 +163,7 @@ func TestDropdownPreviews(t *testing.T) {
 			)
 			v := mediaDropdown(*ctx).(*mediaView)
 			v.showPicker()
-			return newPanelBox(v)
+			return v
 		}},
 		{"network", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			wifi := &fakeWifiCtl{aps: []network.AccessPoint{
@@ -139,7 +172,7 @@ func TestDropdownPreviews(t *testing.T) {
 			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{
 				WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "mine", WifiStrength: 90, WifiFrequency: 5180, WifiIP4: "192.168.1.9",
 			}, ticks: make(chan struct{}, 2)}
-			return newPanelBox(newNetworkView(*ctx, netDeps{wifiCtl: wifi}))
+			return newNetworkView(*ctx, netDeps{wifiCtl: wifi})
 		}},
 		{"network-password", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			wifi := &fakeWifiCtl{aps: []network.AccessPoint{netAP("home", 80, network.SecurityWPA2, "/ap/1")}}
@@ -147,7 +180,7 @@ func TestDropdownPreviews(t *testing.T) {
 			v := newNetworkView(*ctx, netDeps{wifiCtl: wifi})
 			v.attachPopover(&fakePopover{})
 			v.selectNetwork("home")
-			return newPanelBox(v)
+			return v
 		}},
 		{"network-secret", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			agent := &fakeAgent{req: &secrets.Request{
@@ -157,7 +190,7 @@ func TestDropdownPreviews(t *testing.T) {
 			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{}, ticks: make(chan struct{}, 2)}
 			v := newNetworkView(*ctx, netDeps{agent: agent})
 			v.attachPopover(&fakePopover{})
-			return newPanelBox(v)
+			return v
 		}},
 		{"network-vpn", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			vpn := &fakeVPN{entries: []network.VPN{
@@ -167,26 +200,26 @@ func TestDropdownPreviews(t *testing.T) {
 			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000, WiredIP4: "10.0.0.5"}, ticks: make(chan struct{}, 2)}
 			v := newNetworkView(*ctx, netDeps{vpn: vpn, vpnKinds: testKinds})
 			v.apply(v.read(context.Background()))
-			return newPanelBox(v)
+			return v
 		}},
 		{"network-vpn-edit", "network", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Network = &fakeNetworkSource{snap: network.Snapshot{}, ticks: make(chan struct{}, 2)}
 			v := newNetworkView(*ctx, netDeps{vpn: &fakeVPN{}, vpnKinds: testKinds})
 			v.attachPopover(&fakePopover{})
 			v.vpnAdd()
-			return newPanelBox(v)
+			return v
 		}},
 		{"notification", "notification", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			svc := newNotifTestService(t)
 			svc.Notify("mail", 0, "", "Mail", "<b>body</b> text", nil, 0)
 			svc.Notify("chat", 0, "", "Ping", "are you there?", []string{"reply", "Reply", "default", "Open"}, 0)
 			ctx.Notifications = svc
-			return newPanelBox(notificationDropdown(*ctx))
+			return notificationDropdown(*ctx)
 		}},
 		{"recorder", "recorder", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			rc, _, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
 			ctx.Config, ctx.SetConfig, ctx.Recorder = rc.Config, rc.SetConfig, rc.Recorder
-			return newPanelBox(recorderDropdown(*ctx))
+			return recorderDropdown(*ctx)
 		}},
 		{"weather", "weather", func(t *testing.T, ctx *ModuleContext) widget.Widget {
 			now := time.Now()
@@ -207,65 +240,60 @@ func TestDropdownPreviews(t *testing.T) {
 			t.Cleanup(svc.Close)
 			ctx.Weather = svc
 			waitHeadless(t, "the loaded weather", func() bool { return svc.Status().Kind == weather.Loaded })
-			return newPanelBox(weatherDropdown(*ctx))
+			return weatherDropdown(*ctx)
 		}},
 		{"treeman", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Treeman = &fakeTreeman{status: treemanFixture()}
-			return newPanelBox(treemanDropdown(*ctx))
+			return treemanDropdown(*ctx)
 		}},
 		{"treeman-detail", "treeman", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Treeman = &fakeTreeman{status: treemanFixture()}
 			v := treemanDropdown(*ctx).(*treemanView)
 			v.openDetail("/w/feat")
-			return newPanelBox(v)
+			return v
 		}},
-	} {
-		t.Run(p.name, func(t *testing.T) {
-			cfg := config.Defaults()
-			ctx := styledContext(t, cfg)
-			full := computeStyle(cfg, ctx.Style.palette)
-			ctx.Style = &full
-			data, w, h := paintPreview(ctx, p.build(t, &ctx), p.dropdown)
-			if !paintsBeyondBackdrop(data) {
-				t.Fatalf("the %s dropdown paints nothing over the backdrop", p.name)
-			}
-			if dir != "" {
-				writePreview(t, filepath.Join(dir, p.name+".png"), data, w, h)
-			}
-		})
 	}
 }
 
-// paintPreview lays out content in the registry's popover tree at the
-// dropdown's configured size, anchored to a styled bar, and paints it
-// over the backdrop.
-func paintPreview(ctx ModuleContext, content widget.Widget, name string) ([]byte, int, int) {
+// previewMonitorH is the logical height of the monitor a preview's
+// dropdown opens on.
+const previewMonitorH = 1080
+
+// paintPreview lays out the dropdown name's built content in the
+// registry's popover tree as the registry opens it on a
+// previewMonitorH monitor: in its panel clamped to the monitor, at the
+// dropdown's configured size, measured as the popover host measures
+// its content, and anchored to a styled bar. It paints the tree over
+// the backdrop and returns the pixels, their size and the tree.
+func paintPreview(ctx ModuleContext, content widget.Widget, name string) ([]byte, int, int, *widget.Box) {
 	bar := widget.NewBox(widget.Row, 0, 0)
 	ctx.Theme.Attach(bar)
 	anchor := widget.NewBox(widget.Row, 0, 0)
 	bar.Append(anchor, false)
 	bar.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 40}})
 	bar.Arrange(render.Rect{W: 600, H: 40})
-	w, h, _ := dropdownDims(name, ctx.Config)
-	root, rev := dropdownTree(content, ctx.Config, w, h)
+	content = dropdownPanel(name, ctx.Config, content)
+	if panel, ok := content.(*panelBox); ok {
+		panel.clamp(previewMonitorH)
+	}
+	w, _, _ := dropdownDims(name, ctx.Config)
+	root, rev := dropdownTree(content, ctx.Config)
 	rev.SetRevealed(true)
 	rev.Finish()
 	widget.SetStyleAnchor(root, anchor)
-	limit := widget.Constraints{Max: widget.Size{W: 800, H: 1000}}
-	if w > 0 {
-		limit.Max.W = w
-	}
-	sz := root.Measure(limit)
-	root.Arrange(render.Rect{W: sz.W, H: sz.H})
+	pc := dropdownPopover(ctx.Config, anchor, root, previewMonitorH, w)
+	limit := widget.Constraints{Max: widget.Size{W: pc.MaxWidth, H: pc.MaxHeight}}
+	sz := widget.MeasureAsChild(root, limit)
+	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
 	widget.CollectDamage(root)
-	sz = root.Measure(limit)
-	root.Arrange(render.Rect{W: sz.W, H: sz.H})
+	sz = widget.MeasureAsChild(root, limit)
+	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
 	data := make([]byte, render.Stride(sz.W)*sz.H)
 	for i := 3; i < len(data); i += 4 {
 		data[i] = previewBackdrop
 	}
 	root.Paint(render.New(data, render.Stride(sz.W), sz.W, sz.H))
-	return data, sz.W, sz.H
+	return data, sz.W, sz.H, root
 }
 
 // paintsBeyondBackdrop reports whether any pixel differs from the

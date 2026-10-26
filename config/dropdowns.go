@@ -18,13 +18,13 @@ type DropdownsConfig struct {
 	Bitwarden DropdownSize `cfg:"bitwarden"`
 	// Bluetooth dropdown panel size.
 	Bluetooth DropdownSize `cfg:"bluetooth"`
-	// Brightness dropdown panel size. Height grows to fit content.
+	// Brightness dropdown panel size.
 	Brightness DropdownSize `cfg:"brightness"`
-	// Calendar dropdown panel size. Height grows to fit content.
+	// Calendar dropdown panel size.
 	Calendar DropdownSize `cfg:"calendar"`
-	// Dashboard dropdown panel size. Height grows to fit content.
+	// Dashboard dropdown panel size.
 	Dashboard DropdownSize `cfg:"dashboard"`
-	// Mail dropdown panel size. Height grows to fit content.
+	// Mail dropdown panel size.
 	Mail DropdownSize `cfg:"mail"`
 	// Media dropdown panel size.
 	Media DropdownSize `cfg:"media"`
@@ -79,13 +79,16 @@ func (d DropdownsConfig) ByName(name string) (DropdownSize, bool) {
 // Size override for a dropdown foldout panel.
 //
 // Each field is optional: when unset the dropdown keeps its built-in default
-// size (scaled by the global scale). A [`Size`] may be a scale multiplier of
-// the built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `"480px"`).
+// width (scaled by the global scale) and the height of its content. A
+// [`Size`] may be a scale multiplier of the built-in base (e.g. `1.5`) or an
+// absolute pixel length (e.g. `"480px"`).
 type DropdownSize struct {
 	// Panel width override. Unset uses the built-in default width.
 	Width *Size `cfg:"width"`
-	// Panel height override. Unset uses the built-in default height. Has no
-	// effect on dropdowns whose height grows to fit their content.
+	// Panel height cap in pixels: the height a panel grows to before its
+	// lists scroll. Shorter content keeps the panel at its own height. Unset
+	// grows the panel to its content, up to the monitor. A multiplier has no
+	// effect: the height has no built-in base to scale.
 	Height *Size `cfg:"height"`
 }
 

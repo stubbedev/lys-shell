@@ -200,12 +200,10 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	browse.AppendAligned(v.noAdapter, true, widget.AlignCenter)
 	// Two pages rather than a form hiding the lists in place: the editor
 	// is somewhere you go, and coming back is one button. Each page is its
-	// own height (vhomogeneous off) and the card tweens between them; the
-	// panel reserves the taller page up front (dropdown_resize).
+	// own height and the card tweens between them.
 	v.vpnForm = newNetVPNForm(v)
-	v.body = widget.NewStack()
+	v.body = pageStack()
 	v.body.SetTransition(widget.StackSlideLeftRight, gtkStackDuration)
-	v.body.SetHomogeneous(false)
 	v.body.Add(netPageBrowse, browse)
 	v.body.Add(netPageEdit, v.vpnForm)
 	content.Append(v.body, true)

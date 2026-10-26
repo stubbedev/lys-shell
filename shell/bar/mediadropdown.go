@@ -149,7 +149,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	v.AddClass("dropdown", "media-dropdown")
 	v.main = widget.NewStack()
 	v.sources = widget.NewBox(widget.Column, 0, 0)
-	v.pages = widget.NewStack()
+	v.pages = pageStack()
 	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("main", v.main)
 	v.pages.Add("sources", v.sources)

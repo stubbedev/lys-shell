@@ -536,7 +536,7 @@ func TestDashboardGrowsToItsSections(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	v := dashboardDropdown(ctx).(*dashboardView)
 	w, h, _ := dropdownDims("dashboard", ctx.Config)
-	card, _ := dropdownTree(v, ctx.Config, w, h)
+	card, _ := dropdownTree(dropdownPanel("dashboard", ctx.Config, v), ctx.Config)
 	ctx.Theme.Attach(card)
 	sz := widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: 2000, H: 4000}})
 	sections := widget.MeasureAsChild(treetest.WithClass(v, "dashboard-scroll")[0].(*widget.Scroll).Children()[0], widget.Constraints{Max: widget.Size{W: w, H: 4000}})
