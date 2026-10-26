@@ -24,19 +24,12 @@ func TestPickersFocusTheirSearchEntry(t *testing.T) {
 			_, c, f := openIconPicker(t, "modules.clock.icon-name")
 			return f, c.picker.search, c.picker.grid
 		},
-		"theme preset": func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
-			k := testKit(t, "")
-			f := &fakePickers{}
-			k.pickers = f
-			c := newThemeSelector(k)
-			c.btn.ClickAt(widget.Point{})
-			return f, c.picker.search, c.picker.list
-		},
-		"module": func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
-			k, c := newTestLayout(t)
-			p := c.pickModule(nil, func(config.BarModule) {})
-			return k.pickers.(*fakePickers), p.search, p.list
-		},
+	}
+	for name, opener := range searchPickerOpeners {
+		open[name] = func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
+			k, p := opener(t)
+			return k.pickers.(*fakePickers), p.search, p.rows
+		}
 	}
 	for name, opener := range open {
 		t.Run(name, func(t *testing.T) {
@@ -86,19 +79,33 @@ func openIconPicker(t *testing.T, path string) (*kit, *iconEditor, *fakePickers)
 	if c.picker == nil || f.content != widget.Widget(c.picker.root) || f.anchor != widget.Widget(c.btn) {
 		t.Fatal("the trigger opened no picker beside itself")
 	}
-	layOutPicker(theme, c.picker)
+	layOutPicker(theme, c.picker.root)
 	return k, c, f
 }
 
-// layOutPicker lays the open picker out at its natural size, styled
-// as lys-ui styles a popover's content: the popover element with
-// GtkPopover's background class, its border included.
-func layOutPicker(theme *apptheme.Theme, p *iconPicker) {
-	p.root.SetElement("popover")
-	p.root.AddClass("background")
-	theme.Attach(p.root)
-	sz := widget.MeasureAsChild(p.root, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
-	widget.ArrangeAsChild(p.root, render.Rect{X: 300, Y: 100, W: sz.W, H: sz.H})
+// layOutPicker lays the open picker's root out at its natural size,
+// styled as lys-ui styles a popover's content: the popover element
+// with GtkPopover's background class, its border included.
+func layOutPicker(theme *apptheme.Theme, root *widget.Box) {
+	root.SetElement("popover")
+	root.AddClass("background")
+	theme.Attach(root)
+	sz := widget.MeasureAsChild(root, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	widget.ArrangeAsChild(root, render.Rect{X: 300, Y: 100, W: sz.W, H: sz.H})
+}
+
+// paintPicker paints the laid out picker's root and returns its
+// pixels by position.
+func paintPicker(root *widget.Box) func(x, y int) [4]byte {
+	b := root.Bounds()
+	w, h := b.X+b.W+1, b.Y+b.H+1
+	data := make([]byte, render.Stride(w)*h)
+	cv := render.NewScaled(data, render.Stride(w), w, h, 1, 1)
+	root.Paint(cv)
+	return func(x, y int) [4]byte {
+		i := y*render.Stride(w) + 4*x
+		return [4]byte(data[i : i+4])
+	}
 }
 
 // cellRects are the grid's cells as laid out.
@@ -210,15 +217,7 @@ func TestIconPickerGridPaintsNoBackground(t *testing.T) {
 	pickerIcons(t, "a-symbolic", "b-symbolic", "c-symbolic")
 	_, c, _ := openIconPicker(t, "modules.clock.icon-name")
 	p := c.picker
-	root := p.root.Bounds()
-	w, h := root.X+root.W+1, root.Y+root.H+1
-	data := make([]byte, render.Stride(w)*h)
-	cv := render.NewScaled(data, render.Stride(w), w, h, 1, 1)
-	p.root.Paint(cv)
-	px := func(x, y int) [4]byte {
-		i := y*render.Stride(w) + 4*x
-		return [4]byte(data[i : i+4])
-	}
+	px := paintPicker(p.root)
 	a, b := p.grid.ChildAt(0).Bounds(), p.grid.ChildAt(1).Bounds()
 	midY := a.Y + a.H/2
 	padding := px(p.contents.Bounds().X+widget.Current().Padding/2, midY)
@@ -334,8 +333,8 @@ func TestIconPickerOpensAtTheCurrentIcon(t *testing.T) {
 			widget.ArrangeAsChild(c.Box, render.Rect{X: 300, Y: 40, W: sz.W, H: sz.H})
 			c.btn.ClickAt(widget.Point{})
 			p := c.picker
-			layOutPicker(theme, p)
-			layOutPicker(theme, p)
+			layOutPicker(theme, p.root)
+			layOutPicker(theme, p.root)
 			view := p.scroll.Bounds()
 			if _, y := p.scroll.Offset(); tc.atTop != (y == 0) {
 				t.Errorf("the grid opens scrolled %dpx, want at its top %v", y, tc.atTop)
@@ -348,5 +347,241 @@ func TestIconPickerOpensAtTheCurrentIcon(t *testing.T) {
 				t.Errorf("the current icon at %v opens outside the grid's view %v", r, view)
 			}
 		})
+	}
+}
+
+// searchPickerOpeners open each list picker on fake pickers.
+var searchPickerOpeners = map[string]func(t *testing.T) (*kit, *searchPicker){
+	"theme preset": func(t *testing.T) (*kit, *searchPicker) {
+		k := testKit(t, "")
+		k.pickers = &fakePickers{}
+		c := newThemeSelector(k)
+		c.btn.ClickAt(widget.Point{})
+		return k, c.picker
+	},
+	"module": func(t *testing.T) (*kit, *searchPicker) {
+		k, c := newTestLayout(t)
+		return k, c.pickModule(nil, func(config.BarModule) {})
+	},
+}
+
+// styledSearchPicker opens a list picker, styled and laid out as its
+// popover shows it.
+func styledSearchPicker(t *testing.T, open func(t *testing.T) (*kit, *searchPicker)) *searchPicker {
+	t.Helper()
+	restore := widget.SetAnimationsInstant(true)
+	t.Cleanup(restore)
+	k, p := open(t)
+	layOutPicker(apptheme.New(k.store.svc.Config()), p.root)
+	return p
+}
+
+// pickerContentsBox is the laid out picker's contents: the popover
+// inside its border, the search field and the list inside its padding.
+func pickerContentsBox(p *searchPicker) render.Rect {
+	return p.root.Children()[0].(widget.Boundser).Bounds()
+}
+
+// pickerRowBand is a laid out row's content and the band the list
+// draws the row in.
+type pickerRowBand struct{ content, band render.Rect }
+
+// rowBands are the bands of the rows shown whole in the list's view,
+// top to bottom.
+func rowBands(t *testing.T, p *searchPicker) []pickerRowBand {
+	t.Helper()
+	view := p.scroll.Bounds()
+	var out []pickerRowBand
+	for i := range p.rows.Len() {
+		child := p.rows.ChildAt(i)
+		band := child.Bounds()
+		if !widget.IsVisible(child) || band.Y+band.H > view.Y+view.H {
+			continue
+		}
+		content := child.Child().(*widget.Box).Children()[0].(widget.Boundser).Bounds()
+		out = append(out, pickerRowBand{content: content, band: band})
+	}
+	if len(out) < 3 {
+		t.Fatalf("the picker shows %d whole rows, want at least 3", len(out))
+	}
+	return out
+}
+
+// A row sets its content in from the band it highlights by the theme's
+// padding across and half its spacing above and below, as a dropdown's
+// rows; the band, not the content, spans the list.
+func TestSearchPickerRowsInsetTheirContent(t *testing.T) {
+	for name, open := range searchPickerOpeners {
+		t.Run(name, func(t *testing.T) {
+			p := styledSearchPicker(t, open)
+			paintPicker(p.root)
+			th, list := widget.Current(), p.scroll.Bounds()
+			want := map[string]int{"left": th.Padding, "right": th.Padding, "top": th.Spacing / 2, "bottom": th.Spacing / 2}
+			for i, r := range rowBands(t, p) {
+				c, b := r.content, r.band
+				got := map[string]int{
+					"left":   c.X - b.X,
+					"right":  b.X + b.W - (c.X + c.W),
+					"top":    c.Y - b.Y,
+					"bottom": b.Y + b.H - (c.Y + c.H),
+				}
+				for side, w := range want {
+					if got[side] != w {
+						t.Errorf("row %d's content sits %dpx in from its band's %s, want %dpx", i, got[side], side, w)
+					}
+				}
+				if b.X != list.X || b.W != list.W {
+					t.Errorf("row %d's band %v does not span the list %v", i, b, list)
+				}
+			}
+		})
+	}
+}
+
+// The list lies on the popover's own background, flush with the search
+// field and the popover's padding around it on every side: no inset
+// block of another color behind the rows, which show no band of their
+// own away from the pointer.
+func TestSearchPickerListShowsThePopoverBackground(t *testing.T) {
+	for name, open := range searchPickerOpeners {
+		t.Run(name, func(t *testing.T) {
+			p := styledSearchPicker(t, open)
+			px := paintPicker(p.root)
+			th := widget.Current()
+			list, box := p.scroll.Bounds(), pickerContentsBox(p)
+			field := p.field.(widget.Boundser).Bounds()
+			if list.X != field.X || list.X+list.W != field.X+field.W {
+				t.Errorf("the list %v is not flush with the search field %v", list, field)
+			}
+			insets := map[string]int{
+				"left":   list.X - box.X,
+				"right":  box.X + box.W - (list.X + list.W),
+				"top":    field.Y - box.Y,
+				"bottom": box.Y + box.H - (list.Y + list.H),
+			}
+			for side, got := range insets {
+				if got != th.Padding {
+					t.Errorf("the %s inset is %dpx, want the theme's %dpx padding", side, got, th.Padding)
+				}
+			}
+			popover := px(box.X+th.Padding/2, list.Y+list.H/2)
+			for i, r := range rowBands(t, p) {
+				b, mid := r.band, r.band.Y+r.band.H/2
+				for side, x := range map[string]int{"left": b.X + 1, "right": b.X + b.W - 2} {
+					if got := px(x, mid); got != popover {
+						t.Errorf("row %d's %s edge is %v, the popover around the list %v", i, side, got, popover)
+					}
+				}
+			}
+			if got := px(list.X+1, list.Y+list.H-1); got != popover {
+				t.Errorf("the list's bottom edge is %v, the popover around it %v", got, popover)
+			}
+		})
+	}
+}
+
+// The row under the pointer tints a band rounded at its corners, as a
+// dropdown's row does; the rows around it stay untinted.
+func TestSearchPickerHighlightsTheHoveredRow(t *testing.T) {
+	for name, open := range searchPickerOpeners {
+		t.Run(name, func(t *testing.T) {
+			p := styledSearchPicker(t, open)
+			paintPicker(p.root)
+			rows := rowBands(t, p)
+			hovered := rows[1].band
+			r := &widget.Router{Root: p.root}
+			r.Move(widget.Point{X: hovered.X + hovered.W/2, Y: hovered.Y + hovered.H/2})
+			widget.ArrangeAsChild(p.root, p.root.Bounds())
+			px := paintPicker(p.root)
+			box := pickerContentsBox(p)
+			popover := px(box.X+widget.Current().Padding/2, hovered.Y+hovered.H/2)
+			inside := func(b render.Rect) [4]byte { return px(b.X+b.W/2, b.Y+1) }
+			if got := inside(hovered); got == popover {
+				t.Errorf("the hovered row %v shows the popover's %v, want a band", hovered, got)
+			}
+			for corner, at := range map[string][2]int{
+				"top-left":     {hovered.X, hovered.Y},
+				"top-right":    {hovered.X + hovered.W - 1, hovered.Y},
+				"bottom-left":  {hovered.X, hovered.Y + hovered.H - 1},
+				"bottom-right": {hovered.X + hovered.W - 1, hovered.Y + hovered.H - 1},
+			} {
+				if got := px(at[0], at[1]); got != popover {
+					t.Errorf("the hovered band's %s corner is %v, want it rounded off to the popover's %v", corner, got, popover)
+				}
+			}
+			for _, i := range []int{0, 2} {
+				if got := inside(rows[i].band); got != popover {
+					t.Errorf("row %d away from the pointer shows %v, want the popover's %v", i, got, popover)
+				}
+			}
+		})
+	}
+}
+
+// The popover grows to its widest row, so every row's content shows
+// at its natural width; held narrower, a theme's name ellipsizes
+// inside its band instead of running over its edge.
+func TestSearchPickerFitsItsWidestRow(t *testing.T) {
+	for name, open := range searchPickerOpeners {
+		t.Run(name, func(t *testing.T) {
+			p := styledSearchPicker(t, open)
+			paintPicker(p.root)
+			for i := range p.rows.Len() {
+				content := p.rows.ChildAt(i).Child().(*widget.Box).Children()[0]
+				nat := widget.MeasureAsChild(content, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+				if got := content.(widget.Boundser).Bounds().W; got < nat.W {
+					t.Errorf("row %d's content gets %dpx of its natural %dpx", i, got, nat.W)
+				}
+			}
+		})
+	}
+	p := styledSearchPicker(t, searchPickerOpeners["theme preset"])
+	natural := p.root.Bounds()
+	widget.ArrangeAsChild(p.root, render.Rect{X: natural.X, Y: natural.Y, W: natural.W / 2, H: natural.H})
+	px := paintPicker(p.root)
+	popover := px(pickerContentsBox(p).X+widget.Current().Padding/2, p.scroll.Bounds().Y+p.scroll.Bounds().H/2)
+	for i, r := range rowBands(t, p) {
+		b := r.band
+		for x := r.content.X + r.content.W; x < b.X+b.W; x++ {
+			if got := px(x, b.Y+b.H/2); got != popover {
+				t.Errorf("held to half its width, row %d inks %v at x=%d, past its content's right edge %d", i, got, x, r.content.X+r.content.W)
+				break
+			}
+		}
+	}
+}
+
+// Typing narrows the rows to the names containing the query, ignoring
+// case, in their order, and a click on one picks that name; a query
+// matching nothing shows no row, a blank one every row.
+func TestSearchPickerFiltersAndPicks(t *testing.T) {
+	k, c := newTestLayout(t)
+	var picked []config.BarModule
+	p := c.pickModule(nil, func(m config.BarModule) { picked = append(picked, m) })
+	shown := func() []string {
+		var out []string
+		for i, name := range p.all {
+			if widget.IsVisible(p.rows.ChildAt(i)) {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
+	p.filter("  WORKspaces ")
+	want := []string{"hyprland-workspaces", "mango-workspaces", "niri-workspaces", "sway-workspaces"}
+	if got := shown(); !slices.Equal(got, want) {
+		t.Fatalf("the filter shows %v, want %v", got, want)
+	}
+	p.rows.ChildAt(slices.Index(p.all, "niri-workspaces")).ClickAt(widget.Point{})
+	if !slices.Equal(picked, []config.BarModule{config.ModuleNiriWorkspaces}) || k.pickers.(*fakePickers).closed != 1 {
+		t.Errorf("a click picked %v (closed %d), want niri-workspaces once", picked, k.pickers.(*fakePickers).closed)
+	}
+	p.filter("zzz")
+	if got := shown(); len(got) != 0 {
+		t.Errorf("a query matching nothing shows %v", got)
+	}
+	p.filter("")
+	if got := shown(); !slices.Equal(got, p.all) {
+		t.Errorf("a blank query shows %v, want every module %v", got, p.all)
 	}
 }

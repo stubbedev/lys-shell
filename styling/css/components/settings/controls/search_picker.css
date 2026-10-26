@@ -1,0 +1,9 @@
+.search-picker-list flowboxchild {
+  border-radius: var(--rounding-element);
+  transition: background var(--duration-fast);
+}
+
+.search-picker-list flowboxchild:hover,
+.search-picker-list flowboxchild:selected {
+  background-color: var(--bg-hover);
+}

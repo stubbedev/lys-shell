@@ -101,28 +101,32 @@ func pickerFrame(class string) (root, contents *widget.Box) {
 	return root, contents
 }
 
-// matching are the names containing the query (StringFilter,
-// Substring, ignore case), all of them for a blank one.
-func matching(names []string, query string) []string {
+// matcher reports the names containing the query (StringFilter,
+// Substring, ignore case), every one for a blank one.
+func matcher(query string) func(name string) bool {
 	q := strings.ToLower(strings.TrimSpace(query))
-	if q == "" {
-		return names
-	}
+	return func(name string) bool { return strings.Contains(strings.ToLower(name), q) }
+}
+
+// matching are the names matcher keeps for the query, in order.
+func matching(names []string, query string) []string {
+	match := matcher(query)
 	var out []string
 	for _, name := range names {
-		if strings.Contains(strings.ToLower(name), q) {
+		if match(name) {
 			out = append(out, name)
 		}
 	}
 	return out
 }
 
-// pickerSpec shapes a searchPicker: the CSS classes, the search
-// placeholder key, the row for a name and the list's height cap.
+// pickerSpec shapes a searchPicker: the popover's CSS class, the
+// search placeholder key, the content of the row for a name and the
+// list's height cap.
 type pickerSpec struct {
-	class, listClass, scrollClass, placeholder string
-	row                                        func(k *kit, name string) widget.Widget
-	maxH                                       int
+	class, placeholder string
+	row                func(k *kit, name string) widget.Widget
+	maxH               int
 	// searchEntry makes the search a gtk::SearchEntry (the module
 	// picker): the search icon, the clear button, Esc clearing, and the
 	// filter on search-changed after GTK's default delay. The others
@@ -131,21 +135,23 @@ type pickerSpec struct {
 }
 
 // searchPicker is the list pickers' popover (the module picker, the
-// theme presets): a search row over a virtualized list filtered by a
-// case-insensitive substring; one click on a row picks it, writes and
+// theme presets): a search row over a scrolling column of every
+// name's row, those not containing the query (ignoring case) hidden,
+// drawn as a dropdown's list: on the popover's own background, as wide
+// as its widest row, each row's content inset in a band that rounds
+// and tints under the pointer. One click on a row picks it, writes and
 // closes the popover.
 type searchPicker struct {
 	root   *widget.Box
 	search *widget.Entry
 	// field is the search as the tree holds it (the SearchEntry
 	// around search, or search itself), the widget taking the keys.
-	field widget.Widget
-	list  *widget.List
-	all   []string
-	shown []string
-	k     *kit
-	spec  pickerSpec
-	pick  func(string)
+	field  widget.Widget
+	scroll *widget.Scroll
+	// rows holds a row per name of all, in its order.
+	rows *widget.FlowBox
+	all  []string
+	pick func(string)
 }
 
 // openSearchPicker builds the picker and opens it beside anchor.
@@ -159,7 +165,7 @@ func openSearchPicker(k *kit, anchor widget.Widget, names []string, spec pickerS
 }
 
 func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string)) *searchPicker {
-	p := &searchPicker{k: k, all: names, shown: names, spec: spec, pick: pick}
+	p := &searchPicker{all: names, pick: pick}
 	root, contents := pickerFrame(spec.class)
 	p.root = root
 	if spec.searchEntry {
@@ -174,38 +180,46 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 		p.field = p.search
 	}
 	contents.Append(p.field, false)
-	p.list = widget.NewList[widget.Widget](pickerRows{p}, 0)
-	p.list.AddClass(spec.listClass)
-	p.list.SetSingleClickActivate(true)
-	if spec.maxH > 0 {
-		p.list.SetMaxHeight(spec.maxH)
+	p.rows = widget.NewFlowBox(0, 0)
+	p.rows.AddClass(searchPickerListClass)
+	p.rows.SetMaxChildrenPerLine(1)
+	p.rows.SetJustify(widget.JustifyFill)
+	p.rows.OnActivate = func(i int) { p.pick(p.all[i]) }
+	for _, name := range names {
+		p.rows.Append(pickerRow(spec.row(k, name)))
 	}
-	p.list.OnActivate = func(i int) {
-		if i >= 0 && i < len(p.shown) {
-			p.pick(p.shown[i])
-		}
-	}
-	scroll := widget.NewBox(widget.Column, 0, 0)
-	if spec.scrollClass != "" {
-		scroll.AddClass(spec.scrollClass)
-	}
-	scroll.Append(p.list, true)
-	contents.Append(scroll, true)
+	p.scroll = widget.NewScroll(p.rows)
+	p.scroll.VerticalOnly = true
+	p.scroll.SetMaxContentHeight(spec.maxH)
+	contents.Append(p.scroll, true)
 	return p
 }
 
-// filter narrows the list to the names matching the query.
-func (p *searchPicker) filter(query string) {
-	p.shown = matching(p.all, query)
-	p.list.Reset()
+// searchPickerListClass styles every searchPicker's rows' bands.
+const searchPickerListClass = "search-picker-list"
+
+// pickerRowInsets inset a picker row's content in its band: the
+// theme's padding across, half its spacing above and below.
+func pickerRowInsets() render.Insets {
+	th := widget.Current()
+	return render.Insets{Left: th.Padding, Right: th.Padding, Top: th.Spacing / 2, Bottom: th.Spacing / 2}
 }
 
-// pickerRows is the list model over the shown names.
-type pickerRows struct{ p *searchPicker }
+// pickerRow is the band holding a picker row's content.
+func pickerRow(content widget.Widget) *widget.Box {
+	row := widget.NewBox(widget.Row, 0, 0)
+	row.SetPadding(pickerRowInsets())
+	row.Append(content, true)
+	return row
+}
 
-func (r pickerRows) Len() int { return len(r.p.shown) }
-
-func (r pickerRows) Row(i int) widget.Widget { return r.p.spec.row(r.p.k, r.p.shown[i]) }
+// filter shows the rows of the names matching the query alone.
+func (p *searchPicker) filter(query string) {
+	match := matcher(query)
+	for i, name := range p.all {
+		p.rows.ChildAt(i).SetVisible(match(name))
+	}
+}
 
 // colorEditor is ColorControl: lys-ui's color button, its swatch
 // picker's pick written as hex (rgba_to_hex: #rrggbb, #rrggbbaa with
@@ -509,21 +523,16 @@ func (c *themeSelector) open() {
 	}
 	scale, _ := c.k.store.value("styling.scale").(float64)
 	c.picker = openSearchPicker(c.k, c.btn, names, pickerSpec{
-		class: "theme-preset-popover", listClass: "theme-preset-list", scrollClass: "theme-preset-scroll",
-		placeholder: "settings-theme-preset", maxH: int(math.Round(themeListPx * max(scale, 0.25))),
+		class: "theme-preset-popover", placeholder: "settings-theme-preset", maxH: int(math.Round(themeListPx * max(scale, 0.25))),
 		row: func(k *kit, name string) widget.Widget { return c.row(name) },
 	}, c.apply)
 }
 
 // row is build_theme_row: the swatches (bg, primary, red, yellow,
-// green, blue) and the name.
+// green, blue) and the name, ellipsized past the row's width.
 func (c *themeSelector) row(name string) widget.Widget {
-	th := widget.Current()
-	row := widget.NewBox(widget.Row, 0, th.Padding)
-	row.AddClass("theme-preset-entry")
 	content := gapBox(widget.Row)
-	content.AddClass("theme-preset-row")
-	swatches := widget.NewBox(widget.Row, th.Spacing/2, 0)
+	swatches := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
 	swatches.AddClass("theme-preset-swatches")
 	if th, ok := c.theme(name); ok {
 		p := th.Palette
@@ -537,9 +546,10 @@ func (c *themeSelector) row(name string) widget.Widget {
 		}
 	}
 	content.AppendAligned(swatches, false, widget.AlignCenter)
-	content.AppendAligned(c.k.label(name, "theme-preset-name"), true, widget.AlignCenter)
-	row.Append(content, true)
-	return row
+	label := c.k.label(name, "theme-preset-name")
+	label.SetEllipsize(widget.EllipsizeEnd)
+	content.AppendAligned(label, true, widget.AlignCenter)
+	return content
 }
 
 func (c *themeSelector) theme(name string) (config.ThemeEntry, bool) {

@@ -12,11 +12,3 @@
   border: 2px dashed var(--border-subtle);
   border-radius: var(--rounding-container);
 }
-
-.module-picker-list row {
-  border-radius: var(--rounding-element);
-}
-
-.module-picker-list row:hover {
-  background-color: var(--bg-hover);
-}

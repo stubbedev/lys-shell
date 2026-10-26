@@ -343,10 +343,9 @@ func (c *layoutEditor) pickModule(anchor widget.Widget, pick func(config.BarModu
 		return nil
 	}
 	return openSearchPicker(c.k, anchor, c.moduleNames(), pickerSpec{
-		class: "module-picker-popover", listClass: "module-picker-list", scrollClass: "module-picker-scroll",
-		placeholder: "settings-layout-search", maxH: modulePickerListPx, searchEntry: true,
+		class: "module-picker-popover", placeholder: "settings-layout-search", maxH: modulePickerListPx, searchEntry: true,
 		row: func(k *kit, name string) widget.Widget {
-			return k.label(name, "module-picker-item")
+			return k.label(name)
 		},
 	}, func(name string) {
 		var m config.BarModule

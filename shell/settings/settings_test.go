@@ -1242,7 +1242,7 @@ func TestThemeSelectorApplies(t *testing.T) {
 		t.Fatalf("picker lists %d themes, want the %d built-ins", len(c.picker.all), len(themes))
 	}
 	pick := themes[1]
-	c.picker.list.OnActivate(1)
+	c.picker.rows.ChildAt(1).ClickAt(widget.Point{})
 	if v := k.store.value("styling.palette_base_theme"); v != pick.Name {
 		t.Errorf("base theme %v, want %s", v, pick.Name)
 	}
