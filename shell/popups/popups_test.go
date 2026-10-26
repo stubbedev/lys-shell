@@ -192,9 +192,13 @@ func within(root, w widget.Widget) bool {
 func (s *surface) fill(c *card) [4]byte {
 	s.t.Helper()
 	b := c.root.Bounds()
+	return s.pixel(b.X+b.W/2, b.Y+4)
+}
+
+// pixel is the surface's color at (x, y) as it paints now: RGBA.
+func (s *surface) pixel(x, y int) [4]byte {
 	data := make([]byte, render.Stride(surfaceW)*surfaceH)
 	s.host.Paint(render.NewScaled(data, render.Stride(surfaceW), surfaceW, surfaceH, 1, 1))
-	x, y := b.X+b.W/2, b.Y+4
 	i := y*render.Stride(surfaceW) + x*4
 	return [4]byte{data[i+2], data[i+1], data[i], data[i+3]}
 }
@@ -475,6 +479,39 @@ func TestCountSitsInsideTheFrontCard(t *testing.T) {
 	for _, id := range mail[:2] {
 		if s.card(id).count.Visible() {
 			t.Errorf("card %d behind the front shows a count", id)
+		}
+	}
+}
+
+// The urgency bar runs down the card's left edge, inside its border,
+// and nothing of it shows along the top edge.
+func TestUrgencyBarRunsDownTheLeftEdge(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	id := s.notify("mail", "Urgent")
+	s.sync()
+	c := s.card(id)
+	if !c.root.HasClass("urgency-bar") {
+		t.Fatal("a normal card under the default threshold has no urgency bar")
+	}
+	accent, _ := apptheme.New(s.p.cfg).RenderPalette().Token(config.TokenAccent)
+	want := accent.Straight()
+	near := func(px [4]byte) bool {
+		for i := range 3 {
+			if d := int(px[i]) - int(want[i]); d < -12 || d > 12 {
+				return false
+			}
+		}
+		return px[3] == 0xff
+	}
+	b := c.root.Bounds()
+	for _, y := range []int{b.Y + b.H/3, b.Y + b.H/2, b.Y + 2*b.H/3} {
+		if px := s.pixel(b.X+1, y); !near(px) {
+			t.Errorf("left edge at y %d paints %v, want the accent %v", y, px, want)
+		}
+	}
+	for _, x := range []int{b.X + b.W/3, b.X + b.W/2, b.X + 2*b.W/3} {
+		if px := s.pixel(x, b.Y+1); near(px) {
+			t.Errorf("top edge at x %d paints the accent %v", x, px)
 		}
 	}
 }

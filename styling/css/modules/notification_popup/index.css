@@ -16,11 +16,11 @@
   --_drop-shadow: var(--shadow-xs);
 }
 .notification-popup-card.urgency-bar {
-  --_urgency-shadow: inset 0 calc(2px * var(--global-scale)) 0 0 var(--accent);
+  --_urgency-shadow: inset calc(2px * var(--global-scale)) 0 0 0 var(--accent);
 }
 .notification-popup-card.urgency-bar.critical {
-  --_urgency-shadow: inset 0 calc(2px * var(--global-scale)) 0 0 var(--status-error);
+  --_urgency-shadow: inset calc(2px * var(--global-scale)) 0 0 0 var(--status-error);
 }
 .notification-popup-card.urgency-bar.low {
-  --_urgency-shadow: inset 0 calc(2px * var(--global-scale)) 0 0 var(--fg-subtle);
+  --_urgency-shadow: inset calc(2px * var(--global-scale)) 0 0 0 var(--fg-subtle);
 }
