@@ -135,6 +135,7 @@ type producerGeometry struct {
 
 func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{}, closeSource func()) (screenStream, error) {
 	p, err := pipewire.Start(pipewire.Config{
+		Application: shellName, Name: screencastNode,
 		Width: uint32(g.width), Height: uint32(g.height), Stride: uint32(g.stride),
 		Format: videoFormat(g.format), FPS: g.fps, Transform: g.transform, Source: src,
 	})

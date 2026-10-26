@@ -648,7 +648,7 @@ func (o remoteDesktopObject) ConnectToEIS(session dbus.ObjectPath, _ string, _ V
 	if err != nil {
 		return nil, dbusx.Failed(err.Error())
 	}
-	f, err := eis.Pair(eisInput{in})
+	f, err := eis.Pair(eisInput{in}, shellName)
 	if err != nil {
 		return nil, dbusx.Failed(err.Error())
 	}

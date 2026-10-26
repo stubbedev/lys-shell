@@ -24,6 +24,13 @@ const BusName = "org.freedesktop.impl.portal.desktop.lys"
 // ObjectPath is where every interface is mounted.
 const ObjectPath = dbus.ObjectPath("/org/freedesktop/portal/desktop")
 
+// shellName is what the portal's PipeWire client and EIS seat are
+// called, and what its ScreenCast streams are named after.
+const shellName = "lys-shell"
+
+// screencastNode is the PipeWire node name of every ScreenCast stream.
+const screencastNode = shellName + "-screencast"
+
 // Backend is the running portal backend.
 type Backend struct {
 	conn     *dbus.Conn
