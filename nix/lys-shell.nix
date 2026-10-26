@@ -2,17 +2,21 @@
   lib,
   buildGoModule,
   makeWrapper,
+  libva,
   pam,
   vulkan-loader,
 }:
 let
   # The libraries the binaries dlopen through purego: libpam (lock
-  # screen) and libvulkan (lys-lib's GPU renderer, which falls back to the
+  # screen), libvulkan (lys-lib's GPU renderer, which falls back to the
   # CPU without it, the portal's zero-copy dmabufs, which fall back to
-  # shared memory, and the recorder's capture and H.264 encoding, which
-  # have no fallback). The portal speaks PipeWire's protocol itself and
-  # loads no libpipewire.
+  # shared memory, and the recorder's capture and H.264 encoding) and
+  # libva with libva-drm (the recorder's encoder on a GPU whose Vulkan
+  # driver encodes no video, Intel Xe2 among them; the VA driver itself
+  # comes from the system's graphics stack). The portal speaks
+  # PipeWire's protocol itself and loads no libpipewire.
   libs = [
+    libva
     pam
     vulkan-loader
   ];

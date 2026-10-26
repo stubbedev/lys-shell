@@ -20,6 +20,9 @@ Requires:       hicolor-icon-theme
 Requires:       pam
 Recommends:     vulkan-loader
 Recommends:     mesa-vulkan-drivers
+Recommends:     libva
+Recommends:     intel-media-driver
+Recommends:     mesa-va-drivers
 Recommends:     xdg-desktop-portal
 Suggests:       pipewire-pulseaudio
 Suggests:       wireplumber

@@ -37,9 +37,12 @@ lys-shell loads these libraries, so install them from your distribution:
 | --------- | ---------------------------------------------------------- |
 | PAM       | the lock screen and greeter                                |
 | Vulkan    | GPU rendering, zero-copy screen sharing, the screen recorder |
+| VA-API    | the screen recorder on GPUs whose Vulkan driver encodes no video |
 
-The screen recorder needs Vulkan and a GPU whose driver exposes an H.264
-video encoder (Vulkan Video); without one it reports that it cannot record.
+The screen recorder needs Vulkan and a GPU that encodes H.264, through its
+Vulkan driver (Vulkan Video) or, where that has no encoder (Intel Xe2), its
+VA-API driver (libva with intel-media-driver or Mesa's); without either it
+reports that it cannot record, and why.
 Everything else falls back to the CPU without Vulkan. Screen sharing
 (ScreenCast) speaks to the PipeWire daemon, 1.0 or newer, directly and loads
 no PipeWire library.

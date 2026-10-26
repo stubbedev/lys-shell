@@ -20,6 +20,9 @@ Depends:
 Recommends:
  libvulkan1,
  mesa-vulkan-drivers,
+ libva2,
+ libva-drm2,
+ intel-media-va-driver | mesa-va-drivers,
  xdg-desktop-portal
 Suggests:
  dbus-user-session,

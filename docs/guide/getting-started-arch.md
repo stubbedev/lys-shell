@@ -7,12 +7,12 @@ title: Getting started on Arch
 ## Install dependencies
 
 Go, plus the libraries lys-shell loads at runtime (PAM for the lock screen,
-Vulkan for GPU rendering, zero-copy screen sharing and the screen recorder, which
-encodes on a GPU with an H.264 video encoder). Screen sharing speaks to the PipeWire daemon directly and needs
+Vulkan for GPU rendering, zero-copy screen sharing and the screen recorder, and
+VA-API for the recorder on GPUs whose Vulkan driver encodes no video). Screen sharing speaks to the PipeWire daemon directly and needs
 PipeWire 1.0 or newer:
 
 ```sh
-sudo pacman -S --needed go git just pam vulkan-icd-loader
+sudo pacman -S --needed go git just pam vulkan-icd-loader libva intel-media-driver
 ```
 
 If you want the battery, bluetooth, network, power, or audio modules, install their daemons (skip any you don't need):

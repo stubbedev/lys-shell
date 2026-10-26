@@ -7,12 +7,13 @@ title: Getting started on Fedora
 ## Install dependencies
 
 Go, plus the libraries lys-shell loads at runtime (PAM for the lock screen,
-Vulkan for GPU rendering, zero-copy screen sharing and the screen recorder, which
-encodes on a GPU with an H.264 video encoder). Screen sharing speaks to the PipeWire daemon directly and needs
+Vulkan for GPU rendering, zero-copy screen sharing and the screen recorder, and
+VA-API for the recorder on GPUs whose Vulkan driver encodes no video). Screen sharing speaks to the PipeWire daemon directly and needs
 PipeWire 1.0 or newer:
 
 ```sh
-sudo dnf install golang git just pam vulkan-loader
+sudo dnf install golang git just pam vulkan-loader libva intel-media-driver \
+  mesa-va-drivers
 ```
 
 Fedora Workstation already ships the runtime daemons. Minimal and Server installs need:

@@ -4,8 +4,9 @@ package config
 //
 // Native screen recorder encoding on the GPU's video encoder.
 //
-// An output is captured into GPU memory and encoded to H.264 there, with
-// Opus audio; a GPU without a video encoder cannot record.
+// An output is captured into GPU memory and encoded to H.264 there,
+// through Vulkan Video or the GPU's VA-API driver, with Opus audio; a
+// GPU without a video encoder cannot record.
 //
 // Click the bar button to start/stop; the dropdown exposes the recording
 // options below. Controllable from the CLI / RPC socket:
