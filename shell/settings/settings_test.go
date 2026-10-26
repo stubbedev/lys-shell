@@ -906,7 +906,7 @@ func TestIconEditorPicks(t *testing.T) {
 	if len(p.shown) != 2 {
 		t.Errorf("filter kept %v, want the two ld-b icons", p.shown)
 	}
-	p.list.OnActivate(1)
+	p.grid.ChildAt(1).ClickAt(widget.Point{})
 	if v := k.store.value(path); v != "ld-bell-symbolic" || f.closed != 1 {
 		t.Errorf("pick wrote %v (closed %d)", v, f.closed)
 	}
@@ -1037,7 +1037,7 @@ func TestEnumAndIconListItems(t *testing.T) {
 	icons := fieldControl(k, field("modules.battery.level-icons", iconList)).(*listEditor)
 	first := icons.items[0].(iconItem)
 	first.btn.ClickAt(widget.Point{})
-	first.picker.list.OnActivate(0)
+	first.picker.grid.ChildAt(0).ClickAt(widget.Point{})
 	if got, _ := k.store.value("modules.battery.level-icons").([]any); got[0] != "ld-a-symbolic" {
 		t.Errorf("icon row wrote %v", got)
 	}

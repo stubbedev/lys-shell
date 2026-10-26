@@ -1,7 +1,13 @@
-.icon-picker-popover .icon-picker-cell {
+.icon-picker-grid flowboxchild {
   border-radius: var(--rounding-element);
   transition: background var(--duration-fast);
 }
-.icon-picker-popover .icon-picker-cell:hover {
-  background: var(--bg-overlay);
+
+.icon-picker-grid flowboxchild:hover {
+  background: var(--bg-hover);
+}
+
+.icon-picker-grid flowboxchild:selected {
+  background: var(--accent);
+  color: var(--fg-on-accent);
 }

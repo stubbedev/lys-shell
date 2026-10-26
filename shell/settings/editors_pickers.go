@@ -4,6 +4,7 @@ import (
 	"log"
 	"math"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/stubbedev/lys-ui/render"
@@ -74,28 +75,61 @@ func (c *fontEditor) open() {
 	c.k.pickers.font(current, c.monospace, func(family string) { _ = c.slot.set(family) })
 }
 
+// openPicker opens the popover build makes beside anchor. build gets
+// the pick its tree calls: onPick, then the popover closes.
+func openPicker(k *kit, anchor widget.Widget, onPick func(string), build func(pick func(string)) *widget.Box) {
+	var closePicker func()
+	root := build(func(name string) {
+		onPick(name)
+		closePicker()
+	})
+	closePicker = k.pickers.popover(anchor, root)
+}
+
+// pickerFrame is a picker popover's tree: the popover node carrying
+// class over its contents, which the theme's padding insets on every
+// side and its spacing separates.
+func pickerFrame(class string) (root, contents *widget.Box) {
+	th := widget.Current()
+	root = widget.NewBox(widget.Column, 0, 0)
+	root.AddClass(class)
+	contents = widget.NewBox(widget.Column, th.Spacing, th.Padding)
+	contents.SetElement("contents")
+	root.Append(contents, true)
+	return root, contents
+}
+
+// matching are the names containing the query (StringFilter,
+// Substring, ignore case), all of them for a blank one.
+func matching(names []string, query string) []string {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return names
+	}
+	var out []string
+	for _, name := range names {
+		if strings.Contains(strings.ToLower(name), q) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // pickerSpec shapes a searchPicker: the CSS classes, the search
-// placeholder key, the row (or grid cell, with cellW) for a name, the
-// list's height cap and minimum width, and what sits beside the search
-// entry.
+// placeholder key, the row for a name and the list's height cap.
 type pickerSpec struct {
 	class, listClass, scrollClass, placeholder string
 	row                                        func(k *kit, name string) widget.Widget
-	cellW, maxH, minW                          int
-	// trailing builds what follows the search entry (the icon picker's
-	// clear button), handed the pick.
-	trailing func(k *kit, pick func(string)) widget.Widget
-	// pickTyped makes Enter in the search entry pick the typed text.
-	pickTyped bool
-	// searchEntry makes the search a gtk::SearchEntry (the font and
-	// module pickers): the search icon, the clear button, Esc clearing,
-	// and the filter on search-changed after GTK's default delay. The
-	// others are plain gtk::Entry filtering per keystroke.
+	maxH                                       int
+	// searchEntry makes the search a gtk::SearchEntry (the module
+	// picker): the search icon, the clear button, Esc clearing, and the
+	// filter on search-changed after GTK's default delay. The others
+	// are plain gtk::Entry filtering per keystroke.
 	searchEntry bool
 }
 
-// searchPicker is the popovers' shared tree (FontPicker, the icon
-// picker): a search row over a virtualized list filtered by a
+// searchPicker is the list pickers' popover (the module picker, the
+// theme presets): a search row over a virtualized list filtered by a
 // case-insensitive substring; one click on a row picks it, writes and
 // closes the popover.
 type searchPicker struct {
@@ -111,23 +145,18 @@ type searchPicker struct {
 
 // openSearchPicker builds the picker and opens it beside anchor.
 func openSearchPicker(k *kit, anchor widget.Widget, names []string, spec pickerSpec, onPick func(string)) *searchPicker {
-	var closePicker func()
-	p := newSearchPicker(k, names, spec, func(name string) {
-		onPick(name)
-		if closePicker != nil {
-			closePicker()
-		}
+	var p *searchPicker
+	openPicker(k, anchor, onPick, func(pick func(string)) *widget.Box {
+		p = newSearchPicker(k, names, spec, pick)
+		return p.root
 	})
-	closePicker = k.pickers.popover(anchor, p.root)
 	return p
 }
 
 func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string)) *searchPicker {
 	p := &searchPicker{k: k, all: names, shown: names, spec: spec, pick: pick}
-	p.root = widget.NewBox(widget.Column, 0, 0)
-	p.root.AddClass(spec.class)
-	contents := gapBox(widget.Column)
-	contents.SetElement("contents")
+	root, contents := pickerFrame(spec.class)
+	p.root = root
 	var searchField widget.Widget
 	if spec.searchEntry {
 		se := widget.NewSearchEntry(k.face, k.textPx(), i18n.Settings().Get(spec.placeholder))
@@ -137,30 +166,13 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 		se.OnSearchChanged = p.filter
 		p.search, searchField = se.Entry, se
 	} else {
-		p.search = k.entry()
-		p.search.SetPlaceholder(i18n.Settings().Get(spec.placeholder))
-		p.search.OnChanged = p.filter
+		p.search = k.searchField(spec.placeholder, p.filter)
 		searchField = p.search
 	}
-	if spec.pickTyped {
-		p.search.OnActivate = func(text string) {
-			if text != "" {
-				p.pick(text)
-			}
-		}
-	}
-	searchRow := gapBox(widget.Row)
-	searchRow.Append(searchField, true)
-	if spec.trailing != nil {
-		searchRow.AppendAligned(spec.trailing(k, p.pick), false, widget.AlignCenter)
-	}
-	contents.Append(searchRow, false)
+	contents.Append(searchField, false)
 	p.list = widget.NewList[widget.Widget](pickerRows{p}, 0)
 	p.list.AddClass(spec.listClass)
 	p.list.SetSingleClickActivate(true)
-	if spec.cellW > 0 {
-		p.list.SetCellWidth(spec.cellW)
-	}
 	if spec.maxH > 0 {
 		p.list.SetMaxHeight(spec.maxH)
 	}
@@ -173,29 +185,14 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	if spec.scrollClass != "" {
 		scroll.AddClass(spec.scrollClass)
 	}
-	if spec.minW > 0 {
-		scroll.SetSizeRequest(spec.minW, 0)
-	}
 	scroll.Append(p.list, true)
 	contents.Append(scroll, true)
-	p.root.Append(contents, true)
 	return p
 }
 
-// filter narrows the list to the names containing the query
-// (StringFilter, Substring, ignore case).
+// filter narrows the list to the names matching the query.
 func (p *searchPicker) filter(query string) {
-	q := strings.ToLower(strings.TrimSpace(query))
-	if q == "" {
-		p.shown = p.all
-	} else {
-		p.shown = nil
-		for _, f := range p.all {
-			if strings.Contains(strings.ToLower(f), q) {
-				p.shown = append(p.shown, f)
-			}
-		}
-	}
+	p.shown = matching(p.all, query)
 	p.list.Reset()
 }
 
@@ -275,15 +272,31 @@ var (
 	monoFontRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFontEditor(k, s, true) })
 )
 
-// Icon picker sizes (editors/icon: PREVIEW_SIZE, the scroller's
-// minimum content size, and the 2rem cell at the 1.1 global scale plus
-// its padding).
+// Icon picker geometry: the preview size (editors/icon's
+// PREVIEW_SIZE) and the grid the popover shows at once, columns by
+// rows of cells.
 const (
-	iconPreviewPx  = 24
-	iconPickerH    = 420
-	iconPickerW    = 440
-	iconPickerCell = 40
+	iconPreviewPx     = 24
+	iconPickerColumns = 8
+	iconPickerRows    = 8
 )
+
+// iconCellPadding insets a grid cell's preview: half the theme's
+// padding.
+func iconCellPadding() int { return widget.Current().Padding / 2 }
+
+// iconCellPx is a grid cell's side: the preview inside its padding.
+func iconCellPx() int { return iconPreviewPx + 2*iconCellPadding() }
+
+// iconCellGap is the gap between the grid's cells.
+func iconCellGap() int { return widget.Current().Spacing / 2 }
+
+// iconGridExtent is the length n cells take along an axis.
+func iconGridExtent(n int) int { return n*iconCellPx() + (n-1)*iconCellGap() }
+
+// iconPickerWidth is the trigger's width, and so the popover's: a full
+// line of the grid inside the popover's padding.
+func iconPickerWidth() int { return iconGridExtent(iconPickerColumns) + 2*widget.Current().Padding }
 
 // iconNames lists the icons the picker offers: every one the icon
 // theme's search path resolves from lys-shell's directory (a seam for
@@ -298,8 +311,8 @@ var iconNames = func() []string {
 }
 
 // iconEditor is icon_picker_widget: a trigger showing the icon and its
-// name that opens the searchable grid of installed icons; Enter picks
-// the typed name, the clear button none.
+// name that opens the searchable grid of the icons beneath it, as wide
+// as the trigger.
 type iconEditor struct {
 	*widget.Box
 	k      *kit
@@ -307,7 +320,7 @@ type iconEditor struct {
 	btn    *widget.Button
 	icon   *widget.Icon
 	label  *widget.Label
-	picker *searchPicker
+	picker *iconPicker
 }
 
 func newIconEditor(k *kit, s slot) *iconEditor {
@@ -321,6 +334,9 @@ func newIconEditor(k *kit, s slot) *iconEditor {
 	face.AppendAligned(c.icon, false, widget.AlignCenter)
 	face.AppendAligned(c.label, true, widget.AlignCenter)
 	c.btn = k.button(face, c.open, css.Outline)
+	w := iconPickerWidth()
+	c.btn.SetSizeRequest(w, 0)
+	c.btn.SetMaximumSize(w, 0)
 	c.Append(c.btn, false)
 	c.refresh()
 	return c
@@ -343,25 +359,81 @@ func (c *iconEditor) open() {
 	if c.k.pickers == nil {
 		return
 	}
-	c.picker = openSearchPicker(c.k, c.btn, iconNames(), pickerSpec{
-		class: "icon-picker-popover", placeholder: "settings-icon-search",
-		cellW: iconPickerCell, maxH: iconPickerH, minW: iconPickerW, pickTyped: true,
-		row: func(k *kit, name string) widget.Widget {
-			cell := widget.NewBox(widget.Row, 0, widget.Current().Padding/2)
-			cell.AddClass("icon-picker-cell")
-			cell.SetTooltip(name)
-			cell.AppendAligned(widget.NewThemeIcon(name, iconPreviewPx), true, widget.AlignCenter)
-			return cell
-		},
-		trailing: func(k *kit, pick func(string)) widget.Widget {
-			clear := k.button(k.icon("ld-x-circle-symbolic"), func() { pick("") }, "icon-picker-clear", css.Ghost, css.Icon)
-			clear.SetTooltip(i18n.Settings().Get("settings-icon-clear"))
-			return clear
-		},
-	}, func(name string) {
+	openPicker(c.k, c.btn, func(name string) {
 		_ = c.slot.set(name)
 		c.refresh()
+	}, func(pick func(string)) *widget.Box {
+		c.picker = newIconPicker(c.k, iconNames(), c.slot.text(), c.btn.Bounds().W, pick)
+		return c.picker.root
 	})
+}
+
+// iconPicker is the icon popover: the search entry and the clear
+// button in one row over a scrolling grid of the icons whose names
+// contain the query, the current one selected. A click on an icon
+// picks it, Enter in the search the typed name, the clear button none.
+type iconPicker struct {
+	root     *widget.Box
+	contents *widget.Box
+	search   *widget.Entry
+	clear    *widget.Button
+	scroll   *widget.Scroll
+	grid     *widget.FlowBox
+	all      []string
+	shown    []string
+	current  string
+	pick     func(string)
+}
+
+// newIconPicker builds the picker over names, its contents width wide
+// (its trigger's width, the popover's border falling just outside it
+// as a dropdown's does), with current selected.
+func newIconPicker(k *kit, names []string, current string, width int, pick func(string)) *iconPicker {
+	p := &iconPicker{all: names, current: current, pick: pick}
+	root, contents := pickerFrame("icon-picker-popover")
+	contents.SetSizeRequest(width, 0)
+	contents.SetMaximumSize(width, 0)
+	p.root, p.contents = root, contents
+	p.search = k.searchField("settings-icon-search", p.filter)
+	p.search.OnActivate = func(text string) {
+		if text != "" {
+			p.pick(text)
+		}
+	}
+	p.clear = k.button(k.icon("ld-x-circle-symbolic"), func() { p.pick("") }, "icon-picker-clear", css.Ghost, css.Icon)
+	p.clear.SetTooltip(i18n.Settings().Get("settings-icon-clear"))
+	searchRow := gapBox(widget.Row)
+	searchRow.AppendAligned(p.search, true, widget.AlignCenter)
+	searchRow.AppendAligned(p.clear, false, widget.AlignCenter)
+	contents.Append(searchRow, false)
+	p.scroll = widget.NewScroll(nil)
+	p.scroll.AddClass("icon-picker-scroll")
+	p.scroll.VerticalOnly = true
+	p.scroll.SetMaxContentHeight(iconGridExtent(iconPickerRows))
+	contents.Append(p.scroll, true)
+	p.filter("")
+	return p
+}
+
+// filter shows the icons matching the query, the grid scrolled back to
+// its top.
+func (p *iconPicker) filter(query string) {
+	p.shown = matching(p.all, query)
+	gap := iconCellGap()
+	p.grid = widget.NewFlowBox(gap, gap)
+	p.grid.AddClass("icon-picker-grid")
+	p.grid.SetMaxChildrenPerLine(iconPickerColumns)
+	p.grid.OnActivate = func(i int) { p.pick(p.shown[i]) }
+	for _, name := range p.shown {
+		cell := widget.NewBox(widget.Row, 0, iconCellPadding())
+		cell.SetTooltip(name)
+		cell.AppendAligned(widget.NewThemeIcon(name, iconPreviewPx), true, widget.AlignCenter)
+		p.grid.Append(cell)
+	}
+	if i := slices.Index(p.shown, p.current); i >= 0 {
+		p.grid.Select(i)
+	}
+	p.scroll.SetChild(p.grid)
 }
 
 // iconRow is icon::icon for a row.

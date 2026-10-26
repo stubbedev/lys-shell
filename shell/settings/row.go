@@ -84,6 +84,15 @@ func (k *kit) entry() *widget.Entry {
 	return e
 }
 
+// searchField is a picker's search entry: an entry showing the
+// placeholder key's text that hands every edit to onChange.
+func (k *kit) searchField(placeholder string, onChange func(query string)) *widget.Entry {
+	e := k.entry()
+	e.SetPlaceholder(i18n.Settings().Get(placeholder))
+	e.OnChanged = onChange
+	return e
+}
+
 // icon is a theme icon the stylesheet sizes and tints (an image node).
 func (k *kit) icon(name string, classes ...string) *widget.Icon {
 	ic := widget.NewThemeIcon(name, 16)
