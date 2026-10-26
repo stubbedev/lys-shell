@@ -277,13 +277,16 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 }
 
 // set sets the given property and emits PropertyChanged if appropriate. p.mut
-// must already be locked.
+// must already be locked. The new value is stored into a fresh allocation
+// that replaces the old one, never into the old one, whose memory a reply
+// from an earlier Get may still be encoding.
 func (p *Properties) set(iface, property string, v any) error {
 	prop := p.m[iface][property]
-	err := dbus.Store([]any{v}, prop.Value)
-	if err != nil {
+	fresh := reflect.New(reflect.TypeOf(prop.Value).Elem())
+	if err := dbus.Store([]any{v}, fresh.Interface()); err != nil {
 		return err
 	}
+	prop.Value = fresh.Interface()
 	return p.emitChange(iface, property)
 }
 

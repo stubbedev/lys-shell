@@ -32,6 +32,13 @@ upstream decodes fd arrays.
   does not wait on race: xdg-desktop-portal forwards RemoteDesktop input
   that way, and a click could land before the motion that placed it.
   Pinned by `TestOrderedCallsRunInArrivalOrder`.
+- `prop/prop.go`, `set`: a new value is stored into a fresh allocation that
+  replaces the property's, not into the existing one. `Get` and `GetAll`
+  hand out the stored value (a slice shares its backing array) and the
+  reply is encoded after the read lock is released, so storing in place
+  raced with that encode and could rewrite a reply mid-flight; the race
+  detector caught it on a fake NetworkManager's `ActiveConnections`.
+  Pinned by `prop/lys_shell_set_test.go`.
 
 The copy is on Go 1.27.3 (go.mod), with golangci-lint's modernize fixes
 applied throughout: `reflect.TypeFor` and `TypeAssert`, `strings.SplitSeq`
