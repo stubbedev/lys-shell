@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-lib/media/opus"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/audiomix"
 )
 
 // minFrameGap is the least time between two video frames: the muxers
@@ -103,7 +104,7 @@ type recording struct {
 	// their own goroutines.
 	mu       sync.Mutex
 	clock    activeClock
-	mixer    *mixer
+	mixer    *audiomix.Mixer
 	captures []audioCapture
 
 	opus *opus.Encoder
@@ -259,7 +260,7 @@ func (r *recording) pushAudio(source int, chunk []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.clock.paused {
-		r.mixer.push(source, chunk)
+		r.mixer.Push(source, chunk)
 	}
 }
 
@@ -280,7 +281,7 @@ func (r *recording) audioLoop() {
 				r.mu.Unlock()
 				return nil
 			}
-			r.mixer.mix(pcm)
+			r.mixer.Mix(pcm)
 			r.mu.Unlock()
 			var err error
 			if packet, err = r.opus.Encode(packet[:0], pcm); err != nil {

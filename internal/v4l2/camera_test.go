@@ -1,4 +1,4 @@
-package recorder
+package v4l2
 
 import (
 	"image"
@@ -28,17 +28,38 @@ func TestV4L2StreamingStructSizes(t *testing.T) {
 	if off := unsafe.Offsetof(v4l2Buffer{}.length); off != 72 {
 		t.Errorf("v4l2_buffer.length is at %d, want 72", off)
 	}
+	if got := unsafe.Sizeof(v4l2Capability{}); got != 104 {
+		t.Errorf("v4l2_capability is %d bytes, want 104", got)
+	}
 }
 
 // A node that is no camera, or none at all, is an error naming it and
-// the step that failed.
-func TestOpenCameraRejectsANonCamera(t *testing.T) {
-	rect := image.Rect(0, 0, 384, 216)
-	if _, err := openCamera("/dev/null", rect); err == nil || !strings.Contains(err.Error(), "camera /dev/null: VIDIOC_S_FMT") {
+// the step that failed; so is an empty frame or no frame rate.
+func TestOpenRejectsANonCamera(t *testing.T) {
+	for _, bad := range []struct {
+		frame image.Point
+		fps   int
+	}{{image.Pt(0, 9), 30}, {image.Pt(16, 9), 0}} {
+		if _, err := Open("/dev/video0", bad.frame, bad.fps); err == nil {
+			t.Errorf("a %v frame at %d fps opened", bad.frame, bad.fps)
+		}
+	}
+	frame := image.Pt(384, 216)
+	if _, err := Open("/dev/null", frame, 30); err == nil || !strings.Contains(err.Error(), "v4l2: camera /dev/null: VIDIOC_S_FMT") {
 		t.Errorf("/dev/null: %v, want the format negotiation to fail", err)
 	}
-	if _, err := openCamera("/dev/lys-shell-no-camera", rect); err == nil || !strings.Contains(err.Error(), "open the camera /dev/lys-shell-no-camera") {
+	if _, err := Open("/dev/lys-shell-no-camera", frame, 30); err == nil || !strings.Contains(err.Error(), "v4l2: open the camera /dev/lys-shell-no-camera") {
 		t.Errorf("a missing node: %v", err)
+	}
+}
+
+// A node that does not exist, or is no V4L2 device, has no capture
+// card.
+func TestCaptureCardOfANonCamera(t *testing.T) {
+	for _, path := range []string{"/dev/lys-shell-no-camera", "/dev/null"} {
+		if card, ok := CaptureCard(path); ok {
+			t.Errorf("%s probed as the camera %q", path, card)
+		}
 	}
 }
 
@@ -50,17 +71,17 @@ func TestRealCameraStreams(t *testing.T) {
 	if device == "" {
 		t.Skip("LYS_SHELL_TEST_CAMERA names no camera node; this test switches one on")
 	}
-	rect := image.Rect(0, 0, 384, 216)
-	c, err := openCamera(device, rect)
+	frame := image.Pt(384, 216)
+	c, err := Open(device, frame, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s streams %dx%d %s", device, c.format.width, c.format.height, fourccName(c.format.format))
+	t.Logf("%s streams %s", device, c.Format())
 	for i := range 3 {
 		select {
 		case img := <-c.Frames():
 			b := img.Bounds()
-			if b.Dx()*rect.Dy() > (b.Dy()+1)*rect.Dx() || (b.Dx()+1)*rect.Dy() < b.Dy()*rect.Dx() {
+			if b.Dx()*frame.Y > (b.Dy()+1)*frame.X || (b.Dx()+1)*frame.Y < b.Dy()*frame.X {
 				t.Errorf("frame %d is %v, not 16:9", i, b)
 			}
 			c.Recycle(img)

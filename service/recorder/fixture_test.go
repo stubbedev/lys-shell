@@ -2,6 +2,7 @@ package recorder
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"image"
@@ -150,6 +151,15 @@ func (v *fakeVideo) frames() []time.Duration {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return append([]time.Duration(nil), v.pts...)
+}
+
+// pcmBytes lays samples out as s16le.
+func pcmBytes(samples ...int16) []byte {
+	b := make([]byte, 0, len(samples)*sampleBytes)
+	for _, s := range samples {
+		b = binary.LittleEndian.AppendUint16(b, uint16(s))
+	}
+	return b
 }
 
 // fakeAudio is a source whose chunks the test pushes.

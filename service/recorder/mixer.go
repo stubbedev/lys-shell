@@ -1,11 +1,11 @@
 package recorder
 
 import (
-	"encoding/binary"
-	"math"
 	"time"
 
 	"github.com/stubbedev/lys-lib/media/opus"
+
+	"github.com/stubbedev/lys-shell/internal/audiomix"
 )
 
 // The audio track's shape: 48 kHz stereo, 20 ms Opus packets. The
@@ -30,60 +30,9 @@ const audioLatency = 100 * time.Millisecond
 // oldest samples rather than growing without end.
 const audioBacklog = 500 * time.Millisecond
 
-// mixer sums the sources' interleaved stereo s16le PCM into frames.
-// Each source queues what it delivered; a frame takes the oldest
-// samples of every source, missing ones as silence.
-type mixer struct {
-	queues [][]int16
-	// partial holds a source's trailing byte of a sample split across
-	// two chunks.
-	partial [][]byte
-	limit   int
-}
-
-func newMixer(sources int) *mixer {
-	return &mixer{
-		queues:  make([][]int16, sources),
-		partial: make([][]byte, sources),
-		limit:   int(audioBacklog * audioRate / time.Second * audioChannels),
-	}
-}
-
-// push queues source's chunk of little-endian samples.
-func (m *mixer) push(source int, chunk []byte) {
-	q := m.queues[source]
-	if p := m.partial[source]; len(p) > 0 && len(chunk) > 0 {
-		q = append(q, int16(binary.LittleEndian.Uint16([]byte{p[0], chunk[0]})))
-		chunk = chunk[1:]
-		m.partial[source] = p[:0]
-	}
-	for len(chunk) >= sampleBytes {
-		q = append(q, int16(binary.LittleEndian.Uint16(chunk)))
-		chunk = chunk[sampleBytes:]
-	}
-	m.partial[source] = append(m.partial[source], chunk...)
-	if over := len(q) - m.limit; over > 0 {
-		// Whole stereo frames, so the channels stay in place.
-		over += over % audioChannels
-		q = append(q[:0], q[over:]...)
-	}
-	m.queues[source] = q
-}
-
-// mix fills frame (audioFrame stereo samples) with the sum of the
-// sources' oldest samples, clipped, and drops them from the queues.
-func (m *mixer) mix(frame []int16) {
-	var sum [audioFrame * audioChannels]int32
-	for i, q := range m.queues {
-		n := min(len(q), len(sum))
-		for j, v := range q[:n] {
-			sum[j] += int32(v)
-		}
-		m.queues[i] = append(q[:0], q[n:]...)
-	}
-	for i, v := range sum {
-		frame[i] = int16(min(max(v, math.MinInt16), math.MaxInt16))
-	}
+// newMixer mixes sources of the audio track's shape.
+func newMixer(sources int) *audiomix.Mixer {
+	return audiomix.New(sources, audioChannels, int(audioBacklog*audioRate/time.Second))
 }
 
 // framesDue is how many frames follow the emitted ones up to elapsed

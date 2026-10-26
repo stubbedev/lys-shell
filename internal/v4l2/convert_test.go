@@ -1,4 +1,4 @@
-package recorder
+package v4l2
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ func TestYUYVToRGBA(t *testing.T) {
 	f := cameraFrame{width: 4, height: 1, format: pixYUYV, stride: 10}
 	// White and black share a pair; red is the next pair.
 	data := []byte{235, 128, 16, 128, 81, 90, 81, 240, 0xee, 0xee}
-	img, at := paddedFrame(f, image.Rect(0, 0, 4, 2))
+	img, at := paddedFrame(f, image.Pt(4, 2))
 	if at != image.Pt(0, 0) || img.Bounds().Dx() != 4 || img.Bounds().Dy() != 2 {
 		t.Fatalf("padded %v at %v, want 4x2 at the origin", img.Bounds(), at)
 	}
@@ -66,7 +66,7 @@ func TestMJPEGToRGBA(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := cameraFrame{width: 16, height: 8, format: pixMJPG}
-	img, at := paddedFrame(f, image.Rect(0, 0, 16, 16))
+	img, at := paddedFrame(f, image.Pt(16, 16))
 	if err := decodeFrame(img, at, f, buf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
@@ -96,5 +96,30 @@ func TestMJPEGToRGBA(t *testing.T) {
 	}
 	if err := decodeFrame(img, at, cameraFrame{width: 16, height: 8, format: 'N' | 'V'<<8 | '1'<<16 | '2'<<24}, buf.Bytes()); err == nil || !strings.Contains(err.Error(), "NV12") {
 		t.Errorf("NV12: %v, want an error naming it", err)
+	}
+}
+
+// A camera frame is padded to the requested aspect, centred, never
+// stretched: a 4:3 camera gains side bars in a 16:9 frame, a wider one
+// bars above and below, and a matching one none.
+func TestLetterbox(t *testing.T) {
+	aspect := image.Pt(384, 216)
+	for name, c := range map[string]struct {
+		w, h     int
+		size, at image.Point
+	}{
+		"4:3":   {640, 480, image.Pt(854, 480), image.Pt(107, 0)},
+		"16:9":  {1280, 720, image.Pt(1280, 720), image.Pt(0, 0)},
+		"21:9":  {2560, 1080, image.Pt(2560, 1440), image.Pt(0, 180)},
+		"tall":  {480, 640, image.Pt(1138, 640), image.Pt(329, 0)},
+		"exact": {384, 216, image.Pt(384, 216), image.Pt(0, 0)},
+	} {
+		size, at := letterbox(c.w, c.h, aspect)
+		if size != c.size || at != c.at {
+			t.Errorf("%s: size %v at %v, want %v at %v", name, size, at, c.size, c.at)
+		}
+		if at.X+c.w > size.X || at.Y+c.h > size.Y {
+			t.Errorf("%s: the %dx%d frame at %v overflows %v", name, c.w, c.h, at, size)
+		}
 	}
 }

@@ -32,28 +32,3 @@ func TestWebcamRect(t *testing.T) {
 		}
 	}
 }
-
-// A camera frame is padded to the overlay's aspect, centred, never
-// stretched: a 4:3 camera gains side bars in a 16:9 frame, a wider one
-// bars above and below, and a matching one none.
-func TestLetterbox(t *testing.T) {
-	dst := image.Rect(0, 0, 384, 216)
-	for name, c := range map[string]struct {
-		w, h     int
-		size, at image.Point
-	}{
-		"4:3":   {640, 480, image.Pt(854, 480), image.Pt(107, 0)},
-		"16:9":  {1280, 720, image.Pt(1280, 720), image.Pt(0, 0)},
-		"21:9":  {2560, 1080, image.Pt(2560, 1440), image.Pt(0, 180)},
-		"tall":  {480, 640, image.Pt(1138, 640), image.Pt(329, 0)},
-		"exact": {384, 216, image.Pt(384, 216), image.Pt(0, 0)},
-	} {
-		size, at := letterbox(c.w, c.h, dst)
-		if size != c.size || at != c.at {
-			t.Errorf("%s: size %v at %v, want %v at %v", name, size, at, c.size, c.at)
-		}
-		if at.X+c.w > size.X || at.Y+c.h > size.Y {
-			t.Errorf("%s: the %dx%d frame at %v overflows %v", name, c.w, c.h, at, size)
-		}
-	}
-}

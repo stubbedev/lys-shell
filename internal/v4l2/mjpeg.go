@@ -1,4 +1,4 @@
-package recorder
+package v4l2
 
 import (
 	"bytes"

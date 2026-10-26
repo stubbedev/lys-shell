@@ -1,4 +1,8 @@
-package recorder
+// Package v4l2 streams a V4L2 capture node in pure Go (mmap buffers over
+// golang.org/x/sys/unix ioctls), delivering each frame as an RGBA
+// picture letterboxed to a requested aspect, and names the capture
+// nodes a system has.
+package v4l2
 
 import (
 	"errors"
@@ -29,13 +33,9 @@ const (
 // cameraBuffers are the capture buffers the driver cycles.
 const cameraBuffers = 4
 
-// webcamMaxFPS caps the overlay's updates: a webcam picture needs no
-// more, and each one is a conversion and an upload.
-const webcamMaxFPS = 30
-
-// cameraMinWidth is the least width asked of the camera, so a small
-// overlay still gets a picture worth scaling.
-const cameraMinWidth = 640
+// MinWidth is the least width asked of a camera, so a small picture
+// still gets one worth scaling.
+const MinWidth = 640
 
 // v4l2PixFormat mirrors struct v4l2_pix_format (48 bytes): the size,
 // pixel format, field and line stride, then six fields left zero.
@@ -89,14 +89,15 @@ func ioctl[T any](fd int, req uintptr, arg *T) error {
 	}
 }
 
-// v4l2Camera streams a V4L2 capture node, letterboxing each frame for
-// the overlay rectangle on its own goroutine.
-type v4l2Camera struct {
+// Camera streams a V4L2 capture node, letterboxing each frame on its
+// own goroutine.
+type Camera struct {
 	device string
 	fd     int
 	wake   int
 	maps   [][]byte
 	format cameraFrame
+	maxFPS int
 	at     image.Point
 
 	frames chan *image.RGBA
@@ -106,33 +107,21 @@ type v4l2Camera struct {
 	once   sync.Once
 }
 
-// autoCamera is the device "" stands for: the first camera.
-func autoCamera(device string) (string, error) {
-	if device != "" {
-		return device, nil
-	}
-	choices := Cameras()
-	if len(choices) < 2 {
-		return "", errors.New("recorder: the webcam overlay is on but no camera is connected")
-	}
-	return choices[1].ID, nil
-}
-
-// openCamera starts streaming device (YUYV, else MJPEG, at about the
-// overlay's width) for an overlay into dst.
-func openCamera(device string, dst image.Rectangle) (*v4l2Camera, error) {
-	device, err := autoCamera(device)
-	if err != nil {
-		return nil, err
+// Open starts streaming device (YUYV, else MJPEG, about frame's width,
+// at least MinWidth), its pictures letterboxed to frame's aspect,
+// converting at most maxFPS of them a second.
+func Open(device string, frame image.Point, maxFPS int) (*Camera, error) {
+	if frame.X <= 0 || frame.Y <= 0 || maxFPS <= 0 {
+		return nil, fmt.Errorf("v4l2: camera %s: a %v frame at %d fps", device, frame, maxFPS)
 	}
 	fd, err := unix.Open(device, unix.O_RDWR|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return nil, fmt.Errorf("recorder: open the camera %s: %w", device, err)
+		return nil, fmt.Errorf("v4l2: open the camera %s: %w", device, err)
 	}
-	c := &v4l2Camera{device: device, fd: fd, wake: -1}
-	if err := c.setup(dst); err != nil {
+	c := &Camera{device: device, fd: fd, wake: -1, maxFPS: maxFPS}
+	if err := c.setup(frame); err != nil {
 		c.release()
-		return nil, fmt.Errorf("recorder: camera %s: %w", device, err)
+		return nil, fmt.Errorf("v4l2: camera %s: %w", device, err)
 	}
 	go c.run()
 	return c, nil
@@ -140,9 +129,9 @@ func openCamera(device string, dst image.Rectangle) (*v4l2Camera, error) {
 
 // setup negotiates the format, maps and queues the buffers, and starts
 // the stream.
-func (c *v4l2Camera) setup(dst image.Rectangle) error {
-	w := max(dst.Dx(), cameraMinWidth)
-	h := w * dst.Dy() / max(dst.Dx(), 1)
+func (c *Camera) setup(frame image.Point) error {
+	w := max(frame.X, MinWidth)
+	h := w * frame.Y / frame.X
 	var f v4l2Format
 	for _, pix := range []uint32{pixYUYV, pixMJPG} {
 		f = v4l2Format{typ: v4l2BufTypeVideoCapture, pix: v4l2PixFormat{width: uint32(w), height: uint32(h), pixelformat: pix, field: v4l2FieldNone}}
@@ -193,26 +182,34 @@ func (c *v4l2Camera) setup(dst image.Rectangle) error {
 	// One frame uploading, one waiting, one converting.
 	c.frames, c.free, c.done = make(chan *image.RGBA, 1), make(chan *image.RGBA, 3), make(chan struct{})
 	for range cap(c.free) {
-		img, at := paddedFrame(c.format, dst)
+		img, at := paddedFrame(c.format, frame)
 		c.at = at
 		c.free <- img
 	}
 	return nil
 }
 
-func (c *v4l2Camera) Frames() <-chan *image.RGBA { return c.frames }
+// Frames delivers the newest pictures; it closes when the camera
+// stops, Err then saying why.
+func (c *Camera) Frames() <-chan *image.RGBA { return c.frames }
 
-func (c *v4l2Camera) Recycle(img *image.RGBA) { c.free <- img }
+// Recycle hands a picture from Frames back for the next frame.
+func (c *Camera) Recycle(img *image.RGBA) { c.free <- img }
+
+// Format names the negotiated stream: size and pixel format.
+func (c *Camera) Format() string {
+	return fmt.Sprintf("%dx%d %s", c.format.width, c.format.height, fourccName(c.format.format))
+}
 
 // Err is why Frames closed.
-func (c *v4l2Camera) Err() error {
+func (c *Camera) Err() error {
 	<-c.done
 	return c.err
 }
 
 // run dequeues frames until Close wakes it or the device fails,
-// converting at most webcamMaxFPS of them.
-func (c *v4l2Camera) run() {
+// converting at most maxFPS of them a second.
+func (c *Camera) run() {
 	defer close(c.done)
 	defer close(c.frames)
 	var last time.Time
@@ -240,7 +237,7 @@ func (c *v4l2Camera) run() {
 			c.err = fmt.Errorf("VIDIOC_DQBUF on %s: %w", c.device, err)
 			return
 		}
-		if now := time.Now(); now.Sub(last) >= time.Second/webcamMaxFPS && int(b.index) < len(c.maps) {
+		if now := time.Now(); now.Sub(last) >= time.Second/time.Duration(c.maxFPS) && int(b.index) < len(c.maps) {
 			if err := c.convert(c.maps[b.index][:min(int(b.bytesused), len(c.maps[b.index]))]); err != nil {
 				c.err = fmt.Errorf("%s: %w", c.device, err)
 				return
@@ -256,7 +253,7 @@ func (c *v4l2Camera) run() {
 
 // convert decodes data into a free picture and publishes it, replacing
 // one not taken yet. With every picture in use the frame is dropped.
-func (c *v4l2Camera) convert(data []byte) error {
+func (c *Camera) convert(data []byte) error {
 	var img *image.RGBA
 	select {
 	case img = <-c.free:
@@ -281,7 +278,7 @@ func (c *v4l2Camera) convert(data []byte) error {
 }
 
 // Close stops the stream and releases the device.
-func (c *v4l2Camera) Close() {
+func (c *Camera) Close() {
 	c.once.Do(func() {
 		var one [8]byte
 		one[0] = 1
@@ -292,7 +289,7 @@ func (c *v4l2Camera) Close() {
 }
 
 // release stops streaming and frees the maps and descriptors.
-func (c *v4l2Camera) release() {
+func (c *Camera) release() {
 	typ := uint32(v4l2BufTypeVideoCapture)
 	_ = ioctl(c.fd, vidiocStreamoff, &typ)
 	for _, m := range c.maps {

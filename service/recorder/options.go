@@ -58,17 +58,3 @@ func webcamRect(cam Webcam, screenW, screenH int32) image.Rectangle {
 	y := margin + travelH*int32(min(cam.Y, 100))/100
 	return image.Rect(int(x), int(y), int(x+camW), int(y+camH))
 }
-
-// letterbox is the picture a camera's srcW x srcH frame is padded into
-// so it fills a frame of dst's aspect without stretching: the padded
-// size, and where the camera's pixels sit in it. The padding is black.
-func letterbox(srcW, srcH int, dst image.Rectangle) (size, at image.Point) {
-	dw, dh := dst.Dx(), dst.Dy()
-	// Compare srcW/srcH with dw/dh without dividing.
-	if srcW*dh >= srcH*dw {
-		h := (srcW*dh + dw - 1) / dw
-		return image.Pt(srcW, h), image.Pt(0, (h-srcH)/2)
-	}
-	w := (srcH*dw + dh - 1) / dh
-	return image.Pt(w, srcH), image.Pt((w-srcW)/2, 0)
-}

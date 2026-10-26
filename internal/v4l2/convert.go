@@ -1,4 +1,4 @@
-package recorder
+package v4l2
 
 import (
 	"bytes"
@@ -27,10 +27,10 @@ type cameraFrame struct {
 	stride        int
 }
 
-// paddedFrame allocates the overlay picture a camera frame of f's size
-// is letterboxed into for dst, black, and where the camera's pixels go.
-func paddedFrame(f cameraFrame, dst image.Rectangle) (*image.RGBA, image.Point) {
-	size, at := letterbox(f.width, f.height, dst)
+// paddedFrame allocates the picture a camera frame of f's size is
+// letterboxed into for aspect, black, and where the camera's pixels go.
+func paddedFrame(f cameraFrame, aspect image.Point) (*image.RGBA, image.Point) {
+	size, at := letterbox(f.width, f.height, aspect)
 	img := image.NewRGBA(image.Rectangle{Max: size})
 	clearOpaque(img)
 	return img, at
@@ -96,3 +96,17 @@ func ycbcrPixel(px []byte, y8 byte, u, v int32) {
 }
 
 func clamp8(v int32) byte { return byte(min(max(v, 0), 255)) }
+
+// letterbox is the picture a camera's srcW x srcH frame is padded into
+// so it has aspect's proportions without stretching: the padded size,
+// and where the camera's pixels sit in it. The padding is black.
+func letterbox(srcW, srcH int, aspect image.Point) (size, at image.Point) {
+	dw, dh := aspect.X, aspect.Y
+	// Compare srcW/srcH with dw/dh without dividing.
+	if srcW*dh >= srcH*dw {
+		h := (srcW*dh + dw - 1) / dw
+		return image.Pt(srcW, h), image.Pt(0, (h-srcH)/2)
+	}
+	w := (srcH*dw + dh - 1) / dh
+	return image.Pt(w, srcH), image.Pt((w-srcW)/2, 0)
+}

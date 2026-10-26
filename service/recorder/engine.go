@@ -181,7 +181,7 @@ func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, e
 	if opts.Webcam != nil {
 		size := g.screen.size()
 		parts.camRect = webcamRect(*opts.Webcam, int32(size.X), int32(size.Y))
-		cam, err := openCamera(opts.Webcam.Device, parts.camRect)
+		cam, err := openWebcam(opts.Webcam.Device, parts.camRect.Size())
 		if err != nil {
 			video.Close()
 			return nil, err

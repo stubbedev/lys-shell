@@ -144,7 +144,7 @@ func TestPauseDropsAudioDeliveredWhilePaused(t *testing.T) {
 	queued := func() int {
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		return len(r.mixer.queues[0])
+		return r.mixer.Queued(0)
 	}
 	r.SetPaused(true)
 	src.push(pcmBytes(1, 2, 3, 4))

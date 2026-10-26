@@ -5,14 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"unsafe"
 )
-
-func TestV4L2CapabilitySize(t *testing.T) {
-	if got := unsafe.Sizeof(v4l2Capability{}); got != 104 {
-		t.Errorf("sizeof = %d, want 104", got)
-	}
-}
 
 func TestMicrophoneChoices(t *testing.T) {
 	if got := MicrophoneChoices(nil); !slices.Equal(got, []DeviceChoice{{"", "Default"}}) {
@@ -46,9 +39,6 @@ func TestCameras(t *testing.T) {
 	}
 	if got := cameras(filepath.Join(sys, "missing"), "/dev", probe); len(got) != 1 {
 		t.Errorf("no sysfs = %v, want only Automatic", got)
-	}
-	if _, ok := captureCard(filepath.Join(sys, "not-a-device")); ok {
-		t.Error("a missing node probed as a camera")
 	}
 }
 
