@@ -74,6 +74,20 @@ func TestMJPEGToRGBA(t *testing.T) {
 	if got := img.RGBAAt(0, 0); got != (color.RGBA{0, 0, 0, 255}) {
 		t.Errorf("padding = %v, want opaque black", got)
 	}
+	// UVC cameras leave the standard Huffman tables out of their frames.
+	dht, ok := dhtSegment(buf.Bytes())
+	if !ok {
+		t.Fatal("the encoded JPEG has no DHT segment")
+	}
+	bare := bytes.Replace(buf.Bytes(), dht, nil, 1)
+	if _, ok := dhtSegment(bare); ok {
+		t.Fatal("the DHT segment was not cut")
+	}
+	clear(img.Pix)
+	if err := decodeFrame(img, at, f, bare); err != nil {
+		t.Fatalf("a frame without Huffman tables: %v", err)
+	}
+	rgbaNear(t, "blue without tables", img.RGBAAt(at.X+8, at.Y+4), color.RGBA{0, 0, 255, 255})
 	if err := decodeFrame(img, at, cameraFrame{width: 8, height: 8, format: pixMJPG}, buf.Bytes()); err == nil {
 		t.Error("a 16x8 JPEG decoded as an 8x8 stream")
 	}

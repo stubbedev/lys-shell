@@ -50,6 +50,10 @@ func decodeFrame(img *image.RGBA, at image.Point, f cameraFrame, data []byte) er
 	case pixYUYV:
 		return yuyvToRGBA(img, at, f, data)
 	case pixMJPG:
+		data, err := withHuffmanTables(data)
+		if err != nil {
+			return err
+		}
 		pic, err := jpeg.Decode(bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("decode an MJPEG camera frame: %w", err)
