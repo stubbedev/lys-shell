@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/capture"
-	"github.com/stubbedev/lys-ui/dmabuf"
-	"github.com/stubbedev/lys-ui/gpu"
+	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/dmabuf"
+	"github.com/stubbedev/lys-lib/gpu"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"

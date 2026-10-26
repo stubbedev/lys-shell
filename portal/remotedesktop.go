@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/lys-ui/vinput"
+	"github.com/stubbedev/lys-lib/vinput"
 	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"

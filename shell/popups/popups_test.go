@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/app"
-	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 

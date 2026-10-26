@@ -1,5 +1,5 @@
 // Package sharepreview is the capture half of wayle-share-preview on
-// top of lys-ui's capture package: turning captured frames into images
+// top of lys-lib's capture package: turning captured frames into images
 // (the output-transform correction, the preview downscale) and the XDPH
 // window list the share picker reads.
 package sharepreview
@@ -7,7 +7,7 @@ package sharepreview
 import (
 	"image"
 
-	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-lib/capture"
 	xdraw "golang.org/x/image/draw"
 )
 

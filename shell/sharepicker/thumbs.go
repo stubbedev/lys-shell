@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"image"
 
-	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-lib/capture"
 
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 )

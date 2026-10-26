@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/capture"
-	"github.com/stubbedev/lys-ui/dmabuf"
+	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/dmabuf"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/pipewire"

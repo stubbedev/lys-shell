@@ -27,7 +27,7 @@ let
   gstPluginPath = lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" gstPlugins;
 
   # The libraries the binaries dlopen through purego: libgstreamer and
-  # libglib (recorder), libpam (lock screen) and libvulkan (lys-ui's GPU
+  # libglib (recorder), libpam (lock screen) and libvulkan (lys-lib's GPU
   # renderer, which falls back to the CPU without it, and the portal's
   # zero-copy dmabufs, which fall back to shared memory). The portal
   # speaks PipeWire's protocol itself and loads no libpipewire.
@@ -76,7 +76,7 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-EEyFBi/aAjN/CPnnk9yfiB48UKi7sqvOiqKAFvtObGI=";
+  vendorHash = "sha256-uwqEPnEiWNWGaBbNp/dPwwP9nEqeU3jQbAyCRQiKnwQ=";
 
   subPackages = [
     "cmd/lys-shell"

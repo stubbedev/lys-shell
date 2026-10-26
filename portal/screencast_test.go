@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-lib/capture"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/internal/portalreq"

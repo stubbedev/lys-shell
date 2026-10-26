@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"

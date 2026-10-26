@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-lib/render"
 	xdraw "golang.org/x/image/draw"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"

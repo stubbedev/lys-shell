@@ -14,7 +14,7 @@ import (
 
 	"github.com/neurlang/wayland/wl"
 	"github.com/neurlang/wayland/wlclient"
-	"github.com/stubbedev/lys-ui/wlr"
+	"github.com/stubbedev/lys-lib/wlr"
 )
 
 const managerIface = "zwlr_foreign_toplevel_manager_v1"

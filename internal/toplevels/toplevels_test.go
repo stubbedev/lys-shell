@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/wlr"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-	"github.com/stubbedev/lys-ui/wlr"
 
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 )

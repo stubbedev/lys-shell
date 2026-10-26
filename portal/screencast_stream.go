@@ -6,7 +6,7 @@ import (
 	"image"
 	"sync"
 
-	"github.com/stubbedev/lys-ui/capture"
+	"github.com/stubbedev/lys-lib/capture"
 
 	"github.com/stubbedev/lys-shell/internal/pipewire"
 )

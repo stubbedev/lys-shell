@@ -13,7 +13,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/stubbedev/lys-ui/vinput"
+	"github.com/stubbedev/lys-lib/vinput"
 )
 
 // btnLeft is linux/input-event-codes.h's BTN_LEFT.

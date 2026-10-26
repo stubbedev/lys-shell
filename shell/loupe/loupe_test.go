@@ -5,7 +5,7 @@ import (
 	"image/color"
 	"testing"
 
-	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-lib/render"
 )
 
 func gradient() *image.RGBA {

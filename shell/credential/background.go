@@ -10,7 +10,7 @@ import (
 	"math"
 	"os"
 
-	"github.com/stubbedev/lys-ui/render"
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	_ "golang.org/x/image/bmp"  // background decoders
 	_ "golang.org/x/image/tiff" // background decoders
