@@ -179,13 +179,13 @@ func owedAfterNMStop(rows []nmStopRow, now time.Time, window time.Duration) []st
 // NM rather than off the rows, which follow a signal behind: NM starts
 // tearing tunnels down on the same sleep signal.
 func (s *VPNService) upNow(ctx context.Context) []string {
-	active, err := s.nm.activeByUUID(ctx)
+	active, err := s.nm.activeStates(ctx)
 	if err != nil {
 		return nil
 	}
 	states := make(map[string]ActiveState, len(active))
-	for uuid, path := range active {
-		states[uuid] = s.nm.activeState(ctx, path)
+	for uuid, conn := range active {
+		states[uuid] = conn.state
 	}
 	s.mu.Lock()
 	known := make([]string, 0, len(s.entries))

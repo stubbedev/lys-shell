@@ -473,6 +473,61 @@ func TestTunnelsNetworkManagerTookWithItComeBackAndTurnedOffOnesStayOff(t *testi
 	}
 }
 
+func TestATunnelWhoseStateASweepCouldNotReadIsBroughtBackAfterAnNMRestart(t *testing.T) {
+	fx := startService(t, withProfiles(gpConnection("work"), gpConnection("idle")))
+	up := fx.nm.startActive("work", ActiveActivated)
+	idle := fx.nm.startActive("idle", ActiveDeactivated)
+	fx.waitRow(t, "work", "connected", func(r VPN) bool { return r.State == VPNConnected })
+
+	fx.nm.hideActiveState(up)
+	fx.nm.hideActiveState(idle)
+	fx.waitRow(t, "work", "the sweep that could not read its state", func(r VPN) bool { return r.State == VPNDisconnected })
+
+	fx.nm.stop()
+	fx.nm.own()
+	waitFor(t, "the restore", func() bool { return len(fx.activations()) == 1 })
+	time.Sleep(100 * time.Millisecond)
+	if got := fx.activations(); !slices.Equal(got, []dbus.ObjectPath{settingPath(1)}) {
+		t.Errorf("activations = %v; only the tunnel that was up, not the one that never was", got)
+	}
+}
+
+func TestAFailedTunnelWhoseObjectASweepCouldNotReadKeepsItsReason(t *testing.T) {
+	fx := startService(t, withProfiles(gpConnection("work"), gpConnection("other")))
+	up := fx.nm.startActive("work", ActiveActivated)
+	fx.waitRow(t, "work", "connected", func(r VPN) bool { return r.State == VPNConnected })
+	fx.nm.setActiveState(up, ActiveDeactivated, ReasonLoginFailed)
+	fx.waitRow(t, "work", "failed", func(r VPN) bool { return r.State == VPNFailed })
+
+	fx.nm.hideActiveState(up)
+	fx.nm.startActive("other", ActiveActivated)
+	fx.waitRow(t, "other", "the sweep after the unreadable one", func(r VPN) bool { return r.State == VPNConnected })
+	if row := fx.row(t, "work"); row.State != VPNFailed || row.Detail != "authentication failed" {
+		t.Errorf("work = %+v; an unread state is no news, the failure and its reason stand", row)
+	}
+}
+
+func TestATunnelASweepSawGoingDownIsBroughtBackAfterAnNMRestart(t *testing.T) {
+	fx := startService(t, withProfiles(gpConnection("work"), gpConnection("off")))
+	up := fx.nm.startActive("work", ActiveActivated)
+	fx.nm.startActive("off", ActiveActivated)
+	fx.waitRow(t, "work", "connected", func(r VPN) bool { return r.State == VPNConnected })
+	fx.waitRow(t, "off", "connected", func(r VPN) bool { return r.State == VPNConnected })
+	must(t, fx.svc.VPN.Disconnect(t.Context(), "off"))
+	fx.waitRow(t, "off", "turned off", func(r VPN) bool { return r.State == VPNDisconnected })
+
+	fx.nm.moveActiveUnannounced(up, ActiveDeactivating)
+	fx.waitRow(t, "work", "the sweep that saw it going down", func(r VPN) bool { return r.State == VPNDisconnected })
+
+	fx.nm.stop()
+	fx.nm.own()
+	waitFor(t, "the restore", func() bool { return len(fx.activations()) == 1 })
+	time.Sleep(100 * time.Millisecond)
+	if got := fx.activations(); !slices.Equal(got, []dbus.ObjectPath{settingPath(1)}) {
+		t.Errorf("activations = %v; only the tunnel NM took, not the one turned off", got)
+	}
+}
+
 func TestVPNStatePureHelpers(t *testing.T) {
 	now := time.Now()
 	for _, before := range []VPNState{VPNConnected, VPNConnecting} {

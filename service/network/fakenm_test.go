@@ -207,6 +207,41 @@ func (f *fakeNM) setActiveState(path dbus.ObjectPath, state ActiveState, reason 
 	must(f.t, f.conn.Emit(path, activeIface+".StateChanged", uint32(state), uint32(reason)))
 }
 
+// moveActiveUnannounced sets an active connection's State without the
+// StateChanged NM sends with it, then republishes the list: a sweep
+// that reads the new state before the signal lands.
+func (f *fakeNM) moveActiveUnannounced(path dbus.ObjectPath, state ActiveState) {
+	f.mu.Lock()
+	a := f.active[path]
+	f.mu.Unlock()
+	if a == nil {
+		f.t.Fatalf("no active connection %s", path)
+	}
+	a.props.SetMust(activeIface, "State", uint32(state))
+	f.publishActive()
+}
+
+// hideActiveState re-exports an active connection with its Uuid but no
+// State, then republishes the list: a sweep that lists the object and
+// reads its profile, and then cannot read its state, the way an object
+// NM takes away mid-sweep reads.
+func (f *fakeNM) hideActiveState(path dbus.ObjectPath) {
+	f.mu.Lock()
+	a := f.active[path]
+	f.mu.Unlock()
+	if a == nil {
+		f.t.Fatalf("no active connection %s", path)
+	}
+	props, err := prop.Export(f.conn, path, prop.Map{activeIface: {
+		"Uuid": {Value: a.uuid, Emit: prop.EmitTrue},
+	}})
+	must(f.t, err)
+	f.mu.Lock()
+	a.props = props
+	f.mu.Unlock()
+	f.publishActive()
+}
+
 // dropActive tears an active connection down and unlists it.
 func (f *fakeNM) dropActive(path dbus.ObjectPath) {
 	f.mu.Lock()

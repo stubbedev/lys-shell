@@ -268,9 +268,10 @@ func (s *VPNService) update(e *vpnEntry, fn func(e *vpnEntry)) {
 
 // Connect brings the tunnel up if it is not already. The connecting
 // state is read back off the active connection NM creates, not
-// guessed. A refusal (a missing plugin, a polkit denial, a profile NM
-// cannot make sense of) is also published on the row, where the user
-// is looking when it fails.
+// guessed: one gone before it could be read is left to the sweep NM's
+// list change sets off. A refusal (a missing plugin, a polkit denial,
+// a profile NM cannot make sense of) is also published on the row,
+// where the user is looking when it fails.
 func (s *VPNService) Connect(ctx context.Context, uuid string) error {
 	return s.activate(ctx, uuid, false)
 }
@@ -312,8 +313,11 @@ func (s *VPNService) activate(ctx context.Context, uuid string, unattended bool)
 		s.update(e, func(e *vpnEntry) { e.state, e.detail = VPNFailed, err.Error() })
 		return err
 	}
-	state := vpnStateOf(s.nm.activeState(ctx, active))
-	s.update(e, func(e *vpnEntry) { e.state = state })
+	state, err := s.nm.activeState(ctx, active)
+	if err != nil {
+		return nil
+	}
+	s.update(e, func(e *vpnEntry) { e.state = vpnStateOf(state) })
 	return nil
 }
 
@@ -449,33 +453,32 @@ func (s *VPNService) rebuild() {
 // resync reads every row's state straight off NM and records which
 // active objects' transitions to follow.
 func (s *VPNService) resync(ctx context.Context) {
-	active, err := s.nm.activeByUUID(ctx)
+	active, err := s.nm.activeStates(ctx)
 	if err != nil {
 		return
-	}
-	states := make(map[string]ActiveState, len(active))
-	for uuid, path := range active {
-		states[uuid] = s.nm.activeState(ctx, path)
 	}
 	now := time.Now()
 	s.mu.Lock()
 	s.watched = make(map[dbus.ObjectPath]*vpnEntry)
 	for _, e := range s.entries {
-		if path, ok := active[e.uuid]; ok {
-			e.state = vpnStateOf(states[e.uuid])
-			s.watched[path] = e
+		next := VPNDisconnected
+		switch conn, ok := active[e.uuid]; {
+		case ok:
+			next = vpnStateOf(conn.state)
+			s.watched[conn.path] = e
+		case e.state == VPNFailed:
+			// A failed attempt keeps its state and its reason: NM has
+			// torn the object down by the time anyone reads the row,
+			// and "disconnected" with no explanation is exactly what
+			// the user needed the reason for.
 			continue
+		default:
+			e.detail = ""
 		}
-		// A failed attempt keeps its state and its reason: NM has torn
-		// the object down by the time anyone reads the row, and
-		// "disconnected" with no explanation is exactly what the user
-		// needed the reason for.
-		if e.state != VPNFailed {
-			// This can land before the tunnel's own last state change,
-			// so it stamps the way down too.
-			e.wentDownAt = nextWentDownAt(e.state, VPNDisconnected, e.wentDownAt, now)
-			e.state, e.detail = VPNDisconnected, ""
-		}
+		// This can land before the tunnel's own last state change, so
+		// it stamps the way down too.
+		e.wentDownAt = nextWentDownAt(e.state, next, e.wentDownAt, now)
+		e.state = next
 	}
 	s.mu.Unlock()
 	feed.Notify(&s.changes)

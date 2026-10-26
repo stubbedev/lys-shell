@@ -164,9 +164,9 @@ func (s *VPNService) stall() {
 // off when turned off.
 func (s *VPNService) recover(ctx context.Context) {
 	running := map[string]ActiveState{}
-	if active, err := s.nm.activeByUUID(ctx); err == nil {
-		for uuid, path := range active {
-			running[uuid] = s.nm.activeState(ctx, path)
+	if active, err := s.nm.activeStates(ctx); err == nil {
+		for uuid, conn := range active {
+			running[uuid] = conn.state
 		}
 	}
 	var owed []string

@@ -118,14 +118,39 @@ func (n nm) activeByUUID(ctx context.Context) (map[string]dbus.ObjectPath, error
 	return active, nil
 }
 
-// activeState reads one active connection's state; an unreadable
-// object counts as unknown.
-func (n nm) activeState(ctx context.Context, path dbus.ObjectPath) ActiveState {
+// activeConn is one active connection as a sweep read it.
+type activeConn struct {
+	path  dbus.ObjectPath
+	state ActiveState
+}
+
+// activeStates maps every active connection's profile UUID to its
+// object and state. An object whose state cannot be read is left out
+// like one that vanished mid-sweep, which is what NM taking it away, or
+// going away itself, looks like: no state is made up for it.
+func (n nm) activeStates(ctx context.Context) (map[string]activeConn, error) {
+	active, err := n.activeByUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	conns := make(map[string]activeConn, len(active))
+	for uuid, path := range active {
+		state, err := n.activeState(ctx, path)
+		if err != nil {
+			continue
+		}
+		conns[uuid] = activeConn{path: path, state: state}
+	}
+	return conns, nil
+}
+
+// activeState reads one active connection's state.
+func (n nm) activeState(ctx context.Context, path dbus.ObjectPath) (ActiveState, error) {
 	var state uint32
 	if err := n.prop(ctx, path, activeIface, "State", &state); err != nil {
-		return ActiveUnknown
+		return ActiveUnknown, fmt.Errorf("read the state of %s: %w", path, err)
 	}
-	return ActiveState(state)
+	return ActiveState(state), nil
 }
 
 // configAddresses reads an IP config object's addresses (AddressData),
