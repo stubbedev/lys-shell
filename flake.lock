@@ -20,6 +20,29 @@
         "type": "github"
       }
     },
+    "lys-lib": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793028578,
+        "narHash": "sha256-S0GJ3Tx5EGVSui4rYOf6jrGaiUgDoZnZeXnaWly2PyQ=",
+        "owner": "stubbedev",
+        "repo": "lys-lib",
+        "rev": "c484855461a56c7e135a974299d655915ddae87e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "stubbedev",
+        "repo": "lys-lib",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1792502884,
@@ -39,6 +62,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
+        "lys-lib": "lys-lib",
         "nixpkgs": "nixpkgs"
       }
     }

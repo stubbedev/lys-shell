@@ -1,3 +1,4 @@
+{ inputs, ... }:
 {
   perSystem =
     {
@@ -6,6 +7,12 @@
       self',
       ...
     }:
+    let
+      # Vulkan and VA-API drivers off NixOS, as lys-lib's and lys-ui's
+      # shells set them up: without it the GPU tests and sway's renderer
+      # find no driver there.
+      gpuDrivers = inputs.lys-lib.lib.gpuDriverEnv pkgs;
+    in
     {
       devShells.default = pkgs.mkShell {
         # The Go toolchain go.mod pins, from the package.
@@ -36,10 +43,12 @@
           nerd-fonts.jetbrains-mono # the common Nerd Font a user config names
         ];
 
-        # The binaries dlopen these through purego; the ScreenCast tests
-        # add libpipewire, whose streams are the reference consumers the
-        # portal is checked against.
-        LD_LIBRARY_PATH = lib.makeLibraryPath (self'.packages.lys-shell.libs ++ [ pkgs.pipewire ]);
+        # The binaries dlopen these through purego, with the GPU driver
+        # setup's own; the ScreenCast tests add libpipewire, whose streams
+        # are the reference consumers the portal is checked against.
+        LD_LIBRARY_PATH = lib.makeLibraryPath (
+          lib.unique (gpuDrivers.libraries ++ self'.packages.lys-shell.libs ++ [ pkgs.pipewire ])
+        );
 
         # The real xdg-desktop-portal frontend the portal contract tests
         # route through to the backend.
@@ -73,7 +82,8 @@
             </fontconfig>
             EOF
             export FONTCONFIG_FILE="$fontconf"
-          '';
+          ''
+          + gpuDrivers.shellHook;
       };
 
       formatter = pkgs.nixfmt;
