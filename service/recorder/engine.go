@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,9 +20,9 @@ import (
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// outputFile keeps the output the user let the recorder remember, in
-// the state directory, as the picker's payload.
-const outputFile = "recorder-output"
+// sourceFile keeps the output or region the user let the recorder
+// remember, in the state directory, as the picker's payload.
+const sourceFile = "recorder-source"
 
 // pickerAppID names the recorder to the share picker.
 const pickerAppID = "lys-shell"
@@ -34,7 +35,7 @@ const dismissTimeout = 2 * time.Second
 const audioFragment = audioRate / 100
 
 // ErrPickerCancelled is a start the user dismissed at the picker.
-var ErrPickerCancelled = errors.New("recorder: no output was picked")
+var ErrPickerCancelled = errors.New("recorder: nothing was picked to record")
 
 // Picker shows the share picker: sharepicker.Client.
 type Picker interface {
@@ -42,45 +43,56 @@ type Picker interface {
 	Dismiss(ctx context.Context, handle string) error
 }
 
-// GPUEngine is the production Engine: the share picker for the output,
-// screencopy into a buffer on the GPU behind it, the GPU's H.264
-// encoder, and the audio service for the microphone and the desktop.
+// LogicalSize is an output's size in the compositor's logical space,
+// false when the output is not known: what a region is measured in.
+type LogicalSize func(output string) (image.Point, bool)
+
+// GPUEngine is the production Engine: the share picker for an output or
+// a region of one, screencopy into a buffer on the GPU behind it, the
+// GPU's H.264 encoder, and the audio service for the microphone and the
+// desktop.
 type GPUEngine struct {
 	picker     Picker
 	audio      *pulse.Service
 	stateDir   string
+	logical    LogicalSize
 	openDevice func(uint64) (*gpu.Device, error)
 	picks      atomic.Uint64
 }
 
 // NewGPUEngine records through picker, with audio from audio (nil when
 // there is no audio server, which fails a recording that asks for
-// sound), remembering the picked output in stateDir ("" remembers
-// nothing).
-func NewGPUEngine(picker Picker, audio *pulse.Service, stateDir string) *GPUEngine {
-	return &GPUEngine{picker: picker, audio: audio, stateDir: stateDir, openDevice: gpu.OpenNode}
+// sound), regions measured by logical, remembering the pick in stateDir
+// ("" remembers nothing).
+func NewGPUEngine(picker Picker, audio *pulse.Service, logical LogicalSize, stateDir string) *GPUEngine {
+	return &GPUEngine{picker: picker, audio: audio, logical: logical, stateDir: stateDir, openDevice: gpu.OpenNode}
 }
 
-// OpenSession implements Engine: the remembered output, else the one
-// the user picks, opened for capture on its GPU.
+// OpenSession implements Engine: the remembered output or region, else
+// the one the user picks, opened for capture on its GPU.
 func (e *GPUEngine) OpenSession(ctx context.Context, showCursor bool) (Session, error) {
-	if name, ok := e.rememberedOutput(); ok {
-		s, err := openScreen(name, showCursor, e.openDevice)
+	if target, ok := e.rememberedSource(); ok {
+		s, err := openScreen(target, showCursor, e.logical, e.openDevice)
 		if !errors.Is(err, errOutputGone) {
 			return e.session(s, err)
 		}
-		log.Printf("recorder: the remembered output %s is gone; asking again", name)
-		e.forgetOutput()
+		log.Printf("recorder: the output of the remembered %s is gone; asking again", target.Payload())
+		e.forgetSource()
 	}
-	name, remember, err := e.pick(ctx)
+	target, remember, err := e.pick(ctx)
 	if err != nil {
 		return nil, err
 	}
-	s, err := openScreen(name, showCursor, e.openDevice)
+	s, err := openScreen(target, showCursor, e.logical, e.openDevice)
 	if err == nil && remember {
-		e.rememberOutput(name)
+		e.rememberSource(target)
 	}
 	return e.session(s, err)
+}
+
+// recordable is a target the recorder captures: an output or a region.
+func recordable(t sharepicker.Target) bool {
+	return t.Kind == sharepicker.TargetOutput || t.Kind == sharepicker.TargetRegion
 }
 
 func (e *GPUEngine) session(s *screen, err error) (Session, error) {
@@ -90,12 +102,12 @@ func (e *GPUEngine) session(s *screen, err error) (Session, error) {
 	return &gpuSession{screen: s, audio: e.audio}, nil
 }
 
-// pick asks the share picker for one output. A cancelled ctx takes the
-// picker down.
-func (e *GPUEngine) pick(ctx context.Context) (name string, remember bool, err error) {
+// pick asks the share picker for one output or region. A cancelled ctx
+// takes the picker down.
+func (e *GPUEngine) pick(ctx context.Context) (target sharepicker.Target, remember bool, err error) {
 	handle := fmt.Sprintf("/dev/stubbe/lys/Recorder/pick/%d", e.picks.Add(1))
 	reply, err := e.picker.Pick(ctx, portalreq.Caller{Handle: handle, AppID: pickerAppID}, sharepicker.Request{
-		Sources: sharepicker.SourceOutputs, AllowToken: e.stateDir != "",
+		Sources: sharepicker.SourceOutputs | sharepicker.SourceRegions, AllowToken: e.stateDir != "",
 	})
 	if ctx.Err() != nil {
 		dctx, cancel := context.WithTimeout(context.Background(), dismissTimeout)
@@ -103,59 +115,59 @@ func (e *GPUEngine) pick(ctx context.Context) (name string, remember bool, err e
 		if derr := e.picker.Dismiss(dctx, handle); derr != nil {
 			log.Printf("recorder: take down the cancelled picker: %v", derr)
 		}
-		return "", false, ctx.Err()
+		return sharepicker.Target{}, false, ctx.Err()
 	}
 	if err != nil {
-		return "", false, fmt.Errorf("recorder: the share picker: %w", err)
+		return sharepicker.Target{}, false, fmt.Errorf("recorder: the share picker: %w", err)
 	}
 	if reply == "" {
-		return "", false, ErrPickerCancelled
+		return sharepicker.Target{}, false, ErrPickerCancelled
 	}
 	remember, targets, ok := sharepicker.ParseReply(reply)
-	if !ok || len(targets) != 1 || targets[0].Kind != sharepicker.TargetOutput {
-		return "", false, fmt.Errorf("recorder: the share picker replied %q, not one output", reply)
+	if !ok || len(targets) != 1 || !recordable(targets[0]) {
+		return sharepicker.Target{}, false, fmt.Errorf("recorder: the share picker replied %q, not one output or region", reply)
 	}
-	return targets[0].Name, remember, nil
+	return targets[0], remember, nil
 }
 
-func (e *GPUEngine) outputPath() string { return filepath.Join(e.stateDir, outputFile) }
+func (e *GPUEngine) sourcePath() string { return filepath.Join(e.stateDir, sourceFile) }
 
-// rememberedOutput is the output a past pick let the recorder keep.
-func (e *GPUEngine) rememberedOutput() (string, bool) {
+// rememberedSource is the output or region a past pick let the
+// recorder keep.
+func (e *GPUEngine) rememberedSource() (sharepicker.Target, bool) {
 	if e.stateDir == "" {
-		return "", false
+		return sharepicker.Target{}, false
 	}
-	data, err := os.ReadFile(e.outputPath())
+	data, err := os.ReadFile(e.sourcePath())
 	if errors.Is(err, os.ErrNotExist) {
-		return "", false
+		return sharepicker.Target{}, false
 	}
 	if err != nil {
-		log.Printf("recorder: read the remembered output: %v", err)
-		return "", false
+		log.Printf("recorder: read the remembered source: %v", err)
+		return sharepicker.Target{}, false
 	}
 	t, ok := sharepicker.ParseTarget(strings.TrimSpace(string(data)))
-	if !ok || t.Kind != sharepicker.TargetOutput {
-		log.Printf("recorder: %s holds %q, not an output; asking again", e.outputPath(), data)
-		e.forgetOutput()
-		return "", false
+	if !ok || !recordable(t) {
+		log.Printf("recorder: %s holds %q, not an output or region; asking again", e.sourcePath(), data)
+		e.forgetSource()
+		return sharepicker.Target{}, false
 	}
-	return t.Name, true
+	return t, true
 }
 
-func (e *GPUEngine) rememberOutput(name string) {
+func (e *GPUEngine) rememberSource(t sharepicker.Target) {
 	if err := os.MkdirAll(e.stateDir, 0o700); err != nil {
-		log.Printf("recorder: remember output %s: %v", name, err)
+		log.Printf("recorder: remember %s: %v", t.Payload(), err)
 		return
 	}
-	payload := sharepicker.Target{Kind: sharepicker.TargetOutput, Name: name}.Payload()
-	if err := atomicfile.Write(e.outputPath(), []byte(payload+"\n"), 0o600); err != nil {
-		log.Printf("recorder: remember output %s: %v", name, err)
+	if err := atomicfile.Write(e.sourcePath(), []byte(t.Payload()+"\n"), 0o600); err != nil {
+		log.Printf("recorder: remember %s: %v", t.Payload(), err)
 	}
 }
 
-func (e *GPUEngine) forgetOutput() {
-	if err := os.Remove(e.outputPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Printf("recorder: forget the remembered output: %v", err)
+func (e *GPUEngine) forgetSource() {
+	if err := os.Remove(e.sourcePath()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("recorder: forget the remembered source: %v", err)
 	}
 }
 
@@ -179,7 +191,7 @@ func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, e
 	}
 	parts := recordingParts{video: video, audio: sources, fps: fps, now: time.Now}
 	if opts.Webcam != nil {
-		size := g.screen.size()
+		size := g.screen.frameSize()
 		parts.camRect = webcamRect(*opts.Webcam, int32(size.X), int32(size.Y))
 		cam, err := openWebcam(opts.Webcam.Device, parts.camRect.Size())
 		if err != nil {

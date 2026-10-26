@@ -64,3 +64,23 @@ func Start(t *testing.T, env ...string) *os.Process {
 		}
 	}
 }
+
+// Msg runs swaymsg with args against the sway Start ran for this test
+// (its IPC socket in XDG_RUNTIME_DIR), failing the test when sway
+// refuses the command, and returns its output.
+func Msg(t *testing.T, args ...string) []byte {
+	t.Helper()
+	pattern := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sway-ipc.*.sock")
+	var sockets []string
+	for deadline := time.Now().Add(5 * time.Second); len(sockets) == 0; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("no sway IPC socket matches %s", pattern)
+		}
+		sockets, _ = filepath.Glob(pattern)
+	}
+	out, err := exec.Command("swaymsg", append([]string{"-s", sockets[0]}, args...)...).CombinedOutput() //nolint:gosec // swaymsg from PATH, for a test
+	if err != nil {
+		t.Fatalf("swaymsg %s: %v: %s", strings.Join(args, " "), err, out)
+	}
+	return out
+}

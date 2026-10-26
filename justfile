@@ -115,9 +115,10 @@ check: lint test race schema-check
 # Vulkan, the recorder records 3 s of it into MP4 and Matroska with
 # audio, and the log shows the Vulkan device, the modifier the capture
 # took, the codecs the device encodes, and ffprobe's reading of each
-# file. A GPU without an H.264 encoder says so instead.
+# file; every output transform and a region are recorded and checked
+# upright. A GPU without an H.264 encoder says so, and why, instead.
 recorder-check:
-    {{go}} test -count=1 -v -run '^(TestNoH264EncoderIsTheDefinedError|TestRecordsAnOutputOnTheGPU|TestWebcamOverlayIsEncodedIntoTheFrame)$' ./service/recorder/
+    {{go}} test -count=1 -v -run '^(TestNoH264EncoderIsTheDefinedError|TestRecordsAnOutputOnTheGPU|TestWebcamOverlayIsEncodedIntoTheFrame|TestRecordsTransformedOutputsAndRegionsUpright)$' ./service/recorder/
 
 # ─────────────────────────── Generated files ───────────────────────────
 

@@ -23,6 +23,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // hostRenderNodes are the host's DRM render nodes.
@@ -128,7 +129,7 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 	for i, format := range []config.RecorderFormat{config.RecorderFormatMp4, config.RecorderFormatMkv} {
 		t.Run(string(format), func(t *testing.T) {
 			p := &fakePicker{reply: "r/screen:" + output}
-			e := NewGPUEngine(p, audio, stateDir)
+			e := NewGPUEngine(p, audio, noLogical, stateDir)
 			s, err := e.OpenSession(context.Background(), true)
 			if err != nil {
 				t.Fatal(err)
@@ -170,7 +171,7 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 			if want := 1 - min(i, 1); len(p.asked) != want {
 				t.Errorf("asked the picker %d times, want %d: the first pick is remembered", len(p.asked), want)
 			}
-			if data, err := os.ReadFile(filepath.Join(stateDir, outputFile)); err != nil || string(data) != "screen:"+output+"\n" {
+			if data, err := os.ReadFile(filepath.Join(stateDir, sourceFile)); err != nil || string(data) != "screen:"+output+"\n" {
 				t.Errorf("remembered %q (%v)", data, err)
 			}
 		})
@@ -183,7 +184,7 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 func TestWebcamOverlayIsEncodedIntoTheFrame(t *testing.T) {
 	requireFFmpeg(t)
 	output := gpuSway(t)
-	s, err := openScreen(output, false, gpu.OpenNode)
+	s, err := openScreen(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: output}, false, noLogical, gpu.OpenNode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +193,7 @@ func TestWebcamOverlayIsEncodedIntoTheFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	size := s.size()
+	size := s.frameSize()
 	rect := webcamRect(Webcam{X: 0, Y: 0, Size: 30}, int32(size.X), int32(size.Y))
 	red := image.NewRGBA(image.Rect(0, 0, 32, 18))
 	for i := 0; i < len(red.Pix); i += 4 {

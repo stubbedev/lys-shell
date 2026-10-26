@@ -244,11 +244,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 				defer func() { _ = server.Release() }()
 			}
 		}
-		// The recorder asks the share picker on this bus for an output,
-		// records it on the GPU with audio from the audio service, and
-		// reports through the OSD and desktop notifications.
+		// The recorder asks the share picker on this bus for an output or
+		// a region, records it on the GPU with audio from the audio service,
+		// and reports through the OSD and desktop notifications.
 		stateDir, _ := xdg.StateDir()
-		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, stateDir),
+		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(application, sess.Outputs), stateDir),
 			func() config.RecorderConfig { return current.Load().Recorder },
 			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
 				if o := osdRef.Load(); o != nil {

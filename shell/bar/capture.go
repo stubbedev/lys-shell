@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
@@ -96,6 +97,29 @@ func (s *captureServices) trigger(mode, target string) {
 func (s *captureServices) close() {
 	for _, release := range slices.Backward(s.release) {
 		release()
+	}
+}
+
+// logicalOutputSize reads an output's logical size (xdg-output) on the
+// loop, for a recorder measuring the region it was given.
+func logicalOutputSize(application *app.Application, outputs func() []*app.Output) recorder.LogicalSize {
+	type found struct {
+		size image.Point
+		ok   bool
+	}
+	return func(name string) (image.Point, bool) {
+		reply := make(chan found, 1)
+		application.Invoke(func() {
+			for _, o := range outputs() {
+				if o.Name == name {
+					reply <- found{image.Pt(int(o.LogicalW), int(o.LogicalH)), true}
+					return
+				}
+			}
+			reply <- found{}
+		})
+		f := <-reply
+		return f.size, f.ok
 	}
 }
 
