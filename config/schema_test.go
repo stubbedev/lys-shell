@@ -209,3 +209,26 @@ func TestPropertyOrder(t *testing.T) {
 		t.Errorf("fallback = %v", got)
 	}
 }
+
+// TestGenerateSchemaIsIndented pins the form the committed schema file
+// is written in without a formatter: two-space indentation, not the
+// compact form the writer builds it from.
+func TestGenerateSchemaIsIndented(t *testing.T) {
+	got := GenerateSchema()
+	var compact, indented bytes.Buffer
+	if err := json.Compact(&compact, []byte(got)); err != nil {
+		t.Fatal(err)
+	}
+	if got == compact.String() {
+		t.Fatal("the schema is compact")
+	}
+	if err := json.Indent(&indented, compact.Bytes(), "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	if got != indented.String() {
+		t.Error("the schema is not indented by two spaces")
+	}
+	if !strings.HasPrefix(got, "{\n  \"$defs\": {\n    \"") {
+		t.Errorf("the schema does not open with its sorted $defs: %q", got[:min(len(got), 40)])
+	}
+}

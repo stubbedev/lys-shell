@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -136,10 +138,15 @@ type schemaGen struct {
 	defaults map[reflect.Type]reflect.Value
 }
 
-// GenerateSchema returns the JSON Schema of the whole config, compact
-// with sorted keys (the `lys-shell config schema --stdout` output).
+// GenerateSchema returns the JSON Schema of the whole config, indented
+// by two spaces with sorted keys (the `lys-shell config schema --stdout`
+// output and the committed schema/lys-shell-config.schema.json).
 func GenerateSchema() string {
-	return marshalJSON(generateSchemaTree())
+	var b bytes.Buffer
+	if err := json.Indent(&b, []byte(marshalJSON(generateSchemaTree())), "", "  "); err != nil {
+		panic(fmt.Sprintf("config: the generated schema is not JSON: %v", err))
+	}
+	return b.String()
 }
 
 func generateSchemaTree() Schema {

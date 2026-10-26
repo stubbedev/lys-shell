@@ -97,7 +97,7 @@ schema-check:
     set -euo pipefail
     got=$(mktemp)
     trap 'rm -f "$got"' EXIT
-    {{go}} run ./cmd/lys-shell config schema --stdout | jq -S . > "$got"
+    {{go}} run ./cmd/lys-shell config schema --stdout > "$got"
     if ! diff -u schema/lys-shell-config.schema.json "$got"; then
         echo "Config schema is out of date: run \`just schema\`." >&2
         exit 1
@@ -170,7 +170,7 @@ recorder-check:
 # Regenerate the committed config JSON schema. Its $id embeds the version,
 # so the release flow rewrites it on every bump.
 schema:
-    {{go}} run ./cmd/lys-shell config schema --stdout | jq -S . > schema/lys-shell-config.schema.json
+    {{go}} run ./cmd/lys-shell config schema --stdout > schema/lys-shell-config.schema.json
 
 # Recompute nix/lys-shell.nix's vendorHash after a go.mod change (a lys-ui
 # bump): the vendor derivation is fixed-output, so a stale hash reuses
