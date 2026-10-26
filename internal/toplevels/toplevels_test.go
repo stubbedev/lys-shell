@@ -2,11 +2,7 @@ package toplevels
 
 import (
 	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,7 +12,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/wlr"
 
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/internal/swaytest"
 )
 
 // A window is listed from its first done batch, with the batch's app id
@@ -55,60 +51,6 @@ func TestTrackerAppliesBatchesOnDone(t *testing.T) {
 	early.HandleZwlrForeignToplevelHandleV1Closed(wlr.ZwlrForeignToplevelHandleV1ClosedEvent{})
 	if changes.Load() != 3 {
 		t.Error("a window never listed announced its close")
-	}
-}
-
-// startSway runs a private headless sway and points WAYLAND_DISPLAY and
-// XDG_RUNTIME_DIR at it for the test. It gets a private session bus:
-// without one, nixpkgs' wrapper runs it under dbus-run-session, whose
-// process is not sway's. Its log is shown when it fails to start.
-func startSway(t *testing.T) *os.Process {
-	t.Helper()
-	if _, err := exec.LookPath("sway"); err != nil {
-		t.Skip("sway is not installed (the nix dev shell carries it)")
-	}
-	dir, err := os.MkdirTemp("", "lys-sway")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	if err := os.Chmod(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	config := filepath.Join(dir, "config")
-	if err := os.WriteFile(config, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	log, err := os.Create(filepath.Join(dir, "log"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer log.Close()
-	cmd := exec.Command("sway", "-c", config)
-	cmd.Stdout, cmd.Stderr = log, log
-	cmd.Env = append(os.Environ(), "XDG_RUNTIME_DIR="+dir, "DBUS_SESSION_BUS_ADDRESS="+dbustest.Start(t).Address, "WLR_BACKENDS=headless", "WLR_RENDERER=pixman", "WLR_LIBINPUT_NO_DEVICES=1")
-	cmd.Env = slices.DeleteFunc(cmd.Env, func(kv string) bool {
-		return strings.HasPrefix(kv, "WAYLAND_DISPLAY=") || strings.HasPrefix(kv, "SWAYSOCK=")
-	})
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-	})
-	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			out, _ := os.ReadFile(log.Name())
-			t.Fatalf("sway never opened its socket:\n%s", out)
-		}
-		sockets, _ := filepath.Glob(filepath.Join(dir, "wayland-*"))
-		sockets = slices.DeleteFunc(sockets, func(s string) bool { return strings.HasSuffix(s, ".lock") })
-		if len(sockets) > 0 {
-			t.Setenv("XDG_RUNTIME_DIR", dir)
-			t.Setenv("WAYLAND_DISPLAY", filepath.Base(sockets[0]))
-			return cmd.Process
-		}
 	}
 }
 
@@ -170,7 +112,7 @@ func (c closer) Close() error {
 // id and activated, and leaves the list when it closes; Close ends the
 // watcher without an error.
 func TestWatcherFollowsAWindow(t *testing.T) {
-	startSway(t)
+	swaytest.Start(t)
 	var changes atomic.Int32
 	w, err := Watch(func() { changes.Add(1) })
 	if err != nil {
@@ -196,7 +138,7 @@ func TestWatcherFollowsAWindow(t *testing.T) {
 
 // A compositor going away ends the watcher with an error.
 func TestWatcherEndsWithTheCompositor(t *testing.T) {
-	sway := startSway(t)
+	sway := swaytest.Start(t)
 	w, err := Watch(nil)
 	if err != nil {
 		t.Fatal(err)
