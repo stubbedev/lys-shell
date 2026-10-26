@@ -1980,6 +1980,38 @@ func (hs *harness) listRowCells(t *testing.T, i, w, h int) (widget.Widget, []wid
 // A column that gave way paints nothing: a row laid out wide and then
 // at the name's floor paints its cells at the wide layout and nothing
 // past the floor once they hid, though they keep their wide bounds.
+// A column hidden at the name's floor takes no hits: a point where it
+// sat while shown lands on none of its widgets.
+func TestHiddenColumnsTakeNoHits(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{})
+	const wide, narrow, h = 1200, nameMinW, listRowH
+	hs.run(func() {
+		row := rows{hs.c, false}.Row(0)
+		widget.SetParents(hs.c.ui.list, row)
+		cells := treetest.WithClass(row, "file-chooser-cell")
+		layAt := func(w int) {
+			row.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
+			row.Arrange(render.Rect{W: w, H: h})
+		}
+		layAt(wide)
+		centers := make([]widget.Point, len(cells))
+		for i, c := range cells {
+			b := c.(widget.Boundser).Bounds()
+			centers[i] = widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+			if hit := row.HitTest(centers[i]); !treetest.Contains(c, hit) {
+				t.Fatalf("shown, cell %d at %v is not hit", i, centers[i])
+			}
+		}
+		layAt(narrow)
+		for i, c := range cells {
+			if hit := row.HitTest(centers[i]); hit != nil && treetest.Contains(c, hit) {
+				t.Errorf("hidden, cell %d still takes the hit at %v", i, centers[i])
+			}
+		}
+	})
+}
+
 func TestHiddenColumnsPaintNothing(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.open(t, OpenRequest{})

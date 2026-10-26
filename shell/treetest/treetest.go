@@ -46,6 +46,13 @@ func Walk(w widget.Widget, visit func(widget.Widget)) {
 	}
 }
 
+// Contains reports whether w is root or one of its descendants.
+func Contains(root, w widget.Widget) bool {
+	found := false
+	Walk(root, func(k widget.Widget) { found = found || k == w })
+	return found
+}
+
 // All is every widget of type T under root, in walk order.
 func All[T widget.Widget](root widget.Widget) []T {
 	var out []T

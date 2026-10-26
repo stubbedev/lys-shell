@@ -197,10 +197,7 @@ func (r *columnRow) Paint(cv *render.Canvas) {
 
 func (r *columnRow) HitTest(p widget.Point) widget.Widget {
 	for _, k := range r.kids {
-		if !widget.IsVisible(k) {
-			continue
-		}
-		if hit := k.HitTest(p); hit != nil {
+		if hit := widget.HitChild(k, p); hit != nil {
 			return hit
 		}
 	}
