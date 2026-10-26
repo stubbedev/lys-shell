@@ -26,6 +26,8 @@
           delve
 
           just
+          git
+          gh
 
           # Headless test sessions: fontconfig reads the generated config
           # (shellHook), sway is the headless compositor, dbus the private
@@ -57,6 +59,7 @@
         # lys-ui is pure Go by design; keep accidental cgo out (`just race`
         # re-enables it per invocation).
         CGO_ENABLED = "0";
+        GOTOOLCHAIN = "local";
 
         shellHook =
           let

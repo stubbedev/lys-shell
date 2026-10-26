@@ -4,9 +4,7 @@ let
   # consumer's nixpkgs, so the pin is applied per package set.
   lysShellFor =
     pkgs:
-    pkgs.callPackage ./lys-shell.nix {
-      buildGoModule = pkgs.buildGoModule.override { go = pkgs.go_1_27; };
-    };
+    pkgs.callPackage ./lys-shell.nix { };
 in
 {
   perSystem =

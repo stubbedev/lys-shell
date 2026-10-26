@@ -1,6 +1,6 @@
 {
   lib,
-  buildGoModule,
+  buildGo127Module,
   makeWrapper,
   libva,
   pam,
@@ -52,7 +52,7 @@ let
     ];
   };
 in
-buildGoModule {
+buildGo127Module {
   pname = "lys-shell";
   inherit version src;
 
