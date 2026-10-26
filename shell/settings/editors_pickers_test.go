@@ -303,3 +303,50 @@ func TestIconNamesListTheIconSearchPath(t *testing.T) {
 		t.Errorf("the picker offers %v, want %v", got, want)
 	}
 }
+
+// The grid opens scrolled so the current icon shows whole; one in the
+// first lines, or none, leaves it at its top.
+func TestIconPickerOpensAtTheCurrentIcon(t *testing.T) {
+	var names []string
+	for i := range iconPickerColumns * (iconPickerRows + 4) {
+		names = append(names, "icon-"+string(rune('a'+i/26))+string(rune('a'+i%26))+"-symbolic")
+	}
+	pickerIcons(t, names...)
+	for _, tc := range []struct {
+		current string
+		atTop   bool
+	}{
+		{names[len(names)-1], false},
+		{names[(iconPickerRows+1)*iconPickerColumns+3], false},
+		{names[(iconPickerRows-1)*iconPickerColumns+3], true},
+		{names[1], true},
+		{"not-offered-symbolic", true},
+	} {
+		t.Run(tc.current, func(t *testing.T) {
+			k := testKit(t, "")
+			path := "modules.clock.icon-name"
+			_ = k.store.set(path, tc.current)
+			k.pickers = &fakePickers{}
+			theme := apptheme.New(k.store.svc.Config())
+			c := newIconEditor(k, pathSlot(k.store, path))
+			theme.Attach(c.Box)
+			sz := widget.MeasureAsChild(c.Box, widget.Constraints{Max: widget.Size{W: 1400, H: 200}})
+			widget.ArrangeAsChild(c.Box, render.Rect{X: 300, Y: 40, W: sz.W, H: sz.H})
+			c.btn.ClickAt(widget.Point{})
+			p := c.picker
+			layOutPicker(theme, p)
+			layOutPicker(theme, p)
+			view := p.scroll.Bounds()
+			if _, y := p.scroll.Offset(); tc.atTop != (y == 0) {
+				t.Errorf("the grid opens scrolled %dpx, want at its top %v", y, tc.atTop)
+			}
+			i := slices.Index(p.shown, tc.current)
+			if i < 0 {
+				return
+			}
+			if r := p.grid.ChildAt(i).Bounds(); r.Y < view.Y || r.Y+r.H > view.Y+view.H {
+				t.Errorf("the current icon at %v opens outside the grid's view %v", r, view)
+			}
+		})
+	}
+}
