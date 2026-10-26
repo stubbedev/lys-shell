@@ -71,6 +71,7 @@ settings-wallpaper-monitor-label = Monitor
 settings-wallpaper-monitor-placeholder = DP-1
 settings-wallpaper-path-label = Wallpaper
 settings-wallpaper-path-placeholder = /path/to/wallpaper.png
+settings-file-path-placeholder = No path set
 settings-layout-monitor-placeholder = DP-1
 settings-wallpaper-count = { $count } monitors
 settings-layout-zone-left = LEFT

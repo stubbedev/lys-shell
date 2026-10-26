@@ -35,6 +35,7 @@ settings-wallpaper-monitor-label = Moniteur
 settings-wallpaper-monitor-placeholder = DP-1
 settings-wallpaper-path-label = Fond d'écran
 settings-wallpaper-path-placeholder = /chemin/vers/fond-ecran.png
+settings-file-path-placeholder = Aucun chemin
 settings-layout-monitor-placeholder = DP-1
 settings-wallpaper-count = { $count } moniteurs
 settings-layout-zone-left = GAUCHE

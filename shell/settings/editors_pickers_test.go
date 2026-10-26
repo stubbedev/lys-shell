@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -862,5 +863,24 @@ func TestEmptyPathFieldShowsNoDisplay(t *testing.T) {
 	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
 	if c.display.Visible() || c.field.HasClass("at-rest") || c.entry.TooltipText() != "" {
 		t.Errorf("an empty field shows the display %v (at rest %v, tooltip %q), want the bare entry", c.display.Visible(), c.field.HasClass("at-rest"), c.entry.TooltipText())
+	}
+}
+
+// An empty path field reads its translated placeholder, which is only a
+// hint: it is never the field's text nor written to the config.
+func TestEmptyPathFieldShowsItsPlaceholder(t *testing.T) {
+	k := testKit(t, "")
+	s := pathSlot(k.store, "lock.background-image")
+	c := newFileEditor(k, s)
+	want := i18n.Settings().Get("settings-file-path-placeholder")
+	if want == "" || want == "settings-file-path-placeholder" {
+		t.Fatalf("the placeholder key resolves to %q", want)
+	}
+	if got := c.entry.Placeholder(); got != want {
+		t.Errorf("an empty path field reads %q, want the placeholder %q", got, want)
+	}
+	c.entry.OnActivate(c.entry.Text())
+	if c.entry.Text() != "" || s.get() != "" {
+		t.Errorf("committing the empty field left the text %q and the value %v, want the placeholder written nowhere", c.entry.Text(), s.get())
 	}
 }

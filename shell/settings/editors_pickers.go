@@ -278,6 +278,7 @@ type fileEditor struct {
 func newFileEditor(k *kit, s slot) *fileEditor {
 	c := &fileEditor{Box: gapBox(widget.Row), field: widget.NewOverlay(), entry: newText(k, s, false)}
 	c.entry.SetWidthChars(pathEntryChars, pathEntryChars)
+	c.entry.SetPlaceholder(i18n.Settings().Get("settings-file-path-placeholder"))
 	c.display = k.label("", "setting-path-display")
 	c.display.SetEllipsize(widget.EllipsizeMiddle)
 	c.display.SetMaxWidthChars(pathEntryChars)
