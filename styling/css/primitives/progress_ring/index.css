@@ -7,3 +7,7 @@
   min-width: calc(2rem * var(--global-scale));
   min-height: calc(2rem * var(--global-scale));
 }
+
+.glyph-ring image {
+  -gtk-icon-size: var(--icon-xs);
+}

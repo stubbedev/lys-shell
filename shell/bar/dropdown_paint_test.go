@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -195,6 +196,25 @@ func TestStatRingTakesTheStylesheetDiameter(t *testing.T) {
 	lb, rb := r.label.Bounds(), r.ring.Bounds()
 	if dx, dy := (lb.X+lb.W/2)-(rb.X+rb.W/2), (lb.Y+lb.H/2)-(rb.Y+rb.H/2); dx < -1 || dx > 1 || dy < -1 || dy > 1 {
 		t.Errorf("the label %+v sits off the ring's center %+v", lb, rb)
+	}
+}
+
+// A ring's glyph sits inside the track: its corners clear the track's
+// inner edge by at least half lys-ui's default 4px stroke.
+func TestGlyphRingGlyphClearsTheTrack(t *testing.T) {
+	const stroke = 4
+	ctx := styledContext(t, config.Defaults())
+	r := newGlyphRing("ld-wifi-symbolic", 65)
+	ctx.Theme.Attach(r)
+	sz := widget.MeasureAsChild(r, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	widget.ArrangeAsChild(r, render.Rect{W: sz.W, H: sz.H})
+	ring, glyph := r.Bounds(), r.glyph.Bounds()
+	if glyph.W == 0 || glyph.H == 0 {
+		t.Fatalf("the glyph is %dx%d", glyph.W, glyph.H)
+	}
+	hole := float64(ring.W)/2 - stroke
+	if corner := math.Hypot(float64(glyph.W), float64(glyph.H)) / 2; corner > hole-stroke/2 {
+		t.Errorf("a %dx%d glyph's corners reach %.1fpx out in a %dpx ring whose track starts at %.1fpx", glyph.W, glyph.H, corner, ring.W, hole)
 	}
 }
 
