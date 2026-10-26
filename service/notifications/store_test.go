@@ -35,6 +35,7 @@ func newStoredService(t *testing.T, st *Store) *Service {
 func TestStoreRoundTrip(t *testing.T) {
 	st, _ := openTestStore(t)
 	svc := newStoredService(t, st)
+	sent := time.Now()
 	id := svc.NotifyHints("mail", 0, "mail-icon", "Subject", "Body", []string{"default", "Open", "reply", "Reply"},
 		map[string]dbus.Variant{
 			"urgency":        dbus.MakeVariant(byte(2)),
@@ -47,7 +48,7 @@ func TestStoreRoundTrip(t *testing.T) {
 			"x-list":         dbus.MakeVariant([]string{"a", "b"}),
 		}, 5000)
 
-	got, err := st.Load(time.Now(), true)
+	got, err := st.Load(sent, true)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("load = %v, %v", got, err)
 	}
