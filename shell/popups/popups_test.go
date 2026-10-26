@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
@@ -19,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -46,6 +48,539 @@ func newClockedPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *n
 	return p, svc, clock
 }
 
+// surface is a popup host mounted in the tree its window shows, the
+// shell's stylesheet at its priority attached, under a router: the
+// real input path, hit testing and the hover chain included. Motion
+// lands at once (reduced motion), so every frame shows the laid-out
+// state.
+type surface struct {
+	t     *testing.T
+	p     *Popups
+	svc   *notifications.Service
+	clock *fakeclock.Clock
+	host  *widget.Box
+	r     *widget.Router
+}
+
+// surfaceW and surfaceH are the room the test surface lays out in.
+const (
+	surfaceW = 400
+	surfaceH = 3000
+)
+
+func newSurface(t *testing.T, ncfg config.NotificationConfig) *surface {
+	t.Helper()
+	p, svc, clock := newClockedPopups(t, ncfg)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	p.sheet = apptheme.New(p.cfg).Sheet
+	p.cfg.Animations.Enabled = false
+	t.Cleanup(anim.SetInstant(true))
+	s := &surface{t: t, p: p, svc: svc, clock: clock}
+	s.mount()
+	return s
+}
+
+// mount builds the window's tree for the host, as a newly mapped
+// surface does.
+func (s *surface) mount() {
+	host, list := s.p.newHost()
+	s.p.root = list
+	s.p.layout()
+	s.host = host
+	s.r = &widget.Router{Root: host}
+	r := s.r
+	widget.SetRemovedHook(r.Forget)
+	s.t.Cleanup(func() { widget.SetRemovedHook(nil) })
+	s.layout()
+}
+
+// notify posts a notification a millisecond after the last, so ages
+// order the burst.
+func (s *surface) notify(appName, summary string, actions ...string) uint32 {
+	s.clock.Advance(time.Millisecond)
+	return s.svc.Notify(appName, 0, "", summary, "body of "+summary, actions, -1)
+}
+
+func (s *surface) sync() {
+	s.p.sync()
+	s.layout()
+}
+
+func (s *surface) layout() {
+	s.host.Measure(widget.Constraints{Max: widget.Size{W: surfaceW, H: surfaceH}})
+	s.host.Arrange(render.Rect{W: surfaceW, H: surfaceH})
+}
+
+// point is the centre of w.
+func point(w widget.Boundser) widget.Point {
+	b := w.Bounds()
+	return widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+}
+
+// hover moves the pointer onto w and lays the surface out again, as
+// the next frame does.
+func (s *surface) hover(w widget.Boundser) {
+	s.t.Helper()
+	s.r.Move(point(w))
+	s.layout()
+}
+
+// click presses and releases on w where the pointer is moved first.
+func (s *surface) click(w widget.Boundser) {
+	s.t.Helper()
+	s.hover(w)
+	at := point(w)
+	s.r.Press(widget.BTNLeft, at, 0)
+	s.r.Release(widget.BTNLeft, at)
+	s.layout()
+}
+
+func (s *surface) leave() {
+	s.r.Leave()
+	s.layout()
+}
+
+// stackOf is the stack holding the card for id.
+func (s *surface) stackOf(id uint32) *stack {
+	s.t.Helper()
+	for _, st := range s.p.stacks {
+		for _, c := range st.cards {
+			if c.id == id && !c.leaving {
+				return st
+			}
+		}
+	}
+	s.t.Fatalf("no stack holds %d", id)
+	return nil
+}
+
+func (s *surface) card(id uint32) *card {
+	s.t.Helper()
+	c, ok := s.p.cards[id]
+	if !ok {
+		s.t.Fatalf("no card for %d", id)
+	}
+	return c
+}
+
+// expanded is whether the stack's pile lays its cards out as a list.
+func (st *stack) expanded() bool { return st.pile.Expanded() }
+
+// within reports whether w is root or inside it.
+func within(root, w widget.Widget) bool {
+	found := false
+	treetest.Walk(root, func(x widget.Widget) { found = found || x == w })
+	return found
+}
+
+// fill is the color the card paints its plate in, read just under its
+// top edge, clear of its urgency bar, its text, and the cards peeking
+// out behind it: straight RGBA.
+func (s *surface) fill(c *card) [4]byte {
+	s.t.Helper()
+	b := c.root.Bounds()
+	data := make([]byte, render.Stride(surfaceW)*surfaceH)
+	s.host.Paint(render.NewScaled(data, render.Stride(surfaceW), surfaceW, surfaceH, 1, 1))
+	x, y := b.X+b.W/2, b.Y+4
+	i := y*render.Stride(surfaceW) + x*4
+	return [4]byte{data[i+2], data[i+1], data[i], data[i+3]}
+}
+
+// burst posts six notifications from two apps, alternating, and
+// returns their ids per app, oldest first.
+func (s *surface) burst() (mail, chat []uint32) {
+	for i := range 3 {
+		mail = append(mail, s.notify("mail", "Mail "+strconv.Itoa(i), "default", "Open", "reply", "Reply"))
+		chat = append(chat, s.notify("chat", "Chat "+strconv.Itoa(i)))
+	}
+	s.sync()
+	return mail, chat
+}
+
+// A burst of six notifications from two apps renders as two compact
+// stacks, the app with the newest notification on top, each its newest
+// card in front with the count of the ones behind it; every card rests
+// compact, its body clamped and its actions hidden.
+func TestBurstCollapsesIntoAStackPerApp(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupMaxVisible = 6
+	s := newSurface(t, cfg)
+	mail, chat := s.burst()
+	want := [][]uint32{{chat[2], chat[1], chat[0]}, {mail[2], mail[1], mail[0]}}
+	if got := s.p.stackOrder(); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Fatalf("stacks = %v, want %v", got, want)
+	}
+	for _, id := range []uint32{mail[2], chat[2]} {
+		st := s.stackOf(id)
+		if st.expanded() || !st.count.Visible() || st.count.Text() != "+2" || st.clear.Visible() {
+			t.Errorf("stack of %d: expanded %v, count %q shown %v, clear shown %v; want collapsed with +2", id, st.expanded(), st.count.Text(), st.count.Visible(), st.clear.Visible())
+		}
+	}
+	c := s.card(mail[2])
+	if c.actions.Visible() || c.body.MaxLines() != cardBodyLines || c.summary.MaxLines() != 1 {
+		t.Errorf("a resting card: actions shown %v, body lines %d, summary lines %d", c.actions.Visible(), c.body.MaxLines(), c.summary.MaxLines())
+	}
+
+	// A new notification brings its app's stack to the top, in front.
+	late := s.notify("mail", "Late")
+	s.sync()
+	if got := s.p.stackOrder(); len(got) != 2 || got[0][0] != late {
+		t.Errorf("after a late mail: stacks %v, want the mail stack on top with %d in front", got, late)
+	}
+}
+
+// Collapsed, a stack shows its front card whole with the next two
+// peeking out past the edge away from the screen edge, each narrower
+// and further out, the rest buried; only the front takes the pointer.
+// Expanded, the cards lay out as a list from the front's end.
+func TestCollapsedStackPeeks(t *testing.T) {
+	for _, tc := range []struct {
+		position config.PopupPosition
+		down     bool
+	}{
+		{config.PopupPositionTopRight, true},
+		{config.PopupPositionBottomRight, false},
+	} {
+		cfg := config.DefaultsNotification()
+		cfg.PopupPosition = tc.position
+		s := newSurface(t, cfg)
+		var ids []uint32
+		for i := range 4 {
+			ids = append(ids, s.notify("mail", "Mail "+strconv.Itoa(i)))
+		}
+		s.sync()
+		front, peek, deeper, buried := s.card(ids[3]), s.card(ids[2]), s.card(ids[1]), s.card(ids[0])
+		f, pk, d := front.swipe.Bounds(), peek.swipe.Bounds(), deeper.swipe.Bounds()
+		if !front.swipe.HasClass("front") || !peek.swipe.HasClass("peek") || !deeper.swipe.HasClass("peek") || !buried.swipe.HasClass("buried") {
+			t.Errorf("%s: classes front %v peek %v %v buried %v", tc.position, front.swipe.Classes(), peek.swipe.Classes(), deeper.swipe.Classes(), buried.swipe.Classes())
+		}
+		if pk.W >= f.W || d.W >= pk.W {
+			t.Errorf("%s: widths front %d peek %d deeper %d, want each deeper card narrower", tc.position, f.W, pk.W, d.W)
+		}
+		if out := pk.Y > f.Y && d.Y > pk.Y; out != tc.down {
+			t.Errorf("%s: tops front %d peek %d deeper %d, want the peeks out past the far edge", tc.position, f.Y, pk.Y, d.Y)
+		}
+		edge := widget.Point{X: pk.X + pk.W/2, Y: pk.Y + pk.H - 2}
+		if !tc.down {
+			edge.Y = pk.Y + 2
+		}
+		if hit := s.host.HitTest(edge); hit != nil && within(peek.root, hit) {
+			t.Errorf("%s: a peeking card's edge takes the pointer", tc.position)
+		}
+
+		s.hover(front.summary)
+		f, pk = front.swipe.Bounds(), peek.swipe.Bounds()
+		if pk.W != f.W || (pk.Y > f.Y) != tc.down || pk.Y == f.Y {
+			t.Errorf("%s expanded: front %+v peek %+v, want a list of full-width cards from the front's end", tc.position, f, pk)
+		}
+	}
+}
+
+// Swiping a card sideways past the threshold dismisses it under
+// popup-close-behavior and leaves the rest of its stack; a short swipe
+// springs back and a drag up or down dismisses nothing. The drags take
+// real time, as the swipe reads its speed off the animation clock: a
+// short one made at once would be a fling.
+func TestSwipeDismissesACard(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	older := s.notify("mail", "Older")
+	id := s.notify("mail", "Swipe me")
+	s.sync()
+	c := s.card(id)
+	drag := func(dx, dy int) {
+		s.layout()
+		from := point(c.body)
+		s.r.Move(from)
+		s.r.Press(widget.BTNLeft, from, 0)
+		at := from
+		for i := 1; i <= 5; i++ {
+			time.Sleep(25 * time.Millisecond)
+			at = widget.Point{X: from.X + dx*i/5, Y: from.Y + dy*i/5}
+			s.r.Move(at)
+		}
+		s.r.Release(widget.BTNLeft, at)
+		s.p.sync()
+		s.layout()
+	}
+	drag(60, 0)
+	if c.swipe.Offset() != 0 || len(s.svc.Popups()) != 2 {
+		t.Fatalf("a 60px swipe: offset %v, popups %d; want it back and both up", c.swipe.Offset(), len(s.svc.Popups()))
+	}
+	drag(0, 200)
+	if len(s.svc.Popups()) != 2 {
+		t.Fatalf("a vertical drag dismissed: popups %d", len(s.svc.Popups()))
+	}
+	drag(250, 0)
+	popups := s.svc.Popups()
+	if len(popups) != 1 || popups[0].ID != older {
+		t.Fatalf("a 250px swipe: popups %v, want only %d", popups, older)
+	}
+	if len(s.svc.Notifications()) != 2 {
+		t.Errorf("history = %d, want the swiped card dismissed into it", len(s.svc.Notifications()))
+	}
+}
+
+// popup-stack all puts every popup in one stack; off gives each its own
+// card, ordered as popup-stacking-order says, without a count.
+func TestStackModes(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupMaxVisible = 6
+	cfg.PopupStack = config.PopupStackAll
+	s := newSurface(t, cfg)
+	mail, chat := s.burst()
+	if got := s.p.stackOrder(); len(got) != 1 || len(got[0]) != 6 || got[0][0] != chat[2] {
+		t.Errorf("popup-stack all: stacks %v, want one of six with the newest in front", got)
+	}
+	if st := s.stackOf(mail[0]); st.count.Text() != "+5" {
+		t.Errorf("popup-stack all: count %q, want +5", st.count.Text())
+	}
+
+	cfg.PopupStack = config.PopupStackOff
+	s = newSurface(t, cfg)
+	mail, chat = s.burst()
+	want := [][]uint32{{chat[2]}, {mail[2]}, {chat[1]}, {mail[1]}, {chat[0]}, {mail[0]}}
+	if got := s.p.stackOrder(); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("popup-stack off: stacks %v, want %v", got, want)
+	}
+	if st := s.stackOf(mail[0]); st.count.Visible() {
+		t.Error("a stack of one shows a count")
+	}
+
+	cfg.PopupStackingOrder = config.StackingOrderOldestFirst
+	s = newSurface(t, cfg)
+	mail, chat = s.burst()
+	want = [][]uint32{{mail[0]}, {chat[0]}, {mail[1]}, {chat[1]}, {mail[2]}, {chat[2]}}
+	if got := s.p.stackOrder(); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("oldest-first: stacks %v, want %v", got, want)
+	}
+}
+
+// Hovering a stack expands it: its cards show whole with their actions,
+// the clear-all button replaces the count, and the card under the
+// pointer turns opaque while the rest stay frosted. The other stack
+// stays as it was, and leaving restores the stack.
+func TestHoverExpandsTheStackAndLeavingRestoresIt(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupMaxVisible = 6
+	s := newSurface(t, cfg)
+	mail, chat := s.burst()
+	front := s.card(mail[2])
+	behind := s.card(mail[1])
+	rest := s.fill(front)
+	if rest[3] == 0xff || rest[3] == 0 {
+		t.Fatalf("a resting card's plate %v, want frosted", rest)
+	}
+
+	s.hover(front.summary)
+	st, other := s.stackOf(mail[2]), s.stackOf(chat[2])
+	if !st.expanded() || st.count.Visible() || !st.clear.Visible() {
+		t.Errorf("hovered stack: expanded %v, count shown %v, clear shown %v", st.expanded(), st.count.Visible(), st.clear.Visible())
+	}
+	for _, id := range mail {
+		if c := s.card(id); !c.actions.Visible() || c.body.MaxLines() != 0 || c.summary.MaxLines() != 0 {
+			t.Errorf("card %d in a hovered stack: actions shown %v, body lines %d, summary lines %d", id, c.actions.Visible(), c.body.MaxLines(), c.summary.MaxLines())
+		}
+	}
+	if other.expanded() || !other.count.Visible() {
+		t.Error("hovering one stack expanded the other")
+	}
+	s.hover(front.summary)
+	if got := s.fill(front); got[3] != 0xff {
+		t.Errorf("the hovered card's plate alpha %#02x, want opaque", got[3])
+	}
+	if got := s.fill(behind); got[3] == 0xff {
+		t.Error("a card the pointer is not over turned opaque")
+	}
+
+	s.leave()
+	if st.expanded() || !st.count.Visible() || st.clear.Visible() || front.actions.Visible() || front.body.MaxLines() != cardBodyLines {
+		t.Errorf("after leaving: expanded %v, count shown %v, clear shown %v, actions shown %v", st.expanded(), st.count.Visible(), st.clear.Visible(), front.actions.Visible())
+	}
+	if got := s.fill(front); got != rest {
+		t.Errorf("after leaving the plate is %v, want the resting %v", got, rest)
+	}
+}
+
+// Without compositor blur the frosted cards rest opaque: what is behind
+// them would show through unblurred.
+func TestCardsRestOpaqueWithoutBlur(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	id := s.notify("mail", "One")
+	s.sync()
+	s.host.AddClass(css.BlurUnavailable)
+	s.layout()
+	if got := s.fill(s.card(id)); got[3] != 0xff {
+		t.Errorf("without blur the plate alpha is %#02x, want opaque", got[3])
+	}
+}
+
+// Hovering a stack pauses the countdowns of all its cards, a card
+// arriving meanwhile included, while the other stack keeps counting;
+// leaving resumes each with the time it had left.
+func TestHoverPausesTheStacksCountdown(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupDuration = 40
+	s := newSurface(t, cfg)
+	a := s.notify("mail", "A")
+	b := s.notify("mail", "B")
+	other := s.notify("chat", "C")
+	s.sync()
+	s.clock.Advance(10 * time.Millisecond)
+	s.hover(s.card(b).summary)
+	late := s.notify("mail", "Late")
+	s.sync()
+	s.clock.Advance(time.Hour)
+	live := map[uint32]bool{}
+	for _, n := range s.svc.Popups() {
+		live[n.ID] = true
+	}
+	if !live[a] || !live[b] || !live[late] {
+		t.Fatalf("the hovered stack's cards timed out: live %v", live)
+	}
+	if live[other] {
+		t.Error("the stack not hovered stopped counting")
+	}
+	s.leave()
+	s.clock.Advance(27 * time.Millisecond)
+	if got := len(s.svc.Popups()); got != 3 {
+		t.Fatalf("the leave restarted short of the 28ms the oldest had left: popups = %d", got)
+	}
+	s.clock.Advance(13 * time.Millisecond)
+	if got := len(s.svc.Popups()); got != 0 {
+		t.Fatalf("the stack survived the leave: popups = %d", got)
+	}
+}
+
+// A popup arriving for another stack leaves the hovered stack as it
+// is: still under the pointer, expanded, its countdowns paused.
+func TestSyncKeepsTheHoveredStackOpen(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupDuration = 40
+	s := newSurface(t, cfg)
+	a := s.notify("mail", "A")
+	b := s.notify("mail", "B")
+	s.sync()
+	s.hover(s.card(b).summary)
+	s.notify("chat", "C")
+	s.sync()
+	if st := s.stackOf(a); !st.expanded() {
+		t.Error("a sync collapsed the hovered stack")
+	}
+	s.clock.Advance(time.Hour)
+	live := map[uint32]bool{}
+	for _, n := range s.svc.Popups() {
+		live[n.ID] = true
+	}
+	if !live[a] || !live[b] {
+		t.Errorf("a sync resumed the hovered stack's countdowns: live %v", live)
+	}
+}
+
+// A stack whose last card goes while the pointer is on it leaves the
+// surface, the hover leaving with it, and the surface takes the next
+// popup as before.
+func TestStackLeavingUnderThePointer(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	id := s.notify("mail", "Only")
+	s.sync()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c := s.card(id)
+		s.hover(c.summary)
+		s.click(c.close)
+		s.sync()
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("closing the hovered stack's last card hung the surface")
+	}
+	if got := s.p.stackOrder(); len(got) != 0 {
+		t.Fatalf("stacks after closing the last card: %v", got)
+	}
+	next := s.notify("chat", "Next")
+	s.sync()
+	if st := s.stackOf(next); st.expanded() {
+		t.Error("a new stack opened expanded with the pointer gone")
+	}
+}
+
+// With popup-hover-pause off a hovered stack still expands but keeps
+// counting down.
+func TestHoverPauseOffKeepsCounting(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupHoverPause = false
+	cfg.PopupDuration = 30
+	s := newSurface(t, cfg)
+	id := s.notify("app", "Bare")
+	s.sync()
+	s.hover(s.card(id).summary)
+	if !s.stackOf(id).expanded() {
+		t.Error("a hovered stack did not expand with hover-pause off")
+	}
+	s.clock.Advance(30 * time.Millisecond)
+	if got := len(s.svc.Popups()); got != 0 {
+		t.Fatalf("a hovered card paused with hover-pause off: popups = %d", got)
+	}
+}
+
+// A reload while a stack is hovered resumes its countdowns: the pointer
+// leaves with the surface, and no stack is left to hear it.
+func TestReloadReleasesAHoveredStack(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupDuration = 40
+	s := newSurface(t, cfg)
+	id := s.notify("mail", "A")
+	s.sync()
+	s.hover(s.card(id).summary)
+	next := config.Defaults()
+	next.Notification = cfg
+	s.p.SetConfig(next)
+	s.clock.Advance(40 * time.Millisecond)
+	if got := len(s.svc.Popups()); got != 0 {
+		t.Fatalf("a popup hovered across a reload never timed out: popups = %d", got)
+	}
+}
+
+// Clear all on an expanded stack closes every popup of its group, the
+// ones popup-max-visible keeps off screen included, and only those; a
+// collapsed stack or a stack of one offers no clear all.
+func TestClearAllDismissesTheStack(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	mail, chat := s.burst()
+	single := s.notify("calendar", "Meeting")
+	s.sync()
+	s.hover(s.card(single).summary)
+	if s.stackOf(single).clear.Visible() {
+		t.Error("a stack of one offers clear all")
+	}
+	st := s.stackOf(mail[2])
+	if st.clear.Visible() {
+		t.Error("a collapsed stack offers clear all")
+	}
+	s.hover(s.card(mail[2]).summary)
+	s.click(st.clear)
+	s.p.sync()
+	left := map[uint32]bool{}
+	for _, n := range s.svc.Popups() {
+		left[n.ID] = true
+	}
+	for _, id := range mail {
+		if left[id] {
+			t.Errorf("clear all left mail %d up", id)
+		}
+	}
+	for _, id := range chat[1:] {
+		if !left[id] {
+			t.Errorf("clear all on the mail stack took chat %d", id)
+		}
+	}
+	if len(s.svc.Notifications()) != 7 {
+		t.Errorf("history = %d, want clear all to dismiss into the history under the default close behavior", len(s.svc.Notifications()))
+	}
+}
+
 func TestSyncTracksPopupSet(t *testing.T) {
 	p, svc := newTestPopups(t, config.DefaultsNotification())
 	svc.Notify("app", 0, "", "One", "body", nil, 0)
@@ -69,54 +604,28 @@ func TestSyncTracksPopupSet(t *testing.T) {
 	}
 }
 
+// popup-max-visible caps the cards across all stacks, the oldest off
+// first.
 func TestSyncCapsAtMaxVisible(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.PopupMaxVisible = 2
 	p, svc := newTestPopups(t, cfg)
 	svc.Notify("app", 0, "", "One", "", nil, 0)
-	svc.Notify("app", 0, "", "Two", "", nil, 0)
-	svc.Notify("app", 0, "", "Three", "", nil, 0)
+	b := svc.Notify("other", 0, "", "Two", "", nil, 0)
+	c := svc.Notify("app", 0, "", "Three", "", nil, 0)
 	p.sync()
 	if got := p.Visible(); got != 2 {
 		t.Fatalf("visible = %d, want the 2 cap", got)
 	}
-	// The oldest scrolls off first (newest-first stacking keeps 2+3).
-	svc.DismissAll()
-	p.sync()
-}
-
-func TestSyncHonorsStackingOrder(t *testing.T) {
-	cfg := config.DefaultsNotification()
-	cfg.PopupStackingOrder = config.StackingOrderOldestFirst
-	p, svc := newTestPopups(t, cfg)
-	a := svc.Notify("app", 0, "", "First", "", nil, 0)
-	b := svc.Notify("app", 0, "", "Second", "", nil, 0)
-	p.sync()
-	// Oldest-first appends each new card: the oldest sits on top.
-	if got := p.stackOrder(); !slices.Equal(got, []uint32{a, b}) {
-		t.Errorf("oldest-first order = %v, want [%d %d]", got, a, b)
-	}
-	c := svc.Notify("app", 0, "", "Third", "", nil, 0)
-	p.sync()
-	if got := p.stackOrder(); !slices.Equal(got, []uint32{a, b, c}) {
-		t.Errorf("oldest-first after a third = %v, want it at the bottom", got)
-	}
-
-	// Newest-first (the default) prepends: the newest sits on top.
-	p, svc = newTestPopups(t, config.DefaultsNotification())
-	a = svc.Notify("app", 0, "", "First", "", nil, 0)
-	b = svc.Notify("app", 0, "", "Second", "", nil, 0)
-	p.sync()
-	c = svc.Notify("app", 0, "", "Third", "", nil, 0)
-	p.sync()
-	if got := p.stackOrder(); !slices.Equal(got, []uint32{c, b, a}) {
-		t.Errorf("newest-first order = %v, want [%d %d %d]", got, c, b, a)
+	if got := p.stackOrder(); !slices.EqualFunc(got, [][]uint32{{c}, {b}}, slices.Equal) {
+		t.Errorf("stacks = %v, want the oldest capped off", got)
 	}
 }
 
 // TestCardsPlayTheirExit pins the exit: a dismissed card leaves the
-// live set at once but stays on the stack, in its place, until its
-// transition lands; with animations off it goes at once.
+// live set at once but stays in its stack, in its place, until its
+// transition lands; the stack goes with its last card, and with
+// animations off at once.
 func TestCardsPlayTheirExit(t *testing.T) {
 	p, svc := newTestPopups(t, config.DefaultsNotification())
 	a := svc.Notify("app", 0, "", "First", "", nil, 0)
@@ -131,23 +640,23 @@ func TestCardsPlayTheirExit(t *testing.T) {
 	if got := p.Visible(); got != 1 {
 		t.Errorf("live cards = %d, want the dismissed one gone from the live set", got)
 	}
-	if got := p.stackOrder(); !slices.Equal(got, []uint32{b, a}) {
+	if got := p.stackOrder(); !slices.EqualFunc(got, [][]uint32{{b, a}}, slices.Equal) {
 		t.Fatalf("stack mid-exit = %v, want the leaving card still in its place", got)
 	}
 	if leaving.rev.Revealed() {
 		t.Error("the dismissed card is not exiting")
 	}
 	leaving.rev.Finish()
-	if got := p.stackOrder(); !slices.Equal(got, []uint32{a}) {
-		t.Errorf("stack after the exit = %v, want [%d]", got, a)
+	if got := p.stackOrder(); !slices.EqualFunc(got, [][]uint32{{a}}, slices.Equal) {
+		t.Errorf("stack after the exit = %v, want [[%d]]", got, a)
 	}
 
-	// Disabled animations snap: the card goes with the sync.
+	// Disabled animations snap: the card and its stack go with the sync.
 	p.cfg.Animations.Enabled = false
 	svc.DismissPopup(a)
 	p.sync()
 	if got := p.stackOrder(); len(got) != 0 {
-		t.Errorf("stack with animations off = %v, want empty at once", got)
+		t.Errorf("stacks with animations off = %v, want none at once", got)
 	}
 }
 
@@ -174,15 +683,15 @@ func TestCardTransitionFollowsConfig(t *testing.T) {
 	}
 }
 
-// cardOf is the built card for id.
+// cardOf is the built card for id, laid out on its own and expanded,
+// as its hovered stack shows it.
 func cardOf(t *testing.T, p *Popups, id uint32) *card {
 	t.Helper()
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	c, ok := p.cards[id]
 	if !ok {
 		t.Fatalf("no card for %d", id)
 	}
+	c.setFull(true)
 	c.root.Measure(widget.Constraints{Max: widget.Size{W: testCardWidth, H: 600}})
 	c.root.Arrange(render.Rect{W: testCardWidth, H: 600})
 	return c
@@ -190,9 +699,8 @@ func cardOf(t *testing.T, p *Popups, id uint32) *card {
 
 // click presses and releases at the center of w through a router over
 // the card.
-func click(c *card, w interface{ Bounds() render.Rect }) {
-	b := w.Bounds()
-	at := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+func click(c *card, w widget.Boundser) {
+	at := point(w)
 	r := &widget.Router{Root: c.root}
 	r.Move(at)
 	r.Press(widget.BTNLeft, at, 0)
@@ -223,49 +731,9 @@ func (s *signals) count(prefix string) int {
 	return n
 }
 
-func TestHoverPausesTheCountdown(t *testing.T) {
-	cfg := config.DefaultsNotification()
-	cfg.PopupDuration = 40
-	p, svc, clock := newClockedPopups(t, cfg)
-	id := svc.Notify("app", 0, "", "Hover", "", nil, -1)
-	p.sync()
-	c := cardOf(t, p, id)
-	r := &widget.Router{Root: c.root}
-	b := c.titleLabel().Bounds()
-	clock.Advance(10 * time.Millisecond)
-	r.Move(widget.Point{X: b.X + 1, Y: b.Y + 1})
-	clock.Advance(time.Hour)
-	if got := len(svc.Popups()); got != 1 {
-		t.Fatalf("hovered popup timed out: popups = %d", got)
-	}
-	r.Leave()
-	clock.Advance(29 * time.Millisecond)
-	if got := len(svc.Popups()); got != 1 {
-		t.Fatalf("the leave restarted short of the 30ms left: popups = %d", got)
-	}
-	clock.Advance(time.Millisecond)
-	if got := len(svc.Popups()); got != 0 {
-		t.Fatalf("popup survived the leave: popups = %d", got)
-	}
-}
-
-func TestHoverPauseOffKeepsCounting(t *testing.T) {
-	cfg := config.DefaultsNotification()
-	cfg.PopupHoverPause = false
-	cfg.PopupDuration = 30
-	p, svc, clock := newClockedPopups(t, cfg)
-	id := svc.Notify("app", 0, "", "Bare", "", nil, -1)
-	p.sync()
-	c := cardOf(t, p, id)
-	r := &widget.Router{Root: c.root}
-	b := c.titleLabel().Bounds()
-	r.Move(widget.Point{X: b.X + 1, Y: b.Y + 1})
-	clock.Advance(30 * time.Millisecond)
-	if got := len(svc.Popups()); got != 0 {
-		t.Fatalf("a hovered card paused with hover-pause off: popups = %d", got)
-	}
-}
-
+// A card's top row is the app icon, the app name and the age, the
+// summary sits under it in heading weight, and the body under that in
+// muted text.
 func TestCardContent(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.IconSource = config.IconSourceMapped
@@ -277,13 +745,19 @@ func TestCardContent(t *testing.T) {
 	bare := svc.Notify("", 0, "", "No app", "", nil, 0)
 	p.sync()
 	c := cardOf(t, p, full)
-	if c.appLabel().Text() != "firefox" || c.titleLabel().Text() != "Download done" || c.body.Text() != "a & b" || !c.body.Visible() {
-		t.Errorf("card = %q / %q / %q", c.appLabel().Text(), c.titleLabel().Text(), c.body.Text())
+	if c.appLabel().Text() != "firefox" || c.summary.Text() != "Download done" || c.body.Text() != "a & b" || !c.body.Visible() {
+		t.Errorf("card = %q / %q / %q", c.appLabel().Text(), c.summary.Text(), c.body.Text())
+	}
+	if !c.summary.HasClass(css.Heading) || !c.body.HasClass(css.DimLabel) {
+		t.Errorf("summary classes %v, body classes %v; want heading and muted", c.summary.Classes(), c.body.Classes())
 	}
 	if c.time.Text() != i18n.T("notification-popup-time-minutes-ago", i18n.Str("minutes", "5")) {
 		t.Errorf("time = %q", c.time.Text())
 	}
-	if !c.root.HasClass("critical") || !c.root.HasClass("urgency-bar") || !c.root.HasClass("notification-popup-card") {
+	if treetest.WithClass(c.head, "notification-popup-icon") == nil || treetest.WithClass(c.head, "notification-popup-time") == nil {
+		t.Error("the top row lacks the icon or the age")
+	}
+	if !c.root.HasClass("critical") || !c.root.HasClass("urgency-bar") || !c.root.HasClass("notification-popup-card") || !c.root.HasClass(css.Glass) {
 		t.Errorf("classes = %v", c.root.Classes())
 	}
 	if c.root.HasClass("shadow") != cfg.PopupShadow {
@@ -320,17 +794,18 @@ func TestCardCloseBehavior(t *testing.T) {
 	} {
 		cfg := config.DefaultsNotification()
 		cfg.PopupCloseBehavior = tc.behavior
-		p, svc := newTestPopups(t, cfg)
-		id := svc.Notify("app", 0, "", "Close me", "", []string{"default", "Open"}, 0)
+		s := newSurface(t, cfg)
+		id := s.svc.Notify("app", 0, "", "Close me", "", []string{"default", "Open"}, 0)
 		var sig signals
-		svc.SetEmitter(sig.emit)
-		p.sync()
-		c := cardOf(t, p, id)
-		click(c, c.close)
-		if len(svc.Popups()) != 0 {
+		s.svc.SetEmitter(sig.emit)
+		s.sync()
+		c := s.card(id)
+		s.hover(c.summary)
+		s.click(c.close)
+		if len(s.svc.Popups()) != 0 {
 			t.Errorf("%s: the popup stayed", tc.behavior)
 		}
-		if kept := len(svc.Notifications()) == 1; kept != tc.keepHistory {
+		if kept := len(s.svc.Notifications()) == 1; kept != tc.keepHistory {
 			t.Errorf("%s: in history %v, want %v", tc.behavior, kept, tc.keepHistory)
 		}
 		if sig.count("ActionInvoked") != 0 {
@@ -338,10 +813,9 @@ func TestCardCloseBehavior(t *testing.T) {
 		}
 		// The default action reaches the app under either behavior: it is
 		// invoked before the close can take the notification away.
-		open := svc.Notify("app", 0, "", "Open me", "", []string{"default", "Open"}, 0)
-		p.sync()
-		oc := cardOf(t, p, open)
-		click(oc, oc.titleLabel())
+		open := s.svc.Notify("app", 0, "", "Open me", "", []string{"default", "Open"}, 0)
+		s.sync()
+		s.click(s.card(open).summary)
 		if sig.count("ActionInvoked"+fmt.Sprint(open, notifications.DefaultActionID)) != 1 {
 			t.Errorf("%s: default action not invoked: %v", tc.behavior, sig.seen)
 		}
@@ -363,13 +837,13 @@ func TestCardActionsAndDefault(t *testing.T) {
 		t.Fatalf("action rows = %d, want 3 + 1 without the default", len(rows))
 	}
 	// A click on plain text invokes the default action.
-	click(c, c.titleLabel())
+	click(c, c.summary)
 	if sig.count("ActionInvoked"+fmt.Sprint(id, notifications.DefaultActionID)) != 1 || len(svc.Popups()) != 1 {
 		t.Errorf("default: %v, popups %d", sig.seen, len(svc.Popups()))
 	}
 	// No default action: a click on the card does nothing.
 	pc := cardOf(t, p, plain)
-	click(pc, pc.titleLabel())
+	click(pc, pc.summary)
 	if sig.count("ActionInvoked"+strconv.FormatUint(uint64(plain), 10)) != 0 {
 		t.Error("a card without a default action invoked one")
 	}
@@ -409,7 +883,7 @@ func TestActionPressesCarryTheirToken(t *testing.T) {
 	id := svc.Notify("chat", 0, "", "Ping", "", []string{"default", "Open", "reply", "Reply"}, 0)
 	p.sync()
 	c := cardOf(t, p, id)
-	click(c, c.titleLabel())
+	click(c, c.summary)
 	other := svc.Notify("chat", 0, "", "Again", "", []string{"reply", "Reply"}, 0)
 	p.sync()
 	oc := cardOf(t, p, other)
@@ -429,7 +903,7 @@ func TestActionPressesCarryTheirToken(t *testing.T) {
 	last := svc.Notify("chat", 0, "", "Last", "", []string{"default", "Open"}, 0)
 	p.sync()
 	lc := cardOf(t, p, last)
-	click(lc, lc.titleLabel())
+	click(lc, lc.summary)
 	if sig.count("ActivationToken"+strconv.FormatUint(uint64(last), 10)) != 0 || sig.count("ActionInvoked"+fmt.Sprint(last, notifications.DefaultActionID)) != 1 {
 		t.Errorf("without xdg-activation: %v", sig.seen)
 	}
@@ -484,7 +958,7 @@ func TestPopupAnchors(t *testing.T) {
 	}
 }
 
-func TestSetConfigRebuildsTheStackWithTheNewLimits(t *testing.T) {
+func TestSetConfigRebuildsTheStacksWithTheNewLimits(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	p, svc := newTestPopups(t, cfg)
 	for range 3 {
@@ -501,15 +975,22 @@ func TestSetConfigRebuildsTheStackWithTheNewLimits(t *testing.T) {
 	if got := p.Visible(); got != 1 {
 		t.Errorf("after a reload with popup-max-visible = 1: visible = %d", got)
 	}
+	cfg.PopupMaxVisible = 5
+	cfg.PopupStack = config.PopupStackOff
+	next = config.Defaults()
+	next.Notification = cfg
+	p.SetConfig(next)
+	if got := p.stackOrder(); len(got) != 3 {
+		t.Errorf("after a reload with popup-stack off: stacks %v, want one per card", got)
+	}
 }
 
 // testCardWidth is the width the card tests lay a card out at.
 const testCardWidth = 380
 
-// The card is lys-ui's card holding the notification as an Item, its
-// actions small outline buttons in one homogeneous row; the labels take
-// their ink from the stylesheet, and only a default action brings the
-// pointer.
+// The card is lys-ui's card, its top row an Item, its actions small
+// outline buttons in one homogeneous row; the labels take their ink
+// from the stylesheet, and only a default action brings the pointer.
 func TestCardIsAnItemInACard(t *testing.T) {
 	p, svc := newTestPopups(t, config.DefaultsNotification())
 	plain := svc.Notify("app", 0, "", "Plain", "", nil, 0)
@@ -540,14 +1021,9 @@ func TestCardIsAnItemInACard(t *testing.T) {
 	}
 }
 
-// titleLabel is the card's summary, its Item's title.
-func (c *card) titleLabel() *widget.Label {
-	return treetest.WithClass(c.head, "title")[0].(*widget.Label)
-}
-
-// appLabel is the card's app name, its Item's description.
+// appLabel is the card's app name, its top row Item's title.
 func (c *card) appLabel() *widget.Label {
-	return treetest.WithClass(c.head, "description")[0].(*widget.Label)
+	return treetest.WithClass(c.head, "title")[0].(*widget.Label)
 }
 
 // A card is its configured width whatever room the surface offers:

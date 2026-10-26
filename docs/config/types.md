@@ -895,6 +895,14 @@ Screen position for notification popups.
 | `"center-left"` | Center-left edge. |
 | `"center-right"` | Center-right edge. |
 
+## PopupStack {#popup-stack}
+
+| Value | Meaning |
+|---|---|
+| `"per-app"` | Popups from the same app share a stack. |
+| `"all"` | Every popup shares one stack. |
+| `"off"` | Every popup is a card of its own. |
+
 ## PywalContrast {#pywal-contrast}
 
 Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).

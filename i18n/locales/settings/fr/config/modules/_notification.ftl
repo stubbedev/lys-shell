@@ -77,6 +77,11 @@ enum-popup-position-center-right = Centre droite
 enum-stacking-order-newest-first = Plus récent en premier
 enum-stacking-order-oldest-first = Plus ancien en premier
 
+## Variantes de PopupStack
+enum-popup-stack-per-app = Par application
+enum-popup-stack-all = Toutes
+enum-popup-stack-off = Désactivé
+
 ## Variantes de PopupCloseBehavior
 enum-popup-close-behavior-dismiss = Ignorer
 enum-popup-close-behavior-remove = Supprimer

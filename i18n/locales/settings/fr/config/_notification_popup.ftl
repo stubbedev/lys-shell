@@ -19,6 +19,12 @@ settings-modules-notifications-popup-max-visible = Maximum visible
 settings-modules-notifications-popup-stacking-order = Ordre d'empilement
     .description = Les nouvelles fenêtres contextuelles apparaissent au-dessus ou en dessous des existantes
 
+settings-modules-notifications-popup-stack = Empilement
+    .description = Quelles fenêtres contextuelles se regroupent en une pile qui se déploie au survol
+
+settings-modules-notifications-popup-opacity = Opacité au repos
+    .description = Opacité de la surface givrée d'une fenêtre contextuelle quand le pointeur est ailleurs
+
 settings-modules-notifications-popup-margin-x = Marge horizontale
     .description = Distance depuis le bord gauche/droit de l'écran
 

@@ -3,9 +3,14 @@
 }
 
 .notification-popup-card {
+  background-color: var(--notification-popup-surface);
   --_urgency-shadow: 0 0 0 0 transparent;
   --_drop-shadow: 0 0 0 0 transparent;
   box-shadow: var(--_urgency-shadow), var(--_drop-shadow);
+}
+.notification-popup-card:hover,
+.blur-unavailable .notification-popup-card {
+  background-color: var(--palette-elevated);
 }
 .notification-popup-card.shadow {
   --_drop-shadow: var(--shadow-xs);

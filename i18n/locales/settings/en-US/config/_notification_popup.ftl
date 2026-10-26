@@ -19,6 +19,12 @@ settings-modules-notifications-popup-max-visible = Max Visible
 settings-modules-notifications-popup-stacking-order = Stacking Order
     .description = Whether new popups appear above or below existing ones
 
+settings-modules-notifications-popup-stack = Stacking
+    .description = Which popups collapse into one stack that fans out on hover
+
+settings-modules-notifications-popup-opacity = Resting Opacity
+    .description = Opacity of a popup's frosted surface while the pointer is elsewhere
+
 settings-modules-notifications-popup-margin-x = Horizontal Margin
     .description = Distance from the left/right screen edge
 

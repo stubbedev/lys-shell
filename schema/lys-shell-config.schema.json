@@ -5295,8 +5295,10 @@
             "popup-margin-y": 0.0,
             "popup-max-visible": 5,
             "popup-monitor": "primary",
+            "popup-opacity": 75,
             "popup-position": "top-right",
             "popup-shadow": true,
+            "popup-stack": "per-app",
             "popup-stacking-order": "newest-first",
             "popup-urgency-bar": "low",
             "right-click": "lys-shell notify dnd",
@@ -6218,6 +6220,11 @@
           "default": "primary",
           "description": "Target monitor: \"primary\" or a connector name like \"DP-1\"."
         },
+        "popup-opacity": {
+          "$ref": "#/$defs/Percentage",
+          "default": 75,
+          "description": "Opacity of a popup card's frosted surface at rest (0-100). The card\nunder the pointer is opaque, and so is every card where the\ncompositor cannot blur what is behind the popups."
+        },
         "popup-position": {
           "$ref": "#/$defs/PopupPosition",
           "default": "top-right",
@@ -6227,6 +6234,11 @@
           "$ref": "#/$defs/boolean",
           "default": true,
           "description": "Display drop shadow on popup cards."
+        },
+        "popup-stack": {
+          "$ref": "#/$defs/PopupStack",
+          "default": "per-app",
+          "description": "Which popups collapse into one stack: the newest card in front, up\nto two older ones peeking out behind it, and a count of the rest.\nHovering a stack fans it out into a list."
         },
         "popup-stacking-order": {
           "$ref": "#/$defs/StackingOrder",
@@ -6550,6 +6562,25 @@
         {
           "const": "center-right",
           "description": "Center-right edge.",
+          "type": "string"
+        }
+      ]
+    },
+    "PopupStack": {
+      "oneOf": [
+        {
+          "const": "per-app",
+          "description": "Popups from the same app share a stack.",
+          "type": "string"
+        },
+        {
+          "const": "all",
+          "description": "Every popup shares one stack.",
+          "type": "string"
+        },
+        {
+          "const": "off",
+          "description": "Every popup is a card of its own.",
           "type": "string"
         }
       ]
@@ -10022,8 +10053,10 @@
           "popup-margin-y": 0.0,
           "popup-max-visible": 5,
           "popup-monitor": "primary",
+          "popup-opacity": 75,
           "popup-position": "top-right",
           "popup-shadow": true,
+          "popup-stack": "per-app",
           "popup-stacking-order": "newest-first",
           "popup-urgency-bar": "low",
           "right-click": "lys-shell notify dnd",

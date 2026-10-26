@@ -35,6 +35,7 @@ bar:
 | `popup-position` | [`PopupPosition`](/config/types#popup-position) | `"top-right"` | Screen position for popup notifications. |
 | `popup-max-visible` | u32 | `5` | Maximum number of popups visible at once. |
 | `popup-stacking-order` | [`StackingOrder`](/config/types#stacking-order) | `"newest-first"` | Order in which popups stack on screen. |
+| `popup-stack` | [`PopupStack`](/config/types#popup-stack) | `"per-app"` | Which popups collapse into one stack: the newest card in front, up to two older ones peeking out behind it, and a count of the rest. Hovering a stack fans it out into a list. |
 | `popup-duration` | u32 | `5000` | Maximum popup display duration in milliseconds. |
 | `popup-hover-pause` | bool | `true` | Pause popup auto-dismiss timer on hover. |
 | `popup-margin-x` | [`Size`](/config/types#size) | `0` | Horizontal margin from screen edges. Accepts a scale multiplier or pixels (e.g. `"12px"`). |
@@ -44,6 +45,7 @@ bar:
 | `popup-layer` | [`Layer`](/config/types#layer) | `"overlay"` | Layer-shell layer popup notifications are placed on. |
 | `popup-close-behavior` | [`PopupCloseBehavior`](/config/types#popup-close-behavior) | `"dismiss"` | What happens when the close button on a popup is clicked. |
 | `popup-shadow` | bool | `true` | Display drop shadow on popup cards. |
+| `popup-opacity` | [`Percentage`](/config/types#percentage) | `75` | Opacity of a popup card's frosted surface at rest (0-100). The card under the pointer is opaque, and so is every card where the compositor cannot blur what is behind the popups. |
 | `popup-urgency-bar` | [`UrgencyBarThreshold`](/config/types#urgency-bar-threshold) | `"low"` | Minimum urgency level that displays a colored urgency bar. |
 | `thresholds` | array of [`ThresholdEntry`](/config/types#threshold-entry) | `[]` | Dynamic color thresholds based on notification count. |
 
@@ -149,6 +151,7 @@ modules:
     popup-position: top-right
     popup-max-visible: 5
     popup-stacking-order: newest-first
+    popup-stack: per-app
     popup-duration: 5000
     popup-hover-pause: true
     popup-margin-x: 0.0
@@ -158,6 +161,7 @@ modules:
     popup-layer: overlay
     popup-close-behavior: dismiss
     popup-shadow: true
+    popup-opacity: 75
     popup-urgency-bar: low
     thresholds: []
 ```

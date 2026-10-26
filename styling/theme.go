@@ -94,6 +94,12 @@ func ThemeCSS(p config.Palette, general config.GeneralConfig, bar config.BarConf
 	return b.String()
 }
 
+// NotificationCSS declares the popup cards' resting surface: the card
+// color, the palette's elevated surface, at popup-opacity.
+func NotificationCSS(p config.Palette, n config.NotificationConfig) string {
+	return ":root {\n    --notification-popup-surface: " + hexToRGBA(p.Elevated, float32(n.PopupOpacity)/100) + ";\n}"
+}
+
 // PaletteFromHex converts a resolved hex palette to the render-color
 // Palette the Go painters consume. A provider can hand back any string,
 // so an unparsable color is an error naming the slot.
@@ -169,5 +175,5 @@ func cssColor(c render.Color) string {
 // rules, the palette and config block for palette, and the tokens
 // resolved from p, the same palette as render colors.
 func BundleCSS(cfg *config.Config, palette config.Palette, p *Palette) string {
-	return StaticCSS + "\n" + ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling) + "\n" + TokensCSS(p)
+	return StaticCSS + "\n" + ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling) + "\n" + NotificationCSS(palette, cfg.Notification) + "\n" + TokensCSS(p)
 }

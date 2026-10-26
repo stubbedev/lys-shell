@@ -217,3 +217,38 @@ func TestBundleTokensPaintTheTokenColor(t *testing.T) {
 		t.Errorf("var(--bg-overlay) paints %#08x, want the token's %#08x", uint32(got), uint32(want))
 	}
 }
+
+// The popup cards' resting surface is the card color, the palette's
+// elevated surface, at popup-opacity: opaque at 100, translucent below.
+func TestNotificationCSSTintsTheCardColor(t *testing.T) {
+	cfg := config.Defaults()
+	palette := cfg.Styling.ActivePalette()
+	paint := func(opacity config.Percentage) [4]byte {
+		cfg.Notification.PopupOpacity = opacity
+		sheet := widget.NewStylesheet(BundleCSS(cfg, palette, Default())+"\n.probe { background-color: var(--notification-popup-surface); }", 200)
+		box := widget.NewBox(widget.Row, 0, 0)
+		box.AddClass("probe")
+		box.SetSizeRequest(10, 10)
+		box.AttachStylesheet(sheet)
+		box.Measure(widget.Constraints{Max: widget.Size{W: 10, H: 10}})
+		box.Arrange(render.Rect{W: 10, H: 10})
+		data := make([]byte, render.Stride(10)*10)
+		box.Paint(render.NewScaled(data, render.Stride(10), 10, 10, 1, 1))
+		i := 5*render.Stride(10) + 5*4
+		return [4]byte{data[i+2], data[i+1], data[i], data[i+3]}
+	}
+	elevated, err := PaletteFromHex(palette)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := elevated.Elevated.Straight()
+	if got := paint(100); got != [4]byte{want[0], want[1], want[2], 0xff} {
+		t.Errorf("popup-opacity 100 paints %v, want the opaque elevated surface %v", got, want)
+	}
+	if got := paint(40); got[3] < 0x60 || got[3] > 0x6a {
+		t.Errorf("popup-opacity 40 paints alpha %#02x, want about 40%%", got[3])
+	}
+	if !strings.Contains(NotificationCSS(palette, config.NotificationConfig{PopupOpacity: 40}), ", 0.40);") {
+		t.Errorf("NotificationCSS at 40 = %q", NotificationCSS(palette, config.NotificationConfig{PopupOpacity: 40}))
+	}
+}

@@ -61,6 +61,10 @@ type NotificationConfig struct {
 	PopupMaxVisible uint32 `cfg:"popup-max-visible"`
 	// Order in which popups stack on screen.
 	PopupStackingOrder StackingOrder `cfg:"popup-stacking-order"`
+	// Which popups collapse into one stack: the newest card in front, up
+	// to two older ones peeking out behind it, and a count of the rest.
+	// Hovering a stack fans it out into a list.
+	PopupStack PopupStack `cfg:"popup-stack"`
 	// Maximum popup display duration in milliseconds.
 	//
 	// Applications may request a shorter timeout, which takes precedence.
@@ -87,6 +91,10 @@ type NotificationConfig struct {
 	PopupCloseBehavior PopupCloseBehavior `cfg:"popup-close-behavior"`
 	// Display drop shadow on popup cards.
 	PopupShadow bool `cfg:"popup-shadow"`
+	// Opacity of a popup card's frosted surface at rest (0-100). The card
+	// under the pointer is opaque, and so is every card where the
+	// compositor cannot blur what is behind the popups.
+	PopupOpacity Percentage `cfg:"popup-opacity"`
 	// Minimum urgency level that displays a colored urgency bar.
 	PopupUrgencyBar UrgencyBarThreshold `cfg:"popup-urgency-bar"`
 	// Dynamic color thresholds based on notification count.
@@ -137,6 +145,7 @@ func DefaultsNotification() NotificationConfig {
 		PopupPosition:      PopupPositionTopRight,
 		PopupMaxVisible:    5,
 		PopupStackingOrder: StackingOrderNewestFirst,
+		PopupStack:         PopupStackPerApp,
 		PopupDuration:      5000,
 		PopupHoverPause:    true,
 		PopupMarginX:       Size{Value: 0, Unit: SizeMultiplier},
@@ -145,6 +154,7 @@ func DefaultsNotification() NotificationConfig {
 		PopupLayer:         LayerOverlay,
 		PopupCloseBehavior: PopupCloseBehaviorDismiss,
 		PopupShadow:        true,
+		PopupOpacity:       75,
 		PopupUrgencyBar:    UrgencyBarThresholdLow,
 		Thresholds:         []ThresholdEntry{},
 	}
@@ -196,6 +206,21 @@ const (
 )
 
 var _ = registerEnum(StackingOrderNewestFirst, StackingOrderOldestFirst)
+
+// PopupStack is which notification popups share a stack.
+type PopupStack string
+
+// PopupStack values.
+const (
+	// Popups from the same app share a stack.
+	PopupStackPerApp PopupStack = "per-app"
+	// Every popup shares one stack.
+	PopupStackAll PopupStack = "all"
+	// Every popup is a card of its own.
+	PopupStackOff PopupStack = "off"
+)
+
+var _ = registerEnum(PopupStackPerApp, PopupStackAll, PopupStackOff)
 
 // PopupCloseBehavior is ported from crates/wayle-config/src/schemas/modules/notification/types.rs.
 //
