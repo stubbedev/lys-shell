@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,60 +15,33 @@ import (
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	"golang.org/x/sys/unix"
 
+	"github.com/stubbedev/lys-shell/internal/gpuhost"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// hostRenderNodes are the host's DRM render nodes.
-const hostRenderNodes = "/dev/dri/renderD*"
-
-// firstRenderNode is the host's first render node; a host without one
-// (CI, which renders on lavapipe) skips the test.
-func firstRenderNode(t *testing.T) string {
+// vulkanNode is the host's first render node, its device number, and
+// the Vulkan allocator behind it. No render node or no Vulkan device behind it (CI, or
+// Vulkan limited to lavapipe, which has no DRM node) is gpuhost.Absent;
+// any other failure to open it fails.
+func vulkanNode(t *testing.T) (string, uint64, gpuAllocator) {
 	t.Helper()
-	nodes, err := filepath.Glob(hostRenderNodes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(nodes) == 0 {
-		t.Skipf("no DRM render node matches %s: the zero-copy path needs a GPU (CI renders on lavapipe, which has none)", hostRenderNodes)
-	}
-	return nodes[0]
-}
-
-// deviceOf is the DRM device number of node.
-func deviceOf(t *testing.T, node string) uint64 {
-	t.Helper()
-	var st unix.Stat_t
-	if err := unix.Stat(node, &st); err != nil {
-		t.Fatal(err)
-	}
-	return st.Rdev
-}
-
-// vulkanNode is the host's first render node and the Vulkan allocator
-// behind it. A host with no render node, or whose Vulkan drivers have no
-// device on it (CI, or Vulkan limited to lavapipe, which has no DRM
-// node), skips the test with the reason; any other failure to open it
-// fails.
-func vulkanNode(t *testing.T) (string, gpuAllocator) {
-	t.Helper()
-	node := firstRenderNode(t)
-	a, err := openVulkanAllocator(deviceOf(t, node))
+	node, dev := gpuhost.Node(t)
+	a, err := openVulkanAllocator(dev)
 	switch {
 	case errors.Is(err, gpu.ErrNoVulkan), errors.Is(err, gpu.ErrNoDevice):
-		t.Skipf("no Vulkan device behind %s: %v", node, err)
+		gpuhost.Absent(t, "no Vulkan device behind %s: %v", node, err)
 	case err != nil:
 		t.Fatalf("%s has a Vulkan device that fails to open: %v", node, err)
 	}
 	t.Cleanup(a.Close)
-	return node, a
+	return node, dev, a
 }
 
 // realDevice opens the Vulkan allocator on the host's first render node.
 func realDevice(t *testing.T) gpuAllocator {
 	t.Helper()
-	_, a := vulkanNode(t)
+	_, _, a := vulkanNode(t)
 	return a
 }
 
@@ -174,7 +146,7 @@ func captureLog(t *testing.T) *lockedBuffer {
 // Vulkan device behind the named one it streams through shared memory,
 // and says so once, with the reason.
 func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
-	node, _ := vulkanNode(t)
+	node, dev, _ := vulkanNode(t)
 	swaytest.Start(t, "WLR_RENDERER=vulkan", "WLR_RENDER_DRM_DEVICE="+node)
 	pwtest.Start(t)
 	c, err := capture.Connect()
@@ -190,7 +162,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if offered.Device != deviceOf(t, node) || len(offered.Modifiers) == 0 {
+	if offered.Device != dev || len(offered.Modifiers) == 0 {
 		t.Errorf("sway offers device %#x and modifiers %#x, want %s's and at least one", offered.Device, offered.Modifiers, node)
 	}
 	_ = c.Close()

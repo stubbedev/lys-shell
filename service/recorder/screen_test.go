@@ -20,9 +20,10 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/gpu"
-	"golang.org/x/sys/unix"
+	"github.com/stubbedev/lys-lib/gputest"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/gpuhost"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
@@ -30,39 +31,26 @@ import (
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// hostRenderNodes are the host's DRM render nodes.
-const hostRenderNodes = "/dev/dri/renderD*"
-
 // encoderNode is the host's first render node with a Vulkan device
 // that encodes H.264 behind it. No render node, no Vulkan device on it
 // (CI, or Vulkan limited to lavapipe, which has no DRM node), or no
-// H.264 encoder on it skips the test with the reason; any other failure
-// to open it fails.
+// H.264 encoder on it is gpuhost.Absent; any other failure to open it
+// fails.
 func encoderNode(t *testing.T) string {
 	t.Helper()
-	nodes, err := filepath.Glob(hostRenderNodes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(nodes) == 0 {
-		t.Skipf("no DRM render node matches %s: recording needs a GPU", hostRenderNodes)
-	}
-	var st unix.Stat_t
-	if err := unix.Stat(nodes[0], &st); err != nil {
-		t.Fatal(err)
-	}
-	d, err := gpu.OpenNode(st.Rdev)
+	node, dev := gpuhost.Node(t)
+	d, err := gpu.OpenNode(dev)
 	switch {
 	case errors.Is(err, gpu.ErrNoVulkan), errors.Is(err, gpu.ErrNoDevice):
-		t.Skipf("no Vulkan device behind %s: %v", nodes[0], err)
+		gpuhost.Absent(t, "no Vulkan device behind %s: %v", node, err)
 	case err != nil:
-		t.Fatalf("%s has a Vulkan device that fails to open: %v", nodes[0], err)
+		t.Fatalf("%s has a Vulkan device that fails to open: %v", node, err)
 	}
 	defer d.Close()
 	if err := requireH264(d); err != nil {
-		t.Skipf("the GPU behind %s cannot record: %v", nodes[0], err)
+		gpuhost.Absent(t, "the GPU behind %s cannot record: %v", node, err)
 	}
-	return nodes[0]
+	return node
 }
 
 // gpuSway starts a private headless sway rendering with Vulkan on the
@@ -293,9 +281,12 @@ func lastFrame(t *testing.T, path string, size image.Point) *image.RGBA {
 // with no video queue) is the defined ErrNoVideoEncoder, from the check
 // and from the encoder itself; one that does passes the check.
 func TestNoH264EncoderIsTheDefinedError(t *testing.T) {
+	if _, err := gputest.SetupTest(t); err != nil {
+		t.Fatal(err)
+	}
 	d, err := gpu.Open()
 	if errors.Is(err, gpu.ErrNoVulkan) || errors.Is(err, gpu.ErrNoDevice) {
-		t.Skipf("no Vulkan device at all: %v", err)
+		gpuhost.Absent(t, "no Vulkan device at all: %v", err)
 	}
 	if err != nil {
 		t.Fatal(err)
