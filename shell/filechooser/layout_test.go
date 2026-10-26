@@ -241,7 +241,7 @@ func TestSidebarKeepsItsWidth(t *testing.T) {
 }
 
 // The replace notice names the folder, not its path, as GTK does; a
-// long file name wraps the message inside the panel over Replace, and
+// long file name wraps the message inside the panel beside Replace, and
 // a short one keeps it on one line.
 func TestReplaceNoticeWrapsInsideThePanel(t *testing.T) {
 	long := strings.Repeat("a-long-file-name ", 8) + ".txt"
@@ -268,6 +268,9 @@ func TestReplaceNoticeWrapsInsideThePanel(t *testing.T) {
 				}
 				msg := hs.c.ui.noticeLabel
 				at := msg.Bounds()
+				if rb := hs.c.ui.replace.Bounds(); rb.X < at.X+at.W || rb.Y >= at.Y+at.H || rb.Y+rb.H <= at.Y {
+					t.Errorf("Replace at %v, not beside the message %v", rb, at)
+				}
 				line := msg.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}})
 				lines := msg.Measure(widget.Constraints{Max: widget.Size{W: at.W, H: 1 << 20}})
 				if wrapped := lines.H > line.H; wrapped != (name == long) || at.H < lines.H {

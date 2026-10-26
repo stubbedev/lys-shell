@@ -526,14 +526,13 @@ func (c *Chooser) build(r request) {
 	nameRow.Append(u.name, true)
 	nameRow.SetVisible(s.mode == ModeSave)
 
-	// The notice: a warning, or the replace prompt with its button
-	// under it, so the message wraps across the panel's width.
-	u.notice = section(widget.Column, "file-chooser-notice")
+	// The notice: a warning, or the replace prompt with its button.
+	u.notice = section(widget.Row, "file-chooser-notice")
 	u.noticeLabel = c.label("", "file-chooser-notice-label", css.Warning)
 	u.noticeLabel.SetWrap(true)
-	u.notice.Append(u.noticeLabel, false)
+	u.notice.AppendAligned(u.noticeLabel, true, widget.AlignCenter)
 	u.replace, _ = c.textButton("Replace", "file-chooser-replace", css.DestructiveAction, c.confirm)
-	u.notice.AppendAligned(u.replace, false, widget.AlignEnd)
+	u.notice.AppendAligned(u.replace, false, widget.AlignCenter)
 	u.notice.SetVisible(false)
 
 	// The new folder row: a name and Create.
