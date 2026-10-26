@@ -300,10 +300,12 @@ func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 		t.Fatal("at rest the row shows its status")
 	}
 	// One pointer: the router moves over the row, onto a button, then
-	// off the row entirely.
-	row.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
-	row.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
-	router := &widget.Router{Root: row}
+	// off the row onto the list's empty space below it, as in the
+	// dropdown, where the row is never the surface's root.
+	list := widget.NewBox(widget.Column, 0, 0).Append(row, false)
+	list.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	list.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 200})
+	router := &widget.Router{Root: list}
 	router.Move(widget.Point{X: 10, Y: 10})
 	if row.slot.Visible() != btSlotActions || !row.slot.Switching() {
 		t.Fatal("hovered, the row crossfades to its actions")
@@ -316,7 +318,7 @@ func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 	if row.slot.Visible() != btSlotActions {
 		t.Error("moving onto an action hid the actions")
 	}
-	router.Move(widget.Point{X: 1000, Y: 1000})
+	router.Move(widget.Point{X: 10, Y: 190})
 	if row.slot.Visible() != btSlotStatus || !visible(row.status) {
 		t.Error("leaving the row keeps the actions")
 	}
