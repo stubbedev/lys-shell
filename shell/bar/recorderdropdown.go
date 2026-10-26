@@ -24,10 +24,11 @@ const (
 	recorderPathWebcamY   = "modules.recorder.webcam-y"
 )
 
-// previewGeometry is preview_geometry: the 16:9 screen frame fit to the
-// popover width and the webcam frame at its configured size.
+// previewGeometry is preview_geometry: the 16:9 screen frame across the
+// width the preview is given and the webcam frame at its configured
+// size.
 func previewGeometry(width int32, sizePct uint8) (pw, ph, cw, ch int32) {
-	pw = max(width-48, 160)
+	pw = width
 	ph = pw * 9 / 16
 	cw = max(pw*int32(sizePct)/100, 24)
 	ch = max(cw*9/16, 14)
@@ -45,11 +46,15 @@ func pctFromPx(px, margin, travel int32) uint8 {
 // webcamPreview is the draggable position preview: the outer frame is
 // the screen, the inner one the webcam picture-in-picture, inset by the
 // recording pipeline's margin. Both are classed boxes the stylesheet
-// paints (recorder-position-preview, recorder-position-cam); a drag
-// tracks the pointer from where it grabbed the frame, and the release
-// reports the position as percentages.
+// paints (recorder-position-preview, recorder-position-cam). The frame
+// spans the width its row gives it at 16:9, so it never outgrows the
+// card. A drag tracks the pointer from where it grabbed the frame, and
+// the release reports the position as percentages.
 type webcamPreview struct {
 	widget.Base
+	sizePct uint8
+	// x and y are the frame's position as percentages of its travel.
+	x, y           uint8
 	pw, ph, cw, ch int32
 	// camX and camY are the frame's offset inside the preview.
 	camX, camY int32
@@ -62,13 +67,12 @@ type webcamPreview struct {
 	onMove   func(x, y uint8)
 }
 
-func newWebcamPreview(width int32, sizePct, x, y uint8) *webcamPreview {
-	p := &webcamPreview{}
+func newWebcamPreview(sizePct, x, y uint8) *webcamPreview {
+	p := &webcamPreview{sizePct: sizePct}
 	p.frame = widget.NewBox(widget.Row, 0, 0)
 	p.frame.AddClass("recorder-position-preview")
 	p.cam = widget.NewBox(widget.Row, 0, 0)
 	p.cam.AddClass("recorder-position-cam")
-	p.pw, p.ph, p.cw, p.ch = previewGeometry(width, sizePct)
 	p.place(x, y)
 	return p
 }
@@ -80,10 +84,17 @@ func (p *webcamPreview) travel() (margin, w, h int32) {
 
 // place is reposition_cam.
 func (p *webcamPreview) place(x, y uint8) {
-	margin, tw, th := p.travel()
-	p.camX = margin + tw*int32(min(x, 100))/100
-	p.camY = margin + th*int32(min(y, 100))/100
+	p.x, p.y = min(x, 100), min(y, 100)
+	p.reposition()
 	p.Invalidate()
+}
+
+// reposition puts the frame at its percentages inside the current
+// geometry.
+func (p *webcamPreview) reposition() {
+	margin, tw, th := p.travel()
+	p.camX = margin + tw*int32(p.x)/100
+	p.camY = margin + th*int32(p.y)/100
 }
 
 // percent is the frame's position as the config stores it.
@@ -92,10 +103,15 @@ func (p *webcamPreview) percent() (uint8, uint8) {
 	return pctFromPx(p.camX, margin, tw), pctFromPx(p.camY, margin, th)
 }
 
-// Arrange lays the frame over the whole preview and the cam at its
-// offset; the boxes paint from their cascades.
+// Arrange fits the geometry to the arranged width, then lays the frame
+// over the whole preview and the cam at its offset; the boxes paint
+// from their cascades.
 func (p *webcamPreview) Arrange(rect render.Rect) {
 	p.Base.Arrange(rect)
+	p.pw, p.ph, p.cw, p.ch = previewGeometry(int32(rect.W), p.sizePct)
+	if !p.dragging {
+		p.reposition()
+	}
 	p.layOut()
 	widget.SetParents(p, p.frame, p.cam)
 }
@@ -110,8 +126,10 @@ func (p *webcamPreview) layOut() {
 	p.cam.Arrange(render.Rect{X: b.X + int(p.camX), Y: b.Y + int(p.camY), W: int(p.cw), H: int(p.ch)})
 }
 
-func (p *webcamPreview) Measure(widget.Constraints) widget.Size {
-	return widget.Size{W: int(p.pw), H: int(p.ph)}
+// Measure takes the whole width offered and the 16:9 height for it.
+func (p *webcamPreview) Measure(con widget.Constraints) widget.Size {
+	pw, ph, _, _ := previewGeometry(int32(con.Max.W), p.sizePct)
+	return widget.Size{W: int(pw), H: int(ph)}
 }
 
 func (p *webcamPreview) Paint(cv *render.Canvas) {
@@ -137,8 +155,9 @@ func (p *webcamPreview) SetPressed(on bool) {
 		p.grabY = int32(p.pointer.Y-b.Y) - p.camY
 	case !on && p.dragging:
 		p.dragging = false
+		p.x, p.y = p.percent()
 		if p.onMove != nil {
-			p.onMove(p.percent())
+			p.onMove(p.x, p.y)
 		}
 	}
 	p.Invalidate()
@@ -243,15 +262,9 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	position := v.row(i18n.T("dropdown-recorder-position"))
 	position.AddClass("recorder-position")
 	webcam.Append(position)
-	width := int32(360)
-	if w, _, ok := dropdownDims("recorder", ctx.Config); ok {
-		width = int32(w)
-	}
-	v.preview = newWebcamPreview(width, uint8(cfg.WebcamSize), uint8(cfg.WebcamX), uint8(cfg.WebcamY))
+	v.preview = newWebcamPreview(uint8(cfg.WebcamSize), uint8(cfg.WebcamX), uint8(cfg.WebcamY))
 	v.preview.onMove = v.webcamMoved
-	preview := itemBody()
-	preview.AppendAligned(v.preview, false, widget.AlignCenter)
-	webcam.Append(preview)
+	webcam.Append(v.positionPicker())
 	v.webcam = dropdownGroup(v.sectionHeader("ld-camera-symbolic", i18n.T("dropdown-recorder-section-webcam")), webcamCard)
 	v.webcam.SetVisible(len(v.cams) > 1)
 	content.Append(v.webcam, false)
@@ -259,6 +272,17 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.applyState(v.snapshot())
 	v.follow()
 	return v
+}
+
+// positionPicker is the preview's row in the webcam card: lys-ui's
+// small item element, so the theme's item rule insets it exactly as it
+// insets the setting rows.
+func (v *recorderView) positionPicker() *widget.Box {
+	row := widget.NewBox(widget.Column, 0, 0)
+	row.SetElement("item")
+	row.AddClass(css.Small, "recorder-position-picker")
+	row.Append(v.preview, false)
+	return row
 }
 
 // controls is the record/stop toggle and the pause button.

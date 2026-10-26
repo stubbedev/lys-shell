@@ -20,10 +20,10 @@ import (
 )
 
 func TestPreviewGeometryAndPercent(t *testing.T) {
-	if pw, ph, cw, ch := previewGeometry(360, 20); pw != 312 || ph != 175 || cw != 62 || ch != 34 {
+	if pw, ph, cw, ch := previewGeometry(312, 20); pw != 312 || ph != 175 || cw != 62 || ch != 34 {
 		t.Errorf("geometry = %d %d %d %d", pw, ph, cw, ch)
 	}
-	if pw, _, cw, ch := previewGeometry(100, 1); pw != 160 || cw != 24 || ch != 14 {
+	if pw, _, cw, ch := previewGeometry(100, 1); pw != 100 || cw != 24 || ch != 14 {
 		t.Errorf("floors = %d %d %d", pw, cw, ch)
 	}
 	for _, tc := range []struct {
@@ -41,8 +41,8 @@ func TestPreviewGeometryAndPercent(t *testing.T) {
 // The frame follows the pointer from where it was grabbed, clamped to
 // the inset travel, and the release reports the percentages.
 func TestWebcamPreviewDrag(t *testing.T) {
-	p := newWebcamPreview(360, 20, 0, 0)
-	p.Arrange(render.Rect{X: 100, Y: 50, W: int(p.pw), H: int(p.ph)})
+	p := newWebcamPreview(20, 0, 0)
+	p.Arrange(render.Rect{X: 100, Y: 50, W: 312, H: 175})
 	margin, tw, th := p.travel()
 	if p.camX != margin || p.camY != margin {
 		t.Fatalf("0,0 placed at %d,%d, want the margin %d", p.camX, p.camY, margin)
@@ -217,6 +217,73 @@ func TestRecorderSettingsAreItemCards(t *testing.T) {
 	}
 	if _, ok := any(v.recordFace).(*widget.ButtonContent); !ok || recordText(v) != i18n.T("dropdown-recorder-record") {
 		t.Errorf("the record button reads %q", recordText(v))
+	}
+}
+
+// styledWebcamDropdown is the recorder dropdown with a camera, the
+// stylesheet attached, laid out at width w.
+func styledWebcamDropdown(t *testing.T, w int) *recorderView {
+	t.Helper()
+	prev := recorderCameras
+	recorderCameras = func() []recorder.DeviceChoice {
+		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}}
+	}
+	t.Cleanup(func() { recorderCameras = prev })
+	ctx := styledContext(t, config.Defaults())
+	v := recorderDropdown(ctx).(*recorderView)
+	t.Cleanup(v.dropdownClosed)
+	ctx.Theme.Attach(v)
+	arrangeDropdown(t, v, w, 1000)
+	return v
+}
+
+// The position picker spans its row's content box at any dropdown
+// width: the same inset from its row as the webcam switch row's title
+// and switch have from theirs, on every side.
+func TestRecorderPositionPickerInsetLikeTheRows(t *testing.T) {
+	for _, w := range []int{300, 360, 480} {
+		v := styledWebcamDropdown(t, w)
+		card := treetest.WithClass(v, "recorder-card")[1]
+		switchRow := treetest.WithClass(card, "recorder-row")[0]
+		title := boundsOf(treetest.WithClass(switchRow, "title")[0])
+		sw := boundsOf(treetest.First[*widget.Switch](t, switchRow))
+		rb := boundsOf(switchRow)
+		pb := boundsOf(treetest.WithClass(card, "recorder-position-picker")[0])
+		fb := v.preview.frame.Bounds()
+		if got, want := fb.X-pb.X, title.X-rb.X; got != want {
+			t.Errorf("width %d: frame left inset %d, rows' %d", w, got, want)
+		}
+		if got, want := pb.X+pb.W-(fb.X+fb.W), rb.X+rb.W-(sw.X+sw.W); got != want {
+			t.Errorf("width %d: frame right inset %d, rows' %d", w, got, want)
+		}
+		if got, want := fb.Y-pb.Y, title.Y-rb.Y; got != want {
+			t.Errorf("width %d: frame top inset %d, rows' %d", w, got, want)
+		}
+		if got, want := pb.Y+pb.H-(fb.Y+fb.H), rb.Y+rb.H-(title.Y+title.H); got != want {
+			t.Errorf("width %d: frame bottom inset %d, rows' %d", w, got, want)
+		}
+		if fb.H != fb.W*9/16 {
+			t.Errorf("width %d: frame %dx%d is not 16:9", w, fb.W, fb.H)
+		}
+	}
+}
+
+// A dropdown narrower than the configured width does not push the
+// preview out of its card: the frame stays inside the card's content
+// and the webcam frame inside the screen frame, wherever it sits.
+func TestRecorderPositionPickerStaysInsideANarrowCard(t *testing.T) {
+	v := styledWebcamDropdown(t, 260)
+	cb := boundsOf(treetest.WithClass(v, "recorder-card")[1])
+	fb := v.preview.frame.Bounds()
+	if fb.X < cb.X || fb.X+fb.W > cb.X+cb.W || fb.Y+fb.H > cb.Y+cb.H {
+		t.Errorf("frame %v overflows the card %v", fb, cb)
+	}
+	for _, at := range [][2]uint8{{0, 0}, {100, 100}} {
+		v.preview.place(at[0], at[1])
+		v.preview.Arrange(v.preview.Bounds())
+		if cam := v.preview.cam.Bounds(); cam.X < fb.X || cam.Y < fb.Y || cam.X+cam.W > fb.X+fb.W || cam.Y+cam.H > fb.Y+fb.H {
+			t.Errorf("at %v the webcam frame %v leaves the screen frame %v", at, cam, fb)
+		}
 	}
 }
 
