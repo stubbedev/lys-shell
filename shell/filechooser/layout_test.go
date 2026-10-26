@@ -195,3 +195,36 @@ func TestNoFiltersNoFilterDropdown(t *testing.T) {
 		t.Error("a request without filters shows the filter dropdown")
 	}
 }
+
+// The sidebar keeps its width: a long place name ellipsizes inside it
+// instead of widening it, and a short one is neither cut nor narrows
+// it.
+func TestSidebarKeepsItsWidth(t *testing.T) {
+	for _, tc := range []struct{ name, label string }{
+		{"short", "Projects"},
+		{"long", strings.Repeat("a long bookmark name ", 10)},
+	} {
+		label := tc.label
+		t.Run(tc.name, func(t *testing.T) {
+			hs := newHarness(t, "")
+			hs.c.d.Places = func() []Place { return []Place{{label, hs.root, "folder-symbolic"}} }
+			hs.open(t, OpenRequest{})
+			hs.run(func() {
+				hs.laidOut(t)
+				scroll := classed(t, hs.cfg.Root, "file-chooser-sidebar-scroll").Bounds()
+				if scroll.W != sidebarW {
+					t.Errorf("sidebar is %dpx wide, want %d", scroll.W, sidebarW)
+				}
+				place := treetest.Button(t, hs.cfg.Root, label)
+				b := place.Bounds()
+				if b.X+b.W > scroll.X+scroll.W {
+					t.Errorf("place %v runs out of the sidebar %v", b, scroll)
+				}
+				natural := place.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}).W
+				if cut := b.W < natural; cut != (natural > sidebarW) {
+					t.Errorf("%q is %dpx of its natural %d: cut %v", label, b.W, natural, cut)
+				}
+			})
+		})
+	}
+}

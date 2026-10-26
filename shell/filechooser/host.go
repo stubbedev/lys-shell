@@ -630,11 +630,13 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	u.locations = section("Locations", c.d.Locations())
 	box.Append(widget.NewSpacer(0, 0), true)
 	scroll := widget.NewScroll(box)
-	// Filled, so the sections pack at the top instead of floating mid-view.
+	// Filled, so the sections pack at the top instead of floating
+	// mid-view; pinned and vertical only, so a long place name
+	// ellipsizes at the sidebar's width instead of widening it.
 	scroll.FillX, scroll.FillY = true, true
+	scroll.VerticalOnly = true
 	scroll.AddClass("file-chooser-sidebar-scroll")
-	scroll.SetSizeRequest(sidebarW, 0)
-	return scroll
+	return widgets.Pin(scroll, sidebarW, 0)
 }
 
 // placeIcon is a place's icon, through GTK's dash fallbacks as the GTK
