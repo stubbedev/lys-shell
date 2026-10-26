@@ -129,7 +129,8 @@ The flake's dev shell pins the Go toolchain and carries the linters and the head
 ```sh
 nix develop
 just run shell    # run the shell from source
-just check        # lint, tests, race detector, schema check
+just check        # vet, lint, tests, race detector, schema check, release build
+just docker check # the same, in a container that cannot reach your session
 ```
 
 Every change lands with tests; see [CLAUDE.md](CLAUDE.md) for the conventions.

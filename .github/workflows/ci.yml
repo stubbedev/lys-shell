@@ -16,11 +16,12 @@ concurrency:
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-    # Lint, the test suite, the race detector and the schema check, in the
-    # flake's dev shell: the Go toolchain go.mod pins, the lint stack, and the
-    # sway, dbus and pipewire the tests start private instances of.
+    # Vet, lint, the test suite, the race detector, the schema check and the
+    # release build, in the flake's dev shell: the Go toolchain go.mod pins,
+    # the lint stack, and the sway, dbus and pipewire the tests start private
+    # instances of.
     check:
-        name: Check (lint + test + race + schema)
+        name: Check (vet + lint + test + race + schema + build)
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v7

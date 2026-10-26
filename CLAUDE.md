@@ -9,8 +9,10 @@ start private instances of:
 ```sh
 nix develop -c just build   # static binaries into dist/
 nix develop -c just test    # go test ./...
-nix develop -c just lint    # golangci-lint fmt --diff + go vet + golangci-lint run
-nix develop -c just check   # lint + test + race + schema-check, run before every release
+nix develop -c just vet     # go vet ./...
+nix develop -c just lint    # golangci-lint fmt --diff + golangci-lint run
+nix develop -c just check   # vet + lint + test + race + schema-check + build, run before every release
+just docker check           # any recipe in the dev shell inside a container, away from the desktop session
 just hyprland-vm            # the shell on a live Hyprland in a NixOS VM (KVM), screenshots in ./result
 ```
 

@@ -71,11 +71,14 @@ clean:
 fmt:
     golangci-lint fmt
 
-# Lint without changing anything: formatting, vet, and golangci-lint
+# Static analysis of every package with go vet.
+vet:
+    {{go}} vet ./...
+
+# Lint without changing anything: formatting and golangci-lint
 # (settings in .golangci.yml).
 lint:
     golangci-lint fmt --diff
-    {{go}} vet ./...
     golangci-lint run
 
 # Run the test suite in a random order, so a test that leans on state an
@@ -100,6 +103,37 @@ schema-check:
         exit 1
     fi
 
+# Run a recipe in the flake's dev shell inside a throwaway debian container,
+# so nothing the tests start (sway, dbus, pipewire, the portal) reaches the
+# desktop session: no host runtime dir, display or session bus. The nix
+# store is mounted read-only, the Go caches live in a named volume, the
+# container user has a passwd entry, and the GPU comes in through its render
+# and NVIDIA nodes only. Memory is capped, as the race suite runs many
+# binaries. `just docker race` or `just docker check`.
+docker recipe="check" memory="10g":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir=$(mktemp -d)
+    trap 'rm -rf "$dir"' EXIT
+    nix print-dev-env --accept-flake-config > "$dir/env.sh"
+    printf 'root:x:0:0::/root:/bin/sh\nlys-shell:x:%s:%s::/go/home:/bin/sh\n' "$(id -u)" "$(id -g)" > "$dir/passwd"
+    printf 'root:x:0:\nlys-shell:x:%s:\n' "$(id -g)" > "$dir/group"
+    bash=$(nix build --inputs-from . --no-link --print-out-paths nixpkgs#bash^out)/bin/bash
+    certs=$(nix build --inputs-from . --no-link --print-out-paths nixpkgs#cacert^out)/etc/ssl/certs/ca-bundle.crt
+    docker volume create lys-shell-go > /dev/null
+    docker run --rm -v lys-shell-go:/go debian:trixie-slim chown "$(id -u):$(id -g)" /go
+    gpu=()
+    for node in /dev/dri/renderD* /dev/nvidia*; do
+        [[ -c "$node" ]] && gpu+=(--device "$node" --group-add "$(stat -c %g "$node")")
+    done
+    if [[ -e /run/opengl-driver ]]; then
+        gpu+=(-v /run/opengl-driver:/run/opengl-driver:ro)
+    fi
+    docker run --rm --init --user "$(id -u):$(id -g)" --device /dev/kvm "${gpu[@]}" \
+        --memory {{quote(memory)}} --memory-swap {{quote(memory)}} --pids-limit 4096 --shm-size 1g \
+        -v /nix/store:/nix/store:ro -v "$dir/env.sh:/env.sh:ro" -v "$dir/passwd:/etc/passwd:ro" -v "$dir/group:/etc/group:ro" -v "$PWD:/src" -v lys-shell-go:/go -w /src -e SSL_CERT_FILE="$certs" \
+        debian:trixie-slim "$bash" -c 'source /env.sh && export HOME=/go/home GOMODCACHE=/go/mod GOCACHE=/go/cache GOLANGCI_LINT_CACHE=/go/lint TMPDIR=/tmp && unset XDG_RUNTIME_DIR WAYLAND_DISPLAY DISPLAY DBUS_SESSION_BUS_ADDRESS && mkdir -p "$HOME" && exec just "$1"' docker {{quote(recipe)}}
+
 # The shell on a live Hyprland in a NixOS VM (needs KVM): bars on every
 # output and hotplug, the Hyprland modules, launcher, popups, and the
 # session lock across a shell restart. Screenshots of every state land
@@ -107,8 +141,9 @@ schema-check:
 hyprland-vm:
     nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-hyprland-vm
 
-# Lint, test, race, and the schema check. Run before every release.
-check: lint test race schema-check
+# Every release gate in order: vet, lint, test, race, the schema
+# check, and the release build.
+check: vet lint test race schema-check build
 
 # Check the screen recorder on this machine's GPU (run it in the dev
 # shell): a private headless sway renders on the first render node with
