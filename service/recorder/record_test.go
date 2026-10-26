@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/media/opus"
+
 	"github.com/stubbedev/lys-shell/config"
 )
 
@@ -39,8 +41,8 @@ func startTest(t *testing.T, parts recordingParts, format config.RecorderFormat)
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "out."+string(format))
 	terms := &termLog{}
-	if parts.now == nil {
-		parts.now = time.Now
+	if parts.wall == nil {
+		parts.wall = systemClock{}
 	}
 	if parts.fps == 0 {
 		parts.fps = testFPS
@@ -96,40 +98,48 @@ func TestRecordingWritesAPlayableFileWithAudio(t *testing.T) {
 	}
 }
 
-// A pause cuts its span from both tracks: no frame is captured and no
-// audio is kept while paused, and the timestamps run on without a gap.
+// A pause cuts its span from both tracks: no frame falls due while
+// paused, however often the video loop ticks, and after the resume the
+// video and audio timestamps run on from where the pause stopped them.
 func TestRecordingPauseCutsTheSpan(t *testing.T) {
 	fx := loadFixture(t)
 	video := &fakeVideo{fx: fx}
-	src := &fakeAudio{}
-	r, path, _ := startTest(t, recordingParts{video: video, audio: []startAudio{src.start}}, config.RecorderFormatMkv)
-	stopTone := make(chan struct{})
-	go src.tone(2000, stopTone)
-	time.Sleep(300 * time.Millisecond)
+	period := time.Second / testFPS
+	wall := newFakeWall(time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC), period, audioFrameTime)
+	r, path, _ := startTest(t, recordingParts{video: video, audio: []startAudio{(&fakeAudio{}).start}, wall: wall}, config.RecorderFormatMkv)
+	var want []time.Duration
+	run := func(frames int, from time.Duration) {
+		for i := range frames {
+			wall.advance(period)
+			wall.tick(period)
+			want = append(want, from+time.Duration(i+1)*period)
+		}
+	}
+	run(9, 0)
+	wall.advance(period / 2)
 	r.SetPaused(true)
-	r.mu.Lock()
-	pausedAt := r.clock.elapsed(time.Now())
-	r.mu.Unlock()
-	time.Sleep(600 * time.Millisecond)
-	// A frame taken after the pause would carry the stopped clock.
-	if i := slices.IndexFunc(video.frames(), func(pts time.Duration) bool { return pts >= pausedAt }); i >= 0 {
-		t.Errorf("frame %d was captured while paused, at %v", i, video.frames()[i])
+	pausedAt := 9*period + period/2
+	for range 18 {
+		wall.advance(period)
+		wall.tick(period)
 	}
 	r.SetPaused(false)
-	time.Sleep(300 * time.Millisecond)
+	run(9, pausedAt)
 	if err := r.Stop(); err != nil {
 		t.Fatal(err)
 	}
-	close(stopTone)
-	frames := video.frames()
-	for i := 1; i < len(frames); i++ {
-		if gap := frames[i] - frames[i-1]; gap > 150*time.Millisecond {
-			t.Errorf("frames %d and %d are %v apart: the pause was not cut", i-1, i, gap)
-		}
+	if got := video.frames(); !slices.Equal(got, want) {
+		t.Errorf("frames at %v, want %v: the paused span was not cut", got, want)
 	}
+	recorded := pausedAt + 9*period
 	p := ffprobe(t, path)
-	if d := slices.Max(p.ptsOf(1)); d > 0.8 {
-		t.Errorf("audio runs to %vs over 0.6s of recording: the pause was kept", d)
+	if v := p.ptsOf(0); len(v) == 0 || !approx(slices.Max(v), recorded.Seconds(), 0.002) {
+		t.Errorf("video ends at %v, want %v", v, recorded.Seconds())
+	}
+	preSkip := time.Duration(opus.PreSkip) * time.Second / audioRate
+	lastAudio := time.Duration(int(recorded/audioFrameTime)-1)*audioFrameTime - preSkip
+	if a := p.ptsOf(1); len(a) == 0 || !approx(slices.Max(a), lastAudio.Seconds(), 0.001) {
+		t.Errorf("audio ends at %v, want its last packet at %v of %v recorded", a, lastAudio.Seconds(), recorded.Seconds())
 	}
 }
 
@@ -273,7 +283,7 @@ func TestStartRecordingFailsCleanly(t *testing.T) {
 	} {
 		video := &fakeVideo{fx: fx}
 		cam := &fakeCamera{}
-		_, err := startRecording(recordingParts{video: video, cam: cam, audio: c.audio, fps: testFPS, now: time.Now}, c.opts, func(string) {})
+		_, err := startRecording(recordingParts{video: video, cam: cam, audio: c.audio, fps: testFPS, wall: systemClock{}}, c.opts, func(string) {})
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want %q", name, err, c.want)
 		}

@@ -41,3 +41,21 @@ func (c *activeClock) elapsed(now time.Time) time.Duration {
 	}
 	return now.Sub(c.start) - c.pausedFor
 }
+
+// wallClock is the time a recording reads and the tickers that pace its
+// loops: systemClock in production.
+type wallClock interface {
+	Now() time.Time
+	// Ticker ticks every period until stop is called.
+	Ticker(period time.Duration) (ticks <-chan time.Time, stop func())
+}
+
+// systemClock is the system's wall clock and tickers.
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now() }
+
+func (systemClock) Ticker(period time.Duration) (<-chan time.Time, func()) {
+	t := time.NewTicker(period)
+	return t.C, t.Stop
+}

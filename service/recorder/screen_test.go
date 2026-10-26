@@ -244,7 +244,7 @@ func TestWebcamOverlayIsEncodedIntoTheFrame(t *testing.T) {
 	cam := &fakeCamera{frames: make(chan *image.RGBA, 1), recycled: make(chan *image.RGBA, 1)}
 	cam.frames <- red
 	path := filepath.Join(t.TempDir(), "cam.mkv")
-	rec, err := startRecording(recordingParts{video: video, cam: cam, camRect: rect, fps: 30, now: time.Now}, Options{OutputPath: path, Format: config.RecorderFormatMkv}, func(r string) { t.Errorf("reported %q", r) })
+	rec, err := startRecording(recordingParts{video: video, cam: cam, camRect: rect, fps: 30, wall: systemClock{}}, Options{OutputPath: path, Format: config.RecorderFormatMkv}, func(r string) { t.Errorf("reported %q", r) })
 	if err != nil {
 		t.Fatal(err)
 	}

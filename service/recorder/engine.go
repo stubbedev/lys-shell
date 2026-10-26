@@ -190,7 +190,7 @@ func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, e
 	if err != nil {
 		return nil, err
 	}
-	parts := recordingParts{video: video, audio: sources, fps: fps, now: time.Now}
+	parts := recordingParts{video: video, audio: sources, fps: fps, wall: systemClock{}}
 	if opts.Webcam != nil {
 		size := g.screen.frameSize()
 		width, errW := intconv.Exact[int32](size.X)

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"os/exec"
 	"strconv"
@@ -262,4 +263,61 @@ func (p probed) ptsOf(stream int) []float64 {
 		}
 	}
 	return out
+}
+
+// fakeWall is a wall clock that moves only when the test advances it,
+// with a ticker for each period it was made with that ticks only when
+// the test ticks it.
+type fakeWall struct {
+	mu    sync.Mutex
+	read  *sync.Cond
+	now   time.Time
+	reads int
+	ticks map[time.Duration]chan time.Time
+}
+
+func newFakeWall(start time.Time, periods ...time.Duration) *fakeWall {
+	w := &fakeWall{now: start, ticks: make(map[time.Duration]chan time.Time, len(periods))}
+	w.read = sync.NewCond(&w.mu)
+	for _, p := range periods {
+		w.ticks[p] = make(chan time.Time)
+	}
+	return w
+}
+
+func (w *fakeWall) Now() time.Time {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.reads++
+	w.read.Broadcast()
+	return w.now
+}
+
+func (w *fakeWall) Ticker(period time.Duration) (<-chan time.Time, func()) {
+	c, ok := w.ticks[period]
+	if !ok {
+		panic(fmt.Sprintf("fakeWall: a ticker every %v, which it was not made with", period))
+	}
+	return c, func() {}
+}
+
+func (w *fakeWall) advance(d time.Duration) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.now = w.now.Add(d)
+}
+
+// tick ticks the ticker of period and returns once the loop it paces
+// has read the time for that tick: nothing else may read the clock
+// meanwhile, so the test ticks one ticker at a time.
+func (w *fakeWall) tick(period time.Duration) {
+	w.mu.Lock()
+	before, now := w.reads, w.now
+	w.mu.Unlock()
+	w.ticks[period] <- now
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for w.reads == before {
+		w.read.Wait()
+	}
 }

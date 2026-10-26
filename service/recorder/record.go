@@ -85,7 +85,7 @@ type recordingParts struct {
 	camRect image.Rectangle
 	audio   []startAudio
 	fps     uint32
-	now     func() time.Time
+	wall    wallClock
 }
 
 // recording is one running capture: a video goroutine capturing and
@@ -145,7 +145,7 @@ func startRecording(parts recordingParts, opts Options, term func(reason string)
 	if r.mux, err = newMuxer(opts.Format, r.file, tracks...); err != nil {
 		return nil, fmt.Errorf("recorder: %s: %w", opts.OutputPath, err)
 	}
-	r.clock = newActiveClock(parts.now())
+	r.clock = newActiveClock(parts.wall.Now())
 	for i, start := range parts.audio {
 		c, err := start(func(chunk []byte) { r.pushAudio(i, chunk) })
 		if err != nil {
@@ -207,15 +207,15 @@ func (r *recording) writeVideo(pkts []gpu.Packet) error {
 func (r *recording) videoTime() (time.Duration, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.clock.elapsed(r.p.now()), r.clock.paused
+	return r.clock.elapsed(r.p.wall.Now()), r.clock.paused
 }
 
 // videoLoop captures a frame every frame period while the clock runs,
 // and uploads each new webcam frame as the overlay.
 func (r *recording) videoLoop() {
 	defer r.loops.Done()
-	ticker := time.NewTicker(time.Second / time.Duration(max(r.p.fps, 1)))
-	defer ticker.Stop()
+	ticks, stopTicks := r.p.wall.Ticker(time.Second / time.Duration(max(r.p.fps, 1)))
+	defer stopTicks()
 	var frames <-chan *image.RGBA
 	if r.p.cam != nil {
 		frames = r.p.cam.Frames()
@@ -237,7 +237,7 @@ func (r *recording) videoLoop() {
 				return
 			}
 			continue
-		case <-ticker.C:
+		case <-ticks:
 		}
 		pts, paused := r.videoTime()
 		if paused || (last >= 0 && pts-last < minFrameGap) {
@@ -269,15 +269,15 @@ func (r *recording) pushAudio(source int, chunk []byte) {
 // on stop it drains up to the clock itself.
 func (r *recording) audioLoop() {
 	defer r.loops.Done()
-	ticker := time.NewTicker(audioFrameTime)
-	defer ticker.Stop()
+	ticks, stopTicks := r.p.wall.Ticker(audioFrameTime)
+	defer stopTicks()
 	emitted := 0
 	pcm := make([]int16, audioFrame*audioChannels)
 	var packet []byte
 	pump := func(latency time.Duration) error {
 		for {
 			r.mu.Lock()
-			if framesDue(r.clock.elapsed(r.p.now()), latency, emitted) == 0 {
+			if framesDue(r.clock.elapsed(r.p.wall.Now()), latency, emitted) == 0 {
 				r.mu.Unlock()
 				return nil
 			}
@@ -298,7 +298,7 @@ func (r *recording) audioLoop() {
 		case <-r.stop:
 			r.drainErr = pump(0)
 			return
-		case <-ticker.C:
+		case <-ticks:
 			if err := pump(audioLatency); err != nil {
 				r.fail(err)
 				return
@@ -315,10 +315,10 @@ func (r *recording) SetPaused(paused bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if paused {
-		r.clock.pause(r.p.now())
+		r.clock.pause(r.p.wall.Now())
 		return
 	}
-	r.clock.resume(r.p.now())
+	r.clock.resume(r.p.wall.Now())
 }
 
 // Stop stops the sources, lets the loops finish their last frames,
