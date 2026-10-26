@@ -3,6 +3,7 @@ package portal
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -393,11 +394,40 @@ func TestRestoreTokens(t *testing.T) {
 	}
 }
 
+// The requested rate is clamped to a known refresh, never to 0, even
+// for a refresh under 1 Hz; an unknown (0) or bogus negative refresh
+// leaves it alone. A requested 0 is not turned into a rate: it reaches
+// the producer, which refuses it.
 func TestEffectiveFPS(t *testing.T) {
-	for _, tc := range [][3]int64{{60, 0, 60}, {60, 144000, 60}, {60, 30000, 30}, {60, 500, 1}, {0, 0, 1}} {
+	for _, tc := range [][3]int64{
+		{60, 0, 60},
+		{60, -1, 60},
+		{60, 144000, 60},
+		{60, 30000, 30},
+		{60, 999, 1},
+		{60, 500, 1},
+		{60, 1, 1},
+		{0, 0, 0},
+		{0, 60000, 0},
+	} {
 		if got := effectiveFPS(uint32(tc[0]), int32(tc[1])); int64(got) != tc[2] {
 			t.Errorf("effectiveFPS(%d, %d) = %d", tc[0], tc[1], got)
 		}
+	}
+}
+
+// A stream asked for no frame rate is refused by the producer, before
+// it connects, and its capture source is released; it never streams at
+// a rate nobody chose.
+func TestStartProducerRefusesAZeroFrameRate(t *testing.T) {
+	closed := false
+	g := producerGeometry{width: 64, height: 32, stride: 256, format: capture.FormatXRGB8888, fps: effectiveFPS(0, 60000)}
+	s, err := startProducer(g, pattern{}, nil, func() { closed = true })
+	if want := "pipewire: Config.FPS is 0"; s != nil || err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Fatalf("startProducer at 0 fps = %v, %v; want an error starting %q", s, err, want)
+	}
+	if !closed {
+		t.Error("the refused stream's source was not released")
 	}
 }
 

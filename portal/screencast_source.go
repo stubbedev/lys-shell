@@ -165,10 +165,13 @@ func joinTargets(targets []captureTarget) string {
 }
 
 // effectiveFPS clamps the requested rate to the output's refresh
-// (unknown for a window: unclamped), never below 1.
+// (unknown for a window or an output reporting none: unclamped). A
+// refresh below 1 Hz still allows 1 frame per second, so a requested
+// rate never clamps to 0; a requested 0 is passed on for the producer
+// to refuse.
 func effectiveFPS(requested uint32, refreshMHz int32) uint32 {
-	if refreshMHz > 0 {
-		requested = min(requested, max(uint32(refreshMHz)/1000, 1))
+	if refreshMHz <= 0 {
+		return requested
 	}
-	return max(requested, 1)
+	return min(requested, max(uint32(refreshMHz)/1000, 1))
 }
