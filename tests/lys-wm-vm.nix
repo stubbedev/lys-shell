@@ -72,7 +72,6 @@ pkgs.testers.nixosTest {
         systemd.enable = true;
       };
       programs.lys-wm.enable = true;
-      systemd.user.services.lys-shell.environment.LYS_UI_RENDERER = "cpu";
 
       virtualisation.graphics = true;
       virtualisation.cores = 4;
