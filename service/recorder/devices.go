@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// DeviceChoice is DeviceChoice: ID is what the pipeline consumes (""
+// DeviceChoice is DeviceChoice: ID is what the recorder consumes (""
 // is the default or automatic entry), Label what a picker shows.
 type DeviceChoice struct {
 	ID, Label string

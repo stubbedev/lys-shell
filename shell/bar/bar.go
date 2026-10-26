@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/logging"
 	"github.com/stubbedev/lys-shell/internal/spawn"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
+	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/clipboard"
@@ -40,6 +41,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/popups"
 	"github.com/stubbedev/lys-shell/shell/powermenu"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 	wallpapershell "github.com/stubbedev/lys-shell/shell/wallpaper"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -242,9 +244,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 				defer func() { _ = server.Release() }()
 			}
 		}
-		// The recorder captures through the ScreenCast portal on this
-		// bus and reports through the OSD and desktop notifications.
-		recState := recorder.NewState(recorder.GstEngine{Conn: conn},
+		// The recorder asks the share picker on this bus for an output,
+		// records it on the GPU with audio from the audio service, and
+		// reports through the OSD and desktop notifications.
+		stateDir, _ := xdg.StateDir()
+		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, stateDir),
 			func() config.RecorderConfig { return current.Load().Recorder },
 			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
 				if o := osdRef.Load(); o != nil {

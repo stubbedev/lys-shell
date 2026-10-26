@@ -45,7 +45,7 @@ func pctFromPx(px, margin, travel int32) uint8 {
 
 // webcamPreview is the draggable position preview: the outer frame is
 // the screen, the inner one the webcam picture-in-picture, inset by the
-// recording pipeline's margin. Both are classed boxes the stylesheet
+// recording's margin. Both are classed boxes the stylesheet
 // paints (recorder-position-preview, recorder-position-cam). The frame
 // spans the width its row gives it at 16:9, so it never outgrows the
 // card. A drag tracks the pointer from where it grabbed the frame, and

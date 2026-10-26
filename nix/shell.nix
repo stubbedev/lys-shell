@@ -28,6 +28,8 @@
           sway
           dbus
           pipewire
+          # ffprobe, which the recorder tests read their files back with.
+          ffmpeg-headless
 
           inter # config default font-sans
           jetbrains-mono # config default font-mono

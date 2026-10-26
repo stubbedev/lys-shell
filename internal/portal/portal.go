@@ -1,6 +1,5 @@
 // Package portal is the xdg-desktop-portal client side lys-shell needs: the
-// Request/Response handshake and the ScreenCast session the recorder
-// captures through (wayle-recorder portal.rs, which uses ashpd).
+// Request/Response handshake and the FileChooser.
 package portal
 
 import (
@@ -19,7 +18,6 @@ const (
 	BusName       = "org.freedesktop.portal.Desktop"
 	ObjectPath    = dbus.ObjectPath("/org/freedesktop/portal/desktop")
 	RequestIface  = "org.freedesktop.portal.Request"
-	SessionIface  = "org.freedesktop.portal.Session"
 	responseSig   = RequestIface + ".Response"
 	requestPrefix = "/org/freedesktop/portal/desktop/request/"
 )

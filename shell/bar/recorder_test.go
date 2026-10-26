@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -78,6 +79,43 @@ func TestRecorderPreparingClass(t *testing.T) {
 	close(gate)
 	waitHeadless(t, "the class gone once recording", func() bool {
 		return ctx.Recorder.Snapshot().Active && !widget.HasClass(chrome, "recorder-preparing")
+	})
+	ctx.Recorder.Stop()
+	waitHeadless(t, "idle", func() bool { return ctx.Recorder.Snapshot().Status == recorder.StatusIdle })
+}
+
+// A start that fails (a GPU without a video encoder) leaves the idle
+// module tinted by recorder-failed with the reason as its tooltip; a
+// new start takes both away.
+func TestRecorderFailedState(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Recorder.OutputDirectory = t.TempDir()
+	cfg.Recorder.StartDelayMs = 0
+	ctx := newTestContext(t, cfg)
+	ctx.gen = newMountGen()
+	t.Cleanup(func() { onHeadlessLoop(func() bool { ctx.gen.retire(); return true }) })
+	noEncoder := fmt.Errorf("recorder: %w: llvmpipe encodes no H.264", recorder.ErrNoVideoEncoder)
+	engine := &recordertest.Engine{StartErr: noEncoder}
+	ctx.Recorder = recorder.NewState(engine, func() config.RecorderConfig { return cfg.Recorder }, recorder.Hooks{})
+	module, err := Create("recorder", ctx)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	m := module.(*recorderModule)
+	chrome := widget.NewBox(widget.Row, 0, 0)
+	onHeadlessLoop(func() bool { m.setChrome(chrome); return true })
+	failed := func() bool {
+		return widget.HasClass(chrome, "recorder-failed") && m.btn.TooltipText() == noEncoder.Error()
+	}
+	if onHeadlessLoop(failed) || onHeadlessLoop(func() bool { return m.btn.TooltipText() != "" }) {
+		t.Fatal("a fresh module shows a failure")
+	}
+	ctx.Recorder.Start()
+	waitHeadless(t, "the failed class and its reason", failed)
+	engine.StartErr = nil
+	ctx.Recorder.Start()
+	waitHeadless(t, "the failure cleared by recording", func() bool {
+		return ctx.Recorder.Snapshot().Active && !widget.HasClass(chrome, "recorder-failed") && m.btn.TooltipText() == ""
 	})
 	ctx.Recorder.Stop()
 	waitHeadless(t, "idle", func() bool { return ctx.Recorder.Snapshot().Status == recorder.StatusIdle })

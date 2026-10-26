@@ -2,6 +2,7 @@ package recorder_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -89,7 +90,7 @@ func TestRecordPauseStopSaves(t *testing.T) {
 	}
 	rec := engine.Recordings()[0]
 	opts := rec.Opts
-	if opts.Format != recorder.FormatMP4 || !opts.Microphone || opts.MicrophoneDevice != "mic0" || !opts.SystemAudio ||
+	if opts.Format != config.RecorderFormatMp4 || !opts.Microphone || opts.MicrophoneDevice != "mic0" || !opts.SystemAudio ||
 		opts.Webcam == nil || opts.Webcam.X != 10 || opts.Webcam.Y != 90 || opts.Webcam.Size != 25 {
 		t.Errorf("options = %+v (webcam %+v)", opts, opts.Webcam)
 	}
@@ -157,20 +158,60 @@ func TestStartClaimIsSynchronousAndStopCancelsTheStart(t *testing.T) {
 	waitFor(t, "idle", func() bool { return s.Snapshot().Status == recorder.StatusIdle })
 }
 
-func TestFailedStartsReset(t *testing.T) {
+// A start that fails at the picker or at the encoder settles to Idle
+// with the reason as the module's error state, logged and notified; the
+// next start clears it.
+func TestFailedStartsResetWithTheirReason(t *testing.T) {
+	noEncoder := fmt.Errorf("recorder: %w: llvmpipe encodes no H.264", recorder.ErrNoVideoEncoder)
 	for name, engine := range map[string]*recordertest.Engine{
-		"portal":   {OpenErr: errors.New("denied")},
-		"pipeline": {StartErr: errors.New("no encoder")},
+		"picker":  {OpenErr: recorder.ErrPickerCancelled},
+		"encoder": {StartErr: noEncoder},
 	} {
 		s, log := newState(t, engine, nil)
 		s.Start()
 		waitFor(t, name+" failure", func() bool { _, n := log.snapshot(); return len(n) == 1 })
-		if snap := s.Snapshot(); snap.Status != recorder.StatusIdle || snap.Preparing || snap.Active {
+		snap := s.Snapshot()
+		if snap.Status != recorder.StatusIdle || snap.Preparing || snap.Active {
 			t.Errorf("%s: snapshot = %+v", name, snap)
 		}
-		if name == "pipeline" && engine.Sessions()[0].Closed() != 1 {
-			t.Error("pipeline failure leaked the portal session")
+		want := recorder.ErrPickerCancelled.Error()
+		if name == "encoder" {
+			want = noEncoder.Error()
+			if engine.Sessions()[0].Closed() != 1 {
+				t.Error("an encoder failure leaked the session")
+			}
 		}
+		if snap.Error != want {
+			t.Errorf("%s: error state %q, want %q", name, snap.Error, want)
+		}
+		if _, n := log.snapshot(); !strings.Contains(n[0], want) {
+			t.Errorf("%s: notice %q does not say %q", name, n[0], want)
+		}
+		engine.OpenErr, engine.StartErr = nil, nil
+		s.Start()
+		if got := s.Snapshot().Error; got != "" {
+			t.Errorf("%s: a new start kept the error %q", name, got)
+		}
+		waitFor(t, name+" recording", func() bool { return s.Snapshot().Active })
+		s.Stop()
+		waitFor(t, name+" idle", func() bool { return s.Snapshot().Status == recorder.StatusIdle })
+	}
+}
+
+// A recording whose file cannot be finalized is a failure with that
+// reason, never "saved", even when part of the file exists.
+func TestStopFailureIsReported(t *testing.T) {
+	engine := &recordertest.Engine{WriteOutput: true, StopErr: errors.New("recorder: finalize: no space left on device")}
+	s, log := newState(t, engine, nil)
+	s.Start()
+	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
+	s.Stop()
+	waitFor(t, "the failure notice", func() bool { _, n := log.snapshot(); return len(n) == 1 })
+	if _, n := log.snapshot(); !strings.HasPrefix(n[0], i18n.T("recorder-notification-failed")) || !strings.Contains(n[0], "no space left") {
+		t.Errorf("notice = %q, want the failure with its reason", n[0])
+	}
+	if snap := s.Snapshot(); snap.Status != recorder.StatusIdle || snap.Error != engine.StopErr.Error() {
+		t.Errorf("after a failed stop = %+v", snap)
 	}
 }
 
@@ -196,20 +237,6 @@ func TestUnexpectedTerminationTearsDown(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if !s.Snapshot().Active {
 		t.Error("a stale termination stopped the new recording")
-	}
-	s.Stop()
-}
-
-func TestPauseFailureKeepsState(t *testing.T) {
-	engine := &recordertest.Engine{}
-	s, _ := newState(t, engine, nil)
-	s.SetPaused(true) // idle: ignored
-	s.Start()
-	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
-	engine.Recordings()[0].PauseErr = errors.New("busy")
-	s.SetPaused(true)
-	if s.Snapshot().Paused {
-		t.Error("a failed pause reported paused")
 	}
 	s.Stop()
 }
@@ -250,10 +277,10 @@ func TestOutputPath(t *testing.T) {
 	t.Setenv("XDG_VIDEOS_DIR", "")
 	t.Setenv("HOME", "/home/u")
 	now := time.Date(2026, 10, 1, 9, 8, 7, 0, time.Local)
-	if got := recorder.OutputPath("", recorder.FormatMKV, now); got != "/home/u/Videos/lys-shell-20261001-090807.mkv" {
+	if got := recorder.OutputPath("", config.RecorderFormatMkv, now); got != "/home/u/Videos/lys-shell-20261001-090807.mkv" {
 		t.Errorf("default = %q", got)
 	}
-	if got := recorder.OutputPath("/custom", recorder.FormatMP4, now); got != "/custom/lys-shell-20261001-090807.mp4" {
+	if got := recorder.OutputPath("/custom", config.RecorderFormatMp4, now); got != "/custom/lys-shell-20261001-090807.mp4" {
 		t.Errorf("configured = %q", got)
 	}
 	t.Setenv("XDG_VIDEOS_DIR", "/vids")

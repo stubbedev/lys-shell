@@ -80,6 +80,19 @@ func (m *recorderModule) refresh() {
 	// The pre-capture delay pulses the icon through the module root's
 	// recorder-preparing class.
 	setClass(m.chrome, "recorder-preparing", snap.Preparing)
+	// A failed start or a recording that died stays visible until the
+	// next start: recorder-failed tints the icon, the tooltip says why.
+	failed := recorderFailure(snap)
+	setClass(m.chrome, "recorder-failed", failed != "")
+	m.btn.SetTooltip(failed)
+}
+
+// recorderFailure is the error the idle module shows, "" for none.
+func recorderFailure(snap recorder.Change) string {
+	if snap.Status != recorder.StatusIdle {
+		return ""
+	}
+	return snap.Error
 }
 
 func (m *recorderModule) setChrome(c moduleChrome) {

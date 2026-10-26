@@ -1,8 +1,11 @@
-// Package recorder is the screen recorder service (wayle-shell-core
-// services/recorder and the wayle-recorder engine): the lifecycle state
+// Package recorder is the screen recorder service: the lifecycle state
 // machine (idle, starting, recording, stopping), the elapsed timer,
-// options from the [modules.recorder] config, and an engine that
-// negotiates the ScreenCast portal and records through GStreamer.
+// options from the modules.recorder config, and the engine. The engine
+// asks the share picker for an output, has the compositor copy its
+// frames into a buffer on the GPU behind it, encodes them to H.264 on
+// that GPU's video encoder with an optional webcam overlay, mixes the
+// microphone and the desktop's audio into Opus, and muxes both into MP4
+// or Matroska.
 package recorder
 
 import (
@@ -59,27 +62,27 @@ const (
 // Session is a negotiated capture source, held across the start delay
 // and closed when the recording ends.
 type Session interface {
-	Cast() Cast
+	// Start records the source with opts; term reports an unexpected
+	// end (a source disconnect, a full disk), never a requested Stop.
+	Start(opts Options, term func(reason string)) (Recording, error)
 	Close()
 }
 
 // Recording is one running capture.
 type Recording interface {
-	// SetPaused pauses or resumes the capture.
-	SetPaused(paused bool) error
-	// Stop finalizes the file, blocking until the muxer is done.
-	Stop()
+	// SetPaused pauses or resumes the capture: paused time is cut from
+	// the file.
+	SetPaused(paused bool)
+	// Stop drains the encoders and finalizes the file, blocking until
+	// it is written; the error says what of it could not be.
+	Stop() error
 }
 
-// Engine opens capture sessions and records them (wayle-recorder's
-// Recorder: open_session, start).
+// Engine opens capture sessions.
 type Engine interface {
 	// OpenSession negotiates the source, showing the picker when no
-	// grant is cached; ctx cancels it.
+	// choice is remembered; ctx cancels it.
 	OpenSession(ctx context.Context, showCursor bool) (Session, error)
-	// Start records session with opts; term reports an unexpected end
-	// (a source disconnect, a full disk), never a requested Stop.
-	Start(session Session, opts Options, term func(reason string)) (Recording, error)
 }
 
 // Hooks are the user-facing reports: an OSD toast and a desktop
@@ -98,6 +101,9 @@ type Change struct {
 	Preparing   bool
 	ElapsedSecs uint32
 	OutputPath  string
+	// Error is why the last recording failed to start or ended on its
+	// own, "" once a new one starts.
+	Error string
 }
 
 // State is the recorder service. Safe for concurrent use.
@@ -113,6 +119,7 @@ type State struct {
 	preparing   bool
 	elapsed     uint32
 	output      string
+	lastErr     string
 	recording   Recording
 	session     Session
 	cancelStart context.CancelFunc
@@ -148,6 +155,7 @@ func (s *State) snapshotLocked() Change {
 		Preparing:   s.preparing,
 		ElapsedSecs: s.elapsed,
 		OutputPath:  s.output,
+		Error:       s.lastErr,
 	}
 }
 
@@ -168,7 +176,7 @@ func (s *State) Toggle() {
 
 // Start begins a recording with the current config. The Idle→Starting
 // claim is synchronous, so a second call while one is in flight is a
-// no-op; the rest (portal, delay, pipeline) runs off the caller.
+// no-op; the rest (picker, delay, recording) runs off the caller.
 func (s *State) Start() {
 	s.mu.Lock()
 	if s.status != StatusIdle {
@@ -177,6 +185,7 @@ func (s *State) Start() {
 	}
 	s.status = StatusStarting
 	s.preparing = true
+	s.lastErr = ""
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelStart = cancel
 	s.gen++
@@ -186,9 +195,9 @@ func (s *State) Start() {
 	go s.runStart(ctx, gen)
 }
 
-// runStart is run_start: the output directory, the portal session
+// runStart is run_start: the output directory, the capture session
 // (first, so the picker answers the click), the announced start delay,
-// then the pipeline.
+// then the recording.
 func (s *State) runStart(ctx context.Context, gen uint64) {
 	cfg := s.config()
 	opts := BuildOptions(cfg, time.Now())
@@ -216,7 +225,7 @@ func (s *State) runStart(ctx context.Context, gen uint64) {
 		return
 	case <-time.After(time.Duration(cfg.StartDelayMs) * time.Millisecond):
 	}
-	rec, err := s.engine.Start(session, opts, func(reason string) { s.unexpectedStop(gen, reason) })
+	rec, err := session.Start(opts, func(reason string) { s.unexpectedStop(gen, reason) })
 	if err != nil {
 		session.Close()
 		s.failStart(err)
@@ -226,12 +235,14 @@ func (s *State) runStart(ctx context.Context, gen uint64) {
 }
 
 // commit is commit_recording: Recording, unless a stop cancelled the
-// start meanwhile, which tears the fresh pipeline back down.
+// start meanwhile, which tears the fresh recording back down.
 func (s *State) commit(ctx context.Context, rec Recording, session Session, path string) {
 	s.mu.Lock()
 	if s.status != StatusStarting || ctx.Err() != nil {
 		s.mu.Unlock()
-		rec.Stop()
+		if err := rec.Stop(); err != nil {
+			log.Printf("recorder: finalize a recording cancelled while starting: %v", err)
+		}
 		session.Close()
 		s.resetIdle()
 		return
@@ -250,9 +261,17 @@ func (s *State) commit(ctx context.Context, rec Recording, session Session, path
 
 // failStart is fail_start.
 func (s *State) failStart(err error) {
-	s.resetIdle()
 	log.Printf("recorder: failed to start recording: %v", err)
-	s.showError(fmt.Sprintf("%s: %v", i18n.T("recorder-toast-failed"), err))
+	s.fail(err.Error())
+}
+
+// fail settles to Idle with reason as the error state, and reports it.
+func (s *State) fail(reason string) {
+	s.mu.Lock()
+	s.lastErr = reason
+	s.mu.Unlock()
+	s.resetIdle()
+	s.showError(fmt.Sprintf("%s: %s", i18n.T("recorder-toast-failed"), reason))
 }
 
 // unexpectedStop is handle_unexpected_stop: a live recording that died
@@ -267,10 +286,11 @@ func (s *State) unexpectedStop(gen uint64, reason string) {
 	rec, session := s.recording, s.session
 	s.mu.Unlock()
 	log.Printf("recorder: recording terminated unexpectedly: %s", reason)
-	rec.Stop()
+	if err := rec.Stop(); err != nil {
+		log.Printf("recorder: finalize the terminated recording: %v", err)
+	}
 	session.Close()
-	s.resetIdle()
-	s.showError(fmt.Sprintf("%s: %s", i18n.T("recorder-toast-failed"), reason))
+	s.fail(reason)
 }
 
 // Stop stops the recording, or cancels one still starting. Only the
@@ -301,8 +321,13 @@ func (s *State) Stop() {
 	s.mu.Unlock()
 	s.notify()
 	go func() {
-		rec.Stop()
+		err := rec.Stop()
 		session.Close()
+		if err != nil {
+			log.Printf("recorder: finalize %s: %v", path, err)
+			s.fail(err.Error())
+			return
+		}
 		s.mu.Lock()
 		s.status = StatusIdle
 		s.mu.Unlock()
@@ -319,8 +344,7 @@ func (s *State) Stop() {
 	}()
 }
 
-// SetPaused pauses or resumes an active recording; an engine failure
-// leaves the state as it was.
+// SetPaused pauses or resumes an active recording.
 func (s *State) SetPaused(paused bool) {
 	s.mu.Lock()
 	rec := s.recording
@@ -328,15 +352,8 @@ func (s *State) SetPaused(paused bool) {
 		s.mu.Unlock()
 		return
 	}
-	s.mu.Unlock()
-	if err := rec.SetPaused(paused); err != nil {
-		log.Printf("recorder: set paused: %v", err)
-		return
-	}
-	s.mu.Lock()
-	if s.recording == rec {
-		s.paused = paused
-	}
+	rec.SetPaused(paused)
+	s.paused = paused
 	s.mu.Unlock()
 	s.notify()
 }
@@ -407,14 +424,9 @@ func (s *State) showError(message string) {
 // BuildOptions is build_options: the recording's options from the
 // config, the output named for now.
 func BuildOptions(cfg config.RecorderConfig, now time.Time) Options {
-	format := FormatMP4
-	switch cfg.OutputFormat {
-	case config.RecorderFormatMkv:
-		format = FormatMKV
-	}
 	opts := Options{
-		OutputPath:       OutputPath(cfg.OutputDirectory, format, now),
-		Format:           format,
+		OutputPath:       OutputPath(cfg.OutputDirectory, cfg.OutputFormat, now),
+		Format:           cfg.OutputFormat,
 		Framerate:        cfg.Framerate,
 		ShowCursor:       cfg.ShowCursor,
 		Microphone:       cfg.Microphone,
@@ -432,14 +444,15 @@ func BuildOptions(cfg config.RecorderConfig, now time.Time) Options {
 	return opts
 }
 
-// OutputPath is output_path: lys-shell-<local timestamp>.<ext> in the
-// configured directory, else the videos directory.
-func OutputPath(configuredDir string, format Format, now time.Time) string {
+// OutputPath is output_path: lys-shell-<local timestamp>.<format> in
+// the configured directory, else the videos directory; a format's name
+// is its extension.
+func OutputPath(configuredDir string, format config.RecorderFormat, now time.Time) string {
 	dir := configuredDir
 	if dir == "" {
 		dir = VideosDir()
 	}
-	return filepath.Join(dir, "lys-shell-"+now.Format("20060102-150405")+"."+format.Extension())
+	return filepath.Join(dir, "lys-shell-"+now.Format("20060102-150405")+"."+string(format))
 }
 
 // VideosDir is videos_dir: $XDG_VIDEOS_DIR, else $HOME/Videos.

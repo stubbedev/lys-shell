@@ -9,6 +9,9 @@
 .recorder-preparing .bar-button-icon {
   animation: recorder-prepare-pulse var(--cfg-anim-pulse, 0.6s) ease-in-out infinite alternate;
 }
+.recorder-failed .bar-button-icon {
+  color: var(--status-error);
+}
 
 @keyframes recorder-status-blink {
   from {

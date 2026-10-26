@@ -1,7 +1,7 @@
 // Package recordertest is the scripted recorder.Engine every recorder
 // test drives: sessions and recordings that record their calls, an
-// optional gate that holds OpenSession (the portal picker), and a hook
-// that ends a recording as a failed pipeline would.
+// optional gate that holds OpenSession (the output picker), and a hook
+// that ends a recording as a failed capture would.
 package recordertest
 
 import (
@@ -14,8 +14,9 @@ import (
 
 // Engine is a fake recorder.Engine.
 type Engine struct {
-	// OpenErr and StartErr fail the respective step.
-	OpenErr, StartErr error
+	// OpenErr and StartErr fail the respective step; StopErr is what
+	// every recording's Stop returns.
+	OpenErr, StartErr, StopErr error
 	// Gate, when set, holds OpenSession until it closes or ctx ends.
 	Gate chan struct{}
 	// WriteOutput makes a stopped recording leave a non-empty file at
@@ -39,23 +40,11 @@ func (e *Engine) OpenSession(ctx context.Context, _ bool) (recorder.Session, err
 	if e.OpenErr != nil {
 		return nil, e.OpenErr
 	}
-	s := &Session{}
+	s := &Session{e: e}
 	e.mu.Lock()
 	e.sessions = append(e.sessions, s)
 	e.mu.Unlock()
 	return s, nil
-}
-
-// Start implements recorder.Engine.
-func (e *Engine) Start(_ recorder.Session, opts recorder.Options, term func(string)) (recorder.Recording, error) {
-	if e.StartErr != nil {
-		return nil, e.StartErr
-	}
-	r := &Recording{Opts: opts, term: term, write: e.WriteOutput}
-	e.mu.Lock()
-	e.recordings = append(e.recordings, r)
-	e.mu.Unlock()
-	return r, nil
 }
 
 // Sessions are the opened sessions.
@@ -74,12 +63,22 @@ func (e *Engine) Recordings() []*Recording {
 
 // Session is a fake recorder.Session.
 type Session struct {
+	e      *Engine
 	mu     sync.Mutex
 	closed int
 }
 
-// Cast implements recorder.Session.
-func (s *Session) Cast() recorder.Cast { return recorder.Cast{Node: 1, Width: 1920, Height: 1080} }
+// Start implements recorder.Session.
+func (s *Session) Start(opts recorder.Options, term func(string)) (recorder.Recording, error) {
+	if s.e.StartErr != nil {
+		return nil, s.e.StartErr
+	}
+	r := &Recording{Opts: opts, term: term, write: s.e.WriteOutput, stopErr: s.e.StopErr}
+	s.e.mu.Lock()
+	s.e.recordings = append(s.e.recordings, r)
+	s.e.mu.Unlock()
+	return r, nil
+}
 
 // Close implements recorder.Session.
 func (s *Session) Close() {
@@ -100,28 +99,24 @@ type Recording struct {
 	// Opts are the options it started with.
 	Opts recorder.Options
 
-	mu       sync.Mutex
-	paused   []bool
-	stops    int
-	hold     chan struct{}
-	term     func(string)
-	write    bool
-	PauseErr error
+	mu      sync.Mutex
+	paused  []bool
+	stops   int
+	hold    chan struct{}
+	term    func(string)
+	write   bool
+	stopErr error
 }
 
 // SetPaused implements recorder.Recording.
-func (r *Recording) SetPaused(paused bool) error {
+func (r *Recording) SetPaused(paused bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.PauseErr != nil {
-		return r.PauseErr
-	}
 	r.paused = append(r.paused, paused)
-	return nil
 }
 
 // Stop implements recorder.Recording.
-func (r *Recording) Stop() {
+func (r *Recording) Stop() error {
 	r.mu.Lock()
 	r.stops++
 	write := r.write && r.stops == 1
@@ -133,6 +128,7 @@ func (r *Recording) Stop() {
 	if write {
 		_ = os.WriteFile(r.Opts.OutputPath, []byte("video"), 0o600)
 	}
+	return r.stopErr
 }
 
 // HoldStop makes Stop block until release runs, so a test can see
@@ -159,5 +155,5 @@ func (r *Recording) Stops() int {
 	return r.stops
 }
 
-// Fail ends the recording on its own, as a dying pipeline reports.
+// Fail ends the recording on its own, as a dying capture reports.
 func (r *Recording) Fail(reason string) { r.term(reason) }
