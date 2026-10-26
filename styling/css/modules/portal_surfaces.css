@@ -53,29 +53,20 @@
   background: var(--border-default);
 }
 
-.file-chooser-grid flowboxchild {
-  border-radius: var(--rounding-element);
-  padding: var(--space-xs);
-  transition: background var(--duration-fast);
-}
-
-.file-chooser-grid flowboxchild:hover {
-  background: var(--bg-hover);
-}
-
-.file-chooser-grid flowboxchild:selected {
-  background: var(--accent);
-  color: var(--fg-on-accent);
+.file-chooser-grid-name {
+  overflow-wrap: anywhere;
 }
 
 .portal-dialog-app-list,
 .file-chooser-list,
+.file-chooser-grid,
 .print-printer-list {
   background: transparent;
 }
 
 .portal-dialog-app-list row,
 .file-chooser-list row,
+.file-chooser-grid > child,
 .print-printer-list row {
   border-radius: var(--rounding-element);
   transition: background var(--duration-fast), box-shadow var(--duration-fast);
@@ -83,12 +74,14 @@
 
 .portal-dialog-app-list row:hover,
 .file-chooser-list row:hover,
+.file-chooser-grid > child:hover,
 .print-printer-list row:hover {
   background: var(--bg-hover);
 }
 
 .portal-dialog-app-list row:selected,
 .file-chooser-list row:selected,
+.file-chooser-grid > child:selected,
 .print-printer-list row:selected {
   background: var(--accent);
   color: var(--fg-on-accent);
@@ -96,6 +89,7 @@
 
 .portal-dialog-app-list row:focus-visible,
 .file-chooser-list row:focus-visible,
+.file-chooser-grid > child:focus-visible,
 .print-printer-list row:focus-visible {
   outline: var(--focus-ring-width) solid var(--accent);
   outline-offset: calc(-0.125rem * var(--global-scale));

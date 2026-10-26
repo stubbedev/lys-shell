@@ -495,7 +495,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 		t.Errorf("persisted view = %q", b)
 	}
 	hs.click(t, "Toggle grid view")
-	if !hs.c.ui.grid.Visible() || hs.c.ui.list.Visible() || hs.c.ui.colHeader.Visible() {
+	if !widget.IsVisible(hs.c.ui.grid) || widget.IsVisible(hs.c.ui.list) || widget.IsVisible(hs.c.ui.colHeader) {
 		t.Error("grid view did not swap the views")
 	}
 	// The next chooser starts as this one was left.

@@ -354,7 +354,8 @@ type ui struct {
 	crumbs                  *widget.Box
 	search                  *widget.SearchEntry
 	name                    *widget.Entry
-	list, grid              *widget.List
+	list                    *widget.List
+	grid                    *widget.GridView
 	listView, gridView      *typeAhead
 	colHeader               *widget.Box
 	colRow                  *columnRow
@@ -683,22 +684,19 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	}
 	u.columns = cols
 	u.colRow = newColumnRow(lead, cols, grips, c.columns, th.Spacing)
-	u.colHeader = rowBox("file-chooser-colheader", th.Padding/2+th.Padding)
+	u.colHeader = rowBox("file-chooser-colheader", viewsInset()+th.Padding)
 	u.colHeader.Append(u.colRow, true)
 
 	u.list = widget.NewList[widget.Widget](rows{c, false}, listRowH)
 	u.list.AddClass("file-chooser-list")
 	u.list.DragContent = c.dragOut
-	u.grid = widget.NewList[widget.Widget](rows{c, true}, gridCellH)
-	u.grid.AddClass("file-chooser-grid")
-	u.grid.DragContent = c.dragOut
-	u.grid.SetCellWidth(gridCellW)
-	u.listView, u.gridView = &typeAhead{List: u.list, typed: c.typeAhead}, &typeAhead{List: u.grid, typed: c.typeAhead}
+	u.grid = c.newGrid()
+	u.listView, u.gridView = &typeAhead{List: u.list, typed: c.typeAhead}, &typeAhead{List: &u.grid.List, typed: c.typeAhead}
 	mode := widget.SelectionSingle
 	if c.s.mode.multiple() {
 		mode = widget.SelectionMultiple
 	}
-	for _, l := range []*widget.List{u.list, u.grid} {
+	for _, l := range []*widget.List{u.list, &u.grid.List} {
 		l.SetSelectionMode(mode)
 		l.OnActivate = c.activate
 		l.OnSelectionChanged = func([]int) { c.refreshPreview() }
@@ -716,7 +714,8 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	stack.AppendAligned(u.quicklook, widget.AlignCenter, widget.AlignCenter)
 
 	inset := widget.NewBox(widget.Column, 0, 0)
-	inset.SetPadding(render.Insets{Top: th.Padding / 2, Right: th.Padding / 2, Bottom: th.Padding / 2, Left: th.Padding / 2})
+	pad := viewsInset()
+	inset.SetPadding(render.Insets{Top: pad, Right: pad, Bottom: pad, Left: pad})
 	inset.Append(stack, true)
 
 	col := widget.NewBox(widget.Column, 0, 0)
@@ -724,6 +723,10 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	col.Append(inset, true)
 	return col
 }
+
+// viewsInset is the list's and the grid's inset from the sidebar, the
+// separators and the panel's edge: half the theme's padding.
+func viewsInset() int { return widget.Current().Padding / 2 }
 
 // sortButton is col's header: its title, sorting by it on a click.
 func (c *Chooser) sortButton(u *ui, col SortColumn) *widget.Button {
@@ -752,6 +755,19 @@ func cellAlignment(col SortColumn) render.Alignment {
 		return render.AlignEnd
 	}
 	return render.AlignStart
+}
+
+// newGrid is the virtualized grid of cells over the entries, a gap
+// apart and as many columns as the width fits.
+func (c *Chooser) newGrid() *widget.GridView {
+	gap := widget.Current().Spacing
+	g := widget.NewGridView[widget.Widget](rows{c, true}, gridCellW, gridCellH)
+	g.AddClass("file-chooser-grid")
+	g.DragContent = c.dragOut
+	g.SetColumnSpacing(gap)
+	g.SetRowSpacing(gap)
+	g.SetMaxColumns(0)
+	return g
 }
 
 // columnGrip resizes column i (size, modified, kind) by dragging its
@@ -839,13 +855,14 @@ func (c *Chooser) fileRow(e Entry, alt bool) widget.Widget {
 	return row
 }
 
-// gridCell is a large icon over a centred name.
+// gridCell is a large icon over a centred name of at most two lines,
+// broken inside a word too long for the cell.
 func (c *Chooser) gridCell(e Entry) widget.Widget {
 	th := widget.Current()
 	cell := widget.NewBox(widget.Column, th.Spacing/2, th.Padding/2)
 	cell.AddClass("file-chooser-grid-cell")
 	cell.Append(widgets.Center(c.entryIcon(e, gridIconPx)), false)
-	name := c.label(c.s.displayName(e))
+	name := c.label(c.s.displayName(e), "file-chooser-grid-name")
 	name.SetAlignment(render.AlignCenter)
 	name.SetWrap(true)
 	name.SetMaxLines(2)
@@ -1058,7 +1075,7 @@ func (c *Chooser) placedAt(r render.Rect) {
 
 func (c *Chooser) activeView() *widget.List {
 	if c.s.view.grid {
-		return c.ui.grid
+		return &c.ui.grid.List
 	}
 	return c.ui.list
 }
