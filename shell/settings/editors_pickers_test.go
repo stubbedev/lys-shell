@@ -9,8 +9,57 @@ import (
 	"github.com/stubbedev/lys-ui/render"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
+
+// Every picker opens with its search entry, inside the popover, taking
+// the keys: typed text lands in the entry, not in the list or grid it
+// filters.
+func TestPickersFocusTheirSearchEntry(t *testing.T) {
+	pickerIcons(t, "ld-battery-symbolic", "tb-cpu-symbolic")
+	open := map[string]func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget){
+		"icon": func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
+			_, c, f := openIconPicker(t, "modules.clock.icon-name")
+			return f, c.picker.search, c.picker.grid
+		},
+		"theme preset": func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
+			k := testKit(t, "")
+			f := &fakePickers{}
+			k.pickers = f
+			c := newThemeSelector(k)
+			c.btn.ClickAt(widget.Point{})
+			return f, c.picker.search, c.picker.list
+		},
+		"module": func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
+			k, c := newTestLayout(t)
+			p := c.pickModule(nil, func(config.BarModule) {})
+			return k.pickers.(*fakePickers), p.search, p.list
+		},
+	}
+	for name, opener := range open {
+		t.Run(name, func(t *testing.T) {
+			f, search, list := opener(t)
+			if f.focus == nil || f.focus == list {
+				t.Fatalf("the popover focuses %T, want the search entry", f.focus)
+			}
+			inside := false
+			treetest.Walk(f.content, func(w widget.Widget) { inside = inside || w == f.focus })
+			if !inside {
+				t.Fatalf("the focused %T is not inside the popover", f.focus)
+			}
+			r := &widget.Router{Root: f.content}
+			r.SetFocus(f.focus)
+			for _, ch := range "cpu" {
+				r.Type(ch)
+			}
+			if search.Text() != "cpu" {
+				t.Errorf("typing into the open picker left its search %q", search.Text())
+			}
+		})
+	}
+}
 
 // pickerIcons stands in for the installed icons for the test.
 func pickerIcons(t *testing.T, names ...string) {

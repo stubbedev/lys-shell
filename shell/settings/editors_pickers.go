@@ -23,8 +23,9 @@ import (
 // the font dialog and the file chooser. The window provides it; tests
 // fake it.
 type pickers interface {
-	// popover shows content beside anchor; close dismisses it.
-	popover(anchor widget.Widget, content widget.Widget) (close func())
+	// popover shows content beside anchor with focus, inside it,
+	// taking the keys; close dismisses it.
+	popover(anchor, content, focus widget.Widget) (close func())
 	// font asks for a font family, initially family, monospace ones
 	// only when monospace, calling fn with the pick.
 	font(family string, monospace bool, fn func(family string))
@@ -76,14 +77,15 @@ func (c *fontEditor) open() {
 }
 
 // openPicker opens the popover build makes beside anchor. build gets
-// the pick its tree calls: onPick, then the popover closes.
-func openPicker(k *kit, anchor widget.Widget, onPick func(string), build func(pick func(string)) *widget.Box) {
+// the pick its tree calls (onPick, then the popover closes) and returns
+// the tree and the widget in it taking the keys as it opens.
+func openPicker(k *kit, anchor widget.Widget, onPick func(string), build func(pick func(string)) (root *widget.Box, focus widget.Widget)) {
 	var closePicker func()
-	root := build(func(name string) {
+	root, focus := build(func(name string) {
 		onPick(name)
 		closePicker()
 	})
-	closePicker = k.pickers.popover(anchor, root)
+	closePicker = k.pickers.popover(anchor, root, focus)
 }
 
 // pickerFrame is a picker popover's tree: the popover node carrying
@@ -135,20 +137,23 @@ type pickerSpec struct {
 type searchPicker struct {
 	root   *widget.Box
 	search *widget.Entry
-	list   *widget.List
-	all    []string
-	shown  []string
-	k      *kit
-	spec   pickerSpec
-	pick   func(string)
+	// field is the search as the tree holds it (the SearchEntry
+	// around search, or search itself), the widget taking the keys.
+	field widget.Widget
+	list  *widget.List
+	all   []string
+	shown []string
+	k     *kit
+	spec  pickerSpec
+	pick  func(string)
 }
 
 // openSearchPicker builds the picker and opens it beside anchor.
 func openSearchPicker(k *kit, anchor widget.Widget, names []string, spec pickerSpec, onPick func(string)) *searchPicker {
 	var p *searchPicker
-	openPicker(k, anchor, onPick, func(pick func(string)) *widget.Box {
+	openPicker(k, anchor, onPick, func(pick func(string)) (*widget.Box, widget.Widget) {
 		p = newSearchPicker(k, names, spec, pick)
-		return p.root
+		return p.root, p.field
 	})
 	return p
 }
@@ -157,19 +162,18 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	p := &searchPicker{k: k, all: names, shown: names, spec: spec, pick: pick}
 	root, contents := pickerFrame(spec.class)
 	p.root = root
-	var searchField widget.Widget
 	if spec.searchEntry {
 		se := widget.NewSearchEntry(k.face, k.textPx(), i18n.Settings().Get(spec.placeholder))
 		// The stylesheet inks it, as k.entry's.
 		se.SetColor(0)
 		se.SetTextWidth(widget.GTKTextWidth)
 		se.OnSearchChanged = p.filter
-		p.search, searchField = se.Entry, se
+		p.search, p.field = se.Entry, se
 	} else {
 		p.search = k.searchField(spec.placeholder, p.filter)
-		searchField = p.search
+		p.field = p.search
 	}
-	contents.Append(searchField, false)
+	contents.Append(p.field, false)
 	p.list = widget.NewList[widget.Widget](pickerRows{p}, 0)
 	p.list.AddClass(spec.listClass)
 	p.list.SetSingleClickActivate(true)
@@ -362,9 +366,9 @@ func (c *iconEditor) open() {
 	openPicker(c.k, c.btn, func(name string) {
 		_ = c.slot.set(name)
 		c.refresh()
-	}, func(pick func(string)) *widget.Box {
+	}, func(pick func(string)) (*widget.Box, widget.Widget) {
 		c.picker = newIconPicker(c.k, iconNames(), c.slot.text(), c.btn.Bounds().W, pick)
-		return c.picker.root
+		return c.picker.root, c.picker.search
 	})
 }
 

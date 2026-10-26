@@ -567,16 +567,16 @@ func TestSizeEditorModes(t *testing.T) {
 
 // fakePickers records what the editors asked for and answers on cue.
 type fakePickers struct {
-	anchor, content widget.Widget
-	closed          int
-	fileFn          func(string)
-	fontIn          string
-	fontMono        bool
-	fontFn          func(string)
+	anchor, content, focus widget.Widget
+	closed                 int
+	fileFn                 func(string)
+	fontIn                 string
+	fontMono               bool
+	fontFn                 func(string)
 }
 
-func (f *fakePickers) popover(anchor, content widget.Widget) func() {
-	f.anchor, f.content = anchor, content
+func (f *fakePickers) popover(anchor, content, focus widget.Widget) func() {
+	f.anchor, f.content, f.focus = anchor, content, focus
 	return func() { f.closed++ }
 }
 
@@ -2083,13 +2083,16 @@ func TestColorEditorShowsItsColor(t *testing.T) {
 	}
 }
 
-// An editor's popover opens at lys-ui's popover gap from the editor.
+// An editor's popover opens at lys-ui's popover gap from the editor,
+// the widget it names taking the keys.
 func TestPickerPopoverGap(t *testing.T) {
 	anchor := widget.NewBox(widget.Row, 0, 0)
 	content := widget.NewBox(widget.Column, 0, 0)
-	pc := pickerPopoverConfig(anchor, content)
-	if pc.Gap != widget.PopoverGap || pc.Anchor != widget.Boundser(anchor) || pc.Content != widget.Widget(content) {
-		t.Errorf("popover %+v, want the editor's content at gap %d", pc, widget.PopoverGap)
+	focus := widget.NewEntry(treetest.Font(t), 14, 0)
+	content.Append(focus, false)
+	pc := pickerPopoverConfig(anchor, content, focus)
+	if pc.Gap != widget.PopoverGap || pc.Anchor != widget.Boundser(anchor) || pc.Content != widget.Widget(content) || pc.Focus != widget.Widget(focus) {
+		t.Errorf("popover %+v, want the editor's content at gap %d, its entry focused", pc, widget.PopoverGap)
 	}
 }
 

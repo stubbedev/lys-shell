@@ -137,9 +137,9 @@ type windowPickers struct {
 	theme *apptheme.Theme
 }
 
-// popover opens content beside anchor, the search entry or first
-// focusable child taking the keys.
-func (p windowPickers) popover(anchor, content widget.Widget) (closePopover func()) {
+// popover opens content beside anchor, focus (its search entry)
+// taking the keys as it opens, so typing filters at once.
+func (p windowPickers) popover(anchor, content, focus widget.Widget) (closePopover func()) {
 	bound, ok := anchor.(widget.Boundser)
 	if !ok {
 		return func() {}
@@ -147,7 +147,7 @@ func (p windowPickers) popover(anchor, content widget.Widget) (closePopover func
 	if root, ok := content.(interface{ AttachStylesheet(*widget.Stylesheet) }); ok {
 		p.theme.Attach(root)
 	}
-	pop, err := p.app.OpenPopover(p.win, pickerPopoverConfig(bound, content))
+	pop, err := p.app.OpenPopover(p.win, pickerPopoverConfig(bound, content, focus))
 	if err != nil {
 		log.Printf("settings: popover: %v", err)
 		return func() {}
@@ -188,7 +188,7 @@ func (p windowPickers) openFile(fn func(path string)) {
 }
 
 // pickerPopoverConfig is an editor's popover: it opens from the editor
-// at lys-ui's popover gap.
-func pickerPopoverConfig(anchor widget.Boundser, content widget.Widget) app.PopoverConfig {
-	return app.PopoverConfig{Anchor: anchor, Content: content, Gap: widget.PopoverGap}
+// at lys-ui's popover gap, focus inside it taking the keys.
+func pickerPopoverConfig(anchor widget.Boundser, content, focus widget.Widget) app.PopoverConfig {
+	return app.PopoverConfig{Anchor: anchor, Content: content, Focus: focus, Gap: widget.PopoverGap}
 }
