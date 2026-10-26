@@ -1,13 +1,18 @@
-.icon-picker-grid flowboxchild {
+.icon-picker-grid {
+  background: none;
+}
+
+.icon-picker-grid > child {
+  padding: 0;
   border-radius: var(--rounding-element);
   transition: background var(--duration-fast);
 }
 
-.icon-picker-grid flowboxchild:hover {
+.icon-picker-grid > child:hover {
   background: var(--bg-hover);
 }
 
-.icon-picker-grid flowboxchild:selected {
+.icon-picker-grid > child:selected {
   background: var(--accent);
   color: var(--fg-on-accent);
 }

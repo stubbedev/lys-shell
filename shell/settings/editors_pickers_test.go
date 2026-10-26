@@ -21,7 +21,7 @@ func TestPickersFocusTheirSearchEntry(t *testing.T) {
 	pickerIcons(t, "ld-battery-symbolic", "tb-cpu-symbolic")
 	open := map[string]func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget){
 		"icon": func(t *testing.T) (*fakePickers, *widget.Entry, widget.Widget) {
-			_, c, f := openIconPicker(t, "modules.clock.icon-name")
+			_, c, f := openIconPicker(t, "")
 			return f, c.picker.search, c.picker.grid
 		},
 	}
@@ -62,16 +62,47 @@ func pickerIcons(t *testing.T, names ...string) {
 	t.Cleanup(func() { iconNames = prev })
 }
 
-// openIconPicker lays a styled icon editor for path out at its natural
-// size, clicks its trigger and lays the picker it opened out at its
-// own natural size, as the popover does.
-func openIconPicker(t *testing.T, path string) (*kit, *iconEditor, *fakePickers) {
+// manyIcons are n distinct icon names, in name order.
+func manyIcons(n int) []string {
+	names := make([]string, 0, n)
+	for i := range n {
+		names = append(names, "icon-"+string(rune('a'+i/26/26))+string(rune('a'+i/26%26))+string(rune('a'+i%26))+"-symbolic")
+	}
+	return names
+}
+
+// builtCells records, in order, the icon of every grid cell the picker
+// builds while the test runs.
+func builtCells(t *testing.T) *[]string {
+	t.Helper()
+	prev := iconCell
+	var built []string
+	iconCell = func(name string) widget.Widget {
+		built = append(built, name)
+		return prev(name)
+	}
+	t.Cleanup(func() { iconCell = prev })
+	return &built
+}
+
+// iconPickerPath is the field the icon picker tests edit.
+const iconPickerPath = "modules.clock.icon-name"
+
+// openIconPicker lays a styled icon editor holding current out at its
+// natural size, clicks its trigger and lays the picker it opened out at
+// its own natural size, as the popover does.
+func openIconPicker(t *testing.T, current string) (*kit, *iconEditor, *fakePickers) {
 	t.Helper()
 	k := testKit(t, "")
+	if current != "" {
+		if err := k.store.set(iconPickerPath, current); err != nil {
+			t.Fatal(err)
+		}
+	}
 	f := &fakePickers{}
 	k.pickers = f
 	theme := apptheme.New(k.store.svc.Config())
-	c := newIconEditor(k, pathSlot(k.store, path))
+	c := newIconEditor(k, pathSlot(k.store, iconPickerPath))
 	theme.Attach(c.Box)
 	sz := widget.MeasureAsChild(c.Box, widget.Constraints{Max: widget.Size{W: 1400, H: 200}})
 	widget.ArrangeAsChild(c.Box, render.Rect{X: 300, Y: 40, W: sz.W, H: sz.H})
@@ -80,6 +111,7 @@ func openIconPicker(t *testing.T, path string) (*kit, *iconEditor, *fakePickers)
 		t.Fatal("the trigger opened no picker beside itself")
 	}
 	layOutPicker(theme, c.picker.root)
+	paintPicker(c.picker.root)
 	return k, c, f
 }
 
@@ -90,6 +122,11 @@ func layOutPicker(theme *apptheme.Theme, root *widget.Box) {
 	root.SetElement("popover")
 	root.AddClass("background")
 	theme.Attach(root)
+	arrangePicker(root)
+}
+
+// arrangePicker lays the styled picker's root out at its natural size.
+func arrangePicker(root *widget.Box) {
 	sz := widget.MeasureAsChild(root, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
 	widget.ArrangeAsChild(root, render.Rect{X: 300, Y: 100, W: sz.W, H: sz.H})
 }
@@ -108,13 +145,91 @@ func paintPicker(root *widget.Box) func(x, y int) [4]byte {
 	}
 }
 
-// cellRects are the grid's cells as laid out.
-func cellRects(p *iconPicker) []render.Rect {
-	out := make([]render.Rect, p.grid.Len())
-	for i := range out {
-		out[i] = p.grid.ChildAt(i).Bounds()
+// relayOut lays the open icon picker out at its natural size and
+// paints it, as the popover does after every change: the grid places
+// the cells in view as it paints.
+func relayOut(p *iconPicker) func(x, y int) [4]byte {
+	arrangePicker(p.root)
+	return paintPicker(p.root)
+}
+
+// scrollToEnd scrolls the grid as far down as it goes.
+func scrollToEnd(p *iconPicker) { p.grid.ScrollBy(0, iconGridExtent(len(p.shown))) }
+
+// iconCellView is a grid cell as the pointer finds it.
+type iconCellView struct {
+	name     string
+	rect     render.Rect
+	selected bool
+}
+
+// cellsInView are the cells the pointer reaches inside the grid's box,
+// in the order of the shown icons.
+func cellsInView(p *iconPicker) []iconCellView {
+	box := p.grid.Bounds()
+	found := map[string]iconCellView{}
+	for y := box.Y; y < box.Y+box.H; y++ {
+		for x := box.X; x < box.X+box.W; x++ {
+			hit := p.root.HitTest(widget.Point{X: x, Y: y})
+			cell, ok := hit.(interface {
+				TooltipText() string
+				Bounds() render.Rect
+				HasState(widget.StateFlags) bool
+			})
+			if !ok || !slices.Contains(p.shown, cell.TooltipText()) {
+				continue
+			}
+			found[cell.TooltipText()] = iconCellView{name: cell.TooltipText(), rect: cell.Bounds(), selected: cell.HasState(widget.StateSelected)}
+		}
+	}
+	out := make([]iconCellView, 0, len(found))
+	for _, name := range p.shown {
+		if v, ok := found[name]; ok {
+			out = append(out, v)
+		}
 	}
 	return out
+}
+
+// names are the cells' icons.
+func names(cells []iconCellView) []string {
+	out := make([]string, len(cells))
+	for i, c := range cells {
+		out[i] = c.name
+	}
+	return out
+}
+
+// selectedCells are the icons of the selected cells.
+func selectedCells(cells []iconCellView) []string {
+	var out []string
+	for _, c := range cells {
+		if c.selected {
+			out = append(out, c.name)
+		}
+	}
+	return out
+}
+
+// clickAt clicks the open picker at the centre of r.
+func clickAt(p *iconPicker, r render.Rect) {
+	router := &widget.Router{Root: p.root}
+	pt := widget.Point{X: r.X + r.W/2, Y: r.Y + r.H/2}
+	router.Press(widget.BTNLeft, pt, 0)
+	router.Release(widget.BTNLeft, pt)
+}
+
+// clickIcon lays the open picker out and clicks the cell of the icon
+// name, which must be in view.
+func clickIcon(t *testing.T, p *iconPicker, name string) {
+	t.Helper()
+	relayOut(p)
+	cells := cellsInView(p)
+	i := slices.IndexFunc(cells, func(v iconCellView) bool { return v.name == name })
+	if i < 0 {
+		t.Fatalf("the icon %s is not in view: %v", name, names(cells))
+	}
+	clickAt(p, cells[i].rect)
 }
 
 // The picker is as wide as its trigger, so it hangs flush beneath it;
@@ -123,9 +238,9 @@ func cellRects(p *iconPicker) []render.Rect {
 // apart, and the icons lie in lines of the full column count, flush
 // with that row, the cell gap apart across and down.
 func TestIconPickerLaysOutUnderItsTrigger(t *testing.T) {
-	names := []string{"a-symbolic", "b-symbolic", "c-symbolic", "d-symbolic", "e-symbolic", "f-symbolic", "g-symbolic", "h-symbolic", "i-symbolic", "j-symbolic"}
-	pickerIcons(t, names...)
-	_, c, _ := openIconPicker(t, "modules.clock.icon-name")
+	icons := []string{"a-symbolic", "b-symbolic", "c-symbolic", "d-symbolic", "e-symbolic", "f-symbolic", "g-symbolic", "h-symbolic", "i-symbolic", "j-symbolic"}
+	pickerIcons(t, icons...)
+	_, c, _ := openIconPicker(t, "")
 	p, th := c.picker, widget.Current()
 	box, trigger := p.contents.Bounds(), c.btn.Bounds()
 	if trigger.W != iconPickerWidth() {
@@ -137,7 +252,7 @@ func TestIconPickerLaysOutUnderItsTrigger(t *testing.T) {
 	if root := p.root.Bounds(); box.X-root.X != root.X+root.W-(box.X+box.W) {
 		t.Errorf("the popover %v frames its contents %v unevenly", root, box)
 	}
-	entry, clear, scroll := p.search.Bounds(), p.clear.Bounds(), p.scroll.Bounds()
+	entry, clear, scroll := p.search.Bounds(), p.clear.Bounds(), p.grid.Bounds()
 	insets := map[string]int{
 		"left":   entry.X - box.X,
 		"top":    min(entry.Y, clear.Y) - box.Y,
@@ -158,12 +273,13 @@ func TestIconPickerLaysOutUnderItsTrigger(t *testing.T) {
 	if gap := scroll.Y - max(entry.Y+entry.H, clear.Y+clear.H); gap != th.Spacing {
 		t.Errorf("the grid sits %dpx below the search row, want the theme's %dpx", gap, th.Spacing)
 	}
-	cells := cellRects(p)
-	if len(cells) != len(names) {
-		t.Fatalf("%d cells for %d icons", len(cells), len(names))
+	cells := cellsInView(p)
+	if !slices.Equal(names(cells), icons) {
+		t.Fatalf("the grid shows %v, want %v", names(cells), icons)
 	}
 	gap := iconCellGap()
-	for i, r := range cells {
+	for i, cell := range cells {
+		r := cell.rect
 		col, line := i%iconPickerColumns, i/iconPickerColumns
 		if r.W != iconCellPx() || r.H != iconCellPx() {
 			t.Errorf("cell %d is %dx%d, want %dpx square", i, r.W, r.H, iconCellPx())
@@ -175,7 +291,7 @@ func TestIconPickerLaysOutUnderItsTrigger(t *testing.T) {
 			t.Errorf("cell %d starts at y=%d, want %d", i, r.Y, want)
 		}
 	}
-	if last := cells[iconPickerColumns-1]; last.X+last.W != clear.X+clear.W {
+	if last := cells[iconPickerColumns-1].rect; last.X+last.W != clear.X+clear.W {
 		t.Errorf("a full line ends at x=%d, not flush with the clear button's %d", last.X+last.W, clear.X+clear.W)
 	}
 	if scroll.H != 2*iconCellPx()+gap {
@@ -184,30 +300,90 @@ func TestIconPickerLaysOutUnderItsTrigger(t *testing.T) {
 }
 
 // More icons than the grid shows at once scroll inside its height: the
-// picker stays as wide as its trigger and the grid as tall as its rows.
+// picker stays as wide as its trigger and the grid as tall as its rows,
+// showing exactly its columns by rows of icons, the next ones a scroll
+// away.
 func TestIconPickerScrollsAFullGrid(t *testing.T) {
-	var names []string
-	for i := range iconPickerColumns * (iconPickerRows + 3) {
-		names = append(names, "icon-"+string(rune('a'+i/26))+string(rune('a'+i%26))+"-symbolic")
-	}
-	pickerIcons(t, names...)
-	_, c, _ := openIconPicker(t, "modules.clock.icon-name")
+	icons := manyIcons(iconPickerColumns * (iconPickerRows + 3))
+	pickerIcons(t, icons...)
+	_, c, _ := openIconPicker(t, "")
 	p := c.picker
 	if got := p.contents.Bounds().W; got != c.btn.Bounds().W {
 		t.Errorf("a full picker is %dpx wide under its %dpx trigger", got, c.btn.Bounds().W)
 	}
-	if got, want := p.scroll.Bounds().H, iconGridExtent(iconPickerRows); got != want {
+	if got, want := p.grid.Bounds().H, iconGridExtent(iconPickerRows); got != want {
 		t.Errorf("the grid shows %dpx, want %d rows' %dpx", got, iconPickerRows, want)
 	}
-	if p.grid.Len() != len(names) {
-		t.Errorf("%d cells for %d icons", p.grid.Len(), len(names))
+	cells := cellsInView(p)
+	if want := icons[:iconPickerColumns*iconPickerRows]; !slices.Equal(names(cells), want) {
+		t.Fatalf("the grid shows %v, want the first %d icons", names(cells), len(want))
 	}
-	first, next := p.grid.ChildAt(0).Bounds(), p.grid.ChildAt(iconPickerColumns).Bounds()
+	first, next := cells[0].rect, cells[iconPickerColumns].rect
 	if next.X != first.X || next.Y <= first.Y {
 		t.Errorf("scrolling, the grid's second line starts at cell %d's %v, want a line of %d", iconPickerColumns, next, iconPickerColumns)
 	}
-	if last := p.grid.ChildAt(iconPickerColumns - 1).Bounds(); last.X+last.W != p.clear.Bounds().X+p.clear.Bounds().W {
+	if last := cells[iconPickerColumns-1].rect; last.X+last.W != p.clear.Bounds().X+p.clear.Bounds().W {
 		t.Errorf("scrolling, a full line ends at x=%d, not flush with the clear button", last.X+last.W)
+	}
+	if bottom := cells[len(cells)-1].rect; bottom.Y+bottom.H != p.grid.Bounds().Y+p.grid.Bounds().H {
+		t.Errorf("the last line in view ends at y=%d, not at the grid's bottom %d", bottom.Y+bottom.H, p.grid.Bounds().Y+p.grid.Bounds().H)
+	}
+	scrollToEnd(p)
+	relayOut(p)
+	cells = cellsInView(p)
+	if got := names(cells); got[len(got)-1] != icons[len(icons)-1] || slices.Contains(got, icons[0]) {
+		t.Errorf("scrolled to its end, the grid shows %v, want the last icons and not the first", got)
+	}
+	if bottom := cells[len(cells)-1].rect; bottom.Y+bottom.H != p.grid.Bounds().Y+p.grid.Bounds().H {
+		t.Errorf("scrolled to its end, the last line ends at y=%d, not at the grid's bottom %d", bottom.Y+bottom.H, p.grid.Bounds().Y+p.grid.Bounds().H)
+	}
+}
+
+// Only the cells in view exist: opening a picker over many icons, or
+// filtering it, builds the cells of the lines it shows and none of the
+// lines further down; scrolling builds the lines it brings into view.
+func TestIconPickerBuildsOnlyTheCellsInView(t *testing.T) {
+	icons := manyIcons(iconPickerColumns * 40)
+	pickerIcons(t, icons...)
+	built := builtCells(t)
+	_, c, _ := openIconPicker(t, "")
+	p := c.picker
+	most := iconPickerColumns * (iconPickerRows + 1)
+	if len(*built) > most {
+		t.Errorf("opening built %d cells for %d icons, want at most the %d of the lines in view", len(*built), len(icons), most)
+	}
+	if slices.Contains(*built, icons[most]) || slices.Contains(*built, icons[len(icons)-1]) {
+		t.Errorf("opening built cells below the view")
+	}
+	inView := names(cellsInView(p))
+	if len(inView) != iconPickerColumns*iconPickerRows {
+		t.Fatalf("the grid shows %d icons, want %d", len(inView), iconPickerColumns*iconPickerRows)
+	}
+	for _, name := range inView {
+		if !slices.Contains(*built, name) {
+			t.Errorf("the icon %s in view was never built", name)
+		}
+	}
+
+	*built = nil
+	p.search.Insert("-a")
+	relayOut(p)
+	matches := matching(icons, "-a")
+	if got := names(cellsInView(p)); !slices.Equal(got, matches[:iconPickerColumns*iconPickerRows]) {
+		t.Errorf("filtered, the grid shows %v, want the first matches", got)
+	}
+	if len(*built) > most || slices.Contains(*built, matches[len(matches)-1]) {
+		t.Errorf("filtering built %d cells (%v), want only the lines in view", len(*built), *built)
+	}
+
+	*built = nil
+	scrollToEnd(p)
+	relayOut(p)
+	if !slices.Contains(*built, matches[len(matches)-1]) {
+		t.Errorf("scrolling to the end did not build the last match %s", matches[len(matches)-1])
+	}
+	if slices.Contains(*built, matches[0]) {
+		t.Errorf("scrolling to the end rebuilt the first match %s, out of view", matches[0])
 	}
 }
 
@@ -215,63 +391,120 @@ func TestIconPickerScrollsAFullGrid(t *testing.T) {
 // paints no band of its own.
 func TestIconPickerGridPaintsNoBackground(t *testing.T) {
 	pickerIcons(t, "a-symbolic", "b-symbolic", "c-symbolic")
-	_, c, _ := openIconPicker(t, "modules.clock.icon-name")
+	_, c, _ := openIconPicker(t, "")
 	p := c.picker
-	px := paintPicker(p.root)
-	a, b := p.grid.ChildAt(0).Bounds(), p.grid.ChildAt(1).Bounds()
+	px := relayOut(p)
+	cells := cellsInView(p)
+	if len(cells) != 3 {
+		t.Fatalf("the grid shows %v, want the three icons", names(cells))
+	}
+	a, b := cells[0].rect, cells[1].rect
 	midY := a.Y + a.H/2
 	padding := px(p.contents.Bounds().X+widget.Current().Padding/2, midY)
 	if gap := px((a.X+a.W+b.X)/2, midY); gap != padding {
 		t.Errorf("between the icons is %v, the padding beside them %v", gap, padding)
 	}
-	if after := px(p.grid.ChildAt(2).Bounds().X+iconCellPx()+iconCellGap()+1, midY); after != padding {
+	if after := px(cells[2].rect.X+iconCellPx()+iconCellGap()+1, midY); after != padding {
 		t.Errorf("past the last icon is %v, the padding beside them %v", after, padding)
 	}
 }
 
 // Every icon matching the query shows and only those; the current
 // one is selected and no other, and none when it does not show.
+// Filtering writes nothing.
 func TestIconPickerFiltersAndMarksTheCurrent(t *testing.T) {
 	pickerIcons(t, "ld-battery-symbolic", "ld-bell-symbolic", "tb-cpu-symbolic")
-	k := testKit(t, "")
-	path := "modules.clock.icon-name"
-	_ = k.store.set(path, "ld-bell-symbolic")
-	f := &fakePickers{}
-	k.pickers = f
-	c := newIconEditor(k, pathSlot(k.store, path))
-	c.btn.ClickAt(widget.Point{})
+	k, c, f := openIconPicker(t, "ld-bell-symbolic")
 	p := c.picker
-	selected := func() []string {
-		var out []string
-		for i := range p.grid.Len() {
-			if p.grid.ChildAt(i).HasState(widget.StateSelected) {
-				out = append(out, p.shown[i])
-			}
-		}
-		return out
-	}
-	if p.grid.Len() != 3 || !slices.Equal(selected(), []string{"ld-bell-symbolic"}) {
-		t.Fatalf("%d cells, selected %v; want all three, the current one selected", p.grid.Len(), selected())
+	cells := cellsInView(p)
+	if len(cells) != 3 || !slices.Equal(selectedCells(cells), []string{"ld-bell-symbolic"}) {
+		t.Fatalf("the grid shows %v, selected %v; want all three, the current one selected", names(cells), selectedCells(cells))
 	}
 	p.search.Insert("LD-B")
-	if !slices.Equal(p.shown, []string{"ld-battery-symbolic", "ld-bell-symbolic"}) || p.grid.Len() != 2 {
-		t.Errorf("the filter shows %v in %d cells, want the two ld-b icons", p.shown, p.grid.Len())
+	relayOut(p)
+	cells = cellsInView(p)
+	if want := []string{"ld-battery-symbolic", "ld-bell-symbolic"}; !slices.Equal(names(cells), want) {
+		t.Errorf("the filter shows %v, want the two ld-b icons", names(cells))
 	}
-	if !slices.Equal(selected(), []string{"ld-bell-symbolic"}) {
-		t.Errorf("filtered, %v selected, want the current icon", selected())
+	if !slices.Equal(selectedCells(cells), []string{"ld-bell-symbolic"}) {
+		t.Errorf("filtered, %v selected, want the current icon", selectedCells(cells))
 	}
 	p.search.SelectAll()
 	p.search.Insert("cpu")
-	if !slices.Equal(p.shown, []string{"tb-cpu-symbolic"}) || len(selected()) != 0 {
-		t.Errorf("the filter shows %v with %v selected, want the cpu icon alone and unselected", p.shown, selected())
+	relayOut(p)
+	cells = cellsInView(p)
+	if !slices.Equal(names(cells), []string{"tb-cpu-symbolic"}) || len(selectedCells(cells)) != 0 {
+		t.Errorf("the filter shows %v with %v selected, want the cpu icon alone and unselected", names(cells), selectedCells(cells))
 	}
 	p.search.SelectAll()
 	p.search.Insert("zzz")
-	if p.grid.Len() != 0 {
-		t.Errorf("a query matching nothing shows %d cells", p.grid.Len())
+	relayOut(p)
+	if cells := cellsInView(p); len(cells) != 0 || len(p.shown) != 0 {
+		t.Errorf("a query matching nothing shows %v", names(cells))
 	}
-	if f.closed != 0 || k.store.value(path) != "ld-bell-symbolic" {
-		t.Errorf("filtering wrote %v (closed %d)", k.store.value(path), f.closed)
+	if f.closed != 0 || k.store.value(iconPickerPath) != "ld-bell-symbolic" {
+		t.Errorf("filtering wrote %v (closed %d)", k.store.value(iconPickerPath), f.closed)
+	}
+}
+
+// A click on an icon picks that one, filtered or not: it is written,
+// the trigger shows it and the popover closes. A click on the grid
+// between the icons or past the last one picks nothing.
+func TestIconPickerClickPicksTheIcon(t *testing.T) {
+	icons := manyIcons(iconPickerColumns*2 + 3)
+	pickerIcons(t, icons...)
+
+	k, c, f := openIconPicker(t, icons[0])
+	cells := cellsInView(c.picker)
+	a := cells[1].rect
+	past := cells[len(cells)-1].rect
+	past.X += iconCellPx() + iconCellGap()
+	for what, r := range map[string]render.Rect{
+		"past the last icon": past,
+		"between two icons":  {X: a.X + a.W, Y: a.Y, W: iconCellGap(), H: a.H},
+		"between two lines":  {X: a.X, Y: a.Y + a.H, W: a.W, H: iconCellGap()},
+	} {
+		clickAt(c.picker, r)
+		if f.closed != 0 || k.store.value(iconPickerPath) != icons[0] {
+			t.Errorf("a click %s wrote %v (closed %d)", what, k.store.value(iconPickerPath), f.closed)
+		}
+	}
+	clickIcon(t, c.picker, icons[iconPickerColumns+1])
+	if want := icons[iconPickerColumns+1]; k.store.value(iconPickerPath) != want || f.closed != 1 || c.label.Text() != want {
+		t.Errorf("the click wrote %v, shows %q (closed %d), want %s", k.store.value(iconPickerPath), c.label.Text(), f.closed, want)
+	}
+
+	k, c, f = openIconPicker(t, icons[0])
+	c.picker.search.Insert(icons[len(icons)-1])
+	clickIcon(t, c.picker, icons[len(icons)-1])
+	if want := icons[len(icons)-1]; k.store.value(iconPickerPath) != want || f.closed != 1 {
+		t.Errorf("a click on the filtered icon wrote %v (closed %d), want %s", k.store.value(iconPickerPath), f.closed, want)
+	}
+}
+
+// The pointer over an icon hovers that cell; over the gap between two
+// icons it hovers neither.
+func TestIconPickerHoversOnlyTheCellUnderThePointer(t *testing.T) {
+	icons := manyIcons(iconPickerColumns * 2)
+	pickerIcons(t, icons...)
+	_, c, _ := openIconPicker(t, "")
+	p := c.picker
+	cells := cellsInView(p)
+	a := cells[1].rect
+	r := &widget.Router{Root: p.root}
+	hovered := func() string {
+		if tip, ok := r.Hovered().(interface{ TooltipText() string }); ok {
+			return tip.TooltipText()
+		}
+		return ""
+	}
+	r.Move(widget.Point{X: a.X + a.W/2, Y: a.Y + a.H/2})
+	if got := hovered(); got != icons[1] {
+		t.Errorf("the pointer over %s hovers %q", icons[1], got)
+	}
+	r.Move(widget.Point{X: a.X + a.W + iconCellGap()/2, Y: a.Y + a.H/2})
+	if got := hovered(); got != "" {
+		t.Errorf("the pointer between two icons hovers %q", got)
 	}
 }
 
@@ -306,45 +539,40 @@ func TestIconNamesListTheIconSearchPath(t *testing.T) {
 // The grid opens scrolled so the current icon shows whole; one in the
 // first lines, or none, leaves it at its top.
 func TestIconPickerOpensAtTheCurrentIcon(t *testing.T) {
-	var names []string
-	for i := range iconPickerColumns * (iconPickerRows + 4) {
-		names = append(names, "icon-"+string(rune('a'+i/26))+string(rune('a'+i%26))+"-symbolic")
-	}
-	pickerIcons(t, names...)
+	icons := manyIcons(iconPickerColumns * (iconPickerRows + 4))
+	pickerIcons(t, icons...)
 	for _, tc := range []struct {
 		current string
 		atTop   bool
 	}{
-		{names[len(names)-1], false},
-		{names[(iconPickerRows+1)*iconPickerColumns+3], false},
-		{names[(iconPickerRows-1)*iconPickerColumns+3], true},
-		{names[1], true},
+		{icons[len(icons)-1], false},
+		{icons[(iconPickerRows+1)*iconPickerColumns+3], false},
+		{icons[(iconPickerRows-1)*iconPickerColumns+3], true},
+		{icons[1], true},
 		{"not-offered-symbolic", true},
 	} {
 		t.Run(tc.current, func(t *testing.T) {
-			k := testKit(t, "")
-			path := "modules.clock.icon-name"
-			_ = k.store.set(path, tc.current)
-			k.pickers = &fakePickers{}
-			theme := apptheme.New(k.store.svc.Config())
-			c := newIconEditor(k, pathSlot(k.store, path))
-			theme.Attach(c.Box)
-			sz := widget.MeasureAsChild(c.Box, widget.Constraints{Max: widget.Size{W: 1400, H: 200}})
-			widget.ArrangeAsChild(c.Box, render.Rect{X: 300, Y: 40, W: sz.W, H: sz.H})
-			c.btn.ClickAt(widget.Point{})
+			_, c, _ := openIconPicker(t, tc.current)
 			p := c.picker
-			layOutPicker(theme, p.root)
-			layOutPicker(theme, p.root)
-			view := p.scroll.Bounds()
-			if _, y := p.scroll.Offset(); tc.atTop != (y == 0) {
-				t.Errorf("the grid opens scrolled %dpx, want at its top %v", y, tc.atTop)
+			relayOut(p)
+			view := p.grid.Bounds()
+			cells := cellsInView(p)
+			top := cells[0].name == icons[0] && cells[0].rect.Y == view.Y
+			if tc.atTop != top {
+				t.Errorf("the grid opens showing %s at y=%d first, want at its top %v", cells[0].name, cells[0].rect.Y, tc.atTop)
 			}
-			i := slices.Index(p.shown, tc.current)
-			if i < 0 {
+			if !slices.Contains(icons, tc.current) {
 				return
 			}
-			if r := p.grid.ChildAt(i).Bounds(); r.Y < view.Y || r.Y+r.H > view.Y+view.H {
+			i := slices.IndexFunc(cells, func(v iconCellView) bool { return v.name == tc.current })
+			if i < 0 {
+				t.Fatalf("the current icon is not in view: %v", names(cells))
+			}
+			if r := cells[i].rect; r.Y < view.Y || r.Y+r.H > view.Y+view.H {
 				t.Errorf("the current icon at %v opens outside the grid's view %v", r, view)
+			}
+			if !slices.Equal(selectedCells(cells), []string{tc.current}) {
+				t.Errorf("the grid opens with %v selected, want the current icon", selectedCells(cells))
 			}
 		})
 	}

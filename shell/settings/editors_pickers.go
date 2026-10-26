@@ -395,8 +395,7 @@ type iconPicker struct {
 	contents *widget.Box
 	search   *widget.Entry
 	clear    *widget.Button
-	scroll   *widget.Scroll
-	grid     *widget.FlowBox
+	grid     *widget.GridView
 	all      []string
 	shown    []string
 	current  string
@@ -424,34 +423,51 @@ func newIconPicker(k *kit, names []string, current string, width int, pick func(
 	searchRow.AppendAligned(p.search, true, widget.AlignCenter)
 	searchRow.AppendAligned(p.clear, false, widget.AlignCenter)
 	contents.Append(searchRow, false)
-	p.scroll = widget.NewScroll(nil)
-	p.scroll.AddClass("icon-picker-scroll")
-	p.scroll.VerticalOnly = true
-	p.scroll.SetMaxContentHeight(iconGridExtent(iconPickerRows))
-	contents.Append(p.scroll, true)
+	p.grid = newIconGrid(iconCells{p})
+	p.grid.OnActivate = func(i int) { p.pick(p.shown[i]) }
+	contents.Append(p.grid, true)
 	p.filter("")
 	return p
 }
 
+// newIconGrid is the picker's virtualized grid over model: only the
+// cells in view exist, the full column count of them per line, the cell
+// gap apart, at most the picker's rows tall before it scrolls.
+func newIconGrid(model iconCells) *widget.GridView {
+	gap := iconCellGap()
+	g := widget.NewGridView[widget.Widget](model, iconCellPx(), iconCellPx())
+	g.AddClass("icon-picker-grid")
+	g.SetColumnSpacing(gap)
+	g.SetRowSpacing(gap)
+	g.SetMinColumns(iconPickerColumns)
+	g.SetMaxColumns(iconPickerColumns)
+	g.SetMaxHeight(iconGridExtent(iconPickerRows))
+	g.SetSingleClickActivate(true)
+	return g
+}
+
 // filter shows the icons matching the query, the grid scrolled back to
-// its top.
+// its top and the current icon selected and scrolled into view.
 func (p *iconPicker) filter(query string) {
 	p.shown = matching(p.all, query)
-	gap := iconCellGap()
-	p.grid = widget.NewFlowBox(gap, gap)
-	p.grid.AddClass("icon-picker-grid")
-	p.grid.SetMaxChildrenPerLine(iconPickerColumns)
-	p.grid.OnActivate = func(i int) { p.pick(p.shown[i]) }
-	for _, name := range p.shown {
-		cell := widget.NewBox(widget.Row, 0, iconCellPadding())
-		cell.SetTooltip(name)
-		cell.AppendAligned(widget.NewThemeIcon(name, iconPreviewPx), true, widget.AlignCenter)
-		p.grid.Append(cell)
-	}
-	if i := slices.Index(p.shown, p.current); i >= 0 {
-		p.grid.Select(i)
-	}
-	p.scroll.SetChild(p.grid)
+	p.grid.Reset()
+	p.grid.Select(slices.Index(p.shown, p.current))
+}
+
+// iconCells is the grid's model over the shown icons.
+type iconCells struct{ p *iconPicker }
+
+func (m iconCells) Len() int { return len(m.p.shown) }
+
+func (m iconCells) Row(i int) widget.Widget { return iconCell(m.p.shown[i]) }
+
+// iconCell is a grid cell: the icon's preview, centred inside the
+// cell's padding, with its name as the tooltip (a seam for tests).
+var iconCell = func(name string) widget.Widget {
+	cell := widget.NewBox(widget.Row, 0, iconCellPadding())
+	cell.SetTooltip(name)
+	cell.AppendAligned(widget.NewThemeIcon(name, iconPreviewPx), true, widget.AlignCenter)
+	return cell
 }
 
 // iconRow is icon::icon for a row.
