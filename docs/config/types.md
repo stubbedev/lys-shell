@@ -368,14 +368,15 @@ What identifies a workspace in the UI.
 Size override for a dropdown foldout panel.
 
 Each field is optional: when unset the dropdown keeps its built-in default
-width (scaled by the global scale) and the height of its content. A
-[`Size`] may be a scale multiplier of the built-in base (e.g. `1.5`) or an
-absolute pixel length (e.g. `"480px"`).
+width (scaled by the global scale) and the height of its content. The
+width is a [`Size`]: a scale multiplier of the built-in base (e.g. `1.5`)
+or an absolute pixel length (e.g. `"480px"`). The height is a pixel
+length only.
 
 | Field | Description |
 |---|---|
 | `width` | Panel width override. Unset uses the built-in default width. |
-| `height` | Panel height cap in pixels: the height a panel grows to before its |
+| `height` | Panel height cap in pixels (e.g. `"400px"`): the height a panel grows |
 
 ## DynamicLauncherConfig {#dynamic-launcher-config}
 
@@ -857,6 +858,12 @@ Percentage value clamped to 0-100.
 Number in `[0, 100]`.
 
 Serialises as `uint8`.
+
+## PixelLength {#pixel-length}
+
+Absolute length in pixels (e.g. "400px").
+
+String matching `^[0-9]+(\.[0-9]+)?px$`.
 
 ## PopupCloseBehavior {#popup-close-behavior}
 

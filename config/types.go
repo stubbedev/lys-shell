@@ -197,8 +197,48 @@ func (Size) configSchema(*schemaGen) Schema {
 		"description": "Size as a scale multiplier (number) or absolute pixels (e.g. \"24px\")",
 		"anyOf": []any{
 			Schema{"type": "number", "minimum": 0.0},
-			Schema{"type": "string", "pattern": `^[0-9]+(\.[0-9]+)?px$`},
+			Schema{"type": "string", "pattern": sizePxPattern},
 		},
+	}
+}
+
+// sizePxPattern is the schema's form of a pixel length.
+const sizePxPattern = `^[0-9]+(\.[0-9]+)?px$`
+
+// PixelLength is an absolute length in logical pixels, written like
+// "400px". Unlike a Size it takes no multiplier, having no base to
+// scale, and fails to load rather than falling back: a bare number, a
+// negative length or one past 10000px is an error naming the key.
+//
+// Absolute length in pixels (e.g. "400px").
+type PixelLength float32
+
+// pixelLengthExpected is what a PixelLength error says it wants.
+const pixelLengthExpected = `a pixel length like "400px"`
+
+// UnmarshalConfig implements Unmarshaler.
+func (p *PixelLength) UnmarshalConfig(v any) error {
+	raw, ok := v.(string)
+	if !ok {
+		return invalidType(v, pixelLengthExpected)
+	}
+	px, ok := strings.CutSuffix(strings.TrimSpace(raw), "px")
+	length, err := strconv.ParseFloat(strings.TrimSpace(px), 32)
+	if !ok || err != nil || length < 0 || length > sizePxMax {
+		return fmt.Errorf("invalid value: %s, expected %s up to %dpx", unexpected(v), pixelLengthExpected, sizePxMax)
+	}
+	*p = PixelLength(length)
+	return nil
+}
+
+// MarshalConfig implements Marshaler: the "Npx" string.
+func (p PixelLength) MarshalConfig() any { return Px(float32(p)).String() }
+
+func (PixelLength) configSchema(*schemaGen) Schema {
+	return Schema{
+		"description": typeDoc(typeOf[PixelLength]()),
+		"type":        "string",
+		"pattern":     sizePxPattern,
 	}
 }
 

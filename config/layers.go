@@ -105,12 +105,13 @@ func (a *layerApply) applyLeaf(dst reflect.Value, v any, path string) error {
 		if a.kind == runtimeLayer {
 			title = "invalid runtime value"
 		}
+		at, cause := failedPath(path, err)
 		a.sink(Diagnostic{Kind: DiagnosticError, Title: title}.
-			field("Field", path).
-			field("Error", strings.TrimSpace(err.Error())).
+			field("Field", at).
+			field("Error", strings.TrimSpace(cause.Error())).
 			field("Value", formatDiagnosticValue(v)))
 		if a.kind == runtimeLayer {
-			return &RuntimeValueError{Path: path, Err: err}
+			return &RuntimeValueError{Path: at, Err: cause}
 		}
 		return nil
 	}

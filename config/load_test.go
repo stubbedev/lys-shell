@@ -144,6 +144,34 @@ func TestTypeMismatchUsesSerdeWording(t *testing.T) {
 	}
 }
 
+// A dropdown height is a pixel length: "400px" loads, while a
+// multiplier, which has no base height to scale, or a negative length
+// is an error naming the key and the form it takes, and the dropdown's
+// size is left unset rather than read as something else.
+func TestDropdownHeightTakesPixelsOnly(t *testing.T) {
+	path := writeFile(t, t.TempDir(), "config.yaml", "dropdowns:\n  weather:\n    height: 400px\n")
+	cfg, err := LoadFile(path)
+	if err != nil || cfg.Dropdowns.Weather.Height == nil || *cfg.Dropdowns.Weather.Height != 400 {
+		t.Fatalf("height 400px: %v, %v", cfg.Dropdowns.Weather.Height, err)
+	}
+	for raw, wantErr := range map[string]string{
+		"1.5":    "invalid type: floating point `1.5`, expected a pixel length like \"400px\"",
+		"2":      "invalid type: integer `2`, expected a pixel length like \"400px\"",
+		`"1.5"`:  "invalid value: string \"1.5\", expected a pixel length like \"400px\" up to 10000px",
+		`"-4px"`: "invalid value: string \"-4px\", expected a pixel length like \"400px\" up to 10000px",
+	} {
+		path := writeFile(t, t.TempDir(), "config.yaml", "dropdowns:\n  weather:\n    width: 1.5\n    height: "+raw+"\n")
+		cfg, err := LoadFile(path)
+		var d Diagnostic
+		if !errors.As(err, &d) || d.Field("Field") != "dropdowns.weather.height" || d.Field("Error") != wantErr {
+			t.Errorf("height %s: error %v, want %q at dropdowns.weather.height", raw, err, wantErr)
+		}
+		if got := cfg.Dropdowns.Weather; got != (DropdownSize{}) {
+			t.Errorf("height %s: loaded %+v, want the whole size rejected, not read as something else", raw, got)
+		}
+	}
+}
+
 func TestUnknownKeysAndNonTableSectionsAreIgnored(t *testing.T) {
 	path := writeFile(t, t.TempDir(), "config.yaml", "osd: 5\nbar:\n  not-in-the-schema: 3\nmodules:\n  clock:\n    also-unknown: 1\n")
 	if _, err := LoadFile(path); err != nil {

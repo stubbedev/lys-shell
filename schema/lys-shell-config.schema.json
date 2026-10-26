@@ -2283,19 +2283,19 @@
       ]
     },
     "DropdownSize": {
-      "description": "Size override for a dropdown foldout panel.\n\nEach field is optional: when unset the dropdown keeps its built-in default\nwidth (scaled by the global scale) and the height of its content. A\n[`Size`] may be a scale multiplier of the built-in base (e.g. `1.5`) or an\nabsolute pixel length (e.g. `\"480px\"`).",
+      "description": "Size override for a dropdown foldout panel.\n\nEach field is optional: when unset the dropdown keeps its built-in default\nwidth (scaled by the global scale) and the height of its content. The\nwidth is a [`Size`]: a scale multiplier of the built-in base (e.g. `1.5`)\nor an absolute pixel length (e.g. `\"480px\"`). The height is a pixel\nlength only.",
       "properties": {
         "height": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Size"
+              "$ref": "#/$defs/PixelLength"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Panel height cap in pixels: the height a panel grows to before its\nlists scroll. Shorter content keeps the panel at its own height. Unset\ngrows the panel to its content, up to the monitor. A multiplier has no\neffect: the height has no built-in base to scale."
+          "description": "Panel height cap in pixels (e.g. `\"400px\"`): the height a panel grows\nto before its lists scroll. Shorter content keeps the panel at its own\nheight. Unset grows the panel to its content, up to the monitor. A\nmultiplier is an error: the height has no built-in base to scale."
         },
         "width": {
           "anyOf": [
@@ -6483,6 +6483,11 @@
       "maximum": 100,
       "minimum": 0,
       "type": "integer"
+    },
+    "PixelLength": {
+      "description": "Absolute length in pixels (e.g. \"400px\").",
+      "pattern": "^[0-9]+(\\.[0-9]+)?px$",
+      "type": "string"
     },
     "PopupCloseBehavior": {
       "description": "Behavior when the close button is clicked on a popup card.",

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -144,7 +145,7 @@ func decodeValueStruct(dst reflect.Value, v any) error {
 			}
 			found = true
 			if err := decodeInto(dst.FieldByIndex(f.index), val); err != nil {
-				return err
+				return &fieldError{Key: f.key, Err: err}
 			}
 			break
 		}
@@ -153,6 +154,28 @@ func decodeValueStruct(dst reflect.Value, v any) error {
 		}
 	}
 	return nil
+}
+
+// fieldError is a value struct's field that failed to decode: the
+// field's key and why, so a diagnostic names the key itself rather
+// than only the struct holding it.
+type fieldError struct {
+	Key string
+	Err error
+}
+
+func (e *fieldError) Error() string { return e.Key + ": " + e.Err.Error() }
+
+func (e *fieldError) Unwrap() error { return e.Err }
+
+// failedPath is the key path under path where err arose, through the
+// value structs it passed, and the error at that key.
+func failedPath(path string, err error) (string, error) {
+	var fe *fieldError
+	for errors.As(err, &fe) {
+		path, err = joinPath(path, fe.Key), fe.Err
+	}
+	return path, err
 }
 
 func asFloat(v any) (float64, bool) {

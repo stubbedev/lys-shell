@@ -125,7 +125,7 @@ func TestWeatherErrorTextNamesTheCause(t *testing.T) {
 
 // A dropdown's width is its base at the global scale unless
 // overridden; its height is its content's unless a pixel height caps
-// it, a multiplier having no base height to scale.
+// it.
 func TestDropdownDimsResolveTheOverrides(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Styling.Scale = 1
@@ -137,18 +137,14 @@ func TestDropdownDimsResolveTheOverrides(t *testing.T) {
 	}
 	cfg.Styling.Scale = 2
 	scale := config.Size{Value: 1.5}
-	px := config.Size{Value: 480, Unit: config.SizePixels}
+	px := config.PixelLength(480)
 	cfg.Dropdowns.Weather = config.DropdownSize{Width: &scale, Height: &px}
 	if w, h, _ := dropdownDims("weather", cfg); w != 1185 || h != 480 {
 		t.Errorf("weather override = %d×%d, want 1185×480", w, h)
 	}
-	cfg.Dropdowns.Calendar = config.DropdownSize{Height: &scale}
-	if w, h, _ := dropdownDims("calendar", cfg); w != 680 || h != -1 {
-		t.Errorf("calendar = %d×%d, want 680×natural", w, h)
-	}
-	cfg.Dropdowns.Calendar = config.DropdownSize{Height: &px}
-	if _, h, _ := dropdownDims("calendar", cfg); h != 480 {
-		t.Errorf("calendar px height = %d", h)
+	cfg.Dropdowns.Calendar = config.DropdownSize{Width: &scale}
+	if w, h, _ := dropdownDims("calendar", cfg); w != int(dropdownGeometries["calendar"].width*3) || h != -1 {
+		t.Errorf("calendar = %d×%d, want 1.5 × its base at scale 2 × natural", w, h)
 	}
 }
 

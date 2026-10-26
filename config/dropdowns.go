@@ -79,17 +79,18 @@ func (d DropdownsConfig) ByName(name string) (DropdownSize, bool) {
 // Size override for a dropdown foldout panel.
 //
 // Each field is optional: when unset the dropdown keeps its built-in default
-// width (scaled by the global scale) and the height of its content. A
-// [`Size`] may be a scale multiplier of the built-in base (e.g. `1.5`) or an
-// absolute pixel length (e.g. `"480px"`).
+// width (scaled by the global scale) and the height of its content. The
+// width is a [`Size`]: a scale multiplier of the built-in base (e.g. `1.5`)
+// or an absolute pixel length (e.g. `"480px"`). The height is a pixel
+// length only.
 type DropdownSize struct {
 	// Panel width override. Unset uses the built-in default width.
 	Width *Size `cfg:"width"`
-	// Panel height cap in pixels: the height a panel grows to before its
-	// lists scroll. Shorter content keeps the panel at its own height. Unset
-	// grows the panel to its content, up to the monitor. A multiplier has no
-	// effect: the height has no built-in base to scale.
-	Height *Size `cfg:"height"`
+	// Panel height cap in pixels (e.g. `"400px"`): the height a panel grows
+	// to before its lists scroll. Shorter content keeps the panel at its own
+	// height. Unset grows the panel to its content, up to the monitor. A
+	// multiplier is an error: the height has no built-in base to scale.
+	Height *PixelLength `cfg:"height"`
 }
 
 func (DropdownSize) configValue() {}
@@ -105,11 +106,10 @@ func ResolveDimension(override *Size, base, scale float64) int {
 }
 
 // ResolveContentHeight is the height of a dropdown that sizes to its
-// content: -1 (natural size) unless an absolute pixel override is set,
-// since a multiplier has no base to scale (resolve_content_height).
-func ResolveContentHeight(override *Size) int {
-	if override == nil || override.Unit != SizePixels {
+// content: the override's pixels, or -1 (natural size) without one.
+func ResolveContentHeight(override *PixelLength) int {
+	if override == nil {
 		return -1
 	}
-	return int(math.Round(float64(override.Value)))
+	return int(math.Round(float64(*override)))
 }

@@ -54,6 +54,22 @@ func TestConfigSetGetReset(t *testing.T) {
 	}
 }
 
+// A dropdown height set as a multiplier is refused with the key and the
+// pixel form it takes; set in pixels it holds.
+func TestConfigSetDropdownHeightTakesPixels(t *testing.T) {
+	configDir(t)
+	if _, err := runConfigOut(t, "set", "dropdowns.weather", "{height: 1.5}"); err == nil ||
+		err.Error() != "Failed to set config at 'dropdowns.weather': invalid value for 'dropdowns.weather.height': invalid type: floating point `1.5`, expected a pixel length like \"400px\"" {
+		t.Errorf("multiplier height: %v", err)
+	}
+	if _, err := runConfigOut(t, "set", "dropdowns.weather", "{height: 400px}"); err != nil {
+		t.Fatalf("pixel height: %v", err)
+	}
+	if out, _ := runConfigOut(t, "get", "dropdowns.weather"); out != "height: 400px\n" {
+		t.Errorf("get = %q, want the 400px height", out)
+	}
+}
+
 func TestConfigSetAndGetFailures(t *testing.T) {
 	configDir(t)
 	if _, err := runConfigOut(t, "set", "bar.location", "sideways"); err == nil ||
