@@ -5,7 +5,6 @@
   glib,
   pam,
   pipewire,
-  libgbm,
   vulkan-loader,
   gst_all_1,
 }:
@@ -29,14 +28,14 @@ let
 
   # The libraries the binaries dlopen through purego: libgstreamer and
   # libglib (recorder), libpam (lock screen), libpipewire (the ScreenCast
-  # portal), libgbm (its dmabuf path) and libvulkan (lys-ui's GPU
-  # renderer, which falls back to the CPU without it).
+  # portal) and libvulkan (lys-ui's GPU renderer, which falls back to the
+  # CPU without it, and the portal's zero-copy dmabufs, which fall back
+  # to shared memory).
   libs = [
     gst_all_1.gstreamer
     glib
     pam
     pipewire
-    libgbm
     vulkan-loader
   ];
 

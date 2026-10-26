@@ -10,36 +10,66 @@ import (
 	"github.com/stubbedev/lys-ui/dmabuf"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/internal/gbm"
 	"github.com/stubbedev/lys-shell/internal/pipewire"
 )
 
-// fakeGBM allocates memfds posing as buffer objects.
-type fakeGBM struct {
+// fakeDevice allocates memfds posing as GPU buffers.
+type fakeDevice struct {
 	planes int
 	fail   bool
 	asked  [][]uint64
 	fds    []int
 }
 
-func (f *fakeGBM) Alloc(fourcc, w, h uint32, mods []uint64) (*gbm.Buffer, error) {
+func (f *fakeDevice) NewTarget(w, h int, fourcc uint32, mods []uint64) (gpuTarget, error) {
 	f.asked = append(f.asked, mods)
 	if f.fail {
 		return nil, errors.New("no memory")
 	}
-	b := &gbm.Buffer{Width: w, Height: h, Fourcc: fourcc, Modifier: 7}
+	t := &fakeTarget{dmabuf.Buffer{Width: w, Height: h, Format: fourcc, Modifier: 7}}
 	for range max(f.planes, 1) {
-		fd, err := unix.MemfdCreate("fake-bo", unix.MFD_CLOEXEC)
+		fd, err := unix.MemfdCreate("fake-target", unix.MFD_CLOEXEC)
 		if err != nil {
+			t.Close()
 			return nil, err
 		}
 		f.fds = append(f.fds, fd)
-		b.Planes = append(b.Planes, gbm.Plane{Fd: fd, Stride: w * 4})
+		t.b.Planes = append(t.b.Planes, dmabuf.Plane{FD: fd, Stride: uint32(w) * 4})
 	}
-	return b, nil
+	return t, nil
 }
 
-func (f *fakeGBM) Close() {}
+func (f *fakeDevice) Modifiers(uint32) ([]uint64, error) { return linearOnly, nil }
+
+func (f *fakeDevice) Close() {}
+
+var linearOnly = []uint64{dmabuf.ModifierLinear}
+
+// The stream takes linear alone when the device renders in it, else
+// the device's own layouts; none stays none, for the probe to decline.
+func TestStreamModifiersPreferLinear(t *testing.T) {
+	const tiledA, tiledB = 0x300000000606015, 0x300000000606014
+	for _, c := range []struct{ device, want []uint64 }{
+		{[]uint64{tiledA, dmabuf.ModifierLinear, tiledB}, linearOnly},
+		{[]uint64{tiledA, tiledB}, []uint64{tiledA, tiledB}},
+		{nil, nil},
+	} {
+		if got := streamModifiers(c.device); !slices.Equal(got, c.want) {
+			t.Errorf("streamModifiers(%#x) = %#x, want %#x", c.device, got, c.want)
+		}
+	}
+}
+
+type fakeTarget struct{ b dmabuf.Buffer }
+
+func (t *fakeTarget) Dmabuf() dmabuf.Buffer { return t.b }
+
+func (t *fakeTarget) Close() {
+	for _, p := range t.b.Planes {
+		_ = syscall.Close(p.FD)
+	}
+	t.b.Planes = nil
+}
 
 func open(fd int) bool {
 	var st syscall.Stat_t
@@ -76,22 +106,22 @@ func (f *fakeCopy) CopyInto(capture.Output, bool, importedBuffer) error {
 var shmFrame = &capture.Frame{Width: 64, Height: 32, Stride: 256, Format: capture.FormatXRGB8888}
 
 func offer() capture.DmabufFormat {
-	return capture.DmabufFormat{Fourcc: gbm.FormatXRGB8888, Width: 64, Height: 32}
+	return capture.DmabufFormat{Fourcc: dmabuf.FormatXRGB8888, Width: 64, Height: 32}
 }
 
 func TestProbeTakesTheModifierAndReleasesTheProbe(t *testing.T) {
-	dev, cp := &fakeGBM{}, &fakeCopy{}
-	src, err := probeGPUSource(nil, dev, cp, offer(), capture.Output{}, true, shmFrame)
+	dev, cp := &fakeDevice{}, &fakeCopy{}
+	src, err := probeGPUSource(nil, dev, cp, offer(), linearOnly, capture.Output{}, true, shmFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if src.Modifier() != 7 || len(dev.asked) != 1 || dev.asked[0] != nil {
-		t.Errorf("modifier %d asked %v, want the driver's choice probed then offered", src.Modifier(), dev.asked)
+	if src.Modifier() != 7 || len(dev.asked) != 1 || !slices.Equal(dev.asked[0], linearOnly) {
+		t.Errorf("modifier %d asked %v, want the offered modifiers probed and the device's pick streamed", src.Modifier(), dev.asked)
 	}
 	if open(dev.fds[0]) || cp.destroyed != 1 {
 		t.Errorf("the probe buffer leaked: fd open %v, imports destroyed %d", open(dev.fds[0]), cp.destroyed)
 	}
-	if d := cp.got[0]; d.Format != gbm.FormatXRGB8888 || d.Width != 64 || d.Modifier != 7 || len(d.Planes) != 1 || d.Planes[0].Stride != 256 {
+	if d := cp.got[0]; d.Format != dmabuf.FormatXRGB8888 || d.Width != 64 || d.Modifier != 7 || len(d.Planes) != 1 || d.Planes[0].Stride != 256 {
 		t.Errorf("imported %+v", d)
 	}
 }
@@ -99,17 +129,17 @@ func TestProbeTakesTheModifierAndReleasesTheProbe(t *testing.T) {
 func TestProbeDeclines(t *testing.T) {
 	for name, c := range map[string]struct {
 		offered capture.DmabufFormat
-		dev     *fakeGBM
+		dev     *fakeDevice
 		cp      *fakeCopy
 	}{
-		"a 24-bit dmabuf":   {capture.DmabufFormat{Fourcc: uint32(capture.FormatBGR888), Width: 64, Height: 32}, &fakeGBM{}, &fakeCopy{}},
-		"another size":      {capture.DmabufFormat{Fourcc: gbm.FormatXRGB8888, Width: 32, Height: 32}, &fakeGBM{}, &fakeCopy{}},
-		"no allocation":     {offer(), &fakeGBM{fail: true}, &fakeCopy{}},
-		"two planes":        {offer(), &fakeGBM{planes: 2}, &fakeCopy{}},
-		"a rejected import": {offer(), &fakeGBM{}, &fakeCopy{rejectImport: true}},
-		"a failed copy":     {offer(), &fakeGBM{}, &fakeCopy{failCapture: true}},
+		"a 24-bit dmabuf":   {capture.DmabufFormat{Fourcc: uint32(capture.FormatBGR888), Width: 64, Height: 32}, &fakeDevice{}, &fakeCopy{}},
+		"another size":      {capture.DmabufFormat{Fourcc: dmabuf.FormatXRGB8888, Width: 32, Height: 32}, &fakeDevice{}, &fakeCopy{}},
+		"no allocation":     {offer(), &fakeDevice{fail: true}, &fakeCopy{}},
+		"two planes":        {offer(), &fakeDevice{planes: 2}, &fakeCopy{}},
+		"a rejected import": {offer(), &fakeDevice{}, &fakeCopy{rejectImport: true}},
+		"a failed copy":     {offer(), &fakeDevice{}, &fakeCopy{failCapture: true}},
 	} {
-		_, err := probeGPUSource(nil, c.dev, c.cp, c.offered, capture.Output{}, false, shmFrame)
+		_, err := probeGPUSource(nil, c.dev, c.cp, c.offered, linearOnly, capture.Output{}, false, shmFrame)
 		if !errors.Is(err, errNoDmabuf) {
 			t.Errorf("%s: err = %v, want errNoDmabuf (stay on shm)", name, err)
 		}
@@ -132,8 +162,8 @@ func (otherDmabuf) Stride() uint32 { return 0 }
 func (otherDmabuf) Release()       {}
 
 func TestGPUSourceAllocatesAtTheModifierAndFillsInPlace(t *testing.T) {
-	dev, cp := &fakeGBM{}, &fakeCopy{}
-	src, err := probeGPUSource(nil, dev, cp, offer(), capture.Output{}, false, shmFrame)
+	dev, cp := &fakeDevice{}, &fakeCopy{}
+	src, err := probeGPUSource(nil, dev, cp, offer(), linearOnly, capture.Output{}, false, shmFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,8 +206,8 @@ func TestScreencopyRejectsAForeignBuffer(t *testing.T) {
 // each its own.
 func TestProbeTakesADmabufFormatOtherThanTheShmOne(t *testing.T) {
 	shm24 := &capture.Frame{Width: 64, Height: 32, Stride: 192, Format: capture.FormatBGR888}
-	offered := capture.DmabufFormat{Fourcc: gbm.FormatABGR8888, Width: 64, Height: 32}
-	src, err := probeGPUSource(nil, &fakeGBM{}, &fakeCopy{}, offered, capture.Output{}, false, shm24)
+	offered := capture.DmabufFormat{Fourcc: uint32(capture.FormatABGR8888), Width: 64, Height: 32}
+	src, err := probeGPUSource(nil, &fakeDevice{}, &fakeCopy{}, offered, linearOnly, capture.Output{}, false, shm24)
 	if err != nil {
 		t.Fatal(err)
 	}

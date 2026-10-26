@@ -33,13 +33,13 @@ On Hyprland, the built-in lock screen needs one extra compositor setting: `misc:
 Building needs only Go (1.27, or any Go from 1.21 that fetches it). At runtime
 lys-shell loads these libraries, so install them from your distribution:
 
-| Library   | Used by                         |
-| --------- | ------------------------------- |
-| GLib 2    | the screen recorder             |
-| GStreamer | the screen recorder             |
-| PAM       | the lock screen and greeter     |
-| PipeWire  | screen sharing (ScreenCast)     |
-| libgbm    | zero-copy screen sharing        |
+| Library   | Used by                                                    |
+| --------- | ---------------------------------------------------------- |
+| GLib 2    | the screen recorder                                        |
+| GStreamer | the screen recorder                                        |
+| PAM       | the lock screen and greeter                                |
+| PipeWire  | screen sharing (ScreenCast)                                |
+| Vulkan    | GPU rendering and zero-copy screen sharing (optional)      |
 
 The screen recorder also loads GStreamer's base, good, bad, ugly, libav and
 PipeWire plugin sets.

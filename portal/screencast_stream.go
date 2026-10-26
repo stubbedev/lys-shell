@@ -8,7 +8,6 @@ import (
 
 	"github.com/stubbedev/lys-ui/capture"
 
-	"github.com/stubbedev/lys-shell/internal/gbm"
 	"github.com/stubbedev/lys-shell/internal/pipewire"
 )
 
@@ -64,18 +63,27 @@ func (s *pipewireStream) Close() {
 	s.closeSource()
 }
 
-// startScreenStream opens the capture for target and its PipeWire
-// producer. A whole output streams from an
-// ext-image-copy session (damage-driven: a static screen sends
-// nothing new); a compositor without it, a region, and a window take
-// one screencopy or toplevel capture per frame.
-func startScreenStream(target captureTarget, cursor bool, fps uint32) (screenStream, error) {
+// screenStreams starts ScreenCast streams, allocating a whole output's
+// zero-copy buffers on the first render node matching renderNodes (a
+// glob) that takes them.
+type screenStreams struct{ renderNodes string }
+
+// start opens the capture for target and its PipeWire producer. A
+// whole output streams zero-copy when the compositor and the GPU allow,
+// else, logged with the reason, from an ext-image-copy session
+// (damage-driven: a static screen sends nothing new); a compositor
+// without it, a region, and a window take one screencopy or toplevel
+// capture per frame.
+func (st screenStreams) start(target captureTarget, cursor bool, fps uint32) (screenStream, error) {
 	if target.kind == targetOutput {
-		if s, err := startGPUStream(target.name, cursor, fps); err == nil {
+		s, err := st.startGPU(target.name, cursor, fps)
+		if err == nil {
 			return s, nil
-		} else if !errors.Is(err, errNoDmabuf) {
+		}
+		if !errors.Is(err, errNoDmabuf) {
 			return nil, err
 		}
+		warnf("screencast: output %s streams through shared memory: %v", target.name, err)
 		if s, err := capture.OpenOutputStream(target.name, cursor); err == nil {
 			info := s.Info()
 			return startProducer(producerGeometry{
@@ -301,16 +309,19 @@ func outputGrab(c *capture.Client, o capture.Output, cursor bool) func(dst []byt
 	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureOutput(o, opts) }
 }
 
-// startGPUStream streams a whole output zero-copy when the compositor
-// and the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise, and
-// the caller takes the shared-memory paths.
-func startGPUStream(output string, cursor bool, fps uint32) (screenStream, error) {
+// startGPU streams a whole output zero-copy when the compositor and
+// the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise, and the
+// caller takes the shared-memory paths.
+func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screenStream, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
 	}
 	fail := func(err error) (screenStream, error) {
 		_ = c.Close()
+		if errors.Is(err, errNoDmabuf) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
 	}
 	o, ok := findOutput(c, output)
@@ -326,13 +337,18 @@ func startGPUStream(output string, cursor bool, fps uint32) (screenStream, error
 	if err != nil {
 		return fail(err)
 	}
-	dev, err := gbm.Open()
+	dev, err := openVulkanAllocator(st.renderNodes)
 	if err != nil {
+		return fail(err)
+	}
+	mods, err := dev.Modifiers(offered.Fourcc)
+	if err != nil {
+		dev.Close()
 		return fail(err)
 	}
 	watch := newVanishWatch(outputGone(c, output))
 	shm := newSnapshotSource(grab, first, watch)
-	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, o, cursor, first)
+	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, streamModifiers(mods), o, cursor, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)

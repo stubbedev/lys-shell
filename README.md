@@ -81,7 +81,7 @@ The [NixOS guide](docs/guide/getting-started-nixos.md) covers the home-manager m
 
 ### Other distributions
 
-The binaries are static Go; at runtime they load GLib, GStreamer, PAM, PipeWire and GBM. With Go and [just](https://github.com/casey/just) installed:
+The binaries are static Go; at runtime they load GLib, GStreamer, PAM and PipeWire, and Vulkan when it is installed. With Go and [just](https://github.com/casey/just) installed:
 
 ```sh
 git clone https://github.com/stubbedev/lys-shell

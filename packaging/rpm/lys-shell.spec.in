@@ -21,7 +21,6 @@ Requires:       glib2
 Requires:       gstreamer1
 Requires:       pam
 Requires:       pipewire-libs
-Requires:       mesa-libgbm
 Recommends:     vulkan-loader
 Recommends:     mesa-vulkan-drivers
 Recommends:     xdg-desktop-portal

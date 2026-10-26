@@ -38,7 +38,7 @@ type castState struct {
 type screenCast struct {
 	conn     *dbus.Conn
 	sessions *sessions
-	// start runs one stream (startScreenStream; a fake in tests).
+	// start runs one stream (screenStreams.start; a fake in tests).
 	start func(target captureTarget, cursor bool, fps uint32) (screenStream, error)
 	// outputs is the outputs' logical geometry (the Wayland loop's; a
 	// fake in tests).

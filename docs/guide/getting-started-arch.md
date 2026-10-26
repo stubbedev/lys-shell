@@ -7,10 +7,11 @@ title: Getting started on Arch
 ## Install dependencies
 
 Go, plus the libraries lys-shell loads at runtime (GLib, GStreamer for the screen
-recorder, PAM for the lock screen, PipeWire and GBM for screen sharing):
+recorder, PAM for the lock screen, PipeWire for screen sharing, Vulkan for GPU rendering
+and zero-copy screen sharing):
 
 ```sh
-sudo pacman -S --needed go git just glib2 gstreamer pam libpipewire mesa \
+sudo pacman -S --needed go git just glib2 gstreamer pam libpipewire vulkan-icd-loader \
   gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
   gst-libav gst-plugin-pipewire
 ```

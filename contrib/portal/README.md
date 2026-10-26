@@ -127,6 +127,8 @@ NixOS / home-manager module alongside the shell.
 - **InputCapture**: real input capture needs the compositor to redirect local
   input to the portal, which wlroots/niri do not expose (only KWin/Mutter do),
   so the interface is not advertised.
-- **ScreenCast dmabuf**: frames are copied through SHM. dmabuf zero-copy is a
-  performance optimization (needs GPU/gbm), not a missing feature — capture
-  works on every GPU today.
+- **ScreenCast dmabuf**: a whole output streams zero-copy into dmabufs that
+  lys-ui's Vulkan device allocates on the first render node it opens, when the
+  compositor offers dmabuf screencopy. Regions, windows, and a host without a
+  render node, a Vulkan device on it or a layout both sides take stream through
+  SHM, and the portal logs why — capture works on every GPU.

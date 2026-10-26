@@ -27,11 +27,12 @@ func TestHeadlessScreenStreams(t *testing.T) {
 		t.Fatalf("outputs = %v", outs)
 	}
 	pwtest.Start(t)
+	streams := screenStreams{renderNodes: renderNodes}
 	for _, target := range []captureTarget{
 		{kind: targetOutput, name: outs[0].Name},
 		{kind: targetRegion, name: outs[0].Name, x: 10, y: 20, width: 200, height: 100},
 	} {
-		s, err := startScreenStream(target, true, defaultFPS)
+		s, err := streams.start(target, true, defaultFPS)
 		if err != nil {
 			t.Fatalf("%s: %v", target.payload(), err)
 		}
@@ -44,10 +45,10 @@ func TestHeadlessScreenStreams(t *testing.T) {
 		}
 		s.Close()
 	}
-	if _, err := startScreenStream(captureTarget{kind: targetOutput, name: "NOPE-1"}, false, defaultFPS); err == nil {
+	if _, err := streams.start(captureTarget{kind: targetOutput, name: "NOPE-1"}, false, defaultFPS); err == nil {
 		t.Error("a missing output streamed")
 	}
-	if _, err := startScreenStream(captureTarget{kind: targetWindow, name: "no-such-window"}, false, defaultFPS); err == nil {
+	if _, err := streams.start(captureTarget{kind: targetWindow, name: "no-such-window"}, false, defaultFPS); err == nil {
 		t.Error("a missing window streamed")
 	}
 }
@@ -70,7 +71,8 @@ func TestHeadlessGPUStream(t *testing.T) {
 		t.Fatal("no outputs")
 	}
 	pwtest.Start(t)
-	s, err := startGPUStream(outs[0].Name, false, 30)
+	streams := screenStreams{renderNodes: renderNodes}
+	s, err := streams.startGPU(outs[0].Name, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}

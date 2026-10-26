@@ -19,8 +19,7 @@ Depends:
  libglib2.0-0t64 | libglib2.0-0,
  libgstreamer1.0-0,
  libpam0g,
- libpipewire-0.3-0t64 | libpipewire-0.3-0,
- libgbm1
+ libpipewire-0.3-0t64 | libpipewire-0.3-0
 Recommends:
  libvulkan1,
  mesa-vulkan-drivers,
@@ -44,5 +43,5 @@ Description: Wayland desktop shell
  launcher, notifications, OSD, lock screen, greeter and an xdg-desktop-portal
  backend, configured in YAML or through the lys-settings GUI.
  .
- The binaries are Go with no cgo; they load GLib, GStreamer, PAM, PipeWire
- and GBM at runtime.
+ The binaries are Go with no cgo; they load GLib, GStreamer, PAM and PipeWire
+ at runtime, and Vulkan when it is installed.

@@ -7,11 +7,12 @@ title: Getting started on Fedora
 ## Install dependencies
 
 Go, plus the libraries lys-shell loads at runtime (GLib, GStreamer for the screen
-recorder, PAM for the lock screen, PipeWire and GBM for screen sharing):
+recorder, PAM for the lock screen, PipeWire for screen sharing, Vulkan for GPU rendering
+and zero-copy screen sharing):
 
 ```sh
 sudo dnf install golang git just glib2 gstreamer1 pam pipewire-libs \
-  mesa-libgbm gstreamer1-plugins-base gstreamer1-plugins-good \
+  vulkan-loader gstreamer1-plugins-base gstreamer1-plugins-good \
   gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
   gstreamer1-plugin-libav pipewire-gstreamer
 ```

@@ -1,8 +1,7 @@
 // Package sharepreview is the capture half of wayle-share-preview on
 // top of lys-ui's capture package: turning captured frames into images
-// (the output-transform correction, the preview downscale), the XDPH
-// window list the share picker reads, and the best-effort gbm dmabuf
-// allocator the screencast producer's zero-copy path imports.
+// (the output-transform correction, the preview downscale) and the XDPH
+// window list the share picker reads.
 package sharepreview
 
 import (
