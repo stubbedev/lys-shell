@@ -66,15 +66,7 @@ let
     exec-once = lys-shell shell > /tmp/lys/shell.log 2>&1
   '';
 
-  inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient;
-
-  # The portal client's app id: the frontend lets a host app use
-  # GlobalShortcuts once it registered one with a desktop entry.
-  testApp = pkgs.makeDesktopItem {
-    name = "dev.stubbe.lys.VmTest";
-    desktopName = "lys-shell VM test";
-    exec = "portal-client globalshortcuts";
-  };
+  inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient testApp;
 
   shellConfig = (pkgs.formats.yaml { }).generate "config.yaml" {
     lock = {

@@ -11,7 +11,7 @@ let
   uid = 1000;
   runtimeDir = "/run/user/${toString uid}";
 
-  inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient;
+  inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient testApp;
 
   wmConfig = (pkgs.formats.yaml { }).generate "lys-wm.yaml" {
     input.keyboard = {
@@ -117,6 +117,7 @@ pkgs.testers.nixosTest {
 
       environment.systemPackages = [
         portalClient
+        testApp
         vmclick
         pkgs.foot
         pkgs.grim
@@ -359,19 +360,22 @@ pkgs.testers.nixosTest {
         cols = [x for x in range(width) if any(a[(y * width + x) * 3 : (y * width + x) * 3 + 3] != b[(y * width + x) * 3 : (y * width + x) * 3 + 3] for y in range(rows[0], rows[-1] + 1, 4))]
         return cols[0], rows[0], cols[-1], rows[-1]
 
-    calm = capture("before-consent", out)
-    machine.succeed(f"su - ${user} -c '{env} portal-client screenshot > /tmp/lys/shot.json 2>&1 &'")
+    def allow(mode, log, name):
+        calm = capture("before-" + name, out)
+        machine.succeed(f"su - ${user} -c '{env} portal-client {mode} > /tmp/lys/{log} 2>&1 &'")
 
-    def dialog_shown():
-        box = changed_box(calm, capture("consent", out))
-        return box is not None and box[2] - box[0] > 100
+        def dialog_shown():
+            box = changed_box(calm, capture(name, out))
+            return box is not None and box[2] - box[0] > 100
 
-    wait("the screenshot consent dialog", dialog_shown, tries=30)
-    time.sleep(1)
-    shot("09-screenshot-consent")
-    box = changed_box(calm, capture("consent", out))
-    print("consent dialog at", box)
-    click(out["rect"]["x"] + box[2] - 60, out["rect"]["y"] + box[3] - 32)
+        wait(f"the {mode} consent dialog", dialog_shown, tries=30)
+        time.sleep(1)
+        shot(name)
+        box = changed_box(calm, capture(name, out))
+        print(f"{mode} consent dialog at", box)
+        click(out["rect"]["x"] + box[2] - 60, out["rect"]["y"] + box[3] - 32)
+
+    allow("screenshot", "shot.json", "09-screenshot-consent")
     wait("the screenshot answer", lambda: machine.execute("grep -q code /tmp/lys/shot.json")[0] == 0, tries=30)
     answer = json.loads(machine.succeed("cat /tmp/lys/shot.json"))
     print("portal screenshot:", answer)
@@ -379,6 +383,15 @@ pkgs.testers.nixosTest {
     if not uri.startswith("file://"):
         raise Exception(f"the screenshot portal answered {answer}")
     machine.succeed(f"test -s '{uri[len('file://'):]}'")
+
+    allow("globalshortcuts", "shortcuts.json", "14-shortcut-consent")
+    wait("the bound shortcut", lambda: machine.execute("grep -q bound /tmp/lys/shortcuts.json")[0] == 0, tries=30)
+    bound = json.loads(machine.succeed("head -n1 /tmp/lys/shortcuts.json"))
+    if bound["bound"] != 0:
+        raise Exception(f"BindShortcuts answered {bound}")
+    dispatch("global dev.stubbe.lys.VmTest:lys-vm-test")
+    wait("the shortcut's activation", lambda: machine.execute("grep -q activated /tmp/lys/shortcuts.json")[0] == 0, tries=30)
+    print("global shortcut:", machine.succeed("cat /tmp/lys/shortcuts.json"))
 
     logs()
   '';

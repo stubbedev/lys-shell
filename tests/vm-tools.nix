@@ -11,4 +11,10 @@
     libraries = [ pkgs.python3Packages.jeepney ];
     flakeIgnore = [ "E501" ];
   } (builtins.readFile ./portal-client.py);
+
+  testApp = pkgs.makeDesktopItem {
+    name = "dev.stubbe.lys.VmTest";
+    desktopName = "lys-shell VM test";
+    exec = "portal-client globalshortcuts";
+  };
 }
