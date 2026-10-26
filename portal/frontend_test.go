@@ -14,7 +14,10 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-ui/capture"
 
+	"github.com/stubbedev/lys-shell/internal/pipewire"
+	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
@@ -328,5 +331,82 @@ func TestFrontendReturnsThePrintPageSetup(t *testing.T) {
 	}
 	if code, res := prepare(false); code != ResponseCancelled || res["page-setup"] != (dbus.Variant{}) || res["token"] != (dbus.Variant{}) {
 		t.Errorf("PreparePrint declined = %d %v", code, res)
+	}
+}
+
+// pattern is a capture source that needs no compositor: every frame is
+// one byte value.
+type pattern struct{}
+
+func (pattern) Fill(dst []byte) ([]pipewire.Rect, bool) {
+	for i := range dst {
+		dst[i] = 0x5a
+	}
+	return nil, true
+}
+
+// A ScreenCast session through the real frontend streams from the real
+// producer into a libpipewire consumer linked to the node Start
+// returned, and stays open while PipeWire runs; PipeWire going away
+// mid-stream ends the stream, and the frontend tells the app its
+// session closed.
+func TestFrontendScreenCastStreamsToARealConsumer(t *testing.T) {
+	daemon := pwtest.Start(t)
+	r := newRig(t, func(b *Backend) {
+		b.screenCast = newScreenCast(b.conn, b.sessions, func(captureTarget, bool, uint32) (screenStream, error) {
+			return startProducer(producerGeometry{width: 64, height: 32, stride: 256, format: capture.FormatXRGB8888, fps: 30},
+				pattern{}, make(chan struct{}), func() {})
+		}, (&fakeStarts{}).outputs)
+	})
+	serveSharePicker(t, r, "/screen:DP-2")
+	f := startFrontend(t, r, t.TempDir())
+
+	session := f.session(t, publicScreenCast)
+	closed := make(chan *dbus.Signal, 4)
+	if err := f.conn.AddMatchSignal(dbus.WithMatchObjectPath(session), dbus.WithMatchMember("Closed")); err != nil {
+		t.Fatal(err)
+	}
+	f.conn.Signal(closed)
+	if code, _ := f.request(t, publicScreenCast+".SelectSources", session, Vardict{"types": dbus.MakeVariant(sourceMonitor)}); code != ResponseSuccess {
+		t.Fatalf("SelectSources = %d", code)
+	}
+	code, res := f.request(t, publicScreenCast+".Start", session, "", Vardict{})
+	if code != ResponseSuccess {
+		t.Fatalf("Start = %d %v", code, res)
+	}
+	streams := castStreams(t, res)
+	if len(streams) != 1 || streams[0].Node == 0 {
+		t.Fatalf("streams = %+v", streams)
+	}
+
+	consumer := pwtest.Consume(t, "lys-shell-screencast")
+	for range 3 {
+		if size := consumer.Frame(t); size != 256*32 {
+			t.Fatalf("a frame of %d bytes, want %d", size, 256*32)
+		}
+	}
+	sessionClosed := func(within time.Duration) bool {
+		deadline := time.After(within)
+		for {
+			select {
+			case s := <-closed:
+				if s.Path == session && s.Name == "org.freedesktop.portal.Session.Closed" {
+					return true
+				}
+			case <-deadline:
+				return false
+			}
+		}
+	}
+	if sessionClosed(100 * time.Millisecond) {
+		t.Fatal("the session closed while PipeWire ran")
+	}
+
+	daemon.Kill()
+	if !sessionClosed(10 * time.Second) {
+		t.Fatal("the session outlived PipeWire")
+	}
+	if _, live := r.backend.sessions.get(session); live {
+		t.Error("the backend kept the session")
 	}
 }

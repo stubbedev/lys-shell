@@ -25,12 +25,38 @@ type screenStream interface {
 	Close()
 }
 
-// pipewireStream is a producer fed from a capture source.
+// pipewireStream is a producer fed from a capture source. It ends when
+// the source does or when the producer is cut off from PipeWire.
 type pipewireStream struct {
 	producer      *pipewire.Producer
 	width, height int32
-	ended         <-chan struct{}
+	ended         chan struct{}
+	stop          chan struct{}
+	watched       chan struct{}
 	closeSource   func()
+}
+
+func newPipewireStream(p *pipewire.Producer, width, height int32, sourceEnded <-chan struct{}, closeSource func()) *pipewireStream {
+	s := &pipewireStream{
+		producer: p, width: width, height: height, closeSource: closeSource,
+		ended: make(chan struct{}), stop: make(chan struct{}), watched: make(chan struct{}),
+	}
+	go s.watch(sourceEnded)
+	return s
+}
+
+// watch ends the stream on the first of its source ending and its
+// producer losing PipeWire, until Close stops it.
+func (s *pipewireStream) watch(sourceEnded <-chan struct{}) {
+	defer close(s.watched)
+	select {
+	case <-sourceEnded:
+	case <-s.producer.Done():
+		warnf("screencast: the PipeWire stream of node %d ended: %v", s.producer.NodeID(), s.producer.Err())
+	case <-s.stop:
+		return
+	}
+	close(s.ended)
 }
 
 func (s *pipewireStream) NodeID() uint32              { return s.producer.NodeID() }
@@ -59,6 +85,8 @@ func (v *vanishWatch) failed() {
 }
 
 func (s *pipewireStream) Close() {
+	close(s.stop)
+	<-s.watched
 	s.producer.Close()
 	s.closeSource()
 }
@@ -113,7 +141,7 @@ func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{
 		closeSource()
 		return nil, err
 	}
-	return &pipewireStream{producer: p, width: int32(g.width), height: int32(g.height), ended: ended, closeSource: closeSource}, nil
+	return newPipewireStream(p, int32(g.width), int32(g.height), ended, closeSource), nil
 }
 
 // videoFormat maps the wl_shm format the compositor returned; an
