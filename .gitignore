@@ -1,13 +1,12 @@
-dist/
-lys-shell-design
+/dist/
+/lys-shell-design
 
 # Temporary sandboxes
-lys-shell
-sandbox/
+/lys-shell
+/sandbox/
 
-result
-# Golden outputs named "result" (not the nix build link)
-!**/testdata/**/result
+/result
+*.test
 
 
 # direnv
