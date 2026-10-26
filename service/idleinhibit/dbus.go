@@ -6,7 +6,6 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the
@@ -80,9 +79,9 @@ func (d *Daemon) serve(conn *dbus.Conn) (func(), error) {
 		Methods:   d,
 		Properties: dbusx.Getters{
 			"Active":     func() any { return d.state.Active() },
-			"Duration":   func() any { return d.state.Duration() },
-			"Remaining":  func() any { return intconv.Clamp[uint32](d.state.Remaining()) },
-			"Indefinite": func() any { return d.state.Duration() == 0 },
+			"Duration":   func() any { return d.state.Duration().Minutes() },
+			"Remaining":  func() any { return d.state.Remaining() },
+			"Indefinite": func() any { return d.state.Duration().Indefinite() },
 		},
 	})
 }
@@ -127,7 +126,7 @@ func (d *Daemon) timerGuard(verb string) *dbus.Error {
 	if !d.state.Active() {
 		return dbusx.Failed("idle inhibit is not active")
 	}
-	if d.state.Duration() == 0 {
+	if d.state.Duration().Indefinite() {
 		return dbusx.Failed("cannot " + verb + " timer in indefinite mode")
 	}
 	return nil
@@ -151,14 +150,22 @@ func (d *Daemon) SetRemaining(minutes uint32) *dbus.Error {
 	return nil
 }
 
-// SetDuration stores the duration in minutes.
+// SetDuration stores the duration in minutes, refusing one above
+// MaxMinutes with InvalidArgs.
 func (d *Daemon) SetDuration(minutes uint32) *dbus.Error {
-	d.state.SetDuration(minutes)
+	duration, err := NewDuration(int64(minutes))
+	if err != nil {
+		return dbusx.InvalidArgs(err.Error())
+	}
+	d.state.SetDuration(duration)
 	return nil
 }
 
-// AdjustDuration shifts the stored duration.
+// AdjustDuration shifts the stored duration, refusing a shift past
+// MaxMinutes with InvalidArgs.
 func (d *Daemon) AdjustDuration(deltaMinutes int32) *dbus.Error {
-	d.state.AdjustDuration(deltaMinutes)
+	if err := d.state.AdjustDuration(deltaMinutes); err != nil {
+		return dbusx.InvalidArgs(err.Error())
+	}
 	return nil
 }

@@ -3035,12 +3035,19 @@
           "description": "Action on scroll up."
         },
         "startup-duration": {
-          "$ref": "#/$defs/uint32",
+          "$ref": "#/$defs/IdleInhibitDuration",
           "default": 60,
           "description": "Duration in minutes when service starts. 0 means indefinite."
         }
       },
       "type": "object"
+    },
+    "IdleInhibitDuration": {
+      "description": "Idle inhibit duration in whole minutes, 0 for indefinite.",
+      "format": "uint32",
+      "maximum": 71582788,
+      "minimum": 0,
+      "type": "integer"
     },
     "KeybindModeConfig": {
       "description": "Current keybind-mode indicator for modal compositors.",

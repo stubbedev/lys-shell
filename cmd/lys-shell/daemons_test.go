@@ -36,8 +36,11 @@ func runSteps(t *testing.T, steps []step) {
 func TestIdleCommands(t *testing.T) {
 	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"idle", "status"}, "Error: IdleInhibit service not running. Start lys-shell shell first.\n"}})
-	state := idleinhibit.NewState(30)
-	release, err := idleinhibit.NewDaemon(state).Export(dbustest.SessionConn(t))
+	duration, err := idleinhibit.NewDuration(30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release, err := idleinhibit.NewDaemon(idleinhibit.NewState(duration)).Export(dbustest.SessionConn(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,6 +68,27 @@ func TestIdleCommands(t *testing.T) {
 		{[]string{"idle", "status"}, "Active (indefinite)\n"},
 		{[]string{"idle", "remaining", "5"}, "Error: Failed to set remaining: cannot set timer in indefinite mode\n"},
 		{[]string{"idle", "remaining", "+5"}, "Error: Failed to adjust remaining: cannot adjust timer in indefinite mode\n"},
+	})
+}
+
+// The CLI runs the longest duration the timer counts in a uint32 of
+// seconds, and reports the daemon's refusal of anything longer, which
+// leaves the run as it was.
+func TestIdleDurationLimit(t *testing.T) {
+	dbustest.Session(t)
+	release, err := idleinhibit.NewDaemon(idleinhibit.NewState(idleinhibit.Duration{})).Export(dbustest.SessionConn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	runSteps(t, []step{
+		{[]string{"idle", "on", "71582788"}, "Enabled for 71582788 minutes\n"},
+		{[]string{"idle", "status"}, "Active (71582788:00 remaining, 71582788 min duration)\n"},
+		{[]string{"idle", "on", "71582789"}, "Error: Failed to set duration: idle inhibit duration out of range: 71582789 minutes, valid 0-71582788\n"},
+		{[]string{"idle", "duration", "4294967295"}, "Error: Failed to set duration: idle inhibit duration out of range: 4294967295 minutes, valid 0-71582788\n"},
+		{[]string{"idle", "duration", "+1"}, "Error: Failed to adjust duration: idle inhibit duration out of range: 71582789 minutes, valid 0-71582788\n"},
+		{[]string{"idle", "status"}, "Active (71582788:00 remaining, 71582788 min duration)\n"},
+		{[]string{"idle", "off"}, "Disabled\n"},
 	})
 }
 

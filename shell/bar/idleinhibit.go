@@ -17,7 +17,7 @@ import (
 // idleInhibitLabel is helpers.rs's build_label: On/Off state, the
 // remaining time (H:MM:SS or M:SS, "∞" when indefinite, "-" when
 // off), and the stored duration ("∞" when indefinite).
-func idleInhibitLabel(format string, active bool, durationMins uint32, remainingSecs int) string {
+func idleInhibitLabel(format string, active bool, duration idleinhibit.Duration, remainingSecs uint32) string {
 	state := i18n.T("bar-idle-inhibit-off")
 	if active {
 		state = i18n.T("bar-idle-inhibit-on")
@@ -26,16 +26,16 @@ func idleInhibitLabel(format string, active bool, durationMins uint32, remaining
 	switch {
 	case !active:
 		remaining = "-"
-	case durationMins == 0:
+	case duration.Indefinite():
 		remaining = "∞"
 	default:
 		remaining = idleinhibit.FormatDuration(remainingSecs)
 	}
-	duration := "∞"
-	if durationMins != 0 {
-		duration = strconv.FormatUint(uint64(durationMins), 10)
+	total := "∞"
+	if !duration.Indefinite() {
+		total = strconv.FormatUint(uint64(duration.Minutes()), 10)
 	}
-	return jinja.RenderOr(format, map[string]any{"state": state, "remaining": remaining, "duration": duration})
+	return jinja.RenderOr(format, map[string]any{"state": state, "remaining": remaining, "duration": total})
 }
 
 // idleInhibitModule is the module: the shared inhibit state rendered
@@ -51,7 +51,7 @@ type idleInhibitModule struct {
 func newIdleInhibit(ctx ModuleContext) (Module, error) {
 	state := ctx.IdleInhibit
 	if state == nil {
-		state = idleinhibit.NewState(ctx.Config.IdleInhibit.StartupDuration)
+		state = idleinhibit.NewState(ctx.Config.IdleInhibit.StartupDuration.Duration())
 	}
 	m := &idleInhibitModule{ctx: ctx, state: state}
 	m.icon = moduleIcon(ctx, ctx.Config.IdleInhibit.Icons()[config.IdleInhibitInactive])
@@ -68,7 +68,7 @@ func (m *idleInhibitModule) render() {
 	snap := m.state.Status()
 	text := ""
 	if cfg.LabelShow {
-		text = idleInhibitLabel(cfg.Format, snap.Active, snap.DurationMins, snap.RemainingS)
+		text = idleInhibitLabel(cfg.Format, snap.Active, snap.Duration, snap.RemainingS)
 	}
 	m.btn.SetLabel(text)
 	if setter := m.icon; setter != nil {

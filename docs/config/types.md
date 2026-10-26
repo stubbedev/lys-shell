@@ -482,6 +482,14 @@ Source for resolving notification icons.
 | `"mapped"` | Always use lys-shell's mapped icons regardless of what the app provides. |
 | `"application"` | Use the full application icon chain, falling back to mapped if unavailable. |
 
+## IdleInhibitDuration {#idle-inhibit-duration}
+
+Idle inhibit duration in whole minutes, 0 for indefinite.
+
+Number in `[0, 71582788]`.
+
+Serialises as `uint32`.
+
 ## LabelStrategy {#label-strategy}
 
 What identifies each workspace's label.

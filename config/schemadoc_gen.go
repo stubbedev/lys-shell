@@ -555,6 +555,7 @@ var schemaDocs = map[string]string{
 	"IdleInhibitConfig.ScrollDown":                           "Action on scroll down.",
 	"IdleInhibitConfig.ScrollUp":                             "Action on scroll up.",
 	"IdleInhibitConfig.StartupDuration":                      "Duration in minutes when service starts. 0 means indefinite.",
+	"IdleInhibitDuration":                                    "Idle inhibit duration in whole minutes, 0 for indefinite.",
 	"KeybindModeConfig":                                      "Current keybind-mode indicator for modal compositors.",
 	"KeybindModeConfig.AutoHide":                             "Automatically hide module when no mode is active.",
 	"KeybindModeConfig.BorderColor":                          "Border color token.",

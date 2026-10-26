@@ -94,7 +94,7 @@ func describe(t reflect.Type) FieldMeta {
 		m.Kind, m.Variants = FieldEnum, enumVariants(t)
 	case t.Kind() == reflect.Bool:
 		m.Kind = FieldBool
-	case isInt(t.Kind()):
+	case isInt(t.Kind()) || encodesAsInteger(t):
 		m.Kind = FieldInt
 		m.Min, m.Max = intRange(t)
 	case t.Kind() == reflect.Float32 || t.Kind() == reflect.Float64:
@@ -153,6 +153,12 @@ func schemaRange(t reflect.Type, lo, hi float64) (float64, float64) {
 		hi = min(hi, v)
 	}
 	return lo, hi
+}
+
+// encodesAsInteger reports whether t's schema is an integer: a
+// validated struct leaf that serializes as a whole number.
+func encodesAsInteger(t reflect.Type) bool {
+	return newSchemaGen().plainSchema(t)["type"] == "integer"
 }
 
 // encodesAsString reports whether t's schema is a plain string: every

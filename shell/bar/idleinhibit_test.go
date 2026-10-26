@@ -12,20 +12,29 @@ import (
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 )
 
+func inhibitMinutes(t *testing.T, minutes int64) idleinhibit.Duration {
+	t.Helper()
+	d, err := idleinhibit.NewDuration(minutes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
 func TestIdleInhibitLabel(t *testing.T) {
 	// Off: dashes for remaining, the stored duration still shows.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", false, 60, 0); got != i18n.T("bar-idle-inhibit-off")+" - 60" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", false, inhibitMinutes(t, 60), 0); got != i18n.T("bar-idle-inhibit-off")+" - 60" {
 		t.Errorf("= %q", got)
 	}
 	// On, timed: H:MM:SS above the hour, M:SS within it.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, 60, 3661); got != i18n.T("bar-idle-inhibit-on")+" 1:01:01" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, inhibitMinutes(t, 60), 3661); got != i18n.T("bar-idle-inhibit-on")+" 1:01:01" {
 		t.Errorf("= %q", got)
 	}
-	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, 60, 95); got != i18n.T("bar-idle-inhibit-on")+" 1:35" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, inhibitMinutes(t, 60), 95); got != i18n.T("bar-idle-inhibit-on")+" 1:35" {
 		t.Errorf("= %q", got)
 	}
 	// On, indefinite: the infinity sign for both.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", true, 0, 0); got != i18n.T("bar-idle-inhibit-on")+" ∞ ∞" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", true, idleinhibit.Duration{}, 0); got != i18n.T("bar-idle-inhibit-on")+" ∞ ∞" {
 		t.Errorf("= %q", got)
 	}
 }
@@ -40,7 +49,7 @@ func TestLoadFileAppliesIdleInhibit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.IdleInhibit.Format != "[{{ state }}]" || c.IdleInhibit.StartupDuration != 30 {
+	if c.IdleInhibit.Format != "[{{ state }}]" || c.IdleInhibit.StartupDuration.Duration().Minutes() != 30 {
 		t.Errorf("config = %+v", c.IdleInhibit)
 	}
 	if got := c.IdleInhibit.Icons()[config.IdleInhibitActive].Name; got != "tb-eye-symbolic" {
@@ -62,7 +71,7 @@ func TestLoadFileAppliesIdleInhibit(t *testing.T) {
 func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	state := idleinhibit.NewState(60)
+	state := idleinhibit.NewState(inhibitMinutes(t, 60))
 	ctx.IdleInhibit = state
 
 	module, err := Create("idle-inhibit", ctx)
@@ -104,7 +113,7 @@ func TestIdleInhibitKeepsTheStylesheetInk(t *testing.T) {
 	}
 	cfg.IdleInhibit.LabelColor = red
 	ctx := newTestContext(t, cfg)
-	state := idleinhibit.NewState(60)
+	state := idleinhibit.NewState(inhibitMinutes(t, 60))
 	ctx.IdleInhibit = state
 	module, err := Create("idle-inhibit", ctx)
 	if err != nil {
@@ -133,7 +142,7 @@ type namedHost struct {
 // toggle or an app's hold, moves it when its bar closes, and drops it
 // when nothing asks any more.
 func TestIdleHolderFollowsTheStateAcrossBars(t *testing.T) {
-	state := idleinhibit.NewState(0)
+	state := idleinhibit.NewState(idleinhibit.Duration{})
 	var bound []app.Host
 	live := 0
 	h := &idleHolder{state: state, inhibit: func(host app.Host) (func(), error) {

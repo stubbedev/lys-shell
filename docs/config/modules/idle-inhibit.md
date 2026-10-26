@@ -24,7 +24,7 @@ bar:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `startup-duration` | u32 | `60` | Duration in minutes when service starts. 0 means indefinite. |
+| `startup-duration` | [`IdleInhibitDuration`](/config/types#idle-inhibit-duration) | `60` | Duration in minutes when service starts. 0 means indefinite. |
 | `icon-inactive` | string | `"ld-bed-symbolic"` | Icon when idle inhibitor is inactive. |
 | `icon-active` | string | `"ld-coffee-symbolic"` | Icon when idle inhibitor is active. |
 | `format` | string | `"{{ state }}"` | Format string for the label. |

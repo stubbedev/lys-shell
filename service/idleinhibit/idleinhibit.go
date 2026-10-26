@@ -4,7 +4,10 @@
 package idleinhibit
 
 import (
+	"errors"
+	"fmt"
 	"maps"
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -19,6 +22,36 @@ const (
 	ServicePath = "/dev/stubbe/lys/IdleInhibit"
 )
 
+// MaxMinutes is the longest duration: its seconds, which the timer
+// counts and the Remaining property reports, still fit a uint32.
+const MaxMinutes = math.MaxUint32 / 60
+
+// ErrDurationRange is a duration outside 0-MaxMinutes.
+var ErrDurationRange = errors.New("idle inhibit duration out of range")
+
+// Duration is a timed inhibition's length in whole minutes, 0 for
+// indefinite. NewDuration is the only way to a non-zero one, so it
+// never exceeds MaxMinutes.
+type Duration struct{ minutes uint32 }
+
+// NewDuration validates minutes, refusing a negative count or one above
+// MaxMinutes with ErrDurationRange.
+func NewDuration(minutes int64) (Duration, error) {
+	if minutes < 0 || minutes > MaxMinutes {
+		return Duration{}, fmt.Errorf("%w: %d minutes, valid 0-%d", ErrDurationRange, minutes, MaxMinutes)
+	}
+	return Duration{minutes: uint32(minutes)}, nil
+}
+
+// Minutes is the length in minutes, 0 for indefinite.
+func (d Duration) Minutes() uint32 { return d.minutes }
+
+// Seconds is the length in seconds, 0 for indefinite.
+func (d Duration) Seconds() uint32 { return d.minutes * 60 }
+
+// Indefinite reports the zero duration, which has no timer.
+func (d Duration) Indefinite() bool { return d.minutes == 0 }
+
 // State is the reactive state: whether the user's inhibition runs,
 // the stored duration in minutes (0 = indefinite), the seconds left on
 // the timer when one is running, and the holds apps (through the
@@ -26,8 +59,8 @@ const (
 type State struct {
 	mu            sync.Mutex
 	active        bool
-	durationMins  uint32
-	remainingSecs int
+	duration      Duration
+	remainingSecs uint32
 	timerStop     chan struct{}
 	holds         map[uint32]Hold
 	nextHold      uint32
@@ -40,10 +73,9 @@ type Hold struct {
 	Owner, App, Reason string
 }
 
-// NewState starts with the given duration in minutes and inhibition
-// off.
-func NewState(durationMins uint32) *State {
-	return &State{durationMins: durationMins}
+// NewState starts with the given duration and inhibition off.
+func NewState(duration Duration) *State {
+	return &State{duration: duration}
 }
 
 // Active reports whether inhibition is on.
@@ -53,11 +85,11 @@ func (s *State) Active() bool {
 	return s.active
 }
 
-// Duration returns the stored duration in minutes, 0 for indefinite.
-func (s *State) Duration() uint32 {
+// Duration returns the stored duration.
+func (s *State) Duration() Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.durationMins
+	return s.duration
 }
 
 // Inhibiting reports whether idle must be inhibited: the user's
@@ -119,7 +151,7 @@ func (s *State) Holds() map[uint32]Hold {
 }
 
 // Remaining returns the seconds left, 0 when inactive or indefinite.
-func (s *State) Remaining() int {
+func (s *State) Remaining() uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.remainingSecs
@@ -129,7 +161,7 @@ func (s *State) Remaining() int {
 func (s *State) Indefinite() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.active && s.durationMins == 0
+	return s.active && s.duration.Indefinite()
 }
 
 // Changes ticks after every state flip or timer second; every
@@ -145,8 +177,8 @@ func (s *State) notify() { feed.Notify(&s.changes) }
 func (s *State) Enable(indefinite bool) {
 	s.mu.Lock()
 	s.stopTimerLocked()
-	if !indefinite && s.durationMins > 0 {
-		s.remainingSecs = int(s.durationMins * 60)
+	if !indefinite && !s.duration.Indefinite() {
+		s.remainingSecs = s.duration.Seconds()
 		s.startTimerLocked()
 	} else {
 		s.remainingSecs = 0
@@ -166,30 +198,42 @@ func (s *State) Disable() {
 	s.notify()
 }
 
-// SetDuration stores the duration in minutes (0 = indefinite); an
-// active run restarts on the new duration.
-func (s *State) SetDuration(minutes uint32) {
+// SetDuration stores the duration; an active run restarts on it.
+func (s *State) SetDuration(duration Duration) {
 	s.mu.Lock()
-	s.durationMins = minutes
-	if s.active {
-		s.stopTimerLocked()
-		if minutes == 0 {
-			s.remainingSecs = 0
-		} else {
-			s.remainingSecs = int(minutes * 60)
-			s.startTimerLocked()
-		}
-	}
+	s.setDurationLocked(duration)
 	s.mu.Unlock()
 	s.notify()
 }
 
-// AdjustDuration shifts the stored duration; negative clamps at zero.
-func (s *State) AdjustDuration(deltaMinutes int32) {
+// setDurationLocked stores the duration and restarts an active run on
+// it. The caller holds mu.
+func (s *State) setDurationLocked(duration Duration) {
+	s.duration = duration
+	if !s.active {
+		return
+	}
+	s.stopTimerLocked()
+	s.remainingSecs = duration.Seconds()
+	if !duration.Indefinite() {
+		s.startTimerLocked()
+	}
+}
+
+// AdjustDuration shifts the stored duration: below zero it saturates at
+// zero (indefinite), above MaxMinutes it is refused with
+// ErrDurationRange and the duration stays.
+func (s *State) AdjustDuration(deltaMinutes int32) error {
 	s.mu.Lock()
-	current := int64(s.durationMins) + int64(deltaMinutes)
+	next, err := NewDuration(max(int64(s.duration.minutes)+int64(deltaMinutes), 0))
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	s.setDurationLocked(next)
 	s.mu.Unlock()
-	s.SetDuration(intconv.Clamp[uint32](current))
+	s.notify()
+	return nil
 }
 
 // AdjustRemaining shifts the seconds left by minutes: a positive
@@ -197,52 +241,34 @@ func (s *State) AdjustDuration(deltaMinutes int32) {
 // zero, and zero remaining disables the run. Inactive or indefinite
 // runs ignore the call.
 func (s *State) AdjustRemaining(deltaMinutes int32) {
-	s.mu.Lock()
-	if !s.active || s.durationMins == 0 {
-		s.mu.Unlock()
-		return
-	}
-	durationSecs := int(s.durationMins) * 60
-	deltaSecs := int(deltaMinutes) * 60
-	remaining := s.remainingSecs
-	var next int
-	if deltaSecs >= 0 {
-		next = min(remaining+deltaSecs, durationSecs)
-	} else {
-		next = max(remaining+deltaSecs, 0)
-	}
-	if next == 0 {
-		s.stopTimerLocked()
-		s.active = false
-		s.remainingSecs = 0
-		s.mu.Unlock()
-		s.notify()
-		return
-	}
-	s.remainingSecs = next
-	s.mu.Unlock()
-	s.notify()
+	s.retime(func() uint32 {
+		return min(intconv.Clamp[uint32](int64(s.remainingSecs)+int64(deltaMinutes)*60), s.duration.Seconds())
+	})
 }
 
 // SetRemaining replaces the seconds left, capped at the stored
 // duration; zero disables the run. Inactive or indefinite runs
 // ignore the call.
 func (s *State) SetRemaining(minutes uint32) {
+	s.retime(func() uint32 {
+		return min(intconv.Clamp[uint32](uint64(minutes)*60), s.duration.Seconds())
+	})
+}
+
+// retime sets a timed run's seconds left to next, which runs under mu
+// and stays within the stored duration; zero disables the run.
+// Inactive or indefinite runs are left alone.
+func (s *State) retime(next func() uint32) {
 	s.mu.Lock()
-	if !s.active || s.durationMins == 0 {
+	if !s.active || s.duration.Indefinite() {
 		s.mu.Unlock()
 		return
 	}
-	next := min(int(minutes)*60, int(s.durationMins)*60)
-	if next == 0 {
+	s.remainingSecs = next()
+	if s.remainingSecs == 0 {
 		s.stopTimerLocked()
 		s.active = false
-		s.remainingSecs = 0
-		s.mu.Unlock()
-		s.notify()
-		return
 	}
-	s.remainingSecs = next
 	s.mu.Unlock()
 	s.notify()
 }
@@ -264,7 +290,7 @@ func (s *State) startTimerLocked() {
 				return
 			case <-ticker.C:
 				s.mu.Lock()
-				if s.timerStop != stop || !s.active || s.remainingSecs <= 0 {
+				if s.timerStop != stop || !s.active || s.remainingSecs == 0 {
 					s.mu.Unlock()
 					return
 				}
@@ -296,33 +322,33 @@ func (s *State) stopTimerLocked() {
 
 // FormatDuration renders seconds as H:MM:SS above the hour and M:SS
 // within it (helpers.rs's format_duration).
-func FormatDuration(totalSecs int) string {
+func FormatDuration(totalSecs uint32) string {
 	hours := totalSecs / 3600
 	minutes := (totalSecs % 3600) / 60
 	seconds := totalSecs % 60
 	if hours > 0 {
-		return strconv.Itoa(hours) + ":" + pad2(minutes) + ":" + pad2(seconds)
+		return strconv.FormatUint(uint64(hours), 10) + ":" + pad2(minutes) + ":" + pad2(seconds)
 	}
-	return strconv.Itoa(minutes) + ":" + pad2(seconds)
+	return strconv.FormatUint(uint64(minutes), 10) + ":" + pad2(seconds)
 }
 
-func pad2(v int) string {
+func pad2(v uint32) string {
 	if v < 10 {
-		return "0" + strconv.Itoa(v)
+		return "0" + strconv.FormatUint(uint64(v), 10)
 	}
-	return strconv.Itoa(v)
+	return strconv.FormatUint(uint64(v), 10)
 }
 
 // Snapshot is the status view the CLI prints.
 type Snapshot struct {
-	Active       bool
-	DurationMins uint32
-	RemainingS   int
+	Active     bool
+	Duration   Duration
+	RemainingS uint32
 }
 
 // Status reads the current state as a snapshot.
 func (s *State) Status() Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return Snapshot{Active: s.active, DurationMins: s.durationMins, RemainingS: s.remainingSecs}
+	return Snapshot{Active: s.active, Duration: s.duration, RemainingS: s.remainingSecs}
 }

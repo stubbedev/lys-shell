@@ -1,5 +1,11 @@
 package config
 
+import (
+	"reflect"
+
+	"github.com/stubbedev/lys-shell/service/idleinhibit"
+)
+
 // IdleInhibitConfig is ported from crates/wayle-config/src/schemas/modules/idle_inhibit/mod.rs.
 //
 // Toggle that prevents screen dim, lock, and suspend while active.
@@ -7,7 +13,7 @@ package config
 // Controllable from the CLI: `lys-shell idle on|off|duration|remaining|status`.
 type IdleInhibitConfig struct {
 	// Duration in minutes when service starts. 0 means indefinite.
-	StartupDuration uint32 `cfg:"startup-duration"`
+	StartupDuration IdleInhibitDuration `cfg:"startup-duration"`
 	// Icon when idle inhibitor is inactive.
 	IconInactive string `cfg:"icon-inactive"`
 	// Icon when idle inhibitor is active.
@@ -59,7 +65,7 @@ type IdleInhibitConfig struct {
 // DefaultsIdleInhibit returns the schema defaults.
 func DefaultsIdleInhibit() IdleInhibitConfig {
 	return IdleInhibitConfig{
-		StartupDuration: 60,
+		StartupDuration: mustIdleInhibitDuration(60),
 		IconInactive:    "ld-bed-symbolic",
 		IconActive:      "ld-coffee-symbolic",
 		Format:          "{{ state }}",
@@ -83,4 +89,60 @@ func DefaultsIdleInhibit() IdleInhibitConfig {
 // Clicks returns the five input bindings.
 func (c IdleInhibitConfig) Clicks() ClickConfig {
 	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
+}
+
+// IdleInhibitDuration is a timed inhibition's length, refused at load
+// above the longest the service counts down rather than clamped: its
+// seconds must fit the service's uint32 timer.
+//
+// Idle inhibit duration in whole minutes, 0 for indefinite.
+type IdleInhibitDuration struct{ duration idleinhibit.Duration }
+
+// parseIdleInhibitDuration validates minutes as a duration.
+func parseIdleInhibitDuration(minutes int64) (IdleInhibitDuration, error) {
+	d, err := idleinhibit.NewDuration(minutes)
+	if err != nil {
+		return IdleInhibitDuration{}, err
+	}
+	return IdleInhibitDuration{duration: d}, nil
+}
+
+// mustIdleInhibitDuration builds a schema-default duration; a bad
+// literal panics at init.
+func mustIdleInhibitDuration(minutes int64) IdleInhibitDuration {
+	d, err := parseIdleInhibitDuration(minutes)
+	if err != nil {
+		panic(err)
+	}
+	return d
+}
+
+// Duration is the validated duration.
+func (d IdleInhibitDuration) Duration() idleinhibit.Duration { return d.duration }
+
+// UnmarshalConfig implements Unmarshaler.
+func (d *IdleInhibitDuration) UnmarshalConfig(v any) error {
+	var minutes int64
+	if err := decodeInto(reflect.ValueOf(&minutes).Elem(), v); err != nil {
+		return err
+	}
+	parsed, err := parseIdleInhibitDuration(minutes)
+	if err != nil {
+		return err
+	}
+	*d = parsed
+	return nil
+}
+
+// MarshalConfig implements Marshaler.
+func (d IdleInhibitDuration) MarshalConfig() any { return int64(d.duration.Minutes()) }
+
+func (IdleInhibitDuration) configSchema(*schemaGen) Schema {
+	return Schema{
+		"description": typeDoc(typeOf[IdleInhibitDuration]()),
+		"type":        "integer",
+		"format":      "uint32",
+		"minimum":     int64(0),
+		"maximum":     int64(idleinhibit.MaxMinutes),
+	}
 }

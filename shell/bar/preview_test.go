@@ -139,7 +139,7 @@ func dropdownFixtures() []dropdownFixture {
 		{"calendar", "calendar", func(_ *testing.T, ctx *ModuleContext) widget.Widget { return calendarDropdown(*ctx) }},
 		{"dashboard", "dashboard", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Notifications = notifications.NewService()
-			ctx.IdleInhibit = idleinhibit.NewState(0)
+			ctx.IdleInhibit = idleinhibit.NewState(idleinhibit.Duration{})
 			ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
 			return dashboardDropdown(*ctx)
 		}},

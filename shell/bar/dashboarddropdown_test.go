@@ -140,7 +140,7 @@ func TestDashboardQuickActionsDriveTheServices(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	ctx.Notifications = notifications.NewService()
 	ctx.Notifications.SetDND(false)
-	ctx.IdleInhibit = idleinhibit.NewState(0)
+	ctx.IdleInhibit = idleinhibit.NewState(idleinhibit.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
 	v := dashboardDropdown(ctx).(*dashboardView)
 	if len(v.refreshers) == 0 {

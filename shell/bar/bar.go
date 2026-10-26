@@ -206,7 +206,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	// The idle-inhibit service owns its state here and serves it on the
 	// session bus for the `lys-shell idle` CLI.
-	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
+	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration.Duration())
 	baseCtx.IdleInhibit = inhibitState
 	// One inhibitor, held on a bar surface while the user's toggle or an
 	// app's portal hold asks for it.
