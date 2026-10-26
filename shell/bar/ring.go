@@ -37,3 +37,28 @@ func (r *statRing) set(fraction float64, text, variant string) {
 	r.label.SetText(text)
 	r.ring.SetValue(fraction)
 }
+
+// glyphRing is a row's media that reads as a percentage at a glance:
+// lys-ui's ProgressRing filled to it around a glyph, a network's signal
+// around the wifi glyph or a device's battery around its icon, where a
+// 16px stepped glyph did not read.
+type glyphRing struct {
+	*widget.ProgressRing
+	glyph *widget.Icon
+}
+
+func newGlyphRing(icon string, percent uint8) *glyphRing {
+	r := &glyphRing{
+		ProgressRing: widget.NewProgressRing(percentFraction(percent)),
+		glyph:        widget.NewThemeIcon(icon, itemIconPx),
+	}
+	r.AddClass("glyph-ring")
+	r.SetChild(r.glyph)
+	return r
+}
+
+// setPercent fills the ring to percent.
+func (r *glyphRing) setPercent(percent uint8) { r.SetValue(percentFraction(percent)) }
+
+// percentFraction is a percentage as a ring's fill.
+func percentFraction(percent uint8) float64 { return float64(min(percent, 100)) / 100 }

@@ -269,7 +269,7 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	waitHeadless(t, "the failure", func() bool { return v.progress.err != "" })
 	settleNetReads(t, v)
 	onHeadlessLoop(func() bool {
-		if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiIcon.Name() != "ld-wifi-off-symbolic" {
+		if detail := itemText(v.active.wifi, "description"); detail != i18n.T("dropdown-network-error-timeout") || !v.active.badge.Visible() || v.active.wifiSignal.glyph.Name() != "ld-wifi-off-symbolic" || v.active.wifiSignal.Value() != 0 {
 			t.Errorf("error card = %q badge %v", detail, v.active.badge.Visible())
 		}
 		v.active.hovered = true
@@ -603,6 +603,39 @@ func TestNetworkActiveCardSeparatesOnlyShownRows(t *testing.T) {
 	if n := shown(); n != 1 {
 		t.Errorf("wired and wifi: %d separators shown, want one", n)
 	}
+}
+
+// Each network shows its strength as the fill of a ring around the wifi
+// glyph, the available rows and the connected one alike.
+func TestNetworkRowsShowTheirStrengthAsARing(t *testing.T) {
+	wifi := &fakeWifiCtl{aps: []network.AccessPoint{
+		netAP("strong", 80, network.SecurityWPA2, "/ap/1"),
+		netAP("weak", 20, network.SecurityWPA2, "/ap/2"),
+	}}
+	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true, Wifi: network.StatusConnected, WifiSSID: "mine", WifiStrength: 65}, netDeps{wifiCtl: wifi})
+	settleNetReads(t, v)
+	want := map[string]float64{"strong": 0.8, "weak": 0.2}
+	onHeadlessLoop(func() bool {
+		rows := treetest.WithClass(v.listCard, "network-ap")
+		if len(rows) != len(want) {
+			t.Fatalf("%d available rows, want %d", len(rows), len(want))
+		}
+		for _, w := range rows {
+			row := w.(*widget.Item)
+			title := itemText(row, "title")
+			rings := treetest.All[*glyphRing](row)
+			if len(rings) != 1 {
+				t.Fatalf("row %q has %d signal rings, want one", title, len(rings))
+			}
+			if got := rings[0].Value(); got != want[title] || rings[0].glyph.Name() != "ld-wifi-symbolic" {
+				t.Errorf("row %q ring at %v around %q, want %v around the wifi glyph", title, got, rings[0].glyph.Name(), want[title])
+			}
+		}
+		if got := v.active.wifiSignal.Value(); got != 0.65 {
+			t.Errorf("the connected network's ring is at %v, want 0.65", got)
+		}
+		return true
+	})
 }
 
 // The connections' statuses end where their rows end, the wifi row's as

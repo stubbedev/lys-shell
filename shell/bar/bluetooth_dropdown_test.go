@@ -874,3 +874,26 @@ func TestBtRowDetailFitsTheUsualWidth(t *testing.T) {
 		t.Errorf("the detail %q gets %dpx of its %dpx", desc.Text(), desc.Bounds().W, natural)
 	}
 }
+
+// A connected device that reports its battery wears it as a ring
+// around its icon; one without a battery, or not connected, keeps the
+// plain icon.
+func TestConnectedDeviceBatteryIsARing(t *testing.T) {
+	d, _ := newTestBtDropdown(t, btWorld())
+	headset := treetest.All[*glyphRing](rowNamed(t, d, "Headset"))
+	if len(headset) != 1 {
+		t.Fatalf("the connected headset has %d battery rings, want one", len(headset))
+	}
+	if got := headset[0].Value(); got != 0.64 || !headset[0].glyph.HasClass("bluetooth-icon") || headset[0].glyph.Name() == "" {
+		t.Errorf("the headset's ring is at %v around %q, want 0.64 around its icon", got, headset[0].glyph.Name())
+	}
+	for _, name := range []string{"Mouse", "Speaker"} {
+		row := rowNamed(t, d, name)
+		if rings := treetest.All[*glyphRing](row); len(rings) != 0 {
+			t.Errorf("%s, with no battery or not connected, has a ring", name)
+		}
+		if icons := treetest.WithClass(row, "bluetooth-icon"); len(icons) != 1 {
+			t.Errorf("%s shows %d device icons, want its plain icon", name, len(icons))
+		}
+	}
+}

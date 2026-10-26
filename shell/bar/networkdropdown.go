@@ -311,9 +311,7 @@ func (v *networkView) row(ap apSnapshot) *widget.Item {
 		row.AddClass("stale")
 	}
 	row.SetOnActivate(func() { v.selectNetwork(ssid) })
-	signal := widget.NewThemeIcon(signalStrengthIcon(ap.strength), itemIconPx)
-	signal.AddClass("network-item-signal")
-	row.SetMedia(signal, false)
+	row.SetMedia(newGlyphRing("ld-wifi-symbolic", ap.strength), true)
 
 	if ap.known {
 		forgetBtn := v.ghostText(i18n.T("dropdown-network-forget"), "network-item-forget", func() { v.forget(ssid) })
@@ -542,7 +540,7 @@ type netActive struct {
 	label              *widget.Label
 	wired              *widget.Item
 	wifi               *widget.Item
-	wifiIcon           *widget.Icon
+	wifiSignal         *glyphRing
 	wifiStatus         *widget.Label
 	badge              *widget.Badge
 	trailing           *widget.Stack
@@ -570,8 +568,8 @@ func newNetActive(v *networkView) *netActive {
 	a.wifi.SetSmall(true)
 	a.wifi.SetEllipsize(true)
 	a.wifi.AddClass("network-active", "wifi")
-	a.wifiIcon = widget.NewThemeIcon(signalStrengthIcon(0), itemIconPx)
-	a.wifi.SetMedia(a.wifiIcon, false)
+	a.wifiSignal = newGlyphRing("ld-wifi-symbolic", 0)
+	a.wifi.SetMedia(a.wifiSignal, true)
 
 	// Sized to the page it shows, so the status sits at the row's end
 	// and the address keeps its room until hovering widens the row's
@@ -665,11 +663,15 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 	if a.wifiErr {
 		// The row swaps wifi for error, it never wears both
 		// (active_connections/methods.rs:100-110).
-		a.wifiIcon.SetThemeName("ld-wifi-off-symbolic")
+		a.wifiSignal.glyph.SetThemeName("ld-wifi-off-symbolic")
+		a.wifiSignal.SetValue(0)
+		a.wifiSignal.AddClass("error")
 		a.wifi.RemoveClass("wifi")
 		a.wifi.AddClass("error")
 	} else {
-		a.wifiIcon.SetThemeName(signalStrengthIcon(s.WifiStrength))
+		a.wifiSignal.glyph.SetThemeName("ld-wifi-symbolic")
+		a.wifiSignal.setPercent(s.WifiStrength)
+		a.wifiSignal.RemoveClass("error")
 		a.wifi.RemoveClass("error")
 		a.wifi.AddClass("wifi")
 	}

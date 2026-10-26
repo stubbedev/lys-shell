@@ -2,3 +2,8 @@
   min-width: calc(4rem * var(--global-scale));
   min-height: calc(4rem * var(--global-scale));
 }
+
+.glyph-ring {
+  min-width: calc(2rem * var(--global-scale));
+  min-height: calc(2rem * var(--global-scale));
+}
