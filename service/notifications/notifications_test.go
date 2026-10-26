@@ -35,14 +35,16 @@ func newTestService(t *testing.T) *Service {
 	return s
 }
 
+// testClock is a test service's fake clock.
+func testClock(s *Service) *fakeclock.Clock {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.clock.(*fakeclock.Clock)
+}
+
 // advance moves a test service's fake clock d forward, running the
 // countdowns and expiries that fall due.
-func advance(s *Service, d time.Duration) {
-	s.mu.Lock()
-	c := s.clock.(*fakeclock.Clock)
-	s.mu.Unlock()
-	c.Advance(d)
-}
+func advance(s *Service, d time.Duration) { testClock(s).Advance(d) }
 
 func TestNotifyStoresAndEmits(t *testing.T) {
 	s := newTestService(t)

@@ -159,6 +159,9 @@ type Service struct {
 	cacheImage func(imageData) (string, bool)
 	// store persists the history; nil keeps it in memory only.
 	store *Store
+	// storeTail closes once the last queued store write is done; each
+	// write waits for the one before it (persistUnlock).
+	storeTail chan struct{}
 	// clock stamps arrivals and arms the countdowns and expiries.
 	clock Clock
 }
@@ -194,7 +197,10 @@ type expiryTimer struct{ stop func() bool }
 
 // NewService restores the DND flag from the state dir.
 func NewService() *Service {
+	idle := make(chan struct{})
+	close(idle)
 	return &Service{
+		storeTail:     idle,
 		next:          0,
 		expiry:        make(map[uint32]*expiryTimer),
 		timers:        make(map[uint32]*popupTimer),
@@ -355,17 +361,16 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 	}
 	s.owners[n.ID] = appName
 	s.addPopupLocked(n)
-	st := s.store
-	s.mu.Unlock()
-	switch {
-	case st == nil:
-	case !n.Transient:
-		storeErr("add", st.Add(n))
-	case replaced:
-		// A transient replacement takes the stored one's place in
-		// the history, so it leaves the store too.
-		storeErr("remove", st.Remove(id))
-	}
+	s.persistUnlock(func(st *Store) {
+		switch {
+		case !n.Transient:
+			storeErr("add", st.Add(n))
+		case replaced:
+			// A transient replacement takes the stored one's place
+			// in the history, so it leaves the store too.
+			storeErr("remove", st.Remove(id))
+		}
+	})
 	s.notify(Event{Kind: EventAdd, Notif: n})
 	return n.ID
 }
@@ -401,14 +406,11 @@ func (s *Service) Close(id uint32, reason ClosedReason) {
 		s.dropPopupLocked(id)
 	}
 	emit := s.emit
-	st := s.store
-	s.mu.Unlock()
 	if !removed {
+		s.mu.Unlock()
 		return
 	}
-	if st != nil {
-		storeErr("remove", st.Remove(id))
-	}
+	s.persistUnlock(func(st *Store) { storeErr("remove", st.Remove(id)) })
 	if emit != nil {
 		emit(Interface+".NotificationClosed", id, uint32(reason))
 	}
@@ -428,12 +430,12 @@ func (s *Service) DismissAll() {
 		s.dropPopupLocked(id)
 	}
 	emit := s.emit
-	st := s.store
-	s.mu.Unlock()
-	for _, id := range ids {
-		if st != nil {
+	s.persistUnlock(func(st *Store) {
+		for _, id := range ids {
 			storeErr("remove", st.Remove(id))
 		}
+	})
+	for _, id := range ids {
 		if emit != nil {
 			emit(Interface+".NotificationClosed", id, uint32(Dismissed))
 		}
@@ -684,6 +686,26 @@ func (s *Service) AttachStore(st *Store) error {
 		s.notify(Event{Kind: EventAdd})
 	}
 	return nil
+}
+
+// persistUnlock releases mu and writes the change it guarded to the
+// attached store. The write takes its place in line while mu is still
+// held and waits for the one before it, so the writes reach the disk
+// in the order the history changed: an expiry or close racing an
+// arrival cannot remove the row before it is added and leave it on
+// disk. The caller holds mu.
+func (s *Service) persistUnlock(write func(*Store)) {
+	st := s.store
+	if st == nil {
+		s.mu.Unlock()
+		return
+	}
+	prev, done := s.storeTail, make(chan struct{})
+	s.storeTail = done
+	s.mu.Unlock()
+	defer close(done)
+	<-prev
+	write(st)
 }
 
 // storeErr logs a failed write: the in-memory history stays right, the

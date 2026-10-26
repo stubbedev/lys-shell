@@ -2,6 +2,8 @@ package notifications
 
 import (
 	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,11 +23,12 @@ func openTestStore(t *testing.T) (*Store, string) {
 	return st, path
 }
 
+// newStoredService is a test service on its fake clock, persisting in
+// st: no expiry fires unless the test advances the clock.
 func newStoredService(t *testing.T, st *Store) *Service {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	svc := NewService()
+	svc := newTestService(t)
 	if err := svc.AttachStore(st); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +38,7 @@ func newStoredService(t *testing.T, st *Store) *Service {
 func TestStoreRoundTrip(t *testing.T) {
 	st, _ := openTestStore(t)
 	svc := newStoredService(t, st)
-	sent := time.Now()
+	sent := testClock(svc).Now()
 	id := svc.NotifyHints("mail", 0, "mail-icon", "Subject", "Body", []string{"default", "Open", "reply", "Reply"},
 		map[string]dbus.Variant{
 			"urgency":        dbus.MakeVariant(byte(2)),
@@ -74,8 +77,50 @@ func TestStoreRoundTrip(t *testing.T) {
 	if _, ok := n.Hints["x-list"]; ok {
 		t.Error("a container hint was written in a form the Rust store cannot read")
 	}
-	if n.Added.UnixMilli() == 0 || n.Expires.IsZero() {
-		t.Errorf("timestamps: added %v expires %v", n.Added, n.Expires)
+	if !n.Added.Equal(sent) || !n.Expires.Equal(sent.Add(5*time.Second)) {
+		t.Errorf("timestamps: added %v expires %v, want %v and 5s on", n.Added, n.Expires, sent)
+	}
+
+	// The row stays until its timeout runs out, then leaves the disk.
+	advance(svc, 5*time.Second-time.Millisecond)
+	if got, err := st.Load(sent, false); err != nil || len(got) != 1 {
+		t.Fatalf("store before the expiry = %v, %v", got, err)
+	}
+	advance(svc, time.Millisecond)
+	if got, err := st.Load(sent, false); err != nil || len(got) != 0 {
+		t.Errorf("store after the expiry = %v, %v", got, err)
+	}
+}
+
+// TestStoreFollowsAnExpiryRacingTheArrival pins the store write order:
+// an expiry that fires while the arrival waits to be written removes
+// the row after it is added, so the disk ends as the history does
+// rather than keeping a row the history dropped. The connection held
+// by the test stalls every store write until both are queued.
+func TestStoreFollowsAnExpiryRacingTheArrival(t *testing.T) {
+	st, _ := openTestStore(t)
+	svc := newStoredService(t, st)
+	for range 20 {
+		conn, err := st.db.Conn(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		wg.Go(func() { svc.Notify("mail", 0, "", "soon", "", nil, 1) })
+		for svc.Count() == 0 {
+			runtime.Gosched()
+		}
+		wg.Go(func() { advance(svc, time.Millisecond) })
+		for svc.Count() != 0 {
+			runtime.Gosched()
+		}
+		if err := conn.Close(); err != nil {
+			t.Fatal(err)
+		}
+		wg.Wait()
+		if got, err := st.Load(testClock(svc).Now(), false); err != nil || len(got) != 0 {
+			t.Fatalf("store after the history expired = %v, %v", got, err)
+		}
 	}
 }
 
