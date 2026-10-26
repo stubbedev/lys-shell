@@ -20,6 +20,7 @@ func modulePages(cfg *config.Config) []pageSpec {
 		idleInhibitPage(cfg),
 		keybindModePage(cfg),
 		keyboardInputPage(cfg),
+		lysWMWorkspacesPage(cfg),
 		mailPage(cfg),
 		mangoWorkspacesPage(cfg),
 		mediaPage(cfg),

@@ -269,6 +269,22 @@ func (c NiriWorkspacesConfig) View() CompositorWorkspacesConfig {
 	}
 }
 
+// View returns the lys-wm module in the shared shape: its workspaces
+// have numbers and no names, and lys-wm keeps no trailing empty one.
+func (c LysWMWorkspacesConfig) View() CompositorWorkspacesConfig {
+	return CompositorWorkspacesConfig{
+		MonitorSpecific: c.MonitorSpecific, DisplayMode: c.DisplayMode, LabelStrategy: LabelIndex,
+		UrgentShow: c.UrgentShow, UrgentMode: c.UrgentMode, ActiveIndicator: c.ActiveIndicator,
+		Divider: c.Divider, AppIconsShow: c.AppIconsShow, AppIconsDedupe: c.AppIconsDedupe,
+		AppIconsFallback: c.AppIconsFallback, AppIconsEmpty: c.AppIconsEmpty,
+		IconGap: c.IconGap, WorkspacePad: c.WorkspacePadding, IconSize: c.IconSize,
+		LabelSize: c.LabelSize, WorkspaceIgnore: c.WorkspaceIgnore,
+		ActiveColor: c.ActiveColor, OccupiedColor: c.OccupiedColor, EmptyColor: c.EmptyColor,
+		ContainerBgColor: c.ContainerBgColor, BorderShow: c.BorderShow, BorderColor: c.BorderColor,
+		WorkspaceMap: c.WorkspaceMap, AppIconMap: c.AppIconMap, Click: c.Clicks(),
+	}
+}
+
 // View returns the hyprland module's fields in the shared shape; the
 // numeric workspace map carries over with decimal keys.
 func (c HyprlandWorkspacesConfig) View() CompositorWorkspacesConfig {

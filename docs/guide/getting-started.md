@@ -8,7 +8,7 @@ lys-shell is a Wayland desktop shell written in Go on [lys-ui](https://github.co
 
 Settings can be edited in `config.yaml`, through the `lys-settings` GUI, or with the `lys-shell config` CLI. All three surfaces provided hot reloaded updates, reflected in the shell immediately.
 
-lys-shell requires a Wayland compositor that implements the `wlr-layer-shell` protocol. Compositor-specific modules target Hyprland, Niri, Mango and Sway.
+lys-shell requires a Wayland compositor that implements the `wlr-layer-shell` protocol. Compositor-specific modules target lys-wm, Hyprland, Niri, Mango and Sway.
 
 On Hyprland, the built-in lock screen needs one extra compositor setting: `misc:allow_session_lock_restore = true`. lys-shell keeps its lock client inside the shell process, so a shell restart while the session is locked (for example a `home-manager switch` bouncing `lys-shell.service`) has to re-take the lock, and Hyprland refuses that takeover unless the flag is set — the session would stay stuck on Hyprland's crashed-lockscreen render.
 

@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // keybindModeLabel is helpers.rs's format_label: an empty submap
@@ -26,7 +27,7 @@ func keybindModeVisible(submap string, autoHide bool) bool {
 	return !autoHide || submap != ""
 }
 
-// keybindMode is the module: the active Hyprland submap.
+// keybindMode is the module: the compositor's active submap.
 type keybindModeModule struct {
 	ctx    ModuleContext
 	btn    *barButton
@@ -36,25 +37,63 @@ type keybindModeModule struct {
 }
 
 func newKeybindMode(ctx ModuleContext) (Module, error) {
-	if ctx.Hyprland == nil {
-		return nil, errors.New("keybind-mode: the compositor is not Hyprland")
+	submaps, stop, err := submapSource(ctx)
+	if err != nil {
+		return nil, err
 	}
 	m := &keybindModeModule{ctx: ctx}
 	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
 	m.render()
-	events, err := ctx.Hyprland.Events(ctx.Life())
-	if err != nil {
-		return nil, err
-	}
-	follow(ctx, events, nil, func(event hyprland.Event) {
-		if event.Kind != hyprland.EventSubmap {
-			return
-		}
-		m.submap = event.Name
+	follow(ctx, submaps, stop, func(submap string) {
+		m.submap = submap
 		m.render()
 	})
 	return m, nil
+}
+
+func submapSource(ctx ModuleContext) (<-chan string, func(), error) {
+	life := ctx.Life()
+	switch {
+	case ctx.Hyprland != nil:
+		events, err := ctx.Hyprland.Events(life)
+		if err != nil {
+			return nil, nil, err
+		}
+		submaps := make(chan string)
+		go func() {
+			defer close(submaps)
+			for event := range events {
+				if event.Kind != hyprland.EventSubmap {
+					continue
+				}
+				select {
+				case submaps <- event.Name:
+				case <-life.Done():
+					return
+				}
+			}
+		}()
+		return submaps, nil, nil
+	case detectCompositor() == compositorLysWM:
+		w, err := lyswm.Watch(lyswm.EventSubmap)
+		if err != nil {
+			return nil, nil, err
+		}
+		submaps := make(chan string)
+		go func() {
+			defer close(submaps)
+			for range w.Ticks() {
+				select {
+				case submaps <- w.Submap():
+				case <-life.Done():
+					return
+				}
+			}
+		}()
+		return submaps, w.Close, nil
+	}
+	return nil, nil, errors.New("keybind-mode: the compositor is neither Hyprland nor lys-wm")
 }
 
 // render applies the current submap to the label and, under auto-hide,

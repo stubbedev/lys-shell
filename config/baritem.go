@@ -177,6 +177,7 @@ const (
 	ModuleIdleInhibit        BarModule = "idle-inhibit"
 	ModuleKeybindMode        BarModule = "keybind-mode"
 	ModuleKeyboardInput      BarModule = "keyboard-input"
+	ModuleLysWMWorkspaces    BarModule = "lys-wm-workspaces"
 	ModuleMail               BarModule = "mail"
 	ModuleMedia              BarModule = "media"
 	ModuleMangoWorkspaces    BarModule = "mango-workspaces"
@@ -206,7 +207,7 @@ const (
 var BuiltinModules = []BarModule{
 	ModuleBattery, ModuleBitwarden, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
 	ModuleCPU, ModuleDashboard, ModuleHyprlandWorkspaces, ModuleHyprsunset,
-	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleMail,
+	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleLysWMWorkspaces, ModuleMail,
 	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleNetstat,
 	ModuleNetwork, ModuleNiriWorkspaces, ModuleNotifications, ModulePower,
 	ModulePowerProfiles, ModuleRAM, ModuleRecorder, ModuleScreenshot,

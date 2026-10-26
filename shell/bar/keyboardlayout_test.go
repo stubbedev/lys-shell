@@ -17,6 +17,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 )
@@ -135,7 +136,7 @@ func TestKeyboardLayoutModuleRenders(t *testing.T) {
 // advertises, so each test names the one it fakes.
 func clearCompositorEnv(t *testing.T) {
 	t.Helper()
-	for _, name := range []string{"HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
+	for _, name := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
 		t.Setenv(name, "")
 	}
 }

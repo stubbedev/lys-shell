@@ -156,6 +156,7 @@ func docSpecs() []docSpec {
 		m("idle-inhibit", bar, func(c *Config) any { return &c.IdleInhibit }),
 		m("keybind-mode", bar, func(c *Config) any { return &c.KeybindMode }),
 		m("keyboard-input", bar, func(c *Config) any { return &c.KeyboardInput }),
+		m("lys-wm-workspaces", docStandard, func(c *Config) any { return &c.LysWMWorkspaces }),
 		m("mail", bar, func(c *Config) any { return &c.Mail }),
 		m("mango-workspaces", docStandard, func(c *Config) any { return &c.MangoWorkspaces }),
 		m("media", bar, func(c *Config) any { return &c.Media }),

@@ -2,12 +2,14 @@ package bar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/internal/appicons"
 	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -277,3 +279,74 @@ func (b *mangoBackend) subscribe() (<-chan struct{}, func(), error) {
 	return b.watch.Ticks(), b.watch.Close, nil
 }
 func (b *mangoBackend) close() { b.watch.Close() }
+
+func newLysWMWorkspaces(ctx ModuleContext) (Module, error) {
+	if err := requireCompositor("lys-wm-workspaces", compositorLysWM); err != nil {
+		return nil, err
+	}
+	return newCwsModule(ctx, "lys-wm", cwsWorkspaces, ctx.Config.LysWMWorkspaces.View(), lysWMBackend{})
+}
+
+var lysWMWorkspaceEvents = []lyswm.EventKind{
+	lyswm.EventOutput, lyswm.EventWorkspace, lyswm.EventFocusedOutput,
+	lyswm.EventOpen, lyswm.EventClose, lyswm.EventMove, lyswm.EventTitle, lyswm.EventUrgent,
+}
+
+var errNoPreviousWorkspace = errors.New("lys-wm has no action that returns to the previous workspace")
+
+type lysWMBackend struct{}
+
+func (lysWMBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
+	replies, err := lyswm.Workspaces()
+	if err != nil {
+		return nil, nil, err
+	}
+	all, err := lyswm.Windows()
+	if err != nil {
+		return nil, nil, err
+	}
+	workspaces, windows := lysWMModels(replies, all)
+	return workspaces, windows, nil
+}
+
+func lysWMModels(replies []lyswm.Workspace, all []lyswm.Window) ([]cwsWorkspace, []cwsWindow) {
+	urgent := map[int]bool{}
+	windows := make([]cwsWindow, 0, len(all))
+	for _, w := range all {
+		urgent[w.Workspace] = urgent[w.Workspace] || w.Urgent
+		windows = append(windows, cwsWindow{
+			id: w.ID, workspace: uint64(w.Workspace), hasWorkspace: true, urgent: w.Urgent,
+			app: appicons.Window{AppID: w.AppID, HasAppID: w.AppID != "", Title: w.Title, HasTitle: w.Title != ""},
+		})
+	}
+	workspaces := make([]cwsWorkspace, 0, len(replies))
+	for _, r := range replies {
+		workspaces = append(workspaces, cwsWorkspace{
+			id: uint64(r.ID), num: r.ID,
+			output: r.Output, hasOutput: true,
+			urgent: urgent[r.ID], active: r.Visible, focused: r.Focused,
+			hasWindows: r.Windows > 0,
+		})
+	}
+	return workspaces, windows
+}
+
+func (lysWMBackend) focus(_ context.Context, ws cwsWorkspace) error {
+	return lyswm.Dispatch("workspace " + strconv.Itoa(ws.num))
+}
+
+func (lysWMBackend) focusNext(context.Context) error { return lyswm.Dispatch("workspace e+1") }
+
+func (lysWMBackend) focusPrevious(context.Context) error { return lyswm.Dispatch("workspace e-1") }
+
+func (lysWMBackend) focusLast(context.Context) error { return errNoPreviousWorkspace }
+
+func (lysWMBackend) subscribe() (<-chan struct{}, func(), error) {
+	w, err := lyswm.Watch(lysWMWorkspaceEvents...)
+	if err != nil {
+		return nil, nil, err
+	}
+	return w.Ticks(), w.Close, nil
+}
+
+func (lysWMBackend) close() {}

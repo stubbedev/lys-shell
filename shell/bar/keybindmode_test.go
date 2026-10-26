@@ -75,12 +75,13 @@ func TestLoadFileAppliesKeybindMode(t *testing.T) {
 	}
 }
 
-func TestKeybindModeModuleRequiresHyprland(t *testing.T) {
+func TestKeybindModeModuleRequiresHyprlandOrLysWM(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Hyprland = nil
+	advertise(t, "SWAYSOCK")
 	if _, err := Create("keybind-mode", ctx); err == nil {
-		t.Fatal("no Hyprland: want an error, got a module")
+		t.Fatal("under sway: want an error, got a module")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 )
@@ -19,7 +20,7 @@ func advertise(t *testing.T, set ...string) {
 	}
 }
 
-func TestDetectCompositorTakesTheFirstInRustOrder(t *testing.T) {
+func TestDetectCompositorTakesTheFirstAdvertised(t *testing.T) {
 	for _, tc := range []struct {
 		set  []string
 		want compositor
@@ -32,6 +33,8 @@ func TestDetectCompositorTakesTheFirstInRustOrder(t *testing.T) {
 		{[]string{"HYPRLAND_INSTANCE_SIGNATURE", "SWAYSOCK"}, compositorHyprland},
 		{[]string{niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"}, compositorNiri},
 		{[]string{mango.SocketEnv, "SWAYSOCK"}, compositorMango},
+		{[]string{lyswm.SocketEnv}, compositorLysWM},
+		{[]string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv}, compositorLysWM},
 	} {
 		advertise(t, tc.set...)
 		if got := detectCompositor(); got != tc.want {

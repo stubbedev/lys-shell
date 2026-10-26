@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -76,6 +77,8 @@ func windowTitleSource(ctx ModuleContext) (focusSource, error) {
 	switch {
 	case ctx.Hyprland != nil:
 		return hyprlandFocusSource(ctx.Hyprland), nil
+	case detectCompositor() == compositorLysWM:
+		return lysWMFocusSource(), nil
 	case detectCompositor() == compositorNiri:
 		conn, err := niri.Connect()
 		if err != nil {
@@ -175,6 +178,23 @@ func hyprlandFocusSource(conn *hyprland.Connection) focusSource {
 				}
 			}()
 			return ticks, nil, nil
+		},
+		close: func() {},
+	}
+}
+
+func lysWMFocusSource() focusSource {
+	return focusSource{
+		read: func() (focusedWindow, bool, error) {
+			w, ok, err := lyswm.ActiveWindow()
+			return focusedWindow{title: w.Title, appID: w.AppID}, ok, err
+		},
+		subscribe: func(ModuleContext) (<-chan struct{}, func(), error) {
+			w, err := lyswm.Watch(lyswm.EventFocus, lyswm.EventTitle, lyswm.EventClose)
+			if err != nil {
+				return nil, nil, err
+			}
+			return w.Ticks(), w.Close, nil
 		},
 		close: func() {},
 	}

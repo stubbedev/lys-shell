@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -19,6 +20,7 @@ const (
 	compositorNiri
 	compositorMango
 	compositorSway
+	compositorLysWM
 )
 
 // String names the compositor for diagnostics.
@@ -32,16 +34,20 @@ func (c compositor) String() string {
 		return "mango"
 	case compositorSway:
 		return "sway"
+	case compositorLysWM:
+		return "lys-wm"
 	}
 	return "unknown"
 }
 
 // detectCompositor is Compositor::detect: the first advertised socket
-// in Rust's order (Hyprland, niri, mango, sway), so a session that
-// exports more than one is still a single compositor. An empty
-// variable advertises nothing.
+// in the order lys-wm, then Rust's (Hyprland, niri, mango, sway), so a
+// session that exports more than one is still a single compositor. An
+// empty variable advertises nothing.
 func detectCompositor() compositor {
 	switch {
+	case lyswm.IsRunning():
+		return compositorLysWM
 	case os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") != "":
 		return compositorHyprland
 	case niri.IsRunning():

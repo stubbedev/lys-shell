@@ -250,6 +250,7 @@ var factories = map[string]Factory{
 	"sway-workspaces":     newSwayWorkspaces,
 	"niri-workspaces":     newNiriWorkspaces,
 	"mango-workspaces":    newMangoWorkspaces,
+	"lys-wm-workspaces":   newLysWMWorkspaces,
 	"screenshot":          newScreenshot,
 	"separator":           newSeparator,
 }

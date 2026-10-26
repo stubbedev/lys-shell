@@ -78,6 +78,22 @@ func compositorWorkspacesPage(name string) pageSpec {
 	}
 }
 
+func lysWMWorkspacesPage(*config.Config) pageSpec {
+	const m = "modules.lys-wm-workspaces"
+	return pageSpec{
+		id: "lys-wm-workspaces", navKey: "settings-nav-lys-wm-workspaces", icon: "ld-grid-2x2-symbolic",
+		header: "settings-page-lys-wm-workspaces",
+		sections: append([]sectionSpec{
+			{title: "settings-section-general", rows: fields(m + ".monitor-specific")},
+			{title: "settings-section-display", rows: fields(m+".display-mode", m+".divider")},
+		}, workspaceSections(m, workspaceSizing(m, "workspace-padding"), []rowSpec{
+			field(m+".workspace-map", workspaceStyleMap(false)),
+			field(m+".app-icon-map", stringMap),
+			field(m+".workspace-ignore", stringList),
+		}, []string{"active-color", "occupied-color", "empty-color", "container-bg-color", "border-color"})...),
+	}
+}
+
 // mangoWorkspacesPage is pages/modules/mango_workspaces.
 func mangoWorkspacesPage(*config.Config) pageSpec {
 	const m = "modules.mango-workspaces"

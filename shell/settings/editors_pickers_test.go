@@ -796,7 +796,7 @@ func TestSearchPickerFiltersAndPicks(t *testing.T) {
 		return out
 	}
 	p.filter("  WORKspaces ")
-	want := []string{"hyprland-workspaces", "mango-workspaces", "niri-workspaces", "sway-workspaces"}
+	want := []string{"hyprland-workspaces", "lys-wm-workspaces", "mango-workspaces", "niri-workspaces", "sway-workspaces"}
 	if got := shown(); !slices.Equal(got, want) {
 		t.Fatalf("the filter shows %v, want %v", got, want)
 	}

@@ -32,7 +32,7 @@ lys-shell runs on any compositor with `wlr-layer-shell`; it does not need lys-wm
 
 ## What you get
 
-**Bar.** Per-monitor layouts with groups and CSS classes, and the modules you would expect: clock and world clock, battery, power profiles, brightness, volume and microphone, network and VPN, bluetooth, media, cava visualizer, CPU, RAM, storage, network traffic, weather, mail, notifications, system tray, screen recorder, screenshot, idle inhibit, hyprsunset, keyboard layout and keybind mode, window title, a dashboard, and workspaces for Hyprland, Niri, Mango and Sway.
+**Bar.** Per-monitor layouts with groups and CSS classes, and the modules you would expect: clock and world clock, battery, power profiles, brightness, volume and microphone, network and VPN, bluetooth, media, cava visualizer, CPU, RAM, storage, network traffic, weather, mail, notifications, system tray, screen recorder, screenshot, idle inhibit, hyprsunset, keyboard layout and keybind mode, window title, a dashboard, and workspaces for lys-wm, Hyprland, Niri, Mango and Sway.
 
 **Surfaces.** Notifications with popups and history, an OSD and custom toasts, a power menu, a rofi-compatible launcher (`lys-shell launcher`, also usable as `rofi` and dmenu), a native `ext-session-lock` lock screen, a greetd greeter, region and window screenshots, a colour picker, and a wallpaper engine with transitions and cycling.
 

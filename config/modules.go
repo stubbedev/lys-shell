@@ -32,6 +32,8 @@ type ModulesConfig struct {
 	KeybindMode KeybindModeConfig `cfg:"keybind-mode"`
 	// Keyboard input module.
 	KeyboardInput KeyboardInputConfig `cfg:"keyboard-input"`
+	// lys-wm workspace switcher module.
+	LysWMWorkspaces LysWMWorkspacesConfig `cfg:"lys-wm-workspaces"`
 	// Bitwarden vault module.
 	Bitwarden BitwardenConfig `cfg:"bitwarden"`
 	// Unread mail count module.
@@ -137,6 +139,7 @@ func DefaultsModules() ModulesConfig {
 		IdleInhibit:        DefaultsIdleInhibit(),
 		KeybindMode:        DefaultsKeybindMode(),
 		KeyboardInput:      DefaultsKeyboardInput(),
+		LysWMWorkspaces:    DefaultsLysWMWorkspaces(),
 		Mail:               DefaultsMail(),
 		MangoWorkspaces:    DefaultsMangoWorkspaces(),
 		Media:              DefaultsMedia(),

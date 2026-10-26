@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -74,6 +75,19 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 	switch {
 	case ctx.Hyprland != nil:
 		return hyprlandLayoutSource(ctx.Hyprland), nil
+	case detectCompositor() == compositorLysWM:
+		w, err := lyswm.Watch(lyswm.EventLayout)
+		if err != nil {
+			return layoutSource{}, err
+		}
+		return layoutSource{
+			read: func() (string, error) {
+				layout, _ := w.Layout()
+				return layout.Name, nil
+			},
+			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },
+			close:     w.Close,
+		}, nil
 	case detectCompositor() == compositorNiri:
 		conn, err := niri.Connect()
 		if err != nil {
