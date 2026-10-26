@@ -7,8 +7,8 @@ require (
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/neurlang/wayland v0.4.5
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.1.1-0.20261026161449-64b52f3cbc62
-	github.com/stubbedev/lys-ui v0.0.0-20261026182528-9be47c163062
+	github.com/stubbedev/lys-lib v0.1.1-0.20261026174537-62f71098258e
+	github.com/stubbedev/lys-ui v0.0.0-20261026185314-92768be8d755
 	github.com/unxed/xkb-go v0.1.9
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.58.0
@@ -30,7 +30,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yalue/native_endian v1.0.2 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
