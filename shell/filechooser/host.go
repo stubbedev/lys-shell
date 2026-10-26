@@ -76,7 +76,7 @@ const uriListMime = "text/uri-list"
 // Window is the overlay surface the chooser maps (app.LayerWindow).
 type Window interface {
 	Close()
-	SetFocus(widget.Widget)
+	SetFocus(widget.Widget) error
 }
 
 // Deps are the chooser's collaborators.
@@ -955,10 +955,13 @@ func (c *Chooser) show() {
 	}
 	c.win = win
 	reveal.Show(c.rev, c.d.Config().Animations, config.AnimFileChooser)
+	first := c.focusView()
 	if c.s.mode == ModeSave {
-		win.SetFocus(c.ui.name)
-	} else {
-		win.SetFocus(c.focusView())
+		first = c.ui.name
+	}
+	if err := win.SetFocus(first); err != nil {
+		log.Printf("file chooser: cannot focus %T: %v", first, err)
+		c.finish(nil)
 	}
 }
 
@@ -1017,7 +1020,7 @@ func (c *Chooser) key(r *widget.Router, keycode uint32, mods app.Mods) {
 	case keycode == keyL && ctrl:
 		c.showLocation("")
 	case keycode == keyF && ctrl:
-		c.win.SetFocus(c.ui.search)
+		c.focus(c.ui.search)
 	}
 }
 
@@ -1058,6 +1061,13 @@ func (c *Chooser) activeView() *widget.List {
 		return c.ui.grid
 	}
 	return c.ui.list
+}
+
+// focus moves the overlay's keyboard focus to w; a refusal is logged.
+func (c *Chooser) focus(w widget.Widget) {
+	if err := c.win.SetFocus(w); err != nil {
+		log.Printf("file chooser: cannot focus %T: %v", w, err)
+	}
 }
 
 // focusView is the active view's focus target, which takes typing.
@@ -1187,7 +1197,7 @@ func (c *Chooser) typeAhead(r rune) {
 		c.showLocation(string(r))
 		return
 	}
-	c.win.SetFocus(c.ui.search)
+	c.focus(c.ui.search)
 	c.ui.search.SetText(c.ui.search.Text() + string(r))
 }
 
@@ -1198,13 +1208,13 @@ func (c *Chooser) showLocation(text string) {
 	u.crumbs.SetVisible(false)
 	u.location.SetVisible(true)
 	u.location.SetText(text)
-	c.win.SetFocus(u.location)
+	c.focus(u.location)
 }
 
 func (c *Chooser) hideLocation() {
 	c.ui.location.SetVisible(false)
 	c.ui.crumbs.SetVisible(true)
-	c.win.SetFocus(c.focusView())
+	c.focus(c.focusView())
 }
 
 // goToLocation goes where the location entry names: a folder opens; a
@@ -1228,7 +1238,7 @@ func (c *Chooser) goToLocation(text string) {
 		c.hideLocation()
 		c.goTo(filepath.Dir(path))
 		c.ui.name.SetText(filepath.Base(path))
-		c.win.SetFocus(c.ui.name)
+		c.focus(c.ui.name)
 	case err == nil && !c.s.mode.folders():
 		c.finish([]string{fileuri.FromPath(path)})
 	default:
@@ -1241,7 +1251,7 @@ func (c *Chooser) showNewFolder() {
 	u := c.ui
 	u.newFolderName.SetText("")
 	u.newFolder.SetVisible(true)
-	c.win.SetFocus(u.newFolderName)
+	c.focus(u.newFolderName)
 }
 
 // createFolder creates the named folder in the one shown and opens
@@ -1338,7 +1348,7 @@ func (c *Chooser) toggleView() {
 	setIcon(c.ui.viewIcon, viewIcon(c.s.view.grid))
 	c.relist()
 	if c.win != nil {
-		c.win.SetFocus(c.focusView())
+		c.focus(c.focusView())
 	}
 }
 

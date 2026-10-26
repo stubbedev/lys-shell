@@ -665,7 +665,7 @@ func (h *popoverHost) OpenPopover(_ widget.Boundser, content widget.Widget, opts
 	}
 }
 
-func (h *popoverHost) Focus(widget.Widget) {}
+func (h *popoverHost) Focus(widget.Widget) error { return nil }
 
 // hosted puts w in a root the returned host serves.
 func hosted(w widget.Widget) (*widget.Box, *popoverHost) {

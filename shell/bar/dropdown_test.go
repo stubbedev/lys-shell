@@ -1,6 +1,9 @@
 package bar
 
 import (
+	"bytes"
+	"log"
+	"strings"
 	"testing"
 
 	"github.com/neurlang/wayland/wl"
@@ -125,10 +128,42 @@ func TestDropdownGravityOpensAwayFromTheEdge(t *testing.T) {
 type fakePopover struct {
 	dismissed int
 	focused   widget.Widget
+	// refuse fails every SetFocus, as a popover already gone.
+	refuse error
 }
 
-func (f *fakePopover) Dismiss()                 { f.dismissed++ }
-func (f *fakePopover) SetFocus(w widget.Widget) { f.focused = w }
+func (f *fakePopover) Dismiss() { f.dismissed++ }
+
+func (f *fakePopover) SetFocus(w widget.Widget) error {
+	if f.refuse != nil {
+		return f.refuse
+	}
+	f.focused = w
+	return nil
+}
+
+// A focus asked before the popover opens lands once it attaches; one
+// the popover refuses is logged with its reason, not dropped silently.
+func TestPopoverHookFocusesOnAttachAndLogsARefusal(t *testing.T) {
+	entry := widget.NewBox(widget.Column, 0, 0)
+	var hook popoverHook
+	hook.focus(entry)
+	pop := &fakePopover{}
+	hook.attachPopover(pop)
+	if pop.focused != entry {
+		t.Errorf("the pending focus landed on %v, want the entry", pop.focused)
+	}
+	var buf bytes.Buffer
+	prev, flags := log.Writer(), log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	t.Cleanup(func() { log.SetOutput(prev); log.SetFlags(flags) })
+	hook.attachPopover(&fakePopover{refuse: widget.ErrNotInTree})
+	hook.focus(entry)
+	if got := buf.String(); !strings.Contains(got, "cannot focus") || !strings.Contains(got, widget.ErrNotInTree.Error()) {
+		t.Errorf("a refused focus logged %q, want its reason", got)
+	}
+}
 
 func TestDropdownScrollIsVerticalOnly(t *testing.T) {
 	s := dropdownScroll(widget.NewBox(widget.Column, 0, 0), "picker-body")

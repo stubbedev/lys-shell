@@ -57,11 +57,18 @@ type fakeWindow struct {
 	closed bool
 	router *widget.Router
 	sizes  [][2]uint32
+	// refuse fails every SetFocus, as a layer whose surface is gone.
+	refuse error
 }
 
-func (w *fakeWindow) Close()                   { w.closed = true }
-func (w *fakeWindow) SetFocus(f widget.Widget) { w.router.SetFocus(f) }
-func (w *fakeWindow) focused() widget.Widget   { return w.router.Focused() }
+func (w *fakeWindow) Close() { w.closed = true }
+func (w *fakeWindow) SetFocus(f widget.Widget) error {
+	if w.refuse != nil {
+		return w.refuse
+	}
+	return w.router.SetFocus(f)
+}
+func (w *fakeWindow) focused() widget.Widget { return w.router.Focused() }
 func (w *fakeWindow) SetSize(width, height uint32) error {
 	w.sizes = append(w.sizes, [2]uint32{width, height})
 	return nil
@@ -89,6 +96,8 @@ type harness struct {
 	styled []string
 	// openErr fails every Open, as a compositor refusing the layer.
 	openErr error
+	// focusErr fails every opened window's SetFocus.
+	focusErr error
 }
 
 func newHarness(t *testing.T) *harness {
@@ -111,7 +120,7 @@ func newHarness(t *testing.T) *harness {
 			if h.openErr != nil {
 				return nil, h.openErr
 			}
-			w := &fakeWindow{cfg: cfg, router: &widget.Router{Root: cfg.Root}}
+			w := &fakeWindow{cfg: cfg, router: &widget.Router{Root: cfg.Root}, refuse: h.focusErr}
 			h.windows = append(h.windows, w)
 			return w, nil
 		},
@@ -289,6 +298,20 @@ func TestUnmappableSurfaceCancelsWithoutFocus(t *testing.T) {
 	}
 	if len(h.windows) != 0 || h.s.cur != nil {
 		t.Errorf("windows = %d, session live %v; want nothing mapped or focused", len(h.windows), h.s.cur != nil)
+	}
+}
+
+// A surface whose entry cannot take focus could not be typed into: the
+// session ends cancelled with code 1 and the surface closes.
+func TestUnfocusableEntryCancelsAndCloses(t *testing.T) {
+	h := newHarness(t)
+	h.focusErr = app.ErrClosed
+	_, reply := h.open(dmenu(), false, "a")
+	if f := h.frame(reply); f.Type != launcheripc.FrameCancelled || f.Code != 1 {
+		t.Errorf("an unfocusable entry = %+v, want cancelled with code 1", f)
+	}
+	if len(h.windows) != 1 || !h.windows[0].closed || h.s.cur != nil {
+		t.Errorf("windows = %d, session live %v; want the one surface closed", len(h.windows), h.s.cur != nil)
 	}
 }
 

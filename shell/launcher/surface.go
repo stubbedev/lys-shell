@@ -27,7 +27,7 @@ const dumpDebounce = 150 * time.Millisecond
 type Window interface {
 	Close()
 	SetSize(width, height uint32) error
-	SetFocus(w widget.Widget)
+	SetFocus(w widget.Widget) error
 }
 
 // Deps are what the shell hands the surface.
@@ -666,7 +666,10 @@ func (s *Surface) reveal(a *active) {
 	a.win = win
 	a.views.width = width
 	reveal.Show(a.views.rev, s.d.Config().Animations, config.AnimLauncher)
-	win.SetFocus(a.views.entry)
+	if err := win.SetFocus(a.views.entry); err != nil {
+		log.Printf("launcher: cannot focus the entry: %v", err)
+		s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
+	}
 }
 
 // resize keeps the surface as tall as its content: the list grows to

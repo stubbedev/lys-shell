@@ -41,8 +41,12 @@ func (l appLocker) Release() {
 }
 
 func (l appLocker) Focus(w widget.Widget) {
-	if sl := l.a.SessionLock(); sl != nil {
-		sl.SetFocus(w)
+	sl := l.a.SessionLock()
+	if sl == nil {
+		return
+	}
+	if err := sl.SetFocus(w); err != nil {
+		log.Printf("lock: cannot focus %T: %v", w, err)
 	}
 }
 

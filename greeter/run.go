@@ -58,8 +58,11 @@ func Run(init Init) error {
 		},
 		invoke: a.Invoke,
 		focus: func(w widget.Widget) {
-			if win != nil {
-				win.SetFocus(w)
+			if win == nil {
+				return
+			}
+			if err := win.SetFocus(w); err != nil {
+				log.Printf("greeter: cannot focus %T: %v", w, err)
 			}
 		},
 		quit: a.Quit,

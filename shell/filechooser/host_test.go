@@ -35,10 +35,19 @@ import (
 type fakeWindow struct {
 	closed bool
 	focus  widget.Widget
+	// refuse fails every SetFocus, as an overlay whose surface is gone.
+	refuse error
 }
 
-func (w *fakeWindow) Close()                   { w.closed = true }
-func (w *fakeWindow) SetFocus(f widget.Widget) { w.focus = f }
+func (w *fakeWindow) Close() { w.closed = true }
+
+func (w *fakeWindow) SetFocus(f widget.Widget) error {
+	if w.refuse != nil {
+		return w.refuse
+	}
+	w.focus = f
+	return nil
+}
 
 // lay lays root out on a w x h output, as its window does.
 func lay(root widget.Widget, w, h int) {
@@ -87,7 +96,9 @@ type harness struct {
 	opened  chan app.LayerConfig
 	windows []*fakeWindow
 	openErr error
-	cfg     app.LayerConfig
+	// focusErr fails every opened overlay's SetFocus.
+	focusErr error
+	cfg      app.LayerConfig
 	// conf is the live config; the chooser animates as it says.
 	conf    *config.Config
 	queue   chan func()
@@ -126,7 +137,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 			if hs.openErr != nil {
 				return nil, hs.openErr
 			}
-			w := &fakeWindow{}
+			w := &fakeWindow{refuse: hs.focusErr}
 			hs.windows = append(hs.windows, w)
 			hs.opened <- c
 			return w, nil
@@ -639,6 +650,21 @@ func TestOpenFailureAnswersNothing(t *testing.T) {
 	hs.openErr = errors.New("no layer shell")
 	if uris := hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}).URIs; uris != nil {
 		t.Errorf("an unmapped chooser answered %v", uris)
+	}
+}
+
+// An overlay whose first control cannot take focus could not be typed
+// into: the request answers nothing and the overlay closes.
+func TestUnfocusableOverlayAnswersNothing(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.focusErr = app.ErrClosed
+	if uris := hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}).URIs; uris != nil {
+		t.Errorf("an unfocusable chooser answered %v", uris)
+	}
+	var closed bool
+	hs.do(func() { closed = len(hs.windows) == 1 && hs.windows[0].closed })
+	if !closed {
+		t.Error("the unfocusable overlay stayed mapped")
 	}
 }
 

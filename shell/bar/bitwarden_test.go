@@ -181,7 +181,7 @@ func (focusHost) OpenPopover(widget.Boundser, widget.Widget, widget.PopoverOptio
 	return func() {}
 }
 
-func (focusHost) Focus(widget.Widget) {}
+func (focusHost) Focus(widget.Widget) error { return nil }
 
 // waitIdle waits until the view's operation has applied.
 func waitIdle(t *testing.T, v *bitwardenView) {

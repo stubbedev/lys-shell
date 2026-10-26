@@ -2,6 +2,7 @@ package bar
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -74,7 +75,7 @@ type dropdownCloser interface{ dropdownClosed() }
 // *app.Popover implements it.
 type popoverHandle interface {
 	Dismiss()
-	SetFocus(w widget.Widget)
+	SetFocus(w widget.Widget) error
 }
 
 // dropdownAttacher is content that acts on its own popover; the
@@ -93,7 +94,7 @@ type popoverHook struct {
 func (p *popoverHook) attachPopover(h popoverHandle) {
 	p.h = h
 	if p.pending != nil {
-		h.SetFocus(p.pending)
+		p.focus(p.pending)
 		p.pending = nil
 	}
 }
@@ -106,13 +107,15 @@ func (p *popoverHook) popdown() {
 }
 
 // focus moves keyboard focus to w inside the hosting popover, or once
-// it opens.
+// it opens; a refusal is logged.
 func (p *popoverHook) focus(w widget.Widget) {
 	if p.h == nil {
 		p.pending = w
 		return
 	}
-	p.h.SetFocus(w)
+	if err := p.h.SetFocus(w); err != nil {
+		log.Printf("bar: dropdown: cannot focus %T: %v", w, err)
+	}
 }
 
 func newDropdownRegistry(application *app.Application, cfg *config.Config, font render.Font, style *barStyle, base ModuleContext) *dropdownRegistry {
