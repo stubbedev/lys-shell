@@ -76,7 +76,7 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-opdgB7gHpt5KEq7nJeIwNrV/6a5/WDobNqUJ6azOMe4=";
+  vendorHash = "sha256-flcGNn5mjz3gIkL173feWHEWjcijMGqPLdYngVL+wdM=";
 
   subPackages = [
     "cmd/lys-shell"
