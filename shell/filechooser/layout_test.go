@@ -41,12 +41,20 @@ func (h *popoverHost) OpenPopover(_ widget.Boundser, content widget.Widget, opts
 
 func (h *popoverHost) Focus(widget.Widget) error { return nil }
 
+// panelBorder is the panel's border, lys-ui's card surface's 1px.
+const panelBorder = 1
+
+// within is the panel at r inside its border, where its content lies.
+func within(r render.Rect) render.Rect {
+	return render.Rect{X: r.X + panelBorder, Y: r.Y + panelBorder, W: r.W - 2*panelBorder, H: r.H - 2*panelBorder}
+}
+
 // laidOut lays the overlay out on the test output and returns the
-// panel's rect.
+// panel's rect inside its border.
 func (hs *harness) laidOut(t *testing.T) render.Rect {
 	t.Helper()
 	lay(hs.cfg.Root, outW, outH)
-	return hs.panel(t).PanelRect()
+	return within(hs.panel(t).PanelRect())
 }
 
 // classed is the one widget carrying class.

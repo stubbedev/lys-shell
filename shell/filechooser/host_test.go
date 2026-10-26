@@ -807,7 +807,7 @@ func TestColumnGripKeepsTheNameFloor(t *testing.T) {
 	hs.run(func() { grips = treetest.All[*columnGrip](hs.cfg.Root) })
 	var r *widget.Router
 	var at widget.Point
-	hs.do(func() { settle(hs.cfg.Root, W, H) })
+	hs.do(func() { lay(hs.cfg.Root, W, H) })
 	hs.run(func() { r, at = treetest.Pointer(hs.cfg.Root, grips[2], W, H) })
 	hs.do(func() { drag(r, at, widget.Point{X: at.X - 300, Y: at.Y}) })
 	if hs.c.columns[2] >= maxColumnW {
@@ -863,8 +863,9 @@ func TestPanelFloatsOnTheOutput(t *testing.T) {
 		}
 		header := treetest.WithClass(panel, "file-chooser-header")[0].(widget.Boundser).Bounds()
 		footer := treetest.WithClass(panel, "file-chooser-footer")[0].(widget.Boundser).Bounds()
-		if header.Y != centred.Y || footer.Y+footer.H != centred.Y+centred.H || footer.W != centred.W {
-			t.Errorf("header %v and footer %v, want them spanning the panel %v", header, footer, centred)
+		content := within(centred)
+		if header.Y != content.Y || footer.Y+footer.H != content.Y+content.H || header.W != content.W || footer.W != content.W {
+			t.Errorf("header %v and footer %v, want them spanning the panel %v inside its border", header, footer, centred)
 		}
 	})
 	dir := hs.dir()
@@ -1857,20 +1858,12 @@ func TestPanelRevealsAndHidesWithItsAnimation(t *testing.T) {
 	}
 }
 
-// settle lays root out twice, as its window does across the first two
-// frames: the first layout styles the tree, which invalidates it, and
-// the second lays it out as styled.
-func settle(root widget.Widget, w, h int) {
-	lay(root, w, h)
-	lay(root, w, h)
-}
-
-// frame paints the whole surface at w x h as its window does once its
-// layout settled, and reads back its pixels.
+// frame paints the whole surface at w x h as its window does and reads
+// back its pixels.
 func (hs *harness) frame(w, h int) func(x, y int) render.Color {
 	px := make([]uint8, w*h*4)
 	hs.do(func() {
-		settle(hs.cfg.Root, w, h)
+		lay(hs.cfg.Root, w, h)
 		hs.cfg.Root.Paint(render.New(px, w*4, w, h))
 	})
 	return func(x, y int) render.Color {
