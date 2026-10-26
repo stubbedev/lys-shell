@@ -79,25 +79,27 @@ type stack struct {
 	hovered bool
 	root    *widget.Box
 	pile    *widget.Pile
-	// count tells how many cards sit behind the front one while the
-	// stack is collapsed; clear dismisses the whole stack once expanded.
-	count *widget.Badge
+	// clear dismisses the whole stack once expanded.
 	clear *widget.Button
 }
 
 // card is one popup (NotificationPopupCard) on lys-ui's card: the top
-// row as an Item (the app icon, the app name, the age and the close
-// button), the summary, the body, and the action rows.
+// row as an Item (the app icon, the app name, the count of the cards
+// behind it, the age and the close button), the summary, the body, and
+// the action rows.
 type card struct {
 	id uint32
 	// leaving marks a card playing its exit.
 	leaving bool
 	// swipe takes the card away on a sideways swipe; rev inside it
 	// plays the card's enter and exit (the LysShellRevealer around it).
-	swipe   *widget.SwipeDismiss
-	rev     *widget.Revealer
-	root    *widget.Box
-	head    *widget.Item
+	swipe *widget.SwipeDismiss
+	rev   *widget.Revealer
+	root  *widget.Box
+	head  *widget.Item
+	// count shows, on a collapsed stack's front card, how many cards
+	// sit behind it.
+	count   *widget.Badge
 	time    *widget.Label
 	summary *widget.Label
 	body    *widget.RichLabel
@@ -294,12 +296,17 @@ func (p *Popups) dropCard(c *card) {
 }
 
 // newStack builds an empty stack for key: the clear-all button over
-// the pile of cards, with the count on the front card's corner.
+// the pile of cards.
 func (p *Popups) newStack(key string) *stack {
 	th := widget.Current()
 	st := &stack{key: key}
 	st.root = widget.NewBox(widget.Column, th.Spacing, 0)
 	st.root.AddClass("notification-popup-stack")
+	// The stack is the card width exactly, lys-ui's explicit width for
+	// content that fills it: its cards fill the pile's rects, the
+	// peeking ones narrower, and their Items would otherwise fill the
+	// output.
+	st.root.SetInlineStyle(styling.WidthStyle(int(cardWidthPx * float64(p.cfg.Styling.Scale))))
 	label := widget.NewLabel(p.font, th.TextSize*float64(p.cfg.Styling.Scale), i18n.T("notification-popup-clear-all"), 0)
 	st.clear = widget.NewButton(label, 0, 0)
 	st.clear.AddClass("notification-popup-clear-all", css.Ghost, css.Small)
@@ -311,36 +318,29 @@ func (p *Popups) newStack(key string) *stack {
 	st.pile.SetSpacing(th.Spacing)
 	st.pile.SetPeekOffset(th.Spacing)
 	st.pile.SetPeekEdge(peekEdge(p.cfg.Notification.PopupPosition))
-	st.count = widget.NewBadge(p.font, "")
-	st.count.AddClass("notification-popup-count")
-	deck := widget.NewOverlay()
-	deck.Append(st.pile)
-	deck.AppendAligned(st.count, widget.AlignEnd, widget.AlignStart)
-	st.root.Append(deck, false)
+	st.root.Append(st.pile, false)
 	st.root.SetOnHoverWithin(func(on bool) { p.hoverStack(st, on) })
 	return st
 }
 
 // refreshStack lays the stack's cards into its pile, front first, and
 // shows what its state calls for: collapsed, the front card over the
-// edges of the ones behind it and their count; expanded, every card in
-// full and the clear-all button.
+// edges of the ones behind it, counting them in its top row; expanded,
+// every card in full and the clear-all button.
 func (p *Popups) refreshStack(st *stack) {
 	expanded := st.hovered
 	want := make([]widget.Widget, len(st.cards))
-	live := 0
+	ids := st.liveIDs()
 	for i, c := range st.cards {
 		want[i] = c.swipe
 		c.setFull(expanded)
-		if !c.leaving {
-			live++
-		}
+		front := len(ids) > 0 && c.id == ids[0] && !c.leaving
+		c.count.SetText("+" + strconv.Itoa(len(ids)-1))
+		c.count.SetVisible(front && !expanded && len(ids) > 1)
 	}
 	reconcileChildren(pileChildren(st.pile), want)
 	st.pile.SetExpanded(expanded)
-	st.count.SetText("+" + strconv.Itoa(live-1))
-	st.count.SetVisible(!expanded && live > 1)
-	st.clear.SetVisible(expanded && live > 1)
+	st.clear.SetVisible(expanded && len(ids) > 1)
 }
 
 // children is a container's child list as reconcileChildren edits it.
@@ -458,9 +458,6 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	c := &card{id: n.ID}
 	c.root = widget.NewBox(widget.Column, 0, 0)
 	c.root.AddClass(css.Card, css.Glass, "notification-popup-card", notifyui.UrgencyClass(n.Urgency))
-	// The card is its width exactly, lys-ui's explicit width for
-	// content that fills it: the Item would otherwise fill the output.
-	c.root.SetInlineStyle(styling.WidthStyle(int(cardWidthPx * scale)))
 	if cfg.PopupShadow {
 		c.root.AddClass("shadow")
 	}
@@ -487,6 +484,10 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 		glyph.AddClass("file-icon")
 	}
 	c.head.SetMedia(glyph, notifyui.IsFileIcon(icon))
+	c.count = widget.NewBadge(p.font, "")
+	c.count.AddClass("notification-popup-count")
+	c.count.SetVisible(false)
+	c.head.AddAction(c.count)
 	c.time = widget.NewLabel(p.font, px, notifyui.TimeLabel(notifyui.RelativeTime(p.now(), n.Added), "notification-popup"), 0)
 	c.time.AddClass("notification-popup-time", css.Caption, css.DimLabel)
 	c.head.AddAction(c.time)
@@ -684,10 +685,11 @@ func (p *Popups) ensureWindow(out *app.Output) (*app.LayerWindow, *widget.Box, e
 
 // newHost builds the surface's widget tree: the transparent host
 // carrying the stylesheet, around the list that spaces the stacks by
-// popup-gap.
+// popup-gap and keeps that same gap from every edge of the surface,
+// room the cards' shadows paint into.
 func (p *Popups) newHost() (host, list *widget.Box) {
-	gap := p.cfg.Notification.PopupGap.ResolvePx(popupGapBasePx, float64(p.cfg.Styling.Scale))
-	list = widget.NewBox(widget.Column, int(gap), 0)
+	gap := int(p.cfg.Notification.PopupGap.ResolvePx(popupGapBasePx, float64(p.cfg.Styling.Scale)))
+	list = widget.NewBox(widget.Column, gap, gap)
 	list.AddClass("notification-popup-list")
 	host = widget.NewBox(widget.Column, 0, 0)
 	host.SetElement("window")

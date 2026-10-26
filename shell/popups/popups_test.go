@@ -62,7 +62,8 @@ type surface struct {
 	r     *widget.Router
 }
 
-// surfaceW and surfaceH are the room the test surface lays out in.
+// surfaceW and surfaceH bound the test surface, which takes its
+// content's size within them.
 const (
 	surfaceW = 400
 	surfaceH = 3000
@@ -106,9 +107,11 @@ func (s *surface) sync() {
 	s.layout()
 }
 
+// layout sizes the surface to its content, as the layer surface
+// follows its root's natural size.
 func (s *surface) layout() {
-	s.host.Measure(widget.Constraints{Max: widget.Size{W: surfaceW, H: surfaceH}})
-	s.host.Arrange(render.Rect{W: surfaceW, H: surfaceH})
+	sz := s.host.Measure(widget.Constraints{Max: widget.Size{W: surfaceW, H: surfaceH}})
+	s.host.Arrange(render.Rect{W: sz.W, H: sz.H})
 }
 
 // point is the centre of w.
@@ -163,6 +166,16 @@ func (s *surface) card(id uint32) *card {
 	return c
 }
 
+// front is the stack's front card that is not leaving.
+func (st *stack) front() *card {
+	for _, c := range st.cards {
+		if !c.leaving {
+			return c
+		}
+	}
+	return nil
+}
+
 // expanded is whether the stack's pile lays its cards out as a list.
 func (st *stack) expanded() bool { return st.pile.Expanded() }
 
@@ -212,8 +225,8 @@ func TestBurstCollapsesIntoAStackPerApp(t *testing.T) {
 	}
 	for _, id := range []uint32{mail[2], chat[2]} {
 		st := s.stackOf(id)
-		if st.expanded() || !st.count.Visible() || st.count.Text() != "+2" || st.clear.Visible() {
-			t.Errorf("stack of %d: expanded %v, count %q shown %v, clear shown %v; want collapsed with +2", id, st.expanded(), st.count.Text(), st.count.Visible(), st.clear.Visible())
+		if st.expanded() || !st.front().count.Visible() || st.front().count.Text() != "+2" || st.clear.Visible() {
+			t.Errorf("stack of %d: expanded %v, count %q shown %v, clear shown %v; want collapsed with +2", id, st.expanded(), st.front().count.Text(), st.front().count.Visible(), st.clear.Visible())
 		}
 	}
 	c := s.card(mail[2])
@@ -250,12 +263,17 @@ func TestCollapsedStackPeeks(t *testing.T) {
 		}
 		s.sync()
 		front, peek, deeper, buried := s.card(ids[3]), s.card(ids[2]), s.card(ids[1]), s.card(ids[0])
-		f, pk, d := front.swipe.Bounds(), peek.swipe.Bounds(), deeper.swipe.Bounds()
+		f, pk, d := front.root.Bounds(), peek.root.Bounds(), deeper.root.Bounds()
 		if !front.swipe.HasClass("front") || !peek.swipe.HasClass("peek") || !deeper.swipe.HasClass("peek") || !buried.swipe.HasClass("buried") {
 			t.Errorf("%s: classes front %v peek %v %v buried %v", tc.position, front.swipe.Classes(), peek.swipe.Classes(), deeper.swipe.Classes(), buried.swipe.Classes())
 		}
 		if pk.W >= f.W || d.W >= pk.W {
 			t.Errorf("%s: widths front %d peek %d deeper %d, want each deeper card narrower", tc.position, f.W, pk.W, d.W)
+		}
+		for _, b := range []render.Rect{pk, d} {
+			if b.X <= f.X || b.X+b.W >= f.X+f.W {
+				t.Errorf("%s: a peek spans x %d..%d, want it inside the front's %d..%d", tc.position, b.X, b.X+b.W, f.X, f.X+f.W)
+			}
 		}
 		if out := pk.Y > f.Y && d.Y > pk.Y; out != tc.down {
 			t.Errorf("%s: tops front %d peek %d deeper %d, want the peeks out past the far edge", tc.position, f.Y, pk.Y, d.Y)
@@ -269,7 +287,7 @@ func TestCollapsedStackPeeks(t *testing.T) {
 		}
 
 		s.hover(front.summary)
-		f, pk = front.swipe.Bounds(), peek.swipe.Bounds()
+		f, pk = front.root.Bounds(), peek.root.Bounds()
 		if pk.W != f.W || (pk.Y > f.Y) != tc.down || pk.Y == f.Y {
 			t.Errorf("%s expanded: front %+v peek %+v, want a list of full-width cards from the front's end", tc.position, f, pk)
 		}
@@ -331,8 +349,8 @@ func TestStackModes(t *testing.T) {
 	if got := s.p.stackOrder(); len(got) != 1 || len(got[0]) != 6 || got[0][0] != chat[2] {
 		t.Errorf("popup-stack all: stacks %v, want one of six with the newest in front", got)
 	}
-	if st := s.stackOf(mail[0]); st.count.Text() != "+5" {
-		t.Errorf("popup-stack all: count %q, want +5", st.count.Text())
+	if st := s.stackOf(mail[0]); st.front().count.Text() != "+5" {
+		t.Errorf("popup-stack all: count %q, want +5", st.front().count.Text())
 	}
 
 	cfg.PopupStack = config.PopupStackOff
@@ -342,7 +360,7 @@ func TestStackModes(t *testing.T) {
 	if got := s.p.stackOrder(); !slices.EqualFunc(got, want, slices.Equal) {
 		t.Errorf("popup-stack off: stacks %v, want %v", got, want)
 	}
-	if st := s.stackOf(mail[0]); st.count.Visible() {
+	if st := s.stackOf(mail[0]); st.front().count.Visible() {
 		t.Error("a stack of one shows a count")
 	}
 
@@ -373,15 +391,15 @@ func TestHoverExpandsTheStackAndLeavingRestoresIt(t *testing.T) {
 
 	s.hover(front.summary)
 	st, other := s.stackOf(mail[2]), s.stackOf(chat[2])
-	if !st.expanded() || st.count.Visible() || !st.clear.Visible() {
-		t.Errorf("hovered stack: expanded %v, count shown %v, clear shown %v", st.expanded(), st.count.Visible(), st.clear.Visible())
+	if !st.expanded() || st.front().count.Visible() || !st.clear.Visible() {
+		t.Errorf("hovered stack: expanded %v, count shown %v, clear shown %v", st.expanded(), st.front().count.Visible(), st.clear.Visible())
 	}
 	for _, id := range mail {
 		if c := s.card(id); !c.actions.Visible() || c.body.MaxLines() != 0 || c.summary.MaxLines() != 0 {
 			t.Errorf("card %d in a hovered stack: actions shown %v, body lines %d, summary lines %d", id, c.actions.Visible(), c.body.MaxLines(), c.summary.MaxLines())
 		}
 	}
-	if other.expanded() || !other.count.Visible() {
+	if other.expanded() || !other.front().count.Visible() {
 		t.Error("hovering one stack expanded the other")
 	}
 	s.hover(front.summary)
@@ -393,11 +411,71 @@ func TestHoverExpandsTheStackAndLeavingRestoresIt(t *testing.T) {
 	}
 
 	s.leave()
-	if st.expanded() || !st.count.Visible() || st.clear.Visible() || front.actions.Visible() || front.body.MaxLines() != cardBodyLines {
-		t.Errorf("after leaving: expanded %v, count shown %v, clear shown %v, actions shown %v", st.expanded(), st.count.Visible(), st.clear.Visible(), front.actions.Visible())
+	if st.expanded() || !st.front().count.Visible() || st.clear.Visible() || front.actions.Visible() || front.body.MaxLines() != cardBodyLines {
+		t.Errorf("after leaving: expanded %v, count shown %v, clear shown %v, actions shown %v", st.expanded(), st.front().count.Visible(), st.clear.Visible(), front.actions.Visible())
 	}
 	if got := s.fill(front); got != rest {
 		t.Errorf("after leaving the plate is %v, want the resting %v", got, rest)
+	}
+}
+
+// The stacks keep popup-gap from every edge of the surface, as from
+// each other, so no card or clear-all button touches the screen edge
+// the surface is anchored to; the gap follows popup-gap.
+func TestStacksInsetFromTheSurfaceEdges(t *testing.T) {
+	for _, gap := range []config.Size{config.Scale(1), config.Px(20)} {
+		cfg := config.DefaultsNotification()
+		cfg.PopupGap = gap
+		s := newSurface(t, cfg)
+		mail, chat := s.burst()
+		inset := int(gap.ResolvePx(popupGapBasePx, float64(s.p.cfg.Styling.Scale)))
+		host := s.host.Bounds()
+		top, bottom := s.stackOf(chat[2]).root.Bounds(), s.stackOf(mail[2]).root.Bounds()
+		if top.Y != inset || host.H-(bottom.Y+bottom.H) != inset {
+			t.Errorf("gap %v: stacks span %d..%d of a %dpx surface, want %dpx from the top and the bottom", gap, top.Y, bottom.Y+bottom.H, host.H, inset)
+		}
+		for _, id := range []uint32{mail[2], chat[2]} {
+			b := s.card(id).root.Bounds()
+			if b.X != inset || host.W-(b.X+b.W) != inset {
+				t.Errorf("gap %v: card %d spans x %d..%d of a %dpx surface, want %dpx from either side", gap, id, b.X, b.X+b.W, host.W, inset)
+			}
+		}
+		s.hover(s.card(mail[2]).summary)
+		host = s.host.Bounds()
+		clear := s.stackOf(mail[2]).clear.Bounds()
+		card := s.card(mail[2]).root.Bounds()
+		if right := host.W - (clear.X + clear.W); right != inset || clear.X+clear.W != card.X+card.W {
+			t.Errorf("gap %v: clear all ends %dpx from the edge at %d, the card at %d; want both %dpx in", gap, right, clear.X+clear.W, card.X+card.W, inset)
+		}
+	}
+}
+
+// The count of the cards behind a collapsed stack's front sits inline
+// in that card's top row, inside the card and the surface; no other
+// card shows one.
+func TestCountSitsInsideTheFrontCard(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupMaxVisible = 6
+	s := newSurface(t, cfg)
+	mail, _ := s.burst()
+	front := s.card(mail[2])
+	b, c, host := front.count.Bounds(), front.root.Bounds(), s.host.Bounds()
+	if !front.count.Visible() || b.W == 0 {
+		t.Fatal("the front card shows no count")
+	}
+	if b.X < c.X || b.Y < c.Y || b.X+b.W > c.X+c.W || b.Y+b.H > c.Y+c.H {
+		t.Errorf("count %+v leaves its card %+v", b, c)
+	}
+	if b.X < 0 || b.Y < 0 || b.X+b.W > host.W || b.Y+b.H > host.H {
+		t.Errorf("count %+v leaves the %dx%d surface", b, host.W, host.H)
+	}
+	if !within(front.head, front.count) {
+		t.Error("the count is not in the front card's top row")
+	}
+	for _, id := range mail[:2] {
+		if s.card(id).count.Visible() {
+			t.Errorf("card %d behind the front shows a count", id)
+		}
 	}
 }
 
@@ -1026,16 +1104,16 @@ func (c *card) appLabel() *widget.Label {
 	return treetest.WithClass(c.head, "title")[0].(*widget.Label)
 }
 
-// A card is its configured width whatever room the surface offers:
-// the Item inside fills only the card.
-func TestCardKeepsItsWidth(t *testing.T) {
+// A stack is the configured card width whatever room the surface
+// offers: the Items inside fill only their cards.
+func TestStackKeepsItsWidth(t *testing.T) {
 	p, svc := newTestPopups(t, config.DefaultsNotification())
 	id := svc.Notify("app", 0, "", "Ping", "body", nil, 0)
 	p.sync()
-	c := cardOf(t, p, id)
-	sz := widget.MeasureAsChild(c.rev, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	st := p.stacks[0]
+	sz := widget.MeasureAsChild(st.root, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
 	want := int(cardWidthPx * float64(p.cfg.Styling.Scale))
 	if sz.W != want {
-		t.Errorf("the card measures %dpx wide in a 1920px surface, want %d", sz.W, want)
+		t.Errorf("the stack of %d measures %dpx wide in a 1920px surface, want %d", id, sz.W, want)
 	}
 }
