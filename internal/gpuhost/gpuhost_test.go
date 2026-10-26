@@ -3,6 +3,8 @@ package gpuhost
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stubbedev/lys-lib/gpu"
 )
 
 // recorder is a testing.TB that records how a test ended instead of
@@ -33,5 +35,31 @@ func TestAbsentFailsOnlyWhenTheGPUIsAskedFor(t *testing.T) {
 	Absent(unasked, "no device behind %s", "/dev/dri/renderD128")
 	if unasked.skipped != "no device behind /dev/dri/renderD128" || unasked.failed != "" {
 		t.Errorf("not asked: failed %q, skipped %q", unasked.failed, unasked.skipped)
+	}
+}
+
+// reopens is how many devices a test process opens and closes on the
+// node: more than NVIDIA's driver survives being unloaded and loaded
+// again between them (17 in a container with no display server).
+const reopens = 40
+
+// While Node's device is held, every device a test opens and closes on
+// the node is the GPU behind it, however many come and go: the drivers
+// stay loaded. Node hands every caller the same device.
+func TestDevicesOpenedAfterNodeStayOnTheGPU(t *testing.T) {
+	_, dev, held := Node(t)
+	if _, _, again := Node(t); again != held {
+		t.Errorf("a second Node opened another device %p, want the held %p", again, held)
+	}
+	for i := range reopens {
+		d, err := gpu.OpenNode(dev)
+		if err != nil {
+			t.Fatalf("open %d of %d: %v", i+1, reopens, err)
+		}
+		name := d.Name()
+		d.Close()
+		if name != held.Name() {
+			t.Fatalf("open %d of %d landed on %s, want %s", i+1, reopens, name, held.Name())
+		}
 	}
 }

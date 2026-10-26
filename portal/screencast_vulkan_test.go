@@ -11,7 +11,6 @@ import (
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabuf"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
-	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	"golang.org/x/sys/unix"
 
@@ -21,17 +20,13 @@ import (
 )
 
 // vulkanNode is the host's first render node, its device number, and
-// the Vulkan allocator behind it. No render node or no Vulkan device behind it (CI, or
-// Vulkan limited to lavapipe, which has no DRM node) is gpuhost.Absent;
-// any other failure to open it fails.
+// the Vulkan allocator behind it. No device there is gpuhost.Absent
+// (gpuhost.Node); an allocator that then fails to open fails.
 func vulkanNode(t *testing.T) (string, uint64, gpuAllocator) {
 	t.Helper()
-	node, dev := gpuhost.Node(t)
+	node, dev, _ := gpuhost.Node(t)
 	a, err := openVulkanAllocator(dev)
-	switch {
-	case errors.Is(err, gpu.ErrNoVulkan), errors.Is(err, gpu.ErrNoDevice):
-		gpuhost.Absent(t, "no Vulkan device behind %s: %v", node, err)
-	case err != nil:
+	if err != nil {
 		t.Fatalf("%s has a Vulkan device that fails to open: %v", node, err)
 	}
 	t.Cleanup(a.Close)

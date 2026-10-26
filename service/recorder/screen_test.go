@@ -32,21 +32,11 @@ import (
 )
 
 // encoderNode is the host's first render node with a Vulkan device
-// that encodes H.264 behind it. No render node, no Vulkan device on it
-// (CI, or Vulkan limited to lavapipe, which has no DRM node), or no
-// H.264 encoder on it is gpuhost.Absent; any other failure to open it
-// fails.
+// that encodes H.264 behind it. No device there (gpuhost.Node), or no
+// H.264 encoder on it, is gpuhost.Absent.
 func encoderNode(t *testing.T) string {
 	t.Helper()
-	node, dev := gpuhost.Node(t)
-	d, err := gpu.OpenNode(dev)
-	switch {
-	case errors.Is(err, gpu.ErrNoVulkan), errors.Is(err, gpu.ErrNoDevice):
-		gpuhost.Absent(t, "no Vulkan device behind %s: %v", node, err)
-	case err != nil:
-		t.Fatalf("%s has a Vulkan device that fails to open: %v", node, err)
-	}
-	defer d.Close()
+	node, _, d := gpuhost.Node(t)
 	if err := requireH264(d); err != nil {
 		gpuhost.Absent(t, "the GPU behind %s cannot record: %v", node, err)
 	}
