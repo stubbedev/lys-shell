@@ -23,6 +23,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
     };
+    # The compositor the lys-wm VM check runs the shell on.
+    lys-wm = {
+      url = "github:stubbedev/lys-wm";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.lys-ui.inputs.flake-parts.follows = "flake-parts";
+    };
   };
 
   outputs =

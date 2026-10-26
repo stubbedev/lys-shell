@@ -43,6 +43,54 @@
         "type": "github"
       }
     },
+    "lys-ui": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "lys-wm",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792847676,
+        "narHash": "sha256-Lh259vWm/n59pTknaCJqWL2bAXoj4spLTYG/2eWehW8=",
+        "owner": "stubbedev",
+        "repo": "lys-ui",
+        "rev": "b4ed4d0aa4f9b01018bca62f494600f85847ed9b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "stubbedev",
+        "repo": "lys-ui",
+        "type": "github"
+      }
+    },
+    "lys-wm": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "lys-ui": "lys-ui",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793036086,
+        "narHash": "sha256-APaUkJrh9GcHWh68PPlJQtw4Gu2+U/pcQVOoX66d0zs=",
+        "owner": "stubbedev",
+        "repo": "lys-wm",
+        "rev": "bfe4d609178870ad0d7ffefb14f7f51a127a2e3a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "stubbedev",
+        "repo": "lys-wm",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1792502884,
@@ -63,6 +111,7 @@
       "inputs": {
         "flake-parts": "flake-parts",
         "lys-lib": "lys-lib",
+        "lys-wm": "lys-wm",
         "nixpkgs": "nixpkgs"
       }
     }

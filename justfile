@@ -141,6 +141,13 @@ docker recipe="check" memory="10g":
 hyprland-vm:
     nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-hyprland-vm
 
+# The shell on lys-wm in a NixOS VM (needs KVM): bars on both outputs,
+# the lys-wm workspaces, window title, keybind mode and keyboard layout
+# modules following lys-wm's IPC, the layout toast, screenshots and the
+# session lock. Screenshots of every state land in ./result.
+lys-wm-vm:
+    nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-lys-wm-vm
+
 # Every release gate in order: vet, lint, test, race, the schema
 # check, and the release build.
 check: vet lint test race schema-check build

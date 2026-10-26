@@ -66,19 +66,7 @@ let
     exec-once = lys-shell shell > /tmp/lys/shell.log 2>&1
   '';
 
-  # Clicks through the compositor's virtual pointer (QEMU's tablet does
-  # not reach the seat), built from the shell's own module set.
-  vmclick = self.packages.${pkgs.stdenv.hostPlatform.system}.lys-shell.overrideAttrs {
-    pname = "vmclick";
-    subPackages = [ "internal/tools/vmclick" ];
-    postInstall = "";
-    postFixup = "";
-  };
-
-  portalClient = pkgs.writers.writePython3Bin "portal-client" {
-    libraries = [ pkgs.python3Packages.jeepney ];
-    flakeIgnore = [ "E501" ];
-  } (builtins.readFile ./portal-client.py);
+  inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient;
 
   # The portal client's app id: the frontend lets a host app use
   # GlobalShortcuts once it registered one with a desktop entry.
