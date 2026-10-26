@@ -10,7 +10,7 @@ import (
 // it over — handleCall closes it once the reply is sent, or not sent —
 // since nothing else could close it after the method returns without
 // racing the send (a clipboard transfer pipe, a PipeWire remote).
-var fileType = reflect.TypeOf((*os.File)(nil))
+var fileType = reflect.TypeFor[*os.File]()
 
 // closeReplyFiles closes the *os.File values a method replied.
 func closeReplyFiles(ret []any) {

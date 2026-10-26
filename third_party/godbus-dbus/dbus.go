@@ -8,24 +8,24 @@ import (
 )
 
 var (
-	byteType        = reflect.TypeOf(byte(0))
+	byteType        = reflect.TypeFor[byte]()
 	boolType        = reflect.TypeOf(false)
-	int16Type       = reflect.TypeOf(int16(0))
-	uint16Type      = reflect.TypeOf(uint16(0))
-	int32Type       = reflect.TypeOf(int32(0))
-	uint32Type      = reflect.TypeOf(uint32(0))
-	int64Type       = reflect.TypeOf(int64(0))
-	uint64Type      = reflect.TypeOf(uint64(0))
-	float64Type     = reflect.TypeOf(float64(0))
-	stringType      = reflect.TypeOf("")
-	signatureType   = reflect.TypeOf(Signature{""})
-	objectPathType  = reflect.TypeOf(ObjectPath(""))
-	variantType     = reflect.TypeOf(Variant{Signature{""}, nil})
-	interfacesType  = reflect.TypeOf([]any{})
-	interfaceType   = reflect.TypeOf((*any)(nil)).Elem()
-	unixFDType      = reflect.TypeOf(UnixFD(0))
-	unixFDIndexType = reflect.TypeOf(UnixFDIndex(0))
-	errType         = reflect.TypeOf((*error)(nil)).Elem()
+	int16Type       = reflect.TypeFor[int16]()
+	uint16Type      = reflect.TypeFor[uint16]()
+	int32Type       = reflect.TypeFor[int32]()
+	uint32Type      = reflect.TypeFor[uint32]()
+	int64Type       = reflect.TypeFor[int64]()
+	uint64Type      = reflect.TypeFor[uint64]()
+	float64Type     = reflect.TypeFor[float64]()
+	stringType      = reflect.TypeFor[string]()
+	signatureType   = reflect.TypeFor[Signature]()
+	objectPathType  = reflect.TypeFor[ObjectPath]()
+	variantType     = reflect.TypeFor[Variant]()
+	interfacesType  = reflect.TypeFor[[]any]()
+	interfaceType   = reflect.TypeFor[any]()
+	unixFDType      = reflect.TypeFor[UnixFD]()
+	unixFDIndexType = reflect.TypeFor[UnixFDIndex]()
+	errType         = reflect.TypeFor[error]()
 )
 
 // An InvalidTypeError signals that a value which cannot be represented in the
@@ -316,8 +316,8 @@ func (o ObjectPath) IsValid() bool {
 	if s == "/" {
 		return true
 	}
-	split := strings.Split(s[1:], "/")
-	for _, v := range split {
+	split := strings.SplitSeq(s[1:], "/")
+	for v := range split {
 		if len(v) == 0 {
 			return false
 		}
@@ -408,8 +408,8 @@ func isValidMember(s string) bool {
 	if len(s) == 0 || len(s) > 255 {
 		return false
 	}
-	i := strings.Index(s, ".")
-	if i != -1 {
+	found := strings.Contains(s, ".")
+	if found {
 		return false
 	}
 	if s[0] >= '0' && s[0] <= '9' {

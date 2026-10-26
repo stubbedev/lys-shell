@@ -771,8 +771,8 @@ func getTransport(address string) (transport, error) {
 	var err error
 	var t transport
 
-	addresses := strings.Split(address, ";")
-	for _, v := range addresses {
+	addresses := strings.SplitSeq(address, ";")
+	for v := range addresses {
 		i := strings.IndexRune(v, ':')
 		if i == -1 {
 			err = errors.New("dbus: invalid bus address (no transport)")
@@ -794,7 +794,7 @@ func getTransport(address string) (transport, error) {
 // getKey gets a key from a the list of keys. Returns "" on error / not found...
 func getKey(s, key string) string {
 	keyEq := key + "="
-	for _, kv := range strings.Split(s, ",") {
+	for kv := range strings.SplitSeq(s, ",") {
 		if v, ok := strings.CutPrefix(kv, keyEq); ok {
 			val, err := UnescapeBusAddressValue(v)
 			if err != nil {

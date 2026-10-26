@@ -431,14 +431,15 @@ func (n arrayNode) Infer() (Signature, error) {
 }
 
 func (n arrayNode) String() string {
-	s := "["
+	var s strings.Builder
+	s.WriteString("[")
 	for i, v := range n.children {
-		s += v.String()
+		s.WriteString(v.String())
 		if i != len(n.children)-1 {
-			s += ", "
+			s.WriteString(", ")
 		}
 	}
-	return s + "]"
+	return s.String() + "]"
 }
 
 func (n arrayNode) Sigs() sigSet {
@@ -591,14 +592,15 @@ func (n dictNode) Infer() (Signature, error) {
 }
 
 func (n dictNode) String() string {
-	s := "{"
+	var s strings.Builder
+	s.WriteString("{")
 	for i, v := range n.children {
-		s += v.key.String() + ": " + v.val.String()
+		s.WriteString(v.key.String() + ": " + v.val.String())
 		if i != len(n.children)-1 {
-			s += ", "
+			s.WriteString(", ")
 		}
 	}
-	return s + "}"
+	return s.String() + "}"
 }
 
 func (n dictNode) Sigs() sigSet {

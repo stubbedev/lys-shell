@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"slices"
 	"sync"
 )
 
@@ -59,9 +60,9 @@ func (sh *sequentialSignalHandler) RemoveSignal(ch chan<- *Signal) {
 	if sh.closed {
 		return
 	}
-	for i := len(sh.signals) - 1; i >= 0; i-- {
-		if ch == sh.signals[i].ch {
-			sh.signals[i].close()
+	for i, v := range slices.Backward(sh.signals) {
+		if ch == v.ch {
+			v.close()
 			copy(sh.signals[i:], sh.signals[i+1:])
 			sh.signals[len(sh.signals)-1] = nil
 			sh.signals = sh.signals[:len(sh.signals)-1]

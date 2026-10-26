@@ -77,7 +77,7 @@ func TestOrderedCallsRunInArrivalOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := client.Object(server.Names()[0], "/o")
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		o.Go("a.ordered.Slow", FlagNoReplyExpected, nil)
 		o.Go("a.ordered.Fast", FlagNoReplyExpected, nil)
 	}

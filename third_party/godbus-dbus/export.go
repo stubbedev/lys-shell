@@ -115,9 +115,9 @@ func standardMethodArgumentDecode(m Method, sender string, msg *Message, body []
 		tp := reflect.TypeOf(m.ArgumentValue(i))
 		val := reflect.New(tp)
 		pointers[i] = val.Interface()
-		if tp == reflect.TypeOf((*Sender)(nil)).Elem() {
+		if tp == reflect.TypeFor[Sender]() {
 			val.Elem().SetString(sender)
-		} else if tp == reflect.TypeOf((*Message)(nil)).Elem() {
+		} else if tp == reflect.TypeFor[Message]() {
 			val.Elem().Set(reflect.ValueOf(*msg))
 		} else {
 			decode = append(decode, pointers[i])
@@ -221,12 +221,12 @@ func (conn *Conn) handleCall(msg *Message) {
 // Emit emits the given signal on the message bus. The name parameter must be
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
 func (conn *Conn) Emit(path ObjectPath, name string, values ...any) error {
-	i := strings.LastIndex(name, ".")
-	if i == -1 {
+	before, after, ok := strings.CutLast(name, ".")
+	if !ok {
 		return errors.New("dbus: invalid method name")
 	}
-	iface := name[:i]
-	member := name[i+1:]
+	iface := before
+	member := after
 	msg := new(Message)
 	msg.Type = TypeSignal
 	msg.Headers = make(map[HeaderField]Variant)

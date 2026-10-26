@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 const protoVersion byte = 1
@@ -354,40 +355,41 @@ func (msg *Message) String() string {
 	if err := msg.IsValid(); err != nil {
 		return "<invalid>"
 	}
-	s := msg.Type.String()
+	var s strings.Builder
+	s.WriteString(msg.Type.String())
 	if v, ok := msg.Headers[FieldSender]; ok {
-		s += " from " + v.value.(string)
+		s.WriteString(" from " + v.value.(string))
 	}
 	if v, ok := msg.Headers[FieldDestination]; ok {
-		s += " to " + v.value.(string)
+		s.WriteString(" to " + v.value.(string))
 	}
-	s += " serial " + strconv.FormatUint(uint64(msg.serial), 10)
+	s.WriteString(" serial " + strconv.FormatUint(uint64(msg.serial), 10))
 	if v, ok := msg.Headers[FieldReplySerial]; ok {
-		s += " reply_serial " + strconv.FormatUint(uint64(v.value.(uint32)), 10)
+		s.WriteString(" reply_serial " + strconv.FormatUint(uint64(v.value.(uint32)), 10))
 	}
 	if v, ok := msg.Headers[FieldUnixFDs]; ok {
-		s += " unixfds " + strconv.FormatUint(uint64(v.value.(uint32)), 10)
+		s.WriteString(" unixfds " + strconv.FormatUint(uint64(v.value.(uint32)), 10))
 	}
 	if v, ok := msg.Headers[FieldPath]; ok {
-		s += " path " + string(v.value.(ObjectPath))
+		s.WriteString(" path " + string(v.value.(ObjectPath)))
 	}
 	if v, ok := msg.Headers[FieldInterface]; ok {
-		s += " interface " + v.value.(string)
+		s.WriteString(" interface " + v.value.(string))
 	}
 	if v, ok := msg.Headers[FieldErrorName]; ok {
-		s += " error " + v.value.(string)
+		s.WriteString(" error " + v.value.(string))
 	}
 	if v, ok := msg.Headers[FieldMember]; ok {
-		s += " member " + v.value.(string)
+		s.WriteString(" member " + v.value.(string))
 	}
 	if len(msg.Body) != 0 {
-		s += "\n"
+		s.WriteString("\n")
 	}
 	for i, v := range msg.Body {
-		s += "  " + MakeVariant(v).String()
+		s.WriteString("  " + MakeVariant(v).String())
 		if i != len(msg.Body)-1 {
-			s += "\n"
+			s.WriteString("\n")
 		}
 	}
-	return s
+	return s.String()
 }

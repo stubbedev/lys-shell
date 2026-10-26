@@ -32,3 +32,10 @@ upstream decodes fd arrays.
   does not wait on race: xdg-desktop-portal forwards RemoteDesktop input
   that way, and a click could land before the motion that placed it.
   Pinned by `TestOrderedCallsRunInArrivalOrder`.
+
+The copy is on Go 1.27.3 (go.mod), with golangci-lint's modernize fixes
+applied throughout: `reflect.TypeFor` and `TypeAssert`, `strings.SplitSeq`
+and `CutLast`, range over ints and over `Fields`/`Methods`,
+`slices.Backward` and `strings.Builder` where upstream predates them. No
+behaviour changes; the package's own tests pass under -race on a private
+session bus.

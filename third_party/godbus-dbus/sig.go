@@ -32,11 +32,11 @@ type Signature struct {
 // SignatureOf returns the concatenation of all the signatures of the given
 // values. It panics if one of them is not representable in D-Bus.
 func SignatureOf(vs ...any) Signature {
-	var s string
+	var s strings.Builder
 	for _, v := range vs {
-		s += getSignature(reflect.TypeOf(v), &depthCounter{})
+		s.WriteString(getSignature(reflect.TypeOf(v), &depthCounter{}))
 	}
-	return Signature{s}
+	return Signature{s.String()}
 }
 
 // SignatureOfType returns the signature of the given type. It panics if the
@@ -98,17 +98,16 @@ func getSignature(t reflect.Type, depth *depthCounter) (sig string) {
 		case signatureType:
 			return "g"
 		}
-		var s string
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
+		var s strings.Builder
+		for field := range t.Fields() {
 			if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
-				s += getSignature(t.Field(i).Type, depth.EnterStruct())
+				s.WriteString(getSignature(field.Type, depth.EnterStruct()))
 			}
 		}
-		if len(s) == 0 {
+		if len(s.String()) == 0 {
 			panic(InvalidTypeError{t})
 		}
-		return "(" + s + ")"
+		return "(" + s.String() + ")"
 	case reflect.Array, reflect.Slice:
 		return "a" + getSignature(t.Elem(), depth.EnterArray())
 	case reflect.Map:

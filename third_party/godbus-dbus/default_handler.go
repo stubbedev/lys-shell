@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -121,7 +122,7 @@ func (m exportedMethod) Call(args ...any) ([]any, error) {
 	t := m.Type()
 
 	params := make([]reflect.Value, len(args))
-	for i := 0; i < len(args); i++ {
+	for i := range args {
 		params[i] = reflect.ValueOf(args[i]).Elem()
 	}
 
@@ -129,7 +130,7 @@ func (m exportedMethod) Call(args ...any) ([]any, error) {
 	var err error
 	nilErr := false // The reflection will find almost-nils, let's only pass back clean ones!
 	if t.NumOut() > 0 {
-		if e, ok := ret[t.NumOut()-1].Interface().(*Error); ok { // godbus *Error
+		if e, ok := reflect.TypeAssert[*Error](ret[t.NumOut()-1]); ok { // godbus *Error
 			nilErr = ret[t.NumOut()-1].IsNil()
 			ret = ret[:t.NumOut()-1]
 			err = e
@@ -297,9 +298,9 @@ func (sh *defaultSignalHandler) RemoveSignal(ch chan<- *Signal) {
 	if sh.closed {
 		return
 	}
-	for i := len(sh.signals) - 1; i >= 0; i-- {
-		if ch == sh.signals[i].ch {
-			sh.signals[i].close()
+	for i, v := range slices.Backward(sh.signals) {
+		if ch == v.ch {
+			v.close()
 			copy(sh.signals[i:], sh.signals[i+1:])
 			sh.signals[len(sh.signals)-1] = nil
 			sh.signals = sh.signals[:len(sh.signals)-1]

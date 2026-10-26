@@ -62,22 +62,22 @@ func (i Introspectable) Introspect() (string, *dbus.Error) {
 func Methods(v any) []Method {
 	t := reflect.TypeOf(v)
 	ms := make([]Method, 0, t.NumMethod())
-	for i := 0; i < t.NumMethod(); i++ {
-		if t.Method(i).PkgPath != "" {
+	for method := range t.Methods() {
+		if method.PkgPath != "" {
 			continue
 		}
-		mt := t.Method(i).Type
+		mt := method.Type
 		if mt.NumOut() == 0 ||
-			mt.Out(mt.NumOut()-1) != reflect.TypeOf(&dbus.Error{}) {
+			mt.Out(mt.NumOut()-1) != reflect.TypeFor[*dbus.Error]() {
 
 			continue
 		}
 		var m Method
-		m.Name = t.Method(i).Name
+		m.Name = method.Name
 		m.Args = make([]Arg, 0, mt.NumIn()+mt.NumOut()-2)
 		for j := 1; j < mt.NumIn(); j++ {
-			if mt.In(j) != reflect.TypeOf((*dbus.Sender)(nil)).Elem() &&
-				mt.In(j) != reflect.TypeOf((*dbus.Message)(nil)).Elem() {
+			if mt.In(j) != reflect.TypeFor[dbus.Sender]() &&
+				mt.In(j) != reflect.TypeFor[dbus.Message]() {
 				arg := Arg{"", dbus.SignatureOfType(mt.In(j)).String(), "in"}
 				m.Args = append(m.Args, arg)
 			}
