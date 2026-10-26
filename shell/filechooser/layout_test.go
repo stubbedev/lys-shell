@@ -3,6 +3,7 @@ package filechooser
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -262,6 +263,48 @@ func TestReplaceNoticeWrapsInsideThePanel(t *testing.T) {
 				if wrapped := lines.H > line.H; wrapped != (name == long) || at.H < lines.H {
 					t.Errorf("the message for %q is %v, %dpx at its width and one line %d: wrapped %v", name, at, lines.H, line.H, wrapped)
 				}
+			})
+		})
+	}
+}
+
+// The save name sits a padding clear of the separator above it and
+// inset like the other bands; an open dialog has no name row at all,
+// the footer right under the body's separator. No widget in the panel
+// spaces itself with a margin: containers pad and gap their children.
+func TestSaveNameIsPaddedFromTheSeparator(t *testing.T) {
+	for _, save := range []bool{true, false} {
+		t.Run(strconv.FormatBool(save), func(t *testing.T) {
+			hs := newHarness(t, "")
+			if save {
+				hs.ask(t, func() []string {
+					return hs.c.Save(testCaller, SaveRequest{CurrentFolder: hs.root, CurrentName: "x.txt"}).URIs
+				})
+			} else {
+				hs.open(t, OpenRequest{})
+			}
+			hs.run(func() {
+				panel := hs.laidOut(t)
+				pad := widget.Current().Padding
+				body := classed(t, hs.cfg.Root, "file-chooser-body").Bounds()
+				footer := classed(t, hs.cfg.Root, "file-chooser-footer").Bounds()
+				name := hs.c.ui.name.Bounds()
+				if save {
+					if gap := name.Y - (body.Y + body.H); gap <= pad {
+						t.Errorf("name entry %dpx below the body, want it clear of the separator by more than %d", gap, pad)
+					}
+					if name.X-panel.X != 2*pad || panel.X+panel.W-(name.X+name.W) != 2*pad || footer.Y-(name.Y+name.H) != pad {
+						t.Errorf("name entry %v in the panel %v over the footer %v, want it inset %d aside and %d below", name, panel, footer, 2*pad, pad)
+					}
+				} else if gap := footer.Y - (body.Y + body.H); gap > 1 {
+					t.Errorf("footer %dpx below the body in an open dialog, want only the separator", gap)
+				}
+				treetest.Walk(hs.cfg.Root, func(w widget.Widget) {
+					m, ok := w.(interface{ Margin() render.Insets })
+					if ok && m.Margin() != (render.Insets{}) {
+						t.Errorf("%T %v spaces itself with margin %v", w, w.(widget.Boundser).Bounds(), m.Margin())
+					}
+				})
 			})
 		})
 	}

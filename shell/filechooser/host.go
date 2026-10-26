@@ -514,14 +514,15 @@ func (c *Chooser) build(r request) {
 	u.preview.SetVisible(false)
 	body.Append(u.preview, false)
 
+	nameRow := section(widget.Row, "file-chooser-name-row")
 	u.name = widget.NewEntry(c.d.Font, th.TextSize, 0)
 	u.name.AddClass("file-chooser-name")
-	u.name.SetMargin(render.Insets{Right: 2 * th.Padding, Bottom: th.Padding, Left: 2 * th.Padding})
 	u.name.SetPlaceholder("File name")
 	u.name.SetText(name)
 	u.name.OnActivate = func(string) { c.confirm() }
 	u.name.OnChanged = func(string) { c.clearNotice() }
-	u.name.SetVisible(s.mode == ModeSave)
+	nameRow.Append(u.name, true)
+	nameRow.SetVisible(s.mode == ModeSave)
 
 	// The notice: a warning, or the replace prompt with its button
 	// under it, so the message wraps across the panel's width.
@@ -578,7 +579,7 @@ func (c *Chooser) build(r request) {
 	main.Append(widget.NewSeparator(widget.Horizontal), false)
 	main.Append(body, true)
 	main.Append(widget.NewSeparator(widget.Horizontal), false)
-	main.Append(u.name, false)
+	main.Append(nameRow, false)
 	main.Append(u.notice, false)
 	main.Append(footer, false)
 
@@ -609,8 +610,9 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	box := widget.NewBox(widget.Column, th.Spacing/4, th.Padding)
 	box.AddClass("file-chooser-sidebar")
 	section := func(title string, places []Place) *widget.Box {
-		header := c.label(title, "file-chooser-sidebar-header", css.CaptionHeading, css.DimLabel)
-		header.SetMargin(render.Insets{Top: th.Padding / 2, Right: th.Padding, Bottom: th.Padding / 2, Left: th.Padding})
+		header := widget.NewBox(widget.Row, 0, 0)
+		header.SetPadding(render.Insets{Top: th.Padding / 2, Right: th.Padding, Bottom: th.Padding / 2, Left: th.Padding})
+		header.Append(c.label(title, "file-chooser-sidebar-header", css.CaptionHeading, css.DimLabel), true)
 		box.Append(header, false)
 		list := widget.NewBox(widget.Column, 0, 0)
 		list.AddClass("file-chooser-places")
