@@ -16,8 +16,7 @@ Architecture: amd64 arm64
 Depends:
  ${misc:Depends},
  hicolor-icon-theme,
- libpam0g,
- libpipewire-0.3-0t64 | libpipewire-0.3-0
+ libpam0g
 Recommends:
  libvulkan1,
  mesa-vulkan-drivers,
@@ -35,6 +34,6 @@ Description: Wayland desktop shell
  launcher, notifications, OSD, lock screen, greeter and an xdg-desktop-portal
  backend, configured in YAML or through the lys-settings GUI.
  .
- The binaries are Go with no cgo; they load PAM and PipeWire at runtime, and
- Vulkan when it is installed (the screen recorder needs it, with a GPU that
+ The binaries are Go with no cgo; they load PAM at runtime, and Vulkan when
+ it is installed (the screen recorder needs it, with a GPU that
  encodes H.264).

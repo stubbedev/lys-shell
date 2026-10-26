@@ -18,7 +18,6 @@ BuildRequires:  systemd-rpm-macros
 Requires:       hicolor-icon-theme
 # Loaded at runtime through purego, so rpm finds no ELF dependency on them.
 Requires:       pam
-Requires:       pipewire-libs
 Recommends:     vulkan-loader
 Recommends:     mesa-vulkan-drivers
 Recommends:     xdg-desktop-portal
