@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/sockdir"
+
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
@@ -43,11 +45,12 @@ type Server struct {
 	wg            sync.WaitGroup
 }
 
-// New starts a fake on a socket in a test temp dir; it shuts down with
-// the test.
+// New starts a fake on a socket in a short per-test dir (sockdir: a
+// long test name under CI's TMPDIR overflows sun_path); it shuts down
+// with the test.
 func New(t testing.TB) *Server {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "native")
+	path := filepath.Join(sockdir.Dir(t), "native")
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatalf("pulsetest: listen: %v", err)
