@@ -159,37 +159,28 @@ func relayOut(p *iconPicker) func(x, y int) [4]byte {
 // scrollToEnd scrolls the grid as far down as it goes.
 func scrollToEnd(p *iconPicker) { p.grid.ScrollBy(0, iconGridExtent(len(p.shown))) }
 
-// iconCellView is a grid cell as the pointer finds it.
+// iconCellView is a grid cell as the grid realized it.
 type iconCellView struct {
 	name     string
 	rect     render.Rect
 	selected bool
 }
 
-// cellsInView are the cells the pointer reaches inside the grid's box,
-// in the order of the shown icons.
+// cellsInView are the grid's realized cells that reach into its box,
+// in model order.
 func cellsInView(p *iconPicker) []iconCellView {
 	box := p.grid.Bounds()
-	found := map[string]iconCellView{}
-	for y := box.Y; y < box.Y+box.H; y++ {
-		for x := box.X; x < box.X+box.W; x++ {
-			hit := p.root.HitTest(widget.Point{X: x, Y: y})
-			cell, ok := hit.(interface {
-				TooltipText() string
-				Bounds() render.Rect
-				HasState(widget.StateFlags) bool
-			})
-			if !ok || !slices.Contains(p.shown, cell.TooltipText()) {
-				continue
-			}
-			found[cell.TooltipText()] = iconCellView{name: cell.TooltipText(), rect: cell.Bounds(), selected: cell.HasState(widget.StateSelected)}
+	var out []iconCellView
+	for _, k := range p.grid.Children() {
+		cell := k.(interface {
+			TooltipText() string
+			Bounds() render.Rect
+			HasState(widget.StateFlags) bool
+		})
+		if r := cell.Bounds(); r.Intersect(box).Empty() {
+			continue
 		}
-	}
-	out := make([]iconCellView, 0, len(found))
-	for _, name := range p.shown {
-		if v, ok := found[name]; ok {
-			out = append(out, v)
-		}
+		out = append(out, iconCellView{name: cell.TooltipText(), rect: cell.Bounds(), selected: cell.HasState(widget.StateSelected)})
 	}
 	return out
 }

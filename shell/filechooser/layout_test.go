@@ -337,9 +337,8 @@ func gridded(t *testing.T) *harness {
 	return hs
 }
 
-// gridCells paints the surface on the test output and finds the grid's
-// cells by hit testing every pixel of the grid: each cell's rect in
-// model order, and the frame's pixels.
+// gridCells paints the surface on the test output and returns the
+// grid's realized cells' rects in model order, and the frame's pixels.
 func (hs *harness) gridCells(t *testing.T) ([]render.Rect, func(x, y int) render.Color) {
 	t.Helper()
 	at := hs.frame(outW, outH)
@@ -347,18 +346,8 @@ func (hs *harness) gridCells(t *testing.T) ([]render.Rect, func(x, y int) render
 	var entries int
 	hs.run(func() {
 		entries = len(hs.c.s.entries)
-		grid := &hs.c.ui.grid.List
-		g := grid.Bounds()
-		seen := map[widget.Widget]bool{}
-		for y := g.Y; y < g.Y+g.H; y++ {
-			for x := g.X; x < g.X+g.W; x++ {
-				hit := grid.HitTest(widget.Point{X: x, Y: y})
-				if hit == widget.Widget(grid) || seen[hit] {
-					continue
-				}
-				seen[hit] = true
-				cells = append(cells, hit.(widget.Boundser).Bounds())
-			}
+		for _, cell := range hs.c.ui.grid.Children() {
+			cells = append(cells, cell.(widget.Boundser).Bounds())
 		}
 	})
 	if len(cells) != entries {
