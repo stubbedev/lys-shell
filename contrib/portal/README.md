@@ -128,7 +128,9 @@ NixOS / home-manager module alongside the shell.
   input to the portal, which wlroots/niri do not expose (only KWin/Mutter do),
   so the interface is not advertised.
 - **ScreenCast dmabuf**: a whole output streams zero-copy into dmabufs that
-  lys-ui's Vulkan device allocates on the first render node it opens, when the
-  compositor offers dmabuf screencopy. Regions, windows, and a host without a
-  render node, a Vulkan device on it or a layout both sides take stream through
-  SHM, and the portal logs why — capture works on every GPU.
+  lys-ui's Vulkan device allocates on the DRM device the compositor names, in
+  the first modifier it imports that a probe copy proves (linear first, which
+  every consumer imports). It needs dmabuf screencopy and linux-dmabuf v4
+  feedback. Regions, windows, and a compositor without those, no Vulkan device
+  behind its device or no modifier both sides take stream through SHM, and the
+  portal logs why — capture works on every GPU.

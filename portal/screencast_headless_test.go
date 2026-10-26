@@ -27,7 +27,7 @@ func TestHeadlessScreenStreams(t *testing.T) {
 		t.Fatalf("outputs = %v", outs)
 	}
 	pwtest.Start(t)
-	streams := screenStreams{renderNodes: renderNodes}
+	streams := screenStreams{openDevice: openVulkanAllocator}
 	for _, target := range []captureTarget{
 		{kind: targetOutput, name: outs[0].Name},
 		{kind: targetRegion, name: outs[0].Name, x: 10, y: 20, width: 200, height: 100},
@@ -71,7 +71,7 @@ func TestHeadlessGPUStream(t *testing.T) {
 		t.Fatal("no outputs")
 	}
 	pwtest.Start(t)
-	streams := screenStreams{renderNodes: renderNodes}
+	streams := screenStreams{openDevice: openVulkanAllocator}
 	s, err := streams.startGPU(outs[0].Name, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)

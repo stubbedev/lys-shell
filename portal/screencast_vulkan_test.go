@@ -6,36 +6,48 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/capture"
 	"github.com/stubbedev/lys-ui/dmabuf"
+	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/pipewire/pwtest"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 )
 
-// firstRenderNode is the render node the stream allocates on; a host
-// without one (CI, which renders on lavapipe) skips the test.
+// hostRenderNodes are the host's DRM render nodes.
+const hostRenderNodes = "/dev/dri/renderD*"
+
+// firstRenderNode is the host's first render node; a host without one
+// (CI, which renders on lavapipe) skips the test.
 func firstRenderNode(t *testing.T) string {
 	t.Helper()
-	nodes, err := filepath.Glob(renderNodes)
+	nodes, err := filepath.Glob(hostRenderNodes)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(nodes) == 0 {
-		t.Skipf("no DRM render node matches %s: the zero-copy path needs a GPU (CI renders on lavapipe, which has none)", renderNodes)
+		t.Skipf("no DRM render node matches %s: the zero-copy path needs a GPU (CI renders on lavapipe, which has none)", hostRenderNodes)
 	}
 	return nodes[0]
 }
 
-// realDevice opens the Vulkan allocator on the host's render node.
-func realDevice(t *testing.T) *vulkanAllocator {
+// deviceOf is the DRM device number of node.
+func deviceOf(t *testing.T, node string) uint64 {
 	t.Helper()
-	firstRenderNode(t)
-	a, err := openVulkanAllocator(renderNodes)
+	var st unix.Stat_t
+	if err := unix.Stat(node, &st); err != nil {
+		t.Fatal(err)
+	}
+	return st.Rdev
+}
+
+// realDevice opens the Vulkan allocator on the host's first render node.
+func realDevice(t *testing.T) gpuAllocator {
+	t.Helper()
+	a, err := openVulkanAllocator(deviceOf(t, firstRenderNode(t)))
 	if err != nil {
 		t.Fatalf("a render node exists but opens no Vulkan device: %v", err)
 	}
@@ -49,18 +61,22 @@ func isDmabuf(fd int) bool {
 	return err == nil && strings.HasPrefix(target, "/dmabuf:")
 }
 
-// On the host's GPU the stream's buffers are XRGB8888 dmabufs, linear
-// when the device renders XR24 linear and in its own tiling otherwise
-// (NVIDIA renders XR24 only block-linear): the compositor's screencopy
-// imports the probe, the PipeWire side gets one of the same layout, and
-// releasing either closes its fd.
-func TestVulkanBuffersAreXRGBDmabufsInTheStreamsLayout(t *testing.T) {
+// On the host's GPU the stream's buffers are linear XRGB8888 dmabufs,
+// the layout every consumer imports, even where the device renders XR24
+// only tiled (NVIDIA): the compositor's screencopy imports the probe,
+// the PipeWire side gets one of the same layout, and releasing either
+// closes its fd.
+func TestVulkanBuffersAreLinearXRGBDmabufs(t *testing.T) {
 	dev, cp := realDevice(t), &fakeCopy{}
-	mods, err := dev.Modifiers(dmabuf.FormatXRGB8888)
+	mods, err := dev.ExportModifiers(dmabuf.FormatXRGB8888)
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := probeGPUSource(nil, dev, cp, offer(), streamModifiers(mods), capture.Output{}, false, shmFrame)
+	rendered, err := dev.Modifiers(dmabuf.FormatXRGB8888)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := probeGPUSource(nil, dev, cp, offer(), streamLayouts(mods, rendered, mods), capture.Output{}, false, shmFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,10 +87,9 @@ func TestVulkanBuffersAreXRGBDmabufsInTheStreamsLayout(t *testing.T) {
 	if probe.Format != dmabuf.FormatXRGB8888 || probe.Width != 64 || probe.Height != 32 || len(probe.Planes) != 1 || probe.Planes[0].Stride < 64*4 {
 		t.Errorf("screencopy imported %+v, want one XR24 64x32 plane", probe)
 	}
-	if slices.Contains(mods, dmabuf.ModifierLinear) && probe.Modifier != dmabuf.ModifierLinear || !slices.Contains(mods, probe.Modifier) {
-		t.Errorf("the probe is in modifier %#x, want linear if the device has it among %#x", probe.Modifier, mods)
+	if probe.Modifier != dmabuf.ModifierLinear {
+		t.Errorf("the probe is in modifier %#x, want linear among the %#x the device exports XR24 in", probe.Modifier, mods)
 	}
-	t.Logf("%s renders XR24 in %#x; the stream takes %#x", dev.node, mods, probe.Modifier)
 	if isDmabuf(probe.Planes[0].FD) || cp.destroyed != 1 {
 		t.Errorf("the probe outlived the probe: fd still a dmabuf %v, imports destroyed %d", isDmabuf(probe.Planes[0].FD), cp.destroyed)
 	}
@@ -103,7 +118,7 @@ func TestVulkanBuffersAreXRGBDmabufsInTheStreamsLayout(t *testing.T) {
 // naming both lists, with nothing left imported.
 func TestVulkanDeclinesWithoutASharedModifier(t *testing.T) {
 	dev, cp := realDevice(t), &fakeCopy{}
-	_, err := probeGPUSource(nil, dev, cp, offer(), []uint64{dmabuf.ModifierInvalid}, capture.Output{}, false, shmFrame)
+	_, err := probeGPUSource(nil, dev, cp, offer(), []streamLayout{{modifier: dmabuf.ModifierInvalid, render: true}}, capture.Output{}, false, shmFrame)
 	if !errors.Is(err, errNoDmabuf) || !strings.Contains(err.Error(), "none of the modifiers") {
 		t.Fatalf("err = %v, want errNoDmabuf naming the modifier lists", err)
 	}
@@ -112,18 +127,11 @@ func TestVulkanDeclinesWithoutASharedModifier(t *testing.T) {
 	}
 }
 
-// No render node, or a node no Vulkan device is behind, is an error
-// naming what was tried.
-func TestNoRenderNodeOpensNoAllocator(t *testing.T) {
-	empty := filepath.Join(t.TempDir(), "renderD*")
-	if _, err := openVulkanAllocator(empty); err == nil || !strings.Contains(err.Error(), "no DRM render node matches "+empty) {
-		t.Errorf("an empty glob: %v", err)
-	}
-	if _, err := openVulkanAllocator("/dev/null"); err == nil || !strings.Contains(err.Error(), "/dev/null") {
-		t.Errorf("a node no device is behind: %v", err)
-	}
-	if _, err := openVulkanAllocator("["); err == nil {
-		t.Error("a malformed glob opened a device")
+// A DRM device no Vulkan device is behind is an error naming it.
+func TestADeviceWithoutVulkanOpensNoAllocator(t *testing.T) {
+	_, err := openVulkanAllocator(unix.Mkdev(1, 3))
+	if err == nil || !strings.Contains(err.Error(), "DRM device 1:3") {
+		t.Errorf("/dev/null's device number: %v, want an error naming DRM device 1:3", err)
 	}
 }
 
@@ -143,9 +151,10 @@ func captureLog(t *testing.T) *lockedBuffer {
 }
 
 // Against a private headless sway rendering with Vulkan on the host's
-// render node: an output streams zero-copy without a word; with no
-// render node to allocate on it streams through shared memory, and says
-// so once, with the reason.
+// render node: the compositor names that device and the modifiers it
+// imports, and an output streams zero-copy without a word; with no
+// Vulkan device behind the named one it streams through shared memory,
+// and says so once, with the reason.
 func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	node := firstRenderNode(t)
 	swaytest.Start(t, "WLR_RENDERER=vulkan", "WLR_RENDER_DRM_DEVICE="+node)
@@ -155,14 +164,21 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	outs := c.Outputs()
-	_ = c.Close()
 	if len(outs) == 0 {
 		t.Fatal("the headless sway has no output")
 	}
 	output := captureTarget{kind: targetOutput, name: outs[0].Name}
+	offered, err := c.DmabufFormat(outs[0], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offered.Device != deviceOf(t, node) || len(offered.Modifiers) == 0 {
+		t.Errorf("sway offers device %#x and modifiers %#x, want %s's and at least one", offered.Device, offered.Modifiers, node)
+	}
+	_ = c.Close()
 
 	logged := captureLog(t)
-	gpu := screenStreams{renderNodes: renderNodes}
+	gpu := screenStreams{openDevice: openVulkanAllocator}
 	s, err := gpu.startGPU(output.name, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
@@ -177,16 +193,16 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 		t.Errorf("a zero-copy stream logged %q", got)
 	}
 
-	empty := filepath.Join(t.TempDir(), "renderD*")
-	s, err = screenStreams{renderNodes: empty}.start(output, false, 30)
+	noVulkan := errors.New("no Vulkan device")
+	s, err = screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return nil, noVulkan }}.start(output, false, 30)
 	if err != nil {
-		t.Fatalf("no render node failed the stream instead of falling back: %v", err)
+		t.Fatalf("no Vulkan device failed the stream instead of falling back: %v", err)
 	}
 	defer s.Close()
 	if w, h := s.Size(); w <= 0 || h <= 0 || s.NodeID() == 0 {
 		t.Errorf("the shm stream is %dx%d on node %d", w, h, s.NodeID())
 	}
-	want := "portal: screencast: output " + output.name + " streams through shared memory: screencast: no dmabuf path: screencast: no DRM render node matches " + empty + "\n"
+	want := "portal: screencast: output " + output.name + " streams through shared memory: screencast: no dmabuf path: no Vulkan device\n"
 	if got := logged.String(); got != want {
 		t.Errorf("logged %q, want once %q", got, want)
 	}

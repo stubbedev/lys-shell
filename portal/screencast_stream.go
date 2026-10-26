@@ -92,9 +92,11 @@ func (s *pipewireStream) Close() {
 }
 
 // screenStreams starts ScreenCast streams, allocating a whole output's
-// zero-copy buffers on the first render node matching renderNodes (a
-// glob) that takes them.
-type screenStreams struct{ renderNodes string }
+// zero-copy buffers through openDevice on the DRM device the compositor
+// imports them on.
+type screenStreams struct {
+	openDevice func(dev uint64) (gpuAllocator, error)
+}
 
 // start opens the capture for target and its PipeWire producer. A
 // whole output streams zero-copy when the compositor and the GPU allow,
@@ -365,18 +367,23 @@ func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screen
 	if err != nil {
 		return fail(err)
 	}
-	dev, err := openVulkanAllocator(st.renderNodes)
+	dev, err := st.openDevice(offered.Device)
 	if err != nil {
 		return fail(err)
 	}
-	mods, err := dev.Modifiers(offered.Fourcc)
+	rendered, err := dev.Modifiers(offered.Fourcc)
+	if err != nil {
+		dev.Close()
+		return fail(err)
+	}
+	exported, err := dev.ExportModifiers(offered.Fourcc)
 	if err != nil {
 		dev.Close()
 		return fail(err)
 	}
 	watch := newVanishWatch(outputGone(c, output))
 	shm := newSnapshotSource(grab, first, watch)
-	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, streamModifiers(mods), o, cursor, first)
+	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, streamLayouts(offered.Modifiers, rendered, exported), o, cursor, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)
