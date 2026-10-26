@@ -1401,11 +1401,11 @@ func TestEntriesKeepTheirGtkWidth(t *testing.T) {
 	con := widget.Constraints{Max: widget.Size{W: 2000, H: 100}}
 	file := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
 	live := newLiveText(k, pathSlot(k.store, "wallpaper.wallpaper"), "")
+	if empty := live.Measure(con).W; empty < widget.GTKTextWidth {
+		t.Errorf("an empty live entry measures %d, want GTK's %d text width", empty, widget.GTKTextWidth)
+	}
 	for name, e := range map[string]*widget.Entry{"file": file.entry.Entry, "live": live.Entry} {
 		empty := e.Measure(con).W
-		if empty < widget.GTKTextWidth {
-			t.Errorf("%s: an empty entry measures %d, want GTK's %d text width", name, empty, widget.GTKTextWidth)
-		}
 		e.SetText(strings.Repeat("/long/path", 40))
 		if got := e.Measure(con).W; got != empty {
 			t.Errorf("%s: a long text resized the entry from %d to %d", name, empty, got)

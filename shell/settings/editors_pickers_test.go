@@ -813,3 +813,54 @@ func TestSearchPickerFiltersAndPicks(t *testing.T) {
 		t.Errorf("a blank query shows %v, want every module %v", got, p.all)
 	}
 }
+
+// A long path at rest shows ellipsized in the middle, its start and its
+// file name, inside the entry, the whole path in the tooltip; focused,
+// the entry edits the whole path with the resting display out of the
+// way, and an unsaved edit is what shows once focus leaves.
+func TestPathFieldRestsOnItsFileName(t *testing.T) {
+	win := laidOutPage(t, pathPagesYAML, "lock", windowWidth)
+	c := treetest.All[*fileEditor](win.page)[0]
+	if !c.display.Visible() || c.display.Text() != longPath || c.display.Ellipsize() != widget.EllipsizeMiddle {
+		t.Fatalf("at rest the display shows %q (visible %v, ellipsize %v), want %q ellipsized in the middle", c.display.Text(), c.display.Visible(), c.display.Ellipsize(), longPath)
+	}
+	if !c.field.HasClass("at-rest") {
+		t.Error("at rest the entry's own panned text is not hidden under the display")
+	}
+	if tip := c.entry.TooltipText(); tip != longPath {
+		t.Errorf("the tooltip reads %q, want the whole path", tip)
+	}
+	d, e := c.display.Bounds(), c.entry.Bounds()
+	if d.X < e.X || d.Y < e.Y || d.X+d.W > e.X+e.W || d.Y+d.H > e.Y+e.H {
+		t.Errorf("the display at %v paints outside its entry at %v", d, e)
+	}
+	whole := widget.NewLabel(treetest.Font(t), widget.Current().TextSize, longPath, 0)
+	if natural := whole.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}).W; d.W >= natural {
+		t.Errorf("the display is %dpx wide for a %dpx path, so it ellipsizes nothing", d.W, natural)
+	}
+
+	r := &widget.Router{Root: win.root}
+	if err := r.SetFocus(c.entry); err != nil {
+		t.Fatal(err)
+	}
+	if c.display.Visible() || c.field.HasClass("at-rest") || c.entry.Text() != longPath {
+		t.Errorf("focused, the display shows %v (at rest %v) over %q, want the entry editing the whole path", c.display.Visible(), c.field.HasClass("at-rest"), c.entry.Text())
+	}
+	c.entry.Insert("x")
+	if err := r.SetFocus(nil); err != nil {
+		t.Fatal(err)
+	}
+	if !c.display.Visible() || c.display.Text() != longPath+"x" || c.entry.TooltipText() != longPath+"x" {
+		t.Errorf("after an unsaved edit the display shows %q (visible %v), want the edited text", c.display.Text(), c.display.Visible())
+	}
+}
+
+// An empty path field rests on the bare entry: no display stands over
+// it and it has no tooltip.
+func TestEmptyPathFieldShowsNoDisplay(t *testing.T) {
+	k := testKit(t, "")
+	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
+	if c.display.Visible() || c.field.HasClass("at-rest") || c.entry.TooltipText() != "" {
+		t.Errorf("an empty field shows the display %v (at rest %v, tooltip %q), want the bare entry", c.display.Visible(), c.field.HasClass("at-rest"), c.entry.TooltipText())
+	}
+}

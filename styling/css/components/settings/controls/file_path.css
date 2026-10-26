@@ -1,0 +1,13 @@
+.setting-path > entry,
+.setting-path > .setting-path-display {
+  padding-left: calc(var(--space-sm) + var(--space-xs));
+  padding-right: calc(var(--space-sm) + var(--space-xs));
+}
+
+.setting-path > .setting-path-display {
+  pointer-events: none;
+}
+
+.setting-path.at-rest > entry > text {
+  color: transparent;
+}

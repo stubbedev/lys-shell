@@ -255,25 +255,67 @@ func (c *colorEditor) refresh() {
 	c.SetColor(col)
 }
 
+// pathEntryChars is a path field's width in characters: every path row
+// takes the same, kept when the row narrows, its description giving
+// way instead.
+const pathEntryChars = 14
+
 // fileEditor is FilePickerControl: the path entry (committing on
 // Enter, with the unsaved badge) and a browse button asking the file
-// chooser portal; a pick writes the path.
+// chooser portal; a pick writes the path. Out of focus the field shows
+// the path ellipsized in the middle, its start and its file name, over
+// the entry's own text, with the whole path in the tooltip; focused it
+// edits the full text.
 type fileEditor struct {
 	*widget.Box
-	entry  *text
-	browse *widget.Button
+	field   *widget.Overlay
+	entry   *text
+	display *widget.Label
+	browse  *widget.Button
+	focused bool
 }
 
 func newFileEditor(k *kit, s slot) *fileEditor {
-	c := &fileEditor{Box: gapBox(widget.Row), entry: newText(k, s, false)}
+	c := &fileEditor{Box: gapBox(widget.Row), field: widget.NewOverlay(), entry: newText(k, s, false)}
+	c.entry.SetWidthChars(pathEntryChars, pathEntryChars)
+	c.display = k.label("", "setting-path-display")
+	c.display.SetEllipsize(widget.EllipsizeMiddle)
+	c.display.SetMaxWidthChars(pathEntryChars)
+	c.field.AddClass("setting-path")
+	c.field.Append(c.entry).AppendAligned(c.display, widget.AlignFill, widget.AlignCenter)
+	edited := c.entry.OnChanged
+	c.entry.OnChanged = func(path string) {
+		edited(path)
+		c.show(path)
+	}
+	c.entry.SetOnFocusChanged(func(focused bool) {
+		c.focused = focused
+		c.show(c.entry.Text())
+	})
 	c.browse = k.browseButton(func(file string) {
 		if s.set(file) == nil {
 			c.entry.badge.SetVisible(false)
 		}
 	})
-	c.AppendAligned(c.entry, true, widget.AlignCenter)
+	c.AppendAligned(c.field, false, widget.AlignCenter)
 	c.AppendAligned(c.browse, false, widget.AlignCenter)
+	c.show(c.entry.Text())
 	return c
+}
+
+// show puts path in the resting display and the tooltip, the display
+// standing over the entry only while it is out of focus and holds a
+// path, so an empty field shows its placeholder.
+func (c *fileEditor) show(path string) {
+	c.display.SetText(path)
+	c.entry.SetTooltip(path)
+	rest := path != "" && !c.focused
+	c.display.SetVisible(rest)
+	if rest {
+		c.field.AddClass("at-rest")
+	} else {
+		c.field.RemoveClass("at-rest")
+	}
 }
 
 func (c *fileEditor) dirtyBadge() *widget.Badge { return c.entry.badge }

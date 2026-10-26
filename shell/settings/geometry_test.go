@@ -235,3 +235,87 @@ func TestCustomColorButtonMatchesItsDropdown(t *testing.T) {
 		t.Errorf("the dropdown sits %dpx after the color button, want the theme's %dpx", gap, widget.Current().Spacing)
 	}
 }
+
+// longPath is a wallpaper path far longer than a path field.
+const longPath = "/home/someone/Pictures/wallpapers/landscapes/mountains-at-dawn-ultrawide.png"
+
+// pathPagesYAML sets every path row of the wallpaper and lock pages to
+// a long path.
+const pathPagesYAML = `
+wallpaper:
+  wallpaper: ` + longPath + `
+  cycling-directory: /home/someone/Pictures/wallpapers/a-very-long-directory-name
+lock:
+  background-image: ` + longPath + `
+`
+
+// laidOutPage shows the page id of a styled window w pixels wide, laid
+// out the way the window lays it out, and returns the window.
+func laidOutPage(t *testing.T, configYAML, id string, w int) *window {
+	t.Helper()
+	k := testKit(t, configYAML)
+	cfg := k.store.svc.Config()
+	win := newWindow(k, cfg, func(_ time.Duration, fn func()) { fn() })
+	win.stack.SetTransition(widget.StackNone, 0)
+	apptheme.New(cfg).Attach(win.root)
+	win.show(id)
+	con := widget.Constraints{Min: widget.Size{W: w, H: windowHeight}, Max: widget.Size{W: w, H: windowHeight}}
+	for range 2 {
+		win.root.Measure(con)
+		win.root.Arrange(render.Rect{W: w, H: windowHeight})
+	}
+	return win
+}
+
+// pathFieldWidths are the widths of the path entries on page id of a
+// window w pixels wide.
+func pathFieldWidths(t *testing.T, id string, w int) []int {
+	t.Helper()
+	var widths []int
+	for _, c := range treetest.All[*fileEditor](laidOutPage(t, pathPagesYAML, id, w).page) {
+		widths = append(widths, c.entry.Bounds().W)
+	}
+	if len(widths) == 0 {
+		t.Fatalf("%s holds no path row", id)
+	}
+	return widths
+}
+
+// Every path field is one width, whatever its row's description and
+// however narrow the window: the description gives way, not the field.
+func TestPathFieldsShareOneWidth(t *testing.T) {
+	want := pathFieldWidths(t, "wallpaper", windowWidth)[0]
+	if want <= 0 {
+		t.Fatalf("the path field is %dpx wide", want)
+	}
+	for _, page := range []struct {
+		id    string
+		width int
+	}{{"wallpaper", windowWidth}, {"lock", windowWidth}, {"lock", 760}, {"greeter", windowWidth}} {
+		for i, got := range pathFieldWidths(t, page.id, page.width) {
+			if got != want {
+				t.Errorf("%s at %dpx: path field %d is %dpx wide, want the %dpx every path field takes", page.id, page.width, i, got, want)
+			}
+		}
+	}
+}
+
+// The lock page, path row and all, fits a 760px window: no control
+// reaches past its right edge.
+func TestLockPageFitsANarrowWindow(t *testing.T) {
+	const w = 760
+	win := laidOutPage(t, pathPagesYAML, "lock", w)
+	controls := 0
+	walkOwn(win.page, func(x widget.Widget) {
+		if _, ok := role(x); !ok || !shown(x) {
+			return
+		}
+		controls++
+		if b := x.(widget.Boundser).Bounds(); b.X+b.W > w {
+			t.Errorf("%T at %v reaches past the %dpx window", x, b, w)
+		}
+	})
+	if controls == 0 {
+		t.Fatal("the lock page laid out no control")
+	}
+}
