@@ -573,7 +573,12 @@ func newNetActive(v *networkView) *netActive {
 	a.wifiIcon = widget.NewThemeIcon(signalStrengthIcon(0), itemIconPx)
 	a.wifi.SetMedia(a.wifiIcon, false)
 
+	// Sized to the page it shows, so the status sits at the row's end
+	// and the address keeps its room until hovering widens the row's
+	// actions in.
 	a.trailing = widget.NewStack()
+	a.trailing.SetHomogeneous(false)
+	a.trailing.SetInterpolateSize(true)
 	a.trailing.SetTransition(widget.StackCrossfade, hoverTransition)
 	status := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 	a.wifiStatus = v.statusLabel()

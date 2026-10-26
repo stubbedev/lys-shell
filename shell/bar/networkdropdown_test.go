@@ -604,3 +604,27 @@ func TestNetworkActiveCardSeparatesOnlyShownRows(t *testing.T) {
 		t.Errorf("wired and wifi: %d separators shown, want one", n)
 	}
 }
+
+// The connections' statuses end where their rows end, the wifi row's as
+// the wired row's: its actions, wider than the status, take the row's
+// room only while hovered, so the address shows whole.
+func TestNetworkActiveStatusesEndTogether(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{
+		HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000, WiredIP4: "192.168.1.21",
+		WifiEnabled: true, Wifi: network.StatusConnected, WifiSSID: "NetJuice", WifiIP4: "192.168.1.66", WifiFrequency: 5180,
+	}, netDeps{wifiCtl: &fakeWifiCtl{}})
+	settleNetReads(t, v)
+	onHeadlessLoop(func() bool {
+		arrangeDropdown(t, v, 340, 900)
+		wired := treetest.WithClass(v.active.wired, "network-connection-status")[0].(*widget.Label).Bounds()
+		wifi := v.active.wifiStatus.Bounds()
+		if wired.X+wired.W != wifi.X+wifi.W {
+			t.Errorf("wifi's status ends at x %d, the wired one's at %d", wifi.X+wifi.W, wired.X+wired.W)
+		}
+		desc := treetest.WithClass(v.active.wifi, "description")[0].(*widget.Label)
+		if desc.Bounds().W < desc.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 100}}).W {
+			t.Errorf("the wifi address %q is cut to %dpx", desc.Text(), desc.Bounds().W)
+		}
+		return true
+	})
+}
