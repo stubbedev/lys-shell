@@ -257,7 +257,8 @@ func (c *colorEditor) refresh() {
 
 // pathEntryChars is a path field's width in characters: every path row
 // takes the same, kept when the row narrows, its description giving
-// way instead.
+// way instead. It is the widest that keeps every path page inside a
+// 760px window.
 const pathEntryChars = 14
 
 // fileEditor is FilePickerControl: the path entry (committing on

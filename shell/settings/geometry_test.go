@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -251,7 +252,15 @@ wallpaper:
   cycling-directory: /home/someone/Pictures/wallpapers/a-very-long-directory-name
 lock:
   background-image: ` + longPath + `
+greeter:
+  background-image: ` + longPath + `
 `
+
+// narrowWindowWidth is the narrowest window every settings page fits.
+const narrowWindowWidth = 760
+
+// pathPages are the pages holding a path row.
+var pathPages = []string{"wallpaper", "lock", "greeter"}
 
 // laidOutPage shows the page id of a styled window w pixels wide, laid
 // out the way the window lays it out, and returns the window.
@@ -263,12 +272,17 @@ func laidOutPage(t *testing.T, configYAML, id string, w int) *window {
 	win.stack.SetTransition(widget.StackNone, 0)
 	apptheme.New(cfg).Attach(win.root)
 	win.show(id)
+	layOut(win, w)
+	return win
+}
+
+// layOut lays win out w pixels wide the way the window lays it out.
+func layOut(win *window, w int) {
 	con := widget.Constraints{Min: widget.Size{W: w, H: windowHeight}, Max: widget.Size{W: w, H: windowHeight}}
 	for range 2 {
 		win.root.Measure(con)
 		win.root.Arrange(render.Rect{W: w, H: windowHeight})
 	}
-	return win
 }
 
 // pathFieldWidths are the widths of the path entries on page id of a
@@ -292,34 +306,62 @@ func TestPathFieldsShareOneWidth(t *testing.T) {
 	if want <= 0 {
 		t.Fatalf("the path field is %dpx wide", want)
 	}
-	for _, page := range []struct {
-		id    string
-		width int
-	}{{"wallpaper", windowWidth}, {"lock", windowWidth}, {"lock", 760}, {"greeter", windowWidth}} {
-		for i, got := range pathFieldWidths(t, page.id, page.width) {
-			if got != want {
-				t.Errorf("%s at %dpx: path field %d is %dpx wide, want the %dpx every path field takes", page.id, page.width, i, got, want)
+	for _, id := range pathPages {
+		for _, w := range []int{windowWidth, narrowWindowWidth} {
+			for i, got := range pathFieldWidths(t, id, w) {
+				if got != want {
+					t.Errorf("%s at %dpx: path field %d is %dpx wide, want the %dpx every path field takes", id, w, i, got, want)
+				}
 			}
 		}
 	}
 }
 
-// The lock page, path row and all, fits a 760px window: no control
-// reaches past its right edge.
-func TestLockPageFitsANarrowWindow(t *testing.T) {
-	const w = 760
-	win := laidOutPage(t, pathPagesYAML, "lock", w)
+// overflow lays page id out in a narrow window, its path fields chars
+// wide, and returns the controls reaching past the window's right edge.
+func overflow(t *testing.T, id string, chars int) []string {
+	t.Helper()
+	win := laidOutPage(t, pathPagesYAML, id, narrowWindowWidth)
+	for _, c := range treetest.All[*fileEditor](win.page) {
+		c.entry.SetWidthChars(chars, chars)
+	}
+	layOut(win, narrowWindowWidth)
+	var past []string
 	controls := 0
 	walkOwn(win.page, func(x widget.Widget) {
 		if _, ok := role(x); !ok || !shown(x) {
 			return
 		}
 		controls++
-		if b := x.(widget.Boundser).Bounds(); b.X+b.W > w {
-			t.Errorf("%T at %v reaches past the %dpx window", x, b, w)
+		if b := x.(widget.Boundser).Bounds(); b.X+b.W > narrowWindowWidth {
+			past = append(past, fmt.Sprintf("%T at %v", x, b))
 		}
 	})
 	if controls == 0 {
-		t.Fatal("the lock page laid out no control")
+		t.Fatalf("the %s page laid out no control", id)
 	}
+	return past
+}
+
+// Every page with a path row, the row and all, fits a narrow window: no
+// control reaches past its right edge.
+func TestPathPagesFitANarrowWindow(t *testing.T) {
+	for _, id := range pathPages {
+		t.Run(id, func(t *testing.T) {
+			if past := overflow(t, id, pathEntryChars); len(past) > 0 {
+				t.Errorf("at %dpx these reach past the window: %v", narrowWindowWidth, past)
+			}
+		})
+	}
+}
+
+// The path field is as wide as a narrow window allows: a character more
+// pushes some path page past the window's edge.
+func TestPathFieldIsTheWidestThatFits(t *testing.T) {
+	for _, id := range pathPages {
+		if len(overflow(t, id, pathEntryChars+1)) > 0 {
+			return
+		}
+	}
+	t.Errorf("path fields %d characters wide still fit every path page at %dpx; widen them", pathEntryChars+1, narrowWindowWidth)
 }
