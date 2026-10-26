@@ -7,7 +7,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/rivo/uniseg v0.4.7
 	github.com/stubbedev/lys-lib v0.1.1-0.20261026211158-acfb75c4504c
-	github.com/stubbedev/lys-ui v0.0.0-20261026212323-a6f40c29c6b1
+	github.com/stubbedev/lys-ui v0.0.0-20261026214723-af9a44817864
 	github.com/unxed/xkb-go v0.1.9
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.58.0
