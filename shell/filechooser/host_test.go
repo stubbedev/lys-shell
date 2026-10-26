@@ -1977,6 +1977,52 @@ func (hs *harness) listRowCells(t *testing.T, i, w, h int) (widget.Widget, []wid
 	return icon, cells
 }
 
+// A column that gave way paints nothing: a row laid out wide and then
+// at the name's floor paints its cells at the wide layout and nothing
+// past the floor once they hid, though they keep their wide bounds.
+func TestHiddenColumnsPaintNothing(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.open(t, OpenRequest{})
+	const wide, narrow, h = 1200, nameMinW, listRowH
+	paintsPast := func(px []uint8) bool {
+		for y := range h {
+			for x := narrow; x < wide; x++ {
+				if px[(y*wide+x)*4+3] != 0 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	var atWide, atNarrow []uint8
+	var cells []widget.Widget
+	hs.run(func() {
+		row := rows{hs.c, false}.Row(0)
+		widget.SetParents(hs.c.ui.list, row)
+		cells = treetest.WithClass(row, "file-chooser-cell")
+		paintAt := func(w int) []uint8 {
+			row.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
+			row.Arrange(render.Rect{W: w, H: h})
+			px := make([]uint8, wide*h*4)
+			widget.PaintChild(render.New(px, wide*4, wide, h), row)
+			return px
+		}
+		atWide = paintAt(wide)
+		atNarrow = paintAt(narrow)
+	})
+	if !paintsPast(atWide) {
+		t.Fatalf("laid out %dpx wide, the row paints nothing past %dpx", wide, narrow)
+	}
+	for i, c := range cells {
+		if widget.IsVisible(c) {
+			t.Errorf("cell %d still shows at the name's floor", i)
+		}
+	}
+	if paintsPast(atNarrow) {
+		t.Errorf("laid out at the name's floor, the row paints past it: a hidden column painted")
+	}
+}
+
 // Every column header sits over its values: the same span, the same
 // text alignment, the numbers flush right and the text flush left, and
 // the name header starts where the row's icon does.

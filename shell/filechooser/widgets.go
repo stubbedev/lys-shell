@@ -191,9 +191,7 @@ func setShown(w widget.Widget, on bool) {
 
 func (r *columnRow) Paint(cv *render.Canvas) {
 	for _, k := range r.kids {
-		if widget.IsVisible(k) {
-			widget.PaintChild(cv, k)
-		}
+		widget.PaintChild(cv, k)
 	}
 }
 
