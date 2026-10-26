@@ -16,6 +16,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // fakeSink records the injected input.
@@ -318,7 +319,7 @@ func TestRemoteDesktopRestoreToken(t *testing.T) {
 	if code, _ := r3.remoteStart(t, Vardict{"restore_data": token, "types": dbus.MakeVariant(deviceKeyboard)}); code != ResponseCancelled || len(d3.asked.Load()) != 1 {
 		t.Errorf("a token of other devices = %d, asked %d times", code, len(d3.asked.Load()))
 	}
-	if _, ok := decodeRemoteRestore(dbus.MakeVariant(encodeRestore([]captureTarget{{kind: targetOutput, name: "DP-1"}}))); ok {
+	if _, ok := decodeRemoteRestore(dbus.MakeVariant(encodeRestore([]sharepicker.Target{{Kind: sharepicker.TargetOutput, Name: "DP-1"}}))); ok {
 		t.Error("a ScreenCast token decoded as a RemoteDesktop one")
 	}
 	if len(d.asked.Load()) != 1 {

@@ -278,15 +278,16 @@ func confirmLabel(n int) string {
 // identifier when the entry has one (a consumer owning its capture can
 // re-resolve it), else the XDPH id only XDPH resolves.
 func windowPayload(tl sharepreview.Toplevel) string {
-	if tl.Identifier != "" {
-		return "window:" + tl.Identifier
+	id := tl.Identifier
+	if id == "" {
+		id = strconv.FormatUint(tl.ID, 10)
 	}
-	return "window:" + strconv.FormatUint(tl.ID, 10)
+	return Target{Kind: TargetWindow, Name: id}.Payload()
 }
 
 // regionPayload is a region selection's payload.
 func regionPayload(sel regionoverlay.Selection) string {
-	return fmt.Sprintf("region:%s@%d,%d,%d,%d", sel.Output, sel.X, sel.Y, sel.Width, sel.Height)
+	return Target{Kind: TargetRegion, Name: sel.Output, X: int32(sel.X), Y: int32(sel.Y), Width: int32(sel.Width), Height: int32(sel.Height)}.Payload()
 }
 
 // build assembles the surface (the view!):
@@ -568,7 +569,7 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 	button := widget.NewButton(card, 0, 0)
 	button.AddClass(css.Flat, "share-picker-output-button")
 	button.SetCursorName("pointer")
-	payload := "screen:" + o.name
+	payload := Target{Kind: TargetOutput, Name: o.name}.Payload()
 	button.OnClick = func() { p.selectPayload(payload) }
 	p.loadPreview(preview, card, nil, func(size int) (*image.RGBA, error) { return outputThumb(o.name, size) })
 	return button

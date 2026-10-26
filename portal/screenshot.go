@@ -155,12 +155,12 @@ func (s screenshotPortal) Screenshot(handle dbus.ObjectPath, appID, parent strin
 		if code := c.response("screenshot window picker", reply != "", err); code != ResponseSuccess {
 			return code, Vardict{}, nil
 		}
-		_, targets, ok := parsePickerReply(reply)
-		if !ok || len(targets) != 1 || targets[0].kind != targetWindow {
+		_, targets, ok := sharepicker.ParseReply(reply)
+		if !ok || len(targets) != 1 || targets[0].Kind != sharepicker.TargetWindow {
 			warnf("screenshot: the window picker replied %q", reply)
 			return ResponseOther, Vardict{}, nil
 		}
-		window = targets[0].name
+		window = targets[0].Name
 	}
 	path, err := client.CapturePrivate(c.ctx, c.caller, screenshotMode(sh.target), window, sh.pointer)
 	if code := c.response("screenshot", path != "", err); code != ResponseSuccess {

@@ -6,6 +6,8 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
+
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // The real capture-to-PipeWire path against a private headless
@@ -27,27 +29,27 @@ func TestHeadlessScreenStreams(t *testing.T) {
 	}
 	pwtest.Start(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	for _, target := range []captureTarget{
-		{kind: targetOutput, name: outs[0].Name},
-		{kind: targetRegion, name: outs[0].Name, x: 10, y: 20, width: 200, height: 100},
+	for _, target := range []sharepicker.Target{
+		{Kind: sharepicker.TargetOutput, Name: outs[0].Name},
+		{Kind: sharepicker.TargetRegion, Name: outs[0].Name, X: 10, Y: 20, Width: 200, Height: 100},
 	} {
 		s, err := streams.start(target, true, defaultFPS)
 		if err != nil {
-			t.Fatalf("%s: %v", target.payload(), err)
+			t.Fatalf("%s: %v", target.Payload(), err)
 		}
 		w, h := s.Size()
 		if s.NodeID() == 0 || w <= 0 || h <= 0 {
-			t.Errorf("%s: node %d size %dx%d", target.payload(), s.NodeID(), w, h)
+			t.Errorf("%s: node %d size %dx%d", target.Payload(), s.NodeID(), w, h)
 		}
-		if target.kind == targetRegion && (w < 200 || h < 100) {
+		if target.Kind == sharepicker.TargetRegion && (w < 200 || h < 100) {
 			t.Errorf("region streams %dx%d", w, h)
 		}
 		s.Close()
 	}
-	if _, err := streams.start(captureTarget{kind: targetOutput, name: "NOPE-1"}, false, defaultFPS); err == nil {
+	if _, err := streams.start(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: "NOPE-1"}, false, defaultFPS); err == nil {
 		t.Error("a missing output streamed")
 	}
-	if _, err := streams.start(captureTarget{kind: targetWindow, name: "no-such-window"}, false, defaultFPS); err == nil {
+	if _, err := streams.start(sharepicker.Target{Kind: sharepicker.TargetWindow, Name: "no-such-window"}, false, defaultFPS); err == nil {
 		t.Error("a missing window streamed")
 	}
 }

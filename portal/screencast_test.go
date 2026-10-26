@@ -87,11 +87,11 @@ func (f *fakeStarts) outputs() ([]outputGeometry, error) {
 	}, nil
 }
 
-func (f *fakeStarts) start(t captureTarget, cursor bool, fps uint32) (screenStream, error) {
+func (f *fakeStarts) start(t sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
 	f.started.Update(func(s []string) []string {
-		return append(s, t.payload()+map[bool]string{true: "+cursor", false: ""}[cursor])
+		return append(s, t.Payload()+map[bool]string{true: "+cursor", false: ""}[cursor])
 	})
-	if f.fail[t.payload()] {
+	if f.fail[t.Payload()] {
 		return nil, errors.New("gone")
 	}
 	s := &fakeStream{node: uint32(40 + len(f.streams.Load())), ended: make(chan struct{})}
@@ -147,10 +147,10 @@ func pair(v dbus.Variant) [2]int32 {
 	return [2]int32{a, b}
 }
 
-func payloads(targets []captureTarget) []string {
+func payloads(targets []sharepicker.Target) []string {
 	out := make([]string, len(targets))
 	for i, t := range targets {
-		out[i] = t.payload()
+		out[i] = t.Payload()
 	}
 	return out
 }
@@ -300,7 +300,7 @@ func TestScreenCastWithoutATokenGrant(t *testing.T) {
 func TestScreenCastReplaysARestoreToken(t *testing.T) {
 	r, f := castRig(t)
 	p := serveSharePicker(t, r, "/screen:HDMI-A-1")
-	kept := []captureTarget{{kind: targetRegion, name: "DP-2", x: 5, y: 6, width: 640, height: 480}, {kind: targetWindow, name: "w1"}}
+	kept := []sharepicker.Target{{Kind: sharepicker.TargetRegion, Name: "DP-2", X: 5, Y: 6, Width: 640, Height: 480}, {Kind: sharepicker.TargetWindow, Name: "w1"}}
 	token := dbus.MakeVariant(encodeRestore(kept))
 	r.castSession(t, Vardict{"restore_data": token, "persist_mode": dbus.MakeVariant(uint32(2)), "types": dbus.MakeVariant(sourceMonitor | sourceWindow)})
 	code, res := r.castStart(t)
@@ -326,7 +326,7 @@ func TestScreenCastReplaysARestoreToken(t *testing.T) {
 func TestScreenCastRepromptsAGoneRestoreTarget(t *testing.T) {
 	r, f := castRig(t, "screen:DP-9")
 	p := serveSharePicker(t, r, "/screen:DP-1")
-	r.castSession(t, Vardict{"restore_data": dbus.MakeVariant(encodeRestore([]captureTarget{{kind: targetOutput, name: "DP-9"}}))})
+	r.castSession(t, Vardict{"restore_data": dbus.MakeVariant(encodeRestore([]sharepicker.Target{{Kind: sharepicker.TargetOutput, Name: "DP-9"}}))})
 	if code, _ := r.castStart(t); code != ResponseSuccess {
 		t.Fatalf("Start = %d", code)
 	}
@@ -365,21 +365,13 @@ func TestScreenCastStartsAllOrNothing(t *testing.T) {
 	}
 }
 
-func TestParsePickerReply(t *testing.T) {
-	token, targets, ok := parsePickerReply("r/screen:DP-1;window:firefox@instance-3;region:HDMI-A-1@10,-20,800,600")
-	var got []string
-	for _, t := range targets {
-		got = append(got, t.payload())
-	}
-	if !ok || !token || !slices.Equal(got, []string{"screen:DP-1", "window:firefox@instance-3", "region:HDMI-A-1@10,-20,800,600"}) {
-		t.Errorf("= %v %v %v", token, got, ok)
-	}
-	if targets[2].sourceType() != sourceMonitor || targets[1].sourceType() != sourceWindow || targets[0].sourceType() != sourceMonitor {
-		t.Error("source types: a region is a monitor's")
-	}
-	for _, bad := range []string{"", "garbage", "/screen:", "/window:", "/region:DP-1@1,2,3", "/region:DP-1@1,2,0,5", "/region:@1,2,3,4", "/bogus:x", "/screen:DP-1;bogus"} {
-		if _, _, ok := parsePickerReply(bad); ok {
-			t.Errorf("%q parsed", bad)
+// A region is a monitor's source type.
+func TestSourceTypeOf(t *testing.T) {
+	for kind, want := range map[sharepicker.TargetKind]uint32{
+		sharepicker.TargetOutput: sourceMonitor, sharepicker.TargetRegion: sourceMonitor, sharepicker.TargetWindow: sourceWindow,
+	} {
+		if got := sourceTypeOf(sharepicker.Target{Kind: kind, Name: "x"}); got != want {
+			t.Errorf("kind %d: source type %d, want %d", kind, got, want)
 		}
 	}
 }

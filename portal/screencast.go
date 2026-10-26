@@ -29,7 +29,7 @@ const (
 type castState struct {
 	types, cursorMode, persistMode uint32
 	multiple                       bool
-	restore                        []captureTarget
+	restore                        []sharepicker.Target
 	streams                        []startedStream
 }
 
@@ -39,7 +39,7 @@ type screenCast struct {
 	conn     *dbus.Conn
 	sessions *sessions
 	// start runs one stream (screenStreams.start; a fake in tests).
-	start func(target captureTarget, cursor bool, fps uint32) (screenStream, error)
+	start func(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error)
 	// outputs is the outputs' logical geometry (the Wayland loop's; a
 	// fake in tests).
 	outputs func() ([]outputGeometry, error)
@@ -50,12 +50,12 @@ type screenCast struct {
 // not taken for the source vanishing.
 type startedStream struct {
 	stream  screenStream
-	target  captureTarget
+	target  sharepicker.Target
 	node    uint32
 	stopped chan struct{}
 }
 
-func newScreenCast(conn *dbus.Conn, s *sessions, start func(captureTarget, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
+func newScreenCast(conn *dbus.Conn, s *sessions, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
 	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs}
 }
 
@@ -115,7 +115,7 @@ func (c *screenCast) config(s *session) castState {
 // code is cancelled for the user's cancel, a closed request, or no
 // shell, and other for a reply the picker should not have made: one
 // malformed, or naming a type not asked for.
-func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []captureTarget, code uint32) {
+func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []sharepicker.Target, code uint32) {
 	// No window list: the picker enumerates toplevels itself and
 	// replies identifiers the capture re-resolves.
 	reply, err := sharepicker.NewClient(c.conn).Pick(call.ctx, call.caller, sharepicker.Request{
@@ -130,7 +130,7 @@ func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []capt
 	case reply == "":
 		return false, nil, ResponseCancelled
 	}
-	token, targets, ok := parsePickerReply(reply)
+	token, targets, ok := sharepicker.ParseReply(reply)
 	if !ok || !allOfTypes(targets, cfg.types) {
 		warnf("screencast: the picker replied %q for source types %#x", reply, cfg.types)
 		return false, nil, ResponseOther
@@ -139,9 +139,9 @@ func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []capt
 }
 
 // allOfTypes reports whether every target is of one of the types.
-func allOfTypes(targets []captureTarget, types uint32) bool {
+func allOfTypes(targets []sharepicker.Target, types uint32) bool {
 	for _, t := range targets {
-		if t.sourceType()&types == 0 {
+		if sourceTypeOf(t)&types == 0 {
 			return false
 		}
 	}
@@ -151,7 +151,7 @@ func allOfTypes(targets []captureTarget, types uint32) bool {
 // begin starts a stream per target; one that fails stops the ones this
 // call started, so a partial set never runs. A stream that ends by
 // itself (its window closed, its output unplugged) ends the session.
-func (c *screenCast) begin(session *session, targets []captureTarget, cursorMode uint32) ([]startedStream, error) {
+func (c *screenCast) begin(session *session, targets []sharepicker.Target, cursorMode uint32) ([]startedStream, error) {
 	var started []startedStream
 	for _, t := range targets {
 		s, err := c.start(t, cursorMode == cursorEmbedded, defaultFPS)
@@ -204,12 +204,12 @@ type restoreToken struct {
 
 // encodeRestore keeps every target of the session, as the picker
 // replies them.
-func encodeRestore(targets []captureTarget) restoreToken {
-	return restoreToken{restoreVendor, restoreVersion, dbus.MakeVariant(joinTargets(targets))}
+func encodeRestore(targets []sharepicker.Target) restoreToken {
+	return restoreToken{restoreVendor, restoreVersion, dbus.MakeVariant(sharepicker.JoinTargets(targets))}
 }
 
 // decodeRestore reads a token this portal issued; any other is none.
-func decodeRestore(v dbus.Variant) ([]captureTarget, bool) {
+func decodeRestore(v dbus.Variant) ([]sharepicker.Target, bool) {
 	fields, ok := v.Value().([]any)
 	if !ok || len(fields) != 3 || fields[0] != restoreVendor {
 		return nil, false
@@ -222,15 +222,15 @@ func decodeRestore(v dbus.Variant) ([]captureTarget, bool) {
 	if !ok {
 		return nil, false
 	}
-	return parseTargets(payload)
+	return sharepicker.ParseTargets(payload)
 }
 
 // streamProps are a started stream's properties: its source type and,
 // for an output or a region, its position and size in the compositor's
 // logical space. A window's are not known, so it carries neither.
 func streamProps(st startedStream, outputs []outputGeometry) Vardict {
-	props := Vardict{"source_type": dbus.MakeVariant(st.target.sourceType())}
-	if x, y, w, h, ok := st.target.geometry(outputs); ok {
+	props := Vardict{"source_type": dbus.MakeVariant(sourceTypeOf(st.target))}
+	if x, y, w, h, ok := targetGeometry(st.target, outputs); ok {
 		props["position"] = dbus.MakeVariant(castSize{x, y})
 		props["size"] = dbus.MakeVariant(castSize{w, h})
 	}
@@ -280,7 +280,7 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 	o.c.sharing(s)
 	multiple, _ := optBool(options, "multiple")
 	persist, _ := optU32(options, "persist_mode")
-	var restore []captureTarget
+	var restore []sharepicker.Target
 	if v, ok := options["restore_data"]; ok {
 		if targets, ok := decodeRestore(v); ok && allOfTypes(targets, types) {
 			restore = targets
@@ -323,7 +323,7 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 // sources behind them, and whether the user granted a restore token.
 type sharedScreens struct {
 	streams    []castStream
-	targets    []captureTarget
+	targets    []sharepicker.Target
 	allowToken bool
 }
 

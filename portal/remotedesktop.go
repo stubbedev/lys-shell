@@ -193,7 +193,7 @@ type remoteState struct {
 // types the user granted and the screens shared with them.
 type remoteRestore struct {
 	devices uint32
-	targets []captureTarget
+	targets []sharepicker.Target
 }
 
 // remoteTokenPrefix marks a RemoteDesktop token's data, which a
@@ -201,7 +201,7 @@ type remoteRestore struct {
 const remoteTokenPrefix = "remote:"
 
 func encodeRemoteRestore(r remoteRestore) restoreToken {
-	data := remoteTokenPrefix + strconv.FormatUint(uint64(r.devices), 10) + "/" + joinTargets(r.targets)
+	data := remoteTokenPrefix + strconv.FormatUint(uint64(r.devices), 10) + "/" + sharepicker.JoinTargets(r.targets)
 	return restoreToken{restoreVendor, restoreVersion, dbus.MakeVariant(data)}
 }
 
@@ -225,7 +225,7 @@ func decodeRemoteRestore(v dbus.Variant) (remoteRestore, bool) {
 	}
 	r := remoteRestore{devices: uint32(n)}
 	if targets != "" {
-		if r.targets, ok = parseTargets(targets); !ok {
+		if r.targets, ok = sharepicker.ParseTargets(targets); !ok {
 			return remoteRestore{}, false
 		}
 	}
@@ -483,7 +483,7 @@ func (o remoteDesktopObject) NotifyPointerMotionAbsolute(session dbus.ObjectPath
 	if err != nil {
 		return dbusx.Failed(fmt.Sprintf("no output layout for absolute motion: %v", err))
 	}
-	sx, sy, sw, sh, ok := st.target.geometry(outputs)
+	sx, sy, sw, sh, ok := targetGeometry(st.target, outputs)
 	if !ok {
 		return dbusx.Failed(fmt.Sprintf("stream %d has no place in the layout", stream))
 	}

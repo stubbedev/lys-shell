@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/swaytest"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // hostRenderNodes are the host's DRM render nodes.
@@ -183,7 +184,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	if len(outs) == 0 {
 		t.Fatal("the headless sway has no output")
 	}
-	output := captureTarget{kind: targetOutput, name: outs[0].Name}
+	output := sharepicker.Target{Kind: sharepicker.TargetOutput, Name: outs[0].Name}
 	offered, err := c.DmabufFormat(outs[0], false)
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +196,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 
 	logged := captureLog(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	s, err := streams.startGPU(output.name, false, 30)
+	s, err := streams.startGPU(output.Name, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}
@@ -218,7 +219,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	if w, h := s.Size(); w <= 0 || h <= 0 || s.NodeID() == 0 {
 		t.Errorf("the shm stream is %dx%d on node %d", w, h, s.NodeID())
 	}
-	want := "portal: screencast: output " + output.name + " streams through shared memory: screencast: no dmabuf path: no Vulkan device\n"
+	want := "portal: screencast: output " + output.Name + " streams through shared memory: screencast: no dmabuf path: no Vulkan device\n"
 	if got := logged.String(); got != want {
 		t.Errorf("logged %q, want once %q", got, want)
 	}

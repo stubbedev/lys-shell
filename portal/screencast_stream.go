@@ -8,6 +8,8 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/pipewire"
+
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // defaultFPS is the advertised capture rate, clamped to the output's
@@ -103,17 +105,17 @@ type screenStreams struct {
 // (damage-driven: a static screen sends nothing new); a compositor
 // without it, a region, and a window take one screencopy or toplevel
 // capture per frame.
-func (st screenStreams) start(target captureTarget, cursor bool, fps uint32) (screenStream, error) {
-	if target.kind == targetOutput {
-		s, err := st.startGPU(target.name, cursor, fps)
+func (st screenStreams) start(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+	if target.Kind == sharepicker.TargetOutput {
+		s, err := st.startGPU(target.Name, cursor, fps)
 		if err == nil {
 			return s, nil
 		}
 		if !errors.Is(err, errNoDmabuf) {
 			return nil, err
 		}
-		warnf("screencast: output %s streams through shared memory: %v", target.name, err)
-		if s, err := capture.OpenOutputStream(target.name, cursor); err == nil {
+		warnf("screencast: output %s streams through shared memory: %v", target.Name, err)
+		if s, err := capture.OpenOutputStream(target.Name, cursor); err == nil {
 			info := s.Info()
 			return startProducer(producerGeometry{
 				width: info.Width, height: info.Height, stride: info.Stride, format: info.Format,
@@ -256,7 +258,7 @@ func copyRows(dst []byte, f *capture.Frame) {
 }
 
 // startSnapshotStream captures per frame on a connection of its own.
-func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenStream, error) {
+func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
@@ -266,32 +268,32 @@ func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenS
 	var gone func() bool
 	var refresh int32
 	var transform capture.Transform
-	switch target.kind {
-	case targetOutput, targetRegion:
-		o, ok := findOutput(c, target.name)
+	switch target.Kind {
+	case sharepicker.TargetOutput, sharepicker.TargetRegion:
+		o, ok := findOutput(c, target.Name)
 		if !ok {
 			_ = c.Close()
-			return nil, fmt.Errorf("output '%s' is gone", target.name)
+			return nil, fmt.Errorf("output '%s' is gone", target.Name)
 		}
-		gone = outputGone(c, target.name)
+		gone = outputGone(c, target.Name)
 		refresh, transform = o.RefreshMHz, o.Transform
-		if target.kind == targetOutput {
+		if target.Kind == sharepicker.TargetOutput {
 			grab = outputGrab(c, o, cursor)
 		} else {
-			region := image.Rect(int(target.x), int(target.y), int(target.x+target.width), int(target.y+target.height))
+			region := image.Rect(int(target.X), int(target.Y), int(target.X+target.Width), int(target.Y+target.Height))
 			grab = func(dst []byte) (*capture.Frame, error) {
 				opts.Dst = dst
 				return c.CaptureOutputRegion(o, region, opts)
 			}
 		}
-	case targetWindow:
-		t, ok := findToplevel(c, target.name)
+	case sharepicker.TargetWindow:
+		t, ok := findToplevel(c, target.Name)
 		if !ok {
 			_ = c.Close()
-			return nil, fmt.Errorf("window '%s' is gone", target.name)
+			return nil, fmt.Errorf("window '%s' is gone", target.Name)
 		}
 		grab = func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureToplevel(t, opts) }
-		gone = func() bool { _, ok := findToplevel(c, target.name); return !ok }
+		gone = func() bool { _, ok := findToplevel(c, target.Name); return !ok }
 	}
 	first, err := grab(nil)
 	if err != nil {

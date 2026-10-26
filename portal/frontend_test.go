@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 const (
@@ -353,7 +354,7 @@ func (pattern) Fill(dst []byte) ([]pipewire.Rect, bool) {
 func TestFrontendScreenCastStreamsToARealConsumer(t *testing.T) {
 	daemon := pwtest.Start(t)
 	r := newRig(t, func(b *Backend) {
-		b.screenCast = newScreenCast(b.conn, b.sessions, func(captureTarget, bool, uint32) (screenStream, error) {
+		b.screenCast = newScreenCast(b.conn, b.sessions, func(sharepicker.Target, bool, uint32) (screenStream, error) {
 			return startProducer(producerGeometry{width: 64, height: 32, stride: 256, format: capture.FormatXRGB8888, fps: 30},
 				pattern{}, make(chan struct{}), func() {})
 		}, (&fakeStarts{}).outputs)
