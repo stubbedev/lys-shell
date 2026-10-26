@@ -2,7 +2,10 @@ package icons
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -140,19 +143,29 @@ func (m *Manager) Remove(name string) error {
 	return nil
 }
 
-// List is every installed icon name, user and system, sorted.
-func (m *Manager) List() []string {
-	dirs := []string{m.registry.IconsDir()}
-	for _, sys := range SystemIconPaths() {
-		actions := filepath.Join(sys, "hicolor", "scalable", "actions")
-		if exists(actions) {
-			dirs = append(dirs, actions)
-		}
-	}
+// List is every installed icon name, the user's and the system's
+// lys-shell roots', sorted (List over those roots).
+func (m *Manager) List() ([]string, error) {
+	return List(append([]string{m.registry.BasePath()}, SystemIconPaths()...))
+}
+
+// List is every icon name the theme roots offer under
+// hicolor/scalable/actions, where lys-shell's icons live (the user's
+// registry, the packaged ones under a data dir's icons), deduplicated
+// and sorted. A root without that directory offers none; one that
+// cannot be read is an error naming it, returned alongside the names
+// the other roots offer.
+func List(roots []string) ([]string, error) {
 	seen := map[string]bool{}
-	for _, dir := range dirs {
+	var errs []error
+	for _, root := range roots {
+		dir := filepath.Join(root, "hicolor", "scalable", "actions")
 		entries, err := os.ReadDir(dir)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
+			errs = append(errs, fmt.Errorf("list icons in %s: %w", dir, err))
 			continue
 		}
 		for _, e := range entries {
@@ -166,7 +179,7 @@ func (m *Manager) List() []string {
 		out = append(out, name)
 	}
 	sort.Strings(out)
-	return out
+	return out, errors.Join(errs...)
 }
 
 // svgStem is Path::file_stem for a file whose extension is exactly

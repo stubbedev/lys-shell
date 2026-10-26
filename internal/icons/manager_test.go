@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-shell/internal/icons/icontest"
@@ -104,8 +105,65 @@ func TestManagerListMergesSystemIcons(t *testing.T) {
 	writeIcon(t, user, ".svg", "")
 	writeIcon(t, system, "ld-a-symbolic.svg", "")
 	writeIcon(t, system, "shared-symbolic.svg", "")
-	if got, want := m.List(), []string{"ld-a-symbolic", "shared-symbolic", "tb-b-symbolic"}; !slices.Equal(got, want) {
+	got, err := m.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"ld-a-symbolic", "shared-symbolic", "tb-b-symbolic"}; !slices.Equal(got, want) {
 		t.Errorf("List = %v, want %v", got, want)
+	}
+}
+
+// List offers the icons of every theme root: the user's registry and a
+// data dir's plain icons root, where the package installs the bundled
+// ones, merged. Other files, other icon directories and roots without
+// icons offer nothing.
+func TestListMergesTheThemeRoots(t *testing.T) {
+	user := RegistryAt(t.TempDir())
+	packaged := filepath.Join(t.TempDir(), "icons")
+	bundled := filepath.Join(packaged, "hicolor", "scalable", "actions")
+	apps := filepath.Join(packaged, "hicolor", "48x48", "apps")
+	for _, d := range []string{user.IconsDir(), bundled, apps} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeIcon(t, user.IconsDir(), "si-gmail-symbolic.svg", "")
+	writeIcon(t, user.IconsDir(), "shared-symbolic.svg", "")
+	writeIcon(t, user.IconsDir(), "notes.txt", "")
+	writeIcon(t, user.IconsDir(), ".svg", "")
+	writeIcon(t, bundled, "ld-activity-symbolic.svg", "")
+	writeIcon(t, bundled, "shared-symbolic.svg", "")
+	writeIcon(t, apps, "firefox.svg", "")
+	got, err := List([]string{user.BasePath(), filepath.Join(t.TempDir(), "absent"), packaged})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"ld-activity-symbolic", "shared-symbolic", "si-gmail-symbolic"}; !slices.Equal(got, want) {
+		t.Errorf("List = %v, want %v", got, want)
+	}
+}
+
+// A root whose icons directory cannot be read is an error naming it;
+// the other roots' icons still list.
+func TestListReportsAnUnreadableRoot(t *testing.T) {
+	good := RegistryAt(t.TempDir())
+	if err := os.MkdirAll(good.IconsDir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeIcon(t, good.IconsDir(), "ld-a-symbolic.svg", "")
+	bad := t.TempDir()
+	notADir := filepath.Join(bad, "hicolor", "scalable", "actions")
+	if err := os.MkdirAll(filepath.Dir(notADir), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeIcon(t, filepath.Dir(notADir), "actions", "")
+	got, err := List([]string{bad, good.BasePath()})
+	if err == nil || !strings.Contains(err.Error(), notADir) {
+		t.Errorf("err = %v, want one naming %s", err, notADir)
+	}
+	if !slices.Equal(got, []string{"ld-a-symbolic"}) {
+		t.Errorf("List = %v beside the error, want the readable root's icon", got)
 	}
 }
 

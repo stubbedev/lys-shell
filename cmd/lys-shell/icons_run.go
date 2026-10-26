@@ -171,7 +171,10 @@ func iconsList(m *cli.Matches) error {
 	if err != nil {
 		return err
 	}
-	all := manager.List()
+	all, err := manager.List()
+	if err != nil {
+		return err
+	}
 	prefix, filtered := cli.Value[string](m, "source")
 	var names []string
 	for _, n := range all {
@@ -288,7 +291,10 @@ func iconsExport(m *cli.Matches) error {
 	if err != nil {
 		return err
 	}
-	names := manager.List()
+	names, err := manager.List()
+	if err != nil {
+		return err
+	}
 	if len(names) == 0 {
 		fmt.Fprintln(m.Stdout(), "No icons installed")
 		return nil
@@ -345,8 +351,12 @@ func iconsSync(m *cli.Matches) error {
 	if err != nil {
 		return err
 	}
+	names, err := manager.List()
+	if err != nil {
+		return err
+	}
 	installed := map[string]bool{}
-	for _, n := range manager.List() {
+	for _, n := range names {
 		installed[n] = true
 	}
 	missing := icons.FindMissing(referenced, installed)

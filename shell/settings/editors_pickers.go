@@ -285,15 +285,16 @@ const (
 	iconPickerCell = 40
 )
 
-// iconNames lists the installed icons the picker offers (a seam for
-// tests; IconManager::list).
+// iconNames lists the icons the picker offers: every one the icon
+// theme's search path resolves from lys-shell's directory (a seam for
+// tests; IconManager::list). A root that cannot be read is logged; the
+// others' icons are still offered.
 var iconNames = func() []string {
-	m, err := icons.NewManager()
+	names, err := icons.List(widget.IconSearchPaths())
 	if err != nil {
 		log.Printf("settings: icons: %v", err)
-		return nil
 	}
-	return m.List()
+	return names
 }
 
 // iconEditor is icon_picker_widget: a trigger showing the icon and its
