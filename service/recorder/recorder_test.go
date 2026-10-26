@@ -73,7 +73,7 @@ func TestRecordPauseStopSaves(t *testing.T) {
 	gate := make(chan struct{})
 	engine := &recordertest.Engine{WriteOutput: true, Gate: gate}
 	s, log := newState(t, engine, func(c *config.RecorderConfig) {
-		c.OutputFormat = config.RecorderFormatWebm
+		c.OutputFormat = config.RecorderFormatMp4
 		c.Microphone, c.MicrophoneDevice, c.SystemAudio = true, "mic0", true
 		c.WebcamEnabled, c.WebcamX, c.WebcamY, c.WebcamSize = true, 10, 90, 25
 	})
@@ -84,12 +84,12 @@ func TestRecordPauseStopSaves(t *testing.T) {
 	close(gate)
 	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
 	snap := s.Snapshot()
-	if snap.Preparing || snap.Status != recorder.StatusRecording || filepath.Ext(snap.OutputPath) != ".webm" {
+	if snap.Preparing || snap.Status != recorder.StatusRecording || filepath.Ext(snap.OutputPath) != ".mp4" {
 		t.Fatalf("recording snapshot = %+v", snap)
 	}
 	rec := engine.Recordings()[0]
 	opts := rec.Opts
-	if opts.Format != recorder.FormatWebM || !opts.Microphone || opts.MicrophoneDevice != "mic0" || !opts.SystemAudio ||
+	if opts.Format != recorder.FormatMP4 || !opts.Microphone || opts.MicrophoneDevice != "mic0" || !opts.SystemAudio ||
 		opts.Webcam == nil || opts.Webcam.X != 10 || opts.Webcam.Y != 90 || opts.Webcam.Size != 25 {
 		t.Errorf("options = %+v (webcam %+v)", opts, opts.Webcam)
 	}

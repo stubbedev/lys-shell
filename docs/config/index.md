@@ -64,7 +64,7 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 | [`power`](/config/modules/power) | Shutdown, reboot, and logout menu. |
 | [`power-profiles`](/config/modules/power-profiles) | Power profile indicator and switcher (power-profiles-daemon). |
 | [`ram`](/config/modules/ram) | Memory and swap usage. |
-| [`recorder`](/config/modules/recorder) | Native screen recorder backed by a GStreamer pipeline. |
+| [`recorder`](/config/modules/recorder) | Native screen recorder encoding on the GPU's video encoder. |
 | [`screenshot`](/config/modules/screenshot) | Screenshot capture button. |
 | [`separator`](/config/modules/separator) | A vertical rule between bar modules. |
 | [`storage`](/config/modules/storage) | Disk usage for a mount point. |

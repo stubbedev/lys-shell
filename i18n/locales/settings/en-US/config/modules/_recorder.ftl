@@ -99,4 +99,3 @@ settings-modules-recorder-scroll-down = Scroll Down
 ## RecorderFormat variants
 enum-recorder-format-mp4 = MP4
 enum-recorder-format-mkv = MKV
-enum-recorder-format-webm = WebM

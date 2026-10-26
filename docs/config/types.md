@@ -918,8 +918,7 @@ Container format / codec preset for recordings.
 | Value | Meaning |
 |---|---|
 | `"mp4"` | H.264 in an MP4 container. |
-| `"mkv"` | H.264 in a Matroska container (resilient to crashes). |
-| `"webm"` | VP9 in a WebM container. |
+| `"mkv"` | H.264 in a Matroska container. |
 
 ## RestartDelay {#restart-delay}
 

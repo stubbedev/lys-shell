@@ -2,7 +2,6 @@ package recorder
 
 import (
 	"fmt"
-	"math/bits"
 	"strings"
 )
 
@@ -10,7 +9,6 @@ import (
 const (
 	audioBitrate    = 128_000
 	x264Quality     = 18
-	vp9CQLevel      = 20
 	hwH264QP        = 20
 	edgeMarginPct   = 5
 	fallbackScreenW = 1920
@@ -27,16 +25,12 @@ type Format int
 const (
 	FormatMP4 Format = iota
 	FormatMKV
-	FormatWebM
 )
 
 // Extension is the file extension.
 func (f Format) Extension() string {
-	switch f {
-	case FormatMKV:
+	if f == FormatMKV {
 		return "mkv"
-	case FormatWebM:
-		return "webm"
 	}
 	return "mp4"
 }
@@ -94,8 +88,7 @@ func BuildPipeline(opts Options, cast Cast, allowHardware bool, threads int, has
 	}
 	path := quote(opts.OutputPath)
 	threads = max(threads, 1)
-	encoder, hardware := videoEncoder(opts.Format, fps, threads, allowHardware, hasFactory)
-	parser := videoParser(opts.Format)
+	encoder, hardware := videoEncoder(fps, threads, allowHardware, hasFactory)
 	audioEncoder := fmt.Sprintf("opusenc bitrate=%d", audioBitrate)
 	mux := muxer(opts.Format)
 	source := fmt.Sprintf("pipewiresrc fd=%d path=%d do-timestamp=true", cast.FD, cast.Node)
@@ -111,14 +104,14 @@ func BuildPipeline(opts Options, cast Cast, allowHardware bool, threads int, has
 		}
 		fmt.Fprintf(&b, "compositor name=comp background=black "+
 			"sink_1::xpos=%d sink_1::ypos=%d sink_1::width=%d sink_1::height=%d "+
-			"! videoconvert n-threads=0 ! queue leaky=downstream ! %s ! queue ! %s%s name=mux ! filesink location=%s "+
+			"! videoconvert n-threads=0 ! queue leaky=downstream ! %s ! queue ! h264parse ! %s name=mux ! filesink location=%s "+
 			"%s ! videorate ! video/x-raw,framerate=%d/1 ! videoconvert n-threads=0 ! queue ! comp.sink_0 "+
 			"v4l2src%s do-timestamp=true ! queue leaky=downstream max-size-buffers=4 ! videorate max-rate=%d ! videoconvert n-threads=0 ! videoscale add-borders=true ! video/x-raw,width=%d,height=%d ! queue leaky=downstream max-size-buffers=4 ! comp.sink_1 ",
-			x, y, camW, camH, encoder, parser, mux, path, source, fps, device, min(fps, webcamMaxFPS), camW, camH)
+			x, y, camW, camH, encoder, mux, path, source, fps, device, min(fps, webcamMaxFPS), camW, camH)
 	} else {
 		fmt.Fprintf(&b, "%s ! videorate ! video/x-raw,framerate=%d/1 "+
-			"! videoconvert n-threads=0 ! queue leaky=downstream ! %s ! queue ! %s%s name=mux ! filesink location=%s ",
-			source, fps, encoder, parser, mux, path)
+			"! videoconvert n-threads=0 ! queue leaky=downstream ! %s ! queue ! h264parse ! %s name=mux ! filesink location=%s ",
+			source, fps, encoder, mux, path)
 	}
 
 	var audio []string
@@ -152,14 +145,9 @@ func quote(value string) string {
 }
 
 // videoEncoder is video_encoder: constant-quality H.264 (VA-API, then
-// NVENC, then x264) or software VP9, a keyframe every two seconds.
-func videoEncoder(format Format, fps uint32, threads int, allowHardware bool, hasFactory func(string) bool) (string, bool) {
+// NVENC, then x264), a keyframe every two seconds.
+func videoEncoder(fps uint32, threads int, allowHardware bool, hasFactory func(string) bool) (string, bool) {
 	keyint := max(fps*2, 1)
-	if format == FormatWebM {
-		tiles := min(log2Floor(threads), 6)
-		return fmt.Sprintf("vp9enc threads=%d tile-columns=%d deadline=1 cpu-used=4 lag-in-frames=0 end-usage=cq cq-level=%d target-bitrate=25000 keyframe-max-dist=%d",
-			threads, tiles, vp9CQLevel, keyint), false
-	}
 	if allowHardware {
 		if hasFactory("vah264enc") {
 			return fmt.Sprintf("vah264enc rate-control=cqp qpi=%d qpp=%d qpb=%d key-int-max=%d", hwH264QP, hwH264QP, hwH264QP, keyint), true
@@ -172,31 +160,12 @@ func videoEncoder(format Format, fps uint32, threads int, allowHardware bool, ha
 		threads, x264Quality, keyint), false
 }
 
-// videoParser is video_parser.
-func videoParser(format Format) string {
-	if format == FormatWebM {
-		return ""
-	}
-	return "h264parse ! "
-}
-
 // muxer is muxer.
 func muxer(format Format) string {
-	switch format {
-	case FormatMKV:
+	if format == FormatMKV {
 		return "matroskamux"
-	case FormatWebM:
-		return "webmmux"
 	}
 	return "mp4mux"
-}
-
-// log2Floor is log2_floor (0 for n <= 1).
-func log2Floor(n int) int {
-	if n <= 1 {
-		return 0
-	}
-	return bits.Len(uint(n)) - 1
 }
 
 // WebcamMargin is webcam_margin: the uniform inset, a percentage of

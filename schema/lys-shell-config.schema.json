@@ -6932,7 +6932,7 @@
       "type": "object"
     },
     "RecorderConfig": {
-      "description": "Native screen recorder backed by a GStreamer pipeline.\n\nClick the bar button to start/stop; the dropdown exposes the recording\noptions below. Controllable from the CLI / RPC socket:\n`lys-shell recorder start|stop|toggle|pause|status`.",
+      "description": "Native screen recorder encoding on the GPU's video encoder.\n\nAn output is captured into GPU memory and encoded to H.264 there, with\nOpus audio; a GPU without a video encoder cannot record.\n\nClick the bar button to start/stop; the dropdown exposes the recording\noptions below. Controllable from the CLI / RPC socket:\n`lys-shell recorder start|stop|toggle|pause|status`.",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -7102,12 +7102,7 @@
         },
         {
           "const": "mkv",
-          "description": "H.264 in a Matroska container (resilient to crashes).",
-          "type": "string"
-        },
-        {
-          "const": "webm",
-          "description": "VP9 in a WebM container.",
+          "description": "H.264 in a Matroska container.",
           "type": "string"
         }
       ]

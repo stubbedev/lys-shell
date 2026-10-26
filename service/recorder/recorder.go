@@ -411,8 +411,6 @@ func BuildOptions(cfg config.RecorderConfig, now time.Time) Options {
 	switch cfg.OutputFormat {
 	case config.RecorderFormatMkv:
 		format = FormatMKV
-	case config.RecorderFormatWebm:
-		format = FormatWebM
 	}
 	opts := Options{
 		OutputPath:       OutputPath(cfg.OutputDirectory, format, now),

@@ -7,7 +7,10 @@ outline: [2, 3]
 
 <div v-pre>
 
-Native screen recorder backed by a GStreamer pipeline.
+Native screen recorder encoding on the GPU's video encoder.
+
+An output is captured into GPU memory and encoded to H.264 there, with
+Opus audio; a GPU without a video encoder cannot record.
 
 Click the bar button to start/stop; the dropdown exposes the recording
 options below. Controllable from the CLI / RPC socket:

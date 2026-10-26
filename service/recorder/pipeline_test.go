@@ -33,12 +33,6 @@ func TestBuildPipelinePrefersHardware(t *testing.T) {
 	if got := BuildPipeline(Options{Format: FormatMP4}, Cast{}, false, 4, vaapi); got.Hardware || !strings.Contains(got.Description, "x264enc") {
 		t.Errorf("software path: %+v", got)
 	}
-	// VP9 is always software, without a parser.
-	got = BuildPipeline(Options{Format: FormatWebM, Framerate: 30}, Cast{}, true, 16, vaapi)
-	if got.Hardware || !strings.Contains(got.Description, "vp9enc threads=16 tile-columns=4") ||
-		strings.Contains(got.Description, "h264parse") || !strings.Contains(got.Description, "webmmux") {
-		t.Errorf("webm: %+v", got)
-	}
 }
 
 func TestBuildPipelineAudio(t *testing.T) {
@@ -104,12 +98,7 @@ func TestQuoteAndHelpers(t *testing.T) {
 	if got := quote(`a\b"c`); got != `"a\\b\"c"` {
 		t.Errorf("quote = %s", got)
 	}
-	for n, want := range map[int]int{0: 0, 1: 0, 2: 1, 7: 2, 8: 3, 64: 6} {
-		if got := log2Floor(n); got != want {
-			t.Errorf("log2Floor(%d) = %d", n, got)
-		}
-	}
-	for f, ext := range map[Format]string{FormatMP4: "mp4", FormatMKV: "mkv", FormatWebM: "webm"} {
+	for f, ext := range map[Format]string{FormatMP4: "mp4", FormatMKV: "mkv"} {
 		if f.Extension() != ext {
 			t.Errorf("%v extension = %q", f, f.Extension())
 		}

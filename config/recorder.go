@@ -2,7 +2,10 @@ package config
 
 // RecorderConfig is ported from crates/wayle-config/src/schemas/modules/recorder/mod.rs.
 //
-// Native screen recorder backed by a GStreamer pipeline.
+// Native screen recorder encoding on the GPU's video encoder.
+//
+// An output is captured into GPU memory and encoded to H.264 there, with
+// Opus audio; a GPU without a video encoder cannot record.
 //
 // Click the bar button to start/stop; the dropdown exposes the recording
 // options below. Controllable from the CLI / RPC socket:
@@ -134,10 +137,8 @@ type RecorderFormat string
 const (
 	// H.264 in an MP4 container.
 	RecorderFormatMp4 RecorderFormat = "mp4"
-	// H.264 in a Matroska container (resilient to crashes).
+	// H.264 in a Matroska container.
 	RecorderFormatMkv RecorderFormat = "mkv"
-	// VP9 in a WebM container.
-	RecorderFormatWebm RecorderFormat = "webm"
 )
 
-var _ = registerEnum(RecorderFormatMp4, RecorderFormatMkv, RecorderFormatWebm)
+var _ = registerEnum(RecorderFormatMp4, RecorderFormatMkv)
