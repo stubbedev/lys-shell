@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -80,12 +81,11 @@ func TestFillBarRefillsTheSameRoot(t *testing.T) {
 	}
 }
 
-// Against a real compositor: a reload that changes the bar's content
-// and size rebuilds it on the same surface, which never closes and
-// grows to the new thickness; one that changes whether the bar is
-// exclusive opens the new surface and closes the old one only once the
-// new one is configured and drawn.
-func TestBarReloadKeepsOrReplacesTheSurface(t *testing.T) {
+// Against a real compositor, every reload rebuilds the bar on the
+// surface it opened with, which never closes: a larger padding and a
+// second module grow it, and turning exclusive off and on drops the
+// workspace's reserved edge to 0 and back to the bar's thickness.
+func TestBarReloadKeepsTheSurface(t *testing.T) {
 	swaytest.Start(t)
 	sess, err := app.Connect()
 	if err != nil {
@@ -101,7 +101,7 @@ func TestBarReloadKeepsOrReplacesTheSurface(t *testing.T) {
 	host := &barHost{app: application, rt: rt}
 
 	var opened []*barWindow
-	var replacementUp []bool
+	closes := 0
 	set := newBarSet(func(o *app.Output, l config.BarLayout) (barLayer, error) {
 		layer, err := host.open(o, l)
 		if err != nil {
@@ -109,17 +109,13 @@ func TestBarReloadKeepsOrReplacesTheSurface(t *testing.T) {
 		}
 		w := layer.(*barWindow)
 		opened = append(opened, w)
-		return &probeLayer{barWindow: w, onClose: func() {
-			last := opened[len(opened)-1]
-			replacementUp = append(replacementUp, last != w && last.layer.EnsureUsable() == nil && !last.layer.Closed())
-		}}, nil
+		return &probeLayer{barWindow: w, onClose: func() { closes++ }}, nil
 	})
 	outputs := sess.Outputs()
 	if len(outputs) == 0 || outputs[0].Name == "" {
 		t.Fatalf("the headless sway shows outputs %v", outputs)
 	}
-	output := outputs[0]
-	set.plug(output, clockLayout, true)
+	set.plug(outputs[0], clockLayout, true)
 	done := make(chan error, 1)
 	go func() { done <- application.Run() }()
 	defer func() {
@@ -136,38 +132,36 @@ func TestBarReloadKeepsOrReplacesTheSurface(t *testing.T) {
 		})
 		<-ran
 	}
-	waitLoop := func(what string, cond func() bool) {
+	bar := opened[0]
+	thickness := func() int {
+		var h int
+		onLoop(func() { _, h = bar.layer.Size() })
+		return h
+	}
+	wait := func(what string, cond func() bool) {
 		t.Helper()
-		for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-			var ok bool
-			onLoop(func() { ok = cond() })
-			if ok {
-				return
-			}
+		for deadline := time.Now().Add(10 * time.Second); !cond(); time.Sleep(10 * time.Millisecond) {
 			if time.Now().After(deadline) {
-				t.Fatalf("timed out waiting for %s", what)
+				t.Fatalf("timed out waiting for %s (thickness %d, reserved %d)", what, thickness(), reservedTop(t))
 			}
 		}
 	}
-	first := opened[0]
-	thickness := func(w *barWindow) int { _, h := w.layer.Size(); return h }
-	waitLoop("the bar's first configure", func() bool { return first.layer.EnsureUsable() == nil && thickness(first) > 0 })
-	var before int
-	onLoop(func() { before = thickness(first) })
+	reload := func(next *config.Config, layout config.BarLayout) {
+		onLoop(func() {
+			rt.mount(application, next)
+			set.reload(func(string) (config.BarLayout, bool) { return layout, true })
+		})
+	}
+	wait("the exclusive bar's zone", func() bool { h := thickness(); return h > 0 && reservedTop(t) == h })
+	before := thickness()
 
 	taller := config.Defaults()
 	taller.Bar.Padding = config.Px(30)
 	twoClocks := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}, {Module: "clock"}}}
+	reload(taller, twoClocks)
+	wait("the taller bar's zone", func() bool { h := thickness(); return h > before && reservedTop(t) == h })
 	onLoop(func() {
-		rt.mount(application, taller)
-		set.reload(func(string) (config.BarLayout, bool) { return twoClocks, true })
-	})
-	waitLoop("the rebuilt bar's new thickness", func() bool { return thickness(first) > before })
-	onLoop(func() {
-		if len(opened) != 1 || first.layer.Closed() || len(replacementUp) != 0 {
-			t.Errorf("an in-place reload opened %d surfaces, closed the first %v, closed %d", len(opened), first.layer.Closed(), len(replacementUp))
-		}
-		if n := len(first.bar.Start().Children()); n != 2 {
+		if n := len(bar.bar.Start().Children()); n != 2 {
 			t.Errorf("the rebuilt bar holds %d items, want 2", n)
 		}
 	})
@@ -175,22 +169,39 @@ func TestBarReloadKeepsOrReplacesTheSurface(t *testing.T) {
 	shared := config.Defaults()
 	shared.Bar.Padding = config.Px(30)
 	shared.Bar.Exclusive = false
+	reload(shared, twoClocks)
+	wait("the zone to drop", func() bool { return reservedTop(t) == 0 })
+
+	reload(taller, twoClocks)
+	wait("the zone to return", func() bool { h := thickness(); return h > before && reservedTop(t) == h })
+
 	onLoop(func() {
-		rt.mount(application, shared)
-		set.reload(func(string) (config.BarLayout, bool) { return twoClocks, true })
-		if len(opened) != 2 || first.layer.Closed() {
-			t.Errorf("an exclusive change opened %d surfaces in all and closed the old one at once: %v", len(opened), first.layer.Closed())
+		if len(opened) != 1 || closes != 0 || bar.layer.Closed() {
+			t.Errorf("the reloads opened %d surfaces and closed %d, want 1 and none", len(opened), closes)
 		}
 	})
-	waitLoop("the old surface to close", func() bool { return first.layer.Closed() })
-	onLoop(func() {
-		if len(replacementUp) != 1 || !replacementUp[0] {
-			t.Errorf("the old surface closed with the replacement up: %v, want one close after it drew", replacementUp)
+}
+
+// reservedTop is how far the focused workspace of the test's sway
+// starts below its output's top: the exclusive zone of a top bar.
+func reservedTop(t *testing.T) int {
+	t.Helper()
+	var workspaces []struct {
+		Focused bool `json:"focused"`
+		Rect    struct {
+			Y int `json:"y"`
+		} `json:"rect"`
+	}
+	if err := json.Unmarshal(swaytest.Msg(t, "-t", "get_workspaces"), &workspaces); err != nil {
+		t.Fatal(err)
+	}
+	for _, ws := range workspaces {
+		if ws.Focused {
+			return ws.Rect.Y
 		}
-		if set.bars[output.Name].layer.(*probeLayer).barWindow != opened[1] {
-			t.Error("the set does not hold the replacement")
-		}
-	})
+	}
+	t.Fatal("sway has no focused workspace")
+	return 0
 }
 
 // probeLayer reports a bar layer's Close before it runs.

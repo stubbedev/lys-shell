@@ -10,57 +10,37 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// fakeLayer is a bar layer whose Rebuild succeeds when inPlace is set
-// and whose first frame is drawn when the test calls show.
+// fakeLayer is a bar layer whose Rebuild fails with refuse.
 type fakeLayer struct {
-	closed, inPlace bool
-	rebuilt         []config.BarLayout
-	onShown         []func()
+	closed  bool
+	refuse  error
+	rebuilt []config.BarLayout
 }
 
 func (f *fakeLayer) Close() { f.closed = true }
 
-func (f *fakeLayer) Rebuild(layout config.BarLayout) bool {
-	if f.inPlace {
-		f.rebuilt = append(f.rebuilt, layout)
+func (f *fakeLayer) Rebuild(layout config.BarLayout) error {
+	if f.refuse != nil {
+		return f.refuse
 	}
-	return f.inPlace
+	f.rebuilt = append(f.rebuilt, layout)
+	return nil
 }
 
-func (f *fakeLayer) OnShown(fn func()) { f.onShown = append(f.onShown, fn) }
-
-func (f *fakeLayer) show() {
-	for _, fn := range f.onShown {
-		fn()
-	}
-	f.onShown = nil
-}
-
-// fakeOpener opens fakeLayers for newBarSet, in place when inPlace is
-// set, failing while fail is; layers lists them in opening order.
+// fakeOpener opens fakeLayers for newBarSet, failing while fail is
+// set; layers lists them in opening order.
 type fakeOpener struct {
-	inPlace, fail bool
-	layers        []*fakeLayer
+	fail   bool
+	layers []*fakeLayer
 }
 
 func (o *fakeOpener) open(*app.Output, config.BarLayout) (barLayer, error) {
 	if o.fail {
 		return nil, errors.New("no surface")
 	}
-	l := &fakeLayer{inPlace: o.inPlace}
+	l := &fakeLayer{}
 	o.layers = append(o.layers, l)
 	return l, nil
-}
-
-// mapped counts the layers of o not closed.
-func (o *fakeOpener) mapped() int {
-	n := 0
-	for _, l := range o.layers {
-		if !l.closed {
-			n++
-		}
-	}
-	return n
 }
 
 var clockLayout = config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}}}
@@ -68,66 +48,50 @@ var clockLayout = config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module:
 // showClock gives every output the clock layout.
 func showClock(string) (config.BarLayout, bool) { return clockLayout, true }
 
-// A reload that the open bar can take keeps its layer: nothing closes
-// or opens, and the layer is rebuilt with the new layout.
+// A reload keeps every open bar's layer: nothing closes or opens, and
+// the layer is rebuilt with the new layout.
 func TestBarSetReloadRebuildsInPlace(t *testing.T) {
-	o := &fakeOpener{inPlace: true}
+	o := &fakeOpener{}
 	set := newBarSet(o.open)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	set.reload(showClock)
 	set.reload(showClock)
 	if len(o.layers) != 1 || o.layers[0].closed {
-		t.Fatalf("an in-place reload opened %d layers, first closed %v", len(o.layers), o.layers[0].closed)
+		t.Fatalf("reloads opened %d layers, first closed %v", len(o.layers), o.layers[0].closed)
 	}
-	if got := o.layers[0].rebuilt; len(got) != 1 || !slices.EqualFunc(got[0].Left, clockLayout.Left, func(a, b config.BarItem) bool { return a.Module == b.Module }) {
-		t.Fatalf("rebuilt with %+v, want the clock layout", got)
+	if got := o.layers[0].rebuilt; len(got) != 2 || !slices.EqualFunc(got[1].Left, clockLayout.Left, func(a, b config.BarItem) bool { return a.Module == b.Module }) {
+		t.Fatalf("rebuilt with %+v, want the clock layout twice", got)
 	}
 }
 
-// A reload that needs a new surface opens it first and closes the old
-// one only once the new one drew: the output never has no bar.
-func TestBarSetReloadReplacesMakeBeforeBreak(t *testing.T) {
+// A surface that refuses the rebuild is closed and opened afresh; one
+// that then cannot open leaves the output without a bar until the next
+// apply retries it.
+func TestBarSetReloadReopensARefusingSurface(t *testing.T) {
 	o := &fakeOpener{}
 	set := newBarSet(o.open)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	o.layers[0].refuse = errors.New("gone")
 	set.reload(showClock)
-	if len(o.layers) != 2 {
-		t.Fatalf("a replacing reload opened %d layers, want 2", len(o.layers))
+	if len(o.layers) != 2 || !o.layers[0].closed || set.bars["DP-1"].layer != o.layers[1] {
+		t.Fatalf("a refused rebuild: opened %d, old closed %v", len(o.layers), o.layers[0].closed)
 	}
-	old, next := o.layers[0], o.layers[1]
-	if old.closed {
-		t.Fatal("the old bar closed before its replacement drew")
-	}
-	if set.bars["DP-1"].layer != next {
-		t.Fatal("the set does not hold the replacement")
-	}
-	next.show()
-	if !old.closed || next.closed || o.mapped() != 1 {
-		t.Fatalf("after the replacement drew: old closed %v, new closed %v, mapped %d", old.closed, next.closed, o.mapped())
-	}
-}
-
-// A replacement that cannot open leaves the output without a bar, and
-// the next apply retries it.
-func TestBarSetReloadFailedReplacementRetries(t *testing.T) {
-	o := &fakeOpener{}
-	set := newBarSet(o.open)
-	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	o.layers[1].refuse = errors.New("gone")
 	o.fail = true
 	set.reload(showClock)
-	if !o.layers[0].closed || set.bars["DP-1"].layer != nil {
-		t.Fatalf("failed replacement: old closed %v, layer %v", o.layers[0].closed, set.bars["DP-1"].layer)
+	if !o.layers[1].closed || set.bars["DP-1"].layer != nil {
+		t.Fatalf("a failed reopen: old closed %v, layer %v", o.layers[1].closed, set.bars["DP-1"].layer)
 	}
 	o.fail = false
 	set.apply(nil)
-	if len(o.layers) != 2 || o.mapped() != 1 {
-		t.Fatalf("retry: opened %d, mapped %d", len(o.layers), o.mapped())
+	if len(o.layers) != 3 || o.layers[2].closed {
+		t.Fatalf("retry: opened %d", len(o.layers))
 	}
 }
 
-// A hidden bar or one the new layout drops is neither rebuilt nor
-// replaced.
+// A hidden bar or one the new layout drops is not rebuilt.
 func TestBarSetReloadLeavesHiddenAndDroppedBars(t *testing.T) {
-	o := &fakeOpener{inPlace: true}
+	o := &fakeOpener{}
 	set := newBarSet(o.open)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	set.plug(&app.Output{Name: "DP-2"}, config.BarLayout{}, true)

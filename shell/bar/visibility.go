@@ -26,12 +26,9 @@ type barSet struct {
 type barLayer interface {
 	Close()
 	// Rebuild refills the open bar from layout and the current config
-	// on its own surface, and reports false when the change needs a
-	// new surface, leaving the bar as it was.
-	Rebuild(layout config.BarLayout) bool
-	// OnShown runs fn once the layer has drawn its first frame, or
-	// once it closed without one.
-	OnShown(fn func())
+	// on its own surface; an error means the surface refused the
+	// change.
+	Rebuild(layout config.BarLayout) error
 }
 
 type barEntry struct {
@@ -71,36 +68,22 @@ func (b *barSet) apply(hidden map[string]bool) {
 }
 
 // reload rebuilds every bar from layoutFor (a config reload): an open
-// bar that stays rebuilds on its own surface, one that needs a new
-// surface is replaced make-before-break, and outputs the new layout
-// shows or hides follow it. The Shell1 hide state survives.
+// bar that stays rebuilds on its own surface, and outputs the new
+// layout shows or hides follow it. A surface that refuses the rebuild
+// is closed and opened afresh. The Shell1 hide state survives.
 func (b *barSet) reload(layoutFor func(connector string) (config.BarLayout, bool)) {
 	for _, name := range b.order {
 		entry := b.bars[name]
 		entry.layout, entry.shows = layoutFor(name)
-		if entry.layer == nil || !entry.shows || entry.hidden || entry.layer.Rebuild(entry.layout) {
-			b.sync(name, entry)
-			continue
+		if entry.layer != nil && entry.shows && !entry.hidden {
+			if err := entry.layer.Rebuild(entry.layout); err != nil {
+				log.Printf("bar %s: rebuild: %v; reopening it", name, err)
+				entry.layer.Close()
+				entry.layer = nil
+			}
 		}
-		b.replace(name, entry)
+		b.sync(name, entry)
 	}
-}
-
-// replace opens a new layer for the entry and closes the old one once
-// the new one has drawn its first frame, so the output never goes
-// without a bar. A layer that cannot open leaves the output without
-// one, retried as sync does.
-func (b *barSet) replace(name string, entry *barEntry) {
-	old := entry.layer
-	layer, err := b.open(entry.output, entry.layout)
-	if err != nil {
-		log.Printf("bar %s: replace: %v", name, err)
-		old.Close()
-		entry.layer = nil
-		return
-	}
-	entry.layer = layer
-	layer.OnShown(old.Close)
 }
 
 // sync opens or closes the entry's layer to match shows and hidden.

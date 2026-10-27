@@ -644,10 +644,6 @@ func barLayoutFor(cfg *config.Config, connector string) (config.BarLayout, bool)
 	return layout, ok && layout.Show
 }
 
-// shownPoll is how often a replacement bar is checked for its first
-// configure, after which the loop draws its first frame.
-const shownPoll = 10 * time.Millisecond
-
 // barHost opens the bars of the shell's mount generation; `lys-shell
 // panel show` and a reload open bars through it.
 type barHost struct {
@@ -676,7 +672,7 @@ func (h *barHost) open(output *app.Output, layout config.BarLayout) (barLayer, e
 		ctx.gen.retire()
 		return nil, err
 	}
-	w := &barWindow{host: h, output: output, layer: window, bar: bc.Bar, gen: ctx.gen, layerKind: bc.Layer, exclusive: bc.Exclusive}
+	w := &barWindow{host: h, output: output, layer: window, bar: bc.Bar, gen: ctx.gen, layerKind: bc.Layer}
 	w.attach(ctx)
 	if h.holder != nil {
 		h.holder.add(window)
@@ -693,7 +689,6 @@ type barWindow struct {
 	bar       *widget.Bar
 	gen       *mountGen
 	layerKind app.Layer
-	exclusive bool
 }
 
 // attach hands the window to what ctx's modules and the dropdowns
@@ -706,49 +701,32 @@ func (w *barWindow) attach(ctx ModuleContext) {
 }
 
 // Rebuild refills the bar from the current mount generation on its own
-// surface: its modules restart, the stack layer and the edge move in
-// place, and the surface refits to the new content on the next frame.
-// lys-ui's BarWindow fixes whether it is exclusive at creation, so
-// that change needs a new surface.
-func (w *barWindow) Rebuild(layout config.BarLayout) bool {
+// surface: its modules restart, the stack layer, the edge and the
+// exclusive zone move in place, and the surface refits to the new
+// content on the next frame. A refused change leaves the old modules
+// running.
+func (w *barWindow) Rebuild(layout config.BarLayout) error {
 	cfg := w.host.rt.ctx.Config
-	if cfg.Bar.Exclusive != w.exclusive {
-		return false
-	}
-	ctx := w.host.context(w.output)
 	if kind := layering.For(cfg.General, cfg.Bar.Layer); kind != w.layerKind {
 		if err := w.layer.SetLayer(kind); err != nil {
-			log.Printf("bar %s: move to layer %v: %v; replacing the surface", w.output.Name, kind, err)
-			ctx.gen.retire()
-			return false
+			return fmt.Errorf("move to layer %v: %w", kind, err)
 		}
 		w.layerKind = kind
 	}
 	if edge := barEdge(cfg.Bar.Location); edge != w.bar.Edge() {
 		if err := w.layer.SetEdge(edge); err != nil {
-			log.Printf("bar %s: move to %s: %v; replacing the surface", w.output.Name, cfg.Bar.Location, err)
-			ctx.gen.retire()
-			return false
+			return fmt.Errorf("move to %s: %w", cfg.Bar.Location, err)
 		}
 	}
+	if err := w.layer.SetExclusive(cfg.Bar.Exclusive); err != nil {
+		return fmt.Errorf("set exclusive %v: %w", cfg.Bar.Exclusive, err)
+	}
+	ctx := w.host.context(w.output)
 	w.gen.retire()
 	w.gen = ctx.gen
 	fillBar(w.bar, ctx, layout)
 	w.attach(ctx)
-	return true
-}
-
-// OnShown runs fn on the loop once the layer was configured and has
-// drawn: a pass that finds it configured draws it before the Invoke
-// queued there runs.
-func (w *barWindow) OnShown(fn func()) {
-	var cancel func()
-	cancel = w.host.app.Every(shownPoll, func() {
-		if w.layer.Closed() || w.layer.EnsureUsable() == nil {
-			cancel()
-			w.host.app.Invoke(fn)
-		}
-	})
+	return nil
 }
 
 func (w *barWindow) Close() {
