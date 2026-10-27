@@ -13,7 +13,7 @@ On-screen display overlay for transient events like volume and brightness.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | bool | `true` | Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group). |
+| `enabled` | bool | `true` | Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group, except on lys-wm, which reports them over its IPC). |
 | `position` | [`OsdPosition`](/config/types#osd-position) | `"bottom"` | Screen anchor position. |
 | `text-align` | [`OsdTextAlign`](/config/types#osd-text-align) | `"center"` | Horizontal alignment of toast and toggle overlay content. Sliders (volume/brightness) keep their own label+value layout. |
 | `duration` | u32 | `2500` | Auto-dismiss delay in milliseconds. |

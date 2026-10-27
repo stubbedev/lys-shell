@@ -6697,7 +6697,7 @@
         "enabled": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group)."
+          "description": "Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group, except on lys-wm, which reports them over its IPC)."
         },
         "layer": {
           "$ref": "#/$defs/Layer",

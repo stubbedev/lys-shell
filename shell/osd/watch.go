@@ -103,11 +103,15 @@ func (l *layoutEvents) next(src Layouts) (Event, bool) {
 	return layoutEvent(name), true
 }
 
+// LockKeys follows the lock keys: it calls fn for each key that turns
+// on or off until stop, which waits for the last call.
+type LockKeys func(fn func(keytoggles.Event)) (stop func(), err error)
+
 // Watch follows the audio, brightness, keyboard layout, and lock-key
 // sources until ctx ends (watchers.rs spawn). A nil source is skipped. The levels at
 // start seed the dedupe without flashing, as the Rust watchers' first
 // emission lands inside the quiet period.
-func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source, layouts Layouts) {
+func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source, layouts Layouts, locks LockKeys) {
 	if audio != nil {
 		if ticks, stop, err := audio.Subscribe(ctx); err == nil {
 			defer stop()
@@ -158,6 +162,12 @@ func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.So
 			log.Printf("osd: keyboard layout: %v", err)
 		}
 	}
-	defer keytoggles.Watch(func(e keytoggles.Event) { o.Show(toggleEvent(e)) })()
+	if locks != nil {
+		if stop, err := locks(func(e keytoggles.Event) { o.Show(toggleEvent(e)) }); err == nil {
+			defer stop()
+		} else {
+			log.Printf("osd: lock keys: %v", err)
+		}
+	}
 	<-ctx.Done()
 }

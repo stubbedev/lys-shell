@@ -5,7 +5,7 @@ package config
 //
 // On-screen display overlay for transient events like volume and brightness.
 type OsdConfig struct {
-	// Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group).
+	// Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group, except on lys-wm, which reports them over its IPC).
 	Enabled bool `cfg:"enabled"`
 	// Screen anchor position.
 	Position OsdPosition `cfg:"position"`

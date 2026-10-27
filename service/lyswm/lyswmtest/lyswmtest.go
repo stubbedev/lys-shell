@@ -36,7 +36,8 @@ type WM struct {
 }
 
 // Start serves the fake and advertises it. It answers a lys-wm with no
-// windows, the default binds and the English (US) layout.
+// windows, the default binds, the English (US) layout and every lock key
+// off.
 func Start(t *testing.T) *WM {
 	t.Helper()
 	path := filepath.Join(sockdir.Dir(t), "wayland-1.sock")
@@ -58,6 +59,7 @@ func Start(t *testing.T) *WM {
 		"activewindow": `null`,
 		"submap":       `""`,
 		"layout":       `{"index":0,"name":"English (US)"}`,
+		"locks":        `{"caps":false,"num":false,"scroll":false}`,
 	} {
 		w.Result(request, result)
 	}

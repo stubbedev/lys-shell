@@ -83,6 +83,13 @@ type Layout struct {
 	Name  string `json:"name"`
 }
 
+// Locks is the lock keys' state as the keymap's LEDs show it.
+type Locks struct {
+	Caps   bool `json:"caps"`
+	Num    bool `json:"num"`
+	Scroll bool `json:"scroll"`
+}
+
 // RejectedError is a request lys-wm answered with an error.
 type RejectedError struct {
 	Request string
@@ -218,6 +225,17 @@ func activeLayout() (Layout, error) {
 	return *out, nil
 }
 
+func activeLocks() (Locks, error) {
+	var out *Locks
+	if err := call(request{Request: "locks"}, &out); err != nil {
+		return Locks{}, err
+	}
+	if out == nil {
+		return Locks{}, errors.New("lys-wm: locks answered no result")
+	}
+	return *out, nil
+}
+
 // Dispatch runs one action, as a bind would.
 func Dispatch(action string) error {
 	return call(request{Request: "dispatch", Action: action}, nil)
@@ -242,17 +260,19 @@ const (
 	EventFocus         EventKind = "focus"
 	EventSubmap        EventKind = "submap"
 	EventLayout        EventKind = "layout"
+	EventLocks         EventKind = "locks"
 )
 
 type event struct {
 	Event  EventKind `json:"event"`
 	Submap *string   `json:"submap"`
 	Layout *Layout   `json:"layout"`
+	Locks  *Locks    `json:"locks"`
 }
 
-// Watcher follows the watch stream: it keeps the submap and keyboard
-// layout, seeded from the submap and layout requests and then updated
-// by the stream, and ticks after each event of the kinds it was asked
+// Watcher follows the watch stream: it keeps the submap, keyboard
+// layout and lock keys, seeded from the submap, layout and locks
+// requests and then updated by the stream, and ticks after each event of the kinds it was asked
 // for.
 type Watcher struct {
 	conn  net.Conn
@@ -263,6 +283,7 @@ type Watcher struct {
 	mu     sync.Mutex
 	submap string
 	layout Layout
+	locks  Locks
 }
 
 // Watch opens the event stream. It ticks on the given kinds, or on
@@ -291,7 +312,12 @@ func Watch(kinds ...EventKind) (*Watcher, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("lys-wm: watch: seed the layout: %w", err)
 	}
-	w := &Watcher{conn: conn, kinds: kinds, ticks: make(chan struct{}, 1), submap: submap, layout: layout}
+	locks, err := activeLocks()
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("lys-wm: watch: seed the locks: %w", err)
+	}
+	w := &Watcher{conn: conn, kinds: kinds, ticks: make(chan struct{}, 1), submap: submap, layout: layout, locks: locks}
 	go w.pump(reader)
 	return w, nil
 }
@@ -327,6 +353,8 @@ func (w *Watcher) apply(e event) {
 		w.submap = *e.Submap
 	case e.Event == EventLayout && e.Layout != nil:
 		w.layout = *e.Layout
+	case e.Event == EventLocks && e.Locks != nil:
+		w.locks = *e.Locks
 	}
 }
 
@@ -342,6 +370,13 @@ func (w *Watcher) Layout() Layout {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.layout
+}
+
+// Locks is the lock keys' state.
+func (w *Watcher) Locks() Locks {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.locks
 }
 
 // Ticks fires after each followed event; it closes when the stream

@@ -477,7 +477,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		} else {
 			log.Printf("osd: keyboard layout: %v", err)
 		}
-		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts)
+		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts, lockKeySource())
 	}()
 	// The ext-session-lock screen and its triggers (logind, and `lys-shell
 	// lock` through Shell1).

@@ -444,7 +444,7 @@ func TestWatchShowsLayoutSwitches(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.osd.Watch(ctx, nil, nil, src)
+		h.osd.Watch(ctx, nil, nil, src, nil)
 	}()
 	t.Cleanup(func() { cancel(); <-done })
 	tick := func() {
@@ -471,4 +471,74 @@ func TestWatchShowsLayoutSwitches(t *testing.T) {
 		t.Error("the layout the compositor started on was shown")
 	default:
 	}
+}
+
+// Watch shows each lock key its source reports, with the key's new
+// state, and stops the source when it ends.
+func TestWatchShowsLockKeysFromItsSource(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	calls := make(chan func(), 1)
+	h.osd.d.Invoke = func(fn func()) { calls <- fn }
+	reports := make(chan func(keytoggles.Event), 1)
+	stopped := make(chan struct{})
+	locks := func(fn func(keytoggles.Event)) (func(), error) {
+		reports <- fn
+		return func() { close(stopped) }, nil
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.osd.Watch(ctx, nil, nil, nil, locks)
+	}()
+	var report func(keytoggles.Event)
+	select {
+	case report = <-reports:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Watch did not start the lock-key source")
+	}
+	select {
+	case <-calls:
+		t.Fatal("starting the lock-key source showed something")
+	case <-time.After(100 * time.Millisecond):
+	}
+	report(keytoggles.Event{Key: keytoggles.NumLock, Active: true})
+	select {
+	case fn := <-calls:
+		fn()
+	case <-time.After(5 * time.Second):
+		t.Fatal("a reported lock key showed nothing")
+	}
+	if got := h.osd.face.toggleLabel.Text(); got != "\u2068Num Lock\u2069 On" {
+		t.Errorf("the toggle reads %q, want Num Lock On", got)
+	}
+	cancel()
+	<-done
+	select {
+	case <-stopped:
+	default:
+		t.Error("Watch ended without stopping the lock-key source")
+	}
+}
+
+// A lock-key source that fails to start shows nothing and leaves
+// Watch running until ctx ends.
+func TestWatchSurvivesAFailedLockKeySource(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	h.osd.d.Invoke = func(func()) { t.Error("a failed lock-key source showed something") }
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.osd.Watch(ctx, nil, nil, nil, func(func(keytoggles.Event)) (func(), error) {
+			return nil, errors.New("no lys-wm")
+		})
+	}()
+	select {
+	case <-done:
+		t.Fatal("Watch ended before ctx")
+	case <-time.After(100 * time.Millisecond):
+	}
+	cancel()
+	<-done
 }

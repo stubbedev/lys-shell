@@ -1075,7 +1075,7 @@ var schemaDocs = map[string]string{
 	"OsdConfig":                                              "On-screen display overlay for transient events like volume and brightness.",
 	"OsdConfig.Border":                                       "Show a border around the OSD.",
 	"OsdConfig.Duration":                                     "Auto-dismiss delay in milliseconds.",
-	"OsdConfig.Enabled":                                      "Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group).",
+	"OsdConfig.Enabled":                                      "Show OSD overlays for volume, brightness, keyboard layout switches, and lock keys (Caps, Num and Scroll Lock need read access to /dev/input, the input group, except on lys-wm, which reports them over its IPC).",
 	"OsdConfig.Layer":                                        "Layer-shell layer the OSD is placed on.\n\nWhen `general.tearing-mode` is enabled, `overlay` is demoted to `top`\nto allow fullscreen tearing.",
 	"OsdConfig.Margin":                                       "Margin from screen edges: a multiplier of the default 150px (`1.0` =\ndefault) or absolute pixels (e.g. `\"150px\"`).",
 	"OsdConfig.Monitor":                                      "Target monitor: \"primary\" or a connector name like \"DP-1\".",
