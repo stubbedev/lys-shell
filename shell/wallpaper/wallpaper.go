@@ -115,17 +115,19 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 		cancel()
 		unsubscribe()
 		release()
-		s.dropSurfaces()
+		s.shutdown()
 	}, nil
 }
 
-// dropSurfaces lets go of every surface's wallpaper once the loop is
-// done: nothing draws them any more, so their rasters are freed.
-func (s *Shell) dropSurfaces() {
+// shutdown lets go of every surface's wallpaper once the loop is done:
+// nothing draws them any more, so their rasters are freed, and so are
+// those a decode or resample still running makes.
+func (s *Shell) shutdown() {
 	for name, surf := range s.surfaces {
 		surf.drop()
 		delete(s.surfaces, name)
 	}
+	s.rasters.close()
 }
 
 // OutputWatcher is the session's output hotplug feed: the identity of

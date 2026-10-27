@@ -19,6 +19,7 @@ import (
 	"golang.org/x/image/draw"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/handoff"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/offheap"
 	"github.com/stubbedev/lys-shell/internal/xdg"
@@ -51,9 +52,11 @@ type thumbRaster struct {
 
 // thumbnailer makes thumbnails off the loop for every dialog: at most
 // thumbWorkers at once, their decodes within budget, into rasters mem
-// holds.
+// holds. work is the lookups running and the thumbnails they made that
+// the loop has not taken yet.
 type thumbnailer struct {
 	mem     memory.Shared
+	work    handoff.Handoffs
 	workers chan struct{}
 	budget  *byteBudget
 }

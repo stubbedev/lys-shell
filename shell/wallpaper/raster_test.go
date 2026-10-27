@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -92,8 +93,9 @@ func TestRasterUnknownOutputKeepsTheSourceSize(t *testing.T) {
 }
 
 // harness runs a shell on fake surfaces: work off the loop waits in a
-// queue until run, decodes come from a map, and every renderer forget
-// is recorded and checked.
+// queue until run, decodes come from a map, every renderer forget is
+// recorded and checked, and once the loop has ended an invoke is
+// dropped, as lys-ui drops it.
 type harness struct {
 	t       *testing.T
 	s       *Shell
@@ -108,6 +110,7 @@ type harness struct {
 	closed   map[string]int
 	onClosed map[string]func()
 	ticks    map[string]func()
+	ended    atomic.Bool
 }
 
 // newHarness starts a shell on monitors, all showing a.png, with the
@@ -148,8 +151,12 @@ func newHarness(t *testing.T, kind config.AnimationType, monitors ...string) *ha
 			}
 			return nil, errors.New("no such image")
 		},
-		spawn:  func(fn func()) { h.queued = append(h.queued, fn) },
-		invoke: func(fn func()) { fn() },
+		spawn: func(fn func()) { h.queued = append(h.queued, fn) },
+		invoke: func(fn func()) {
+			if !h.ended.Load() {
+				fn()
+			}
+		},
 		forget: func(id render.ImageID) {
 			if id == 0 {
 				t.Error("forgot a raster without an ImageID")
@@ -192,6 +199,16 @@ func (h *harness) run() {
 		fn := h.queued[0]
 		h.queued[0] = nil
 		h.queued = h.queued[1:]
+		fn()
+	}
+}
+
+// step does the work queued now, leaving what it queues in turn: a
+// decode, but not the resamples it starts.
+func (h *harness) step() {
+	queued := h.queued
+	h.queued = nil
+	for _, fn := range queued {
 		fn()
 	}
 }
@@ -351,11 +368,100 @@ func TestShutdownFreesEveryRaster(t *testing.T) {
 	h.run()
 	h.show("b.png")
 	h.wantLive(4, "both outputs mid-crossfade")
-	h.s.dropSurfaces()
+	h.s.shutdown()
 	h.wantLive(0, "shut down")
 	if len(h.forgotten) != 4 || len(h.s.surfaces) != 0 || len(h.s.rasters.live) != 0 {
 		t.Errorf("forgot %v; %d surfaces, %d rasters left", h.forgotten, len(h.s.surfaces), len(h.s.rasters.live))
 	}
+}
+
+// A resample that finishes after the loop ended hands a raster to a
+// loop that never takes it: shutdown frees it, and it is never
+// forgotten, as the renderer never saw it.
+func TestShutdownFreesARasterMadeAfterTheLoopEnded(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1")
+	h.plug("DP-1", 64, 36)
+	h.step()
+	if len(h.queued) != 1 {
+		t.Fatalf("%d resamples queued, want one", len(h.queued))
+	}
+	h.ended.Store(true)
+	h.run()
+	h.wantLive(1, "the raster landed nowhere")
+	h.s.shutdown()
+	h.wantLive(0, "shut down")
+	h.wantForgotten("shut down")
+}
+
+// Shutdown waits for a resample running alongside it and frees what
+// it makes, whichever finishes first.
+func TestShutdownAwaitsAResampleInFlight(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1")
+	h.plug("DP-1", 64, 36)
+	h.step()
+	h.ended.Store(true)
+	resampled := make(chan struct{})
+	go func() {
+		defer close(resampled)
+		h.run()
+	}()
+	h.s.shutdown()
+	<-resampled
+	h.wantLive(0, "shut down mid-resample")
+}
+
+// A decode spawned but not yet running when shutdown begins does
+// nothing: no decode and no raster, and shutdown waits for it.
+func TestShutdownStartsNoQueuedWork(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1")
+	h.plug("DP-1", 64, 36)
+	h.ended.Store(true)
+	shut := make(chan struct{})
+	go func() {
+		defer close(shut)
+		h.s.shutdown()
+	}()
+	for !h.s.rasters.work.Closed() {
+		time.Sleep(time.Millisecond)
+	}
+	h.run()
+	<-shut
+	h.wantLive(0, "shut down before the decode ran")
+	if n := h.decodes[h.path("a.png")]; n != 0 {
+		t.Errorf("a.png decoded %d times after shutdown", n)
+	}
+}
+
+// An output removed mid-resample has its raster freed when it lands,
+// never shown or forgotten, while the other output keeps its own.
+func TestOutputRemovedMidResampleFreesItsRaster(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1", "DP-2")
+	gone := h.plug("DP-1", 64, 36)
+	h.plug("DP-2", 32, 18)
+	h.step()
+	h.s.RemoveOutput(gone)
+	h.run()
+	h.wantLive(1, "DP-1 removed mid-resample")
+	if len(h.forgotten) != 1 {
+		t.Errorf("forgot %v, want DP-1's unshown raster", h.forgotten)
+	}
+	h.current("DP-2")
+	h.s.shutdown()
+	h.wantLive(0, "shut down")
+}
+
+// An output removed mid-resample whose raster lands after the loop
+// ended leaves nothing behind at shutdown.
+func TestOutputRemovedMidResampleThenShutdownFreesItsRaster(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1", "DP-2")
+	gone := h.plug("DP-1", 64, 36)
+	h.plug("DP-2", 32, 18)
+	h.step()
+	h.s.RemoveOutput(gone)
+	h.ended.Store(true)
+	h.run()
+	h.s.shutdown()
+	h.wantLive(0, "shut down after DP-1 went mid-resample")
 }
 
 // Nothing is freed while a List recorded before the release is open:

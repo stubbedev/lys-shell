@@ -187,6 +187,39 @@ func TestClosingCancelsThumbnailsInFlight(t *testing.T) {
 	})
 }
 
+// Thumbnails made after the loop ended land nowhere: Close frees them
+// with the ones the dialog found, leaving no allocation behind.
+func TestCloseFreesThumbnailsMadeAfterTheLoopEnded(t *testing.T) {
+	hs := newHarness(t, "")
+	dir, paths := photoFolder(t, hs, 3)
+	th := hs.c.thumbnailer
+	release, err := th.budget.acquire(context.Background(), th.budget.total)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hs.open(t, OpenRequest{CurrentFolder: dir})
+	hs.scrollGrid()
+	waitFor(t, "every lookup to wait for the budget", func() bool {
+		th.budget.mu.Lock()
+		defer th.budget.mu.Unlock()
+		return len(th.budget.waiters) == len(paths)
+	})
+	hs.endLoop()
+	release()
+	waitFor(t, "the lookups to end", func() bool {
+		th.budget.mu.Lock()
+		defer th.budget.mu.Unlock()
+		return len(th.budget.waiters) == 0 && th.budget.free == th.budget.total && len(th.workers) == 0
+	})
+	if live := th.mem.Stats().Live; live != len(paths) {
+		t.Fatalf("%d thumbnails allocated after the loop ended, want %d", live, len(paths))
+	}
+	hs.c.Close()
+	if live := th.mem.Stats().Live; live != 0 {
+		t.Errorf("%d thumbnails still allocated after Close", live)
+	}
+}
+
 func waitFor(t *testing.T, what string, done func() bool) {
 	t.Helper()
 	for deadline := time.Now().Add(treetest.Liveness); !done(); time.Sleep(time.Millisecond) {

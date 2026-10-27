@@ -104,6 +104,7 @@ type harness struct {
 	queue     chan func()
 	qmu       sync.Mutex
 	stopped   bool
+	drained   chan struct{}
 }
 
 func newHarness(t *testing.T, viewFile string) *harness {
@@ -113,22 +114,16 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	conf.Animations.Enabled = false
 	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4), conf: conf, theme: apptheme.New(conf)}
 	hs.queue = make(chan func(), 256)
-	drained := make(chan struct{})
+	hs.drained = make(chan struct{})
 	go func() {
-		defer close(drained)
+		defer close(hs.drained)
 		for fn := range hs.queue {
 			hs.run(fn)
 		}
 	}()
 	// The loop ends with the test: work already queued runs out before
 	// the next test touches the widget package's loop state.
-	t.Cleanup(func() {
-		hs.qmu.Lock()
-		hs.stopped = true
-		close(hs.queue)
-		hs.qmu.Unlock()
-		<-drained
-	})
+	t.Cleanup(hs.endLoop)
 	hs.c = New(Deps{
 		Config: func() *config.Config { return hs.conf },
 		Open: func(c app.LayerConfig) (Window, error) {
@@ -155,6 +150,18 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		},
 	})
 	return hs
+}
+
+// endLoop ends the loop as Run returning does: what is queued runs
+// out, and every later invoke is dropped.
+func (hs *harness) endLoop() {
+	hs.qmu.Lock()
+	if !hs.stopped {
+		hs.stopped = true
+		close(hs.queue)
+	}
+	hs.qmu.Unlock()
+	<-hs.drained
 }
 
 // flush waits until the loop ran everything queued so far.

@@ -30,12 +30,13 @@ import (
 // services/portal_dialogs), dev.stubbe.lys.FileChooser1 (services/
 // file_chooser) and dev.stubbe.lys.Print1 (services/print, spooling over
 // CUPS' IPP). A bus failure leaves the portal answering those requests
-// "other".
-func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet) {
+// "other". The returned stop ends the hosts once the loop has ended,
+// freeing what the file chooser still holds.
+func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet) (stop func()) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("portal hosts: session bus: %v", err)
-		return
+		return func() {}
 	}
 	exported := 0
 	home, _ := os.UserHomeDir()
@@ -102,6 +103,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	if exported == 0 {
 		_ = conn.Close()
 	}
+	return chooser.Close
 }
 
 // dialogOutput is the output a portal dialog maps on: the focused one,

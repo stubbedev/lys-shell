@@ -929,10 +929,19 @@ func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widg
 		return slot
 	}
 	if _, pending := set.waiting[key]; !pending {
-		go func() {
-			done, err := c.thumbnailer.thumbnail(set.ctx, path, 2*px)
-			c.d.Invoke(func() { c.landThumb(set, key, done, err) })
-		}()
+		th := c.thumbnailer
+		th.work.Go(func(fn func()) { go fn() }, func() {
+			done, err := th.thumbnail(set.ctx, path, 2*px)
+			if err != nil {
+				c.d.Invoke(func() { c.landThumb(set, key, thumbRaster{}, err) })
+				return
+			}
+			th.work.Deliver(c.d.Invoke, func() { c.landThumb(set, key, done, nil) }, func() {
+				if err := th.free([]thumbRaster{done}); err != nil {
+					log.Printf("file chooser: freeing the thumbnail of %s that landed after shutdown: %v", key.path, err)
+				}
+			})
+		})
 	}
 	set.waiting[key] = append(set.waiting[key], show)
 	return slot
@@ -986,6 +995,14 @@ func (c *Chooser) freeThumbs() {
 			log.Printf("file chooser: freeing %d thumbnails: %v", len(rasters), err)
 		}
 	})
+}
+
+// Close ends the host once the loop has ended: the request's lookups
+// give up, the thumbnails it found are freed, and so is every one a
+// lookup still running makes.
+func (c *Chooser) Close() {
+	c.freeThumbs()
+	c.thumbnailer.work.Close()
 }
 
 // --- surface --------------------------------------------------------

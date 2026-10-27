@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
 
+	"github.com/stubbedev/lys-shell/internal/handoff"
 	"github.com/stubbedev/lys-shell/internal/offheap"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
@@ -52,10 +53,14 @@ type rasterDeps struct {
 // rasters makes, shares and frees the wallpaper rasters. A file is
 // decoded once for every key asked of it while the decode runs, each
 // key is made once while anyone waits for it, and a raster lives while
-// a surface holds it. Its methods run on the loop goroutine.
+// a surface holds it. Its methods run on the loop goroutine, close
+// once the loop has ended.
 type rasters struct {
 	d   rasterDeps
 	mem memory.Shared
+	// work is the decodes and resamples off the loop, and the rasters
+	// they made that the loop has not taken yet.
+	work handoff.Handoffs
 	// live are the rasters held now.
 	live map[rasterKey]*raster
 	// waiting are the keys being made and who waits for each.
@@ -94,7 +99,10 @@ func (rs *rasters) acquire(key rasterKey, done func(*raster)) {
 		return
 	}
 	rs.decoding[key.path] = []rasterKey{key}
-	rs.d.spawn(func() {
+	rs.work.Go(rs.d.spawn, func() {
+		if rs.work.Closed() {
+			return
+		}
 		img, err := rs.d.decode(key.path)
 		rs.d.invoke(func() { rs.decoded(key.path, img, err) })
 	})
@@ -113,11 +121,23 @@ func (rs *rasters) decoded(path string, img image.Image, err error) {
 		return
 	}
 	for _, key := range keys {
-		rs.d.spawn(func() {
-			r, err := rasterize(&rs.mem, img, key.fit, key.box, key.known)
-			rs.d.invoke(func() { rs.made(key, r, err) })
-		})
+		rs.work.Go(rs.d.spawn, func() { rs.make(key, img) })
 	}
+}
+
+// make rasterizes key from img off the loop and hands the raster to
+// the loop, which frees it instead when it never takes it. Nothing is
+// made once the rasters are closing.
+func (rs *rasters) make(key rasterKey, img image.Image) {
+	if rs.work.Closed() {
+		return
+	}
+	r, err := rasterize(&rs.mem, img, key.fit, key.box, key.known)
+	if err != nil {
+		rs.d.invoke(func() { rs.made(key, nil, err) })
+		return
+	}
+	rs.work.Deliver(rs.d.invoke, func() { rs.made(key, r, nil) }, func() { rs.free(key, r) })
 }
 
 // made hands a new raster to everyone waiting for its key.
@@ -149,9 +169,18 @@ func (rs *rasters) release(r *raster) {
 	}
 	delete(rs.live, r.key)
 	rs.d.forget(r.image.ID)
-	render.Retire(func() {
-		if err := offheap.Free(&rs.mem, r.pix); err != nil {
-			log.Printf("wallpaper: freeing the %v raster of %s: %v", r.size(), r.key.path, err)
-		}
-	})
+	render.Retire(func() { rs.free(r.key, r) })
 }
+
+// free frees the pixels of key's raster r; nothing may read them any
+// more.
+func (rs *rasters) free(key rasterKey, r *raster) {
+	if err := offheap.Free(&rs.mem, r.pix); err != nil {
+		log.Printf("wallpaper: freeing the %v raster of %s: %v", r.size(), key.path, err)
+	}
+}
+
+// close ends the rasters once the loop has ended: no decode or
+// resample starts any more, those running are waited for, and every
+// raster they made that the loop never took is freed.
+func (rs *rasters) close() { rs.work.Close() }
