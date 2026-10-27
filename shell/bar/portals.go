@@ -21,6 +21,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs/dialoghost"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
@@ -66,13 +67,13 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	} else {
 		exported++
 	}
-	dialogs := portaldialogs.New(portaldialogs.Deps{
+	dialogs := dialoghost.New(dialoghost.Deps{
 		Config:     current,
-		Open:       layerOpener[portaldialogs.Window](application),
+		Open:       layerOpener[dialoghost.Window](application),
 		Invoke:     application.Invoke,
 		Font:       font,
 		Sheet:      sheet,
-		Candidates: portaldialogs.CandidateApps,
+		Candidates: dialoghost.CandidateApps,
 		SetDefault: desktopentry.SetDefault,
 		PickImage:  func(chosen func(string)) { pickImage(application, chooser, chosen) },
 		Describe:   describeApp,
@@ -191,7 +192,7 @@ func layerOpener[W interface{ Close() }](application *app.Application) func(app.
 
 // Every host's Window is a layer window.
 var (
-	_ portaldialogs.Window = (*app.LayerWindow)(nil)
-	_ filechooser.Window   = (*app.LayerWindow)(nil)
-	_ printdialog.Window   = (*app.LayerWindow)(nil)
+	_ dialoghost.Window  = (*app.LayerWindow)(nil)
+	_ filechooser.Window = (*app.LayerWindow)(nil)
+	_ printdialog.Window = (*app.LayerWindow)(nil)
 )

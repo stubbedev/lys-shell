@@ -70,6 +70,13 @@ type Device struct {
 	Writable bool
 }
 
+// PasswordRequest asks for a password, (ssbb): Confirm asks for a new
+// one, typed twice; Retry says the previous answer was wrong.
+type PasswordRequest struct {
+	Title, Body    string
+	Confirm, Retry bool
+}
+
 // Host shows the dialogs; each call blocks until the user answers or
 // the request is dismissed, which answers no ("" for a chooser).
 type Host interface {
@@ -94,6 +101,8 @@ type Host interface {
 	// ConfirmInstall replies whether to install a dynamic launcher,
 	// and under what name.
 	ConfirmInstall(portalreq.Caller, LauncherRequest) (bool, string)
+	// Password replies whether the user entered a password, and it.
+	Password(portalreq.Caller, PasswordRequest) (bool, string)
 	// Dismiss takes down the dialog showing for the request at handle,
 	// when one is; the app closed the request.
 	Dismiss(handle string)
@@ -154,6 +163,12 @@ func (d *Daemon) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []st
 func (d *Daemon) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, string, *dbus.Error) {
 	ok, name := d.host.ConfirmInstall(c, r)
 	return ok, name, nil
+}
+
+// Password is the password prompt.
+func (d *Daemon) Password(c portalreq.Caller, r PasswordRequest) (bool, string, *dbus.Error) {
+	ok, password := d.host.Password(c, r)
+	return ok, password, nil
 }
 
 // Dismiss takes down the dialog showing for the request at handle.
@@ -232,6 +247,12 @@ func (c *Client) ConfirmInstall(ctx context.Context, caller portalreq.Caller, r 
 	}
 	err = c.obj.CallWithContext(ctx, iface+".ConfirmInstall", 0, caller, r).Store(&ok, &name)
 	return ok, name, err
+}
+
+// Password asks for a password; ok is false when the user cancelled.
+func (c *Client) Password(ctx context.Context, caller portalreq.Caller, r PasswordRequest) (ok bool, password string, err error) {
+	err = c.obj.CallWithContext(ctx, iface+".Password", 0, caller, r).Store(&ok, &password)
+	return ok, password, err
 }
 
 // Dismiss takes down the dialog showing for the request at handle.

@@ -1,4 +1,4 @@
-package portaldialogs
+package dialoghost
 
 import (
 	"bytes"
@@ -21,12 +21,21 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
-type fakeWindow struct{ closed bool }
+type fakeWindow struct {
+	closed  bool
+	focused widget.Widget
+}
 
 func (w *fakeWindow) Close() { w.closed = true }
+
+func (w *fakeWindow) SetFocus(f widget.Widget) error {
+	w.focused = f
+	return nil
+}
 
 // harness runs the host with a synchronous loop: the UI work happens
 // on the asking goroutine, and Open hands the tree to the test.
@@ -127,7 +136,7 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 	}{{"Allow", true}, {"Deny", false}} {
 		got := make(chan bool, 1)
 		go func() {
-			ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/test"}, AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
+			ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/test"}, portaldialogs.AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
 			got <- ok
 		}()
 		c := hs.open(t)
@@ -169,7 +178,7 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 	hs := newHarness(t, nil)
 	first := make(chan bool, 1)
 	go func() {
-		ok, _ := hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/1", AppID: "org.one"}, LauncherRequest{Name: "App"})
+		ok, _ := hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/1", AppID: "org.one"}, portaldialogs.LauncherRequest{Name: "App"})
 		first <- ok
 	}()
 	c := hs.open(t)
@@ -178,7 +187,7 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 	}
 	second := make(chan bool, 1)
 	go func() {
-		ok, _ := hs.h.Account(portalreq.Caller{Handle: "/r/2", AppID: "org.two"}, "", AccountInfo{Name: "Ada"})
+		ok, _ := hs.h.Account(portalreq.Caller{Handle: "/r/2", AppID: "org.two"}, "", portaldialogs.AccountInfo{Name: "Ada"})
 		second <- ok
 	}()
 	select {
@@ -288,7 +297,7 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	hs := newHarness(t, apps)
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{ContentType: "image/png"})
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{ContentType: "image/png"})
 	}()
 	c := hs.open(t)
 	// The search is a gtk::SearchEntry; its search-changed delay runs
@@ -345,7 +354,7 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{installApp(t, dir, "org.example.Viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{Choices: []string{"org.example.Viewer"}})
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{Choices: []string{"org.example.Viewer"}})
 	}()
 	c := hs.open(t)
 	treetest.Walk(c.Root, func(w widget.Widget) {
@@ -363,7 +372,9 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{installApp(t, t.TempDir(), "viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{}) }()
+	go func() {
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{})
+	}()
 	c := hs.open(t)
 	var rowY, scrollY int
 	hs.do(func() {
@@ -393,7 +404,9 @@ func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
 	}
 	hs := newHarness(t, []desktopentry.App{long})
 	got := make(chan string, 1)
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{}) }()
+	go func() {
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{})
+	}()
 	c := hs.open(t)
 	var w int
 	hs.do(func() { w = widget.SizeWithin(c.Root, widget.Size{W: 2000, H: 2000}).W })
@@ -410,7 +423,7 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 	hs := newHarness(t, nil)
 	got := make(chan bool, 1)
 	go func() {
-		ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/mine"}, AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
+		ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/mine"}, portaldialogs.AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
 		got <- ok
 	}()
 	hs.open(t)
@@ -443,7 +456,7 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 // user left them at; a deny returns nothing.
 func TestAccessChoices(t *testing.T) {
 	hs := newHarness(t, nil)
-	req := AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portalreq.Choice{
+	req := portaldialogs.AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portalreq.Choice{
 		{ID: "remember", Label: "Remember this", Initial: "false"},
 		{ID: "scope", Label: "Scope", Options: []portalreq.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
 	}}
@@ -493,13 +506,13 @@ func TestAccountEditsBeforeSharing(t *testing.T) {
 	hs := newHarness(t, nil)
 	type answer struct {
 		ok   bool
-		info AccountInfo
+		info portaldialogs.AccountInfo
 	}
 	run := func(edit func(c app.LayerConfig)) answer {
 		t.Helper()
 		got := make(chan answer, 1)
 		go func() {
-			ok, info := hs.h.Account(portalreq.Caller{Handle: "/r/a", AppID: "org.app"}, "why", AccountInfo{Name: "Ada Lovelace", Image: "/home/ada/.face"})
+			ok, info := hs.h.Account(portalreq.Caller{Handle: "/r/a", AppID: "org.app"}, "why", portaldialogs.AccountInfo{Name: "Ada Lovelace", Image: "/home/ada/.face"})
 			got <- answer{ok, info}
 		}()
 		c := hs.open(t)
@@ -518,7 +531,7 @@ func TestAccountEditsBeforeSharing(t *testing.T) {
 			treetest.Button(t, c.Root, "Remove picture").OnClick()
 		})
 	})
-	if !r.ok || r.info != (AccountInfo{Name: "Ada"}) {
+	if !r.ok || r.info != (portaldialogs.AccountInfo{Name: "Ada"}) {
 		t.Errorf("edited = %+v", r)
 	}
 	hs.mu.Lock()
@@ -531,7 +544,7 @@ func TestAccountEditsBeforeSharing(t *testing.T) {
 			treetest.Button(t, c.Root, "Choose picture…").OnClick()
 		})
 	})
-	if !r.ok || r.info != (AccountInfo{Name: "Ada Lovelace", Image: "/pics/cat.png"}) {
+	if !r.ok || r.info != (portaldialogs.AccountInfo{Name: "Ada Lovelace", Image: "/pics/cat.png"}) {
 		t.Errorf("chosen = %+v", r)
 	}
 }
@@ -572,7 +585,7 @@ func TestAppChooserPreselectsTheLastChoice(t *testing.T) {
 	hs := newHarness(t, chooserApps(t))
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{LastChoice: "org.example.Editor"})
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{LastChoice: "org.example.Editor"})
 	}()
 	c := hs.open(t)
 	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != 1 {
@@ -589,7 +602,7 @@ func TestAppChooserPreselectsTheLastChoice(t *testing.T) {
 	}
 
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test2"}, ChooserRequest{LastChoice: "org.example.Gone"})
+		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test2"}, portaldialogs.ChooserRequest{LastChoice: "org.example.Gone"})
 	}()
 	c = hs.open(t)
 	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != -1 {
@@ -611,7 +624,7 @@ func TestAppChooserPreselectsTheLastChoice(t *testing.T) {
 func TestAppChooserUpdateChoices(t *testing.T) {
 	hs := newHarness(t, chooserApps(t))
 	got := make(chan string, 2)
-	viewer := ChooserRequest{Choices: []string{"org.example.Viewer"}, LastChoice: "org.example.Viewer"}
+	viewer := portaldialogs.ChooserRequest{Choices: []string{"org.example.Viewer"}, LastChoice: "org.example.Viewer"}
 	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/a"}, viewer) }()
 	c := hs.open(t)
 	list := treetest.First[*widget.ListBox](t, c.Root)
@@ -655,7 +668,7 @@ func TestAppChooserNamesTheTarget(t *testing.T) {
 	for target, want := range map[string]bool{"report.pdf": true, "": false} {
 		got := make(chan string, 1)
 		go func() {
-			got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{Target: target})
+			got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{Target: target})
 		}()
 		c := hs.open(t)
 		line := "Choose an application to open “" + target + "”."
@@ -689,7 +702,7 @@ func pngBytes(t *testing.T) []byte {
 
 // installDialog shows ConfirmInstall for r and answers it with click,
 // after inspect looks at the dialog.
-func installDialog(t *testing.T, hs *harness, r LauncherRequest, inspect func(app.LayerConfig), click string) (bool, string) {
+func installDialog(t *testing.T, hs *harness, r portaldialogs.LauncherRequest, inspect func(app.LayerConfig), click string) (bool, string) {
 	t.Helper()
 	type answer struct {
 		ok   bool
@@ -712,7 +725,7 @@ func installDialog(t *testing.T, hs *harness, r LauncherRequest, inspect func(ap
 func TestConfirmInstallEditsTheName(t *testing.T) {
 	hs := newHarness(t, nil)
 	for edit, want := range map[string]string{"My Launcher": "My Launcher", "  ": "App"} {
-		ok, name := installDialog(t, hs, LauncherRequest{Name: "App", EditableName: true}, func(c app.LayerConfig) {
+		ok, name := installDialog(t, hs, portaldialogs.LauncherRequest{Name: "App", EditableName: true}, func(c app.LayerConfig) {
 			entry := treetest.First[*widget.Entry](t, c.Root)
 			if entry.Text() != "App" {
 				t.Errorf("entry starts at %q", entry.Text())
@@ -723,7 +736,7 @@ func TestConfirmInstallEditsTheName(t *testing.T) {
 			t.Errorf("edited to %q: %v %q, want %q", edit, ok, name, want)
 		}
 	}
-	ok, name := installDialog(t, hs, LauncherRequest{Name: "App"}, func(c app.LayerConfig) {
+	ok, name := installDialog(t, hs, portaldialogs.LauncherRequest{Name: "App"}, func(c app.LayerConfig) {
 		if len(treetest.All[*widget.Entry](c.Root)) != 0 || !slices.Contains(treetest.Labels(c.Root), "Install “App”?") {
 			t.Errorf("a fixed name: entries %d, labels %q", len(treetest.All[*widget.Entry](c.Root)), treetest.Labels(c.Root))
 		}
@@ -731,7 +744,7 @@ func TestConfirmInstallEditsTheName(t *testing.T) {
 	if !ok || name != "App" {
 		t.Errorf("fixed name answered %v %q", ok, name)
 	}
-	if ok, name := installDialog(t, hs, LauncherRequest{Name: "App", EditableName: true}, func(app.LayerConfig) {}, "Cancel"); ok || name != "" {
+	if ok, name := installDialog(t, hs, portaldialogs.LauncherRequest{Name: "App", EditableName: true}, func(app.LayerConfig) {}, "Cancel"); ok || name != "" {
 		t.Errorf("cancel answered %v %q", ok, name)
 	}
 }
@@ -740,7 +753,7 @@ func TestConfirmInstallEditsTheName(t *testing.T) {
 func TestConfirmInstallShowsTheTarget(t *testing.T) {
 	hs := newHarness(t, nil)
 	for target, want := range map[string]bool{"https://example.org/app": true, "": false} {
-		installDialog(t, hs, LauncherRequest{Name: "App", Target: target}, func(c app.LayerConfig) {
+		installDialog(t, hs, portaldialogs.LauncherRequest{Name: "App", Target: target}, func(c app.LayerConfig) {
 			has := slices.ContainsFunc(treetest.Labels(c.Root), func(l string) bool { return strings.HasPrefix(l, "Opens ") })
 			if has != want || want && !slices.Contains(treetest.Labels(c.Root), "Opens "+target) {
 				t.Errorf("target %q: labels %q", target, treetest.Labels(c.Root))
@@ -759,7 +772,7 @@ func TestConfirmInstallDrawsTheIcon(t *testing.T) {
 		icon         []byte
 		images, svgs int
 	}{{"png", pngBytes(t), 1, 0}, {"svg", svg, 0, 1}, {"none", nil, 0, 0}} {
-		installDialog(t, hs, LauncherRequest{Name: "App", Icon: tc.icon}, func(c app.LayerConfig) {
+		installDialog(t, hs, portaldialogs.LauncherRequest{Name: "App", Icon: tc.icon}, func(c app.LayerConfig) {
 			header := treetest.WithClass(c.Root, "portal-dialog-image")
 			var images, svgs int
 			for _, w := range header {
@@ -781,7 +794,7 @@ func TestConfirmInstallDrawsTheIcon(t *testing.T) {
 // answers the ones left checked, Deny answers none.
 func TestChooseDevicesAnswersTheChecked(t *testing.T) {
 	hs := newHarness(t, nil)
-	devices := []Device{{ID: "d0", Name: "Pad", Writable: true}, {ID: "d1", Name: "Key"}}
+	devices := []portaldialogs.Device{{ID: "d0", Name: "Pad", Writable: true}, {ID: "d1", Name: "Key"}}
 	type answer struct {
 		ok  bool
 		ids []string
@@ -841,7 +854,7 @@ func TestDialogTakesLysUiParts(t *testing.T) {
 	hs := newHarness(t, nil)
 	done := make(chan struct{})
 	go func() {
-		hs.h.Access(portalreq.Caller{Handle: "/r/p"}, AccessRequest{Title: "Camera", Body: "Use it?", GrantLabel: "Allow", DenyLabel: "Deny"})
+		hs.h.Access(portalreq.Caller{Handle: "/r/p"}, portaldialogs.AccessRequest{Title: "Camera", Body: "Use it?", GrantLabel: "Allow", DenyLabel: "Deny"})
 		close(done)
 	}()
 	c := hs.open(t)
@@ -873,4 +886,81 @@ func TestDialogTakesLysUiParts(t *testing.T) {
 	}
 	hs.do(func() { cancel.(*widget.Button).OnClick() })
 	<-done
+}
+
+func TestPasswordAsksOnceOrTwice(t *testing.T) {
+	hs := newHarness(t, nil)
+	type answer struct {
+		ok       bool
+		password string
+	}
+	run := func(r portaldialogs.PasswordRequest, act func(c app.LayerConfig, entries []*widget.Entry)) answer {
+		t.Helper()
+		got := make(chan answer, 1)
+		go func() {
+			ok, pw := hs.h.Password(portalreq.Caller{Handle: "/r/p"}, r)
+			got <- answer{ok, pw}
+		}()
+		c := hs.open(t)
+		entries := treetest.All[*widget.Entry](c.Root)
+		act(c, entries)
+		return <-got
+	}
+
+	r := run(portaldialogs.PasswordRequest{Title: "Unlock", Body: "login"}, func(c app.LayerConfig, entries []*widget.Entry) {
+		if len(entries) != 1 || entries[0].Echo() != widget.EchoPassword {
+			t.Fatalf("unlock shows %d entries", len(entries))
+		}
+		if c.Keyboard != app.KeyboardExclusive {
+			t.Errorf("the password dialog takes keyboard %v, want exclusive", c.Keyboard)
+		}
+		var focused widget.Widget
+		hs.do(func() {
+			hs.mu.Lock()
+			focused = hs.windows[len(hs.windows)-1].focused
+			hs.mu.Unlock()
+		})
+		if focused != entries[0] {
+			t.Error("the password entry is not focused")
+		}
+		hs.do(func() {
+			entries[0].SetText("secret")
+			entries[0].OnActivate(entries[0].Text())
+		})
+	})
+	if !r.ok || r.password != "secret" {
+		t.Errorf("unlock = %+v", r)
+	}
+
+	r = run(portaldialogs.PasswordRequest{Title: "Unlock", Retry: true}, func(c app.LayerConfig, _ []*widget.Entry) {
+		if !slices.Contains(treetest.Labels(c.Root), "The password was wrong. Try again.") {
+			t.Errorf("a retry does not say so: %v", treetest.Labels(c.Root))
+		}
+		hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
+	})
+	if r.ok || r.password != "" {
+		t.Errorf("cancel = %+v", r)
+	}
+
+	r = run(portaldialogs.PasswordRequest{Title: "New", Confirm: true}, func(c app.LayerConfig, entries []*widget.Entry) {
+		if len(entries) != 2 {
+			t.Fatalf("a new password shows %d entries", len(entries))
+		}
+		hs.do(func() {
+			treetest.Button(t, c.Root, "Continue").OnClick()
+			entries[0].SetText("one")
+			entries[1].SetText("two")
+			treetest.Button(t, c.Root, "Continue").OnClick()
+		})
+		if !slices.Contains(treetest.Labels(c.Root), "The passwords do not match.") {
+			t.Errorf("a mismatch does not say so: %v", treetest.Labels(c.Root))
+		}
+		hs.do(func() {
+			entries[1].SetText("one")
+			entries[1].OnActivate(entries[1].Text())
+		})
+	})
+	if !r.ok || r.password != "one" {
+		t.Errorf("new password = %+v", r)
+	}
 }

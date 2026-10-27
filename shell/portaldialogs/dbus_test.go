@@ -66,6 +66,14 @@ func (f *fakeHost) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []
 	return true, []string{devices[0].ID}
 }
 
+func (f *fakeHost) Password(c portalreq.Caller, r PasswordRequest) (bool, string) {
+	f.record(c, r)
+	if !f.yes {
+		return false, ""
+	}
+	return true, "typed"
+}
+
 func (f *fakeHost) Dismiss(handle string) {
 	f.dismissed.Update(func(d []string) []string { return append(d, handle) })
 }
@@ -120,6 +128,10 @@ func TestDialogsRoundTrip(t *testing.T) {
 		}
 		if found, err := c.UpdateChoices(ctx, "/r/none", nil); err != nil || found {
 			t.Errorf("UpdateChoices without a chooser = %v, %v", found, err)
+		}
+		pw := PasswordRequest{Title: "Unlock", Body: "login", Confirm: true, Retry: true}
+		if ok, typed, err := c.Password(ctx, caller, pw); err != nil || ok != yes || typed != map[bool]string{true: "typed"}[yes] || host.asked.Load()[0] != pw {
+			t.Errorf("Password = %v, %q, %v (asked %v)", ok, typed, err, host.asked.Load())
 		}
 		if err := c.Dismiss(ctx, "/r/1"); err != nil || !slices.Equal(host.dismissed.Load(), []string{"/r/1"}) {
 			t.Errorf("Dismiss = %v, dismissed %v", err, host.dismissed.Load())

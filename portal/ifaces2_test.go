@@ -438,6 +438,13 @@ func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.Launche
 	return true, "Renamed"
 }
 
+func (f *fakeDialogs) Password(c portalreq.Caller, r portaldialogs.PasswordRequest) (bool, string) {
+	if !f.answer(c, r) {
+		return false, ""
+	}
+	return true, "typed"
+}
+
 func serveDialogs(t *testing.T, r *rig, yes bool) *fakeDialogs {
 	t.Helper()
 	f := &fakeDialogs{}

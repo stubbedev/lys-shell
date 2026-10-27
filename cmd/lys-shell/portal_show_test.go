@@ -72,6 +72,10 @@ func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, r portaldialogs.Launcher
 	return f.yes.Load(), r.Name
 }
 
+func (fakeDialogs) Password(portalreq.Caller, portaldialogs.PasswordRequest) (bool, string) {
+	return false, ""
+}
+
 func (fakeDialogs) Dismiss(string) {}
 
 type fakePrinter struct{ granted *dbustest.Var[bool] }

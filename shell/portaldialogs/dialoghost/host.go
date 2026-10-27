@@ -1,4 +1,4 @@
-package portaldialogs
+package dialoghost
 
 import (
 	"log"
@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
@@ -40,7 +41,10 @@ const (
 )
 
 // Window is the overlay surface the dialog maps (app.LayerWindow).
-type Window interface{ Close() }
+type Window interface {
+	Close()
+	SetFocus(w widget.Widget) error
+}
 
 // Deps are the dialogs' collaborators.
 type Deps struct {
@@ -70,7 +74,7 @@ type Deps struct {
 // Dialogs is the dev.stubbe.lys.PortalDialogs1 host: one overlay showing
 // one request, naming the app that asks; requests arriving meanwhile
 // wait their turn, and dismissing a request answers it no (or "" for
-// an app chooser), showing or waiting. Its Host methods may be called
+// an app chooser), showing or waiting. Its portaldialogs.Host methods may be called
 // from any goroutine; the rest runs on the loop.
 type Dialogs struct {
 	d       Deps
@@ -84,13 +88,17 @@ type Dialogs struct {
 	// choosers are the app chooser requests open, showing or waiting,
 	// by handle.
 	choosers map[string]*appChooser
+	// focus is the widget the dialog being built types into: its surface
+	// takes the keyboard and focuses it. Dialogs without one take the
+	// keyboard only when clicked.
+	focus widget.Widget
 }
 
 // appChooser is one open app chooser request: the request, kept
 // current by UpdateChoices, and while it shows the refresh refilling
 // its list from it.
 type appChooser struct {
-	req     ChooserRequest
+	req     portaldialogs.ChooserRequest
 	refresh func()
 }
 
@@ -141,7 +149,7 @@ func (h *Dialogs) finish(ok bool, choice string) {
 
 // Access is the grant/deny prompt: the permission's icon above the
 // title, the subtitle and body below it.
-func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) (bool, []portalreq.Selection) {
+func (h *Dialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) (bool, []portalreq.Selection) {
 	var picked []portalreq.Selection
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
@@ -161,7 +169,7 @@ func (h *Dialogs) Access(c portalreq.Caller, r AccessRequest) (bool, []portalreq
 }
 
 // Account asks to share the user's name and avatar, previewing it.
-func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (bool, AccountInfo) {
+func (h *Dialogs) Account(c portalreq.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
 	shared := info
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		if reason == "" {
@@ -190,7 +198,7 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 		remove := widgets.DialogButton(h.d.Font, "Remove picture", "portal-dialog-picture", css.Outline, func() { setImage("") })
 		share := func(ok bool, s string) {
 			if ok {
-				shared = AccountInfo{Name: strings.TrimSpace(name.Text()), Image: image}
+				shared = portaldialogs.AccountInfo{Name: strings.TrimSpace(name.Text()), Image: image}
 				if shared.Name == "" {
 					shared.Name = info.Name
 				}
@@ -205,9 +213,61 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 		return h.confirm(share, picture, "Share account information?", reason, "Cancel", "Share", name, pictureRow)
 	})
 	if !ok {
-		return false, AccountInfo{}
+		return false, portaldialogs.AccountInfo{}
 	}
 	return true, shared
+}
+
+// Password asks for a password in a masked entry; with Confirm it asks
+// twice and accepts only matching, non-empty entries. Enter submits.
+func (h *Dialogs) Password(c portalreq.Caller, r portaldialogs.PasswordRequest) (bool, string) {
+	return h.ask(c, func(answer func(bool, string)) widget.Widget {
+		entry := h.passwordEntry("Password")
+		rows := []widget.Widget{entry}
+		var again *widget.Entry
+		if r.Confirm {
+			again = h.passwordEntry("Repeat the password")
+			rows = append(rows, again)
+		}
+		status := h.label("", "portal-dialog-error")
+		if r.Retry {
+			status.SetText("The password was wrong. Try again.")
+		}
+		rows = append(rows, status)
+		h.focus = entry
+		submit := func() {
+			switch {
+			case entry.Text() == "":
+				status.SetText("Enter a password.")
+			case again != nil && again.Text() != entry.Text():
+				status.SetText("The passwords do not match.")
+			default:
+				answer(true, entry.Text())
+			}
+		}
+		entry.OnActivate = func(string) {
+			if again == nil {
+				submit()
+			}
+		}
+		if again != nil {
+			again.OnActivate = func(string) { submit() }
+		}
+		action := "Unlock"
+		if r.Confirm {
+			action = "Continue"
+		}
+		return h.surface(r.Title, r.Body, rows, h.cancel("Cancel", answer), h.accept(action, submit))
+	})
+}
+
+// passwordEntry is a masked dialog entry.
+func (h *Dialogs) passwordEntry(placeholder string) *widget.Entry {
+	e := widget.NewEntry(h.d.Font, widgets.TextPx(styling.Body, 1), 0)
+	e.AddClass("portal-dialog-entry")
+	e.SetEcho(widget.EchoPassword)
+	e.SetPlaceholder(placeholder)
+	return e
 }
 
 // ConfirmWallpaper previews a file:// image before it is set.
@@ -221,7 +281,7 @@ func (h *Dialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 
 // ChooseDevices asks which USB devices the app may open: a check
 // button per device, all checked, naming it and the access asked for.
-func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []string) {
+func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []portaldialogs.Device) (bool, []string) {
 	picked := []string{}
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		checks := make([]*widget.CheckButton, len(devices))
@@ -258,7 +318,7 @@ func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []Device) (bool, []s
 // ConfirmInstall confirms a dynamic launcher: its icon, the URL a web
 // app opens, and its name, in an entry when it is editable. An emptied
 // name installs under the default one.
-func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, string) {
+func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
 	chosen := r.Name
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		var extra []widget.Widget
@@ -294,7 +354,7 @@ func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, s
 // ChooseApplication is the app chooser: icon + name rows with a live
 // search filter, and "always use" when the type is known. Its choices
 // follow UpdateChoices while it is open.
-func (h *Dialogs) ChooseApplication(c portalreq.Caller, r ChooserRequest) string {
+func (h *Dialogs) ChooseApplication(c portalreq.Caller, r portaldialogs.ChooserRequest) string {
 	ac := &appChooser{req: r}
 	if c.Handle != "" {
 		h.d.Invoke(func() { h.choosers[c.Handle] = ac })
@@ -554,10 +614,16 @@ func (h *Dialogs) show(tree widget.Widget) {
 		root.AttachStylesheet(h.d.Sheet)
 	}
 	root.Append(h.rev, true)
+	focus := h.focus
+	h.focus = nil
+	keyboard := app.KeyboardOnDemand
+	if focus != nil {
+		keyboard = app.KeyboardExclusive
+	}
 	win, err := h.d.Open(app.LayerConfig{
 		Layer:         app.LayerOverlay,
 		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardOnDemand,
+		Keyboard:      keyboard,
 		Namespace:     "lys-shell-portal-dialog",
 		Root:          root,
 		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
@@ -573,6 +639,11 @@ func (h *Dialogs) show(tree widget.Widget) {
 	}
 	h.win = win
 	reveal.Show(h.rev, cfg.Animations, config.AnimDialog)
+	if focus != nil {
+		if err := win.SetFocus(focus); err != nil {
+			log.Printf("portal dialogs: cannot focus the entry: %v", err)
+		}
+	}
 }
 
 // hide plays the exit and closes the surface.

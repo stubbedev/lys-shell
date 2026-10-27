@@ -104,3 +104,7 @@
 .print-printer-list row:selected .print-printer-detail {
   color: var(--fg-on-accent);
 }
+
+.portal-dialog-error {
+  color: var(--status-error);
+}
