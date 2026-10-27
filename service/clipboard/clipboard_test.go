@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/transfer"
 )
 
 // fakeDevice plays the data-control device: the test announces
@@ -314,6 +315,68 @@ func TestACopyAfterARestoreIsRememberedAgain(t *testing.T) {
 
 	if got := texts(c.history); !slices.Equal(got, []string{"two", "one"}) {
 		t.Fatalf("entries = %v", got)
+	}
+}
+
+func TestPutClaimsEveryMimeServesEveryReaderAndRemembersTheBest(t *testing.T) {
+	c, dev := newTestClipboard(t, nil)
+	content := transfer.Payloads([]string{"image/png", "image/jpeg"}, map[string][]byte{
+		"image/png": []byte("\x89PNG shot"), "image/jpeg": []byte("\xff\xd8 shot"),
+	})
+
+	if err := c.Put(content); err != nil {
+		t.Fatal(err)
+	}
+	dev.announce(&fakeOffer{mimes: content.Mimes, own: true})
+
+	if len(dev.claims) != 1 || !slices.Equal(dev.claims[0].src.Mimes, content.Mimes) {
+		t.Fatalf("claims = %+v", dev.claims)
+	}
+	for range 3 {
+		if got := dev.claims[0].paste(t, "image/png"); got != "\x89PNG shot" {
+			t.Fatalf("a reader of image/png got %q", got)
+		}
+	}
+	if got := dev.claims[0].paste(t, "image/jpeg"); got != "\xff\xd8 shot" {
+		t.Fatalf("a reader of image/jpeg got %q", got)
+	}
+	if got := mimesOf(c.history); !slices.Equal(got, []string{"image/png=\x89PNG shot"}) {
+		t.Fatalf("entries = %v", got)
+	}
+	if !dev.claims[0].live {
+		t.Fatal("serving readers ended the claim")
+	}
+}
+
+func TestPutReportsAFailedClaimAndRemembersNothing(t *testing.T) {
+	c, dev := newTestClipboard(t, nil)
+	dev.claimErr = app.ErrDataControlFinished
+
+	err := c.Put(transfer.Bytes("image/png", []byte("\x89PNG")))
+
+	if !errors.Is(err, app.ErrDataControlFinished) {
+		t.Fatalf("Put = %v, want the claim's error", err)
+	}
+	if c.serving != nil || c.history.Len() != 0 {
+		t.Fatalf("a failed claim left serving %v and %d entries", c.serving, c.history.Len())
+	}
+	if err := c.Put(transfer.Content{}); err == nil {
+		t.Fatal("Put of empty content succeeded")
+	}
+}
+
+func TestPutOfSensitiveContentIsServedButNotRemembered(t *testing.T) {
+	c, dev := newTestClipboard(t, nil)
+
+	if err := c.Put(SecretContent("hunter2")); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := dev.claims[0].paste(t, textMime); got != "hunter2" {
+		t.Fatalf("served %q", got)
+	}
+	if c.history.Len() != 0 {
+		t.Fatalf("a secret was remembered: %v", mimesOf(c.history))
 	}
 }
 

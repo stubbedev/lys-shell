@@ -2,11 +2,13 @@ package clipboard
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"sync"
 
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/transfer"
 
 	"github.com/stubbedev/lys-shell/internal/offheap"
 )
@@ -59,13 +61,13 @@ func (r *pendingRead) discard() {
 // entry until the claim ends, so pasting it still works after the
 // history dropped it.
 type serving struct {
-	claim selectionClaim
-	p     *payload
-	once  sync.Once
+	claim   selectionClaim
+	release func()
+	once    sync.Once
 }
 
 // end lets go of the entry; once, however the claim ended.
-func (s *serving) end() { s.once.Do(s.p.release) }
+func (s *serving) end() { s.once.Do(s.release) }
 
 // selectionDevice is what the service needs from lys-ui's data-control
 // device, narrowed so tests drive it with fakes.
@@ -173,7 +175,7 @@ func (c *Clipboard) Copy(id uint64) bool {
 // the entry nor the claim ending can free them mid-paste. Loop
 // goroutine only.
 func (c *Clipboard) claim(mime string, p *payload) {
-	cl, err := c.dev.claim(app.SelectionSource{
+	err := c.serve(app.SelectionSource{
 		Mimes: offerMimes(mime),
 		// The receiver may ask under any mime offered; every alias is
 		// an alias for the entry's own type, so the bytes are the same.
@@ -182,21 +184,71 @@ func (c *Clipboard) claim(mime string, p *payload) {
 			go func() {
 				_, err := w.Write(p.bytes())
 				p.release()
-				if err != nil {
-					log.Printf("clipboard: cannot paste the %s entry: %v", mime, err)
-				}
-				if err := w.Close(); err != nil {
-					log.Printf("clipboard: cannot finish pasting the %s entry: %v", mime, err)
-				}
+				finishPaste(mime, w, err)
 			}()
 		},
-	})
+	}, p.release)
 	if err != nil {
-		p.release()
 		log.Printf("clipboard: cannot take the selection: %v", err)
+	}
+}
+
+// Put claims the regular selection with content through data-control,
+// which needs neither keyboard focus nor an input event, serves it to
+// every receiver that asks until another client takes the selection,
+// and remembers it like any other copy. Loop goroutine only.
+func (c *Clipboard) Put(content transfer.Content) error {
+	if content.Empty() {
+		return errors.New("clipboard: put: the content offers no mime type")
+	}
+	err := c.serve(app.SelectionSource{
+		Mimes: content.Mimes,
+		Send: func(mime string, w io.WriteCloser) {
+			go func() { finishPaste(mime, w, content.Write(mime, w)) }()
+		},
+	}, func() {})
+	if err != nil {
+		return fmt.Errorf("clipboard: put %v: %w", content.Mimes, err)
+	}
+	c.record(content)
+	return nil
+}
+
+func (c *Clipboard) record(content transfer.Content) {
+	if IsSensitive(content.Mimes) {
 		return
 	}
-	s := &serving{claim: cl, p: p}
+	mime, ok := BestMime(content.Mimes)
+	if !ok {
+		return
+	}
+	read, _ := c.startRead(mime)
+	if read == nil {
+		return
+	}
+	err := content.Write(mime, read.buf)
+	if err != nil && !errors.Is(err, offheap.ErrBufferFull) {
+		log.Printf("clipboard: cannot remember the %s copy: %v", mime, err)
+	}
+	c.finishRead(read, err == nil)
+}
+
+func finishPaste(mime string, w io.WriteCloser, err error) {
+	if err != nil {
+		log.Printf("clipboard: cannot paste the %s entry: %v", mime, err)
+	}
+	if err := w.Close(); err != nil {
+		log.Printf("clipboard: cannot finish pasting the %s entry: %v", mime, err)
+	}
+}
+
+func (c *Clipboard) serve(src app.SelectionSource, release func()) error {
+	cl, err := c.dev.claim(src)
+	if err != nil {
+		release()
+		return err
+	}
+	s := &serving{claim: cl, release: release}
 	c.serving = s
 	cl.OnCancelled(func() {
 		s.end()
@@ -204,6 +256,7 @@ func (c *Clipboard) claim(mime string, p *payload) {
 			c.serving = nil
 		}
 	})
+	return nil
 }
 
 // Close gives up a restored selection and frees the history; the
@@ -244,23 +297,11 @@ func (c *Clipboard) selectionChanged(offer selectionOffer) {
 	if !ok {
 		return
 	}
-	c.mu.Lock()
-	limit := c.history.maxEntryBytes
-	mem := &c.history.mem
-	closed := c.closed
-	c.mu.Unlock()
-	if limit == 0 || closed {
+	read, limit := c.startRead(mime)
+	if read == nil {
 		return
 	}
-	buf, err := offheap.NewBuffer(mem, limit)
-	if err != nil {
-		log.Printf("clipboard: cannot read the selection (%s): %v", mime, err)
-		return
-	}
-
-	read := &pendingRead{mime: mime, buf: buf}
-	c.reads = append(c.reads, read)
-	err = offer.ReadTo(mime, int64(limit), buf, func(_ int64, err error) {
+	err := offer.ReadTo(mime, int64(limit), read.buf, func(_ int64, err error) {
 		// An oversized selection is refused whole, the same verdict the
 		// history would give it; anything else is worth a line.
 		if err != nil && !errors.Is(err, app.ErrTransferTooLarge) {
@@ -272,6 +313,25 @@ func (c *Clipboard) selectionChanged(offer selectionOffer) {
 		log.Printf("clipboard: cannot read the selection (%s): %v", mime, err)
 		c.finishRead(read, false)
 	}
+}
+
+func (c *Clipboard) startRead(mime string) (*pendingRead, int) {
+	c.mu.Lock()
+	limit := c.history.maxEntryBytes
+	mem := &c.history.mem
+	closed := c.closed
+	c.mu.Unlock()
+	if limit == 0 || closed {
+		return nil, 0
+	}
+	buf, err := offheap.NewBuffer(mem, limit)
+	if err != nil {
+		log.Printf("clipboard: cannot read the selection (%s): %v", mime, err)
+		return nil, 0
+	}
+	read := &pendingRead{mime: mime, buf: buf}
+	c.reads = append(c.reads, read)
+	return read, limit
 }
 
 // finishRead marks a read done, freeing a failed one's partial bytes

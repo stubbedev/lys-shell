@@ -66,8 +66,9 @@ type Host struct {
 	Focus Focus
 	// Copy puts an image on the clipboard; nil disables the copy.
 	Copy func(image.Image) error
-	// Notify reports a saved path; nil sends the desktop notification.
-	Notify func(path string)
+	// Notify announces a saved screenshot, and a failed copy with it;
+	// nil sends the desktop notification.
+	Notify func(Notice)
 	// Forget drops the GPU textures of the frozen frames with these
 	// identities, once the overlay that drew them has closed.
 	Forget func(ids []render.ImageID)
@@ -179,20 +180,36 @@ func (h *Host) save(img *image.RGBA) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	var copyErr error
 	if cfg.CopyToClipboard && h.Copy != nil {
-		if err := h.Copy(img); err != nil {
-			log.Printf("screenshot: clipboard copy: %v", err)
+		if copyErr = h.Copy(img); copyErr != nil {
+			log.Printf("screenshot: clipboard copy: %v", copyErr)
 		}
 	}
 	if cfg.Notify {
+		n := savedNotice(path, copyErr)
 		if h.Notify != nil {
-			h.Notify(path)
+			h.Notify(n)
 		} else {
-			// The saved PNG doubles as the notification icon.
-			desktopnotify.Notify("lys-shell", "Screenshot saved", path, path)
+			desktopnotify.Notify("lys-shell", n.Summary, n.Body, n.Icon)
 		}
 	}
 	return path, nil
+}
+
+// Notice is the desktop notification announcing a saved screenshot.
+type Notice struct {
+	Summary string
+	Body    string
+	Icon    string
+}
+
+func savedNotice(path string, copyErr error) Notice {
+	n := Notice{Summary: "Screenshot saved", Body: path, Icon: path}
+	if copyErr != nil {
+		n.Body += "\nNot copied to the clipboard: " + copyErr.Error()
+	}
+	return n
 }
 
 func (h *Host) clock() time.Time {

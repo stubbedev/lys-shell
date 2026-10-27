@@ -209,11 +209,11 @@ func fixed(cfg config.ScreenshotConfig) func() config.ScreenshotConfig {
 	return func() config.ScreenshotConfig { return cfg }
 }
 
-func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
+func testHost(t *testing.T, region *fakeRegion) (*Host, *[]Notice, *int) {
 	t.Helper()
 	cfg := config.DefaultsScreenshot()
 	cfg.OutputDirectory = filepath.Join(t.TempDir(), "shots")
-	var notified []string
+	var notified []Notice
 	copies := 0
 	h := &Host{
 		Config: fixed(cfg),
@@ -223,7 +223,7 @@ func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
 		Region: region,
 		Picker: fakePicker{c: colorpicker.RGB{R: 255, G: 51, B: 0}, ok: true},
 		Copy:   func(image.Image) error { copies++; return nil },
-		Notify: func(p string) { notified = append(notified, p) },
+		Notify: func(n Notice) { notified = append(notified, n) },
 		Forget: func([]render.ImageID) {},
 		now:    func() time.Time { return time.Date(2026, 9, 30, 12, 34, 56, 0, time.Local) },
 	}
@@ -272,8 +272,28 @@ func TestHostRegionCapture(t *testing.T) {
 	if b := img.Bounds(); b.Dx() != 40 || b.Dy() != 20 {
 		t.Fatalf("saved %v, want the 2x-scaled 40x20 crop", b)
 	}
-	if *copies != 1 || len(*notified) != 1 || (*notified)[0] != path {
+	if *copies != 1 || len(*notified) != 1 || (*notified)[0] != (Notice{Summary: "Screenshot saved", Body: path, Icon: path}) {
 		t.Fatalf("copies %d notified %v", *copies, *notified)
+	}
+}
+
+func TestHostReportsAFailedCopyInTheNotification(t *testing.T) {
+	h, notified, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
+	h.Copy = func(image.Image) error { return errors.New("no data-control and no input serial") }
+	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	if err != nil {
+		t.Fatalf("a failed copy failed the capture: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("a failed copy lost the saved file: %v", err)
+	}
+	want := Notice{
+		Summary: "Screenshot saved",
+		Body:    path + "\nNot copied to the clipboard: no data-control and no input serial",
+		Icon:    path,
+	}
+	if len(*notified) != 1 || (*notified)[0] != want {
+		t.Fatalf("notified %+v, want %+v", *notified, want)
 	}
 }
 

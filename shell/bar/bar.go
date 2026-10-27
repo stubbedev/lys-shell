@@ -143,6 +143,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 		defer clip.Close()
 	} else {
 		history.Close()
+		if !errors.Is(err, clipboard.ErrNoDataControl) {
+			log.Printf("bar: clipboard history: %v", err)
+		}
 	}
 	if detectCompositor() == compositorHyprland {
 		if conn, err := hyprland.Connect(); err != nil {
@@ -325,7 +328,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		Font:    font,
 	}, cfg)
 	osdRef.Store(osdSrv)
-	captureSvc := startCapture(application, sess.Outputs, current.Load, baseCtx.Hyprland, font, theme.Sheet)
+	captureSvc := startCapture(application, sess.Outputs, current.Load, baseCtx.Hyprland, baseCtx.Clipboard, font, theme.Sheet)
 	defer servePortalHosts(application, sess.Outputs, current.Load, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput, font, theme.Sheet)()
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger

@@ -8,10 +8,12 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
@@ -36,7 +38,7 @@ type captureServices struct {
 // startCapture builds the overlays and the host on the application and
 // serves the host on the session bus. A bus failure leaves the
 // in-process builtin working.
-func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, hypr *hyprland.Connection, sans render.Font, sheet *widget.Stylesheet) *captureServices {
+func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, hypr *hyprland.Connection, clip *clipboard.Clipboard, sans render.Font, sheet *widget.Stylesheet) *captureServices {
 	cfg := current()
 	var font render.Font
 	if face, err := app.FontWeighted(cfg.General.FontMono, overlayLabelPx, 700, false); err == nil {
@@ -60,7 +62,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 		Region:   region,
 		Picker:   colorpicker.New(application, outputs, font, colorpicker.HistoryPath()),
 		Focus:    focus,
-		Copy:     clipboardCopier(application),
+		Copy:     clipboardCopier(application, clip),
 		Forget: func(ids []render.ImageID) {
 			application.Invoke(func() {
 				for _, id := range ids {
@@ -130,19 +132,25 @@ func logicalOutputSize(application *app.Application, outputs func() []*app.Outpu
 	}
 }
 
-// clipboardCopier copies an image through the application's clipboard
-// (RunWith installs it). The Wayland calls run on the loop.
-func clipboardCopier(application *app.Application) func(image.Image) error {
+func clipboardCopier(application *app.Application, clip *clipboard.Clipboard) func(image.Image) error {
 	return func(img image.Image) error {
+		content, err := transfer.Image(img)
+		if err != nil {
+			return err
+		}
 		errc := make(chan error, 1)
-		application.Invoke(func() {
-			clip := application.Clipboard()
-			if clip == nil {
-				errc <- app.ErrClipboardUnavailable
-				return
-			}
-			errc <- clip.WriteImage(img)
-		})
+		application.Invoke(func() { errc <- putOnClipboard(application, clip, content) })
 		return <-errc
 	}
+}
+
+func putOnClipboard(application *app.Application, clip *clipboard.Clipboard, content transfer.Content) error {
+	if clip != nil {
+		return clip.Put(content)
+	}
+	device := application.Clipboard()
+	if device == nil {
+		return app.ErrClipboardUnavailable
+	}
+	return device.Write(content)
 }

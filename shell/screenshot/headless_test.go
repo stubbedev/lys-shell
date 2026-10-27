@@ -84,7 +84,7 @@ func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 			return []regionoverlay.Monitor{{Connector: frozen[0].connector, Width: b.Dx(), Height: b.Dy()}}
 		},
 		Region: &fakeRegion{sel: regionoverlay.Selection{Output: frozen[0].connector, X: 5, Y: 5, Width: 30, Height: 20}, ok: true},
-		Notify: func(string) {},
+		Notify: func(Notice) {},
 	}
 	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
 	if err != nil {
