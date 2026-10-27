@@ -136,17 +136,37 @@ func (st *Store) Add(n *Notification, prune int) error {
 	return nil
 }
 
-// Remove deletes one notification, reporting whether it was stored.
-func (st *Store) Remove(id uint32) (bool, error) {
-	res, err := st.db.Exec(removeSQL, id)
+// Remove deletes the notifications ids names in one transaction,
+// returning the ones that were stored, in the order of ids.
+func (st *Store) Remove(ids []uint32) ([]uint32, error) {
+	tx, err := st.db.Begin()
 	if err != nil {
-		return false, fmt.Errorf("removing notification %d: %w", id, err)
+		return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
 	}
-	n, err := res.RowsAffected()
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.Prepare(removeSQL)
 	if err != nil {
-		return false, fmt.Errorf("removing notification %d: %w", id, err)
+		return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
 	}
-	return n > 0, nil
+	defer func() { _ = stmt.Close() }()
+	stored := make([]uint32, 0, len(ids))
+	for _, id := range ids {
+		res, err := stmt.Exec(id)
+		if err != nil {
+			return nil, fmt.Errorf("removing notification %d: %w", id, err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("removing notification %d: %w", id, err)
+		}
+		if n > 0 {
+			stored = append(stored, id)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
+	}
+	return stored, nil
 }
 
 // RemoveAll empties the history.

@@ -424,6 +424,7 @@ func TestHotQueriesUseTheirIndexes(t *testing.T) {
 		{"sweep", sweepSQL, []any{int64(1), 500}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)", "SEARCH notifications USING INDEX notifications_expiry (<expr><?)"}},
 		{"expiries", expiriesSQL, []any{int64(1)}, []string{"SEARCH notifications USING INDEX notifications_expiry (<expr>>?)"}},
 		{"find", findSQL, []any{1}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)"}},
+		{"remove", removeSQL, []any{1}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)"}},
 	} {
 		plan := queryPlan(t, st.db, tc.query, tc.args...)
 		t.Logf("%s:\n%s", tc.name, plan)
@@ -704,6 +705,105 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 	svc2.DismissAll()
 	if got, _ := st2.Page(nil, MaxPage); len(got) != 0 {
 		t.Errorf("store after dismiss all = %v", got)
+	}
+}
+
+func closedSignals(svc *Service) *[]uint32 {
+	var closed []uint32
+	svc.SetEmitter(func(signal string, args ...any) {
+		if signal == Interface+".NotificationClosed" {
+			closed = append(closed, args[0].(uint32))
+		}
+	})
+	return &closed
+}
+
+func popupIDs(svc *Service) map[uint32]bool {
+	ids := map[uint32]bool{}
+	for _, n := range svc.Popups() {
+		ids[n.ID] = true
+	}
+	return ids
+}
+
+func TestDismissClosesTheGivenNotifications(t *testing.T) {
+	st, _ := openTestStore(t)
+	svc := newStoredService(t, st)
+	memory, _ := NewMemoryLimit(MinHistoryMemory)
+	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	old := svc.Notify("mail", 0, "", "old", "", nil, 0)
+	for i := range MinHistoryMemory {
+		advance(svc, time.Millisecond)
+		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+	}
+	a := svc.Notify("mail", 0, "", "A", "", nil, 0)
+	b := svc.Notify("mail", 0, "", "B", "", nil, 0)
+	keep := svc.Notify("chat", 0, "", "keep", "", nil, 0)
+	closed := closedSignals(svc)
+	total := svc.Count()
+
+	svc.Dismiss([]uint32{old, a, b, 9999})
+	if svc.Count() != total-3 || !slices.Equal(*closed, []uint32{old, a, b}) {
+		t.Errorf("dismiss: count %d (want %d), closed %v", svc.Count(), total-3, *closed)
+	}
+	onDisk, popped := storedIDs(t, st), popupIDs(svc)
+	for _, id := range []uint32{old, a, b} {
+		if onDisk[id] || popped[id] {
+			t.Errorf("dismissed %d stayed: stored %v, popped %v", id, onDisk[id], popped[id])
+		}
+	}
+	if !onDisk[keep] || !popped[keep] || history(t, svc)[0].ID != keep {
+		t.Errorf("dismiss took %d, which it was not given", keep)
+	}
+
+	svc.Dismiss([]uint32{old, a, b})
+	if svc.Count() != total-3 || len(*closed) != 3 {
+		t.Errorf("a second dismiss: count %d, closed %v", svc.Count(), *closed)
+	}
+}
+
+func TestDismissAllEmptiesThePopupsPastTheWindow(t *testing.T) {
+	st, _ := openTestStore(t)
+	svc := newStoredService(t, st)
+	memory, _ := NewMemoryLimit(MinHistoryMemory)
+	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	for i := range MinHistoryMemory + 2 {
+		advance(svc, time.Millisecond)
+		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+	}
+	if got := len(svc.Popups()); got != MinHistoryMemory+2 {
+		t.Fatalf("popups = %d, want every sticky one up", got)
+	}
+
+	svc.DismissAll()
+	if svc.Count() != 0 || len(history(t, svc)) != 0 || len(stored(t, st)) != 0 || len(svc.Popups()) != 0 {
+		t.Errorf("dismiss all left count %d, history %d, store %d, popups %d", svc.Count(), len(history(t, svc)), len(stored(t, st)), len(svc.Popups()))
+	}
+
+	next := svc.Notify("chat", 0, "", "after", "", nil, 0)
+	if svc.Count() != 1 || !storedIDs(t, st)[next] || !popupIDs(svc)[next] {
+		t.Errorf("a notification after dismiss all: count %d", svc.Count())
+	}
+}
+
+func TestClosingAPopupOutsideTheHistoryUpdatesThePopups(t *testing.T) {
+	st, _ := openTestStore(t)
+	svc := newStoredService(t, st)
+	feed, _ := svc.Subscribe()
+	id := svc.NotifyHints("tmp", 0, "", "Transient", "", nil, map[string]dbus.Variant{"transient": dbus.MakeVariant(true)}, 0)
+	collect(t, feed, 1)
+	closed := closedSignals(svc)
+
+	svc.Close(id, Dismissed)
+	if ev := collect(t, feed, 1)[0]; ev.Kind != EventPopups || len(svc.Popups()) != 0 || len(*closed) != 0 {
+		t.Errorf("closing a transient popup: event %+v, popups %d, closed %v", ev, len(svc.Popups()), *closed)
+	}
+
+	svc.Close(id, Dismissed)
+	select {
+	case ev := <-feed:
+		t.Errorf("closing a popup already gone emitted %+v", ev)
+	default:
 	}
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -390,8 +391,8 @@ func TestSwipeDismissesACard(t *testing.T) {
 	if len(popups) != 1 || popups[0].ID != older {
 		t.Fatalf("a 250px swipe: popups %v, want only %d", popups, older)
 	}
-	if len(history(t, s.svc)) != 2 {
-		t.Errorf("history = %d, want the swiped card dismissed into it", len(history(t, s.svc)))
+	if len(notifytest.History(t, s.svc)) != 2 {
+		t.Errorf("history = %d, want the swiped card dismissed into it", len(notifytest.History(t, s.svc)))
 	}
 }
 
@@ -711,41 +712,50 @@ func TestReloadReleasesAHoveredStack(t *testing.T) {
 	}
 }
 
-// Clear all on an expanded stack closes every popup of its group, the
-// ones popup-max-visible keeps off screen included, and only those; a
-// collapsed stack or a stack of one offers no clear all.
-func TestClearAllDismissesTheStack(t *testing.T) {
-	s := newSurface(t, config.DefaultsNotification())
-	mail, chat := s.burst()
-	single := s.notify("calendar", "Meeting")
-	s.sync()
-	s.hover(s.card(single).summary)
-	if s.stackOf(single).clear.Visible() {
-		t.Error("a stack of one offers clear all")
-	}
-	st := s.stackOf(mail[2])
-	if st.clear.Visible() {
-		t.Error("a collapsed stack offers clear all")
-	}
-	s.hover(s.card(mail[2]).summary)
-	s.click(st.clear)
-	s.p.sync()
-	left := map[uint32]bool{}
-	for _, n := range s.svc.Popups() {
-		left[n.ID] = true
-	}
-	for _, id := range mail {
-		if left[id] {
-			t.Errorf("clear all left mail %d up", id)
+// Clear all on an expanded stack takes every notification of its group
+// off the screen, out of the history and out of the store, the ones
+// popup-max-visible keeps off screen included, whatever the close
+// button's behavior, and only those; a collapsed stack or a stack of
+// one offers no clear all.
+func TestClearAllRemovesTheStacksNotifications(t *testing.T) {
+	for _, behavior := range []config.PopupCloseBehavior{config.PopupCloseBehaviorDismiss, config.PopupCloseBehaviorRemove} {
+		cfg := config.DefaultsNotification()
+		cfg.PopupCloseBehavior = behavior
+		s := newSurface(t, cfg)
+		st := notifytest.AttachStore(t, s.svc)
+		mail, chat := s.burst()
+		single := s.notify("calendar", "Meeting")
+		s.sync()
+		s.hover(s.card(single).summary)
+		if s.stackOf(single).clear.Visible() {
+			t.Errorf("%s: a stack of one offers clear all", behavior)
 		}
-	}
-	for _, id := range chat[1:] {
-		if !left[id] {
-			t.Errorf("clear all on the mail stack took chat %d", id)
+		stack := s.stackOf(mail[2])
+		if stack.clear.Visible() {
+			t.Errorf("%s: a collapsed stack offers clear all", behavior)
 		}
-	}
-	if len(history(t, s.svc)) != 7 {
-		t.Errorf("history = %d, want clear all to dismiss into the history under the default close behavior", len(history(t, s.svc)))
+		s.hover(s.card(mail[2]).summary)
+		s.click(stack.clear)
+		s.p.sync()
+		up, kept, onDisk := notifytest.IDs(s.svc.Popups()), notifytest.IDs(notifytest.History(t, s.svc)), notifytest.IDs(notifytest.Stored(t, st))
+		for _, id := range mail {
+			if up[id] || kept[id] || onDisk[id] {
+				t.Errorf("%s: clear all left mail %d: popped %v, in history %v, stored %v", behavior, id, up[id], kept[id], onDisk[id])
+			}
+		}
+		for _, id := range append(chat, single) {
+			if !kept[id] || !onDisk[id] {
+				t.Errorf("%s: clear all on the mail stack took %d: in history %v, stored %v", behavior, id, kept[id], onDisk[id])
+			}
+		}
+		for _, id := range chat[1:] {
+			if !up[id] {
+				t.Errorf("%s: clear all on the mail stack took chat %d off the screen", behavior, id)
+			}
+		}
+		if s.svc.Count() != len(chat)+1 {
+			t.Errorf("%s: count = %d, want %d", behavior, s.svc.Count(), len(chat)+1)
+		}
 	}
 }
 
@@ -973,7 +983,7 @@ func TestCardCloseBehavior(t *testing.T) {
 		if len(s.svc.Popups()) != 0 {
 			t.Errorf("%s: the popup stayed", tc.behavior)
 		}
-		if kept := len(history(t, s.svc)) == 1; kept != tc.keepHistory {
+		if kept := len(notifytest.History(t, s.svc)) == 1; kept != tc.keepHistory {
 			t.Errorf("%s: in history %v, want %v", tc.behavior, kept, tc.keepHistory)
 		}
 		if sig.count("ActionInvoked") != 0 {
@@ -1025,7 +1035,7 @@ func TestCardActionsAndDefault(t *testing.T) {
 	if sig.count("ActionInvoked"+fmt.Sprint(other, "reply")) != 1 {
 		t.Errorf("action: %v", sig.seen)
 	}
-	for _, n := range history(t, svc) {
+	for _, n := range notifytest.History(t, svc) {
 		if n.ID == other {
 			t.Error("an invoked notification stayed in the history")
 		}
@@ -1206,14 +1216,4 @@ func TestStackKeepsItsWidth(t *testing.T) {
 	if sz.W != want {
 		t.Errorf("the stack of %d measures %dpx wide in a 1920px surface, want %d", id, sz.W, want)
 	}
-}
-
-// history is the first page of svc's history, newest first.
-func history(t *testing.T, svc *notifications.Service) []*notifications.Notification {
-	t.Helper()
-	got, err := svc.Page(nil, notifications.MaxPage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return got
 }

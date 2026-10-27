@@ -471,7 +471,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 		case replaced:
 			// A transient replacement takes the stored one's place
 			// in the history, so it leaves the store too.
-			_, err := st.Remove(id)
+			_, err := st.Remove([]uint32{id})
 			storeErr("remove", err)
 		}
 	})
@@ -535,62 +535,101 @@ func (s *Service) addPopupLocked(n *Notification) {
 // off the popup list; an expired history entry leaves its popup to its
 // own countdown (handle_notification_removed).
 func (s *Service) Close(id uint32, reason ClosedReason) {
-	s.mu.Lock()
-	removed := s.removeHistoryLocked(id)
-	if reason != Expired {
-		s.dropPopupLocked(id)
-	}
-	emit := s.emit
-	if removed {
-		s.total--
-	} else if s.store == nil {
-		s.mu.Unlock()
-		return
-	}
-	s.persistUnlock(func(st *Store) {
-		onDisk, err := st.Remove(id)
-		storeErr("remove", err)
-		if !removed && onDisk {
-			removed = true
-			s.mu.Lock()
-			s.total--
-			s.mu.Unlock()
-		}
-	})
-	if !removed {
-		return
-	}
-	if emit != nil {
-		emit(Interface+".NotificationClosed", id, uint32(reason))
-	}
-	s.notify(Event{Kind: EventRemove, ID: id, Reason: reason})
+	s.close([]uint32{id}, reason)
 }
 
-// DismissAll empties the history, the store included, and the popups
-// with the dismissed reason. The closed signal goes out for the
-// in-memory window and the popups: the entries only on disk are past
-// any app's interest, and a signal each would flood the bus.
+// Dismiss closes every notification ids names with the dismissed
+// reason, in memory, on the popup list and in the store in one write:
+// a popup stack's clear all and a history group's clear.
+func (s *Service) Dismiss(ids []uint32) {
+	s.close(ids, Dismissed)
+}
+
+func (s *Service) close(ids []uint32, reason ClosedReason) {
+	s.mu.Lock()
+	c := s.forgetLocked(ids, reason)
+	s.persistUnlock(func(st *Store) {
+		onDisk, err := st.Remove(ids)
+		storeErr("remove", err)
+		s.mu.Lock()
+		for _, id := range onDisk {
+			if !c.closed[id] {
+				c.closed[id] = true
+				s.total--
+			}
+		}
+		s.mu.Unlock()
+	})
+	s.announce(c)
+}
+
+// DismissAll empties the history, the store included, and the popup
+// list with the dismissed reason. The closed signal goes out for the
+// in-memory window: the entries only on disk are past any app's
+// interest, and a signal each would flood the bus.
 func (s *Service) DismissAll() {
 	s.mu.Lock()
-	ids := make([]uint32, 0, len(s.recent))
-	for _, n := range s.recent {
-		ids = append(ids, n.ID)
-	}
 	for id := range s.expiry {
 		s.stopExpiryLocked(id)
 	}
-	for _, id := range ids {
-		s.removeHistoryLocked(id)
-		s.dropPopupLocked(id)
-	}
+	c := s.forgetLocked(s.shownLocked(), Dismissed)
 	s.total = 0
-	emit := s.emit
 	s.persistUnlock(func(st *Store) { storeErr("remove all", st.RemoveAll()) })
+	s.announce(c)
+}
+
+type closing struct {
+	ids    []uint32
+	reason ClosedReason
+	closed map[uint32]bool
+	popped bool
+	emit   func(signal string, args ...any)
+}
+
+func (s *Service) forgetLocked(ids []uint32, reason ClosedReason) *closing {
+	c := &closing{ids: ids, reason: reason, closed: make(map[uint32]bool, len(ids)), emit: s.emit}
 	for _, id := range ids {
-		if emit != nil {
-			emit(Interface+".NotificationClosed", id, uint32(Dismissed))
+		if s.removeHistoryLocked(id) {
+			c.closed[id] = true
+			s.total--
 		}
-		s.notify(Event{Kind: EventRemove, ID: id, Reason: Dismissed})
+		if reason != Expired && s.dropPopupLocked(id) {
+			c.popped = true
+		}
+	}
+	return c
+}
+
+func (s *Service) shownLocked() []uint32 {
+	inWindow := make(map[uint32]bool, len(s.recent))
+	ids := make([]uint32, 0, len(s.recent)+len(s.popups))
+	for _, n := range s.recent {
+		inWindow[n.ID] = true
+		ids = append(ids, n.ID)
+	}
+	for _, n := range s.popups {
+		if !inWindow[n.ID] {
+			ids = append(ids, n.ID)
+		}
+	}
+	return ids
+}
+
+func (s *Service) announce(c *closing) {
+	announced := false
+	for _, id := range c.ids {
+		if !c.closed[id] {
+			continue
+		}
+		delete(c.closed, id)
+		announced = true
+		if c.emit != nil {
+			c.emit(Interface+".NotificationClosed", id, uint32(c.reason))
+		}
+		s.notify(Event{Kind: EventRemove, ID: id, Reason: c.reason})
+	}
+	if !announced && c.popped {
+		s.notify(Event{Kind: EventPopups})
 	}
 }
 

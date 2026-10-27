@@ -21,6 +21,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/notifyui"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -144,7 +145,7 @@ func TestNotificationDropdownGroups(t *testing.T) {
 		t.Error("the default action did not close the dropdown")
 	}
 	waitHeadless(t, "the chat group gone", func() bool { return len(v.groups) == 1 })
-	for _, n := range history(t, svc) {
+	for _, n := range notifytest.History(t, svc) {
 		if n.ID == chat {
 			t.Error("the invoked notification stayed")
 		}
@@ -235,6 +236,80 @@ func TestNotificationGroupHeaderClickTargets(t *testing.T) {
 	waitHeadless(t, "the cleared group", func() bool { return len(v.groups) == 0 })
 	if !g.expanded {
 		t.Error("the clear button's click toggled the group")
+	}
+}
+
+// clearableDropdown is a laid-out notification dropdown over a stored
+// history of three mails and two chats, every one still popped up.
+func clearableDropdown(t *testing.T) (*notificationView, *notifications.Service, *notifications.Store) {
+	t.Helper()
+	svc := newNotifTestService(t)
+	st := notifytest.AttachStore(t, svc)
+	for i := range 3 {
+		svc.Notify("mail", 0, "", "Mail "+strconv.Itoa(i), "", nil, 0)
+	}
+	for i := range 2 {
+		svc.Notify("chat", 0, "", "Chat "+strconv.Itoa(i), "", nil, 0)
+	}
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Notifications = svc
+	v := notificationDropdown(ctx).(*notificationView)
+	t.Cleanup(v.dropdownClosed)
+	widget.SizeWithin(v, widget.Size{W: 425, H: 725})
+	v.Arrange(render.Rect{W: 425, H: 725})
+	return v, svc, st
+}
+
+// A click on the header's clear all empties the dropdown, the history,
+// the store and the popups; a click on the header beside it clears
+// nothing.
+func TestNotificationDropdownClearAllClick(t *testing.T) {
+	v, svc, st := clearableDropdown(t)
+	title := treetest.WithClass(v.Children()[0], "title")[0]
+	routeClick(v, title)
+	if svc.Count() != 5 || len(notifytest.Stored(t, st)) != 5 || len(svc.Popups()) != 5 || len(v.groups) != 2 || !v.clearAll.Visible() {
+		t.Fatalf("a click beside clear all: count %d, stored %d, popups %d, groups %d", svc.Count(), len(notifytest.Stored(t, st)), len(svc.Popups()), len(v.groups))
+	}
+
+	routeClick(v, v.clearAll)
+	waitHeadless(t, "the empty state", func() bool { return v.empty.Visible() && !v.scroll.Visible() && len(v.groups) == 0 })
+	if v.clearAll.Visible() {
+		t.Error("clear all stays without notifications")
+	}
+	if n := len(notifytest.History(t, svc)); n != 0 || svc.Count() != 0 {
+		t.Errorf("history after clear all = %d (count %d)", n, svc.Count())
+	}
+	if n := len(notifytest.Stored(t, st)); n != 0 {
+		t.Errorf("store after clear all = %d", n)
+	}
+	if n := len(svc.Popups()); n != 0 {
+		t.Errorf("popups after clear all = %d", n)
+	}
+}
+
+// A group's clear takes its app's notifications out of the dropdown,
+// the history, the store and the popups, and leaves the other app's.
+func TestNotificationGroupClearRemovesOnlyItsApp(t *testing.T) {
+	v, svc, st := clearableDropdown(t)
+	var mail *notifGroup
+	for _, g := range v.groups {
+		if g.app == "mail" {
+			mail = g
+		}
+	}
+	routeClick(v, findByClass(mail, "notification-dropdown-group-clear"))
+	waitHeadless(t, "the mail group gone", func() bool { return len(v.groups) == 1 })
+	if v.groups[0].app != "chat" || len(v.groups[0].items) != 2 {
+		t.Fatalf("left group %q with %d items, want chat with 2", v.groups[0].app, len(v.groups[0].items))
+	}
+	for name, left := range map[string][]*notifications.Notification{
+		"history": notifytest.History(t, svc),
+		"store":   notifytest.Stored(t, st),
+		"popups":  svc.Popups(),
+	} {
+		if len(left) != 2 || left[0].AppName != "chat" || left[1].AppName != "chat" {
+			t.Errorf("%s after the mail clear = %v, want the two chats", name, left)
+		}
 	}
 }
 
@@ -387,7 +462,7 @@ func TestNotificationItemDismissInsideADefaultActionRow(t *testing.T) {
 	widget.SizeWithin(item, widget.Size{W: 360, H: 400})
 	item.Arrange(render.Rect{W: 360, H: 400})
 	routeClick(item, findByClass(item, "notification-dropdown-item-dismiss"))
-	waitHeadless(t, "the dismissal", func() bool { return len(history(t, svc)) == 0 })
+	waitHeadless(t, "the dismissal", func() bool { return len(notifytest.History(t, svc)) == 0 })
 	if pop.dismissed != 0 || len(invoked) != 0 {
 		t.Errorf("dismiss closed the dropdown (%d) or invoked %v", pop.dismissed, invoked)
 	}
@@ -419,7 +494,7 @@ func TestNotificationItemActionCarriesItsToken(t *testing.T) {
 	defer v.dropdownClosed()
 	v.minter = barMinter{token: "tok-3"}
 	v.groups[0].items[0].invoke("reply")
-	waitHeadless(t, "the action", func() bool { return len(history(t, svc)) == 0 })
+	waitHeadless(t, "the action", func() bool { return len(notifytest.History(t, svc)) == 0 })
 	if want := []string{"ActivationToken" + fmt.Sprint(first, "tok-3"), "ActionInvoked" + fmt.Sprint(first, "reply")}; !slices.Equal(seen, want) {
 		t.Errorf("signals = %q, want %q", seen, want)
 	}

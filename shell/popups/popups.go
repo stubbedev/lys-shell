@@ -426,15 +426,18 @@ func (p *Popups) setHovered(st *stack, on bool) {
 }
 
 // clearStack is the clear-all button: every popup of the stack's
-// group closes under popup-close-behavior, those popup-max-visible
-// keeps off screen included, so none moves up into the cleared stack.
+// group leaves the history as the dropdown's clear all does, those
+// popup-max-visible keeps off screen included, so none moves up into
+// the cleared stack.
 func (p *Popups) clearStack(st *stack) {
 	key := stackKey(p.cfg.Notification.PopupStack)
+	var ids []uint32
 	for _, n := range p.svc.Popups() {
 		if key(n) == st.key {
-			p.closeCard(n.ID)
+			ids = append(ids, n.ID)
 		}
 	}
+	p.svc.Dismiss(ids)
 }
 
 // liveIDs are the ids of the stack's cards not leaving, front first.

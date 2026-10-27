@@ -408,9 +408,11 @@ func (g *notifGroup) showAll() {
 
 // clear is ClearGroup.
 func (g *notifGroup) clear() {
-	for _, n := range g.notifs {
-		g.view.dismiss(n.ID)
+	ids := make([]uint32, len(g.notifs))
+	for i, n := range g.notifs {
+		ids[i] = n.ID
 	}
+	g.view.svc.Dismiss(ids)
 }
 
 // notifItem is NotificationItem: the notification as lys-ui's Item
