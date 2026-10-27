@@ -13,7 +13,7 @@ menubutton > button.toggle:checked arrow {
 menubutton.menu > button.toggle {
   all: unset;
   min-width: calc(10rem * var(--global-scale));
-  font-size: var(--text-md);
+  font-size: var(--text-body);
   font-weight: var(--weight-semibold);
   background: var(--bg-overlay);
   transition: background var(--duration-fast);

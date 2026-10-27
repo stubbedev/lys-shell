@@ -2,7 +2,7 @@
   background-color: var(--bg-overlay);
   border: 1px solid var(--border-default);
   border-radius: var(--rounding-element);
-  font-size: var(--text-md);
+  font-size: var(--text-body);
   color: var(--fg-default);
   padding: var(--space-sm);
   min-height: calc(13rem * var(--global-scale));

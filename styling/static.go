@@ -17,6 +17,7 @@ var sheets embed.FS
 var sheetOrder = []string{
 	"tokens/index.css",
 	"base/index.css",
+	"base/typography.css",
 	"primitives/badge/index.css",
 	"primitives/buttons/index.css",
 	"primitives/dropdown/index.css",

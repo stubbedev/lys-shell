@@ -1,0 +1,48 @@
+.caption,
+.caption-heading,
+.keycap,
+badge,
+chip,
+tooltip,
+sidebar .group-label,
+sidebar button.group-label,
+sidebar button.item .badge,
+.description {
+  font-size: var(--text-caption);
+}
+
+sidebar .group-label,
+sidebar button.group-label {
+  font-weight: var(--weight-semibold);
+}
+
+.small-text,
+.muted,
+.inline-code,
+sidebar button.item label,
+dialog .footer label,
+inputotp label,
+.title {
+  font-size: var(--text-body);
+}
+
+.title-4,
+.lead,
+.large-text,
+statuspage .title,
+dialog .title {
+  font-size: var(--text-subtitle);
+}
+
+.title-2,
+.title-3,
+.h3,
+.h4 {
+  font-size: var(--text-title);
+}
+
+.title-1,
+.h1,
+.h2 {
+  font-size: var(--text-display);
+}
