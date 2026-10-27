@@ -6,8 +6,9 @@ require (
 	github.com/ebitengine/purego v0.11.2
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.1.1-0.20261027075344-3dc3050f439c
-	github.com/stubbedev/lys-ui v0.0.0-20261027085743-342bdbb80464
+	github.com/stubbedev/lys-lib v0.1.1-0.20261027092510-2236ab4c9fa6
+	github.com/stubbedev/lys-ui v0.0.0-20261027092646-06642b92ce57
+	github.com/stubbedev/memory-go v0.1.1-0.20261027092317-8b116b9fa590
 	github.com/unxed/xkb-go v0.1.9
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.58.0
