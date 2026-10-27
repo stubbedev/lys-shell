@@ -2353,7 +2353,7 @@ _lys-shell_commands() {
 'idle:Idle inhibit control commands' \
 'launcher:Application launcher / dmenu with rofi-compatible flags' \
 'lock:Lock the session via lys-shell'\''s lock screen' \
-'logout:Log out of the session through logind' \
+'logout:Log out of the session through lys-wm or logind' \
 'vpn:VPN commands' \
 'recorder:Screen recorder control commands' \
 'screenshot:Screenshot capture commands' \
@@ -2580,7 +2580,7 @@ _lys-shell__help_commands() {
 'idle:Idle inhibit control commands' \
 'launcher:Application launcher / dmenu with rofi-compatible flags' \
 'lock:Lock the session via lys-shell'\''s lock screen' \
-'logout:Log out of the session through logind' \
+'logout:Log out of the session through lys-wm or logind' \
 'vpn:VPN commands' \
 'recorder:Screen recorder control commands' \
 'screenshot:Screenshot capture commands' \

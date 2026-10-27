@@ -1,4 +1,4 @@
-Log out of the session through logind
+Log out of the session through lys-wm or logind
 
 Usage: lys-shell logout
 

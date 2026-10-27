@@ -16,7 +16,7 @@ Wayland services CLI
   [1m[32midle[0m         Idle inhibit control commands
   [1m[32mlauncher[0m     Application launcher / dmenu with rofi-compatible flags
   [1m[32mlock[0m         Lock the session via lys-shell's lock screen
-  [1m[32mlogout[0m       Log out of the session through logind
+  [1m[32mlogout[0m       Log out of the session through lys-wm or logind
   [1m[32mvpn[0m          VPN commands
   [1m[32mrecorder[0m     Screen recorder control commands
   [1m[32mscreenshot[0m   Screenshot capture commands
