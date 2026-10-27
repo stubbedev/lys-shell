@@ -22,11 +22,15 @@ type fakeMonitor struct {
 	reply   []byte
 	writes  []uint16
 	closes  int // how many opened connections were closed
+	hold    chan struct{}
 }
 
 var errNAK = errors.New("i2c: NAK")
 
 func (m *fakeMonitor) Write(p []byte) (int, error) {
+	if m.hold != nil && len(p) > 2 && p[2] == 0x03 {
+		<-m.hold
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(p) < 3 || p[0] != ddcSubAddress || p[len(p)-1] != checksum(ddcAddress<<1, p[:len(p)-1]) {
@@ -120,11 +124,12 @@ type fakeI2C struct {
 	mu    sync.Mutex
 	dir   string
 	buses map[uint32]i2cBus
+	sysfs *fakeSysfs
 }
 
 func newFakeI2C(t *testing.T) *fakeI2C {
 	t.Helper()
-	f := &fakeI2C{dir: t.TempDir(), buses: map[uint32]i2cBus{}}
+	f := &fakeI2C{dir: t.TempDir(), buses: map[uint32]i2cBus{}, sysfs: newFakeSysfs(t)}
 	origDir, origOpen, origSleep := DevDir, openBus, ddcSleep
 	DevDir = f.dir
 	openBus = func(path string) (i2cBus, error) {
@@ -150,6 +155,19 @@ func newFakeI2C(t *testing.T) *fakeI2C {
 
 func (f *fakeI2C) plug(t *testing.T, n uint32, bus i2cBus) {
 	t.Helper()
+	f.plugAt(t, n, bus, f.sysfs.devices)
+}
+
+func (f *fakeI2C) plugOn(t *testing.T, n uint32, bus i2cBus, connector string) {
+	t.Helper()
+	f.plugAt(t, n, bus, f.sysfs.connector(connector))
+}
+
+func (f *fakeI2C) plugAt(t *testing.T, n uint32, bus i2cBus, parent string) {
+	t.Helper()
+	if _, err := os.Lstat(filepath.Join(I2CAdapterDir, i2cNodePrefix+strconv.FormatUint(uint64(n), 10))); os.IsNotExist(err) {
+		f.sysfs.adapter(n, parent)
+	}
 	path := filepath.Join(f.dir, i2cNodePrefix+strconv.FormatUint(uint64(n), 10))
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)

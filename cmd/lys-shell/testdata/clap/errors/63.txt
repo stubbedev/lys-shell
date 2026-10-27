@@ -1,0 +1,10 @@
+args: brightness --output DP-1
+code: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <CHANGE>
+
+Usage: lys-shell brightness --output <NAME> <CHANGE>
+
+For more information, try '--help'.

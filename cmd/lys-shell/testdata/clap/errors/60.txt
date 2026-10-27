@@ -1,0 +1,7 @@
+args: brightness abc
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'abc' for '<CHANGE>': expected N to set, +N to raise or -N to lower, with N a whole percent
+
+For more information, try '--help'.

@@ -91,3 +91,18 @@ func (e enumParser) possibleValues() []PossibleValue { return e.values }
 // Enum accepts exactly one of values (a clap ValueEnum); the parsed
 // value is the matching Name.
 func Enum(values ...PossibleValue) ValueParser { return enumParser{values: values} }
+
+type funcParser[T any] struct{ fn func(string) (T, error) }
+
+func (f funcParser[T]) parse(_ *cmd, a *arg, raw string) (any, *Error) {
+	v, err := f.fn(raw)
+	if err != nil {
+		return nil, valueValidationError(a.String(), raw, err.Error())
+	}
+	return v, nil
+}
+func (funcParser[T]) possibleValues() []PossibleValue { return nil }
+
+// Func parses with parse (a clap value_parser over a fn); its error
+// becomes the invalid-value message.
+func Func[T any](parse func(string) (T, error)) ValueParser { return funcParser[T]{fn: parse} }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/brightness"
@@ -209,5 +210,38 @@ func TestBrightnessModuleIconFollowsTheLevel(t *testing.T) {
 	}
 	if m.icon.Name() != "low" || m.btn.Label().Text() != "--%" {
 		t.Errorf("no device: icon %q label %q", m.icon.Name(), m.btn.Label().Text())
+	}
+}
+
+func TestBrightnessStepActionHoldsTheConfiguredFloor(t *testing.T) {
+	cfg := config.Defaults()
+	if cfg.Brightness.MinBrightness != 5 {
+		t.Fatalf("default min-brightness = %d, want 5", cfg.Brightness.MinBrightness)
+	}
+	ctx := newTestContext(t, cfg)
+	source := &fakeBrightnessSource{devices: []brightness.Device{
+		{Name: "panel", Brightness: 80, Max: 1000},
+		{Name: "monitor", Brightness: 50, Max: 100},
+	}}
+	ctx.Brightness = source
+	runClickAction(ctx, config.ParseClickAction("brightness:-10"))
+	waitForSets := func(n int) []brightnessSet {
+		t.Helper()
+		for range 300 {
+			if sets := source.recorded(); len(sets) >= n {
+				return sets
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Fatalf("fewer than %d brightness writes", n)
+		return nil
+	}
+	want := []brightnessSet{{"panel", 5}, {"monitor", 40}}
+	if got := waitForSets(2); !slices.Equal(got, want) {
+		t.Errorf("-10 wrote %v, want %v", got, want)
+	}
+	runClickAction(ctx, config.ParseClickAction("brightness:5"))
+	if got := waitForSets(4)[2:]; !slices.Equal(got, []brightnessSet{{"panel", 13}, {"monitor", 55}}) {
+		t.Errorf("+5 wrote %v, want steps from each rounded level", got)
 	}
 }

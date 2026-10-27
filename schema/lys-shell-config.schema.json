@@ -1287,9 +1287,9 @@
           "description": "Action on middle click."
         },
         "min-brightness": {
-          "$ref": "#/$defs/uint32",
-          "default": 1,
-          "description": "Lower bound (percent) for the native brightness-adjust action.\n\nScrolling or clicking down never drops below this, so a dimmer cannot\nreach a fully dark screen by accident. Use the brightness-toggle action\nto intentionally blackout to 0%."
+          "$ref": "#/$defs/Percentage",
+          "default": 5,
+          "description": "Lower bound (percent) for the native brightness-adjust action and\n`lys-shell brightness`.\n\nScrolling, clicking or a brightness key bound to `lys-shell brightness`\nnever drops below this, so a dimmer cannot reach a fully dark screen by\naccident. Use the brightness-toggle action to intentionally blackout to\n0%."
         },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
@@ -4972,7 +4972,7 @@
               "ld-sun-symbolic"
             ],
             "middle-click": "",
-            "min-brightness": 1,
+            "min-brightness": 5,
             "right-click": "",
             "scroll-down": "brightness:-5",
             "scroll-up": "brightness:5",
@@ -9864,7 +9864,7 @@
             "ld-sun-symbolic"
           ],
           "middle-click": "",
-          "min-brightness": 1,
+          "min-brightness": 5,
           "right-click": "",
           "scroll-down": "brightness:-5",
           "scroll-up": "brightness:5",

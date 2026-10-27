@@ -1,0 +1,7 @@
+args: brightness 101
+code: 2
+--- stdout
+--- stderr
+error: invalid value '101' for '<CHANGE>': 101 is not in 0..=100
+
+For more information, try '--help'.

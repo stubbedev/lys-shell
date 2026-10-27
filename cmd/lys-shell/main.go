@@ -23,6 +23,7 @@ func rootCommand() *cli.Command {
 		Version: version.Version,
 		Subcommands: []*cli.Command{
 			audioCommand(),
+			brightnessCommand(),
 			configCommand(),
 			iconsCommand(),
 			mediaCommand(),

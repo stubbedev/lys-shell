@@ -51,25 +51,30 @@ func (a *audioEvents) next(ctx context.Context, src pulse.Source) []Event {
 	return evs
 }
 
-// brightnessEvents is handle_brightness_changed: the average over every
-// backlight (a brightness action drives them all), flashed when its
-// rounded value moved.
-type brightnessEvents struct{ last level }
+// brightnessEvents is handle_brightness_changed per device: the average
+// over the devices whose rounded level moved, so changing one output
+// shows that output's level. A device appearing is not a change.
+type brightnessEvents struct{ last map[string]level }
 
 func (b *brightnessEvents) next(ctx context.Context, src brightness.Source) (Event, bool) {
 	devices, err := src.Devices(ctx)
 	if err != nil {
 		return Event{}, false
 	}
-	pct, ok := brightness.AveragePercentage(devices)
+	seen := make(map[string]level, len(devices))
+	var moved []brightness.Device
+	for _, d := range devices {
+		l := levelOf(d.Percentage(), false)
+		seen[d.Name] = l
+		if prev, ok := b.last[d.Name]; ok && prev != l {
+			moved = append(moved, d)
+		}
+	}
+	b.last = seen
+	pct, ok := brightness.AveragePercentage(moved)
 	if !ok {
 		return Event{}, false
 	}
-	l := levelOf(pct, false)
-	if l == b.last {
-		return Event{}, false
-	}
-	b.last = l
 	return Slider(i18n.T("osd-brightness"), BrightnessIcon, pct, false), true
 }
 

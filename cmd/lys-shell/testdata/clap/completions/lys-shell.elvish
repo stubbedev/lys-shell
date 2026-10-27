@@ -23,6 +23,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
             cand audio 'Audio control commands'
+            cand brightness 'Set an output''s brightness through its backlight or DDC/CI'
             cand config 'Configuration management commands'
             cand icons 'Icon management commands'
             cand media 'Media player control commands'
@@ -110,6 +111,12 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;audio;help;status'= {
         }
         &'lys-shell;audio;help;help'= {
+        }
+        &'lys-shell;brightness'= {
+            cand -o 'Output connector name (e.g. DP-1); the focused output when omitted'
+            cand --output 'Output connector name (e.g. DP-1); the focused output when omitted'
+            cand -h 'Print help'
+            cand --help 'Print help'
         }
         &'lys-shell;config'= {
             cand -h 'Print help'
@@ -994,6 +1001,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         }
         &'lys-shell;help'= {
             cand audio 'Audio control commands'
+            cand brightness 'Set an output''s brightness through its backlight or DDC/CI'
             cand config 'Configuration management commands'
             cand icons 'Icon management commands'
             cand media 'Media player control commands'
@@ -1038,6 +1046,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;audio;sources'= {
         }
         &'lys-shell;help;audio;status'= {
+        }
+        &'lys-shell;help;brightness'= {
         }
         &'lys-shell;help;config'= {
             cand get 'Get the value of a configuration path'

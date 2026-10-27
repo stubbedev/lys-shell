@@ -44,6 +44,20 @@ lys-shell audio sources
 lys-shell audio status
 ```
 
+Brightness, for binding brightness keys. It takes a level in percent (`50`) or a
+step (`+10`, `-10`) and acts on the focused output, or on the one `--output`
+names. Laptop panels change through logind, so no root or udev rule is needed.
+External monitors change over DDC/CI when `modules.brightness.enable-external`
+is on. A change never drops below `modules.brightness.min-brightness` (5% by
+default), so a key cannot black the screen out. The running shell applies the
+change, so the brightness OSD and the bar module follow it:
+
+```sh
+lys-shell brightness +10
+lys-shell brightness -10 --output DP-1
+lys-shell brightness 50
+```
+
 Media player control. Most subcommands take an optional player id (a number or
 partial name match); omit it to target the active player:
 

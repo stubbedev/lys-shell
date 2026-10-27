@@ -271,6 +271,13 @@ func run(cfg *config.Config, svc *config.Service) error {
 		} else {
 			log.Printf("recorder: daemon: %v", err)
 		}
+		floor := func() float64 { return float64(current.Load().Brightness.MinBrightness) }
+		focus := screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}
+		if release, err := brightness.NewDaemon(backlights, focus.FocusedOutput, floor).Export(conn); err == nil {
+			defer release()
+		} else {
+			log.Printf("brightness: daemon: %v", err)
+		}
 		if audio != nil {
 			if release, err := pulse.NewDaemon(audio).Export(conn); err == nil {
 				defer release()

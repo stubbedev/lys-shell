@@ -5,6 +5,7 @@ Wayland services CLI
 
 [1m[33mCommands:[0m
   [1m[32maudio[0m        Audio control commands
+  [1m[32mbrightness[0m   Set an output's brightness through its backlight or DDC/CI
   [1m[32mconfig[0m       Configuration management commands
   [1m[32micons[0m        Icon management commands
   [1m[32mmedia[0m        Media player control commands

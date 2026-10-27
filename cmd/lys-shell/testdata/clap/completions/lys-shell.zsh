@@ -138,6 +138,15 @@ esac
     ;;
 esac
 ;;
+(brightness)
+_arguments "${_arguments_options[@]}" : \
+'-o+[Output connector name (e.g. DP-1); the focused output when omitted]:NAME:_default' \
+'--output=[Output connector name (e.g. DP-1); the focused output when omitted]:NAME:_default' \
+'-h[Print help]' \
+'--help[Print help]' \
+':change -- Percent\: N sets, +N raises, -N lowers; never below modules.brightness.min-brightness:_default' \
+&& ret=0
+;;
 (config)
 _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
@@ -1741,6 +1750,10 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(brightness)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (config)
 _arguments "${_arguments_options[@]}" : \
 ":: :_lys-shell__help__config_commands" \
@@ -2342,6 +2355,7 @@ esac
 _lys-shell_commands() {
     local commands; commands=(
 'audio:Audio control commands' \
+'brightness:Set an output'\''s brightness through its backlight or DDC/CI' \
 'config:Configuration management commands' \
 'icons:Icon management commands' \
 'media:Media player control commands' \
@@ -2469,6 +2483,11 @@ _lys-shell__audio__status_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell audio status commands' commands "$@"
 }
+(( $+functions[_lys-shell__brightness_commands] )) ||
+_lys-shell__brightness_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell brightness commands' commands "$@"
+}
 (( $+functions[_lys-shell__completions_commands] )) ||
 _lys-shell__completions_commands() {
     local commands; commands=()
@@ -2569,6 +2588,7 @@ _lys-shell__config__set_commands() {
 _lys-shell__help_commands() {
     local commands; commands=(
 'audio:Audio control commands' \
+'brightness:Set an output'\''s brightness through its backlight or DDC/CI' \
 'config:Configuration management commands' \
 'icons:Icon management commands' \
 'media:Media player control commands' \
@@ -2640,6 +2660,11 @@ _lys-shell__help__audio__sources_commands() {
 _lys-shell__help__audio__status_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help audio status commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__brightness_commands] )) ||
+_lys-shell__help__brightness_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help brightness commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__completions_commands] )) ||
 _lys-shell__help__completions_commands() {

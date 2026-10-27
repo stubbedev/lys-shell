@@ -241,11 +241,12 @@ type ddcDisplay struct {
 	// io serializes transactions on the bus and guards the handle;
 	// it is held across the slow I/O, so the manager's map lock never
 	// is.
-	io      sync.Mutex
-	handle  *ddcHandle
-	closed  bool
-	max     uint32
-	current uint32 // guarded by the manager's mu
+	io        sync.Mutex
+	handle    *ddcHandle
+	closed    bool
+	max       uint32
+	connector string
+	current   uint32 // guarded by the manager's mu
 }
 
 // close releases the handle once no transaction is using it.
@@ -291,9 +292,13 @@ func scan() []scannedDisplay {
 			_ = dev.Close()
 			continue
 		}
+		connector, err := i2cConnector(bus)
+		if err != nil {
+			log.Printf("%v", err)
+		}
 		found = append(found, scannedDisplay{
 			name:    ddcNamePrefix + strconv.FormatUint(uint64(bus), 10),
-			display: &ddcDisplay{handle: handle, max: uint32(value.maximum), current: uint32(value.current)},
+			display: &ddcDisplay{handle: handle, max: uint32(value.maximum), connector: connector, current: uint32(value.current)},
 		})
 	}
 	return found
@@ -364,7 +369,7 @@ func (m *ddcManager) devices() []Device {
 	defer m.mu.Unlock()
 	out := make([]Device, 0, len(m.displays))
 	for name, d := range m.displays {
-		out = append(out, Device{Name: name, Type: TypeDDC, Brightness: d.current, Max: d.max})
+		out = append(out, Device{Name: name, Type: TypeDDC, Brightness: d.current, Max: d.max, Connector: d.connector})
 	}
 	slices.SortFunc(out, func(a, b Device) int { return strings.Compare(a.Name, b.Name) })
 	return out

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/service/brightness"
 )
 
 // runClickAction dispatches one binding, the Go counterpart of
@@ -24,7 +25,7 @@ func runClickAction(ctx ModuleContext, action config.ClickAction) {
 	case config.ClickShell:
 		runShellBuiltin(ctx, action.Command)
 	case config.ClickBrightness:
-		stepBrightness(ctx, float64(action.Brightness))
+		stepBrightness(ctx, action.Brightness)
 	case config.ClickBrightnessToggle:
 		toggleBrightness(ctx)
 	}
@@ -94,31 +95,19 @@ func toggleSourceMute(ctx ModuleContext, input bool) {
 // stepBrightness moves every backlight by delta percent, floored at
 // the configured minimum (the dimmer can never scroll fully dark; 0%
 // is reserved for the toggle).
-func stepBrightness(ctx ModuleContext, delta float64) {
+func stepBrightness(ctx ModuleContext, delta int32) {
 	if ctx.Brightness == nil {
 		return
 	}
-	min := float64(ctx.Config.Brightness.MinBrightness)
-	if min < 0 {
-		min = 0
-	}
-	if min > 100 {
-		min = 100
-	}
+	change := brightness.Relative(delta)
+	floor := float64(ctx.Config.Brightness.MinBrightness)
 	go func() {
 		devices, err := ctx.Brightness.Devices(context.Background())
 		if err != nil || len(devices) == 0 {
 			return
 		}
 		for _, device := range devices {
-			target := device.Percentage() + delta
-			if target < min {
-				target = min
-			}
-			if target > 100 {
-				target = 100
-			}
-			if err := ctx.Brightness.Set(context.Background(), device.Name, target); err != nil {
+			if err := ctx.Brightness.Set(context.Background(), device.Name, change.Target(device, floor)); err != nil {
 				log.Printf("click: brightness %s: %v", device.Name, err)
 			}
 		}

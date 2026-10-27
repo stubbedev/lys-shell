@@ -53,6 +53,7 @@ type Device struct {
 	Type       Type
 	Brightness uint32
 	Max        uint32
+	Connector  string
 }
 
 // Percentage maps the raw level onto 0..100.
@@ -104,11 +105,16 @@ func ReadDevice(name string) (Device, error) {
 	if err != nil {
 		return Device{}, err
 	}
+	connector, err := backlightConnector(name)
+	if err != nil {
+		return Device{}, err
+	}
 	return Device{
 		Name:       name,
 		Type:       TypeFromSysfs(rawType),
 		Brightness: brightness,
 		Max:        max,
+		Connector:  connector,
 	}, nil
 }
 

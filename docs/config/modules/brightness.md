@@ -28,7 +28,7 @@ bar:
 | `label-show` | bool | `true` | Display percentage label. |
 | `format` | string | `"{{ percent }}%"` | Format string for the label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
-| `min-brightness` | u32 | `1` | Lower bound (percent) for the native brightness-adjust action. |
+| `min-brightness` | [`Percentage`](/config/types#percentage) | `5` | Lower bound (percent) for the native brightness-adjust action and `lys-shell brightness`. |
 | `enable-external` | bool | `true` | Discover and control external monitors over DDC/CI (I²C). |
 | `thresholds` | array of [`ThresholdEntry`](/config/types#threshold-entry) | `[]` | Dynamic color thresholds based on brightness percentage. |
 
@@ -53,9 +53,10 @@ The percentage is divided evenly among icons. With 3 icons:
 
 ::: details More about `min-brightness`
 
-Scrolling or clicking down never drops below this, so a dimmer cannot
-reach a fully dark screen by accident. Use the brightness-toggle action
-to intentionally blackout to 0%.
+Scrolling, clicking or a brightness key bound to `lys-shell brightness`
+never drops below this, so a dimmer cannot reach a fully dark screen by
+accident. Use the brightness-toggle action to intentionally blackout to
+0%.
 
 :::
 
@@ -124,7 +125,7 @@ modules:
     label-color: yellow
     format: '{{ percent }}%'
     label-max-length: 0
-    min-brightness: 1
+    min-brightness: 5
     enable-external: true
     button-bg-color: bg-surface-elevated
     left-click: dropdown:brightness

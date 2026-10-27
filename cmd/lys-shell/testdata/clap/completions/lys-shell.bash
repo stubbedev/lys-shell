@@ -19,6 +19,9 @@ _lys-shell() {
             lys__shell,audio)
                 cmd="lys__shell__audio"
                 ;;
+            lys__shell,brightness)
+                cmd="lys__shell__brightness"
+                ;;
             lys__shell,completions)
                 cmd="lys__shell__completions"
                 ;;
@@ -174,6 +177,9 @@ _lys-shell() {
                 ;;
             lys__shell__help,audio)
                 cmd="lys__shell__help__audio"
+                ;;
+            lys__shell__help,brightness)
+                cmd="lys__shell__help__brightness"
                 ;;
             lys__shell__help,completions)
                 cmd="lys__shell__help__completions"
@@ -1073,7 +1079,7 @@ _lys-shell() {
 
     case "${cmd}" in
         lys__shell)
-            opts="-h -V --help --version audio config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
+            opts="-h -V --help --version audio brightness config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1324,6 +1330,28 @@ _lys-shell() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        lys__shell__brightness)
+            opts="-o -h --output --help <CHANGE>"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --output)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -o)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         lys__shell__completions)
             opts="-h --help bash elvish fish powershell zsh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
@@ -1557,7 +1585,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help)
-            opts="audio config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
+            opts="audio brightness config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1671,6 +1699,20 @@ _lys-shell() {
         lys__shell__help__audio__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__brightness)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi

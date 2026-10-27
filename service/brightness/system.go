@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,10 +33,10 @@ type System struct {
 	bus *dbus.Conn // logind; nil means sysfs writes only
 	ddc *ddcManager
 
-	mu      sync.Mutex
-	subs    map[chan struct{}]struct{}
-	pending map[string]uint32 // latest DDC target per monitor
-	writing map[string]bool   // a writer goroutine owns the monitor
+	mu        sync.Mutex
+	subs      map[chan struct{}]struct{}
+	pending   map[string]uint32 // latest DDC target per monitor
+	requested map[string]uint32 // a writer goroutine owns the monitor; the level it is heading to
 
 	watch  *fswatch.Watcher
 	events ueventReader
@@ -51,11 +52,11 @@ type System struct {
 // degrades (sysfs writes, no hotplug) instead of failing.
 func NewSystem(external bool) *System {
 	s := &System{
-		subs:    map[chan struct{}]struct{}{},
-		pending: map[string]uint32{},
-		writing: map[string]bool{},
-		stop:    make(chan struct{}),
-		settle:  hotplugSettle,
+		subs:      map[chan struct{}]struct{}{},
+		pending:   map[string]uint32{},
+		requested: map[string]uint32{},
+		stop:      make(chan struct{}),
+		settle:    hotplugSettle,
 	}
 	if conn, err := sessionBus(); err == nil {
 		s.bus = conn
@@ -198,18 +199,27 @@ func (s *System) broadcast() {
 }
 
 // Devices reads every sysfs device, then the DDC monitors from their
-// cached levels (a DDC read is too slow to make per refresh).
+// cached levels (a DDC read is too slow to make per refresh), each at
+// the level a queued write is heading to.
 func (s *System) Devices(context.Context) ([]Device, error) {
 	devices := Enumerate()
-	if s.ddc != nil {
-		devices = append(devices, s.ddc.devices()...)
+	if s.ddc == nil {
+		return devices, nil
 	}
-	return devices, nil
+	monitors := s.ddc.devices()
+	s.mu.Lock()
+	for i, d := range monitors {
+		if level, ok := s.requested[d.Name]; ok {
+			monitors[i].Brightness = min(level, d.Max)
+		}
+	}
+	s.mu.Unlock()
+	return append(devices, monitors...), nil
 }
 
-// clampPercent bounds a requested percentage to 0..100.
-func clampPercent(percent float64) float64 {
-	return min(max(percent, 0), 100)
+// rawLevel maps a percentage, clamped to 0..100, onto 0..top.
+func rawLevel(percent float64, top uint32) uint32 {
+	return uint32(math.Round(min(max(percent, 0), 100) / 100 * float64(top)))
 }
 
 // Set applies a clamped percentage. A DDC monitor's write is handed to
@@ -218,10 +228,9 @@ func clampPercent(percent float64) float64 {
 // latest value instead of queueing every step. Write failures are
 // logged, as the Rust caller does with the error it gets back.
 func (s *System) Set(_ context.Context, name string, percent float64) error {
-	fraction := clampPercent(percent) / 100
 	if s.ddc != nil {
 		if d, ok := s.ddc.display(name); ok {
-			s.queueDDC(name, uint32(fraction*float64(d.max)))
+			s.queueDDC(name, rawLevel(percent, d.max))
 			return nil
 		}
 	}
@@ -229,7 +238,7 @@ func (s *System) Set(_ context.Context, name string, percent float64) error {
 	if err != nil {
 		return err
 	}
-	value := uint32(fraction * float64(device.Max))
+	value := rawLevel(percent, device.Max)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.bus != nil {
@@ -240,34 +249,35 @@ func (s *System) Set(_ context.Context, name string, percent float64) error {
 	return writeSysfs(name, value)
 }
 
-// queueDDC records the latest target and starts the monitor's writer
-// if none is running.
+// queueDDC records the latest target, reports it at once, and starts
+// the monitor's writer if none is running. DDC has no kernel
+// notification, so the writer reports again when it settles, which
+// shows the monitor's real level after a failed write.
 func (s *System) queueDDC(name string, value uint32) {
 	s.mu.Lock()
 	s.pending[name] = value
-	if s.writing[name] {
-		s.mu.Unlock()
+	_, running := s.requested[name]
+	s.requested[name] = value
+	s.mu.Unlock()
+	s.broadcast()
+	if running {
 		return
 	}
-	s.writing[name] = true
-	s.mu.Unlock()
 	s.done.Go(func() {
 		for {
 			s.mu.Lock()
 			target, ok := s.pending[name]
 			delete(s.pending, name)
 			if !ok {
-				delete(s.writing, name)
+				delete(s.requested, name)
 				s.mu.Unlock()
+				s.broadcast()
 				return
 			}
 			s.mu.Unlock()
 			if err := s.ddc.setRaw(name, target); err != nil {
 				log.Printf("%v", err)
-				continue
 			}
-			// DDC has no kernel notification; report the new level.
-			s.broadcast()
 		}
 	})
 }

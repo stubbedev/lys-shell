@@ -1,0 +1,10 @@
+Set an output's brightness through its backlight or DDC/CI
+
+Usage: lys-shell brightness [OPTIONS] <CHANGE>
+
+Arguments:
+  <CHANGE>  Percent: N sets, +N raises, -N lowers; never below modules.brightness.min-brightness
+
+Options:
+  -o, --output <NAME>  Output connector name (e.g. DP-1); the focused output when omitted
+  -h, --help           Print help

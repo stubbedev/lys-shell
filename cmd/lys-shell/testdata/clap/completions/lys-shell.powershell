@@ -26,6 +26,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('audio', 'audio', [CompletionResultType]::ParameterValue, 'Audio control commands')
+            [CompletionResult]::new('brightness', 'brightness', [CompletionResultType]::ParameterValue, 'Set an output''s brightness through its backlight or DDC/CI')
             [CompletionResult]::new('config', 'config', [CompletionResultType]::ParameterValue, 'Configuration management commands')
             [CompletionResult]::new('icons', 'icons', [CompletionResultType]::ParameterValue, 'Icon management commands')
             [CompletionResult]::new('media', 'media', [CompletionResultType]::ParameterValue, 'Media player control commands')
@@ -130,6 +131,13 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;audio;help;help' {
+            break
+        }
+        'lys-shell;brightness' {
+            [CompletionResult]::new('-o', '-o', [CompletionResultType]::ParameterName, 'Output connector name (e.g. DP-1); the focused output when omitted')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output connector name (e.g. DP-1); the focused output when omitted')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
         'lys-shell;config' {
@@ -1237,6 +1245,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
         }
         'lys-shell;help' {
             [CompletionResult]::new('audio', 'audio', [CompletionResultType]::ParameterValue, 'Audio control commands')
+            [CompletionResult]::new('brightness', 'brightness', [CompletionResultType]::ParameterValue, 'Set an output''s brightness through its backlight or DDC/CI')
             [CompletionResult]::new('config', 'config', [CompletionResultType]::ParameterValue, 'Configuration management commands')
             [CompletionResult]::new('icons', 'icons', [CompletionResultType]::ParameterValue, 'Icon management commands')
             [CompletionResult]::new('media', 'media', [CompletionResultType]::ParameterValue, 'Media player control commands')
@@ -1289,6 +1298,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;audio;status' {
+            break
+        }
+        'lys-shell;help;brightness' {
             break
         }
         'lys-shell;help;config' {

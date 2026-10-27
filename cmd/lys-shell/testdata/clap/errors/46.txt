@@ -7,6 +7,7 @@ Usage: lys-shell <COMMAND>
 
 Commands:
   audio        Audio control commands
+  brightness   Set an output's brightness through its backlight or DDC/CI
   config       Configuration management commands
   icons        Icon management commands
   media        Media player control commands

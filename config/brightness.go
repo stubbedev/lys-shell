@@ -35,12 +35,14 @@ type BrightnessConfig struct {
 	Format string `cfg:"format"`
 	// Max label characters before truncation with ellipsis. Set to 0 to disable.
 	LabelMaxLength uint32 `cfg:"label-max-length"`
-	// Lower bound (percent) for the native brightness-adjust action.
+	// Lower bound (percent) for the native brightness-adjust action and
+	// `lys-shell brightness`.
 	//
-	// Scrolling or clicking down never drops below this, so a dimmer cannot
-	// reach a fully dark screen by accident. Use the brightness-toggle action
-	// to intentionally blackout to 0%.
-	MinBrightness uint32 `cfg:"min-brightness"`
+	// Scrolling, clicking or a brightness key bound to `lys-shell brightness`
+	// never drops below this, so a dimmer cannot reach a fully dark screen by
+	// accident. Use the brightness-toggle action to intentionally blackout to
+	// 0%.
+	MinBrightness Percentage `cfg:"min-brightness"`
 	// Discover and control external monitors over DDC/CI (I²C).
 	//
 	// External monitors appear as extra sliders in the brightness panel.
@@ -96,7 +98,7 @@ func DefaultsBrightness() BrightnessConfig {
 		LabelColor:     mustColor("yellow"),
 		Format:         "{{ percent }}%",
 		LabelMaxLength: 0,
-		MinBrightness:  1,
+		MinBrightness:  5,
 		EnableExternal: true,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
 		LeftClick:      ParseClickAction("dropdown:brightness"),

@@ -198,7 +198,7 @@ var schemaDocs = map[string]string{
 	"BrightnessConfig.LeftClick":                             "Action on left click. Default opens the brightness dropdown.",
 	"BrightnessConfig.LevelIcons":                            "Icons for brightness levels from low to maximum.\n\nThe percentage is divided evenly among icons. With 3 icons:\n0-33% uses icons\\[0\\], 34-66% uses icons\\[1\\], 67-100% uses icons\\[2\\].",
 	"BrightnessConfig.MiddleClick":                           "Action on middle click.",
-	"BrightnessConfig.MinBrightness":                         "Lower bound (percent) for the native brightness-adjust action.\n\nScrolling or clicking down never drops below this, so a dimmer cannot\nreach a fully dark screen by accident. Use the brightness-toggle action\nto intentionally blackout to 0%.",
+	"BrightnessConfig.MinBrightness":                         "Lower bound (percent) for the native brightness-adjust action and\n`lys-shell brightness`.\n\nScrolling, clicking or a brightness key bound to `lys-shell brightness`\nnever drops below this, so a dimmer cannot reach a fully dark screen by\naccident. Use the brightness-toggle action to intentionally blackout to\n0%.",
 	"BrightnessConfig.RightClick":                            "Action on right click.",
 	"BrightnessConfig.ScrollDown":                            "Action on scroll down. Default lowers brightness by 5%, floored at\n`min-brightness`.",
 	"BrightnessConfig.ScrollUp":                              "Action on scroll up. Default raises brightness by 5%.",

@@ -336,19 +336,35 @@ type fakeLight struct {
 
 func (f *fakeLight) Devices(context.Context) ([]brightness.Device, error) { return f.devices, nil }
 
-func TestBrightnessEventsAverageAndDedupe(t *testing.T) {
-	src := &fakeLight{devices: []brightness.Device{{Brightness: 20, Max: 100}, {Brightness: 60, Max: 100}}}
-	var b brightnessEvents
-	ev, ok := b.next(context.Background(), src)
-	if !ok || ev.percent != 40 || ev.icon != BrightnessIcon || ev.label != "Brightness" {
-		t.Fatalf("first level %+v %v, want the 40%% average", ev, ok)
+func TestBrightnessEventsShowTheDevicesThatMoved(t *testing.T) {
+	panel := func(pct uint32) brightness.Device { return brightness.Device{Name: "panel", Brightness: pct, Max: 100} }
+	monitor := func(pct uint32) brightness.Device {
+		return brightness.Device{Name: "monitor", Brightness: pct, Max: 100}
 	}
-	if _, ok := b.next(context.Background(), src); ok {
-		t.Error("an unchanged average flashed")
+	src := &fakeLight{devices: []brightness.Device{panel(20), monitor(60)}}
+	var b brightnessEvents
+	if ev, ok := b.next(context.Background(), src); ok {
+		t.Fatalf("the seeding read flashed %+v", ev)
+	}
+	src.devices = []brightness.Device{panel(20), monitor(80)}
+	ev, ok := b.next(context.Background(), src)
+	if !ok || ev.percent != 80 || ev.icon != BrightnessIcon || ev.label != "Brightness" {
+		t.Fatalf("one monitor moved: %+v %v, want its 80%%, not the 50%% average", ev, ok)
+	}
+	if ev, ok := b.next(context.Background(), src); ok {
+		t.Errorf("unchanged levels flashed %+v", ev)
+	}
+	src.devices = []brightness.Device{panel(30), monitor(90)}
+	if ev, ok := b.next(context.Background(), src); !ok || ev.percent != 60 {
+		t.Errorf("both moved: %+v %v, want their 60%% average", ev, ok)
+	}
+	src.devices = append(src.devices, brightness.Device{Name: "hotplugged", Brightness: 10, Max: 100})
+	if ev, ok := b.next(context.Background(), src); ok {
+		t.Errorf("a device appearing flashed %+v", ev)
 	}
 	src.devices = nil
-	if _, ok := b.next(context.Background(), src); ok {
-		t.Error("no backlights flashed")
+	if ev, ok := b.next(context.Background(), src); ok {
+		t.Errorf("no backlights flashed %+v", ev)
 	}
 }
 

@@ -4,9 +4,38 @@ import (
 	"bytes"
 	"errors"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+type evenNumber int
+
+func parseEven(raw string) (evenNumber, error) {
+	n, err := strconv.Atoi(raw)
+	if err != nil || n%2 != 0 {
+		return 0, errors.New("not an even number")
+	}
+	return evenNumber(n), nil
+}
+
+func TestFuncParsesIntoItsTypeAndReportsItsError(t *testing.T) {
+	var seen Matches
+	tree := &Command{Name: "tool", Args: []*Arg{{ID: "n", Value: Func(parseEven), Required: true}}, Run: func(m *Matches) error { seen = *m; return nil }}
+	var out, errOut bytes.Buffer
+	if code := Run(tree, []string{"4"}, Output{Stdout: &out, Stderr: &errOut}); code != 0 {
+		t.Fatalf("code %d: %s", code, errOut.String())
+	}
+	if n, ok := Value[evenNumber](&seen, "n"); !ok || n != 4 {
+		t.Errorf("n = %v %v, want 4", n, ok)
+	}
+	errOut.Reset()
+	code := Run(tree, []string{"3"}, Output{Stdout: &out, Stderr: &errOut})
+	want := "error: invalid value '3' for '<N>': not an even number\n\nFor more information, try '--help'.\n"
+	if code != 2 || errOut.String() != want {
+		t.Errorf("odd: code %d stderr %q, want %q", code, errOut.String(), want)
+	}
+}
 
 func TestJaroMatchesStrsim(t *testing.T) {
 	cases := []struct {
