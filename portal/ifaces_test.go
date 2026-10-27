@@ -2,6 +2,7 @@ package portal
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,9 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-shell/secrets/client"
+	"github.com/stubbedev/lys-shell/secrets/keyring"
+	secretservice "github.com/stubbedev/lys-shell/secrets/service"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
@@ -253,10 +257,68 @@ func (r *rig) retrieveSecret(t *testing.T, appID string) (uint32, []byte) {
 	return code, got
 }
 
-func TestSecretIsStablePerApp(t *testing.T) {
+// promptAnswers answers the Secret Service's prompts from a script: a
+// password, or "" to dismiss.
+type promptAnswers struct {
+	mu      sync.Mutex
+	answers []string
+}
+
+func (p *promptAnswers) next() ([]byte, bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.answers) == 0 {
+		return nil, false, nil
+	}
+	a := p.answers[0]
+	p.answers = p.answers[1:]
+	return []byte(a), a != "", nil
+}
+
+func (p *promptAnswers) Password(context.Context, string, bool) ([]byte, bool, error) {
+	return p.next()
+}
+
+func (p *promptAnswers) NewPassword(context.Context, string) ([]byte, bool, error) { return p.next() }
+
+// withKeyring serves a Secret Service on the rig's bus whose login
+// collection is unlocked with "pw".
+func withKeyring(t *testing.T, r *rig) (*secretservice.Service, *promptAnswers) {
+	t.Helper()
+	answers := &promptAnswers{}
+	svc, err := secretservice.Start(r.bus.Conn(t), secretservice.Config{
+		Dir: t.TempDir(), KDF: keyring.KDF{Time: 1, MemKiB: 64, Threads: 1}, Prompter: answers,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(svc.Close)
+	if err := svc.UnlockLogin([]byte("pw")); err != nil {
+		t.Fatal(err)
+	}
+	return svc, answers
+}
+
+// stored reads the app's master secret straight from the Secret Service.
+func stored(t *testing.T, r *rig, appID string) ([]byte, bool) {
+	t.Helper()
+	c, err := client.Open(context.Background(), r.bus.Conn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	v, found, err := c.Lookup(context.Background(), secretAttrs(appID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v, found
+}
+
+func TestSecretIsStablePerAppAndKeptInTheKeyring(t *testing.T) {
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
 	r := newRig(t, nil)
+	withKeyring(t, r)
 	code, first := r.retrieveSecret(t, "org.app")
 	if code != ResponseSuccess || len(first) != secretLen {
 		t.Fatalf("first = %d, %d bytes", code, len(first))
@@ -267,19 +329,51 @@ func TestSecretIsStablePerApp(t *testing.T) {
 	if _, other := r.retrieveSecret(t, "org.other"); bytes.Equal(first, other) {
 		t.Error("two apps share a secret")
 	}
-	path := filepath.Join(data, "lys-shell/portal/secrets/org.app")
-	if st, err := os.Stat(path); err != nil || st.Mode().Perm() != 0o600 {
-		t.Errorf("stored secret mode = %v, %v", st, err)
+	if v, found := stored(t, r, "org.app"); !found || !bytes.Equal(v, first) {
+		t.Error("the secret is not in the keyring")
+	}
+	if _, err := os.Stat(filepath.Join(data, "lys-shell/portal/secrets")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a plain secret file was written: %v", err)
 	}
 }
 
-// A secret file that cannot be read, or reads short (a truncated
-// file), is an error and is left as it is: replacing it would make the
-// app's keyring undecryptable for good.
-func TestSecretNeverReplacesAStoredOne(t *testing.T) {
+// A plain secret file left from before moves into the keyring once, with
+// its value, and is removed.
+func TestSecretMigratesThePlainFile(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	path := filepath.Join(data, "lys-shell/portal/secrets/org.app")
+	old := bytes.Repeat([]byte{7}, secretLen)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, old, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := newRig(t, nil)
+	withKeyring(t, r)
+	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseSuccess || !bytes.Equal(got, old) {
+		t.Fatalf("migrated = %d, %x", code, got)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the plain file survived the migration: %v", err)
+	}
+	if v, found := stored(t, r, "org.app"); !found || !bytes.Equal(v, old) {
+		t.Error("the migrated secret is not in the keyring")
+	}
+	if _, got := r.retrieveSecret(t, "org.app"); !bytes.Equal(got, old) {
+		t.Error("the secret changed after the migration")
+	}
+}
+
+// A plain file that cannot be read, or reads short (a truncated file),
+// is an error and is left as it is: replacing it would make the app's
+// keyring undecryptable for good.
+func TestSecretNeverReplacesABrokenPlainFile(t *testing.T) {
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
 	r := newRig(t, nil)
+	withKeyring(t, r)
 	path := filepath.Join(data, "lys-shell/portal/secrets/org.app")
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
@@ -293,43 +387,33 @@ func TestSecretNeverReplacesAStoredOne(t *testing.T) {
 	if got, _ := os.ReadFile(path); string(got) != "short" {
 		t.Errorf("the short secret was replaced with %d bytes", len(got))
 	}
+	if _, found := stored(t, r, "org.app"); found {
+		t.Error("a secret was stored in place of the broken file")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("root reads a 0000 file")
 	}
-	full := bytes.Repeat([]byte{7}, secretLen)
-	if err := os.WriteFile(path, full, 0o600); err != nil {
+	if err := os.WriteFile(path, bytes.Repeat([]byte{7}, secretLen), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(path, 0o000); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
 	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
 		t.Errorf("an unreadable secret = %d, %d bytes; want other and nothing", code, len(got))
 	}
-	if err := os.Chmod(path, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got, _ := os.ReadFile(path); !bytes.Equal(got, full) {
-		t.Error("the unreadable secret was replaced")
-	}
 }
 
-// Concurrent first uses agree on one secret, and a write that fails
-// leaves no file behind to be read as a secret later.
-func TestSecretCreationIsAtomic(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
-	dir := filepath.Join(data, "lys-shell/portal/secrets")
+// Concurrent first uses agree on one secret.
+func TestSecretCreationAgreesUnderConcurrency(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	r := newRig(t, nil)
+	withKeyring(t, r)
 	got := make([][]byte, 8)
 	var wg sync.WaitGroup
 	for i := range got {
-		wg.Go(func() {
-			v, err := loadOrCreateSecret("org.app")
-			if err != nil {
-				t.Error(err)
-			}
-			got[i] = v
-		})
+		wg.Go(func() { _, got[i] = r.retrieveSecret(t, "org.app") })
 	}
 	wg.Wait()
 	for i, v := range got {
@@ -337,33 +421,53 @@ func TestSecretCreationIsAtomic(t *testing.T) {
 			t.Fatalf("call %d got a different secret", i)
 		}
 	}
-	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
-		t.Errorf("%d entries in the secrets dir, want the secret alone", len(entries))
+}
+
+// A locked keyring is unlocked through the provider's prompt; a
+// dismissed prompt fails the request and hands out nothing.
+func TestSecretUnlocksTheKeyringThroughItsPrompt(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	r := newRig(t, nil)
+	svc, answers := withKeyring(t, r)
+	_, first := r.retrieveSecret(t, "org.app")
+	svc.Lock()
+	answers.mu.Lock()
+	answers.answers = []string{""}
+	answers.mu.Unlock()
+	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
+		t.Errorf("dismissed unlock = %d, %d bytes", code, len(got))
 	}
-	if os.Geteuid() == 0 {
-		t.Skip("root writes into a read-only dir")
+	answers.mu.Lock()
+	answers.answers = []string{"pw"}
+	answers.mu.Unlock()
+	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseSuccess || !bytes.Equal(got, first) {
+		t.Errorf("unlocked = %d, same secret %v", code, bytes.Equal(got, first))
 	}
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Fatal(err)
+}
+
+// Without a Secret Service the request fails; nothing is written in the
+// clear instead.
+func TestSecretFailsWithoutAKeyring(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	r := newRig(t, nil)
+	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
+		t.Errorf("no keyring = %d, %d bytes", code, len(got))
 	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
-	if _, err := loadOrCreateSecret("org.other"); err == nil {
-		t.Error("a secret was handed out though it could not be stored")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "org.other")); !errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("a failed write left a file: %v", err)
+	if _, err := os.Stat(filepath.Join(data, "lys-shell/portal/secrets")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a plain secret file was written: %v", err)
 	}
 }
 
 func TestSecretRefusesAnAppWithoutAnID(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	r := newRig(t, nil)
+	withKeyring(t, r)
 	if code, got := r.retrieveSecret(t, ""); code != ResponseOther || len(got) != 0 {
 		t.Errorf("no app id = %d, %d bytes", code, len(got))
 	}
-	if _, err := os.Stat(filepath.Join(data, "lys-shell/portal/secrets/_")); !errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("a shared host secret was stored: %v", err)
+	if _, found := stored(t, r, ""); found {
+		t.Error("a shared host secret was stored")
 	}
 }
 
@@ -372,6 +476,7 @@ func TestSecretFailsWithoutAHome(t *testing.T) {
 	t.Setenv("HOME", "")
 	_ = os.Unsetenv("HOME")
 	r := newRig(t, nil)
+	withKeyring(t, r)
 	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
 		t.Errorf("no home = %d, %d bytes", code, len(got))
 	}
