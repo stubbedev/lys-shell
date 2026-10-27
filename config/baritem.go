@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"log"
 	"slices"
 	"strings"
 )
@@ -173,7 +174,6 @@ const (
 	ModuleCPU                BarModule = "cpu"
 	ModuleDashboard          BarModule = "dashboard"
 	ModuleHyprlandWorkspaces BarModule = "hyprland-workspaces"
-	ModuleHyprsunset         BarModule = "hyprsunset"
 	ModuleIdleInhibit        BarModule = "idle-inhibit"
 	ModuleKeybindMode        BarModule = "keybind-mode"
 	ModuleKeyboardInput      BarModule = "keyboard-input"
@@ -184,6 +184,7 @@ const (
 	ModuleMicrophone         BarModule = "microphone"
 	ModuleNetstat            BarModule = "netstat"
 	ModuleNetwork            BarModule = "network"
+	ModuleNightlight         BarModule = "nightlight"
 	ModuleNiriWorkspaces     BarModule = "niri-workspaces"
 	ModuleNotifications      BarModule = "notifications"
 	ModulePower              BarModule = "power"
@@ -206,14 +207,20 @@ const (
 // BuiltinModules is the built-in module list in schema order.
 var BuiltinModules = []BarModule{
 	ModuleBattery, ModuleBitwarden, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
-	ModuleCPU, ModuleDashboard, ModuleHyprlandWorkspaces, ModuleHyprsunset,
+	ModuleCPU, ModuleDashboard, ModuleHyprlandWorkspaces,
 	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleLysWMWorkspaces, ModuleMail,
 	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleNetstat,
-	ModuleNetwork, ModuleNiriWorkspaces, ModuleNotifications, ModulePower,
+	ModuleNetwork, ModuleNightlight, ModuleNiriWorkspaces, ModuleNotifications, ModulePower,
 	ModulePowerProfiles, ModuleRAM, ModuleRecorder, ModuleScreenshot,
 	ModuleSeparator, ModuleStorage, ModuleSwayWorkspaces, ModuleSystray,
 	ModuleTreeman, ModuleUpdates, ModuleVolume, ModuleWeather,
 	ModuleWindowTitle, ModuleWorldClock,
+}
+
+// renamedModules maps a module's former layout name to its current one;
+// a layout naming the old one still loads, with a warning.
+var renamedModules = map[string]BarModule{
+	"hyprsunset": ModuleNightlight,
 }
 
 const customModulePrefix = "custom-"
@@ -235,6 +242,11 @@ func (m *BarModule) UnmarshalConfig(v any) error {
 			return errors.New("custom module ID cannot be empty")
 		}
 		*m = BarModule(s)
+		return nil
+	}
+	if renamed, ok := renamedModules[s]; ok {
+		log.Printf("config: bar module %q was renamed to %q; update the bar layout", s, renamed)
+		*m = renamed
 		return nil
 	}
 	if !slices.Contains(BuiltinModules, BarModule(s)) {

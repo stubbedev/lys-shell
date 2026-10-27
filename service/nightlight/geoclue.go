@@ -1,4 +1,4 @@
-package hyprsunset
+package nightlight
 
 import (
 	"context"

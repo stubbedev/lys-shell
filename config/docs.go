@@ -154,7 +154,7 @@ func docSpecs() []docSpec {
 		m("cpu", bar, func(c *Config) any { return &c.CPU }),
 		m("dashboard", bar, func(c *Config) any { return &c.Dashboard }),
 		m("hyprland-workspaces", docStandard, func(c *Config) any { return &c.HyprlandWorkspaces }),
-		m("hyprsunset", bar, func(c *Config) any { return &c.Hyprsunset }),
+		m("nightlight", bar, func(c *Config) any { return &c.Nightlight }),
 		m("idle-inhibit", bar, func(c *Config) any { return &c.IdleInhibit }),
 		m("keybind-mode", bar, func(c *Config) any { return &c.KeybindMode }),
 		m("keyboard-input", bar, func(c *Config) any { return &c.KeyboardInput }),

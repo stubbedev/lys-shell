@@ -1,4 +1,4 @@
-package hyprsunset
+package nightlight
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 )
 
 // overrideFile is the record's name inside the lys-shell state dir.
-const overrideFile = "hyprsunset-override"
+const overrideFile = "nightlight-override"
 
 // overrideMaxAge discards records old enough to span a whole day/night
 // cycle (persist.rs MAX_AGE).

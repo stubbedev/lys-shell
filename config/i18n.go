@@ -24,7 +24,7 @@ var i18nPrefixes = map[string]string{
 	"GeneralConfig":             "settings-general",
 	"GreeterConfig":             "settings-greeter",
 	"HyprlandWorkspacesConfig":  "settings-modules-hyprland-workspaces",
-	"HyprsunsetConfig":          "settings-modules-hyprsunset",
+	"NightlightConfig":          "settings-modules-nightlight",
 	"IdleInhibitConfig":         "settings-modules-idle-inhibit",
 	"KeybindModeConfig":         "settings-modules-keybind-mode",
 	"KeyboardInputConfig":       "settings-modules-keyboard-input",

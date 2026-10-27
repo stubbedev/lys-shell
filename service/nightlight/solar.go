@@ -1,9 +1,9 @@
-// Package hyprsunset is the hyprsunset module's service side: the
-// blue-light filter process and its control socket, the sunrise/sunset
-// schedule (NOAA sunrise equation, no network), the GeoClue location
-// lookup, and the manual-override record that survives restarts
-// (crates/wayle-bar-workspaces/src/modules/hyprsunset).
-package hyprsunset
+// Package nightlight is the night light module's service side: the
+// colour filter it applies through the compositor's CTM or gamma
+// protocol, the sunrise/sunset schedule (NOAA sunrise equation, no
+// network), the GeoClue location lookup, and the manual-override record
+// that survives restarts.
+package nightlight
 
 import (
 	"math"

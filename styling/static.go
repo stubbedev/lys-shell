@@ -41,6 +41,7 @@ var sheetOrder = []string{
 	"modules/cava.css",
 	"modules/launcher.css",
 	"modules/lock.css",
+	"modules/nightlight.css",
 	"modules/notification_popup/content.css",
 	"modules/notification_popup/index.css",
 	"modules/osd/index.css",

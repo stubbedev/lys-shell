@@ -8,8 +8,8 @@
 # every output with its exclusive zone, the launcher and popup layers
 # coming and going, the OSD and popups on the configured output, the
 # portal's answers - screenshot, colour pick, a global shortcut bound
-# and activated through the compositor - the hyprsunset filter started
-# from the bar, the session lock taking the outputs and releasing them
+# and activated through the compositor - the night light applied
+# from the bar through hyprland-ctm-control, the session lock taking the outputs and releasing them
 # on a typed password, the lock surviving a shell restart) and leaves a
 # screenshot of every state in the result for review.
 #
@@ -85,7 +85,7 @@ let
           "keybind-mode"
           "keyboard-input"
           "notifications"
-          "hyprsunset"
+          "nightlight"
         ];
       }
     ];
@@ -171,7 +171,6 @@ pkgs.testers.nixosTest {
         vmclick
         pkgs.hyprland
         pkgs.foot
-        pkgs.hyprsunset
         pkgs.libnotify
         pkgs.dbus
       ];
@@ -413,23 +412,23 @@ pkgs.testers.nixosTest {
     hypr(f"dispatch global {listed[0]}")
     wait("the shortcut's activation", lambda: machine.execute("grep -q activated /tmp/lys/shortcuts.json")[0] == 0, tries=30)
 
-    # The hyprsunset module, the bar's last, starts the filter on a click
-    # and stops it on the next.
-    def sunset_running():
-        return machine.execute("pgrep -x hyprsunset")[0] == 0
-
-    if sunset_running():
-        raise Exception("hyprsunset runs before the bar started it")
-    click(1262, 22)
-    wait("hyprsunset started from the bar", sunset_running, tries=30)
-    wait("hyprsunset's socket", lambda: machine.execute(f"ls ${runtimeDir}/hypr/{sig}/.hyprsunset.sock")[0] == 0, tries=30)
-    machine.screenshot("06h-hyprsunset-on")
-    click(1262, 22)
-    wait("hyprsunset stopped from the bar", lambda: not sunset_running(), tries=30)
-
-    # The session lock covers every output and a typed password lifts it.
     def logged(log, line):
         return line in machine.execute(f"cat /tmp/lys/{log}.log")[1]
+
+    # The night light, the bar's last module, warms the outputs through
+    # the compositor's CTM protocol on a click, with no hyprsunset
+    # installed, and returns them to normal on the next.
+    if machine.execute("command -v hyprsunset")[0] == 0:
+        raise Exception("hyprsunset is installed; the night light must not need it")
+    click(1262, 22)
+    wait("the night light on", lambda: logged("shell", "nightlight: on at 5000K 100% through hyprland_ctm_control_manager_v1"), tries=30)
+    machine.screenshot("06h-nightlight-on")
+    click(1262, 22)
+    wait("the night light off", lambda: logged("shell", "nightlight: off"), tries=30)
+    if logged("shell", "another program controls the display colours"):
+        raise Exception("the compositor refused the night light")
+
+    # The session lock covers every output and a typed password lifts it.
 
     def count(log, line):
         return machine.execute(f"cat /tmp/lys/{log}.log")[1].count(line)

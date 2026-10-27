@@ -1,21 +1,21 @@
 ---
-title: hyprsunset
+title: nightlight
 outline: [2, 3]
 ---
 
-# hyprsunset
+# nightlight
 
 <div v-pre>
 
-Toggle for Hyprland's blue-light filter.
+Night light: warms the display colours, by hand or on a sunrise/sunset schedule.
 
-Add it to your layout with `hyprsunset`:
+Add it to your layout with `nightlight`:
 
 ```yaml
 bar:
   layout:
     - monitor: "*"
-      right: [hyprsunset]
+      right: [nightlight]
 ```
 
 ## General
@@ -85,7 +85,7 @@ sunset, after which the schedule resumes.
 
 ```yaml
 modules:
-  hyprsunset:
+  nightlight:
     format: '{{ status }}'
     temperature: 5000
     gamma: 100

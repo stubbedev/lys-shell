@@ -73,10 +73,10 @@ func (c PowerProfilesConfig) Colors() map[string]ColorValue {
 	}
 }
 
-// IconOnView is the hyprsunset icon while the filter runs.
-func (c HyprsunsetConfig) IconOnView() IconConfig { return IconWith(c.IconShow, c.IconOn, c.IconColor) }
+// IconOnView is the nightlight icon while the filter runs.
+func (c NightlightConfig) IconOnView() IconConfig { return IconWith(c.IconShow, c.IconOn, c.IconColor) }
 
-// IconOffView is the hyprsunset icon while the filter is off.
-func (c HyprsunsetConfig) IconOffView() IconConfig {
+// IconOffView is the nightlight icon while the filter is off.
+func (c NightlightConfig) IconOffView() IconConfig {
 	return IconWith(c.IconShow, c.IconOff, c.IconColor)
 }

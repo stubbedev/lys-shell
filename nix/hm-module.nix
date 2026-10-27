@@ -72,7 +72,7 @@ in
         (theme-provider tools like matugen/wallust/pywal, wl-clipboard and
         xdg-utils, plus notmuch when the `mail` module is in the layout).
         System-level dependencies (NetworkManager, bluez, upower,
-        power-profiles-daemon, GeoClue for the hyprsunset auto-schedule,
+        power-profiles-daemon, GeoClue for the night light auto-schedule,
         pipewire/wireplumber) are not installed by home-manager — enable those
         at the NixOS level.
       '';

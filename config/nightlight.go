@@ -1,9 +1,11 @@
 package config
 
-// HyprsunsetConfig is ported from crates/wayle-config/src/schemas/modules/hyprsunset/mod.rs.
+// NightlightConfig is the night light: a blue-light filter lys-shell
+// applies itself, through the compositor's colour transform matrix
+// (hyprland-ctm-control-v1) or gamma ramps (wlr-gamma-control-v1).
 //
-// Toggle for Hyprland's blue-light filter.
-type HyprsunsetConfig struct {
+// Night light: warms the display colours, by hand or on a sunrise/sunset schedule.
+type NightlightConfig struct {
 	// Format string for the label.
 	//
 	// ## Placeholders
@@ -71,9 +73,9 @@ type HyprsunsetConfig struct {
 	ScrollDown ClickAction `cfg:"scroll-down"`
 }
 
-// DefaultsHyprsunset returns the schema defaults.
-func DefaultsHyprsunset() HyprsunsetConfig {
-	return HyprsunsetConfig{
+// DefaultsNightlight returns the schema defaults.
+func DefaultsNightlight() NightlightConfig {
+	return NightlightConfig{
 		Format:         "{{ status }}",
 		Temperature:    5000,
 		Gamma:          100,
@@ -100,6 +102,6 @@ func DefaultsHyprsunset() HyprsunsetConfig {
 }
 
 // Clicks returns the five input bindings.
-func (c HyprsunsetConfig) Clicks() ClickConfig {
+func (c NightlightConfig) Clicks() ClickConfig {
 	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

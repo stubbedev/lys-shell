@@ -35,9 +35,9 @@ bar-recorder-paused = Paused
 ## Keybind Mode
 bar-keybind-mode-default = default
 
-## Hyprsunset
-bar-hyprsunset-on = On
-bar-hyprsunset-off = Off
+## Night light
+bar-nightlight-on = On
+bar-nightlight-off = Off
 
 ## Storage
 bar-storage-multiple = Multiple

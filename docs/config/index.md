@@ -50,7 +50,6 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 | [`dashboard`](/config/modules/dashboard) | Quick-access button with a distro icon; opens the dashboard dropdown. |
 | [`dropdown-dashboard-user-session`](/config/modules/dropdown-dashboard-user-session) | Settings for user session the in dashboard |
 | [`hyprland-workspaces`](/config/modules/hyprland-workspaces) | Hyprland workspace indicators with click-to-switch. |
-| [`hyprsunset`](/config/modules/hyprsunset) | Toggle for Hyprland's blue-light filter. |
 | [`idle-inhibit`](/config/modules/idle-inhibit) | Toggle that prevents screen dim, lock, and suspend while active. |
 | [`keybind-mode`](/config/modules/keybind-mode) | Current keybind-mode indicator for modal compositors. |
 | [`keyboard-input`](/config/modules/keyboard-input) | Active keyboard layout indicator. |
@@ -61,6 +60,7 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 | [`microphone`](/config/modules/microphone) | Microphone input level and mute toggle. |
 | [`netstat`](/config/modules/netstat) | Network traffic counters (up/down rates). |
 | [`network`](/config/modules/network) | Network connection status with a dropdown for switching connections. |
+| [`nightlight`](/config/modules/nightlight) | Night light: warms the display colours, by hand or on a sunrise/sunset schedule. |
 | [`niri-workspaces`](/config/modules/niri-workspaces) | Niri workspace indicators with click-to-switch. |
 | [`notifications`](/config/modules/notifications) | Notification center: icon in the bar, dropdown with history, DND toggle. |
 | [`power`](/config/modules/power) | Shutdown, reboot, and logout menu. |

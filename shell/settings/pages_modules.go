@@ -16,7 +16,7 @@ func modulePages(cfg *config.Config) []pageSpec {
 		customPage(cfg),
 		dashboardPage(cfg),
 		hyprlandWorkspacesPage(cfg),
-		hyprsunsetPage(cfg),
+		nightlightPage(cfg),
 		idleInhibitPage(cfg),
 		keybindModePage(cfg),
 		keyboardInputPage(cfg),
@@ -228,24 +228,24 @@ func dashboardPage(*config.Config) pageSpec {
 	}}
 }
 
-// hyprsunsetPage is pages/modules/hyprsunset.
-func hyprsunsetPage(*config.Config) pageSpec {
-	return pageSpec{id: "hyprsunset", navKey: "settings-nav-hyprsunset", icon: "ld-sun-symbolic", header: "settings-page-hyprsunset", sections: []sectionSpec{
+// nightlightPage is pages/modules/nightlight.
+func nightlightPage(*config.Config) pageSpec {
+	return pageSpec{id: "nightlight", navKey: "settings-nav-nightlight", icon: "ld-sun-symbolic", header: "settings-page-nightlight", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
-			field("modules.hyprsunset.format"),
-			field("modules.hyprsunset.temperature"),
-			field("modules.hyprsunset.gamma"),
-			field("modules.hyprsunset.icon-off", iconRow),
-			field("modules.hyprsunset.icon-on", iconRow),
+			field("modules.nightlight.format"),
+			field("modules.nightlight.temperature"),
+			field("modules.nightlight.gamma"),
+			field("modules.nightlight.icon-off", iconRow),
+			field("modules.nightlight.icon-on", iconRow),
 		}},
-		{title: "settings-section-hyprsunset-schedule", rows: []rowSpec{
-			field("modules.hyprsunset.auto-schedule"),
-			field("modules.hyprsunset.latitude", spin(-90.0, 90.0, 0.1, 4)),
-			field("modules.hyprsunset.longitude", spin(-180.0, 180.0, 0.1, 4)),
+		{title: "settings-section-nightlight-schedule", rows: []rowSpec{
+			field("modules.nightlight.auto-schedule"),
+			field("modules.nightlight.latitude", spin(-90.0, 90.0, 0.1, 4)),
+			field("modules.nightlight.longitude", spin(-180.0, 180.0, 0.1, 4)),
 		}},
-		barDisplaySection("modules.hyprsunset"),
-		colorsSection("modules.hyprsunset"),
-		actionsSection("modules.hyprsunset", actionChoices("hyprsunset")),
+		barDisplaySection("modules.nightlight"),
+		colorsSection("modules.nightlight"),
+		actionsSection("modules.nightlight", actionChoices("nightlight")),
 	}}
 }
 

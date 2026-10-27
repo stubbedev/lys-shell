@@ -190,7 +190,7 @@ func actionChoices(module string) []actionChoice {
 		return []actionChoice{dropdown("Open calendar", "calendar"), dropdown("Open weather panel", "weather")}
 	case "world-clock":
 		return []actionChoice{dropdown("Open calendar", "calendar")}
-	case "hyprsunset":
+	case "nightlight":
 		return []actionChoice{shell("Toggle night light", ":toggle")}
 	case "power-profiles":
 		return []actionChoice{shell("Cycle profile", ":cycle")}

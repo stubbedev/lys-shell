@@ -24,8 +24,8 @@ type ModulesConfig struct {
 	Dashboard DashboardConfig `cfg:"dashboard"`
 	// Hyprland workspace switcher module.
 	HyprlandWorkspaces HyprlandWorkspacesConfig `cfg:"hyprland-workspaces"`
-	// Hyprsunset (blue light filter) module.
-	Hyprsunset HyprsunsetConfig `cfg:"hyprsunset"`
+	// Night light (blue light filter) module.
+	Nightlight NightlightConfig `cfg:"nightlight,deprecated=hyprsunset"`
 	// Idle inhibitor module.
 	IdleInhibit IdleInhibitConfig `cfg:"idle-inhibit"`
 	// Keybind mode indicator module.
@@ -135,7 +135,7 @@ func DefaultsModules() ModulesConfig {
 		CPU:                DefaultsCpu(),
 		Dashboard:          DefaultsDashboard(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
-		Hyprsunset:         DefaultsHyprsunset(),
+		Nightlight:         DefaultsNightlight(),
 		IdleInhibit:        DefaultsIdleInhibit(),
 		KeybindMode:        DefaultsKeybindMode(),
 		KeyboardInput:      DefaultsKeyboardInput(),

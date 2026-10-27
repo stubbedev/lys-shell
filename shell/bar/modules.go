@@ -237,7 +237,7 @@ var factories = map[string]Factory{
 	"dashboard":           newDashboard,
 	"keybind-mode":        newKeybindMode,
 	"power-profiles":      newPowerProfiles,
-	"hyprsunset":          newHyprsunset,
+	"nightlight":          newNightlight,
 	"idle-inhibit":        newIdleInhibit,
 	"treeman":             newTreeman,
 	"notifications":       newNotification,

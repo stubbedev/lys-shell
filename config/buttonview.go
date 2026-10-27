@@ -171,7 +171,7 @@ var moduleAutoIconColors = map[string]CssToken{
 	"brightness":     TokenYellow,
 	"cpu":            TokenBlue,
 	"dashboard":      TokenYellow,
-	"hyprsunset":     TokenYellow,
+	"nightlight":     TokenYellow,
 	"idle-inhibit":   TokenGreen,
 	"keybind-mode":   TokenBlue,
 	"keyboard-input": TokenYellow,

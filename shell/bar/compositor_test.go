@@ -48,29 +48,12 @@ func TestRequireCompositorNamesBothSides(t *testing.T) {
 	if err := requireCompositor("sway-workspaces", compositorSway); err != nil {
 		t.Errorf("sway under sway: %v", err)
 	}
-	err := requireCompositor("hyprsunset", compositorHyprland)
+	err := requireCompositor("niri-workspaces", compositorNiri)
 	if err == nil {
-		t.Fatal("hyprsunset under sway: want an error")
+		t.Fatal("niri-workspaces under sway: want an error")
 	}
-	if msg := err.Error(); !strings.Contains(msg, "hyprsunset") || !strings.Contains(msg, "Hyprland") || !strings.Contains(msg, "sway") {
+	if msg := err.Error(); !strings.Contains(msg, "niri-workspaces") || !strings.Contains(msg, "requires niri") || !strings.Contains(msg, "sway") {
 		t.Errorf("error %q, want the module, the wanted and the running compositor", msg)
-	}
-}
-
-// hyprsunset is Hyprland-only (factory.rs require_hyprland): it is not
-// built under sway, where the Rust bar skips it.
-func TestHyprsunsetRequiresHyprland(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	ctx := newTestContext(t, config.Defaults())
-
-	advertise(t, "SWAYSOCK")
-	if _, err := Create("hyprsunset", ctx); err == nil {
-		t.Error("hyprsunset under sway: want an error, got a module")
-	}
-
-	advertise(t, "HYPRLAND_INSTANCE_SIGNATURE")
-	if _, err := Create("hyprsunset", ctx); err != nil {
-		t.Errorf("hyprsunset under Hyprland: %v", err)
 	}
 }
 

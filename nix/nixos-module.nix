@@ -116,7 +116,7 @@ in
       default = false;
       description = ''
         Enable the backing system services lys-shell integrates with: UPower
-        (battery), BlueZ (bluetooth), and GeoClue (location for the hyprsunset
+        (battery), BlueZ (bluetooth), and GeoClue (location for the night light
         auto-schedule), plus wl-clipboard and xdg-utils. Set with `mkDefault` so
         your own settings win. Networking (NetworkManager),
         power-profiles-daemon, and PipeWire are intentionally left out — enable
@@ -408,7 +408,7 @@ in
       services.upower.enable = lib.mkDefault true;
       hardware.bluetooth.enable = lib.mkDefault true;
 
-      # GeoClue backs the hyprsunset auto-schedule's location lookup. The
+      # GeoClue backs the night light auto-schedule's location lookup. The
       # appConfig entry whitelists lys-shell (DesktopId "lys-shell") so the daemon
       # serves it without an agent prompt; isSystem skips the per-user agent.
       # If GeoClue is unavailable the schedule falls back to the configured

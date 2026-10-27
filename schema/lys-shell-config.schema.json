@@ -821,7 +821,6 @@
             "cpu",
             "dashboard",
             "hyprland-workspaces",
-            "hyprsunset",
             "idle-inhibit",
             "keybind-mode",
             "keyboard-input",
@@ -832,6 +831,7 @@
             "microphone",
             "netstat",
             "network",
+            "nightlight",
             "niri-workspaces",
             "notifications",
             "power",
@@ -2917,122 +2917,6 @@
           "$ref": "#/$defs/Size",
           "default": 0.5,
           "description": "Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `\"8px\"`).\n\nFor horizontal bars, controls horizontal (left/right) padding.\nFor vertical bars, controls vertical (top/bottom) padding."
-        }
-      },
-      "type": "object"
-    },
-    "HyprsunsetConfig": {
-      "description": "Toggle for Hyprland's blue-light filter.",
-      "properties": {
-        "auto-schedule": {
-          "$ref": "#/$defs/boolean",
-          "default": false,
-          "description": "Automatically enable the filter at night and disable it during the day,\nbased on local sunrise/sunset computed from `latitude`/`longitude`.\n\nWhile enabled, the module drives the filter on the solar schedule. A\nmanual click toggles an override that lasts until the next sunrise or\nsunset, after which the schedule resumes."
-        },
-        "border-color": {
-          "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
-          "description": "Border color token."
-        },
-        "border-show": {
-          "$ref": "#/$defs/boolean",
-          "default": false,
-          "description": "Display border around button."
-        },
-        "button-bg-color": {
-          "$ref": "#/$defs/ColorValue",
-          "default": "bg-surface-elevated",
-          "description": "Button background color token."
-        },
-        "format": {
-          "$ref": "#/$defs/string",
-          "default": "{{ status }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ status }}` - Filter status text (On, Off)\n- `{{ temp }}` - Current temperature in Kelvin (shows \"--\" when disabled)\n- `{{ gamma }}` - Current gamma percentage (shows \"--\" when disabled)\n- `{{ config_temp }}` - Configured temperature (always available)\n- `{{ config_gamma }}` - Configured gamma (always available)\n\n## Examples\n\n- `\"{{ status }}\"` - \"On\"\n- `\"{{ temp }}K {{ gamma }}%\"` - \"4500K 80%\"\n- `\"{{ status }} ({{ temp }}K)\"` - \"On (4500K)\""
-        },
-        "gamma": {
-          "$ref": "#/$defs/uint32",
-          "default": 100,
-          "description": "Display gamma percentage when filter is enabled. Range: 0-200."
-        },
-        "icon-bg-color": {
-          "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
-          "description": "Icon container background color token."
-        },
-        "icon-color": {
-          "$ref": "#/$defs/ColorValue",
-          "default": "auto",
-          "description": "Icon foreground color. Auto selects based on variant for contrast."
-        },
-        "icon-off": {
-          "$ref": "#/$defs/string",
-          "default": "ld-sun-symbolic",
-          "description": "Icon when filter is disabled (showing normal daylight colors)."
-        },
-        "icon-on": {
-          "$ref": "#/$defs/string",
-          "default": "ld-moon-symbolic",
-          "description": "Icon when filter is enabled (showing warm night colors)."
-        },
-        "icon-show": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Display module icon."
-        },
-        "label-color": {
-          "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
-          "description": "Label text color token."
-        },
-        "label-max-length": {
-          "$ref": "#/$defs/uint32",
-          "default": 0,
-          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
-        },
-        "label-show": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Display label."
-        },
-        "latitude": {
-          "$ref": "#/$defs/double",
-          "default": 0.0,
-          "description": "Latitude for the sunrise/sunset schedule, in decimal degrees\n(north positive). Range: -90 to 90. Only used when `auto-schedule` is on."
-        },
-        "left-click": {
-          "$ref": "#/$defs/ClickAction",
-          "default": ":toggle",
-          "description": "Action on left click. Default toggles blue light filter."
-        },
-        "longitude": {
-          "$ref": "#/$defs/double",
-          "default": 0.0,
-          "description": "Longitude for the sunrise/sunset schedule, in decimal degrees\n(east positive). Range: -180 to 180. Only used when `auto-schedule` is on."
-        },
-        "middle-click": {
-          "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on middle click."
-        },
-        "right-click": {
-          "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on right click."
-        },
-        "scroll-down": {
-          "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on scroll down."
-        },
-        "scroll-up": {
-          "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on scroll up."
-        },
-        "temperature": {
-          "$ref": "#/$defs/uint32",
-          "default": 5000,
-          "description": "Color temperature in Kelvin when filter is enabled. Range: 1000-20000."
         }
       },
       "type": "object"
@@ -5268,34 +5152,6 @@
           },
           "description": "Hyprland workspace switcher module."
         },
-        "hyprsunset": {
-          "$ref": "#/$defs/HyprsunsetConfig",
-          "default": {
-            "auto-schedule": false,
-            "border-color": "yellow",
-            "border-show": false,
-            "button-bg-color": "bg-surface-elevated",
-            "format": "{{ status }}",
-            "gamma": 100,
-            "icon-bg-color": "yellow",
-            "icon-color": "auto",
-            "icon-off": "ld-sun-symbolic",
-            "icon-on": "ld-moon-symbolic",
-            "icon-show": true,
-            "label-color": "yellow",
-            "label-max-length": 0,
-            "label-show": true,
-            "latitude": 0.0,
-            "left-click": ":toggle",
-            "longitude": 0.0,
-            "middle-click": "",
-            "right-click": "",
-            "scroll-down": "",
-            "scroll-up": "",
-            "temperature": 5000
-          },
-          "description": "Hyprsunset (blue light filter) module."
-        },
         "idle-inhibit": {
           "$ref": "#/$defs/IdleInhibitConfig",
           "default": {
@@ -5572,6 +5428,34 @@
             "wired-disconnected-icon": "ld-unplug-symbolic"
           },
           "description": "Network connection module."
+        },
+        "nightlight": {
+          "$ref": "#/$defs/NightlightConfig",
+          "default": {
+            "auto-schedule": false,
+            "border-color": "yellow",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "format": "{{ status }}",
+            "gamma": 100,
+            "icon-bg-color": "yellow",
+            "icon-color": "auto",
+            "icon-off": "ld-sun-symbolic",
+            "icon-on": "ld-moon-symbolic",
+            "icon-show": true,
+            "label-color": "yellow",
+            "label-max-length": 0,
+            "label-show": true,
+            "latitude": 0.0,
+            "left-click": ":toggle",
+            "longitude": 0.0,
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": "",
+            "temperature": 5000
+          },
+          "description": "Night light (blue light filter) module."
         },
         "niri-workspaces": {
           "$ref": "#/$defs/NiriWorkspacesConfig",
@@ -6265,6 +6149,122 @@
           "$ref": "#/$defs/string",
           "default": "ld-unplug-symbolic",
           "description": "Wired icon when disconnected."
+        }
+      },
+      "type": "object"
+    },
+    "NightlightConfig": {
+      "description": "Night light: warms the display colours, by hand or on a sunrise/sunset schedule.",
+      "properties": {
+        "auto-schedule": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Automatically enable the filter at night and disable it during the day,\nbased on local sunrise/sunset computed from `latitude`/`longitude`.\n\nWhile enabled, the module drives the filter on the solar schedule. A\nmanual click toggles an override that lasts until the next sunrise or\nsunset, after which the schedule resumes."
+        },
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "yellow",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ status }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ status }}` - Filter status text (On, Off)\n- `{{ temp }}` - Current temperature in Kelvin (shows \"--\" when disabled)\n- `{{ gamma }}` - Current gamma percentage (shows \"--\" when disabled)\n- `{{ config_temp }}` - Configured temperature (always available)\n- `{{ config_gamma }}` - Configured gamma (always available)\n\n## Examples\n\n- `\"{{ status }}\"` - \"On\"\n- `\"{{ temp }}K {{ gamma }}%\"` - \"4500K 80%\"\n- `\"{{ status }} ({{ temp }}K)\"` - \"On (4500K)\""
+        },
+        "gamma": {
+          "$ref": "#/$defs/uint32",
+          "default": 100,
+          "description": "Display gamma percentage when filter is enabled. Range: 0-200."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "yellow",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-off": {
+          "$ref": "#/$defs/string",
+          "default": "ld-sun-symbolic",
+          "description": "Icon when filter is disabled (showing normal daylight colors)."
+        },
+        "icon-on": {
+          "$ref": "#/$defs/string",
+          "default": "ld-moon-symbolic",
+          "description": "Icon when filter is enabled (showing warm night colors)."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "yellow",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display label."
+        },
+        "latitude": {
+          "$ref": "#/$defs/double",
+          "default": 0.0,
+          "description": "Latitude for the sunrise/sunset schedule, in decimal degrees\n(north positive). Range: -90 to 90. Only used when `auto-schedule` is on."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": ":toggle",
+          "description": "Action on left click. Default toggles blue light filter."
+        },
+        "longitude": {
+          "$ref": "#/$defs/double",
+          "default": 0.0,
+          "description": "Longitude for the sunrise/sunset schedule, in decimal degrees\n(east positive). Range: -180 to 180. Only used when `auto-schedule` is on."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        },
+        "temperature": {
+          "$ref": "#/$defs/uint32",
+          "default": 5000,
+          "description": "Color temperature in Kelvin when filter is enabled. Range: 1000-20000."
         }
       },
       "type": "object"
@@ -10203,30 +10203,6 @@
           "workspace-map": {},
           "workspace-padding": 0.5
         },
-        "hyprsunset": {
-          "auto-schedule": false,
-          "border-color": "yellow",
-          "border-show": false,
-          "button-bg-color": "bg-surface-elevated",
-          "format": "{{ status }}",
-          "gamma": 100,
-          "icon-bg-color": "yellow",
-          "icon-color": "auto",
-          "icon-off": "ld-sun-symbolic",
-          "icon-on": "ld-moon-symbolic",
-          "icon-show": true,
-          "label-color": "yellow",
-          "label-max-length": 0,
-          "label-show": true,
-          "latitude": 0.0,
-          "left-click": ":toggle",
-          "longitude": 0.0,
-          "middle-click": "",
-          "right-click": "",
-          "scroll-down": "",
-          "scroll-up": "",
-          "temperature": 5000
-        },
         "idle-inhibit": {
           "border-color": "green",
           "border-show": false,
@@ -10463,6 +10439,30 @@
           "wired-acquiring-icon": "ld-loader-circle-symbolic",
           "wired-connected-icon": "ld-ethernet-port-symbolic",
           "wired-disconnected-icon": "ld-unplug-symbolic"
+        },
+        "nightlight": {
+          "auto-schedule": false,
+          "border-color": "yellow",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "format": "{{ status }}",
+          "gamma": 100,
+          "icon-bg-color": "yellow",
+          "icon-color": "auto",
+          "icon-off": "ld-sun-symbolic",
+          "icon-on": "ld-moon-symbolic",
+          "icon-show": true,
+          "label-color": "yellow",
+          "label-max-length": 0,
+          "label-show": true,
+          "latitude": 0.0,
+          "left-click": ":toggle",
+          "longitude": 0.0,
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": "",
+          "temperature": 5000
         },
         "niri-workspaces": {
           "active-color": "accent",
