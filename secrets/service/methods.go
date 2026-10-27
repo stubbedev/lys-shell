@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"log"
 	"maps"
@@ -29,7 +30,7 @@ func (m serviceMethods) OpenSession(sender dbus.Sender, algorithm string, input 
 		if !ok {
 			return dbus.Variant{}, "", dbusx.InvalidArgs("the DH input is the client's public key, ay")
 		}
-		public, dh, err := negotiateDH(peer)
+		public, dh, err := negotiateDH(peer, rand.Reader)
 		if err != nil {
 			return dbus.Variant{}, "", dbusx.InvalidArgs(err.Error())
 		}
