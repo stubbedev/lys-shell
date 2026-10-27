@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	"log"
 	"math"
 	"math/bits"
 
@@ -24,17 +25,17 @@ func HexFill(c config.HexColor) render.Color {
 }
 
 // Background builds the surface background (build_background): the
-// decoded image scaled to cover under the .lock-bg-scrim legibility
-// layer, or the configured color painted by a .lock-bg area when there
-// is no image.
-func Background(img image.Image, color render.Color) widget.Widget {
-	if img == nil {
+// backdrop scaled to cover under the .lock-bg-scrim legibility layer,
+// or the configured color painted by a .lock-bg area when there is no
+// backdrop.
+func Background(bg *Backdrop, color render.Color) widget.Widget {
+	if bg == nil {
 		fill := widget.NewDrawingArea(0, 0)
 		fill.AddClass("lock-bg")
 		fill.OnDraw = func(cv *render.Canvas, r render.Rect) { cv.FillRect(r, color) }
 		return fill
 	}
-	pic := widget.NewImage(img)
+	pic := widget.NewImage(bg.Image)
 	pic.SetScale(widget.ImageCover)
 	scrim := widget.NewBox(widget.Column, 0, 0)
 	scrim.AddClass("lock-bg-scrim")
@@ -48,6 +49,21 @@ func Background(img image.Image, color render.Color) widget.Widget {
 type Backdrop struct {
 	Image render.StillImage
 	pix   memory.Slice[byte]
+	mem   *memory.Shared
+}
+
+// LoadBackdrop decodes the background at path and makes it a backdrop
+// for outputs, as NewBackdrop does.
+func LoadBackdrop(mem *memory.Shared, decode func(path string) (image.Image, error), path string, sigma float64, outputs []image.Point) (*Backdrop, error) {
+	src, err := decode(path)
+	if err != nil {
+		return nil, fmt.Errorf("background %s unreadable: %w", path, err)
+	}
+	bg, err := NewBackdrop(mem, src, sigma, outputs)
+	if err != nil {
+		return nil, fmt.Errorf("background %s unusable: %w", path, err)
+	}
+	return &bg, nil
 }
 
 // NewBackdrop resamples src to the smallest size that still covers
@@ -72,12 +88,25 @@ func NewBackdrop(mem *memory.Shared, src image.Image, sigma float64, outputs []i
 	if err := blurOffHeap(mem, img, sigma*scale); err != nil {
 		return Backdrop{}, errors.Join(err, offheap.Free(mem, pix))
 	}
-	return Backdrop{Image: render.NewStillImage(img), pix: pix}, nil
+	return Backdrop{Image: render.NewStillImage(img), pix: pix, mem: mem}, nil
 }
 
 // Free frees the backdrop's pixels; nothing may draw them any more.
-func (b Backdrop) Free(mem *memory.Shared) error {
-	return offheap.Free(mem, b.pix)
+func (b Backdrop) Free() error {
+	return offheap.Free(b.mem, b.pix)
+}
+
+// Retire lets go of the backdrop once no surface draws it: forget drops
+// the renderer's texture now, and the pixels are freed once every List
+// recorded until now has ended, so no frame still being played reads
+// freed memory. A failed free is logged under who.
+func (b Backdrop) Retire(forget func(render.ImageID), who string) {
+	forget(b.Image.ID)
+	render.Retire(func() {
+		if err := b.Free(); err != nil {
+			log.Printf("%s: freeing the background: %v", who, err)
+		}
+	})
 }
 
 // coverScale is the factor src scales by so it covers the largest of

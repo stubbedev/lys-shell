@@ -202,44 +202,21 @@ func (s *Screen) loadBackground() *credential.Backdrop {
 	if path == "" {
 		return nil
 	}
-	src, err := s.d.Decode(path)
+	bg, err := credential.LoadBackdrop(&s.mem, s.d.Decode, path, float64(s.cfg.Blur), s.d.Outputs())
 	if err != nil {
-		log.Printf("lock: background %s unreadable; using the color fill: %v", path, err)
+		log.Printf("lock: %v; using the color fill", err)
 		return nil
 	}
-	bg, err := credential.NewBackdrop(&s.mem, src, float64(s.cfg.Blur), s.d.Outputs())
-	if err != nil {
-		log.Printf("lock: background %s unusable; using the color fill: %v", path, err)
-		return nil
-	}
-	return &bg
+	return bg
 }
 
-// background is what the surfaces draw: the backdrop, or nil for the
-// color.
-func (s *Screen) background() image.Image {
-	if s.bg == nil {
-		return nil
-	}
-	return s.bg.Image
-}
-
-// dropBackground lets go of the backdrop once no surface draws it: the
-// renderer drops its texture, and its pixels are freed once every List
-// recorded until now has ended, so no frame still being played reads
-// freed memory.
+// dropBackground lets go of the backdrop once no surface draws it.
 func (s *Screen) dropBackground() {
-	bg := s.bg
-	if bg == nil {
+	if s.bg == nil {
 		return
 	}
+	s.bg.Retire(s.d.Forget, "lock")
 	s.bg = nil
-	s.d.Forget(bg.Image.ID)
-	render.Retire(func() {
-		if err := bg.Free(&s.mem); err != nil {
-			log.Printf("lock: freeing the background: %v", err)
-		}
-	})
 }
 
 // buildFace builds one output's surface; lys-ui calls it for every
@@ -260,7 +237,7 @@ func (s *Screen) buildFace(*app.Output) app.LockSurface {
 	reveal.Show(f.prompt.Reveal, s.anims, config.AnimLock)
 	s.faces = append(s.faces, f)
 	root := credential.Window(s.sheet,
-		credential.Background(s.background(), credential.HexFill(s.cfg.Background.Color)),
+		credential.Background(s.bg, credential.HexFill(s.cfg.Background.Color)),
 		f.prompt.Reveal,
 		f.scrim)
 	return app.LockSurface{

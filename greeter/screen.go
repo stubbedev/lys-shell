@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -65,6 +66,12 @@ type deps struct {
 	power   func(verb string)
 	// loadImage decodes the background (no blur in the greeter).
 	loadImage func(path string) (image.Image, error)
+	// outputs are the device pixel sizes of the outputs the greeter
+	// shows on, which the background is resampled to.
+	outputs func() []image.Point
+	// forget drops the renderer's copy of a raster that is no longer
+	// drawn, before its pixels are freed.
+	forget func(render.ImageID)
 	// loadAvatar decodes an avatar file.
 	loadAvatar func(path string) (image.Image, error)
 }
@@ -83,6 +90,11 @@ type screen struct {
 	drop   *widget.Dropdown
 	caps   *widget.Label
 	users  []*userButton
+
+	// bg is the background at the outputs' size, freed when the
+	// greeter ends; nil draws the color. Its pixels live in mem.
+	bg  *credential.Backdrop
+	mem memory.Shared
 
 	mu       sync.Mutex // guards selected: greetd reads it off the loop
 	selected int
@@ -148,8 +160,9 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 	s.prompt.Reveal.SetTransition(widget.RevealFade)
 	s.prompt.Reveal.SetDuration(revealFade)
 
+	s.bg = s.loadBackground()
 	layers := []widget.Widget{
-		credential.Background(s.background(), credential.HexFill(g.Background.Color)),
+		credential.Background(s.bg, credential.HexFill(g.Background.Color)),
 		s.prompt.Reveal,
 	}
 	if g.ShowPowerButtons {
@@ -172,20 +185,29 @@ func (s *screen) start() {
 	s.d.focus(s.prompt.Username)
 }
 
-// background is the greeter's background (app.rs build_background): an
-// unreadable image falls back to the color, never a mystery black.
-func (s *screen) background() image.Image {
-	g := s.init.Config.Greeter
-	path := g.Background.ImagePath(s.init.Config.Wallpaper.Wallpaper)
+// loadBackground is the greeter's background (app.rs
+// build_background), unblurred at the outputs' size: an unreadable
+// image falls back to the color, never a mystery black.
+func (s *screen) loadBackground() *credential.Backdrop {
+	path := s.init.Config.Greeter.Background.ImagePath(s.init.Config.Wallpaper.Wallpaper)
 	if path == "" {
 		return nil
 	}
-	img, err := s.d.loadImage(path)
+	bg, err := credential.LoadBackdrop(&s.mem, s.d.loadImage, path, 0, s.d.outputs())
 	if err != nil {
-		log.Printf("greeter: background image unreadable; using color fill: %v", err)
+		log.Printf("greeter: %v; using color fill", err)
 		return nil
 	}
-	return img
+	return bg
+}
+
+// end lets go of the background once the greeter no longer shows it.
+func (s *screen) end() {
+	if s.bg == nil {
+		return
+	}
+	s.bg.Retire(s.d.forget, "greeter")
+	s.bg = nil
 }
 
 // populateUsers is populate_user_row: one avatar button per login user

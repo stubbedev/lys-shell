@@ -21,3 +21,15 @@ func Device(out *app.Output) (image.Point, bool) {
 	}
 	return image.Pt(w, h), true
 }
+
+// Devices are the device pixel sizes of the outputs that report a
+// mode, in their order.
+func Devices(outputs []*app.Output) []image.Point {
+	sizes := make([]image.Point, 0, len(outputs))
+	for _, o := range outputs {
+		if size, ok := Device(o); ok {
+			sizes = append(sizes, size)
+		}
+	}
+	return sizes
+}

@@ -89,7 +89,7 @@ func TestBackground(t *testing.T) {
 	if !ok || !slices.Contains(fill.Classes(), "lock-bg") {
 		t.Error("no image: the .lock-bg color fill")
 	}
-	over, ok := Background(image.NewRGBA(image.Rect(0, 0, 1, 1)), 0).(*widget.Overlay)
+	over, ok := Background(&Backdrop{Image: render.NewStillImage(image.NewRGBA(image.Rect(0, 0, 1, 1)))}, 0).(*widget.Overlay)
 	if !ok || len(treetest.WithClass(over, "lock-bg-scrim")) != 1 {
 		t.Error("an image: picture under the .lock-bg-scrim")
 	}

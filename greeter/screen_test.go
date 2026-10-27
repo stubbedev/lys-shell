@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
@@ -37,9 +38,22 @@ type rig struct {
 	focused    widget.Widget
 	quit       int
 	power      []string
+	// background is what the background image decodes to; nil fails
+	// the decode.
+	background image.Image
+	// outputs are the device sizes the greeter shows on.
+	outputs []image.Point
+	// forgotten are the rasters the renderer was told to drop.
+	forgotten []render.ImageID
 }
 
 func newRig(t *testing.T, edit func(*Init)) *rig {
+	t.Helper()
+	return buildRig(t, edit, &rig{outputs: []image.Point{{1920, 1080}}})
+}
+
+// buildRig builds r's screen over its fakes, with Init edited by edit.
+func buildRig(t *testing.T, edit func(*Init), r *rig) *rig {
 	t.Helper()
 	face := treetest.Font(t)
 	state := filepath.Join(t.TempDir(), "last-session")
@@ -58,7 +72,6 @@ func newRig(t *testing.T, edit func(*Init)) *rig {
 	if edit != nil {
 		edit(&init)
 	}
-	r := &rig{}
 	r.s = newScreen(init, face, Stylesheet(init.Config), deps{
 		connect: func(cmd func() []string, env []string) (auth.Conversation, error) {
 			if r.connectErr != nil {
@@ -73,12 +86,19 @@ func newRig(t *testing.T, edit func(*Init)) *rig {
 			r.convs = append(r.convs, h)
 			return h
 		},
-		invoke:     func(fn func()) { fn() },
-		focus:      func(w widget.Widget) { r.focused = w },
-		quit:       func() { r.quit++ },
-		now:        func() time.Time { return time.Date(2026, 3, 5, 9, 7, 0, 0, time.UTC) },
-		power:      func(verb string) { r.power = append(r.power, verb) },
-		loadImage:  func(string) (image.Image, error) { return nil, errors.New("none") },
+		invoke: func(fn func()) { fn() },
+		focus:  func(w widget.Widget) { r.focused = w },
+		quit:   func() { r.quit++ },
+		now:    func() time.Time { return time.Date(2026, 3, 5, 9, 7, 0, 0, time.UTC) },
+		power:  func(verb string) { r.power = append(r.power, verb) },
+		loadImage: func(string) (image.Image, error) {
+			if r.background == nil {
+				return nil, errors.New("none")
+			}
+			return r.background, nil
+		},
+		outputs:    func() []image.Point { return r.outputs },
+		forget:     func(id render.ImageID) { r.forgotten = append(r.forgotten, id) },
 		loadAvatar: func(string) (image.Image, error) { return nil, errors.New("none") },
 	})
 	return r

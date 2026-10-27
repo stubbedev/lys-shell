@@ -70,7 +70,7 @@ func Start(a *app.Application, outputs func() []*app.Output, cfg *config.Config,
 			return auth.Spawn(auth.NewPAM(service), auth.CurrentUsername(), onEvent)
 		},
 		Decode:   imagedecode.Open,
-		Outputs:  func() []image.Point { return deviceSizes(outputs()) },
+		Outputs:  func() []image.Point { return outputsize.Devices(outputs()) },
 		Forget:   a.ForgetImage,
 		OnLocked: onLocked,
 	}
@@ -116,18 +116,6 @@ func Start(a *app.Application, outputs func() []*app.Output, cfg *config.Config,
 			stop()
 		}
 	}
-}
-
-// deviceSizes are the device pixel sizes of the outputs that report a
-// mode.
-func deviceSizes(outputs []*app.Output) []image.Point {
-	sizes := make([]image.Point, 0, len(outputs))
-	for _, o := range outputs {
-		if size, ok := outputsize.Device(o); ok {
-			sizes = append(sizes, size)
-		}
-	}
-	return sizes
 }
 
 // claimLockOnStart claims the once-per-login-session lock-on-start

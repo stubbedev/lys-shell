@@ -2,6 +2,7 @@ package outputsize
 
 import (
 	"image"
+	"slices"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/app"
@@ -26,5 +27,20 @@ func TestDevice(t *testing.T) {
 		if got, ok := Device(&out); ok {
 			t.Errorf("an output without a mode (%+v) has size %v", out, got)
 		}
+	}
+}
+
+func TestDevices(t *testing.T) {
+	outputs := []*app.Output{
+		{ModeW: 1920, ModeH: 1080, Transform: 1},
+		{},
+		{ModeW: 3840, ModeH: 2160},
+	}
+	got := Devices(outputs)
+	if want := []image.Point{{1080, 1920}, {3840, 2160}}; !slices.Equal(got, want) {
+		t.Errorf("Devices = %v, want %v: the turned output turned, the modeless one left out", got, want)
+	}
+	if got := Devices(nil); len(got) != 0 {
+		t.Errorf("no outputs: %v", got)
 	}
 }

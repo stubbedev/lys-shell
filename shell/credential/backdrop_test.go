@@ -115,7 +115,7 @@ func newBackdrop(t *testing.T, mem *memory.Shared, src image.Image, sigma float6
 	}
 	t.Cleanup(func() {
 		if mem.Stats().Live > 0 {
-			_ = bg.Free(mem)
+			_ = bg.Free()
 		}
 	})
 	return bg
@@ -176,7 +176,7 @@ func TestBackdropFreesItsScratch(t *testing.T) {
 	if st := mem.Stats(); st.Live != 1 {
 		t.Fatalf("%d allocations after the blur, want the backdrop alone", st.Live)
 	}
-	if err := bg.Free(&mem); err != nil {
+	if err := bg.Free(); err != nil {
 		t.Fatal(err)
 	}
 	if st := mem.Stats(); st.Live != 0 || st.Bytes != 0 {
