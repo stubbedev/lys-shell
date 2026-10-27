@@ -29,9 +29,8 @@ type Focus interface {
 }
 
 // CompositorFocus asks Hyprland (when Hyprland is set), then lys-wm,
-// then mango, then niri - the Rust host's order with lys-wm added. Sway
-// reports nothing, as in Rust: the output mode falls back to the first
-// output there.
+// then mango, then niri - the Rust host's order with lys-wm added. The
+// focused output also comes from sway's and niri's focused workspace.
 type CompositorFocus struct {
 	Hyprland *hyprland.Connection
 }
@@ -66,7 +65,59 @@ func (f CompositorFocus) FocusedOutput() (string, bool) {
 			}
 		}
 	}
-	// niri / unknown: the caller falls back to the first output.
+	if name, ok := swayFocusedOutput(); ok {
+		return name, true
+	}
+	return niriFocusedOutput()
+}
+
+func swayFocusedOutput() (string, bool) {
+	if !sway.IsRunning() {
+		return "", false
+	}
+	conn, err := sway.Connect()
+	if err != nil {
+		return "", false
+	}
+	defer func() { _ = conn.Close() }()
+	workspaces, err := conn.Workspaces()
+	if err != nil {
+		return "", false
+	}
+	return swayFocusedWorkspaceOutput(workspaces)
+}
+
+func swayFocusedWorkspaceOutput(workspaces []sway.Workspace) (string, bool) {
+	for _, ws := range workspaces {
+		if ws.Focused {
+			return ws.Output, ws.Output != ""
+		}
+	}
+	return "", false
+}
+
+func niriFocusedOutput() (string, bool) {
+	if !niri.IsRunning() {
+		return "", false
+	}
+	conn, err := niri.Connect()
+	if err != nil {
+		return "", false
+	}
+	defer func() { _ = conn.Close() }()
+	workspaces, err := conn.Workspaces()
+	if err != nil {
+		return "", false
+	}
+	return niriFocusedWorkspaceOutput(workspaces)
+}
+
+func niriFocusedWorkspaceOutput(workspaces []niri.Workspace) (string, bool) {
+	for _, ws := range workspaces {
+		if ws.IsFocused && ws.Output != nil {
+			return *ws.Output, *ws.Output != ""
+		}
+	}
 	return "", false
 }
 

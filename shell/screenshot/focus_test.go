@@ -7,8 +7,36 @@ import (
 
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
 )
+
+func TestSwayFocusedWorkspaceOutput(t *testing.T) {
+	got, ok := swayFocusedWorkspaceOutput([]sway.Workspace{{Name: "1", Output: "eDP-1"}, {Name: "2", Output: "DP-2", Focused: true}})
+	if !ok || got != "DP-2" {
+		t.Errorf("focused output = %q %v, want DP-2", got, ok)
+	}
+	if got, ok := swayFocusedWorkspaceOutput([]sway.Workspace{{Name: "1", Output: "eDP-1"}}); ok {
+		t.Errorf("no focused workspace reported %q", got)
+	}
+	if got, ok := swayFocusedWorkspaceOutput([]sway.Workspace{{Name: "1", Focused: true}}); ok {
+		t.Errorf("a focused workspace without an output reported %q", got)
+	}
+}
+
+func TestNiriFocusedWorkspaceOutput(t *testing.T) {
+	out := func(s string) *string { return &s }
+	got, ok := niriFocusedWorkspaceOutput([]niri.Workspace{{ID: 1, Output: out("eDP-1"), IsActive: true}, {ID: 2, Output: out("DP-2"), IsFocused: true}})
+	if !ok || got != "DP-2" {
+		t.Errorf("focused output = %q %v, want DP-2", got, ok)
+	}
+	if got, ok := niriFocusedWorkspaceOutput([]niri.Workspace{{ID: 1, Output: out("eDP-1"), IsActive: true}}); ok {
+		t.Errorf("no focused workspace reported %q", got)
+	}
+	if got, ok := niriFocusedWorkspaceOutput([]niri.Workspace{{ID: 1, IsFocused: true}}); ok {
+		t.Errorf("a focused workspace without an output reported %q", got)
+	}
+}
 
 func hyprClient(ws, focus int, floating bool, at, size [2]int) hyprland.Client {
 	c := hyprland.Client{Floating: floating, At: at, Size: size, Mapped: true, FocusHistoryID: focus}
