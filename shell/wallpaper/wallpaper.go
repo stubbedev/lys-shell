@@ -8,7 +8,6 @@ package wallpaper
 
 import (
 	"context"
-	"image"
 	"log"
 	"time"
 
@@ -29,12 +28,42 @@ const frameInterval = 16 * time.Millisecond
 // Shell owns the wallpaper service and its surfaces. Its methods run
 // on the lys-ui loop goroutine.
 type Shell struct {
-	app      *app.Application
+	ui       loop
 	svc      *wallpaper.Service
 	cfg      config.WallpaperConfig
 	anims    config.AnimationsConfig
 	outputs  map[string]*app.Output
 	surfaces map[string]*surface
+	rasters  *rasters
+}
+
+// loop is what the shell does through the application: open a
+// surface (handing back its close), and run a ticker on the loop.
+type loop struct {
+	newLayer func(app.LayerConfig) (closeLayer func(), err error)
+	every    func(d time.Duration, fn func()) (cancel func())
+}
+
+// appLoop is the application's loop.
+func appLoop(application *app.Application) loop {
+	return loop{
+		newLayer: func(cfg app.LayerConfig) (func(), error) {
+			layer, err := application.NewLayer(cfg)
+			if err != nil {
+				return nil, err
+			}
+			return layer.Close, nil
+		},
+		every: application.Every,
+	}
+}
+
+func newShell(ui loop, svc *wallpaper.Service, cfg *config.Config, d rasterDeps) *Shell {
+	return &Shell{
+		ui: ui, svc: svc, cfg: cfg.Wallpaper, anims: cfg.Animations,
+		outputs: map[string]*app.Output{}, surfaces: map[string]*surface{},
+		rasters: newRasters(d),
+	}
 }
 
 // Start builds the service from config (build_wallpaper_service),
@@ -42,8 +71,8 @@ type Shell struct {
 // dev.stubbe.lys.Wallpaper1 on conn, and starts the cycling and extraction
 // loops and the surfaces. It fails like the Rust service init when
 // the D-Bus name is taken (another shell is running): no wallpaper is
-// drawn then. The returned stop function ends the loops and releases
-// the name.
+// drawn then. The returned stop function ends the loops, releases
+// the name, and lets go of the wallpapers once the loop has ended.
 func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn) (*Shell, func(), error) {
 	svc := wallpaper.New(wallpaper.Options{
 		Extractor:      extract.FromConfig(cfg.Styling.ColorExtractor),
@@ -54,10 +83,12 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 	if err != nil {
 		return nil, nil, err
 	}
-	s := &Shell{
-		app: application, svc: svc, cfg: cfg.Wallpaper, anims: cfg.Animations,
-		outputs: map[string]*app.Output{}, surfaces: map[string]*surface{},
-	}
+	s := newShell(appLoop(application), svc, cfg, rasterDeps{
+		decode: imagedecode.Open,
+		spawn:  func(fn func()) { go fn() },
+		invoke: application.Invoke,
+		forget: application.ForgetImage,
+	})
 	for _, out := range outputs {
 		if out.Name != "" {
 			s.outputs[out.Name] = out
@@ -84,7 +115,17 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 		cancel()
 		unsubscribe()
 		release()
+		s.dropSurfaces()
 	}, nil
+}
+
+// dropSurfaces lets go of every surface's wallpaper once the loop is
+// done: nothing draws them any more, so their rasters are freed.
+func (s *Shell) dropSurfaces() {
+	for name, surf := range s.surfaces {
+		surf.drop()
+		delete(s.surfaces, name)
+	}
 }
 
 // OutputWatcher is the session's output hotplug feed: the identity of
@@ -262,8 +303,9 @@ func (s *Shell) reconcile() {
 type surface struct {
 	shell *Shell
 	out   *app.Output
-	layer *app.LayerWindow
-	view  *view
+	// closeLayer closes the layer surface.
+	closeLayer func()
+	view       *view
 	// path and fit are what was last asked for; gen invalidates a
 	// decode that a newer request overtook.
 	path     string
@@ -274,7 +316,7 @@ type surface struct {
 
 func (s *Shell) newSurface(name string, out *app.Output) (*surface, error) {
 	surf := &surface{shell: s, out: out, view: newView()}
-	layer, err := s.app.NewLayer(app.LayerConfig{
+	closeLayer, err := s.ui.newLayer(app.LayerConfig{
 		Output:        out,
 		Layer:         app.LayerBackground,
 		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
@@ -286,6 +328,7 @@ func (s *Shell) newSurface(name string, out *app.Output) (*surface, error) {
 		OnClosed: func() {
 			// The output went away (or the compositor closed us): the
 			// next reconcile rebuilds it if the monitor is still known.
+			surf.drop()
 			if s.surfaces[name] == surf {
 				delete(s.surfaces, name)
 			}
@@ -294,16 +337,24 @@ func (s *Shell) newSurface(name string, out *app.Output) (*surface, error) {
 	if err != nil {
 		return nil, err
 	}
-	surf.layer = layer
+	surf.closeLayer = closeLayer
 	return surf, nil
 }
 
 func (surf *surface) close() {
+	surf.drop()
+	surf.closeLayer()
+}
+
+// drop stops what the surface has in flight and lets go of its
+// wallpapers: a decode still running lands nowhere.
+func (surf *surface) drop() {
 	if surf.stopAnim != nil {
 		surf.stopAnim()
+		surf.stopAnim = nil
 	}
 	surf.gen++
-	surf.layer.Close()
+	surf.view.clear()
 }
 
 // outputTarget is the output's device-pixel size and scale; false when
@@ -320,9 +371,9 @@ func outputTarget(out *app.Output) (target, bool) {
 	return target{w: size.X, h: size.Y, scale: scale}, true
 }
 
-// render decodes path off the loop and swaps it in. A repeat of the
-// current request is a no-op; a fit change alone re-renders without a
-// transition.
+// render asks for path's raster at fit for the output and swaps it in
+// once it is made. A repeat of the current request is a no-op; a fit
+// change alone re-renders without a transition.
 func (surf *surface) render(path string, fit wallpaper.FitMode) {
 	if path == surf.path && fit == surf.fit {
 		return
@@ -332,46 +383,34 @@ func (surf *surface) render(path string, fit wallpaper.FitMode) {
 	surf.gen++
 	gen := surf.gen
 	box, known := outputTarget(surf.out)
-	application := surf.shell.app
-	go func() {
-		img, err := imagedecode.Open(path)
-		if err != nil {
-			log.Printf("wallpaper: cannot decode wallpaper %s: %v", path, err)
+	rs := surf.shell.rasters
+	rs.acquire(rasterKey{path: path, fit: fit, box: box, known: known}, func(r *raster) {
+		if gen != surf.gen {
+			rs.release(r)
 			return
 		}
-		scale := widget.ImageScaleDown
-		if known {
-			img = prepare(img, fit, box)
-		} else {
-			scale = widgetScale(fit)
-		}
-		application.Invoke(func() {
-			if gen != surf.gen {
-				return
-			}
-			surf.swap(img, scale, animate)
-		})
-	}()
+		surf.swap(r, animate)
+	})
 }
 
-func (surf *surface) swap(img image.Image, scale widget.ImageScale, animate bool) {
+func (surf *surface) swap(r *raster, animate bool) {
 	if surf.stopAnim != nil {
 		surf.stopAnim()
 		surf.stopAnim = nil
 	}
-	im := widget.NewImage(img)
-	im.SetScale(scale)
+	pic := widget.NewImage(r.image)
+	pic.SetScale(r.scale)
 	trans := transitionOf(surf.shell.anims)
 	kind := trans.Kind
 	if !animate || trans.Duration <= 0 {
 		kind = TransitionNone
 	}
-	surf.view.show(im, img.Bounds().Size(), kind)
-	if kind == TransitionNone {
+	rs := surf.shell.rasters
+	if !surf.view.show(&shown{pic: pic, size: r.size(), release: func() { rs.release(r) }}, kind) {
 		return
 	}
 	start := time.Now()
-	surf.stopAnim = surf.shell.app.Every(frameInterval, func() {
+	surf.stopAnim = surf.shell.ui.every(frameInterval, func() {
 		t := float64(time.Since(start)) / float64(trans.Duration)
 		if !surf.view.step(t) && surf.stopAnim != nil {
 			surf.stopAnim()

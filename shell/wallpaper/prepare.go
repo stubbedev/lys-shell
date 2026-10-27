@@ -2,11 +2,15 @@ package wallpaper
 
 import (
 	"image"
+	"image/draw"
 	"math"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/memory-go"
 
+	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/internal/resample"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
@@ -17,18 +21,18 @@ type target struct {
 	scale float64
 }
 
-// prepare resamples img for its monitor off the loop, so the surface
-// blits it 1:1 instead of rescaling a multi-megapixel source on the
-// frame path. The result is shown with ImageScaleDown, which draws it
-// at its natural size once it fits the box. The fits mirror the GTK
-// ContentFit the Rust shell maps each FitMode to (content_fit): Fill is
-// Cover, Fit is Contain, Stretch is Fill, and Center is ScaleDown with
-// the natural size in logical pixels, as GTK measures a texture.
-func prepare(img image.Image, fit wallpaper.FitMode, box target) image.Image {
-	b := img.Bounds()
+// plan is where a wallpaper of bounds b lands on its monitor: the
+// source rect and the size it is resampled to, so the surface blits it
+// 1:1 instead of rescaling a multi-megapixel source on the frame path.
+// It is shown with ImageScaleDown, which draws it at its natural size
+// once it fits the box. The fits mirror the GTK ContentFit the Rust
+// shell maps each FitMode to (content_fit): Fill is Cover, Fit is
+// Contain, Stretch is Fill, and Center is ScaleDown with the natural
+// size in logical pixels, as GTK measures a texture.
+func plan(b image.Rectangle, fit wallpaper.FitMode, box target) (image.Rectangle, image.Point) {
 	sw, sh := b.Dx(), b.Dy()
 	if sw <= 0 || sh <= 0 || box.w <= 0 || box.h <= 0 {
-		return img
+		return b, b.Size()
 	}
 	var (
 		src image.Rectangle
@@ -50,11 +54,31 @@ func prepare(img image.Image, fit wallpaper.FitMode, box target) image.Image {
 	default: // FitFill
 		src, dst = render.PlaceImage(sw, sh, box.w, box.h, render.ImageCover, render.ImageCentered)
 	}
-	src = src.Add(b.Min)
-	if src == b && dst.W == sw && dst.H == sh {
-		return img
+	return src.Add(b.Min), image.Pt(dst.W, dst.H)
+}
+
+// rasterize makes the raster img is shown as on a monitor of box (the
+// whole image, drawn by the fit's widget policy, when known is false
+// because the output's size is not reported yet) in mem: resampled from
+// img's rows straight into it, or converted as it is when no resample
+// is needed, with no image-sized copy on the Go heap.
+func rasterize(mem *memory.Shared, img image.Image, fit wallpaper.FitMode, box target, known bool) (*raster, error) {
+	b := img.Bounds()
+	src, size, scale := b, b.Size(), widgetScale(fit)
+	if known {
+		src, size = plan(b, fit, box)
+		scale = widget.ImageScaleDown
 	}
-	return render.Resample(img, src, dst.W, dst.H)
+	dst, pix, err := offheap.NewRGBA(mem, size.X, size.Y)
+	if err != nil {
+		return nil, err
+	}
+	if src == b && size == b.Size() {
+		draw.Draw(dst, dst.Rect, img, b.Min, draw.Src)
+	} else {
+		resample.Into(dst, img, src)
+	}
+	return &raster{image: render.NewStillImage(dst), scale: scale, pix: pix}, nil
 }
 
 // widgetScale is the lys-ui policy for an image that could not be

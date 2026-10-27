@@ -70,25 +70,34 @@ func easeOutCubic(t float64) float64 {
 	return p*p*p + 1
 }
 
+// shown is one image the view draws and how it lets go of it.
+type shown struct {
+	pic *widget.Image
+	// size is the image's pixel size, for the crossfade's letterbox.
+	size image.Point
+	// release runs once the view no longer draws pic.
+	release func()
+}
+
 // view shows the current wallpaper and, mid-transition, the previous
 // one: the Go counterpart of the surface's two-picture gtk::Stack.
 type view struct {
 	widget.Base
-	cur, prev *widget.Image
-	// curSize is cur's source size, for the crossfade's letterbox.
-	curSize image.Point
-	kind    TransitionKind
+	cur, prev *shown
+	kind      TransitionKind
 	// progress runs 0 -> 1 over a transition; at 1 prev is dropped.
 	progress float64
 }
 
 func newView() *view { return &view{progress: 1} }
 
-// show swaps img in with the given transition kind; the caller then
-// drives progress with step. TransitionNone (or no previous image)
-// lands at once.
-func (v *view) show(img *widget.Image, size image.Point, kind TransitionKind) {
-	v.prev, v.cur, v.curSize = v.cur, img, size
+// show swaps img in with the given transition kind and reports whether
+// it transitions, its progress then driven by step. TransitionNone (or
+// no previous image) lands at once. An outgoing image still fading from
+// an earlier swap is dropped now.
+func (v *view) show(img *shown, kind TransitionKind) bool {
+	v.drop()
+	v.prev, v.cur = v.cur, img
 	v.kind, v.progress = kind, 0
 	if kind == TransitionNone || v.prev == nil {
 		v.finish()
@@ -96,6 +105,7 @@ func (v *view) show(img *widget.Image, size image.Point, kind TransitionKind) {
 	v.arrangeChildren()
 	v.InvalidateLayout()
 	v.Invalidate()
+	return v.progress < 1
 }
 
 // step advances a running transition to linear time fraction t (0-1)
@@ -112,7 +122,30 @@ func (v *view) step(t float64) bool {
 }
 
 func (v *view) finish() {
-	v.progress, v.prev = 1, nil
+	v.progress = 1
+	v.drop()
+}
+
+// drop lets go of the outgoing image.
+func (v *view) drop() {
+	if v.prev == nil {
+		return
+	}
+	prev := v.prev
+	v.prev = nil
+	prev.release()
+}
+
+// clear lets go of every image: the surface is going away.
+func (v *view) clear() {
+	v.drop()
+	if v.cur == nil {
+		return
+	}
+	cur := v.cur
+	v.cur = nil
+	cur.release()
+	v.Invalidate()
 }
 
 // Measure claims the whole box: the surface is anchored to every edge.
@@ -152,10 +185,10 @@ func (v *view) arrangeChildren() {
 	r := v.Bounds()
 	inX, inY, outX, outY := v.offsets(r)
 	if v.cur != nil {
-		v.cur.Arrange(render.Rect{X: r.X + inX, Y: r.Y + inY, W: r.W, H: r.H})
+		v.cur.pic.Arrange(render.Rect{X: r.X + inX, Y: r.Y + inY, W: r.W, H: r.H})
 	}
 	if v.prev != nil {
-		v.prev.Arrange(render.Rect{X: r.X + outX, Y: r.Y + outY, W: r.W, H: r.H})
+		v.prev.pic.Arrange(render.Rect{X: r.X + outX, Y: r.Y + outY, W: r.W, H: r.H})
 	}
 	widget.SetParents(v, v.Children()...)
 }
@@ -168,23 +201,23 @@ func (v *view) Paint(cv *render.Canvas) {
 	prevClip := cv.PushClip(v.Bounds())
 	defer cv.PopClip(prevClip)
 	if v.prev != nil {
-		widget.PaintChild(cv, v.prev)
+		widget.PaintChild(cv, v.prev.pic)
 	}
 	if v.cur == nil {
 		return
 	}
 	if v.prev == nil || v.kind != TransitionCrossfade {
-		widget.PaintChild(cv, v.cur)
+		widget.PaintChild(cv, v.cur.pic)
 		return
 	}
 	// The incoming letterbox is the black backdrop fading in too.
 	prevAlpha := cv.PushAlpha(v.progress)
-	box := cv.MapRect(v.cur.Bounds())
-	_, inner := render.PlaceImage(v.curSize.X, v.curSize.Y, box.W, box.H, v.cur.Scale(), render.ImageCentered)
+	box := cv.MapRect(v.cur.pic.Bounds())
+	_, inner := render.PlaceImage(v.cur.size.X, v.cur.size.Y, box.W, box.H, v.cur.pic.Scale(), render.ImageCentered)
 	inner.X += box.X
 	inner.Y += box.Y
 	fillOutside(cv, box, inner, backdrop)
-	widget.PaintChild(cv, v.cur)
+	widget.PaintChild(cv, v.cur.pic)
 	cv.PopAlpha(prevAlpha)
 }
 
@@ -216,10 +249,10 @@ func (v *view) HitTest(p widget.Point) widget.Widget { return v.HitLeaf(v, p) }
 func (v *view) Children() []widget.Widget {
 	var out []widget.Widget
 	if v.prev != nil {
-		out = append(out, v.prev)
+		out = append(out, v.prev.pic)
 	}
 	if v.cur != nil {
-		out = append(out, v.cur)
+		out = append(out, v.cur.pic)
 	}
 	return out
 }

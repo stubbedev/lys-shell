@@ -27,7 +27,7 @@ func solid(w, h int, c color.NRGBA) *image.NRGBA {
 	return img
 }
 
-func TestPrepareFits(t *testing.T) {
+func TestPlanFits(t *testing.T) {
 	src := solid(400, 200, color.NRGBA{R: 255, A: 255})
 	box := target{w: 100, h: 100, scale: 1}
 	for _, tt := range []struct {
@@ -39,28 +39,28 @@ func TestPrepareFits(t *testing.T) {
 		{wallpaper.FitStretch, 100, 100}, // ignore the aspect
 		{wallpaper.FitCenter, 100, 50},   // too big: shrink to fit
 	} {
-		got := prepare(src, tt.fit, box).Bounds()
-		if got.Dx() != tt.wantW || got.Dy() != tt.wantH {
-			t.Errorf("%v: %dx%d, want %dx%d", tt.fit, got.Dx(), got.Dy(), tt.wantW, tt.wantH)
+		_, got := plan(src.Bounds(), tt.fit, box)
+		if got.X != tt.wantW || got.Y != tt.wantH {
+			t.Errorf("%v: %v, want %dx%d", tt.fit, got, tt.wantW, tt.wantH)
 		}
 	}
 }
 
-func TestPrepareCenterIsNaturalLogicalSize(t *testing.T) {
-	small := solid(20, 10, color.NRGBA{G: 255, A: 255})
+func TestPlanCenterIsNaturalLogicalSize(t *testing.T) {
+	small := image.Rect(0, 0, 20, 10)
 	// At scale 1 a fitting image is untouched, not enlarged.
-	if got := prepare(small, wallpaper.FitCenter, target{w: 100, h: 100, scale: 1}); got != image.Image(small) {
-		t.Errorf("scale 1 center resampled to %v", got.Bounds())
+	if src, size := plan(small, wallpaper.FitCenter, target{w: 100, h: 100, scale: 1}); src != small || size != small.Size() {
+		t.Errorf("scale 1 center resampled %v to %v", src, size)
 	}
 	// At scale 2 the natural size is 20x10 logical = 40x20 device, as GTK
 	// measures a texture.
-	if got := prepare(small, wallpaper.FitCenter, target{w: 100, h: 100, scale: 2}).Bounds(); got.Dx() != 40 || got.Dy() != 20 {
-		t.Errorf("scale 2 center = %v, want 40x20", got)
+	if _, size := plan(small, wallpaper.FitCenter, target{w: 100, h: 100, scale: 2}); size != image.Pt(40, 20) {
+		t.Errorf("scale 2 center = %v, want 40x20", size)
 	}
 	// An exact 1:1 cover needs no resample either.
-	exact := solid(100, 100, color.NRGBA{A: 255})
-	if got := prepare(exact, wallpaper.FitFill, target{w: 100, h: 100, scale: 1}); got != image.Image(exact) {
-		t.Error("a 1:1 cover was resampled")
+	exact := image.Rect(5, 5, 105, 105)
+	if src, size := plan(exact, wallpaper.FitFill, target{w: 100, h: 100, scale: 1}); src != exact || size != exact.Size() {
+		t.Errorf("a 1:1 cover was resampled from %v to %v", src, size)
 	}
 }
 
@@ -138,21 +138,21 @@ func px(data []byte, w, x, y int) render.Color {
 	return render.ColorFromBytes(data[y*render.Stride(w)+x*4:])
 }
 
-func imageOf(c color.NRGBA, w, h int) (*widget.Image, image.Point) {
+func imageOf(c color.NRGBA, w, h int) *shown {
 	im := widget.NewImage(solid(w, h, c))
 	im.SetScale(widget.ImageScaleDown)
-	return im, image.Pt(w, h)
+	return &shown{pic: im, size: image.Pt(w, h), release: func() {}}
 }
 
 func TestViewCrossfadeBlendsAndFinishes(t *testing.T) {
 	v := newView()
-	red, redSize := imageOf(color.NRGBA{R: 255, A: 255}, 4, 4)
-	v.show(red, redSize, TransitionCrossfade)
+	red := imageOf(color.NRGBA{R: 255, A: 255}, 4, 4)
+	v.show(red, TransitionCrossfade)
 	if v.prev != nil || v.progress != 1 {
 		t.Fatal("the first image transitioned from nothing")
 	}
-	blue, blueSize := imageOf(color.NRGBA{B: 255, A: 255}, 4, 4)
-	v.show(blue, blueSize, TransitionCrossfade)
+	blue := imageOf(color.NRGBA{B: 255, A: 255}, 4, 4)
+	v.show(blue, TransitionCrossfade)
 	if !v.step(0.5) {
 		t.Fatal("the transition ended halfway")
 	}
@@ -172,11 +172,11 @@ func TestViewCrossfadeBlendsAndFinishes(t *testing.T) {
 
 func TestViewCrossfadeFadesTheOldImageOutOfTheLetterbox(t *testing.T) {
 	v := newView()
-	red, redSize := imageOf(color.NRGBA{R: 255, A: 255}, 4, 4)
-	v.show(red, redSize, TransitionNone)
+	red := imageOf(color.NRGBA{R: 255, A: 255}, 4, 4)
+	v.show(red, TransitionNone)
 	// A narrow incoming image leaves a letterbox at x=0.
-	blue, blueSize := imageOf(color.NRGBA{B: 255, A: 255}, 2, 4)
-	v.show(blue, blueSize, TransitionCrossfade)
+	blue := imageOf(color.NRGBA{B: 255, A: 255}, 2, 4)
+	v.show(blue, TransitionCrossfade)
 	v.step(0.99)
 	data, w := paintView(v, 4, 4)
 	if r := px(data, w, 0, 0).R(); r > 0x20 {
@@ -186,10 +186,10 @@ func TestViewCrossfadeFadesTheOldImageOutOfTheLetterbox(t *testing.T) {
 
 func TestViewNoneSwapsAtOnce(t *testing.T) {
 	v := newView()
-	a, as := imageOf(color.NRGBA{R: 255, A: 255}, 2, 2)
-	v.show(a, as, TransitionNone)
-	b, bs := imageOf(color.NRGBA{G: 255, A: 255}, 2, 2)
-	v.show(b, bs, TransitionNone)
+	a := imageOf(color.NRGBA{R: 255, A: 255}, 2, 2)
+	v.show(a, TransitionNone)
+	b := imageOf(color.NRGBA{G: 255, A: 255}, 2, 2)
+	v.show(b, TransitionNone)
 	if v.prev != nil || v.progress != 1 {
 		t.Error("a none transition kept the old image")
 	}
@@ -357,10 +357,10 @@ func TestBootstrapCyclingTakesPrecedence(t *testing.T) {
 func TestViewClipsToItsBoundsAtScale(t *testing.T) {
 	v := newView()
 	// 8px sources fill the 4px logical view at 2x exactly.
-	red, redSize := imageOf(color.NRGBA{R: 255, A: 255}, 8, 8)
-	v.show(red, redSize, TransitionNone)
-	green, greenSize := imageOf(color.NRGBA{G: 255, A: 255}, 8, 8)
-	v.show(green, greenSize, TransitionSlideRight)
+	red := imageOf(color.NRGBA{R: 255, A: 255}, 8, 8)
+	v.show(red, TransitionNone)
+	green := imageOf(color.NRGBA{G: 255, A: 255}, 8, 8)
+	v.show(green, TransitionSlideRight)
 	v.step(0.2)    // eased to about half: the outgoing image 2px right
 	const dev = 16 // logical 8x8 at 2x; the view holds the top-left 4x4
 	data := make([]byte, render.Stride(dev)*dev)
