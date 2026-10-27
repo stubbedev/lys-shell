@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -82,7 +83,10 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 		}
 		return layoutSource{
 			read: func() (string, error) {
-				layout, _ := w.Layout()
+				layout := w.Layout()
+				if layout.Name == "" {
+					return "", fmt.Errorf("lys-wm's layout %d has no name", layout.Index)
+				}
 				return layout.Name, nil
 			},
 			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },

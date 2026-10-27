@@ -1,90 +1,21 @@
-package lyswm
+package lyswm_test
 
 import (
-	"bufio"
 	"errors"
-	"net"
-	"path/filepath"
+	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-lib/sockdir"
+	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 )
 
-type fakeWM struct {
-	mu       sync.Mutex
-	requests []string
-	answers  map[string]string
-	events   chan string
-	done     chan struct{}
+func watchRequests() []string {
+	return []string{`{"request":"watch"}`, `{"request":"submap"}`, `{"request":"layout"}`}
 }
 
-func newFakeWM(t *testing.T, answers map[string]string) *fakeWM {
-	t.Helper()
-	path := filepath.Join(sockdir.Dir(t), "wayland-1.sock")
-	ln, err := net.Listen("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = ln.Close() })
-	t.Setenv(SocketEnv, path)
-	f := &fakeWM{answers: answers, events: make(chan string, 16), done: make(chan struct{})}
-	t.Cleanup(func() { close(f.done) })
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go f.serve(conn)
-		}
-	}()
-	return f
-}
-
-func (f *fakeWM) serve(conn net.Conn) {
-	defer conn.Close()
-	line, err := bufio.NewReader(conn).ReadString('\n')
-	if err != nil {
-		return
-	}
-	line = strings.TrimSuffix(line, "\n")
-	f.mu.Lock()
-	f.requests = append(f.requests, line)
-	f.mu.Unlock()
-	answer, ok := f.answers[line]
-	if !ok {
-		answer = `{"version":1,"error":"unknown request"}`
-	}
-	if _, err := conn.Write([]byte(answer + "\n")); err != nil {
-		return
-	}
-	if line != `{"request":"watch"}` {
-		return
-	}
-	for {
-		select {
-		case e := <-f.events:
-			if _, err := conn.Write([]byte(e + "\n")); err != nil {
-				return
-			}
-		case <-f.done:
-			return
-		}
-	}
-}
-
-func (f *fakeWM) sent() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]string(nil), f.requests...)
-}
-
-const watchAck = `{"version":1}`
-
-func awaitTick(t *testing.T, w *Watcher) {
+func awaitTick(t *testing.T, w *lyswm.Watcher) {
 	t.Helper()
 	select {
 	case _, ok := <-w.Ticks():
@@ -97,126 +28,190 @@ func awaitTick(t *testing.T, w *Watcher) {
 }
 
 func TestNotRunning(t *testing.T) {
-	t.Setenv(SocketEnv, "")
-	if IsRunning() {
+	t.Setenv(lyswm.SocketEnv, "")
+	if lyswm.IsRunning() {
 		t.Fatal("an empty socket variable reads as running")
 	}
-	if _, err := Workspaces(); !errors.Is(err, ErrNotRunning) {
+	if _, err := lyswm.Workspaces(); !errors.Is(err, lyswm.ErrNotRunning) {
 		t.Fatalf("Workspaces err = %v", err)
 	}
-	if err := Dispatch("workspace 2"); !errors.Is(err, ErrNotRunning) {
+	if err := lyswm.Dispatch("workspace 2"); !errors.Is(err, lyswm.ErrNotRunning) {
 		t.Fatalf("Dispatch err = %v", err)
 	}
-	if _, err := Watch(); !errors.Is(err, ErrNotRunning) {
+	if _, err := lyswm.Watch(); !errors.Is(err, lyswm.ErrNotRunning) {
 		t.Fatalf("Watch err = %v", err)
 	}
 }
 
 func TestQueriesDecodeTheResults(t *testing.T) {
-	f := newFakeWM(t, map[string]string{
-		`{"request":"workspaces"}`: `{"version":1,"result":[{"id":1,"output":"DP-1","windows":3,"visible":true,"focused":true},{"id":4,"output":"HDMI-A-1","windows":0,"visible":true,"focused":false}]}`,
-		`{"request":"windows"}`:    `{"version":1,"result":[{"id":7,"app_id":"foot","title":"~","pid":4242,"workspace":1,"output":"DP-1","rect":{"x":10,"y":20,"width":300,"height":400},"floating":true,"fullscreen":false,"urgent":true,"unresponsive":false,"focused":true,"content_type":"none","icon":null}]}`,
-		`{"request":"outputs"}`:    `{"version":1,"result":[{"name":"DP-1","description":"LG","rect":{"x":0,"y":0,"width":2048,"height":1152},"scale":1.25,"mode":{"width":2560,"height":1440,"refresh_mhz":143912},"workspace":1,"focused":true,"powered":true}]}`,
-	})
-	workspaces, err := Workspaces()
+	f := lyswmtest.Start(t)
+	f.Result("workspaces", `[{"id":1,"output":"DP-1","windows":3,"visible":true,"focused":true},{"id":4,"output":"HDMI-A-1","windows":0,"visible":true,"focused":false}]`)
+	f.Result("windows", `[{"id":7,"app_id":"foot","title":"~","pid":4242,"workspace":1,"output":"DP-1","rect":{"x":10,"y":20,"width":300,"height":400},"floating":true,"fullscreen":false,"urgent":true,"unresponsive":false,"focused":true,"content_type":"none","icon":null}]`)
+	f.Result("outputs", `[{"name":"DP-1","description":"LG","rect":{"x":0,"y":0,"width":2048,"height":1152},"scale":1.25,"mode":{"width":2560,"height":1440,"refresh_mhz":143912},"workspace":1,"focused":true,"powered":true}]`)
+	workspaces, err := lyswm.Workspaces()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Workspace{{ID: 1, Output: "DP-1", Windows: 3, Visible: true, Focused: true}, {ID: 4, Output: "HDMI-A-1", Visible: true}}
-	if len(workspaces) != 2 || workspaces[0] != want[0] || workspaces[1] != want[1] {
+	want := []lyswm.Workspace{{ID: 1, Output: "DP-1", Windows: 3, Visible: true, Focused: true}, {ID: 4, Output: "HDMI-A-1", Visible: true}}
+	if !slices.Equal(workspaces, want) {
 		t.Fatalf("workspaces = %+v", workspaces)
 	}
-	windows, err := Windows()
+	windows, err := lyswm.Windows()
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantWin := Window{ID: 7, AppID: "foot", Title: "~", Workspace: 1, Output: "DP-1", Rect: Rect{10, 20, 300, 400}, Floating: true, Urgent: true, Focused: true}
+	wantWin := lyswm.Window{ID: 7, AppID: "foot", Title: "~", Workspace: 1, Output: "DP-1", Rect: lyswm.Rect{X: 10, Y: 20, Width: 300, Height: 400}, Floating: true, Urgent: true, Focused: true}
 	if len(windows) != 1 || windows[0] != wantWin {
 		t.Fatalf("windows = %+v", windows)
 	}
-	outputs, err := Outputs()
+	outputs, err := lyswm.Outputs()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(outputs) != 1 || outputs[0].Name != "DP-1" || !outputs[0].Focused || outputs[0].Scale != 1.25 || outputs[0].Rect.Width != 2048 {
 		t.Fatalf("outputs = %+v", outputs)
 	}
-	if got := f.sent(); len(got) != 3 {
+	wantSent := []string{`{"request":"workspaces"}`, `{"request":"windows"}`, `{"request":"outputs"}`}
+	if got := f.Requests(); !slices.Equal(got, wantSent) {
 		t.Fatalf("requests = %q", got)
 	}
 }
 
 func TestActiveWindowNullIsNoWindow(t *testing.T) {
-	newFakeWM(t, map[string]string{`{"request":"activewindow"}`: `{"version":1}`})
-	if w, ok, err := ActiveWindow(); err != nil || ok {
+	f := lyswmtest.Start(t)
+	f.Answer("activewindow", `{"version":1}`)
+	if w, ok, err := lyswm.ActiveWindow(); err != nil || ok {
 		t.Fatalf("ActiveWindow = %+v, %v, %v; want no window", w, ok, err)
 	}
 }
 
 func TestActiveWindow(t *testing.T) {
-	newFakeWM(t, map[string]string{`{"request":"activewindow"}`: `{"version":1,"result":{"id":3,"app_id":"firefox","title":"Docs","focused":true}}`})
-	w, ok, err := ActiveWindow()
+	f := lyswmtest.Start(t)
+	f.Result("activewindow", `{"id":3,"app_id":"firefox","title":"Docs","focused":true}`)
+	w, ok, err := lyswm.ActiveWindow()
 	if err != nil || !ok || w.ID != 3 || w.AppID != "firefox" || w.Title != "Docs" {
 		t.Fatalf("ActiveWindow = %+v, %v, %v", w, ok, err)
 	}
 }
 
 func TestDispatchSendsTheAction(t *testing.T) {
-	f := newFakeWM(t, map[string]string{`{"request":"dispatch","action":"workspace e+1"}`: `{"version":1}`})
-	if err := Dispatch("workspace e+1"); err != nil {
+	f := lyswmtest.Start(t)
+	if err := lyswm.Dispatch("workspace e+1"); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.sent(); len(got) != 1 || got[0] != `{"request":"dispatch","action":"workspace e+1"}` {
+	f.ExpectDispatch(t, "workspace e+1")
+	if got := f.Requests(); len(got) != 1 || got[0] != `{"request":"dispatch","action":"workspace e+1"}` {
 		t.Fatalf("requests = %q", got)
 	}
 }
 
 func TestDispatchRejected(t *testing.T) {
-	newFakeWM(t, map[string]string{`{"request":"dispatch","action":"teleport"}`: `{"version":1,"error":"bad action: unknown action \"teleport\""}`})
-	err := Dispatch("teleport")
-	var rejected *RejectedError
+	f := lyswmtest.Start(t)
+	f.Answer("dispatch", `{"version":1,"error":"bad action: unknown action \"teleport\""}`)
+	err := lyswm.Dispatch("teleport")
+	var rejected *lyswm.RejectedError
 	if !errors.As(err, &rejected) || rejected.Request != "dispatch" || !strings.Contains(rejected.Message, "teleport") {
 		t.Fatalf("err = %v, want the rejection", err)
 	}
 }
 
 func TestUnknownVersionIsRefused(t *testing.T) {
-	newFakeWM(t, map[string]string{
-		`{"request":"workspaces"}`: `{"version":2,"result":[]}`,
-		`{"request":"watch"}`:      `{"version":2}`,
-	})
-	if _, err := Workspaces(); err == nil || !strings.Contains(err.Error(), "version 2") {
+	f := lyswmtest.Start(t)
+	f.Answer("workspaces", `{"version":2,"result":[]}`)
+	f.Answer("watch", `{"version":2}`)
+	if _, err := lyswm.Workspaces(); err == nil || !strings.Contains(err.Error(), "version 2") {
 		t.Fatalf("Workspaces err = %v, want a version refusal", err)
 	}
-	if _, err := Watch(); err == nil || !strings.Contains(err.Error(), "version 2") {
+	if _, err := lyswm.Watch(); err == nil || !strings.Contains(err.Error(), "version 2") {
 		t.Fatalf("Watch err = %v, want a version refusal", err)
 	}
 }
 
-func TestWatchKeepsSubmapAndLayout(t *testing.T) {
-	f := newFakeWM(t, map[string]string{`{"request":"watch"}`: watchAck})
-	w, err := Watch()
+func TestWatchSeedsSubmapAndLayoutWithoutAnEvent(t *testing.T) {
+	f := lyswmtest.Start(t)
+	f.Result("submap", `"resize"`)
+	f.Result("layout", `{"index":1,"name":"German"}`)
+	w, err := lyswm.Watch()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	if w.Submap() != "" {
-		t.Fatalf("submap before any event = %q", w.Submap())
+	if w.Submap() != "resize" {
+		t.Errorf("seeded submap = %q, want resize", w.Submap())
 	}
-	if _, ok := w.Layout(); ok {
-		t.Fatal("a layout before the stream reported one")
+	if l := w.Layout(); l != (lyswm.Layout{Index: 1, Name: "German"}) {
+		t.Errorf("seeded layout = %+v, want German", l)
 	}
-	f.events <- `{"event":"submap","submap":"resize"}`
+	if got := f.Requests(); !slices.Equal(got, watchRequests()) {
+		t.Errorf("requests = %q, want %q", got, watchRequests())
+	}
+	select {
+	case <-w.Ticks():
+		t.Error("seeding ticked")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestWatchEventAfterTheStreamOpensWinsOverTheSeed(t *testing.T) {
+	f := lyswmtest.Start(t)
+	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
+	f.Events <- `{"event":"submap","submap":"resize"}`
+	w, err := lyswm.Watch(lyswm.EventSubmap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	awaitTick(t, w)
+	if l := w.Layout(); l != (lyswm.Layout{Index: 1, Name: "German"}) {
+		t.Errorf("layout = %+v, want the event's German over the seeded English (US)", l)
+	}
+	if w.Submap() != "resize" {
+		t.Errorf("submap = %q, want the event's resize over the seeded default", w.Submap())
+	}
+}
+
+func TestWatchFailsWhenTheSeedFails(t *testing.T) {
+	for _, c := range []struct {
+		name, request, answer, want string
+	}{
+		{"submap rejected", "submap", `{"version":1,"error":"unknown request"}`, "seed the submap: lys-wm rejected submap: unknown request"},
+		{"submap null", "submap", `{"version":1,"result":null}`, "seed the submap: lys-wm: submap answered no result"},
+		{"layout rejected", "layout", `{"version":1,"error":"unknown request"}`, "seed the layout: lys-wm rejected layout: unknown request"},
+		{"layout missing", "layout", `{"version":1}`, "seed the layout: lys-wm: layout answered no result"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := lyswmtest.Start(t)
+			f.Answer(c.request, c.answer)
+			w, err := lyswm.Watch()
+			if err == nil {
+				w.Close()
+				t.Fatal("Watch succeeded without a seed")
+			}
+			if !strings.Contains(err.Error(), c.want) {
+				t.Errorf("Watch err = %v, want %q", err, c.want)
+			}
+		})
+	}
+}
+
+func TestWatchKeepsSubmapAndLayout(t *testing.T) {
+	f := lyswmtest.Start(t)
+	w, err := lyswm.Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	f.Events <- `{"event":"submap","submap":"resize"}`
 	awaitTick(t, w)
 	if w.Submap() != "resize" {
 		t.Fatalf("submap = %q", w.Submap())
 	}
-	f.events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
+	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
 	awaitTick(t, w)
-	if l, ok := w.Layout(); !ok || l != (Layout{Index: 1, Name: "German"}) {
-		t.Fatalf("layout = %+v, %v", l, ok)
+	if l := w.Layout(); l != (lyswm.Layout{Index: 1, Name: "German"}) {
+		t.Fatalf("layout = %+v", l)
 	}
-	f.events <- `{"event":"submap","submap":""}`
+	f.Events <- `{"event":"submap","submap":""}`
 	awaitTick(t, w)
 	if w.Submap() != "" {
 		t.Fatalf("submap after reset = %q", w.Submap())
@@ -224,33 +219,33 @@ func TestWatchKeepsSubmapAndLayout(t *testing.T) {
 }
 
 func TestWatchTicksOnlyOnItsKinds(t *testing.T) {
-	f := newFakeWM(t, map[string]string{`{"request":"watch"}`: watchAck})
-	w, err := Watch(EventFocus)
+	f := lyswmtest.Start(t)
+	w, err := lyswm.Watch(lyswm.EventFocus)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	f.events <- `{"event":"title","window":3,"title":"x"}`
-	f.events <- `{"event":"layout","layout":{"index":0,"name":"English (US)"}}`
+	f.Events <- `{"event":"title","window":3,"title":"x"}`
+	f.Events <- `{"event":"layout","layout":{"index":2,"name":"French"}}`
 	select {
 	case <-w.Ticks():
 		t.Fatal("ticked on an event it does not follow")
 	case <-time.After(200 * time.Millisecond):
 	}
-	if l, ok := w.Layout(); !ok || l.Name != "English (US)" {
-		t.Fatalf("an unfollowed layout event was not kept: %+v, %v", l, ok)
+	if l := w.Layout(); l.Name != "French" {
+		t.Fatalf("an unfollowed layout event was not kept: %+v", l)
 	}
-	f.events <- `{"event":"focus","window":null}`
+	f.Events <- `{"event":"focus","window":null}`
 	awaitTick(t, w)
 }
 
 func TestWatchEndsOnAMalformedLine(t *testing.T) {
-	f := newFakeWM(t, map[string]string{`{"request":"watch"}`: watchAck})
-	w, err := Watch()
+	f := lyswmtest.Start(t)
+	w, err := lyswm.Watch()
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.events <- `not json`
+	f.Events <- `not json`
 	select {
 	case _, ok := <-w.Ticks():
 		if ok {
@@ -262,8 +257,8 @@ func TestWatchEndsOnAMalformedLine(t *testing.T) {
 }
 
 func TestWatchEndsWhenClosed(t *testing.T) {
-	newFakeWM(t, map[string]string{`{"request":"watch"}`: watchAck})
-	w, err := Watch()
+	lyswmtest.Start(t)
+	w, err := lyswm.Watch()
 	if err != nil {
 		t.Fatal(err)
 	}

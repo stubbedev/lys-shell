@@ -1,14 +1,11 @@
 package bar
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
-	"net"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,113 +13,14 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
-type fakeLysWM struct {
-	mu         sync.Mutex
-	answers    map[string]string
-	dispatched chan string
-	events     chan string
-	watching   chan struct{}
-}
-
-func newFakeLysWM(t *testing.T) *fakeLysWM {
+func newFakeLysWM(t *testing.T) *lyswmtest.WM {
 	t.Helper()
-	f := &fakeLysWM{
-		answers: map[string]string{
-			"workspaces":   `[]`,
-			"windows":      `[]`,
-			"outputs":      `[]`,
-			"activewindow": ``,
-		},
-		dispatched: make(chan string, 8),
-		events:     make(chan string, 8),
-		watching:   make(chan struct{}, 8),
-	}
-	done := make(chan struct{})
-	t.Cleanup(func() { close(done) })
-	path := serveUnix(t, "wayland-1.sock", func(conn net.Conn) {
-		line, err := bufio.NewReader(conn).ReadBytes('\n')
-		if err != nil {
-			return
-		}
-		var req struct {
-			Request string `json:"request"`
-			Action  string `json:"action"`
-		}
-		if err := json.Unmarshal(line, &req); err != nil {
-			return
-		}
-		switch req.Request {
-		case "dispatch":
-			f.dispatched <- req.Action
-			_, _ = conn.Write([]byte(`{"version":1}` + "\n"))
-		case "watch":
-			if _, err := conn.Write([]byte(`{"version":1}` + "\n")); err != nil {
-				return
-			}
-			f.watching <- struct{}{}
-			for {
-				select {
-				case e := <-f.events:
-					if _, err := conn.Write([]byte(e + "\n")); err != nil {
-						return
-					}
-				case <-done:
-					return
-				}
-			}
-		default:
-			f.mu.Lock()
-			result := f.answers[req.Request]
-			f.mu.Unlock()
-			reply := `{"version":1}`
-			if result != "" {
-				reply = `{"version":1,"result":` + result + `}`
-			}
-			_, _ = conn.Write([]byte(reply + "\n"))
-		}
-	})
 	clearCompositorEnv(t)
-	t.Setenv(lyswm.SocketEnv, path)
-	return f
-}
-
-func (f *fakeLysWM) answer(request, result string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.answers[request] = result
-}
-
-func (f *fakeLysWM) awaitWatch(t *testing.T) {
-	t.Helper()
-	select {
-	case <-f.watching:
-	case <-time.After(2 * time.Second):
-		t.Fatal("nothing watched the event stream")
-	}
-}
-
-func (f *fakeLysWM) expectDispatch(t *testing.T, want string) {
-	t.Helper()
-	select {
-	case got := <-f.dispatched:
-		if got != want {
-			t.Errorf("dispatched %q, want %q", got, want)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("nothing dispatched, want %q", want)
-	}
-}
-
-func (f *fakeLysWM) expectNoDispatch(t *testing.T) {
-	t.Helper()
-	select {
-	case got := <-f.dispatched:
-		t.Errorf("dispatched %q, want nothing", got)
-	case <-time.After(200 * time.Millisecond):
-	}
+	return lyswmtest.Start(t)
 }
 
 const lysWMTwoOutputs = `[{"id":1,"output":"DP-1","windows":2,"visible":false,"focused":false},` +
@@ -174,8 +72,8 @@ func newTestLysWM(t *testing.T, cfg *config.Config, connector string) *cwsModule
 
 func TestLysWMWorkspacesShowTheBarOutputsNumbers(t *testing.T) {
 	f := newFakeLysWM(t)
-	f.answer("workspaces", lysWMTwoOutputs)
-	f.answer("windows", lysWMWindows)
+	f.Result("workspaces", lysWMTwoOutputs)
+	f.Result("windows", lysWMWindows)
 	m := newTestLysWM(t, config.Defaults(), "DP-1")
 	labels := make([]string, 0, len(m.models))
 	for _, model := range m.models {
@@ -194,7 +92,7 @@ func TestLysWMWorkspacesShowTheBarOutputsNumbers(t *testing.T) {
 
 func TestLysWMWorkspacesClicksDispatch(t *testing.T) {
 	f := newFakeLysWM(t)
-	f.answer("workspaces", lysWMTwoOutputs)
+	f.Result("workspaces", lysWMTwoOutputs)
 	cfg := config.Defaults()
 	cfg.LysWMWorkspaces.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
 	m := newTestLysWM(t, cfg, "DP-1")
@@ -202,13 +100,13 @@ func TestLysWMWorkspacesClicksDispatch(t *testing.T) {
 	router, p := treetest.Pointer(m.segs, first, 500, 40)
 	router.Press(widget.BTNLeft, p, 0)
 	router.Release(widget.BTNLeft, p)
-	f.expectDispatch(t, "workspace 1")
+	f.ExpectDispatch(t, "workspace 1")
 	router.Axis(0, 1, 0)
-	f.expectDispatch(t, "workspace e+1")
+	f.ExpectDispatch(t, "workspace e+1")
 	router.Axis(0, -1, 0)
-	f.expectDispatch(t, "workspace e-1")
+	f.ExpectDispatch(t, "workspace e-1")
 	router.Press(widget.BTNMiddle, p, 0)
-	f.expectNoDispatch(t)
+	f.ExpectNoDispatch(t)
 	if err := (lysWMBackend{}).focusLast(context.Background()); !errors.Is(err, errNoPreviousWorkspace) {
 		t.Errorf("focus:last = %v, want the missing-action error", err)
 	}
@@ -228,9 +126,9 @@ func TestLysWMWorkspacesFollowTheEventStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stop()
-	f.awaitWatch(t)
-	f.events <- `{"event":"submap","submap":"resize"}`
-	f.events <- `{"event":"workspace","output":"DP-1","workspace":3}`
+	f.AwaitWatch(t)
+	f.Events <- `{"event":"submap","submap":"resize"}`
+	f.Events <- `{"event":"workspace","output":"DP-1","workspace":3}`
 	select {
 	case <-ticks:
 	case <-time.After(2 * time.Second):
@@ -245,7 +143,7 @@ func TestLysWMWorkspacesFollowTheEventStream(t *testing.T) {
 
 func TestWindowTitleFollowsLysWMFocus(t *testing.T) {
 	f := newFakeLysWM(t)
-	f.answer("activewindow", `{"id":4,"app_id":"foot","title":"~"}`)
+	f.Result("activewindow", `{"id":4,"app_id":"foot","title":"~"}`)
 	cfg := config.Defaults()
 	cfg.WindowTitle.Format = "{{ app }}: {{ title }}"
 	module, err := Create("window-title", newTestContext(t, cfg))
@@ -254,24 +152,60 @@ func TestWindowTitleFollowsLysWMFocus(t *testing.T) {
 	}
 	label := findLabel(module.Root())
 	waitForText(t, label, "foot: ~")
-	f.awaitWatch(t)
-	f.answer("activewindow", `{"id":5,"app_id":"firefox","title":"Docs"}`)
-	f.events <- `{"event":"focus","window":5}`
+	f.AwaitWatch(t)
+	f.Result("activewindow", `{"id":5,"app_id":"firefox","title":"Docs"}`)
+	f.Events <- `{"event":"focus","window":5}`
 	waitForText(t, label, "firefox: Docs")
-	f.answer("activewindow", ``)
-	f.events <- `{"event":"focus","window":null}`
+	f.Result("activewindow", `null`)
+	f.Events <- `{"event":"focus","window":null}`
 	waitForText(t, label, windowTitleLabel(cfg.WindowTitle.Format, "", ""))
 }
 
-func TestKeyboardLayoutFollowsLysWM(t *testing.T) {
+func TestKeyboardLayoutReadsLysWMsLayoutBeforeAnyEvent(t *testing.T) {
 	f := newFakeLysWM(t)
 	label := newTestKeyboardLayout(t, config.Defaults())
-	if got := onHeadlessLoop(label.Text); got != unknownLayout {
-		t.Errorf("before any layout event the label reads %q, want %q", got, unknownLayout)
+	if got := onHeadlessLoop(label.Text); got != "English (US)" {
+		t.Errorf("before any layout event the label reads %q, want the layout request's English (US)", got)
 	}
-	f.awaitWatch(t)
-	f.events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
+	f.AwaitWatch(t)
+	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
 	waitLabel(t, label, "German")
+}
+
+func TestKeyboardLayoutLysWMUnnamedLayoutIsAnError(t *testing.T) {
+	f := newFakeLysWM(t)
+	f.Result("layout", `{"index":2,"name":""}`)
+	source, err := keyboardLayoutSource(newTestContext(t, config.Defaults()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.close()
+	name, err := source.read()
+	if err == nil || !strings.Contains(err.Error(), "layout 2 has no name") {
+		t.Errorf("read = %q, %v; want the unnamed-layout error", name, err)
+	}
+	label := newTestKeyboardLayout(t, config.Defaults())
+	if got := onHeadlessLoop(label.Text); got != unknownLayout {
+		t.Errorf("an unnamed layout reads %q, want %q", got, unknownLayout)
+	}
+}
+
+func TestKeyboardLayoutLysWMWithoutALayoutAnswerFails(t *testing.T) {
+	f := newFakeLysWM(t)
+	f.Result("layout", `null`)
+	if _, err := Create("keyboard-input", newTestContext(t, config.Defaults())); err == nil || !strings.Contains(err.Error(), "seed the layout") {
+		t.Errorf("Create = %v, want the seed error", err)
+	}
+}
+
+func TestKeybindModeShowsLysWMsSubmapBeforeAnyEvent(t *testing.T) {
+	f := newFakeLysWM(t)
+	f.Result("submap", `"resize"`)
+	module, err := Create("keybind-mode", newTestContext(t, config.Defaults()))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	waitForText(t, findLabel(module.Root()), "resize")
 }
 
 func TestKeybindModeFollowsLysWMSubmaps(t *testing.T) {
@@ -281,11 +215,13 @@ func TestKeybindModeFollowsLysWMSubmaps(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	label := findLabel(module.Root())
-	f.awaitWatch(t)
-	f.events <- `{"event":"submap","submap":"resize"}`
+	defaultLabel := keybindModeLabel(config.Defaults().KeybindMode.Format, "")
+	waitForText(t, label, defaultLabel)
+	f.AwaitWatch(t)
+	f.Events <- `{"event":"submap","submap":"resize"}`
 	waitForText(t, label, "resize")
-	f.events <- `{"event":"submap","submap":""}`
-	waitForText(t, label, keybindModeLabel(config.Defaults().KeybindMode.Format, ""))
+	f.Events <- `{"event":"submap","submap":""}`
+	waitForText(t, label, defaultLabel)
 	if strings.Contains(onHeadlessLoop(label.Text), "resize") {
 		t.Error("the default binds still read as resize")
 	}

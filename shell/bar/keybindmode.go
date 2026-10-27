@@ -83,10 +83,13 @@ func submapSource(ctx ModuleContext) (<-chan string, func(), error) {
 		submaps := make(chan string)
 		go func() {
 			defer close(submaps)
-			for range w.Ticks() {
+			for {
 				select {
 				case submaps <- w.Submap():
 				case <-life.Done():
+					return
+				}
+				if _, ok := <-w.Ticks(); !ok {
 					return
 				}
 			}

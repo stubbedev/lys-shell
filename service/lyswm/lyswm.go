@@ -196,6 +196,28 @@ func ActiveWindow() (Window, bool, error) {
 	return *out, true, nil
 }
 
+func activeSubmap() (string, error) {
+	var out *string
+	if err := call(request{Request: "submap"}, &out); err != nil {
+		return "", err
+	}
+	if out == nil {
+		return "", errors.New("lys-wm: submap answered no result")
+	}
+	return *out, nil
+}
+
+func activeLayout() (Layout, error) {
+	var out *Layout
+	if err := call(request{Request: "layout"}, &out); err != nil {
+		return Layout{}, err
+	}
+	if out == nil {
+		return Layout{}, errors.New("lys-wm: layout answered no result")
+	}
+	return *out, nil
+}
+
 // Dispatch runs one action, as a bind would.
 func Dispatch(action string) error {
 	return call(request{Request: "dispatch", Action: action}, nil)
@@ -229,18 +251,18 @@ type event struct {
 }
 
 // Watcher follows the watch stream: it keeps the submap and keyboard
-// layout the stream last reported, and ticks after each event of the
-// kinds it was asked for.
+// layout, seeded from the submap and layout requests and then updated
+// by the stream, and ticks after each event of the kinds it was asked
+// for.
 type Watcher struct {
 	conn  net.Conn
 	kinds []EventKind
 	ticks chan struct{}
 	once  sync.Once
 
-	mu        sync.Mutex
-	submap    string
-	layout    Layout
-	hasLayout bool
+	mu     sync.Mutex
+	submap string
+	layout Layout
 }
 
 // Watch opens the event stream. It ticks on the given kinds, or on
@@ -259,7 +281,17 @@ func Watch(kinds ...EventKind) (*Watcher, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("lys-wm: watch: %w", err)
 	}
-	w := &Watcher{conn: conn, kinds: kinds, ticks: make(chan struct{}, 1)}
+	submap, err := activeSubmap()
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("lys-wm: watch: seed the submap: %w", err)
+	}
+	layout, err := activeLayout()
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("lys-wm: watch: seed the layout: %w", err)
+	}
+	w := &Watcher{conn: conn, kinds: kinds, ticks: make(chan struct{}, 1), submap: submap, layout: layout}
 	go w.pump(reader)
 	return w, nil
 }
@@ -294,24 +326,22 @@ func (w *Watcher) apply(e event) {
 	case e.Event == EventSubmap && e.Submap != nil:
 		w.submap = *e.Submap
 	case e.Event == EventLayout && e.Layout != nil:
-		w.layout, w.hasLayout = *e.Layout, true
+		w.layout = *e.Layout
 	}
 }
 
-// Submap is the bind submap the stream last reported; "" (the default
-// binds) until it reports one.
+// Submap is the active bind submap; "" for the default binds.
 func (w *Watcher) Submap() string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.submap
 }
 
-// Layout is the keyboard layout the stream last reported; false until
-// it reports one.
-func (w *Watcher) Layout() (Layout, bool) {
+// Layout is the active keyboard layout.
+func (w *Watcher) Layout() Layout {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.layout, w.hasLayout
+	return w.layout
 }
 
 // Ticks fires after each followed event; it closes when the stream
