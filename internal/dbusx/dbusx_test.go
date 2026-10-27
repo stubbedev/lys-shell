@@ -191,3 +191,65 @@ func TestFileWrapsAReceivedDescriptor(t *testing.T) {
 		t.Errorf("name %q", f.Name())
 	}
 }
+
+func TestSettersWriteTheirPropertyOnly(t *testing.T) {
+	dbustest.Session(t)
+	conn := dbustest.SessionConn(t)
+	var label dbustest.Var[string]
+	label.Store("old")
+	const wpath = dbus.ObjectPath("/dev/stubbe/lys/Writable")
+	unexport, err := dbusx.Export(conn, wpath, dbusx.Interface{
+		Name: iface, Methods: echo{},
+		Properties: dbusx.Getters{
+			"Label": func() any { return label.Load() },
+			"Fixed": func() any { return uint32(7) },
+		},
+		Setters: dbusx.Setters{"Label": func(v dbus.Variant) *dbus.Error {
+			s, ok := v.Value().(string)
+			if !ok {
+				return dbusx.InvalidArgs("Label is a string")
+			}
+			label.Store(s)
+			return nil
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unexport()
+	obj := dbustest.SessionConn(t).Object(conn.Names()[0], wpath)
+
+	if err := obj.SetProperty(iface+".Label", dbus.MakeVariant("new")); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := obj.GetProperty(iface + ".Label"); err != nil || v.Value() != "new" {
+		t.Errorf("Label = %v, %v; want new", v, err)
+	}
+	if err := obj.SetProperty(iface+".Label", dbus.MakeVariant(uint32(1))); !isDBusError(err, dbusx.ErrInvalidArgs) {
+		t.Errorf("wrong type: %v", err)
+	}
+	if err := obj.SetProperty(iface+".Fixed", dbus.MakeVariant(uint32(1))); !isDBusError(err, dbusx.ErrPropertyRO) {
+		t.Errorf("read-only: %v", err)
+	}
+	if err := obj.SetProperty(iface+".Nope", dbus.MakeVariant("x")); !isDBusError(err, dbusx.ErrUnknownProperty) {
+		t.Errorf("unknown: %v", err)
+	}
+	var xml string
+	if err := obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(xml, `<property name="Label" type="s" access="readwrite">`) || !strings.Contains(xml, `<property name="Fixed" type="u" access="read">`) {
+		t.Errorf("introspection does not mark the access:\n%s", xml)
+	}
+}
+
+func TestExportRefusesASetterWithoutAGetter(t *testing.T) {
+	dbustest.Session(t)
+	_, err := dbusx.Export(dbustest.SessionConn(t), "/dev/stubbe/lys/Bad", dbusx.Interface{
+		Name: iface, Methods: echo{},
+		Setters: dbusx.Setters{"Ghost": func(dbus.Variant) *dbus.Error { return nil }},
+	})
+	if err == nil || !strings.Contains(err.Error(), "Ghost") {
+		t.Errorf("Export = %v, want an error naming Ghost", err)
+	}
+}
