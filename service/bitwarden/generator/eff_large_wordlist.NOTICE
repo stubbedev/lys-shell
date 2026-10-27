@@ -1,0 +1,15 @@
+eff_large_wordlist.txt
+
+The words of the EFF large wordlist for passphrases, copyright the
+Electronic Frontier Foundation, from
+https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt
+(described at https://www.eff.org/dice).
+
+Licensed under the Creative Commons Attribution 3.0 United States
+License (CC BY 3.0 US), https://creativecommons.org/licenses/by/3.0/us/,
+the license of EFF's site when the list was published in 2016. EFF now
+offers its original material under the Creative Commons Attribution 4.0
+International License, https://creativecommons.org/licenses/by/4.0/.
+
+Changes: the dice-roll column is removed; the file holds the 7776 words
+in their original order, one per line.

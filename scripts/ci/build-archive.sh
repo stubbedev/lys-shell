@@ -25,7 +25,7 @@ for bin in lys-shell lys-greeter lys-lock lys-settings; do
 done
 cp "${BIN_DIR}/completions/completions.bash" "${BIN_DIR}/completions/_lys-shell" "${BIN_DIR}/completions/lys-shell.fish" "${STAGING}/completions/"
 
-cp LICENSE "${STAGING}/"
+cp LICENSE service/bitwarden/generator/eff_large_wordlist.NOTICE "${STAGING}/"
 cp -r resources/icons/hicolor "${STAGING}/icons/"
 cp resources/lys-shell.service \
 	resources/dev.stubbe.lys.settings.desktop \

@@ -142,3 +142,5 @@ lys-shell began as a fork of [wayle-rs/wayle](https://github.com/wayle-rs/wayle)
 ## License
 
 [MIT](LICENSE)
+
+The passphrase generator embeds the words of the EFF large wordlist by the Electronic Frontier Foundation, under the Creative Commons Attribution 3.0 United States License; see [eff_large_wordlist.NOTICE](service/bitwarden/generator/eff_large_wordlist.NOTICE).

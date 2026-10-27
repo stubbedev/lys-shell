@@ -8,7 +8,7 @@ Name:           lys-shell
 Version:        @VERSION@
 Release:        1%{?dist}
 Summary:        Wayland desktop shell
-License:        MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND CC0-1.0 AND blessing
+License:        MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND CC0-1.0 AND CC-BY-3.0-US AND blessing
 URL:            https://github.com/stubbedev/lys-shell
 Source0:        https://github.com/stubbedev/lys-shell/releases/download/v%{version}/lys-shell-%{version}-%{_arch}-linux.tar.gz
 ExclusiveArch:  x86_64
@@ -78,7 +78,7 @@ install -d %{buildroot}%{_datadir}/fish/vendor_completions.d
 install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/lys-shell.fish
 
 %files
-%license LICENSE
+%license LICENSE eff_large_wordlist.NOTICE
 %{_bindir}/lys-shell
 %{_bindir}/lys-greeter
 %{_bindir}/lys-lock
