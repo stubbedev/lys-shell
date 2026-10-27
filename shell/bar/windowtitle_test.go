@@ -12,8 +12,6 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/mango"
-	"github.com/stubbedev/lys-shell/service/niri"
 )
 
 // startFakeEventStream serves one burst of socket2 lines and keeps the
@@ -140,9 +138,7 @@ func TestWindowTitleIcon(t *testing.T) {
 
 // Without a supported compositor the module is skipped with an error.
 func TestNewWindowTitleNeedsACompositor(t *testing.T) {
-	for _, env := range []string{niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
-		t.Setenv(env, "")
-	}
+	clearCompositorEnv(t)
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Hyprland = nil
 	if _, err := Create("window-title", ctx); err == nil {

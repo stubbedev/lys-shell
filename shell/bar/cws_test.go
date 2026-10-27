@@ -747,8 +747,7 @@ func TestCwsModuleIsNotWrappedInButtonChrome(t *testing.T) {
 }
 
 func TestCwsFactoriesRequireTheirCompositor(t *testing.T) {
-	t.Setenv("SWAYSOCK", "")
-	t.Setenv("NIRI_SOCKET", "")
+	clearCompositorEnv(t)
 	ctx := newTestContext(t, config.Defaults())
 	for _, name := range []string{"sway-workspaces", "niri-workspaces"} {
 		if _, err := Create(name, ctx); err == nil {
