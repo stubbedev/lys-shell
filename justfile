@@ -148,6 +148,12 @@ hyprland-vm:
 lys-wm-vm:
     nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-lys-wm-vm
 
+# lys-login as the display manager in a NixOS VM (needs KVM): the greeter in
+# a lys-wm kiosk with no greetd or cage, a wrong and a right password, the
+# logind session, and the greeter back after it. Screenshots in ./result.
+login-vm:
+    nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-login-vm
+
 # Every release gate in order: vet, lint, test, race, the schema
 # check, and the release build.
 check: vet lint test race schema-check build

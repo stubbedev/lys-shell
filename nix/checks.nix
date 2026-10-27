@@ -17,6 +17,12 @@
             inherit self;
             inherit (inputs) lys-wm;
           };
+          # lys-login as the display manager in a NixOS VM (needs KVM); see
+          # tests/login-vm.nix.
+          lys-shell-login-vm = pkgs.callPackage ../tests/login-vm.nix {
+            inherit self;
+            inherit (inputs) lys-wm;
+          };
         }
         // {
           # Every wrapped binary finds the Vulkan loader: lys-ui renders on

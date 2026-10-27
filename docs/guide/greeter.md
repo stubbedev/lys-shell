@@ -88,13 +88,33 @@ clobbered.
 
 ## How it runs
 
-greetd starts a kiosk compositor ([cage](https://github.com/cage-kiosk/cage))
-whose single client is the greeter. On successful login greetd replaces the
-greeter with your chosen session.
+There are two ways to run it.
+
+**Under greetd** (the default): greetd starts a kiosk compositor
+([cage](https://github.com/cage-kiosk/cage)) whose single client is the
+greeter. On successful login greetd replaces the greeter with your chosen
+session.
 
 ```
 greetd → cage -s → lys-login greet → (login) → your compositor
 ```
+
+**As its own display manager** (`lys-login daemon`): a root daemon on a VT
+shows the greeter in a lys-wm kiosk (a generated lys-wm config with no
+binds, the greeter as its one program) and starts the session itself. PAM
+is the only dependency: no greetd, no cage. Every login runs in a worker
+process of its own that holds the PAM transaction and leads the logind
+session pam_systemd registers; the greeter runs as the unprivileged
+`lys-greeter` user and talks to the daemon in the greetd protocol over a
+socket only it can reach, so it is the same greeter in both setups.
+
+```
+lys-login daemon → worker (greeter session) → lys-wm kiosk → lys-login greet
+                 → worker (your login)       → your compositor
+```
+
+When the session ends the greeter comes back. A wrong password keeps the
+greeter up for the next attempt.
 
 ## NixOS
 
@@ -113,6 +133,21 @@ programs.lys-shell.greeter = {
   };
 };
 ```
+
+To run it as its own display manager instead of under greetd:
+
+```nix
+programs.lys-wm.enable = true;
+programs.lys-shell.greeter = {
+  enable = true;
+  displayManager = "lys-login";
+  compositorPackage = config.programs.lys-wm.package;
+};
+```
+
+This adds the `lys-login` PAM service, the `lys-greeter` system user and a
+`display-manager.service` running `lys-login daemon` on `greeter.vt` (1),
+and leaves greetd and cage out.
 
 Sessions are discovered from the aggregate NixOS sessions directory, which
 contains the session files of every installed Wayland compositor. Options:

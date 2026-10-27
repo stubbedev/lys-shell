@@ -198,6 +198,34 @@ in
         description = "Package providing the `lys-login` binary.";
       };
 
+      displayManager = lib.mkOption {
+        type = lib.types.enum [
+          "greetd"
+          "lys-login"
+        ];
+        default = "greetd";
+        description = ''
+          What runs the greeter. `greetd` runs it under greetd in a cage kiosk.
+          `lys-login` is lys-login's own display manager: a root daemon on
+          `vt` that shows the greeter in a lys-wm kiosk (`compositorPackage`)
+          and starts the session a user logs in to through PAM (the
+          `lys-login` service), with neither greetd nor cage.
+        '';
+      };
+
+      compositorPackage = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        example = lib.literalExpression "config.programs.lys-wm.package";
+        description = "lys-wm, the kiosk compositor the `lys-login` display manager shows the greeter in.";
+      };
+
+      vt = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 1;
+        description = "Virtual terminal the `lys-login` display manager runs on.";
+      };
+
       cagePackage = lib.mkOption {
         type = lib.types.package;
         default = pkgs.cage;
@@ -421,7 +449,7 @@ in
       security.pam.services.${cfg.lock.pamService}.enableGnomeKeyring = !cfg.secrets.enable;
     })
 
-    (lib.mkIf cfg.greeter.enable {
+    (lib.mkIf (cfg.greeter.enable && cfg.greeter.displayManager == "greetd") {
       # greetd runs the kiosk compositor + greeter as the unprivileged greeter
       # user. mkDefault so an explicit greetd config wins.
       services.greetd = {
@@ -435,6 +463,93 @@ in
         "d ${greeterStateDir} 0700 greeter greeter -"
       ];
 
+      environment.systemPackages = [ cfg.greeter.cagePackage ];
+    })
+
+    (lib.mkIf (cfg.greeter.enable && cfg.greeter.displayManager == "lys-login") {
+      assertions = [
+        {
+          assertion = cfg.greeter.compositorPackage != null;
+          message = ''programs.lys-shell.greeter.displayManager = "lys-login" needs programs.lys-shell.greeter.compositorPackage (lys-wm).'';
+        }
+      ];
+      services.displayManager.enable = true;
+      users.users.lys-greeter = {
+        isSystemUser = true;
+        group = "lys-greeter";
+        home = greeterStateDir;
+      };
+      users.groups.lys-greeter = { };
+      # One PAM service for both: the greeter's session (class greeter, no
+      # authentication) and each login. startSession adds pam_systemd, which
+      # registers both with logind on the seat and VT the daemon hands it.
+      security.pam.services.lys-login.startSession = true;
+      systemd.tmpfiles.rules = [
+        "d ${greeterStateDir} 0700 lys-greeter lys-greeter -"
+      ];
+      systemd.defaultUnit = "graphical.target";
+      systemd.services.lys-login = {
+        description = "lys-login display manager";
+        aliases = [ "display-manager.service" ];
+        wantedBy = [ "graphical.target" ];
+        wants = [ "systemd-user-sessions.service" ];
+        after = [
+          "systemd-user-sessions.service"
+          "plymouth-quit-wait.service"
+          "getty@tty${toString cfg.greeter.vt}.service"
+        ];
+        conflicts = [ "getty@tty${toString cfg.greeter.vt}.service" ];
+        restartIfChanged = false;
+        serviceConfig = {
+          ExecStart = lib.escapeShellArgs (
+            [
+              (lib.getExe' cfg.greeter.package "lys-login")
+              "daemon"
+              "--vt"
+              (toString cfg.greeter.vt)
+              "--service"
+              "lys-login"
+              "--greeter-user"
+              "lys-greeter"
+              "--compositor"
+              (lib.getExe' cfg.greeter.compositorPackage "lys-wm")
+              "--"
+              "--config"
+              "/etc/lys-shell/config.yaml"
+              "--state"
+              "${greeterStateDir}/last-session"
+            ]
+            ++ lib.concatMap (d: [
+              "--sessions"
+              d
+            ]) cfg.greeter.session.dirs
+            ++ lib.concatMap (d: [
+              "--xsessions"
+              d
+            ]) cfg.greeter.session.x11Dirs
+            ++ lib.concatMap (e: [
+              "--env"
+              e
+            ]) cfg.greeter.session.environment
+            ++ lib.optionals (cfg.greeter.session.command != "") [
+              "--"
+              "/bin/sh"
+              "-c"
+              cfg.greeter.session.command
+            ]
+          );
+          Restart = "always";
+          RestartSec = 1;
+          Type = "idle";
+          KeyringMode = "shared";
+          IgnoreSIGPIPE = false;
+          SendSIGHUP = true;
+          TimeoutStopSec = "30s";
+        };
+      };
+    })
+
+    (lib.mkIf cfg.greeter.enable {
       # The greeter runs as the greetd user with no $HOME, so its theme config
       # lives system-wide. environment.etc files are world-readable (0444).
       environment.etc."lys-shell/config.yaml" = lib.mkIf (cfg.greeter.settings != { }) {
@@ -448,8 +563,6 @@ in
       security.polkit.enable = true;
       environment.etc."polkit-1/actions/dev.stubbe.lys.greeter.policy".source =
         "${cfg.greeter.package}/share/polkit-1/actions/dev.stubbe.lys.greeter.policy";
-
-      environment.systemPackages = [ cfg.greeter.cagePackage ];
     })
 
     (lib.mkIf cfg.autoInstallDependencies {
