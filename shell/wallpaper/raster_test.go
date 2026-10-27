@@ -1,10 +1,13 @@
 package wallpaper
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"image"
+	"image/jpeg"
+	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -16,6 +19,7 @@ import (
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
@@ -93,16 +97,17 @@ func TestRasterUnknownOutputKeepsTheSourceSize(t *testing.T) {
 }
 
 // harness runs a shell on fake surfaces: work off the loop waits in a
-// queue until run, decodes come from a map, every renderer forget is
+// queue until run, decodes read JPEG files into the rasters' memory
+// unless made undecodable, every renderer forget is
 // recorded and checked, and once the loop has ended an invoke is
 // dropped, as lys-ui drops it.
 type harness struct {
-	t       *testing.T
-	s       *Shell
-	dir     string
-	images  map[string]image.Image
-	decodes map[string]int
-	queued  []func()
+	t         *testing.T
+	s         *Shell
+	dir       string
+	decodable map[string]bool
+	decodes   map[string]int
+	queued    []func()
 	// forgotten are the IDs the renderer was told to forget, in order.
 	forgotten []render.ImageID
 	// closed counts each output's closed layers; onClosed is its
@@ -119,11 +124,18 @@ func newHarness(t *testing.T, kind config.AnimationType, monitors ...string) *ha
 	t.Helper()
 	h := &harness{
 		t: t, dir: files(t, "a.png", "b.png", "c.png"),
-		images: map[string]image.Image{}, decodes: map[string]int{},
+		decodable: map[string]bool{}, decodes: map[string]int{},
 		closed: map[string]int{}, onClosed: map[string]func(){}, ticks: map[string]func(){},
 	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, photo(120, 80), nil); err != nil {
+		t.Fatal(err)
+	}
 	for _, n := range []string{"a.png", "b.png", "c.png"} {
-		h.images[h.path(n)] = photo(120, 80)
+		if err := os.WriteFile(h.path(n), buf.Bytes(), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		h.decodable[h.path(n)] = true
 	}
 	cfg := config.Defaults()
 	ms := uint32(1)
@@ -144,12 +156,12 @@ func newHarness(t *testing.T, kind config.AnimationType, monitors ...string) *ha
 		},
 	}
 	h.s = newShell(ui, svc, cfg, rasterDeps{
-		decode: func(path string) (image.Image, error) {
+		decode: func(mem *memory.Shared, path string) (imagedecode.Decoded, error) {
 			h.decodes[path]++
-			if img, ok := h.images[path]; ok {
-				return img, nil
+			if !h.decodable[path] {
+				return imagedecode.Decoded{}, errors.New("no such image")
 			}
-			return nil, errors.New("no such image")
+			return imagedecode.OpenOffHeap(mem, path)
 		},
 		spawn: func(fn func()) { h.queued = append(h.queued, fn) },
 		invoke: func(fn func()) {
@@ -526,13 +538,69 @@ func TestUndecodableFileLeavesNothing(t *testing.T) {
 	h := newHarness(t, config.AnimationNone, "DP-1")
 	h.plug("DP-1", 64, 36)
 	h.run()
-	delete(h.images, h.path("b.png"))
+	delete(h.decodable, h.path("b.png"))
 	h.show("b.png")
 	h.wantLive(1, "a kept")
 	h.wantForgotten("a kept")
 	if len(h.s.rasters.waiting) != 0 || len(h.s.rasters.decoding) != 0 {
 		t.Errorf("left %d waiting keys and %d decodes", len(h.s.rasters.waiting), len(h.s.rasters.decoding))
 	}
+}
+
+// The decoded image lives off the heap while its rasters are made, and
+// is freed once the last of them is.
+func TestDecodedImageIsFreedOnceEveryRasterIsMade(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1", "DP-2")
+	h.plug("DP-1", 64, 36)
+	h.plug("DP-2", 32, 18)
+	h.wantLive(0, "nothing decoded yet")
+	h.step()
+	if len(h.queued) != 2 {
+		t.Fatalf("%d resamples queued, want one per size", len(h.queued))
+	}
+	h.wantLive(1, "the decoded image waits for its resamples")
+	fn := h.queued[0]
+	h.queued = h.queued[1:]
+	fn()
+	h.wantLive(2, "one raster made, the decoded image still needed")
+	h.run()
+	h.wantLive(2, "both rasters made, the decoded image freed")
+}
+
+// A decode that finishes after the loop ended lands nowhere: shutdown
+// frees the decoded image, and no raster is made from it.
+func TestShutdownFreesADecodeTheLoopNeverTook(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1")
+	h.plug("DP-1", 64, 36)
+	h.ended.Store(true)
+	h.step()
+	if len(h.queued) != 0 {
+		t.Fatalf("%d resamples queued from a decode the loop never took", len(h.queued))
+	}
+	h.wantLive(1, "the decoded image landed nowhere")
+	h.s.shutdown()
+	h.wantLive(0, "shut down")
+}
+
+// Resamples that never start because shutdown began still free the
+// decoded image they would have read.
+func TestShutdownFreesTheDecodedImageOfResamplesNotStarted(t *testing.T) {
+	h := newHarness(t, config.AnimationNone, "DP-1", "DP-2")
+	h.plug("DP-1", 64, 36)
+	h.plug("DP-2", 32, 18)
+	h.step()
+	h.ended.Store(true)
+	shut := make(chan struct{})
+	go func() {
+		defer close(shut)
+		h.s.shutdown()
+	}()
+	for !h.s.rasters.work.Closed() {
+		time.Sleep(time.Millisecond)
+	}
+	h.run()
+	<-shut
+	h.wantLive(0, "shut down before the resamples ran")
 }
 
 // Releasing a raster nobody holds is a bug, not a no-op.

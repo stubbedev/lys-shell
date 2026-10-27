@@ -3,12 +3,14 @@ package wallpaper
 import (
 	"image"
 	"log"
+	"sync/atomic"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/internal/handoff"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/offheap"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
@@ -39,8 +41,8 @@ func (r *raster) size() image.Point { return r.image.Rect.Size() }
 
 // rasterDeps are the effects the rasters run through.
 type rasterDeps struct {
-	// decode reads an image file.
-	decode func(path string) (image.Image, error)
+	// decode reads an image file, its pixels in mem where it can.
+	decode func(mem *memory.Shared, path string) (imagedecode.Decoded, error)
 	// spawn runs work off the loop.
 	spawn func(func())
 	// invoke runs fn on the loop.
@@ -103,25 +105,53 @@ func (rs *rasters) acquire(key rasterKey, done func(*raster)) {
 		if rs.work.Closed() {
 			return
 		}
-		img, err := rs.d.decode(key.path)
-		rs.d.invoke(func() { rs.decoded(key.path, img, err) })
+		src, err := rs.d.decode(&rs.mem, key.path)
+		if err != nil {
+			rs.d.invoke(func() { rs.undecodable(key.path, err) })
+			return
+		}
+		rs.work.Deliver(rs.d.invoke, func() { rs.decoded(key.path, src) }, func() { freeSource(key.path, src) })
 	})
 }
 
+// undecodable drops every key asked of path.
+func (rs *rasters) undecodable(path string, err error) {
+	log.Printf("wallpaper: cannot decode wallpaper %s: %v", path, err)
+	for _, key := range rs.decoding[path] {
+		delete(rs.waiting, key)
+	}
+	delete(rs.decoding, path)
+}
+
 // decoded makes every key asked of path from its decoded image, each
-// off the loop.
-func (rs *rasters) decoded(path string, img image.Image, err error) {
+// off the loop, and frees the image once the last of them is made or
+// never starts.
+func (rs *rasters) decoded(path string, src imagedecode.Decoded) {
 	keys := rs.decoding[path]
 	delete(rs.decoding, path)
-	if err != nil {
-		log.Printf("wallpaper: cannot decode wallpaper %s: %v", path, err)
-		for _, key := range keys {
-			delete(rs.waiting, key)
+	var users atomic.Int64
+	users.Store(int64(len(keys)) + 1)
+	done := func() {
+		if users.Add(-1) == 0 {
+			freeSource(path, src)
 		}
-		return
 	}
 	for _, key := range keys {
-		rs.work.Go(rs.d.spawn, func() { rs.make(key, img) })
+		if !rs.work.Go(rs.d.spawn, func() {
+			defer done()
+			rs.make(key, src.Image)
+		}) {
+			done()
+		}
+	}
+	done()
+}
+
+// freeSource frees the decoded image of path; nothing reads it any
+// more.
+func freeSource(path string, src imagedecode.Decoded) {
+	if err := src.Free(); err != nil {
+		log.Printf("wallpaper: freeing the decoded %s: %v", path, err)
 	}
 }
 
