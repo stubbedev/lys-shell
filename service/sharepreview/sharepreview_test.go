@@ -4,6 +4,8 @@ import (
 	"image"
 	"image/color"
 	"reflect"
+	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/capture"
@@ -131,4 +133,39 @@ func TestParseList(t *testing.T) {
 			t.Fatalf("parsed %+v", got)
 		}
 	})
+}
+
+// Every output transform lands each pixel where image.rs puts it, into
+// a fresh image and into one the caller owns at an offset origin.
+func TestTransformInto(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 3, 2))
+	for i := range src.Pix {
+		src.Pix[i] = uint8(i / 4)
+	}
+	for tr, want := range map[capture.Transform][]string{
+		capture.TransformNormal:     {"012", "345"},
+		capture.Transform90:         {"30", "41", "52"},
+		capture.Transform180:        {"543", "210"},
+		capture.Transform270:        {"25", "14", "03"},
+		capture.TransformFlipped:    {"345", "012"},
+		capture.TransformFlipped90:  {"03", "14", "25"},
+		capture.TransformFlipped180: {"210", "543"},
+		capture.TransformFlipped270: {"52", "41", "30"},
+	} {
+		w, h := TransformedSize(3, 2, tr)
+		owned := image.NewRGBA(image.Rect(5, 7, 5+w, 7+h))
+		TransformInto(owned, src, tr)
+		for _, img := range []*image.RGBA{Transform(src, tr), owned} {
+			b := img.Bounds()
+			got := make([]string, b.Dy())
+			for y := range b.Dy() {
+				for x := range b.Dx() {
+					got[y] += strconv.Itoa(int(img.RGBAAt(b.Min.X+x, b.Min.Y+y).R))
+				}
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("transform %d: %q, want %q", tr, got, want)
+			}
+		}
+	}
 }

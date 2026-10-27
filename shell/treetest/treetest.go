@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -253,4 +254,15 @@ func ButtonTextPx(a, b *widget.Button, face render.Font) float64 {
 	grow := a.Measure(unbounded).W - b.Measure(unbounded).W
 	unit := (face.Shape(widget.Describe(a).Name, 1000).Advance() - face.Shape(widget.Describe(b).Name, 1000).Advance()) / 1000
 	return float64(grow) / unit
+}
+
+// HeapBytes is how many bytes f allocates on the Go heap, read from
+// the runtime's stopped-world statistics so allocations still cached
+// per thread are counted where they happened.
+func HeapBytes(f func()) uint64 {
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	f()
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
 }

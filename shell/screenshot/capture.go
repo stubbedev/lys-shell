@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	"log"
 	"math"
 	"sync"
 
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -23,10 +26,23 @@ import (
 // Every function blocks on the capture connection.
 
 // frozenOutput is one output captured up front: its connector and the
-// full-resolution, transform-corrected frame.
+// full-resolution, transform-corrected frame. The frame's pixels live
+// off the Go heap in pix, so they go back to the system when the frame
+// is released instead of lingering as garbage; its identity keys the
+// GPU texture drawn from it, which is dropped on release too.
 type frozenOutput struct {
 	connector string
-	image     *image.RGBA
+	image     render.StillImage
+	pix       memory.Slice[byte]
+}
+
+// framesOf maps each frozen output's connector to its frame.
+func framesOf(frozen []frozenOutput) map[string]render.StillImage {
+	frames := make(map[string]render.StillImage, len(frozen))
+	for _, f := range frozen {
+		frames[f.connector] = f.image
+	}
+	return frames
 }
 
 // windowTarget identifies the window to capture: one the user picked
@@ -44,12 +60,84 @@ type windowTarget struct {
 	hasAppID, hasTitle bool
 }
 
+// offHeapRGBA is a zeroed w x h image whose pixels mem holds, and the
+// slice to free them by.
+func offHeapRGBA(mem *memory.Shared, w, h int) (*image.RGBA, memory.Slice[byte], error) {
+	pix, err := memory.MakeSlice[byte](mem, 4*w*h)
+	if err != nil {
+		return nil, pix, fmt.Errorf("cannot allocate a %dx%d frame: %w", w, h, err)
+	}
+	return &image.RGBA{Pix: pix.Elems(), Stride: 4 * w, Rect: image.Rect(0, 0, w, h)}, pix, nil
+}
+
+// freeFrames frees the frames' pixels; nothing may draw them any more.
+func freeFrames(mem *memory.Shared, frozen []frozenOutput) {
+	pix := make([]memory.Slice[byte], len(frozen))
+	for i, f := range frozen {
+		pix[i] = f.pix
+	}
+	freePixels(mem, pix...)
+}
+
+// freePixels frees pixels mem holds and hands the pages back to the
+// system at once: the allocator otherwise keeps the newest region of
+// each size committed for reuse, a whole frame's worth of resident
+// memory for the next capture.
+func freePixels(mem *memory.Shared, pix ...memory.Slice[byte]) {
+	for _, p := range pix {
+		if err := memory.FreeSlice(mem, p); err != nil {
+			log.Printf("screenshot: freeing %d bytes of frame pixels: %v", p.Len(), err)
+		}
+	}
+	if err := mem.Trim(); err != nil {
+		log.Printf("screenshot: returning freed frame pages: %v", err)
+	}
+}
+
+// frozenFrame converts a captured frame into pixels mem holds, with the
+// output transform applied: straight in when there is none, else
+// through a scratch image freed before it returns.
+func frozenFrame(mem *memory.Shared, connector string, f *capture.Frame, t capture.Transform) (frozenOutput, error) {
+	w, h := sharepreview.TransformedSize(f.Width, f.Height, t)
+	img, pix, err := offHeapRGBA(mem, w, h)
+	if err != nil {
+		return frozenOutput{}, err
+	}
+	out := frozenOutput{connector: connector, image: render.NewStillImage(img), pix: pix}
+	if t == capture.TransformNormal {
+		err = f.ImageInto(img)
+	} else {
+		err = transformedInto(mem, img, f, t)
+	}
+	if err != nil {
+		freeFrames(mem, []frozenOutput{out})
+		return frozenOutput{}, fmt.Errorf("cannot decode the capture of %s: %w", connector, err)
+	}
+	return out, nil
+}
+
+// transformedInto converts f into dst with t applied, through a
+// scratch image of f's own orientation that mem holds while it runs.
+func transformedInto(mem *memory.Shared, dst *image.RGBA, f *capture.Frame, t capture.Transform) error {
+	raw, pix, err := offHeapRGBA(mem, f.Width, f.Height)
+	if err != nil {
+		return err
+	}
+	defer freePixels(mem, pix)
+	if err := f.ImageInto(raw); err != nil {
+		return err
+	}
+	sharepreview.TransformInto(dst, raw, t)
+	return nil
+}
+
 // captureAllOutputs captures every named output for the freeze-frame
-// flows, the pointer composited in when pointer is set. Run it before any overlay maps, so transient popups on screen
+// flows into frames mem holds, the pointer composited in when pointer
+// is set. Run it before any overlay maps, so transient popups on screen
 // are baked into the frames. The copies run sequentially on one
 // connection; the conversions (format + transform) fan out one
-// goroutine per output.
-func captureAllOutputs(pointer bool) ([]frozenOutput, error) {
+// goroutine per output. On an error no frame is left allocated.
+func captureAllOutputs(mem *memory.Shared, pointer bool) ([]frozenOutput, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
@@ -75,17 +163,11 @@ func captureAllOutputs(pointer bool) ([]frozenOutput, error) {
 	errs := make([]error, len(raws))
 	var wg sync.WaitGroup
 	for i, r := range raws {
-		wg.Go(func() {
-			img, err := sharepreview.FrameImage(r.frame, r.transform)
-			if err != nil {
-				errs[i] = fmt.Errorf("cannot decode capture: %w", err)
-				return
-			}
-			out[i] = frozenOutput{connector: r.connector, image: img}
-		})
+		wg.Go(func() { out[i], errs[i] = frozenFrame(mem, r.connector, r.frame, r.transform) })
 	}
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {
+		freeFrames(mem, out)
 		return nil, err
 	}
 	return out, nil
@@ -274,7 +356,7 @@ func cropFrozen(img *image.RGBA, logicalW, logicalH int, sel regionoverlay.Selec
 // frozen frames, at logical resolution as the whole-screen composite:
 // each output's part is cropped at its frame's resolution, scaled to
 // its logical size, and placed by its offset in the selection.
-func cropAcross(frames map[string]*image.RGBA, monitors []regionoverlay.Monitor, sel image.Rectangle) *image.RGBA {
+func cropAcross(frames map[string]render.StillImage, monitors []regionoverlay.Monitor, sel image.Rectangle) *image.RGBA {
 	out := image.NewRGBA(image.Rect(0, 0, sel.Dx(), sel.Dy()))
 	for _, m := range monitors {
 		frame, ok := frames[m.Connector]
@@ -283,7 +365,7 @@ func cropAcross(frames map[string]*image.RGBA, monitors []regionoverlay.Monitor,
 		if !ok || part.Empty() {
 			continue
 		}
-		crop := cropFrozen(frame, m.Width, m.Height, regionoverlay.Selection{
+		crop := cropFrozen(frame.RGBA, m.Width, m.Height, regionoverlay.Selection{
 			Output: m.Connector, X: part.Min.X - m.X, Y: part.Min.Y - m.Y, Width: part.Dx(), Height: part.Dy(),
 		})
 		if b := crop.Bounds(); b.Dx() != part.Dx() || b.Dy() != part.Dy() {

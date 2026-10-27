@@ -61,6 +61,13 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 		Picker:   colorpicker.New(application, outputs, font, colorpicker.HistoryPath()),
 		Focus:    focus,
 		Copy:     clipboardCopier(application),
+		Forget: func(ids []render.ImageID) {
+			application.Invoke(func() {
+				for _, id := range ids {
+					application.ForgetImage(id)
+				}
+			})
+		},
 	}}
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {

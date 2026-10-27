@@ -25,65 +25,62 @@ func FrameImage(f *capture.Frame, t capture.Transform) (*image.RGBA, error) {
 // Transform applies an output transform to a captured frame the way
 // image.rs's Image::transform does: the 90/270 variants rotate
 // clockwise (image's rotate90/rotate270), and the flipped variants
-// flip vertically first.
+// flip vertically first. TransformNormal returns img itself.
 func Transform(img *image.RGBA, t capture.Transform) *image.RGBA {
-	switch t {
-	case capture.Transform90:
-		return rotate90(img)
-	case capture.Transform180:
-		return rotate180(img)
-	case capture.Transform270:
-		return rotate270(img)
-	case capture.TransformFlipped:
-		return flipVertical(img)
-	case capture.TransformFlipped90:
-		return rotate90(flipVertical(img))
-	case capture.TransformFlipped180:
-		return rotate180(flipVertical(img))
-	case capture.TransformFlipped270:
-		return rotate270(flipVertical(img))
+	if t == capture.TransformNormal {
+		return img
 	}
-	return img
-}
-
-// remap builds a w x h image whose pixel (x, y) comes from src at
-// at(x, y).
-func remap(src *image.RGBA, w, h int, at func(x, y int) (int, int)) *image.RGBA {
+	w, h := TransformedSize(img.Bounds().Dx(), img.Bounds().Dy(), t)
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	b := src.Bounds()
-	for y := range h {
-		for x := range w {
-			sx, sy := at(x, y)
-			si := src.PixOffset(b.Min.X+sx, b.Min.Y+sy)
-			di := dst.PixOffset(x, y)
-			copy(dst.Pix[di:di+4], src.Pix[si:si+4])
-		}
-	}
+	TransformInto(dst, img, t)
 	return dst
 }
 
-// rotate90 turns the image 90 degrees clockwise.
-func rotate90(src *image.RGBA) *image.RGBA {
-	w, h := src.Bounds().Dx(), src.Bounds().Dy()
-	return remap(src, h, w, func(x, y int) (int, int) { return y, h - 1 - x })
+// TransformedSize is the size of a w x h frame once t is applied.
+func TransformedSize(w, h int, t capture.Transform) (int, int) {
+	if t.SwapsAxes() {
+		return h, w
+	}
+	return w, h
 }
 
-// rotate180 turns the image upside down.
-func rotate180(src *image.RGBA) *image.RGBA {
-	w, h := src.Bounds().Dx(), src.Bounds().Dy()
-	return remap(src, w, h, func(x, y int) (int, int) { return w - 1 - x, h - 1 - y })
+// TransformInto writes src with t applied into dst, for a caller that
+// owns dst's memory; dst has src's TransformedSize.
+func TransformInto(dst, src *image.RGBA, t capture.Transform) {
+	b := src.Bounds()
+	at := sourceOf(t, b.Dx(), b.Dy())
+	d := dst.Bounds()
+	for y := range d.Dy() {
+		for x := range d.Dx() {
+			sx, sy := at(x, y)
+			si := src.PixOffset(b.Min.X+sx, b.Min.Y+sy)
+			di := dst.PixOffset(d.Min.X+x, d.Min.Y+y)
+			copy(dst.Pix[di:di+4], src.Pix[si:si+4])
+		}
+	}
 }
 
-// rotate270 turns the image 270 degrees clockwise.
-func rotate270(src *image.RGBA) *image.RGBA {
-	w, h := src.Bounds().Dx(), src.Bounds().Dy()
-	return remap(src, h, w, func(x, y int) (int, int) { return w - 1 - y, x })
-}
-
-// flipVertical mirrors the image top to bottom.
-func flipVertical(src *image.RGBA) *image.RGBA {
-	w, h := src.Bounds().Dx(), src.Bounds().Dy()
-	return remap(src, w, h, func(x, y int) (int, int) { return x, h - 1 - y })
+// sourceOf maps a pixel of a w x h source with t applied back to the
+// source pixel it shows. The flipped variants flip vertically before
+// they rotate, so their source is the rotation's source flipped.
+func sourceOf(t capture.Transform, w, h int) func(x, y int) (int, int) {
+	switch t {
+	case capture.Transform90:
+		return func(x, y int) (int, int) { return y, h - 1 - x }
+	case capture.Transform180:
+		return func(x, y int) (int, int) { return w - 1 - x, h - 1 - y }
+	case capture.Transform270:
+		return func(x, y int) (int, int) { return w - 1 - y, x }
+	case capture.TransformFlipped:
+		return func(x, y int) (int, int) { return x, h - 1 - y }
+	case capture.TransformFlipped90:
+		return func(x, y int) (int, int) { return y, x }
+	case capture.TransformFlipped180:
+		return func(x, y int) (int, int) { return w - 1 - x, y }
+	case capture.TransformFlipped270:
+		return func(x, y int) (int, int) { return w - 1 - y, h - 1 - x }
+	}
+	return func(x, y int) (int, int) { return x, y }
 }
 
 // Resize scales the image to w x h with a triangle (bilinear) filter,

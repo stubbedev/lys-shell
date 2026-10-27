@@ -4,6 +4,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/render"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
@@ -169,12 +171,12 @@ func TestParseHyprlandActiveWindow(t *testing.T) {
 type fakeRegion struct {
 	sel     regionoverlay.Selection
 	ok      bool
-	frames  map[string]*image.RGBA
+	frames  map[string]render.StillImage
 	block   chan struct{}
 	cancels int
 }
 
-func (f *fakeRegion) Request(frames map[string]*image.RGBA) (regionoverlay.Selection, bool) {
+func (f *fakeRegion) Request(frames map[string]render.StillImage) (regionoverlay.Selection, bool) {
 	f.frames = frames
 	if f.block != nil {
 		<-f.block
@@ -196,7 +198,7 @@ type fakePicker struct {
 	err error
 }
 
-func (f fakePicker) Request(map[string]*image.RGBA) (colorpicker.RGB, bool, error) {
+func (f fakePicker) Request(map[string]render.StillImage) (colorpicker.RGB, bool, error) {
 	return f.c, f.ok, f.err
 }
 func (fakePicker) Cancel() {}
@@ -221,12 +223,26 @@ func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
 		Picker: fakePicker{c: colorpicker.RGB{R: 255, G: 51, B: 0}, ok: true},
 		Copy:   func(image.Image) error { copies++; return nil },
 		Notify: func(p string) { notified = append(notified, p) },
+		Forget: func([]render.ImageID) {},
 		now:    func() time.Time { return time.Date(2026, 9, 30, 12, 34, 56, 0, time.Local) },
-		frozen: func(bool) ([]frozenOutput, error) {
-			return []frozenOutput{{"DP-1", solid(200, 100, red)}, {"DP-2", solid(100, 50, green)}}, nil
-		},
+	}
+	h.frozen = func(bool) ([]frozenOutput, error) {
+		return []frozenOutput{offHeap(t, h, "DP-1", solid(200, 100, red)), offHeap(t, h, "DP-2", solid(100, 50, green))}, nil
 	}
 	return h, &notified, &copies
+}
+
+// offHeap is a frozen frame of img's pixels that h's allocator holds,
+// as the capture makes them.
+func offHeap(t *testing.T, h *Host, connector string, img *image.RGBA) frozenOutput {
+	t.Helper()
+	b := img.Bounds()
+	dst, pix, err := offHeapRGBA(&h.mem, b.Dx(), b.Dy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	draw.Draw(dst, dst.Bounds(), img, b.Min, draw.Src)
+	return frozenOutput{connector: connector, image: render.NewStillImage(dst), pix: pix}
 }
 
 func TestHostRegionCapture(t *testing.T) {
@@ -240,7 +256,7 @@ func TestHostRegionCapture(t *testing.T) {
 	if path != want {
 		t.Fatalf("path %q, want %q", path, want)
 	}
-	if len(region.frames) != 2 || region.frames["DP-1"] == nil {
+	if len(region.frames) != 2 || region.frames["DP-1"].RGBA == nil {
 		t.Fatal("the overlay did not get the frozen frames")
 	}
 	f, err := os.Open(path)
@@ -408,7 +424,8 @@ func TestHostCapturePrivate(t *testing.T) {
 	if _, err := os.Stat(h.Config().OutputDirectory); !errors.Is(err, os.ErrNotExist) {
 		t.Error("an app's capture went to the user's screenshot directory")
 	}
-	if path, err := (&Host{Region: &fakeRegion{}, frozen: h.frozen, Monitors: h.Monitors}).CapturePrivate(portalreq.Caller{}, ModeRegion, "", false); err != nil || path != "" {
+	h.Region = &fakeRegion{}
+	if path, err := h.CapturePrivate(portalreq.Caller{}, ModeRegion, "", false); err != nil || path != "" {
 		t.Errorf("a cancelled private capture = %q, %v", path, err)
 	}
 }
@@ -599,5 +616,126 @@ func TestMatchesToplevel(t *testing.T) {
 	}
 	if !matchesToplevel(tl, windowTarget{appID: "foot", hasAppID: true}) {
 		t.Error("the focused window's app id did not match")
+	}
+}
+
+// The overlay gets the captured frames themselves, and the saved region
+// is the frame's pixels under the selection, byte for byte.
+func TestHostRegionSavesTheFramePixels(t *testing.T) {
+	frame := image.NewRGBA(image.Rect(0, 0, 200, 100))
+	for i := range frame.Pix {
+		frame.Pix[i] = uint8(i*13 + i/797)
+		if i%4 == 3 {
+			frame.Pix[i] = 255
+		}
+	}
+	region := &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 13, Y: 7, Width: 31, Height: 17}, ok: true}
+	h, _, _ := testHost(t, region)
+	var captured *image.RGBA
+	h.frozen = func(bool) ([]frozenOutput, error) {
+		dp1 := offHeap(t, h, "DP-1", frame)
+		captured = dp1.image.RGBA
+		return []frozenOutput{dp1, offHeap(t, h, "DP-2", solid(100, 50, green))}, nil
+	}
+	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if region.frames["DP-1"].RGBA != captured {
+		t.Error("the overlay got a copy of the captured frame, not the frame")
+	}
+	f, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := img.Bounds(); b.Dx() != 62 || b.Dy() != 34 {
+		t.Fatalf("saved %v, want the 2x-scaled 62x34 crop", b)
+	}
+	for y := range 34 {
+		for x := range 62 {
+			r, g, b, _ := img.At(x, y).RGBA()
+			want := frame.RGBAAt(26+x, 14+y)
+			if uint8(r>>8) != want.R || uint8(g>>8) != want.G || uint8(b>>8) != want.B {
+				t.Fatalf("saved (%d,%d) = %d,%d,%d, want the frame's %v", x, y, r>>8, g>>8, b>>8, want)
+			}
+		}
+	}
+}
+
+// Every flow that freezes the outputs releases the frames once it is
+// done with them, whether the user confirmed, cancelled or picked: each
+// frame's GPU texture is forgotten once, by its identity, and its
+// off-heap pixels are freed.
+func TestHostReleasesTheFrozenFrames(t *testing.T) {
+	sel := regionoverlay.Selection{Output: "DP-1", X: 10, Y: 10, Width: 20, Height: 10}
+	for name, run := range map[string]func(h *Host) error{
+		"region confirmed": func(h *Host) error { _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); return err },
+		"region across outputs": func(h *Host) error {
+			h.Region = &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 90, Y: 10, Width: 20, Height: 10}, ok: true}
+			_, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+			return err
+		},
+		"region cancelled": func(h *Host) error {
+			h.Region = &fakeRegion{}
+			_, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+			return err
+		},
+		"screen":     func(h *Host) error { _, err := h.Capture(portalreq.Caller{}, ModeScreen, ""); return err },
+		"color pick": func(h *Host) error { _, _, err := h.PickColor(portalreq.Caller{}); return err },
+		"color pick failed": func(h *Host) error {
+			h.Picker = fakePicker{err: errors.New("no output")}
+			if _, _, err := h.PickColor(portalreq.Caller{}); err == nil {
+				return errors.New("the failed pick succeeded")
+			}
+			return nil
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h, _, _ := testHost(t, &fakeRegion{sel: sel, ok: true})
+			var captured, forgotten []render.ImageID
+			frozen := h.frozen
+			h.frozen = func(pointer bool) ([]frozenOutput, error) {
+				out, err := frozen(pointer)
+				for _, f := range out {
+					captured = append(captured, f.image.ID)
+				}
+				return out, err
+			}
+			h.Forget = func(ids []render.ImageID) { forgotten = append(forgotten, ids...) }
+			if err := run(h); err != nil {
+				t.Fatal(err)
+			}
+			if live := h.mem.Stats().Live; live != 0 {
+				t.Errorf("%d frames still allocated after the flow", live)
+			}
+			if len(captured) != 2 || !slices.Equal(forgotten, captured) {
+				t.Errorf("forgot %v, want each captured frame %v once", forgotten, captured)
+			}
+			if slices.Contains(forgotten, 0) {
+				t.Errorf("forgot a frame without an identity: %v", forgotten)
+			}
+		})
+	}
+}
+
+// The frames' pixels are freed only once every List recorded while the
+// overlay was up has ended: a frame still being played keeps them.
+func TestHostFreesTheFramesAfterTheFence(t *testing.T) {
+	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 10, Y: 10, Width: 20, Height: 10}, ok: true})
+	drawing := render.NewRecorder(1, 1, 1, 1).Recording()
+	if _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); err != nil {
+		t.Fatal(err)
+	}
+	if live := h.mem.Stats().Live; live != 2 {
+		t.Fatalf("%d frames allocated while a List from before the release is open, want both kept", live)
+	}
+	drawing.End()
+	if live := h.mem.Stats().Live; live != 0 {
+		t.Fatalf("%d frames still allocated after the last List ended", live)
 	}
 }

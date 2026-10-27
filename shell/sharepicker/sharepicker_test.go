@@ -2,7 +2,6 @@ package sharepicker
 
 import (
 	"context"
-	"image"
 	"slices"
 	"strconv"
 	"testing"
@@ -49,7 +48,7 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 // fakeRegion is the region overlay; it records cancels.
 type fakeRegion struct{ cancels int }
 
-func (*fakeRegion) Request(map[string]*image.RGBA) (regionoverlay.Selection, bool) {
+func (*fakeRegion) Request(map[string]render.StillImage) (regionoverlay.Selection, bool) {
 	return regionoverlay.Selection{}, false
 }
 func (f *fakeRegion) Cancel() { f.cancels++ }

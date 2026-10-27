@@ -65,7 +65,7 @@ type Picker struct {
 	app    *app.Application
 	d      Deps
 	region interface {
-		Request(frames map[string]*image.RGBA) (regionoverlay.Selection, bool)
+		Request(frames map[string]render.StillImage) (regionoverlay.Selection, bool)
 		Cancel()
 	}
 

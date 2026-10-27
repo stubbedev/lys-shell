@@ -107,7 +107,7 @@ func HistoryPath() string {
 // monitor without a frame gets no surface; when no frame matches any
 // monitor there is nothing to pick from, and that is an error naming
 // both, not a cancel. Call it from any goroutine but the loop's.
-func (p *Picker) Request(frames map[string]*image.RGBA) (RGB, bool, error) {
+func (p *Picker) Request(frames map[string]render.StillImage) (RGB, bool, error) {
 	ch := make(chan result, 1)
 	p.app.Invoke(func() { p.show(ch, frames) })
 	r := <-ch
@@ -120,13 +120,13 @@ func (p *Picker) Cancel() {
 	p.app.Invoke(func() { p.finish(RGB{}, false) })
 }
 
-func (p *Picker) show(ch chan result, frames map[string]*image.RGBA) {
+func (p *Picker) show(ch chan result, frames map[string]render.StillImage) {
 	p.finish(RGB{}, false)
 	p.reply = ch
 	for _, out := range p.outputs() {
 		mon := regionoverlay.MonitorOf(out)
 		frame, ok := frames[mon.Connector]
-		if !ok || frame == nil {
+		if !ok || frame.RGBA == nil {
 			continue
 		}
 		l := &surface{p: p, frame: frame, logicalW: mon.Width, logicalH: mon.Height}
@@ -169,17 +169,18 @@ func (p *Picker) finish(c RGB, ok bool) {
 	p.answer(result{color: c, ok: ok})
 }
 
-// answer replies to the open request, if any, and tears the surfaces
-// down.
+// answer tears the surfaces down and then replies to the open request,
+// if any: once the requester has its reply nothing draws its frames, so
+// it may release them.
 func (p *Picker) answer(r result) {
-	if p.reply != nil {
-		p.reply <- r
-		p.reply = nil
-	}
 	for _, s := range p.surfaces {
 		s.Close()
 	}
 	p.surfaces = nil
+	if p.reply != nil {
+		p.reply <- r
+		p.reply = nil
+	}
 }
 
 // pushHistory moves c to the front, dropping its older copy and
@@ -251,16 +252,11 @@ func pixel(img *image.RGBA, x, y int) RGB {
 type surface struct {
 	widget.Base
 	p                  *Picker
-	frame              *image.RGBA
+	frame              render.StillImage
 	logicalW, logicalH int
 
 	cursorX, cursorY float64
 	hasCursor        bool
-
-	// bright is the frame resampled to the device rect, built on first
-	// paint and never changed after: still, so a GPU renderer uploads it
-	// once rather than on every pointer move.
-	bright render.StillImage
 }
 
 func (l *surface) Measure(con widget.Constraints) widget.Size { return con.Max }
@@ -290,19 +286,15 @@ func (l *surface) SetHovered(on bool) {
 // it.
 func (l *surface) ClickAt(p widget.Point) {
 	b := l.Bounds()
-	x, y := loupe.SampleAt(l.frame, l.logicalW, l.logicalH, float64(p.X-b.X), float64(p.Y-b.Y))
-	l.p.finish(pixel(l.frame, x, y), true)
+	x, y := loupe.SampleAt(l.frame.RGBA, l.logicalW, l.logicalH, float64(p.X-b.X), float64(p.Y-b.Y))
+	l.p.finish(pixel(l.frame.RGBA, x, y), true)
 }
 
 func (l *surface) Paint(cv *render.Canvas) {
 	b := l.Bounds()
-	dev := cv.MapRect(b)
-	if l.bright.RGBA == nil || l.bright.Bounds().Dx() != dev.W || l.bright.Bounds().Dy() != dev.H {
-		l.bright = render.StillImage{RGBA: render.Resample(l.frame, l.frame.Bounds(), dev.W, dev.H)}
-	}
-	cv.DrawImageDevice(l.bright, dev.X, dev.Y)
+	loupe.DrawFrame(cv, l.frame, b)
 	if l.hasCursor {
-		drawLoupe(cv, l.p.font, l.frame, l.logicalW, l.logicalH, b, l.cursorX, l.cursorY, l.p.history)
+		drawLoupe(cv, l.p.font, l.frame.RGBA, l.logicalW, l.logicalH, b, l.cursorX, l.cursorY, l.p.history)
 	}
 }
 

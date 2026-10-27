@@ -1,5 +1,6 @@
-// Package loupe is the magnified pixel grid shown near the pointer
-// over a frozen frame: the color picker's card and the region
+// Package loupe is the frozen frame the color picker and the region
+// overlay paint behind everything, and the magnified pixel grid they
+// show near the pointer over it: the color picker's card and the region
 // overlay's magnifier.
 package loupe
 
@@ -30,6 +31,20 @@ var (
 	crossWhite = render.RGBA(255, 255, 255, 242)
 	crossBlack = render.RGBA(0, 0, 0, 230)
 )
+
+// DrawFrame paints the frozen frame over the logical box: one frame
+// pixel per device pixel when the frame has the box's device size, the
+// output's usual case, else scaled into it as it is drawn. The frame is
+// drawn from its own pixels, never from a resampled copy, so the
+// surface holds no raster beyond the capture.
+func DrawFrame(cv *render.Canvas, frame render.StillImage, box render.Rect) {
+	dev := cv.MapRect(box)
+	if b := frame.Bounds(); b.Dx() == dev.W && b.Dy() == dev.H {
+		cv.DrawImageDevice(frame, dev.X, dev.Y)
+		return
+	}
+	cv.DrawImageCover(frame, box, render.Corners{})
+}
 
 // SampleAt is the frame pixel under a surface-local logical point: the
 // point scaled to the frame's physical resolution, truncated and

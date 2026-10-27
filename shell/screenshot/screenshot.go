@@ -22,6 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/memory-go"
+
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
@@ -52,11 +55,11 @@ type Host struct {
 	Monitors func() []regionoverlay.Monitor
 	// Region and Picker are the freeze-frame overlays.
 	Region interface {
-		Request(frames map[string]*image.RGBA) (regionoverlay.Selection, bool)
+		Request(frames map[string]render.StillImage) (regionoverlay.Selection, bool)
 		Cancel()
 	}
 	Picker interface {
-		Request(frames map[string]*image.RGBA) (colorpicker.RGB, bool, error)
+		Request(frames map[string]render.StillImage) (colorpicker.RGB, bool, error)
 		Cancel()
 	}
 	// Focus resolves the focused output and the active window.
@@ -65,6 +68,12 @@ type Host struct {
 	Copy func(image.Image) error
 	// Notify reports a saved path; nil sends the desktop notification.
 	Notify func(path string)
+	// Forget drops the GPU textures of the frozen frames with these
+	// identities, once the overlay that drew them has closed.
+	Forget func(ids []render.ImageID)
+
+	// mem holds the frozen frames' pixels off the Go heap.
+	mem memory.Shared
 
 	// now and frozen stand in for the clock and the all-outputs
 	// capture (with the pointer or not) in tests.
@@ -197,7 +206,20 @@ func (h *Host) captureAll(pointer bool) ([]frozenOutput, error) {
 	if h.frozen != nil {
 		return h.frozen(pointer)
 	}
-	return captureAllOutputs(pointer)
+	return captureAllOutputs(&h.mem, pointer)
+}
+
+// release lets go of frozen frames nothing will draw again: the GPU
+// drops their textures, and their pixels are freed once every List
+// recorded until now has ended, so no frame still being played reads
+// freed memory.
+func (h *Host) release(frozen []frozenOutput) {
+	ids := make([]render.ImageID, len(frozen))
+	for i, f := range frozen {
+		ids[i] = f.image.ID
+	}
+	h.Forget(ids)
+	render.Retire(func() { freeFrames(&h.mem, frozen) })
 }
 
 // logical maps each connector to its logical geometry.
@@ -221,11 +243,9 @@ func (h *Host) captureRegion(c portalreq.Caller, pointer bool) (*image.RGBA, boo
 	if err != nil {
 		return nil, false, err
 	}
+	defer h.release(frozen)
 	logical := h.logical()
-	frames := make(map[string]*image.RGBA, len(frozen))
-	for _, f := range frozen {
-		frames[f.connector] = f.image
-	}
+	frames := framesOf(frozen)
 	sel, ok := overlay(h, c, h.Region.Cancel, func() (regionoverlay.Selection, bool) { return h.Region.Request(frames) })
 	if !ok {
 		return nil, false, nil
@@ -239,7 +259,7 @@ func (h *Host) captureRegion(c portalreq.Caller, pointer bool) (*image.RGBA, boo
 		return nil, false, errors.New("no logical geometry for the selected output")
 	}
 	if sel.X+sel.Width <= mon.Width && sel.Y+sel.Height <= mon.Height {
-		return cropFrozen(frame, mon.Width, mon.Height, sel), true, nil
+		return cropFrozen(frame.RGBA, mon.Width, mon.Height, sel), true, nil
 	}
 	// A selection past its output's edge takes the other outputs'
 	// parts too.
@@ -254,6 +274,7 @@ func (h *Host) captureFullScreen(pointer bool) (*image.RGBA, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer h.release(frozen)
 	logical := h.logical()
 	var placed []placedFrame
 	for _, f := range frozen {
@@ -263,7 +284,7 @@ func (h *Host) captureFullScreen(pointer bool) (*image.RGBA, error) {
 		}
 		placed = append(placed, placedFrame{
 			logical: logicalGeometry{x: m.X, y: m.Y, width: m.Width, height: m.Height},
-			image:   f.image,
+			image:   f.image.RGBA,
 		})
 	}
 	if len(placed) == 0 {
@@ -280,10 +301,8 @@ func (h *Host) PickColor(caller portalreq.Caller) (color [3]float64, picked bool
 	if err != nil {
 		return color, false, err
 	}
-	frames := make(map[string]*image.RGBA, len(frozen))
-	for _, f := range frozen {
-		frames[f.connector] = f.image
-	}
+	defer h.release(frozen)
+	frames := framesOf(frozen)
 	if len(frames) == 0 {
 		return color, false, errors.New("no outputs available")
 	}

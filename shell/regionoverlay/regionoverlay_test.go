@@ -94,12 +94,20 @@ func TestLabelOrigin(t *testing.T) {
 // does.
 const accentCSS = `.region-overlay-window .region-overlay-area { color: #b4befe; }`
 
+// stillOf is img as an identified frame, nil as no frame.
+func stillOf(img *image.RGBA) render.StillImage {
+	if img == nil {
+		return render.StillImage{}
+	}
+	return render.NewStillImage(img)
+}
+
 func harness(frame *image.RGBA, windows ...image.Rectangle) (*Overlay, *area, chan result) {
 	o := &Overlay{monitors: mons[:1], shown: windows, sheet: widget.NewStylesheet(accentCSS, 0)}
 	o.ed = editor{bounds: layout(o.monitors)}
 	ch := make(chan result, 1)
 	o.reply = ch
-	a := &area{o: o, mon: mons[0], frame: frame}
+	a := &area{o: o, mon: mons[0], frame: stillOf(frame)}
 	o.areas = []*area{a}
 	root := o.surfaceRoot(a)
 	root.Measure(widget.Constraints{Max: widget.Size{W: 40, H: 30}})
@@ -257,15 +265,6 @@ func TestPaintFrozen(t *testing.T) {
 	}
 }
 
-func TestWashKeepsOpaque(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	img.SetRGBA(0, 0, color.RGBA{255, 255, 255, 255})
-	w := wash(img).RGBAAt(0, 0)
-	if w.A != 255 || w.R != 166 {
-		t.Fatalf("wash = %v", w)
-	}
-}
-
 // A selection up for adjustment shows its handles; one being drawn
 // shows none.
 func TestPaintHandles(t *testing.T) {
@@ -341,5 +340,86 @@ func TestPillTakesTheTheme(t *testing.T) {
 	}
 	if got := at(p.w/2, 0); got.A() == 0 {
 		t.Error("the top edge is not backed")
+	}
+}
+
+// A frozen surface paints straight from the captured frame: no
+// resampled or washed copy of it is made, at the frame's own size or
+// scaled. The wash darkens outside the selection and leaves the frame
+// exact inside it.
+func TestPaintFrozenFromTheFrame(t *testing.T) {
+	const w, h = 400, 300
+	mon := Monitor{Connector: "DP-1", Width: w, Height: h}
+	surface := func(frame *image.RGBA) (*area, *render.Canvas, []byte) {
+		o := &Overlay{monitors: []Monitor{mon}, sheet: widget.NewStylesheet(accentCSS, 0)}
+		o.ed = editor{bounds: layout(o.monitors), sel: image.Rect(100, 50, 300, 250)}
+		a := &area{o: o, mon: mon, frame: render.NewStillImage(frame)}
+		root := o.surfaceRoot(a)
+		root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+		root.Arrange(render.Rect{W: w, H: h})
+		data := make([]byte, render.Stride(w)*h)
+		return a, render.New(data, render.Stride(w), w, h), data
+	}
+	for _, scale := range []int{1, 2} {
+		frame := image.NewRGBA(image.Rect(0, 0, w*scale, h*scale))
+		for i := range frame.Pix {
+			frame.Pix[i] = uint8(i * 7)
+			if i%4 == 3 {
+				frame.Pix[i] = 255
+			}
+		}
+		a, cv, data := surface(frame)
+		if got := treetest.HeapBytes(func() { a.Paint(cv) }); got >= uint64(len(frame.Pix))/4 {
+			t.Errorf("scale %d: painting allocated %d bytes, a copy of the %d-byte frame", scale, got, len(frame.Pix))
+		}
+		at := func(x, y int) render.Color { return render.ColorFromBytes(data[y*render.Stride(w)+x*4:]) }
+		src := func(x, y int) color.RGBA { return frame.RGBAAt(x*scale, y*scale) }
+		if c, want := at(200, 150), src(200, 150); c != render.RGB(want.R, want.G, want.B) {
+			t.Errorf("scale %d: inside the selection %#x, want the frame's %v", scale, uint32(c), want)
+		}
+		washed := func(v uint8) uint8 { return uint8((uint32(v)*(255-dimAlpha) + 127) / 255) }
+		for _, p := range []image.Point{{10, 10}, {350, 280}, {50, 150}, {350, 150}, {200, 20}} {
+			s := src(p.X, p.Y)
+			if c, want := at(p.X, p.Y), render.RGB(washed(s.R), washed(s.G), washed(s.B)); c != want {
+				t.Errorf("scale %d: outside the selection at %v %#x, want the washed %#x", scale, p, uint32(c), uint32(want))
+			}
+		}
+	}
+}
+
+// around covers outer less the hole exactly once per pixel.
+func TestAround(t *testing.T) {
+	outer := render.Rect{X: 5, Y: 7, W: 40, H: 30}
+	for _, hole := range []render.Rect{
+		{X: 15, Y: 12, W: 10, H: 8},
+		{X: 5, Y: 7, W: 40, H: 30},
+		{X: 0, Y: 0, W: 20, H: 20},
+		{X: 30, Y: 20, W: 50, H: 50},
+		{},
+		{X: 100, Y: 100, W: 5, H: 5},
+	} {
+		cover := map[image.Point]int{}
+		for _, r := range around(outer, hole) {
+			if r.Empty() {
+				t.Errorf("hole %+v: an empty band %+v", hole, r)
+			}
+			for y := r.Y; y < r.Y+r.H; y++ {
+				for x := r.X; x < r.X+r.W; x++ {
+					cover[image.Pt(x, y)]++
+				}
+			}
+		}
+		in := func(r render.Rect, x, y int) bool { return x >= r.X && x < r.X+r.W && y >= r.Y && y < r.Y+r.H }
+		for y := range 60 {
+			for x := range 60 {
+				want := 0
+				if in(outer, x, y) && !in(hole, x, y) {
+					want = 1
+				}
+				if got := cover[image.Pt(x, y)]; got != want {
+					t.Fatalf("hole %+v: (%d,%d) covered %d times, want %d", hole, x, y, got, want)
+				}
+			}
+		}
 	}
 }

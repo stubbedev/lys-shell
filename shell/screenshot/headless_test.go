@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/memory-go"
+
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -36,9 +39,17 @@ func TestHeadlessCaptureOutput(t *testing.T) {
 	if _, err := captureOutput("NOPE-1", false); err == nil || !strings.Contains(err.Error(), "output NOPE-1 not found") {
 		t.Fatalf("a missing output = %v", err)
 	}
-	frozen, err := captureAllOutputs(false)
+	var mem memory.Shared
+	frozen, err := captureAllOutputs(&mem, false)
 	if err != nil || len(frozen) == 0 || frozen[0].connector == "" {
 		t.Fatalf("captureAllOutputs = %v %v", frozen, err)
+	}
+	if live := mem.Stats().Live; live != len(frozen) {
+		t.Errorf("%d frames hold %d allocations, want one each", len(frozen), live)
+	}
+	freeFrames(&mem, frozen)
+	if live := mem.Stats().Live; live != 0 {
+		t.Errorf("%d allocations left after freeing the frames", live)
 	}
 	// sway offers ext toplevel capture, and no window matches an
 	// identity nothing carries.
@@ -50,14 +61,24 @@ func TestHeadlessCaptureOutput(t *testing.T) {
 
 func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 	requireHeadless(t)
-	frozen, err := captureAllOutputs(false)
+	var mem memory.Shared
+	frozen, err := captureAllOutputs(&mem, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	defer freeFrames(&mem, frozen)
+	seen := map[render.ImageID]bool{}
+	for _, f := range frozen {
+		if f.image.ID == 0 || seen[f.image.ID] {
+			t.Fatalf("frame of %s has identity %d, want a fresh one", f.connector, f.image.ID)
+		}
+		seen[f.image.ID] = true
 	}
 	b := frozen[0].image.Bounds()
 	cfg := config.DefaultsScreenshot()
 	cfg.OutputDirectory = t.TempDir()
 	h := &Host{
+		Forget: func([]render.ImageID) {},
 		Config: fixed(cfg),
 		Monitors: func() []regionoverlay.Monitor {
 			return []regionoverlay.Monitor{{Connector: frozen[0].connector, Width: b.Dx(), Height: b.Dy()}}

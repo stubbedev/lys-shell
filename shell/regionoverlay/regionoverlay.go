@@ -17,6 +17,7 @@ import (
 	"image"
 	"log"
 	"math"
+	"slices"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
@@ -197,7 +198,7 @@ func (o *Overlay) surfaceRoot(a *area) widget.Widget {
 // missing connector leaves that surface transparent over the live
 // screen. A request arriving while one is open cancels the older one.
 // Call it from any goroutine but the loop's.
-func (o *Overlay) Request(frames map[string]*image.RGBA) (Selection, bool) {
+func (o *Overlay) Request(frames map[string]render.StillImage) (Selection, bool) {
 	ch := make(chan result, 1)
 	o.app.Invoke(func() { o.show(ch, frames) })
 	r := <-ch
@@ -212,7 +213,7 @@ func (o *Overlay) Cancel() {
 
 // show replaces any open request with a fresh one and maps the
 // surfaces.
-func (o *Overlay) show(ch chan result, frames map[string]*image.RGBA) {
+func (o *Overlay) show(ch chan result, frames map[string]render.StillImage) {
 	o.finish(Selection{}, false)
 	o.reply = ch
 	o.open(frames)
@@ -223,7 +224,7 @@ func (o *Overlay) show(ch chan result, frames map[string]*image.RGBA) {
 }
 
 // open maps one surface per monitor.
-func (o *Overlay) open(frames map[string]*image.RGBA) {
+func (o *Overlay) open(frames map[string]render.StillImage) {
 	outs := o.outputs()
 	o.monitors = o.monitors[:0]
 	for _, out := range outs {
@@ -256,17 +257,18 @@ func (o *Overlay) open(frames map[string]*image.RGBA) {
 	}
 }
 
-// finish answers the open request (if any) and tears the surfaces
-// down.
+// finish tears the surfaces down and then answers the open request (if
+// any): once the requester has its answer nothing draws its frames, so
+// it may release them.
 func (o *Overlay) finish(sel Selection, ok bool) {
-	if o.reply != nil {
-		o.reply <- result{sel: sel, ok: ok}
-		o.reply = nil
-	}
 	for _, s := range o.surfaces {
 		s.Close()
 	}
 	o.surfaces, o.areas, o.ed = nil, nil, editor{}
+	if o.reply != nil {
+		o.reply <- result{sel: sel, ok: ok}
+		o.reply = nil
+	}
 }
 
 // confirm answers the selection; without one it does nothing.
@@ -331,16 +333,14 @@ func (o *Overlay) redraw() {
 // wash with its hole, the border, and the label.
 type area struct {
 	widget.Base
-	o     *Overlay
-	mon   Monitor
-	frame *image.RGBA
-
-	// bright and dim are the frame resampled to the device rect and
-	// its washed copy, built on first paint at that size and never
-	// changed after: still, so a GPU renderer uploads them once rather
-	// than on every drag motion.
-	bright, dim render.StillImage
+	o   *Overlay
+	mon Monitor
+	// frame is the frozen frame, without pixels over the live screen.
+	frame render.StillImage
 }
+
+// frozen reports whether the area paints a frozen frame.
+func (a *area) frozen() bool { return a.frame.RGBA != nil }
 
 func (a *area) Measure(con widget.Constraints) widget.Size { return con.Max }
 
@@ -409,8 +409,11 @@ func (a *area) Paint(cv *render.Canvas) {
 	selected := !ed.sel.Empty()
 	sel := a.local(ed.sel)
 	selDev := cv.MapRect(sel).Intersect(dev)
-	if a.frame != nil {
-		a.paintFrozen(cv, dev, selDev, selected)
+	if a.frozen() {
+		loupe.DrawFrame(cv, a.frame, b)
+		for _, r := range around(dev, selDev) {
+			cv.FillRectDevice(r, render.Color(dimAlpha<<24))
+		}
 	} else {
 		cv.ClearDevice(dev, render.Color(dimAlpha<<24))
 		if selected && !selDev.Empty() {
@@ -427,10 +430,10 @@ func (a *area) Paint(cv *render.Canvas) {
 	if a.magnifying() {
 		p := a.o.pointer
 		lx, ly := float64(p.X-a.mon.X), float64(p.Y-a.mon.Y)
-		cx, cy := loupe.SampleAt(a.frame, a.mon.Width, a.mon.Height, lx, ly)
+		cx, cy := loupe.SampleAt(a.frame.RGBA, a.mon.Width, a.mon.Height, lx, ly)
 		x0, y0 := loupe.Place(b, lx, ly, loupe.Size, loupe.Size)
 		cv.FillRect(render.Rect{X: x0 - 2, Y: y0 - 2, W: loupe.Size + 4, H: loupe.Size + 4}, labelBacking)
-		loupe.Draw(cv, a.frame, cx, cy, x0, y0)
+		loupe.Draw(cv, a.frame.RGBA, cx, cy, x0, y0)
 	}
 }
 
@@ -440,37 +443,24 @@ func (a *area) Paint(cv *render.Canvas) {
 func (a *area) magnifying() bool {
 	ed := &a.o.ed
 	placing := ed.gesture == gestureCreate || ed.gesture == gestureResize || ed.sel.Empty()
-	return a.frame != nil && a.o.onSurface && placing && a.o.pointer.In(a.mon.rect())
+	return a.frozen() && a.o.onSurface && placing && a.o.pointer.In(a.mon.rect())
 }
 
-// paintFrozen draws the washed frame and, inside the selection, the
-// bright one: the wash-then-hole composite of the Rust overlay, whose
-// transparent drawing area sits over the frame picture.
-func (a *area) paintFrozen(cv *render.Canvas, dev, selDev render.Rect, selected bool) {
-	if a.bright.RGBA == nil || a.bright.Bounds().Dx() != dev.W || a.bright.Bounds().Dy() != dev.H {
-		a.bright = render.StillImage{RGBA: render.Resample(a.frame, a.frame.Bounds(), dev.W, dev.H)}
-		a.dim = render.StillImage{RGBA: wash(a.bright.RGBA)}
+// around is outer less hole: the bands above and below the hole across
+// outer's width, and those left and right of it, the empty ones left
+// out. Without a hole it is outer whole.
+func around(outer, hole render.Rect) []render.Rect {
+	hole = hole.Intersect(outer)
+	if hole.Empty() {
+		return []render.Rect{outer}
 	}
-	cv.DrawImageDevice(a.dim, dev.X, dev.Y)
-	if selected && !selDev.Empty() {
-		sub := image.Rect(selDev.X-dev.X, selDev.Y-dev.Y, selDev.X-dev.X+selDev.W, selDev.Y-dev.Y+selDev.H)
-		cv.DrawImageDevice(a.bright.SubImage(sub), selDev.X, selDev.Y)
+	bands := []render.Rect{
+		{X: outer.X, Y: outer.Y, W: outer.W, H: hole.Y - outer.Y},
+		{X: outer.X, Y: hole.Y + hole.H, W: outer.W, H: outer.Y + outer.H - hole.Y - hole.H},
+		{X: outer.X, Y: hole.Y, W: hole.X - outer.X, H: hole.H},
+		{X: hole.X + hole.W, Y: hole.Y, W: outer.X + outer.W - hole.X - hole.W, H: hole.H},
 	}
-}
-
-// wash composites the 35% black dim over a copy of img.
-func wash(img *image.RGBA) *image.RGBA {
-	out := image.NewRGBA(img.Bounds())
-	const keep = 255 - dimAlpha
-	for i, v := range img.Pix {
-		out.Pix[i] = uint8((uint32(v)*keep + 127) / 255 & 0xff)
-		if i%4 == 3 {
-			// Alpha: the black wash over opaque stays opaque; over a
-			// translucent pixel it adds its own coverage.
-			out.Pix[i] = uint8((dimAlpha + (uint32(v)*keep+127)/255) & 0xff)
-		}
-	}
-	return out
+	return slices.DeleteFunc(bands, render.Rect.Empty)
 }
 
 // paintBorderAndLabel strokes the accent border (2px, centered on the

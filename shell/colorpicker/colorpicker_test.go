@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/shell/loupe"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestParseHex(t *testing.T) {
@@ -101,7 +102,7 @@ func TestClickPicksAndRemembers(t *testing.T) {
 	p := &Picker{historyPath: filepath.Join(dir, "h")}
 	ch := make(chan result, 1)
 	p.reply = ch
-	l := &surface{p: p, frame: gradient(), logicalW: 60, logicalH: 40}
+	l := &surface{p: p, frame: render.NewStillImage(gradient()), logicalW: 60, logicalH: 40}
 	l.Arrange(render.Rect{W: 60, H: 40})
 	l.ClickAt(widget.Point{X: 10, Y: 5})
 	r := <-ch
@@ -178,12 +179,32 @@ func TestLoupePaints(t *testing.T) {
 func TestNoMatchingFrameFails(t *testing.T) {
 	p := &Picker{outputs: func() []*app.Output { return []*app.Output{{Name: "DP-1"}} }}
 	ch := make(chan result, 1)
-	p.show(ch, map[string]*image.RGBA{"HDMI-A-1": gradient()})
+	p.show(ch, map[string]render.StillImage{"HDMI-A-1": render.NewStillImage(gradient())})
 	r := <-ch
 	if r.ok || r.err == nil || !strings.Contains(r.err.Error(), "HDMI-A-1") || !strings.Contains(r.err.Error(), "DP-1") {
 		t.Fatalf("unmatched frames answered %+v, want an error naming the frame and the output", r)
 	}
 	if p.reply != nil {
 		t.Error("the failed request stayed open")
+	}
+}
+
+// The surface paints the frozen frame from its own pixels, at the 2x
+// device scale it was captured at, without a resampled copy; the click
+// still reads the frame pixel under the pointer.
+func TestSurfacePaintsTheFrame(t *testing.T) {
+	frame := gradient()
+	l := &surface{p: &Picker{}, frame: render.NewStillImage(frame), logicalW: 60, logicalH: 40}
+	l.Arrange(render.Rect{W: 60, H: 40})
+	data := make([]byte, render.Stride(120)*80)
+	cv := render.NewScaled(data, render.Stride(120), 120, 80, 2, 1)
+	if got := treetest.HeapBytes(func() { l.Paint(cv) }); got >= uint64(len(frame.Pix))/4 {
+		t.Errorf("painting allocated %d bytes, a copy of the %d-byte frame", got, len(frame.Pix))
+	}
+	for _, p := range []image.Point{{0, 0}, {37, 21}, {119, 79}} {
+		want := frame.RGBAAt(p.X, p.Y)
+		if got := render.ColorFromBytes(data[p.Y*render.Stride(120)+p.X*4:]); got != render.RGB(want.R, want.G, want.B) {
+			t.Errorf("device pixel %v = %#x, want the frame's %v", p, uint32(got), want)
+		}
 	}
 }
