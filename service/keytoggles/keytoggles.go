@@ -103,7 +103,17 @@ func parseEvent(b []byte) (typ, code uint16, value int32) {
 
 // ioctlBytes fills buf through a read ioctl.
 func ioctlBytes(f *os.File, req uintptr, buf []byte) error {
-	if _, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(&buf[0]))); errno != 0 { //nolint:gosec // audited: the request's size is len(buf)
+	conn, err := f.SyscallConn()
+	if err != nil {
+		return err
+	}
+	var errno unix.Errno
+	if err := conn.Control(func(fd uintptr) {
+		_, _, errno = unix.Syscall(unix.SYS_IOCTL, fd, req, uintptr(unsafe.Pointer(&buf[0]))) //nolint:gosec // audited: the request's size is len(buf)
+	}); err != nil {
+		return err
+	}
+	if errno != 0 {
 		return errno
 	}
 	return nil

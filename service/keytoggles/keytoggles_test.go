@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // Only a lock key's release is a toggle: its press, a repeat, other
@@ -104,5 +105,30 @@ func TestWatchSkipsNonKeyboards(t *testing.T) {
 	stop()
 	if called {
 		t.Error("a non-keyboard produced a toggle")
+	}
+}
+
+// Probing a device leaves it pollable, so closing it ends a pending
+// read; one that does not end is a stop that never returns.
+func TestCloseEndsAReadAfterTheProbe(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close() }()
+	if isKeyboard(r) {
+		t.Fatal("a pipe probed as a keyboard")
+	}
+	done := make(chan struct{})
+	go func() {
+		read(r, func(Event) {})
+		close(done)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	_ = r.Close()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the read outlived Close")
 	}
 }
