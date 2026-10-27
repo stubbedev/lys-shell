@@ -154,15 +154,11 @@ type payload struct {
 	refs atomic.Int64
 }
 
-// newPayload copies data off the heap, held once by the caller.
-func newPayload(mem *memory.Shared, data []byte) (*payload, error) {
-	buf, err := offheap.Clone(mem, data)
-	if err != nil {
-		return nil, fmt.Errorf("clipboard: %w", err)
-	}
+// newPayload takes buf, which mem holds, held once by the caller.
+func newPayload(mem *memory.Shared, buf memory.Slice[byte]) *payload {
 	p := &payload{mem: mem, data: buf}
 	p.refs.Store(1)
-	return p, nil
+	return p
 }
 
 // bytes are the payload, valid while the caller holds it.
@@ -455,36 +451,71 @@ var errClosed = errors.New("clipboard: the history is closed")
 // oversized, whitespace-only text, or a zero-capacity history. An
 // error when the history is closed or the bytes cannot be held.
 func (h *History) Push(mime string, data []byte) (uint64, bool, error) {
+	if v := h.judge(mime, data); v.settled {
+		return v.id, v.kept, v.err
+	}
+	buf, err := offheap.Clone(&h.mem, data)
+	if err != nil {
+		return 0, false, fmt.Errorf("clipboard: %w", err)
+	}
+	return h.insert(mime, buf), true, nil
+}
+
+// pushOwned is Push of bytes already off the heap in the history's
+// memory, taking buf: it becomes the entry, or is freed.
+func (h *History) pushOwned(mime string, buf memory.Slice[byte]) (uint64, bool, error) {
+	if v := h.judge(mime, buf.Elems()); v.settled {
+		if err := offheap.Free(&h.mem, buf); err != nil {
+			v.err = errors.Join(v.err, fmt.Errorf("clipboard: freeing a selection not kept: %w", err))
+		}
+		return v.id, v.kept, v.err
+	}
+	return h.insert(mime, buf), true, nil
+}
+
+// verdict is what Push makes of a selection before it needs its own
+// bytes: settled when it is refused, already held, or cannot be
+// recorded at all.
+type verdict struct {
+	settled bool
+	id      uint64
+	kept    bool
+	err     error
+}
+
+// judge settles a selection that needs no new entry: refused, or
+// already held under mime, which it moves to the front.
+func (h *History) judge(mime string, data []byte) verdict {
 	if h.closed {
-		return 0, false, errClosed
+		return verdict{settled: true, err: errClosed}
 	}
 	if len(data) == 0 || len(data) > h.maxEntryBytes || h.capacity == 0 {
-		return 0, false, nil
+		return verdict{settled: true}
 	}
 	// Whitespace-only text comes from a stray drag as often as from
 	// intent, and is unrecognisable as a row. Non-text is judged by
 	// length alone: bytes that look like whitespace are still content.
 	if IsTextMime(mime) && utf8.Valid(data) && strings.TrimSpace(string(data)) == "" {
-		return 0, false, nil
+		return verdict{settled: true}
 	}
+	i := slices.IndexFunc(h.entries, func(e stored) bool { return e.mime == mime && bytes.Equal(e.p.bytes(), data) })
+	if i < 0 {
+		return verdict{}
+	}
+	entry := h.entries[i]
+	copy(h.entries[1:i+1], h.entries[:i])
+	h.entries[0] = entry
+	return verdict{settled: true, id: entry.id, kept: true}
+}
 
-	if i := slices.IndexFunc(h.entries, func(e stored) bool { return e.mime == mime && bytes.Equal(e.p.bytes(), data) }); i >= 0 {
-		entry := h.entries[i]
-		copy(h.entries[1:i+1], h.entries[:i])
-		h.entries[0] = entry
-		return entry.id, true, nil
-	}
-
-	p, err := newPayload(&h.mem, data)
-	if err != nil {
-		return 0, false, err
-	}
+// insert adds buf as the newest entry and returns its id.
+func (h *History) insert(mime string, buf memory.Slice[byte]) uint64 {
 	id := h.nextID
 	h.nextID++
-	h.entries = slices.Insert(h.entries, 0, stored{id: id, mime: mime, p: p})
-	h.size += len(data)
+	h.entries = slices.Insert(h.entries, 0, stored{id: id, mime: mime, p: newPayload(&h.mem, buf)})
+	h.size += buf.Len()
 	h.evict()
-	return id, true, nil
+	return id
 }
 
 // evict drops the oldest entries until the history is within its

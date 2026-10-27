@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-ui/app"
+
+	"github.com/stubbedev/lys-shell/internal/offheap"
 )
 
 // Clipboard is the session's clipboard history, kept current: it
@@ -35,11 +37,22 @@ type Clipboard struct {
 	serving *serving
 }
 
-// pendingRead is one selection read awaiting its bytes.
+// pendingRead is one selection read, streaming off the heap into buf.
+// Once done, buf holds the whole selection when ok, and nothing
+// otherwise.
 type pendingRead struct {
 	mime string
-	data []byte
+	buf  *offheap.Buffer
 	done bool
+	ok   bool
+}
+
+// discard frees whatever the read holds, a transfer still writing into
+// it included.
+func (r *pendingRead) discard() {
+	if err := r.buf.Free(); err != nil {
+		log.Printf("clipboard: freeing the %s selection read: %v", r.mime, err)
+	}
 }
 
 // serving is a restored entry on the clipboard: the claim holds the
@@ -77,7 +90,7 @@ type selectionClaim interface {
 type selectionOffer interface {
 	Mimes() []string
 	Own() bool
-	Read(mime string, limit int64, done func([]byte, error)) error
+	ReadTo(mime string, limit int64, w io.Writer, done func(int64, error)) error
 }
 
 // ErrNoDataControl is the Start failure on a compositor without
@@ -195,13 +208,17 @@ func (c *Clipboard) claim(mime string, p *payload) {
 
 // Close gives up a restored selection and frees the history; the
 // clipboard records nothing afterwards. Pastes still being written
-// free their entry when they finish. Loop goroutine, or once the loop
-// ended.
+// free their entry when they finish; reads still in flight are freed
+// now, and their transfers end on the next write. Loop goroutine, or
+// once the loop ended.
 func (c *Clipboard) Close() {
 	if s := c.serving; s != nil {
 		c.serving = nil
 		s.claim.Release()
 		s.end()
+	}
+	for _, r := range c.reads {
+		r.discard()
 	}
 	c.reads = nil
 	c.mu.Lock()
@@ -228,34 +245,48 @@ func (c *Clipboard) selectionChanged(offer selectionOffer) {
 		return
 	}
 	c.mu.Lock()
-	limit := int64(c.history.maxEntryBytes)
+	limit := c.history.maxEntryBytes
+	mem := &c.history.mem
 	closed := c.closed
 	c.mu.Unlock()
 	if limit == 0 || closed {
 		return
 	}
+	buf, err := offheap.NewBuffer(mem, limit)
+	if err != nil {
+		log.Printf("clipboard: cannot read the selection (%s): %v", mime, err)
+		return
+	}
 
-	read := &pendingRead{mime: mime}
+	read := &pendingRead{mime: mime, buf: buf}
 	c.reads = append(c.reads, read)
-	err := offer.Read(mime, limit, func(data []byte, err error) {
+	err = offer.ReadTo(mime, int64(limit), buf, func(_ int64, err error) {
 		// An oversized selection is refused whole, the same verdict the
 		// history would give it; anything else is worth a line.
 		if err != nil && !errors.Is(err, app.ErrTransferTooLarge) {
 			log.Printf("clipboard: cannot read the selection (%s): %v", mime, err)
 		}
-		read.data, read.done = data, true
-		c.flushReads()
+		c.finishRead(read, err == nil)
 	})
 	if err != nil {
 		log.Printf("clipboard: cannot read the selection (%s): %v", mime, err)
-		read.done = true
-		c.flushReads()
+		c.finishRead(read, false)
 	}
+}
+
+// finishRead marks a read done, freeing a failed one's partial bytes
+// at once, and records what the queue can.
+func (c *Clipboard) finishRead(r *pendingRead, ok bool) {
+	r.done, r.ok = true, ok
+	if !ok {
+		r.discard()
+	}
+	c.flushReads()
 }
 
 // flushReads records every finished read at the head of the queue,
 // stopping at the first one still in flight. Reads finishing after
-// Close are dropped with the queue.
+// Close were freed with the queue.
 func (c *Clipboard) flushReads() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -263,13 +294,23 @@ func (c *Clipboard) flushReads() {
 		return
 	}
 	for len(c.reads) > 0 && c.reads[0].done {
-		if r := c.reads[0]; r.data != nil {
-			if _, _, err := c.history.Push(r.mime, r.data); err != nil {
-				log.Printf("clipboard: cannot remember the selection (%s, %d bytes): %v", r.mime, len(r.data), err)
-			}
+		if r := c.reads[0]; r.ok {
+			c.remember(r)
 		}
 		c.reads[0] = nil
 		c.reads = c.reads[1:]
+	}
+}
+
+// remember hands a finished read's bytes to the history. c.mu held.
+func (c *Clipboard) remember(r *pendingRead) {
+	buf, err := r.buf.Take()
+	if err != nil {
+		log.Printf("clipboard: cannot take the %s selection read: %v", r.mime, err)
+		return
+	}
+	if _, _, err := c.history.pushOwned(r.mime, buf); err != nil {
+		log.Printf("clipboard: cannot remember the selection (%s, %d bytes): %v", r.mime, buf.Len(), err)
 	}
 }
 

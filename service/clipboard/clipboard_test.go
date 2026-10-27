@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -86,30 +88,64 @@ func (c *fakeClaim) paste(t *testing.T, mime string) string {
 
 func (d *fakeDevice) announce(o selectionOffer) { d.fn(o) }
 
-// fakeOffer holds its read open until the test finishes it.
+// fakeOffer holds its read open until the test streams it.
 type fakeOffer struct {
 	mimes   []string
 	own     bool
 	readErr error
 	asked   []string
 	limit   int64
-	done    func([]byte, error)
+	w       io.Writer
+	done    func(int64, error)
 }
 
 func (o *fakeOffer) Mimes() []string { return o.mimes }
 func (o *fakeOffer) Own() bool       { return o.own }
 
-func (o *fakeOffer) Read(mime string, limit int64, done func([]byte, error)) error {
+func (o *fakeOffer) ReadTo(mime string, limit int64, w io.Writer, done func(int64, error)) error {
 	if o.readErr != nil {
 		return o.readErr
 	}
 	o.asked = append(o.asked, mime)
-	o.limit = limit
-	o.done = done
+	o.limit, o.w, o.done = limit, w, done
 	return nil
 }
 
-func (o *fakeOffer) finish(data string) { o.done([]byte(data), nil) }
+// transferChunk is the most a transfer writes at once (lys-ui's xfer).
+const transferChunk = 32 << 10
+
+// write streams data into the reader's writer in transfer-sized writes,
+// as lys-ui's transfer goroutine does, stopping at the limit or the
+// first refused write. It reports the bytes written and the error the
+// transfer ends with, without calling done.
+func (o *fakeOffer) write(data []byte) (int64, error) {
+	var n int64
+	for off := 0; off < len(data); off += transferChunk {
+		chunk := data[off:min(off+transferChunk, len(data))]
+		if room := o.limit - n; int64(len(chunk)) > room {
+			if room > 0 {
+				if _, err := o.w.Write(chunk[:room]); err != nil {
+					return n, err
+				}
+				n += room
+			}
+			return n, fmt.Errorf("fake transfer past %d bytes: %w", o.limit, app.ErrTransferTooLarge)
+		}
+		if _, err := o.w.Write(chunk); err != nil {
+			return n, err
+		}
+		n += int64(len(chunk))
+	}
+	return n, nil
+}
+
+// stream delivers data and ends the transfer.
+func (o *fakeOffer) stream(data []byte) { o.done(o.write(data)) }
+
+func (o *fakeOffer) finish(data string) { o.stream([]byte(data)) }
+
+// fail ends the transfer with err after nothing more is written.
+func (o *fakeOffer) fail(n int64, err error) { o.done(n, err) }
 
 // newTestClipboard runs invoke inline: the tests are the loop.
 func newTestClipboard(t *testing.T, h *History) (*Clipboard, *fakeDevice) {
@@ -209,7 +245,7 @@ func TestAFailedReadIsSkippedWithoutBlockingTheNext(t *testing.T) {
 	dev.announce(refused)
 	dev.announce(fine)
 	fine.finish("kept")
-	broken.done(nil, app.ErrTransferTooLarge)
+	broken.fail(0, app.ErrTransferTooLarge)
 
 	if got := texts(c.history); !slices.Equal(got, []string{"kept"}) {
 		t.Fatalf("entries = %v", got)
@@ -489,5 +525,143 @@ func TestSetBudgetEvictsOldestFirst(t *testing.T) {
 	}
 	if got := texts(h); !slices.Equal(got, []string{"cccc", "bbbb"}) || live(h) != 2 {
 		t.Fatalf("entries = %v, %d allocations", got, live(h))
+	}
+}
+
+// selection is n bytes of a payload that differs at every offset.
+func selection(n int) []byte {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = byte('!' + i%94 + i/7919%3)
+	}
+	return b
+}
+
+// heapAllocated is the Go-heap bytes fn allocates.
+func heapAllocated(fn func()) uint64 {
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	fn()
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
+// storedBytes is the one entry the history holds, byte for byte.
+func storedBytes(t *testing.T, h *History) (string, []byte) {
+	t.Helper()
+	snap := h.Entries()
+	defer snap.Release()
+	if len(snap.Entries()) != 1 {
+		t.Fatalf("%d entries, want 1", len(snap.Entries()))
+	}
+	e := snap.Entries()[0]
+	return e.Mime, bytes.Clone(e.content().data)
+}
+
+// A received selection streams into the history's own memory: a 4 MB
+// one costs the Go heap nothing near its size, and is stored byte for
+// byte, text (judged for whitespace) and binary alike.
+func TestAReceivedSelectionNeverLandsOnTheGoHeap(t *testing.T) {
+	const size = 4 << 20
+	for _, mime := range []string{textMime, "image/png"} {
+		h := defaultHistory(t)
+		_, dev := newTestClipboard(t, h)
+		data := selection(size)
+		offer := &fakeOffer{mimes: []string{mime}}
+		heap := heapAllocated(func() {
+			dev.announce(offer)
+			offer.stream(data)
+		})
+		t.Logf("%s: %d Go-heap bytes for a %d-byte selection", mime, heap, size)
+		if heap >= size/16 {
+			t.Errorf("%s: %d Go-heap bytes for a %d-byte selection", mime, heap, size)
+		}
+		if got, b := storedBytes(t, h); got != mime || !bytes.Equal(b, data) {
+			t.Fatalf("%s: stored %d bytes under %s, not the selection", mime, len(b), got)
+		}
+		if st := h.mem.Stats(); st.Live != 1 || st.Bytes < size || st.Bytes > size+64<<10 {
+			t.Fatalf("%s: %d allocations of %d bytes, want the entry alone", mime, st.Live, st.Bytes)
+		}
+	}
+}
+
+// A transfer that breaks off mid-stream remembers nothing and frees
+// the bytes it had received at once.
+func TestABrokenTransferFreesItsPartialBytes(t *testing.T) {
+	h := defaultHistory(t)
+	c, dev := newTestClipboard(t, h)
+	offer := &fakeOffer{mimes: []string{"image/png"}}
+	dev.announce(offer)
+	n, err := offer.write(selection(200 << 10))
+	if err != nil || live(h) != 1 {
+		t.Fatalf("mid-transfer: %v, %d allocations", err, live(h))
+	}
+	offer.fail(n, errors.New("peer gone"))
+	if live(h) != 0 || h.Len() != 0 || len(c.reads) != 0 {
+		t.Fatalf("after the break: %d allocations, %d entries, %d reads", live(h), h.Len(), len(c.reads))
+	}
+}
+
+// A selection over the entry cap is refused whole (#101): the first
+// cap's worth the transfer kept is freed, nothing is stored, and the
+// next selection is read as usual.
+func TestAnOverCapSelectionIsFreedAndRefusedWhole(t *testing.T) {
+	const capBytes = 64 << 10
+	h := mustHistory(t, 4, capBytes, capBytes)
+	c, dev := newTestClipboard(t, h)
+	big := &fakeOffer{mimes: []string{"image/png"}}
+	dev.announce(big)
+	n, err := big.write(selection(capBytes + 1))
+	if !errors.Is(err, app.ErrTransferTooLarge) || n != capBytes || live(h) != 1 {
+		t.Fatalf("over the cap: %d bytes, %v, %d allocations", n, err, live(h))
+	}
+	big.fail(n, err)
+	if live(h) != 0 || h.Len() != 0 || len(c.reads) != 0 {
+		t.Fatalf("after the refusal: %d allocations, %d entries, %d reads", live(h), h.Len(), len(c.reads))
+	}
+
+	exact := selection(capBytes)
+	remember(dev, "image/png", string(exact))
+	if _, b := storedBytes(t, h); !bytes.Equal(b, exact) || live(h) != 1 {
+		t.Fatalf("a selection of exactly the cap: %d bytes stored, %d allocations", len(b), live(h))
+	}
+}
+
+// A selection already held moves to the front, and its fresh copy is
+// freed rather than kept twice.
+func TestAReceivedDuplicateIsFreed(t *testing.T) {
+	h := defaultHistory(t)
+	c, dev := newTestClipboard(t, h)
+	remember(dev, textMime, "same")
+	remember(dev, textMime, "other")
+	remember(dev, textMime, "same")
+	if got := texts(c.history); !slices.Equal(got, []string{"same", "other"}) || live(h) != 2 {
+		t.Fatalf("entries = %v, %d allocations", got, live(h))
+	}
+}
+
+// Close frees a read still streaming; the transfer's next write is
+// refused, not written into freed memory, and its late end records
+// nothing.
+func TestCloseFreesAReadStillStreaming(t *testing.T) {
+	h := defaultHistory(t)
+	c, dev := newTestClipboard(t, h)
+	offer := &fakeOffer{mimes: []string{"image/png"}}
+	dev.announce(offer)
+	if _, err := offer.write(selection(100 << 10)); err != nil || live(h) != 1 {
+		t.Fatalf("mid-transfer: %v, %d allocations", err, live(h))
+	}
+
+	c.Close()
+	if live(h) != 0 {
+		t.Fatalf("%d allocations after Close", live(h))
+	}
+	n, err := offer.write(selection(100 << 10))
+	if err == nil || n != 0 || live(h) != 0 {
+		t.Fatalf("a write after Close: %d bytes, %v, %d allocations", n, err, live(h))
+	}
+	offer.fail(n, err)
+	if live(h) != 0 || h.Len() != 0 {
+		t.Fatalf("the late end: %d allocations, %d entries", live(h), h.Len())
 	}
 }
