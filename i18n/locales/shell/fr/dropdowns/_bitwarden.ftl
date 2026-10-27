@@ -61,3 +61,6 @@ launcher-bitwarden-locked = Bitwarden est verrouillé. Saisissez votre mot de pa
 launcher-bitwarden-logged-out = Connectez-vous d'abord à Bitwarden depuis son menu dans la barre.
 launcher-bitwarden-hint = Entrée copie le mot de passe ou le premier champ d'un élément ; Maj+Entrée liste ses champs.
 dropdown-bitwarden-totp-live = { $code } · { $seconds } s restantes
+dropdown-bitwarden-notify-sync-failed = Bitwarden n’a pas pu se synchroniser
+dropdown-bitwarden-notify-logged-out = Bitwarden vous a déconnecté
+dropdown-bitwarden-notify-logged-out-body = La session a expiré ou a été révoquée. Reconnectez-vous depuis la barre.

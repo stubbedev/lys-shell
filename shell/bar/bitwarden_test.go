@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -676,6 +677,34 @@ func TestBitwardenLocksWithTheSession(t *testing.T) {
 	h.lockIfOpen()
 	if st := v.Status().State; st != bitwarden.StateLoggedOut {
 		t.Errorf("a logged-out vault locked into %v", st)
+	}
+}
+
+// A failing periodic sync notifies once per run of failures, and again
+// only after a success; a forced logout always notifies.
+func TestBitwardenSyncNotifies(t *testing.T) {
+	cfg := config.Defaults()
+	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked}}
+	h := testBitwardenHost(v, cfg, &[]copied{})
+	var notes []string
+	h.notify = func(summary, body string) { notes = append(notes, summary+": "+body) }
+
+	h.reportSync(errors.New("connection refused"))
+	h.reportSync(errors.New("connection refused"))
+	if len(notes) != 1 || !strings.HasPrefix(notes[0], i18n.T("dropdown-bitwarden-notify-sync-failed")) {
+		t.Fatalf("two failures notified %q", notes)
+	}
+	h.reportSync(nil)
+	if len(notes) != 1 {
+		t.Errorf("a success notified: %q", notes)
+	}
+	h.reportSync(errors.New("again"))
+	if len(notes) != 2 {
+		t.Errorf("a failure after a success did not notify: %q", notes)
+	}
+	h.reportSync(fmt.Errorf("refresh: %w", bitwarden.ErrLoginRequired))
+	if len(notes) != 3 || !strings.HasPrefix(notes[2], i18n.T("dropdown-bitwarden-notify-logged-out")) {
+		t.Errorf("a forced logout = %q", notes)
 	}
 }
 

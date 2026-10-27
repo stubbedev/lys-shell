@@ -16,6 +16,8 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/clipboard"
@@ -57,15 +59,26 @@ type bitwardenHost struct {
 	// replaced (0 keeps it); loop goroutine only.
 	copy  func(content transfer.Content, ttl time.Duration) error
 	vault func() (vault, error)
+	// notify posts a desktop notification, for what happens while the
+	// dropdown is closed: a failing periodic sync, a forced logout.
+	notify func(summary, body string)
 
 	mu     sync.Mutex
 	opened vault
+	// syncFailing holds while periodic syncs keep failing, so only the
+	// first failure of a run notifies; upkeep goroutine only.
+	syncFailing bool
 }
 
 // newBitwardenHost is the host over the session clipboard, the vault
 // opening in the state directory.
 func newBitwardenHost(life context.Context, application *app.Application, current func() *config.Config) *bitwardenHost {
-	h := &bitwardenHost{life: life, config: func() config.BitwardenConfig { return current().Bitwarden }}
+	h := &bitwardenHost{
+		life: life, config: func() config.BitwardenConfig { return current().Bitwarden },
+		notify: func(summary, body string) {
+			desktopnotify.Notify(i18n.T("dropdown-bitwarden-title"), summary, body, "ld-shield-check-symbolic")
+		},
+	}
 	h.copy = func(content transfer.Content, ttl time.Duration) error {
 		clip := application.Clipboard()
 		if clip == nil {
@@ -175,10 +188,27 @@ func (h *bitwardenHost) upkeep(v vault, now, lastAttempt time.Time) time.Time {
 	if !syncDue(st, cfg.SyncInterval, lastAttempt, now) {
 		return lastAttempt
 	}
-	if err := v.Sync(h.life); err != nil {
-		log.Printf("bitwarden: periodic sync: %v", err)
-	}
+	h.reportSync(v.Sync(h.life))
 	return now
+}
+
+// reportSync notifies the first failure of a run of periodic syncs and
+// a forced logout, which the closed dropdown would not show.
+func (h *bitwardenHost) reportSync(err error) {
+	switch {
+	case err == nil:
+		h.syncFailing = false
+	case errors.Is(err, bitwarden.ErrLoginRequired):
+		log.Printf("bitwarden: periodic sync: %v", err)
+		h.syncFailing = false
+		h.notify(i18n.T("dropdown-bitwarden-notify-logged-out"), i18n.T("dropdown-bitwarden-notify-logged-out-body"))
+	default:
+		log.Printf("bitwarden: periodic sync: %v", err)
+		if !h.syncFailing {
+			h.syncFailing = true
+			h.notify(i18n.T("dropdown-bitwarden-notify-sync-failed"), bwErrorText(err))
+		}
+	}
 }
 
 // syncDue reports whether an open vault is due its periodic sync.

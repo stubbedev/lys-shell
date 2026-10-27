@@ -61,3 +61,6 @@ launcher-bitwarden-locked = Bitwarden is locked. Type your master password and p
 launcher-bitwarden-logged-out = Log in to Bitwarden from its dropdown in the bar first.
 launcher-bitwarden-hint = Enter copies an item's password or first field; Shift+Enter lists its fields.
 dropdown-bitwarden-totp-live = { $code } · { $seconds } s left
+dropdown-bitwarden-notify-sync-failed = Bitwarden could not sync
+dropdown-bitwarden-notify-logged-out = Bitwarden logged you out
+dropdown-bitwarden-notify-logged-out-body = The session expired or was revoked. Log in again from the bar.
