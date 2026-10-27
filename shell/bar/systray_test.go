@@ -217,7 +217,7 @@ func (f trayFrame) center(r render.Rect) render.Color {
 // It runs on the loop.
 func paintTrayFrame(m *systrayModule, scale deviceScale) trayFrame {
 	const w, h = 200, 40
-	m.root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	widget.SizeWithin(m.root, widget.Size{W: w, H: h})
 	m.root.Arrange(render.Rect{W: w, H: h})
 	dw, dh := scale.box(w), scale.box(h)
 	data := make([]byte, render.Stride(dw)*dh)
@@ -403,7 +403,7 @@ func TestResolveTrayIcon(t *testing.T) {
 	hooks := trayPixmapHooks{scaled: func(deviceScale) {}, forget: func(render.ImageID) {}}
 	// A pixmap icon is a raster at the icon size.
 	icon := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: pixmap}, 20, deviceScale{1, 1}, hooks)
-	if sz := icon.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}}); sz.W != 20 {
+	if sz := widget.SizeWithin(icon, widget.Size{W: 100, H: 100}); sz.W != 20 {
 		t.Errorf("pixmap icon = %v, want 20px", sz)
 	}
 	// A short pixmap is the fallback glyph, not a crash.

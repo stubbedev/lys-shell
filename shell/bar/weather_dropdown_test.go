@@ -218,7 +218,7 @@ func TestWeatherDropdownShowsTheStatusPage(t *testing.T) {
 func arrangeDropdown(t *testing.T, v widget.Widget, w, h int) {
 	t.Helper()
 	for range 2 {
-		sz := v.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+		sz := widget.SizeWithin(v, widget.Size{W: w, H: h})
 		v.Arrange(render.Rect{W: max(sz.W, w), H: h})
 	}
 }

@@ -26,7 +26,7 @@ func pagedPanel(tall widget.Widget, height int) (*panelBox, *widget.Stack) {
 // panelLayout measures and arranges p as the popover does, returning
 // its height and its content's rect.
 func panelLayout(p *panelBox) (height int, content render.Rect) {
-	sz := p.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 2000}})
+	sz := widget.SizeWithin(p, widget.Size{W: 1000, H: 2000})
 	p.Arrange(render.Rect{W: sz.W, H: sz.H})
 	return sz.H, p.child.(widget.Boundser).Bounds()
 }
@@ -119,7 +119,7 @@ func TestDropdownCardIsItsContent(t *testing.T) {
 	p := newPanelBox(s, 382, 512)
 	root, _ := dropdownTree(p, cfg)
 	apptheme.New(cfg).Attach(root)
-	sz := widget.MeasureAsChild(root, widget.Constraints{Max: widget.Size{W: 382, H: 2000}})
+	sz := widget.SizeWithinAsChild(root, widget.Size{W: 382, H: 2000})
 	if sz != (widget.Size{W: 382, H: 100 + 2*popoverBorder}) {
 		t.Fatalf("card %+v, want the 382px width and the 100px content inside the border", sz)
 	}
@@ -135,7 +135,7 @@ func TestDropdownCardIsItsContent(t *testing.T) {
 	wide.Append(widget.NewSpacer(500, 20), false)
 	root, _ = dropdownTree(newPanelBox(wide, 382, 0), cfg)
 	apptheme.New(cfg).Attach(root)
-	if sz := widget.MeasureAsChild(root, widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}); sz.W != 500+2*popoverBorder {
+	if sz := widget.SizeWithinAsChild(root, widget.Size{W: 2000, H: 2000}); sz.W != 500+2*popoverBorder {
 		t.Errorf("card width %d, want the 500px content plus the popover's border", sz.W)
 	}
 }
@@ -143,11 +143,12 @@ func TestDropdownCardIsItsContent(t *testing.T) {
 // popoverBorder is lys-ui's popover surface border width.
 const popoverBorder = 1
 
-// A panel is as wide as its width or its content's preferred width,
-// GTK's popover sizing: long wrapping text wraps inside the width,
-// while text that cannot narrow (an ellipsizing device name keeps its
-// natural width) widens the popover past it.
-func TestPanelWidthIsRequestOrPreferredWidth(t *testing.T) {
+// A panel is as wide as its width or its content's natural width, GTK's
+// popover sizing: long wrapping text, its natural width capped to the
+// width (capWrapping), wraps inside it, while text that cannot narrow
+// (an ellipsizing device name keeps its natural width) widens the
+// popover past it.
+func TestPanelWidthIsRequestOrContentWidth(t *testing.T) {
 	face := treetest.Font(t)
 	long := strings.Repeat("worktree daemon ", 8)
 	panelWith := func(label *widget.Label) *panelBox {
@@ -155,26 +156,26 @@ func TestPanelWidthIsRequestOrPreferredWidth(t *testing.T) {
 		col.Append(label, false)
 		return newPanelBox(col, 300, 0)
 	}
-	con := widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}
+	con := widget.Size{W: 2000, H: 2000}
 
 	wrapping := widget.NewLabel(face, 13, long, 0)
 	wrapping.SetWrap(true)
-	if w := panelWith(wrapping).Measure(con).W; w != 300 {
+	if w := widget.SizeWithin(panelWith(wrapping), con).W; w != 300 {
 		t.Errorf("a wrapping sentence widened the panel to %d, want the 300px width", w)
 	}
 
 	name := widget.NewLabel(face, 13, long, 0)
 	name.SetEllipsize(widget.EllipsizeEnd)
-	nat := name.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 100}}).W
-	if w := panelWith(name).Measure(con).W; w != nat || w <= 300 {
+	nat := widget.SizeWithin(name, widget.Size{W: 2000, H: 100}).W
+	if w := widget.SizeWithin(panelWith(name), con).W; w != nat || w <= 300 {
 		t.Errorf("an ellipsizing name sized the panel %d, want its %dpx natural width past the width", w, nat)
 	}
 }
 
 // The panel's height is its content's at the width it is laid out at:
 // text that wraps narrower than the panel's width never leaves the
-// card taller than the lines it shows. Measured without the width, the
-// same column is taller.
+// card taller than the lines it shows. At a narrower width the same
+// column is taller.
 func TestPanelHeightIsTheContentsAtItsWidth(t *testing.T) {
 	face := treetest.Font(t)
 	column := func() *widget.Box {
@@ -184,13 +185,13 @@ func TestPanelHeightIsTheContentsAtItsWidth(t *testing.T) {
 		col.Append(text, false)
 		return col
 	}
-	con := widget.Constraints{Max: widget.Size{W: 1000, H: 1000}}
-	atWidth := column().Measure(widget.Constraints{Min: widget.Size{W: 380}, Max: widget.Size{W: 380, H: 1000}}).H
-	if sz := newPanelBox(column(), 380, 0).Measure(con); sz.W != 380 || sz.H != atWidth {
+	con := widget.Size{W: 1000, H: 1000}
+	atWidth := column().Measure(widget.Column, 380).Nat
+	if sz := widget.SizeWithin(newPanelBox(column(), 380, 0), con); sz.W != 380 || sz.H != atWidth {
 		t.Errorf("panel %+v, want 380 wide and the %dpx the text takes at 380", sz, atWidth)
 	}
-	if bare := newPanelBox(column(), 0, 0).Measure(con); bare.H <= atWidth {
-		t.Fatalf("the column measured at its preferred width is %dpx, no taller than the %dpx at 380: nothing to pin", bare.H, atWidth)
+	if narrow := column().Measure(widget.Column, 200).Nat; narrow <= atWidth {
+		t.Fatalf("the column at 200 is %dpx, no taller than the %dpx at 380: nothing to pin", narrow, atWidth)
 	}
 }
 
@@ -200,16 +201,16 @@ func TestPanelHeightIsTheContentsAtItsWidth(t *testing.T) {
 func TestGrowingDropdownScrollAsksForItsContent(t *testing.T) {
 	cfg := config.Defaults()
 	isolateConfigDir(t)
-	con := widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}
+	con := widget.Size{W: 2000, H: 2000}
 	list := func() widget.Widget { return widget.NewSpacer(10, 700) }
 	grown, _ := dropdownTree(newPanelBox(growingScroll(dropdownScroll(list(), "")), 380, 0), cfg)
 	apptheme.New(cfg).Attach(grown)
-	if sz := widget.MeasureAsChild(grown, con); sz.H < 700 {
+	if sz := widget.SizeWithinAsChild(grown, con); sz.H < 700 {
 		t.Errorf("a growing dropdown over a 700px scroll is %dpx tall, want its content's height", sz.H)
 	}
 	plain, _ := dropdownTree(newPanelBox(dropdownScroll(list(), ""), 380, 0), cfg)
 	apptheme.New(cfg).Attach(plain)
-	if sz := widget.MeasureAsChild(plain, con); sz.H >= 700 {
+	if sz := widget.SizeWithinAsChild(plain, con); sz.H >= 700 {
 		t.Errorf("a plain dropdown scroll asked for %dpx, want none of its content's height", sz.H)
 	}
 }

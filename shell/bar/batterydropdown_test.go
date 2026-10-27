@@ -109,12 +109,12 @@ type styledRoot interface {
 func batteryArrangeStyled(t *testing.T, ctx ModuleContext, v styledRoot, w int) {
 	t.Helper()
 	// The tree pass first: elements resolve on parenting.
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: w, H: 1 << 14}})
+	sz := widget.SizeWithin(v, widget.Size{W: w, H: 1 << 14})
 	v.Arrange(render.Rect{W: w, H: max(sz.H, 1)})
 	ctx.Theme.Attach(v)
 	restore := widget.SetAnimationsInstant(true)
 	t.Cleanup(restore)
-	sz = v.Measure(widget.Constraints{Max: widget.Size{W: w, H: 1 << 14}})
+	sz = widget.SizeWithin(v, widget.Size{W: w, H: 1 << 14})
 	v.Arrange(render.Rect{W: max(sz.W, 1), H: max(sz.H, 1)})
 }
 
@@ -221,7 +221,7 @@ func TestBatteryHealthDotIsAClassedBoxTheCSSPaints(t *testing.T) {
 	// The size request gives the empty box extent, and the stylesheet's
 	// variant fills it with the status color, clipped round.
 	batteryArrangeStyled(t, ctx, v, 320)
-	if sz := widget.MeasureAsChild(dot, widget.Constraints{Max: widget.Size{W: 64, H: 64}}); sz != (widget.Size{W: statusDotPx, H: statusDotPx}) {
+	if sz := widget.SizeWithinAsChild(dot, widget.Size{W: 64, H: 64}); sz != (widget.Size{W: statusDotPx, H: statusDotPx}) {
 		t.Errorf("dot measure = %+v, want the %dpx request", sz, statusDotPx)
 	}
 	palette := ctx.Theme.RenderPalette()
@@ -289,13 +289,13 @@ func TestBatteryProfileSegmentsEqualWidth(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	v := batteryDropdown(ctx).(*batteryView)
 	defer v.dropdownClosed()
-	big := widget.Constraints{Max: widget.Size{W: 1 << 14, H: 1 << 14}}
+	big := widget.Size{W: 1 << 14, H: 1 << 14}
 
 	// The segments' own naturals differ (the precondition: there is
 	// something to equalize).
 	naturals := map[string]int{}
 	for _, p := range batteryProfiles {
-		naturals[p.name] = v.profileButtons[p.name].Measure(big).W
+		naturals[p.name] = widget.SizeWithin(v.profileButtons[p.name], big).W
 	}
 	lo, hi := 1<<30, 0
 	for _, w := range naturals {
@@ -494,10 +494,10 @@ func TestBatteryDetailsShowTheirText(t *testing.T) {
 	defer v.dropdownClosed()
 	waitHeadless(t, "the battery page", func() bool { return v.body.Visible() == "battery" })
 	ctx.Theme.Attach(v)
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 2000}})
+	sz := widget.SizeWithin(v, widget.Size{W: 400, H: 2000})
 	v.Arrange(render.Rect{W: 400, H: sz.H})
 	for _, l := range treetest.All[*widget.Label](findByClass(v, "battery-details")) {
-		if natural := widget.MeasureAsChild(l, widget.Constraints{Max: widget.Size{W: 400, H: 400}}).H; l.Bounds().H < natural {
+		if natural := widget.SizeWithinAsChild(l, widget.Size{W: 400, H: 400}).H; l.Bounds().H < natural {
 			t.Errorf("detail %q is %dpx tall, want its %dpx", l.Text(), l.Bounds().H, natural)
 		}
 	}
@@ -515,7 +515,7 @@ func TestBatteryProfileSegmentsFitTheDropdown(t *testing.T) {
 	end := boundsOf(seg).X + boundsOf(seg).W
 	for _, p := range batteryProfiles {
 		b := v.profileButtons[p.name].Bounds()
-		if b.X+b.W > end || widget.MeasureAsChild(v.profileButtons[p.name], widget.Constraints{Max: widget.Size{W: 1 << 14, H: 100}}).W > b.W {
+		if b.X+b.W > end || widget.SizeWithinAsChild(v.profileButtons[p.name], widget.Size{W: 1 << 14, H: 100}).W > b.W {
 			t.Errorf("%s spans %+v, cut off in its %d-wide row", p.name, b, end)
 		}
 	}

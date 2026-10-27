@@ -172,7 +172,7 @@ func (v *views) setMessage(markup *string) {
 
 // height is the tree's natural height at width.
 func (v *views) height(width int) int {
-	return v.surface.Measure(widget.Constraints{Max: widget.Size{W: width, H: math.MaxInt32}}).H
+	return v.surface.Measure(widget.Column, width).Nat
 }
 
 // iconPx is -gtk-icon-size: 1.5rem at the styling scale.

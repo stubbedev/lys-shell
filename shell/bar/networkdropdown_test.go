@@ -27,7 +27,7 @@ import (
 func clickAt(t *testing.T, root, target widget.Widget) {
 	t.Helper()
 	onHeadlessLoop(func() bool {
-		root.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 400}})
+		widget.SizeWithin(root, widget.Size{W: 500, H: 400})
 		root.Arrange(render.Rect{X: 0, Y: 0, W: 500, H: 400})
 		b := target.(widget.Boundser).Bounds()
 		p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
@@ -655,7 +655,7 @@ func TestNetworkActiveStatusesEndTogether(t *testing.T) {
 			t.Errorf("wifi's status ends at x %d, the wired one's at %d", wifi.X+wifi.W, wired.X+wired.W)
 		}
 		desc := treetest.WithClass(v.active.wifi, "description")[0].(*widget.Label)
-		if desc.Bounds().W < desc.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 100}}).W {
+		if desc.Bounds().W < widget.SizeWithin(desc, widget.Size{W: 1000, H: 100}).W {
 			t.Errorf("the wifi address %q is cut to %dpx", desc.Text(), desc.Bounds().W)
 		}
 		return true

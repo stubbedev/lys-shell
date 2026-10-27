@@ -128,7 +128,7 @@ func paintView(v *view, w, h int) ([]byte, int) {
 	data := make([]byte, render.Stride(w)*h)
 	cv := render.NewScaled(data, render.Stride(w), w, h, 1, 1)
 	cv.Clear(cv.Rect(), render.RGB(0, 0, 0))
-	v.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	widget.SizeWithin(v, widget.Size{W: w, H: h})
 	v.Arrange(render.Rect{W: w, H: h})
 	v.Paint(cv)
 	return data, w
@@ -366,7 +366,7 @@ func TestViewClipsToItsBoundsAtScale(t *testing.T) {
 	data := make([]byte, render.Stride(dev)*dev)
 	cv := render.NewScaled(data, render.Stride(dev), dev, dev, 2, 1)
 	cv.Clear(cv.Rect(), render.RGB(0, 0, 0))
-	v.Measure(widget.Constraints{Max: widget.Size{W: 4, H: 4}})
+	widget.SizeWithin(v, widget.Size{W: 4, H: 4})
 	v.Arrange(render.Rect{W: 4, H: 4})
 	v.Paint(cv)
 	// The outgoing image slides out across the view's right edge.

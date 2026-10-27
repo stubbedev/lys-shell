@@ -110,7 +110,7 @@ func harness(frame *image.RGBA, windows ...image.Rectangle) (*Overlay, *area, ch
 	a := &area{o: o, mon: mons[0], frame: stillOf(frame)}
 	o.areas = []*area{a}
 	root := o.surfaceRoot(a)
-	root.Measure(widget.Constraints{Max: widget.Size{W: 40, H: 30}})
+	widget.SizeWithin(root, widget.Size{W: 40, H: 30})
 	root.Arrange(render.Rect{W: 40, H: 30})
 	return o, a, ch
 }
@@ -355,7 +355,7 @@ func TestPaintFrozenFromTheFrame(t *testing.T) {
 		o.ed = editor{bounds: layout(o.monitors), sel: image.Rect(100, 50, 300, 250)}
 		a := &area{o: o, mon: mon, frame: render.NewStillImage(frame)}
 		root := o.surfaceRoot(a)
-		root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+		widget.SizeWithin(root, widget.Size{W: w, H: h})
 		root.Arrange(render.Rect{W: w, H: h})
 		data := make([]byte, render.Stride(w)*h)
 		return a, render.New(data, render.Stride(w), w, h), data

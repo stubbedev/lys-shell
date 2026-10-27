@@ -90,7 +90,7 @@ type outputMap struct {
 
 // Measure asks for nothing of its own (the Rust Fixed fills its
 // scrolled page): the map takes whatever the page gives it.
-func (m *outputMap) Measure(con widget.Constraints) widget.Size { return con.Min }
+func (m *outputMap) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 func (m *outputMap) Arrange(r render.Rect) {
 	m.ArrangeSelf(r)

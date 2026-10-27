@@ -12,7 +12,7 @@ import (
 func layout(child widget.Widget) render.Rect {
 	row := widget.NewBox(widget.Row, 0, 0)
 	row.AppendAligned(child, false, widget.AlignStart)
-	row.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 500}})
+	widget.SizeWithin(row, widget.Size{W: 500, H: 500})
 	row.Arrange(render.Rect{W: 500, H: 500})
 	return child.(interface{ Bounds() render.Rect }).Bounds()
 }

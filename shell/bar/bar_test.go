@@ -101,14 +101,13 @@ func right(w widget.Widget) int {
 // settleBar lays bar out within out until its styles settle, as lys-ui's
 // bar window does, and returns its natural size.
 func settleBar(bar *widget.Bar, out widget.Size) widget.Size {
-	con := widget.Constraints{Max: out}
-	size := bar.Measure(con)
+	size := widget.SizeWithin(bar, out)
 	for range 4 {
 		bar.Arrange(render.Rect{W: size.W, H: size.H})
 		if !widget.LayoutPending(bar) {
 			break
 		}
-		size = bar.Measure(con)
+		size = widget.SizeWithin(bar, out)
 	}
 	return size
 }

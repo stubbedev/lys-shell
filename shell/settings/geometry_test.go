@@ -49,7 +49,6 @@ func laidOutPages(t *testing.T, visit func(id string, page widget.Widget)) {
 	for _, sec := range w.sections {
 		for _, p := range sec.pages {
 			w.show(p.id)
-			w.root.Measure(widget.Constraints{Min: widget.Size{W: W, H: H}, Max: widget.Size{W: W, H: H}})
 			w.root.Arrange(render.Rect{W: W, H: H})
 			visit(p.id, w.page)
 		}
@@ -221,7 +220,7 @@ func TestCustomColorButtonMatchesItsDropdown(t *testing.T) {
 	k := testKit(t, "modules:\n  clock:\n    icon-color: \"#123456\"\n")
 	c := fieldControl(k, field("modules.clock.icon-color")).(*colorValueEditor)
 	apptheme.New(k.store.svc.Config()).Attach(c.Box)
-	widget.MeasureAsChild(c.Box, widget.Constraints{Max: widget.Size{W: 600, H: 200}})
+	widget.SizeWithinAsChild(c.Box, widget.Size{W: 600, H: 200})
 	widget.ArrangeAsChild(c.Box, render.Rect{W: 600, H: 200})
 	if !c.swatch.Visible() {
 		t.Fatal("a custom color hides its color button")
@@ -319,9 +318,7 @@ func laidOutPageOn(t *testing.T, d desktop, configYAML, id string, w int) *windo
 
 // layOut lays win out w pixels wide the way the window lays it out.
 func layOut(win *window, w int) {
-	con := widget.Constraints{Min: widget.Size{W: w, H: windowHeight}, Max: widget.Size{W: w, H: windowHeight}}
 	for range 2 {
-		win.root.Measure(con)
 		win.root.Arrange(render.Rect{W: w, H: windowHeight})
 	}
 }
@@ -387,10 +384,10 @@ func overflow(t *testing.T, d desktop, id string) []string {
 // cutTitles are the shown row titles under page narrower than their
 // text.
 func cutTitles(page widget.Widget) []*widget.Label {
-	unbounded := widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}
+	unbounded := widget.Size{W: 1 << 20, H: 1 << 20}
 	var cut []*widget.Label
 	for _, x := range treetest.WithClass(page, "setting-label") {
-		if l := x.(*widget.Label); shown(l) && l.Bounds().W < l.Measure(unbounded).W {
+		if l := x.(*widget.Label); shown(l) && l.Bounds().W < widget.SizeWithin(l, unbounded).W {
 			cut = append(cut, l)
 		}
 	}

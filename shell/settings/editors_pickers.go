@@ -190,6 +190,10 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	}
 	p.scroll = widget.NewScroll(p.rows)
 	p.scroll.VerticalOnly = true
+	// The popover grows to the widest row (GTK's
+	// propagate-natural-width), so a row ellipsizes only when held
+	// narrower.
+	p.scroll.PropagateNaturalWidth = true
 	p.scroll.SetMaxContentHeight(spec.maxH)
 	contents.Append(p.scroll, true)
 	return p

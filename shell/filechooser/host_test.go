@@ -54,7 +54,7 @@ func (w *fakeWindow) SetFocus(f widget.Widget) error {
 
 // lay lays root out on a w x h output, as its window does.
 func lay(root widget.Widget, w, h int) {
-	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	widget.SizeWithin(root, widget.Size{W: w, H: h})
 	root.Arrange(render.Rect{W: w, H: h})
 }
 
@@ -774,7 +774,7 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 		hs.do(func() {
 			lay(hs.cfg.Root, W, H)
 			l := hs.c.ui.list
-			l.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 200}})
+			widget.SizeWithin(l, widget.Size{W: 600, H: 200})
 			l.Arrange(render.Rect{W: 600, H: 200})
 			px = make([]uint8, 600*200*4)
 			l.Paint(render.New(px, 600*4, 600, 200))
@@ -1077,7 +1077,7 @@ func TestSidebarPacksAtTheTop(t *testing.T) {
 	hs.open(t, OpenRequest{})
 	var labelY, scrollY int
 	hs.do(func() {
-		hs.cfg.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 720}})
+		widget.SizeWithin(hs.cfg.Root, widget.Size{W: 1280, H: 720})
 		hs.cfg.Root.Arrange(render.Rect{W: 1280, H: 720})
 		for _, l := range treetest.All[*widget.Label](hs.cfg.Root) {
 			if l.Text() == "Favorites" {
@@ -1101,7 +1101,7 @@ func TestLongNamesKeepTheColumnsAligned(t *testing.T) {
 	hs.do(func() {
 		for i := range hs.c.s.entries {
 			row := rows{hs.c, false}.Row(i)
-			row.Measure(widget.Constraints{Max: widget.Size{W: 600, H: listRowH}})
+			widget.SizeWithin(row, widget.Size{W: 600, H: listRowH})
 			row.Arrange(render.Rect{W: 600, H: listRowH})
 			cells := treetest.WithClass(row, "file-chooser-cell")
 			xs[cells[0].(interface{ Bounds() render.Rect }).Bounds().X] = true
@@ -1419,7 +1419,7 @@ func TestTypeAheadAndLocation(t *testing.T) {
 	// A click on the list lands on the wrapper, which takes the typing.
 	var hit widget.Widget
 	hs.do(func() {
-		hs.cfg.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 800}})
+		widget.SizeWithin(hs.cfg.Root, widget.Size{W: 1280, H: 800})
 		hs.cfg.Root.Arrange(render.Rect{W: 1280, H: 800})
 		b := hs.c.ui.list.Bounds()
 		hit = hs.c.ui.listView.HitTest(widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2})
@@ -1994,7 +1994,6 @@ func (hs *harness) listRowCells(t *testing.T, i, w, h int) (widget.Widget, []wid
 		row := rows{hs.c, false}.Row(i)
 		widget.SetParents(hs.c.ui.list, row)
 		band := render.Rect{X: lb.X, Y: lb.Y + i*listRowH, W: lb.W, H: listRowH}
-		row.Measure(widget.Constraints{Min: widget.Size{W: band.W, H: band.H}, Max: widget.Size{W: band.W, H: band.H}})
 		row.Arrange(band)
 		cells = treetest.WithClass(row, "file-chooser-cell")
 		icon = treetest.All[*columnRow](row)[0].lead.(*widget.Box).Children()[0]
@@ -2016,7 +2015,6 @@ func TestHiddenColumnsTakeNoHits(t *testing.T) {
 		widget.SetParents(hs.c.ui.list, row)
 		cells := treetest.WithClass(row, "file-chooser-cell")
 		layAt := func(w int) {
-			row.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
 			row.Arrange(render.Rect{W: w, H: h})
 		}
 		layAt(wide)
@@ -2058,7 +2056,6 @@ func TestHiddenColumnsPaintNothing(t *testing.T) {
 		widget.SetParents(hs.c.ui.list, row)
 		cells = treetest.WithClass(row, "file-chooser-cell")
 		paintAt := func(w int) []uint8 {
-			row.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
 			row.Arrange(render.Rect{W: w, H: h})
 			px := make([]uint8, wide*h*4)
 			widget.PaintChild(render.New(px, wide*4, wide, h), row)

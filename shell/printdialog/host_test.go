@@ -241,7 +241,7 @@ func TestSheetIsTheRustLayout(t *testing.T) {
 	// whole width.
 	var listW, scrollW int
 	hs.do(func() {
-		c.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 800}})
+		widget.SizeWithin(c.Root, widget.Size{W: 1280, H: 800})
 		c.Root.Arrange(render.Rect{W: 1280, H: 800})
 		listW = treetest.All[*widget.ListBox](c.Root)[0].Bounds().W
 		scrollW = scrolls[0].Bounds().W

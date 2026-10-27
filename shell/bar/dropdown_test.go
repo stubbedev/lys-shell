@@ -364,11 +364,11 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 	ctx.Theme.Attach(bar)
 	anchor := widget.NewBox(widget.Row, 0, 0)
 	bar.Append(anchor, false)
-	bar.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 40}})
+	widget.SizeWithin(bar, widget.Size{W: 600, H: 40})
 	bar.Arrange(render.Rect{W: 600, H: 40})
 	root, _ := dropdownTree(calendarDropdown(ctx), cfg)
 	arrange := func() []*widget.Label {
-		root.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 900}})
+		widget.SizeWithin(root, widget.Size{W: 600, H: 900})
 		root.Arrange(render.Rect{W: 600, H: 900})
 		labels := treetest.All[*widget.Label](root)
 		if len(labels) == 0 {
@@ -409,7 +409,7 @@ func TestDropdownScrollPacksShortContentAtTheTop(t *testing.T) {
 	first := widget.NewSpacer(10, 20)
 	col.Append(first, false)
 	s := dropdownScroll(col, "")
-	s.Measure(widget.Constraints{Max: widget.Size{W: 300, H: 400}})
+	widget.SizeWithin(s, widget.Size{W: 300, H: 400})
 	s.Arrange(render.Rect{W: 300, H: 400})
 	if y := first.Bounds().Y; y > 2 {
 		t.Errorf("the first child sits at y=%d, want the top", y)

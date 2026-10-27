@@ -24,7 +24,7 @@ func TestEmptyStateCentersInItsPage(t *testing.T) {
 	page.Append(state, true)
 	ctx.Theme.Attach(page)
 	const w = 240
-	page.Measure(widgetConstraintsMax(w, 400))
+	widget.SizeWithin(page, availSize(w, 400))
 	page.Arrange(render.Rect{W: w, H: 400})
 	if d := midX(boundsOf(glyph)) - w/2; d < -1 || d > 1 {
 		t.Errorf("the icon sits %dpx off the page's center", d)
@@ -42,7 +42,7 @@ func TestEmptyStateCentersInItsPage(t *testing.T) {
 		}
 	}
 	desc := labels[1]
-	if one := widget.MeasureAsChild(desc, widgetConstraintsMax(2000, 400)).H; boundsOf(desc).H <= one {
+	if one := widget.SizeWithinAsChild(desc, availSize(2000, 400)).H; boundsOf(desc).H <= one {
 		t.Errorf("the description is one %dpx line in a %d page, want it wrapped", one, w)
 	}
 }
@@ -57,7 +57,7 @@ func TestDropdownContentTakesTheThemeMetrics(t *testing.T) {
 	content.Append(first, false)
 	content.Append(second, false)
 	ctx.Theme.Attach(content)
-	content.Measure(widgetConstraintsMax(300, 400))
+	widget.SizeWithin(content, availSize(300, 400))
 	content.Arrange(render.Rect{W: 300, H: 400})
 	th := widget.Current()
 	inset := 2 * th.Padding
@@ -80,7 +80,7 @@ func TestDropdownHeaderIsAnItem(t *testing.T) {
 	action := widget.NewSwitch(false)
 	header, glyph, item := dropdownHeaderParts(ctx.Font, "ld-bluetooth-symbolic", "Bluetooth", action)
 	ctx.Theme.Attach(header)
-	header.Measure(widgetConstraintsMax(360, 200))
+	widget.SizeWithin(header, availSize(360, 200))
 	header.Arrange(render.Rect{W: 360, H: 200})
 	kids := header.Children()
 	if len(kids) != 2 || kids[0] != widget.Widget(item) {
@@ -148,11 +148,11 @@ func TestDropdownButtonTextKeepsItsSize(t *testing.T) {
 	content := dropdownContent()
 	content.Append(dropdownButton(label, nil, css.Ghost, css.Small), false)
 	ctx.Theme.Attach(content)
-	content.Measure(widgetConstraintsMax(400, 200))
+	widget.SizeWithin(content, availSize(400, 200))
 	content.Arrange(render.Rect{W: 400, H: 200})
 	bare := widget.NewLabel(font, px, "Clear All", 0)
-	big := widget.Constraints{Max: widget.Size{W: 400, H: 200}}
-	if got, want := widget.MeasureAsChild(label, big).W, bare.Measure(big).W; got != want {
+	big := widget.Size{W: 400, H: 200}
+	if got, want := widget.SizeWithinAsChild(label, big).W, widget.SizeWithin(bare, big).W; got != want {
 		t.Errorf("the button's label measures %dpx wide, want its own %dpx", got, want)
 	}
 }

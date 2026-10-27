@@ -163,7 +163,7 @@ func IconTheme(t *testing.T, names ...string) {
 
 // Ink counts the pixels w paints when laid out at its natural size.
 func Ink(w widget.Widget) int {
-	sz := w.Measure(widget.Constraints{Max: widget.Size{W: 256, H: 256}})
+	sz := widget.SizeWithin(w, widget.Size{W: 256, H: 256})
 	w.Arrange(render.Rect{W: max(sz.W, 1), H: max(sz.H, 1)})
 	data := make([]byte, render.Stride(256)*256)
 	cv := render.NewScaled(data, render.Stride(256), 256, 256, 1, 1)
@@ -181,7 +181,6 @@ func Ink(w widget.Widget) int {
 // with the pointer resting on target's centre, and that point: the real
 // input path, hit testing and the pointer and scroll hooks included.
 func Pointer(root widget.Widget, target widget.Boundser, w, h int) (*widget.Router, widget.Point) {
-	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
 	root.Arrange(render.Rect{W: w, H: h})
 	b := target.Bounds()
 	p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
@@ -206,11 +205,10 @@ func RenderedTextPx(l *widget.Label, face render.Font) float64 {
 	l.SetWidthChars(0)
 	l.SetMaxWidthChars(0)
 	const probe = "MMMMMMMM"
-	unbounded := widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}
 	l.SetText(probe)
-	short := l.Measure(unbounded).W
+	short := l.Measure(widget.Row, widget.Unknown).Nat
 	l.SetText(probe + probe)
-	long := l.Measure(unbounded).W
+	long := l.Measure(widget.Row, widget.Unknown).Nat
 	return float64(long-short) / (face.Shape(probe, 1000).Advance() / 1000)
 }
 
@@ -250,8 +248,7 @@ func LabelReading(t *testing.T, root widget.Widget, text string) *widget.Label {
 // accessible name measures: their padding, borders and icons cancel
 // out, so it needs no reach into a button's content.
 func ButtonTextPx(a, b *widget.Button, face render.Font) float64 {
-	unbounded := widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}
-	grow := a.Measure(unbounded).W - b.Measure(unbounded).W
+	grow := a.Measure(widget.Row, widget.Unknown).Nat - b.Measure(widget.Row, widget.Unknown).Nat
 	unit := (face.Shape(widget.Describe(a).Name, 1000).Advance() - face.Shape(widget.Describe(b).Name, 1000).Advance()) / 1000
 	return float64(grow) / unit
 }

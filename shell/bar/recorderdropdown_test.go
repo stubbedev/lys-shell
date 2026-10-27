@@ -308,7 +308,7 @@ func TestRecorderLongCameraSelectNarrowsToItsRow(t *testing.T) {
 	if b.X+b.W != edge {
 		t.Errorf("the select ends at %d, the rows' content at %d", b.X+b.W, edge)
 	}
-	if natural := d.Measure(widget.Constraints{Max: widget.Size{W: 1 << 12, H: 1 << 12}}).W; b.W >= natural {
+	if natural := widget.SizeWithin(d, widget.Size{W: 1 << 12, H: 1 << 12}).W; b.W >= natural {
 		t.Errorf("the select is %dpx, its label wants %dpx: it did not narrow", b.W, natural)
 	}
 
@@ -327,7 +327,7 @@ func TestRecorderShortCameraSelectKeepsItsWidth(t *testing.T) {
 	v := styledWebcamDropdown(t, 360, "Cam")
 	d, edge := cameraSelect(t, v)
 	b := d.Bounds()
-	if natural := d.Measure(widget.Constraints{Max: widget.Size{W: 1 << 12, H: 1 << 12}}).W; b.W != natural {
+	if natural := widget.SizeWithin(d, widget.Size{W: 1 << 12, H: 1 << 12}).W; b.W != natural {
 		t.Errorf("the select is %dpx, its natural width %dpx", b.W, natural)
 	}
 	if b.X+b.W != edge {

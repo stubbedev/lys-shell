@@ -416,7 +416,6 @@ func TestPickerTakesLysUiParts(t *testing.T) {
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	empty := p.windowsPage(nil)
 	const w, h = 600, 400
-	empty.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
 	empty.Arrange(render.Rect{W: w, H: h})
 	pages := treetest.All[*widget.StatusPage](empty)
 	if len(pages) != 1 {

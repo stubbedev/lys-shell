@@ -137,7 +137,7 @@ func TestNotificationDropdownGroups(t *testing.T) {
 	}
 	pop := &fakePopover{}
 	v.attachPopover(pop)
-	item.Measure(widget.Constraints{Max: widget.Size{W: 360, H: 400}})
+	widget.SizeWithin(item, widget.Size{W: 360, H: 400})
 	item.Arrange(render.Rect{W: 360, H: 400})
 	routeClick(item, treetest.WithClass(main, "title")[0])
 	if pop.dismissed != 1 {
@@ -216,7 +216,7 @@ func TestNotificationGroupHeaderClickTargets(t *testing.T) {
 	v := notificationDropdown(ctx).(*notificationView)
 	defer v.dropdownClosed()
 	g := v.groups[0]
-	v.Measure(widget.Constraints{Max: widget.Size{W: 425, H: 725}})
+	widget.SizeWithin(v, widget.Size{W: 425, H: 725})
 	v.Arrange(render.Rect{W: 425, H: 725})
 
 	header := g.head
@@ -250,7 +250,7 @@ func TestNotificationMoreRowShowsAll(t *testing.T) {
 	v := notificationDropdown(ctx).(*notificationView)
 	defer v.dropdownClosed()
 	g := v.groups[0]
-	v.Measure(widget.Constraints{Max: widget.Size{W: 425, H: 725}})
+	widget.SizeWithin(v, widget.Size{W: 425, H: 725})
 	v.Arrange(render.Rect{W: 425, H: 725})
 
 	more, ok := findByClass(g, "notification-dropdown-group-more").(*widget.Button)
@@ -384,7 +384,7 @@ func TestNotificationItemDismissInsideADefaultActionRow(t *testing.T) {
 	pop := &fakePopover{}
 	v.attachPopover(pop)
 	item := v.groups[0].items[0]
-	item.Measure(widget.Constraints{Max: widget.Size{W: 360, H: 400}})
+	widget.SizeWithin(item, widget.Size{W: 360, H: 400})
 	item.Arrange(render.Rect{W: 360, H: 400})
 	routeClick(item, findByClass(item, "notification-dropdown-item-dismiss"))
 	waitHeadless(t, "the dismissal", func() bool { return len(history(t, svc)) == 0 })
@@ -452,7 +452,7 @@ func TestNotificationLongBodyStaysInItsItem(t *testing.T) {
 	rev.SetRevealed(true)
 	ctx.Theme.Attach(card)
 	onHeadlessLoop(func() bool {
-		widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: 425, H: 400}})
+		widget.SizeWithinAsChild(card, widget.Size{W: 425, H: 400})
 		widget.ArrangeAsChild(card, render.Rect{W: 425, H: 400})
 		item := treetest.WithClass(card, "notification-dropdown-item")[0].(widget.Boundser).Bounds()
 		label := treetest.WithClass(card, "notification-dropdown-item-body")[0]

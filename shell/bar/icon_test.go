@@ -123,7 +123,7 @@ func TestBarIconTakesItsLogicalSizeOnFractionalScales(t *testing.T) {
 	host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
 	ctx.Theme.Attach(host)
 	const lw, lh = 200, 60
-	host.Measure(widget.Constraints{Max: widget.Size{W: lw, H: lh}})
+	widget.SizeWithin(host, widget.Size{W: lw, H: lh})
 	host.Arrange(render.Rect{W: lw, H: lh})
 	for _, tc := range []struct {
 		num, denom, want int

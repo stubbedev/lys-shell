@@ -164,7 +164,7 @@ func TestModuleWrapsTheButtonInModuleClasses(t *testing.T) {
 func shownIcon(b *barButton) *widget.Icon {
 	r := b.Bounds()
 	if r.Empty() {
-		size := b.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}})
+		size := widget.SizeWithin(b, widget.Size{W: 1000, H: 1000})
 		r = render.Rect{W: size.W, H: size.H}
 	}
 	b.Arrange(r)
@@ -184,7 +184,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	b := newBarButton(ctx, icon, "42%")
 	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
 	host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
-	host.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
+	widget.SizeWithin(host, widget.Size{W: 400, H: 40})
 	host.Arrange(render.Rect{W: 400, H: 40})
 	if b.Element() != "button" || !b.HasClass("bar-button") {
 		t.Fatalf("the module button is %q %v, not lys-ui's button.bar-button", b.Element(), b.Classes())
@@ -240,7 +240,7 @@ func TestBarButtonIconPosition(t *testing.T) {
 		icon := widget.NewThemeIcon("x", 16)
 		b := newBarButton(newTestContext(t, cfg), icon, "12:30")
 		host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
-		host.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
+		widget.SizeWithin(host, widget.Size{W: 400, H: 40})
 		host.Arrange(render.Rect{W: 400, H: 40})
 		iconFirst := icon.Bounds().X < b.Label().Bounds().X
 		if iconFirst != (at == config.IconStart) {
@@ -290,12 +290,12 @@ func TestBarButtonLabelMaxLength(t *testing.T) {
 	capped := batteryButton(cfg)
 	capped.LabelMaxLength = 4
 	b.configure(capped, config.ClickConfig{}, nil)
-	short := b.Label().Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 100}}).W
+	short := widget.SizeWithin(b.Label(), widget.Size{W: 2000, H: 100}).W
 	if b.Label().MaxWidthChars() != 4 || b.Label().Ellipsize() != widget.EllipsizeEnd {
 		t.Errorf("capped: %d chars, ellipsize %v; want 4, end", b.Label().MaxWidthChars(), b.Label().Ellipsize())
 	}
 	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
-	whole := b.Label().Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 100}}).W
+	whole := widget.SizeWithin(b.Label(), widget.Size{W: 2000, H: 100}).W
 	if b.Label().Ellipsize() != widget.EllipsizeNone || whole <= short {
 		t.Errorf("uncapped: ellipsize %v, %dpx against the capped %dpx", b.Label().Ellipsize(), whole, short)
 	}
@@ -349,7 +349,7 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
 	binding := config.ClickConfig{LeftClick: config.ParseClickAction("left")}
 	button, rec := newWrappedModule(t, binding)
-	button.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}})
+	widget.SizeWithin(button, widget.Size{W: 200, H: 50})
 	button.Arrange(render.Rect{X: 0, Y: 0, W: 100, H: 30})
 	router := &widget.Router{Root: button}
 	p := widget.Point{X: 10, Y: 10}

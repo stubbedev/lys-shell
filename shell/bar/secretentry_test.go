@@ -11,8 +11,8 @@ import (
 // box again and empties it.
 func TestSecretEntryPeekKeepsItsSize(t *testing.T) {
 	s := newSecretEntry(testFont(t), 14)
-	con := widget.Constraints{Max: widget.Size{W: 100, H: 100}}
-	size := func() widget.Size { return s.entry.TrailingIcon().Measure(con) }
+	con := widget.Size{W: 100, H: 100}
+	size := func() widget.Size { return widget.SizeWithin(s.entry.TrailingIcon(), con) }
 	want := size()
 	if want.W != 14 {
 		t.Fatalf("peek icon %v, want 14px", want)

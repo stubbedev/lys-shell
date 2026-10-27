@@ -76,8 +76,7 @@ const dropdownHeaderIconPx = 18
 // twice the theme's padding, which lines the content up with the
 // header's icon. It carries .dropdown-content and the given classes.
 func dropdownContent(classes ...string) *widget.Box {
-	t := widget.Current()
-	content := widget.NewBox(widget.Column, 2*t.Spacing, 2*t.Padding)
+	content := widget.NewBox(widget.Column, 2*widget.Current().Spacing, dropdownInset())
 	content.AddClass(append([]string{"dropdown-content"}, classes...)...)
 	return content
 }
@@ -170,11 +169,15 @@ func newFormCard(font render.Font, px float64, icon string, onClose func(), clas
 // spacing between its parts, inset on the sides and below by twice the
 // theme's padding, in line with the item's own.
 func itemBody() *widget.Box {
-	th := widget.Current()
-	body := widget.NewBox(widget.Column, th.Spacing, 0)
-	body.SetPadding(render.Insets{Left: 2 * th.Padding, Right: 2 * th.Padding, Bottom: 2 * th.Padding})
+	in := dropdownInset()
+	body := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
+	body.SetPadding(render.Insets{Left: in, Right: in, Bottom: in})
 	return body
 }
+
+// dropdownInset is how far a dropdown's content sits inside its card
+// on every side: twice the theme's padding.
+func dropdownInset() int { return 2 * widget.Current().Padding }
 
 // formActions is a form's button row: the buttons at the end, the
 // theme's spacing apart, as lys-ui's dialogs place theirs.

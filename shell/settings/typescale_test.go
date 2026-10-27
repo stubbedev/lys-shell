@@ -28,7 +28,7 @@ func styledWindow(t *testing.T) (*kit, *window) {
 	k := testKit(t, "")
 	w := newWindow(k, k.store.svc.Config(), (&fakeAfter{}).after)
 	apptheme.New(k.store.svc.Config()).Attach(w.root)
-	w.root.Measure(widget.Constraints{Max: widget.Size{W: windowWidth, H: windowHeight}})
+	widget.SizeWithin(w.root, widget.Size{W: windowWidth, H: windowHeight})
 	w.root.Arrange(render.Rect{W: windowWidth, H: windowHeight})
 	return k, w
 }
@@ -92,7 +92,7 @@ func TestOffScaleCatchesAHardCodedSize(t *testing.T) {
 	k, w := styledWindow(t)
 	stray := widget.NewLabel(k.face, 13, "stray", 0)
 	w.root.Append(stray, false)
-	w.root.Measure(widget.Constraints{Max: widget.Size{W: windowWidth, H: windowHeight}})
+	widget.SizeWithin(w.root, widget.Size{W: windowWidth, H: windowHeight})
 	w.root.Arrange(render.Rect{W: windowWidth, H: windowHeight})
 	off := treetest.OffScale(w.root, k.face, scaleSizes(1))
 	if len(off) == 0 {

@@ -127,10 +127,14 @@ func (p *webcamPreview) layOut() {
 	p.cam.Arrange(render.Rect{X: b.X + int(p.camX), Y: b.Y + int(p.camY), W: int(p.cw), H: int(p.ch)})
 }
 
-// Measure takes the whole width offered and the 16:9 height for it.
-func (p *webcamPreview) Measure(con widget.Constraints) widget.Size {
-	pw, ph, _, _ := previewGeometry(intconv.Clamp[int32](con.Max.W), p.sizePct)
-	return widget.Size{W: int(pw), H: int(ph)}
+// Measure asks for no width of its own, taking the width it is given,
+// and the 16:9 height for that width.
+func (p *webcamPreview) Measure(axis widget.Axis, forSize int) widget.Sizes {
+	if axis == widget.Row || forSize == widget.Unknown {
+		return widget.Sizes{}
+	}
+	_, ph, _, _ := previewGeometry(intconv.Clamp[int32](forSize), p.sizePct)
+	return widget.FixedSizes(int(ph))
 }
 
 func (p *webcamPreview) Paint(cv *render.Canvas) {

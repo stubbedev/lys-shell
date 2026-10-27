@@ -504,8 +504,8 @@ func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
 	} {
 		bare := widget.NewButton(widget.NewThemeIcon(tc.glyph, int(tc.px)), 0, 0)
 		bare.AddClass(tc.b.Classes()...)
-		want := bare.Measure(widgetConstraintsMax(200, 200))
-		if got := tc.b.Measure(widgetConstraintsMax(200, 200)); got != want {
+		want := widget.SizeWithin(bare, availSize(200, 200))
+		if got := widget.SizeWithin(tc.b, availSize(200, 200)); got != want {
 			t.Errorf("%s measures %v, want an unpadded button's %v (programmatic padding)", tc.glyph, got, want)
 		}
 		if got := widget.CursorNameOf(tc.b); got != "pointer" {
@@ -515,7 +515,7 @@ func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
 	// Negative: the constructor padding the Rust tree leaves out would
 	// show up as a padded measure.
 	padded := widget.NewButton(widget.NewThemeIcon("ld-play-symbolic", int(px)), 6, 6)
-	if padded.Measure(widgetConstraintsMax(200, 200)) == widget.NewThemeIcon("ld-play-symbolic", int(px)).Measure(widgetConstraintsMax(200, 200)) {
+	if widget.SizeWithin(padded, availSize(200, 200)) == widget.SizeWithin(widget.NewThemeIcon("ld-play-symbolic", int(px)), availSize(200, 200)) {
 		t.Error("a padded button measures like its icon; the test cannot see padding")
 	}
 }
@@ -569,10 +569,10 @@ func TestMediaEmptyStateKeepsThePlayersHeight(t *testing.T) {
 	if v.mode != "empty" || v.main.Visible() != "empty" {
 		t.Fatalf("mode %q page %q, want the empty state", v.mode, v.main.Visible())
 	}
-	con := widgetConstraintsMax(380, 900)
-	page := v.main.Measure(con).H
-	player := v.player.Measure(con).H
-	bare := v.empty.Measure(con).H
+	con := availSize(380, 900)
+	page := widget.SizeWithin(v.main, con).H
+	player := widget.SizeWithin(v.player, con).H
+	bare := widget.SizeWithin(v.empty, con).H
 	if bare == player {
 		t.Fatalf("the empty state and the player are both %dpx: the test proves nothing", bare)
 	}

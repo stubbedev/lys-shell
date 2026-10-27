@@ -378,7 +378,7 @@ func cwsBar(t *testing.T, ctx ModuleContext, m Module) (*widget.Bar, widget.Size
 // holds a pixel of exactly color c, and the color at its rest point
 // (the left of its middle, clear of the content).
 func paintCwsBar(m *cwsModule, bar *widget.Bar, size widget.Size) (has func(i int, c render.Color) bool, rest func(i int) render.Color) {
-	bar.Measure(widgetConstraintsMax(size.W, size.H))
+	widget.SizeWithin(bar, availSize(size.W, size.H))
 	bar.Arrange(render.Rect{W: size.W, H: size.H})
 	widget.CollectDamage(bar)
 	data := make([]byte, render.Stride(size.W)*size.H)
@@ -458,7 +458,7 @@ func TestCwsUnderlinesTheActiveWorkspace(t *testing.T) {
 	}
 	bar, size := cwsBar(t, ctx, m)
 	accent, _ := styling.ResolveColor(wcfg.ActiveColor, palette)
-	bar.Measure(widgetConstraintsMax(size.W, size.H))
+	widget.SizeWithin(bar, availSize(size.W, size.H))
 	bar.Arrange(render.Rect{W: size.W, H: size.H})
 	data := make([]byte, render.Stride(size.W)*size.H)
 	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
@@ -543,7 +543,7 @@ func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	defer delete(factories, "test-cws")
 	bar := buildRoot(ctx, config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "test-cws"}, {Module: "clock"}}}, "DP-1")
 	size := settleBar(bar, widget.Size{W: 200, H: 400})
-	bar.Measure(widgetConstraintsMax(size.W, size.H))
+	widget.SizeWithin(bar, availSize(size.W, size.H))
 	bar.Arrange(render.Rect{W: size.W, H: size.H})
 	data := make([]byte, render.Stride(size.W)*size.H)
 	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))

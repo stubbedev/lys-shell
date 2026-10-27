@@ -102,12 +102,11 @@ func (s *spectrum) size() widget.Size {
 	return widget.Size{W: s.length, H: s.thick}
 }
 
-// Measure reports the fixed natural size.
-func (s *spectrum) Measure(con widget.Constraints) widget.Size { return clampSize(s.size(), con) }
-
-// MinSize keeps the length: a visualizer squeezed shorter would
-// misrepresent the bar layout.
-func (s *spectrum) MinSize() widget.Size { return s.size() }
+// Measure reports the fixed natural size as its minimum too: a
+// visualizer squeezed shorter would misrepresent the bar layout.
+func (s *spectrum) Measure(axis widget.Axis, _ int) widget.Sizes {
+	return widget.FixedSizes(s.size().Along(axis))
+}
 
 // Arrange records the rect.
 func (s *spectrum) Arrange(r render.Rect) { s.Base.Arrange(r) }
@@ -376,12 +375,4 @@ func resolveModuleColor(ctx ModuleContext, cv config.ColorValue) render.Color {
 		return render.Color(0)
 	}
 	return color
-}
-
-// clampSize confines s to the constraint box.
-func clampSize(s widget.Size, con widget.Constraints) widget.Size {
-	return widget.Size{
-		W: min(max(s.W, con.Min.W), con.Max.W),
-		H: min(max(s.H, con.Min.H), con.Max.H),
-	}
 }

@@ -231,7 +231,7 @@ func TestSidebarKeepsItsWidth(t *testing.T) {
 				if b.X+b.W > scroll.X+scroll.W {
 					t.Errorf("place %v runs out of the sidebar %v", b, scroll)
 				}
-				natural := place.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}).W
+				natural := widget.SizeWithin(place, widget.Size{W: 1 << 20, H: 1 << 20}).W
 				if cut := b.W < natural; cut != (natural > sidebarW) {
 					t.Errorf("%q is %dpx of its natural %d: cut %v", label, b.W, natural, cut)
 				}
@@ -271,8 +271,8 @@ func TestReplaceNoticeWrapsInsideThePanel(t *testing.T) {
 				if rb := hs.c.ui.replace.Bounds(); rb.X < at.X+at.W || rb.Y >= at.Y+at.H || rb.Y+rb.H <= at.Y {
 					t.Errorf("Replace at %v, not beside the message %v", rb, at)
 				}
-				line := msg.Measure(widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}})
-				lines := msg.Measure(widget.Constraints{Max: widget.Size{W: at.W, H: 1 << 20}})
+				line := widget.SizeWithin(msg, widget.Size{W: 1 << 20, H: 1 << 20})
+				lines := widget.SizeWithin(msg, widget.Size{W: at.W, H: 1 << 20})
 				if wrapped := lines.H > line.H; wrapped != (name == long) || at.H < lines.H {
 					t.Errorf("the message for %q is %v, %dpx at its width and one line %d: wrapped %v", name, at, lines.H, line.H, wrapped)
 				}

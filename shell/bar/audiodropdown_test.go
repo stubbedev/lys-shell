@@ -314,7 +314,7 @@ func TestAudioEmptyStatesCenterVertically(t *testing.T) {
 	restore := widget.SetAnimationsInstant(true)
 	t.Cleanup(restore)
 	v := audioDropdown(newTestContext(t, config.Defaults())).(*audioView)
-	sz := v.Measure(widgetConstraintsMax(420, 700))
+	sz := widget.SizeWithin(v, availSize(420, 700))
 	v.Arrange(render.Rect{W: sz.W, H: 700})
 
 	for _, tc := range []struct {
@@ -375,8 +375,8 @@ func TestAudioPickerTitleKeepsNaturalWidth(t *testing.T) {
 	p := v.pickers[audioOutput]
 	title := findByClass(p, "picker-title").(*widget.Label)
 	header := findByClass(p, "picker-header").(*widget.Box)
-	hh := header.Measure(widgetConstraintsMax(420, 60))
-	nat := title.Measure(widgetConstraintsMax(hh.W+200, 60))
+	hh := widget.SizeWithin(header, availSize(420, 60))
+	nat := widget.SizeWithin(title, availSize(hh.W+200, 60))
 	header.Arrange(render.Rect{W: hh.W + 200, H: hh.H})
 	if got := boundsOf(title).W; got != nat.W {
 		t.Errorf("title width = %d, want its natural %d (it took the free width)", got, nat.W)
@@ -464,7 +464,7 @@ func TestAudioOptionFitsANarrowPicker(t *testing.T) {
 	row := v.pickers[audioOutput].row(audioDevice{description: "alsa_output.pci-0000_00_1f.3.analog-stereo", icon: "ld-speaker-symbolic"}, true)
 	ctx.Theme.Attach(row)
 	const w = 240
-	sz := row.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})
+	sz := widget.SizeWithin(row, widget.Size{W: w, H: 400})
 	row.Arrange(render.Rect{W: w, H: sz.H})
 	check := treetest.WithClass(row, "audio-device-option-check")[0].(*widget.Icon)
 	if end := check.Bounds().X + check.Bounds().W; end > w {

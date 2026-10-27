@@ -147,7 +147,7 @@ func spacedWidth(attach func(*widget.Box)) int {
 	box.Append(widget.NewSpacer(10, 10), false)
 	attach(box)
 	widget.CollectDamage(box)
-	return box.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}}).W
+	return widget.SizeWithin(box, widget.Size{W: 1000, H: 1000}).W
 }
 
 // The bundle styles only the roots it is attached to: reloading a theme

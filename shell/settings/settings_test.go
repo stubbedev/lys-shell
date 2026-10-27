@@ -374,7 +374,7 @@ func TestWindowNavigatesAndDropsOldPages(t *testing.T) {
 func TestSidebarSectionsCollapse(t *testing.T) {
 	k := testKit(t, "")
 	w := newWindow(k, k.store.svc.Config(), (&fakeAfter{}).after)
-	w.root.Measure(widget.Constraints{Max: widget.Size{W: windowWidth, H: windowHeight}})
+	widget.SizeWithin(w.root, widget.Size{W: windowWidth, H: windowHeight})
 	w.root.Arrange(render.Rect{W: windowWidth, H: windowHeight})
 	sec := w.sections[0]
 	head := treetest.Button(t, w.sidebar, i18n.Settings().Get(sec.key))
@@ -1372,7 +1372,7 @@ func TestMonitorWallpaperCards(t *testing.T) {
 	}
 	// The body takes the row's spare width, not its label.
 	bodyRow := c.list.Children()[0].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Box)
-	bodyRow.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 400}})
+	widget.SizeWithin(bodyRow, widget.Size{W: 600, H: 400})
 	bodyRow.Arrange(render.Rect{W: 600, H: 40})
 	if label := treetest.First[*widget.Label](t, bodyRow).Bounds(); label.W > 200 || body.Bounds().W < 400 {
 		t.Errorf("label %v and body %v share the row; the body should fill it", label, body.Bounds())
@@ -1398,16 +1398,16 @@ func TestMonitorWallpaperCards(t *testing.T) {
 
 func TestEntriesKeepTheirGtkWidth(t *testing.T) {
 	k := testKit(t, "")
-	con := widget.Constraints{Max: widget.Size{W: 2000, H: 100}}
+	con := widget.Size{W: 2000, H: 100}
 	file := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
 	live := newLiveText(k, pathSlot(k.store, "wallpaper.wallpaper"), "")
-	if empty := live.Measure(con).W; empty < widget.GTKTextWidth {
+	if empty := widget.SizeWithin(live, con).W; empty < widget.GTKTextWidth {
 		t.Errorf("an empty live entry measures %d, want GTK's %d text width", empty, widget.GTKTextWidth)
 	}
 	for name, e := range map[string]*widget.Entry{"file": file.entry.Entry, "live": live.Entry} {
-		empty := e.Measure(con).W
+		empty := widget.SizeWithin(e, con).W
 		e.SetText(strings.Repeat("/long/path", 40))
-		if got := e.Measure(con).W; got != empty {
+		if got := widget.SizeWithin(e, con).W; got != empty {
 			t.Errorf("%s: a long text resized the entry from %d to %d", name, empty, got)
 		}
 	}
@@ -1529,14 +1529,14 @@ func TestWorkspaceChoicesAreFocusActions(t *testing.T) {
 func TestActionCustomEntryCollapsesWhileHidden(t *testing.T) {
 	k := testKit(t, "")
 	c := newActionEditor(k, pathSlot(k.store, "modules.battery.left-click"), actionChoices("battery"))
-	con := widget.Constraints{Max: widget.Size{W: 400, H: 400}}
+	con := widget.Size{W: 400, H: 400}
 	c.reveal.Finish()
-	hidden := c.Measure(con).H
+	hidden := widget.SizeWithin(c, con).H
 	c.drop.SetSelected(c.customIndex())
 	c.reveal.Finish()
 	c.InvalidateLayout()
-	shown := c.Measure(con).H
-	if shown <= hidden || hidden > c.drop.Measure(con).H+8 {
+	shown := widget.SizeWithin(c, con).H
+	if shown <= hidden || hidden > widget.SizeWithin(c.drop, con).H+8 {
 		t.Errorf("heights hidden %d shown %d: the hidden entry should take no space", hidden, shown)
 	}
 }
@@ -1829,7 +1829,7 @@ func TestLayoutEditorCards(t *testing.T) {
 // that keeps each zone's chips on one line.
 func zoneChips(t *testing.T, root widget.Widget, c *layoutEditor, i, z int) *widget.ChipBox {
 	t.Helper()
-	root.Measure(widget.Constraints{Max: widget.Size{W: 1200, H: 800}})
+	widget.SizeWithin(root, widget.Size{W: 1200, H: 800})
 	root.Arrange(render.Rect{W: 1200, H: 800})
 	boxes := treetest.All[*widget.ChipBox](c.list.Children()[i])
 	if len(boxes) != zoneCount {
@@ -2069,7 +2069,7 @@ func TestColorEditorShowsItsColor(t *testing.T) {
 	slot.Append(c, false)
 	cfg := config.Defaults()
 	slot.AttachStylesheet(widget.NewStylesheet(styling.BundleCSS(cfg, cfg.Styling.ActivePalette(), styling.Default()), 200))
-	sz := slot.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 100}})
+	sz := widget.SizeWithin(slot, widget.Size{W: 200, H: 100})
 	slot.Arrange(render.Rect{W: sz.W, H: sz.H})
 	b := c.Bounds()
 	if b.W < 20 || b.H < 12 {
@@ -2143,7 +2143,6 @@ func TestWindowTakesLysUiParts(t *testing.T) {
 	for _, sec := range w.sections {
 		for _, p := range sec.pages {
 			w.show(p.id)
-			w.root.Measure(widget.Constraints{Min: widget.Size{W: winW, H: winH}, Max: widget.Size{W: winW, H: winH}})
 			w.root.Arrange(render.Rect{W: winW, H: winH})
 			if b := w.page.Bounds(); b.X+b.W > winW {
 				t.Errorf("page %s runs to x=%d past the %dpx window", p.id, b.X+b.W, winW)
@@ -2203,7 +2202,7 @@ func TestIdleWindowOwesNoFrame(t *testing.T) {
 	const W, H = 1200, 900
 	data := make([]byte, render.Stride(W)*H)
 	frame := func() {
-		w.root.Measure(widget.Constraints{Max: widget.Size{W: W, H: H}})
+		widget.SizeWithin(w.root, widget.Size{W: W, H: H})
 		w.root.Arrange(render.Rect{W: W, H: H})
 		w.root.Paint(render.New(data, render.Stride(W), W, H))
 		widget.CollectDamage(w.root)

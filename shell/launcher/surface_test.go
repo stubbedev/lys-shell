@@ -728,7 +728,7 @@ func TestMarkupShapesWithTheVariants(t *testing.T) {
 
 // layout measures and arranges root at w x h, building the visible rows.
 func layout(root widget.Widget, w, h int) {
-	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	widget.SizeWithin(root, widget.Size{W: w, H: h})
 	root.Arrange(render.Rect{W: w, H: h})
 }
 
@@ -809,8 +809,8 @@ func TestMessageLineKeepsItsPadding(t *testing.T) {
 	v.root.AttachStylesheet(widget.NewStylesheet(styling.BundleCSS(cfg, cfg.Styling.ActivePalette(), styling.Default()), 200))
 	layout(v.root, 600, 400)
 	bare := widget.NewRichLabel(h.s.d.Font, fontPx(), v.message.Markup(), 0)
-	natural := widget.MeasureAsChild(bare, widget.Constraints{Max: widget.Size{W: 600, H: 400}})
-	got := widget.MeasureAsChild(v.message, widget.Constraints{Max: widget.Size{W: 600, H: 400}})
+	natural := widget.SizeWithinAsChild(bare, widget.Size{W: 600, H: 400})
+	got := widget.SizeWithinAsChild(v.message, widget.Size{W: 600, H: 400})
 	if got.W <= natural.W || got.H <= natural.H {
 		t.Errorf("the message measures %v around %v of text, want its padding added", got, natural)
 	}

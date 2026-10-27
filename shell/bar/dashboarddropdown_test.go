@@ -513,10 +513,10 @@ func TestDashboardQuickActionTileCenters(t *testing.T) {
 	col := quickActionTile(icon, label)
 	b := dropdownButton(col, func() {}, "quick-action")
 	ctx.Theme.Attach(b)
-	b.Measure(widgetConstraintsMax(200, 120))
+	widget.SizeWithin(b, availSize(200, 120))
 	b.Arrange(render.Rect{W: 200, H: 120})
 	tile := col.Children()[0]
-	nat := widget.MeasureAsChild(tile, widgetConstraintsMax(200, 120))
+	nat := widget.SizeWithinAsChild(tile, availSize(200, 120))
 	tb := boundsOf(tile)
 	if tb.W != nat.W {
 		t.Errorf("the icon tile spans %dpx, want its natural %dpx", tb.W, nat.W)
@@ -538,8 +538,8 @@ func TestDashboardGrowsToItsSections(t *testing.T) {
 	w, h, _ := dropdownDims("dashboard", ctx.Config)
 	card, _ := dropdownTree(dropdownPanel("dashboard", ctx.Config, v), ctx.Config)
 	ctx.Theme.Attach(card)
-	sz := widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: 2000, H: 4000}})
-	sections := widget.MeasureAsChild(treetest.WithClass(v, "dashboard-scroll")[0].(*widget.Scroll).Children()[0], widget.Constraints{Max: widget.Size{W: w, H: 4000}})
+	sz := widget.SizeWithinAsChild(card, widget.Size{W: 2000, H: 4000})
+	sections := widget.SizeWithinAsChild(treetest.WithClass(v, "dashboard-scroll")[0].(*widget.Scroll).Children()[0], widget.Size{W: w, H: 4000})
 	if h > 0 || sz.H < sections.H {
 		t.Errorf("the dashboard (height %d) measures %dpx over %dpx of sections, want it grown to fit them", h, sz.H, sections.H)
 	}

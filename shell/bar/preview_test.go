@@ -270,7 +270,7 @@ func paintPreview(ctx ModuleContext, content widget.Widget, name string) ([]byte
 	ctx.Theme.Attach(bar)
 	anchor := widget.NewBox(widget.Row, 0, 0)
 	bar.Append(anchor, false)
-	bar.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 40}})
+	widget.SizeWithin(bar, widget.Size{W: 600, H: 40})
 	bar.Arrange(render.Rect{W: 600, H: 40})
 	content = dropdownPanel(name, ctx.Config, content)
 	if panel, ok := content.(*panelBox); ok {
@@ -282,11 +282,11 @@ func paintPreview(ctx ModuleContext, content widget.Widget, name string) ([]byte
 	rev.Finish()
 	widget.SetStyleAnchor(root, anchor)
 	pc := dropdownPopover(ctx.Config, anchor, root, previewMonitorH, w)
-	limit := widget.Constraints{Max: widget.Size{W: pc.MaxWidth, H: pc.MaxHeight}}
-	sz := widget.MeasureAsChild(root, limit)
+	limit := widget.Size{W: pc.MaxWidth, H: pc.MaxHeight}
+	sz := widget.SizeWithinAsChild(root, limit)
 	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
 	widget.CollectDamage(root)
-	sz = widget.MeasureAsChild(root, limit)
+	sz = widget.SizeWithinAsChild(root, limit)
 	widget.ArrangeAsChild(root, render.Rect{W: sz.W, H: sz.H})
 	data := make([]byte, render.Stride(sz.W)*sz.H)
 	for i := 3; i < len(data); i += 4 {

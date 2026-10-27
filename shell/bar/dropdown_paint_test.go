@@ -21,7 +21,7 @@ func TestDropdownPanelsPaintFromTheStylesheet(t *testing.T) {
 	ctx := styledContext(t, cfg)
 	v := audioDropdown(ctx).(*audioView)
 	ctx.Theme.Attach(v)
-	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 600}})
+	sz := widget.SizeWithin(v, widget.Size{W: 400, H: 600})
 	v.Arrange(render.Rect{W: sz.W, H: 600})
 
 	name := treetest.WithClass(v.output.item, "title")[0].(*widget.Label)
@@ -49,7 +49,7 @@ func TestDropdownPanelsPaintFromTheStylesheet(t *testing.T) {
 
 // paintLabel paints one label into a fresh buffer.
 func paintLabel(l *widget.Label) []byte {
-	sz := l.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 40}})
+	sz := widget.SizeWithin(l, widget.Size{W: 200, H: 40})
 	l.Arrange(render.Rect{W: sz.W + 8, H: 24})
 	data := make([]byte, render.Stride(200)*40)
 	cv := render.NewScaled(data, render.Stride(200), 200, 40, 1, 1)
@@ -77,7 +77,7 @@ func TestBatteryGaugePaintsFromTheLevelbarRules(t *testing.T) {
 	v := batteryDropdown(ctx).(*batteryView)
 	defer v.dropdownClosed()
 	// The tree pass first: the gauge's element resolves on parenting.
-	sz0 := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 600}})
+	sz0 := widget.SizeWithin(v, widget.Size{W: 400, H: 600})
 	v.Arrange(render.Rect{W: sz0.W, H: 600})
 	ctx.Theme.Attach(v)
 	restore := widget.SetAnimationsInstant(true)
@@ -85,7 +85,7 @@ func TestBatteryGaugePaintsFromTheLevelbarRules(t *testing.T) {
 	v.gauge.SetValue(0.5)
 	v.gauge.RemoveClass(batteryVariants...)
 	v.gauge.AddClass("good")
-	sz := v.gauge.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 40}})
+	sz := widget.SizeWithin(v.gauge, widget.Size{W: 200, H: 40})
 	v.gauge.Arrange(render.Rect{X: 0, Y: 0, W: 200, H: sz.H})
 
 	palette := ctx.Theme.RenderPalette()
@@ -137,7 +137,7 @@ func TestStatRingPaintsTheThresholdColor(t *testing.T) {
 	}
 	fresh()
 	paintRing := func() []byte {
-		sz := r.ring.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
+		sz := widget.SizeWithin(r.ring, widget.Size{W: 100, H: 100})
 		r.ring.Arrange(render.Rect{W: sz.W, H: sz.H})
 		data := make([]byte, render.Stride(100)*100)
 		cv := render.NewScaled(data, render.Stride(100), 100, 100, 1, 1)
@@ -182,13 +182,13 @@ func spanOf(data []byte, h int, want func(render.Color) bool) (minX, maxX int) {
 func TestStatRingTakesTheStylesheetDiameter(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	bare := newStatRing(widget.NewLabel(ctx.Font, 12, "", 0))
-	if s := widget.MeasureAsChild(bare.ring, widget.Constraints{Max: widget.Size{W: 400, H: 400}}); s.H >= 48 {
+	if s := widget.SizeWithinAsChild(bare.ring, widget.Size{W: 400, H: 400}); s.H >= 48 {
 		t.Fatalf("a ring outside the stylesheet measures %v: its size is not the stylesheet's", s)
 	}
 	r := newStatRing(widget.NewLabel(ctx.Font, 12, "", 0))
 	ctx.Theme.Attach(r.ring)
 	r.set(0.5, "50%", "")
-	sz := widget.MeasureAsChild(r.ring, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	sz := widget.SizeWithinAsChild(r.ring, widget.Size{W: 400, H: 400})
 	if sz.W < 60 || sz.W != sz.H {
 		t.Fatalf("the ring measures %v, want the square 4rem .stat-ring", sz)
 	}
@@ -206,7 +206,7 @@ func TestGlyphRingGlyphClearsTheTrack(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	r := newGlyphRing("ld-wifi-symbolic", 65)
 	ctx.Theme.Attach(r)
-	sz := widget.MeasureAsChild(r, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	sz := widget.SizeWithinAsChild(r, widget.Size{W: 400, H: 400})
 	widget.ArrangeAsChild(r, render.Rect{W: sz.W, H: sz.H})
 	ring, glyph := r.Bounds(), r.glyph.Bounds()
 	if glyph.W == 0 || glyph.H == 0 {
@@ -227,8 +227,8 @@ func TestDropdownHeaderActionsKeepTheirHeight(t *testing.T) {
 	scan := dropdownButton(widget.NewThemeIcon("tb-refresh-symbolic", 16), nil, css.Ghost, css.Icon)
 	header := dropdownHeader(ctx.Font, "ld-bluetooth-symbolic", "Bluetooth", scan, sw)
 	ctx.Theme.Attach(header)
-	natural := widget.MeasureAsChild(sw, widget.Constraints{Max: widget.Size{W: 400, H: 400}})
-	sz := header.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 400}})
+	natural := widget.SizeWithinAsChild(sw, widget.Size{W: 400, H: 400})
+	sz := widget.SizeWithin(header, widget.Size{W: 400, H: 400})
 	header.Arrange(render.Rect{W: 400, H: sz.H})
 	if scan.Bounds().H <= natural.H {
 		t.Fatalf("the icon button (%d) is no taller than the switch (%d): nothing to stretch against", scan.Bounds().H, natural.H)

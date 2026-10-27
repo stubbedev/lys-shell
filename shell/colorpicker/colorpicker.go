@@ -259,7 +259,8 @@ type surface struct {
 	hasCursor        bool
 }
 
-func (l *surface) Measure(con widget.Constraints) widget.Size { return con.Max }
+// Measure asks for nothing: the surface takes the whole output.
+func (l *surface) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 func (l *surface) HitTest(p widget.Point) widget.Widget { return l.HitLeaf(l, p) }
 

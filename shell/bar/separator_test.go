@@ -61,7 +61,7 @@ func TestSeparatorRunsAcrossTheBar(t *testing.T) {
 		if loc.IsVertical() {
 			w, h = size.W, 1000
 		}
-		bar.Measure(widgetConstraintsMax(w, h))
+		widget.SizeWithin(bar, availSize(w, h))
 		bar.Arrange(render.Rect{W: w, H: h})
 		data := make([]byte, render.Stride(w)*h)
 		cv := render.New(data, render.Stride(w), w, h)

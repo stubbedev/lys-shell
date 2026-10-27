@@ -303,7 +303,7 @@ func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 	// off the row onto the list's empty space below it, as in the
 	// dropdown, where the row is never the surface's root.
 	list := widget.NewBox(widget.Column, 0, 0).Append(row, false)
-	list.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	widget.SizeWithin(list, widget.Size{W: 400, H: 200})
 	list.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 200})
 	router := &widget.Router{Root: list}
 	router.Move(widget.Point{X: 10, Y: 10})
@@ -324,7 +324,7 @@ func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 	}
 	// Hovering an available row never swaps.
 	speaker := rowNamed(t, d, "Speaker")
-	speaker.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	widget.SizeWithin(speaker, widget.Size{W: 400, H: 200})
 	speaker.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
 	(&widget.Router{Root: speaker}).Move(widget.Point{X: 10, Y: 10})
 	if speaker.actions != nil {
@@ -337,7 +337,7 @@ func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 // hears it.
 func (r *btDeviceRow) clickRow(t *testing.T) {
 	t.Helper()
-	r.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	widget.SizeWithin(r, widget.Size{W: 400, H: 200})
 	r.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
 	router := &widget.Router{Root: r}
 	p := widget.Point{X: 10, Y: 10}
@@ -803,7 +803,7 @@ func TestBtGhostClassesAreExact(t *testing.T) {
 // rows are laid out and painted, not just built.
 func TestBluetoothRowsAreInThePanel(t *testing.T) {
 	d, _ := newTestBtDropdown(t, btWorld())
-	d.root.Measure(widget.Constraints{Max: widget.Size{W: 420, H: 900}})
+	widget.SizeWithin(d.root, widget.Size{W: 420, H: 900})
 	d.root.Arrange(render.Rect{W: 420, H: 900})
 	inTree := map[widget.Widget]bool{}
 	treetest.Walk(d.root, func(w widget.Widget) { inTree[w] = true })
@@ -824,7 +824,7 @@ func TestBluetoothRowsAreInThePanel(t *testing.T) {
 func TestBtDeviceStatusSitsAtTheRowsEnd(t *testing.T) {
 	d, _ := newTestBtDropdown(t, btWorld())
 	row := rowNamed(t, d, "Mouse")
-	row.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	widget.SizeWithin(row, widget.Size{W: 400, H: 200})
 	row.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
 	slot, status := boundsOf(row.slot), boundsOf(row.status)
 	if status.W >= slot.W {
@@ -846,14 +846,14 @@ func TestBtRowFitsANarrowDropdown(t *testing.T) {
 	r := rows(d.myList)[0]
 	styledContext(t, d.ctx.Config).Theme.Attach(r)
 	const w = 280
-	sz := r.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})
+	sz := widget.SizeWithin(r, widget.Size{W: w, H: 400})
 	r.Arrange(render.Rect{W: w, H: sz.H})
 	if end := r.slot.Bounds().X + r.slot.Bounds().W; end > w {
 		t.Errorf("the status slot ends at %d, past the %d row", end, w)
 	}
 	for _, part := range treetest.WithClass(r, "title") {
 		l := part.(*widget.Label)
-		if one := widget.MeasureAsChild(l, widget.Constraints{Max: widget.Size{W: 1000, H: 400}}).H; l.Bounds().H != one {
+		if one := widget.SizeWithinAsChild(l, widget.Size{W: 1000, H: 400}).H; l.Bounds().H != one {
 			t.Errorf("the name spans %dpx, want one %dpx line", l.Bounds().H, one)
 		}
 	}
@@ -867,10 +867,10 @@ func TestBtRowDetailFitsTheUsualWidth(t *testing.T) {
 	r := rowNamed(t, d, "Headset")
 	styledContext(t, d.ctx.Config).Theme.Attach(r)
 	const w = 360
-	sz := r.Measure(widget.Constraints{Max: widget.Size{W: w, H: 400}})
+	sz := widget.SizeWithin(r, widget.Size{W: w, H: 400})
 	r.Arrange(render.Rect{W: w, H: sz.H})
 	desc := treetest.WithClass(r, "description")[0].(*widget.Label)
-	if natural := widget.MeasureAsChild(desc, widget.Constraints{Max: widget.Size{W: 2000, H: 400}}).W; desc.Bounds().W < natural {
+	if natural := widget.SizeWithinAsChild(desc, widget.Size{W: 2000, H: 400}).W; desc.Bounds().W < natural {
 		t.Errorf("the detail %q gets %dpx of its %dpx", desc.Text(), desc.Bounds().W, natural)
 	}
 }

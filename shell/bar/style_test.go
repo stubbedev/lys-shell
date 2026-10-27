@@ -41,8 +41,8 @@ func TestComputeStyleDefaults(t *testing.T) {
 	}
 }
 
-func widgetConstraintsMax(w, h int) widget.Constraints {
-	return widget.Constraints{Max: widget.Size{W: w, H: h}}
+func availSize(w, h int) widget.Size {
+	return widget.Size{W: w, H: h}
 }
 
 // isolateConfigDir points the config dir at a temp dir, so the theme
@@ -86,10 +86,10 @@ func paintBar(t *testing.T, ctx ModuleContext, layout config.BarLayout, w int) (
 	t.Helper()
 	root := buildRoot(ctx, layout, "DP-1")
 	h := barThickness(root, widget.Size{W: w, H: 1 << 16})
-	root.Measure(widgetConstraintsMax(w, h))
+	widget.SizeWithin(root, availSize(w, h))
 	root.Arrange(render.Rect{W: w, H: h})
 	widget.CollectDamage(root)
-	root.Measure(widgetConstraintsMax(w, h))
+	widget.SizeWithin(root, availSize(w, h))
 	root.Arrange(render.Rect{W: w, H: h})
 	data := make([]byte, render.Stride(w)*max(h, 1))
 	root.Paint(render.New(data, render.Stride(w), w, max(h, 1)))
@@ -111,7 +111,7 @@ func TestBarCenterSectionIsCentered(t *testing.T) {
 		Center:  []config.BarItem{{Module: "clock"}},
 	}
 	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
-	root.Measure(widget.Constraints{Max: widget.Size{W: 1600, H: 60}})
+	widget.SizeWithin(root, widget.Size{W: 1600, H: 60})
 	root.Arrange(render.Rect{W: 1600, H: 60})
 	b := root.Center().Bounds()
 	if mid := b.X + b.W/2; mid < 795 || mid > 805 {

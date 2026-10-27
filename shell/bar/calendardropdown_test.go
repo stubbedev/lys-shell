@@ -130,11 +130,11 @@ func TestCalendarFillsItsSection(t *testing.T) {
 	w, _, _ := dropdownDims("calendar", ctx.Config)
 	card, _ := dropdownTree(dropdownPanel("calendar", ctx.Config, v), ctx.Config)
 	ctx.Theme.Attach(card)
-	sz := widget.MeasureAsChild(card, widget.Constraints{Max: widget.Size{W: w, H: 4000}})
+	sz := widget.SizeWithinAsChild(card, widget.Size{W: w, H: 4000})
 	card.Arrange(render.Rect{W: sz.W, H: sz.H})
 	section := treetest.WithClass(v, "cal-section")[0].(*widget.Box).Bounds()
 	cal := v.cal.Bounds()
-	natural := widget.MeasureAsChild(v.cal, widget.Constraints{Max: widget.Size{W: 4000, H: 4000}})
+	natural := widget.SizeWithinAsChild(v.cal, widget.Size{W: 4000, H: 4000})
 	if natural.W >= section.W {
 		t.Fatalf("the section (%dpx) leaves the grid (%dpx) no room to fill", section.W, natural.W)
 	}

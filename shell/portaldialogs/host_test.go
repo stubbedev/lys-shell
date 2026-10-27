@@ -367,7 +367,7 @@ func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
 	c := hs.open(t)
 	var rowY, scrollY int
 	hs.do(func() {
-		c.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 720}})
+		widget.SizeWithin(c.Root, widget.Size{W: 1280, H: 720})
 		c.Root.Arrange(render.Rect{W: 1280, H: 720})
 		rowY = treetest.First[*widget.ListBox](t, c.Root).RowAt(0).Bounds().Y
 		scrollY = treetest.First[*widget.Scroll](t, c.Root).Bounds().Y
@@ -396,7 +396,7 @@ func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
 	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, ChooserRequest{}) }()
 	c := hs.open(t)
 	var w int
-	hs.do(func() { w = c.Root.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}).W })
+	hs.do(func() { w = widget.SizeWithin(c.Root, widget.Size{W: 2000, H: 2000}).W })
 	if w > surfaceWidth+80 {
 		t.Errorf("dialog %dpx wide, want about its %dpx request", w, surfaceWidth)
 	}

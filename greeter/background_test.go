@@ -46,7 +46,7 @@ func imageRig(t *testing.T, src image.Image, outputs ...image.Point) *rig {
 // paintInto lays w out over size and paints it into data, which holds
 // a size raster.
 func paintInto(w widget.Widget, size image.Point, data []byte) {
-	w.Measure(widget.Constraints{Max: widget.Size{W: size.X, H: size.Y}})
+	widget.SizeWithin(w, widget.Size{W: size.X, H: size.Y})
 	w.Arrange(render.Rect{W: size.X, H: size.Y})
 	clear(data)
 	w.Paint(render.NewScaled(data, render.Stride(size.X), size.X, size.Y, 1, 1))

@@ -111,7 +111,7 @@ func (s *surface) sync() {
 // layout sizes the surface to its content, as the layer surface
 // follows its root's natural size.
 func (s *surface) layout() {
-	sz := s.host.Measure(widget.Constraints{Max: widget.Size{W: surfaceW, H: surfaceH}})
+	sz := widget.SizeWithin(s.host, widget.Size{W: surfaceW, H: surfaceH})
 	s.host.Arrange(render.Rect{W: sz.W, H: sz.H})
 }
 
@@ -860,7 +860,7 @@ func cardOf(t *testing.T, p *Popups, id uint32) *card {
 		t.Fatalf("no card for %d", id)
 	}
 	c.setFull(true)
-	c.root.Measure(widget.Constraints{Max: widget.Size{W: testCardWidth, H: 600}})
+	widget.SizeWithin(c.root, widget.Size{W: testCardWidth, H: 600})
 	c.root.Arrange(render.Rect{W: testCardWidth, H: 600})
 	return c
 }
@@ -1201,7 +1201,7 @@ func TestStackKeepsItsWidth(t *testing.T) {
 	id := svc.Notify("app", 0, "", "Ping", "body", nil, 0)
 	p.sync()
 	st := p.stacks[0]
-	sz := widget.MeasureAsChild(st.root, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	sz := widget.SizeWithinAsChild(st.root, widget.Size{W: 1920, H: 1080})
 	want := int(cardWidthPx * float64(p.cfg.Styling.Scale))
 	if sz.W != want {
 		t.Errorf("the stack of %d measures %dpx wide in a 1920px surface, want %d", id, sz.W, want)

@@ -61,8 +61,8 @@ func dropdownDims(name string, cfg *config.Config) (w, h int, ok bool) {
 // the panel is laid out at, so text wrapping at a narrower one never
 // leaves the card taller than what it shows. A configured height caps
 // the panel: content taller than it gives the difference up from its
-// scrolls (lys-ui's Shrinker), and only content that cannot scroll
-// grows the panel past it. The monitor caps it outright.
+// scrolls (down to its minimum height), and only content that cannot
+// scroll grows the panel past it. The monitor caps it outright.
 type panelBox struct {
 	widget.Base
 	child widget.Widget
@@ -73,7 +73,7 @@ type panelBox struct {
 	// lets the content grow to the monitor.
 	height int
 	// maxH caps the card (the monitor less 100, the registry's
-	// max_allowed_height); <= 0 takes the measure constraints.
+	// max_allowed_height); <= 0 leaves it to the host.
 	maxH int
 }
 
@@ -104,6 +104,31 @@ func (p *panelBox) clamp(monH int) {
 	})
 }
 
+// capWrapping gives every wrapping label in content, every page
+// included, the max-width-chars that holds its natural width to the
+// panel's width less the content's insets, so wrapped text asks for no
+// more than the panel's width (GTK apps cap a wrapping label's natural
+// width the same way). Labels added later are capped on the next
+// measure. A panel with no width leaves its labels uncapped.
+func capWrapping(content widget.Widget, width int) {
+	if width <= 0 {
+		return
+	}
+	room := width - 2*dropdownInset()
+	walkPages(content, func(w widget.Widget) {
+		switch l := w.(type) {
+		case *widget.Label:
+			if l.Wrap() {
+				l.SetMaxWidthChars(l.CharsWithin(room))
+			}
+		case *widget.RichLabel:
+			if l.Wrap() {
+				l.SetMaxWidthChars(l.CharsWithin(room))
+			}
+		}
+	})
+}
+
 // walkPages visits w and everything under it, every page of a stack
 // included (the Rust walks follow GTK's child list, where a stack's
 // hidden pages are children too; a lys-ui Stack lists only its visible
@@ -123,38 +148,34 @@ func walkPages(w widget.Widget, visit func(widget.Widget)) {
 	}
 }
 
-// heightAt is the panel's height at width w under maxH: the content's
-// natural height, down to the configured height as far as its scrolls
-// give way, and never past maxH.
-func (p *panelBox) heightAt(w, maxH int) int {
-	if p.maxH > 0 {
-		maxH = min(maxH, p.maxH)
+// Measure sizes the panel as GTK sizes a popover: across, its width
+// request or its content's natural width, whichever is wider, so
+// content that cannot narrow (a long device name) widens it, while
+// wrapping text, its natural width capped to fit the width (capWrapping),
+// wraps inside it; down, the content's natural height at the width given, down to
+// the configured height as far as its scrolls give way, and never past
+// maxH.
+func (p *panelBox) Measure(axis widget.Axis, forSize int) widget.Sizes {
+	widget.SetParents(p, p.child)
+	if axis == widget.Row {
+		capWrapping(p.child, p.width)
+		req := p.child.Measure(widget.Row, widget.Unknown)
+		return widget.Sizes{Min: req.Min, Nat: max(p.width, req.Nat)}
 	}
-	natural := p.child.Measure(widget.Constraints{Min: widget.Size{W: w}, Max: widget.Size{W: w, H: maxH}}).H
-	h := natural
+	req := p.child.Measure(widget.Column, forSize)
+	h := req.Nat
 	if p.height > 0 {
-		least := natural
-		if s, ok := p.child.(widget.Shrinker); ok {
-			least -= s.Shrinkable()
-		}
-		h = max(min(natural, p.height), least)
+		h = max(min(req.Nat, p.height), req.Min)
 	}
-	return min(h, maxH)
-}
-
-func (p *panelBox) Measure(con widget.Constraints) widget.Size {
-	// GTK sizes a popover to its request or its content's preferred
-	// width, whichever is wider: the configured width floors it,
-	// unbroken content (a long device name) widens it, and wrapping
-	// text wraps inside it instead.
-	w := min(max(con.Min.W, p.width, widget.PreferredWidth(p.child)), con.Max.W)
-	return widget.Size{W: w, H: p.heightAt(w, con.Max.H)}
+	if p.maxH > 0 {
+		h = min(h, p.maxH)
+	}
+	return widget.FixedSizes(h)
 }
 
 func (p *panelBox) Arrange(r render.Rect) {
 	p.ArrangeSelf(r)
 	widget.SetParents(p, p.child)
-	p.child.Measure(widget.Constraints{Min: widget.Size{W: r.W, H: r.H}, Max: widget.Size{W: r.W, H: r.H}})
 	p.child.Arrange(r)
 }
 

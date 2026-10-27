@@ -94,17 +94,18 @@ func (l *resultList) rowAt(i int) widget.Widget {
 	return w
 }
 
-// Measure is the viewport: the offered width by visibleRows rows when
-// fixed, by its rows up to visibleRows otherwise.
-func (l *resultList) Measure(con widget.Constraints) widget.Size {
+// Measure is the viewport: no width of its own, the column it sits in
+// gives it one; visibleRows rows tall when fixed, its rows up to
+// visibleRows otherwise.
+func (l *resultList) Measure(axis widget.Axis, _ int) widget.Sizes {
+	if axis == widget.Row {
+		return widget.Sizes{}
+	}
 	rows := l.visibleRows
 	if !l.fixed {
 		rows = min(l.count, l.visibleRows)
 	}
-	return widget.Size{
-		W: min(max(con.Max.W, con.Min.W), con.Max.W),
-		H: min(max(rows*rowPx, con.Min.H), con.Max.H),
-	}
+	return widget.FixedSizes(rows * rowPx)
 }
 
 // Arrange lays the visible rows out and evicts the rest.

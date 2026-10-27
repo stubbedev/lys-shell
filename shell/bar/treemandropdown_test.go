@@ -123,7 +123,7 @@ func TestTreemanRowHoverSwapsTheActions(t *testing.T) {
 	v := treemanDropdown(ctx).(*treemanView)
 	defer v.dropdownClosed()
 	ctx.Theme.Attach(v)
-	v.Measure(widget.Constraints{Max: widget.Size{W: 440, H: 460}})
+	widget.SizeWithin(v, widget.Size{W: 440, H: 460})
 	v.Arrange(render.Rect{W: 440, H: 460})
 
 	row := treetest.WithClass(v.list, "treeman-wt")[0].(*widget.Item)

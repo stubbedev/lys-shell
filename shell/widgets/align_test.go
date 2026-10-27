@@ -16,7 +16,7 @@ func TestCenter(t *testing.T) {
 			Center(child)
 		}
 		root := widget.NewOverlay().Append(child)
-		root.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 100}})
+		widget.SizeWithin(root, widget.Size{W: 200, H: 100})
 		root.Arrange(render.Rect{W: 200, H: 100})
 		return child.Bounds()
 	}

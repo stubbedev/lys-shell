@@ -148,8 +148,9 @@ func (v *view) clear() {
 	v.Invalidate()
 }
 
-// Measure claims the whole box: the surface is anchored to every edge.
-func (v *view) Measure(con widget.Constraints) widget.Size { return con.Max }
+// Measure asks for nothing: the surface is anchored to every edge and
+// the view takes the whole box.
+func (v *view) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 // Arrange records the rect and places the images for the current
 // transition offset.

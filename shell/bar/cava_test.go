@@ -23,7 +23,7 @@ var (
 // paintSpectrum paints one frame of s into a w x h canvas and returns
 // a pixel reader.
 func paintSpectrum(s *spectrum, w, h int, values ...float64) func(x, y int) render.Color {
-	s.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}})
+	widget.SizeWithin(s, widget.Size{W: 1000, H: 1000})
 	s.Arrange(render.Rect{W: w, H: h})
 	data := make([]byte, render.Stride(w)*h)
 	cv := render.New(data, render.Stride(w), w, h)
@@ -55,12 +55,12 @@ func TestSpectrumLength(t *testing.T) {
 	if s.length != 2*8+10*6+9*1 {
 		t.Errorf("length = %d, want %d", s.length, 2*8+10*6+9*1)
 	}
-	got := s.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}})
-	if got != (widget.Size{W: s.length, H: s.thick}) || s.MinSize() != got {
+	got := widget.SizeWithin(s, widget.Size{W: 1000, H: 1000})
+	if got != (widget.Size{W: s.length, H: s.thick}) || s.Measure(widget.Row, widget.Unknown).Min != s.length {
 		t.Errorf("horizontal size = %+v", got)
 	}
 	v := newSpectrum(cfg, 10, cavaRed, 1, true)
-	if got := v.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 1000}}); got != (widget.Size{W: v.thick, H: v.length}) {
+	if got := widget.SizeWithin(v, widget.Size{W: 1000, H: 1000}); got != (widget.Size{W: v.thick, H: v.length}) {
 		t.Errorf("vertical size = %+v, want the length along the height", got)
 	}
 	if cavaWidgetLength(1, 3, 1, 0) != 3 || cavaWidgetLength(20, 3, 1, 8) != 95 || cavaWidgetLength(0, 3, 1, 0) != 1 {

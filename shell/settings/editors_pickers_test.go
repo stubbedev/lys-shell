@@ -107,7 +107,7 @@ func openIconPicker(t *testing.T, current string) (*kit, *iconEditor, *fakePicke
 	theme := apptheme.New(k.store.svc.Config())
 	c := newIconEditor(k, pathSlot(k.store, iconPickerPath))
 	theme.Attach(c.Box)
-	sz := widget.MeasureAsChild(c.Box, widget.Constraints{Max: widget.Size{W: 1400, H: 200}})
+	sz := widget.SizeWithinAsChild(c.Box, widget.Size{W: 1400, H: 200})
 	widget.ArrangeAsChild(c.Box, render.Rect{X: 300, Y: 40, W: sz.W, H: sz.H})
 	c.btn.ClickAt(widget.Point{})
 	if c.picker == nil || f.content != widget.Widget(c.picker.root) || f.anchor != widget.Widget(c.btn) {
@@ -130,7 +130,7 @@ func layOutPicker(theme *apptheme.Theme, root *widget.Box) {
 
 // arrangePicker lays the styled picker's root out at its natural size.
 func arrangePicker(root *widget.Box) {
-	sz := widget.MeasureAsChild(root, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	sz := widget.SizeWithinAsChild(root, widget.Size{W: 1920, H: 1080})
 	widget.ArrangeAsChild(root, render.Rect{X: 300, Y: 100, W: sz.W, H: sz.H})
 }
 
@@ -750,7 +750,7 @@ func TestSearchPickerFitsItsWidestRow(t *testing.T) {
 			paintPicker(p.root)
 			for i := range p.rows.Len() {
 				content := p.rows.ChildAt(i).Child().(*widget.Box).Children()[0]
-				nat := widget.MeasureAsChild(content, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+				nat := widget.SizeWithinAsChild(content, widget.Size{W: 1920, H: 1080})
 				if got := content.(widget.Boundser).Bounds().W; got < nat.W {
 					t.Errorf("row %d's content gets %dpx of its natural %dpx", i, got, nat.W)
 				}

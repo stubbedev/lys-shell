@@ -48,9 +48,7 @@ func newColumnGrip() *columnGrip {
 	return g
 }
 
-func (g *columnGrip) Measure(con widget.Constraints) widget.Size {
-	return con.Min
-}
+func (g *columnGrip) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 func (g *columnGrip) Paint(*render.Canvas) {}
 
@@ -144,14 +142,30 @@ func (r *columnRow) setWidths(widths [3]int) {
 }
 
 // Measure asks for the name column's floor: the columns give way below
-// their widths instead of widening the view.
-func (r *columnRow) Measure(con widget.Constraints) widget.Size {
+// their widths instead of widening the view. Its height is the tallest
+// cell's at the width the cell gets.
+func (r *columnRow) Measure(axis widget.Axis, forSize int) widget.Sizes {
 	widget.SetParents(r, r.kids...)
-	h := 0
-	for _, k := range r.kids {
-		h = max(h, k.Measure(widget.Constraints{Max: widget.Size{W: con.Max.W, H: con.Max.H}}).H)
+	if axis == widget.Row {
+		return widget.FixedSizes(nameMinW)
 	}
-	return widget.Size{W: min(max(nameMinW, con.Min.W), con.Max.W), H: min(max(h, con.Min.H), con.Max.H)}
+	lead := forSize
+	var shown [3]bool
+	if forSize != widget.Unknown {
+		shown = shownColumns(forSize, r.spacing, r.widths)
+	}
+	h := 0
+	for i, col := range r.cols {
+		if !shown[i] {
+			continue
+		}
+		lead -= r.spacing + r.widths[i]
+		h = max(h, col.Measure(widget.Column, r.widths[i]).Nat)
+		if r.gaps[i] != nil {
+			h = max(h, r.gaps[i].Measure(widget.Column, r.spacing).Nat)
+		}
+	}
+	return widget.FixedSizes(max(h, r.lead.Measure(widget.Column, lead).Nat))
 }
 
 func (r *columnRow) Arrange(rect render.Rect) {
@@ -176,11 +190,7 @@ func (r *columnRow) Arrange(rect render.Rect) {
 }
 
 // place lays k out in exactly rect.
-func (r *columnRow) place(k widget.Widget, rect render.Rect) {
-	size := widget.Size{W: rect.W, H: rect.H}
-	k.Measure(widget.Constraints{Min: size, Max: size})
-	k.Arrange(rect)
-}
+func (r *columnRow) place(k widget.Widget, rect render.Rect) { k.Arrange(rect) }
 
 // setShown shows or hides a column's widget, nil for a missing gap.
 func setShown(w widget.Widget, on bool) {

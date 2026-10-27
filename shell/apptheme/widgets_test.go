@@ -127,7 +127,7 @@ func TestShellSheetKeepsTheButtonVariantFills(t *testing.T) {
 	}
 	theme.Attach(root)
 	const w, h = 200, 300
-	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	widget.SizeWithin(root, widget.Size{W: w, H: h})
 	root.Arrange(render.Rect{W: w, H: h})
 	data := make([]byte, render.Stride(w)*h)
 	root.Paint(render.NewScaled(data, render.Stride(w), w, h, 1, 1))

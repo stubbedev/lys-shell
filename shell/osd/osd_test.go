@@ -358,7 +358,7 @@ func TestOsdKeepsItsWidth(t *testing.T) {
 	cfg := quietConfig()
 	h := readyHarness(t, cfg)
 	h.osd.Show(Slider("Speakers", VolumeIcon(40, false), 40, false))
-	sz := widget.MeasureAsChild(h.osd.face.container, widget.Constraints{Max: widget.Size{W: 1920, H: 1080}})
+	sz := widget.SizeWithinAsChild(h.osd.face.container, widget.Size{W: 1920, H: 1080})
 	if want := int(widthPx * float64(cfg.Styling.Scale)); sz.W != want {
 		t.Errorf("the OSD measures %dpx wide in a 1920px surface, want %d", sz.W, want)
 	}

@@ -342,7 +342,8 @@ type area struct {
 // frozen reports whether the area paints a frozen frame.
 func (a *area) frozen() bool { return a.frame.RGBA != nil }
 
-func (a *area) Measure(con widget.Constraints) widget.Size { return con.Max }
+// Measure asks for nothing: the area takes the whole output.
+func (a *area) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 func (a *area) HitTest(p widget.Point) widget.Widget { return a.HitLeaf(a, p) }
 
