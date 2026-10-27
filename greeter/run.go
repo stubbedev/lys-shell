@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/logging"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
@@ -74,8 +75,8 @@ func Run(init Init) error {
 				log.Printf("greeter: power action %s failed: %v", verb, err)
 			}
 		},
-		loadImage:  decodeImage,
-		loadAvatar: decodeImage,
+		loadImage:  imagedecode.Open,
+		loadAvatar: imagedecode.Open,
 	})
 	win, err = a.NewWindow(app.WindowConfig{
 		Title:      "lys-greeter",

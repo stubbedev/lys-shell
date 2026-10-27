@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/offheap"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -237,7 +238,7 @@ func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
 func offHeap(t *testing.T, h *Host, connector string, img *image.RGBA) frozenOutput {
 	t.Helper()
 	b := img.Bounds()
-	dst, pix, err := offHeapRGBA(&h.mem, b.Dx(), b.Dy())
+	dst, pix, err := offheap.NewRGBA(&h.mem, b.Dx(), b.Dy())
 	if err != nil {
 		t.Fatal(err)
 	}

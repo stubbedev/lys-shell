@@ -2,10 +2,6 @@ package credential
 
 import (
 	"image"
-	"image/color"
-	"image/png"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 
@@ -81,51 +77,6 @@ func TestBuildTakesLysUiParts(t *testing.T) {
 	}
 	if !slices.Contains(p.Error.Classes(), css.Error) || slices.Contains(p.Error.Classes(), css.Heading) {
 		t.Errorf("error line classes = %v", p.Error.Classes())
-	}
-}
-
-func TestBlurSmoothsAndKeepsSize(t *testing.T) {
-	src := image.NewRGBA(image.Rect(0, 0, 21, 5))
-	src.Set(10, 2, color.RGBA{255, 255, 255, 255})
-	out := Blur(src, 2)
-	if out.Rect.Dx() != 21 || out.Rect.Dy() != 5 {
-		t.Fatalf("size = %v", out.Rect)
-	}
-	center := out.RGBAAt(10, 2).R
-	side := out.RGBAAt(12, 2).R
-	far := out.RGBAAt(0, 2).R
-	if center == 255 || side == 0 || far != 0 || side > center {
-		t.Errorf("blur profile center=%d side=%d far=%d", center, side, far)
-	}
-	if same := Blur(src, 0); same.RGBAAt(10, 2).R != 255 {
-		t.Error("radius 0 must leave the image untouched")
-	}
-}
-
-func TestLoadImage(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "bg.png")
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := png.Encode(f, image.NewRGBA(image.Rect(0, 0, 3, 2))); err != nil {
-		t.Fatal(err)
-	}
-	_ = f.Close()
-	img, err := LoadImage(path, 0)
-	if err != nil || img.Bounds().Dx() != 3 {
-		t.Fatalf("LoadImage = %v, %v", img, err)
-	}
-	if _, err := LoadImage(path, 4); err != nil {
-		t.Errorf("blurred load: %v", err)
-	}
-	if _, err := LoadImage(filepath.Join(t.TempDir(), "absent.png"), 0); err == nil {
-		t.Error("a missing file loaded")
-	}
-	junk := filepath.Join(t.TempDir(), "junk.png")
-	_ = os.WriteFile(junk, []byte("not an image"), 0o600)
-	if _, err := LoadImage(junk, 0); err == nil {
-		t.Error("an undecodable file loaded")
 	}
 }
 

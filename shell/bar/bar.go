@@ -459,7 +459,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}()
 	// The ext-session-lock screen and its triggers (logind, and `lys-shell
 	// lock` through Shell1).
-	lockScreen, stopLock := lock.Start(application, current.Load(), font, theme.Sheet, func() {
+	lockScreen, stopLock := lock.Start(application, sess.Outputs, current.Load(), font, theme.Sheet, func() {
 		if current.Load().Bitwarden.LockWithSession {
 			baseCtx.Bitwarden.lockIfOpen()
 		}

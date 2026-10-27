@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -96,6 +97,8 @@ type harness struct {
 	locked int
 	now    time.Time
 	timers []*timer
+	// forgotten are the rasters the renderer was told to drop.
+	forgotten []render.ImageID
 }
 
 type timer struct {
@@ -131,9 +134,11 @@ func newHarness(t *testing.T, edit func(*config.LockConfig)) *harness {
 			return c
 		},
 		SetLockedHint: func(locked bool) { h.hints = append(h.hints, locked) },
-		LoadImage: func(string, uint32) (image.Image, error) {
+		Decode: func(string) (image.Image, error) {
 			return image.NewRGBA(image.Rect(0, 0, 4, 4)), nil
 		},
+		Outputs:  func() []image.Point { return []image.Point{{1920, 1080}, {1080, 1920}} },
+		Forget:   func(id render.ImageID) { h.forgotten = append(h.forgotten, id) },
 		OnLocked: func() { h.locked++ },
 	})
 	return h
@@ -275,6 +280,7 @@ func TestFailedAttempts(t *testing.T) {
 	h.lock(t)
 	fail := func() {
 		t.Helper()
+		h.now = h.now.Add(time.Hour)
 		h.s.Submit("wrong")
 		h.conv(t).onEvent(auth.Event{Kind: auth.EventFailure, Reason: "authentication failed"})
 	}
@@ -453,11 +459,8 @@ func TestBackgroundModes(t *testing.T) {
 		l.Background.Image = "/srv/lock.png"
 		l.Blur = 8
 	})
-	h.s.d.LoadImage = func(path string, blur uint32) (image.Image, error) {
+	h.s.d.Decode = func(path string) (image.Image, error) {
 		loaded = append(loaded, path)
-		if blur != 8 {
-			t.Errorf("blur = %d", blur)
-		}
 		return image.NewRGBA(image.Rect(0, 0, 2, 2)), nil
 	}
 	h.lock(t)
@@ -471,17 +474,111 @@ func TestBackgroundModes(t *testing.T) {
 	}
 
 	h = newHarness(t, nil)
-	h.s.d.LoadImage = func(string, uint32) (image.Image, error) {
+	h.s.d.Decode = func(string) (image.Image, error) {
 		t.Error("color mode decoded an image")
 		return nil, nil
 	}
 	h.lock(t)
 
 	h = newHarness(t, func(l *config.LockConfig) { l.Background.Mode = config.BackgroundImage; l.Background.Image = "/nope" })
-	h.s.d.LoadImage = func(string, uint32) (image.Image, error) { return nil, errors.New("no such file") }
+	h.s.d.Decode = func(string) (image.Image, error) { return nil, errors.New("no such file") }
 	h.lock(t)
 	if h.s.bg != nil || !h.locker.active {
 		t.Error("an unreadable image must fall back to the color and still lock")
+	}
+}
+
+// imageHarness is a harness whose lock shows a 600x400 image on a
+// 192x108 output.
+func imageHarness(t *testing.T) *harness {
+	t.Helper()
+	h := newHarness(t, func(l *config.LockConfig) {
+		l.Background.Mode = config.BackgroundImage
+		l.Background.Image = "/srv/lock.png"
+		l.Blur = 8
+	})
+	h.s.d.Decode = func(string) (image.Image, error) { return image.NewRGBA(image.Rect(0, 0, 600, 400)), nil }
+	h.s.d.Outputs = func() []image.Point { return []image.Point{{192, 108}} }
+	return h
+}
+
+// The background is made at the size the outputs show it at, and every
+// surface draws that one raster, by its identity.
+func TestLockBackgroundIsSizedForTheOutputs(t *testing.T) {
+	h := imageHarness(t)
+	h.lock(t)
+	if h.s.bg == nil {
+		t.Fatal("image mode made no background")
+	}
+	if got := h.s.bg.Image.Bounds().Size(); got != image.Pt(192, 128) {
+		t.Errorf("background %v, want the 600x400 source covering 192x108: 192x128", got)
+	}
+	if h.s.bg.Image.ID == 0 {
+		t.Error("the off-heap background has no identity to drop its texture by")
+	}
+	if live := h.s.mem.Stats().Live; live != 1 {
+		t.Errorf("%d off-heap allocations while locked, want the background alone", live)
+	}
+}
+
+// However the lock ends, the background's texture is forgotten once,
+// by its identity, and its off-heap pixels are freed; a lock the
+// compositor never took frees it too.
+func TestLockFreesTheBackground(t *testing.T) {
+	for name, end := range map[string]func(h *harness){
+		"unlocked":            func(h *harness) { h.s.ForceUnlock() },
+		"ended by compositor": func(h *harness) { h.locker.cfg.OnFinished() },
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := imageHarness(t)
+			h.lock(t)
+			id := h.s.bg.Image.ID
+			end(h)
+			if live := h.s.mem.Stats().Live; live != 0 {
+				t.Errorf("%d off-heap allocations after the lock ended", live)
+			}
+			if !slices.Equal(h.forgotten, []render.ImageID{id}) {
+				t.Errorf("forgot %v, want the background %v once", h.forgotten, id)
+			}
+			if h.s.bg != nil {
+				t.Error("the background outlived the lock")
+			}
+		})
+	}
+	t.Run("lock refused", func(t *testing.T) {
+		h := imageHarness(t)
+		h.locker.lockErr = errors.New("refused")
+		h.s.Lock()
+		if live := h.s.mem.Stats().Live; live != 0 || len(h.forgotten) != 1 {
+			t.Errorf("a refused lock left %d allocations and forgot %v", live, h.forgotten)
+		}
+	})
+	t.Run("still locked", func(t *testing.T) {
+		h := imageHarness(t)
+		h.lock(t)
+		h.now = h.now.Add(time.Hour)
+		h.s.Submit("wrong")
+		h.conv(t).onEvent(auth.Event{Kind: auth.EventFailure, Reason: "bad"})
+		if live := h.s.mem.Stats().Live; live != 1 || len(h.forgotten) != 0 {
+			t.Errorf("a failed attempt left %d allocations and forgot %v; the lock still shows it", live, h.forgotten)
+		}
+	})
+}
+
+// The background's pixels are freed only once every List recorded
+// while the lock was up has ended: a frame still being played keeps
+// them.
+func TestLockFreesTheBackgroundAfterTheFence(t *testing.T) {
+	h := imageHarness(t)
+	h.lock(t)
+	drawing := render.NewRecorder(1, 1, 1, 1).Recording()
+	h.s.ForceUnlock()
+	if live := h.s.mem.Stats().Live; live != 1 {
+		t.Fatalf("%d allocations while a List from before the unlock is open, want the background kept", live)
+	}
+	drawing.End()
+	if live := h.s.mem.Stats().Live; live != 0 {
+		t.Fatalf("%d allocations after the last List ended", live)
 	}
 }
 

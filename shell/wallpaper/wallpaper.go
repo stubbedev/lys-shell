@@ -18,6 +18,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/internal/outputsize"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
@@ -308,18 +309,15 @@ func (surf *surface) close() {
 // outputTarget is the output's device-pixel size and scale; false when
 // the compositor has not reported them yet.
 func outputTarget(out *app.Output) (target, bool) {
-	w, h := out.ModeW, out.ModeH
-	if out.Transform%2 == 1 { // 90/270, flipped or not
-		w, h = h, w
-	}
-	if w <= 0 || h <= 0 {
+	size, ok := outputsize.Device(out)
+	if !ok {
 		return target{}, false
 	}
 	scale := float64(max(out.Scale, 1))
 	if out.LogicalW > 0 {
-		scale = float64(w) / float64(out.LogicalW)
+		scale = float64(size.X) / float64(out.LogicalW)
 	}
-	return target{w: w, h: h, scale: scale}, true
+	return target{w: size.X, h: size.Y, scale: scale}, true
 }
 
 // render decodes path off the loop and swaps it in. A repeat of the

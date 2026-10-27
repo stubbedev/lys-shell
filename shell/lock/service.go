@@ -14,8 +14,9 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/internal/outputsize"
 	"github.com/stubbedev/lys-shell/service/auth"
-	"github.com/stubbedev/lys-shell/shell/credential"
 )
 
 // appLocker adapts lys-ui's session lock to the screen.
@@ -53,8 +54,9 @@ func (l appLocker) Focus(w widget.Widget) {
 // Start wires the lock screen into the running shell: the logind
 // triggers, lock-on-start, and the LockedHint restart recovery. The
 // shell serves `lys-shell lock` by handing Screen.Lock to its
-// dev.stubbe.lys.Shell1 hooks. The returned stop ends the logind listener.
-func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widget.Stylesheet, onLocked func()) (*Screen, func()) {
+// dev.stubbe.lys.Shell1 hooks. outputs are the session's outputs, the
+// background is sized for. The returned stop ends the logind listener.
+func Start(a *app.Application, outputs func() []*app.Output, cfg *config.Config, font render.Font, sheet *widget.Stylesheet, onLocked func()) (*Screen, func()) {
 	ld := systemLogind()
 	deps := Deps{
 		Locker: appLocker{a: a},
@@ -67,8 +69,10 @@ func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widg
 		Auth: func(service string, onEvent func(auth.Event)) authHandle {
 			return auth.Spawn(auth.NewPAM(service), auth.CurrentUsername(), onEvent)
 		},
-		LoadImage: func(path string, blur uint32) (image.Image, error) { return credential.LoadImage(path, blur) },
-		OnLocked:  onLocked,
+		Decode:   imagedecode.Open,
+		Outputs:  func() []image.Point { return deviceSizes(outputs()) },
+		Forget:   a.ForgetImage,
+		OnLocked: onLocked,
 	}
 	if ld != nil {
 		deps.SetLockedHint = func(locked bool) {
@@ -112,6 +116,18 @@ func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widg
 			stop()
 		}
 	}
+}
+
+// deviceSizes are the device pixel sizes of the outputs that report a
+// mode.
+func deviceSizes(outputs []*app.Output) []image.Point {
+	sizes := make([]image.Point, 0, len(outputs))
+	for _, o := range outputs {
+		if size, ok := outputsize.Device(o); ok {
+			sizes = append(sizes, size)
+		}
+	}
+	return sizes
 }
 
 // claimLockOnStart claims the once-per-login-session lock-on-start

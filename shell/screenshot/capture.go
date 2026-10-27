@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/memory-go"
 
+	"github.com/stubbedev/lys-shell/internal/offheap"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -60,16 +61,6 @@ type windowTarget struct {
 	hasAppID, hasTitle bool
 }
 
-// offHeapRGBA is a zeroed w x h image whose pixels mem holds, and the
-// slice to free them by.
-func offHeapRGBA(mem *memory.Shared, w, h int) (*image.RGBA, memory.Slice[byte], error) {
-	pix, err := memory.MakeSlice[byte](mem, 4*w*h)
-	if err != nil {
-		return nil, pix, fmt.Errorf("cannot allocate a %dx%d frame: %w", w, h, err)
-	}
-	return &image.RGBA{Pix: pix.Elems(), Stride: 4 * w, Rect: image.Rect(0, 0, w, h)}, pix, nil
-}
-
 // freeFrames frees the frames' pixels; nothing may draw them any more.
 func freeFrames(mem *memory.Shared, frozen []frozenOutput) {
 	pix := make([]memory.Slice[byte], len(frozen))
@@ -79,18 +70,11 @@ func freeFrames(mem *memory.Shared, frozen []frozenOutput) {
 	freePixels(mem, pix...)
 }
 
-// freePixels frees pixels mem holds and hands the pages back to the
-// system at once: the allocator otherwise keeps the newest region of
-// each size committed for reuse, a whole frame's worth of resident
-// memory for the next capture.
+// freePixels frees frame pixels mem holds, logging a failure: the flow
+// that let go of them has nothing left to undo.
 func freePixels(mem *memory.Shared, pix ...memory.Slice[byte]) {
-	for _, p := range pix {
-		if err := memory.FreeSlice(mem, p); err != nil {
-			log.Printf("screenshot: freeing %d bytes of frame pixels: %v", p.Len(), err)
-		}
-	}
-	if err := mem.Trim(); err != nil {
-		log.Printf("screenshot: returning freed frame pages: %v", err)
+	if err := offheap.Free(mem, pix...); err != nil {
+		log.Printf("screenshot: %v", err)
 	}
 }
 
@@ -99,7 +83,7 @@ func freePixels(mem *memory.Shared, pix ...memory.Slice[byte]) {
 // through a scratch image freed before it returns.
 func frozenFrame(mem *memory.Shared, connector string, f *capture.Frame, t capture.Transform) (frozenOutput, error) {
 	w, h := sharepreview.TransformedSize(f.Width, f.Height, t)
-	img, pix, err := offHeapRGBA(mem, w, h)
+	img, pix, err := offheap.NewRGBA(mem, w, h)
 	if err != nil {
 		return frozenOutput{}, err
 	}
@@ -119,7 +103,7 @@ func frozenFrame(mem *memory.Shared, connector string, f *capture.Frame, t captu
 // transformedInto converts f into dst with t applied, through a
 // scratch image of f's own orientation that mem holds while it runs.
 func transformedInto(mem *memory.Shared, dst *image.RGBA, f *capture.Frame, t capture.Transform) error {
-	raw, pix, err := offHeapRGBA(mem, f.Width, f.Height)
+	raw, pix, err := offheap.NewRGBA(mem, f.Width, f.Height)
 	if err != nil {
 		return err
 	}

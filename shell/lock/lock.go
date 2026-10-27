@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -69,8 +70,14 @@ type Deps struct {
 	// SetLockedHint reports the state to logind, best effort; nil
 	// without logind.
 	SetLockedHint func(locked bool)
-	// LoadImage decodes (and blurs) the background image.
-	LoadImage func(path string, blur uint32) (image.Image, error)
+	// Decode decodes the background image file.
+	Decode func(path string) (image.Image, error)
+	// Outputs are the device pixel sizes of the outputs a lock covers,
+	// which the background is resampled to before it is blurred.
+	Outputs func() []image.Point
+	// Forget drops the renderer's copy of a raster that is no longer
+	// drawn, before its pixels are freed.
+	Forget func(render.ImageID)
 	// OnLocked runs on the loop each time the compositor confirms a
 	// lock, for what locks with the session (the vault); nil for
 	// nothing.
@@ -100,10 +107,11 @@ type Screen struct {
 	d         Deps
 
 	faces []*face
-	// bg is the background decoded once per lock, shared by every
-	// output's surface and dropped when the lock ends; nil draws the
-	// color.
-	bg image.Image
+	// bg is the background made once per lock, shared by every
+	// output's surface and freed when the lock ends; nil draws the
+	// color. Its pixels live in mem.
+	bg  *credential.Backdrop
+	mem memory.Shared
 	// attempts counts failures in this lock session.
 	attempts uint32
 	// lockedAt drives the password-free grace window.
@@ -180,24 +188,58 @@ func (s *Screen) Lock() {
 	if err != nil {
 		log.Printf("lock: cannot lock the session: %v", err)
 		s.faces = nil
+		s.dropBackground()
 		return
 	}
 	s.startClock()
 	s.armBlank()
 }
 
-// loadBackground resolves and decodes the configured background.
-func (s *Screen) loadBackground() image.Image {
+// loadBackground resolves the configured background and makes it at
+// the outputs' size, blurred; nil draws the color.
+func (s *Screen) loadBackground() *credential.Backdrop {
 	path := s.cfg.Background.ImagePath(s.wallpaper)
 	if path == "" {
 		return nil
 	}
-	img, err := s.d.LoadImage(path, s.cfg.Blur)
+	src, err := s.d.Decode(path)
 	if err != nil {
 		log.Printf("lock: background %s unreadable; using the color fill: %v", path, err)
 		return nil
 	}
-	return img
+	bg, err := credential.NewBackdrop(&s.mem, src, float64(s.cfg.Blur), s.d.Outputs())
+	if err != nil {
+		log.Printf("lock: background %s unusable; using the color fill: %v", path, err)
+		return nil
+	}
+	return &bg
+}
+
+// background is what the surfaces draw: the backdrop, or nil for the
+// color.
+func (s *Screen) background() image.Image {
+	if s.bg == nil {
+		return nil
+	}
+	return s.bg.Image
+}
+
+// dropBackground lets go of the backdrop once no surface draws it: the
+// renderer drops its texture, and its pixels are freed once every List
+// recorded until now has ended, so no frame still being played reads
+// freed memory.
+func (s *Screen) dropBackground() {
+	bg := s.bg
+	if bg == nil {
+		return
+	}
+	s.bg = nil
+	s.d.Forget(bg.Image.ID)
+	render.Retire(func() {
+		if err := bg.Free(&s.mem); err != nil {
+			log.Printf("lock: freeing the background: %v", err)
+		}
+	})
 }
 
 // buildFace builds one output's surface; lys-ui calls it for every
@@ -218,7 +260,7 @@ func (s *Screen) buildFace(*app.Output) app.LockSurface {
 	reveal.Show(f.prompt.Reveal, s.anims, config.AnimLock)
 	s.faces = append(s.faces, f)
 	root := credential.Window(s.sheet,
-		credential.Background(s.bg, credential.HexFill(s.cfg.Background.Color)),
+		credential.Background(s.background(), credential.HexFill(s.cfg.Background.Color)),
 		f.prompt.Reveal,
 		f.scrim)
 	return app.LockSurface{
@@ -266,7 +308,7 @@ func (s *Screen) onFinished() {
 	s.stopTimers()
 	s.resetAuth()
 	s.faces = nil
-	s.bg = nil
+	s.dropBackground()
 	s.attempts = 0
 	s.lockedAt = time.Time{}
 }
@@ -410,6 +452,7 @@ func (s *Screen) release() {
 	}
 	s.confirmed = false
 	s.faces = nil
+	s.dropBackground()
 	s.lockedAt = time.Time{}
 	s.attempts = 0
 	s.resetAuth()
