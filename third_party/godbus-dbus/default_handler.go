@@ -40,11 +40,15 @@ type defaultHandler struct {
 }
 
 func (h *defaultHandler) PathExists(path ObjectPath) bool {
+	h.RLock()
+	defer h.RUnlock()
 	_, ok := h.objects[path]
 	return ok
 }
 
 func (h *defaultHandler) introspectPath(path ObjectPath) string {
+	h.RLock()
+	defer h.RUnlock()
 	subpath := make(map[string]struct{})
 	var xml bytes.Buffer
 	xml.WriteString("<node>")
@@ -102,16 +106,31 @@ func (h *defaultHandler) LookupObject(path ObjectPath) (ServerObject, bool) {
 	return subtreeObject, true
 }
 
-func (h *defaultHandler) AddObject(path ObjectPath, object *exportedObj) {
+// addInterface puts iface on the object at path, creating the object,
+// in one step under the handler's lock.
+func (h *defaultHandler) addInterface(path ObjectPath, name string, iface *exportedIntf) {
 	h.Lock()
-	h.objects[path] = object
-	h.Unlock()
+	defer h.Unlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		obj = newExportedObject()
+		h.objects[path] = obj
+	}
+	obj.AddInterface(name, iface)
 }
 
-func (h *defaultHandler) DeleteObject(path ObjectPath) {
+// deleteInterface takes iface off the object at path, and the object
+// with its last interface, in one step under the handler's lock.
+func (h *defaultHandler) deleteInterface(path ObjectPath, name string) {
 	h.Lock()
-	delete(h.objects, path)
-	h.Unlock()
+	defer h.Unlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		return
+	}
+	if obj.DeleteInterface(name) == 0 {
+		delete(h.objects, path)
+	}
 }
 
 type exportedMethod struct {
@@ -198,10 +217,12 @@ func (obj *exportedObj) AddInterface(name string, iface *exportedIntf) {
 	obj.interfaces[name] = iface
 }
 
-func (obj *exportedObj) DeleteInterface(name string) {
+// DeleteInterface removes an interface and returns how many remain.
+func (obj *exportedObj) DeleteInterface(name string) int {
 	obj.mu.Lock()
 	defer obj.mu.Unlock()
 	delete(obj.interfaces, name)
+	return len(obj.interfaces)
 }
 
 func (obj *exportedObj) LookupMethod(name string) (Method, bool) {

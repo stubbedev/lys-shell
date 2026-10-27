@@ -39,6 +39,14 @@ upstream decodes fd arrays.
   raced with that encode and could rewrite a reply mid-flight; the race
   detector caught it on a fake NetworkManager's `ActiveConnections`.
   Pinned by `prop/lys_shell_set_test.go`.
+- `default_handler.go` and `export.go`: the handler's object table is read
+  and changed only under its lock. `PathExists`, `introspectPath` and
+  `unexport` read it unlocked, and `export` added a path's object and then
+  its interface in two separate steps, so exporting and unexporting from
+  several goroutines (lys-secrets' prompts and sessions) raced, and a call
+  could find an object between the steps. `addInterface` and
+  `deleteInterface` now do each change in one locked step. Pinned by
+  `TestConcurrentExportsAndCalls`.
 
 The copy is on Go 1.27.3 (go.mod), with golangci-lint's modernize fixes
 applied throughout: `reflect.TypeFor` and `TypeAssert`, `strings.SplitSeq`
