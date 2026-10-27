@@ -2,6 +2,7 @@ package filechooser
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
@@ -97,10 +98,12 @@ type harness struct {
 	// conf is the live config; the chooser animates as it says.
 	conf *config.Config
 	// theme is the stylesheet and palette the chooser paints with.
-	theme   *apptheme.Theme
-	queue   chan func()
-	qmu     sync.Mutex
-	stopped bool
+	theme *apptheme.Theme
+	// forgotten are the thumbnails the renderer was told to forget.
+	forgotten []render.ImageID
+	queue     chan func()
+	qmu       sync.Mutex
+	stopped   bool
 }
 
 func newHarness(t *testing.T, viewFile string) *harness {
@@ -147,6 +150,9 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		Places:    func() []Place { return []Place{{"Home", hs.root, "user-home-symbolic"}} },
 		Locations: func() []Place { return []Place{{"Computer", "/", "drive-harddisk-symbolic"}} },
 		ViewFile:  viewFile,
+		ForgetImage: func(id render.ImageID) {
+			hs.forgotten = append(hs.forgotten, id)
+		},
 	})
 	return hs
 }
@@ -625,9 +631,16 @@ func TestUnfocusableOverlayAnswersNothing(t *testing.T) {
 // waitThumb waits until the thumbnail lookup for path at px ended.
 func (hs *harness) waitThumb(t *testing.T, path string, px int) {
 	t.Helper()
-	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+	hs.waitThumbFor(t, path, px, 2*time.Second)
+}
+
+// waitThumbFor waits up to limit until the thumbnail lookup for path
+// at px ended.
+func (hs *harness) waitThumbFor(t *testing.T, path string, px int, limit time.Duration) {
+	t.Helper()
+	for deadline := time.Now().Add(limit); ; time.Sleep(5 * time.Millisecond) {
 		var ok bool
-		hs.do(func() { _, ok = hs.c.thumbs[thumbKey{path, px}] })
+		hs.do(func() { _, ok = hs.c.thumbs.found[thumbKey{path, px}] })
 		if ok {
 			return
 		}
@@ -703,11 +716,14 @@ func TestThumbnailFromTheCache(t *testing.T) {
 		}
 	}
 	put(info.ModTime().Unix())
-	if got, err := thumbnail(doc, 48); err != nil || got.Bounds().Dx() != 48 {
-		t.Errorf("a cached thumbnail = %v, %v", got, err)
+	th := newThumbnailer()
+	if got, err := th.thumbnail(context.Background(), doc, 48); err != nil || got.image.Bounds().Dx() != 48 {
+		t.Errorf("a cached thumbnail = %v, %v", got.image.Bounds(), err)
+	} else if err := th.free([]thumbRaster{got}); err != nil {
+		t.Fatal(err)
 	}
 	put(info.ModTime().Unix() - 60)
-	if _, err := thumbnail(doc, 48); !errors.Is(err, errNoThumb) {
+	if _, err := th.thumbnail(context.Background(), doc, 48); !errors.Is(err, errNoThumb) {
 		t.Errorf("a stale cached thumbnail = %v, want none", err)
 	}
 	if got := pngText([]byte("not a png"), "Thumb::MTime"); got != "" {

@@ -499,24 +499,29 @@ func TestThumbnailIsACentreCroppedSquare(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = f.Close()
-	got, err := thumbnail(path, 24)
+	th := newThumbnailer()
+	ctx := context.Background()
+	got, err := th.thumbnail(ctx, path, 24)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Bounds() != image.Rect(0, 0, 24, 24) {
-		t.Fatalf("bounds = %v, want a 24px square", got.Bounds())
+	if got.image.Bounds() != image.Rect(0, 0, 24, 24) {
+		t.Fatalf("bounds = %v, want a 24px square", got.image.Bounds())
 	}
-	if l, r := got.RGBAAt(0, 12), got.RGBAAt(23, 12); l.R <= l.B || r.B <= r.R {
+	if l, r := got.image.RGBAAt(0, 12), got.image.RGBAAt(23, 12); l.R <= l.B || r.B <= r.R {
 		t.Errorf("left %v / right %v, want red then blue", l, r)
 	}
-	if _, err := thumbnail(filepath.Join(t.TempDir(), "missing.png"), 24); err == nil {
+	if err := th.free([]thumbRaster{got}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := th.thumbnail(ctx, filepath.Join(t.TempDir(), "missing.png"), 24); err == nil {
 		t.Error("a missing file thumbnailed")
 	}
 	garbage := filepath.Join(t.TempDir(), "g.png")
 	if err := os.WriteFile(garbage, []byte("not an image"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := thumbnail(garbage, 24); err == nil {
+	if _, err := th.thumbnail(ctx, garbage, 24); err == nil {
 		t.Error("garbage thumbnailed")
 	}
 	big := filepath.Join(t.TempDir(), "big.png")
@@ -526,8 +531,11 @@ func TestThumbnailIsACentreCroppedSquare(t *testing.T) {
 	if err := os.Truncate(big, thumbMaxBytes+1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := thumbnail(big, 24); !errors.Is(err, errThumbTooLarge) {
+	if _, err := th.thumbnail(ctx, big, 24); !errors.Is(err, errThumbTooLarge) {
 		t.Errorf("an oversized file = %v, want errThumbTooLarge", err)
+	}
+	if live := th.mem.Stats().Live; live != 0 {
+		t.Errorf("%d thumbnails left allocated", live)
 	}
 }
 

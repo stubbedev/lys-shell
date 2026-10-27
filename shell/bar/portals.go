@@ -58,6 +58,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		RecentFile:     filechooser.RecentFile(),
 		TrashDirs:      filechooser.SystemTrashDirs(home),
 		Target:         func() *app.Output { return dialogOutput(outputs(), focused) },
+		ForgetImage:    application.ForgetImage,
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)

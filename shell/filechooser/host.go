@@ -3,7 +3,6 @@ package filechooser
 import (
 	"context"
 	"errors"
-	"image"
 	"io/fs"
 	"log"
 	"os"
@@ -52,7 +51,6 @@ const (
 	nameMinW             = 160
 	maxColumnW           = 400
 	crumbMaxChars        = 16
-	thumbWorkers         = 4
 )
 
 // The keys and buttons the chooser binds: evdev keycodes and the
@@ -113,6 +111,9 @@ type Deps struct {
 	// Target is the output a dialog maps on (the focused one, else the
 	// first); nil while none is known, when the compositor picks one.
 	Target func() *app.Output
+	// ForgetImage drops the renderer's copy of a thumbnail nothing
+	// draws any more (app.Application.ForgetImage).
+	ForgetImage func(render.ImageID)
 }
 
 // Chooser is the dev.stubbe.lys.FileChooser1 host: one overlay showing one
@@ -168,11 +169,9 @@ type Chooser struct {
 	moved    bool
 	placedOn string
 
-	// thumbs are the thumbnails found (nil for a file without one),
-	// waiting the slots each lookup in flight fills.
-	thumbs  map[thumbKey]image.Image
-	waiting map[thumbKey][]func(image.Image)
-	workers chan struct{}
+	// thumbnailer makes the thumbnails; thumbs are the request's.
+	thumbnailer *thumbnailer
+	thumbs      *thumbSet
 }
 
 type thumbKey struct {
@@ -180,10 +179,28 @@ type thumbKey struct {
 	px   int
 }
 
+// thumbSet is one request's thumbnails: found (nil for a file without
+// one), waiting the slots each lookup in flight fills, and the context
+// the lookups run under, cancelled when the request ends.
+type thumbSet struct {
+	found   map[thumbKey]*thumbRaster
+	waiting map[thumbKey][]func(render.StillImage)
+	ctx     context.Context
+	cancel  context.CancelFunc
+}
+
+func newThumbSet() *thumbSet {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &thumbSet{
+		found: map[thumbKey]*thumbRaster{}, waiting: map[thumbKey][]func(render.StillImage){},
+		ctx: ctx, cancel: cancel,
+	}
+}
+
 // New builds the host; nothing maps until a request.
 func New(d Deps) *Chooser {
 	c := &Chooser{
-		d: d, view: defaultView, columns: [3]int{90, 150, 90}, workers: make(chan struct{}, thumbWorkers),
+		d: d, view: defaultView, columns: [3]int{90, 150, 90}, thumbnailer: newThumbnailer(), thumbs: newThumbSet(),
 		size: widget.Size{W: panelW, H: panelH},
 	}
 	if d.ViewFile != "" {
@@ -248,6 +265,7 @@ func (c *Chooser) ask(caller portalreq.Caller, r request) Result {
 // exit, and shows the next request waiting.
 func (c *Chooser) finish(uris []string) {
 	c.cancelWalk()
+	c.thumbs.cancel()
 	c.unwatch()
 	if c.stopMounts != nil {
 		c.stopMounts()
@@ -271,7 +289,10 @@ func (c *Chooser) finish(uris []string) {
 }
 
 func (c *Chooser) begin(r request) {
-	c.thumbs, c.waiting = map[thumbKey]image.Image{}, map[thumbKey][]func(image.Image){}
+	if c.win != nil {
+		c.closeWindow()
+	}
+	c.thumbs = newThumbSet()
 	c.replacing = ""
 	c.s = newSession(r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
 	c.s.hidden, c.s.recursive, c.s.recentFile, c.s.trashDirs = c.hidden, c.recursive, c.d.RecentFile, c.d.TrashDirs
@@ -881,59 +902,95 @@ func (c *Chooser) entryIcon(e Entry, px int) widget.Widget {
 // thumb is a px square showing fallback until one of the bounded
 // workers found the file's thumbnail (at twice the size, for HiDPI);
 // each file is looked up once per request however often its row is
-// rebuilt.
+// rebuilt, and every row draws the one raster. A lookup that ends
+// after its request did lands nowhere: its raster is freed at once.
 func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widget {
 	slot := widget.NewBox(widget.Row, 0, 0)
 	slot.SetHAlign(widget.AlignCenter)
 	slot.SetVAlign(widget.AlignCenter)
-	show := func(done image.Image) {
+	show := func(done render.StillImage) {
 		img := widget.NewImage(done)
 		img.SetScale(widget.ImageCover)
 		img.AddClass("file-chooser-thumb")
 		slot.Clear()
 		slot.Append(widgets.Pin(img, px, px), false)
 	}
-	key := thumbKey{path, px}
-	if done, ok := c.thumbs[key]; ok {
+	set, key := c.thumbs, thumbKey{path, px}
+	if done, ok := set.found[key]; ok {
 		if done != nil {
-			show(done)
+			show(done.image)
 		} else {
 			slot.Append(fallback, false)
 		}
 		return slot
 	}
 	slot.Append(fallback, false)
-	if _, pending := c.waiting[key]; !pending {
-		thumbs, waiting := c.thumbs, c.waiting
+	if set.ctx.Err() != nil {
+		return slot
+	}
+	if _, pending := set.waiting[key]; !pending {
 		go func() {
-			c.workers <- struct{}{}
-			done, err := thumbnail(path, 2*px)
-			<-c.workers
-			c.d.Invoke(func() {
-				shows := waiting[key]
-				delete(waiting, key)
-				if err != nil {
-					thumbs[key] = nil
-					return
-				}
-				thumbs[key] = done
-				for _, show := range shows {
-					show(done)
-				}
-			})
+			done, err := c.thumbnailer.thumbnail(set.ctx, path, 2*px)
+			c.d.Invoke(func() { c.landThumb(set, key, done, err) })
 		}()
 	}
-	c.waiting[key] = append(c.waiting[key], show)
+	set.waiting[key] = append(set.waiting[key], show)
 	return slot
+}
+
+// landThumb fills the slots waiting for key with the thumbnail done,
+// or with nothing when err, unless set's request ended.
+func (c *Chooser) landThumb(set *thumbSet, key thumbKey, done thumbRaster, err error) {
+	if err != nil {
+		if set.ctx.Err() == nil {
+			set.found[key] = nil
+			delete(set.waiting, key)
+		}
+		return
+	}
+	if set.ctx.Err() != nil {
+		if err := c.thumbnailer.free([]thumbRaster{done}); err != nil {
+			log.Printf("file chooser: freeing the thumbnail of %s that landed after its dialog: %v", key.path, err)
+		}
+		return
+	}
+	set.found[key] = &done
+	shows := set.waiting[key]
+	delete(set.waiting, key)
+	for _, show := range shows {
+		show(done.image)
+	}
+}
+
+// freeThumbs ends the request's thumbnail lookups and frees the
+// thumbnails it found, which nothing draws any more: the renderer
+// forgets their textures, and their pixels go once every List recorded
+// until now has ended.
+func (c *Chooser) freeThumbs() {
+	set := c.thumbs
+	set.cancel()
+	rasters := make([]thumbRaster, 0, len(set.found))
+	for _, r := range set.found {
+		if r != nil {
+			c.d.ForgetImage(r.image.ID)
+			rasters = append(rasters, *r)
+		}
+	}
+	set.found, set.waiting = map[thumbKey]*thumbRaster{}, map[thumbKey][]func(render.StillImage){}
+	if len(rasters) == 0 {
+		return
+	}
+	th := c.thumbnailer
+	render.Retire(func() {
+		if err := th.free(rasters); err != nil {
+			log.Printf("file chooser: freeing %d thumbnails: %v", len(rasters), err)
+		}
+	})
 }
 
 // --- surface --------------------------------------------------------
 
 func (c *Chooser) show() {
-	if c.win != nil {
-		c.win.Close()
-		c.win, c.closing = nil, false
-	}
 	c.rev = widget.NewRevealer(c.ui.root)
 	if c.d.Sheet != nil {
 		c.rev.AttachStylesheet(c.d.Sheet)
@@ -990,18 +1047,30 @@ func outputName(o *app.Output) string {
 	return o.Name
 }
 
+// hide plays the exit and then closes the overlay; without one mapped
+// it frees the request's thumbnails at once.
 func (c *Chooser) hide() {
-	if c.win == nil || c.closing {
+	if c.closing {
+		return
+	}
+	if c.win == nil {
+		c.freeThumbs()
 		return
 	}
 	c.closing = true
 	win := c.win
 	reveal.Hide(c.rev, c.d.Config().Animations, config.AnimFileChooser, func() {
-		win.Close()
 		if c.win == win {
-			c.win, c.rev, c.closing = nil, nil, false
+			c.closeWindow()
 		}
 	})
+}
+
+// closeWindow closes the overlay and frees the thumbnails it drew.
+func (c *Chooser) closeWindow() {
+	c.win.Close()
+	c.win, c.rev, c.closing = nil, nil, false
+	c.freeThumbs()
 }
 
 // key binds GTK's chooser keys: Escape closes quick look, then

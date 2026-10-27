@@ -197,33 +197,49 @@ func decodePNM(r io.Reader) (image.Image, error) {
 
 // TGA: uncompressed and RLE true-color (24/32 bit) and grayscale (8 bit).
 
-func decodeTGA(r io.Reader) (image.Image, error) {
+type tgaHead struct {
+	idLen, w, h, px int
+	desc            byte
+	rle, gray       bool
+}
+
+func readTGAHeader(r io.Reader) (tgaHead, error) {
 	var hdr [18]byte
 	if _, err := io.ReadFull(r, hdr[:]); err != nil {
-		return nil, err
+		return tgaHead{}, err
 	}
-	idLen, cmapType, imgType := int(hdr[0]), hdr[1], hdr[2]
-	w := int(binary.LittleEndian.Uint16(hdr[12:14]))
-	h := int(binary.LittleEndian.Uint16(hdr[14:16]))
-	bpp, desc := int(hdr[16]), hdr[17]
+	cmapType, imgType := hdr[1], hdr[2]
+	bpp := int(hdr[16])
+	t := tgaHead{
+		idLen: int(hdr[0]),
+		w:     int(binary.LittleEndian.Uint16(hdr[12:14])),
+		h:     int(binary.LittleEndian.Uint16(hdr[14:16])),
+		px:    bpp / 8,
+		desc:  hdr[17],
+		rle:   imgType == 10 || imgType == 11,
+		gray:  imgType == 3 || imgType == 11,
+	}
 	if cmapType != 0 {
-		return nil, errors.New("imagedecode: color-mapped TGA is not supported")
+		return t, errors.New("imagedecode: color-mapped TGA is not supported")
 	}
-	rle := imgType == 10 || imgType == 11
-	gray := imgType == 3 || imgType == 11
 	switch {
 	case imgType != 2 && imgType != 3 && imgType != 10 && imgType != 11:
-		return nil, fmt.Errorf("imagedecode: TGA type %d", imgType)
-	case gray && bpp != 8, !gray && bpp != 24 && bpp != 32:
-		return nil, fmt.Errorf("imagedecode: TGA depth %d", bpp)
+		return t, fmt.Errorf("imagedecode: TGA type %d", imgType)
+	case t.gray && bpp != 8, !t.gray && bpp != 24 && bpp != 32:
+		return t, fmt.Errorf("imagedecode: TGA depth %d", bpp)
 	}
-	if err := checkSize(w, h); err != nil {
+	return t, checkSize(t.w, t.h)
+}
+
+func decodeTGA(r io.Reader) (image.Image, error) {
+	t, err := readTGAHeader(r)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := io.CopyN(io.Discard, r, int64(idLen)); err != nil {
+	w, h, px, desc, rle, gray := t.w, t.h, t.px, t.desc, t.rle, t.gray
+	if _, err := io.CopyN(io.Discard, r, int64(t.idLen)); err != nil {
 		return nil, err
 	}
-	px := bpp / 8
 	data := make([]byte, w*h*px)
 	if !rle {
 		if _, err := io.ReadFull(r, data); err != nil {
