@@ -60,3 +60,4 @@ dropdown-bitwarden-error-network = Could not reach the server.
 launcher-bitwarden-locked = Bitwarden is locked. Type your master password and press Enter.
 launcher-bitwarden-logged-out = Log in to Bitwarden from its dropdown in the bar first.
 launcher-bitwarden-hint = Enter copies an item's password or first field; Shift+Enter lists its fields.
+dropdown-bitwarden-totp-live = { $code } · { $seconds } s left

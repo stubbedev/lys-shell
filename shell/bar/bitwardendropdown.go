@@ -119,6 +119,34 @@ func (f bwField) value(it bitwarden.Item, now time.Time) (string, error) {
 	return it.Notes, nil
 }
 
+// expiry is how long the field's value stays valid: a verification
+// code's remaining period, zero for the fields that do not expire.
+func (f bwField) expiry(it bitwarden.Item, now time.Time) time.Duration {
+	if f != bwTOTP {
+		return 0
+	}
+	t, err := bitwarden.ParseTOTP(it.TOTP)
+	if err != nil {
+		return 0
+	}
+	_, remaining := t.Code(now)
+	return remaining
+}
+
+// bwTOTPLine is the live code row's caption: the code in two halves and
+// the seconds it has left.
+func bwTOTPLine(it bitwarden.Item, now time.Time) (string, bool) {
+	t, err := bitwarden.ParseTOTP(it.TOTP)
+	if err != nil {
+		return "", false
+	}
+	code, remaining := t.Code(now)
+	if half := len(code) / 2; len(code) == 6 || len(code) == 8 {
+		code = code[:half] + " " + code[half:]
+	}
+	return i18n.T("dropdown-bitwarden-totp-live", i18n.Str("code", code), i18n.Int("seconds", int64(remaining/time.Second))), true
+}
+
 // bwFields is what an item's row copies, its primary field first (the
 // one a click on the row copies).
 func bwFields(it bitwarden.Item) []bwField {
@@ -284,10 +312,16 @@ type bitwardenView struct {
 	unlockPw *secretEntry
 
 	search *widget.SearchEntry
-	list   *widget.ItemGroup
-	listSt *widget.Stack
-	more   *widget.Label
-	status *widget.Label
+	// totpRow is the live verification code of the item whose fields
+	// were copied last, totpID that item; hidden for none, and never
+	// shown for an item behind the master password reprompt.
+	totpRow *widget.Item
+	totpSt  *widget.Stack
+	totpID  string
+	list    *widget.ItemGroup
+	listSt  *widget.Stack
+	more    *widget.Label
+	status  *widget.Label
 
 	repromptDesc *widget.Label
 	repromptPw   *secretEntry
@@ -344,8 +378,10 @@ func (v *bitwardenView) follow() {
 	v.cancel = cancel
 	v.life = life
 	ticks, stop := v.vault.Subscribe()
+	second := time.NewTicker(time.Second)
 	go func() {
 		defer stop()
+		defer second.Stop()
 		for {
 			select {
 			case <-life.Done():
@@ -355,9 +391,48 @@ func (v *bitwardenView) follow() {
 					return
 				}
 				v.ctx.Invoke(v.apply)
+			case <-second.C:
+				v.ctx.Invoke(v.refreshTOTP)
 			}
 		}
 	}()
+}
+
+// liveTOTPItem is the item the live code row follows, false when there
+// is none to show.
+func (v *bitwardenView) liveTOTPItem() (bitwarden.Item, bool) {
+	if v.totpID == "" || v.vault == nil || v.vault.Status().State != bitwarden.StateUnlocked {
+		return bitwarden.Item{}, false
+	}
+	for _, it := range v.vault.Items() {
+		if it.ID == v.totpID && it.TOTP != "" && !it.Reprompt {
+			return it, true
+		}
+	}
+	return bitwarden.Item{}, false
+}
+
+// refreshTOTP shows the followed item's current code and its seconds left.
+func (v *bitwardenView) refreshTOTP() {
+	it, ok := v.liveTOTPItem()
+	line := ""
+	if ok {
+		line, ok = bwTOTPLine(it, v.now())
+	}
+	if !ok {
+		v.totpSt.Show("none")
+		return
+	}
+	v.totpRow.SetTitle(it.Name)
+	v.totpRow.SetDescription(line)
+	v.totpSt.Show("code")
+}
+
+// copyLiveTOTP copies the live row's code.
+func (v *bitwardenView) copyLiveTOTP() {
+	if it, ok := v.liveTOTPItem(); ok {
+		v.copyNow(it, bwTOTP)
+	}
 }
 
 // showError replaces the pages with why there is no vault.
@@ -494,6 +569,18 @@ func (v *bitwardenView) buildVault() widget.Widget {
 	v.search = widget.NewSearchEntry(v.font, v.px, i18n.T("dropdown-bitwarden-search"))
 	v.search.OnSearchChanged = func(string) { v.rebuildList() }
 	page.Append(v.search, false)
+	totpCard, totpGroup := itemCard()
+	v.totpRow = widget.NewItem(v.font, "", "")
+	v.totpRow.SetSmall(true)
+	v.totpRow.SetEllipsize(true)
+	v.totpRow.SetMedia(widget.NewThemeIcon(bwTOTP.icon(), int(v.px*1.2)), false)
+	v.totpRow.AddClass("bitwarden-totp-live")
+	v.totpRow.SetOnActivate(v.copyLiveTOTP)
+	totpGroup.Append(v.totpRow)
+	v.totpSt = pageStack()
+	v.totpSt.Add("none", widget.NewBox(widget.Column, 0, 0))
+	v.totpSt.Add("code", totpCard)
+	page.Append(v.totpSt, false)
 	card, list := itemCard()
 	v.list = list
 	v.listSt = pageStack()
@@ -578,6 +665,7 @@ func (v *bitwardenView) apply() {
 		}
 		v.rebuildList()
 	}
+	v.refreshTOTP()
 }
 
 // setError shows err under the page; the server asking for a code is
@@ -837,6 +925,10 @@ func (v *bitwardenView) copyField(it bitwarden.Item, f bwField) {
 func (v *bitwardenView) copyNow(it bitwarden.Item, f bwField) {
 	ttl, err := v.host.copyField(v.vault, it, f, v.now())
 	reportCopy(v.status, f.name(), ttl, err)
+	if err == nil && it.TOTP != "" && !it.Reprompt {
+		v.totpID = it.ID
+		v.refreshTOTP()
+	}
 }
 
 func reportCopy(l *widget.Label, field string, ttl time.Duration, err error) {

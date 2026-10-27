@@ -103,7 +103,7 @@ func (h *bitwardenHost) copyField(v vault, it bitwarden.Item, f bwField, now tim
 	if err != nil {
 		return 0, err
 	}
-	ttl, err := h.copyText(value, f.secret())
+	ttl, err := h.copyText(value, f.secret(), f.expiry(it, now))
 	if err != nil {
 		return 0, err
 	}
@@ -116,14 +116,19 @@ func (h *bitwardenHost) copyGenerated(rules bwRules, random io.Reader) (time.Dur
 	if err != nil {
 		return 0, err
 	}
-	return h.copyText(value, true)
+	return h.copyText(value, true, 0)
 }
 
-func (h *bitwardenHost) copyText(value string, secret bool) (time.Duration, error) {
+// copyText copies value; a secret clears after clipboard-clear, or at
+// expires when that comes sooner (a verification code's end).
+func (h *bitwardenHost) copyText(value string, secret bool, expires time.Duration) (time.Duration, error) {
 	content, ttl := transfer.Text(value), time.Duration(0)
 	if secret {
 		content = clipboard.SecretContent(value)
 		ttl = time.Duration(h.config().ClipboardClear) * time.Second
+		if expires > 0 && (ttl == 0 || expires < ttl) {
+			ttl = expires
+		}
 	}
 	if err := h.copy(content, ttl); err != nil {
 		return 0, err

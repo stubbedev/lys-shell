@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -674,5 +676,72 @@ func TestBitwardenLocksWithTheSession(t *testing.T) {
 	h.lockIfOpen()
 	if st := v.Status().State; st != bitwarden.StateLoggedOut {
 		t.Errorf("a logged-out vault locked into %v", st)
+	}
+}
+
+// A verification code clears from the clipboard when it expires, if
+// that is before clipboard-clear; the other secrets keep the setting.
+func TestBitwardenTOTPCopyClearsAtExpiry(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bitwarden.ClipboardClear = 30
+	copies := &[]copied{}
+	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked}}
+	h := testBitwardenHost(v, cfg, copies)
+	it := bitwarden.Item{Type: bitwarden.ItemLogin, Password: "pw", TOTP: "JBSWY3DPEHPK3PXP"}
+	at := time.Unix(1_700_000_020, 0)
+	ttl, err := h.copyField(v, it, bwTOTP, at)
+	if err != nil || ttl != 20*time.Second {
+		t.Errorf("TOTP ttl = %v, %v; want the code's 20 s left", ttl, err)
+	}
+	if ttl, _ := h.copyField(v, it, bwPassword, at); ttl != 30*time.Second {
+		t.Errorf("password ttl = %v, want clipboard-clear", ttl)
+	}
+	cfg.Bitwarden.ClipboardClear = 5
+	if ttl, _ := h.copyField(v, it, bwTOTP, at); ttl != 5*time.Second {
+		t.Errorf("TOTP ttl with a shorter clipboard-clear = %v", ttl)
+	}
+	cfg.Bitwarden.ClipboardClear = 0
+	if ttl, _ := h.copyField(v, it, bwTOTP, at); ttl != 20*time.Second {
+		t.Errorf("TOTP ttl with clipboard-clear off = %v, want the code's expiry", ttl)
+	}
+}
+
+// Copying from an item with a verification code shows that code live,
+// with its seconds left, until the vault locks; an item behind the
+// reprompt never shows it.
+func TestBitwardenLiveTOTPRow(t *testing.T) {
+	cfg := config.Defaults()
+	login := bitwarden.Item{ID: "a", Type: bitwarden.ItemLogin, Name: "Mail", Password: "pw", TOTP: "JBSWY3DPEHPK3PXP"}
+	guarded := bitwarden.Item{ID: "b", Type: bitwarden.ItemLogin, Name: "Bank", Password: "pw", TOTP: "JBSWY3DPEHPK3PXP", Reprompt: true}
+	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked}, items: []bitwarden.Item{login, guarded}, verifyOK: "master"}
+	view, _ := bitwardenTestView(t, v, cfg)
+	at := time.Unix(1_700_000_020, 0)
+	onHeadlessLoop(func() bool { view.now = func() time.Time { return at }; view.refreshTOTP(); return true })
+	if onHeadlessLoop(func() bool { return view.totpSt.Visible() == "code" }) {
+		t.Fatal("a live code shows before any copy")
+	}
+	onHeadlessLoop(func() bool { view.copyNow(login, bwPassword); return true })
+	code, _ := bitwarden.ParseTOTP(login.TOTP)
+	want, _ := code.Code(at)
+	caption := onHeadlessLoop(func() string { return strings.Join(treetest.Labels(view.totpSt), "|") })
+	if !strings.Contains(caption, "Mail") || !strings.Contains(caption, want[:3]+" "+want[3:]) || !strings.Contains(caption, "20") {
+		t.Errorf("live row = %q, want Mail, %s and 20 s", caption, want)
+	}
+	at = at.Add(30 * time.Second)
+	onHeadlessLoop(func() bool { view.refreshTOTP(); return true })
+	next, _ := code.Code(at)
+	if caption := onHeadlessLoop(func() string { return strings.Join(treetest.Labels(view.totpSt), "|") }); !strings.Contains(caption, next[:3]+" "+next[3:]) {
+		t.Errorf("the live row did not follow the next period: %q", caption)
+	}
+	onHeadlessLoop(func() bool { view.copyNow(guarded, bwUsername); return true })
+	if caption := onHeadlessLoop(func() string { return strings.Join(treetest.Labels(view.totpSt), "|") }); strings.Contains(caption, "Bank") {
+		t.Errorf("a reprompt-protected item's code shows: %q", caption)
+	}
+	v.mu.Lock()
+	v.status.State = bitwarden.StateLocked
+	v.mu.Unlock()
+	onHeadlessLoop(func() bool { view.refreshTOTP(); return true })
+	if onHeadlessLoop(func() bool { return view.totpSt.Visible() == "code" }) {
+		t.Error("the live code shows on a locked vault")
 	}
 }
