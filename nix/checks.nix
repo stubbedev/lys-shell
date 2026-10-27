@@ -23,8 +23,7 @@
           # the GPU through it and silently stays on the CPU without it, and
           # NixOS has no global library path to fall back on.
           lys-shell-wrapper-vulkan = pkgs.runCommand "lys-shell-wrapper-vulkan" { } ''
-            for bin in ${pkg}/bin/*; do
-              case "$bin" in */.*) continue ;; esac
+            for bin in ${lib.concatMapStringsSep " " (b: "${pkg}/bin/${b}") pkg.wrapped}; do
               grep -q "${lib.getLib pkgs.vulkan-loader}/lib" "$bin" || { echo "$bin lacks the Vulkan loader on its library path" >&2; exit 1; }
             done
             touch $out

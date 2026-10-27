@@ -137,6 +137,13 @@ in
       };
     };
 
+    secrets.enable = lib.mkEnableOption ''
+      lys-secrets as the session's Secret Service (`org.freedesktop.secrets`),
+      with collections encrypted at rest under `$XDG_DATA_HOME/lys-secrets`
+      and the login collection unlocked by the lock screen. Only one provider
+      can own the name: do not run gnome-keyring's secrets component as well
+      (lys-secrets logs the other owner and stays off)'';
+
     lock = {
       enable = lib.mkEnableOption ''
         guidance for the lys-shell session lock's PAM service. lys-shell locks the
@@ -332,6 +339,26 @@ in
         RestartSec = 3;
         Slice = "session.slice";
       };
+    };
+
+    xdg.dataFile."dbus-1/services/org.freedesktop.secrets.service" = lib.mkIf cfg.secrets.enable {
+      source = "${cfg.package}/share/lys-shell/org.freedesktop.secrets.service";
+    };
+    systemd.user.services.lys-secrets = lib.mkIf cfg.secrets.enable {
+      Unit = {
+        Description = "lys-secrets Secret Service provider";
+        PartOf = [ cfg.systemd.target ];
+        After = [ cfg.systemd.target ];
+      };
+      Service = {
+        Type = "dbus";
+        BusName = "org.freedesktop.secrets";
+        ExecStart = lib.getExe' cfg.package "lys-secrets";
+        Restart = "on-failure";
+        RestartSec = 3;
+        Slice = "session.slice";
+      };
+      Install.WantedBy = [ cfg.systemd.target ];
     };
   };
 }

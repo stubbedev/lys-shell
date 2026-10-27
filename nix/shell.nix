@@ -45,6 +45,13 @@
           # wl-paste, the out-of-process data-control reader the screenshot
           # clipboard tests read the selection back with.
           wl-clipboard
+          # The Secret Service clients lys-secrets is checked against:
+          # libsecret's secret-tool, python-secretstorage (DH sessions),
+          # and Chromium's libsecret password store; git's libsecret
+          # credential helper is GIT_CREDENTIAL_LIBSECRET below.
+          libsecret
+          (python3.withPackages (ps: [ ps.secretstorage ]))
+          chromium
 
           inter # config default font-sans
           jetbrains-mono # config default font-mono
@@ -57,6 +64,8 @@
         LD_LIBRARY_PATH = lib.makeLibraryPath (
           lib.unique (gpuDrivers.libraries ++ self'.packages.lys-shell.libs ++ [ pkgs.pipewire ])
         );
+
+        GIT_CREDENTIAL_LIBSECRET = "${pkgs.gitFull}/libexec/git-core/git-credential-libsecret";
 
         # The real xdg-desktop-portal frontend the portal contract tests
         # route through to the backend.

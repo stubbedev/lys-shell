@@ -44,6 +44,7 @@ let
       ../internal
       ../portal
       ../resources
+      ../secrets
       ../service
       ../shell
       ../strftime
@@ -51,6 +52,15 @@ let
       ../third_party
     ];
   };
+
+  # The binaries that draw through lys-ui and dlopen the GPU and media
+  # libraries; lys-secrets draws nothing and links none of them.
+  wrapped = [
+    "lys-shell"
+    "lys-greeter"
+    "lys-lock"
+    "lys-settings"
+  ];
 in
 buildGo127Module {
   pname = "lys-shell";
@@ -59,13 +69,14 @@ buildGo127Module {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-kBvU30hEu7dkfh8W6LdCGRZICn2Pmp3fjIauQ+koEGA=";
+  vendorHash = "sha256-8lf4BN35RjunHBZbQQFLqxNSbQTVND7NAdtc0lElkRE=";
 
   subPackages = [
     "cmd/lys-shell"
     "cmd/lys-greeter"
     "cmd/lys-lock"
     "cmd/lys-settings"
+    "cmd/lys-secrets"
   ];
 
   # lys-ui and the purego bindings are pure Go; cgo stays off, as in the
@@ -80,7 +91,7 @@ buildGo127Module {
 
   # The dlopened libraries on the loader path.
   postFixup = ''
-    for bin in lys-shell lys-greeter lys-lock lys-settings; do
+    for bin in ${lib.concatStringsSep " " wrapped}; do
       wrapProgram $out/bin/$bin \
         --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libs}"
     done
@@ -114,10 +125,19 @@ buildGo127Module {
       $out/share/lys-shell/xdg-desktop-portal-lys-shell.service \
       --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
     install -Dm0644 resources/lys-shell-portals.conf -t $out/share/lys-shell
+
+    # lys-secrets' unit and D-Bus activation file, as references only: the
+    # modules install them when the Secret Service is enabled, since
+    # gnome-keyring's activation file claims the same name.
+    substitute resources/lys-secrets.service $out/share/lys-shell/lys-secrets.service \
+      --replace-fail /usr/bin/lys-secrets "$out/bin/lys-secrets"
+    substitute resources/org.freedesktop.secrets.lys-secrets.service \
+      $out/share/lys-shell/org.freedesktop.secrets.service \
+      --replace-fail /usr/bin/lys-secrets "$out/bin/lys-secrets"
   '';
 
   # The dev shell puts the same libraries on its loader path.
-  passthru = { inherit libs; };
+  passthru = { inherit libs wrapped; };
 
   meta = {
     description = "Wayland desktop shell";

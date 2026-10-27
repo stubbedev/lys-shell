@@ -42,10 +42,14 @@ lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns, launch
 
 %install
 install -d %{buildroot}%{_bindir}
-install -m 0755 lys-shell lys-greeter lys-lock lys-settings %{buildroot}%{_bindir}/
+install -m 0755 lys-shell lys-greeter lys-lock lys-settings lys-secrets %{buildroot}%{_bindir}/
 
 install -d %{buildroot}%{_userunitdir}
-install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service %{buildroot}%{_userunitdir}/
+install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service lys-secrets.service %{buildroot}%{_userunitdir}/
+# lys-secrets' D-Bus activation file stays a reference: gnome-keyring's
+# claims the same name. `systemctl --user enable lys-secrets` opts in.
+install -d %{buildroot}%{_datadir}/lys-shell
+install -m 0644 org.freedesktop.secrets.lys-secrets.service %{buildroot}%{_datadir}/lys-shell/
 
 install -d %{buildroot}%{_datadir}/xdg-desktop-portal/portals
 install -m 0644 lys-shell.portal %{buildroot}%{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
@@ -83,8 +87,11 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %{_bindir}/lys-greeter
 %{_bindir}/lys-lock
 %{_bindir}/lys-settings
+%{_bindir}/lys-secrets
 %{_userunitdir}/lys-shell.service
 %{_userunitdir}/xdg-desktop-portal-lys-shell.service
+%{_userunitdir}/lys-secrets.service
+%{_datadir}/lys-shell/org.freedesktop.secrets.lys-secrets.service
 %{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
 %{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
 %{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service
