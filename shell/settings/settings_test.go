@@ -689,7 +689,7 @@ func click(root widget.Widget, target widget.Boundser) {
 // refresh shows the stored color without writing it back.
 func TestColorEditorWritesThePickersPick(t *testing.T) {
 	k := testKit(t, "lock:\n  background-color: \"#336699\"\n")
-	c := newColorEditor(k, pathSlot(k.store, "lock.background-color"))
+	c := newColorEditor(k, pathSlot(k.store, "login.background-color"))
 	root, host := hosted(c)
 	if c.Color() != render.RGB(0x33, 0x66, 0x99) {
 		t.Fatalf("shows %#08x, want the stored #336699", uint32(c.Color()))
@@ -707,13 +707,13 @@ func TestColorEditorWritesThePickersPick(t *testing.T) {
 		t.Fatalf("the picker offers %d swatches, want the %d presets", len(swatches), len(widget.DefaultSwatches()))
 	}
 	click(host.opened[0], swatches[4].(*widget.Button))
-	if want := styling.HexRGBA(widget.DefaultSwatches()[4]); k.store.value("lock.background-color") != want || host.closed != 1 {
-		t.Errorf("a swatch pick wrote %v (closed %d), want %s and the picker closed", k.store.value("lock.background-color"), host.closed, want)
+	if want := styling.HexRGBA(widget.DefaultSwatches()[4]); k.store.value("login.background-color") != want || host.closed != 1 {
+		t.Errorf("a swatch pick wrote %v (closed %d), want %s and the picker closed", k.store.value("login.background-color"), host.closed, want)
 	}
 	click(root, c)
 	pickers = treetest.All[*widget.SwatchPicker](host.opened[1])
 	pickers[0].OnEdited(render.RGBA(0xff, 0, 0, 0x80))
-	if v := k.store.value("lock.background-color"); v != "#ff000080" {
+	if v := k.store.value("login.background-color"); v != "#ff000080" {
 		t.Errorf("a translucent edit wrote %v, want #rrggbbaa", v)
 	}
 	before := runtimeFile(t, k)
@@ -728,14 +728,14 @@ func TestFileEditorBrowses(t *testing.T) {
 	k := testKit(t, "")
 	f := &fakePickers{}
 	k.pickers = f
-	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
+	c := newFileEditor(k, pathSlot(k.store, "login.background-image"))
 	c.entry.Insert("/typed")
 	if !c.entry.badge.Visible() {
 		t.Fatal("typing did not raise the unsaved badge")
 	}
 	click(c, c.browse)
 	f.fileFn("/home/me/wall.png")
-	if v := k.store.value("lock.background-image"); v != "/home/me/wall.png" || c.entry.badge.Visible() {
+	if v := k.store.value("login.background-image"); v != "/home/me/wall.png" || c.entry.badge.Visible() {
 		t.Errorf("browse wrote %v (badge %v)", v, c.entry.badge.Visible())
 	}
 	c.refresh()
@@ -746,7 +746,8 @@ func TestFileEditorBrowses(t *testing.T) {
 
 func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
 	k := testKit(t, "")
-	_ = k.store.set("greeter.cursor-size", int64(32))
+	_ = k.store.set("login.greeter.cursor-size", int64(32))
+	_ = k.store.set("login.lock.pam-service", "secret-service")
 	var staged string
 	prev := spawnGreeterApply
 	spawnGreeterApply = func(path string) error {
@@ -762,11 +763,22 @@ func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("staged %q: %v", staged, err)
 	}
-	greeter, _ := doc["greeter"].(map[string]any)
-	if len(doc) != 1 || greeter["cursor-size"] != int64(32) || greeter["show-clock"] == nil {
+	login, _ := doc["login"].(map[string]any)
+	if v, _ := config.PathValue(login, "greeter.cursor-size"); len(doc) != 1 || v != int64(32) || login["show-clock"] == nil {
 		t.Errorf("staged:\n%s", staged)
 	}
-	for key := range greeter {
+	if _, ok := login["lock"]; ok {
+		t.Errorf("the lock screen's keys were staged for the greeter:\n%s", staged)
+	}
+	for key, v := range login {
+		if sub, ok := v.(map[string]any); ok {
+			for inner := range sub {
+				if !slices.Contains(config.GreeterApplyKeys, key+"."+inner) {
+					t.Errorf("%s.%s is outside the allowlist but was staged", key, inner)
+				}
+			}
+			continue
+		}
 		if !slices.Contains(config.GreeterApplyKeys, key) {
 			t.Errorf("%s is outside the allowlist but was staged", key)
 		}
@@ -1422,7 +1434,7 @@ func TestMonitorWallpaperCards(t *testing.T) {
 func TestEntriesKeepTheirGtkWidth(t *testing.T) {
 	k := testKit(t, "")
 	con := widget.Size{W: 2000, H: 100}
-	file := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
+	file := newFileEditor(k, pathSlot(k.store, "login.background-image"))
 	live := newLiveText(k, pathSlot(k.store, "wallpaper.wallpaper"), "")
 	if empty := widget.SizeWithin(live, con).W; empty < widget.GTKTextWidth {
 		t.Errorf("an empty live entry measures %d, want GTK's %d text width", empty, widget.GTKTextWidth)
@@ -2086,7 +2098,7 @@ func TestRowBadgeIsALysUIBadgeWithOneTint(t *testing.T) {
 // nothing, its rules written for GTK's colorbutton tree).
 func TestColorEditorShowsItsColor(t *testing.T) {
 	k := testKit(t, "lock:\n  background-color: \"#336699\"\n")
-	c := newColorEditor(k, pathSlot(k.store, "lock.background-color"))
+	c := newColorEditor(k, pathSlot(k.store, "login.background-color"))
 	slot := widget.NewBox(widget.Row, 0, 0)
 	slot.AddClass("setting-control")
 	slot.Append(c, false)

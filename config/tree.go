@@ -260,10 +260,10 @@ func (e *InvalidFieldError) Error() string {
 	return fmt.Sprintf("invalid config field '%s' in %s: %s", e.Field, e.Component, e.Reason)
 }
 
-// insertPath sets value at a dot-separated path, creating intermediate
-// tables. An empty path inserts the "" key, like
-// the Rust split on '.'.
-func insertPath(root map[string]any, path string, value any) error {
+// InsertPath sets value at a dot-separated path, creating intermediate
+// tables; a non-table in the way is an *InvalidFieldError. An empty
+// path inserts the "" key, like the Rust split on '.'.
+func InsertPath(root map[string]any, path string, value any) error {
 	segments := strings.Split(path, ".")
 	final := segments[len(segments)-1]
 	current := root
@@ -427,13 +427,20 @@ func rustFloatDebug(f float64, bits int) string {
 
 // hasPath reports whether the dot path names a value in tree.
 func hasPath(tree any, path string) bool {
+	_, ok := PathValue(tree, path)
+	return ok
+}
+
+// PathValue is the value at the dot path in a parsed tree; false when
+// the path names none.
+func PathValue(tree any, path string) (any, bool) {
 	v := tree
 	for seg := range strings.SplitSeq(path, ".") {
 		next, ok := lookup(v, seg)
 		if !ok {
-			return false
+			return nil, false
 		}
 		v = next
 	}
-	return true
+	return v, true
 }

@@ -71,7 +71,7 @@ let
   inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient testApp;
 
   shellConfig = (pkgs.formats.yaml { }).generate "config.yaml" {
-    lock = {
+    login.lock = {
       enabled = true;
       pam-service = "lys-shell";
     };

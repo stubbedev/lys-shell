@@ -115,10 +115,10 @@ func (w wallpaperPortal) SetWallpaperURI(handle dbus.ObjectPath, appID, parent, 
 // setLockScreen makes the picture the lock screen's background and
 // saves it as a runtime override.
 func (w wallpaperPortal) setLockScreen(path string) error {
-	if err := w.cfg.SetByPath("lock.background-image", path); err != nil {
+	if err := w.cfg.SetByPath("login.background-image", path); err != nil {
 		return fmt.Errorf("set the lock screen's picture: %w", err)
 	}
-	if err := w.cfg.SetByPath("lock.background-mode", string(config.BackgroundImage)); err != nil {
+	if err := w.cfg.SetByPath("login.background-mode", string(config.BackgroundImage)); err != nil {
 		return fmt.Errorf("set the lock screen's background mode: %w", err)
 	}
 	if err := w.cfg.Save(); err != nil {

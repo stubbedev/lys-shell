@@ -69,8 +69,8 @@ func buildRig(t *testing.T, edit func(*Init), r *rig) *rig {
 		StatePath:  state,
 		SessionEnv: []string{"XDG_SESSION_TYPE=wayland"},
 	}
-	init.Config.Greeter.ShowUserList = true
-	init.Config.Greeter.ShowPowerButtons = true
+	init.Config.Login.Greeter.ShowUserList = true
+	init.Config.Login.Greeter.ShowPowerButtons = true
 	if edit != nil {
 		edit(&init)
 	}
@@ -252,7 +252,7 @@ func TestGreeterUserRowAndPower(t *testing.T) {
 	if r := newRig(t, func(i *Init) { i.Users = many }); len(r.s.users) != 0 {
 		t.Error("more users than the cap still listed")
 	}
-	if r := newRig(t, func(i *Init) { i.Config.Greeter.ShowUserList = false }); len(r.s.users) != 0 {
+	if r := newRig(t, func(i *Init) { i.Config.Login.Greeter.ShowUserList = false }); len(r.s.users) != 0 {
 		t.Error("show-user-list off still listed users")
 	}
 	// The power buttons call systemctl's verbs.

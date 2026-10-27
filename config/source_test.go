@@ -61,11 +61,11 @@ func TestDefaultValue(t *testing.T) {
 }
 
 func TestSourceAcceptsAliases(t *testing.T) {
-	canonical, ok := canonicalPath("lock.lock-on-start")
-	if !ok || canonical != "lock.lock-on-start" {
+	canonical, ok := canonicalPath("login.lock.lock-on-start")
+	if !ok || canonical != "login.lock.lock-on-start" {
 		t.Errorf("canonical = %q %v", canonical, ok)
 	}
-	if _, ok := canonicalPath("lock.nope"); ok {
+	if _, ok := canonicalPath("login.nope"); ok {
 		t.Error("an unknown field resolved")
 	}
 }

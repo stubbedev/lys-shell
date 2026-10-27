@@ -39,10 +39,12 @@ let
   # point XCURSOR_PATH at the system icon dir, where a theme installed via
   # `environment.systemPackages` lands. Set your cursor there — install the theme
   # system-wide and export XCURSOR_THEME/XCURSOR_SIZE — and the greeter follows.
-  # An explicit `greeter.settings.greeter.cursor-theme`/`cursor-size` still wins.
+  # An explicit `greeter.settings.login.greeter.cursor-theme`/`cursor-size`
+  # still wins; the former `greeter.settings.greeter.*` keys are read too, as
+  # the greeter itself still reads them.
   # sessionVariables wins over variables (that's the layer users set cursor in).
   sysVars = config.environment.variables // config.environment.sessionVariables;
-  greeterSettings = cfg.greeter.settings.greeter or { };
+  greeterSettings = (cfg.greeter.settings.greeter or { }) // (cfg.greeter.settings.login.greeter or { });
   cursorName =
     if (greeterSettings.cursor-theme or "") != "" then
       greeterSettings.cursor-theme
@@ -175,7 +177,7 @@ in
         default = "lys-shell";
         description = ''
           Name of the PAM service created for unlock authentication. Must match
-          `lock.pam-service` in your lys-shell config (the config default is
+          `login.lock.pam-service` in your lys-shell config (the config default is
           `system-auth`, which exists on Arch/Fedora but not NixOS — point it at
           this service, or set this to a service that already exists).
         '';
@@ -287,15 +289,16 @@ in
         example = lib.literalExpression ''
           {
             styling.appearance = "dark";
-            lock.background-mode = "color";
-            lock.background-color = "#1e1e2e";
+            login.background-mode = "color";
+            login.background-color = "#1e1e2e";
           }
         '';
         description = ''
           Theme/background/clock config written to {file}`/etc/lys-shell/config.yaml`
           and read by the greeter. Uses the full lys-shell config schema; the
-          greeter honours `styling`, `greeter.*` (background, clock, cursor,
-          user list, power buttons), and `wallpaper`. Leave empty to use the
+          greeter honours `styling`, `login.*` (background, blur, clock, and
+          `login.greeter` for the cursor, user list and power buttons), and
+          `wallpaper`. Leave empty to use the
           built-in defaults.
         '';
       };
@@ -414,7 +417,7 @@ in
       # lines are `optional`, so with no keyring daemon running they no-op.
       # With `secrets.enable` lys-shell hands the password to lys-secrets
       # itself after the unlock, and the gnome-keyring lines stay unused.
-      # The user's lys-shell config `lock.pam-service` must name this same service.
+      # The user's lys-shell config `login.lock.pam-service` must name this same service.
       security.pam.services.${cfg.lock.pamService}.enableGnomeKeyring = !cfg.secrets.enable;
     })
 

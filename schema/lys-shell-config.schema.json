@@ -2684,62 +2684,6 @@
       },
       "type": "object"
     },
-    "GreeterConfig": {
-      "description": "Greeter (display manager): the pre-login screen `lys-greeter` renders as\na greetd greeter.\n\nThe greeter reads the system config (`/etc/lys-shell/config.yaml`), so these\nsettings take effect there — copy or symlink your user config if you want\nthe login screen to follow it.",
-      "properties": {
-        "background-color": {
-          "$ref": "#/$defs/HexColor",
-          "default": "#000000",
-          "description": "Background fill color (used when `background-mode: color`)."
-        },
-        "background-image": {
-          "$ref": "#/$defs/string",
-          "default": "",
-          "description": "Background image path (used when `background-mode: image`)."
-        },
-        "background-mode": {
-          "$ref": "#/$defs/LockBackground",
-          "default": "color",
-          "description": "How the background is drawn: solid color, an image, or the wallpaper."
-        },
-        "clock-format": {
-          "$ref": "#/$defs/string",
-          "default": "%H:%M",
-          "description": "`strftime` format for the greeter time."
-        },
-        "cursor-size": {
-          "$ref": "#/$defs/uint32",
-          "default": 24,
-          "description": "Logical cursor size on the login screen. Scaled automatically per\ndisplay, so HiDPI outputs get a matching high-resolution cursor."
-        },
-        "cursor-theme": {
-          "$ref": "#/$defs/string",
-          "default": "",
-          "description": "Xcursor theme used on the login screen (empty = system default)."
-        },
-        "date-format": {
-          "$ref": "#/$defs/string",
-          "default": "%A, %B %-d",
-          "description": "`strftime` format for the greeter date."
-        },
-        "show-clock": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show a clock above the login form."
-        },
-        "show-power-buttons": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show the shutdown/reboot buttons at the bottom of the screen."
-        },
-        "show-user-list": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show clickable avatars for the machine's login users."
-        }
-      },
-      "type": "object"
-    },
     "HexColor": {
       "description": "GTK4 CSS hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa)",
       "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
@@ -3959,82 +3903,6 @@
       "minimum": 0,
       "type": "integer"
     },
-    "LockConfig": {
-      "description": "Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`.\n\nWhen `enabled`, lys-shell locks the session in response to the logind `Lock`\nsignal (`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC\n`lock()` method. The lock surface grabs all input and survives client\ncrashes (the compositor shows a solid color), unlike a layer-shell overlay.",
-      "properties": {
-        "background-color": {
-          "$ref": "#/$defs/HexColor",
-          "default": "#000000",
-          "description": "Background fill color (used when `background-mode: color`)."
-        },
-        "background-image": {
-          "$ref": "#/$defs/string",
-          "default": "",
-          "description": "Background image path (used when `background-mode: image`)."
-        },
-        "background-mode": {
-          "$ref": "#/$defs/LockBackground",
-          "default": "color",
-          "description": "How the background is drawn: solid color, an image, or the wallpaper."
-        },
-        "blank-timeout-ms": {
-          "$ref": "#/$defs/uint32",
-          "default": 0,
-          "description": "Black out the lock screen after this idle time (milliseconds, `0` =\nnever). This is a visual blank that hides the clock/prompt and dismisses\non any key; true display power-off (DPMS) is left to your idle daemon."
-        },
-        "blur": {
-          "$ref": "#/$defs/LockBlur",
-          "default": 0,
-          "description": "Gaussian blur radius applied to image/wallpaper backgrounds (0 = none)."
-        },
-        "clock-format": {
-          "$ref": "#/$defs/string",
-          "default": "%H:%M",
-          "description": "`strftime` format for the lock-screen time."
-        },
-        "date-format": {
-          "$ref": "#/$defs/string",
-          "default": "%A, %B %-d",
-          "description": "`strftime` format for the lock-screen date."
-        },
-        "enabled": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Let lys-shell handle session locking. When off, lock requests are ignored\nand an external locker (e.g. hyprlock) stays responsible."
-        },
-        "grace-period-ms": {
-          "$ref": "#/$defs/uint32",
-          "default": 0,
-          "description": "Grace window after locking during which the screen unlocks without a\npassword (milliseconds, `0` = always require the password)."
-        },
-        "lock-on-start": {
-          "$ref": "#/$defs/boolean",
-          "default": false,
-          "description": "Lock the session as soon as the shell starts. For autologin setups\n(e.g. greetd with no password at boot) where the lock screen is the\naccess gate: the session comes up locked and requires the password\nbefore use. Off by default — a normal login has already authenticated."
-        },
-        "max-attempts": {
-          "$ref": "#/$defs/uint32",
-          "default": 0,
-          "description": "Maximum failed password attempts before further input is blocked\n(`0` = unlimited). The screen stays locked regardless."
-        },
-        "pam-service": {
-          "$ref": "#/$defs/string",
-          "default": "system-auth",
-          "description": "PAM service name used to authenticate the unlock. Distro-dependent:\n`system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry."
-        },
-        "show-clock": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show a clock on the lock screen."
-        },
-        "show-failed-attempts": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show the failed-attempt count on the lock screen."
-        }
-      },
-      "type": "object"
-    },
     "LockdownConfig": {
       "description": "Features no app may use while set.",
       "properties": {
@@ -4072,6 +3940,135 @@
           "$ref": "#/$defs/boolean",
           "default": false,
           "description": "Refuse sound output."
+        }
+      },
+      "type": "object"
+    },
+    "LoginConfig": {
+      "description": "Login screen: the greeter and the lock screen, one screen in two modes.\n\nThe greeter reads the system config (`/etc/lys-shell/config.yaml`), the\nlock screen the user's: copy or symlink your user config if you want the\ngreeter to follow it.",
+      "properties": {
+        "background-color": {
+          "$ref": "#/$defs/HexColor",
+          "default": "#000000",
+          "description": "Background fill color (used when `background-mode: color`)."
+        },
+        "background-image": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Background image path (used when `background-mode: image`)."
+        },
+        "background-mode": {
+          "$ref": "#/$defs/LockBackground",
+          "default": "color",
+          "description": "How the background is drawn: solid color, an image, or the wallpaper."
+        },
+        "blur": {
+          "$ref": "#/$defs/LockBlur",
+          "default": 0,
+          "description": "Gaussian blur radius applied to image/wallpaper backgrounds (0 = none)."
+        },
+        "clock-format": {
+          "$ref": "#/$defs/string",
+          "default": "%H:%M",
+          "description": "`strftime` format for the time."
+        },
+        "date-format": {
+          "$ref": "#/$defs/string",
+          "default": "%A, %B %-d",
+          "description": "`strftime` format for the date."
+        },
+        "greeter": {
+          "$ref": "#/$defs/LoginGreeterConfig",
+          "default": {
+            "cursor-size": 24,
+            "cursor-theme": "",
+            "show-power-buttons": true,
+            "show-user-list": true
+          },
+          "description": "The greeter's own settings."
+        },
+        "lock": {
+          "$ref": "#/$defs/LoginLockConfig",
+          "default": {
+            "blank-timeout-ms": 0,
+            "enabled": true,
+            "grace-period-ms": 0,
+            "lock-on-start": false,
+            "pam-service": "system-auth"
+          },
+          "description": "The lock screen's own settings."
+        },
+        "max-attempts": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Maximum failed password attempts before further input is blocked\n(`0` = unlimited). A locked session stays locked regardless."
+        },
+        "show-clock": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show a clock above the credential prompt."
+        },
+        "show-failed-attempts": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the failed-attempt count."
+        }
+      },
+      "type": "object"
+    },
+    "LoginGreeterConfig": {
+      "description": "Greeter mode: the login screen before login, as the display manager.",
+      "properties": {
+        "cursor-size": {
+          "$ref": "#/$defs/uint32",
+          "default": 24,
+          "description": "Logical cursor size on the login screen. Scaled automatically per\ndisplay, so HiDPI outputs get a matching high-resolution cursor."
+        },
+        "cursor-theme": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Xcursor theme used on the login screen (empty = system default)."
+        },
+        "show-power-buttons": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the shutdown/reboot buttons at the bottom of the screen."
+        },
+        "show-user-list": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show clickable avatars for the machine's login users."
+        }
+      },
+      "type": "object"
+    },
+    "LoginLockConfig": {
+      "description": "Lock mode: the login screen locking the session via `ext-session-lock-v1`.\n\nWhen `enabled`, the session locks in response to the logind `Lock` signal\n(`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC\n`lock()` method. The lock surface grabs all input and survives client\ncrashes (the compositor shows a solid color), unlike a layer-shell overlay.",
+      "properties": {
+        "blank-timeout-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Black out the lock screen after this idle time (milliseconds, `0` =\nnever). This is a visual blank that hides the clock/prompt and dismisses\non any key; true display power-off (DPMS) is left to your idle daemon."
+        },
+        "enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Let lys-shell handle session locking. When off, lock requests are ignored\nand an external locker (e.g. hyprlock) stays responsible."
+        },
+        "grace-period-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Grace window after locking during which the screen unlocks without a\npassword (milliseconds, `0` = always require the password)."
+        },
+        "lock-on-start": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Lock the session as soon as the shell starts. For autologin setups\n(e.g. greetd with no password at boot) where the lock screen is the\naccess gate: the session comes up locked and requires the password\nbefore use. Off by default — a normal login has already authenticated."
+        },
+        "pam-service": {
+          "$ref": "#/$defs/string",
+          "default": "system-auth",
+          "description": "PAM service name used to authenticate the unlock. Distro-dependent:\n`system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry."
         }
       },
       "type": "object"
@@ -9814,22 +9811,6 @@
       },
       "description": "General lys-shell settings."
     },
-    "greeter": {
-      "$ref": "#/$defs/GreeterConfig",
-      "default": {
-        "background-color": "#000000",
-        "background-image": "",
-        "background-mode": "color",
-        "clock-format": "%H:%M",
-        "cursor-size": 24,
-        "cursor-theme": "",
-        "date-format": "%A, %B %-d",
-        "show-clock": true,
-        "show-power-buttons": true,
-        "show-user-list": true
-      },
-      "description": "Greeter (display manager) settings."
-    },
     "imports": {
       "default": [],
       "description": "YAML files to import and merge before this config.\n\nPaths are relative to the config file.\nImported values are overridden by values in this file.\n\n```yaml\nimports: [themes.yaml, modules/clock.yaml]\n```",
@@ -9928,25 +9909,33 @@
       },
       "description": "Application launcher (rofi replacement) settings."
     },
-    "lock": {
-      "$ref": "#/$defs/LockConfig",
+    "login": {
+      "$ref": "#/$defs/LoginConfig",
       "default": {
         "background-color": "#000000",
         "background-image": "",
         "background-mode": "color",
-        "blank-timeout-ms": 0,
         "blur": 0,
         "clock-format": "%H:%M",
         "date-format": "%A, %B %-d",
-        "enabled": true,
-        "grace-period-ms": 0,
-        "lock-on-start": false,
+        "greeter": {
+          "cursor-size": 24,
+          "cursor-theme": "",
+          "show-power-buttons": true,
+          "show-user-list": true
+        },
+        "lock": {
+          "blank-timeout-ms": 0,
+          "enabled": true,
+          "grace-period-ms": 0,
+          "lock-on-start": false,
+          "pam-service": "system-auth"
+        },
         "max-attempts": 0,
-        "pam-service": "system-auth",
         "show-clock": true,
         "show-failed-attempts": true
       },
-      "description": "Lock screen settings."
+      "description": "Login screen settings: the greeter and the lock screen."
     },
     "modules": {
       "$ref": "#/$defs/ModulesConfig",

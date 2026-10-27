@@ -32,14 +32,14 @@ func lockPage(*config.Config) pageSpec {
 		id: "lock", navKey: "settings-nav-lock-page", icon: "ld-lock-symbolic",
 		header: "settings-page-lock",
 		sections: []sectionSpec{
-			{title: "settings-section-general", rows: fields("lock.enabled")},
+			{title: "settings-section-general", rows: fields("login.lock.enabled", "login.lock.lock-on-start")},
 			{title: "settings-section-background", rows: []rowSpec{
-				field("lock.background-mode"), field("lock.background-image", filePath),
-				field("lock.background-color"), field("lock.blur"),
+				field("login.background-mode"), field("login.background-image", filePath),
+				field("login.background-color"), field("login.blur"),
 			}},
-			{title: "settings-section-clock", rows: fields("lock.show-clock", "lock.clock-format", "lock.date-format")},
-			{title: "settings-section-security", rows: fields("lock.grace-period-ms", "lock.max-attempts",
-				"lock.show-failed-attempts", "lock.blank-timeout-ms", "lock.pam-service")},
+			{title: "settings-section-clock", rows: fields("login.show-clock", "login.clock-format", "login.date-format")},
+			{title: "settings-section-security", rows: fields("login.lock.grace-period-ms", "login.max-attempts",
+				"login.show-failed-attempts", "login.lock.blank-timeout-ms", "login.lock.pam-service")},
 			{title: "settings-section-animation", rows: surfaceAnimationRows("animations.lock")},
 		},
 	}
@@ -51,12 +51,8 @@ func greeterPage(*config.Config) pageSpec {
 		id: "greeter", navKey: "settings-nav-greeter-page", icon: "ld-monitor-symbolic",
 		header: "settings-page-greeter",
 		sections: []sectionSpec{
-			{title: "settings-section-general", rows: fields("greeter.show-user-list", "greeter.show-power-buttons")},
-			{title: "settings-section-background", rows: []rowSpec{
-				field("greeter.background-mode"), field("greeter.background-image", filePath), field("greeter.background-color"),
-			}},
-			{title: "settings-section-clock", rows: fields("greeter.show-clock", "greeter.clock-format", "greeter.date-format")},
-			{title: "settings-section-cursor", rows: fields("greeter.cursor-theme", "greeter.cursor-size")},
+			{title: "settings-section-general", rows: fields("login.greeter.show-user-list", "login.greeter.show-power-buttons")},
+			{title: "settings-section-cursor", rows: fields("login.greeter.cursor-theme", "login.greeter.cursor-size")},
 		},
 		footer: greeterApplyFooter,
 	}
@@ -89,16 +85,18 @@ func greeterApplyFooter(k *kit) widget.Widget {
 	return box
 }
 
-// applyGreeter stages the greeter keys the login screen takes and
-// hands them to `pkexec lys-greeter apply-config` (dispatch).
+// applyGreeter stages the login keys the greeter takes and hands them
+// to `pkexec lys-greeter apply-config` (dispatch).
 func applyGreeter(s store) error {
-	greeter := make(map[string]any, len(config.GreeterApplyKeys))
+	login := make(map[string]any, len(config.GreeterApplyKeys))
 	for _, key := range config.GreeterApplyKeys {
-		if v := s.value("greeter." + key); v != nil {
-			greeter[key] = v
+		if v := s.value("login." + key); v != nil {
+			if err := config.InsertPath(login, key, v); err != nil {
+				return fmt.Errorf("stage login.%s: %w", key, err)
+			}
 		}
 	}
-	body, err := config.YAMLDocument(map[string]any{"greeter": greeter})
+	body, err := config.YAMLDocument(map[string]any{"login": login})
 	if err != nil {
 		return err
 	}

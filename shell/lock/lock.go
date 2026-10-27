@@ -101,7 +101,7 @@ type face struct {
 // Screen is the lock screen component. Every method runs on the event
 // loop; auth events and signals cross into it through Loop.Invoke.
 type Screen struct {
-	cfg       config.LockConfig
+	cfg       config.LoginConfig
 	anims     config.AnimationsConfig
 	wallpaper string
 	font      render.Font
@@ -143,7 +143,7 @@ type Screen struct {
 // The prompt shapes text with font; sheet (the shell's stylesheet)
 // styles the surfaces through the lock.css rules.
 func New(cfg *config.Config, font render.Font, sheet *widget.Stylesheet, d Deps) *Screen {
-	return &Screen{cfg: cfg.Lock, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, font: font, sheet: sheet, d: d}
+	return &Screen{cfg: cfg.Login, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, font: font, sheet: sheet, d: d}
 }
 
 // SetConfig applies a reloaded config, as the Rust lock reads its keys
@@ -152,7 +152,7 @@ func New(cfg *config.Config, font render.Font, sheet *widget.Stylesheet, d Deps)
 // and the next lock builds its surfaces and background from it. Loop
 // goroutine.
 func (s *Screen) SetConfig(cfg *config.Config) {
-	s.cfg, s.anims, s.wallpaper = cfg.Lock, cfg.Animations, cfg.Wallpaper.Wallpaper
+	s.cfg, s.anims, s.wallpaper = cfg.Login, cfg.Animations, cfg.Wallpaper.Wallpaper
 }
 
 // Locked reports whether a lock is pending or held.
@@ -162,7 +162,7 @@ func (s *Screen) Locked() bool { return s.d.Locker.Active() }
 // while locked). Refused, with a log line, when [lock] is disabled or
 // the compositor lacks ext-session-lock-v1.
 func (s *Screen) Lock() {
-	if !s.cfg.Enabled {
+	if !s.cfg.Lock.Enabled {
 		log.Printf("lock: disabled in config; ignoring lock request")
 		return
 	}
@@ -315,7 +315,7 @@ func (s *Screen) Submit(value string) {
 	if s.auth != nil {
 		return // a conversation runs and asked nothing: a stray submit
 	}
-	if grace := s.cfg.GracePeriodMS; grace > 0 && !s.lockedAt.IsZero() &&
+	if grace := s.cfg.Lock.GracePeriodMS; grace > 0 && !s.lockedAt.IsZero() &&
 		s.d.Now().Sub(s.lockedAt) < time.Duration(grace)*time.Millisecond {
 		log.Printf("lock: unlocked within grace window")
 		s.release()
@@ -332,7 +332,7 @@ func (s *Screen) startConversation(first string) {
 	s.pending = &first
 	s.authGen++
 	gen := s.authGen
-	s.auth = s.d.Auth(s.cfg.PamService, func(ev auth.Event) {
+	s.auth = s.d.Auth(s.cfg.Lock.PamService, func(ev auth.Event) {
 		s.d.Loop.Invoke(func() {
 			if gen == s.authGen {
 				s.onAuthEvent(ev)
@@ -457,7 +457,7 @@ func (s *Screen) armBlank() {
 		s.blankStop = nil
 	}
 	s.blankGen++
-	ms := s.cfg.BlankTimeoutMS
+	ms := s.cfg.Lock.BlankTimeoutMS
 	if ms == 0 || !s.d.Locker.Active() {
 		return
 	}

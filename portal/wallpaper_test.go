@@ -81,7 +81,7 @@ func TestWallpaperKeepsACopy(t *testing.T) {
 func TestWallpaperSetOn(t *testing.T) {
 	r, w, dir := wallpaperRig(t)
 	uri, kept := picture(t, dir, "lock picture")
-	lock := func() config.Background { return r.cfg.Config().Lock.Background }
+	lock := func() config.Background { return r.cfg.Config().Login.Background }
 	before := lock()
 	setOn := func(v string) Vardict { return Vardict{"set-on": dbus.MakeVariant(v)} }
 
@@ -101,14 +101,14 @@ func TestWallpaperSetOn(t *testing.T) {
 
 	r2, w2, dir2 := wallpaperRig(t)
 	uri2, kept2 := picture(t, dir2, "both picture")
-	if code := r2.setWallpaper(t, uri2, setOn("both")); code != ResponseSuccess || !slices.Equal(w2.set.Load(), []string{kept2, ""}) || r2.cfg.Config().Lock.Background.Image != kept2 {
-		t.Errorf("both = %d, desktop %v, lock %+v", code, w2.set.Load(), r2.cfg.Config().Lock.Background)
+	if code := r2.setWallpaper(t, uri2, setOn("both")); code != ResponseSuccess || !slices.Equal(w2.set.Load(), []string{kept2, ""}) || r2.cfg.Config().Login.Background.Image != kept2 {
+		t.Errorf("both = %d, desktop %v, lock %+v", code, w2.set.Load(), r2.cfg.Config().Login.Background)
 	}
 	r3, w3, dir3 := wallpaperRig(t)
-	lockBefore := r3.cfg.Config().Lock.Background
+	lockBefore := r3.cfg.Config().Login.Background
 	uri3, kept3 := picture(t, dir3, "desktop picture")
-	if code := r3.setWallpaper(t, uri3, Vardict{}); code != ResponseSuccess || !slices.Equal(w3.set.Load(), []string{kept3, ""}) || r3.cfg.Config().Lock.Background != lockBefore {
-		t.Errorf("no set-on = %d, desktop %v, lock %+v", code, w3.set.Load(), r3.cfg.Config().Lock.Background)
+	if code := r3.setWallpaper(t, uri3, Vardict{}); code != ResponseSuccess || !slices.Equal(w3.set.Load(), []string{kept3, ""}) || r3.cfg.Config().Login.Background != lockBefore {
+		t.Errorf("no set-on = %d, desktop %v, lock %+v", code, w3.set.Load(), r3.cfg.Config().Login.Background)
 	}
 }
 

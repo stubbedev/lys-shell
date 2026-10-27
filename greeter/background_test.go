@@ -38,8 +38,8 @@ func jpegPhoto(w, h int) *image.YCbCr {
 func imageRig(t *testing.T, src image.Image, outputs ...image.Point) *rig {
 	t.Helper()
 	return buildRig(t, func(i *Init) {
-		i.Config.Greeter.Background.Mode = config.BackgroundImage
-		i.Config.Greeter.Background.Image = "/srv/greeter.jpg"
+		i.Config.Login.Background.Mode = config.BackgroundImage
+		i.Config.Login.Background.Image = "/srv/greeter.jpg"
 	}, &rig{background: src, outputs: outputs})
 }
 

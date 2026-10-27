@@ -921,7 +921,7 @@ func TestShortPathFieldShowsWhole(t *testing.T) {
 // An empty path field shows its placeholder and has no tooltip.
 func TestEmptyPathFieldShowsItsPlaceholder(t *testing.T) {
 	k := testKit(t, "")
-	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
+	c := newFileEditor(k, pathSlot(k.store, "login.background-image"))
 	if want := i18n.Settings().Get("settings-file-path-placeholder"); c.entry.Placeholder() != want || c.entry.TooltipText() != "" {
 		t.Errorf("an empty field shows %q with tooltip %q, want %q and none", c.entry.Placeholder(), c.entry.TooltipText(), want)
 	}

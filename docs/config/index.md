@@ -22,9 +22,8 @@ Editor intellisense via JSON Schema. Install the [YAML extension](https://market
 | [`clipboard`](/config/clipboard) | Clipboard history settings. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
-| [`greeter`](/config/greeter) | Greeter (display manager): the pre-login screen `lys-greeter` renders as |
 | [`launcher`](/config/launcher) | Application launcher / dmenu (rofi replacement). |
-| [`lock`](/config/lock) | Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`. |
+| [`login`](/config/login) | Login screen: the greeter and the lock screen, one screen in two modes. |
 | [`mail-account`](/config/mail-account) | One mail account in the `modules.mail` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
 | [`portal`](/config/portal) | Desktop-portal policy for sandboxed apps. |

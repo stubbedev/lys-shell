@@ -42,10 +42,8 @@ type Config struct {
 	ModulesConfig `cfg:"modules"`
 	// On-screen display settings.
 	Osd OsdConfig `cfg:"osd"`
-	// Lock screen settings.
-	Lock LockConfig `cfg:"lock"`
-	// Greeter (display manager) settings.
-	Greeter GreeterConfig `cfg:"greeter"`
+	// Login screen settings: the greeter and the lock screen.
+	Login LoginConfig `cfg:"login"`
 	// Screen-share picker settings.
 	SharePicker SharePickerConfig `cfg:"share-picker"`
 	// Application launcher (rofi replacement) settings.
@@ -70,8 +68,7 @@ func Defaults() *Config {
 		Styling:       DefaultsStyling(),
 		ModulesConfig: DefaultsModules(),
 		Osd:           DefaultsOsd(),
-		Lock:          DefaultsLock(),
-		Greeter:       DefaultsGreeter(),
+		Login:         DefaultsLogin(),
 		SharePicker:   DefaultsSharePicker(),
 		Launcher:      DefaultsLauncher(),
 		Animations:    DefaultsAnimations(),
@@ -117,6 +114,7 @@ func LoadFile(path string) (*Config, error) {
 	if err != nil {
 		return Defaults(), err
 	}
+	tree = migrateLogin(tree)
 	cfg := Defaults()
 	var diags []error
 	apply := &layerApply{kind: configLayer, sink: func(d Diagnostic) { diags = append(diags, d) }}

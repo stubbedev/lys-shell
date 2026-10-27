@@ -2,9 +2,11 @@
 
 `lys-greeter` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
 display-manager login screen that can replace sddm/gdm for Wayland sessions. It
-shares the lys-shell theme (colors, fonts) and has its own `greeter` config
-section for appearance: background, clock, cursor, user list, and power
-buttons — editable under **Greeter → Login Screen** in `lys-settings`.
+is the same login screen as the lock screen, in its greeter mode: both read the
+`login` config section, so they share the theme, background, blur, clock and
+the failed-attempt handling; `login.greeter` holds what only the greeter has
+(user list, power buttons, cursor). It is editable under **Login & Lock Screen**
+and **Greeter** in `lys-settings`.
 
 Features:
 
@@ -27,22 +29,27 @@ Features:
 
 ## Configuration
 
-The greeter reads the `greeter` section of its config file (see below for
-where that file lives per setup):
+The greeter reads the `login` section of its config file (see below for where
+that file lives per setup); the full list is in the
+[config reference](/config/login):
 
 | Key | Default | What it does |
 | --- | --- | --- |
 | `background-mode` | `"color"` | `color`, `image`, or `wallpaper` (reuses `wallpaper.wallpaper`). |
 | `background-image` | `""` | Image path for `background-mode: image`. |
 | `background-color` | `"#000000"` | Fill color for `background-mode: color`. |
+| `blur` | `0` | Blur radius for image and wallpaper backgrounds. |
 | `show-clock` | `true` | Show the clock above the login form. |
 | `clock-format` / `date-format` | `"%H:%M"` / `"%A, %B %-d"` | strftime formats. |
-| `show-user-list` | `true` | Clickable avatars for login users. |
-| `show-power-buttons` | `true` | Shutdown/reboot buttons at the bottom. |
-| `cursor-theme` | `""` (auto) | Xcursor theme. Empty = auto-detect (see below). |
-| `cursor-size` | `24` (auto) | Logical cursor size; scaled per display, so HiDPI outputs get a sharp cursor (hotplug included). Unset = auto-detect. |
+| `greeter.show-user-list` | `true` | Clickable avatars for login users. |
+| `greeter.show-power-buttons` | `true` | Shutdown/reboot buttons at the bottom. |
+| `greeter.cursor-theme` | `""` (auto) | Xcursor theme. Empty = auto-detect (see below). |
+| `greeter.cursor-size` | `24` (auto) | Logical cursor size; scaled per display, so HiDPI outputs get a sharp cursor (hotplug included). Unset = auto-detect. |
 
-When `cursor-theme` / `cursor-size` are not set, the greeter auto-detects the
+The former `greeter` and `lock` sections still load: each key is moved to its
+place in `login` with a warning naming the new key.
+
+When `greeter.cursor-theme` / `greeter.cursor-size` are not set, the greeter auto-detects the
 cursor the last logged-in user actually sees. The primary source is a small file
 each running lys-shell shell writes at startup —
 `~/.local/state/lys-shell/greeter-cursor`, recording the session's live
@@ -65,17 +72,17 @@ home is readable by the greetd user (e.g. `chmod o+x` on `$HOME`); otherwise the
 > way (`environment.sessionVariables.XCURSOR_THEME` / `XCURSOR_SIZE`) and install
 > the theme system-wide (`environment.systemPackages`, so it lands in
 > `/run/current-system/sw/share/icons`, which is on the greeter's `XCURSOR_PATH`).
-> An explicit `greeter.settings.greeter.cursor-theme` still overrides. On other
+> An explicit `greeter.settings.login.greeter.cursor-theme` still overrides. On other
 > setups install the theme system-wide and pass `XCURSOR_THEME` / `XCURSOR_PATH`
 > in the greetd command.
 
-These options live under **Greeter → Login Screen** in `lys-settings`. The
+These options live under **Login & Lock Screen** and **Greeter** in `lys-settings`. The
 greeter reads the *system* config (`/etc/lys-shell/config.yaml` plus a
 `runtime.yaml` overlay beside it), not your user config. The **Apply to login
 screen** button on that page pushes the current greeter values to the system via
 `pkexec lys-greeter apply-config` (bundled polkit action
-`dev.stubbe.lys.greeter.apply-config`, admin auth), writing only greeter keys
-to `/etc/lys-shell/runtime.yaml` — so any user can set the login-screen background
+`dev.stubbe.lys.greeter.apply-config`, admin auth), writing only the login keys
+the greeter reads to `/etc/lys-shell/runtime.yaml` — so any user can set the login-screen background
 without hand-editing root-owned files, and a hand-written `config.yaml` is never
 clobbered.
 
@@ -97,12 +104,12 @@ Enable it through the system module:
 programs.lys-shell.greeter = {
   enable = true;
   # Theme it like your desktop (full lys-shell config schema; the greeter honours
-  # styling, greeter.* and wallpaper).
+  # styling, login.* and wallpaper).
   settings = {
     styling.appearance = "dark";
-    greeter.background-mode = "color";
-    greeter.background-color = "#1e1e2e";
-    greeter.cursor-size = 24;
+    login.background-mode = "color";
+    login.background-color = "#1e1e2e";
+    login.greeter.cursor-size = 24;
   };
 };
 ```

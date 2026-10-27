@@ -108,7 +108,7 @@ func Start(a *app.Application, outputs func() []*app.Output, cfg *config.Config,
 	}
 	// The autologin gate: lock once when the login session's shell
 	// first starts - never on a restart within the session.
-	if cfg.Lock.LockOnStart && claimLockOnStart(os.Getenv("XDG_RUNTIME_DIR")) {
+	if cfg.Login.Lock.LockOnStart && claimLockOnStart(os.Getenv("XDG_RUNTIME_DIR")) {
 		a.Invoke(s.Lock)
 	}
 	return s, func() {

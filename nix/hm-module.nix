@@ -17,11 +17,14 @@ let
   # the driver-free pixman/cairo path so it runs without nixGL at all.
   # cage's own cursor (shown until the greeter maps) follows XCURSOR_*; mirror
   # the greeter's cursor config so both cursors match.
+  # The former `greeter.*` cursor keys are read too, as the greeter still
+  # reads them.
+  greeterCursor = (cfg.greeter.settings.greeter or { }) // (cfg.greeter.settings.login.greeter or { });
   greeterCursorEnv =
-    "XCURSOR_SIZE=${toString (cfg.greeter.settings.greeter.cursor-size or 24)}"
+    "XCURSOR_SIZE=${toString (greeterCursor.cursor-size or 24)}"
     + lib.optionalString (
-      (cfg.greeter.settings.greeter.cursor-theme or "") != ""
-    ) " XCURSOR_THEME=${cfg.greeter.settings.greeter.cursor-theme}";
+      (greeterCursor.cursor-theme or "") != ""
+    ) " XCURSOR_THEME=${greeterCursor.cursor-theme}";
 
   greeterSession = pkgs.writeShellScriptBin "lys-greeter-session" ''
     exec env ${greeterCursorEnv} ${lib.optionalString (cfg.greeter.renderer == "software")
@@ -158,7 +161,7 @@ in
         default = "lys-shell";
         description = ''
           Name of the PAM service the unlock authenticates against. Must match
-          `lock.pam-service` in your lys-shell config. The config default is
+          `login.lock.pam-service` in your lys-shell config. The config default is
           `system-auth` (exists on Arch/Fedora); on other distros create
           {file}`/etc/pam.d/<this name>` and point the config at it.
         '';
@@ -200,8 +203,8 @@ in
         example = lib.literalExpression ''
           {
             styling.appearance = "dark";
-            lock.background-mode = "color";
-            lock.background-color = "#1e1e2e";
+            login.background-mode = "color";
+            login.background-color = "#1e1e2e";
           }
         '';
         description = ''
@@ -262,9 +265,9 @@ in
           session  optional   pam_gnome_keyring.so auto_start
         (pam_gnome_keyring.so is packaged as libpam-gnome-keyring on
         Debian/Ubuntu, bundled with gnome-keyring on Arch/Fedora.)
-        — and set `lock.pam-service = "${cfg.lock.pamService}"` in your lys-shell
+        — and set `login.lock.pam-service = "${cfg.lock.pamService}"` in your lys-shell
         config. On Arch/Fedora the config default `system-auth` already exists;
-        set lock.pam-service to that instead and skip this. On NixOS use the
+        set login.lock.pam-service to that instead and skip this. On NixOS use the
         system module's programs.lys-shell.lock, which provisions it for you.
       '';
 

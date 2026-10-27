@@ -244,15 +244,13 @@ const (
 	longPath     = longPathHead + "someone/Pictures/wallpapers/landscapes/mountains-at-dawn-ultrawide.png"
 )
 
-// pathPagesYAML sets every path row of the wallpaper and lock pages to
+// pathPagesYAML sets every path row of the wallpaper and login pages to
 // a long path.
 const pathPagesYAML = `
 wallpaper:
   wallpaper: ` + longPath + `
   cycling-directory: /home/someone/Pictures/wallpapers/a-very-long-directory-name
-lock:
-  background-image: ` + longPath + `
-greeter:
+login:
   background-image: ` + longPath + `
 `
 
@@ -260,7 +258,7 @@ greeter:
 const narrowWindowWidth = 760
 
 // pathPages are the pages holding a path row.
-var pathPages = []string{"wallpaper", "lock", "greeter"}
+var pathPages = []string{"wallpaper", "lock"}
 
 // desktop is the font a settings window lays out under: the face, and
 // the desktop font size that is its rem. The zero desktop is the test

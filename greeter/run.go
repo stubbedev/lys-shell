@@ -27,7 +27,7 @@ import (
 func Run(init Init) error {
 	// lys-ui draws the cursor client-side from the XCURSOR_* theme: set
 	// the resolved one before connecting.
-	ApplyCursor(ResolveCursor(init.Config.Greeter, DetectCursor(cursorHome(init.Users, init.LastUser), init.LastSession)))
+	ApplyCursor(ResolveCursor(init.Config.Login.Greeter, DetectCursor(cursorHome(init.Users, init.LastUser), init.LastSession)))
 
 	// The stylesheet's font families and weights resolve through the
 	// system store, as in the shell (the clock's 700 weight).

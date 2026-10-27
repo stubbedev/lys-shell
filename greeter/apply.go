@@ -12,19 +12,9 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// allowedKeys are the greeter keys lys-settings may push to the
-// system config.
-var allowedKeys = func() map[string]bool {
-	m := make(map[string]bool, len(config.GreeterApplyKeys))
-	for _, k := range config.GreeterApplyKeys {
-		m[k] = true
-	}
-	return m
-}()
-
 // RunApplyConfig is `lys-greeter apply-config [--config PATH]
 // <STAGED.yaml>`, run as root through pkexec by lys-settings: it
-// copies only the allowlisted greeter keys of the staged file into
+// copies only the allowlisted login keys of the staged file into
 // runtime.yaml beside the system config, never touching config.yaml.
 // It returns the exit code and writes its messages to stdout/stderr.
 func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
@@ -62,8 +52,8 @@ func applyFail(stderr io.Writer, msg string) int {
 	return 1
 }
 
-// applyConfig merges the staged greeter keys into runtime.yaml and
-// returns its path. readAsCaller performs the one privileged read a
+// applyConfig puts the staged login keys the greeter takes into
+// runtime.yaml and returns its path. readAsCaller performs the one privileged read a
 // user controls - the background image - with the caller's rights.
 func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, error)) ([]byte, error)) (string, error) {
 	text, err := os.ReadFile(staged) //nolint:gosec // the staged file lys-settings names
@@ -74,21 +64,25 @@ func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, er
 	if err != nil {
 		return "", fmt.Errorf("invalid YAML in %s: %w", staged, err)
 	}
-	// Accept a greeter table or the bare keys at top level.
-	source := table
-	if inner, ok := table["greeter"].(map[string]any); ok {
+	// Accept a login table or its keys at top level.
+	var source any = table
+	if inner, ok := table["login"].(map[string]any); ok {
 		source = inner
 	}
-	greeter := map[string]any{}
-	for k, v := range source {
-		if allowedKeys[k] {
-			greeter[k] = v
+	login := map[string]any{}
+	for _, key := range config.GreeterApplyKeys {
+		v, ok := config.PathValue(source, key)
+		if !ok {
+			continue
+		}
+		if err := config.InsertPath(login, key, v); err != nil {
+			return "", fmt.Errorf("staged %s: %w", key, err)
 		}
 	}
-	if len(greeter) == 0 {
-		return "", errors.New("no recognised greeter keys in staged file")
+	if len(login) == 0 {
+		return "", errors.New("no recognised login screen keys in staged file")
 	}
-	if err := relocateBackgroundImage(greeter, configPath, readAsCaller); err != nil {
+	if err := relocateBackgroundImage(login, configPath, readAsCaller); err != nil {
 		return "", err
 	}
 
@@ -99,7 +93,7 @@ func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, er
 			return "", fmt.Errorf("existing %s is invalid: %w", dest, err)
 		}
 	}
-	root["greeter"] = greeter
+	root["login"] = login
 	out, err := config.YAMLDocument(root)
 	if err != nil {
 		return "", fmt.Errorf("serialize %s: %w", dest, err)
@@ -119,11 +113,11 @@ func applyConfig(staged, configPath string, readAsCaller func(func() ([]byte, er
 // Other modes leave the key alone. The read runs with the pkexec
 // caller's rights, so a caller cannot point background-image at a
 // root-only file (/etc/shadow) and get a world-readable copy.
-func relocateBackgroundImage(greeter map[string]any, configPath string, readAsCaller func(func() ([]byte, error)) ([]byte, error)) error {
-	if mode, _ := greeter["background-mode"].(string); mode != "image" {
+func relocateBackgroundImage(login map[string]any, configPath string, readAsCaller func(func() ([]byte, error)) ([]byte, error)) error {
+	if mode, _ := login["background-mode"].(string); mode != "image" {
 		return nil
 	}
-	src, _ := greeter["background-image"].(string)
+	src, _ := login["background-image"].(string)
 	if src == "" {
 		return nil
 	}
@@ -140,7 +134,7 @@ func relocateBackgroundImage(greeter map[string]any, configPath string, readAsCa
 		return fmt.Errorf("cannot write %s: %w", dest, err)
 	}
 	_ = os.Chmod(dest, 0o644) //nolint:gosec // world-readable on purpose
-	greeter["background-image"] = dest
+	login["background-image"] = dest
 	return nil
 }
 

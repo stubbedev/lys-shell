@@ -99,7 +99,7 @@ func DetectCursor(home, session string) Cursor {
 // ResolveCursor applies install_cursor's order: an explicit [greeter]
 // key (config.yaml or runtime.yaml), the detected dotfiles, the
 // XCURSOR_* environment, then the size default. The theme may stay "".
-func ResolveCursor(g config.GreeterConfig, detected Cursor) Cursor {
+func ResolveCursor(g config.LoginGreeterConfig, detected Cursor) Cursor {
 	var configured Cursor
 	if g.CursorThemeExplicit {
 		configured.Theme = g.CursorTheme

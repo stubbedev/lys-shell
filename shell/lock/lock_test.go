@@ -109,12 +109,12 @@ type timer struct {
 	stopped bool
 }
 
-func newHarness(t *testing.T, edit func(*config.LockConfig)) *harness {
+func newHarness(t *testing.T, edit func(*config.LoginConfig)) *harness {
 	t.Helper()
 	face := treetest.Font(t)
 	cfg := config.Defaults()
 	if edit != nil {
-		edit(&cfg.Lock)
+		edit(&cfg.Login)
 	}
 	h := &harness{
 		locker: &fakeLocker{available: true, outputs: 2},
@@ -218,7 +218,7 @@ func TestLockCoversOutputsAndReportsTheHint(t *testing.T) {
 }
 
 func TestLockRefusals(t *testing.T) {
-	h := newHarness(t, func(l *config.LockConfig) { l.Enabled = false })
+	h := newHarness(t, func(l *config.LoginConfig) { l.Lock.Enabled = false })
 	h.s.Lock()
 	if h.locker.active {
 		t.Error("[lock] enabled = false still locked")
@@ -240,7 +240,7 @@ func TestLockRefusals(t *testing.T) {
 // TestUnlockWithPassword: the typed password answers PAM's first
 // prompt, success unlocks, and the hint goes false.
 func TestUnlockWithPassword(t *testing.T) {
-	h := newHarness(t, func(l *config.LockConfig) { l.PamService = "lys-shell" })
+	h := newHarness(t, func(l *config.LoginConfig) { l.Lock.PamService = "lys-shell" })
 	h.lock(t)
 	h.s.Submit("")
 	if len(h.convs) != 0 {
@@ -278,7 +278,7 @@ func TestUnlockWithPassword(t *testing.T) {
 
 // TestFailedAttempts pins the failure feedback and the attempt cap.
 func TestFailedAttempts(t *testing.T) {
-	h := newHarness(t, func(l *config.LockConfig) { l.MaxAttempts = 2 })
+	h := newHarness(t, func(l *config.LoginConfig) { l.MaxAttempts = 2 })
 	h.lock(t)
 	fail := func() {
 		t.Helper()
@@ -312,7 +312,7 @@ func TestFailedAttempts(t *testing.T) {
 		t.Error("the cap unlocked the screen; it must stay locked")
 	}
 
-	quiet := newHarness(t, func(l *config.LockConfig) { l.ShowFailedAttempts = false })
+	quiet := newHarness(t, func(l *config.LoginConfig) { l.ShowFailedAttempts = false })
 	quiet.lock(t)
 	quiet.s.Submit("wrong")
 	quiet.conv(t).onEvent(auth.Event{Kind: auth.EventFailure})
@@ -347,14 +347,14 @@ func TestRePrompt(t *testing.T) {
 }
 
 func TestGraceWindow(t *testing.T) {
-	h := newHarness(t, func(l *config.LockConfig) { l.GracePeriodMS = 5000 })
+	h := newHarness(t, func(l *config.LoginConfig) { l.Lock.GracePeriodMS = 5000 })
 	h.lock(t)
 	h.now = h.now.Add(4 * time.Second)
 	h.s.Submit("")
 	if h.locker.active || len(h.convs) != 0 {
 		t.Error("a submit within the grace window must unlock without PAM")
 	}
-	h = newHarness(t, func(l *config.LockConfig) { l.GracePeriodMS = 5000 })
+	h = newHarness(t, func(l *config.LoginConfig) { l.Lock.GracePeriodMS = 5000 })
 	h.lock(t)
 	h.now = h.now.Add(6 * time.Second)
 	h.s.Submit("pw")
@@ -364,7 +364,7 @@ func TestGraceWindow(t *testing.T) {
 }
 
 func TestBlankTimer(t *testing.T) {
-	h := newHarness(t, func(l *config.LockConfig) { l.BlankTimeoutMS = 30000 })
+	h := newHarness(t, func(l *config.LoginConfig) { l.Lock.BlankTimeoutMS = 30000 })
 	h.lock(t)
 	if len(h.timers) != 1 || h.timers[0].d != 30*time.Second {
 		t.Fatalf("blank timers = %+v", h.timers)
@@ -456,7 +456,7 @@ func TestDeniedLock(t *testing.T) {
 
 func TestBackgroundModes(t *testing.T) {
 	var loaded []string
-	h := newHarness(t, func(l *config.LockConfig) {
+	h := newHarness(t, func(l *config.LoginConfig) {
 		l.Background.Mode = config.BackgroundImage
 		l.Background.Image = "/srv/lock.png"
 		l.Blur = mustBlur(8)
@@ -482,7 +482,7 @@ func TestBackgroundModes(t *testing.T) {
 	}
 	h.lock(t)
 
-	h = newHarness(t, func(l *config.LockConfig) { l.Background.Mode = config.BackgroundImage; l.Background.Image = "/nope" })
+	h = newHarness(t, func(l *config.LoginConfig) { l.Background.Mode = config.BackgroundImage; l.Background.Image = "/nope" })
 	h.s.d.Decode = func(*memory.Shared, string) (imagedecode.Decoded, error) {
 		return imagedecode.Decoded{}, errors.New("no such file")
 	}
@@ -496,7 +496,7 @@ func TestBackgroundModes(t *testing.T) {
 // 192x108 output.
 func imageHarness(t *testing.T) *harness {
 	t.Helper()
-	h := newHarness(t, func(l *config.LockConfig) {
+	h := newHarness(t, func(l *config.LoginConfig) {
 		l.Background.Mode = config.BackgroundImage
 		l.Background.Image = "/srv/lock.png"
 		l.Blur = mustBlur(8)
@@ -639,14 +639,14 @@ func TestFailureTextIsLocalized(t *testing.T) {
 func TestSetConfigAppliesAReload(t *testing.T) {
 	h := newHarness(t, nil)
 	next := config.Defaults()
-	next.Lock.Enabled = false
+	next.Login.Lock.Enabled = false
 	h.s.SetConfig(next)
 	h.s.Lock()
 	if h.locker.active {
 		t.Fatal("a reload disabling [lock] still locked")
 	}
 	next = config.Defaults()
-	next.Lock.PamService = "lys-shell-reloaded"
+	next.Login.Lock.PamService = "lys-shell-reloaded"
 	h.s.SetConfig(next)
 	h.lock(t)
 	h.s.Submit("pw")

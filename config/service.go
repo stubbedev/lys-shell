@@ -155,6 +155,7 @@ func (s *Service) publish(cfg *Config, staged *table, tree any) {
 // a reload: config leaves they shadow get the "change ignored"
 // warning.
 func build(configTree, runtimeTree any, warn *table, sink DiagnosticSink) (*Config, *table, error) {
+	configTree, runtimeTree = migrateLogin(configTree), migrateLogin(runtimeTree)
 	cfg := Defaults()
 	ca := &layerApply{kind: configLayer, sink: sink}
 	if warn != nil {
@@ -216,7 +217,7 @@ func (s *Service) GetByPath(path string) (any, error) {
 // rejects is a *RuntimeValueError; an unknown path applies nothing.
 func (s *Service) SetByPath(path string, value any) error {
 	root := map[string]any{}
-	if err := insertPath(root, path, value); err != nil {
+	if err := InsertPath(root, path, value); err != nil {
 		return err
 	}
 	s.mu.Lock()

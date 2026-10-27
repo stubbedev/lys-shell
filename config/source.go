@@ -28,7 +28,7 @@ func configLeaves(tree any) *table {
 		return staged
 	}
 	ca := &layerApply{kind: configLayer, sink: DiscardDiagnostics, staged: staged}
-	_ = ca.applyContainer(valueOf(Defaults()), tree, "")
+	_ = ca.applyContainer(valueOf(Defaults()), migrateLogin(tree), "")
 	return staged
 }
 

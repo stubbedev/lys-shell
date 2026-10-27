@@ -118,7 +118,7 @@ type userButton struct {
 // greeter shares with the lock screen.
 func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *screen {
 	s := &screen{init: init, d: d}
-	g := init.Config.Greeter
+	g := init.Config.Login
 	th := widget.Current()
 	textPx := widgets.TextPx(styling.Body, 1)
 
@@ -149,7 +149,7 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 	users := widget.NewBox(widget.Row, th.Spacing, 0)
 	users.AddClass("lock-users")
 	users.SetHAlign(widget.AlignCenter)
-	if g.ShowUserList && len(init.Users) > 0 && len(init.Users) <= maxListedUsers {
+	if g.Greeter.ShowUserList && len(init.Users) > 0 && len(init.Users) <= maxListedUsers {
 		s.populateUsers(users, font)
 	} else {
 		users.SetVisible(false)
@@ -167,7 +167,7 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 		credential.Background(s.bg, credential.HexFill(g.Background.Color)),
 		s.prompt.Reveal,
 	}
-	if g.ShowPowerButtons {
+	if g.Greeter.ShowPowerButtons {
 		layers = append(layers, s.powerRow())
 	}
 	s.root = credential.Window(sheet, layers...)
@@ -191,7 +191,7 @@ func (s *screen) start() {
 // build_background), unblurred at the outputs' size: an unreadable
 // image falls back to the color, never a mystery black.
 func (s *screen) loadBackground() *credential.Backdrop {
-	path := s.init.Config.Greeter.Background.ImagePath(s.init.Config.Wallpaper.Wallpaper)
+	path := s.init.Config.Login.Background.ImagePath(s.init.Config.Wallpaper.Wallpaper)
 	if path == "" {
 		return nil
 	}
@@ -404,7 +404,7 @@ func (s *screen) rememberLogin() {
 
 func (s *screen) refreshClock() {
 	now := s.d.now()
-	g := s.init.Config.Greeter
+	g := s.init.Config.Login
 	s.prompt.Clock.SetText(g.ClockFormat.Layout().Format(now))
 	s.prompt.Date.SetText(g.DateFormat.Layout().Format(now))
 }

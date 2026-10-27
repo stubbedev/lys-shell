@@ -758,6 +758,34 @@ Features no app may use while set.
 | `disable-microphone` | Refuse microphone access. |
 | `disable-sound-output` | Refuse sound output. |
 
+## LoginGreeterConfig {#login-greeter-config}
+
+Greeter mode: the login screen before login, as the display manager.
+
+| Field | Description |
+|---|---|
+| `show-user-list` | Show clickable avatars for the machine's login users. |
+| `show-power-buttons` | Show the shutdown/reboot buttons at the bottom of the screen. |
+| `cursor-theme` | Xcursor theme used on the login screen (empty = system default). |
+| `cursor-size` | Logical cursor size on the login screen. Scaled automatically per |
+
+## LoginLockConfig {#login-lock-config}
+
+Lock mode: the login screen locking the session via `ext-session-lock-v1`.
+
+When `enabled`, the session locks in response to the logind `Lock` signal
+(`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC
+`lock()` method. The lock surface grabs all input and survives client
+crashes (the compositor shows a solid color), unlike a layer-shell overlay.
+
+| Field | Description |
+|---|---|
+| `enabled` | Let lys-shell handle session locking. When off, lock requests are ignored |
+| `lock-on-start` | Lock the session as soon as the shell starts. For autologin setups |
+| `grace-period-ms` | Grace window after locking during which the screen unlocks without a |
+| `blank-timeout-ms` | Black out the lock screen after this idle time (milliseconds, `0` = |
+| `pam-service` | PAM service name used to authenticate the unlock. Distro-dependent: |
+
 ## MailAccount {#mail-account}
 
 One mail account in the `modules.mail` per-account breakdown.

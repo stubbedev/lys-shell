@@ -229,7 +229,7 @@ func TestDetectCursorOrder(t *testing.T) {
 func TestResolveCursor(t *testing.T) {
 	t.Setenv("XCURSOR_THEME", "EnvTheme")
 	t.Setenv("XCURSOR_SIZE", "18")
-	g := config.DefaultsGreeter()
+	g := config.DefaultsLogin().Greeter
 	if got := ResolveCursor(g, Cursor{Theme: "Detected"}); got != (Cursor{"Detected", 18}) {
 		t.Errorf("defaults are not explicit: %+v", got)
 	}
@@ -240,7 +240,7 @@ func TestResolveCursor(t *testing.T) {
 	}
 	t.Setenv("XCURSOR_THEME", "")
 	t.Setenv("XCURSOR_SIZE", "")
-	if got := ResolveCursor(config.DefaultsGreeter(), Cursor{}); got != (Cursor{Size: 24}) {
+	if got := ResolveCursor(config.DefaultsLogin().Greeter, Cursor{}); got != (Cursor{Size: 24}) {
 		t.Errorf("nothing anywhere: %+v, want the 24px size default", got)
 	}
 }
@@ -289,7 +289,7 @@ func directRead(read func() ([]byte, error)) ([]byte, error) { return read() }
 func TestApplyConfigAllowlist(t *testing.T) {
 	dir := t.TempDir()
 	staged := filepath.Join(dir, "staged.yaml")
-	_ = os.WriteFile(staged, []byte("greeter:\n  background-color: \"#123456\"\n  evil: x\ngeneral:\n  foo: 1\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("login:\n  background-color: \"#123456\"\n  evil: x\n  greeter:\n    show-user-list: false\n  lock:\n    pam-service: evil\ngeneral:\n  foo: 1\n"), 0o600)
 	cfg := filepath.Join(dir, "config.yaml")
 	_ = os.WriteFile(filepath.Join(dir, "runtime.yaml"), []byte("styling:\n  theme: kept\n"), 0o600)
 	dest, err := applyConfig(staged, cfg, directRead)
@@ -297,8 +297,9 @@ func TestApplyConfigAllowlist(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := readRuntime(t, dest)
-	g := out["greeter"].(map[string]any)
-	if g["background-color"] != "#123456" || g["evil"] != nil || out["general"] != nil {
+	g := out["login"].(map[string]any)
+	if g["background-color"] != "#123456" || g["evil"] != nil || out["general"] != nil || g["lock"] != nil ||
+		g["greeter"].(map[string]any)["show-user-list"] != false {
 		t.Errorf("runtime.yaml = %v", out)
 	}
 	if out["styling"].(map[string]any)["theme"] != "kept" {
@@ -310,11 +311,11 @@ func TestApplyConfigAllowlist(t *testing.T) {
 
 	_ = os.WriteFile(staged, []byte("general:\n  foo: 1\n"), 0o600)
 	if _, err := applyConfig(staged, cfg, directRead); err == nil {
-		t.Error("a file without greeter keys applied")
+		t.Error("a file without login screen keys applied")
 	}
 	_ = os.WriteFile(staged, []byte("show-clock: false\n"), 0o600)
 	dest, err = applyConfig(staged, cfg, directRead)
-	if err != nil || readRuntime(t, dest)["greeter"].(map[string]any)["show-clock"] != false {
+	if err != nil || readRuntime(t, dest)["login"].(map[string]any)["show-clock"] != false {
 		t.Errorf("bare top-level keys: %v", err)
 	}
 	_ = os.WriteFile(staged, []byte("[greeter]\nshow-clock = false\n"), 0o600)
@@ -331,7 +332,7 @@ func TestApplyConfigCopiesImage(t *testing.T) {
 	src := filepath.Join(dir, "wall.png")
 	_ = os.WriteFile(src, []byte("PNGDATA"), 0o600)
 	staged := filepath.Join(dir, "staged.yaml")
-	_ = os.WriteFile(staged, []byte("greeter:\n  background-mode: image\n  background-image: \""+src+"\"\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("login:\n  background-mode: image\n  background-image: \""+src+"\"\n"), 0o600)
 	cfg := filepath.Join(dir, "config.yaml")
 	reads := 0
 	dest, err := applyConfig(staged, cfg, func(read func() ([]byte, error)) ([]byte, error) {
@@ -342,7 +343,7 @@ func TestApplyConfigCopiesImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := filepath.Join(dir, "greeter-background.png")
-	if got := readRuntime(t, dest)["greeter"].(map[string]any)["background-image"]; got != want {
+	if got := readRuntime(t, dest)["login"].(map[string]any)["background-image"]; got != want {
 		t.Errorf("background-image = %v, want %s", got, want)
 	}
 	if data, _ := os.ReadFile(want); string(data) != "PNGDATA" || reads != 1 {
@@ -352,17 +353,17 @@ func TestApplyConfigCopiesImage(t *testing.T) {
 		t.Errorf("copy mode = %v, want world-readable", fi.Mode().Perm())
 	}
 
-	_ = os.WriteFile(staged, []byte("greeter:\n  background-mode: color\n  background-image: /home/nobody/x.png\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("login:\n  background-mode: color\n  background-image: /home/nobody/x.png\n"), 0o600)
 	reads = 0
 	dest, err = applyConfig(staged, cfg, func(read func() ([]byte, error)) ([]byte, error) { reads++; return read() })
 	if err != nil || reads != 0 {
 		t.Fatalf("color mode: err %v, reads %d", err, reads)
 	}
-	if got := readRuntime(t, dest)["greeter"].(map[string]any)["background-image"]; got != "/home/nobody/x.png" {
+	if got := readRuntime(t, dest)["login"].(map[string]any)["background-image"]; got != "/home/nobody/x.png" {
 		t.Errorf("color mode rewrote the path: %v", got)
 	}
 
-	_ = os.WriteFile(staged, []byte("greeter:\n  background-mode: image\n  background-image: /root/secret\n"), 0o600)
+	_ = os.WriteFile(staged, []byte("login:\n  background-mode: image\n  background-image: /root/secret\n"), 0o600)
 	if _, err := applyConfig(staged, cfg, func(func() ([]byte, error)) ([]byte, error) {
 		return nil, os.ErrPermission
 	}); err == nil {

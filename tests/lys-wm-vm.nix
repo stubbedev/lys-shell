@@ -33,7 +33,7 @@ let
   };
 
   shellConfig = (pkgs.formats.yaml { }).generate "config.yaml" {
-    lock = {
+    login.lock = {
       enabled = true;
       pam-service = "lys-shell";
     };
