@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/binary"
 	"io"
 	"net"
@@ -9,6 +10,9 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/secrets/control"
+	"github.com/stubbedev/lys-shell/secrets/keyring"
 )
 
 // fakeKeyring serves one control-socket exchange: it captures the
@@ -89,5 +93,56 @@ func TestKeyringControlPath(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
 	if got := keyringControlPath(); got != "/run/user/1000/keyring/control" {
 		t.Errorf("runtime-dir path = %q", got)
+	}
+}
+
+type secretsUnlocker struct{ got chan string }
+
+func (u secretsUnlocker) UnlockLogin(pw []byte) error {
+	u.got <- string(pw)
+	if string(pw) != "pw" {
+		return keyring.ErrWrongPassword
+	}
+	return nil
+}
+
+// lys-secrets, when it runs, gets the password and gnome-keyring is not
+// asked; without it gnome-keyring is.
+func TestLoginKeyringPrefersLysSecrets(t *testing.T) {
+	secrets := filepath.Join(sockdir.Dir(t), "lys-secrets", "control")
+	ln, err := control.Listen(secrets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	u := secretsUnlocker{got: make(chan string, 2)}
+	go control.Serve(ctx, ln, u)
+	gnome, gnomeGot := fakeKeyring(t, 8, keyringResultOK)
+
+	if err := unlockLoginKeyring(secrets, gnome, "pw"); err != nil {
+		t.Fatalf("unlock through lys-secrets: %v", err)
+	}
+	if got := <-u.got; got != "pw" {
+		t.Errorf("lys-secrets got %q", got)
+	}
+	if err := unlockLoginKeyring(secrets, gnome, "other"); err == nil || !strings.Contains(err.Error(), "lys-secrets") {
+		t.Errorf("a wrong password = %v, want lys-secrets' refusal", err)
+	}
+	select {
+	case msg := <-gnomeGot:
+		t.Errorf("gnome-keyring was asked while lys-secrets runs: %v", msg)
+	default:
+	}
+
+	absent := filepath.Join(sockdir.Dir(t), "absent")
+	if err := unlockLoginKeyring(absent, gnome, "pw"); err != nil {
+		t.Fatalf("fall back to gnome-keyring: %v", err)
+	}
+	if msg := <-gnomeGot; !strings.HasSuffix(string(msg), "pw") {
+		t.Errorf("gnome-keyring got %q", msg)
+	}
+	if err := unlockLoginKeyring(absent, filepath.Join(sockdir.Dir(t), "absent2"), "pw"); err == nil || !strings.Contains(err.Error(), "lys-secrets is not running") {
+		t.Errorf("neither running = %v", err)
 	}
 }

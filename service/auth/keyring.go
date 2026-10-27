@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-shell/secrets/control"
 )
 
 // keyringTimeout bounds the control-socket exchange: a locker must
@@ -28,16 +29,38 @@ const (
 	keyringHeaderSize = 8
 )
 
-// UnlockLoginKeyring hands the just-verified password to the running
-// gnome-keyring daemon, so the login collection unlocks here. Under
-// greetd autologin no password is typed at boot and the daemon starts
-// locked: the lock screen is the first place the password appears.
-// Best effort — failures are logged, never blocking or denying the
-// unlock the user already earned.
+// UnlockLoginKeyring hands the just-verified password to the keyring
+// serving this session, so its login collection unlocks here: lys-secrets
+// through its control socket when it runs, else a running gnome-keyring
+// daemon. Under greetd autologin no password is typed at boot and the
+// keyring starts locked: the lock screen is the first place the password
+// appears. Best effort — failures are logged, never blocking or denying
+// the unlock the user already earned.
 func UnlockLoginKeyring(password string) {
-	if err := keyringUnlock(keyringControlPath(), password); err != nil {
-		log.Printf("keyring: could not unlock login keyring: %v", err)
+	secrets, err := control.SocketPath()
+	if err != nil {
+		log.Printf("keyring: could not unlock the login keyring: %v", err)
+		return
 	}
+	if err := unlockLoginKeyring(secrets, keyringControlPath(), password); err != nil {
+		log.Printf("keyring: could not unlock the login keyring: %v", err)
+	}
+}
+
+// unlockLoginKeyring tries lys-secrets at secretsSock, then gnome-keyring
+// at gnomeSock when lys-secrets is not running.
+func unlockLoginKeyring(secretsSock, gnomeSock, password string) error {
+	err := control.Unlock(secretsSock, []byte(password))
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, control.ErrNotRunning) {
+		return fmt.Errorf("lys-secrets: %w", err)
+	}
+	if err := keyringUnlock(gnomeSock, password); err != nil {
+		return fmt.Errorf("lys-secrets is not running, and gnome-keyring: %w", err)
+	}
+	return nil
 }
 
 // keyringControlPath is the daemon's control socket:

@@ -10,7 +10,9 @@
 # portal's answers - screenshot, colour pick, a global shortcut bound
 # and activated through the compositor - the night light applied
 # from the bar through hyprland-ctm-control, the session lock taking the outputs and releasing them
-# on a typed password, the lock surviving a shell restart) and leaves a
+# on a typed password, the lock surviving a shell restart, lys-secrets'
+# login collection unlocked by that password and, after a restart,
+# through the shell's own password dialog) and leaves a
 # screenshot of every state in the result for review.
 #
 # Build: nix build .#checks.<system>.lys-shell-hyprland-vm -L
@@ -102,6 +104,7 @@ pkgs.testers.nixosTest {
       programs.lys-shell = {
         enable = true;
         lock.enable = true;
+        secrets.enable = true;
       };
 
       virtualisation.graphics = true;
@@ -173,6 +176,7 @@ pkgs.testers.nixosTest {
         pkgs.foot
         pkgs.libnotify
         pkgs.dbus
+        pkgs.libsecret
       ];
     };
 
@@ -440,6 +444,34 @@ pkgs.testers.nixosTest {
     machine.send_chars("${password}\n")
     wait("the unlock", lambda: logged("shell", "lock: session unlocked"))
     machine.screenshot("08-unlocked")
+
+    # lys-secrets serves the Secret Service from the session start, and
+    # the password the lock screen verified created and unlocked its login
+    # collection: a store and lookup need no prompt.
+    def secret_tool(args, stdin=""):
+        return machine.execute(f"su - ${user} -c 'printf %s {stdin} | env {env} timeout 20 secret-tool {args}'")
+
+    wait("lys-secrets running", lambda: machine.execute(f"su - ${user} -c '{env} systemctl --user is-active lys-secrets'")[0] == 0)
+    status, _ = secret_tool("store --label=vm vm-test 1", "vm-secret")
+    if status != 0:
+        raise Exception("secret-tool store failed after the lock screen unlock")
+    if secret_tool("lookup vm-test 1")[1] != "vm-secret":
+        raise Exception("secret-tool lookup did not return the stored secret")
+    if machine.execute("ls /home/${user}/.local/share/lys-secrets/login.keyring")[0] != 0:
+        raise Exception("no login collection on disk")
+    if machine.execute("grep -c vm-secret /home/${user}/.local/share/lys-secrets/login.keyring")[0] == 0:
+        raise Exception("the secret is stored in the clear")
+
+    # Restarted, lys-secrets starts locked; a lookup asks through the
+    # shell's password dialog, where the session password unlocks it.
+    machine.succeed(f"su - ${user} -c '{env} systemctl --user restart lys-secrets'")
+    wait("lys-secrets restarted", lambda: machine.execute(f"su - ${user} -c '{env} systemctl --user is-active lys-secrets'")[0] == 0)
+    machine.succeed(f"su - ${user} -c '{env} timeout 60 secret-tool lookup vm-test 1 > /tmp/lys/lookup.txt 2>&1 &'")
+    wait("the keyring password dialog", lambda: "lys-shell-portal-dialog" in namespaces())
+    time.sleep(1)
+    machine.screenshot("08b-keyring-unlock-dialog")
+    machine.send_chars("${password}\n")
+    wait("the lookup through the dialog", lambda: machine.execute("cat /tmp/lys/lookup.txt")[1] == "vm-secret", tries=30)
 
     # A shell that dies while locked leaves the compositor locked
     # (allow_session_lock_restore) and logind's LockedHint set; the

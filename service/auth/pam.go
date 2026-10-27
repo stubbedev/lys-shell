@@ -61,7 +61,7 @@ type PAM struct {
 	// Service is the PAM service name (/etc/pam.d/<service>).
 	Service string
 	lib     pamLib
-	// unlockKeyring hands the verified password to gnome-keyring;
+	// unlockKeyring hands the verified password to the session keyring;
 	// a field so tests observe it without a daemon.
 	unlockKeyring func(password string)
 }
@@ -75,8 +75,8 @@ func NewPAM(service string) *PAM {
 // session user when empty), authenticates, then checks the account
 // (pam_authenticate + pam_acct_mgmt), and always ends with pam_end
 // carrying the last call's status, as nonstick's transaction does; it
-// sets no credentials, an unlock needs none. On success the last secret answered unlocks the gnome-keyring login
-// collection, best effort.
+// sets no credentials, an unlock needs none. On success the last secret answered unlocks the session keyring's
+// login collection (lys-secrets, else gnome-keyring), best effort.
 func (p *PAM) Run(username string, ask Ask) error {
 	if username == "" {
 		username = CurrentUsername()
