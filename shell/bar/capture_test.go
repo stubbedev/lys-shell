@@ -8,6 +8,7 @@ import (
 	"image/draw"
 	"image/png"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -44,34 +45,24 @@ func runLoop(t *testing.T, application *app.Application) func(func()) {
 	}
 }
 
-type selectionRead struct {
-	data []byte
-	err  error
-}
-
-func watchClipboardPNG(t *testing.T) <-chan selectionRead {
+// pastePNG reads the regular selection as image/png through wl-paste, a
+// data-control client in a process of its own, as cliphist and
+// wl-clip-persist are.
+func pastePNG(t *testing.T) []byte {
 	t.Helper()
-	sess, err := app.Connect()
-	if err != nil {
-		t.Fatal(err)
+	if _, err := exec.LookPath("wl-paste"); err != nil {
+		t.Skip("wl-paste is not installed (the nix dev shell carries it)")
 	}
-	t.Cleanup(sess.Close)
-	reader := app.NewApplication(sess)
-	dc, err := reader.DataControl()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "wl-paste", "--no-newline", "--type", transfer.MimePNG)
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("the data-control reader: %v", err)
+		t.Fatalf("wl-paste: %v: %s", err, stderr.Bytes())
 	}
-	reads := make(chan selectionRead, 8)
-	dc.OnSelection(func(sel app.Selection, offer *app.SelectionOffer) {
-		if sel != app.SelectionClipboard || offer == nil || !offer.Has(transfer.MimePNG) {
-			return
-		}
-		if err := offer.Read(transfer.MimePNG, 1<<30, func(data []byte, err error) { reads <- selectionRead{data, err} }); err != nil {
-			reads <- selectionRead{err: err}
-		}
-	})
-	runLoop(t, reader)
-	return reads
+	return out
 }
 
 func decodePNG(t *testing.T, data []byte) *image.RGBA {
@@ -125,37 +116,12 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 		t.Fatal("wl_data_device claimed the selection with no input event behind it")
 	}
 
-	reads := watchClipboardPNG(t)
 	ctxCall, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	path, err := screenshot.NewClient(bus.Conn(t)).Capture(ctxCall, portalreq.Caller{}, screenshot.ModeOutput, outputs[0].Name)
 	if err != nil {
 		t.Fatalf("Capture over D-Bus: %v", err)
 	}
-	saved, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := decodePNG(t, saved)
-
-	for i := range 3 {
-		if i > 0 {
-			reads = watchClipboardPNG(t)
-		}
-		select {
-		case r := <-reads:
-			if r.err != nil {
-				t.Fatalf("reader %d reading the selection: %v", i, r.err)
-			}
-			got := decodePNG(t, r.data)
-			if got.Bounds() != want.Bounds() || !bytes.Equal(got.Pix, want.Pix) {
-				t.Fatalf("reader %d got a %v image unlike the saved %v capture", i, got.Bounds(), want.Bounds())
-			}
-		case <-time.After(10 * time.Second):
-			t.Fatalf("no image/png selection reached data-control reader %d", i)
-		}
-	}
-
 	select {
 	case n := <-notices:
 		if n.Body != path {
@@ -164,6 +130,18 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 	case <-time.After(5 * time.Second):
 		t.Fatal("no notification")
 	}
+	saved, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := decodePNG(t, saved)
+	for i := range 3 {
+		got := decodePNG(t, pastePNG(t))
+		if got.Bounds() != want.Bounds() || !bytes.Equal(got.Pix, want.Pix) {
+			t.Fatalf("reader %d got a %v image unlike the saved %v capture", i, got.Bounds(), want.Bounds())
+		}
+	}
+
 	snap := clip.Entries()
 	defer snap.Release()
 	if entries := snap.Entries(); len(entries) != 1 || entries[0].Mime != transfer.MimePNG {

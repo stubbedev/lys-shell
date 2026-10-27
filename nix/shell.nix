@@ -42,6 +42,9 @@
           systemd
           # ffprobe, which the recorder tests read their files back with.
           ffmpeg-headless
+          # wl-paste, the out-of-process data-control reader the screenshot
+          # clipboard tests read the selection back with.
+          wl-clipboard
 
           inter # config default font-sans
           jetbrains-mono # config default font-mono
