@@ -10,9 +10,136 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
-type fakeLayer struct{ closed bool }
+// fakeLayer is a bar layer whose Rebuild succeeds when inPlace is set
+// and whose first frame is drawn when the test calls show.
+type fakeLayer struct {
+	closed, inPlace bool
+	rebuilt         []config.BarLayout
+	onShown         []func()
+}
 
 func (f *fakeLayer) Close() { f.closed = true }
+
+func (f *fakeLayer) Rebuild(layout config.BarLayout) bool {
+	if f.inPlace {
+		f.rebuilt = append(f.rebuilt, layout)
+	}
+	return f.inPlace
+}
+
+func (f *fakeLayer) OnShown(fn func()) { f.onShown = append(f.onShown, fn) }
+
+func (f *fakeLayer) show() {
+	for _, fn := range f.onShown {
+		fn()
+	}
+	f.onShown = nil
+}
+
+// fakeOpener opens fakeLayers for newBarSet, in place when inPlace is
+// set, failing while fail is; layers lists them in opening order.
+type fakeOpener struct {
+	inPlace, fail bool
+	layers        []*fakeLayer
+}
+
+func (o *fakeOpener) open(*app.Output, config.BarLayout) (barLayer, error) {
+	if o.fail {
+		return nil, errors.New("no surface")
+	}
+	l := &fakeLayer{inPlace: o.inPlace}
+	o.layers = append(o.layers, l)
+	return l, nil
+}
+
+// mapped counts the layers of o not closed.
+func (o *fakeOpener) mapped() int {
+	n := 0
+	for _, l := range o.layers {
+		if !l.closed {
+			n++
+		}
+	}
+	return n
+}
+
+var clockLayout = config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}}}
+
+// showClock gives every output the clock layout.
+func showClock(string) (config.BarLayout, bool) { return clockLayout, true }
+
+// A reload that the open bar can take keeps its layer: nothing closes
+// or opens, and the layer is rebuilt with the new layout.
+func TestBarSetReloadRebuildsInPlace(t *testing.T) {
+	o := &fakeOpener{inPlace: true}
+	set := newBarSet(o.open)
+	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	set.reload(showClock)
+	if len(o.layers) != 1 || o.layers[0].closed {
+		t.Fatalf("an in-place reload opened %d layers, first closed %v", len(o.layers), o.layers[0].closed)
+	}
+	if got := o.layers[0].rebuilt; len(got) != 1 || !slices.EqualFunc(got[0].Left, clockLayout.Left, func(a, b config.BarItem) bool { return a.Module == b.Module }) {
+		t.Fatalf("rebuilt with %+v, want the clock layout", got)
+	}
+}
+
+// A reload that needs a new surface opens it first and closes the old
+// one only once the new one drew: the output never has no bar.
+func TestBarSetReloadReplacesMakeBeforeBreak(t *testing.T) {
+	o := &fakeOpener{}
+	set := newBarSet(o.open)
+	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	set.reload(showClock)
+	if len(o.layers) != 2 {
+		t.Fatalf("a replacing reload opened %d layers, want 2", len(o.layers))
+	}
+	old, next := o.layers[0], o.layers[1]
+	if old.closed {
+		t.Fatal("the old bar closed before its replacement drew")
+	}
+	if set.bars["DP-1"].layer != next {
+		t.Fatal("the set does not hold the replacement")
+	}
+	next.show()
+	if !old.closed || next.closed || o.mapped() != 1 {
+		t.Fatalf("after the replacement drew: old closed %v, new closed %v, mapped %d", old.closed, next.closed, o.mapped())
+	}
+}
+
+// A replacement that cannot open leaves the output without a bar, and
+// the next apply retries it.
+func TestBarSetReloadFailedReplacementRetries(t *testing.T) {
+	o := &fakeOpener{}
+	set := newBarSet(o.open)
+	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	o.fail = true
+	set.reload(showClock)
+	if !o.layers[0].closed || set.bars["DP-1"].layer != nil {
+		t.Fatalf("failed replacement: old closed %v, layer %v", o.layers[0].closed, set.bars["DP-1"].layer)
+	}
+	o.fail = false
+	set.apply(nil)
+	if len(o.layers) != 2 || o.mapped() != 1 {
+		t.Fatalf("retry: opened %d, mapped %d", len(o.layers), o.mapped())
+	}
+}
+
+// A hidden bar or one the new layout drops is neither rebuilt nor
+// replaced.
+func TestBarSetReloadLeavesHiddenAndDroppedBars(t *testing.T) {
+	o := &fakeOpener{inPlace: true}
+	set := newBarSet(o.open)
+	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
+	set.plug(&app.Output{Name: "DP-2"}, config.BarLayout{}, true)
+	set.apply(map[string]bool{"DP-2": true})
+	set.reload(func(name string) (config.BarLayout, bool) { return clockLayout, name != "DP-1" })
+	if !o.layers[0].closed || len(o.layers[0].rebuilt) != 0 {
+		t.Fatalf("the dropped DP-1 bar: closed %v, rebuilt %d", o.layers[0].closed, len(o.layers[0].rebuilt))
+	}
+	if len(o.layers) != 2 || set.bars["DP-2"].layer != nil {
+		t.Fatalf("the hidden DP-2 bar reopened: layers %d", len(o.layers))
+	}
+}
 
 func TestBarSetClosesHiddenAndReopensShown(t *testing.T) {
 	opened := map[string]int{}

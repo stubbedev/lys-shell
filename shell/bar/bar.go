@@ -324,36 +324,14 @@ func run(cfg *config.Config, svc *config.Service) error {
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
-	// openBar shows one output's bar; `lys-shell panel show` and a
-	// reload reopen bars through it.
-	openBar := func(output *app.Output, layout config.BarLayout) (barLayer, error) {
-		ctx := rt.ctx
-		ctx.Connector = output.Name
-		ctx.Attachers = &[]interface{ Attach(app.Host) }{}
-		// Each bar is its own generation: closing it (panel hide, a
-		// reload) ends its modules.
-		ctx.gen = newMountGen()
-		window, err := application.NewBar(barConfigFor(ctx, layout, output))
-		if err != nil {
-			ctx.gen.retire()
-			return nil, err
-		}
-		for _, a := range *ctx.Attachers {
-			a.Attach(window)
-		}
-		rt.ctx.Dropdowns.attachHost(output.Name, window, logicalSize(output).H)
-		if holder != nil {
-			holder.add(window)
-		}
-		return barWindow{window, ctx.gen, holder}, nil
-	}
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
 	if notifSvc != nil {
 		popupHost = popups.New(application, notifSvc, cfg, font, theme.Sheet, sess.Outputs)
 		go popupHost.Run()
 	}
-	bars := newBarSet(openBar)
+	host := &barHost{app: application, rt: rt, holder: holder}
+	bars := newBarSet(host.open)
 	// plugOutput gives a named output its bar; startup
 	// outputs and hotplugged ones (once their connector name is known)
 	// take the same path, the Rust SyncMonitors. A bar that cannot open
@@ -412,35 +390,34 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if svc != nil {
 		// A reload recompiles the stylesheet for the new snapshot,
 		// rebuilds the bars, and hands the OSD and popups their new
-		// sections.
-		cancel := svc.Subscribe(func(old, next *config.Config) {
-			application.Invoke(func() {
-				current.Store(next)
-				apptheme.ReportMissingIcons(next, config.StderrDiagnostics)
-				theme.SetConfig(next)
-				if barsAffected(old, next) {
-					restyle(next)
-				} else {
-					// The open bars stay; dropdowns opened from now on
-					// read the new snapshot.
-					rt.ctx.Config = next
-					rt.ctx.Dropdowns.setConfig(next)
-				}
-				osdSrv.SetConfig(next)
-				applyNotificationConfig(notifSvc, next.Notification)
-				weatherSvc.Configure(weatherSettings(next.Weather))
-				if wall != nil {
-					wall.SetConfig(next)
-				}
-				if popupHost != nil {
-					popupHost.SetConfig(next)
-				}
-				if lockScreen != nil {
-					lockScreen.SetConfig(next)
-				}
-			})
+		// sections. Snapshots published faster than the loop applies
+		// them apply once, as the latest.
+		reloads := newReloadQueue(application.Invoke, func(old, next *config.Config) {
+			current.Store(next)
+			apptheme.ReportMissingIcons(next, config.StderrDiagnostics)
+			theme.SetConfig(next)
+			if barsAffected(old, next) {
+				restyle(next)
+			} else {
+				// The open bars stay; dropdowns opened from now on
+				// read the new snapshot.
+				rt.ctx.Config = next
+				rt.ctx.Dropdowns.setConfig(next)
+			}
+			osdSrv.SetConfig(next)
+			applyNotificationConfig(notifSvc, next.Notification)
+			weatherSvc.Configure(weatherSettings(next.Weather))
+			if wall != nil {
+				wall.SetConfig(next)
+			}
+			if popupHost != nil {
+				popupHost.SetConfig(next)
+			}
+			if lockScreen != nil {
+				lockScreen.SetConfig(next)
+			}
 		})
-		defer cancel()
+		defer svc.Subscribe(reloads.push)()
 		// A secrets reload re-resolves the weather API keys
 		// (spawn_secrets_reload_watcher).
 		defer svc.SubscribeSecrets(func() { weatherSvc.Configure(weatherSettings(current.Load().Weather)) })()
@@ -556,17 +533,31 @@ func barConfigFor(ctx ModuleContext, layout config.BarLayout, output *app.Output
 // border, background and padding the bar chrome; each zone spaces its
 // items by the module gap.
 func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) *widget.Bar {
-	cfg := ctx.Config
-	bar := widget.NewBar(barEdge(cfg.Bar.Location))
-	bar.AddClass(rootClasses(connector, cfg)...)
-	bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
+	bar := widget.NewBar(barEdge(ctx.Config.Bar.Location))
+	if connector != "" {
+		bar.AddClass(connector)
+	}
 	if ctx.Theme != nil {
 		ctx.Theme.Attach(bar)
 	}
-	appendItems(bar.Start(), layout.Left, ctx)
-	appendItems(bar.Center(), layout.Center, ctx)
-	appendItems(bar.End(), layout.Right, ctx)
+	fillBar(bar, ctx, layout)
 	return bar
+}
+
+// fillBar gives bar the config-derived parts of buildRoot: its
+// floating class, the --bar-* variables, and the zones' modules, which
+// replace the ones it held. The edge is the window's to move.
+func fillBar(bar *widget.Bar, ctx ModuleContext, layout config.BarLayout) {
+	cfg := ctx.Config
+	bar.SetClass("floating", floating(cfg))
+	bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
+	for _, z := range []struct {
+		box   *widget.Box
+		items []config.BarItem
+	}{{bar.Start(), layout.Left}, {bar.Center(), layout.Center}, {bar.End(), layout.Right}} {
+		z.box.Clear()
+		appendItems(z.box, z.items, ctx)
+	}
 }
 
 // barEdge is the lys-ui edge a bar at location runs along.
@@ -653,17 +644,116 @@ func barLayoutFor(cfg *config.Config, connector string) (config.BarLayout, bool)
 	return layout, ok && layout.Show
 }
 
-// barWindow is an open bar: closing it closes the layer and ends the
-// generation its modules run in.
-type barWindow struct {
-	layer  *app.BarWindow
-	gen    *mountGen
+// shownPoll is how often a replacement bar is checked for its first
+// configure, after which the loop draws its first frame.
+const shownPoll = 10 * time.Millisecond
+
+// barHost opens the bars of the shell's mount generation; `lys-shell
+// panel show` and a reload open bars through it.
+type barHost struct {
+	app    *app.Application
+	rt     *barRuntime
 	holder *idleHolder
 }
 
-func (w barWindow) Close() {
-	if w.holder != nil {
-		w.holder.remove(w.layer)
+// context is the module context of output's bar: each bar is its own
+// generation, so closing or rebuilding it (panel hide, a reload) ends
+// its modules.
+func (h *barHost) context(output *app.Output) ModuleContext {
+	ctx := h.rt.ctx
+	ctx.Connector = output.Name
+	ctx.Attachers = &[]interface{ Attach(app.Host) }{}
+	ctx.gen = newMountGen()
+	return ctx
+}
+
+// open shows one output's bar.
+func (h *barHost) open(output *app.Output, layout config.BarLayout) (barLayer, error) {
+	ctx := h.context(output)
+	bc := barConfigFor(ctx, layout, output)
+	window, err := h.app.NewBar(bc)
+	if err != nil {
+		ctx.gen.retire()
+		return nil, err
+	}
+	w := &barWindow{host: h, output: output, layer: window, bar: bc.Bar, gen: ctx.gen, layerKind: bc.Layer, exclusive: bc.Exclusive}
+	w.attach(ctx)
+	if h.holder != nil {
+		h.holder.add(window)
+	}
+	return w, nil
+}
+
+// barWindow is an open bar: closing it closes the layer and ends the
+// generation its modules run in.
+type barWindow struct {
+	host      *barHost
+	output    *app.Output
+	layer     *app.BarWindow
+	bar       *widget.Bar
+	gen       *mountGen
+	layerKind app.Layer
+	exclusive bool
+}
+
+// attach hands the window to what ctx's modules and the dropdowns
+// need it for.
+func (w *barWindow) attach(ctx ModuleContext) {
+	for _, a := range *ctx.Attachers {
+		a.Attach(w.layer)
+	}
+	w.host.rt.ctx.Dropdowns.attachHost(w.output.Name, w.layer, logicalSize(w.output).H)
+}
+
+// Rebuild refills the bar from the current mount generation on its own
+// surface: its modules restart, the stack layer and the edge move in
+// place, and the surface refits to the new content on the next frame.
+// lys-ui's BarWindow fixes whether it is exclusive at creation, so
+// that change needs a new surface.
+func (w *barWindow) Rebuild(layout config.BarLayout) bool {
+	cfg := w.host.rt.ctx.Config
+	if cfg.Bar.Exclusive != w.exclusive {
+		return false
+	}
+	ctx := w.host.context(w.output)
+	if kind := layering.For(cfg.General, cfg.Bar.Layer); kind != w.layerKind {
+		if err := w.layer.SetLayer(kind); err != nil {
+			log.Printf("bar %s: move to layer %v: %v; replacing the surface", w.output.Name, kind, err)
+			ctx.gen.retire()
+			return false
+		}
+		w.layerKind = kind
+	}
+	if edge := barEdge(cfg.Bar.Location); edge != w.bar.Edge() {
+		if err := w.layer.SetEdge(edge); err != nil {
+			log.Printf("bar %s: move to %s: %v; replacing the surface", w.output.Name, cfg.Bar.Location, err)
+			ctx.gen.retire()
+			return false
+		}
+	}
+	w.gen.retire()
+	w.gen = ctx.gen
+	fillBar(w.bar, ctx, layout)
+	w.attach(ctx)
+	return true
+}
+
+// OnShown runs fn on the loop once the layer was configured and has
+// drawn: a pass that finds it configured draws it before the Invoke
+// queued there runs.
+func (w *barWindow) OnShown(fn func()) {
+	var cancel func()
+	cancel = w.host.app.Every(shownPoll, func() {
+		if w.layer.Closed() || w.layer.EnsureUsable() == nil {
+			cancel()
+			w.host.app.Invoke(fn)
+		}
+	})
+}
+
+func (w *barWindow) Close() {
+	if w.host.holder != nil {
+		w.host.holder.remove(w.layer)
 	}
 	w.layer.Close()
 	w.gen.retire()
