@@ -5,6 +5,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -74,7 +75,7 @@ func (o *Osd) icon() *widget.Icon {
 }
 
 func (o *Osd) label(class string) *widget.Label {
-	l := widget.NewLabel(o.d.Font, widget.Current().TextSize*o.scale(), "", 0)
+	l := widget.NewLabel(o.d.Font, widgets.TextPx(styling.Body, o.scale()), "", 0)
 	l.AddClass(class)
 	l.SetVAlign(widget.AlignCenter)
 	return l

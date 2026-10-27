@@ -3,6 +3,9 @@ package bar
 import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // dropdownBuilders maps the Rust registry's names onto content
@@ -28,9 +31,9 @@ func dropdownBuilders() map[string]func(ctx ModuleContext) widget.Widget {
 	}
 }
 
-// dropdownFont is the dropdowns' face and text size: lys-ui's text
-// size, which its own components set, times the styling scale, so a
-// dropdown's labels match the lys-ui parts around them.
+// dropdownFont is the dropdowns' face and text size: the body size
+// times the styling scale, the --text-body the stylesheet sizes the
+// lys-ui parts around them by.
 func dropdownFont(ctx ModuleContext) (render.Font, float64) {
-	return ctx.Font, widget.Current().TextSize * float64(ctx.Config.Styling.Scale)
+	return ctx.Font, widgets.TextPx(styling.Body, float64(ctx.Config.Styling.Scale))
 }

@@ -185,8 +185,8 @@ func (v *weatherView) icon(name string, scale float64, classes ...string) *widge
 
 // label paints with the constructor ink unset (0): the classed rule
 // the class selects supplies the color.
-func (v *weatherView) label(text string, scale float64, class string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*scale, text, 0)
+func (v *weatherView) label(text string, role styling.TextRole, class string) *widget.Label {
+	l := widget.NewLabel(v.font, v.px*role.Ratio(), text, 0)
 	l.AddClass(class)
 	return l
 }
@@ -228,7 +228,7 @@ func (v *weatherView) loadingPage() widget.Widget {
 func (v *weatherView) errorPage() widget.Widget {
 	page := widgets.EmptyState(v.font, v.px, "ld-info-symbolic", i18n.T("dropdown-weather-error-title"), "")
 	page.AddClass("error-weather")
-	v.errorText = v.label("", 1, "error-text")
+	v.errorText = v.label("", styling.Body, "error-text")
 	v.errorText.AddClass(css.DimLabel)
 	v.errorText.SetAlignment(render.AlignCenter)
 	v.errorText.SetWrap(true)
@@ -284,12 +284,12 @@ func (v *weatherView) currentHeader(w *weather.Weather, imperial bool) widget.Wi
 	row.AppendAligned(v.condIcon(c.Condition, c.IsDay, 3), false, widget.AlignCenter)
 	temps := widget.NewBox(widget.Column, 0, 0)
 	temp := widget.NewBox(widget.Row, th.Spacing/4, 0)
-	temp.AppendAligned(v.label(weatherTemp(c.Temperature, imperial), 2.4, "weather-temp"), false, widget.AlignBaseline)
-	unit := v.label(weatherUnitSymbol(imperial), 1, "weather-temp-unit")
+	temp.AppendAligned(v.label(weatherTemp(c.Temperature, imperial), styling.Display, "weather-temp"), false, widget.AlignBaseline)
+	unit := v.label(weatherUnitSymbol(imperial), styling.Body, "weather-temp-unit")
 	unit.AddClass(css.DimLabel)
 	temp.AppendAligned(unit, false, widget.AlignBaseline)
 	temps.Append(temp, false)
-	cond := v.label(weatherConditionLabel(c.Condition), 1, "weather-condition")
+	cond := v.label(weatherConditionLabel(c.Condition), styling.Body, "weather-condition")
 	cond.AddClass(css.DimLabel)
 	temps.Append(cond, false)
 	row.AppendAligned(temps, false, widget.AlignCenter)
@@ -297,12 +297,12 @@ func (v *weatherView) currentHeader(w *weather.Weather, imperial bool) widget.Wi
 	// mid-height.
 	place := widget.NewBox(widget.Column, 0, 0)
 	place.AddClass("weather-location")
-	city := v.label(weatherLocationDisplay(w.Location), 1, "weather-city")
+	city := v.label(weatherLocationDisplay(w.Location), styling.Body, "weather-city")
 	city.AddClass(css.Heading)
 	city.SetEllipsize(widget.EllipsizeEnd)
 	city.SetAlignment(render.AlignEnd)
 	place.Append(city, false)
-	ago := v.label(weatherUpdatedAgo(w.UpdatedAt, time.Now()), 1, "weather-updated")
+	ago := v.label(weatherUpdatedAgo(w.UpdatedAt, time.Now()), styling.Body, "weather-updated")
 	ago.AddClass(css.Caption, css.DimLabel)
 	ago.SetAlignment(render.AlignEnd)
 	place.Append(ago, false)
@@ -356,9 +356,9 @@ func (v *weatherView) statsGrid(w *weather.Weather, imperial bool) widget.Widget
 	}
 	cells := make([]widget.Widget, 0, len(stats))
 	for _, s := range stats {
-		value := v.label(s.value, 1, "weather-stat-value")
+		value := v.label(s.value, styling.Body, "weather-stat-value")
 		value.AddClass(css.Heading)
-		name := v.label(i18n.T(s.label), 1, "weather-stat-label")
+		name := v.label(i18n.T(s.label), styling.Body, "weather-stat-label")
 		name.AddClass(css.Caption, css.DimLabel)
 		cells = append(cells, tile("weather-stat", v.icon(s.icon, 1.3, "weather-stat-icon", s.class), value, name))
 	}
@@ -373,9 +373,9 @@ func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.Ti
 		if i > 0 {
 			when = weatherHourLabel(h.Time, format)
 		}
-		at := v.label(when, 1, "hourly-time")
+		at := v.label(when, styling.Body, "hourly-time")
 		at.AddClass(css.Caption, css.DimLabel)
-		temp := v.label(weatherTemp(h.Temperature, imperial), 1, "hourly-temp")
+		temp := v.label(weatherTemp(h.Temperature, imperial), styling.Body, "hourly-temp")
 		temp.AddClass(css.Heading)
 		cells = append(cells, tile("hourly-item", at, v.condIcon(h.Condition, h.IsDay, 1.4), temp))
 	}
@@ -419,9 +419,9 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		fill.SetSizeRequest(fillPx, weatherBarPx)
 		bar.Append(fill, false)
 		row.AddAction(bar)
-		high := v.label(weatherTemp(d.TempHigh, imperial), 1, "daily-high")
+		high := v.label(weatherTemp(d.TempHigh, imperial), styling.Body, "daily-high")
 		high.AddClass(css.Heading, css.Numeric)
-		low := v.label(weatherTemp(d.TempLow, imperial), 1, "daily-low")
+		low := v.label(weatherTemp(d.TempLow, imperial), styling.Body, "daily-low")
 		low.AddClass(css.DimLabel, css.Numeric)
 		row.AddAction(high)
 		row.AddAction(low)
@@ -443,9 +443,9 @@ func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) wid
 		{"ld-sunrise-symbolic", "dropdown-weather-sunrise", "sunrise", w.Astronomy.Sunrise},
 		{"ld-sunset-symbolic", "dropdown-weather-sunset", "sunset", w.Astronomy.Sunset},
 	} {
-		at := v.label(weatherSunTime(s.at, format), 1, "sun-value")
+		at := v.label(weatherSunTime(s.at, format), styling.Body, "sun-value")
 		at.AddClass(css.Heading)
-		name := v.label(i18n.T(s.label), 1, "sun-label")
+		name := v.label(i18n.T(s.label), styling.Body, "sun-label")
 		name.AddClass(css.Caption, css.DimLabel)
 		cells = append(cells, tile("sun-time", v.icon(s.icon, 1.4, "sun-icon", s.class), at, name))
 	}

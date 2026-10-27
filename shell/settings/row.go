@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -64,9 +65,11 @@ func (k *kit) palette() styling.Palette {
 	return *p
 }
 
-// textPx is lys-ui's text size, which every label and control of the
-// window takes.
-func (k *kit) textPx() float64 { return widget.Current().TextSize }
+// textPx is the body size at the styling scale, which every label and
+// control of the window takes.
+func (k *kit) textPx() float64 {
+	return widgets.TextPx(styling.Body, float64(k.store.svc.Config().Styling.Scale))
+}
 
 // label is a styled label; color, size and weight come from the
 // stylesheet.
@@ -172,7 +175,10 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 
 	info := widget.NewBox(widget.Column, th.Spacing/4, 0)
 	labelRow := widget.NewBox(widget.Row, th.Spacing/2, 0)
-	labelRow.AppendAligned(k.label(t.Get(spec.labelKey()), "setting-label"), false, widget.AlignCenter)
+	title := k.label(t.Get(spec.labelKey()), "setting-label")
+	title.SetEllipsize(widget.EllipsizeEnd)
+	title.SetTooltip(t.Get(spec.labelKey()))
+	labelRow.AppendAligned(title, false, widget.AlignCenter)
 	if spec.unit != "" {
 		labelRow.AppendAligned(k.label("("+spec.unit+")", "setting-unit", css.Caption, css.DimLabel, css.Monospace), false, widget.AlignCenter)
 	}

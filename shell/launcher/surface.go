@@ -708,7 +708,7 @@ func (s *Surface) resolveWidth(ui uiSettings) int {
 		}
 		return max(int(float64(monitor)*w.Value/100), 1)
 	case launcheripc.WidthChars:
-		advance := max(int(math.Ceil(s.d.Font.Shape("0", fontPx).Advance())), 1)
+		advance := max(int(math.Ceil(s.d.Font.Shape("0", fontPx()).Advance())), 1)
 		return max(advance*int(w.Value), 1)
 	}
 	return max(ui.width, 1)
@@ -763,7 +763,7 @@ func (s *Surface) rebuildTabs(names []string, activeMode int) {
 		if shown, ok := s.cur.ui.displayNames[name]; ok {
 			label = shown
 		}
-		b := widget.NewButton(widget.NewLabel(s.d.Font, fontPx, label, 0), 0, 0)
+		b := widget.NewButton(widget.NewLabel(s.d.Font, fontPx(), label, 0), 0, 0)
 		b.AddClass("launcher-tab")
 		if i == activeMode {
 			b.AddClass("active")

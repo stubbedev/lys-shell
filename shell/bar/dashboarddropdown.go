@@ -617,7 +617,7 @@ func (v *dashboardView) battery() widget.Widget {
 	card.Append(remaining, false)
 	profileRow := widget.NewBox(widget.Row, th.Spacing/2, 0)
 	profileRow.AddClass("battery-profile")
-	profileIcon := widget.NewThemeIcon("ld-scale-symbolic", sectionLabelPx)
+	profileIcon := widget.NewThemeIcon("ld-scale-symbolic", int(math.Round(sectionLabelPx())))
 	profileIcon.AddClass("battery-profile-icon")
 	profileLabel := v.label("")
 	profileLabel.AddClass("battery-profile-label", css.Caption, css.DimLabel)

@@ -9,15 +9,13 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
-// The prompt's metrics over lys-ui's text size: the entries'
-// width-chars, and the clock's and the date's display scales.
-const (
-	entryChars = 24
-	clockScale = 4
-	dateScale  = 1.25
-)
+// entryChars is the entries' width-chars.
+const entryChars = 24
 
 // The PasswordEntry peek icons (GtkPasswordEntry show-peek-icon): the
 // eye reveals masked text, the crossed eye masks it again.
@@ -66,10 +64,10 @@ type Prompt struct {
 // Build assembles a prompt (CredentialBox::build); onSubmit fires with
 // the secret entry's text each time the user presses Enter in it.
 func Build(o Options, onSubmit func(string)) *Prompt {
-	textPx := widget.Current().TextSize
+	textPx := widgets.TextPx(styling.Body, 1)
 	p := &Prompt{
-		Clock: label(o.Font, textPx*clockScale, "lock-clock", css.Heading, css.Numeric),
-		Date:  label(o.Font, textPx*dateScale, "lock-date"),
+		Clock: label(o.Font, textPx*styling.Hero.Ratio(), "lock-clock", css.Heading, css.Numeric),
+		Date:  label(o.Font, textPx*styling.Subtitle.Ratio(), "lock-date"),
 		Entry: widget.NewEntry(o.Font, textPx, 0),
 		Error: label(o.Font, textPx, "lock-error", css.Error),
 	}

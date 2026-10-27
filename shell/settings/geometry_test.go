@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/shell/apptheme"
@@ -262,11 +263,51 @@ const narrowWindowWidth = 760
 // pathPages are the pages holding a path row.
 var pathPages = []string{"wallpaper", "lock", "greeter"}
 
+// desktop is the font a settings window lays out under: the face, and
+// the desktop font size that is its rem. The zero desktop is the test
+// binary's own, Go Regular at lys-ui's 16px rem.
+type desktop struct {
+	name, family string
+	pt           float64
+}
+
+// narrowDesktops are the desktops every path page must fit a narrow
+// window on: the user's monospace 10pt, and GNOME's 11pt in the
+// monospace face and the config's default sans.
+var narrowDesktops = []desktop{
+	{"10pt JetBrains Mono", "JetBrainsMono Nerd Font", 10},
+	{"11pt JetBrains Mono", "JetBrainsMono Nerd Font", 11},
+	{"11pt Inter", "Inter", 11},
+}
+
+// apply puts k and the rem on d for the rest of the test.
+func (d desktop) apply(t *testing.T, k *kit) {
+	t.Helper()
+	if d.family == "" {
+		return
+	}
+	face, err := app.Font(d.family, 14)
+	if err != nil {
+		t.Fatalf("%s: %v", d.name, err)
+	}
+	k.face, k.mono = app.FontFallback(face), app.FontFallback(face)
+	rem := widget.RootFontSize()
+	widget.SetRootFontSize(d.pt * 96 / 72)
+	t.Cleanup(func() { widget.SetRootFontSize(rem) })
+}
+
 // laidOutPage shows the page id of a styled window w pixels wide, laid
 // out the way the window lays it out, and returns the window.
 func laidOutPage(t *testing.T, configYAML, id string, w int) *window {
 	t.Helper()
+	return laidOutPageOn(t, desktop{}, configYAML, id, w)
+}
+
+// laidOutPageOn is laidOutPage on desktop d.
+func laidOutPageOn(t *testing.T, d desktop, configYAML, id string, w int) *window {
+	t.Helper()
 	k := testKit(t, configYAML)
+	d.apply(t, k)
 	cfg := k.store.svc.Config()
 	win := newWindow(k, cfg, func(_ time.Duration, fn func()) { fn() })
 	win.stack.SetTransition(widget.StackNone, 0)
@@ -286,11 +327,11 @@ func layOut(win *window, w int) {
 }
 
 // pathFieldWidths are the widths of the path entries on page id of a
-// window w pixels wide.
-func pathFieldWidths(t *testing.T, id string, w int) []int {
+// window w pixels wide on desktop d.
+func pathFieldWidths(t *testing.T, d desktop, id string, w int) []int {
 	t.Helper()
 	var widths []int
-	for _, c := range treetest.All[*fileEditor](laidOutPage(t, pathPagesYAML, id, w).page) {
+	for _, c := range treetest.All[*fileEditor](laidOutPageOn(t, d, pathPagesYAML, id, w).page) {
 		widths = append(widths, c.entry.Bounds().W)
 	}
 	if len(widths) == 0 {
@@ -302,31 +343,31 @@ func pathFieldWidths(t *testing.T, id string, w int) []int {
 // Every path field is one width, whatever its row's description and
 // however narrow the window: the description gives way, not the field.
 func TestPathFieldsShareOneWidth(t *testing.T) {
-	want := pathFieldWidths(t, "wallpaper", windowWidth)[0]
-	if want <= 0 {
-		t.Fatalf("the path field is %dpx wide", want)
-	}
-	for _, id := range pathPages {
-		for _, w := range []int{windowWidth, narrowWindowWidth} {
-			for i, got := range pathFieldWidths(t, id, w) {
-				if got != want {
-					t.Errorf("%s at %dpx: path field %d is %dpx wide, want the %dpx every path field takes", id, w, i, got, want)
+	for _, d := range narrowDesktops {
+		t.Run(d.name, func(t *testing.T) {
+			want := pathFieldWidths(t, d, "wallpaper", windowWidth)[0]
+			if want <= 0 {
+				t.Fatalf("the path field is %dpx wide", want)
+			}
+			for _, id := range pathPages {
+				for _, w := range []int{windowWidth, narrowWindowWidth} {
+					for i, got := range pathFieldWidths(t, d, id, w) {
+						if got != want {
+							t.Errorf("%s at %dpx: path field %d is %dpx wide, want the %dpx every path field takes", id, w, i, got, want)
+						}
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
-// overflow lays page id out in a narrow window, its path fields chars
-// wide, and returns the controls reaching past the window's right edge.
-func overflow(t *testing.T, id string, chars int) []string {
+// overflow lays page id out in a narrow window on desktop d and
+// returns the controls reaching past the window's right edge.
+func overflow(t *testing.T, d desktop, id string) []string {
 	t.Helper()
-	win := laidOutPage(t, pathPagesYAML, id, narrowWindowWidth)
-	for _, c := range treetest.All[*fileEditor](win.page) {
-		c.entry.SetWidthChars(chars, chars)
-	}
-	layOut(win, narrowWindowWidth)
-	var past []string
+	win := laidOutPageOn(t, d, pathPagesYAML, id, narrowWindowWidth)
+	var out []string
 	controls := 0
 	walkOwn(win.page, func(x widget.Widget) {
 		if _, ok := role(x); !ok || !shown(x) {
@@ -334,34 +375,71 @@ func overflow(t *testing.T, id string, chars int) []string {
 		}
 		controls++
 		if b := x.(widget.Boundser).Bounds(); b.X+b.W > narrowWindowWidth {
-			past = append(past, fmt.Sprintf("%T at %v", x, b))
+			out = append(out, fmt.Sprintf("%T at %v", x, b))
 		}
 	})
 	if controls == 0 {
 		t.Fatalf("the %s page laid out no control", id)
 	}
-	return past
+	return out
 }
 
-// Every page with a path row, the row and all, fits a narrow window: no
-// control reaches past its right edge.
-func TestPathPagesFitANarrowWindow(t *testing.T) {
-	for _, id := range pathPages {
-		t.Run(id, func(t *testing.T) {
-			if past := overflow(t, id, pathEntryChars); len(past) > 0 {
-				t.Errorf("at %dpx these reach past the window: %v", narrowWindowWidth, past)
-			}
-		})
-	}
-}
-
-// The path field is as wide as a narrow window allows: a character more
-// pushes some path page past the window's edge.
-func TestPathFieldIsTheWidestThatFits(t *testing.T) {
-	for _, id := range pathPages {
-		if len(overflow(t, id, pathEntryChars+1)) > 0 {
-			return
+// cutTitles are the shown row titles under page narrower than their
+// text.
+func cutTitles(page widget.Widget) []*widget.Label {
+	unbounded := widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}
+	var cut []*widget.Label
+	for _, x := range treetest.WithClass(page, "setting-label") {
+		if l := x.(*widget.Label); shown(l) && l.Bounds().W < l.Measure(unbounded).W {
+			cut = append(cut, l)
 		}
 	}
-	t.Errorf("path fields %d characters wide still fit every path page at %dpx; widen them", pathEntryChars+1, narrowWindowWidth)
+	return cut
+}
+
+// Every page with a path row, the row and all, fits a narrow window on
+// every desktop: no control reaches past its right edge.
+func TestPathPagesFitANarrowWindow(t *testing.T) {
+	for _, d := range narrowDesktops {
+		for _, id := range pathPages {
+			t.Run(d.name+"/"+id, func(t *testing.T) {
+				if past := overflow(t, d, id); len(past) > 0 {
+					t.Errorf("at %dpx these reach past the window: %v", narrowWindowWidth, past)
+				}
+			})
+		}
+	}
+}
+
+// The path field is the narrowest that still reads its path's head and
+// file name at rest: a character less loses one of them.
+func TestPathFieldIsTheNarrowestThatReads(t *testing.T) {
+	win := laidOutPage(t, pathPagesYAML, "lock", windowWidth)
+	twinWin := laidOutPage(t, pathPagesYAML, "lock", windowWidth)
+	c, twin := treetest.All[*fileEditor](win.page)[0], treetest.All[*fileEditor](twinWin.page)[0]
+	for _, f := range []*fileEditor{c, twin} {
+		f.entry.SetWidthChars(pathEntryChars-1, pathEntryChars-1)
+	}
+	layOut(win, windowWidth)
+	layOut(twinWin, windowWidth)
+	if line, ok := restingLine(t, c.entry.Entry, twin.entry.Entry, longPath); ok && readsHeadAndFile(line, longPath) {
+		t.Errorf("path fields %d characters wide still read %q; narrow them", pathEntryChars-1, line)
+	}
+}
+
+// A row title gives way, ellipsized, once the window is too narrow for
+// it: the row stays inside the window instead.
+func TestRowTitlesGiveWayLast(t *testing.T) {
+	const tooNarrow = 640
+	win := laidOutPageOn(t, narrowDesktops[1], pathPagesYAML, "lock", tooNarrow)
+	if len(cutTitles(win.page)) == 0 {
+		t.Fatalf("no row title gave way at %dpx", tooNarrow)
+	}
+	walkOwn(win.page, func(x widget.Widget) {
+		if _, ok := x.(*settingRow); ok && shown(x) {
+			if b := x.(widget.Boundser).Bounds(); b.X+b.W > tooNarrow {
+				t.Errorf("a row reaches past the %dpx window: %v", tooNarrow, b)
+			}
+		}
+	})
 }

@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // popoverCard is the popover root: lys-ui's popover surface (its fill,
@@ -203,7 +206,7 @@ const itemIconPx = 16
 // sectionLabel is a heading over a dropdown section, lys-ui's muted
 // caption heading.
 func sectionLabel(font render.Font, text string) *widget.Label {
-	l := widget.NewLabel(font, sectionLabelPx, text, 0)
+	l := widget.NewLabel(font, sectionLabelPx(), text, 0)
 	l.AddClass("section-label", css.CaptionHeading, css.DimLabel)
 	return l
 }
@@ -212,16 +215,15 @@ func sectionLabel(font render.Font, text string) *widget.Label {
 // muted ink.
 func iconSectionLabel(font render.Font, icon, title string) *widget.Box {
 	row := widget.NewBox(widget.Row, widget.Current().Spacing/2, 0)
-	glyph := widget.NewThemeIcon(icon, sectionLabelPx)
+	glyph := widget.NewThemeIcon(icon, int(math.Round(sectionLabelPx())))
 	glyph.AddClass(css.DimLabel)
 	row.AppendAligned(glyph, false, widget.AlignCenter)
 	row.AppendAligned(sectionLabel(font, title), true, widget.AlignCenter)
 	return row
 }
 
-// sectionLabelPx is lys-ui's caption size, which .caption-heading
-// also sets.
-const sectionLabelPx = 12
+// sectionLabelPx is the caption size, which .caption-heading also sets.
+func sectionLabelPx() float64 { return widgets.TextPx(styling.Caption, 1) }
 
 // refresher is a view's reader: every refresh of the view goes through
 // it, reads run off the loop one at a time, and requests made while a

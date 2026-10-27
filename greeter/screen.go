@@ -15,6 +15,8 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/shell/credential"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // t is the greeter's t! (lys-greeter.ftl, the desktop locale).
@@ -104,7 +106,7 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 	s := &screen{init: init, d: d}
 	g := init.Config.Greeter
 	th := widget.Current()
-	textPx := th.TextSize
+	textPx := widgets.TextPx(styling.Body, 1)
 
 	names := make([]string, len(init.Sessions))
 	for i, sess := range init.Sessions {
@@ -193,7 +195,7 @@ func (s *screen) populateUsers(row *widget.Box, font render.Font) {
 	th := widget.Current()
 	for _, u := range s.init.Users {
 		ub := &userButton{user: u}
-		name := widget.NewLabel(font, th.TextSize, u.DisplayName, 0)
+		name := widget.NewLabel(font, widgets.TextPx(styling.Body, 1), u.DisplayName, 0)
 		name.AddClass("lock-user-name", css.DimLabel)
 		name.SetEllipsize(widget.EllipsizeEnd)
 		name.SetMaxWidthChars(nameChars)

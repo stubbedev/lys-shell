@@ -3,8 +3,11 @@
 package treetest
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -184,4 +187,70 @@ func Pointer(root widget.Widget, target widget.Boundser, w, h int) (*widget.Rout
 	r := &widget.Router{Root: root}
 	r.Move(p)
 	return r, p
+}
+
+// RenderedTextPx is the font size l's text renders at in face: the
+// cascade's font-size, else the constructor's, read off how much its
+// measured width grows by eight more probe glyphs, unclipped, so
+// padding and borders cancel out.
+func RenderedTextPx(l *widget.Label, face render.Font) float64 {
+	text, ell, chars, maxChars := l.Text(), l.Ellipsize(), l.WidthChars(), l.MaxWidthChars()
+	defer func() {
+		l.SetText(text)
+		l.SetEllipsize(ell)
+		l.SetWidthChars(chars)
+		l.SetMaxWidthChars(maxChars)
+	}()
+	l.SetEllipsize(widget.EllipsizeNone)
+	l.SetWidthChars(0)
+	l.SetMaxWidthChars(0)
+	const probe = "MMMMMMMM"
+	unbounded := widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}
+	l.SetText(probe)
+	short := l.Measure(unbounded).W
+	l.SetText(probe + probe)
+	long := l.Measure(unbounded).W
+	return float64(long-short) / (face.Shape(probe, 1000).Advance() / 1000)
+}
+
+// OffScale names every laid-out, shown label Walk reaches under root
+// whose rendered size is none of sizes, within the rounding of its
+// measured width. A button's content is out of its reach: lys-ui's
+// Button lists no Children.
+func OffScale(root widget.Widget, face render.Font, sizes []float64) []string {
+	var out []string
+	for _, l := range All[*widget.Label](root) {
+		if !widget.IsVisible(l) || l.Bounds().Empty() {
+			continue
+		}
+		px := RenderedTextPx(l, face)
+		if !slices.ContainsFunc(sizes, func(s float64) bool { return math.Abs(s-px) <= 0.02*s }) {
+			out = append(out, fmt.Sprintf("%q %.2fpx %v", l.Text(), px, l.Classes()))
+		}
+	}
+	return out
+}
+
+// LabelReading is the first label Walk reaches under root whose text
+// is text.
+func LabelReading(t *testing.T, root widget.Widget, text string) *widget.Label {
+	t.Helper()
+	for _, l := range All[*widget.Label](root) {
+		if l.Text() == text {
+			return l
+		}
+	}
+	t.Fatalf("no %q label", text)
+	return nil
+}
+
+// ButtonTextPx is the font size two buttons of one build render their
+// labels at in face, read off how much wider the one with the longer
+// accessible name measures: their padding, borders and icons cancel
+// out, so it needs no reach into a button's content.
+func ButtonTextPx(a, b *widget.Button, face render.Font) float64 {
+	unbounded := widget.Constraints{Max: widget.Size{W: 1 << 20, H: 1 << 20}}
+	grow := a.Measure(unbounded).W - b.Measure(unbounded).W
+	unit := (face.Shape(widget.Describe(a).Name, 1000).Advance() - face.Shape(widget.Describe(b).Name, 1000).Advance()) / 1000
+	return float64(grow) / unit
 }

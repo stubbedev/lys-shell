@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The surface's sizes (shell/portal_dialogs: set_width_request,
@@ -178,7 +179,7 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info AccountInfo) (
 			}
 		}
 		setImage(info.Image)
-		name := widget.NewEntry(h.d.Font, widget.Current().TextSize, 0)
+		name := widget.NewEntry(h.d.Font, widgets.TextPx(styling.Body, 1), 0)
 		name.AddClass("portal-dialog-entry")
 		name.SetText(info.Name)
 		choose := widgets.DialogButton(h.d.Font, "Choose picture…", "portal-dialog-picture", css.Outline, func() {
@@ -265,7 +266,7 @@ func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r LauncherRequest) (bool, s
 		var entry *widget.Entry
 		if r.EditableName {
 			title = "Install launcher?"
-			entry = widget.NewEntry(h.d.Font, widget.Current().TextSize, 0)
+			entry = widget.NewEntry(h.d.Font, widgets.TextPx(styling.Body, 1), 0)
 			entry.AddClass("portal-dialog-entry")
 			entry.SetText(r.Name)
 			extra = append(extra, entry)
@@ -330,7 +331,7 @@ func nonEmpty(parts ...string) []string {
 	return out
 }
 
-// label is a wrapping line at lys-ui's text size.
+// label is a wrapping line at the body size.
 func (h *Dialogs) label(text string, classes ...string) *widget.Label {
 	return widgets.DialogText(h.d.Font, text, classes...)
 }
@@ -480,7 +481,7 @@ func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widg
 	ac.refresh()
 	// gtk::SearchEntry: the list filters on search-changed, after the
 	// default delay.
-	search := widget.NewSearchEntry(h.d.Font, widget.Current().TextSize, "Search applications…")
+	search := widget.NewSearchEntry(h.d.Font, widgets.TextPx(styling.Body, 1), "Search applications…")
 	search.AddClass("portal-dialog-search")
 	search.OnSearchChanged = func(q string) {
 		query = strings.ToLower(q)

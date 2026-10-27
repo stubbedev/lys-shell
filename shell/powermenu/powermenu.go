@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // iconPx is an action glyph's size.
@@ -126,7 +127,7 @@ const buttonPx = 80
 func (m *Menu) button(a action) widget.Widget {
 	icon := widget.NewThemeIcon(a.icon, iconPx)
 	icon.AddClass("power-menu-icon")
-	label := widget.NewLabel(m.d.Font, widget.Current().TextSize, a.label, 0)
+	label := widget.NewLabel(m.d.Font, widgets.TextPx(styling.Body, 1), a.label, 0)
 	label.AddClass("power-menu-label", css.DimLabel)
 	label.SetAlignment(render.AlignCenter)
 	content := widget.NewBox(widget.Column, widget.Current().Spacing, 0)

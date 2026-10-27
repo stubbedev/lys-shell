@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/portalreq"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // ChoiceRows builds a row per portal choice, a check button for a
@@ -15,7 +16,7 @@ import (
 // The rows carry class and their labels class+"-label".
 func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]widget.Widget, func() []portalreq.Selection) {
 	label := func(text string) *widget.Label {
-		l := widget.NewLabel(font, widget.Current().TextSize, text, 0)
+		l := widget.NewLabel(font, TextPx(styling.Body, 1), text, 0)
 		l.AddClass(class + "-label")
 		return l
 	}
@@ -42,7 +43,7 @@ func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]w
 				start = i
 			}
 		}
-		drop := widget.NewDropdown(font, widget.Current().TextSize, labels, start)
+		drop := widget.NewDropdown(font, TextPx(styling.Body, 1), labels, start)
 		drop.AddClass(class)
 		row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
 		row.Append(label(c.Label), true)

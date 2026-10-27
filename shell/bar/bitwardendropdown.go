@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // bitwardenListMax caps the rows the vault page builds: a vault holds
@@ -364,12 +365,12 @@ func (v *bitwardenView) iconButton(icon, tooltip string, onClick func()) *widget
 }
 
 func (v *bitwardenView) textButton(text string, onClick func(), classes ...string) *widget.Button {
-	return dropdownButton(widget.NewLabel(v.font, v.px*0.85, text, 0), onClick, classes...)
+	return dropdownButton(widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), text, 0), onClick, classes...)
 }
 
 // caption is a wrapped secondary line, hidden while empty.
 func (v *bitwardenView) caption(classes ...string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*0.85, "", 0)
+	l := widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
 	l.AddClass(classes...)
 	l.SetWrap(true)
 	l.SetVisible(false)
@@ -383,7 +384,7 @@ func setCaption(l *widget.Label, text string) {
 
 func (v *bitwardenView) buildLogin() widget.Widget {
 	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
-	v.server = widget.NewLabel(v.font, v.px*0.85, "", 0)
+	v.server = widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
 	v.server.AddClass(css.DimLabel)
 	v.server.SetEllipsize(widget.EllipsizeEnd)
 	page.Append(v.server, false)
@@ -411,7 +412,7 @@ func (v *bitwardenView) buildLogin() widget.Widget {
 	})
 	v.loginForm.OnSubmit = v.login
 	page.Append(v.loginForm, false)
-	v.apiLabel = widget.NewLabel(v.font, v.px*0.85, "", 0)
+	v.apiLabel = widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
 	page.Append(formActions(dropdownButton(v.apiLabel, v.toggleAPIKey, css.Link), v.textButton(i18n.T("dropdown-bitwarden-login"), v.loginForm.Submit, css.SuggestedAction)), false)
 	v.setAPIKey(false)
 	return page
@@ -448,7 +449,7 @@ func (v *bitwardenView) buildChallenge() widget.Widget {
 	v.codeTitle = widget.NewLabel(v.font, v.px, "", 0)
 	v.codeTitle.AddClass(css.Heading)
 	page.Append(v.codeTitle, false)
-	v.codeDesc = widget.NewLabel(v.font, v.px*0.85, "", 0)
+	v.codeDesc = widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
 	v.codeDesc.AddClass(css.DimLabel)
 	v.codeDesc.SetWrap(true)
 	page.Append(v.codeDesc, false)
@@ -463,7 +464,7 @@ func (v *bitwardenView) buildChallenge() widget.Widget {
 
 func (v *bitwardenView) buildUnlock() widget.Widget {
 	page := widget.NewBox(widget.Column, widget.Current().Spacing, 0)
-	v.account = widget.NewLabel(v.font, v.px*0.85, "", 0)
+	v.account = widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
 	v.account.AddClass(css.DimLabel)
 	v.account.SetEllipsize(widget.EllipsizeEnd)
 	page.Append(v.account, false)
@@ -498,7 +499,7 @@ func (v *bitwardenView) buildReprompt() widget.Widget {
 	title := widget.NewLabel(v.font, v.px, i18n.T("dropdown-bitwarden-reprompt-title"), 0)
 	title.AddClass(css.Heading)
 	page.Append(title, false)
-	v.repromptDesc = widget.NewLabel(v.font, v.px*0.85, "", 0)
+	v.repromptDesc = widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
 	v.repromptDesc.AddClass(css.DimLabel)
 	v.repromptDesc.SetWrap(true)
 	page.Append(v.repromptDesc, false)

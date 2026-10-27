@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/strftime"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // calendarWeekStart maps calendar-weekday-start.
@@ -113,13 +114,9 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 
 // label paints with the constructor ink unset (0): the cascade's
 // color — a classed rule, or the content box's default — supplies it.
-func (v *calendarView) label(text string, scale float64) *widget.Label {
-	return widget.NewLabel(v.font, v.px*scale, text, 0)
+func (v *calendarView) label(text string, role styling.TextRole) *widget.Label {
+	return widget.NewLabel(v.font, v.px*role.Ratio(), text, 0)
 }
-
-// clockTimeScale is the hero clock's display size over the dropdown's
-// text size.
-const clockTimeScale = 4.5
 
 // hero is the clock-hero: HH:MM[:SS][ AM] in the display size over
 // "Weekday, Month D, YYYY", the day in the heading weight and the rest
@@ -132,13 +129,13 @@ func (v *calendarView) hero() widget.Widget {
 	row.AddClass("clock-time-row")
 	v.timeRow = row
 	timeLabel := func(text string, classes ...string) *widget.Label {
-		l := v.label(text, clockTimeScale)
+		l := v.label(text, styling.Hero)
 		l.AddClass(append([]string{"clock-time", css.Numeric}, classes...)...)
 		return l
 	}
 	v.hours, v.minutes, v.seconds = timeLabel(""), timeLabel(""), timeLabel("")
 	v.secSep = timeLabel(":", "clock-separator")
-	v.ampm = v.label("", 1)
+	v.ampm = v.label("", styling.Body)
 	v.ampm.AddClass("clock-ampm", css.Heading, css.DimLabel)
 	// The time and the ampm share the row's text baseline.
 	for _, w := range []widget.Widget{v.hours, timeLabel(":", "clock-separator"), v.minutes, v.secSep, v.seconds, v.ampm} {
@@ -147,9 +144,9 @@ func (v *calendarView) hero() widget.Widget {
 	col.AppendAligned(row, false, widget.AlignCenter)
 	date := widget.NewBox(widget.Row, 0, 0)
 	date.AddClass("clock-date")
-	v.dayName = v.label("", 1)
+	v.dayName = v.label("", styling.Body)
 	v.dayName.AddClass("clock-date-day", css.Heading)
-	v.dateRest = v.label("", 1)
+	v.dateRest = v.label("", styling.Body)
 	v.dateRest.AddClass(css.DimLabel)
 	date.Append(v.dayName, false)
 	date.Append(v.dateRest, false)
@@ -165,7 +162,7 @@ func (v *calendarView) calendar() widget.Widget {
 	col.AddClass("cal-section")
 	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("cal-header")
-	today := dropdownButton(v.label(i18n.T("cal-today"), 1), v.goToToday, css.Ghost, css.Small, "cal-today-btn")
+	today := dropdownButton(v.label(i18n.T("cal-today"), styling.Body), v.goToToday, css.Ghost, css.Small, "cal-today-btn")
 	header.Append(widget.NewSpacer(0, 0), true)
 	header.Append(today, false)
 	col.Append(header, false)

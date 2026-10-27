@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/service/bluetooth"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // pairingVariant is PairingVariant: which prompt the card shows. The
@@ -105,7 +106,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 		if labelKey != "" {
 			box.Append(message(labelKey), false)
 		}
-		code := widget.NewLabel(font, px*1.8, "", 0)
+		code := widget.NewLabel(font, px*styling.Display.Ratio(), "", 0)
 		code.AddClass("bluetooth-pin-code", css.Title1, css.Monospace)
 		box.Append(code, false)
 		c.pinCode = append(c.pinCode, code)

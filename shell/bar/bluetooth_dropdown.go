@@ -14,6 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The bluetooth dropdown, ported from
@@ -347,7 +348,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 
 	// The trailing slot: status, or the actions while hovered.
 	if s.category != categoryAvailable || pending != 0 {
-		status := widget.NewLabel(font, px*0.85, statusLabel(s, pending), 0)
+		status := widget.NewLabel(font, px*styling.Caption.Ratio(), statusLabel(s, pending), 0)
 		status.AddClass("bluetooth-device-status", css.Caption, css.DimLabel)
 		row.statusShown = s.connected || s.paired || pending != 0
 		row.status = status

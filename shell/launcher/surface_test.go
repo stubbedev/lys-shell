@@ -808,7 +808,7 @@ func TestMessageLineKeepsItsPadding(t *testing.T) {
 	cfg := config.Defaults()
 	v.root.AttachStylesheet(widget.NewStylesheet(styling.BundleCSS(cfg, cfg.Styling.ActivePalette(), styling.Default()), 200))
 	layout(v.root, 600, 400)
-	bare := widget.NewRichLabel(h.s.d.Font, fontPx, v.message.Markup(), 0)
+	bare := widget.NewRichLabel(h.s.d.Font, fontPx(), v.message.Markup(), 0)
 	natural := widget.MeasureAsChild(bare, widget.Constraints{Max: widget.Size{W: 600, H: 400}})
 	got := widget.MeasureAsChild(v.message, widget.Constraints{Max: widget.Size{W: 600, H: 400}})
 	if got.W <= natural.W || got.H <= natural.H {

@@ -256,10 +256,10 @@ func (c *colorEditor) refresh() {
 }
 
 // pathEntryChars is a path field's width in characters: every path row
-// takes the same, kept when the row narrows, its description giving
-// way instead. It is the widest that keeps every path page inside a
-// 760px window.
-const pathEntryChars = 14
+// takes the same, kept when the row narrows, its description and then
+// its title giving way instead. It is the narrowest that still reads a
+// long path's head and file name at rest.
+const pathEntryChars = 12
 
 // fileEditor is FilePickerControl: the path entry (committing on
 // Enter, with the unsaved badge) and a browse button asking the file

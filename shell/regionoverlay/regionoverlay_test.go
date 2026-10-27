@@ -316,17 +316,19 @@ func TestMagnifier(t *testing.T) {
 }
 
 // The size label and the hint are pills on lys-ui's theme: the text at
-// its text size, padded by its padding, the backing rounded by its
+// the body size, padded by its padding, the backing rounded by its
 // radius so the corner stays clear while the edge is backed.
 func TestPillTakesTheTheme(t *testing.T) {
 	th := *widget.DarkTheme()
-	th.Padding, th.Radius, th.TextSize = 10, 8, 20
+	th.Padding, th.Radius = 10, 8
 	widget.SetTheme(&th)
-	t.Cleanup(func() { widget.SetTheme(nil) })
+	rem := widget.RootFontSize()
+	widget.SetRootFontSize(20)
+	t.Cleanup(func() { widget.SetTheme(nil); widget.SetRootFontSize(rem) })
 	o, a, _ := harness(nil)
 	o.font = treetest.Font(t)
 	p := a.pill("8 × 8")
-	ref := o.font.Shape("8 × 8", th.TextSize)
+	ref := o.font.Shape("8 × 8", 20)
 	if p.pad != th.Padding || p.radius != th.Radius || p.h != int(math.Ceil(ref.Ascent()))+2*th.Padding || p.w != int(math.Ceil(ref.Advance()))+2*th.Padding {
 		t.Fatalf("pill %dx%d pad %d radius %d, want the theme's metrics", p.w, p.h, p.pad, p.radius)
 	}

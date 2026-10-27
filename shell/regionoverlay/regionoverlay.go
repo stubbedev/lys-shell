@@ -23,6 +23,8 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/shell/loupe"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // Selection is a region the user dragged, in logical pixels relative
@@ -487,7 +489,7 @@ func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
 	p.paint(cv, bx, by, accent)
 }
 
-// pill is text shaped at lys-ui's text size on a dark backing padded
+// pill is text shaped at the body size on a dark backing padded
 // and rounded by the theme.
 type pill struct {
 	font   render.Font
@@ -500,7 +502,7 @@ type pill struct {
 
 func (a *area) pill(text string) pill {
 	th := widget.Current()
-	shaped := a.o.font.Shape(text, th.TextSize)
+	shaped := a.o.font.Shape(text, widgets.TextPx(styling.Body, 1))
 	ascent := int(math.Ceil(shaped.Ascent()))
 	return pill{
 		font: a.o.font, shaped: shaped, ascent: ascent, pad: th.Padding, radius: th.Radius,

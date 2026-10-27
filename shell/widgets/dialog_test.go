@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The dialog parts are lys-ui's: the card titled and pinned at the
@@ -23,7 +24,7 @@ func TestDialogParts(t *testing.T) {
 	if kids := DialogBody(a, nil, b).Children(); len(kids) != 2 || kids[0] != widget.Widget(a) || kids[1] != widget.Widget(b) {
 		t.Errorf("body rows %v, want the two given without the nil", kids)
 	}
-	text := widget.Current().TextSize
+	text := TextPx(styling.Body, 1)
 	body := DialogText(font, "B", "x-body", css.DimLabel)
 	if widget.HasClass(body, css.Heading) || !widget.HasClass(body, css.DimLabel) || body.SizePx() != text || !body.Wrap() {
 		t.Errorf("text %vpx %v", body.SizePx(), body.Classes())

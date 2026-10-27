@@ -21,6 +21,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/portal"
 	"github.com/stubbedev/lys-shell/service/network"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // This file is the network dropdown's VPNs: the section listing NM's
@@ -462,7 +463,7 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	f.rawHint.AddClass(css.Caption, css.DimLabel)
 	f.rawHint.SetWrap(true)
 	body.Append(f.rawHint, false)
-	f.raw = widget.NewTextArea(monoFont(v.ctx, v.font, v.px), v.px*0.9, 0)
+	f.raw = widget.NewTextArea(monoFont(v.ctx, v.font, v.px), v.px, 0)
 	f.raw.AddClass("network-vpn-raw")
 	body.Append(f.raw, false)
 	scroll := dropdownScroll(body, "network-vpn-form-scroll")
@@ -632,7 +633,7 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 		entry.SetLeadingIcon(iconGenerateKey, f.v.px, func() {
 			entry.SetText(network.GenerateKeyPair().Private)
 		})
-		readout = widget.NewRichLabel(f.v.font, f.v.px*0.85, publicKeyReadout(current), 0)
+		readout = widget.NewRichLabel(f.v.font, f.v.px*styling.Caption.Ratio(), publicKeyReadout(current), 0)
 		readout.SetVariants(app.FontVariantsOf(f.v.font))
 		readout.AddClass("network-vpn-public-key", css.Caption, css.DimLabel, css.Monospace)
 		readout.SetWrap(true)

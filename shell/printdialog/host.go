@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The sheet's geometry (shell/print: the surface's width request, the
@@ -290,15 +291,15 @@ func (h *Dialog) finish(p prepared, ok bool) {
 	h.queue.Done()
 }
 
-// label is a one-line label at lys-ui's text size.
+// label is a one-line label at the body size.
 func (h *Dialog) label(text string, classes ...string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, widget.Current().TextSize, text, 0)
+	l := widget.NewLabel(h.d.Font, widgets.TextPx(styling.Body, 1), text, 0)
 	l.AddClass(classes...)
 	return l
 }
 
 func (h *Dialog) dropdown(items []string) *widget.Dropdown {
-	return widget.NewDropdown(h.d.Font, widget.Current().TextSize, items, 0)
+	return widget.NewDropdown(h.d.Font, widgets.TextPx(styling.Body, 1), items, 0)
 }
 
 // labelsOf is a choice list's labels.
@@ -363,7 +364,7 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 
 	initial := initialForm(r, queues[start].caps)
 	th := widget.Current()
-	copies := widget.NewSpinButton(h.d.Font, th.TextSize, 0, minCopies, maxCopies, 1, 0)
+	copies := widget.NewSpinButton(h.d.Font, widgets.TextPx(styling.Body, 1), 0, minCopies, maxCopies, 1, 0)
 	copies.SetValue(float64(initial.copies))
 	pageKinds := []pagesKind{pagesAll}
 	if r.HasCurrentPage {
@@ -377,7 +378,7 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 		return [...]string{"All pages", "Current page", "Selection", "Range"}[k]
 	}}
 	pagesDrop.refill(pageKinds, initial.pages)
-	ranges := widget.NewEntry(h.d.Font, th.TextSize, 0)
+	ranges := widget.NewEntry(h.d.Font, widgets.TextPx(styling.Body, 1), 0)
 	ranges.SetPlaceholder("e.g. 1-5, 8")
 	ranges.SetText(initial.ranges)
 	ranges.OnChanged = func(text string) {

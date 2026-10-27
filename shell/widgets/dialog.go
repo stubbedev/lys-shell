@@ -3,6 +3,8 @@ package widgets
 import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
+
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // DialogCard is a dialog's surface: lys-ui's card under title, width
@@ -26,9 +28,9 @@ func DialogBody(rows ...widget.Widget) *widget.Box {
 	return box
 }
 
-// DialogText is a wrapping line at lys-ui's text size.
+// DialogText is a wrapping line at the body size.
 func DialogText(font render.Font, text string, classes ...string) *widget.Label {
-	l := widget.NewLabel(font, widget.Current().TextSize, text, 0)
+	l := widget.NewLabel(font, TextPx(styling.Body, 1), text, 0)
 	l.AddClass(classes...)
 	l.SetWrap(true)
 	return l
@@ -37,7 +39,7 @@ func DialogText(font render.Font, text string, classes ...string) *widget.Label 
 // DialogButton is a text button in lys-ui's variant (css.Outline,
 // css.SuggestedAction), carrying class and its label class+"-label".
 func DialogButton(font render.Font, text, class, variant string, onClick func()) *widget.Button {
-	l := widget.NewLabel(font, widget.Current().TextSize, text, 0)
+	l := widget.NewLabel(font, TextPx(styling.Body, 1), text, 0)
 	l.AddClass(class + "-label")
 	l.SetAlignment(render.AlignCenter)
 	b := widget.NewButton(l, 0, 0)

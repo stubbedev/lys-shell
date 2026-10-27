@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/layering"
 	"github.com/stubbedev/lys-shell/shell/notifyui"
 	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -307,7 +308,7 @@ func (p *Popups) newStack(key string) *stack {
 	// peeking ones narrower, and their Items would otherwise fill the
 	// output.
 	st.root.SetInlineStyle(styling.WidthStyle(int(cardWidthPx * float64(p.cfg.Styling.Scale))))
-	label := widget.NewLabel(p.font, th.TextSize*float64(p.cfg.Styling.Scale), i18n.T("notification-popup-clear-all"), 0)
+	label := widget.NewLabel(p.font, widgets.TextPx(styling.Body, float64(p.cfg.Styling.Scale)), i18n.T("notification-popup-clear-all"), 0)
 	st.clear = widget.NewButton(label, 0, 0)
 	st.clear.AddClass("notification-popup-clear-all", css.Ghost, css.Small)
 	st.clear.SetHAlign(widget.AlignEnd)
@@ -454,7 +455,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	cfg := p.cfg.Notification
 	scale := float64(p.cfg.Styling.Scale)
 	th := widget.Current()
-	px := th.TextSize * scale
+	px := widgets.TextPx(styling.Body, scale)
 	c := &card{id: n.ID}
 	c.root = widget.NewBox(widget.Column, 0, 0)
 	c.root.AddClass(css.Card, css.Glass, "notification-popup-card", notifyui.UrgencyClass(n.Urgency))

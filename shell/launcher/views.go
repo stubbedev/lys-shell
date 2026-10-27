@@ -7,12 +7,13 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// fontPx is GTK's default 11pt at 96 dpi, which the launcher's labels
+// fontPx is the body size, which the launcher's labels
 // take before the stylesheet (or -font) sizes them.
-const fontPx = 11.0 * 96 / 72
+func fontPx() float64 { return widgets.TextPx(styling.Body, 1) }
 
 // sessionCSSPriority puts a session's -font/-style CSS above the
 // shell's own stylesheet, as the Rust provider sits above the shell's
@@ -62,10 +63,10 @@ func (s *Surface) buildViews(a *active) *views {
 	v.inputRow = widget.NewBox(widget.Row, th.Spacing, 0)
 	v.inputRow.SetPadding(render.Insets{Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
 	v.inputRow.AddClass("input", "launcher-input")
-	v.prompt = widget.NewLabel(s.d.Font, fontPx, "", 0)
+	v.prompt = widget.NewLabel(s.d.Font, fontPx(), "", 0)
 	v.prompt.AddClass("launcher-prompt")
 	v.inputRow.Append(v.prompt, false)
-	v.entry = widget.NewEntry(s.d.Font, fontPx, 0)
+	v.entry = widget.NewEntry(s.d.Font, fontPx(), 0)
 	v.entry.AddClass("launcher-entry")
 	if ui.filter != nil {
 		v.entry.SetText(*ui.filter)
@@ -79,7 +80,7 @@ func (s *Surface) buildViews(a *active) *views {
 	v.inputRow.Append(v.entry, true)
 	v.surface.Append(v.inputRow, false)
 
-	v.message = widget.NewRichLabel(s.d.Font, fontPx, "", 0)
+	v.message = widget.NewRichLabel(s.d.Font, fontPx(), "", 0)
 	v.message.AddClass("launcher-message", css.DimLabel)
 	v.message.SetMargin(render.Insets{Top: th.Padding, Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
 	v.message.SetVariants(s.d.Variants)
@@ -87,7 +88,7 @@ func (s *Surface) buildViews(a *active) *views {
 	v.surface.Append(v.message, false)
 
 	st := rowStyle{
-		font: s.d.Font, variants: s.d.Variants, px: fontPx, iconPx: iconPx(s.d), showIcons: ui.showIcons,
+		font: s.d.Font, variants: s.d.Variants, px: fontPx(), iconPx: iconPx(s.d), showIcons: ui.showIcons,
 		display: rowDisplay{columns: ui.displayColumns, separator: ui.columnSeparator, ellipsize: ui.ellipsize},
 	}
 	v.list = newResultList(func(pos int) widget.Widget { return s.makeRow(a, pos, st) })

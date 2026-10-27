@@ -30,6 +30,8 @@ import (
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 type fakeWindow struct {
@@ -1812,7 +1814,7 @@ func TestChooserTakesLysUiParts(t *testing.T) {
 			t.Errorf("%d separators, want the 3 between the bands", n)
 		}
 		title := treetest.WithClass(root, "file-chooser-title")[0].(*widget.Label)
-		if want := widget.Current().TitleSize(); title.SizePx() != want {
+		if want := widgets.TextPx(styling.Subtitle, 1); title.SizePx() != want {
 			t.Errorf("title %vpx, want %vpx", title.SizePx(), want)
 		}
 		if widget.HasClass(treetest.WithClass(root, "file-chooser-cancel")[0], css.SuggestedAction) {

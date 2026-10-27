@@ -369,9 +369,9 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 	return root
 }
 
-// label is a line at lys-ui's text size, scaled.
+// label is a line at the body size, scaled.
 func (p *Picker) label(text string) *widget.Label {
-	return widget.NewLabel(p.d.Font, widget.Current().TextSize*p.scale, text, 0)
+	return widget.NewLabel(p.d.Font, widgets.TextPx(styling.Body, p.scale), text, 0)
 }
 
 // page is a notebook page: the content in a .share-picker-page scroll
@@ -387,7 +387,7 @@ func page(content widget.Widget) *widget.Scroll {
 // placeholder is an empty page's lys-ui empty state, centered in the
 // page.
 func (p *Picker) placeholder(icon, text string) widget.Widget {
-	empty := widgets.EmptyState(p.d.Font, widget.Current().TextSize*p.scale, icon, text, "")
+	empty := widgets.EmptyState(p.d.Font, widgets.TextPx(styling.Body, p.scale), icon, text, "")
 	empty.AddClass("share-picker-placeholder")
 	empty.SetHExpand(true)
 	empty.SetVExpand(true)

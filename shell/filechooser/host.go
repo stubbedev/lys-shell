@@ -27,6 +27,7 @@ import (
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The panel's geometry (shell/file_chooser: its default size,
@@ -387,9 +388,9 @@ type ui struct {
 	locations *widget.Box
 }
 
-// label is a one-line label at lys-ui's text size.
+// label is a one-line label at the body size.
 func (c *Chooser) label(text string, classes ...string) *widget.Label {
-	l := widget.NewLabel(c.d.Font, widget.Current().TextSize, text, 0)
+	l := widget.NewLabel(c.d.Font, widgets.TextPx(styling.Body, 1), text, 0)
 	l.AddClass(classes...)
 	return l
 }
@@ -473,7 +474,7 @@ func (c *Chooser) build(r request) {
 	}
 	headerStack := widget.NewOverlay()
 	headerStack.Append(headerRow)
-	titleLabel := widget.NewLabel(c.d.Font, th.TitleSize(), title, 0)
+	titleLabel := widget.NewLabel(c.d.Font, widgets.TextPx(styling.Subtitle, 1), title, 0)
 	titleLabel.AddClass("file-chooser-title", css.Heading)
 	headerStack.AppendAligned(titleLabel, widget.AlignCenter, widget.AlignCenter)
 	header := section(widget.Column, "file-chooser-header")
@@ -484,7 +485,7 @@ func (c *Chooser) build(r request) {
 	u.crumbs = widget.NewBox(widget.Row, th.Spacing/4, 0)
 	u.crumbs.AddClass("file-chooser-crumbs")
 	crumbBar.Append(u.crumbs, true)
-	u.location = widget.NewEntry(c.d.Font, th.TextSize, 0)
+	u.location = widget.NewEntry(c.d.Font, widgets.TextPx(styling.Body, 1), 0)
 	u.location.AddClass("file-chooser-location")
 	u.location.SetPlaceholder("Type a path")
 	u.location.OnActivate = c.goToLocation
@@ -494,7 +495,7 @@ func (c *Chooser) build(r request) {
 	// gtk::SearchEntry with no debounce: filtering the cached listing
 	// is an in-memory scan, and a recursive walk is cancelled by its
 	// generation instead.
-	u.search = widget.NewSearchEntry(c.d.Font, th.TextSize, "Filter this folder")
+	u.search = widget.NewSearchEntry(c.d.Font, widgets.TextPx(styling.Body, 1), "Filter this folder")
 	u.search.AddClass("file-chooser-search")
 	u.search.SetDelay(0)
 	u.search.OnSearchChanged = c.setSearch
@@ -517,7 +518,7 @@ func (c *Chooser) build(r request) {
 	body.Append(u.preview, false)
 
 	nameRow := section(widget.Row, "file-chooser-name-row")
-	u.name = widget.NewEntry(c.d.Font, th.TextSize, 0)
+	u.name = widget.NewEntry(c.d.Font, widgets.TextPx(styling.Body, 1), 0)
 	u.name.AddClass("file-chooser-name")
 	u.name.SetPlaceholder("File name")
 	u.name.SetText(name)
@@ -537,7 +538,7 @@ func (c *Chooser) build(r request) {
 
 	// The new folder row: a name and Create.
 	u.newFolder = section(widget.Row, "file-chooser-new-folder")
-	u.newFolderName = widget.NewEntry(c.d.Font, th.TextSize, 0)
+	u.newFolderName = widget.NewEntry(c.d.Font, widgets.TextPx(styling.Body, 1), 0)
 	u.newFolderName.SetPlaceholder("Folder name")
 	u.newFolderName.OnActivate = func(string) { c.createFolder() }
 	u.newFolderName.OnEscape = func() bool { c.ui.newFolder.SetVisible(false); return true }
@@ -555,7 +556,7 @@ func (c *Chooser) build(r request) {
 	for i, f := range s.filters {
 		labels[i] = FilterLabel(f)
 	}
-	u.filter = widget.NewDropdown(c.d.Font, th.TextSize, labels, s.active)
+	u.filter = widget.NewDropdown(c.d.Font, widgets.TextPx(styling.Body, 1), labels, s.active)
 	u.filter.AddClass("file-chooser-filter")
 	u.filter.OnSelect = c.selectFilter
 	u.filter.SetVisible(len(s.filters) > 0)

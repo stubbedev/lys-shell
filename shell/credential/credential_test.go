@@ -15,6 +15,8 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // TestBuildShape pins the prompt: the secret entry masks and submits
@@ -70,12 +72,12 @@ func TestBuildTakesLysUiParts(t *testing.T) {
 	if len(cards) != 1 || len(treetest.WithClass(cards[0], css.Card)) != 1 {
 		t.Fatal("the credential column must be lys-ui's card")
 	}
-	text := widget.Current().TextSize
-	if p.Clock.SizePx() != text*clockScale || !slices.Contains(p.Clock.Classes(), css.Heading) || !slices.Contains(p.Clock.Classes(), css.Numeric) {
-		t.Errorf("clock = %vpx %v, want %vpx numeric heading", p.Clock.SizePx(), p.Clock.Classes(), text*clockScale)
+	text := widgets.TextPx(styling.Body, 1)
+	if p.Clock.SizePx() != text*styling.Hero.Ratio() || !slices.Contains(p.Clock.Classes(), css.Heading) || !slices.Contains(p.Clock.Classes(), css.Numeric) {
+		t.Errorf("clock = %vpx %v, want %vpx numeric heading", p.Clock.SizePx(), p.Clock.Classes(), text*styling.Hero.Ratio())
 	}
-	if p.Date.SizePx() != text*dateScale || slices.Contains(p.Date.Classes(), css.Heading) {
-		t.Errorf("date = %vpx %v, want %vpx, no heading", p.Date.SizePx(), p.Date.Classes(), text*dateScale)
+	if p.Date.SizePx() != text*styling.Subtitle.Ratio() || slices.Contains(p.Date.Classes(), css.Heading) {
+		t.Errorf("date = %vpx %v, want %vpx, no heading", p.Date.SizePx(), p.Date.Classes(), text*styling.Subtitle.Ratio())
 	}
 	if !slices.Contains(p.Error.Classes(), css.Error) || slices.Contains(p.Error.Classes(), css.Heading) {
 		t.Errorf("error line classes = %v", p.Error.Classes())

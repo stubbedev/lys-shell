@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/shell/widgets"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The empty state is lys-ui's StatusPage: its icon sits on the page's
@@ -119,21 +120,22 @@ func isUnder(w, root widget.Widget) bool {
 	return found
 }
 
-// The dropdowns' text is lys-ui's text size times the styling scale,
+// The dropdowns' text is the body size times the styling scale,
 // whatever size the bar's own labels take.
-func TestDropdownFontIsTheToolkitTextSize(t *testing.T) {
+func TestDropdownFontIsTheBodySize(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := styledContext(t, cfg)
-	if _, px := dropdownFont(ctx); px != widget.Current().TextSize {
-		t.Errorf("default text = %vpx, want lys-ui's %v", px, widget.Current().TextSize)
+	body := widgets.TextPx(styling.Body, 1)
+	if _, px := dropdownFont(ctx); px != body {
+		t.Errorf("default text = %vpx, want the body's %v", px, body)
 	}
 	ctx.Style.labelPx *= 2
-	if _, px := dropdownFont(ctx); px != widget.Current().TextSize {
+	if _, px := dropdownFont(ctx); px != body {
 		t.Errorf("a larger bar label moved the dropdown text to %vpx", px)
 	}
 	cfg.Styling.Scale = 1.5
-	if _, px := dropdownFont(ctx); px != widget.Current().TextSize*1.5 {
-		t.Errorf("scale 1.5 text = %vpx, want %v", px, widget.Current().TextSize*1.5)
+	if _, px := dropdownFont(ctx); px != body*1.5 {
+		t.Errorf("scale 1.5 text = %vpx, want %v", px, body*1.5)
 	}
 }
 
