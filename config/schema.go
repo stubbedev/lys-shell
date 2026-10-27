@@ -535,3 +535,15 @@ func PropertyOrder(props Schema) []string {
 	sort.Strings(keys)
 	return keys
 }
+
+// uint32RangeSchema is the schema of t, a whole number in [lo, hi]
+// serialised as a uint32.
+func uint32RangeSchema(t reflect.Type, lo, hi int64) Schema {
+	return Schema{
+		"description": typeDoc(t),
+		"type":        "integer",
+		"format":      "uint32",
+		"minimum":     lo,
+		"maximum":     hi,
+	}
+}

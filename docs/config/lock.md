@@ -23,7 +23,7 @@ crashes (the compositor shows a solid color), unlike a layer-shell overlay.
 | `background-mode` | [`LockBackground`](/config/types#lock-background) | `"color"` | How the background is drawn: solid color, an image, or the wallpaper. |
 | `background-image` | string | `""` | Background image path (used when `background-mode: image`). |
 | `background-color` | [`HexColor`](/config/types#hex-color) | `"#000000"` | Background fill color (used when `background-mode: color`). |
-| `blur` | u32 | `0` | Gaussian blur radius applied to image/wallpaper backgrounds (0 = none). |
+| `blur` | [`LockBlur`](/config/types#lock-blur) | `0` | Gaussian blur radius applied to image/wallpaper backgrounds (0 = none). |
 | `show-clock` | bool | `true` | Show a clock on the lock screen. |
 | `clock-format` | string | `"%H:%M"` | `strftime` format for the lock-screen time. |
 | `date-format` | string | `"%A, %B %-d"` | `strftime` format for the lock-screen date. |

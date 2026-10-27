@@ -457,7 +457,7 @@ func TestBackgroundModes(t *testing.T) {
 	h := newHarness(t, func(l *config.LockConfig) {
 		l.Background.Mode = config.BackgroundImage
 		l.Background.Image = "/srv/lock.png"
-		l.Blur = 8
+		l.Blur = mustBlur(8)
 	})
 	h.s.d.Decode = func(path string) (image.Image, error) {
 		loaded = append(loaded, path)
@@ -495,7 +495,7 @@ func imageHarness(t *testing.T) *harness {
 	h := newHarness(t, func(l *config.LockConfig) {
 		l.Background.Mode = config.BackgroundImage
 		l.Background.Image = "/srv/lock.png"
-		l.Blur = 8
+		l.Blur = mustBlur(8)
 	})
 	h.s.d.Decode = func(string) (image.Image, error) { return image.NewRGBA(image.Rect(0, 0, 600, 400)), nil }
 	h.s.d.Outputs = func() []image.Point { return []image.Point{{192, 108}} }
@@ -674,4 +674,13 @@ func TestSurfaceIsTheStyledLockTree(t *testing.T) {
 	if e := h.s.faces[0].prompt.Entry; e.Color() != 0 {
 		t.Errorf("the entry pins ink %#08x", uint32(e.Color()))
 	}
+}
+
+// mustBlur is a valid blur of sigma px.
+func mustBlur(sigma int64) config.LockBlur {
+	b, err := config.NewLockBlur(sigma)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }

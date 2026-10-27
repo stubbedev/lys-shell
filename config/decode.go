@@ -328,3 +328,10 @@ func encode(v any) any {
 	}
 	return encodeValue(rv)
 }
+
+// decodeInt64 decodes v as a whole number.
+func decodeInt64(v any) (int64, error) {
+	var n int64
+	err := decodeInto(reflect.ValueOf(&n).Elem(), v)
+	return n, err
+}

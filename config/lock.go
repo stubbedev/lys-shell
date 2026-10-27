@@ -22,7 +22,7 @@ type LockConfig struct {
 	// background-color.
 	Background Background `cfg:",inline"`
 	// Gaussian blur radius applied to image/wallpaper backgrounds (0 = none).
-	Blur uint32 `cfg:"blur"`
+	Blur LockBlur `cfg:"blur"`
 	// Show a clock on the lock screen.
 	ShowClock bool `cfg:"show-clock"`
 	// `strftime` format for the lock-screen time.

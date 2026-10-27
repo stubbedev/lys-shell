@@ -724,6 +724,7 @@ var schemaDocs = map[string]string{
 	"LockBackground=color":                                   "Solid color fill (`background-color`).",
 	"LockBackground=image":                                   "A specific image file (`background-image`).",
 	"LockBackground=wallpaper":                               "Reuse the current desktop wallpaper.",
+	"LockBlur":                                               "Lock background blur in pixels, 0 for none.",
 	"LockConfig":                                             "Lock screen: a secure session lock rendered by lys-shell via `ext-session-lock-v1`.\n\nWhen `enabled`, lys-shell locks the session in response to the logind `Lock`\nsignal (`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC\n`lock()` method. The lock surface grabs all input and survives client\ncrashes (the compositor shows a solid color), unlike a layer-shell overlay.",
 	"LockConfig.Background":                                  "Background is background-mode, background-image, and\nbackground-color.",
 	"LockConfig.BlankTimeoutMS":                              "Black out the lock screen after this idle time (milliseconds, `0` =\nnever). This is a visual blank that hides the clock/prompt and dismisses\non any key; true display power-off (DPMS) is left to your idle daemon.",

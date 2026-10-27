@@ -699,6 +699,14 @@ How the lock screen background is rendered.
 | `"image"` | A specific image file (`background-image`). |
 | `"wallpaper"` | Reuse the current desktop wallpaper. |
 
+## LockBlur {#lock-blur}
+
+Lock background blur in pixels, 0 for none.
+
+Number in `[0, 1000]`.
+
+Serialises as `uint32`.
+
 ## LockdownConfig {#lockdown-config}
 
 Features no app may use while set.

@@ -1,10 +1,6 @@
 package config
 
-import (
-	"reflect"
-
-	"github.com/stubbedev/lys-shell/service/idleinhibit"
-)
+import "github.com/stubbedev/lys-shell/service/idleinhibit"
 
 // IdleInhibitConfig is ported from crates/wayle-config/src/schemas/modules/idle_inhibit/mod.rs.
 //
@@ -122,8 +118,8 @@ func (d IdleInhibitDuration) Duration() idleinhibit.Duration { return d.duration
 
 // UnmarshalConfig implements Unmarshaler.
 func (d *IdleInhibitDuration) UnmarshalConfig(v any) error {
-	var minutes int64
-	if err := decodeInto(reflect.ValueOf(&minutes).Elem(), v); err != nil {
+	minutes, err := decodeInt64(v)
+	if err != nil {
 		return err
 	}
 	parsed, err := parseIdleInhibitDuration(minutes)
@@ -138,11 +134,5 @@ func (d *IdleInhibitDuration) UnmarshalConfig(v any) error {
 func (d IdleInhibitDuration) MarshalConfig() any { return int64(d.duration.Minutes()) }
 
 func (IdleInhibitDuration) configSchema(*schemaGen) Schema {
-	return Schema{
-		"description": typeDoc(typeOf[IdleInhibitDuration]()),
-		"type":        "integer",
-		"format":      "uint32",
-		"minimum":     int64(0),
-		"maximum":     int64(idleinhibit.MaxMinutes),
-	}
+	return uint32RangeSchema(typeOf[IdleInhibitDuration](), 0, idleinhibit.MaxMinutes)
 }

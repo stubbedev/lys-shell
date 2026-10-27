@@ -202,7 +202,7 @@ func (s *Screen) loadBackground() *credential.Backdrop {
 	if path == "" {
 		return nil
 	}
-	bg, err := credential.LoadBackdrop(&s.mem, s.d.Decode, path, float64(s.cfg.Blur), s.d.Outputs())
+	bg, err := credential.LoadBackdrop(&s.mem, s.d.Decode, path, s.cfg.Blur.Sigma(), s.d.Outputs())
 	if err != nil {
 		log.Printf("lock: %v; using the color fill", err)
 		return nil

@@ -1,8 +1,6 @@
 package config
 
 import (
-	"reflect"
-
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -307,7 +305,7 @@ func (m NotificationHistoryMemory) Limit() notifications.MemoryLimit { return m.
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
-	n, err := decodeCount(v)
+	n, err := decodeInt64(v)
 	if err != nil {
 		return err
 	}
@@ -323,7 +321,7 @@ func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
 func (m NotificationHistoryMemory) MarshalConfig() any { return int64(m.limit.Count()) }
 
 func (NotificationHistoryMemory) configSchema(*schemaGen) Schema {
-	return countSchema(typeOf[NotificationHistoryMemory](), notifications.MinHistoryMemory, notifications.MaxHistoryMemory)
+	return uint32RangeSchema(typeOf[NotificationHistoryMemory](), notifications.MinHistoryMemory, notifications.MaxHistoryMemory)
 }
 
 // NotificationHistoryStored is how many notifications the history keeps
@@ -337,7 +335,7 @@ func (m NotificationHistoryStored) Limit() notifications.StoredLimit { return m.
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
-	n, err := decodeCount(v)
+	n, err := decodeInt64(v)
 	if err != nil {
 		return err
 	}
@@ -353,21 +351,5 @@ func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
 func (m NotificationHistoryStored) MarshalConfig() any { return int64(m.limit.Count()) }
 
 func (NotificationHistoryStored) configSchema(*schemaGen) Schema {
-	return countSchema(typeOf[NotificationHistoryStored](), notifications.MinHistoryStored, notifications.MaxHistoryStored)
-}
-
-func decodeCount(v any) (int64, error) {
-	var n int64
-	err := decodeInto(reflect.ValueOf(&n).Elem(), v)
-	return n, err
-}
-
-func countSchema(t reflect.Type, lo, hi int64) Schema {
-	return Schema{
-		"description": typeDoc(t),
-		"type":        "integer",
-		"format":      "uint32",
-		"minimum":     lo,
-		"maximum":     hi,
-	}
+	return uint32RangeSchema(typeOf[NotificationHistoryStored](), notifications.MinHistoryStored, notifications.MaxHistoryStored)
 }
