@@ -57,7 +57,7 @@ let
   # libraries; lys-secrets draws nothing and links none of them.
   wrapped = [
     "lys-shell"
-    "lys-greeter"
+    "lys-login"
     "lys-lock"
     "lys-settings"
   ];
@@ -73,7 +73,7 @@ buildGo127Module {
 
   subPackages = [
     "cmd/lys-shell"
-    "cmd/lys-greeter"
+    "cmd/lys-login"
     "cmd/lys-lock"
     "cmd/lys-settings"
     "cmd/lys-secrets"
@@ -105,7 +105,7 @@ buildGo127Module {
     install -Dm0644 resources/dev.stubbe.lys.settings.desktop -t $out/share/applications
     install -Dm0644 resources/lys-settings.svg \
       $out/share/icons/hicolor/scalable/apps/lys-settings.svg
-    # Polkit action for `pkexec lys-greeter apply-config`.
+    # Polkit action for `pkexec lys-login apply-config`.
     install -Dm0644 resources/dev.stubbe.lys.greeter.policy \
       -t $out/share/polkit-1/actions
     install -Dm0644 resources/icons/hicolor/scalable/actions/*.svg \

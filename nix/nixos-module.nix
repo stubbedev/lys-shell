@@ -74,7 +74,7 @@ let
   greeterCommand =
     let
       cageExe = lib.getExe cfg.greeter.cagePackage;
-      greeterExe = lib.getExe' cfg.greeter.package "lys-greeter";
+      greeterExe = lib.getExe' cfg.greeter.package "lys-login";
       envArgs = lib.concatMapStringsSep " " (
         e: "--env ${lib.escapeShellArg e}"
       ) cfg.greeter.session.environment;
@@ -99,7 +99,7 @@ let
         + " ";
     in
     "${wrapperPrefix}${envPrefix}${cageExe} -s -- "
-    + "${greeterExe} --config /etc/lys-shell/config.yaml "
+    + "${greeterExe} greet --config /etc/lys-shell/config.yaml "
     + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${xsessionDirArgs} ${envArgs} ${fallback}";
 in
 {
@@ -195,7 +195,7 @@ in
         type = lib.types.package;
         default = cfg.package;
         defaultText = lib.literalExpression "config.programs.lys-shell.package";
-        description = "Package providing the `lys-greeter` binary.";
+        description = "Package providing the `lys-login` binary.";
       };
 
       cagePackage = lib.mkOption {
@@ -442,7 +442,7 @@ in
       };
 
       # Let any local user push their greeter (login-screen) choices from
-      # lys-settings to the system config via `pkexec lys-greeter
+      # lys-settings to the system config via `pkexec lys-login
       # apply-config` (writes only greeter keys to /etc/lys-shell/runtime.yaml,
       # which the greeter overlays on config.yaml). Admin auth is required.
       security.polkit.enable = true;

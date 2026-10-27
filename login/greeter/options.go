@@ -1,5 +1,5 @@
-// Package greeter is lys-greeter: a greetd greeter sharing the lock
-// screen's credential prompt. It runs as the single client of a kiosk
+// Package greeter is `lys-login greet`: the login screen in its greeter
+// mode, as a greetd greeter. It runs as the single client of a kiosk
 // compositor (cage) that greetd spawns, drives the login over the
 // greetd IPC socket, and exits when greetd starts the chosen session.
 package greeter
@@ -41,7 +41,7 @@ type Options struct {
 type UsageError struct{ detail string }
 
 func (e UsageError) Error() string {
-	return e.detail + "\nusage: lys-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... " +
+	return e.detail + "\nusage: lys-login greet [--config PATH] [--sessions DIR]... [--xsessions DIR]... " +
 		"[--state PATH] [--env KEY=VAL]... [-- <session argv...>]"
 }
 

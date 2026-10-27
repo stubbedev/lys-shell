@@ -3,8 +3,6 @@ package lock
 import (
 	"errors"
 	"image"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -219,19 +217,19 @@ func TestLockCoversOutputsAndReportsTheHint(t *testing.T) {
 
 func TestLockRefusals(t *testing.T) {
 	h := newHarness(t, func(l *config.LoginConfig) { l.Lock.Enabled = false })
-	h.s.Lock()
-	if h.locker.active {
-		t.Error("[lock] enabled = false still locked")
+	if err := h.s.Lock(); err == nil || !strings.Contains(err.Error(), "disabled") || h.locker.active {
+		t.Errorf("login.lock.enabled = false: %v, locked %v", err, h.locker.active)
 	}
 	h = newHarness(t, nil)
 	h.locker.available = false
-	h.s.Lock()
-	if h.locker.active {
-		t.Error("locked without ext-session-lock-v1")
+	if err := h.s.Lock(); err == nil || !strings.Contains(err.Error(), "ext-session-lock-v1") || h.locker.active {
+		t.Errorf("without ext-session-lock-v1: %v, locked %v", err, h.locker.active)
 	}
 	h = newHarness(t, nil)
 	h.locker.lockErr = errors.New("boom")
-	h.s.Lock()
+	if err := h.s.Lock(); !errors.Is(err, h.locker.lockErr) {
+		t.Errorf("a refused lock request = %v, want it wrapped", err)
+	}
 	if len(h.s.faces) != 0 || len(h.loop.every) != 0 {
 		t.Error("a failed LockSession left state behind")
 	}
@@ -588,38 +586,6 @@ func TestLockFreesTheBackgroundAfterTheFence(t *testing.T) {
 	}
 }
 
-func TestClaimLockOnStart(t *testing.T) {
-	dir := t.TempDir()
-	if !claimLockOnStart(dir) {
-		t.Fatal("the first start of a session must lock")
-	}
-	if second, third := claimLockOnStart(dir), claimLockOnStart(dir); second || third {
-		t.Error("a restart within the session must not lock")
-	}
-	if !claimLockOnStart("") {
-		t.Error("without a runtime dir it must fail secure and lock")
-	}
-	ro := filepath.Join(t.TempDir(), "ro")
-	if err := os.Mkdir(ro, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	if os.Geteuid() != 0 && !claimLockOnStart(ro) {
-		t.Error("an unwritable runtime dir must fail secure and lock")
-	}
-}
-
-func TestShouldRelock(t *testing.T) {
-	if !shouldRelock(true, nil) {
-		t.Error("LockedHint set: the previous shell died holding the lock, re-acquire")
-	}
-	if shouldRelock(false, nil) {
-		t.Error("LockedHint clear: a restart must not lock")
-	}
-	if shouldRelock(true, errors.New("no logind")) {
-		t.Error("probe unavailable: fail soft")
-	}
-}
-
 // The messages are _lock.ftl's, the count interpolated.
 func TestFailureTextIsLocalized(t *testing.T) {
 	if got := failedAttempts(3); !strings.Contains(got, "3") || strings.HasPrefix(got, "No localization") {
@@ -632,32 +598,6 @@ func TestFailureTextIsLocalized(t *testing.T) {
 	}
 }
 
-// TestSetConfigAppliesAReload pins the live config: a reload that
-// disables the lock refuses the next request, and one that changes
-// the PAM service takes effect on the next lock, as the Rust lock
-// reads its keys at use.
-func TestSetConfigAppliesAReload(t *testing.T) {
-	h := newHarness(t, nil)
-	next := config.Defaults()
-	next.Login.Lock.Enabled = false
-	h.s.SetConfig(next)
-	h.s.Lock()
-	if h.locker.active {
-		t.Fatal("a reload disabling [lock] still locked")
-	}
-	next = config.Defaults()
-	next.Login.Lock.PamService = "lys-shell-reloaded"
-	h.s.SetConfig(next)
-	h.lock(t)
-	h.s.Submit("pw")
-	if c := h.conv(t); c.service != "lys-shell-reloaded" {
-		t.Errorf("PAM service = %q, want the reloaded one", c.service)
-	}
-}
-
-// The surface is the Rust lock window's tree, styled by lock.css:
-// window.lock-window over the background, the .lock-center card with
-// its lock-* nodes, and the .lock-scrim; nothing pins an ink the
 // stylesheet should set.
 func TestSurfaceIsTheStyledLockTree(t *testing.T) {
 	h := newHarness(t, nil)

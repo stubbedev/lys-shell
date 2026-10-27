@@ -10,7 +10,8 @@
 # portal's answers - screenshot, colour pick, a global shortcut bound
 # and activated through the compositor - the night light applied
 # from the bar through hyprland-ctm-control, the session lock taking the outputs and releasing them
-# on a typed password, the lock surviving a shell restart, lys-secrets'
+# on a typed password, a dead lock client replaced, the lock surviving a
+# shell restart, lys-secrets'
 # login collection unlocked by that password and, after a restart,
 # through the shell's own password dialog) and leaves a
 # screenshot of every state in the result for review.
@@ -473,20 +474,23 @@ pkgs.testers.nixosTest {
     machine.send_chars("${password}\n")
     wait("the lookup through the dialog", lambda: machine.execute("cat /tmp/lys/lookup.txt")[1] == "vm-secret", tries=30)
 
-    # A shell that dies while locked leaves the compositor locked
-    # (allow_session_lock_restore) and logind's LockedHint set; the
-    # restarted shell re-acquires the lock and a password lifts it.
+    # A lock client that dies leaves the compositor locked
+    # (allow_session_lock_restore) and logind's LockedHint set: the shell
+    # starts lys-login again, which re-acquires the lock.
     shell("lock")
     wait("the second lock", lambda: count("shell", "lock: session locked") == 2)
-    machine.succeed("pkill -KILL -f 'lys-shell shell'")
-    time.sleep(2)
-    machine.screenshot("09-locked-shell-dead")
-    hypr('dispatch exec "lys-shell shell > /tmp/lys/shell2.log 2>&1"')
-    wait("the restarted shell to re-acquire the lock", lambda: logged("shell2", "re-acquiring") and logged("shell2", "lock: session locked"))
+    machine.succeed("pkill -KILL -f 'lys-login lock'")
+    wait("the shell to re-acquire the lock", lambda: logged("shell", "still locked; re-acquiring") and count("shell", "lock: session locked") == 3)
     time.sleep(1)
-    machine.screenshot("10-relocked-after-restart")
+    machine.screenshot("09-relocked-after-the-lock-client-died")
+    # A shell restarted while locked leaves the lock to the lys-login
+    # holding it, which outlives the shell.
+    machine.succeed("pkill -KILL -f 'lys-shell shell'")
+    hypr('dispatch exec "lys-shell shell > /tmp/lys/shell2.log 2>&1"')
+    wait("the restarted shell to find the lock held", lambda: logged("shell2", "re-acquiring") and logged("shell2", "another lys-login already holds the session locked"))
+    machine.screenshot("10-locked-after-a-shell-restart")
     machine.send_chars("${password}\n")
-    wait("the unlock after the restart", lambda: logged("shell2", "lock: session unlocked"))
+    wait("the unlock after the restart", lambda: count("shell", "lock: session unlocked") == 2)
     wait("the bar after the restart", lambda: bars_on(names))
     machine.screenshot("11-unlocked-after-restart")
 

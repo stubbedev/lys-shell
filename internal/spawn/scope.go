@@ -28,19 +28,19 @@ const (
 // stay there.
 func Detached(cmd *exec.Cmd, name string) error {
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
-	if err := start(cmd, name); err != nil {
+	if err := Scoped(cmd, name); err != nil {
 		return err
 	}
 	go func() { _ = cmd.Wait() }()
 	return nil
 }
 
-// start starts cmd in a session of its own and moves it into its own
-// scope; the error is a failure to start. Without a systemd user
+// Scoped starts cmd in a session of its own and moves it into its own
+// scope, for the caller to wait on; the error is a failure to start. Without a systemd user
 // manager there is no unit cgroup to leave, so it stays where it is; a
 // manager that refuses the scope is logged, the process already
 // running.
-func start(cmd *exec.Cmd, name string) error {
+func Scoped(cmd *exec.Cmd, name string) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return err

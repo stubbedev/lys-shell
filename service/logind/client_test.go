@@ -1,4 +1,4 @@
-package lock
+package logind
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/lys-shell/internal/dbustest"
-	"github.com/stubbedev/lys-shell/service/logind"
 )
 
 // fakeLogindSession is the session object of a fake logind: the real
@@ -30,7 +29,7 @@ func (s *fakeLogindSession) SetLockedHint(locked bool) *dbus.Error {
 type fakeProps struct{ s *fakeLogindSession }
 
 func (p fakeProps) Get(iface, name string) (dbus.Variant, *dbus.Error) {
-	if iface != logind.SessionIf || name != "LockedHint" {
+	if iface != SessionIf || name != "LockedHint" {
 		return dbus.Variant{}, dbus.NewError("org.freedesktop.DBus.Error.UnknownProperty", nil)
 	}
 	p.s.mu.Lock()
@@ -60,16 +59,16 @@ func startFakeLogind(t *testing.T) (*dbustest.Bus, *dbus.Conn, *fakeLogindSessio
 		path dbus.ObjectPath
 		as   string
 	}{
-		{fakeManager{}, logind.ManagerPath, logind.ManagerIf},
-		{sess, fakeSessionPath, logind.SessionIf},
+		{fakeManager{}, ManagerPath, ManagerIf},
+		{sess, fakeSessionPath, SessionIf},
 		{fakeProps{s: sess}, fakeSessionPath, "org.freedesktop.DBus.Properties"},
 	} {
 		if err := server.Export(e.v, e.path, e.as); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if reply, err := server.RequestName(logind.Service, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
-		t.Fatalf("claim %s: %v %v", logind.Service, reply, err)
+	if reply, err := server.RequestName(Service, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("claim %s: %v %v", Service, reply, err)
 	}
 	return bus, server, sess
 }
@@ -78,7 +77,7 @@ func startFakeLogind(t *testing.T) (*dbustest.Bus, *dbus.Conn, *fakeLogindSessio
 // the hint round-trips.
 func TestLogindHint(t *testing.T) {
 	bus, _, sess := startFakeLogind(t)
-	l, err := NewLogind(bus.Conn(t))
+	l, err := NewClient(bus.Conn(t))
 	if err != nil {
 		t.Fatalf("NewLogind: %v", err)
 	}
@@ -106,7 +105,7 @@ func TestLogindHint(t *testing.T) {
 // callbacks; the same signals from another session do not.
 func TestLogindSignals(t *testing.T) {
 	bus, server, _ := startFakeLogind(t)
-	l, err := NewLogind(bus.Conn(t))
+	l, err := NewClient(bus.Conn(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +118,7 @@ func TestLogindSignals(t *testing.T) {
 	// Let the match rule land before emitting.
 	time.Sleep(100 * time.Millisecond)
 	emit := func(path dbus.ObjectPath, member string) {
-		if err := server.Emit(path, logind.SessionIf+"."+member); err != nil {
+		if err := server.Emit(path, SessionIf+"."+member); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -149,7 +148,7 @@ func TestLogindSignals(t *testing.T) {
 
 func TestNewLogindWithoutLogind(t *testing.T) {
 	bus := dbustest.Start(t)
-	if _, err := NewLogind(bus.Conn(t)); err == nil {
+	if _, err := NewClient(bus.Conn(t)); err == nil {
 		t.Error("NewLogind succeeded with no logind on the bus")
 	}
 }

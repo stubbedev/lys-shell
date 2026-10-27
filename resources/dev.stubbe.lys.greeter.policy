@@ -8,9 +8,9 @@
 
   <!--
     Lets lys-settings push a user's greeter (login-screen) choices to the
-    system config via `pkexec lys-greeter apply-config`. The annotation makes
+    system config via `pkexec lys-login apply-config`. The annotation makes
     pkexec use THIS action (instead of the generic org.freedesktop.policykit.exec)
-    when the target program is /usr/bin/lys-greeter, so it carries this
+    when the target program is /usr/bin/lys-login, so it carries this
     action's admin-auth policy and message. apply-config only ever writes
     allowlisted greeter keys to <config-dir>/runtime.yaml.
   -->
@@ -22,7 +22,7 @@
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/lys-greeter</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/lys-login</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
   </action>
 </policyconfig>

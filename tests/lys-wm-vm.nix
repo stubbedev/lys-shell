@@ -134,7 +134,9 @@ pkgs.testers.nixosTest {
     machine.wait_for_unit("multi-user.target")
 
     def shell_log():
-        return machine.execute("journalctl --no-pager -o cat _SYSTEMD_USER_UNIT=lys-shell.service")[1]
+        # lys-login logs to the shell's stream from a scope of its own:
+        # the stream's identifier finds both, the unit only the shell.
+        return machine.execute("journalctl --no-pager -o cat SYSLOG_IDENTIFIER=lys-shell")[1]
 
     def logs():
         print(machine.execute("cat /tmp/lys/*.log | tail -n 80; tail -n 40 /tmp/lys/events.jsonl")[1])
@@ -330,10 +332,16 @@ pkgs.testers.nixosTest {
 
     run("lys-shell lock")
     wait("the second lock", lambda: count("lock: session locked (2 monitors)") == 2)
-    run("systemctl --user kill --signal=KILL lys-shell.service")
-    wait("the restarted shell to re-acquire the lock", lambda: "re-acquiring" in shell_log() and count("lock: session locked (2 monitors)") == 3, tries=60)
+    # A lock client that dies leaves the session locked; the shell starts
+    # lys-login again, which re-acquires it.
+    machine.succeed("pkill -KILL -f 'lys-login lock'")
+    wait("the shell to re-acquire the lock", lambda: "still locked; re-acquiring" in shell_log() and count("lock: session locked (2 monitors)") == 3, tries=60)
     time.sleep(1)
-    shot("12-relocked-after-restart")
+    shot("12-relocked-after-the-lock-client-died")
+    # A shell restarted while locked leaves the lock to the lys-login
+    # holding it, in a scope of its own.
+    run("systemctl --user kill --signal=KILL lys-shell.service")
+    wait("the restarted shell to find the lock held", lambda: count("another lys-login already holds the session locked") >= 1, tries=60)
     machine.send_chars("${password}\n")
     wait("the unlock after the restart", lambda: count("lock: session unlocked") == 2)
     for o in (first, second):

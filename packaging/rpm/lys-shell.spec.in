@@ -42,7 +42,7 @@ lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns, launch
 
 %install
 install -d %{buildroot}%{_bindir}
-install -m 0755 lys-shell lys-greeter lys-lock lys-settings lys-secrets %{buildroot}%{_bindir}/
+install -m 0755 lys-shell lys-login lys-lock lys-settings lys-secrets %{buildroot}%{_bindir}/
 
 install -d %{buildroot}%{_userunitdir}
 install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service lys-secrets.service %{buildroot}%{_userunitdir}/
@@ -84,7 +84,7 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %files
 %license LICENSE eff_large_wordlist.NOTICE
 %{_bindir}/lys-shell
-%{_bindir}/lys-greeter
+%{_bindir}/lys-login
 %{_bindir}/lys-lock
 %{_bindir}/lys-settings
 %{_bindir}/lys-secrets

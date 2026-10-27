@@ -12,6 +12,8 @@
 package lock
 
 import (
+	"errors"
+	"fmt"
 	"image"
 	"log"
 	"strconv"
@@ -86,6 +88,9 @@ type Deps struct {
 	OnLocked func()
 	// CapsLock reports whether Caps Lock is on.
 	CapsLock func() bool
+	// OnEnded runs on the loop when a lock ends: unlocked, refused, or
+	// ended by the compositor; nil for nothing.
+	OnEnded func()
 }
 
 // authHandle is the running conversation's reply side.
@@ -141,6 +146,9 @@ type Screen struct {
 	dateText  string
 	// confirmed: the compositor sent locked for this lock.
 	confirmed bool
+	// unlocked: the last lock ended in an unlock, by password or by
+	// logind.
+	unlocked bool
 }
 
 // New builds the screen over its collaborators.
@@ -150,32 +158,21 @@ func New(cfg *config.Config, font render.Font, sheet *widget.Stylesheet, d Deps)
 	return &Screen{cfg: cfg.Login, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, font: font, sheet: sheet, d: d}
 }
 
-// SetConfig applies a reloaded config, as the Rust lock reads its keys
-// live: every later read (the grace period, the attempt limit, the
-// PAM service, the blank timeout, the clock formats) sees it at once,
-// and the next lock builds its surfaces and background from it. Loop
-// goroutine.
-func (s *Screen) SetConfig(cfg *config.Config) {
-	s.cfg, s.anims, s.wallpaper = cfg.Login, cfg.Animations, cfg.Wallpaper.Wallpaper
-}
-
 // Locked reports whether a lock is pending or held.
 func (s *Screen) Locked() bool { return s.d.Locker.Active() }
 
 // Lock acquires the session lock and covers every output (idempotent
 // while locked). Refused, with a log line, when [lock] is disabled or
 // the compositor lacks ext-session-lock-v1.
-func (s *Screen) Lock() {
+func (s *Screen) Lock() error {
 	if !s.cfg.Lock.Enabled {
-		log.Printf("lock: disabled in config; ignoring lock request")
-		return
+		return errors.New("lock: disabled in config (login.lock.enabled)")
 	}
 	if s.d.Locker.Active() {
-		return
+		return nil
 	}
 	if !s.d.Locker.Available() {
-		log.Printf("lock: compositor does not support ext-session-lock-v1; cannot lock")
-		return
+		return errors.New("lock: the compositor does not support ext-session-lock-v1")
 	}
 	s.bg = s.loadBackground()
 	s.attempts = 0
@@ -192,13 +189,13 @@ func (s *Screen) Lock() {
 		OnFinished: s.onFinished,
 	})
 	if err != nil {
-		log.Printf("lock: cannot lock the session: %v", err)
 		s.faces = nil
 		s.dropBackground()
-		return
+		return fmt.Errorf("lock: cannot lock the session: %w", err)
 	}
 	s.startClock()
 	s.armBlank()
+	return nil
 }
 
 // loadBackground resolves the configured background and makes it at
@@ -291,6 +288,14 @@ func (s *Screen) onFinished() {
 	s.dropBackground()
 	s.attempts = 0
 	s.lockedAt = time.Time{}
+	s.unlocked = false
+	s.ended()
+}
+
+func (s *Screen) ended() {
+	if s.d.OnEnded != nil {
+		s.d.OnEnded()
+	}
 }
 
 // ForceUnlock is logind's Unlock: tear down without a password - only
@@ -437,7 +442,9 @@ func (s *Screen) release() {
 	s.attempts = 0
 	s.resetAuth()
 	s.setLockedHint(false)
+	s.unlocked = true
 	log.Printf("lock: session unlocked")
+	s.ended()
 }
 
 func (s *Screen) setLockedHint(locked bool) {

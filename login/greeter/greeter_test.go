@@ -45,7 +45,7 @@ func TestParseOptions(t *testing.T) {
 	for _, bad := range [][]string{{"--config"}, {"--env", "NOEQUALS"}, {"--bogus"}, {"--sessions"}, {"--state"}} {
 		_, err := ParseOptions(bad)
 		var usage UsageError
-		if !errors.As(err, &usage) || !strings.Contains(err.Error(), "usage: lys-greeter") {
+		if !errors.As(err, &usage) || !strings.Contains(err.Error(), "usage: lys-login greet") {
 			t.Errorf("ParseOptions(%q) = %v, want a usage error", bad, err)
 		}
 	}

@@ -15,7 +15,7 @@ override_dh_strip:
 
 override_dh_auto_install:
 	install -d debian/lys-shell/usr/bin
-	install -m 0755 lys-shell lys-greeter lys-lock lys-settings lys-secrets debian/lys-shell/usr/bin/
+	install -m 0755 lys-shell lys-login lys-lock lys-settings lys-secrets debian/lys-shell/usr/bin/
 
 	install -d debian/lys-shell/usr/lib/systemd/user
 	install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service lys-secrets.service debian/lys-shell/usr/lib/systemd/user/

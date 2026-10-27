@@ -19,7 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/spawn"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
 	"github.com/stubbedev/lys-shell/internal/xdg"
-	"github.com/stubbedev/lys-shell/login/lock"
+	"github.com/stubbedev/lys-shell/login/lockclient"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/clipboard"
@@ -402,8 +402,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 			log.Printf("bar: %v; modules of services that start later will not appear", err)
 		}
 	}
-	// lockScreen starts below; a reload reaches it once it exists.
-	var lockScreen *lock.Screen
 	if svc != nil {
 		// A reload recompiles the stylesheet for the new snapshot,
 		// rebuilds the bars, and hands the OSD and popups their new
@@ -429,9 +427,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 			}
 			if popupHost != nil {
 				popupHost.SetConfig(next)
-			}
-			if lockScreen != nil {
-				lockScreen.SetConfig(next)
 			}
 			if baseCtx.Clipboard != nil {
 				if err := baseCtx.Clipboard.SetBudget(next.Clipboard.HistoryMiB.Budget()); err != nil {
@@ -479,16 +474,17 @@ func run(cfg *config.Config, svc *config.Service) error {
 		}
 		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts, lockKeySource())
 	}()
-	// The ext-session-lock screen and its triggers (logind, and `lys-shell
-	// lock` through Shell1).
-	lockScreen, stopLock := lock.Start(application, sess.Outputs, current.Load(), font, theme.Sheet, func() {
+	// The lock triggers (logind, lock-on-start, and `lys-shell lock`
+	// through Shell1) start `lys-login lock`, the login screen in its
+	// lock mode, as a process of its own.
+	locker, stopLock := lockclient.Start(current.Load, func() {
 		if current.Load().Bitwarden.LockWithSession {
-			baseCtx.Bitwarden.lockIfOpen()
+			application.Invoke(baseCtx.Bitwarden.lockIfOpen)
 		}
 	})
 	defer stopLock()
 	defer serveShellIPC(application, bars, func() bool {
-		application.Invoke(lockScreen.Lock)
+		locker.Lock()
 		return true
 	})()
 	// The launcher surface serves `lys-shell launcher` sessions.

@@ -1,6 +1,6 @@
 # Greeter (login screen)
 
-`lys-greeter` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
+`lys-login greet` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
 display-manager login screen that can replace sddm/gdm for Wayland sessions. It
 is the same login screen as the lock screen, in its greeter mode: both read the
 `login` config section, so they share the theme, background, blur, clock and
@@ -80,7 +80,7 @@ These options live under **Login & Lock Screen** and **Greeter** in `lys-setting
 greeter reads the *system* config (`/etc/lys-shell/config.yaml` plus a
 `runtime.yaml` overlay beside it), not your user config. The **Apply to login
 screen** button on that page pushes the current greeter values to the system via
-`pkexec lys-greeter apply-config` (bundled polkit action
+`pkexec lys-login apply-config` (bundled polkit action
 `dev.stubbe.lys.greeter.apply-config`, admin auth), writing only the login keys
 the greeter reads to `/etc/lys-shell/runtime.yaml` — so any user can set the login-screen background
 without hand-editing root-owned files, and a hand-written `config.yaml` is never
@@ -93,7 +93,7 @@ whose single client is the greeter. On successful login greetd replaces the
 greeter with your chosen session.
 
 ```
-greetd → cage -s → lys-greeter → (login) → your compositor
+greetd → cage -s → lys-login greet → (login) → your compositor
 ```
 
 ## NixOS
@@ -136,7 +136,7 @@ Point greetd's `default_session` at the greeter, hosted by cage:
 ```toml
 # /etc/greetd/config.toml
 [default_session]
-command = "cage -s -- lys-greeter --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session"
+command = "cage -s -- lys-login greet --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session"
 user = "greeter"
 ```
 
@@ -170,7 +170,7 @@ nixGLIntel lys-greeter-session --config /etc/lys-shell/config.yaml --state /var/
 ## CLI reference
 
 ```
-lys-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
+lys-login greet [--config PATH] [--sessions DIR]... [--xsessions DIR]... [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
 ```
 
 | Flag | Default | What it does |

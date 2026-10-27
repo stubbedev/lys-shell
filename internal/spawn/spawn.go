@@ -22,7 +22,7 @@ func Quiet(cmd string) error {
 	c := exec.Command("sh", "-c", cmd) //nolint:gosec // the command comes from the user's own config
 	var stderr bytes.Buffer
 	c.Stderr = &stderr
-	if err := start(c, strings.Fields(cmd)[0]); err != nil {
+	if err := Scoped(c, strings.Fields(cmd)[0]); err != nil {
 		log.Printf("cannot spawn command %q: %v", cmd, err)
 		return err
 	}

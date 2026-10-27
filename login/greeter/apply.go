@@ -12,7 +12,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// RunApplyConfig is `lys-greeter apply-config [--config PATH]
+// RunApplyConfig is `lys-login apply-config [--config PATH]
 // <STAGED.yaml>`, run as root through pkexec by lys-settings: it
 // copies only the allowlisted login keys of the staged file into
 // runtime.yaml beside the system config, never touching config.yaml.
@@ -37,7 +37,7 @@ func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if staged == "" {
-		return applyFail(stderr, "usage: lys-greeter apply-config [--config PATH] <STAGED.yaml>")
+		return applyFail(stderr, "usage: lys-login apply-config [--config PATH] <STAGED.yaml>")
 	}
 	dest, err := applyConfig(staged, configPath, asPkexecCaller)
 	if err != nil {
@@ -48,7 +48,7 @@ func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 }
 
 func applyFail(stderr io.Writer, msg string) int {
-	_, _ = fmt.Fprintf(stderr, "lys-greeter apply-config: %s\n", msg)
+	_, _ = fmt.Fprintf(stderr, "lys-login apply-config: %s\n", msg)
 	return 1
 }
 

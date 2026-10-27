@@ -87,7 +87,7 @@ The binaries are static Go; at runtime they load PAM, and Vulkan when it is inst
 git clone https://github.com/stubbedev/lys-shell
 cd lys-shell
 just build
-sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-greeter dist/lys-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-login dist/lys-lock -t /usr/local/bin
 lys-shell icons setup
 lys-shell panel start
 ```

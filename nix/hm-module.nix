@@ -9,7 +9,7 @@ let
   cfg = config.programs.lys-shell;
   yamlFormat = pkgs.formats.yaml { };
 
-  # A self-contained launch wrapper for the greeter: `cage -s -- lys-greeter`
+  # A self-contained launch wrapper for the greeter: `cage -s -- lys-login greet`
   # with the render env baked in, passing any extra args straight through. Point
   # your (non-NixOS) greetd at this one path — or, for GPU acceleration, wrap it
   # with nixGL: `nixGLIntel lys-greeter-session --config /etc/lys-shell/config.yaml
@@ -30,7 +30,7 @@ let
     exec env ${greeterCursorEnv} ${lib.optionalString (cfg.greeter.renderer == "software")
       "WLR_RENDERER=pixman WLR_DRM_NO_MODIFIERS=1 GSK_RENDERER=cairo GDK_DISABLE=gl "
     }${lib.getExe cfg.greeter.cagePackage} -s -- \
-      ${lib.getExe' cfg.package "lys-greeter"} "$@"
+      ${lib.getExe' cfg.package "lys-login"} greet "$@"
   '';
 
   pkgIfPresent = name: lib.optional (builtins.hasAttr name pkgs) (builtins.getAttr name pkgs);
@@ -212,7 +212,7 @@ in
           {file}`$XDG_CONFIG_HOME/lys-shell/greeter.yaml`. The greeter runs as the
           greetd user, so copy this somewhere that user can read (e.g.
           {file}`/etc/lys-shell/config.yaml`) and point greetd's command at it:
-          {command}`cage -s -- lys-greeter --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session`.
+          {command}`cage -s -- lys-login greet --config /etc/lys-shell/config.yaml --state /var/lib/lys-greeter/last-session`.
           The greeter discovers Wayland sessions from the standard
           {file}`wayland-sessions` dirs; add `--sessions DIR` to override.
         '';

@@ -77,7 +77,7 @@ func greeterApplyFooter(k *kit) widget.Widget {
 			label.SetText(greeterApplyFailed)
 			return
 		}
-		log.Printf("settings: greeter apply: launched pkexec lys-greeter apply-config")
+		log.Printf("settings: greeter apply: launched pkexec lys-login apply-config")
 	}, css.SuggestedAction), false, widget.AlignStart)
 	hint := k.label(greeterApplyHint, "settings-section-title")
 	hint.SetWrap(true)
@@ -86,7 +86,7 @@ func greeterApplyFooter(k *kit) widget.Widget {
 }
 
 // applyGreeter stages the login keys the greeter takes and hands them
-// to `pkexec lys-greeter apply-config` (dispatch).
+// to `pkexec lys-login apply-config` (dispatch).
 func applyGreeter(s store) error {
 	login := make(map[string]any, len(config.GreeterApplyKeys))
 	for _, key := range config.GreeterApplyKeys {
@@ -108,9 +108,9 @@ func applyGreeter(s store) error {
 }
 
 // spawnGreeterApply starts pkexec without waiting: the polkit agent
-// asks, and lys-greeter reports on its own (a test seam).
+// asks, and lys-login reports on its own (a test seam).
 var spawnGreeterApply = func(staged string) error {
-	cmd := exec.Command("pkexec", "lys-greeter", "apply-config", staged) //nolint:gosec // fixed program, staged path
+	cmd := exec.Command("pkexec", "lys-login", "apply-config", staged) //nolint:gosec // fixed program, staged path
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("spawn pkexec: %w", err)
 	}

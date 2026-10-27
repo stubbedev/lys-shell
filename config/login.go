@@ -105,13 +105,13 @@ func DefaultsLogin() LoginConfig {
 const GreeterConfigPath = "/etc/lys-shell/config.yaml"
 
 // RuntimeOverlayPath is the runtime.yaml beside a config file: where
-// `config set`, the settings GUI, and `lys-greeter apply-config` write
+// `config set`, the settings GUI, and `lys-login apply-config` write
 // overrides so they never clobber a hand-written config.yaml.
 func RuntimeOverlayPath(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), "runtime.yaml")
 }
 
-// LoadGreeter is lys-greeter's config load: the file at path with
+// LoadGreeter is the greeter's config load: the file at path with
 // its imports on the config layer, the sibling runtime.yaml on the
 // runtime layer. A file that fails to load leaves its layer out (the
 // errors come back joined beside a usable config), so the greeter
@@ -144,7 +144,7 @@ func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 }
 
 // GreeterApplyKeys are the login keys, relative to login, that
-// lys-settings pushes to the system login screen and lys-greeter
+// lys-settings pushes to the system login screen and lys-login
 // apply-config accepts, in the settings app's order: the shared look
 // and the greeter's own keys, never the lock screen's.
 var GreeterApplyKeys = []string{
