@@ -39,7 +39,7 @@ let
       ../cava
       ../cmd
       ../config
-      ../greeter
+      ../login
       ../i18n
       ../internal
       ../portal

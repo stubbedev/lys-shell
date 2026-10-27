@@ -1,4 +1,4 @@
-// Package lock is the secure lock screen (lys-shell's shell/lock): an
+// Package lock is the login screen in its lock mode: an
 // ext-session-lock surface per output, so the compositor blanks every
 // output, routes input only here, and keeps the session locked if the
 // shell dies. The password is verified by a PAM conversation on a
@@ -25,8 +25,8 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	loginscreen "github.com/stubbedev/lys-shell/login/screen"
 	"github.com/stubbedev/lys-shell/service/auth"
-	"github.com/stubbedev/lys-shell/shell/credential"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
@@ -84,6 +84,8 @@ type Deps struct {
 	// lock, for what locks with the session (the vault); nil for
 	// nothing.
 	OnLocked func()
+	// CapsLock reports whether Caps Lock is on.
+	CapsLock func() bool
 }
 
 // authHandle is the running conversation's reply side.
@@ -94,7 +96,7 @@ type authHandle interface {
 
 // face is one output's lock surface: the prompt and the blank scrim.
 type face struct {
-	prompt *credential.Prompt
+	prompt *loginscreen.Prompt
 	scrim  *widget.Box
 }
 
@@ -112,7 +114,7 @@ type Screen struct {
 	// bg is the background made once per lock, shared by every
 	// output's surface and freed when the lock ends; nil draws the
 	// color. Its pixels live in mem.
-	bg  *credential.Backdrop
+	bg  *loginscreen.Backdrop
 	mem memory.Shared
 	// attempts counts failures in this lock session.
 	attempts uint32
@@ -131,6 +133,8 @@ type Screen struct {
 	message   string
 	blanked   bool
 	clockStop func()
+	capsStop  func()
+	caps      bool
 	blankStop func()
 	blankGen  uint64
 	clockText string
@@ -199,12 +203,12 @@ func (s *Screen) Lock() {
 
 // loadBackground resolves the configured background and makes it at
 // the outputs' size, blurred; nil draws the color.
-func (s *Screen) loadBackground() *credential.Backdrop {
+func (s *Screen) loadBackground() *loginscreen.Backdrop {
 	path := s.cfg.Background.ImagePath(s.wallpaper)
 	if path == "" {
 		return nil
 	}
-	bg, err := credential.LoadBackdrop(&s.mem, s.d.Decode, path, s.cfg.Blur.Sigma(), s.d.Outputs())
+	bg, err := loginscreen.LoadBackdrop(&s.mem, s.d.Decode, path, s.cfg.Blur.Sigma(), s.d.Outputs())
 	if err != nil {
 		log.Printf("lock: %v; using the color fill", err)
 		return nil
@@ -225,11 +229,12 @@ func (s *Screen) dropBackground() {
 // output at lock time and again for each output plugged in while
 // locked. A new face picks up the current state.
 func (s *Screen) buildFace(*app.Output) app.LockSurface {
-	f := &face{scrim: credential.Scrim()}
-	f.prompt = credential.Build(credential.Options{
-		Font:      s.font,
-		ShowClock: s.cfg.ShowClock,
-	}, s.Submit)
+	surface := loginscreen.Build(loginscreen.Spec{
+		Mode: loginscreen.Lock, Config: s.cfg, Font: s.font, Sheet: s.sheet, Backdrop: s.bg,
+		CapsLock: i18n.T("lock-caps-lock"), OnSubmit: s.Submit,
+	})
+	f := &face{prompt: surface.Prompt, scrim: surface.Scrim}
+	f.prompt.SetCapsLock(s.caps)
 	f.prompt.Clock.SetText(s.clockText)
 	f.prompt.Date.SetText(s.dateText)
 	f.prompt.SetMessage(s.message)
@@ -238,12 +243,8 @@ func (s *Screen) buildFace(*app.Output) app.LockSurface {
 	// The background is opaque at once; the card reveals over it.
 	reveal.Show(f.prompt.Reveal, s.anims, config.AnimLock)
 	s.faces = append(s.faces, f)
-	root := credential.Window(s.sheet,
-		credential.Background(s.bg, credential.HexFill(s.cfg.Background.Color)),
-		f.prompt.Reveal,
-		f.scrim)
 	return app.LockSurface{
-		Root:       root,
+		Root:       surface.Root,
 		Background: blackout,
 		Focus:      f.prompt.Entry,
 		// Any key press is activity: unblank and re-arm the timer.
@@ -479,6 +480,21 @@ func (s *Screen) setBlanked(on bool) {
 func (s *Screen) startClock() {
 	s.refreshClock()
 	s.clockStop = s.d.Loop.Every(time.Second, s.refreshClock)
+	if s.d.CapsLock != nil {
+		s.refreshCaps()
+		s.capsStop = s.d.Loop.Every(capsPoll, s.refreshCaps)
+	}
+}
+
+// capsPoll is how often the caps lock warning follows the keyboard, as
+// the greeter's does.
+const capsPoll = 250 * time.Millisecond
+
+func (s *Screen) refreshCaps() {
+	s.caps = s.d.CapsLock()
+	for _, f := range s.faces {
+		f.prompt.SetCapsLock(s.caps)
+	}
 }
 
 func (s *Screen) refreshClockText() {
@@ -499,6 +515,10 @@ func (s *Screen) stopTimers() {
 	if s.clockStop != nil {
 		s.clockStop()
 		s.clockStop = nil
+	}
+	if s.capsStop != nil {
+		s.capsStop()
+		s.capsStop = nil
 	}
 	if s.blankStop != nil {
 		s.blankStop()

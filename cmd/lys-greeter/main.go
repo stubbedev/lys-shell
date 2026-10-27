@@ -14,7 +14,7 @@ import (
 	"os"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/greeter"
+	"github.com/stubbedev/lys-shell/login/greeter"
 )
 
 func main() {

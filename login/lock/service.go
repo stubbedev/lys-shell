@@ -73,6 +73,7 @@ func Start(a *app.Application, outputs func() []*app.Output, cfg *config.Config,
 		Outputs:  func() []image.Point { return outputsize.Devices(outputs()) },
 		Forget:   a.ForgetImage,
 		OnLocked: onLocked,
+		CapsLock: func() bool { return a.Session().Mods()&app.ModCapsLock != 0 },
 	}
 	if ld != nil {
 		deps.SetLockedHint = func(locked bool) {

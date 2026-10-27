@@ -690,3 +690,39 @@ func mustBlur(sigma int64) config.LockBlur {
 	}
 	return b
 }
+
+// The lock screen warns of Caps Lock as the greeter does: every face
+// follows the keyboard while locked, and a face built later starts in
+// the current state.
+func TestLockFollowsCapsLock(t *testing.T) {
+	h := newHarness(t, nil)
+	caps := false
+	h.s.d.CapsLock = func() bool { return caps }
+	h.s.Lock()
+	for _, f := range h.s.faces {
+		if f.prompt.Caps.Visible() {
+			t.Fatal("the caps warning shows with Caps Lock off")
+		}
+	}
+	caps = true
+	for _, tick := range h.loop.every {
+		if tick != nil {
+			tick()
+		}
+	}
+	for _, f := range h.s.faces {
+		if !f.prompt.Caps.Visible() || f.prompt.Caps.Text() != i18n.T("lock-caps-lock") {
+			t.Error("a face does not warn of Caps Lock")
+		}
+	}
+	h.locker.plug()
+	if last := h.s.faces[len(h.s.faces)-1]; !last.prompt.Caps.Visible() {
+		t.Error("a face plugged in later does not start warning")
+	}
+	h.s.ForceUnlock()
+	for i, tick := range h.loop.every {
+		if tick != nil {
+			t.Errorf("timer %d still runs after the unlock", i)
+		}
+	}
+}

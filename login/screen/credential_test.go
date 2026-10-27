@@ -1,4 +1,4 @@
-package credential
+package screen
 
 import (
 	"image"
@@ -21,7 +21,7 @@ import (
 func TestBuildShape(t *testing.T) {
 	var submitted []string
 	var focused []widget.Widget
-	p := Build(Options{
+	p := newPrompt(Options{
 		Font: treetest.Font(t), ShowClock: true, WithUsername: true,
 		Focus: func(w widget.Widget) { focused = append(focused, w) },
 	}, func(s string) { submitted = append(submitted, s) })
@@ -52,7 +52,7 @@ func TestBuildShape(t *testing.T) {
 		t.Error("an empty message hides the line")
 	}
 
-	lock := Build(Options{Font: treetest.Font(t)}, func(string) {})
+	lock := newPrompt(Options{Font: treetest.Font(t)}, func(string) {})
 	if lock.Username != nil || lock.Clock.Visible() {
 		t.Error("the lock-screen prompt has no username entry, and ShowClock false hides the clock")
 	}
@@ -63,7 +63,7 @@ func TestBuildShape(t *testing.T) {
 // scale of the theme's text size, the error line lys-ui's error text;
 // only the clock is a heading.
 func TestBuildTakesLysUiParts(t *testing.T) {
-	p := Build(Options{Font: treetest.Font(t), ShowClock: true}, func(string) {})
+	p := newPrompt(Options{Font: treetest.Font(t), ShowClock: true}, func(string) {})
 	cards := treetest.WithClass(p.Reveal, "lock-center")
 	if len(cards) != 1 || len(treetest.WithClass(cards[0], css.Card)) != 1 {
 		t.Fatal("the credential column must be lys-ui's card")
@@ -97,7 +97,7 @@ func TestBackground(t *testing.T) {
 
 // The peek icon reveals the masked secret and masks it again.
 func TestPeekTogglesTheEcho(t *testing.T) {
-	p := Build(Options{Font: treetest.Font(t)}, func(string) {})
+	p := newPrompt(Options{Font: treetest.Font(t)}, func(string) {})
 	p.togglePeek()
 	if !p.peeked {
 		t.Fatal("the peek did not reveal")

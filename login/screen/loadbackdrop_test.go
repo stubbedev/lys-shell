@@ -1,4 +1,4 @@
-package credential
+package screen
 
 import (
 	"image"

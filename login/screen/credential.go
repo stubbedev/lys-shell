@@ -1,9 +1,14 @@
-// Package credential is the credential prompt the lock screen and the
-// greeter share (wayle-widgets' credential_box.rs): clock, date, an
-// optional username entry, the secret entry, and the error line in the
-// centered .lock-center card. Both screens build it the same way and
-// style it with the same lock.css rules, so they render identically.
-package credential
+// Package screen is the login screen: one screen the greeter shows
+// before login and the lock screen shows over a locked session, built by
+// the same code (Build) and styled by the same lock.css rules, so the two
+// look and behave alike. A Mode adds only what genuinely differs: the
+// greeter's user list, username entry, session picker and power buttons.
+//
+// The credential prompt at its center (wayle-widgets' credential_box.rs)
+// holds the clock, the date, an optional username entry, the secret
+// entry, the caps lock warning and the error line in the centered
+// .lock-center card.
+package screen
 
 import (
 	"github.com/stubbedev/lys-lib/render"
@@ -35,9 +40,11 @@ type Options struct {
 	// (the greeter; the lock screen authenticates the session user).
 	WithUsername bool
 	// Header goes between the date and the entries (the greeter's user
-	// list); Extra between the secret entry and the error line (the
+	// list); Extra between the caps lock warning and the error line (the
 	// greeter's session picker). Either may be nil.
 	Header, Extra widget.Widget
+	// CapsLock is the caps lock warning's text.
+	CapsLock string
 	// Focus moves keyboard focus; the username entry's Enter uses it
 	// to move on to the secret entry.
 	Focus func(widget.Widget)
@@ -56,21 +63,26 @@ type Prompt struct {
 	Entry *widget.Entry
 	// Clock and Date are hidden without ShowClock.
 	Clock, Date *widget.Label
+	// Caps is the caps lock warning, hidden until SetCapsLock shows it.
+	Caps *widget.Label
 	// Error is the error and info line, hidden until it has text.
 	Error  *widget.Label
 	peeked bool
 }
 
-// Build assembles a prompt (CredentialBox::build); onSubmit fires with
+// newPrompt assembles a prompt (CredentialBox::build); onSubmit fires with
 // the secret entry's text each time the user presses Enter in it.
-func Build(o Options, onSubmit func(string)) *Prompt {
+func newPrompt(o Options, onSubmit func(string)) *Prompt {
 	textPx := widgets.TextPx(styling.Body, 1)
 	p := &Prompt{
 		Clock: label(o.Font, textPx*styling.Hero.Ratio(), "lock-clock", css.Heading, css.Numeric),
 		Date:  label(o.Font, textPx*styling.Subtitle.Ratio(), "lock-date"),
 		Entry: widget.NewEntry(o.Font, textPx, 0),
+		Caps:  label(o.Font, textPx, "lock-caps", css.Warning),
 		Error: label(o.Font, textPx, "lock-error", css.Error),
 	}
+	p.Caps.SetText(o.CapsLock)
+	p.Caps.SetVisible(false)
 	p.Clock.SetVisible(o.ShowClock)
 	p.Date.SetVisible(o.ShowClock)
 	p.Entry.AddClass("lock-entry")
@@ -101,7 +113,7 @@ func Build(o Options, onSubmit func(string)) *Prompt {
 		}
 		center.Append(p.Username, false)
 	}
-	center.Append(p.Entry, false)
+	center.Append(p.Entry, false).Append(p.Caps, false)
 	if o.Extra != nil {
 		center.Append(o.Extra, false)
 	}
@@ -132,6 +144,13 @@ func (p *Prompt) togglePeek() {
 		icon = peekConceal
 	}
 	p.Entry.SetTrailingIcon(icon, 0, p.togglePeek)
+}
+
+// SetCapsLock shows or hides the caps lock warning.
+func (p *Prompt) SetCapsLock(on bool) {
+	if p.Caps.Visible() != on {
+		p.Caps.SetVisible(on)
+	}
 }
 
 // SetMessage shows text on the error line, or hides it when empty.

@@ -11,7 +11,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/logind"
 )
 
-// logind integration (shell/lock/logind.rs): the session's Lock and
+// logind integration: the session's Lock and
 // Unlock signals drive the lock screen, so `loginctl lock-session`, idle
 // daemons, and `lys-shell lock` all end up here; SetLockedHint reports the
 // state back, and LockedHint - kept by logind across our restarts - says

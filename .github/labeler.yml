@@ -28,7 +28,7 @@
 
 "area:greeter":
     - changed-files:
-          - any-glob-to-any-file: "greeter/**"
+          - any-glob-to-any-file: "login/**"
 
 "area:cli":
     - changed-files:

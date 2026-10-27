@@ -307,11 +307,11 @@ func TestGreeterSessionPickerAndCaps(t *testing.T) {
 		t.Error("two sessions hide the picker")
 	}
 	r.s.setCapsLock(true)
-	if !r.s.caps.Visible() || r.s.caps.Text() != "Caps Lock is on" || !slices.Contains(r.s.caps.Classes(), css.Warning) {
+	if !r.s.prompt.Caps.Visible() || r.s.prompt.Caps.Text() != "Caps Lock is on" || !slices.Contains(r.s.prompt.Caps.Classes(), css.Warning) {
 		t.Error("caps lock on shows the warning")
 	}
 	r.s.setCapsLock(false)
-	if r.s.caps.Visible() {
+	if r.s.prompt.Caps.Visible() {
 		t.Error("caps lock off keeps the warning")
 	}
 }

@@ -15,8 +15,8 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	loginscreen "github.com/stubbedev/lys-shell/login/screen"
 	"github.com/stubbedev/lys-shell/service/auth"
-	"github.com/stubbedev/lys-shell/shell/credential"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -87,15 +87,14 @@ type authHandle interface {
 type screen struct {
 	init   Init
 	d      deps
-	prompt *credential.Prompt
+	prompt *loginscreen.Prompt
 	root   widget.Widget
 	drop   *widget.Dropdown
-	caps   *widget.Label
 	users  []*userButton
 
 	// bg is the background at the outputs' size, freed when the
 	// greeter ends; nil draws the color. Its pixels live in mem.
-	bg  *credential.Backdrop
+	bg  *loginscreen.Backdrop
 	mem memory.Shared
 
 	mu       sync.Mutex // guards selected: greetd reads it off the loop
@@ -113,9 +112,9 @@ type userButton struct {
 	button *widget.Button
 }
 
-// newScreen builds the greeter view (app.rs init): font shapes the
-// text and sheet styles the window through the lock.css rules the
-// greeter shares with the lock screen.
+// newScreen builds the greeter view: the login screen in its greeter
+// mode, with the user list, the session picker and the power buttons;
+// font shapes the text and sheet styles the window.
 func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *screen {
 	s := &screen{init: init, d: d}
 	g := init.Config.Login
@@ -139,12 +138,6 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 		s.mu.Unlock()
 	}
 	s.drop.SetVisible(len(init.Sessions) > 1)
-	s.caps = widget.NewLabel(font, textPx, t("greeter-caps-lock"), 0)
-	s.caps.AddClass("lock-caps", css.Warning)
-	s.caps.SetAlignment(render.AlignCenter)
-	s.caps.SetVisible(false)
-	below := widget.NewBox(widget.Column, th.Spacing, 0)
-	below.Append(s.caps, false).Append(s.drop, false)
 
 	users := widget.NewBox(widget.Row, th.Spacing, 0)
 	users.AddClass("lock-users")
@@ -154,23 +147,19 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 	} else {
 		users.SetVisible(false)
 	}
-	s.prompt = credential.Build(credential.Options{
-		Font: font, ShowClock: g.ShowClock, WithUsername: true,
-		Header: users, Extra: below, Focus: d.focus,
-	}, s.submit)
+	rows := loginscreen.GreeterRows{Users: users, Session: s.drop}
+	if g.Greeter.ShowPowerButtons {
+		rows.Power = s.powerRow()
+	}
+	s.bg = s.loadBackground()
+	surface := loginscreen.Build(loginscreen.Spec{
+		Mode: loginscreen.Greeter, Config: g, Font: font, Sheet: sheet, Backdrop: s.bg,
+		Greeter: rows, CapsLock: t("greeter-caps-lock"), Focus: d.focus, OnSubmit: s.submit,
+	})
+	s.prompt, s.root = surface.Prompt, surface.Root
 	s.prompt.Username.SetPlaceholder(t("greeter-username"))
 	s.prompt.Reveal.SetTransition(widget.RevealFade)
 	s.prompt.Reveal.SetDuration(revealFade)
-
-	s.bg = s.loadBackground()
-	layers := []widget.Widget{
-		credential.Background(s.bg, credential.HexFill(g.Background.Color)),
-		s.prompt.Reveal,
-	}
-	if g.Greeter.ShowPowerButtons {
-		layers = append(layers, s.powerRow())
-	}
-	s.root = credential.Window(sheet, layers...)
 	s.refreshClock()
 	return s
 }
@@ -187,15 +176,15 @@ func (s *screen) start() {
 	s.d.focus(s.prompt.Username)
 }
 
-// loadBackground is the greeter's background (app.rs
-// build_background), unblurred at the outputs' size: an unreadable
-// image falls back to the color, never a mystery black.
-func (s *screen) loadBackground() *credential.Backdrop {
+// loadBackground is the greeter's background at the outputs' size,
+// blurred as the lock screen's is: an unreadable image falls back to the
+// color, never a mystery black.
+func (s *screen) loadBackground() *loginscreen.Backdrop {
 	path := s.init.Config.Login.Background.ImagePath(s.init.Config.Wallpaper.Wallpaper)
 	if path == "" {
 		return nil
 	}
-	bg, err := credential.LoadBackdrop(&s.mem, s.d.loadImage, path, 0, s.d.outputs())
+	bg, err := loginscreen.LoadBackdrop(&s.mem, s.d.loadImage, path, s.init.Config.Login.Blur.Sigma(), s.d.outputs())
 	if err != nil {
 		log.Printf("greeter: %v; using color fill", err)
 		return nil
@@ -410,8 +399,4 @@ func (s *screen) refreshClock() {
 }
 
 // setCapsLock shows or hides the warning.
-func (s *screen) setCapsLock(on bool) {
-	if s.caps.Visible() != on {
-		s.caps.SetVisible(on)
-	}
-}
+func (s *screen) setCapsLock(on bool) { s.prompt.SetCapsLock(on) }
