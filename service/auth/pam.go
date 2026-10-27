@@ -48,9 +48,20 @@ type pamLib interface {
 type pamTxn interface {
 	authenticate() int32
 	acctMgmt() int32
+	setcred(flags int32) int32
+	openSession() int32
+	closeSession() int32
+	putenv(kv string) int32
+	getenvlist() []string
 	end(status int32)
 	strerror(code int32) string
 }
+
+// pam_setcred flags (security/_pam_types.h).
+const (
+	pamEstablishCred = 0x0002
+	pamDeleteCred    = 0x0004
+)
 
 // PAM authenticates against a PAM service (e.g. system-auth): the
 // in-session backend of the lock screen. The conversation runs on the
@@ -88,21 +99,13 @@ func (p *PAM) Run(username string, ask Ask) error {
 	defer runtime.UnlockOSThread()
 
 	conv := &pamConversation{ask: ask}
-	txn, err := p.lib.start(p.Service, username, conv.handle)
+	l, err := authenticate(p.lib, p.Service, username, conv)
 	if err != nil {
-		log.Printf("auth: could not start PAM transaction for %s: %v", p.Service, err)
-		return fmt.Errorf("could not start PAM transaction: %w", err)
+		log.Printf("auth: PAM %s: %v", p.Service, err)
+		return err
 	}
-	var last int32 = pamSuccess
-	defer func() { txn.end(last) }()
-
-	if last = txn.authenticate(); last != pamSuccess {
-		log.Printf("auth: PAM authentication failed for %s: %s", p.Service, txn.strerror(last))
-		return fmt.Errorf("authentication failed: %s", txn.strerror(last))
-	}
-	if last = txn.acctMgmt(); last != pamSuccess {
-		log.Printf("auth: PAM account check failed for %s: %s", p.Service, txn.strerror(last))
-		return fmt.Errorf("account check failed: %s", txn.strerror(last))
+	if err := l.Close(); err != nil {
+		log.Printf("auth: PAM %s: %v", p.Service, err)
 	}
 	if conv.secret != "" && p.unlockKeyring != nil {
 		p.unlockKeyring(conv.secret)

@@ -145,34 +145,66 @@ func greetdPrompt(kind, text string) (Prompt, error) {
 	return Prompt{}, fmt.Errorf("greetd: unknown auth_message_type %q", kind)
 }
 
-// send writes one length-prefixed request.
-func (g *Greetd) send(req any) error {
-	payload, err := json.Marshal(req)
+// maxGreetdFrame bounds a frame's length: greetd messages are small,
+// and a peer must not make the other side allocate gigabytes.
+const maxGreetdFrame = 1 << 20
+
+// writeGreetdFrame writes one length-prefixed JSON message.
+func writeGreetdFrame(w io.Writer, msg any) error {
+	payload, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
 	size, err := intconv.Exact[uint32](len(payload))
 	if err != nil {
-		return fmt.Errorf("request too large: %w", err)
+		return fmt.Errorf("message too large: %w", err)
 	}
 	frame := binary.NativeEndian.AppendUint32(make([]byte, 0, 4+len(payload)), size)
 	frame = append(frame, payload...)
-	_, err = g.conn.Write(frame)
+	_, err = w.Write(frame)
 	return err
 }
 
-// recv reads one length-prefixed response.
-func (g *Greetd) recv() (greetdResponse, error) {
+// readGreetdFrame reads one length-prefixed JSON message into v.
+func readGreetdFrame(r io.Reader, v any) error {
 	var head [4]byte
-	if _, err := io.ReadFull(g.conn, head[:]); err != nil {
-		return greetdResponse{}, err
+	if _, err := io.ReadFull(r, head[:]); err != nil {
+		return err
 	}
-	buf := make([]byte, binary.NativeEndian.Uint32(head[:]))
-	if _, err := io.ReadFull(g.conn, buf); err != nil {
-		return greetdResponse{}, err
+	n := binary.NativeEndian.Uint32(head[:])
+	if n > maxGreetdFrame {
+		return fmt.Errorf("greetd: a %d-byte message is over the %d-byte limit", n, maxGreetdFrame)
 	}
+	buf := make([]byte, n)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return err
+	}
+	return json.Unmarshal(buf, v)
+}
+
+// cancel cancels the session and reads greetd's answer, so the
+// connection is idle again rather than closed under a reply in flight.
+func (g *Greetd) cancel() error {
+	if err := g.send(cancelSession); err != nil {
+		return fmt.Errorf("greetd: cancel the session: %w", err)
+	}
+	resp, err := g.recv()
+	if err != nil {
+		return fmt.Errorf("greetd: the answer to cancel_session: %w", err)
+	}
+	if resp.Type != "success" {
+		return fmt.Errorf("greetd: cancel_session refused: %s", resp.Description)
+	}
+	return nil
+}
+
+// send writes one request.
+func (g *Greetd) send(req any) error { return writeGreetdFrame(g.conn, req) }
+
+// recv reads one response.
+func (g *Greetd) recv() (greetdResponse, error) {
 	var resp greetdResponse
-	if err := json.Unmarshal(buf, &resp); err != nil {
+	if err := readGreetdFrame(g.conn, &resp); err != nil {
 		return greetdResponse{}, err
 	}
 	return resp, resp.validate()
@@ -202,15 +234,13 @@ func (g *Greetd) Run(username string, ask Ask) error {
 			break
 		}
 		if resp.Type == "error" {
-			_ = g.send(cancelSession)
-			return errors.New(resp.Description)
+			return errors.Join(errors.New(resp.Description), g.cancel())
 		}
 		prompt, _ := greetdPrompt(resp.AuthMessageType, resp.AuthMessage)
 		answer, ok := ask(prompt)
 		// A cancelled input prompt aborts the whole session.
 		if prompt.WantsInput() && !ok {
-			_ = g.send(cancelSession)
-			return ErrCancelled
+			return errors.Join(ErrCancelled, g.cancel())
 		}
 		var response *string
 		if ok {

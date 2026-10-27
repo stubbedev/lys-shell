@@ -126,12 +126,27 @@ func TestGreetdAuthErrorCancels(t *testing.T) {
 		f.read()
 		f.reply(`{"type":"error","error_type":"auth_error","description":"pam_authenticate: AUTH_ERR"}`)
 		f.read()
+		f.reply(`{"type":"success"}`)
 	})
 	if err == nil || err.Error() != "pam_authenticate: AUTH_ERR" {
 		t.Fatalf("Run = %v, want the greetd description", err)
 	}
 	if last := f.requests[len(f.requests)-1]; last["type"] != "cancel_session" {
 		t.Errorf("last request = %v, want cancel_session", last)
+	}
+}
+
+// TestGreetdRefusedCancelIsReported: a cancel greetd refuses is part of
+// the error, next to the failure that led to it.
+func TestGreetdRefusedCancelIsReported(t *testing.T) {
+	_, err := runGreetd(t, "alice", func(Prompt) (string, bool) { return "wrong", true }, func() []string { return nil }, func(f *fakeGreetd) {
+		f.read()
+		f.reply(`{"type":"error","error_type":"auth_error","description":"pam_authenticate: AUTH_ERR"}`)
+		f.read()
+		f.reply(`{"type":"error","error_type":"error","description":"no session"}`)
+	})
+	if err == nil || !strings.Contains(err.Error(), "pam_authenticate: AUTH_ERR") || !strings.Contains(err.Error(), "cancel_session refused: no session") {
+		t.Fatalf("Run = %v, want the failure and the refused cancel", err)
 	}
 }
 
@@ -142,6 +157,7 @@ func TestGreetdCancelledPrompt(t *testing.T) {
 		f.read()
 		f.reply(`{"type":"auth_message","auth_message_type":"visible","auth_message":"OTP:"}`)
 		f.read()
+		f.reply(`{"type":"success"}`)
 	})
 	if !errors.Is(err, ErrCancelled) {
 		t.Fatalf("Run = %v, want ErrCancelled", err)

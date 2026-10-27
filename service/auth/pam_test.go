@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,8 @@ type fakePAM struct {
 	codes         []int32
 	calls         []string
 	endStatus     int32
+	openRC        int32
+	env           []string
 }
 
 func (f *fakePAM) start(service, user string, converse func([]pamMessage) ([]pamReply, int32)) (pamTxn, error) {
@@ -68,6 +71,32 @@ func (t *fakeTxn) acctMgmt() int32 {
 	t.f.calls = append(t.f.calls, "acct_mgmt")
 	return t.f.acctRC
 }
+
+func (t *fakeTxn) setcred(flags int32) int32 {
+	t.f.calls = append(t.f.calls, fmt.Sprintf("setcred %#x", flags))
+	return pamSuccess
+}
+
+func (t *fakeTxn) openSession() int32 {
+	t.f.calls = append(t.f.calls, "open_session")
+	if t.f.openRC != 0 {
+		return t.f.openRC
+	}
+	t.f.env = append(t.f.env, "XDG_SESSION_ID=7")
+	return pamSuccess
+}
+
+func (t *fakeTxn) closeSession() int32 {
+	t.f.calls = append(t.f.calls, "close_session")
+	return pamSuccess
+}
+
+func (t *fakeTxn) putenv(kv string) int32 {
+	t.f.env = append(t.f.env, kv)
+	return pamSuccess
+}
+
+func (t *fakeTxn) getenvlist() []string { return append([]string(nil), t.f.env...) }
 
 func (t *fakeTxn) end(status int32) {
 	t.f.calls = append(t.f.calls, "end")
@@ -217,7 +246,7 @@ func TestPAMStartFailure(t *testing.T) {
 	f := &fakePAM{startErr: errors.New("load libpam: not found")}
 	var unlocked []string
 	err := newTestPAM(f, &unlocked).Run("", func(Prompt) (string, bool) { return "", false })
-	if err == nil || !strings.Contains(err.Error(), "could not start PAM transaction") {
+	if err == nil || !strings.Contains(err.Error(), "start PAM transaction lys-shell for") || !strings.Contains(err.Error(), "load libpam: not found") {
 		t.Fatalf("Run = %v", err)
 	}
 }

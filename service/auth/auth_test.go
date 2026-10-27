@@ -138,3 +138,33 @@ func TestPromptWantsInput(t *testing.T) {
 		}
 	}
 }
+
+// closingConversation is a Conversation over a connection.
+type closingConversation struct {
+	err    error
+	closed chan struct{}
+}
+
+func (c *closingConversation) Run(string, Ask) error { return c.err }
+
+func (c *closingConversation) Close() error {
+	close(c.closed)
+	return nil
+}
+
+// A conversation over a connection closes it when it ends, failed or
+// not: the next attempt opens its own, and a greetd-style server must
+// not wait on the old one.
+func TestSpawnClosesTheConversation(t *testing.T) {
+	for _, runErr := range []error{nil, errors.New("Authentication failure")} {
+		c := &closingConversation{err: runErr, closed: make(chan struct{})}
+		events := make(chan Event, 2)
+		Spawn(c, "alice", func(e Event) { events <- e })
+		<-events
+		select {
+		case <-c.closed:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("run error %v: the conversation was not closed", runErr)
+		}
+	}
+}

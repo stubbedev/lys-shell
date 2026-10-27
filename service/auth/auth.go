@@ -12,6 +12,7 @@ package auth
 
 import (
 	"errors"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -148,7 +149,15 @@ func Spawn(conv Conversation, username string, onEvent func(Event)) *Handle {
 				return "", false
 			}
 		}
-		if err := conv.Run(username, ask); err != nil {
+		err := conv.Run(username, ask)
+		// A conversation over a connection (greetd's) ends with it: the
+		// next attempt opens its own.
+		if c, ok := conv.(io.Closer); ok {
+			if cerr := c.Close(); cerr != nil {
+				log.Printf("auth: close the conversation: %v", cerr)
+			}
+		}
+		if err != nil {
 			log.Printf("auth: conversation failed: %v", err)
 			onEvent(Event{Kind: EventFailure, Reason: err.Error()})
 			return

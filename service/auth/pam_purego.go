@@ -48,6 +48,11 @@ type libpam struct {
 	startConfdir func(service, user string, conv unsafe.Pointer, confdir string, pamh *uintptr) int32
 	authenticate func(pamh uintptr, flags int32) int32
 	acctMgmt     func(pamh uintptr, flags int32) int32
+	setcred      func(pamh uintptr, flags int32) int32
+	openSession  func(pamh uintptr, flags int32) int32
+	closeSession func(pamh uintptr, flags int32) int32
+	putenv       func(pamh uintptr, kv string) int32
+	getenvlist   func(pamh uintptr) unsafe.Pointer
 	end          func(pamh uintptr, status int32) int32
 	strerror     func(pamh uintptr, code int32) string
 	calloc       func(n, size uintptr) unsafe.Pointer
@@ -81,6 +86,11 @@ func bindLibpam() (*libpam, error) {
 	purego.RegisterLibFunc(&l.start, pam, "pam_start")
 	purego.RegisterLibFunc(&l.authenticate, pam, "pam_authenticate")
 	purego.RegisterLibFunc(&l.acctMgmt, pam, "pam_acct_mgmt")
+	purego.RegisterLibFunc(&l.setcred, pam, "pam_setcred")
+	purego.RegisterLibFunc(&l.openSession, pam, "pam_open_session")
+	purego.RegisterLibFunc(&l.closeSession, pam, "pam_close_session")
+	purego.RegisterLibFunc(&l.putenv, pam, "pam_putenv")
+	purego.RegisterLibFunc(&l.getenvlist, pam, "pam_getenvlist")
 	purego.RegisterLibFunc(&l.end, pam, "pam_end")
 	purego.RegisterLibFunc(&l.strerror, pam, "pam_strerror")
 	// pam_start_confdir (Linux-PAM 1.4+) is optional: only the tests
@@ -210,8 +220,28 @@ type systemTxn struct {
 	conv   unsafe.Pointer
 }
 
-func (t *systemTxn) authenticate() int32 { return t.l.authenticate(t.handle, 0) }
-func (t *systemTxn) acctMgmt() int32     { return t.l.acctMgmt(t.handle, 0) }
+func (t *systemTxn) authenticate() int32       { return t.l.authenticate(t.handle, 0) }
+func (t *systemTxn) acctMgmt() int32           { return t.l.acctMgmt(t.handle, 0) }
+func (t *systemTxn) setcred(flags int32) int32 { return t.l.setcred(t.handle, flags) }
+func (t *systemTxn) openSession() int32        { return t.l.openSession(t.handle, 0) }
+func (t *systemTxn) closeSession() int32       { return t.l.closeSession(t.handle, 0) }
+func (t *systemTxn) putenv(kv string) int32    { return t.l.putenv(t.handle, kv) }
+
+// getenvlist is the transaction's environment, the C list freed once
+// copied.
+func (t *systemTxn) getenvlist() []string {
+	list := t.l.getenvlist(t.handle)
+	if list == nil {
+		return nil
+	}
+	var env []string
+	for p := (*unsafe.Pointer)(list); *p != nil; p = (*unsafe.Pointer)(unsafe.Add(unsafe.Pointer(p), unsafe.Sizeof(uintptr(0)))) { //nolint:gosec // audited: a NULL-terminated char** from pam_getenvlist
+		env = append(env, clib.GoString((*byte)(*p)))
+		t.l.free(*p)
+	}
+	t.l.free(list)
+	return env
+}
 
 func (t *systemTxn) strerror(code int32) string { return t.l.strerror(t.handle, code) }
 
