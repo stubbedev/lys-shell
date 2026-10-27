@@ -292,6 +292,14 @@ A module with an associated CSS class for custom styling.
 
 String.
 
+## ClipboardHistoryMiB {#clipboard-history-mi-b}
+
+Clipboard history budget in MiB.
+
+Number in `[8, 1024]`.
+
+Serialises as `uint32`.
+
 ## ColorValue {#color-value}
 
 CSS token, hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa), 'transparent', or 'auto'

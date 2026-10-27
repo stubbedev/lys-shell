@@ -134,8 +134,15 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).
-	if clip, err := clipboard.Start(application, clipboard.DefaultHistory()); err == nil {
+	history, err := clipboard.DefaultHistory(cfg.Clipboard.HistoryMiB.Budget())
+	if err != nil {
+		return fmt.Errorf("bar: clipboard history: %w", err)
+	}
+	if clip, err := clipboard.Start(application, history); err == nil {
 		baseCtx.Clipboard = clip
+		defer clip.Close()
+	} else {
+		history.Close()
 	}
 	if detectCompositor() == compositorHyprland {
 		if conn, err := hyprland.Connect(); err != nil {
@@ -415,6 +422,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 			}
 			if lockScreen != nil {
 				lockScreen.SetConfig(next)
+			}
+			if baseCtx.Clipboard != nil {
+				if err := baseCtx.Clipboard.SetBudget(next.Clipboard.HistoryMiB.Budget()); err != nil {
+					log.Printf("bar: clipboard history budget: %v", err)
+				}
 			}
 		})
 		defer svc.Subscribe(reloads.push)()

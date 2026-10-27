@@ -34,6 +34,28 @@ func TestNewRGBAAndFree(t *testing.T) {
 	}
 }
 
+func TestCloneCopiesOffTheHeapAndFrees(t *testing.T) {
+	var mem memory.Shared
+	src := []byte("payload")
+	buf, err := Clone(&mem, src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src[0] = 'X'
+	if string(buf.Elems()) != "payload" || mem.Stats().Live != 1 {
+		t.Fatalf("clone = %q, %d allocations", buf.Elems(), mem.Stats().Live)
+	}
+	if err := Free(&mem, buf); err != nil {
+		t.Fatal(err)
+	}
+	if st := mem.Stats(); st.Live != 0 {
+		t.Errorf("after Free: %d allocations", st.Live)
+	}
+	if _, err := Clone(&mem, nil); err == nil || mem.Stats().Live != 0 {
+		t.Error("an empty buffer was allocated")
+	}
+}
+
 func TestNewRGBARejectsImpossibleSizes(t *testing.T) {
 	var mem memory.Shared
 	for _, size := range []image.Point{{0, 5}, {5, 0}, {-1, 5}, {math.MaxInt / 2, 4}} {

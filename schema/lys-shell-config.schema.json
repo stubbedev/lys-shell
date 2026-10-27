@@ -1556,6 +1556,24 @@
     "ClickAction": {
       "type": "string"
     },
+    "ClipboardConfig": {
+      "description": "Clipboard history settings.",
+      "properties": {
+        "history-mib": {
+          "$ref": "#/$defs/ClipboardHistoryMiB",
+          "default": 64,
+          "description": "Most memory the history keeps, in MiB, across every entry. The\noldest entries are forgotten to make room for a new one. The\nbudget is never less than the largest single entry kept."
+        }
+      },
+      "type": "object"
+    },
+    "ClipboardHistoryMiB": {
+      "description": "Clipboard history budget in MiB.",
+      "format": "uint32",
+      "maximum": 1024,
+      "minimum": 8,
+      "type": "integer"
+    },
     "ClockConfig": {
       "description": "Clock module configuration.",
       "properties": {
@@ -9511,6 +9529,13 @@
         "shadow": "none"
       },
       "description": "Bar layout and module placement."
+    },
+    "clipboard": {
+      "$ref": "#/$defs/ClipboardConfig",
+      "default": {
+        "history-mib": 64
+      },
+      "description": "Clipboard history settings."
     },
     "dropdowns": {
       "$ref": "#/$defs/DropdownsConfig",

@@ -56,6 +56,8 @@ type Config struct {
 	Wallpaper WallpaperConfig `cfg:"wallpaper"`
 	// Desktop-portal policy for sandboxed apps.
 	Portal PortalConfig `cfg:"portal"`
+	// Clipboard history settings.
+	Clipboard ClipboardConfig `cfg:"clipboard"`
 }
 
 // Defaults returns the schema defaults for every section.
@@ -75,6 +77,7 @@ func Defaults() *Config {
 		Animations:    DefaultsAnimations(),
 		Wallpaper:     DefaultsWallpaper(),
 		Portal:        DefaultsPortal(),
+		Clipboard:     DefaultsClipboard(),
 	}
 }
 

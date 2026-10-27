@@ -19,6 +19,7 @@ Editor intellisense via JSON Schema. Install the [YAML extension](https://market
 |---|---|
 | [`animations`](/config/animations) | Enter/exit and change animations for transient surfaces. |
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
+| [`clipboard`](/config/clipboard) | Clipboard history settings. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
 | [`greeter`](/config/greeter) | Greeter (display manager): the pre-login screen `lys-greeter` renders as |

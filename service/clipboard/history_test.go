@@ -1,6 +1,7 @@
 package clipboard
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -11,21 +12,46 @@ import (
 
 const textMime = "text/plain;charset=utf-8"
 
-func entry(mime, data string) Entry { return Entry{ID: 1, Mime: mime, Bytes: []byte(data)} }
+func entry(mime, data string) content { return content{mime: mime, data: []byte(data)} }
 
-func mustHistory(t *testing.T, capacity, maxBytes int) *History {
+// mustHistory is a history that, once the test ends, is closed and
+// must have freed every entry.
+func mustHistory(t *testing.T, capacity, maxBytes, budget int) *History {
 	t.Helper()
-	h, err := NewHistory(capacity, maxBytes)
+	h, err := NewHistory(capacity, maxBytes, budget)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		h.Close()
+		if st := h.mem.Stats(); st.Live != 0 || st.Bytes != 0 {
+			t.Errorf("closed history left %d allocations of %d bytes", st.Live, st.Bytes)
+		}
+	})
 	return h
 }
 
+func defaultHistory(t *testing.T) *History {
+	t.Helper()
+	return mustHistory(t, DefaultCapacity, MaxEntryBytes, DefaultBudget().Bytes())
+}
+
+// push remembers data, failing the test on an error.
+func push(t *testing.T, h *History, mime string, data []byte) (uint64, bool) {
+	t.Helper()
+	id, ok, err := h.Push(mime, data)
+	if err != nil {
+		t.Fatalf("push %d bytes of %s: %v", len(data), mime, err)
+	}
+	return id, ok
+}
+
 func texts(h *History) []string {
+	snap := h.Entries()
+	defer snap.Release()
 	var out []string
-	for _, e := range h.Entries() {
-		if s, ok := e.Text(); ok {
+	for _, e := range snap.Entries() {
+		if s, ok := e.content().text(); ok {
 			out = append(out, s)
 		}
 	}
@@ -33,11 +59,11 @@ func texts(h *History) []string {
 }
 
 func TestNewestSelectionComesFirst(t *testing.T) {
-	h := DefaultHistory()
-	if _, ok := h.Push(textMime, []byte("one")); !ok {
+	h := defaultHistory(t)
+	if _, ok := push(t, h, textMime, []byte("one")); !ok {
 		t.Fatal("refused")
 	}
-	h.Push(textMime, []byte("two"))
+	push(t, h, textMime, []byte("two"))
 
 	if got := texts(h); !slices.Equal(got, []string{"two", "one"}) {
 		t.Fatalf("entries = %v", got)
@@ -45,12 +71,12 @@ func TestNewestSelectionComesFirst(t *testing.T) {
 }
 
 func TestRecopyingMovesTheEntryWithoutDuplicatingIt(t *testing.T) {
-	h := DefaultHistory()
-	first, _ := h.Push(textMime, []byte("one"))
-	h.Push(textMime, []byte("two"))
-	h.Push(textMime, []byte("three"))
+	h := defaultHistory(t)
+	first, _ := push(t, h, textMime, []byte("one"))
+	push(t, h, textMime, []byte("two"))
+	push(t, h, textMime, []byte("three"))
 
-	again, ok := h.Push(textMime, []byte("one"))
+	again, ok := push(t, h, textMime, []byte("one"))
 
 	if !ok || again != first {
 		t.Fatalf("recopy id = %d, want %d", again, first)
@@ -61,9 +87,9 @@ func TestRecopyingMovesTheEntryWithoutDuplicatingIt(t *testing.T) {
 }
 
 func TestTheSameBytesUnderADifferentMimeIsADifferentEntry(t *testing.T) {
-	h := DefaultHistory()
-	h.Push(textMime, []byte("data"))
-	h.Push("image/png", []byte("data"))
+	h := defaultHistory(t)
+	push(t, h, textMime, []byte("data"))
+	push(t, h, "image/png", []byte("data"))
 
 	if h.Len() != 2 {
 		t.Fatalf("len = %d, want 2", h.Len())
@@ -71,10 +97,10 @@ func TestTheSameBytesUnderADifferentMimeIsADifferentEntry(t *testing.T) {
 }
 
 func TestTheOldestEntryFallsOffTheEnd(t *testing.T) {
-	h := mustHistory(t, 2, MaxEntryBytes)
-	h.Push(textMime, []byte("one"))
-	h.Push(textMime, []byte("two"))
-	h.Push(textMime, []byte("three"))
+	h := mustHistory(t, 2, MaxEntryBytes, MaxEntryBytes)
+	push(t, h, textMime, []byte("one"))
+	push(t, h, textMime, []byte("two"))
+	push(t, h, textMime, []byte("three"))
 
 	if got := texts(h); !slices.Equal(got, []string{"three", "two"}) {
 		t.Fatalf("entries = %v", got)
@@ -82,10 +108,10 @@ func TestTheOldestEntryFallsOffTheEnd(t *testing.T) {
 }
 
 func TestSelectionsNotWorthRememberingAreRefused(t *testing.T) {
-	h := mustHistory(t, 4, 8)
+	h := mustHistory(t, 4, 8, 16)
 
 	for _, data := range []string{"", "   \n\t ", "123456789"} {
-		if _, ok := h.Push(textMime, []byte(data)); ok {
+		if _, ok := push(t, h, textMime, []byte(data)); ok {
 			t.Errorf("%q was remembered", data)
 		}
 	}
@@ -94,10 +120,10 @@ func TestSelectionsNotWorthRememberingAreRefused(t *testing.T) {
 	}
 	// Exactly at the cap is fine, and whitespace-looking binary is
 	// content rather than a stray drag.
-	if _, ok := h.Push(textMime, []byte("12345678")); !ok {
+	if _, ok := push(t, h, textMime, []byte("12345678")); !ok {
 		t.Error("a selection exactly at the cap was refused")
 	}
-	if _, ok := h.Push("image/png", []byte("  \n  ")); !ok {
+	if _, ok := push(t, h, "image/png", []byte("  \n  ")); !ok {
 		t.Error("whitespace-looking binary was refused")
 	}
 	if h.Len() != 2 {
@@ -106,35 +132,39 @@ func TestSelectionsNotWorthRememberingAreRefused(t *testing.T) {
 }
 
 func TestAZeroCapacityHistoryRemembersNothing(t *testing.T) {
-	h := mustHistory(t, 0, MaxEntryBytes)
+	h := mustHistory(t, 0, MaxEntryBytes, MaxEntryBytes)
 
-	if _, ok := h.Push(textMime, []byte("one")); ok || h.Len() != 0 {
+	if _, ok := push(t, h, textMime, []byte("one")); ok || h.Len() != 0 {
 		t.Fatal("a zero-capacity history remembered something")
 	}
 }
 
 func TestNegativeBoundsAreAnError(t *testing.T) {
-	if _, err := NewHistory(-1, 8); err == nil {
+	if _, err := NewHistory(-1, 8, 8); err == nil {
 		t.Error("negative capacity accepted")
 	}
-	if _, err := NewHistory(8, -1); err == nil {
+	if _, err := NewHistory(8, -1, 8); err == nil {
 		t.Error("negative entry size accepted")
 	}
 }
 
 func TestAnAgedOutOrRemovedIDResolvesToNothing(t *testing.T) {
-	h := mustHistory(t, 1, MaxEntryBytes)
-	old, _ := h.Push(textMime, []byte("one"))
-	current, _ := h.Push(textMime, []byte("two"))
+	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	old, _ := push(t, h, textMime, []byte("one"))
+	current, _ := push(t, h, textMime, []byte("two"))
 
-	if _, ok := h.Get(old); ok {
+	if _, _, ok := h.hold(old); ok {
 		t.Error("an aged-out id resolved")
 	}
-	if _, ok := h.Get(^uint64(0)); ok {
+	if _, _, ok := h.hold(^uint64(0)); ok {
 		t.Error("an unknown id resolved")
 	}
-	if e, ok := h.Get(current); !ok || string(e.Bytes) != "two" {
-		t.Errorf("current id = %v, %v", e, ok)
+	mime, p, ok := h.hold(current)
+	if !ok || mime != textMime || string(p.bytes()) != "two" {
+		t.Errorf("current id = %q, %v", mime, ok)
+	}
+	if ok {
+		p.release()
 	}
 	if !h.Remove(current) || h.Remove(current) {
 		t.Error("Remove did not report presence exactly once")
@@ -145,31 +175,32 @@ func TestAnAgedOutOrRemovedIDResolvesToNothing(t *testing.T) {
 }
 
 func TestClearForgetsEverything(t *testing.T) {
-	h := DefaultHistory()
-	h.Push(textMime, []byte("one"))
-	h.Push(textMime, []byte("two"))
+	h := defaultHistory(t)
+	push(t, h, textMime, []byte("one"))
+	push(t, h, textMime, []byte("two"))
 
 	h.Clear()
 
-	if h.Len() != 0 || len(h.Entries()) != 0 {
+	if h.Len() != 0 || len(texts(h)) != 0 {
 		t.Fatal("Clear left entries")
 	}
 	// Ids keep counting: a row drawn before the clear cannot name a
 	// selection made after it.
-	id, _ := h.Push(textMime, []byte("three"))
+	id, _ := push(t, h, textMime, []byte("three"))
 	if id != 3 {
 		t.Fatalf("id after clear = %d, want 3", id)
 	}
 }
 
 func TestEntriesIsASnapshot(t *testing.T) {
-	h := DefaultHistory()
-	h.Push(textMime, []byte("one"))
+	h := defaultHistory(t)
+	push(t, h, textMime, []byte("one"))
 	snap := h.Entries()
+	defer snap.Release()
 
-	h.Push(textMime, []byte("two"))
+	push(t, h, textMime, []byte("two"))
 
-	if len(snap) != 1 {
+	if len(snap.Entries()) != 1 {
 		t.Fatal("a snapshot changed under a later push")
 	}
 }
@@ -231,30 +262,30 @@ func TestAnUnknownSelectionIsStillKeptAndNothingOfferedIsNone(t *testing.T) {
 }
 
 func TestKindsComeFromTheMime(t *testing.T) {
-	cases := map[Kind]Entry{
+	cases := map[Kind]content{
 		KindText:  entry(textMime, "hi"),
 		KindFiles: entry(URIListMime, "file:///a"),
 		KindImage: entry("image/png", "\x89PNG"),
 		KindOther: entry("application/pdf", "%PDF"),
 	}
 	for want, e := range cases {
-		if got := e.Kind(); got != want {
-			t.Errorf("%s: kind = %v, want %v", e.Mime, got, want)
+		if got := kindOf(e.mime); got != want {
+			t.Errorf("%s: kind = %v, want %v", e.mime, got, want)
 		}
 	}
-	if got := entry("text/html", "<p>").Kind(); got != KindText {
+	if got := kindOf("text/html"); got != KindText {
 		t.Errorf("text/html kind = %v", got)
 	}
 }
 
 func TestTextOnlyForTextAndValidUTF8(t *testing.T) {
-	if s, ok := entry(textMime, "hi").Text(); !ok || s != "hi" {
+	if s, ok := entry(textMime, "hi").text(); !ok || s != "hi" {
 		t.Errorf("text = %q, %v", s, ok)
 	}
-	if _, ok := entry("image/png", "hi").Text(); ok {
+	if _, ok := entry("image/png", "hi").text(); ok {
 		t.Error("an image read as text")
 	}
-	if _, ok := entry(textMime, "\xff\xfe").Text(); ok {
+	if _, ok := entry(textMime, "\xff\xfe").text(); ok {
 		t.Error("invalid UTF-8 read as text")
 	}
 }
@@ -262,18 +293,18 @@ func TestTextOnlyForTextAndValidUTF8(t *testing.T) {
 func TestURIListYieldsDecodedPaths(t *testing.T) {
 	list := entry(URIListMime, "# a comment\r\nfile:///home/me/my%20photo.png\r\nfile:///tmp/notes.txt\r\n")
 
-	if got := list.Paths(); !slices.Equal(got, []string{"/home/me/my photo.png", "/tmp/notes.txt"}) {
+	if got := list.paths(); !slices.Equal(got, []string{"/home/me/my photo.png", "/tmp/notes.txt"}) {
 		t.Fatalf("paths = %v", got)
 	}
 }
 
 func TestANonFileURIAndANonListEntryYieldNoPaths(t *testing.T) {
 	// Only file:// URIs name something on disk.
-	if got := entry(URIListMime, "https://example.com/a\n").Paths(); len(got) != 0 {
+	if got := entry(URIListMime, "https://example.com/a\n").paths(); len(got) != 0 {
 		t.Errorf("paths = %v", got)
 	}
 	// Text that happens to look like one is still text.
-	if got := entry(textMime, "file:///tmp/a").Paths(); len(got) != 0 {
+	if got := entry(textMime, "file:///tmp/a").paths(); len(got) != 0 {
 		t.Errorf("paths = %v", got)
 	}
 }
@@ -282,7 +313,7 @@ func TestAStrayPercentInANameSurvivesDecoding(t *testing.T) {
 	list := entry(URIListMime, "file:///tmp/100%25.txt\nfile:///tmp/50%off.txt\nfile:///tmp/end%\nfile:///tmp/end%a\n")
 
 	want := []string{"/tmp/100%.txt", "/tmp/50%off.txt", "/tmp/end%", "/tmp/end%a"}
-	if got := list.Paths(); !slices.Equal(got, want) {
+	if got := list.paths(); !slices.Equal(got, want) {
 		t.Fatalf("paths = %v, want %v", got, want)
 	}
 }
@@ -290,7 +321,7 @@ func TestAStrayPercentInANameSurvivesDecoding(t *testing.T) {
 func TestTextPreviewIsOneLine(t *testing.T) {
 	text := entry(textMime, "  fn main() {\n    println!(\"hi\");\n}  ")
 
-	if got := text.Preview(80); got != `fn main() { println!("hi"); }` {
+	if got := text.preview(80); got != `fn main() { println!("hi"); }` {
 		t.Fatalf("preview = %q", got)
 	}
 }
@@ -298,27 +329,27 @@ func TestTextPreviewIsOneLine(t *testing.T) {
 func TestPreviewIsCutOnACharacterBoundary(t *testing.T) {
 	text := entry(textMime, strings.Repeat("é", 40))
 
-	got := text.Preview(10)
+	got := text.preview(10)
 
 	if utf8.RuneCountInString(got) != 10 || !strings.HasSuffix(got, "…") {
 		t.Fatalf("preview = %q", got)
 	}
-	if got := entry(textMime, "short").Preview(10); got != "short" {
+	if got := entry(textMime, "short").preview(10); got != "short" {
 		t.Fatalf("a short preview was cut: %q", got)
 	}
 }
 
 func TestFileAndImagePreviewsSayWhatTheyAre(t *testing.T) {
-	cases := map[string]Entry{
+	cases := map[string]content{
 		"notes.txt":                  entry(URIListMime, "file:///tmp/notes.txt\n"),
 		"a.txt, b.txt (2 files)":     entry(URIListMime, "file:///tmp/a.txt\nfile:///tmp/b.txt\n"),
 		"No files":                   entry(URIListMime, "https://example.com\n"),
-		"Image · image/png · 2.0 KB": {Mime: "image/png", Bytes: make([]byte, 2048)},
+		"Image · image/png · 2.0 KB": {mime: "image/png", data: make([]byte, 2048)},
 		"application/pdf · 4 B":      entry("application/pdf", "%PDF"),
-		"Image · image/png · 1.5 MB": {Mime: "image/png", Bytes: make([]byte, 3<<19)},
+		"Image · image/png · 1.5 MB": {mime: "image/png", data: make([]byte, 3<<19)},
 	}
 	for want, e := range cases {
-		if got := e.Preview(80); got != want {
+		if got := e.preview(80); got != want {
 			t.Errorf("preview = %q, want %q", got, want)
 		}
 	}
@@ -373,5 +404,187 @@ func TestSecretContentIsTextTheHistoryRefuses(t *testing.T) {
 	}
 	if IsSensitive(transfer.Text("hunter2").Mimes) {
 		t.Error("plain text counts as sensitive")
+	}
+}
+
+// live is how many entries' bytes are allocated, held by anyone.
+func live(h *History) int { return h.mem.Stats().Live }
+
+func mustPanic(t *testing.T, what string, fn func()) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Errorf("%s did not panic", what)
+		}
+	}()
+	fn()
+}
+
+func TestTheHistoryStaysWithinItsByteBudgetOldestFirst(t *testing.T) {
+	h := mustHistory(t, DefaultCapacity, 4, 10)
+	for _, s := range []string{"aaaa", "bbbb", "cc"} {
+		push(t, h, textMime, []byte(s))
+	}
+	if got := texts(h); !slices.Equal(got, []string{"cc", "bbbb", "aaaa"}) || h.size != 10 {
+		t.Fatalf("entries = %v (%d bytes), want all three at exactly the budget", got, h.size)
+	}
+
+	push(t, h, textMime, []byte("d"))
+	if got := texts(h); !slices.Equal(got, []string{"d", "cc", "bbbb"}) || h.size != 7 {
+		t.Fatalf("entries = %v (%d bytes), want the oldest gone", got, h.size)
+	}
+
+	// A recopy is the newest again, so it outlives older entries.
+	push(t, h, textMime, []byte("bbbb"))
+	push(t, h, textMime, []byte("eeee"))
+	if got := texts(h); !slices.Equal(got, []string{"eeee", "bbbb", "d"}) || h.size != 9 {
+		t.Fatalf("entries = %v (%d bytes), want the least recently copied gone", got, h.size)
+	}
+
+	// The largest entry evicts everything else, but never itself.
+	h2 := mustHistory(t, DefaultCapacity, 4, 4)
+	push(t, h2, textMime, []byte("ab"))
+	if _, ok := push(t, h2, textMime, []byte("wxyz")); !ok {
+		t.Fatal("an entry exactly the budget was refused")
+	}
+	if got := texts(h2); !slices.Equal(got, []string{"wxyz"}) {
+		t.Fatalf("entries = %v, want only the largest", got)
+	}
+}
+
+func TestEveryDroppedEntryIsFreed(t *testing.T) {
+	h := mustHistory(t, 3, 4, 8)
+	for _, s := range []string{"a", "b", "c"} {
+		push(t, h, textMime, []byte(s))
+	}
+	if n := live(h); n != 3 {
+		t.Fatalf("%d allocations for 3 entries", n)
+	}
+
+	push(t, h, textMime, []byte("d"))
+	if n := live(h); n != 3 {
+		t.Errorf("evicted by count: %d allocations, want 3", n)
+	}
+	push(t, h, textMime, []byte("eeee"))
+	push(t, h, textMime, []byte("ffff"))
+	if n := live(h); n != 2 || h.Len() != 2 {
+		t.Errorf("evicted by budget: %d allocations for %d entries, want 2", n, h.Len())
+	}
+	if err := h.SetBudget(4); err != nil {
+		t.Fatal(err)
+	}
+	if n := live(h); n != 1 || h.Len() != 1 {
+		t.Errorf("evicted by a smaller budget: %d allocations for %d entries, want 1", n, h.Len())
+	}
+	if err := h.SetBudget(8); err != nil {
+		t.Fatal(err)
+	}
+	id, _ := push(t, h, textMime, []byte("g"))
+	if !h.Remove(id) || live(h) != 1 {
+		t.Errorf("removed: %d allocations, want 1", live(h))
+	}
+	push(t, h, textMime, []byte("i"))
+	h.Clear()
+	if n := live(h); n != 0 {
+		t.Errorf("cleared: %d allocations, want none", n)
+	}
+	// A refused or recopied selection allocates nothing.
+	push(t, h, textMime, []byte("toolong"))
+	push(t, h, textMime, []byte("h"))
+	push(t, h, textMime, []byte("h"))
+	if n := live(h); n != 1 {
+		t.Errorf("%d allocations for one entry", n)
+	}
+}
+
+func TestAListedEntryOutlivesItsEviction(t *testing.T) {
+	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	push(t, h, URIListMime, []byte("file:///tmp/a.png\n"))
+	snap := h.Entries()
+
+	push(t, h, textMime, []byte("newer"))
+	h.Clear()
+
+	if n := live(h); n != 1 {
+		t.Fatalf("%d allocations while the snapshot holds the evicted entry, want 1", n)
+	}
+	e := snap.Entries()[0]
+	if got := e.Paths(); !slices.Equal(got, []string{"/tmp/a.png"}) || e.Preview(80) != "a.png" {
+		t.Fatalf("held entry reads %v / %q", got, e.Preview(80))
+	}
+	snap.Release()
+	if n := live(h); n != 0 {
+		t.Fatalf("%d allocations after the last holder let go", n)
+	}
+}
+
+func TestAReleasedSnapshotCannotBeRead(t *testing.T) {
+	h := defaultHistory(t)
+	push(t, h, textMime, []byte("kept"))
+	snap := h.Entries()
+	e := snap.Entries()[0]
+	snap.Release()
+
+	// Still in the history, so the bytes are live: the snapshot alone
+	// decides whether its entries may be read.
+	mustPanic(t, "reading a released entry", func() { e.Preview(10) })
+	mustPanic(t, "releasing twice", snap.Release)
+	if live(h) != 1 {
+		t.Fatal("the history's own entry was freed with the snapshot")
+	}
+}
+
+func TestBudgetsSmallerThanAnEntryAreRefused(t *testing.T) {
+	if _, err := NewHistory(8, 16, 15); err == nil {
+		t.Error("a budget below the largest entry was accepted")
+	}
+	if _, err := NewHistory(8, 16, 16); err != nil {
+		t.Errorf("a budget of exactly the largest entry was refused: %v", err)
+	}
+	h := mustHistory(t, 8, 4, 8)
+	push(t, h, textMime, []byte("abc"))
+	if err := h.SetBudget(3); err == nil {
+		t.Error("SetBudget accepted a budget below the largest entry")
+	}
+	if h.budget != 8 || h.Len() != 1 {
+		t.Errorf("a refused budget still applied: budget %d, %d entries", h.budget, h.Len())
+	}
+}
+
+func TestBudgetRange(t *testing.T) {
+	for _, mib := range []int64{MinBudgetMiB, DefaultBudgetMiB, MaxBudgetMiB} {
+		b, err := NewBudget(mib)
+		if err != nil || b.MiB() != mib || b.Bytes() != int(mib)*MiB {
+			t.Errorf("%d MiB: %+v, %v", mib, b, err)
+		}
+	}
+	if b := DefaultBudget(); b.MiB() != DefaultBudgetMiB {
+		t.Errorf("default budget = %d MiB", b.MiB())
+	}
+	for _, mib := range []int64{MinBudgetMiB - 1, MaxBudgetMiB + 1, 0, -1} {
+		if _, err := NewBudget(mib); !errors.Is(err, ErrBudgetRange) {
+			t.Errorf("%d MiB: err = %v, want ErrBudgetRange", mib, err)
+		}
+	}
+	if MinBudgetMiB*MiB != MaxEntryBytes {
+		t.Errorf("the least budget, %d MiB, is not the largest entry, %d bytes", MinBudgetMiB, MaxEntryBytes)
+	}
+	if _, err := DefaultHistory(Budget{}); err == nil {
+		t.Error("a zero budget built a history")
+	}
+}
+
+func TestCloseFreesEverythingAndRefusesPushes(t *testing.T) {
+	h := defaultHistory(t)
+	push(t, h, textMime, []byte("one"))
+	push(t, h, "image/png", []byte("\x89PNG"))
+
+	h.Close()
+
+	if n := live(h); n != 0 {
+		t.Fatalf("%d allocations after Close", n)
+	}
+	if _, ok, err := h.Push(textMime, []byte("late")); err == nil || ok || live(h) != 0 {
+		t.Fatalf("a push after Close: %v, %v, %d allocations", ok, err, live(h))
 	}
 }

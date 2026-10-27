@@ -120,6 +120,7 @@ func docSpecs() []docSpec {
 	return []docSpec{
 		top("animations", docStandard(), func(c *Config) any { return &c.Animations }),
 		top("bar", []DocGroup{docGeneral(), docColors(), docPrefix("Buttons", "button-"), docPrefix("Dropdowns", "dropdown-")}, func(c *Config) any { return &c.Bar }),
+		top("clipboard", docStandard(), func(c *Config) any { return &c.Clipboard }),
 		top("dropdowns", docStandard(), func(c *Config) any { return &c.Dropdowns }),
 		top("general", docStandard(), func(c *Config) any { return &c.General }),
 		top("greeter", docStandard(), func(c *Config) any { return &c.Greeter }),

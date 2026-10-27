@@ -11,7 +11,7 @@ import (
 // ClipboardHistory is what the clipboard mode needs from the session's
 // clipboard service; *clipboard.Clipboard implements it.
 type ClipboardHistory interface {
-	Entries() []clipboard.Entry
+	Entries() *clipboard.Snapshot
 	Forget(id uint64) bool
 	Clear()
 	Copy(id uint64) bool
@@ -60,7 +60,9 @@ func (c *Clipboard) state() launcher.ModeState {
 		msg := "No clipboard history: the compositor does not support wlr-data-control."
 		return launcher.ModeState{Prompt: "clipboard", Message: &msg, NoCustom: true, UseHotKeys: true}
 	}
-	entries := c.history.Entries()
+	snap := c.history.Entries()
+	defer snap.Release()
+	entries := snap.Entries()
 	c.ids = make([]uint64, len(entries))
 	items := make([]launcher.Item, len(entries))
 	for i, e := range entries {

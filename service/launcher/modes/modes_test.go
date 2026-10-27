@@ -537,26 +537,39 @@ func TestTheEmbeddedEmojiTableLoads(t *testing.T) {
 	}
 }
 
-// fakeClipboard is a ClipboardHistory double.
+// fakeClipboard is a ClipboardHistory double over a real history,
+// recording restores instead of claiming the selection.
 type fakeClipboard struct {
-	entries []clipboard.Entry
+	history *clipboard.History
 	copied  []uint64
 	cleared bool
 }
 
-func (f *fakeClipboard) Entries() []clipboard.Entry { return f.entries }
-
-func (f *fakeClipboard) Forget(id uint64) bool {
-	for i, e := range f.entries {
-		if e.ID == id {
-			f.entries = append(f.entries[:i], f.entries[i+1:]...)
-			return true
-		}
+// newFakeClipboard remembers each selection, oldest first, and
+// returns the ids they are stored under.
+func newFakeClipboard(t *testing.T, selections ...[2]string) (*fakeClipboard, []uint64) {
+	t.Helper()
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return false
+	t.Cleanup(h.Close)
+	ids := make([]uint64, len(selections))
+	for i, sel := range selections {
+		id, ok, err := h.Push(sel[0], []byte(sel[1]))
+		if err != nil || !ok {
+			t.Fatalf("remembering %q: %v, %v", sel[1], ok, err)
+		}
+		ids[i] = id
+	}
+	return &fakeClipboard{history: h}, ids
 }
 
-func (f *fakeClipboard) Clear() { f.entries, f.cleared = nil, true }
+func (f *fakeClipboard) Entries() *clipboard.Snapshot { return f.history.Entries() }
+
+func (f *fakeClipboard) Forget(id uint64) bool { return f.history.Remove(id) }
+
+func (f *fakeClipboard) Clear() { f.history.Clear(); f.cleared = true }
 
 func (f *fakeClipboard) Copy(id uint64) bool {
 	f.copied = append(f.copied, id)
@@ -564,20 +577,24 @@ func (f *fakeClipboard) Copy(id uint64) bool {
 }
 
 func TestClipboardKindsHaveTheirOwnIcons(t *testing.T) {
-	entries := []clipboard.Entry{
-		{ID: 1, Mime: "text/plain;charset=utf-8", Bytes: []byte("hi")},
-		{ID: 2, Mime: "text/uri-list", Bytes: []byte("file:///a\nfile:///b\n")},
-		{ID: 3, Mime: "image/png", Bytes: []byte("\x89PNG")},
-		{ID: 4, Mime: "application/pdf", Bytes: []byte("%PDF")},
-	}
+	f, _ := newFakeClipboard(t,
+		[2]string{"text/plain;charset=utf-8", "hi"},
+		[2]string{"text/uri-list", "file:///a\nfile:///b\n"},
+		[2]string{"image/png", "\x89PNG"},
+		[2]string{"application/pdf", "%PDF"},
+		[2]string{"text/uri-list", "file:///tmp/a.png\n"},
+	)
+	snap := f.Entries()
+	defer snap.Release()
+	entries := snap.Entries()
 	seen := map[launcher.Icon]bool{}
-	for _, e := range entries {
+	for _, e := range entries[1:] {
 		seen[iconFor(e)] = true
 	}
 	if len(seen) != 4 {
 		t.Errorf("two kinds share an icon: %v", seen)
 	}
-	one := iconFor(clipboard.Entry{Mime: "text/uri-list", Bytes: []byte("file:///tmp/a.png\n")})
+	one := iconFor(entries[0])
 	if th, ok := one.(launcher.IconThumbnail); !ok || th.Path != "/tmp/a.png" || th.Fallback != iconFiles {
 		t.Errorf("one copied file is pictured: %#v", one)
 	}
@@ -595,13 +612,10 @@ func TestClipboardWithoutAHistorySaysSo(t *testing.T) {
 }
 
 func TestClipboardRestoresAndForgets(t *testing.T) {
-	f := &fakeClipboard{entries: []clipboard.Entry{
-		{ID: 7, Mime: "text/plain", Bytes: []byte("seven")},
-		{ID: 4, Mime: "text/plain", Bytes: []byte("four")},
-	}}
+	f, ids := newFakeClipboard(t, [2]string{"text/plain", "four"}, [2]string{"text/plain", "seven"})
 	m := NewClipboard(f)
 	m.Load(bg)
-	if _, ok := m.Activate(bg, launcher.RowTarget(1), launcher.ActivateAlt{}, "").(launcher.ActionClose); !ok || !reflect.DeepEqual(f.copied, []uint64{4}) {
+	if _, ok := m.Activate(bg, launcher.RowTarget(1), launcher.ActivateAlt{}, "").(launcher.ActionClose); !ok || !reflect.DeepEqual(f.copied, ids[:1]) {
 		t.Errorf("restore = %v", f.copied)
 	}
 	r, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateKbCustom{N: 1}, "").(launcher.ActionReload)
