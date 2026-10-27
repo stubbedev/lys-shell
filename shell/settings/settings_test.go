@@ -1023,7 +1023,7 @@ func TestEnumAndIconListItems(t *testing.T) {
 	}
 	c := fieldControl(k, field(path, enumList)).(*listEditor)
 	c.appendRow(c.spec.blank)
-	last := c.items[len(c.items)-1].(enumItem)
+	last := c.items[len(c.items)-1].(*enumItem)
 	last.SetSelected(2)
 	got, _ := k.store.value(path).([]any)
 	if got[len(got)-1] != m.Elem.Variants[2] {
@@ -1043,6 +1043,29 @@ func TestEnumAndIconListItems(t *testing.T) {
 	}
 	if first.label.Text() != "ld-a-symbolic" {
 		t.Errorf("icon row shows %q after the pick", first.label.Text())
+	}
+}
+
+func TestEnumListRowsMoveAndRemove(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.dashboard.user-session.actions"
+	c := fieldControl(k, field(path, enumList)).(*listEditor)
+	before, _ := k.store.value(path).([]any)
+	if len(before) < 2 {
+		t.Fatalf("test premise: %s holds %v", path, before)
+	}
+	c.move(c.items[0], 1)
+	moved, _ := k.store.value(path).([]any)
+	if moved[0] != before[1] || moved[1] != before[0] {
+		t.Errorf("moving the first row down stored %v from %v", moved, before)
+	}
+	c.move(c.items[0], -1)
+	if got, _ := k.store.value(path).([]any); !slices.Equal(got, moved) {
+		t.Errorf("moving the first row up stored %v, want it unchanged", got)
+	}
+	c.remove(c.items[0])
+	if got, _ := k.store.value(path).([]any); !slices.Equal(got, moved[1:]) {
+		t.Errorf("removing the first row stored %v, want %v", got, moved[1:])
 	}
 }
 

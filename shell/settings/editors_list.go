@@ -222,7 +222,7 @@ type enumItem struct {
 	variants []string
 }
 
-func (e enumItem) itemValue() any { return e.variants[max(e.Selected(), 0)] }
+func (e *enumItem) itemValue() any { return e.variants[max(e.Selected(), 0)] }
 
 // enumList is enum_list::enum_list over the list's element enum.
 var enumList = listRow(func(meta config.FieldMeta) listSpec {
@@ -240,7 +240,7 @@ var enumList = listRow(func(meta config.FieldMeta) listSpec {
 			s, _ := v.(string)
 			d := widget.NewDropdown(k.face, k.textPx(), enumLabels(elem), max(slices.Index(elem.Variants, s), 0))
 			d.OnSelect = func(int) { changed() }
-			return enumItem{d, elem.Variants}
+			return &enumItem{d, elem.Variants}
 		},
 	}
 })
