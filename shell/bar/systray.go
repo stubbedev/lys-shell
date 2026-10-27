@@ -29,8 +29,6 @@ var errSystrayNoStore = errors.New("systray: no SNI store available")
 
 // Tray icon constants (systray/item/helpers.rs).
 const (
-	// trayPixmapTarget is the size select_best_pixmap aims for.
-	trayPixmapTarget = 24
 	// trayFallbackIcon is the glyph for an item with no icon at all.
 	trayFallbackIcon = "ld-app-window-symbolic"
 	trayCallTimeout  = 5 * time.Second
@@ -57,6 +55,9 @@ type TrayService interface {
 	// WatchMenu ticks on the item's menu changes until stop, which
 	// closes the feed and may be called more than once.
 	WatchMenu(key string) (<-chan struct{}, func())
+	// WantPixmapSize keeps the items' pixmaps for px device pixels
+	// until release.
+	WantPixmapSize(px int) (release func())
 }
 
 // NewTrayService adapts a running SNI host.
@@ -99,6 +100,8 @@ func (t hostTray) MenuClicked(ctx context.Context, it sni.Item, id int32) error 
 
 func (t hostTray) WatchMenu(key string) (<-chan struct{}, func()) { return t.h.WatchMenu(key) }
 
+func (t hostTray) WantPixmapSize(px int) func() { return t.h.WantPixmapSize(px) }
+
 // systrayMatches is helpers.rs's pattern test against an item's Id and
 // Title: case-sensitive globs.
 func systrayMatches(pattern string, it sni.Item) bool {
@@ -123,26 +126,6 @@ func systrayOverride(overrides []config.TrayItemOverride, it sni.Item) (config.T
 		}
 	}
 	return config.TrayItemOverride{}, false
-}
-
-// bestPixmap is select_best_pixmap: the one closest to 24x24 by summed
-// width and height distance, the first on ties.
-func bestPixmap(pixmaps []sni.Pixmap) (sni.Pixmap, bool) {
-	best, bestDist := sni.Pixmap{}, math.MaxInt
-	for _, p := range pixmaps {
-		d := absInt(int(p.Width)-trayPixmapTarget) + absInt(int(p.Height)-trayPixmapTarget)
-		if d < bestDist {
-			best, bestDist = p, d
-		}
-	}
-	return best, bestDist != math.MaxInt
-}
-
-func absInt(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // themePathIcon is find_icon_in_theme_path: <path>/<name>.<ext>.
@@ -183,8 +166,9 @@ func (s trayIconSource) signature() string {
 
 // resolveTrayIcon is update_icon's source pick: the override icon or
 // the item's IconName - as a file in IconThemePath, a file path, or a
-// theme name - else the best IconPixmap, else the fallback glyph.
-func resolveTrayIcon(cfg config.SystrayConfig, it sni.Item) trayIconSource {
+// theme name - else the IconPixmap sni.BestPixmap picks for devicePx,
+// else the fallback glyph.
+func resolveTrayIcon(cfg config.SystrayConfig, it sni.Item, devicePx int) trayIconSource {
 	name := it.IconName
 	if o, ok := systrayOverride(cfg.Overrides, it); ok && o.Icon != nil && *o.Icon != "" {
 		name = *o.Icon
@@ -198,26 +182,122 @@ func resolveTrayIcon(cfg config.SystrayConfig, it sni.Item) trayIconSource {
 		}
 		return trayIconSource{kind: "named", name: name}
 	}
-	if p, ok := bestPixmap(it.IconPixmap); ok {
+	if p, ok := sni.BestPixmap(it.IconPixmap, devicePx); ok {
 		return trayIconSource{kind: "pixmap", pixmap: p}
 	}
 	return trayIconSource{kind: "fallback", name: trayFallbackIcon}
 }
 
+// trayGlyph is an item's icon widget.
+type trayGlyph interface {
+	widget.Widget
+	Bounds() render.Rect
+	SetTint(render.Color)
+}
+
 // buildTrayIcon makes the widget for a source at px logical pixels; a
-// pixmap that does not decode falls back to the generic glyph.
-func buildTrayIcon(src trayIconSource, px int) *widget.Icon {
+// pixmap rasterizes at scale, the device scale the tray last drew at,
+// and falls back to the generic glyph when it does not decode.
+func buildTrayIcon(src trayIconSource, px int, scale deviceScale, hooks trayPixmapHooks) trayGlyph {
 	switch src.kind {
 	case "file":
 		return widget.NewFileIcon(src.name, px)
 	case "pixmap":
-		p := src.pixmap
-		if ic, err := render.IconFromARGB32(int(p.Width), int(p.Height), p.Data, px, px); err == nil {
-			return widget.NewIcon(ic)
+		if g, err := newTrayPixmap(src.pixmap, px, scale, hooks); err == nil {
+			return g
 		}
 		return widget.NewThemeIcon(trayFallbackIcon, px)
 	}
 	return widget.NewThemeIconFallback(src.name, px)
+}
+
+// deviceScale is a canvas's device scale: num device pixels per denom
+// logical ones.
+type deviceScale struct{ num, denom int }
+
+// box is the device pixels covering px logical ones, rounded up as a
+// theme icon's device box is.
+func (s deviceScale) box(px int) int { return (px*s.num + s.denom - 1) / s.denom }
+
+// trayPixmapHooks are what a pixmap glyph reports to its tray: the
+// device scale it drew at, and the rasters it stops drawing.
+type trayPixmapHooks struct {
+	scaled func(deviceScale)
+	forget func(render.ImageID)
+}
+
+// trayPixmap draws an item's pixmap rasterized at the canvas device
+// scale, one raster at a time: a scale change re-rasterizes the same
+// pixmap before the frame draws, and the raster it replaces, or the
+// last one on retire, is forgotten.
+type trayPixmap struct {
+	*widget.DrawingArea
+	pixmap sni.Pixmap
+	px     int
+	scale  deviceScale
+	tint   render.Color
+	ic     *render.Icon
+	hooks  trayPixmapHooks
+}
+
+func newTrayPixmap(p sni.Pixmap, px int, scale deviceScale, hooks trayPixmapHooks) (*trayPixmap, error) {
+	g := &trayPixmap{DrawingArea: widget.NewDrawingArea(px, px), pixmap: p, px: px, hooks: hooks}
+	if err := g.rasterize(scale); err != nil {
+		return nil, err
+	}
+	g.OnDraw = g.draw
+	return g, nil
+}
+
+// rasterize replaces the raster with one made for scale and the tint.
+func (g *trayPixmap) rasterize(scale deviceScale) error {
+	box := scale.box(g.px)
+	ic, err := render.IconFromARGB32(int(g.pixmap.Width), int(g.pixmap.Height), g.pixmap.Data, box, box)
+	if err != nil {
+		return fmt.Errorf("systray: pixmap %dx%d at %d px: %w", g.pixmap.Width, g.pixmap.Height, box, err)
+	}
+	ic = ic.AtScale(scale.num, scale.denom)
+	if g.tint != 0 {
+		ic = ic.Tint(g.tint)
+	}
+	g.retire()
+	g.ic, g.scale = ic, scale
+	return nil
+}
+
+// retire forgets the raster drawn so far.
+func (g *trayPixmap) retire() {
+	if g.ic != nil {
+		g.hooks.forget(g.ic.Still().ID)
+		g.ic = nil
+	}
+}
+
+// SetTint recolors the pixmap as a mask, as a static icon's tint does.
+// The pixmap decoded when the glyph was built, so it decodes again.
+func (g *trayPixmap) SetTint(tint render.Color) {
+	if tint == g.tint {
+		return
+	}
+	g.tint = tint
+	if err := g.rasterize(g.scale); err != nil {
+		panic(err)
+	}
+	g.QueueDraw()
+}
+
+// draw re-rasterizes for a new device scale, then reports it, before
+// drawing centered in the area.
+func (g *trayPixmap) draw(cv *render.Canvas, area render.Rect) {
+	num, denom := cv.DeviceScale()
+	if s := (deviceScale{num, denom}); s != g.scale {
+		if err := g.rasterize(s); err != nil {
+			panic(err)
+		}
+		g.hooks.scaled(s)
+	}
+	w, h := g.ic.LogicalSize()
+	g.ic.Draw(cv, area.X+(area.W-w)/2, area.Y+(area.H-h)/2)
 }
 
 // trayEntry is one rendered item.
@@ -225,8 +305,16 @@ type trayEntry struct {
 	item   sni.Item
 	button *widget.Button
 	slot   *widget.Box
-	icon   *widget.Icon
+	icon   trayGlyph
 	sig    string
+}
+
+// retireIcon drops the entry's icon, forgetting a pixmap's raster.
+func (e *trayEntry) retireIcon() {
+	if g, ok := e.icon.(*trayPixmap); ok {
+		g.retire()
+	}
+	e.icon = nil
 }
 
 // systrayModule is the tray: one button per SNI item, following the
@@ -251,6 +339,13 @@ type systrayModule struct {
 	// accelKeys are the bindings made, undone on refresh and close.
 	accels    accelBinder
 	accelKeys []string
+
+	// scale is the device scale the tray last drew at; unwant releases
+	// the pixmap size wanted for it.
+	scale  deviceScale
+	unwant func()
+	// forget drops a raster's GPU copy (nil: the application's).
+	forget func(render.ImageID)
 }
 
 // trayMenu is an open menu: its item key, its popover (nil headless),
@@ -279,12 +374,83 @@ func newSystray(ctx ModuleContext) (Module, error) {
 		tray:    ctx.Tray,
 		entries: make(map[string]*trayEntry),
 		root:    widget.NewBox(widget.Row, trayItemGap(ctx), 0),
+		scale:   deviceScale{1, 1},
 	}
 	m.root.AddClass("systray")
+	m.want()
 	ticks, stop := ctx.SNI.Subscribe()
 	follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
+	go func() {
+		<-ctx.gen.ended()
+		m.onLoop(m.retire)
+	}()
 	m.refresh()
 	return m, nil
+}
+
+// want asks the host for the pixmaps the tray draws at its scale, then
+// releases the size wanted before.
+func (m *systrayModule) want() {
+	if m.tray == nil {
+		return
+	}
+	prev := m.unwant
+	m.unwant = m.tray.WantPixmapSize(m.devicePx())
+	if prev != nil {
+		prev()
+	}
+}
+
+// devicePx is the icon box in device pixels at the tray's scale.
+func (m *systrayModule) devicePx() int { return m.scale.box(m.iconPx()) }
+
+// scaled follows a pixmap glyph to the device scale it drew at: the
+// host keeps the pixmaps for the new size, and the refresh that follows
+// picks from them.
+func (m *systrayModule) scaled(s deviceScale) {
+	if s == m.scale {
+		return
+	}
+	m.scale = s
+	m.want()
+}
+
+// pixmapHooks wire a pixmap glyph to the tray.
+func (m *systrayModule) pixmapHooks() trayPixmapHooks {
+	return trayPixmapHooks{scaled: m.scaled, forget: m.forgetImage}
+}
+
+func (m *systrayModule) forgetImage(id render.ImageID) {
+	switch {
+	case m.forget != nil:
+		m.forget(id)
+	case m.ctx.App != nil:
+		m.ctx.App.ForgetImage(id)
+	}
+}
+
+// onLoop runs fn on the event loop even once the generation retired,
+// which ctx.Invoke skips.
+func (m *systrayModule) onLoop(fn func()) {
+	if m.ctx.App == nil {
+		headlessLoop.Lock()
+		defer headlessLoop.Unlock()
+		fn()
+		return
+	}
+	m.ctx.App.Invoke(fn)
+}
+
+// retire releases the wanted pixmap size and forgets every raster as
+// the module's generation ends.
+func (m *systrayModule) retire() {
+	if m.unwant != nil {
+		m.unwant()
+		m.unwant = nil
+	}
+	for _, e := range m.entries {
+		e.retireIcon()
+	}
 }
 
 // trayItemGap is item-gap in pixels (resolved at 1 rem).
@@ -328,6 +494,7 @@ func (m *systrayModule) refresh() {
 	}
 	for key := range m.entries {
 		if !live[key] {
+			m.entries[key].retireIcon()
 			delete(m.entries, key)
 			if m.menu != nil && key == m.menu.key {
 				m.closeMenu()
@@ -383,9 +550,10 @@ func (m *systrayModule) newEntry(it sni.Item) *trayEntry {
 // updateIcon applies the resolved source and the override tint.
 func (m *systrayModule) updateIcon(e *trayEntry) {
 	cfg := m.ctx.Config.Systray
-	src := resolveTrayIcon(cfg, e.item)
+	src := resolveTrayIcon(cfg, e.item, m.devicePx())
 	if sig := src.signature(); sig != e.sig || e.icon == nil {
-		e.icon = buildTrayIcon(src, m.iconPx())
+		e.retireIcon()
+		e.icon = buildTrayIcon(src, m.iconPx(), m.scale, m.pixmapHooks())
 		e.slot.Clear()
 		e.slot.Append(widgets.Center(e.icon), true)
 		e.sig = sig

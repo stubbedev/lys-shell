@@ -3,13 +3,16 @@ package bar
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -20,10 +23,11 @@ import (
 
 // fakeTray records the tray calls and serves a scripted menu.
 type fakeTray struct {
-	mu    sync.Mutex
-	calls []string
-	menu  sni.MenuItem
-	err   error
+	mu     sync.Mutex
+	calls  []string
+	menu   sni.MenuItem
+	err    error
+	wanted map[int]int
 }
 
 func (f *fakeTray) record(s string) error {
@@ -88,6 +92,29 @@ func (f *fakeTray) WatchMenu(string) (<-chan struct{}, func()) {
 	return feed, sync.OnceFunc(func() { close(feed) })
 }
 
+func (f *fakeTray) WantPixmapSize(px int) func() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.wanted == nil {
+		f.wanted = make(map[int]int)
+	}
+	f.wanted[px]++
+	return sync.OnceFunc(func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if f.wanted[px]--; f.wanted[px] == 0 {
+			delete(f.wanted, px)
+		}
+	})
+}
+
+// wantedSizes lists the pixmap sizes wanted now, ascending.
+func (f *fakeTray) wantedSizes() []int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Sorted(maps.Keys(f.wanted))
+}
+
 func waitTray(t *testing.T, f *fakeTray, n int) []string {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
@@ -138,24 +165,193 @@ func TestSystrayPatternsAreCaseSensitiveGlobs(t *testing.T) {
 	}
 }
 
-func TestBestPixmap(t *testing.T) {
-	px := func(w, h int32) sni.Pixmap { return sni.Pixmap{Width: w, Height: h} }
+// solidPixmap is a size x size ARGB32 pixmap of one opaque color.
+func solidPixmap(size int32, argb uint32) sni.Pixmap {
+	data := make([]byte, size*size*4)
+	for i := 0; i < len(data); i += 4 {
+		data[i], data[i+1], data[i+2], data[i+3] = byte(argb>>24), byte(argb>>16), byte(argb>>8), byte(argb)
+	}
+	return sni.Pixmap{Width: size, Height: size, Data: data}
+}
+
+// The tray draws the pixmap sni.BestPixmap picks for its icon box in
+// device pixels, the size it asks the host to keep: at 1x the 20 px
+// box picks the 22 px pixmap the old fixed 24 px target missed for
+// the 24 px one, at 1.5x the 30 px box the 32 px one, and at 3x the
+// 60 px box the 64 px one.
+func TestSystrayDrawsTheSharedPick(t *testing.T) {
+	sizes := []int32{16, 22, 24, 32, 48, 64}
+	var pixmaps []sni.Pixmap
+	for _, s := range sizes {
+		pixmaps = append(pixmaps, solidPixmap(s, 0xff000000|uint32(s)))
+	}
+	it := sni.Item{IconPixmap: pixmaps}
+	cfg := config.DefaultsSystray()
 	for _, tc := range []struct {
-		in   []sni.Pixmap
-		want int32
-	}{
-		{[]sni.Pixmap{px(16, 16), px(24, 24), px(48, 48)}, 24},
-		{[]sni.Pixmap{px(16, 16), px(28, 28), px(64, 64)}, 28},
-		{[]sni.Pixmap{px(8, 8), px(20, 20)}, 20},
-		{[]sni.Pixmap{px(128, 128)}, 128},
-		{[]sni.Pixmap{px(32, 16), px(24, 24), px(16, 32)}, 24},
-	} {
-		if got, ok := bestPixmap(tc.in); !ok || got.Width != tc.want {
-			t.Errorf("%v = %v, want width %d", tc.in, got, tc.want)
+		scale deviceScale
+		want  int32
+	}{{deviceScale{1, 1}, 22}, {deviceScale{3, 2}, 32}, {deviceScale{3, 1}, 64}} {
+		device := tc.scale.box(20)
+		shared, _ := sni.BestPixmap(pixmaps, device)
+		got := resolveTrayIcon(cfg, it, device)
+		if got.kind != "pixmap" || got.pixmap.Width != shared.Width || got.pixmap.Width != tc.want {
+			t.Errorf("at %v: drew %dx%d, sni.BestPixmap picks %d, want %d", tc.scale, got.pixmap.Width, got.pixmap.Height, shared.Width, tc.want)
 		}
 	}
-	if _, ok := bestPixmap(nil); ok {
-		t.Error("no pixmaps selected one")
+}
+
+// paintTray lays the tray out and paints it on a canvas at scale,
+// returning the pixel at the first item's icon center.
+func paintTray(m *systrayModule, scale deviceScale) render.Color {
+	return onHeadlessLoop(func() render.Color {
+		const w, h = 200, 40
+		m.root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+		m.root.Arrange(render.Rect{W: w, H: h})
+		dw, dh := scale.box(w), scale.box(h)
+		data := make([]byte, render.Stride(dw)*dh)
+		m.root.Paint(render.NewScaled(data, render.Stride(dw), dw, dh, scale.num, scale.denom))
+		var b render.Rect
+		for _, e := range m.entries {
+			b = e.icon.Bounds()
+		}
+		x, y := (2*b.X+b.W)*scale.num/(2*scale.denom), (2*b.Y+b.H)*scale.num/(2*scale.denom)
+		return pixelAt(data, dw, x, y)
+	})
+}
+
+// forgotten records the rasters a tray forgets.
+type forgotten struct {
+	mu  sync.Mutex
+	ids []render.ImageID
+}
+
+func (f *forgotten) forget(id render.ImageID) {
+	f.mu.Lock()
+	f.ids = append(f.ids, id)
+	f.mu.Unlock()
+}
+
+func (f *forgotten) has(id render.ImageID) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Contains(f.ids, id)
+}
+
+func (f *forgotten) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.ids)
+}
+
+func newPixmapTray(t *testing.T, it *sni.Item) (*systrayModule, *fakeTray, *sni.Store, *forgotten) {
+	t.Helper()
+	m, tray, store := newTrayForTest(t, config.Defaults(), it)
+	f := &forgotten{}
+	onHeadlessLoop(func() bool { m.forget = f.forget; return true })
+	return m, tray, store, f
+}
+
+func pixmapGlyph(t *testing.T, m *systrayModule, key string) *trayPixmap {
+	t.Helper()
+	return onHeadlessLoop(func() *trayPixmap {
+		e, ok := m.entries[key]
+		if !ok {
+			t.Fatalf("no entry %s", key)
+		}
+		g, ok := e.icon.(*trayPixmap)
+		if !ok {
+			t.Fatalf("%s: icon %T, want a pixmap", key, e.icon)
+		}
+		return g
+	})
+}
+
+const (
+	red  = 0xffff0000
+	blue = 0xff0000ff
+)
+
+// A scale change re-rasterizes the drawn pixmap at the new scale in the
+// same frame, so the icon never goes blank, asks the host for the new
+// device size instead of the old, and the store's next snapshot swaps
+// in the pixmap picked for it, forgetting each replaced raster.
+func TestSystrayScaleChangeRepicksWithoutABlankIcon(t *testing.T) {
+	it := &sni.Item{Bus: ":1.1", Path: "/a", ID: "app", IconPixmap: []sni.Pixmap{solidPixmap(20, red), solidPixmap(40, blue)}}
+	m, tray, store, f := newPixmapTray(t, it)
+	if got := tray.wantedSizes(); !slices.Equal(got, []int{20}) {
+		t.Fatalf("wanted %v at 1x, want [20]", got)
+	}
+	if c := paintTray(m, deviceScale{1, 1}); c != render.RGBA(255, 0, 0, 255) {
+		t.Fatalf("1x icon center = %#x, want the 20 px red pixmap", uint32(c))
+	}
+	first := pixmapGlyph(t, m, it.Key())
+	firstID := onHeadlessLoop(func() render.ImageID { return first.ic.Still().ID })
+
+	if c := paintTray(m, deviceScale{2, 1}); c != render.RGBA(255, 0, 0, 255) {
+		t.Fatalf("2x icon center = %#x right after the scale change, want the red pixmap re-rasterized, not blank", uint32(c))
+	}
+	if !f.has(firstID) {
+		t.Error("the 1x raster was not forgotten when the 2x one replaced it")
+	}
+	if got := tray.wantedSizes(); !slices.Equal(got, []int{40}) {
+		t.Fatalf("wanted %v at 2x, want [40] alone", got)
+	}
+	second := onHeadlessLoop(func() render.ImageID { return first.ic.Still().ID })
+
+	store.Put(it)
+	waitHeadless(t, "the 40 px pixmap", func() bool {
+		g, ok := m.entries[it.Key()].icon.(*trayPixmap)
+		return ok && g.pixmap.Width == 40
+	})
+	if c := paintTray(m, deviceScale{2, 1}); c != render.RGBA(0, 0, 255, 255) {
+		t.Errorf("2x icon center = %#x after the refresh, want the 40 px blue pixmap", uint32(c))
+	}
+	if !f.has(second) {
+		t.Error("the replaced glyph's raster was not forgotten")
+	}
+}
+
+// The same scale draws the same raster: nothing is re-rasterized or
+// forgotten from frame to frame.
+func TestSystrayPixmapRasterIsStableAcrossFrames(t *testing.T) {
+	it := &sni.Item{Bus: ":1.1", Path: "/a", ID: "app", IconPixmap: []sni.Pixmap{solidPixmap(20, red)}}
+	m, _, _, f := newPixmapTray(t, it)
+	paintTray(m, deviceScale{1, 1})
+	g := pixmapGlyph(t, m, it.Key())
+	id := onHeadlessLoop(func() render.ImageID { return g.ic.Still().ID })
+	paintTray(m, deviceScale{1, 1})
+	if got := onHeadlessLoop(func() render.ImageID { return g.ic.Still().ID }); got != id || f.count() != 0 {
+		t.Errorf("raster %d -> %d, %d forgotten; want one raster kept", id, got, f.count())
+	}
+}
+
+// A removed item's raster is forgotten, and so are the rest when the
+// module retires, which also releases its wanted size.
+func TestSystrayForgetsRemovedAndRetiredRasters(t *testing.T) {
+	a := &sni.Item{Bus: ":1.1", Path: "/a", ID: "a", IconPixmap: []sni.Pixmap{solidPixmap(20, red)}}
+	b := &sni.Item{Bus: ":1.2", Path: "/b", ID: "b", IconPixmap: []sni.Pixmap{solidPixmap(20, blue)}}
+	m, tray, store, f := newPixmapTray(t, a)
+	store.Put(b)
+	waitHeadless(t, "both items", func() bool { return len(m.entries) == 2 })
+	idA := onHeadlessLoop(func() render.ImageID { return m.entries[a.Key()].icon.(*trayPixmap).ic.Still().ID })
+	idB := onHeadlessLoop(func() render.ImageID { return m.entries[b.Key()].icon.(*trayPixmap).ic.Still().ID })
+
+	store.Remove(a.Bus, a.Path)
+	waitHeadless(t, "a's removal", func() bool { return len(m.entries) == 1 })
+	if !f.has(idA) {
+		t.Error("the removed item's raster was not forgotten")
+	}
+	if f.has(idB) {
+		t.Error("the remaining item's raster was forgotten")
+	}
+
+	onHeadlessLoop(func() bool { m.ctx.gen.retire(); return true })
+	deadline := time.Now().Add(2 * time.Second)
+	for (!f.has(idB) || len(tray.wantedSizes()) != 0) && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !f.has(idB) || len(tray.wantedSizes()) != 0 {
+		t.Errorf("after retire: forgot b %v, wanted %v; want the raster forgotten and no size wanted", f.has(idB), tray.wantedSizes())
 	}
 }
 
@@ -180,19 +376,21 @@ func TestResolveTrayIcon(t *testing.T) {
 		{"fallback", sni.Item{}, cfg, "fallback", trayFallbackIcon},
 		{"override icon wins", sni.Item{ID: "app", IconName: "nm-applet"}, config.SystrayConfig{Overrides: []config.TrayItemOverride{{Name: "app", Icon: new("custom")}}}, "named", "custom"},
 	} {
-		got := resolveTrayIcon(tc.cfg, tc.it)
+		got := resolveTrayIcon(tc.cfg, tc.it, 20)
 		if got.kind != tc.kind || (tc.want != "" && got.name != tc.want) {
 			t.Errorf("%s: = %+v, want %s %q", tc.name, got, tc.kind, tc.want)
 		}
 	}
-	// A pixmap icon is a static raster at the icon size.
-	icon := buildTrayIcon(trayIconSource{kind: "pixmap", pixmap: pixmap}, 20)
+	hooks := trayPixmapHooks{scaled: func(deviceScale) {}, forget: func(render.ImageID) {}}
+	// A pixmap icon is a raster at the icon size.
+	icon := buildTrayIcon(trayIconSource{kind: "pixmap", pixmap: pixmap}, 20, deviceScale{1, 1}, hooks)
 	if sz := icon.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}}); sz.W != 20 {
 		t.Errorf("pixmap icon = %v, want 20px", sz)
 	}
 	// A short pixmap is the fallback glyph, not a crash.
-	if icon := buildTrayIcon(trayIconSource{kind: "pixmap", pixmap: sni.Pixmap{Width: 4, Height: 4}}, 20); icon.Name() != trayFallbackIcon {
-		t.Errorf("short pixmap = %q, want the fallback", icon.Name())
+	short := buildTrayIcon(trayIconSource{kind: "pixmap", pixmap: sni.Pixmap{Width: 4, Height: 4}}, 20, deviceScale{1, 1}, hooks)
+	if icon, ok := short.(*widget.Icon); !ok || icon.Name() != trayFallbackIcon {
+		t.Errorf("short pixmap = %T, want the fallback glyph", short)
 	}
 }
 

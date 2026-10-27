@@ -134,6 +134,7 @@ func TestHostAsWatcherTracksItemsAndMenus(t *testing.T) {
 	if host.watcher == nil {
 		t.Fatal("no watcher on the bus: the host must take the role")
 	}
+	defer host.WantPixmapSize(24)()
 
 	item := startItem(t, bus, "app")
 	item.register(t)
@@ -319,6 +320,134 @@ func TestWatcherRegistersTheDefaultPathOnce(t *testing.T) {
 	host.watcher.mu.Unlock()
 	if n != 3 {
 		t.Errorf("items = %d, want a third for the other path", n)
+	}
+}
+
+// wirePixmap is a(iiay)'s element.
+type wirePixmap struct {
+	W, H int32
+	Data []byte
+}
+
+// wirePixmaps publishes one size x size pixmap per size, each filled
+// with fill, after a 20 x 20 one whose data is too short to draw.
+func wirePixmaps(fill byte, sizes ...int32) []wirePixmap {
+	out := []wirePixmap{{20, 20, []byte{1, 2, 3, 4}}}
+	for _, s := range sizes {
+		data := make([]byte, s*s*4)
+		for i := range data {
+			data[i] = fill
+		}
+		out = append(out, wirePixmap{s, s, data})
+	}
+	return out
+}
+
+var pixmapProps = []string{"IconPixmap", "AttentionIconPixmap", "OverlayIconPixmap"}
+
+func itemPixmaps(it Item) map[string][]Pixmap {
+	return map[string][]Pixmap{
+		"IconPixmap":          it.IconPixmap,
+		"AttentionIconPixmap": it.AttentionIconPixmap,
+		"OverlayIconPixmap":   it.OverlayIconPixmap,
+	}
+}
+
+// pixmapsAre reports whether every pixmap property of the one item
+// holds exactly widths, each pixmap filled with fill.
+func pixmapsAre(items []Item, fill byte, widths ...int32) bool {
+	if len(items) != 1 {
+		return false
+	}
+	for _, ps := range itemPixmaps(items[0]) {
+		if !slices.Equal(pixmapWidths(ps), widths) {
+			return false
+		}
+		for _, p := range ps {
+			if p.Data[0] != fill {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// The host keeps, of IconPixmap, AttentionIconPixmap and
+// OverlayIconPixmap alike, only the pixmaps BestPixmap picks for the
+// wanted sizes: none while nothing is wanted, one per distinct pick
+// while several are, re-read as soon as the wanted set changes and on
+// NewIcon. A pixmap too short to draw is never kept, though it is the
+// closest.
+func TestHostKeepsOnlyTheWantedPixmaps(t *testing.T) {
+	bus := dbustest.Start(t)
+	store := NewStore()
+	host, err := NewHostOn(bus.Conn(t), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	conn := bus.Conn(t)
+	all := wirePixmaps(0xaa, 16, 22, 24, 32, 48, 64)
+	pm := prop.Map{ItemIface: {"Id": {Value: "app", Emit: prop.EmitConst}}}
+	for _, name := range pixmapProps {
+		pm[ItemIface][name] = &prop.Prop{Value: all, Emit: prop.EmitFalse}
+	}
+	props, err := prop.Export(conn, "/StatusNotifierItem", pm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := &fakeItem{conn: conn, props: props}
+	item.register(t)
+	waitItems(t, store, func(i []Item) bool { return len(i) == 1 })
+	waitPixmaps := func(fill byte, widths ...int32) {
+		t.Helper()
+		deadline := time.Now().Add(3 * time.Second)
+		for !pixmapsAre(store.Items(), fill, widths...) {
+			if time.Now().After(deadline) {
+				got := map[string][]int32{}
+				for name, ps := range itemPixmaps(store.Items()[0]) {
+					got[name] = pixmapWidths(ps)
+				}
+				t.Fatalf("kept %v, want %v filled with %#x", got, widths, fill)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	waitPixmaps(0xaa)
+
+	release20 := host.WantPixmapSize(20)
+	waitPixmaps(0xaa, 22)
+	release40 := host.WantPixmapSize(40)
+	waitPixmaps(0xaa, 22, 32)
+	release40()
+	waitPixmaps(0xaa, 22)
+
+	for _, name := range pixmapProps {
+		props.SetMust(ItemIface, name, wirePixmaps(0xbb, 16, 20, 64))
+	}
+	if err := conn.Emit("/StatusNotifierItem", ItemIface+".NewIcon"); err != nil {
+		t.Fatal(err)
+	}
+	waitPixmaps(0xbb, 20)
+
+	release20()
+	waitPixmaps(0xbb)
+}
+
+func TestWantPixmapSizeRejectsNonPositive(t *testing.T) {
+	h := &Host{pixmapSizes: make(map[int]int), retrack: make(chan struct{}, 1)}
+	for _, px := range []int{0, -24} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("WantPixmapSize(%d) did not panic", px)
+				}
+			}()
+			h.WantPixmapSize(px)
+		}()
+	}
+	if len(h.pixmapSizes) != 0 {
+		t.Errorf("sizes = %v after rejected wants", h.pixmapSizes)
 	}
 }
 

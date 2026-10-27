@@ -52,6 +52,11 @@ type Host struct {
 	owners map[string]string
 	// menus are the open menus' change feeds, by item key.
 	menus map[string][]chan struct{}
+	// pixmapSizes counts the consumers wanting each pixmap size, in
+	// device pixels; retrack asks the signal loop to re-read every item
+	// when the set of sizes changes.
+	pixmapSizes map[int]int
+	retrack     chan struct{}
 }
 
 // NewHost connects to the session bus and claims the roles: when no
@@ -74,11 +79,13 @@ func NewHost(store *Store) (*Host, error) {
 // private bus).
 func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 	h := &Host{
-		conn:   conn,
-		store:  store,
-		stop:   make(chan struct{}),
-		owners: make(map[string]string),
-		menus:  make(map[string][]chan struct{}),
+		conn:        conn,
+		store:       store,
+		stop:        make(chan struct{}),
+		owners:      make(map[string]string),
+		menus:       make(map[string][]chan struct{}),
+		pixmapSizes: make(map[int]int),
+		retrack:     make(chan struct{}, 1),
 	}
 	signals := make(chan *dbus.Signal, 64)
 	conn.Signal(signals)
@@ -167,8 +174,61 @@ func (h *Host) run(signals chan *dbus.Signal) {
 				return
 			}
 			h.handle(sig)
+		case <-h.retrack:
+			for _, it := range h.store.Items() {
+				h.track(it.Bus + it.Path)
+			}
 		}
 	}
+}
+
+// WantPixmapSize asks the host to keep, of every pixmap property, the
+// pixmap BestPixmap picks for px device pixels, until release. Items
+// are read again whenever the set of wanted sizes changes, so a new
+// size is served at once and a dropped one frees its pixmaps. It
+// panics on a non-positive size, a programming error.
+func (h *Host) WantPixmapSize(px int) (release func()) {
+	if px <= 0 {
+		panic(fmt.Sprintf("sni: invalid pixmap size %d", px))
+	}
+	h.mu.Lock()
+	h.pixmapSizes[px]++
+	added := h.pixmapSizes[px] == 1
+	h.mu.Unlock()
+	if added {
+		h.requestRetrack()
+	}
+	return sync.OnceFunc(func() {
+		h.mu.Lock()
+		h.pixmapSizes[px]--
+		removed := h.pixmapSizes[px] == 0
+		if removed {
+			delete(h.pixmapSizes, px)
+		}
+		h.mu.Unlock()
+		if removed {
+			h.requestRetrack()
+		}
+	})
+}
+
+func (h *Host) requestRetrack() {
+	select {
+	case h.retrack <- struct{}{}:
+	default:
+	}
+}
+
+// wantedPixmapSizes lists the wanted sizes, ascending.
+func (h *Host) wantedPixmapSizes() []int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	sizes := make([]int, 0, len(h.pixmapSizes))
+	for px := range h.pixmapSizes {
+		sizes = append(sizes, px)
+	}
+	slices.Sort(sizes)
+	return sizes
 }
 
 // handle routes one signal.
@@ -310,7 +370,7 @@ func (h *Host) probe(name string) bool {
 // owner.
 func (h *Host) track(reg string) {
 	bus, path := ParseAddress(reg)
-	item, err := readItem(h.conn, bus, path)
+	item, err := readItem(h.conn, bus, path, h.wantedPixmapSizes())
 	if err != nil {
 		log.Printf("sni: %s: %v", reg, err)
 		return
@@ -406,8 +466,9 @@ func (h *Host) notifyMenu(key string) {
 	}
 }
 
-// readItem fetches the SNI property set.
-func readItem(conn *dbus.Conn, bus, path string) (*Item, error) {
+// readItem fetches the SNI property set, keeping of each pixmap
+// property the pixmaps picked for sizes.
+func readItem(conn *dbus.Conn, bus, path string, sizes []int) (*Item, error) {
 	obj := conn.Object(bus, dbus.ObjectPath(path))
 	var props map[string]dbus.Variant
 	if err := obj.Call(PropsIface+".GetAll", 0, ItemIface).Store(&props); err != nil {
@@ -438,16 +499,24 @@ func readItem(conn *dbus.Conn, bus, path string) (*Item, error) {
 	it.AttentionMovie = str("AttentionMovieName")
 	it.IconThemePath = str("IconThemePath")
 	it.MenuPath = str("Menu")
-	if pixmaps, ok := props["IconPixmap"]; ok {
-		it.IconPixmap = parsePixmaps(pixmaps.Value())
+	pixmaps := func(name string) []Pixmap {
+		v, ok := props[name]
+		if !ok {
+			return nil
+		}
+		return keepPixmaps(parsePixmaps(v.Value()), sizes)
 	}
+	it.IconPixmap = pixmaps("IconPixmap")
+	it.AttentionIconPixmap = pixmaps("AttentionIconPixmap")
+	it.OverlayIconPixmap = pixmaps("OverlayIconPixmap")
 	if tooltip, ok := props["ToolTip"]; ok {
 		it.Tooltip = parseTooltip(tooltip.Value())
 	}
 	return it, nil
 }
 
-// parsePixmaps converts the spec's a(iiay) list.
+// parsePixmaps converts the spec's a(iiay) list, dropping a pixmap
+// whose data is shorter than its size.
 func parsePixmaps(v any) []Pixmap {
 	rows, ok := v.([][]any)
 	if !ok {
@@ -467,6 +536,9 @@ func parsePixmaps(v any) []Pixmap {
 		w, _ := tuple[0].(int32)
 		hgt, _ := tuple[1].(int32)
 		data, _ := tuple[2].([]byte)
+		if w <= 0 || hgt <= 0 || int64(len(data)) < int64(w)*int64(hgt)*4 {
+			continue
+		}
 		out = append(out, Pixmap{Width: w, Height: hgt, Data: data})
 	}
 	return out
@@ -480,7 +552,6 @@ func parseTooltip(v any) Tooltip {
 	}
 	tip := Tooltip{}
 	tip.IconName, _ = tuple[0].(string)
-	tip.IconPixmap = parsePixmaps(tuple[1])
 	tip.Title, _ = tuple[2].(string)
 	tip.Description, _ = tuple[3].(string)
 	return tip

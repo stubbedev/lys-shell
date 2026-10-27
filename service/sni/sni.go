@@ -4,6 +4,7 @@
 package sni
 
 import (
+	"math"
 	"strings"
 	"sync"
 
@@ -49,17 +50,71 @@ func ParseStatus(s string) Status {
 	return StatusPassive
 }
 
-// Pixmap is ARGB32 icon data in network byte order.
+// Pixmap is ARGB32 icon data in network byte order: Data holds at
+// least Width x Height pixels.
 type Pixmap struct {
 	Width  int32
 	Height int32
 	Data   []byte
 }
 
-// Tooltip is the item's hover information.
+// BestPixmap is the pixmap drawn in a box of target device pixels: the
+// one closest to target x target by summed width and height distance,
+// the first on ties. It is the one rule both the host's retention and
+// the tray's drawing follow.
+func BestPixmap(pixmaps []Pixmap, target int) (Pixmap, bool) {
+	i, ok := bestPixmapIndex(pixmaps, target)
+	if !ok {
+		return Pixmap{}, false
+	}
+	return pixmaps[i], true
+}
+
+func bestPixmapIndex(pixmaps []Pixmap, target int) (int, bool) {
+	best, bestDist := -1, math.MaxInt
+	for i, p := range pixmaps {
+		if d := absInt(int(p.Width)-target) + absInt(int(p.Height)-target); d < bestDist {
+			best, bestDist = i, d
+		}
+	}
+	return best, best >= 0
+}
+
+// keepPixmaps is the subset of pixmaps BestPixmap picks for any of the
+// targets, in their published order, so BestPixmap over the subset
+// picks what it picks over the whole set for each of them.
+func keepPixmaps(pixmaps []Pixmap, targets []int) []Pixmap {
+	keep := make([]bool, len(pixmaps))
+	n := 0
+	for _, t := range targets {
+		if i, ok := bestPixmapIndex(pixmaps, t); ok && !keep[i] {
+			keep[i] = true
+			n++
+		}
+	}
+	if n == 0 {
+		return nil
+	}
+	kept := make([]Pixmap, 0, n)
+	for i, p := range pixmaps {
+		if keep[i] {
+			kept = append(kept, p)
+		}
+	}
+	return kept
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// Tooltip is the item's hover information. Its pixmaps are not read:
+// nothing draws them.
 type Tooltip struct {
 	IconName    string
-	IconPixmap  []Pixmap
 	Title       string
 	Description string
 }
@@ -77,14 +132,19 @@ type Item struct {
 	Status     Status
 	ItemIsMenu bool
 
-	IconName        string
-	IconPixmap      []Pixmap
-	OverlayIconName string
-	AttentionName   string
-	AttentionMovie  string
-	IconThemePath   string
-	Tooltip         Tooltip
-	MenuPath        string
+	// IconPixmap, AttentionIconPixmap and OverlayIconPixmap hold only
+	// the pixmaps BestPixmap picks for the sizes the host's consumers
+	// want (Host.WantPixmapSize).
+	IconName            string
+	IconPixmap          []Pixmap
+	OverlayIconName     string
+	OverlayIconPixmap   []Pixmap
+	AttentionName       string
+	AttentionIconPixmap []Pixmap
+	AttentionMovie      string
+	IconThemePath       string
+	Tooltip             Tooltip
+	MenuPath            string
 }
 
 // Key is the store's identity for an item.

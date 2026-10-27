@@ -1,6 +1,7 @@
 package sni
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -109,4 +110,69 @@ func TestStoreNoTickOnMiss(t *testing.T) {
 		t.Fatal("a missed remove ticked the store")
 	default:
 	}
+}
+
+func TestBestPixmap(t *testing.T) {
+	px := func(w, h int32) Pixmap { return Pixmap{Width: w, Height: h} }
+	for _, tc := range []struct {
+		in     []Pixmap
+		target int
+		want   int32
+	}{
+		{[]Pixmap{px(16, 16), px(24, 24), px(48, 48)}, 24, 24},
+		{[]Pixmap{px(16, 16), px(28, 28), px(64, 64)}, 24, 28},
+		{[]Pixmap{px(8, 8), px(20, 20)}, 24, 20},
+		{[]Pixmap{px(128, 128)}, 24, 128},
+		{[]Pixmap{px(32, 16), px(24, 24), px(16, 32)}, 24, 24},
+		{[]Pixmap{px(16, 16), px(24, 24), px(48, 48)}, 48, 48},
+		{[]Pixmap{px(32, 32), px(48, 48)}, 40, 32},
+	} {
+		if got, ok := BestPixmap(tc.in, tc.target); !ok || got.Width != tc.want {
+			t.Errorf("%v for %d = %v, want width %d", tc.in, tc.target, got, tc.want)
+		}
+	}
+	if _, ok := BestPixmap(nil, 24); ok {
+		t.Error("no pixmaps selected one")
+	}
+}
+
+// The kept subset holds one pixmap per distinct pick, in published
+// order, and BestPixmap over it picks for every kept target what it
+// picks over the whole set: what the tray draws is what it would draw
+// had every size been kept.
+func TestKeepPixmapsKeepsThePicks(t *testing.T) {
+	var all []Pixmap
+	for _, s := range []int32{256, 16, 22, 24, 32, 48, 64, 128} {
+		all = append(all, Pixmap{Width: s, Height: s})
+	}
+	for _, tc := range []struct {
+		targets []int
+		want    []int32
+	}{
+		{nil, nil},
+		{[]int{20}, []int32{22}},
+		{[]int{20, 21, 22}, []int32{22}},
+		{[]int{20, 40}, []int32{22, 32}},
+		{[]int{30, 60, 200}, []int32{256, 32, 64}},
+	} {
+		kept := keepPixmaps(all, tc.targets)
+		if got := pixmapWidths(kept); !slices.Equal(got, tc.want) {
+			t.Errorf("targets %v kept %v, want %v", tc.targets, got, tc.want)
+		}
+		for _, target := range tc.targets {
+			whole, _ := BestPixmap(all, target)
+			sub, _ := BestPixmap(kept, target)
+			if whole.Width != sub.Width {
+				t.Errorf("target %d: the kept set picks %d, the whole set %d", target, sub.Width, whole.Width)
+			}
+		}
+	}
+}
+
+func pixmapWidths(ps []Pixmap) []int32 {
+	var out []int32
+	for _, p := range ps {
+		out = append(out, p.Width)
+	}
+	return out
 }
