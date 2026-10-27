@@ -77,6 +77,10 @@ func bitwardenPage(*config.Config) pageSpec {
 			field(m+".icon-locked", iconRow),
 			field(m+".icon-unlocked", iconRow),
 		}},
+		{title: "settings-section-generator", rows: []rowSpec{
+			field(m+".generator-passwords", passwordPresetList),
+			field(m+".generator-passphrases", passphrasePresetList),
+		}},
 		barDisplaySection(m),
 		colorsSection(m),
 		actionsSection(m, actionChoices("bitwarden")),

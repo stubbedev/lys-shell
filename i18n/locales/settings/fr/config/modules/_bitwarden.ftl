@@ -20,6 +20,17 @@ settings-modules-bitwarden-clipboard-clear = Vider le presse-papiers après (sec
 settings-modules-bitwarden-sync-interval = Intervalle de synchronisation (minutes)
     .description = Synchroniser le coffre ouvert toutes les tant de minutes. 0 ne synchronise qu'au déverrouillage et à la demande
 
+settings-modules-bitwarden-generator-passwords = Préréglages de mot de passe
+    .description = Mots de passe aléatoires que le générateur du menu copie
+
+settings-modules-bitwarden-generator-passphrases = Préréglages de phrase de passe
+    .description = Phrases de passe en mots de la grande liste de l'EFF que le générateur du menu copie
+
+enum-password-charset-lowercase = Minuscules (a-z)
+enum-password-charset-uppercase = Majuscules (A-Z)
+enum-password-charset-digits = Chiffres (0-9)
+enum-password-charset-symbols = Symboles (!@#$%^&*)
+
 settings-modules-bitwarden-format = Format
     .description = Chaîne de format du libellé. Espaces réservés : {"{{ count }}"} (éléments du coffre ouvert)
 

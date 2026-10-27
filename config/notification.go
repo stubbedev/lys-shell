@@ -305,7 +305,7 @@ func (m NotificationHistoryMemory) Limit() notifications.MemoryLimit { return m.
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
-	n, err := decodeInt64(v)
+	n, err := decodeInteger[int64](v)
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (m NotificationHistoryStored) Limit() notifications.StoredLimit { return m.
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
-	n, err := decodeInt64(v)
+	n, err := decodeInteger[int64](v)
 	if err != nil {
 		return err
 	}

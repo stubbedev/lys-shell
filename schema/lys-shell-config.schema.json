@@ -382,6 +382,18 @@
       },
       "type": "array"
     },
+    "Array_of_BitwardenPassphrasePreset": {
+      "items": {
+        "$ref": "#/$defs/BitwardenPassphrasePreset"
+      },
+      "type": "array"
+    },
+    "Array_of_BitwardenPasswordPreset": {
+      "items": {
+        "$ref": "#/$defs/BitwardenPasswordPreset"
+      },
+      "type": "array"
+    },
     "Array_of_CustomModuleDefinition": {
       "items": {
         "$ref": "#/$defs/CustomModuleDefinition"
@@ -954,7 +966,7 @@
       "type": "object"
     },
     "BitwardenConfig": {
-      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe shell keeps only the session (the server, the email and the\nrefresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the\nmaster password, a key or an item. Copied secrets are marked so\nclipboard managers, the shell's own history included, do not keep\nthem.\n\nThe launcher's `vault` mode (`lys-shell launcher -show vault`) searches\nthe open vault from anywhere: Enter copies an item's password (or its\nfirst field), Shift+Enter lists its fields to pick one. A locked vault\nasks for the master password in the launcher's masked input, and a\nprotected item asks again before a secret is copied.",
+      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe shell keeps only the session (the server, the email and the\nrefresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the\nmaster password, a key or an item. Copied secrets are marked so\nclipboard managers, the shell's own history included, do not keep\nthem.\n\nThe launcher's `vault` mode (`lys-shell launcher -show vault`) searches\nthe open vault from anywhere: Enter copies an item's password (or its\nfirst field), Shift+Enter lists its fields to pick one. A locked vault\nasks for the master password in the launcher's masked input, and a\nprotected item asks again before a secret is copied.\n\nThe dropdown's generator (its header's shuffle button) lists the\n`generator-passwords` and `generator-passphrases` presets; picking one\ncopies a new password or passphrase, made in the shell, as a secret.\nPassphrases draw from the EFF large wordlist (CC BY 3.0 US, by the\nElectronic Frontier Foundation).",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -985,6 +997,36 @@
           "$ref": "#/$defs/string",
           "default": "{{ count }}",
           "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of items in the open vault (empty while\n  locked)\n\n## Examples\n\n- `\"{{ count }}\"` - \"142\""
+        },
+        "generator-passphrases": {
+          "$ref": "#/$defs/Array_of_BitwardenPassphrasePreset",
+          "default": [
+            {
+              "capitalize": true,
+              "name": "Passphrase",
+              "number": true,
+              "separator": "-",
+              "words": 6
+            }
+          ],
+          "description": "Passphrase presets the dropdown's generator offers, of words from\nthe EFF large wordlist. Generating copies a new passphrase as a\nsecret, cleared after `clipboard-clear`."
+        },
+        "generator-passwords": {
+          "$ref": "#/$defs/Array_of_BitwardenPasswordPreset",
+          "default": [
+            {
+              "avoid-ambiguous": false,
+              "charsets": [
+                "lowercase",
+                "uppercase",
+                "digits",
+                "symbols"
+              ],
+              "length": 20,
+              "name": "Password"
+            }
+          ],
+          "description": "Password presets the dropdown's generator offers. Generating\ncopies a new password as a secret, cleared after\n`clipboard-clear`."
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -1072,6 +1114,72 @@
           "description": "Sync the open vault every this many minutes. 0 syncs only on\nunlock and by hand."
         }
       },
+      "type": "object"
+    },
+    "BitwardenPassphrasePreset": {
+      "description": "A passphrase of words from the EFF large wordlist the Bitwarden\ndropdown's generator makes and copies.\n\n## Example\n\n```yaml\nmodules: {bitwarden: {generator-passphrases: [{name: Spoken, words: 5, separator: \" \", capitalize: false, number: false}]}}\n```",
+      "properties": {
+        "capitalize": {
+          "default": true,
+          "description": "Capitalise the first letter of every word.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Name the generator lists the preset by.",
+          "type": "string"
+        },
+        "number": {
+          "default": true,
+          "description": "Append a digit to one of the words.",
+          "type": "boolean"
+        },
+        "separator": {
+          "default": "-",
+          "description": "Text between the words.",
+          "type": "string"
+        },
+        "words": {
+          "$ref": "#/$defs/PassphraseWords",
+          "default": 6,
+          "description": "Number of words, 3-20."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "BitwardenPasswordPreset": {
+      "description": "A random-character password the Bitwarden dropdown's generator makes\nand copies.\n\n## Example\n\n```yaml\nmodules: {bitwarden: {generator-passwords: [{name: PIN-safe, length: 12, charsets: [uppercase, digits], avoid-ambiguous: true}]}}\n```",
+      "properties": {
+        "avoid-ambiguous": {
+          "default": false,
+          "description": "Leave out the easily confused characters `l`, `I`, `O`, `0` and `1`.",
+          "type": "boolean"
+        },
+        "charsets": {
+          "$ref": "#/$defs/PasswordCharsets",
+          "default": [
+            "lowercase",
+            "uppercase",
+            "digits",
+            "symbols"
+          ],
+          "description": "Character classes to draw from; each appears at least once."
+        },
+        "length": {
+          "$ref": "#/$defs/PasswordLength",
+          "default": 20,
+          "description": "Length in characters, 5-128."
+        },
+        "name": {
+          "description": "Name the generator lists the preset by.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
       "type": "object"
     },
     "BitwardenServer": {
@@ -4907,6 +5015,28 @@
             "clipboard-clear": 30,
             "email": "",
             "format": "{{ count }}",
+            "generator-passphrases": [
+              {
+                "capitalize": true,
+                "name": "Passphrase",
+                "number": true,
+                "separator": "-",
+                "words": 6
+              }
+            ],
+            "generator-passwords": [
+              {
+                "avoid-ambiguous": false,
+                "charsets": [
+                  "lowercase",
+                  "uppercase",
+                  "digits",
+                  "symbols"
+                ],
+                "length": 20,
+                "name": "Password"
+              }
+            ],
             "icon-bg-color": "blue",
             "icon-color": "auto",
             "icon-locked": "ld-lock-symbolic",
@@ -6727,6 +6857,53 @@
         }
       },
       "type": "object"
+    },
+    "PassphraseWords": {
+      "description": "A generated passphrase's number of words, 3-20.",
+      "format": "uint32",
+      "maximum": 20,
+      "minimum": 3,
+      "type": "integer"
+    },
+    "PasswordCharset": {
+      "description": "A class of characters a generated password draws from.",
+      "oneOf": [
+        {
+          "const": "lowercase",
+          "description": "Lowercase letters, a-z.",
+          "type": "string"
+        },
+        {
+          "const": "uppercase",
+          "description": "Uppercase letters, A-Z.",
+          "type": "string"
+        },
+        {
+          "const": "digits",
+          "description": "Digits, 0-9.",
+          "type": "string"
+        },
+        {
+          "const": "symbols",
+          "description": "The symbols `!@#$%^&*`.",
+          "type": "string"
+        }
+      ]
+    },
+    "PasswordCharsets": {
+      "description": "The character classes a generated password draws from, at least one\nof `lowercase`, `uppercase`, `digits` and `symbols` (`!@#$%^&*`).\nEvery class listed appears in the password at least once.",
+      "items": {
+        "$ref": "#/$defs/PasswordCharset"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "PasswordLength": {
+      "description": "A generated password's length in characters, 5-128.",
+      "format": "uint32",
+      "maximum": 128,
+      "minimum": 5,
+      "type": "integer"
     },
     "Percentage": {
       "description": "Percentage value clamped to 0-100.",
@@ -9807,6 +9984,28 @@
           "clipboard-clear": 30,
           "email": "",
           "format": "{{ count }}",
+          "generator-passphrases": [
+            {
+              "capitalize": true,
+              "name": "Passphrase",
+              "number": true,
+              "separator": "-",
+              "words": 6
+            }
+          ],
+          "generator-passwords": [
+            {
+              "avoid-ambiguous": false,
+              "charsets": [
+                "lowercase",
+                "uppercase",
+                "digits",
+                "symbols"
+              ],
+              "length": 20,
+              "name": "Password"
+            }
+          ],
           "icon-bg-color": "blue",
           "icon-color": "auto",
           "icon-locked": "ld-lock-symbolic",

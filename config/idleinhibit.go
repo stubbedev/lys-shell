@@ -118,7 +118,7 @@ func (d IdleInhibitDuration) Duration() idleinhibit.Duration { return d.duration
 
 // UnmarshalConfig implements Unmarshaler.
 func (d *IdleInhibitDuration) UnmarshalConfig(v any) error {
-	minutes, err := decodeInt64(v)
+	minutes, err := decodeInteger[int64](v)
 	if err != nil {
 		return err
 	}

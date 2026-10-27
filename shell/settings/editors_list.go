@@ -230,6 +230,10 @@ var enumList = listRow(func(meta config.FieldMeta) listSpec {
 	if meta.Elem != nil {
 		elem = *meta.Elem
 	}
+	return enumListSpec(elem)
+})
+
+func enumListSpec(elem config.FieldMeta) listSpec {
 	blank := ""
 	if len(elem.Variants) > 0 {
 		blank = elem.Variants[0]
@@ -243,7 +247,7 @@ var enumList = listRow(func(meta config.FieldMeta) listSpec {
 			return &enumItem{d, elem.Variants}
 		},
 	}
-})
+}
 
 // sameStored compares stored values, an empty list or map equal to
 // none.

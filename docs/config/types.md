@@ -225,6 +225,43 @@ One of: `"battery"`, `"bitwarden"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"c
 
 String matching `^custom-[a-z0-9-]+$`.
 
+## BitwardenPassphrasePreset {#bitwarden-passphrase-preset}
+
+A passphrase of words from the EFF large wordlist the Bitwarden
+dropdown's generator makes and copies.
+
+### Example
+
+```yaml
+modules: {bitwarden: {generator-passphrases: [{name: Spoken, words: 5, separator: " ", capitalize: false, number: false}]}}
+```
+
+| Field | Description |
+|---|---|
+| `name` | Name the generator lists the preset by. |
+| `words` | Number of words, 3-20. |
+| `separator` | Text between the words. |
+| `capitalize` | Capitalise the first letter of every word. |
+| `number` | Append a digit to one of the words. |
+
+## BitwardenPasswordPreset {#bitwarden-password-preset}
+
+A random-character password the Bitwarden dropdown's generator makes
+and copies.
+
+### Example
+
+```yaml
+modules: {bitwarden: {generator-passwords: [{name: PIN-safe, length: 12, charsets: [uppercase, digits], avoid-ambiguous: true}]}}
+```
+
+| Field | Description |
+|---|---|
+| `name` | Name the generator lists the preset by. |
+| `length` | Length in characters, 5-128. |
+| `charsets` | Character classes to draw from; each appears at least once. |
+| `avoid-ambiguous` | Leave out the easily confused characters `l`, `I`, `O`, `0` and `1`. |
+
 ## BitwardenServer {#bitwarden-server}
 
 String.
@@ -890,6 +927,41 @@ Color palette configuration for the active theme.
 | `yellow` | Yellow semantic color. |
 | `green` | Green semantic color. |
 | `blue` | Blue semantic color. |
+
+## PassphraseWords {#passphrase-words}
+
+A generated passphrase's number of words, 3-20.
+
+Number in `[3, 20]`.
+
+Serialises as `uint32`.
+
+## PasswordCharset {#password-charset}
+
+A class of characters a generated password draws from.
+
+| Value | Meaning |
+|---|---|
+| `"lowercase"` | Lowercase letters, a-z. |
+| `"uppercase"` | Uppercase letters, A-Z. |
+| `"digits"` | Digits, 0-9. |
+| `"symbols"` | The symbols `!@#$%^&*`. |
+
+## PasswordCharsets {#password-charsets}
+
+The character classes a generated password draws from, at least one
+of `lowercase`, `uppercase`, `digits` and `symbols` (`!@#$%^&*`).
+Every class listed appears in the password at least once.
+
+See the schema for valid values.
+
+## PasswordLength {#password-length}
+
+A generated password's length in characters, 5-128.
+
+Number in `[5, 128]`.
+
+Serialises as `uint32`.
 
 ## Percentage {#percentage}
 

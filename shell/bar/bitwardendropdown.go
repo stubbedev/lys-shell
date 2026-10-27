@@ -2,7 +2,9 @@ package bar
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"io"
 	"log"
 	"net/url"
 	"strconv"
@@ -236,23 +238,26 @@ type bitwardenView struct {
 	popoverHook
 	*widget.Box
 
-	ctx   ModuleContext
-	host  *bitwardenHost
-	vault vault
-	font  render.Font
-	px    float64
-	now   func() time.Time
+	ctx    ModuleContext
+	host   *bitwardenHost
+	vault  vault
+	font   render.Font
+	px     float64
+	now    func() time.Time
+	random io.Reader
 
 	life   context.Context
 	cancel context.CancelFunc
 	once   sync.Once
 
-	busy    bool
-	state   bitwarden.State
-	pending *bwChallenge
-	copying *bwCopyRequest
+	busy       bool
+	state      bitwarden.State
+	pending    *bwChallenge
+	copying    *bwCopyRequest
+	generating bool
 
 	spinner   *widget.Spinner
+	genBtn    *widget.Button
 	syncBtn   *widget.Button
 	lockBtn   *widget.Button
 	logoutBtn *widget.Button
@@ -286,19 +291,25 @@ type bitwardenView struct {
 
 	repromptDesc *widget.Label
 	repromptPw   *secretEntry
+
+	genList   *widget.ItemGroup
+	genSt     *widget.Stack
+	genRows   []*widget.Item
+	genStatus *widget.Label
 }
 
 func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &bitwardenView{ctx: ctx, host: ctx.Bitwarden, font: font, px: px, now: time.Now, state: bwStateUnknown}
+	v := &bitwardenView{ctx: ctx, host: ctx.Bitwarden, font: font, px: px, now: time.Now, random: rand.Reader, state: bwStateUnknown}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "bitwarden-dropdown")
 	v.spinner = widget.NewSpinner(int(px))
 	v.spinner.SetVisible(false)
+	v.genBtn = v.iconButton("ld-shuffle-symbolic", i18n.T("dropdown-bitwarden-generator"), v.toggleGenerator)
 	v.syncBtn = v.iconButton("ld-refresh-cw-symbolic", i18n.T("dropdown-bitwarden-sync"), v.sync)
 	v.lockBtn = v.iconButton("ld-lock-symbolic", i18n.T("dropdown-bitwarden-lock"), v.lock)
 	v.logoutBtn = v.iconButton("ld-log-out-symbolic", i18n.T("dropdown-bitwarden-logout"), v.logout)
-	v.Append(dropdownHeader(font, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-title"), v.spinner, v.syncBtn, v.lockBtn, v.logoutBtn), false)
+	v.Append(dropdownHeader(font, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-title"), v.spinner, v.genBtn, v.syncBtn, v.lockBtn, v.logoutBtn), false)
 	content := dropdownContent()
 	v.errLabel = v.caption(css.Error)
 	v.pages = pageStack()
@@ -307,6 +318,7 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.Add(bwPageUnlock, v.buildUnlock())
 	v.pages.Add(bwPageVault, v.buildVault())
 	v.pages.Add(bwPageReprompt, v.buildReprompt())
+	v.pages.Add(bwPageGenerator, v.buildGenerator())
 	content.Append(v.errLabel, false)
 	content.Append(v.pages, true)
 	v.Append(content, true)
@@ -353,6 +365,7 @@ func (v *bitwardenView) showError(err error) {
 	log.Printf("bitwarden: %v", err)
 	v.pages.Add(bwPageError, widgets.EmptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-unavailable"), err.Error()))
 	v.pages.Show(bwPageError)
+	v.genBtn.SetVisible(false)
 	v.syncBtn.SetVisible(false)
 	v.lockBtn.SetVisible(false)
 	v.logoutBtn.SetVisible(false)
@@ -536,6 +549,10 @@ func (v *bitwardenView) apply() {
 	cfg := v.host.config()
 	v.server.SetText(i18n.T("dropdown-bitwarden-server", i18n.Str("server", cfg.Server.String())))
 	v.account.SetText(i18n.T("dropdown-bitwarden-account", i18n.Str("email", st.Email)))
+	if v.generating {
+		v.pages.Show(bwPageGenerator)
+		return
+	}
 	switch st.State {
 	case bitwarden.StateLoggedOut:
 		if v.pending != nil {
@@ -589,6 +606,8 @@ func (v *bitwardenView) clearSecrets() {
 // box outlives the popover.
 func (v *bitwardenView) dropdownHidden() {
 	v.clearSecrets()
+	v.generating = false
+	setCaption(v.genStatus, "")
 	if v.vault != nil {
 		v.apply()
 	}
@@ -613,6 +632,10 @@ func (v *bitwardenView) dropdownFocus() widget.Widget {
 		return v.search
 	case bwPageReprompt:
 		return v.repromptPw.entry
+	case bwPageGenerator:
+		if len(v.genRows) > 0 {
+			return v.genRows[0]
+		}
 	}
 	return nil
 }
@@ -813,22 +836,22 @@ func (v *bitwardenView) copyField(it bitwarden.Item, f bwField) {
 // copyNow puts the field on the clipboard and says so.
 func (v *bitwardenView) copyNow(it bitwarden.Item, f bwField) {
 	ttl, err := v.host.copyField(v.vault, it, f, v.now())
-	if err != nil {
-		v.setStatus(err)
-		return
-	}
-	msg := i18n.T("dropdown-bitwarden-copied", i18n.Str("field", f.name()))
-	if ttl > 0 {
-		msg = i18n.T("dropdown-bitwarden-copied-clears", i18n.Str("field", f.name()), i18n.Str("seconds", strconv.Itoa(int(ttl/time.Second))))
-	}
-	v.status.RemoveClass(css.Error)
-	setCaption(v.status, msg)
+	reportCopy(v.status, f.name(), ttl, err)
 }
 
-func (v *bitwardenView) setStatus(err error) {
-	log.Printf("bitwarden: copy: %v", err)
-	v.status.AddClass(css.Error)
-	setCaption(v.status, bwErrorText(err))
+func reportCopy(l *widget.Label, field string, ttl time.Duration, err error) {
+	if err != nil {
+		log.Printf("bitwarden: copy %s: %v", field, err)
+		l.AddClass(css.Error)
+		setCaption(l, bwErrorText(err))
+		return
+	}
+	msg := i18n.T("dropdown-bitwarden-copied", i18n.Str("field", field))
+	if ttl > 0 {
+		msg = i18n.T("dropdown-bitwarden-copied-clears", i18n.Str("field", field), i18n.Str("seconds", strconv.Itoa(int(ttl/time.Second))))
+	}
+	l.RemoveClass(css.Error)
+	setCaption(l, msg)
 }
 
 func (v *bitwardenView) confirmReprompt() {

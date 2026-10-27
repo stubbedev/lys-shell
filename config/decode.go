@@ -329,9 +329,9 @@ func encode(v any) any {
 	return encodeValue(rv)
 }
 
-// decodeInt64 decodes v as a whole number.
-func decodeInt64(v any) (int64, error) {
-	var n int64
+// decodeInteger decodes v as a whole number that T holds.
+func decodeInteger[T uint32 | int64](v any) (T, error) {
+	var n T
 	err := decodeInto(reflect.ValueOf(&n).Elem(), v)
 	return n, err
 }

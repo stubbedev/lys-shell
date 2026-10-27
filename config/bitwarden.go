@@ -74,6 +74,12 @@ func (BitwardenServer) configSchema(*schemaGen) Schema {
 // first field), Shift+Enter lists its fields to pick one. A locked vault
 // asks for the master password in the launcher's masked input, and a
 // protected item asks again before a secret is copied.
+//
+// The dropdown's generator (its header's shuffle button) lists the
+// `generator-passwords` and `generator-passphrases` presets; picking one
+// copies a new password or passphrase, made in the shell, as a secret.
+// Passphrases draw from the EFF large wordlist (CC BY 3.0 US, by the
+// Electronic Frontier Foundation).
 type BitwardenConfig struct {
 	// Server the login form logs in to. A logged-in account keeps the
 	// server it logged in to.
@@ -91,6 +97,14 @@ type BitwardenConfig struct {
 	// Sync the open vault every this many minutes. 0 syncs only on
 	// unlock and by hand.
 	SyncInterval uint32 `cfg:"sync-interval"`
+	// Password presets the dropdown's generator offers. Generating
+	// copies a new password as a secret, cleared after
+	// `clipboard-clear`.
+	GeneratorPasswords []BitwardenPasswordPreset `cfg:"generator-passwords"`
+	// Passphrase presets the dropdown's generator offers, of words from
+	// the EFF large wordlist. Generating copies a new passphrase as a
+	// secret, cleared after `clipboard-clear`.
+	GeneratorPassphrases []BitwardenPassphrasePreset `cfg:"generator-passphrases"`
 	// Format string for the label.
 	//
 	// ## Placeholders
@@ -138,30 +152,34 @@ type BitwardenConfig struct {
 
 // DefaultsBitwarden returns the schema defaults.
 func DefaultsBitwarden() BitwardenConfig {
+	password, passphrase := DefaultsBitwardenPasswordPreset(), DefaultsBitwardenPassphrasePreset()
+	password.Name, passphrase.Name = "Password", "Passphrase"
 	return BitwardenConfig{
-		Server:          mustBitwardenServer(bitwarden.CloudUS),
-		Email:           "",
-		LockAfter:       15,
-		LockWithSession: true,
-		ClipboardClear:  30,
-		SyncInterval:    30,
-		Format:          "{{ count }}",
-		IconLocked:      "ld-lock-symbolic",
-		IconUnlocked:    "ld-lock-open-symbolic",
-		BorderShow:      false,
-		BorderColor:     mustColor("blue"),
-		IconShow:        true,
-		IconColor:       mustColor("auto"),
-		IconBgColor:     mustColor("blue"),
-		LabelShow:       false,
-		LabelColor:      mustColor("blue"),
-		LabelMaxLength:  0,
-		ButtonBgColor:   mustColor("bg-surface-elevated"),
-		LeftClick:       ParseClickAction("dropdown:bitwarden"),
-		RightClick:      ClickAction{},
-		MiddleClick:     ClickAction{},
-		ScrollUp:        ClickAction{},
-		ScrollDown:      ClickAction{},
+		Server:               mustBitwardenServer(bitwarden.CloudUS),
+		Email:                "",
+		LockAfter:            15,
+		LockWithSession:      true,
+		ClipboardClear:       30,
+		SyncInterval:         30,
+		GeneratorPasswords:   []BitwardenPasswordPreset{password},
+		GeneratorPassphrases: []BitwardenPassphrasePreset{passphrase},
+		Format:               "{{ count }}",
+		IconLocked:           "ld-lock-symbolic",
+		IconUnlocked:         "ld-lock-open-symbolic",
+		BorderShow:           false,
+		BorderColor:          mustColor("blue"),
+		IconShow:             true,
+		IconColor:            mustColor("auto"),
+		IconBgColor:          mustColor("blue"),
+		LabelShow:            false,
+		LabelColor:           mustColor("blue"),
+		LabelMaxLength:       0,
+		ButtonBgColor:        mustColor("bg-surface-elevated"),
+		LeftClick:            ParseClickAction("dropdown:bitwarden"),
+		RightClick:           ClickAction{},
+		MiddleClick:          ClickAction{},
+		ScrollUp:             ClickAction{},
+		ScrollDown:           ClickAction{},
 	}
 }
 

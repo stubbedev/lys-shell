@@ -116,3 +116,53 @@ var mailAccountList = cardRow(cardSpec{
 	},
 	listCls: "card-form-list", rowClass: "card-form-row", labelCls: "card-form-label",
 })
+
+func presetBlank(preset any) func() map[string]any {
+	return func() map[string]any {
+		m, _ := config.Encode(preset).(map[string]any)
+		return m
+	}
+}
+
+func presetNamed(item map[string]any) bool { name, _ := item["name"].(string); return name != "" }
+
+func presetName() *cardField {
+	return &cardField{key: "name", label: "settings-generator-preset-name", editor: func(k *kit, s slot) control {
+		return newLiveText(k, s, "name")
+	}}
+}
+
+func presetSpin(meta config.FieldMeta) func(k *kit, s slot) control {
+	return func(k *kit, s slot) control { return newNumber(k, s, meta.Min, meta.Max, 1, 0) }
+}
+
+func presetToggle(k *kit, s slot) control { return newToggle(k, s) }
+
+var passwordPresetList = cardRow(cardSpec{
+	identity: presetName(),
+	fields: []cardField{
+		{key: "length", label: "settings-generator-preset-length", editor: presetSpin(config.MetaOf[config.PasswordLength]())},
+		{key: "charsets", label: "settings-generator-preset-charsets", fill: true, editor: func(k *kit, s slot) control {
+			return newListEditor(k, s, enumListSpec(config.MetaOf[config.PasswordCharset]()))
+		}},
+		{key: "avoid-ambiguous", label: "settings-generator-preset-avoid-ambiguous", editor: presetToggle},
+	},
+	blank:   presetBlank(config.DefaultsBitwardenPasswordPreset()),
+	keep:    presetNamed,
+	listCls: "card-form-list", rowClass: "card-form-row", labelCls: "card-form-label",
+})
+
+var passphrasePresetList = cardRow(cardSpec{
+	identity: presetName(),
+	fields: []cardField{
+		{key: "words", label: "settings-generator-preset-words", editor: presetSpin(config.MetaOf[config.PassphraseWords]())},
+		{key: "separator", label: "settings-generator-preset-separator", editor: func(k *kit, s slot) control {
+			return newLiveText(k, s, "-")
+		}},
+		{key: "capitalize", label: "settings-generator-preset-capitalize", editor: presetToggle},
+		{key: "number", label: "settings-generator-preset-number", editor: presetToggle},
+	},
+	blank:   presetBlank(config.DefaultsBitwardenPassphrasePreset()),
+	keep:    presetNamed,
+	listCls: "card-form-list", rowClass: "card-form-row", labelCls: "card-form-label",
+})

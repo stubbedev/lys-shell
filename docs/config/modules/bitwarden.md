@@ -23,6 +23,12 @@ first field), Shift+Enter lists its fields to pick one. A locked vault
 asks for the master password in the launcher's masked input, and a
 protected item asks again before a secret is copied.
 
+The dropdown's generator (its header's shuffle button) lists the
+`generator-passwords` and `generator-passphrases` presets; picking one
+copies a new password or passphrase, made in the shell, as a secret.
+Passphrases draw from the EFF large wordlist (CC BY 3.0 US, by the
+Electronic Frontier Foundation).
+
 Add it to your layout with `bitwarden`:
 
 ```yaml
@@ -83,6 +89,13 @@ bar:
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
 | `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
 
+## Generator
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `generator-passwords` | array of [`BitwardenPasswordPreset`](/config/types#bitwarden-password-preset) | `[...]` | Password presets the dropdown's generator offers. Generating copies a new password as a secret, cleared after `clipboard-clear`. |
+| `generator-passphrases` | array of [`BitwardenPassphrasePreset`](/config/types#bitwarden-passphrase-preset) | `[...]` | Passphrase presets the dropdown's generator offers, of words from the EFF large wordlist. Generating copies a new passphrase as a secret, cleared after `clipboard-clear`. |
+
 ## Default configuration
 
 ```yaml
@@ -94,6 +107,21 @@ modules:
     lock-with-session: true
     clipboard-clear: 30
     sync-interval: 30
+    generator-passwords:
+      - name: Password
+        length: 20
+        charsets:
+          - lowercase
+          - uppercase
+          - digits
+          - symbols
+        avoid-ambiguous: false
+    generator-passphrases:
+      - name: Passphrase
+        words: 6
+        separator: '-'
+        capitalize: true
+        number: true
     format: '{{ count }}'
     icon-locked: ld-lock-symbolic
     icon-unlocked: ld-lock-open-symbolic

@@ -37,7 +37,7 @@ func (b LockBlur) Sigma() float64 { return float64(b.sigma) }
 
 // UnmarshalConfig implements Unmarshaler.
 func (b *LockBlur) UnmarshalConfig(v any) error {
-	sigma, err := decodeInt64(v)
+	sigma, err := decodeInteger[int64](v)
 	if err != nil {
 		return err
 	}

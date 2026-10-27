@@ -20,6 +20,17 @@ settings-modules-bitwarden-clipboard-clear = Clear Clipboard After (seconds)
 settings-modules-bitwarden-sync-interval = Sync Interval (minutes)
     .description = Sync the open vault every this many minutes. 0 syncs only on unlock and by hand
 
+settings-modules-bitwarden-generator-passwords = Password Presets
+    .description = Random-character passwords the dropdown's generator copies
+
+settings-modules-bitwarden-generator-passphrases = Passphrase Presets
+    .description = Passphrases of words from the EFF large wordlist the dropdown's generator copies
+
+enum-password-charset-lowercase = Lowercase (a-z)
+enum-password-charset-uppercase = Uppercase (A-Z)
+enum-password-charset-digits = Digits (0-9)
+enum-password-charset-symbols = Symbols (!@#$%^&*)
+
 settings-modules-bitwarden-format = Format
     .description = Label format string. Placeholders: {"{{ count }}"} (items in the open vault)
 

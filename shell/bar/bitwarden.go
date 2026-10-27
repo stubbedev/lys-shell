@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"path/filepath"
 	"strconv"
@@ -102,15 +103,31 @@ func (h *bitwardenHost) copyField(v vault, it bitwarden.Item, f bwField, now tim
 	if err != nil {
 		return 0, err
 	}
+	ttl, err := h.copyText(value, f.secret())
+	if err != nil {
+		return 0, err
+	}
+	v.Touch()
+	return ttl, nil
+}
+
+func (h *bitwardenHost) copyGenerated(rules bwRules, random io.Reader) (time.Duration, error) {
+	value, err := rules.Generate(random)
+	if err != nil {
+		return 0, err
+	}
+	return h.copyText(value, true)
+}
+
+func (h *bitwardenHost) copyText(value string, secret bool) (time.Duration, error) {
 	content, ttl := transfer.Text(value), time.Duration(0)
-	if f.secret() {
+	if secret {
 		content = clipboard.SecretContent(value)
 		ttl = time.Duration(h.config().ClipboardClear) * time.Second
 	}
 	if err := h.copy(content, ttl); err != nil {
 		return 0, err
 	}
-	v.Touch()
 	return ttl, nil
 }
 
