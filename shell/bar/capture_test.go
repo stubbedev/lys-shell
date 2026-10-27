@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,21 +50,18 @@ func runLoop(t *testing.T, application *app.Application) func(func()) {
 // pastePNG reads the regular selection as image/png through wl-paste, a
 // data-control client in a process of its own, as cliphist and
 // wl-clip-persist are.
-func pastePNG(t *testing.T) []byte {
-	t.Helper()
-	if _, err := exec.LookPath("wl-paste"); err != nil {
-		t.Skip("wl-paste is not installed (the nix dev shell carries it)")
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+func pastePNG(ctx context.Context) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "wl-paste", "--no-newline", "--type", transfer.MimePNG)
 	cmd.Stderr = &stderr
+	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("wl-paste: %v: %s", err, stderr.Bytes())
+		return nil, fmt.Errorf("wl-paste: %w: %s", err, stderr.Bytes())
 	}
-	return out
+	return out, nil
 }
 
 func decodePNG(t *testing.T, data []byte) *image.RGBA {
@@ -135,10 +134,39 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 		t.Fatal(err)
 	}
 	want := decodePNG(t, saved)
-	for i := range 3 {
-		got := decodePNG(t, pastePNG(t))
+	if _, err := exec.LookPath("wl-paste"); err != nil {
+		t.Skip("wl-paste is not installed (the nix dev shell carries it)")
+	}
+	matches := func(reader string, data []byte, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("%s: %v", reader, err)
+		}
+		got := decodePNG(t, data)
 		if got.Bounds() != want.Bounds() || !bytes.Equal(got.Pix, want.Pix) {
-			t.Fatalf("reader %d got a %v image unlike the saved %v capture", i, got.Bounds(), want.Bounds())
+			t.Fatalf("%s got a %v image unlike the saved %v capture", reader, got.Bounds(), want.Bounds())
+		}
+	}
+	for i := range 3 {
+		data, err := pastePNG(t.Context())
+		matches(fmt.Sprintf("reader %d", i), data, err)
+	}
+	type paste struct {
+		data []byte
+		err  error
+	}
+	for round := range 3 {
+		pastes := make([]paste, 4)
+		var wg sync.WaitGroup
+		for i := range pastes {
+			wg.Go(func() {
+				data, err := pastePNG(t.Context())
+				pastes[i] = paste{data, err}
+			})
+		}
+		wg.Wait()
+		for i, p := range pastes {
+			matches(fmt.Sprintf("round %d, concurrent reader %d", round, i), p.data, p.err)
 		}
 	}
 
