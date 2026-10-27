@@ -1,8 +1,12 @@
 /dist/
 /lys-shell-design
 
-# Temporary sandboxes
+# Temporary sandboxes, and binaries `go build ./cmd/...` leaves at the root
 /lys-shell
+/lys-login
+/lys-lock
+/lys-settings
+/lys-secrets
 /sandbox/
 
 /result
