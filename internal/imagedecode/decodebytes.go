@@ -22,7 +22,7 @@ func DecodeBytes(path string) (int64, error) {
 	}
 	defer f.Close()
 	br := bufio.NewReader(f)
-	if magic, err := br.Peek(2); err == nil && magic[0] == 0xff && magic[1] == 0xd8 {
+	if isJPEG(br) {
 		n, err := jpegDecodeBytes(br)
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", path, err)

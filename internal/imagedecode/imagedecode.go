@@ -56,6 +56,12 @@ func OpenContext(ctx context.Context, path string) (image.Image, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return decodeFile(ctx, f, path)
+}
+
+// decodeFile decodes the image file f, opened from path and read from
+// its start, as OpenContext does.
+func decodeFile(ctx context.Context, f *os.File, path string) (image.Image, error) {
 	r := ctxReader{ctx, f}
 	img, _, err := image.Decode(bufio.NewReader(r))
 	if err == nil {

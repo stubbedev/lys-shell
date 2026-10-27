@@ -65,6 +65,12 @@ linters:
         linters:
           - gosec
         text: "G115: integer overflow conversion int(64)? -> uint64$"
+      # The standard library's JPEG decoder narrows bit-stream words and
+      # fixed-point DCT values whose range its arithmetic bounds.
+      - path: ^third_party/jpeg/
+        linters:
+          - gosec
+        text: "G115: integer overflow conversion"
 
 issues:
   max-issues-per-linter: 0
