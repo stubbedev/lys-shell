@@ -11,10 +11,6 @@ import (
 	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 )
 
-func watchRequests() []string {
-	return []string{`{"request":"watch"}`, `{"request":"submap"}`, `{"request":"layout"}`, `{"request":"locks"}`}
-}
-
 func awaitTick(t *testing.T, w *lyswm.Watcher) {
 	t.Helper()
 	select {
@@ -127,27 +123,32 @@ func TestUnknownVersionIsRefused(t *testing.T) {
 	}
 }
 
-func TestWatchSeedsSubmapLayoutAndLocksWithoutAnEvent(t *testing.T) {
+func TestWatchSendsOnlyTheWatchRequest(t *testing.T) {
 	f := lyswmtest.Start(t)
-	f.Result("submap", `"resize"`)
-	f.Result("layout", `{"index":1,"name":"German"}`)
-	f.Result("locks", `{"caps":false,"num":true,"scroll":false}`)
 	w, err := lyswm.Watch()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	if w.Submap() != "resize" {
-		t.Errorf("seeded submap = %q, want resize", w.Submap())
+	if got, want := f.Requests(), []string{`{"request":"watch"}`}; !slices.Equal(got, want) {
+		t.Errorf("requests = %q, want %q", got, want)
 	}
-	if l := w.Layout(); l != (lyswm.Layout{Index: 1, Name: "German"}) {
-		t.Errorf("seeded layout = %+v, want German", l)
+}
+
+func checkSeed[T comparable](t *testing.T, s lyswm.State[T], kind, seed string, want T) {
+	t.Helper()
+	f := lyswmtest.Start(t)
+	f.Result(kind, seed)
+	w, err := lyswm.WatchState(s)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if l := w.Locks(); l != (lyswm.Locks{Num: true}) {
-		t.Errorf("seeded locks = %+v, want Num Lock on", l)
+	defer w.Close()
+	if got := w.Value(); got != want {
+		t.Errorf("seeded %s = %+v, want %+v", kind, got, want)
 	}
-	if got := f.Requests(); !slices.Equal(got, watchRequests()) {
-		t.Errorf("requests = %q, want %q", got, watchRequests())
+	if got, want := f.Requests(), []string{`{"request":"watch"}`, `{"request":"` + kind + `"}`}; !slices.Equal(got, want) {
+		t.Errorf("requests = %q, want %q", got, want)
 	}
 	select {
 	case <-w.Ticks():
@@ -156,82 +157,102 @@ func TestWatchSeedsSubmapLayoutAndLocksWithoutAnEvent(t *testing.T) {
 	}
 }
 
-func TestWatchEventAfterTheStreamOpensWinsOverTheSeed(t *testing.T) {
+func TestWatchStateSeedsWithoutAnEvent(t *testing.T) {
+	t.Run("submap", func(t *testing.T) { checkSeed(t, lyswm.SubmapState, "submap", `"resize"`, "resize") })
+	t.Run("layout", func(t *testing.T) {
+		checkSeed(t, lyswm.LayoutState, "layout", `{"index":1,"name":"German"}`, lyswm.Layout{Index: 1, Name: "German"})
+	})
+	t.Run("locks", func(t *testing.T) {
+		checkSeed(t, lyswm.LocksState, "locks", `{"caps":false,"num":true,"scroll":false}`, lyswm.Locks{Num: true})
+	})
+}
+
+func checkFollow[T comparable](t *testing.T, s lyswm.State[T], event string, want T) {
+	t.Helper()
 	f := lyswmtest.Start(t)
-	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
-	f.Events <- `{"event":"submap","submap":"resize"}`
-	f.Events <- `{"event":"locks","locks":{"caps":true,"num":false,"scroll":true}}`
-	w, err := lyswm.Watch(lyswm.EventLocks)
+	w, err := lyswm.WatchState(s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	awaitTick(t, w)
-	if l := w.Layout(); l != (lyswm.Layout{Index: 1, Name: "German"}) {
-		t.Errorf("layout = %+v, want the event's German over the seeded English (US)", l)
+	seeded := w.Value()
+	f.Events <- `{"event":"focus","window":null}`
+	f.Events <- `{"event":"title","window":3,"title":"x"}`
+	select {
+	case <-w.Ticks():
+		t.Fatal("ticked on an event of another kind")
+	case <-time.After(200 * time.Millisecond):
 	}
-	if w.Submap() != "resize" {
-		t.Errorf("submap = %q, want the event's resize over the seeded default", w.Submap())
+	if got := w.Value(); got != seeded {
+		t.Fatalf("another kind's event changed the value to %+v", got)
 	}
-	if l := w.Locks(); l != (lyswm.Locks{Caps: true, Scroll: true}) {
+	f.Events <- event
+	awaitTick(t, w.Watcher)
+	if got := w.Value(); got != want {
+		t.Fatalf("value = %+v, want %+v", got, want)
+	}
+}
+
+func TestWatchStateFollowsItsEvent(t *testing.T) {
+	t.Run("submap", func(t *testing.T) {
+		checkFollow(t, lyswm.SubmapState, `{"event":"submap","submap":"resize"}`, "resize")
+	})
+	t.Run("layout", func(t *testing.T) {
+		checkFollow(t, lyswm.LayoutState, `{"event":"layout","layout":{"index":1,"name":"German"}}`, lyswm.Layout{Index: 1, Name: "German"})
+	})
+	t.Run("locks", func(t *testing.T) {
+		checkFollow(t, lyswm.LocksState, `{"event":"locks","locks":{"caps":true,"num":true,"scroll":false}}`, lyswm.Locks{Caps: true, Num: true})
+	})
+}
+
+func TestWatchStateEventAfterTheStreamOpensWinsOverTheSeed(t *testing.T) {
+	f := lyswmtest.Start(t)
+	f.Events <- `{"event":"locks","locks":{"caps":true,"num":false,"scroll":true}}`
+	w, err := lyswm.WatchState(lyswm.LocksState)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	awaitTick(t, w.Watcher)
+	if l := w.Value(); l != (lyswm.Locks{Caps: true, Scroll: true}) {
 		t.Errorf("locks = %+v, want the event's Caps and Scroll Lock over the seeded all off", l)
 	}
 }
 
-func TestWatchFailsWhenTheSeedFails(t *testing.T) {
-	for _, c := range []struct {
-		name, request, answer, want string
-	}{
-		{"submap rejected", "submap", `{"version":1,"error":"unknown request"}`, "seed the submap: lys-wm rejected submap: unknown request"},
-		{"submap null", "submap", `{"version":1,"result":null}`, "seed the submap: lys-wm: submap answered no result"},
-		{"layout rejected", "layout", `{"version":1,"error":"unknown request"}`, "seed the layout: lys-wm rejected layout: unknown request"},
-		{"layout missing", "layout", `{"version":1}`, "seed the layout: lys-wm: layout answered no result"},
-		{"locks rejected", "locks", `{"version":1,"error":"unknown request"}`, "seed the locks: lys-wm rejected locks: unknown request"},
-		{"locks missing", "locks", `{"version":1}`, "seed the locks: lys-wm: locks answered no result"},
-		{"locks null", "locks", `{"version":1,"result":null}`, "seed the locks: lys-wm: locks answered no result"},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			f := lyswmtest.Start(t)
-			f.Answer(c.request, c.answer)
-			w, err := lyswm.Watch()
-			if err == nil {
-				w.Close()
-				t.Fatal("Watch succeeded without a seed")
-			}
-			if !strings.Contains(err.Error(), c.want) {
-				t.Errorf("Watch err = %v, want %q", err, c.want)
-			}
-		})
+func checkSeedFails[T any](t *testing.T, s lyswm.State[T], request, answer, want string) {
+	t.Helper()
+	f := lyswmtest.Start(t)
+	f.Answer(request, answer)
+	w, err := lyswm.WatchState(s)
+	if err == nil {
+		w.Close()
+		t.Fatal("WatchState succeeded without a seed")
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("WatchState err = %v, want %q", err, want)
 	}
 }
 
-func TestWatchKeepsSubmapLayoutAndLocks(t *testing.T) {
-	f := lyswmtest.Start(t)
-	w, err := lyswm.Watch()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Close()
-	f.Events <- `{"event":"submap","submap":"resize"}`
-	awaitTick(t, w)
-	if w.Submap() != "resize" {
-		t.Fatalf("submap = %q", w.Submap())
-	}
-	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
-	awaitTick(t, w)
-	if l := w.Layout(); l != (lyswm.Layout{Index: 1, Name: "German"}) {
-		t.Fatalf("layout = %+v", l)
-	}
-	f.Events <- `{"event":"locks","locks":{"caps":true,"num":true,"scroll":false}}`
-	awaitTick(t, w)
-	if l := w.Locks(); l != (lyswm.Locks{Caps: true, Num: true}) {
-		t.Fatalf("locks = %+v", l)
-	}
-	f.Events <- `{"event":"submap","submap":""}`
-	awaitTick(t, w)
-	if w.Submap() != "" {
-		t.Fatalf("submap after reset = %q", w.Submap())
-	}
+func TestWatchStateFailsWhenTheSeedFails(t *testing.T) {
+	rejected := `{"version":1,"error":"unknown request"}`
+	t.Run("submap rejected", func(t *testing.T) {
+		checkSeedFails(t, lyswm.SubmapState, "submap", rejected, "seed the submap: lys-wm rejected submap: unknown request")
+	})
+	t.Run("submap null", func(t *testing.T) {
+		checkSeedFails(t, lyswm.SubmapState, "submap", `{"version":1,"result":null}`, "seed the submap: lys-wm: submap answered no result")
+	})
+	t.Run("layout rejected", func(t *testing.T) {
+		checkSeedFails(t, lyswm.LayoutState, "layout", rejected, "seed the layout: lys-wm rejected layout: unknown request")
+	})
+	t.Run("layout missing", func(t *testing.T) {
+		checkSeedFails(t, lyswm.LayoutState, "layout", `{"version":1}`, "seed the layout: lys-wm: layout answered no result")
+	})
+	t.Run("locks rejected", func(t *testing.T) {
+		checkSeedFails(t, lyswm.LocksState, "locks", rejected, "seed the locks: lys-wm rejected locks: unknown request")
+	})
+	t.Run("locks null", func(t *testing.T) {
+		checkSeedFails(t, lyswm.LocksState, "locks", `{"version":1,"result":null}`, "seed the locks: lys-wm: locks answered no result")
+	})
 }
 
 func TestWatchTicksOnlyOnItsKinds(t *testing.T) {
@@ -247,9 +268,6 @@ func TestWatchTicksOnlyOnItsKinds(t *testing.T) {
 	case <-w.Ticks():
 		t.Fatal("ticked on an event it does not follow")
 	case <-time.After(200 * time.Millisecond):
-	}
-	if l := w.Layout(); l.Name != "French" {
-		t.Fatalf("an unfollowed layout event was not kept: %+v", l)
 	}
 	f.Events <- `{"event":"focus","window":null}`
 	awaitTick(t, w)

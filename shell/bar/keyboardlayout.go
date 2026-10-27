@@ -77,13 +77,13 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 	case ctx.Hyprland != nil:
 		return hyprlandLayoutSource(ctx.Hyprland), nil
 	case detectCompositor() == compositorLysWM:
-		w, err := lyswm.Watch(lyswm.EventLayout)
+		w, err := lyswm.WatchState(lyswm.LayoutState)
 		if err != nil {
 			return layoutSource{}, err
 		}
 		return layoutSource{
 			read: func() (string, error) {
-				layout := w.Layout()
+				layout := w.Value()
 				if layout.Name == "" {
 					return "", fmt.Errorf("lys-wm's layout %d has no name", layout.Index)
 				}

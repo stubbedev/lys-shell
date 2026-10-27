@@ -18,16 +18,16 @@ func evdevLockKeys(fn func(keytoggles.Event)) (func(), error) {
 }
 
 func lysWMLockKeys(fn func(keytoggles.Event)) (func(), error) {
-	w, err := lyswm.Watch(lyswm.EventLocks)
+	w, err := lyswm.WatchState(lyswm.LocksState)
 	if err != nil {
 		return nil, err
 	}
-	last := w.Locks()
+	last := w.Value()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for range w.Ticks() {
-			next := w.Locks()
+			next := w.Value()
 			for _, e := range lockChanges(last, next) {
 				fn(e)
 			}

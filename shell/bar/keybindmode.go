@@ -76,7 +76,7 @@ func submapSource(ctx ModuleContext) (<-chan string, func(), error) {
 		}()
 		return submaps, nil, nil
 	case detectCompositor() == compositorLysWM:
-		w, err := lyswm.Watch(lyswm.EventSubmap)
+		w, err := lyswm.WatchState(lyswm.SubmapState)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -85,7 +85,7 @@ func submapSource(ctx ModuleContext) (<-chan string, func(), error) {
 			defer close(submaps)
 			for {
 				select {
-				case submaps <- w.Submap():
+				case submaps <- w.Value():
 				case <-life.Done():
 					return
 				}
