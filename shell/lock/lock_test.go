@@ -13,9 +13,11 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -134,8 +136,8 @@ func newHarness(t *testing.T, edit func(*config.LockConfig)) *harness {
 			return c
 		},
 		SetLockedHint: func(locked bool) { h.hints = append(h.hints, locked) },
-		Decode: func(string) (image.Image, error) {
-			return image.NewRGBA(image.Rect(0, 0, 4, 4)), nil
+		Decode: func(*memory.Shared, string) (imagedecode.Decoded, error) {
+			return imagedecode.Decoded{Image: image.NewRGBA(image.Rect(0, 0, 4, 4))}, nil
 		},
 		Outputs:  func() []image.Point { return []image.Point{{1920, 1080}, {1080, 1920}} },
 		Forget:   func(id render.ImageID) { h.forgotten = append(h.forgotten, id) },
@@ -459,9 +461,9 @@ func TestBackgroundModes(t *testing.T) {
 		l.Background.Image = "/srv/lock.png"
 		l.Blur = mustBlur(8)
 	})
-	h.s.d.Decode = func(path string) (image.Image, error) {
+	h.s.d.Decode = func(_ *memory.Shared, path string) (imagedecode.Decoded, error) {
 		loaded = append(loaded, path)
-		return image.NewRGBA(image.Rect(0, 0, 2, 2)), nil
+		return imagedecode.Decoded{Image: image.NewRGBA(image.Rect(0, 0, 2, 2))}, nil
 	}
 	h.lock(t)
 	if len(loaded) != 1 || loaded[0] != "/srv/lock.png" || h.s.bg == nil {
@@ -474,14 +476,16 @@ func TestBackgroundModes(t *testing.T) {
 	}
 
 	h = newHarness(t, nil)
-	h.s.d.Decode = func(string) (image.Image, error) {
+	h.s.d.Decode = func(*memory.Shared, string) (imagedecode.Decoded, error) {
 		t.Error("color mode decoded an image")
-		return nil, nil
+		return imagedecode.Decoded{}, nil
 	}
 	h.lock(t)
 
 	h = newHarness(t, func(l *config.LockConfig) { l.Background.Mode = config.BackgroundImage; l.Background.Image = "/nope" })
-	h.s.d.Decode = func(string) (image.Image, error) { return nil, errors.New("no such file") }
+	h.s.d.Decode = func(*memory.Shared, string) (imagedecode.Decoded, error) {
+		return imagedecode.Decoded{}, errors.New("no such file")
+	}
 	h.lock(t)
 	if h.s.bg != nil || !h.locker.active {
 		t.Error("an unreadable image must fall back to the color and still lock")
@@ -497,7 +501,9 @@ func imageHarness(t *testing.T) *harness {
 		l.Background.Image = "/srv/lock.png"
 		l.Blur = mustBlur(8)
 	})
-	h.s.d.Decode = func(string) (image.Image, error) { return image.NewRGBA(image.Rect(0, 0, 600, 400)), nil }
+	h.s.d.Decode = func(*memory.Shared, string) (imagedecode.Decoded, error) {
+		return imagedecode.Decoded{Image: image.NewRGBA(image.Rect(0, 0, 600, 400))}, nil
+	}
 	h.s.d.Outputs = func() []image.Point { return []image.Point{{192, 108}} }
 	return h
 }

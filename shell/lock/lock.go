@@ -24,6 +24,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/shell/credential"
 	"github.com/stubbedev/lys-shell/shell/reveal"
@@ -70,8 +71,9 @@ type Deps struct {
 	// SetLockedHint reports the state to logind, best effort; nil
 	// without logind.
 	SetLockedHint func(locked bool)
-	// Decode decodes the background image file.
-	Decode func(path string) (image.Image, error)
+	// Decode decodes the background image file, its pixels in mem
+	// where it can.
+	Decode func(mem *memory.Shared, path string) (imagedecode.Decoded, error)
 	// Outputs are the device pixel sizes of the outputs a lock covers,
 	// which the background is resampled to before it is blurred.
 	Outputs func() []image.Point

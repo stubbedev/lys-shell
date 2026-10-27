@@ -77,7 +77,7 @@ func Run(init Init) error {
 				log.Printf("greeter: power action %s failed: %v", verb, err)
 			}
 		},
-		loadImage:  imagedecode.Open,
+		loadImage:  imagedecode.OpenOffHeap,
 		outputs:    func() []image.Point { return outputsize.Devices(sess.Outputs()) },
 		forget:     a.ForgetImage,
 		loadAvatar: imagedecode.Open,

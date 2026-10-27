@@ -14,6 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/shell/credential"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -64,8 +65,9 @@ type deps struct {
 	quit    func()
 	now     func() time.Time
 	power   func(verb string)
-	// loadImage decodes the background (no blur in the greeter).
-	loadImage func(path string) (image.Image, error)
+	// loadImage decodes the background (no blur in the greeter), its
+	// pixels in mem where it can.
+	loadImage func(mem *memory.Shared, path string) (imagedecode.Decoded, error)
 	// outputs are the device pixel sizes of the outputs the greeter
 	// shows on, which the background is resampled to.
 	outputs func() []image.Point

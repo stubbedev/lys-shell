@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/offheap"
 )
@@ -52,16 +53,20 @@ type Backdrop struct {
 	mem   *memory.Shared
 }
 
-// LoadBackdrop decodes the background at path and makes it a backdrop
-// for outputs, as NewBackdrop does.
-func LoadBackdrop(mem *memory.Shared, decode func(path string) (image.Image, error), path string, sigma float64, outputs []image.Point) (*Backdrop, error) {
-	src, err := decode(path)
+// LoadBackdrop decodes the background at path into mem and makes it a
+// backdrop for outputs, as NewBackdrop does; the decoded image is
+// freed before it returns.
+func LoadBackdrop(mem *memory.Shared, decode func(mem *memory.Shared, path string) (imagedecode.Decoded, error), path string, sigma float64, outputs []image.Point) (*Backdrop, error) {
+	src, err := decode(mem, path)
 	if err != nil {
 		return nil, fmt.Errorf("background %s unreadable: %w", path, err)
 	}
-	bg, err := NewBackdrop(mem, src, sigma, outputs)
+	bg, err := NewBackdrop(mem, src.Image, sigma, outputs)
 	if err != nil {
-		return nil, fmt.Errorf("background %s unusable: %w", path, err)
+		return nil, errors.Join(fmt.Errorf("background %s unusable: %w", path, err), src.Free())
+	}
+	if err := src.Free(); err != nil {
+		return nil, errors.Join(fmt.Errorf("freeing the decoded background %s: %w", path, err), bg.Free())
 	}
 	return &bg, nil
 }

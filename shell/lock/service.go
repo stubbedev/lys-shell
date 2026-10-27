@@ -69,7 +69,7 @@ func Start(a *app.Application, outputs func() []*app.Output, cfg *config.Config,
 		Auth: func(service string, onEvent func(auth.Event)) authHandle {
 			return auth.Spawn(auth.NewPAM(service), auth.CurrentUsername(), onEvent)
 		},
-		Decode:   imagedecode.Open,
+		Decode:   imagedecode.OpenOffHeap,
 		Outputs:  func() []image.Point { return outputsize.Devices(outputs()) },
 		Forget:   a.ForgetImage,
 		OnLocked: onLocked,

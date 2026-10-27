@@ -11,8 +11,10 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -91,11 +93,11 @@ func buildRig(t *testing.T, edit func(*Init), r *rig) *rig {
 		quit:   func() { r.quit++ },
 		now:    func() time.Time { return time.Date(2026, 3, 5, 9, 7, 0, 0, time.UTC) },
 		power:  func(verb string) { r.power = append(r.power, verb) },
-		loadImage: func(string) (image.Image, error) {
+		loadImage: func(*memory.Shared, string) (imagedecode.Decoded, error) {
 			if r.background == nil {
-				return nil, errors.New("none")
+				return imagedecode.Decoded{}, errors.New("none")
 			}
-			return r.background, nil
+			return imagedecode.Decoded{Image: r.background}, nil
 		},
 		outputs:    func() []image.Point { return r.outputs },
 		forget:     func(id render.ImageID) { r.forgotten = append(r.forgotten, id) },
