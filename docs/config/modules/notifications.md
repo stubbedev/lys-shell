@@ -32,6 +32,8 @@ bar:
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `blocklist` | array of string | `[]` | Glob patterns for app names whose notifications are blocked entirely. |
 | `icon-source` | [`IconSource`](/config/types#icon-source) | `"automatic"` | How notification icons are resolved. |
+| `history-memory` | [`NotificationHistoryMemory`](/config/types#notification-history-memory) | `200` | How many of the newest notifications the history keeps in memory. Older ones stay on disk and load as the dropdown scrolls to them. |
+| `history-stored` | [`NotificationHistoryStored`](/config/types#notification-history-stored) | `10000` | How many notifications the history keeps on disk. The oldest are deleted past it. |
 | `popup-position` | [`PopupPosition`](/config/types#popup-position) | `"top-right"` | Screen position for popup notifications. |
 | `popup-max-visible` | u32 | `5` | Maximum number of popups visible at once. |
 | `popup-stacking-order` | [`StackingOrder`](/config/types#stacking-order) | `"newest-first"` | Order in which popups stack on screen. |
@@ -148,6 +150,8 @@ modules:
     scroll-down: ""
     blocklist: []
     icon-source: automatic
+    history-memory: 200
+    history-stored: 10000
     popup-position: top-right
     popup-max-visible: 5
     popup-stacking-order: newest-first

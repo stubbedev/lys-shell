@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -114,6 +116,43 @@ func TestNotifyCommands(t *testing.T) {
 	})
 	if id != 1 {
 		t.Errorf("first id = %d", id)
+	}
+}
+
+// TestNotifyListPagesTheWholeHistory pins `notify list` past one D-Bus
+// page: every notification once, newest first, and a page size the
+// daemon does not serve is an error rather than a silent clamp.
+func TestNotifyListPagesTheWholeHistory(t *testing.T) {
+	dbustest.Session(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	svc := notifications.NewService()
+	memory, err := notifications.NewMemoryLimit(notifications.MaxHistoryMemory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.SetHistoryLimits(memory, notifications.DefaultStoredLimit())
+	server, err := notifications.Serve(dbustest.SessionConn(t), svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = server.Release() }()
+	const sent = 2 * notifications.MaxPage
+	for i := 1; i <= sent; i++ {
+		svc.Notify("app", 0, "", "s"+strconv.Itoa(i), "", nil, 0)
+	}
+	var want strings.Builder
+	want.WriteString("Notifications:\n")
+	for i := sent; i >= 1; i-- {
+		fmt.Fprintf(&want, "  [%d] app: s%d\n", i, i)
+	}
+	runSteps(t, []step{{[]string{"notify", "list"}, want.String()}})
+
+	obj := dbustest.SessionConn(t).Object(notifications.LysShellName, notifications.LysShellPath)
+	for _, limit := range []uint32{0, notifications.MaxPage + 1} {
+		var rows []notifications.ListRow
+		if err := obj.Call(notifications.LysShellName+".List", 0, limit).Store(&rows); err == nil {
+			t.Errorf("List(%d) served %d rows", limit, len(rows))
+		}
 	}
 }
 

@@ -807,6 +807,22 @@ Number in `[0.0, 1.0]`.
 
 Serialises as `double`.
 
+## NotificationHistoryMemory {#notification-history-memory}
+
+Notifications kept in memory.
+
+Number in `[10, 1000]`.
+
+Serialises as `uint32`.
+
+## NotificationHistoryStored {#notification-history-stored}
+
+Notifications kept on disk.
+
+Number in `[1000, 1000000]`.
+
+Serialises as `uint32`.
+
 ## Numbering {#numbering}
 
 How workspace numbers are displayed.

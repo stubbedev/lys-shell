@@ -33,9 +33,12 @@ func withNotify(run func(*cli.Matches, *daemonProxy) error) func(*cli.Matches) e
 	return withDaemon("Notification", notifications.LysShellName, notifications.LysShellPath, notifications.LysShellName, run)
 }
 
+// notifyList pages through the whole history, newest first, keyset by
+// the last row of each page.
 func notifyList(m *cli.Matches, p *daemonProxy) error {
+	const limit = uint32(notifications.MaxPage)
 	var rows []notifications.ListRow
-	if err := p.call("list notifications", "List", []any{&rows}); err != nil {
+	if err := p.call("list notifications", "List", []any{&rows}, limit); err != nil {
 		return err
 	}
 	if len(rows) == 0 {
@@ -43,13 +46,22 @@ func notifyList(m *cli.Matches, p *daemonProxy) error {
 		return nil
 	}
 	fmt.Fprintln(m.Stdout(), "Notifications:")
-	for _, r := range rows {
-		fmt.Fprintf(m.Stdout(), "  [%d] %s: %s\n", r.ID, r.App, r.Summary)
-		if r.Body != "" {
-			fmt.Fprintf(m.Stdout(), "      %s\n", r.Body)
+	for {
+		for _, r := range rows {
+			fmt.Fprintf(m.Stdout(), "  [%d] %s: %s\n", r.ID, r.App, r.Summary)
+			if r.Body != "" {
+				fmt.Fprintf(m.Stdout(), "      %s\n", r.Body)
+			}
+		}
+		if len(rows) < int(limit) {
+			return nil
+		}
+		last := rows[len(rows)-1]
+		rows = nil
+		if err := p.call("list notifications", "ListBefore", []any{&rows}, last.Stamp, last.ID, limit); err != nil {
+			return err
 		}
 	}
-	return nil
 }
 
 func notifyDismiss(m *cli.Matches, p *daemonProxy) error {

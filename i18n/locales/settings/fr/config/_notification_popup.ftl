@@ -8,6 +8,12 @@ settings-modules-notifications-blocklist = Liste de blocage
 settings-modules-notifications-icon-source = Source des icônes
     .description = Méthode de résolution des icônes de notification
 
+settings-modules-notifications-history-memory = Historique en mémoire
+    .description = Notifications les plus récentes gardées en mémoire ; les plus anciennes se chargent depuis le disque au défilement
+
+settings-modules-notifications-history-stored = Historique sur disque
+    .description = Notifications gardées sur disque ; les plus anciennes sont supprimées au-delà
+
 ## Paramètres des fenêtres contextuelles
 
 settings-modules-notifications-popup-position = Position de la fenêtre contextuelle

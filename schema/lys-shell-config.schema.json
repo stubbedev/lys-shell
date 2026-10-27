@@ -5480,6 +5480,8 @@
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
             "enabled": true,
+            "history-memory": 200,
+            "history-stored": 10000,
             "icon-bg-color": "green",
             "icon-color": "auto",
             "icon-dnd": "ld-bell-off-symbolic",
@@ -6321,6 +6323,16 @@
           "default": true,
           "description": "Enable the notifications service and module."
         },
+        "history-memory": {
+          "$ref": "#/$defs/NotificationHistoryMemory",
+          "default": 200,
+          "description": "How many of the newest notifications the history keeps in memory.\nOlder ones stay on disk and load as the dropdown scrolls to them."
+        },
+        "history-stored": {
+          "$ref": "#/$defs/NotificationHistoryStored",
+          "default": 10000,
+          "description": "How many notifications the history keeps on disk. The oldest are\ndeleted past it."
+        },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "green",
@@ -6478,6 +6490,20 @@
         }
       },
       "type": "object"
+    },
+    "NotificationHistoryMemory": {
+      "description": "Notifications kept in memory.",
+      "format": "uint32",
+      "maximum": 1000,
+      "minimum": 10,
+      "type": "integer"
+    },
+    "NotificationHistoryStored": {
+      "description": "Notifications kept on disk.",
+      "format": "uint32",
+      "maximum": 1000000,
+      "minimum": 1000,
+      "type": "integer"
     },
     "Nullable_AnimationType": {
       "anyOf": [
@@ -10270,6 +10296,8 @@
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
           "enabled": true,
+          "history-memory": 200,
+          "history-stored": 10000,
           "icon-bg-color": "green",
           "icon-color": "auto",
           "icon-dnd": "ld-bell-off-symbolic",

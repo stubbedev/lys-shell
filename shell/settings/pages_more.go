@@ -65,6 +65,8 @@ func notificationsPage(*config.Config) pageSpec {
 	return pageSpec{id: "notifications", navKey: "settings-nav-notifications", icon: "ld-bell-symbolic", header: "settings-page-notifications", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
 			field("modules.notifications.enabled"),
+			field("modules.notifications.history-memory"),
+			field("modules.notifications.history-stored"),
 		}},
 		{title: "settings-section-popup-display", rows: []rowSpec{
 			field("modules.notifications.popup-position"),

@@ -8,6 +8,12 @@ settings-modules-notifications-blocklist = Blocklist
 settings-modules-notifications-icon-source = Icon Source
     .description = How notification icons are resolved
 
+settings-modules-notifications-history-memory = History in Memory
+    .description = Newest notifications kept in memory; older ones load from disk as you scroll
+
+settings-modules-notifications-history-stored = History on Disk
+    .description = Notifications kept on disk; the oldest are deleted past this
+
 ## Popup Settings
 
 settings-modules-notifications-popup-position = Popup Position

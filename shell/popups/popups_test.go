@@ -390,8 +390,8 @@ func TestSwipeDismissesACard(t *testing.T) {
 	if len(popups) != 1 || popups[0].ID != older {
 		t.Fatalf("a 250px swipe: popups %v, want only %d", popups, older)
 	}
-	if len(s.svc.Notifications()) != 2 {
-		t.Errorf("history = %d, want the swiped card dismissed into it", len(s.svc.Notifications()))
+	if len(history(t, s.svc)) != 2 {
+		t.Errorf("history = %d, want the swiped card dismissed into it", len(history(t, s.svc)))
 	}
 }
 
@@ -744,8 +744,8 @@ func TestClearAllDismissesTheStack(t *testing.T) {
 			t.Errorf("clear all on the mail stack took chat %d", id)
 		}
 	}
-	if len(s.svc.Notifications()) != 7 {
-		t.Errorf("history = %d, want clear all to dismiss into the history under the default close behavior", len(s.svc.Notifications()))
+	if len(history(t, s.svc)) != 7 {
+		t.Errorf("history = %d, want clear all to dismiss into the history under the default close behavior", len(history(t, s.svc)))
 	}
 }
 
@@ -973,7 +973,7 @@ func TestCardCloseBehavior(t *testing.T) {
 		if len(s.svc.Popups()) != 0 {
 			t.Errorf("%s: the popup stayed", tc.behavior)
 		}
-		if kept := len(s.svc.Notifications()) == 1; kept != tc.keepHistory {
+		if kept := len(history(t, s.svc)) == 1; kept != tc.keepHistory {
 			t.Errorf("%s: in history %v, want %v", tc.behavior, kept, tc.keepHistory)
 		}
 		if sig.count("ActionInvoked") != 0 {
@@ -1025,7 +1025,7 @@ func TestCardActionsAndDefault(t *testing.T) {
 	if sig.count("ActionInvoked"+fmt.Sprint(other, "reply")) != 1 {
 		t.Errorf("action: %v", sig.seen)
 	}
-	for _, n := range svc.Notifications() {
+	for _, n := range history(t, svc) {
 		if n.ID == other {
 			t.Error("an invoked notification stayed in the history")
 		}
@@ -1206,4 +1206,14 @@ func TestStackKeepsItsWidth(t *testing.T) {
 	if sz.W != want {
 		t.Errorf("the stack of %d measures %dpx wide in a 1920px surface, want %d", id, sz.W, want)
 	}
+}
+
+// history is the first page of svc's history, newest first.
+func history(t *testing.T, svc *notifications.Service) []*notifications.Notification {
+	t.Helper()
+	got, err := svc.Page(nil, notifications.MaxPage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
 }

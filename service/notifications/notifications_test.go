@@ -251,3 +251,13 @@ func TestDNDPersistence(t *testing.T) {
 		t.Fatal("dnd off did not persist")
 	}
 }
+
+// history is the first page of s's history, newest first.
+func history(t *testing.T, s *Service) []*Notification {
+	t.Helper()
+	got, err := s.Page(nil, MaxPage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}

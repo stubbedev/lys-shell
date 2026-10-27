@@ -22,13 +22,14 @@ func startNotifications(cfg config.NotificationConfig) *notifications.Service {
 }
 
 // applyNotificationConfig hands a running service the reloadable keys
-// (notification.rs's blocklist watcher); a disabled service stays off
+// (notification.rs's blocklist watcher, and the history limits); a disabled service stays off
 // until the next start, as in the Rust shell.
 func applyNotificationConfig(svc *notifications.Service, cfg config.NotificationConfig) {
 	if svc == nil {
 		return
 	}
 	svc.SetBlocklist(cfg.Blocklist)
+	svc.SetHistoryLimits(cfg.HistoryMemory.Limit(), cfg.HistoryStored.Limit())
 }
 
 // attachNotificationStore persists the history in the Rust store's file

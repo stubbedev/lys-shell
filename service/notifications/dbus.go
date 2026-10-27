@@ -123,20 +123,36 @@ func (d *lysShellDaemon) SetPopupDuration(ms uint32) *dbus.Error {
 	return nil
 }
 
-// ListRow is one List row: (id, app, summary, body).
+// ListRow is one List row: (id, arrival in Unix milliseconds, app,
+// summary, body). The last row's (Stamp, ID) is the next page's cursor.
 type ListRow struct {
 	ID      uint32
+	Stamp   int64
 	App     string
 	Summary string
 	Body    string
 }
 
-// List snapshots the history.
-func (d *lysShellDaemon) List() ([]ListRow, *dbus.Error) {
-	notifs := d.svc.Notifications()
+// List is the history's first page, newest first: up to limit rows,
+// fewer at the end of the history.
+func (d *lysShellDaemon) List(limit uint32) ([]ListRow, *dbus.Error) {
+	return d.page(nil, limit)
+}
+
+// ListBefore is the page after the row (stamp, id): up to limit rows
+// strictly older, newest first.
+func (d *lysShellDaemon) ListBefore(stamp int64, id, limit uint32) ([]ListRow, *dbus.Error) {
+	return d.page(&Key{Stamp: stamp, ID: id}, limit)
+}
+
+func (d *lysShellDaemon) page(before *Key, limit uint32) ([]ListRow, *dbus.Error) {
+	notifs, err := d.svc.Page(before, intconv.Clamp[int](limit))
+	if err != nil {
+		return nil, dbus.MakeFailedError(err)
+	}
 	rows := make([]ListRow, 0, len(notifs))
 	for _, n := range notifs {
-		rows = append(rows, ListRow{n.ID, n.AppName, n.Summary, n.Body})
+		rows = append(rows, ListRow{n.ID, n.Key().Stamp, n.AppName, n.Summary, n.Body})
 	}
 	return rows, nil
 }

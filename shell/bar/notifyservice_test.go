@@ -48,8 +48,8 @@ func TestNotificationHistorySurvivesARestart(t *testing.T) {
 	cfg.Enabled = true
 	first := startNotifications(cfg)
 	first.Notify("mail", 0, "", "Kept", "body", nil, 0)
-	if again := startNotifications(cfg); again.Count() != 1 || again.Notifications()[0].Summary != "Kept" {
-		t.Fatalf("restarted history = %v, want the stored notification", again.Notifications())
+	if again := startNotifications(cfg); again.Count() != 1 || history(t, again)[0].Summary != "Kept" {
+		t.Fatalf("restarted history = %v, want the stored notification", history(t, again))
 	}
 
 	svc := notifications.NewService()
@@ -58,4 +58,14 @@ func TestNotificationHistorySurvivesARestart(t *testing.T) {
 	if svc.Count() != 1 {
 		t.Error("a missing store stopped the history")
 	}
+}
+
+// history is the first page of svc's history, newest first.
+func history(t *testing.T, svc *notifications.Service) []*notifications.Notification {
+	t.Helper()
+	got, err := svc.Page(nil, notifications.MaxPage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
 }

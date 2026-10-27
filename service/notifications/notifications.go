@@ -5,6 +5,7 @@
 package notifications
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -79,10 +80,8 @@ type Notification struct {
 	// after an action is invoked.
 	Transient bool
 	Resident  bool
-	// ReplacesID is the replaces_id the sender passed, and Hints the
-	// raw hints but the inline image pixels: what the store keeps.
+	// ReplacesID is the replaces_id the sender passed.
 	ReplacesID uint32
-	Hints      map[string]dbus.Variant
 }
 
 // DefaultAction is the "default" action, when the sender offered one.
@@ -141,8 +140,15 @@ func (t *popupTimer) remaining(now time.Time) time.Duration {
 type Service struct {
 	mu   sync.Mutex
 	next uint32
-	all  []*Notification
-	// expiry holds the history-expiry timers (remove-expired).
+	// recent is the newest part of the history, oldest first by Key:
+	// at most memory notifications, the rest only in the store.
+	recent []*Notification
+	// total counts the whole history, stored ones included.
+	total  int
+	memory MemoryLimit
+	stored StoredLimit
+	// expiry holds the history-expiry timers (remove-expired), stored
+	// notifications outside recent included.
 	expiry map[uint32]*expiryTimer
 	// popups is the visible popup list, newest first; timers holds
 	// each one's countdown.
@@ -202,6 +208,8 @@ func NewService() *Service {
 	return &Service{
 		storeTail:     idle,
 		next:          0,
+		memory:        DefaultMemoryLimit(),
+		stored:        DefaultStoredLimit(),
 		expiry:        make(map[uint32]*expiryTimer),
 		timers:        make(map[uint32]*popupTimer),
 		popupDuration: DefaultPopupDuration,
@@ -232,20 +240,99 @@ func (s *Service) Subscribe() (<-chan Event, func()) { return s.events.Subscribe
 // ones whose buffer is full.
 func (s *Service) notify(ev Event) { s.events.Publish(ev) }
 
-// Notifications snapshots the stored history.
-func (s *Service) Notifications() []*Notification {
+// Page reads up to limit history entries strictly older than before
+// (nil: from the newest), newest first: from memory, then, past the
+// in-memory window, from the store by its (timestamp, id) index. A
+// short page is the end of the history.
+func (s *Service) Page(before *Key, limit int) ([]*Notification, error) {
+	if err := checkPageLimit(limit); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make([]*Notification, len(s.all))
-	copy(out, s.all)
-	return out
+	end := len(s.recent)
+	if before != nil {
+		end, _ = slices.BinarySearchFunc(s.recent, *before, func(n *Notification, k Key) int { return n.Key().Compare(k) })
+	}
+	out := make([]*Notification, 0, limit)
+	for i := end - 1; i >= 0 && len(out) < limit; i-- {
+		out = append(out, s.recent[i])
+	}
+	st, onDisk := s.store, s.total > len(s.recent)
+	cursor := before
+	if end > 0 {
+		k := s.recent[0].Key()
+		cursor = &k
+	}
+	s.mu.Unlock()
+	if len(out) == limit || st == nil || !onDisk {
+		return out, nil
+	}
+	older, err := st.Page(cursor, limit-len(out))
+	if err != nil {
+		return nil, err
+	}
+	return append(out, older...), nil
 }
 
-// Count returns the stored count.
+// Count returns the history's size, stored entries included.
 func (s *Service) Count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return len(s.all)
+	return s.total
+}
+
+// SetHistoryLimits bounds the history: memory newest entries stay in
+// memory, stored on disk. Lowering either applies at once.
+func (s *Service) SetHistoryLimits(memory MemoryLimit, stored StoredLimit) {
+	s.mu.Lock()
+	s.memory, s.stored = memory, stored
+	s.evictLocked()
+	prune := s.pruneLocked()
+	s.persistUnlock(func(st *Store) {
+		_, err := st.Prune(prune)
+		storeErr("prune", err)
+	})
+}
+
+// pruneLocked is how many of the oldest stored entries the stored
+// limit drops, taken off the total. The caller holds mu.
+func (s *Service) pruneLocked() int {
+	if s.store == nil {
+		return 0
+	}
+	prune := max(0, s.total-s.stored.n)
+	s.total -= prune
+	return prune
+}
+
+// evictLocked drops the oldest in-memory entries past the memory limit.
+// Without a store they leave the history; with one they stay on disk,
+// their expiries armed. The caller holds mu.
+func (s *Service) evictLocked() {
+	for len(s.recent) > s.memory.n {
+		n := s.recent[0]
+		s.recent[0] = nil
+		s.recent = s.recent[1:]
+		delete(s.owners, n.ID)
+		if s.store == nil {
+			s.total--
+			s.stopExpiryLocked(n.ID)
+		}
+	}
+}
+
+// insertLocked adds n to the in-memory window at its Key's place,
+// normally the end. An entry older than the window while older ones
+// live only on disk stays only on disk, so the window remains the
+// newest part of the history. The caller holds mu.
+func (s *Service) insertLocked(n *Notification) {
+	i, _ := slices.BinarySearchFunc(s.recent, n.Key(), func(m *Notification, k Key) int { return m.Key().Compare(k) })
+	if i == 0 && len(s.recent) > 0 && s.total > len(s.recent)+1 {
+		return
+	}
+	s.owners[n.ID] = n.AppName
+	s.recent = slices.Insert(s.recent, i, n)
+	s.evictLocked()
 }
 
 // Popups snapshots the visible popup list, newest first. DND keeps
@@ -314,17 +401,24 @@ func (s *Service) Notify(appName string, replacesID uint32, appIcon, summary, bo
 }
 
 // NotifyHints receives a notification (the D-Bus Notify call). An app
-// may only replace an id it owns; any other replaces_id gets a new id
-// (resolve_id). A blocked app name consumes the notification and still
-// returns an id. A transient notification pops up but skips the
-// history (handle_notification_added); the history is newest first.
+// may only replace an id it owns, in memory or in the store; any other
+// replaces_id gets a new id (resolve_id). A blocked app name consumes
+// the notification and still returns an id. A transient notification
+// pops up but skips the history (handle_notification_added). The hints
+// are parsed into the typed fields and not kept.
 func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summary, body string, actions []string, rawHints map[string]dbus.Variant, expireTimeout int32) uint32 {
 	h := decodeHints(rawHints, s.cacheImage)
+	stored, onDisk := s.storedOwner(replacesID)
 	s.mu.Lock()
 	id := replacesID
-	if id == 0 || s.owners[id] != appName {
+	owner, inMemory := s.owners[id]
+	if !inMemory && onDisk {
+		owner = stored
+	}
+	if id == 0 || owner != appName {
 		s.next++
 		id = s.next
+		onDisk = false
 	}
 	for _, pattern := range s.block {
 		if globMatch(pattern, appName) {
@@ -332,7 +426,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 			return id
 		}
 	}
-	replaced := s.removeHistoryLocked(id)
+	replaced := s.removeHistoryLocked(id) || onDisk
 	n := &Notification{
 		ID:           id,
 		AppName:      appName,
@@ -348,31 +442,72 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 		Transient:    h.transient,
 		Resident:     h.resident,
 		ReplacesID:   replacesID,
-		Hints:        storedHints(rawHints),
 	}
 	if expireTimeout > 0 {
 		n.Expires = n.Added.Add(time.Duration(expireTimeout) * time.Millisecond)
 	}
-	if !n.Transient {
-		s.all = append([]*Notification{n}, s.all...)
-		if !n.Expires.IsZero() && s.removeExpired {
-			s.startExpiryLocked(n)
+	prune := 0
+	switch {
+	case !n.Transient:
+		if !replaced {
+			s.total++
 		}
+		s.insertLocked(n)
+		prune = s.pruneLocked()
+		if !n.Expires.IsZero() && s.removeExpired {
+			s.startExpiryLocked(n.ID, n.Expires)
+		}
+	case replaced:
+		s.total--
+		s.owners[n.ID] = appName
+	default:
+		s.owners[n.ID] = appName
 	}
-	s.owners[n.ID] = appName
 	s.addPopupLocked(n)
 	s.persistUnlock(func(st *Store) {
 		switch {
 		case !n.Transient:
-			storeErr("add", st.Add(n))
+			storeErr("add", st.Add(n, prune))
 		case replaced:
 			// A transient replacement takes the stored one's place
 			// in the history, so it leaves the store too.
-			storeErr("remove", st.Remove(id))
+			_, err := st.Remove(id)
+			storeErr("remove", err)
 		}
 	})
 	s.notify(Event{Kind: EventAdd, Notif: n})
 	return n.ID
+}
+
+// storedOwner is the app owning id in the store, for a replaces_id past
+// the in-memory window.
+func (s *Service) storedOwner(id uint32) (string, bool) {
+	n, ok := s.storedOnly(id)
+	if !ok {
+		return "", false
+	}
+	return n.AppName, true
+}
+
+// storedOnly reads a history entry the in-memory window and the popups
+// do not hold from the store.
+func (s *Service) storedOnly(id uint32) (*Notification, bool) {
+	if id == 0 {
+		return nil, false
+	}
+	s.mu.Lock()
+	_, known := s.owners[id]
+	st := s.store
+	s.mu.Unlock()
+	if known || st == nil {
+		return nil, false
+	}
+	n, ok, err := st.Find(id)
+	if err != nil {
+		log.Printf("notifications: %v", err)
+		return nil, false
+	}
+	return n, ok
 }
 
 // addPopupLocked is handle_popup_added: outside DND the notification
@@ -395,10 +530,10 @@ func (s *Service) addPopupLocked(n *Notification) {
 	}
 }
 
-// Close removes a notification, emitting the closed signal. Every
-// reason but Expired also takes it off the popup list; an expired
-// history entry leaves its popup to its own countdown
-// (handle_notification_removed).
+// Close removes a notification, in memory or only in the store,
+// emitting the closed signal. Every reason but Expired also takes it
+// off the popup list; an expired history entry leaves its popup to its
+// own countdown (handle_notification_removed).
 func (s *Service) Close(id uint32, reason ClosedReason) {
 	s.mu.Lock()
 	removed := s.removeHistoryLocked(id)
@@ -406,35 +541,51 @@ func (s *Service) Close(id uint32, reason ClosedReason) {
 		s.dropPopupLocked(id)
 	}
 	emit := s.emit
-	if !removed {
+	if removed {
+		s.total--
+	} else if s.store == nil {
 		s.mu.Unlock()
 		return
 	}
-	s.persistUnlock(func(st *Store) { storeErr("remove", st.Remove(id)) })
+	s.persistUnlock(func(st *Store) {
+		onDisk, err := st.Remove(id)
+		storeErr("remove", err)
+		if !removed && onDisk {
+			removed = true
+			s.mu.Lock()
+			s.total--
+			s.mu.Unlock()
+		}
+	})
+	if !removed {
+		return
+	}
 	if emit != nil {
 		emit(Interface+".NotificationClosed", id, uint32(reason))
 	}
 	s.notify(Event{Kind: EventRemove, ID: id, Reason: reason})
 }
 
-// DismissAll empties the history and the popups with the dismissed
-// reason.
+// DismissAll empties the history, the store included, and the popups
+// with the dismissed reason. The closed signal goes out for the
+// in-memory window and the popups: the entries only on disk are past
+// any app's interest, and a signal each would flood the bus.
 func (s *Service) DismissAll() {
 	s.mu.Lock()
-	ids := make([]uint32, 0, len(s.all))
-	for _, n := range s.all {
+	ids := make([]uint32, 0, len(s.recent))
+	for _, n := range s.recent {
 		ids = append(ids, n.ID)
+	}
+	for id := range s.expiry {
+		s.stopExpiryLocked(id)
 	}
 	for _, id := range ids {
 		s.removeHistoryLocked(id)
 		s.dropPopupLocked(id)
 	}
+	s.total = 0
 	emit := s.emit
-	s.persistUnlock(func(st *Store) {
-		for _, id := range ids {
-			storeErr("remove", st.Remove(id))
-		}
-	})
+	s.persistUnlock(func(st *Store) { storeErr("remove all", st.RemoveAll()) })
 	for _, id := range ids {
 		if emit != nil {
 			emit(Interface+".NotificationClosed", id, uint32(Dismissed))
@@ -447,16 +598,20 @@ func (s *Service) DismissAll() {
 // resident, closes it with the closed reason (Notification::invoke).
 // A token minted from the press goes first as ActivationToken, as the
 // spec orders them, so the app can raise its window; "" sends none.
+// An entry only in the store is read from it.
 func (s *Service) InvokeAction(id uint32, key, token string) {
 	s.mu.Lock()
 	_, ok := s.owners[id]
 	n := s.findLocked(id)
-	resident := n != nil && n.Resident
 	emit := s.emit
 	s.mu.Unlock()
 	if !ok {
+		n, ok = s.storedOnly(id)
+	}
+	if !ok {
 		return
 	}
+	resident := n != nil && n.Resident
 	if emit != nil {
 		if token != "" {
 			emit(Interface+".ActivationToken", id, token)
@@ -558,39 +713,44 @@ func (s *Service) dropPopupLocked(id uint32) bool {
 	return false
 }
 
-// removeHistoryLocked drops a notification from the history and its
-// expiry timer, reporting whether it was stored. The caller holds mu.
+// removeHistoryLocked drops a notification from the in-memory window,
+// its owner and its expiry timer, reporting whether the window held it.
+// The total is the caller's to adjust. The caller holds mu.
 func (s *Service) removeHistoryLocked(id uint32) bool {
+	s.stopExpiryLocked(id)
+	delete(s.owners, id)
+	i := slices.IndexFunc(s.recent, func(n *Notification) bool { return n.ID == id })
+	if i < 0 {
+		return false
+	}
+	s.recent = slices.Delete(s.recent, i, i+1)
+	return true
+}
+
+// startExpiryLocked schedules the remove-expired cleanup: the history
+// entry closes with the Expired reason at at, whether it is still in
+// memory or only in the store by then. The caller holds mu.
+func (s *Service) startExpiryLocked(id uint32, at time.Time) {
+	timer := &expiryTimer{}
+	timer.stop = s.clock.AfterFunc(at.Sub(s.clock.Now()), func() {
+		// A replacement under the same id stopped this timer; a fire
+		// racing that Stop must not close the newcomer.
+		s.mu.Lock()
+		current := s.expiry[id] == timer
+		s.mu.Unlock()
+		if current {
+			s.Close(id, Expired)
+		}
+	})
+	s.expiry[id] = timer
+}
+
+// stopExpiryLocked disarms id's expiry. The caller holds mu.
+func (s *Service) stopExpiryLocked(id uint32) {
 	if timer, ok := s.expiry[id]; ok {
 		timer.stop()
 		delete(s.expiry, id)
 	}
-	delete(s.owners, id)
-	for i, n := range s.all {
-		if n.ID == id {
-			s.all = append(s.all[:i], s.all[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
-// startExpiryLocked schedules the remove-expired cleanup: the history
-// entry closes with the Expired reason once its timeout passes. The
-// caller holds mu.
-func (s *Service) startExpiryLocked(n *Notification) {
-	timer := &expiryTimer{}
-	timer.stop = s.clock.AfterFunc(n.Expires.Sub(s.clock.Now()), func() {
-		// A replacement under the same id stopped this timer; a fire
-		// racing that Stop must not close the newcomer.
-		s.mu.Lock()
-		current := s.expiry[n.ID] == timer
-		s.mu.Unlock()
-		if current {
-			s.Close(n.ID, Expired)
-		}
-	})
-	s.expiry[n.ID] = timer
 }
 
 // globMatch delegates to the shared blocklist matcher.
@@ -635,10 +795,10 @@ func (n *Notification) String() string {
 	return fmt.Sprintf("%d %s: %s", n.ID, n.AppName, n.Summary)
 }
 
-// findLocked is the stored or popped-up notification with id, or nil.
-// The caller holds mu.
+// findLocked is the in-memory or popped-up notification with id, or
+// nil. The caller holds mu.
 func (s *Service) findLocked(id uint32) *Notification {
-	for _, list := range [][]*Notification{s.all, s.popups} {
+	for _, list := range [][]*Notification{s.recent, s.popups} {
 		for _, n := range list {
 			if n.ID == id {
 				return n
@@ -649,40 +809,65 @@ func (s *Service) findLocked(id uint32) *Notification {
 }
 
 // AttachStore persists the history in st and restores what it holds
-// (builder.rs's load_stored_notifications): the stored notifications
-// join the history newest first, their apps own their ids again, new
-// ids continue past the highest stored one, and pending expiries are
-// re-armed. Restored notifications do not pop up again.
+// (builder.rs's load_stored_notifications), before the first
+// notification arrives: with remove-expired, what expired while
+// lys-shell was down leaves the store, and the rest arms its expiry;
+// the newest entries up to the memory limit fill the in-memory window,
+// the rest stay on disk; a lowered stored limit prunes the oldest; new
+// ids continue past the highest stored one. Restored notifications do
+// not pop up again.
 func (s *Service) AttachStore(st *Store) error {
 	s.mu.Lock()
-	removeExpired, now := s.removeExpired, s.clock.Now()
+	removeExpired, now, memory, stored := s.removeExpired, s.clock.Now(), s.memory, s.stored
+	arrived := len(s.recent) > 0 || s.store != nil
 	s.mu.Unlock()
-	stored, err := st.Load(now, removeExpired)
+	if arrived {
+		return errors.New("notifications: the store attaches once, before the first notification")
+	}
+	if removeExpired {
+		if _, err := st.SweepExpired(now); err != nil {
+			return fmt.Errorf("notifications: restoring the history: %w", err)
+		}
+	}
+	total, err := st.Count()
+	if err != nil {
+		return fmt.Errorf("notifications: restoring the history: %w", err)
+	}
+	if excess := total - stored.n; excess > 0 {
+		pruned, err := st.Prune(excess)
+		if err != nil {
+			return fmt.Errorf("notifications: restoring the history: %w", err)
+		}
+		total -= pruned
+	}
+	newest, err := st.Page(nil, memory.n)
+	if err != nil {
+		return fmt.Errorf("notifications: restoring the history: %w", err)
+	}
+	var pending []expiry
+	if removeExpired {
+		if pending, err = st.pendingExpiries(now); err != nil {
+			return fmt.Errorf("notifications: restoring the history: %w", err)
+		}
+	}
+	maxID, err := st.MaxID()
 	if err != nil {
 		return fmt.Errorf("notifications: restoring the history: %w", err)
 	}
 	s.mu.Lock()
 	s.store = st
-	have := make(map[uint32]bool, len(s.all))
-	for _, n := range s.all {
-		have[n.ID] = true
+	s.total = total
+	s.next = max(s.next, maxID)
+	s.recent = make([]*Notification, 0, len(newest))
+	for _, n := range slices.Backward(newest) {
+		s.recent = append(s.recent, n)
+		s.owners[n.ID] = n.AppName
 	}
-	for _, n := range stored {
-		s.next = max(s.next, n.ID)
-		if have[n.ID] {
-			continue
-		}
-		s.all = append(s.all, n)
-		if n.AppName != "" {
-			s.owners[n.ID] = n.AppName
-		}
-		if !n.Expires.IsZero() && removeExpired {
-			s.startExpiryLocked(n)
-		}
+	for _, e := range pending {
+		s.startExpiryLocked(e.id, e.at)
 	}
-	slices.SortStableFunc(s.all, func(a, b *Notification) int { return b.Added.Compare(a.Added) })
 	s.mu.Unlock()
-	if len(stored) > 0 {
+	if total > 0 {
 		s.notify(Event{Kind: EventAdd})
 	}
 	return nil

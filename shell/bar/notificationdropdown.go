@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"log"
 	"os"
 	"slices"
 	"strconv"
@@ -25,6 +26,10 @@ const (
 	notifMaxVisibleItems = 3
 	notifIconPx          = 32
 	notifTimeTick        = 30 * time.Second
+	// notifPageSize is how many notifications the dropdown reads at
+	// once; scrolling within notifPageAhead px of the end reads the next.
+	notifPageSize  = 50
+	notifPageAhead = 200
 )
 
 // notifTimeLabel is time_to_string.
@@ -55,6 +60,10 @@ type notificationView struct {
 	scroll *widget.Scroll
 	list   *widget.Box
 	groups []*notifGroup
+	// notifs is the history read so far, newest first; more reports
+	// whether the last read came back full, so older ones may follow.
+	notifs []*notifications.Notification
+	more   bool
 
 	once sync.Once
 	stop chan struct{}
@@ -88,6 +97,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	v.list.AddClass("notification-dropdown-groups")
 	scroll := dropdownScroll(v.list, "notification-dropdown-scroll")
 	v.scroll = scroll
+	scroll.WatchRange(v.scrolled)
 	v.body = dropdownContent("notification-dropdown-content")
 	v.body.Append(dndCard, false)
 	v.body.Append(empty, true)
@@ -133,14 +143,66 @@ func (v *notificationView) dismiss(id uint32) {
 	v.svc.Close(id, notifications.Dismissed)
 }
 
-// rebuild is rebuild_groups: stale groups go, existing ones take their
-// new notifications (keeping their expansion), new ones are added, and
-// the list takes the newest-first order.
+// rebuild rereads the history as deep as the dropdown has read it,
+// at least a page, after a change.
 func (v *notificationView) rebuild() {
-	var notifs []*notifications.Notification
+	depth := max(notifPageSize, len(v.notifs))
+	v.notifs, v.more = nil, false
 	if v.svc != nil {
-		notifs = v.svc.Notifications()
+		v.read(depth)
 	}
+	v.regroup()
+}
+
+// read appends up to n more notifications older than the ones read,
+// a page at a time, noting whether more may follow.
+func (v *notificationView) read(n int) {
+	for n > 0 {
+		var before *notifications.Key
+		if len(v.notifs) > 0 {
+			k := v.notifs[len(v.notifs)-1].Key()
+			before = &k
+		}
+		limit := min(n, notifications.MaxPage)
+		page, err := v.svc.Page(before, limit)
+		if err != nil {
+			log.Printf("notification dropdown: %v", err)
+			v.more = false
+			return
+		}
+		v.notifs = append(v.notifs, page...)
+		v.more = len(page) == limit
+		if !v.more {
+			return
+		}
+		n -= limit
+	}
+}
+
+// scrolled reads the next page once the list scrolls near its end.
+func (v *notificationView) scrolled() {
+	r := v.scroll.AxisRange(widget.Column)
+	if !v.more || !r.Overflows() || r.Offset < r.Max()-notifPageAhead {
+		return
+	}
+	v.ctx.Invoke(v.loadMore)
+}
+
+// loadMore reads the next page into the groups.
+func (v *notificationView) loadMore() {
+	if !v.more {
+		return
+	}
+	v.read(notifPageSize)
+	v.regroup()
+}
+
+// regroup is rebuild_groups over what has been read: stale groups go,
+// existing ones take their new notifications (keeping their
+// expansion), new ones are added, and the list takes the newest-first
+// order.
+func (v *notificationView) regroup() {
+	notifs := v.notifs
 	v.clearAll.SetVisible(len(notifs) > 0)
 	v.empty.SetVisible(len(notifs) == 0)
 	v.scroll.SetVisible(len(notifs) > 0)

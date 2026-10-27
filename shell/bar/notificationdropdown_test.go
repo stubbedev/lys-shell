@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -143,7 +144,7 @@ func TestNotificationDropdownGroups(t *testing.T) {
 		t.Error("the default action did not close the dropdown")
 	}
 	waitHeadless(t, "the chat group gone", func() bool { return len(v.groups) == 1 })
-	for _, n := range svc.Notifications() {
+	for _, n := range history(t, svc) {
 		if n.ID == chat {
 			t.Error("the invoked notification stayed")
 		}
@@ -386,7 +387,7 @@ func TestNotificationItemDismissInsideADefaultActionRow(t *testing.T) {
 	item.Measure(widget.Constraints{Max: widget.Size{W: 360, H: 400}})
 	item.Arrange(render.Rect{W: 360, H: 400})
 	routeClick(item, findByClass(item, "notification-dropdown-item-dismiss"))
-	waitHeadless(t, "the dismissal", func() bool { return len(svc.Notifications()) == 0 })
+	waitHeadless(t, "the dismissal", func() bool { return len(history(t, svc)) == 0 })
 	if pop.dismissed != 0 || len(invoked) != 0 {
 		t.Errorf("dismiss closed the dropdown (%d) or invoked %v", pop.dismissed, invoked)
 	}
@@ -418,7 +419,7 @@ func TestNotificationItemActionCarriesItsToken(t *testing.T) {
 	defer v.dropdownClosed()
 	v.minter = barMinter{token: "tok-3"}
 	v.groups[0].items[0].invoke("reply")
-	waitHeadless(t, "the action", func() bool { return len(svc.Notifications()) == 0 })
+	waitHeadless(t, "the action", func() bool { return len(history(t, svc)) == 0 })
 	if want := []string{"ActivationToken" + fmt.Sprint(first, "tok-3"), "ActionInvoked" + fmt.Sprint(first, "reply")}; !slices.Equal(seen, want) {
 		t.Errorf("signals = %q, want %q", seen, want)
 	}
@@ -481,5 +482,63 @@ func TestNotificationLongBodyStaysInItsItem(t *testing.T) {
 			t.Errorf("the body inked %d pixels past its right edge x=%d", outside, body.X+body.W)
 		}
 		return true
+	})
+}
+
+// TestNotificationDropdownPagesTheHistory pins the paging: the dropdown
+// reads a page, the next only when the list scrolls near its end, and
+// a change rereads as deep as it had read.
+func TestNotificationDropdownPagesTheHistory(t *testing.T) {
+	svc := newNotifTestService(t)
+	memory, err := notifications.NewMemoryLimit(notifications.MaxHistoryMemory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.SetHistoryLimits(memory, notifications.DefaultStoredLimit())
+	const sent = 2*notifPageSize + 20
+	for i := range sent {
+		svc.Notify("app"+strconv.Itoa(i%4), 0, "", "n", "", nil, 0)
+	}
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Notifications = svc
+	v := notificationDropdown(ctx).(*notificationView)
+	defer v.dropdownClosed()
+
+	read := func() int {
+		n := 0
+		for _, g := range v.groups {
+			n += len(g.notifs)
+		}
+		return n
+	}
+	if len(v.notifs) != notifPageSize || read() != notifPageSize || !v.more {
+		t.Fatalf("first read %d (grouped %d, more %v), want one page", len(v.notifs), read(), v.more)
+	}
+	if v.notifs[0].ID != sent {
+		t.Errorf("newest read = %d, want %d", v.notifs[0].ID, sent)
+	}
+	// The groups collapse to a few items each: nothing overflows, so
+	// nothing scrolls, and no page follows.
+	v.scrolled()
+	if len(v.notifs) != notifPageSize {
+		t.Errorf("a list that does not scroll read %d", len(v.notifs))
+	}
+	v.loadMore()
+	v.loadMore()
+	if len(v.notifs) != sent || v.more || read() != sent {
+		t.Fatalf("after two more pages read %d (grouped %d, more %v), want all %d", len(v.notifs), read(), v.more, sent)
+	}
+	for i, n := range v.notifs {
+		if n.ID != uint32(sent-i) {
+			t.Fatalf("read[%d] = %d, want %d", i, n.ID, sent-i)
+		}
+	}
+	v.loadMore()
+	if len(v.notifs) != sent {
+		t.Errorf("past the end read %d", len(v.notifs))
+	}
+	svc.Notify("app0", 0, "", "new", "", nil, 0)
+	waitHeadless(t, "the same depth reread from the newest", func() bool {
+		return len(v.notifs) == sent && v.notifs[0].ID == sent+1 && v.more
 	})
 }

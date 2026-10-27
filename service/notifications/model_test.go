@@ -175,7 +175,7 @@ func TestHistoryNewestFirstAndTransientSkipsIt(t *testing.T) {
 	s := newTestService(t)
 	a := s.Notify("a", 0, "", "A", "", nil, 0)
 	b := s.Notify("b", 0, "", "B", "", nil, 0)
-	if got := s.Notifications(); len(got) != 2 || got[0].ID != b || got[1].ID != a {
+	if got := history(t, s); len(got) != 2 || got[0].ID != b || got[1].ID != a {
 		t.Fatalf("history = %v, want newest first", got)
 	}
 	tr := s.NotifyHints("c", 0, "", "T", "", nil, map[string]dbus.Variant{"transient": dbus.MakeVariant(true)}, 0)
@@ -242,7 +242,7 @@ func TestServerNotifyDecodesHints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := svc.Notifications()[0]
+	n := history(t, svc)[0]
 	if n.ID != id || n.Urgency != UrgencyCritical || n.ImagePath == "" {
 		t.Errorf("stored = %+v", n)
 	}

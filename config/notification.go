@@ -1,5 +1,11 @@
 package config
 
+import (
+	"reflect"
+
+	"github.com/stubbedev/lys-shell/service/notifications"
+)
+
 // NotificationConfig is ported from crates/wayle-config/src/schemas/modules/notification/mod.rs.
 //
 // Notification center: icon in the bar, dropdown with history, DND toggle.
@@ -55,6 +61,12 @@ type NotificationConfig struct {
 	// | `mapped` | Ignored | Mapped icon |
 	// | `application` | Shows the image | App's generic icon, then mapped fallback |
 	IconSource IconSource `cfg:"icon-source"`
+	// How many of the newest notifications the history keeps in memory.
+	// Older ones stay on disk and load as the dropdown scrolls to them.
+	HistoryMemory NotificationHistoryMemory `cfg:"history-memory"`
+	// How many notifications the history keeps on disk. The oldest are
+	// deleted past it.
+	HistoryStored NotificationHistoryStored `cfg:"history-stored"`
 	// Screen position for popup notifications.
 	PopupPosition PopupPosition `cfg:"popup-position"`
 	// Maximum number of popups visible at once.
@@ -142,6 +154,8 @@ func DefaultsNotification() NotificationConfig {
 		ScrollDown:         ClickAction{},
 		Blocklist:          []string{},
 		IconSource:         IconSourceAutomatic,
+		HistoryMemory:      NotificationHistoryMemory{limit: notifications.DefaultMemoryLimit()},
+		HistoryStored:      NotificationHistoryStored{limit: notifications.DefaultStoredLimit()},
 		PopupPosition:      PopupPositionTopRight,
 		PopupMaxVisible:    5,
 		PopupStackingOrder: StackingOrderNewestFirst,
@@ -281,3 +295,79 @@ const (
 	PopupMarginBaseRem = 0.75
 	PopupGapBaseRem    = 0.5
 )
+
+// NotificationHistoryMemory is how many of the newest notifications
+// the history keeps in memory, refused at load outside its range.
+//
+// Notifications kept in memory.
+type NotificationHistoryMemory struct{ limit notifications.MemoryLimit }
+
+// Limit is the validated bound.
+func (m NotificationHistoryMemory) Limit() notifications.MemoryLimit { return m.limit }
+
+// UnmarshalConfig implements Unmarshaler.
+func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
+	n, err := decodeCount(v)
+	if err != nil {
+		return err
+	}
+	limit, err := notifications.NewMemoryLimit(n)
+	if err != nil {
+		return err
+	}
+	m.limit = limit
+	return nil
+}
+
+// MarshalConfig implements Marshaler.
+func (m NotificationHistoryMemory) MarshalConfig() any { return int64(m.limit.Count()) }
+
+func (NotificationHistoryMemory) configSchema(*schemaGen) Schema {
+	return countSchema(typeOf[NotificationHistoryMemory](), notifications.MinHistoryMemory, notifications.MaxHistoryMemory)
+}
+
+// NotificationHistoryStored is how many notifications the history keeps
+// on disk, refused at load outside its range.
+//
+// Notifications kept on disk.
+type NotificationHistoryStored struct{ limit notifications.StoredLimit }
+
+// Limit is the validated bound.
+func (m NotificationHistoryStored) Limit() notifications.StoredLimit { return m.limit }
+
+// UnmarshalConfig implements Unmarshaler.
+func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
+	n, err := decodeCount(v)
+	if err != nil {
+		return err
+	}
+	limit, err := notifications.NewStoredLimit(n)
+	if err != nil {
+		return err
+	}
+	m.limit = limit
+	return nil
+}
+
+// MarshalConfig implements Marshaler.
+func (m NotificationHistoryStored) MarshalConfig() any { return int64(m.limit.Count()) }
+
+func (NotificationHistoryStored) configSchema(*schemaGen) Schema {
+	return countSchema(typeOf[NotificationHistoryStored](), notifications.MinHistoryStored, notifications.MaxHistoryStored)
+}
+
+func decodeCount(v any) (int64, error) {
+	var n int64
+	err := decodeInto(reflect.ValueOf(&n).Elem(), v)
+	return n, err
+}
+
+func countSchema(t reflect.Type, lo, hi int64) Schema {
+	return Schema{
+		"description": typeDoc(t),
+		"type":        "integer",
+		"format":      "uint32",
+		"minimum":     lo,
+		"maximum":     hi,
+	}
+}
