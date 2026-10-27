@@ -1,6 +1,8 @@
 package wallpaper
 
 import (
+	"errors"
+	"fmt"
 	"image"
 	"image/draw"
 	"math"
@@ -10,7 +12,6 @@ import (
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/internal/offheap"
-	"github.com/stubbedev/lys-shell/internal/resample"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
@@ -75,8 +76,8 @@ func rasterize(mem *memory.Shared, img image.Image, fit wallpaper.FitMode, box t
 	}
 	if src == b && size == b.Size() {
 		draw.Draw(dst, dst.Rect, img, b.Min, draw.Src)
-	} else {
-		resample.Into(dst, img, src)
+	} else if err := render.ResampleTo(dst, img, src); err != nil {
+		return nil, errors.Join(fmt.Errorf("wallpaper: resample %v to %dx%d: %w", src, size.X, size.Y, err), offheap.Free(mem, pix))
 	}
 	return &raster{image: render.NewStillImage(dst), scale: scale, pix: pix}, nil
 }
