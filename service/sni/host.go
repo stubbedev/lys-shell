@@ -247,8 +247,9 @@ func (h *Host) handle(sig *dbus.Signal) {
 			h.forget(bus, path)
 		}
 	case iface == ItemIface, iface == PropsIface:
-		// NewIcon, NewTitle, NewStatus, NewToolTip, NewMenu, ... and
-		// PropertiesChanged: re-read the item's snapshot.
+		// NewIcon, NewAttentionIcon, NewOverlayIcon, NewStatus, NewTitle,
+		// NewToolTip, NewMenu, ... and PropertiesChanged: re-read the
+		// item's snapshot.
 		for _, key := range h.itemsOf(sig.Sender, string(sig.Path)) {
 			if it, ok := h.store.Get(key); ok {
 				h.track(it.Bus + it.Path)
@@ -496,7 +497,6 @@ func readItem(conn *dbus.Conn, bus, path string, sizes []int) (*Item, error) {
 	it.IconName = str("IconName")
 	it.OverlayIconName = str("OverlayIconName")
 	it.AttentionName = str("AttentionIconName")
-	it.AttentionMovie = str("AttentionMovieName")
 	it.IconThemePath = str("IconThemePath")
 	it.MenuPath = str("Menu")
 	pixmaps := func(name string) []Pixmap {

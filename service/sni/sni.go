@@ -134,14 +134,14 @@ type Item struct {
 
 	// IconPixmap, AttentionIconPixmap and OverlayIconPixmap hold only
 	// the pixmaps BestPixmap picks for the sizes the host's consumers
-	// want (Host.WantPixmapSize).
+	// want (Host.WantPixmapSize). AttentionMovieName is not read: the
+	// tray draws the still attention icon instead.
 	IconName            string
 	IconPixmap          []Pixmap
 	OverlayIconName     string
 	OverlayIconPixmap   []Pixmap
 	AttentionName       string
 	AttentionIconPixmap []Pixmap
-	AttentionMovie      string
 	IconThemePath       string
 	Tooltip             Tooltip
 	MenuPath            string

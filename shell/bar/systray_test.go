@@ -193,29 +193,48 @@ func TestSystrayDrawsTheSharedPick(t *testing.T) {
 	}{{deviceScale{1, 1}, 22}, {deviceScale{3, 2}, 32}, {deviceScale{3, 1}, 64}} {
 		device := tc.scale.box(20)
 		shared, _ := sni.BestPixmap(pixmaps, device)
-		got := resolveTrayIcon(cfg, it, device)
-		if got.kind != "pixmap" || got.pixmap.Width != shared.Width || got.pixmap.Width != tc.want {
+		got := resolveTrayLook(cfg, it, device).icon
+		if got.kind != trayIconPixmap || got.pixmap.Width != shared.Width || got.pixmap.Width != tc.want {
 			t.Errorf("at %v: drew %dx%d, sni.BestPixmap picks %d, want %d", tc.scale, got.pixmap.Width, got.pixmap.Height, shared.Width, tc.want)
 		}
 	}
 }
 
-// paintTray lays the tray out and paints it on a canvas at scale,
-// returning the pixel at the first item's icon center.
+// trayFrame is the tray painted on a canvas at scale.
+type trayFrame struct {
+	data  []byte
+	w     int
+	scale deviceScale
+}
+
+// center is the pixel at the middle of r, in logical pixels.
+func (f trayFrame) center(r render.Rect) render.Color {
+	x, y := (2*r.X+r.W)*f.scale.num/(2*f.scale.denom), (2*r.Y+r.H)*f.scale.num/(2*f.scale.denom)
+	return pixelAt(f.data, f.w, x, y)
+}
+
+// paintTrayFrame lays the tray out and paints it on a canvas at scale.
+// It runs on the loop.
+func paintTrayFrame(m *systrayModule, scale deviceScale) trayFrame {
+	const w, h = 200, 40
+	m.root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	m.root.Arrange(render.Rect{W: w, H: h})
+	dw, dh := scale.box(w), scale.box(h)
+	data := make([]byte, render.Stride(dw)*dh)
+	m.root.Paint(render.NewScaled(data, render.Stride(dw), dw, dh, scale.num, scale.denom))
+	return trayFrame{data: data, w: dw, scale: scale}
+}
+
+// paintTray paints the tray at scale, returning the pixel at the first
+// item's icon center.
 func paintTray(m *systrayModule, scale deviceScale) render.Color {
 	return onHeadlessLoop(func() render.Color {
-		const w, h = 200, 40
-		m.root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
-		m.root.Arrange(render.Rect{W: w, H: h})
-		dw, dh := scale.box(w), scale.box(h)
-		data := make([]byte, render.Stride(dw)*dh)
-		m.root.Paint(render.NewScaled(data, render.Stride(dw), dw, dh, scale.num, scale.denom))
+		f := paintTrayFrame(m, scale)
 		var b render.Rect
 		for _, e := range m.entries {
 			b = e.icon.Bounds()
 		}
-		x, y := (2*b.X+b.W)*scale.num/(2*scale.denom), (2*b.Y+b.H)*scale.num/(2*scale.denom)
-		return pixelAt(data, dw, x, y)
+		return f.center(b)
 	})
 }
 
@@ -366,29 +385,29 @@ func TestResolveTrayIcon(t *testing.T) {
 		name string
 		it   sni.Item
 		cfg  config.SystrayConfig
-		kind string
+		kind trayIconKind
 		want string
 	}{
-		{"theme path file", sni.Item{IconName: "app-icon", IconThemePath: dir}, cfg, "file", filepath.Join(dir, "app-icon.png")},
-		{"named", sni.Item{IconName: "nm-applet"}, cfg, "named", "nm-applet"},
-		{"file path", sni.Item{IconName: filepath.Join(dir, "app-icon.png")}, cfg, "file", filepath.Join(dir, "app-icon.png")},
-		{"pixmap", sni.Item{IconPixmap: []sni.Pixmap{pixmap}}, cfg, "pixmap", ""},
-		{"fallback", sni.Item{}, cfg, "fallback", trayFallbackIcon},
-		{"override icon wins", sni.Item{ID: "app", IconName: "nm-applet"}, config.SystrayConfig{Overrides: []config.TrayItemOverride{{Name: "app", Icon: new("custom")}}}, "named", "custom"},
+		{"theme path file", sni.Item{IconName: "app-icon", IconThemePath: dir}, cfg, trayIconFile, filepath.Join(dir, "app-icon.png")},
+		{"named", sni.Item{IconName: "nm-applet"}, cfg, trayIconNamed, "nm-applet"},
+		{"file path", sni.Item{IconName: filepath.Join(dir, "app-icon.png")}, cfg, trayIconFile, filepath.Join(dir, "app-icon.png")},
+		{"pixmap", sni.Item{IconPixmap: []sni.Pixmap{pixmap}}, cfg, trayIconPixmap, ""},
+		{"fallback", sni.Item{}, cfg, trayIconFallback, trayFallbackIcon},
+		{"override icon wins", sni.Item{ID: "app", IconName: "nm-applet"}, config.SystrayConfig{Overrides: []config.TrayItemOverride{{Name: "app", Icon: new("custom")}}}, trayIconNamed, "custom"},
 	} {
-		got := resolveTrayIcon(tc.cfg, tc.it, 20)
+		got := resolveTrayLook(tc.cfg, tc.it, 20).icon
 		if got.kind != tc.kind || (tc.want != "" && got.name != tc.want) {
-			t.Errorf("%s: = %+v, want %s %q", tc.name, got, tc.kind, tc.want)
+			t.Errorf("%s: = %+v, want %d %q", tc.name, got, tc.kind, tc.want)
 		}
 	}
 	hooks := trayPixmapHooks{scaled: func(deviceScale) {}, forget: func(render.ImageID) {}}
 	// A pixmap icon is a raster at the icon size.
-	icon := buildTrayIcon(trayIconSource{kind: "pixmap", pixmap: pixmap}, 20, deviceScale{1, 1}, hooks)
+	icon := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: pixmap}, 20, deviceScale{1, 1}, hooks)
 	if sz := icon.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}}); sz.W != 20 {
 		t.Errorf("pixmap icon = %v, want 20px", sz)
 	}
 	// A short pixmap is the fallback glyph, not a crash.
-	short := buildTrayIcon(trayIconSource{kind: "pixmap", pixmap: sni.Pixmap{Width: 4, Height: 4}}, 20, deviceScale{1, 1}, hooks)
+	short := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: sni.Pixmap{Width: 4, Height: 4}}, 20, deviceScale{1, 1}, hooks)
 	if icon, ok := short.(*widget.Icon); !ok || icon.Name() != trayFallbackIcon {
 		t.Errorf("short pixmap = %T, want the fallback glyph", short)
 	}

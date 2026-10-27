@@ -148,44 +148,93 @@ func isFile(name string) bool {
 	return err == nil && st.Mode().IsRegular()
 }
 
-// trayIconSource is the resolved source of an item's glyph, and its
-// identity for change detection (item/mod.rs IconSignature).
+// trayIconKind is where a glyph comes from.
+type trayIconKind uint8
+
+const (
+	trayIconFile trayIconKind = iota
+	trayIconNamed
+	trayIconPixmap
+	trayIconFallback
+)
+
+// trayIconSource is the resolved source of a glyph, and its identity
+// for change detection (item/mod.rs IconSignature).
 type trayIconSource struct {
-	kind   string // "file", "named", "pixmap", "fallback"
+	kind   trayIconKind
 	name   string
 	pixmap sni.Pixmap
 }
 
 // signature identifies the source: equal sources keep the widget.
 func (s trayIconSource) signature() string {
-	if s.kind == "pixmap" {
+	if s.kind == trayIconPixmap {
 		return "pixmap:" + strconv.Itoa(int(s.pixmap.Width)) + "x" + strconv.Itoa(int(s.pixmap.Height)) + ":" + string(s.pixmap.Data)
 	}
-	return s.kind + ":" + s.name
+	return strconv.Itoa(int(s.kind)) + ":" + s.name
 }
 
-// resolveTrayIcon is update_icon's source pick: the override icon or
-// the item's IconName - as a file in IconThemePath, a file path, or a
-// theme name - else the IconPixmap sni.BestPixmap picks for devicePx,
-// else the fallback glyph.
-func resolveTrayIcon(cfg config.SystrayConfig, it sni.Item, devicePx int) trayIconSource {
+// iconSource is the source of one SNI name and pixmap pair: the name -
+// as a file in IconThemePath, a file path, or a theme name - else the
+// pixmap sni.BestPixmap picks for devicePx; false without either.
+func iconSource(name, themePath string, pixmaps []sni.Pixmap, devicePx int) (trayIconSource, bool) {
+	if name != "" {
+		if file, ok := themePathIcon(themePath, name); ok {
+			return trayIconSource{kind: trayIconFile, name: file}, true
+		}
+		if isFile(name) {
+			return trayIconSource{kind: trayIconFile, name: name}, true
+		}
+		return trayIconSource{kind: trayIconNamed, name: name}, true
+	}
+	if p, ok := sni.BestPixmap(pixmaps, devicePx); ok {
+		return trayIconSource{kind: trayIconPixmap, pixmap: p}, true
+	}
+	return trayIconSource{}, false
+}
+
+// trayLook is what an item's button draws: its icon, whether that is
+// the item's attention icon, and the overlay composited over it.
+type trayLook struct {
+	icon       trayIconSource
+	attention  bool
+	overlay    trayIconSource
+	hasOverlay bool
+}
+
+// signature identifies the look: equal looks keep the widgets.
+func (l trayLook) signature() string {
+	if !l.hasOverlay {
+		return l.icon.signature()
+	}
+	return l.icon.signature() + "\x00" + l.overlay.signature()
+}
+
+// resolveTrayLook is update_icon's source pick. A NeedsAttention item
+// draws its AttentionIconName, else its AttentionIconPixmap, over an
+// override's icon. Otherwise, or without either, it draws the override
+// icon or its IconName, else its IconPixmap, else the fallback glyph.
+// OverlayIconName, else OverlayIconPixmap, composites over the icon
+// drawn.
+func resolveTrayLook(cfg config.SystrayConfig, it sni.Item, devicePx int) trayLook {
+	var l trayLook
+	l.overlay, l.hasOverlay = iconSource(it.OverlayIconName, it.IconThemePath, it.OverlayIconPixmap, devicePx)
+	if it.Status == sni.StatusNeedsAttention {
+		if src, ok := iconSource(it.AttentionName, it.IconThemePath, it.AttentionIconPixmap, devicePx); ok {
+			l.icon, l.attention = src, true
+			return l
+		}
+	}
 	name := it.IconName
 	if o, ok := systrayOverride(cfg.Overrides, it); ok && o.Icon != nil && *o.Icon != "" {
 		name = *o.Icon
 	}
-	if name != "" {
-		if file, ok := themePathIcon(it.IconThemePath, name); ok {
-			return trayIconSource{kind: "file", name: file}
-		}
-		if isFile(name) {
-			return trayIconSource{kind: "file", name: name}
-		}
-		return trayIconSource{kind: "named", name: name}
+	src, ok := iconSource(name, it.IconThemePath, it.IconPixmap, devicePx)
+	if !ok {
+		src = trayIconSource{kind: trayIconFallback, name: trayFallbackIcon}
 	}
-	if p, ok := sni.BestPixmap(it.IconPixmap, devicePx); ok {
-		return trayIconSource{kind: "pixmap", pixmap: p}
-	}
-	return trayIconSource{kind: "fallback", name: trayFallbackIcon}
+	l.icon = src
+	return l
 }
 
 // trayGlyph is an item's icon widget.
@@ -200,9 +249,9 @@ type trayGlyph interface {
 // and falls back to the generic glyph when it does not decode.
 func buildTrayIcon(src trayIconSource, px int, scale deviceScale, hooks trayPixmapHooks) trayGlyph {
 	switch src.kind {
-	case "file":
+	case trayIconFile:
 		return widget.NewFileIcon(src.name, px)
-	case "pixmap":
+	case trayIconPixmap:
 		if g, err := newTrayPixmap(src.pixmap, px, scale, hooks); err == nil {
 			return g
 		}
@@ -306,15 +355,20 @@ type trayEntry struct {
 	button *widget.Button
 	slot   *widget.Box
 	icon   trayGlyph
-	sig    string
+	// overlay is the glyph composited over icon's bottom-right quarter,
+	// nil without one.
+	overlay trayGlyph
+	sig     string
 }
 
-// retireIcon drops the entry's icon, forgetting a pixmap's raster.
+// retireIcon drops the entry's glyphs, forgetting their pixmap rasters.
 func (e *trayEntry) retireIcon() {
-	if g, ok := e.icon.(*trayPixmap); ok {
-		g.retire()
+	for _, g := range []trayGlyph{e.icon, e.overlay} {
+		if p, ok := g.(*trayPixmap); ok {
+			p.retire()
+		}
 	}
-	e.icon = nil
+	e.icon, e.overlay = nil, nil
 }
 
 // systrayModule is the tray: one button per SNI item, following the
@@ -547,22 +601,39 @@ func (m *systrayModule) newEntry(it sni.Item) *trayEntry {
 	return e
 }
 
-// updateIcon applies the resolved source and the override tint.
+// updateIcon applies the resolved look and the override tint, which
+// recolors the item's own icon but neither its attention icon nor its
+// overlay.
 func (m *systrayModule) updateIcon(e *trayEntry) {
 	cfg := m.ctx.Config.Systray
-	src := resolveTrayIcon(cfg, e.item, m.devicePx())
-	if sig := src.signature(); sig != e.sig || e.icon == nil {
+	look := resolveTrayLook(cfg, e.item, m.devicePx())
+	if sig := look.signature(); sig != e.sig || e.icon == nil {
 		e.retireIcon()
-		e.icon = buildTrayIcon(src, m.iconPx(), m.scale, m.pixmapHooks())
-		e.slot.Clear()
-		e.slot.Append(widgets.Center(e.icon), true)
+		m.buildLook(e, look)
 		e.sig = sig
 	}
 	var tint render.Color
-	if o, ok := systrayOverride(cfg.Overrides, e.item); ok && o.Color != nil {
+	if o, ok := systrayOverride(cfg.Overrides, e.item); ok && o.Color != nil && !look.attention {
 		tint, _ = styling.ResolveColor(*o.Color, m.ctx.Style.palette)
 	}
 	e.icon.SetTint(tint)
+}
+
+// buildLook fills the entry's slot: the icon centered, and the overlay
+// at half the icon size in its bottom-right corner.
+func (m *systrayModule) buildLook(e *trayEntry, look trayLook) {
+	px, hooks := m.iconPx(), m.pixmapHooks()
+	e.icon = buildTrayIcon(look.icon, px, m.scale, hooks)
+	e.slot.Clear()
+	if !look.hasOverlay {
+		e.slot.Append(widgets.Center(e.icon), true)
+		return
+	}
+	e.overlay = buildTrayIcon(look.overlay, px/2, m.scale, hooks)
+	stack := widget.NewOverlay().
+		Append(widgets.Center(e.icon)).
+		AppendAligned(e.overlay, widget.AlignEnd, widget.AlignEnd)
+	e.slot.Append(stack, true)
 }
 
 // call runs one item control off the loop, logging failures as the
