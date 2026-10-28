@@ -17,6 +17,7 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-shell/internal/rusterr"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // Methods.
@@ -29,9 +30,9 @@ const (
 // widget.sock, falling back to /tmp/lys-shell-widget.sock.
 func SocketPath() string {
 	if dir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
-		return filepath.Join(dir, "lys-shell", "widget.sock")
+		return filepath.Join(dir, version.Name, "widget.sock")
 	}
-	return "/tmp/lys-shell-widget.sock"
+	return "/tmp/" + version.Name + "-widget.sock"
 }
 
 // ToastRequest is one toast.show payload (ToastShowParams).

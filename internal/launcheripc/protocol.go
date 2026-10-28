@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // RowChunk is the number of rows per rows frame when streaming stdin.
@@ -29,9 +31,9 @@ const RowChunk = 2000
 // /tmp/wayle-launcher.sock when the runtime dir is unset.
 func SocketPath() string {
 	if dir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
-		return filepath.Join(dir, "lys-shell", "launcher.sock")
+		return filepath.Join(dir, version.Name, "launcher.sock")
 	}
-	return "/tmp/lys-shell-launcher.sock"
+	return "/tmp/" + version.Name + "-launcher.sock"
 }
 
 // WidthUnit is the unit of a rofi -width value.

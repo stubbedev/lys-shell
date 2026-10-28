@@ -27,7 +27,7 @@ const ObjectPath = dbus.ObjectPath("/org/freedesktop/portal/desktop")
 
 // shellName is what the portal's PipeWire client and EIS seat are
 // called, and what its ScreenCast streams are named after.
-const shellName = "lys-shell"
+const shellName = version.Name
 
 // screencastNode is the PipeWire node name of every ScreenCast stream.
 const screencastNode = shellName + "-screencast"

@@ -12,6 +12,7 @@ import (
 func TestNotificationServiceRunsOnlyWhenEnabled(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	cfg := config.Defaults().Notification
 	cfg.Enabled = false
 	if svc := startNotifications(cfg); svc != nil {
@@ -45,6 +46,7 @@ func TestNotificationServiceRunsOnlyWhenEnabled(t *testing.T) {
 func TestNotificationHistorySurvivesARestart(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	cfg := config.Defaults().Notification
 	cfg.Enabled = true
 	first := startNotifications(cfg)

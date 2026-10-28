@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // CLI runs the notmuch binary, as the Rust service does.
@@ -95,7 +96,7 @@ func (d DesktopNotifier) Notify(summary, body, icon string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 		defer cancel()
-		if _, err := d.Sender.Send(ctx, "lys-shell", summary, body, icon); err != nil {
+		if _, err := d.Sender.Send(ctx, version.Name, summary, body, icon); err != nil {
 			log.Printf("mail: notify: %v", err)
 		}
 	}()

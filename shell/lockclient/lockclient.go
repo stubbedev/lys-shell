@@ -21,6 +21,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/logind"
 )
 
@@ -226,7 +227,7 @@ func claimLockOnStart(runtimeDir string) bool {
 	if runtimeDir == "" {
 		return true
 	}
-	marker := filepath.Join(runtimeDir, "lys-shell", "lock-on-start.done")
+	marker := filepath.Join(runtimeDir, version.Name, "lock-on-start.done")
 	_ = os.MkdirAll(filepath.Dir(marker), 0o700) //nolint:gosec // our own runtime dir
 	// O_EXCL is the atomic first-writer-wins test: exactly one shell
 	// per session sees success.

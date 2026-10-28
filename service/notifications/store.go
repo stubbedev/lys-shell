@@ -14,7 +14,10 @@ import (
 
 	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/xdg"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: notifications.db stays the Rust file
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // deleteBatch is the most rows one retention or expiry DELETE removes,
@@ -66,14 +69,15 @@ type Store struct {
 	db *sql.DB
 }
 
-// StorePath is persistence.rs's path: $HOME/.local/share/lys-shell/
-// notifications.db (HOME, not XDG_DATA_HOME, as the Rust store does).
+// StorePath is notifications.db in lys-shell's data directory,
+// $XDG_DATA_HOME/lys-shell or ~/.local/share/lys-shell, where the
+// launcher history and the colour history live too.
 func StorePath() (string, error) {
-	home := os.Getenv("HOME")
-	if home == "" {
-		return "", errors.New("notifications: HOME is not set")
+	dir, ok := xdg.OS.DataDir(version.Name)
+	if !ok {
+		return "", errors.New("notifications: neither XDG_DATA_HOME nor HOME is an absolute path")
 	}
-	return filepath.Join(home, ".local", "share", "lys-shell", "notifications.db"), nil
+	return filepath.Join(dir, "notifications.db"), nil
 }
 
 // OpenStore opens (creating or migrating if needed) the history at

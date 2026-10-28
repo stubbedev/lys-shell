@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // Status is the lifecycle gate (state.rs's Status), updated
@@ -54,7 +55,7 @@ const (
 	savedIcon      = "ld-video-symbolic"
 	startToastMS   = 1000
 	stopToastMS    = 1500
-	notifyAppName  = "lys-shell"
+	notifyAppName  = version.Name
 	elapsedTick    = time.Second
 	outputDirPerms = 0o755
 )
@@ -452,7 +453,7 @@ func OutputPath(configuredDir string, format config.RecorderFormat, now time.Tim
 	if dir == "" {
 		dir = VideosDir()
 	}
-	return filepath.Join(dir, "lys-shell-"+now.Format("20060102-150405")+"."+string(format))
+	return filepath.Join(dir, version.Name+"-"+now.Format("20060102-150405")+"."+string(format))
 }
 
 // VideosDir is videos_dir: $XDG_VIDEOS_DIR, else $HOME/Videos.

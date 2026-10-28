@@ -275,10 +275,12 @@ func TestDirFollowsXDG(t *testing.T) {
 	if got, err := Dir(); err != nil || got != "/xdg/lys-shell" {
 		t.Errorf("xdg: %q %v", got, err)
 	}
-	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got, err := Dir(); err != nil || got != "/home/u/.config/lys-shell" {
-		t.Errorf("home: %q %v", got, err)
+	for _, ignored := range []string{"", "relative/config"} {
+		t.Setenv("XDG_CONFIG_HOME", ignored)
+		if got, err := Dir(); err != nil || got != "/home/u/.config/lys-shell" {
+			t.Errorf("XDG_CONFIG_HOME %q: %q %v, want the HOME fallback", ignored, got, err)
+		}
 	}
 	t.Setenv("HOME", "")
 	if _, err := Dir(); err == nil {

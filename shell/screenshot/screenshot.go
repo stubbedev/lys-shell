@@ -192,7 +192,7 @@ func (h *Host) save(img *image.RGBA) (string, error) {
 		if h.Notify != nil {
 			h.Notify(n)
 		} else {
-			desktopnotify.Notify("lys-shell", n.Summary, n.Body, n.Icon)
+			desktopnotify.Notify(version.Name, n.Summary, n.Body, n.Icon)
 		}
 	}
 	return path, nil

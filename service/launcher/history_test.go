@@ -87,6 +87,22 @@ func TestHistoryPersistsInTheRustFileLayout(t *testing.T) {
 	}
 }
 
+// The data directory ignores a relative XDG_DATA_HOME, as the XDG spec
+// says, and is an error when HOME is not absolute either.
+func TestDataDirIgnoresARelativeXDGDataHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_DATA_HOME", "relative/data")
+	if got, err := DataDir(); err != nil || got != filepath.Join(home, ".local", "share", "lys-shell") {
+		t.Errorf("DataDir = %q %v, want the HOME fallback", got, err)
+	}
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "relative/home")
+	if got, err := DataDir(); err == nil {
+		t.Errorf("DataDir = %q with no absolute base, want an error", got)
+	}
+}
+
 func TestAnUnopenableHistoryIsAnError(t *testing.T) {
 	if _, err := OpenHistoryAt(filepath.Join(t.TempDir(), "missing-dir", "x.db")); err == nil {
 		t.Error("a database in a missing directory must fail to open")

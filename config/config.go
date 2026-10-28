@@ -10,8 +10,11 @@ package config
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
+
+	"github.com/stubbedev/lys-lib/xdg"
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // Config is the loaded user configuration.
@@ -80,16 +83,14 @@ func Defaults() *Config {
 
 // Dir returns the lys-shell configuration directory:
 // $XDG_CONFIG_HOME/lys-shell, or ~/.config/lys-shell when XDG_CONFIG_HOME is
-// unset. Both variables unset is an error — there is nowhere to look.
+// not an absolute path. Neither being one is an error: there is nowhere
+// to look.
 func Dir() (string, error) {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "lys-shell"), nil
+	dir, ok := xdg.OS.ConfigDir(version.Name)
+	if !ok {
+		return "", errors.New("config: neither XDG_CONFIG_HOME nor HOME is an absolute path")
 	}
-	home := os.Getenv("HOME")
-	if home == "" {
-		return "", errors.New("config: neither XDG_CONFIG_HOME nor HOME is set")
-	}
-	return filepath.Join(home, ".config", "lys-shell"), nil
+	return dir, nil
 }
 
 // DiscoverMain resolves the user's main config file inside dir:

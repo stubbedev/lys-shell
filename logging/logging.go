@@ -16,22 +16,23 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stubbedev/lys-lib/xdg"
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // daysToKeep is tracing.rs's DAYS_TO_KEEP.
 const daysToKeep = 7
 
 // Dir is ConfigPaths::log_dir: $XDG_STATE_HOME/lys-shell, or
-// ~/.local/state/lys-shell.
+// ~/.local/state/lys-shell when XDG_STATE_HOME is not an absolute path.
 func Dir() (string, error) {
-	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
-		return filepath.Join(dir, "lys-shell"), nil
+	dir, ok := xdg.OS.StateDir(version.Name)
+	if !ok {
+		return "", errors.New("logging: neither XDG_STATE_HOME nor HOME is an absolute path")
 	}
-	home := os.Getenv("HOME")
-	if home == "" {
-		return "", errors.New("neither XDG_STATE_HOME nor HOME environment variable found")
-	}
-	return filepath.Join(home, ".local", "state", "lys-shell"), nil
+	return dir, nil
 }
 
 // Setup routes the standard logger to prefix's daily file in Dir, and

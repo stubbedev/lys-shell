@@ -16,10 +16,12 @@ func TestDirFollowsXDGStateHome(t *testing.T) {
 	if got, _ := Dir(); got != "/xdg/state/lys-shell" {
 		t.Errorf("Dir = %q", got)
 	}
-	t.Setenv("XDG_STATE_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got, _ := Dir(); got != "/home/u/.local/state/lys-shell" {
-		t.Errorf("fallback = %q", got)
+	for _, ignored := range []string{"", "relative/state"} {
+		t.Setenv("XDG_STATE_HOME", ignored)
+		if got, _ := Dir(); got != "/home/u/.local/state/lys-shell" {
+			t.Errorf("XDG_STATE_HOME %q: fallback = %q", ignored, got)
+		}
 	}
 	t.Setenv("HOME", "")
 	if _, err := Dir(); err == nil {

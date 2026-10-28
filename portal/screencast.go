@@ -6,6 +6,7 @@ import (
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -19,7 +20,7 @@ const ScreenCastIface = "org.freedesktop.impl.portal.ScreenCast"
 
 // Restore tokens are (suv): vendor, version, and the target payload.
 const (
-	restoreVendor  = "lys-shell"
+	restoreVendor  = version.Name
 	restoreVersion = uint32(1)
 )
 

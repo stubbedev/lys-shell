@@ -17,10 +17,12 @@ func TestDefaultPath(t *testing.T) {
 	if got, _ := DefaultPath(); got != "/data/lys-shell/icons" {
 		t.Errorf("with XDG_DATA_HOME: %q", got)
 	}
-	// Set but empty is taken as given, as std::env::var does.
-	t.Setenv("XDG_DATA_HOME", "")
-	if got, _ := DefaultPath(); got != "lys-shell/icons" {
-		t.Errorf("with an empty XDG_DATA_HOME: %q, want the relative lys-shell/icons", got)
+	// Empty or relative is ignored, as the XDG spec says.
+	for _, ignored := range []string{"", "relative/data"} {
+		t.Setenv("XDG_DATA_HOME", ignored)
+		if got, _ := DefaultPath(); got != "/home/u/.local/share/lys-shell/icons" {
+			t.Errorf("with XDG_DATA_HOME %q: %q, want the HOME fallback", ignored, got)
+		}
 	}
 	_ = os.Unsetenv("XDG_DATA_HOME")
 	if got, _ := DefaultPath(); got != "/home/u/.local/share/lys-shell/icons" {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/cli"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/logging"
 )
 
@@ -17,7 +18,7 @@ var selfManaged = map[string]bool{"shell": true, "portal": true, "completions": 
 // The daily log prefixes: the running shell and the one-shot CLI
 // commands keep separate files, so neither prunes the other's.
 const (
-	shellLogPrefix = "lys-shell"
+	shellLogPrefix = version.Name
 	cliLogPrefix   = "lys-shell-cli"
 )
 

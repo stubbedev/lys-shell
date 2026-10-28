@@ -25,7 +25,7 @@ import (
 )
 
 // bitwardenDevice is the name the account's device list shows.
-const bitwardenDevice = "lys-shell"
+const bitwardenDevice = version.Name
 
 // bitwardenTick is how often the upkeep checks the idle lock and the
 // sync interval, both configured in minutes.

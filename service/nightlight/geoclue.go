@@ -7,6 +7,8 @@ import (
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // GeoClue2 names (geoclue.rs).
@@ -49,7 +51,7 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, timeout time.Duration) 
 	}
 	// DesktopId is mandatory before Start; without a requested accuracy
 	// the daemon yields nothing.
-	if err := set("DesktopId", "lys-shell"); err != nil {
+	if err := set("DesktopId", version.Name); err != nil {
 		return Location{}, fmt.Errorf("geoclue: desktop id: %w", err)
 	}
 	if err := set("RequestedAccuracyLevel", accuracyCity); err != nil {

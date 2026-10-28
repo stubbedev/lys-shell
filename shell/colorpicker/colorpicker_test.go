@@ -75,10 +75,12 @@ func TestHistoryPath(t *testing.T) {
 	if got := HistoryPath(); got != "/data/lys-shell/color-history" {
 		t.Errorf("xdg = %q", got)
 	}
-	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got := HistoryPath(); got != "/home/u/.local/share/lys-shell/color-history" {
-		t.Errorf("home = %q", got)
+	for _, ignored := range []string{"", "relative/data"} {
+		t.Setenv("XDG_DATA_HOME", ignored)
+		if got := HistoryPath(); got != "/home/u/.local/share/lys-shell/color-history" {
+			t.Errorf("XDG_DATA_HOME %q: home = %q", ignored, got)
+		}
 	}
 	t.Setenv("HOME", "")
 	if got := HistoryPath(); got != "" {

@@ -835,3 +835,23 @@ func TestRestoredExpiryStillFires(t *testing.T) {
 		t.Errorf("the expired one stayed on disk: %v", got)
 	}
 }
+
+// The store lives in lys-shell's data directory, following an absolute
+// XDG_DATA_HOME and ignoring a relative one, as the XDG spec says.
+func TestStorePathFollowsTheDataDirectory(t *testing.T) {
+	data, home := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_DATA_HOME", data)
+	if got, err := StorePath(); err != nil || got != filepath.Join(data, "lys-shell", "notifications.db") {
+		t.Errorf("StorePath = %q %v, want it under XDG_DATA_HOME", got, err)
+	}
+	t.Setenv("XDG_DATA_HOME", "relative/data")
+	if got, err := StorePath(); err != nil || got != filepath.Join(home, ".local", "share", "lys-shell", "notifications.db") {
+		t.Errorf("a relative XDG_DATA_HOME: StorePath = %q %v, want the HOME fallback", got, err)
+	}
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "")
+	if got, err := StorePath(); err == nil {
+		t.Errorf("StorePath = %q with neither base absolute, want an error", got)
+	}
+}

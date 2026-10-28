@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -26,7 +27,7 @@ import (
 const sourceFile = "recorder-source"
 
 // pickerAppID names the recorder to the share picker.
-const pickerAppID = "lys-shell"
+const pickerAppID = version.Name
 
 // dismissTimeout bounds taking down a picker whose start was
 // cancelled.
@@ -241,7 +242,7 @@ func audioSources(audio *pulse.Service, opts Options) ([]startAudio, error) {
 	sources := make([]startAudio, len(targets))
 	for i, t := range targets {
 		sources[i] = func(onData func([]byte)) (audioCapture, error) {
-			c, err := audio.Capture(t, pulse.CaptureSpec{Name: "lys-shell recorder", Rate: audioRate, Channels: audioChannels, FragmentFrames: audioFragment}, onData)
+			c, err := audio.Capture(t, pulse.CaptureSpec{Name: version.Name + " recorder", Rate: audioRate, Channels: audioChannels, FragmentFrames: audioFragment}, onData)
 			if err != nil {
 				return nil, fmt.Errorf("recorder: capture %s: %w", t, err)
 			}

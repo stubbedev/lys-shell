@@ -184,10 +184,21 @@ func TestColorsPaths(t *testing.T) {
 	if _, ok, err := ColorsPath(None); ok || err != nil {
 		t.Errorf("ColorsPath(None) = ok %v err %v, want no path", ok, err)
 	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", "relative/cache")
+	for tool, want := range map[Tool]string{
+		Matugen: filepath.Join(home, ".cache", "lys-shell", "matugen-colors.json"),
+		Pywal:   filepath.Join(home, ".cache", "wal", "colors.json"),
+	} {
+		if got, ok, err := ColorsPath(tool); err != nil || !ok || got != want {
+			t.Errorf("a relative XDG_CACHE_HOME: ColorsPath(%v) = %q %v %v, want the HOME fallback %q", tool, got, ok, err, want)
+		}
+	}
 	t.Setenv("XDG_CACHE_HOME", "")
-	t.Setenv("HOME", "")
+	t.Setenv("HOME", "relative/home")
 	if _, ok, err := ColorsPath(Pywal); ok || err == nil {
-		t.Error("a path resolved with neither XDG_CACHE_HOME nor HOME")
+		t.Error("a path resolved with neither XDG_CACHE_HOME nor HOME absolute")
 	}
 }
 

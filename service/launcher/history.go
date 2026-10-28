@@ -8,7 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/stubbedev/lys-lib/xdg"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: launcher.db stays the Rust file
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 const day = 86_400
@@ -23,15 +26,10 @@ type History struct {
 // DataDir resolves lys-shell's data directory, $XDG_DATA_HOME/lys-shell or
 // ~/.local/share/lys-shell, creating it (wayle-core ConfigPaths::data_dir).
 func DataDir() (string, error) {
-	base := os.Getenv("XDG_DATA_HOME")
-	if base == "" {
-		home := os.Getenv("HOME")
-		if home == "" {
-			return "", errors.New("launcher: neither XDG_DATA_HOME nor HOME is set")
-		}
-		base = filepath.Join(home, ".local", "share")
+	dir, ok := xdg.OS.DataDir(version.Name)
+	if !ok {
+		return "", errors.New("launcher: neither XDG_DATA_HOME nor HOME is an absolute path")
 	}
-	dir := filepath.Join(base, "lys-shell")
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the shared data dir, as the Rust shell creates it
 		return "", err
 	}

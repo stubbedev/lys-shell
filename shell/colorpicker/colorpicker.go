@@ -20,9 +20,11 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -89,17 +91,13 @@ func New(a *app.Application, outputs func() []*app.Output, font render.Font, his
 
 // HistoryPath is the persisted swatch file:
 // $XDG_DATA_HOME/lys-shell/color-history, else ~/.local/share/lys-shell/color-history.
-// Empty when neither variable is set.
+// Empty when neither is an absolute path.
 func HistoryPath() string {
-	base := os.Getenv("XDG_DATA_HOME")
-	if base == "" {
-		home := os.Getenv("HOME")
-		if home == "" {
-			return ""
-		}
-		base = filepath.Join(home, ".local", "share")
+	dir, ok := xdg.OS.DataDir(version.Name)
+	if !ok {
+		return ""
 	}
-	return filepath.Join(base, "lys-shell", "color-history")
+	return filepath.Join(dir, "color-history")
 }
 
 // Request opens the picker over the frozen frames (keyed by connector)
