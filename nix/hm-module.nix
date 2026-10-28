@@ -283,6 +283,10 @@ in
       Unit = {
         Description = "lys-shell desktop shell";
         PartOf = [ cfg.systemd.target ];
+        # D-Bus activation (a Notify before the shell is up) must not start
+        # the shell outside the session: with no compositor it exits, and
+        # Restart= would loop it. Requisite fails that start at once.
+        Requisite = [ cfg.systemd.target ];
         # The recorder captures via the xdg-desktop-portal ScreenCast interface
         # over PipeWire; order after (and weakly want) both so they're up when
         # the shell starts. Wants is weak: a missing unit just logs, never
