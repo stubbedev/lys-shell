@@ -35,6 +35,16 @@ func userPlaces(home string) []filechooser.Place {
 	return places
 }
 
+// authSignal sends what the user does in an authentication dialog no
+// Authenticate call waits on, logging a signal the bus refused.
+func authSignal(e *portaldialogs.Emitter) func(string, portaldialogs.AuthAction) {
+	return func(handle string, a portaldialogs.AuthAction) {
+		if err := e.AuthAction(handle, a); err != nil {
+			log.Printf("portal dialogs: %v", err)
+		}
+	}
+}
+
 // servePortalHosts hosts the shell's halves of the portal backend on
 // one session bus connection: dev.stubbe.lys.PortalDialogs1 (access,
 // account, app chooser, dynamic launcher and the wallpaper preview;
@@ -87,6 +97,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		SetDefault: desktopentry.SetDefault,
 		PickImage:  func(chosen func(string)) { pickImage(application, chooser, chosen) },
 		Describe:   describeApp,
+		Signal:     authSignal(portaldialogs.NewEmitter(conn)),
 	})
 	if _, err := portaldialogs.NewDaemon(dialogs).Export(conn); err != nil {
 		log.Printf("portal dialogs: daemon: %v", err)

@@ -1,0 +1,6 @@
+Administrator authentication dialog (`dev.stubbe.lys.PortalDialogs1` `Authenticate`, lys-polkit's)
+
+Usage: lys-shell portal show authenticate
+
+Options:
+  -h, --help  Print help

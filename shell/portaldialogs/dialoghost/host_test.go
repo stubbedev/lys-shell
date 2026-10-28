@@ -48,6 +48,14 @@ type harness struct {
 	defaults []string
 	// picked is the picture the file chooser answers, "" for a cancel.
 	picked string
+	// signals are the authentication actions signalled, by handle.
+	signals chan signalled
+}
+
+// signalled is one Signal call.
+type signalled struct {
+	handle string
+	action portaldialogs.AuthAction
 }
 
 func newHarness(t *testing.T, apps []desktopentry.App) *harness {
@@ -55,7 +63,7 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 	face := treetest.Font(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
-	hs := &harness{cfg: cfg, opened: make(chan app.LayerConfig, 4)}
+	hs := &harness{cfg: cfg, opened: make(chan app.LayerConfig, 4), signals: make(chan signalled, 4)}
 	hs.h = New(Deps{
 		Config: func() *config.Config { return hs.cfg },
 		Open: func(c app.LayerConfig) (Window, error) {
@@ -103,6 +111,7 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 			}
 			return "App " + appID, ""
 		},
+		Signal: func(handle string, action portaldialogs.AuthAction) { hs.signals <- signalled{handle, action} },
 	})
 	return hs
 }

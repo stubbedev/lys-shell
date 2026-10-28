@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -33,11 +34,14 @@ func (f fakeChooser) Save(_ portaldialogs.Caller, r filechooser.SaveRequest) fil
 
 func (fakeChooser) Dismiss(string) {}
 
-// fakeDialogs answers yes (or with id) and records the last call.
+// fakeDialogs answers yes (or with id, or auth for an authentication)
+// and records the last call and the last handle dismissed.
 type fakeDialogs struct {
-	yes *dbustest.Var[bool]
-	id  *dbustest.Var[string]
-	got *dbustest.Var[[]any]
+	yes       *dbustest.Var[bool]
+	id        *dbustest.Var[string]
+	auth      *dbustest.Var[portaldialogs.AuthReply]
+	got       *dbustest.Var[[]any]
+	dismissed *dbustest.Var[string]
 }
 
 func (f fakeDialogs) Access(_ portaldialogs.Caller, r portaldialogs.AccessRequest) (bool, []portaldialogs.Selection) {
@@ -75,7 +79,16 @@ func (fakeDialogs) Password(portaldialogs.Caller, portaldialogs.PasswordRequest)
 	return false, ""
 }
 
-func (fakeDialogs) Dismiss(string) {}
+func (f fakeDialogs) Authenticate(c portaldialogs.Caller, r portaldialogs.AuthRequest) portaldialogs.AuthReply {
+	f.got.Store([]any{c.Handle, r})
+	return f.auth.Load()
+}
+
+func (f fakeDialogs) ShowAuthentication(c portaldialogs.Caller, r portaldialogs.AuthRequest) {
+	f.got.Store([]any{c.Handle, r})
+}
+
+func (f fakeDialogs) Dismiss(handle string) { f.dismissed.Store(handle) }
 
 type fakePrinter struct{ granted *dbustest.Var[bool] }
 
@@ -149,7 +162,7 @@ func TestPortalShowDialogs(t *testing.T) {
 	dbustest.Session(t)
 	got := &dbustest.Var[[]any]{}
 	yes, id := &dbustest.Var[bool]{}, &dbustest.Var[string]{}
-	host := fakeDialogs{yes: yes, id: id, got: got}
+	host := fakeDialogs{yes: yes, id: id, auth: &dbustest.Var[portaldialogs.AuthReply]{}, got: got, dismissed: &dbustest.Var[string]{}}
 	export(t, portaldialogs.NewDaemon(host).Export)
 	for _, c := range []struct {
 		args       []string
@@ -186,6 +199,39 @@ func TestPortalShowDialogs(t *testing.T) {
 		id.Store("")
 		if stdout, _, _ := show(t, c.args...); stdout != c.no {
 			t.Errorf("%v no: stdout %q, want %q", c.args, stdout, c.no)
+		}
+	}
+}
+
+// The authentication preview asks one prompt under its own handle,
+// prints how it ended (never the answer) and dismisses the dialog.
+func TestPortalShowAuthenticate(t *testing.T) {
+	dbustest.Session(t)
+	host := fakeDialogs{yes: &dbustest.Var[bool]{}, id: &dbustest.Var[string]{}, auth: &dbustest.Var[portaldialogs.AuthReply]{}, got: &dbustest.Var[[]any]{}, dismissed: &dbustest.Var[string]{}}
+	export(t, portaldialogs.NewDaemon(host).Export)
+	for _, c := range []struct {
+		reply portaldialogs.AuthReply
+		want  string
+	}{
+		{portaldialogs.AuthAnswer{Response: portaldialogs.NewResponse("hunter2")}, "answered\n"},
+		{portaldialogs.AuthSwitch{UID: 1000}, "switched to uid 1000\n"},
+		{portaldialogs.AuthCancel{}, "cancelled\n"},
+	} {
+		host.auth.Store(c.reply)
+		host.dismissed.Store("")
+		stdout, stderr, code := show(t, "authenticate")
+		if code != 0 || stdout != c.want || stderr != "" {
+			t.Errorf("%T: code %d stdout %q stderr %q, want %q", c.reply, code, stdout, stderr, c.want)
+		}
+		if strings.Contains(stdout, "hunter2") {
+			t.Error("the preview printed the answer")
+		}
+		got := host.got.Load()
+		if got[0] != previewAuthHandle || !reflect.DeepEqual(got[1], previewAuth) {
+			t.Errorf("%T: asked %v", c.reply, got)
+		}
+		if d := host.dismissed.Load(); d != previewAuthHandle {
+			t.Errorf("%T: dismissed %q, want the preview's handle", c.reply, d)
 		}
 	}
 }

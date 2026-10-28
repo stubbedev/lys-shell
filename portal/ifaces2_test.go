@@ -444,6 +444,17 @@ func (f *fakeDialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordR
 	return true, "typed"
 }
 
+// The xdg-desktop-portal backend never authenticates (that is
+// lys-polkit's); the fake records a call as the others do and cancels.
+func (f *fakeDialogs) Authenticate(portaldialogs.Caller, portaldialogs.AuthRequest) portaldialogs.AuthReply {
+	f.asked.Store([]any{"Authenticate"})
+	return portaldialogs.AuthCancel{}
+}
+
+func (f *fakeDialogs) ShowAuthentication(portaldialogs.Caller, portaldialogs.AuthRequest) {
+	f.asked.Store([]any{"ShowAuthentication"})
+}
+
 func serveDialogs(t *testing.T, r *rig, yes bool) *fakeDialogs {
 	t.Helper()
 	f := &fakeDialogs{}

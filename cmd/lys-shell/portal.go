@@ -66,6 +66,7 @@ func portalCommand() *cli.Command {
 					{Name: "account", About: "Account info sharing consent (`org.freedesktop.impl.portal.Account`)", Run: showAccount},
 					{Name: "app-chooser", About: "Application chooser (`org.freedesktop.impl.portal.AppChooser`)", Run: showAppChooser},
 					{Name: "dynamic-launcher", About: "Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)", Run: showDynamicLauncher},
+					{Name: "authenticate", About: "Administrator authentication dialog (`dev.stubbe.lys.PortalDialogs1` `Authenticate`, lys-polkit's)", Run: showAuthenticate},
 					{
 						Name:  "wallpaper",
 						About: "Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)",

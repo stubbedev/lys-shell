@@ -861,6 +861,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
             cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
             cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand authenticate 'Administrator authentication dialog (`dev.stubbe.lys.PortalDialogs1` `Authenticate`, lys-polkit''s)'
             cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -907,6 +908,10 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'lys-shell;portal;show;authenticate'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'lys-shell;portal;show;wallpaper'= {
             cand --uri '`file://` image URI to preview (defaults to a placeholder)'
             cand -h 'Print help'
@@ -922,6 +927,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
             cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
             cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand authenticate 'Administrator authentication dialog (`dev.stubbe.lys.PortalDialogs1` `Authenticate`, lys-polkit''s)'
             cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -942,6 +948,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;portal;show;help;app-chooser'= {
         }
         &'lys-shell;portal;show;help;dynamic-launcher'= {
+        }
+        &'lys-shell;portal;show;help;authenticate'= {
         }
         &'lys-shell;portal;show;help;wallpaper'= {
         }
@@ -967,6 +975,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
             cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
             cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand authenticate 'Administrator authentication dialog (`dev.stubbe.lys.PortalDialogs1` `Authenticate`, lys-polkit''s)'
             cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
         }
         &'lys-shell;portal;help;show;file-chooser'= {
@@ -986,6 +995,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;portal;help;show;app-chooser'= {
         }
         &'lys-shell;portal;help;show;dynamic-launcher'= {
+        }
+        &'lys-shell;portal;help;show;authenticate'= {
         }
         &'lys-shell;portal;help;show;wallpaper'= {
         }
@@ -1306,6 +1317,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
             cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
             cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand authenticate 'Administrator authentication dialog (`dev.stubbe.lys.PortalDialogs1` `Authenticate`, lys-polkit''s)'
             cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
         }
         &'lys-shell;help;portal;show;file-chooser'= {
@@ -1325,6 +1337,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;portal;show;app-chooser'= {
         }
         &'lys-shell;help;portal;show;dynamic-launcher'= {
+        }
+        &'lys-shell;help;portal;show;authenticate'= {
         }
         &'lys-shell;help;portal;show;wallpaper'= {
         }

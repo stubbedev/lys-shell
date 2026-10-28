@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -145,3 +146,35 @@ func showWallpaper(m *cli.Matches) error {
 		return verdict(ok, "accepted", "declined"), "Wallpaper", "show wallpaper preview", err
 	})(m)
 }
+
+// previewAuthHandle is the request the authentication preview runs
+// under, dismissed once answered.
+const previewAuthHandle = "/dev/stubbe/lys/preview/authenticate"
+
+// previewAuth is one prompt of an authentication as lys-polkit asks it,
+// with two identities to pick from. The answer is never printed.
+var previewAuth = portaldialogs.AuthRequest{
+	Message:    "Preview: authentication is needed to run a program as the super user",
+	Icon:       "ld-shield-check-symbolic",
+	Details:    []portaldialogs.AuthDetail{{Label: "Program", Value: "/usr/bin/true"}},
+	Identities: []portaldialogs.AuthIdentity{{UID: 0, Name: "root"}, {UID: 1000, Name: "Preview User"}},
+	Selected:   0,
+	Notes:      []portaldialogs.AuthNote{{Text: "This is a preview; nothing is authenticated."}},
+	Prompt:     "Password:",
+}
+
+var showAuthenticate = showDialog(func(ctx context.Context, conn *dbus.Conn) ([]string, string, string, error) {
+	c := portaldialogs.NewClient(conn)
+	reply, err := c.Authenticate(ctx, portaldialogs.Caller{Handle: previewAuthHandle}, previewAuth)
+	err = errors.Join(err, c.Dismiss(ctx, previewAuthHandle))
+	var line string
+	switch reply := reply.(type) {
+	case portaldialogs.AuthAnswer:
+		line = "answered"
+	case portaldialogs.AuthSwitch:
+		line = fmt.Sprintf("switched to uid %d", reply.UID)
+	default:
+		line = "cancelled"
+	}
+	return []string{line}, "Authenticate", "show authentication dialog", err
+})

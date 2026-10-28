@@ -412,6 +412,9 @@ _lys-shell() {
             lys__shell__help__portal__show,app-chooser)
                 cmd="lys__shell__help__portal__show__app__chooser"
                 ;;
+            lys__shell__help__portal__show,authenticate)
+                cmd="lys__shell__help__portal__show__authenticate"
+                ;;
             lys__shell__help__portal__show,color)
                 cmd="lys__shell__help__portal__show__color"
                 ;;
@@ -793,6 +796,9 @@ _lys-shell() {
             lys__shell__portal__help__show,app-chooser)
                 cmd="lys__shell__portal__help__show__app__chooser"
                 ;;
+            lys__shell__portal__help__show,authenticate)
+                cmd="lys__shell__portal__help__show__authenticate"
+                ;;
             lys__shell__portal__help__show,color)
                 cmd="lys__shell__portal__help__show__color"
                 ;;
@@ -822,6 +828,9 @@ _lys-shell() {
                 ;;
             lys__shell__portal__show,app-chooser)
                 cmd="lys__shell__portal__show__app__chooser"
+                ;;
+            lys__shell__portal__show,authenticate)
+                cmd="lys__shell__portal__show__authenticate"
                 ;;
             lys__shell__portal__show,color)
                 cmd="lys__shell__portal__show__color"
@@ -855,6 +864,9 @@ _lys-shell() {
                 ;;
             lys__shell__portal__show__help,app-chooser)
                 cmd="lys__shell__portal__show__help__app__chooser"
+                ;;
+            lys__shell__portal__show__help,authenticate)
+                cmd="lys__shell__portal__show__help__authenticate"
                 ;;
             lys__shell__portal__show__help,color)
                 cmd="lys__shell__portal__show__help__color"
@@ -2523,7 +2535,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__portal__show)
-            opts="file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher wallpaper"
+            opts="file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher authenticate wallpaper"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2565,6 +2577,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__portal__show__app__chooser)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__portal__show__authenticate)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -4519,7 +4545,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__help__show)
-            opts="file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher wallpaper"
+            opts="file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher authenticate wallpaper"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4561,6 +4587,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__help__show__app__chooser)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__help__show__authenticate)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -4701,7 +4741,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__show)
-            opts="-h --help file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher wallpaper help"
+            opts="-h --help file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher authenticate wallpaper help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4743,6 +4783,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__show__app__chooser)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__show__authenticate)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -4799,7 +4853,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__show__help)
-            opts="file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher wallpaper help"
+            opts="file-chooser screenshot color print screen-cast access account app-chooser dynamic-launcher authenticate wallpaper help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4841,6 +4895,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__show__help__app__chooser)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__show__help__authenticate)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

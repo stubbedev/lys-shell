@@ -68,6 +68,9 @@ type Deps struct {
 	// Describe names the app a request comes from: its display name
 	// and icon (desktopentry.Describe).
 	Describe func(appID string) (name, icon string)
+	// Signal reports what the user did in an authentication dialog
+	// while no Authenticate call waits on it (portaldialogs.Emitter).
+	Signal func(handle string, action portaldialogs.AuthAction)
 }
 
 // Dialogs is the dev.stubbe.lys.PortalDialogs1 host: one overlay showing
@@ -87,10 +90,16 @@ type Dialogs struct {
 	// choosers are the app chooser requests open, showing or waiting,
 	// by handle.
 	choosers map[string]*appChooser
+	// auths are the authentication dialogs open, showing or waiting,
+	// by handle.
+	auths map[string]*authDialog
 	// focus is the widget the dialog being built types into: its surface
 	// takes the keyboard and focuses it. Dialogs without one take the
-	// keyboard only when clicked.
+	// keyboard only when clicked, unless grab is set.
 	focus widget.Widget
+	grab  bool
+	// escape is what Escape does in the dialog showing.
+	escape func()
 }
 
 // appChooser is one open app chooser request: the request, kept
@@ -102,7 +111,9 @@ type appChooser struct {
 }
 
 // New builds the host; nothing maps until a request.
-func New(d Deps) *Dialogs { return &Dialogs{d: d, choosers: map[string]*appChooser{}} }
+func New(d Deps) *Dialogs {
+	return &Dialogs{d: d, choosers: map[string]*appChooser{}, auths: map[string]*authDialog{}}
+}
 
 // ask shows a dialog for c on the loop and waits for its answer.
 func (h *Dialogs) ask(c portaldialogs.Caller, build func(answer func(bool, string)) widget.Widget) (bool, string) {
@@ -115,6 +126,7 @@ func (h *Dialogs) ask(c portaldialogs.Caller, build func(answer func(bool, strin
 		h.queue.Enqueue(c.Handle, func() {
 			h.answer = func(ok bool, choice string) { ch <- result{ok, choice} }
 			h.app, h.appIcon = h.d.Describe(c.AppID)
+			h.escape = func() { h.finish(false, "") }
 			h.show(build(h.finish))
 		}, func() { ch <- result{} })
 	})
@@ -613,10 +625,10 @@ func (h *Dialogs) show(tree widget.Widget) {
 		root.AttachStylesheet(h.d.Sheet)
 	}
 	root.Append(h.rev, true)
-	focus := h.focus
-	h.focus = nil
+	focus, grab := h.focus, h.grab
+	h.focus, h.grab = nil, false
 	keyboard := app.KeyboardOnDemand
-	if focus != nil {
+	if focus != nil || grab {
 		keyboard = app.KeyboardExclusive
 	}
 	win, err := h.d.Open(app.LayerConfig{
@@ -627,7 +639,7 @@ func (h *Dialogs) show(tree widget.Widget) {
 		Root:          root,
 		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 			if keycode == escapeKeycode {
-				h.finish(false, "")
+				h.escape()
 			}
 		},
 	})

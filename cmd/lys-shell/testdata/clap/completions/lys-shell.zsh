@@ -1522,6 +1522,12 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(authenticate)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
 (wallpaper)
 _arguments "${_arguments_options[@]}" : \
 '--uri=[\`file\://\` image URI to preview (defaults to a placeholder)]:URI:_default' \
@@ -1574,6 +1580,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (dynamic-launcher)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(authenticate)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1658,6 +1668,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (dynamic-launcher)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(authenticate)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -2315,6 +2329,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (dynamic-launcher)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(authenticate)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -3016,6 +3034,7 @@ _lys-shell__help__portal__show_commands() {
 'account:Account info sharing consent (\`org.freedesktop.impl.portal.Account\`)' \
 'app-chooser:Application chooser (\`org.freedesktop.impl.portal.AppChooser\`)' \
 'dynamic-launcher:Dynamic launcher install confirmation (\`org.freedesktop.impl.portal.DynamicLauncher\`)' \
+'authenticate:Administrator authentication dialog (\`dev.stubbe.lys.PortalDialogs1\` \`Authenticate\`, lys-polkit'\''s)' \
 'wallpaper:Wallpaper preview confirmation (\`org.freedesktop.impl.portal.Wallpaper\` \`show-preview\`)' \
     )
     _describe -t commands 'lys-shell help portal show commands' commands "$@"
@@ -3034,6 +3053,11 @@ _lys-shell__help__portal__show__account_commands() {
 _lys-shell__help__portal__show__app-chooser_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help portal show app-chooser commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__portal__show__authenticate_commands] )) ||
+_lys-shell__help__portal__show__authenticate_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help portal show authenticate commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__portal__show__color_commands] )) ||
 _lys-shell__help__portal__show__color_commands() {
@@ -3873,6 +3897,7 @@ _lys-shell__portal__help__show_commands() {
 'account:Account info sharing consent (\`org.freedesktop.impl.portal.Account\`)' \
 'app-chooser:Application chooser (\`org.freedesktop.impl.portal.AppChooser\`)' \
 'dynamic-launcher:Dynamic launcher install confirmation (\`org.freedesktop.impl.portal.DynamicLauncher\`)' \
+'authenticate:Administrator authentication dialog (\`dev.stubbe.lys.PortalDialogs1\` \`Authenticate\`, lys-polkit'\''s)' \
 'wallpaper:Wallpaper preview confirmation (\`org.freedesktop.impl.portal.Wallpaper\` \`show-preview\`)' \
     )
     _describe -t commands 'lys-shell portal help show commands' commands "$@"
@@ -3891,6 +3916,11 @@ _lys-shell__portal__help__show__account_commands() {
 _lys-shell__portal__help__show__app-chooser_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell portal help show app-chooser commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__help__show__authenticate_commands] )) ||
+_lys-shell__portal__help__show__authenticate_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal help show authenticate commands' commands "$@"
 }
 (( $+functions[_lys-shell__portal__help__show__color_commands] )) ||
 _lys-shell__portal__help__show__color_commands() {
@@ -3949,6 +3979,7 @@ _lys-shell__portal__show_commands() {
 'account:Account info sharing consent (\`org.freedesktop.impl.portal.Account\`)' \
 'app-chooser:Application chooser (\`org.freedesktop.impl.portal.AppChooser\`)' \
 'dynamic-launcher:Dynamic launcher install confirmation (\`org.freedesktop.impl.portal.DynamicLauncher\`)' \
+'authenticate:Administrator authentication dialog (\`dev.stubbe.lys.PortalDialogs1\` \`Authenticate\`, lys-polkit'\''s)' \
 'wallpaper:Wallpaper preview confirmation (\`org.freedesktop.impl.portal.Wallpaper\` \`show-preview\`)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -3968,6 +3999,11 @@ _lys-shell__portal__show__account_commands() {
 _lys-shell__portal__show__app-chooser_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell portal show app-chooser commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__show__authenticate_commands] )) ||
+_lys-shell__portal__show__authenticate_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal show authenticate commands' commands "$@"
 }
 (( $+functions[_lys-shell__portal__show__color_commands] )) ||
 _lys-shell__portal__show__color_commands() {
@@ -3996,6 +4032,7 @@ _lys-shell__portal__show__help_commands() {
 'account:Account info sharing consent (\`org.freedesktop.impl.portal.Account\`)' \
 'app-chooser:Application chooser (\`org.freedesktop.impl.portal.AppChooser\`)' \
 'dynamic-launcher:Dynamic launcher install confirmation (\`org.freedesktop.impl.portal.DynamicLauncher\`)' \
+'authenticate:Administrator authentication dialog (\`dev.stubbe.lys.PortalDialogs1\` \`Authenticate\`, lys-polkit'\''s)' \
 'wallpaper:Wallpaper preview confirmation (\`org.freedesktop.impl.portal.Wallpaper\` \`show-preview\`)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -4015,6 +4052,11 @@ _lys-shell__portal__show__help__account_commands() {
 _lys-shell__portal__show__help__app-chooser_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell portal show help app-chooser commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__show__help__authenticate_commands] )) ||
+_lys-shell__portal__show__help__authenticate_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal show help authenticate commands' commands "$@"
 }
 (( $+functions[_lys-shell__portal__show__help__color_commands] )) ||
 _lys-shell__portal__show__help__color_commands() {
