@@ -6,13 +6,12 @@ title: Getting started on Fedora
 
 ## Install dependencies
 
-Go, plus the libraries lys-shell loads at runtime (PAM for the lock screen,
-Vulkan for GPU rendering, zero-copy screen sharing and the screen recorder, and
+Go, plus the libraries lys-shell loads at runtime (Vulkan for GPU rendering, zero-copy screen sharing and the screen recorder, and
 VA-API for the recorder on GPUs whose Vulkan driver encodes no video). Screen sharing speaks to the PipeWire daemon directly and needs
 PipeWire 1.0 or newer:
 
 ```sh
-sudo dnf install golang git just pam vulkan-loader libva intel-media-driver \
+sudo dnf install golang git just vulkan-loader libva intel-media-driver \
   mesa-va-drivers
 ```
 
@@ -34,7 +33,7 @@ toolchain on its own.
 git clone https://github.com/stubbedev/lys-shell
 cd lys-shell
 just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
-sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-login dist/lys-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-lock -t /usr/local/bin
 ```
 
 ## Icon assets

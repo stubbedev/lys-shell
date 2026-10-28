@@ -15,8 +15,7 @@ Package: lys-shell
 Architecture: amd64 arm64
 Depends:
  ${misc:Depends},
- hicolor-icon-theme,
- libpam0g
+ hicolor-icon-theme
 Recommends:
  libvulkan1,
  mesa-vulkan-drivers,
@@ -34,9 +33,9 @@ Suggests:
  wireplumber
 Description: Wayland desktop shell
  lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns,
- launcher, notifications, OSD, lock screen, greeter and an xdg-desktop-portal
+ launcher, notifications, OSD, and an xdg-desktop-portal
  backend, configured in YAML or through the lys-settings GUI.
  .
- The binaries are Go with no cgo; they load PAM at runtime, and Vulkan when
+ The binaries are Go with no cgo; they load Vulkan at runtime when
  it is installed (the screen recorder needs it, with a GPU that
  encodes H.264).

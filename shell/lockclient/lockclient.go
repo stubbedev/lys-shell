@@ -46,7 +46,7 @@ const (
 
 // Client starts and follows the lock process.
 type Client struct {
-	// program is lys-login's path.
+	// program is lys-login's name on the PATH, or a path.
 	program string
 	enabled func() bool
 	// onLocked runs when the compositor confirms a lock this client
@@ -63,27 +63,13 @@ type Client struct {
 	respawns []time.Time
 }
 
-// New is a client for the lys-login next to the running executable, or on
-// PATH when there is none there.
+// New is a client for the lys-login on the PATH, which lys-login's own
+// package installs.
 func New(enabled func() bool, onLocked func(), locked func() (bool, error)) *Client {
 	return &Client{
-		program: program(), enabled: enabled, onLocked: onLocked, locked: locked,
+		program: "lys-login", enabled: enabled, onLocked: onLocked, locked: locked,
 		start: startScoped, now: time.Now,
 	}
-}
-
-// program is lys-login beside the running executable (a package installs
-// them together), else "lys-login" for the PATH lookup.
-func program() string {
-	self, err := os.Executable()
-	if err != nil {
-		return "lys-login"
-	}
-	sibling := filepath.Join(filepath.Dir(self), "lys-login")
-	if _, err := os.Stat(sibling); err != nil {
-		return "lys-login"
-	}
-	return sibling
 }
 
 // startScoped starts cmd in a scope of its own, so restarting the shell's

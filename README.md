@@ -5,7 +5,7 @@
 <h1 align="center">lys-shell</h1>
 
 <p align="center">
-  A complete Wayland desktop shell in pure Go: bar, notifications, OSD, launcher, lock screen, greeter, wallpaper, and a desktop portal, as static Go binaries.
+  A complete Wayland desktop shell in pure Go: bar, notifications, OSD, launcher, wallpaper, and a desktop portal, as static Go binaries.
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@ lys-shell runs on any compositor with `wlr-layer-shell`; it does not need lys-wm
 
 **Bar.** Per-monitor layouts with groups and CSS classes, and the modules you would expect: clock and world clock, battery, power profiles, brightness, volume and microphone, network and VPN, bluetooth, media, cava visualizer, CPU, RAM, storage, network traffic, weather, mail, notifications, system tray, screen recorder, screenshot, idle inhibit, night light, keyboard layout and keybind mode, window title, a dashboard, and workspaces for lys-wm, Hyprland, Niri, Mango and Sway.
 
-**Surfaces.** Notifications with popups and history, an OSD and custom toasts, a power menu, a rofi-compatible launcher (`lys-shell launcher`, also usable as `rofi` and dmenu), a native `ext-session-lock` lock screen, a greetd greeter, region and window screenshots, a colour picker, and a wallpaper engine with transitions and cycling.
+**Surfaces.** Notifications with popups and history, an OSD and custom toasts, a power menu, a rofi-compatible launcher (`lys-shell launcher`, also usable as `rofi` and dmenu), locking through [lys-login](https://github.com/stubbedev/lys-login)'s `ext-session-lock` lock screen, region and window screenshots, a colour picker, and a wallpaper engine with transitions and cycling.
 
 **Desktop portal.** An `xdg-desktop-portal` backend covering FileChooser, ScreenCast and Screenshot with its own share picker, Print, AppChooser, Settings, Notification, Wallpaper, GlobalShortcuts, Clipboard, Inhibit and more, so GTK, Qt, Electron and Flatpak apps get native dialogs.
 
@@ -72,22 +72,23 @@ The flake ships the package, a NixOS module and a home-manager module:
     enable = true;
     systemd.enable = true; # run the shell as a user service in the graphical session
     portal.enable = true; # register the desktop portal backend
-    lock.enable = true; # PAM service for the lock screen
   };
 }
 ```
+
+The lock screen is [lys-login](https://github.com/stubbedev/lys-login), with a flake and NixOS module of its own (`programs.lys-login.lock.enable`); lys-shell runs `lys-login lock` from the PATH.
 
 The [NixOS guide](docs/guide/getting-started-nixos.md) covers the home-manager module and declarative settings.
 
 ### Other distributions
 
-The binaries are static Go; at runtime they load PAM, and Vulkan when it is installed (the screen recorder needs it, with a GPU that encodes H.264 through Vulkan Video or, failing that, libva and its VA driver). Screen sharing speaks to the PipeWire daemon (1.0 or newer) directly and loads no PipeWire library. With Go and [just](https://github.com/casey/just) installed:
+The binaries are static Go; at runtime they load Vulkan when it is installed (the screen recorder needs it, with a GPU that encodes H.264 through Vulkan Video or, failing that, libva and its VA driver). Screen sharing speaks to the PipeWire daemon (1.0 or newer) directly and loads no PipeWire library. With Go and [just](https://github.com/casey/just) installed:
 
 ```sh
 git clone https://github.com/stubbedev/lys-shell
 cd lys-shell
 just build
-sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-login dist/lys-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-lock -t /usr/local/bin
 lys-shell icons setup
 lys-shell panel start
 ```
@@ -118,7 +119,6 @@ modules:
 - [Bars and layouts](docs/guide/bars-and-layouts.md): per-monitor layouts, groups, classes
 - [Themes](docs/guide/themes.md) and [custom styles](docs/guide/custom-styles.md): palettes, theme providers, your own CSS
 - [Custom modules](docs/guide/custom-modules.md) and [custom icons](docs/guide/custom-icons.md)
-- [Greeter](docs/guide/greeter.md): the greetd login screen
 - [CLI](docs/guide/cli.md): every subcommand
 - [Config reference](docs/config/): every field
 

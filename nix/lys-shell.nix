@@ -3,12 +3,10 @@
   buildGo127Module,
   makeWrapper,
   libva,
-  pam,
   vulkan-loader,
 }:
 let
-  # The libraries the binaries dlopen through purego: libpam (lock
-  # screen), libvulkan (lys-lib's GPU renderer, which falls back to the
+  # The libraries the binaries dlopen through purego: libvulkan (lys-lib's GPU renderer, which falls back to the
   # CPU without it, the portal's zero-copy dmabufs, which fall back to
   # shared memory, and the recorder's capture and H.264 encoding) and
   # libva with libva-drm (the recorder's encoder on a GPU whose Vulkan
@@ -17,7 +15,6 @@ let
   # PipeWire's protocol itself and loads no libpipewire.
   libs = [
     libva
-    pam
     vulkan-loader
   ];
 
@@ -39,7 +36,6 @@ let
       ../cava
       ../cmd
       ../config
-      ../login
       ../i18n
       ../imagedecode
       ../internal
@@ -64,7 +60,6 @@ let
   # libraries.
   wrapped = [
     "lys-shell"
-    "lys-login"
     "lys-lock"
     "lys-settings"
   ];
@@ -80,7 +75,6 @@ buildGo127Module {
 
   subPackages = [
     "cmd/lys-shell"
-    "cmd/lys-login"
     "cmd/lys-lock"
     "cmd/lys-settings"
   ];
@@ -111,9 +105,6 @@ buildGo127Module {
     install -Dm0644 resources/dev.stubbe.lys.settings.desktop -t $out/share/applications
     install -Dm0644 resources/lys-settings.svg \
       $out/share/icons/hicolor/scalable/apps/lys-settings.svg
-    # Polkit action for `pkexec lys-login apply-config`.
-    install -Dm0644 resources/dev.stubbe.lys.greeter.policy \
-      -t $out/share/polkit-1/actions
     install -Dm0644 resources/icons/hicolor/scalable/actions/*.svg \
       -t $out/share/icons/hicolor/scalable/actions
     # Reference copy of the systemd user unit; the modules define their own.

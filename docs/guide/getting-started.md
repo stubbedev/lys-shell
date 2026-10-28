@@ -35,7 +35,6 @@ lys-shell loads these libraries, so install them from your distribution:
 
 | Library   | Used by                                                    |
 | --------- | ---------------------------------------------------------- |
-| PAM       | the lock screen and greeter                                |
 | Vulkan    | GPU rendering, zero-copy screen sharing, the screen recorder |
 | VA-API    | the screen recorder on GPUs whose Vulkan driver encodes no video |
 

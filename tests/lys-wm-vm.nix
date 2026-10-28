@@ -3,6 +3,7 @@
   lib,
   self,
   lys-wm,
+  lys-login,
 }:
 
 let
@@ -64,12 +65,16 @@ pkgs.testers.nixosTest {
       imports = [
         self.nixosModules.default
         lys-wm.nixosModules.default
+        lys-login.nixosModules.default
       ];
 
       programs.lys-shell = {
         enable = true;
-        lock.enable = true;
         systemd.enable = true;
+      };
+      programs.lys-login = {
+        enable = true;
+        lock.enable = true;
       };
       programs.lys-wm.enable = true;
 

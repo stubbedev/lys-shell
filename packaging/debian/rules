@@ -15,7 +15,7 @@ override_dh_strip:
 
 override_dh_auto_install:
 	install -d debian/lys-shell/usr/bin
-	install -m 0755 lys-shell lys-login lys-lock lys-settings debian/lys-shell/usr/bin/
+	install -m 0755 lys-shell lys-lock lys-settings debian/lys-shell/usr/bin/
 
 	install -d debian/lys-shell/usr/lib/systemd/user
 	install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service debian/lys-shell/usr/lib/systemd/user/
@@ -26,8 +26,6 @@ override_dh_auto_install:
 	install -d debian/lys-shell/usr/share/dbus-1/services
 	install -m 0644 org.freedesktop.impl.portal.desktop.lys.service debian/lys-shell/usr/share/dbus-1/services/
 
-	install -d debian/lys-shell/usr/share/polkit-1/actions
-	install -m 0644 dev.stubbe.lys.greeter.policy debian/lys-shell/usr/share/polkit-1/actions/
 
 	install -d debian/lys-shell/usr/share/applications
 	install -m 0644 dev.stubbe.lys.settings.desktop debian/lys-shell/usr/share/applications/dev.stubbe.lys.settings.desktop

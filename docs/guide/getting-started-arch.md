@@ -33,7 +33,7 @@ toolchain on its own.
 git clone https://github.com/stubbedev/lys-shell
 cd lys-shell
 just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
-sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-login dist/lys-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-lock -t /usr/local/bin
 ```
 
 ## Icon assets

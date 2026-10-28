@@ -3,7 +3,6 @@ module github.com/stubbedev/lys-shell
 go 1.27.3
 
 require (
-	github.com/ebitengine/purego v0.11.2
 	github.com/rivo/uniseg v0.4.7
 	github.com/stubbedev/lys-lib v0.1.1-0.20261028202131-e10e9a07cba0
 	github.com/stubbedev/lys-secrets v0.0.0-20261028203124-5e7d4f0af5f5
@@ -21,6 +20,7 @@ require (
 
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
+	github.com/ebitengine/purego v0.11.2 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jfreymuth/pulse v0.1.3 // indirect

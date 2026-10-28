@@ -20,7 +20,7 @@ STAGING="lys-shell-${VERSION}-${ARCH}-linux"
 rm -rf "${STAGING}"
 mkdir -p "${STAGING}/icons" "${STAGING}/completions"
 
-for bin in lys-shell lys-login lys-lock lys-settings; do
+for bin in lys-shell lys-lock lys-settings; do
 	cp "${BIN_DIR}/${bin}" "${STAGING}/"
 done
 cp "${BIN_DIR}/completions/completions.bash" "${BIN_DIR}/completions/_lys-shell" "${BIN_DIR}/completions/lys-shell.fish" "${STAGING}/completions/"
@@ -31,7 +31,6 @@ cp resources/lys-shell.service \
 	resources/dev.stubbe.lys.settings.desktop \
 	resources/dev.stubbe.lys.vpn-sso-callback.desktop \
 	resources/lys-settings.svg \
-	resources/dev.stubbe.lys.greeter.policy \
 	resources/lys-shell.portal \
 	resources/org.freedesktop.impl.portal.desktop.lys.service \
 	resources/xdg-desktop-portal-lys-shell.service \

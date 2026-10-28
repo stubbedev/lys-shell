@@ -31,6 +31,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
     };
+    # The lock screen the VM checks lock the session with; its own
+    # lys-shell input is this flake.
+    lys-login = {
+      url = "github:stubbedev/lys-login";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.lys-shell.follows = "";
+      inputs.lys-wm.follows = "lys-wm";
+    };
     # The compositor the lys-wm VM check runs the shell on.
     lys-wm = {
       url = "github:stubbedev/lys-wm";

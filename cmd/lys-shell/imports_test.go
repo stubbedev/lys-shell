@@ -8,10 +8,10 @@ import (
 )
 
 // lys-shell links no login screen: locking runs in `lys-login lock`, and
-// the shell holds only the client that starts it. The greeter, the lock
-// screen and the screen they share must never come back into its import
-// graph, nor lys-secrets' keys (its internals, or the test server that
-// serves them).
+// the shell holds only the client that starts it. lys-login must never
+// come into its import graph (lys-login imports lys-shell, so that would
+// be a cycle), nor lys-secrets' keys (its internals, or the test server
+// that serves them).
 func TestShellLinksNoLoginScreen(t *testing.T) {
 	gobin, err := exec.LookPath("go")
 	if err != nil {
@@ -23,10 +23,9 @@ func TestShellLinksNoLoginScreen(t *testing.T) {
 	}
 	deps := strings.Fields(string(out))
 	const module = "github.com/stubbedev/lys-shell/"
-	forbidden := []string{module + "login/screen", module + "login/greeter", module + "login/lock", "github.com/stubbedev/lys-secrets/secretstest"}
-	const secretsInternal = "github.com/stubbedev/lys-secrets/internal/"
+	forbidden := []string{"github.com/stubbedev/lys-login/", "github.com/stubbedev/lys-secrets/internal/", "github.com/stubbedev/lys-secrets/secretstest"}
 	for _, dep := range deps {
-		if slices.Contains(forbidden, dep) || strings.HasPrefix(dep, secretsInternal) {
+		if slices.ContainsFunc(forbidden, func(prefix string) bool { return strings.HasPrefix(dep, prefix) }) {
 			t.Errorf("lys-shell imports %s", dep)
 		}
 	}

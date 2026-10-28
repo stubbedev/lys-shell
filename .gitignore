@@ -3,7 +3,6 @@
 
 # Temporary sandboxes, and binaries `go build ./cmd/...` leaves at the root
 /lys-shell
-/lys-login
 /lys-lock
 /lys-settings
 /sandbox/

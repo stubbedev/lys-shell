@@ -26,9 +26,9 @@
     - changed-files:
           - any-glob-to-any-file: "portal/**"
 
-"area:greeter":
+"area:lock":
     - changed-files:
-          - any-glob-to-any-file: "login/**"
+          - any-glob-to-any-file: "shell/lockclient/**"
 
 "area:cli":
     - changed-files:

@@ -12,19 +12,13 @@
           # tests/hyprland-vm.nix.
           lys-shell-hyprland-vm = pkgs.callPackage ../tests/hyprland-vm.nix {
             inherit self;
-            inherit (inputs) lys-secrets;
+            inherit (inputs) lys-secrets lys-login;
           };
           # The shell on lys-wm in a NixOS VM (needs KVM); see
           # tests/lys-wm-vm.nix.
           lys-shell-lys-wm-vm = pkgs.callPackage ../tests/lys-wm-vm.nix {
             inherit self;
-            inherit (inputs) lys-wm;
-          };
-          # lys-login as the display manager in a NixOS VM (needs KVM); see
-          # tests/login-vm.nix.
-          lys-shell-login-vm = pkgs.callPackage ../tests/login-vm.nix {
-            inherit self;
-            inherit (inputs) lys-wm;
+            inherit (inputs) lys-wm lys-login;
           };
         }
         // {
