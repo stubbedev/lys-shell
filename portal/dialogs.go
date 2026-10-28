@@ -12,7 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/useraccount"
+	"github.com/stubbedev/lys-shell/useraccount"
 )
 
 // The consent dialogs' header icons: glyphs the shell installs

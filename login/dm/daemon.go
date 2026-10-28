@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/internal/shlex"
 	"github.com/stubbedev/lys-shell/service/auth"
+	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // Options configure the daemon.

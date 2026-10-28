@@ -15,8 +15,8 @@ import (
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/imagedecode"
+	"github.com/stubbedev/lys-shell/offheap"
 )
 
 // HexFill converts a config color to a premultiplied fill.

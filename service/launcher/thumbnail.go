@@ -14,7 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/mime"
-	"github.com/stubbedev/lys-shell/internal/shlex"
+	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // Thumbnails for row icons (rofi -preview-cmd and thumbnail://),

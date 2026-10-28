@@ -10,8 +10,8 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/spawn"
-	"github.com/stubbedev/lys-shell/internal/useraccount"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/useraccount"
 )
 
 // avatarPx is the user avatar's logical box in the session row.

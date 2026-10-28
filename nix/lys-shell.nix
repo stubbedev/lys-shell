@@ -41,14 +41,21 @@ let
       ../config
       ../login
       ../i18n
+      ../imagedecode
       ../internal
+      ../logging
+      ../offheap
+      ../outputsize
       ../portal
       ../resources
       ../service
       ../shell
+      ../shlex
       ../strftime
       ../styling
+      ../testhome
       ../third_party
+      ../useraccount
     ];
   };
 

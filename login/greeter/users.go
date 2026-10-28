@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/internal/useraccount"
+	"github.com/stubbedev/lys-shell/useraccount"
 )
 
 // uidMin and uidMax bound the regular-user range offered in the user

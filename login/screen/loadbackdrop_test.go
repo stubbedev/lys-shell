@@ -8,7 +8,7 @@ import (
 
 	"github.com/stubbedev/memory-go"
 
-	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/imagedecode"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 

@@ -15,13 +15,13 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/logging"
-	"github.com/stubbedev/lys-shell/internal/outputsize"
-	"github.com/stubbedev/lys-shell/login/lockclient"
+	"github.com/stubbedev/lys-shell/imagedecode"
+	"github.com/stubbedev/lys-shell/logging"
+	"github.com/stubbedev/lys-shell/outputsize"
 	"github.com/stubbedev/lys-shell/service/auth"
 	"github.com/stubbedev/lys-shell/service/logind"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/lockclient"
 )
 
 // Errors Run ends with, which `lys-login lock` maps to lockclient's exit

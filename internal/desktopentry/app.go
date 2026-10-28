@@ -14,8 +14,8 @@ import (
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/shlex"
 	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // App is one application desktop entry, the GDesktopAppInfo a gio

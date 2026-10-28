@@ -29,7 +29,7 @@ import (
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/offheap"
 )
 
 // MiB is a mebibyte, the unit the history's byte budget is set in.

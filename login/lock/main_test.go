@@ -3,7 +3,7 @@ package lock
 import (
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/testhome"
+	"github.com/stubbedev/lys-shell/testhome"
 )
 
 // TestMain runs the package against a scratch home: building a theme

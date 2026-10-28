@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/internal/shlex"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // maxEntries caps the collected entries: a recursive walk of a home

@@ -19,7 +19,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/stubbedev/lys-shell/internal/imagedecode"
+	"github.com/stubbedev/lys-shell/imagedecode"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 

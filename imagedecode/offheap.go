@@ -10,7 +10,7 @@ import (
 
 	"github.com/stubbedev/memory-go"
 
-	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/offheap"
 	"github.com/stubbedev/lys-shell/third_party/jpeg"
 )
 

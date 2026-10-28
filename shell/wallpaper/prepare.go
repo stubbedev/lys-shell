@@ -11,7 +11,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
 
-	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/offheap"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 

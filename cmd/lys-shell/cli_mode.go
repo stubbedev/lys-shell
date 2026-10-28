@@ -6,7 +6,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/internal/logging"
+	"github.com/stubbedev/lys-shell/logging"
 )
 
 // selfManaged are the commands main.rs runs outside the shared CLI

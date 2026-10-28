@@ -10,7 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
 
-	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/offheap"
 )
 
 // Clipboard is the session's clipboard history, kept current: it

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/pango"
-	"github.com/stubbedev/lys-shell/internal/shlex"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // DrunField is a desktop-entry field fed to the matcher

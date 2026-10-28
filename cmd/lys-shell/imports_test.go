@@ -30,8 +30,8 @@ func TestShellLinksNoLoginScreen(t *testing.T) {
 			t.Errorf("lys-shell imports %s", dep)
 		}
 	}
-	found := slices.Contains(deps, module+"login/lockclient")
+	found := slices.Contains(deps, module+"shell/lockclient")
 	if !found {
-		t.Error("lys-shell does not import login/lockclient: the check above lists nothing")
+		t.Error("lys-shell does not import shell/lockclient: the check above lists nothing")
 	}
 }

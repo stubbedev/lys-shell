@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/testhome"
+	"github.com/stubbedev/lys-shell/testhome"
 )
 
 // TestMain points every per-user location at a scratch home so no

@@ -9,9 +9,9 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
 
+	"github.com/stubbedev/lys-shell/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/handoff"
-	"github.com/stubbedev/lys-shell/internal/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/offheap"
+	"github.com/stubbedev/lys-shell/offheap"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 

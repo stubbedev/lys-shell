@@ -13,7 +13,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/useraccount"
+	"github.com/stubbedev/lys-shell/useraccount"
 )
 
 // sessionCardTree walks the section into its session Item, its avatar

@@ -14,8 +14,8 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/logging"
 	"github.com/stubbedev/lys-shell/internal/portal"
+	"github.com/stubbedev/lys-shell/logging"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 )
 
