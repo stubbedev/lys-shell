@@ -67,7 +67,7 @@ func run(unlockFD int) error {
 		}
 		defer clear(password)
 	}
-	data, ok := xdg.DataHome()
+	data, ok := xdg.OS.DataHome()
 	if !ok {
 		return errors.New("neither XDG_DATA_HOME nor HOME is set")
 	}

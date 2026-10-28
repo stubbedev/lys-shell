@@ -215,7 +215,7 @@ var thumbSizes = []struct {
 // by the MD5 of its URI, and only while its Thumb::MTime matches the
 // file's modification time (a stale one is no thumbnail).
 func cachedThumbnail(path string, info os.FileInfo, px int) (image.Image, error) {
-	cache, ok := xdg.CacheHome()
+	cache, ok := xdg.OS.CacheHome()
 	if !ok {
 		return nil, errNoThumb
 	}

@@ -441,12 +441,14 @@ func printerDetail(location, status string) string {
 const fileQueue = "Print to File"
 
 // SuggestedOutput is where Print to File proposes to write, GTK's
-// default: output.<format> in the documents directory, else the home
-// directory.
-func SuggestedOutput(home, format string) string {
+// default: output.<format> in env's documents directory, else the home
+// directory. The error reports a user-dirs.dirs that cannot say where
+// the documents directory is; the path is then the one in home.
+func SuggestedOutput(env xdg.Env, home, format string) (string, error) {
 	name := "output." + format
-	if dir, ok := xdg.UserDir("DOCUMENTS"); ok {
-		return filepath.Join(dir, name)
+	dir, ok, err := env.UserDir("DOCUMENTS")
+	if err != nil || !ok {
+		return filepath.Join(home, name), err
 	}
-	return filepath.Join(home, name)
+	return filepath.Join(dir, name), nil
 }

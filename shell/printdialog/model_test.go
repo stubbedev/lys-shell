@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/xdg"
+
 	"github.com/stubbedev/lys-shell/internal/ipp"
 )
 
@@ -230,16 +232,25 @@ func TestPrinterStatusAndDetail(t *testing.T) {
 
 func TestSuggestedOutput(t *testing.T) {
 	home, cfg := t.TempDir(), t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", cfg)
-	if got := SuggestedOutput(home, "pdf"); got != filepath.Join(home, "output.pdf") {
-		t.Errorf("no documents dir = %s", got)
+	env := xdg.Env(func(name string) string {
+		return map[string]string{"HOME": home, "XDG_CONFIG_HOME": cfg}[name]
+	})
+	userDirs := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(cfg, "user-dirs.dirs"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := os.WriteFile(filepath.Join(cfg, "user-dirs.dirs"), []byte("XDG_DOCUMENTS_DIR=\"$HOME/Docs\"\n"), 0o600); err != nil {
-		t.Fatal(err)
+	if got, err := SuggestedOutput(env, home, "pdf"); err != nil || got != filepath.Join(home, "output.pdf") {
+		t.Errorf("no documents dir = %s, %v", got, err)
 	}
-	if got := SuggestedOutput(home, "ps"); got != filepath.Join(home, "Docs", "output.ps") {
-		t.Errorf("documents dir = %s", got)
+	userDirs("XDG_DOCUMENTS_DIR=\"$HOME/Docs\"\n")
+	if got, err := SuggestedOutput(env, home, "ps"); err != nil || got != filepath.Join(home, "Docs", "output.ps") {
+		t.Errorf("documents dir = %s, %v", got, err)
+	}
+	userDirs("XDG_DOCUMENTS_DIR=Docs\n")
+	if got, err := SuggestedOutput(env, home, "pdf"); err == nil || got != filepath.Join(home, "output.pdf") {
+		t.Errorf("an invalid documents dir = %s, %v; want the home path and an error", got, err)
 	}
 	if got := outputFormat([]string{"ps", "svg"}); got != "ps" {
 		t.Errorf("without pdf the format = %s", got)

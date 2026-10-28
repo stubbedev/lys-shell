@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
@@ -435,7 +436,10 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 	if acceptLabel == "" {
 		acceptLabel = "Print"
 	}
-	output := SuggestedOutput(h.d.Home, outputFormat(r.OutputFormats))
+	output, err := SuggestedOutput(xdg.OS, h.d.Home, outputFormat(r.OutputFormats))
+	if err != nil {
+		log.Printf("print dialog: %v", err)
+	}
 	outputLabel := h.label(output, "print-output-path")
 	replaceNote := widgets.DialogText(h.d.Font, "", "print-output-replace", css.Warning)
 	replaceNote.SetVisible(false)

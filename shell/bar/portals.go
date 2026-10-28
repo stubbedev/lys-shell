@@ -25,6 +25,16 @@ import (
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
 
+// userPlaces are the file chooser's favorite places in home, logging a
+// user directory or bookmarks file that could not be read.
+func userPlaces(home string) []filechooser.Place {
+	places, err := filechooser.UserPlaces(xdg.OS, home)
+	if err != nil {
+		log.Printf("file chooser: places: %v", err)
+	}
+	return places
+}
+
 // servePortalHosts hosts the shell's halves of the portal backend on
 // one session bus connection: dev.stubbe.lys.PortalDialogs1 (access,
 // account, app chooser, dynamic launcher and the wallpaper preview;
@@ -42,7 +52,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	exported := 0
 	home, _ := os.UserHomeDir()
 	viewFile := ""
-	if dir, ok := xdg.StateDir(version.Name); ok {
+	if dir, ok := xdg.OS.StateDir(version.Name); ok {
 		viewFile = filepath.Join(dir, "file-chooser-view")
 	}
 	chooser := filechooser.New(filechooser.Deps{
@@ -53,7 +63,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 		Sheet:          sheet,
 		MIME:           mime.System(),
 		Home:           home,
-		Places:         func() []filechooser.Place { return filechooser.UserPlaces(home) },
+		Places:         func() []filechooser.Place { return userPlaces(home) },
 		Locations:      filechooser.SystemLocations(home),
 		WatchLocations: filechooser.WatchSystemLocations,
 		ViewFile:       viewFile,

@@ -62,7 +62,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
-	if dir, ok := xdg.DataDir(version.Name); ok {
+	if dir, ok := xdg.OS.DataDir(version.Name); ok {
 		b.dataDir = dir
 	}
 	b.windows = &windowList{conn: conn, watch: toplevels.Watch}

@@ -64,7 +64,7 @@ type sunsetEnv struct {
 
 // liveSunsetEnv is the real environment.
 func liveSunsetEnv() sunsetEnv {
-	dir, _ := xdg.StateDir(version.Name)
+	dir, _ := xdg.OS.StateDir(version.Name)
 	return sunsetEnv{
 		open: func(changed func()) (colourFilter, error) {
 			f, err := nightlight.Open(changed)

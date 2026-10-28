@@ -91,7 +91,7 @@ func newBitwardenHost(life context.Context, application *app.Application, curren
 		return clip.WriteExpiring(content, ttl)
 	}
 	h.vault = sync.OnceValues(func() (vault, error) {
-		dir, ok := xdg.StateDir(version.Name)
+		dir, ok := xdg.OS.StateDir(version.Name)
 		if !ok {
 			return nil, errors.New("bitwarden: no state directory: neither XDG_STATE_HOME nor HOME is set")
 		}

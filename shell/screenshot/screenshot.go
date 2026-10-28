@@ -372,7 +372,7 @@ func saveNew(img image.Image, path string) (string, error) {
 // savePrivate saves an app's screenshot to a new private file under
 // $XDG_CACHE_HOME/lys-shell/portal-screenshots.
 func (h *Host) savePrivate(img image.Image) (string, error) {
-	cache, ok := xdg.CacheDir(version.Name)
+	cache, ok := xdg.OS.CacheDir(version.Name)
 	if !ok {
 		return "", errors.New("no cache directory for the screenshot (XDG_CACHE_HOME and HOME unset)")
 	}

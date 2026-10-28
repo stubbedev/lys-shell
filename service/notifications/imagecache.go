@@ -20,7 +20,7 @@ import (
 // Only 8-bit RGB and RGBA are supported; anything else, or a buffer too
 // short for its geometry, caches nothing.
 func cacheImage(img imageData) (string, bool) {
-	dir, ok := xdg.CacheDir(version.Name)
+	dir, ok := xdg.OS.CacheDir(version.Name)
 	if !ok {
 		return "", false
 	}

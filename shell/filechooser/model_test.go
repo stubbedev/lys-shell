@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/xdg"
+
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/mime"
 )
@@ -391,21 +393,75 @@ func TestListDirReturnsEverythingButHonorsFolderMode(t *testing.T) {
 	}
 }
 
+func homeEnv(home string) xdg.Env {
+	return func(name string) string {
+		switch name {
+		case "HOME":
+			return home
+		case "XDG_CONFIG_HOME":
+			return filepath.Join(home, ".config")
+		}
+		return ""
+	}
+}
+
+func placeLabels(t *testing.T, home string) []string {
+	t.Helper()
+	places, err := UserPlaces(homeEnv(home), home)
+	if err != nil {
+		t.Fatalf("UserPlaces: %v", err)
+	}
+	var got []string
+	for _, p := range places {
+		got = append(got, p.Label+"="+p.Path)
+	}
+	return got
+}
+
 func TestUserPlacesListsHomeAndExistingDirs(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	touch(t, home, "Documents/", "Pictures/", "Music")
+	// Music is a file, not a folder, so it is not offered.
+	want := []string{"Home=" + home, "Documents=" + filepath.Join(home, "Documents"), "Pictures=" + filepath.Join(home, "Pictures")}
+	if got := placeLabels(t, home); !slices.Equal(got, want) {
+		t.Errorf("places = %v, want %v", got, want)
+	}
+	if places, err := UserPlaces(homeEnv(""), ""); places != nil || err != nil {
+		t.Errorf("no home = %v, %v; want no places", places, err)
+	}
+}
+
+// A user directory user-dirs.dirs cannot say is left out and named in
+// the error, never guessed at its default name; the others stay.
+func TestUserPlacesReportsAnUnreadableUserDir(t *testing.T) {
+	home := t.TempDir()
+	touch(t, home, "Documents/", "Bilder/", ".config/user-dirs.dirs")
+	body := "XDG_DOCUMENTS_DIR=Documents\nXDG_PICTURES_DIR=\"$HOME/Bilder\"\n"
+	if err := os.WriteFile(filepath.Join(home, ".config", "user-dirs.dirs"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	places, err := UserPlaces(homeEnv(home), home)
+	if err == nil || !strings.Contains(err.Error(), "DOCUMENTS") {
+		t.Errorf("err = %v, want one naming DOCUMENTS", err)
+	}
 	var got []string
-	for _, p := range UserPlaces(home) {
+	for _, p := range places {
 		got = append(got, p.Label)
 	}
-	// Music is a file, not a folder, so it is not offered.
-	if !slices.Equal(got, []string{"Home", "Documents", "Pictures"}) {
-		t.Errorf("places = %v", got)
+	if !slices.Equal(got, []string{"Home", "Bilder"}) {
+		t.Errorf("places = %v, want Home and Bilder", got)
 	}
-	if UserPlaces("") != nil {
-		t.Error("no home offered places")
+}
+
+func TestUserPlacesReportsAnUnreadableBookmarksFile(t *testing.T) {
+	home := t.TempDir()
+	touch(t, home, ".config/gtk-3.0/bookmarks/")
+	places, err := UserPlaces(homeEnv(home), home)
+	if err == nil || !strings.Contains(err.Error(), "bookmarks") {
+		t.Errorf("err = %v, want one naming the bookmarks", err)
+	}
+	if len(places) != 1 || places[0].Label != "Home" {
+		t.Errorf("places = %v, want Home only", places)
 	}
 }
 
@@ -583,9 +639,7 @@ func TestFilterExt(t *testing.T) {
 // bookmarks follow, the local folders that exist.
 func TestUserPlacesFollowUserDirsAndBookmarks(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	config := filepath.Join(home, ".config")
-	t.Setenv("XDG_CONFIG_HOME", config)
 	touch(t, home, "Dokumente/", "Bilder/", "Projects/", "Music/")
 	touch(t, config, "user-dirs.dirs", "gtk-3.0/bookmarks")
 	write := func(rel, body string) {
@@ -595,10 +649,7 @@ func TestUserPlacesFollowUserDirsAndBookmarks(t *testing.T) {
 	}
 	write("user-dirs.dirs", "XDG_DOCUMENTS_DIR=\"$HOME/Dokumente\"\nXDG_PICTURES_DIR=\"$HOME/Bilder\"\nXDG_MUSIC_DIR=\"$HOME/\"\n")
 	write("gtk-3.0/bookmarks", fileuri.FromPath(filepath.Join(home, "Projects"))+" Work\nsftp://host/x Remote\n"+fileuri.FromPath(filepath.Join(home, "gone"))+"\n")
-	var got []string
-	for _, p := range UserPlaces(home) {
-		got = append(got, p.Label+"="+p.Path)
-	}
+	got := placeLabels(t, home)
 	want := []string{"Home=" + home, "Dokumente=" + filepath.Join(home, "Dokumente"), "Bilder=" + filepath.Join(home, "Bilder"), "Work=" + filepath.Join(home, "Projects")}
 	if !slices.Equal(got, want) {
 		t.Errorf("places = %v, want %v", got, want)

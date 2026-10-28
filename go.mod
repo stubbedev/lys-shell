@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/ebitengine/purego v0.11.2
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.1.1-0.20261028194726-7780832d5c88
+	github.com/stubbedev/lys-lib v0.1.1-0.20261028202131-e10e9a07cba0
 	github.com/stubbedev/lys-ui v0.0.0-20261028195420-8f40bd86c0b3
 	github.com/stubbedev/memory-go v0.3.0
 	github.com/unxed/xkb-go v0.1.9
@@ -28,8 +28,8 @@ require (
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
-	golang.org/x/net v0.61.0 // indirect
-	modernc.org/libc v1.79.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	modernc.org/libc v1.79.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )

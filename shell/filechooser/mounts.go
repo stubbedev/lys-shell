@@ -90,7 +90,7 @@ func SystemLocations(home string) func() []Place {
 // TrashDirs: the home trash, then the user-visible mounts' trashes.
 func SystemTrashDirs(home string) func() []string {
 	return func() []string {
-		data, _ := xdg.DataHome()
+		data, _ := xdg.OS.DataHome()
 		return TrashDirs(data, VisibleMounts(readMounts(), home, os.Getenv("USER")), os.Getuid())
 	}
 }

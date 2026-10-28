@@ -799,7 +799,7 @@ func globMatch(pattern, name string) bool {
 
 // loadDND restores the sticky flag; anything but "on" reads off.
 func loadDND() bool {
-	dir, ok := xdg.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(version.Name)
 	if !ok {
 		return false
 	}
@@ -812,7 +812,7 @@ func loadDND() bool {
 
 // saveDND mirrors the flag into the state dir; failures are quiet.
 func saveDND(on bool) {
-	dir, ok := xdg.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(version.Name)
 	if !ok {
 		return
 	}

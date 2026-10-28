@@ -236,7 +236,7 @@ func (g *globalShortcuts) session(path dbus.ObjectPath) (*session, error) {
 // shortcutStorePath is $XDG_STATE_HOME/lys-shell/portal-shortcuts.json,
 // "" without a state directory.
 func shortcutStorePath() string {
-	dir, ok := xdg.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(version.Name)
 	if !ok {
 		return ""
 	}

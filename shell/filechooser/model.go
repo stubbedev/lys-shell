@@ -587,16 +587,23 @@ var userPlaceDirs = []struct{ key, name, icon string }{
 	{"VIDEOS", "Videos", "ld-video-symbolic"},
 }
 
-// UserPlaces is Home, the user directories that exist (where
+// UserPlaces is Home, the user directories that exist (where env's
 // user-dirs.dirs puts them, under their localized names), then the GTK
-// bookmarks.
-func UserPlaces(home string) []Place {
+// bookmarks. A user directory user-dirs.dirs cannot say, or a
+// bookmarks file that cannot be read, is left out, and the error names
+// it.
+func UserPlaces(env xdg.Env, home string) ([]Place, error) {
 	if home == "" {
-		return nil
+		return nil, nil
 	}
 	places := []Place{{"Home", home, "ld-house-symbolic"}}
+	var errs []error
 	for _, d := range userPlaceDirs {
-		path, ok := xdg.UserDir(d.key)
+		path, ok, err := env.UserDir(d.key)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
 		if !ok {
 			path = filepath.Join(home, d.name)
 		}
@@ -608,26 +615,39 @@ func UserPlaces(home string) []Place {
 			places = append(places, Place{filepath.Base(path), path, d.icon})
 		}
 	}
-	if f, err := os.Open(gtkBookmarksPath(home)); err == nil {
-		defer func() { _ = f.Close() }()
-		places = append(places, Bookmarks(f)...)
+	bookmarks, err := gtkBookmarks(env)
+	if err != nil {
+		errs = append(errs, err)
 	}
-	return places
+	return append(places, bookmarks...), errors.Join(errs...)
 }
 
-// gtkBookmarksPath is GTK 3's bookmarks file, which GTK 4 reads too.
-func gtkBookmarksPath(home string) string {
-	config := os.Getenv("XDG_CONFIG_HOME")
-	if config == "" {
-		config = filepath.Join(home, ".config")
+// gtkBookmarks are the folders in GTK 3's bookmarks file, which GTK 4
+// reads too; none when there is no config directory or no file.
+func gtkBookmarks(env xdg.Env) ([]Place, error) {
+	dir, ok := env.ConfigDir("gtk-3.0")
+	if !ok {
+		return nil, nil
 	}
-	return filepath.Join(config, "gtk-3.0", "bookmarks")
+	f, err := os.Open(filepath.Join(dir, "bookmarks")) //nolint:gosec // the user's own GTK bookmarks
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("gtk bookmarks: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	places, err := bookmarks(f)
+	if err != nil {
+		return nil, fmt.Errorf("gtk bookmarks: reading %s: %w", f.Name(), err)
+	}
+	return places, nil
 }
 
-// Bookmarks are the local folders a GTK bookmarks file lists, one
+// bookmarks are the local folders a GTK bookmarks file lists, one
 // "<uri> [label]" a line, labelled by their label else their name;
 // remote ones and folders that are gone are left out.
-func Bookmarks(r io.Reader) []Place {
+func bookmarks(r io.Reader) ([]Place, error) {
 	var places []Place
 	sc := bufio.NewScanner(r)
 	for sc.Scan() {
@@ -644,7 +664,7 @@ func Bookmarks(r io.Reader) []Place {
 		}
 		places = append(places, Place{label, path, "ld-folder-symbolic"})
 	}
-	return places
+	return places, sc.Err()
 }
 
 // recentLocation is the Recent place's directory: not a path, the
@@ -657,7 +677,7 @@ const maxRecent = 100
 // RecentFile is the recently-used list GTK writes,
 // $XDG_DATA_HOME/recently-used.xbel; "" without a data home.
 func RecentFile() string {
-	data, ok := xdg.DataHome()
+	data, ok := xdg.OS.DataHome()
 	if !ok {
 		return ""
 	}
