@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/cursorrecord"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/spawn"
 	"github.com/stubbedev/lys-shell/internal/version"
@@ -47,10 +48,15 @@ import (
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// Run loads the user config and shows the bar. A config failure logs
-// and falls back to defaults — the Rust shell's behavior — rather than
-// refusing to start.
+// Run records the session's cursor for the login greeter, loads the
+// user config and shows the bar. A config failure logs and falls back
+// to defaults — the Rust shell's behavior — rather than refusing to
+// start; a failed cursor record only logs, as the greeter then reads
+// the user's dotfiles instead.
 func Run() error {
+	if _, err := cursorrecord.Record(xdg.OS); err != nil {
+		log.Printf("lys-shell: %v", err)
+	}
 	svc, err := config.Open()
 	if err != nil {
 		log.Printf("lys-shell: config: %v", err)
