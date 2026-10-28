@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // SocketPath reads $SWAYSOCK; empty when sway is not running.

@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/intconv"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/gtksettings"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // SettingsIface serves org.freedesktop.appearance from the live styling

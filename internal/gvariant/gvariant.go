@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // ErrMalformed is serialized data that does not fit its type.

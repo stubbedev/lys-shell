@@ -26,9 +26,9 @@ import (
 	"syscall"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/xdg"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/secrets/control"
 	"github.com/stubbedev/lys-shell/secrets/keyring"
 	"github.com/stubbedev/lys-shell/secrets/prompt"

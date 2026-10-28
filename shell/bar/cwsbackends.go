@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/stubbedev/lys-lib/intconv"
+
 	"github.com/stubbedev/lys-shell/internal/appicons"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"

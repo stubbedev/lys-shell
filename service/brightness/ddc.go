@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/intconv"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // DDC/CI over i2c-dev, the Go counterpart of backend/ddc.rs and the

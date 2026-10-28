@@ -11,11 +11,12 @@ import (
 	"os"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // BusName is the backend's well-known name (lys-shell.portal's DBusName).
@@ -61,7 +62,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
-	if dir, ok := xdg.DataDir(); ok {
+	if dir, ok := xdg.DataDir(version.Name); ok {
 		b.dataDir = dir
 	}
 	b.windows = &windowList{conn: conn, watch: toplevels.Watch}

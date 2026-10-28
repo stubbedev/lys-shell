@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // TOTPAlgorithm is a code's HMAC; Steam is SHA-1 with Steam's alphabet.

@@ -5,12 +5,12 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/recorder"
 )
 

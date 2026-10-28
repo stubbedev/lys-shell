@@ -23,12 +23,13 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -371,7 +372,7 @@ func saveNew(img image.Image, path string) (string, error) {
 // savePrivate saves an app's screenshot to a new private file under
 // $XDG_CACHE_HOME/lys-shell/portal-screenshots.
 func (h *Host) savePrivate(img image.Image) (string, error) {
-	cache, ok := xdg.CacheDir()
+	cache, ok := xdg.CacheDir(version.Name)
 	if !ok {
 		return "", errors.New("no cache directory for the screenshot (XDG_CACHE_HOME and HOME unset)")
 	}

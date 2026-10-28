@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
@@ -18,7 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 )
@@ -90,7 +91,7 @@ func newBitwardenHost(life context.Context, application *app.Application, curren
 		return clip.WriteExpiring(content, ttl)
 	}
 	h.vault = sync.OnceValues(func() (vault, error) {
-		dir, ok := xdg.StateDir()
+		dir, ok := xdg.StateDir(version.Name)
 		if !ok {
 			return nil, errors.New("bitwarden: no state directory: neither XDG_STATE_HOME nor HOME is set")
 		}

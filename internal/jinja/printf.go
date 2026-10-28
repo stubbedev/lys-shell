@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // printf is the format filter: minijinja's printf_style formatter

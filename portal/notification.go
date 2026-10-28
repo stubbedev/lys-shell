@@ -14,12 +14,12 @@ import (
 	"sync/atomic"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
 	xdraw "golang.org/x/image/draw"
 
 	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 

@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/stubbedev/lys-lib/intconv"
+
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/rustparse"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 )

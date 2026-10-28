@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/xdg"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/fswatch"
-	"github.com/stubbedev/lys-shell/internal/intconv"
-	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // WatchMounts calls changed (off the loop) each time the mount table

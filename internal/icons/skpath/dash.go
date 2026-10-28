@@ -3,7 +3,7 @@ package skpath
 import (
 	"math"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // This file ports dash.rs (SkDashPath, SkContourMeasure).

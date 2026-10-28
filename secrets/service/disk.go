@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/internal/atomicfile"
+	"github.com/stubbedev/lys-lib/atomicfile"
 )
 
 const (
@@ -61,7 +61,7 @@ func (d disk) save(id string, data []byte) error {
 	if err := d.ensure(); err != nil {
 		return err
 	}
-	return atomicfile.Write(d.path(id), data, 0o600)
+	return atomicfile.WriteFile(d.path(id), data, 0o600)
 }
 
 func (d disk) remove(id string) error {
@@ -99,7 +99,7 @@ func (d disk) saveAliases(aliases map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("encode aliases: %w", err)
 	}
-	return atomicfile.Write(filepath.Join(d.dir, aliasesFile), data, 0o600)
+	return atomicfile.WriteFile(filepath.Join(d.dir, aliasesFile), data, 0o600)
 }
 
 // validID is a collection id or alias: a non-empty object path element.

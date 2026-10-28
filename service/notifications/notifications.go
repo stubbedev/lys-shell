@@ -16,19 +16,19 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // D-Bus identity and server information.
 const (
 	Interface     = "org.freedesktop.Notifications"
 	ObjPath       = "/org/freedesktop/Notifications"
-	ServerName    = "lys-shell"
-	ServerVendor  = "lys-shell"
+	ServerName    = version.Name
+	ServerVendor  = version.Name
 	ServerVersion = version.Version
 	SpecVersion   = "1.2"
 )
@@ -797,12 +797,9 @@ func globMatch(pattern, name string) bool {
 	return glob.Match(pattern, name)
 }
 
-// StateDir is the DND flag's directory, lys-shell's state dir.
-func StateDir() (string, bool) { return xdg.StateDir() }
-
 // loadDND restores the sticky flag; anything but "on" reads off.
 func loadDND() bool {
-	dir, ok := StateDir()
+	dir, ok := xdg.StateDir(version.Name)
 	if !ok {
 		return false
 	}
@@ -815,7 +812,7 @@ func loadDND() bool {
 
 // saveDND mirrors the flag into the state dir; failures are quiet.
 func saveDND(on bool) {
-	dir, ok := StateDir()
+	dir, ok := xdg.StateDir(version.Name)
 	if !ok {
 		return
 	}

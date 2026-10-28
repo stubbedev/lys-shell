@@ -13,9 +13,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/intconv"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: notifications.db stays the Rust file
-
-	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // deleteBatch is the most rows one retention or expiry DELETE removes,

@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-lib/xdg"
+
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // cacheImage is image_cache.rs's cache_image_data: inline pixels become
@@ -18,7 +20,7 @@ import (
 // Only 8-bit RGB and RGBA are supported; anything else, or a buffer too
 // short for its geometry, caches nothing.
 func cacheImage(img imageData) (string, bool) {
-	dir, ok := xdg.CacheDir()
+	dir, ok := xdg.CacheDir(version.Name)
 	if !ok {
 		return "", false
 	}

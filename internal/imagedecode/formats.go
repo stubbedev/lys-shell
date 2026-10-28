@@ -10,7 +10,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // maxPixels bounds a decoded image (16k x 16k): a corrupt header must

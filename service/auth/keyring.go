@@ -12,7 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
+
 	"github.com/stubbedev/lys-shell/secrets/control"
 )
 

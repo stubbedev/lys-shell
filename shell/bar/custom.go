@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/internal/spawn"
 )

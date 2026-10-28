@@ -5,8 +5,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/stubbedev/lys-lib/intconv"
+
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )

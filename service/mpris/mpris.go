@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/intconv"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/glob"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // D-Bus names of the MPRIS2 surface.

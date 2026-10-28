@@ -10,6 +10,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -17,8 +18,8 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/logging"
 	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
-	"github.com/stubbedev/lys-shell/internal/xdg"
 	"github.com/stubbedev/lys-shell/login/lockclient"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
@@ -257,7 +258,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		// The recorder asks the share picker on this bus for an output or
 		// a region, records it on the GPU with audio from the audio service,
 		// and reports through the OSD and desktop notifications.
-		stateDir, _ := xdg.StateDir()
+		stateDir, _ := xdg.StateDir(version.Name)
 		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(application, sess.Outputs), stateDir),
 			func() config.RecorderConfig { return current.Load().Recorder },
 			recorder.Hooks{Toast: func(label, icon string, ms uint32) {

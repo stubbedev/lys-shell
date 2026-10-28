@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/atomicfile"
+	"github.com/stubbedev/lys-lib/atomicfile"
+
 	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
@@ -146,7 +147,7 @@ func deviceID(path string) (string, error) {
 	u[6] = u[6]&0x0f | 0x40
 	u[8] = u[8]&0x3f | 0x80
 	id := fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16])
-	if err := atomicfile.Write(path, []byte(id+"\n"), privateFileMode); err != nil {
+	if err := atomicfile.WriteFile(path, []byte(id+"\n"), privateFileMode); err != nil {
 		return "", fmt.Errorf("bitwarden: save the device id: %w", err)
 	}
 	return id, nil
@@ -172,7 +173,7 @@ func (s *Service) saveSession(sess *session) error {
 	if err != nil {
 		return fmt.Errorf("bitwarden: session: %w", err)
 	}
-	if err := atomicfile.Write(filepath.Join(s.dir, sessionFile), b, privateFileMode); err != nil {
+	if err := atomicfile.WriteFile(filepath.Join(s.dir, sessionFile), b, privateFileMode); err != nil {
 		return fmt.Errorf("bitwarden: save the session: %w", err)
 	}
 	return nil

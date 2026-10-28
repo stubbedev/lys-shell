@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // Action is one notification button: Key is what Ask reports, Label

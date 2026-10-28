@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/jinja"
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
 )
 
@@ -63,7 +64,7 @@ type sunsetEnv struct {
 
 // liveSunsetEnv is the real environment.
 func liveSunsetEnv() sunsetEnv {
-	dir, _ := xdg.StateDir()
+	dir, _ := xdg.StateDir(version.Name)
 	return sunsetEnv{
 		open: func(changed func()) (colourFilter, error) {
 			f, err := nightlight.Open(changed)

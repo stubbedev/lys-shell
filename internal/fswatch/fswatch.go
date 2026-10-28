@@ -16,9 +16,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/stubbedev/lys-lib/intconv"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/intconv"
 )
 
 // Changes is the event mask that counts as a change for a directory

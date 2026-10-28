@@ -16,10 +16,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-lib/xdg"
+
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/mime"
-	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // Mode is what the chooser is doing.

@@ -6,9 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/internal/atomicfile"
 )
 
 // embeddedIcons are the glyphs the greeter shows (the power buttons,
@@ -50,7 +49,7 @@ func writeIcons(dir string) error {
 		if err != nil {
 			return fmt.Errorf("greeter: embedded icon %s: %w", e.Name(), err)
 		}
-		if err := atomicfile.Write(filepath.Join(dir, e.Name()), data, 0o600); err != nil {
+		if err := atomicfile.WriteFile(filepath.Join(dir, e.Name()), data, 0o600); err != nil {
 			return fmt.Errorf("greeter: icon %s: %w", e.Name(), err)
 		}
 	}

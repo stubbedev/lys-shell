@@ -3,7 +3,7 @@ package config
 import (
 	"reflect"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // Bar-button views: the bar_button key set (wayle-derive's

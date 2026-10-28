@@ -9,6 +9,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs/dialoghost"
@@ -42,7 +43,7 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	exported := 0
 	home, _ := os.UserHomeDir()
 	viewFile := ""
-	if dir, ok := xdg.StateDir(); ok {
+	if dir, ok := xdg.StateDir(version.Name); ok {
 		viewFile = filepath.Join(dir, "file-chooser-view")
 	}
 	chooser := filechooser.New(filechooser.Deps{

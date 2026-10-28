@@ -14,12 +14,13 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/atomicfile"
+	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/internal/atomicfile"
 	"github.com/stubbedev/lys-shell/internal/dbusx"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/internal/xdg"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
@@ -236,7 +237,7 @@ func (g *globalShortcuts) session(path dbus.ObjectPath) (*session, error) {
 // shortcutStorePath is $XDG_STATE_HOME/lys-shell/portal-shortcuts.json,
 // "" without a state directory.
 func shortcutStorePath() string {
-	dir, ok := xdg.StateDir()
+	dir, ok := xdg.StateDir(version.Name)
 	if !ok {
 		return ""
 	}
@@ -296,7 +297,7 @@ func (g *globalShortcuts) remember(owner shortcutOwner, shortcuts []shortcut) er
 	if err := os.MkdirAll(filepath.Dir(g.storePath), 0o700); err != nil {
 		return err
 	}
-	return atomicfile.Write(g.storePath, data, 0o600)
+	return atomicfile.WriteFile(g.storePath, data, 0o600)
 }
 
 // boundBefore is an identified owner's shortcuts from earlier

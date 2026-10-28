@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/stubbedev/lys-shell/internal/intconv"
+	"github.com/stubbedev/lys-lib/intconv"
 )
 
 // Operations.

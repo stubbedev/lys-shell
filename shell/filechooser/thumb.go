@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/memory-go"
 	"golang.org/x/image/draw"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/stubbedev/lys-shell/internal/handoff"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/offheap"
-	"github.com/stubbedev/lys-shell/internal/xdg"
 )
 
 // thumbMaxBytes skips images too large to decode for a row icon.

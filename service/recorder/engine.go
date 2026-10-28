@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/gpu"
+	"github.com/stubbedev/lys-lib/intconv"
 
-	"github.com/stubbedev/lys-shell/internal/atomicfile"
-	"github.com/stubbedev/lys-shell/internal/intconv"
 	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -162,7 +162,7 @@ func (e *GPUEngine) rememberSource(t sharepicker.Target) {
 		log.Printf("recorder: remember %s: %v", t.Payload(), err)
 		return
 	}
-	if err := atomicfile.Write(e.sourcePath(), []byte(t.Payload()+"\n"), 0o600); err != nil {
+	if err := atomicfile.WriteFile(e.sourcePath(), []byte(t.Payload()+"\n"), 0o600); err != nil {
 		log.Printf("recorder: remember %s: %v", t.Payload(), err)
 	}
 }
