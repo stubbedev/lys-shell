@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -118,17 +119,6 @@ const hintText = "Drag to adjust · Enter or double-click to confirm · Esc to c
 
 // labelBacking is the pills' dark backing, rgba(0, 0, 0, 0.75).
 var labelBacking = render.Color(191 << 24)
-
-// The evdev codes of the overlay's keys.
-const (
-	keyEscape      = 1
-	keyEnter       = 28
-	keyKeypadEnter = 96
-	keyUp          = 103
-	keyLeft        = 105
-	keyRight       = 106
-	keyDown        = 108
-)
 
 // nudgeStep is how far an arrow key moves the selection; Shift moves
 // it nudgeStepShift.
@@ -246,7 +236,7 @@ func (o *Overlay) open(frames map[string]render.StillImage) {
 			Keyboard:      app.KeyboardExclusive,
 			Namespace:     "lys-shell-region-overlay",
 			Root:          o.surfaceRoot(a),
-			OnKey:         func(_ *widget.Router, keycode uint32, mods app.Mods) { o.key(keycode, mods) },
+			OnKey:         func(_ *widget.Router, keycode uint32, mods app.Mods) { o.key(o.app.KeySym(keycode), mods) },
 		})
 		if err != nil {
 			log.Printf("region overlay: surface on %s: %v", mon.Connector, err)
@@ -278,25 +268,27 @@ func (o *Overlay) confirm() {
 	}
 }
 
-// key handles the overlay's keys: Escape cancels, Enter confirms, the
-// arrows nudge the selection (further with Shift).
-func (o *Overlay) key(keycode uint32, mods app.Mods) {
+// key handles the overlay's keys, by the symbol the seat's keymap gives
+// them, as a client sending its own keymap (wtype, a remote desktop)
+// means them: Escape cancels, Enter confirms, the arrows nudge the
+// selection (further with Shift).
+func (o *Overlay) key(sym xkb.Keysym, mods app.Mods) {
 	step := nudgeStep
 	if mods&app.ModShift != 0 {
 		step = nudgeStepShift
 	}
-	switch keycode {
-	case keyEscape:
+	switch sym {
+	case xkb.KeyEscape:
 		o.finish(Selection{}, false)
-	case keyEnter, keyKeypadEnter:
+	case xkb.KeyReturn, xkb.KeyKPEnter:
 		o.confirm()
-	case keyLeft:
+	case xkb.KeyLeft:
 		o.ed.nudge(-step, 0)
-	case keyRight:
+	case xkb.KeyRight:
 		o.ed.nudge(step, 0)
-	case keyUp:
+	case xkb.KeyUp:
 		o.ed.nudge(0, -step)
-	case keyDown:
+	case xkb.KeyDown:
 		o.ed.nudge(0, step)
 	default:
 		return

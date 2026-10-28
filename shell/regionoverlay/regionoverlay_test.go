@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -137,11 +138,11 @@ func pending(t *testing.T, ch chan result) {
 func TestGestures(t *testing.T) {
 	t.Run("a drag draws the selection; Enter confirms it", func(t *testing.T) {
 		o, a, ch := harness(nil)
-		o.key(keyEnter, 0)
+		o.key(xkb.KeyReturn, 0)
 		pending(t, ch)
 		drag(a, widget.Point{X: 5, Y: 6}, widget.Point{X: 25, Y: 16})
 		pending(t, ch)
-		o.key(keyEnter, 0)
+		o.key(xkb.KeyReturn, 0)
 		if r := <-ch; !r.ok || r.sel != (Selection{Output: "DP-1", X: 5, Y: 6, Width: 20, Height: 10}) {
 			t.Fatalf("answer = %+v", r)
 		}
@@ -151,9 +152,9 @@ func TestGestures(t *testing.T) {
 		drag(a, widget.Point{X: 100, Y: 100}, widget.Point{X: 300, Y: 200})
 		drag(a, widget.Point{X: 150, Y: 150}, widget.Point{X: 160, Y: 170})
 		drag(a, widget.Point{X: 310, Y: 220}, widget.Point{X: 410, Y: 320})
-		o.key(keyLeft, 0)
-		o.key(keyDown, app.ModShift)
-		o.key(keyKeypadEnter, 0)
+		o.key(xkb.KeyLeft, 0)
+		o.key(xkb.KeyDown, app.ModShift)
+		o.key(xkb.KeyKPEnter, 0)
 		if r := <-ch; !r.ok || r.sel != (Selection{Output: "DP-1", X: 109, Y: 130, Width: 300, Height: 200}) {
 			t.Fatalf("answer = %+v", r)
 		}
@@ -172,7 +173,7 @@ func TestGestures(t *testing.T) {
 	t.Run("a click on no window picks the output", func(t *testing.T) {
 		o, a, ch := harness(nil)
 		drag(a, widget.Point{X: 5, Y: 6}, widget.Point{X: 5, Y: 6})
-		o.key(keyEnter, 0)
+		o.key(xkb.KeyReturn, 0)
 		if r := <-ch; !r.ok || r.sel != (Selection{Output: "DP-1", Width: 1920, Height: 1080}) {
 			t.Fatalf("answer = %+v", r)
 		}
@@ -180,7 +181,7 @@ func TestGestures(t *testing.T) {
 	t.Run("Escape cancels, a selection or not", func(t *testing.T) {
 		o, a, ch := harness(nil)
 		drag(a, widget.Point{X: 5, Y: 6}, widget.Point{X: 25, Y: 16})
-		o.key(keyEscape, 0)
+		o.key(xkb.KeyEscape, 0)
 		if r := <-ch; r.ok {
 			t.Fatalf("Escape selected %+v", r.sel)
 		}
