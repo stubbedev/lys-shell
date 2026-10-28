@@ -16,12 +16,11 @@ import (
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // GlobalShortcutsIface bridges org.freedesktop.impl.portal.GlobalShortcuts
@@ -493,7 +492,7 @@ func (o globalShortcutsObject) ConfigureShortcuts(session dbus.ObjectPath, paren
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), configureDialogTimeout)
 		defer cancel()
-		_, _, err := portaldialogs.NewClient(o.g.conn).Access(ctx, portalreq.Caller{AppID: s.appID, ParentWindow: parent}, portaldialogs.AccessRequest{
+		_, _, err := portaldialogs.NewClient(o.g.conn).Access(ctx, portaldialogs.Caller{AppID: s.appID, ParentWindow: parent}, portaldialogs.AccessRequest{
 			Title: "Global shortcuts", Subtitle: "Their keys are set in your compositor's binds.",
 			Body: body, GrantLabel: "Done", DenyLabel: "Close", Icon: shortcutsIcon,
 		})

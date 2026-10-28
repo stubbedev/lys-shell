@@ -3,10 +3,10 @@ package widgets
 import (
 	"strconv"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -14,14 +14,14 @@ import (
 // yes/no and a labelled dropdown otherwise, each starting at its
 // choice's start value, and the function reading what the user picked.
 // The rows carry class and their labels class+"-label".
-func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]widget.Widget, func() []portalreq.Selection) {
+func ChoiceRows(font render.Font, choices []portaldialogs.Choice, class string) ([]widget.Widget, func() []portaldialogs.Selection) {
 	label := func(text string) *widget.Label {
 		l := widget.NewLabel(font, TextPx(styling.Body, 1), text, 0)
 		l.AddClass(class + "-label")
 		return l
 	}
 	rows := make([]widget.Widget, 0, len(choices))
-	reads := make([]func() portalreq.Selection, 0, len(choices))
+	reads := make([]func() portaldialogs.Selection, 0, len(choices))
 	for _, c := range choices {
 		if c.Boolean() {
 			check := widget.NewCheckButton(c.Start() == "true")
@@ -30,8 +30,8 @@ func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]w
 			l.SetWrap(true)
 			check.SetChild(l)
 			rows = append(rows, check)
-			reads = append(reads, func() portalreq.Selection {
-				return portalreq.Selection{ID: c.ID, Value: strconv.FormatBool(check.Checked())}
+			reads = append(reads, func() portaldialogs.Selection {
+				return portaldialogs.Selection{ID: c.ID, Value: strconv.FormatBool(check.Checked())}
 			})
 			continue
 		}
@@ -49,12 +49,12 @@ func ChoiceRows(font render.Font, choices []portalreq.Choice, class string) ([]w
 		row.Append(label(c.Label), true)
 		row.Append(drop, false)
 		rows = append(rows, row)
-		reads = append(reads, func() portalreq.Selection {
-			return portalreq.Selection{ID: c.ID, Value: c.Options[drop.Selected()].ID}
+		reads = append(reads, func() portaldialogs.Selection {
+			return portaldialogs.Selection{ID: c.ID, Value: c.Options[drop.Selected()].ID}
 		})
 	}
-	return rows, func() []portalreq.Selection {
-		out := make([]portalreq.Selection, 0, len(reads))
+	return rows, func() []portaldialogs.Selection {
+		out := make([]portaldialogs.Selection, 0, len(reads))
 		for _, read := range reads {
 			out = append(out, read())
 		}

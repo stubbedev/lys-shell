@@ -6,11 +6,10 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -22,12 +21,12 @@ type fakeChooser struct {
 	got  *dbustest.Var[any]
 }
 
-func (f fakeChooser) Open(_ portalreq.Caller, r filechooser.OpenRequest) filechooser.Result {
+func (f fakeChooser) Open(_ portaldialogs.Caller, r filechooser.OpenRequest) filechooser.Result {
 	f.got.Store(r)
 	return filechooser.Result{URIs: f.uris.Load()}
 }
 
-func (f fakeChooser) Save(_ portalreq.Caller, r filechooser.SaveRequest) filechooser.Result {
+func (f fakeChooser) Save(_ portaldialogs.Caller, r filechooser.SaveRequest) filechooser.Result {
 	f.got.Store(r)
 	return filechooser.Result{URIs: f.uris.Load()}
 }
@@ -41,38 +40,38 @@ type fakeDialogs struct {
 	got *dbustest.Var[[]any]
 }
 
-func (f fakeDialogs) Access(_ portalreq.Caller, r portaldialogs.AccessRequest) (bool, []portalreq.Selection) {
+func (f fakeDialogs) Access(_ portaldialogs.Caller, r portaldialogs.AccessRequest) (bool, []portaldialogs.Selection) {
 	f.got.Store([]any{r})
 	return f.yes.Load(), nil
 }
 
-func (f fakeDialogs) Account(_ portalreq.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
+func (f fakeDialogs) Account(_ portaldialogs.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
 	f.got.Store([]any{reason})
 	return f.yes.Load(), info
 }
 
-func (f fakeDialogs) ConfirmWallpaper(_ portalreq.Caller, uri string) bool {
+func (f fakeDialogs) ConfirmWallpaper(_ portaldialogs.Caller, uri string) bool {
 	f.got.Store([]any{uri})
 	return f.yes.Load()
 }
 
-func (f fakeDialogs) ChooseApplication(_ portalreq.Caller, r portaldialogs.ChooserRequest) string {
+func (f fakeDialogs) ChooseApplication(_ portaldialogs.Caller, r portaldialogs.ChooserRequest) string {
 	f.got.Store([]any{r})
 	return f.id.Load()
 }
 
 func (fakeDialogs) UpdateChoices(string, []string) bool { return false }
 
-func (fakeDialogs) ChooseDevices(portalreq.Caller, []portaldialogs.Device) (bool, []string) {
+func (fakeDialogs) ChooseDevices(portaldialogs.Caller, []portaldialogs.Device) (bool, []string) {
 	return false, nil
 }
 
-func (f fakeDialogs) ConfirmInstall(_ portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
+func (f fakeDialogs) ConfirmInstall(_ portaldialogs.Caller, r portaldialogs.LauncherRequest) (bool, string) {
 	f.got.Store([]any{r})
 	return f.yes.Load(), r.Name
 }
 
-func (fakeDialogs) Password(portalreq.Caller, portaldialogs.PasswordRequest) (bool, string) {
+func (fakeDialogs) Password(portaldialogs.Caller, portaldialogs.PasswordRequest) (bool, string) {
 	return false, ""
 }
 
@@ -80,11 +79,11 @@ func (fakeDialogs) Dismiss(string) {}
 
 type fakePrinter struct{ granted *dbustest.Var[bool] }
 
-func (f fakePrinter) Prepare(portalreq.Caller, printdialog.PrepareRequest) (bool, []printdialog.Setting, printdialog.PageSetup, uint32) {
+func (f fakePrinter) Prepare(portaldialogs.Caller, printdialog.PrepareRequest) (bool, []printdialog.Setting, printdialog.PageSetup, uint32) {
 	return f.granted.Load(), []printdialog.Setting{{Key: "copies", Value: "1"}}, printdialog.PageSetup{}, 7
 }
 
-func (fakePrinter) Print(portalreq.Caller, string, *os.File, uint32) bool { return false }
+func (fakePrinter) Print(portaldialogs.Caller, string, *os.File, uint32) bool { return false }
 
 func (fakePrinter) Dismiss(string) {}
 
@@ -95,15 +94,15 @@ type fakeShot struct {
 	picked *dbustest.Var[bool]
 }
 
-func (f fakeShot) Capture(_ portalreq.Caller, mode, target string) (string, *dbus.Error) {
+func (f fakeShot) Capture(_ portaldialogs.Caller, mode, target string) (string, *dbus.Error) {
 	return "user:" + mode, nil
 }
 
-func (f fakeShot) CapturePrivate(_ portalreq.Caller, mode, target string, _ bool) (string, *dbus.Error) {
+func (f fakeShot) CapturePrivate(_ portaldialogs.Caller, mode, target string, _ bool) (string, *dbus.Error) {
 	return f.path + ":" + mode + ":" + target, nil
 }
 
-func (f fakeShot) PickColor(portalreq.Caller) (bool, float64, float64, float64, *dbus.Error) {
+func (f fakeShot) PickColor(portaldialogs.Caller) (bool, float64, float64, float64, *dbus.Error) {
 	return f.picked.Load(), 0.25, 0.5, 1, nil
 }
 

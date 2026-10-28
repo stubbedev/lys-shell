@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -405,7 +405,7 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	first := hs.open(t, OpenRequest{})
 	second := make(chan []string, 1)
 	go func() {
-		second <- hs.c.Save(portalreq.Caller{Handle: "/r/second", Modal: true}, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"}).URIs
+		second <- hs.c.Save(portaldialogs.Caller{Handle: "/r/second", Modal: true}, SaveRequest{CurrentFolder: hs.root, CurrentName: "x"}).URIs
 	}()
 	pending(t, first)
 	hs.click(t, "Cancel")
@@ -982,7 +982,7 @@ func TestPanelOpensAtItsDefaultSize(t *testing.T) {
 func TestModalDecidesTheKeyboard(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.ask(t, func() []string {
-		return hs.c.Open(portalreq.Caller{Handle: "/r/m", Modal: true}, OpenRequest{CurrentFolder: hs.root}).URIs
+		return hs.c.Open(portaldialogs.Caller{Handle: "/r/m", Modal: true}, OpenRequest{CurrentFolder: hs.root}).URIs
 	})
 	if hs.cfg.Keyboard != app.KeyboardExclusive {
 		t.Errorf("modal keyboard = %v, want exclusive", hs.cfg.Keyboard)
@@ -990,7 +990,7 @@ func TestModalDecidesTheKeyboard(t *testing.T) {
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
 	hs.ask(t, func() []string {
-		return hs.c.Open(portalreq.Caller{Handle: "/r/n", Modal: false}, OpenRequest{CurrentFolder: hs.root}).URIs
+		return hs.c.Open(portaldialogs.Caller{Handle: "/r/n", Modal: false}, OpenRequest{CurrentFolder: hs.root}).URIs
 	})
 	if hs.cfg.Keyboard != app.KeyboardOnDemand {
 		t.Errorf("non-modal keyboard = %v, want on demand", hs.cfg.Keyboard)
@@ -1003,7 +1003,7 @@ func TestConcurrentRequestsBothGetAnswers(t *testing.T) {
 	first := hs.open(t, OpenRequest{})
 	second := make(chan []string, 1)
 	go func() {
-		second <- hs.c.Open(portalreq.Caller{Handle: "/r/2"}, OpenRequest{CurrentFolder: hs.root}).URIs
+		second <- hs.c.Open(portaldialogs.Caller{Handle: "/r/2"}, OpenRequest{CurrentFolder: hs.root}).URIs
 	}()
 	select {
 	case uris := <-first:
@@ -1135,7 +1135,7 @@ func TestLayoutWidgetsReportTheirChildToTheFocusRing(t *testing.T) {
 }
 
 // testCaller is the request the tests' dialogs serve.
-var testCaller = portalreq.Caller{Handle: "/r/test", AppID: "org.app", Modal: true}
+var testCaller = portaldialogs.Caller{Handle: "/r/test", AppID: "org.app", Modal: true}
 
 // Dismissing the request the chooser shows answers it with nothing and
 // takes it down; another request's dismissal leaves it up.
@@ -1190,8 +1190,8 @@ var (
 // choices made; a cancel carries neither.
 func TestOpenTakesTheAppsOptions(t *testing.T) {
 	hs := newHarness(t, "")
-	choices := []portalreq.Choice{
-		{ID: "encoding", Label: "Encoding", Options: []portalreq.Option{{ID: "utf8", Label: "UTF-8"}, {ID: "latin1", Label: "Latin-1"}}, Initial: "latin1"},
+	choices := []portaldialogs.Choice{
+		{ID: "encoding", Label: "Encoding", Options: []portaldialogs.Option{{ID: "utf8", Label: "UTF-8"}, {ID: "latin1", Label: "Latin-1"}}, Initial: "latin1"},
 		{ID: "readonly", Label: "Open read-only", Initial: "true"},
 	}
 	got := hs.askResult(t, func() Result {
@@ -1213,7 +1213,7 @@ func TestOpenTakesTheAppsOptions(t *testing.T) {
 	if !slices.Equal(r.URIs, []string{hs.uri("a.png")}) || r.Filter.Name != "Images" {
 		t.Errorf("result %+v", r)
 	}
-	if want := []portalreq.Selection{{ID: "encoding", Value: "latin1"}, {ID: "readonly", Value: "false"}}; !slices.Equal(r.Choices, want) {
+	if want := []portaldialogs.Selection{{ID: "encoding", Value: "latin1"}, {ID: "readonly", Value: "false"}}; !slices.Equal(r.Choices, want) {
 		t.Errorf("choices = %v, want %v", r.Choices, want)
 	}
 	got = hs.askResult(t, func() Result { return hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root, Choices: choices}) })

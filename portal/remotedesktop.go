@@ -14,11 +14,11 @@ import (
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/eis"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/vinput"
 	"github.com/unxed/xkb-go"
 
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 

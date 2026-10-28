@@ -10,10 +10,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 const (
@@ -60,7 +58,7 @@ func TestAccessDialogLabels(t *testing.T) {
 	r := newRig(t, nil)
 	d := serveDialogs(t, r, true)
 	r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{})
-	if got := d.asked.Load()[0]; !reflect.DeepEqual(got, portaldialogs.AccessRequest{Title: "T", Subtitle: "S", Body: "B", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portalreq.Choice{}}) {
+	if got := d.asked.Load()[0]; !reflect.DeepEqual(got, portaldialogs.AccessRequest{Title: "T", Subtitle: "S", Body: "B", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portaldialogs.Choice{}}) {
 		t.Errorf("defaults = %+v", got)
 	}
 	r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{
@@ -76,19 +74,19 @@ func TestAccessDialogLabels(t *testing.T) {
 func TestAccessDialogChoicesRoundTrip(t *testing.T) {
 	r := newRig(t, nil)
 	d := serveDialogs(t, r, true)
-	choices := []portalreq.Choice{
-		{ID: "remember", Label: "Remember", Options: []portalreq.Option{}, Initial: "true"},
-		{ID: "scope", Label: "Scope", Options: []portalreq.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
+	choices := []portaldialogs.Choice{
+		{ID: "remember", Label: "Remember", Options: []portaldialogs.Option{}, Initial: "true"},
+		{ID: "scope", Label: "Scope", Options: []portaldialogs.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
 	}
 	code, res := r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{"choices": dbus.MakeVariant(choices)})
 	if got := d.asked.Load()[0].(portaldialogs.AccessRequest); !reflect.DeepEqual(got.Choices, choices) {
 		t.Errorf("the dialog got choices %+v", got.Choices)
 	}
-	var picked []portalreq.Selection
+	var picked []portaldialogs.Selection
 	if err := dbus.Store([]any{res["choices"].Value()}, &picked); err != nil {
 		t.Fatalf("choices result %v: %v", res, err)
 	}
-	want := []portalreq.Selection{{ID: "remember", Value: "true"}, {ID: "scope", Value: "always"}}
+	want := []portaldialogs.Selection{{ID: "remember", Value: "true"}, {ID: "scope", Value: "always"}}
 	if code != ResponseSuccess || !reflect.DeepEqual(picked, want) {
 		t.Errorf("granted %d with %+v, want %+v", code, picked, want)
 	}
@@ -96,7 +94,7 @@ func TestAccessDialogChoicesRoundTrip(t *testing.T) {
 	if code, res := r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{"choices": dbus.MakeVariant(choices)}); code != ResponseCancelled || len(res) != 0 {
 		t.Errorf("denied = %d %v, want no choices", code, res)
 	}
-	bad := []portalreq.Choice{{ID: "", Label: "No id"}}
+	bad := []portaldialogs.Choice{{ID: "", Label: "No id"}}
 	if code, _ := r.interactive(t, accessDialog, handle, "org.app", "", "T", "S", "B", Vardict{"choices": dbus.MakeVariant(bad)}); code != ResponseOther {
 		t.Errorf("a choice without an id = %d, want other", code)
 	}

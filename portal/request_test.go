@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // gate is what every fake shell dialog embeds: it records who asked,
@@ -16,7 +15,7 @@ import (
 // dismissed, and records the dismissals.
 type gate struct {
 	hold      dbustest.Var[bool]
-	callers   dbustest.Var[[]portalreq.Caller]
+	callers   dbustest.Var[[]portaldialogs.Caller]
 	dismissed dbustest.Var[[]string]
 	mu        sync.Mutex
 	waiting   map[string]chan struct{}
@@ -24,8 +23,8 @@ type gate struct {
 
 // enter records c and, when holding, waits for c's dismissal; it
 // reports whether the dialog was dismissed.
-func (g *gate) enter(c portalreq.Caller) bool {
-	g.callers.Update(func(all []portalreq.Caller) []portalreq.Caller { return append(all, c) })
+func (g *gate) enter(c portaldialogs.Caller) bool {
+	g.callers.Update(func(all []portaldialogs.Caller) []portaldialogs.Caller { return append(all, c) })
 	if !g.hold.Load() {
 		return false
 	}
@@ -193,7 +192,7 @@ func TestRequestCloseDismissesEveryDialog(t *testing.T) {
 				done <- c
 			}()
 			g.waitOpen(t, handle)
-			if got := g.callers.Load(); len(got) != 1 || got[0] != (portalreq.Caller{Handle: string(handle), AppID: "org.app", Modal: true}) {
+			if got := g.callers.Load(); len(got) != 1 || got[0] != (portaldialogs.Caller{Handle: string(handle), AppID: "org.app", Modal: true}) {
 				t.Errorf("the shell was told %+v", got)
 			}
 			req := r.client.Object(BusName, handle)

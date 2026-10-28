@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -105,7 +105,7 @@ func (hs *harness) prepare(t *testing.T) (chan prepareResult, app.LayerConfig) {
 	return hs.prepareWith(t, testCaller, PrepareRequest{Title: "Doc"})
 }
 
-func (hs *harness) prepareWith(t *testing.T, c portalreq.Caller, r PrepareRequest) (chan prepareResult, app.LayerConfig) {
+func (hs *harness) prepareWith(t *testing.T, c portaldialogs.Caller, r PrepareRequest) (chan prepareResult, app.LayerConfig) {
 	t.Helper()
 	got := make(chan prepareResult, 1)
 	go func() {
@@ -278,7 +278,7 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	first, c := hs.prepare(t)
 	second := make(chan prepareResult, 1)
 	go func() {
-		ok, s, setup, tok := hs.h.Prepare(portalreq.Caller{Handle: "/r/second"}, PrepareRequest{Title: "Doc 2"})
+		ok, s, setup, tok := hs.h.Prepare(portaldialogs.Caller{Handle: "/r/second"}, PrepareRequest{Title: "Doc 2"})
 		second <- prepareResult{ok, s, setup, tok}
 	}()
 	select {
@@ -400,7 +400,7 @@ func TestTokensBelongToTheirApp(t *testing.T) {
 	if first == 0 || second == 0 || second == first+1 {
 		t.Errorf("tokens %d then %d, want random non-zero ones", first, second)
 	}
-	other := portalreq.Caller{Handle: "/r/other", AppID: "org.other"}
+	other := portaldialogs.Caller{Handle: "/r/other", AppID: "org.other"}
 	if hs.h.Print(other, "Doc", document(t, "x"), first) {
 		t.Error("another app printed with the token")
 	}
@@ -505,7 +505,7 @@ func TestFormFollowsThePrinter(t *testing.T) {
 }
 
 // testCaller is the request the tests' dialogs serve.
-var testCaller = portalreq.Caller{Handle: "/r/test", AppID: "org.app"}
+var testCaller = portaldialogs.Caller{Handle: "/r/test", AppID: "org.app"}
 
 // Dismissing the request the dialog shows cancels it; another request's
 // dismissal leaves it up.

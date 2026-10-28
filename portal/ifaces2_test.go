@@ -15,12 +15,11 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // notifyCall is one Notify the fake daemon received.
@@ -370,28 +369,28 @@ type fakeDialogs struct {
 
 // answer records a dialog and gives the configured verdict, no when
 // it was dismissed.
-func (f *fakeDialogs) answer(c portalreq.Caller, args ...any) bool {
+func (f *fakeDialogs) answer(c portaldialogs.Caller, args ...any) bool {
 	f.asked.Store(args)
 	return !f.enter(c) && f.yes.Load()
 }
 
-func (f *fakeDialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) (bool, []portalreq.Selection) {
+func (f *fakeDialogs) Access(c portaldialogs.Caller, r portaldialogs.AccessRequest) (bool, []portaldialogs.Selection) {
 	if !f.answer(c, r) {
 		return false, nil
 	}
-	picked := make([]portalreq.Selection, 0, len(r.Choices))
+	picked := make([]portaldialogs.Selection, 0, len(r.Choices))
 	answers := f.answers.Load()
 	for _, ch := range r.Choices {
 		value, ok := answers[ch.ID]
 		if !ok {
 			value = ch.Start()
 		}
-		picked = append(picked, portalreq.Selection{ID: ch.ID, Value: value})
+		picked = append(picked, portaldialogs.Selection{ID: ch.ID, Value: value})
 	}
 	return true, picked
 }
 
-func (f *fakeDialogs) Account(c portalreq.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
+func (f *fakeDialogs) Account(c portaldialogs.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
 	if !f.answer(c, reason, info) {
 		return false, portaldialogs.AccountInfo{}
 	}
@@ -401,11 +400,11 @@ func (f *fakeDialogs) Account(c portalreq.Caller, reason string, info portaldial
 	return true, info
 }
 
-func (f *fakeDialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
+func (f *fakeDialogs) ConfirmWallpaper(c portaldialogs.Caller, uri string) bool {
 	return f.answer(c, uri)
 }
 
-func (f *fakeDialogs) ChooseApplication(c portalreq.Caller, r portaldialogs.ChooserRequest) string {
+func (f *fakeDialogs) ChooseApplication(c portaldialogs.Caller, r portaldialogs.ChooserRequest) string {
 	if f.answer(c, r) {
 		return "org.chosen.App"
 	}
@@ -417,7 +416,7 @@ func (f *fakeDialogs) UpdateChoices(h string, choices []string) bool {
 	return h == string(handle)
 }
 
-func (f *fakeDialogs) ChooseDevices(c portalreq.Caller, devices []portaldialogs.Device) (bool, []string) {
+func (f *fakeDialogs) ChooseDevices(c portaldialogs.Caller, devices []portaldialogs.Device) (bool, []string) {
 	if !f.answer(c, devices) {
 		return false, nil
 	}
@@ -431,14 +430,14 @@ func (f *fakeDialogs) ChooseDevices(c portalreq.Caller, devices []portaldialogs.
 	return true, ids
 }
 
-func (f *fakeDialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
+func (f *fakeDialogs) ConfirmInstall(c portaldialogs.Caller, r portaldialogs.LauncherRequest) (bool, string) {
 	if !f.answer(c, r) {
 		return false, ""
 	}
 	return true, "Renamed"
 }
 
-func (f *fakeDialogs) Password(c portalreq.Caller, r portaldialogs.PasswordRequest) (bool, string) {
+func (f *fakeDialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string) {
 	if !f.answer(c, r) {
 		return false, ""
 	}

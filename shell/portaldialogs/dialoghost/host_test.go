@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -20,8 +21,6 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -136,7 +135,7 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 	}{{"Allow", true}, {"Deny", false}} {
 		got := make(chan bool, 1)
 		go func() {
-			ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/test"}, portaldialogs.AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
+			ok, _ := hs.h.Access(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
 			got <- ok
 		}()
 		c := hs.open(t)
@@ -178,7 +177,7 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 	hs := newHarness(t, nil)
 	first := make(chan bool, 1)
 	go func() {
-		ok, _ := hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/1", AppID: "org.one"}, portaldialogs.LauncherRequest{Name: "App"})
+		ok, _ := hs.h.ConfirmInstall(portaldialogs.Caller{Handle: "/r/1", AppID: "org.one"}, portaldialogs.LauncherRequest{Name: "App"})
 		first <- ok
 	}()
 	c := hs.open(t)
@@ -187,7 +186,7 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 	}
 	second := make(chan bool, 1)
 	go func() {
-		ok, _ := hs.h.Account(portalreq.Caller{Handle: "/r/2", AppID: "org.two"}, "", portaldialogs.AccountInfo{Name: "Ada"})
+		ok, _ := hs.h.Account(portaldialogs.Caller{Handle: "/r/2", AppID: "org.two"}, "", portaldialogs.AccountInfo{Name: "Ada"})
 		second <- ok
 	}()
 	select {
@@ -216,10 +215,10 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 func TestDismissingAWaitingRequest(t *testing.T) {
 	hs := newHarness(t, nil)
 	first := make(chan bool, 1)
-	go func() { first <- hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/1"}, "file:///a.png") }()
+	go func() { first <- hs.h.ConfirmWallpaper(portaldialogs.Caller{Handle: "/r/1"}, "file:///a.png") }()
 	c := hs.open(t)
 	second := make(chan bool, 1)
-	go func() { second <- hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/2"}, "file:///b.png") }()
+	go func() { second <- hs.h.ConfirmWallpaper(portaldialogs.Caller{Handle: "/r/2"}, "file:///b.png") }()
 	deadline := time.Now().Add(treetest.Liveness)
 	for {
 		var waiting int
@@ -250,7 +249,7 @@ func TestDismissingAWaitingRequest(t *testing.T) {
 func TestOpenFailureAnswersNo(t *testing.T) {
 	hs := newHarness(t, nil)
 	hs.openErr = errors.New("no layer shell")
-	if hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/test"}, "file:///x.png") {
+	if hs.h.ConfirmWallpaper(portaldialogs.Caller{Handle: "/r/test"}, "file:///x.png") {
 		t.Error("an unmapped dialog answered yes")
 	}
 }
@@ -259,7 +258,7 @@ func TestWallpaperPreviewShowsTheImage(t *testing.T) {
 	hs := newHarness(t, nil)
 	got := make(chan bool, 1)
 	go func() {
-		got <- hs.h.ConfirmWallpaper(portalreq.Caller{Handle: "/r/test"}, "file:///home/u/My%20Walls/a.png")
+		got <- hs.h.ConfirmWallpaper(portaldialogs.Caller{Handle: "/r/test"}, "file:///home/u/My%20Walls/a.png")
 	}()
 	c := hs.open(t)
 	var img *widget.Image
@@ -297,7 +296,7 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	hs := newHarness(t, apps)
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{ContentType: "image/png"})
+		got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{ContentType: "image/png"})
 	}()
 	c := hs.open(t)
 	// The search is a gtk::SearchEntry; its search-changed delay runs
@@ -354,7 +353,7 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{installApp(t, dir, "org.example.Viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{Choices: []string{"org.example.Viewer"}})
+		got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{Choices: []string{"org.example.Viewer"}})
 	}()
 	c := hs.open(t)
 	treetest.Walk(c.Root, func(w widget.Widget) {
@@ -373,7 +372,7 @@ func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{installApp(t, t.TempDir(), "viewer.desktop", "Image Viewer")})
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{})
+		got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{})
 	}()
 	c := hs.open(t)
 	var rowY, scrollY int
@@ -405,7 +404,7 @@ func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
 	hs := newHarness(t, []desktopentry.App{long})
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{})
+		got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{})
 	}()
 	c := hs.open(t)
 	var w int
@@ -423,7 +422,7 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 	hs := newHarness(t, nil)
 	got := make(chan bool, 1)
 	go func() {
-		ok, _ := hs.h.Access(portalreq.Caller{Handle: "/r/mine"}, portaldialogs.AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
+		ok, _ := hs.h.Access(portaldialogs.Caller{Handle: "/r/mine"}, portaldialogs.AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny"})
 		got <- ok
 	}()
 	hs.open(t)
@@ -456,18 +455,18 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 // user left them at; a deny returns nothing.
 func TestAccessChoices(t *testing.T) {
 	hs := newHarness(t, nil)
-	req := portaldialogs.AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portalreq.Choice{
+	req := portaldialogs.AccessRequest{Title: "Camera", GrantLabel: "Allow", DenyLabel: "Deny", Choices: []portaldialogs.Choice{
 		{ID: "remember", Label: "Remember this", Initial: "false"},
-		{ID: "scope", Label: "Scope", Options: []portalreq.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
+		{ID: "scope", Label: "Scope", Options: []portaldialogs.Option{{ID: "once", Label: "Once"}, {ID: "always", Label: "Always"}}, Initial: "always"},
 	}}
 	type answer struct {
 		ok     bool
-		picked []portalreq.Selection
+		picked []portaldialogs.Selection
 	}
 	for _, grant := range []bool{true, false} {
 		got := make(chan answer, 1)
 		go func() {
-			ok, picked := hs.h.Access(portalreq.Caller{Handle: "/r/c"}, req)
+			ok, picked := hs.h.Access(portaldialogs.Caller{Handle: "/r/c"}, req)
 			got <- answer{ok, picked}
 		}()
 		c := hs.open(t)
@@ -492,7 +491,7 @@ func TestAccessChoices(t *testing.T) {
 			}
 			continue
 		}
-		want := []portalreq.Selection{{ID: "remember", Value: "true"}, {ID: "scope", Value: "once"}}
+		want := []portaldialogs.Selection{{ID: "remember", Value: "true"}, {ID: "scope", Value: "once"}}
 		if !r.ok || !slices.Equal(r.picked, want) {
 			t.Errorf("grant = %+v, want %+v", r, want)
 		}
@@ -512,7 +511,7 @@ func TestAccountEditsBeforeSharing(t *testing.T) {
 		t.Helper()
 		got := make(chan answer, 1)
 		go func() {
-			ok, info := hs.h.Account(portalreq.Caller{Handle: "/r/a", AppID: "org.app"}, "why", portaldialogs.AccountInfo{Name: "Ada Lovelace", Image: "/home/ada/.face"})
+			ok, info := hs.h.Account(portaldialogs.Caller{Handle: "/r/a", AppID: "org.app"}, "why", portaldialogs.AccountInfo{Name: "Ada Lovelace", Image: "/home/ada/.face"})
 			got <- answer{ok, info}
 		}()
 		c := hs.open(t)
@@ -585,7 +584,7 @@ func TestAppChooserPreselectsTheLastChoice(t *testing.T) {
 	hs := newHarness(t, chooserApps(t))
 	got := make(chan string, 1)
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{LastChoice: "org.example.Editor"})
+		got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{LastChoice: "org.example.Editor"})
 	}()
 	c := hs.open(t)
 	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != 1 {
@@ -602,7 +601,7 @@ func TestAppChooserPreselectsTheLastChoice(t *testing.T) {
 	}
 
 	go func() {
-		got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test2"}, portaldialogs.ChooserRequest{LastChoice: "org.example.Gone"})
+		got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test2"}, portaldialogs.ChooserRequest{LastChoice: "org.example.Gone"})
 	}()
 	c = hs.open(t)
 	if sel := treetest.First[*widget.ListBox](t, c.Root).Selected(); sel != -1 {
@@ -625,7 +624,7 @@ func TestAppChooserUpdateChoices(t *testing.T) {
 	hs := newHarness(t, chooserApps(t))
 	got := make(chan string, 2)
 	viewer := portaldialogs.ChooserRequest{Choices: []string{"org.example.Viewer"}, LastChoice: "org.example.Viewer"}
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/a"}, viewer) }()
+	go func() { got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/a"}, viewer) }()
 	c := hs.open(t)
 	list := treetest.First[*widget.ListBox](t, c.Root)
 	if list.Len() != 1 {
@@ -641,7 +640,7 @@ func TestAppChooserUpdateChoices(t *testing.T) {
 		t.Error("UpdateChoices found a chooser for another request")
 	}
 
-	go func() { got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/b"}, viewer) }()
+	go func() { got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/b"}, viewer) }()
 	waitFor(t, func() bool { return hs.h.UpdateChoices("/r/b", []string{"org.example.Editor"}) })
 	hs.do(func() { list.OnActivate(0) })
 	if id := <-got; id != "org.example.Editor" {
@@ -668,7 +667,7 @@ func TestAppChooserNamesTheTarget(t *testing.T) {
 	for target, want := range map[string]bool{"report.pdf": true, "": false} {
 		got := make(chan string, 1)
 		go func() {
-			got <- hs.h.ChooseApplication(portalreq.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{Target: target})
+			got <- hs.h.ChooseApplication(portaldialogs.Caller{Handle: "/r/test"}, portaldialogs.ChooserRequest{Target: target})
 		}()
 		c := hs.open(t)
 		line := "Choose an application to open “" + target + "”."
@@ -710,7 +709,7 @@ func installDialog(t *testing.T, hs *harness, r portaldialogs.LauncherRequest, i
 	}
 	got := make(chan answer, 1)
 	go func() {
-		ok, name := hs.h.ConfirmInstall(portalreq.Caller{Handle: "/r/test"}, r)
+		ok, name := hs.h.ConfirmInstall(portaldialogs.Caller{Handle: "/r/test"}, r)
 		got <- answer{ok, name}
 	}()
 	c := hs.open(t)
@@ -810,7 +809,7 @@ func TestChooseDevicesAnswersTheChecked(t *testing.T) {
 	} {
 		got := make(chan answer, 1)
 		go func() {
-			ok, ids := hs.h.ChooseDevices(portalreq.Caller{Handle: "/r/test"}, devices)
+			ok, ids := hs.h.ChooseDevices(portaldialogs.Caller{Handle: "/r/test"}, devices)
 			got <- answer{ok, ids}
 		}()
 		c := hs.open(t)
@@ -854,7 +853,7 @@ func TestDialogTakesLysUiParts(t *testing.T) {
 	hs := newHarness(t, nil)
 	done := make(chan struct{})
 	go func() {
-		hs.h.Access(portalreq.Caller{Handle: "/r/p"}, portaldialogs.AccessRequest{Title: "Camera", Body: "Use it?", GrantLabel: "Allow", DenyLabel: "Deny"})
+		hs.h.Access(portaldialogs.Caller{Handle: "/r/p"}, portaldialogs.AccessRequest{Title: "Camera", Body: "Use it?", GrantLabel: "Allow", DenyLabel: "Deny"})
 		close(done)
 	}()
 	c := hs.open(t)
@@ -898,7 +897,7 @@ func TestPasswordAsksOnceOrTwice(t *testing.T) {
 		t.Helper()
 		got := make(chan answer, 1)
 		go func() {
-			ok, pw := hs.h.Password(portalreq.Caller{Handle: "/r/p"}, r)
+			ok, pw := hs.h.Password(portaldialogs.Caller{Handle: "/r/p"}, r)
 			got <- answer{ok, pw}
 		}()
 		c := hs.open(t)

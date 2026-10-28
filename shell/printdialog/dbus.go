@@ -8,9 +8,8 @@ import (
 	"os"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // D-Bus identity (wayle-ipc print.rs).
@@ -53,11 +52,11 @@ type Host interface {
 	// request and stashes them under the returned token, for that app
 	// alone; granted is false on a cancel or when the request is
 	// dismissed.
-	Prepare(portalreq.Caller, PrepareRequest) (granted bool, settings []Setting, setup PageSetup, token uint32)
+	Prepare(portaldialogs.Caller, PrepareRequest) (granted bool, settings []Setting, setup PageSetup, token uint32)
 	// Print spools document (a PDF the host takes ownership of) to the
 	// printer the app prepared under token, or, without a token,
 	// through the dialog first; it reports whether it was sent.
-	Print(c portalreq.Caller, title string, document *os.File, token uint32) bool
+	Print(c portaldialogs.Caller, title string, document *os.File, token uint32) bool
 	// Dismiss takes down the dialog showing for the request at handle.
 	Dismiss(handle string)
 }
@@ -75,7 +74,7 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 }
 
 // Prepare shows the dialog.
-func (d *Daemon) Prepare(c portalreq.Caller, r PrepareRequest) (bool, []Setting, PageSetup, uint32, *dbus.Error) {
+func (d *Daemon) Prepare(c portaldialogs.Caller, r PrepareRequest) (bool, []Setting, PageSetup, uint32, *dbus.Error) {
 	granted, settings, setup, token := d.host.Prepare(c, r)
 	if settings == nil {
 		settings = []Setting{}
@@ -84,7 +83,7 @@ func (d *Daemon) Prepare(c portalreq.Caller, r PrepareRequest) (bool, []Setting,
 }
 
 // Print spools document.
-func (d *Daemon) Print(c portalreq.Caller, title string, document dbus.UnixFD, token uint32) (bool, *dbus.Error) {
+func (d *Daemon) Print(c portaldialogs.Caller, title string, document dbus.UnixFD, token uint32) (bool, *dbus.Error) {
 	f, err := dbusx.File(document, "document")
 	if err != nil {
 		return false, dbusx.InvalidArgs(err.Error())
@@ -105,7 +104,7 @@ type Client struct{ obj dbus.BusObject }
 func NewClient(conn *dbus.Conn) *Client { return &Client{obj: conn.Object(ServiceName, ServicePath)} }
 
 // Prepare shows the dialog.
-func (c *Client) Prepare(ctx context.Context, caller portalreq.Caller, r PrepareRequest) (granted bool, settings []Setting, setup PageSetup, token uint32, err error) {
+func (c *Client) Prepare(ctx context.Context, caller portaldialogs.Caller, r PrepareRequest) (granted bool, settings []Setting, setup PageSetup, token uint32, err error) {
 	if r.Settings == nil {
 		r.Settings = []Setting{}
 	}
@@ -117,7 +116,7 @@ func (c *Client) Prepare(ctx context.Context, caller portalreq.Caller, r Prepare
 }
 
 // Print spools document, which stays the caller's to close.
-func (c *Client) Print(ctx context.Context, caller portalreq.Caller, title string, document dbus.UnixFD, token uint32) (sent bool, err error) {
+func (c *Client) Print(ctx context.Context, caller portaldialogs.Caller, title string, document dbus.UnixFD, token uint32) (sent bool, err error) {
 	err = c.obj.CallWithContext(ctx, iface+".Print", 0, caller, title, document, token).Store(&sent)
 	return sent, err
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
@@ -22,7 +23,6 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -130,7 +130,7 @@ type Chooser struct {
 	reply   func(Result)
 	queue   dialogqueue.Queue
 	// readChoices reads the request's choices as the user left them.
-	readChoices func() []portalreq.Selection
+	readChoices func() []portaldialogs.Selection
 	// replacing is the existing file a save asked to replace, which a
 	// second confirm of the same name replaces.
 	replacing string
@@ -217,11 +217,11 @@ type request struct {
 	mode                             Mode
 	filters                          []Filter
 	currentFilter                    int32
-	choices                          []portalreq.Choice
+	choices                          []portaldialogs.Choice
 }
 
 // Open shows the open dialog.
-func (c *Chooser) Open(caller portalreq.Caller, r OpenRequest) Result {
+func (c *Chooser) Open(caller portaldialogs.Caller, r OpenRequest) Result {
 	return c.ask(caller, request{
 		title: r.Title, folder: r.CurrentFolder, acceptLabel: r.AcceptLabel, mode: openMode(r),
 		filters: r.Filters, currentFilter: r.CurrentFilter, choices: r.Choices,
@@ -229,7 +229,7 @@ func (c *Chooser) Open(caller portalreq.Caller, r OpenRequest) Result {
 }
 
 // Save shows the save dialog seeded with the suggested name.
-func (c *Chooser) Save(caller portalreq.Caller, r SaveRequest) Result {
+func (c *Chooser) Save(caller portaldialogs.Caller, r SaveRequest) Result {
 	return c.ask(caller, request{
 		title: r.Title, folder: r.CurrentFolder, name: r.CurrentName, acceptLabel: r.AcceptLabel, mode: ModeSave,
 		filters: r.Filters, currentFilter: r.CurrentFilter, choices: r.Choices,
@@ -248,7 +248,7 @@ func (c *Chooser) Dismiss(handle string) {
 }
 
 // ask queues a request on the loop and waits for its answer.
-func (c *Chooser) ask(caller portalreq.Caller, r request) Result {
+func (c *Chooser) ask(caller portaldialogs.Caller, r request) Result {
 	ch := make(chan Result, 1)
 	c.d.Invoke(func() {
 		c.queue.Enqueue(caller.Handle, func() {

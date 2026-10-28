@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -117,7 +117,7 @@ func New(d Deps) *Dialog { return &Dialog{d: d, jobs: map[uint32]prepared{}, now
 // Prepare shows the printer picker and settings form for the request;
 // a confirmed one is stashed under the returned token, a random one
 // only the same app can print with, until it expires.
-func (h *Dialog) Prepare(c portalreq.Caller, r PrepareRequest) (bool, []Setting, PageSetup, uint32) {
+func (h *Dialog) Prepare(c portaldialogs.Caller, r PrepareRequest) (bool, []Setting, PageSetup, uint32) {
 	p, ok := h.ask(c, r)
 	if !ok {
 		return false, nil, PageSetup{}, 0
@@ -131,7 +131,7 @@ func (h *Dialog) Prepare(c portalreq.Caller, r PrepareRequest) (bool, []Setting,
 }
 
 // ask shows the dialog for the request and waits for the user.
-func (h *Dialog) ask(c portalreq.Caller, r PrepareRequest) (prepared, bool) {
+func (h *Dialog) ask(c portaldialogs.Caller, r PrepareRequest) (prepared, bool) {
 	queues := h.queues()
 	type answer struct {
 		p  prepared
@@ -190,7 +190,7 @@ func (h *Dialog) Dismiss(handle string) {
 // once; token 0 shows the dialog first. A token another app prepared,
 // or one expired, prints nothing. The dialog owns and closes the
 // document.
-func (h *Dialog) Print(c portalreq.Caller, title string, document *os.File, token uint32) bool {
+func (h *Dialog) Print(c portaldialogs.Caller, title string, document *os.File, token uint32) bool {
 	defer func() { _ = document.Close() }()
 	job, ok := h.claim(c.AppID, token)
 	if token == 0 {

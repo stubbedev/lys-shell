@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // wallpaperPortal maps SetWallpaperURI onto the shell's

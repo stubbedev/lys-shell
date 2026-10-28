@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/internal/dbuscli"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
@@ -45,7 +45,7 @@ func captureScreenshot(mode string) func(*cli.Matches) error {
 		}
 		defer func() { _ = conn.Close() }()
 		// No timeout: a region capture waits for the user's drag.
-		path, err := screenshot.NewClient(conn).Capture(context.Background(), portalreq.Caller{}, mode, target)
+		path, err := screenshot.NewClient(conn).Capture(context.Background(), portaldialogs.Caller{}, mode, target)
 		if err != nil {
 			return dbuscli.FormatError("Screenshot", "capture screenshot", err)
 		}

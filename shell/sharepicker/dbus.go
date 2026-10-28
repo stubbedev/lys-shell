@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // D-Bus identity (wayle-ipc's share_picker proxy).
@@ -39,7 +38,7 @@ type Request struct {
 
 // picker is what the daemon serves: the Picker, or a fake in tests.
 type picker interface {
-	Pick(portalreq.Caller, Request) string
+	Pick(portaldialogs.Caller, Request) string
 	Dismiss(handle string)
 }
 
@@ -71,7 +70,7 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 // replying the XDPH selection suffix (printed after `[SELECTION]`), or
 // an empty string on cancel.
 // A request offering no kind of source is refused.
-func (d *Daemon) Pick(c portalreq.Caller, r Request) (string, *dbus.Error) {
+func (d *Daemon) Pick(c portaldialogs.Caller, r Request) (string, *dbus.Error) {
 	if r.Sources&AllSources == 0 {
 		return "", dbus.MakeFailedError(fmt.Errorf("share picker: no kind of source to offer in %#x", uint32(r.Sources)))
 	}
@@ -96,7 +95,7 @@ func NewClient(conn *dbus.Conn) *Client {
 }
 
 // Pick asks the shell to show the picker; see Daemon.Pick.
-func (c *Client) Pick(ctx context.Context, caller portalreq.Caller, r Request) (string, error) {
+func (c *Client) Pick(ctx context.Context, caller portaldialogs.Caller, r Request) (string, error) {
 	var selection string
 	err := c.obj.CallWithContext(ctx, iface+".Pick", 0, caller, r).Store(&selection)
 	return selection, err

@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
@@ -26,18 +26,18 @@ type fakeChooser struct {
 	saved  dbustest.Var[filechooser.SaveRequest]
 }
 
-func answerChooser(uris []string, filters []filechooser.Filter, current int32, choices []portalreq.Choice) filechooser.Result {
+func answerChooser(uris []string, filters []filechooser.Filter, current int32, choices []portaldialogs.Choice) filechooser.Result {
 	res := filechooser.Result{URIs: uris}
 	if int(current) < len(filters) {
 		res.Filter = filters[current]
 	}
 	for _, c := range choices {
-		res.Choices = append(res.Choices, portalreq.Selection{ID: c.ID, Value: c.Start()})
+		res.Choices = append(res.Choices, portaldialogs.Selection{ID: c.ID, Value: c.Start()})
 	}
 	return res
 }
 
-func (f *fakeChooser) Open(c portalreq.Caller, r filechooser.OpenRequest) filechooser.Result {
+func (f *fakeChooser) Open(c portaldialogs.Caller, r filechooser.OpenRequest) filechooser.Result {
 	f.opened.Store(r)
 	if f.enter(c) {
 		return filechooser.Result{}
@@ -45,7 +45,7 @@ func (f *fakeChooser) Open(c portalreq.Caller, r filechooser.OpenRequest) filech
 	return answerChooser(f.uris.Load(), r.Filters, r.CurrentFilter, r.Choices)
 }
 
-func (f *fakeChooser) Save(c portalreq.Caller, r filechooser.SaveRequest) filechooser.Result {
+func (f *fakeChooser) Save(c portaldialogs.Caller, r filechooser.SaveRequest) filechooser.Result {
 	f.saved.Store(r)
 	if f.enter(c) {
 		return filechooser.Result{}
@@ -136,7 +136,7 @@ type fakePrinter struct {
 	got     dbustest.Var[[]any]
 }
 
-func (f *fakePrinter) Prepare(c portalreq.Caller, r printdialog.PrepareRequest) (bool, []printdialog.Setting, printdialog.PageSetup, uint32) {
+func (f *fakePrinter) Prepare(c portaldialogs.Caller, r printdialog.PrepareRequest) (bool, []printdialog.Setting, printdialog.PageSetup, uint32) {
 	f.got.Store([]any{r})
 	if f.enter(c) {
 		return false, nil, printdialog.PageSetup{}, 0
@@ -145,7 +145,7 @@ func (f *fakePrinter) Prepare(c portalreq.Caller, r printdialog.PrepareRequest) 
 	return f.granted, []printdialog.Setting{{Key: "printer", Value: "Office"}, {Key: "n-copies", Value: "2"}}, setup, 7
 }
 
-func (f *fakePrinter) Print(_ portalreq.Caller, title string, doc *os.File, token uint32) bool {
+func (f *fakePrinter) Print(_ portaldialogs.Caller, title string, doc *os.File, token uint32) bool {
 	defer doc.Close()
 	b, _ := io.ReadAll(doc)
 	f.got.Store([]any{title, string(b), token})
@@ -262,7 +262,7 @@ func TestFileChooserOptions(t *testing.T) {
 	f := serveChooser(t, r, "file:///a.png")
 	txt := filechooser.Filter{Name: "Text", Rules: []filechooser.Rule{{Kind: filechooser.RuleGlob, Value: "*.txt"}}}
 	png := filechooser.Filter{Name: "Images", Rules: []filechooser.Rule{{Kind: filechooser.RuleGlob, Value: "*.png"}}}
-	choices := []portalreq.Choice{{ID: "ro", Label: "Read-only", Options: []portalreq.Option{}, Initial: "true"}}
+	choices := []portaldialogs.Choice{{ID: "ro", Label: "Read-only", Options: []portaldialogs.Option{}, Initial: "true"}}
 	code, res := r.interactive(t, fileChooserIfaceName+"OpenFile", handle, "org.app", "", "Pick", Vardict{
 		"accept_label": dbus.MakeVariant("_Import"), "filters": dbus.MakeVariant([]filechooser.Filter{txt, png}),
 		"current_filter": dbus.MakeVariant(png), "choices": dbus.MakeVariant(choices),
@@ -275,8 +275,8 @@ func TestFileChooserOptions(t *testing.T) {
 	if err := dbus.Store([]any{res["current_filter"].Value()}, &cf); err != nil || code != ResponseSuccess || cf.Name != "Images" {
 		t.Errorf("current_filter = %v, %v", res["current_filter"], err)
 	}
-	var picked []portalreq.Selection
-	if err := dbus.Store([]any{res["choices"].Value()}, &picked); err != nil || !slices.Equal(picked, []portalreq.Selection{{ID: "ro", Value: "true"}}) {
+	var picked []portaldialogs.Selection
+	if err := dbus.Store([]any{res["choices"].Value()}, &picked); err != nil || !slices.Equal(picked, []portaldialogs.Selection{{ID: "ro", Value: "true"}}) {
 		t.Errorf("choices = %v, %v", res["choices"], err)
 	}
 	other := filechooser.Filter{Name: "Other", Rules: []filechooser.Rule{{Kind: filechooser.RuleGlob, Value: "*.x"}}}

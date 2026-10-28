@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -15,9 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
@@ -106,7 +105,7 @@ type appChooser struct {
 func New(d Deps) *Dialogs { return &Dialogs{d: d, choosers: map[string]*appChooser{}} }
 
 // ask shows a dialog for c on the loop and waits for its answer.
-func (h *Dialogs) ask(c portalreq.Caller, build func(answer func(bool, string)) widget.Widget) (bool, string) {
+func (h *Dialogs) ask(c portaldialogs.Caller, build func(answer func(bool, string)) widget.Widget) (bool, string) {
 	type result struct {
 		ok     bool
 		choice string
@@ -149,8 +148,8 @@ func (h *Dialogs) finish(ok bool, choice string) {
 
 // Access is the grant/deny prompt: the permission's icon above the
 // title, the subtitle and body below it.
-func (h *Dialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) (bool, []portalreq.Selection) {
-	var picked []portalreq.Selection
+func (h *Dialogs) Access(c portaldialogs.Caller, r portaldialogs.AccessRequest) (bool, []portaldialogs.Selection) {
+	var picked []portaldialogs.Selection
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
 		rows, collect := widgets.ChoiceRows(h.d.Font, r.Choices, "portal-dialog-choice")
@@ -169,7 +168,7 @@ func (h *Dialogs) Access(c portalreq.Caller, r portaldialogs.AccessRequest) (boo
 }
 
 // Account asks to share the user's name and avatar, previewing it.
-func (h *Dialogs) Account(c portalreq.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
+func (h *Dialogs) Account(c portaldialogs.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
 	shared := info
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		if reason == "" {
@@ -220,7 +219,7 @@ func (h *Dialogs) Account(c portalreq.Caller, reason string, info portaldialogs.
 
 // Password asks for a password in a masked entry; with Confirm it asks
 // twice and accepts only matching, non-empty entries. Enter submits.
-func (h *Dialogs) Password(c portalreq.Caller, r portaldialogs.PasswordRequest) (bool, string) {
+func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string) {
 	return h.ask(c, func(answer func(bool, string)) widget.Widget {
 		entry := h.passwordEntry("Password")
 		rows := []widget.Widget{entry}
@@ -271,7 +270,7 @@ func (h *Dialogs) passwordEntry(placeholder string) *widget.Entry {
 }
 
 // ConfirmWallpaper previews a file:// image before it is set.
-func (h *Dialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
+func (h *Dialogs) ConfirmWallpaper(c portaldialogs.Caller, uri string) bool {
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		path, _ := fileuri.Path(uri)
 		return h.confirm(answer, h.headerFile(path, wallpaperPx), "Set as wallpaper?", "", "Cancel", "Set wallpaper")
@@ -281,7 +280,7 @@ func (h *Dialogs) ConfirmWallpaper(c portalreq.Caller, uri string) bool {
 
 // ChooseDevices asks which USB devices the app may open: a check
 // button per device, all checked, naming it and the access asked for.
-func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []portaldialogs.Device) (bool, []string) {
+func (h *Dialogs) ChooseDevices(c portaldialogs.Caller, devices []portaldialogs.Device) (bool, []string) {
 	picked := []string{}
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		checks := make([]*widget.CheckButton, len(devices))
@@ -318,7 +317,7 @@ func (h *Dialogs) ChooseDevices(c portalreq.Caller, devices []portaldialogs.Devi
 // ConfirmInstall confirms a dynamic launcher: its icon, the URL a web
 // app opens, and its name, in an entry when it is editable. An emptied
 // name installs under the default one.
-func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.LauncherRequest) (bool, string) {
+func (h *Dialogs) ConfirmInstall(c portaldialogs.Caller, r portaldialogs.LauncherRequest) (bool, string) {
 	chosen := r.Name
 	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		var extra []widget.Widget
@@ -354,7 +353,7 @@ func (h *Dialogs) ConfirmInstall(c portalreq.Caller, r portaldialogs.LauncherReq
 // ChooseApplication is the app chooser: icon + name rows with a live
 // search filter, and "always use" when the type is known. Its choices
 // follow UpdateChoices while it is open.
-func (h *Dialogs) ChooseApplication(c portalreq.Caller, r portaldialogs.ChooserRequest) string {
+func (h *Dialogs) ChooseApplication(c portaldialogs.Caller, r portaldialogs.ChooserRequest) string {
 	ac := &appChooser{req: r}
 	if c.Handle != "" {
 		h.d.Invoke(func() { h.choosers[c.Handle] = ac })

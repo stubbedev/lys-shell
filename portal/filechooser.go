@@ -12,10 +12,10 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 )
 
@@ -37,7 +37,7 @@ func (f fileChooser) client() *filechooser.Client { return filechooser.NewClient
 // share: the filters and the one to start on, the choices, and the
 // confirm button's label. A current_filter that is not one of the
 // filters starts on the first; with no filters it is the one filter.
-func chooserOptions(options Vardict) (filters []filechooser.Filter, current int32, choices []portalreq.Choice, accept string, err error) {
+func chooserOptions(options Vardict) (filters []filechooser.Filter, current int32, choices []portaldialogs.Choice, accept string, err error) {
 	filters = fileFilters(options)
 	if v, ok := options["current_filter"]; ok {
 		var cf filechooser.Filter

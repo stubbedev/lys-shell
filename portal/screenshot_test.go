@@ -6,10 +6,9 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -25,12 +24,12 @@ type fakeShooter struct {
 	userShots dbustest.Var[int]
 }
 
-func (f *fakeShooter) Capture(portalreq.Caller, string, string) (string, *dbus.Error) {
+func (f *fakeShooter) Capture(portaldialogs.Caller, string, string) (string, *dbus.Error) {
 	f.userShots.Update(func(n int) int { return n + 1 })
 	return "/home/u/Pictures/user.png", nil
 }
 
-func (f *fakeShooter) CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, *dbus.Error) {
+func (f *fakeShooter) CapturePrivate(c portaldialogs.Caller, mode, target string, pointer bool) (string, *dbus.Error) {
 	if pointer {
 		target += "+pointer"
 	}
@@ -44,7 +43,7 @@ func (f *fakeShooter) CapturePrivate(c portalreq.Caller, mode, target string, po
 	return f.path, nil
 }
 
-func (f *fakeShooter) PickColor(c portalreq.Caller) (bool, float64, float64, float64, *dbus.Error) {
+func (f *fakeShooter) PickColor(c portaldialogs.Caller) (bool, float64, float64, float64, *dbus.Error) {
 	if f.enter(c) || f.unpicked.Load() {
 		return false, 0, 0, 0, nil
 	}

@@ -22,13 +22,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -95,7 +95,7 @@ type Host struct {
 // path, or "" when the user cancelled a region selection. It is saved
 // where [modules.screenshot] says, then copied and announced as it
 // says.
-func (h *Host) Capture(c portalreq.Caller, mode, target string) (string, error) {
+func (h *Host) Capture(c portaldialogs.Caller, mode, target string) (string, error) {
 	img, ok, err := h.grab(c, mode, target, false)
 	if err != nil || !ok {
 		return "", err
@@ -107,7 +107,7 @@ func (h *Host) Capture(c portalreq.Caller, mode, target string) (string, error) 
 // own in lys-shell's cache, with none of the user's save, clipboard or
 // notification settings applied, the pointer composited in when
 // pointer is set. "" is a cancelled selection.
-func (h *Host) CapturePrivate(c portalreq.Caller, mode, target string, pointer bool) (string, error) {
+func (h *Host) CapturePrivate(c portaldialogs.Caller, mode, target string, pointer bool) (string, error) {
 	img, ok, err := h.grab(c, mode, target, pointer)
 	if err != nil || !ok {
 		return "", err
@@ -128,7 +128,7 @@ func (h *Host) Dismiss(handle string) {
 }
 
 // overlay runs one overlay request for c, dismissable meanwhile.
-func overlay[T any](h *Host, c portalreq.Caller, cancel func(), request func() (T, bool)) (T, bool) {
+func overlay[T any](h *Host, c portaldialogs.Caller, cancel func(), request func() (T, bool)) (T, bool) {
 	h.mu.Lock()
 	h.interactive.handle, h.interactive.cancel = c.Handle, cancel
 	h.mu.Unlock()
@@ -144,7 +144,7 @@ func overlay[T any](h *Host, c portalreq.Caller, cancel func(), request func() (
 
 // grab captures the image for a mode, with the pointer when pointer is
 // set; ok is false for a cancelled region.
-func (h *Host) grab(c portalreq.Caller, mode, target string, pointer bool) (*image.RGBA, bool, error) {
+func (h *Host) grab(c portaldialogs.Caller, mode, target string, pointer bool) (*image.RGBA, bool, error) {
 	switch mode {
 	case ModeRegion:
 		return h.captureRegion(c, pointer)
@@ -256,7 +256,7 @@ func (h *Host) logical() map[string]regionoverlay.Monitor {
 // before the overlay maps (so transient popups survive), show the
 // overlay over those frames, and crop the selection out of the frame
 // of its output. Not ok means the user cancelled.
-func (h *Host) captureRegion(c portalreq.Caller, pointer bool) (*image.RGBA, bool, error) {
+func (h *Host) captureRegion(c portaldialogs.Caller, pointer bool) (*image.RGBA, bool, error) {
 	frozen, err := h.captureAll(pointer)
 	if err != nil {
 		return nil, false, err
@@ -314,7 +314,7 @@ func (h *Host) captureFullScreen(pointer bool) (*image.RGBA, error) {
 // PickColor freezes every output and lets the user pick one pixel with
 // the loupe, returning sRGB channels in [0, 1]; picked is false when
 // the user cancelled, and an error is a failure.
-func (h *Host) PickColor(caller portalreq.Caller) (color [3]float64, picked bool, err error) {
+func (h *Host) PickColor(caller portaldialogs.Caller) (color [3]float64, picked bool, err error) {
 	frozen, err := h.captureAll(false)
 	if err != nil {
 		return color, false, err

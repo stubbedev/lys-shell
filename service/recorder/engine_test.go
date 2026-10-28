@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -27,11 +27,11 @@ type fakePicker struct {
 
 	mu        sync.Mutex
 	asked     []sharepicker.Request
-	callers   []portalreq.Caller
+	callers   []portaldialogs.Caller
 	dismissed []string
 }
 
-func (p *fakePicker) Pick(ctx context.Context, c portalreq.Caller, r sharepicker.Request) (string, error) {
+func (p *fakePicker) Pick(ctx context.Context, c portaldialogs.Caller, r sharepicker.Request) (string, error) {
 	p.mu.Lock()
 	p.asked = append(p.asked, r)
 	p.callers = append(p.callers, c)

@@ -3,9 +3,8 @@ package portal
 import (
 	"fmt"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // Vardict is a portal a{sv}: every interactive method's options and
@@ -69,12 +68,12 @@ func serializedIcon(v dbus.Variant) (kind string, value dbus.Variant, ok bool) {
 
 // optChoices reads a choices option, a(ssa(ss)s); a malformed one, or
 // a list choice without options' ids and labels, is an error.
-func optChoices(options Vardict) ([]portalreq.Choice, error) {
+func optChoices(options Vardict) ([]portaldialogs.Choice, error) {
 	v, ok := options["choices"]
 	if !ok {
 		return nil, nil
 	}
-	var choices []portalreq.Choice
+	var choices []portaldialogs.Choice
 	if err := dbus.Store([]any{v.Value()}, &choices); err != nil {
 		return nil, fmt.Errorf("malformed choices: %w", err)
 	}

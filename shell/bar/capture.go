@@ -5,6 +5,7 @@ import (
 	"log"
 	"slices"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
@@ -12,7 +13,6 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/recorder"
@@ -96,7 +96,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 // oneshot.
 func (s *captureServices) trigger(mode, target string) {
 	go func() {
-		if _, err := s.host.Capture(portalreq.Caller{}, mode, target); err != nil {
+		if _, err := s.host.Capture(portaldialogs.Caller{}, mode, target); err != nil {
 			log.Printf("screenshot: %v", err)
 		}
 	}()

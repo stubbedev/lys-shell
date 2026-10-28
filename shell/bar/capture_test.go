@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
@@ -117,7 +117,7 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 
 	ctxCall, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	path, err := screenshot.NewClient(bus.Conn(t)).Capture(ctxCall, portalreq.Caller{}, screenshot.ModeOutput, outputs[0].Name)
+	path, err := screenshot.NewClient(bus.Conn(t)).Capture(ctxCall, portaldialogs.Caller{}, screenshot.ModeOutput, outputs[0].Name)
 	if err != nil {
 		t.Fatalf("Capture over D-Bus: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestHeadlessScreenshotCopyFailureReachesTheNotification(t *testing.T) {
 
 	ctxCall, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	path, err := screenshot.NewClient(bus.Conn(t)).Capture(ctxCall, portalreq.Caller{}, screenshot.ModeOutput, outputs[0].Name)
+	path, err := screenshot.NewClient(bus.Conn(t)).Capture(ctxCall, portaldialogs.Caller{}, screenshot.ModeOutput, outputs[0].Name)
 	if err != nil {
 		t.Fatalf("a failed copy failed the capture: %v", err)
 	}

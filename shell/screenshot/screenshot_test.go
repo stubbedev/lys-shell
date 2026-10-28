@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/offheap"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -249,7 +249,7 @@ func offHeap(t *testing.T, h *Host, connector string, img *image.RGBA) frozenOut
 func TestHostRegionCapture(t *testing.T) {
 	region := &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 10, Y: 10, Width: 20, Height: 10}, ok: true}
 	h, notified, copies := testHost(t, region)
-	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	path, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestHostRegionCapture(t *testing.T) {
 func TestHostReportsAFailedCopyInTheNotification(t *testing.T) {
 	h, notified, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
 	h.Copy = func(image.Image) error { return errors.New("no data-control and no input serial") }
-	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	path, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatalf("a failed copy failed the capture: %v", err)
 	}
@@ -303,12 +303,12 @@ func TestHostReadsTheReloadedConfig(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
 	cfg := h.Config()
 	h.Config = func() config.ScreenshotConfig { return cfg }
-	first, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	first, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg.OutputDirectory = filepath.Join(t.TempDir(), "reloaded")
-	second, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	second, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +319,7 @@ func TestHostReadsTheReloadedConfig(t *testing.T) {
 
 func TestHostRegionCancel(t *testing.T) {
 	h, notified, copies := testHost(t, &fakeRegion{ok: false})
-	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	path, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil || path != "" {
 		t.Fatalf("cancel = %q, %v; want an empty path and no error", path, err)
 	}
@@ -333,7 +333,7 @@ func TestHostRegionCancel(t *testing.T) {
 
 func TestHostRegionOnAVanishedOutput(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "HDMI-9", Width: 5, Height: 5}, ok: true})
-	if _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); err == nil || !strings.Contains(err.Error(), "no longer present") {
+	if _, err := h.Capture(portaldialogs.Caller{}, ModeRegion, ""); err == nil || !strings.Contains(err.Error(), "no longer present") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -343,7 +343,7 @@ func TestHostOptionsOff(t *testing.T) {
 	cfg := h.Config()
 	cfg.CopyToClipboard, cfg.Notify = false, false
 	h.Config = fixed(cfg)
-	if _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); err != nil {
+	if _, err := h.Capture(portaldialogs.Caller{}, ModeRegion, ""); err != nil {
 		t.Fatal(err)
 	}
 	if *copies != 0 || len(*notified) != 0 {
@@ -353,7 +353,7 @@ func TestHostOptionsOff(t *testing.T) {
 
 func TestHostScreenComposites(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{})
-	path, err := h.Capture(portalreq.Caller{}, ModeScreen, "")
+	path, err := h.Capture(portaldialogs.Caller{}, ModeScreen, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,14 +370,14 @@ func TestHostScreenComposites(t *testing.T) {
 		t.Fatalf("screen %v, want the 200x50 layout", b)
 	}
 	h.Monitors = func() []regionoverlay.Monitor { return nil }
-	if _, err := h.Capture(portalreq.Caller{}, ModeScreen, ""); err == nil {
+	if _, err := h.Capture(portaldialogs.Caller{}, ModeScreen, ""); err == nil {
 		t.Fatal("a screen capture without monitor geometry succeeded")
 	}
 }
 
 func TestHostUnknownMode(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{})
-	if _, err := h.Capture(portalreq.Caller{}, "everything", ""); err == nil || err.Error() != "unknown screenshot mode: everything" {
+	if _, err := h.Capture(portaldialogs.Caller{}, "everything", ""); err == nil || err.Error() != "unknown screenshot mode: everything" {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -391,7 +391,7 @@ func TestHostSaveFailure(t *testing.T) {
 	cfg := h.Config()
 	cfg.OutputDirectory = filepath.Join(file, "sub")
 	h.Config = fixed(cfg)
-	if _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); err == nil || !strings.HasPrefix(err.Error(), "cannot create") {
+	if _, err := h.Capture(portaldialogs.Caller{}, ModeRegion, ""); err == nil || !strings.HasPrefix(err.Error(), "cannot create") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -400,20 +400,20 @@ func TestHostSaveFailure(t *testing.T) {
 // failure - no outputs, or a picker with nothing to show - an error.
 func TestHostPickColor(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{})
-	c, picked, err := h.PickColor(portalreq.Caller{})
+	c, picked, err := h.PickColor(portaldialogs.Caller{})
 	if err != nil || !picked || c != [3]float64{1, 0.2, 0} {
 		t.Fatalf("pick = %v %v %v", c, picked, err)
 	}
 	h.Picker = fakePicker{ok: false}
-	if _, picked, err := h.PickColor(portalreq.Caller{}); err != nil || picked {
+	if _, picked, err := h.PickColor(portaldialogs.Caller{}); err != nil || picked {
 		t.Fatalf("cancel = %v, %v; want no pick and no error", picked, err)
 	}
 	h.Picker = fakePicker{err: errors.New("color picker: no captured frame matches an output")}
-	if _, picked, err := h.PickColor(portalreq.Caller{}); err == nil || picked {
+	if _, picked, err := h.PickColor(portaldialogs.Caller{}); err == nil || picked {
 		t.Fatalf("a picker failure = %v, %v; want its error, not a cancel", picked, err)
 	}
 	h.frozen = func(bool) ([]frozenOutput, error) { return nil, nil }
-	if _, _, err := h.PickColor(portalreq.Caller{}); err == nil || err.Error() != "no outputs available" {
+	if _, _, err := h.PickColor(portaldialogs.Caller{}); err == nil || err.Error() != "no outputs available" {
 		t.Fatalf("no outputs err = %v", err)
 	}
 }
@@ -424,11 +424,11 @@ func TestHostCapturePrivate(t *testing.T) {
 	cache := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", cache)
 	h, notified, copies := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
-	first, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/1"}, ModeRegion, "", false)
+	first, err := h.CapturePrivate(portaldialogs.Caller{Handle: "/r/1"}, ModeRegion, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := h.CapturePrivate(portalreq.Caller{Handle: "/r/2"}, ModeRegion, "", false)
+	second, err := h.CapturePrivate(portaldialogs.Caller{Handle: "/r/2"}, ModeRegion, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +446,7 @@ func TestHostCapturePrivate(t *testing.T) {
 		t.Error("an app's capture went to the user's screenshot directory")
 	}
 	h.Region = &fakeRegion{}
-	if path, err := h.CapturePrivate(portalreq.Caller{}, ModeRegion, "", false); err != nil || path != "" {
+	if path, err := h.CapturePrivate(portaldialogs.Caller{}, ModeRegion, "", false); err != nil || path != "" {
 		t.Errorf("a cancelled private capture = %q, %v", path, err)
 	}
 }
@@ -464,11 +464,11 @@ func TestHostCapturesThePointerOnlyWhenAsked(t *testing.T) {
 		return frozen(pointer)
 	}
 	for _, capture := range []func() error{
-		func() error { _, err := h.CapturePrivate(portalreq.Caller{}, ModeScreen, "", true); return err },
-		func() error { _, err := h.CapturePrivate(portalreq.Caller{}, ModeRegion, "", true); return err },
-		func() error { _, err := h.CapturePrivate(portalreq.Caller{}, ModeScreen, "", false); return err },
-		func() error { _, err := h.Capture(portalreq.Caller{}, ModeScreen, ""); return err },
-		func() error { _, _, err := h.PickColor(portalreq.Caller{}); return err },
+		func() error { _, err := h.CapturePrivate(portaldialogs.Caller{}, ModeScreen, "", true); return err },
+		func() error { _, err := h.CapturePrivate(portaldialogs.Caller{}, ModeRegion, "", true); return err },
+		func() error { _, err := h.CapturePrivate(portaldialogs.Caller{}, ModeScreen, "", false); return err },
+		func() error { _, err := h.Capture(portaldialogs.Caller{}, ModeScreen, ""); return err },
+		func() error { _, _, err := h.PickColor(portaldialogs.Caller{}); return err },
 	} {
 		if err := capture(); err != nil {
 			t.Fatal(err)
@@ -484,7 +484,7 @@ func TestHostKeepsCapturesOfTheSameSecond(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
 	var paths []string
 	for range 3 {
-		path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+		path, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -500,7 +500,7 @@ func TestHostKeepsCapturesOfTheSameSecond(t *testing.T) {
 func TestHostRegionAcrossOutputs(t *testing.T) {
 	// DP-1 (red, 2x) spans x 0-100, DP-2 (green, 1x) x 100-200.
 	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 90, Y: 0, Width: 20, Height: 10}, ok: true})
-	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	path, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -543,14 +543,14 @@ func TestResolveDir(t *testing.T) {
 // fakeCapturer is the daemon's host in tests.
 type fakeCapturer struct{ err error }
 
-func (f fakeCapturer) Capture(_ portalreq.Caller, mode, target string) (string, error) {
+func (f fakeCapturer) Capture(_ portaldialogs.Caller, mode, target string) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return "/p/" + mode + target, nil
 }
 
-func (f fakeCapturer) CapturePrivate(_ portalreq.Caller, mode, target string, pointer bool) (string, error) {
+func (f fakeCapturer) CapturePrivate(_ portaldialogs.Caller, mode, target string, pointer bool) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
@@ -560,7 +560,7 @@ func (f fakeCapturer) CapturePrivate(_ portalreq.Caller, mode, target string, po
 	return "/private/" + mode + target, nil
 }
 
-func (f fakeCapturer) PickColor(portalreq.Caller) ([3]float64, bool, error) {
+func (f fakeCapturer) PickColor(portaldialogs.Caller) ([3]float64, bool, error) {
 	return [3]float64{0.5, 0.25, 1}, f.err == nil, f.err
 }
 
@@ -568,21 +568,21 @@ func (fakeCapturer) Dismiss(string) {}
 
 func TestDaemonMethods(t *testing.T) {
 	d := &Daemon{host: fakeCapturer{}}
-	if p, err := d.Capture(portalreq.Caller{}, "output", "DP-1"); err != nil || p != "/p/outputDP-1" {
+	if p, err := d.Capture(portaldialogs.Caller{}, "output", "DP-1"); err != nil || p != "/p/outputDP-1" {
 		t.Fatalf("Capture = %q %v", p, err)
 	}
-	if picked, r, g, b, err := d.PickColor(portalreq.Caller{}); err != nil || !picked || r != 0.5 || g != 0.25 || b != 1 {
+	if picked, r, g, b, err := d.PickColor(portaldialogs.Caller{}); err != nil || !picked || r != 0.5 || g != 0.25 || b != 1 {
 		t.Fatalf("PickColor = %v %v %v %v %v", picked, r, g, b, err)
 	}
-	if p, err := d.CapturePrivate(portalreq.Caller{}, "window", "id-1", false); err != nil || p != "/private/windowid-1" {
+	if p, err := d.CapturePrivate(portaldialogs.Caller{}, "window", "id-1", false); err != nil || p != "/private/windowid-1" {
 		t.Fatalf("CapturePrivate = %q %v", p, err)
 	}
 	d = &Daemon{host: fakeCapturer{err: errors.New("no outputs available")}}
-	_, err := d.Capture(portalreq.Caller{}, "output", "")
+	_, err := d.Capture(portaldialogs.Caller{}, "output", "")
 	if err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" || err.Body[0] != "no outputs available" {
 		t.Fatalf("Capture error = %v", err)
 	}
-	if _, _, _, _, err := d.PickColor(portalreq.Caller{}); err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" {
+	if _, _, _, _, err := d.PickColor(portaldialogs.Caller{}); err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" {
 		t.Fatalf("PickColor error = %v", err)
 	}
 }
@@ -594,7 +594,7 @@ func TestDismissCancelsItsOverlayOnly(t *testing.T) {
 	h, _, _ := testHost(t, region)
 	done := make(chan string, 1)
 	go func() {
-		path, _ := h.Capture(portalreq.Caller{Handle: "/r/mine"}, ModeRegion, "")
+		path, _ := h.Capture(portaldialogs.Caller{Handle: "/r/mine"}, ModeRegion, "")
 		done <- path
 	}()
 	deadline := time.Now().Add(2 * time.Second)
@@ -658,7 +658,7 @@ func TestHostRegionSavesTheFramePixels(t *testing.T) {
 		captured = dp1.image.RGBA
 		return []frozenOutput{dp1, offHeap(t, h, "DP-2", solid(100, 50, green))}, nil
 	}
-	path, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+	path, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -695,22 +695,22 @@ func TestHostRegionSavesTheFramePixels(t *testing.T) {
 func TestHostReleasesTheFrozenFrames(t *testing.T) {
 	sel := regionoverlay.Selection{Output: "DP-1", X: 10, Y: 10, Width: 20, Height: 10}
 	for name, run := range map[string]func(h *Host) error{
-		"region confirmed": func(h *Host) error { _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); return err },
+		"region confirmed": func(h *Host) error { _, err := h.Capture(portaldialogs.Caller{}, ModeRegion, ""); return err },
 		"region across outputs": func(h *Host) error {
 			h.Region = &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 90, Y: 10, Width: 20, Height: 10}, ok: true}
-			_, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+			_, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 			return err
 		},
 		"region cancelled": func(h *Host) error {
 			h.Region = &fakeRegion{}
-			_, err := h.Capture(portalreq.Caller{}, ModeRegion, "")
+			_, err := h.Capture(portaldialogs.Caller{}, ModeRegion, "")
 			return err
 		},
-		"screen":     func(h *Host) error { _, err := h.Capture(portalreq.Caller{}, ModeScreen, ""); return err },
-		"color pick": func(h *Host) error { _, _, err := h.PickColor(portalreq.Caller{}); return err },
+		"screen":     func(h *Host) error { _, err := h.Capture(portaldialogs.Caller{}, ModeScreen, ""); return err },
+		"color pick": func(h *Host) error { _, _, err := h.PickColor(portaldialogs.Caller{}); return err },
 		"color pick failed": func(h *Host) error {
 			h.Picker = fakePicker{err: errors.New("no output")}
-			if _, _, err := h.PickColor(portalreq.Caller{}); err == nil {
+			if _, _, err := h.PickColor(portaldialogs.Caller{}); err == nil {
 				return errors.New("the failed pick succeeded")
 			}
 			return nil
@@ -749,7 +749,7 @@ func TestHostReleasesTheFrozenFrames(t *testing.T) {
 func TestHostFreesTheFramesAfterTheFence(t *testing.T) {
 	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", X: 10, Y: 10, Width: 20, Height: 10}, ok: true})
 	drawing := render.NewRecorder(1, 1, 1, 1).Recording()
-	if _, err := h.Capture(portalreq.Caller{}, ModeRegion, ""); err != nil {
+	if _, err := h.Capture(portaldialogs.Caller{}, ModeRegion, ""); err != nil {
 		t.Fatal(err)
 	}
 	if live := h.mem.Stats().Live; live != 2 {

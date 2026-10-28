@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // Dialogs is a service.Prompter over the shell's dialogs.
@@ -25,7 +23,7 @@ func New(conn *dbus.Conn) *Dialogs { return &Dialogs{client: portaldialogs.NewCl
 
 func (d *Dialogs) ask(ctx context.Context, r portaldialogs.PasswordRequest) ([]byte, bool, error) {
 	d.seq++
-	caller := portalreq.Caller{Handle: fmt.Sprintf("/dev/stubbe/lys/secrets/prompt/%d", d.seq)}
+	caller := portaldialogs.Caller{Handle: fmt.Sprintf("/dev/stubbe/lys/secrets/prompt/%d", d.seq)}
 	done := make(chan struct{})
 	defer close(done)
 	go func() {

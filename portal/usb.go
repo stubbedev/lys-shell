@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // usb is org.freedesktop.impl.portal.Usb: the frontend

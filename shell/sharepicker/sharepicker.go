@@ -18,13 +18,13 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -108,7 +108,7 @@ func New(a *app.Application, d Deps, region *regionoverlay.Overlay) *Picker {
 // flag seeds the restore-token box; multiple enables multi-select. A
 // request arriving while one is open waits its turn. Call it from any
 // goroutine but the loop's.
-func (p *Picker) Pick(c portalreq.Caller, r Request) string {
+func (p *Picker) Pick(c portaldialogs.Caller, r Request) string {
 	ch := make(chan string, 1)
 	toplevels := sharepreview.ParseList(r.WindowList)
 	p.invoke(func() {
@@ -134,7 +134,7 @@ func (p *Picker) Dismiss(handle string) {
 
 // show re-reads the config and maps the surface for one request with
 // its enter transition.
-func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []sharepreview.Toplevel, r Request) {
+func (p *Picker) show(c portaldialogs.Caller, ch chan string, toplevels []sharepreview.Toplevel, r Request) {
 	p.snapshot()
 	p.reply, p.allowToken, p.multiple, p.pending = ch, r.AllowToken, r.Multiple, nil
 	p.requester = p.describe(c)
@@ -149,7 +149,7 @@ func (p *Picker) show(c portalreq.Caller, ch chan string, toplevels []shareprevi
 
 // describe is the line naming the app a request comes from, "" without
 // a describer.
-func (p *Picker) describe(c portalreq.Caller) string {
+func (p *Picker) describe(c portaldialogs.Caller) string {
 	if p.d.Describe == nil {
 		return ""
 	}

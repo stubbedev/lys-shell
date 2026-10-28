@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
@@ -18,10 +19,8 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs/dialoghost"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
 )
@@ -131,7 +130,7 @@ func dialogOutput(outs []*app.Output, focused func() (string, bool)) *app.Output
 func pickImage(application *app.Application, chooser *filechooser.Chooser, chosen func(string)) {
 	images := filechooser.Filter{Name: "Images", Rules: []filechooser.Rule{{Kind: filechooser.RuleMIME, Value: "image/*"}}}
 	go func() {
-		uris := chooser.Open(portalreq.Caller{Modal: true}, filechooser.OpenRequest{Title: "Choose a picture", Filters: []filechooser.Filter{images}}).URIs
+		uris := chooser.Open(portaldialogs.Caller{Modal: true}, filechooser.OpenRequest{Title: "Choose a picture", Filters: []filechooser.Filter{images}}).URIs
 		if len(uris) == 0 {
 			return
 		}
@@ -147,7 +146,7 @@ func pickImage(application *app.Application, chooser *filechooser.Chooser, chose
 // loop.
 func pickOutput(application *app.Application, chooser *filechooser.Chooser, suggested string, chosen func(string)) {
 	go func() {
-		uris := chooser.Save(portalreq.Caller{Modal: true}, filechooser.SaveRequest{
+		uris := chooser.Save(portaldialogs.Caller{Modal: true}, filechooser.SaveRequest{
 			Title: "Print to File", CurrentName: filepath.Base(suggested), CurrentFolder: filepath.Dir(suggested),
 		}).URIs
 		if len(uris) == 0 {

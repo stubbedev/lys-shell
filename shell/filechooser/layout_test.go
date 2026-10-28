@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -110,7 +110,7 @@ func TestFooterStaysInThePanel(t *testing.T) {
 				dir = crowded(t, hs.root, tc.files)
 			}
 			hs.ask(t, func() []string {
-				return hs.c.Save(portalreq.Caller{Handle: "/r/footer", Modal: true}, SaveRequest{CurrentFolder: dir, CurrentName: "new.txt"}).URIs
+				return hs.c.Save(portaldialogs.Caller{Handle: "/r/footer", Modal: true}, SaveRequest{CurrentFolder: dir, CurrentName: "new.txt"}).URIs
 			})
 			if tc.show != nil {
 				tc.show(hs)

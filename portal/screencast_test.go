@@ -9,9 +9,9 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -22,7 +22,7 @@ type fakeSharePicker struct {
 	asked dbustest.Var[[]any]
 }
 
-func (f *fakeSharePicker) Pick(c portalreq.Caller, r sharepicker.Request) (string, *dbus.Error) {
+func (f *fakeSharePicker) Pick(c portaldialogs.Caller, r sharepicker.Request) (string, *dbus.Error) {
 	f.asked.Update(func(a []any) []any { return append(a, r) })
 	if f.enter(c) {
 		return "", nil

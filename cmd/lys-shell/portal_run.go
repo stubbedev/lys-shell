@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/portal"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -61,7 +61,7 @@ func runSharePicker(m *cli.Matches) error {
 	}
 	defer func() { _ = conn.Close() }()
 	// The legacy single-select path: never multi-select.
-	selection, err := sharepicker.NewClient(conn).Pick(context.Background(), portalreq.Caller{}, sharepicker.Request{
+	selection, err := sharepicker.NewClient(conn).Pick(context.Background(), portaldialogs.Caller{}, sharepicker.Request{
 		WindowList: os.Getenv("XDPH_WINDOW_SHARING_LIST"), Sources: sharepicker.AllSources, AllowToken: m.Flag("allow_token"),
 	})
 	if err != nil {

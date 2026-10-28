@@ -5,11 +5,10 @@ import (
 	"errors"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -90,8 +89,8 @@ var grabTargets = map[string]uint32{"screen": targetScreen, "window": targetPick
 var screenshotChooser = portaldialogs.AccessRequest{
 	Title: "Take a screenshot", Subtitle: "Choose what to capture.",
 	GrantLabel: "Take Screenshot", DenyLabel: "Cancel", Icon: screenshotIcon,
-	Choices: []portalreq.Choice{
-		{ID: choiceGrab, Label: "Grab", Initial: "screen", Options: []portalreq.Option{
+	Choices: []portaldialogs.Choice{
+		{ID: choiceGrab, Label: "Grab", Initial: "screen", Options: []portaldialogs.Option{
 			{ID: "screen", Label: "Whole screen"}, {ID: "window", Label: "A window"}, {ID: "area", Label: "An area"},
 		}},
 		{ID: choicePointer, Label: "Show the pointer"},
@@ -100,7 +99,7 @@ var screenshotChooser = portaldialogs.AccessRequest{
 
 // chosenShot reads the chooser's answers; false for a grab it did not
 // offer.
-func chosenShot(selections []portalreq.Selection) (shot, bool) {
+func chosenShot(selections []portaldialogs.Selection) (shot, bool) {
 	var s shot
 	for _, sel := range selections {
 		switch sel.ID {

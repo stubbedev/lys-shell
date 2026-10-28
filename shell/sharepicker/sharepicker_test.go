@@ -8,12 +8,12 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -278,7 +278,7 @@ func TestMonitorAreaPlacement(t *testing.T) {
 
 type fakePicker struct{ reply string }
 
-func (f fakePicker) Pick(c portalreq.Caller, r Request) string {
+func (f fakePicker) Pick(c portaldialogs.Caller, r Request) string {
 	return f.reply + "|" + c.Handle + "|" + r.WindowList + "|" + boolStr(r.AllowToken) + boolStr(r.Multiple) + "|" + strconv.Itoa(int(r.Sources))
 }
 
@@ -300,12 +300,12 @@ func TestDaemonOverTheBus(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer release()
-	got, err := NewClient(client).Pick(context.Background(), portalreq.Caller{Handle: "/r/1"}, Request{WindowList: "1[HC>]a[HT>]b[HE>]", Sources: SourceWindows, AllowToken: true})
+	got, err := NewClient(client).Pick(context.Background(), portaldialogs.Caller{Handle: "/r/1"}, Request{WindowList: "1[HC>]a[HT>]b[HE>]", Sources: SourceWindows, AllowToken: true})
 	if err != nil || got != "/screen:DP-1|/r/1|1[HC>]a[HT>]b[HE>]|tf|2" {
 		t.Fatalf("Pick = %q %v", got, err)
 	}
 	// A request offering nothing to pick is refused, not shown empty.
-	if got, err := NewClient(client).Pick(context.Background(), portalreq.Caller{Handle: "/r/2"}, Request{}); err == nil {
+	if got, err := NewClient(client).Pick(context.Background(), portaldialogs.Caller{Handle: "/r/2"}, Request{}); err == nil {
 		t.Fatalf("Pick with no sources = %q", got)
 	}
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {
@@ -374,7 +374,7 @@ func isLabeledCheck(w widget.Widget, text string) bool {
 func TestPickerNamesTheRequester(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.d.Describe = func(appID string) (string, string) { return "Meet " + appID, "" }
-	p.requester = p.describe(portalreq.Caller{Handle: "/r/9", AppID: "org.meet"})
+	p.requester = p.describe(portaldialogs.Caller{Handle: "/r/9", AppID: "org.meet"})
 	p.root = p.build(nil, AllSources)
 	if labels := treetest.Labels(p.root); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
 		t.Errorf("labels = %q", labels)

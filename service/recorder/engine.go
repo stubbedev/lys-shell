@@ -15,8 +15,8 @@ import (
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -40,7 +40,7 @@ var ErrPickerCancelled = errors.New("recorder: nothing was picked to record")
 
 // Picker shows the share picker: sharepicker.Client.
 type Picker interface {
-	Pick(ctx context.Context, caller portalreq.Caller, r sharepicker.Request) (string, error)
+	Pick(ctx context.Context, caller portaldialogs.Caller, r sharepicker.Request) (string, error)
 	Dismiss(ctx context.Context, handle string) error
 }
 
@@ -108,7 +108,7 @@ func (e *GPUEngine) session(s *screen, err error) (Session, error) {
 // takes the picker down.
 func (e *GPUEngine) pick(ctx context.Context) (target sharepicker.Target, remember bool, err error) {
 	handle := fmt.Sprintf("/dev/stubbe/lys/Recorder/pick/%d", e.picks.Add(1))
-	reply, err := e.picker.Pick(ctx, portalreq.Caller{Handle: handle, AppID: pickerAppID}, sharepicker.Request{
+	reply, err := e.picker.Pick(ctx, portaldialogs.Caller{Handle: handle, AppID: pickerAppID}, sharepicker.Request{
 		Sources: sharepicker.SourceOutputs | sharepicker.SourceRegions, AllowToken: e.stateDir != "",
 	})
 	if ctx.Err() != nil {

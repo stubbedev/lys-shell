@@ -7,12 +7,12 @@ import (
 	"slices"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/useraccount"
-	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 )
 
 // The consent dialogs' header icons: glyphs the shell installs

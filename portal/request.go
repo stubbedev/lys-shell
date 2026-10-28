@@ -6,9 +6,8 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // RequestIface is the object the frontend passes the handle of into
@@ -57,7 +56,7 @@ func (o requestObject) Close() *dbus.Error {
 // dialog the call shows; the call's Request lives until end.
 type call struct {
 	ctx    context.Context
-	caller portalreq.Caller
+	caller portaldialogs.Caller
 	req    *request
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -76,7 +75,7 @@ func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, 
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &call{
-		ctx: ctx, caller: portalreq.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow, Modal: true},
+		ctx: ctx, caller: portaldialogs.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow, Modal: true},
 		req: req, cancel: cancel, done: make(chan struct{}),
 	}
 	c.watching.Go(func() {

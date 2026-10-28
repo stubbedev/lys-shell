@@ -7,9 +7,8 @@ import (
 	"context"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/portalreq"
 )
 
 // D-Bus identity (wayle-ipc file_chooser.rs).
@@ -50,7 +49,7 @@ type OpenRequest struct {
 	// first by default).
 	CurrentFilter int32
 	// Choices are extra questions shown with the dialog.
-	Choices []portalreq.Choice
+	Choices []portaldialogs.Choice
 }
 
 // SaveRequest is one save dialog.
@@ -61,7 +60,7 @@ type SaveRequest struct {
 	CurrentFolder string
 	AcceptLabel   string
 	CurrentFilter int32
-	Choices       []portalreq.Choice
+	Choices       []portaldialogs.Choice
 }
 
 // Result is what a dialog answers, (asa(sa(us))a(ss)) on the wire as
@@ -71,13 +70,13 @@ type SaveRequest struct {
 type Result struct {
 	URIs    []string
 	Filter  Filter
-	Choices []portalreq.Selection
+	Choices []portaldialogs.Selection
 }
 
 // Host shows the dialogs; each blocks until the user answers.
 type Host interface {
-	Open(portalreq.Caller, OpenRequest) Result
-	Save(portalreq.Caller, SaveRequest) Result
+	Open(portaldialogs.Caller, OpenRequest) Result
+	Save(portaldialogs.Caller, SaveRequest) Result
 	// Dismiss takes down the dialog showing for the request at handle.
 	Dismiss(handle string)
 }
@@ -95,13 +94,13 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 }
 
 // OpenFile opens existing files or directories.
-func (d *Daemon) OpenFile(c portalreq.Caller, r OpenRequest) ([]string, Filter, []portalreq.Selection, *dbus.Error) {
+func (d *Daemon) OpenFile(c portaldialogs.Caller, r OpenRequest) ([]string, Filter, []portaldialogs.Selection, *dbus.Error) {
 	res := d.host.Open(c, r)
 	return nonNil(res.URIs), withRules(res.Filter), nonNil(res.Choices), nil
 }
 
 // SaveFile chooses a save destination.
-func (d *Daemon) SaveFile(c portalreq.Caller, r SaveRequest) ([]string, Filter, []portalreq.Selection, *dbus.Error) {
+func (d *Daemon) SaveFile(c portaldialogs.Caller, r SaveRequest) ([]string, Filter, []portaldialogs.Selection, *dbus.Error) {
 	res := d.host.Save(c, r)
 	return nonNil(res.URIs), withRules(res.Filter), nonNil(res.Choices), nil
 }
@@ -133,14 +132,14 @@ type Client struct{ obj dbus.BusObject }
 func NewClient(conn *dbus.Conn) *Client { return &Client{obj: conn.Object(ServiceName, ServicePath)} }
 
 // Open shows the open dialog.
-func (c *Client) Open(ctx context.Context, caller portalreq.Caller, r OpenRequest) (res Result, err error) {
+func (c *Client) Open(ctx context.Context, caller portaldialogs.Caller, r OpenRequest) (res Result, err error) {
 	r.Filters, r.Choices = wireFilters(r.Filters), wireChoices(r.Choices)
 	err = c.obj.CallWithContext(ctx, iface+".OpenFile", 0, caller, r).Store(&res.URIs, &res.Filter, &res.Choices)
 	return res, err
 }
 
 // Save shows the save dialog.
-func (c *Client) Save(ctx context.Context, caller portalreq.Caller, r SaveRequest) (res Result, err error) {
+func (c *Client) Save(ctx context.Context, caller portaldialogs.Caller, r SaveRequest) (res Result, err error) {
 	r.Filters, r.Choices = wireFilters(r.Filters), wireChoices(r.Choices)
 	err = c.obj.CallWithContext(ctx, iface+".SaveFile", 0, caller, r).Store(&res.URIs, &res.Filter, &res.Choices)
 	return res, err
@@ -157,8 +156,8 @@ func wireFilters(filters []Filter) []Filter {
 }
 
 // wireChoices does the same for choices.
-func wireChoices(choices []portalreq.Choice) []portalreq.Choice {
-	out := make([]portalreq.Choice, len(choices))
+func wireChoices(choices []portaldialogs.Choice) []portaldialogs.Choice {
+	out := make([]portaldialogs.Choice, len(choices))
 	for i, c := range choices {
 		c.Options = nonNil(c.Options)
 		out[i] = c
