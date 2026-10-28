@@ -7,15 +7,21 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/fourcc"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
+	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 	"golang.org/x/sys/unix"
 
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/gpuhost"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/swaytest"
 )
 
@@ -190,5 +196,158 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	want := "portal: screencast: output " + output.Name + " streams through shared memory: screencast: no dmabuf path: no Vulkan device\n"
 	if got := logged.String(); got != want {
 		t.Errorf("logged %q, want once %q", got, want)
+	}
+}
+
+// sharedWindow maps a window on a's sway, showing label, and returns
+// its toplevel identifier.
+func sharedWindow(t *testing.T, a *app.Application, label *widget.Label) string {
+	t.Helper()
+	const appID = "dev.stubbe.lys.test.shared"
+	opened := make(chan error, 1)
+	a.Invoke(func() {
+		_, err := a.NewWindow(app.WindowConfig{Title: "shared", AppID: appID, Width: 320, Height: 200, Root: label})
+		opened <- err
+	})
+	if err := <-opened; err != nil {
+		t.Fatal(err)
+	}
+	c, err := capture.Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		list, err := c.Toplevels()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tl := range list {
+			if tl.AppID == appID && tl.Identifier != "" && settled(c, tl) {
+				return tl.Identifier
+			}
+		}
+	}
+	t.Fatal("the shared window never listed at a settled size")
+	return ""
+}
+
+// settled reports whether two captures of tl in a row have one size:
+// sway tiles a new window, resizing it after it first maps.
+func settled(c *capture.Client, tl capture.Toplevel) bool {
+	var sizes [2][2]int
+	for i := range sizes {
+		f, err := c.CaptureToplevel(tl, capture.Options{})
+		if err != nil {
+			return false
+		}
+		sizes[i] = [2]int{f.Width, f.Height}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return sizes[0] == sizes[1]
+}
+
+// On the host's GPU a window share streams zero-copy too, over the
+// window's capture session, and logs nothing; a consumer that takes
+// only shared memory still gets frames from it. Without a Vulkan device
+// it says why and streams through shared memory.
+func TestWindowStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
+	node, _, _ := vulkanNode(t)
+	a := apptest.Run(t, "WLR_RENDERER=vulkan", "WLR_RENDER_DRM_DEVICE="+node)
+	pwtest.Start(t)
+	window := sharepicker.Target{Kind: sharepicker.TargetWindow, Name: sharedWindow(t, a, widget.NewLabel(treetest.Font(t), 14, "shared", render.RGBA(255, 255, 255, 255)))}
+
+	logged := captureLog(t)
+	streams := screenStreams{openDevice: openVulkanAllocator}
+	s, err := streams.startWindowGPU(window.Name, false, 30)
+	if err != nil {
+		t.Fatalf("the zero-copy path declined: %v", err)
+	}
+	w, h := s.Size()
+	if w <= 0 || h <= 0 || s.NodeID() == 0 {
+		t.Fatalf("the GPU stream is %dx%d on node %d", w, h, s.NodeID())
+	}
+	consumer := pwtest.Consume(t, screencastNode)
+	for range 2 {
+		if size := consumer.Frame(t); size != uint32(w*h*4) {
+			t.Fatalf("a shared-memory consumer of the GPU stream got %d bytes, want a %dx%d frame", size, w, h)
+		}
+	}
+	s.Close()
+	s, err = streams.start(window, false, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if got := logged.String(); got != "" {
+		t.Errorf("a zero-copy window stream logged %q", got)
+	}
+
+	noVulkan := errors.New("no Vulkan device")
+	s, err = screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return nil, noVulkan }}.start(window, false, 30)
+	if err != nil {
+		t.Fatalf("no Vulkan device failed the stream instead of falling back: %v", err)
+	}
+	defer s.Close()
+	want := "portal: screencast: window " + window.Name + " streams through shared memory: screencast: no dmabuf path: no Vulkan device\n"
+	if got := logged.String(); got != want {
+		t.Errorf("logged %q, want once %q", got, want)
+	}
+}
+
+// On the host's GPU the window's session copies into the stream's own
+// GPU buffers: a buffer handed over goes out once the window painted
+// into it, in the modifier the probe took.
+func TestWindowSessionCopiesIntoTheStreamsBuffers(t *testing.T) {
+	node, _, dev := vulkanNode(t)
+	a := apptest.Run(t, "WLR_RENDERER=vulkan", "WLR_RENDER_DRM_DEVICE="+node)
+	label := widget.NewLabel(treetest.Font(t), 14, "shared", render.RGBA(255, 255, 255, 255))
+	id := sharedWindow(t, a, label)
+	c, err := capture.Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	tl, ok := findToplevel(c, id)
+	if !ok {
+		t.Fatal("the shared window is gone")
+	}
+	grab := toplevelGrab(c, tl, false)
+	first, err := grab(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	offered, err := windowDmabufFormat(c, tl, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, layouts, err := screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return dev, nil }}.deviceLayouts(offered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := newWindowGPUSource(newSnapshotSource(grab, first, newVanishWatch(toplevelGone(c, id))), dev, &windowSession{c: c, t: tl}, offered, layouts)
+	if err != nil {
+		t.Fatalf("the zero-copy path declined: %v", err)
+	}
+	t.Cleanup(src.Close)
+	b, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(b.Release)
+	if !isDmabuf(b.Fd()) {
+		t.Fatalf("buffer fd %d is not a dmabuf", b.Fd())
+	}
+	for i := 0; ; i++ {
+		if _, ok := src.FillDmabuf(b); ok {
+			return
+		}
+		if i == 500 {
+			t.Fatal("no frame landed in the stream's buffer")
+		}
+		if i%25 == 0 {
+			a.Invoke(func() { label.SetText(fmt.Sprintf("frame %d", i)) })
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

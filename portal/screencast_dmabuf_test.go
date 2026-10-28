@@ -24,8 +24,12 @@ type fakeDevice struct {
 	// targets counts the allocations made for rendering into.
 	targets int
 	asked   [][]fourcc.Modifier
+	sizes   [][2]int
 	fds     []int
 }
+
+// lastSize is the size of the latest allocation.
+func (f *fakeDevice) lastSize() [2]int { return f.sizes[len(f.sizes)-1] }
 
 func (f *fakeDevice) NewTarget(w, h int, format fourcc.Format, mods []fourcc.Modifier) (gpuAllocation, error) {
 	f.targets++
@@ -34,6 +38,7 @@ func (f *fakeDevice) NewTarget(w, h int, format fourcc.Format, mods []fourcc.Mod
 
 func (f *fakeDevice) NewBuffer(w, h int, format fourcc.Format, mods []fourcc.Modifier) (gpuAllocation, error) {
 	f.asked = append(f.asked, mods)
+	f.sizes = append(f.sizes, [2]int{w, h})
 	if f.fail {
 		return nil, errors.New("no memory")
 	}

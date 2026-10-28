@@ -83,9 +83,12 @@ func newVanishWatch(gone func() bool) *vanishWatch {
 // watch never ends by itself.
 func (v *vanishWatch) failed() {
 	if v != nil && v.gone() {
-		v.once.Do(func() { close(v.ended) })
+		v.end()
 	}
 }
+
+// end ends the stream, once.
+func (v *vanishWatch) end() { v.once.Do(func() { close(v.ended) }) }
 
 func (s *pipewireStream) Close() {
 	close(s.stop)
@@ -102,12 +105,22 @@ type screenStreams struct {
 }
 
 // start opens the capture for target and its PipeWire producer. A
-// whole output streams zero-copy when the compositor and the GPU allow,
-// else, logged with the reason, from an ext-image-copy session
-// (damage-driven: a static screen sends nothing new); a compositor
-// without it, a region, and a window take one screencopy or toplevel
-// capture per frame.
+// whole output and a window stream zero-copy when the compositor and
+// the GPU allow; else, logged with the reason, an output streams from an
+// ext-image-copy session (damage-driven: a static screen sends nothing
+// new), and a compositor without it, a region, and a window take one
+// screencopy or toplevel capture per frame.
 func (st screenStreams) start(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+	if target.Kind == sharepicker.TargetWindow {
+		s, err := st.startWindowGPU(target.Name, cursor, fps)
+		if err == nil {
+			return s, nil
+		}
+		if !errors.Is(err, errNoDmabuf) {
+			return nil, err
+		}
+		warnf("screencast: window %s streams through shared memory: %v", target.Name, err)
+	}
 	if target.Kind == sharepicker.TargetOutput {
 		s, err := st.startGPU(target.Name, cursor, fps)
 		if err == nil {
@@ -303,8 +316,8 @@ func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (sc
 			_ = c.Close()
 			return nil, fmt.Errorf("window '%s' is gone", target.Name)
 		}
-		grab = func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureToplevel(t, opts) }
-		gone = func() bool { _, ok := findToplevel(c, target.Name); return !ok }
+		grab = toplevelGrab(c, t, cursor)
+		gone = toplevelGone(c, target.Name)
 	}
 	first, err := grab(nil)
 	if err != nil {
@@ -346,26 +359,86 @@ func findToplevel(c *capture.Client, id string) (capture.Toplevel, bool) {
 	return capture.Toplevel{}, false
 }
 
+// toplevelGone reports, on each call, whether the window closed.
+func toplevelGone(c *capture.Client, id string) func() bool {
+	return func() bool { _, ok := findToplevel(c, id); return !ok }
+}
+
+// toplevelGrab captures a window per call, into dst when it fits.
+func toplevelGrab(c *capture.Client, t capture.Toplevel, cursor bool) func(dst []byte) (*capture.Frame, error) {
+	opts := capture.Options{Cursor: cursor}
+	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureToplevel(t, opts) }
+}
+
 // outputGrab captures a whole output per call, into dst when it fits.
 func outputGrab(c *capture.Client, o capture.Output, cursor bool) func(dst []byte) (*capture.Frame, error) {
 	opts := capture.Options{Cursor: cursor}
 	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureOutput(o, opts) }
 }
 
-// startGPU streams a whole output zero-copy when the compositor and
-// the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise, and the
+// windowDmabufFormat is the dmabuf layout a capture session on t
+// prefers, read from a session opened for it and closed again: the
+// stream opens its own only once a consumer takes the GPU buffers.
+func windowDmabufFormat(c *capture.Client, t capture.Toplevel, cursor bool) (capture.DmabufFormat, error) {
+	session, err := c.OpenDmabufSession(t, cursor)
+	if err != nil {
+		return capture.DmabufFormat{}, err
+	}
+	formats, err := session.Formats()
+	if err := errors.Join(err, session.Close()); err != nil {
+		return capture.DmabufFormat{}, err
+	}
+	if len(formats) == 0 {
+		return capture.DmabufFormat{}, errors.New("the window's capture session offers no dmabuf format")
+	}
+	return formats[0], nil
+}
+
+// connectForDmabuf connects a zero-copy stream's capture client, and
+// its fail closes the client and marks any error errNoDmabuf, so the
 // caller takes the shared-memory paths.
-func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screenStream, error) {
+func connectForDmabuf() (*capture.Client, func(error) (screenStream, error), error) {
 	c, err := capture.Connect()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
+		return nil, nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
 	}
-	fail := func(err error) (screenStream, error) {
+	return c, func(err error) (screenStream, error) {
 		_ = c.Close()
 		if errors.Is(err, errNoDmabuf) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
+	}, nil
+}
+
+// deviceLayouts opens the device the compositor names for offered and
+// lists the layouts to probe, the compositor's modifiers the device
+// renders or exports.
+func (st screenStreams) deviceLayouts(offered capture.DmabufFormat) (gpuAllocator, []dmabufprobe.Layout, error) {
+	dev, err := st.openDevice(offered.Device)
+	if err != nil {
+		return nil, nil, err
+	}
+	rendered, err := dev.Modifiers(offered.Fourcc)
+	if err != nil {
+		dev.Close()
+		return nil, nil, err
+	}
+	exported, err := dev.ExportModifiers(offered.Fourcc)
+	if err != nil {
+		dev.Close()
+		return nil, nil, err
+	}
+	return dev, dmabufprobe.Layouts(offered.Modifiers, rendered, exported), nil
+}
+
+// startGPU streams a whole output zero-copy when the compositor and
+// the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise, and the
+// caller takes the shared-memory paths.
+func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screenStream, error) {
+	c, fail, err := connectForDmabuf()
+	if err != nil {
+		return nil, err
 	}
 	o, ok := findOutput(c, output)
 	if !ok {
@@ -380,23 +453,13 @@ func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screen
 	if err != nil {
 		return fail(err)
 	}
-	dev, err := st.openDevice(offered.Device)
+	dev, layouts, err := st.deviceLayouts(offered)
 	if err != nil {
-		return fail(err)
-	}
-	rendered, err := dev.Modifiers(offered.Fourcc)
-	if err != nil {
-		dev.Close()
-		return fail(err)
-	}
-	exported, err := dev.ExportModifiers(offered.Fourcc)
-	if err != nil {
-		dev.Close()
 		return fail(err)
 	}
 	watch := newVanishWatch(outputGone(c, output))
 	shm := newSnapshotSource(grab, first, watch)
-	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, dmabufprobe.Layouts(offered.Modifiers, rendered, exported), o, cursor, first)
+	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, layouts, o, cursor, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)
@@ -406,6 +469,48 @@ func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screen
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, o.RefreshMHz), transform: uint32(o.Transform),
 	}, src, watch.ended, func() {
+		dev.Close()
+		_ = c.Close()
+	})
+}
+
+// startWindowGPU streams a window zero-copy over a capture session of
+// its own (screencast_window.go) when the compositor and the GPU allow;
+// errNoDmabuf otherwise, and the caller takes the shared-memory path.
+func (st screenStreams) startWindowGPU(id string, cursor bool, fps uint32) (screenStream, error) {
+	c, fail, err := connectForDmabuf()
+	if err != nil {
+		return nil, err
+	}
+	t, ok := findToplevel(c, id)
+	if !ok {
+		return fail(fmt.Errorf("window '%s' is gone", id))
+	}
+	grab := toplevelGrab(c, t, cursor)
+	first, err := grab(nil)
+	if err != nil {
+		return fail(err)
+	}
+	offered, err := windowDmabufFormat(c, t, cursor)
+	if err != nil {
+		return fail(err)
+	}
+	dev, layouts, err := st.deviceLayouts(offered)
+	if err != nil {
+		return fail(err)
+	}
+	watch := newVanishWatch(toplevelGone(c, id))
+	ws := &windowSession{c: c, t: t, cursor: cursor}
+	src, err := newWindowGPUSource(newSnapshotSource(grab, first, watch), dev, ws, offered, layouts)
+	if err != nil {
+		dev.Close()
+		return fail(err)
+	}
+	return startProducer(producerGeometry{
+		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
+		fps: effectiveFPS(fps, 0),
+	}, src, watch.ended, func() {
+		src.Close()
 		dev.Close()
 		_ = c.Close()
 	})

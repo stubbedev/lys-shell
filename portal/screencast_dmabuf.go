@@ -128,7 +128,7 @@ func (v *vulkanAllocation) Close() {
 
 // gpuCapturer is the capture connection the source copies with.
 type gpuCapturer interface {
-	Import(dmabuf.Buffer) (importedBuffer, error)
+	importer
 	CopyInto(o capture.Output, cursor bool, buf importedBuffer) error
 }
 
@@ -196,11 +196,22 @@ func (s *gpuSource) AllocDmabuf() (pipewire.Dmabuf, error) {
 }
 
 func (s *gpuSource) alloc(layout dmabufprobe.Layout) (*gpuBuffer, error) {
-	allocate := s.dev.NewBuffer
+	return allocImported(s.dev, s.cap, s.width, s.height, s.format, layout)
+}
+
+// importer is the capture connection a buffer is imported on.
+type importer interface {
+	Import(dmabuf.Buffer) (importedBuffer, error)
+}
+
+// allocImported allocates a width x height buffer in layout on dev and
+// imports it on imp.
+func allocImported(dev gpuAllocator, imp importer, width, height uint32, format fourcc.Format, layout dmabufprobe.Layout) (*gpuBuffer, error) {
+	allocate := dev.NewBuffer
 	if layout.Render {
-		allocate = s.dev.NewTarget
+		allocate = dev.NewTarget
 	}
-	t, err := allocate(int(s.width), int(s.height), s.format, []fourcc.Modifier{layout.Modifier})
+	t, err := allocate(int(width), int(height), format, []fourcc.Modifier{layout.Modifier})
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +221,7 @@ func (s *gpuSource) alloc(layout dmabufprobe.Layout) (*gpuBuffer, error) {
 		t.Close()
 		return nil, fmt.Errorf("screencast: a %d-plane buffer", len(d.Planes))
 	}
-	imported, err := s.cap.Import(d)
+	imported, err := imp.Import(d)
 	if err != nil {
 		t.Close()
 		return nil, fmt.Errorf("screencast: import a %dx%d buffer of modifier %s: %w", d.Width, d.Height, d.Modifier, err)
