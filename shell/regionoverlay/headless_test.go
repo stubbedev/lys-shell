@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 )
 
@@ -16,7 +17,7 @@ const buttonLeft = 0x110
 // request; the answer arrives on the returned channel.
 func startOverlay(t *testing.T) (*keytest.Keyboard, chan result) {
 	t.Helper()
-	a := keytest.Run(t)
+	a := apptest.Run(t)
 	font, err := app.Font("sans", 14)
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +60,7 @@ func TestHeadlessEnterConfirmsTheDraggedRegion(t *testing.T) {
 	kb, answers := startOverlay(t)
 	dragOn(t, kb, 100, 100, 300, 200)
 	kb.Tap(keytest.Return)
-	r := keytest.Answer(t, "the region after Return", answers)
+	r := apptest.Answer(t, "the region after Return", answers)
 	if !r.ok || r.sel.Width != 200 || r.sel.Height != 100 || r.sel.X != 100 || r.sel.Y != 100 {
 		t.Fatalf("answer = %+v, want the 200x100 region at 100,100 confirmed", r)
 	}
@@ -71,7 +72,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	kb, answers := startOverlay(t)
 	dragOn(t, kb, 100, 100, 300, 200)
 	kb.Tap(keytest.Escape)
-	if r := keytest.Answer(t, "the region after Escape", answers); r.ok {
+	if r := apptest.Answer(t, "the region after Escape", answers); r.ok {
 		t.Fatalf("Escape confirmed %+v", r.sel)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -25,7 +26,7 @@ func TestHeadlessKeysFollowTheKeymap(t *testing.T) {
 			c.Close()
 		}
 	})
-	a := keytest.Run(t)
+	a := apptest.Run(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	home := t.TempDir()
@@ -50,18 +51,18 @@ func TestHeadlessKeysFollowTheKeymap(t *testing.T) {
 	keytest.AwaitFocus(t, a)
 
 	kb.Tap(keytest.Return)
-	keytest.Never(t, "Return on a physical keyboard's Escape code", answers)
+	apptest.Never(t, "Return on a physical keyboard's Escape code", answers)
 
 	kb.CtrlTap(keytest.H)
-	keytest.Until(t, a, "Ctrl+H showed hidden files", func() bool { return c.hidden })
-	if keytest.On(a, c.ui.location.Visible) {
+	apptest.Until(t, a, "Ctrl+H showed hidden files", func() bool { return c.hidden })
+	if apptest.On(a, c.ui.location.Visible) {
 		t.Fatal("Ctrl+H, on a physical keyboard's L, opened the location entry")
 	}
 	kb.CtrlTap(keytest.L)
-	keytest.Until(t, a, "Ctrl+L opened the location entry", func() bool { return c.ui.location.Visible() })
+	apptest.Until(t, a, "Ctrl+L opened the location entry", func() bool { return c.ui.location.Visible() })
 
 	kb.Tap(keytest.Escape)
-	if r := keytest.Answer(t, "the chooser after Escape", answers); r.URIs != nil {
+	if r := apptest.Answer(t, "the chooser after Escape", answers); r.URIs != nil {
 		t.Fatalf("Escape answered %v, want a cancel", r.URIs)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/shell/treetest"
@@ -17,7 +18,7 @@ import (
 // the keyboard's keymap gives it; the code a physical keyboard gives
 // Escape, Return in that keymap, leaves the dialog open.
 func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
-	a := keytest.Run(t)
+	a := apptest.Run(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	h := New(Deps{
@@ -44,9 +45,9 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	kb := keytest.Dial(t)
 	keytest.AwaitFocus(t, a)
 	kb.Tap(keytest.Return)
-	keytest.Never(t, "Return on a physical keyboard's Escape code", answers)
+	apptest.Never(t, "Return on a physical keyboard's Escape code", answers)
 	kb.Tap(keytest.Escape)
-	if ok := keytest.Answer(t, "the dialog after Escape", answers); ok {
+	if ok := apptest.Answer(t, "the dialog after Escape", answers); ok {
 		t.Fatal("Escape confirmed the print")
 	}
 }
