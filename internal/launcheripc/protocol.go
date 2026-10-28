@@ -16,25 +16,20 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-lib/xdg"
+
+	"github.com/stubbedev/lys-shell/internal/runtimesock"
 )
 
 // RowChunk is the number of rows per rows frame when streaming stdin.
 const RowChunk = 2000
 
-// SocketPath is $XDG_RUNTIME_DIR/lys-shell/launcher.sock, or
-// /tmp/wayle-launcher.sock when the runtime dir is unset.
-func SocketPath() string {
-	if dir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
-		return filepath.Join(dir, version.Name, "launcher.sock")
-	}
-	return "/tmp/" + version.Name + "-launcher.sock"
-}
+// SocketPath is $XDG_RUNTIME_DIR/lys-shell/launcher.sock; an error
+// naming XDG_RUNTIME_DIR when the process has no absolute one.
+func SocketPath() (string, error) { return runtimesock.Path(xdg.OS, "launcher") }
 
 // WidthUnit is the unit of a rofi -width value.
 type WidthUnit uint8

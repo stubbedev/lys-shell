@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-lib/xdg"
 )
 
 // TestMain lets the test binary play `lys-login lock`: FAKE_LOCK names
@@ -167,22 +169,36 @@ func TestReplacementsAreBounded(t *testing.T) {
 	}
 }
 
+// runtimeEnv is an environment whose XDG_RUNTIME_DIR is dir.
+func runtimeEnv(dir string) xdg.Env {
+	return func(name string) string {
+		if name == "XDG_RUNTIME_DIR" {
+			return dir
+		}
+		return ""
+	}
+}
+
 func TestClaimLockOnStart(t *testing.T) {
-	dir := t.TempDir()
+	dir := runtimeEnv(t.TempDir())
 	if !claimLockOnStart(dir) {
 		t.Fatal("the first start of a session must lock")
 	}
 	if second, third := claimLockOnStart(dir), claimLockOnStart(dir); second || third {
 		t.Error("a restart within the session must not lock")
 	}
-	if !claimLockOnStart("") {
-		t.Error("without a runtime dir it must fail secure and lock")
+	for _, none := range []string{"", "relative"} {
+		for start := range 2 {
+			if !claimLockOnStart(runtimeEnv(none)) {
+				t.Errorf("XDG_RUNTIME_DIR=%q: start %d did not lock; every start must fail secure and lock", none, start+1)
+			}
+		}
 	}
 	ro := filepath.Join(t.TempDir(), "ro")
 	if err := os.Mkdir(ro, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	if os.Geteuid() != 0 && !claimLockOnStart(ro) {
+	if os.Geteuid() != 0 && !claimLockOnStart(runtimeEnv(ro)) {
 		t.Error("an unwritable runtime dir must fail secure and lock")
 	}
 }

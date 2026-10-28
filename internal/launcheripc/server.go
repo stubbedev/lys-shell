@@ -71,7 +71,10 @@ func NewServer(handler Handler) *Server { return &Server{handler: handler} }
 // user) and accepts in the background. stop closes the listener and
 // removes the socket file.
 func (s *Server) Listen() (stop func(), err error) {
-	path := SocketPath()
+	path, err := SocketPath()
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}

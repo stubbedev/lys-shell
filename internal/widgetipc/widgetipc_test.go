@@ -13,14 +13,34 @@ import (
 	"github.com/stubbedev/lys-lib/sockdir"
 )
 
+// socketPath is SocketPath under a runtime dir the test set.
+func socketPath(t *testing.T) string {
+	t.Helper()
+	path, err := SocketPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestSocketPathLookup(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
-	if got := SocketPath(); got != "/run/user/1000/lys-shell/widget.sock" {
+	if got := socketPath(t); got != "/run/user/1000/lys-shell/widget.sock" {
 		t.Errorf("runtime dir = %q", got)
 	}
-	os.Unsetenv("XDG_RUNTIME_DIR")
-	if got := SocketPath(); got != "/tmp/lys-shell-widget.sock" {
-		t.Errorf("fallback = %q", got)
+}
+
+// Without an absolute runtime dir neither half places a socket anywhere
+// else: both fail naming XDG_RUNTIME_DIR.
+func TestNoRuntimeDirIsAnError(t *testing.T) {
+	for _, dir := range []string{"", "relative"} {
+		t.Setenv("XDG_RUNTIME_DIR", dir)
+		if _, err := NewServer().Listen(); err == nil || !strings.Contains(err.Error(), "XDG_RUNTIME_DIR") {
+			t.Errorf("XDG_RUNTIME_DIR=%q: Listen = %v, want an error naming the variable", dir, err)
+		}
+		if err := SendWidgetUpdate(context.Background(), "a", "b"); err == nil || !strings.Contains(err.Error(), "XDG_RUNTIME_DIR") {
+			t.Errorf("XDG_RUNTIME_DIR=%q: a client = %v, want an error naming the variable", dir, err)
+		}
 	}
 }
 
@@ -75,7 +95,7 @@ func TestWidgetUpdateRoundTrip(t *testing.T) {
 // exchange writes one raw line and returns the raw reply line.
 func exchange(t *testing.T, line string) string {
 	t.Helper()
-	conn, err := net.Dial("unix", SocketPath())
+	conn, err := net.Dial("unix", socketPath(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,10 +155,10 @@ func TestClientErrorsMatchRust(t *testing.T) {
 
 	// A shell that rejects the request surfaces its message.
 	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
-	if err := os.MkdirAll(filepath.Dir(SocketPath()), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(socketPath(t)), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	fake, err := net.Listen("unix", SocketPath())
+	fake, err := net.Listen("unix", socketPath(t))
 	if err != nil {
 		t.Fatal(err)
 	}

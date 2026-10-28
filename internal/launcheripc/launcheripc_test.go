@@ -13,7 +13,27 @@ import (
 )
 
 // dialRaw connects the socket without sending an open frame.
-func dialRaw() (net.Conn, error) { return net.Dial("unix", SocketPath()) }
+func dialRaw() (net.Conn, error) {
+	path, err := SocketPath()
+	if err != nil {
+		return nil, err
+	}
+	return net.Dial("unix", path)
+}
+
+// Without an absolute runtime dir neither half places a socket anywhere
+// else: both fail naming XDG_RUNTIME_DIR.
+func TestNoRuntimeDirIsAnError(t *testing.T) {
+	for _, dir := range []string{"", "relative"} {
+		t.Setenv("XDG_RUNTIME_DIR", dir)
+		if _, err := NewServer(newRecordingHandler()).Listen(); err == nil || !strings.Contains(err.Error(), "XDG_RUNTIME_DIR") {
+			t.Errorf("XDG_RUNTIME_DIR=%q: Listen = %v, want an error naming the variable", dir, err)
+		}
+		if _, err := Open(SessionOptions{}, false); err == nil || !strings.Contains(err.Error(), "XDG_RUNTIME_DIR") {
+			t.Errorf("XDG_RUNTIME_DIR=%q: Open = %v, want an error naming the variable", dir, err)
+		}
+	}
+}
 
 func TestOpenFrameRoundTrips(t *testing.T) {
 	opts := SessionOptions{

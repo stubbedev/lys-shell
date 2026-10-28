@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/xdg"
+
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/spawn"
 	"github.com/stubbedev/lys-shell/internal/version"
@@ -204,7 +206,7 @@ func Start(current func() *config.Config, onLocked func()) (*Client, func()) {
 			}
 		}()
 	}
-	if current().Login.Lock.LockOnStart && claimLockOnStart(os.Getenv("XDG_RUNTIME_DIR")) {
+	if current().Login.Lock.LockOnStart && claimLockOnStart(xdg.OS) {
 		c.Lock()
 	}
 	return c, stop
@@ -220,15 +222,18 @@ func shouldRelock(locked bool, err error) bool {
 
 // claimLockOnStart claims the once-per-login-session lock-on-start
 // gate: true the first time in a session, false on every restart.
-// The marker lives under XDG_RUNTIME_DIR, which logind clears when the
-// login session ends. Without a runtime dir there is no deduplication,
-// so it locks: failing secure for an access gate.
-func claimLockOnStart(runtimeDir string) bool {
-	if runtimeDir == "" {
+// The marker lives in lys-shell's runtime directory under
+// XDG_RUNTIME_DIR, which logind clears when the login session ends.
+// Without an absolute XDG_RUNTIME_DIR there is no deduplication, so it
+// warns and locks: failing secure for an access gate.
+func claimLockOnStart(env xdg.Env) bool {
+	dir, ok := env.RuntimeDir(version.Name)
+	if !ok {
+		log.Printf("lock: XDG_RUNTIME_DIR is %q, not an absolute path; lock-on-start locks on every start of the shell", env("XDG_RUNTIME_DIR"))
 		return true
 	}
-	marker := filepath.Join(runtimeDir, version.Name, "lock-on-start.done")
-	_ = os.MkdirAll(filepath.Dir(marker), 0o700) //nolint:gosec // our own runtime dir
+	marker := filepath.Join(dir, "lock-on-start.done")
+	_ = os.MkdirAll(filepath.Dir(marker), 0o700)
 	// O_EXCL is the atomic first-writer-wins test: exactly one shell
 	// per session sees success.
 	f, err := os.OpenFile(marker, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // our own runtime marker

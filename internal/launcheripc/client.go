@@ -27,7 +27,10 @@ type Client struct {
 
 // Open connects the launcher socket and sends the open frame.
 func Open(options SessionOptions, replace bool) (*Client, error) {
-	path := SocketPath()
+	path, err := SocketPath()
+	if err != nil {
+		return nil, err
+	}
 	conn, err := net.Dial("unix", path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to lys-shell launcher socket at %s: %w", path, err)

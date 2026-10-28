@@ -16,8 +16,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/stubbedev/lys-lib/xdg"
+
+	"github.com/stubbedev/lys-shell/internal/runtimesock"
 	"github.com/stubbedev/lys-shell/internal/rusterr"
-	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // Methods.
@@ -26,14 +28,9 @@ const (
 	MethodWidgetUpdate = "widget.update"
 )
 
-// SocketPath mirrors wayle-ipc's lookup: $XDG_RUNTIME_DIR/lys-shell/
-// widget.sock, falling back to /tmp/lys-shell-widget.sock.
-func SocketPath() string {
-	if dir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
-		return filepath.Join(dir, version.Name, "widget.sock")
-	}
-	return "/tmp/" + version.Name + "-widget.sock"
-}
+// SocketPath is $XDG_RUNTIME_DIR/lys-shell/widget.sock; an error naming
+// XDG_RUNTIME_DIR when the process has no absolute one.
+func SocketPath() (string, error) { return runtimesock.Path(xdg.OS, "widget") }
 
 // ToastRequest is one toast.show payload (ToastShowParams).
 type ToastRequest struct {
@@ -110,7 +107,10 @@ func (s *Server) Updates() <-chan WidgetUpdate { return s.updates }
 // stale socket, restricting it to the owner) and starts accepting. The
 // returned stop closes the listener and removes the socket file.
 func (s *Server) Listen() (func(), error) {
-	path := SocketPath()
+	path, err := SocketPath()
+	if err != nil {
+		return nil, err
+	}
 	_ = os.MkdirAll(filepath.Dir(path), 0o700)
 	// A leftover socket from a previous run would make bind fail.
 	_ = os.Remove(path)
@@ -228,7 +228,10 @@ func (e *ClientError) Error() string { return e.msg }
 func (e *ClientError) Unwrap() error { return e.err }
 
 func send(ctx context.Context, method string, params any) error {
-	path := SocketPath()
+	path, err := SocketPath()
+	if err != nil {
+		return &ClientError{msg: err.Error(), err: err}
+	}
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", path)
 	if err != nil {
