@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/dbustest"
+
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/recorder"

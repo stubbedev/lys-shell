@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/godbus/dbus/v5"
-	"github.com/godbus/dbus/v5/introspect"
 	"github.com/stubbedev/lys-lib/intconv"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/third_party/godbus/introspect"
 )
 
 // D-Bus identity (crates/wayle-audio/src/dbus/mod.rs).

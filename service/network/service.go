@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // Service is the network service beyond the bar's status read

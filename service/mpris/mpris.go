@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/intconv"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/glob"

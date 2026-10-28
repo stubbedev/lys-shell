@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
-
-	"github.com/stubbedev/lys-shell/internal/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // Server serves org.freedesktop.Notifications on the session bus and

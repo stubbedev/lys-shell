@@ -3,9 +3,8 @@ package idleinhibit
 import (
 	"fmt"
 
-	"github.com/godbus/dbus/v5"
-
-	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-lib/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the

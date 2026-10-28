@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-lib/dbustest"
+
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"

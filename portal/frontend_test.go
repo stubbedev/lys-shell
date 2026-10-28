@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/pipewire"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"

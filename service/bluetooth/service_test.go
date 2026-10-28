@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // populated is a fake with an unpowered hci0, a powered hci1, one

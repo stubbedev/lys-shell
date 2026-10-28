@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // fakeBacklightDir builds a sysfs-looking tree in a temp dir and

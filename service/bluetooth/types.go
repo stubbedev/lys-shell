@@ -3,7 +3,7 @@ package bluetooth
 import (
 	"strings"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // BlueZ names (types/mod.rs).

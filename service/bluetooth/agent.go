@@ -5,7 +5,7 @@ import (
 	"log"
 	"unicode/utf8"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // agentPath is where the pairing agent lives on the bus (service.rs).

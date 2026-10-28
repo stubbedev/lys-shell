@@ -3,12 +3,12 @@ package bar
 import (
 	"testing"
 
-	"github.com/godbus/dbus/v5/prop"
+	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/service/sni"
 )
 

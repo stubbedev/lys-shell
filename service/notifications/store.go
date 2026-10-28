@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/intconv"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: notifications.db stays the Rust file
 )
 

@@ -28,8 +28,8 @@ github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef h1:Ch6Q+AZUxDBCVqd
 github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef/go.mod h1:nXTWP6+gD5+LUJ8krVhhoeHjvHTutPxMYl5SvkcnJNE=
 github.com/stubbedev/lys-lib v0.1.1-0.20261028194726-7780832d5c88 h1:Rn0TYejG3ldzk93RZ/IucuEqMwaihIEwJbdSQd80H7s=
 github.com/stubbedev/lys-lib v0.1.1-0.20261028194726-7780832d5c88/go.mod h1:c/U4WtCt7n1gEafIV7nhKHZ7Rs+n22C4MWRd4na2Afo=
-github.com/stubbedev/lys-ui v0.0.0-20261028194601-dff9d9e8dd85 h1:DYMirwSVrSKMHqF9q7cl3WuFyCVbTV/IRfTXrSMhcc0=
-github.com/stubbedev/lys-ui v0.0.0-20261028194601-dff9d9e8dd85/go.mod h1:sj3te7gSdzyDIAIoHvxtCPypSm2rvnaljvgUhMMOgYc=
+github.com/stubbedev/lys-ui v0.0.0-20261028195420-8f40bd86c0b3 h1:9a/WsrBNdeEu4woSOZLVLseJTD+m91OPAD9SgZo/xW0=
+github.com/stubbedev/lys-ui v0.0.0-20261028195420-8f40bd86c0b3/go.mod h1:uSAI6YEL9WT4U8UPOMSLgAG9mfoF0nw+JYjHXGOLAXA=
 github.com/stubbedev/memory-go v0.3.0 h1:Hkm+aw0vs9qhwXLL9p98U3IbQFRxPLyGvlrf2GZ9ov8=
 github.com/stubbedev/memory-go v0.3.0/go.mod h1:G7ZRpWZ/VbEDhOj22Ncx7jBqqiflWFKEnntKl2UcLEg=
 github.com/unxed/xkb-go v0.1.9 h1:t2lhW6bcPxzX/1DBf9jIRoo13KhMm9+XUPJT4o5a/Kw=

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/godbus/dbus/v5"
-	"github.com/godbus/dbus/v5/introspect"
-
-	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-lib/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/third_party/godbus/introspect"
 )
 
 // The shell's application identity: the name and the org.gtk.Actions

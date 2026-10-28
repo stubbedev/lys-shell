@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 func wifiFixture(t *testing.T, setup func(f *fakeNM)) (*serviceFixture, *Wifi) {

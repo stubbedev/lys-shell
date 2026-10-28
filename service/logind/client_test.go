@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godbus/dbus/v5"
-
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // fakeLogindSession is the session object of a fake logind: the real

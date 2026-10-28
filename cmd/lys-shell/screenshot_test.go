@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-lib/dbustest"
 )
 
 func TestScreenshotSubcommandsReachTheService(t *testing.T) {

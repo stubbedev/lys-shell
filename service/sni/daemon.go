@@ -5,10 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
-
-	"github.com/stubbedev/lys-shell/internal/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // lys-shell's own interface over the tray, which `lys-shell systray` drives

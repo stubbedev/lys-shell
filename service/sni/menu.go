@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/intconv"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // MenuIface is the DBusMenu interface tray items publish their menus

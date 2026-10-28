@@ -10,9 +10,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/godbus/dbus/v5"
-
-	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-lib/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // dev.stubbe.lys.Shell1 (wayle-ipc/src/shell_ipc.rs).

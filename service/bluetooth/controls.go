@@ -3,7 +3,7 @@ package bluetooth
 import (
 	"context"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // AdapterRef drives one adapter by path (core/adapter/controls.rs).

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/godbus/dbus/v5"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/fswatch"

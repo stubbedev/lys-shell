@@ -9,8 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/intconv"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // systemd's user manager on the session bus.

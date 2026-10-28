@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-lib/dbustest"
+
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )

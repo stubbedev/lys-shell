@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/sockdir"
 
-	"github.com/stubbedev/lys-shell/internal/dbustest"
 	"github.com/stubbedev/lys-shell/secrets/control"
 )
 

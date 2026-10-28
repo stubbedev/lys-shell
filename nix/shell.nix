@@ -31,7 +31,7 @@
 
           # Headless test sessions: fontconfig reads the generated config
           # (shellHook), sway is the headless compositor, dbus the private
-          # test buses (internal/dbustest), and pipewire the private daemon
+          # test buses (lys-lib's dbustest), and pipewire the private daemon
           # and pw-link for the ScreenCast portal tests (lys-lib's pwtest).
           fontconfig
           sway

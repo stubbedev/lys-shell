@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godbus/dbus/v5"
-	"github.com/godbus/dbus/v5/prop"
-
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
 )
 
 func TestStateFromString(t *testing.T) {

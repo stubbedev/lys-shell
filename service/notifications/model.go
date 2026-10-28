@@ -1,6 +1,6 @@
 package notifications
 
-import "github.com/godbus/dbus/v5"
+import dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 // Urgency is the spec's urgency hint (types/notification.rs's Urgency).
 type Urgency uint8

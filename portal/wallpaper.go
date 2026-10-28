@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/lys-lib/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/dbusx"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs"

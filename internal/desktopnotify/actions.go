@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/lys-lib/intconv"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // Action is one notification button: Key is what Ask reports, Label

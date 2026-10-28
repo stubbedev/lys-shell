@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/dbustest"
+	"github.com/stubbedev/lys-lib/dbustest"
+
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
 

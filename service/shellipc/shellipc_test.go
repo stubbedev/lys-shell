@@ -5,10 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/godbus/dbus/v5"
-
-	"github.com/stubbedev/lys-shell/internal/dbustest"
-	"github.com/stubbedev/lys-shell/internal/dbusx"
+	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/dbusx"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 func TestBarVisibilityMatchesBarRS(t *testing.T) {
