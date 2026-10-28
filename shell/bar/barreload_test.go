@@ -10,7 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/swaytest"
+	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // Snapshots published before the loop runs apply once, from the first

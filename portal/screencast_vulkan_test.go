@@ -15,8 +15,8 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/internal/gpuhost"
-	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
+	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // vulkanNode is the host's first render node, its device number, and

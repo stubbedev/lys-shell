@@ -14,8 +14,8 @@ import (
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 
-	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
+	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // fakePicker answers every pick with reply, or holds it until the

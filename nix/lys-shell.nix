@@ -53,6 +53,7 @@ let
       ../shlex
       ../strftime
       ../styling
+      ../swaytest
       ../testhome
       ../third_party
       ../useraccount

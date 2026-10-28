@@ -13,7 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/internal/swaytest"
+	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // A window is listed from its first done batch, with the batch's app id

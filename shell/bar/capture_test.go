@@ -21,9 +21,9 @@ import (
 	"github.com/stubbedev/lys-ui/transfer"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
+	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 func runLoop(t *testing.T, application *app.Application) func(func()) {

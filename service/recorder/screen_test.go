@@ -24,11 +24,11 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/gpuhost"
-	"github.com/stubbedev/lys-shell/internal/swaytest"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
+	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // encoderNode is the host's first render node with a Vulkan device
