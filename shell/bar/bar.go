@@ -200,13 +200,17 @@ func run(cfg *config.Config, svc *config.Service) error {
 		defer func() { _ = nm.Close() }()
 		baseCtx.Network = nm
 	}
-	if svc, stop, err := startNetworkService(); err == nil {
+	bwLife, stopBitwarden := context.WithCancel(context.Background())
+	defer stopBitwarden()
+	baseCtx.Bitwarden = newBitwardenHost(bwLife, application, current.Load)
+	networkVault := bitwardenNetworkVault{baseCtx.Bitwarden}
+	if svc, stop, err := startNetworkService(networkVault); err == nil {
 		defer stop()
 		baseCtx.Networking = svc
 	} else {
 		log.Printf("network: %v", err)
 		lateStarts[network.BusName] = func() (func(*ModuleContext), func(), error) {
-			svc, stop, err := startNetworkService()
+			svc, stop, err := startNetworkService(networkVault)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -295,9 +299,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	stopMail := startMail(&baseCtx)
 	defer stopMail()
-	bwLife, stopBitwarden := context.WithCancel(context.Background())
-	defer stopBitwarden()
-	baseCtx.Bitwarden = newBitwardenHost(bwLife, application, current.Load)
 	sniHost, err := sni.NewHost(sniStore)
 	if err == nil {
 		defer func() { _ = sniHost.Close() }()

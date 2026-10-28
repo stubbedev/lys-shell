@@ -97,6 +97,16 @@ type BitwardenConfig struct {
 	// Sync the open vault every this many minutes. 0 syncs only on
 	// unlock and by hand.
 	SyncInterval uint32 `cfg:"sync-interval"`
+	// Vault folder whose logins answer NetworkManager's requests for
+	// Wi-Fi, 802.1X and VPN secrets while the vault is open, before the
+	// shell asks. The one login named exactly like the connection
+	// profile answers: its password for the password, PSK or secret,
+	// its username for the username, and a custom field of a key's name
+	// for that key (`pin`, `domain`, `private-key-password`). A login
+	// behind the master-password reprompt never answers, and secrets
+	// NetworkManager rejected are asked for again. Empty answers nothing
+	// from the vault.
+	NetworkFolder string `cfg:"network-folder"`
 	// Password presets the dropdown's generator offers. Generating
 	// copies a new password as a secret, cleared after
 	// `clipboard-clear`.
@@ -161,6 +171,7 @@ func DefaultsBitwarden() BitwardenConfig {
 		LockWithSession:      true,
 		ClipboardClear:       30,
 		SyncInterval:         30,
+		NetworkFolder:        "",
 		GeneratorPasswords:   []BitwardenPasswordPreset{password},
 		GeneratorPassphrases: []BitwardenPassphrasePreset{passphrase},
 		Format:               "{{ count }}",

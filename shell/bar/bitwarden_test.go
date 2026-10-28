@@ -774,3 +774,32 @@ func TestBitwardenLiveTOTPRow(t *testing.T) {
 		t.Error("the live code shows on a locked vault")
 	}
 }
+
+// The network agent's vault is the open vault's network folder: the
+// login named like the connection answers, with its custom fields by
+// name; no folder configured, or a vault the shell never opened,
+// answers nothing.
+func TestBitwardenNetworkVault(t *testing.T) {
+	cfg := config.DefaultsBitwarden()
+	cfg.NetworkFolder = "Networks"
+	h := &bitwardenHost{config: func() config.BitwardenConfig { return cfg }}
+	v := bitwardenNetworkVault{h}
+	if _, ok := v.Entry("Home"); ok {
+		t.Fatal("a vault the shell never opened answered")
+	}
+	h.opened = &fakeVault{items: []bitwarden.Item{{
+		Type: bitwarden.ItemLogin, Folder: "Networks", Name: "Home", Username: "ann", Password: "hunter22",
+		Fields: []bitwarden.Field{{Name: "pin", Value: "1234", Hidden: true}},
+	}}}
+	e, ok := v.Entry("Home")
+	if !ok || e.Username != "ann" || e.Password != "hunter22" || e.Fields["pin"] != "1234" {
+		t.Fatalf("entry = %+v %v", e, ok)
+	}
+	if _, ok := v.Entry("Office"); ok {
+		t.Error("a connection with no login answered")
+	}
+	cfg.NetworkFolder = ""
+	if _, ok := v.Entry("Home"); ok {
+		t.Error("answered with no network folder configured")
+	}
+}

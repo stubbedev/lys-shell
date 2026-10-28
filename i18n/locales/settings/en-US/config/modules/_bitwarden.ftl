@@ -20,6 +20,9 @@ settings-modules-bitwarden-clipboard-clear = Clear Clipboard After (seconds)
 settings-modules-bitwarden-sync-interval = Sync Interval (minutes)
     .description = Sync the open vault every this many minutes. 0 syncs only on unlock and by hand
 
+settings-modules-bitwarden-network-folder = Network Folder
+    .description = Vault folder whose logins, named like the connection, answer Wi-Fi and VPN password requests while the vault is open. Empty answers none
+
 settings-modules-bitwarden-generator-passwords = Password Presets
     .description = Random-character passwords the dropdown's generator copies
 

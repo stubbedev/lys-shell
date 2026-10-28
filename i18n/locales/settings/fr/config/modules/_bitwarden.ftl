@@ -20,6 +20,9 @@ settings-modules-bitwarden-clipboard-clear = Vider le presse-papiers après (sec
 settings-modules-bitwarden-sync-interval = Intervalle de synchronisation (minutes)
     .description = Synchroniser le coffre ouvert toutes les tant de minutes. 0 ne synchronise qu'au déverrouillage et à la demande
 
+settings-modules-bitwarden-network-folder = Dossier réseau
+    .description = Dossier du coffre dont les identifiants, nommés comme la connexion, répondent aux demandes de mot de passe Wi-Fi et VPN tant que le coffre est ouvert. Vide : aucun
+
 settings-modules-bitwarden-generator-passwords = Préréglages de mot de passe
     .description = Mots de passe aléatoires que le générateur du menu copie
 

@@ -48,6 +48,7 @@ bar:
 | `lock-with-session` | bool | `true` | Lock the vault when the session locks. |
 | `clipboard-clear` | u32 | `30` | Clear a copied secret from the clipboard after this many seconds, unless something else was copied since. 0 leaves it there. |
 | `sync-interval` | u32 | `30` | Sync the open vault every this many minutes. 0 syncs only on unlock and by hand. |
+| `network-folder` | string | `""` | Vault folder whose logins answer NetworkManager's requests for Wi-Fi, 802.1X and VPN secrets while the vault is open, before the shell asks. The one login named exactly like the connection profile answers: its password for the password, PSK or secret, its username for the username, and a custom field of a key's name for that key (`pin`, `domain`, `private-key-password`). A login behind the master-password reprompt never answers, and secrets NetworkManager rejected are asked for again. Empty answers nothing from the vault. |
 | `format` | string | `"{{ count }}"` | Format string for the label. |
 | `icon-locked` | string | `"ld-lock-symbolic"` | Icon while the vault is locked or logged out. |
 | `icon-unlocked` | string | `"ld-lock-open-symbolic"` | Icon while the vault is open. |
@@ -107,6 +108,7 @@ modules:
     lock-with-session: true
     clipboard-clear: 30
     sync-interval: 30
+    network-folder: ""
     generator-passwords:
       - name: Password
         length: 20

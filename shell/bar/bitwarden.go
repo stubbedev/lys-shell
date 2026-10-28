@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/network"
 )
 
 // bitwardenDevice is the name the account's device list shows.
@@ -284,3 +285,31 @@ func (m *bitwardenModule) render() {
 }
 
 func (m *bitwardenModule) Root() widget.Widget { return m.btn }
+
+// bitwardenNetworkVault answers the NetworkManager secret agent from
+// the open vault's network folder (bitwarden.NetworkLogin); a vault the
+// shell never opened, or no folder configured, answers nothing.
+type bitwardenNetworkVault struct{ h *bitwardenHost }
+
+// Entry implements network.Vault.
+func (v bitwardenNetworkVault) Entry(name string) (network.VaultEntry, bool) {
+	folder := v.h.config().NetworkFolder
+	if folder == "" {
+		return network.VaultEntry{}, false
+	}
+	v.h.mu.Lock()
+	opened := v.h.opened
+	v.h.mu.Unlock()
+	if opened == nil {
+		return network.VaultEntry{}, false
+	}
+	it, ok := bitwarden.NetworkLogin(opened.Items(), folder, name)
+	if !ok {
+		return network.VaultEntry{}, false
+	}
+	fields := make(map[string]string, len(it.Fields))
+	for _, f := range it.Fields {
+		fields[f.Name] = f.Value
+	}
+	return network.VaultEntry{Username: it.Username, Password: it.Password, Fields: fields}, true
+}

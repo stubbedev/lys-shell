@@ -40,7 +40,7 @@ func startService(t *testing.T, setup func(f *fakeNM)) *serviceFixture {
 	}
 	conn := f.client()
 	signIn := &fakeSignIn{}
-	svc, err := start(t.Context(), conn, signIn, RequestBudget, fastResume)
+	svc, err := start(t.Context(), conn, signIn, nil, RequestBudget, fastResume)
 	if err != nil {
 		t.Fatal(err)
 	}

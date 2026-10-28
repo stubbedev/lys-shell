@@ -39,13 +39,23 @@ func defaultKey(setting string) (string, bool) {
 	return "", false
 }
 
+// The keys a login's password and username answer.
+var (
+	passwordKeys = []string{"psk", "password", "passwd", "leap-password", "secret"}
+	usernameKeys = []string{"user", "username", "user-name"}
+)
+
 // describe labels a key and says whether it is masked. An unknown key
 // from some plugin's own vocabulary is masked: a secret shown in the
 // clear is the worse of the two wrong guesses.
 func describe(key string) (label string, secret bool) {
-	switch key {
-	case "psk", "password", "passwd", "leap-password", "secret":
+	switch {
+	case slices.Contains(passwordKeys, key):
 		return "Password", true
+	case slices.Contains(usernameKeys, key):
+		return "Username", false
+	}
+	switch key {
 	case "wep-key0", "wep-key1", "wep-key2", "wep-key3":
 		return "WEP key", true
 	case "private-key-password":
@@ -54,8 +64,6 @@ func describe(key string) (label string, secret bool) {
 		return "Private key", true
 	case "pin":
 		return "PIN", true
-	case "user", "username", "user-name":
-		return "Username", false
 	case "usergroup":
 		return "Group", false
 	case "domain":

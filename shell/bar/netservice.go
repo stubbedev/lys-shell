@@ -10,15 +10,15 @@ import (
 )
 
 // startNetworkService brings up the NetworkManager service (the secret
-// agent, VPNs, wifi) on its own system-bus connection; stop ends its
-// watchers and closes the connection.
-func startNetworkService() (*network.Service, func(), error) {
+// agent, answering from vault first, VPNs, wifi) on its own system-bus
+// connection; stop ends its watchers and closes the connection.
+func startNetworkService(vault network.Vault) (*network.Service, func(), error) {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
 		return nil, nil, fmt.Errorf("system bus: %w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	svc, err := network.Start(ctx, conn)
+	svc, err := network.Start(ctx, conn, vault)
 	if err != nil {
 		cancel()
 		_ = conn.Close()

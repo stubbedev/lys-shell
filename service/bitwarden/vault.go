@@ -261,3 +261,23 @@ func (it Item) Match(query string) bool {
 	}
 	return true
 }
+
+// NetworkLogin is the login stored for the network connection named
+// name: the one login item in folder with that exact name. None, two of
+// them, or one protected by the master-password reprompt or not fully
+// decrypted is no answer: a network secret is sent without asking, so
+// it must be unambiguous and unprotected.
+func NetworkLogin(items []Item, folder, name string) (Item, bool) {
+	var found Item
+	matches := 0
+	for _, it := range items {
+		if it.Type == ItemLogin && it.Folder == folder && it.Name == name {
+			found = it
+			matches++
+		}
+	}
+	if matches != 1 || found.Reprompt || found.Undecryptable {
+		return Item{}, false
+	}
+	return found, true
+}

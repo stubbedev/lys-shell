@@ -334,6 +334,8 @@ func (a *Agent) withdraw(path dbus.ObjectPath, setting string) {
 type agentObject struct {
 	agent  *Agent
 	signIn SignIn
+	// vault answers before the user is asked; nil for none.
+	vault Vault
 	// budget is RequestBudget, short of NM's own timeout; tests
 	// shorten it.
 	budget time.Duration
@@ -386,12 +388,20 @@ func (o *agentObject) secretsFor(ctx context.Context, connection ConnectionDict,
 		}
 	}
 
+	fields := fieldsFor(setting, hints)
+	// The vault answers nobody watching as well as somebody, but never
+	// twice: credentials NM rejected go to the user.
+	if fields != nil && flags&flagRequestNew == 0 {
+		if values, ok := o.fromVault(name, fields); ok {
+			log.Printf("network: %s: answered from the vault", name)
+			return replyMap(setting, values), nil
+		}
+	}
 	// A form nobody is there to fill in would sit on screen until the
 	// budget ran out, and fail the activation just the same.
 	if unattended {
 		return nil, agentError(errUserCanceled, "nobody was there to answer; connect again to sign in")
 	}
-	fields := fieldsFor(setting, hints)
 	if fields == nil {
 		return nil, agentError(errNoSecrets, "nothing to ask for "+setting)
 	}
@@ -477,19 +487,14 @@ func replyMap(setting string, values map[string]string) ConnectionDict {
 	return ConnectionDict{setting: section}
 }
 
-// ServeAgent exports the agent object on conn and registers it with
+// serveAgent exports the agent object on conn and registers it with
 // NetworkManager, re-registering whenever NM comes back (the
 // registration lives in NM's process, so a restart silently drops it,
 // and a silently unregistered agent looks exactly like a VPN that asks
 // for nothing and fails). A failure to register is logged, not fatal:
 // lys-shell still works without answering secrets, and NM may not be up
 // yet. The watch ends with ctx.
-func ServeAgent(ctx context.Context, conn *dbus.Conn, agent *Agent, signIn SignIn) error {
-	return serveAgent(ctx, conn, agent, signIn, RequestBudget)
-}
-
-func serveAgent(ctx context.Context, conn *dbus.Conn, agent *Agent, signIn SignIn, budget time.Duration) error {
-	obj := &agentObject{agent: agent, signIn: signIn, budget: budget}
+func serveAgent(ctx context.Context, conn *dbus.Conn, obj *agentObject) error {
 	if err := conn.Export(obj, AgentPath, agentIface); err != nil {
 		return fmt.Errorf("network: export secret agent: %w", err)
 	}

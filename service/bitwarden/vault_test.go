@@ -118,3 +118,27 @@ func TestItemMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestNetworkLogin(t *testing.T) {
+	home := Item{ID: "1", Type: ItemLogin, Folder: "Networks", Name: "Home Wi-Fi", Password: "hunter22"}
+	items := []Item{
+		home,
+		{ID: "2", Type: ItemLogin, Folder: "Personal", Name: "Office"},
+		{ID: "3", Type: ItemSecureNote, Folder: "Networks", Name: "Office"},
+		{ID: "4", Type: ItemLogin, Folder: "Networks", Name: "Twice"},
+		{ID: "5", Type: ItemLogin, Folder: "Networks", Name: "Twice"},
+		{ID: "6", Type: ItemLogin, Folder: "Networks", Name: "Guarded", Reprompt: true},
+		{ID: "7", Type: ItemLogin, Folder: "Networks", Name: "Broken", Undecryptable: true},
+	}
+	if got, ok := NetworkLogin(items, "Networks", "Home Wi-Fi"); !ok || got.ID != "1" {
+		t.Errorf("the one login named like the connection: %+v %v", got, ok)
+	}
+	for _, name := range []string{"home wi-fi", "Office", "Twice", "Guarded", "Broken", "Absent"} {
+		if got, ok := NetworkLogin(items, "Networks", name); ok {
+			t.Errorf("%q answered with %+v: not the one exact, unprotected login in the folder", name, got)
+		}
+	}
+	if _, ok := NetworkLogin(items, "Personal", "Home Wi-Fi"); ok {
+		t.Error("a login outside the folder answered")
+	}
+}

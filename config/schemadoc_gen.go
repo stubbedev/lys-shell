@@ -154,6 +154,7 @@ var schemaDocs = map[string]string{
 	"BitwardenConfig.LockAfter":                              "Lock the vault after this many minutes without a copy. 0 keeps it\nopen until locked by hand.",
 	"BitwardenConfig.LockWithSession":                        "Lock the vault when the session locks.",
 	"BitwardenConfig.MiddleClick":                            "Action on middle click.",
+	"BitwardenConfig.NetworkFolder":                          "Vault folder whose logins answer NetworkManager's requests for\nWi-Fi, 802.1X and VPN secrets while the vault is open, before the\nshell asks. The one login named exactly like the connection\nprofile answers: its password for the password, PSK or secret,\nits username for the username, and a custom field of a key's name\nfor that key (`pin`, `domain`, `private-key-password`). A login\nbehind the master-password reprompt never answers, and secrets\nNetworkManager rejected are asked for again. Empty answers nothing\nfrom the vault.",
 	"BitwardenConfig.RightClick":                             "Action on right click.",
 	"BitwardenConfig.ScrollDown":                             "Action on scroll down.",
 	"BitwardenConfig.ScrollUp":                               "Action on scroll up.",

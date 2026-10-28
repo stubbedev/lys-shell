@@ -21,7 +21,7 @@ func serveNative(t *testing.T, budget time.Duration) *agentFixture {
 	f := startFakeNM(t)
 	conn := f.client()
 	agent := NewAgent()
-	must(t, serveAgent(t.Context(), conn, agent, NativeSignIn, budget))
+	must(t, serveAgent(t.Context(), conn, &agentObject{agent: agent, signIn: NativeSignIn, budget: budget}))
 	f.registered(t)
 	return &agentFixture{nm: f, agent: agent, name: conn.Names()[0]}
 }

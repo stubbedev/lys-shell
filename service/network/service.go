@@ -26,12 +26,13 @@ type Service struct {
 // Start brings the service up on conn (the system bus) until ctx ends.
 // The secret agent is served before anything can activate: a VPN that
 // needs a password has nowhere to ask otherwise. openconnect VPNs sign
-// in natively (NativeSignIn).
-func Start(ctx context.Context, conn *dbus.Conn) (*Service, error) {
-	return start(ctx, conn, NativeSignIn, RequestBudget, defaultResumeTiming)
+// in natively (NativeSignIn); other secrets come from vault when it has
+// them (nil for no vault), else from the user.
+func Start(ctx context.Context, conn *dbus.Conn, vault Vault) (*Service, error) {
+	return start(ctx, conn, NativeSignIn, vault, RequestBudget, defaultResumeTiming)
 }
 
-func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, budget time.Duration, timing resumeTiming) (*Service, error) {
+func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, vault Vault, budget time.Duration, timing resumeTiming) (*Service, error) {
 	n := nm{conn: conn}
 	settings, err := newSettings(ctx, n)
 	if err != nil {
@@ -41,7 +42,7 @@ func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, budget time.Dura
 	if device, ok := findWifiDevice(ctx, n); ok {
 		svc.Wifi = &Wifi{nm: n, settings: settings, Device: device}
 	}
-	if err := serveAgent(ctx, conn, svc.Agent, signIn, budget); err != nil {
+	if err := serveAgent(ctx, conn, &agentObject{agent: svc.Agent, signIn: signIn, vault: vault, budget: budget}); err != nil {
 		return nil, err
 	}
 	vpn, err := newVPNService(ctx, n, settings, svc.Agent, signIn, timing)
