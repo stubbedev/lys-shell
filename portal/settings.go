@@ -1,8 +1,7 @@
 package portal
 
 import (
-	"os"
-	"path/filepath"
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -10,9 +9,10 @@ import (
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/xdg"
+	"github.com/stubbedev/lys-ui/gtksettings"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/gtksettings"
 )
 
 // SettingsIface serves org.freedesktop.appearance from the live styling
@@ -66,7 +66,7 @@ var servedSettings = []setting{
 	{AppearanceNS, keyReducedMotion, always(func(d desktop) any { return boolU32(!d.cfg.Animations.Enabled) })},
 	{GnomeInterfaceNS, "color-scheme", always(func(d desktop) any { return gnomeColorScheme(colorScheme(d.cfg.Styling)) })},
 	{GnomeInterfaceNS, "gtk-theme", always(gtkTheme)},
-	{GnomeInterfaceNS, "icon-theme", nonEmpty(func(d desktop) string { return d.gtk.IconTheme })},
+	{GnomeInterfaceNS, "icon-theme", nonEmpty(func(d desktop) string { return d.gtk.IconThemeName })},
 	{GnomeInterfaceNS, "cursor-theme", nonEmpty(cursorTheme)},
 	{GnomeInterfaceNS, "cursor-size", cursorSize},
 	{GnomeInterfaceNS, "font-name", always(func(d desktop) any { return fontName(d) })},
@@ -110,14 +110,14 @@ func cursorTheme(d desktop) string {
 	if theme := d.getenv("XCURSOR_THEME"); theme != "" {
 		return theme
 	}
-	return d.gtk.CursorTheme
+	return d.gtk.CursorThemeName
 }
 
 func cursorSize(d desktop) (any, bool) {
 	if size, err := strconv.ParseInt(strings.TrimSpace(d.getenv("XCURSOR_SIZE")), 10, 32); err == nil && size > 0 {
 		return int32(size), true
 	}
-	if size, err := intconv.Exact[int32](d.gtk.CursorSize); err == nil && size > 0 {
+	if size, err := intconv.Exact[int32](d.gtk.CursorThemeSize); err == nil && size > 0 {
 		return size, true
 	}
 	return nil, false
@@ -134,10 +134,11 @@ func fontName(d desktop) string {
 
 // textScale is gtk-xft-dpi over GTK's 96 DPI baseline, 1 without one.
 func textScale(s gtksettings.Settings) float64 {
-	if s.XftDPI <= 0 {
+	dpi := s.XftDPI.DotsPerInch()
+	if dpi <= 0 {
 		return 1
 	}
-	return float64(s.XftDPI) / 1024 / 96
+	return dpi / 96
 }
 
 // colorScheme is 0 no preference, 1 dark, 2 light. Auto states no
@@ -190,17 +191,14 @@ type settings struct {
 	getenv func(string) string
 }
 
-// hostGTKSettings reads the user's settings.ini under XDG_CONFIG_HOME.
+// hostGTKSettings reads the settings.ini files GTK 4 reads, logging one
+// it could not.
 func hostGTKSettings() gtksettings.Settings {
-	dir := os.Getenv("XDG_CONFIG_HOME")
-	if !filepath.IsAbs(dir) {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return gtksettings.Settings{}
-		}
-		dir = filepath.Join(home, ".config")
+	s, err := gtksettings.Load(xdg.OS)
+	if err != nil {
+		log.Printf("settings: %v", err)
 	}
-	return gtksettings.Load(dir)
+	return s
 }
 
 func (s *settings) iface() dbusx.Interface {

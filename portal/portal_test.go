@@ -4,15 +4,16 @@ import (
 	"errors"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-ui/gtksettings"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/gtksettings"
 )
 
 // rig is a backend serving on a private bus, with a client connection
@@ -166,7 +167,7 @@ func TestSettingsReadAndUnknownKeys(t *testing.T) {
 // cursor; what neither sets falls back to the shell's palette and font,
 // or is not served.
 func TestSettingsServeTheGTKInterfaceKeys(t *testing.T) {
-	r := settingsRig(t, gtksettings.Settings{IconTheme: "Papirus", CursorTheme: "Vimix", CursorSize: 22, FontName: "Inter 11", XftDPI: 98304 * 5 / 4},
+	r := settingsRig(t, gtksettings.Settings{IconThemeName: "Papirus", CursorThemeName: "Vimix", CursorThemeSize: 22, FontName: "Inter 11", XftDPI: 98304 * 5 / 4},
 		map[string]string{"XCURSOR_THEME": "Bibata", "XCURSOR_SIZE": "28"})
 	got := r.readAll(t, GnomeInterfaceNS)[GnomeInterfaceNS]
 	want := map[string]any{
@@ -192,7 +193,7 @@ func TestSettingsServeTheGTKInterfaceKeys(t *testing.T) {
 	if got["font-name"].Value() != config.Defaults().General.FontSans+" 10" || got["text-scaling-factor"].Value() != 1.0 {
 		t.Errorf("fallbacks = %v", got)
 	}
-	host := settingsRig(t, gtksettings.Settings{ThemeName: "Orchis", CursorTheme: "Vimix", CursorSize: 22}, nil)
+	host := settingsRig(t, gtksettings.Settings{ThemeName: "Orchis", CursorThemeName: "Vimix", CursorThemeSize: 22}, nil)
 	got = host.readAll(t, GnomeInterfaceNS)[GnomeInterfaceNS]
 	if got["gtk-theme"].Value() != "Orchis" || got["cursor-theme"].Value() != "Vimix" || got["cursor-size"].Value() != int32(22) {
 		t.Errorf("settings.ini values = %v", got)
@@ -500,5 +501,30 @@ func TestOptions(t *testing.T) {
 	}
 	if stringOr(o, "s", "x") != "hi" || stringOr(o, "missing", "x") != "x" || stringOr(o, "b", "x") != "x" {
 		t.Error("stringOr")
+	}
+}
+
+// The host's GTK settings are what GTK 4 reads under the session's
+// config home: the gtk-4.0 file, not gtk-3.0's.
+func TestHostGTKSettingsReadGTK4sFiles(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("XDG_CONFIG_DIRS", t.TempDir())
+	write := func(dir, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(config, dir), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(config, dir, "settings.ini"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("gtk-3.0", "[Settings]\ngtk-icon-theme-name=Old\n")
+	if got := hostGTKSettings(); got.IconThemeName != "" {
+		t.Errorf("gtk-3.0 was read: %+v", got)
+	}
+	write("gtk-4.0", "[Settings]\ngtk-cursor-theme-name=Vimix\ngtk-cursor-theme-size=22\n")
+	if got := hostGTKSettings(); got.CursorThemeName != "Vimix" || got.CursorThemeSize != 22 {
+		t.Errorf("gtk-4.0 settings = %+v", got)
 	}
 }
