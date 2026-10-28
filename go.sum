@@ -30,8 +30,12 @@ github.com/stubbedev/lys-lib v0.1.1-0.20261027165538-f6074bfcef28 h1:TOtef5vvrUn
 github.com/stubbedev/lys-lib v0.1.1-0.20261027165538-f6074bfcef28/go.mod h1:c/U4WtCt7n1gEafIV7nhKHZ7Rs+n22C4MWRd4na2Afo=
 github.com/stubbedev/lys-lib v0.1.1-0.20261027212047-5ff5256e5088 h1:Q6q5NUak1CYh01Hppf4WTlyN7p5bdB5kwvxlFW6pr5E=
 github.com/stubbedev/lys-lib v0.1.1-0.20261027212047-5ff5256e5088/go.mod h1:c/U4WtCt7n1gEafIV7nhKHZ7Rs+n22C4MWRd4na2Afo=
+github.com/stubbedev/lys-lib v0.1.1-0.20261028194248-f0a5033ac3fb h1:EWFamFvu9TuQRRmL3/9qzw9rqW9XIaEjJq+MWWtPrNQ=
+github.com/stubbedev/lys-lib v0.1.1-0.20261028194248-f0a5033ac3fb/go.mod h1:c/U4WtCt7n1gEafIV7nhKHZ7Rs+n22C4MWRd4na2Afo=
 github.com/stubbedev/lys-ui v0.0.0-20261027170516-c6487842b233 h1:kFRDRvGDDPEpsQ5UurFzFMpzlWazoDNV2+P6kaTdfos=
 github.com/stubbedev/lys-ui v0.0.0-20261027170516-c6487842b233/go.mod h1:sOT3EdvugN4hSaDt9uazebnw13B+synPW/d/MzaF/io=
+github.com/stubbedev/lys-ui v0.0.0-20261028194601-dff9d9e8dd85 h1:DYMirwSVrSKMHqF9q7cl3WuFyCVbTV/IRfTXrSMhcc0=
+github.com/stubbedev/lys-ui v0.0.0-20261028194601-dff9d9e8dd85/go.mod h1:sj3te7gSdzyDIAIoHvxtCPypSm2rvnaljvgUhMMOgYc=
 github.com/stubbedev/memory-go v0.3.0 h1:Hkm+aw0vs9qhwXLL9p98U3IbQFRxPLyGvlrf2GZ9ov8=
 github.com/stubbedev/memory-go v0.3.0/go.mod h1:G7ZRpWZ/VbEDhOj22Ncx7jBqqiflWFKEnntKl2UcLEg=
 github.com/unxed/xkb-go v0.1.9 h1:t2lhW6bcPxzX/1DBf9jIRoo13KhMm9+XUPJT4o5a/Kw=

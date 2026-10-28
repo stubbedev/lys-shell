@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
+	"github.com/stubbedev/lys-lib/fourcc"
 	"github.com/stubbedev/lys-lib/gpu"
 
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -41,7 +42,7 @@ type screen struct {
 	dev      *gpu.Device
 	buf      *gpu.Buffer
 	frame    *capture.DmabufBuffer
-	modifier uint64
+	modifier fourcc.Modifier
 	source   image.Rectangle
 }
 
@@ -81,17 +82,17 @@ func openScreen(target sharepicker.Target, cursor bool, logical LogicalSize, ope
 	}
 	exported, err := s.dev.ExportModifiers(offered.Fourcc)
 	if err != nil {
-		return nil, fmt.Errorf("recorder: the modifiers %s allocates %v in: %w", s.dev.Name(), capture.FormatFromFourcc(offered.Fourcc), err)
+		return nil, fmt.Errorf("recorder: the modifiers %s allocates %v in: %w", s.dev.Name(), offered.Fourcc, err)
 	}
 	probed, layout, err := dmabufprobe.First(dmabufprobe.Layouts(offered.Modifiers, nil, exported), func(l dmabufprobe.Layout) (*probedBuffer, error) {
 		return s.probe(offered, l.Modifier)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("recorder: output %s: no %dx%d %v buffer on %s takes its frames: %w", output, offered.Width, offered.Height, capture.FormatFromFourcc(offered.Fourcc), s.dev.Name(), err)
+		return nil, fmt.Errorf("recorder: output %s: no %dx%d %v buffer on %s takes its frames: %w", output, offered.Width, offered.Height, offered.Fourcc, s.dev.Name(), err)
 	}
 	s.buf, s.frame, s.modifier = probed.buf, probed.frame, layout.Modifier
-	log.Printf("recorder: capturing %s (%dx%d %v, transform %d, recording %v) on %s in modifier %#x", target.Payload(), offered.Width, offered.Height,
-		capture.FormatFromFourcc(offered.Fourcc), o.Transform, s.source, s.dev.Name(), s.modifier)
+	log.Printf("recorder: capturing %s (%dx%d %v, transform %d, recording %v) on %s in modifier %s", target.Payload(), offered.Width, offered.Height,
+		offered.Fourcc, o.Transform, s.source, s.dev.Name(), s.modifier)
 	return s, nil
 }
 
@@ -133,8 +134,8 @@ type probedBuffer struct {
 
 // probe allocates a buffer in modifier, has the compositor import it,
 // and copies a frame into it.
-func (s *screen) probe(offered capture.DmabufFormat, modifier uint64) (*probedBuffer, error) {
-	b, err := s.dev.NewBuffer(offered.Width, offered.Height, offered.Fourcc, []uint64{modifier})
+func (s *screen) probe(offered capture.DmabufFormat, modifier fourcc.Modifier) (*probedBuffer, error) {
+	b, err := s.dev.NewBuffer(offered.Width, offered.Height, offered.Fourcc, []fourcc.Modifier{modifier})
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabuf"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
+	"github.com/stubbedev/lys-lib/fourcc"
 	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/pipewire"
 	"golang.org/x/sys/unix"
@@ -26,10 +27,10 @@ import (
 
 // gpuAllocator is the device the source allocates from.
 type gpuAllocator interface {
-	Modifiers(fourcc uint32) ([]uint64, error)
-	ExportModifiers(fourcc uint32) ([]uint64, error)
-	NewTarget(width, height int, fourcc uint32, modifiers []uint64) (gpuAllocation, error)
-	NewBuffer(width, height int, fourcc uint32, modifiers []uint64) (gpuAllocation, error)
+	Modifiers(format fourcc.Format) ([]fourcc.Modifier, error)
+	ExportModifiers(format fourcc.Format) ([]fourcc.Modifier, error)
+	NewTarget(width, height int, format fourcc.Format, modifiers []fourcc.Modifier) (gpuAllocation, error)
+	NewBuffer(width, height int, format fourcc.Format, modifiers []fourcc.Modifier) (gpuAllocation, error)
 	Close()
 }
 
@@ -60,42 +61,42 @@ func openVulkanAllocator(dev uint64) (gpuAllocator, error) {
 	return &vulkanAllocator{dev: d, node: node}, nil
 }
 
-func (a *vulkanAllocator) Modifiers(fourcc uint32) ([]uint64, error) {
+func (a *vulkanAllocator) Modifiers(format fourcc.Format) ([]fourcc.Modifier, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	mods, err := a.dev.Modifiers(fourcc)
+	mods, err := a.dev.Modifiers(format)
 	if err != nil {
-		return nil, fmt.Errorf("screencast: the modifiers %s renders %v in: %w", a.node, capture.FormatFromFourcc(fourcc), err)
+		return nil, fmt.Errorf("screencast: the modifiers %s renders %v in: %w", a.node, format, err)
 	}
 	return mods, nil
 }
 
-func (a *vulkanAllocator) ExportModifiers(fourcc uint32) ([]uint64, error) {
+func (a *vulkanAllocator) ExportModifiers(format fourcc.Format) ([]fourcc.Modifier, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	mods, err := a.dev.ExportModifiers(fourcc)
+	mods, err := a.dev.ExportModifiers(format)
 	if err != nil {
-		return nil, fmt.Errorf("screencast: the modifiers %s exports %v in: %w", a.node, capture.FormatFromFourcc(fourcc), err)
+		return nil, fmt.Errorf("screencast: the modifiers %s exports %v in: %w", a.node, format, err)
 	}
 	return mods, nil
 }
 
-func (a *vulkanAllocator) NewTarget(width, height int, fourcc uint32, modifiers []uint64) (gpuAllocation, error) {
+func (a *vulkanAllocator) NewTarget(width, height int, format fourcc.Format, modifiers []fourcc.Modifier) (gpuAllocation, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	t, err := a.dev.NewTarget(width, height, fourcc, modifiers)
+	t, err := a.dev.NewTarget(width, height, format, modifiers)
 	if err != nil {
-		return nil, fmt.Errorf("screencast: allocate a %dx%d %v render target on %s: %w", width, height, capture.FormatFromFourcc(fourcc), a.node, err)
+		return nil, fmt.Errorf("screencast: allocate a %dx%d %v render target on %s: %w", width, height, format, a.node, err)
 	}
 	return &vulkanAllocation{a: a, b: t}, nil
 }
 
-func (a *vulkanAllocator) NewBuffer(width, height int, fourcc uint32, modifiers []uint64) (gpuAllocation, error) {
+func (a *vulkanAllocator) NewBuffer(width, height int, format fourcc.Format, modifiers []fourcc.Modifier) (gpuAllocation, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	b, err := a.dev.NewBuffer(width, height, fourcc, modifiers)
+	b, err := a.dev.NewBuffer(width, height, format, modifiers)
 	if err != nil {
-		return nil, fmt.Errorf("screencast: allocate a %dx%d %v buffer on %s: %w", width, height, capture.FormatFromFourcc(fourcc), a.node, err)
+		return nil, fmt.Errorf("screencast: allocate a %dx%d %v buffer on %s: %w", width, height, format, a.node, err)
 	}
 	return &vulkanAllocation{a: a, b: b}, nil
 }
@@ -159,10 +160,10 @@ type gpuSource struct {
 	cap             gpuCapturer
 	output          capture.Output
 	cursor          bool
-	fourcc          uint32
+	format          fourcc.Format
 	video           pipewire.VideoFormat
 	width, height   uint32
-	modifier        uint64
+	modifier        fourcc.Modifier
 	render          bool
 	// watch ends the stream when a failed copy finds the output gone.
 	watch *vanishWatch
@@ -173,7 +174,7 @@ type gpuSource struct {
 type gpuBuffer struct {
 	alloc    gpuAllocation
 	plane    dmabuf.Plane
-	modifier uint64
+	modifier fourcc.Modifier
 	imported importedBuffer
 }
 
@@ -186,7 +187,7 @@ func (b *gpuBuffer) Release() {
 	b.alloc.Close()
 }
 
-func (s *gpuSource) Modifier() uint64 { return s.modifier }
+func (s *gpuSource) Modifier() fourcc.Modifier { return s.modifier }
 
 func (s *gpuSource) DmabufVideoFormat() pipewire.VideoFormat { return s.video }
 
@@ -200,7 +201,7 @@ func (s *gpuSource) alloc(layout dmabufprobe.Layout) (*gpuBuffer, error) {
 	if layout.Render {
 		allocate = s.dev.NewTarget
 	}
-	t, err := allocate(int(s.width), int(s.height), s.fourcc, []uint64{layout.Modifier})
+	t, err := allocate(int(s.width), int(s.height), s.format, []fourcc.Modifier{layout.Modifier})
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,7 @@ func (s *gpuSource) alloc(layout dmabufprobe.Layout) (*gpuBuffer, error) {
 	imported, err := s.cap.Import(d)
 	if err != nil {
 		t.Close()
-		return nil, fmt.Errorf("screencast: import a %dx%d buffer of modifier %#x: %w", d.Width, d.Height, d.Modifier, err)
+		return nil, fmt.Errorf("screencast: import a %dx%d buffer of modifier %s: %w", d.Width, d.Height, d.Modifier, err)
 	}
 	return &gpuBuffer{alloc: t, plane: d.Planes[0], modifier: d.Modifier, imported: imported}, nil
 }
@@ -257,7 +258,7 @@ func probeGPUSource(shm pipewire.Source, dev gpuAllocator, c gpuCapturer, offere
 	}
 	s := &gpuSource{
 		Source: shm, dev: dev, cap: c, output: o, cursor: cursor,
-		fourcc: offered.Fourcc, video: videoFormat(format), width: width, height: height,
+		format: offered.Fourcc, video: videoFormat(format), width: width, height: height,
 	}
 	modifier, layout, err := dmabufprobe.First(layouts, s.probe)
 	if err != nil {
@@ -269,7 +270,7 @@ func probeGPUSource(shm pipewire.Source, dev gpuAllocator, c gpuCapturer, offere
 
 // probe allocates a buffer in layout and screencopies into it,
 // returning the modifier it was allocated in when the copy lands.
-func (s *gpuSource) probe(layout dmabufprobe.Layout) (uint64, error) {
+func (s *gpuSource) probe(layout dmabufprobe.Layout) (fourcc.Modifier, error) {
 	probe, err := s.alloc(layout)
 	if err != nil {
 		return 0, err

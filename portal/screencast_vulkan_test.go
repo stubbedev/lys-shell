@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/capture"
-	"github.com/stubbedev/lys-lib/dmabuf"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
+	"github.com/stubbedev/lys-lib/fourcc"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	"golang.org/x/sys/unix"
 
@@ -53,11 +53,11 @@ func isDmabuf(fd int) bool {
 // closes its fd.
 func TestVulkanBuffersAreLinearXRGBDmabufs(t *testing.T) {
 	dev, cp := realDevice(t), &fakeCopy{}
-	mods, err := dev.ExportModifiers(dmabuf.FormatXRGB8888)
+	mods, err := dev.ExportModifiers(fourcc.XRGB8888)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rendered, err := dev.Modifiers(dmabuf.FormatXRGB8888)
+	rendered, err := dev.Modifiers(fourcc.XRGB8888)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,17 +69,17 @@ func TestVulkanBuffersAreLinearXRGBDmabufs(t *testing.T) {
 		t.Fatalf("screencopy imported %d buffers, want the probe", len(cp.got))
 	}
 	probe := cp.got[0]
-	if probe.Format != dmabuf.FormatXRGB8888 || probe.Width != 64 || probe.Height != 32 || len(probe.Planes) != 1 || probe.Planes[0].Stride < 64*4 {
+	if probe.Format != fourcc.XRGB8888 || probe.Width != 64 || probe.Height != 32 || len(probe.Planes) != 1 || probe.Planes[0].Stride < 64*4 {
 		t.Errorf("screencopy imported %+v, want one XR24 64x32 plane", probe)
 	}
-	if probe.Modifier != dmabuf.ModifierLinear {
-		t.Errorf("the probe is in modifier %#x, want linear among the %#x the device exports XR24 in", probe.Modifier, mods)
+	if probe.Modifier != fourcc.Linear {
+		t.Errorf("the probe is in modifier %s, want linear among the %v the device exports XR24 in", probe.Modifier, mods)
 	}
 	if isDmabuf(probe.Planes[0].FD) || cp.destroyed != 1 {
 		t.Errorf("the probe outlived the probe: fd still a dmabuf %v, imports destroyed %d", isDmabuf(probe.Planes[0].FD), cp.destroyed)
 	}
 	if src.Modifier() != probe.Modifier {
-		t.Errorf("the stream offers modifier %#x, want the probe's %#x", src.Modifier(), probe.Modifier)
+		t.Errorf("the stream offers modifier %s, want the probe's %s", src.Modifier(), probe.Modifier)
 	}
 	d, err := src.AllocDmabuf()
 	if err != nil {
@@ -103,7 +103,7 @@ func TestVulkanBuffersAreLinearXRGBDmabufs(t *testing.T) {
 // naming both lists, with nothing left imported.
 func TestVulkanDeclinesWithoutASharedModifier(t *testing.T) {
 	dev, cp := realDevice(t), &fakeCopy{}
-	_, err := probeGPUSource(nil, dev, cp, offer(), []dmabufprobe.Layout{{Modifier: dmabuf.ModifierInvalid, Render: true}}, capture.Output{}, false, shmFrame)
+	_, err := probeGPUSource(nil, dev, cp, offer(), []dmabufprobe.Layout{{Modifier: fourcc.Invalid, Render: true}}, capture.Output{}, false, shmFrame)
 	if !errors.Is(err, errNoDmabuf) || !strings.Contains(err.Error(), "none of the modifiers") {
 		t.Fatalf("err = %v, want errNoDmabuf naming the modifier lists", err)
 	}
@@ -158,7 +158,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	if offered.Device != dev || len(offered.Modifiers) == 0 {
-		t.Errorf("sway offers device %#x and modifiers %#x, want %s's and at least one", offered.Device, offered.Modifiers, node)
+		t.Errorf("sway offers device %#x and modifiers %v, want %s's and at least one", offered.Device, offered.Modifiers, node)
 	}
 	_ = c.Close()
 
