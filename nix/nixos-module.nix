@@ -103,6 +103,13 @@ let
     + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${xsessionDirArgs} ${envArgs} ${fallback}";
 in
 {
+  imports = [
+    (lib.mkRemovedOptionModule [ "programs" "lys-shell" "secrets" "enable" ] ''
+      lys-secrets moved to its own flake, github:stubbedev/lys-secrets: import
+      its nixosModules.default and set `services.lys-secrets.enable = true;`.
+    '')
+  ];
+
   options.programs.lys-shell = {
     enable = lib.mkEnableOption "the lys-shell desktop shell";
 
@@ -155,15 +162,6 @@ in
         '';
       };
     };
-
-    secrets.enable = lib.mkEnableOption ''
-      lys-secrets as the session's Secret Service (`org.freedesktop.secrets`):
-      libsecret, Chromium and Electron apps, git's libsecret credential helper
-      and the portal's per-app secrets keep their secrets in collections
-      encrypted at rest under `$XDG_DATA_HOME/lys-secrets`. The lock screen
-      unlocks the login collection with the session password. Only one
-      provider can own the name, so this cannot be combined with
-      `services.gnome.gnome-keyring.enable`'';
 
     lock = {
       enable = lib.mkEnableOption ''
@@ -398,40 +396,6 @@ in
       };
     })
 
-    (lib.mkIf cfg.secrets.enable {
-      assertions = [
-        {
-          assertion = !config.services.gnome.gnome-keyring.enable;
-          message = ''
-            programs.lys-shell.secrets.enable and services.gnome.gnome-keyring.enable
-            both provide org.freedesktop.secrets; enable one of them.
-          '';
-        }
-      ];
-      # The activation file clients start lys-secrets through, handing it to
-      # the user unit below.
-      services.dbus.packages = [
-        (pkgs.runCommand "lys-secrets-dbus" { } ''
-          install -Dm0644 ${cfg.package}/share/lys-shell/org.freedesktop.secrets.service \
-            $out/share/dbus-1/services/org.freedesktop.secrets.service
-        '')
-      ];
-      systemd.user.services.lys-secrets = {
-        description = "lys-secrets Secret Service provider";
-        wantedBy = [ "graphical-session.target" ];
-        partOf = [ "graphical-session.target" ];
-        after = [ "graphical-session.target" ];
-        serviceConfig = {
-          Type = "dbus";
-          BusName = "org.freedesktop.secrets";
-          ExecStart = lib.getExe' cfg.package "lys-secrets";
-          Restart = "on-failure";
-          RestartSec = 3;
-          Slice = "session.slice";
-        };
-      };
-    })
-
     (lib.mkIf cfg.lock.enable {
       # The lock surface authenticates the unlock against this PAM service.
       # The NixOS default stack (pam_unix password auth) is what an unlock
@@ -443,10 +407,11 @@ in
       # can unlock the keyring — without this, secret-service clients (Chrome,
       # ...) prompt for the keyring password on first use every session. The
       # lines are `optional`, so with no keyring daemon running they no-op.
-      # With `secrets.enable` lys-shell hands the password to lys-secrets
-      # itself after the unlock, and the gnome-keyring lines stay unused.
+      # With lys-secrets' services.lys-secrets.enable the lock screen hands
+      # the password to lys-secrets itself after the unlock, and the
+      # gnome-keyring lines stay unused.
       # The user's lys-shell config `login.lock.pam-service` must name this same service.
-      security.pam.services.${cfg.lock.pamService}.enableGnomeKeyring = !cfg.secrets.enable;
+      security.pam.services.${cfg.lock.pamService}.enableGnomeKeyring = !(config.services.lys-secrets.enable or false);
     })
 
     (lib.mkIf (cfg.greeter.enable && cfg.greeter.displayManager == "greetd") {

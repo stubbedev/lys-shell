@@ -10,7 +10,10 @@
         lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
           # The shell on a live Hyprland in a NixOS VM (needs KVM); see
           # tests/hyprland-vm.nix.
-          lys-shell-hyprland-vm = pkgs.callPackage ../tests/hyprland-vm.nix { inherit self; };
+          lys-shell-hyprland-vm = pkgs.callPackage ../tests/hyprland-vm.nix {
+            inherit self;
+            inherit (inputs) lys-secrets;
+          };
           # The shell on lys-wm in a NixOS VM (needs KVM); see
           # tests/lys-wm-vm.nix.
           lys-shell-lys-wm-vm = pkgs.callPackage ../tests/lys-wm-vm.nix {

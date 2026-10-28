@@ -58,7 +58,6 @@ export default defineConfig({
             { text: 'Custom icons', link: '/guide/custom-icons' },
             { text: 'Custom modules', link: '/guide/custom-modules' },
             { text: 'Greeter (login screen)', link: '/guide/greeter' },
-            { text: 'Secrets (keyring)', link: '/guide/secrets' },
             { text: 'CLI', link: '/guide/cli' },
           ],
         },

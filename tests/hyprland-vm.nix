@@ -21,6 +21,7 @@
   pkgs,
   lib,
   self,
+  lys-secrets,
 }:
 
 let
@@ -100,13 +101,16 @@ pkgs.testers.nixosTest {
   nodes.machine =
     { ... }:
     {
-      imports = [ self.nixosModules.default ];
+      imports = [
+        self.nixosModules.default
+        lys-secrets.nixosModules.default
+      ];
 
       programs.lys-shell = {
         enable = true;
         lock.enable = true;
-        secrets.enable = true;
       };
+      services.lys-secrets.enable = true;
 
       virtualisation.graphics = true;
       virtualisation.cores = 4;

@@ -13,8 +13,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/intconv"
-
-	"github.com/stubbedev/lys-shell/secrets/control"
+	"github.com/stubbedev/lys-secrets/control"
 )
 
 // keyringTimeout bounds the control-socket exchange: a locker must

@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -9,7 +10,8 @@ import (
 // lys-shell links no login screen: locking runs in `lys-login lock`, and
 // the shell holds only the client that starts it. The greeter, the lock
 // screen and the screen they share must never come back into its import
-// graph, nor lys-secrets' keys.
+// graph, nor lys-secrets' keys (its internals, or the test server that
+// serves them).
 func TestShellLinksNoLoginScreen(t *testing.T) {
 	gobin, err := exec.LookPath("go")
 	if err != nil {
@@ -21,18 +23,14 @@ func TestShellLinksNoLoginScreen(t *testing.T) {
 	}
 	deps := strings.Fields(string(out))
 	const module = "github.com/stubbedev/lys-shell/"
-	forbidden := []string{"login/screen", "login/greeter", "login/lock", "secrets/keyring", "secrets/service"}
+	forbidden := []string{module + "login/screen", module + "login/greeter", module + "login/lock", "github.com/stubbedev/lys-secrets/secretstest"}
+	const secretsInternal = "github.com/stubbedev/lys-secrets/internal/"
 	for _, dep := range deps {
-		for _, f := range forbidden {
-			if dep == module+f {
-				t.Errorf("lys-shell imports %s", dep)
-			}
+		if slices.Contains(forbidden, dep) || strings.HasPrefix(dep, secretsInternal) {
+			t.Errorf("lys-shell imports %s", dep)
 		}
 	}
-	found := false
-	for _, dep := range deps {
-		found = found || dep == module+"login/lockclient"
-	}
+	found := slices.Contains(deps, module+"login/lockclient")
 	if !found {
 		t.Error("lys-shell does not import login/lockclient: the check above lists nothing")
 	}

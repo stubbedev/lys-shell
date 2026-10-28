@@ -23,6 +23,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
     };
+    # The Secret Service the Hyprland VM check unlocks through the lock
+    # screen and the shell's password dialog; the Go client comes through
+    # go.mod.
+    lys-secrets = {
+      url = "github:stubbedev/lys-secrets";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+    };
     # The compositor the lys-wm VM check runs the shell on.
     lys-wm = {
       url = "github:stubbedev/lys-wm";

@@ -20,7 +20,7 @@ STAGING="lys-shell-${VERSION}-${ARCH}-linux"
 rm -rf "${STAGING}"
 mkdir -p "${STAGING}/icons" "${STAGING}/completions"
 
-for bin in lys-shell lys-login lys-lock lys-settings lys-secrets; do
+for bin in lys-shell lys-login lys-lock lys-settings; do
 	cp "${BIN_DIR}/${bin}" "${STAGING}/"
 done
 cp "${BIN_DIR}/completions/completions.bash" "${BIN_DIR}/completions/_lys-shell" "${BIN_DIR}/completions/lys-shell.fish" "${STAGING}/completions/"
@@ -36,7 +36,5 @@ cp resources/lys-shell.service \
 	resources/org.freedesktop.impl.portal.desktop.lys.service \
 	resources/xdg-desktop-portal-lys-shell.service \
 	resources/lys-shell-portals.conf \
-	resources/lys-secrets.service \
-	resources/org.freedesktop.secrets.lys-secrets.service \
 	"${STAGING}/"
 tar czf "${STAGING}.tar.gz" "${STAGING}"

@@ -17,10 +17,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/secrets/client"
-	"github.com/stubbedev/lys-shell/secrets/keyring"
-	secretservice "github.com/stubbedev/lys-shell/secrets/service"
+	"github.com/stubbedev/lys-secrets/client"
+	"github.com/stubbedev/lys-secrets/secretstest"
 )
 
 // interactive calls a (u, a{sv}) method.
@@ -257,46 +255,11 @@ func (r *rig) retrieveSecret(t *testing.T, appID string) (uint32, []byte) {
 	return code, got
 }
 
-// promptAnswers answers the Secret Service's prompts from a script: a
-// password, or "" to dismiss.
-type promptAnswers struct {
-	mu      sync.Mutex
-	answers []string
-}
-
-func (p *promptAnswers) next() ([]byte, bool, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if len(p.answers) == 0 {
-		return nil, false, nil
-	}
-	a := p.answers[0]
-	p.answers = p.answers[1:]
-	return []byte(a), a != "", nil
-}
-
-func (p *promptAnswers) Password(context.Context, string, bool) ([]byte, bool, error) {
-	return p.next()
-}
-
-func (p *promptAnswers) NewPassword(context.Context, string) ([]byte, bool, error) { return p.next() }
-
 // withKeyring serves a Secret Service on the rig's bus whose login
 // collection is unlocked with "pw".
-func withKeyring(t *testing.T, r *rig) (*secretservice.Service, *promptAnswers) {
+func withKeyring(t *testing.T, r *rig) *secretstest.Server {
 	t.Helper()
-	answers := &promptAnswers{}
-	svc, err := secretservice.Start(r.bus.Conn(t), secretservice.Config{
-		Dir: t.TempDir(), KDF: keyring.KDF{Time: 1, MemKiB: 64, Threads: 1}, Prompter: answers,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(svc.Close)
-	if err := svc.UnlockLogin([]byte("pw")); err != nil {
-		t.Fatal(err)
-	}
-	return svc, answers
+	return secretstest.Start(t, r.bus.Conn(t), "pw")
 }
 
 // stored reads the app's master secret straight from the Secret Service.
@@ -428,18 +391,14 @@ func TestSecretCreationAgreesUnderConcurrency(t *testing.T) {
 func TestSecretUnlocksTheKeyringThroughItsPrompt(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	r := newRig(t, nil)
-	svc, answers := withKeyring(t, r)
+	keyring := withKeyring(t, r)
 	_, first := r.retrieveSecret(t, "org.app")
-	svc.Lock()
-	answers.mu.Lock()
-	answers.answers = []string{""}
-	answers.mu.Unlock()
+	keyring.Lock()
+	keyring.Answer("")
 	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseOther || len(got) != 0 {
 		t.Errorf("dismissed unlock = %d, %d bytes", code, len(got))
 	}
-	answers.mu.Lock()
-	answers.answers = []string{"pw"}
-	answers.mu.Unlock()
+	keyring.Answer("pw")
 	if code, got := r.retrieveSecret(t, "org.app"); code != ResponseSuccess || !bytes.Equal(got, first) {
 		t.Errorf("unlocked = %d, same secret %v", code, bytes.Equal(got, first))
 	}

@@ -10,9 +10,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/sockdir"
-
-	"github.com/stubbedev/lys-shell/secrets/control"
-	"github.com/stubbedev/lys-shell/secrets/keyring"
+	"github.com/stubbedev/lys-secrets/control"
 )
 
 // fakeKeyring serves one control-socket exchange: it captures the
@@ -101,7 +99,7 @@ type secretsUnlocker struct{ got chan string }
 func (u secretsUnlocker) UnlockLogin(pw []byte) error {
 	u.got <- string(pw)
 	if string(pw) != "pw" {
-		return keyring.ErrWrongPassword
+		return control.ErrWrongPassword
 	}
 	return nil
 }

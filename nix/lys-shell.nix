@@ -44,7 +44,6 @@ let
       ../internal
       ../portal
       ../resources
-      ../secrets
       ../service
       ../shell
       ../strftime
@@ -54,7 +53,7 @@ let
   };
 
   # The binaries that draw through lys-ui and dlopen the GPU and media
-  # libraries; lys-secrets draws nothing and links none of them.
+  # libraries.
   wrapped = [
     "lys-shell"
     "lys-login"
@@ -69,14 +68,13 @@ buildGo127Module {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-Melytzysew0zuM/lY6r+4yuEYmhQVmJHGHs6t12rLsw=";
+  vendorHash = "sha256-NKxRzmpWUjqKYMa+WWPn9YKxOqJqixAr6y9s6EAXbB8=";
 
   subPackages = [
     "cmd/lys-shell"
     "cmd/lys-login"
     "cmd/lys-lock"
     "cmd/lys-settings"
-    "cmd/lys-secrets"
   ];
 
   # lys-ui and the purego bindings are pure Go; cgo stays off, as in the
@@ -125,15 +123,6 @@ buildGo127Module {
       $out/share/lys-shell/xdg-desktop-portal-lys-shell.service \
       --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
     install -Dm0644 resources/lys-shell-portals.conf -t $out/share/lys-shell
-
-    # lys-secrets' unit and D-Bus activation file, as references only: the
-    # modules install them when the Secret Service is enabled, since
-    # gnome-keyring's activation file claims the same name.
-    substitute resources/lys-secrets.service $out/share/lys-shell/lys-secrets.service \
-      --replace-fail /usr/bin/lys-secrets "$out/bin/lys-secrets"
-    substitute resources/org.freedesktop.secrets.lys-secrets.service \
-      $out/share/lys-shell/org.freedesktop.secrets.service \
-      --replace-fail /usr/bin/lys-secrets "$out/bin/lys-secrets"
   '';
 
   # The dev shell puts the same libraries on its loader path.
