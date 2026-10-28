@@ -25,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
@@ -138,6 +139,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 			return w, nil
 		},
 		Invoke:    hs.invoke,
+		KeySym:    treetest.KeySym,
 		Font:      face,
 		Sheet:     hs.theme.Sheet,
 		MIME:      testDB(t),
@@ -390,13 +392,13 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 	got := hs.open(t, OpenRequest{Filters: []Filter{{"Images", []Rule{{RuleGlob, "*.png"}}}}})
 	// Escape closes quick look first, then the dialog.
 	hs.pick(t, "a.png")
-	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keySpace, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, treetest.Code(xkb.KeySpace), 0) })
 	if !hs.c.ui.quicklook.Visible() {
 		t.Fatal("space did not open quick look")
 	}
-	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, treetest.Code(xkb.KeyEscape), 0) })
 	pending(t, got)
-	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, treetest.Code(xkb.KeyEscape), 0) })
 	if uris := answer(t, got); uris != nil {
 		t.Errorf("Escape answered %v", uris)
 	}
@@ -430,7 +432,7 @@ func TestSpaceInATextFieldTypes(t *testing.T) {
 	r := &widget.Router{Root: hs.cfg.Root}
 	hs.do(func() {
 		r.SetFocus(hs.c.ui.search)
-		hs.cfg.OnKey(r, keySpace, 0)
+		hs.cfg.OnKey(r, treetest.Code(xkb.KeySpace), 0)
 	})
 	if hs.c.ui.quicklook.Visible() {
 		t.Error("space in the search box opened quick look")
@@ -1339,13 +1341,13 @@ func TestSaveFilterSetsTheExtension(t *testing.T) {
 }
 
 // key presses a key on the dialog with focus on focused (none for nil).
-func (hs *harness) key(keycode uint32, mods app.Mods, focused widget.Widget) {
+func (hs *harness) key(sym xkb.Keysym, mods app.Mods, focused widget.Widget) {
 	hs.do(func() {
 		r := &widget.Router{Root: hs.cfg.Root}
 		if focused != nil {
 			r.SetFocus(focused)
 		}
-		hs.cfg.OnKey(r, keycode, mods)
+		hs.cfg.OnKey(r, treetest.Code(sym), mods)
 	})
 }
 
@@ -1363,46 +1365,46 @@ func (hs *harness) dir() string {
 func TestChooserKeys(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{CurrentFolder: filepath.Join(hs.root, "docs")})
-	hs.key(keyBackspace, 0, hs.c.ui.search)
+	hs.key(xkb.KeyBackSpace, 0, hs.c.ui.search)
 	if hs.dir() != filepath.Join(hs.root, "docs") {
 		t.Error("Backspace in the search box went up")
 	}
-	hs.key(keyBackspace, 0, nil)
+	hs.key(xkb.KeyBackSpace, 0, nil)
 	if hs.dir() != hs.root {
 		t.Errorf("Backspace left %s, want the parent", hs.dir())
 	}
-	hs.key(keyLeft, app.ModAlt, nil)
+	hs.key(xkb.KeyLeft, app.ModAlt, nil)
 	if hs.dir() != filepath.Join(hs.root, "docs") {
 		t.Errorf("Alt+Left left %s, want back in docs", hs.dir())
 	}
-	hs.key(keyRight, app.ModAlt, nil)
-	hs.key(keyUp, app.ModAlt, nil)
+	hs.key(xkb.KeyRight, app.ModAlt, nil)
+	hs.key(xkb.KeyUp, app.ModAlt, nil)
 	if hs.dir() != filepath.Dir(hs.root) {
 		t.Errorf("Alt+Right then Alt+Up left %s", hs.dir())
 	}
 	hs.do(func() { hs.c.goTo(hs.root) })
-	hs.key(keyH, app.ModCtrl, nil)
+	hs.key('h', app.ModCtrl, nil)
 	if shown := hs.shown(); !slices.Contains(shown, ".dot.txt") {
 		t.Errorf("Ctrl+H left %v", shown)
 	}
-	hs.key(keyL, app.ModCtrl, nil)
+	hs.key('l', app.ModCtrl, nil)
 	var locating bool
 	hs.do(func() { locating = hs.c.ui.location.Visible() && !hs.c.ui.crumbs.Visible() })
 	if !locating || hs.windows[0].focus != hs.c.ui.location {
 		t.Error("Ctrl+L did not open the focused location entry")
 	}
-	hs.key(keyF, app.ModCtrl, nil)
+	hs.key('f', app.ModCtrl, nil)
 	if hs.windows[0].focus != hs.c.ui.search {
 		t.Error("Ctrl+F did not focus the search")
 	}
 	hs.pick(t, "a.png")
-	hs.key(keySpace, app.ModCtrl, nil)
+	hs.key(xkb.KeySpace, app.ModCtrl, nil)
 	var ql bool
 	hs.do(func() { ql = hs.c.ui.quicklook.Visible() })
 	if ql {
 		t.Error("Ctrl+Space opened quick look")
 	}
-	hs.key(keySpace, 0, nil)
+	hs.key(xkb.KeySpace, 0, nil)
 	hs.do(func() { ql = hs.c.ui.quicklook.Visible() })
 	if !ql {
 		t.Error("Space did not open quick look")
@@ -1864,7 +1866,7 @@ func TestPanelRevealsAndHidesWithItsAnimation(t *testing.T) {
 		t.Errorf("revealed %v with %v, want revealed with the file chooser's %v", rev.Revealed(), rev.Transition(), want)
 	}
 	win := hs.windows[len(hs.windows)-1]
-	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, treetest.Code(xkb.KeyEscape), 0) })
 	answer(t, got)
 	if rev.Revealed() {
 		t.Error("cancelling left the panel revealed")
@@ -1876,7 +1878,7 @@ func TestPanelRevealsAndHidesWithItsAnimation(t *testing.T) {
 	hs.conf.Animations.Enabled = false
 	got = hs.open(t, OpenRequest{})
 	win = hs.windows[len(hs.windows)-1]
-	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, keyEscape, 0) })
+	hs.do(func() { hs.cfg.OnKey(&widget.Router{}, treetest.Code(xkb.KeyEscape), 0) })
 	answer(t, got)
 	if !win.closed {
 		t.Error("with animations off the overlay outlived the answer")

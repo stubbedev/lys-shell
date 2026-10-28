@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/unxed/xkb-go"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
@@ -53,20 +55,10 @@ const (
 	crumbMaxChars        = 16
 )
 
-// The keys and buttons the chooser binds: evdev keycodes and the
-// mouse's thumb buttons.
+// The mouse's thumb buttons, which walk the history.
 const (
-	keyEscape    = 1
-	keyBackspace = 14
-	keyF         = 33
-	keyH         = 35
-	keyL         = 38
-	keySpace     = 57
-	keyUp        = 103
-	keyLeft      = 105
-	keyRight     = 106
-	btnBack      = 0x113 // BTN_SIDE
-	btnForward   = 0x114 // BTN_EXTRA
+	btnBack    = 0x113 // BTN_SIDE
+	btnForward = 0x114 // BTN_EXTRA
 )
 
 // uriListMime is what a file drag offers.
@@ -82,9 +74,11 @@ type Window interface {
 type Deps struct {
 	// Config is the live config (the chooser's reveal animation).
 	Config func() *config.Config
-	// Open maps the overlay; Invoke runs on the UI loop.
+	// Open maps the overlay; Invoke runs on the UI loop; KeySym reads
+	// its keys through the seat's keymap.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
+	KeySym keys.Translator
 	// Font shapes the text; Sheet styles the surface, the labels'
 	// and entries' ink included.
 	Font  render.Font
@@ -1036,7 +1030,7 @@ func (c *Chooser) show() {
 		Keyboard:      keyboard,
 		Namespace:     "lys-shell-file-chooser",
 		Root:          c.rev,
-		OnKey:         c.key,
+		OnKey:         keys.OnKey(c.d.KeySym, c.key),
 		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
 	})
 	if err != nil {
@@ -1095,7 +1089,7 @@ func (c *Chooser) closeWindow() {
 // and Alt+Up go up, Alt+Left and Alt+Right walk the history (none of
 // these while a text field has the key); Ctrl+H shows hidden files,
 // Ctrl+L the location entry, Ctrl+F the search.
-func (c *Chooser) key(r *widget.Router, keycode uint32, mods app.Mods) {
+func (c *Chooser) key(r *widget.Router, sym xkb.Keysym, mods app.Mods) {
 	if c.reply == nil {
 		return
 	}
@@ -1107,22 +1101,22 @@ func (c *Chooser) key(r *widget.Router, keycode uint32, mods app.Mods) {
 	ctrl, alt := mods&app.ModCtrl != 0, mods&app.ModAlt != 0
 	plain := mods&(app.ModCtrl|app.ModAlt|app.ModSuper|app.ModShift) == 0
 	switch {
-	case keycode == keyEscape:
+	case sym == xkb.KeyEscape:
 		c.escape()
-	case keycode == keySpace && plain && !typing:
+	case sym == xkb.KeySpace && plain && !typing:
 		c.toggleQuicklook()
-	case keycode == keyBackspace && plain && !typing, keycode == keyUp && alt:
+	case sym == xkb.KeyBackSpace && plain && !typing, sym == xkb.KeyUp && alt:
 		c.goUp()
-	case keycode == keyLeft && alt:
+	case sym == xkb.KeyLeft && alt:
 		c.step(true)
-	case keycode == keyRight && alt:
+	case sym == xkb.KeyRight && alt:
 		c.step(false)
-	case keycode == keyH && ctrl:
+	case sym == 'h' && ctrl:
 		// The toggle's handler applies it.
 		c.ui.hiddenTg.SetActive(!c.hidden)
-	case keycode == keyL && ctrl:
+	case sym == 'l' && ctrl:
 		c.showLocation("")
-	case keycode == keyF && ctrl:
+	case sym == 'f' && ctrl:
 		c.focus(c.ui.search)
 	}
 }

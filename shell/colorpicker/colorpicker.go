@@ -25,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
@@ -47,9 +48,6 @@ var (
 	hexColor      = render.RGBA(255, 255, 255, 242)
 	swatchOutline = render.RGBA(255, 255, 255, 77)
 )
-
-// escapeKeycode is the evdev code of Escape.
-const escapeKeycode = 1
 
 // RGB is one 8-bit color.
 type RGB struct{ R, G, B uint8 }
@@ -136,11 +134,7 @@ func (p *Picker) show(ch chan result, frames map[string]render.StillImage) {
 			Keyboard:      app.KeyboardExclusive,
 			Namespace:     "lys-shell-color-picker",
 			Root:          l,
-			OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
-				if keycode == escapeKeycode {
-					p.finish(RGB{}, false)
-				}
-			},
+			OnKey:         keys.OnEscape(p.app.KeySym, func() { p.finish(RGB{}, false) }),
 		})
 		if err != nil {
 			log.Printf("color picker: surface on %s: %v", mon.Connector, err)

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
@@ -60,6 +61,7 @@ func newHarness(t *testing.T) *harness {
 			return &fakeWindow{}, nil
 		},
 		Invoke: hs.do,
+		KeySym: treetest.KeySym,
 		Font:   face,
 		Printers: func(context.Context) ([]ipp.Printer, error) {
 			hs.mu.Lock()
@@ -270,7 +272,7 @@ func TestCancelEscapeAndQueueing(t *testing.T) {
 		t.Errorf("cancel = %+v", r)
 	}
 	got, c = hs.prepare(t)
-	hs.do(func() { c.OnKey(nil, escapeKeycode, 0) })
+	hs.do(func() { c.OnKey(nil, treetest.Code(xkb.KeyEscape), 0) })
 	if r := <-got; r.ok {
 		t.Errorf("escape = %+v", r)
 	}

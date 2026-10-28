@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/unxed/xkb-go"
 	"golang.org/x/image/font/gofont/goregular"
 )
 
@@ -263,3 +264,10 @@ func HeapBytes(f func()) uint64 {
 	runtime.ReadMemStats(&after)
 	return after.TotalAlloc - before.TotalAlloc
 }
+
+// KeySym reads each code as the keysym of the same number, so a
+// surface harness presses a key by its symbol: OnKey(r, Code(xkb.KeyEscape), 0).
+func KeySym(code uint32) xkb.Keysym { return xkb.Keysym(code) }
+
+// Code is the code KeySym reads as sym.
+func Code(sym xkb.Keysym) uint32 { return uint32(sym) }

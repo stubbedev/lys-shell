@@ -27,14 +27,12 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
-
-// escapeKeycode is the evdev code of Escape.
-const escapeKeycode = 1
 
 // spinnerPx sizes the cards' loading spinner.
 const spinnerPx = 24
@@ -184,11 +182,7 @@ func (p *Picker) mapSurface() error {
 		Keyboard:      app.KeyboardOnDemand,
 		Namespace:     "lys-shell-share-picker",
 		Root:          p.root,
-		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
-			if keycode == escapeKeycode {
-				p.answer("")
-			}
-		},
+		OnKey:         keys.OnEscape(p.app.KeySym, func() { p.answer("") }),
 	})
 	if err != nil {
 		return err

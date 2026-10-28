@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
@@ -78,6 +79,7 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 			return w, nil
 		},
 		Invoke: hs.do,
+		KeySym: treetest.KeySym,
 		Font:   face,
 		Candidates: func(choices []string, _ string) []desktopentry.App {
 			if len(choices) == 0 {
@@ -213,7 +215,7 @@ func TestRequestsQueueAndEscape(t *testing.T) {
 	if l := treetest.Labels(c.Root); !slices.Contains(l, "An application is requesting your name and avatar.") || !slices.Contains(l, "App org.two") {
 		t.Errorf("account labels = %q", l)
 	}
-	hs.do(func() { c.OnKey(nil, escapeKeycode, 0) })
+	hs.do(func() { c.OnKey(nil, treetest.Code(xkb.KeyEscape), 0) })
 	if r := <-second; r {
 		t.Error("Escape answered yes")
 	}

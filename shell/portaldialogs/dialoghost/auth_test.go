@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -169,7 +170,7 @@ func TestShowAuthenticationShowsNotesAndSignalsActions(t *testing.T) {
 	if entry := authEntry(t, c); entry.Visible() {
 		t.Error("a step without a prompt shows the entry")
 	}
-	hs.do(func() { c.OnKey(nil, escapeKeycode, 0) })
+	hs.do(func() { c.OnKey(nil, treetest.Code(xkb.KeyEscape), 0) })
 	if s := signal(t, hs); s.handle != authHandle || s.action != (portaldialogs.AuthCancel{}) {
 		t.Errorf("Escape signalled %+v", s)
 	}

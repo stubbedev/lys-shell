@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
@@ -36,7 +37,6 @@ const (
 	wallpaperPx    = 180
 	appIconPx      = 32
 	appListHeight  = 360
-	escapeKeycode  = 1
 )
 
 // Window is the overlay surface the dialog maps (app.LayerWindow).
@@ -49,9 +49,11 @@ type Window interface {
 type Deps struct {
 	// Config is the live config (the dialog animation).
 	Config func() *config.Config
-	// Open maps the overlay; Invoke runs on the UI loop.
+	// Open maps the overlay; Invoke runs on the UI loop; KeySym reads
+	// its keys through the seat's keymap.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
+	KeySym keys.Translator
 	// Font shapes the text; Sheet styles the surface, the labels'
 	// and entries' ink included.
 	Font  render.Font
@@ -637,11 +639,7 @@ func (h *Dialogs) show(tree widget.Widget) {
 		Keyboard:      keyboard,
 		Namespace:     "lys-shell-portal-dialog",
 		Root:          root,
-		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
-			if keycode == escapeKeycode {
-				h.escape()
-			}
-		},
+		OnKey:         keys.OnEscape(h.d.KeySym, func() { h.escape() }),
 	})
 	if err != nil {
 		log.Printf("portal dialogs: cannot map the overlay: %v", err)

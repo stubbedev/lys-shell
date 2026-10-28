@@ -23,6 +23,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
@@ -34,7 +35,6 @@ const (
 	surfaceWidth  = 460
 	listMinHeight = 64
 	listMaxHeight = 240
-	escapeKeycode = 1
 )
 
 // documentFormat lets CUPS type the document, as GTK's backend does for
@@ -57,9 +57,11 @@ type Window interface{ Close() }
 type Deps struct {
 	// Config is the live config (the print animation).
 	Config func() *config.Config
-	// Open maps the overlay; Invoke runs on the UI loop.
+	// Open maps the overlay; Invoke runs on the UI loop; KeySym reads
+	// its keys through the seat's keymap.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
+	KeySym keys.Translator
 	// Font shapes the text; Sheet styles the surface, the labels'
 	// and entries' ink included.
 	Font  render.Font
@@ -544,11 +546,7 @@ func (h *Dialog) show(tree widget.Widget) {
 		Keyboard:      app.KeyboardOnDemand,
 		Namespace:     "lys-shell-print",
 		Root:          root,
-		OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
-			if keycode == escapeKeycode {
-				h.finish(prepared{}, false)
-			}
-		},
+		OnKey:         keys.OnEscape(h.d.KeySym, func() { h.finish(prepared{}, false) }),
 	})
 	if err != nil {
 		log.Printf("print: cannot map the overlay: %v", err)

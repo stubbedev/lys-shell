@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/unxed/xkb-go"
 
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
@@ -236,7 +237,7 @@ func (o *Overlay) open(frames map[string]render.StillImage) {
 			Keyboard:      app.KeyboardExclusive,
 			Namespace:     "lys-shell-region-overlay",
 			Root:          o.surfaceRoot(a),
-			OnKey:         func(_ *widget.Router, keycode uint32, mods app.Mods) { o.key(o.app.KeySym(keycode), mods) },
+			OnKey:         keys.OnKey(o.app.KeySym, func(_ *widget.Router, sym xkb.Keysym, mods app.Mods) { o.key(sym, mods) }),
 		})
 		if err != nil {
 			log.Printf("region overlay: surface on %s: %v", mon.Connector, err)
