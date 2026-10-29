@@ -4,9 +4,9 @@ go 1.27.3
 
 require (
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.1.1-0.20261028214804-85dafc4edd1e
-	github.com/stubbedev/lys-secrets v0.0.0-20261028203124-5e7d4f0af5f5
-	github.com/stubbedev/lys-ui v0.0.0-20261028203534-7c0a1e46a7c9
+	github.com/stubbedev/lys-lib v0.1.1-0.20261029053638-68a67a2e917e
+	github.com/stubbedev/lys-secrets v0.0.0-20261029054527-b3d9628c86f9
+	github.com/stubbedev/lys-ui v0.0.0-20261029054550-58eaf388bdae
 	github.com/stubbedev/memory-go v0.3.0
 	github.com/unxed/xkb-go v0.1.9
 	go.yaml.in/yaml/v3 v3.0.5
@@ -21,7 +21,6 @@ require (
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.2 // indirect
-	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jfreymuth/pulse v0.1.3 // indirect
 	github.com/kettek/apng v0.0.0-20250827064933-2bb5f5fcf253 // indirect
