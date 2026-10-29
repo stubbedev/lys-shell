@@ -1,6 +1,6 @@
 package config
 
-import "github.com/stubbedev/lys-shell/service/bitwarden"
+import "github.com/stubbedev/lys-secrets/vault"
 
 // BitwardenServer is where the account lives, resolved at load so a
 // mistyped URL is a diagnostic for its field: `bitwarden.com`,
@@ -8,12 +8,12 @@ import "github.com/stubbedev/lys-shell/service/bitwarden"
 // URL, e.g. `https://vault.example.com`.
 type BitwardenServer struct {
 	src    string
-	server bitwarden.Server
+	server vault.Server
 }
 
 // ParseBitwardenServer resolves one server setting.
 func ParseBitwardenServer(s string) (BitwardenServer, error) {
-	server, err := bitwarden.ParseServer(s)
+	server, err := vault.ParseServer(s)
 	if err != nil {
 		return BitwardenServer{}, err
 	}
@@ -33,8 +33,8 @@ func mustBitwardenServer(s string) BitwardenServer {
 // String is the setting as written.
 func (b BitwardenServer) String() string { return b.src }
 
-// Server is the resolved endpoints.
-func (b BitwardenServer) Server() bitwarden.Server { return b.server }
+// Server is the parsed server.
+func (b BitwardenServer) Server() vault.Server { return b.server }
 
 // UnmarshalConfig implements Unmarshaler.
 func (b *BitwardenServer) UnmarshalConfig(v any) error {
@@ -63,11 +63,12 @@ func (BitwardenServer) configSchema(*schemaGen) Schema {
 // in, unlocks, searches the vault and copies an item's username,
 // password or one-time code.
 //
-// The shell keeps only the session (the server, the email and the
-// refresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the
-// master password, a key or an item. Copied secrets are marked so
-// clipboard managers, the shell's own history included, do not keep
-// them.
+// The vault lives in lys-secrets (`dev.stubbe.lys.Vault1`), the one
+// process holding its keys; the shell shows it and copies from it. The
+// idle lock and the sync interval are lys-secrets' settings
+// (`--vault-lock-after`, `--vault-sync-interval`). Copied secrets are
+// marked so clipboard managers, the shell's own history included, do
+// not keep them.
 //
 // The launcher's `vault` mode (`lys-shell launcher -show vault`) searches
 // the open vault from anywhere: Enter copies an item's password (or its
@@ -86,17 +87,11 @@ type BitwardenConfig struct {
 	Server BitwardenServer `cfg:"server"`
 	// Email the login form starts with.
 	Email string `cfg:"email"`
-	// Lock the vault after this many minutes without a copy. 0 keeps it
-	// open until locked by hand.
-	LockAfter uint32 `cfg:"lock-after"`
 	// Lock the vault when the session locks.
 	LockWithSession bool `cfg:"lock-with-session"`
 	// Clear a copied secret from the clipboard after this many seconds,
 	// unless something else was copied since. 0 leaves it there.
 	ClipboardClear uint32 `cfg:"clipboard-clear"`
-	// Sync the open vault every this many minutes. 0 syncs only on
-	// unlock and by hand.
-	SyncInterval uint32 `cfg:"sync-interval"`
 	// Vault folder whose logins answer NetworkManager's requests for
 	// Wi-Fi, 802.1X and VPN secrets while the vault is open, before the
 	// shell asks. The one login named exactly like the connection
@@ -165,12 +160,10 @@ func DefaultsBitwarden() BitwardenConfig {
 	password, passphrase := DefaultsBitwardenPasswordPreset(), DefaultsBitwardenPassphrasePreset()
 	password.Name, passphrase.Name = "Password", "Passphrase"
 	return BitwardenConfig{
-		Server:               mustBitwardenServer(bitwarden.CloudUS),
+		Server:               mustBitwardenServer(vault.CloudUS),
 		Email:                "",
-		LockAfter:            15,
 		LockWithSession:      true,
 		ClipboardClear:       30,
-		SyncInterval:         30,
 		NetworkFolder:        "",
 		GeneratorPasswords:   []BitwardenPasswordPreset{password},
 		GeneratorPassphrases: []BitwardenPassphrasePreset{passphrase},

@@ -8,17 +8,11 @@ settings-modules-bitwarden-server = Server
 settings-modules-bitwarden-email = Email
     .description = Email the login form starts with
 
-settings-modules-bitwarden-lock-after = Lock After (minutes)
-    .description = Lock the vault after this many minutes without a copy. 0 keeps it open until locked by hand
-
 settings-modules-bitwarden-lock-with-session = Lock With the Session
     .description = Lock the vault when the session locks
 
 settings-modules-bitwarden-clipboard-clear = Clear Clipboard After (seconds)
     .description = Clear a copied secret after this many seconds unless something else was copied. 0 leaves it
-
-settings-modules-bitwarden-sync-interval = Sync Interval (minutes)
-    .description = Sync the open vault every this many minutes. 0 syncs only on unlock and by hand
 
 settings-modules-bitwarden-network-folder = Network Folder
     .description = Vault folder whose logins, named like the connection, answer Wi-Fi and VPN password requests while the vault is open. Empty answers none

@@ -8,17 +8,11 @@ settings-modules-bitwarden-server = Serveur
 settings-modules-bitwarden-email = E-mail
     .description = E-mail prérempli dans le formulaire de connexion
 
-settings-modules-bitwarden-lock-after = Verrouiller après (minutes)
-    .description = Verrouiller le coffre après ce nombre de minutes sans copie. 0 le laisse ouvert jusqu'au verrouillage manuel
-
 settings-modules-bitwarden-lock-with-session = Verrouiller avec la session
     .description = Verrouiller le coffre lorsque la session se verrouille
 
 settings-modules-bitwarden-clipboard-clear = Vider le presse-papiers après (secondes)
     .description = Effacer un secret copié après ce nombre de secondes, sauf si autre chose a été copié. 0 le laisse
-
-settings-modules-bitwarden-sync-interval = Intervalle de synchronisation (minutes)
-    .description = Synchroniser le coffre ouvert toutes les tant de minutes. 0 ne synchronise qu'au déverrouillage et à la demande
 
 settings-modules-bitwarden-network-folder = Dossier réseau
     .description = Dossier du coffre dont les identifiants, nommés comme la connexion, répondent aux demandes de mot de passe Wi-Fi et VPN tant que le coffre est ouvert. Vide : aucun

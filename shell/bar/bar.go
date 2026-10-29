@@ -203,7 +203,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	bwLife, stopBitwarden := context.WithCancel(context.Background())
 	defer stopBitwarden()
 	baseCtx.Bitwarden = newBitwardenHost(bwLife, application, current.Load)
-	networkVault := bitwardenNetworkVault{baseCtx.Bitwarden}
+	networkVault := baseCtx.Bitwarden.networkVault()
 	if svc, stop, err := startNetworkService(networkVault); err == nil {
 		defer stop()
 		baseCtx.Networking = svc
@@ -487,7 +487,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// lock mode, as a process of its own.
 	locker, stopLock := lockclient.Start(current.Load, func() {
 		if current.Load().Bitwarden.LockWithSession {
-			application.Invoke(baseCtx.Bitwarden.lockIfOpen)
+			baseCtx.Bitwarden.lockVault()
 		}
 	})
 	defer stopLock()

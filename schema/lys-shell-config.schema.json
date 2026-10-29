@@ -966,7 +966,7 @@
       "type": "object"
     },
     "BitwardenConfig": {
-      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe shell keeps only the session (the server, the email and the\nrefresh token) under `$XDG_STATE_HOME/lys-shell/bitwarden`, never the\nmaster password, a key or an item. Copied secrets are marked so\nclipboard managers, the shell's own history included, do not keep\nthem.\n\nThe launcher's `vault` mode (`lys-shell launcher -show vault`) searches\nthe open vault from anywhere: Enter copies an item's password (or its\nfirst field), Shift+Enter lists its fields to pick one. A locked vault\nasks for the master password in the launcher's masked input, and a\nprotected item asks again before a secret is copied.\n\nThe dropdown's generator (its header's shuffle button) lists the\n`generator-passwords` and `generator-passphrases` presets; picking one\ncopies a new password or passphrase, made in the shell, as a secret.\nPassphrases draw from the EFF large wordlist (CC BY 3.0 US, by the\nElectronic Frontier Foundation).",
+      "description": "Bitwarden vault: the bar shows whether it is locked; the dropdown logs\nin, unlocks, searches the vault and copies an item's username,\npassword or one-time code.\n\nThe vault lives in lys-secrets (`dev.stubbe.lys.Vault1`), the one\nprocess holding its keys; the shell shows it and copies from it. The\nidle lock and the sync interval are lys-secrets' settings\n(`--vault-lock-after`, `--vault-sync-interval`). Copied secrets are\nmarked so clipboard managers, the shell's own history included, do\nnot keep them.\n\nThe launcher's `vault` mode (`lys-shell launcher -show vault`) searches\nthe open vault from anywhere: Enter copies an item's password (or its\nfirst field), Shift+Enter lists its fields to pick one. A locked vault\nasks for the master password in the launcher's masked input, and a\nprotected item asks again before a secret is copied.\n\nThe dropdown's generator (its header's shuffle button) lists the\n`generator-passwords` and `generator-passphrases` presets; picking one\ncopies a new password or passphrase, made in the shell, as a secret.\nPassphrases draw from the EFF large wordlist (CC BY 3.0 US, by the\nElectronic Frontier Foundation).",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -1073,11 +1073,6 @@
           "default": "dropdown:bitwarden",
           "description": "Action on left click. Defaults to opening the vault dropdown."
         },
-        "lock-after": {
-          "$ref": "#/$defs/uint32",
-          "default": 15,
-          "description": "Lock the vault after this many minutes without a copy. 0 keeps it\nopen until locked by hand."
-        },
         "lock-with-session": {
           "$ref": "#/$defs/boolean",
           "default": true,
@@ -1112,11 +1107,6 @@
           "$ref": "#/$defs/BitwardenServer",
           "default": "bitwarden.com",
           "description": "Server the login form logs in to. A logged-in account keeps the\nserver it logged in to."
-        },
-        "sync-interval": {
-          "$ref": "#/$defs/uint32",
-          "default": 30,
-          "description": "Sync the open vault every this many minutes. 0 syncs only on\nunlock and by hand."
         }
       },
       "type": "object"
@@ -4932,15 +4922,13 @@
             "label-max-length": 0,
             "label-show": false,
             "left-click": "dropdown:bitwarden",
-            "lock-after": 15,
             "lock-with-session": true,
             "middle-click": "",
             "network-folder": "",
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
-            "server": "bitwarden.com",
-            "sync-interval": 30
+            "server": "bitwarden.com"
           },
           "description": "Bitwarden vault module."
         },
@@ -10010,15 +9998,13 @@
           "label-max-length": 0,
           "label-show": false,
           "left-click": "dropdown:bitwarden",
-          "lock-after": 15,
           "lock-with-session": true,
           "middle-click": "",
           "network-folder": "",
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
-          "server": "bitwarden.com",
-          "sync-interval": 30
+          "server": "bitwarden.com"
         },
         "bluetooth": {
           "border-color": "blue",

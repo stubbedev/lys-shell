@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-secrets/vault"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/bitwarden/generator"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/styling"
@@ -69,8 +69,8 @@ func TestBitwardenGeneratorCopiesASecret(t *testing.T) {
 	if view.genStatus.Text() != want || view.genStatus.HasClass("error") {
 		t.Errorf("status %q, want %q", view.genStatus.Text(), want)
 	}
-	if v.touches != 0 {
-		t.Errorf("generating counted as vault use %d times", v.touches)
+	if v.readCount() != 0 {
+		t.Errorf("generating read the vault: %q", v.reads)
 	}
 	cfg.Bitwarden.ClipboardClear = 0
 	onLoop(func() { view.generate(presets[0]) })
@@ -81,7 +81,7 @@ func TestBitwardenGeneratorCopiesASecret(t *testing.T) {
 
 func TestBitwardenGeneratorWorksWhileLocked(t *testing.T) {
 	cfg := config.Defaults()
-	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateLocked}}
+	v := &fakeVault{status: vault.Status{State: vault.StateLocked}}
 	view, copies := generatorTestView(t, v, cfg)
 	view.unlockPw.entry.SetText("hunter")
 	onLoop(view.toggleGenerator)
@@ -103,7 +103,7 @@ func TestBitwardenGeneratorDropsAPendingReprompt(t *testing.T) {
 	cfg := config.Defaults()
 	v := unlockedVault()
 	view, copies := generatorTestView(t, v, cfg)
-	onLoop(func() { view.copyField(v.items[1], bwPassword) })
+	onLoop(func() { view.copyField(v.entries[1].item, vault.FieldPassword) })
 	view.repromptPw.entry.SetText("hunt")
 	onLoop(view.toggleGenerator)
 	if view.copying != nil || view.repromptPw.entry.Text() != "" || page(view) != bwPageGenerator {

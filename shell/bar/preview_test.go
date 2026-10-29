@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-secrets/vault"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
@@ -96,7 +96,7 @@ func dropdownFixtures() []dropdownFixture {
 			return batteryDropdown(*ctx)
 		}},
 		{"bitwarden-vault", "bitwarden", func(t *testing.T, ctx *ModuleContext) widget.Widget {
-			v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked, Items: 2}, items: bitwardenPreviewItems()}
+			v := &fakeVault{status: vault.Status{State: vault.StateUnlocked, Items: 2}, entries: bitwardenPreviewItems()}
 			ctx.Bitwarden = testBitwardenHost(v, ctx.Config, &[]copied{})
 			view := bitwardenDropdown(*ctx).(*bitwardenView)
 			widget.SetSurfaceHost(view.Box, focusHost{})
@@ -329,9 +329,9 @@ func writePreview(t *testing.T, path string, data []byte, w, h int) {
 }
 
 // bitwardenPreviewItems is a small open vault: a login and a card.
-func bitwardenPreviewItems() []bitwarden.Item {
-	return []bitwarden.Item{
-		{ID: "1", Type: bitwarden.ItemLogin, Name: "Example Mail", Username: "ada@example.com", Password: "pw"},
-		{ID: "2", Type: bitwarden.ItemCard, Name: "Travel card", Card: bitwarden.Card{Number: "4111", Code: "123"}},
+func bitwardenPreviewItems() []fakeEntry {
+	return []fakeEntry{
+		entry(vault.Item{ID: "1", Type: vault.ItemLogin, Name: "Example Mail", Username: "ada@example.com"}, map[vault.Field]string{vault.FieldUsername: "ada@example.com", vault.FieldPassword: "pw"}),
+		entry(vault.Item{ID: "2", Type: vault.ItemCard, Name: "Travel card"}, map[vault.Field]string{vault.FieldCardNumber: "4111", vault.FieldCardCode: "123"}),
 	}
 }

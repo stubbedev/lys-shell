@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-secrets/vault"
+
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
@@ -37,7 +38,7 @@ func custom(text string) engine.ActivateKind { return engine.ActivateCustom{Text
 // taking typed text: a wrong one stays asking and says so, the right
 // one lists the items, which take no typed text.
 func TestVaultModeUnlocksInTheMaskedInput(t *testing.T) {
-	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateLocked}, items: bitwardenPreviewItems(), unlockErr: bitwarden.ErrWrongPassword}
+	v := &fakeVault{status: vault.Status{State: vault.StateLocked}, entries: bitwardenPreviewItems(), unlockErr: vault.ErrWrongPassword}
 	m, copies := vaultModeOver(v)
 	ctx := context.Background()
 	st := m.Load(ctx)
@@ -48,13 +49,13 @@ func TestVaultModeUnlocksInTheMaskedInput(t *testing.T) {
 		t.Error("an empty password was tried")
 	}
 	st = reloaded(t, m.Activate(ctx, engine.NoRow, custom("wrong"), "wrong"))
-	if !st.Password || st.Message == nil || *st.Message != bwErrorText(bitwarden.ErrWrongPassword) {
+	if !st.Password || st.Message == nil || *st.Message != bwErrorText(vault.ErrWrongPassword) {
 		t.Errorf("after a wrong password %+v, want the prompt saying so", st)
 	}
 	v.set(func(f *fakeVault) { f.unlockErr = nil })
 	st = reloaded(t, m.Activate(ctx, engine.NoRow, custom("hunter2"), "hunter2"))
-	if st.Password || !st.NoCustom || m.AllowsCustom() || len(st.Items) != len(v.items) {
-		t.Errorf("after unlocking %+v, want the %d items, unmasked", st, len(v.items))
+	if st.Password || !st.NoCustom || m.AllowsCustom() || len(st.Items) != len(v.entries) {
+		t.Errorf("after unlocking %+v, want the %d items, unmasked", st, len(v.entries))
 	}
 	if !slices.Equal(v.unlocks, []string{"wrong", "hunter2"}) || len(*copies) != 0 {
 		t.Errorf("unlocks %q, copies %d", v.unlocks, len(*copies))
@@ -65,7 +66,7 @@ func TestVaultModeUnlocksInTheMaskedInput(t *testing.T) {
 // marked and cleared as the dropdown's, and closes; Shift+Enter lists
 // the item's fields, a pick copying that one as it is.
 func TestVaultModeCopiesThroughTheHost(t *testing.T) {
-	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked}, items: bitwardenPreviewItems()}
+	v := &fakeVault{status: vault.Status{State: vault.StateUnlocked}, entries: bitwardenPreviewItems()}
 	m, copies := vaultModeOver(v)
 	ctx := context.Background()
 	m.Load(ctx)
@@ -90,8 +91,8 @@ func TestVaultModeCopiesThroughTheHost(t *testing.T) {
 	if b, _ := user.content.Bytes("text/plain"); string(b) != "ada@example.com" || clipboard.IsSensitive(user.content.Mimes) || user.ttl != 0 {
 		t.Errorf("username copy %q, mimes %v, ttl %v", b, user.content.Mimes, user.ttl)
 	}
-	if v.touches != 2 {
-		t.Errorf("touches %d, want one per copy", v.touches)
+	if v.readCount() != 2 {
+		t.Errorf("reads %q, want one per copy", v.reads)
 	}
 }
 
@@ -99,8 +100,8 @@ func TestVaultModeCopiesThroughTheHost(t *testing.T) {
 // copies nothing, the right one copies and closes. Its username, not a
 // secret, copies at once.
 func TestVaultModeReprompts(t *testing.T) {
-	items := []bitwarden.Item{{ID: "1", Type: bitwarden.ItemLogin, Name: "Bank", Username: "ada", Password: "pw2", Reprompt: true}}
-	v := &fakeVault{status: bitwarden.Status{State: bitwarden.StateUnlocked}, items: items, verifyOK: "hunter2"}
+	bank := entry(vault.Item{ID: "1", Type: vault.ItemLogin, Name: "Bank", Username: "ada", Reprompt: true}, map[vault.Field]string{vault.FieldUsername: "ada", vault.FieldPassword: "pw2"})
+	v := &fakeVault{status: vault.Status{State: vault.StateUnlocked}, entries: []fakeEntry{bank}, master: "hunter2"}
 	m, copies := vaultModeOver(v)
 	ctx := context.Background()
 	m.Load(ctx)
@@ -127,7 +128,7 @@ func TestVaultModeReprompts(t *testing.T) {
 
 // Logged out, the mode says to log in from the bar and does nothing.
 func TestVaultModeLoggedOut(t *testing.T) {
-	v := &fakeVault{items: bitwardenPreviewItems()}
+	v := &fakeVault{entries: bitwardenPreviewItems()}
 	m, copies := vaultModeOver(v)
 	ctx := context.Background()
 	st := m.Load(ctx)

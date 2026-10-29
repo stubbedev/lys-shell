@@ -2,11 +2,13 @@ package bar
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/stubbedev/lys-secrets/vault"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/pango"
-	"github.com/stubbedev/lys-shell/service/bitwarden"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/shell/launcher"
 )
@@ -44,10 +46,9 @@ type vaultMode struct {
 	reason string
 	// items are the item rows in row order; item, fields and field the
 	// item and field a fields list or reprompt is about.
-	items  []bitwarden.Item
-	item   bitwarden.Item
-	fields []bwField
-	field  bwField
+	items []vault.Item
+	item  vault.Item
+	field vault.Field
 }
 
 func newVaultMode(host *bitwardenHost, invoke func(func()), now func() time.Time) *vaultMode {
@@ -71,11 +72,11 @@ func (m *vaultMode) Load(context.Context) engine.ModeState {
 
 // fresh is the state the vault's lock state calls for, with message
 // shown over it.
-func (m *vaultMode) fresh(v vault, message string) engine.ModeState {
+func (m *vaultMode) fresh(v bwVault, message string) engine.ModeState {
 	switch v.Status().State {
-	case bitwarden.StateLoggedOut:
+	case vault.StateLoggedOut:
 		return m.unusable(i18n.T("launcher-bitwarden-logged-out"))
-	case bitwarden.StateLocked:
+	case vault.StateLocked:
 		if message == "" {
 			message = i18n.T("launcher-bitwarden-locked")
 		}
@@ -96,7 +97,7 @@ func (m *vaultMode) password(phase vaultPhase, message string) engine.ModeState 
 }
 
 // list is the item rows: the name over its caption, matched on both.
-func (m *vaultMode) list(items []bitwarden.Item, message string) engine.ModeState {
+func (m *vaultMode) list(items []vault.Item, message string) engine.ModeState {
 	m.phase, m.items = vaultItems, items
 	rows := make([]engine.Item, len(items))
 	for i, it := range items {
@@ -110,11 +111,11 @@ func (m *vaultMode) list(items []bitwarden.Item, message string) engine.ModeStat
 }
 
 // fieldList is one item's field rows.
-func (m *vaultMode) fieldList(it bitwarden.Item) engine.ModeState {
-	m.phase, m.item, m.fields = vaultFields, it, bwFields(it)
-	rows := make([]engine.Item, len(m.fields))
-	for i, f := range m.fields {
-		rows[i] = vaultRow(i18n.T("dropdown-bitwarden-copy-field", i18n.Str("field", f.name())), "", f.icon())
+func (m *vaultMode) fieldList(it vault.Item) engine.ModeState {
+	m.phase, m.item = vaultFields, it
+	rows := make([]engine.Item, len(it.Fields))
+	for i, f := range it.Fields {
+		rows[i] = vaultRow(i18n.T("dropdown-bitwarden-copy-field", i18n.Str("field", bwFieldName(f))), "", bwFieldIcon(f))
 	}
 	m.reason = it.Name
 	return engine.ModeState{Items: rows, Prompt: launcher.VaultModeName, Message: &m.reason, MarkupRows: true, NoCustom: true}
@@ -148,10 +149,7 @@ func (m *vaultMode) Activate(ctx context.Context, target engine.Target, kind eng
 		if input == "" {
 			return engine.ActionNothing{}
 		}
-		if err := v.VerifyPassword(input); err != nil {
-			return engine.ActionReload{State: m.password(vaultReprompt, bwErrorText(err))}
-		}
-		return m.copy(ctx, v, m.item, m.field)
+		return m.copy(ctx, v, m.item, m.field, input)
 	case vaultItems:
 		i, ok := target.Row()
 		if !ok || int(i) >= len(m.items) {
@@ -161,37 +159,45 @@ func (m *vaultMode) Activate(ctx context.Context, target engine.Target, kind eng
 		if _, alt := kind.(engine.ActivateAlt); alt {
 			return engine.ActionReload{State: m.fieldList(it)}
 		}
-		fields := bwFields(it)
-		if len(fields) == 0 {
+		if len(it.Fields) == 0 {
 			return engine.ActionNothing{}
 		}
-		return m.pick(ctx, v, it, fields[0])
+		return m.pick(ctx, v, it, it.Fields[0])
 	case vaultFields:
 		i, ok := target.Row()
-		if !ok || int(i) >= len(m.fields) {
+		if !ok || int(i) >= len(m.item.Fields) {
 			return engine.ActionNothing{}
 		}
-		return m.pick(ctx, v, m.item, m.fields[i])
+		return m.pick(ctx, v, m.item, m.item.Fields[i])
 	}
 	return engine.ActionNothing{}
 }
 
 // pick copies f, asking for the master password first when the item
 // is protected by the reprompt and f is a secret.
-func (m *vaultMode) pick(ctx context.Context, v vault, it bitwarden.Item, f bwField) engine.Action {
-	if it.Reprompt && f.secret() {
+func (m *vaultMode) pick(ctx context.Context, v bwVault, it vault.Item, f vault.Field) engine.Action {
+	if it.Reprompt && f.Secret() {
 		m.item, m.field = it, f
-		return engine.ActionReload{State: m.password(vaultReprompt, i18n.T("dropdown-bitwarden-reprompt-desc", i18n.Str("field", f.name()), i18n.Str("item", it.Name)))}
+		return engine.ActionReload{State: m.password(vaultReprompt, i18n.T("dropdown-bitwarden-reprompt-desc", i18n.Str("field", bwFieldName(f)), i18n.Str("item", it.Name)))}
 	}
-	return m.copy(ctx, v, it, f)
+	return m.copy(ctx, v, it, f, "")
 }
 
-// copy puts the field on the clipboard on the UI loop and closes; a
-// failure stays open on the items, saying why.
-func (m *vaultMode) copy(ctx context.Context, v vault, it bitwarden.Item, f bwField) engine.Action {
+// copy reads the field from the vault, with the master password for a
+// protected item, puts it on the clipboard on the UI loop and closes. A
+// wrong master password asks again; another failure stays open on the
+// items, saying why.
+func (m *vaultMode) copy(ctx context.Context, v bwVault, it vault.Item, f vault.Field, password string) engine.Action {
+	value, err := v.Field(ctx, it.ID, f, password)
+	if errors.Is(err, vault.ErrWrongPassword) {
+		return engine.ActionReload{State: m.password(vaultReprompt, bwErrorText(err))}
+	}
+	if err != nil {
+		return engine.ActionReload{State: m.fresh(v, bwErrorText(err))}
+	}
 	done := make(chan error, 1)
 	m.invoke(func() {
-		_, err := m.host.copyField(v, it, f, m.now())
+		_, err := m.host.copyValue(f, value, m.now())
 		done <- err
 	})
 	select {

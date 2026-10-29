@@ -16,7 +16,8 @@ import (
 //   - keys are matched canonical first, then aliases, then deprecated
 //     aliases (which log a deprecation warning);
 //   - unknown keys are ignored, and a section given a non-table value
-//     is ignored;
+//     is ignored; a key the shell no longer reads (removedKeys) is an
+//     error diagnostic naming where its setting went;
 //   - a leaf that fails to decode is a diagnostic and keeps its lower
 //     layer's value. On the config layer the rest still applies; on the
 //     runtime layer the first failure stops the walk and is returned,
@@ -69,6 +70,7 @@ func (a *layerApply) applyContainer(dst reflect.Value, v any, path string) error
 	if !isTable(v) {
 		return nil
 	}
+	a.reportRemoved(v, path)
 	for _, f := range fieldsOf(dst.Type()) {
 		if f.nolayer {
 			continue

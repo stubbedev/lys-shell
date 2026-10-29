@@ -5,13 +5,13 @@ import (
 	"errors"
 	"io"
 	"log"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-lib/xdg"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-secrets/vault"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
@@ -19,61 +19,142 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/service/bitwarden"
+	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/network"
 )
 
-// bitwardenDevice is the name the account's device list shows.
-const bitwardenDevice = version.Name
+// vaultCallTimeout bounds a call the shell makes on its own: locking
+// with the session, answering the network agent.
+const vaultCallTimeout = 5 * time.Second
 
-// bitwardenTick is how often the upkeep checks the idle lock and the
-// sync interval, both configured in minutes.
-const bitwardenTick = 30 * time.Second
-
-// vault is what the module and the dropdown use of the Bitwarden
-// service; *bitwarden.Service implements it.
-type vault interface {
-	Status() bitwarden.Status
-	Items() []bitwarden.Item
+// bwVault is what the module, the dropdown and the launcher use of
+// lys-secrets' vault: its status and listing as last read, a tick after
+// each change of them, and the vault's operations. *vaultMirror
+// implements it.
+type bwVault interface {
+	Status() vault.Status
+	Items() []vault.Item
 	Subscribe() (<-chan struct{}, func())
-	Login(ctx context.Context, req bitwarden.LoginRequest) error
-	SendLoginEmail(ctx context.Context, req bitwarden.LoginRequest) error
-	LoginAPIKey(ctx context.Context, req bitwarden.APIKeyRequest) error
+	Login(ctx context.Context, r vault.LoginRequest) error
+	SendLoginEmail(ctx context.Context, r vault.LoginRequest) error
+	LoginAPIKey(ctx context.Context, r vault.APIKeyRequest) error
 	Unlock(ctx context.Context, password string) error
 	Sync(ctx context.Context) error
-	Lock()
-	Logout() error
-	VerifyPassword(password string) error
-	Touch()
-	LockIdle(idle time.Duration) bool
+	Lock(ctx context.Context) error
+	Logout(ctx context.Context) error
+	Field(ctx context.Context, id string, f vault.Field, password string) (vault.Value, error)
 }
 
-// bitwardenHost is the shell's one vault, shared by every bar's module
-// and the dropdown. The service opens on first use, so a layout without
-// the module never creates its state directory; opening starts the
-// upkeep, which runs until the shell exits.
+// vaultMirror keeps the vault's status and listing as lys-secrets last
+// reported them, so the UI reads them without a bus call, and reads
+// them again after every operation and every Changed signal.
+type vaultMirror struct {
+	client *vault.Client
+	ticks  *feed.Tick
+
+	// refreshing serializes the reads, so an older answer never lands
+	// after a newer one.
+	refreshing sync.Mutex
+
+	mu     sync.Mutex
+	status vault.Status
+	items  []vault.Item
+}
+
+func newVaultMirror(client *vault.Client) *vaultMirror {
+	return &vaultMirror{client: client, ticks: feed.NewTick()}
+}
+
+// refresh reads the status, and the listing of an open vault. A vault
+// that does not answer reads as logged out, its error the reason.
+func (m *vaultMirror) refresh(ctx context.Context) {
+	m.refreshing.Lock()
+	defer m.refreshing.Unlock()
+	st, err := m.client.Status(ctx)
+	var items []vault.Item
+	switch {
+	case err != nil:
+		st = vault.Status{State: vault.StateLoggedOut, Err: err}
+	case st.State == vault.StateUnlocked:
+		if items, err = m.client.Items(ctx); err != nil && !errors.Is(err, vault.ErrLocked) {
+			st.Err = err
+		}
+	}
+	m.mu.Lock()
+	m.status, m.items = st, items
+	m.mu.Unlock()
+	feed.Notify(m.ticks)
+}
+
+func (m *vaultMirror) Status() vault.Status {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.status
+}
+
+func (m *vaultMirror) Items() []vault.Item {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.items
+}
+
+func (m *vaultMirror) Subscribe() (<-chan struct{}, func()) { return m.ticks.Subscribe() }
+
+// then reads the vault again after op, returning op's error.
+func (m *vaultMirror) then(ctx context.Context, err error) error {
+	m.refresh(ctx)
+	return err
+}
+
+func (m *vaultMirror) Login(ctx context.Context, r vault.LoginRequest) error {
+	return m.then(ctx, m.client.Login(ctx, r))
+}
+
+func (m *vaultMirror) SendLoginEmail(ctx context.Context, r vault.LoginRequest) error {
+	return m.client.SendLoginEmail(ctx, r)
+}
+
+func (m *vaultMirror) LoginAPIKey(ctx context.Context, r vault.APIKeyRequest) error {
+	return m.then(ctx, m.client.LoginAPIKey(ctx, r))
+}
+
+func (m *vaultMirror) Unlock(ctx context.Context, password string) error {
+	return m.then(ctx, m.client.Unlock(ctx, password))
+}
+
+func (m *vaultMirror) Sync(ctx context.Context) error { return m.then(ctx, m.client.Sync(ctx)) }
+
+func (m *vaultMirror) Lock(ctx context.Context) error { return m.then(ctx, m.client.Lock(ctx)) }
+
+func (m *vaultMirror) Logout(ctx context.Context) error { return m.then(ctx, m.client.Logout(ctx)) }
+
+func (m *vaultMirror) Field(ctx context.Context, id string, f vault.Field, password string) (vault.Value, error) {
+	return m.client.Field(ctx, id, f, password)
+}
+
+// bitwardenHost is the shell's one view of the vault, shared by every
+// bar's module, the dropdown, the launcher mode and the network agent.
+// The client connects on first use and the mirror follows the vault
+// from its first use until the shell exits, so a layout without the
+// module never starts lys-secrets.
 type bitwardenHost struct {
 	life   context.Context
 	config func() config.BitwardenConfig
 	// copy puts content on the clipboard, cleared after ttl unless
 	// replaced (0 keeps it); loop goroutine only.
-	copy  func(content transfer.Content, ttl time.Duration) error
-	vault func() (vault, error)
+	copy func(content transfer.Content, ttl time.Duration) error
+	// client is the vault's client on the session bus.
+	client func() (*vault.Client, error)
+	// vault is the mirror, following the vault once opened.
+	vault func() (bwVault, error)
 	// notify posts a desktop notification, for what happens while the
 	// dropdown is closed: a failing periodic sync, a forced logout.
 	notify func(summary, body string)
-
-	mu     sync.Mutex
-	opened vault
-	// syncFailing holds while periodic syncs keep failing, so only the
-	// first failure of a run notifies; upkeep goroutine only.
-	syncFailing bool
 }
 
-// newBitwardenHost is the host over the session clipboard, the vault
-// opening in the state directory.
+// newBitwardenHost is the host over the session clipboard and the
+// session bus.
 func newBitwardenHost(life context.Context, application *app.Application, current func() *config.Config) *bitwardenHost {
 	h := &bitwardenHost{
 		life: life, config: func() config.BitwardenConfig { return current().Bitwarden },
@@ -91,39 +172,47 @@ func newBitwardenHost(life context.Context, application *app.Application, curren
 		}
 		return clip.WriteExpiring(content, ttl)
 	}
-	h.vault = sync.OnceValues(func() (vault, error) {
-		dir, ok := xdg.OS.StateDir(version.Name)
-		if !ok {
-			return nil, errors.New("bitwarden: no state directory: neither XDG_STATE_HOME nor HOME is set")
-		}
-		svc, err := bitwarden.Open(filepath.Join(dir, "bitwarden"), bitwardenDevice)
+	h.client = sync.OnceValues(func() (*vault.Client, error) {
+		conn, err := dbus.ConnectSessionBus()
 		if err != nil {
 			return nil, err
 		}
-		h.mu.Lock()
-		h.opened = svc
-		h.mu.Unlock()
-		go h.keep(svc)
-		return svc, nil
+		return vault.NewClient(conn), nil
+	})
+	h.vault = sync.OnceValues(func() (bwVault, error) {
+		c, err := h.client()
+		if err != nil {
+			return nil, err
+		}
+		return h.follow(newVaultMirror(c))
 	})
 	return h
 }
 
-// copyField puts item it's field f on the clipboard, as its value at now: a
-// secret marked and cleared after clipboard-clear, the rest as plain
-// text. The copy counts as use of v. It returns the clear delay (0 for
-// none). Loop goroutine only.
-func (h *bitwardenHost) copyField(v vault, it bitwarden.Item, f bwField, now time.Time) (time.Duration, error) {
-	value, err := f.value(it, now)
+// follow keeps m current until the shell exits, reporting the vault's
+// periodic sync failures.
+func (h *bitwardenHost) follow(m *vaultMirror) (bwVault, error) {
+	err := m.client.Watch(h.life, vault.Watcher{
+		Changed:    func(vault.Status) { m.refresh(h.life) },
+		SyncFailed: h.reportSync,
+	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	ttl, err := h.copyText(value, f.secret(), f.expiry(it, now))
-	if err != nil {
-		return 0, err
+	go m.refresh(h.life)
+	return m, nil
+}
+
+// copyValue puts field f's value on the clipboard as of now: a secret
+// marked and cleared after clipboard-clear, or when the value expires
+// if that is sooner (a verification code's end); the rest as plain
+// text. It returns the clear delay (0 for none). Loop goroutine only.
+func (h *bitwardenHost) copyValue(f vault.Field, v vault.Value, now time.Time) (time.Duration, error) {
+	var expires time.Duration
+	if !v.Expires.IsZero() {
+		expires = max(v.Expires.Sub(now), time.Second)
 	}
-	v.Touch()
-	return ttl, nil
+	return h.copyText(v.Text, f.Secret(), expires)
 }
 
 func (h *bitwardenHost) copyGenerated(rules bwRules, random io.Reader) (time.Duration, error) {
@@ -135,7 +224,7 @@ func (h *bitwardenHost) copyGenerated(rules bwRules, random io.Reader) (time.Dur
 }
 
 // copyText copies value; a secret clears after clipboard-clear, or at
-// expires when that comes sooner (a verification code's end).
+// expires when that comes sooner.
 func (h *bitwardenHost) copyText(value string, secret bool, expires time.Duration) (time.Duration, error) {
 	content, ttl := transfer.Text(value), time.Duration(0)
 	if secret {
@@ -151,87 +240,44 @@ func (h *bitwardenHost) copyText(value string, secret bool, expires time.Duratio
 	return ttl, nil
 }
 
-// lockIfOpen locks the vault with the session; a vault never opened
-// stays unopened.
-func (h *bitwardenHost) lockIfOpen() {
-	h.mu.Lock()
-	v := h.opened
-	h.mu.Unlock()
-	if v != nil {
-		v.Lock()
-	}
-}
-
-// keep runs the upkeep every tick until the shell exits.
-func (h *bitwardenHost) keep(v vault) {
-	t := time.NewTicker(bitwardenTick)
-	defer t.Stop()
-	var lastSync time.Time
-	for {
-		select {
-		case <-h.life.Done():
-			return
-		case now := <-t.C:
-			lastSync = h.upkeep(v, now, lastSync)
+// lockVault locks lys-secrets' vault with the session, off the loop.
+func (h *bitwardenHost) lockVault() {
+	go func() {
+		ctx, cancel := context.WithTimeout(h.life, vaultCallTimeout)
+		defer cancel()
+		if err := h.lock(ctx); err != nil {
+			log.Printf("bitwarden: lock with the session: %v", err)
 		}
-	}
+	}()
 }
 
-// upkeep locks the vault once unused for lock-after and syncs it every
-// sync-interval, counted from the last sync or the last attempt, so a
-// server that is down is retried once an interval, not every tick. It
-// returns the attempt time.
-func (h *bitwardenHost) upkeep(v vault, now, lastAttempt time.Time) time.Time {
-	cfg := h.config()
-	if cfg.LockAfter > 0 {
-		v.LockIdle(minutes(cfg.LockAfter))
+// lock locks lys-secrets' vault whether or not this shell ever opened
+// it; a vault that is not running is left alone.
+func (h *bitwardenHost) lock(ctx context.Context) error {
+	c, err := h.client()
+	if err != nil {
+		return err
 	}
-	st := v.Status()
-	if !syncDue(st, cfg.SyncInterval, lastAttempt, now) {
-		return lastAttempt
-	}
-	h.reportSync(v.Sync(h.life))
-	return now
+	return c.Lock(ctx)
 }
 
-// reportSync notifies the first failure of a run of periodic syncs and
-// a forced logout, which the closed dropdown would not show.
+// reportSync notifies a periodic sync failing, which lys-secrets
+// reports once per run of failures, and a forced logout, which the
+// closed dropdown would not show.
 func (h *bitwardenHost) reportSync(err error) {
-	switch {
-	case err == nil:
-		h.syncFailing = false
-	case errors.Is(err, bitwarden.ErrLoginRequired):
-		log.Printf("bitwarden: periodic sync: %v", err)
-		h.syncFailing = false
+	log.Printf("bitwarden: periodic sync: %v", err)
+	if errors.Is(err, vault.ErrLoginRequired) {
 		h.notify(i18n.T("dropdown-bitwarden-notify-logged-out"), i18n.T("dropdown-bitwarden-notify-logged-out-body"))
-	default:
-		log.Printf("bitwarden: periodic sync: %v", err)
-		if !h.syncFailing {
-			h.syncFailing = true
-			h.notify(i18n.T("dropdown-bitwarden-notify-sync-failed"), bwErrorText(err))
-		}
+		return
 	}
+	h.notify(i18n.T("dropdown-bitwarden-notify-sync-failed"), bwErrorText(err))
 }
-
-// syncDue reports whether an open vault is due its periodic sync.
-func syncDue(st bitwarden.Status, every uint32, lastAttempt, now time.Time) bool {
-	if every == 0 || st.State != bitwarden.StateUnlocked || st.Syncing {
-		return false
-	}
-	last := st.LastSync
-	if lastAttempt.After(last) {
-		last = lastAttempt
-	}
-	return !now.Before(last.Add(minutes(every)))
-}
-
-func minutes(n uint32) time.Duration { return time.Duration(n) * time.Minute }
 
 // bitwardenLabel is the label: {{ count }} is the open vault's item
 // count, empty while locked.
-func bitwardenLabel(format string, st bitwarden.Status) string {
+func bitwardenLabel(format string, st vault.Status) string {
 	count := ""
-	if st.State == bitwarden.StateUnlocked {
+	if st.State == vault.StateUnlocked {
 		count = strconv.Itoa(st.Items)
 	}
 	return strings.ReplaceAll(format, "{{ count }}", count)
@@ -241,7 +287,7 @@ func bitwardenLabel(format string, st bitwarden.Status) string {
 // item count.
 type bitwardenModule struct {
 	ctx   ModuleContext
-	vault vault
+	vault bwVault
 	btn   *barButton
 	icon  *widget.Icon
 }
@@ -278,7 +324,7 @@ func (m *bitwardenModule) render() {
 		return
 	}
 	state := config.BitwardenLocked
-	if st.State == bitwarden.StateUnlocked {
+	if st.State == vault.StateUnlocked {
 		state = config.BitwardenUnlocked
 	}
 	m.icon.SetThemeName(cfg.Icons()[state].Name)
@@ -287,29 +333,43 @@ func (m *bitwardenModule) render() {
 func (m *bitwardenModule) Root() widget.Widget { return m.btn }
 
 // bitwardenNetworkVault answers the NetworkManager secret agent from
-// the open vault's network folder (bitwarden.NetworkLogin); a vault the
-// shell never opened, or no folder configured, answers nothing.
-type bitwardenNetworkVault struct{ h *bitwardenHost }
+// the vault's network folder (lys-secrets' NetworkLogin); no folder
+// configured, a vault that is not open or does not answer, answers
+// nothing.
+type bitwardenNetworkVault struct {
+	folder func() string
+	lookup func(ctx context.Context, folder, name string) (vault.NetworkLogin, bool, error)
+}
+
+// networkVault is the host's vault for the network agent.
+func (h *bitwardenHost) networkVault() bitwardenNetworkVault {
+	return bitwardenNetworkVault{
+		folder: func() string { return h.config().NetworkFolder },
+		lookup: func(ctx context.Context, folder, name string) (vault.NetworkLogin, bool, error) {
+			c, err := h.client()
+			if err != nil {
+				return vault.NetworkLogin{}, false, err
+			}
+			return c.NetworkLogin(ctx, folder, name)
+		},
+	}
+}
 
 // Entry implements network.Vault.
 func (v bitwardenNetworkVault) Entry(name string) (network.VaultEntry, bool) {
-	folder := v.h.config().NetworkFolder
+	folder := v.folder()
 	if folder == "" {
 		return network.VaultEntry{}, false
 	}
-	v.h.mu.Lock()
-	opened := v.h.opened
-	v.h.mu.Unlock()
-	if opened == nil {
+	ctx, cancel := context.WithTimeout(context.Background(), vaultCallTimeout)
+	defer cancel()
+	l, ok, err := v.lookup(ctx, folder, name)
+	if err != nil {
+		log.Printf("bitwarden: the network login for %s: %v", name, err)
 		return network.VaultEntry{}, false
 	}
-	it, ok := bitwarden.NetworkLogin(opened.Items(), folder, name)
 	if !ok {
 		return network.VaultEntry{}, false
 	}
-	fields := make(map[string]string, len(it.Fields))
-	for _, f := range it.Fields {
-		fields[f.Name] = f.Value
-	}
-	return network.VaultEntry{Username: it.Username, Password: it.Password, Fields: fields}, true
+	return network.VaultEntry{Username: l.Username, Password: l.Password, Fields: l.Fields}, true
 }

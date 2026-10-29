@@ -19,6 +19,14 @@ let
   ) layoutZones;
   usesMail = lib.elem "mail" layoutModules;
 
+  # Settings the Bitwarden vault took to lys-secrets, with where they live
+  # now; setting one here fails evaluation instead of being dropped.
+  vaultMoved = {
+    lock-after = "services.lys-secrets.vault.lockAfter (lys-secrets --vault-lock-after)";
+    sync-interval = "services.lys-secrets.vault.syncInterval (lys-secrets --vault-sync-interval)";
+  };
+  bitwardenSettings = cfg.settings.modules.bitwarden or { };
+
   # Soft dependencies lys-shell shells out to, selected from the config. Theme
   # providers are spawned for wallpaper-driven color extraction; wl-clipboard
   # and xdg-utils back copy / open-link actions; notmuch backs the mail module.
@@ -134,6 +142,15 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = lib.mapAttrsToList (key: moved: {
+      assertion = !(bitwardenSettings ? ${key});
+      message = ''
+        programs.lys-shell.settings.modules.bitwarden.${key} is gone: the
+        Bitwarden vault moved to lys-secrets (github:stubbedev/lys-secrets).
+        Set ${moved} instead.
+      '';
+    }) vaultMoved;
+
     home.packages = [ cfg.package ] ++ lib.optionals cfg.autoInstallDependencies softDeps;
 
     xdg.configFile."lys-shell/config.yaml" = lib.mkIf (cfg.settings != { }) {

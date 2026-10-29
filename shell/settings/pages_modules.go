@@ -69,10 +69,8 @@ func bitwardenPage(*config.Config) pageSpec {
 		{title: "settings-section-general", rows: []rowSpec{
 			field(m + ".server"),
 			field(m + ".email"),
-			field(m + ".lock-after"),
 			field(m + ".lock-with-session"),
 			field(m + ".clipboard-clear"),
-			field(m + ".sync-interval"),
 			field(m + ".format"),
 			field(m+".icon-locked", iconRow),
 			field(m+".icon-unlocked", iconRow),

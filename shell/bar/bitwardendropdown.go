@@ -6,17 +6,17 @@ import (
 	"errors"
 	"io"
 	"log"
-	"net/url"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-secrets/vault"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/service/bitwarden"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -35,154 +35,62 @@ const (
 	bwPageError     = "error"
 )
 
-// bwField is one value an item row copies.
-type bwField int
-
-const (
-	bwUsername bwField = iota
-	bwPassword
-	bwTOTP
-	bwCardNumber
-	bwCardCode
-	bwEmail
-	bwNotes
-)
-
-// secret reports whether the field is a secret: offered marked for
-// clipboard managers to skip, cleared after clipboard-clear, and behind
-// the item's master password reprompt.
-func (f bwField) secret() bool {
+// bwFieldIcon is a field's copy button glyph.
+func bwFieldIcon(f vault.Field) string {
 	switch f {
-	case bwUsername, bwEmail:
-		return false
-	}
-	return true
-}
-
-// icon is the field's copy button glyph.
-func (f bwField) icon() string {
-	switch f {
-	case bwUsername:
+	case vault.FieldUsername:
 		return "ld-user-symbolic"
-	case bwTOTP:
+	case vault.FieldTOTP:
 		return "ld-clock-symbolic"
-	case bwCardNumber:
+	case vault.FieldCardNumber:
 		return "ld-credit-card-symbolic"
-	case bwEmail:
+	case vault.FieldEmail:
 		return "ld-mail-symbolic"
-	case bwNotes:
+	case vault.FieldNotes:
 		return "ld-copy-symbolic"
 	}
 	return "ld-key-round-symbolic"
 }
 
-// name is the field as the copy messages say it.
-func (f bwField) name() string {
+// bwFieldName is a field as the copy messages say it.
+func bwFieldName(f vault.Field) string {
 	switch f {
-	case bwUsername:
+	case vault.FieldUsername:
 		return i18n.T("dropdown-bitwarden-field-username")
-	case bwTOTP:
+	case vault.FieldTOTP:
 		return i18n.T("dropdown-bitwarden-field-totp")
-	case bwCardNumber:
+	case vault.FieldCardNumber:
 		return i18n.T("dropdown-bitwarden-field-card-number")
-	case bwCardCode:
+	case vault.FieldCardCode:
 		return i18n.T("dropdown-bitwarden-field-card-code")
-	case bwEmail:
+	case vault.FieldEmail:
 		return i18n.T("dropdown-bitwarden-field-email")
-	case bwNotes:
+	case vault.FieldNotes:
 		return i18n.T("dropdown-bitwarden-field-notes")
 	}
 	return i18n.T("dropdown-bitwarden-field-password")
 }
 
-// value is the field's text in it; a TOTP is the code current at now.
-func (f bwField) value(it bitwarden.Item, now time.Time) (string, error) {
-	switch f {
-	case bwUsername:
-		return it.Username, nil
-	case bwPassword:
-		return it.Password, nil
-	case bwTOTP:
-		t, err := bitwarden.ParseTOTP(it.TOTP)
-		if err != nil {
-			return "", err
-		}
-		code, _ := t.Code(now)
-		return code, nil
-	case bwCardNumber:
-		return it.Card.Number, nil
-	case bwCardCode:
-		return it.Card.Code, nil
-	case bwEmail:
-		return it.Identity.Email, nil
-	}
-	return it.Notes, nil
-}
-
-// expiry is how long the field's value stays valid: a verification
-// code's remaining period, zero for the fields that do not expire.
-func (f bwField) expiry(it bitwarden.Item, now time.Time) time.Duration {
-	if f != bwTOTP {
-		return 0
-	}
-	t, err := bitwarden.ParseTOTP(it.TOTP)
-	if err != nil {
-		return 0
-	}
-	_, remaining := t.Code(now)
-	return remaining
-}
-
 // bwTOTPLine is the live code row's caption: the code in two halves and
-// the seconds it has left.
-func bwTOTPLine(it bitwarden.Item, now time.Time) (string, bool) {
-	t, err := bitwarden.ParseTOTP(it.TOTP)
-	if err != nil {
-		return "", false
+// the seconds it has left at now.
+func bwTOTPLine(code vault.Value, now time.Time) string {
+	text := code.Text
+	if half := len(text) / 2; len(text) == 6 || len(text) == 8 {
+		text = text[:half] + " " + text[half:]
 	}
-	code, remaining := t.Code(now)
-	if half := len(code) / 2; len(code) == 6 || len(code) == 8 {
-		code = code[:half] + " " + code[half:]
-	}
-	return i18n.T("dropdown-bitwarden-totp-live", i18n.Str("code", code), i18n.Int("seconds", int64(remaining/time.Second))), true
-}
-
-// bwFields is what an item's row copies, its primary field first (the
-// one a click on the row copies).
-func bwFields(it bitwarden.Item) []bwField {
-	var fs []bwField
-	add := func(f bwField, v string) {
-		if v != "" {
-			fs = append(fs, f)
-		}
-	}
-	switch it.Type {
-	case bitwarden.ItemLogin:
-		add(bwPassword, it.Password)
-		add(bwUsername, it.Username)
-		add(bwTOTP, it.TOTP)
-	case bitwarden.ItemCard:
-		add(bwCardNumber, it.Card.Number)
-		add(bwCardCode, it.Card.Code)
-	case bitwarden.ItemIdentity:
-		add(bwEmail, it.Identity.Email)
-		add(bwUsername, it.Identity.Username)
-	case bitwarden.ItemSecureNote:
-		add(bwNotes, it.Notes)
-	}
-	return fs
+	return i18n.T("dropdown-bitwarden-totp-live", i18n.Str("code", text), i18n.Int("seconds", int64(code.Expires.Sub(now)/time.Second)))
 }
 
 // bwItemIcon is an item's row glyph by its type.
-func bwItemIcon(t bitwarden.ItemType) string {
+func bwItemIcon(t vault.ItemType) string {
 	switch t {
-	case bitwarden.ItemCard:
+	case vault.ItemCard:
 		return "ld-credit-card-symbolic"
-	case bitwarden.ItemIdentity:
+	case vault.ItemIdentity:
 		return "ld-id-card-symbolic"
-	case bitwarden.ItemSecureNote:
+	case vault.ItemSecureNote:
 		return "ld-file-text-symbolic"
-	case bitwarden.ItemSSHKey:
+	case vault.ItemSSHKey:
 		return "ld-terminal-symbolic"
 	}
 	return "ld-globe-symbolic"
@@ -190,22 +98,22 @@ func bwItemIcon(t bitwarden.ItemType) string {
 
 // bwItemCaption is the row's second line: the login's username, the
 // card's brand, the item's folder.
-func bwItemCaption(it bitwarden.Item) string {
+func bwItemCaption(it vault.Item) string {
 	switch {
 	case it.Undecryptable:
 		return i18n.T("dropdown-bitwarden-undecryptable")
-	case it.Type == bitwarden.ItemLogin && it.Username != "":
+	case it.Type == vault.ItemLogin && it.Username != "":
 		return it.Username
-	case it.Type == bitwarden.ItemCard && it.Card.Brand != "":
-		return it.Card.Brand
+	case it.Type == vault.ItemCard && it.CardBrand != "":
+		return it.CardBrand
 	}
 	return it.Folder
 }
 
 // bwMatches is the items matching query in vault order, at most max,
 // and how many matched in all.
-func bwMatches(items []bitwarden.Item, query string, max int) ([]bitwarden.Item, int) {
-	var shown []bitwarden.Item
+func bwMatches(items []vault.Item, query string, max int) ([]vault.Item, int) {
+	var shown []vault.Item
 	total := 0
 	for _, it := range items {
 		if !it.Match(query) {
@@ -221,41 +129,37 @@ func bwMatches(items []bitwarden.Item, query string, max int) ([]bitwarden.Item,
 
 // bwErrorText is an operation's failure as the dropdown says it.
 func bwErrorText(err error) string {
-	var api *bitwarden.APIError
-	var netErr *url.Error
 	switch {
-	case errors.Is(err, bitwarden.ErrWrongPassword):
+	case errors.Is(err, vault.ErrWrongPassword):
 		return i18n.T("dropdown-bitwarden-error-wrong-password")
-	case errors.Is(err, bitwarden.ErrInvalidCredentials):
+	case errors.Is(err, vault.ErrInvalidCredentials):
 		return i18n.T("dropdown-bitwarden-error-credentials")
-	case errors.Is(err, bitwarden.ErrLoginRequired):
+	case errors.Is(err, vault.ErrLoginRequired):
 		return i18n.T("dropdown-bitwarden-error-login-required")
-	case errors.As(err, &api) && api.Retryable():
-		return i18n.T("dropdown-bitwarden-error-unavailable")
-	case errors.As(err, &api):
-		return i18n.T("dropdown-bitwarden-error-server", i18n.Str("message", api.Message))
-	case errors.As(err, &netErr):
+	case errors.Is(err, vault.ErrUnreachable):
 		return i18n.T("dropdown-bitwarden-error-network")
+	}
+	if se, ok := errors.AsType[*vault.ServerError](err); ok {
+		if se.Retryable() {
+			return i18n.T("dropdown-bitwarden-error-unavailable")
+		}
+		return i18n.T("dropdown-bitwarden-error-server", i18n.Str("message", se.Message))
 	}
 	return err.Error()
 }
 
-// bwStateUnknown is the view's state before its first apply, so that
-// apply sets up whatever page the vault starts on.
-const bwStateUnknown bitwarden.State = -1
-
 // bwChallenge is a login waiting on a code: the attempt to repeat and
 // what the server asked for.
 type bwChallenge struct {
-	req       bitwarden.LoginRequest
+	req       vault.LoginRequest
 	newDevice bool
-	provider  bitwarden.TwoFactorProvider
+	provider  vault.TwoFactorProvider
 }
 
 // bwCopyRequest is a copy waiting on the master password reprompt.
 type bwCopyRequest struct {
-	item  bitwarden.Item
-	field bwField
+	item  vault.Item
+	field vault.Field
 }
 
 // bitwardenView is the vault dropdown: the login (and its code step),
@@ -268,7 +172,7 @@ type bitwardenView struct {
 
 	ctx    ModuleContext
 	host   *bitwardenHost
-	vault  vault
+	vault  bwVault
 	font   render.Font
 	px     float64
 	now    func() time.Time
@@ -278,8 +182,11 @@ type bitwardenView struct {
 	cancel context.CancelFunc
 	once   sync.Once
 
-	busy       bool
-	state      bitwarden.State
+	busy bool
+	// state is the vault's state at the last apply; started says there
+	// was one.
+	state      vault.State
+	started    bool
 	pending    *bwChallenge
 	copying    *bwCopyRequest
 	generating bool
@@ -313,15 +220,18 @@ type bitwardenView struct {
 
 	search *widget.SearchEntry
 	// totpRow is the live verification code of the item whose fields
-	// were copied last, totpID that item; hidden for none, and never
-	// shown for an item behind the master password reprompt.
-	totpRow *widget.Item
-	totpSt  *widget.Stack
-	totpID  string
-	list    *widget.ItemGroup
-	listSt  *widget.Stack
-	more    *widget.Label
-	status  *widget.Label
+	// were copied last, totpID that item and totpCode its code as last
+	// read; hidden for none, and never shown for an item behind the
+	// master password reprompt. totpReading holds while a code is read.
+	totpRow     *widget.Item
+	totpSt      *widget.Stack
+	totpID      string
+	totpCode    vault.Value
+	totpReading bool
+	list        *widget.ItemGroup
+	listSt      *widget.Stack
+	more        *widget.Label
+	status      *widget.Label
 
 	repromptDesc *widget.Label
 	repromptPw   *secretEntry
@@ -334,7 +244,7 @@ type bitwardenView struct {
 
 func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &bitwardenView{ctx: ctx, host: ctx.Bitwarden, font: font, px: px, now: time.Now, random: rand.Reader, state: bwStateUnknown}
+	v := &bitwardenView{ctx: ctx, host: ctx.Bitwarden, font: font, px: px, now: time.Now, random: rand.Reader}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "bitwarden-dropdown")
 	v.spinner = widget.NewSpinner(int(px))
@@ -400,39 +310,68 @@ func (v *bitwardenView) follow() {
 
 // liveTOTPItem is the item the live code row follows, false when there
 // is none to show.
-func (v *bitwardenView) liveTOTPItem() (bitwarden.Item, bool) {
-	if v.totpID == "" || v.vault == nil || v.vault.Status().State != bitwarden.StateUnlocked {
-		return bitwarden.Item{}, false
+func (v *bitwardenView) liveTOTPItem() (vault.Item, bool) {
+	if v.totpID == "" || v.vault == nil || v.vault.Status().State != vault.StateUnlocked {
+		return vault.Item{}, false
 	}
 	for _, it := range v.vault.Items() {
-		if it.ID == v.totpID && it.TOTP != "" && !it.Reprompt {
+		if it.ID == v.totpID && slices.Contains(it.Fields, vault.FieldTOTP) && !it.Reprompt {
 			return it, true
 		}
 	}
-	return bitwarden.Item{}, false
+	return vault.Item{}, false
 }
 
-// refreshTOTP shows the followed item's current code and its seconds left.
+// refreshTOTP shows the followed item's current code and its seconds
+// left, reading the next code once the shown one expired.
 func (v *bitwardenView) refreshTOTP() {
 	it, ok := v.liveTOTPItem()
-	line := ""
-	if ok {
-		line, ok = bwTOTPLine(it, v.now())
-	}
 	if !ok {
 		v.totpSt.Show("none")
 		return
 	}
+	now := v.now()
+	if !now.Before(v.totpCode.Expires) {
+		v.totpSt.Show("none")
+		v.readTOTP(it.ID)
+		return
+	}
 	v.totpRow.SetTitle(it.Name)
-	v.totpRow.SetDescription(line)
+	v.totpRow.SetDescription(bwTOTPLine(v.totpCode, now))
 	v.totpSt.Show("code")
+}
+
+// readTOTP reads item id's current code off the loop; a code that does
+// not come stops the row following the item.
+func (v *bitwardenView) readTOTP(id string) {
+	if v.totpReading || v.life == nil {
+		return
+	}
+	v.totpReading = true
+	go func() {
+		code, err := v.vault.Field(v.life, id, vault.FieldTOTP, "")
+		v.ctx.Invoke(func() {
+			v.totpReading = false
+			if id != v.totpID {
+				return
+			}
+			if err != nil {
+				log.Printf("bitwarden: the live code: %v", err)
+				v.totpID = ""
+			}
+			v.totpCode = code
+			v.refreshTOTP()
+		})
+	}()
 }
 
 // copyLiveTOTP copies the live row's code.
 func (v *bitwardenView) copyLiveTOTP() {
-	if it, ok := v.liveTOTPItem(); ok {
-		v.copyNow(it, bwTOTP)
+	if _, ok := v.liveTOTPItem(); !ok || !v.now().Before(v.totpCode.Expires) {
+		return
 	}
+	ttl, err := v.host.copyValue(vault.FieldTOTP, v.totpCode, v.now())
+	reportCopy(v.status, bwFieldName(vault.FieldTOTP), ttl, err)
 }
 
 // showError replaces the pages with why there is no vault.
@@ -573,7 +512,7 @@ func (v *bitwardenView) buildVault() widget.Widget {
 	v.totpRow = widget.NewItem(v.font, "", "")
 	v.totpRow.SetSmall(true)
 	v.totpRow.SetEllipsize(true)
-	v.totpRow.SetMedia(widget.NewThemeIcon(bwTOTP.icon(), int(v.px*1.2)), false)
+	v.totpRow.SetMedia(widget.NewThemeIcon(bwFieldIcon(vault.FieldTOTP), int(v.px*1.2)), false)
 	v.totpRow.AddClass("bitwarden-totp-live")
 	v.totpRow.SetOnActivate(v.copyLiveTOTP)
 	totpGroup.Append(v.totpRow)
@@ -621,13 +560,13 @@ func (v *bitwardenView) apply() {
 		}
 	}()
 	st := v.vault.Status()
-	changed := st.State != v.state
-	v.state = st.State
+	changed := !v.started || st.State != v.state
+	v.state, v.started = st.State, true
 	v.spinner.SetVisible(v.busy || st.Syncing)
 	v.spinner.SetSpinning(v.busy || st.Syncing)
-	v.syncBtn.SetVisible(st.State == bitwarden.StateUnlocked)
-	v.lockBtn.SetVisible(st.State == bitwarden.StateUnlocked)
-	v.logoutBtn.SetVisible(st.State != bitwarden.StateLoggedOut)
+	v.syncBtn.SetVisible(st.State == vault.StateUnlocked)
+	v.lockBtn.SetVisible(st.State == vault.StateUnlocked)
+	v.logoutBtn.SetVisible(st.State != vault.StateLoggedOut)
 	v.syncBtn.SetEnabled(!v.busy && !st.Syncing)
 	v.pages.SetEnabled(!v.busy)
 	if !v.busy {
@@ -641,7 +580,7 @@ func (v *bitwardenView) apply() {
 		return
 	}
 	switch st.State {
-	case bitwarden.StateLoggedOut:
+	case vault.StateLoggedOut:
 		if v.pending != nil {
 			v.pages.Show(bwPageChallenge)
 			return
@@ -653,13 +592,13 @@ func (v *bitwardenView) apply() {
 			}
 			v.pages.Show(bwPageLogin)
 		}
-	case bitwarden.StateLocked:
+	case vault.StateLocked:
 		if changed || v.pages.Visible() != bwPageUnlock {
 			v.clearSecrets()
 			setCaption(v.status, "")
 			v.pages.Show(bwPageUnlock)
 		}
-	case bitwarden.StateUnlocked:
+	case vault.StateUnlocked:
 		if v.copying == nil {
 			v.pages.Show(bwPageVault)
 		}
@@ -671,9 +610,9 @@ func (v *bitwardenView) apply() {
 // setError shows err under the page; the server asking for a code is
 // the code step, not an error.
 func (v *bitwardenView) setError(err error) {
-	var tf *bitwarden.TwoFactorRequiredError
+	_, challenged := errors.AsType[*vault.TwoFactorRequiredError](err)
 	text := ""
-	if err != nil && !errors.As(err, &tf) && !errors.Is(err, bitwarden.ErrNewDeviceVerification) {
+	if err != nil && !challenged && !errors.Is(err, vault.ErrNewDeviceVerification) {
 		text = bwErrorText(err)
 	}
 	setCaption(v.errLabel, text)
@@ -763,22 +702,22 @@ func (v *bitwardenView) login() {
 	server := v.host.config().Server.Server()
 	email, password := v.email.Text(), v.password.entry.Text()
 	if v.apiKey {
-		req := bitwarden.APIKeyRequest{Server: server, Email: email, ClientID: v.clientIDIn.Text(), Secret: v.secretIn.entry.Text(), Password: password}
+		req := vault.APIKeyRequest{Server: server, Email: email, ClientID: v.clientIDIn.Text(), Secret: v.secretIn.entry.Text(), Password: password}
 		v.run(func(ctx context.Context) error { return v.vault.LoginAPIKey(ctx, req) }, nil)
 		return
 	}
-	v.attempt(bitwarden.LoginRequest{Server: server, Email: email, Password: password})
+	v.attempt(vault.LoginRequest{Server: server, Email: email, Password: password})
 }
 
 // attempt logs in, turning the server's ask for a code into the code
 // step.
-func (v *bitwardenView) attempt(req bitwarden.LoginRequest) {
+func (v *bitwardenView) attempt(req vault.LoginRequest) {
 	v.run(func(ctx context.Context) error { return v.vault.Login(ctx, req) }, func(err error) {
-		var tf *bitwarden.TwoFactorRequiredError
+		tf, challenged := errors.AsType[*vault.TwoFactorRequiredError](err)
 		switch {
-		case errors.As(err, &tf):
+		case challenged:
 			v.challenge(&bwChallenge{req: req, provider: bwProvider(tf.Providers)})
-		case errors.Is(err, bitwarden.ErrNewDeviceVerification):
+		case errors.Is(err, vault.ErrNewDeviceVerification):
 			v.challenge(&bwChallenge{req: req, newDevice: true})
 		case err == nil:
 			v.pending = nil
@@ -788,13 +727,13 @@ func (v *bitwardenView) attempt(req bitwarden.LoginRequest) {
 
 // bwProvider picks the second factor to ask for: the authenticator app
 // when the account has one, else the emailed code.
-func bwProvider(ps []bitwarden.TwoFactorProvider) bitwarden.TwoFactorProvider {
+func bwProvider(ps []vault.TwoFactorProvider) vault.TwoFactorProvider {
 	for _, p := range ps {
-		if p == bitwarden.TwoFactorAuthenticator {
+		if p == vault.TwoFactorAuthenticator {
 			return p
 		}
 	}
-	return bitwarden.TwoFactorEmail
+	return vault.TwoFactorEmail
 }
 
 // challenge shows the code step for c.
@@ -805,14 +744,14 @@ func (v *bitwardenView) challenge(c *bwChallenge) {
 	case c.newDevice:
 		v.codeTitle.SetText(i18n.T("dropdown-bitwarden-new-device-title"))
 		v.codeDesc.SetText(i18n.T("dropdown-bitwarden-new-device-desc", i18n.Str("email", c.req.Email)))
-	case c.provider == bitwarden.TwoFactorEmail:
+	case c.provider == vault.TwoFactorEmail:
 		v.codeTitle.SetText(i18n.T("dropdown-bitwarden-two-factor-title"))
 		v.codeDesc.SetText(i18n.T("dropdown-bitwarden-two-factor-email", i18n.Str("email", c.req.Email)))
 	default:
 		v.codeTitle.SetText(i18n.T("dropdown-bitwarden-two-factor-title"))
 		v.codeDesc.SetText(i18n.T("dropdown-bitwarden-two-factor-app"))
 	}
-	v.sendEmail.SetVisible(!c.newDevice && c.provider == bitwarden.TwoFactorEmail)
+	v.sendEmail.SetVisible(!c.newDevice && c.provider == vault.TwoFactorEmail)
 	v.pages.Show(bwPageChallenge)
 	v.focus(v.code)
 }
@@ -834,7 +773,7 @@ func (v *bitwardenView) submitCode() {
 	if c.newDevice {
 		req.NewDeviceOTP = v.code.Text()
 	} else {
-		req.TwoFactor = &bitwarden.TwoFactor{Provider: c.provider, Code: v.code.Text()}
+		req.TwoFactor = &vault.TwoFactor{Provider: c.provider, Code: v.code.Text()}
 	}
 	v.attempt(req)
 }
@@ -860,11 +799,11 @@ func (v *bitwardenView) sync() {
 }
 
 func (v *bitwardenView) lock() {
-	v.vault.Lock()
+	v.run(func(ctx context.Context) error { return v.vault.Lock(ctx) }, nil)
 }
 
 func (v *bitwardenView) logout() {
-	v.run(func(context.Context) error { return v.vault.Logout() }, nil)
+	v.run(func(ctx context.Context) error { return v.vault.Logout(ctx) }, nil)
 }
 
 // rebuildList shows the items matching the search.
@@ -891,17 +830,16 @@ func (v *bitwardenView) rebuildList() {
 
 // row is one item: its type's glyph, name and caption, a copy button
 // per field; a click copies the primary field.
-func (v *bitwardenView) row(it bitwarden.Item) widget.Widget {
+func (v *bitwardenView) row(it vault.Item) widget.Widget {
 	row := widget.NewItem(v.font, it.Name, bwItemCaption(it))
 	row.SetSmall(true)
 	row.SetEllipsize(true)
 	row.SetMedia(widget.NewThemeIcon(bwItemIcon(it.Type), int(v.px*1.2)), false)
-	fields := bwFields(it)
-	if len(fields) > 0 {
-		row.SetOnActivate(func() { v.copyField(it, fields[0]) })
+	if len(it.Fields) > 0 {
+		row.SetOnActivate(func() { v.copyField(it, it.Fields[0]) })
 	}
-	for _, f := range fields {
-		b := v.iconButton(f.icon(), i18n.T("dropdown-bitwarden-copy-field", i18n.Str("field", f.name())), func() { v.copyField(it, f) })
+	for _, f := range it.Fields {
+		b := v.iconButton(bwFieldIcon(f), i18n.T("dropdown-bitwarden-copy-field", i18n.Str("field", bwFieldName(f))), func() { v.copyField(it, f) })
 		row.AddAction(b)
 	}
 	return row
@@ -909,26 +847,43 @@ func (v *bitwardenView) row(it bitwarden.Item) widget.Widget {
 
 // copyField copies one field, asking for the master password first when
 // the item is protected by the reprompt and the field is a secret.
-func (v *bitwardenView) copyField(it bitwarden.Item, f bwField) {
-	if it.Reprompt && f.secret() {
+func (v *bitwardenView) copyField(it vault.Item, f vault.Field) {
+	if it.Reprompt && f.Secret() {
 		v.copying = &bwCopyRequest{item: it, field: f}
-		v.repromptDesc.SetText(i18n.T("dropdown-bitwarden-reprompt-desc", i18n.Str("field", f.name()), i18n.Str("item", it.Name)))
+		v.repromptDesc.SetText(i18n.T("dropdown-bitwarden-reprompt-desc", i18n.Str("field", bwFieldName(f)), i18n.Str("item", it.Name)))
 		v.repromptPw.reset()
 		v.pages.Show(bwPageReprompt)
 		v.focus(v.repromptPw.entry)
 		return
 	}
-	v.copyNow(it, f)
+	v.copyNow(it, f, "")
 }
 
-// copyNow puts the field on the clipboard and says so.
-func (v *bitwardenView) copyNow(it bitwarden.Item, f bwField) {
-	ttl, err := v.host.copyField(v.vault, it, f, v.now())
-	reportCopy(v.status, f.name(), ttl, err)
-	if err == nil && it.TOTP != "" && !it.Reprompt {
-		v.totpID = it.ID
-		v.refreshTOTP()
-	}
+// copyNow reads the field from the vault, with the master password for
+// a protected item, then puts it on the clipboard and says so. A copy
+// from an item with a verification code makes the live row follow it.
+func (v *bitwardenView) copyNow(it vault.Item, f vault.Field, password string) {
+	var value vault.Value
+	v.run(func(ctx context.Context) (err error) {
+		value, err = v.vault.Field(ctx, it.ID, f, password)
+		return err
+	}, func(err error) {
+		if err != nil {
+			if v.copying != nil {
+				v.focus(v.repromptPw.entry)
+			}
+			return
+		}
+		v.copying = nil
+		ttl, err := v.host.copyValue(f, value, v.now())
+		reportCopy(v.status, bwFieldName(f), ttl, err)
+		if err == nil && slices.Contains(it.Fields, vault.FieldTOTP) && !it.Reprompt {
+			v.totpID, v.totpCode = it.ID, vault.Value{}
+			if f == vault.FieldTOTP {
+				v.totpCode = value
+			}
+		}
+	})
 }
 
 func reportCopy(l *widget.Label, field string, ttl time.Duration, err error) {
@@ -953,14 +908,7 @@ func (v *bitwardenView) confirmReprompt() {
 		return
 	}
 	v.repromptPw.reset()
-	v.run(func(context.Context) error { return v.vault.VerifyPassword(password) }, func(err error) {
-		if err != nil {
-			v.focus(v.repromptPw.entry)
-			return
-		}
-		v.copying = nil
-		v.copyNow(req.item, req.field)
-	})
+	v.copyNow(req.item, req.field, password)
 }
 
 func (v *bitwardenView) cancelReprompt() {
