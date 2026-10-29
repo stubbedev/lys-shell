@@ -2,7 +2,9 @@ package settings
 
 import (
 	"errors"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -744,21 +746,49 @@ func TestFileEditorBrowses(t *testing.T) {
 	}
 }
 
+// fakeGreeterApply puts lys-login and pkexec scripts on an otherwise
+// empty PATH. lys-login copies the staged file to out and succeeds
+// only as root, which the fake pkexec marks with LYS_TEST_ROOT, unless
+// userOK; pkexec leaves out.pkexec behind when it runs.
+func fakeGreeterApply(t *testing.T, userOK bool) (out string) {
+	t.Helper()
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	out = filepath.Join(dir, "out")
+	refuse := `[ -n "$LYS_TEST_ROOT" ] || { echo "lys-login's display manager is not running" >&2; exit 1; }`
+	if userOK {
+		refuse = ""
+	}
+	scripts := map[string]string{
+		"lys-login": refuse + "\n" + `[ "$1" = apply-config ] || exit 2; while IFS= read -r l; do printf '%s\n' "$l"; done < "$2" > ` + out,
+		"pkexec":    `: > ` + out + `.pkexec; LYS_TEST_ROOT=1 exec "$@"`,
+	}
+	for name, body := range scripts {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!"+sh+"\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+	return out
+}
+
 func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
 	k := testKit(t, "")
 	_ = k.store.set("login.greeter.cursor-size", int64(32))
 	_ = k.store.set("login.lock.pam-service", "secret-service")
-	var staged string
-	prev := spawnGreeterApply
-	spawnGreeterApply = func(path string) error {
-		b, err := os.ReadFile(path)
-		staged = string(b)
-		return err
-	}
-	t.Cleanup(func() { spawnGreeterApply = prev })
-	if err := applyGreeter(k.store); err != nil {
+	t.Setenv("TMPDIR", t.TempDir())
+	out := fakeGreeterApply(t, true)
+	if err := applyGreeter(k.store, applyAsUser); err != nil {
 		t.Fatal(err)
 	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staged := string(b)
 	doc, err := config.ParseYAML(staged)
 	if err != nil {
 		t.Fatalf("staged %q: %v", staged, err)
@@ -783,18 +813,76 @@ func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
 			t.Errorf("%s is outside the allowlist but was staged", key)
 		}
 	}
-	// A failed spawn shows on the button.
-	spawnGreeterApply = func(string) error { return errors.New("no pkexec") }
-	footer := greeterApplyFooter(k).(*widget.Box)
-	var btn *widget.Button
+	if _, err := os.Stat(out + ".pkexec"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the user's apply went through pkexec: %v", err)
+	}
+	if left, _ := os.ReadDir(os.TempDir()); len(left) != 0 {
+		t.Errorf("the staged file outlived the apply: %v", left)
+	}
+}
+
+// greeterApplyButtons are the footer's apply and administrator buttons.
+func greeterApplyButtons(t *testing.T, footer *widget.Box) (apply, admin *widget.Button) {
+	t.Helper()
+	var buttons []*widget.Button
 	for _, kid := range footer.Children() {
 		if b, ok := kid.(*widget.Button); ok {
-			btn = b
+			buttons = append(buttons, b)
 		}
 	}
-	btn.ClickAt(widget.Point{})
-	if !strings.Contains(widget.DumpTree(footer, nil), greeterApplyFailed) {
-		t.Error("a failed apply did not show on the button")
+	if len(buttons) != 2 {
+		t.Fatalf("footer has %d buttons, want apply and admin", len(buttons))
+	}
+	return buttons[0], buttons[1]
+}
+
+// Under lys-login's display manager the apply runs as the user, with
+// no polkit prompt and no administrator button.
+func TestGreeterApplyRunsAsTheUser(t *testing.T) {
+	k := testKit(t, "")
+	out := fakeGreeterApply(t, true)
+	footer := greeterApplyFooter(k).(*widget.Box)
+	apply, admin := greeterApplyButtons(t, footer)
+	apply.ClickAt(widget.Point{})
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("apply-config did not run: %v", err)
+	}
+	if _, err := os.Stat(out + ".pkexec"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the apply went through pkexec: %v", err)
+	}
+	if dump := widget.DumpTree(footer, nil); !strings.Contains(dump, greeterApplyDone) || strings.Contains(dump, greeterApplyFailed) {
+		t.Errorf("a good apply shows:\n%s", dump)
+	}
+	if admin.Visible() {
+		t.Error("a good apply offered the administrator's path")
+	}
+}
+
+// Without lys-login's display manager the apply shows lys-login's
+// reason and offers the administrator's path, which goes through
+// pkexec only when asked.
+func TestGreeterApplyFailureOffersTheAdministratorsPath(t *testing.T) {
+	k := testKit(t, "")
+	out := fakeGreeterApply(t, false)
+	footer := greeterApplyFooter(k).(*widget.Box)
+	apply, admin := greeterApplyButtons(t, footer)
+	apply.ClickAt(widget.Point{})
+	dump := widget.DumpTree(footer, nil)
+	if !strings.Contains(dump, greeterApplyFailed) || !strings.Contains(dump, "display manager is not running") {
+		t.Errorf("a refused apply shows:\n%s", dump)
+	}
+	if !admin.Visible() {
+		t.Fatal("a refused apply did not offer the administrator's path")
+	}
+	if _, err := os.Stat(out + ".pkexec"); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("the refused apply fell back to pkexec on its own: %v", err)
+	}
+	admin.ClickAt(widget.Point{})
+	if _, err := os.Stat(out + ".pkexec"); err != nil {
+		t.Fatalf("the administrator's apply did not go through pkexec: %v", err)
+	}
+	if dump := widget.DumpTree(footer, nil); !strings.Contains(dump, greeterApplyDone) || admin.Visible() {
+		t.Errorf("the administrator's apply shows (admin visible %v):\n%s", admin.Visible(), dump)
 	}
 }
 
