@@ -113,12 +113,13 @@ func RuntimeOverlayPath(configPath string) string {
 
 // LoadGreeter is the greeter's config load: the file at path with
 // its imports on the config layer, the sibling runtime.yaml on the
-// runtime layer. A file that fails to load leaves its layer out (the
-// errors come back joined beside a usable config), so the greeter
-// always renders.
+// runtime layer. Both are system files the greeter only reads: a
+// missing one is its layer left out, never created. A file that fails
+// to load leaves its layer out too (the errors come back joined beside
+// a usable config), so the greeter always renders.
 func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 	var errs []error
-	configTree, err := loadTree(path)
+	configTree, err := readExistingTree(path)
 	if err != nil {
 		errs = append(errs, err)
 		configTree = nil

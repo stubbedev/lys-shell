@@ -38,15 +38,43 @@ func loadTree(path string) (any, error) {
 			return nil, err
 		}
 	}
-	canonical, err := filepath.EvalSymlinks(path)
-	if err == nil {
-		canonical, err = filepath.Abs(canonical)
+	return readTree(path)
+}
+
+// readExistingTree is loadTree for a file its reader does not own: a
+// missing main file is no tree and no error, and nothing is written.
+func readExistingTree(path string) (any, error) {
+	tree, err := readTree(path)
+	if errors.Is(err, errMainMissing) {
+		return nil, nil
+	}
+	return tree, err
+}
+
+// errMainMissing marks readTree's main file as absent, apart from a
+// missing import, which stays an error everywhere.
+var errMainMissing = errors.New("config file is missing")
+
+// readTree reads the existing file at path with its imports resolved.
+func readTree(path string) (any, error) {
+	canonical, err := resolveFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, &LoadError{msg: "cannot resolve path", err: errors.Join(errMainMissing, err)}
 	}
 	if err != nil {
 		return nil, &LoadError{msg: "cannot resolve path", err: err}
 	}
 	var chain []string
 	return loadMerged(canonical, path, &chain)
+}
+
+// resolveFile is path with its symlinks resolved, made absolute.
+func resolveFile(path string) (string, error) {
+	canonical, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(canonical)
 }
 
 // legacyTOMLError reports a TOML file left from before lys-shell read
@@ -106,10 +134,7 @@ func mergeWithImports(data []byte, path, importBase string, chain *[]string) (an
 		if !isYAMLPath(resolved) {
 			return nil, &LoadError{msg: fmt.Sprintf("cannot import '%s': imports must be YAML (.yaml or .yml)", resolved)}
 		}
-		canonical, err := filepath.EvalSymlinks(resolved)
-		if err == nil {
-			canonical, err = filepath.Abs(canonical)
-		}
+		canonical, err := resolveFile(resolved)
 		if err != nil {
 			return nil, &LoadError{
 				msg: fmt.Sprintf("cannot import '%s'", resolved),

@@ -1,6 +1,9 @@
 package config
 
 import (
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -171,10 +174,64 @@ func TestLoadGreeterLayersAndExplicitCursor(t *testing.T) {
 	}
 }
 
-func TestLoadGreeterWithoutFilesRenders(t *testing.T) {
-	cfg, err := LoadGreeter(filepath.Join(t.TempDir(), "missing", "config.yaml"), func(Diagnostic) {})
+// The greeter's config is a system file it only reads: a missing one
+// is the defaults with no error, and nothing is created for it.
+func TestLoadGreeterWithoutFilesIsTheDefaultsAndWritesNothing(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "lys-shell")
+	cfg, err := LoadGreeter(filepath.Join(dir, "config.yaml"), func(Diagnostic) {})
+	if err != nil {
+		t.Fatalf("missing greeter config: %v", err)
+	}
 	if cfg == nil || cfg.Login.Greeter.CursorSize != 24 {
-		t.Fatalf("no config: cfg %+v err %v", cfg, err)
+		t.Fatalf("missing greeter config: cfg %+v", cfg)
+	}
+	if entries, err := os.ReadDir(root); err != nil || len(entries) != 0 {
+		t.Errorf("loading a missing greeter config wrote %v (%v)", entries, err)
+	}
+}
+
+// A runtime.yaml apply-config wrote is the greeter's even without a
+// config.yaml beside it, and that config.yaml is still not created.
+func TestLoadGreeterReadsARuntimeBesideAMissingConfig(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "runtime.yaml", "login:\n  greeter:\n    cursor-size: 32\n")
+	path := filepath.Join(dir, "config.yaml")
+	cfg, err := LoadGreeter(path, func(Diagnostic) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g := cfg.Login.Greeter; g.CursorSize != 32 || !g.CursorSizeExplicit {
+		t.Errorf("cursor size = %d explicit=%v, want the runtime value", g.CursorSize, g.CursorSizeExplicit)
+	}
+	if _, err := os.Lstat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("config.yaml was created: %v", err)
+	}
+}
+
+// An existing greeter config that cannot be read is still an error,
+// and so is a missing import: only the main file may be absent.
+func TestLoadGreeterReportsAnUnreadableConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "config.yaml", "login:\n  show-clock: false\n")
+	if err := os.Chmod(path, 0); err != nil {
+		t.Fatal(err)
+	}
+	if f, err := os.Open(path); err == nil {
+		_ = f.Close()
+		t.Skip("running as root: mode 0 does not stop the read")
+	}
+	cfg, err := LoadGreeter(path, func(Diagnostic) {})
+	if err == nil || !strings.Contains(err.Error(), "cannot read file") {
+		t.Errorf("unreadable greeter config: %v", err)
+	}
+	if !cfg.Login.ShowClock {
+		t.Error("the unreadable config layer applied")
+	}
+
+	imports := writeFile(t, t.TempDir(), "config.yaml", "imports: [absent]\n")
+	if _, err := LoadGreeter(imports, func(Diagnostic) {}); err == nil || !strings.Contains(err.Error(), "cannot import") {
+		t.Errorf("missing import in the greeter config: %v", err)
 	}
 }
 
