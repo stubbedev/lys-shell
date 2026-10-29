@@ -36,7 +36,6 @@ let
       ../cava
       ../cmd
       ../config
-      ../cursorrecord
       ../i18n
       ../imagedecode
       ../internal
