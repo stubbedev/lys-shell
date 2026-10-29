@@ -1,6 +1,7 @@
 package sharepicker
 
 import (
+	"bytes"
 	"context"
 	"slices"
 	"strconv"
@@ -15,7 +16,9 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -183,11 +186,9 @@ func TestBuildPagesAndOptions(t *testing.T) {
 func TestWindowCardsRunInReverseWithTheirTitles(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	var titles []string
-	treetest.Walk(p.windowsPage(nil), func(w widget.Widget) {
-		if b, ok := w.(*widget.Box); ok && b.Element() == "flowboxchild" {
-			titles = append(titles, b.TooltipText())
-		}
-	})
+	for _, w := range treetest.WithClass(p.windowsPage(nil), "share-picker-window-button") {
+		titles = append(titles, w.(*widget.Button).TooltipText())
+	}
 	// The tooltips carry title and class; the list order is reversed.
 	if len(titles) != 2 || titles[0] != " \nkitty" || titles[1] != "a\nfoot" {
 		t.Fatalf("titles %v", titles)
@@ -423,5 +424,48 @@ func TestPickerTakesLysUiParts(t *testing.T) {
 	}
 	if b := pages[0].Bounds(); b.X < 0 || b.X+b.W > w || b.W == 0 {
 		t.Errorf("empty state laid out at %v, outside the %dpx page", b, w)
+	}
+}
+
+// The focused choice's card takes the hover look, so the keyboard
+// focus shows; focus on another card leaves this one as it was.
+func TestFocusedChoiceIsHighlighted(t *testing.T) {
+	t.Cleanup(widget.SetAnimationsInstant(true))
+	cfg := config.DefaultsSharePicker()
+	cfg.DefaultPage = config.SharePickerOutputs
+	p, _ := testPicker(t, cfg, false, false)
+	p.d.Sheet = apptheme.New(config.Defaults()).Sheet
+	p.root = p.build(nil, AllSources)
+	reveal.Show(p.rev, p.anims, config.AnimSharePicker)
+	const w, h = 1000, 500
+	p.root.Arrange(render.Rect{W: w, H: h})
+	choices := p.choices[pageOutputs]
+	if len(choices) != 2 {
+		t.Fatalf("test premise: %d output choices", len(choices))
+	}
+	card := choices[0].(*widget.Button).Bounds()
+	paint := func() []byte {
+		data := make([]byte, render.Stride(w)*h)
+		p.root.Arrange(render.Rect{W: w, H: h})
+		p.root.Paint(render.NewScaled(data, render.Stride(w), w, h, 1, 1))
+		var out []byte
+		for y := card.Y; y < card.Y+card.H; y++ {
+			out = append(out, data[y*render.Stride(w)+card.X*4:y*render.Stride(w)+(card.X+card.W)*4]...)
+		}
+		return out
+	}
+	r := &widget.Router{Root: p.root}
+	resting := paint()
+	if err := r.SetFocus(choices[1]); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(paint(), resting) {
+		t.Error("focus on the other card changed this one")
+	}
+	if err := r.SetFocus(choices[0]); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(paint(), resting) {
+		t.Error("the focused card looks as it does at rest")
 	}
 }

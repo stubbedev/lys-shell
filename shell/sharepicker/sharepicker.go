@@ -3,7 +3,9 @@
 // dev.stubbe.lys.SharePicker1: a layer surface with Windows, Outputs, and
 // Region pages. A card or region confirms at once in single-select
 // mode; in multi-select mode cards toggle into a pending set the Share
-// button confirms. The reply is the XDPH selection suffix -
+// button confirms. The keyboard drives all of it: the opened page's
+// first card holds the focus, Ctrl+PageUp/PageDown switch pages, the
+// arrows move to the nearest card that way, and Enter or Space chooses. The reply is the XDPH selection suffix -
 // `[r]/window:<id>`, `/screen:<name>`, `/region:<out>@x,y,w,h`, several
 // payloads joined by `;` - or empty on cancel.
 package sharepicker
@@ -23,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
+	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
@@ -36,6 +39,10 @@ import (
 
 // spinnerPx sizes the cards' loading spinner.
 const spinnerPx = 24
+
+// choiceClass marks the widgets that choose a source, a page's keyboard
+// stops: the window and output cards and the Select region button.
+const choiceClass = "share-picker-choice"
 
 // The page names, which are also the notebook tab labels.
 const (
@@ -81,6 +88,9 @@ type Picker struct {
 	multiple   bool
 	pending    []string
 	root       widget.Widget
+	nb         *widget.Notebook
+	pages      []string
+	choices    map[string][]widget.Widget
 	rev        *widget.Revealer
 	layer      *app.LayerWindow
 	confirm    *widget.Button
@@ -143,6 +153,7 @@ func (p *Picker) show(c portaldialogs.Caller, ch chan string, toplevels []sharep
 		return
 	}
 	reveal.Show(p.rev, p.anims, config.AnimSharePicker)
+	p.focusPage(p.nb.SelectedTab())
 }
 
 // describe is the line naming the app a request comes from, "" without
@@ -179,16 +190,79 @@ func (p *Picker) mapSurface() error {
 	layer, err := p.app.NewLayer(app.LayerConfig{
 		Layer:         app.LayerOverlay,
 		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardOnDemand,
+		Keyboard:      app.KeyboardExclusive,
 		Namespace:     "lys-shell-share-picker",
 		Root:          p.root,
-		OnKey:         keys.OnEscape(p.app.KeySym, func() { p.answer("") }),
+		OnKey:         keys.OnKey(p.app.KeySym, p.key),
 	})
 	if err != nil {
 		return err
 	}
 	p.layer = layer
 	return nil
+}
+
+// key handles the picker's own keys after the widgets had theirs:
+// Escape cancels whatever modifiers are held, Ctrl+PageUp/PageDown
+// switch pages (the notebook does so itself while it holds the focus),
+// and the arrows move between the page's cards. Enter and Space reach
+// the focused card or button as a click.
+func (p *Picker) key(r *widget.Router, sym xkb.Keysym, mods app.Mods) {
+	switch {
+	case sym == xkb.KeyEscape:
+		p.answer("")
+	case mods&app.ModCtrl != 0 && (sym == xkb.KeyPrior || sym == xkb.KeyNext):
+		if r.Focused() == widget.Widget(p.nb) {
+			return
+		}
+		step := 1
+		if sym == xkb.KeyPrior {
+			step = -1
+		}
+		p.cyclePage(step)
+	case mods&(app.ModCtrl|app.ModAlt|app.ModShift) == 0:
+		if dir, ok := arrowDirs[sym]; ok {
+			p.moveFocus(r, dir)
+		}
+	}
+}
+
+// cyclePage selects the page step away from the open one, wrapping;
+// the notebook's OnSelect then focuses its first card.
+func (p *Picker) cyclePage(step int) {
+	i := slices.Index(p.pages, p.nb.SelectedTab())
+	p.nb.SelectTab(p.pages[(i+step+len(p.pages))%len(p.pages)])
+}
+
+// focusPage gives the keyboard focus to the first choice on the page,
+// once the surface is up; a page without one (a placeholder) leaves
+// the focus where it is.
+func (p *Picker) focusPage(name string) {
+	choices := p.choices[name]
+	if p.layer == nil || len(choices) == 0 {
+		return
+	}
+	if err := p.layer.SetFocus(choices[0]); err != nil {
+		log.Printf("share picker: focus the %s page: %v", name, err)
+	}
+}
+
+// moveFocus moves the focus from the focused choice to the nearest one
+// in dir on the open page. Off a choice, or with none that way, the
+// focus stays.
+func (p *Picker) moveFocus(r *widget.Router, dir direction) {
+	choices := p.choices[p.nb.SelectedTab()]
+	from := r.Focused()
+	if !slices.Contains(choices, from) {
+		return
+	}
+	next := nearest(choices, from, dir)
+	if next == nil {
+		return
+	}
+	if err := r.SetFocus(next); err != nil {
+		log.Printf("share picker: move the focus: %v", err)
+	}
 }
 
 // hide unmaps the surface at once (the Region page steps aside while
@@ -301,6 +375,7 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 	nb := widget.NewNotebook(p.d.Font)
 	nb.AddClass("share-picker-notebook")
 	nb.SetVExpand(true)
+	p.nb, p.choices = nb, map[string][]widget.Widget{}
 	var pages []string
 	for _, page := range []struct {
 		name   string
@@ -312,7 +387,9 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 		{pageRegion, SourceRegions, p.regionPage},
 	} {
 		if sources&page.source != 0 {
-			p.appendPage(nb, page.name, page.build())
+			content := page.build()
+			p.choices[page.name] = choicesIn(content)
+			p.appendPage(nb, page.name, content)
 			pages = append(pages, page.name)
 		}
 	}
@@ -323,6 +400,8 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 		wanted = pages[0]
 	}
 	nb.SelectTab(wanted)
+	nb.OnSelect = p.focusPage
+	p.pages = pages
 	th := widget.Current()
 	surface := widget.NewBox(widget.Column, 2*th.Spacing, 3*th.Padding)
 	surface.AddClass(css.Card, "share-picker-surface")
@@ -453,8 +532,8 @@ func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 
 // windowCard is build_window_card: lys-ui's card around the preview (a
 // spinner over it until the capture lands), the title (the class when
-// the title is blank), and the class as a caption, the whole card
-// clickable.
+// the title is blank), and the class as a caption, in a flat button
+// that chooses the window by click or by key.
 func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	preview := widget.NewImage(nil)
 	preview.AddClass("share-picker-image")
@@ -466,19 +545,18 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	spinner.SetSpinning(true)
 	shot := widget.NewOverlay().Append(preview).Append(widgets.Center(spinner))
 	card := p.card()
-	card.SetVAlign(widget.AlignStart)
 	card.Append(shot, false)
 	card.Append(p.cardLabel(cardTitle(tl), "share-picker-image-label"), false)
 	card.Append(p.cardLabel(tl.Class, "share-picker-image-class-label", css.Caption, css.DimLabel), false)
-	child := widget.NewBox(widget.Column, 0, 0)
-	child.SetElement("flowboxchild")
-	child.Append(card, false)
-	child.SetTooltip(tl.Title + "\n" + tl.Class)
-	child.SetCursorName("pointer")
+	button := widget.NewButton(card, 0, 0)
+	button.AddClass(css.Flat, "share-picker-window-button", choiceClass)
+	button.SetVAlign(widget.AlignStart)
+	button.SetTooltip(tl.Title + "\n" + tl.Class)
+	button.SetCursorName("pointer")
 	payload := windowPayload(tl)
-	child.SetOnClickWithin(func() { p.selectPayload(payload) })
+	button.OnClick = func() { p.selectPayload(payload) }
 	p.loadPreview(preview, card, spinner, func(size int) (*image.RGBA, error) { return windowThumb(tl, size) })
-	return child
+	return button
 }
 
 // cardTitle is a window card's title line: the title, or the class
@@ -562,7 +640,7 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 		card.Append(p.cardLabel(o.name, "share-picker-image-label"), false)
 	}
 	button := widget.NewButton(card, 0, 0)
-	button.AddClass(css.Flat, "share-picker-output-button")
+	button.AddClass(css.Flat, "share-picker-output-button", choiceClass)
 	button.SetCursorName("pointer")
 	payload := Target{Kind: TargetOutput, Name: o.name}.Payload()
 	button.OnClick = func() { p.selectPayload(payload) }
@@ -577,7 +655,7 @@ func (p *Picker) regionPage() widget.Widget {
 	lbl := p.label("Select region")
 	lbl.SetAlignment(render.AlignCenter)
 	btn := widget.NewButton(lbl, 0, 0)
-	btn.AddClass(css.SuggestedAction, "share-picker-region-button")
+	btn.AddClass(css.SuggestedAction, "share-picker-region-button", choiceClass)
 	btn.SetCursorName("pointer")
 	btn.OnClick = func() {
 		p.hide()
@@ -592,6 +670,7 @@ func (p *Picker) regionPage() widget.Widget {
 				if err := p.mapSurface(); err != nil {
 					log.Printf("share picker: %v", err)
 				}
+				p.focusPage(pageRegion)
 				if ok {
 					p.selectPayload(regionPayload(sel))
 				}

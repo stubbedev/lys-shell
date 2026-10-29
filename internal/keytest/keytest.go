@@ -26,12 +26,32 @@ const (
 	L = 35
 	// H is on evdev 38, a physical keyboard's L.
 	H = 38
+	// Tab is on evdev 30, a physical keyboard's A.
+	Tab = 30
+	// Space is on evdev 31, a physical keyboard's S.
+	Space = 31
+	// Left is on evdev 32, a physical keyboard's D.
+	Left = 32
+	// Right is on evdev 33, a physical keyboard's F.
+	Right = 33
+	// Up is on evdev 34, a physical keyboard's G.
+	Up = 34
+	// Down is on evdev 36, a physical keyboard's J.
+	Down = 36
+	// PageUp is on evdev 37, a physical keyboard's K.
+	PageUp = 37
+	// PageDown is on evdev 44, a physical keyboard's Z.
+	PageDown = 44
 )
 
 // keymap places the keys above. Control is a real modifier whatever
 // key carries it, so Ctrl chords need no key of their own.
 const keymap = `xkb_keymap {
-	xkb_keycodes "remapped" { minimum = 8; maximum = 255; <K1> = 9; <K28> = 36; <K35> = 43; <K38> = 46; };
+	xkb_keycodes "remapped" {
+		minimum = 8; maximum = 255;
+		<K1> = 9; <K28> = 36; <K35> = 43; <K38> = 46;
+		<K30> = 38; <K31> = 39; <K32> = 40; <K33> = 41; <K34> = 42; <K36> = 44; <K37> = 45; <K44> = 52;
+	};
 	xkb_types { include "complete" };
 	xkb_compat { include "complete" };
 	xkb_symbols "remapped" {
@@ -39,6 +59,14 @@ const keymap = `xkb_keymap {
 		key <K28> { [ Escape ] };
 		key <K35> { [ l, L ] };
 		key <K38> { [ h, H ] };
+		key <K30> { [ Tab, ISO_Left_Tab ] };
+		key <K31> { [ space ] };
+		key <K32> { [ Left ] };
+		key <K33> { [ Right ] };
+		key <K34> { [ Up ] };
+		key <K36> { [ Down ] };
+		key <K37> { [ Prior ] };
+		key <K44> { [ Next ] };
 	};
 };
 `

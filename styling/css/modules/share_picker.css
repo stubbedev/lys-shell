@@ -16,3 +16,7 @@
 .share-picker-card.share-picker-card-loading {
   opacity: 0.6;
 }
+.share-picker-choice:focus > .share-picker-card {
+  background: var(--bg-hover);
+  border-color: var(--border-accent);
+}
