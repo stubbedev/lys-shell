@@ -24,8 +24,8 @@ github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef h1:Ch6Q+AZUxDBCVqd
 github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef/go.mod h1:nXTWP6+gD5+LUJ8krVhhoeHjvHTutPxMYl5SvkcnJNE=
 github.com/stubbedev/lys-lib v0.1.1-0.20261030165258-8d724daf626c h1:GV4/gJFh3mU2y2LhbWBnQ4N2AR01anqzE+J5IcdWvuo=
 github.com/stubbedev/lys-lib v0.1.1-0.20261030165258-8d724daf626c/go.mod h1:l6zaxsNo6lXlQ0IAZk+mjKbSGi5a78yN+luKKnqiQ5I=
-github.com/stubbedev/lys-secrets v0.0.0-20261030165028-e618292d353f h1:VgdBV2MdMqVy0QASJoYm2ikVRc0iarzJodi+VCIFTmk=
-github.com/stubbedev/lys-secrets v0.0.0-20261030165028-e618292d353f/go.mod h1:gDPJbU1M3O2lEOgN3Gs1aFS2SptIwurMqi18Ztr8OHc=
+github.com/stubbedev/lys-secrets v0.0.0-20261030175806-ad147641c34c h1:hx0l+waCVC8NJABYhuiP4E/f9AiqPmlprUKdYIl+CTw=
+github.com/stubbedev/lys-secrets v0.0.0-20261030175806-ad147641c34c/go.mod h1:gDPJbU1M3O2lEOgN3Gs1aFS2SptIwurMqi18Ztr8OHc=
 github.com/stubbedev/lys-ui v0.0.0-20261030173429-11461fb962f6 h1:z7OpVoWGlkqE/CKI6pVnMb81eSQbYWM4kOY/NzmsxHw=
 github.com/stubbedev/lys-ui v0.0.0-20261030173429-11461fb962f6/go.mod h1:aHMWYI03R5gJZC3NLHzSTlf8/0JWzjaMSkk//OKwTvI=
 github.com/stubbedev/memory-go v0.3.0 h1:Hkm+aw0vs9qhwXLL9p98U3IbQFRxPLyGvlrf2GZ9ov8=
