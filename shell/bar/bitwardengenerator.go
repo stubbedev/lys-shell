@@ -82,6 +82,8 @@ func (v *bitwardenView) setGenerating(on bool) {
 	v.generating = on
 	setCaption(v.genStatus, "")
 	if on {
+		v.sending = false
+		v.clearSendForm()
 		v.copying = nil
 		v.repromptPw.reset()
 		v.rebuildPresets()

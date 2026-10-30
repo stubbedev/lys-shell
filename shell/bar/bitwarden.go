@@ -44,6 +44,9 @@ type bwVault interface {
 	Lock(ctx context.Context) error
 	Logout(ctx context.Context) error
 	Field(ctx context.Context, id string, f vault.Field, password string) (vault.Value, error)
+	Sends(ctx context.Context) ([]vault.Send, error)
+	CreateTextSend(ctx context.Context, s vault.NewTextSend) (vault.CreatedSend, error)
+	DeleteSend(ctx context.Context, id vault.SendID) error
 }
 
 // vaultMirror keeps the vault's status and listing as lys-secrets last
@@ -131,6 +134,16 @@ func (m *vaultMirror) Logout(ctx context.Context) error { return m.then(ctx, m.c
 
 func (m *vaultMirror) Field(ctx context.Context, id string, f vault.Field, password string) (vault.Value, error) {
 	return m.client.Field(ctx, id, f, password)
+}
+
+func (m *vaultMirror) Sends(ctx context.Context) ([]vault.Send, error) { return m.client.Sends(ctx) }
+
+func (m *vaultMirror) CreateTextSend(ctx context.Context, s vault.NewTextSend) (vault.CreatedSend, error) {
+	return m.client.CreateTextSend(ctx, s)
+}
+
+func (m *vaultMirror) DeleteSend(ctx context.Context, id vault.SendID) error {
+	return m.client.DeleteSend(ctx, id)
 }
 
 // bitwardenHost is the shell's one view of the vault, shared by every

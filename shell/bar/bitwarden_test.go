@@ -60,6 +60,10 @@ type fakeVault struct {
 	syncs     int
 	loginErr  error
 	unlockErr error
+	sends     []vault.Send
+	created   []vault.NewTextSend
+	deleted   []vault.SendID
+	sendErr   error
 }
 
 func (f *fakeVault) Status() vault.Status {
@@ -172,6 +176,44 @@ func (f *fakeVault) Field(_ context.Context, id string, field vault.Field, passw
 		return vault.Value{Text: e.values[field]}, nil
 	}
 	return vault.Value{}, vault.ErrNoSuchItem
+}
+
+func (f *fakeVault) Sends(context.Context) ([]vault.Send, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.status.State != vault.StateUnlocked {
+		return nil, vault.ErrLocked
+	}
+	return slices.Clone(f.sends), nil
+}
+
+// CreateTextSend answers as lys-secrets does: a Send it validates, with
+// a link carrying its key.
+func (f *fakeVault) CreateTextSend(_ context.Context, s vault.NewTextSend) (vault.CreatedSend, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.sendErr != nil {
+		return vault.CreatedSend{}, f.sendErr
+	}
+	if err := s.Validate(time.Now()); err != nil {
+		return vault.CreatedSend{}, err
+	}
+	f.created = append(f.created, s)
+	id := vault.SendID(fmt.Sprint("s", len(f.created)))
+	f.sends = append(f.sends, vault.Send{ID: id, Type: vault.SendText, Name: s.Name, MaxAccessCount: s.MaxAccessCount, HasPassword: s.Password != "", Deletion: s.Deletion})
+	return vault.CreatedSend{ID: id, URL: "https://send.example/#/" + string(id) + "/key"}, nil
+}
+
+func (f *fakeVault) DeleteSend(_ context.Context, id vault.SendID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	i := slices.IndexFunc(f.sends, func(s vault.Send) bool { return s.ID == id })
+	if i < 0 {
+		return vault.ErrNoSuchSend
+	}
+	f.sends = slices.Delete(f.sends, i, i+1)
+	f.deleted = append(f.deleted, id)
+	return nil
 }
 
 func (f *fakeVault) set(fn func(f *fakeVault)) {

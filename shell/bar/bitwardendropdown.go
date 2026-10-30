@@ -240,6 +240,19 @@ type bitwardenView struct {
 	genSt     *widget.Stack
 	genRows   []*widget.Item
 	genStatus *widget.Label
+
+	// sending is whether the Sends page is open.
+	sending    bool
+	sendBtn    *widget.Button
+	sendForm   *widget.Form
+	sendName   *widget.Entry
+	sendText   *widget.TextArea
+	sendLife   *widget.Dropdown
+	sendMax    *widget.SpinButton
+	sendPw     *secretEntry
+	sendStatus *widget.Label
+	sendList   *widget.ItemGroup
+	sendSt     *widget.Stack
 }
 
 func bitwardenDropdown(ctx ModuleContext) widget.Widget {
@@ -250,10 +263,11 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	v.spinner = widget.NewSpinner(int(px))
 	v.spinner.SetVisible(false)
 	v.genBtn = v.iconButton("ld-shuffle-symbolic", i18n.T("dropdown-bitwarden-generator"), v.toggleGenerator)
+	v.sendBtn = v.iconButton("ld-send-symbolic", i18n.T("dropdown-bitwarden-sends"), v.toggleSends)
 	v.syncBtn = v.iconButton("ld-refresh-cw-symbolic", i18n.T("dropdown-bitwarden-sync"), v.sync)
 	v.lockBtn = v.iconButton("ld-lock-symbolic", i18n.T("dropdown-bitwarden-lock"), v.lock)
 	v.logoutBtn = v.iconButton("ld-log-out-symbolic", i18n.T("dropdown-bitwarden-logout"), v.logout)
-	v.Append(dropdownHeader(font, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-title"), v.spinner, v.genBtn, v.syncBtn, v.lockBtn, v.logoutBtn), false)
+	v.Append(dropdownHeader(font, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-title"), v.spinner, v.genBtn, v.sendBtn, v.syncBtn, v.lockBtn, v.logoutBtn), false)
 	content := dropdownContent()
 	v.errLabel = v.caption(css.Error)
 	v.pages = pageStack()
@@ -263,6 +277,7 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.Add(bwPageVault, v.buildVault())
 	v.pages.Add(bwPageReprompt, v.buildReprompt())
 	v.pages.Add(bwPageGenerator, v.buildGenerator())
+	v.pages.Add(bwPageSends, v.buildSends())
 	content.Append(v.errLabel, false)
 	content.Append(v.pages, true)
 	v.Append(content, true)
@@ -380,6 +395,7 @@ func (v *bitwardenView) showError(err error) {
 	v.pages.Add(bwPageError, widgets.EmptyState(v.font, v.px, "ld-shield-check-symbolic", i18n.T("dropdown-bitwarden-unavailable"), err.Error()))
 	v.pages.Show(bwPageError)
 	v.genBtn.SetVisible(false)
+	v.sendBtn.SetVisible(false)
 	v.syncBtn.SetVisible(false)
 	v.lockBtn.SetVisible(false)
 	v.logoutBtn.SetVisible(false)
@@ -565,6 +581,7 @@ func (v *bitwardenView) apply() {
 	v.spinner.SetVisible(v.busy || st.Syncing)
 	v.spinner.SetSpinning(v.busy || st.Syncing)
 	v.syncBtn.SetVisible(st.State == vault.StateUnlocked)
+	v.sendBtn.SetVisible(st.State == vault.StateUnlocked)
 	v.lockBtn.SetVisible(st.State == vault.StateUnlocked)
 	v.logoutBtn.SetVisible(st.State != vault.StateLoggedOut)
 	v.syncBtn.SetEnabled(!v.busy && !st.Syncing)
@@ -577,6 +594,14 @@ func (v *bitwardenView) apply() {
 	v.account.SetText(i18n.T("dropdown-bitwarden-account", i18n.Str("email", st.Email)))
 	if v.generating {
 		v.pages.Show(bwPageGenerator)
+		return
+	}
+	if v.sending && st.State != vault.StateUnlocked {
+		v.sending = false
+		v.clearSendForm()
+	}
+	if v.sending {
+		v.pages.Show(bwPageSends)
 		return
 	}
 	switch st.State {
@@ -634,6 +659,8 @@ func (v *bitwardenView) clearSecrets() {
 func (v *bitwardenView) dropdownHidden() {
 	v.clearSecrets()
 	v.generating = false
+	v.sending = false
+	v.clearSendForm()
 	setCaption(v.genStatus, "")
 	if v.vault != nil {
 		v.apply()
@@ -663,6 +690,8 @@ func (v *bitwardenView) dropdownFocus() widget.Widget {
 		if len(v.genRows) > 0 {
 			return v.genRows[0]
 		}
+	case bwPageSends:
+		return v.sendName
 	}
 	return nil
 }

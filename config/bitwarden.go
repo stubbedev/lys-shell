@@ -81,6 +81,12 @@ func (BitwardenServer) configSchema(*schemaGen) Schema {
 // copies a new password or passphrase, made in the shell, as a secret.
 // Passphrases draw from the EFF large wordlist (CC BY 3.0 US, by the
 // Electronic Frontier Foundation).
+//
+// The dropdown's Sends (its header's paper plane) lists the vault's
+// Bitwarden Sends, deletes them, and creates a text Send deleted after
+// an hour, a day, a week or 31 days, optionally limited in opens and
+// behind a password; its link, which carries the Send's key, is copied
+// as a secret.
 type BitwardenConfig struct {
 	// Server the login form logs in to. A logged-in account keeps the
 	// server it logged in to.

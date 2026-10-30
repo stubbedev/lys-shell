@@ -64,3 +64,32 @@ dropdown-bitwarden-totp-live = { $code } · { $seconds } s restantes
 dropdown-bitwarden-notify-sync-failed = Bitwarden n’a pas pu se synchroniser
 dropdown-bitwarden-notify-logged-out = Bitwarden vous a déconnecté
 dropdown-bitwarden-notify-logged-out-body = La session a expiré ou a été révoquée. Reconnectez-vous depuis la barre.
+dropdown-bitwarden-sends = Bitwarden Send
+dropdown-bitwarden-send-name = Nom
+dropdown-bitwarden-send-name-placeholder = Ce que vous envoyez
+dropdown-bitwarden-send-text = Texte
+dropdown-bitwarden-send-text-placeholder = Le texte qu'ouvre le lien
+dropdown-bitwarden-send-deletion = Supprimer après
+dropdown-bitwarden-send-max-access = Ouvertures maximales (0 pour aucune limite)
+dropdown-bitwarden-send-password = Mot de passe
+dropdown-bitwarden-send-password-placeholder = Facultatif, demandé avant d'afficher le texte
+dropdown-bitwarden-send-create = Créer et copier le lien
+dropdown-bitwarden-send-none = Aucun Send
+dropdown-bitwarden-send-delete = Supprimer { $name }
+dropdown-bitwarden-send-hours = { $hours ->
+    [one] 1 heure
+   *[other] { $hours } heures
+}
+dropdown-bitwarden-send-days = { $days ->
+    [one] 1 jour
+   *[other] { $days } jours
+}
+dropdown-bitwarden-send-accesses = { $count ->
+    [one] ouvert une fois
+   *[other] ouvert { $count } fois
+}
+dropdown-bitwarden-send-accesses-of = ouvert { $count } fois sur { $max }
+dropdown-bitwarden-send-deletes = supprimé le { $date }
+dropdown-bitwarden-send-protected = mot de passe
+dropdown-bitwarden-send-disabled = désactivé
+dropdown-bitwarden-field-send-link = lien du Send
