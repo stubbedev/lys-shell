@@ -637,6 +637,8 @@ type hostFake struct {
 	items   []vault.Item
 	locks   int
 	network map[string]vault.NetworkLogin
+	created []vault.NewLogin
+	sends   []vault.Send
 }
 
 func (h *hostFake) Status() vault.Status {
@@ -677,6 +679,65 @@ func (h *hostFake) NetworkLogin(folder, name string) (vault.NetworkLogin, bool) 
 	defer h.mu.Unlock()
 	l, ok := h.network[folder+"/"+name]
 	return l, ok
+}
+
+func (h *hostFake) CreateLogin(_ context.Context, l vault.NewLogin) (vault.ItemID, error) {
+	if err := l.Validate(); err != nil {
+		return "", err
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.status.State != vault.StateUnlocked {
+		return "", vault.ErrLocked
+	}
+	h.created = append(h.created, l)
+	return vault.ItemID(fmt.Sprint("new-", len(h.created))), nil
+}
+
+func (h *hostFake) FindLogin(name string, scope vault.FolderScope) (vault.Item, bool, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.status.State != vault.StateUnlocked {
+		return vault.Item{}, false, vault.ErrLocked
+	}
+	for _, it := range h.items {
+		if it.Type == vault.ItemLogin && it.Name == name {
+			return it, true, nil
+		}
+	}
+	return vault.Item{}, false, nil
+}
+
+func (h *hostFake) Sends() ([]vault.Send, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.status.State != vault.StateUnlocked {
+		return nil, vault.ErrLocked
+	}
+	return h.sends, nil
+}
+
+func (h *hostFake) CreateTextSend(_ context.Context, s vault.NewTextSend) (vault.CreatedSend, error) {
+	if err := s.Validate(time.Now()); err != nil {
+		return vault.CreatedSend{}, err
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	id := vault.SendID(fmt.Sprint("send-", len(h.sends)+1))
+	h.sends = append(h.sends, vault.Send{ID: id, Type: vault.SendText, Name: s.Name, MaxAccessCount: s.MaxAccessCount, HasPassword: s.Password != "", Deletion: s.Deletion})
+	return vault.CreatedSend{ID: id, URL: "https://send.example/#" + string(id)}, nil
+}
+
+func (h *hostFake) DeleteSend(_ context.Context, id vault.SendID) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for i, s := range h.sends {
+		if s.ID == id {
+			h.sends = append(h.sends[:i], h.sends[i+1:]...)
+			return nil
+		}
+	}
+	return vault.ErrNoSuchSend
 }
 
 func (h *hostFake) lockCount() int {
