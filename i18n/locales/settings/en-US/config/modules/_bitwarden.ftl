@@ -11,6 +11,9 @@ settings-modules-bitwarden-email = Email
 settings-modules-bitwarden-lock-with-session = Lock With the Session
     .description = Lock the vault when the session locks
 
+settings-modules-bitwarden-unlock-with-session = Unlock With the Session
+    .description = Unlock a locked vault with the lock screen's password, when it is the master password
+
 settings-modules-bitwarden-clipboard-clear = Clear Clipboard After (seconds)
     .description = Clear a copied secret after this many seconds unless something else was copied. 0 leaves it
 

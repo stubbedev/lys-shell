@@ -11,6 +11,9 @@ settings-modules-bitwarden-email = E-mail
 settings-modules-bitwarden-lock-with-session = Verrouiller avec la session
     .description = Verrouiller le coffre lorsque la session se verrouille
 
+settings-modules-bitwarden-unlock-with-session = Déverrouiller avec la session
+    .description = Déverrouiller le coffre avec le mot de passe de l'écran de verrouillage, s'il est le mot de passe principal
+
 settings-modules-bitwarden-clipboard-clear = Vider le presse-papiers après (secondes)
     .description = Effacer un secret copié après ce nombre de secondes, sauf si autre chose a été copié. 0 le laisse
 

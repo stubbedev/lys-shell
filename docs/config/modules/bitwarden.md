@@ -46,6 +46,7 @@ bar:
 | `server` | [`BitwardenServer`](/config/types#bitwarden-server) | `"bitwarden.com"` | Server the login form logs in to. A logged-in account keeps the server it logged in to. |
 | `email` | string | `""` | Email the login form starts with. |
 | `lock-with-session` | bool | `true` | Lock the vault when the session locks. |
+| `unlock-with-session` | bool | `false` | Unlock a locked vault with the password that unlocks the lock screen, once per unlock and never retried. Only useful when the master password is the login password; each wrong guess costs lys-secrets a full key derivation. |
 | `clipboard-clear` | u32 | `30` | Clear a copied secret from the clipboard after this many seconds, unless something else was copied since. 0 leaves it there. |
 | `network-folder` | string | `""` | Vault folder whose logins answer NetworkManager's requests for Wi-Fi, 802.1X and VPN secrets while the vault is open, before the shell asks. The one login named exactly like the connection profile answers: its password for the password, PSK or secret, its username for the username, and a custom field of a key's name for that key (`pin`, `domain`, `private-key-password`). A login behind the master-password reprompt never answers, and secrets NetworkManager rejected are asked for again. Empty answers nothing from the vault. |
 | `format` | string | `"{{ count }}"` | Format string for the label. |
@@ -104,6 +105,7 @@ modules:
     server: bitwarden.com
     email: ""
     lock-with-session: true
+    unlock-with-session: false
     clipboard-clear: 30
     network-folder: ""
     generator-passwords:

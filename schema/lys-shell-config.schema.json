@@ -1107,6 +1107,11 @@
           "$ref": "#/$defs/BitwardenServer",
           "default": "bitwarden.com",
           "description": "Server the login form logs in to. A logged-in account keeps the\nserver it logged in to."
+        },
+        "unlock-with-session": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Unlock a locked vault with the password that unlocks the lock\nscreen, once per unlock and never retried. Only useful when the\nmaster password is the login password; each wrong guess costs\nlys-secrets a full key derivation."
         }
       },
       "type": "object"
@@ -4928,7 +4933,8 @@
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
-            "server": "bitwarden.com"
+            "server": "bitwarden.com",
+            "unlock-with-session": false
           },
           "description": "Bitwarden vault module."
         },
@@ -10004,7 +10010,8 @@
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
-          "server": "bitwarden.com"
+          "server": "bitwarden.com",
+          "unlock-with-session": false
         },
         "bluetooth": {
           "border-color": "blue",

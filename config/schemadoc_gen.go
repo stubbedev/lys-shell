@@ -158,6 +158,7 @@ var schemaDocs = map[string]string{
 	"BitwardenConfig.ScrollDown":                             "Action on scroll down.",
 	"BitwardenConfig.ScrollUp":                               "Action on scroll up.",
 	"BitwardenConfig.Server":                                 "Server the login form logs in to. A logged-in account keeps the\nserver it logged in to.",
+	"BitwardenConfig.UnlockWithSession":                      "Unlock a locked vault with the password that unlocks the lock\nscreen, once per unlock and never retried. Only useful when the\nmaster password is the login password; each wrong guess costs\nlys-secrets a full key derivation.",
 	"BitwardenPassphrasePreset":                              "A passphrase of words from the EFF large wordlist the Bitwarden\ndropdown's generator makes and copies.\n\n## Example\n\n```yaml\nmodules: {bitwarden: {generator-passphrases: [{name: Spoken, words: 5, separator: \" \", capitalize: false, number: false}]}}\n```",
 	"BitwardenPassphrasePreset.Capitalize":                   "Capitalise the first letter of every word.",
 	"BitwardenPassphrasePreset.Name":                         "Name the generator lists the preset by.",

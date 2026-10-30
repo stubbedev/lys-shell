@@ -70,6 +70,7 @@ func bitwardenPage(*config.Config) pageSpec {
 			field(m + ".server"),
 			field(m + ".email"),
 			field(m + ".lock-with-session"),
+			field(m + ".unlock-with-session"),
 			field(m + ".clipboard-clear"),
 			field(m + ".format"),
 			field(m+".icon-locked", iconRow),

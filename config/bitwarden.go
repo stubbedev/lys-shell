@@ -89,6 +89,11 @@ type BitwardenConfig struct {
 	Email string `cfg:"email"`
 	// Lock the vault when the session locks.
 	LockWithSession bool `cfg:"lock-with-session"`
+	// Unlock a locked vault with the password that unlocks the lock
+	// screen, once per unlock and never retried. Only useful when the
+	// master password is the login password; each wrong guess costs
+	// lys-secrets a full key derivation.
+	UnlockWithSession bool `cfg:"unlock-with-session"`
 	// Clear a copied secret from the clipboard after this many seconds,
 	// unless something else was copied since. 0 leaves it there.
 	ClipboardClear uint32 `cfg:"clipboard-clear"`
@@ -163,6 +168,7 @@ func DefaultsBitwarden() BitwardenConfig {
 		Server:               mustBitwardenServer(vault.CloudUS),
 		Email:                "",
 		LockWithSession:      true,
+		UnlockWithSession:    false,
 		ClipboardClear:       30,
 		NetworkFolder:        "",
 		GeneratorPasswords:   []BitwardenPasswordPreset{password},
