@@ -86,7 +86,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		background{b.conn, b.notifier, b.windows}.iface(),
 		usbIface(b.conn),
 		emailIface(b.conn, b.spawn),
-		secretIface(b.conn),
+		secretIface(b.conn, b.cfg),
 		b.inhibitor.iface(),
 		screenshotIface(b.conn),
 		fileChooserIface(b.conn),

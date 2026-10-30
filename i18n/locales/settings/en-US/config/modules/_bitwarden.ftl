@@ -20,6 +20,9 @@ settings-modules-bitwarden-clipboard-clear = Clear Clipboard After (seconds)
 settings-modules-bitwarden-network-folder = Network Folder
     .description = Vault folder whose logins, named like the connection, answer Wi-Fi and VPN password requests while the vault is open. Empty answers none
 
+settings-modules-bitwarden-portal-folder = Portal Secrets Folder
+    .description = Vault folder sandboxed apps' keyring keys are kept in, after you allow each. Empty keeps them in the keyring only
+
 settings-modules-bitwarden-generator-passwords = Password Presets
     .description = Random-character passwords the dropdown's generator copies
 

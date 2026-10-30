@@ -55,6 +55,7 @@ bar:
 | `unlock-with-session` | bool | `false` | Unlock a locked vault with the password that unlocks the lock screen, once per unlock and never retried. Only useful when the master password is the login password; each wrong guess costs lys-secrets a full key derivation. |
 | `clipboard-clear` | u32 | `30` | Clear a copied secret from the clipboard after this many seconds, unless something else was copied since. 0 leaves it there. |
 | `network-folder` | string | `""` | Vault folder whose logins answer NetworkManager's requests for Wi-Fi, 802.1X and VPN secrets while the vault is open, before the shell asks. The one login named exactly like the connection profile answers: its password for the password, PSK or secret, its username for the username, and a custom field of a key's name for that key (`pin`, `domain`, `private-key-password`). A login behind the master-password reprompt never answers, and secrets NetworkManager rejected are asked for again. Empty answers nothing from the vault. A password (and username) typed into the shell's prompt is offered for saving here, as a login named like the profile, once the connection came up with it. |
+| `portal-folder` | string | `""` | Vault folder apps' Secret portal master secrets are kept in: the key each sandboxed app's saved passwords are encrypted with, which then survives a reinstall and is the same on every computer. Each app's key is put there on its first use with the vault open, after you allow it; the keyring keeps a copy, so the app still opens while the vault is locked. Empty keeps the keys in the keyring only. |
 | `format` | string | `"{{ count }}"` | Format string for the label. |
 | `icon-locked` | string | `"ld-lock-symbolic"` | Icon while the vault is locked or logged out. |
 | `icon-unlocked` | string | `"ld-lock-open-symbolic"` | Icon while the vault is open. |
@@ -114,6 +115,7 @@ modules:
     unlock-with-session: false
     clipboard-clear: 30
     network-folder: ""
+    portal-folder: ""
     generator-passwords:
       - name: Password
         length: 20

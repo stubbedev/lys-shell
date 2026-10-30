@@ -115,6 +115,13 @@ type BitwardenConfig struct {
 	// prompt is offered for saving here, as a login named like the
 	// profile, once the connection came up with it.
 	NetworkFolder string `cfg:"network-folder"`
+	// Vault folder apps' Secret portal master secrets are kept in: the
+	// key each sandboxed app's saved passwords are encrypted with, which
+	// then survives a reinstall and is the same on every computer. Each
+	// app's key is put there on its first use with the vault open, after
+	// you allow it; the keyring keeps a copy, so the app still opens
+	// while the vault is locked. Empty keeps the keys in the keyring only.
+	PortalFolder string `cfg:"portal-folder"`
 	// Password presets the dropdown's generator offers. Generating
 	// copies a new password as a secret, cleared after
 	// `clipboard-clear`.
@@ -179,6 +186,7 @@ func DefaultsBitwarden() BitwardenConfig {
 		UnlockWithSession:    false,
 		ClipboardClear:       30,
 		NetworkFolder:        "",
+		PortalFolder:         "",
 		GeneratorPasswords:   []BitwardenPasswordPreset{password},
 		GeneratorPassphrases: []BitwardenPassphrasePreset{passphrase},
 		Format:               "{{ count }}",

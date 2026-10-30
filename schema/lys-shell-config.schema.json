@@ -1088,6 +1088,11 @@
           "default": "",
           "description": "Vault folder whose logins answer NetworkManager's requests for\nWi-Fi, 802.1X and VPN secrets while the vault is open, before the\nshell asks. The one login named exactly like the connection\nprofile answers: its password for the password, PSK or secret,\nits username for the username, and a custom field of a key's name\nfor that key (`pin`, `domain`, `private-key-password`). A login\nbehind the master-password reprompt never answers, and secrets\nNetworkManager rejected are asked for again. Empty answers nothing\nfrom the vault. A password (and username) typed into the shell's\nprompt is offered for saving here, as a login named like the\nprofile, once the connection came up with it."
         },
+        "portal-folder": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Vault folder apps' Secret portal master secrets are kept in: the\nkey each sandboxed app's saved passwords are encrypted with, which\nthen survives a reinstall and is the same on every computer. Each\napp's key is put there on its first use with the vault open, after\nyou allow it; the keyring keeps a copy, so the app still opens\nwhile the vault is locked. Empty keeps the keys in the keyring only."
+        },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
@@ -4930,6 +4935,7 @@
             "lock-with-session": true,
             "middle-click": "",
             "network-folder": "",
+            "portal-folder": "",
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
@@ -10007,6 +10013,7 @@
           "lock-with-session": true,
           "middle-click": "",
           "network-folder": "",
+          "portal-folder": "",
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
