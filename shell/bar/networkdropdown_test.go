@@ -132,6 +132,26 @@ type fakeAgent struct {
 	req       *secrets.Request
 	submitted []map[string]string
 	cancels   int
+	offer     *network.SaveOffer
+	dismissed []string
+}
+
+func (a *fakeAgent) SaveOffer() (network.SaveOffer, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.offer == nil {
+		return network.SaveOffer{}, false
+	}
+	return *a.offer, true
+}
+
+func (a *fakeAgent) DismissSave(uuid string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.dismissed = append(a.dismissed, uuid)
+	if a.offer != nil && a.offer.UUID == uuid {
+		a.offer = nil
+	}
 }
 
 func (a *fakeAgent) Request() (secrets.Request, bool) {
@@ -497,13 +517,13 @@ func TestNetworkDropdownContentOnTheRootWrapper(t *testing.T) {
 		t.Fatalf(".dropdown-content boxes = %d, want the one root wrapper", found)
 	}
 	kids := content.Children()
-	if len(kids) != 3 {
-		t.Fatalf("content children = %d, want active, secret, and the body stack", len(kids))
+	if len(kids) != 4 {
+		t.Fatalf("content children = %d, want active, secret, the save offer, and the body stack", len(kids))
 	}
-	if kids[0] != widget.Widget(v.active) || kids[1] != widget.Widget(v.secret) {
-		t.Error("the active connections and secret form are not under the content wrapper")
+	if kids[0] != widget.Widget(v.active) || kids[1] != widget.Widget(v.secret) || kids[2] != widget.Widget(v.saveOffer) {
+		t.Error("the active connections, secret form and save offer are not under the content wrapper")
 	}
-	if kids[2] != widget.Widget(v.body) {
+	if kids[3] != widget.Widget(v.body) {
 		t.Error("the body stack is not under the content wrapper")
 	}
 }

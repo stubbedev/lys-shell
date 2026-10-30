@@ -352,6 +352,8 @@ func (m *bitwardenModule) Root() widget.Widget { return m.btn }
 type bitwardenNetworkVault struct {
 	folder func() string
 	lookup func(ctx context.Context, folder, name string) (vault.NetworkLogin, bool, error)
+	find   func(ctx context.Context, name string, scope vault.FolderScope) (vault.Item, bool, error)
+	create func(ctx context.Context, l vault.NewLogin) (vault.ItemID, error)
 }
 
 // networkVault is the host's vault for the network agent.
@@ -364,6 +366,20 @@ func (h *bitwardenHost) networkVault() bitwardenNetworkVault {
 				return vault.NetworkLogin{}, false, err
 			}
 			return c.NetworkLogin(ctx, folder, name)
+		},
+		find: func(ctx context.Context, name string, scope vault.FolderScope) (vault.Item, bool, error) {
+			c, err := h.client()
+			if err != nil {
+				return vault.Item{}, false, err
+			}
+			return c.FindLogin(ctx, name, scope)
+		},
+		create: func(ctx context.Context, l vault.NewLogin) (vault.ItemID, error) {
+			c, err := h.client()
+			if err != nil {
+				return "", err
+			}
+			return c.CreateLogin(ctx, l)
 		},
 	}
 }
@@ -386,3 +402,35 @@ func (v bitwardenNetworkVault) Entry(name string) (network.VaultEntry, bool) {
 	}
 	return network.VaultEntry{Username: l.Username, Password: l.Password, Fields: l.Fields}, true
 }
+
+// Saveable implements network.Vault: with a network folder configured
+// and the vault open, a profile the folder has no login for.
+func (v bitwardenNetworkVault) Saveable(name string) bool {
+	folder := v.folder()
+	if folder == "" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), vaultCallTimeout)
+	defer cancel()
+	_, found, err := v.find(ctx, name, vault.InFolder(folder))
+	if err != nil {
+		if !errors.Is(err, vault.ErrLocked) {
+			log.Printf("bitwarden: look up the network login for %s: %v", name, err)
+		}
+		return false
+	}
+	return !found
+}
+
+// Save keeps the profile's sign-in as a login named like it in the
+// network folder, where the agent finds it next time.
+func (v bitwardenNetworkVault) Save(ctx context.Context, name string, e network.VaultEntry) error {
+	folder := v.folder()
+	if folder == "" {
+		return errBitwardenNoNetworkFolder
+	}
+	_, err := v.create(ctx, vault.NewLogin{Folder: folder, Name: name, Username: e.Username, Password: e.Password})
+	return err
+}
+
+var errBitwardenNoNetworkFolder = errors.New("bitwarden: no network folder is configured")

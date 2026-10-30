@@ -42,7 +42,7 @@ func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, vault Vault, bud
 	if device, ok := findWifiDevice(ctx, n); ok {
 		svc.Wifi = &Wifi{nm: n, settings: settings, Device: device}
 	}
-	if err := serveAgent(ctx, conn, &agentObject{agent: svc.Agent, signIn: signIn, vault: vault, budget: budget}); err != nil {
+	if err := serveAgent(ctx, conn, &agentObject{agent: svc.Agent, signIn: signIn, vault: vault, active: n.profileState, budget: budget}); err != nil {
 		return nil, err
 	}
 	vpn, err := newVPNService(ctx, n, settings, svc.Agent, signIn, timing)

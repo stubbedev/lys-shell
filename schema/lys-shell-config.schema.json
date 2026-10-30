@@ -1086,7 +1086,7 @@
         "network-folder": {
           "$ref": "#/$defs/string",
           "default": "",
-          "description": "Vault folder whose logins answer NetworkManager's requests for\nWi-Fi, 802.1X and VPN secrets while the vault is open, before the\nshell asks. The one login named exactly like the connection\nprofile answers: its password for the password, PSK or secret,\nits username for the username, and a custom field of a key's name\nfor that key (`pin`, `domain`, `private-key-password`). A login\nbehind the master-password reprompt never answers, and secrets\nNetworkManager rejected are asked for again. Empty answers nothing\nfrom the vault."
+          "description": "Vault folder whose logins answer NetworkManager's requests for\nWi-Fi, 802.1X and VPN secrets while the vault is open, before the\nshell asks. The one login named exactly like the connection\nprofile answers: its password for the password, PSK or secret,\nits username for the username, and a custom field of a key's name\nfor that key (`pin`, `domain`, `private-key-password`). A login\nbehind the master-password reprompt never answers, and secrets\nNetworkManager rejected are asked for again. Empty answers nothing\nfrom the vault. A password (and username) typed into the shell's\nprompt is offered for saving here, as a login named like the\nprofile, once the connection came up with it."
         },
         "right-click": {
           "$ref": "#/$defs/ClickAction",

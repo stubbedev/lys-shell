@@ -33,12 +33,14 @@ const (
 
 // netState is one read of NetworkManager for the dropdown.
 type netState struct {
-	snap    network.Snapshot
-	aps     []network.AccessPoint
-	known   map[string]bool
-	request secrets.Request
-	asking  bool
-	vpns    []network.VPN
+	snap     network.Snapshot
+	aps      []network.AccessPoint
+	known    map[string]bool
+	request  secrets.Request
+	asking   bool
+	offer    network.SaveOffer
+	offering bool
+	vpns     []network.VPN
 }
 
 // netProgress is ConnectionProgress: the network being joined, its
@@ -64,6 +66,7 @@ type networkView struct {
 	syncing      bool
 	active       *netActive
 	secret       *netSecretForm
+	saveOffer    *netSaveOffer
 	vpns         *netVPNs
 	vpnForm      *netVPNForm
 	body         *widget.Stack
@@ -109,6 +112,8 @@ type secretAgent interface {
 	Request() (secrets.Request, bool)
 	Submit(values map[string]string)
 	Cancel()
+	SaveOffer() (network.SaveOffer, bool)
+	DismissSave(uuid string)
 }
 
 // netDeps are the services the dropdown drives beside the snapshot
@@ -125,6 +130,9 @@ type netDeps struct {
 	// changes are the extra feeds a re-read follows (saved profiles,
 	// the agent, the VPNs).
 	changes []func(context.Context) <-chan struct{}
+	// saveLogin keeps a connection's typed sign-in in the vault; nil
+	// without one.
+	saveLogin func(ctx context.Context, name string, e network.VaultEntry) error
 }
 
 // networkDeps wires the dropdown to the live network service.
@@ -151,7 +159,11 @@ func networkDeps(n *network.Service) netDeps {
 }
 
 func networkDropdown(ctx ModuleContext) widget.Widget {
-	return newNetworkView(ctx, networkDeps(ctx.Networking))
+	deps := networkDeps(ctx.Networking)
+	if ctx.Bitwarden != nil {
+		deps.saveLogin = ctx.Bitwarden.networkVault().Save
+	}
+	return newNetworkView(ctx, deps)
 }
 
 func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
@@ -175,12 +187,14 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 
 	v.active = newNetActive(v)
 	v.secret = newNetSecretForm(v)
+	v.saveOffer = newNetSaveOffer(v)
 
 	// The content wraps the active connections, the secret form, and
 	// the body stack (network/mod.rs:129-183).
 	content := dropdownContent("network-content")
 	content.Append(v.active, false)
 	content.Append(v.secret, false)
+	content.Append(v.saveOffer, false)
 
 	browse := widget.NewBox(widget.Column, 2*widget.Current().Spacing, 0)
 	v.vpns = newNetVPNs(v)
@@ -233,6 +247,7 @@ func (v *networkView) read(ctx context.Context) netState {
 	}
 	if v.agent != nil {
 		s.request, s.asking = v.agent.Request()
+		s.offer, s.offering = v.agent.SaveOffer()
 	}
 	if v.vpn != nil {
 		s.vpns = v.vpn.Entries()
@@ -265,6 +280,7 @@ func (v *networkView) apply(s netState) {
 	}
 	v.active.apply(s.snap, v.progress)
 	v.secret.apply(s.request, s.asking)
+	v.saveOffer.apply(s.offer, s.offering)
 	v.vpns.apply(s.vpns)
 	if !s.snap.WifiEnabled && wifiAvail {
 		v.cache = nil

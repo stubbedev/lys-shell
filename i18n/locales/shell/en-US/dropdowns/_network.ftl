@@ -167,3 +167,7 @@ dropdown-network-vpn-field-nameserver = Nameserver
 dropdown-network-vpn-field-fragsize = Fragment size
 dropdown-network-vpn-field-lys-shell-sso = Browser sign-in (SAML)
 dropdown-network-vpn-back = Back
+dropdown-network-save-title = Save to Bitwarden?
+dropdown-network-save-body = { $name } connected with what you typed. Keep it in the vault's network folder to connect without asking next time.
+dropdown-network-save = Save
+dropdown-network-save-not-now = Not now

@@ -12,6 +12,10 @@ type Vault interface {
 	// Entry is the entry stored for the connection profile named name;
 	// false when there is none, or the store is locked.
 	Entry(name string) (VaultEntry, bool)
+	// Saveable reports whether an entry for the profile named name can
+	// be saved now: the store is open, saving is configured, and it
+	// holds none for that name yet.
+	Saveable(name string) bool
 }
 
 // VaultEntry is one stored credential: a login's username and password,
@@ -55,4 +59,30 @@ func vaultValues(e VaultEntry, fields []secrets.Field) (map[string]string, bool)
 		values[f.Key] = v
 	}
 	return values, true
+}
+
+// SaveOffer is a sign-in the user typed that the vault could keep: the
+// profile it answered, once that profile connected with it.
+type SaveOffer struct {
+	UUID, Name string
+	Entry      VaultEntry
+}
+
+// savableEntry is what the user answered as a login, when every key is
+// one a login holds: a password and maybe a username. An answer with
+// anything else (a PIN, a domain, a key) could not be given back whole,
+// so it is not offered.
+func savableEntry(values map[string]string) (VaultEntry, bool) {
+	var e VaultEntry
+	for key, value := range values {
+		switch {
+		case slices.Contains(passwordKeys, key) && e.Password == "":
+			e.Password = value
+		case slices.Contains(usernameKeys, key) && e.Username == "":
+			e.Username = value
+		default:
+			return VaultEntry{}, false
+		}
+	}
+	return e, e.Password != ""
 }

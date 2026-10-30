@@ -134,6 +134,27 @@ type agentFixture struct {
 	agent  *Agent
 	name   string
 	signIn *fakeSignIn
+	states *profileStates
+}
+
+// profileStates are the active connections' states by profile UUID, as
+// the agent reads them to tell that a typed sign-in worked.
+type profileStates struct {
+	mu sync.Mutex
+	m  map[string]ActiveState
+}
+
+func (p *profileStates) set(uuid string, s ActiveState) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.m[uuid] = s
+}
+
+func (p *profileStates) read(_ context.Context, uuid string) (ActiveState, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	s, ok := p.m[uuid]
+	return s, ok
 }
 
 func serveFixture(t *testing.T, budget time.Duration) *agentFixture {
@@ -148,9 +169,10 @@ func serveFixtureWith(t *testing.T, budget time.Duration, vault Vault) *agentFix
 	conn := f.client()
 	agent := NewAgent()
 	signIn := &fakeSignIn{}
-	must(t, serveAgent(t.Context(), conn, &agentObject{agent: agent, signIn: signIn, vault: vault, budget: budget}))
+	states := &profileStates{m: map[string]ActiveState{}}
+	must(t, serveAgent(t.Context(), conn, &agentObject{agent: agent, signIn: signIn, vault: vault, active: states.read, budget: budget}))
 	f.registered(t)
-	return &agentFixture{nm: f, agent: agent, name: conn.Names()[0], signIn: signIn}
+	return &agentFixture{nm: f, agent: agent, name: conn.Names()[0], signIn: signIn, states: states}
 }
 
 type answer struct {

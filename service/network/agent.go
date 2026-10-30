@@ -130,6 +130,12 @@ type Agent struct {
 	// request would hang until NM timed it out.
 	turn chan struct{}
 
+	// offer is the typed sign-in the vault could keep, nil for none;
+	// watching are the answers waiting for their profile to connect,
+	// by profile UUID.
+	offer    *SaveOffer
+	watching map[string]inFlight
+
 	changes  feed.Tick
 	failures feed.Tick
 }
@@ -149,6 +155,7 @@ func NewAgent() *Agent {
 	return &Agent{
 		inFlight:   make(map[requestKey]inFlight),
 		unattended: make(map[string]time.Time),
+		watching:   make(map[string]inFlight),
 		turn:       make(chan struct{}, 1),
 	}
 }
@@ -254,6 +261,75 @@ func (a *Agent) Prompt(ctx context.Context, req secrets.Request) (map[string]str
 	}
 }
 
+// SaveOffer is the typed sign-in the vault could keep, if one is
+// standing.
+func (a *Agent) SaveOffer() (SaveOffer, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.offer == nil {
+		return SaveOffer{}, false
+	}
+	return *a.offer, true
+}
+
+// OfferSave puts up o, replacing any standing offer: a sign-in the user
+// typed for a profile that then connected.
+func (a *Agent) OfferSave(o SaveOffer) {
+	a.mu.Lock()
+	a.offer = &o
+	a.mu.Unlock()
+	feed.Notify(&a.changes)
+}
+
+// DismissSave takes the offer for profile uuid down, saved or declined.
+func (a *Agent) DismissSave(uuid string) {
+	a.mu.Lock()
+	dismissed := a.offer != nil && a.offer.UUID == uuid
+	if dismissed {
+		a.offer = nil
+	}
+	a.mu.Unlock()
+	if dismissed {
+		feed.Notify(&a.changes)
+	}
+}
+
+// watch registers a wait for profile uuid to connect, replacing an
+// older one, and returns its context and its end.
+func (a *Agent) watch(uuid string, budget time.Duration) (context.Context, func()) {
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	a.mu.Lock()
+	a.nextID++
+	id := a.nextID
+	older, ok := a.watching[uuid]
+	a.watching[uuid] = inFlight{id: id, cancel: cancel}
+	a.mu.Unlock()
+	if ok {
+		older.cancel()
+	}
+	return ctx, func() {
+		cancel()
+		a.mu.Lock()
+		if current, ok := a.watching[uuid]; ok && current.id == id {
+			delete(a.watching, uuid)
+		}
+		a.mu.Unlock()
+	}
+}
+
+// unwatch drops the wait for profile uuid and its standing offer: NM
+// asking for its secrets again means what was typed did not do.
+func (a *Agent) unwatch(uuid string) {
+	a.mu.Lock()
+	w, ok := a.watching[uuid]
+	delete(a.watching, uuid)
+	a.mu.Unlock()
+	if ok {
+		w.cancel()
+	}
+	a.DismissSave(uuid)
+}
+
 // ExpectUnattended says the next activation of this profile is made
 // with nobody watching: a tunnel brought back after a suspend, or after
 // NM restarted. Its sign-in may reuse a session that is still alive and
@@ -336,6 +412,9 @@ type agentObject struct {
 	signIn SignIn
 	// vault answers before the user is asked; nil for none.
 	vault Vault
+	// active reads the state of profile uuid's active connection,
+	// false while it has none; it tells a typed sign-in that worked.
+	active func(ctx context.Context, uuid string) (ActiveState, bool)
 	// budget is RequestBudget, short of NM's own timeout; tests
 	// shorten it.
 	budget time.Duration
@@ -381,6 +460,9 @@ func (o *agentObject) secretsFor(ctx context.Context, connection ConnectionDict,
 	r := dictReader(connection)
 	uuid, name := r.str("connection", "uuid"), r.str("connection", "id")
 	unattended := o.agent.takeUnattended(uuid, time.Now())
+	// A new request for the profile means the last answer did not
+	// connect it: it is no longer worth keeping.
+	o.agent.unwatch(uuid)
 
 	if setting == "vpn" && o.signIn != nil {
 		if vpn, ok := o.signIn.ProfileFrom(connection, uuid, name); ok {
@@ -414,12 +496,51 @@ func (o *agentObject) secretsFor(ctx context.Context, connection ConnectionDict,
 	values, ok := o.agent.Prompt(budget, req)
 	switch {
 	case ok:
+		o.offerOnceConnected(uuid, name, values)
 		return replyMap(setting, values), nil
 	case errors.Is(budget.Err(), context.DeadlineExceeded):
 		return nil, agentError(errUserCanceled, "no answer in time")
 	default:
 		return nil, agentError(errUserCanceled, "dismissed")
 	}
+}
+
+// connectWait is how long a typed sign-in waits for its profile to
+// connect before it is no longer offered to the vault.
+const connectWait = 90 * time.Second
+
+// connectPoll is how often that wait reads the profile's state.
+const connectPoll = 500 * time.Millisecond
+
+// offerOnceConnected offers what the user typed for the profile to the
+// vault once the profile connects with it: the vault must be able to
+// take it, and it must be a login (a password, maybe a username). NM
+// asking again, or the wait running out, drops it.
+func (o *agentObject) offerOnceConnected(uuid, name string, values map[string]string) {
+	if o.vault == nil || o.active == nil {
+		return
+	}
+	entry, ok := savableEntry(values)
+	if !ok || !o.vault.Saveable(name) {
+		return
+	}
+	ctx, done := o.agent.watch(uuid, connectWait)
+	go func() {
+		defer done()
+		tick := time.NewTicker(connectPoll)
+		defer tick.Stop()
+		for {
+			if state, ok := o.active(ctx, uuid); ok && state == ActiveActivated {
+				o.agent.OfferSave(SaveOffer{UUID: uuid, Name: name, Entry: entry})
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+			}
+		}
+	}()
 }
 
 // vpnSecrets signs in to an openconnect VPN and answers with the

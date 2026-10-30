@@ -118,6 +118,17 @@ func (n nm) activeByUUID(ctx context.Context) (map[string]dbus.ObjectPath, error
 	return active, nil
 }
 
+// profileState is the state of profile uuid's active connection; false
+// while it has none, or none can be read.
+func (n nm) profileState(ctx context.Context, uuid string) (ActiveState, bool) {
+	conns, err := n.activeStates(ctx)
+	if err != nil {
+		return 0, false
+	}
+	c, ok := conns[uuid]
+	return c.state, ok
+}
+
 // activeConn is one active connection as a sweep read it.
 type activeConn struct {
 	path  dbus.ObjectPath

@@ -168,3 +168,7 @@ dropdown-network-vpn-field-lys-shell-sso = Connexion par navigateur (SAML)
 dropdown-network-vpn-field-xauth-password = Mot de passe
 dropdown-network-vpn-field-xauthpassword = Mot de passe
 dropdown-network-vpn-field-xauth-username = Nom d'utilisateur
+dropdown-network-save-title = Enregistrer dans Bitwarden ?
+dropdown-network-save-body = { $name } s'est connecté avec ce que vous avez saisi. Gardez-le dans le dossier réseau du coffre pour vous connecter sans saisie la prochaine fois.
+dropdown-network-save = Enregistrer
+dropdown-network-save-not-now = Plus tard

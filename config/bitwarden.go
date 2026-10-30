@@ -111,7 +111,9 @@ type BitwardenConfig struct {
 	// for that key (`pin`, `domain`, `private-key-password`). A login
 	// behind the master-password reprompt never answers, and secrets
 	// NetworkManager rejected are asked for again. Empty answers nothing
-	// from the vault.
+	// from the vault. A password (and username) typed into the shell's
+	// prompt is offered for saving here, as a login named like the
+	// profile, once the connection came up with it.
 	NetworkFolder string `cfg:"network-folder"`
 	// Password presets the dropdown's generator offers. Generating
 	// copies a new password as a secret, cleared after
