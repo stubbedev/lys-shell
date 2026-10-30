@@ -3,7 +3,11 @@
 package apptest
 
 import (
+	"bufio"
 	"errors"
+	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,4 +89,31 @@ func Answer[T any](t *testing.T, what string, answered <-chan T) T {
 		var none T
 		return none
 	}
+}
+
+// ShmResident is how many bytes of lys-ui's shared-memory buffer pool
+// are resident in this process: the pixels of every surface drawn on a
+// compositor without the GPU path, and of none it has let go.
+func ShmResident(t *testing.T) int {
+	t.Helper()
+	f, err := os.Open("/proc/self/smaps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	resident, inPool := 0, false
+	for sc := bufio.NewScanner(f); sc.Scan(); {
+		fields := strings.Fields(sc.Text())
+		switch {
+		case len(fields) >= 5 && strings.Contains(fields[0], "-"):
+			inPool = len(fields) >= 6 && strings.HasPrefix(fields[5], "/memfd:lys-ui-shm")
+		case inPool && len(fields) == 3 && fields[0] == "Rss:":
+			kb, err := strconv.Atoi(fields[1])
+			if err != nil {
+				t.Fatal(err)
+			}
+			resident += kb << 10
+		}
+	}
+	return resident
 }
