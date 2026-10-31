@@ -2,7 +2,6 @@ package sharepicker
 
 import (
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,9 +21,7 @@ import (
 // meanwhile.
 func TestADismissedPickerReleasesItsPixels(t *testing.T) {
 	a := apptest.Run(t)
-	p := headlessPicker(t, a, config.SharePickerWindows)
-	presented := make(chan struct{})
-	p.presented = sync.OnceFunc(func() { close(presented) })
+	p, presented := headlessPicker(t, a, config.SharePickerWindows)
 	t.Cleanup(func() { p.Dismiss("/r/memory") })
 	before := apptest.ShmResident(t)
 	answers := make(chan string, 1)

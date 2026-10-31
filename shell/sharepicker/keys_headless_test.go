@@ -1,9 +1,14 @@
 package sharepicker
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/app"
@@ -44,7 +49,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 		_, err := a.NewWindow(app.WindowConfig{Title: "Requester", AppID: "requester", Root: widget.NewBox(widget.Column, 0, 0)})
 		return err
 	})
-	p := headlessPicker(t, a, page)
+	p, _ := headlessPicker(t, a, page)
 	t.Cleanup(func() { p.Dismiss("/r/keys") })
 	kb := keytest.Dial(t, a)
 	answers := make(chan string, 1)
@@ -60,18 +65,25 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 }
 
 // headlessPicker is a picker on a's compositor over five windows and
-// two outputs, opening on page, with animations off.
-func headlessPicker(t *testing.T, a *app.Application, page config.SharePickerPage) *Picker {
+// two outputs, opening on page, with animations off and, as the bar
+// runs it, lys-ui's own surface motion off too; presented closes
+// once the compositor presented its surface's first buffer, drawn at
+// the size it was configured to.
+func headlessPicker(t *testing.T, a *app.Application, page config.SharePickerPage) (p *Picker, presented <-chan struct{}) {
 	t.Helper()
+	apptest.On(a, func() bool { a.SetSurfaceMotion(false); return true })
+	t.Cleanup(func() { apptest.On(a, func() bool { a.SetSurfaceMotion(true); return true }) })
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	cfg.SharePicker.DefaultPage = page
-	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, nil)
+	p = New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, nil)
+	shown := make(chan struct{})
+	p.presented = sync.OnceFunc(func() { close(shown) })
 	p.windows = func() []sharepreview.Toplevel { return fiveWindows }
 	p.outputs = func() []outputInfo {
 		return []outputInfo{{name: "DP-1", width: 1920, height: 1080, scale: 1}, {name: "DP-2", x: 1920, width: 1920, height: 1080, scale: 1}}
 	}
-	return p
+	return p, shown
 }
 
 var fiveWindows = func() []sharepreview.Toplevel {
@@ -213,10 +225,24 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	}
 }
 
-// A card spins while its preview loads; once the capture lands, failed
-// here as these windows do not exist, its spinner is hidden, which
-// lys-ui takes as off screen and schedules no frames for.
-func TestHeadlessLandedPreviewsHideTheirSpinners(t *testing.T) {
+// A card spins while its preview loads; once every capture has landed,
+// failed here as these windows do not exist, the open picker idles: no
+// widget invalidates and no frame is drawn while nothing changes. The
+// counters are lys-ui's, process-wide, and the trees earlier tests'
+// applications left behind can still animate on the shared animation
+// clock (stubbedev/lys-ui#438), so the picker idles in a test process of
+// its own.
+func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
+	if os.Getenv(idleChildEnv) == "" {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHeadlessIdlePickerDrawsNothing$", "-test.count=1", "-test.v")
+		cmd.Env = append(os.Environ(), idleChildEnv+"=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("the idle picker's own test process: %v\n%s", err, out)
+		}
+		return
+	}
 	k := keyPicker(t, config.SharePickerWindows, Request{Sources: AllSources})
 	spinners := apptest.On(k.a, func() []*widget.Spinner { return treetest.All[*widget.Spinner](k.p.root) })
 	if len(spinners) != len(fiveWindows) {
@@ -225,4 +251,22 @@ func TestHeadlessLandedPreviewsHideTheirSpinners(t *testing.T) {
 	apptest.Until(t, k.a, "every preview landed and hid its spinner", func() bool {
 		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() })
 	})
+	type activity struct{ damage, walks uint64 }
+	sample := func() activity {
+		return apptest.On(k.a, func() activity { return activity{widget.DamageGeneration(), widget.DamageWalks()} })
+	}
+	apptest.Dispatched(t, k.a)
+	before := sample()
+	time.Sleep(idleWindow)
+	if after := sample(); after != before {
+		t.Errorf("the idle picker invalidated %d times and walked damage %d times in %v", after.damage-before.damage, after.walks-before.walks, idleWindow)
+	}
 }
+
+// idleWindow is how long the idle picker is watched for frames;
+// idleChildEnv marks the test process TestHeadlessIdlePickerDrawsNothing
+// runs the picker in.
+const (
+	idleWindow   = 500 * time.Millisecond
+	idleChildEnv = "LYS_SHELL_IDLE_PICKER_CHILD"
+)
