@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"sync"
 
 	"github.com/stubbedev/lys-lib/intconv"
 )
@@ -111,12 +112,18 @@ func moduleSection(m *ModulesConfig, name string) (cur, def reflect.Value, ok bo
 	v := valueOf(m)
 	for _, f := range fieldsOf(v.Type()) {
 		if f.key == name {
-			defaults := DefaultsModules()
-			return v.FieldByIndex(f.index), valueOf(&defaults).FieldByIndex(f.index), true
+			return v.FieldByIndex(f.index), valueOf(sharedModuleDefaults()).FieldByIndex(f.index), true
 		}
 	}
 	return reflect.Value{}, reflect.Value{}, false
 }
+
+// sharedModuleDefaults is DefaultsModules built once, which the section
+// views only read.
+var sharedModuleDefaults = sync.OnceValue(func() *ModulesConfig {
+	d := DefaultsModules()
+	return &d
+})
 
 // keyField is the section field with the given key.
 func keyField(section reflect.Value, key string) (reflect.Value, bool) {
