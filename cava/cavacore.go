@@ -2,19 +2,22 @@ package cava
 
 import (
 	"math"
+	"slices"
 )
 
 // Execute is cava_execute: fold new samples into the ring, FFT the
 // windowed bass and main buffers per channel, sum each bar's bins
 // through the eq, and run cava's two-stage smoothing (gravity falloff
 // plus integral) with the autosens feedback clamping bars into 0..1.
-// Stereo samples come interleaved, left first. It returns the bar
-// heights, one per bar per channel: the left bars, then the right.
+// Stereo samples come interleaved, left first. It writes the bar
+// heights, one per bar per channel (the left bars, then the right), into
+// dst, grown when it is short, and returns it: a caller passing the
+// previous frame's slice back analyzes without allocating.
 //
 // The ring is the C one, newest sample first, so the main FFT reads the
 // newest stretch of it as cava's does; its reversed time order only
 // conjugates the spectrum, whose magnitudes are all that is read.
-func (p *Plan) Execute(samples []float64) []float64 {
+func (p *Plan) Execute(dst, samples []float64) []float64 {
 	newSamples := min(len(samples), len(p.inputBuffer))
 
 	silence := true
@@ -34,24 +37,18 @@ func (p *Plan) Execute(samples []float64) []float64 {
 		p.frameSkip++
 	}
 
-	out := make([]float64, p.bars*p.channels)
+	out := slices.Grow(dst[:0], p.bars*p.channels)[:p.bars*p.channels]
 	// In the reversed ring a stereo pair lands right first.
 	for ch := range p.channels {
-		at := func(n int) float64 { return p.inputBuffer[n] }
-		if p.channels == 2 {
-			offset := 1 - ch
-			at = func(n int) float64 { return p.inputBuffer[n*2+offset] }
-		}
-		bass := make([]float64, p.bassSize)
+		offset := p.channels - 1 - ch
 		for n := range p.bassSize {
-			bass[n] = p.bassMultiplier[n] * at(n)
+			p.bass[n] = p.bassMultiplier[n] * p.inputBuffer[n*p.channels+offset]
 		}
-		main := make([]float64, p.fftSize)
 		for n := range p.fftSize {
-			main[n] = p.multiplier[n] * at(n)
+			p.main[n] = p.multiplier[n] * p.inputBuffer[n*p.channels+offset]
 		}
-		bassCoeffs := p.fftBass.Coefficients(nil, bass)
-		coeffs := p.fft.Coefficients(nil, main)
+		bassCoeffs := p.fftBass.Coefficients(p.bassCoeffs, p.bass)
+		coeffs := p.fft.Coefficients(p.coeffs, p.main)
 		for n := range p.bars {
 			var sum float64
 			for i := p.lowerCutoff[n]; i <= p.upperCutoff[n]; i++ {

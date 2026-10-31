@@ -95,9 +95,9 @@ func TestExecuteFindsEnergyInTheRightBand(t *testing.T) {
 	// Prime the ring with the tone, then measure a settled frame.
 	for range 8 {
 		for range 512 {
-			plan.Execute(sine(plan.bassSize, toneHz, 44100)[:512])
+			plan.Execute(nil, sine(plan.bassSize, toneHz, 44100)[:512])
 		}
-		bars := plan.Execute(sine(512, toneHz, 44100))
+		bars := plan.Execute(nil, sine(512, toneHz, 44100))
 		best, bestV := 0, 0.0
 		for i, v := range bars {
 			if v > bestV {
@@ -120,7 +120,7 @@ func TestExecuteSilenceStaysFlat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bars := plan.Execute(make([]float64, plan.bassSize))
+	bars := plan.Execute(nil, make([]float64, plan.bassSize))
 	for i, v := range bars {
 		if v != 0 {
 			t.Fatalf("silence: bar %d = %v, want 0", i, v)
@@ -141,7 +141,7 @@ func TestExecuteAutosensClampsToOne(t *testing.T) {
 	}
 	for range 2000 {
 		for range 8 {
-			bars := plan.Execute(loud)
+			bars := plan.Execute(nil, loud)
 			for _, v := range bars {
 				if v < 0 || v > 1.0+1e-9 {
 					t.Fatalf("autosens let a bar reach %v", v)
@@ -163,7 +163,7 @@ func TestNoiseReductionFallsOffAfterSilence(t *testing.T) {
 	clamped := false
 	var peakValue float64
 	for range 300 {
-		for _, v := range plan.Execute(tone) {
+		for _, v := range plan.Execute(nil, tone) {
 			peakValue = max(peakValue, v)
 			clamped = clamped || v >= 1.0
 		}
@@ -177,7 +177,7 @@ func TestNoiseReductionFallsOffAfterSilence(t *testing.T) {
 	// below the clamped peak, and they keep decaying from there.
 	var after float64
 	for i := range 250 {
-		bars := plan.Execute(make([]float64, 512))
+		bars := plan.Execute(nil, make([]float64, 512))
 		if i >= 100 {
 			for _, v := range bars {
 				after = max(after, v)

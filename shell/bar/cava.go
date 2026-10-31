@@ -261,11 +261,14 @@ func (s *spectrum) paintWave(cv *render.Canvas, c spectrumCanvas) {
 func (s *spectrum) HitTest(widget.Point) widget.Widget { return nil }
 
 // cavaModule is the module: the analyzer plan and its capture source,
-// ticked at the configured framerate.
+// ticked at the configured framerate. samples and frame are the tick's
+// buffers, reused frame to frame.
 type cavaModule struct {
-	paint  *spectrum
-	plan   *analyzer.Plan
-	source analyzer.Input
+	paint   *spectrum
+	plan    *analyzer.Plan
+	source  analyzer.Input
+	samples []float64
+	frame   []float64
 }
 
 // cavaBars is the bar count and channel count the service runs with:
@@ -363,7 +366,9 @@ var errCavaNoAudio = errors.New("cava: no audio server connection")
 // capture keeps itself attached across default changes and server
 // kills.
 func (m *cavaModule) tick() {
-	m.paint.SetFrame(m.plan.Execute(m.source.Drained()))
+	m.samples = m.source.Drained(m.samples)
+	m.frame = m.plan.Execute(m.frame, m.samples)
+	m.paint.SetFrame(m.frame)
 }
 
 func (m *cavaModule) Root() widget.Widget { return m.paint }

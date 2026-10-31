@@ -51,8 +51,9 @@ func (f *FifoInput) Start() error {
 	return nil
 }
 
-// Drained hands over every sample read since the last call.
-func (f *FifoInput) Drained() []float64 { return f.samples.drained() }
+// Drained hands over every sample read since the last call, in place
+// of dst's contents.
+func (f *FifoInput) Drained(dst []float64) []float64 { return f.samples.drained(dst) }
 
 // Stop ends the reader.
 func (f *FifoInput) Stop() {

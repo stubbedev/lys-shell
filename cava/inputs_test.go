@@ -17,7 +17,7 @@ func waitDrained(t *testing.T, in Input, what string, ok func([]float64) bool) [
 	var got []float64
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		got = append(got, in.Drained()...)
+		got = append(got, in.Drained(nil)...)
 		if ok(got) {
 			return got
 		}

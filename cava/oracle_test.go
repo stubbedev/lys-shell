@@ -64,7 +64,7 @@ func runOracle(t *testing.T, p *Plan, channels, frames int) [][]float64 {
 			}
 			i++
 		}
-		out = append(out, p.Execute(in))
+		out = append(out, p.Execute(nil, in))
 	}
 	return out
 }

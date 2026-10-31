@@ -45,7 +45,7 @@ func drainUntil(t *testing.T, src *Source, n int) []float64 {
 		if time.Now().After(deadline) {
 			t.Fatalf("got %d samples, want %d", len(got), n)
 		}
-		got = append(got, src.Drained()...)
+		got = append(got, src.Drained(nil)...)
 		time.Sleep(5 * time.Millisecond)
 	}
 	return got
@@ -79,7 +79,7 @@ func TestSourceRecordsTheMonitorAsRawInt16Mono(t *testing.T) {
 	if got[0] != 1 || got[1] != -1 || got[2] != -32768 {
 		t.Errorf("samples = %v, want raw int16 values 1, -1, -32768", got)
 	}
-	if again := src.Drained(); again != nil {
+	if again := src.Drained(nil); again != nil {
 		t.Errorf("second drain = %v, want nothing new", again)
 	}
 }
@@ -89,12 +89,12 @@ func TestSourceDiscardsTheBacklogOnOverflow(t *testing.T) {
 	src.accumulate([]byte{1, 0, 2, 0, 3, 0})
 	// Two more would make five: cava drops the stale three.
 	src.accumulate([]byte{4, 0, 5, 0})
-	if got := src.Drained(); len(got) != 2 || got[0] != 4 || got[1] != 5 {
+	if got := src.Drained(nil); len(got) != 2 || got[0] != 4 || got[1] != 5 {
 		t.Errorf("after overflow = %v, want only the new 4, 5", got)
 	}
 	// One chunk alone larger than the buffer keeps its newest samples.
 	src.accumulate([]byte{1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0})
-	if got := src.Drained(); len(got) != 4 || got[0] != 3 || got[3] != 6 {
+	if got := src.Drained(nil); len(got) != 4 || got[0] != 3 || got[3] != 6 {
 		t.Errorf("oversized chunk = %v, want the newest four", got)
 	}
 }
@@ -161,7 +161,7 @@ func TestStereoOverflowKeepsFramesPaired(t *testing.T) {
 	// Three frames into room for two: the newest two frames stay, left
 	// before right.
 	src.accumulate([]byte{1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0})
-	if got := src.Drained(); len(got) != 4 || got[0] != 3 || got[1] != 4 || got[3] != 6 {
+	if got := src.Drained(nil); len(got) != 4 || got[0] != 3 || got[1] != 4 || got[3] != 6 {
 		t.Errorf("oversized stereo chunk = %v, want 3 4 5 6", got)
 	}
 }

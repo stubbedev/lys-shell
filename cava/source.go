@@ -40,10 +40,10 @@ type Source struct {
 }
 
 // Input is what the analyzer reads from: a capture started and
-// stopped, its samples drained each frame.
+// stopped, its samples drained each frame into the caller's buffer.
 type Input interface {
 	Start() error
-	Drained() []float64
+	Drained(dst []float64) []float64
 	Stop()
 }
 
@@ -84,15 +84,12 @@ func (s *samples) silence() {
 	s.pend = append(s.pend[:0], make([]float64, s.capacity)...)
 }
 
-// drained hands over every sample since the last call.
-func (s *samples) drained() []float64 {
+// drained hands over every sample since the last call, in place of
+// dst's contents (dst grown when short).
+func (s *samples) drained(dst []float64) []float64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.pend) == 0 {
-		return nil
-	}
-	out := make([]float64, len(s.pend))
-	copy(out, s.pend)
+	out := append(dst[:0], s.pend...)
 	s.pend = s.pend[:0]
 	return out
 }
@@ -158,8 +155,9 @@ func (s *Source) Start() error {
 // capacity drops whole frames, so stereo stays left-right paired.
 func (s *Source) accumulate(data []byte) { s.samples.push(s16(data, s.channels)) }
 
-// Drained hands over every sample captured since the last call.
-func (s *Source) Drained() []float64 { return s.samples.drained() }
+// Drained hands over every sample captured since the last call, in
+// place of dst's contents.
+func (s *Source) Drained(dst []float64) []float64 { return s.samples.drained(dst) }
 
 // Stop closes the record stream.
 func (s *Source) Stop() {

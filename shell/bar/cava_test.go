@@ -204,7 +204,7 @@ func TestNewCavaBuildsEveryStyleAndStereo(t *testing.T) {
 		if m.plan.Channels() != 2 || len(m.paint.values) != 10 {
 			t.Errorf("%s stereo: %d channels, %d values", style, m.plan.Channels(), len(m.paint.values))
 		}
-		if got := len(m.plan.Execute(nil)); got != 10 {
+		if got := len(m.plan.Execute(nil, nil)); got != 10 {
 			t.Errorf("a stereo frame has %d values, want 10", got)
 		}
 	}
@@ -325,9 +325,9 @@ func TestCavaInputPicksTheCapture(t *testing.T) {
 
 type fakeCavaInput struct{ stopped chan struct{} }
 
-func (f *fakeCavaInput) Start() error       { return nil }
-func (f *fakeCavaInput) Drained() []float64 { return nil }
-func (f *fakeCavaInput) Stop()              { close(f.stopped) }
+func (f *fakeCavaInput) Start() error                    { return nil }
+func (f *fakeCavaInput) Drained(dst []float64) []float64 { return dst[:0] }
+func (f *fakeCavaInput) Stop()                           { close(f.stopped) }
 
 // TestCavaModuleEndsWithItsGeneration pins the lifetime: the frame
 // ticker runs while the bar generation lives and, once it retires,

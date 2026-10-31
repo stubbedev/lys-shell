@@ -75,8 +75,9 @@ func (s *ShmemInput) Start() error {
 	return nil
 }
 
-// Drained hands over every sample read since the last call.
-func (s *ShmemInput) Drained() []float64 { return s.samples.drained() }
+// Drained hands over every sample read since the last call, in place
+// of dst's contents.
+func (s *ShmemInput) Drained(dst []float64) []float64 { return s.samples.drained(dst) }
 
 // Stop ends the reader and unmaps the area.
 func (s *ShmemInput) Stop() {

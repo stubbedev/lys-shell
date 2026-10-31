@@ -35,6 +35,10 @@ type Plan struct {
 
 	fftBass *fourier.FFT
 	fft     *fourier.FFT
+	// bass and main are one channel's windowed FFT inputs, bassCoeffs
+	// and coeffs its spectra: Execute's scratch, reused every frame.
+	bass, main         []float64
+	bassCoeffs, coeffs []complex128
 
 	inputBuffer []float64
 
@@ -111,6 +115,10 @@ func NewPlan(bars, rate, channels int, noiseReduction float64, autosens bool, lo
 		multiplier:     hann(fftSize),
 		fftBass:        fourier.NewFFT(bassSize),
 		fft:            fourier.NewFFT(fftSize),
+		bass:           make([]float64, bassSize),
+		main:           make([]float64, fftSize),
+		bassCoeffs:     make([]complex128, bassSize/2+1),
+		coeffs:         make([]complex128, fftSize/2+1),
 		inputBuffer:    make([]float64, bassSize*channels),
 		sens:           1.0,
 		sensInit:       true,
