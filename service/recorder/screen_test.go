@@ -242,7 +242,8 @@ func TestWebcamOverlayIsEncodedIntoTheFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-cam.recycled
-	time.Sleep(500 * time.Millisecond)
+	after := rec.videoFrames.Load()
+	waitRecording(t, "frames encoded over the overlay", func() bool { return rec.videoFrames.Load() >= after+3 })
 	if err := rec.Stop(); err != nil {
 		t.Fatal(err)
 	}

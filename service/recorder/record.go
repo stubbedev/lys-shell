@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/audiomix"
@@ -117,6 +118,9 @@ type recording struct {
 	// drainErr is the audio loop's last drain on stop, read after it
 	// ends.
 	drainErr error
+	// videoFrames counts the video samples written: what a caller
+	// waiting for footage watches.
+	videoFrames atomic.Uint64
 }
 
 // startRecording opens opts.OutputPath and starts recording parts into
@@ -199,6 +203,7 @@ func (r *recording) writeVideo(pkts []gpu.Packet) error {
 		if err := r.writeSample(mux.Sample{Track: videoTrack, PTS: p.PTS, Data: p.Data}); err != nil {
 			return err
 		}
+		r.videoFrames.Add(1)
 	}
 	return nil
 }

@@ -151,7 +151,7 @@ func TestRegionSourceMatchesTheCompositor(t *testing.T) {
 			}
 			seen[o.Transform] = true
 			logical := logicalSize(t, name)
-			full := settledNoise(t, c, o, "scale "+scale+" transform "+transform)
+			full := settledScreen(t, c, o, "scale "+scale+" transform "+transform, 1000)
 			buffer := full.Bounds().Size()
 			for _, region := range []image.Rectangle{
 				image.Rect(0, 0, logical.X, logical.Y),
@@ -180,23 +180,24 @@ func TestRegionSourceMatchesTheCompositor(t *testing.T) {
 	}
 }
 
-// settledNoise is the full capture of o once the background has
-// redrawn after a reconfiguration: the screen shows the noise and two
-// captures in a row agree, so the regions grabbed next see the same
-// frame. swaybg redraws on its own time after sway applied the change,
-// blank meanwhile. It fails after five seconds with what the screen
-// showed last.
-func settledNoise(t *testing.T, c *capture.Client, o capture.Output, what string) *image.RGBA {
+// settledScreen is the full capture of o once the background has
+// redrawn after a reconfiguration: the screen shows at least
+// minColours colours of the pattern and two captures in a row agree,
+// so what is grabbed or recorded next sees the same frame. swaybg
+// redraws on its own time after sway applied the change, blank
+// meanwhile. It fails after five seconds with what the screen showed
+// last.
+func settledScreen(t *testing.T, c *capture.Client, o capture.Output, what string, minColours int) *image.RGBA {
 	t.Helper()
 	var prev *image.RGBA
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
 		full := grab(t, c, o, nil)
 		n := distinctColors(full)
-		if n >= 1000 && prev != nil && full.Bounds() == prev.Bounds() && samePixels(full, prev) {
+		if n >= minColours && prev != nil && full.Bounds() == prev.Bounds() && samePixels(full, prev) {
 			return full
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("%s: the screen never settled on the noise (last capture %v, %d colours)", what, full.Bounds(), n)
+			t.Fatalf("%s: the screen never settled on the pattern (last capture %v, %d colours, want %d)", what, full.Bounds(), n, minColours)
 		}
 		prev = full
 	}

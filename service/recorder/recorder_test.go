@@ -147,7 +147,8 @@ func TestStartClaimIsSynchronousAndStopCancelsTheStart(t *testing.T) {
 	s.Stop()  // cancels the start held at the picker
 	waitFor(t, "idle", func() bool { return s.Snapshot().Status == recorder.StatusIdle })
 	close(gate)
-	time.Sleep(20 * time.Millisecond)
+	// The cancelled start reset to idle as its last step, so nothing
+	// can record for it now.
 	if len(engine.Recordings()) != 0 {
 		t.Error("a cancelled start still recorded")
 	}
@@ -233,8 +234,7 @@ func TestUnexpectedTerminationTearsDown(t *testing.T) {
 	// A stale report from a finished recording is ignored.
 	s.Start()
 	waitFor(t, "recording again", func() bool { return s.Snapshot().Active })
-	rec.Fail("late")
-	time.Sleep(20 * time.Millisecond)
+	rec.Fail("late") // the report is handled before Fail returns
 	if !s.Snapshot().Active {
 		t.Error("a stale termination stopped the new recording")
 	}
@@ -244,15 +244,33 @@ func TestUnexpectedTerminationTearsDown(t *testing.T) {
 func TestElapsedSkipsPausedSeconds(t *testing.T) {
 	engine := &recordertest.Engine{}
 	s, _ := newState(t, engine, nil)
+	ticks := make(chan time.Time)
+	recorder.DriveElapsed(s, ticks)
+	// tick hands the timer a tick; the timer takes the next one only
+	// once it handled this one.
+	tick := func() {
+		t.Helper()
+		select {
+		case ticks <- time.Time{}:
+		case <-time.After(3 * time.Second):
+			t.Fatal("the elapsed timer took no tick")
+		}
+	}
 	s.Start()
 	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
-	waitFor(t, "a second", func() bool { return s.Snapshot().ElapsedSecs >= 1 })
+	tick()
+	tick()
+	waitFor(t, "two seconds", func() bool { return s.Snapshot().ElapsedSecs == 2 })
 	s.SetPaused(true)
-	held := s.Snapshot().ElapsedSecs
-	time.Sleep(1300 * time.Millisecond)
-	if got := s.Snapshot().ElapsedSecs; got != held {
-		t.Errorf("elapsed moved while paused: %d -> %d", held, got)
+	tick()
+	tick()
+	tick() // the first two are handled, paused
+	if got := s.Snapshot().ElapsedSecs; got != 2 {
+		t.Errorf("elapsed moved while paused: 2 -> %d", got)
 	}
+	s.SetPaused(false)
+	tick()
+	waitFor(t, "a second after the resume", func() bool { return s.Snapshot().ElapsedSecs >= 3 })
 	s.Stop()
 }
 

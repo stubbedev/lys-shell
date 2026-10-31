@@ -52,6 +52,17 @@ func startTest(t *testing.T, parts recordingParts, format config.RecorderFormat)
 	return r, path, terms
 }
 
+// waitRecording polls cond until it holds, failing with what after
+// five seconds.
+func waitRecording(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); !cond(); time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("never: %s", what)
+		}
+	}
+}
+
 // MP4 and Matroska each come out playable with a video and an Opus
 // track: every frame encoded is in the file, the one still in flight
 // at Stop included (the drain), each frame decodes, and the audio runs
@@ -66,7 +77,7 @@ func TestRecordingWritesAPlayableFileWithAudio(t *testing.T) {
 			stopTones := make(chan struct{})
 			go desktop.tone(4000, stopTones)
 			go mic.tone(-1000, stopTones)
-			time.Sleep(700 * time.Millisecond)
+			waitRecording(t, "ten frames", func() bool { return len(video.frames()) >= 10 })
 			if err := r.Stop(); err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +167,14 @@ func TestFailuresOfBothTracksAreReportedOnce(t *testing.T) {
 	defer close(stopTone)
 	go src.tone(100, stopTone)
 	_ = r.file.Close()
-	time.Sleep(2500 * time.Millisecond)
+	ended := make(chan struct{})
+	go func() { r.loops.Wait(); close(ended) }()
+	select {
+	case <-ended:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("the tracks still run 5 s after their file closed; reported %q", terms.all())
+	}
+	waitRecording(t, "the failure report", func() bool { return len(terms.all()) > 0 })
 	if got := terms.all(); len(got) != 1 || !strings.Contains(got[0], "file already closed") {
 		t.Errorf("reported %q, want the write failure once", got)
 	}
@@ -171,10 +189,7 @@ func TestRecordingFailureIsReportedAndStillFinalized(t *testing.T) {
 	fx := loadFixture(t)
 	video := &fakeVideo{fx: fx, failAt: 4, failErr: errors.New("recorder: the output is gone: HDMI-A-1")}
 	r, path, terms := startTest(t, recordingParts{video: video}, config.RecorderFormatMp4)
-	deadline := time.Now().Add(3 * time.Second)
-	for len(terms.all()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
+	waitRecording(t, "the failure report", func() bool { return len(terms.all()) > 0 })
 	if got := terms.all(); !slices.Equal(got, []string{"recorder: the output is gone: HDMI-A-1"}) {
 		t.Fatalf("reported %q, want the failure once", got)
 	}
@@ -221,10 +236,7 @@ func TestWebcamFramesBecomeTheOverlay(t *testing.T) {
 		t.Error("another frame came back")
 	}
 	close(cam.frames)
-	deadline := time.Now().Add(3 * time.Second)
-	for len(terms.all()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
+	waitRecording(t, "the camera's report", func() bool { return len(terms.all()) > 0 })
 	if got := terms.all(); len(got) != 1 || !strings.Contains(got[0], "the webcam stopped: /dev/video0 hung up") {
 		t.Errorf("reported %q, want the camera's reason", got)
 	}

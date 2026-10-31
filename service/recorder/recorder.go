@@ -129,12 +129,22 @@ type State struct {
 	gen       uint64
 	timerStop chan struct{}
 	changes   *feed.Feed[Change]
+	// newTicker starts the elapsed-seconds clock: time.NewTicker's
+	// channel and stop, a hand-driven one in tests.
+	newTicker func(time.Duration) (<-chan time.Time, func())
 }
 
 // NewState builds the service over an engine, reading options from
 // cfg at each start.
 func NewState(engine Engine, cfg func() config.RecorderConfig, hooks Hooks) *State {
-	return &State{engine: engine, config: cfg, hooks: hooks, changes: feed.New[Change](8)}
+	return &State{engine: engine, config: cfg, hooks: hooks, changes: feed.New[Change](8), newTicker: systemTicker}
+}
+
+// systemTicker is a time.Ticker as the channel and stop newTicker
+// hands out.
+func systemTicker(d time.Duration) (<-chan time.Time, func()) {
+	t := time.NewTicker(d)
+	return t.C, t.Stop
 }
 
 // Changes delivers a snapshot on every change and elapsed second to
@@ -376,14 +386,15 @@ func (s *State) resetIdle() {
 func (s *State) startTimerLocked() {
 	stop := make(chan struct{})
 	s.timerStop = stop
+	newTicker := s.newTicker
 	go func() {
-		ticker := time.NewTicker(elapsedTick)
-		defer ticker.Stop()
+		ticks, stopTicks := newTicker(elapsedTick)
+		defer stopTicks()
 		for {
 			select {
 			case <-stop:
 				return
-			case <-ticker.C:
+			case <-ticks:
 				s.mu.Lock()
 				if s.timerStop != stop || !s.active {
 					s.mu.Unlock()

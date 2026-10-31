@@ -7,7 +7,8 @@ import (
 	"image/color"
 	"path/filepath"
 	"testing"
-	"time"
+
+	"github.com/stubbedev/lys-lib/capture"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -53,6 +54,11 @@ func colourNear(a, b color.RGBA) bool {
 func TestRecordsTransformedOutputsAndRegionsUpright(t *testing.T) {
 	requireFFmpeg(t)
 	output := gpuSway(t)
+	c, err := capture.Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
 	mode := image.Pt(1280, 720)
 	for _, transform := range []string{"normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"} {
 		upright := mode
@@ -60,7 +66,14 @@ func TestRecordsTransformedOutputsAndRegionsUpright(t *testing.T) {
 			upright = image.Pt(mode.Y, mode.X)
 		}
 		swaytest.Msg(t, "output", output, "scale", "2", "transform", transform, "bg", writeBlocks(t, upright), "stretch")
-		time.Sleep(300 * time.Millisecond)
+		if err := c.Refresh(); err != nil {
+			t.Fatal(err)
+		}
+		o, ok := c.OutputByName(output)
+		if !ok {
+			t.Fatalf("output %s is gone", output)
+		}
+		settledScreen(t, c, o, "transform "+transform, (upright.X/blockSize)*(upright.Y/blockSize)/2)
 		logical := logicalSize(t, output)
 		layout := func(name string) (image.Point, bool) { return logical, name == output }
 		for _, target := range []sharepicker.Target{
@@ -83,7 +96,11 @@ func TestRecordsTransformedOutputsAndRegionsUpright(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				time.Sleep(400 * time.Millisecond)
+				r, ok := rec.(*recording)
+				if !ok {
+					t.Fatalf("the engine started a %T", rec)
+				}
+				waitRecording(t, "ten frames recorded", func() bool { return r.videoFrames.Load() >= 10 })
 				if err := rec.Stop(); err != nil {
 					t.Fatal(err)
 				}
