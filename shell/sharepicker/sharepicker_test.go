@@ -217,6 +217,15 @@ func TestShortLastRowKeepsTheColumns(t *testing.T) {
 	}
 }
 
+// A card's spinner spins from the start, while its preview loads.
+func TestLoadingCardSpins(t *testing.T) {
+	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
+	spinners := treetest.All[*widget.Spinner](p.windowsPage(nil))
+	if len(spinners) != 2 || !spinners[0].Spinning() || !spinners[1].Spinning() {
+		t.Fatalf("loading cards' spinners %v, want both spinning", spinners)
+	}
+}
+
 // Only the pages of the sources offered are built; the configured
 // default page opens when it is one of them, else the first.
 func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {

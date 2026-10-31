@@ -202,3 +202,17 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 		t.Fatalf("Escape answered %q, want a cancel", got)
 	}
 }
+
+// A card spins while its preview loads; once the capture lands, failed
+// here as these windows do not exist, the spinner is hidden and stops,
+// so an open picker schedules no frames for it.
+func TestHeadlessLandedPreviewsStopTheirSpinners(t *testing.T) {
+	k := keyPicker(t, config.SharePickerWindows, Request{Sources: AllSources})
+	spinners := apptest.On(k.a, func() []*widget.Spinner { return treetest.All[*widget.Spinner](k.p.root) })
+	if len(spinners) != len(fiveWindows) {
+		t.Fatalf("%d spinners, want one per window card (%d)", len(spinners), len(fiveWindows))
+	}
+	apptest.Until(t, k.a, "every preview landed and its spinner stopped", func() bool {
+		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() || s.Spinning() })
+	})
+}

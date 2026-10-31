@@ -589,6 +589,7 @@ func (p *Picker) loadPreview(preview *widget.Image, card *widget.Box, spinner *w
 		img, err := grab(size)
 		invoke(func() {
 			if spinner != nil {
+				spinner.SetSpinning(false)
 				spinner.SetVisible(false)
 			}
 			card.RemoveClass("share-picker-card-loading")
