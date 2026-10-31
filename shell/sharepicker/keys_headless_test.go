@@ -34,7 +34,9 @@ type keyRig struct {
 }
 
 // keyPicker shows the picker for r over five windows and two outputs,
-// on the page named, and waits until it holds the keyboard.
+// on the page named, and waits until it holds the keyboard: the
+// compositor sends keys to its surface, not to the requester's, and its
+// focus is on one of its widgets.
 func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 	t.Helper()
 	a := apptest.Run(t)
@@ -48,7 +50,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 	answers := make(chan string, 1)
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/keys"}, r) }()
 	apptest.Until(t, a, "the picker holds the keyboard, laid out", func() bool {
-		if p.layer == nil || a.Session().KeyboardFocus() == nil || !treetest.Contains(p.root, a.Focused()) {
+		if p.layer == nil || a.Session().KeyboardFocus() != p.layer.HostSurface() || !treetest.Contains(p.root, a.Focused()) {
 			return false
 		}
 		choices := p.choices[p.nb.SelectedTab()]
