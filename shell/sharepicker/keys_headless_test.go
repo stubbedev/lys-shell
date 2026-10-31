@@ -1,10 +1,7 @@
 package sharepicker
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"slices"
 	"sync"
 	"testing"
@@ -227,22 +224,8 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 
 // A card spins while its preview loads; once every capture has landed,
 // failed here as these windows do not exist, the open picker idles: no
-// widget invalidates and no frame is drawn while nothing changes. The
-// counters are lys-ui's, process-wide, and the trees earlier tests'
-// applications left behind can still animate on the shared animation
-// clock (stubbedev/lys-ui#438), so the picker idles in a test process of
-// its own.
+// widget invalidates and no frame is drawn while nothing changes.
 func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
-	if os.Getenv(idleChildEnv) == "" {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHeadlessIdlePickerDrawsNothing$", "-test.count=1", "-test.v")
-		cmd.Env = append(os.Environ(), idleChildEnv+"=1")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("the idle picker's own test process: %v\n%s", err, out)
-		}
-		return
-	}
 	k := keyPicker(t, config.SharePickerWindows, Request{Sources: AllSources})
 	spinners := apptest.On(k.a, func() []*widget.Spinner { return treetest.All[*widget.Spinner](k.p.root) })
 	if len(spinners) != len(fiveWindows) {
@@ -263,10 +246,5 @@ func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 	}
 }
 
-// idleWindow is how long the idle picker is watched for frames;
-// idleChildEnv marks the test process TestHeadlessIdlePickerDrawsNothing
-// runs the picker in.
-const (
-	idleWindow   = 500 * time.Millisecond
-	idleChildEnv = "LYS_SHELL_IDLE_PICKER_CHILD"
-)
+// idleWindow is how long the idle picker is watched for frames.
+const idleWindow = 500 * time.Millisecond
