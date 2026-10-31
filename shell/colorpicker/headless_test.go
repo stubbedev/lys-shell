@@ -34,7 +34,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 		c, ok, err := p.Request(frames)
 		answers <- result{color: c, ok: ok, err: err}
 	}()
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 	kb.Tap(keytest.Return)
 	apptest.Never(t, "Return on a physical keyboard's Escape code", answers)

@@ -74,24 +74,29 @@ const keymap = `xkb_keymap {
 // controlMask is the Control real modifier's bit.
 const controlMask = 1 << 2
 
-// Keyboard is the remapped virtual keyboard, with a pointer.
+// Keyboard is the remapped virtual keyboard, with a pointer, typing to
+// an application.
 type Keyboard struct {
 	*vinput.Device
 	t *testing.T
+	a *app.Application
 }
 
-// Dial connects the remapped keyboard to the sway apptest.Run started.
-func Dial(t *testing.T) *Keyboard {
+// Dial connects the remapped keyboard to the sway apptest.Run started
+// for a.
+func Dial(t *testing.T, a *app.Application) *Keyboard {
 	t.Helper()
 	dev, err := vinput.Dial("", vinput.Options{Keyboard: true, FallbackKeymap: []byte(keymap)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(dev.Close)
-	return &Keyboard{Device: dev, t: t}
+	return &Keyboard{Device: dev, t: t, a: a}
 }
 
-// Tap presses and releases the key on code.
+// Tap presses and releases the key on code and returns once the
+// application has handled both, so what the key does (or does not do)
+// is there to observe.
 func (k *Keyboard) Tap(code uint32) {
 	k.t.Helper()
 	for _, pressed := range []bool{true, false} {
@@ -102,6 +107,7 @@ func (k *Keyboard) Tap(code uint32) {
 	if err := k.Roundtrip(); err != nil {
 		k.t.Fatal(err)
 	}
+	apptest.Dispatched(k.t, k.a)
 }
 
 // CtrlTap taps the key on code with Control held.

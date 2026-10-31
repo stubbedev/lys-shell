@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/third_party/wayland/wl"
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/swaytest"
@@ -64,6 +65,43 @@ func On[T any](a *app.Application, fn func() T) T {
 	got := make(chan T, 1)
 	a.Invoke(func() { got <- fn() })
 	return <-got
+}
+
+// Dispatched waits until a's loop has handled every event the
+// compositor sent it before the call: the compositor answers a
+// wl_display.sync after all it queued for the client ahead of it, and
+// the loop dispatches in order. Input another client of the compositor
+// injected and round-tripped has reached a's handlers when it returns.
+// It fails the test after ten seconds.
+func Dispatched(t *testing.T, a *app.Application) {
+	t.Helper()
+	done := make(chan struct{})
+	if err := On(a, func() error {
+		cb, err := a.Session().Display.Sync()
+		if err != nil {
+			return err
+		}
+		cb.AddDoneHandler(syncDone{cb: cb, done: done})
+		return nil
+	}); err != nil {
+		t.Fatalf("sync the display: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the loop dispatched no answer to a display sync within 10s: it was stuck or the compositor never answered")
+	}
+}
+
+// syncDone closes done when the sync callback cb fires.
+type syncDone struct {
+	cb   *wl.Callback
+	done chan struct{}
+}
+
+func (s syncDone) HandleCallbackDone(wl.CallbackDoneEvent) {
+	s.cb.Unregister()
+	close(s.done)
 }
 
 // Never waits out settle, failing the test with what if answered has

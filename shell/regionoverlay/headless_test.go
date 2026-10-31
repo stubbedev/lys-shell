@@ -29,7 +29,7 @@ func startOverlay(t *testing.T) (*keytest.Keyboard, chan result) {
 		sel, ok := o.Request(nil)
 		answers <- result{sel: sel, ok: ok}
 	}()
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 	return kb, answers
 }

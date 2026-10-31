@@ -34,7 +34,7 @@ func TestHeadlessEscapeDeniesByItsSymbol(t *testing.T) {
 		ok, _ := h.Access(portaldialogs.Caller{Handle: handle}, portaldialogs.AccessRequest{Title: "Allow?", GrantLabel: "Allow", DenyLabel: "Deny"})
 		answers <- ok
 	}()
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 	kb.Tap(keytest.Return)
 	apptest.Never(t, "Return on a physical keyboard's Escape code", answers)

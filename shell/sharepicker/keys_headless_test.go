@@ -51,7 +51,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 		return []outputInfo{{name: "DP-1", width: 1920, height: 1080, scale: 1}, {name: "DP-2", x: 1920, width: 1920, height: 1080, scale: 1}}
 	}
 	t.Cleanup(func() { p.Dismiss("/r/keys") })
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	answers := make(chan string, 1)
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/keys"}, r) }()
 	apptest.Until(t, a, "the picker holds the keyboard, laid out", func() bool {
@@ -76,15 +76,14 @@ var fiveWindows = func() []sharepreview.Toplevel {
 // order, which reverses the list.
 func windowAt(i int) string { return windowPayload(fiveWindows[len(fiveWindows)-1-i]) }
 
-// press taps code and waits until the focus is on the open page's
-// choice at index want (in paint order), failing with what.
+// press taps code and fails with what unless the focus is then on the
+// open page's choice at index want (in paint order).
 func (k *keyRig) press(code uint32, want int, what string) {
 	k.t.Helper()
 	k.kb.Tap(code)
-	apptest.Until(k.t, k.a, what, func() bool {
-		choices := k.p.choices[k.p.nb.SelectedTab()]
-		return want < len(choices) && k.a.Focused() == choices[want]
-	})
+	if got := apptest.On(k.a, func() int { return slices.Index(k.p.choices[k.p.nb.SelectedTab()], k.a.Focused()) }); got != want {
+		k.t.Fatalf("%s: the focus is on choice %d, want %d", what, got, want)
+	}
 }
 
 func (k *keyRig) answer(what string) string {
@@ -194,7 +193,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	t.Cleanup(func() { p.Dismiss("/r/headless") })
 	answers := make(chan string, 1)
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/headless"}, Request{Sources: AllSources}) }()
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 	kb.Tap(keytest.Return)
 	apptest.Never(t, "Return on a physical keyboard's Escape code", answers)

@@ -47,7 +47,7 @@ func TestHeadlessKeysFollowTheKeymap(t *testing.T) {
 	go func() {
 		answers <- c.Open(portaldialogs.Caller{Handle: handle, Modal: true}, OpenRequest{CurrentFolder: home})
 	}()
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 
 	kb.Tap(keytest.Return)

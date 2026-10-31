@@ -42,7 +42,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 		ok, _, _, _ := h.Prepare(portaldialogs.Caller{Handle: handle}, PrepareRequest{Title: "Doc"})
 		answers <- ok
 	}()
-	kb := keytest.Dial(t)
+	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 	kb.Tap(keytest.Return)
 	apptest.Never(t, "Return on a physical keyboard's Escape code", answers)
