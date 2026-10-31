@@ -1,7 +1,6 @@
 package sharepicker
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -13,10 +12,8 @@ import (
 
 // A dismissed picker gives its pixels back: once the compositor has
 // presented it, the shared memory it was drawn in is resident, and
-// after the dismissal no more stays resident than before it opened
-// but the one page lys-ui's pool keeps where two freed buffers met
-// (it punches each slot's whole pages, stubbedev/lys-ui#433), so a
-// share leaves no picker-sized trace for the rest of the session. The
+// after the dismissal no more stays resident than before it opened, so
+// a share leaves no picker-sized trace for the rest of the session. The
 // application has no other surface whose buffers could come and go
 // meanwhile.
 func TestADismissedPickerReleasesItsPixels(t *testing.T) {
@@ -35,11 +32,11 @@ func TestADismissedPickerReleasesItsPixels(t *testing.T) {
 	apptest.Answer(t, "the dismissed picker's answer", answers)
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(50 * time.Millisecond) {
 		left := apptest.ShmResident(t)
-		if left <= before+os.Getpagesize() {
+		if left <= before {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("after dismissing, %d resident bytes stay, want at most the %d before the picker opened and a page (%d while shown)", left, before, shown)
+			t.Fatalf("after dismissing, %d resident bytes stay, want at most the %d before the picker opened (%d while shown)", left, before, shown)
 		}
 	}
 }
