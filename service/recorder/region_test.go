@@ -142,7 +142,6 @@ func TestRegionSourceMatchesTheCompositor(t *testing.T) {
 		// the output reports is the transform under test.
 		for _, transform := range []string{"normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"} {
 			swaytest.Msg(t, "output", name, "scale", scale, "transform", transform, "bg", noise, "stretch")
-			time.Sleep(300 * time.Millisecond)
 			if err := c.Refresh(); err != nil {
 				t.Fatal(err)
 			}
@@ -152,10 +151,7 @@ func TestRegionSourceMatchesTheCompositor(t *testing.T) {
 			}
 			seen[o.Transform] = true
 			logical := logicalSize(t, name)
-			full := grab(t, c, o, nil)
-			if n := distinctColors(full); n < 1000 {
-				t.Fatalf("scale %s transform %s: the screen shows %d colours, not the noise", scale, transform, n)
-			}
+			full := settledNoise(t, c, o, "scale "+scale+" transform "+transform)
 			buffer := full.Bounds().Size()
 			for _, region := range []image.Rectangle{
 				image.Rect(0, 0, logical.X, logical.Y),
@@ -181,6 +177,28 @@ func TestRegionSourceMatchesTheCompositor(t *testing.T) {
 	}
 	if len(seen) != 8 {
 		t.Errorf("the output went through transforms %v, want all eight", seen)
+	}
+}
+
+// settledNoise is the full capture of o once the background has
+// redrawn after a reconfiguration: the screen shows the noise and two
+// captures in a row agree, so the regions grabbed next see the same
+// frame. swaybg redraws on its own time after sway applied the change,
+// blank meanwhile. It fails after five seconds with what the screen
+// showed last.
+func settledNoise(t *testing.T, c *capture.Client, o capture.Output, what string) *image.RGBA {
+	t.Helper()
+	var prev *image.RGBA
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		full := grab(t, c, o, nil)
+		n := distinctColors(full)
+		if n >= 1000 && prev != nil && full.Bounds() == prev.Bounds() && samePixels(full, prev) {
+			return full
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s: the screen never settled on the noise (last capture %v, %d colours)", what, full.Bounds(), n)
+		}
+		prev = full
 	}
 }
 
