@@ -102,6 +102,10 @@ type Picker struct {
 	// tests.
 	windows func() []sharepreview.Toplevel
 	outputs func() []outputInfo
+	// presented, when set, runs on the loop once the compositor
+	// presented a mapped surface's first buffer: tests read what a
+	// drawn picker holds.
+	presented func()
 }
 
 // New builds the picker on the application; region is the live region
@@ -194,6 +198,7 @@ func (p *Picker) mapSurface() error {
 		Namespace:     "lys-shell-share-picker",
 		Root:          p.root,
 		OnKey:         keys.OnKey(p.app.KeySym, p.key),
+		OnPresented:   p.presented,
 	})
 	if err != nil {
 		return err
@@ -589,7 +594,6 @@ func (p *Picker) loadPreview(preview *widget.Image, card *widget.Box, spinner *w
 		img, err := grab(size)
 		invoke(func() {
 			if spinner != nil {
-				spinner.SetSpinning(false)
 				spinner.SetVisible(false)
 			}
 			card.RemoveClass("share-picker-card-loading")

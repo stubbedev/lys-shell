@@ -42,14 +42,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 		_, err := a.NewWindow(app.WindowConfig{Title: "Requester", AppID: "requester", Root: widget.NewBox(widget.Column, 0, 0)})
 		return err
 	})
-	cfg := config.Defaults()
-	cfg.Animations.Enabled = false
-	cfg.SharePicker.DefaultPage = page
-	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, nil)
-	p.windows = func() []sharepreview.Toplevel { return fiveWindows }
-	p.outputs = func() []outputInfo {
-		return []outputInfo{{name: "DP-1", width: 1920, height: 1080, scale: 1}, {name: "DP-2", x: 1920, width: 1920, height: 1080, scale: 1}}
-	}
+	p := headlessPicker(t, a, page)
 	t.Cleanup(func() { p.Dismiss("/r/keys") })
 	kb := keytest.Dial(t, a)
 	answers := make(chan string, 1)
@@ -62,6 +55,21 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 		return len(choices) > 0 && !slices.ContainsFunc(choices, func(c widget.Widget) bool { return c.(widget.Boundser).Bounds().W == 0 })
 	})
 	return &keyRig{t: t, a: a, p: p, kb: kb, answers: answers}
+}
+
+// headlessPicker is a picker on a's compositor over five windows and
+// two outputs, opening on page, with animations off.
+func headlessPicker(t *testing.T, a *app.Application, page config.SharePickerPage) *Picker {
+	t.Helper()
+	cfg := config.Defaults()
+	cfg.Animations.Enabled = false
+	cfg.SharePicker.DefaultPage = page
+	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, nil)
+	p.windows = func() []sharepreview.Toplevel { return fiveWindows }
+	p.outputs = func() []outputInfo {
+		return []outputInfo{{name: "DP-1", width: 1920, height: 1080, scale: 1}, {name: "DP-2", x: 1920, width: 1920, height: 1080, scale: 1}}
+	}
+	return p
 }
 
 var fiveWindows = func() []sharepreview.Toplevel {
@@ -204,15 +212,15 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 }
 
 // A card spins while its preview loads; once the capture lands, failed
-// here as these windows do not exist, the spinner is hidden and stops,
-// so an open picker schedules no frames for it.
-func TestHeadlessLandedPreviewsStopTheirSpinners(t *testing.T) {
+// here as these windows do not exist, its spinner is hidden, which
+// lys-ui takes as off screen and schedules no frames for.
+func TestHeadlessLandedPreviewsHideTheirSpinners(t *testing.T) {
 	k := keyPicker(t, config.SharePickerWindows, Request{Sources: AllSources})
 	spinners := apptest.On(k.a, func() []*widget.Spinner { return treetest.All[*widget.Spinner](k.p.root) })
 	if len(spinners) != len(fiveWindows) {
 		t.Fatalf("%d spinners, want one per window card (%d)", len(spinners), len(fiveWindows))
 	}
-	apptest.Until(t, k.a, "every preview landed and its spinner stopped", func() bool {
-		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() || s.Spinning() })
+	apptest.Until(t, k.a, "every preview landed and hid its spinner", func() bool {
+		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() })
 	})
 }
