@@ -252,15 +252,19 @@ func (p *Picker) focusPage(name string) {
 // focus stays.
 func (p *Picker) moveFocus(r *widget.Router, dir direction) {
 	choices := p.choices[p.nb.SelectedTab()]
-	from := r.Focused()
-	if !slices.Contains(choices, from) {
+	from := slices.Index(choices, r.Focused())
+	if from < 0 {
 		return
 	}
-	next := nearest(choices, from, dir)
-	if next == nil {
+	rects := make([]render.Rect, len(choices))
+	for i, c := range choices {
+		rects[i] = bounds(c)
+	}
+	next := nearest(rects, rects[from], dir)
+	if next < 0 {
 		return
 	}
-	if err := r.SetFocus(next); err != nil {
+	if err := r.SetFocus(choices[next]); err != nil {
 		log.Printf("share picker: move the focus: %v", err)
 	}
 }
@@ -499,9 +503,11 @@ func (p *Picker) cardLabel(text string, classes ...string) *widget.Label {
 }
 
 // windowsPage lays the window cards out in rows, as the homogeneous
-// FlowBox does. The XDPH list feeds it; without one, the generic ext
-// enumeration does. Cards run in reverse list order, as the Rust
-// FlowBox inserted each at the front.
+// FlowBox does: every row holds cols cells of one width, a short last
+// row padded with empty ones, so a card there sits in its column. The
+// XDPH list feeds it; without one, the generic ext enumeration does.
+// Cards run in reverse list order, as the Rust FlowBox inserted each at
+// the front.
 func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 	if len(toplevels) == 0 {
 		enumerate := p.windows
@@ -518,14 +524,18 @@ func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 	grid := widget.NewBox(widget.Column, spacing, 0)
 	grid.SetElement("flowbox")
 	var row *widget.Box
-	for i := range toplevels {
-		tl := toplevels[len(toplevels)-1-i]
+	n := len(toplevels)
+	for i := range (n + cols - 1) / cols * cols {
 		if i%cols == 0 {
 			row = widget.NewBox(widget.Row, spacing, 0)
 			row.SetHomogeneous(true)
 			grid.Append(row, false)
 		}
-		row.Append(p.windowCard(tl), true)
+		if i >= n {
+			row.Append(widget.NewBox(widget.Row, 0, 0), true)
+			continue
+		}
+		row.Append(p.windowCard(toplevels[n-1-i]), true)
 	}
 	return page(grid)
 }

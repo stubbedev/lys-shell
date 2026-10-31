@@ -195,6 +195,28 @@ func TestWindowCardsRunInReverseWithTheirTitles(t *testing.T) {
 	}
 }
 
+// A short last row keeps the grid's columns: its card is as wide as
+// every other and sits under the first column, and the empty cells
+// padding the row are no keyboard stops.
+func TestShortLastRowKeepsTheColumns(t *testing.T) {
+	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
+	content := p.windowsPage(fiveWindows)
+	content.Arrange(render.Rect{W: 1000, H: 600})
+	choices := choicesIn(content)
+	if len(choices) != len(fiveWindows) {
+		t.Fatalf("%d choices, want one per window (%d)", len(choices), len(fiveWindows))
+	}
+	first := choices[0].(widget.Boundser).Bounds()
+	for i, c := range choices {
+		if b := c.(widget.Boundser).Bounds(); b.W != first.W {
+			t.Errorf("card %d is %dpx wide, card 0 %dpx", i, b.W, first.W)
+		}
+	}
+	if last := choices[len(choices)-1].(widget.Boundser).Bounds(); last.X != first.X || last.Y <= first.Y {
+		t.Errorf("the last row's card is at %v, want under card 0 at %v", last, first)
+	}
+}
+
 // Only the pages of the sources offered are built; the configured
 // default page opens when it is one of them, else the first.
 func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {

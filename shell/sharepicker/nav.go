@@ -17,35 +17,52 @@ var arrowDirs = map[xkb.Keysym]direction{
 	xkb.KeyDown:  {dy: 1},
 }
 
-// nearest is the choice whose centre lies strictly beyond from's in
-// dir, closest along dir and then across it; nil when none does. The
-// window grid and the output map, which places cards as the outputs
-// sit, both navigate by where the cards are.
-func nearest(choices []widget.Widget, from widget.Widget, dir direction) widget.Widget {
+// nearest is the index of the rect in rects that lies beyond from in
+// dir and shares part of its span across dir (GTK's directional focus
+// keeps to the widgets overlapping the focused one so), the closest
+// centre along dir and then across it; -1 when none does. The window
+// grid and the output map, which places cards as the outputs sit, both
+// navigate by where the cards are, so a grid's short last row has
+// nothing to its right and a column without a card below has nothing
+// down.
+func nearest(rects []render.Rect, from render.Rect, dir direction) int {
 	fx, fy := centre(from)
-	var best widget.Widget
-	bestAlong, bestAcross := 0, 0
-	for _, c := range choices {
-		cx, cy := centre(c)
+	best, bestAlong, bestAcross := -1, 0, 0
+	for i, r := range rects {
+		if !overlapsAcross(from, r, dir) {
+			continue
+		}
+		cx, cy := centre(r)
 		along := (cx-fx)*dir.dx + (cy-fy)*dir.dy
 		if along <= 0 {
 			continue
 		}
 		across := abs((cx-fx)*dir.dy + (cy-fy)*dir.dx)
-		if best == nil || along < bestAlong || along == bestAlong && across < bestAcross {
-			best, bestAlong, bestAcross = c, along, across
+		if best < 0 || along < bestAlong || along == bestAlong && across < bestAcross {
+			best, bestAlong, bestAcross = i, along, across
 		}
 	}
 	return best
 }
 
-// centre is the centre of w's laid-out bounds.
-func centre(w widget.Widget) (x, y int) {
-	var r render.Rect
-	if b, ok := w.(widget.Boundser); ok {
-		r = b.Bounds()
+// overlapsAcross reports whether a and b share part of their spans on
+// the axis across dir.
+func overlapsAcross(a, b render.Rect, dir direction) bool {
+	if dir.dx != 0 {
+		return a.Y < b.Y+b.H && b.Y < a.Y+a.H
 	}
-	return r.X + r.W/2, r.Y + r.H/2
+	return a.X < b.X+b.W && b.X < a.X+a.W
+}
+
+// centre is r's centre.
+func centre(r render.Rect) (x, y int) { return r.X + r.W/2, r.Y + r.H/2 }
+
+// bounds is w's laid-out bounds.
+func bounds(w widget.Widget) render.Rect {
+	if b, ok := w.(widget.Boundser); ok {
+		return b.Bounds()
+	}
+	return render.Rect{}
 }
 
 func abs(n int) int {
