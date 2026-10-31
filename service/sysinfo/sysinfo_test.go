@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // fakeProc writes a minimal procfs tree and repoints ProcRoot at it.
@@ -134,10 +136,10 @@ func TestSensorsLabelLikeSysinfoAndAutoPicksByPattern(t *testing.T) {
 		"class/hwmon/hwmon2/name":        "acpitz\n",
 		"class/hwmon/hwmon2/temp2_label": "orphan\n",
 	})
-	sensors := Sensors()
-	labels := make([]string, len(sensors))
-	for i, s := range sensors {
-		labels[i] = s.Label
+	inputs := sensorInputs()
+	labels := make([]string, len(inputs))
+	for i, in := range inputs {
+		labels[i] = in.label
 	}
 	// A labeled input keeps its label; an unlabeled one is "<chip>
 	// tempN"; a label without an input is no sensor.
@@ -152,6 +154,60 @@ func TestSensorsLabelLikeSysinfoAndAutoPicksByPattern(t *testing.T) {
 	}
 	if _, ok := CPUTemperature("nonexistent"); ok {
 		t.Error("an unknown sensor matched")
+	}
+}
+
+// The lookup reads only the input it settles on: an unmatched sensor's
+// input, here a FIFO no one writes, which blocks whoever opens it as a
+// device busy answering would stall, is never opened. An input that
+// does not read is skipped for the next of its label, and with no hwmon
+// sensor read thermal_zone0 answers the unlabeled lookup.
+func TestCPUTemperatureReadsOnlyTheMatchedInput(t *testing.T) {
+	fakeSys(t, map[string]string{
+		"class/hwmon/hwmon0/name":        "nvme\n",
+		"class/hwmon/hwmon1/name":        "coretemp\n",
+		"class/hwmon/hwmon1/temp1_label": "Package id 0\n",
+		"class/hwmon/hwmon1/temp1_input": "garbage\n",
+		"class/hwmon/hwmon1/temp2_label": "Package id 0\n",
+		"class/hwmon/hwmon1/temp2_input": "61000\n",
+	})
+	fifo := filepath.Join(SysRoot, "class/hwmon/hwmon0/temp1_input")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if f, err := os.OpenFile(fifo, os.O_WRONLY|syscall.O_NONBLOCK, 0); err == nil {
+			f.Close()
+		}
+	})
+	type result struct {
+		temp float32
+		ok   bool
+	}
+	got := make(chan result, 1)
+	go func() {
+		temp, ok := CPUTemperature("auto")
+		got <- result{temp, ok}
+	}()
+	select {
+	case r := <-got:
+		if !r.ok || r.temp != 61 {
+			t.Errorf("auto = %v %v, want the second Package id 0 input's 61", r.temp, r.ok)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("CPUTemperature opened the unmatched nvme input")
+	}
+
+	fakeSys(t, map[string]string{
+		"class/hwmon/hwmon0/name":          "nvme\n",
+		"class/hwmon/hwmon0/temp1_input":   "unreadable\n",
+		"class/thermal/thermal_zone0/temp": "45000\n",
+	})
+	if temp, ok := CPUTemperature(""); !ok || temp != 45 {
+		t.Errorf("unlabeled lookup without a hwmon sensor = %v %v, want thermal_zone0's 45", temp, ok)
+	}
+	if _, ok := CPUTemperature("auto"); ok {
+		t.Error("auto matched thermal_zone0, which carries no label")
 	}
 }
 

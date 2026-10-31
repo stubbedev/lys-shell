@@ -189,37 +189,35 @@ func (r *CPUReader) Read() (CPU, error) {
 // cpuTempPatterns are CPU_TEMP_PATTERNS, tried in order for "auto".
 var cpuTempPatterns = []string{"tctl", "tdie", "tccd", "k10temp", "coretemp", "package id", "cpu"}
 
-// Sensor is one hwmon temperature input, labeled the way the sysinfo
-// crate labels its components.
-type Sensor struct {
-	Label        string
-	TemperatureC float32
+// sensorInput is one hwmon temperature input, labeled the way the
+// sysinfo crate labels its components, not yet read.
+type sensorInput struct {
+	label string
+	path  string
 }
 
-// Sensors lists the hwmon temperature inputs (sysinfo's Components):
-// a sensor's label is its tempN_label, else "<chip> <model>" or
-// "<chip> tempN". Without any hwmon sensor, thermal_zone0 stands in.
-// The order is by hwmon directory, then by input number.
-func Sensors() []Sensor {
-	var out []Sensor
+// sensorInputs lists the hwmon temperature inputs (sysinfo's
+// Components): an input's label is its tempN_label, else "<chip>
+// <model>" or "<chip> tempN". The order is by hwmon directory, then by
+// input number. Only the labels are read: reading an input queries its
+// device (an NVMe drive or a Wi-Fi card wakes to answer), so that waits
+// for the one input a lookup settles on.
+func sensorInputs() []sensorInput {
+	var out []sensorInput
 	dirs, _ := filepath.Glob(filepath.Join(SysRoot, "class/hwmon/hwmon*"))
 	sort.Strings(dirs)
 	for _, dir := range dirs {
 		chip := readLine(filepath.Join(dir, "name"))
 		model, hasModel := readLineOK(filepath.Join(dir, "device/model"))
-		inputs, _ := filepath.Glob(filepath.Join(dir, "temp*_input"))
+		paths, _ := filepath.Glob(filepath.Join(dir, "temp*_input"))
 		type entry struct {
 			id int
-			s  Sensor
+			in sensorInput
 		}
-		var entries []entry
-		for _, input := range inputs {
-			id, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(filepath.Base(input), "temp"), "_input"))
+		entries := make([]entry, 0, len(paths))
+		for _, path := range paths {
+			id, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "temp"), "_input"))
 			if err != nil {
-				continue
-			}
-			temp, ok := readMilliCelsius(input)
-			if !ok {
 				continue
 			}
 			label := readLine(filepath.Join(dir, "temp"+strconv.Itoa(id)+"_label"))
@@ -230,43 +228,34 @@ func Sensors() []Sensor {
 					label = chip + " temp" + strconv.Itoa(id)
 				}
 			}
-			entries = append(entries, entry{id, Sensor{Label: label, TemperatureC: temp}})
+			entries = append(entries, entry{id, sensorInput{label: label, path: path}})
 		}
 		sort.Slice(entries, func(i, j int) bool { return entries[i].id < entries[j].id })
 		for _, e := range entries {
-			if !containsLabel(out, e.s.Label) {
-				out = append(out, e.s)
-			}
-		}
-	}
-	if len(out) == 0 {
-		zone := filepath.Join(SysRoot, "class/thermal/thermal_zone0")
-		if temp, ok := readMilliCelsius(filepath.Join(zone, "temp")); ok {
-			out = append(out, Sensor{Label: "", TemperatureC: temp})
+			out = append(out, e.in)
 		}
 	}
 	return out
 }
 
-func containsLabel(sensors []Sensor, label string) bool {
-	for _, s := range sensors {
-		if s.Label == label {
-			return true
-		}
-	}
-	return false
-}
-
 // CPUTemperature is find_cpu_temperature: a named sensor by label
 // substring (case-insensitive), or for "auto" the first sensor matching
-// each pattern in turn.
+// each pattern in turn. A sensor is an input that reads; of inputs
+// sharing a label the first that reads is the sensor. Without any
+// hwmon sensor, thermal_zone0 stands in, unlabeled.
 func CPUTemperature(sensor string) (float32, bool) {
-	sensors := Sensors()
+	inputs := sensorInputs()
 	find := func(pattern string) (float32, bool) {
-		for _, s := range sensors {
-			if strings.Contains(strings.ToLower(s.Label), pattern) {
-				return s.TemperatureC, true
+		for _, in := range inputs {
+			if !strings.Contains(strings.ToLower(in.label), pattern) {
+				continue
 			}
+			if temp, ok := readMilliCelsius(in.path); ok {
+				return temp, true
+			}
+		}
+		if pattern == "" {
+			return readMilliCelsius(filepath.Join(SysRoot, "class/thermal/thermal_zone0/temp"))
 		}
 		return 0, false
 	}
