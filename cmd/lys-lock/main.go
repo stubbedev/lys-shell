@@ -5,26 +5,20 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"os"
-	"time"
 
-	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/service/shellipc"
+	"github.com/stubbedev/lys-shell/internal/cli"
+	"github.com/stubbedev/lys-shell/internal/lockcli"
+	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 func main() {
-	conn, err := dbus.ConnectSessionBus()
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
-	err = shellipc.LockCommand(ctx, conn, err, os.Stdout)
-	cancel()
-	if conn != nil {
-		_ = conn.Close()
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	os.Exit(run(os.Args[1:], cli.StdOutput()))
+}
+
+// run is main without the process exit.
+func run(args []string, out cli.Output) int {
+	root := lockcli.Command("lys-lock")
+	root.Version = version.Version
+	return cli.Run(root, args, out)
 }
