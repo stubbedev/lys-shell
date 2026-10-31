@@ -2,13 +2,17 @@ package sysinfo
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // CPUTimes is one /proc/stat cpu line reduced the way the sysinfo
@@ -25,7 +29,9 @@ type CPUStat struct {
 	Cores  []CPUTimes
 }
 
-// ReadCPUStat parses /proc/stat's cpu lines.
+// ReadCPUStat parses /proc/stat's cpu lines in place: the poll runs
+// every couple of seconds for the life of the bar, so a line costs no
+// allocation beyond the scanner's buffer.
 func ReadCPUStat() (CPUStat, error) {
 	file, err := os.Open(filepath.Join(ProcRoot, "stat"))
 	if err != nil {
@@ -36,15 +42,15 @@ func ReadCPUStat() (CPUStat, error) {
 	found := false
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) == 0 || !strings.HasPrefix(fields[0], "cpu") {
+		name, rest := nextField(scanner.Bytes())
+		if !bytes.HasPrefix(name, []byte("cpu")) {
 			continue
 		}
-		times, err := parseCPUTimes(fields[1:])
+		times, err := parseCPUTimes(rest)
 		if err != nil {
 			return CPUStat{}, err
 		}
-		if fields[0] == "cpu" {
+		if len(name) == len("cpu") {
 			stat.Global, found = times, true
 		} else {
 			stat.Cores = append(stat.Cores, times)
@@ -59,10 +65,26 @@ func ReadCPUStat() (CPUStat, error) {
 	return stat, nil
 }
 
-func parseCPUTimes(fields []string) (CPUTimes, error) {
+// nextField splits the first space-separated field off line.
+func nextField(line []byte) (field, rest []byte) {
+	line = bytes.TrimLeft(line, " ")
+	if i := bytes.IndexByte(line, ' '); i >= 0 {
+		return line[:i], line[i:]
+	}
+	return line, nil
+}
+
+// parseCPUTimes reduces a cpu line's counters (after its name), the
+// first ten of them, absent ones zero.
+func parseCPUTimes(fields []byte) (CPUTimes, error) {
 	var v [10]uint64
-	for i := range min(len(fields), 10) {
-		n, err := strconv.ParseUint(fields[i], 10, 64)
+	for i := range v {
+		var field []byte
+		field, fields = nextField(fields)
+		if len(field) == 0 {
+			break
+		}
+		n, err := parseDecimal(field)
 		if err != nil {
 			return CPUTimes{}, fmt.Errorf("sysinfo: /proc/stat field %d: %w", i, err)
 		}
@@ -73,6 +95,23 @@ func parseCPUTimes(fields []string) (CPUTimes, error) {
 	nice = satSub(nice, guestNice)
 	work := user + nice + system + irq + softirq
 	return CPUTimes{Work: work, Total: work + idle + iowait + guest + guestNice + steal}, nil
+}
+
+// parseDecimal is strconv.ParseUint(string(b), 10, 64) without the
+// string.
+func parseDecimal(b []byte) (uint64, error) {
+	var n uint64
+	for _, c := range b {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("%q is not a decimal number", b)
+		}
+		d := uint64(c - '0')
+		if n > (math.MaxUint64-d)/10 {
+			return 0, fmt.Errorf("%q overflows 64 bits", b)
+		}
+		n = n*10 + d
+	}
+	return n, nil
 }
 
 func satSub(a, b uint64) uint64 {
@@ -98,16 +137,22 @@ func Usage(prev, cur CPUTimes) float32 {
 }
 
 // CoreFrequencyMHz is get_cpu_frequency: the core's cpufreq
-// scaling_cur_freq (kHz), else the first MHz line of /proc/cpuinfo,
-// else 0.
-func CoreFrequencyMHz(core int) uint64 {
+// scaling_cur_freq (kHz), else cpuinfo, the first MHz line of
+// /proc/cpuinfo (cpuinfoMHz), else 0. Read passes one cpuinfo for all
+// its cores, so a machine without cpufreq reads /proc/cpuinfo once per
+// poll, not once per core.
+func CoreFrequencyMHz(core int, cpuinfo func() uint64) uint64 {
 	path := filepath.Join(SysRoot, "devices/system/cpu", "cpu"+strconv.Itoa(core), "cpufreq/scaling_cur_freq")
-	if data, err := os.ReadFile(path); err == nil { //nolint:gosec // a sysfs path under SysRoot
-		line, _, _ := strings.Cut(strings.TrimSpace(string(data)), "\n")
+	if line, ok := readLineOK(path); ok {
 		if khz, err := strconv.ParseUint(line, 10, 64); err == nil {
 			return khz / 1000
 		}
 	}
+	return cpuinfo()
+}
+
+// cpuinfoMHz is the first MHz line of /proc/cpuinfo, 0 without one.
+func cpuinfoMHz() uint64 {
 	data, err := os.ReadFile(filepath.Join(ProcRoot, "cpuinfo"))
 	if err != nil {
 		return 0
@@ -160,7 +205,8 @@ func (r *CPUReader) Read() (CPU, error) {
 	if err != nil {
 		return CPU{}, err
 	}
-	out := CPU{UsagePercent: Usage(r.prev.Global, stat.Global)}
+	out := CPU{UsagePercent: Usage(r.prev.Global, stat.Global), Cores: make([]Core, 0, len(stat.Cores))}
+	cpuinfo := sync.OnceValue(cpuinfoMHz)
 	var sum uint64
 	busiest := -1
 	for i, cur := range stat.Cores {
@@ -168,7 +214,7 @@ func (r *CPUReader) Read() (CPU, error) {
 		if i < len(r.prev.Cores) {
 			prev = r.prev.Cores[i]
 		}
-		core := Core{UsagePercent: Usage(prev, cur), FrequencyMHz: CoreFrequencyMHz(i)}
+		core := Core{UsagePercent: Usage(prev, cur), FrequencyMHz: CoreFrequencyMHz(i, cpuinfo)}
 		out.Cores = append(out.Cores, core)
 		sum += core.FrequencyMHz
 		out.MaxFrequencyMHz = max(out.MaxFrequencyMHz, core.FrequencyMHz)
@@ -283,10 +329,36 @@ func readLine(path string) string {
 	return s
 }
 
+// readLineOK reads a small sysfs or procfs attribute, trailing
+// whitespace trimmed; false when it cannot be opened or read. A stack
+// buffer takes the usual few bytes in one read: sysfs files stat as a
+// page, so os.ReadFile would stat and allocate 4 KiB for each.
 func readLineOK(path string) (string, bool) {
-	data, err := os.ReadFile(path) //nolint:gosec // a sysfs/procfs path under the roots
+	f, err := os.Open(path) //nolint:gosec // a sysfs/procfs path under the roots
 	if err != nil {
 		return "", false
 	}
-	return strings.TrimRightFunc(string(data), func(r rune) bool { return r == '\n' || r == ' ' || r == '\t' || r == '\r' }), true
+	defer f.Close()
+	var buf [128]byte
+	n := 0
+	for n < len(buf) {
+		m, err := f.Read(buf[n:])
+		n += m
+		if errors.Is(err, io.EOF) {
+			return trimLine(buf[:n]), true
+		}
+		if err != nil {
+			return "", false
+		}
+	}
+	rest, err := io.ReadAll(f)
+	if err != nil {
+		return "", false
+	}
+	return trimLine(append(buf[:n:n], rest...)), true
+}
+
+// trimLine is b as a string without its trailing whitespace.
+func trimLine(b []byte) string {
+	return string(bytes.TrimRightFunc(b, func(r rune) bool { return r == '\n' || r == ' ' || r == '\t' || r == '\r' }))
 }

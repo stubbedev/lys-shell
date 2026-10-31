@@ -4,6 +4,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -103,24 +104,74 @@ func fakeSys(t *testing.T, files map[string]string) {
 	t.Cleanup(func() { SysRoot = old })
 }
 
+// A core's frequency is its cpufreq reading, and only a core without
+// one asks the cpuinfo fallback, which is the first MHz line of
+// /proc/cpuinfo, else 0.
 func TestCoreFrequencyFromCpufreqThenCpuinfo(t *testing.T) {
 	fakeSys(t, map[string]string{"devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "3400123\n"})
 	fakeProc(t, "", "")
 	if err := os.WriteFile(filepath.Join(ProcRoot, "cpuinfo"), []byte("processor\t: 0\ncpu MHz\t\t: 1999.7\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := CoreFrequencyMHz(0); got != 3400 {
-		t.Errorf("cpufreq = %d, want 3400", got)
+	asked := 0
+	fallback := func() uint64 { asked++; return cpuinfoMHz() }
+	if got := CoreFrequencyMHz(0, fallback); got != 3400 || asked != 0 {
+		t.Errorf("cpufreq = %d (cpuinfo asked %d times), want 3400 without asking", got, asked)
 	}
-	// No cpufreq for core 1: the first cpuinfo MHz line.
-	if got := CoreFrequencyMHz(1); got != 1999 {
-		t.Errorf("cpuinfo = %d, want 1999", got)
+	if got := CoreFrequencyMHz(1, fallback); got != 1999 || asked != 1 {
+		t.Errorf("cpuinfo = %d (asked %d times), want 1999 asked once", got, asked)
 	}
 	if err := os.Remove(filepath.Join(ProcRoot, "cpuinfo")); err != nil {
 		t.Fatal(err)
 	}
-	if got := CoreFrequencyMHz(1); got != 0 {
+	if got := cpuinfoMHz(); got != 0 {
 		t.Errorf("no source = %d, want 0", got)
+	}
+}
+
+// /proc/stat's cpu lines parse into the global and per-core counters,
+// lines without the cpu prefix are skipped, and a counter that is no
+// number is an error naming its field.
+func TestReadCPUStatParsesTheCPULines(t *testing.T) {
+	fakeSys(t, nil)
+	fakeProc(t, "cpu  10 1 10 80 2 0 0 0 0 0\ncpu0 4 0 6 40 0 0 0 0\nintr 123 4 5\ncpu1 6 1 4 40 2 0 0 0 0 0\nctxt 99\n", "")
+	stat, err := ReadCPUStat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := CPUStat{Global: CPUTimes{Work: 21, Total: 103}, Cores: []CPUTimes{{Work: 10, Total: 50}, {Work: 11, Total: 53}}}
+	if stat.Global != want.Global || !slices.Equal(stat.Cores, want.Cores) {
+		t.Errorf("stat = %+v, want %+v", stat, want)
+	}
+	fakeProc(t, "cpu  10 x 10 80\n", "")
+	if _, err := ReadCPUStat(); err == nil || !strings.Contains(err.Error(), "field 1") {
+		t.Errorf("a non-numeric counter: %v, want an error naming field 1", err)
+	}
+	fakeProc(t, "intr 1\n", "")
+	if _, err := ReadCPUStat(); err == nil {
+		t.Error("a stat without a cpu line parsed")
+	}
+}
+
+// A sysfs attribute reads trimmed, a long one whole, and a missing one
+// reports false.
+func TestReadLineOK(t *testing.T) {
+	dir := t.TempDir()
+	short, long := filepath.Join(dir, "short"), filepath.Join(dir, "long")
+	longText := strings.Repeat("model-", 60)
+	for path, text := range map[string]string{short: "coretemp\n", long: longText + " \n"} {
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, ok := readLineOK(short); !ok || got != "coretemp" {
+		t.Errorf("short = %q %v", got, ok)
+	}
+	if got, ok := readLineOK(long); !ok || got != longText {
+		t.Errorf("long = %d bytes %v, want %d", len(got), ok, len(longText))
+	}
+	if _, ok := readLineOK(filepath.Join(dir, "missing")); ok {
+		t.Error("a missing attribute read")
 	}
 }
 
