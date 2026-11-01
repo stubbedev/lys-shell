@@ -1,7 +1,9 @@
 package nightlight
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -50,9 +52,14 @@ func saveState(dir, name, body string) error {
 	return nil
 }
 
-// ClearOverride drops the record (a phase change ends it).
-func ClearOverride(dir string) {
-	_ = os.Remove(filepath.Join(dir, overrideFile))
+// ClearOverride drops the record (a phase change ends it); having none
+// to drop is not a failure.
+func ClearOverride(dir string) error {
+	err := os.Remove(filepath.Join(dir, overrideFile))
+	if err == nil || errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return fmt.Errorf("nightlight: clear %s: %w", overrideFile, err)
 }
 
 // LoadOverride reads the record; false when absent, malformed, or

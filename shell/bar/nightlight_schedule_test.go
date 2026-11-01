@@ -13,9 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
 )
 
@@ -271,6 +273,60 @@ func TestNightlightRestartReplaysTheToggle(t *testing.T) {
 	newTestNightlight(t, cfg, env2)
 	if fake2.starts != 0 {
 		t.Error("a remembered disable started the filter")
+	}
+}
+
+// A phase change whose record cannot be deleted still hands control back
+// to the schedule, and says the toggle can come back; one that deletes it
+// logs no failure.
+func TestNightlightLogsAFailedClear(t *testing.T) {
+	logged := captureLog(t)
+	fake := &fakeSunset{clock: sunsetNight}
+	env := fake.env(t)
+	m := newTestNightlight(t, sunsetConfig(true), env)
+	m.evaluate()
+	m.toggle()
+	fake.clock = sunsetDay
+	m.evaluate()
+	if m.manualOverride {
+		t.Error("the override survived the phase change")
+	}
+	if strings.Contains(logged.String(), "can replay") {
+		t.Errorf("a clear that worked logged %q", logged.String())
+	}
+
+	record := filepath.Join(env.stateDir, "nightlight-override")
+	if err := os.MkdirAll(filepath.Join(record, "occupied"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	m.toggle()
+	fake.clock = sunsetNight.Add(24 * time.Hour)
+	m.evaluate()
+	if m.manualOverride {
+		t.Error("a failed clear kept the override")
+	}
+	if got := logged.String(); !strings.Contains(got, "can replay") || !strings.Contains(got, record) {
+		t.Errorf("log = %q, want the failed clear naming %s", got, record)
+	}
+}
+
+// The live environment keeps its records in the state dir the variables
+// name, and fails rather than fall to a relative path when they name none.
+func TestNightlightLiveEnvNeedsAStateDir(t *testing.T) {
+	vars := func(values map[string]string) xdg.Env {
+		return func(name string) string { return values[name] }
+	}
+	env, err := liveSunsetEnv(vars(map[string]string{"XDG_STATE_HOME": "/state"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join("/state", version.Name); env.stateDir != want {
+		t.Errorf("stateDir = %q, want %q", env.stateDir, want)
+	}
+	for _, values := range []map[string]string{nil, {"HOME": "relative"}, {"XDG_STATE_HOME": "relative"}} {
+		if _, err := liveSunsetEnv(vars(values)); err == nil || !strings.Contains(err.Error(), "no state directory") {
+			t.Errorf("%v: err = %v, want no state directory", values, err)
+		}
 	}
 }
 
@@ -1023,9 +1079,13 @@ func (l *lockedLog) String() string {
 // The shell's real environment watches the kernel's clock, and lets go
 // with the module.
 func TestNightlightLiveEnvWatchesTheClock(t *testing.T) {
+	env, err := liveSunsetEnv(func(string) string { return t.TempDir() })
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- liveSunsetEnv().clockJumps(ctx, func() {}) }()
+	go func() { done <- env.clockJumps(ctx, func() {}) }()
 	time.Sleep(50 * time.Millisecond)
 	cancel()
 	select {

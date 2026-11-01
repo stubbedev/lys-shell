@@ -47,9 +47,28 @@ func TestOverrideRoundTrip(t *testing.T) {
 	if _, ok := LoadOverride(dir, persistNow().Add(13*time.Hour)); ok {
 		t.Error("the record outlived its 12h age limit")
 	}
-	ClearOverride(dir)
+	if err := ClearOverride(dir); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := LoadOverride(dir, persistNow()); ok {
 		t.Error("the record survived ClearOverride")
+	}
+	if err := ClearOverride(dir); err != nil {
+		t.Errorf("clearing with no record: %v", err)
+	}
+}
+
+// A record that cannot be deleted stays replayable, so the failure says
+// which file it was and why.
+func TestClearOverrideReportsWhyItFailed(t *testing.T) {
+	dir := t.TempDir()
+	record := filepath.Join(dir, overrideFile)
+	if err := os.MkdirAll(filepath.Join(record, "occupied"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	err := ClearOverride(dir)
+	if !errors.Is(err, syscall.ENOTEMPTY) || !strings.Contains(err.Error(), record) {
+		t.Errorf("a record that cannot go: err = %v, want ENOTEMPTY naming %s", err, record)
 	}
 }
 

@@ -76,9 +76,14 @@ type sunsetEnv struct {
 	clockJumps func(ctx context.Context, onJump func()) error
 }
 
-// liveSunsetEnv is the real environment.
-func liveSunsetEnv() sunsetEnv {
-	dir, _ := xdg.OS.StateDir(version.Name)
+// liveSunsetEnv is the real environment, its state dir resolved from
+// vars. It fails when they name none: the records would otherwise land
+// in whatever directory the shell started from.
+func liveSunsetEnv(vars xdg.Env) (sunsetEnv, error) {
+	dir, ok := vars.StateDir(version.Name)
+	if !ok {
+		return sunsetEnv{}, errors.New("nightlight: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path")
+	}
 	return sunsetEnv{
 		open: func(changed func()) (colourFilter, error) {
 			f, err := nightlight.Open(changed)
@@ -98,7 +103,7 @@ func liveSunsetEnv() sunsetEnv {
 			return nightlight.QueryLocation(ctx, conn)
 		},
 		clockJumps: clockwatch.Watch,
-	}
+	}, nil
 }
 
 // nightlightModule is the night-light toggle with the solar
@@ -152,7 +157,11 @@ type nightlightModule struct {
 }
 
 func newNightlight(ctx ModuleContext) (Module, error) {
-	return newNightlightWith(ctx, liveSunsetEnv())
+	env, err := liveSunsetEnv(xdg.OS)
+	if err != nil {
+		return nil, err
+	}
+	return newNightlightWith(ctx, env)
 }
 
 // newNightlightWith builds the module over env: it connects the filter,
@@ -429,7 +438,9 @@ func (m *nightlightModule) evaluate() {
 		m.heldThroughEase = m.manualOverride && m.enabled == (target.Phase == nightlight.PhaseNight)
 		m.autoPhase = target.Phase
 		m.manualOverride = false
-		nightlight.ClearOverride(m.env.stateDir)
+		if err := nightlight.ClearOverride(m.env.stateDir); err != nil {
+			log.Printf("nightlight: a restart can replay the ended toggle: %v", err)
+		}
 	}
 	if m.manualOverride {
 		return
