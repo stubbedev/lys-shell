@@ -1,44 +1,11 @@
 package sysinfo
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
 )
-
-func TestReadNetTotals(t *testing.T) {
-	dir := t.TempDir()
-	write := func(rel, body string) {
-		path := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("wlan0/statistics/rx_bytes", "1000\n")
-	write("wlan0/statistics/tx_bytes", "2000\n")
-	write("lo/statistics/rx_bytes", "1\n")
-	write("lo/statistics/tx_bytes", "1\n")
-	write("broken/statistics/rx_bytes", "not-a-number\n")
-
-	old := SysClassNet
-	SysClassNet = dir
-	t.Cleanup(func() { SysClassNet = old })
-
-	totals, err := ReadNetTotals()
-	if err != nil {
-		t.Fatalf("ReadNetTotals: %v", err)
-	}
-	if totals["wlan0"] != (NetTotals{Rx: 1000, Tx: 2000}) {
-		t.Errorf("wlan0 = %+v", totals["wlan0"])
-	}
-	// A bad counter skips the interface instead of failing the read.
-	if _, ok := totals["broken"]; ok {
-		t.Error("broken interface matched")
-	}
-}
 
 func TestSelectInterface(t *testing.T) {
 	totals := map[string]NetTotals{
@@ -112,28 +79,54 @@ func TestAutoBytes(t *testing.T) {
 	}
 }
 
-func TestReadNetDevTotals(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "net/dev")
+func fakeNetDev(t *testing.T, body string) {
+	t.Helper()
+	fakeProc(t, "", "")
+	path := filepath.Join(ProcRoot, "net/dev")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	body := "Inter-|   Receive\n face |bytes    packets\n" +
-		"    lo: 100 1 0 0 0 0 0 0 10 2 0 0 0 0 0 0\n" +
-		" wlan0: 2048 5 0 0 0 0 0 0 4096 6 0 0 0 0 0 0\n"
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	totals, err := ReadNetDevTotals(path)
+}
+
+func TestReadNetTotals(t *testing.T) {
+	fakeNetDev(t, "Inter-|   Receive\n face |bytes    packets\n"+
+		"    lo: 100 1 0 0 0 0 0 0 10 2 0 0 0 0 0 0\n"+
+		" wlan0:2048 5 0 0 0 0 0 0 4096 6 0 0 0 0 0 0\n"+
+		"eth0:1: 7 0 0 0 0 0 0 0 8 0 0 0 0 0 0 0\n"+
+		" broken: nope 5 0 0 0 0 0 0 4096 6 0 0 0 0 0 0\n"+
+		" badtx: 1 5 0 0 0 0 0 0 nope 6 0 0 0 0 0 0\n"+
+		" short: 1 2 3\n")
+	totals, err := ReadNetTotals()
 	if err != nil {
-		t.Fatalf("ReadNetDevTotals: %v", err)
+		t.Fatalf("ReadNetTotals: %v", err)
 	}
-	if totals["wlan0"] != (NetTotals{Rx: 2048, Tx: 4096}) {
-		t.Errorf("wlan0 = %+v", totals["wlan0"])
+	want := map[string]NetTotals{
+		"lo":     {Rx: 100, Tx: 10},
+		"wlan0":  {Rx: 2048, Tx: 4096},
+		"eth0:1": {Rx: 7, Tx: 8},
 	}
-	if totals["lo"] != (NetTotals{Rx: 100, Tx: 10}) {
-		t.Errorf("lo = %+v", totals["lo"])
+	if !maps.Equal(totals, want) {
+		t.Errorf("totals = %+v, want %+v; a line that does not parse skips its interface", totals, want)
 	}
-	if _, err := ReadNetDevTotals(filepath.Join(t.TempDir(), "missing")); err == nil {
-		t.Error("missing file: want an error")
+}
+
+func TestReadNetTotalsWithoutTheFile(t *testing.T) {
+	fakeProc(t, "", "")
+	if _, err := ReadNetTotals(); err == nil {
+		t.Error("missing net/dev: want an error")
+	}
+}
+
+func TestParseNetDevCountersDoesNotAllocate(t *testing.T) {
+	line := []byte(" 2048 5 0 0 0 0 0 0 4096 6 0 0 0 0 0 0")
+	if got := testing.AllocsPerRun(100, func() {
+		if totals, ok := parseNetDevCounters(line); !ok || totals.Tx != 4096 {
+			t.Fatal(totals, ok)
+		}
+	}); got != 0 {
+		t.Errorf("%v allocations per line", got)
 	}
 }

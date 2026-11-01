@@ -2,6 +2,7 @@ package sysinfo
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -11,54 +12,10 @@ import (
 	"strings"
 )
 
-// SysClassNet is the interface directory; tests repoint it.
-var SysClassNet = "/sys/class/net"
-
 // NetTotals is one interface's lifetime byte counters.
 type NetTotals struct {
 	Rx uint64
 	Tx uint64
-}
-
-// ReadNetTotals reads rx/tx byte totals per interface.
-func ReadNetTotals() (map[string]NetTotals, error) {
-	entries, err := os.ReadDir(SysClassNet)
-	if err != nil {
-		return nil, fmt.Errorf("sysinfo: %w", err)
-	}
-	out := make(map[string]NetTotals, len(entries))
-	for _, entry := range entries {
-		totals, err := readInterfaceTotals(entry.Name())
-		if err != nil {
-			continue
-		}
-		out[entry.Name()] = totals
-	}
-	return out, nil
-}
-
-func readInterfaceTotals(name string) (NetTotals, error) {
-	rx, err := readCounter(name, "rx_bytes")
-	if err != nil {
-		return NetTotals{}, err
-	}
-	tx, err := readCounter(name, "tx_bytes")
-	if err != nil {
-		return NetTotals{}, err
-	}
-	return NetTotals{Rx: rx, Tx: tx}, nil
-}
-
-func readCounter(iface, counter string) (uint64, error) {
-	data, err := os.ReadFile(filepath.Join(SysClassNet, iface, "statistics", counter)) //nolint:gosec // the path is SysClassNet + validated directory entries
-	if err != nil {
-		return 0, err
-	}
-	value, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("sysinfo: %s/%s: %w", iface, counter, err)
-	}
-	return value, nil
 }
 
 // SelectInterface is netstat's helpers.rs select_interface: "auto"
@@ -124,10 +81,12 @@ func AutoBytes(bytes uint64) string {
 	return strconv.FormatFloat(size/math.Pow(kib, float64(exp)), 'f', 1, 64) + " " + string(prefix) + "iB"
 }
 
-// ReadNetDevTotals is an alternative reader over /proc/net/dev used by
-// the tests to drive counter snapshots; production reads sysfs.
-func ReadNetDevTotals(path string) (map[string]NetTotals, error) {
-	file, err := os.Open(path) //nolint:gosec // the path is the caller's procfs location, injected for tests
+// ReadNetTotals reads every interface's rx/tx byte totals in one read of
+// /proc/net/dev, parsed in place. The poll runs for the life of the bar,
+// so this is one file however many interfaces there are, rather than two
+// per interface in sysfs. A line that does not parse skips its interface.
+func ReadNetTotals() (map[string]NetTotals, error) {
+	file, err := os.Open(filepath.Join(ProcRoot, "net/dev"))
 	if err != nil {
 		return nil, fmt.Errorf("sysinfo: %w", err)
 	}
@@ -135,24 +94,43 @@ func ReadNetDevTotals(path string) (map[string]NetTotals, error) {
 	out := map[string]NetTotals{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
-		name, rest, found := strings.Cut(line, ":")
+		name, counters, found := bytes.CutLast(scanner.Bytes(), []byte{':'})
 		if !found {
 			continue
 		}
-		fields := strings.Fields(rest)
-		if len(fields) < 9 {
-			continue
+		if totals, ok := parseNetDevCounters(counters); ok {
+			out[string(bytes.TrimSpace(name))] = totals
 		}
-		rx, err := strconv.ParseUint(fields[0], 10, 64)
-		if err != nil {
-			continue
-		}
-		tx, err := strconv.ParseUint(fields[8], 10, 64)
-		if err != nil {
-			continue
-		}
-		out[strings.TrimSpace(name)] = NetTotals{Rx: rx, Tx: tx}
 	}
-	return out, scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("sysinfo: read /proc/net/dev: %w", err)
+	}
+	return out, nil
+}
+
+// parseNetDevCounters reads the receive bytes and transmit bytes, the
+// first and ninth of a /proc/net/dev line's counters.
+func parseNetDevCounters(fields []byte) (NetTotals, bool) {
+	const txField = 8
+	var totals NetTotals
+	for i := range txField + 1 {
+		var field []byte
+		field, fields = nextField(fields)
+		if len(field) == 0 {
+			return NetTotals{}, false
+		}
+		if i != 0 && i != txField {
+			continue
+		}
+		n, err := parseDecimal(field)
+		if err != nil {
+			return NetTotals{}, false
+		}
+		if i == 0 {
+			totals.Rx = n
+		} else {
+			totals.Tx = n
+		}
+	}
+	return totals, true
 }
