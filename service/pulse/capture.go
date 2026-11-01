@@ -216,7 +216,7 @@ func (c *Capture) run(ticks <-chan struct{}, unsubscribe func()) {
 		// name is tried at once.
 		if stream == nil && want != "" && (retry == nil || want != failed) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			st, err := c.s.conn.CreateRecordStream(ctx, c.spec.params(want), c.onData)
+			st, err := c.s.createRecordStream(ctx, c.spec.params(want), c.onData)
 			cancel()
 			if err != nil {
 				if want != failed {
@@ -247,4 +247,12 @@ func (c *Capture) run(ticks <-chan struct{}, unsubscribe func()) {
 			retry = nil
 		}
 	}
+}
+
+func (s *Service) createRecordStream(ctx context.Context, p native.RecordParams, onData func([]byte)) (*native.RecordStream, error) {
+	conn, err := s.current()
+	if err != nil {
+		return nil, err
+	}
+	return conn.CreateRecordStream(ctx, p, onData)
 }

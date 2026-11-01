@@ -14,6 +14,7 @@ import (
 	"log"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
@@ -25,6 +26,13 @@ const clientName = "lys-shell-pulse"
 const subscriptionMask = native.MaskSink | native.MaskSource | native.MaskSinkInput |
 	native.MaskSourceOutput | native.MaskServer
 
+const dialTimeout = 5 * time.Second
+
+var (
+	reconnectMin = 250 * time.Millisecond
+	reconnectMax = 5 * time.Second
+)
+
 // ErrNoDefaultDevice reports that the server names no default device
 // of the requested kind, or names one not discovered yet.
 var ErrNoDefaultDevice = errors.New("pulse: no default device")
@@ -33,15 +41,25 @@ var ErrNoDefaultDevice = errors.New("pulse: no default device")
 // answer PA_ERR_INVALID).
 var ErrEmptyVolume = errors.New("pulse: volume has no channels")
 
+// ErrDisconnected reports a request made while the service has no
+// connection to the server.
+var ErrDisconnected = errors.New("pulse: not connected to the server")
+
+// ErrClosed reports a request made after Close.
+var ErrClosed = errors.New("pulse: service closed")
+
 // Service is the live audio state. Every change PulseAudio announces
 // is folded in as it arrives; the getters return snapshots that the
-// caller owns. It is safe for concurrent use.
+// caller owns. A lost connection empties the state and is redialled
+// until Close, refilling it. It is safe for concurrent use.
 type Service struct {
-	conn  *native.Conn
-	ready chan struct{} // closes once discovery filled the state
-	abort chan struct{} // closes when discovery failed
+	server  string
+	life    context.Context
+	close   context.CancelFunc
+	stopped chan struct{}
 
 	mu            sync.RWMutex
+	sess          *session
 	outputs       map[uint32]OutputDevice
 	inputs        map[uint32]InputDevice
 	streams       map[StreamKey]AudioStream
@@ -51,104 +69,226 @@ type Service struct {
 	nextSub       int
 }
 
-// Connect dials the server (server "" resolves like libpulse:
-// $PULSE_SERVER, then $XDG_RUNTIME_DIR/pulse/native), subscribes, and
-// discovers every device, stream, and default before returning, so the
-// first snapshot is complete.
-func Connect(ctx context.Context, server string) (*Service, error) {
-	s := &Service{
-		ready:   make(chan struct{}),
-		abort:   make(chan struct{}),
+type session struct {
+	conn  *native.Conn
+	ready chan struct{}
+	abort chan struct{}
+}
+
+type snapshot struct {
+	sinks, sources []native.DeviceInfo
+	inputs         []native.StreamInfo
+	outputs        []native.StreamInfo
+	info           native.ServerInfo
+}
+
+func newService(server string) *Service {
+	life, cancel := context.WithCancel(context.Background())
+	return &Service{
+		server:  server,
+		life:    life,
+		close:   cancel,
+		stopped: make(chan struct{}),
 		outputs: map[uint32]OutputDevice{},
 		inputs:  map[uint32]InputDevice{},
 		streams: map[StreamKey]AudioStream{},
 		subs:    map[int]chan struct{}{},
 	}
+}
+
+// Connect dials the server (server "" resolves like libpulse:
+// $PULSE_SERVER, then $XDG_RUNTIME_DIR/pulse/native) and discovers
+// every device, stream, and default before returning, so the first
+// snapshot is complete; a later loss reconnects as Start does.
+func Connect(ctx context.Context, server string) (*Service, error) {
+	s := newService(server)
+	sess, err := s.open(ctx)
+	if err != nil {
+		s.close()
+		return nil, err
+	}
+	go s.supervise(sess)
+	return s, nil
+}
+
+// Start returns at once and connects in the background, retrying until
+// the server is up and again whenever the connection is lost; the
+// state is empty while there is none.
+func Start(server string) *Service {
+	s := newService(server)
+	go s.supervise(nil)
+	return s
+}
+
+// open dials one connection and installs its discovery. The
+// subscription comes first so no change in between is lost: events
+// queue until ready closes.
+func (s *Service) open(ctx context.Context) (*session, error) {
+	sess := &session{ready: make(chan struct{}), abort: make(chan struct{})}
 	conn, err := native.Dial(ctx, native.Options{
-		Server:      server,
+		Server:      s.server,
 		ClientName:  clientName,
-		OnSubscribe: s.handleEvent,
+		OnSubscribe: func(ev native.SubscribeEvent) { s.handleEvent(sess, ev) },
 	})
 	if err != nil {
 		return nil, fmt.Errorf("pulse: cannot connect to the server: %w", err)
 	}
-	s.conn = conn
-	if err := s.discover(ctx); err != nil {
-		close(s.abort)
+	sess.conn = conn
+	snap, err := discover(ctx, conn)
+	if err != nil {
+		close(sess.abort)
 		_ = conn.Close()
 		return nil, err
 	}
-	close(s.ready)
-	go func() {
-		<-conn.Done()
-		s.closeSubscribers()
-	}()
-	return s, nil
+	s.install(sess, snap)
+	close(sess.ready)
+	return sess, nil
 }
 
-// discover is the initial refresh (Devices, Streams, ServerInfo),
-// after the subscription so no change in between is lost: events
-// queue until ready closes.
-func (s *Service) discover(ctx context.Context) error {
-	if err := s.conn.Subscribe(ctx, subscriptionMask); err != nil {
-		return err
+func discover(ctx context.Context, conn *native.Conn) (snapshot, error) {
+	var snap snapshot
+	var err error
+	if err = conn.Subscribe(ctx, subscriptionMask); err != nil {
+		return snap, err
 	}
-	sinks, err := s.conn.Sinks(ctx)
-	if err != nil {
-		return err
+	if snap.sinks, err = conn.Sinks(ctx); err != nil {
+		return snap, err
 	}
-	sources, err := s.conn.Sources(ctx)
-	if err != nil {
-		return err
+	if snap.sources, err = conn.Sources(ctx); err != nil {
+		return snap, err
 	}
-	inputs, err := s.conn.SinkInputs(ctx)
-	if err != nil {
-		return err
+	if snap.inputs, err = conn.SinkInputs(ctx); err != nil {
+		return snap, err
 	}
-	outputs, err := s.conn.SourceOutputs(ctx)
-	if err != nil {
-		return err
+	if snap.outputs, err = conn.SourceOutputs(ctx); err != nil {
+		return snap, err
 	}
-	info, err := s.conn.ServerInfo(ctx)
-	if err != nil {
-		return err
-	}
+	snap.info, err = conn.ServerInfo(ctx)
+	return snap, err
+}
+
+func (s *Service) install(sess *session, snap snapshot) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, d := range sinks {
+	s.sess = sess
+	s.clearLocked()
+	for _, d := range snap.sinks {
 		s.outputs[d.Index] = fromSink(d)
 	}
-	for _, d := range sources {
+	for _, d := range snap.sources {
 		s.inputs[d.Index] = fromSource(d)
 	}
-	for _, st := range inputs {
+	for _, st := range snap.inputs {
 		s.streams[StreamKey{Index: st.Index, Type: StreamPlayback}] = fromStream(st, StreamPlayback)
 	}
-	for _, st := range outputs {
+	for _, st := range snap.outputs {
 		s.streams[StreamKey{Index: st.Index, Type: StreamRecord}] = fromStream(st, StreamRecord)
 	}
-	s.defaultSink, s.defaultSource = info.DefaultSink, info.DefaultSource
+	s.defaultSink, s.defaultSource = snap.info.DefaultSink, snap.info.DefaultSource
+	s.mu.Unlock()
+	s.notify()
+}
+
+func (s *Service) drop(sess *session) {
+	s.mu.Lock()
+	if s.sess != sess {
+		s.mu.Unlock()
+		return
+	}
+	s.sess = nil
+	s.clearLocked()
+	s.mu.Unlock()
+	s.notify()
+}
+
+func (s *Service) clearLocked() {
+	clear(s.outputs)
+	clear(s.inputs)
+	clear(s.streams)
+	s.defaultSink, s.defaultSource = "", ""
+}
+
+func (s *Service) supervise(sess *session) {
+	defer close(s.stopped)
+	for {
+		if sess != nil {
+			select {
+			case <-sess.conn.Done():
+				log.Printf("pulse: connection lost: %v; reconnecting", sess.conn.Err())
+				s.drop(sess)
+			case <-s.life.Done():
+				_ = sess.conn.Close()
+				s.drop(sess)
+				return
+			}
+		}
+		if sess = s.reconnect(); sess == nil {
+			return
+		}
+	}
+}
+
+func (s *Service) reconnect() *session {
+	delay := reconnectMin
+	failing := false
+	for {
+		ctx, cancel := context.WithTimeout(s.life, dialTimeout)
+		sess, err := s.open(ctx)
+		cancel()
+		if err == nil {
+			if failing {
+				log.Print("pulse: connected to the server")
+			}
+			return sess
+		}
+		if s.life.Err() != nil {
+			return nil
+		}
+		if !failing {
+			log.Printf("%v; retrying until it is up", err)
+			failing = true
+		}
+		select {
+		case <-s.life.Done():
+			return nil
+		case <-time.After(delay):
+		}
+		delay = min(2*delay, reconnectMax)
+	}
+}
+
+// Close disconnects for good and closes every subscriber channel.
+func (s *Service) Close() error {
+	s.close()
+	<-s.stopped
+	s.closeSubscribers()
 	return nil
 }
 
-// Close disconnects; subscriber channels close.
-func (s *Service) Close() error { return s.conn.Close() }
+func (s *Service) current() (*native.Conn, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentLocked()
+}
 
-// Done closes when the connection is gone. Like the Rust backend, the
-// service does not reconnect: the state freezes at its last values.
-func (s *Service) Done() <-chan struct{} { return s.conn.Done() }
+func (s *Service) currentLocked() (*native.Conn, error) {
+	if s.life.Err() != nil {
+		return nil, ErrClosed
+	}
+	if s.sess == nil {
+		return nil, ErrDisconnected
+	}
+	return s.sess.conn, nil
+}
 
-// handleEvent folds one subscription event (backend/events): a
-// removal drops the object, a new or changed object is re-queried by
-// index, a server change re-reads the defaults. Queries that race a
+// handleEvent folds one subscription event of sess (backend/events):
+// a removal drops the object, a new or changed object is re-queried
+// by index, a server change re-reads the defaults. Queries that race a
 // removal (no such entity) are dropped, as the Rust callbacks never
-// fire for them.
-func (s *Service) handleEvent(ev native.SubscribeEvent) {
-	// Events queue until discovery is done; the channel also orders
-	// the s.conn write before this goroutine reads it.
+// fire for them, and so is anything from a connection since replaced.
+func (s *Service) handleEvent(sess *session, ev native.SubscribeEvent) {
 	select {
-	case <-s.ready:
-	case <-s.abort:
+	case <-sess.ready:
+	case <-sess.abort:
 		return
 	}
 	ctx := context.Background()
@@ -156,21 +296,21 @@ func (s *Service) handleEvent(ev native.SubscribeEvent) {
 	var err error
 	switch ev.Facility {
 	case native.FacilitySink:
-		changed, err = foldObject(s, ev, s.outputs, s.conn.Sink, fromSink)
+		changed, err = foldObject(s, sess, ev, s.outputs, sess.conn.Sink, fromSink)
 	case native.FacilitySource:
-		changed, err = foldObject(s, ev, s.inputs, s.conn.Source, fromSource)
+		changed, err = foldObject(s, sess, ev, s.inputs, sess.conn.Source, fromSource)
 	case native.FacilitySinkInput:
-		changed, err = s.foldStream(ctx, ev, StreamPlayback, s.conn.SinkInput)
+		changed, err = s.foldStream(ctx, sess, ev, StreamPlayback, sess.conn.SinkInput)
 	case native.FacilitySourceOutput:
-		changed, err = s.foldStream(ctx, ev, StreamRecord, s.conn.SourceOutput)
+		changed, err = s.foldStream(ctx, sess, ev, StreamRecord, sess.conn.SourceOutput)
 	case native.FacilityServer:
 		if ev.Operation == native.OpChange {
-			changed, err = s.refreshDefaults(ctx)
+			changed, err = s.refreshDefaults(ctx, sess)
 		}
 	}
 	if err != nil && !errors.Is(err, native.ErrNoEntity) {
 		select {
-		case <-s.conn.Done():
+		case <-sess.conn.Done():
 		default:
 			log.Printf("pulse: refresh after %v: %v", ev, err)
 		}
@@ -180,12 +320,15 @@ func (s *Service) handleEvent(ev native.SubscribeEvent) {
 	}
 }
 
-func foldObject[T any](s *Service, ev native.SubscribeEvent, m map[uint32]T,
+func foldObject[T any](s *Service, sess *session, ev native.SubscribeEvent, m map[uint32]T,
 	query func(context.Context, uint32) (native.DeviceInfo, error), convert func(native.DeviceInfo) T,
 ) (bool, error) {
 	if ev.Operation == native.OpRemove {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if s.sess != sess {
+			return false, nil
+		}
 		_, had := m[ev.Index]
 		delete(m, ev.Index)
 		return had, nil
@@ -195,18 +338,24 @@ func foldObject[T any](s *Service, ev native.SubscribeEvent, m map[uint32]T,
 		return false, err
 	}
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sess != sess {
+		return false, nil
+	}
 	m[ev.Index] = convert(info)
-	s.mu.Unlock()
 	return true, nil
 }
 
-func (s *Service) foldStream(ctx context.Context, ev native.SubscribeEvent, t StreamType,
+func (s *Service) foldStream(ctx context.Context, sess *session, ev native.SubscribeEvent, t StreamType,
 	query func(context.Context, uint32) (native.StreamInfo, error),
 ) (bool, error) {
 	key := StreamKey{Index: ev.Index, Type: t}
 	if ev.Operation == native.OpRemove {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if s.sess != sess {
+			return false, nil
+		}
 		_, had := s.streams[key]
 		delete(s.streams, key)
 		return had, nil
@@ -216,35 +365,39 @@ func (s *Service) foldStream(ctx context.Context, ev native.SubscribeEvent, t St
 		return false, err
 	}
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sess != sess {
+		return false, nil
+	}
 	s.streams[key] = fromStream(info, t)
-	s.mu.Unlock()
 	return true, nil
 }
 
-func (s *Service) refreshDefaults(ctx context.Context) (bool, error) {
-	info, err := s.conn.ServerInfo(ctx)
+func (s *Service) refreshDefaults(ctx context.Context, sess *session) (bool, error) {
+	info, err := sess.conn.ServerInfo(ctx)
 	if err != nil {
 		return false, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.sess != sess {
+		return false, nil
+	}
 	changed := s.defaultSink != info.DefaultSink || s.defaultSource != info.DefaultSource
 	s.defaultSink, s.defaultSource = info.DefaultSink, info.DefaultSource
 	return changed, nil
 }
 
-// Subscribe ticks after every applied change; ticks coalesce, so a
-// slow reader sees the latest state on its next read rather than a
-// backlog. The channel closes when ctx ends or the connection dies;
-// stop unsubscribes early.
+// Subscribe ticks after every applied change, a lost or regained
+// connection included; ticks coalesce, so a slow reader sees the
+// latest state on its next read rather than a backlog. The channel
+// closes when ctx ends or the service closes; stop unsubscribes early.
 func (s *Service) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
 	ch := make(chan struct{}, 1)
 	s.mu.Lock()
-	select {
-	case <-s.conn.Done():
+	if s.life.Err() != nil {
 		s.mu.Unlock()
-		return nil, nil, fmt.Errorf("pulse: subscribe: %w", s.conn.Err())
-	default:
+		return nil, nil, fmt.Errorf("pulse: subscribe: %w", ErrClosed)
 	}
 	id := s.nextSub
 	s.nextSub++
@@ -268,7 +421,7 @@ func (s *Service) Subscribe(ctx context.Context) (<-chan struct{}, func(), error
 		case <-ctx.Done():
 			stop()
 		case <-quit:
-		case <-s.conn.Done():
+		case <-s.stopped:
 		}
 	}()
 	return ch, stop, nil
@@ -415,30 +568,38 @@ func (s *Service) AudioStream(key StreamKey) (AudioStream, error) {
 	return st.clone(), nil
 }
 
-// device looks a key up, returning its name.
-func (s *Service) device(key DeviceKey) (string, error) {
+// device looks a key up on the current connection, returning its name.
+func (s *Service) device(key DeviceKey) (string, *native.Conn, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	conn, err := s.currentLocked()
+	if err != nil {
+		return "", nil, err
+	}
 	switch key.Type {
 	case DeviceOutput:
 		if d, ok := s.outputs[key.Index]; ok {
-			return d.Name, nil
+			return d.Name, conn, nil
 		}
 	case DeviceInput:
 		if d, ok := s.inputs[key.Index]; ok {
-			return d.Name, nil
+			return d.Name, conn, nil
 		}
 	}
-	return "", &DeviceNotFoundError{Key: key}
+	return "", nil, &DeviceNotFoundError{Key: key}
 }
 
-func (s *Service) hasStream(key StreamKey) error {
+func (s *Service) stream(key StreamKey) (*native.Conn, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if _, ok := s.streams[key]; !ok {
-		return &StreamNotFoundError{Key: key}
+	conn, err := s.currentLocked()
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	if _, ok := s.streams[key]; !ok {
+		return nil, &StreamNotFoundError{Key: key}
+	}
+	return conn, nil
 }
 
 // SetDeviceVolume sets a device's per-channel volume.
@@ -446,48 +607,51 @@ func (s *Service) SetDeviceVolume(ctx context.Context, key DeviceKey, v Volume) 
 	if v.Channels() == 0 {
 		return ErrEmptyVolume
 	}
-	if _, err := s.device(key); err != nil {
+	_, conn, err := s.device(key)
+	if err != nil {
 		return err
 	}
 	if key.Type == DeviceOutput {
-		return s.conn.SetSinkVolume(ctx, key.Index, v.toPulse())
+		return conn.SetSinkVolume(ctx, key.Index, v.toPulse())
 	}
-	return s.conn.SetSourceVolume(ctx, key.Index, v.toPulse())
+	return conn.SetSourceVolume(ctx, key.Index, v.toPulse())
 }
 
 // SetDeviceMute mutes or unmutes a device.
 func (s *Service) SetDeviceMute(ctx context.Context, key DeviceKey, muted bool) error {
-	if _, err := s.device(key); err != nil {
+	_, conn, err := s.device(key)
+	if err != nil {
 		return err
 	}
 	if key.Type == DeviceOutput {
-		return s.conn.SetSinkMute(ctx, key.Index, muted)
+		return conn.SetSinkMute(ctx, key.Index, muted)
 	}
-	return s.conn.SetSourceMute(ctx, key.Index, muted)
+	return conn.SetSourceMute(ctx, key.Index, muted)
 }
 
 // SetDevicePort switches a device's active port (headphones vs
 // speakers).
 func (s *Service) SetDevicePort(ctx context.Context, key DeviceKey, port string) error {
-	if _, err := s.device(key); err != nil {
-		return err
-	}
-	if key.Type == DeviceOutput {
-		return s.conn.SetSinkPort(ctx, key.Index, port)
-	}
-	return s.conn.SetSourcePort(ctx, key.Index, port)
-}
-
-// SetDefault makes a device the default of its kind.
-func (s *Service) SetDefault(ctx context.Context, key DeviceKey) error {
-	name, err := s.device(key)
+	_, conn, err := s.device(key)
 	if err != nil {
 		return err
 	}
 	if key.Type == DeviceOutput {
-		return s.conn.SetDefaultSink(ctx, name)
+		return conn.SetSinkPort(ctx, key.Index, port)
 	}
-	return s.conn.SetDefaultSource(ctx, name)
+	return conn.SetSourcePort(ctx, key.Index, port)
+}
+
+// SetDefault makes a device the default of its kind.
+func (s *Service) SetDefault(ctx context.Context, key DeviceKey) error {
+	name, conn, err := s.device(key)
+	if err != nil {
+		return err
+	}
+	if key.Type == DeviceOutput {
+		return conn.SetDefaultSink(ctx, name)
+	}
+	return conn.SetDefaultSource(ctx, name)
 }
 
 // SetStreamVolume sets a stream's per-channel volume.
@@ -495,24 +659,26 @@ func (s *Service) SetStreamVolume(ctx context.Context, key StreamKey, v Volume) 
 	if v.Channels() == 0 {
 		return ErrEmptyVolume
 	}
-	if err := s.hasStream(key); err != nil {
+	conn, err := s.stream(key)
+	if err != nil {
 		return err
 	}
 	if key.Type == StreamPlayback {
-		return s.conn.SetSinkInputVolume(ctx, key.Index, v.toPulse())
+		return conn.SetSinkInputVolume(ctx, key.Index, v.toPulse())
 	}
-	return s.conn.SetSourceOutputVolume(ctx, key.Index, v.toPulse())
+	return conn.SetSourceOutputVolume(ctx, key.Index, v.toPulse())
 }
 
 // SetStreamMute mutes or unmutes a stream.
 func (s *Service) SetStreamMute(ctx context.Context, key StreamKey, muted bool) error {
-	if err := s.hasStream(key); err != nil {
+	conn, err := s.stream(key)
+	if err != nil {
 		return err
 	}
 	if key.Type == StreamPlayback {
-		return s.conn.SetSinkInputMute(ctx, key.Index, muted)
+		return conn.SetSinkInputMute(ctx, key.Index, muted)
 	}
-	return s.conn.SetSourceOutputMute(ctx, key.Index, muted)
+	return conn.SetSourceOutputMute(ctx, key.Index, muted)
 }
 
 // MoveStream routes a stream to another device: a playback stream to
@@ -521,14 +687,15 @@ func (s *Service) MoveStream(ctx context.Context, key StreamKey, device DeviceKe
 	if device.Type != key.Type.deviceType() {
 		return fmt.Errorf("pulse: a %s stream cannot move to an %s device", key.Type, device.Type)
 	}
-	if err := s.hasStream(key); err != nil {
+	conn, err := s.stream(key)
+	if err != nil {
 		return err
 	}
-	if _, err := s.device(device); err != nil {
+	if _, _, err := s.device(device); err != nil {
 		return err
 	}
 	if key.Type == StreamPlayback {
-		return s.conn.MoveSinkInput(ctx, key.Index, device.Index)
+		return conn.MoveSinkInput(ctx, key.Index, device.Index)
 	}
-	return s.conn.MoveSourceOutput(ctx, key.Index, device.Index)
+	return conn.MoveSourceOutput(ctx, key.Index, device.Index)
 }

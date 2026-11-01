@@ -76,7 +76,7 @@ func New(t testing.TB) *Server {
 		},
 	}
 	s.wg.Add(1)
-	go s.accept()
+	go s.accept(ln)
 	t.Cleanup(s.Close)
 	return s
 }
@@ -84,11 +84,30 @@ func New(t testing.TB) *Server {
 // Addr is the server string for native.Options.Server / PULSE_SERVER.
 func (s *Server) Addr() string { return "unix:" + s.path }
 
-// Close stops accepting and drops every client.
+// Close stops accepting and drops every client: the server is down
+// until Listen.
 func (s *Server) Close() {
-	_ = s.ln.Close()
+	s.mu.Lock()
+	ln := s.ln
+	s.mu.Unlock()
+	_ = ln.Close()
 	s.Disconnect()
 	s.wg.Wait()
+}
+
+// Listen brings a closed server back on the same socket, its devices,
+// streams, and defaults kept, as a restarted sound server.
+func (s *Server) Listen(t testing.TB) {
+	t.Helper()
+	ln, err := net.Listen("unix", s.path)
+	if err != nil {
+		t.Fatalf("pulsetest: listen: %v", err)
+	}
+	s.mu.Lock()
+	s.ln = ln
+	s.mu.Unlock()
+	s.wg.Add(1)
+	go s.accept(ln)
 }
 
 // SetVersion changes the protocol version later handshakes announce.
@@ -332,10 +351,10 @@ func (r *Record) Kill() {
 	s.RemoveSourceOutput(r.SourceOutput)
 }
 
-func (s *Server) accept() {
+func (s *Server) accept(ln net.Listener) {
 	defer s.wg.Done()
 	for {
-		nc, err := s.ln.Accept()
+		nc, err := ln.Accept()
 		if err != nil {
 			return
 		}

@@ -169,11 +169,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 	backlights := brightness.NewSystem(cfg.Brightness.EnableExternal)
 	defer func() { _ = backlights.Close() }()
 	baseCtx.Brightness = backlights
-	audio := connectAudio()
-	if audio != nil {
-		defer func() { _ = audio.Close() }()
-		baseCtx.Pulse = audio
-	}
+	audio := pulse.Start("")
+	defer func() { _ = audio.Close() }()
+	baseCtx.Pulse = audio
 	// lateStarts are the clients that could not start without their
 	// service; each starts when the service appears.
 	lateStarts := map[string]lateStart{}
@@ -290,12 +288,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 		} else {
 			log.Printf("brightness: daemon: %v", err)
 		}
-		if audio != nil {
-			if release, err := pulse.NewDaemon(audio).Export(conn); err == nil {
-				defer release()
-			} else {
-				log.Printf("audio: daemon: %v", err)
-			}
+		if release, err := pulse.NewDaemon(audio).Export(conn); err == nil {
+			defer release()
+		} else {
+			log.Printf("audio: daemon: %v", err)
 		}
 	}
 	stopMail := startMail(&baseCtx)
@@ -516,20 +512,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 		}
 	}()
 	return application.Run()
-}
-
-// connectAudio starts the audio service (the Rust bootstrap's
-// AudioService with its daemon). A missing sound server leaves the
-// shell without audio, logged, rather than failing it.
-func connectAudio() *pulse.Service {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	audio, err := pulse.Connect(ctx, "")
-	if err != nil {
-		log.Printf("audio: %v", err)
-		return nil
-	}
-	return audio
 }
 
 // barConfigFor shows one output's bar on lys-ui's bar window: anchored

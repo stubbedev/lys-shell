@@ -441,19 +441,15 @@ func TestSubscribeLifetime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv.Disconnect()
-	waitClosed(t, ticks, "disconnect")
-	select {
-	case <-s.Done():
-	case <-time.After(5 * time.Second):
-		t.Fatal("Done did not close on disconnect")
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
 	}
-	if _, _, err := s.Subscribe(context.Background()); err == nil {
-		t.Error("Subscribe on a dead service succeeded")
+	waitClosed(t, ticks, "close")
+	if _, _, err := s.Subscribe(context.Background()); !errors.Is(err, ErrClosed) {
+		t.Errorf("Subscribe after Close = %v, want ErrClosed", err)
 	}
-	// The last state stays readable, frozen, like the Rust properties.
-	if len(s.OutputDevices()) != 2 {
-		t.Error("state vanished with the connection")
+	if err := s.SetMuted(context.Background(), true); err == nil {
+		t.Error("a control after Close succeeded")
 	}
 }
 

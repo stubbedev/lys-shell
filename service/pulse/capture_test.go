@@ -195,3 +195,30 @@ func TestCaptureEndsWithTheService(t *testing.T) {
 		t.Fatal("Close hung after the connection died")
 	}
 }
+
+func TestCaptureResumesOnTheNextConnection(t *testing.T) {
+	captureRetry = 20 * time.Millisecond
+	t.Cleanup(func() { captureRetry = time.Second })
+	fastReconnect(t)
+	srv := fixture(t)
+	s := connect(t, srv)
+	c, data := startCapture(t, s, CaptureDefaultMonitor(), cavaSpec(1))
+	first := onlyRecord(t, srv)
+	srv.Close()
+	waitFor(t, "the capture to lose its source", func() bool { return c.Source() == "" })
+	srv.Listen(t)
+	next := onlyRecord(t, srv)
+	if next == first {
+		t.Fatal("the stream of the lost connection is still listed")
+	}
+	waitFor(t, "the capture to follow the reconnect", func() bool { return c.Source() == "speakers.monitor" })
+	next.Push([]byte{7, 0})
+	select {
+	case b := <-data:
+		if !bytes.Equal(b, []byte{7, 0}) {
+			t.Errorf("chunk = %v", b)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no audio after the reconnect")
+	}
+}
