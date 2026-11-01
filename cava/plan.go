@@ -162,7 +162,7 @@ func (p *Plan) computeBands() {
 
 	for n := 0; n <= p.bars; n++ {
 		coefficient := -frequencyConstant +
-			float64(n+1)/float64(p.bars+1)*frequencyConstant
+			float64(float64(n+1)/float64(p.bars+1)*frequencyConstant)
 		cutoffFrequency[n] = float32(p.highCutoff) * float32(math.Pow(10, coefficient))
 
 		if n > 0 && cutoffFrequency[n-1] >= cutoffFrequency[n] {

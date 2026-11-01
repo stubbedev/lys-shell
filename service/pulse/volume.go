@@ -151,7 +151,7 @@ func (v Volume) ToPercentage() []float64 {
 }
 
 // AveragePercentage is the channel mean as a percentage.
-func (v Volume) AveragePercentage() float64 { return v.Average() * 100 }
+func (v Volume) AveragePercentage() float64 { return float64(v.Average() * 100) }
 
 // IsMuted reports every channel at 0.0.
 func (v Volume) IsMuted() bool {

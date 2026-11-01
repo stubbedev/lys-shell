@@ -51,8 +51,8 @@ func (a monitorArea) place(s outputSlot, w, h int) render.Rect {
 		}
 		return float64(v) / mh * float64(h)
 	}
-	offX := max(float64(w)-tx(a.width), 0) / 2
-	offY := max(float64(h)-ty(a.height), 0) / 2
+	offX := float64(max(float64(w)-tx(a.width), 0) / 2)
+	offY := float64(max(float64(h)-ty(a.height), 0) / 2)
 	return render.Rect{
 		X: int(offX + tx(s.x-a.minX)),
 		Y: int(offY + ty(s.y-a.minY)),

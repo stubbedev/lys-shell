@@ -86,7 +86,7 @@ func newWindow(k *kit, cfg *config.Config, after func(time.Duration, func())) *w
 // sidebarLimit is setup_paned_clamp's bound on the sidebar's width:
 // 25rem at the current styling scale.
 func (w *window) sidebarLimit() int {
-	return int(maxSidebarRem*basePxPerRem*float64(w.k.store.svc.Config().Styling.Scale) + 0.5)
+	return int(float64(maxSidebarRem*basePxPerRem*float64(w.k.store.svc.Config().Styling.Scale)) + 0.5)
 }
 
 // show builds the page fresh and cross-fades to it (show_page); the

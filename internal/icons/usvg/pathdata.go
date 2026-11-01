@@ -340,7 +340,7 @@ func arcFromSVG(fromX, fromY, toX, toY, radX, radY, xRotation float64, largeArc,
 	if largeArc == sweep {
 		signCoe = -1
 	}
-	coe := float64(signCoe * math.Sqrt(math.Abs((rxry*rxry-sumOfSq)/sumOfSq)))
+	coe := float64(signCoe * math.Sqrt(math.Abs((float64(rxry*rxry)-sumOfSq)/sumOfSq)))
 	tcx := coe * rxpy / ry
 	tcy := -coe * rypx / rx
 	cx := float64(cosPhi*tcx) - float64(sinPhi*tcy) + hsX

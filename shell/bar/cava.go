@@ -76,7 +76,7 @@ func newSpectrum(cfg config.CavaConfig, bars int, color render.Color, scale floa
 // cavaWidgetLength is calculate_widget_length: every bar and gap plus
 // the padding at both ends, at least one pixel.
 func cavaWidgetLength(bars, barWidth, barGap int, padding float64) int {
-	total := float64(bars*barWidth) + float64(max(bars-1, 0)*barGap) + 2*padding
+	total := float64(bars*barWidth) + float64(max(bars-1, 0)*barGap) + float64(2*padding)
 	return max(int(math.Round(total)), 1)
 }
 
@@ -200,13 +200,13 @@ func (s *spectrum) Paint(cv *render.Canvas) {
 func (s *spectrum) paintBars(cv *render.Canvas, c spectrumCanvas) {
 	stride := s.width + s.gap
 	for i, amp := range s.values {
-		u := s.pad + float64(i)*stride
+		u := s.pad + float64(float64(i)*stride)
 		h := math.Min(math.Max(amp*c.h, cavaMinBarHeight), c.h)
 		c.fillRect(cv, u, barOrigin(s.dir, h, c.h), s.width, h, s.color)
 		if s.style != config.CavaStylePeaks {
 			continue
 		}
-		peak := s.peaks[i] * c.h
+		peak := float64(s.peaks[i] * c.h)
 		if peak <= h {
 			continue
 		}
@@ -215,9 +215,9 @@ func (s *spectrum) paintBars(cv *render.Canvas, c spectrumCanvas) {
 		case config.CavaDirectionReverse:
 			c.fillRect(cv, u, peak, s.width, capH, s.color)
 		case config.CavaDirectionMirror:
-			center := c.h / 2
-			c.fillRect(cv, u, center-peak/2-capH, s.width, capH, s.color)
-			c.fillRect(cv, u, center+peak/2, s.width, capH, s.color)
+			center := float64(c.h / 2)
+			c.fillRect(cv, u, center-float64(peak/2)-capH, s.width, capH, s.color)
+			c.fillRect(cv, u, center+float64(peak/2), s.width, capH, s.color)
 		default:
 			c.fillRect(cv, u, c.h-peak-capH, s.width, capH, s.color)
 		}
@@ -229,7 +229,7 @@ func (s *spectrum) paintBars(cv *render.Canvas, c spectrumCanvas) {
 // back along its reflection).
 func (s *spectrum) paintWave(cv *render.Canvas, c spectrumCanvas) {
 	n := len(s.values)
-	width := math.Max(c.w-2*s.pad, 0)
+	width := math.Max(c.w-float64(2*s.pad), 0)
 	spacing := width
 	if n > 1 {
 		spacing = width / float64(n-1)
@@ -239,35 +239,35 @@ func (s *spectrum) paintWave(cv *render.Canvas, c spectrumCanvas) {
 		amp = math.Max(amp, minAmp)
 		switch s.dir {
 		case config.CavaDirectionReverse:
-			return c.h * amp
+			return float64(c.h * amp)
 		case config.CavaDirectionMirror:
-			return c.h * (1 - amp) / 2
+			return float64(c.h * (1 - amp) / 2)
 		}
-		return c.h * (1 - amp)
+		return float64(c.h * (1 - amp))
 	}
 	var p render.Path
 	at := func(u, v float64) (float64, float64) { return c.point(s.pad+u, v) }
 	p.MoveTo(at(0, y(s.values[0])))
 	curve := func(u0, v0, u1, v1 float64) {
-		mid := (u0 + u1) / 2
+		mid := float64((u0 + u1) / 2)
 		x1, y1 := at(mid, v0)
 		x2, y2 := at(mid, v1)
 		x3, y3 := at(u1, v1)
 		p.CubeTo(x1, y1, x2, y2, x3, y3)
 	}
 	for i := 1; i < n; i++ {
-		curve(float64(i-1)*spacing, y(s.values[i-1]), float64(i)*spacing, y(s.values[i]))
+		curve(float64(float64(i-1)*spacing), y(s.values[i-1]), float64(float64(i)*spacing), y(s.values[i]))
 	}
 	switch s.dir {
 	case config.CavaDirectionReverse:
 		p.LineTo(at(width, 0))
 		p.LineTo(at(0, 0))
 	case config.CavaDirectionMirror:
-		center := c.h / 2
-		mirror := func(i int) float64 { return center + math.Max(s.values[i], minAmp)*c.h/2 }
-		p.LineTo(at(float64(n-1)*spacing, mirror(n-1)))
+		center := float64(c.h / 2)
+		mirror := func(i int) float64 { return center + float64(math.Max(s.values[i], minAmp)*c.h/2) }
+		p.LineTo(at(float64(float64(n-1)*spacing), mirror(n-1)))
 		for i := n - 2; i >= 0; i-- {
-			curve(float64(i+1)*spacing, mirror(i+1), float64(i)*spacing, mirror(i))
+			curve(float64(float64(i+1)*spacing), mirror(i+1), float64(float64(i)*spacing), mirror(i))
 		}
 	default:
 		p.LineTo(at(width, c.h))

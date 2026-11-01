@@ -156,7 +156,7 @@ func colorScheme(s config.StylingConfig) uint32 {
 		return 0
 	}
 	r, g, b := rgb(bg)
-	if 0.2126*r+0.7152*g+0.0722*b < 0.5 {
+	if float64(0.2126*r)+float64(0.7152*g)+float64(0.0722*b) < 0.5 {
 		return 1
 	}
 	return 2

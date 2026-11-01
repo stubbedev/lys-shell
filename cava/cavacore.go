@@ -22,9 +22,9 @@ func (p *Plan) Execute(dst, samples []float64) []float64 {
 
 	silence := true
 	if newSamples > 0 {
-		p.framerate -= p.framerate / 64
+		p.framerate -= float64(p.framerate / 64)
 		// The C divides in integers before the conversion.
-		p.framerate += float64(p.rate*p.channels*p.frameSkip/newSamples) / 64
+		p.framerate += float64(float64(p.rate*p.channels*p.frameSkip/newSamples) / 64)
 		p.frameSkip = 1
 		copy(p.inputBuffer[newSamples:], p.inputBuffer[:len(p.inputBuffer)-newSamples])
 		for n := range newSamples {
@@ -76,7 +76,7 @@ func (p *Plan) Execute(dst, samples []float64) []float64 {
 
 	for n := range out {
 		if out[n] < p.prev[n] && p.noiseReduction > 0.1 {
-			out[n] = p.peak[n] * (1 - p.fall[n]*p.fall[n]*gravityMod)
+			out[n] = p.peak[n] * (1 - float64(p.fall[n]*p.fall[n]*gravityMod))
 			if out[n] < 0 {
 				out[n] = 0
 			}
@@ -87,7 +87,7 @@ func (p *Plan) Execute(dst, samples []float64) []float64 {
 		}
 		p.prev[n] = out[n]
 
-		out[n] = p.mem[n]*p.noiseReduction + out[n]
+		out[n] = float64(p.mem[n]*p.noiseReduction) + out[n]
 		p.mem[n] = out[n]
 		if p.autosens && out[n] > 1.0 {
 			// The C clamps the output after the integrator stored it, so

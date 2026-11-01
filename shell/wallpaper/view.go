@@ -67,7 +67,7 @@ func stackTransition(t config.AnimationType) TransitionKind {
 // easeOutCubic is GtkStack's progress curve.
 func easeOutCubic(t float64) float64 {
 	p := t - 1
-	return p*p*p + 1
+	return float64(p*p*p) + 1
 }
 
 // shown is one image the view draws and how it lets go of it.

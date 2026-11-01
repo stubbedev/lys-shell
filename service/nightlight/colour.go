@@ -65,14 +65,14 @@ func (s Setting) eased(fraction float64) Setting {
 	case fraction >= 1:
 		return s
 	}
-	gamma := identity.gamma + (s.gamma-identity.gamma)*fraction
+	gamma := identity.gamma + float64((s.gamma-identity.gamma)*fraction)
 	if s.temp == identity.temp {
 		return Setting{temp: identity.temp, gamma: gamma}
 	}
 	from, to := miredsPerKelvin/identity.temp, miredsPerKelvin/s.temp
 	seam := fitSeam(s.temp)
 	return Setting{
-		temp:  miredsPerKelvin / (from + (to-from)*fraction),
+		temp:  miredsPerKelvin / (from + float64((to-from)*fraction)),
 		gamma: gamma,
 		lift:  [3]float64{seam[0] * (1 - fraction), seam[1] * (1 - fraction), seam[2] * (1 - fraction)},
 	}
@@ -89,7 +89,7 @@ func whitepoint(temp float64) [3]float64 {
 	var r, g, b float64
 	if t <= 66 {
 		r = 255
-		g = clamp255(99.4708025861*math.Log(t) - 161.1195681661)
+		g = clamp255(float64(99.4708025861*math.Log(t)) - 161.1195681661)
 	} else {
 		r = clamp255(329.698727446 * math.Pow(t-60, -0.1332047592))
 		g = coolGreen(t)
@@ -105,7 +105,9 @@ func whitepoint(temp float64) [3]float64 {
 
 func coolGreen(t float64) float64 { return clamp255(288.1221695283 * math.Pow(t-60, -0.0755148492)) }
 
-func warmBlue(t float64) float64 { return clamp255(138.5177312231*math.Log(t-10) - 305.0447927307) }
+func warmBlue(t float64) float64 {
+	return clamp255(float64(138.5177312231*math.Log(t-10)) - 305.0447927307)
+}
 
 // fitSeam is how far the fit's piece on temp's side of neutralTemp stops
 // short of the identity: the fit's pieces do not meet there, so an ease

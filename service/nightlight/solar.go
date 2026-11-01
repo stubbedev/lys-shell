@@ -147,18 +147,18 @@ func sunTimesFor(now time.Time, latitude, longitude, altitude float64) sunTimes 
 	jStar := n + lW/360.0
 
 	// Solar mean anomaly (degrees).
-	m := remEuclid(357.5291+0.985_600_28*jStar, 360.0)
+	m := remEuclid(357.5291+float64(0.985_600_28*jStar), 360.0)
 	mRad := radians(m)
 
 	// Equation of the center (degrees).
-	c := 1.9148*math.Sin(mRad) + 0.0200*math.Sin(2.0*mRad) + 0.0003*math.Sin(3.0*mRad)
+	c := float64(1.9148*math.Sin(mRad)) + float64(0.0200*math.Sin(2.0*mRad)) + float64(0.0003*math.Sin(3.0*mRad))
 
 	// Ecliptic longitude (degrees).
 	lambda := remEuclid(m+c+180.0+102.9372, 360.0)
 	lambdaRad := radians(lambda)
 
 	// Solar transit (Julian date of solar noon).
-	jTransit := 2_451_545.0 + jStar + 0.0053*math.Sin(mRad) - 0.0069*math.Sin(2.0*lambdaRad)
+	jTransit := 2_451_545.0 + jStar + float64(0.0053*math.Sin(mRad)) - float64(0.0069*math.Sin(2.0*lambdaRad))
 
 	// Sun declination.
 	sinDecl := math.Sin(lambdaRad) * math.Sin(radians(23.4397))
@@ -172,7 +172,7 @@ func sunTimesFor(now time.Time, latitude, longitude, altitude float64) sunTimes 
 
 	// Hour angle at the altitude.
 	latRad := radians(latitude)
-	cosOmega := (math.Sin(radians(altitude)) - math.Sin(latRad)*math.Sin(decl)) /
+	cosOmega := (math.Sin(radians(altitude)) - float64(math.Sin(latRad)*math.Sin(decl))) /
 		(math.Cos(latRad) * math.Cos(decl))
 
 	if cosOmega < -1.0 {

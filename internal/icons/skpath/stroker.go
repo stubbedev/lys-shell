@@ -655,7 +655,7 @@ func (s *stroker) strokeCloseEnough(stroke *[3]Point, ray [2]Point, qp *quadCons
 		return resultSplit
 	}
 	quadPt := evalQuadAt(stroke, roots[0])
-	e := float32(s.invResScale * (1 - absf(roots[0]-0.5)*2))
+	e := float32(s.invResScale * (1 - float32(absf(roots[0]-0.5)*2)))
 	if pointsWithinDist(ray[0], quadPt, e) {
 		if sharpAngle(&qp.quad) {
 			return resultSplit

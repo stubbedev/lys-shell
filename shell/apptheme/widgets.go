@@ -55,7 +55,7 @@ func WidgetTheme(p *styling.Palette, cfg *config.Config) *widget.Theme {
 // isLight reports a background bright enough for dark text: its
 // Rec. 709 luma above the midpoint.
 func isLight(c widget.Color) bool {
-	luma := 0.2126*float64(c.R()) + 0.7152*float64(c.G()) + 0.0722*float64(c.B())
+	luma := float64(0.2126*float64(c.R())) + float64(0.7152*float64(c.G())) + float64(0.0722*float64(c.B()))
 	return luma > 127.5
 }
 

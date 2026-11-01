@@ -203,19 +203,19 @@ func viewBoxTransform(vb rect, aspect aspectRatio, w, h float32) skpath.Transfor
 func alignedPos(a align, x, y, w, h float32) (float32, float32) {
 	switch a {
 	case alignXMidYMin:
-		return x + w/2, y
+		return x + float32(w/2), y
 	case alignXMaxYMin:
 		return x + w, y
 	case alignXMinYMid:
-		return x, y + h/2
+		return x, y + float32(h/2)
 	case alignXMidYMid:
-		return x + w/2, y + h/2
+		return x + float32(w/2), y + float32(h/2)
 	case alignXMaxYMid:
-		return x + w, y + h/2
+		return x + w, y + float32(h/2)
 	case alignXMinYMax:
 		return x, y + h
 	case alignXMidYMax:
-		return x + w/2, y + h
+		return x + float32(w/2), y + h
 	case alignXMaxYMax:
 		return x + w, y + h
 	default:

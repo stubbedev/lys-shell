@@ -17,7 +17,7 @@ func evalQuadAt(src *[3]Point, t float32) Point {
 	p2 := src[2]
 	b := times2(p1.sub(c))
 	a := p2.sub(times2(p1)).add(c)
-	return Point{float32((a.X*t+b.X)*t) + c.X, float32((a.Y*t+b.Y)*t) + c.Y}
+	return Point{float32((float32(a.X*t)+b.X)*t) + c.X, float32((float32(a.Y*t)+b.Y)*t) + c.Y}
 }
 
 func evalQuadTangentAt(src *[3]Point, t float32) Point {
@@ -35,7 +35,7 @@ func evalCubicPosAt(src *[4]Point, t float32) Point {
 	a := Point{p3.X + float32(3*(p1.X-p2.X)) - p0.X, p3.Y + float32(3*(p1.Y-p2.Y)) - p0.Y}
 	b := Point{float32(3 * (p2.X - (p1.X + p1.X) + p0.X)), float32(3 * (p2.Y - (p1.Y + p1.Y) + p0.Y))}
 	c := Point{float32(3 * (p1.X - p0.X)), float32(3 * (p1.Y - p0.Y))}
-	return Point{float32(((a.X*t+b.X)*t+c.X)*t) + p0.X, float32(((a.Y*t+b.Y)*t+c.Y)*t) + p0.Y}
+	return Point{float32((float32((float32(a.X*t)+b.X)*t)+c.X)*t) + p0.X, float32((float32((float32(a.Y*t)+b.Y)*t)+c.Y)*t) + p0.Y}
 }
 
 func evalCubicTangentAt(src *[4]Point, t float32) Point {
@@ -59,7 +59,7 @@ func evalCubicDerivative(src *[4]Point, t float32) Point {
 	a := Point{p3.X + float32(3*(p1.X-p2.X)) - p0.X, p3.Y + float32(3*(p1.Y-p2.Y)) - p0.Y}
 	b := times2(p2.sub(times2(p1)).add(p0))
 	c := p1.sub(p0)
-	return Point{float32((a.X*t+b.X)*t) + c.X, float32((a.Y*t+b.Y)*t) + c.Y}
+	return Point{float32((float32(a.X*t)+b.X)*t) + c.X, float32((float32(a.Y*t)+b.Y)*t) + c.Y}
 }
 
 func chopQuadAt(src []Point, t float32, dst *[5]Point) {
@@ -284,8 +284,8 @@ func (c conic) computeQuadPow2(tol float32) (int, bool) {
 	}
 	a := c.weight - 1
 	k := a / (4 * (2 + a))
-	x := float32(k * (c.points[0].X - 2*c.points[1].X + c.points[2].X))
-	y := float32(k * (c.points[0].Y - 2*c.points[1].Y + c.points[2].Y))
+	x := float32(k * (c.points[0].X - float32(2*c.points[1].X) + c.points[2].X))
+	y := float32(k * (c.points[0].Y - float32(2*c.points[1].Y) + c.points[2].Y))
 	e := sqrtf(float32(x*x) + float32(y*y))
 	pow2 := 0
 	for range 4 {

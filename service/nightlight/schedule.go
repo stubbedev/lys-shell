@@ -54,7 +54,7 @@ func TargetAt(now time.Time, loc Location, transition Transition, night Setting)
 	case st.polarNight:
 		target.Setting = night
 	default:
-		day := easedPast(now, st.rise, length) * (1 - easedPast(now, st.set, length))
+		day := float64(easedPast(now, st.rise, length) * (1 - easedPast(now, st.set, length)))
 		target.Setting = night.eased(1 - day)
 		target.Easing = inTransition(now, st.rise, length) || inTransition(now, st.set, length)
 	}
