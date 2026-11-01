@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -60,6 +61,41 @@ func (f *fakeSunset) env(t *testing.T) sunsetEnv {
 		locate: func(context.Context) (nightlight.Location, error) {
 			return nightlight.Location{}, errors.New("no GeoClue in this test")
 		},
+		clockJumps: func(ctx context.Context, _ func()) error {
+			<-ctx.Done()
+			return nil
+		},
+	}
+}
+
+// clockWatch is a scripted clockJumps: it hands the test the callback
+// the module gave it, and says when the module's context ended it.
+type clockWatch struct {
+	onJump chan func()
+	ended  chan struct{}
+}
+
+func (f *fakeSunset) watchedEnv(t *testing.T) (sunsetEnv, *clockWatch) {
+	t.Helper()
+	w := &clockWatch{onJump: make(chan func(), 1), ended: make(chan struct{})}
+	env := f.env(t)
+	env.clockJumps = func(ctx context.Context, onJump func()) error {
+		w.onJump <- onJump
+		<-ctx.Done()
+		close(w.ended)
+		return nil
+	}
+	return env, w
+}
+
+func (w *clockWatch) jump(t *testing.T) func() {
+	t.Helper()
+	select {
+	case jump := <-w.onJump:
+		return jump
+	case <-time.After(5 * time.Second):
+		t.Fatal("the module never watched the clock")
+		return nil
 	}
 }
 
@@ -829,6 +865,176 @@ func TestNightlightStepsOnItsTimer(t *testing.T) {
 	defer headlessLoop.Unlock()
 	if fake.starts != stopped {
 		t.Error("the module stepped after Stop")
+	}
+}
+
+// A resume lands on the moment's value at once, not on the next minute
+// tick, without passing through anything in between, and rearms the timer.
+func TestNightlightCatchesUpOnAClockJump(t *testing.T) {
+	cfg := sunsetConfig(true)
+	night, err := nightlight.NewSetting(int(cfg.Nightlight.Temperature), int(cfg.Nightlight.Gamma))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeSunset{clock: sunsetDay}
+	env, watch := fake.watchedEnv(t)
+	m := newTestNightlight(t, cfg, env)
+	m.run()
+	t.Cleanup(m.Stop)
+	jump := watch.jump(t)
+	waitForSchedule(t, func() bool { return m.timer != nil })
+
+	headlessLoop.Lock()
+	fake.clock = sunsetNight.Add(24 * time.Hour)
+	headlessLoop.Unlock()
+	jump()
+	waitForSchedule(t, func() bool { return fake.running })
+	headlessLoop.Lock()
+	if fake.applied != night || fake.starts != 1 {
+		t.Errorf("after waking at night: applied %+v in %d applies, want %+v in one", fake.applied, fake.starts, night)
+	}
+	fake.clock = sunsetDay.Add(24 * time.Hour)
+	headlessLoop.Unlock()
+	jump()
+	waitForSchedule(t, func() bool { return !fake.running })
+	headlessLoop.Lock()
+	defer headlessLoop.Unlock()
+	if fake.stops != 1 || fake.starts != 1 {
+		t.Errorf("after waking by day: %d stops and %d applies, want one of each", fake.stops, fake.starts)
+	}
+}
+
+// Waking inside a transition lands partway along it and steps from there.
+func TestNightlightWakesIntoAnEase(t *testing.T) {
+	cfg := sunsetConfig(true)
+	start, length := duskEase(t, cfg)
+	fake := &fakeSunset{clock: start.Add(-time.Hour)}
+	env, watch := fake.watchedEnv(t)
+	m := newTestNightlight(t, cfg, env)
+	m.run()
+	t.Cleanup(m.Stop)
+	jump := watch.jump(t)
+	waitForSchedule(t, func() bool { return m.timer != nil })
+	headlessLoop.Lock()
+	fake.clock = start.Add(length / 2)
+	want := nightlight.TargetAt(fake.clock, mustLocation(t, 55.6, 12.5), cfg.Nightlight.TransitionDuration.Transition(), m.night).Setting
+	headlessLoop.Unlock()
+	jump()
+	waitForSchedule(t, func() bool { return fake.running })
+	headlessLoop.Lock()
+	defer headlessLoop.Unlock()
+	if fake.applied != want {
+		t.Errorf("applied %+v, want the ease's %+v", fake.applied, want)
+	}
+	if !m.stepping {
+		t.Error("the module woke into an ease and is not stepping")
+	}
+}
+
+// A manual toggle outlasts a jump that stays inside its phase.
+func TestNightlightClockJumpKeepsAToggleInItsPhase(t *testing.T) {
+	fake := &fakeSunset{clock: sunsetDay}
+	env, watch := fake.watchedEnv(t)
+	m := newTestNightlight(t, sunsetConfig(true), env)
+	m.run()
+	t.Cleanup(m.Stop)
+	jump := watch.jump(t)
+	waitForSchedule(t, func() bool { return m.timer != nil })
+	headlessLoop.Lock()
+	m.toggle()
+	fake.clock = sunsetDay.Add(time.Hour)
+	headlessLoop.Unlock()
+	jump()
+	time.Sleep(50 * time.Millisecond)
+	headlessLoop.Lock()
+	defer headlessLoop.Unlock()
+	if !fake.running || !m.manualOverride {
+		t.Errorf("after the jump: running %v, override %v; want the toggle to hold", fake.running, m.manualOverride)
+	}
+}
+
+// Stop ends the clock watch; with the schedule off it never starts.
+func TestNightlightClockWatchLivesWithTheSchedule(t *testing.T) {
+	fake := &fakeSunset{clock: sunsetDay}
+	env, watch := fake.watchedEnv(t)
+	m := newTestNightlight(t, sunsetConfig(true), env)
+	m.run()
+	watch.jump(t)
+	m.Stop()
+	select {
+	case <-watch.ended:
+	case <-time.After(5 * time.Second):
+		t.Error("Stop left the clock watch running")
+	}
+
+	off := &fakeSunset{clock: sunsetDay}
+	offEnv, offWatch := off.watchedEnv(t)
+	idle := newTestNightlight(t, sunsetConfig(false), offEnv)
+	idle.run()
+	t.Cleanup(idle.Stop)
+	select {
+	case <-offWatch.onJump:
+		t.Error("the schedule is off and the module watches the clock")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// A kernel that refuses the watch costs the prompt wake and nothing else:
+// the schedule runs on its timer, and the log says why.
+func TestNightlightWithoutAClockWatchStillSchedulesAndSaysSo(t *testing.T) {
+	logged := &lockedLog{}
+	prev := log.Writer()
+	log.SetOutput(logged)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	fake := &fakeSunset{clock: sunsetNight}
+	env := fake.env(t)
+	env.clockJumps = func(context.Context, func()) error { return errors.New("timerfd refused") }
+	m := newTestNightlight(t, sunsetConfig(true), env)
+	m.run()
+	t.Cleanup(m.Stop)
+	waitForSchedule(t, func() bool { return fake.running && m.timer != nil })
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(logged.String(), "timerfd refused") {
+		if time.Now().After(deadline) {
+			t.Fatalf("log = %q, want the refusal", logged.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// lockedLog is a log sink a test can read while goroutines write to it.
+type lockedLog struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (l *lockedLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+func (l *lockedLog) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.String()
+}
+
+// The shell's real environment watches the kernel's clock, and lets go
+// with the module.
+func TestNightlightLiveEnvWatchesTheClock(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- liveSunsetEnv().clockJumps(ctx, func() {}) }()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("clockJumps = %v, want nil", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the live clock watch outlived its context")
 	}
 }
 

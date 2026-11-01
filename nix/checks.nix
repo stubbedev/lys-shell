@@ -14,6 +14,12 @@
             inherit self;
             inherit (inputs) lys-secrets lys-login;
           };
+          # internal/clockwatch on a real kernel, stepping the clock and
+          # suspending, in a NixOS VM (needs KVM); see
+          # tests/clockwatch-vm.nix.
+          lys-shell-clockwatch-vm = pkgs.callPackage ../tests/clockwatch-vm.nix {
+            inherit self;
+          };
           # The shell on lys-wm in a NixOS VM (needs KVM); see
           # tests/lys-wm-vm.nix.
           lys-shell-lys-wm-vm = pkgs.callPackage ../tests/lys-wm-vm.nix {

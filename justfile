@@ -141,6 +141,11 @@ hyprland-vm:
 lys-wm-vm:
     nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-lys-wm-vm
 
+# The wall-clock jump watcher on a real kernel in a NixOS VM (needs KVM):
+# clock steps and the kernel's suspend and resume.
+clockwatch-vm:
+    nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-clockwatch-vm
+
 # Every release gate in order: vet, lint, test, race, the schema
 # check, and the release build.
 check: vet lint test race schema-check build

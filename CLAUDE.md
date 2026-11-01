@@ -14,6 +14,7 @@ nix develop -c just lint    # golangci-lint fmt --diff + golangci-lint run
 nix develop -c just check   # vet + lint + test + race + schema-check + build, run before every release
 just docker check           # any recipe in the dev shell inside a container, away from the desktop session
 just hyprland-vm            # the shell on a live Hyprland in a NixOS VM (KVM), screenshots in ./result
+just clockwatch-vm          # the clock-jump watcher on a real kernel in a NixOS VM (KVM): clock steps and suspend
 ```
 
 After a `go.mod` change (a lys-ui bump), refresh `nix/lys-shell.nix`'s

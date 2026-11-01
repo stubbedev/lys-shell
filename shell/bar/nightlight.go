@@ -15,15 +15,17 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/clockwatch"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
 )
 
-// The schedule's cadence. It wakes every nightlightScheduleTick to catch
-// a suspend or a clock change and steps every nightlightEaseTick inside
-// a transition, where 900 steps over the default 15 minutes keep each
-// one below what shows. A location refreshes every
+// The schedule's cadence. A jump of the clock, as a resume from suspend
+// is, wakes it at once; otherwise it wakes every nightlightScheduleTick,
+// all it has should the kernel refuse to report jumps, and steps every
+// nightlightEaseTick inside a transition, where 900 steps over the
+// default 15 minutes keep each one below what shows. A location refreshes every
 // nightlightLocationEach, and a failed lookup retries sooner so a
 // GeoClue that comes up after the shell is picked up.
 const (
@@ -69,6 +71,9 @@ type sunsetEnv struct {
 	stateDir string
 	// locate resolves the schedule location.
 	locate func(ctx context.Context) (nightlight.Location, error)
+	// clockJumps calls onJump on every jump of the wall clock until ctx
+	// ends, and returns why not if it cannot.
+	clockJumps func(ctx context.Context, onJump func()) error
 }
 
 // liveSunsetEnv is the real environment.
@@ -92,6 +97,7 @@ func liveSunsetEnv() sunsetEnv {
 			defer func() { _ = conn.Close() }()
 			return nightlight.QueryLocation(ctx, conn)
 		},
+		clockJumps: clockwatch.Watch,
 	}
 }
 
@@ -214,13 +220,26 @@ func (m *nightlightModule) resolveStartLocation() {
 	}
 }
 
-// run starts the watchers: the schedule's timer and, unless the config
-// pins the location, the GeoClue lookup.
+// run starts the watchers: the schedule's timer and, with the schedule
+// on, the clock and, unless the config pins the location, the GeoClue
+// lookup.
 func (m *nightlightModule) run() {
 	m.life, m.cancel = context.WithCancel(m.ctx.Life())
 	m.ctx.Invoke(m.tick)
-	if m.ctx.Config.Nightlight.AutoSchedule && !m.pinned {
+	if !m.ctx.Config.Nightlight.AutoSchedule {
+		return
+	}
+	go m.followClock(m.life)
+	if !m.pinned {
 		go m.followLocation(m.life)
+	}
+}
+
+// followClock re-evaluates the schedule the moment the clock jumps.
+func (m *nightlightModule) followClock(ctx context.Context) {
+	err := m.env.clockJumps(ctx, func() { m.ctx.Invoke(m.tick) })
+	if err != nil {
+		log.Printf("nightlight: a resume can lag by up to %s: %v", nightlightScheduleTick, err)
 	}
 }
 
