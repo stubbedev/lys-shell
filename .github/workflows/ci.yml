@@ -3,7 +3,15 @@ name: CI
 on:
     push:
         branches: [master]
+        paths:
+            - "**"
+            - "!docs/**"
+            - "docs/config/**"
     pull_request:
+        paths:
+            - "**"
+            - "!docs/**"
+            - "docs/config/**"
 
 permissions:
     contents: read
