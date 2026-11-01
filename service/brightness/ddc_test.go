@@ -360,3 +360,42 @@ func TestSetRawClampsAndRetries(t *testing.T) {
 		t.Errorf("a failed write changed the cached level to %d", d.Brightness)
 	}
 }
+
+func TestClosedManagerOpensNothing(t *testing.T) {
+	fake := newFakeI2C(t)
+	monitor := &fakeMonitor{current: 30, max: 100}
+	fake.plug(t, 3, monitor)
+	opened := 0
+	open := openBus
+	openBus = func(path string) (i2cBus, error) {
+		opened++
+		return open(path)
+	}
+	m := newDDCManager()
+	m.close()
+	added, removed := m.refresh()
+	if len(added)+len(removed) != 0 || opened != 0 || len(m.devices()) != 0 {
+		t.Errorf("refresh after close: added %v, removed %v, %d buses opened", added, removed, opened)
+	}
+}
+
+func TestScanFinishingAfterCloseReleasesWhatItOpened(t *testing.T) {
+	fake := newFakeI2C(t)
+	monitor := &fakeMonitor{current: 30, max: 100}
+	fake.plug(t, 3, monitor)
+	m := newDDCManager()
+	open := openBus
+	openBus = func(path string) (i2cBus, error) {
+		m.close()
+		return open(path)
+	}
+	added, _ := m.refresh()
+	if len(added) != 0 || len(m.devices()) != 0 {
+		t.Errorf("a scan outlasting close kept monitors: added %v, devices %v", added, m.devices())
+	}
+	monitor.mu.Lock()
+	defer monitor.mu.Unlock()
+	if monitor.closes == 0 {
+		t.Error("a scan outlasting close left the bus open")
+	}
+}

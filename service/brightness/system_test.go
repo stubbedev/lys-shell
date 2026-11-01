@@ -399,3 +399,63 @@ func writeFakeDevice(t *testing.T, name, level string) {
 		}
 	}
 }
+
+func TestSetExternalOffClosesTheBusesAndStopsScanning(t *testing.T) {
+	fakeBacklightDir(t, nil)
+	fake := newFakeI2C(t)
+	monitor := &fakeMonitor{current: 40, max: 100}
+	fake.plug(t, 6, monitor)
+	sys, events := newTestSystemWithEvents(t, true)
+	waitFor(t, "the initial DDC scan", func() bool { return len(ddcNames(t, sys)) == 1 })
+	ticks, stop, err := sys.Subscribe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+
+	sys.SetExternal(false)
+	if names := ddcNames(t, sys); len(names) != 0 {
+		t.Errorf("enable-external turned off still lists %v", names)
+	}
+	monitor.mu.Lock()
+	closes := monitor.closes
+	monitor.mu.Unlock()
+	if closes == 0 {
+		t.Error("enable-external turned off left the bus open")
+	}
+	select {
+	case <-ticks:
+	case <-time.After(3 * time.Second):
+		t.Error("no tick after the monitors went away")
+	}
+
+	fake.plug(t, 8, &fakeMonitor{current: 70, max: 100})
+	events <- uevent{Action: "change", Subsystem: "drm", Props: map[string]string{"HOTPLUG": "1"}}
+	time.Sleep(50 * time.Millisecond)
+	if names := ddcNames(t, sys); len(names) != 0 {
+		t.Errorf("a hotplug with enable-external off scanned: %v", names)
+	}
+	if err := sys.Set(context.Background(), "ddci2c-6", 50); err == nil {
+		t.Error("a write to a released monitor succeeded")
+	}
+	if got := monitor.written(); len(got) != 0 {
+		t.Errorf("a released monitor was written: %v", got)
+	}
+}
+
+func TestSetExternalOnScansAndARepeatDoesNot(t *testing.T) {
+	fakeBacklightDir(t, nil)
+	fake := newFakeI2C(t)
+	fake.plug(t, 6, &fakeMonitor{current: 40, max: 100})
+	sys, _ := newTestSystemWithEvents(t, false)
+	if names := ddcNames(t, sys); len(names) != 0 {
+		t.Fatalf("enable-external off found %v", names)
+	}
+	sys.SetExternal(true)
+	waitFor(t, "the scan on enable", func() bool { return len(ddcNames(t, sys)) == 1 })
+	manager := sys.ddc.Load()
+	sys.SetExternal(true)
+	if sys.ddc.Load() != manager {
+		t.Error("enabling twice replaced the manager and its open buses")
+	}
+}

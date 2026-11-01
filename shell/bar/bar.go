@@ -425,6 +425,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 				rt.ctx.Dropdowns.setConfig(next)
 			}
 			osdSrv.SetConfig(next)
+			backlights.SetExternal(next.Brightness.EnableExternal)
 			applyNotificationConfig(notifSvc, next.Notification)
 			weatherSvc.Configure(weatherSettings(next.Weather))
 			if wall != nil {

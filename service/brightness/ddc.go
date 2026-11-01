@@ -263,6 +263,7 @@ func (d *ddcDisplay) close() {
 type ddcManager struct {
 	mu       sync.Mutex
 	displays map[string]*ddcDisplay
+	closed   bool
 }
 
 func newDDCManager() *ddcManager { return &ddcManager{displays: map[string]*ddcDisplay{}} }
@@ -330,9 +331,22 @@ func i2cBuses() []uint32 {
 // ones; the old handles close once any in-flight write finishes.
 // Blocking and slow.
 func (m *ddcManager) refresh() (added, removed []string) {
+	m.mu.Lock()
+	closed := m.closed
+	m.mu.Unlock()
+	if closed {
+		return nil, nil
+	}
 	scanned := scan()
 	next := make(map[string]*ddcDisplay, len(scanned))
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		for _, s := range scanned {
+			s.display.close()
+		}
+		return nil, nil
+	}
 	for _, s := range scanned {
 		if _, ok := m.displays[s.name]; !ok {
 			added = append(added, s.name)
@@ -352,6 +366,19 @@ func (m *ddcManager) refresh() (added, removed []string) {
 	}
 	slices.Sort(removed)
 	return added, removed
+}
+
+// close lets go of every bus; a scan still running discards what it
+// found, and later refreshes open nothing.
+func (m *ddcManager) close() {
+	m.mu.Lock()
+	displays := m.displays
+	m.displays = map[string]*ddcDisplay{}
+	m.closed = true
+	m.mu.Unlock()
+	for _, d := range displays {
+		d.close()
+	}
 }
 
 // display looks one managed monitor up.

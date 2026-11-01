@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -31,7 +32,7 @@ var driftInterval = time.Second
 // on DRM hotplug.
 type System struct {
 	bus *dbus.Conn // logind; nil means sysfs writes only
-	ddc *ddcManager
+	ddc atomic.Pointer[ddcManager]
 
 	mu        sync.Mutex
 	subs      map[chan struct{}]struct{}
@@ -61,11 +62,25 @@ func NewSystem(external bool) *System {
 	if conn, err := sessionBus(); err == nil {
 		s.bus = conn
 	}
-	if external {
-		s.ddc = newDDCManager()
-	}
 	s.start()
+	s.SetExternal(external)
 	return s
+}
+
+// SetExternal follows the enable-external key: on starts a detached DDC
+// scan, off closes every i2c bus held and scans no more until it is on
+// again.
+func (s *System) SetExternal(on bool) {
+	if !on {
+		if m := s.ddc.Swap(nil); m != nil {
+			m.close()
+			s.broadcast()
+		}
+		return
+	}
+	if m := newDDCManager(); s.ddc.CompareAndSwap(nil, m) {
+		s.scanDDC(m, 0)
+	}
 }
 
 func (s *System) start() {
@@ -82,9 +97,6 @@ func (s *System) start() {
 	probe := &levelProbe{}
 	s.rescan(probe)
 	s.done.Go(func() { s.loop(probe) })
-	if s.ddc != nil {
-		s.scanDDC(0)
-	}
 }
 
 // Close stops the watchers and waits for the goroutines; later calls
@@ -190,8 +202,10 @@ func (s *System) loop(probe *levelProbe) {
 					armDrift()
 				}
 				s.broadcast()
-			case ev.isDRMHotplug() && s.ddc != nil:
-				s.scanDDC(s.settle)
+			case ev.isDRMHotplug():
+				if m := s.ddc.Load(); m != nil {
+					s.scanDDC(m, s.settle)
+				}
 			}
 		}
 	}
@@ -199,7 +213,7 @@ func (s *System) loop(probe *levelProbe) {
 
 // scanDDC re-scans detached after settle and ticks subscribers when
 // the monitor set changed (scan_ddc).
-func (s *System) scanDDC(settle time.Duration) {
+func (s *System) scanDDC(m *ddcManager, settle time.Duration) {
 	s.done.Go(func() {
 		if settle > 0 {
 			select {
@@ -208,7 +222,7 @@ func (s *System) scanDDC(settle time.Duration) {
 				return
 			}
 		}
-		added, removed := s.ddc.refresh()
+		added, removed := m.refresh()
 		for _, name := range added {
 			log.Printf("brightness: external DDC monitor connected: %s", name)
 		}
@@ -237,10 +251,11 @@ func (s *System) broadcast() {
 // the level a queued write is heading to.
 func (s *System) Devices(context.Context) ([]Device, error) {
 	devices := Enumerate()
-	if s.ddc == nil {
+	m := s.ddc.Load()
+	if m == nil {
 		return devices, nil
 	}
-	monitors := s.ddc.devices()
+	monitors := m.devices()
 	s.mu.Lock()
 	for i, d := range monitors {
 		if level, ok := s.requested[d.Name]; ok {
@@ -262,9 +277,9 @@ func rawLevel(percent float64, top uint32) uint32 {
 // latest value instead of queueing every step. Write failures are
 // logged, as the Rust caller does with the error it gets back.
 func (s *System) Set(_ context.Context, name string, percent float64) error {
-	if s.ddc != nil {
-		if d, ok := s.ddc.display(name); ok {
-			s.queueDDC(name, rawLevel(percent, d.max))
+	if m := s.ddc.Load(); m != nil {
+		if d, ok := m.display(name); ok {
+			s.queueDDC(m, name, rawLevel(percent, d.max))
 			return nil
 		}
 	}
@@ -287,7 +302,7 @@ func (s *System) Set(_ context.Context, name string, percent float64) error {
 // the monitor's writer if none is running. DDC has no kernel
 // notification, so the writer reports again when it settles, which
 // shows the monitor's real level after a failed write.
-func (s *System) queueDDC(name string, value uint32) {
+func (s *System) queueDDC(m *ddcManager, name string, value uint32) {
 	s.mu.Lock()
 	s.pending[name] = value
 	_, running := s.requested[name]
@@ -309,7 +324,7 @@ func (s *System) queueDDC(name string, value uint32) {
 				return
 			}
 			s.mu.Unlock()
-			if err := s.ddc.setRaw(name, target); err != nil {
+			if err := m.setRaw(name, target); err != nil {
 				log.Printf("%v", err)
 			}
 		}
