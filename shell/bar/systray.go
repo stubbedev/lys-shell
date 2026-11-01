@@ -433,12 +433,12 @@ func newSystray(ctx ModuleContext) (Module, error) {
 	m.root.AddClass("systray")
 	m.want()
 	ticks, stop := ctx.SNI.Subscribe()
+	m.refresh()
 	follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
 	go func() {
 		<-ctx.gen.ended()
 		m.onLoop(m.retire)
 	}()
-	m.refresh()
 	return m, nil
 }
 
