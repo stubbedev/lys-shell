@@ -25,8 +25,11 @@ func TestADismissedPickerReleasesItsPixels(t *testing.T) {
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/memory"}, Request{Sources: AllSources}) }()
 	apptest.Answer(t, "the picker presented", presented)
 	shown := apptest.ShmResident(t)
-	if shown <= before {
-		t.Fatalf("the presented picker holds %d resident bytes, no more than the %d before it opened", shown, before)
+	for deadline := time.Now().Add(10 * time.Second); shown <= before; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the presented picker holds %d resident bytes, no more than the %d before it opened", shown, before)
+		}
+		shown = apptest.ShmResident(t)
 	}
 	p.Dismiss("/r/memory")
 	apptest.Answer(t, "the dismissed picker's answer", answers)

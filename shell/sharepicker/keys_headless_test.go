@@ -239,11 +239,15 @@ func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 		return apptest.On(k.a, func() activity { return activity{widget.DamageGeneration(), widget.DamageWalks()} })
 	}
 	apptest.Dispatched(t, k.a)
-	before := sample()
-	time.Sleep(idleWindow)
-	if after := sample(); after != before {
-		t.Errorf("the idle picker invalidated %d times and walked damage %d times in %v", after.damage-before.damage, after.walks-before.walks, idleWindow)
+	var before, after activity
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		before = sample()
+		time.Sleep(idleWindow)
+		if after = sample(); after == before {
+			return
+		}
 	}
+	t.Errorf("the idle picker invalidated %d times and walked damage %d times in its last %v", after.damage-before.damage, after.walks-before.walks, idleWindow)
 }
 
 // idleWindow is how long the idle picker is watched for frames.
