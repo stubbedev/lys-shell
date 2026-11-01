@@ -125,10 +125,7 @@ func TestStepsNeverMoveBackwardsOrShow(t *testing.T) {
 	tr := mustTransition(t, 15)
 	st := sunTimesFor(utc(2024, 3, 20, 12, 0), loc.latitude, loc.longitude, civilTwilightAltitude)
 	const visible = 0.005
-	// The fit's blue meets the identity with a seam of its own, once, in
-	// the channel the eye reads least.
-	seam := 1 - whitepoint(neutralTemp - 0.001)[2]
-	for _, night := range []Setting{mustSetting(t, 5000, 100), mustSetting(t, 3000, 80), mustSetting(t, 1000, 100), mustSetting(t, 2000, 20)} {
+	for _, night := range []Setting{mustSetting(t, 5000, 100), mustSetting(t, 3000, 80), mustSetting(t, 1000, 100), mustSetting(t, 2000, 20), mustSetting(t, 6700, 100), mustSetting(t, 10000, 100), mustSetting(t, MaxTemp, 80)} {
 		for _, tc := range []struct {
 			event time.Time
 			warms bool
@@ -137,7 +134,7 @@ func TestStepsNeverMoveBackwardsOrShow(t *testing.T) {
 			for s := time.Second; s <= tr.Duration(); s += time.Second {
 				now := TargetAt(tc.event.Add(-tr.Duration()/2+s), loc, tr, night).Setting
 				backwards := mired(now) < mired(prev)-1e-9
-				if !tc.warms {
+				if tc.warms != (mired(night) > mired(identity)) {
 					backwards = mired(now) > mired(prev)+1e-9
 				}
 				if backwards {
@@ -145,11 +142,7 @@ func TestStepsNeverMoveBackwardsOrShow(t *testing.T) {
 				}
 				a, b := prev.scale(), now.scale()
 				for ch := range a {
-					limit := visible
-					if prev.IsIdentity() || now.IsIdentity() {
-						limit += seam
-					}
-					if d := math.Abs(a[ch] - b[ch]); d > limit {
+					if d := math.Abs(a[ch] - b[ch]); d > visible {
 						t.Fatalf("%+v at %v: channel %d jumped by %v", night, s, ch, d)
 					}
 				}

@@ -26,6 +26,8 @@ const neutralTemp = 6600
 type Setting struct {
 	temp  float64
 	gamma float64
+	// lift is what is left of the fit's seam partway through an ease.
+	lift [3]float64
 }
 
 // identity is the strength that leaves the display's colours alone.
@@ -63,10 +65,16 @@ func (s Setting) eased(fraction float64) Setting {
 	case fraction >= 1:
 		return s
 	}
+	gamma := identity.gamma + (s.gamma-identity.gamma)*fraction
+	if s.temp == identity.temp {
+		return Setting{temp: identity.temp, gamma: gamma}
+	}
 	from, to := miredsPerKelvin/identity.temp, miredsPerKelvin/s.temp
+	seam := fitSeam(s.temp)
 	return Setting{
 		temp:  miredsPerKelvin / (from + (to-from)*fraction),
-		gamma: identity.gamma + (s.gamma-identity.gamma)*fraction,
+		gamma: gamma,
+		lift:  [3]float64{seam[0] * (1 - fraction), seam[1] * (1 - fraction), seam[2] * (1 - fraction)},
 	}
 }
 
@@ -84,15 +92,30 @@ func whitepoint(temp float64) [3]float64 {
 		g = clamp255(99.4708025861*math.Log(t) - 161.1195681661)
 	} else {
 		r = clamp255(329.698727446 * math.Pow(t-60, -0.1332047592))
-		g = clamp255(288.1221695283 * math.Pow(t-60, -0.0755148492))
+		g = coolGreen(t)
 	}
 	switch {
 	case t >= 66:
 		b = 255
 	case t > 19:
-		b = clamp255(138.5177312231*math.Log(t-10) - 305.0447927307)
+		b = warmBlue(t)
 	}
 	return [3]float64{r / 255, g / 255, b / 255}
+}
+
+func coolGreen(t float64) float64 { return clamp255(288.1221695283 * math.Pow(t-60, -0.0755148492)) }
+
+func warmBlue(t float64) float64 { return clamp255(138.5177312231*math.Log(t-10) - 305.0447927307) }
+
+// fitSeam is how far the fit's piece on temp's side of neutralTemp stops
+// short of the identity: the fit's pieces do not meet there, so an ease
+// that only followed the fit would open with that whole step.
+func fitSeam(temp float64) [3]float64 {
+	t := float64(neutralTemp) / 100
+	if temp > neutralTemp {
+		return [3]float64{1: 1 - coolGreen(t)/255}
+	}
+	return [3]float64{2: 1 - warmBlue(t)/255}
 }
 
 func clamp255(v float64) float64 { return math.Min(math.Max(v, 0), 255) }
@@ -101,7 +124,11 @@ func clamp255(v float64) float64 { return math.Min(math.Max(v, 0), 255) }
 func (s Setting) scale() [3]float64 {
 	wp := whitepoint(s.temp)
 	k := s.gamma / 100
-	return [3]float64{wp[0] * k, wp[1] * k, wp[2] * k}
+	return [3]float64{
+		min(wp[0]+s.lift[0], 1) * k,
+		min(wp[1]+s.lift[1], 1) * k,
+		min(wp[2]+s.lift[2], 1) * k,
+	}
 }
 
 // Matrix is the colour transform that applies s: a diagonal of the

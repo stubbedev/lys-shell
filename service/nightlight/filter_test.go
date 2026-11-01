@@ -192,9 +192,9 @@ func TestOpenWithoutAColourProtocol(t *testing.T) {
 
 // An ease is a run of fractional strengths through Apply, each of which
 // reaches the display on either protocol, ending back at the identity
-// when the filter lets go.
+// when the filter lets go, warm or cool of the identity, from the ease's
+// first step.
 func TestAnEaseReachesTheDisplayOnEitherProtocol(t *testing.T) {
-	night := mustSetting(t, 3000, 80)
 	for _, tc := range []struct {
 		name       string
 		ctm, gamma bool
@@ -207,17 +207,19 @@ func TestAnEaseReachesTheDisplayOnEitherProtocol(t *testing.T) {
 			comp := newCompositor(t, tc.ctm, tc.gamma)
 			comp.addOutput("DP-1")
 			f, _ := openFilter(t)
-			for _, fraction := range []float64{0.25, 0.5, 0.75, 1} {
-				s := night.eased(fraction)
-				if err := f.Apply(s); err != nil {
+			for _, night := range []Setting{mustSetting(t, 3000, 80), mustSetting(t, 10000, 100)} {
+				for _, fraction := range []float64{1.0 / 900, 0.25, 0.5, 0.75, 1} {
+					s := night.eased(fraction)
+					if err := f.Apply(s); err != nil {
+						t.Fatal(err)
+					}
+					eventually(t, tc.name+" step", tc.want(comp, s))
+				}
+				if err := f.Clear(); err != nil {
 					t.Fatal(err)
 				}
-				eventually(t, tc.name+" step", tc.want(comp, s))
+				eventually(t, "identity after Clear", wantIdentity(comp, "DP-1"))
 			}
-			if err := f.Clear(); err != nil {
-				t.Fatal(err)
-			}
-			eventually(t, "identity after Clear", wantIdentity(comp, "DP-1"))
 		})
 	}
 }

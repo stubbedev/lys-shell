@@ -123,3 +123,65 @@ func TestNewSettingRejectsOutOfRange(t *testing.T) {
 		}
 	}
 }
+
+// The fit's pieces stop short of the identity at the neutral temperature,
+// green above it and blue below. An ease must not show that as a step at
+// either end, on any channel, and must still arrive at the fit itself.
+func TestAnEaseCrossesTheFitsSeamWithoutAStep(t *testing.T) {
+	const visible = 0.005
+	const steps = 900
+	for _, temp := range []int{MinTemp, 3000, 6500, 6599, 6601, 6700, 7500, 10000, MaxTemp} {
+		night := mustSetting(t, temp, 100)
+		prev := night.eased(0).scale()
+		if prev != ([3]float64{1, 1, 1}) {
+			t.Errorf("%dK: the ease starts at %v, want the identity", temp, prev)
+		}
+		for i := 1; i <= steps; i++ {
+			now := night.eased(float64(i) / steps).scale()
+			for ch := range now {
+				if d := math.Abs(now[ch] - prev[ch]); d > visible {
+					t.Fatalf("%dK step %d: channel %d jumped by %v", temp, i, ch, d)
+				}
+				if now[ch] > prev[ch]+1e-12 {
+					t.Fatalf("%dK step %d: channel %d turned back, %v to %v", temp, i, ch, prev[ch], now[ch])
+				}
+			}
+			prev = now
+		}
+		if got := night.eased(1); got != night {
+			t.Errorf("%dK: the ease ends at %+v, want %+v", temp, got, night)
+		}
+	}
+}
+
+// The seam is only ever closed along an ease: a settled strength is the
+// fit, however close to neutral, with the seam's step still in it.
+func TestASettledStrengthKeepsTheFitsEndValues(t *testing.T) {
+	cool := mustSetting(t, neutralTemp+1, 100).scale()
+	if want := whitepoint(neutralTemp + 1); cool != want {
+		t.Errorf("6601K scale = %v, want the fit's %v", cool, want)
+	}
+	if cool[1] > 0.99 {
+		t.Errorf("6601K green = %v: the fit's own value moved", cool[1])
+	}
+	warm := mustSetting(t, neutralTemp-1, 100).scale()
+	if want := whitepoint(neutralTemp - 1); warm != want {
+		t.Errorf("6599K scale = %v, want the fit's %v", warm, want)
+	}
+}
+
+// Easing to the neutral temperature has no seam to close, so a schedule
+// configured at the identity never asks for a filter.
+func TestAnEaseToTheIdentityStaysTheIdentity(t *testing.T) {
+	for _, fraction := range []float64{0, 0.001, 0.25, 0.5, 0.75, 0.999, 1} {
+		if got := identity.eased(fraction); !got.IsIdentity() {
+			t.Errorf("identity eased by %v = %+v", fraction, got)
+		}
+	}
+	if mustSetting(t, 5000, 100).eased(0.5).IsIdentity() {
+		t.Error("a strength partway through an ease reads as the identity")
+	}
+	if got := mustSetting(t, neutralTemp, 80).eased(0.5).scale(); got != [3]float64{0.9, 0.9, 0.9} {
+		t.Errorf("a gamma-only ease = %v, want 90%% on every channel", got)
+	}
+}
