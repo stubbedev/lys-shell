@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/lys-shell.svg" width="160" alt="lys-shell">
+  <img src="docs/public/lys-shell.svg" width="160" alt="lys-shell">
 </p>
 
 <h1 align="center">lys-shell</h1>
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/lys-shell-preview.png" alt="lys-shell on a desktop">
+  <img src="docs/public/lys-shell-preview.png" alt="lys-shell on a desktop">
 </p>
 
 lys-shell runs on any compositor with `wlr-layer-shell`. It is built on [lys-ui](https://github.com/stubbedev/lys-ui), and does not need [lys-wm](https://github.com/stubbedev/lys-wm).
