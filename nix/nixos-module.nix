@@ -152,11 +152,12 @@ in
         services.upower.enable = lib.mkDefault true;
         hardware.bluetooth.enable = lib.mkDefault true;
 
-        # GeoClue backs the night light auto-schedule's location lookup. The
-        # appConfig entry whitelists lys-shell (DesktopId "lys-shell") so the daemon
-        # serves it without an agent prompt; isSystem skips the per-user agent.
-        # If GeoClue is unavailable the schedule falls back to the configured
-        # latitude/longitude, so this is purely a convenience.
+        # GeoClue backs the night light auto-schedule's location lookup when
+        # the config sets no latitude and longitude. The appConfig entry names
+        # lys-shell (DesktopId "lys-shell"): isAllowed lets it start with no
+        # agent prompt, isSystem keeps it out of GeoClue's in-use indicator.
+        # Without GeoClue the schedule does not run and the module says why;
+        # coordinates in the config are the only other source of a location.
         services.geoclue2 = {
           enable = lib.mkDefault true;
           appConfig.lys-shell = {
