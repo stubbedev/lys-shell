@@ -75,33 +75,55 @@ func On[T any](a *app.Application, fn func() T) T {
 // It fails the test after ten seconds.
 func Dispatched(t *testing.T, a *app.Application) {
 	t.Helper()
+	awaitCallback(t, a, "a display sync", func() (*wl.Callback, error) { return a.Session().Display.Sync() })
+}
+
+// Drawn waits until the compositor has taken a frame of surface drawn
+// after the call: invalidate owes the surface a draw, and that draw
+// drains every invalidation made before it, so no frame is owed for
+// them when Drawn returns. It fails the test after ten seconds.
+func Drawn(t *testing.T, a *app.Application, surface *wl.Surface, invalidate func()) {
+	t.Helper()
+	awaitCallback(t, a, "a frame callback", func() (*wl.Callback, error) {
+		cb, err := surface.Frame()
+		if err == nil {
+			invalidate()
+		}
+		return cb, err
+	})
+}
+
+// awaitCallback makes request on a's loop and waits for its callback,
+// what naming it in the failure after ten seconds.
+func awaitCallback(t *testing.T, a *app.Application, what string, request func() (*wl.Callback, error)) {
+	t.Helper()
 	done := make(chan struct{})
 	if err := On(a, func() error {
-		cb, err := a.Session().Display.Sync()
+		cb, err := request()
 		if err != nil {
 			return err
 		}
-		cb.AddDoneHandler(syncDone{cb: cb, done: done})
+		cb.AddDoneHandler(callbackDone{cb: cb, done: done})
 		return nil
 	}); err != nil {
-		t.Fatalf("sync the display: %v", err)
+		t.Fatalf("request %s: %v", what, err)
 	}
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatal("the loop dispatched no answer to a display sync within 10s: it was stuck or the compositor never answered")
+		t.Fatalf("the loop dispatched no answer to %s within 10s: it was stuck or the compositor never answered", what)
 	}
 }
 
-// syncDone closes done when the sync callback cb fires.
-type syncDone struct {
+// callbackDone closes done when the callback cb fires.
+type callbackDone struct {
 	cb   *wl.Callback
 	done chan struct{}
 }
 
-func (s syncDone) HandleCallbackDone(wl.CallbackDoneEvent) {
-	s.cb.Unregister()
-	close(s.done)
+func (c callbackDone) HandleCallbackDone(wl.CallbackDoneEvent) {
+	c.cb.Unregister()
+	close(c.done)
 }
 
 // Never waits out settle, failing the test with what if answered has

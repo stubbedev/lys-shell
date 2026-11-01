@@ -234,23 +234,20 @@ func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 	if len(spinners) != len(fiveWindows) {
 		t.Fatalf("%d spinners, want one per window card (%d)", len(spinners), len(fiveWindows))
 	}
-	apptest.Until(t, k.a, "every preview landed and hid its spinner", func() bool {
-		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() })
+	apptest.Until(t, k.a, "every capture landed, each window's hiding its spinner", func() bool {
+		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() }) &&
+			len(treetest.WithClass(k.p.root, "share-picker-card-loading")) == 0
 	})
+	apptest.Drawn(t, k.a, k.p.layer.HostSurface(), k.p.root.(interface{ Invalidate() }).Invalidate)
 	type activity struct{ damage, walks uint64 }
 	sample := func() activity {
 		return apptest.On(k.a, func() activity { return activity{widget.DamageGeneration(), widget.DamageWalks()} })
 	}
-	apptest.Dispatched(t, k.a)
-	var before, after activity
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
-		before = sample()
-		time.Sleep(idleWindow)
-		if after = sample(); after == before {
-			return
-		}
+	before := sample()
+	time.Sleep(idleWindow)
+	if after := sample(); after != before {
+		t.Errorf("the idle picker invalidated %d times and walked damage %d times in %v", after.damage-before.damage, after.walks-before.walks, idleWindow)
 	}
-	t.Errorf("the idle picker invalidated %d times and walked damage %d times in its last %v", after.damage-before.damage, after.walks-before.walks, idleWindow)
 }
 
 // idleWindow is how long the idle picker is watched for frames.
