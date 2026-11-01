@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -257,5 +258,20 @@ func TestLoadGreeterReadsTheFormerCursorKeys(t *testing.T) {
 	cfg, _ := LoadGreeter(path, func(Diagnostic) {})
 	if g := cfg.Login.Greeter; g.CursorSize != 48 || !g.CursorSizeExplicit {
 		t.Errorf("cursor size = %d explicit=%v", g.CursorSize, g.CursorSizeExplicit)
+	}
+}
+
+// The greeter counts no failed attempts, so pushing the counters to it
+// would claim an effect they do not have; everything it does read goes.
+func TestGreeterApplyKeysHoldOnlyWhatTheGreeterReads(t *testing.T) {
+	for _, key := range []string{"max-attempts", "show-failed-attempts"} {
+		if slices.Contains(GreeterApplyKeys, key) {
+			t.Errorf("%s is the lock screen's alone but is pushed to the greeter", key)
+		}
+	}
+	for _, key := range []string{"background-mode", "show-clock", "greeter.show-user-list", "greeter.cursor-theme"} {
+		if !slices.Contains(GreeterApplyKeys, key) {
+			t.Errorf("%s configures the greeter but is not pushed to it", key)
+		}
 	}
 }

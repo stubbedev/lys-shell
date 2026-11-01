@@ -7,7 +7,8 @@ import (
 
 // LoginConfig is the login screen: one screen, run as the greeter before
 // login and as the lock screen in the session, so both look and behave
-// alike. The keys here apply to both; `greeter` and `lock` hold what
+// alike. The keys here apply to both, except the failed-attempt keys
+// only the lock screen counts; `greeter` and `lock` hold what
 // only one of them has.
 //
 // Login screen: the greeter and the lock screen, one screen in two modes.
@@ -27,10 +28,11 @@ type LoginConfig struct {
 	ClockFormat StrftimeFormat `cfg:"clock-format"`
 	// `strftime` format for the date.
 	DateFormat StrftimeFormat `cfg:"date-format"`
-	// Maximum failed password attempts before further input is blocked
+	// Lock screen only. Maximum failed password attempts before further
+	// input is blocked
 	// (`0` = unlimited). A locked session stays locked regardless.
 	MaxAttempts uint32 `cfg:"max-attempts"`
-	// Show the failed-attempt count.
+	// Lock screen only. Show the failed-attempt count.
 	ShowFailedAttempts bool `cfg:"show-failed-attempts"`
 	// The lock screen's own settings.
 	Lock LoginLockConfig `cfg:"lock"`
@@ -147,11 +149,13 @@ func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 // GreeterApplyKeys are the login keys, relative to login, that
 // lys-settings pushes to the system login screen and lys-login
 // apply-config accepts, in the settings app's order: the shared look
-// and the greeter's own keys, never the lock screen's.
+// and the greeter's own keys, never those only the lock screen reads.
+// The greeter counts no failed attempts: PAM decides a login, and
+// pam_faillock locks an account per user and across restarts, which a
+// counter in the greeter could not.
 var GreeterApplyKeys = []string{
 	"background-mode", "background-image", "background-color", "blur",
 	"show-clock", "clock-format", "date-format",
-	"max-attempts", "show-failed-attempts",
 	"greeter.show-user-list", "greeter.show-power-buttons",
 	"greeter.cursor-theme", "greeter.cursor-size",
 }

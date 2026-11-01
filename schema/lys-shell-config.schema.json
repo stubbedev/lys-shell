@@ -4006,7 +4006,7 @@
         "max-attempts": {
           "$ref": "#/$defs/uint32",
           "default": 0,
-          "description": "Maximum failed password attempts before further input is blocked\n(`0` = unlimited). A locked session stays locked regardless."
+          "description": "Lock screen only. Maximum failed password attempts before further\ninput is blocked\n(`0` = unlimited). A locked session stays locked regardless."
         },
         "show-clock": {
           "$ref": "#/$defs/boolean",
@@ -4016,7 +4016,7 @@
         "show-failed-attempts": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Show the failed-attempt count."
+          "description": "Lock screen only. Show the failed-attempt count."
         }
       },
       "type": "object"

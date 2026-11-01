@@ -24,10 +24,10 @@ settings-login-date-format = Date Format
     .description = strftime format for the login-screen date (e.g. %A, %B %-d)
 
 settings-login-max-attempts = Max Attempts
-    .description = Failed password attempts before input is blocked (0 = unlimited). Screen stays locked.
+    .description = Failed password attempts on the lock screen before input is blocked (0 = unlimited). Screen stays locked.
 
 settings-login-show-failed-attempts = Show Failed Attempts
-    .description = Show the failed-attempt count on the login screen
+    .description = Show the failed-attempt count on the lock screen
 
 settings-login-lock-enabled = Enabled
     .description = Let lys-shell lock the session (responds to loginctl lock-session and `lys-shell lock`)
