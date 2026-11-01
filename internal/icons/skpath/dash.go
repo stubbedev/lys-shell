@@ -77,7 +77,7 @@ func findFirstInterval(array []float32, offset float32) (float32, int) {
 func (p *Path) DashPath(d *StrokeDash, resScale float32) (*Path, bool) {
 	pb := NewBuilder()
 	var dashCount float32
-	it := contourMeasureIter{iter: p.Segments(), tolerance: 0.5 * invert(resScale)}
+	it := contourMeasureIter{iter: p.Segments(), tolerance: float32(0.5 * invert(resScale))}
 	for {
 		contour, ok := it.next()
 		if !ok {
@@ -141,7 +141,7 @@ type measureSegment struct {
 // as the Rust constant is.
 var maxTReciprocal = 1 / float32(maxTValue)
 
-func (s measureSegment) scalarT() float32 { return float32(s.tValue) * maxTReciprocal }
+func (s measureSegment) scalarT() float32 { return float32(float32(s.tValue) * maxTReciprocal) }
 
 type contourMeasure struct {
 	segments []measureSegment
@@ -346,7 +346,7 @@ func findSegment(base []measureSegment, key float32) int32 {
 	return hi
 }
 
-func interpf(a, b, t float32) float32 { return a + (b-a)*t }
+func interpf(a, b, t float32) float32 { return a + float32((b-a)*t) }
 
 func computePos(points []Point, kind segKind, t float32) Point {
 	switch kind {
@@ -416,8 +416,8 @@ func segmentTo(points []Point, kind segKind, startT, stopT float32, pb *Builder)
 }
 
 func quadTooCurvy(p0, p1, p2 Point, tol float32) bool {
-	dx := p1.X*0.5 - (p0.X+p2.X)*0.5*0.5
-	dy := p1.Y*0.5 - (p0.Y+p2.Y)*0.5*0.5
+	dx := float32(p1.X*0.5) - float32((p0.X+p2.X)*0.5*0.5)
+	dy := float32(p1.Y*0.5) - float32((p0.Y+p2.Y)*0.5*0.5)
 	return maxf(absf(dx), absf(dy)) > tol
 }
 

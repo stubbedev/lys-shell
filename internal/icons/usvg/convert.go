@@ -192,10 +192,10 @@ func viewBoxTransform(vb rect, aspect aspectRatio, w, h float32) skpath.Transfor
 		}
 		sx, sy = s, s
 	}
-	x := -vb.x * sx
-	y := -vb.y * sy
-	ww := w - vb.w*sx
-	hh := h - vb.h*sy
+	x := float32(-vb.x * sx)
+	y := float32(-vb.y * sy)
+	ww := w - float32(vb.w*sx)
+	hh := h - float32(vb.h*sy)
 	tx, ty := alignedPos(aspect.align, x, y, ww, hh)
 	return skpath.FromRow(sx, 0, 0, sy, tx, ty)
 }
@@ -263,12 +263,12 @@ func resolveSVGSize(svg *node) (float32, float32, bool, bool) {
 	if hasVB {
 		st.viewBox = vb
 		if width.unit == unitPercent {
-			w = vb.w * (float32(width.number) / 100)
+			w = float32(vb.w * (float32(width.number) / 100))
 		} else {
 			w = svg.userLength("width", st, def)
 		}
 		if height.unit == unitPercent {
-			h = vb.h * (float32(height.number) / 100)
+			h = float32(vb.h * (float32(height.number) / 100))
 		} else {
 			h = svg.userLength("height", st, def)
 		}
@@ -310,11 +310,11 @@ func convertLength(l length, n *node, name string, objectBBox bool, st *state) f
 	num := float32(l.number)
 	switch l.unit {
 	case unitEm:
-		return num * resolveFontSize(n)
+		return float32(num * resolveFontSize(n))
 	case unitEx:
 		return num * resolveFontSize(n) / 2
 	case unitIn:
-		return num * optDPI
+		return float32(num * optDPI)
 	case unitCm:
 		return num * optDPI / 2.54
 	case unitMm:
@@ -333,7 +333,7 @@ func convertLength(l length, n *node, name string, objectBBox bool, st *state) f
 		case yLike[name]:
 			return st.viewBox.h * num / 100
 		default:
-			vbLen := st.viewBox.w*st.viewBox.w + st.viewBox.h*st.viewBox.h
+			vbLen := float32(st.viewBox.w*st.viewBox.w) + float32(st.viewBox.h*st.viewBox.h)
 			vbLen = float32(math.Sqrt(float64(vbLen / 2)))
 			return vbLen * num / 100
 		}
@@ -357,11 +357,11 @@ func resolveFontSize(n *node) float32 {
 			case unitNone, unitPx:
 				fontSize = num
 			case unitEm:
-				fontSize = num * fontSize
+				fontSize = float32(num * fontSize)
 			case unitEx:
 				fontSize = num * fontSize / 2
 			case unitIn:
-				fontSize = num * optDPI
+				fontSize = float32(num * optDPI)
 			case unitCm:
 				fontSize = num * optDPI / 2.54
 			case unitMm:
@@ -371,7 +371,7 @@ func resolveFontSize(n *node) float32 {
 			case unitPc:
 				fontSize = num * optDPI / 6
 			case unitPercent:
-				fontSize = float32(l.number) * fontSize * 0.01
+				fontSize = float32(float32(l.number) * fontSize * 0.01)
 			}
 			continue
 		}

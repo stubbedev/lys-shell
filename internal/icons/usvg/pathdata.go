@@ -227,7 +227,7 @@ func simplifyPath(text string) []simpleSeg {
 		case 's':
 			x1, y1 := prevX, prevY
 			if prevSeg.cmd == 'c' || prevSeg.cmd == 's' {
-				x1, y1 = prevSeg.x*2-prevSeg.x2, prevSeg.y*2-prevSeg.y2
+				x1, y1 = float64(prevSeg.x*2)-prevSeg.x2, float64(prevSeg.y*2)-prevSeg.y2
 			}
 			if !seg.abs {
 				seg.x2 += prevX
@@ -252,9 +252,9 @@ func simplifyPath(text string) []simpleSeg {
 			x1, y1 := prevX, prevY
 			switch prevSeg.cmd {
 			case 'q':
-				x1, y1 = prevSeg.x*2-prevSeg.x1, prevSeg.y*2-prevSeg.y1
+				x1, y1 = float64(prevSeg.x*2)-prevSeg.x1, float64(prevSeg.y*2)-prevSeg.y1
 			case 't':
-				x1, y1 = prevSeg.x*2-prevTX, prevSeg.y*2-prevTY
+				x1, y1 = float64(prevSeg.x*2)-prevTX, float64(prevSeg.y*2)-prevTY
 			}
 			prevTX, prevTY = x1, y1
 			if !seg.abs {
@@ -320,31 +320,31 @@ func arcFromSVG(fromX, fromY, toX, toY, radX, radY, xRotation float64, largeArc,
 	ry := math.Abs(radY)
 	xr := math.Mod(xRotation, 2*math.Pi)
 	sinPhi, cosPhi := sincos(xr)
-	hdX := (fromX - toX) * 0.5
-	hdY := (fromY - toY) * 0.5
-	hsX := (fromX + toX) * 0.5
-	hsY := (fromY + toY) * 0.5
-	px := cosPhi*hdX + sinPhi*hdY
-	py := -sinPhi*hdX + cosPhi*hdY
+	hdX := float64((fromX - toX) * 0.5)
+	hdY := float64((fromY - toY) * 0.5)
+	hsX := float64((fromX + toX) * 0.5)
+	hsY := float64((fromY + toY) * 0.5)
+	px := float64(cosPhi*hdX) + float64(sinPhi*hdY)
+	py := float64(-sinPhi*hdX) + float64(cosPhi*hdY)
 	rf := px*px/(rx*rx) + py*py/(ry*ry)
 	if rf > 1 {
 		scale := math.Sqrt(rf)
 		rx *= scale
 		ry *= scale
 	}
-	rxry := rx * ry
-	rxpy := rx * py
-	rypx := ry * px
-	sumOfSq := rxpy*rxpy + rypx*rypx
+	rxry := float64(rx * ry)
+	rxpy := float64(rx * py)
+	rypx := float64(ry * px)
+	sumOfSq := float64(rxpy*rxpy) + float64(rypx*rypx)
 	signCoe := 1.0
 	if largeArc == sweep {
 		signCoe = -1
 	}
-	coe := signCoe * math.Sqrt(math.Abs((rxry*rxry-sumOfSq)/sumOfSq))
+	coe := float64(signCoe * math.Sqrt(math.Abs((rxry*rxry-sumOfSq)/sumOfSq)))
 	tcx := coe * rxpy / ry
 	tcy := -coe * rypx / rx
-	cx := cosPhi*tcx - sinPhi*tcy + hsX
-	cy := sinPhi*tcx + cosPhi*tcy + hsY
+	cx := float64(cosPhi*tcx) - float64(sinPhi*tcy) + hsX
+	cy := float64(sinPhi*tcx) + float64(cosPhi*tcy) + hsY
 	startAngle := atan2R((py-tcy)/ry, (px-tcx)/rx)
 	endAngle := atan2R((-py-tcy)/ry, (-px-tcx)/rx)
 	sweepAngle := math.Mod(endAngle-startAngle, 2*math.Pi)
@@ -369,33 +369,33 @@ func signum(f float64) float64 {
 
 func sampleEllipse(rx, ry, xRotation, angle float64) (float64, float64) {
 	s, c := sincos(angle)
-	u := rx * c
-	v := ry * s
+	u := float64(rx * c)
+	v := float64(ry * s)
 	rs, rc := sincos(xRotation)
-	return u*rc - v*rs, u*rs + v*rc
+	return float64(u*rc) - float64(v*rs), float64(u*rs) + float64(v*rc)
 }
 
 // toCubics is Arc::to_cubic_beziers via append_iter.
 func (a kArc) toCubics(tolerance float64, emit func(x1, y1, x2, y2, x, y float64)) {
 	sign := signum(a.sweepAngle)
 	scaledErr := math.Max(a.rx, a.ry) / tolerance
-	nErr := math.Max(math.Pow(1.1163*scaledErr, 1.0/6.0), 3.999_999)
-	nf := math.Ceil(nErr * math.Abs(a.sweepAngle) * (1.0 / (2 * math.Pi)))
+	nErr := math.Max(math.Pow(float64(1.1163*scaledErr), 1.0/6.0), 3.999_999)
+	nf := math.Ceil(float64(nErr * math.Abs(a.sweepAngle) * (1.0 / (2 * math.Pi))))
 	angleStep := a.sweepAngle / nf
 	n := int(nf)
 	if nf < 0 || math.IsNaN(nf) {
 		n = 0
 	}
-	armLen := (4.0 / 3.0) * tanR(math.Abs(0.25*angleStep)) * sign
+	armLen := float64((4.0 / 3.0) * tanR(math.Abs(0.25*angleStep)) * sign)
 	angle0 := a.startAngle
 	p0x, p0y := sampleEllipse(a.rx, a.ry, a.xRotation, angle0)
 	for range n {
 		angle1 := angle0 + angleStep
 		dx, dy := sampleEllipse(a.rx, a.ry, a.xRotation, angle0+math.Pi/2)
-		p1x, p1y := p0x+armLen*dx, p0y+armLen*dy
+		p1x, p1y := p0x+float64(armLen*dx), p0y+float64(armLen*dy)
 		p3x, p3y := sampleEllipse(a.rx, a.ry, a.xRotation, angle1)
 		ex, ey := sampleEllipse(a.rx, a.ry, a.xRotation, angle1+math.Pi/2)
-		p2x, p2y := p3x-armLen*ex, p3y-armLen*ey
+		p2x, p2y := p3x-float64(armLen*ex), p3y-float64(armLen*ey)
 		angle0 = angle1
 		p0x, p0y = p3x, p3y
 		emit(a.cx+p1x, a.cy+p1y, a.cx+p2x, a.cy+p2y, a.cx+p3x, a.cy+p3y)

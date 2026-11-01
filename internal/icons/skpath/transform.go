@@ -52,7 +52,7 @@ func (t Transform) isScaleTranslate() bool {
 
 // Scale is get_scale: the lengths of the transformed unit axes.
 func (t Transform) Scale() (float32, float32) {
-	return sqrtf(t.SX*t.SX + t.KX*t.KX), sqrtf(t.KY*t.KY + t.SY*t.SY)
+	return sqrtf(float32(t.SX*t.SX) + float32(t.KX*t.KX)), sqrtf(float32(t.KY*t.KY) + float32(t.SY*t.SY))
 }
 
 // PreConcat is self * other.
@@ -78,7 +78,7 @@ func concat(a, b Transform) Transform {
 	case b.IsIdentity():
 		return a
 	case !a.hasSkew() && !b.hasSkew():
-		return FromRow(a.SX*b.SX, 0, 0, a.SY*b.SY, a.SX*b.TX+a.TX, a.SY*b.TY+a.TY)
+		return FromRow(float32(a.SX*b.SX), 0, 0, float32(a.SY*b.SY), float32(a.SX*b.TX)+a.TX, float32(a.SY*b.TY)+a.TY)
 	default:
 		return FromRow(
 			mulAddMul(a.SX, b.SX, a.KX, b.KY),
@@ -92,7 +92,7 @@ func concat(a, b Transform) Transform {
 }
 
 func mulAddMul(a, b, c, d float32) float32 {
-	return float32(float64(a)*float64(b) + float64(c)*float64(d))
+	return float32(float64(float64(a)*float64(b)) + float64(float64(c)*float64(d)))
 }
 
 // MapPoints transforms points in place.
@@ -106,13 +106,13 @@ func (t Transform) MapPoints(points []Point) {
 		}
 	case t.isScaleTranslate():
 		for i := range points {
-			points[i].X = points[i].X*t.SX + t.TX
-			points[i].Y = points[i].Y*t.SY + t.TY
+			points[i].X = float32(points[i].X*t.SX) + t.TX
+			points[i].Y = float32(points[i].Y*t.SY) + t.TY
 		}
 	default:
 		for i := range points {
 			p := points[i]
-			points[i] = Point{p.X*t.SX + p.Y*t.KX + t.TX, p.X*t.KY + p.Y*t.SY + t.TY}
+			points[i] = Point{float32(p.X*t.SX) + float32(p.Y*t.KX) + t.TX, float32(p.X*t.KY) + float32(p.Y*t.SY) + t.TY}
 		}
 	}
 }
@@ -190,7 +190,7 @@ func rectFromPoints(points []Point) (Rect, bool) {
 		offset += 2
 	}
 	for i := range 4 {
-		if accum[i]*0 != 0 {
+		if float32(accum[i]*0) != 0 {
 			return Rect{}, false
 		}
 	}

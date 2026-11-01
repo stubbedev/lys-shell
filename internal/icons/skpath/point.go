@@ -27,13 +27,13 @@ func Pt(x, y float32) Point { return Point{x, y} }
 func (p Point) add(o Point) Point      { return Point{p.X + o.X, p.Y + o.Y} }
 func (p Point) sub(o Point) Point      { return Point{p.X - o.X, p.Y - o.Y} }
 func (p Point) neg() Point             { return Point{-p.X, -p.Y} }
-func (p Point) scaled(s float32) Point { return Point{p.X * s, p.Y * s} }
-func (p Point) dot(o Point) float32    { return p.X*o.X + p.Y*o.Y }
-func (p Point) cross(o Point) float32  { return p.X*o.Y - p.Y*o.X }
+func (p Point) scaled(s float32) Point { return Point{float32(p.X * s), float32(p.Y * s)} }
+func (p Point) dot(o Point) float32    { return float32(p.X*o.X) + float32(p.Y*o.Y) }
+func (p Point) cross(o Point) float32  { return float32(p.X*o.Y) - float32(p.Y*o.X) }
 func (p Point) isZero() bool           { return p.X == 0 && p.Y == 0 }
 func (p Point) lengthSqd() float32     { return p.dot(p) }
 
-func (p Point) isFinite() bool { return isFinite(p.X * p.Y) }
+func (p Point) isFinite() bool { return isFinite(float32(p.X * p.Y)) }
 
 func (p Point) canNormalize() bool {
 	return isFinite(p.X) && isFinite(p.Y) && (p.X != 0 || p.Y != 0)
@@ -46,18 +46,18 @@ func (p Point) equalsWithinTolerance(o Point, tol float32) bool {
 }
 
 func (p Point) length() float32 {
-	mag2 := p.X*p.X + p.Y*p.Y
+	mag2 := float32(p.X*p.X) + float32(p.Y*p.Y)
 	if isFinite(mag2) {
 		return sqrtf(mag2)
 	}
 	xx, yy := float64(p.X), float64(p.Y)
-	return float32(math.Sqrt(xx*xx + yy*yy))
+	return float32(math.Sqrt(float64(xx*xx) + float64(yy*yy)))
 }
 
 func (p Point) distanceToSqd(o Point) float32 {
 	dx := p.X - o.X
 	dy := p.Y - o.Y
-	return dx*dx + dy*dy
+	return float32(dx*dx) + float32(dy*dy)
 }
 
 func (p Point) distance(o Point) float32 { return p.sub(o).length() }
@@ -72,7 +72,7 @@ func (p *Point) setLength(l float32) bool { return p.setLengthFrom(p.X, p.Y, l) 
 // components do not overflow.
 func (p *Point) setLengthFrom(x, y, length float32) bool {
 	xx, yy := float64(x), float64(y)
-	dmag := math.Sqrt(xx*xx + yy*yy)
+	dmag := math.Sqrt(float64(xx*xx) + float64(yy*yy))
 	dscale := float64(length) / dmag
 	x *= float32(dscale)
 	y *= float32(dscale)

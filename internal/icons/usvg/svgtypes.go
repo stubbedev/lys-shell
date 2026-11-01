@@ -379,16 +379,16 @@ var identityTS = transform{1, 0, 0, 1, 0, 0}
 
 func multiply(t1, t2 transform) transform {
 	return transform{
-		a: t1.a*t2.a + t1.c*t2.b,
-		b: t1.b*t2.a + t1.d*t2.b,
-		c: t1.a*t2.c + t1.c*t2.d,
-		d: t1.b*t2.c + t1.d*t2.d,
-		e: t1.a*t2.e + t1.c*t2.f + t1.e,
-		f: t1.b*t2.e + t1.d*t2.f + t1.f,
+		a: float64(t1.a*t2.a) + float64(t1.c*t2.b),
+		b: float64(t1.b*t2.a) + float64(t1.d*t2.b),
+		c: float64(t1.a*t2.c) + float64(t1.c*t2.d),
+		d: float64(t1.b*t2.c) + float64(t1.d*t2.d),
+		e: float64(t1.a*t2.e) + float64(t1.c*t2.f) + t1.e,
+		f: float64(t1.b*t2.e) + float64(t1.d*t2.f) + t1.f,
 	}
 }
 
-func toRadians(deg float64) float64 { return deg * (math.Pi / 180) }
+func toRadians(deg float64) float64 { return float64(deg * (math.Pi / 180)) }
 
 // parseTransform is Transform::from_str over TransformListParser.
 func parseTransform(text string) (transform, bool) {
@@ -657,7 +657,7 @@ func (s *stream) parseColor() (uint8, bool) {
 			if err != nil {
 				return 0, false
 			}
-			alpha = roundU8(v * 255)
+			alpha = roundU8(float64(v * 255))
 		}
 		s.skipSpaces()
 		return alpha, s.consumeByte(')') == nil
@@ -679,7 +679,7 @@ func (s *stream) parseColor() (uint8, bool) {
 			if err != nil {
 				return 0, false
 			}
-			alpha = roundU8(v * 255)
+			alpha = roundU8(float64(v * 255))
 		}
 		s.skipSpaces()
 		return alpha, s.consumeByte(')') == nil

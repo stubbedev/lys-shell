@@ -98,7 +98,7 @@ func resolveMarker(shape *node, data *skpath.Path, marker *node, kind markerKind
 			ts = ts.PreConcat(fromRotate(angle))
 		}
 		if hasVB {
-			sx, sy := viewBoxTransform(vb, aspect, r.w*scale, r.h*scale).Scale()
+			sx, sy := viewBoxTransform(vb, aspect, float32(r.w*scale), float32(r.h*scale)).Scale()
 			ts = ts.PreScale(sx, sy)
 		} else {
 			ts = ts.PreScale(scale, scale)
@@ -156,7 +156,7 @@ func markerSegments(data *skpath.Path) []markerSeg {
 			prev = s.P[0]
 		case skpath.SegQuad:
 			// quad_to_curve
-			third := func(n1, n2 float32) float32 { return (n1 + n2*2) / 3 }
+			third := func(n1, n2 float32) float32 { return (n1 + float32(n2*2)) / 3 }
 			p1, p := s.P[0], s.P[1]
 			segs = append(segs, markerSeg{
 				kind: skpath.SegCubic,
@@ -306,12 +306,12 @@ func angle4(a1, a2, b1, b2 skpath.Point) float32 {
 	}
 	in := vectorAngle(a2.X-a1.X, a2.Y-a1.Y)
 	out := vectorAngle(b2.X-b1.X, b2.Y-b1.Y)
-	d := (out - in) * 0.5
+	d := float32((out - in) * 0.5)
 	angle := in + d
 	if float32(math.Pi/2) < float32(math.Abs(float64(d))) {
 		angle -= float32(math.Pi)
 	}
-	return normalize(angle) * f32DegreesPerRadian
+	return float32(normalize(angle) * f32DegreesPerRadian)
 }
 
 // f32DegreesPerRadian is f32::to_degrees's constant.
@@ -321,7 +321,7 @@ const f32DegreesPerRadian float32 = 57.2957795130823208767981548141051703
 // f32::to_radians and the f32 sin and cos.
 func fromRotate(angle float32) skpath.Transform {
 	pi := float32(math.Pi)
-	v := angle * (pi / 180)
+	v := float32(angle * (pi / 180))
 	s, c := sincos(float64(v))
 	sin, cos := float32(s), float32(c)
 	return skpath.FromRow(cos, sin, -sin, cos, 0, 0)
@@ -388,10 +388,10 @@ func parseAngleStr(text string) (float64, bool) {
 	case s.startsWith("rad"):
 		s.pos += 3
 		pi := math.Pi
-		deg = n * (180 / pi)
+		deg = float64(n * (180 / pi))
 	case s.startsWith("turn"):
 		s.pos += 4
-		deg = n * 360
+		deg = float64(n * 360)
 	}
 	return deg, s.atEnd()
 }

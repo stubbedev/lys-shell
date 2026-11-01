@@ -6,7 +6,7 @@ import "math"
 // per component in the same operation order.
 
 func interpPt(v0, v1 Point, t float32) Point {
-	return Point{v0.X + (v1.X-v0.X)*t, v0.Y + (v1.Y-v0.Y)*t}
+	return Point{v0.X + float32((v1.X-v0.X)*t), v0.Y + float32((v1.Y-v0.Y)*t)}
 }
 
 func times2(p Point) Point { return Point{p.X + p.X, p.Y + p.Y} }
@@ -17,7 +17,7 @@ func evalQuadAt(src *[3]Point, t float32) Point {
 	p2 := src[2]
 	b := times2(p1.sub(c))
 	a := p2.sub(times2(p1)).add(c)
-	return Point{(a.X*t+b.X)*t + c.X, (a.Y*t+b.Y)*t + c.Y}
+	return Point{float32((a.X*t+b.X)*t) + c.X, float32((a.Y*t+b.Y)*t) + c.Y}
 }
 
 func evalQuadTangentAt(src *[3]Point, t float32) Point {
@@ -26,16 +26,16 @@ func evalQuadTangentAt(src *[3]Point, t float32) Point {
 	}
 	b := src[1].sub(src[0])
 	a := src[2].sub(src[1]).sub(b)
-	tt := Point{a.X*t + b.X, a.Y*t + b.Y}
+	tt := Point{float32(a.X*t) + b.X, float32(a.Y*t) + b.Y}
 	return tt.add(tt)
 }
 
 func evalCubicPosAt(src *[4]Point, t float32) Point {
 	p0, p1, p2, p3 := src[0], src[1], src[2], src[3]
-	a := Point{p3.X + 3*(p1.X-p2.X) - p0.X, p3.Y + 3*(p1.Y-p2.Y) - p0.Y}
-	b := Point{3 * (p2.X - (p1.X + p1.X) + p0.X), 3 * (p2.Y - (p1.Y + p1.Y) + p0.Y)}
-	c := Point{3 * (p1.X - p0.X), 3 * (p1.Y - p0.Y)}
-	return Point{((a.X*t+b.X)*t+c.X)*t + p0.X, ((a.Y*t+b.Y)*t+c.Y)*t + p0.Y}
+	a := Point{p3.X + float32(3*(p1.X-p2.X)) - p0.X, p3.Y + float32(3*(p1.Y-p2.Y)) - p0.Y}
+	b := Point{float32(3 * (p2.X - (p1.X + p1.X) + p0.X)), float32(3 * (p2.Y - (p1.Y + p1.Y) + p0.Y))}
+	c := Point{float32(3 * (p1.X - p0.X)), float32(3 * (p1.Y - p0.Y))}
+	return Point{float32(((a.X*t+b.X)*t+c.X)*t) + p0.X, float32(((a.Y*t+b.Y)*t+c.Y)*t) + p0.Y}
 }
 
 func evalCubicTangentAt(src *[4]Point, t float32) Point {
@@ -56,10 +56,10 @@ func evalCubicTangentAt(src *[4]Point, t float32) Point {
 
 func evalCubicDerivative(src *[4]Point, t float32) Point {
 	p0, p1, p2, p3 := src[0], src[1], src[2], src[3]
-	a := Point{p3.X + 3*(p1.X-p2.X) - p0.X, p3.Y + 3*(p1.Y-p2.Y) - p0.Y}
+	a := Point{p3.X + float32(3*(p1.X-p2.X)) - p0.X, p3.Y + float32(3*(p1.Y-p2.Y)) - p0.Y}
 	b := times2(p2.sub(times2(p1)).add(p0))
 	c := p1.sub(p0)
-	return Point{(a.X*t+b.X)*t + c.X, (a.Y*t+b.Y)*t + c.Y}
+	return Point{float32((a.X*t+b.X)*t) + c.X, float32((a.Y*t+b.Y)*t) + c.Y}
 }
 
 func chopQuadAt(src []Point, t float32, dst *[5]Point) {
@@ -93,7 +93,7 @@ func findUnitQuadRoots(a, b, c float32, roots *[3]float32) int {
 		}
 		return 0
 	}
-	dr := float64(b)*float64(b) - 4*float64(a)*float64(c)
+	dr := float64(float64(b)*float64(b)) - float64(4*float64(a)*float64(c))
 	if dr < 0 {
 		return 0
 	}
@@ -128,8 +128,8 @@ func findUnitQuadRoots(a, b, c float32, roots *[3]float32) int {
 }
 
 func findCubicExtrema(a, b, c, d float32, t *[3]float32) int {
-	aa := d - a + 3*(b-c)
-	bb := 2 * (a - b - b + c)
+	aa := d - a + float32(3*(b-c))
+	bb := float32(2 * (a - b - b + c))
 	cc := b - a
 	return findUnitQuadRoots(aa, bb, cc, t)
 }
@@ -139,8 +139,8 @@ func findQuadMaxCurvature(src *[3]Point) float32 {
 	ay := src[1].Y - src[0].Y
 	bx := src[0].X - src[1].X - src[1].X + src[2].X
 	by := src[0].Y - src[1].Y - src[1].Y + src[2].Y
-	numer := -(ax*bx + ay*by)
-	denom := bx*bx + by*by
+	numer := -(float32(ax*bx) + float32(ay*by))
+	denom := float32(bx*bx) + float32(by*by)
 	if denom < 0 {
 		numer = -numer
 		denom = -denom
@@ -165,9 +165,9 @@ func findCubicMaxCurvature(src *[4]Point, t *[3]float32) int {
 
 func formulateF1DotF2(s [4]float32) [4]float32 {
 	a := s[1] - s[0]
-	b := s[2] - 2*s[1] + s[0]
-	c := s[3] + 3*(s[1]-s[2]) - s[0]
-	return [4]float32{c * c, 3 * b * c, 2*b*b + c*a, a * b}
+	b := s[2] - float32(2*s[1]) + s[0]
+	c := s[3] + float32(3*(s[1]-s[2])) - s[0]
+	return [4]float32{float32(c * c), float32(3 * b * c), float32(2*b*b) + float32(c*a), float32(a * b)}
 }
 
 func cosf(x float32) float32 { return float32(math.Cos(float64(x))) }
@@ -180,20 +180,20 @@ func solveCubicPoly(coeff *[4]float32, t *[3]float32) int {
 		return n
 	}
 	inva := invert(coeff[0])
-	a := coeff[1] * inva
-	b := coeff[2] * inva
-	c := coeff[3] * inva
-	q := (a*a - b*3) / 9
-	r := (2*a*a*a - 9*a*b + 27*c) / 54
-	q3 := q * q * q
-	r2MinusQ3 := r*r - q3
+	a := float32(coeff[1] * inva)
+	b := float32(coeff[2] * inva)
+	c := float32(coeff[3] * inva)
+	q := (float32(a*a) - float32(b*3)) / 9
+	r := (float32(2*a*a*a) - float32(9*a*b) + float32(27*c)) / 54
+	q3 := float32(q * q * q)
+	r2MinusQ3 := float32(r*r) - q3
 	adiv3 := a / 3
 	if r2MinusQ3 < 0 {
 		theta := float32(math.Acos(float64(bound(r/sqrtf(q3), -1, 1))))
-		neg2RootQ := -2 * sqrtf(q)
-		t[0] = clamp01(neg2RootQ*cosf(theta/3) - adiv3)
-		t[1] = clamp01(neg2RootQ*cosf((theta+2*floatPI)/3) - adiv3)
-		t[2] = clamp01(neg2RootQ*cosf((theta-2*floatPI)/3) - adiv3)
+		neg2RootQ := float32(-2 * sqrtf(q))
+		t[0] = clamp01(float32(neg2RootQ*cosf(theta/3)) - adiv3)
+		t[1] = clamp01(float32(neg2RootQ*cosf((theta+2*floatPI)/3)) - adiv3)
+		t[2] = clamp01(float32(neg2RootQ*cosf((theta-2*floatPI)/3)) - adiv3)
 		if t[0] > t[1] {
 			t[0], t[1] = t[1], t[0]
 		}
@@ -227,11 +227,11 @@ func solveCubicPoly(coeff *[4]float32, t *[3]float32) int {
 func findCubicInflections(src *[4]Point, t *[3]float32) int {
 	ax := src[1].X - src[0].X
 	ay := src[1].Y - src[0].Y
-	bx := src[2].X - 2*src[1].X + src[0].X
-	by := src[2].Y - 2*src[1].Y + src[0].Y
-	cx := src[3].X + 3*(src[1].X-src[2].X) - src[0].X
-	cy := src[3].Y + 3*(src[1].Y-src[2].Y) - src[0].Y
-	return findUnitQuadRoots(bx*cy-by*cx, ax*cy-ay*cx, ax*by-ay*bx, t)
+	bx := src[2].X - float32(2*src[1].X) + src[0].X
+	by := src[2].Y - float32(2*src[1].Y) + src[0].Y
+	cx := src[3].X + float32(3*(src[1].X-src[2].X)) - src[0].X
+	cy := src[3].Y + float32(3*(src[1].Y-src[2].Y)) - src[0].Y
+	return findUnitQuadRoots(float32(bx*cy)-float32(by*cx), float32(ax*cy)-float32(ay*cx), float32(ax*by)-float32(ay*bx), t)
 }
 
 func findCubicCusp(src *[4]Point) (float32, bool) {
@@ -262,11 +262,11 @@ func onSameSide(src *[4]Point, testIndex, lineIndex int) bool {
 	for i := range 2 {
 		crosses[i] = line.cross(src[testIndex+i].sub(origin))
 	}
-	return crosses[0]*crosses[1] >= 0
+	return float32(crosses[0]*crosses[1]) >= 0
 }
 
 func calcCubicPrecision(src *[4]Point) float32 {
-	return (src[1].distanceToSqd(src[0]) + src[2].distanceToSqd(src[1]) + src[3].distanceToSqd(src[2])) * 1e-8
+	return float32((src[1].distanceToSqd(src[0]) + src[2].distanceToSqd(src[1]) + src[3].distanceToSqd(src[2])) * 1e-8)
 }
 
 // conic is path_geometry::Conic.
@@ -284,9 +284,9 @@ func (c conic) computeQuadPow2(tol float32) (int, bool) {
 	}
 	a := c.weight - 1
 	k := a / (4 * (2 + a))
-	x := k * (c.points[0].X - 2*c.points[1].X + c.points[2].X)
-	y := k * (c.points[0].Y - 2*c.points[1].Y + c.points[2].Y)
-	e := sqrtf(x*x + y*y)
+	x := float32(k * (c.points[0].X - 2*c.points[1].X + c.points[2].X))
+	y := float32(k * (c.points[0].Y - 2*c.points[1].Y + c.points[2].Y))
+	e := sqrtf(float32(x*x) + float32(y*y))
 	pow2 := 0
 	for range 4 {
 		if e <= tol {
@@ -316,26 +316,23 @@ func (c conic) chopIntoQuadsPow2(pow2 int, points []Point) int {
 
 func (c conic) chop() (conic, conic) {
 	scale := invert(1 + c.weight)
-	newW := sqrtf(0.5 + c.weight*0.5)
+	newW := sqrtf(0.5 + float32(c.weight*0.5))
 	p0, p1, p2 := c.points[0], c.points[1], c.points[2]
 	w := c.weight
-	wp1 := Point{w * p1.X, w * p1.Y}
-	m := Point{
-		(p0.X + (wp1.X + wp1.X) + p2.X) * scale * 0.5,
-		(p0.Y + (wp1.Y + wp1.Y) + p2.Y) * scale * 0.5,
-	}
+	wp1 := Point{float32(w * p1.X), float32(w * p1.Y)}
+	m := Point{float32((p0.X + (wp1.X + wp1.X) + p2.X) * scale * 0.5), float32((p0.Y + (wp1.Y + wp1.Y) + p2.Y) * scale * 0.5)}
 	if !m.isFinite() {
 		wd := float64(c.weight)
-		w2 := wd * 2
-		sh := 1 / (1 + wd) * 0.5
-		m.X = float32((float64(p0.X) + w2*float64(p1.X) + float64(p2.X)) * sh)
-		m.Y = float32((float64(p0.Y) + w2*float64(p1.Y) + float64(p2.Y)) * sh)
+		w2 := float64(wd * 2)
+		sh := float64(1 / (1 + wd) * 0.5)
+		m.X = float32((float64(p0.X) + float64(w2*float64(p1.X)) + float64(p2.X)) * sh)
+		m.Y = float32((float64(p0.Y) + float64(w2*float64(p1.Y)) + float64(p2.Y)) * sh)
 	}
-	return conic{[3]Point{p0, {(p0.X + wp1.X) * scale, (p0.Y + wp1.Y) * scale}, m}, newW},
-		conic{[3]Point{m, {(wp1.X + p2.X) * scale, (wp1.Y + p2.Y) * scale}, p2}, newW}
+	return conic{[3]Point{p0, {float32((p0.X + wp1.X) * scale), float32((p0.Y + wp1.Y) * scale)}, m}, newW},
+		conic{[3]Point{m, {float32((wp1.X + p2.X) * scale), float32((wp1.Y + p2.Y) * scale)}, p2}, newW}
 }
 
-func between(a, b, c float32) bool { return (a-b)*(c-b) <= 0 }
+func between(a, b, c float32) bool { return float32((a-b)*(c-b)) <= 0 }
 
 func subdivide(src conic, points []Point, level int) []Point {
 	if level == 0 {

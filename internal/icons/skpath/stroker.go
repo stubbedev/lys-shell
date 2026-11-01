@@ -82,7 +82,7 @@ type quadConstruct struct {
 
 func (q *quadConstruct) init(start, end float32) bool {
 	q.startT = start
-	q.midT = clamp01((start + end) * 0.5)
+	q.midT = clamp01(float32((start + end) * 0.5))
 	q.endT = end
 	q.startSet = false
 	q.endSet = false
@@ -165,9 +165,9 @@ func (s *stroker) stroke(path *Path, width, miterLimit float32, lineCap LineCap,
 		invMiterLimit = invert(miterLimit)
 	}
 	s.resScale = resScale
-	s.invResScale = invert(resScale * 4)
-	s.invResScaleSquared = s.invResScale * s.invResScale
-	s.radius = width * 0.5
+	s.invResScale = invert(float32(resScale * 4))
+	s.invResScaleSquared = float32(s.invResScale * s.invResScale)
+	s.radius = float32(width * 0.5)
 	s.invMiterLimit = invMiterLimit
 	s.segmentCount = -1
 	s.capper = lineCap
@@ -223,7 +223,7 @@ func (s *stroker) moveTo(p Point) {
 }
 
 func (s *stroker) lineTo(p Point, it *segmentsIter) {
-	teeny := s.prevPt.equalsWithinTolerance(p, scalarNearlyZero*s.invResScale)
+	teeny := s.prevPt.equalsWithinTolerance(p, float32(scalarNearlyZero*s.invResScale))
 	if s.capper == CapButt && teeny {
 		return
 	}
@@ -613,8 +613,8 @@ func (s *stroker) setRayPoints(tp Point, dxy, onP, tangent *Point) {
 		*dxy = Point{s.radius, 0}
 	}
 	flip := float32(s.strokeType)
-	onP.X = tp.X + flip*dxy.Y
-	onP.Y = tp.Y - flip*dxy.X
+	onP.X = tp.X + float32(flip*dxy.Y)
+	onP.Y = tp.Y - float32(flip*dxy.X)
 	if tangent != nil {
 		tangent.X = onP.X + dxy.X
 		tangent.Y = onP.Y + dxy.Y
@@ -655,7 +655,7 @@ func (s *stroker) strokeCloseEnough(stroke *[3]Point, ray [2]Point, qp *quadCons
 		return resultSplit
 	}
 	quadPt := evalQuadAt(stroke, roots[0])
-	e := s.invResScale * (1 - absf(roots[0]-0.5)*2)
+	e := float32(s.invResScale * (1 - absf(roots[0]-0.5)*2))
 	if pointsWithinDist(ray[0], quadPt, e) {
 		if sharpAngle(&qp.quad) {
 			return resultSplit
@@ -690,8 +690,8 @@ func (s *stroker) intersectRay(kind intersectRayType, qp *quadConstruct) resultT
 	numerA /= denom
 	if numerA > numerA-1 {
 		if kind == rayCtrlPt {
-			qp.quad[1].X = start.X*(1-numerA) + qp.tangentStart.X*numerA
-			qp.quad[1].Y = start.Y*(1-numerA) + qp.tangentStart.Y*numerA
+			qp.quad[1].X = float32(start.X*(1-numerA)) + float32(qp.tangentStart.X*numerA)
+			qp.quad[1].Y = float32(start.Y*(1-numerA)) + float32(qp.tangentStart.Y*numerA)
 		}
 		return resultQuad
 	}
@@ -741,7 +741,9 @@ func squareCapper(pivot, normal, stop Point, other bool, path *Builder) {
 	path.LineTo(stop.X, stop.Y)
 }
 
-func isClockwise(before, after Point) bool { return before.X*after.Y > before.Y*after.X }
+func isClockwise(before, after Point) bool {
+	return float32(before.X*after.Y) > float32(before.Y*after.X)
+}
 
 type angleType uint8
 
@@ -882,7 +884,7 @@ func miterJoinerInner(beforeUnit, pivot, afterUnit Point, radius, invMiterLimit 
 	} else {
 		mid = Point{before.X + after.X, before.Y + after.Y}
 	}
-	sinHalfAngle := sqrtf((1 + dotProd) * 0.5)
+	sinHalfAngle := sqrtf(float32((1 + dotProd) * 0.5))
 	if sinHalfAngle < invMiterLimit {
 		doBluntOrClipped(b, false, before, mid, after)
 		return
@@ -892,7 +894,7 @@ func miterJoinerInner(beforeUnit, pivot, afterUnit Point, radius, invMiterLimit 
 }
 
 func setNormalUnitNormal(before, after Point, scale, radius float32, normal, unitNormal *Point) bool {
-	if !unitNormal.setNormalize((after.X-before.X)*scale, (after.Y-before.Y)*scale) {
+	if !unitNormal.setNormalize(float32((after.X-before.X)*scale), float32((after.Y-before.Y)*scale)) {
 		return false
 	}
 	unitNormal.rotateCCW()
@@ -941,7 +943,7 @@ func quadInLine(quad *[3]Point) bool {
 	}
 	mid := outer1 ^ outer2 ^ 3
 	const curvatureSlop float32 = 0.000005
-	lineSlop := ptMax * ptMax * curvatureSlop
+	lineSlop := float32(ptMax * ptMax * curvatureSlop)
 	return ptToLine(quad[mid], quad[outer1], quad[outer2]) <= lineSlop
 }
 
@@ -952,7 +954,7 @@ func ptToLine(pt, lineStart, lineEnd Point) float32 {
 	denom := dxy.dot(dxy)
 	t := numer / denom
 	if t >= 0 && t <= 1 {
-		hit := Point{lineStart.X*(1-t) + lineEnd.X*t, lineStart.Y*(1-t) + lineEnd.Y*t}
+		hit := Point{float32(lineStart.X*(1-t)) + float32(lineEnd.X*t), float32(lineStart.Y*(1-t)) + float32(lineEnd.Y*t)}
 		return hit.distanceToSqd(pt)
 	}
 	return pt.distanceToSqd(lineStart)
@@ -962,16 +964,16 @@ func intersectQuadRay(line [2]Point, quad *[3]Point, roots *[3]float32) int {
 	vec := line[1].sub(line[0])
 	var r [3]float32
 	for n := range 3 {
-		r[n] = (quad[n].Y-line[0].Y)*vec.X - (quad[n].X-line[0].X)*vec.Y
+		r[n] = float32((quad[n].Y-line[0].Y)*vec.X) - float32((quad[n].X-line[0].X)*vec.Y)
 	}
 	a, b, c := r[2], r[1], r[0]
-	a += c - 2*b
+	a += c - float32(2*b)
 	b -= c
-	return findUnitQuadRoots(a, 2*b, c, roots)
+	return findUnitQuadRoots(a, float32(2*b), c, roots)
 }
 
 func pointsWithinDist(near, far Point, limit float32) bool {
-	return near.distanceToSqd(far) <= limit*limit
+	return near.distanceToSqd(far) <= float32(limit*limit)
 }
 
 func sharpAngle(quad *[3]Point) bool {
@@ -1057,7 +1059,7 @@ func cubicInLine(cubic *[4]Point) bool {
 	}
 	mid1 := (1 + (2 >> outer2)) >> outer1
 	mid2 := outer1 ^ outer2 ^ mid1
-	lineSlop := ptMax * ptMax * 0.00001
+	lineSlop := float32(ptMax * ptMax * 0.00001)
 	return ptToLine(cubic[mid1], cubic[outer1], cubic[outer2]) <= lineSlop &&
 		ptToLine(cubic[mid2], cubic[outer1], cubic[outer2]) <= lineSlop
 }

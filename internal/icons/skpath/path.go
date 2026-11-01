@@ -361,8 +361,8 @@ func (b *Builder) isZeroLengthSincePoint(start int) bool {
 }
 
 func (b *Builder) pushOval(oval Rect) {
-	cx := oval.Left*0.5 + oval.Right*0.5
-	cy := oval.Top*0.5 + oval.Bottom*0.5
+	cx := float32(oval.Left*0.5) + float32(oval.Right*0.5)
+	cy := float32(oval.Top*0.5) + float32(oval.Bottom*0.5)
 	ovalPoints := [4]Point{{cx, oval.Bottom}, {oval.Left, cy}, {cx, oval.Top}, {oval.Right, cy}}
 	rectPoints := [4]Point{{oval.Right, oval.Bottom}, {oval.Left, oval.Bottom}, {oval.Left, oval.Top}, {oval.Right, oval.Top}}
 	b.MoveTo(ovalPoints[3].X, ovalPoints[3].Y)
