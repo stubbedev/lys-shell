@@ -464,9 +464,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 			}
 		}()
 	}
-	// The OSD watcher runs whether or not the OSD is enabled: the OSD
-	// drops events while disabled, so a reload can turn it on or off
-	// (the Rust OsdEnabledChanged).
+	// The level and layout watchers run whether or not the OSD is enabled:
+	// the OSD drops their events while disabled, so a reload can turn it on
+	// or off (the Rust OsdEnabledChanged). The lock-key source, which opens
+	// input devices, follows the setting instead.
 	osdCtx, stopOsd := context.WithCancel(context.Background())
 	defer stopOsd()
 	go func() {

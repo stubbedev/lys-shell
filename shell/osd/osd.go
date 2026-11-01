@@ -7,6 +7,7 @@ package osd
 
 import (
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -73,12 +74,16 @@ type Osd struct {
 	ready     bool
 	dismissID uint32
 	face      *face
+
+	lockKeysWanted  atomic.Bool
+	lockKeysChanged chan struct{}
 }
 
 // New builds the OSD; nothing maps until the first event after the
 // start-up quiet period.
 func New(d Deps, cfg *config.Config) *Osd {
-	o := &Osd{d: d, cfg: cfg}
+	o := &Osd{d: d, cfg: cfg, lockKeysChanged: make(chan struct{}, 1)}
+	o.lockKeysWanted.Store(cfg.Osd.Enabled)
 	d.After(readyDelay, func() { d.Invoke(func() { o.ready = true }) })
 	return o
 }
@@ -94,6 +99,12 @@ func (o *Osd) ShowToast(req widgetipc.ToastRequest) {
 // SetConfig takes a reloaded config; a mapped OSD re-anchors to it
 // (OsdCmd::ConfigChanged).
 func (o *Osd) SetConfig(cfg *config.Config) {
+	if o.lockKeysWanted.Swap(cfg.Osd.Enabled) != cfg.Osd.Enabled {
+		select {
+		case o.lockKeysChanged <- struct{}{}:
+		default:
+		}
+	}
 	o.d.Invoke(func() {
 		o.cfg = cfg
 		if o.face != nil {

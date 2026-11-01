@@ -110,7 +110,8 @@ type LockKeys func(fn func(keytoggles.Event)) (stop func(), err error)
 // Watch follows the audio, brightness, keyboard layout, and lock-key
 // sources until ctx ends (watchers.rs spawn). A nil source is skipped. The levels at
 // start seed the dedupe without flashing, as the Rust watchers' first
-// emission lands inside the quiet period.
+// emission lands inside the quiet period. The lock-key source runs only
+// while the OSD is enabled, since it holds input devices open.
 func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source, layouts Layouts, locks LockKeys) {
 	if audio != nil {
 		if ticks, stop, err := audio.Subscribe(ctx); err == nil {
@@ -162,12 +163,41 @@ func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.So
 			log.Printf("osd: keyboard layout: %v", err)
 		}
 	}
-	if locks != nil {
-		if stop, err := locks(func(e keytoggles.Event) { o.Show(toggleEvent(e)) }); err == nil {
-			defer stop()
-		} else {
-			log.Printf("osd: lock keys: %v", err)
+	if locks == nil {
+		<-ctx.Done()
+		return
+	}
+	o.followLockKeys(ctx, locks)
+}
+
+// followLockKeys keeps the lock-key source running exactly while the
+// OSD is enabled, until ctx ends. A source that fails to start is tried
+// again the next time the OSD is enabled.
+func (o *Osd) followLockKeys(ctx context.Context, locks LockKeys) {
+	var stop func()
+	defer func() {
+		if stop != nil {
+			stop()
+		}
+	}()
+	for {
+		wanted := o.lockKeysWanted.Load()
+		switch {
+		case wanted && stop == nil:
+			started, err := locks(func(e keytoggles.Event) { o.Show(toggleEvent(e)) })
+			if err != nil {
+				log.Printf("osd: lock keys: %v", err)
+				break
+			}
+			stop = started
+		case !wanted && stop != nil:
+			stop()
+			stop = nil
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-o.lockKeysChanged:
 		}
 	}
-	<-ctx.Done()
 }

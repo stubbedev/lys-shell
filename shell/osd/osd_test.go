@@ -542,3 +542,113 @@ func TestWatchSurvivesAFailedLockKeySource(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// lockKeySource counts its starts and stops for the tests of when the
+// lock-key source runs.
+type lockKeySource struct {
+	started, stopped chan struct{}
+}
+
+func newLockKeySource() *lockKeySource {
+	return &lockKeySource{started: make(chan struct{}, 8), stopped: make(chan struct{}, 8)}
+}
+
+func (s *lockKeySource) start(func(keytoggles.Event)) (func(), error) {
+	s.started <- struct{}{}
+	return func() { s.stopped <- struct{}{} }, nil
+}
+
+func awaitSignal(t *testing.T, what string, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+	}
+}
+
+func expectNoSignal(t *testing.T, what string, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+		t.Errorf("unexpected: %s", what)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func startWatch(t *testing.T, h *harness, locks LockKeys) (finish func()) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.osd.Watch(ctx, nil, nil, nil, locks)
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
+}
+
+// A disabled OSD opens no input devices: the source never starts.
+func TestWatchStartsNoLockKeySourceWhileDisabled(t *testing.T) {
+	cfg := quietConfig()
+	cfg.Osd.Enabled = false
+	h := readyHarness(t, cfg)
+	source := newLockKeySource()
+	finish := startWatch(t, h, source.start)
+	expectNoSignal(t, "a disabled OSD started the lock-key source", source.started)
+	finish()
+	expectNoSignal(t, "a source that never started was stopped", source.stopped)
+}
+
+// A reload turns the source on and off with the OSD, and one that
+// leaves the setting alone does not touch it.
+func TestLockKeySourceFollowsReloads(t *testing.T) {
+	cfg := quietConfig()
+	cfg.Osd.Enabled = false
+	h := readyHarness(t, cfg)
+	source := newLockKeySource()
+	finish := startWatch(t, h, source.start)
+
+	enabled := quietConfig()
+	enabled.Osd.Enabled = true
+	h.osd.SetConfig(enabled)
+	awaitSignal(t, "enabling the OSD to start the source", source.started)
+
+	h.osd.SetConfig(enabled)
+	expectNoSignal(t, "a reload with the OSD still on restarted the source", source.started)
+	expectNoSignal(t, "a reload with the OSD still on stopped the source", source.stopped)
+
+	h.osd.SetConfig(cfg)
+	awaitSignal(t, "disabling the OSD to stop the source", source.stopped)
+	h.osd.SetConfig(cfg)
+	expectNoSignal(t, "a reload with the OSD still off started the source", source.started)
+
+	h.osd.SetConfig(enabled)
+	awaitSignal(t, "enabling the OSD again to start the source", source.started)
+	finish()
+	awaitSignal(t, "the end of Watch to stop the source", source.stopped)
+	expectNoSignal(t, "the source was stopped twice", source.stopped)
+}
+
+// A source that fails is left alone until the OSD is enabled again.
+func TestFailedLockKeySourceRetriesOnTheNextEnable(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	attempts := make(chan struct{}, 8)
+	finish := startWatch(t, h, func(func(keytoggles.Event)) (func(), error) {
+		attempts <- struct{}{}
+		return nil, errors.New("no lys-wm")
+	})
+	defer finish()
+	awaitSignal(t, "the first attempt", attempts)
+	on := quietConfig()
+	h.osd.SetConfig(on)
+	expectNoSignal(t, "a reload with the OSD still on retried", attempts)
+	off := quietConfig()
+	off.Osd.Enabled = false
+	h.osd.SetConfig(off)
+	expectNoSignal(t, "disabling the OSD retried", attempts)
+	h.osd.SetConfig(on)
+	awaitSignal(t, "enabling the OSD to retry", attempts)
+}
