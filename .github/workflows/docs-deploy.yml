@@ -15,4 +15,4 @@ concurrency:
   cancel-in-progress: true
 jobs:
   pages:
-    uses: stubbedev/lys-docs-theme/.github/workflows/pages.yml@fbadf1d230df34b1df844b7bb7c4c38f82e1c95b
+    uses: stubbedev/lys-docs-theme/.github/workflows/pages.yml@fbadf1d230df34b1df844b7bb7c4c38f82e1c95b # v0.1.0
