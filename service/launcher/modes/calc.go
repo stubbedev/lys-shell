@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/stubbedev/lys-lib/third_party/gomath"
+
 	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
@@ -181,7 +183,7 @@ func (p *calcParser) power() (float64, bool) {
 		if !ok {
 			return 0, false
 		}
-		return math.Pow(base, exp), true
+		return gomath.Pow(base, exp), true
 	}
 	return base, true
 }
@@ -272,15 +274,15 @@ func (p *calcParser) named() (float64, bool) {
 	case "round":
 		return math.Round(arg), true
 	case "ln":
-		return math.Log(arg), true
+		return gomath.Log(arg), true
 	case "log":
-		return math.Log10(arg), true
+		return gomath.Log10(arg), true
 	case "sin":
-		return math.Sin(arg), true
+		return gomath.Sin(arg), true
 	case "cos":
-		return math.Cos(arg), true
+		return gomath.Cos(arg), true
 	case "tan":
-		return math.Tan(arg), true
+		return gomath.Tan(arg), true
 	}
 	return 0, false
 }

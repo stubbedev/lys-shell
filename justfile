@@ -69,6 +69,16 @@ vet:
     {{go}} vet ./...
 
 # Lint without changing anything: formatting and golangci-lint
+# Fail on any float product fused into an FMA, which rounds differently from amd64.
+no-fused:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    asm=$(GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -gcflags=-S -o /dev/null ./... 2>&1)
+    if fused=$(grep -E '\b(FMADD|FMSUB|FNMADD|FNMSUB)[DS]\b' <<<"$asm"); then
+        printf '%s\n' "$fused" >&2
+        exit 1
+    fi
+
 # (settings in .golangci.yml).
 lint:
     golangci-lint fmt --diff
@@ -148,7 +158,7 @@ clockwatch-vm:
 
 # Every release gate in order: vet, lint, test, race, the schema
 # check, and the release build.
-check: vet lint test race schema-check build
+check: vet lint no-fused test race schema-check build
 
 # Check the screen recorder on this machine's GPU (run it in the dev
 # shell): a private headless sway renders on the first render node with

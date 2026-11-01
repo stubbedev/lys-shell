@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -322,7 +323,7 @@ func roundFilter(_ *evaluator, v any, args []any, kwargs map[string]any) (any, e
 		if p, ok := argAt(args, kwargs, 0, "precision"); ok {
 			precision, _ = asInt(p)
 		}
-		scale := math.Pow(10, float64(precision))
+		scale := gomath.Pow(10, float64(precision))
 		return math.Round(x*scale) / scale, nil
 	}
 	return nil, errorf("cannot round value (%s)", kind(v))

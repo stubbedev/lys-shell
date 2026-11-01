@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 )
 
 // civilTwilightAltitude is the solar altitude of civil dawn and dusk, in
@@ -151,18 +153,18 @@ func sunTimesFor(now time.Time, latitude, longitude, altitude float64) sunTimes 
 	mRad := radians(m)
 
 	// Equation of the center (degrees).
-	c := float64(1.9148*math.Sin(mRad)) + float64(0.0200*math.Sin(2.0*mRad)) + float64(0.0003*math.Sin(3.0*mRad))
+	c := float64(1.9148*gomath.Sin(mRad)) + float64(0.0200*gomath.Sin(2.0*mRad)) + float64(0.0003*gomath.Sin(3.0*mRad))
 
 	// Ecliptic longitude (degrees).
 	lambda := remEuclid(m+c+180.0+102.9372, 360.0)
 	lambdaRad := radians(lambda)
 
 	// Solar transit (Julian date of solar noon).
-	jTransit := 2_451_545.0 + jStar + float64(0.0053*math.Sin(mRad)) - float64(0.0069*math.Sin(2.0*lambdaRad))
+	jTransit := 2_451_545.0 + jStar + float64(0.0053*gomath.Sin(mRad)) - float64(0.0069*gomath.Sin(2.0*lambdaRad))
 
 	// Sun declination.
-	sinDecl := math.Sin(lambdaRad) * math.Sin(radians(23.4397))
-	decl := math.Asin(sinDecl)
+	sinDecl := gomath.Sin(lambdaRad) * gomath.Sin(radians(23.4397))
+	decl := gomath.Asin(sinDecl)
 
 	noon, okNoon := julianToUTC(jTransit)
 	if !okNoon {
@@ -172,8 +174,8 @@ func sunTimesFor(now time.Time, latitude, longitude, altitude float64) sunTimes 
 
 	// Hour angle at the altitude.
 	latRad := radians(latitude)
-	cosOmega := (math.Sin(radians(altitude)) - float64(math.Sin(latRad)*math.Sin(decl))) /
-		(math.Cos(latRad) * math.Cos(decl))
+	cosOmega := (gomath.Sin(radians(altitude)) - float64(gomath.Sin(latRad)*gomath.Sin(decl))) /
+		(gomath.Cos(latRad) * gomath.Cos(decl))
 
 	if cosOmega < -1.0 {
 		return sunTimes{noon: noon, polarDay: true} // never goes below
@@ -182,7 +184,7 @@ func sunTimesFor(now time.Time, latitude, longitude, altitude float64) sunTimes 
 		return sunTimes{noon: noon, polarNight: true} // never comes above
 	}
 
-	omega := degrees(math.Acos(cosOmega))
+	omega := degrees(gomath.Acos(cosOmega))
 	jRise := jTransit - omega/360.0
 	jSet := jTransit + omega/360.0
 

@@ -1,8 +1,9 @@
 package cava
 
 import (
-	"math"
 	"slices"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 )
 
 // Execute is cava_execute: fold new samples into the ring, FFT the
@@ -69,7 +70,7 @@ func (p *Plan) Execute(dst, samples []float64) []float64 {
 	}
 
 	overshoot := false
-	gravityMod := math.Pow(60/p.framerate, 2.5) * 1.54 / p.noiseReduction
+	gravityMod := gomath.Pow(60/p.framerate, 2.5) * 1.54 / p.noiseReduction
 	if gravityMod < 1 {
 		gravityMod = 1
 	}
@@ -130,5 +131,5 @@ func (p *Plan) Peaks() []float64 {
 
 // cmag is hypot(re, im) on a Fourier coefficient.
 func cmag(c complex128) float64 {
-	return math.Hypot(real(c), imag(c))
+	return gomath.Hypot(real(c), imag(c))
 }

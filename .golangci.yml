@@ -9,6 +9,7 @@ linters:
     - bodyclose
     - copyloopvar
     - errorlint
+    - forbidigo
     - gosec
     - intrange
     - misspell
@@ -21,6 +22,10 @@ linters:
     - usestdlibvars
     - whitespace
   settings:
+    forbidigo:
+      forbid:
+        - pattern: ^math\.(Sin|Cos|Sincos|Tan|Atan|Atan2|Asin|Acos|Exp|Exp2|Log|Log2|Log10|Pow|Cbrt|Hypot|Erf|Erfc)$
+          msg: its result depends on the architecture; use lys-lib's third_party/gomath
     errcheck:
       check-type-assertions: true
       exclude-functions:
@@ -48,6 +53,7 @@ linters:
     rules:
       - path: _test\.go
         linters:
+          - forbidigo
           - errcheck
           - gosec
           - unparam

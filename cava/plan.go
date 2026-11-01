@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 	"gonum.org/v1/gonum/dsp/fourier"
 )
 
@@ -139,7 +140,7 @@ func NewPlan(bars, rate, channels int, noiseReduction float64, autosens bool, lo
 func hann(n int) []float64 {
 	m := make([]float64, n)
 	for i := range m {
-		m[i] = 0.5 * (1 - math.Cos(2*math.Pi*float64(i)/float64(n-1)))
+		m[i] = 0.5 * (1 - gomath.Cos(2*math.Pi*float64(i)/float64(n-1)))
 	}
 	return m
 }
@@ -150,7 +151,7 @@ func hann(n int) []float64 {
 // The float32 arithmetic is load-bearing: cava computes the cutoff
 // table in C floats, and the clump detection depends on that precision.
 func (p *Plan) computeBands() {
-	frequencyConstant := math.Log10(float64(p.lowCutoff)/float64(p.highCutoff)) /
+	frequencyConstant := gomath.Log10(float64(p.lowCutoff)/float64(p.highCutoff)) /
 		(1/float64(p.bars+1) - 1)
 
 	relative := make([]float32, p.bars+1)
@@ -163,7 +164,7 @@ func (p *Plan) computeBands() {
 	for n := 0; n <= p.bars; n++ {
 		coefficient := -frequencyConstant +
 			float64(float64(n+1)/float64(p.bars+1)*frequencyConstant)
-		cutoffFrequency[n] = float32(p.highCutoff) * float32(math.Pow(10, coefficient))
+		cutoffFrequency[n] = float32(p.highCutoff) * float32(gomath.Pow(10, coefficient))
 
 		if n > 0 && cutoffFrequency[n-1] >= cutoffFrequency[n] {
 			cutoffFrequency[n] = cutoffFrequency[n-1] + minBandwidth
@@ -228,12 +229,12 @@ func (p *Plan) computeBands() {
 
 	// The hardcoded eq normalizes the FFT output and boosts treble.
 	for n := range p.bars {
-		p.eq[n] = 1 / math.Pow(2, 28)
-		p.eq[n] *= math.Pow(float64(cutoffFrequency[n+1]), 0.8)
+		p.eq[n] = 1 / gomath.Pow(2, 28)
+		p.eq[n] *= gomath.Pow(float64(cutoffFrequency[n+1]), 0.8)
 		if n < p.bassCutoffBar {
-			p.eq[n] /= math.Log2(float64(p.bassSize))
+			p.eq[n] /= gomath.Log2(float64(p.bassSize))
 		} else {
-			p.eq[n] /= math.Log2(float64(p.fftSize))
+			p.eq[n] /= gomath.Log2(float64(p.fftSize))
 		}
 		p.eq[n] /= float64(p.upperCutoff[n] - p.lowerCutoff[n] + 1)
 	}

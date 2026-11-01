@@ -1,6 +1,10 @@
 package skpath
 
-import "math"
+import (
+	"math"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
+)
 
 // This file ports path_geometry.rs. The f32x2 lane math is written out
 // per component in the same operation order.
@@ -170,7 +174,7 @@ func formulateF1DotF2(s [4]float32) [4]float32 {
 	return [4]float32{float32(c * c), float32(3 * b * c), float32(2*b*b) + float32(c*a), float32(a * b)}
 }
 
-func cosf(x float32) float32 { return float32(math.Cos(float64(x))) }
+func cosf(x float32) float32 { return float32(gomath.Cos(float64(x))) }
 
 func solveCubicPoly(coeff *[4]float32, t *[3]float32) int {
 	if nearlyZero(coeff[0]) {
@@ -189,7 +193,7 @@ func solveCubicPoly(coeff *[4]float32, t *[3]float32) int {
 	r2MinusQ3 := float32(r*r) - q3
 	adiv3 := a / 3
 	if r2MinusQ3 < 0 {
-		theta := float32(math.Acos(float64(bound(r/sqrtf(q3), -1, 1))))
+		theta := float32(gomath.Acos(float64(bound(r/sqrtf(q3), -1, 1))))
 		neg2RootQ := float32(-2 * sqrtf(q))
 		t[0] = clamp01(float32(neg2RootQ*cosf(theta/3)) - adiv3)
 		t[1] = clamp01(float32(neg2RootQ*cosf((theta+2*floatPI)/3)) - adiv3)
@@ -213,7 +217,7 @@ func solveCubicPoly(coeff *[4]float32, t *[3]float32) int {
 		return n
 	}
 	aa := absf(r) + sqrtf(r2MinusQ3)
-	aa = float32(math.Pow(float64(aa), float64(float32(0.3333333))))
+	aa = float32(gomath.Pow(float64(aa), float64(float32(0.3333333))))
 	if r > 0 {
 		aa = -aa
 	}

@@ -3,6 +3,8 @@ package usvg
 import (
 	"math"
 	"math/big"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 )
 
 // The Rust code's f64 sin, cos, tan and atan2 come from the system
@@ -55,7 +57,7 @@ func bigSincos(x float64) (*big.Float, *big.Float) {
 // sincos returns the correctly rounded sin and cos of x.
 func sincos(x float64) (float64, float64) {
 	if special(x) {
-		return math.Sincos(x)
+		return gomath.Sincos(x)
 	}
 	s, c := bigSincos(x)
 	sf, _ := s.Float64()
@@ -66,7 +68,7 @@ func sincos(x float64) (float64, float64) {
 // tanR returns the correctly rounded tan of x.
 func tanR(x float64) float64 {
 	if special(x) {
-		return math.Tan(x)
+		return gomath.Tan(x)
 	}
 	s, c := bigSincos(x)
 	t, _ := bf().Quo(s, c).Float64()
@@ -76,7 +78,7 @@ func tanR(x float64) float64 {
 // atan2R returns the correctly rounded atan2(y, x).
 func atan2R(y, x float64) float64 {
 	if y == 0 || x == 0 || math.IsNaN(x) || math.IsNaN(y) || math.IsInf(x, 0) || math.IsInf(y, 0) {
-		return math.Atan2(y, x)
+		return gomath.Atan2(y, x)
 	}
 	by, bx := bf().SetFloat64(y), bf().SetFloat64(x)
 	var a *big.Float

@@ -3,6 +3,8 @@ package nightlight
 import (
 	"fmt"
 	"math"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 )
 
 // The documented ranges of the module's temperature and gamma.
@@ -89,9 +91,9 @@ func whitepoint(temp float64) [3]float64 {
 	var r, g, b float64
 	if t <= 66 {
 		r = 255
-		g = clamp255(float64(99.4708025861*math.Log(t)) - 161.1195681661)
+		g = clamp255(float64(99.4708025861*gomath.Log(t)) - 161.1195681661)
 	} else {
-		r = clamp255(329.698727446 * math.Pow(t-60, -0.1332047592))
+		r = clamp255(329.698727446 * gomath.Pow(t-60, -0.1332047592))
 		g = coolGreen(t)
 	}
 	switch {
@@ -103,10 +105,10 @@ func whitepoint(temp float64) [3]float64 {
 	return [3]float64{r / 255, g / 255, b / 255}
 }
 
-func coolGreen(t float64) float64 { return clamp255(288.1221695283 * math.Pow(t-60, -0.0755148492)) }
+func coolGreen(t float64) float64 { return clamp255(288.1221695283 * gomath.Pow(t-60, -0.0755148492)) }
 
 func warmBlue(t float64) float64 {
-	return clamp255(float64(138.5177312231*math.Log(t-10)) - 305.0447927307)
+	return clamp255(float64(138.5177312231*gomath.Log(t-10)) - 305.0447927307)
 }
 
 // fitSeam is how far the fit's piece on temp's side of neutralTemp stops

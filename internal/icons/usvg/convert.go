@@ -6,6 +6,8 @@ import (
 	"math"
 	"strings"
 
+	"github.com/stubbedev/lys-lib/third_party/gomath"
+
 	"github.com/stubbedev/lys-shell/internal/icons/skpath"
 )
 
@@ -376,7 +378,7 @@ func resolveFontSize(n *node) float32 {
 			continue
 		}
 		factors := map[string]int{"xx-small": -3, "x-small": -2, "small": -1, "medium": 0, "large": 1, "x-large": 2, "xx-large": 3, "smaller": -1, "larger": 1}
-		fontSize *= float32(math.Pow(float64(float32(1.2)), float64(factors[v])))
+		fontSize *= float32(gomath.Pow(float64(float32(1.2)), float64(factors[v])))
 	}
 	return fontSize
 }

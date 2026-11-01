@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 )
 
 // Error is a template syntax or render error.
@@ -648,7 +650,7 @@ func arith(op string, l, r any) (any, error) {
 		// euclidean one.
 		return math.Mod(a, b), nil
 	case "**":
-		return math.Pow(a, b), nil
+		return gomath.Pow(a, b), nil
 	}
 	return nil, opError(op, l, r)
 }

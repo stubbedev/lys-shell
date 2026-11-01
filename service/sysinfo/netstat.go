@@ -3,10 +3,11 @@ package sysinfo
 import (
 	"bytes"
 	"errors"
-	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
 )
 
 // NetTotals is one interface's lifetime byte counters.
@@ -73,9 +74,9 @@ func AutoBytes(bytes uint64) string {
 		return strconv.FormatUint(bytes, 10) + " B"
 	}
 	size := float64(bytes)
-	exp := int(math.Log(size) / 6.931471805599453)
+	exp := int(gomath.Log(size) / 6.931471805599453)
 	prefix := "KMGTPE"[exp-1]
-	return strconv.FormatFloat(size/math.Pow(kib, float64(exp)), 'f', 1, 64) + " " + string(prefix) + "iB"
+	return strconv.FormatFloat(size/gomath.Pow(kib, float64(exp)), 'f', 1, 64) + " " + string(prefix) + "iB"
 }
 
 // ReadNetTotals reads every interface's rx/tx byte totals once.

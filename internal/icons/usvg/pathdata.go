@@ -1,6 +1,10 @@
 package usvg
 
-import "math"
+import (
+	"math"
+
+	"github.com/stubbedev/lys-lib/third_party/gomath"
+)
 
 // This file ports svgtypes' PathParser and SimplifyingPathParser plus
 // kurbo 0.13's SvgArc -> Arc -> cubic conversion they use.
@@ -379,7 +383,7 @@ func sampleEllipse(rx, ry, xRotation, angle float64) (float64, float64) {
 func (a kArc) toCubics(tolerance float64, emit func(x1, y1, x2, y2, x, y float64)) {
 	sign := signum(a.sweepAngle)
 	scaledErr := math.Max(a.rx, a.ry) / tolerance
-	nErr := math.Max(math.Pow(float64(1.1163*scaledErr), 1.0/6.0), 3.999_999)
+	nErr := math.Max(gomath.Pow(float64(1.1163*scaledErr), 1.0/6.0), 3.999_999)
 	nf := math.Ceil(float64(nErr * math.Abs(a.sweepAngle) * (1.0 / (2 * math.Pi))))
 	angleStep := a.sweepAngle / nf
 	n := int(nf)
