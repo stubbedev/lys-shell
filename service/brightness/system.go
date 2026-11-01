@@ -20,9 +20,9 @@ import (
 // DRM has settled and the monitor's I²C bus answers the probe.
 const hotplugSettle = 500 * time.Millisecond
 
-// driftInterval re-ticks subscribers as a cheap correction for level
-// changes no watch reports (firmware hotkeys that never touch the
-// brightness attribute); a var so tests can quiet it.
+// driftInterval is how often the levels are compared, the correction
+// for changes no watch or uevent reports (firmware hotkeys that never
+// touch the attribute through a write); a var so tests can quiet it.
 var driftInterval = time.Second
 
 // System is the real source (backend/mod.rs): sysfs devices written
@@ -71,7 +71,6 @@ func NewSystem(external bool) *System {
 func (s *System) start() {
 	if w, err := fswatch.New(unix.IN_MODIFY, false); err == nil {
 		s.watch = w
-		s.rewatch()
 	} else {
 		log.Printf("brightness: %v", err)
 	}
@@ -80,7 +79,9 @@ func (s *System) start() {
 	} else {
 		log.Printf("brightness: no hotplug: %v", err)
 	}
-	s.done.Go(s.loop)
+	probe := &levelProbe{}
+	s.rescan(probe)
+	s.done.Go(func() { s.loop(probe) })
 	if s.ddc != nil {
 		s.scanDDC(0)
 	}
@@ -105,20 +106,24 @@ func (s *System) Close() error {
 	return nil
 }
 
-// rewatch (re-)adds a watch per device directory; adding an existing
-// one is a no-op for inotify.
-func (s *System) rewatch() {
+// rescan looks at the devices present: a watch per device directory
+// (adding an existing one is a no-op for inotify) and the drift probe.
+func (s *System) rescan(probe *levelProbe) {
 	entries, err := os.ReadDir(BacklightDir)
 	if err != nil {
-		return
+		log.Printf("brightness: rescan: %v", err)
+		entries = nil
 	}
-	for _, entry := range entries {
-		_ = s.watch.Add(filepath.Join(BacklightDir, entry.Name()))
+	if s.watch != nil {
+		for _, entry := range entries {
+			_ = s.watch.Add(filepath.Join(BacklightDir, entry.Name()))
+		}
 	}
+	probe.open(entries)
 }
 
 // loop fans the watches out to subscribers.
-func (s *System) loop() {
+func (s *System) loop(probe *levelProbe) {
 	var changed <-chan struct{}
 	if s.watch != nil {
 		changed = s.watch.Changed()
@@ -139,21 +144,50 @@ func (s *System) loop() {
 			}
 		})
 	}
+	defer probe.close()
 	drift := time.NewTicker(driftInterval)
 	defer drift.Stop()
+	// Without a device there is no level to drift, and hotplug says when
+	// one appears; without hotplug the ticker has to look for it.
+	armDrift := func() {
+		if probe.empty() && s.events != nil {
+			drift.Stop()
+			return
+		}
+		drift.Reset(driftInterval)
+	}
+	armDrift()
 	for {
 		select {
 		case <-s.stop:
 			return
 		case <-changed:
+			if _, err := probe.moved(); err != nil {
+				s.rescan(probe)
+				armDrift()
+			}
 			s.broadcast()
 		case <-drift.C:
-			s.broadcast()
+			moved, err := probe.moved()
+			if err != nil || probe.empty() {
+				count := len(probe.levels)
+				s.rescan(probe)
+				armDrift()
+				moved = err != nil || len(probe.levels) != count
+			}
+			if moved {
+				s.broadcast()
+			}
 		case ev := <-hotplug:
 			switch {
 			case ev.isBacklightHotplug():
-				if s.watch != nil {
-					s.rewatch()
+				s.rescan(probe)
+				armDrift()
+				s.broadcast()
+			case ev.isBacklightChange():
+				if _, err := probe.moved(); err != nil {
+					s.rescan(probe)
+					armDrift()
 				}
 				s.broadcast()
 			case ev.isDRMHotplug() && s.ddc != nil:

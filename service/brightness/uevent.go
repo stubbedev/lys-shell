@@ -65,6 +65,12 @@ func (ev uevent) isBacklightHotplug() bool {
 	return ev.Subsystem == "backlight" && (ev.Action == "add" || ev.Action == "remove")
 }
 
+// isBacklightChange is the kernel announcing a level (backlight_generate_event:
+// a hotkey or a sysfs write).
+func (ev uevent) isBacklightChange() bool {
+	return ev.Subsystem == "backlight" && ev.Action == "change"
+}
+
 // ueventReader yields uevents until closed.
 type ueventReader interface {
 	// Next blocks for the next parsed uevent; it returns an error once

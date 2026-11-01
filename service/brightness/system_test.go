@@ -40,11 +40,16 @@ func newTestSystem(t *testing.T, external bool) *System {
 
 func newTestSystemWithEvents(t *testing.T, external bool) (*System, chan<- uevent) {
 	t.Helper()
+	// Quiet the drift ticks so every tick a test sees has a cause.
+	return newDriftingSystem(t, external, time.Hour)
+}
+
+func newDriftingSystem(t *testing.T, external bool, drift time.Duration) (*System, chan<- uevent) {
+	t.Helper()
 	events := &fakeUevents{events: make(chan uevent), closed: make(chan struct{})}
 	orig, origDrift := listenUevents, driftInterval
 	listenUevents = func() (ueventReader, error) { return events, nil }
-	// Quiet the drift ticks so every tick a test sees has a cause.
-	driftInterval = time.Hour
+	driftInterval = drift
 	t.Cleanup(func() { listenUevents, driftInterval = orig, origDrift })
 	sys := NewSystem(external)
 	sys.settle = 0
@@ -289,5 +294,108 @@ func TestUeventSocketCloseUnblocksNext(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Close did not unblock Next")
+	}
+}
+
+func tickWithin(ticks <-chan struct{}, d time.Duration) bool {
+	select {
+	case <-ticks:
+		return true
+	case <-time.After(d):
+		return false
+	}
+}
+
+func TestDriftWithoutADeviceWakesNobodyUntilOneAppears(t *testing.T) {
+	fakeBacklightDir(t, nil)
+	sys, events := newDriftingSystem(t, false, time.Millisecond)
+	ticks, stop, err := sys.Subscribe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	if tickWithin(ticks, 50*time.Millisecond) {
+		t.Fatal("a machine without a backlight ticked")
+	}
+	writeFakeDevice(t, "acpi_video0", "5")
+	events <- uevent{Action: "add", Subsystem: "backlight", Sysname: "acpi_video0", Props: map[string]string{}}
+	if !tickWithin(ticks, 3*time.Second) {
+		t.Fatal("the hotplugged device did not tick")
+	}
+	if tickWithin(ticks, 50*time.Millisecond) {
+		t.Fatal("an unmoved level ticked")
+	}
+}
+
+func TestDriftWithAStillLevelWakesNobody(t *testing.T) {
+	fakeBacklightDir(t, nil)
+	writeFakeDevice(t, "acpi_video0", "5")
+	sys, _ := newDriftingSystem(t, false, time.Millisecond)
+	ticks, stop, err := sys.Subscribe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	if tickWithin(ticks, 50*time.Millisecond) {
+		t.Fatal("an unmoved level ticked")
+	}
+}
+
+func TestBacklightChangeUeventTicks(t *testing.T) {
+	fakeBacklightDir(t, nil)
+	sys, events := newTestSystemWithEvents(t, false)
+	ticks, stop, err := sys.Subscribe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	events <- uevent{Action: "change", Subsystem: "drm", Props: map[string]string{}}
+	if tickWithin(ticks, 50*time.Millisecond) {
+		t.Fatal("a drm change ticked the backlight subscribers")
+	}
+	events <- uevent{Action: "change", Subsystem: "backlight", Sysname: "x", Props: map[string]string{}}
+	if !tickWithin(ticks, 3*time.Second) {
+		t.Fatal("the kernel announced a level and nobody heard")
+	}
+}
+
+func TestLevelProbeSeesAChangeOnTheFileItHoldsOpen(t *testing.T) {
+	fakeBacklightDir(t, nil)
+	writeFakeDevice(t, "acpi_video0", "5")
+	entries, err := os.ReadDir(BacklightDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var probe levelProbe
+	probe.open(entries)
+	defer probe.close()
+	if moved, err := probe.moved(); moved || err != nil {
+		t.Fatalf("unchanged level: moved %v, err %v", moved, err)
+	}
+	if err := writeSysfs("acpi_video0", 7); err != nil {
+		t.Fatal(err)
+	}
+	if moved, err := probe.moved(); !moved || err != nil {
+		t.Fatalf("changed level: moved %v, err %v", moved, err)
+	}
+	if moved, err := probe.moved(); moved || err != nil {
+		t.Fatalf("settled level: moved %v, err %v", moved, err)
+	}
+	_ = probe.levels[0].file.Close()
+	if _, err := probe.moved(); err == nil {
+		t.Fatal("a device that no longer reads was not reported")
+	}
+}
+
+func writeFakeDevice(t *testing.T, name, level string) {
+	t.Helper()
+	base := filepath.Join(BacklightDir, name)
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for attr, value := range map[string]string{"type": "firmware\n", "brightness": level, "max_brightness": "10"} {
+		if err := os.WriteFile(filepath.Join(base, attr), []byte(value), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
