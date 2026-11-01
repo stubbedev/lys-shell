@@ -28,8 +28,8 @@ github.com/stubbedev/lys-secrets v0.2.1-0.20261101124821-71f6a67787e7 h1:gGa/jfE
 github.com/stubbedev/lys-secrets v0.2.1-0.20261101124821-71f6a67787e7/go.mod h1:N8DxCNXj1XLz/pQz7P8Ku3hpZOmIuStfoPaGdSKrX9M=
 github.com/stubbedev/lys-ui v0.0.0-20261101125124-247256277028 h1:iMGO5HB/20ftq4Tc2LtHX0TkePNqlJO6xX4y4sboY14=
 github.com/stubbedev/lys-ui v0.0.0-20261101125124-247256277028/go.mod h1:rB31TuOATkrv5QV92zHNliAj7wbemg9iufi3SY2MurQ=
-github.com/stubbedev/memory-go v0.4.0 h1:dNT06buO6tdkF4Ocyw/PArrNljgrN5fSc/8JkFJl1r8=
-github.com/stubbedev/memory-go v0.4.0/go.mod h1:o5etMTWH5bhekxgE/iH/zndRj4U5Wl7BIVD+olGUuzw=
+github.com/stubbedev/memory-go v0.5.0 h1:xo2HTc/1vhHuafiKCPveaGIQO2aEgH56IUJi+M+hieo=
+github.com/stubbedev/memory-go v0.5.0/go.mod h1:o5etMTWH5bhekxgE/iH/zndRj4U5Wl7BIVD+olGUuzw=
 github.com/unxed/xkb-go v0.1.9 h1:t2lhW6bcPxzX/1DBf9jIRoo13KhMm9+XUPJT4o5a/Kw=
 github.com/unxed/xkb-go v0.1.9/go.mod h1:p0uH0w1PGo5GU/qxcyj65edin5qHssAhvJTjCZ8nxNU=
 go.yaml.in/yaml/v3 v3.0.6 h1:zcDfvjXEqTQmpjniUBLc91xYJMB2c4QOFxEF/LCEckM=
