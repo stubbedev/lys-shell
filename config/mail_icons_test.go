@@ -18,12 +18,6 @@ func TestMailAccountResolvedIcon(t *testing.T) {
 			t.Errorf("%+v: %q, want %q", tc.account, got, tc.want)
 		}
 	}
-	if _, ok := MailProviderGeneric.SimpleIconsSlug(); ok {
-		t.Error("the generic provider has no brand icon to install")
-	}
-	if slug, ok := MailProviderOutlook.SimpleIconsSlug(); !ok || slug != "microsoftoutlook" {
-		t.Errorf("outlook slug = %q %v", slug, ok)
-	}
 }
 
 // TestMailProviderDefaultIcons pins MailProvider::default_icon for

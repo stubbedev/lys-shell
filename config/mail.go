@@ -175,33 +175,24 @@ func (a *MailAccount) setDefaults() { *a = DefaultsMailAccount() }
 
 func (MailAccount) noStructDefault() {}
 
-// DefaultIcon is the provider's brand icon (MailProvider::default_icon):
-// its Simple Icons glyph, or the generic mail icon.
+// DefaultIcon is the provider's bundled brand icon, or the generic
+// mail icon.
 func (p MailProvider) DefaultIcon() string {
-	if slug, ok := p.SimpleIconsSlug(); ok {
-		return "si-" + slug + "-symbolic"
-	}
-	return "ld-mail-symbolic"
-}
-
-// SimpleIconsSlug is the Simple Icons slug that installs the provider's
-// brand icon; false for the generic provider (simple_icons_slug).
-func (p MailProvider) SimpleIconsSlug() (string, bool) {
 	switch p {
 	case MailProviderGmail:
-		return "gmail", true
+		return "si-gmail-symbolic"
 	case MailProviderOutlook:
-		return "microsoftoutlook", true
+		return "si-microsoftoutlook-symbolic"
 	case MailProviderIcloud:
-		return "icloud", true
+		return "si-icloud-symbolic"
 	case MailProviderProton:
-		return "protonmail", true
+		return "si-protonmail-symbolic"
 	case MailProviderFastmail:
-		return "fastmail", true
+		return "si-fastmail-symbolic"
 	case MailProviderYahoo:
-		return "yahoo", true
+		return "si-yahoo-symbolic"
 	}
-	return "", false
+	return "ld-mail-symbolic"
 }
 
 // ResolvedIcon is the account's icon: its own when set and non-empty,

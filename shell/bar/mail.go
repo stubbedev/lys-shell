@@ -10,15 +10,13 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
-	"github.com/stubbedev/lys-shell/internal/icons"
 	"github.com/stubbedev/lys-shell/service/mail"
 )
 
 // startMail builds and runs the shared mail service, as the Rust
 // bootstrap does whether or not a mail module is placed. Without a
-// session bus it still counts; it only cannot notify. The configured
-// providers' brand icons install alongside. The returned function stops
-// it.
+// session bus it still counts; it only cannot notify. The returned function
+// stops it.
 func startMail(ctx *ModuleContext) func() {
 	var notifier mail.Notifier
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
@@ -28,9 +26,6 @@ func startMail(ctx *ModuleContext) func() {
 	ctx.Mail = svc
 	runCtx, cancel := context.WithCancel(context.Background())
 	go svc.Run(runCtx)
-	if manager, err := icons.NewManager(); err == nil {
-		go mail.InstallProviderIcons(runCtx, ctx.Config.Mail.Accounts, manager)
-	}
 	return cancel
 }
 
