@@ -158,8 +158,14 @@ in
         # agent prompt, isSystem keeps it out of GeoClue's in-use indicator.
         # Without GeoClue the schedule does not run and the module says why;
         # coordinates in the config are the only other source of a location.
+        # GeoClue answers no client until an agent serves the user; the demo
+        # agent does that by default, and with it off lys-shell has to be
+        # allowed to register as one for its lookups.
         services.geoclue2 = {
           enable = lib.mkDefault true;
+          whitelistedAgents = lib.mkIf (!config.services.geoclue2.enableDemoAgent) (
+            lib.mkOptionDefault [ "lys-shell" ]
+          );
           appConfig.lys-shell = {
             desktopID = "lys-shell";
             isAllowed = true;

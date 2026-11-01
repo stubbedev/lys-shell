@@ -47,6 +47,25 @@ type NightlightConfig struct {
 	// or one off the globe, the schedule does not run: the module says why in
 	// its tooltip and in the log, and the filter stays as it is.
 	//
+	// GeoClue answers a client only once an agent serves the user, and only
+	// GNOME and a few other desktops run one. With none running, lys-shell
+	// registers as the agent itself for the length of the lookup, which GeoClue
+	// allows only for names on its whitelist. The deb and rpm install that as
+	// `/etc/geoclue/conf.d/50-lys-shell.conf`, and the NixOS module's
+	// `autoInstallDependencies` sets it up too. From the release archive, install
+	// the archive's `geoclue-lys-shell.conf` at that path yourself and run
+	// `sudo systemctl restart geoclue`. GeoClue older than 2.7 does not read
+	// `conf.d`: put the file's `lys-shell` entry in `/etc/geoclue/geoclue.conf`
+	// and add `lys-shell` to `whitelist` under `[agent]` there. A `whitelist` in a
+	// drop-in replaces the main file's, so the shipped file repeats upstream's
+	// list; if you have changed yours, add your agents to the drop-in.
+	//
+	// The log names what to check when the lookup fails. No answer usually means
+	// the whitelist above. No fix after that usually means GeoClue has no source
+	// that can place the machine, as upstream's default config names no Wi-Fi
+	// location service: set `url` under `[wifi]`, describe the location in
+	// `/etc/geolocation` for the static source, or set `latitude` and `longitude`.
+	//
 	// A manual click cancels a running transition, applies at once, and holds
 	// until the next transition begins, after which the schedule resumes.
 	AutoSchedule bool `cfg:"auto-schedule"`

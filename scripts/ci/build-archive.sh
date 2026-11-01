@@ -35,5 +35,6 @@ cp resources/lys-shell.service \
 	resources/org.freedesktop.impl.portal.desktop.lys.service \
 	resources/xdg-desktop-portal-lys-shell.service \
 	resources/lys-shell-portals.conf \
+	resources/geoclue-lys-shell.conf \
 	"${STAGING}/"
 tar czf "${STAGING}.tar.gz" "${STAGING}"

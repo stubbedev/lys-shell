@@ -22,7 +22,8 @@ Recommends:
  libva2,
  libva-drm2,
  intel-media-va-driver | mesa-va-drivers,
- xdg-desktop-portal
+ xdg-desktop-portal,
+ geoclue-2.0
 Suggests:
  dbus-user-session,
  bluez,

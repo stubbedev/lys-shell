@@ -23,6 +23,7 @@ Recommends:     libva
 Recommends:     intel-media-driver
 Recommends:     mesa-va-drivers
 Recommends:     xdg-desktop-portal
+Recommends:     geoclue2
 Suggests:       pipewire-pulseaudio
 Suggests:       wireplumber
 Suggests:       NetworkManager
@@ -53,6 +54,9 @@ install -d %{buildroot}%{_datadir}/dbus-1/services
 install -m 0644 org.freedesktop.impl.portal.desktop.lys.service %{buildroot}%{_datadir}/dbus-1/services/
 
 
+install -d %{buildroot}%{_sysconfdir}/geoclue/conf.d
+install -m 0644 geoclue-lys-shell.conf %{buildroot}%{_sysconfdir}/geoclue/conf.d/50-lys-shell.conf
+
 install -d %{buildroot}%{_datadir}/applications
 install -m 0644 dev.stubbe.lys.settings.desktop %{buildroot}%{_datadir}/applications/dev.stubbe.lys.settings.desktop
 desktop-file-validate %{buildroot}%{_datadir}/applications/dev.stubbe.lys.settings.desktop
@@ -79,6 +83,9 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %{_bindir}/lys-shell
 %{_bindir}/lys-lock
 %{_bindir}/lys-settings
+%dir %{_sysconfdir}/geoclue
+%dir %{_sysconfdir}/geoclue/conf.d
+%config(noreplace) %{_sysconfdir}/geoclue/conf.d/50-lys-shell.conf
 %{_userunitdir}/lys-shell.service
 %{_userunitdir}/xdg-desktop-portal-lys-shell.service
 %{_datadir}/xdg-desktop-portal/portals/lys-shell.portal

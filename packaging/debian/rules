@@ -27,6 +27,9 @@ override_dh_auto_install:
 	install -m 0644 org.freedesktop.impl.portal.desktop.lys.service debian/lys-shell/usr/share/dbus-1/services/
 
 
+	install -d debian/lys-shell/etc/geoclue/conf.d
+	install -m 0644 geoclue-lys-shell.conf debian/lys-shell/etc/geoclue/conf.d/50-lys-shell.conf
+
 	install -d debian/lys-shell/usr/share/applications
 	install -m 0644 dev.stubbe.lys.settings.desktop debian/lys-shell/usr/share/applications/dev.stubbe.lys.settings.desktop
 	desktop-file-validate debian/lys-shell/usr/share/applications/dev.stubbe.lys.settings.desktop
