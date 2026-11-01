@@ -1,14 +1,13 @@
 {
-  "name": "lys-shell-docs",
-  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vitepress dev --port 5173",
+    "dev": "vitepress dev",
     "build": "vitepress build",
-    "preview": "vitepress preview --port 5173"
+    "preview": "vitepress preview"
   },
   "devDependencies": {
+    "lys-docs-theme": "github:stubbedev/lys-docs-theme#fbadf1d230df34b1df844b7bb7c4c38f82e1c95b",
     "vitepress": "^1.6.3"
   },
   "overrides": {
