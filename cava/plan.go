@@ -13,7 +13,8 @@ import (
 	"math"
 
 	"github.com/stubbedev/lys-lib/third_party/gomath"
-	"gonum.org/v1/gonum/dsp/fourier"
+
+	"github.com/stubbedev/lys-shell/third_party/fourier"
 )
 
 // Plan holds the analyzer state for one bar layout: one cava_init call.

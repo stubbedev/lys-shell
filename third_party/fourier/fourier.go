@@ -1,0 +1,84 @@
+// Copyright ©2018 The Gonum Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package fourier
+
+import "github.com/stubbedev/lys-shell/third_party/fourier/internal/fftpack"
+
+// FFT implements the Fast Fourier Transform for real sequences.
+type FFT struct {
+	work []float64
+	ifac [15]int
+
+	// real temporarily store complex data as
+	// pairs of real values to allow passing to
+	// the backing code. The length of real
+	// must always be half the length of work.
+	real []float64
+}
+
+// NewFFT returns an FFT initialized for work on sequences of length n.
+func NewFFT(n int) *FFT {
+	var t FFT
+	t.Reset(n)
+	return &t
+}
+
+// Len returns the length of the acceptable input.
+func (t *FFT) Len() int { return len(t.real) }
+
+// Reset reinitializes the FFT for work on sequences of length n.
+func (t *FFT) Reset(n int) {
+	if 2*n <= cap(t.work) {
+		t.work = t.work[:2*n]
+		t.real = t.real[:n]
+	} else {
+		t.work = make([]float64, 2*n)
+		t.real = make([]float64, n)
+	}
+	fftpack.Rffti(n, t.work, t.ifac[:])
+}
+
+// Coefficients computes the Fourier coefficients of the input sequence,
+// converting the time series in seq into the frequency spectrum, placing
+// the result in dst and returning it. This transform is unnormalized.
+//
+// If the length of seq is not t.Len(), Coefficients will panic.
+// If dst is nil, a new slice is allocated and returned. If dst is not nil and
+// the length of dst does not equal t.Len()/2+1, Coefficients will panic.
+func (t *FFT) Coefficients(dst []complex128, seq []float64) []complex128 {
+	if len(seq) != t.Len() {
+		panic("fourier: sequence length mismatch")
+	}
+	if dst == nil {
+		dst = make([]complex128, t.Len()/2+1)
+	} else if len(dst) != t.Len()/2+1 {
+		panic("fourier: destination length mismatch")
+	}
+	copy(t.real, seq)
+	fftpack.Rfftf(len(t.real), t.real, t.work, t.ifac[:])
+	dst[0] = complex(t.real[0], 0)
+	if len(seq) < 2 {
+		return dst
+	}
+	if len(seq)%2 == 1 {
+		dst[len(dst)-1] = complex(t.real[len(t.real)-2], t.real[len(t.real)-1])
+	} else {
+		dst[len(dst)-1] = complex(t.real[len(t.real)-1], 0)
+	}
+	for i := 1; i < len(dst)-1; i++ {
+		dst[i] = complex(t.real[2*i-1], t.real[2*i])
+	}
+	return dst
+}
+
+// Freq returns the relative frequency center for coefficient i.
+// Freq will panic if i is negative or greater than or equal to t.Len().
+func (t *FFT) Freq(i int) float64 {
+	if i < 0 || t.Len() <= i {
+		panic("fourier: index out of range")
+	}
+	step := 1 / float64(t.Len())
+	return step * float64(i)
+}

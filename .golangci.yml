@@ -49,6 +49,9 @@ linters:
         # name, so godoc and the lys-shell-facing API stay complete.
         - name: exported
   exclusions:
+    # Upstream code carried close to verbatim (LYS_SHELL-PATCHES.md).
+    paths:
+      - third_party/fourier/
     generated: lax
     rules:
       - path: _test\.go
@@ -93,4 +96,7 @@ formatters:
         - default
         - prefix(github.com/stubbedev/lys-shell)
   exclusions:
+    # Upstream code carried close to verbatim (LYS_SHELL-PATCHES.md).
+    paths:
+      - third_party/fourier/
     generated: lax
