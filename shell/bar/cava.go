@@ -30,6 +30,9 @@ const (
 	cavaMinWaveHeight = 2.0   // MIN_WAVE_HEIGHT
 	cavaPeakCap       = 2.0   // PEAK_CAP_HEIGHT
 	cavaPeakGravity   = 0.015 // PEAK_GRAVITY, per frame
+	// cavaStill is the change in a bar, as a fraction of its height,
+	// too small to reach a pixel on any bar.
+	cavaStill = 1.0 / 1024
 )
 
 // spectrum paints the analyzer frame the way the Rust module's cairo
@@ -78,19 +81,36 @@ func cavaWidgetLength(bars, barWidth, barGap int, padding float64) int {
 }
 
 // SetFrame swaps in the latest values and, in the peaks style, lets
-// each cap rise to its bar or fall by the gravity (update_peak).
-func (s *spectrum) SetFrame(values []float64) {
-	copy(s.values, values)
+// each cap rise to its bar or fall by the gravity (update_peak). It
+// reports whether the frame moved what is on screen; one that did not
+// keeps the painted values, so a slow drift still repaints once it
+// adds up, and asks for no paint.
+func (s *spectrum) SetFrame(values []float64) bool {
+	moved := false
+	for i, v := range values {
+		if math.Abs(v-s.values[i]) >= cavaStill {
+			moved = true
+			break
+		}
+	}
+	if moved {
+		copy(s.values, values)
+	}
 	if s.style == config.CavaStylePeaks {
 		for i, v := range s.values {
-			if v >= s.peaks[i] {
+			switch {
+			case v >= s.peaks[i]:
 				s.peaks[i] = v
-			} else {
+			default:
 				s.peaks[i] = max(s.peaks[i]-cavaPeakGravity, 0)
+				moved = true
 			}
 		}
 	}
-	s.Invalidate()
+	if moved {
+		s.Invalidate()
+	}
+	return moved
 }
 
 // size is the natural size: the length along the bar, the thickness
@@ -261,14 +281,22 @@ func (s *spectrum) paintWave(cv *render.Canvas, c spectrumCanvas) {
 func (s *spectrum) HitTest(widget.Point) widget.Widget { return nil }
 
 // cavaModule is the module: the analyzer plan and its capture source,
-// ticked at the configured framerate. samples and frame are the tick's
-// buffers, reused frame to frame.
+// ticked at the configured framerate while there is sound or the bars
+// are still falling, and parked otherwise. samples and frame are the
+// tick's buffers, reused frame to frame.
 type cavaModule struct {
 	paint   *spectrum
 	plan    *analyzer.Plan
 	source  analyzer.Input
 	samples []float64
 	frame   []float64
+
+	frameEvery time.Duration
+	every      func(time.Duration, func()) func()
+	invoke     func(func())
+	// stopTick is the running frame timer, nil while parked.
+	stopTick func()
+	retired  bool
 }
 
 // cavaBars is the bar count and channel count the service runs with:
@@ -345,30 +373,53 @@ func newCava(ctx ModuleContext) (Module, error) {
 	return module, nil
 }
 
-// follow ticks the analyzer every frame until life ends - the module's
-// bar generation, which a reload retires - then stops the ticker and
-// the capture on the loop.
+// follow ticks the analyzer until life ends - the module's bar
+// generation, which a reload retires - then stops the timer and the
+// capture on the loop.
 func (m *cavaModule) follow(life context.Context, frame time.Duration, every func(time.Duration, func()) func(), invoke func(func())) {
-	stopTick := every(frame, m.tick)
+	m.frameEvery, m.every, m.invoke = frame, every, invoke
+	m.resume()
 	go func() {
 		<-life.Done()
 		invoke(func() {
-			stopTick()
+			m.retired = true
+			if m.stopTick != nil {
+				m.stopTick()
+				m.stopTick = nil
+			}
 			m.source.Stop()
 		})
 	}()
 }
 
+// resume starts the frame timer; sound reaching a parked module lands
+// here, and after its generation retired it stays stopped.
+func (m *cavaModule) resume() {
+	if m.retired || m.stopTick != nil {
+		return
+	}
+	m.stopTick = m.every(m.frameEvery, m.tick)
+}
+
+// park stops the frame timer until the capture hears something.
+func (m *cavaModule) park() {
+	m.stopTick()
+	m.stopTick = nil
+	m.source.NotifySound(func() { m.invoke(m.resume) })
+}
+
 var errCavaNoAudio = errors.New("cava: no audio server connection")
 
-// tick analyzes what arrived and repaints, every frame as the Rust
-// service does: with no new samples the bars still fall off. The
-// capture keeps itself attached across default changes and server
-// kills.
+// tick analyzes what arrived and repaints what moved: with no new
+// samples the bars still fall off. Once silence leaves nothing moving
+// the module parks, so a quiet session costs no frames. The capture
+// keeps itself attached across default changes and server kills.
 func (m *cavaModule) tick() {
 	m.samples = m.source.Drained(m.samples)
 	m.frame = m.plan.Execute(m.frame, m.samples)
-	m.paint.SetFrame(m.frame)
+	if !m.paint.SetFrame(m.frame) && analyzer.Silent(m.samples) {
+		m.park()
+	}
 }
 
 func (m *cavaModule) Root() widget.Widget { return m.paint }

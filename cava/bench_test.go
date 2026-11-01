@@ -31,3 +31,13 @@ func BenchmarkDrain(b *testing.B) {
 		out = s.drained(out)
 	}
 }
+
+func BenchmarkCaptureChunk(b *testing.B) {
+	s := newSamples(2, 8192)
+	chunk := make([]byte, fragmentFrames*2*2)
+	b.ReportAllocs()
+	for b.Loop() {
+		s.pushS16(chunk)
+		s.pend = s.pend[:0]
+	}
+}

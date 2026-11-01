@@ -79,6 +79,9 @@ func (s *ShmemInput) Start() error {
 // of dst's contents.
 func (s *ShmemInput) Drained(dst []float64) []float64 { return s.samples.drained(dst) }
 
+// NotifySound implements Input.
+func (s *ShmemInput) NotifySound(fn func()) { s.samples.notifySound(fn) }
+
 // Stop ends the reader and unmaps the area.
 func (s *ShmemInput) Stop() {
 	if s.stop == nil {

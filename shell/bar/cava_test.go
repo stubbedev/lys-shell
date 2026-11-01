@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -323,11 +324,18 @@ func TestCavaInputPicksTheCapture(t *testing.T) {
 	}
 }
 
-type fakeCavaInput struct{ stopped chan struct{} }
+type fakeCavaInput struct {
+	stopped chan struct{}
+	next    []float64
+	onSound func()
+}
 
-func (f *fakeCavaInput) Start() error                    { return nil }
-func (f *fakeCavaInput) Drained(dst []float64) []float64 { return dst[:0] }
-func (f *fakeCavaInput) Stop()                           { close(f.stopped) }
+func (f *fakeCavaInput) Start() error { return nil }
+func (f *fakeCavaInput) Drained(dst []float64) []float64 {
+	return append(dst[:0], f.next...)
+}
+func (f *fakeCavaInput) NotifySound(fn func()) { f.onSound = fn }
+func (f *fakeCavaInput) Stop()                 { close(f.stopped) }
 
 // TestCavaModuleEndsWithItsGeneration pins the lifetime: the frame
 // ticker runs while the bar generation lives and, once it retires,
@@ -356,5 +364,129 @@ func TestCavaModuleEndsWithItsGeneration(t *testing.T) {
 	}
 	if ticking || invoked != 1 {
 		t.Errorf("after retiring: ticking %v, %d invokes; want stopped on the loop once", ticking, invoked)
+	}
+}
+
+// cavaLoop drives a module's frame timer by hand: tick is the armed
+// timer's frame, nil while none is armed.
+type cavaLoop struct {
+	tick    func()
+	started int
+}
+
+func (l *cavaLoop) every(_ time.Duration, fn func()) func() {
+	l.tick = fn
+	l.started++
+	return func() { l.tick = nil }
+}
+
+func newLoopedCava(t *testing.T) (*cavaModule, *fakeCavaInput, *cavaLoop) {
+	t.Helper()
+	plan, err := analyzer.NewPlan(10, 44100, 1, 0.77, true, 50, 10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := &fakeCavaInput{stopped: make(chan struct{})}
+	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), plan: plan, source: in}
+	loop := &cavaLoop{}
+	m.follow(t.Context(), time.Second/60, loop.every, func(fn func()) { fn() })
+	return m, in, loop
+}
+
+func loudSamples(n int) []float64 {
+	out := make([]float64, n)
+	for i := range out {
+		out[i] = float64((i%32)*2000 - 32000)
+	}
+	return out
+}
+
+func TestCavaParksInSilenceAndWakesForSound(t *testing.T) {
+	m, in, loop := newLoopedCava(t)
+	loop.tick()
+	if loop.tick != nil {
+		t.Fatal("a silent first frame moved nothing, yet the frame timer still runs")
+	}
+	if in.onSound == nil {
+		t.Fatal("parked without asking to hear about sound")
+	}
+	in.onSound()
+	if loop.tick == nil || loop.started != 2 {
+		t.Fatalf("sound did not restart the frame timer (started %d times)", loop.started)
+	}
+	in.next = loudSamples(m.plan.InputSize())
+	for range 5 {
+		loop.tick()
+		if loop.tick == nil {
+			t.Fatal("parked while sound plays")
+		}
+	}
+}
+
+func TestCavaFallsToRestBeforeParking(t *testing.T) {
+	m, in, loop := newLoopedCava(t)
+	in.next = loudSamples(m.plan.InputSize())
+	for range 30 {
+		loop.tick()
+	}
+	if !slices.ContainsFunc(m.paint.values, func(v float64) bool { return v > cavaStill }) {
+		t.Fatal("the bars never rose")
+	}
+	in.next = make([]float64, m.plan.InputSize())
+	frames := 0
+	for loop.tick != nil {
+		if frames++; frames > 2000 {
+			t.Fatal("silence never settled")
+		}
+		loop.tick()
+		if frames == 1 && loop.tick == nil {
+			t.Fatal("parked on the first silent frame with the bars still up")
+		}
+	}
+}
+
+func TestCavaStaysStoppedWhenSoundFollowsItsGeneration(t *testing.T) {
+	plan, err := analyzer.NewPlan(10, 44100, 1, 0.77, true, 50, 10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := &fakeCavaInput{stopped: make(chan struct{})}
+	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), plan: plan, source: in}
+	loop := &cavaLoop{}
+	life, retire := context.WithCancel(context.Background())
+	m.follow(life, time.Second/60, loop.every, func(fn func()) { fn() })
+	loop.tick()
+	retire()
+	select {
+	case <-in.stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the capture outlived its generation")
+	}
+	in.onSound()
+	if loop.tick != nil {
+		t.Error("sound restarted a retired module")
+	}
+}
+
+func TestSpectrumIgnoresChangesBelowAPixel(t *testing.T) {
+	s := newSpectrum(cavaTestConfig(1), 1, cavaRed, 1, false)
+	if !s.SetFrame([]float64{0.5}) {
+		t.Fatal("a real change reported no movement")
+	}
+	if s.SetFrame([]float64{0.5 + cavaStill/2}) {
+		t.Error("a sub-pixel change asked for a paint")
+	}
+	if !s.SetFrame([]float64{0.5 + cavaStill}) {
+		t.Error("the drift never added up to a paint")
+	}
+	peaks := cavaTestConfig(1)
+	peaks.Style = config.CavaStylePeaks
+	p := newSpectrum(peaks, 1, cavaRed, 1, false)
+	p.SetFrame([]float64{0.9})
+	if !p.SetFrame([]float64{0.9 - 0.3}) {
+		t.Error("a fallen bar did not paint")
+	}
+	if !p.SetFrame([]float64{0.9 - 0.3}) {
+		t.Error("a falling cap must keep painting while the bar holds still")
 	}
 }

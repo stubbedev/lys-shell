@@ -55,6 +55,9 @@ func (f *FifoInput) Start() error {
 // of dst's contents.
 func (f *FifoInput) Drained(dst []float64) []float64 { return f.samples.drained(dst) }
 
+// NotifySound implements Input.
+func (f *FifoInput) NotifySound(fn func()) { f.samples.notifySound(fn) }
+
 // Stop ends the reader.
 func (f *FifoInput) Stop() {
 	if f.stop == nil {
@@ -114,7 +117,7 @@ func (f *FifoInput) run() {
 				idle, offset = 0, 0
 			}
 		}
-		f.samples.push(s16(buf, f.channels))
+		f.samples.pushS16(buf)
 		if testMode && f.stopped(time.Millisecond) {
 			return
 		}

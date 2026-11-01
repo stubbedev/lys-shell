@@ -165,3 +165,62 @@ func TestStereoOverflowKeepsFramesPaired(t *testing.T) {
 		t.Errorf("oversized stereo chunk = %v, want 3 4 5 6", got)
 	}
 }
+
+func TestNotifySoundFiresOnceForTheFirstSoundAndDropsSilence(t *testing.T) {
+	s := newSamples(1, 8)
+	fired := make(chan struct{}, 2)
+	s.notifySound(func() { fired <- struct{}{} })
+	s.push([]float64{0, 0, 0})
+	s.silence()
+	select {
+	case <-fired:
+		t.Fatal("silence reported as sound")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if got := s.drained(nil); len(got) != 0 {
+		t.Errorf("silence queued while parked: %v", got)
+	}
+	s.push([]float64{0, 7})
+	select {
+	case <-fired:
+	case <-time.After(2 * time.Second):
+		t.Fatal("sound never reported")
+	}
+	if got := s.drained(nil); len(got) != 2 || got[1] != 7 {
+		t.Errorf("the sound that woke the analyzer was lost: %v", got)
+	}
+	s.push([]float64{9})
+	select {
+	case <-fired:
+		t.Fatal("one arming fired twice")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestNotifySoundFiresAtOnceForSoundAlreadyWaiting(t *testing.T) {
+	s := newSamples(1, 8)
+	s.push([]float64{1})
+	fired := make(chan struct{})
+	s.notifySound(func() { close(fired) })
+	select {
+	case <-fired:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waiting sound never reported")
+	}
+}
+
+func TestPushS16DecodesWholeFramesAndReusesItsBuffer(t *testing.T) {
+	s := newSamples(2, 16)
+	s.pushS16([]byte{1, 0, 0xff, 0xff, 9})
+	if got := s.drained(nil); len(got) != 2 || got[0] != 1 || got[1] != -1 {
+		t.Errorf("samples = %v, want the one whole frame 1 -1", got)
+	}
+	chunk := make([]byte, 16)
+	s.pushS16(chunk)
+	if allocs := testing.AllocsPerRun(100, func() {
+		s.pushS16(chunk)
+		s.drained(s.pend[:0])
+	}); allocs != 0 {
+		t.Errorf("a chunk allocated %v times", allocs)
+	}
+}
