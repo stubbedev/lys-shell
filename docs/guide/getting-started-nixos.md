@@ -26,7 +26,7 @@ NixOS:
   programs.lys-shell.enable = true;
   # optional: run `lys-shell shell` as a user service in the graphical session
   programs.lys-shell.systemd.enable = true;
-  # optional: enable backing services (UPower, BlueZ) + wl-clipboard/xdg-utils
+  # optional: enable backing services (UPower, BlueZ, GeoClue) + wl-clipboard/xdg-utils
   programs.lys-shell.autoInstallDependencies = true;
 }
 ```
@@ -63,6 +63,10 @@ You can also use the package directly
 > Soft dependencies (NetworkManager, bluez, upower, power-profiles-daemon,
 > pipewire/wireplumber, and theming tools like wallust/matugen) are not pulled
 > in automatically — enable the ones your config uses.
+
+## Lock screen
+
+The lock screen is [lys-login](https://github.com/stubbedev/lys-login), with a flake and NixOS module of its own. `programs.lys-login.enable` puts it on the PATH, where lys-shell looks for it. `programs.lys-login.lock.enable` declares the PAM service the unlock authenticates against, which NixOS does not provide by default; point [`login.lock.pam-service`](/config/login) at that service.
 
 ## home-manager usage
 

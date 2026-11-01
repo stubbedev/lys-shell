@@ -69,7 +69,7 @@ A handful of top-level JSON keys are reserved:
 
 ## Format templates
 
-`format` and `tooltip-format` use [MiniJinja](https://docs.rs/minijinja), a Jinja2-compatible template engine.
+`format` and `tooltip-format` use lys-shell's built-in Jinja2-compatible template engine, tested to render the same as [MiniJinja](https://docs.rs/minijinja).
 
 ```
 {{ field }}                 read a top-level variable

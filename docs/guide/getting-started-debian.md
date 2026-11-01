@@ -15,8 +15,6 @@ sudo apt install golang-go git just libvulkan1 libva2 libva-drm2 \
   intel-media-va-driver mesa-va-drivers
 ```
 
-On releases before the 64-bit time transition, drop the `t64` suffixes.
-
 Runtime daemons for the battery, bluetooth, network, power, and audio modules (skip any you don't need):
 
 ```sh
@@ -27,7 +25,7 @@ sudo systemctl enable --now bluetooth NetworkManager upower power-profiles-daemo
 
 ## Build
 
-The build needs only Go: the binaries are static, and load the libraries above
+The build needs only Go: the binaries use no cgo, and load the libraries above
 at runtime. `go.mod` pins Go 1.27; an older `go` (1.21 or later) downloads that
 toolchain on its own.
 
@@ -73,4 +71,4 @@ This launches `lys-settings`, which edits the same config the shell reads. Chang
 
 ## Configuration
 
-lys-shell reads `$XDG_CONFIG_HOME/lys-shell/config.yaml`, falling back to `~/.config/lys-shell/config.yaml`. On first run, if no config exists, lys-shell writes a default one. A JSON schema is written to `~/.config/lys-shell/schema.json` at startup, which editors running the YAML language server can use for validation and completion (see [Editor setup](/guide/editing-config#editor-setup)).
+lys-shell reads `$XDG_CONFIG_HOME/lys-shell/config.yaml`, falling back to `~/.config/lys-shell/config.yaml`. On first run, if no config exists, lys-shell writes a stub holding only the schema modeline; every field keeps its default until you set it. A JSON schema is written to `~/.config/lys-shell/schema.json` at startup, which editors running the YAML language server can use for validation and completion (see [Editor setup](/guide/editing-config#editor-setup)).

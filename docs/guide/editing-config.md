@@ -38,7 +38,7 @@ bar:
   button-gap: 1.5            # scale multiplier (default form)
 ```
 
-Pixel values are logical pixels: GTK scales them for HiDPI displays automatically, so `"20px"` renders at the correct physical size on a 2× monitor while ignoring the configurable `bar.scale` multiplier.
+Pixel values are logical pixels: lys-ui scales them for HiDPI displays automatically, so `"20px"` renders at the correct physical size on a 2× monitor while ignoring the configurable `bar.scale` multiplier.
 
 ## Imports
 

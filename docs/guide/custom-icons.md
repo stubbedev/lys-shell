@@ -60,7 +60,7 @@ For a directory, omit the name. Every SVG is imported; files already starting wi
 lys-shell icons import ~/exported-icons/
 ```
 
-Imported SVGs are transformed into GTK symbolic icons so they pick up theme colours.
+Imported SVGs are transformed into symbolic icons so they pick up theme colours.
 
 ## List and remove
 

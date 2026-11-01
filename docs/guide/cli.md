@@ -180,17 +180,48 @@ lys-shell toast "Volume" --icon audio-volume-high-symbolic --percentage 65
 lys-shell toast "Syncing…" --duration 5000
 ```
 
+Application launcher and dmenu, with rofi-compatible flags. Invoked through a
+symlink named `rofi`, the binary takes the same flags directly.
+`lys-shell launcher --help` lists them:
+
+```sh
+lys-shell launcher -show drun
+printf 'a\nb\n' | lys-shell launcher -dmenu
+lys-shell launcher -e "Build finished"
+```
+
+End or lock the session. `lock` asks the running shell to start the lock screen;
+`lys-lock` is the same command as a single executable, for places that exec one
+token without splitting on whitespace. `logout` goes through lys-wm when it runs,
+otherwise logind:
+
+```sh
+lys-shell lock
+lys-lock
+lys-shell logout
+```
+
+The desktop portal backend. Without a subcommand `portal` runs the backend, which
+is what the installed D-Bus and systemd units exec. `portal show` previews a
+dialog without an application request:
+
+```sh
+lys-shell portal
+lys-shell portal show file-chooser
+```
+
 Run the desktop shell in the foreground:
 
 ```sh
 lys-shell shell
 ```
 
-Shell completions for any clap-supported shell (bash, fish, zsh, …):
+Shell completions for bash, elvish, fish, powershell or zsh:
 
 ```sh
 lys-shell completions fish > ~/.config/fish/completions/lys-shell.fish
 ```
 
-> `lys-shell share-picker` exists for the xdg-desktop-portal screencast flow and is
-> invoked by the portal, not by hand.
+> `lys-shell portal share-picker` exists for the xdg-desktop-portal screencast flow
+> and `lys-shell vpn sso-callback` receives a browser's VPN sign-in. The portal and
+> the browser invoke them, not you.
