@@ -3,6 +3,8 @@ package bar
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"math"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -28,6 +30,7 @@ func volumePercent(dev pulse.Device) float64 {
 // volume is the module: the default sink's volume label, refreshed on
 // PulseAudio events, scroll to adjust.
 type volumeModule struct {
+	defaultDeviceChrome
 	ctx    ModuleContext
 	source pulse.Source
 	btn    *barButton
@@ -44,28 +47,66 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := followPulse(ctx, "volume", m.refresh); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.Pulse.Subscribe(ctx.Life())
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
-		}
-		stop()
-	}()
 	return m, nil
 }
 
-// refresh re-reads and restyles the label and state icon.
+type defaultDeviceChrome struct {
+	chrome  moduleChrome
+	present bool
+}
+
+func (c *defaultDeviceChrome) setChrome(chrome moduleChrome) {
+	c.chrome = chrome
+	c.show()
+}
+
+func (c *defaultDeviceChrome) setPresent(present bool) {
+	c.present = present
+	c.show()
+}
+
+func (c *defaultDeviceChrome) show() {
+	if c.chrome != nil {
+		c.chrome.SetVisible(c.present)
+	}
+}
+
+func followPulse(ctx ModuleContext, module string, refresh func() error) error {
+	if err := refresh(); err != nil {
+		return fmt.Errorf("%s: %w", module, err)
+	}
+	ticks, stop, err := ctx.Pulse.Subscribe(ctx.Life())
+	if err != nil {
+		return fmt.Errorf("%s: %w", module, err)
+	}
+	go func() {
+		for range ticks {
+			ctx.Invoke(func() {
+				if err := refresh(); err != nil {
+					log.Printf("%s: refresh: %v", module, err)
+				}
+			})
+		}
+		stop()
+	}()
+	return nil
+}
+
+// refresh re-reads and restyles the label and state icon; with no
+// default sink the module hides until one appears.
 func (m *volumeModule) refresh() error {
 	out, err := m.source.DefaultSink(context.Background())
+	if errors.Is(err, pulse.ErrNoDefaultDevice) {
+		m.setPresent(false)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
+	m.setPresent(true)
 	dev := out.Device
 	cfg := m.ctx.Config.Volume
 	label := ""

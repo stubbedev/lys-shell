@@ -20,6 +20,7 @@ import (
 type fakePulseSource struct {
 	pulse.Source
 	dev   pulse.Device
+	err   error
 	ticks chan struct{}
 }
 
@@ -27,7 +28,7 @@ type fakePulseSource struct {
 func pct(p float64) pulse.Volume { return pulse.VolumeFromPercentage(p, 2) }
 
 func (f *fakePulseSource) DefaultSink(context.Context) (pulse.OutputDevice, error) {
-	return pulse.OutputDevice{Device: f.dev}, nil
+	return pulse.OutputDevice{Device: f.dev}, f.err
 }
 
 func (f *fakePulseSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
@@ -39,7 +40,7 @@ func (f *fakePulseSource) SetVolume(context.Context, float64) error { return nil
 func (f *fakePulseSource) SetMuted(context.Context, bool) error { return nil }
 
 func (f *fakePulseSource) DefaultSource(context.Context) (pulse.InputDevice, error) {
-	return pulse.InputDevice{Device: f.dev}, nil
+	return pulse.InputDevice{Device: f.dev}, f.err
 }
 
 func (f *fakePulseSource) SetSourceMuted(context.Context, bool) error { return nil }

@@ -19,6 +19,7 @@ func microphoneLabel(percent float64) string {
 
 // microphone is the module: the default input's level.
 type microphoneModule struct {
+	defaultDeviceChrome
 	ctx    ModuleContext
 	source pulse.Source
 	btn    *barButton
@@ -35,28 +36,24 @@ func newMicrophone(ctx ModuleContext) (Module, error) {
 	m := &microphoneModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := followPulse(ctx, "microphone", m.refresh); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.Pulse.Subscribe(ctx.Life())
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
-		}
-		stop()
-	}()
 	return m, nil
 }
 
-// refresh re-reads and restyles the label and state icon.
+// refresh re-reads and restyles the label and state icon; with no
+// default source the module hides until one appears.
 func (m *microphoneModule) refresh() error {
 	dev, err := m.source.DefaultSource(context.Background())
+	if errors.Is(err, pulse.ErrNoDefaultDevice) {
+		m.setPresent(false)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
+	m.setPresent(true)
 	cfg := m.ctx.Config.Microphone
 	label := ""
 	if cfg.LabelShow {
