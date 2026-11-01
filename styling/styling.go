@@ -65,7 +65,7 @@ func ColorMix(a, b render.Color, pct int) render.Color {
 	for shift := uint(0); shift <= 24; shift += 8 {
 		ca := float64((uint32(a) >> shift) & 0xFF)
 		cb := float64((uint32(b) >> shift) & 0xFF)
-		out |= uint32(math.Round(ca*w+cb*(1-w))) << shift
+		out |= uint32(math.Round(float64(ca*w)+float64(cb*(1-w)))) << shift
 	}
 	return render.Color(out)
 }
