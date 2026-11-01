@@ -29,9 +29,10 @@ import (
 // producer renegotiates and allocates anew. Only a session's first frame
 // is copied without waiting, so when a consumer drops its buffers (a
 // preview handing over to the real share), the next ones get a new
-// session, or a still window would never fill them. A window still for
-// stillRefresh gets one too, so its frame reaches a consumer that had no
-// use for the first one.
+// session, or a still window would never fill them: Electron takes a window
+// with two consumers in turn, a thumbnail's and the share's, and the first took
+// the session's only frame. A window still for stillRefresh gets a new session
+// too, which keeps a still share moving at about one frame a second.
 
 // stillRefresh is how often a still source sends its frame again.
 const stillRefresh = time.Second
