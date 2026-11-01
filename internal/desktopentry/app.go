@@ -105,8 +105,9 @@ func walk(dirs []string) []entryFile {
 // remnant of an uninstalled package does not show.
 func AllApps(dirs []string) []App {
 	var apps []App
+	onPath := pathPrograms()
 	for _, f := range walk(dirs) {
-		if app, ok := LoadApp(f.id, f.path); ok {
+		if app, ok := loadApp(f.id, f.path, onPath); ok {
 			apps = append(apps, app)
 		}
 	}
@@ -144,7 +145,9 @@ func FindApps(dirs, ids []string) []App {
 }
 
 // LoadApp reads one entry, applying gio's load rules (see AllApps).
-func LoadApp(id, path string) (App, bool) {
+func LoadApp(id, path string) (App, bool) { return loadApp(id, path, findOnPath) }
+
+func loadApp(id, path string, onPath func(program string) bool) (App, bool) {
 	kf, err := LoadKeyFile(path)
 	if err != nil || !kf.HasGroup(DesktopGroup) {
 		return App{}, false
@@ -156,12 +159,12 @@ func LoadApp(id, path string) (App, bool) {
 		return App{}, false
 	}
 	workdir, _ := kf.String(DesktopGroup, "Path")
-	if try, _ := kf.String(DesktopGroup, "TryExec"); try != "" && !findProgram(try, workdir) {
+	if try, _ := kf.String(DesktopGroup, "TryExec"); try != "" && !findProgram(try, workdir, onPath) {
 		return App{}, false
 	}
 	if execLine, _ := kf.String(DesktopGroup, "Exec"); execLine != "" {
 		argv, ok := shlex.Split(execLine)
-		if !ok || len(argv) == 0 || !findProgram(argv[0], workdir) {
+		if !ok || len(argv) == 0 || !findProgram(argv[0], workdir, onPath) {
 			return App{}, false
 		}
 	}
@@ -169,20 +172,48 @@ func LoadApp(id, path string) (App, bool) {
 }
 
 // findProgram is g_find_program_for_path: an absolute or relative
-// path is checked as is (relative to workdir), a bare name on $PATH.
-func findProgram(program, workdir string) bool {
+// path is checked as is (relative to workdir), a bare name through
+// onPath.
+func findProgram(program, workdir string, onPath func(string) bool) bool {
 	if strings.ContainsRune(program, '/') {
 		if !filepath.IsAbs(program) && workdir != "" {
 			program = filepath.Join(workdir, program)
 		}
 		return executable(program)
 	}
+	return onPath(program)
+}
+
+// findOnPath stats program in each $PATH directory.
+func findOnPath(program string) bool {
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		if executable(filepath.Join(dir, program)) {
 			return true
 		}
 	}
 	return false
+}
+
+// pathPrograms is findOnPath for looking up many programs: $PATH's
+// directories are listed once, so a name no directory holds costs no
+// stat, which is most of the stats a scan over every application makes.
+func pathPrograms() func(program string) bool {
+	names := map[string]struct{}{}
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			names[entry.Name()] = struct{}{}
+		}
+	}
+	return func(program string) bool {
+		if _, listed := names[program]; !listed {
+			return false
+		}
+		return findOnPath(program)
+	}
 }
 
 func executable(path string) bool {

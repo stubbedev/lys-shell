@@ -247,3 +247,28 @@ func TestFindAppsKeepsTheOrderAsked(t *testing.T) {
 		t.Errorf("FindApps = %q, want %q", got, want)
 	}
 }
+
+func TestPathProgramsFindsWhatAPathScanFinds(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, mode os.FileMode) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), nil, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("runs", 0o755)
+	write("notexec", 0o644)
+	if err := os.Mkdir(filepath.Join(dir, "adir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", filepath.Join(dir, "absent")+":"+dir)
+	onPath := pathPrograms()
+	for program, want := range map[string]bool{"runs": true, "notexec": false, "adir": false, "absent": false} {
+		if got := onPath(program); got != want {
+			t.Errorf("listed lookup of %q = %v, want %v", program, got, want)
+		}
+		if got := findOnPath(program); got != want {
+			t.Errorf("scan of %q = %v, want %v", program, got, want)
+		}
+	}
+}
