@@ -116,16 +116,19 @@ jobs:
                       extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
 
             - name: Build package
+              shell: bash
               run: |
                   nix build -L --accept-flake-config --print-out-paths .#lys-shell | tee /tmp/lys-shell-outpaths
 
             # Push the build closure to the xilo cache on master pushes and
-            # same-repo PRs (both have the token); fork PRs lack the secret and
-            # just pull via the substituter above.
+            # same-repo PRs (both have the token); fork PRs and Dependabot's,
+            # which see only Dependabot secrets, lack it and just pull via the
+            # substituter above.
             - name: setup xilo
               if: >-
                   github.event_name == 'push' ||
-                  github.event.pull_request.head.repo.full_name == github.repository
+                  (github.event.pull_request.head.repo.full_name == github.repository &&
+                  github.event.pull_request.user.login != 'dependabot[bot]')
               uses: stubbedev/xilo@dd96cb09f7781ceccd534af338a36853c80f7193 # v1.2.6
               with:
                   url: https://nix.stubbe.dev
@@ -137,7 +140,8 @@ jobs:
             - name: Push to cache (xilo)
               if: >-
                   github.event_name == 'push' ||
-                  github.event.pull_request.head.repo.full_name == github.repository
+                  (github.event.pull_request.head.repo.full_name == github.repository &&
+                  github.event.pull_request.user.login != 'dependabot[bot]')
               run: |
                   xilo push default/default $(cat /tmp/lys-shell-outpaths)
 

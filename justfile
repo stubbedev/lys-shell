@@ -165,19 +165,9 @@ recorder-check:
 schema:
     {{go}} run ./cmd/lys-shell config schema --stdout > schema/lys-shell-config.schema.json
 
-# Recompute nix/lys-shell.nix's vendorHash after a go.mod change (a lys-ui
-# bump): the vendor derivation is fixed-output, so a stale hash reuses
-# the old module set instead of reporting the new one. Needs nix.
+# Set nix/lys-shell.nix's vendorHash to the hash of the modules go.sum pins.
 vendor-hash:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    file=nix/lys-shell.nix
-    sed -i 's|vendorHash = "sha256-[^"]*";|vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";|' "$file"
-    # The build fails by design (the fake hash); its report is the point.
-    got=$( (nix build .#lys-shell --no-link 2>&1 || true) | sed -n 's/^ *got: *\(sha256-[^ ]*\).*/\1/p' | head -1)
-    if [ -z "$got" ]; then echo "no hash reported" >&2; exit 1; fi
-    sed -i "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$got\";|" "$file"
-    echo "vendorHash = $got"
+    nix run github:stubbedev/lys-ci#vendor-hash -- nix/lys-shell.nix .#lys-shell.goModules
 
 # Update the Go dependencies to their latest versions, then the vendor hash.
 update:
