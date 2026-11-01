@@ -22,7 +22,7 @@ The lock screen is [lys-login](https://github.com/stubbedev/lys-login). lys-shel
 
 ## Install
 
-Each [release](https://github.com/stubbedev/lys-shell/releases) publishes a `.deb`, a Fedora `.rpm` and an x86_64 tarball. To build from source instead, follow your distribution's guide:
+Each [release](https://github.com/stubbedev/lys-shell/releases) publishes a `.deb`, a Fedora `.rpm` and a tarball, for x86_64 and aarch64. To build from source instead, follow your distribution's guide:
 
 - [Arch Linux](/guide/getting-started-arch)
 - [Debian / Ubuntu](/guide/getting-started-debian)

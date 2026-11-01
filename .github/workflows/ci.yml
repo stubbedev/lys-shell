@@ -30,7 +30,11 @@ jobs:
     # instances of.
     check:
         name: Check (vet + lint + test + race + schema + build)
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runs-on: ${{ matrix.runner }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
@@ -50,7 +54,13 @@ jobs:
     # them, so a packaging break shows up before a tag does.
     package:
         name: Package (archive + deb)
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix: &arches
+                include:
+                    - { runner: ubuntu-latest, arch: x86_64 }
+                    - { runner: ubuntu-24.04-arm, arch: aarch64 }
+        runs-on: ${{ matrix.runner }}
         outputs:
             version: ${{ steps.archive.outputs.version }}
         steps:
@@ -72,24 +82,27 @@ jobs:
               id: archive
               run: |
                   VERSION="$(./scripts/ci/version.sh)"
-                  ./scripts/ci/build-archive.sh dist "${VERSION}" x86_64
+                  ./scripts/ci/build-archive.sh dist "${VERSION}" ${{ matrix.arch }}
                   echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
             - name: Build Debian package
               run: |
                   sudo apt-get update
                   sudo apt-get install -y --no-install-recommends build-essential debhelper desktop-file-utils dpkg-dev
-                  ./scripts/ci/build-packages.sh "lys-shell-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz" "${{ steps.archive.outputs.version }}" deb
+                  ./scripts/ci/build-packages.sh "lys-shell-${{ steps.archive.outputs.version }}-${{ matrix.arch }}-linux.tar.gz" "${{ steps.archive.outputs.version }}" deb
 
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
-                  name: archive
-                  path: lys-shell-${{ steps.archive.outputs.version }}-x86_64-linux.tar.gz
+                  name: archive-${{ matrix.arch }}
+                  path: lys-shell-${{ steps.archive.outputs.version }}-${{ matrix.arch }}-linux.tar.gz
 
     rpm:
         name: Package (rpm)
         needs: package
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix: *arches
+        runs-on: ${{ matrix.runner }}
         container:
             image: fedora:latest
         steps:
@@ -99,12 +112,12 @@ jobs:
 
             - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
-                  name: archive
+                  name: archive-${{ matrix.arch }}
 
             - name: Build Fedora package
               run: |
                   dnf -y --setopt=install_weak_deps=False install rpm-build desktop-file-utils systemd-rpm-macros
-                  ./scripts/ci/build-packages.sh "lys-shell-${{ needs.package.outputs.version }}-x86_64-linux.tar.gz" "${{ needs.package.outputs.version }}" rpm
+                  ./scripts/ci/build-packages.sh "lys-shell-${{ needs.package.outputs.version }}-${{ matrix.arch }}-linux.tar.gz" "${{ needs.package.outputs.version }}" rpm
 
     nix:
         name: Nix build + cache

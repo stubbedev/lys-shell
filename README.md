@@ -22,7 +22,7 @@ lys-shell runs on any compositor with `wlr-layer-shell`. It is built on [lys-ui]
 
 ## Install
 
-[Releases](https://github.com/stubbedev/lys-shell/releases) carry a `.deb`, a Fedora `.rpm` and an x86_64 tarball. The flake ships the package, a NixOS module and a home-manager module; see the [NixOS guide](https://stubbedev.github.io/lys-shell/guide/getting-started-nixos).
+[Releases](https://github.com/stubbedev/lys-shell/releases) carry a `.deb`, a Fedora `.rpm` and a tarball, for x86_64 and aarch64. The flake ships the package, a NixOS module and a home-manager module; see the [NixOS guide](https://stubbedev.github.io/lys-shell/guide/getting-started-nixos).
 
 To build from source, with Go and [just](https://github.com/casey/just) installed:
 

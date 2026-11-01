@@ -56,7 +56,13 @@ jobs:
     archive:
         name: Archive + deb
         needs: changelog
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix: &arches
+                include:
+                    - { runner: ubuntu-latest, arch: x86_64 }
+                    - { runner: ubuntu-24.04-arm, arch: aarch64 }
+        runs-on: ${{ matrix.runner }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
@@ -73,19 +79,19 @@ jobs:
               run: nix develop --accept-flake-config -c just build
 
             - name: Build archive
-              run: ./scripts/ci/build-archive.sh dist "${GITHUB_REF_NAME#v}" x86_64
+              run: ./scripts/ci/build-archive.sh dist "${GITHUB_REF_NAME#v}" ${{ matrix.arch }}
 
             - name: Build Debian package
               run: |
                   sudo apt-get update
                   sudo apt-get install -y --no-install-recommends build-essential debhelper desktop-file-utils dpkg-dev
                   VERSION="${GITHUB_REF_NAME#v}"
-                  ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" deb
+                  ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-${{ matrix.arch }}-linux.tar.gz" "${VERSION}" deb
 
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
-                  name: archive
-                  path: lys-shell-*-x86_64-linux.tar.gz
+                  name: archive-${{ matrix.arch }}
+                  path: lys-shell-*-${{ matrix.arch }}-linux.tar.gz
 
             - name: Upload to release
               env:
@@ -93,14 +99,17 @@ jobs:
               run: |
                   VERSION="${GITHUB_REF_NAME#v}"
                   gh release upload "${{ github.ref_name }}" \
-                    "lys-shell-${VERSION}-x86_64-linux.tar.gz" \
+                    "lys-shell-${VERSION}-${{ matrix.arch }}-linux.tar.gz" \
                     debbuild/DEBS/*/*.deb \
                     --clobber
 
     rpm:
         name: Package (Fedora)
         needs: archive
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix: *arches
+        runs-on: ${{ matrix.runner }}
         container:
             image: fedora:latest
         steps:
@@ -110,13 +119,13 @@ jobs:
 
             - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
-                  name: archive
+                  name: archive-${{ matrix.arch }}
 
             - name: Build Fedora package
               run: |
                   dnf -y --setopt=install_weak_deps=False install rpm-build desktop-file-utils systemd-rpm-macros gh
                   VERSION="${GITHUB_REF_NAME#v}"
-                  ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-x86_64-linux.tar.gz" "${VERSION}" rpm
+                  ./scripts/ci/build-packages.sh "lys-shell-${VERSION}-${{ matrix.arch }}-linux.tar.gz" "${VERSION}" rpm
 
             - name: Upload to release
               env:
@@ -124,7 +133,7 @@ jobs:
               run: |
                   gh release upload "${{ github.ref_name }}" \
                     --repo "${{ github.repository }}" \
-                    rpmbuild/RPMS/x86_64/*.rpm \
+                    rpmbuild/RPMS/${{ matrix.arch }}/*.rpm \
                     --clobber
 
     checksums:
