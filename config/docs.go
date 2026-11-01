@@ -69,7 +69,7 @@ type DocSection struct {
 	// LayoutID is the bar layout name a module goes by; "" for a
 	// top-level section.
 	LayoutID string
-	// ArrayEntry: the section is one entry of an array of tables
+	// ArrayEntry: the section is one entry of a list
 	// (custom modules, mail accounts, toast presets).
 	ArrayEntry bool
 	Groups     []DocGroup

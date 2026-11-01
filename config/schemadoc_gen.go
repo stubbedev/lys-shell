@@ -429,7 +429,7 @@ var schemaDocs = map[string]string{
 	"DisplayMode=label":                                      "Show workspace number or name.",
 	"DisplayMode=none":                                       "Show nothing - only app icons visible.",
 	"DocGroup.Arg":                                           "Arg is the type name, prefix, or field name the rule matches.",
-	"DocSection.ArrayEntry":                                  "ArrayEntry: the section is one entry of an array of tables\n(custom modules, mail accounts, toast presets).",
+	"DocSection.ArrayEntry":                                  "ArrayEntry: the section is one entry of a list\n(custom modules, mail accounts, toast presets).",
 	"DocSection.LayoutID":                                    "LayoutID is the bar layout name a module goes by; \"\" for a\ntop-level section.",
 	"DocSection.Required":                                    "Required are the fields without a default, in declaration order.",
 	"DocSection.Schema":                                      "Schema is schema_for! of the section's type: description,\nproperties (see PropertyOrder), and its own $defs.",
