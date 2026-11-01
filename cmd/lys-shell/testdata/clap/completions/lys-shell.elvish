@@ -827,7 +827,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand --icon 'Icon name shown beside the text'
             cand --percentage 'Progress percentage (0-100); shows a progress bar when set'
             cand --duration 'Auto-dismiss duration in milliseconds (toast config default when unset)'
-            cand --preset 'Preset id from `[[toasts.presets]]` to base this toast on'
+            cand --preset 'Preset id from `osd.presets` to base this toast on'
             cand --class 'Extra CSS class applied to the toast for custom styling'
             cand -h 'Print help'
             cand --help 'Print help'

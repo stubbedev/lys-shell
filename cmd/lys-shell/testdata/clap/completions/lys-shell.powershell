@@ -1027,7 +1027,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--icon', '--icon', [CompletionResultType]::ParameterName, 'Icon name shown beside the text')
             [CompletionResult]::new('--percentage', '--percentage', [CompletionResultType]::ParameterName, 'Progress percentage (0-100); shows a progress bar when set')
             [CompletionResult]::new('--duration', '--duration', [CompletionResultType]::ParameterName, 'Auto-dismiss duration in milliseconds (toast config default when unset)')
-            [CompletionResult]::new('--preset', '--preset', [CompletionResultType]::ParameterName, 'Preset id from `[[toasts.presets]]` to base this toast on')
+            [CompletionResult]::new('--preset', '--preset', [CompletionResultType]::ParameterName, 'Preset id from `osd.presets` to base this toast on')
             [CompletionResult]::new('--class', '--class', [CompletionResultType]::ParameterName, 'Extra CSS class applied to the toast for custom styling')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')

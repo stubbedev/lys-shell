@@ -1413,7 +1413,7 @@ _arguments "${_arguments_options[@]}" : \
 '--icon=[Icon name shown beside the text]:ICON:_default' \
 '--percentage=[Progress percentage (0-100); shows a progress bar when set]:PERCENTAGE:_default' \
 '--duration=[Auto-dismiss duration in milliseconds (toast config default when unset)]:DURATION:_default' \
-'--preset=[Preset id from \`\[\[toasts.presets\]\]\` to base this toast on]:PRESET:_default' \
+'--preset=[Preset id from \`osd.presets\` to base this toast on]:PRESET:_default' \
 '--class=[Extra CSS class applied to the toast for custom styling]:CLASS:_default' \
 '-h[Print help]' \
 '--help[Print help]' \

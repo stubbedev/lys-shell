@@ -342,7 +342,7 @@ complete -c lys-shell -n "__fish_lys_shell_using_subcommand widget; and __fish_s
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -l icon -d 'Icon name shown beside the text' -r
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -l percentage -d 'Progress percentage (0-100); shows a progress bar when set' -r
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -l duration -d 'Auto-dismiss duration in milliseconds (toast config default when unset)' -r
-complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -l preset -d 'Preset id from `[[toasts.presets]]` to base this toast on' -r
+complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -l preset -d 'Preset id from `osd.presets` to base this toast on' -r
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -l class -d 'Extra CSS class applied to the toast for custom styling' -r
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand toast" -s h -l help -d 'Print help'
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand portal; and not __fish_seen_subcommand_from run share-picker show help" -s h -l help -d 'Print help'

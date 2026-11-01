@@ -18,7 +18,7 @@ func toastCommand() *cli.Command {
 			{ID: "icon", Long: "icon", Value: cli.String, Help: "Icon name shown beside the text"},
 			{ID: "percentage", Long: "percentage", Value: cli.F64, Help: "Progress percentage (0-100); shows a progress bar when set"},
 			{ID: "duration", Long: "duration", Value: cli.U32, Help: "Auto-dismiss duration in milliseconds (toast config default when unset)"},
-			{ID: "preset", Long: "preset", Value: cli.String, Help: "Preset id from `[[toasts.presets]]` to base this toast on"},
+			{ID: "preset", Long: "preset", Value: cli.String, Help: "Preset id from `osd.presets` to base this toast on"},
 			{ID: "class", Long: "class", Value: cli.String, Help: "Extra CSS class applied to the toast for custom styling"},
 		},
 		Run: runToast,
