@@ -9,7 +9,6 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -75,7 +74,7 @@ func TestRasterPixelsMatchTheHeapPipeline(t *testing.T) {
 		v := newView()
 		v.show(&shown{pic: pic, size: r.size(), release: func() {}}, TransitionNone)
 		data, _ := paintView(v, tc.box.w, tc.box.h)
-		if got := fmt.Sprintf("%x", sha256.Sum256(data)); runtime.GOARCH == "amd64" && got != tc.want {
+		if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != tc.want {
 			t.Errorf("%v on %+v: the screen changed", tc.fit, tc.box)
 		}
 		if err := mem.Trim(); err != nil || mem.Stats().Live != 1 {
