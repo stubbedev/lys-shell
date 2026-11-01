@@ -2,12 +2,15 @@ package sharepicker
 
 import (
 	"fmt"
+	"image"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -252,3 +255,87 @@ func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 
 // idleWindow is how long the idle picker is watched for frames.
 const idleWindow = 500 * time.Millisecond
+
+// A window's preview stays in its card whatever its shape: the card is
+// as tall as the configured preview height allows, so a window taller
+// than wide keeps its title and class on the page, and every card of a
+// row lines up.
+func TestHeadlessTallPreviewKeepsItsCardsTitle(t *testing.T) {
+	a := apptest.Run(t)
+	p, presented := headlessPicker(t, a, config.SharePickerWindows)
+	t.Cleanup(func() { p.Dismiss("/r/tall") })
+	shapes := []image.Point{{X: 500, Y: 4000}, {X: 4000, Y: 500}, {X: 800, Y: 800}, {X: 640, Y: 1280}, {X: 1280, Y: 640}}
+	var landed atomic.Int32
+	p.windowPreview = func(tl sharepreview.Toplevel, _ int) (*image.RGBA, error) {
+		defer landed.Add(1)
+		return image.NewRGBA(image.Rectangle{Max: shapes[tl.ID]}), nil
+	}
+	answers := make(chan string, 1)
+	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/tall"}, Request{Sources: AllSources}) }()
+	apptest.Answer(t, "the picker presented", presented)
+	apptest.Until(t, a, "every preview landed and laid out", func() bool {
+		return int(landed.Load()) == len(shapes) && len(treetest.WithClass(p.root, "share-picker-card-loading")) == 0 && p.laidOutPreviews() == len(shapes)
+	})
+	cards := apptest.On(a, func() []cardLayout { return p.windowCardLayouts() })
+	if len(cards) != len(shapes) {
+		t.Fatalf("%d cards laid out, want %d", len(cards), len(shapes))
+	}
+	want := apptest.On(a, p.widgetSize)
+	for i, c := range cards {
+		if c.preview.H != want {
+			t.Errorf("card %d's preview is %dpx tall, want the configured %dpx", i, c.preview.H, want)
+		}
+		if !c.preview.In(c.card) || !c.title.In(c.card) || !c.class.In(c.card) {
+			t.Errorf("card %d %v does not hold its preview %v title %v and class %v", i, c.card, c.preview, c.title, c.class)
+		}
+		if c.title.Y < c.preview.Y+c.preview.H {
+			t.Errorf("card %d's title %v overlaps its preview %v", i, c.title, c.preview)
+		}
+		if c.card.H != cards[0].card.H {
+			t.Errorf("card %d is %dpx tall, card 0 %dpx", i, c.card.H, cards[0].card.H)
+		}
+		if i < 2 && !c.class.In(c.page) {
+			t.Errorf("the first row's card %d has its class %v outside the page %v", i, c.class, c.page)
+		}
+	}
+}
+
+// cardLayout is where one window card's parts landed.
+type cardLayout struct{ page, card, preview, title, class rect }
+
+// rect is a laid out widget's box.
+type rect render.Rect
+
+// In reports whether the whole box lies inside o.
+func (r rect) In(o rect) bool {
+	return r.W > 0 && r.H > 0 && r.X >= o.X && r.Y >= o.Y && r.X+r.W <= o.X+o.W && r.Y+r.H <= o.Y+o.H
+}
+
+func boundsOf(w widget.Widget) rect { return rect(w.(widget.Boundser).Bounds()) }
+
+// laidOutPreviews counts the window previews with a box and a picture.
+func (p *Picker) laidOutPreviews() int {
+	n := 0
+	for _, im := range treetest.WithClass(p.root, "share-picker-image") {
+		if b := boundsOf(im); b.W > 0 && b.H > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// windowCardLayouts reads the open page's window cards.
+func (p *Picker) windowCardLayouts() []cardLayout {
+	page := treetest.WithClass(p.root, "share-picker-page")
+	var out []cardLayout
+	for _, button := range treetest.WithClass(p.root, "share-picker-window-button") {
+		out = append(out, cardLayout{
+			page:    boundsOf(page[0]),
+			card:    boundsOf(treetest.WithClass(button, "share-picker-card")[0]),
+			preview: boundsOf(treetest.WithClass(button, "share-picker-image")[0]),
+			title:   boundsOf(treetest.WithClass(button, "share-picker-image-label")[0]),
+			class:   boundsOf(treetest.WithClass(button, "share-picker-image-class-label")[0]),
+		})
+	}
+	return out
+}

@@ -102,6 +102,9 @@ type Picker struct {
 	// tests.
 	windows func() []sharepreview.Toplevel
 	outputs func() []outputInfo
+	// windowPreview stands in for the window capture in tests; nil
+	// captures the window.
+	windowPreview func(tl sharepreview.Toplevel, size int) (*image.RGBA, error)
 	// presented, when set, runs on the loop once the compositor
 	// presented a mapped surface's first buffer: tests read what a
 	// drawn picker holds.
@@ -545,7 +548,8 @@ func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 	return page(grid)
 }
 
-// windowCard is build_window_card: lys-ui's card around the preview (a
+// windowCard is build_window_card: lys-ui's card around the preview, at
+// the configured height whatever the window's shape (a
 // spinner over it until the capture lands), the title (the class when
 // the title is blank), and the class as a caption, in a flat button
 // that chooses the window by click or by key.
@@ -554,6 +558,7 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	preview.AddClass("share-picker-image")
 	preview.SetScale(widget.ImageFit)
 	preview.SetSizeRequest(0, p.widgetSize())
+	preview.SetMaximumSize(0, p.widgetSize())
 	preview.SetVExpand(true)
 	preview.SetVAlign(widget.AlignCenter)
 	spinner := widget.NewSpinner(spinnerPx)
@@ -570,7 +575,11 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	button.SetCursorName("pointer")
 	payload := windowPayload(tl)
 	button.OnClick = func() { p.selectPayload(payload) }
-	p.loadPreview(preview, card, spinner, func(size int) (*image.RGBA, error) { return windowThumb(tl, size) })
+	grab := p.windowPreview
+	if grab == nil {
+		grab = windowThumb
+	}
+	p.loadPreview(preview, card, spinner, func(size int) (*image.RGBA, error) { return grab(tl, size) })
 	return button
 }
 
