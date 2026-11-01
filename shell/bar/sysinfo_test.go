@@ -74,3 +74,25 @@ func TestSysinfoThresholdColors(t *testing.T) {
 		}
 	}
 }
+
+// A reading that changes nothing on the button stays off the loop, and
+// one that changes the label or the colors reaches it.
+func TestPollReadingThatChangesNothingStaysOffTheLoop(t *testing.T) {
+	cfg := config.Defaults()
+	cv, err := config.ParseColorValue("status-error")
+	if err != nil {
+		t.Fatal(err)
+	}
+	thresholds := []config.ThresholdEntry{{Above: ptrF(90), LabelColor: &cv}}
+	m := &pollModule{cfg: pollConfig{"{{ percent }}", thresholds, cfg.CPU.Icon(), 1000}}
+	base := m.shows(reading{vars: map[string]any{"percent": "50"}, value: 50, ok: true})
+	if !base.same(m.shows(reading{vars: map[string]any{"percent": "50"}, value: 51, ok: true})) {
+		t.Error("the same label and colors differ")
+	}
+	if base.same(m.shows(reading{vars: map[string]any{"percent": "60"}, value: 60, ok: true})) {
+		t.Error("a new label reads as unchanged")
+	}
+	if base.same(m.shows(reading{vars: map[string]any{"percent": "50"}, value: 95, ok: true})) {
+		t.Error("a threshold crossed under the same label reads as unchanged")
+	}
+}

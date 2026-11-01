@@ -506,3 +506,96 @@ func TestReadUint(t *testing.T) {
 		t.Error("missing attribute: want an error")
 	}
 }
+
+func TestKeptFileSeesNewContentAndGrowsPastItsBuffer(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "proc")
+	if err := os.WriteFile(path, []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	k := keptFile{path: path}
+	defer k.Close()
+	if got, err := k.read(nil); err != nil || string(got) != "one\n" {
+		t.Fatalf("read = %q, %v", got, err)
+	}
+	long := strings.Repeat("x", 3*keptFileStart)
+	if err := os.WriteFile(path, []byte(long), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := k.read(nil); err != nil || string(got) != long {
+		t.Fatalf("a file past the buffer read %d bytes, %v", len(got), err)
+	}
+}
+
+func TestKeptFileStopsOnlyWithTheWholeLineItWasToldToReach(t *testing.T) {
+	if holdsLine([]byte("a\nmark: 12"), []byte("mark:")) {
+		t.Error("a cut line counted as whole")
+	}
+	if !holdsLine([]byte("a\nmark: 12\nb"), []byte("mark:")) {
+		t.Error("a whole line was missed")
+	}
+	if holdsLine([]byte("a\nb\n"), []byte("mark:")) {
+		t.Error("an absent line was found")
+	}
+}
+
+func TestKeptFileReopensAfterAFailureAndReportsAMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "proc")
+	k := keptFile{path: path}
+	if _, err := k.read(nil); err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("missing file: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("now\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	defer k.Close()
+	if got, err := k.read(nil); err != nil || string(got) != "now\n" {
+		t.Fatalf("after it appeared: %q, %v", got, err)
+	}
+	_ = k.file.Close()
+	if _, err := k.read(nil); err == nil {
+		t.Fatal("a closed descriptor read")
+	}
+	if k.file != nil {
+		t.Fatal("a failed read kept its descriptor")
+	}
+	if got, err := k.read(nil); err != nil || string(got) != "now\n" {
+		t.Fatalf("after a failure: %q, %v", got, err)
+	}
+}
+
+func TestCPUReaderOmitsWhatItIsToldTo(t *testing.T) {
+	fakeProc(t, "cpu  1 0 1 8 0 0 0 0 0 0\ncpu0 1 0 1 8 0 0 0 0 0 0\nintr 1\n", "")
+	r := CPUReader{OmitFrequency: true, OmitTemperature: true}
+	defer r.Close()
+	cpu, err := r.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpu.UsagePercent == 0 || len(cpu.Cores) != 1 {
+		t.Fatalf("usage still has to come through: %+v", cpu)
+	}
+	if cpu.AvgFrequencyMHz != 0 || cpu.Cores[0].FrequencyMHz != 0 || cpu.HasTemperature {
+		t.Errorf("omitted fields were read: %+v", cpu)
+	}
+}
+
+func TestDisksAtStatsOnlyTheMountsAskedFor(t *testing.T) {
+	all := Disks()
+	if len(all) == 0 {
+		t.Skip("no real mounts visible")
+	}
+	want := all[0].MountPoint
+	got := DisksAt([]string{want + "/"})
+	if want == "/" {
+		got = DisksAt([]string{"/"})
+	}
+	if len(got) != 1 || got[0].MountPoint != want {
+		t.Fatalf("DisksAt(%q) = %+v", want, got)
+	}
+	if got := DisksAt([]string{"/no/such/mount"}); len(got) != 0 {
+		t.Errorf("a path that is no mount found %+v", got)
+	}
+	if got := DisksAt(nil); len(got) != 0 {
+		t.Errorf("no paths found %+v", got)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/stubbedev/lys-lib/intconv"
@@ -108,7 +109,8 @@ type reading struct {
 }
 
 // pollModule is the shared poll loop of cpu/ram/storage: read on an
-// interval, render the format, and apply the threshold colors.
+// interval, render the format, and apply the threshold colors. A reading
+// that would change nothing on the button stays off the loop.
 type pollModule struct {
 	ctx    ModuleContext
 	cfg    pollConfig
@@ -116,6 +118,20 @@ type pollModule struct {
 	icon   *widget.Icon
 	read   func() (reading, error)
 	cancel context.CancelFunc
+}
+
+// shown is what a reading puts on the button.
+type shown struct {
+	label  string
+	colors config.ThresholdColors
+}
+
+func (s shown) same(other shown) bool {
+	return s.label == other.label && thresholdsEqual(s.colors, other.colors)
+}
+
+func (m *pollModule) shows(r reading) shown {
+	return shown{jinja.RenderOr(m.cfg.format, r.vars), config.EvaluateThresholds(r.value, m.cfg.thresholds)}
 }
 
 // pollConfig is the keys the cpu, ram, and storage sections share.
@@ -126,7 +142,7 @@ type pollConfig struct {
 	pollMs     uint64
 }
 
-func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func() (reading, error)) (*pollModule, error) {
+func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func() (reading, error), closeRead func()) (*pollModule, error) {
 	if ctx.App == nil {
 		return nil, errors.New("poll: requires the application loop")
 	}
@@ -136,22 +152,29 @@ func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func(
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	if cfg.pollMs == 0 {
-		if r, err := read(); err == nil {
-			m.render(r)
+		if r, err := read(); err == nil && r.ok {
+			m.show(m.shows(r))
 		}
+		closeRead()
 		return m, nil
 	}
 	go func() {
+		defer closeRead()
 		timer := time.NewTimer(0)
 		defer timer.Stop()
+		var last shown
+		first := true
 		for {
 			select {
 			case <-runCtx.Done():
 				return
 			case <-timer.C:
 			}
-			if r, err := m.read(); err == nil {
-				m.ctx.Invoke(func() { m.render(r) })
+			if r, err := m.read(); err == nil && r.ok {
+				if next := m.shows(r); first || !next.same(last) {
+					first, last = false, next
+					m.ctx.Invoke(func() { m.show(next) })
+				}
 			}
 			timer.Reset(intconv.Duration(cfg.pollMs, time.Millisecond))
 		}
@@ -172,17 +195,24 @@ func (m *pollModule) Stop() {
 // render applies one reading: the rendered format, then the threshold
 // colors over the defaults.
 func (m *pollModule) render(r reading) {
-	if !r.ok {
-		return
+	if r.ok {
+		m.show(m.shows(r))
 	}
-	m.btn.SetLabel(jinja.RenderOr(m.cfg.format, r.vars))
-	m.btn.applyThresholds(r.value, m.cfg.thresholds)
+}
+
+func (m *pollModule) show(s shown) {
+	m.btn.SetLabel(s.label)
+	m.btn.SetThresholds(s.colors)
 }
 
 // newCpu builds the cpu module (polling/cpu.rs and helpers.rs).
 func newCpu(ctx ModuleContext) (Module, error) {
 	c := ctx.Config.CPU
-	reader := &sysinfo.CPUReader{Sensor: c.TempSensor}
+	reader := &sysinfo.CPUReader{
+		Sensor:          c.TempSensor,
+		OmitFrequency:   !strings.Contains(c.Format, "freq"),
+		OmitTemperature: !strings.Contains(c.Format, "temp"),
+	}
 	read := func() (reading, error) {
 		cpu, err := reader.Read()
 		if err != nil {
@@ -191,14 +221,15 @@ func newCpu(ctx ModuleContext) (Module, error) {
 		return reading{vars: cpuContext(cpu), value: float64(cpu.UsagePercent), ok: true}, nil
 	}
 	initial := jinja.RenderOr(c.Format, cpuContext(sysinfo.CPU{}))
-	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read)
+	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read, reader.Close)
 }
 
 // newRam builds the ram module (polling/memory.rs and helpers.rs).
 func newRam(ctx ModuleContext) (Module, error) {
 	c := ctx.Config.RAM
+	reader := &sysinfo.MemoryReader{}
 	read := func() (reading, error) {
-		mem, err := sysinfo.ReadMemory()
+		mem, err := reader.Read()
 		if err != nil {
 			return reading{}, err
 		}
@@ -206,7 +237,7 @@ func newRam(ctx ModuleContext) (Module, error) {
 		return reading{vars: ramContext(mem), value: float64(usage), ok: true}, nil
 	}
 	initial := jinja.RenderOr(c.Format, ramContext(sysinfo.Memory{}))
-	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read)
+	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read, reader.Close)
 }
 
 // newStorage builds the storage module: the configured mount points
@@ -215,11 +246,11 @@ func newStorage(ctx ModuleContext) (Module, error) {
 	c := ctx.Config.Storage
 	paths := c.MountPoint.Paths
 	read := func() (reading, error) {
-		s, ok := sysinfo.AggregateStorage(sysinfo.Disks(), paths)
+		s, ok := sysinfo.AggregateStorage(sysinfo.DisksAt(paths), paths)
 		if !ok {
 			return reading{}, nil
 		}
 		return reading{vars: storageContext(s), value: float64(s.UsagePercent), ok: true}, nil
 	}
-	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, "--", read)
+	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, "--", read, func() {})
 }

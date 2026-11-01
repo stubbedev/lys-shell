@@ -1,12 +1,9 @@
 package sysinfo
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -81,29 +78,42 @@ func AutoBytes(bytes uint64) string {
 	return strconv.FormatFloat(size/math.Pow(kib, float64(exp)), 'f', 1, 64) + " " + string(prefix) + "iB"
 }
 
-// ReadNetTotals reads every interface's rx/tx byte totals in one read of
-// /proc/net/dev, parsed in place. The poll runs for the life of the bar,
-// so this is one file however many interfaces there are, rather than two
-// per interface in sysfs. A line that does not parse skips its interface.
+// ReadNetTotals reads every interface's rx/tx byte totals once.
 func ReadNetTotals() (map[string]NetTotals, error) {
-	file, err := os.Open(filepath.Join(ProcRoot, "net/dev"))
-	if err != nil {
-		return nil, fmt.Errorf("sysinfo: %w", err)
+	var r NetReader
+	defer r.Close()
+	return r.Read()
+}
+
+// NetReader polls /proc/net/dev through a kept descriptor: one file
+// however many interfaces there are, rather than two per interface in
+// sysfs.
+type NetReader struct{ file keptFile }
+
+// Close releases the descriptor; a later Read opens it again.
+func (r *NetReader) Close() { r.file.Close() }
+
+// Read parses the totals in place. A line that does not parse skips its
+// interface.
+func (r *NetReader) Read() (map[string]NetTotals, error) {
+	if r.file.path == "" {
+		r.file.path = filepath.Join(ProcRoot, "net/dev")
 	}
-	defer file.Close()
+	content, err := r.file.read(nil)
+	if err != nil {
+		return nil, err
+	}
 	out := map[string]NetTotals{}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		name, counters, found := bytes.CutLast(scanner.Bytes(), []byte{':'})
+	for len(content) > 0 {
+		var line []byte
+		line, content, _ = bytes.Cut(content, []byte{'\n'})
+		name, counters, found := bytes.CutLast(line, []byte{':'})
 		if !found {
 			continue
 		}
 		if totals, ok := parseNetDevCounters(counters); ok {
 			out[string(bytes.TrimSpace(name))] = totals
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("sysinfo: read /proc/net/dev: %w", err)
 	}
 	return out, nil
 }

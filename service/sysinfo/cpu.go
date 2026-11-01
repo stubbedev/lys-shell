@@ -1,7 +1,6 @@
 package sysinfo
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -30,25 +29,31 @@ type CPUStat struct {
 	Cores  []CPUTimes
 }
 
-// ReadCPUStat parses /proc/stat's cpu lines in place.
+// ReadCPUStat parses /proc/stat's cpu lines.
 func ReadCPUStat() (CPUStat, error) {
-	return readCPUStat(nil)
+	file := keptFile{path: filepath.Join(ProcRoot, "stat")}
+	defer file.Close()
+	return readCPUStat(&file, nil)
 }
 
-// readCPUStat is ReadCPUStat with cores' storage to reuse: the poll runs
-// every couple of seconds for the life of the bar, so a line costs no
-// allocation beyond the scanner's buffer.
-func readCPUStat(cores []CPUTimes) (CPUStat, error) {
-	file, err := os.Open(filepath.Join(ProcRoot, "stat"))
+// statPastCPUs is what follows the cpu lines in /proc/stat; the rest of
+// the file is not read.
+var statPastCPUs = []byte("\nintr ")
+
+// readCPUStat is ReadCPUStat through file, with cores' storage to
+// reuse: the poll runs every couple of seconds for the life of the bar,
+// so it costs one pread and no allocation.
+func readCPUStat(file *keptFile, cores []CPUTimes) (CPUStat, error) {
+	data, err := file.read(statPastCPUs)
 	if err != nil {
-		return CPUStat{}, fmt.Errorf("sysinfo: %w", err)
+		return CPUStat{}, err
 	}
-	defer file.Close()
 	stat := CPUStat{Cores: cores[:0]}
 	found := false
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		name, rest := nextField(scanner.Bytes())
+	for len(data) > 0 {
+		var line []byte
+		line, data, _ = bytes.Cut(data, []byte{'\n'})
+		name, rest := nextField(line)
 		if !bytes.HasPrefix(name, []byte("cpu")) {
 			continue
 		}
@@ -61,9 +66,6 @@ func readCPUStat(cores []CPUTimes) (CPUStat, error) {
 		} else {
 			stat.Cores = append(stat.Cores, times)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return CPUStat{}, fmt.Errorf("sysinfo: read /proc/stat: %w", err)
 	}
 	if !found {
 		return CPUStat{}, errors.New("sysinfo: /proc/stat has no cpu line")
@@ -213,13 +215,24 @@ type CPUReader struct {
 	// sensorPath is the input the last lookup settled on: scanning hwmon
 	// costs hundreds of syscalls, so only a failed read scans again.
 	sensorPath string
+	stat       keptFile
 	// Sensor is the temp-sensor key: "auto" or a label substring.
 	Sensor string
+	// OmitFrequency and OmitTemperature leave out what the caller does
+	// not show, which is most of a read's cost: a file per core and a
+	// query of the sensor.
+	OmitFrequency, OmitTemperature bool
 }
+
+// Close releases what the reader keeps open; a later Read opens it again.
+func (r *CPUReader) Close() { r.stat.Close() }
 
 // Read samples the counters, frequencies, and temperature.
 func (r *CPUReader) Read() (CPU, error) {
-	stat, err := readCPUStat(r.spare)
+	if r.stat.path == "" {
+		r.stat.path = filepath.Join(ProcRoot, "stat")
+	}
+	stat, err := readCPUStat(&r.stat, r.spare)
 	if err != nil {
 		return CPU{}, err
 	}
@@ -232,7 +245,10 @@ func (r *CPUReader) Read() (CPU, error) {
 		if i < len(r.prev.Cores) {
 			prev = r.prev.Cores[i]
 		}
-		core := Core{UsagePercent: Usage(prev, cur), FrequencyMHz: frequencyMHz(r.frequencyPath(i), cpuinfo)}
+		core := Core{UsagePercent: Usage(prev, cur)}
+		if !r.OmitFrequency {
+			core.FrequencyMHz = frequencyMHz(r.frequencyPath(i), cpuinfo)
+		}
 		out.Cores = append(out.Cores, core)
 		sum += core.FrequencyMHz
 		out.MaxFrequencyMHz = max(out.MaxFrequencyMHz, core.FrequencyMHz)
@@ -246,7 +262,9 @@ func (r *CPUReader) Read() (CPU, error) {
 		out.BusiestCoreFreqMHz = out.Cores[busiest].FrequencyMHz
 	}
 	r.spare, r.prev = r.prev.Cores, stat
-	out.TemperatureC, out.HasTemperature = r.temperature()
+	if !r.OmitTemperature {
+		out.TemperatureC, out.HasTemperature = r.temperature()
+	}
 	return out, nil
 }
 

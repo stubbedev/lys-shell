@@ -36,17 +36,35 @@ var memFields = [...]struct {
 	{"SwapFree", func(m *Memory) *uint64 { return &m.SwapFree }},
 }
 
-// ReadMemory parses the meminfo totals in place. All four lines sit in
-// the file's first page; one that does not is an error, not a zero.
+// ReadMemory parses the meminfo totals once.
 func ReadMemory() (Memory, error) {
-	var buf [4096]byte
-	n, err := readInto(filepath.Join(ProcRoot, "meminfo"), buf[:])
+	var r MemoryReader
+	defer r.Close()
+	return r.Read()
+}
+
+// MemoryReader polls the meminfo totals through a kept descriptor.
+type MemoryReader struct{ file keptFile }
+
+// Close releases the descriptor; a later Read opens it again.
+func (r *MemoryReader) Close() { r.file.Close() }
+
+// meminfoLast is the last line Read needs; the rest is not read.
+var meminfoLast = []byte("\nSwapFree:")
+
+// Read parses the totals in place; a missing line is an error, not a
+// zero.
+func (r *MemoryReader) Read() (Memory, error) {
+	if r.file.path == "" {
+		r.file.path = filepath.Join(ProcRoot, "meminfo")
+	}
+	content, err := r.file.read(meminfoLast)
 	if err != nil {
-		return Memory{}, fmt.Errorf("sysinfo: read meminfo: %w", err)
+		return Memory{}, err
 	}
 	var mem Memory
 	var seen [len(memFields)]bool
-	for data := buf[:n]; len(data) > 0; {
+	for data := content; len(data) > 0; {
 		var line []byte
 		line, data, _ = bytes.Cut(data, []byte{'\n'})
 		name, rest, found := bytes.Cut(line, []byte{':'})

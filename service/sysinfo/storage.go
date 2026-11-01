@@ -3,6 +3,7 @@ package sysinfo
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -30,7 +31,17 @@ var ignoredFilesystems = map[string]bool{
 // ignored filesystems and mount points under /sys, /proc, and /run
 // (except /run/media) are skipped, one disk per mount point, and a
 // filesystem statvfs reports as empty is left out.
-func Disks() []Disk {
+func Disks() []Disk { return disks(func(string) bool { return true }) }
+
+// DisksAt is Disks for the mount points in paths: statvfs on any other
+// mount would only cost a syscall, and can wake a sleeping or remote one.
+func DisksAt(paths []string) []Disk {
+	return disks(func(mount string) bool {
+		return slices.ContainsFunc(paths, func(p string) bool { return mount == p || mount == filepath.Clean(p) })
+	})
+}
+
+func disks(wanted func(mount string) bool) []Disk {
 	data, err := os.ReadFile(filepath.Join(ProcRoot, "mounts"))
 	if err != nil {
 		return nil
@@ -48,6 +59,9 @@ func Disks() []Disk {
 			continue
 		}
 		if seen[file] {
+			continue
+		}
+		if !wanted(file) {
 			continue
 		}
 		total, available, ok := statvfs(file)

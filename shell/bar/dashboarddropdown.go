@@ -807,6 +807,7 @@ func (v *dashboardView) systemStats() widget.Widget {
 		r.set(float64(pct/100), strconv.FormatFloat(float64(pct), 'f', 0, 32)+"%", dashboardThresholdClass(pct, cfg.UsageWarning, cfg.UsageError))
 	}
 	reader := &sysinfo.CPUReader{Sensor: v.ctx.Config.CPU.TempSensor}
+	v.stops = append(v.stops, reader.Close)
 	poll := func() {
 		if cpu, err := reader.Read(); err == nil {
 			usage(cpuRing, cpu.UsagePercent)

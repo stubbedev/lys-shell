@@ -31,6 +31,11 @@ type netstatModule struct {
 	cancel  context.CancelFunc
 	prev    map[string]sysinfo.NetTotals
 	current sysinfo.Rate
+	reader  sysinfo.NetReader
+	// shownLabel is the last text sent to the loop, so an unchanged rate
+	// does not wake it; shownOnce marks that one was sent.
+	shownLabel string
+	shownOnce  bool
 }
 
 func newNetstat(ctx ModuleContext) (Module, error) {
@@ -47,6 +52,7 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 			interval := intconv.Duration(cfg.PollIntervalMs, time.Millisecond)
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
+			defer m.reader.Close()
 			for {
 				select {
 				case <-runCtx.Done():
@@ -64,20 +70,20 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 // previous snapshot without a rate.
 func (m *netstatModule) sample(elapsed time.Duration) {
 	cfg := m.ctx.Config.Netstat
-	totals, err := sysinfo.ReadNetTotals()
+	totals, err := m.reader.Read()
 	if err != nil {
 		return
 	}
 	name, ok := sysinfo.SelectInterface(totals, cfg.Interface)
 	if !ok {
-		m.ctx.Invoke(func() { m.btn.SetLabel("") })
+		m.show("")
 		return
 	}
 	now := totals[name]
 	prev, seen := m.prev[name]
 	m.prev = totals
 	if !seen {
-		m.ctx.Invoke(func() { m.btn.SetLabel("") })
+		m.show("")
 		return
 	}
 	rate, err := sysinfo.NetRate(name, prev, now, elapsed.Seconds())
@@ -85,13 +91,20 @@ func (m *netstatModule) sample(elapsed time.Duration) {
 		return
 	}
 	m.current = rate
-	m.ctx.Invoke(func() {
-		text := ""
-		if cfg.LabelShow {
-			text = netstatLabel(cfg.Format, rate)
-		}
-		m.btn.SetLabel(text)
-	})
+	text := ""
+	if cfg.LabelShow {
+		text = netstatLabel(cfg.Format, rate)
+	}
+	m.show(text)
+}
+
+// show sends a text that differs from the last one to the button.
+func (m *netstatModule) show(text string) {
+	if m.shownOnce && text == m.shownLabel {
+		return
+	}
+	m.shownOnce, m.shownLabel = true, text
+	m.ctx.Invoke(func() { m.btn.SetLabel(text) })
 }
 
 func (m *netstatModule) Root() widget.Widget { return m.btn }
