@@ -36,7 +36,7 @@ func newMicrophone(ctx ModuleContext) (Module, error) {
 	m := &microphoneModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followPulse(ctx, "microphone", m.refresh); err != nil {
+	if err := followRefresh(ctx, "microphone", ctx.Pulse.Subscribe, m.refresh); err != nil {
 		return nil, err
 	}
 	return m, nil

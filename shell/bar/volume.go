@@ -3,8 +3,6 @@ package bar
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
 	"math"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -47,7 +45,7 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followPulse(ctx, "volume", m.refresh); err != nil {
+	if err := followRefresh(ctx, "volume", ctx.Pulse.Subscribe, m.refresh); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -72,27 +70,6 @@ func (c *defaultDeviceChrome) show() {
 	if c.chrome != nil {
 		c.chrome.SetVisible(c.present)
 	}
-}
-
-func followPulse(ctx ModuleContext, module string, refresh func() error) error {
-	if err := refresh(); err != nil {
-		return fmt.Errorf("%s: %w", module, err)
-	}
-	ticks, stop, err := ctx.Pulse.Subscribe(ctx.Life())
-	if err != nil {
-		return fmt.Errorf("%s: %w", module, err)
-	}
-	go func() {
-		for range ticks {
-			ctx.Invoke(func() {
-				if err := refresh(); err != nil {
-					log.Printf("%s: refresh: %v", module, err)
-				}
-			})
-		}
-		stop()
-	}()
-	return nil
 }
 
 // refresh re-reads and restyles the label and state icon; with no

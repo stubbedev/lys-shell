@@ -3,7 +3,6 @@ package bar
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -47,7 +46,6 @@ type battery struct {
 	source upower.Source
 	btn    *barButton
 	icon   *widget.Icon
-	cancel context.CancelFunc
 }
 
 func newBattery(ctx ModuleContext) (Module, error) {
@@ -61,10 +59,7 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	m := &battery{ctx: ctx, source: ctx.Battery}
 	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
-		return nil, err
-	}
-	if err := m.subscribe(); err != nil {
+	if err := followRefresh(ctx, "battery", m.source.Subscribe, m.refresh); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -107,19 +102,6 @@ func (m *battery) setIcon(cfg config.BatteryConfig, dev upower.Device) {
 		name = cfg.LevelIcons[levelIndexFloor(dev.Percentage, len(cfg.LevelIcons))]
 	}
 	setter.SetThemeName(name)
-}
-
-// subscribe re-reads on every PropertiesChanged tick.
-func (m *battery) subscribe() error {
-	ctx, cancel := context.WithCancel(m.ctx.Life())
-	ticks, stop, err := m.source.Subscribe(ctx)
-	if err != nil {
-		cancel()
-		return fmt.Errorf("battery: subscribe: %w", err)
-	}
-	m.cancel = cancel
-	follow(m.ctx, ticks, stop, func(struct{}) { _ = m.refresh() })
-	return nil
 }
 
 func (m *battery) Root() widget.Widget { return m.btn }

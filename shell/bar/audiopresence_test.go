@@ -57,7 +57,7 @@ func TestAudioModulesFollowTheDefaultDevice(t *testing.T) {
 		chromes[i] = widget.NewBox(widget.Row, 0, 0)
 		if err := onHeadlessLoop(func() error {
 			tc.module.setChrome(chromes[i])
-			return followPulse(ctx, tc.name, tc.module.refresh)
+			return followRefresh(ctx, tc.name, ctx.Pulse.Subscribe, tc.module.refresh)
 		}); err != nil {
 			t.Fatalf("%s without a default device: want a module, got %v", tc.name, err)
 		}
@@ -88,7 +88,7 @@ func TestAudioModulesFailOnOtherErrors(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Pulse = source
 	for _, tc := range audioPresenceCases(ctx, source) {
-		err := onHeadlessLoop(func() error { return followPulse(ctx, tc.name, tc.module.refresh) })
+		err := onHeadlessLoop(func() error { return followRefresh(ctx, tc.name, ctx.Pulse.Subscribe, tc.module.refresh) })
 		if !errors.Is(err, broken) {
 			t.Errorf("%s: error = %v, want it to wrap %v", tc.name, err, broken)
 		}

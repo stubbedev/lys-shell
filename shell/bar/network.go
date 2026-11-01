@@ -148,26 +148,11 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	}
 	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := followRefresh(ctx, "network", ctx.Network.Subscribe, m.refresh); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.Network.Subscribe(ctx.Life())
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
-		}
-		stop()
-	}()
 	if m.vpn != nil {
-		changes := m.vpn.Changes(ctx.Life())
-		go func() {
-			for range changes {
-				m.ctx.Invoke(func() { _ = m.refresh() })
-			}
-		}()
+		follow(ctx, m.vpn.Changes(ctx.Life()), nil, func(struct{}) { logRefresh("network", m.refresh) })
 	}
 	return m, nil
 }

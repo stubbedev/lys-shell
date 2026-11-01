@@ -28,7 +28,6 @@ type powerProfilesModule struct {
 	// btn takes the active profile's color as threshold colors.
 	btn  *barButton
 	snap powerprofiles.Snapshot
-	stop func()
 }
 
 func newPowerProfiles(ctx ModuleContext) (Module, error) {
@@ -38,19 +37,9 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles}
 	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons()[config.ProfileBalanced])
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := followRefresh(ctx, "power-profiles", ctx.PowerProfiles.Subscribe, m.refresh); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.PowerProfiles.Subscribe(ctx.Life())
-	if err != nil {
-		return nil, err
-	}
-	m.stop = stop
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
-		}
-	}()
 	return m, nil
 }
 
@@ -109,10 +98,3 @@ func (m *powerProfilesModule) cycle() {
 }
 
 func (m *powerProfilesModule) Root() widget.Widget { return m.btn }
-
-// Stop releases the subscription.
-func (m *powerProfilesModule) Stop() {
-	if m.stop != nil {
-		m.stop()
-	}
-}

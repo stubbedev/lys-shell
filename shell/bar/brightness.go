@@ -58,7 +58,7 @@ func newBrightness(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	follow(ctx, ticks, stop, func(struct{}) { _ = m.refresh() })
+	follow(ctx, ticks, stop, func(struct{}) { logRefresh("brightness", m.refresh) })
 	return m, nil
 }
 
