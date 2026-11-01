@@ -153,6 +153,9 @@ type windowGPUSource struct {
 	// failing is whether copies fail, logged when that starts and stops.
 	failing bool
 	copies  sync.WaitGroup
+	// wake tells the producer a copy ended, so it need not poll; nil until
+	// it asks.
+	wake func()
 }
 
 // windowBuffer is one of the stream's GPU buffers.
@@ -293,6 +296,9 @@ func (s *windowGPUSource) startCopy(b *windowBuffer) {
 	go s.copyInto(b)
 }
 
+// NotifyFrames has each ended copy wake the producer.
+func (s *windowGPUSource) NotifyFrames(wake func()) { s.wake = wake }
+
 // Restart gives the buffers that follow dropped ones a session of their
 // own, once the session in use has taken a copy; it wakes a copy waiting
 // on the old one.
@@ -358,6 +364,11 @@ func (s *windowGPUSource) capture(b *windowBuffer) (capture.FrameInfo, error) {
 // copyInto runs one copy into b and files its outcome.
 func (s *windowGPUSource) copyInto(b *windowBuffer) {
 	defer s.copies.Done()
+	defer func() {
+		if s.wake != nil {
+			s.wake()
+		}
+	}()
 	info, err := s.capture(b)
 	s.mu.Lock()
 	defer s.mu.Unlock()

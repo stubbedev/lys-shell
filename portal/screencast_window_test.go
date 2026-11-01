@@ -477,3 +477,37 @@ func TestWindowSourceRefreshesAStillWindow(t *testing.T) {
 		}
 	}
 }
+
+// An ended copy wakes the producer, whatever its outcome, for the next fill
+// to send it or start another: the producer does not poll this source.
+func TestWindowSourceWakesTheProducerWhenACopyEnds(t *testing.T) {
+	src, sess, _ := newWindowHarness(t)
+	t.Cleanup(src.Close)
+	woken := make(chan struct{}, 4)
+	src.NotifyFrames(func() { woken <- struct{}{} })
+	a, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := src.FillDmabuf(a); ok {
+		t.Fatal("a buffer went out before a copy into it ran")
+	}
+	select {
+	case <-woken:
+		t.Fatal("woken before the copy ended")
+	default:
+	}
+	for _, outcome := range []error{nil, errors.New("copy refused")} {
+		sess.land(t, src, outcome)
+		select {
+		case <-woken:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("no wake after a copy ended with %v", outcome)
+		}
+		src.FillDmabuf(a)
+		src.FillDmabuf(a)
+	}
+	sess.land(t, src, nil)
+	<-woken
+	a.Release()
+}
