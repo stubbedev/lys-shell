@@ -17,7 +17,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/fswatch"
 )
 
 // Bucket is the coarse worktree state, mirroring treeman's bucket
@@ -165,11 +168,12 @@ type Source interface {
 	RunAction(ctx context.Context, action Action, path string) error
 }
 
-// The service's timing (service.rs): the pause before reconnecting a
-// dropped or absent daemon (and so the poll period while it is down),
-// and the window an event burst collapses into one fetch.
+// The service's timing: how often the status is looked at with no
+// daemon to report it (a daemon appearing is seen at once through the
+// watch on its socket's directory), and the window an event burst
+// collapses into one fetch.
 const (
-	reconnectDelay = 5 * time.Second
+	reconnectDelay = time.Minute
 	debounce       = 200 * time.Millisecond
 )
 
@@ -275,8 +279,7 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 
 // run is service.rs's run: fetch (which works with the daemon down),
 // follow the daemon's events, and after the stream drops or the daemon
-// is absent wait reconnectDelay and go again - the poll that keeps the
-// status fresh without a daemon.
+// is absent wait for its socket or the next look at the status.
 func (s *System) run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -284,15 +287,62 @@ func (s *System) run() {
 		<-s.stopped
 		cancel()
 	}()
+	socket, appeared := watchSocket()
+	if socket != nil {
+		defer func() { _ = socket.Close() }()
+	}
 	for {
 		if !s.refresh(ctx) {
 			return
 		}
 		s.consume(ctx)
+		if !s.awaitDaemon(ctx, appeared) {
+			return
+		}
+	}
+}
+
+// watchSocket watches the directory the daemon's socket appears in; a
+// nil channel when it cannot be watched, which leaves the periodic look.
+func watchSocket() (*fswatch.Watcher, <-chan struct{}) {
+	path, ok := SocketPath()
+	if !ok {
+		return nil, nil
+	}
+	watcher, err := fswatch.New(unix.IN_CREATE|unix.IN_MOVED_TO, false)
+	if err != nil {
+		log.Printf("treeman: cannot watch for the daemon: %v", err)
+		return nil, nil
+	}
+	if err := watcher.Add(filepath.Dir(path)); err != nil {
+		log.Printf("treeman: cannot watch for the daemon: %v", err)
+		_ = watcher.Close()
+		return nil, nil
+	}
+	return watcher, watcher.Changed()
+}
+
+// awaitDaemon sleeps until the socket is there or retry passed; false
+// when ctx ended. Other files appearing beside the socket spawn nothing.
+func (s *System) awaitDaemon(ctx context.Context, appeared <-chan struct{}) bool {
+	timer := time.NewTimer(s.retry)
+	defer timer.Stop()
+	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-time.After(s.retry):
+			return false
+		case <-timer.C:
+			return true
+		case _, open := <-appeared:
+			if !open {
+				appeared = nil
+				continue
+			}
+			if path, ok := SocketPath(); ok {
+				if _, err := os.Stat(path); err == nil {
+					return true
+				}
+			}
 		}
 	}
 }

@@ -292,3 +292,34 @@ func TestParseBucketAndFindWorktree(t *testing.T) {
 		t.Error("found a missing worktree")
 	}
 }
+
+// A daemon coming up is noticed at once, with no waiting for the next
+// periodic look, and other files appearing beside its socket spawn
+// nothing.
+func TestTheDaemonSocketAppearingIsSeenAtOnce(t *testing.T) {
+	dir := sockdir.Dir(t)
+	socket := filepath.Join(dir, "treeman.sock")
+	t.Setenv("TREEMAN_SOCKET", socket)
+	s := New(fakeTreemanBin(t, `{"total":1}`, `{"total":2}`))
+	s.retry = time.Hour
+	defer s.Stop()
+	ticks, _, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, s, ticks, 1)
+	if err := os.WriteFile(filepath.Join(dir, "unrelated"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ticks:
+		t.Fatalf("a file beside the socket made a fetch: %+v", s.Status())
+	case <-time.After(100 * time.Millisecond):
+	}
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	waitStatus(t, s, ticks, 2)
+}
