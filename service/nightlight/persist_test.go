@@ -2,10 +2,12 @@ package nightlight
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -35,7 +37,9 @@ func TestOverrideRoundTrip(t *testing.T) {
 	if _, ok := LoadOverride(dir, persistNow()); ok {
 		t.Fatal("an empty dir has a record")
 	}
-	SaveOverride(dir, Override{Phase: PhaseNight, Enabled: true}, persistNow())
+	if err := SaveOverride(dir, Override{Phase: PhaseNight, Enabled: true}, persistNow()); err != nil {
+		t.Fatal(err)
+	}
 	rec, ok := LoadOverride(dir, persistNow().Add(time.Hour))
 	if !ok || rec.Phase != PhaseNight || !rec.Enabled {
 		t.Fatalf("round trip = %+v, %v", rec, ok)
@@ -46,6 +50,78 @@ func TestOverrideRoundTrip(t *testing.T) {
 	ClearOverride(dir)
 	if _, ok := LoadOverride(dir, persistNow()); ok {
 		t.Error("the record survived ClearOverride")
+	}
+}
+
+// A save replaces the record whole: a reader holding the old file keeps
+// the old file, and nothing but the record is left behind.
+func TestSaveOverrideReplacesTheRecordAtomically(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "state")
+	if err := SaveOverride(dir, Override{Phase: PhaseDay, Enabled: true}, persistNow()); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, overrideFile)
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := before.Mode().Perm(); perm != 0o600 {
+		t.Errorf("record mode = %o, want 600", perm)
+	}
+	old, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer old.Close()
+	if err := SaveOverride(dir, Override{Phase: PhaseNight}, persistNow()); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.SameFile(before, after) {
+		t.Error("the save wrote into the existing file instead of replacing it")
+	}
+	held, err := io.ReadAll(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(held), "day on ") {
+		t.Errorf("a reader of the old file sees %q", held)
+	}
+	if rec, ok := LoadOverride(dir, persistNow()); !ok || rec.Phase != PhaseNight || rec.Enabled {
+		t.Errorf("after the second save = %+v, %v", rec, ok)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 1 {
+		t.Errorf("state dir = %v, %v; want the record and no temp file", entries, err)
+	}
+}
+
+func TestSaveOverrideReportsWhyItFailed(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(blocker, "state")
+	err := SaveOverride(dir, Override{Enabled: true}, persistNow())
+	if !errors.Is(err, syscall.ENOTDIR) || !strings.Contains(err.Error(), dir) {
+		t.Errorf("a state dir under a file: err = %v, want ENOTDIR naming %s", err, dir)
+	}
+
+	// The record's own path taken by a directory: the rename fails, and the
+	// temporary does not stay behind.
+	dir = t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, overrideFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	err = SaveOverride(dir, Override{Enabled: true}, persistNow())
+	if err == nil || !strings.Contains(err.Error(), overrideFile) {
+		t.Errorf("a directory in the record's place: err = %v, want one naming %s", err, overrideFile)
+	}
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 1 {
+		t.Errorf("state dir = %v, %v; want no temp file left", entries, err)
 	}
 }
 

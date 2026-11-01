@@ -457,7 +457,9 @@ func (m *nightlightModule) toggle() {
 			m.autoPhase = nightlight.TargetAt(m.env.now(), *m.location, cfg.TransitionDuration.Transition(), m.night).Phase
 		}
 	}
-	nightlight.SaveOverride(m.env.stateDir, nightlight.Override{Phase: m.autoPhase, Enabled: !m.enabled}, m.env.now())
+	if err := nightlight.SaveOverride(m.env.stateDir, nightlight.Override{Phase: m.autoPhase, Enabled: !m.enabled}, m.env.now()); err != nil {
+		log.Printf("nightlight: the toggle will not survive a restart: %v", err)
+	}
 	if m.enabled {
 		m.stopFilter()
 		return

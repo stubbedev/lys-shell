@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -212,7 +214,9 @@ func TestNightlightRestartReplaysTheToggle(t *testing.T) {
 	fake := &fakeSunset{clock: sunsetDay}
 	env := fake.env(t)
 	cfg := sunsetConfig(true)
-	nightlight.SaveOverride(env.stateDir, nightlight.Override{Phase: nightlight.PhaseDay, Enabled: true}, sunsetDay.Add(-time.Minute))
+	if err := nightlight.SaveOverride(env.stateDir, nightlight.Override{Phase: nightlight.PhaseDay, Enabled: true}, sunsetDay.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
 	m := newTestNightlight(t, cfg, env)
 	if !fake.running || !m.enabled {
 		t.Fatal("a remembered manual enable was not replayed")
@@ -225,10 +229,47 @@ func TestNightlightRestartReplaysTheToggle(t *testing.T) {
 	// A remembered disable starts nothing.
 	fake2 := &fakeSunset{clock: sunsetDay}
 	env2 := fake2.env(t)
-	nightlight.SaveOverride(env2.stateDir, nightlight.Override{Enabled: false}, sunsetDay)
+	if err := nightlight.SaveOverride(env2.stateDir, nightlight.Override{Enabled: false}, sunsetDay); err != nil {
+		t.Fatal(err)
+	}
 	newTestNightlight(t, cfg, env2)
 	if fake2.starts != 0 {
 		t.Error("a remembered disable started the filter")
+	}
+}
+
+// A toggle whose record cannot be saved still toggles, and says so.
+func TestNightlightToggleLogsAFailedSave(t *testing.T) {
+	logged := captureLog(t)
+	fake := &fakeSunset{clock: sunsetDay}
+	env := fake.env(t)
+	blocker := filepath.Join(env.stateDir, "file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env.stateDir = filepath.Join(blocker, "state")
+	m := newTestNightlight(t, sunsetConfig(false), env)
+	m.toggle()
+	if !fake.running {
+		t.Error("a failed save stopped the toggle")
+	}
+	if got := logged.String(); !strings.Contains(got, "will not survive a restart") || !strings.Contains(got, env.stateDir) {
+		t.Errorf("log = %q, want the failed save naming %s", got, env.stateDir)
+	}
+}
+
+// A toggle that saves logs no failure.
+func TestNightlightToggleSavesQuietly(t *testing.T) {
+	logged := captureLog(t)
+	fake := &fakeSunset{clock: sunsetDay}
+	env := fake.env(t)
+	m := newTestNightlight(t, sunsetConfig(false), env)
+	m.toggle()
+	if strings.Contains(logged.String(), "will not survive") {
+		t.Errorf("log = %q", logged.String())
+	}
+	if rec, ok := nightlight.LoadOverride(env.stateDir, sunsetDay); !ok || !rec.Enabled {
+		t.Errorf("record = %+v, %v", rec, ok)
 	}
 }
 

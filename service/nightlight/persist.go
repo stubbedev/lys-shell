@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stubbedev/lys-lib/atomicfile"
 )
 
 // overrideFile is the record's name inside the lys-shell state dir.
@@ -27,18 +29,25 @@ type Override struct {
 	Enabled bool
 }
 
-// SaveOverride records a toggle made at now (persist.rs save); write
-// failures are quiet, as the record is a convenience.
-func SaveOverride(dir string, o Override, now time.Time) {
+// SaveOverride records a toggle made at now (persist.rs save), atomically.
+func SaveOverride(dir string, o Override, now time.Time) error {
 	enabled := "off"
 	if o.Enabled {
 		enabled = "on"
 	}
 	body := o.Phase.String() + " " + enabled + " " + now.UTC().Format(time.RFC3339) + "\n"
+	return saveState(dir, overrideFile, body)
+}
+
+// saveState replaces a record in the state dir, creating the dir first.
+func saveState(dir, name, body string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return
+		return fmt.Errorf("nightlight: create the state dir %s: %w", dir, err)
 	}
-	_ = os.WriteFile(filepath.Join(dir, overrideFile), []byte(body), 0o600)
+	if err := atomicfile.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+		return fmt.Errorf("nightlight: save %s: %w", name, err)
+	}
+	return nil
 }
 
 // ClearOverride drops the record (a phase change ends it).
@@ -86,26 +95,8 @@ func parseOverride(body string, now time.Time) (Override, bool) {
 // restart at night tints the display at once rather than after GeoClue
 // answers.
 func SaveLocation(dir string, loc Location) error {
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("nightlight: create the state dir %s: %w", dir, err)
-	}
-	tmp, err := os.CreateTemp(dir, locationFile+".*")
-	if err != nil {
-		return fmt.Errorf("nightlight: save the location in %s: %w", dir, err)
-	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
 	body := strconv.FormatFloat(loc.latitude, 'f', -1, 64) + " " + strconv.FormatFloat(loc.longitude, 'f', -1, 64) + "\n"
-	_, err = tmp.WriteString(body)
-	if closeErr := tmp.Close(); err == nil {
-		err = closeErr
-	}
-	if err == nil {
-		err = os.Rename(tmp.Name(), filepath.Join(dir, locationFile))
-	}
-	if err != nil {
-		return fmt.Errorf("nightlight: save the location in %s: %w", dir, err)
-	}
-	return nil
+	return saveState(dir, locationFile, body)
 }
 
 // LoadLocation reads the remembered fix; the error wraps fs.ErrNotExist
