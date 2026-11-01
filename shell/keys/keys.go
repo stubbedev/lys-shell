@@ -5,9 +5,9 @@
 package keys
 
 import (
+	"github.com/stubbedev/lys-lib/xkb"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-	"github.com/unxed/xkb-go"
 )
 
 // Translator reads an evdev code through the seat's keymap and current

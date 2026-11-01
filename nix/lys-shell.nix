@@ -2,6 +2,8 @@
   lib,
   buildGo127Module,
   makeWrapper,
+  libX11,
+  xkeyboard-config,
   libva,
   vulkan-loader,
 }:
@@ -71,7 +73,7 @@ buildGo127Module {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-XAid2a4XHQNtR3J+NVYJE74Jdg/87HheNO4BqUOJ0m0=";
+  vendorHash = "sha256-0Vl/OdbpkS6byMFwbmtNXfM5Dk3y/jIOkDFTz+P1uUM=";
 
   subPackages = [
     "cmd/lys-shell"
@@ -82,7 +84,12 @@ buildGo127Module {
   # lys-ui and the purego bindings are pure Go; cgo stays off, as in the
   # devShell.
   env.CGO_ENABLED = "0";
-  ldflags = [ "-s" "-w" ];
+  ldflags = [
+    "-s"
+    "-w"
+    "-X github.com/stubbedev/lys-lib/xkb.defaultRoot=${xkeyboard-config}/share/X11/xkb"
+    "-X github.com/stubbedev/lys-lib/xkb.defaultXLocaleDir=${libX11}/share/X11/locale"
+  ];
 
   # The suite runs in `just check` (it needs a compositor and D-Bus).
   doCheck = false;

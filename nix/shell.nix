@@ -60,6 +60,8 @@
         # The real xdg-desktop-portal frontend the portal contract tests
         # route through to the backend.
         XDG_DESKTOP_PORTAL = "${pkgs.xdg-desktop-portal}/libexec/xdg-desktop-portal";
+        XKB_CONFIG_ROOT = "${pkgs.xkeyboard-config}/share/X11/xkb";
+        XLOCALEDIR = "${pkgs.libX11}/share/X11/locale";
 
         # lys-ui is pure Go by design; keep accidental cgo out (`just race`
         # re-enables it per invocation).

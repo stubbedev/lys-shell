@@ -17,7 +17,7 @@ import (
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/vinput"
-	"github.com/unxed/xkb-go"
+	"github.com/stubbedev/lys-lib/xkb"
 
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -134,7 +134,7 @@ func keysymTable(keymap []byte) map[uint32]keysymKey {
 	if len(keymap) == 0 {
 		return table
 	}
-	km, err := xkb.NewContext(context.Background(), xkb.ContextNoFlags).NewKeymapFromString(keymap, xkb.KeymapFormatTextV1)
+	km, err := xkb.NewContext(os.Getenv).NewKeymapFromString(keymap)
 	if err != nil {
 		warnf("remotedesktop: the seat keymap does not parse: %v", err)
 		return table
@@ -157,29 +157,12 @@ func keysymTable(keymap []byte) map[uint32]keysymKey {
 	add(0, keysymKey{})
 	add(xkb.ModShift, keysymKey{shift: true})
 	level3, ok := table[keysymISOLevel3Shift]
-	if !ok || !inModifierMap(keymap, km.KeyGetName(xkb.Keycode(level3.code+8)), "Mod5") {
+	if !ok || km.KeyModMap(xkb.Keycode(level3.code+8))&xkb.ModMod5 == 0 {
 		return table
 	}
 	add(xkb.ModMod5, keysymKey{level3: true, level3Code: level3.code})
 	add(xkb.ModMod5|xkb.ModShift, keysymKey{shift: true, level3: true, level3Code: level3.code})
 	return table
-}
-
-// inModifierMap reports whether the keymap text's modifier_map puts
-// the key named name in the real modifier mod: libxkbcommon writes one
-// `modifier_map <mod> { <KEY>, ... };` line per modifier, and the
-// parser does not expose the map.
-func inModifierMap(keymap []byte, name, mod string) bool {
-	if name == "" {
-		return false
-	}
-	for line := range strings.SplitSeq(string(keymap), "\n") {
-		keys, ok := strings.CutPrefix(strings.TrimSpace(line), "modifier_map "+mod+" {")
-		if ok && strings.Contains(keys, "<"+name+">") {
-			return true
-		}
-	}
-	return false
 }
 
 // remoteState is a RemoteDesktop session's options and, once started,
