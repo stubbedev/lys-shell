@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabuf"
@@ -25,30 +26,44 @@ import (
 // copy into it, and goes out the next time it is handed over once the
 // copy landed. The buffers follow the window's size: a resize ends the
 // copy with capture.ErrReconfigured, Size reports the new size, and the
-// producer renegotiates and allocates anew.
+// producer renegotiates and allocates anew. Only a session's first frame
+// is copied without waiting, so when a consumer drops its buffers (a
+// preview handing over to the real share), the next ones get a new
+// session, or a still window would never fill them. A window still for
+// stillRefresh gets one too, so its frame reaches a consumer that had no
+// use for the first one.
+
+// stillRefresh is how often a still source sends its frame again.
+const stillRefresh = time.Second
 
 // windowCapturer is the window's capture session on its connection.
 type windowCapturer interface {
 	importer
-	// Open opens the session, once; Formats and Capture need it.
+	// Open opens the session unless one is open; Formats and Capture
+	// need it.
 	Open() error
 	Formats() ([]capture.DmabufFormat, error)
 	Capture(importedBuffer) (capture.FrameInfo, error)
-	// Close ends the session if open, waking a Capture that waits.
+	// Close ends the session if open, waking a Capture that waits; Open
+	// starts a new one, whose first frame is copied at once.
 	Close() error
 }
 
-// windowSession is the windowCapturer over a capture client.
+// windowSession is the windowCapturer over a capture client. mu guards
+// s only: a Capture waits without it, and Close wakes that wait.
 type windowSession struct {
 	c      *capture.Client
 	t      capture.Toplevel
 	cursor bool
+	mu     sync.Mutex
 	s      *capture.DmabufSession
 }
 
 func (w *windowSession) Import(d dmabuf.Buffer) (importedBuffer, error) { return w.c.ImportDmabuf(d) }
 
 func (w *windowSession) Open() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if w.s != nil {
 		return nil
 	}
@@ -60,21 +75,44 @@ func (w *windowSession) Open() error {
 	return nil
 }
 
-func (w *windowSession) Formats() ([]capture.DmabufFormat, error) { return w.s.Formats() }
+func (w *windowSession) session() (*capture.DmabufSession, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.s == nil {
+		return nil, fmt.Errorf("screencast: the window's capture session: %w", capture.ErrClosed)
+	}
+	return w.s, nil
+}
+
+func (w *windowSession) Formats() ([]capture.DmabufFormat, error) {
+	s, err := w.session()
+	if err != nil {
+		return nil, err
+	}
+	return s.Formats()
+}
 
 func (w *windowSession) Capture(buf importedBuffer) (capture.FrameInfo, error) {
 	b, ok := buf.(*capture.DmabufBuffer)
 	if !ok {
 		return capture.FrameInfo{}, errors.New("screencast: a buffer the window's client did not import")
 	}
-	return w.s.Capture(b)
+	s, err := w.session()
+	if err != nil {
+		return capture.FrameInfo{}, err
+	}
+	return s.Capture(b)
 }
 
 func (w *windowSession) Close() error {
-	if w.s == nil {
+	w.mu.Lock()
+	s := w.s
+	w.s = nil
+	w.mu.Unlock()
+	if s == nil {
 		return nil
 	}
-	return w.s.Close()
+	return s.Close()
 }
 
 // windowGPUSource is a pipewire.DmabufSource over a window's capture
@@ -97,6 +135,14 @@ type windowGPUSource struct {
 	// the consumer took the GPU buffers.
 	width, height uint32
 	gpu           bool
+	// copied is whether the session took a copy, so that only a new
+	// session would fill new buffers from a still window.
+	copied bool
+	// refresh is how long a copy waits for the window to change before
+	// a new session takes its frame anyway; refreshing is set while one
+	// wakes the copy for that.
+	refresh    time.Duration
+	refreshing bool
 	// inflight is the buffer a copy is running into; ready are the
 	// buffers whose copy landed, with its damage; orphaned are buffers
 	// the producer released while their copy ran, freed when it ends.
@@ -150,6 +196,7 @@ func newWindowGPUSource(shm *snapshotSource, dev gpuAllocator, c windowCapturer,
 		shm: shm, dev: dev, cap: c, format: offered.Fourcc, video: videoFormat(format),
 		width: width, height: height, watch: shm.watch,
 		ready: map[*windowBuffer][]pipewire.Rect{}, orphaned: map[*windowBuffer]bool{},
+		refresh: stillRefresh,
 	}
 	modifier, layout, err := dmabufprobe.First(layouts, func(l dmabufprobe.Layout) (fourcc.Modifier, error) {
 		b, err := allocImported(dev, c, width, height, s.format, l)
@@ -218,19 +265,100 @@ func (s *windowGPUSource) FillDmabuf(d pipewire.Dmabuf) ([]pipewire.Rect, bool) 
 		delete(s.ready, b)
 		return damage, true
 	}
+	s.startCopy(b)
+	return nil, false
+}
+
+// PrepareDmabuf starts the next copy as the last frame goes out, so a
+// changing window has a frame ready every cycle.
+func (s *windowGPUSource) PrepareDmabuf(d pipewire.Dmabuf) {
+	b, ok := d.(*windowBuffer)
+	if !ok || b.src != s {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.startCopy(b)
+}
+
+// startCopy runs a copy into b unless one runs, the source closed, or b
+// is of a size the session left behind. s.mu is held.
+func (s *windowGPUSource) startCopy(b *windowBuffer) {
 	if s.inflight != nil || s.closed || b.width != s.width || b.height != s.height {
-		return nil, false
+		return
 	}
 	s.inflight = b
+	s.copied = true
 	s.copies.Add(1)
 	go s.copyInto(b)
-	return nil, false
+}
+
+// Restart gives the buffers that follow dropped ones a session of their
+// own, once the session in use has taken a copy; it wakes a copy waiting
+// on the old one.
+func (s *windowGPUSource) Restart() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.gpu || !s.copied || s.closed {
+		return
+	}
+	s.copied = false
+	if err := s.cap.Close(); err != nil {
+		warnf("screencast: close the window's capture session to restart it: %v", err)
+	}
+	if err := s.cap.Open(); err != nil {
+		warnf("screencast: restart the window's capture session: %v", err)
+		s.watch.end()
+		return
+	}
+	s.resize()
+}
+
+// wakeForRefresh ends the wait of a copy into b that is still running,
+// for copyInto to take the window's frame from a new session.
+func (s *windowGPUSource) wakeForRefresh(b *windowBuffer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.inflight != b || s.closed || s.orphaned[b] {
+		return
+	}
+	s.refreshing = true
+	if err := s.cap.Close(); err != nil {
+		warnf("screencast: close the still window's capture session: %v", err)
+	}
+}
+
+// capture copies the window into b, refreshing while it does not change.
+func (s *windowGPUSource) capture(b *windowBuffer) (capture.FrameInfo, error) {
+	for {
+		s.mu.Lock()
+		refresh := s.refresh
+		s.mu.Unlock()
+		wake := time.AfterFunc(refresh, func() { s.wakeForRefresh(b) })
+		info, err := s.cap.Capture(b.imported)
+		wake.Stop()
+		s.mu.Lock()
+		refreshing := s.refreshing && !s.closed && !s.orphaned[b]
+		s.refreshing = false
+		if !refreshing {
+			s.mu.Unlock()
+			return info, err
+		}
+		openErr := s.cap.Open()
+		s.mu.Unlock()
+		if openErr != nil {
+			return capture.FrameInfo{}, fmt.Errorf("reopen the still window's capture session: %w", openErr)
+		}
+		if err == nil {
+			return info, nil
+		}
+	}
 }
 
 // copyInto runs one copy into b and files its outcome.
 func (s *windowGPUSource) copyInto(b *windowBuffer) {
 	defer s.copies.Done()
-	info, err := s.cap.Capture(b.imported)
+	info, err := s.capture(b)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.inflight = nil

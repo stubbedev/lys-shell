@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
@@ -197,17 +198,26 @@ type extSource struct {
 	stream *capture.Stream
 	seq    uint64
 	sent   bool
+	at     time.Time
 }
+
+// Restart has the next fill send the latest frame again: a consumer's
+// new buffers hold nothing, and a still output brings no newer one.
+func (e *extSource) Restart() { e.sent = false }
 
 func (e *extSource) Fill(dst []byte) ([]pipewire.Rect, bool) {
 	f := e.stream.Latest()
-	if f == nil || (e.sent && f.Seq == e.seq) {
+	if f == nil {
+		return nil, false
+	}
+	now := time.Now()
+	if e.sent && f.Seq == e.seq && now.Sub(e.at) < stillRefresh {
 		return nil, false
 	}
 	if f.ReadInto(dst) == 0 {
 		return nil, false
 	}
-	e.seq, e.sent = f.Seq, true
+	e.seq, e.sent, e.at = f.Seq, true, now
 	return rects(f.Damage), true
 }
 

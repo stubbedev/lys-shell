@@ -2,6 +2,7 @@ package portal
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,10 +19,13 @@ type fakeSession struct {
 	formats  []capture.DmabufFormat
 	results  chan error
 	started  chan struct{}
-	closed   chan struct{}
 	closeErr error
 	openErr  error
 	opened   int
+
+	mu     sync.Mutex
+	closed chan struct{}
+	closes int
 }
 
 func newFakeSession() *fakeSession {
@@ -35,19 +39,31 @@ func (f *fakeSession) Open() error {
 	if f.openErr != nil {
 		return f.openErr
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.closes > 0 {
+		f.closed = make(chan struct{})
+	}
 	f.opened++
 	return nil
 }
 
+func (f *fakeSession) closedChan() (chan struct{}, int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.closed, f.opened
+}
+
 func (f *fakeSession) Formats() ([]capture.DmabufFormat, error) {
-	if f.opened == 0 {
+	if _, opened := f.closedChan(); opened == 0 {
 		return nil, errors.New("formats of a session never opened")
 	}
 	return f.formats, nil
 }
 
 func (f *fakeSession) Capture(importedBuffer) (capture.FrameInfo, error) {
-	if f.opened == 0 {
+	closed, opened := f.closedChan()
+	if opened == 0 {
 		return capture.FrameInfo{}, errors.New("a capture on a session never opened")
 	}
 	f.started <- struct{}{}
@@ -57,13 +73,20 @@ func (f *fakeSession) Capture(importedBuffer) (capture.FrameInfo, error) {
 			return capture.FrameInfo{}, err
 		}
 		return capture.FrameInfo{Damage: []capture.Rect{{X: 1, Y: 2, Width: 3, Height: 4}}}, nil
-	case <-f.closed:
+	case <-closed:
 		return capture.FrameInfo{}, capture.ErrClosed
 	}
 }
 
 func (f *fakeSession) Close() error {
-	close(f.closed)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.closes++
+	select {
+	case <-f.closed:
+	default:
+		close(f.closed)
+	}
 	return f.closeErr
 }
 
@@ -310,5 +333,147 @@ func TestWindowSourceOpensItsSessionWithTheFirstGPUBuffer(t *testing.T) {
 	}
 	if w, h, _ := refusing.Size(); w != 64 || h != 32 {
 		t.Errorf("size after a failed open = %dx%d, want the shm frames' 64x32", w, h)
+	}
+}
+
+// Buffers that replace dropped ones get a new session, whose first frame
+// is copied at once, even from a window that does not change: a copy
+// waiting on the old session is woken, and a buffer already dropped is
+// freed with it.
+func TestWindowSourceRestartsItsSessionForNewBuffers(t *testing.T) {
+	src, sess, _ := newWindowHarness(t)
+	t.Cleanup(src.Close)
+	a, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src.Restart()
+	if sess.opened != 1 || sess.closes != 0 {
+		t.Fatalf("a session that took no copy restarted: opened %d, closed %d", sess.opened, sess.closes)
+	}
+	src.FillDmabuf(a)
+	sess.land(t, src, nil)
+	if _, ok := src.FillDmabuf(a); !ok {
+		t.Fatal("the landed copy did not go out")
+	}
+	src.FillDmabuf(a)
+	<-sess.started
+	fd := a.Fd()
+	a.Release()
+	src.Restart()
+	sess.mu.Lock()
+	opened, closes := sess.opened, sess.closes
+	sess.mu.Unlock()
+	if opened != 2 || closes != 1 {
+		t.Fatalf("after the restart: opened %d, closed %d", opened, closes)
+	}
+	for deadline := time.Now().Add(5 * time.Second); open(fd); time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the copy on the old session was not woken to free its buffer")
+		}
+	}
+	b, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Release()
+	src.FillDmabuf(b)
+	sess.land(t, src, nil)
+	if _, ok := src.FillDmabuf(b); !ok {
+		t.Fatal("the new session's frame did not go out")
+	}
+}
+
+// A window whose session does not reopen can send nothing more.
+func TestWindowSourceEndsWhenItsSessionDoesNotRestart(t *testing.T) {
+	src, sess, _ := newWindowHarness(t)
+	t.Cleanup(src.Close)
+	a, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Release()
+	src.FillDmabuf(a)
+	sess.land(t, src, nil)
+	sess.openErr = capture.ErrSessionStopped
+	src.Restart()
+	select {
+	case <-src.watch.ended:
+	default:
+		t.Fatal("the stream outlived its session")
+	}
+}
+
+// Preparing starts the copy the next handover collects, and does nothing
+// while one runs.
+func TestWindowSourcePreparesTheNextCopy(t *testing.T) {
+	src, sess, _ := newWindowHarness(t)
+	t.Cleanup(src.Close)
+	a, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Release()
+	b, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Release()
+	src.PrepareDmabuf(a)
+	src.PrepareDmabuf(b)
+	sess.land(t, src, nil)
+	select {
+	case <-sess.started:
+		t.Fatal("a second copy started while one ran")
+	default:
+	}
+	if _, ok := src.FillDmabuf(a); !ok {
+		t.Fatal("the prepared frame did not go out")
+	}
+}
+
+// A copy waiting on a still window takes its frame from a new session
+// after the refresh, so the stream keeps sending what the window shows.
+func TestWindowSourceRefreshesAStillWindow(t *testing.T) {
+	src, sess, _ := newWindowHarness(t)
+	t.Cleanup(src.Close)
+	src.refresh = 10 * time.Millisecond
+	a, err := src.AllocDmabuf()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Release()
+	src.FillDmabuf(a)
+	<-sess.started
+	select {
+	case <-sess.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the copy was not restarted for the refresh")
+	}
+	src.mu.Lock()
+	src.refresh = time.Hour
+	src.mu.Unlock()
+	sess.mu.Lock()
+	opened, closes := sess.opened, sess.closes
+	sess.mu.Unlock()
+	if opened < 2 || closes < 1 {
+		t.Fatalf("opened %d, closed %d, want a new session", opened, closes)
+	}
+	drained := false
+	for !drained {
+		select {
+		case <-sess.started:
+		default:
+			drained = true
+		}
+	}
+	sess.results <- nil
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		if _, ok := src.FillDmabuf(a); ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the refreshed frame did not go out")
+		}
 	}
 }
