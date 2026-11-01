@@ -375,3 +375,134 @@ func TestGiB(t *testing.T) {
 		t.Errorf("GiB = %q, want 3.0", got)
 	}
 }
+
+func TestCPUReaderKeepsItsSensorWhileItReads(t *testing.T) {
+	fakeProc(t, "cpu 1 0 0 0\n", "")
+	fakeSys(t, map[string]string{
+		"class/hwmon/hwmon0/name":        "coretemp\n",
+		"class/hwmon/hwmon0/temp1_label": "Package id 0\n",
+		"class/hwmon/hwmon0/temp1_input": "40000\n",
+	})
+	write := func(name, content string) {
+		t.Helper()
+		path := filepath.Join(SysRoot, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := &CPUReader{Sensor: "auto"}
+	read := func() (float32, bool) {
+		t.Helper()
+		cpu, err := r.Read()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cpu.TemperatureC, cpu.HasTemperature
+	}
+	if temp, ok := read(); !ok || temp != 40 {
+		t.Fatalf("first read = %v %v", temp, ok)
+	}
+	write("class/hwmon/hwmon1/name", "k10temp\n")
+	write("class/hwmon/hwmon1/temp1_label", "Tctl\n")
+	write("class/hwmon/hwmon1/temp1_input", "70000\n")
+	write("class/hwmon/hwmon0/temp1_input", "41000\n")
+	if temp, ok := read(); !ok || temp != 41 {
+		t.Errorf("second read = %v %v, want the sensor already found, updated, with no rescan", temp, ok)
+	}
+	if err := os.Remove(filepath.Join(SysRoot, "class/hwmon/hwmon0/temp1_input")); err != nil {
+		t.Fatal(err)
+	}
+	if temp, ok := read(); !ok || temp != 70 {
+		t.Errorf("after the sensor went away = %v %v, want a rescan to find Tctl's 70", temp, ok)
+	}
+}
+
+func TestCPUReaderLooksAgainUntilASensorAppears(t *testing.T) {
+	fakeProc(t, "cpu 1 0 0 0\n", "")
+	fakeSys(t, map[string]string{"class/hwmon/hwmon0/name": "nvme\n"})
+	r := &CPUReader{Sensor: "auto"}
+	cpu, err := r.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpu.HasTemperature {
+		t.Fatalf("no sensor reads %v", cpu.TemperatureC)
+	}
+	dir := filepath.Join(SysRoot, "class/hwmon/hwmon1")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{"name": "coretemp\n", "temp1_label": "Package id 0\n", "temp1_input": "52000\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if cpu, err = r.Read(); err != nil || !cpu.HasTemperature || cpu.TemperatureC != 52 {
+		t.Errorf("after the sensor appeared = %+v, %v", cpu, err)
+	}
+}
+
+func TestCPUReaderReusesItsCoreStorage(t *testing.T) {
+	fakeProc(t, "cpu 1 0 0 0\ncpu0 1 0 0 0\ncpu1 2 0 0 0\n", "")
+	fakeSys(t, map[string]string{})
+	r := &CPUReader{Sensor: "auto"}
+	for range 2 {
+		if _, err := r.Read(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first := r.prev.Cores
+	if _, err := r.Read(); err != nil {
+		t.Fatal(err)
+	}
+	if &r.spare[0] != &first[0] {
+		t.Error("the previous counters' storage is not kept for the next read")
+	}
+	if got := r.prev.Cores; got[0].Work != 1 || got[1].Work != 2 {
+		t.Errorf("cores = %+v", got)
+	}
+}
+
+func TestReadMemoryNamesWhatIsWrong(t *testing.T) {
+	fakeProc(t, "", "MemTotal: 100 kB\nMemAvailable: 50 kB\nSwapFree: 1 kB\n")
+	if _, err := ReadMemory(); err == nil || !strings.Contains(err.Error(), "misses SwapTotal") {
+		t.Errorf("missing line: %v", err)
+	}
+	fakeProc(t, "", "MemTotal: lots kB\n")
+	if _, err := ReadMemory(); err == nil || !strings.Contains(err.Error(), "MemTotal") {
+		t.Errorf("bad number: %v", err)
+	}
+	fakeProc(t, "", "MemTotalish: 1 kB\nMemTotal:\nMemAvailable: 2 kB\nSwapTotal: 3 kB\nSwapFree: 4 kB\n")
+	if _, err := ReadMemory(); err == nil || !strings.Contains(err.Error(), "misses MemTotal") {
+		t.Errorf("a line with no value, or a longer name, counted as MemTotal: %v", err)
+	}
+}
+
+func TestReadUint(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "attr")
+	for _, tc := range []struct {
+		body string
+		want uint64
+		ok   bool
+	}{
+		{"3400000\n", 3400000, true},
+		{"", 0, false},
+		{"  \n", 0, false},
+		{"12a\n", 0, false},
+		{"-1\n", 0, false},
+	} {
+		if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := readUint(path)
+		if (err == nil) != tc.ok || got != tc.want {
+			t.Errorf("readUint(%q) = %d, %v", tc.body, got, err)
+		}
+	}
+	if _, err := readUint(path + ".missing"); err == nil {
+		t.Error("missing attribute: want an error")
+	}
+}

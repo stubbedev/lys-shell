@@ -11,3 +11,21 @@ func BenchmarkCPURead(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkReadMemory(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := ReadMemory(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkReadNetTotals(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := ReadNetTotals(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

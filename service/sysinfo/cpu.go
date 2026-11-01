@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/sys/unix"
 )
 
 // CPUTimes is one /proc/stat cpu line reduced the way the sysinfo
@@ -29,16 +30,21 @@ type CPUStat struct {
 	Cores  []CPUTimes
 }
 
-// ReadCPUStat parses /proc/stat's cpu lines in place: the poll runs
+// ReadCPUStat parses /proc/stat's cpu lines in place.
+func ReadCPUStat() (CPUStat, error) {
+	return readCPUStat(nil)
+}
+
+// readCPUStat is ReadCPUStat with cores' storage to reuse: the poll runs
 // every couple of seconds for the life of the bar, so a line costs no
 // allocation beyond the scanner's buffer.
-func ReadCPUStat() (CPUStat, error) {
+func readCPUStat(cores []CPUTimes) (CPUStat, error) {
 	file, err := os.Open(filepath.Join(ProcRoot, "stat"))
 	if err != nil {
 		return CPUStat{}, fmt.Errorf("sysinfo: %w", err)
 	}
 	defer file.Close()
-	var stat CPUStat
+	stat := CPUStat{Cores: cores[:0]}
 	found := false
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -103,11 +109,11 @@ func parseDecimal(b []byte) (uint64, error) {
 	var n uint64
 	for _, c := range b {
 		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("%q is not a decimal number", b)
+			return 0, fmt.Errorf("%q is not a decimal number", string(b))
 		}
 		d := uint64(c - '0')
 		if n > (math.MaxUint64-d)/10 {
-			return 0, fmt.Errorf("%q overflows 64 bits", b)
+			return 0, fmt.Errorf("%q overflows 64 bits", string(b))
 		}
 		n = n*10 + d
 	}
@@ -142,11 +148,16 @@ func Usage(prev, cur CPUTimes) float32 {
 // its cores, so a machine without cpufreq reads /proc/cpuinfo once per
 // poll, not once per core.
 func CoreFrequencyMHz(core int, cpuinfo func() uint64) uint64 {
-	path := filepath.Join(SysRoot, "devices/system/cpu", "cpu"+strconv.Itoa(core), "cpufreq/scaling_cur_freq")
-	if line, ok := readLineOK(path); ok {
-		if khz, err := strconv.ParseUint(line, 10, 64); err == nil {
-			return khz / 1000
-		}
+	return frequencyMHz(coreFrequencyPath(core), cpuinfo)
+}
+
+func coreFrequencyPath(core int) string {
+	return filepath.Join(SysRoot, "devices/system/cpu", "cpu"+strconv.Itoa(core), "cpufreq/scaling_cur_freq")
+}
+
+func frequencyMHz(path string, cpuinfo func() uint64) uint64 {
+	if khz, err := readUint(path); err == nil {
+		return khz / 1000
 	}
 	return cpuinfo()
 }
@@ -195,13 +206,20 @@ type CPU struct {
 // poll loop keeps its System.
 type CPUReader struct {
 	prev CPUStat
+	// spare is the older counters' storage, for the next read.
+	spare []CPUTimes
+	// frequencyPaths are the cores' cpufreq attributes, built once.
+	frequencyPaths []string
+	// sensorPath is the input the last lookup settled on: scanning hwmon
+	// costs hundreds of syscalls, so only a failed read scans again.
+	sensorPath string
 	// Sensor is the temp-sensor key: "auto" or a label substring.
 	Sensor string
 }
 
 // Read samples the counters, frequencies, and temperature.
 func (r *CPUReader) Read() (CPU, error) {
-	stat, err := ReadCPUStat()
+	stat, err := readCPUStat(r.spare)
 	if err != nil {
 		return CPU{}, err
 	}
@@ -214,7 +232,7 @@ func (r *CPUReader) Read() (CPU, error) {
 		if i < len(r.prev.Cores) {
 			prev = r.prev.Cores[i]
 		}
-		core := Core{UsagePercent: Usage(prev, cur), FrequencyMHz: CoreFrequencyMHz(i, cpuinfo)}
+		core := Core{UsagePercent: Usage(prev, cur), FrequencyMHz: frequencyMHz(r.frequencyPath(i), cpuinfo)}
 		out.Cores = append(out.Cores, core)
 		sum += core.FrequencyMHz
 		out.MaxFrequencyMHz = max(out.MaxFrequencyMHz, core.FrequencyMHz)
@@ -227,9 +245,30 @@ func (r *CPUReader) Read() (CPU, error) {
 		out.AvgFrequencyMHz = sum / uint64(n)
 		out.BusiestCoreFreqMHz = out.Cores[busiest].FrequencyMHz
 	}
-	r.prev = stat
-	out.TemperatureC, out.HasTemperature = CPUTemperature(r.Sensor)
+	r.spare, r.prev = r.prev.Cores, stat
+	out.TemperatureC, out.HasTemperature = r.temperature()
 	return out, nil
+}
+
+func (r *CPUReader) frequencyPath(core int) string {
+	for len(r.frequencyPaths) <= core {
+		r.frequencyPaths = append(r.frequencyPaths, coreFrequencyPath(len(r.frequencyPaths)))
+	}
+	return r.frequencyPaths[core]
+}
+
+// temperature reads the input the last lookup settled on, and looks
+// again when it no longer reads, or when no lookup has found one yet.
+func (r *CPUReader) temperature() (float32, bool) {
+	if r.sensorPath != "" {
+		if temp, ok := readMilliCelsius(r.sensorPath); ok {
+			return temp, true
+		}
+	}
+	var temp float32
+	var ok bool
+	r.sensorPath, temp, ok = findSensor(r.Sensor)
+	return temp, ok
 }
 
 // cpuTempPatterns are CPU_TEMP_PATTERNS, tried in order for "auto".
@@ -290,30 +329,39 @@ func sensorInputs() []sensorInput {
 // sharing a label the first that reads is the sensor. Without any
 // hwmon sensor, thermal_zone0 stands in, unlabeled.
 func CPUTemperature(sensor string) (float32, bool) {
+	_, temp, ok := findSensor(sensor)
+	return temp, ok
+}
+
+// findSensor is CPUTemperature, also naming the input that answered.
+func findSensor(sensor string) (path string, temp float32, ok bool) {
 	inputs := sensorInputs()
-	find := func(pattern string) (float32, bool) {
+	find := func(pattern string) (string, float32, bool) {
 		for _, in := range inputs {
 			if !strings.Contains(strings.ToLower(in.label), pattern) {
 				continue
 			}
 			if temp, ok := readMilliCelsius(in.path); ok {
-				return temp, true
+				return in.path, temp, true
 			}
 		}
 		if pattern == "" {
-			return readMilliCelsius(filepath.Join(SysRoot, "class/thermal/thermal_zone0/temp"))
+			zone := filepath.Join(SysRoot, "class/thermal/thermal_zone0/temp")
+			if temp, ok := readMilliCelsius(zone); ok {
+				return zone, temp, true
+			}
 		}
-		return 0, false
+		return "", 0, false
 	}
 	if sensor != "auto" {
 		return find(strings.ToLower(sensor))
 	}
 	for _, p := range cpuTempPatterns {
-		if t, ok := find(p); ok {
-			return t, true
+		if path, temp, ok := find(p); ok {
+			return path, temp, true
 		}
 	}
-	return 0, false
+	return "", 0, false
 }
 
 func readMilliCelsius(path string) (float32, bool) {
@@ -329,33 +377,63 @@ func readLine(path string) string {
 	return s
 }
 
-// readLineOK reads a small sysfs or procfs attribute, trailing
-// whitespace trimmed; false when it cannot be opened or read. A stack
-// buffer takes the usual few bytes in one read: sysfs files stat as a
-// page, so os.ReadFile would stat and allocate 4 KiB for each.
-func readLineOK(path string) (string, bool) {
-	f, err := os.Open(path) //nolint:gosec // a sysfs/procfs path under the roots
+// readInto reads path until EOF or buf is full, with no *os.File: that
+// would stat every attribute it opens. It is for procfs and sysfs files,
+// which stat as a page whatever they hold.
+func readInto(path string, buf []byte) (int, error) {
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return "", false
+		return 0, fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
-	var buf [128]byte
+	defer unix.Close(fd) //nolint:errcheck // a read-only attribute
 	n := 0
 	for n < len(buf) {
-		m, err := f.Read(buf[n:])
+		m, err := unix.Read(fd, buf[n:])
+		switch {
+		case errors.Is(err, unix.EINTR):
+			continue
+		case err != nil:
+			return n, fmt.Errorf("read %s: %w", path, err)
+		case m == 0:
+			return n, nil
+		}
 		n += m
-		if errors.Is(err, io.EOF) {
-			return trimLine(buf[:n]), true
-		}
-		if err != nil {
-			return "", false
-		}
 	}
-	rest, err := io.ReadAll(f)
+	return n, nil
+}
+
+// readUint reads a sysfs attribute holding one decimal number.
+func readUint(path string) (uint64, error) {
+	var buf [32]byte
+	n, err := readInto(path, buf[:])
+	if err != nil {
+		return 0, err
+	}
+	line := bytes.TrimSpace(buf[:n])
+	if len(line) == 0 {
+		return 0, fmt.Errorf("%s is empty", path)
+	}
+	return parseDecimal(line)
+}
+
+// readLineOK reads a small sysfs or procfs attribute, trailing
+// whitespace trimmed; false when it cannot be opened or read. A stack
+// buffer takes the usual few bytes: only one that fills it is read again
+// whole.
+func readLineOK(path string) (string, bool) {
+	var buf [128]byte
+	n, err := readInto(path, buf[:])
 	if err != nil {
 		return "", false
 	}
-	return trimLine(append(buf[:n:n], rest...)), true
+	if n < len(buf) {
+		return trimLine(buf[:n]), true
+	}
+	whole, err := os.ReadFile(path) //nolint:gosec // a sysfs/procfs path under the roots
+	if err != nil {
+		return "", false
+	}
+	return trimLine(whole), true
 }
 
 // trimLine is b as a string without its trailing whitespace.

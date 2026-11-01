@@ -4,12 +4,10 @@
 package sysinfo
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 // ProcRoot and SysRoot are the procfs and sysfs mounts; tests repoint
@@ -27,56 +25,57 @@ type Memory struct {
 	SwapFree  uint64
 }
 
-// ReadMemory parses the meminfo totals.
+// memFields are the meminfo lines Memory holds.
+var memFields = [...]struct {
+	name  string
+	field func(*Memory) *uint64
+}{
+	{"MemTotal", func(m *Memory) *uint64 { return &m.Total }},
+	{"MemAvailable", func(m *Memory) *uint64 { return &m.Available }},
+	{"SwapTotal", func(m *Memory) *uint64 { return &m.SwapTotal }},
+	{"SwapFree", func(m *Memory) *uint64 { return &m.SwapFree }},
+}
+
+// ReadMemory parses the meminfo totals in place. All four lines sit in
+// the file's first page; one that does not is an error, not a zero.
 func ReadMemory() (Memory, error) {
-	file, err := os.Open(filepath.Join(ProcRoot, "meminfo"))
+	var buf [4096]byte
+	n, err := readInto(filepath.Join(ProcRoot, "meminfo"), buf[:])
 	if err != nil {
-		return Memory{}, fmt.Errorf("sysinfo: %w", err)
+		return Memory{}, fmt.Errorf("sysinfo: read meminfo: %w", err)
 	}
-	defer file.Close()
-	want := map[string]*uint64{
-		"MemTotal":     new(uint64),
-		"MemAvailable": new(uint64),
-		"SwapTotal":    new(uint64),
-		"SwapFree":     new(uint64),
-	}
-	seen := map[string]bool{}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		name, rest, found := strings.Cut(line, ":")
+	var mem Memory
+	var seen [len(memFields)]bool
+	for data := buf[:n]; len(data) > 0; {
+		var line []byte
+		line, data, _ = bytes.Cut(data, []byte{'\n'})
+		name, rest, found := bytes.Cut(line, []byte{':'})
 		if !found {
 			continue
 		}
-		target, ok := want[name]
-		if !ok {
-			continue
-		}
-		fields := strings.Fields(rest)
-		if len(fields) == 0 {
-			continue
-		}
-		kb, err := strconv.ParseUint(fields[0], 10, 64)
-		if err != nil {
-			return Memory{}, fmt.Errorf("sysinfo: meminfo %s: %w", name, err)
-		}
-		*target = kb * 1024
-		seen[name] = true
-	}
-	if err := scanner.Err(); err != nil {
-		return Memory{}, fmt.Errorf("sysinfo: read /proc/meminfo: %w", err)
-	}
-	for name := range want {
-		if !seen[name] {
-			return Memory{}, fmt.Errorf("sysinfo: meminfo misses %s", name)
+		for i := range memFields {
+			if string(name) != memFields[i].name {
+				continue
+			}
+			field, _ := nextField(rest)
+			if len(field) == 0 {
+				break
+			}
+			kb, err := parseDecimal(field)
+			if err != nil {
+				return Memory{}, fmt.Errorf("sysinfo: meminfo %s: %w", memFields[i].name, err)
+			}
+			*memFields[i].field(&mem) = kb * 1024
+			seen[i] = true
+			break
 		}
 	}
-	return Memory{
-		Total:     *want["MemTotal"],
-		Available: *want["MemAvailable"],
-		SwapTotal: *want["SwapTotal"],
-		SwapFree:  *want["SwapFree"],
-	}, nil
+	for i := range memFields {
+		if !seen[i] {
+			return Memory{}, fmt.Errorf("sysinfo: meminfo misses %s", memFields[i].name)
+		}
+	}
+	return mem, nil
 }
 
 // Used returns total minus available (sysinfo's definition).
