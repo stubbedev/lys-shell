@@ -189,3 +189,35 @@ func TestOpenWithoutAColourProtocol(t *testing.T) {
 		t.Errorf("Open = %v, want ErrUnsupported", err)
 	}
 }
+
+// An ease is a run of fractional strengths through Apply, each of which
+// reaches the display on either protocol, ending back at the identity
+// when the filter lets go.
+func TestAnEaseReachesTheDisplayOnEitherProtocol(t *testing.T) {
+	night := mustSetting(t, 3000, 80)
+	for _, tc := range []struct {
+		name       string
+		ctm, gamma bool
+		want       func(*compositor, Setting) func() error
+	}{
+		{"ctm", true, false, func(c *compositor, s Setting) func() error { return wantMatrix(c, "DP-1", s.Matrix()) }},
+		{"gamma", false, true, func(c *compositor, s Setting) func() error { return wantRamps(c, "DP-1", s.Ramps(c.gammaSize)) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp := newCompositor(t, tc.ctm, tc.gamma)
+			comp.addOutput("DP-1")
+			f, _ := openFilter(t)
+			for _, fraction := range []float64{0.25, 0.5, 0.75, 1} {
+				s := night.eased(fraction)
+				if err := f.Apply(s); err != nil {
+					t.Fatal(err)
+				}
+				eventually(t, tc.name+" step", tc.want(comp, s))
+			}
+			if err := f.Clear(); err != nil {
+				t.Fatal(err)
+			}
+			eventually(t, "identity after Clear", wantIdentity(comp, "DP-1"))
+		})
+	}
+}

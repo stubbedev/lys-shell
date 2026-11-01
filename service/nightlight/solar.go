@@ -1,16 +1,56 @@
 // Package nightlight is the night light module's service side: the
 // colour filter it applies through the compositor's CTM or gamma
-// protocol, the sunrise/sunset schedule (NOAA sunrise equation, no
-// network), the GeoClue location lookup, and the manual-override record
-// that survives restarts.
+// protocol, the dawn/dusk schedule (NOAA sunrise equation, no network)
+// and its easing, the GeoClue location lookup, and the records that
+// survive restarts.
 package nightlight
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"time"
 )
 
-// Phase is whether the sun is up at a place and time.
+// civilTwilightAltitude is the solar altitude of civil dawn and dusk, in
+// degrees: the event the schedule anchors to.
+const civilTwilightAltitude = -6.0
+
+// ErrNullIsland is the coordinates 0, 0: open water no machine sits on,
+// and the value an unset coordinate used to default to, so it is never
+// taken for a position.
+var ErrNullIsland = errors.New("nightlight: the coordinates 0, 0 are not a position")
+
+// Location is a position in decimal degrees, north and east positive.
+// NewLocation is the only way to build one, so every Location is on the
+// globe and not 0, 0.
+type Location struct {
+	latitude  float64
+	longitude float64
+}
+
+// NewLocation validates the coordinates, refusing NaN, anything off the
+// globe, and ErrNullIsland.
+func NewLocation(latitude, longitude float64) (Location, error) {
+	if !(latitude >= -90 && latitude <= 90) {
+		return Location{}, fmt.Errorf("nightlight: latitude %v is outside -90 to 90", latitude)
+	}
+	if !(longitude >= -180 && longitude <= 180) {
+		return Location{}, fmt.Errorf("nightlight: longitude %v is outside -180 to 180", longitude)
+	}
+	if latitude == 0 && longitude == 0 {
+		return Location{}, ErrNullIsland
+	}
+	return Location{latitude: latitude, longitude: longitude}, nil
+}
+
+// Latitude is the latitude in decimal degrees, north positive.
+func (l Location) Latitude() float64 { return l.latitude }
+
+// Longitude is the longitude in decimal degrees, east positive.
+func (l Location) Longitude() float64 { return l.longitude }
+
+// Phase is whether the sun is above civil twilight at a place and time.
 type Phase uint8
 
 // Solar phases.
@@ -30,25 +70,41 @@ func (p Phase) String() string {
 	return "none"
 }
 
-// sunTimes is one date's outcome: a sunrise/sunset pair, or the sun
-// never setting or never rising.
+// sunTimes is one solar day's outcome at an altitude: the solar noon
+// and the sun's crossings of the altitude, or the sun never going below
+// it or never above it.
 type sunTimes struct {
-	sunrise, sunset time.Time
-	polarDay        bool
-	polarNight      bool
+	noon       time.Time
+	rise, set  time.Time
+	polarDay   bool
+	polarNight bool
 }
 
-// PhaseAt is solar.rs phase_at: day between sunrise and sunset of now's
-// UTC date, night otherwise; polar day is day and polar night is night.
-// Latitude and longitude are decimal degrees, north and east positive.
-func PhaseAt(now time.Time, latitude, longitude float64) Phase {
-	st := sunTimesFor(now, latitude, longitude)
+// solarDayAt is the civil solar day now belongs to, the one whose solar
+// noon is nearest: a UTC date's day spills across midnight away from
+// Greenwich, so the date alone can name the wrong one.
+func solarDayAt(now time.Time, loc Location) sunTimes {
+	nearest := sunTimesFor(now, loc.latitude, loc.longitude, civilTwilightAltitude)
+	for _, days := range []time.Duration{-24, 24} {
+		st := sunTimesFor(now.Add(days*time.Hour), loc.latitude, loc.longitude, civilTwilightAltitude)
+		if st.noon.Sub(now).Abs() < nearest.noon.Sub(now).Abs() {
+			nearest = st
+		}
+	}
+	return nearest
+}
+
+// PhaseAt is day from civil dawn up to civil dusk of the solar day now
+// belongs to, night otherwise; polar day is day and polar night is
+// night.
+func PhaseAt(now time.Time, loc Location) Phase {
+	st := solarDayAt(now, loc)
 	switch {
 	case st.polarDay:
 		return PhaseDay
 	case st.polarNight:
 		return PhaseNight
-	case !now.Before(st.sunrise) && now.Before(st.sunset):
+	case !now.Before(st.rise) && now.Before(st.set):
 		return PhaseDay
 	}
 	return PhaseNight
@@ -70,8 +126,9 @@ func radians(deg float64) float64 { return deg * math.Pi / 180 }
 
 func degrees(rad float64) float64 { return rad * 180 / math.Pi }
 
-// sunTimesFor is solar.rs sun_times, step for step.
-func sunTimesFor(now time.Time, latitude, longitude float64) sunTimes {
+// sunTimesFor is solar.rs sun_times, step for step, at any solar
+// altitude in degrees.
+func sunTimesFor(now time.Time, latitude, longitude, altitude float64) sunTimes {
 	utc := now.UTC()
 	midnight := time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC)
 	daysFromCE := float64(midnight.Unix()/86400 + unixEpochDaysFromCE)
@@ -107,16 +164,22 @@ func sunTimesFor(now time.Time, latitude, longitude float64) sunTimes {
 	sinDecl := math.Sin(lambdaRad) * math.Sin(radians(23.4397))
 	decl := math.Asin(sinDecl)
 
-	// Hour angle (with -0.833 degrees for refraction + solar disc radius).
+	noon, okNoon := julianToUTC(jTransit)
+	if !okNoon {
+		// Numerically degenerate: the safer "day" keeps the filter off.
+		return sunTimes{polarDay: true}
+	}
+
+	// Hour angle at the altitude.
 	latRad := radians(latitude)
-	cosOmega := (math.Sin(radians(-0.833)) - math.Sin(latRad)*math.Sin(decl)) /
+	cosOmega := (math.Sin(radians(altitude)) - math.Sin(latRad)*math.Sin(decl)) /
 		(math.Cos(latRad) * math.Cos(decl))
 
 	if cosOmega < -1.0 {
-		return sunTimes{polarDay: true} // sun never sets
+		return sunTimes{noon: noon, polarDay: true} // never goes below
 	}
 	if cosOmega > 1.0 {
-		return sunTimes{polarNight: true} // sun never rises
+		return sunTimes{noon: noon, polarNight: true} // never comes above
 	}
 
 	omega := degrees(math.Acos(cosOmega))
@@ -126,10 +189,9 @@ func sunTimesFor(now time.Time, latitude, longitude float64) sunTimes {
 	rise, okRise := julianToUTC(jRise)
 	set, okSet := julianToUTC(jSet)
 	if !okRise || !okSet {
-		// Numerically degenerate: the safer "day" keeps the filter off.
-		return sunTimes{polarDay: true}
+		return sunTimes{noon: noon, polarDay: true}
 	}
-	return sunTimes{sunrise: rise, sunset: set}
+	return sunTimes{noon: noon, rise: rise, set: set}
 }
 
 // julianToUTC converts a Julian Date to a UTC instant, rounded to the

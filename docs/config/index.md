@@ -59,7 +59,7 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 | [`microphone`](/config/modules/microphone) | Microphone input level and mute toggle. |
 | [`netstat`](/config/modules/netstat) | Network traffic counters (up/down rates). |
 | [`network`](/config/modules/network) | Network connection status with a dropdown for switching connections. |
-| [`nightlight`](/config/modules/nightlight) | Night light: warms the display colours, by hand or on a sunrise/sunset schedule. |
+| [`nightlight`](/config/modules/nightlight) | Night light: warms the display colours, by hand or on a dawn/dusk schedule. |
 | [`niri-workspaces`](/config/modules/niri-workspaces) | Niri workspace indicators with click-to-switch. |
 | [`notifications`](/config/modules/notifications) | Notification center: icon in the bar, dropdown with history, DND toggle. |
 | [`power`](/config/modules/power) | Shutdown, reboot, and logout menu. |

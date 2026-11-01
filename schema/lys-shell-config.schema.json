@@ -5449,14 +5449,15 @@
             "label-color": "yellow",
             "label-max-length": 0,
             "label-show": true,
-            "latitude": 0.0,
+            "latitude": null,
             "left-click": ":toggle",
-            "longitude": 0.0,
+            "longitude": null,
             "middle-click": "",
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
-            "temperature": 5000
+            "temperature": 5000,
+            "transition-duration": 15
           },
           "description": "Night light (blue light filter) module."
         },
@@ -6157,12 +6158,12 @@
       "type": "object"
     },
     "NightlightConfig": {
-      "description": "Night light: warms the display colours, by hand or on a sunrise/sunset schedule.",
+      "description": "Night light: warms the display colours, by hand or on a dawn/dusk schedule.",
       "properties": {
         "auto-schedule": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "Automatically enable the filter at night and disable it during the day,\nbased on local sunrise/sunset computed from `latitude`/`longitude`.\n\nWhile enabled, the module drives the filter on the solar schedule. A\nmanual click toggles an override that lasts until the next sunrise or\nsunset, after which the schedule resumes."
+          "description": "Automatically ease the filter on at dusk and off at dawn, following the\nsun at the machine's location.\n\nThe schedule anchors to civil dawn and civil dusk, when the sun is 6\ndegrees below the horizon, with each transition centred on the event.\nWhere the sun never crosses that line (polar day and polar night) the\nfilter stays off or on with no transition.\n\nThe location comes from GeoClue, unless `latitude` and `longitude` are\nboth set: explicit coordinates win, and GeoClue is then never asked. A\nspelled-out 0, 0 counts as unset. The last GeoClue fix is remembered in\nthe state directory. With no location at all, or with only one coordinate\nor one off the globe, the schedule does not run: the module says why in\nits tooltip and in the log, and the filter stays as it is.\n\nA manual click cancels a running transition, applies at once, and holds\nuntil the next transition begins, after which the schedule resumes."
         },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -6230,9 +6231,9 @@
           "description": "Display label."
         },
         "latitude": {
-          "$ref": "#/$defs/double",
-          "default": 0.0,
-          "description": "Latitude for the sunrise/sunset schedule, in decimal degrees\n(north positive). Range: -90 to 90. Only used when `auto-schedule` is on."
+          "$ref": "#/$defs/Nullable_double",
+          "default": null,
+          "description": "Latitude for the schedule, in decimal degrees (north positive). Range: -90\nto 90. Unset uses GeoClue. Set together with `longitude`, it overrides\nGeoClue. Only used when `auto-schedule` is on."
         },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
@@ -6240,9 +6241,9 @@
           "description": "Action on left click. Default toggles blue light filter."
         },
         "longitude": {
-          "$ref": "#/$defs/double",
-          "default": 0.0,
-          "description": "Longitude for the sunrise/sunset schedule, in decimal degrees\n(east positive). Range: -180 to 180. Only used when `auto-schedule` is on."
+          "$ref": "#/$defs/Nullable_double",
+          "default": null,
+          "description": "Longitude for the schedule, in decimal degrees (east positive). Range:\n-180 to 180. Unset uses GeoClue. Set together with `latitude`, it overrides\nGeoClue. Only used when `auto-schedule` is on."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
@@ -6268,9 +6269,21 @@
           "$ref": "#/$defs/uint32",
           "default": 5000,
           "description": "Color temperature in Kelvin when filter is enabled. Range: 1000-20000."
+        },
+        "transition-duration": {
+          "$ref": "#/$defs/NightlightTransition",
+          "default": 15,
+          "description": "Length of the transition between day and night, in whole minutes, centred\non civil dawn or dusk. 0 switches at once. Range: 0-120."
         }
       },
       "type": "object"
+    },
+    "NightlightTransition": {
+      "description": "Night light transition length in whole minutes, 0 for an instant switch.",
+      "format": "uint32",
+      "maximum": 120,
+      "minimum": 0,
+      "type": "integer"
     },
     "NiriWorkspacesConfig": {
       "description": "Niri workspace indicators with click-to-switch.",
@@ -6653,6 +6666,13 @@
         {
           "type": "null"
         }
+      ]
+    },
+    "Nullable_double": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
       ]
     },
     "Nullable_string": {
@@ -10451,14 +10471,15 @@
           "label-color": "yellow",
           "label-max-length": 0,
           "label-show": true,
-          "latitude": 0.0,
+          "latitude": null,
           "left-click": ":toggle",
-          "longitude": 0.0,
+          "longitude": null,
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
-          "temperature": 5000
+          "temperature": 5000,
+          "transition-duration": 15
         },
         "niri-workspaces": {
           "active-color": "accent",

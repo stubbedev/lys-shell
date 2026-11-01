@@ -38,6 +38,7 @@ bar-keybind-mode-default = par défaut
 ## Night light
 bar-nightlight-on = Activé
 bar-nightlight-off = Désactivé
+bar-nightlight-no-location = Planification auto suspendue, aucune position : { $reason }
 
 ## Stockage
 bar-storage-multiple = Multiple

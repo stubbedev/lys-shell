@@ -239,8 +239,9 @@ func nightlightPage(*config.Config) pageSpec {
 		}},
 		{title: "settings-section-nightlight-schedule", rows: []rowSpec{
 			field("modules.nightlight.auto-schedule"),
-			field("modules.nightlight.latitude", spin(-90.0, 90.0, 0.1, 4)),
-			field("modules.nightlight.longitude", spin(-180.0, 180.0, 0.1, 4)),
+			field("modules.nightlight.transition-duration"),
+			field("modules.nightlight.latitude", optionalFloat(-90.0, 90.0, 0.1, 4)),
+			field("modules.nightlight.longitude", optionalFloat(-180.0, 180.0, 0.1, 4)),
 		}},
 		barDisplaySection("modules.nightlight"),
 		colorsSection("modules.nightlight"),

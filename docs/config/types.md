@@ -872,6 +872,14 @@ Per-monitor wallpaper configuration.
 | `fit-mode` | Image scaling mode for this monitor. |
 | `wallpaper` | Wallpaper image path for this monitor. |
 
+## NightlightTransition {#nightlight-transition}
+
+Night light transition length in whole minutes, 0 for an instant switch.
+
+Number in `[0, 120]`.
+
+Serialises as `uint32`.
+
 ## NormalizedF64 {#normalized-f64}
 
 Floating-point value clamped to 0.0-1.0.

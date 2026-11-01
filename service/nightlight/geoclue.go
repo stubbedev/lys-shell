@@ -25,17 +25,11 @@ const (
 	fixTimeout = 15 * time.Second
 )
 
-// Location is a resolved position in decimal degrees.
-type Location struct {
-	Latitude  float64
-	Longitude float64
-}
-
 // QueryLocation resolves the position once over GeoClue2 on conn (the
 // system bus in the shell): get a client, set DesktopId and the city
 // accuracy, start it, and take the first LocationUpdated. Any failure
-// (no daemon, no agent, denied, timeout) is an error the caller treats
-// as "use the configured coordinates".
+// (no daemon, no agent, denied, timeout, a fix of 0, 0) is an error,
+// which leaves the schedule on the last location it had, or on none.
 func QueryLocation(ctx context.Context, conn *dbus.Conn) (Location, error) {
 	return queryLocation(ctx, conn, fixTimeout)
 }
@@ -75,7 +69,7 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, timeout time.Duration) 
 	for {
 		select {
 		case <-ctx.Done():
-			return Location{}, ctx.Err()
+			return Location{}, fmt.Errorf("geoclue: wait for a location fix: %w", ctx.Err())
 		case <-deadline.C:
 			return Location{}, errors.New("geoclue: location fix timed out")
 		case sig := <-signals:
@@ -93,17 +87,29 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, timeout time.Duration) 
 
 // readLocation reads the Latitude and Longitude of a Location object.
 func readLocation(ctx context.Context, obj dbus.BusObject) (Location, error) {
-	var loc Location
-	for prop, dest := range map[string]*float64{"Latitude": &loc.Latitude, "Longitude": &loc.Longitude} {
-		var v dbus.Variant
-		if err := obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, geoclueLocation, prop).Store(&v); err != nil {
-			return Location{}, fmt.Errorf("geoclue: %s: %w", prop, err)
-		}
-		f, ok := v.Value().(float64)
-		if !ok {
-			return Location{}, fmt.Errorf("geoclue: %s is %T, want a double", prop, v.Value())
-		}
-		*dest = f
+	latitude, err := readCoordinate(ctx, obj, "Latitude")
+	if err != nil {
+		return Location{}, err
+	}
+	longitude, err := readCoordinate(ctx, obj, "Longitude")
+	if err != nil {
+		return Location{}, err
+	}
+	loc, err := NewLocation(latitude, longitude)
+	if err != nil {
+		return Location{}, fmt.Errorf("geoclue: %w", err)
 	}
 	return loc, nil
+}
+
+func readCoordinate(ctx context.Context, obj dbus.BusObject, prop string) (float64, error) {
+	var v dbus.Variant
+	if err := obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, geoclueLocation, prop).Store(&v); err != nil {
+		return 0, fmt.Errorf("geoclue: %s: %w", prop, err)
+	}
+	f, ok := v.Value().(float64)
+	if !ok {
+		return 0, fmt.Errorf("geoclue: %s is %T, want a double", prop, v.Value())
+	}
+	return f, nil
 }

@@ -362,7 +362,7 @@ var thresholdList = cardRow(cardSpec{
 // thresholdBound is the override switch and spin over an optional
 // bound (optional_number_f64_widget at whole numbers).
 func thresholdBound(k *kit, s slot) control {
-	return newOptionalNumber(k, s, 0, maxThreshold, 1, thresholdFallback)
+	return newOptionalNumber(k, s, 0, maxThreshold, 1, thresholdFallback, 0)
 }
 
 // thresholdTitle is card_title: the range the entry covers, or its

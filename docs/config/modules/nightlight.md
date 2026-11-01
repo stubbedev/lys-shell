@@ -7,7 +7,7 @@ outline: [2, 3]
 
 <div v-pre>
 
-Night light: warms the display colours, by hand or on a sunrise/sunset schedule.
+Night light: warms the display colours, by hand or on a dawn/dusk schedule.
 
 Add it to your layout with `nightlight`:
 
@@ -25,9 +25,10 @@ bar:
 | `format` | string | `"{{ status }}"` | Format string for the label. |
 | `temperature` | u32 | `5000` | Color temperature in Kelvin when filter is enabled. Range: 1000-20000. |
 | `gamma` | u32 | `100` | Display gamma percentage when filter is enabled. Range: 0-200. |
-| `auto-schedule` | bool | `false` | Automatically enable the filter at night and disable it during the day, based on local sunrise/sunset computed from `latitude`/`longitude`. |
-| `latitude` | f64 | `0` | Latitude for the sunrise/sunset schedule, in decimal degrees (north positive). Range: -90 to 90. Only used when `auto-schedule` is on. |
-| `longitude` | f64 | `0` | Longitude for the sunrise/sunset schedule, in decimal degrees (east positive). Range: -180 to 180. Only used when `auto-schedule` is on. |
+| `auto-schedule` | bool | `false` | Automatically ease the filter on at dusk and off at dawn, following the sun at the machine's location. |
+| `transition-duration` | [`NightlightTransition`](/config/types#nightlight-transition) | `15` | Length of the transition between day and night, in whole minutes, centred on civil dawn or dusk. 0 switches at once. Range: 0-120. |
+| `latitude` | f64 or null | `null` | Latitude for the schedule, in decimal degrees (north positive). Range: -90 to 90. Unset uses GeoClue. Set together with `longitude`, it overrides GeoClue. Only used when `auto-schedule` is on. |
+| `longitude` | f64 or null | `null` | Longitude for the schedule, in decimal degrees (east positive). Range: -180 to 180. Unset uses GeoClue. Set together with `latitude`, it overrides GeoClue. Only used when `auto-schedule` is on. |
 | `icon-off` | string | `"ld-sun-symbolic"` | Icon when filter is disabled (showing normal daylight colors). |
 | `icon-on` | string | `"ld-moon-symbolic"` | Icon when filter is enabled (showing warm night colors). |
 | `border-show` | bool | `false` | Display border around button. |
@@ -55,9 +56,20 @@ bar:
 
 ::: details More about `auto-schedule`
 
-While enabled, the module drives the filter on the solar schedule. A
-manual click toggles an override that lasts until the next sunrise or
-sunset, after which the schedule resumes.
+The schedule anchors to civil dawn and civil dusk, when the sun is 6
+degrees below the horizon, with each transition centred on the event.
+Where the sun never crosses that line (polar day and polar night) the
+filter stays off or on with no transition.
+
+The location comes from GeoClue, unless `latitude` and `longitude` are
+both set: explicit coordinates win, and GeoClue is then never asked. A
+spelled-out 0, 0 counts as unset. The last GeoClue fix is remembered in
+the state directory. With no location at all, or with only one coordinate
+or one off the globe, the schedule does not run: the module says why in
+its tooltip and in the log, and the filter stays as it is.
+
+A manual click cancels a running transition, applies at once, and holds
+until the next transition begins, after which the schedule resumes.
 
 :::
 
@@ -90,8 +102,7 @@ modules:
     temperature: 5000
     gamma: 100
     auto-schedule: false
-    latitude: 0.0
-    longitude: 0.0
+    transition-duration: 15
     icon-off: ld-sun-symbolic
     icon-on: ld-moon-symbolic
     border-show: false

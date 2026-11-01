@@ -38,6 +38,7 @@ bar-keybind-mode-default = default
 ## Night light
 bar-nightlight-on = On
 bar-nightlight-off = Off
+bar-nightlight-no-location = Auto-schedule paused, no location: { $reason }
 
 ## Storage
 bar-storage-multiple = Multiple

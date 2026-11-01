@@ -32,7 +32,7 @@ func autoEditor(k *kit, s slot, meta config.FieldMeta) (control, error) {
 	case meta.Optional && meta.Kind == config.FieldEnum:
 		return newOptionalEnum(k, s, meta), nil
 	case meta.Optional && meta.Kind == config.FieldInt:
-		return newOptionalNumber(k, s, meta.Min, meta.Max, 1, 0), nil
+		return newOptionalNumber(k, s, meta.Min, meta.Max, 1, 0, 0), nil
 	}
 	switch meta.Kind {
 	case config.FieldBool:

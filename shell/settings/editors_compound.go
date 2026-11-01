@@ -71,15 +71,16 @@ type optionalNumber struct {
 	slot    slot
 	on      *widget.Switch
 	spin    *widget.SpinButton
+	whole   bool
 	syncing bool
 }
 
-func newOptionalNumber(k *kit, s slot, lo, hi, step, fallback float64) *optionalNumber {
-	c := &optionalNumber{Box: gapBox(widget.Row), k: k, slot: s}
+func newOptionalNumber(k *kit, s slot, lo, hi, step, fallback float64, digits int) *optionalNumber {
+	c := &optionalNumber{Box: gapBox(widget.Row), k: k, slot: s, whole: digits == 0}
 	c.on = widget.NewSwitch(false)
 	c.on.AddClass("inherit-switch")
 	c.on.SetTooltip(i18n.Settings().Get("settings-override"))
-	c.spin = widget.NewSpinButton(k.face, k.textPx(), 0, lo, hi, step, 0)
+	c.spin = widget.NewSpinButton(k.face, k.textPx(), 0, lo, hi, step, digits)
 	c.spin.SetValue(fallback)
 	c.AppendAligned(c.on, false, widget.AlignCenter)
 	c.AppendAligned(c.spin, false, widget.AlignCenter)
@@ -101,8 +102,15 @@ func newOptionalNumber(k *kit, s slot, lo, hi, step, fallback float64) *optional
 	return c
 }
 
-// write stores a whole number (float fields take it as one).
-func (c *optionalNumber) write(v float64) { _ = c.slot.set(int64(math.Round(v))) }
+// write stores a whole number (float fields take it as one), or the
+// fraction when the spin shows digits.
+func (c *optionalNumber) write(v float64) {
+	if c.whole {
+		_ = c.slot.set(int64(math.Round(v)))
+		return
+	}
+	_ = c.slot.set(v)
+}
 
 func (c *optionalNumber) refresh() {
 	v := c.slot.get()
@@ -122,7 +130,15 @@ func (c *optionalNumber) refresh() {
 // spin over [lo, hi] stepping by step, starting at fallback.
 func optionalSpin(lo, hi, step, fallback float64) rowOpt {
 	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
-		return newOptionalNumber(k, s, lo, hi, step, fallback)
+		return newOptionalNumber(k, s, lo, hi, step, fallback, 0)
+	})
+}
+
+// optionalFloat is optionalSpin for a fractional value: digits decimals
+// and a start at 0.
+func optionalFloat(lo, hi, step float64, digits int) rowOpt {
+	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+		return newOptionalNumber(k, s, lo, hi, step, 0, digits)
 	})
 }
 

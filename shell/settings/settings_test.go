@@ -3,6 +3,7 @@ package settings
 import (
 	"errors"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -518,9 +519,29 @@ func TestOptionalEnumInheritsOrPicks(t *testing.T) {
 	}
 }
 
+// A coordinate keeps its fraction and can go back to unset; a whole
+// number editor would round it away.
+func TestOptionalCoordinateKeepsItsFraction(t *testing.T) {
+	const path = "modules.nightlight.latitude"
+	k := testKit(t, "")
+	c := newOptionalNumber(k, pathSlot(k.store, path), -90, 90, 0.1, 0, 4)
+	if c.on.On() || c.spin.Enabled() {
+		t.Fatal("an unset coordinate shows an active override")
+	}
+	c.on.SetOn(true)
+	c.spin.KeyAction(widget.KeyUp, 0)
+	if v, ok := k.store.value(path).(float64); !ok || math.Abs(v-0.1) > 1e-9 {
+		t.Fatalf("a step wrote %v, want 0.1", k.store.value(path))
+	}
+	c.on.SetOn(false)
+	if k.store.svc.Source(path) != config.SourceDefault || k.store.value(path) != nil {
+		t.Errorf("override off kept %v", k.store.value(path))
+	}
+}
+
 func TestOptionalNumberOverrideSwitch(t *testing.T) {
 	k := testKit(t, "")
-	c := newOptionalNumber(k, pathSlot(k.store, "animations.enter-duration"), 0, maxDurationMS, durationStepMS, durationFallbackMS)
+	c := newOptionalNumber(k, pathSlot(k.store, "animations.enter-duration"), 0, maxDurationMS, durationStepMS, durationFallbackMS, 0)
 	if c.on.On() || c.spin.Enabled() {
 		t.Fatal("an unset duration shows an active override")
 	}

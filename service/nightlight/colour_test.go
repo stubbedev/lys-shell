@@ -17,7 +17,8 @@ func mustSetting(t *testing.T, temp, gamma int) Setting {
 }
 
 // The whitepoints are hyprsunset's matrixForKelvin, evaluated
-// independently (Python, double precision) on whole hundreds of Kelvin.
+// independently (Python, double precision); between whole hundreds the
+// fit is continuous, which hyprsunset's is not.
 func TestMatrixMatchesHyprsunset(t *testing.T) {
 	for _, tc := range []struct {
 		temp int
@@ -25,7 +26,7 @@ func TestMatrixMatchesHyprsunset(t *testing.T) {
 	}{
 		{1000, [3]float64{1, 0.266354585, 0}},
 		{2500, [3]float64{1, 0.62378272, 0.274777165}},
-		{4550, [3]float64{1, 0.85306747, 0.735035116}},
+		{4550, [3]float64{1, 0.857377808, 0.742740306}},
 		{5000, [3]float64{1, 0.894166666, 0.807570275}},
 		{6500, [3]float64{1, 0.996510133, 0.980556503}},
 		{10000, [3]float64{0.790997435, 0.855179294, 1}},
@@ -44,6 +45,32 @@ func TestMatrixMatchesHyprsunset(t *testing.T) {
 				t.Errorf("%dK matrix %v is not diagonal", tc.temp, m)
 			}
 		}
+	}
+}
+
+// The neutral temperature is the fit's exact identity, so an ease ends
+// where clearing the filter leaves the display: no last-moment step.
+func TestNeutralTemperatureIsTheIdentity(t *testing.T) {
+	if got := identity.Matrix(); got != (Matrix{1, 0, 0, 0, 1, 0, 0, 0, 1}) {
+		t.Errorf("identity matrix = %v", got)
+	}
+	if !mustSetting(t, neutralTemp, 100).IsIdentity() {
+		t.Error("the neutral temperature at full gamma is not the identity")
+	}
+	if mustSetting(t, neutralTemp, 99).IsIdentity() || mustSetting(t, 6500, 100).IsIdentity() {
+		t.Error("a strength that tints reads as the identity")
+	}
+	if got := mustSetting(t, neutralTemp, 100).Ramps(3); !slices.Equal(got, []uint16{0, 32768, 65535, 0, 32768, 65535, 0, 32768, 65535}) {
+		t.Errorf("identity ramps = %v", got)
+	}
+}
+
+// An eased strength reads back rounded; the fraction is only for the
+// colour.
+func TestEasedStrengthReadsWhole(t *testing.T) {
+	s := mustSetting(t, 3000, 81).eased(0.5)
+	if s.Temp() != 4125 || s.Gamma() != 91 {
+		t.Errorf("eased = %dK %d%%, want 4125K 91%%", s.Temp(), s.Gamma())
 	}
 }
 

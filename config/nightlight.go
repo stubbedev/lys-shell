@@ -1,10 +1,16 @@
 package config
 
+import (
+	"errors"
+
+	"github.com/stubbedev/lys-shell/service/nightlight"
+)
+
 // NightlightConfig is the night light: a blue-light filter lys-shell
 // applies itself, through the compositor's colour transform matrix
 // (hyprland-ctm-control-v1) or gamma ramps (wlr-gamma-control-v1).
 //
-// Night light: warms the display colours, by hand or on a sunrise/sunset schedule.
+// Night light: warms the display colours, by hand or on a dawn/dusk schedule.
 type NightlightConfig struct {
 	// Format string for the label.
 	//
@@ -26,19 +32,35 @@ type NightlightConfig struct {
 	Temperature uint32 `cfg:"temperature"`
 	// Display gamma percentage when filter is enabled. Range: 0-200.
 	Gamma uint32 `cfg:"gamma"`
-	// Automatically enable the filter at night and disable it during the day,
-	// based on local sunrise/sunset computed from `latitude`/`longitude`.
+	// Automatically ease the filter on at dusk and off at dawn, following the
+	// sun at the machine's location.
 	//
-	// While enabled, the module drives the filter on the solar schedule. A
-	// manual click toggles an override that lasts until the next sunrise or
-	// sunset, after which the schedule resumes.
+	// The schedule anchors to civil dawn and civil dusk, when the sun is 6
+	// degrees below the horizon, with each transition centred on the event.
+	// Where the sun never crosses that line (polar day and polar night) the
+	// filter stays off or on with no transition.
+	//
+	// The location comes from GeoClue, unless `latitude` and `longitude` are
+	// both set: explicit coordinates win, and GeoClue is then never asked. A
+	// spelled-out 0, 0 counts as unset. The last GeoClue fix is remembered in
+	// the state directory. With no location at all, or with only one coordinate
+	// or one off the globe, the schedule does not run: the module says why in
+	// its tooltip and in the log, and the filter stays as it is.
+	//
+	// A manual click cancels a running transition, applies at once, and holds
+	// until the next transition begins, after which the schedule resumes.
 	AutoSchedule bool `cfg:"auto-schedule"`
-	// Latitude for the sunrise/sunset schedule, in decimal degrees
-	// (north positive). Range: -90 to 90. Only used when `auto-schedule` is on.
-	Latitude float64 `cfg:"latitude"`
-	// Longitude for the sunrise/sunset schedule, in decimal degrees
-	// (east positive). Range: -180 to 180. Only used when `auto-schedule` is on.
-	Longitude float64 `cfg:"longitude"`
+	// Length of the transition between day and night, in whole minutes, centred
+	// on civil dawn or dusk. 0 switches at once. Range: 0-120.
+	TransitionDuration NightlightTransition `cfg:"transition-duration"`
+	// Latitude for the schedule, in decimal degrees (north positive). Range: -90
+	// to 90. Unset uses GeoClue. Set together with `longitude`, it overrides
+	// GeoClue. Only used when `auto-schedule` is on.
+	Latitude *float64 `cfg:"latitude"`
+	// Longitude for the schedule, in decimal degrees (east positive). Range:
+	// -180 to 180. Unset uses GeoClue. Set together with `latitude`, it overrides
+	// GeoClue. Only used when `auto-schedule` is on.
+	Longitude *float64 `cfg:"longitude"`
 	// Icon when filter is disabled (showing normal daylight colors).
 	IconOff string `cfg:"icon-off"`
 	// Icon when filter is enabled (showing warm night colors).
@@ -76,32 +98,89 @@ type NightlightConfig struct {
 // DefaultsNightlight returns the schema defaults.
 func DefaultsNightlight() NightlightConfig {
 	return NightlightConfig{
-		Format:         "{{ status }}",
-		Temperature:    5000,
-		Gamma:          100,
-		AutoSchedule:   false,
-		Latitude:       0,
-		Longitude:      0,
-		IconOff:        "ld-sun-symbolic",
-		IconOn:         "ld-moon-symbolic",
-		BorderShow:     false,
-		BorderColor:    mustColor("yellow"),
-		IconShow:       true,
-		IconColor:      mustColor("auto"),
-		IconBgColor:    mustColor("yellow"),
-		LabelShow:      true,
-		LabelColor:     mustColor("yellow"),
-		LabelMaxLength: 0,
-		ButtonBgColor:  mustColor("bg-surface-elevated"),
-		LeftClick:      ParseClickAction(":toggle"),
-		RightClick:     ClickAction{},
-		MiddleClick:    ClickAction{},
-		ScrollUp:       ClickAction{},
-		ScrollDown:     ClickAction{},
+		Format:             "{{ status }}",
+		Temperature:        5000,
+		Gamma:              100,
+		AutoSchedule:       false,
+		TransitionDuration: mustNightlightTransition(15),
+		IconOff:            "ld-sun-symbolic",
+		IconOn:             "ld-moon-symbolic",
+		BorderShow:         false,
+		BorderColor:        mustColor("yellow"),
+		IconShow:           true,
+		IconColor:          mustColor("auto"),
+		IconBgColor:        mustColor("yellow"),
+		LabelShow:          true,
+		LabelColor:         mustColor("yellow"),
+		LabelMaxLength:     0,
+		ButtonBgColor:      mustColor("bg-surface-elevated"),
+		LeftClick:          ParseClickAction(":toggle"),
+		RightClick:         ClickAction{},
+		MiddleClick:        ClickAction{},
+		ScrollUp:           ClickAction{},
+		ScrollDown:         ClickAction{},
 	}
 }
 
 // Clicks returns the five input bindings.
 func (c NightlightConfig) Clicks() ClickConfig {
 	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
+}
+
+// PinnedLocation is the position latitude and longitude name: false with
+// neither set, and an error with only one set, off the globe, or at 0, 0
+// (nightlight.ErrNullIsland), which older default configs still spell
+// out.
+func (c NightlightConfig) PinnedLocation() (nightlight.Location, bool, error) {
+	if c.Latitude == nil && c.Longitude == nil {
+		return nightlight.Location{}, false, nil
+	}
+	if c.Latitude == nil || c.Longitude == nil {
+		return nightlight.Location{}, false, errors.New("nightlight: set both latitude and longitude, or neither")
+	}
+	loc, err := nightlight.NewLocation(*c.Latitude, *c.Longitude)
+	if err != nil {
+		return nightlight.Location{}, false, err
+	}
+	return loc, true, nil
+}
+
+// NightlightTransition is the ease's length, refused at load outside
+// its range rather than clamped.
+//
+// Night light transition length in whole minutes, 0 for an instant switch.
+type NightlightTransition struct{ transition nightlight.Transition }
+
+// mustNightlightTransition builds a schema-default length; a bad literal
+// panics at init.
+func mustNightlightTransition(minutes int64) NightlightTransition {
+	t, err := nightlight.NewTransition(minutes)
+	if err != nil {
+		panic(err)
+	}
+	return NightlightTransition{transition: t}
+}
+
+// Transition is the validated length.
+func (t NightlightTransition) Transition() nightlight.Transition { return t.transition }
+
+// UnmarshalConfig implements Unmarshaler.
+func (t *NightlightTransition) UnmarshalConfig(v any) error {
+	minutes, err := decodeInteger[int64](v)
+	if err != nil {
+		return err
+	}
+	parsed, err := nightlight.NewTransition(minutes)
+	if err != nil {
+		return err
+	}
+	t.transition = parsed
+	return nil
+}
+
+// MarshalConfig implements Marshaler.
+func (t NightlightTransition) MarshalConfig() any { return int64(t.transition.Minutes()) }
+
+func (NightlightTransition) configSchema(*schemaGen) Schema {
+	return uint32RangeSchema(typeOf[NightlightTransition](), 0, nightlight.MaxTransitionMinutes)
 }

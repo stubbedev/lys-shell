@@ -3,6 +3,8 @@ package bar
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"log"
 	"strconv"
 	"time"
@@ -18,25 +20,32 @@ import (
 	"github.com/stubbedev/lys-shell/service/nightlight"
 )
 
-// nightlightLocationEach is how often the schedule refreshes its
-// GeoClue location; the schedule itself ticks every minute.
+// The schedule's cadence. It wakes every nightlightScheduleTick to catch
+// a suspend or a clock change and steps every nightlightEaseTick inside
+// a transition, where 900 steps over the default 15 minutes keep each
+// one below what shows. A location refreshes every
+// nightlightLocationEach, and a failed lookup retries sooner so a
+// GeoClue that comes up after the shell is picked up.
 const (
-	nightlightScheduleTick = time.Minute
-	nightlightLocationEach = 6 * time.Hour
+	nightlightScheduleTick  = time.Minute
+	nightlightEaseTick      = time.Second
+	nightlightLocationEach  = 6 * time.Hour
+	nightlightLocationRetry = 5 * time.Minute
+	nightlightLookupTimeout = 30 * time.Second
 )
 
-// nightlightLabel renders the format: On/Off status with the applied
-// temp and gamma while on, "--" placeholders when off; the configured
-// values are always on their own placeholders.
-func nightlightLabel(format string, applied bool, temp, gamma int) string {
-	configTemp, configGamma := strconv.Itoa(temp), strconv.Itoa(gamma)
+// nightlightLabel renders the format: On/Off status with the live temp
+// and gamma while the filter applies (nil live when it does not), "--"
+// placeholders otherwise; the configured values are always on their own
+// placeholders.
+func nightlightLabel(format string, live *nightlight.Setting, temp, gamma int) string {
 	status, tempText, gammaText := i18n.T("bar-nightlight-off"), "--", "--"
-	if applied {
-		status, tempText, gammaText = i18n.T("bar-nightlight-on"), configTemp, configGamma
+	if live != nil {
+		status, tempText, gammaText = i18n.T("bar-nightlight-on"), strconv.Itoa(live.Temp()), strconv.Itoa(live.Gamma())
 	}
 	return jinja.RenderOr(format, map[string]any{
 		"status": status, "temp": tempText, "gamma": gammaText,
-		"config_temp": configTemp, "config_gamma": configGamma,
+		"config_temp": strconv.Itoa(temp), "config_gamma": strconv.Itoa(gamma),
 	})
 }
 
@@ -58,7 +67,7 @@ type sunsetEnv struct {
 	open     func(changed func()) (colourFilter, error)
 	now      func() time.Time
 	stateDir string
-	// locate resolves the schedule location; nil disables the lookup.
+	// locate resolves the schedule location.
 	locate func(ctx context.Context) (nightlight.Location, error)
 }
 
@@ -78,7 +87,7 @@ func liveSunsetEnv() sunsetEnv {
 		locate: func(ctx context.Context) (nightlight.Location, error) {
 			conn, err := dbus.ConnectSystemBus()
 			if err != nil {
-				return nightlight.Location{}, err
+				return nightlight.Location{}, fmt.Errorf("geoclue: connect to the system bus: %w", err)
 			}
 			defer func() { _ = conn.Close() }()
 			return nightlight.QueryLocation(ctx, conn)
@@ -96,19 +105,44 @@ type nightlightModule struct {
 	icon   *widget.Icon
 	chrome moduleChrome
 
+	// night is the configured full strength, and nightErr why it is
+	// unusable, which stops the schedule and refuses a toggle.
+	night    nightlight.Setting
+	nightErr error
+
 	enabled bool
+	// live is the strength on the display while enabled.
+	live nightlight.Setting
 	// refused is why the filter is not applied although the module is
 	// on: another program owns the display colours, or the configured
 	// strength is out of range.
 	refused error
 	// autoPhase is the last phase the schedule applied (zero while the
 	// schedule is off); manualOverride holds a manual toggle until the
-	// next sunrise/sunset.
+	// next phase.
 	autoPhase      nightlight.Phase
 	manualOverride bool
-	// geo is the GeoClue location, preferred over the configured one.
-	geo    *nightlight.Location
+	// heldThroughEase keeps a toggle that already shows where the new
+	// phase's transition is heading, so the transition does not snap
+	// back to its start only to return.
+	heldThroughEase bool
+	// stepping is whether the last evaluation is driving a transition.
+	stepping bool
+
+	// location is what the schedule follows, nil with none; locationErr
+	// is why there is none, nil while the first lookup is out.
+	location    *nightlight.Location
+	locationErr error
+	// pinned is the config naming the location, so GeoClue stays out.
+	pinned bool
+	// lookupErr is the last failed lookup's text, so a failure repeating
+	// on every retry logs once.
+	lookupErr string
+
+	// life ends with Stop; nil until run, which only the loop reaches.
+	life   context.Context
 	cancel context.CancelFunc
+	timer  *time.Timer
 }
 
 func newNightlight(ctx ModuleContext) (Module, error) {
@@ -116,9 +150,9 @@ func newNightlight(ctx ModuleContext) (Module, error) {
 }
 
 // newNightlightWith builds the module over env: it connects the filter,
-// replays a remembered manual toggle, then (with the loop) ticks the
-// schedule and resolves the location. A compositor without a colour
-// protocol fails the module.
+// settles what the schedule follows, replays a remembered manual toggle,
+// then (with the loop) ticks the schedule and resolves the location. A
+// compositor without a colour protocol fails the module.
 func newNightlightWith(ctx ModuleContext, env sunsetEnv) (*nightlightModule, error) {
 	cfg := ctx.Config.Nightlight
 	m := &nightlightModule{ctx: ctx, env: env}
@@ -129,6 +163,14 @@ func newNightlightWith(ctx ModuleContext, env sunsetEnv) (*nightlightModule, err
 	m.filter = filter
 	m.icon = moduleIcon(ctx, cfg.IconOffView())
 	m.btn = newBarButton(ctx, m.icon, "")
+
+	if m.night, m.nightErr = nightlight.NewSetting(int(cfg.Temperature), int(cfg.Gamma)); m.nightErr != nil {
+		log.Printf("nightlight: %v", m.nightErr)
+		m.refused = m.nightErr
+	}
+	if cfg.AutoSchedule {
+		m.resolveStartLocation()
+	}
 
 	// The filter dies with the shell, so a manual toggle is replayed
 	// rather than lost to the schedule.
@@ -145,47 +187,111 @@ func newNightlightWith(ctx ModuleContext, env sunsetEnv) (*nightlightModule, err
 	return m, nil
 }
 
-// run starts the watchers: the 60s schedule tick and the GeoClue
-// lookup (at start and every six hours while the schedule is on).
-func (m *nightlightModule) run() {
-	runCtx, cancel := context.WithCancel(m.ctx.Life())
-	m.cancel = cancel
-	go func() {
-		tick := time.NewTicker(nightlightScheduleTick)
-		defer tick.Stop()
-		m.ctx.Invoke(m.evaluate)
-		for {
-			select {
-			case <-runCtx.Done():
-				return
-			case <-tick.C:
-				m.ctx.Invoke(m.evaluate)
-			}
-		}
-	}()
-	if m.ctx.Config.Nightlight.AutoSchedule && m.env.locate != nil {
-		go func() {
-			for {
-				lookup, done := context.WithTimeout(runCtx, 30*time.Second)
-				loc, err := m.env.locate(lookup)
-				done()
-				if err == nil {
-					m.ctx.Invoke(func() { m.setLocation(loc) })
-				}
-				select {
-				case <-runCtx.Done():
-					return
-				case <-time.After(nightlightLocationEach):
-				}
-			}
-		}()
+// resolveStartLocation settles what the schedule follows before the
+// first lookup: the config's coordinates, else the remembered fix. A
+// spelled-out 0, 0 counts as unset, as it was the former default; any
+// other unusable pair stops the schedule rather than falling to GeoClue
+// behind the user's back.
+func (m *nightlightModule) resolveStartLocation() {
+	pinned, ok, err := m.ctx.Config.Nightlight.PinnedLocation()
+	switch {
+	case errors.Is(err, nightlight.ErrNullIsland):
+		log.Printf("nightlight: ignoring latitude and longitude: %v; using GeoClue", err)
+	case err != nil:
+		m.pinned, m.locationErr = true, err
+		log.Printf("nightlight: the auto-schedule has no location: %v", err)
+		return
+	case ok:
+		m.pinned, m.location = true, &pinned
+		return
 	}
+	remembered, err := nightlight.LoadLocation(m.env.stateDir)
+	switch {
+	case err == nil:
+		m.location = &remembered
+	case !errors.Is(err, fs.ErrNotExist):
+		log.Printf("nightlight: %v", err)
+	}
+}
+
+// run starts the watchers: the schedule's timer and, unless the config
+// pins the location, the GeoClue lookup.
+func (m *nightlightModule) run() {
+	m.life, m.cancel = context.WithCancel(m.ctx.Life())
+	m.ctx.Invoke(m.tick)
+	if m.ctx.Config.Nightlight.AutoSchedule && !m.pinned {
+		go m.followLocation(m.life)
+	}
+}
+
+// followLocation looks the location up at start and then every
+// nightlightLocationEach, sooner after a failure.
+func (m *nightlightModule) followLocation(ctx context.Context) {
+	for {
+		lookup, done := context.WithTimeout(ctx, nightlightLookupTimeout)
+		loc, err := m.env.locate(lookup)
+		done()
+		if ctx.Err() != nil {
+			return
+		}
+		wait := nightlightLocationEach
+		if err != nil {
+			wait = nightlightLocationRetry
+			m.ctx.Invoke(func() { m.lookupFailed(err) })
+		} else {
+			m.ctx.Invoke(func() { m.setLocation(loc) })
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+	}
+}
+
+// tick is one schedule wakeup: evaluate, then sleep until the next.
+func (m *nightlightModule) tick() {
+	if m.life.Err() != nil {
+		return
+	}
+	m.evaluate()
+	m.armTick()
+}
+
+// armTick sets the timer for the next wakeup. Nothing wakes the module
+// without a schedule to follow; setLocation arms it when one arrives.
+func (m *nightlightModule) armTick() {
+	if m.life == nil || m.life.Err() != nil || !m.ctx.Config.Nightlight.AutoSchedule || m.location == nil {
+		return
+	}
+	if m.timer != nil {
+		m.timer.Stop()
+	}
+	m.timer = time.AfterFunc(m.nextTick(), func() { m.ctx.Invoke(m.tick) })
+}
+
+// nextTick is how long the schedule sleeps: a step while a transition
+// runs, otherwise a minute or until the next transition starts,
+// whichever comes first, so a transition starts on time.
+func (m *nightlightModule) nextTick() time.Duration {
+	if m.stepping {
+		return nightlightEaseTick
+	}
+	now := m.env.now()
+	next, ok := nightlight.NextEase(now, *m.location, m.ctx.Config.Nightlight.TransitionDuration.Transition())
+	if !ok {
+		return nightlightScheduleTick
+	}
+	return min(nightlightScheduleTick, next.Sub(now))
 }
 
 // Stop ends the watchers and lets go of the display colours.
 func (m *nightlightModule) Stop() {
 	if m.cancel != nil {
 		m.cancel()
+	}
+	if m.timer != nil {
+		m.timer.Stop()
 	}
 	m.filter.Close()
 }
@@ -195,29 +301,43 @@ func (m *nightlightModule) setChrome(c moduleChrome) {
 	m.render()
 }
 
-// render shows the state icon and the label; a refused filter tints the
-// icon and says why in the tooltip.
+// render shows the state icon, the label and any problem: a refused
+// filter or a schedule without a location tints the icon and says why in
+// the tooltip.
 func (m *nightlightModule) render() {
 	cfg := m.ctx.Config.Nightlight
-	applied := m.enabled && m.refused == nil
-	text := ""
-	if cfg.LabelShow {
-		text = nightlightLabel(cfg.Format, applied, int(cfg.Temperature), int(cfg.Gamma))
-	}
-	m.btn.SetLabel(text)
+	m.renderLabel()
 	if m.icon != nil {
 		icon := cfg.IconOffView()
-		if applied {
+		if m.enabled && m.refused == nil {
 			icon = cfg.IconOnView()
 		}
 		m.icon.SetThemeName(icon.Name)
 	}
-	tooltip := ""
-	if m.enabled && m.refused != nil {
-		tooltip = m.refused.Error()
+	refusal, noLocation := "", ""
+	switch {
+	case m.refused != nil:
+		refusal = m.refused.Error()
+	case cfg.AutoSchedule && m.location == nil && m.locationErr != nil:
+		noLocation = i18n.T("bar-nightlight-no-location", i18n.Str("reason", m.locationErr.Error()))
 	}
-	setClass(m.chrome, "nightlight-refused", tooltip != "")
-	m.btn.SetTooltip(tooltip)
+	setClass(m.chrome, "nightlight-refused", refusal != "")
+	setClass(m.chrome, "nightlight-no-location", noLocation != "")
+	m.btn.SetTooltip(refusal + noLocation)
+}
+
+// renderLabel shows the label alone, all a transition step changes.
+func (m *nightlightModule) renderLabel() {
+	cfg := m.ctx.Config.Nightlight
+	if !cfg.LabelShow {
+		m.btn.SetLabel("")
+		return
+	}
+	var live *nightlight.Setting
+	if m.enabled && m.refused == nil {
+		live = &m.live
+	}
+	m.btn.SetLabel(nightlightLabel(cfg.Format, live, int(cfg.Temperature), int(cfg.Gamma)))
 }
 
 // refreshRefusal picks up a refusal the compositor sent after the
@@ -237,49 +357,82 @@ func (m *nightlightModule) refreshRefusal() {
 	m.render()
 }
 
-// currentPhase is the phase here and now: the GeoClue location when
-// resolved, else the configured coordinates.
-func (m *nightlightModule) currentPhase() nightlight.Phase {
-	cfg := m.ctx.Config.Nightlight
-	lat, lng := cfg.Latitude, cfg.Longitude
-	if m.geo != nil {
-		lat, lng = m.geo.Latitude, m.geo.Longitude
-	}
-	return nightlight.PhaseAt(m.env.now(), lat, lng)
-}
-
-// setLocation is LocationResolved: a new fix re-evaluates at once.
+// setLocation is LocationResolved: a new fix is remembered for the next
+// start and re-evaluates at once. Only GeoClue calls it, and never with
+// a pinned location.
 func (m *nightlightModule) setLocation(loc nightlight.Location) {
-	if m.geo != nil && *m.geo == loc {
+	m.lookupErr, m.locationErr = "", nil
+	if m.location != nil && *m.location == loc {
 		return
 	}
-	m.geo = &loc
+	m.location = &loc
+	log.Printf("nightlight: the location changed, following GeoClue")
+	if err := nightlight.SaveLocation(m.env.stateDir, loc); err != nil {
+		log.Printf("nightlight: %v", err)
+	}
 	m.evaluate()
+	m.armTick()
+	m.render()
 }
 
-// evaluate is evaluate_schedule: night turns the filter on, day off; a
-// manual toggle holds until the phase changes, which clears it and the
-// remembered record.
+// lookupFailed logs a failed lookup, once while it keeps failing the
+// same way. The schedule keeps the location it has; with none, the
+// module shows why.
+func (m *nightlightModule) lookupFailed(err error) {
+	if text := err.Error(); text != m.lookupErr {
+		m.lookupErr = text
+		log.Printf("nightlight: the location lookup failed: %v", err)
+	}
+	m.locationErr = err
+	m.render()
+}
+
+// evaluate is evaluate_schedule: the filter shows the schedule's target,
+// off when that is the identity; a manual toggle holds until the phase
+// changes, which clears it and the remembered record. With no location
+// or no usable strength there is no target and the filter stays as it
+// is.
 func (m *nightlightModule) evaluate() {
-	if !m.ctx.Config.Nightlight.AutoSchedule {
+	cfg := m.ctx.Config.Nightlight
+	if !cfg.AutoSchedule {
 		m.autoPhase, m.manualOverride = 0, false
 		return
 	}
-	phase := m.currentPhase()
-	if m.autoPhase != phase {
-		m.autoPhase = phase
+	m.stepping = false
+	if m.location == nil || m.nightErr != nil {
+		return
+	}
+	target := nightlight.TargetAt(m.env.now(), *m.location, cfg.TransitionDuration.Transition(), m.night)
+	switch {
+	case m.manualOverride && m.autoPhase == 0:
+		m.autoPhase = target.Phase
+	case m.autoPhase != target.Phase:
+		m.heldThroughEase = m.manualOverride && m.enabled == (target.Phase == nightlight.PhaseNight)
+		m.autoPhase = target.Phase
 		m.manualOverride = false
 		nightlight.ClearOverride(m.env.stateDir)
 	}
 	if m.manualOverride {
 		return
 	}
-	if wantOn := phase == nightlight.PhaseNight; wantOn != m.enabled {
-		if wantOn {
-			m.startFilter()
-		} else {
+	if m.heldThroughEase && target.Easing {
+		return
+	}
+	m.heldThroughEase = false
+	m.stepping = target.Easing
+	m.show(target.Setting)
+}
+
+// show brings the filter to a schedule target. A refusal holds until the
+// filter next clears: stepping would only be turned away again.
+func (m *nightlightModule) show(target nightlight.Setting) {
+	switch {
+	case target.IsIdentity():
+		if m.enabled {
 			m.stopFilter()
 		}
+	case !m.enabled || (m.refused == nil && m.live != target):
+		m.applyFilter(target)
 	}
 }
 
@@ -293,13 +446,15 @@ func (m *nightlightModule) RunAction(action config.ClickAction) {
 }
 
 // toggle is the left-click :toggle: under the schedule it sets the
-// override (seeding the phase when the schedule has not ticked yet),
-// records the new state for restarts, and flips the filter.
+// override, which also ends a running transition (seeding the phase when
+// the schedule has not ticked yet, or at the first location when it has
+// none), records the new state for restarts, and flips the filter.
 func (m *nightlightModule) toggle() {
-	if m.ctx.Config.Nightlight.AutoSchedule {
-		m.manualOverride = true
-		if m.autoPhase == 0 {
-			m.autoPhase = m.currentPhase()
+	cfg := m.ctx.Config.Nightlight
+	if cfg.AutoSchedule {
+		m.manualOverride, m.stepping = true, false
+		if m.autoPhase == 0 && m.location != nil {
+			m.autoPhase = nightlight.TargetAt(m.env.now(), *m.location, cfg.TransitionDuration.Transition(), m.night).Phase
 		}
 	}
 	nightlight.SaveOverride(m.env.stateDir, nightlight.Override{Phase: m.autoPhase, Enabled: !m.enabled}, m.env.now())
@@ -310,23 +465,37 @@ func (m *nightlightModule) toggle() {
 	m.startFilter()
 }
 
-// startFilter applies the configured strength to every output.
+// startFilter applies the configured full strength to every output, or
+// shows why it is unusable.
 func (m *nightlightModule) startFilter() {
-	cfg := m.ctx.Config.Nightlight
-	m.enabled, m.refused = true, nil
-	setting, err := nightlight.NewSetting(int(cfg.Temperature), int(cfg.Gamma))
-	if err == nil {
-		err = m.filter.Apply(setting)
+	if m.nightErr != nil {
+		m.enabled, m.refused = true, m.nightErr
+		m.render()
+		return
 	}
+	m.applyFilter(m.night)
+}
+
+// applyFilter puts a strength on every output. Only turning on logs and
+// repaints the whole module: a transition step changes the label at most.
+func (m *nightlightModule) applyFilter(setting nightlight.Setting) {
+	wasOn := m.enabled
+	m.enabled, m.refused, m.live = true, nil, setting
+	err := m.filter.Apply(setting)
 	if err == nil {
 		err = m.filter.Refused()
 	}
 	if err != nil {
 		log.Printf("nightlight: %v", err)
 		m.refused = err
-	} else {
-		log.Printf("nightlight: on at %dK %d%% through %s", setting.Temp(), setting.Gamma(), m.filter.Protocol())
+		m.render()
+		return
 	}
+	if wasOn {
+		m.renderLabel()
+		return
+	}
+	log.Printf("nightlight: on at %dK %d%% through %s", setting.Temp(), setting.Gamma(), m.filter.Protocol())
 	m.render()
 }
 
@@ -337,7 +506,7 @@ func (m *nightlightModule) stopFilter() {
 	} else {
 		log.Printf("nightlight: off")
 	}
-	m.enabled, m.refused = false, nil
+	m.enabled, m.refused = false, m.nightErr
 	m.render()
 }
 

@@ -2,6 +2,7 @@ package nightlight
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -33,7 +34,10 @@ func (c *fakeGeoClient) Start() *dbus.Error {
 
 func (c *fakeGeoClient) Stop() *dbus.Error { return nil }
 
-func TestQueryLocationOverGeoClue(t *testing.T) {
+// serveGeoClue puts a GeoClue on a private bus that reports one fix,
+// and returns the client's properties and a connection to query it over.
+func serveGeoClue(t *testing.T, latitude, longitude float64) (*prop.Properties, *dbus.Conn) {
+	t.Helper()
 	bus := dbustest.Start(t)
 	daemon := bus.Conn(t)
 	g := &fakeGeoClue{conn: daemon}
@@ -52,8 +56,8 @@ func TestQueryLocationOverGeoClue(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := prop.Export(daemon, "/org/freedesktop/GeoClue2/Location/1", prop.Map{geoclueLocation: {
-		"Latitude":  {Value: 55.6761, Emit: prop.EmitConst},
-		"Longitude": {Value: 12.5683, Emit: prop.EmitConst},
+		"Latitude":  {Value: latitude, Emit: prop.EmitConst},
+		"Longitude": {Value: longitude, Emit: prop.EmitConst},
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -61,11 +65,16 @@ func TestQueryLocationOverGeoClue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loc, err := QueryLocation(context.Background(), bus.Conn(t))
+	return clientProps, bus.Conn(t)
+}
+
+func TestQueryLocationOverGeoClue(t *testing.T) {
+	clientProps, conn := serveGeoClue(t, 55.6761, 12.5683)
+	loc, err := QueryLocation(context.Background(), conn)
 	if err != nil {
 		t.Fatalf("QueryLocation: %v", err)
 	}
-	if loc.Latitude != 55.6761 || loc.Longitude != 12.5683 {
+	if loc.Latitude() != 55.6761 || loc.Longitude() != 12.5683 {
 		t.Errorf("location = %+v", loc)
 	}
 	// The client was configured before Start.
@@ -74,6 +83,14 @@ func TestQueryLocationOverGeoClue(t *testing.T) {
 	}
 	if lvl, _ := clientProps.Get(geoclueClient, "RequestedAccuracyLevel"); lvl.Value() != accuracyCity {
 		t.Errorf("accuracy = %v, want city", lvl.Value())
+	}
+}
+
+// A fix of 0, 0 is an agent with nothing to say, not a position.
+func TestQueryLocationRefusesANullFix(t *testing.T) {
+	_, conn := serveGeoClue(t, 0, 0)
+	if _, err := QueryLocation(context.Background(), conn); !errors.Is(err, ErrNullIsland) {
+		t.Errorf("err = %v, want ErrNullIsland", err)
 	}
 }
 

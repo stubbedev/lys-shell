@@ -6,21 +6,27 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/nightlight"
 )
 
 func TestNightlightLabel(t *testing.T) {
-	// Running: the live temp and gamma.
-	got := nightlightLabel("{{ status }} {{ temp }}K {{ gamma }}%", true, 4500, 90)
-	if got != i18n.T("bar-nightlight-on")+" 4500K 90%" {
-		t.Errorf("= %q, want On 4500K 90%%", got)
+	// Running: the live temp and gamma, which a transition moves away
+	// from the configured ones.
+	live, err := nightlight.NewSetting(5200, 95)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := nightlightLabel("{{ status }} {{ temp }}K {{ gamma }}%", &live, 4500, 90)
+	if got != i18n.T("bar-nightlight-on")+" 5200K 95%" {
+		t.Errorf("= %q, want On 5200K 95%%", got)
 	}
 	// Off: the status word with -- placeholders.
-	got = nightlightLabel("{{ status }} {{ temp }} {{ gamma }}", false, 4500, 90)
+	got = nightlightLabel("{{ status }} {{ temp }} {{ gamma }}", nil, 4500, 90)
 	if got != i18n.T("bar-nightlight-off")+" -- --" {
 		t.Errorf("= %q, want Off -- --", got)
 	}
 	// The configured values land on their own placeholders.
-	got = nightlightLabel("set {{ config_temp }}/{{ config_gamma }}", false, 3500, 80)
+	got = nightlightLabel("set {{ config_temp }}/{{ config_gamma }}", nil, 3500, 80)
 	if got != "set 3500/80" {
 		t.Errorf("= %q", got)
 	}
