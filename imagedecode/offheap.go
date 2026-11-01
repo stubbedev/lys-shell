@@ -32,6 +32,10 @@ func (d Decoded) Free() error {
 	return offheap.Free(d.mem, d.pix)
 }
 
+// decodeReadSize is the buffer a whole image is read through: a wallpaper
+// is megabytes, which at bufio's 4 KiB default is hundreds of reads.
+const decodeReadSize = 32 << 10
+
 // OpenOffHeap decodes the image file at path as Open does, a JPEG
 // straight into memory mem holds: its pixels until Free, and a
 // progressive scan's coefficients only while it decodes.
@@ -41,7 +45,7 @@ func OpenOffHeap(mem *memory.Shared, path string) (Decoded, error) {
 		return Decoded{}, err
 	}
 	defer f.Close()
-	br := bufio.NewReader(f)
+	br := bufio.NewReaderSize(f, decodeReadSize)
 	if isJPEG(br) {
 		img, pix, err := jpeg.Decode(br, mem)
 		if err != nil {
