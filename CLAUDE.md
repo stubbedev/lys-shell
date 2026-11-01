@@ -7,7 +7,7 @@ stack, fonts, and the sway, dbus, pipewire and xdg-desktop-portal the tests
 start private instances of:
 
 ```sh
-nix develop -c just build   # static binaries into dist/
+nix develop -c just build   # pure-Go binaries (no cgo) into dist/
 nix develop -c just test    # go test ./...
 nix develop -c just vet     # go vet ./...
 nix develop -c just lint    # golangci-lint fmt --diff + golangci-lint run

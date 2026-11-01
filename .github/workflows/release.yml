@@ -49,7 +49,7 @@ jobs:
                   draft: true
                   token: ${{ secrets.GITHUB_TOKEN }}
 
-    # The binaries are static Go (lys-ui dlopens what it needs), so one build
+    # The binaries are pure Go (lys-ui dlopens what it needs), so one build
     # serves the archive and both packages. The nix closure is not built
     # here: the tag points at the release commit on master, whose push
     # already ran ci.yml's nix job and pushed that closure to xilo.
