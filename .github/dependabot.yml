@@ -1,5 +1,14 @@
 version: 2
 
+multi-ecosystem-groups:
+  actions-and-docs:
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "ci"
+
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
@@ -16,13 +25,12 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule:
-      interval: "monthly"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "ci"
-    groups:
-      all:
-        patterns:
-          - "*"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "actions-and-docs"
+
+  - package-ecosystem: "npm"
+    directory: "/docs"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "actions-and-docs"
