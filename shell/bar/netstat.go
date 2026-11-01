@@ -50,16 +50,19 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 	if cfg.PollIntervalMs > 0 {
 		go func() {
 			interval := intconv.Duration(cfg.PollIntervalMs, time.Millisecond)
-			ticker := time.NewTicker(interval)
-			defer ticker.Stop()
+			timer := time.NewTimer(untilPollGrid(time.Now(), interval))
+			defer timer.Stop()
 			defer m.reader.Close()
+			last := time.Now()
 			for {
 				select {
 				case <-runCtx.Done():
 					return
-				case <-ticker.C:
+				case now := <-timer.C:
+					m.sample(now.Sub(last))
+					last = now
+					timer.Reset(untilPollGrid(time.Now(), interval))
 				}
-				m.sample(interval)
 			}
 		}()
 	}

@@ -99,6 +99,12 @@ func storageContext(s sysinfo.Storage) map[string]any {
 	}
 }
 
+// untilPollGrid is the wait to the next multiple of every: modules polling
+// on the same grid wake together, one wakeup instead of one each.
+func untilPollGrid(now time.Time, every time.Duration) time.Duration {
+	return now.Truncate(every).Add(every).Sub(now)
+}
+
 // reading is one poll: the template context and the value thresholds
 // evaluate, or ok false when there is nothing to show (storage with no
 // matching mount point keeps its last label).
@@ -176,7 +182,7 @@ func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func(
 					m.ctx.Invoke(func() { m.show(next) })
 				}
 			}
-			timer.Reset(intconv.Duration(cfg.pollMs, time.Millisecond))
+			timer.Reset(untilPollGrid(time.Now(), intconv.Duration(cfg.pollMs, time.Millisecond)))
 		}
 	}()
 	return m, nil

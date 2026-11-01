@@ -3,6 +3,7 @@ package bar
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -94,5 +95,19 @@ func TestPollReadingThatChangesNothingStaysOffTheLoop(t *testing.T) {
 	}
 	if base.same(m.shows(reading{vars: map[string]any{"percent": "50"}, value: 95, ok: true})) {
 		t.Error("a threshold crossed under the same label reads as unchanged")
+	}
+}
+
+func TestPollsWithTheSameGridWakeTogether(t *testing.T) {
+	at := time.Date(2026, 11, 1, 12, 0, 7, 250_000_000, time.UTC)
+	if got := untilPollGrid(at, 2*time.Second); got != 750*time.Millisecond {
+		t.Errorf("wait to a 2 s grid = %v", got)
+	}
+	if got := untilPollGrid(at, 5*time.Second); got != 2750*time.Millisecond {
+		t.Errorf("wait to a 5 s grid = %v", got)
+	}
+	onGrid := time.Date(2026, 11, 1, 12, 0, 8, 0, time.UTC)
+	if got := untilPollGrid(onGrid, 2*time.Second); got != 2*time.Second {
+		t.Errorf("a poll on the grid must wait a whole interval, not %v", got)
 	}
 }
