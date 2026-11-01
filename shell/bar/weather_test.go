@@ -151,3 +151,16 @@ func TestWeatherConditionLabels(t *testing.T) {
 		t.Errorf("out-of-range condition = %q", got)
 	}
 }
+
+func TestWorldClockResolutionIsTheFinestLayoutUsed(t *testing.T) {
+	for format, want := range map[string]time.Duration{
+		"{{ tz('UTC', '%H:%M %Z') }}": time.Minute,
+		"plain":                       time.Minute,
+		"{{ tz('UTC', '%H:%M') }} {{ tz('Asia/Tokyo', '%H:%M:%S') }}": time.Second,
+		"{{ tz('Not/AZone', '%S') }}":                                 time.Minute,
+	} {
+		if got := worldClockResolution(format); got != want {
+			t.Errorf("%q: resolution %v, want %v", format, got, want)
+		}
+	}
+}

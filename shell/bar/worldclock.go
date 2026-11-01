@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/internal/walltimer"
 	"github.com/stubbedev/lys-shell/strftime"
 )
 
@@ -18,6 +19,12 @@ import (
 // zone. An unknown zone fails the render, which shows as nothing
 // (format_world_clock(...).unwrap_or_default()).
 func worldClockRender(format string, now time.Time) string {
+	return worldClockRenderTracking(format, now, func(*strftime.Layout) {})
+}
+
+// worldClockRenderTracking is worldClockRender, reporting each strftime
+// layout the template uses.
+func worldClockRenderTracking(format string, now time.Time, used func(*strftime.Layout)) string {
 	var env jinja.Env
 	env.AddFunction("tz", func(args []any, _ map[string]any) (any, error) {
 		if len(args) != 2 {
@@ -34,6 +41,7 @@ func worldClockRender(format string, now time.Time) string {
 		if err != nil {
 			return "", nil
 		}
+		used(formatted)
 		return formatted.Format(now.In(location)), nil
 	})
 	out, err := env.Render(format, nil)
@@ -43,7 +51,18 @@ func worldClockRender(format string, now time.Time) string {
 	return out
 }
 
-// worldClock is the module: the format re-renders every second.
+// worldClockResolution is how often the template's text can change: the
+// finest of the layouts it formats with.
+func worldClockResolution(format string) time.Duration {
+	resolution := time.Minute
+	worldClockRenderTracking(format, time.Now(), func(l *strftime.Layout) {
+		resolution = min(resolution, l.Resolution())
+	})
+	return resolution
+}
+
+// worldClock is the module: the format re-renders when its text can
+// change.
 type worldClockModule struct {
 	ctx  ModuleContext
 	btn  *barButton
@@ -60,18 +79,11 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	m.apply(cfg.Format)
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.stop = cancel
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-runCtx.Done():
-				return
-			case <-ticker.C:
-			}
-			m.ctx.Invoke(func() { m.apply(m.ctx.Config.WorldClock.Format) })
-		}
-	}()
+	update := func() { m.apply(m.ctx.Config.WorldClock.Format) }
+	if err := walltimer.Start(runCtx, worldClockResolution(cfg.Format), func() { m.ctx.Invoke(update) }); err != nil {
+		cancel()
+		return nil, err
+	}
 	return m, nil
 }
 

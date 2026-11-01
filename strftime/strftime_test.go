@@ -130,3 +130,23 @@ func TestFormatPreservesLiteralPercentAtEnd(t *testing.T) {
 		t.Errorf("dangling %% renders = %q, want 14%%", got)
 	}
 }
+
+func TestResolutionFollowsTheSecondsFields(t *testing.T) {
+	for format, want := range map[string]time.Duration{
+		"%H:%M":          time.Minute,
+		"%Y-%m-%d %H:%M": time.Minute,
+		"%A %%S":         time.Minute,
+		"%H:%M:%S":       time.Second,
+		"%T":             time.Second,
+		"%s":             time.Second,
+		"%-S":            time.Second,
+	} {
+		layout, err := Compile(format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := layout.Resolution(); got != want {
+			t.Errorf("%q: resolution %v, want %v", format, got, want)
+		}
+	}
+}

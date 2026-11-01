@@ -30,6 +30,17 @@ func Compile(format string) (*Layout, error) {
 	return &Layout{src: format}, nil
 }
 
+// Resolution is how often the rendered text can change: a second with
+// a seconds field in the format, otherwise a minute.
+func (l *Layout) Resolution() time.Duration {
+	for _, spec := range specs(l.src) {
+		if spec == 'S' || spec == 'T' || spec == 's' {
+			return time.Second
+		}
+	}
+	return time.Minute
+}
+
 // String returns the source format.
 func (l *Layout) String() string { return l.src }
 
