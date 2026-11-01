@@ -2,8 +2,12 @@ package nightlight
 
 import (
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/stubbedev/lys-lib/third_party/wayland/wl"
 )
 
 func openFilter(t *testing.T) (*Filter, *atomic.Int32) {
@@ -221,5 +225,218 @@ func TestAnEaseReachesTheDisplayOnEitherProtocol(t *testing.T) {
 				eventually(t, "identity after Clear", wantIdentity(comp, "DP-1"))
 			}
 		})
+	}
+}
+
+// easedPair finds two different steps of an ease that encode alike.
+func easedPair(t *testing.T, night Setting) (a, b Setting) {
+	t.Helper()
+	const steps = 4000
+	for i := 1; i < steps; i++ {
+		a, b = night.eased(float64(i)/steps), night.eased(float64(i+1)/steps)
+		if a != b && encodeMatrix(a.Matrix()) == encodeMatrix(b.Matrix()) {
+			return a, b
+		}
+	}
+	t.Fatal("no two steps of an ease encode alike")
+	return a, b
+}
+
+func eventuallyCommits(t *testing.T, c *compositor, want int) {
+	t.Helper()
+	eventually(t, fmt.Sprintf("%d commits", want), func() error {
+		if got := c.commits(); got != want {
+			return fmt.Errorf("commits = %d, want %d", got, want)
+		}
+		return nil
+	})
+}
+
+// roundtripFilter proves the compositor has read all f sent: its sync
+// is answered in order, after the requests before it.
+func roundtripFilter(t *testing.T, f *Filter) {
+	t.Helper()
+	done := &syncDone{ch: make(chan struct{})}
+	f.mu.Lock()
+	wlcb := wl.NewCallback(f.ctx)
+	wlcb.AddDoneHandler(done)
+	err := f.ctx.SendRequest(f.display, 0, wlcb)
+	f.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done.ch:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no sync reply")
+	}
+}
+
+type syncDone struct{ ch chan struct{} }
+
+func (d *syncDone) HandleCallbackDone(wl.CallbackDoneEvent) { close(d.ch) }
+
+func TestCTMSendsOnlyWhatTheWireWouldChange(t *testing.T) {
+	comp := newCompositor(t, true, false)
+	comp.addOutput("DP-1")
+	f, _ := openFilter(t)
+	night := mustSetting(t, 5000, 100)
+	a, b := easedPair(t, night)
+
+	if err := f.Apply(a); err != nil {
+		t.Fatal(err)
+	}
+	roundtripFilter(t, f)
+	eventuallyCommits(t, comp, 1)
+
+	if err := f.Apply(b); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Apply(a); err != nil {
+		t.Fatal(err)
+	}
+	roundtripFilter(t, f)
+	if got := comp.commits(); got != 1 {
+		t.Errorf("commits = %d after steps that encode alike, want 1", got)
+	}
+
+	if err := f.Apply(night); err != nil {
+		t.Fatal(err)
+	}
+	roundtripFilter(t, f)
+	if got := comp.commits(); got != 2 {
+		t.Errorf("commits = %d after a changed matrix, want 2", got)
+	}
+	eventually(t, "the changed matrix", wantMatrix(comp, "DP-1", night.Matrix()))
+}
+
+// An output that appears has no matrix, however unchanged the value.
+func TestCTMSendsTheSameMatrixToANewOutput(t *testing.T) {
+	comp := newCompositor(t, true, false)
+	comp.addOutput("DP-1")
+	f, _ := openFilter(t)
+	s := mustSetting(t, 5000, 100)
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "DP-1 warmed", wantMatrix(comp, "DP-1", s.Matrix()))
+	comp.addOutput("DP-2")
+	eventually(t, "the new output warmed", wantMatrix(comp, "DP-2", s.Matrix()))
+	eventually(t, "DP-1 still warmed", wantMatrix(comp, "DP-1", s.Matrix()))
+}
+
+// Clearing destroys the manager and the compositor forgets the matrix,
+// so the next bind sends it even if nothing about it changed.
+func TestCTMSendsTheSameMatrixAfterARebind(t *testing.T) {
+	comp := newCompositor(t, true, false)
+	comp.addOutput("DP-1")
+	f, _ := openFilter(t)
+	s := mustSetting(t, 5000, 100)
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "DP-1 warmed", wantMatrix(comp, "DP-1", s.Matrix()))
+	if err := f.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the identity", wantIdentity(comp, "DP-1"))
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "DP-1 warmed again", wantMatrix(comp, "DP-1", s.Matrix()))
+}
+
+func TestGammaSendsOnlyChangedRamps(t *testing.T) {
+	comp := newCompositor(t, false, true)
+	comp.addOutput("DP-1")
+	f, _ := openFilter(t)
+	s := mustSetting(t, 5000, 100)
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the control's size", func() error {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if f.outputs[firstOutput(f)].size == 0 {
+			return errors.New("no ramp size yet")
+		}
+		return nil
+	})
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the first ramps", wantRamps(comp, "DP-1", s.Ramps(256)))
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	roundtripFilter(t, f)
+	if got := comp.rampsSent("DP-1"); got != 1 {
+		t.Errorf("ramps sent %d times for one value, want 1", got)
+	}
+
+	warmer := mustSetting(t, 3000, 100)
+	if err := f.Apply(warmer); err != nil {
+		t.Fatal(err)
+	}
+	roundtripFilter(t, f)
+	if got := comp.rampsSent("DP-1"); got != 2 {
+		t.Errorf("ramps sent %d times after a change, want 2", got)
+	}
+	eventually(t, "the changed ramps", wantRamps(comp, "DP-1", warmer.Ramps(256)))
+}
+
+// A control that is gone took its ramps with it: a new output, and the
+// same output after a Clear, get the unchanged value.
+func TestGammaSendsTheSameRampsToANewControl(t *testing.T) {
+	comp := newCompositor(t, false, true)
+	comp.addOutput("DP-1")
+	f, _ := openFilter(t)
+	s := mustSetting(t, 5000, 100)
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "DP-1's ramps", wantRamps(comp, "DP-1", s.Ramps(256)))
+
+	comp.addOutput("DP-2")
+	eventually(t, "the new output's ramps", wantRamps(comp, "DP-2", s.Ramps(256)))
+
+	if err := f.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the identity", wantIdentity(comp, "DP-1"))
+	if err := f.Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "DP-1's ramps again", wantRamps(comp, "DP-1", s.Ramps(256)))
+}
+
+func firstOutput(f *Filter) uint32 {
+	for name := range f.outputs {
+		return name
+	}
+	return 0
+}
+
+// An ease's real traffic: one Apply a second over 15 minutes.
+func TestEaseCommitCounts(t *testing.T) {
+	const steps = 900
+	for _, c := range []struct {
+		temp, gamma int
+		max         int
+	}{{5000, 100, 120}, {2500, 90, 400}} {
+		night := mustSetting(t, c.temp, c.gamma)
+		distinct := 0
+		var last encodedMatrix
+		for i := 0; i <= steps; i++ {
+			e := encodeMatrix(night.eased(float64(i) / steps).Matrix())
+			if i == 0 || e != last {
+				distinct++
+			}
+			last = e
+		}
+		t.Logf("%dK %d%%: %d steps, %d distinct on the wire", c.temp, c.gamma, steps+1, distinct)
+		if distinct > c.max {
+			t.Errorf("%dK: %d distinct matrices, want at most %d", c.temp, distinct, c.max)
+		}
 	}
 }

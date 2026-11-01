@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -70,9 +71,12 @@ type Filter struct {
 	ctm                 *wlr.CtmControlManagerV1
 	gamma               *wlr.ZwlrGammaControlManagerV1
 	setting             *Setting
-	refused             error
-	closing             bool
-	err                 error
+	// sentCTM is the matrix the compositor holds on every output, as the
+	// wire encodes it; nil when it may hold anything else.
+	sentCTM *encodedMatrix
+	refused error
+	closing bool
+	err     error
 	// finished is the final sync's reply, read and written on the
 	// read loop alone.
 	finished bool
@@ -86,6 +90,19 @@ type output struct {
 	version uint32
 	control *wlr.ZwlrGammaControlV1
 	size    int
+	// sentRamps is what the control last took, nil before it took any.
+	sentRamps []uint16
+}
+
+// encodedMatrix is a Matrix as wl_fixed puts it on the wire.
+type encodedMatrix [9]int32
+
+func encodeMatrix(m Matrix) encodedMatrix {
+	var e encodedMatrix
+	for i, v := range m {
+		e[i] = wl.FloatToFixed(float64(float32(v)))
+	}
+	return e
 }
 
 // Open connects to the compositor named by WAYLAND_DISPLAY. changed runs
@@ -192,7 +209,7 @@ func (f *Filter) Close() {
 }
 
 func (f *Filter) clearLocked() error {
-	f.setting, f.refused = nil, nil
+	f.setting, f.refused, f.sentCTM = nil, nil, nil
 	var err error
 	if f.ctm != nil {
 		err = f.ctm.Destroy()
@@ -224,9 +241,15 @@ func (f *Filter) applyCTMLocked() error {
 }
 
 // commitCTMLocked sets the matrix on every output and commits; an
-// output left out would reset to the identity.
+// output left out would reset to the identity. A matrix that encodes the
+// same as the one every output holds sends nothing: wl_fixed's 1/256
+// steps are far coarser than an ease's.
 func (f *Filter) commitCTMLocked() error {
 	m := f.setting.Matrix()
+	encoded := encodeMatrix(m)
+	if f.sentCTM != nil && *f.sentCTM == encoded {
+		return nil
+	}
 	for _, o := range f.outputs {
 		if err := f.ctm.SetCtmForOutput(o.wl,
 			float32(m[0]), float32(m[1]), float32(m[2]),
@@ -238,6 +261,7 @@ func (f *Filter) commitCTMLocked() error {
 	if err := f.ctm.Commit(); err != nil {
 		return fmt.Errorf("nightlight: commit the matrices: %w", err)
 	}
+	f.sentCTM = &encoded
 	return nil
 }
 
@@ -265,7 +289,7 @@ func (f *Filter) gammaOutputLocked(o *output) error {
 		h := &gammaHandler{f: f, o: o}
 		c.AddGammaSizeHandler(h)
 		c.AddFailedHandler(h)
-		o.control, o.size = c, 0
+		o.control, o.size, o.sentRamps = c, 0, nil
 		if err := f.ctx.SendRequest(f.gamma, 0, c, o.wl); err != nil {
 			return fmt.Errorf("nightlight: gamma control for output %s: %w", o.name, err)
 		}
@@ -277,8 +301,12 @@ func (f *Filter) gammaOutputLocked(o *output) error {
 	return o.sendRamps(f.setting.Ramps(o.size))
 }
 
-// sendRamps hands the compositor the ramps in a sealed memfd.
+// sendRamps hands the compositor the ramps in a sealed memfd, unless the
+// control already holds exactly these.
 func (o *output) sendRamps(ramps []uint16) error {
+	if slices.Equal(o.sentRamps, ramps) {
+		return nil
+	}
 	fd, err := unix.MemfdCreate("lys-nightlight", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
 	if err != nil {
 		return fmt.Errorf("nightlight: ramp memfd for output %s: %w", o.name, err)
@@ -300,6 +328,7 @@ func (o *output) sendRamps(ramps []uint16) error {
 	if err := o.control.SetGamma(uintptr(fd)); err != nil {
 		return fmt.Errorf("nightlight: set the ramps of output %s: %w", o.name, err)
 	}
+	o.sentRamps = ramps
 	return nil
 }
 
@@ -308,7 +337,7 @@ func (o *output) dropControl() error {
 		return nil
 	}
 	err := o.control.Destroy()
-	o.control, o.size = nil, 0
+	o.control, o.size, o.sentRamps = nil, 0, nil
 	return err
 }
 
@@ -379,6 +408,7 @@ func (f *Filter) addOutputLocked(ev wl.RegistryGlobalEvent) {
 	var err error
 	switch {
 	case f.ctm != nil:
+		f.sentCTM = nil
 		err = f.commitCTMLocked()
 	case f.gamma != nil:
 		err = f.gammaOutputLocked(o)

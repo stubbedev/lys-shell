@@ -32,6 +32,9 @@ type compositor struct {
 	ctm       map[string][9]float64
 	gammaOwns map[string]*gammaControl
 	ramps     map[string][]uint16
+	// ctmCommits and rampSends count what reached the compositor.
+	ctmCommits int
+	rampSends  map[string]int
 }
 
 func newCompositor(t *testing.T, offerCTM, offerGamma bool) *compositor {
@@ -40,7 +43,7 @@ func newCompositor(t *testing.T, offerCTM, offerGamma bool) *compositor {
 	c := &compositor{
 		ln: ln, offerCTM: offerCTM, offerGam: offerGamma, gammaSize: 256, nextName: 100,
 		outputs: map[uint32]string{}, ctm: map[string][9]float64{},
-		gammaOwns: map[string]*gammaControl{}, ramps: map[string][]uint16{},
+		gammaOwns: map[string]*gammaControl{}, ramps: map[string][]uint16{}, rampSends: map[string]int{},
 	}
 	go c.accept()
 	t.Cleanup(func() {
@@ -111,6 +114,18 @@ func (c *compositor) matrix(output string) ([9]float64, bool) {
 	defer c.mu.Unlock()
 	m, ok := c.ctm[output]
 	return m, ok
+}
+
+func (c *compositor) commits() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.ctmCommits
+}
+
+func (c *compositor) rampsSent(output string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.rampSends[output]
 }
 
 func (c *compositor) gammaRamps(output string) []uint16 {
@@ -259,6 +274,7 @@ func (cl *client) request(id, op uint32, a *args) {
 			}
 			obj.pending[out] = m
 		case 1:
+			c.ctmCommits++
 			if c.ctmOwner != obj {
 				return
 			}
@@ -304,6 +320,7 @@ func (cl *client) request(id, op uint32, a *args) {
 				vals[i] = binary.NativeEndian.Uint16(ramps[2*i:])
 			}
 			c.ramps[obj.output] = vals
+			c.rampSends[obj.output]++
 		case 1:
 			cl.release(obj)
 			delete(cl.objects, id)
