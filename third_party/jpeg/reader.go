@@ -108,7 +108,7 @@ type decoder struct {
 	// pix holds the pixels of the image decoded so far.
 	pix memory.Slice[byte]
 	// coeffs holds progCoeffs.
-	coeffs [maxComponents]memory.Slice[block]
+	coeffs [maxComponents]memory.Slice[storedBlock]
 	bits   bits
 	// bytes is a byte buffer, similar to a bufio.Reader, except that it
 	// has to be able to unread more than 1 byte, due to byte stuffing.
@@ -150,7 +150,7 @@ type decoder struct {
 	eobRun              uint16 // End-of-Band run, specified in section G.1.2.2.
 
 	comp       [maxComponents]component
-	progCoeffs [maxComponents][]block // Saved state between progressive-mode scans.
+	progCoeffs [maxComponents][]storedBlock // Saved state between progressive-mode scans.
 	huff       [maxTc + 1][maxTh + 1]huffman
 	quant      [maxTq + 1]block // Quantization tables, in zig-zag order.
 	tmp        [2 * blockSize]byte
@@ -826,7 +826,7 @@ func (d *decoder) release(withPix bool) error {
 			errs = append(errs, fmt.Errorf("jpeg: freeing component %d's progressive coefficients: %w", i, err))
 		}
 	}
-	d.coeffs, d.progCoeffs = [maxComponents]memory.Slice[block]{}, [maxComponents][]block{}
+	d.coeffs, d.progCoeffs = [maxComponents]memory.Slice[storedBlock]{}, [maxComponents][]storedBlock{}
 	if withPix {
 		if err := memory.FreeSlice(d.mem, d.pix); err != nil {
 			errs = append(errs, fmt.Errorf("jpeg: freeing the image: %w", err))

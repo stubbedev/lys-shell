@@ -211,7 +211,7 @@ func (d *decoder) processSOS(n int) error {
 		for i := range nComp {
 			compIndex := scan[i].compIndex
 			if d.progCoeffs[compIndex] == nil {
-				coeffs, err := memory.MakeSlice[block](d.mem, mxx*myy*d.comp[compIndex].h*d.comp[compIndex].v)
+				coeffs, err := memory.MakeSlice[storedBlock](d.mem, mxx*myy*d.comp[compIndex].h*d.comp[compIndex].v)
 				if err != nil {
 					return fmt.Errorf("jpeg: allocating component %d's progressive coefficients: %w", compIndex, err)
 				}
@@ -279,7 +279,7 @@ func (d *decoder) processSOS(n int) error {
 
 					// Load the previous partially decoded coefficients, if applicable.
 					if d.progressive {
-						b = d.progCoeffs[compIndex][by*mxx*hi+bx]
+						d.progCoeffs[compIndex][by*mxx*hi+bx].load(&b)
 					} else {
 						b = block{}
 					}
@@ -351,7 +351,7 @@ func (d *decoder) processSOS(n int) error {
 
 					if d.progressive {
 						// Save the coefficients.
-						d.progCoeffs[compIndex][by*mxx*hi+bx] = b
+						d.progCoeffs[compIndex][by*mxx*hi+bx].save(&b)
 						// At this point, we could call reconstructBlock to dequantize and perform the
 						// inverse DCT, to save early stages of a progressive image to the *image.YCbCr
 						// buffers (the whole point of progressive encoding), but in Go, the jpeg.Decode
@@ -514,7 +514,9 @@ func (d *decoder) reconstructProgressiveImage() error {
 		stride := mxx * d.comp[i].h
 		for by := 0; by*v < d.height; by++ {
 			for bx := 0; bx*h < d.width; bx++ {
-				if err := d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i); err != nil {
+				var b block
+				d.progCoeffs[i][by*stride+bx].load(&b)
+				if err := d.reconstructBlock(&b, bx, by, i); err != nil {
 					return err
 				}
 			}

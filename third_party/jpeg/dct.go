@@ -92,6 +92,24 @@ func dctBox(x0, x1, kcos, ksin int32) (y0, y1 int32) {
 // dct_test.go defines a String method for nice printing in tests.
 type block [blockSize]int32
 
+// storedBlock is a block kept between progressive scans: a coefficient of
+// an 8-bit image fits 16 bits, half of what the inverse DCT computes in,
+// and a progressive image holds one block per 8x8 of every component
+// until its last scan.
+type storedBlock [blockSize]int16
+
+func (s *storedBlock) load(b *block) {
+	for i, c := range s {
+		b[i] = int32(c)
+	}
+}
+
+func (s *storedBlock) save(b *block) {
+	for i, c := range b {
+		s[i] = int16(c)
+	}
+}
+
 const blockSize = 8 * 8
 
 // Note on Numerical Precision

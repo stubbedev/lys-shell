@@ -14,10 +14,10 @@ under `testdata/` are the standard library's, plus
   plane of a 4-component image are one memory-go allocation, laid out
   as `image.NewYCbCr` lays them out (`chromaSize`).
 - `scan.go`, `processSOS`: a progressive scan's coefficient blocks (an
-  int32 per sample, four times the decoded image) are memory-go
-  allocations, freed and trimmed back to the system before `Decode`
-  returns. A 3840x2880 4:4:4 progressive photo held 133 MB of them on
-  the Go heap.
+  int16 per sample, `storedBlock`, twice the decoded image, where the
+  standard library keeps an int32) are memory-go allocations, freed and
+  trimmed back to the system before `Decode` returns. A 3840x2880 4:4:4
+  progressive photo held 133 MB of them on the Go heap; it holds 66 MB.
 - `reader.go`, `applyBlack` and `convertToRGB`: the converted image is
   a memory-go allocation, and the planes it was converted from are
   freed at once; `image/internal/imageutil.DrawYCbCr` becomes

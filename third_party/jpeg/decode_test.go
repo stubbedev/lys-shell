@@ -3,6 +3,7 @@ package jpeg
 import (
 	"bytes"
 	stdjpeg "image/jpeg"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -145,4 +146,18 @@ func TestDecodeKeepsAProgressiveImageOffTheHeap(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNothingHeld(t, &mem)
+}
+
+func TestStoredBlockKeepsEveryCoefficient(t *testing.T) {
+	var b, got block
+	for i := range b {
+		b[i] = int32(i-blockSize/2) * 1000
+	}
+	b[0], b[1] = math.MinInt16, math.MaxInt16
+	var s storedBlock
+	s.save(&b)
+	s.load(&got)
+	if got != b {
+		t.Errorf("round trip = %v, want %v", got, b)
+	}
 }
