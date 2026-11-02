@@ -196,23 +196,35 @@ func findOnPath(program string) bool {
 
 // pathPrograms is findOnPath for looking up many programs: $PATH's
 // directories are listed once, so a name no directory holds costs no
-// stat, which is most of the stats a scan over every application makes.
+// stat, a listed name costs one in the first directory holding it rather
+// than one in every directory before it, and a name asked for again costs
+// none: the answers are kept.
 func pathPrograms() func(program string) bool {
-	names := map[string]struct{}{}
+	first := map[string]string{}
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
 		for _, entry := range entries {
-			names[entry.Name()] = struct{}{}
+			if _, seen := first[entry.Name()]; !seen {
+				first[entry.Name()] = dir
+			}
 		}
 	}
+	known := map[string]bool{}
 	return func(program string) bool {
-		if _, listed := names[program]; !listed {
+		if ok, asked := known[program]; asked {
+			return ok
+		}
+		dir, listed := first[program]
+		if !listed {
 			return false
 		}
-		return findOnPath(program)
+		// A first match that cannot run is rare enough to search the rest.
+		ok := executable(filepath.Join(dir, program)) || findOnPath(program)
+		known[program] = ok
+		return ok
 	}
 }
 
