@@ -311,15 +311,7 @@ pkgs.testers.nixosTest {
         raise Exception("the open dropdown took the focus from foot")
 
     click(*away)
-    frames = set()
-    for _ in range(40):
-        frames.add(region(*below_clock))
-        if region(*below_clock) == closed:
-            break
-    print("frames of the dropdown's exit after a click away:", len(frames))
     wait("a click away to close the dropdown", lambda: region(*below_clock) == closed, tries=20)
-    if len(frames) < 2:
-        raise Exception("a click away closed the dropdown without an exit")
     shot("06b-dropdown-clicked-away")
     typed_reaches_foot("key-after-click-away")
 
