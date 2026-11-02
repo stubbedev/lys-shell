@@ -13,18 +13,21 @@ import (
 // iconSearch is the lys-ui icon search path the registry drives (a seam
 // for tests; the shell's is lys-ui's process-wide theme).
 type iconSearch struct {
-	paths   func() []string
-	set     func([]string)
-	refresh func()
+	paths     func() []string
+	set       func([]string)
+	refresh   func()
+	namespace func(dir string, prefixes []string)
 }
 
-var lysUIIcons = iconSearch{paths: widget.IconSearchPaths, set: widget.SetIconSearchPaths, refresh: widget.RefreshIcons}
+var lysUIIcons = iconSearch{paths: widget.IconSearchPaths, set: widget.SetIconSearchPaths, refresh: widget.RefreshIcons, namespace: widget.SetIconNamespace}
 
 // initIcons is bootstrap.rs's init_icons (IconRegistry::init): the
 // icons directory and index.theme set up, stale icons migrated, the
 // registry's roots put first on the icon search path, and the directory
 // watched so icons `lys-shell icons install` writes while the shell runs
-// resolve without a restart. A failure is logged and the shell runs on
+// resolve without a restart. lys-shell's prefixes are declared its own, so
+// neither drawing them nor checking them in ReportMissingIcons lists the
+// theme chain. A failure is logged and the shell runs on
 // without lys-shell's icons. The returned function stops the watch.
 func initIcons(r *icons.Registry, search iconSearch) (stop func()) {
 	if err := r.EnsureSetup(); err != nil {
@@ -32,6 +35,7 @@ func initIcons(r *icons.Registry, search iconSearch) (stop func()) {
 		return func() {}
 	}
 	icons.Migrate(r.IconsDir())
+	search.namespace(icons.IconsSubdir, icons.AllPrefixes())
 	refresh := func() {
 		search.set(r.ThemeSearchPaths(search.paths()))
 		search.refresh()

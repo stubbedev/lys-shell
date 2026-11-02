@@ -19,12 +19,19 @@ type fakeIconSearch struct {
 	mu        sync.Mutex
 	paths     []string
 	refreshes int
+	nsDir     string
+	nsPrefix  []string
 }
 
 func (f *fakeIconSearch) search() iconSearch {
 	return iconSearch{
 		paths: func() []string { f.mu.Lock(); defer f.mu.Unlock(); return slices.Clone(f.paths) },
 		set:   func(p []string) { f.mu.Lock(); defer f.mu.Unlock(); f.paths = p },
+		namespace: func(dir string, prefixes []string) {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			f.nsDir, f.nsPrefix = dir, prefixes
+		},
 		refresh: func() {
 			f.mu.Lock()
 			defer f.mu.Unlock()
@@ -54,6 +61,10 @@ func TestInitIcons(t *testing.T) {
 	paths, refreshes := fake.state()
 	if !slices.Equal(paths, []string{base, "/usr/share/icons"}) || refreshes != 1 {
 		t.Fatalf("after init: paths %v, %d refreshes; want the registry first, one refresh", paths, refreshes)
+	}
+
+	if fake.nsDir != icons.IconsSubdir || !slices.Equal(fake.nsPrefix, icons.AllPrefixes()) {
+		t.Errorf("declared namespace %q %v, want the icons directory and every prefix", fake.nsDir, fake.nsPrefix)
 	}
 
 	// An icon installed while the shell runs is picked up.
@@ -178,5 +189,29 @@ func TestAMissingConfigIconIsReported(t *testing.T) {
 		if d.Kind != config.DiagnosticWarning || d.Field("Icon") != w.icon || d.Field("Source") != w.source || d.Hint != w.hint {
 			t.Errorf("diagnostic %d = %+v, want a warning for %s from %s hinting %q", i, d, w.icon, w.source, w.hint)
 		}
+	}
+}
+
+func useIconNamespace(t *testing.T) {
+	t.Helper()
+	widget.SetIconNamespace(icons.IconsSubdir, icons.AllPrefixes())
+	t.Cleanup(func() { widget.SetIconNamespace("", nil) })
+}
+
+// Declaring the icons lys-shell's own takes the theme chain out of the
+// check, not icons out of the report: one no root holds still warns,
+// and every bundled one still resolves.
+func TestTheNamespaceKeepsTheMissingIconReport(t *testing.T) {
+	useBundledIcons(t)
+	useIconNamespace(t)
+	for _, d := range reportedIcons(config.Defaults()) {
+		t.Errorf("a default icon is not bundled: %s", d.Field("Icon"))
+	}
+	cfg := config.Defaults()
+	cfg.Battery.ChargingIcon = "md-battery_android_frame_bolt-symbolic"
+	cfg.Network.WiredConnectedIcon = "cm-wired-symbolic"
+	got := reportedIcons(cfg)
+	if len(got) != 2 || got[0].Field("Icon") != "cm-wired-symbolic" || got[1].Field("Icon") != "md-battery_android_frame_bolt-symbolic" {
+		t.Errorf("reported %v, want the two icons no root holds", got)
 	}
 }

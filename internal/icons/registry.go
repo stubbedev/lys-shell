@@ -59,9 +59,12 @@ func DefaultPath() (string, error) {
 // BasePath is the theme root.
 func (r *Registry) BasePath() string { return r.base }
 
+// IconsSubdir is where lys-shell's icons live below an icon root.
+const IconsSubdir = "hicolor/scalable/actions"
+
 // IconsDir is <base>/hicolor/scalable/actions.
 func (r *Registry) IconsDir() string {
-	return filepath.Join(r.base, "hicolor", "scalable", "actions")
+	return filepath.Join(r.base, IconsSubdir)
 }
 
 // EnsureSetup creates the directory tree and index.theme.
