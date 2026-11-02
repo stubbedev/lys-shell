@@ -610,7 +610,7 @@
         "dropdown-autohide": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Close dropdown when clicking outside it."
+          "description": "Close dropdown when clicking outside it.\n\nEsc closes an open dropdown too. On lys-wm it does so beside the\ndropdown, with the keys still on the focused window, and the window\nsees neither the press nor the release, unless a bind on bare Esc, a\nwindow inhibiting shortcuts, an exclusive layer or a grab has the key.\nElsewhere Esc reaches a dropdown only after a click into it, as keys\nstay with the focused window until then."
         },
         "dropdown-freeze-label": {
           "$ref": "#/$defs/boolean",

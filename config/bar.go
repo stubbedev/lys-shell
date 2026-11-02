@@ -113,6 +113,13 @@ type BarConfig struct {
 	// Dropdown panel opacity (0-100).
 	DropdownOpacity Percentage `cfg:"dropdown-opacity"`
 	// Close dropdown when clicking outside it.
+	//
+	// Esc closes an open dropdown too. On lys-wm it does so beside the
+	// dropdown, with the keys still on the focused window, and the window
+	// sees neither the press nor the release, unless a bind on bare Esc, a
+	// window inhibiting shortcuts, an exclusive layer or a grab has the key.
+	// Elsewhere Esc reaches a dropdown only after a click into it, as keys
+	// stay with the focused window until then.
 	DropdownAutohide bool `cfg:"dropdown-autohide"`
 	// Freeze the bar button label while its dropdown is open.
 	//

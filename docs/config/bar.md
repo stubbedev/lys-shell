@@ -119,6 +119,17 @@ When disabled, windows may overlap the bar and the bar draws over them.
 | `dropdown-autohide` | bool | `true` | Close dropdown when clicking outside it. |
 | `dropdown-freeze-label` | bool | `true` | Freeze the bar button label while its dropdown is open. |
 
+::: details More about `dropdown-autohide`
+
+Esc closes an open dropdown too. On lys-wm it does so beside the
+dropdown, with the keys still on the focused window, and the window
+sees neither the press nor the release, unless a bind on bare Esc, a
+window inhibiting shortcuts, an exclusive layer or a grab has the key.
+Elsewhere Esc reaches a dropdown only after a click into it, as keys
+stay with the focused window until then.
+
+:::
+
 ::: details More about `dropdown-freeze-label`
 
 Prevents the button from resizing mid-interaction, which keeps the

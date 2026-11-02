@@ -87,7 +87,7 @@ var schemaDocs = map[string]string{
 	"BarConfig.ButtonOpacity":                                "Button opacity (0-100).",
 	"BarConfig.ButtonRounding":                               "Corner rounding level for the buttons in the bar.",
 	"BarConfig.ButtonVariant":                                "Visual style variant for bar buttons.",
-	"BarConfig.DropdownAutohide":                             "Close dropdown when clicking outside it.",
+	"BarConfig.DropdownAutohide":                             "Close dropdown when clicking outside it.\n\nEsc closes an open dropdown too. On lys-wm it does so beside the\ndropdown, with the keys still on the focused window, and the window\nsees neither the press nor the release, unless a bind on bare Esc, a\nwindow inhibiting shortcuts, an exclusive layer or a grab has the key.\nElsewhere Esc reaches a dropdown only after a click into it, as keys\nstay with the focused window until then.",
 	"BarConfig.DropdownFreezeLabel":                          "Freeze the bar button label while its dropdown is open.\n\nPrevents the button from resizing mid-interaction, which keeps the\ndropdown anchored in place.",
 	"BarConfig.DropdownOpacity":                              "Dropdown panel opacity (0-100).",
 	"BarConfig.DropdownShadow":                               "Enable dropdown panel shadow.",

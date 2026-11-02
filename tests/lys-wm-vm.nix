@@ -324,6 +324,19 @@ pkgs.testers.nixosTest {
     typed_reaches_foot("key-after-click-away")
 
     click(centre, bar_y)
+    wait("the dropdown to reopen for Esc beside it", lambda: region(*below_clock) != closed, tries=20)
+    time.sleep(1)
+    reopened = region(*below_clock)
+    machine.send_key("esc")
+    # Not compared with closed: the pointer still rests on the clock, whose
+    # tooltip then shows there.
+    wait("Esc beside the dropdown to close it", lambda: region(*below_clock) != reopened, tries=20)
+    if (wmctl("activewindow") or {}).get("app_id") != "foot":
+        raise Exception("Esc beside the dropdown took the focus from foot")
+    # Readline reads a leaked ESC and the next t as M-t, so the touch fails.
+    typed_reaches_foot("esc-beside")
+
+    click(centre, bar_y)
     wait("the dropdown to reopen", lambda: region(*below_clock) != closed, tries=20)
     time.sleep(1)
     click(centre, below_clock[1] + 20)
