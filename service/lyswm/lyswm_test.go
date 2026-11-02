@@ -164,6 +164,7 @@ func TestWatchStateSeedsWithoutAnEvent(t *testing.T) {
 	})
 	t.Run("locks", func(t *testing.T) {
 		checkSeed(t, lyswm.LocksState, "locks", `{"caps":false,"num":true,"scroll":false}`, lyswm.Locks{Num: true})
+		checkSeed(t, lyswm.ReducedMotionState, "reducedmotion", `true`, true)
 	})
 }
 
@@ -202,6 +203,7 @@ func TestWatchStateFollowsItsEvent(t *testing.T) {
 	})
 	t.Run("locks", func(t *testing.T) {
 		checkFollow(t, lyswm.LocksState, `{"event":"locks","locks":{"caps":true,"num":true,"scroll":false}}`, lyswm.Locks{Caps: true, Num: true})
+		checkFollow(t, lyswm.ReducedMotionState, `{"event":"reducedmotion","reduced_motion":true}`, true)
 	})
 }
 

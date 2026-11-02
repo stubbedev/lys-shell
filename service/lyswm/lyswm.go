@@ -243,6 +243,7 @@ const (
 	EventSubmap        EventKind = "submap"
 	EventLayout        EventKind = "layout"
 	EventLocks         EventKind = "locks"
+	EventReducedMotion EventKind = "reducedmotion"
 )
 
 type event struct {
@@ -250,6 +251,7 @@ type event struct {
 	Submap *string   `json:"submap"`
 	Layout *Layout   `json:"layout"`
 	Locks  *Locks    `json:"locks"`
+	Motion *bool     `json:"reduced_motion"`
 }
 
 // Watcher follows the watch stream and ticks after each event of the
@@ -330,7 +332,31 @@ var (
 	SubmapState = State[string]{EventSubmap, func(e event) *string { return e.Submap }}
 	LayoutState = State[Layout]{EventLayout, func(e event) *Layout { return e.Layout }}
 	LocksState  = State[Locks]{EventLocks, func(e event) *Locks { return e.Locks }}
+	// ReducedMotionState is whether animations.reduced_motion is in force.
+	ReducedMotionState = State[bool]{EventReducedMotion, func(e event) *bool { return e.Motion }}
 )
+
+// FollowReducedMotion calls set with lys-wm's reduced motion now and at
+// every change, until the returned stop or the end of the stream, which
+// calls set(false) since nothing asks for it then. It does nothing
+// without a lys-wm session.
+func FollowReducedMotion(set func(bool)) (stop func(), err error) {
+	if !IsRunning() {
+		return func() {}, nil
+	}
+	w, err := WatchState(ReducedMotionState)
+	if err != nil {
+		return nil, err
+	}
+	set(w.Value())
+	go func() {
+		for range w.Ticks() {
+			set(w.Value())
+		}
+		set(false)
+	}()
+	return w.Close, nil
+}
 
 // StateWatcher follows one State: seeded from its request once the
 // stream is open, so an event sent in between wins, then updated by its

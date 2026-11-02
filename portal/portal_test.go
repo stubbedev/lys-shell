@@ -173,6 +173,7 @@ func TestSettingsServeTheGTKInterfaceKeys(t *testing.T) {
 	want := map[string]any{
 		"color-scheme": "prefer-dark", "gtk-theme": "Adwaita-dark", "icon-theme": "Papirus",
 		"cursor-theme": "Bibata", "cursor-size": int32(28), "font-name": "Inter 11", "text-scaling-factor": 1.25,
+		"enable-animations": true,
 	}
 	if len(got) != len(want) {
 		t.Errorf("served %v, want %v", got, want)
@@ -243,6 +244,46 @@ func TestColorScheme(t *testing.T) {
 	}
 }
 
+func TestReducedMotionReachesThePortal(t *testing.T) {
+	r := settingsRig(t, gtksettings.Settings{}, nil)
+	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(0) {
+		t.Fatalf("reduced-motion = %v by default", v)
+	}
+	if v, _ := r.read(GnomeInterfaceNS, "enable-animations"); v != true {
+		t.Fatalf("enable-animations = %v by default", v)
+	}
+	if err := r.cfg.SetByPath("animations.reduced-motion", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyReducedMotion, GnomeInterfaceNS + " enable-animations"}) {
+		t.Errorf("the key emitted %v", got)
+	}
+	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(1) {
+		t.Errorf("reduced-motion = %v with the key on", v)
+	}
+	if v, _ := r.read(GnomeInterfaceNS, "enable-animations"); v != false {
+		t.Errorf("enable-animations = %v with the key on", v)
+	}
+	if err := r.cfg.SetByPath("animations.reduced-motion", false); err != nil {
+		t.Fatal(err)
+	}
+	r.changed(t)
+	r.cfg.SetSessionReducedMotion(true)
+	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyReducedMotion, GnomeInterfaceNS + " enable-animations"}) {
+		t.Errorf("the compositor's reduced motion emitted %v", got)
+	}
+	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(1) {
+		t.Errorf("reduced-motion = %v when the compositor asks", v)
+	}
+}
+
+func TestTheHostsGTKAnimationsSettingReachesThePortal(t *testing.T) {
+	r := settingsRig(t, gtksettings.Settings{Animations: gtksettings.AnimationsOff}, nil)
+	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(1) {
+		t.Errorf("reduced-motion = %v with gtk-enable-animations off", v)
+	}
+}
+
 func TestSettingChangedFollowsTheConfig(t *testing.T) {
 	r := settingsRig(t, gtksettings.Settings{}, nil)
 	// Nothing is emitted until a value actually changes.
@@ -252,7 +293,7 @@ func TestSettingChangedFollowsTheConfig(t *testing.T) {
 	if err := r.cfg.SetByPath("animations.enabled", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyReducedMotion}) {
+	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyReducedMotion, GnomeInterfaceNS + " enable-animations"}) {
 		t.Errorf("animations off emitted %v", got)
 	}
 	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(1) {

@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/portal"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -39,6 +40,11 @@ func runPortal(m *cli.Matches) error {
 	defer func() { _ = conn.Close() }()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	if stopFollow, err := lyswm.FollowReducedMotion(cfg.SetSessionReducedMotion); err != nil {
+		_, _ = fmt.Fprintf(m.Stderr(), "portal: lys-wm reduced motion unavailable: %v\n", err)
+	} else {
+		defer stopFollow()
+	}
 	stop, err := portal.New(conn, cfg).Serve()
 	if err != nil {
 		return fail(err)

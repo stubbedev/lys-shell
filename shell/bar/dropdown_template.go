@@ -403,7 +403,11 @@ func pageStack() *widget.Stack {
 
 // pageSlide gives a dropdown's page stack its slide between pages at
 // the configured interaction-duration (zero, an instant switch, with
-// animations off).
+// animations off), a cross-fade under reduced motion.
 func pageSlide(s *widget.Stack, cfg *config.Config) {
-	s.SetTransition(widget.StackSlideLeftRight, time.Duration(cfg.Animations.InteractionDurationMs())*time.Millisecond)
+	transition := widget.StackCrossfade
+	if cfg.Animations.PagesSlide() {
+		transition = widget.StackSlideLeftRight
+	}
+	s.SetTransition(transition, time.Duration(cfg.Animations.InteractionDurationMs())*time.Millisecond)
 }

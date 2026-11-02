@@ -29,6 +29,7 @@ type Service struct {
 	configSet *table
 	subs      map[int]func(old, new *Config)
 	nextSub   int
+	session   bool
 
 	secretsMu   sync.Mutex
 	secretsSubs map[int]func()
@@ -135,6 +136,7 @@ func Watch[T any](s *Service, selector func(*Config) T, fn func(T)) (cancel func
 // the effective config changed.
 func (s *Service) publish(cfg *Config, staged *table, tree any) {
 	s.mu.Lock()
+	cfg.Animations.session = s.session
 	old := s.cfg
 	s.cfg, s.staged, s.tree = cfg, staged, tree
 	s.configSet = configLeaves(tree)
@@ -148,6 +150,22 @@ func (s *Service) publish(cfg *Config, staged *table, tree any) {
 	for _, fn := range subs {
 		fn(old, cfg)
 	}
+}
+
+// SetSessionReducedMotion records whether the compositor asks for
+// reduced motion. It holds across reloads and reaches subscribers as a
+// change of the effective config.
+func (s *Service) SetSessionReducedMotion(on bool) {
+	s.mu.Lock()
+	if s.session == on {
+		s.mu.Unlock()
+		return
+	}
+	s.session = on
+	next := *s.cfg
+	staged, tree := s.staged, s.tree
+	s.mu.Unlock()
+	s.publish(&next, staged, tree)
 }
 
 // build applies the config tree then the runtime tree onto the

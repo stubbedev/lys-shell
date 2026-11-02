@@ -308,6 +308,11 @@
           },
           "description": "Per-surface override for the portal print surface."
         },
+        "reduced-motion": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Replace motion with fades in the shell and, through the portal's\nreduced-motion setting, in apps: surfaces fade instead of sliding,\nswinging or bouncing, and looping indicators stop. Under lys-wm its\n`animations.reduced_motion` turns this on as well."
+        },
         "share-picker": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
@@ -9908,6 +9913,7 @@
           "exit": null,
           "exit-duration": null
         },
+        "reduced-motion": false,
         "share-picker": {
           "enter": null,
           "enter-duration": null,

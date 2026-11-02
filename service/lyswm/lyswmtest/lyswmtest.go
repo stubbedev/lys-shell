@@ -53,13 +53,14 @@ func Start(t *testing.T) *WM {
 		Events:     make(chan string, 16),
 	}
 	for request, result := range map[string]string{
-		"workspaces":   `[]`,
-		"windows":      `[]`,
-		"outputs":      `[]`,
-		"activewindow": `null`,
-		"submap":       `""`,
-		"layout":       `{"index":0,"name":"English (US)"}`,
-		"locks":        `{"caps":false,"num":false,"scroll":false}`,
+		"workspaces":    `[]`,
+		"windows":       `[]`,
+		"outputs":       `[]`,
+		"activewindow":  `null`,
+		"submap":        `""`,
+		"layout":        `{"index":0,"name":"English (US)"}`,
+		"locks":         `{"caps":false,"num":false,"scroll":false}`,
+		"reducedmotion": `false`,
 	} {
 		w.Result(request, result)
 	}

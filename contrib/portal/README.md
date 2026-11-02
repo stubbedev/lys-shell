@@ -20,7 +20,7 @@ Implemented natively by `lys-shell portal`:
 | `RemoteDesktop` | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1`: relative+absolute pointer, scroll, evdev + keysym keys (libxkbcommon), and an `ConnectToEIS` libei socket (`reis`) |
 | `Screenshot` (+ PickColor) | the shell's `dev.stubbe.lys.Screenshot1` overlay |
 | `GlobalShortcuts` | `hyprland-global-shortcuts-v1` (where the compositor implements it) |
-| `Settings` | `lys-shell-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast) |
+| `Settings` | `lys-shell-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast, reduced-motion) |
 | `Notification` (v2) | the shell's notification daemon: update by id, body click as the default action, buttons with targets, priority/category/display hints, markup body, themed, file-descriptor and bytes icons |
 | `Wallpaper` | `dev.stubbe.lys.Wallpaper1` |
 | `Inhibit` | systemd-logind block locks (idle, sleep, shutdown for logout) with the app's reason, plus a hold on the shell's own idle inhibitor; monitor sessions follow the lock screen (user switching cannot be inhibited) |

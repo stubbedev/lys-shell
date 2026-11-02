@@ -63,8 +63,9 @@ var servedSettings = []setting{
 	{AppearanceNS, keyColorScheme, always(func(d desktop) any { return colorScheme(d.cfg.Styling) })},
 	{AppearanceNS, keyAccentColor, always(func(d desktop) any { return accentColor(d.cfg.Styling.Palette.Primary) })},
 	{AppearanceNS, keyContrast, always(func(d desktop) any { return boolU32(d.cfg.Styling.HighContrast) })},
-	{AppearanceNS, keyReducedMotion, always(func(d desktop) any { return boolU32(!d.cfg.Animations.Enabled) })},
+	{AppearanceNS, keyReducedMotion, always(func(d desktop) any { return boolU32(reducedMotion(d)) })},
 	{GnomeInterfaceNS, "color-scheme", always(func(d desktop) any { return gnomeColorScheme(colorScheme(d.cfg.Styling)) })},
+	{GnomeInterfaceNS, "enable-animations", always(func(d desktop) any { return !reducedMotion(d) })},
 	{GnomeInterfaceNS, "gtk-theme", always(gtkTheme)},
 	{GnomeInterfaceNS, "icon-theme", nonEmpty(func(d desktop) string { return d.gtk.IconThemeName })},
 	{GnomeInterfaceNS, "cursor-theme", nonEmpty(cursorTheme)},
@@ -78,6 +79,12 @@ func nonEmpty(read func(desktop) string) func(desktop) (any, bool) {
 		s := read(d)
 		return s, s != ""
 	}
+}
+
+// reducedMotion is the shell's animations off or reduced, or the host's
+// gtk-enable-animations off, which sandboxed apps cannot read.
+func reducedMotion(d desktop) bool {
+	return !d.cfg.Animations.Enabled || d.cfg.Animations.Reduced() || d.gtk.Animations == gtksettings.AnimationsOff
 }
 
 // gnomeColorScheme is the GSettings enum for a color-scheme value.

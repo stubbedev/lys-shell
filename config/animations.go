@@ -13,6 +13,11 @@ type AnimationsConfig struct {
 	// Enable enter/exit animations (OSD, toasts, notifications) and
 	// icon-change crossfades. When disabled, surfaces appear instantly.
 	Enabled bool `cfg:"enabled"`
+	// Replace motion with fades in the shell and, through the portal's
+	// reduced-motion setting, in apps: surfaces fade instead of sliding,
+	// swinging or bouncing, and looping indicators stop. Under lys-wm its
+	// `animations.reduced_motion` turns this on as well.
+	ReducedMotion bool `cfg:"reduced-motion"`
 	// Animation duration in milliseconds.
 	Duration uint32 `cfg:"duration"`
 	// Transition style used for enter/exit of the OSD, toasts, and
@@ -62,7 +67,15 @@ type AnimationsConfig struct {
 	Lock SurfaceAnimation `cfg:"lock"`
 	// Per-surface override for the application launcher.
 	Launcher SurfaceAnimation `cfg:"launcher"`
+
+	// session is reduced motion the compositor asks for
+	// (Service.SetSessionReducedMotion).
+	session bool
 }
+
+// Reduced reports whether motion gives way to fades: asked for here or
+// by the compositor.
+func (a AnimationsConfig) Reduced() bool { return a.ReducedMotion || a.session }
 
 // DefaultsAnimations returns the schema defaults.
 func DefaultsAnimations() AnimationsConfig {
@@ -144,13 +157,17 @@ func (a AnimationsConfig) TransitionFor(s AnimSurface, exiting bool) AnimationTy
 	if exiting {
 		perSurface, global = sa.Exit, a.Exit
 	}
+	chosen := a.Transition
 	switch {
 	case perSurface != nil:
-		return *perSurface
+		chosen = *perSurface
 	case global != nil:
-		return *global
+		chosen = *global
 	}
-	return a.Transition
+	if a.Reduced() && chosen != AnimationNone {
+		return AnimationFade
+	}
+	return chosen
 }
 
 // DurationFor is the resolved duration in ms for a surface and
@@ -182,6 +199,10 @@ func (a AnimationsConfig) InteractionDurationMs() uint32 {
 	return 0
 }
 
+// PagesSlide reports whether a dropdown's pages slide rather than
+// cross-fade.
+func (a AnimationsConfig) PagesSlide() bool { return !a.Reduced() }
+
 // CSSOverrides is the :root block bridging the config into the
 // stylesheet: the --duration-* family from ui-duration (0.3/0.6/1/1.4
 // scaled) and, with indicators off, every looping keyframe frozen.
@@ -194,7 +215,7 @@ func (a AnimationsConfig) CSSOverrides() string {
 		return uint32(math.Round(float64(float32(ui) * factor)))
 	}
 	frozen := ""
-	if !a.Enabled || !a.Indicators {
+	if !a.Enabled || !a.Indicators || a.Reduced() {
 		frozen = "    --cfg-anim-spin: 0s;\n    --cfg-anim-media-spin: 0s;\n    " +
 			"--cfg-anim-scan: 0s;\n    --cfg-anim-blink: 0s;\n    --cfg-anim-pulse: 0s;\n"
 	}

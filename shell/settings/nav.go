@@ -82,7 +82,7 @@ func animationsPage(*config.Config) pageSpec {
 		id: "animations", navKey: "settings-nav-animations", icon: "ld-zap-symbolic",
 		header: "settings-page-animations",
 		sections: []sectionSpec{
-			{title: "settings-section-general", rows: fields("animations.enabled", "animations.transition", "animations.duration")},
+			{title: "settings-section-general", rows: fields("animations.enabled", "animations.reduced-motion", "animations.transition", "animations.duration")},
 			{title: "settings-section-direction", rows: []rowSpec{
 				field("animations.enter"), field("animations.exit"),
 				field("animations.enter-duration", duration), field("animations.exit-duration", duration),

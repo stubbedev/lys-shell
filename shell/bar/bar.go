@@ -25,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/notifications"
@@ -69,6 +70,34 @@ func Run() error {
 	return run(svc.Config(), svc)
 }
 
+// followReducedMotion keeps the toolkit's reduced motion on while the
+// desktop or the shell's config asks for it: the application follows
+// only the desktop, and without a portal that is never. The compositor's
+// own setting reaches the config from here too.
+func followReducedMotion(application *app.Application, cfg *config.Config, svc *config.Service) (stop func()) {
+	apply := func(c *config.Config) {
+		widget.SetReducedMotion(application.ReducedMotion() || c.Animations.Reduced())
+	}
+	apply(cfg)
+	if svc == nil {
+		return func() {}
+	}
+	offDesktop := application.OnReducedMotionChange(func(bool) { apply(svc.Config()) })
+	offConfig := svc.Subscribe(func(_, next *config.Config) {
+		application.Invoke(func() { apply(next) })
+	})
+	stopFollow, err := lyswm.FollowReducedMotion(svc.SetSessionReducedMotion)
+	if err != nil {
+		log.Printf("lys-shell: lys-wm reduced motion: %v", err)
+		stopFollow = func() {}
+	}
+	return func() {
+		stopFollow()
+		offConfig()
+		offDesktop()
+	}
+}
+
 // RunWith shows the bar from a prepared config: one layer surface per
 // output the layout gives a visible bar, then the lys-ui loop.
 func RunWith(cfg *config.Config) error { return run(cfg, nil) }
@@ -110,6 +139,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	theme.WatchUserStyles(application)
 	defer apptheme.Setup(application)()
 	apptheme.ReportMissingIcons(cfg, config.StderrDiagnostics)
+	defer followReducedMotion(application, cfg, svc)()
 	// rt is what the bars are built from; a config reload or a new
 	// palette re-derives it and rebuilds them.
 	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}
