@@ -277,8 +277,8 @@ func TestResolve(t *testing.T) {
 	if p, _ := resolve(c, "DP-1", st); p != "state.png" {
 		t.Errorf("state wins = %q", p)
 	}
-	if p, _ := resolve(wcfg(), "DP-1", wallpaper.MonitorState{}); p != "" {
-		t.Errorf("nothing configured = %q", p)
+	if p, _ := resolve(wcfg(), "DP-1", wallpaper.MonitorState{}); p != builtinWallpaper {
+		t.Errorf("nothing configured = %q, want the built-in wallpaper", p)
 	}
 }
 

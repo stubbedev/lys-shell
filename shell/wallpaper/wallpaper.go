@@ -255,7 +255,8 @@ func (s *Shell) RemoveOutput(out *app.Output) {
 }
 
 // resolve is the image and fit a monitor renders (reconcile): its own
-// state, else its [[wallpaper.monitors]] image, else the global one.
+// state, else its [[wallpaper.monitors]] image, else the global one, else
+// the built-in one.
 func resolve(cfg config.WallpaperConfig, name string, st wallpaper.MonitorState) (string, wallpaper.FitMode) {
 	path := st.Wallpaper
 	if path == "" {
@@ -265,6 +266,9 @@ func resolve(cfg config.WallpaperConfig, name string, st wallpaper.MonitorState)
 	}
 	if path == "" {
 		path = cfg.Wallpaper
+	}
+	if path == "" {
+		path = builtinWallpaper
 	}
 	return path, st.FitMode
 }
@@ -295,9 +299,8 @@ func (s *Shell) reconcile() {
 			}
 			s.surfaces[name] = surf
 		}
-		if path, fit := resolve(s.cfg, name, st); path != "" {
-			surf.render(path, fit)
-		}
+		path, fit := resolve(s.cfg, name, st)
+		surf.render(path, fit)
 	}
 }
 

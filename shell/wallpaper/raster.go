@@ -96,6 +96,10 @@ func (rs *rasters) acquire(key rasterKey, done func(*raster)) {
 		return
 	}
 	rs.waiting[key] = []func(*raster){done}
+	if key.path == builtinWallpaper {
+		rs.work.Go(rs.d.spawn, func() { rs.deliver(key, func() (*raster, error) { return builtinRaster(&rs.mem, key.box, key.known) }) })
+		return
+	}
 	if keys, ok := rs.decoding[key.path]; ok {
 		rs.decoding[key.path] = append(keys, key)
 		return
@@ -159,10 +163,16 @@ func freeSource(path string, src imagedecode.Decoded) {
 // the loop, which frees it instead when it never takes it. Nothing is
 // made once the rasters are closing.
 func (rs *rasters) make(key rasterKey, img image.Image) {
+	rs.deliver(key, func() (*raster, error) { return rasterize(&rs.mem, img, key.fit, key.box, key.known) })
+}
+
+// deliver runs draw off the loop and hands its raster to the loop, which
+// frees it instead when it never takes it.
+func (rs *rasters) deliver(key rasterKey, draw func() (*raster, error)) {
 	if rs.work.Closed() {
 		return
 	}
-	r, err := rasterize(&rs.mem, img, key.fit, key.box, key.known)
+	r, err := draw()
 	if err != nil {
 		rs.d.invoke(func() { rs.made(key, nil, err) })
 		return
