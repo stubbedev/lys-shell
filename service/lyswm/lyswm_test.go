@@ -42,7 +42,7 @@ func TestNotRunning(t *testing.T) {
 func TestQueriesDecodeTheResults(t *testing.T) {
 	f := lyswmtest.Start(t)
 	f.Result("workspaces", `[{"id":1,"output":"DP-1","windows":3,"visible":true,"focused":true},{"id":4,"output":"HDMI-A-1","windows":0,"visible":true,"focused":false}]`)
-	f.Result("windows", `[{"id":7,"app_id":"foot","title":"~","pid":4242,"workspace":1,"output":"DP-1","rect":{"x":10,"y":20,"width":300,"height":400},"floating":true,"fullscreen":false,"urgent":true,"unresponsive":false,"focused":true,"content_type":"none","icon":null}]`)
+	f.Result("windows", `[{"id":7,"app_id":"foot","title":"~","pid":4242,"workspace":1,"output":"DP-1","rect":{"x":10,"y":20,"width":300,"height":400},"floating":true,"fullscreen":false,"minimized":true,"urgent":true,"unresponsive":false,"focused":true,"content_type":"none","icon":null}]`)
 	f.Result("outputs", `[{"name":"DP-1","description":"LG","rect":{"x":0,"y":0,"width":2048,"height":1152},"scale":1.25,"mode":{"width":2560,"height":1440,"refresh_mhz":143912},"workspace":1,"focused":true,"powered":true}]`)
 	workspaces, err := lyswm.Workspaces()
 	if err != nil {
@@ -56,7 +56,7 @@ func TestQueriesDecodeTheResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantWin := lyswm.Window{ID: 7, AppID: "foot", Title: "~", Workspace: 1, Output: "DP-1", Rect: lyswm.Rect{X: 10, Y: 20, Width: 300, Height: 400}, Floating: true, Urgent: true, Focused: true}
+	wantWin := lyswm.Window{ID: 7, AppID: "foot", Title: "~", Workspace: 1, Output: "DP-1", Rect: lyswm.Rect{X: 10, Y: 20, Width: 300, Height: 400}, Floating: true, Minimized: true, Urgent: true, Focused: true}
 	if len(windows) != 1 || windows[0] != wantWin {
 		t.Fatalf("windows = %+v", windows)
 	}

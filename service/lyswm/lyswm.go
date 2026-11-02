@@ -73,6 +73,7 @@ type Window struct {
 	Rect       Rect   `json:"rect"`
 	Floating   bool   `json:"floating"`
 	Fullscreen bool   `json:"fullscreen"`
+	Minimized  bool   `json:"minimized"`
 	Urgent     bool   `json:"urgent"`
 	Focused    bool   `json:"focused"`
 }
@@ -236,6 +237,7 @@ const (
 	EventTitle         EventKind = "title"
 	EventIcon          EventKind = "icon"
 	EventUrgent        EventKind = "urgent"
+	EventMinimized     EventKind = "minimized"
 	EventUnresponsive  EventKind = "unresponsive"
 	EventFocus         EventKind = "focus"
 	EventSubmap        EventKind = "submap"
