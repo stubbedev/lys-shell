@@ -110,7 +110,8 @@ type BarConfig struct {
 	ButtonGroupRounding RoundingLevel `cfg:"button-group-rounding"`
 	// Enable dropdown panel shadow.
 	DropdownShadow bool `cfg:"dropdown-shadow"`
-	// Dropdown panel opacity (0-100).
+	// Dropdown panel opacity (0-100). Below 100 the compositor blurs what is
+	// behind the panel; where it offers no blur the panel is opaque.
 	DropdownOpacity Percentage `cfg:"dropdown-opacity"`
 	// Close dropdown when clicking outside it.
 	//
@@ -170,7 +171,7 @@ func DefaultsBar() BarConfig {
 		ButtonGroupBorderColor:    mustColor("border-accent"),
 		ButtonGroupRounding:       RoundingSm,
 		DropdownShadow:            true,
-		DropdownOpacity:           100,
+		DropdownOpacity:           75,
 		DropdownAutohide:          true,
 		DropdownFreezeLabel:       true,
 	}

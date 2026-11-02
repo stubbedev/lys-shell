@@ -115,7 +115,7 @@ When disabled, windows may overlap the bar and the bar draws over them.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `dropdown-shadow` | bool | `true` | Enable dropdown panel shadow. |
-| `dropdown-opacity` | [`Percentage`](/config/types#percentage) | `100` | Dropdown panel opacity (0-100). |
+| `dropdown-opacity` | [`Percentage`](/config/types#percentage) | `75` | Dropdown panel opacity (0-100). Below 100 the compositor blurs what is behind the panel; where it offers no blur the panel is opaque. |
 | `dropdown-autohide` | bool | `true` | Close dropdown when clicking outside it. |
 | `dropdown-freeze-label` | bool | `true` | Freeze the bar button label while its dropdown is open. |
 
@@ -179,7 +179,7 @@ bar:
   button-group-border-color: border-accent
   button-group-rounding: sm
   dropdown-shadow: true
-  dropdown-opacity: 100
+  dropdown-opacity: 75
   dropdown-autohide: true
   dropdown-freeze-label: true
 ```

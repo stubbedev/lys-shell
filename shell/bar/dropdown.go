@@ -353,14 +353,18 @@ func (r *dropdownRegistry) closeAll() {
 // focused window, or with dropdown-autohide off staying open. The width
 // caps as well as floors: lys-ui's
 // rows fill whatever width they are offered, and a popover offers the
-// widest output.
+// widest output. A translucent panel (dropdown-opacity) asks the
+// compositor to blur the desktop behind it, which its own backdrop-filter
+// could not see; where there is no blur the card carries lys-ui's
+// blur-unavailable class and rests opaque.
 func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, monH, width int) app.PopoverConfig {
 	pc := app.PopoverConfig{
-		Anchor:    anchor,
-		Gravity:   app.GravityOf(barEdge(cfg.Bar.Location).PopoverSide()),
-		Content:   content,
-		Gap:       widget.PopoverGap,
-		Dismissal: app.PopoverSticky,
+		Anchor:         anchor,
+		Gravity:        app.GravityOf(barEdge(cfg.Bar.Location).PopoverSide()),
+		Content:        content,
+		Gap:            widget.PopoverGap,
+		Dismissal:      app.PopoverSticky,
+		BackgroundBlur: cfg.Bar.DropdownOpacity < 100,
 	}
 	if cfg.Bar.DropdownAutohide {
 		pc.Dismissal = app.PopoverClickAway

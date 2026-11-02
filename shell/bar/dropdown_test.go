@@ -349,6 +349,7 @@ func TestDropdownPopoverCapsAtItsWidth(t *testing.T) {
 // tree they resolved nothing and painted transparent.
 func TestDropdownTreeStylesThePanelText(t *testing.T) {
 	cfg := config.Defaults()
+	cfg.Bar.DropdownOpacity = 100
 	ctx := styledContext(t, cfg)
 	full := computeStyle(cfg, ctx.Style.palette)
 	ctx.Style = &full
@@ -457,5 +458,19 @@ func TestPopoverGaps(t *testing.T) {
 	}
 	if pc := dropdownPopover(config.Defaults(), anchor, anchor, 1000, 0); pc.Gap != widget.PopoverGap {
 		t.Errorf("dropdown gap %d, want %d from its button", pc.Gap, widget.PopoverGap)
+	}
+}
+
+// A translucent panel asks for the compositor's blur; a panel at full
+// opacity has nothing to show through and pays nothing.
+func TestDropdownPopoverAsksForBlurWhenTranslucent(t *testing.T) {
+	anchor := widget.NewBox(widget.Column, 0, 0)
+	cfg := config.Defaults()
+	if !dropdownPopover(cfg, anchor, anchor, 1000, 0).BackgroundBlur {
+		t.Error("the default translucent panel does not ask for blur")
+	}
+	cfg.Bar.DropdownOpacity = 100
+	if dropdownPopover(cfg, anchor, anchor, 1000, 0).BackgroundBlur {
+		t.Error("an opaque panel asks for blur")
 	}
 }

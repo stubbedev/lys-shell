@@ -135,7 +135,7 @@ func TestBarStylingKeysDefaultsAndDecode(t *testing.T) {
 	if d.Shadow != ShadowNone || d.ButtonVariant != ButtonBlockPrefix || d.ButtonOpacity != 100 ||
 		d.ButtonIconSize != (Size{1, SizeMultiplier}) || d.ButtonLabelWeight != WeightSemibold ||
 		d.ButtonGap != (Size{1, SizeMultiplier}) || d.ButtonIconPosition != IconStart ||
-		!d.DropdownShadow || d.DropdownOpacity != 100 {
+		!d.DropdownShadow || d.DropdownOpacity != 75 {
 		t.Errorf("bar styling defaults = %+v", d)
 	}
 	path := writeConfig(t, `

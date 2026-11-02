@@ -241,3 +241,29 @@ func TestDropdownHeaderActionsKeepTheirHeight(t *testing.T) {
 		t.Errorf("the switch's middle %d is off the row's %d", mid, rowMid)
 	}
 }
+
+// The panel's fill honours dropdown-opacity while the compositor blurs
+// behind it, and rests on the opaque surface where it does not.
+func TestDropdownCardFallsBackToOpaqueWithoutBlur(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bar.DropdownOpacity = 40
+	ctx := styledContext(t, cfg)
+	card := popoverCard(widget.NewSpacer(100, 60), false)
+	ctx.Theme.Attach(card)
+	card.Arrange(render.Rect{W: 100, H: 60})
+	alpha := func() uint8 {
+		t.Helper()
+		pix := make([]byte, render.Stride(100)*60)
+		cv := render.NewScaled(pix, render.Stride(100), 100, 60, 1, 1)
+		card.Paint(cv)
+		return pix[30*render.Stride(100)+50*4+3]
+	}
+	if got := alpha(); got < 0x60 || got > 0x70 {
+		t.Errorf("a 40%% panel paints alpha %#02x, want about 0x66", got)
+	}
+	card.AddClass(css.BlurUnavailable)
+	card.Arrange(render.Rect{W: 100, H: 60})
+	if got := alpha(); got != 0xff {
+		t.Errorf("without blur the panel paints alpha %#02x, want opaque", got)
+	}
+}

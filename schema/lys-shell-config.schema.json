@@ -619,8 +619,8 @@
         },
         "dropdown-opacity": {
           "$ref": "#/$defs/Percentage",
-          "default": 100,
-          "description": "Dropdown panel opacity (0-100)."
+          "default": 75,
+          "description": "Dropdown panel opacity (0-100). Below 100 the compositor blurs what is\nbehind the panel; where it offers no blur the panel is opaque."
         },
         "dropdown-shadow": {
           "$ref": "#/$defs/boolean",
@@ -9727,7 +9727,7 @@
         "button-variant": "block-prefix",
         "dropdown-autohide": true,
         "dropdown-freeze-label": true,
-        "dropdown-opacity": 100,
+        "dropdown-opacity": 75,
         "dropdown-shadow": true,
         "exclusive": true,
         "inset-edge": 0.0,

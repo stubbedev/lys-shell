@@ -9,7 +9,7 @@
     --palette-yellow: #e0b870;
     --palette-green: #68c898;
     --palette-blue: #78a0e0;
-    --dropdown-surface: rgba(28, 28, 44, 1.00);
+    --dropdown-surface: rgba(28, 28, 44, 0.75);
 
     --cfg-font-sans: "Inter";
     --cfg-font-mono: "JetBrains Mono";
