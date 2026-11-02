@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/stubbedev/lys-ui/widget/css"
+
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
@@ -112,7 +114,7 @@ func deref(s *string) string {
 // classes is osd_classes: osd, then muted (a muted slider), toggle-off
 // (a toggle turned off), bordered (osd.border), and a toast's class.
 func classes(ev Event, border bool) []string {
-	out := []string{"osd"}
+	out := []string{"osd", css.Glass}
 	if ev.kind == kindSlider && ev.muted {
 		out = append(out, "muted")
 	}

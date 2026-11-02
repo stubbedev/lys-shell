@@ -84,7 +84,10 @@ func styledContext(t *testing.T, cfg *config.Config) ModuleContext {
 // returning the pixels and the measured height.
 func paintBar(t *testing.T, ctx ModuleContext, layout config.BarLayout, w int) ([]byte, int, widget.Widget) {
 	t.Helper()
-	root := buildRoot(ctx, layout, "DP-1")
+	return paintBarRoot(buildRoot(ctx, layout, "DP-1"), w)
+}
+
+func paintBarRoot(root *widget.Bar, w int) ([]byte, int, widget.Widget) {
 	h := barThickness(root, widget.Size{W: w, H: 1 << 16})
 	widget.SizeWithin(root, availSize(w, h))
 	root.Arrange(render.Rect{W: w, H: h})
@@ -121,6 +124,7 @@ func TestBarCenterSectionIsCentered(t *testing.T) {
 
 func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	cfg := config.Defaults()
+	cfg.Bar = config.PlainBar()
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock", Class: "mine"}}}
 	ctx := newTestContext(t, cfg)
 	root := buildRoot(ctx, layout, "DP-1")
@@ -195,6 +199,7 @@ func TestGroupsAreBarItemsWithModules(t *testing.T) {
 
 func TestBarPaintsFromTheRustStylesheet(t *testing.T) {
 	cfg := config.Defaults()
+	cfg.Bar = config.PlainBar()
 	cfg.Bar.BorderLocation = config.BorderBottom
 	cfg.Bar.BorderWidth = 2
 	cfg.Bar.BorderColor = mustToken(config.TokenRed)
@@ -227,10 +232,13 @@ func TestBarPaintsFromTheRustStylesheet(t *testing.T) {
 
 func TestBarInsetsAreWindowMargins(t *testing.T) {
 	cfg := config.Defaults()
+	cfg.Bar = config.PlainBar()
 	cfg.Bar.InsetEdge = config.Size{Value: 10, Unit: config.SizePixels}
 	ctx := styledContext(t, cfg)
 	palette := ctx.Theme.RenderPalette()
-	_, flatH, _ := paintBar(t, styledContext(t, config.Defaults()), config.BarLayout{Monitor: "*"}, 200)
+	flat := config.Defaults()
+	flat.Bar = config.PlainBar()
+	_, flatH, _ := paintBar(t, styledContext(t, flat), config.BarLayout{Monitor: "*"}, 200)
 	data, h, _ := paintBar(t, ctx, config.BarLayout{Monitor: "*"}, 200)
 	if h != flatH+10 {
 		t.Errorf("inset bar height = %d, want the flat %d plus the 10px edge margin", h, flatH)
@@ -278,6 +286,7 @@ func TestBarPaddingInsetsTheZones(t *testing.T) {
 		{config.LocationTop, 0, 0},
 	} {
 		cfg := config.Defaults()
+		cfg.Bar = config.PlainBar()
 		cfg.Bar.Location = tc.loc
 		cfg.Bar.Padding = config.Size{Value: float32(tc.padding), Unit: config.SizePixels}
 		cfg.Bar.PaddingEnds = config.Size{Value: float32(tc.ends), Unit: config.SizePixels}
@@ -314,6 +323,7 @@ func TestBarButtonGapSeparatesIconAndLabel(t *testing.T) {
 		{config.ButtonBlockPrefix, config.IconEnd, 20, 0},
 	} {
 		cfg := config.Defaults()
+		cfg.Bar = config.PlainBar()
 		cfg.Bar.ButtonVariant = tc.variant
 		cfg.Bar.ButtonIconPosition = tc.at
 		cfg.Bar.ButtonGap = config.Size{Value: tc.gap, Unit: config.SizePixels}
@@ -337,6 +347,7 @@ func TestBarButtonGapSeparatesIconAndLabel(t *testing.T) {
 func TestBarButtonFollowsTheBarsOrientation(t *testing.T) {
 	for _, loc := range []config.Location{config.LocationTop, config.LocationLeft} {
 		cfg := config.Defaults()
+		cfg.Bar = config.PlainBar()
 		cfg.Bar.Location = loc
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
 		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
@@ -399,5 +410,35 @@ func TestBlockPrefixIconFillsTheButtonHeight(t *testing.T) {
 	icon, label := shownIcon(btn).Bounds(), btn.Label().Bounds()
 	if icon.Y != label.Y || icon.H != label.H {
 		t.Errorf("the icon block spans y=%d..%d beside the label's y=%d..%d, want the same band", icon.Y, icon.Y+icon.H, label.Y, label.Y+label.H)
+	}
+}
+
+func TestTheDefaultBarIsAFloatingPaneOfGlass(t *testing.T) {
+	cfg := config.Defaults()
+	if cfg.Bar.BackgroundOpacity >= 100 {
+		t.Fatalf("background-opacity %d asks the compositor for no blur", cfg.Bar.BackgroundOpacity)
+	}
+	ctx := styledContext(t, cfg)
+	root := buildRoot(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
+	if !widget.HasClass(root, "floating") {
+		t.Error("the default bar touches its edge")
+	}
+	data, h, _ := paintBar(t, ctx, config.BarLayout{Monitor: "*"}, 200)
+	if got := pixelAt(data, 200, 100, 2); got.A() != 0 {
+		t.Errorf("the inset above the bar = %#08x, want transparent", uint32(got))
+	}
+	if got := pixelAt(data, 200, 100, h/2); got.A() == 0 || got.A() == 0xff {
+		t.Errorf("the bar = %#08x, want translucent", uint32(got))
+	}
+}
+
+func TestABarWithoutBlurRestsOnItsOpaqueColor(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	palette := ctx.Theme.RenderPalette()
+	root := buildRoot(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
+	root.AddClass("blur-unavailable")
+	data, h, _ := paintBarRoot(root, 200)
+	if got := pixelAt(data, 200, 100, h/2); got != palette.Surface {
+		t.Errorf("blur-unavailable bar = %#08x, want the opaque surface %#08x", uint32(got), uint32(palette.Surface))
 	}
 }

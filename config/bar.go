@@ -53,7 +53,8 @@ type BarConfig struct {
 	Layer Layer `cfg:"layer"`
 	// Bar background color.
 	BG ColorValue `cfg:"bg"`
-	// Bar background opacity (0-100).
+	// Bar background opacity (0-100). Below 100 the compositor blurs what is
+	// behind the bar; where it offers no blur the bar rests on its opaque color.
 	BackgroundOpacity Percentage `cfg:"background-opacity"`
 	// Border placement for bar.
 	BorderLocation BorderLocation `cfg:"border-location"`
@@ -129,8 +130,20 @@ type BarConfig struct {
 	DropdownFreezeLabel bool `cfg:"dropdown-freeze-label"`
 }
 
-// DefaultsBar returns the schema defaults.
+// DefaultsBar returns the schema defaults: PlainBar made a floating pane of
+// glass whose buttons are ink on the glass.
 func DefaultsBar() BarConfig {
+	b := PlainBar()
+	b.InsetEdge, b.InsetEnds = Scale(0.5), Scale(0.5)
+	b.BackgroundOpacity = 60
+	b.BorderLocation, b.BorderColor = BorderAll, mustColor("border-default")
+	b.Rounding = RoundingDefault
+	b.ButtonVariant, b.ButtonBGOpacity = ButtonBasic, 0
+	return b
+}
+
+// PlainBar is a flat opaque bar along its edge, with colored block buttons.
+func PlainBar() BarConfig {
 	return BarConfig{
 		Layout:                    []BarLayout{DefaultBarLayout()},
 		Scale:                     1,
@@ -197,20 +210,23 @@ type BarLayout struct {
 	Right []BarItem `cfg:"right"`
 }
 
-// DefaultBarLayout is BarLayout::default(): every monitor, media left,
-// clock centered, the status modules right.
+// DefaultBarLayout is BarLayout::default(): every monitor, the workspaces
+// and media left, clock centered, the status modules right.
 func DefaultBarLayout() BarLayout {
 	return BarLayout{
 		Monitor: "*",
 		Show:    true,
-		Left:    []BarItem{{Module: ModuleMedia}},
+		Left:    []BarItem{{Module: ModuleWorkspaces}, {Module: ModuleMedia}},
 		Center:  []BarItem{{Module: ModuleClock}},
 		Right: []BarItem{
+			{Module: ModuleSystray},
 			{Module: ModuleBattery},
 			{Module: ModuleBluetooth},
 			{Module: ModuleNetwork},
 			{Module: ModuleMicrophone},
 			{Module: ModuleVolume},
+			{Module: ModuleNotifications},
+			{Module: ModulePower},
 		},
 	}
 }

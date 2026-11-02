@@ -502,8 +502,8 @@
       "properties": {
         "background-opacity": {
           "$ref": "#/$defs/Percentage",
-          "default": 100,
-          "description": "Bar background opacity (0-100)."
+          "default": 60,
+          "description": "Bar background opacity (0-100). Below 100 the compositor blurs what is\nbehind the bar; where it offers no blur the bar rests on its opaque color."
         },
         "bg": {
           "$ref": "#/$defs/ColorValue",
@@ -512,12 +512,12 @@
         },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "border-accent",
+          "default": "border-default",
           "description": "Border color for the bar."
         },
         "border-location": {
           "$ref": "#/$defs/BorderLocation",
-          "default": "none",
+          "default": "all",
           "description": "Border placement for bar."
         },
         "border-width": {
@@ -527,7 +527,7 @@
         },
         "button-bg-opacity": {
           "$ref": "#/$defs/Percentage",
-          "default": 100,
+          "default": 0,
           "description": "Button background opacity (0-100)."
         },
         "button-border-location": {
@@ -627,7 +627,7 @@
         },
         "button-variant": {
           "$ref": "#/$defs/BarButtonVariant",
-          "default": "block-prefix",
+          "default": "basic",
           "description": "Visual style variant for bar buttons."
         },
         "dropdown-autohide": {
@@ -657,12 +657,12 @@
         },
         "inset-edge": {
           "$ref": "#/$defs/Size",
-          "default": 0.0,
+          "default": 0.5,
           "description": "Gap between bar and its attached screen edge.\n\n- **Orientation**: Distance from top (horizontal bar) or left (vertical bar)"
         },
         "inset-ends": {
           "$ref": "#/$defs/Size",
-          "default": 0.0,
+          "default": 0.5,
           "description": "Gap at the bar's ends.\n\n- **Orientation**: Left/right (horizontal bar), top/bottom (vertical bar)"
         },
         "layer": {
@@ -679,15 +679,19 @@
               ],
               "extends": null,
               "left": [
+                "workspaces",
                 "media"
               ],
               "monitor": "*",
               "right": [
+                "systray",
                 "battery",
                 "bluetooth",
                 "network",
                 "microphone",
-                "volume"
+                "volume",
+                "notifications",
+                "power"
               ],
               "show": true
             }
@@ -716,7 +720,7 @@
         },
         "rounding": {
           "$ref": "#/$defs/RoundingLevel",
-          "default": "none",
+          "default": "default",
           "description": "Corner rounding level for the bar."
         },
         "scale": {
@@ -796,6 +800,7 @@
         },
         "left": {
           "default": [
+            "workspaces",
             "media"
           ],
           "description": "Modules in the left section.",
@@ -811,11 +816,14 @@
         },
         "right": {
           "default": [
+            "systray",
             "battery",
             "bluetooth",
             "network",
             "microphone",
-            "volume"
+            "volume",
+            "notifications",
+            "power"
           ],
           "description": "Modules in the right section.",
           "items": {
@@ -871,6 +879,7 @@
             "volume",
             "weather",
             "window-title",
+            "workspaces",
             "world-clock"
           ]
         },
@@ -932,7 +941,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -1078,7 +1087,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "blue",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -1264,7 +1273,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "blue",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -1390,7 +1399,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -1765,7 +1774,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "accent",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -2035,7 +2044,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "blue",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -2978,7 +2987,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "green",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -3081,7 +3090,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "blue",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -3167,7 +3176,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -4903,7 +4912,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "blue",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -5034,7 +5043,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "red",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -5108,7 +5117,7 @@
             "icon-bg-color": "yellow",
             "icon-color": "auto",
             "icon-show": true,
-            "label-color": "yellow",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:battery",
@@ -5162,7 +5171,7 @@
             "icon-locked": "ld-lock-symbolic",
             "icon-show": true,
             "icon-unlocked": "ld-lock-open-symbolic",
-            "label-color": "blue",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": false,
             "left-click": "dropdown:bitwarden",
@@ -5190,7 +5199,7 @@
             "icon-bg-color": "blue",
             "icon-color": "auto",
             "icon-show": true,
-            "label-color": "blue",
+            "label-color": "fg-default",
             "label-max-length": 15,
             "label-show": true,
             "left-click": "dropdown:bluetooth",
@@ -5213,7 +5222,7 @@
             "icon-bg-color": "yellow",
             "icon-color": "auto",
             "icon-show": true,
-            "label-color": "yellow",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:brightness",
@@ -5274,7 +5283,7 @@
             "icon-color": "auto",
             "icon-name": "ld-calendar-clock-symbolic",
             "icon-show": true,
-            "label-color": "accent",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:calendar",
@@ -5296,7 +5305,7 @@
             "icon-color": "auto",
             "icon-name": "ld-cpu-symbolic",
             "icon-show": true,
-            "label-color": "blue",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "",
@@ -5401,7 +5410,7 @@
             "icon-color": "auto",
             "icon-inactive": "ld-bed-symbolic",
             "icon-show": true,
-            "label-color": "green",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "lys-shell idle toggle --indefinite",
@@ -5425,7 +5434,7 @@
             "icon-color": "auto",
             "icon-name": "ld-layers-symbolic",
             "icon-show": true,
-            "label-color": "blue",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "",
@@ -5447,7 +5456,7 @@
             "icon-color": "auto",
             "icon-name": "ld-keyboard-symbolic",
             "icon-show": true,
-            "label-color": "yellow",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "layout-alias-map": {},
@@ -5567,7 +5576,7 @@
             "icon-name": "ld-music-symbolic",
             "icon-show": true,
             "icon-type": "application-mapped",
-            "label-color": "blue",
+            "label-color": "fg-default",
             "label-max-length": 35,
             "label-show": true,
             "left-click": "dropdown:media",
@@ -5593,7 +5602,7 @@
             "icon-color": "auto",
             "icon-muted": "ld-mic-off-symbolic",
             "icon-show": true,
-            "label-color": "red",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:audio",
@@ -5617,7 +5626,7 @@
             "icon-name": "ld-activity-symbolic",
             "icon-show": true,
             "interface": "auto",
-            "label-color": "red",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "",
@@ -5638,7 +5647,7 @@
             "icon-bg-color": "accent",
             "icon-color": "auto",
             "icon-show": true,
-            "label-color": "accent",
+            "label-color": "fg-default",
             "label-max-length": 15,
             "label-show": true,
             "left-click": "dropdown:network",
@@ -5680,7 +5689,7 @@
             "icon-off": "ld-sun-symbolic",
             "icon-on": "ld-moon-symbolic",
             "icon-show": true,
-            "label-color": "yellow",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "latitude": null,
@@ -5748,7 +5757,7 @@
             "icon-show": true,
             "icon-source": "automatic",
             "icon-unread": "ld-bell-dot-symbolic",
-            "label-color": "green",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:notification",
@@ -5767,7 +5776,7 @@
             "popup-shadow": true,
             "popup-stack": "per-app",
             "popup-stacking-order": "newest-first",
-            "popup-urgency-bar": "low",
+            "popup-urgency-bar": "critical",
             "right-click": "lys-shell notify dnd",
             "scroll-down": "",
             "scroll-up": "",
@@ -5839,7 +5848,7 @@
             "icon-color": "auto",
             "icon-name": "ld-memory-stick-symbolic",
             "icon-show": true,
-            "label-color": "green",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "",
@@ -5866,7 +5875,7 @@
             "icon-paused": "ld-circle-pause-symbolic",
             "icon-recording": "ld-circle-dot-symbolic",
             "icon-show": true,
-            "label-color": "red",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "lys-shell recorder toggle",
@@ -5902,7 +5911,7 @@
             "icon-color": "auto",
             "icon-show": true,
             "label": "",
-            "label-color": "accent",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": false,
             "left-click": "lys-shell screenshot region",
@@ -5935,7 +5944,7 @@
             "icon-color": "auto",
             "icon-name": "ld-hard-drive-symbolic",
             "icon-show": true,
-            "label-color": "yellow",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "",
@@ -6014,7 +6023,7 @@
             "icon-preparing": "ld-loader-circle-symbolic",
             "icon-show": true,
             "icon-tearing-down": "ld-trash-2-symbolic",
-            "label-color": "accent",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:treeman",
@@ -6037,7 +6046,7 @@
             "icon-color": "auto",
             "icon-muted": "ld-volume-x-symbolic",
             "icon-show": true,
-            "label-color": "red",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:audio",
@@ -6065,7 +6074,7 @@
             "icon-color": "auto",
             "icon-name": "ld-sun-symbolic",
             "icon-show": true,
-            "label-color": "accent",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "dropdown:weather",
@@ -6095,7 +6104,7 @@
             "icon-mappings": {},
             "icon-name": "ld-app-window-symbolic",
             "icon-show": true,
-            "label-color": "blue",
+            "label-color": "fg-default",
             "label-max-length": 50,
             "label-show": true,
             "left-click": "",
@@ -6117,7 +6126,7 @@
             "icon-color": "auto",
             "icon-name": "ld-globe-symbolic",
             "icon-show": true,
-            "label-color": "yellow",
+            "label-color": "fg-default",
             "label-max-length": 0,
             "label-show": true,
             "left-click": "",
@@ -6204,7 +6213,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "red",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -6285,7 +6294,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "accent",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -6451,7 +6460,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -6757,7 +6766,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "green",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -6852,7 +6861,7 @@
         },
         "popup-urgency-bar": {
           "$ref": "#/$defs/UrgencyBarThreshold",
-          "default": "low",
+          "default": "critical",
           "description": "Minimum urgency level that displays a colored urgency bar."
         },
         "right-click": {
@@ -7553,7 +7562,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "green",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -7664,7 +7673,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "red",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -7903,7 +7912,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "accent",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -8252,7 +8261,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -8967,7 +8976,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "accent",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -9114,7 +9123,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "red",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -9225,7 +9234,7 @@
         "wallpaper": {
           "$ref": "#/$defs/string",
           "default": "",
-          "description": "A single image file to use as the wallpaper on all monitors. Leave empty\nto use cycling and/or per-monitor overrides instead."
+          "description": "A single image file to use as the wallpaper on all monitors. Leave empty\nto use cycling and/or per-monitor overrides instead; a monitor none of\nthem gives an image shows the built-in wallpaper."
         }
       },
       "type": "object"
@@ -9455,7 +9464,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "accent",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -9641,7 +9650,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "blue",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -9772,7 +9781,7 @@
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
-          "default": "yellow",
+          "default": "fg-default",
           "description": "Label text color token."
         },
         "label-max-length": {
@@ -9934,12 +9943,12 @@
     "bar": {
       "$ref": "#/$defs/BarConfig",
       "default": {
-        "background-opacity": 100,
+        "background-opacity": 60,
         "bg": "bg-surface",
-        "border-color": "border-accent",
-        "border-location": "none",
+        "border-color": "border-default",
+        "border-location": "all",
         "border-width": 1,
-        "button-bg-opacity": 100,
+        "button-bg-opacity": 0,
         "button-border-location": "all",
         "button-border-width": 1,
         "button-gap": 1.0,
@@ -9959,14 +9968,14 @@
         "button-label-weight": "semibold",
         "button-opacity": 100,
         "button-rounding": "sm",
-        "button-variant": "block-prefix",
+        "button-variant": "basic",
         "dropdown-autohide": true,
         "dropdown-freeze-label": true,
         "dropdown-opacity": 75,
         "dropdown-shadow": true,
         "exclusive": true,
-        "inset-edge": 0.0,
-        "inset-ends": 0.0,
+        "inset-edge": 0.5,
+        "inset-ends": 0.5,
         "layer": "top",
         "layout": [
           {
@@ -9975,15 +9984,19 @@
             ],
             "extends": null,
             "left": [
+              "workspaces",
               "media"
             ],
             "monitor": "*",
             "right": [
+              "systray",
               "battery",
               "bluetooth",
               "network",
               "microphone",
-              "volume"
+              "volume",
+              "notifications",
+              "power"
             ],
             "show": true
           }
@@ -9992,7 +10005,7 @@
         "module-gap": 0.5,
         "padding": 0.3499999940395355,
         "padding-ends": 0.5,
-        "rounding": "none",
+        "rounding": "default",
         "scale": 1.0,
         "shadow": "none"
       },
@@ -10236,7 +10249,7 @@
           "icon-bg-color": "yellow",
           "icon-color": "auto",
           "icon-show": true,
-          "label-color": "yellow",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:battery",
@@ -10286,7 +10299,7 @@
           "icon-locked": "ld-lock-symbolic",
           "icon-show": true,
           "icon-unlocked": "ld-lock-open-symbolic",
-          "label-color": "blue",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": false,
           "left-click": "dropdown:bitwarden",
@@ -10310,7 +10323,7 @@
           "icon-bg-color": "blue",
           "icon-color": "auto",
           "icon-show": true,
-          "label-color": "blue",
+          "label-color": "fg-default",
           "label-max-length": 15,
           "label-show": true,
           "left-click": "dropdown:bluetooth",
@@ -10329,7 +10342,7 @@
           "icon-bg-color": "yellow",
           "icon-color": "auto",
           "icon-show": true,
-          "label-color": "yellow",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:brightness",
@@ -10382,7 +10395,7 @@
           "icon-color": "auto",
           "icon-name": "ld-calendar-clock-symbolic",
           "icon-show": true,
-          "label-color": "accent",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:calendar",
@@ -10400,7 +10413,7 @@
           "icon-color": "auto",
           "icon-name": "ld-cpu-symbolic",
           "icon-show": true,
-          "label-color": "blue",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "",
@@ -10489,7 +10502,7 @@
           "icon-color": "auto",
           "icon-inactive": "ld-bed-symbolic",
           "icon-show": true,
-          "label-color": "green",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "lys-shell idle toggle --indefinite",
@@ -10509,7 +10522,7 @@
           "icon-color": "auto",
           "icon-name": "ld-layers-symbolic",
           "icon-show": true,
-          "label-color": "blue",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "",
@@ -10527,7 +10540,7 @@
           "icon-color": "auto",
           "icon-name": "ld-keyboard-symbolic",
           "icon-show": true,
-          "label-color": "yellow",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "layout-alias-map": {},
@@ -10631,7 +10644,7 @@
           "icon-name": "ld-music-symbolic",
           "icon-show": true,
           "icon-type": "application-mapped",
-          "label-color": "blue",
+          "label-color": "fg-default",
           "label-max-length": 35,
           "label-show": true,
           "left-click": "dropdown:media",
@@ -10653,7 +10666,7 @@
           "icon-color": "auto",
           "icon-muted": "ld-mic-off-symbolic",
           "icon-show": true,
-          "label-color": "red",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:audio",
@@ -10673,7 +10686,7 @@
           "icon-name": "ld-activity-symbolic",
           "icon-show": true,
           "interface": "auto",
-          "label-color": "red",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "",
@@ -10690,7 +10703,7 @@
           "icon-bg-color": "accent",
           "icon-color": "auto",
           "icon-show": true,
-          "label-color": "accent",
+          "label-color": "fg-default",
           "label-max-length": 15,
           "label-show": true,
           "left-click": "dropdown:network",
@@ -10728,7 +10741,7 @@
           "icon-off": "ld-sun-symbolic",
           "icon-on": "ld-moon-symbolic",
           "icon-show": true,
-          "label-color": "yellow",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "latitude": null,
@@ -10788,7 +10801,7 @@
           "icon-show": true,
           "icon-source": "automatic",
           "icon-unread": "ld-bell-dot-symbolic",
-          "label-color": "green",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:notification",
@@ -10807,7 +10820,7 @@
           "popup-shadow": true,
           "popup-stack": "per-app",
           "popup-stacking-order": "newest-first",
-          "popup-urgency-bar": "low",
+          "popup-urgency-bar": "critical",
           "right-click": "lys-shell notify dnd",
           "scroll-down": "",
           "scroll-up": "",
@@ -10867,7 +10880,7 @@
           "icon-color": "auto",
           "icon-name": "ld-memory-stick-symbolic",
           "icon-show": true,
-          "label-color": "green",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "",
@@ -10890,7 +10903,7 @@
           "icon-paused": "ld-circle-pause-symbolic",
           "icon-recording": "ld-circle-dot-symbolic",
           "icon-show": true,
-          "label-color": "red",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "lys-shell recorder toggle",
@@ -10922,7 +10935,7 @@
           "icon-color": "auto",
           "icon-show": true,
           "label": "",
-          "label-color": "accent",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": false,
           "left-click": "lys-shell screenshot region",
@@ -10947,7 +10960,7 @@
           "icon-color": "auto",
           "icon-name": "ld-hard-drive-symbolic",
           "icon-show": true,
-          "label-color": "yellow",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "",
@@ -11014,7 +11027,7 @@
           "icon-preparing": "ld-loader-circle-symbolic",
           "icon-show": true,
           "icon-tearing-down": "ld-trash-2-symbolic",
-          "label-color": "accent",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:treeman",
@@ -11033,7 +11046,7 @@
           "icon-color": "auto",
           "icon-muted": "ld-volume-x-symbolic",
           "icon-show": true,
-          "label-color": "red",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:audio",
@@ -11057,7 +11070,7 @@
           "icon-color": "auto",
           "icon-name": "ld-sun-symbolic",
           "icon-show": true,
-          "label-color": "accent",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "dropdown:weather",
@@ -11083,7 +11096,7 @@
           "icon-mappings": {},
           "icon-name": "ld-app-window-symbolic",
           "icon-show": true,
-          "label-color": "blue",
+          "label-color": "fg-default",
           "label-max-length": 50,
           "label-show": true,
           "left-click": "",
@@ -11101,7 +11114,7 @@
           "icon-color": "auto",
           "icon-name": "ld-globe-symbolic",
           "icon-show": true,
-          "label-color": "yellow",
+          "label-color": "fg-default",
           "label-max-length": 0,
           "label-show": true,
           "left-click": "",

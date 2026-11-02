@@ -75,7 +75,9 @@ func TestFillBarRefillsTheSameRoot(t *testing.T) {
 		t.Error("the old item is still parented to the bar")
 	}
 
-	fillBar(bar, styledContext(t, config.Defaults()), clockLayout)
+	inset := config.Defaults()
+	inset.Bar = config.PlainBar()
+	fillBar(bar, styledContext(t, inset), clockLayout)
 	if widget.HasClass(bar, "floating") {
 		t.Error("a bar without insets stayed floating")
 	}

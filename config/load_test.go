@@ -348,7 +348,7 @@ bar:
 	}
 	// An unset section takes BarLayout's own default, as serde(default)
 	// fills it.
-	if right := cfg.Bar.Layout[0].Right; len(right) != 5 {
+	if right := cfg.Bar.Layout[0].Right; len(right) != len(DefaultBarLayout().Right) {
 		t.Errorf("right = %+v, want the default layout's right section", right)
 	}
 	bad := writeFile(t, t.TempDir(), "config.yaml", "bar:\n  layout:\n    - left: [nope]\n")

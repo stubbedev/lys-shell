@@ -60,7 +60,7 @@ the key changes nothing on a machine with no VPN.
 | `border-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Border color token. |
 | `icon-color` | [`ColorValue`](/config/types#color-value) | `"auto"` | Icon foreground color. Auto selects based on variant for contrast. |
 | `icon-bg-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Icon container background color token. |
-| `label-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Label text color token. |
+| `label-color` | [`ColorValue`](/config/types#color-value) | `"fg-default"` | Label text color token. |
 | `button-bg-color` | [`ColorValue`](/config/types#color-value) | `"bg-surface-elevated"` | Button background color token. |
 
 ## Click actions
@@ -96,7 +96,7 @@ modules:
     icon-color: auto
     icon-bg-color: accent
     label-show: true
-    label-color: accent
+    label-color: fg-default
     label-max-length: 15
     button-bg-color: bg-surface-elevated
     vpn-connected-icon: ld-lock-symbolic

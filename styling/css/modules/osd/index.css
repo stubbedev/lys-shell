@@ -3,9 +3,13 @@ window.background.osd-host {
 }
 
 .osd {
-  background: var(--bg-elevated);
+  background: var(--notification-popup-surface);
   box-shadow: 0 calc(0.25rem * var(--global-scale)) calc(1rem * var(--global-scale)) var(--shadow-color-soft);
   margin: var(--space-md);
+}
+
+.blur-unavailable .osd {
+  background: var(--bg-elevated);
 }
 
 image.osd-icon {

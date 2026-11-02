@@ -47,6 +47,7 @@ func assertCSS(t *testing.T, name, got, want string) {
 
 func TestThemeCSSMatchesRustGoldens(t *testing.T) {
 	d := config.Defaults()
+	d.Bar = config.PlainBar()
 	latte, _ := config.PaletteByName("catppuccin-latte")
 
 	px := d.Bar

@@ -119,7 +119,7 @@ func DefaultsMedia() MediaConfig {
 		IconColor:        mustColor("auto"),
 		IconBgColor:      mustColor("blue"),
 		LabelShow:        true,
-		LabelColor:       mustColor("blue"),
+		LabelColor:       mustColor("fg-default"),
 		LabelMaxLength:   35,
 		ButtonBgColor:    mustColor("bg-surface-elevated"),
 		LeftClick:        ParseClickAction("dropdown:media"),

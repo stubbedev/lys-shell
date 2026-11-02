@@ -183,13 +183,14 @@ func (o *Osd) place() bool {
 	o.closeFace()
 	f := o.build()
 	win, err := o.d.Open(app.LayerConfig{
-		Output:    output,
-		Layer:     layer,
-		Anchor:    anchor,
-		Margin:    margin,
-		Keyboard:  app.KeyboardNone,
-		Namespace: "lys-shell-osd",
-		Root:      f.root(o.d.Sheet),
+		Output:         output,
+		Layer:          layer,
+		Anchor:         anchor,
+		Margin:         margin,
+		Keyboard:       app.KeyboardNone,
+		Namespace:      "lys-shell-osd",
+		Root:           f.root(o.d.Sheet),
+		BackgroundBlur: true,
 	})
 	if err != nil {
 		log.Printf("osd: cannot map on %s: %v", output.Name, err)

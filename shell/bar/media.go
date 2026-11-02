@@ -133,7 +133,7 @@ type mediaModule struct {
 	// chrome is the module box around the button: the disc classes are
 	// ancestor selectors (`.media-disc button.bar-button ... image`), so they
 	// must sit above the bar button, on the wrapper.
-	chrome classer
+	chrome moduleChrome
 }
 
 func newMedia(ctx ModuleContext) (Module, error) {
@@ -181,6 +181,9 @@ func (m *mediaModule) refresh() {
 	m.btn.SetLabel(label)
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
+	}
+	if m.chrome != nil {
+		m.chrome.SetVisible(ok)
 	}
 	setClass(m.chrome, "media-disc", ok && cfg.IconType == config.MediaIconTypeSpinningDisc)
 	setClass(m.chrome, "media-spinning", ok && p.State == mpris.StatePlaying)

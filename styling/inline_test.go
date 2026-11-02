@@ -45,7 +45,7 @@ func TestBarCSSDefaults(t *testing.T) {
 		"--bar-group-opacity: 100%; --bar-group-border-color: var(--border-accent); " +
 		"--bar-group-border-top: 0; --bar-group-border-bottom: 0; --bar-group-border-left: 0; " +
 		"--bar-group-border-right: 0; --bar-shadow: none; --bar-shadow-margin: 0; }"
-	if got := BarCSS(config.Defaults().Bar, config.ThemeProviderLysShell); got != want {
+	if got := BarCSS(config.PlainBar(), config.ThemeProviderLysShell); got != want {
 		t.Errorf("BarCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 }
@@ -105,7 +105,8 @@ func contains(s, sub string) bool {
 func TestButtonCSS(t *testing.T) {
 	d := config.Defaults()
 	battery, _ := d.ModuleButton("battery")
-	bar := d.Bar // block-prefix variant, border width 1
+	battery.Colors.Label, battery.Defaults.Label = color(t, "yellow"), color(t, "yellow")
+	bar := config.PlainBar() // block-prefix variant, border width 1
 
 	want := "* { --bar-btn-icon-color: var(--fg-on-accent); --bar-btn-label-color: var(--yellow); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: var(--bg-surface-elevated); " +
@@ -114,11 +115,11 @@ func TestButtonCSS(t *testing.T) {
 		t.Errorf("ButtonCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 
-	// Basic variant: auto resolves to the module's accent token.
+	// Basic variant: auto resolves to the default ink.
 	basic := bar
 	basic.ButtonVariant = config.ButtonBasic
 	basic.ButtonBorderWidth = 3
-	want = "* { --bar-btn-icon-color: var(--yellow); --bar-btn-label-color: var(--yellow); " +
+	want = "* { --bar-btn-icon-color: var(--fg-default); --bar-btn-label-color: var(--yellow); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: var(--bg-surface-elevated); " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 3px; }"
 	if got := ButtonCSS(battery, basic, config.ThemeProviderLysShell, config.ThresholdColors{}); got != want {
@@ -142,9 +143,9 @@ func TestButtonCSS(t *testing.T) {
 		!contains(got, "--bar-btn-label-color: #040506;") {
 		t.Errorf("lys-shell keeps custom hexes:\n%s", got)
 	}
-	if got := ButtonCSS(custom, basic, config.ThemeProviderPywal, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: var(--yellow);") ||
+	if got := ButtonCSS(custom, basic, config.ThemeProviderPywal, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: var(--fg-default);") ||
 		!contains(got, "--bar-btn-label-color: var(--yellow);") {
-		t.Errorf("a provider falls back to the defaults (auto icon → accent token):\n%s", got)
+		t.Errorf("a provider falls back to the defaults (auto icon → default ink):\n%s", got)
 	}
 }
 
@@ -156,12 +157,12 @@ func TestResolveIconColor(t *testing.T) {
 		provider config.ThemeProvider
 		want     string
 	}{
-		{"auto", config.ButtonBasic, config.ThemeProviderLysShell, "var(--accent)"},
+		{"auto", config.ButtonBasic, config.ThemeProviderLysShell, "var(--fg-default)"},
 		{"auto", config.ButtonBlockPrefix, config.ThemeProviderLysShell, "var(--fg-on-accent)"},
 		{"auto", config.ButtonIconSquare, config.ThemeProviderLysShell, "var(--fg-on-accent)"},
 		{"red", config.ButtonIconSquare, config.ThemeProviderLysShell, "var(--red)"},
 		{"#00ff00", config.ButtonBasic, config.ThemeProviderLysShell, "#00ff00"},
-		{"#00ff00", config.ButtonBasic, config.ThemeProviderWallust, "var(--accent)"},
+		{"#00ff00", config.ButtonBasic, config.ThemeProviderWallust, "var(--fg-default)"},
 		{"transparent", config.ButtonBasic, config.ThemeProviderLysShell, "transparent"},
 	} {
 		b.Colors.Icon = color(t, tc.icon)

@@ -15,7 +15,8 @@ import (
 // Wallpaper rendering, cycling, and per-monitor overrides.
 type WallpaperConfig struct {
 	// A single image file to use as the wallpaper on all monitors. Leave empty
-	// to use cycling and/or per-monitor overrides instead.
+	// to use cycling and/or per-monitor overrides instead; a monitor none of
+	// them gives an image shows the built-in wallpaper.
 	Wallpaper string `cfg:"wallpaper"`
 	// How the wallpaper is scaled to the screen. Per-monitor entries in
 	// `wallpaper.monitors` override this.

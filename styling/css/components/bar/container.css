@@ -9,6 +9,9 @@ bar {
   border-right-width: calc(var(--bar-border-right) * 1px);
   box-shadow: var(--bar-shadow);
 }
+bar.blur-unavailable {
+  background-color: var(--bar-bg);
+}
 bar.top {
   margin-top: calc(var(--bar-inset-edge-px) * 1px);
   margin-bottom: calc(var(--bar-shadow-margin) * 1px);

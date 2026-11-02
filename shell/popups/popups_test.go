@@ -540,12 +540,14 @@ func TestCountSitsInsideTheFrontCard(t *testing.T) {
 // The urgency bar runs down the card's left edge, inside its border,
 // and nothing of it shows along the top edge.
 func TestUrgencyBarRunsDownTheLeftEdge(t *testing.T) {
-	s := newSurface(t, config.DefaultsNotification())
+	cfg := config.DefaultsNotification()
+	cfg.PopupUrgencyBar = config.UrgencyBarThresholdLow
+	s := newSurface(t, cfg)
 	id := s.notify("mail", "Urgent")
 	s.sync()
 	c := s.card(id)
 	if !c.root.HasClass("urgency-bar") {
-		t.Fatal("a normal card under the default threshold has no urgency bar")
+		t.Fatal("a normal card under the low threshold has no urgency bar")
 	}
 	accent, _ := apptheme.New(s.p.cfg).RenderPalette().Token(config.TokenAccent)
 	want := accent.Straight()

@@ -132,7 +132,7 @@ func TestSizeScaleAndPxValue(t *testing.T) {
 
 func TestBarStylingKeysDefaultsAndDecode(t *testing.T) {
 	d := Defaults().Bar
-	if d.Shadow != ShadowNone || d.ButtonVariant != ButtonBlockPrefix || d.ButtonOpacity != 100 ||
+	if d.Shadow != ShadowNone || d.ButtonVariant != ButtonBasic || d.ButtonOpacity != 100 ||
 		d.ButtonIconSize != (Size{1, SizeMultiplier}) || d.ButtonLabelWeight != WeightSemibold ||
 		d.ButtonGap != (Size{1, SizeMultiplier}) || d.ButtonIconPosition != IconStart ||
 		!d.DropdownShadow || d.DropdownOpacity != 75 {

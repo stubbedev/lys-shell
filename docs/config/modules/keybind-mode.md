@@ -51,7 +51,7 @@ bar:
 | `border-color` | [`ColorValue`](/config/types#color-value) | `"blue"` | Border color token. |
 | `icon-color` | [`ColorValue`](/config/types#color-value) | `"auto"` | Icon foreground color. |
 | `icon-bg-color` | [`ColorValue`](/config/types#color-value) | `"blue"` | Icon container background color token. |
-| `label-color` | [`ColorValue`](/config/types#color-value) | `"blue"` | Label text color token. |
+| `label-color` | [`ColorValue`](/config/types#color-value) | `"fg-default"` | Label text color token. |
 | `button-bg-color` | [`ColorValue`](/config/types#color-value) | `"bg-surface-elevated"` | Button background color token. |
 
 ## Click actions
@@ -78,7 +78,7 @@ modules:
     icon-color: auto
     icon-bg-color: blue
     label-show: true
-    label-color: blue
+    label-color: fg-default
     label-max-length: 0
     button-bg-color: bg-surface-elevated
     left-click: ""

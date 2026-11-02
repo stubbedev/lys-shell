@@ -51,7 +51,7 @@ Anything outside a placeholder stays as literal text.
 | `border-color` | [`ColorValue`](/config/types#color-value) | `"yellow"` | Border color token. |
 | `icon-color` | [`ColorValue`](/config/types#color-value) | `"auto"` | Icon foreground color. Auto selects based on variant for contrast. |
 | `icon-bg-color` | [`ColorValue`](/config/types#color-value) | `"yellow"` | Icon container background color token. |
-| `label-color` | [`ColorValue`](/config/types#color-value) | `"yellow"` | Label text color token. |
+| `label-color` | [`ColorValue`](/config/types#color-value) | `"fg-default"` | Label text color token. |
 | `button-bg-color` | [`ColorValue`](/config/types#color-value) | `"bg-surface-elevated"` | Button background color token. |
 
 ## Click actions
@@ -77,7 +77,7 @@ modules:
     icon-color: auto
     icon-bg-color: yellow
     label-show: true
-    label-color: yellow
+    label-color: fg-default
     label-max-length: 0
     button-bg-color: bg-surface-elevated
     left-click: ""

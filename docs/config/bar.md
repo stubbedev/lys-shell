@@ -15,18 +15,18 @@ Bar chrome: per-monitor layout, spacing, colors, and button styling.
 |---|---|---|---|
 | `layout` | array of [`BarLayout`](/config/types#bar-layout) | `[...]` | Per-monitor bar layouts. Each entry targets a monitor by connector name (e.g., `"DP-1"`) or `"*"` for all monitors. See [`BarLayout`] for the full shape, including layout inheritance via `extends`. |
 | `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Bar-specific scale multiplier for spacing, radius, and other bar elements. |
-| `inset-edge` | [`Size`](/config/types#size) | `0` | Gap between bar and its attached screen edge. |
-| `inset-ends` | [`Size`](/config/types#size) | `0` | Gap at the bar's ends. |
+| `inset-edge` | [`Size`](/config/types#size) | `0.5` | Gap between bar and its attached screen edge. |
+| `inset-ends` | [`Size`](/config/types#size) | `0.5` | Gap at the bar's ends. |
 | `padding` | [`Size`](/config/types#size) | `0.35` | Internal spacing along bar thickness. |
 | `padding-ends` | [`Size`](/config/types#size) | `0.5` | Internal spacing at bar ends. |
 | `module-gap` | [`Size`](/config/types#size) | `0.5` | Gap between modules and groups on the bar. |
 | `location` | [`Location`](/config/types#location) | `"top"` | Bar position on screen edge. |
 | `exclusive` | bool | `true` | Reserve screen space for the bar. |
 | `layer` | [`Layer`](/config/types#layer) | `"top"` | Layer-shell layer the bar is placed on. |
-| `background-opacity` | [`Percentage`](/config/types#percentage) | `100` | Bar background opacity (0-100). |
-| `border-location` | [`BorderLocation`](/config/types#border-location) | `"none"` | Border placement for bar. |
+| `background-opacity` | [`Percentage`](/config/types#percentage) | `60` | Bar background opacity (0-100). Below 100 the compositor blurs what is behind the bar; where it offers no blur the bar rests on its opaque color. |
+| `border-location` | [`BorderLocation`](/config/types#border-location) | `"all"` | Border placement for bar. |
 | `border-width` | u8 | `1` | Border width for bar (pixels). |
-| `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"none"` | Corner rounding level for the bar. |
+| `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"default"` | Corner rounding level for the bar. |
 | `shadow` | [`ShadowPreset`](/config/types#shadow-preset) | `"none"` | Shadow style for the bar. |
 
 ::: details More about `layout`
@@ -82,7 +82,7 @@ When disabled, windows may overlap the bar and the bar draws over them.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `bg` | [`ColorValue`](/config/types#color-value) | `"bg-surface"` | Bar background color. |
-| `border-color` | [`ColorValue`](/config/types#color-value) | `"border-accent"` | Border color for the bar. |
+| `border-color` | [`ColorValue`](/config/types#color-value) | `"border-default"` | Border color for the bar. |
 | `button-group-background` | [`ColorValue`](/config/types#color-value) | `"bg-elevated"` | Background color for button groups. |
 | `button-group-border-color` | [`ColorValue`](/config/types#color-value) | `"border-accent"` | Border color for button groups. |
 
@@ -90,9 +90,9 @@ When disabled, windows may overlap the bar and the bar draws over them.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `button-variant` | [`BarButtonVariant`](/config/types#bar-button-variant) | `"block-prefix"` | Visual style variant for bar buttons. |
+| `button-variant` | [`BarButtonVariant`](/config/types#bar-button-variant) | `"basic"` | Visual style variant for bar buttons. |
 | `button-opacity` | [`Percentage`](/config/types#percentage) | `100` | Button opacity (0-100). |
-| `button-bg-opacity` | [`Percentage`](/config/types#percentage) | `100` | Button background opacity (0-100). |
+| `button-bg-opacity` | [`Percentage`](/config/types#percentage) | `0` | Button background opacity (0-100). |
 | `button-icon-size` | [`Size`](/config/types#size) | `1` | Button icon size. Accepts a scale multiplier or pixels (e.g. `"24px"`). |
 | `button-icon-padding` | [`Size`](/config/types#size) | `1` | Button icon container padding. Only applies to `block-prefix` and `icon-square` variants. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `button-label-size` | [`Size`](/config/types#size) | `1` | Button label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
@@ -142,8 +142,8 @@ dropdown anchored in place.
 ```yaml
 bar:
   scale: 1.0
-  inset-edge: 0.0
-  inset-ends: 0.0
+  inset-edge: 0.5
+  inset-ends: 0.5
   padding: 0.3499999940395355
   padding-ends: 0.5
   module-gap: 0.5
@@ -151,15 +151,15 @@ bar:
   exclusive: true
   layer: top
   bg: bg-surface
-  background-opacity: 100
-  border-location: none
+  background-opacity: 60
+  border-location: all
   border-width: 1
-  border-color: border-accent
-  rounding: none
+  border-color: border-default
+  rounding: default
   shadow: none
-  button-variant: block-prefix
+  button-variant: basic
   button-opacity: 100
-  button-bg-opacity: 100
+  button-bg-opacity: 0
   button-icon-size: 1.0
   button-icon-padding: 1.0
   button-label-size: 1.0

@@ -13,7 +13,7 @@ Wallpaper rendering, cycling, and per-monitor overrides.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `wallpaper` | string | `""` | A single image file to use as the wallpaper on all monitors. Leave empty to use cycling and/or per-monitor overrides instead. |
+| `wallpaper` | string | `""` | A single image file to use as the wallpaper on all monitors. Leave empty to use cycling and/or per-monitor overrides instead; a monitor none of them gives an image shows the built-in wallpaper. |
 | `fit-mode` | [`FitMode`](/config/types#fit-mode) | `"fill"` | How the wallpaper is scaled to the screen. Per-monitor entries in `wallpaper.monitors` override this. |
 
 ## Cycling

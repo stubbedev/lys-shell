@@ -209,7 +209,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 			t.Errorf("default button carries %q", c)
 		}
 	}
-	if !strings.Contains(b.InlineStyle(), "--bar-btn-label-color: var(--yellow)") {
+	if !strings.Contains(b.InlineStyle(), "--bar-btn-label-color: var(--fg-default)") {
 		t.Errorf("inline vars = %q, want the battery's label color", b.InlineStyle())
 	}
 

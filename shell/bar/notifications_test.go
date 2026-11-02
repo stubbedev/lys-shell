@@ -14,7 +14,7 @@ func TestNotificationLabel(t *testing.T) {
 		count int
 		want  string
 	}{
-		{0, "00"}, {5, "05"}, {12, "12"}, {99, "99"}, {100, "100"},
+		{0, ""}, {1, "1"}, {5, "5"}, {12, "12"}, {100, "100"},
 	} {
 		if got := notificationLabel(tc.count); got != tc.want {
 			t.Errorf("notificationLabel(%d) = %q, want %q", tc.count, got, tc.want)
@@ -65,22 +65,22 @@ func TestNotificationModuleFollowsService(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	label := findLabel(module.Root())
-	if got := label.Text(); got != "00" {
-		t.Fatalf("resting label = %q, want 00", got)
+	if got := label.Text(); got != "" {
+		t.Fatalf("resting label = %q, want none", got)
 	}
 	tm := module.(*notificationModule)
 	icon := tm.icon
 
 	// A notification flips the count and the icon.
 	ctx.Notifications.Notify("app", 0, "", "hello", "", nil, 0)
-	waitForText(t, label, "01")
+	waitForText(t, label, "1")
 	if got := icon.Name(); got != cfg.Notification.IconUnread {
 		t.Errorf("unread icon = %q", got)
 	}
 
 	// DND takes priority over the count and clears the popups.
 	ctx.Notifications.SetDND(true)
-	waitForText(t, label, "01")
+	waitForText(t, label, "1")
 	waitHeadless(t, "the dnd icon", func() bool { return icon.Name() == cfg.Notification.IconDnd })
 }
 

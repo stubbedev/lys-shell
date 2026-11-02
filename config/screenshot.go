@@ -64,7 +64,7 @@ func DefaultsScreenshot() ScreenshotConfig {
 		IconBgColor:     mustColor("accent"),
 		Label:           "",
 		LabelShow:       false,
-		LabelColor:      mustColor("accent"),
+		LabelColor:      mustColor("fg-default"),
 		LabelMaxLength:  0,
 		ButtonBgColor:   mustColor("bg-surface-elevated"),
 		LeftClick:       ParseClickAction("lys-shell screenshot region"),

@@ -716,6 +716,7 @@ func (h *barHost) open(output *app.Output, layout config.BarLayout) (barLayer, e
 		ctx.gen.retire()
 		return nil, err
 	}
+	window.SetBackgroundBlur(ctx.Config.Bar.BackgroundOpacity < 100)
 	w := &barWindow{host: h, output: output, layer: window, bar: bc.Bar, gen: ctx.gen, layerKind: bc.Layer}
 	w.attach(ctx)
 	if h.holder != nil {
@@ -762,6 +763,7 @@ func (w *barWindow) Rebuild(layout config.BarLayout) error {
 			return fmt.Errorf("move to %s: %w", cfg.Bar.Location, err)
 		}
 	}
+	w.layer.SetBackgroundBlur(cfg.Bar.BackgroundOpacity < 100)
 	if err := w.layer.SetExclusive(cfg.Bar.Exclusive); err != nil {
 		return fmt.Errorf("set exclusive %v: %w", cfg.Bar.Exclusive, err)
 	}

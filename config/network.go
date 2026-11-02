@@ -86,7 +86,7 @@ func DefaultsNetwork() NetworkConfig {
 		IconColor:             mustColor("auto"),
 		IconBgColor:           mustColor("accent"),
 		LabelShow:             true,
-		LabelColor:            mustColor("accent"),
+		LabelColor:            mustColor("fg-default"),
 		LabelMaxLength:        15,
 		ButtonBgColor:         mustColor("bg-surface-elevated"),
 		VpnConnectedIcon:      "ld-lock-symbolic",

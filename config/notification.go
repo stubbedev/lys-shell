@@ -142,7 +142,7 @@ func DefaultsNotification() NotificationConfig {
 		IconColor:          mustColor("auto"),
 		IconBgColor:        mustColor("green"),
 		LabelShow:          true,
-		LabelColor:         mustColor("green"),
+		LabelColor:         mustColor("fg-default"),
 		LabelMaxLength:     0,
 		ButtonBgColor:      mustColor("bg-surface-elevated"),
 		LeftClick:          ParseClickAction("dropdown:notification"),
@@ -167,7 +167,7 @@ func DefaultsNotification() NotificationConfig {
 		PopupCloseBehavior: PopupCloseBehaviorDismiss,
 		PopupShadow:        true,
 		PopupOpacity:       75,
-		PopupUrgencyBar:    UrgencyBarThresholdLow,
+		PopupUrgencyBar:    UrgencyBarThresholdCritical,
 		Thresholds:         []ThresholdEntry{},
 	}
 }

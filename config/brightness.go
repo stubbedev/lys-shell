@@ -95,7 +95,7 @@ func DefaultsBrightness() BrightnessConfig {
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("yellow"),
 		LabelShow:      true,
-		LabelColor:     mustColor("yellow"),
+		LabelColor:     mustColor("fg-default"),
 		Format:         "{{ percent }}%",
 		LabelMaxLength: 0,
 		MinBrightness:  5,

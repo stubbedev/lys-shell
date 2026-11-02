@@ -94,7 +94,7 @@ func DefaultsBattery() BatteryConfig {
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("yellow"),
 		LabelShow:      true,
-		LabelColor:     mustColor("yellow"),
+		LabelColor:     mustColor("fg-default"),
 		Format:         "{{ percent }}%",
 		LabelMaxLength: 0,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),

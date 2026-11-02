@@ -24,6 +24,40 @@ modules:
 
 Every supported key is documented in the [config reference](/config/).
 
+## The default look
+
+An empty config looks finished: a floating bar of frosted glass, ink-colored
+buttons with the workspaces on the left, a built-in wallpaper, and panels, OSD and
+notifications in one material. Where the compositor offers no blur, as lys-wm on a
+CPU renderer, those surfaces rest on their opaque colors instead.
+
+**A config you already have changes.** Keys you did not set take these defaults,
+so a file that set only some of the bar now gets the rest of the new look. What
+changed, and how to have the old look back:
+
+```yaml
+bar:
+  inset-edge: 0
+  inset-ends: 0
+  background-opacity: 100
+  border-location: none
+  border-color: border-accent
+  rounding: none
+  button-variant: block-prefix
+  button-bg-opacity: 100
+modules:
+  notifications:
+    popup-urgency-bar: low
+```
+
+Also changed, and set per module: `label-color` is now `fg-default` on every module
+that had a color of its own, and an `auto` icon color under the `basic` variant is
+the same ink; set `label-color` and `icon-color` on a module to color it. The
+default layout adds `workspaces` (whichever compositor is running), `systray`,
+`notifications` and `power`. The media button hides while no player is active, the
+notification count hides at zero and is no longer zero-padded, and a monitor with
+no wallpaper shows the built-in one instead of an empty background.
+
 ## Migrating from TOML
 
 Earlier releases read `config.toml`. It is no longer read: when a `config.toml` exists without a `config.yaml`, lys-shell reports an error asking for it to be converted. The keys are unchanged, so converting is a matter of syntax: `[section]` tables become nested mappings, `[[bar.layout]]` arrays of tables become a list under `bar: layout:`, and `key = value` becomes `key: value`. Quote strings YAML would otherwise misread, such as `"*"`, hex colors like `"#1e1e2e"` and anything starting with `%` or `{`. Imported files and `themes/*.toml` need the same conversion.

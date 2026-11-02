@@ -207,6 +207,14 @@ func TestMediaModuleRenders(t *testing.T) {
 	if widget.HasClass(m.chrome.(widget.Widget), "media-disc") || widget.HasClass(m.chrome.(widget.Widget), "media-spinning") {
 		t.Error("disc classes stayed without a player")
 	}
+	if widget.IsVisible(m.chrome.(widget.Widget)) {
+		t.Error("the module shows with no player")
+	}
+	source.active = 0
+	m.refresh()
+	if !widget.IsVisible(m.chrome.(widget.Widget)) {
+		t.Error("the module stays hidden with a player")
+	}
 }
 
 func TestNewMediaRequiresSource(t *testing.T) {

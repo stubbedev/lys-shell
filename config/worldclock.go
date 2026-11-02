@@ -60,7 +60,7 @@ func DefaultsWorldClock() WorldClockConfig {
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("yellow"),
 		LabelShow:      true,
-		LabelColor:     mustColor("yellow"),
+		LabelColor:     mustColor("fg-default"),
 		LabelMaxLength: 0,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
 		LeftClick:      ClickAction{},

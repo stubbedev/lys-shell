@@ -55,7 +55,7 @@ func DefaultsBluetooth() BluetoothConfig {
 		IconColor:        mustColor("auto"),
 		IconBgColor:      mustColor("blue"),
 		LabelShow:        true,
-		LabelColor:       mustColor("blue"),
+		LabelColor:       mustColor("fg-default"),
 		LabelMaxLength:   15,
 		ButtonBgColor:    mustColor("bg-surface-elevated"),
 		LeftClick:        ParseClickAction("dropdown:bluetooth"),

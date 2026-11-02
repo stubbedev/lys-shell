@@ -2,7 +2,7 @@ package bar
 
 import (
 	"errors"
-	"fmt"
+	"strconv"
 
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -10,10 +10,13 @@ import (
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
-// notificationLabel is helpers.rs's format_label: the count
-// zero-padded to two digits.
+// notificationLabel is the count, and nothing when there is none, which
+// the bell's icon already says.
 func notificationLabel(count int) string {
-	return fmt.Sprintf("%02d", count)
+	if count == 0 {
+		return ""
+	}
+	return strconv.Itoa(count)
 }
 
 // notificationIconName is helpers.rs's select_icon: dnd wins, then

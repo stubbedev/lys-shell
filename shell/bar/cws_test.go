@@ -407,6 +407,7 @@ func paintCwsBar(m *cwsModule, bar *widget.Bar, size widget.Size) (has func(i in
 // color in place of the state color.
 func TestCwsPaintsTheConfiguredColors(t *testing.T) {
 	cfg := config.Defaults()
+	cfg.Bar = config.PlainBar()
 	ctx := styledContext(t, cfg)
 	ctx.Connector = "DP-1"
 	palette := ctx.Theme.RenderPalette()

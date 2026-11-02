@@ -70,3 +70,18 @@ func TestSwayWorkspacesSkippedUnderHyprland(t *testing.T) {
 		t.Error("sway-workspaces under Hyprland: want an error, got a module")
 	}
 }
+
+func TestNewWorkspacesFollowsTheCompositor(t *testing.T) {
+	for _, env := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
+		t.Setenv(env, "")
+	}
+	_, err := newWorkspaces(ModuleContext{})
+	if err == nil || !strings.Contains(err.Error(), "unknown") {
+		t.Errorf("no compositor: %v, want an error naming it", err)
+	}
+	t.Setenv("SWAYSOCK", "/nonexistent/sway.sock")
+	_, err = newWorkspaces(ModuleContext{})
+	if err != nil && strings.Contains(err.Error(), "requires") {
+		t.Errorf("under sway the sway module was refused: %v", err)
+	}
+}

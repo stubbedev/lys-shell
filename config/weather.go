@@ -88,7 +88,7 @@ func DefaultsWeather() WeatherConfig {
 		IconColor:              mustColor("auto"),
 		IconBgColor:            mustColor("accent"),
 		LabelShow:              true,
-		LabelColor:             mustColor("accent"),
+		LabelColor:             mustColor("fg-default"),
 		LabelMaxLength:         0,
 		ButtonBgColor:          mustColor("bg-surface-elevated"),
 		LeftClick:              ParseClickAction("dropdown:weather"),

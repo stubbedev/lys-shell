@@ -96,7 +96,7 @@ func DefaultsCpu() CpuConfig {
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("blue"),
 		LabelShow:      true,
-		LabelColor:     mustColor("blue"),
+		LabelColor:     mustColor("fg-default"),
 		LabelMaxLength: 0,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
 		LeftClick:      ClickAction{},

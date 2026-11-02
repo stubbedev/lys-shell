@@ -168,40 +168,6 @@ func buttonColorsOf(section reflect.Value) ButtonColors {
 	}
 }
 
-// moduleAutoIconColors is each bar module's auto_icon_color (the
-// BarButtonColors each module builds in its crate); modules not listed
-// use the accent.
-var moduleAutoIconColors = map[string]CssToken{
-	"battery":        TokenYellow,
-	"bitwarden":      TokenBlue,
-	"bluetooth":      TokenBlue,
-	"brightness":     TokenYellow,
-	"cpu":            TokenBlue,
-	"dashboard":      TokenYellow,
-	"nightlight":     TokenYellow,
-	"idle-inhibit":   TokenGreen,
-	"keybind-mode":   TokenBlue,
-	"keyboard-input": TokenYellow,
-	"mail":           TokenBlue,
-	"media":          TokenBlue,
-	"microphone":     TokenRed,
-	"netstat":        TokenRed,
-	"notifications":  TokenGreen,
-	"power-profiles": TokenBlue,
-	"power":          TokenRed,
-	"ram":            TokenGreen,
-	"recorder":       TokenRed,
-	"storage":        TokenYellow,
-	"volume":         TokenRed,
-	"window-title":   TokenBlue,
-	"world-clock":    TokenYellow,
-}
-
-// autoIconColor is the module's auto icon token; clock, custom,
-// network, screenshot, treeman, and weather use the accent.
-func autoIconColor(module string) CssToken {
-	if t, ok := moduleAutoIconColors[module]; ok {
-		return t
-	}
-	return TokenAccent
-}
+// autoIconColor is the token an auto icon color takes under the basic
+// variant: the default ink, so that one accent carries the bar.
+func autoIconColor(string) CssToken { return TokenFgDefault }

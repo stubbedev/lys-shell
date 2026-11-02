@@ -77,7 +77,7 @@ func DefaultsWindowTitle() WindowTitleConfig {
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("blue"),
 		LabelShow:      true,
-		LabelColor:     mustColor("blue"),
+		LabelColor:     mustColor("fg-default"),
 		LabelMaxLength: 50,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
 		LeftClick:      ClickAction{},

@@ -48,7 +48,7 @@ bar:
 | `popup-close-behavior` | [`PopupCloseBehavior`](/config/types#popup-close-behavior) | `"dismiss"` | What happens when the close button on a popup is clicked. |
 | `popup-shadow` | bool | `true` | Display drop shadow on popup cards. |
 | `popup-opacity` | [`Percentage`](/config/types#percentage) | `75` | Opacity of a popup card's frosted surface at rest (0-100). The card under the pointer is opaque, and so is every card where the compositor cannot blur what is behind the popups. |
-| `popup-urgency-bar` | [`UrgencyBarThreshold`](/config/types#urgency-bar-threshold) | `"low"` | Minimum urgency level that displays a colored urgency bar. |
+| `popup-urgency-bar` | [`UrgencyBarThreshold`](/config/types#urgency-bar-threshold) | `"critical"` | Minimum urgency level that displays a colored urgency bar. |
 | `thresholds` | array of [`ThresholdEntry`](/config/types#threshold-entry) | `[]` | Dynamic color thresholds based on notification count. |
 
 ::: details More about `blocklist`
@@ -112,7 +112,7 @@ modules:
 | `border-color` | [`ColorValue`](/config/types#color-value) | `"green"` | Border color token. |
 | `icon-color` | [`ColorValue`](/config/types#color-value) | `"auto"` | Icon foreground color. Auto selects based on variant for contrast. |
 | `icon-bg-color` | [`ColorValue`](/config/types#color-value) | `"green"` | Icon container background color token. |
-| `label-color` | [`ColorValue`](/config/types#color-value) | `"green"` | Label text color token. |
+| `label-color` | [`ColorValue`](/config/types#color-value) | `"fg-default"` | Label text color token. |
 | `button-bg-color` | [`ColorValue`](/config/types#color-value) | `"bg-surface-elevated"` | Button background color token. |
 
 ## Click actions
@@ -140,7 +140,7 @@ modules:
     icon-color: auto
     icon-bg-color: green
     label-show: true
-    label-color: green
+    label-color: fg-default
     label-max-length: 0
     button-bg-color: bg-surface-elevated
     left-click: dropdown:notification
@@ -166,7 +166,7 @@ modules:
     popup-close-behavior: dismiss
     popup-shadow: true
     popup-opacity: 75
-    popup-urgency-bar: low
+    popup-urgency-bar: critical
     thresholds: []
 ```
 

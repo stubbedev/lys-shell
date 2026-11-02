@@ -71,7 +71,7 @@ func DefaultsIdleInhibit() IdleInhibitConfig {
 		IconColor:       mustColor("auto"),
 		IconBgColor:     mustColor("green"),
 		LabelShow:       true,
-		LabelColor:      mustColor("green"),
+		LabelColor:      mustColor("fg-default"),
 		LabelMaxLength:  0,
 		ButtonBgColor:   mustColor("bg-surface-elevated"),
 		LeftClick:       ParseClickAction("lys-shell idle toggle --indefinite"),

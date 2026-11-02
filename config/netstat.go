@@ -84,7 +84,7 @@ func DefaultsNetstat() NetstatConfig {
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("red"),
 		LabelShow:      true,
-		LabelColor:     mustColor("red"),
+		LabelColor:     mustColor("fg-default"),
 		LabelMaxLength: 0,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
 		LeftClick:      ClickAction{},

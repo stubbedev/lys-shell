@@ -201,6 +201,7 @@ const (
 	ModuleVolume             BarModule = "volume"
 	ModuleWeather            BarModule = "weather"
 	ModuleWindowTitle        BarModule = "window-title"
+	ModuleWorkspaces         BarModule = "workspaces"
 	ModuleWorldClock         BarModule = "world-clock"
 )
 
@@ -214,7 +215,7 @@ var BuiltinModules = []BarModule{
 	ModulePowerProfiles, ModuleRAM, ModuleRecorder, ModuleScreenshot,
 	ModuleSeparator, ModuleStorage, ModuleSwayWorkspaces, ModuleSystray,
 	ModuleTreeman, ModuleUpdates, ModuleVolume, ModuleWeather,
-	ModuleWindowTitle, ModuleWorldClock,
+	ModuleWindowTitle, ModuleWorkspaces, ModuleWorldClock,
 }
 
 // renamedModules maps a module's former layout name to its current one;

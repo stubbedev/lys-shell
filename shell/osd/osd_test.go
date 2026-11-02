@@ -221,7 +221,7 @@ func TestViewFollowsTheEvent(t *testing.T) {
 			t.Errorf("label %v pins ink %#08x over the stylesheet", l.Classes(), uint32(l.Color()))
 		}
 	}
-	if !slices.Equal(f.container.Classes(), []string{"osd", "muted", "bordered", css.Card}) {
+	if !slices.Equal(f.container.Classes(), []string{"osd", css.Glass, "muted", "bordered", css.Card}) {
 		t.Errorf("slider classes %v", f.container.Classes())
 	}
 	if !f.sliderHeader.Visible() || !f.bar.Visible() || f.toggleHeader.Visible() {
@@ -232,7 +232,7 @@ func TestViewFollowsTheEvent(t *testing.T) {
 	}
 
 	h.osd.Show(toggleEvent(keytoggles.Event{Key: keytoggles.CapsLock}))
-	if !slices.Equal(f.container.Classes(), []string{"osd", "toggle-off", "bordered", css.Card}) {
+	if !slices.Equal(f.container.Classes(), []string{"osd", css.Glass, "toggle-off", "bordered", css.Card}) {
 		t.Errorf("toggle classes %v", f.container.Classes())
 	}
 	if f.sliderHeader.Visible() || f.bar.Visible() || !f.toggleHeader.Visible() {
@@ -243,7 +243,7 @@ func TestViewFollowsTheEvent(t *testing.T) {
 	}
 
 	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("Done"), Class: new("success")})
-	if !slices.Equal(f.container.Classes(), []string{"osd", "bordered", "success", css.Card}) {
+	if !slices.Equal(f.container.Classes(), []string{"osd", css.Glass, "bordered", "success", css.Card}) {
 		t.Errorf("toast classes %v", f.container.Classes())
 	}
 	if f.toggleIcon.Visible() || f.toggleLabel.Text() != "Done" {

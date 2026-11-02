@@ -68,3 +68,22 @@ func requireCompositor(module string, want compositor) error {
 	}
 	return nil
 }
+
+// newWorkspaces is the running compositor's workspace module, so that a
+// layout works on any of them.
+func newWorkspaces(ctx ModuleContext) (Module, error) {
+	switch c := detectCompositor(); c {
+	case compositorLysWM:
+		return newLysWMWorkspaces(ctx)
+	case compositorHyprland:
+		return newHyprlandWorkspaces(ctx)
+	case compositorNiri:
+		return newNiriWorkspaces(ctx)
+	case compositorMango:
+		return newMangoWorkspaces(ctx)
+	case compositorSway:
+		return newSwayWorkspaces(ctx)
+	default:
+		return nil, fmt.Errorf("workspaces: no workspace module for the compositor, which is %s", c)
+	}
+}

@@ -28,3 +28,11 @@ button.bar-button:hover {
 button.bar-button:checked {
   filter: brightness(0.95);
 }
+button.bar-button.basic:hover {
+  background-color: color-mix(in srgb, var(--fg-default) 10%, transparent);
+  filter: none;
+}
+button.bar-button.basic:checked {
+  background-color: color-mix(in srgb, var(--fg-default) 16%, transparent);
+  filter: none;
+}
