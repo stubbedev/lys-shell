@@ -249,6 +249,14 @@ func TestViewFollowsTheEvent(t *testing.T) {
 	if f.toggleIcon.Visible() || f.toggleLabel.Text() != "Done" {
 		t.Error("a toast without an icon shows its label only")
 	}
+	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("Named"), Icon: new("no-such-icon-anywhere")})
+	if f.toggleIcon.Visible() {
+		t.Error("an icon nothing resolves keeps its empty space")
+	}
+	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("Named"), Icon: new("list-add")})
+	if !f.toggleIcon.Visible() {
+		t.Error("an icon that resolves stays hidden")
+	}
 }
 
 // Presets supply the label and icon; request fields override them; an

@@ -99,9 +99,10 @@ func (f *face) apply(ev Event, cfg config.OsdConfig) {
 	f.bar.SetVisible(ev.bar)
 	f.toggleHeader.SetVisible(!ev.bar)
 	f.toggleHeader.SetHAlign(textAlign(cfg.TextAlign))
-	for _, icon := range []*widget.Icon{f.sliderIcon, f.toggleIcon} {
+	resolves := widget.ThemeIconExists(ev.icon)
+	for _, icon := range [...]*widget.Icon{f.sliderIcon, f.toggleIcon} {
 		icon.SetThemeName(ev.icon)
-		icon.SetVisible(ev.icon != "")
+		icon.SetVisible(resolves)
 	}
 	if ev.bar {
 		f.sliderLabel.SetText(ev.label)
