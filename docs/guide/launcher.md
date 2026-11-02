@@ -44,6 +44,10 @@ be running, as it hosts the panel.
 | Shell | `>command` runs a command; the actions panel can run it in a terminal |
 | Web | The last row, always: search the web for what you typed |
 
+It opens on the focused output, or the one [`launcher.monitor`](/config/launcher) names; a
+name no output has is logged and the focused output is used, so a typo cannot lock
+you out of the launcher.
+
 An empty field suggests what you use most. Picking a row teaches the ranking,
 overall and for what you typed to find it, so `f` comes to mean Firefox if you
 keep choosing it. Uses count half as much every two weeks. What it learned is in

@@ -2,12 +2,16 @@ package launcher
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
@@ -30,10 +34,18 @@ func (w headlessWindows) Focus(_ context.Context, id string) error {
 }
 func (headlessWindows) Close(context.Context, string) error { return nil }
 
-// On a real compositor, keys typed into a real layer surface find a row
-// and Enter takes it; from the key to the frame showing its rows is
-// measured here, through the socket, the engine and the renderer.
-func TestHeadlessKeysFindARowAndEnterTakesIt(t *testing.T) {
+type headlessPanel struct {
+	a       *app.Application
+	s       *Surface
+	layer   *app.LayerWindow
+	kb      *keytest.Keyboard
+	focused chan string
+	reply   <-chan launcheripc.ServerFrame
+}
+
+// startHeadlessPanel opens the panel on a private headless sway.
+func startHeadlessPanel(t *testing.T) *headlessPanel {
+	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	a := apptest.Run(t)
@@ -74,6 +86,15 @@ func TestHeadlessKeysFindARowAndEnterTakesIt(t *testing.T) {
 		p := s.panel
 		return p != nil && p.eng != nil
 	})
+	return &headlessPanel{a: a, s: s, layer: layer, kb: kb, focused: focused, reply: reply}
+}
+
+// On a real compositor, keys typed into a real layer surface find a row
+// and Enter takes it; from the key to the frame showing its rows is
+// measured here, through the socket, the engine and the renderer.
+func TestHeadlessKeysFindARowAndEnterTakesIt(t *testing.T) {
+	h := startHeadlessPanel(t)
+	a, s, layer, kb, focused, reply := h.a, h.s, h.layer, h.kb, h.focused, h.reply
 
 	var latencies []time.Duration
 	want := ""
@@ -109,4 +130,42 @@ func TestHeadlessKeysFindARowAndEnterTakesIt(t *testing.T) {
 	if f := apptest.Answer(t, "the session's reply", reply); f.Type != launcheripc.FrameResult {
 		t.Errorf("reply %+v", f)
 	}
+}
+
+// The desktop's preference, read the way any lys-ui application reads it
+// (gtk-enable-animations in settings.ini), reaches the panel on a real
+// compositor: it fades, it does not move, and its height lands at once.
+func TestHeadlessDesktopReducedMotionReachesThePanel(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "gtk-4.0"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gtk-4.0", "settings.ini"), []byte("[Settings]\ngtk-enable-animations=false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Cleanup(func() { widget.SetReducedMotion(false) })
+	h := startHeadlessPanel(t)
+	a, s := h.a, h.s
+	if !anim.Reduced() {
+		t.Fatal("the application did not take the preference from settings.ini")
+	}
+	p := s.panel
+	m := p.v.motion
+	apptest.Until(t, a, "the fade's end", func() bool { return m.reveal == 1 })
+	if m.style.grow || m.style.shift != 0 {
+		t.Errorf("style %+v: nothing may move", m.style)
+	}
+	rest := apptest.On(a, func() bool { return p.v.box.Bounds() == m.restRect(p.v.root.Bounds()) })
+	if !rest {
+		t.Error("the panel is not where it rests")
+	}
+	h.kb.Tap(keytest.H)
+	apptest.Until(t, a, "the rows", func() bool { return p.frame.Query == "h" })
+	settled := apptest.On(a, func() bool { return int(m.h) == m.targetH })
+	if !settled {
+		t.Errorf("height %v, want %d at once under reduced motion", m.h, m.targetH)
+	}
+	h.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the session's reply", h.reply)
 }

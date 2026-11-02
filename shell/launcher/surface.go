@@ -53,6 +53,8 @@ type Deps struct {
 	// sits above.
 	Sheet         *widget.Stylesheet
 	SheetPriority int
+	// Outputs lists the connected outputs, for launcher.monitor.
+	Outputs func() []*app.Output
 	// MonitorWidth is the width a percent -width resolves against (the
 	// compositor picks the output, so the first one stands in, as the
 	// Rust surface's fallback does before it is realized).
@@ -115,9 +117,12 @@ type Surface struct {
 	cur *active
 	// panel is the live search session; cur and panel never both live.
 	panel *panel
-	model matchModel
-	multi multiSelect
-	sel   int
+	// scaleNum and scaleDenom are the device scale the last panel painted
+	// at, so the next decodes its icons for it from the start.
+	scaleNum, scaleDenom int
+	model                matchModel
+	multi                multiSelect
+	sel                  int
 }
 
 // New builds the surface over its collaborators.
@@ -664,6 +669,32 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 	s.sel = -1
 }
 
+// scale is the device scale to decode icons for.
+func (s *Surface) scale() (int, int) {
+	if s.scaleNum == 0 {
+		return 1, 1
+	}
+	return s.scaleNum, s.scaleDenom
+}
+
+func (s *Surface) setScale(num, denom int) { s.scaleNum, s.scaleDenom = num, denom }
+
+// outputFor is the output launcher.monitor names; empty is the focused
+// output, the compositor's choice. A name no output has is said in the
+// log and the launcher still opens: it may be how you would fix it.
+func (s *Surface) outputFor(name string) *app.Output {
+	if name == "" || s.d.Outputs == nil {
+		return nil
+	}
+	for _, o := range s.d.Outputs() {
+		if o.Name == name {
+			return o
+		}
+	}
+	log.Printf("launcher: no output named %q (launcher.monitor): using the focused one", name)
+	return nil
+}
+
 // reveal maps the surface over the configured location, shows it, then
 // focuses the entry in the shown tree.
 func (s *Surface) reveal(a *active) {
@@ -671,6 +702,7 @@ func (s *Surface) reveal(a *active) {
 	anchor, margin := locationAnchors(a.ui.location, a.ui.offsetX, a.ui.offsetY)
 	h := a.views.height(width)
 	win, err := s.d.Open(app.LayerConfig{
+		Output:        s.outputFor(s.d.Config().Launcher.Monitor),
 		Layer:         app.LayerOverlay,
 		Anchor:        anchor,
 		Margin:        margin,

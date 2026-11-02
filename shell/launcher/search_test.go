@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // panelHarness is the surface with a search session's world faked: what
@@ -585,7 +586,6 @@ func TestPreviewOffStaysOff(t *testing.T) {
 }
 
 func TestHighlightMarkup(t *testing.T) {
-	accent := render.RGB(0x11, 0x22, 0x33)
 	open := `<span weight="700" foreground="#112233">`
 	for _, tc := range []struct {
 		title string
@@ -596,9 +596,10 @@ func TestHighlightMarkup(t *testing.T) {
 		{"abc", []int{0, 1}, open + "ab</span>c"},
 		{"abc", []int{2}, "ab" + open + "c</span>"},
 		{"a<b", []int{1}, "a" + open + "&lt;</span>b"},
+		{"it's", nil, "it&apos;s"},
 		{"é🙂x", []int{1}, "é" + open + "🙂</span>x"},
 	} {
-		if got := highlightMarkup(tc.title, tc.at, accent); got != tc.want {
+		if got := string(appendHighlightMarkup(nil, tc.title, tc.at, open)); got != tc.want {
 			t.Errorf("%q %v = %q, want %q", tc.title, tc.at, got, tc.want)
 		}
 	}
@@ -646,7 +647,7 @@ func webRow(query string) string {
 func TestLateRowsTakeTheSelectionUnlessThePersonMovedIt(t *testing.T) {
 	h := newPanelHarness(t)
 	p, _ := h.openPanel()
-	row := func(id string) search.Row { return search.Row{Entry: search.Entry{ID: id, Title: id}} }
+	row := func(id string) search.Row { return search.Row{Entry: &search.Entry{ID: id, Title: id}} }
 	p.results(search.Frame{Query: "x", Rows: []search.Row{row("web")}})
 	p.results(search.Frame{Query: "x", Late: true, Rows: []search.Row{row("app"), row("web")}})
 	if got := p.selectedTitle(); got != "app" {
@@ -699,5 +700,220 @@ func TestPanelOwnsItsMotion(t *testing.T) {
 	h.openPanel()
 	if !h.harness.windows[0].cfg.OwnMotion {
 		t.Error("the toolkit would scale the whole output's buffer every frame")
+	}
+}
+
+func TestApostropheInATitleIsMarkupTheLabelReads(t *testing.T) {
+	l := widget.NewRichLabel(treetest.Font(t), 14, string(appendEscaped(nil, "it's")), 0)
+	if !strings.Contains(l.Text(), "it's") {
+		t.Errorf("label reads %q", l.Text())
+	}
+}
+
+func TestMonitorPicksTheOutputAndAnUnknownOneStillOpens(t *testing.T) {
+	h := newPanelHarness(t)
+	second := &app.Output{Name: "DP-2"}
+	h.s.d.Outputs = func() []*app.Output { return []*app.Output{{Name: "DP-1"}, second} }
+	h.cfg.Launcher.Monitor = "DP-2"
+	h.openPanel()
+	if got := h.harness.windows[0].cfg.Output; got != second {
+		t.Errorf("output = %+v, want DP-2", got)
+	}
+	h.key("Escape")
+	h.until("closed", func() bool { return h.s.panel == nil })
+
+	h.cfg.Launcher.Monitor = "HDMI-9"
+	h.openPanel()
+	if got := h.harness.windows[1].cfg.Output; got != nil {
+		t.Errorf("an unknown output must leave it to the compositor, got %+v", got)
+	}
+}
+
+func TestMonitorAlsoReachesARofiSession(t *testing.T) {
+	h := newPanelHarness(t)
+	second := &app.Output{Name: "DP-2"}
+	h.s.d.Outputs = func() []*app.Output { return []*app.Output{second} }
+	h.cfg.Launcher.Monitor = "DP-2"
+	_, _ = h.open(dmenu(), false, "a")
+	h.until("the surface", func() bool { return len(h.harness.windows) == 1 })
+	if h.harness.windows[0].cfg.Output != second {
+		t.Error("launcher.monitor is every surface's")
+	}
+}
+
+// loaderHarness lets a test decide when a decode finishes.
+func TestIconsDecodeOffTheLoopAndLandWithoutMovingAnything(t *testing.T) {
+	h := newPanelHarness(t)
+	const name = "no-such-launcher-test-icon"
+	h.cfg.Launcher.Search.Quicklinks[1].Icon = name
+	p, _ := h.openPanel()
+	v := p.v
+	decoded := make(chan iconRequest, 8)
+	release := make(chan struct{})
+	v.list.loader.decode = func(r iconRequest) {
+		decoded <- r
+		<-release
+	}
+	defer close(release)
+	out := render.Rect{W: 1600, H: 1000}
+	h.typed(p, "alpha")
+	h.waitTitles(p, "Alpha Docs", "Alpha Issues", webRow("alpha"))
+	v.root.Arrange(out)
+	var target *searchRow
+	for _, r := range v.list.pool {
+		if r.icon.name == name {
+			target = r
+		}
+	}
+	if target == nil {
+		t.Fatal("no row bound the icon")
+	}
+	before := target.Bounds()
+	if target.icon.shown == name {
+		t.Fatal("shown before its decode")
+	}
+	select {
+	case <-decoded:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the decode must run on the loader, with the UI loop free")
+	}
+	v.root.Arrange(out)
+	if target.Bounds() != before {
+		t.Errorf("waiting moved the row: %+v to %+v", before, target.Bounds())
+	}
+	if got := target.icon.slot.Bounds().W; got != target.icon.size {
+		t.Errorf("slot %d wide, want its icon's %d before the icon lands", got, target.icon.size)
+	}
+	v.list.iconReady(iconRequest{name: name, size: target.icon.size})
+	if target.icon.shown != name {
+		t.Error("the row did not take its icon when ready")
+	}
+	v.root.Arrange(out)
+	if target.Bounds() != before {
+		t.Errorf("landing moved the row: %+v to %+v", before, target.Bounds())
+	}
+}
+
+func TestAStaleIconDoesNotLandOnARowThatMovedOn(t *testing.T) {
+	h := newPanelHarness(t)
+	p, _ := h.openPanel()
+	l := p.v.list
+	l.loader.decode = func(iconRequest) {}
+	a := newAsyncIcon(24, "x")
+	l.bindAsync(a, "first-launcher-test-icon")
+	l.bindAsync(a, "second-launcher-test-icon")
+	l.iconReady(iconRequest{name: "first-launcher-test-icon", size: 24})
+	if a.shown == "first-launcher-test-icon" {
+		t.Error("a decode for a row that moved on must not show")
+	}
+	l.iconReady(iconRequest{name: "second-launcher-test-icon", size: 24})
+	if a.shown != "second-launcher-test-icon" {
+		t.Errorf("shown %q", a.shown)
+	}
+}
+
+func TestLoaderStopsWithThePanel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var ready []iconRequest
+	loop := &fakeLoop{}
+	l := newIconLoader(ctx, loop.invoke, func(r iconRequest) { ready = append(ready, r) })
+	gate := make(chan struct{})
+	l.decode = func(iconRequest) { <-gate }
+	l.request(iconRequest{name: "a"})
+	l.request(iconRequest{name: "b"})
+	l.request(iconRequest{name: "b"})
+	cancel()
+	close(gate)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		l.mu.Lock()
+		running := l.running
+		l.mu.Unlock()
+		if !running {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the loader kept running")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	loop.pump()
+	if len(ready) != 0 {
+		t.Errorf("delivered after the panel closed: %v", ready)
+	}
+}
+
+func TestReducedMotionFadesAndNothingMoves(t *testing.T) {
+	anim.SetReduced(true)
+	defer anim.SetReduced(false)
+	h := newPanelHarness(t)
+	h.cfg.Animations.Enabled = true
+	p, _ := h.openPanel()
+	m := p.v.motion
+	if m.reveal >= 1 {
+		t.Errorf("reveal %v: reduced motion keeps the fade", m.reveal)
+	}
+	if m.style.grow || m.style.shift != 0 {
+		t.Errorf("style %+v: nothing may move", m.style)
+	}
+	out := render.Rect{W: 1600, H: 1000}
+	v := p.v
+	v.root.Arrange(out)
+	if got, want := v.box.Bounds(), m.restRect(out); got != want {
+		t.Errorf("panel at %+v mid-fade, want its resting %+v", got, want)
+	}
+	h.typed(p, "alpha")
+	h.waitTitles(p, "Alpha Docs", "Alpha Issues", webRow("alpha"))
+	if int(m.h) != m.targetH {
+		t.Errorf("height %v, want %d at once", m.h, m.targetH)
+	}
+}
+
+func TestFramesAndBindsAllocateLittleOnceWarm(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the race detector allocates")
+	}
+	h := newPanelHarness(t)
+	p, _ := h.openPanel()
+	data := make([]byte, render.Stride(renderW)*renderH)
+	h.typed(p, "alpha")
+	h.waitTitles(p, "Alpha Docs", "Alpha Issues", webRow("alpha"))
+	paintPanel(p, data)
+	out := render.Rect{W: renderW, H: renderH}
+	for range len(p.frame.Rows) {
+		p.move(1)
+		p.v.root.Arrange(out)
+	}
+	selection := testing.AllocsPerRun(50, func() {
+		p.move(1)
+		p.v.root.Arrange(out)
+	})
+	t.Logf("selection move and layout, rows seen before: %v allocations", selection)
+	// What is left is lys-ui restyling the two rows whose state flipped.
+	if selection > 4 {
+		t.Errorf("moving over rows already seen allocates %v", selection)
+	}
+}
+
+// animations.reduced-motion, the shell's own key, as the shell applies it:
+// the toolkit's preference on, and every transition resolving to a fade.
+func TestReducedMotionConfigKeyFadesThePanel(t *testing.T) {
+	h := newPanelHarness(t)
+	h.cfg.Animations.Enabled = true
+	h.cfg.Animations.ReducedMotion = true
+	zoom := config.AnimationZoom
+	h.cfg.Animations.Launcher.Enter = &zoom
+	if got := h.cfg.Animations.TransitionFor(config.AnimLauncher, false); got != config.AnimationFade {
+		t.Fatalf("transition %v, want the fade the key promises", got)
+	}
+	widget.SetReducedMotion(h.cfg.Animations.Reduced())
+	defer widget.SetReducedMotion(false)
+	p, _ := h.openPanel()
+	m := p.v.motion
+	if m.style.grow || m.style.shift != 0 {
+		t.Errorf("style %+v: nothing may move", m.style)
+	}
+	if m.reveal >= 1 || m.instant {
+		t.Errorf("reveal %v instant %v: it must fade, not pop", m.reveal, m.instant)
 	}
 }

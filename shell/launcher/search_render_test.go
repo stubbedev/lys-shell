@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +16,9 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/icons"
+	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 )
 
@@ -166,5 +169,98 @@ func TestKeystrokeToPaintBudget(t *testing.T) {
 		percentile(answer, 50), percentile(answer, 99), percentile(paint, 50), percentile(paint, 99), percentile(total, 50), percentile(total, 99))
 	if got := percentile(total, 50); got > 100*time.Millisecond {
 		t.Errorf("median keystroke to paint %v", got)
+	}
+}
+
+// TestRealIconsCostOnTheLoop measures, with this machine's real
+// application icons, what the UI loop spends painting rows whose icons
+// are not decoded yet: decoding at first paint, as rows did, against
+// the loader decoding first. Set LYS_SHELL_LAUNCHER_ICONS to run it; it
+// needs the host's icon themes.
+func TestRealIconsCostOnTheLoop(t *testing.T) {
+	if os.Getenv("LYS_SHELL_LAUNCHER_ICONS") == "" {
+		t.Skip("set LYS_SHELL_LAUNCHER_ICONS to measure with this host's icons")
+	}
+	var names []string
+	for _, app := range desktopentry.AllApps(desktopentry.ApplicationDirs()) {
+		if name := app.Icon(); name != "" && !strings.HasPrefix(name, "/") && !slices.Contains(names, name) && widget.ThemeIconExists(name) {
+			names = append(names, name)
+		}
+	}
+	if len(names) < 8 {
+		t.Skipf("only %d real icons here", len(names))
+	}
+	names = names[:min(len(names), 8)]
+	const size = 26
+	data := make([]byte, render.Stride(size)*size)
+	cv := render.New(data, render.Stride(size), size, size)
+	paintAll := func() time.Duration {
+		start := time.Now()
+		for _, name := range names {
+			icon := widget.NewThemeIconFallback(name, size)
+			icon.Arrange(render.Rect{W: size, H: size})
+			icon.Paint(cv)
+		}
+		return time.Since(start)
+	}
+	var syncFirst, preloadOffLoop, paintAfter []time.Duration
+	for range 15 {
+		widget.RefreshIcons()
+		syncFirst = append(syncFirst, paintAll())
+		widget.RefreshIcons()
+		start := time.Now()
+		for _, name := range names {
+			widget.PreloadThemeIcon(name, size, 1, 1)
+		}
+		preloadOffLoop = append(preloadOffLoop, time.Since(start))
+		paintAfter = append(paintAfter, paintAll())
+	}
+	widget.RefreshIcons()
+	for _, s := range [][]time.Duration{syncFirst, preloadOffLoop, paintAfter} {
+		slices.Sort(s)
+	}
+	t.Logf("%d real icons, first paint on the UI loop: decoded there p50 %v max %v; preloaded, p50 %v max %v on the loop; decode moved off it p50 %v",
+		len(names), percentile(syncFirst, 50), syncFirst[len(syncFirst)-1], percentile(paintAfter, 50), paintAfter[len(paintAfter)-1], percentile(preloadOffLoop, 50))
+}
+
+// TestWholeKeystrokeAllocations logs what one keystroke costs on the UI
+// loop, as frames with different rows swap, and bounds it.
+func TestWholeKeystrokeAllocations(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the race detector allocates")
+	}
+	h := newPanelHarness(t)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	p, _ := h.openPanel()
+	data := make([]byte, render.Stride(renderW)*renderH)
+	h.typed(p, "alpha")
+	h.waitTitles(p, "Alpha Docs", "Alpha Issues", webRow("alpha"))
+	paintPanel(p, data)
+	first := slices.Clone(p.frame.Rows)
+	frame := search.Frame{Query: "alpha", Rows: first}
+	other := search.Frame{Query: "alph", Rows: first}
+	out := render.Rect{W: renderW, H: renderH}
+	cv := render.NewScaled(data, render.Stride(renderW), renderW, renderH, 1, 1)
+	eng := p.eng
+	p.eng = nil
+	defer func() { p.eng = eng }()
+	swap := false
+	run := func() {
+		if swap {
+			p.results(frame)
+		} else {
+			p.results(other)
+		}
+		swap = !swap
+		p.v.root.Arrange(out)
+		p.v.root.Paint(cv)
+	}
+	for range 4 {
+		run()
+	}
+	got := testing.AllocsPerRun(50, run)
+	t.Logf("same rows, query changes the highlights: %v allocations per frame on the UI loop", got)
+	if got > 40 {
+		t.Errorf("%v allocations per keystroke frame", got)
 	}
 }

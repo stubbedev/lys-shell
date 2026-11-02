@@ -6,10 +6,9 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/stubbedev/lys-lib/render"
+	"github.com/rivo/uniseg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -53,8 +52,14 @@ type panel struct {
 	moved bool
 	// querySeq numbers the edits of the field sent to the engine.
 	querySeq uint64
-	// actions caches the selected row's actions.
-	actions []search.Action
+	// actions caches the selected row's actions, for the entry they were
+	// listed for: typing rarely changes the top row, and listing them
+	// builds closures.
+	actions     []search.Action
+	actionsFor  *search.Entry
+	actionCache map[*search.Entry][]search.Action
+	// hl is the query's copy for highlighting, on this goroutine.
+	hl engine.FuzzyQuery
 	// accept is an Enter pressed before the rows for the typed text
 	// arrived: it runs when they do, so typing fast and pressing Enter
 	// takes the row the text finds, not the row showing when the key
@@ -82,6 +87,7 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 		Keyboard:       app.KeyboardExclusive,
 		Namespace:      "lys-shell-launcher",
 		Root:           p.v.root,
+		Output:         s.outputFor(cfg.Launcher.Monitor),
 		OwnMotion:      true,
 		BackgroundBlur: true,
 		KeyCapture:     p.keyCaptured,
@@ -156,7 +162,7 @@ func (k panelSink) Notice(m string) {
 func (p *panel) results(f search.Frame) {
 	prev := p.frame
 	selectedID := ""
-	if p.sel >= 0 && p.sel < len(prev.Rows) {
+	if p.sel >= 0 && p.sel < len(prev.Rows) && prev.Rows[p.sel].Entry != nil {
 		selectedID = prev.Rows[p.sel].Entry.ID
 	}
 	switch {
@@ -177,6 +183,7 @@ func (p *panel) results(f search.Frame) {
 	}
 	p.depth = f.Depth
 	p.frame = f
+	p.hl.Set(f.Query)
 	p.notice = ""
 	if f.SetField && f.QuerySeq >= p.querySeq {
 		p.v.setField(f.Field)
@@ -193,6 +200,10 @@ func (p *panel) results(f search.Frame) {
 	p.v.setHasPreview(hasPreview(f.Rows), p)
 	p.v.setFooter(p)
 	p.v.retarget(p)
+	// Nothing reads the old rows now: the list took the new ones.
+	if p.eng != nil {
+		p.eng.Recycle(prev.Rows)
+	}
 	if p.acceptArmed && f.Query == p.v.entry.Text() {
 		p.acceptArmed = false
 		p.activate(p.accept)
@@ -232,9 +243,15 @@ func (p *panel) setSelected(i int, fresh bool) {
 		return
 	}
 	p.sel = i
-	p.actions = nil
+	var entry *search.Entry
 	if i >= 0 && i < len(p.frame.Rows) {
-		p.actions = p.frame.Rows[i].Actions()
+		entry = p.frame.Rows[i].Entry
+	}
+	if entry != p.actionsFor {
+		p.actionsFor, p.actions = entry, nil
+		if entry != nil {
+			p.actions = p.actionsOf(p.frame.Rows[i])
+		}
 	}
 	if !fresh {
 		p.moved = true
@@ -242,6 +259,24 @@ func (p *panel) setSelected(i int, fresh bool) {
 		p.v.setFooter(p)
 	}
 	p.schedulePreview()
+}
+
+// actionsCacheMax bounds what is remembered between clears.
+const actionsCacheMax = 256
+
+// actionsOf lists a row's actions, once per entry: listing builds closures,
+// and arrowing over a list revisits the same few rows. An entry is never
+// written after it is published, so its pointer is its identity.
+func (p *panel) actionsOf(row search.Row) []search.Action {
+	if a, ok := p.actionCache[row.Entry]; ok {
+		return a
+	}
+	if p.actionCache == nil || len(p.actionCache) >= actionsCacheMax {
+		p.actionCache = make(map[*search.Entry][]search.Action, actionsCacheMax)
+	}
+	a := row.Actions()
+	p.actionCache[row.Entry] = a
+	return a
 }
 
 // selected is the selected row.
@@ -543,8 +578,7 @@ func lookupPanelKey(press app.Accel) (panelKey, bool) {
 
 // hintFor is the footer's text: the default action, the second, how to
 // open the actions, and how to leave.
-func hintFor(p *panel) []footerHint {
-	var hints []footerHint
+func hintFor(p *panel, hints []footerHint) []footerHint {
 	row, ok := p.selected()
 	switch {
 	case ok && len(p.actions) > 0:
@@ -568,34 +602,56 @@ func hintFor(p *panel) []footerHint {
 // footerHint is one key and what it does.
 type footerHint struct{ key, does string }
 
-// highlightMarkup is a title in lys-ui markup with the positions in
-// grapheme clusters marked.
-func highlightMarkup(title string, positions []int, accent render.Color) string {
+// appendHighlightMarkup appends a title in lys-ui markup to dst, the
+// positions in grapheme clusters marked with open.
+func appendHighlightMarkup(dst []byte, title string, positions []int, open string) []byte {
 	if len(positions) == 0 {
-		return escapeMarkup(title)
+		return appendEscaped(dst, title)
 	}
-	open := "<span weight=\"700\" foreground=\"" + hexColor(accent) + "\">"
-	var b strings.Builder
-	b.Grow(len(title) + len(positions)*8)
 	marked := false
 	next := 0
-	for i, cluster := range graphemes(title) {
+	state := -1
+	for i := 0; len(title) > 0; i++ {
+		var cluster string
+		cluster, title, _, state = uniseg.FirstGraphemeClusterInString(title, state)
 		hit := next < len(positions) && positions[next] == i
 		if hit {
 			next++
 		}
 		if hit != marked {
 			if hit {
-				b.WriteString(open)
+				dst = append(dst, open...)
 			} else {
-				b.WriteString("</span>")
+				dst = append(dst, "</span>"...)
 			}
 			marked = hit
 		}
-		b.WriteString(escapeMarkup(cluster))
+		dst = appendEscaped(dst, cluster)
 	}
 	if marked {
-		b.WriteString("</span>")
+		dst = append(dst, "</span>"...)
 	}
-	return b.String()
+	return dst
+}
+
+// appendEscaped appends text escaped for lys-ui markup, as pango.Escape
+// does, with no intermediate string.
+func appendEscaped(dst []byte, text string) []byte {
+	for i := range len(text) {
+		switch c := text[i]; c {
+		case '&':
+			dst = append(dst, "&amp;"...)
+		case '<':
+			dst = append(dst, "&lt;"...)
+		case '>':
+			dst = append(dst, "&gt;"...)
+		case '\'':
+			dst = append(dst, "&apos;"...)
+		case '"':
+			dst = append(dst, "&quot;"...)
+		default:
+			dst = append(dst, c)
+		}
+	}
+	return dst
 }

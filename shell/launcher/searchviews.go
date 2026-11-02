@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/rivo/uniseg"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/widget"
@@ -15,7 +15,6 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/pango"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 )
@@ -40,49 +39,39 @@ const (
 	entryFontFactor  = 1.45
 )
 
-// escapeMarkup escapes text for lys-ui markup, which reads Pango's.
-func escapeMarkup(s string) string { return pango.Escape(s) }
-
-// graphemes splits text the way the matcher counts positions.
-func graphemes(s string) []string {
-	out := make([]string, 0, len(s))
-	g := uniseg.NewGraphemes(s)
-	for g.Next() {
-		out = append(out, g.Str())
-	}
-	return out
-}
-
 func hexColor(c render.Color) string {
 	return fmt.Sprintf("#%02x%02x%02x", c.R(), c.G(), c.B())
 }
 
 // panelViews is the panel's widget tree.
 type panelViews struct {
-	p       *panel
-	root    *panelRoot
-	box     *widget.Box
-	content *widget.Box
-	input   *widget.Box
-	chip    *widget.Label
-	entry   *widget.Entry
-	message *widget.RichLabel
-	sep     *widget.Box
-	body    *widget.Box
-	list    *searchList
-	pane    *widget.Box
-	image   *widget.Image
-	text    *widget.Label
-	empty   *widget.Label
-	footer  *widget.Box
-	notice  *widget.Label
-	hints   *widget.RichLabel
-	motion  *panelMotion
-	font    render.Font
-	scale   float64
-	lines   int
+	p          *panel
+	root       *panelRoot
+	box        *widget.Box
+	content    *widget.Box
+	input      *widget.Box
+	chip       *widget.Label
+	entry      *widget.Entry
+	message    *widget.RichLabel
+	sep        *widget.Box
+	body       *widget.Box
+	list       *searchList
+	pane       *widget.Box
+	image      *widget.Image
+	text       *widget.Label
+	empty      *widget.Label
+	footer     *widget.Box
+	notice     *widget.Label
+	hints      *widget.RichLabel
+	motion     *panelMotion
+	searchIcon *asyncIcon
+	font       render.Font
+	scale      float64
+	lines      int
 	// baseW is the width without the preview pane, previewW the pane's.
 	baseW, previewW int
+	hintBuf         []footerHint
+	markup          []byte
 	withPreview     bool
 }
 
@@ -100,9 +89,8 @@ func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	v.input.AddClass("launcher-search-input")
 	v.input.SetSizeRequest(0, px(inputRowHeight))
 	v.input.SetPadding(render.Insets{Left: px(18), Right: px(18)})
-	icon := widget.NewThemeIconFallback("ld-search-symbolic", px(22))
-	icon.AddClass("launcher-search-icon")
-	v.input.AppendAligned(icon, false, widget.AlignCenter)
+	v.searchIcon = newAsyncIcon(px(22), "launcher-search-icon")
+	v.input.AppendAligned(v.searchIcon.slot, false, widget.AlignCenter)
 	v.chip = widget.NewLabel(d.Font, body, "", 0)
 	v.chip.AddClass("launcher-search-chip")
 	v.chip.SetVisible(false)
@@ -130,6 +118,7 @@ func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	v.sep.SetVisible(false)
 
 	v.list = newSearchList(p, cfg, d.Font, d.Variants, px(searchRowHeight), px(headerRowHeight), px(searchIconSize))
+	v.list.bindAsync(v.searchIcon, "ld-search-symbolic")
 	v.pane = widget.NewBox(widget.Column, 0, px(12))
 	v.pane.AddClass("launcher-search-preview")
 	v.pane.SetSizeRequest(v.previewW, 0)
@@ -287,14 +276,22 @@ func (v *panelViews) setFooter(p *panel) {
 	if !shown {
 		return
 	}
-	var b strings.Builder
-	for i, h := range hintFor(p) {
+	v.hintBuf = hintFor(p, v.hintBuf[:0])
+	b := v.markup[:0]
+	for i, h := range v.hintBuf {
 		if i > 0 {
-			b.WriteString("     ")
+			b = append(b, "     "...)
 		}
-		b.WriteString("<b>" + escapeMarkup(h.key) + "</b> " + escapeMarkup(h.does))
+		b = append(b, "<b>"...)
+		b = appendEscaped(b, h.key)
+		b = append(b, "</b> "...)
+		b = appendEscaped(b, h.does)
 	}
-	v.hints.SetMarkup(b.String())
+	v.markup = b
+	// The comparison allocates nothing, and the same footer is the usual case.
+	if string(b) != v.hints.Markup() {
+		v.hints.SetMarkup(string(b))
+	}
 }
 
 // showPreview shows content; err or nothing shows the empty note.
@@ -336,7 +333,8 @@ func previewLines(text string) string {
 // moves, and the blur region follows the panel's own rect.
 type panelRoot struct {
 	widget.Base
-	v *panelViews
+	v    *panelViews
+	kids [1]widget.Widget
 }
 
 func (r *panelRoot) bounds() render.Rect { return r.Bounds() }
@@ -353,7 +351,8 @@ func (r *panelRoot) Arrange(rect render.Rect) {
 		r.v.motion.snapSize(r.v.targetW(), r.v.targetH())
 	}
 	r.v.box.Arrange(r.v.motion.shownRect(rect))
-	widget.SetParents(r, r.v.box)
+	r.kids[0] = r.v.box
+	widget.SetParents(r, r.kids[:]...)
 }
 
 // ArrangeRoot mirrors Arrange for the root path.
@@ -362,6 +361,7 @@ func (r *panelRoot) ArrangeRoot(rect render.Rect) { r.Arrange(rect) }
 // Paint paints the panel, carrying the fade itself where the compositor
 // cannot.
 func (r *panelRoot) Paint(cv *render.Canvas) {
+	r.v.list.setScale(cv.DeviceScale())
 	if alpha := r.v.motion.paintAlpha(); alpha < 1 {
 		prev := cv.PushAlpha(alpha)
 		widget.PaintChild(cv, r.v.box)
@@ -372,7 +372,7 @@ func (r *panelRoot) Paint(cv *render.Canvas) {
 }
 
 // Children is the panel.
-func (r *panelRoot) Children() []widget.Widget { return []widget.Widget{r.v.box} }
+func (r *panelRoot) Children() []widget.Widget { r.kids[0] = r.v.box; return r.kids[:] }
 
 // BackdropRegion is what the compositor blurs: the panel's rounded box as
 // it shows this frame, never the output around it.
@@ -392,7 +392,8 @@ func (r *panelRoot) HitTest(p widget.Point) widget.Widget {
 // is laid out at its destination, so text never reflows or stretches.
 type panelStage struct {
 	widget.Base
-	v *panelViews
+	v    *panelViews
+	kids [1]widget.Widget
 }
 
 // Measure wants nothing: the motion sizes the panel.
@@ -402,7 +403,8 @@ func (s *panelStage) Measure(widget.Axis, int) widget.Sizes { return widget.Size
 func (s *panelStage) Arrange(rect render.Rect) {
 	s.ArrangeSelf(rect)
 	s.v.content.Arrange(s.v.motion.contentRect(s.v.root.bounds()))
-	widget.SetParents(s, s.v.content)
+	s.kids[0] = s.v.content
+	widget.SetParents(s, s.kids[:]...)
 }
 
 // ArrangeRoot mirrors Arrange for the root path.
@@ -416,7 +418,7 @@ func (s *panelStage) Paint(cv *render.Canvas) {
 }
 
 // Children is the content.
-func (s *panelStage) Children() []widget.Widget { return []widget.Widget{s.v.content} }
+func (s *panelStage) Children() []widget.Widget { s.kids[0] = s.v.content; return s.kids[:] }
 
 // HitTest descends into the content.
 func (s *panelStage) HitTest(p widget.Point) widget.Widget {
@@ -445,6 +447,7 @@ type panelMotion struct {
 	// compositorFade is the surface's opacity carrying the fade; false
 	// where the compositor has no alpha modifier.
 	compositorFade bool
+	fadeStop       func()
 	// instant is animations being off for this surface: nothing springs.
 	instant bool
 	targetW int
@@ -514,9 +517,13 @@ func (m *panelMotion) open(anims config.AnimationsConfig) {
 	t := anims.TransitionFor(config.AnimLauncher, false)
 	m.style = panelStyleFor(t)
 	d := anims.DurationFor(config.AnimLauncher, false)
-	m.instant = t == config.AnimationNone || d == 0
+	m.instant = t == config.AnimationNone || d == 0 || anim.NoFades()
 	if m.instant {
 		m.revS.Snap(1)
+		return
+	}
+	if anim.Reduced() {
+		m.fade(0, 1, d, nil)
 		return
 	}
 	m.revS.SetParams(springFor(d, true))
@@ -529,17 +536,49 @@ func (m *panelMotion) open(anims config.AnimationsConfig) {
 func (m *panelMotion) close(anims config.AnimationsConfig, done func()) {
 	t := anims.TransitionFor(config.AnimLauncher, true)
 	d := anims.DurationFor(config.AnimLauncher, true)
-	if t == config.AnimationNone || d == 0 || anim.Instant() {
-		m.revS.Stop()
-		m.sizeS.Stop()
+	if t == config.AnimationNone || d == 0 || anim.NoFades() {
+		m.stop()
 		m.alive = false
 		done()
+		return
+	}
+	if anim.Reduced() {
+		m.fade(m.reveal, 0, d, func() {
+			m.alive = false
+			done()
+		})
 		return
 	}
 	m.style = panelStyleFor(t)
 	m.done = done
 	m.revS.SetParams(springFor(d, false))
 	m.revS.SetTarget(0)
+}
+
+// stop halts everything moving.
+func (m *panelMotion) stop() {
+	m.revS.Stop()
+	m.sizeS.Stop()
+	if m.fadeStop != nil {
+		m.fadeStop()
+		m.fadeStop = nil
+	}
+}
+
+// fade is reduced motion's reveal: a tween of the opacity alone, the
+// panel where it rests, which is what the preference keeps.
+func (m *panelMotion) fade(from, to float64, d uint32, done func()) {
+	m.style = panelStyle{}
+	if m.fadeStop != nil {
+		m.fadeStop()
+	}
+	m.fadeStop = anim.Start(time.Duration(d)*time.Millisecond, func(t float64) {
+		m.reveal = from + (to-from)*t
+		m.applyReveal()
+		if t >= 1 && done != nil {
+			done()
+		}
+	})
 }
 
 // resize retargets the size.
@@ -634,10 +673,20 @@ type searchList struct {
 	scroll *anim.Spring
 	pool   []*searchRow
 	shown  []widget.Widget
+	loader *iconLoader
+	// num and denom are the device scale icons are decoded for.
+	num, denom int
+	// waiting are the icons shown once decoded.
+	waiting []*asyncIcon
+	// openTag is the highlight's markup, for the theme's accent.
+	openTag   string
+	openColor render.Color
 }
 
 func newSearchList(p *panel, cfg *config.Config, font render.Font, variants widget.VariantFunc, rowH, headerH, iconSize int) *searchList {
 	l := &searchList{p: p, font: font, variants: variants, rowH: rowH, headerH: headerH, iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
+	l.num, l.denom = p.s.scale()
+	l.loader = newIconLoader(p.ctx, p.s.d.Invoke, l.iconReady)
 	l.SetElement("listview")
 	l.AddClass("launcher-search-list")
 	l.scroll = anim.NewSpring(anim.SpringParams{Response: 160 * time.Millisecond, Damping: 1}, []float64{0}, func(pos []float64) {
@@ -806,14 +855,17 @@ func (l *searchList) ScrollBy(_, dy int) { l.scrollTo(l.offset + float64(dy*l.ro
 // searchRow is one row of the pool, rebound as the list changes.
 type searchRow struct {
 	*widget.Box
-	l        *searchList
-	index    int
-	iconSlot *widget.Box
-	iconKey  string
-	title    *widget.RichLabel
-	subtitle *widget.Label
-	hint     *widget.Label
-	header   *widget.Label
+	l     *searchList
+	index int
+	icon  *asyncIcon
+	glyph *widget.Label
+	title *widget.RichLabel
+	// positions and markup are the highlight's memory.
+	positions []int
+	markup    []byte
+	subtitle  *widget.Label
+	hint      *widget.Label
+	header    *widget.Label
 }
 
 func newSearchRow(l *searchList) *searchRow {
@@ -822,10 +874,12 @@ func newSearchRow(l *searchList) *searchRow {
 	r := &searchRow{Box: widget.NewBox(widget.Row, th.Spacing+4, 0), l: l}
 	r.SetPadding(render.Insets{Left: th.Padding + 6, Right: th.Padding + 6})
 	r.AddClass("launcher-search-row")
-	r.iconSlot = widget.NewBox(widget.Row, 0, 0)
-	r.iconSlot.AddClass("launcher-search-row-icon")
-	r.iconSlot.SetSizeRequest(l.iconSize, l.iconSize)
-	r.AppendAligned(r.iconSlot, false, widget.AlignCenter)
+	r.icon = newAsyncIcon(l.iconSize, "launcher-search-row-icon")
+	r.AppendAligned(r.icon.slot, false, widget.AlignCenter)
+	r.glyph = widget.NewLabel(l.font, float64(l.iconSize)*0.8, "", 0)
+	r.glyph.SetVisible(false)
+	r.glyph.SetSizeRequest(l.iconSize, l.iconSize)
+	r.AppendAligned(r.glyph, false, widget.AlignCenter)
 	r.title = widget.NewRichLabel(l.font, px, "", 0)
 	r.title.AddClass("launcher-search-row-title")
 	r.title.SetVariants(l.variants)
@@ -859,7 +913,8 @@ func (r *searchRow) bind(i int, row search.Row, selected bool, number int) {
 	r.SetState(widget.StateSelected, selected)
 	isHeader := row.Header != ""
 	r.header.SetVisible(isHeader)
-	r.iconSlot.SetVisible(!isHeader && r.l.icons)
+	r.icon.slot.SetVisible(!isHeader && r.l.icons && row.Entry != nil && row.Entry.Glyph == "")
+	r.glyph.SetVisible(!isHeader && r.l.icons && row.Entry != nil && row.Entry.Glyph != "")
 	r.title.SetVisible(!isHeader)
 	r.subtitle.SetVisible(!isHeader)
 	r.hint.SetVisible(!isHeader)
@@ -868,44 +923,139 @@ func (r *searchRow) bind(i int, row search.Row, selected bool, number int) {
 		return
 	}
 	e := row.Entry
-	r.title.SetMarkup(highlightMarkup(e.Title, row.Highlights(), widget.Current().Accent))
+	r.positions = row.AppendHighlights(r.positions[:0], &r.l.p.hl)
+	r.markup = appendHighlightMarkup(r.markup[:0], e.Title, r.positions, r.l.highlightTag())
+	if string(r.markup) != r.title.Markup() {
+		r.title.SetMarkup(string(r.markup))
+	}
 	r.subtitle.SetText(e.Subtitle)
 	hint := e.Hint
 	if hint == "" && number >= 1 && number <= 9 {
-		hint = "Ctrl+" + string(rune('0'+number))
+		hint = numberHints[number-1]
 	}
 	r.hint.SetText(hint)
-	if r.l.icons {
-		r.bindIcon(e)
-	}
-}
-
-func (r *searchRow) bindIcon(e search.Entry) {
-	key := iconKeyOf(e)
-	if key == r.iconKey {
+	if !r.l.icons {
 		return
 	}
-	r.iconKey = key
-	r.iconSlot.Clear()
-	size := r.l.iconSize
 	if e.Glyph != "" {
-		g := widget.NewLabel(r.l.font, float64(size)*0.8, e.Glyph, 0)
-		r.iconSlot.AppendAligned(g, true, widget.AlignCenter)
+		r.glyph.SetText(e.Glyph)
 		return
 	}
-	if icon := rowIcon(e.Icon, size); icon != nil {
-		r.iconSlot.AppendAligned(icon, false, widget.AlignCenter)
+	r.l.bindAsync(r.icon, iconSource(e.Icon))
+}
+
+// numberHints are the rows' shortcut labels.
+var numberHints = [...]string{"Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6", "Ctrl+7", "Ctrl+8", "Ctrl+9"}
+
+// iconSource is what names an entry's icon: a theme name or a file.
+func iconSource(icon engine.Icon) string {
+	switch ic := icon.(type) {
+	case engine.IconName:
+		return string(ic)
+	case engine.IconFile:
+		return string(ic)
+	case engine.IconThumbnail:
+		return ic.Fallback
+	}
+	return ""
+}
+
+// highlightTag is the highlight's markup for the theme's accent, built
+// when the accent changes rather than per row.
+func (l *searchList) highlightTag() string {
+	accent := widget.Current().Accent
+	if l.openTag == "" || accent != l.openColor {
+		l.openColor = accent
+		l.openTag = "<span weight=\"700\" foreground=\"" + hexColor(accent) + "\">"
+	}
+	return l.openTag
+}
+
+// asyncIcon is a fixed-size slot for an icon that may not be decoded yet.
+// The slot is its size from the start, so an icon landing moves nothing,
+// and the one Icon widget is renamed rather than rebuilt.
+type asyncIcon struct {
+	slot *widget.Box
+	icon *widget.Icon
+	size int
+	// name is what the slot should show, shown what it does.
+	name, shown string
+}
+
+func newAsyncIcon(size int, class string) *asyncIcon {
+	a := &asyncIcon{slot: widget.NewBox(widget.Row, 0, 0), size: size}
+	a.slot.SetSizeRequest(size, size)
+	a.slot.AddClass(class)
+	return a
+}
+
+// show puts the decoded icon in the slot. Only this touches a theme name
+// on the UI loop, once the cache holds its raster.
+func (a *asyncIcon) show(name string) {
+	a.shown = name
+	if a.icon == nil {
+		a.icon = widget.NewThemeIconFallback(name, a.size)
+		a.slot.Append(a.icon, false)
+		return
+	}
+	a.icon.SetThemeName(name)
+	a.icon.SetVisible(true)
+}
+
+func (a *asyncIcon) blank() {
+	a.shown = ""
+	if a.icon != nil {
+		a.icon.SetVisible(false)
 	}
 }
 
-func iconKeyOf(e search.Entry) string {
-	switch ic := e.Icon.(type) {
-	case engine.IconName:
-		return "n:" + string(ic)
-	case engine.IconFile:
-		return "f:" + string(ic)
-	case engine.IconThumbnail:
-		return "t:" + ic.Path
+// bindAsync makes a show name: at once when its raster is decoded (the
+// cache answers without waiting), else blank until the loader has it.
+func (l *searchList) bindAsync(a *asyncIcon, name string) {
+	if a.name == name && (a.shown == name || name == "") {
+		return
 	}
-	return "g:" + e.Glyph
+	a.name = name
+	if name == "" {
+		a.blank()
+		return
+	}
+	if widget.ThemeIconPreloaded(name, a.size, l.num, l.denom) {
+		a.show(name)
+		return
+	}
+	a.blank()
+	if !slices.Contains(l.waiting, a) {
+		l.waiting = append(l.waiting, a)
+	}
+	l.loader.request(iconRequest{name: name, size: a.size, num: l.num, denom: l.denom})
+}
+
+// iconReady runs on the UI loop when a decode finished.
+func (l *searchList) iconReady(req iconRequest) {
+	kept := l.waiting[:0]
+	for _, a := range l.waiting {
+		switch {
+		case a.name == req.name && a.size == req.size:
+			a.show(req.name)
+		case a.name != "" && a.shown != a.name:
+			kept = append(kept, a)
+		}
+	}
+	l.waiting = kept
+}
+
+// setScale follows the canvas: another device scale is another raster.
+func (l *searchList) setScale(num, denom int) {
+	if num == l.num && denom == l.denom {
+		return
+	}
+	l.num, l.denom = num, denom
+	l.p.s.setScale(num, denom)
+	for _, row := range l.pool {
+		row.icon.name = ""
+	}
+	l.p.v.searchIcon.name = ""
+	l.bindAsync(l.p.v.searchIcon, "ld-search-symbolic")
+	l.InvalidateLayout()
 }

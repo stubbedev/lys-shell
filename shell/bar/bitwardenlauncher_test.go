@@ -2,7 +2,9 @@ package bar
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/search"
 )
 
 // vaultModeOver is the vault mode over v, copies landing in the
@@ -137,5 +140,146 @@ func TestVaultModeLoggedOut(t *testing.T) {
 	}
 	if _, nothing := m.Activate(ctx, engine.NoRow, custom("x"), "x").(engine.ActionNothing); !nothing || len(*copies) != 0 || len(v.unlocks) != 0 {
 		t.Error("a logged-out vault took input")
+	}
+}
+
+// searchSink is the panel's seat in a search session.
+type searchSink struct {
+	mu       sync.Mutex
+	frames   []search.Frame
+	finished []search.Outcome
+	notices  []string
+}
+
+func (s *searchSink) Results(f search.Frame) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.frames = append(s.frames, f)
+}
+
+func (s *searchSink) Finish(o search.Outcome) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.finished = append(s.finished, o)
+}
+
+func (s *searchSink) Notice(m string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.notices = append(s.notices, m)
+}
+
+func (s *searchSink) last() search.Frame {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.frames) == 0 {
+		return search.Frame{}
+	}
+	return s.frames[len(s.frames)-1]
+}
+
+func (s *searchSink) ended() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.finished) > 0
+}
+
+func searchUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func startVaultSearch(t *testing.T, v *fakeVault) (*search.Engine, *searchSink, *[]copied) {
+	t.Helper()
+	m, copies := vaultModeOver(v)
+	pickers := search.NewPickers(nil, nil, func() *search.Level { return search.ModeLevel(m, "Vault") }, false)
+	s := &searchSink{}
+	e := search.Start(&search.Level{Providers: []search.Provider{pickers}}, nil, s, func(fn func()) { fn() })
+	t.Cleanup(e.Stop)
+	e.SetQuery("bitwarden", 1)
+	searchUntil(t, "the picker row", func() bool { return len(s.last().Rows) > 0 && s.last().Query == "bitwarden" })
+	return e, s, copies
+}
+
+func firstEntry(f search.Frame) string {
+	for _, r := range f.Rows {
+		if r.Header == "" {
+			return r.Entry.ID
+		}
+	}
+	return ""
+}
+
+// The picker on the real vault mode: a locked vault masks the field and
+// takes the master password there, a wrong one stays asking, the items
+// then list, and Enter copies through the host, marked as a secret.
+func TestSearchPickerUnlocksTheRealVaultAndCopies(t *testing.T) {
+	v := &fakeVault{status: vault.Status{State: vault.StateLocked}, entries: bitwardenPreviewItems(), unlockErr: errors.New("wrong")}
+	e, s, copies := startVaultSearch(t, v)
+	e.Activate(firstEntry(s.last()), 0)
+	searchUntil(t, "the masked prompt", func() bool { return s.last().Mask })
+	f := s.last()
+	if !f.CanSubmit || f.Title != "Vault" || f.Message == "" || f.Depth != 1 {
+		t.Fatalf("prompt %+v", f)
+	}
+	if len(f.Rows) != 0 {
+		t.Errorf("a locked vault lists nothing: %+v", f.Rows)
+	}
+	e.Submit("nope")
+	searchUntil(t, "the refusal", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return len(s.frames) > 3
+	})
+	if f := s.last(); !f.Mask {
+		t.Errorf("a wrong password stays asking: %+v", f)
+	}
+	v.set(func(f *fakeVault) { f.unlockErr = nil })
+	e.Submit("right")
+	searchUntil(t, "the items", func() bool { return !s.last().Mask && len(s.last().Rows) > 0 })
+	f = s.last()
+	if f.CanSubmit {
+		t.Error("an open vault takes no typed text")
+	}
+	e.Activate(firstEntry(f), 0)
+	searchUntil(t, "the copy", s.ended)
+	if _, ok := s.finished[0].(search.Close); !ok {
+		t.Errorf("finished %+v", s.finished)
+	}
+	if len(*copies) != 1 || !clipboard.IsSensitive((*copies)[0].content.Mimes) {
+		t.Errorf("copies %+v: the mode copies, marked sensitive, through the host", *copies)
+	}
+}
+
+func TestSearchPickerShowsAnOpenVaultsFieldsOnItsSecondAction(t *testing.T) {
+	v := &fakeVault{status: vault.Status{State: vault.StateUnlocked}, entries: bitwardenPreviewItems()}
+	e, s, _ := startVaultSearch(t, v)
+	e.Activate(firstEntry(s.last()), 0)
+	searchUntil(t, "the items", func() bool { return s.last().Depth == 1 && len(s.last().Rows) > 0 })
+	e.Activate(firstEntry(s.last()), 1)
+	searchUntil(t, "the fields", func() bool { return s.last().Message == "Example Mail" })
+	if got := len(s.last().Rows); got == 0 {
+		t.Errorf("fields %d", got)
+	}
+	e.Back()
+	searchUntil(t, "the root", func() bool { return s.last().Depth == 0 })
+}
+
+func TestSearchPickerOverALoggedOutVaultSaysSo(t *testing.T) {
+	e, s, copies := startVaultSearch(t, &fakeVault{entries: bitwardenPreviewItems()})
+	e.Activate(firstEntry(s.last()), 0)
+	searchUntil(t, "the message", func() bool { return s.last().Depth == 1 })
+	f := s.last()
+	if f.Message == "" || len(f.Rows) != 0 || f.CanSubmit || f.Mask {
+		t.Errorf("frame %+v", f)
+	}
+	if len(*copies) != 0 {
+		t.Errorf("copies %+v", *copies)
 	}
 }

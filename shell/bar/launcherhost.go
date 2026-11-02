@@ -42,6 +42,7 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 		Variants:      app.FontVariantsOf(font),
 		Sheet:         theme.Sheet,
 		SheetPriority: apptheme.Priority,
+		Outputs:       outputs,
 		MonitorWidth: func() int {
 			if outs := outputs(); len(outs) > 0 {
 				return int(outs[0].LogicalW)
