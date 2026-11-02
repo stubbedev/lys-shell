@@ -2,6 +2,7 @@ package modes
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/mango"
 )
 
 var bg = context.Background()
@@ -264,10 +267,10 @@ func TestSwayTreeWalkExtractsViews(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(windows) != 2 || windows[0].class != "foot" || windows[0].workspace != "3" || !windows[0].focused || windows[1].class != "Galculator" {
+	if len(windows) != 2 || windows[0].Class != "foot" || windows[0].Workspace != "3" || !windows[0].Focused || windows[1].Class != "Galculator" {
 		t.Errorf("windows = %+v", windows)
 	}
-	if !windows[1].onCurrentWorkspace {
+	if !windows[1].OnCurrentWorkspace {
 		t.Error("the focused window's workspace is current")
 	}
 }
@@ -281,13 +284,13 @@ func TestHyprlandClientsParse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(windows) != 2 || !windows[0].focused || !windows[0].onCurrentWorkspace || windows[1].onCurrentWorkspace || windows[1].workspace != "web" {
+	if len(windows) != 2 || !windows[0].Focused || !windows[0].OnCurrentWorkspace || windows[1].OnCurrentWorkspace || windows[1].Workspace != "web" {
 		t.Errorf("windows = %+v (an unmapped client is left out)", windows)
 	}
 }
 
 func TestWindowFormatAndMatchText(t *testing.T) {
-	item := windowItem(windowInfo{id: "0x1", title: "README.md - vim", class: "foot", workspace: "3"}, DefaultWindowConfig())
+	item := windowItem(WindowInfo{ID: "0x1", Title: "README.md - vim", Class: "foot", Workspace: "3"}, DefaultWindowConfig())
 	if item.Display != "3   foot   README.md - vim" || item.MatchText != "README.md - vim foot" || item.Icon != launcher.IconName("foot") {
 		t.Errorf("item = %+v", item)
 	}
@@ -638,5 +641,45 @@ func TestKeysListsBindingsReadOnly(t *testing.T) {
 	}
 	if _, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateDefault{}, "").(launcher.ActionNothing); !ok || m.AllowsCustom() {
 		t.Error("keys is read-only")
+	}
+}
+
+func TestLysWMWindows(t *testing.T) {
+	got := lysWMWindows([]lyswm.Window{
+		{ID: 1, AppID: "foot", Title: "a", Workspace: 1},
+		{ID: 2, AppID: "firefox", Title: "b", Workspace: 2, Focused: true},
+		{ID: 3, AppID: "mpv", Title: "c", Workspace: 2},
+	})
+	if len(got) != 3 || got[1].ID != "2" || got[1].Class != "firefox" || got[1].Workspace != "2" || !got[1].Focused {
+		t.Fatalf("mapped %+v", got)
+	}
+	if got[0].OnCurrentWorkspace || !got[2].OnCurrentWorkspace {
+		t.Errorf("current workspace: %+v", got)
+	}
+	if got[2].FocusOrder >= got[0].FocusOrder {
+		t.Errorf("the newest window must rank first: %+v", got)
+	}
+	if none := lysWMWindows([]lyswm.Window{{ID: 1, Workspace: 0}}); none[0].OnCurrentWorkspace {
+		t.Errorf("nothing focused means no current workspace, not workspace 0: %+v", none)
+	}
+}
+
+func TestMangoWindows(t *testing.T) {
+	got := mangoWindows([]mango.Client{
+		{ID: 7, Title: "a", AppID: "foot", Tags: []uint32{2}, IsFocused: true},
+		{ID: 8, Title: "b", AppID: "mpv", Tags: []uint32{3}},
+		{ID: 9, Title: "untagged"},
+	})
+	if got[0].ID != "7" || got[0].Workspace != "2" || !got[0].OnCurrentWorkspace {
+		t.Errorf("focused client: %+v", got[0])
+	}
+	if got[1].OnCurrentWorkspace || got[2].OnCurrentWorkspace || got[2].Workspace != "" {
+		t.Errorf("others: %+v", got[1:])
+	}
+}
+
+func TestMangoCloseIsAnError(t *testing.T) {
+	if err := (mangoBackend{}).Close(context.Background(), "1"); !errors.Is(err, ErrWindowCloseUnsupported) {
+		t.Errorf("close = %v", err)
 	}
 }

@@ -3,6 +3,8 @@ package modes
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"slices"
@@ -12,6 +14,8 @@ import (
 
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
 )
@@ -55,32 +59,41 @@ func DefaultWindowConfig() WindowConfig {
 	}
 }
 
-// windowInfo is one open window, compositor-agnostic.
-type windowInfo struct {
-	// id is the compositor's id: hyprland address, niri id, sway con_id.
-	id        string
-	title     string
-	class     string
-	workspace string
-	focused   bool
-	// focusOrder is lower for more recently focused windows.
-	focusOrder         int64
-	onCurrentWorkspace bool
+// WindowInfo is one open window, compositor-agnostic.
+type WindowInfo struct {
+	// ID is the compositor's id: lys-wm IPC id, hyprland address, niri
+	// id, sway con_id, mango client id.
+	ID        string
+	Title     string
+	Class     string
+	Workspace string
+	Focused   bool
+	// FocusOrder is lower for more recently focused windows.
+	FocusOrder         int64
+	OnCurrentWorkspace bool
 }
 
-// windowBackend talks to one compositor. The Rust mode shelled out to
+// WindowBackend talks to one compositor. The Rust mode shelled out to
 // hyprctl, niri msg, and swaymsg; the Go shell already has native IPC
-// clients for all three, so the same JSON arrives over the sockets.
-type windowBackend interface {
-	list(ctx context.Context) ([]windowInfo, error)
-	focus(ctx context.Context, id string) error
-	close(ctx context.Context, id string) error
+// clients for every compositor, so the same JSON arrives over the sockets.
+type WindowBackend interface {
+	List(ctx context.Context) ([]WindowInfo, error)
+	Focus(ctx context.Context, id string) error
+	Close(ctx context.Context, id string) error
 }
 
-// detectBackend picks the compositor from the environment, in the Rust
-// order: hyprland, niri, sway.
-func detectBackend() windowBackend {
+// ErrWindowCloseUnsupported is a compositor whose IPC cannot close a
+// window by id: mango dispatches to the focused client only.
+var ErrWindowCloseUnsupported = errors.New("launcher: this compositor cannot close a window by id")
+
+// DetectWindows picks the compositor from the environment, nil when
+// none it can talk to is running.
+func DetectWindows() WindowBackend {
 	switch {
+	case lyswm.IsRunning():
+		return lysWMBackend{}
+	case mango.IsRunning():
+		return mangoBackend{}
 	case os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") != "":
 		return hyprlandBackend{}
 	case os.Getenv("NIRI_SOCKET") != "":
@@ -94,13 +107,13 @@ func detectBackend() windowBackend {
 // Window switches between open windows (window.rs).
 type Window struct {
 	cfg     WindowConfig
-	backend windowBackend
-	windows []windowInfo
+	backend WindowBackend
+	windows []WindowInfo
 }
 
 // NewWindow builds the mode; the compositor is detected from the
 // environment.
-func NewWindow(cfg WindowConfig) *Window { return &Window{cfg: cfg, backend: detectBackend()} }
+func NewWindow(cfg WindowConfig) *Window { return &Window{cfg: cfg, backend: DetectWindows()} }
 
 // Name is window or windowcd.
 func (w *Window) Name() string {
@@ -113,29 +126,29 @@ func (w *Window) Name() string {
 // Load lists the windows, most recently focused first; the focused one
 // sorts last so plain Enter switches to the previous window, as rofi.
 func (w *Window) Load(ctx context.Context) launcher.ModeState {
-	var windows []windowInfo
+	var windows []WindowInfo
 	if w.backend == nil {
 		log.Printf("launcher: window mode: no supported compositor detected")
 	} else {
 		var err error
-		if windows, err = w.backend.list(ctx); err != nil {
+		if windows, err = w.backend.List(ctx); err != nil {
 			log.Printf("launcher: window mode: %v", err)
 		}
 	}
-	windows = slices.DeleteFunc(windows, func(win windowInfo) bool {
-		return (w.cfg.HideActive && win.focused) || (w.cfg.CurrentDesktopOnly && !win.onCurrentWorkspace)
+	windows = slices.DeleteFunc(windows, func(win WindowInfo) bool {
+		return (w.cfg.HideActive && win.Focused) || (w.cfg.CurrentDesktopOnly && !win.OnCurrentWorkspace)
 	})
-	slices.SortStableFunc(windows, func(a, b windowInfo) int {
-		if a.focused != b.focused {
-			if a.focused {
+	slices.SortStableFunc(windows, func(a, b WindowInfo) int {
+		if a.Focused != b.Focused {
+			if a.Focused {
 				return 1
 			}
 			return -1
 		}
 		switch {
-		case a.focusOrder < b.focusOrder:
+		case a.FocusOrder < b.FocusOrder:
 			return -1
-		case a.focusOrder > b.focusOrder:
+		case a.FocusOrder > b.FocusOrder:
 			return 1
 		}
 		return 0
@@ -156,10 +169,10 @@ func (w *Window) Activate(ctx context.Context, target launcher.Target, kind laun
 	}
 	win := w.windows[i]
 	if _, alt := kind.(launcher.ActivateAlt); alt && w.cfg.WindowCommand != "" {
-		launcher.RunShell(launcher.Render(w.cfg.WindowCommand, launcher.Values(map[string]string{"window": win.id})))
+		launcher.RunShell(launcher.Render(w.cfg.WindowCommand, launcher.Values(map[string]string{"window": win.ID})))
 		return launcher.ActionClose{}
 	}
-	if err := w.backend.focus(ctx, win.id); err != nil {
+	if err := w.backend.Focus(ctx, win.ID); err != nil {
 		log.Printf("launcher: focus window: %v", err)
 	}
 	return launcher.ActionClose{}
@@ -170,7 +183,7 @@ func (w *Window) Delete(ctx context.Context, index uint32) launcher.Action {
 	if !w.cfg.CloseOnDelete || w.backend == nil || int(index) >= len(w.windows) {
 		return launcher.ActionNothing{}
 	}
-	if err := w.backend.close(ctx, w.windows[index].id); err != nil {
+	if err := w.backend.Close(ctx, w.windows[index].ID); err != nil {
 		log.Printf("launcher: close window: %v", err)
 	}
 	// Give the compositor a beat before the reload re-queries.
@@ -181,26 +194,26 @@ func (w *Window) Delete(ctx context.Context, index uint32) launcher.Action {
 // AllowsCustom is false.
 func (*Window) AllowsCustom() bool { return false }
 
-func windowItem(win windowInfo, cfg WindowConfig) launcher.Item {
+func windowItem(win WindowInfo, cfg WindowConfig) launcher.Item {
 	display := launcher.Render(cfg.Format, launcher.Values(map[string]string{
-		"w": win.workspace, "c": win.class, "t": win.title, "n": win.class, "r": "",
+		"w": win.Workspace, "c": win.Class, "t": win.Title, "n": win.Class, "r": "",
 	}))
 	parts := make([]string, 0, len(cfg.MatchFields))
 	for _, f := range cfg.MatchFields {
 		switch f {
 		case WindowFieldTitle:
-			parts = append(parts, win.title)
+			parts = append(parts, win.Title)
 		case WindowFieldDesktop:
-			parts = append(parts, win.workspace)
+			parts = append(parts, win.Workspace)
 		default:
-			parts = append(parts, win.class)
+			parts = append(parts, win.Class)
 		}
 	}
-	id := win.id
+	id := win.ID
 	return launcher.Item{
 		Display:   display,
 		MatchText: strings.Join(parts, " "),
-		Icon:      launcher.IconName(strings.ToLower(win.class)),
+		Icon:      launcher.IconName(strings.ToLower(win.Class)),
 		Info:      &id,
 	}
 }
@@ -222,7 +235,7 @@ type hyprClient struct {
 
 func (hyprlandBackend) conn() (*hyprland.Connection, error) { return hyprland.Connect() }
 
-func (b hyprlandBackend) list(context.Context) ([]windowInfo, error) {
+func (b hyprlandBackend) List(context.Context) ([]WindowInfo, error) {
 	c, err := b.conn()
 	if err != nil {
 		return nil, err
@@ -243,12 +256,12 @@ func (b hyprlandBackend) list(context.Context) ([]windowInfo, error) {
 	return parseHyprlandClients([]byte(raw), active)
 }
 
-func parseHyprlandClients(raw []byte, active *int64) ([]windowInfo, error) {
+func parseHyprlandClients(raw []byte, active *int64) ([]WindowInfo, error) {
 	var clients []hyprClient
 	if err := json.Unmarshal(raw, &clients); err != nil {
 		return nil, err
 	}
-	var out []windowInfo
+	var out []WindowInfo
 	for _, c := range clients {
 		if c.Mapped != nil && !*c.Mapped {
 			continue
@@ -257,17 +270,17 @@ func parseHyprlandClients(raw []byte, active *int64) ([]windowInfo, error) {
 		if c.FocusHistoryID != nil {
 			order = *c.FocusHistoryID
 		}
-		out = append(out, windowInfo{
-			id: c.Address, title: c.Title, class: c.Class, workspace: c.Workspace.Name,
-			focused:            c.FocusHistoryID != nil && *c.FocusHistoryID == 0,
-			focusOrder:         order,
-			onCurrentWorkspace: c.Workspace.ID != nil && active != nil && *c.Workspace.ID == *active,
+		out = append(out, WindowInfo{
+			ID: c.Address, Title: c.Title, Class: c.Class, Workspace: c.Workspace.Name,
+			Focused:            c.FocusHistoryID != nil && *c.FocusHistoryID == 0,
+			FocusOrder:         order,
+			OnCurrentWorkspace: c.Workspace.ID != nil && active != nil && *c.Workspace.ID == *active,
 		})
 	}
 	return out, nil
 }
 
-func (b hyprlandBackend) focus(_ context.Context, id string) error {
+func (b hyprlandBackend) Focus(_ context.Context, id string) error {
 	c, err := b.conn()
 	if err != nil {
 		return err
@@ -276,7 +289,7 @@ func (b hyprlandBackend) focus(_ context.Context, id string) error {
 	return err
 }
 
-func (b hyprlandBackend) close(_ context.Context, id string) error {
+func (b hyprlandBackend) Close(_ context.Context, id string) error {
 	c, err := b.conn()
 	if err != nil {
 		return err
@@ -287,7 +300,7 @@ func (b hyprlandBackend) close(_ context.Context, id string) error {
 
 type niriBackend struct{}
 
-func (niriBackend) list(context.Context) ([]windowInfo, error) {
+func (niriBackend) List(context.Context) ([]WindowInfo, error) {
 	c, err := niri.Connect()
 	if err != nil {
 		return nil, err
@@ -302,7 +315,7 @@ func (niriBackend) list(context.Context) ([]windowInfo, error) {
 
 // niriWindows maps niri's list; niri reports no MRU, so list order
 // stands in for focus order.
-func niriWindows(windows []niri.Window) []windowInfo {
+func niriWindows(windows []niri.Window) []WindowInfo {
 	var focusedWS *uint64
 	for _, w := range windows {
 		if w.IsFocused {
@@ -310,7 +323,7 @@ func niriWindows(windows []niri.Window) []windowInfo {
 			break
 		}
 	}
-	out := make([]windowInfo, len(windows))
+	out := make([]WindowInfo, len(windows))
 	for i, w := range windows {
 		ws := ""
 		if w.WorkspaceID != nil {
@@ -318,9 +331,9 @@ func niriWindows(windows []niri.Window) []windowInfo {
 		}
 		sameWS := (w.WorkspaceID == nil && focusedWS == nil) ||
 			(w.WorkspaceID != nil && focusedWS != nil && *w.WorkspaceID == *focusedWS)
-		out[i] = windowInfo{
-			id: strconv.FormatUint(w.ID, 10), title: deref(w.Title), class: deref(w.AppID), workspace: ws,
-			focused: w.IsFocused, focusOrder: int64(i), onCurrentWorkspace: sameWS,
+		out[i] = WindowInfo{
+			ID: strconv.FormatUint(w.ID, 10), Title: deref(w.Title), Class: deref(w.AppID), Workspace: ws,
+			Focused: w.IsFocused, FocusOrder: int64(i), OnCurrentWorkspace: sameWS,
 		}
 	}
 	return out
@@ -346,17 +359,17 @@ func (niriBackend) action(ctx context.Context, name, id string) error {
 	return c.Action(ctx, name, map[string]any{"id": n})
 }
 
-func (b niriBackend) focus(ctx context.Context, id string) error {
+func (b niriBackend) Focus(ctx context.Context, id string) error {
 	return b.action(ctx, "FocusWindow", id)
 }
 
-func (b niriBackend) close(ctx context.Context, id string) error {
+func (b niriBackend) Close(ctx context.Context, id string) error {
 	return b.action(ctx, "CloseWindow", id)
 }
 
 type swayBackend struct{}
 
-func (swayBackend) list(context.Context) ([]windowInfo, error) {
+func (swayBackend) List(context.Context) ([]WindowInfo, error) {
 	c, err := sway.Connect()
 	if err != nil {
 		return nil, err
@@ -391,20 +404,20 @@ func jsonString(raw json.RawMessage) (string, bool) {
 	return s, true
 }
 
-func parseSwayTree(raw []byte) ([]windowInfo, error) {
-	var out []windowInfo
+func parseSwayTree(raw []byte) ([]WindowInfo, error) {
+	var out []WindowInfo
 	if err := walkSway(raw, "", false, &out); err != nil {
 		return nil, err
 	}
 	focusedWS, found := "", false
 	for _, w := range out {
-		if w.focused {
-			focusedWS, found = w.workspace, true
+		if w.Focused {
+			focusedWS, found = w.Workspace, true
 			break
 		}
 	}
 	for i := range out {
-		out[i].onCurrentWorkspace = found && out[i].workspace == focusedWS
+		out[i].OnCurrentWorkspace = found && out[i].Workspace == focusedWS
 	}
 	return out, nil
 }
@@ -412,7 +425,7 @@ func parseSwayTree(raw []byte) ([]windowInfo, error) {
 // walkSway collects view nodes, carrying the nearest workspace name. A
 // view is a con or floating_con leaf with a string name and either an
 // app_id string or window_properties object (window.rs walk_sway).
-func walkSway(raw json.RawMessage, workspace string, hasWS bool, out *[]windowInfo) error {
+func walkSway(raw json.RawMessage, workspace string, hasWS bool, out *[]WindowInfo) error {
 	var n swayNode
 	if err := json.Unmarshal(raw, &n); err != nil {
 		return err
@@ -440,9 +453,9 @@ func walkSway(raw json.RawMessage, workspace string, hasWS bool, out *[]windowIn
 		if hasWS {
 			ws = workspace
 		}
-		*out = append(*out, windowInfo{
-			id: strconv.FormatInt(n.ID, 10), title: name, class: class, workspace: ws,
-			focused: n.Focused, focusOrder: 1<<63 - 1,
+		*out = append(*out, WindowInfo{
+			ID: strconv.FormatInt(n.ID, 10), Title: name, Class: class, Workspace: ws,
+			Focused: n.Focused, FocusOrder: 1<<63 - 1,
 		})
 	}
 	for _, child := range append(n.Nodes, n.FloatingNodes...) {
@@ -462,10 +475,123 @@ func (swayBackend) command(ctx context.Context, cmd string) error {
 	return c.RunCommand(ctx, cmd)
 }
 
-func (b swayBackend) focus(ctx context.Context, id string) error {
+func (b swayBackend) Focus(ctx context.Context, id string) error {
 	return b.command(ctx, "[con_id="+id+"] focus")
 }
 
-func (b swayBackend) close(ctx context.Context, id string) error {
+func (b swayBackend) Close(ctx context.Context, id string) error {
 	return b.command(ctx, "[con_id="+id+"] kill")
 }
+
+type lysWMBackend struct{}
+
+func (lysWMBackend) List(context.Context) ([]WindowInfo, error) {
+	windows, err := lyswm.Windows()
+	if err != nil {
+		return nil, err
+	}
+	return lysWMWindows(windows), nil
+}
+
+// lysWMWindows maps lys-wm's list, oldest first: lys-wm reports no focus
+// history, so the newest window ranks as the most recently used.
+func lysWMWindows(windows []lyswm.Window) []WindowInfo {
+	focusedWS, found := 0, false
+	for _, w := range windows {
+		if w.Focused {
+			focusedWS, found = w.Workspace, true
+			break
+		}
+	}
+	out := make([]WindowInfo, len(windows))
+	for i, w := range windows {
+		out[i] = WindowInfo{
+			ID: strconv.FormatUint(w.ID, 10), Title: w.Title, Class: w.AppID, Workspace: strconv.Itoa(w.Workspace),
+			Focused: w.Focused, FocusOrder: int64(len(windows) - i), OnCurrentWorkspace: found && w.Workspace == focusedWS,
+		}
+	}
+	return out
+}
+
+func (lysWMBackend) Focus(_ context.Context, id string) error {
+	return lyswm.Dispatch("focuswindow " + id)
+}
+
+func (lysWMBackend) Close(_ context.Context, id string) error {
+	return lyswm.Dispatch("closewindow " + id)
+}
+
+// mangoStateWait bounds waiting for mango's first full-state frames.
+const mangoStateWait = 2 * time.Second
+
+type mangoBackend struct{}
+
+func (mangoBackend) state(ctx context.Context) ([]mango.Client, error) {
+	w, err := mango.Watch()
+	if err != nil {
+		return nil, err
+	}
+	defer w.Close()
+	ctx, cancel := context.WithTimeout(ctx, mangoStateWait)
+	defer cancel()
+	for !w.Ready() {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("mango: waiting for its client list: %w", ctx.Err())
+		case <-w.Ticks():
+		}
+	}
+	_, clients := w.State()
+	return clients, nil
+}
+
+func (b mangoBackend) List(ctx context.Context) ([]WindowInfo, error) {
+	clients, err := b.state(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mangoWindows(clients), nil
+}
+
+// mangoWindows maps mango's clients. Mango reports no focus history, so
+// list order stands in for it, and a window's workspace is its first tag.
+func mangoWindows(clients []mango.Client) []WindowInfo {
+	var focused []uint32
+	for _, c := range clients {
+		if c.IsFocused {
+			focused = c.Tags
+			break
+		}
+	}
+	out := make([]WindowInfo, len(clients))
+	for i, c := range clients {
+		ws := ""
+		if len(c.Tags) > 0 {
+			ws = strconv.FormatUint(uint64(c.Tags[0]), 10)
+		}
+		out[i] = WindowInfo{
+			ID: strconv.FormatUint(uint64(c.ID), 10), Title: c.Title, Class: c.AppID, Workspace: ws,
+			Focused: c.IsFocused, FocusOrder: int64(i),
+			OnCurrentWorkspace: slices.ContainsFunc(c.Tags, func(t uint32) bool { return slices.Contains(focused, t) }),
+		}
+	}
+	return out
+}
+
+// Focus shows the client's tag: mango's dispatchers name no client, so
+// the window's tag is as close as its IPC goes.
+func (b mangoBackend) Focus(ctx context.Context, id string) error {
+	clients, err := b.state(ctx)
+	if err != nil {
+		return err
+	}
+	for _, c := range clients {
+		if strconv.FormatUint(uint64(c.ID), 10) == id && len(c.Tags) > 0 {
+			return mango.ViewTag(c.Tags[0])
+		}
+	}
+	return fmt.Errorf("mango: no client %s with a tag", id)
+}
+
+// Close cannot be done: see ErrWindowCloseUnsupported.
+func (mangoBackend) Close(context.Context, string) error { return ErrWindowCloseUnsupported }
