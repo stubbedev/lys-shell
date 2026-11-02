@@ -8,6 +8,7 @@ package search
 
 import (
 	"context"
+	"sync"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/launcher"
@@ -50,8 +51,21 @@ func (s Section) Title() string {
 	if s == SectionNone {
 		return ""
 	}
-	return i18n.T(sectionKeys[s])
+	sectionTitlesOnce.Do(func() {
+		for i, key := range sectionKeys {
+			if key != "" {
+				sectionTitles[i] = i18n.T(key)
+			}
+		}
+	})
+	return sectionTitles[s]
 }
+
+// The headings, read from the locale once: every keystroke shows them.
+var (
+	sectionTitlesOnce sync.Once
+	sectionTitles     [sectionCount]string
+)
 
 // Preview is what a row shows in the side pane. The zero Preview is
 // none.
@@ -60,8 +74,10 @@ type Preview struct {
 	Path string
 	// Text is text to show as it is.
 	Text string
-	// Load produces an encoded image (a clipboard image) off the UI loop.
-	Load func() ([]byte, error)
+	// Load produces an encoded image, or text with LoadsText, off the UI loop
+	// and only when the row is selected.
+	Load      func() ([]byte, error)
+	LoadsText bool
 }
 
 // Any reports whether there is anything to preview.
@@ -205,4 +221,5 @@ var (
 	iconCalc     launcher.Icon = launcher.IconName("ld-calculator-symbolic")
 	iconWeb      launcher.Icon = launcher.IconName("ld-globe-symbolic")
 	iconTerminal launcher.Icon = launcher.IconName("ld-terminal-symbolic")
+	iconFolder   launcher.Icon = launcher.IconName("ld-folder-symbolic")
 )

@@ -172,7 +172,7 @@ func TestHighlightsMarkTheMatchedCharacters(t *testing.T) {
 	e := start(t, s, nil, &fakeProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("Visual Studio Code")}})
 	e.SetQuery("vsc", 1)
 	until(t, s, "Visual Studio Code")
-	got := s.last().Rows[0].Highlights()
+	got := s.last().Rows[0].AppendHighlights(nil, launcher.NewFuzzyQuery("vsc"))
 	if want := []int{0, 7, 14}; !slices.Equal(got, want) {
 		t.Errorf("highlights = %v, want the word starts %v", got, want)
 	}
@@ -205,10 +205,10 @@ func TestFrecencyLearnsTheQuery(t *testing.T) {
 	if err := freq.Record("Zed", "ze"); err != nil {
 		t.Fatal(err)
 	}
-	if got := freq.QueryBoosts("z")["Zed"]; got == 0 {
+	if got := boostsFor(freq, "z")["Zed"]; got == 0 {
 		t.Error("a query that starts what was typed before should find it")
 	}
-	if freq.QueryBoosts("q") != nil {
+	if len(boostsFor(freq, "q")) != 0 {
 		t.Error("a different query must learn nothing from it")
 	}
 }
@@ -322,19 +322,19 @@ func TestLateRowsLeaveWhatIsOnScreenInPlace(t *testing.T) {
 }
 
 func TestSectionsDoNotSwapOnASmallLead(t *testing.T) {
-	prev := []Section{SectionApps, SectionFiles}
+	want := []Section{SectionApps, SectionFiles}
 	sections := []sectionRows{
 		{section: SectionFiles, rows: []ranked{{score: 105}}},
 		{section: SectionApps, rows: []ranked{{score: 100}}},
 	}
-	if got := orderSections(sections, prev, false); !slices.Equal(got, prev) {
+	if got := orderSections(sections, slices.Clone(want), false); !slices.Equal(got, want) {
 		t.Errorf("a small lead swapped them: %v", got)
 	}
 	sections = []sectionRows{
 		{section: SectionFiles, rows: []ranked{{score: 100 + sectionStickiness + 1}}},
 		{section: SectionApps, rows: []ranked{{score: 100}}},
 	}
-	if got := orderSections(sections, prev, false); got[0] != SectionFiles {
+	if got := orderSections(sections, slices.Clone(want), false); got[0] != SectionFiles {
 		t.Errorf("a clear lead must win: %v", got)
 	}
 }
@@ -441,14 +441,15 @@ func TestActivatingRecordsTheUse(t *testing.T) {
 }
 
 func TestOvertakenQueriesAreSkippedButAcceptsSeeTheirText(t *testing.T) {
-	q := func(s string) engineCmd { return cmdQuery{text: s} }
-	if !overtaken(q("a"), []engineCmd{q("ab")}) {
+	q := func(s string) engineCmd { return engineCmd{kind: cmdQuery, text: s} }
+	a := q("a")
+	if !overtaken(&a, []engineCmd{q("ab")}) {
 		t.Error("an adjacent newer query overtakes")
 	}
-	if overtaken(q("a"), []engineCmd{cmdActivate{id: "x"}, q("ab")}) {
+	if overtaken(&a, []engineCmd{{kind: cmdActivate, id: "x"}, q("ab")}) {
 		t.Error("an accept between them must see the older text")
 	}
-	if overtaken(q("a"), nil) {
+	if overtaken(&a, nil) {
 		t.Error("the last query stands")
 	}
 }
@@ -813,4 +814,10 @@ func TestNewRootHonoursTheProviderList(t *testing.T) {
 	if len(root.Providers) != 1 {
 		t.Errorf("providers = %d", len(root.Providers))
 	}
+}
+
+func boostsFor(f *Frecency, q string) map[string]int {
+	m := map[string]int{}
+	f.QueryBoostsInto(m, q)
+	return m
 }

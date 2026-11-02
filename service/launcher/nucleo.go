@@ -3,8 +3,6 @@ package launcher
 import (
 	"strings"
 	"unicode"
-
-	"github.com/rivo/uniseg"
 )
 
 // This file ports the parts of nucleo-matcher 0.3.1 the launcher's
@@ -185,30 +183,7 @@ func satSub(a, b int) int { return max(a-b, 0) }
 
 // graphemeRunes is Utf32Str::new: ASCII text rune for rune, anything
 // else as the first char of each grapheme cluster.
-func graphemeRunes(s string) []rune {
-	ascii := true
-	for i := range len(s) {
-		if s[i] >= 0x80 {
-			ascii = false
-			break
-		}
-	}
-	if ascii {
-		out := make([]rune, len(s))
-		for i := range len(s) {
-			out[i] = rune(s[i])
-		}
-		return out
-	}
-	var out []rune
-	g := uniseg.NewGraphemes(s)
-	for g.Next() {
-		if rs := g.Runes(); len(rs) > 0 {
-			out = append(out, rs[0])
-		}
-	}
-	return out
-}
+func graphemeRunes(s string) []rune { return AppendHaystack(nil, s) }
 
 // atomKind is pattern.rs AtomKind.
 type atomKind uint8

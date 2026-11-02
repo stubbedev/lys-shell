@@ -49,6 +49,13 @@ func LoadPreview(ctx context.Context, p Preview, thumbs Thumbnailing) (PreviewCo
 		if err != nil {
 			return PreviewContent{}, err
 		}
+		if p.LoadsText {
+			text, ok := textOf(data, false)
+			if !ok {
+				return PreviewContent{}, ErrNoPreview
+			}
+			return PreviewContent{Text: text}, nil
+		}
 		img, err := imagedecode.Decode(data)
 		if err != nil {
 			return PreviewContent{}, fmt.Errorf("preview: decode: %w", err)

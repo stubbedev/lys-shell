@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/third_party/gomath"
@@ -95,10 +94,14 @@ func decay(score float64, from, to int64) float64 {
 // queryKey is the remembered form of a query: folded and cut short.
 func queryKey(query string) string {
 	q := strings.ToLower(strings.TrimSpace(query))
-	if utf8.RuneCountInString(q) <= frecencyQueryChars {
-		return q
+	n := 0
+	for i := range q {
+		if n == frecencyQueryChars {
+			return q[:i]
+		}
+		n++
 	}
-	return string([]rune(q)[:frecencyQueryChars])
+	return q
 }
 
 // Record counts one use of key, found by query, and saves.
@@ -201,29 +204,31 @@ func (f *Frecency) Boost(key string) int {
 	return boostOf(decay(r.Score, r.At, f.now().Unix()))
 }
 
-// QueryBoosts maps each key picked for query (or a query it starts
-// with) to the score that adds, so typing what you typed last time
-// finds what you chose last time.
-func (f *Frecency) QueryBoosts(query string) map[string]int {
+// QueryBoostsInto fills into, empty, with each key picked for query (or a
+// query it starts with) and the score that adds, so typing what you typed
+// last time finds what you chose last time. It reports whether it found
+// any.
+func (f *Frecency) QueryBoostsInto(into map[string]int, query string) bool {
 	q := queryKey(query)
 	if q == "" {
-		return nil
+		return false
 	}
-	now := f.now().Unix()
-	var out map[string]int
+	var now int64
+	found := false
 	for key, r := range f.entries {
 		best := 0.0
 		for prefix, s := range r.Queries {
 			if strings.HasPrefix(prefix, q) {
+				if now == 0 {
+					now = f.now().Unix()
+				}
 				best = max(best, decay(s, r.At, now))
 			}
 		}
 		if best > 0 {
-			if out == nil {
-				out = map[string]int{}
-			}
-			out[key] = min(int(math.Round(queryBoost*gomath.Log2(1+best))), 2*queryBoost)
+			into[key] = min(int(math.Round(queryBoost*gomath.Log2(1+best))), 2*queryBoost)
+			found = true
 		}
 	}
-	return out
+	return found
 }

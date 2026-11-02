@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/stubbedev/lys-lib/atomicfile"
 
@@ -100,44 +101,82 @@ func (f *Files) Load(ctx context.Context, publish func([]Entry)) {
 	}
 }
 
-// entries are the rows: recents first and only once.
+// entries are the rows: recents first and only once. A row shares its
+// path's bytes for its id and title, and the rows share one block for
+// what they hold besides, so thirty thousand rows are a few allocations
+// rather than a few per row.
 func (f *Files) entries(recent, indexed []string) []Entry {
+	total := len(recent) + len(indexed)
 	seen := make(map[string]struct{}, len(recent))
-	out := make([]Entry, 0, len(recent)+len(indexed))
+	out := make([]Entry, 0, total)
+	data := make([]fileData, total)
+	var dirs strings.Builder
+	size := 0
+	for _, p := range indexed {
+		size += len(p)
+	}
+	for _, p := range recent {
+		size += len(p)
+	}
+	dirs.Grow(size)
+	icons := map[string]launcher.Icon{}
+	add := func(path string, dir bool, rank int) {
+		d := &data[len(out)]
+		*d = fileData{path: path, dir: dir}
+		out = append(out, f.entry(d, &dirs, icons, rank))
+	}
 	for _, p := range recent {
 		seen[p] = struct{}{}
-		e := f.entry(p, false)
-		e.Rank = recentRank
-		out = append(out, e)
+		add(p, false, recentRank)
 	}
 	for _, p := range indexed {
 		if _, dup := seen[p]; dup {
 			continue
 		}
 		dir := strings.HasSuffix(p, "/")
-		out = append(out, f.entry(strings.TrimSuffix(p, "/"), dir))
+		add(strings.TrimSuffix(p, "/"), dir, 0)
 	}
 	return out
 }
 
-func (f *Files) display(p string) string {
-	if f.cfg.Home != "" {
-		if rest, ok := strings.CutPrefix(p, f.cfg.Home+"/"); ok {
-			return "~/" + rest
-		}
+// displayDir is path's folder as shown: under the home directory, ~/.
+// Outside it the path's own bytes serve, and within it the shortened form
+// goes in the shared block.
+func (f *Files) displayDir(path string, block *strings.Builder) string {
+	dir := path[:max(strings.LastIndexByte(path, '/'), 1)]
+	if f.cfg.Home == "" || !strings.HasPrefix(dir, f.cfg.Home) {
+		return dir
 	}
-	return p
+	rest := dir[len(f.cfg.Home):]
+	if rest != "" && rest[0] != '/' {
+		return dir
+	}
+	start := block.Len()
+	block.WriteByte('~')
+	block.WriteString(rest)
+	return block.String()[start:]
 }
 
-func (f *Files) entry(path string, dir bool) Entry {
-	id := "file:" + path
-	e := Entry{ID: id, Learn: id, Title: filepath.Base(path), Subtitle: f.display(filepath.Dir(path)), Data: fileData{path: path, dir: dir}}
-	if dir {
-		e.Icon = launcher.IconName("ld-folder-symbolic")
-		e.Completion = f.display(path) + "/"
+func (f *Files) entry(d *fileData, block *strings.Builder, icons map[string]launcher.Icon, rank int) Entry {
+	path := d.path
+	e := Entry{
+		ID: path, Learn: path, Title: path[strings.LastIndexByte(path, '/')+1:], Subtitle: f.displayDir(path, block),
+		Data: d, Rank: rank,
+	}
+	if d.dir {
+		e.Icon = iconFolder
+		e.Completion = strings.TrimSuffix(e.Subtitle, "/") + "/" + e.Title + "/"
 		return e
 	}
-	e.Icon = launcher.IconName(launcher.MimeIcon(path))
+	ext := e.Title[max(strings.LastIndexByte(e.Title, '.'), 0):]
+	icon, ok := icons[ext]
+	if !ok {
+		icon = launcher.IconName(launcher.MimeIcon(path))
+		if icons != nil && strings.HasPrefix(ext, ".") {
+			icons[ext] = icon
+		}
+	}
+	e.Icon = icon
 	if f.cfg.Previews {
 		e.Preview = Preview{Path: path}
 	}
@@ -178,6 +217,7 @@ func (f *Files) Answer(query string) []Entry {
 		return nil
 	}
 	folded := strings.ToLower(prefix)
+	var block strings.Builder
 	out := make([]Entry, 0, min(len(listing), pathRowsMax))
 	for _, d := range listing {
 		name := d.Name()
@@ -187,7 +227,8 @@ func (f *Files) Answer(query string) []Entry {
 		if !strings.HasPrefix(strings.ToLower(name), folded) {
 			continue
 		}
-		out = append(out, f.entry(filepath.Join(dir, name), d.IsDir()))
+		data := &fileData{path: filepath.Join(dir, name), dir: d.IsDir()}
+		out = append(out, f.entry(data, &block, nil, 0))
 		if len(out) == pathRowsMax {
 			break
 		}
@@ -197,7 +238,7 @@ func (f *Files) Answer(query string) []Entry {
 
 // Actions implements Provider.
 func (f *Files) Actions(e Entry) []Action {
-	d, ok := e.Data.(fileData)
+	d, ok := e.Data.(*fileData)
 	if !ok {
 		return nil
 	}
@@ -293,15 +334,16 @@ func readFileIndex(path string, now func() time.Time) ([]string, time.Duration, 
 	if err != nil {
 		return nil, 0, err
 	}
-	data, err := io.ReadAll(file)
-	if err != nil {
+	// One read of the known size; the lines are slices of one string.
+	data := make([]byte, info.Size())
+	if _, err := io.ReadFull(file, data); err != nil {
 		return nil, 0, err
 	}
-	var lines []string
-	if len(data) > 0 {
-		lines = strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	if len(data) == 0 {
+		return nil, now().Sub(info.ModTime()), nil
 	}
-	return lines, now().Sub(info.ModTime()), nil
+	text := unsafe.String(&data[0], len(data)) //nolint:gosec // data is never written again, and copying the index is what this avoids
+	return strings.Split(strings.TrimSuffix(text, "\n"), "\n"), now().Sub(info.ModTime()), nil
 }
 
 func writeFileIndex(path string, paths []string) error {
@@ -358,7 +400,7 @@ func walkFiles(ctx context.Context, roots, exclude []string, limit int) (paths [
 			if strings.HasPrefix(name, ".") {
 				continue
 			}
-			full := filepath.Join(d.path, name)
+			full := d.path + "/" + name
 			if !entry.IsDir() {
 				if entry.Type()&os.ModeSymlink == 0 {
 					paths = append(paths, full)

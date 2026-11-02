@@ -56,27 +56,27 @@ func newCorpus(p Provider) *corpus { return &corpus{prov: p, spec: p.Spec()} }
 func (c *corpus) set(entries []Entry, boost func(string) int) {
 	c.entries = entries
 	c.scanned, c.lastQuery = false, ""
-	c.titles = make([][]rune, len(entries))
-	c.full = make([][]rune, len(entries))
-	c.boost = make([]int32, len(entries))
+	c.titles = slices.Grow(c.titles[:0], len(entries))[:len(entries)]
+	c.full = slices.Grow(c.full[:0], len(entries))[:len(entries)]
+	c.boost = slices.Grow(c.boost[:0], len(entries))[:len(entries)]
 	size := 0
 	for i := range entries {
 		e := &entries[i]
 		size += len(e.Title) + len(e.Subtitle) + len(e.Keywords) + 2
 	}
 	arena := make([]rune, 0, size)
+	// size counts bytes, so it holds every rune and the arena never moves
+	// under the slices taken of it.
 	for i := range entries {
 		e := &entries[i]
 		start := len(arena)
-		arena = append(arena, launcher.Haystack(e.Title)...)
+		arena = launcher.AppendHaystack(arena, e.Title)
 		titleEnd := len(arena)
 		if e.Subtitle != "" {
-			arena = append(arena, ' ')
-			arena = append(arena, launcher.Haystack(e.Subtitle)...)
+			arena = launcher.AppendHaystack(append(arena, ' '), e.Subtitle)
 		}
 		if e.Keywords != "" {
-			arena = append(arena, ' ')
-			arena = append(arena, launcher.Haystack(e.Keywords)...)
+			arena = launcher.AppendHaystack(append(arena, ' '), e.Keywords)
 		}
 		c.titles[i] = arena[start:titleEnd:titleEnd]
 		c.full[i] = arena[start:len(arena):len(arena)]
@@ -85,7 +85,7 @@ func (c *corpus) set(entries []Entry, boost func(string) int) {
 }
 
 // matchOne scores one entry: its title, else the whole of it for less.
-func (c *corpus) matchOne(q launcher.FuzzyQuery, i int) (int32, bool) {
+func (c *corpus) matchOne(q *launcher.FuzzyQuery, i int) (int32, bool) {
 	if s, ok := q.Score(c.titles[i]); ok {
 		return intconv.Clamp[int32](s), true
 	}
@@ -100,7 +100,7 @@ func (c *corpus) matchOne(q launcher.FuzzyQuery, i int) (int32, bool) {
 
 // scan brings hits up to query: only the last query's hits when query
 // extends it, a query that narrows matching a subset by construction.
-func (c *corpus) scan(q launcher.FuzzyQuery, query string) {
+func (c *corpus) scan(q *launcher.FuzzyQuery, query string) {
 	if c.scanned && c.lastQuery != "" && strings.HasPrefix(query, c.lastQuery) {
 		kept := c.hits[:0]
 		for _, h := range c.hits {
@@ -180,46 +180,52 @@ type sectionRows struct {
 // already showing) prev's order stands outright and newcomers go after
 // it, so what is on screen does not move.
 func orderSections(sections []sectionRows, prev []Section, pin bool) []Section {
-	best := func(s sectionRows) int32 { return s.rows[0].score }
-	place := func(sec Section) int { return max(slices.Index(prev, sec), -1) }
-	fixed := func(sec Section) int {
-		switch sec {
-		case SectionAnswer:
-			return -1
-		case SectionWeb:
-			return 1
+	// Insertion sort: a handful of sections, stable, and with no closure
+	// to allocate per keystroke.
+	for i := 1; i < len(sections); i++ {
+		for j := i; j > 0 && sectionBefore(&sections[j], &sections[j-1], prev, pin); j-- {
+			sections[j], sections[j-1] = sections[j-1], sections[j]
 		}
-		return 0
 	}
-	slices.SortStableFunc(sections, func(a, b sectionRows) int {
-		if c := cmp.Compare(fixed(a.section), fixed(b.section)); c != 0 {
-			return c
-		}
-		pa, pb := place(a.section), place(b.section)
-		if pin {
-			switch {
-			case pa >= 0 && pb >= 0:
-				return cmp.Compare(pa, pb)
-			case pa >= 0:
-				return -1
-			case pb >= 0:
-				return 1
-			}
-		}
-		diff := int(best(a)) - int(best(b))
-		if pa >= 0 && pb >= 0 {
-			if diff > -sectionStickiness && diff < sectionStickiness {
-				return cmp.Compare(pa, pb)
-			}
-		}
-		if diff != 0 {
-			return -cmp.Compare(diff, 0)
-		}
-		return cmp.Compare(a.section, b.section)
-	})
-	out := make([]Section, len(sections))
-	for i, s := range sections {
-		out[i] = s.section
+	out := prev[:0]
+	for i := range sections {
+		out = append(out, sections[i].section)
 	}
 	return out
+}
+
+func sectionFixed(sec Section) int {
+	switch sec {
+	case SectionAnswer:
+		return -1
+	case SectionWeb:
+		return 1
+	}
+	return 0
+}
+
+// sectionBefore reports a strictly before b.
+func sectionBefore(a, b *sectionRows, prev []Section, pin bool) bool {
+	if fa, fb := sectionFixed(a.section), sectionFixed(b.section); fa != fb {
+		return fa < fb
+	}
+	pa, pb := slices.Index(prev, a.section), slices.Index(prev, b.section)
+	if pin {
+		switch {
+		case pa >= 0 && pb >= 0:
+			return pa < pb
+		case pa >= 0:
+			return true
+		case pb >= 0:
+			return false
+		}
+	}
+	diff := int(a.rows[0].score) - int(b.rows[0].score)
+	if pa >= 0 && pb >= 0 && diff > -sectionStickiness && diff < sectionStickiness {
+		return pa < pb
+	}
+	if diff != 0 {
+		return diff > 0
+	}
+	return a.section < b.section
 }

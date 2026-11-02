@@ -14,34 +14,38 @@ import (
 )
 
 // Row is one line of the list: a section heading (Header set) or an
-// entry.
+// entry. It points at its entry rather than copying it, and a row of the
+// list is 64 bytes, so a frame costs little whatever an entry holds.
 type Row struct {
 	// Header is a heading's text; "" for an entry.
 	Header string
-	// Entry is the row.
-	Entry Entry
+	// Entry is the row; nil for a heading. It is never written after its
+	// provider published it.
+	Entry *Entry
 
-	query launcher.FuzzyQuery
+	prov Provider
+	// title is the title as the matcher read it; nil for an answer, whose
+	// text is the answer rather than a match.
 	title []rune
-	acts  func(Entry) []Action
 }
 
 // Actions lists the row's actions, the default first.
 func (r Row) Actions() []Action {
-	if r.acts != nil {
-		return r.acts(r.Entry)
-	}
-	return nil
-}
-
-// Highlights are the positions in the title, counted in grapheme
-// clusters, of the characters the query matched. It is computed when
-// asked, so only rows on screen pay for it.
-func (r Row) Highlights() []int {
-	if r.query.Empty() {
+	if r.prov == nil {
 		return nil
 	}
-	return r.query.Positions(r.title)
+	return r.prov.Actions(*r.Entry)
+}
+
+// AppendHighlights appends the positions in the title, counted in
+// grapheme clusters, of the characters q matched. It is computed when
+// asked, so only rows on screen pay for it, on the reader's own q and
+// buffer.
+func (r Row) AppendHighlights(dst []int, q *launcher.FuzzyQuery) []int {
+	if r.title == nil {
+		return dst
+	}
+	return q.AppendPositions(dst, r.title)
 }
 
 // Frame is everything the panel shows for one state of the search.
@@ -67,7 +71,8 @@ type Frame struct {
 	// Late marks rows that arrived while the query stood still: the
 	// selection stays on the row it is on.
 	Late bool
-	// Rows are the list.
+	// Rows are the list. They stay the receiver's until it hands them
+	// back with Engine.Recycle.
 	Rows []Row
 }
 
@@ -82,27 +87,30 @@ type Sink interface {
 	Notice(message string)
 }
 
-// engineCmd is a panel -> engine command.
-type engineCmd any
+// cmdKind is a panel -> engine command's kind.
+type cmdKind uint8
 
-type (
-	cmdQuery struct {
-		text string
-		seq  uint64
-	}
-	cmdActivate struct {
-		id     string
-		action int
-	}
-	cmdSubmit  struct{ text string }
-	cmdActions struct{ id string }
-	cmdBack    struct{}
-	cmdPublish struct {
-		state   *levelState
-		corpus  *corpus
-		entries []Entry
-	}
+const (
+	cmdQuery cmdKind = iota + 1
+	cmdActivate
+	cmdSubmit
+	cmdActions
+	cmdBack
+	cmdPublish
 )
+
+// engineCmd is one command, a plain value, so sending one per keystroke
+// boxes nothing.
+type engineCmd struct {
+	kind cmdKind
+	// text is a query or a submission; id a row.
+	text, id string
+	seq      uint64
+	action   int
+	state    *levelState
+	corpus   *corpus
+	entries  []Entry
+}
 
 // levelState is one level on the stack, with the query it was left at.
 type levelState struct {
@@ -113,26 +121,46 @@ type levelState struct {
 	cancel   context.CancelFunc
 }
 
+// frameBox is a pooled frame with its delivery bound once, so delivering
+// one allocates no closure.
+type frameBox struct {
+	frame Frame
+	run   func()
+}
+
 // Engine is one session's search, on its own goroutine: providers load
 // beside it and publish into it, queries are answered in order, and a
 // query already overtaken by a newer one is skipped, so typing fast
-// costs one answer rather than one per key.
+// costs one answer rather than one per key. Answering a query reuses its
+// memory: only what a provider's answer or the query's own text needs is
+// allocated.
 type Engine struct {
 	sink    Sink
 	deliver func(func())
 	freq    *Frecency
-	mu      sync.Mutex
-	queue   []engineCmd
-	wake    chan struct{}
-	cancel  context.CancelFunc
-	done    chan struct{}
+
+	mu    sync.Mutex
+	queue []engineCmd
+	head  int
+	// freeRows and freeBoxes come back from the UI loop.
+	freeRows  [][]Row
+	freeBoxes []*frameBox
+
+	wake   chan struct{}
+	cancel context.CancelFunc
+	done   chan struct{}
 
 	stack []*levelState
 	rows  []Row
 	// seq is the last edit of the search field answered.
 	seq uint64
-	// scratch is reused between queries.
-	scratch []sectionRows
+
+	// What one query's answer works in, reused.
+	query     launcher.FuzzyQuery
+	sections  []sectionRows
+	secBuf    [sectionCount][]ranked
+	boosts    map[string]int
+	emptyCand []ranked
 }
 
 // Start runs the engine over root. openFrecency runs on its goroutine,
@@ -140,9 +168,14 @@ type Engine struct {
 // loop.
 func Start(root *Level, openFrecency func() (*Frecency, error), sink Sink, deliver func(func())) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
-	e := &Engine{sink: sink, deliver: deliver, wake: make(chan struct{}, 1), cancel: cancel, done: make(chan struct{})}
+	e := newEngine()
+	e.sink, e.deliver, e.cancel = sink, deliver, cancel
 	go e.run(ctx, root, openFrecency)
 	return e
+}
+
+func newEngine() *Engine {
+	return &Engine{wake: make(chan struct{}, 1), done: make(chan struct{}), boosts: map[string]int{}}
 }
 
 func (e *Engine) send(c engineCmd) {
@@ -157,19 +190,34 @@ func (e *Engine) send(c engineCmd) {
 
 // SetQuery answers text; seq numbers the edit, so a frame can say which
 // edits it has seen.
-func (e *Engine) SetQuery(text string, seq uint64) { e.send(cmdQuery{text: text, seq: seq}) }
+func (e *Engine) SetQuery(text string, seq uint64) {
+	e.send(engineCmd{kind: cmdQuery, text: text, seq: seq})
+}
 
 // Activate runs action number action of the row with this id.
-func (e *Engine) Activate(id string, action int) { e.send(cmdActivate{id: id, action: action}) }
+func (e *Engine) Activate(id string, action int) {
+	e.send(engineCmd{kind: cmdActivate, id: id, action: action})
+}
 
 // Submit is Enter with no row: the level's Submit gets the text.
-func (e *Engine) Submit(text string) { e.send(cmdSubmit{text: text}) }
+func (e *Engine) Submit(text string) { e.send(engineCmd{kind: cmdSubmit, text: text}) }
 
 // ShowActions enters the actions panel of the row with this id.
-func (e *Engine) ShowActions(id string) { e.send(cmdActions{id: id}) }
+func (e *Engine) ShowActions(id string) { e.send(engineCmd{kind: cmdActions, id: id}) }
 
 // Back leaves the current level; at the root it finishes with Cancel.
-func (e *Engine) Back() { e.send(cmdBack{}) }
+func (e *Engine) Back() { e.send(engineCmd{kind: cmdBack}) }
+
+// Recycle hands a frame's rows back once nothing reads them.
+func (e *Engine) Recycle(rows []Row) {
+	if cap(rows) == 0 {
+		return
+	}
+	clear(rows)
+	e.mu.Lock()
+	e.freeRows = append(e.freeRows, rows[:0])
+	e.mu.Unlock()
+}
 
 // Stop ends the engine and every provider it started. It does not wait:
 // the UI loop calls it, and an action in flight may still be finishing.
@@ -179,15 +227,20 @@ func (e *Engine) Stop() { e.cancel() }
 func (e *Engine) Done() <-chan struct{} { return e.done }
 
 // next takes the next command, dropping a query a later one overtook
-// and a publish a later one for the same corpus replaced.
+// and a publish a later one for the same corpus replaced. The queue's
+// memory is reused once it drains.
 func (e *Engine) next(ctx context.Context) (engineCmd, bool) {
 	for {
 		e.mu.Lock()
-		if len(e.queue) > 0 {
-			c := e.queue[0]
-			e.queue = e.queue[1:]
-			if overtaken(c, e.queue) {
-				e.mu.Unlock()
+		for e.head < len(e.queue) {
+			c := e.queue[e.head]
+			e.queue[e.head] = engineCmd{}
+			e.head++
+			rest := e.queue[e.head:]
+			if e.head == len(e.queue) {
+				e.queue, e.head = e.queue[:0], 0
+			}
+			if overtaken(&c, rest) {
 				continue
 			}
 			e.mu.Unlock()
@@ -196,26 +249,24 @@ func (e *Engine) next(ctx context.Context) (engineCmd, bool) {
 		e.mu.Unlock()
 		select {
 		case <-ctx.Done():
-			return nil, false
+			return engineCmd{}, false
 		case <-e.wake:
 		}
 	}
 }
 
-func overtaken(c engineCmd, rest []engineCmd) bool {
-	switch v := c.(type) {
+func overtaken(c *engineCmd, rest []engineCmd) bool {
+	switch c.kind {
 	case cmdQuery:
 		// Only an adjacent query: anything between (an accept) must see
 		// the text it was typed after.
-		if len(rest) > 0 {
-			_, again := rest[0].(cmdQuery)
-			return again
-		}
+		return len(rest) > 0 && rest[0].kind == cmdQuery
 	case cmdPublish:
-		return slices.ContainsFunc(rest, func(o engineCmd) bool {
-			p, ok := o.(cmdPublish)
-			return ok && p.corpus == v.corpus
-		})
+		for i := range rest {
+			if rest[i].kind == cmdPublish && rest[i].corpus == c.corpus {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -235,11 +286,11 @@ func (e *Engine) run(ctx context.Context, root *Level, openFrecency func() (*Fre
 	e.push(ctx, root, &loads)
 	e.frame(frameOpts{setField: true})
 	for {
-		cmd, ok := e.next(ctx)
+		c, ok := e.next(ctx)
 		if !ok {
 			return
 		}
-		switch c := cmd.(type) {
+		switch c.kind {
 		case cmdQuery:
 			e.seq = c.seq
 			e.top().query = c.text
@@ -295,7 +346,7 @@ func (st *levelState) start(ctx context.Context, e *Engine, loads *sync.WaitGrou
 		}
 		loads.Go(func() {
 			p.Load(ctx, func(entries []Entry) {
-				e.send(cmdPublish{state: st, corpus: c, entries: entries})
+				e.send(engineCmd{kind: cmdPublish, state: st, corpus: c, entries: entries})
 			})
 		})
 	}
@@ -336,7 +387,7 @@ func (e *Engine) record(learn, query string) {
 	}
 }
 
-func (e *Engine) activate(ctx context.Context, c cmdActivate, loads *sync.WaitGroup) {
+func (e *Engine) activate(ctx context.Context, c engineCmd, loads *sync.WaitGroup) {
 	row, ok := e.rowByID(c.id)
 	if !ok {
 		return
@@ -451,44 +502,85 @@ type frameOpts struct {
 	late     bool
 }
 
+// takeRows is an empty row slice from the UI loop's returns.
+func (e *Engine) takeRows() []Row {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if n := len(e.freeRows); n > 0 {
+		rows := e.freeRows[n-1]
+		e.freeRows = e.freeRows[:n-1]
+		return rows
+	}
+	return make([]Row, 0, 64)
+}
+
+func (e *Engine) takeBox() *frameBox {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if n := len(e.freeBoxes); n > 0 {
+		box := e.freeBoxes[n-1]
+		e.freeBoxes = e.freeBoxes[:n-1]
+		return box
+	}
+	box := &frameBox{}
+	box.run = func() {
+		e.sink.Results(box.frame)
+		box.frame = Frame{}
+		e.mu.Lock()
+		e.freeBoxes = append(e.freeBoxes, box)
+		e.mu.Unlock()
+	}
+	return box
+}
+
 // frame computes the list for the current level and query and delivers
 // it.
 func (e *Engine) frame(o frameOpts) {
 	st := e.top()
-	rows := e.compute(st, o.late)
+	rows := e.compute(st, o.late, e.takeRows())
+	// e.rows reads the frame's rows; the UI loop only writes them when it
+	// recycles, and it recycles a frame only after a newer one reached it.
 	e.rows = rows
-	f := Frame{
+	box := e.takeBox()
+	box.frame = Frame{
 		Depth: len(e.stack) - 1, Title: st.level.Title, Placeholder: st.level.Placeholder, Message: st.level.Message,
 		Mask: st.level.Mask, SubmitTitle: st.level.SubmitTitle, CanSubmit: st.level.Submit != nil,
 		Query: st.query, QuerySeq: e.seq, SetField: o.setField, Field: st.query, Late: o.late, Rows: rows,
 	}
-	e.deliver(func() { e.sink.Results(f) })
+	e.deliver(box.run)
 }
 
 // isRoot is a level that suggests rather than lists when nothing is
 // typed.
 func (st *levelState) isRoot() bool { return st.level.Title == "" }
 
-func (e *Engine) compute(st *levelState, late bool) []Row {
-	query := launcher.NewFuzzyQuery(st.query)
-	if query.Empty() {
-		return e.emptyRows(st)
-	}
-	var boosts map[string]int
-	if e.freq != nil {
-		boosts = e.freq.QueryBoosts(st.query)
-	}
-	sections := e.scratch[:0]
-	sectionOf := func(s Section) *sectionRows {
-		for i := range sections {
-			if sections[i].section == s {
-				return &sections[i]
-			}
+// sectionOf is the working section for s, opened on first use.
+func (e *Engine) sectionOf(s Section) *sectionRows {
+	for i := range e.sections {
+		if e.sections[i].section == s {
+			return &e.sections[i]
 		}
-		sections = append(sections, sectionRows{section: s})
-		return &sections[len(sections)-1]
 	}
-	queryLen := len([]rune(st.query))
+	e.sections = append(e.sections, sectionRows{section: s, rows: e.secBuf[s][:0]})
+	return &e.sections[len(e.sections)-1]
+}
+
+// compute answers st's query into rows.
+func (e *Engine) compute(st *levelState, late bool, rows []Row) []Row {
+	e.query.Set(st.query)
+	if e.query.Empty() {
+		return e.emptyRows(st, rows)
+	}
+	useBoosts := false
+	if e.freq != nil {
+		clear(e.boosts)
+		useBoosts = e.freq.QueryBoostsInto(e.boosts, st.query)
+	}
+	e.sections = e.sections[:0]
+	queryLen := 0
+	for range st.query {
+		queryLen++
+	}
 	for _, c := range st.corpora {
 		spec := c.spec
 		limit := spec.Limit
@@ -497,7 +589,7 @@ func (e *Engine) compute(st *levelState, late bool) []Row {
 		}
 		if a, ok := c.prov.(Answerer); ok {
 			if answers := a.Answer(st.query); len(answers) > 0 {
-				sec := sectionOf(spec.Section)
+				sec := e.sectionOf(spec.Section)
 				for i := range answers {
 					sec.rows = append(sec.rows, ranked{corpus: c, answer: &answers[i], score: intconv.Clamp[int32](answerScore - i)})
 				}
@@ -507,54 +599,55 @@ func (e *Engine) compute(st *levelState, late bool) []Row {
 		if queryLen < spec.MinQuery {
 			continue
 		}
-		c.scan(query, st.query)
+		c.scan(&e.query, st.query)
 		if len(c.hits) == 0 {
 			continue
 		}
-		sec := sectionOf(spec.Section)
+		sec := e.sectionOf(spec.Section)
 		for _, h := range c.hits {
-			score := h.score + intconv.Clamp[int32](spec.Weight+c.entries[h.index].Rank) + c.boost[h.index]
-			if boosts != nil {
-				if learn := c.entries[h.index].Learn; learn != "" {
-					score += intconv.Clamp[int32](boosts[learn])
-				}
+			entry := &c.entries[h.index]
+			score := h.score + intconv.Clamp[int32](spec.Weight+entry.Rank) + c.boost[h.index]
+			if useBoosts && entry.Learn != "" {
+				score += intconv.Clamp[int32](e.boosts[entry.Learn])
 			}
 			sec.rows = insertTop(sec.rows, ranked{corpus: c, index: h.index, score: score}, limit)
 		}
 	}
-	sections = slices.DeleteFunc(sections, func(s sectionRows) bool { return len(s.rows) == 0 })
-	order := orderSections(sections, st.sections, late)
-	st.sections = order
-	rows := make([]Row, 0, 64)
-	flat := len(sections) == 1 && (sections[0].section == SectionNone || !st.isRoot())
-	for _, sec := range sections {
+	kept := e.sections[:0]
+	for _, s := range e.sections {
+		if len(s.rows) > 0 {
+			kept = append(kept, s)
+		}
+	}
+	e.sections = kept
+	st.sections = orderSections(e.sections, st.sections, late)
+	flat := len(e.sections) == 1 && (e.sections[0].section == SectionNone || !st.isRoot())
+	for i := range e.sections {
+		sec := &e.sections[i]
 		if !flat && sec.section != SectionNone {
 			rows = append(rows, Row{Header: sec.section.Title()})
 		}
 		for _, r := range sec.rows {
-			rows = append(rows, rowOf(r, query))
+			rows = append(rows, rowOf(r))
 		}
+		e.secBuf[sec.section] = sec.rows[:0]
 	}
-	e.scratch = sections[:0]
 	return rows
 }
 
-func rowOf(r ranked, query launcher.FuzzyQuery) Row {
-	en := r.entry()
-	row := Row{Entry: *en, query: query, acts: r.corpus.prov.Actions}
+func rowOf(r ranked) Row {
+	row := Row{Entry: r.entry(), prov: r.corpus.prov}
 	if r.answer == nil {
 		row.title = r.corpus.titles[r.index]
-	} else {
-		row.query = launcher.FuzzyQuery{}
 	}
 	return row
 }
 
 // emptyRows is an empty query's list: at the root what gets used most;
 // in any other level everything, used things first.
-func (e *Engine) emptyRows(st *levelState) []Row {
-	st.sections = nil
-	var cands []ranked
+func (e *Engine) emptyRows(st *levelState, rows []Row) []Row {
+	st.sections = st.sections[:0]
+	cands := e.emptyCand[:0]
 	root := st.isRoot()
 	for _, c := range st.corpora {
 		if c.spec.MinQuery > 0 && !root {
@@ -567,24 +660,22 @@ func (e *Engine) emptyRows(st *levelState) []Row {
 			cands = append(cands, ranked{corpus: c, index: intconv.Clamp[int32](i), score: c.boost[i]})
 		}
 	}
+	e.emptyCand = cands
 	if root {
 		slices.SortStableFunc(cands, better)
 		cands = cands[:min(len(cands), recentRows)]
 		if len(cands) == 0 {
-			return nil
+			return rows
 		}
-		rows := make([]Row, 0, len(cands)+1)
 		rows = append(rows, Row{Header: SectionRecent.Title()})
 		for _, r := range cands {
-			rows = append(rows, rowOf(r, launcher.FuzzyQuery{}))
+			rows = append(rows, rowOf(r))
 		}
 		return rows
 	}
 	slices.SortStableFunc(cands, func(a, b ranked) int { return int(b.score) - int(a.score) })
-	cands = cands[:min(len(cands), flatRowCap)]
-	rows := make([]Row, len(cands))
-	for i, r := range cands {
-		rows[i] = rowOf(r, launcher.FuzzyQuery{})
+	for _, r := range cands[:min(len(cands), flatRowCap)] {
+		rows = append(rows, rowOf(r))
 	}
 	return rows
 }

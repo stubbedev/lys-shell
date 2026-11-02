@@ -51,33 +51,34 @@ func (c *Clipboard) read() []Entry {
 	all := snap.Entries()
 	entries := make([]Entry, len(all))
 	for i, e := range all {
-		preview := e.Preview(clipboardPreviewChars)
-		title, _, _ := strings.Cut(preview, "\n")
+		// Preview folds the lines into one, so the title is what is searched.
 		entries[i] = Entry{
-			ID: "clipboard:" + strconv.FormatUint(e.ID, 10), Title: title, Keywords: preview, Icon: clipboardIcon(e), Data: clipboardData{id: e.ID, kind: e.Kind(), paths: e.Paths()},
+			ID: "clipboard:" + strconv.FormatUint(e.ID, 10), Title: e.Preview(clipboardPreviewChars), Icon: clipboardIcon(e), Data: clipboardData{id: e.ID, kind: e.Kind(), paths: e.Paths()},
 		}
 		if c.previews {
-			entries[i].Preview = c.preview(e, preview)
+			entries[i].Preview = c.preview(e)
 		}
 	}
 	return entries
 }
 
-func (c *Clipboard) preview(e clipboard.Entry, text string) Preview {
+func (c *Clipboard) preview(e clipboard.Entry) Preview {
+	id := e.ID
+	load := func() ([]byte, error) { return c.entryBytes(id) }
 	switch e.Kind() {
 	case clipboard.KindImage:
-		id := e.ID
-		return Preview{Load: func() ([]byte, error) { return c.imageBytes(id) }}
+		return Preview{Load: load}
 	case clipboard.KindFiles:
 		if paths := e.Paths(); len(paths) == 1 {
 			return Preview{Path: paths[0]}
 		}
 	}
-	return Preview{Text: text}
+	// Read when the row is selected, not copied up front for every entry.
+	return Preview{Load: load, LoadsText: true}
 }
 
-// imageBytes copies one entry's bytes out while a snapshot holds them.
-func (c *Clipboard) imageBytes(id uint64) ([]byte, error) {
+// entryBytes copies one entry's bytes out while a snapshot holds them.
+func (c *Clipboard) entryBytes(id uint64) ([]byte, error) {
 	snap := c.history.Entries()
 	defer snap.Release()
 	for _, e := range snap.Entries() {

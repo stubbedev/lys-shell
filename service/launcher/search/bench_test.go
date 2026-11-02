@@ -23,7 +23,7 @@ func benchEntries(n int) []Entry {
 }
 
 func benchEngine(n int) (*Engine, *levelState) {
-	e := &Engine{}
+	e := newEngine()
 	st := &levelState{level: &Level{}}
 	c := newCorpus(&fakeProvider{spec: Spec{Section: SectionFiles, Limit: 6}})
 	c.set(benchEntries(n), func(string) int { return 0 })
@@ -38,13 +38,12 @@ func BenchmarkQuery(b *testing.B) {
 	for _, n := range []int{1000, 5000, 30000} {
 		b.Run(strconv.Itoa(n), func(b *testing.B) {
 			e, st := benchEngine(n)
+			rows := make([]Row, 0, 64)
 			b.ReportAllocs()
 			for b.Loop() {
 				st.corpora[0].scanned = false
 				st.query = "fxrpt"
-				if rows := e.compute(st, false); rows == nil && n == 0 {
-					b.Fatal("no rows")
-				}
+				rows = e.compute(st, false, rows[:0])
 			}
 		})
 	}
@@ -56,12 +55,13 @@ func BenchmarkTyping(b *testing.B) {
 	for _, n := range []int{5000, 30000} {
 		b.Run(strconv.Itoa(n), func(b *testing.B) {
 			e, st := benchEngine(n)
+			rows := make([]Row, 0, 64)
 			b.ReportAllocs()
 			for b.Loop() {
 				st.corpora[0].scanned = false
 				for _, q := range []string{"f", "fi", "fir", "fire", "firef"} {
 					st.query = q
-					e.compute(st, false)
+					rows = e.compute(st, false, rows[:0])
 				}
 			}
 		})
@@ -82,9 +82,10 @@ func BenchmarkPublish(b *testing.B) {
 func BenchmarkHighlights(b *testing.B) {
 	q := launcher.NewFuzzyQuery("vsc")
 	hay := launcher.Haystack("Visual Studio Code - Insiders")
+	dst := make([]int, 0, 8)
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = q.Positions(hay)
+		dst = q.AppendPositions(dst[:0], hay)
 	}
 }
 
@@ -103,5 +104,46 @@ func BenchmarkLoadEmoji(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		e.Load(context.Background(), func([]Entry) {})
+	}
+}
+
+// BenchmarkFilesEntries builds thirty thousand file rows.
+func BenchmarkFilesEntries(b *testing.B) {
+	paths := make([]string, 30000)
+	for i := range paths {
+		paths[i] = "/home/x/Documents/project/report-" + strconv.Itoa(i) + ".txt"
+	}
+	f := NewFiles(Env{}, FilesConfig{Home: "/home/x", Previews: true})
+	b.ReportAllocs()
+	for b.Loop() {
+		f.entries(nil, paths)
+	}
+}
+
+// Answering a keystroke allocates nothing once warm: a regression fails
+// here rather than showing up as jank.
+func TestAnsweringAQueryAllocatesNothing(t *testing.T) {
+	e, st := benchEngine(5000)
+	rows := make([]Row, 0, 64)
+	queries := []string{"f", "fi", "fir", "fire", "firef", "report inv"}
+	warm := func() {
+		st.corpora[0].scanned = false
+		for _, q := range queries {
+			st.query = q
+			rows = e.compute(st, false, rows[:0])
+		}
+	}
+	warm()
+	if got := testing.AllocsPerRun(20, warm); got != 0 {
+		t.Errorf("%v allocations per typed word, want none", got)
+	}
+}
+
+func TestHighlightsAllocateNothing(t *testing.T) {
+	q := launcher.NewFuzzyQuery("vsc code")
+	hay := launcher.Haystack("Visual Studio Code - Insiders")
+	dst := make([]int, 0, 16)
+	if got := testing.AllocsPerRun(20, func() { dst = q.AppendPositions(dst[:0], hay) }); got != 0 {
+		t.Errorf("%v allocations per row", got)
 	}
 }
