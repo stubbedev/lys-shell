@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -12,14 +14,20 @@ import (
 // come into its import graph (lys-login imports lys-shell, so that would
 // be a cycle), nor lys-secrets' keys (its internals, or the test server
 // that serves them).
+var realHome, realCacheHome = os.Getenv("HOME"), os.Getenv("XDG_CACHE_HOME")
+
 func TestShellLinksNoLoginScreen(t *testing.T) {
 	gobin, err := exec.LookPath("go")
 	if err != nil {
 		t.Fatalf("the go tool is needed to list the import graph: %v", err)
 	}
-	out, err := exec.Command(gobin, "list", "-deps", ".").Output()
+	list := exec.Command(gobin, "list", "-deps", ".")
+	list.Env = append(os.Environ(), "HOME="+realHome, "XDG_CACHE_HOME="+realCacheHome)
+	var stderr bytes.Buffer
+	list.Stderr = &stderr
+	out, err := list.Output()
 	if err != nil {
-		t.Fatalf("go list -deps: %v", err)
+		t.Fatalf("go list -deps: %v: %s", err, stderr.Bytes())
 	}
 	deps := strings.Fields(string(out))
 	const module = "github.com/stubbedev/lys-shell/"
