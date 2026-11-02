@@ -52,6 +52,27 @@ const delimiterChars = "/,:;|"
 type matchConfig struct {
 	ignoreCase bool
 	normalize  bool
+	// scratch is the optimal matcher's reused memory: an atom scores every
+	// item of a list per keystroke on one goroutine.
+	scratch *matchScratch
+}
+
+// matchScratch holds fuzzyOptimal's buffers between items.
+type matchScratch struct {
+	hs        []rune
+	bonus     []int
+	rowOffs   []int
+	row, next []scoreCell
+}
+
+// fit returns buf at length n, zeroed, reallocating only to grow.
+func fit[T any](buf []T, n int) []T {
+	if cap(buf) < n {
+		return make([]T, n, n*2)
+	}
+	buf = buf[:n]
+	clear(buf)
+	return buf
 }
 
 func classOf(c rune) charClass {
@@ -280,7 +301,7 @@ func parseAtom(raw string, ignoreCase, normalize bool) atom {
 
 // newAtom is Atom::new_inner with whitespace escaping on.
 func newAtom(needle string, ignoreCase, normalize bool, kind atomKind, appendDollar bool) atom {
-	a := atom{kind: kind, cfg: matchConfig{ignoreCase: ignoreCase, normalize: normalize}}
+	a := atom{kind: kind, cfg: matchConfig{ignoreCase: ignoreCase, normalize: normalize, scratch: &matchScratch{}}}
 	ascii := true
 	for i := range len(needle) {
 		if needle[i] >= 0x80 {
@@ -678,10 +699,11 @@ func pScore(prevP, prevM int) int {
 // at its greedy first position.
 func (cfg matchConfig) fuzzyOptimal(hay, needle []rune, start, end int) (int, bool) {
 	w := end - start
-	hs := make([]rune, w)
-	bonus := make([]int, w)
+	s := cfg.scratch
+	s.hs, s.bonus = fit(s.hs, w), fit(s.bonus, w)
+	s.rowOffs = fit(s.rowOffs, len(needle))
+	hs, bonus, rowOffs := s.hs, s.bonus, s.rowOffs
 	prev := prevClass(hay, start)
-	rowOffs := make([]int, len(needle))
 	ni := 0
 	matched := false
 	for j := range w {
@@ -703,7 +725,8 @@ func (cfg matchConfig) fuzzyOptimal(hay, needle []rune, start, end int) (int, bo
 	if !matched {
 		return 0, false
 	}
-	row := make([]scoreCell, w)
+	s.row, s.next = fit(s.row, w), fit(s.next, w)
+	row, next := s.row, s.next
 	for j := rowOffs[0]; j < w; j++ {
 		if hs[j] == needle[0] {
 			row[j] = scoreCell{score: bonus[j]*bonusFirstCharMultiplier + scoreMatch, consecutive: bonus[j]}
@@ -712,7 +735,7 @@ func (cfg matchConfig) fuzzyOptimal(hay, needle []rune, start, end int) (int, bo
 		}
 	}
 	for i := 0; i+1 < len(needle); i++ {
-		next := make([]scoreCell, w)
+		clear(next)
 		prevP, prevM := 0, 0
 		for j := rowOffs[i]; j < w; j++ {
 			p := pScore(prevP, prevM)
@@ -726,7 +749,7 @@ func (cfg matchConfig) fuzzyOptimal(hay, needle []rune, start, end int) (int, bo
 			}
 			prevP, prevM = p, m.score
 		}
-		row = next
+		row, next = next, row
 	}
 	best := 0
 	for j := rowOffs[len(needle)-1]; j < w; j++ {
