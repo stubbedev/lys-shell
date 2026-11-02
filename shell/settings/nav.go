@@ -1,6 +1,11 @@
 package settings
 
-import "github.com/stubbedev/lys-shell/config"
+import (
+	"strings"
+
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+)
 
 // initialPage is the page the window opens on (INITIAL_PAGE_ID), or
 // the first page while that one is not ported.
@@ -111,4 +116,34 @@ func sharePickerPage(*config.Config) pageSpec {
 			{title: "settings-section-animation", rows: surfaceAnimationRows("animations.share-picker")},
 		},
 	}
+}
+
+// Page names one page for whatever links to it: the launcher's search.
+type Page struct {
+	ID, Title, Icon string
+}
+
+// Pages lists the pages in sidebar order, localized.
+func Pages(cfg *config.Config) []Page {
+	t := i18n.Settings()
+	var out []Page
+	for _, s := range layout(cfg) {
+		for _, p := range s.pages {
+			out = append(out, Page{ID: p.id, Title: t.Get(p.navKey), Icon: p.icon})
+		}
+	}
+	return out
+}
+
+// pageArg is the --page value of a forwarded command line, "" for none.
+func pageArg(args []string) string {
+	for i, a := range args {
+		if a == "--page" && i+1 < len(args) {
+			return args[i+1]
+		}
+		if v, ok := strings.CutPrefix(a, "--page="); ok {
+			return v
+		}
+	}
+	return ""
 }

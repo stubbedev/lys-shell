@@ -11,11 +11,12 @@ import (
 
 const help = `Configure the lys-shell desktop shell
 
-Usage: lys-settings
+Usage: lys-settings [OPTIONS]
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --page <PAGE>  Open on this settings page
+  -h, --help         Print help
+  -V, --version      Print version
 `
 
 func runCaptured(t *testing.T, args ...string) (stdout, stderr string, code int) {

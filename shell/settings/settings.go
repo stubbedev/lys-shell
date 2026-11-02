@@ -26,11 +26,11 @@ const appID = "dev.stubbe.lys.settings"
 // Run loads the config and shows the settings window until it closes
 // (main.rs). A config that cannot load is an error: the window edits
 // it, so there is nothing to show without it.
-func Run() error {
+func Run(page string) error {
 	// raise is set once the window exists; forwarded launches buffer
 	// until Bind, after it.
-	var raise func()
-	ins, primary, err := claimInstance(app.OSInvocation(os.Args[1:]), func() { raise() })
+	var raise func(args []string)
+	ins, primary, err := claimInstance(app.OSInvocation(os.Args[1:]), func(args []string) { raise(args) })
 	switch {
 	case err != nil:
 		// No socket for the guard: run anyway, as GApplication does
@@ -45,6 +45,11 @@ func Run() error {
 		return fmt.Errorf("cannot load config: %w", err)
 	}
 	defer svc.Close()
+	if page != "" {
+		if _, ok := pageByID(layout(svc.Config()), page); !ok {
+			return fmt.Errorf("settings: no page %q", page)
+		}
+	}
 	app.SetLogger(logging.Library())
 	sess, err := app.Connect()
 	if err != nil {
@@ -86,12 +91,18 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("settings: window: %w", err)
 	}
+	if page != "" {
+		w.openPage(page)
+	}
 	w.onClose = win.Close
 	if ins != nil {
 		// A second launch raises this window (connect_activate's
 		// present): its activation token focuses it when the launcher
 		// gave one, else the window asks for attention.
-		raise = win.RequestAttention
+		raise = func(args []string) {
+			w.openPage(pageArg(args))
+			win.RequestAttention()
+		}
 		ins.Bind(application)
 	}
 	k.pickers = windowPickers{app: application, win: win, theme: theme}
@@ -121,11 +132,11 @@ func confirmResetAll(application *app.Application, parent *app.Window, k *kit) {
 // (set_application_id): the first launch is the primary, a later one
 // forwards its invocation and exits.
 // onRelaunch runs on the loop for each later launch.
-func claimInstance(inv app.Invocation, onRelaunch func()) (*app.Instance, bool, error) {
+func claimInstance(inv app.Invocation, onRelaunch func(args []string)) (*app.Instance, bool, error) {
 	return app.ClaimInstance(app.InstanceConfig{
 		AppID:         appID,
-		OnCommandLine: func([]string, string) { onRelaunch() },
-		OnOpen:        func([]string, string) { onRelaunch() },
+		OnCommandLine: func(args []string, _ string) { onRelaunch(args) },
+		OnOpen:        func([]string, string) { onRelaunch(nil) },
 	}, inv)
 }
 

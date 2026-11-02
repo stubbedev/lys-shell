@@ -122,6 +122,17 @@ func (w *window) dropStalePages(keep string) {
 	w.names = []string{keep}
 }
 
+// openPage shows the page with this id and marks it in the sidebar; an
+// id the layout does not hold (a forwarded launch from another version)
+// changes nothing.
+func (w *window) openPage(id string) {
+	if _, ok := pageByID(w.sections, id); !ok {
+		return
+	}
+	w.sidebar.SetActive(id)
+	w.show(id)
+}
+
 // refresh re-reads the open page and the sidebar cap after a config
 // change.
 func (w *window) refresh() {

@@ -22,6 +22,12 @@ func run(args []string, out cli.Output) int {
 		Name:    "lys-settings",
 		About:   "Configure the lys-shell desktop shell",
 		Version: version.Version,
-		Run:     func(*cli.Matches) error { return settings.Run() },
+		Args: []*cli.Arg{
+			{ID: "page", Long: "page", Value: cli.String, Help: "Open on this settings page"},
+		},
+		Run: func(m *cli.Matches) error {
+			page, _ := cli.Value[string](m, "page")
+			return settings.Run(page)
+		},
 	}, args, out)
 }

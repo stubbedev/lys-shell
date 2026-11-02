@@ -2164,15 +2164,15 @@ func TestLayoutEditorRefresh(t *testing.T) {
 // is the primary again.
 func TestSettingsIsSingleInstance(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", sockdir.Dir(t))
-	first, primary, err := claimInstance(app.Invocation{}, func() {})
+	first, primary, err := claimInstance(app.Invocation{}, func([]string) {})
 	if err != nil || !primary {
 		t.Fatalf("first launch: primary %v, %v", primary, err)
 	}
-	if _, primary, err := claimInstance(app.Invocation{}, func() {}); err != nil || primary {
+	if _, primary, err := claimInstance(app.Invocation{}, func([]string) {}); err != nil || primary {
 		t.Fatalf("second launch: primary %v, %v; want it to forward", primary, err)
 	}
 	first.Close()
-	again, primary, err := claimInstance(app.Invocation{}, func() {})
+	again, primary, err := claimInstance(app.Invocation{}, func([]string) {})
 	if err != nil || !primary {
 		t.Fatalf("after the first closed: primary %v, %v", primary, err)
 	}
@@ -2362,5 +2362,41 @@ func TestIdleWindowOwesNoFrame(t *testing.T) {
 	frame()
 	if got := widget.DamageGeneration(); got == gen {
 		t.Error("switching the page damaged nothing")
+	}
+}
+
+func TestOpenPageShowsAndMarksThePage(t *testing.T) {
+	k := testKit(t, "")
+	w := newWindow(k, k.store.svc.Config(), (&fakeAfter{}).after)
+	pages := Pages(k.store.svc.Config())
+	if len(pages) == 0 || pages[0].Title == "" || pages[0].Icon == "" {
+		t.Fatalf("pages = %+v", pages)
+	}
+	w.openPage("launcher")
+	if w.pageID != "launcher" {
+		t.Errorf("page = %q, want launcher", w.pageID)
+	}
+	if !sidebarItem(t, w, "settings-nav-launcher-page").HasState(widget.StateChecked) {
+		t.Error("the sidebar must mark it")
+	}
+	w.openPage("no-such-page")
+	if w.pageID != "launcher" {
+		t.Errorf("an unknown page moved the window to %q", w.pageID)
+	}
+}
+
+func TestPageArg(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--page", "theme"}, "theme"},
+		{[]string{"--page=theme"}, "theme"},
+		{[]string{"--page"}, ""},
+		{nil, ""},
+	} {
+		if got := pageArg(tc.args); got != tc.want {
+			t.Errorf("%v = %q, want %q", tc.args, got, tc.want)
+		}
 	}
 }
