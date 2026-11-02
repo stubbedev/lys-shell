@@ -48,6 +48,8 @@ type corpus struct {
 	hits      []hit
 	lastQuery string
 	scanned   bool
+	// tested counts the rows matched against, the work a query costs.
+	tested uint64
 }
 
 func newCorpus(p Provider) *corpus { return &corpus{prov: p, spec: p.Spec()} }
@@ -86,6 +88,7 @@ func (c *corpus) set(entries []Entry, boost func(string) int) {
 
 // matchOne scores one entry: its title, else the whole of it for less.
 func (c *corpus) matchOne(q *launcher.FuzzyQuery, i int) (int32, bool) {
+	c.tested++
 	if s, ok := q.Score(c.titles[i]); ok {
 		return intconv.Clamp[int32](s), true
 	}

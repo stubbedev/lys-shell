@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -124,11 +125,12 @@ func TestPanelPaintsOnlyThePanel(t *testing.T) {
 
 func percentile(sorted []time.Duration, p int) time.Duration { return sorted[len(sorted)*p/100] }
 
-// TestKeystrokeToPaintBudget measures, over 5,000 searchable rows on the
-// real engine goroutine, from a key's edit of the field to its rows being
-// laid out and painted on a 1600x1000 canvas in software. It bounds a
-// regression loosely; the numbers are in the verbose output.
-func TestKeystrokeToPaintBudget(t *testing.T) {
+// typingWorkload types queries into a panel over 5,000 searchable rows on
+// the real engine goroutine, laying out and painting each answer on a
+// 1600x1000 canvas in software, and hands every keystroke's durations to
+// observe.
+func typingWorkload(t *testing.T, observe func(answer, paint time.Duration)) {
+	t.Helper()
 	h := newPanelHarness(t)
 	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
 	links := make([]config.LauncherQuicklink, 5000)
@@ -143,7 +145,6 @@ func TestKeystrokeToPaintBudget(t *testing.T) {
 	h.until("the rows", func() bool { return len(p.frame.Rows) > 2 })
 	paintPanel(p, data)
 	queries := []string{"p", "pr", "pro", "proj", "proje", "project", "project-", "project-1", "project-12", "project-123"}
-	var answer, paint, total []time.Duration
 	for range 12 {
 		for _, q := range queries {
 			start := time.Now()
@@ -157,18 +158,92 @@ func TestKeystrokeToPaintBudget(t *testing.T) {
 			answered := time.Now()
 			paintPanel(p, data)
 			done := time.Now()
-			answer = append(answer, answered.Sub(start))
-			paint = append(paint, done.Sub(answered))
-			total = append(total, done.Sub(start))
+			observe(answered.Sub(start), done.Sub(answered))
 		}
 	}
+}
+
+// TestKeystrokeToPaintIsMeasured logs what a keystroke takes. It asserts no
+// time, which would measure the runner and the race detector rather than
+// this code. What keeps a keystroke cheap is held by what does not depend
+// on the clock: TestTypingDoesNoFileIO, TestAnsweringAQueryAllocatesNothing,
+// TestTypingRescansOnlyWhatMatched, TestLayoutBindsOnlyTheRowsInView and
+// TestWholeKeystrokeAllocations.
+func TestKeystrokeToPaintIsMeasured(t *testing.T) {
+	var answer, paint, total []time.Duration
+	typingWorkload(t, func(a, p time.Duration) {
+		answer, paint, total = append(answer, a), append(paint, p), append(total, a+p)
+	})
 	for _, s := range [][]time.Duration{answer, paint, total} {
 		slices.Sort(s)
 	}
 	t.Logf("answer p50 %v p99 %v; layout+paint p50 %v p99 %v; total p50 %v p99 %v",
 		percentile(answer, 50), percentile(answer, 99), percentile(paint, 50), percentile(paint, 99), percentile(total, 50), percentile(total, 99))
-	if got := percentile(total, 50); got > 100*time.Millisecond {
-		t.Errorf("median keystroke to paint %v", got)
+}
+
+// fileIO is the process's read and write syscalls so far, from the kernel's
+// own count, which is all files, sockets and pipes.
+func fileIO(t *testing.T) (reads, writes int) {
+	t.Helper()
+	data, err := os.ReadFile("/proc/self/io")
+	if err != nil {
+		t.Skipf("this kernel does not count a process's I/O: %v", err)
+	}
+	for line := range strings.SplitSeq(string(data), "\n") {
+		key, value, _ := strings.Cut(line, ": ")
+		n, _ := strconv.Atoi(value)
+		switch key {
+		case "syscr":
+			reads = n
+		case "syscw":
+			writes = n
+		}
+	}
+	return reads, writes
+}
+
+// Typing reads and writes nothing: no file, on the engine goroutine or the
+// UI loop. A provider or row that takes to touching the disk per keystroke
+// fails here, however fast the disk.
+func TestTypingDoesNoFileIO(t *testing.T) {
+	const allowed = 10 // reading /proc/self/io itself, and stray runtime reads
+	keys := 0
+	started := false
+	var reads0, writes0 int
+	typingWorkload(t, func(time.Duration, time.Duration) {
+		if !started {
+			started = true
+			reads0, writes0 = fileIO(t)
+			return
+		}
+		keys++
+	})
+	reads, writes := fileIO(t)
+	t.Logf("%d keystrokes: %d reads, %d writes", keys, reads-reads0, writes-writes0)
+	if reads-reads0 > allowed || writes-writes0 > allowed {
+		t.Errorf("%d keystrokes made %d reads and %d writes, want none of their own", keys, reads-reads0, writes-writes0)
+	}
+}
+
+// However long the list, layout binds a viewport's worth of rows.
+func TestLayoutBindsOnlyTheRowsInView(t *testing.T) {
+	h := newPanelHarness(t)
+	h.cfg.Launcher.Lines = 6
+	links := make([]config.LauncherQuicklink, 200)
+	for i := range links {
+		links[i] = config.LauncherQuicklink{Name: "project " + strconv.Itoa(i), URL: "https://x/"}
+	}
+	h.cfg.Launcher.Search.Quicklinks = links
+	h.cfg.Launcher.Search.Previews = false
+	p, _ := h.openPanel()
+	h.typed(p, "project")
+	h.until("the rows", func() bool { return len(p.frame.Rows) > 6 })
+	out := render.Rect{W: renderW, H: renderH}
+	p.v.root.Arrange(out)
+	p.v.root.Arrange(out)
+	// The six lines, a part-row at each edge, and a heading.
+	if got := len(p.v.list.pool); got > 6+3 {
+		t.Errorf("%d row widgets for six visible lines", got)
 	}
 }
 

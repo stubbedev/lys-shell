@@ -147,3 +147,32 @@ func TestHighlightsAllocateNothing(t *testing.T) {
 		t.Errorf("%v allocations per row", got)
 	}
 }
+
+// A query extending the last one rematches only the rows that matched it:
+// what makes typing over a long list cheap, counted rather than timed.
+func TestTypingRescansOnlyWhatMatched(t *testing.T) {
+	e, st := benchEngine(5000)
+	c := st.corpora[0]
+	rows := make([]Row, 0, 64)
+	answer := func(q string) (tested uint64, hits int) {
+		before := c.tested
+		st.query = q
+		rows = e.compute(st, false, rows[:0])
+		return c.tested - before, len(c.hits)
+	}
+	tested, hits := answer("firefox")
+	if tested != 5000 {
+		t.Fatalf("a first query tests %d rows, want all 5000", tested)
+	}
+	if hits == 0 || hits >= 5000 {
+		t.Fatalf("%d hits: the fixture no longer narrows", hits)
+	}
+	again, _ := answer("firefox-")
+	if again != uint64(hits) {
+		t.Errorf("extending the query tested %d rows, want the %d that matched", again, hits)
+	}
+	back, _ := answer("fire")
+	if back != 5000 {
+		t.Errorf("a shorter query tested %d rows, want all 5000: its matches are not a subset", back)
+	}
+}

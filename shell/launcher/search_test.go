@@ -750,10 +750,10 @@ func TestIconsDecodeOffTheLoopAndLandWithoutMovingAnything(t *testing.T) {
 	v := p.v
 	decoded := make(chan iconRequest, 8)
 	release := make(chan struct{})
-	v.list.loader.decode = func(r iconRequest) {
+	v.list.loader.setDecode(func(r iconRequest) {
 		decoded <- r
 		<-release
-	}
+	})
 	defer close(release)
 	out := render.Rect{W: 1600, H: 1000}
 	h.typed(p, "alpha")
@@ -798,7 +798,7 @@ func TestAStaleIconDoesNotLandOnARowThatMovedOn(t *testing.T) {
 	h := newPanelHarness(t)
 	p, _ := h.openPanel()
 	l := p.v.list
-	l.loader.decode = func(iconRequest) {}
+	l.loader.setDecode(func(iconRequest) {})
 	a := newAsyncIcon(24, "x")
 	l.bindAsync(a, "first-launcher-test-icon")
 	l.bindAsync(a, "second-launcher-test-icon")
@@ -818,7 +818,7 @@ func TestLoaderStopsWithThePanel(t *testing.T) {
 	loop := &fakeLoop{}
 	l := newIconLoader(ctx, loop.invoke, func(r iconRequest) { ready = append(ready, r) })
 	gate := make(chan struct{})
-	l.decode = func(iconRequest) { <-gate }
+	l.setDecode(func(iconRequest) { <-gate })
 	l.request(iconRequest{name: "a"})
 	l.request(iconRequest{name: "b"})
 	l.request(iconRequest{name: "b"})
@@ -916,4 +916,32 @@ func TestReducedMotionConfigKeyFadesThePanel(t *testing.T) {
 	if m.reveal >= 1 || m.instant {
 		t.Errorf("reveal %v instant %v: it must fade, not pop", m.reveal, m.instant)
 	}
+}
+
+// setDecode replaces the loader's decoder, which may already be running.
+func (l *iconLoader) setDecode(decode func(iconRequest)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.decode = decode
+}
+
+// A frame for the row already selected, as a provider publishing late
+// sends, must not cancel the preview on its way: the row would keep its
+// empty pane for good, since nothing asks for it again.
+func TestAFrameForTheSameRowLeavesItsPreviewLoading(t *testing.T) {
+	h := newPanelHarness(t)
+	p, _ := h.openPanel()
+	h.typed(p, "signature")
+	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
+	waiting := h.timers[len(h.timers)-1]
+	count := len(h.timers)
+	p.results(search.Frame{Query: "signature", Late: true, Rows: slices.Clone(p.frame.Rows)})
+	if waiting.stopped {
+		t.Fatal("the same row's frame cancelled its preview")
+	}
+	if len(h.timers) != count {
+		t.Errorf("%d new timers: the same row need not load twice", len(h.timers)-count)
+	}
+	waiting.fn()
+	h.until("the text", func() bool { return p.v.text.Visible() && strings.Contains(p.v.text.Text(), "truly") })
 }

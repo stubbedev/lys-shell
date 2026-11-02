@@ -48,12 +48,15 @@ func startHeadlessPanel(t *testing.T) *headlessPanel {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
+	cfg := config.Defaults()
+	// The theme installs before the loop runs, as the shell does it: the
+	// toolkit's theme belongs to the loop once there is one.
+	sheet := apptheme.New(cfg).Sheet
 	a := apptest.Run(t)
 	font, err := app.Font("sans", 14)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Defaults()
 	cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchWindows, config.SearchCalculator, config.SearchWeb}
 	focused := make(chan string, 1)
 	var layer *app.LayerWindow
@@ -70,7 +73,7 @@ func startHeadlessPanel(t *testing.T) *headlessPanel {
 			return w, err
 		},
 		Font:  font,
-		Sheet: apptheme.New(cfg).Sheet,
+		Sheet: sheet,
 		Search: func() search.Deps {
 			return search.Deps{Env: search.Env{Spawn: func([]string) {}, SpawnShell: func(string) {}}, Windows: headlessWindows{focused: focused}}
 		},
@@ -150,11 +153,13 @@ func TestHeadlessDesktopReducedMotionReachesThePanel(t *testing.T) {
 	if !anim.Reduced() {
 		t.Fatal("the application did not take the preference from settings.ini")
 	}
-	p := s.panel
-	m := p.v.motion
+	// The panel and its motion belong to the loop: everything about them
+	// is read there.
+	p := apptest.On(a, func() *panel { return s.panel })
+	m := apptest.On(a, func() *panelMotion { return p.v.motion })
 	apptest.Until(t, a, "the fade's end", func() bool { return m.reveal == 1 })
-	if m.style.grow || m.style.shift != 0 {
-		t.Errorf("style %+v: nothing may move", m.style)
+	if style := apptest.On(a, func() panelStyle { return m.style }); style.grow || style.shift != 0 {
+		t.Errorf("style %+v: nothing may move", style)
 	}
 	rest := apptest.On(a, func() bool { return p.v.box.Bounds() == m.restRect(p.v.root.Bounds()) })
 	if !rest {
@@ -164,7 +169,7 @@ func TestHeadlessDesktopReducedMotionReachesThePanel(t *testing.T) {
 	apptest.Until(t, a, "the rows", func() bool { return p.frame.Query == "h" })
 	settled := apptest.On(a, func() bool { return int(m.h) == m.targetH })
 	if !settled {
-		t.Errorf("height %v, want %d at once under reduced motion", m.h, m.targetH)
+		t.Error("the height must land at once under reduced motion")
 	}
 	h.kb.Tap(keytest.Escape)
 	apptest.Answer(t, "the session's reply", h.reply)

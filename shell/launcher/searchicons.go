@@ -60,8 +60,9 @@ func (l *iconLoader) run() {
 		}
 		r := l.queue[n-1]
 		l.queue = l.queue[:n-1]
+		decode := l.decode
 		l.mu.Unlock()
-		l.decode(r)
+		decode(r)
 		l.invoke(func() {
 			if l.ctx.Err() == nil {
 				l.ready(r)
