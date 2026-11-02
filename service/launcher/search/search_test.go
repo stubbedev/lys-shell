@@ -296,7 +296,11 @@ func TestEmptyQuerySuggestsWhatWasUsed(t *testing.T) {
 func TestEmptyQueryAtTheRootShowsNothingWithNoHistory(t *testing.T) {
 	s := &sink{}
 	start(t, s, nil, &fakeProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("Abc")}})
-	waitFor(t, "a frame", func() bool { return len(s.frames) > 1 })
+	waitFor(t, "a frame", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return len(s.frames) > 1
+	})
 	if rows := s.last().Rows; len(rows) != 0 {
 		t.Errorf("rows = %v", rows)
 	}
