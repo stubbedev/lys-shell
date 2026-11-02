@@ -51,7 +51,7 @@ func (h *portalVault) SendLoginEmail(context.Context, vault.LoginRequest) error 
 func (h *portalVault) LoginAPIKey(context.Context, vault.APIKeyRequest) error   { return nil }
 func (h *portalVault) Unlock(context.Context, string) error                     { return nil }
 func (h *portalVault) Lock()                                                    {}
-func (h *portalVault) Logout() error                                            { return nil }
+func (h *portalVault) Logout(context.Context) error                             { return nil }
 func (h *portalVault) Sync(context.Context) error                               { return nil }
 func (h *portalVault) NetworkLogin(string, string) (vault.NetworkLogin, bool) {
 	return vault.NetworkLogin{}, false

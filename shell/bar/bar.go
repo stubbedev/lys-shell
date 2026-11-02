@@ -267,7 +267,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 		// The recorder asks the share picker on this bus for an output or
 		// a region, records it on the GPU with audio from the audio service,
 		// and reports through the OSD and desktop notifications.
-		stateDir, _ := xdg.OS.StateDir(version.Name)
+		stateDir, ok := xdg.OS.StateDir(version.Name)
+		if !ok {
+			log.Print("recorder: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path; a picked source is not remembered")
+		}
 		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(application, sess.Outputs), stateDir),
 			func() config.RecorderConfig { return current.Load().Recorder },
 			recorder.Hooks{Toast: func(label, icon string, ms uint32) {

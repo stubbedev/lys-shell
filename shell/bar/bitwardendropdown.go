@@ -832,7 +832,13 @@ func (v *bitwardenView) lock() {
 }
 
 func (v *bitwardenView) logout() {
-	v.run(func(ctx context.Context) error { return v.vault.Logout(ctx) }, nil)
+	v.run(func(ctx context.Context) error {
+		err := v.vault.Logout(ctx)
+		if errors.Is(err, vault.ErrRevocationUnsupported) {
+			return nil
+		}
+		return err
+	}, nil)
 }
 
 // rebuildList shows the items matching the search.

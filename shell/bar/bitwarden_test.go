@@ -706,7 +706,7 @@ func (h *hostFake) Login(context.Context, vault.LoginRequest) error          { r
 func (h *hostFake) SendLoginEmail(context.Context, vault.LoginRequest) error { return nil }
 func (h *hostFake) LoginAPIKey(context.Context, vault.APIKeyRequest) error   { return nil }
 func (h *hostFake) Unlock(context.Context, string) error                     { return nil }
-func (h *hostFake) Logout() error                                            { return nil }
+func (h *hostFake) Logout(context.Context) error                             { return nil }
 func (h *hostFake) Sync(context.Context) error                               { return nil }
 
 func (h *hostFake) Lock() {
