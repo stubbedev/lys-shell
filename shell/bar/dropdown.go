@@ -28,10 +28,8 @@ type dropdownRegistry struct {
 
 	mu      sync.Mutex
 	openPop map[string]*app.Popover
-	// openRev is the revealer around each open popover's card; openName
-	// is the dropdown it shows, so a second module's click re-anchors
-	// instead of toggling off.
-	openRev  map[string]*widget.Revealer
+	// openName is the dropdown each open popover shows, so a second
+	// module's click re-anchors instead of toggling off.
 	openName map[string]string
 	// monH is each connector's monitor height in logical pixels, the
 	// popover ceiling's input (GTK keeps a popover on its output).
@@ -133,7 +131,6 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		hosts:    make(map[string]app.Host),
 		builders: dropdownBuilders(),
 		openPop:  make(map[string]*app.Popover),
-		openRev:  make(map[string]*widget.Revealer),
 		openName: make(map[string]string),
 		monH:     make(map[string]int),
 
@@ -211,7 +208,6 @@ func (r *dropdownRegistry) detachHost(connector string) {
 	r.mu.Lock()
 	delete(r.hosts, connector)
 	delete(r.openPop, connector)
-	delete(r.openRev, connector)
 	delete(r.openName, connector)
 	delete(r.monH, connector)
 	r.mu.Unlock()
@@ -238,12 +234,10 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	// counts as open: the next click opens instead of toggling off.
 	if prev := r.openPop[connector]; prev != nil && !prev.Closed() {
 		same := r.openName[connector] == name
-		rev := r.openRev[connector]
 		delete(r.openPop, connector)
-		delete(r.openRev, connector)
 		delete(r.openName, connector)
 		r.mu.Unlock()
-		dismissAnimated(prev, rev, r.cfg.Animations)
+		prev.Dismiss()
 		if same {
 			return nil
 		}
@@ -268,10 +262,9 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	for other, shown := range r.openName {
 		if shown == name && other != connector {
 			if pop := r.openPop[other]; pop != nil && !pop.Closed() {
-				defer pop.Dismiss()
+				defer pop.Close()
 			}
 			delete(r.openPop, other)
-			delete(r.openRev, other)
 			delete(r.openName, other)
 		}
 	}
@@ -293,6 +286,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	}
 	var rev *widget.Revealer
 	cfg.Content, rev = dropdownTree(content, r.cfg)
+	cfg.Exit = dropdownExit(rev, r.cfg.Animations)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -309,7 +303,6 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	reveal.Show(rev, r.cfg.Animations, config.AnimDropdown)
 	r.mu.Lock()
 	r.openPop[connector] = pop
-	r.openRev[connector] = rev
 	r.openName[connector] = name
 	r.mu.Unlock()
 	return nil
@@ -339,39 +332,38 @@ func holdDropdown(anchor widget.Widget, freezeLabel bool, content widget.Widget)
 // closeAll dismisses every open dropdown, each playing its exit.
 func (r *dropdownRegistry) closeAll() {
 	r.mu.Lock()
-	type open struct {
-		pop *app.Popover
-		rev *widget.Revealer
-	}
-	var closing []open
+	var closing []*app.Popover
 	for connector, pop := range r.openPop {
 		if pop != nil && !pop.Closed() {
-			closing = append(closing, open{pop, r.openRev[connector]})
+			closing = append(closing, pop)
 		}
 		delete(r.openPop, connector)
-		delete(r.openRev, connector)
 		delete(r.openName, connector)
 	}
 	r.mu.Unlock()
-	for _, o := range closing {
-		dismissAnimated(o.pop, o.rev, r.cfg.Animations)
+	for _, pop := range closing {
+		pop.Dismiss()
 	}
 }
 
 // dropdownPopover declares a dropdown's popover (apply_style,
 // clamp_height): opening away from the bar's edge, clamped to the
 // monitor less 100, as wide as its configured width at most (width > 0),
-// and with dropdown-autohide off a no-grab popover that a click
-// elsewhere leaves open. The width caps as well as floors: lys-ui's
+// closing on a click elsewhere without taking the keyboard from the
+// focused window, or with dropdown-autohide off staying open. The width
+// caps as well as floors: lys-ui's
 // rows fill whatever width they are offered, and a popover offers the
 // widest output.
 func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, monH, width int) app.PopoverConfig {
 	pc := app.PopoverConfig{
-		Anchor:     anchor,
-		Gravity:    app.GravityOf(barEdge(cfg.Bar.Location).PopoverSide()),
-		Content:    content,
-		Gap:        widget.PopoverGap,
-		NoAutohide: !cfg.Bar.DropdownAutohide,
+		Anchor:    anchor,
+		Gravity:   app.GravityOf(barEdge(cfg.Bar.Location).PopoverSide()),
+		Content:   content,
+		Gap:       widget.PopoverGap,
+		Dismissal: app.PopoverSticky,
+	}
+	if cfg.Bar.DropdownAutohide {
+		pc.Dismissal = app.PopoverClickAway
 	}
 	if monH > 0 {
 		pc.MaxHeight = monH - 100
@@ -382,15 +374,10 @@ func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.
 	return pc
 }
 
-// dismissAnimated is animate_out: the card plays its exit, then the
-// popover goes. Only this programmatic close animates; a click-away or
-// Esc closes at once, the compositor's grab having no exit hook.
-func dismissAnimated(pop interface{ Dismiss() }, rev *widget.Revealer, anims config.AnimationsConfig) {
-	if rev == nil {
-		pop.Dismiss()
-		return
-	}
-	reveal.Hide(rev, anims, config.AnimDropdown, pop.Dismiss)
+// dropdownExit is animate_out, whatever closes the popover: the card
+// plays its exit, then the popover goes.
+func dropdownExit(rev *widget.Revealer, anims config.AnimationsConfig) func(done func()) {
+	return func(done func()) { reveal.Hide(rev, anims, config.AnimDropdown, done) }
 }
 
 // dropdownGenieEdge is the edge a genie collapses toward: the bar's.

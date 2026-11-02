@@ -289,6 +289,49 @@ pkgs.testers.nixosTest {
     wait("the submap reset", lambda: any(e["submap"] == "" for e in events("submap")))
     wait("the keybind mode to hide", lambda: region(*right_strip(out)) == plain, tries=20)
 
+    centre = out["rect"]["x"] + out["rect"]["width"] // 2
+    bar_y = out["rect"]["y"] + 12
+    below_clock = (centre - 100, out["rect"]["y"] + 40, 200, 120)
+    away = (out["rect"]["x"] + out["rect"]["width"] - 60, out["rect"]["y"] + out["rect"]["height"] - 60)
+
+    def typed_reaches_foot(name):
+        machine.send_chars(f"touch /tmp/lys/{name}\n")
+        wait(f"{name} from keys typed into foot", lambda: machine.execute(f"test -e /tmp/lys/{name}")[0] == 0, tries=20)
+
+    closed = region(*below_clock)
+    click(centre, bar_y)
+    wait("the clock's dropdown to open", lambda: region(*below_clock) != closed, tries=20)
+    time.sleep(1)
+    opened = region(*below_clock)
+    shot("06a-dropdown-open")
+    typed_reaches_foot("key-beside-dropdown")
+    if region(*below_clock) != opened:
+        raise Exception("a key typed beside the open dropdown closed or changed it")
+    if (wmctl("activewindow") or {}).get("app_id") != "foot":
+        raise Exception("the open dropdown took the focus from foot")
+
+    click(*away)
+    frames = set()
+    for _ in range(40):
+        frames.add(region(*below_clock))
+        if region(*below_clock) == closed:
+            break
+    print("frames of the dropdown's exit after a click away:", len(frames))
+    wait("a click away to close the dropdown", lambda: region(*below_clock) == closed, tries=20)
+    if len(frames) < 2:
+        raise Exception("a click away closed the dropdown without an exit")
+    shot("06b-dropdown-clicked-away")
+    typed_reaches_foot("key-after-click-away")
+
+    click(centre, bar_y)
+    wait("the dropdown to reopen", lambda: region(*below_clock) != closed, tries=20)
+    time.sleep(1)
+    click(centre, below_clock[1] + 20)
+    time.sleep(0.5)
+    machine.send_key("esc")
+    wait("Esc to close the dropdown it reached", lambda: region(*below_clock) == closed, tries=20)
+    typed_reaches_foot("key-after-esc")
+
     dispatch("workspace 6")
     wait("workspace 6 focused", lambda: focused_workspace() == [6])
     time.sleep(1)

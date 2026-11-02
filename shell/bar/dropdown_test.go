@@ -175,39 +175,31 @@ func TestDropdownScrollIsVerticalOnly(t *testing.T) {
 	}
 }
 
-type fakeDismisser struct{ dismissed int }
-
-func (f *fakeDismisser) Dismiss() { f.dismissed++ }
-
-// TestDropdownDismissPlaysTheExit pins animate_out: a programmatic
-// close keeps the popover through the card's exit and dismisses it
-// when that lands; disabled animations dismiss at once.
+// TestDropdownDismissPlaysTheExit pins animate_out: whatever closes it,
+// the popover stays through the card's exit and goes
+// when that lands; disabled animations end it at once.
 func TestDropdownDismissPlaysTheExit(t *testing.T) {
 	anims := config.DefaultsAnimations()
 	rev := widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))
 	reveal.Show(rev, anims, config.AnimDropdown)
 	rev.Finish()
-	pop := &fakeDismisser{}
-	dismissAnimated(pop, rev, anims)
-	if pop.dismissed != 0 || rev.Revealed() {
-		t.Fatalf("mid-exit: %d dismisses, revealed %v", pop.dismissed, rev.Revealed())
+	done := 0
+	dropdownExit(rev, anims)(func() { done++ })
+	if done != 0 || rev.Revealed() {
+		t.Fatalf("mid-exit: %d dones, revealed %v", done, rev.Revealed())
 	}
 	rev.Finish()
-	if pop.dismissed != 1 {
-		t.Errorf("after the exit: %d dismisses, want 1", pop.dismissed)
+	if done != 1 {
+		t.Errorf("after the exit: %d dones, want 1", done)
 	}
 
 	anims.Enabled = false
 	rev = widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))
 	reveal.Show(rev, anims, config.AnimDropdown)
-	pop = &fakeDismisser{}
-	dismissAnimated(pop, rev, anims)
-	if pop.dismissed != 1 {
-		t.Errorf("animations off: %d dismisses, want 1 at once", pop.dismissed)
-	}
-	dismissAnimated(pop, nil, anims)
-	if pop.dismissed != 2 {
-		t.Error("a popover without a revealer was not dismissed")
+	done = 0
+	dropdownExit(rev, anims)(func() { done++ })
+	if done != 1 {
+		t.Errorf("animations off: %d dones, want 1 at once", done)
 	}
 }
 
@@ -327,12 +319,12 @@ func TestDropdownInstanceStacksInterpolate(t *testing.T) {
 func TestDropdownPopoverFollowsAutohide(t *testing.T) {
 	cfg := config.Defaults()
 	anchor := widget.NewBox(widget.Row, 0, 0)
-	if pc := dropdownPopover(cfg, anchor, anchor, 1000, 0); pc.NoAutohide || pc.MaxHeight != 900 {
-		t.Errorf("autohide on: %+v, want a grabbing popover capped at 900", pc)
+	if pc := dropdownPopover(cfg, anchor, anchor, 1000, 0); pc.Dismissal != app.PopoverClickAway || pc.MaxHeight != 900 {
+		t.Errorf("autohide on: %+v, want a click-away popover capped at 900", pc)
 	}
 	cfg.Bar.DropdownAutohide = false
-	if pc := dropdownPopover(cfg, anchor, anchor, 0, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
-		t.Errorf("autohide off: %+v, want a no-grab popover", pc)
+	if pc := dropdownPopover(cfg, anchor, anchor, 0, 0); pc.Dismissal != app.PopoverSticky || pc.MaxHeight != 0 {
+		t.Errorf("autohide off: %+v, want a sticky popover", pc)
 	}
 }
 
