@@ -262,3 +262,4 @@ settings-section-urgent = Urgence
 settings-section-commands = Commandes
 settings-section-fonts = Polices
 settings-section-mappings = Correspondances
+settings-section-launcher-search = Panneau de recherche

@@ -47,6 +47,7 @@ Application launcher / dmenu (rofi replacement).
 | `ssh` | [`LauncherSshConfig`](/config/types#launcher-ssh-config) | `{...}` | ssh mode. |
 | `filebrowser` | [`LauncherFilebrowserConfig`](/config/types#launcher-filebrowser-config) | `{...}` | file browser mode. |
 | `combi` | [`LauncherCombiConfig`](/config/types#launcher-combi-config) | `{...}` | combi (combined modes) mode. |
+| `search` | [`LauncherSearchConfig`](/config/types#launcher-search-config) | `{...}` | The search panel, `lys-shell launcher` with no arguments. |
 
 ::: details More about `styles`
 
@@ -134,6 +135,29 @@ launcher:
       - drun
       - run
     display-format: '{text}'
+  search:
+    providers:
+      - apps
+      - windows
+      - files
+      - calculator
+      - system
+      - settings
+      - clipboard
+      - emoji
+      - vault
+      - links
+      - scripts
+      - shell
+      - web
+    web-engine: DuckDuckGo
+    web-url: https://duckduckgo.com/?q={query}
+    file-roots: []
+    file-exclude: []
+    commands-dir: ""
+    previews: true
+    quicklinks: []
+    snippets: []
 ```
 
 

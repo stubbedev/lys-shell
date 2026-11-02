@@ -303,6 +303,7 @@ settings-section-launcher-window = Windows
 settings-section-launcher-ssh = SSH
 settings-section-launcher-filebrowser = File Browser
 settings-section-launcher-combi = Combi
+settings-section-launcher-search = Search Panel
 settings-section-launcher-scripts = Script Modes
 settings-section-nightlight-schedule = Schedule
 settings-section-power-profiles-profiles = Profiles

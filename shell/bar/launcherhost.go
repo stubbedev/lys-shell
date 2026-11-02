@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -10,8 +11,11 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/modes"
+	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/launcher"
+	"github.com/stubbedev/lys-shell/shell/settings"
 )
 
 // startLauncher serves the launcher socket from the shell, as the Rust
@@ -52,6 +56,35 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 			}
 		},
 		OpenHistory: engine.OpenHistory,
+		OpenFrecency: func() (*search.Frecency, error) {
+			path, ok := search.FrecencyPath()
+			if !ok {
+				return nil, errors.New("launcher: no state directory: uses will not be remembered")
+			}
+			return search.OpenFrecency(path, time.Now)
+		},
+	}
+	deps.Search = func() search.Deps {
+		cfg := current()
+		d := search.Deps{
+			Env:     search.RealEnv(cfg.Launcher.Terminal),
+			Windows: modes.DetectWindows(),
+			SettingsPages: func() []search.SettingsPage {
+				pages := settings.Pages(cfg)
+				out := make([]search.SettingsPage, len(pages))
+				for i, p := range pages {
+					out[i] = search.SettingsPage{ID: p.ID, Title: p.Title, Icon: p.Icon}
+				}
+				return out
+			},
+		}
+		if deps.Clipboard != nil {
+			d.Clipboard = deps.Clipboard
+		}
+		if deps.Vault != nil {
+			d.Vault = deps.Vault
+		}
+		return d
 	}
 	if ctx.Clipboard != nil {
 		deps.Clipboard = ctx.Clipboard

@@ -39,6 +39,7 @@ export default lysConfig({
           { text: 'Custom styles', link: '/guide/custom-styles' },
           { text: 'Custom icons', link: '/guide/custom-icons' },
           { text: 'Custom modules', link: '/guide/custom-modules' },
+          { text: 'Launcher', link: '/guide/launcher' },
           { text: 'CLI', link: '/guide/cli' },
         ],
       },

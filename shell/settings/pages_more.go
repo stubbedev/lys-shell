@@ -218,6 +218,17 @@ func launcherModesPage(*config.Config) pageSpec {
 			field("launcher.combi.modes", stringList),
 			field("launcher.combi.display-format"),
 		}},
+		{title: "settings-section-launcher-search", rows: []rowSpec{
+			field("launcher.search.providers", enumList),
+			field("launcher.search.web-engine"),
+			field("launcher.search.web-url"),
+			field("launcher.search.file-roots", stringList),
+			field("launcher.search.file-exclude", stringList),
+			field("launcher.search.commands-dir"),
+			field("launcher.search.previews"),
+			field("launcher.search.quicklinks", yamlRow("quicklinks", 8)),
+			field("launcher.search.snippets", yamlRow("snippets", 8)),
+		}},
 		{title: "settings-section-launcher-scripts", rows: []rowSpec{
 			field("launcher.scripts", stringMap),
 		}},

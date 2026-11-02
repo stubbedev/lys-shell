@@ -21,3 +21,71 @@
 .launcher-row.nonselectable {
   opacity: 0.5;
 }
+
+.launcher-panel {
+  font-family: var(--font-sans);
+  background-color: var(--dropdown-surface);
+  border-radius: calc(16px * var(--global-scale));
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  box-shadow: var(--shadow);
+}
+.blur-unavailable .launcher-panel {
+  background-color: var(--palette-elevated);
+}
+
+.launcher-search-icon,
+.launcher-search-chip {
+  color: var(--fg-muted);
+}
+.launcher-search-chip {
+  padding: calc(3px * var(--global-scale)) calc(10px * var(--global-scale));
+  border-radius: calc(8px * var(--global-scale));
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--fg);
+  font-weight: 600;
+}
+.launcher-search-entry,
+.launcher-search-entry:focus {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  padding: 0;
+}
+.launcher-search-separator {
+  background-color: color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.launcher-search-list {
+  background: transparent;
+}
+.launcher-search-row {
+  border-radius: calc(10px * var(--global-scale));
+  margin: 0 calc(8px * var(--global-scale));
+  color: var(--fg);
+}
+.launcher-search-row:hover {
+  background-color: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+.launcher-search-row:selected {
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.launcher-search-row-title {
+  font-weight: 500;
+}
+.launcher-search-header {
+  color: var(--fg-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.launcher-search-preview {
+  border-left: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.launcher-search-preview-text {
+  font-family: var(--font-mono);
+}
+.launcher-search-footer {
+  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.launcher-search-notice {
+  color: var(--status-error);
+}

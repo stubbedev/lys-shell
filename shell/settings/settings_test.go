@@ -2372,15 +2372,15 @@ func TestOpenPageShowsAndMarksThePage(t *testing.T) {
 	if len(pages) == 0 || pages[0].Title == "" || pages[0].Icon == "" {
 		t.Fatalf("pages = %+v", pages)
 	}
-	w.openPage("launcher")
-	if w.pageID != "launcher" {
-		t.Errorf("page = %q, want launcher", w.pageID)
+	w.openPage("theme")
+	if w.pageID != "theme" {
+		t.Errorf("page = %q, want theme", w.pageID)
 	}
-	if !sidebarItem(t, w, "settings-nav-launcher-page").HasState(widget.StateChecked) {
+	if !sidebarItem(t, w, "settings-nav-theme").HasState(widget.StateChecked) {
 		t.Error("the sidebar must mark it")
 	}
 	w.openPage("no-such-page")
-	if w.pageID != "launcher" {
+	if w.pageID != "theme" {
 		t.Errorf("an unknown page moved the window to %q", w.pageID)
 	}
 }

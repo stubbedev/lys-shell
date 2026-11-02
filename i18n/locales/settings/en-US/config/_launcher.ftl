@@ -231,3 +231,49 @@ enum-launcher-file-sort-ctime = Created
 ## Animations
 settings-animations-launcher = Launcher
     .description = Enter/exit animation override for the application launcher
+
+# Search panel
+
+settings-launcher-search = Search Panel
+    .description = The panel `lys-shell launcher` opens with no arguments
+
+settings-launcher-search-providers = Sources
+    .description = What the list searches
+
+settings-launcher-search-web-engine = Web Search Name
+    .description = The engine's name on the fallback row
+
+settings-launcher-search-web-url = Web Search URL
+    .description = The URL, with {"{"}query{"}"} where the search goes
+
+settings-launcher-search-file-roots = File Index Folders
+    .description = Folders the file index walks; empty indexes the home folder
+
+settings-launcher-search-file-exclude = File Index Exclusions
+    .description = Folder names the file index skips
+
+settings-launcher-search-commands-dir = Script Commands Folder
+    .description = Empty uses launcher/commands in the config folder
+
+settings-launcher-search-previews = Previews
+    .description = Show the side pane for files, snippets and clipboard entries
+
+settings-launcher-search-quicklinks = Quick Links
+    .description = Links to open by name or keyword
+
+settings-launcher-search-snippets = Snippets
+    .description = Text to copy by name or keyword
+
+enum-launcher-search-provider-apps = Applications
+enum-launcher-search-provider-windows = Open Windows
+enum-launcher-search-provider-files = Files
+enum-launcher-search-provider-calculator = Calculator
+enum-launcher-search-provider-system = System Commands
+enum-launcher-search-provider-settings = Settings Pages
+enum-launcher-search-provider-clipboard = Clipboard History
+enum-launcher-search-provider-emoji = Emoji
+enum-launcher-search-provider-vault = Bitwarden Vault
+enum-launcher-search-provider-links = Quick Links and Snippets
+enum-launcher-search-provider-scripts = Script Commands
+enum-launcher-search-provider-shell = Shell Commands
+enum-launcher-search-provider-web = Web Search

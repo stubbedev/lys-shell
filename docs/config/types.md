@@ -651,6 +651,17 @@ Matching method (rofi `-matching`).
 | `"fuzzy"` | fzf-style fuzzy matching. |
 | `"prefix"` | Tokenized prefix matching. |
 
+## LauncherQuicklink {#launcher-quicklink}
+
+A link in the search panel.
+
+| Field | Description |
+|---|---|
+| `name` | Name shown and searched. |
+| `url` | URL to open, with `{query}` where a query goes if it takes one. |
+| `keyword` | Word that leads a query for this link: `gh` makes `gh rust` search it. |
+| `icon` | Icon name or file (empty is a link icon). |
+
 ## LauncherRunConfig {#launcher-run-config}
 
 run (command) mode settings.
@@ -660,6 +671,52 @@ run (command) mode settings.
 | `run-command` | Plain accept template (`{cmd}`). |
 | `shell-command` | Run-in-terminal template (`{terminal}`, `{cmd}`). |
 | `list-command` | Extra command whose stdout lines add entries. |
+
+## LauncherSearchConfig {#launcher-search-config}
+
+The search panel: one ranked list over apps, windows, files and more.
+
+| Field | Description |
+|---|---|
+| `providers` | What the list searches, and what it leaves out by omission. |
+| `web-engine` | Web search fallback: the engine's name, shown on the row. |
+| `web-url` | Web search fallback: the URL, with `{query}` where the search goes. |
+| `file-roots` | Directories the file index walks (`~` allowed). Empty indexes the home |
+| `file-exclude` | Directory names the file index skips, on top of hidden ones and the |
+| `commands-dir` | Directory of script commands. Empty uses `launcher/commands` in the |
+| `previews` | Show the side pane for files, snippets and clipboard entries. |
+| `quicklinks` | Links to open by name or keyword. |
+| `snippets` | Text to copy by name or keyword. |
+
+## LauncherSearchProvider {#launcher-search-provider}
+
+A source of rows in the search panel.
+
+| Value | Meaning |
+|---|---|
+| `"apps"` | Desktop entries, with their actions. |
+| `"windows"` | Open windows to jump to. |
+| `"files"` | Recent files and the file index. |
+| `"calculator"` | Inline arithmetic and unit conversion. |
+| `"system"` | Lock, suspend, log out, reboot, shut down. |
+| `"settings"` | Pages of lys-settings. |
+| `"clipboard"` | The clipboard history. |
+| `"emoji"` | The emoji table. |
+| `"vault"` | The Bitwarden vault. |
+| `"links"` | Quick links and snippets. |
+| `"scripts"` | Script commands from the commands directory. |
+| `"shell"` | `>command` runs a shell command. |
+| `"web"` | The web search fallback. |
+
+## LauncherSnippet {#launcher-snippet}
+
+A piece of text in the search panel.
+
+| Field | Description |
+|---|---|
+| `name` | Name shown and searched. |
+| `text` | The text Enter copies. |
+| `keyword` | Extra word it is found by. |
 
 ## LauncherSorting {#launcher-sorting}
 

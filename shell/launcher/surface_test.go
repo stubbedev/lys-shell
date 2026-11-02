@@ -57,6 +57,10 @@ type fakeWindow struct {
 	closed bool
 	router *widget.Router
 	sizes  [][2]uint32
+	// opacity records every fade step.
+	opacity []float64
+	// opacityErr is a compositor without the alpha modifier.
+	opacityErr error
 	// refuse fails every SetFocus, as a layer whose surface is gone.
 	refuse error
 }
@@ -69,6 +73,14 @@ func (w *fakeWindow) SetFocus(f widget.Widget) error {
 	return w.router.SetFocus(f)
 }
 func (w *fakeWindow) focused() widget.Widget { return w.router.Focused() }
+func (w *fakeWindow) SetOpacity(alpha float64) error {
+	if w.opacityErr != nil {
+		return w.opacityErr
+	}
+	w.opacity = append(w.opacity, alpha)
+	return nil
+}
+
 func (w *fakeWindow) SetSize(width, height uint32) error {
 	w.sizes = append(w.sizes, [2]uint32{width, height})
 	return nil

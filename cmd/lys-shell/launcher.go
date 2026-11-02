@@ -22,7 +22,9 @@ import (
 const launcherHelp = `lys-shell launcher — rofi-compatible application launcher / dmenu
 
 USAGE:
-    lys-shell launcher -show <mode>       open a mode (drun, run, window, ssh, ...)
+    lys-shell launcher                    open the search panel: apps, windows,
+                                          files, sums, commands and more
+    lys-shell launcher -show <mode>       open a mode (search, drun, run, window, ssh, ...)
     lys-shell launcher -dmenu [...]       dmenu mode: rows from stdin, selection to stdout
     lys-shell launcher -e <message>       message dialog
 
@@ -77,6 +79,9 @@ const launcherDumpTheme = `# lys-shell does not use rasi themes; the launcher is
 // kb-custom-N; a usage error prints "Error: ..." and is 1, as the Rust
 // binary does.
 func runLauncher(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		args = []string{"-show", "search"}
+	}
 	inv, err := parseLauncherArgs(args, stderr)
 	if err == nil && inv.local != localNone {
 		err = runLauncherLocal(inv.local, stdout)

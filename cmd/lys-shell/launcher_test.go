@@ -274,3 +274,11 @@ func TestFormatOutput(t *testing.T) {
 		t.Errorf("an empty selection prints no rows: %q", out.String())
 	}
 }
+
+func TestBareLauncherAsksForTheSearchPanel(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	var stderr strings.Builder
+	if code := runLauncher(nil, nil, io.Discard, &stderr); code != 1 || strings.Contains(stderr.String(), "nothing to show") {
+		t.Errorf("code %d, stderr %q: want it to reach for the shell, which is not running here", code, stderr.String())
+	}
+}

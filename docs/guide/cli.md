@@ -185,6 +185,7 @@ symlink named `rofi`, the binary takes the same flags directly.
 `lys-shell launcher --help` lists them:
 
 ```sh
+lys-shell launcher            # the search panel, see the Launcher guide
 lys-shell launcher -show drun
 printf 'a\nb\n' | lys-shell launcher -dmenu
 lys-shell launcher -e "Build finished"

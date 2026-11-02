@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/pango"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
+	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
@@ -28,6 +29,9 @@ type Window interface {
 	Close()
 	SetSize(width, height uint32) error
 	SetFocus(w widget.Widget) error
+	// SetOpacity fades the surface in the compositor, with the blur behind
+	// it; an error is a compositor without the protocol.
+	SetOpacity(alpha float64) error
 }
 
 // Deps are what the shell hands the surface.
@@ -61,6 +65,10 @@ type Deps struct {
 	Copy func(text string)
 	// OpenHistory opens the launch history (a test seam).
 	OpenHistory func() (*engine.History, error)
+	// Search is what the search panel's providers draw on.
+	Search func() search.Deps
+	// OpenFrecency opens what the search panel has learned.
+	OpenFrecency func() (*search.Frecency, error)
 	// FireHook runs a -on-* hook (engine.FireHook; a test seam).
 	FireHook func(command string, ctx engine.HookContext)
 }
@@ -103,8 +111,10 @@ type active struct {
 // Surface is the launcher (shell/launcher/mod.rs): it serves the
 // launcher socket's sessions on the UI loop.
 type Surface struct {
-	d     Deps
-	cur   *active
+	d   Deps
+	cur *active
+	// panel is the live search session; cur and panel never both live.
+	panel *panel
 	model matchModel
 	multi multiSelect
 	sel   int
@@ -131,17 +141,38 @@ func (s *Surface) ClientGone(id uint64) {
 		if s.cur != nil && s.cur.sess.ID == id {
 			s.end(nil)
 		}
+		if s.panel != nil && s.panel.sess.ID == id {
+			s.panel.release()
+		}
 	})
 }
 
 // openSession is open_session.
 func (s *Surface) openSession(sess *launcheripc.Session) {
+	if s.panel != nil {
+		// The bind that opened the panel closes it; anything else asking
+		// for the screen takes it only when it says -replace.
+		switch {
+		case wantsSearch(sess.Options):
+			s.panel.finish(search.Cancel{})
+			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
+			return
+		case !sess.Replace:
+			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameBusy})
+			return
+		}
+		s.panel.finish(search.Cancel{})
+	}
 	if s.cur != nil {
 		if !sess.Replace {
 			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameBusy})
 			return
 		}
 		s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
+	}
+	if wantsSearch(sess.Options) && s.d.Search != nil {
+		s.openPanel(sess)
+		return
 	}
 	cfg := s.d.Config()
 	setup := buildSession(sess.Options, cfg, sess.Rows, setupDeps{clipboard: s.d.Clipboard, vault: s.d.Vault, openHistory: s.d.OpenHistory})
