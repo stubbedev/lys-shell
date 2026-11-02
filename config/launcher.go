@@ -94,6 +94,8 @@ type LauncherConfig struct {
 	Filebrowser LauncherFilebrowserConfig `cfg:"filebrowser"`
 	// combi (combined modes) mode.
 	Combi LauncherCombiConfig `cfg:"combi"`
+	// The search panel, `lys-shell launcher` with no arguments.
+	Search LauncherSearchConfig `cfg:"search"`
 }
 
 // LauncherHistoryConfig is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
@@ -191,6 +193,94 @@ type LauncherCombiConfig struct {
 	// Row template (`{mode}`, `{text}`).
 	DisplayFormat string `cfg:"display-format"`
 }
+
+// LauncherSearchConfig is a [launcher] schema type.
+//
+// The search panel: one ranked list over apps, windows, files and more.
+type LauncherSearchConfig struct {
+	// What the list searches, and what it leaves out by omission.
+	Providers []LauncherSearchProvider `cfg:"providers"`
+	// Web search fallback: the engine's name, shown on the row.
+	WebEngine string `cfg:"web-engine"`
+	// Web search fallback: the URL, with `{query}` where the search goes.
+	WebURL string `cfg:"web-url"`
+	// Directories the file index walks (`~` allowed). Empty indexes the home
+	// directory.
+	FileRoots []string `cfg:"file-roots"`
+	// Directory names the file index skips, on top of hidden ones and the
+	// built-in list (`node_modules`, `vendor`, `target`, ...).
+	FileExclude []string `cfg:"file-exclude"`
+	// Directory of script commands. Empty uses `launcher/commands` in the
+	// config directory.
+	CommandsDir string `cfg:"commands-dir"`
+	// Show the side pane for files, snippets and clipboard entries.
+	Previews bool `cfg:"previews"`
+	// Links to open by name or keyword.
+	Quicklinks []LauncherQuicklink `cfg:"quicklinks"`
+	// Text to copy by name or keyword.
+	Snippets []LauncherSnippet `cfg:"snippets"`
+}
+
+// LauncherQuicklink is a [launcher] schema type.
+//
+// A link in the search panel.
+type LauncherQuicklink struct {
+	// Name shown and searched.
+	Name string `cfg:"name"`
+	// URL to open, with `{query}` where a query goes if it takes one.
+	URL string `cfg:"url"`
+	// Word that leads a query for this link: `gh` makes `gh rust` search it.
+	Keyword string `cfg:"keyword"`
+	// Icon name or file (empty is a link icon).
+	Icon string `cfg:"icon"`
+}
+
+// LauncherSnippet is a [launcher] schema type.
+//
+// A piece of text in the search panel.
+type LauncherSnippet struct {
+	// Name shown and searched.
+	Name string `cfg:"name"`
+	// The text Enter copies.
+	Text string `cfg:"text"`
+	// Extra word it is found by.
+	Keyword string `cfg:"keyword"`
+}
+
+// LauncherSearchProvider is a [launcher] schema type.
+//
+// A source of rows in the search panel.
+type LauncherSearchProvider string
+
+// LauncherSearchProvider values.
+const (
+	// Desktop entries, with their actions.
+	SearchApps LauncherSearchProvider = "apps"
+	// Open windows to jump to.
+	SearchWindows LauncherSearchProvider = "windows"
+	// Recent files and the file index.
+	SearchFiles LauncherSearchProvider = "files"
+	// Inline arithmetic and unit conversion.
+	SearchCalculator LauncherSearchProvider = "calculator"
+	// Lock, suspend, log out, reboot, shut down.
+	SearchSystem LauncherSearchProvider = "system"
+	// Pages of lys-settings.
+	SearchSettings LauncherSearchProvider = "settings"
+	// The clipboard history.
+	SearchClipboard LauncherSearchProvider = "clipboard"
+	// The emoji table.
+	SearchEmoji LauncherSearchProvider = "emoji"
+	// The Bitwarden vault.
+	SearchVault LauncherSearchProvider = "vault"
+	// Quick links and snippets.
+	SearchLinks LauncherSearchProvider = "links"
+	// Script commands from the commands directory.
+	SearchScripts LauncherSearchProvider = "scripts"
+	// `>command` runs a shell command.
+	SearchShell LauncherSearchProvider = "shell"
+	// The web search fallback.
+	SearchWeb LauncherSearchProvider = "web"
+)
 
 // LauncherLocation is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
 //
@@ -332,6 +422,8 @@ var (
 	_ = registerEnum(DrunFieldName, DrunFieldGeneric, DrunFieldExec, DrunFieldCategories, DrunFieldComment, DrunFieldKeywords)
 	_ = registerEnum(WindowFieldTitle, WindowFieldClass, WindowFieldName, WindowFieldRole, WindowFieldDesktop)
 	_ = registerEnum(FileSortName, FileSortMtime, FileSortAtime, FileSortCtime)
+	_ = registerEnum(SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
+		SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchScripts, SearchShell, SearchWeb)
 )
 
 // launcherLocations is rofi's -location numbering: 0 center, then
@@ -400,6 +492,19 @@ func DefaultsLauncher() LauncherConfig {
 		Combi: LauncherCombiConfig{
 			Modes:         []string{"window", "drun", "run"},
 			DisplayFormat: "{text}",
+		},
+		Search: LauncherSearchConfig{
+			Providers: []LauncherSearchProvider{
+				SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
+				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchScripts, SearchShell, SearchWeb,
+			},
+			WebEngine:   "DuckDuckGo",
+			WebURL:      "https://duckduckgo.com/?q={query}",
+			Previews:    true,
+			FileRoots:   []string{},
+			FileExclude: []string{},
+			Quicklinks:  []LauncherQuicklink{},
+			Snippets:    []LauncherSnippet{},
 		},
 	}
 }

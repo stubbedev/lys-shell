@@ -406,6 +406,24 @@
       },
       "type": "array"
     },
+    "Array_of_LauncherQuicklink": {
+      "items": {
+        "$ref": "#/$defs/LauncherQuicklink"
+      },
+      "type": "array"
+    },
+    "Array_of_LauncherSearchProvider": {
+      "items": {
+        "$ref": "#/$defs/LauncherSearchProvider"
+      },
+      "type": "array"
+    },
+    "Array_of_LauncherSnippet": {
+      "items": {
+        "$ref": "#/$defs/LauncherSnippet"
+      },
+      "type": "array"
+    },
     "Array_of_LauncherWindowField": {
       "items": {
         "$ref": "#/$defs/LauncherWindowField"
@@ -3415,6 +3433,35 @@
           "default": {},
           "description": "Custom script modes: name → executable (rofi `name:script`)."
         },
+        "search": {
+          "$ref": "#/$defs/LauncherSearchConfig",
+          "default": {
+            "commands-dir": "",
+            "file-exclude": [],
+            "file-roots": [],
+            "previews": true,
+            "providers": [
+              "apps",
+              "windows",
+              "files",
+              "calculator",
+              "system",
+              "settings",
+              "clipboard",
+              "emoji",
+              "vault",
+              "links",
+              "scripts",
+              "shell",
+              "web"
+            ],
+            "quicklinks": [],
+            "snippets": [],
+            "web-engine": "DuckDuckGo",
+            "web-url": "https://duckduckgo.com/?q={query}"
+          },
+          "description": "The search panel, `lys-shell launcher` with no arguments."
+        },
         "show-icons": {
           "$ref": "#/$defs/boolean",
           "default": true,
@@ -3710,6 +3757,32 @@
         }
       ]
     },
+    "LauncherQuicklink": {
+      "description": "A link in the search panel.",
+      "properties": {
+        "icon": {
+          "default": "",
+          "description": "Icon name or file (empty is a link icon).",
+          "type": "string"
+        },
+        "keyword": {
+          "default": "",
+          "description": "Word that leads a query for this link: `gh` makes `gh rust` search it.",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "description": "Name shown and searched.",
+          "type": "string"
+        },
+        "url": {
+          "default": "",
+          "description": "URL to open, with `{query}` where a query goes if it takes one.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "LauncherRunConfig": {
       "description": "run (command) mode settings.",
       "properties": {
@@ -3727,6 +3800,162 @@
           "$ref": "#/$defs/string",
           "default": "{terminal} -e {cmd}",
           "description": "Run-in-terminal template (`{terminal}`, `{cmd}`)."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherSearchConfig": {
+      "description": "The search panel: one ranked list over apps, windows, files and more.",
+      "properties": {
+        "commands-dir": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Directory of script commands. Empty uses `launcher/commands` in the\nconfig directory."
+        },
+        "file-exclude": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Directory names the file index skips, on top of hidden ones and the\nbuilt-in list (`node_modules`, `vendor`, `target`, ...)."
+        },
+        "file-roots": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Directories the file index walks (`~` allowed). Empty indexes the home\ndirectory."
+        },
+        "previews": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the side pane for files, snippets and clipboard entries."
+        },
+        "providers": {
+          "$ref": "#/$defs/Array_of_LauncherSearchProvider",
+          "default": [
+            "apps",
+            "windows",
+            "files",
+            "calculator",
+            "system",
+            "settings",
+            "clipboard",
+            "emoji",
+            "vault",
+            "links",
+            "scripts",
+            "shell",
+            "web"
+          ],
+          "description": "What the list searches, and what it leaves out by omission."
+        },
+        "quicklinks": {
+          "$ref": "#/$defs/Array_of_LauncherQuicklink",
+          "default": [],
+          "description": "Links to open by name or keyword."
+        },
+        "snippets": {
+          "$ref": "#/$defs/Array_of_LauncherSnippet",
+          "default": [],
+          "description": "Text to copy by name or keyword."
+        },
+        "web-engine": {
+          "$ref": "#/$defs/string",
+          "default": "DuckDuckGo",
+          "description": "Web search fallback: the engine's name, shown on the row."
+        },
+        "web-url": {
+          "$ref": "#/$defs/string",
+          "default": "https://duckduckgo.com/?q={query}",
+          "description": "Web search fallback: the URL, with `{query}` where the search goes."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherSearchProvider": {
+      "description": "A source of rows in the search panel.",
+      "oneOf": [
+        {
+          "const": "apps",
+          "description": "Desktop entries, with their actions.",
+          "type": "string"
+        },
+        {
+          "const": "windows",
+          "description": "Open windows to jump to.",
+          "type": "string"
+        },
+        {
+          "const": "files",
+          "description": "Recent files and the file index.",
+          "type": "string"
+        },
+        {
+          "const": "calculator",
+          "description": "Inline arithmetic and unit conversion.",
+          "type": "string"
+        },
+        {
+          "const": "system",
+          "description": "Lock, suspend, log out, reboot, shut down.",
+          "type": "string"
+        },
+        {
+          "const": "settings",
+          "description": "Pages of lys-settings.",
+          "type": "string"
+        },
+        {
+          "const": "clipboard",
+          "description": "The clipboard history.",
+          "type": "string"
+        },
+        {
+          "const": "emoji",
+          "description": "The emoji table.",
+          "type": "string"
+        },
+        {
+          "const": "vault",
+          "description": "The Bitwarden vault.",
+          "type": "string"
+        },
+        {
+          "const": "links",
+          "description": "Quick links and snippets.",
+          "type": "string"
+        },
+        {
+          "const": "scripts",
+          "description": "Script commands from the commands directory.",
+          "type": "string"
+        },
+        {
+          "const": "shell",
+          "description": "`>command` runs a shell command.",
+          "type": "string"
+        },
+        {
+          "const": "web",
+          "description": "The web search fallback.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherSnippet": {
+      "description": "A piece of text in the search panel.",
+      "properties": {
+        "keyword": {
+          "default": "",
+          "description": "Extra word it is found by.",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "description": "Name shown and searched.",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "description": "The text Enter copies.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -9909,6 +10138,31 @@
           "shell-command": "{terminal} -e {cmd}"
         },
         "scripts": {},
+        "search": {
+          "commands-dir": "",
+          "file-exclude": [],
+          "file-roots": [],
+          "previews": true,
+          "providers": [
+            "apps",
+            "windows",
+            "files",
+            "calculator",
+            "system",
+            "settings",
+            "clipboard",
+            "emoji",
+            "vault",
+            "links",
+            "scripts",
+            "shell",
+            "web"
+          ],
+          "quicklinks": [],
+          "snippets": [],
+          "web-engine": "DuckDuckGo",
+          "web-url": "https://duckduckgo.com/?q={query}"
+        },
         "show-icons": true,
         "sidebar-mode": false,
         "sort": false,

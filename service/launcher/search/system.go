@@ -1,0 +1,137 @@
+package search
+
+import (
+	"context"
+
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/launcher"
+)
+
+// System offers the session commands, through the commands the power
+// menu runs. Those that end what you are doing ask first: a fuzzy search
+// and an Enter should not be enough to reboot.
+type System struct {
+	env   Env
+	power config.PowerConfig
+}
+
+// NewSystem builds it over the power configuration.
+func NewSystem(env Env, power config.PowerConfig) *System { return &System{env: env, power: power} }
+
+// Spec implements Provider.
+func (*System) Spec() Spec { return Spec{Section: SectionCommands, Limit: 5, MinQuery: 2} }
+
+type systemCommand struct {
+	id, titleKey, keywords, icon string
+	command                      string
+	shown                        bool
+	confirm                      bool
+}
+
+func (s *System) commands() []systemCommand {
+	p := s.power
+	return []systemCommand{
+		{"lock", "launcher-system-lock", "screen secure away", "ld-lock-symbolic", p.LockCommand, p.ShowLock, false},
+		{"suspend", "launcher-system-suspend", "sleep standby", "ld-moon-symbolic", p.SuspendCommand, p.ShowSuspend, false},
+		{"logout", "launcher-system-logout", "sign out exit session", "ld-log-out-symbolic", p.LogoutCommand, p.ShowLogout, true},
+		{"reboot", "launcher-system-reboot", "restart", "ld-rotate-ccw-symbolic", p.RebootCommand, p.ShowReboot, true},
+		{"shutdown", "launcher-system-shutdown", "power off poweroff halt", "ld-power-symbolic", p.ShutdownCommand, p.ShowShutdown, true},
+	}
+}
+
+// Load implements Provider.
+func (s *System) Load(_ context.Context, publish func([]Entry)) {
+	var entries []Entry
+	for _, c := range s.commands() {
+		if !c.shown || c.command == "" {
+			continue
+		}
+		id := "system:" + c.id
+		entries = append(entries, Entry{
+			ID: id, Learn: id, Title: i18n.T(c.titleKey), Keywords: c.keywords,
+			Icon: launcher.IconName(c.icon), Data: c,
+		})
+	}
+	publish(entries)
+}
+
+// Actions implements Provider.
+func (s *System) Actions(e Entry) []Action {
+	c, ok := e.Data.(systemCommand)
+	if !ok {
+		return nil
+	}
+	run := Action{Title: e.Title, Icon: c.icon, Run: func(context.Context) Outcome {
+		s.env.SpawnShell(c.command)
+		return Close{}
+	}}
+	if !c.confirm {
+		return []Action{run}
+	}
+	title := e.Title
+	return []Action{{Title: title, Icon: c.icon, Run: func(context.Context) Outcome {
+		return Push{Level: &Level{
+			Title:     title,
+			Message:   i18n.T("launcher-system-confirm", i18n.Str("what", title)),
+			Providers: []Provider{&fixedProvider{entries: []Entry{{ID: "confirm", Title: title, Icon: launcher.IconName(c.icon), Data: run}}}},
+		}}
+	}}}
+}
+
+// fixedProvider offers rows whose Data is the Action to run: a flat list
+// settled before it opens.
+type fixedProvider struct{ entries []Entry }
+
+func (*fixedProvider) Spec() Spec { return Spec{Section: SectionNone} }
+
+func (*fixedProvider) Immediate() {}
+
+func (p *fixedProvider) Load(_ context.Context, publish func([]Entry)) { publish(p.entries) }
+
+func (*fixedProvider) Actions(e Entry) []Action {
+	a, ok := e.Data.(Action)
+	if !ok {
+		return nil
+	}
+	return []Action{a}
+}
+
+// SettingsPage is one page of lys-settings.
+type SettingsPage struct {
+	ID, Title, Icon string
+}
+
+// Settings offers lys-settings' pages.
+type Settings struct {
+	env   Env
+	pages []SettingsPage
+}
+
+// NewSettings offers pages.
+func NewSettings(env Env, pages []SettingsPage) *Settings { return &Settings{env: env, pages: pages} }
+
+// Spec implements Provider.
+func (*Settings) Spec() Spec { return Spec{Section: SectionSettings, Limit: 4, MinQuery: 2} }
+
+// Load implements Provider.
+func (s *Settings) Load(_ context.Context, publish func([]Entry)) {
+	entries := make([]Entry, 0, len(s.pages))
+	for _, p := range s.pages {
+		id := "settings:" + p.ID
+		entries = append(entries, Entry{ID: id, Learn: id, Title: p.Title, Subtitle: i18n.T("launcher-settings-subtitle"), Keywords: p.ID, Icon: launcher.IconName(p.Icon), Data: p})
+	}
+	publish(entries)
+}
+
+// Actions implements Provider.
+func (s *Settings) Actions(e Entry) []Action {
+	p, ok := e.Data.(SettingsPage)
+	if !ok {
+		return nil
+	}
+	return []Action{{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
+		s.env.Spawn([]string{"lys-settings", "--page", p.ID})
+		return Close{}
+	}}}
+}

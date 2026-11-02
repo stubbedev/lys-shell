@@ -631,3 +631,11 @@ func humanSize(n int) string {
 	}
 	return fmt.Sprintf("%.1f %s", size, units[unit])
 }
+
+// ErrEntryGone is an entry that left the history since a row was drawn
+// for it.
+var ErrEntryGone = errors.New("clipboard: the entry is no longer in the history")
+
+// Bytes copies the entry's bytes out, for a reader that outlives its
+// snapshot.
+func (e Entry) Bytes() []byte { return slices.Clone(e.content().data) }
