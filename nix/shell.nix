@@ -28,6 +28,7 @@
           just
           git
           gh
+          "${inputs.lys-ci}" # no-fused
 
           # Headless test sessions: fontconfig reads the generated config
           # (shellHook), sway is the headless compositor, dbus the private

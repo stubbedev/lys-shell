@@ -440,6 +440,21 @@
         "type": "github"
       }
     },
+    "lys-ci": {
+      "locked": {
+        "lastModified": 1793652628,
+        "narHash": "sha256-+EBfYwDJujIzUaQH772LYB6e8+219XJLfLErXgpjlpw=",
+        "owner": "stubbedev",
+        "repo": "lys-ci",
+        "rev": "74446277aea118bda0664890c3d11d28e4319976",
+        "type": "github"
+      },
+      "original": {
+        "owner": "stubbedev",
+        "repo": "lys-ci",
+        "type": "github"
+      }
+    },
     "lys-lib": {
       "inputs": {
         "flake-parts": [
@@ -3184,6 +3199,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
+        "lys-ci": "lys-ci",
         "lys-lib": "lys-lib",
         "lys-login": "lys-login",
         "lys-secrets": "lys-secrets_2",
