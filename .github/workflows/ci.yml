@@ -40,13 +40,9 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
               with:
-                  extra_nix_config: |
-                      experimental-features = nix-command flakes
-                      extra-substituters = https://nix.stubbe.dev/c/default/default
-                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
-
+                github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: just check
               run: nix develop --accept-flake-config -c just check
 
@@ -68,13 +64,9 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
               with:
-                  extra_nix_config: |
-                      experimental-features = nix-command flakes
-                      extra-substituters = https://nix.stubbe.dev/c/default/default
-                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
-
+                github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Build binaries
               run: nix develop --accept-flake-config -c just build
 
@@ -127,15 +119,9 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
               with:
-                  extra_nix_config: |
-                      experimental-features = nix-command flakes
-                      # Pull from the self-hosted xilo cache on every event
-                      # (incl. fork PRs — read access is public, no secret).
-                      extra-substituters = https://nix.stubbe.dev/c/default/default
-                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
-
+                github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Build package
               shell: bash
               run: |
