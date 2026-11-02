@@ -150,9 +150,9 @@ func TestOneListAcrossProvidersWithSections(t *testing.T) {
 		defer s.mu.Unlock()
 		return len(s.frames) >= 3
 	})
-	e.SetQuery("firef")
+	e.SetQuery("firef", 1)
 	until(t, s, "#"+SectionApps.Title(), "Firefox", "#"+SectionWindows.Title(), "firefox: news")
-	e.SetQuery("zzz")
+	e.SetQuery("zzz", 1)
 	until(t, s)
 }
 
@@ -163,14 +163,14 @@ func TestSubtitleAndKeywordsMatchBelowTitle(t *testing.T) {
 		{ID: "b", Title: "web thing"},
 	}}
 	e := start(t, s, nil, p)
-	e.SetQuery("web")
+	e.SetQuery("web", 1)
 	until(t, s, "web thing", "Browser")
 }
 
 func TestHighlightsMarkTheMatchedCharacters(t *testing.T) {
 	s := &sink{}
 	e := start(t, s, nil, &fakeProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("Visual Studio Code")}})
-	e.SetQuery("vsc")
+	e.SetQuery("vsc", 1)
 	until(t, s, "Visual Studio Code")
 	got := s.last().Rows[0].Highlights()
 	if want := []int{0, 7, 14}; !slices.Equal(got, want) {
@@ -188,14 +188,14 @@ func TestFrecencyLiftsWhatGetsUsed(t *testing.T) {
 	}
 	s := &sink{}
 	e := start(t, s, freq, &fakeProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("Files"), entry("Filezilla")}})
-	e.SetQuery("fil")
+	e.SetQuery("fil", 1)
 	until(t, s, "Filezilla", "Files")
 }
 
 func TestUntouchedRanksByMatchNotHistory(t *testing.T) {
 	s := &sink{}
 	e := start(t, s, nil, &fakeProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("Filezilla"), entry("Files")}})
-	e.SetQuery("fil")
+	e.SetQuery("fil", 1)
 	until(t, s, "Files", "Filezilla")
 }
 
@@ -308,7 +308,7 @@ func TestLateRowsLeaveWhatIsOnScreenInPlace(t *testing.T) {
 	fast := &fakeProvider{spec: Spec{Section: SectionFiles}, entries: []Entry{entry("alpha one")}}
 	slow := &fakeProvider{spec: Spec{Section: SectionApps, Weight: 1000}, entries: []Entry{entry("alpha two")}, gate: gate}
 	e := start(t, s, nil, fast, slow)
-	e.SetQuery("alpha")
+	e.SetQuery("alpha", 1)
 	until(t, s, "#"+SectionFiles.Title(), "alpha one")
 	close(gate)
 	until(t, s, "#"+SectionFiles.Title(), "alpha one", "#"+SectionApps.Title(), "alpha two")
@@ -339,7 +339,7 @@ func TestAnswerLeadsAndWebClosesTheList(t *testing.T) {
 	s := &sink{}
 	web := NewWeb(Env{}, "E", "https://e/?q={query}")
 	e := start(t, s, nil, web, Calculator{}, &fakeProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("2+2 app")}})
-	e.SetQuery("2+2")
+	e.SetQuery("2+2", 1)
 	waitFor(t, "rows", func() bool { return len(s.last().Rows) >= 5 })
 	got := titles(s.last())
 	if got[1] != "4" {
@@ -368,14 +368,14 @@ func TestActionsLevelAndBackRestoreTheQuery(t *testing.T) {
 		{Title: "Copy", Run: func(context.Context) Outcome { ran <- "copy"; return Copy{Text: "x"} }},
 	}}
 	e := start(t, s, nil, p)
-	e.SetQuery("thi")
+	e.SetQuery("thi", 1)
 	until(t, s, "Thing")
 	e.ShowActions("Thing")
 	until(t, s, "Open", "Copy")
 	if f := s.last(); f.Depth != 1 || f.Title != "Thing" || !f.SetField || f.Field != "" {
 		t.Errorf("actions frame = %+v", f)
 	}
-	e.SetQuery("cop")
+	e.SetQuery("cop", 1)
 	until(t, s, "Copy")
 	e.Back()
 	until(t, s, "Thing")
@@ -423,7 +423,7 @@ func TestActivatingRecordsTheUse(t *testing.T) {
 		{Title: "Open", Run: func(context.Context) Outcome { close(done); return Close{} }},
 	}}
 	e := start(t, s, freq, p)
-	e.SetQuery("thi")
+	e.SetQuery("thi", 1)
 	until(t, s, "Thing")
 	e.Activate("Thing", 0)
 	<-done
@@ -540,7 +540,7 @@ func TestScriptArgumentsStayData(t *testing.T) {
 	}
 	s := &sink{}
 	e := start(t, s, nil, NewScripts(Env{}, dir))
-	e.SetQuery("c")
+	e.SetQuery("c", 1)
 	waitFor(t, "row", func() bool { return len(titles(s.last())) > 0 })
 	id := ""
 	for _, r := range s.last().Rows {
@@ -774,7 +774,7 @@ func TestModeLevelHostsAModeWithItsPrompts(t *testing.T) {
 	e := start(t, s, nil, &fakeProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("vault")}, actions: []Action{
 		{Title: "open", Run: func(context.Context) Outcome { return Push{Level: ModeLevel(&scriptedMode{}, "Vault")} }},
 	}})
-	e.SetQuery("vault")
+	e.SetQuery("vault", 1)
 	until(t, s, "vault")
 	e.Activate("vault", 0)
 	waitFor(t, "the masked prompt", func() bool { return s.last().Mask })

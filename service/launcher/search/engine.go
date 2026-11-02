@@ -56,6 +56,10 @@ type Frame struct {
 	CanSubmit bool
 	// Query is the text these rows answer.
 	Query string
+	// QuerySeq is the last edit of the field the engine had seen. A panel
+	// that has sent a later one keeps its text: what was typed since must
+	// not be overwritten by a frame that predates it.
+	QuerySeq uint64
 	// SetField asks the panel to put Field in the search field: a level
 	// was entered or left, or an action set the query.
 	SetField bool
@@ -72,7 +76,7 @@ type Frame struct {
 type Sink interface {
 	// Results is a new list.
 	Results(Frame)
-	// Finish ends the session: Close or Copy.
+	// Finish ends the session: Close, Cancel or Copy.
 	Finish(Outcome)
 	// Notice says something in the footer without changing the list.
 	Notice(message string)
@@ -82,7 +86,10 @@ type Sink interface {
 type engineCmd any
 
 type (
-	cmdQuery    struct{ text string }
+	cmdQuery struct {
+		text string
+		seq  uint64
+	}
 	cmdActivate struct {
 		id     string
 		action int
@@ -122,6 +129,8 @@ type Engine struct {
 
 	stack []*levelState
 	rows  []Row
+	// seq is the last edit of the search field answered.
+	seq uint64
 	// scratch is reused between queries.
 	scratch []sectionRows
 }
@@ -146,8 +155,9 @@ func (e *Engine) send(c engineCmd) {
 	}
 }
 
-// SetQuery answers text.
-func (e *Engine) SetQuery(text string) { e.send(cmdQuery{text: text}) }
+// SetQuery answers text; seq numbers the edit, so a frame can say which
+// edits it has seen.
+func (e *Engine) SetQuery(text string, seq uint64) { e.send(cmdQuery{text: text, seq: seq}) }
 
 // Activate runs action number action of the row with this id.
 func (e *Engine) Activate(id string, action int) { e.send(cmdActivate{id: id, action: action}) }
@@ -158,7 +168,7 @@ func (e *Engine) Submit(text string) { e.send(cmdSubmit{text: text}) }
 // ShowActions enters the actions panel of the row with this id.
 func (e *Engine) ShowActions(id string) { e.send(cmdActions{id: id}) }
 
-// Back leaves the current level; at the root it finishes with Close.
+// Back leaves the current level; at the root it finishes with Cancel.
 func (e *Engine) Back() { e.send(cmdBack{}) }
 
 // Stop ends the engine and every provider it started. It does not wait:
@@ -231,6 +241,7 @@ func (e *Engine) run(ctx context.Context, root *Level, openFrecency func() (*Fre
 		}
 		switch c := cmd.(type) {
 		case cmdQuery:
+			e.seq = c.seq
 			e.top().query = c.text
 			e.frame(frameOpts{})
 		case cmdPublish:
@@ -298,7 +309,7 @@ func (e *Engine) leaveAll() {
 
 func (e *Engine) back() {
 	if len(e.stack) == 1 {
-		e.deliver(func() { e.sink.Finish(Close{}) })
+		e.deliver(func() { e.sink.Finish(Cancel{}) })
 		return
 	}
 	e.top().cancel()
@@ -449,7 +460,7 @@ func (e *Engine) frame(o frameOpts) {
 	f := Frame{
 		Depth: len(e.stack) - 1, Title: st.level.Title, Placeholder: st.level.Placeholder, Message: st.level.Message,
 		Mask: st.level.Mask, SubmitTitle: st.level.SubmitTitle, CanSubmit: st.level.Submit != nil,
-		Query: st.query, SetField: o.setField, Field: st.query, Late: o.late, Rows: rows,
+		Query: st.query, QuerySeq: e.seq, SetField: o.setField, Field: st.query, Late: o.late, Rows: rows,
 	}
 	e.deliver(func() { e.sink.Results(f) })
 }

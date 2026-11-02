@@ -105,19 +105,22 @@ type SettingsPage struct {
 // Settings offers lys-settings' pages.
 type Settings struct {
 	env   Env
-	pages []SettingsPage
+	pages func() []SettingsPage
 }
 
 // NewSettings offers pages.
-func NewSettings(env Env, pages []SettingsPage) *Settings { return &Settings{env: env, pages: pages} }
+func NewSettings(env Env, pages func() []SettingsPage) *Settings {
+	return &Settings{env: env, pages: pages}
+}
 
 // Spec implements Provider.
 func (*Settings) Spec() Spec { return Spec{Section: SectionSettings, Limit: 4, MinQuery: 2} }
 
 // Load implements Provider.
 func (s *Settings) Load(_ context.Context, publish func([]Entry)) {
-	entries := make([]Entry, 0, len(s.pages))
-	for _, p := range s.pages {
+	pages := s.pages()
+	entries := make([]Entry, 0, len(pages))
+	for _, p := range pages {
 		id := "settings:" + p.ID
 		entries = append(entries, Entry{ID: id, Learn: id, Title: p.Title, Subtitle: i18n.T("launcher-settings-subtitle"), Keywords: p.ID, Icon: launcher.IconName(p.Icon), Data: p})
 	}

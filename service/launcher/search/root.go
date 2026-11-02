@@ -74,7 +74,7 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	add(config.SearchLinks, func() Provider { return NewLinks(d.Env, cfg.Quicklinks, cfg.Snippets, cfg.Previews) })
 	add(config.SearchScripts, func() Provider { return NewScripts(d.Env, commandsDir(cfg.CommandsDir, home)) })
 	if has(config.SearchSettings) && d.SettingsPages != nil {
-		root.Providers = append(root.Providers, NewSettings(d.Env, d.SettingsPages()))
+		root.Providers = append(root.Providers, NewSettings(d.Env, d.SettingsPages))
 	}
 	add(config.SearchFiles, func() Provider { return NewFiles(d.Env, filesConfig(cfg, home)) })
 	if has(config.SearchClipboard) && d.Clipboard != nil {

@@ -113,8 +113,10 @@ type Action struct {
 type Outcome interface{ isOutcome() }
 
 type (
-	// Close ends the session.
+	// Close ends the session: the action did its work.
 	Close struct{}
+	// Cancel ends the session with nothing done (Esc at the root).
+	Cancel struct{}
 	// Copy puts Text on the clipboard and ends the session.
 	Copy struct{ Text string }
 	// SetQuery replaces the search field's text.
@@ -131,6 +133,7 @@ type (
 )
 
 func (Close) isOutcome()    {}
+func (Cancel) isOutcome()   {}
 func (Copy) isOutcome()     {}
 func (SetQuery) isOutcome() {}
 func (Push) isOutcome()     {}

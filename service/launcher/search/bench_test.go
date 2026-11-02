@@ -1,11 +1,14 @@
 package search
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
 
+	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
 
 // benchEntries are plausible rows: names with words, paths beneath them.
@@ -82,5 +85,23 @@ func BenchmarkHighlights(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		_ = q.Positions(hay)
+	}
+}
+
+// BenchmarkLoadApps reads this machine's desktop entries, off the UI loop.
+func BenchmarkLoadApps(b *testing.B) {
+	a := NewApps(Env{}, desktopentry.ApplicationDirs())
+	b.ReportAllocs()
+	for b.Loop() {
+		a.Load(context.Background(), func([]Entry) {})
+	}
+}
+
+// BenchmarkLoadEmoji decompresses and prepares the emoji table.
+func BenchmarkLoadEmoji(b *testing.B) {
+	e := NewEmoji(modes.AvailableEmoji)
+	b.ReportAllocs()
+	for b.Loop() {
+		e.Load(context.Background(), func([]Entry) {})
 	}
 }
