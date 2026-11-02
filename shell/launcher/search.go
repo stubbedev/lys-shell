@@ -435,18 +435,23 @@ func (p *panel) rowPressed(i int, button uint32) {
 // schedulePreview loads the selected row's preview once it rests, and
 // drops one in flight for another row.
 func (p *panel) schedulePreview() {
+	row, ok := p.selected()
+	id := ""
+	if ok && row.Entry.Preview.Any() {
+		id = row.Entry.ID
+	}
+	// The same row again, as a frame for rows arriving late: whatever is
+	// loading or loaded for it stands.
+	if id != "" && id == p.previewFor {
+		return
+	}
 	if p.previewStop != nil {
 		p.previewStop()
 		p.previewStop = nil
 	}
-	row, ok := p.selected()
-	if !ok || !row.Entry.Preview.Any() {
+	if id == "" {
 		p.previewFor = ""
 		p.v.showPreview(search.PreviewContent{}, nil, p)
-		return
-	}
-	id := row.Entry.ID
-	if id == p.previewFor {
 		return
 	}
 	p.previewFor = id
