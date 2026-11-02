@@ -4,9 +4,9 @@ go 1.27.3
 
 require (
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.1.1-0.20261101201358-84198873c126
-	github.com/stubbedev/lys-secrets v0.2.1-0.20261101200308-86fefedf039f
-	github.com/stubbedev/lys-ui v0.0.0-20261101201333-753e90aa0111
+	github.com/stubbedev/lys-lib v0.1.1-0.20261101235025-6595d87e7c82
+	github.com/stubbedev/lys-secrets v0.2.1-0.20261101235344-f73553c76e8e
+	github.com/stubbedev/lys-ui v0.0.0-20261101235832-063b0c557a81
 	github.com/stubbedev/memory-go v0.5.0
 	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.58.0
@@ -26,7 +26,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	golang.org/x/net v0.62.0 // indirect
 	modernc.org/libc v1.79.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
