@@ -308,3 +308,34 @@ func TestWatchEndsWhenClosed(t *testing.T) {
 		t.Fatal("Ticks stayed open after Close")
 	}
 }
+
+func TestFollowReducedMotionSeedsFollowsAndSaysWhenItEnds(t *testing.T) {
+	f := lyswmtest.Start(t)
+	f.Result("reducedmotion", `true`)
+	seen := make(chan bool, 4)
+	gone := make(chan struct{})
+	stop, err := lyswm.FollowReducedMotion(func(on bool) { seen <- on }, func() { close(gone) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect := func(want bool) {
+		t.Helper()
+		select {
+		case got := <-seen:
+			if got != want {
+				t.Fatalf("set(%v), want %v", got, want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("no call of set")
+		}
+	}
+	expect(true)
+	f.Events <- `{"event":"reducedmotion","reduced_motion":false}`
+	expect(false)
+	stop()
+	select {
+	case <-gone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("gone was not called when the stream ended")
+	}
+}

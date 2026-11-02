@@ -14,7 +14,7 @@ Enter/exit and change animations for transient surfaces.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | bool | `true` | Enable enter/exit animations (OSD, toasts, notifications) and icon-change crossfades. When disabled, surfaces appear instantly. |
-| `reduced-motion` | bool | `false` | Replace motion with fades in the shell and, through the portal's reduced-motion setting, in apps: surfaces fade instead of sliding, swinging or bouncing, and looping indicators stop. Under lys-wm its `animations.reduced_motion` turns this on as well. |
+| `reduced-motion` | bool | `false` | Replace motion with fades in the shell and, through the portal's reduced-motion setting, in apps: surfaces fade instead of sliding, swinging or bouncing, and looping indicators stop. Under lys-wm this key has no effect and says so: lys-wm's `animations.reduced_motion` owns the setting for the whole desktop. |
 | `duration` | u32 | `200` | Animation duration in milliseconds. |
 | `transition` | [`AnimationType`](/config/types#animation-type) | `"fade"` | Transition style used for enter/exit of the OSD, toasts, and notification cards. Base fallback for every surface and direction. |
 | `enter` | [`AnimationType`](/config/types#animation-type) or null | `null` | Global enter transition. Unset → `transition`. |

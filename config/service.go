@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -26,10 +27,11 @@ type Service struct {
 	tree   any    // the merged config document last loaded, nil for none
 	staged *table // the runtime leaves in effect, canonical paths
 	// configSet is the leaves the config file set, canonical paths.
-	configSet *table
-	subs      map[int]func(old, new *Config)
-	nextSub   int
-	session   bool
+	configSet    *table
+	subs         map[int]func(old, new *Config)
+	nextSub      int
+	session      sessionMotion
+	motionWarned *bool
 
 	secretsMu   sync.Mutex
 	secretsSubs map[int]func()
@@ -146,22 +148,65 @@ func (s *Service) publish(cfg *Config, staged *table, tree any) {
 			subs = append(subs, fn)
 		}
 	}
+	warn := s.shadowedMotionKey()
 	s.mu.Unlock()
+	if warn != nil {
+		s.sink(*warn)
+	}
 	for _, fn := range subs {
 		fn(old, cfg)
 	}
 }
 
-// SetSessionReducedMotion records whether the compositor asks for
-// reduced motion. It holds across reloads and reaches subscribers as a
+// reducedMotionKey is the key a compositor that owns reduced motion
+// leaves without effect.
+const reducedMotionKey = "animations.reduced-motion"
+
+// shadowedMotionKey is the warning due when the compositor owns reduced
+// motion and the key is set, once for each value it is set to. The lock
+// is held.
+func (s *Service) shadowedMotionKey() *Diagnostic {
+	set := stagedAt(s.staged, reducedMotionKey) || stagedAt(s.configSet, reducedMotionKey)
+	if !s.cfg.Animations.CompositorOwnsMotion() || !set {
+		s.motionWarned = nil
+		return nil
+	}
+	value := s.cfg.Animations.ReducedMotion
+	if s.motionWarned != nil && *s.motionWarned == value {
+		return nil
+	}
+	s.motionWarned = &value
+	d := Diagnostic{Kind: DiagnosticWarning, Title: "config key has no effect under lys-wm"}.
+		field("key", reducedMotionKey).
+		field("value", strconv.FormatBool(value))
+	d.Hint = "lys-wm owns this setting for the desktop: set animations.reduced_motion in its config, ~/.config/lys-wm/config.yaml"
+	return &d
+}
+
+// SetSessionReducedMotion records what the compositor that owns reduced
+// motion says. It holds across reloads and reaches subscribers as a
 // change of the effective config.
 func (s *Service) SetSessionReducedMotion(on bool) {
+	say := sessionFull
+	if on {
+		say = sessionReduced
+	}
+	s.setSessionMotion(say)
+}
+
+// ClearSessionReducedMotion hands reduced motion back to the key: the
+// compositor that owned it has gone.
+func (s *Service) ClearSessionReducedMotion() {
+	s.setSessionMotion(sessionSilent)
+}
+
+func (s *Service) setSessionMotion(say sessionMotion) {
 	s.mu.Lock()
-	if s.session == on {
+	if s.session == say {
 		s.mu.Unlock()
 		return
 	}
-	s.session = on
+	s.session = say
 	next := *s.cfg
 	staged, tree := s.staged, s.tree
 	s.mu.Unlock()

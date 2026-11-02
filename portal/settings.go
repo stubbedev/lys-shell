@@ -81,10 +81,12 @@ func nonEmpty(read func(desktop) string) func(desktop) (any, bool) {
 	}
 }
 
-// reducedMotion is the shell's animations off or reduced, or the host's
+// reducedMotion is what the compositor says when it owns the setting,
+// else the shell's animations off or reduced; and either way the host's
 // gtk-enable-animations off, which sandboxed apps cannot read.
 func reducedMotion(d desktop) bool {
-	return !d.cfg.Animations.Enabled || d.cfg.Animations.Reduced() || d.gtk.Animations == gtksettings.AnimationsOff
+	a := d.cfg.Animations
+	return a.Reduced() || (!a.CompositorOwnsMotion() && !a.Enabled) || d.gtk.Animations == gtksettings.AnimationsOff
 }
 
 // gnomeColorScheme is the GSettings enum for a color-scheme value.

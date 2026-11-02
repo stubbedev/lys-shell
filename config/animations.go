@@ -15,8 +15,9 @@ type AnimationsConfig struct {
 	Enabled bool `cfg:"enabled"`
 	// Replace motion with fades in the shell and, through the portal's
 	// reduced-motion setting, in apps: surfaces fade instead of sliding,
-	// swinging or bouncing, and looping indicators stop. Under lys-wm its
-	// `animations.reduced_motion` turns this on as well.
+	// swinging or bouncing, and looping indicators stop. Under lys-wm this
+	// key has no effect and says so: lys-wm's `animations.reduced_motion`
+	// owns the setting for the whole desktop.
 	ReducedMotion bool `cfg:"reduced-motion"`
 	// Animation duration in milliseconds.
 	Duration uint32 `cfg:"duration"`
@@ -68,14 +69,32 @@ type AnimationsConfig struct {
 	// Per-surface override for the application launcher.
 	Launcher SurfaceAnimation `cfg:"launcher"`
 
-	// session is reduced motion the compositor asks for
+	// session is the compositor's say over reduced motion
 	// (Service.SetSessionReducedMotion).
-	session bool
+	session sessionMotion
 }
 
-// Reduced reports whether motion gives way to fades: asked for here or
-// by the compositor.
-func (a AnimationsConfig) Reduced() bool { return a.ReducedMotion || a.session }
+// sessionMotion is what a compositor that owns reduced motion says.
+type sessionMotion uint8
+
+const (
+	sessionSilent sessionMotion = iota
+	sessionFull
+	sessionReduced
+)
+
+// Reduced reports whether motion gives way to fades: what the
+// compositor says when one owns the setting, else the key.
+func (a AnimationsConfig) Reduced() bool {
+	if a.session != sessionSilent {
+		return a.session == sessionReduced
+	}
+	return a.ReducedMotion
+}
+
+// CompositorOwnsMotion reports whether the compositor decides reduced
+// motion, leaving the key without effect.
+func (a AnimationsConfig) CompositorOwnsMotion() bool { return a.session != sessionSilent }
 
 // DefaultsAnimations returns the schema defaults.
 func DefaultsAnimations() AnimationsConfig {

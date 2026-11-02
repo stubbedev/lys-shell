@@ -72,8 +72,8 @@ func Run() error {
 
 // followReducedMotion keeps the toolkit's reduced motion on while the
 // desktop or the shell's config asks for it: the application follows
-// only the desktop, and without a portal that is never. The compositor's
-// own setting reaches the config from here too.
+// only the desktop, and without a portal that is never. Under lys-wm the
+// compositor's setting replaces the key's here.
 func followReducedMotion(application *app.Application, cfg *config.Config, svc *config.Service) (stop func()) {
 	apply := func(c *config.Config) {
 		widget.SetReducedMotion(application.ReducedMotion() || c.Animations.Reduced())
@@ -86,7 +86,7 @@ func followReducedMotion(application *app.Application, cfg *config.Config, svc *
 	offConfig := svc.Subscribe(func(_, next *config.Config) {
 		application.Invoke(func() { apply(next) })
 	})
-	stopFollow, err := lyswm.FollowReducedMotion(svc.SetSessionReducedMotion)
+	stopFollow, err := lyswm.FollowReducedMotion(svc.SetSessionReducedMotion, svc.ClearSessionReducedMotion)
 	if err != nil {
 		log.Printf("lys-shell: lys-wm reduced motion: %v", err)
 		stopFollow = func() {}

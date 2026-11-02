@@ -40,8 +40,9 @@ func TestReducedMotionTurnsEveryTransitionIntoAFade(t *testing.T) {
 	}
 }
 
-func TestTheCompositorsReducedMotionSurvivesAReload(t *testing.T) {
-	s := Load(t.TempDir(), DiscardDiagnostics)
+func TestTheOwningCompositorDecidesAndTheKeySaysItHasNoEffect(t *testing.T) {
+	var warnings []Diagnostic
+	s := Load(t.TempDir(), func(d Diagnostic) { warnings = append(warnings, d) })
 	var heard int
 	s.Subscribe(func(_, next *Config) {
 		if next.Animations.Reduced() {
@@ -53,14 +54,52 @@ func TestTheCompositorsReducedMotionSurvivesAReload(t *testing.T) {
 	if heard != 1 || !s.Config().Animations.Reduced() {
 		t.Fatalf("heard %d, reduced %v", heard, s.Config().Animations.Reduced())
 	}
+	if len(warnings) != 0 {
+		t.Fatalf("warned with the key unset: %v", warnings)
+	}
 	if err := s.SetByPath("animations.duration", ParseCLIValue("99")); err != nil {
 		t.Fatal(err)
 	}
 	if !s.Config().Animations.Reduced() {
-		t.Error("a config change forgot it")
+		t.Error("a config change forgot the compositor's say")
+	}
+
+	s.SetSessionReducedMotion(false)
+	if err := s.SetByPath(reducedMotionKey, true); err != nil {
+		t.Fatal(err)
+	}
+	if s.Config().Animations.Reduced() {
+		t.Error("the key overruled the owning compositor")
+	}
+	if len(warnings) != 1 || warnings[0].Kind != DiagnosticWarning || warnings[0].Field("key") != reducedMotionKey || !strings.Contains(warnings[0].Hint, "animations.reduced_motion") {
+		t.Fatalf("warnings %+v", warnings)
+	}
+	if err := s.SetByPath("animations.duration", ParseCLIValue("98")); err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 1 {
+		t.Errorf("warned again with the key unchanged: %v", warnings)
+	}
+	if err := s.SetByPath(reducedMotionKey, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 2 {
+		t.Errorf("no warning for the key's new value: %v", warnings)
+	}
+
+	if err := s.SetByPath(reducedMotionKey, true); err != nil {
+		t.Fatal(err)
+	}
+	warned := len(warnings)
+	s.ClearSessionReducedMotion()
+	if !s.Config().Animations.Reduced() {
+		t.Error("the key does not count once the compositor has gone")
+	}
+	if len(warnings) != warned {
+		t.Errorf("warned with no compositor: %v", warnings[warned:])
 	}
 	s.SetSessionReducedMotion(false)
-	if s.Config().Animations.Reduced() {
-		t.Error("it stays after the compositor stops asking")
+	if len(warnings) != warned+1 {
+		t.Errorf("no warning when a compositor takes the setting over a set key: %v", warnings)
 	}
 }

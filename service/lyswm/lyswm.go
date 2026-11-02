@@ -337,10 +337,9 @@ var (
 )
 
 // FollowReducedMotion calls set with lys-wm's reduced motion now and at
-// every change, until the returned stop or the end of the stream, which
-// calls set(false) since nothing asks for it then. It does nothing
-// without a lys-wm session.
-func FollowReducedMotion(set func(bool)) (stop func(), err error) {
+// every change, and gone when the stream ends, by the returned stop or
+// because lys-wm went away. It does nothing without a lys-wm session.
+func FollowReducedMotion(set func(bool), gone func()) (stop func(), err error) {
 	if !IsRunning() {
 		return func() {}, nil
 	}
@@ -353,7 +352,7 @@ func FollowReducedMotion(set func(bool)) (stop func(), err error) {
 		for range w.Ticks() {
 			set(w.Value())
 		}
-		set(false)
+		gone()
 	}()
 	return w.Close, nil
 }

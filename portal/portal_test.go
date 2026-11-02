@@ -268,6 +268,22 @@ func TestReducedMotionReachesThePortal(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.changed(t)
+	if err := r.cfg.SetByPath("animations.reduced-motion", true); err != nil {
+		t.Fatal(err)
+	}
+	r.changed(t)
+	r.cfg.SetSessionReducedMotion(false)
+	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(0) {
+		t.Errorf("reduced-motion = %v when the owning compositor says no, with the key on", v)
+	}
+	r.changed(t)
+	if err := r.cfg.SetByPath("animations.enabled", false); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(0) {
+		t.Errorf("reduced-motion = %v from the shell's own animations.enabled under an owning compositor", v)
+	}
+	r.changed(t)
 	r.cfg.SetSessionReducedMotion(true)
 	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyReducedMotion, GnomeInterfaceNS + " enable-animations"}) {
 		t.Errorf("the compositor's reduced motion emitted %v", got)

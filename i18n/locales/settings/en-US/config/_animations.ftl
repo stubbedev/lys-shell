@@ -26,7 +26,7 @@ settings-animations-ui-duration = UI Duration
     .description = Base length in ms for general UI micro-transitions (hover, focus, color fades)
 
 settings-animations-reduced-motion = Reduced motion
-    .description = Replace motion with fades here and in apps: nothing slides, swings or bounces, and looping indicators stop
+    .description = Replace motion with fades here and in apps: nothing slides, swings or bounces, and looping indicators stop. Under lys-wm this has no effect: set animations.reduced_motion in its config
 
 settings-animations-indicators = Indicators
     .description = Run looping status indicators: spinners, scan animations, the recording pulse, the clock blink
