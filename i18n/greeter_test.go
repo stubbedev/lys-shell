@@ -20,6 +20,9 @@ func TestGreeterDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got := l.Get("greeter-login-incorrect"); got != "Nom d'utilisateur ou mot de passe incorrect" {
+		t.Errorf("fr incorrect = %q", got)
+	}
 	if got := l.Get("greeter-username"); got != "Nom d'utilisateur" {
 		t.Errorf("fr username = %q", got)
 	}
@@ -30,6 +33,9 @@ func TestGreeterDomain(t *testing.T) {
 	}
 	if got := l.Get("greeter-greetd-unavailable", Str("error", "no socket")); got != "greetd unavailable: \u2068no socket\u2069" {
 		t.Errorf("unavailable = %q", got)
+	}
+	if got := l.Get("greeter-login-incorrect"); got != "Incorrect username or password" {
+		t.Errorf("fallback incorrect = %q", got)
 	}
 	if got := l.Get("lock-nothing"); got == "" {
 		t.Error("a missing id came back empty, want the no-localization marker")
