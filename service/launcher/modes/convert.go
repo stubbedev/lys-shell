@@ -182,7 +182,7 @@ func Convert(query string) (Conversion, bool) {
 		if !ok || source.kind != target.kind {
 			return Conversion{}, false
 		}
-		base := value*source.factor + source.offset
+		base := float64(value*source.factor) + source.offset
 		return Conversion{Value: FormatResult((base - target.offset) / target.factor), Unit: target.name}, true
 	}
 	return Conversion{}, false

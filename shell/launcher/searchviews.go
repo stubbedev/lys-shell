@@ -573,7 +573,7 @@ func (m *panelMotion) fade(from, to float64, d uint32, done func()) {
 		m.fadeStop()
 	}
 	m.fadeStop = anim.Start(time.Duration(d)*time.Millisecond, func(t float64) {
-		m.reveal = from + (to-from)*t
+		m.reveal = from + float64((to-from)*t)
 		m.applyReveal()
 		if t >= 1 && done != nil {
 			done()
@@ -639,7 +639,7 @@ func (m *panelMotion) shownRect(out render.Rect) render.Rect {
 		return r
 	}
 	const from = 0.94
-	s := from + (1-from)*m.reveal
+	s := from + float64((1-from)*m.reveal)
 	w, h := int(math.Round(float64(r.W)*s)), int(math.Round(float64(r.H)*s))
 	return render.Rect{X: r.X + (r.W-w)/2, Y: r.Y + (r.H-h)/2, W: w, H: h}
 }

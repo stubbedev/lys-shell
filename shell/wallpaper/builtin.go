@@ -87,7 +87,7 @@ func paintBuiltin(img *image.RGBA) {
 				at := i * (w + h)
 				t := tables[at+x] * tables[at+w+y] * g.strength
 				for ch := range c {
-					c[ch] += (g.color[ch] - c[ch]) * t
+					c[ch] += float64((g.color[ch] - c[ch]) * t)
 				}
 			}
 			noise := ditherAt(x, y)
