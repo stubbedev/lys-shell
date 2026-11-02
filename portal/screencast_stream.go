@@ -105,8 +105,8 @@ type screenStreams struct {
 	openDevice func(dev uint64) (gpuAllocator, error)
 }
 
-// start opens the capture for target and its PipeWire producer. A
-// whole output and a window stream zero-copy when the compositor and
+// start opens the capture for target and its PipeWire producer. An
+// output, a region and a window stream zero-copy when the compositor and
 // the GPU allow; else, logged with the reason, an output streams from an
 // ext-image-copy session (damage-driven: a static screen sends nothing
 // new), and a compositor without it, a region, and a window take one
@@ -122,13 +122,17 @@ func (st screenStreams) start(target sharepicker.Target, cursor bool, fps uint32
 		}
 		warnf("screencast: window %s streams through shared memory: %v", target.Name, err)
 	}
-	if target.Kind == sharepicker.TargetOutput {
-		s, err := st.startGPU(target.Name, cursor, fps)
+	if target.Kind == sharepicker.TargetOutput || target.Kind == sharepicker.TargetRegion {
+		s, err := st.startGPU(target, cursor, fps)
 		if err == nil {
 			return s, nil
 		}
 		if !errors.Is(err, errNoDmabuf) {
 			return nil, err
+		}
+		if target.Kind == sharepicker.TargetRegion {
+			warnf("screencast: a region of output %s streams through shared memory: %v", target.Name, err)
+			return startSnapshotStream(target, cursor, fps)
 		}
 		warnf("screencast: output %s streams through shared memory: %v", target.Name, err)
 		if s, err := capture.OpenOutputStream(target.Name, cursor); err == nil {
@@ -297,7 +301,6 @@ func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (sc
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
 	}
-	opts := capture.Options{Cursor: cursor}
 	var grab func([]byte) (*capture.Frame, error)
 	var gone func() bool
 	var refresh int32
@@ -311,15 +314,7 @@ func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (sc
 		}
 		gone = outputGone(c, target.Name)
 		refresh, transform = o.RefreshMHz, o.Transform
-		if target.Kind == sharepicker.TargetOutput {
-			grab = outputGrab(c, o, cursor)
-		} else {
-			region := image.Rect(int(target.X), int(target.Y), int(target.X+target.Width), int(target.Y+target.Height))
-			grab = func(dst []byte) (*capture.Frame, error) {
-				opts.Dst = dst
-				return c.CaptureOutputRegion(o, region, opts)
-			}
-		}
+		grab = outputGrab(c, o, regionOf(target), cursor)
 	case sharepicker.TargetWindow:
 		t, ok := findToplevel(c, target.Name)
 		if !ok {
@@ -380,10 +375,27 @@ func toplevelGrab(c *capture.Client, t capture.Toplevel, cursor bool) func(dst [
 	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureToplevel(t, opts) }
 }
 
-// outputGrab captures a whole output per call, into dst when it fits.
-func outputGrab(c *capture.Client, o capture.Output, cursor bool) func(dst []byte) (*capture.Frame, error) {
+// regionOf is a region target's rectangle of its output; nil for a whole
+// output.
+func regionOf(t sharepicker.Target) *image.Rectangle {
+	if t.Kind != sharepicker.TargetRegion {
+		return nil
+	}
+	r := image.Rect(int(t.X), int(t.Y), int(t.X+t.Width), int(t.Y+t.Height))
+	return &r
+}
+
+// outputGrab captures an output, or the region of it when one is given, per
+// call, into dst when it fits.
+func outputGrab(c *capture.Client, o capture.Output, region *image.Rectangle, cursor bool) func(dst []byte) (*capture.Frame, error) {
 	opts := capture.Options{Cursor: cursor}
-	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureOutput(o, opts) }
+	if region == nil {
+		return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureOutput(o, opts) }
+	}
+	return func(dst []byte) (*capture.Frame, error) {
+		opts.Dst = dst
+		return c.CaptureOutputRegion(o, *region, opts)
+	}
 }
 
 // windowDmabufFormat is the dmabuf layout a capture session on t
@@ -442,23 +454,30 @@ func (st screenStreams) deviceLayouts(offered capture.DmabufFormat) (gpuAllocato
 	return dev, dmabufprobe.Layouts(offered.Modifiers, rendered, exported), nil
 }
 
-// startGPU streams a whole output zero-copy when the compositor and
-// the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise, and the
-// caller takes the shared-memory paths.
-func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screenStream, error) {
+// startGPU streams an output or a region of one zero-copy when the
+// compositor and the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise,
+// and the caller takes the shared-memory paths.
+func (st screenStreams) startGPU(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
 	c, fail, err := connectForDmabuf()
 	if err != nil {
 		return nil, err
 	}
+	output := target.Name
 	o, ok := findOutput(c, output)
 	if !ok {
 		return fail(fmt.Errorf("output '%s' is gone", output))
 	}
-	offered, err := c.DmabufFormat(o, cursor)
+	region := regionOf(target)
+	var offered capture.DmabufFormat
+	if region != nil {
+		offered, err = c.DmabufRegionFormat(o, *region, cursor)
+	} else {
+		offered, err = c.DmabufFormat(o, cursor)
+	}
 	if err != nil {
 		return fail(err)
 	}
-	grab := outputGrab(c, o, cursor)
+	grab := outputGrab(c, o, region, cursor)
 	first, err := grab(nil)
 	if err != nil {
 		return fail(err)
@@ -469,7 +488,7 @@ func (st screenStreams) startGPU(output string, cursor bool, fps uint32) (screen
 	}
 	watch := newVanishWatch(outputGone(c, output))
 	shm := newSnapshotSource(grab, first, watch)
-	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, layouts, o, cursor, first)
+	src, err := probeGPUSource(shm, dev, screencopy{c: c, region: region}, offered, layouts, o, cursor, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)

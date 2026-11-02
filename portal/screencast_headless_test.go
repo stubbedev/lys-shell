@@ -73,7 +73,7 @@ func TestHeadlessGPUStream(t *testing.T) {
 	}
 	pwtest.Start(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	s, err := streams.startGPU(outs[0].Name, false, 30)
+	s, err := streams.startGPU(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: outs[0].Name}, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}

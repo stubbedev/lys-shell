@@ -170,9 +170,18 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 
 	logged := captureLog(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	s, err := streams.startGPU(output.Name, false, 30)
+	s, err := streams.startGPU(output, false, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
+	}
+	s.Close()
+	region := sharepicker.Target{Kind: sharepicker.TargetRegion, Name: output.Name, X: 10, Y: 20, Width: 200, Height: 100}
+	s, err = streams.startGPU(region, false, 30)
+	if err != nil {
+		t.Fatalf("the zero-copy path declined a region: %v", err)
+	}
+	if w, h := s.Size(); w != 200 || h != 100 {
+		t.Errorf("the region's stream is %dx%d, want 200x100", w, h)
 	}
 	s.Close()
 	s, err = streams.start(output, false, 30)

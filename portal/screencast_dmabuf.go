@@ -3,6 +3,7 @@ package portal
 import (
 	"errors"
 	"fmt"
+	"image"
 	"sync"
 
 	"github.com/stubbedev/lys-lib/capture"
@@ -15,7 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// The zero-copy path: a whole output's screencopy frames land straight in
+// The zero-copy path: an output's or a region's screencopy frames land straight in
 // buffers lys-lib's Vulkan device allocates on the DRM device the
 // compositor names, in a modifier it imports, one bound to each PipeWire
 // buffer for the stream's life, which the consumer imports as dmabufs.
@@ -135,8 +136,12 @@ type gpuCapturer interface {
 // importedBuffer is the compositor's import of one buffer.
 type importedBuffer interface{ Destroy() }
 
-// screencopy is the gpuCapturer over a capture client.
-type screencopy struct{ c *capture.Client }
+// screencopy is the gpuCapturer over a capture client, of a whole output or
+// the region of it when one is set.
+type screencopy struct {
+	c      *capture.Client
+	region *image.Rectangle
+}
 
 func (s screencopy) Import(d dmabuf.Buffer) (importedBuffer, error) { return s.c.ImportDmabuf(d) }
 
@@ -146,6 +151,9 @@ func (s screencopy) CopyInto(o capture.Output, cursor bool, buf importedBuffer) 
 	b, ok := buf.(*capture.DmabufBuffer)
 	if !ok {
 		return errors.New("screencast: a buffer this client did not import")
+	}
+	if s.region != nil {
+		return s.c.CopyOutputRegionDmabuf(o, *s.region, cursor, b)
 	}
 	return s.c.CopyOutputDmabuf(o, cursor, b)
 }
