@@ -14,6 +14,12 @@ let
 
   inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient testApp;
 
+  flatWallpaper =
+    pkgs.runCommand "flat-wallpaper.png" { nativeBuildInputs = [ pkgs.imagemagick ]; }
+      ''
+        magick -size 64x64 xc:'#20242c' "png:$out"
+      '';
+
   wmConfig = (pkgs.formats.yaml { }).generate "lys-wm.yaml" {
     input.keyboard = {
       layout = "us,de";
@@ -39,6 +45,7 @@ let
       pam-service = "lys-shell";
     };
     osd.duration = 8000;
+    wallpaper.wallpaper = "${flatWallpaper}";
     bar.layout = [
       {
         monitor = "*";
@@ -237,13 +244,16 @@ pkgs.testers.nixosTest {
     time.sleep(2)
     shot("02-foot-focused")
 
+    above_foot = foot["rect"]["y"] - out["rect"]["y"]
+    bar_y = out["rect"]["y"] + above_foot // 2
+
     def title_strip(o):
         r = o["rect"]
-        return (r["x"], r["y"], r["width"] // 3, 24)
+        return (r["x"], r["y"], r["width"] // 3, above_foot)
 
     def right_strip(o):
         r = o["rect"]
-        return (r["x"] + r["width"] * 2 // 3, r["y"], r["width"] // 3, 24)
+        return (r["x"] + r["width"] * 2 // 3, r["y"], r["width"] // 3, above_foot)
 
     titled = region(*title_strip(out))
     machine.send_chars("PS1='$ '\n")
@@ -269,7 +279,7 @@ pkgs.testers.nixosTest {
 
     clicked = None
     for x in range(out["rect"]["x"] + 6, out["rect"]["x"] + 160, 6):
-        click(x, out["rect"]["y"] + 12)
+        click(x, bar_y)
         time.sleep(0.5)
         if focused_workspace() == [foot["workspace"]]:
             clicked = x
@@ -290,8 +300,7 @@ pkgs.testers.nixosTest {
     wait("the keybind mode to hide", lambda: region(*right_strip(out)) == plain, tries=20)
 
     centre = out["rect"]["x"] + out["rect"]["width"] // 2
-    bar_y = out["rect"]["y"] + 12
-    below_clock = (centre - 100, out["rect"]["y"] + 40, 200, 120)
+    below_clock = (centre - 100, out["rect"]["y"] + above_foot, 200, 120)
     away = (out["rect"]["x"] + out["rect"]["width"] - 60, out["rect"]["y"] + out["rect"]["height"] - 60)
 
     def typed_reaches_foot(name):
