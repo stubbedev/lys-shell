@@ -70,6 +70,7 @@ type Deps struct {
 type Picker struct {
 	app    *app.Application
 	d      Deps
+	gate   *regionoverlay.Gate
 	region interface {
 		Request(ctx context.Context, frames regionoverlay.Frames) (regionoverlay.Selection, bool, error)
 	}
@@ -107,6 +108,9 @@ type Picker struct {
 	// windowPreview stands in for the window capture in tests; nil
 	// captures the window.
 	windowPreview func(tl sharepreview.Toplevel, size int) (*image.RGBA, error)
+	outputPreview func(name string, size int) (*image.RGBA, error)
+	previews      context.Context
+	endPreviews   context.CancelFunc
 	// presented, when set, runs on the loop once the compositor
 	// presented a mapped surface's first buffer: tests read what a
 	// drawn picker holds.
@@ -114,9 +118,9 @@ type Picker struct {
 }
 
 // New builds the picker on the application; region is the live region
-// overlay the Region page opens.
-func New(a *app.Application, d Deps, region *regionoverlay.Overlay) *Picker {
-	return &Picker{app: a, d: d, region: region, invoke: a.Invoke}
+// overlay the Region page opens, on the shell's one capture gate.
+func New(a *app.Application, d Deps, gate *regionoverlay.Gate, region *regionoverlay.Overlay) *Picker {
+	return &Picker{app: a, d: d, gate: gate, region: region, invoke: a.Invoke}
 }
 
 // Pick shows the picker for one portal request and blocks until the
@@ -309,6 +313,7 @@ func (p *Picker) answer(s string) {
 	}
 	p.reply <- s
 	p.reply = nil
+	p.endPreviews()
 	p.dismiss()
 	p.queue.Done()
 }
@@ -387,6 +392,7 @@ func regionPayload(sel regionoverlay.Selection) string {
 // The configured default page opens when it is offered, else the first
 // page offered.
 func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widget.Widget {
+	p.previews, p.endPreviews = context.WithCancel(context.Background())
 	nb := widget.NewNotebook(p.d.Font)
 	nb.AddClass("share-picker-notebook")
 	nb.SetVExpand(true)
@@ -582,7 +588,7 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	if grab == nil {
 		grab = windowThumb
 	}
-	p.loadPreview(preview, card, spinner, func(size int) (*image.RGBA, error) { return grab(tl, size) })
+	p.loadPreview(preview, card, spinner, p.previews, func(size int) (*image.RGBA, error) { return grab(tl, size) })
 	return button
 }
 
@@ -599,11 +605,15 @@ func cardTitle(tl sharepreview.Toplevel) string {
 // lands back on it; the spinner goes and the card drops its loading
 // class either way. grab gets the request's resize size, read on the
 // loop since the next request re-snapshots the config; the loop's
-// invoke is read here too, not from the capture goroutine.
-func (p *Picker) loadPreview(preview *widget.Image, card *widget.Box, spinner *widget.Spinner, grab func(size int) (*image.RGBA, error)) {
+// invoke is read here too, not from the capture goroutine. A preview
+// the request outlived lands nowhere.
+func (p *Picker) loadPreview(preview *widget.Image, card *widget.Box, spinner *widget.Spinner, life context.Context, grab func(size int) (*image.RGBA, error)) {
 	size, invoke := int(p.cfg.ResizeSize), p.invoke
 	go func() {
 		img, err := grab(size)
+		if life.Err() != nil {
+			return
+		}
 		invoke(func() {
 			if spinner != nil {
 				spinner.SetVisible(false)
@@ -671,7 +681,14 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 	button.SetCursorName("pointer")
 	payload := Target{Kind: TargetOutput, Name: o.name}.Payload()
 	button.OnClick = func() { p.selectPayload(payload) }
-	p.loadPreview(preview, card, nil, func(size int) (*image.RGBA, error) { return outputThumb(o.name, size) })
+	grab := p.outputPreview
+	if grab == nil {
+		grab = outputThumb
+	}
+	life, gate := p.previews, p.gate
+	p.loadPreview(preview, card, nil, life, func(size int) (*image.RGBA, error) {
+		return regionoverlay.BackgroundCapture(life, gate, func() (*image.RGBA, error) { return grab(o.name, size) })
+	})
 	return button
 }
 

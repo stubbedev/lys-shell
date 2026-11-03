@@ -30,8 +30,6 @@ func TestHeadlessCaptureServicesAdmitOneOverlaySession(t *testing.T) {
 	}
 	t.Cleanup(sess.Close)
 	application := app.NewApplication(sess)
-	application.SetSurfaceMotion(false)
-	t.Cleanup(func() { application.SetSurfaceMotion(true) })
 	cfg := config.Defaults()
 	cfg.Screenshot.OutputDirectory = t.TempDir()
 	cfg.Screenshot.CopyToClipboard = false

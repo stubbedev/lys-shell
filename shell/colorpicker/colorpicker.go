@@ -134,16 +134,7 @@ func (p *Picker) show(frames map[string]render.StillImage, ch chan result) {
 			continue
 		}
 		l := &surface{p: p, frame: frame, logicalW: mon.Width, logicalH: mon.Height}
-		layer, err := p.app.NewLayer(app.LayerConfig{
-			Output:        out,
-			Layer:         app.LayerOverlay,
-			Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
-			ExclusiveZone: -1,
-			Keyboard:      app.KeyboardExclusive,
-			Namespace:     "lys-shell-color-picker",
-			Root:          l,
-			OnKey:         keys.OnEscape(p.app.KeySym, func() { p.finish(RGB{}, false) }),
-		})
+		layer, err := regionoverlay.OpenSurface(p.app, out, "lys-shell-color-picker", l, keys.OnEscape(p.app.KeySym, func() { p.finish(RGB{}, false) }))
 		if err != nil {
 			log.Printf("color picker: surface on %s: %v", mon.Connector, err)
 			continue

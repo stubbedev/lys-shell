@@ -91,6 +91,19 @@ func uncaptured(t *testing.T) regionoverlay.Frames {
 	}
 }
 
+func TestHeadlessClosingLeavesNothingPainting(t *testing.T) {
+	r := newRig(t)
+	answers := r.pick(t)
+	surfaces := apptest.On(r.a, func() []*app.LayerWindow { return slices.Clone(r.p.surfaces) })
+	r.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the pick after Escape", answers)
+	for i, s := range surfaces {
+		if err := apptest.On(r.a, s.EnsureUsable); err == nil {
+			t.Errorf("surface %d still draws after the requester got its answer", i)
+		}
+	}
+}
+
 // A region selection during a color pick is refused: it captures nothing,
 // and the picker stays open, holding the keyboard, until the user answers.
 // The region overlay opens once the pick ended.

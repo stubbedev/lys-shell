@@ -80,7 +80,7 @@ func headlessPicker(t *testing.T, a *app.Application, page config.SharePickerPag
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	cfg.SharePicker.DefaultPage = page
-	p = New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, nil)
+	p = New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil)
 	shown := make(chan struct{})
 	p.presented = sync.OnceFunc(func() { close(shown) })
 	p.windows = func() []sharepreview.Toplevel { return fiveWindows }
@@ -213,7 +213,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	a := apptest.Run(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
-	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, nil)
+	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil)
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	p.outputs = func() []outputInfo { return []outputInfo{{name: "HEADLESS-1", width: 1920, height: 1080, scale: 1}} }
 	t.Cleanup(func() { p.Dismiss("/r/headless") })
@@ -354,7 +354,7 @@ func regionPicker(t *testing.T) *regionRig {
 	k := keyPicker(t, config.SharePickerRegion, Request{Sources: SourceRegions})
 	gate := &regionoverlay.Gate{}
 	region := regionoverlay.New(k.a, gate, k.a.Session().Outputs, nil, treetest.Font(t), nil)
-	apptest.On(k.a, func() bool { k.p.region = region; return true })
+	apptest.On(k.a, func() bool { k.p.region, k.p.gate = region, gate; return true })
 	return &regionRig{keyRig: k, gate: gate, region: region}
 }
 
@@ -452,4 +452,135 @@ func within[T any](t *testing.T, what string, fn func() T) T {
 	answered := make(chan T, 1)
 	go func() { answered <- fn() }()
 	return apptest.Answer(t, what, answered)
+}
+
+func redFrames(a *app.Application) (map[string]render.StillImage, error) {
+	frame := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for i := 0; i < len(frame.Pix); i += 4 {
+		frame.Pix[i], frame.Pix[i+3] = 0xff, 0xff
+	}
+	return apptest.On(a, func() map[string]render.StillImage {
+		frames := map[string]render.StillImage{}
+		for _, out := range a.Session().Outputs() {
+			frames[out.Name] = render.NewStillImage(frame)
+		}
+		return frames
+	}), nil
+}
+
+func openOverlay(t *testing.T, a *app.Application, gate *regionoverlay.Gate) (end func()) {
+	t.Helper()
+	keytest.Dial(t, a)
+	region := regionoverlay.New(a, gate, a.Session().Outputs, nil, treetest.Font(t), nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	answered := make(chan error, 1)
+	go func() {
+		_, _, err := region.Request(ctx, func() (map[string]render.StillImage, error) { return redFrames(a) })
+		answered <- err
+	}()
+	apptest.Until(t, a, "the overlay took the keyboard", func() bool { return a.Session().KeyboardFocus() != nil })
+	return func() {
+		t.Helper()
+		cancel()
+		if err := apptest.Answer(t, "the session ended", answered); err != nil {
+			t.Fatalf("the session answered %v", err)
+		}
+	}
+}
+
+func TestHeadlessOutputPreviewsWaitOutTheOverlay(t *testing.T) {
+	a := apptest.Run(t)
+	p, _ := headlessPicker(t, a, config.SharePickerOutputs)
+	end := openOverlay(t, a, p.gate)
+	windows := make(chan struct{}, len(fiveWindows))
+	p.windowPreview = func(sharepreview.Toplevel, int) (*image.RGBA, error) {
+		windows <- struct{}{}
+		return image.NewRGBA(image.Rect(0, 0, 8, 8)), nil
+	}
+	outputs := make(chan string, 2)
+	p.outputPreview = func(name string, _ int) (*image.RGBA, error) {
+		outputs <- name
+		return image.NewRGBA(image.Rect(0, 0, 8, 8)), nil
+	}
+	answers := make(chan string, 1)
+	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/over"}, Request{Sources: AllSources}) }()
+	for range fiveWindows {
+		apptest.Answer(t, "a window preview during the session", windows)
+	}
+	apptest.Never(t, "an output preview during the session", outputs)
+	end()
+	got := []string{apptest.Answer(t, "the first output preview", outputs), apptest.Answer(t, "the second output preview", outputs)}
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"DP-1", "DP-2"}) {
+		t.Fatalf("the previews after the session captured %v", got)
+	}
+	p.Dismiss("/r/over")
+	apptest.Answer(t, "the dismissed request", answers)
+}
+
+func TestHeadlessPreviewsWaitingEndWithTheirRequest(t *testing.T) {
+	a := apptest.Run(t)
+	p, _ := headlessPicker(t, a, config.SharePickerOutputs)
+	end := openOverlay(t, a, p.gate)
+	captured := make(chan string, 2)
+	p.outputPreview = func(name string, _ int) (*image.RGBA, error) {
+		captured <- name
+		return image.NewRGBA(image.Rect(0, 0, 8, 8)), nil
+	}
+	p.windowPreview = func(sharepreview.Toplevel, int) (*image.RGBA, error) {
+		return image.NewRGBA(image.Rect(0, 0, 8, 8)), nil
+	}
+	answers := make(chan string, 1)
+	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/gone"}, Request{Sources: AllSources}) }()
+	apptest.Until(t, a, "the picker mapped", func() bool { return p.layer != nil })
+	p.Dismiss("/r/gone")
+	apptest.Answer(t, "the dismissed request", answers)
+	end()
+	apptest.Never(t, "a capture for the request that ended", captured)
+}
+
+func showsRed(img *image.RGBA) bool {
+	for i := 0; i < len(img.Pix); i += 4 {
+		if img.Pix[i] > 0x20 && img.Pix[i+1] == 0 && img.Pix[i+2] == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func TestHeadlessOutputThumbShowsNoOverlay(t *testing.T) {
+	a := apptest.Run(t)
+	apptest.Until(t, a, "an output appeared", func() bool { return len(a.Session().Outputs()) > 0 })
+	name := apptest.On(a, func() string { return a.Session().Outputs()[0].Name })
+	gate := &regionoverlay.Gate{}
+	end := openOverlay(t, a, gate)
+	var during *image.RGBA
+	for deadline := time.Now().Add(10 * time.Second); during == nil || !showsRed(during); {
+		if time.Now().After(deadline) {
+			t.Fatal("a capture during the session never showed the overlay's frame")
+		}
+		var err error
+		if during, err = outputThumb(name, 64); err != nil {
+			t.Fatalf("the capture during the session failed: %v", err)
+		}
+	}
+	type thumb struct {
+		img *image.RGBA
+		err error
+	}
+	thumbs := make(chan thumb, 1)
+	go func() {
+		img, err := regionoverlay.BackgroundCapture(context.Background(), gate, func() (*image.RGBA, error) { return outputThumb(name, 64) })
+		thumbs <- thumb{img, err}
+	}()
+	apptest.Never(t, "a thumbnail during the session", thumbs)
+	end()
+	got := apptest.Answer(t, "the thumbnail after the session", thumbs)
+	if got.err != nil {
+		t.Fatalf("the thumbnail failed: %v", got.err)
+	}
+	if showsRed(got.img) {
+		t.Fatal("the thumbnail shows the overlay's frame")
+	}
 }

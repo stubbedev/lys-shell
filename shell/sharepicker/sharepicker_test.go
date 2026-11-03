@@ -32,6 +32,7 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	full.Animations.Enabled = false
 	p := &Picker{
 		d:      Deps{Config: func() *config.Config { return full }, Font: treetest.Font(t)},
+		gate:   &regionoverlay.Gate{},
 		invoke: func(func()) {},
 		windows: func() []sharepreview.Toplevel {
 			return []sharepreview.Toplevel{{ID: 0, Class: "foot", Title: "a", Identifier: "id-a"}, {ID: 1, Class: "kitty", Title: " "}}

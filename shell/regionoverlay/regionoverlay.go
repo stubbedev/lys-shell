@@ -249,16 +249,8 @@ func (o *Overlay) open(frames map[string]render.StillImage) {
 	for i, out := range outs {
 		mon := o.monitors[i]
 		a := &area{o: o, mon: mon, frame: frames[mon.Connector]}
-		layer, err := o.app.NewLayer(app.LayerConfig{
-			Output:        out,
-			Layer:         app.LayerOverlay,
-			Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
-			ExclusiveZone: -1,
-			Keyboard:      app.KeyboardExclusive,
-			Namespace:     "lys-shell-region-overlay",
-			Root:          o.surfaceRoot(a),
-			OnKey:         keys.OnKey(o.app.KeySym, func(_ *widget.Router, sym xkb.Keysym, mods app.Mods) { o.key(sym, mods) }),
-		})
+		layer, err := OpenSurface(o.app, out, "lys-shell-region-overlay", o.surfaceRoot(a),
+			keys.OnKey(o.app.KeySym, func(_ *widget.Router, sym xkb.Keysym, mods app.Mods) { o.key(sym, mods) }))
 		if err != nil {
 			log.Printf("region overlay: surface on %s: %v", mon.Connector, err)
 			continue

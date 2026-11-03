@@ -165,3 +165,88 @@ func TestCancelIsForItsOwnRequest(t *testing.T) {
 		t.Fatalf("the cancel answered %+v", r)
 	}
 }
+
+func TestBackgroundCaptureWaitsOutASession(t *testing.T) {
+	g := &Gate{}
+	s := openSession(context.Background(), g, nil)
+	reply := apptest.Answer(t, "the session opened", s.reply)
+	captured := make(chan int, 1)
+	got := make(chan int, 1)
+	go func() {
+		n, err := BackgroundCapture(context.Background(), g, func() (int, error) { captured <- 1; return 1, nil })
+		if err != nil {
+			t.Errorf("the capture failed: %v", err)
+		}
+		got <- n
+	}()
+	apptest.Never(t, "a capture during the session", captured)
+	reply <- 7
+	apptest.Answer(t, "the session answered", s.answer)
+	apptest.Answer(t, "the capture after the session", captured)
+	if n := apptest.Answer(t, "the capture's answer", got); n != 1 {
+		t.Fatalf("the capture answered %d", n)
+	}
+}
+
+func TestBackgroundCaptureGivesWayToASession(t *testing.T) {
+	g := &Gate{}
+	running, release := make(chan int, 2), make(chan struct{})
+	captures := 0
+	got := make(chan int, 1)
+	go func() {
+		n, err := BackgroundCapture(context.Background(), g, func() (int, error) {
+			captures++
+			running <- captures
+			if captures == 1 {
+				<-release
+			}
+			return captures, nil
+		})
+		if err != nil {
+			t.Errorf("the capture failed: %v", err)
+		}
+		got <- n
+	}()
+	apptest.Answer(t, "the first capture ran", running)
+	s := openSession(context.Background(), g, nil)
+	reply := apptest.Answer(t, "the session opened during the capture", s.reply)
+	close(release)
+	apptest.Never(t, "a second capture during the session", running)
+	apptest.Never(t, "the capture's answer during the session", got)
+	reply <- 1
+	if a := apptest.Answer(t, "the session answered", s.answer); a.err != nil {
+		t.Fatalf("the session answered %v", a.err)
+	}
+	apptest.Answer(t, "the second capture ran", running)
+	if n := apptest.Answer(t, "the capture's answer", got); n != 2 {
+		t.Fatalf("the capture answered capture %d, want the one after the session", n)
+	}
+}
+
+func TestBackgroundCaptureEndsWithItsContext(t *testing.T) {
+	g := &Gate{}
+	s := openSession(context.Background(), g, nil)
+	reply := apptest.Answer(t, "the session opened", s.reply)
+	ctx, cancel := context.WithCancel(context.Background())
+	failed := make(chan error, 1)
+	go func() {
+		_, err := BackgroundCapture(ctx, g, func() (int, error) {
+			t.Error("a capture ran for an ended context")
+			return 0, nil
+		})
+		failed <- err
+	}()
+	cancel()
+	if err := apptest.Answer(t, "the ended capture", failed); !errors.Is(err, context.Canceled) {
+		t.Fatalf("the capture answered %v, want its context's error", err)
+	}
+	reply <- 1
+	apptest.Answer(t, "the session answered", s.answer)
+}
+
+func TestBackgroundCaptureFailure(t *testing.T) {
+	failed := errors.New("no compositor")
+	if _, err := BackgroundCapture(context.Background(), &Gate{}, func() (int, error) { return 0, failed }); !errors.Is(err, failed) {
+		t.Fatalf("answered %v", err)
+	}
+}

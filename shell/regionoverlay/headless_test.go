@@ -187,6 +187,19 @@ func TestHeadlessNewRequestAfterTheSessionEnded(t *testing.T) {
 	apptest.Answer(t, "the session after a dismissal", last)
 }
 
+func TestHeadlessClosingLeavesNothingPainting(t *testing.T) {
+	r := newRig(t)
+	answers := r.request(t, context.Background())
+	surfaces := apptest.On(r.a, func() []*app.LayerWindow { return slices.Clone(r.o.surfaces) })
+	r.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the region after Escape", answers)
+	for i, s := range surfaces {
+		if err := apptest.On(r.a, s.EnsureUsable); err == nil {
+			t.Errorf("surface %d still draws after the requester got its answer", i)
+		}
+	}
+}
+
 // within runs fn, failing the test with what if it does not return in
 // apptest.Answer's bound: a request wrongly admitted would block on its overlay.
 func within[T any](t *testing.T, what string, fn func() T) T {
