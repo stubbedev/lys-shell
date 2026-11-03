@@ -13,7 +13,7 @@ import (
 	shelllocales "github.com/stubbedev/lys-shell/i18n/locales/shell"
 )
 
-var ftlPlaceholder = regexp.MustCompile(`\{"[^"]+"\}|\{ *[$-]?[a-zA-Z][a-zA-Z0-9_.-]* *(->)? *\}?`)
+var ftlPlaceholder = regexp.MustCompile(`\{"[^"]*[^"\s][^"]*"\}|\{ *[$-]?[a-zA-Z][a-zA-Z0-9_.-]* *(->)? *\}?`)
 
 func catalogueKeys(t *testing.T, fsys fs.FS, locale string) map[string]string {
 	t.Helper()
