@@ -18,8 +18,10 @@ func (c *Connection) Events(ctx context.Context) (<-chan Event, error) {
 	if err != nil {
 		return nil, fmt.Errorf("hyprland: connect the event socket: %w", err)
 	}
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	out := make(chan Event, 64)
 	go func() {
+		defer stop()
 		defer func() { _ = conn.Close() }()
 		defer close(out)
 		scanner := bufio.NewScanner(conn)

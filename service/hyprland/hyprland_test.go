@@ -2,6 +2,7 @@ package hyprland
 
 import (
 	"bufio"
+	"context"
 	"net"
 	"path/filepath"
 	"strings"
@@ -338,5 +339,25 @@ func TestCommandNamesWhatItCouldNotConnectFor(t *testing.T) {
 	_, err := conn.Command("j/clients")
 	if err == nil || !strings.Contains(err.Error(), "j/clients") || !strings.Contains(err.Error(), "gone.sock") {
 		t.Errorf("error = %v, want the request and the socket", err)
+	}
+}
+
+func TestEventsCloseOnCancelWhileTheCompositorIsSilent(t *testing.T) {
+	conn := ConnectTo("", ipcsocktest.Silent(t))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	events, err := conn.Events(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Duration(ipcsocktest.Fast))
+	cancel()
+	select {
+	case _, open := <-events:
+		if open {
+			t.Fatal("an event from a silent compositor")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the channel stayed open after the cancel")
 	}
 }
