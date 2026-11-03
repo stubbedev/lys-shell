@@ -72,12 +72,17 @@ func savePanel(t *testing.T, data []byte, name string) {
 
 func alphaAt(data []byte, x, y int) byte { return data[(y*renderW+x)*4+3] }
 
+func useBundledIcons(t *testing.T) {
+	t.Helper()
+	widget.SetIconSearchPaths([]string{"../../resources/icons"})
+	widget.SetIconNamespace(icons.IconsSubdir, icons.AllPrefixes())
+	t.Cleanup(func() { widget.SetIconSearchPaths(nil) })
+}
+
 // The panel paints where it says it is and leaves the rest of the output
 // clear, in each state a person meets.
 func TestPanelPaintsOnlyThePanel(t *testing.T) {
-	widget.SetIconSearchPaths([]string{"../../resources/icons"})
-	widget.SetIconNamespace(icons.IconsSubdir, icons.AllPrefixes())
-	defer widget.SetIconSearchPaths(nil)
+	useBundledIcons(t)
 	for _, name := range []string{"ld-search-symbolic", "ld-link-symbolic", "ld-external-link-symbolic", "ld-calculator-symbolic", "ld-globe-symbolic"} {
 		if !widget.ThemeIconExists(name) {
 			t.Errorf("the bundle has no %s", name)
@@ -303,6 +308,7 @@ func TestWholeKeystrokeAllocations(t *testing.T) {
 	if raceEnabled {
 		t.Skip("the race detector allocates")
 	}
+	useBundledIcons(t)
 	h := newPanelHarness(t)
 	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
 	p, _ := h.openPanel()
@@ -310,6 +316,17 @@ func TestWholeKeystrokeAllocations(t *testing.T) {
 	h.typed(p, "alpha")
 	h.waitTitles(p, "Alpha Docs", "Alpha Issues", webRow("alpha"))
 	paintPanel(p, data)
+	h.until("the rows' icons", func() bool { return len(p.v.list.waiting) == 0 })
+	paintPanel(p, data)
+	shown := 0
+	for _, r := range p.v.list.pool {
+		if r.icon.shown != "" {
+			shown++
+		}
+	}
+	if want := len(p.rowTitles()); shown != want {
+		t.Fatalf("%d icons shown for %d rows", shown, want)
+	}
 	first := slices.Clone(p.frame.Rows)
 	frame := search.Frame{Query: "alpha", Rows: first}
 	other := search.Frame{Query: "alph", Rows: first}
