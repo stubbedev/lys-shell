@@ -185,10 +185,25 @@ jobs:
             - name: The shell on a live Hyprland
               run: nix build -L --accept-flake-config .#checks.x86_64-linux.lys-shell-hyprland-vm
 
+    lys-wm-vm:
+        name: lys-wm VM
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+              with:
+                github-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: The shell on a live lys-wm
+              run: nix build -L --accept-flake-config .#checks.x86_64-linux.lys-shell-lys-wm-vm
+
     ci-status:
         name: CI Status
         if: always()
-        needs: [check, race, package, rpm, nix, hyprland-vm]
+        needs: [check, race, package, rpm, nix, hyprland-vm, lys-wm-vm]
         runs-on: ubuntu-latest
         steps:
             - name: Check results
@@ -198,7 +213,8 @@ jobs:
                         "${{ needs.package.result }}" != "success" || \
                         "${{ needs.rpm.result }}" != "success" || \
                         "${{ needs.nix.result }}" != "success" || \
-                        "${{ needs.hyprland-vm.result }}" != "success" ]]; then
+                        "${{ needs.hyprland-vm.result }}" != "success" || \
+                        "${{ needs.lys-wm-vm.result }}" != "success" ]]; then
                     echo "One or more checks did not pass"
                     exit 1
                   fi
