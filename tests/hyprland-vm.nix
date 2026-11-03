@@ -31,44 +31,35 @@ let
   uid = 1000;
   runtimeDir = "/run/user/${toString uid}";
 
-  hyprConf = pkgs.writeText "hyprland-vm.conf" ''
-    monitor = Virtual-1, 1280x800, 0x0, 1
-    monitor = HEADLESS-2, 1024x768, 1280x0, 1
-    monitor = , preferred, auto, 1
+  hyprLua = pkgs.writeText "hyprland-vm.lua" ''
+    hl.monitor({ output = "Virtual-1", mode = "1280x800", position = "0x0", scale = 1 })
+    hl.monitor({ output = "HEADLESS-2", mode = "1024x768", position = "1280x0", scale = 1 })
+    hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 
-    animations {
-        enabled = 0
-    }
-    input {
-        kb_layout = us,de
-        repeat_delay = 5000
-    }
-    decoration {
-        rounding = 0
-        shadow {
-            enabled = false
-        }
-    }
-    misc {
-        disable_splash_rendering = true
-        force_default_wallpaper = 0
-        allow_session_lock_restore = true
-    }
-    debug {
-        disable_logs = false
-    }
+    hl.config({
+      animations = { enabled = false },
+      input = { kb_layout = "us,de", repeat_delay = 2000 },
+      decoration = { rounding = 0, shadow = { enabled = false } },
+      misc = {
+        disable_splash_rendering = true,
+        force_default_wallpaper = 0,
+        allow_session_lock_restore = true,
+      },
+      debug = { disable_logs = false },
+    })
 
-    workspace = 1, monitor:Virtual-1
-    workspace = 2, monitor:Virtual-1
-    workspace = 3, monitor:HEADLESS-2
+    hl.workspace_rule({ workspace = "1", monitor = "Virtual-1" })
+    hl.workspace_rule({ workspace = "2", monitor = "Virtual-1" })
+    hl.workspace_rule({ workspace = "3", monitor = "HEADLESS-2" })
 
-    submap = resize
-    binde = , right, resizeactive, 10 0
-    bind = , escape, submap, reset
-    submap = reset
+    hl.define_submap("resize", function()
+      hl.bind("escape", hl.dsp.submap("reset"))
+    end)
 
-    exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE && systemctl --user start hyprland-vm-session.target
-    exec-once = lys-shell shell > /tmp/lys/shell.log 2>&1
+    hl.on("hyprland.start", function()
+      hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE && systemctl --user start hyprland-vm-session.target")
+      hl.exec_cmd("lys-shell shell > /tmp/lys/shell.log 2>&1")
+    end)
   '';
 
   inherit (import ./vm-tools.nix { inherit pkgs self; }) vmclick portalClient testApp;
@@ -146,7 +137,7 @@ pkgs.testers.nixosTest {
         "d /home/${user}/.config 0755 ${user} users -"
         "d /home/${user}/.config/hypr 0755 ${user} users -"
         "d /home/${user}/.config/lys-shell 0755 ${user} users -"
-        "L+ /home/${user}/.config/hypr/hyprland.conf - - - - ${hyprConf}"
+        "L+ /home/${user}/.config/hypr/hyprland.lua - - - - ${hyprLua}"
         "C /home/${user}/.config/lys-shell/config.yaml 0644 ${user} users - ${shellConfig}"
       ];
       hardware.graphics.enable = true;
@@ -215,8 +206,19 @@ pkgs.testers.nixosTest {
     def hypr(args):
         return machine.succeed(f"su - ${user} -c '{env} hyprctl {args}'")
 
+    def dispatch(lua):
+        escaped = lua.replace('"', '\\"')
+        reply = hypr(f'dispatch "{escaped}"').strip()
+        if reply != "ok":
+            raise Exception(f"dispatch {lua} answered {reply}")
+
     def hypr_json(args):
         return json.loads(hypr(f"-j {args}"))
+
+    print(hypr("version"))
+    config_errors = hypr("configerrors").strip()
+    if config_errors:
+        raise Exception(f"Hyprland rejected the config: {config_errors}")
 
     def namespaces():
         found = []
@@ -259,25 +261,25 @@ pkgs.testers.nixosTest {
 
     # Workspaces: windows on 1 and 3, the view on 2, a special
     # workspace toggled over the first output.
-    hypr('dispatch exec "[workspace 1 silent] foot"')
-    hypr('dispatch exec "[workspace 3 silent] foot"')
+    dispatch('hl.dsp.exec_cmd("foot", { workspace = "1 silent" })')
+    dispatch('hl.dsp.exec_cmd("foot", { workspace = "3 silent" })')
     wait("two windows", lambda: len(hypr_json("clients")) == 2, tries=60)
-    hypr("dispatch workspace 2")
+    dispatch("hl.dsp.focus({ workspace = 2 })")
     time.sleep(1)
     machine.screenshot("02-workspace-2")
-    hypr("dispatch workspace 1")
-    hypr("dispatch togglespecialworkspace scratch")
+    dispatch("hl.dsp.focus({ workspace = 1 })")
+    dispatch('hl.dsp.workspace.toggle_special("scratch")')
     time.sleep(1)
     machine.screenshot("03-special-workspace")
-    hypr("dispatch togglespecialworkspace scratch")
+    dispatch('hl.dsp.workspace.toggle_special("scratch")')
 
     # The keyboard layout and keybind mode modules follow the
     # compositor.
     hypr("switchxkblayout all next")
-    hypr("dispatch submap resize")
+    dispatch('hl.dsp.submap("resize")')
     time.sleep(1)
     machine.screenshot("04-layout-de-and-resize-submap")
-    hypr("dispatch submap reset")
+    dispatch('hl.dsp.submap("reset")')
     hypr("switchxkblayout all prev")
 
     # The launcher maps its layer and Escape closes it.
@@ -374,7 +376,7 @@ pkgs.testers.nixosTest {
         shell(f"toast --duration 4000 {word}")
         machine.succeed(f"su - ${user} -c '{env} notify-send {word}'")
 
-    hypr("dispatch focusmonitor HEADLESS-2")
+    dispatch('hl.dsp.focus({ monitor = "HEADLESS-2" })')
     toast_and_notify("Primary")
     wait("the OSD", lambda: "lys-shell-osd" in namespaces())
     wait("the popup", lambda: "lys-shell-notification-popup" in namespaces())
@@ -390,7 +392,7 @@ pkgs.testers.nixosTest {
     machine.screenshot("06e-osd-and-popup-on-configured-output")
     shell("config reset osd.monitor")
     shell("config reset modules.notifications.popup-monitor")
-    hypr("dispatch focusmonitor Virtual-1")
+    dispatch('hl.dsp.focus({ monitor = "Virtual-1" })')
 
     # The colour picker answers the portal's PickColor with the colour
     # under the click.
@@ -421,7 +423,7 @@ pkgs.testers.nixosTest {
     listed = [line.split(" -> ")[0].strip() for line in hypr("globalshortcuts").splitlines() if "lys-vm-test" in line]
     if len(listed) != 1:
         raise Exception(f"the compositor lists {listed} for the bound shortcut")
-    hypr(f"dispatch global {listed[0]}")
+    dispatch(f'hl.dsp.global("{listed[0]}")')
     wait("the shortcut's activation", lambda: machine.execute("grep -q activated /tmp/lys/shortcuts.json")[0] == 0, tries=30)
 
     def logged(log, line):
@@ -493,7 +495,7 @@ pkgs.testers.nixosTest {
     # A shell restarted while locked leaves the lock to the lys-login
     # holding it, which outlives the shell.
     machine.succeed("pkill -KILL -f 'lys-shell shell'")
-    hypr('dispatch exec "lys-shell shell > /tmp/lys/shell2.log 2>&1"')
+    dispatch('hl.dsp.exec_cmd("lys-shell shell > /tmp/lys/shell2.log 2>&1")')
     wait("the restarted shell to find the lock held", lambda: logged("shell2", "re-acquiring") and logged("shell2", "another lys-login already holds the session locked"))
     machine.screenshot("10-locked-after-a-shell-restart")
     machine.send_chars("${password}\n")
