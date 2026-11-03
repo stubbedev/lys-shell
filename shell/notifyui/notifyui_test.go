@@ -9,6 +9,8 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -201,5 +203,37 @@ func TestGroupBy(t *testing.T) {
 	}
 	if len(GroupBy(nil, AppKey)) != 0 {
 		t.Error("no notifications made groups")
+	}
+}
+
+// Who delivered a notification is no heading: notify-send and the shell's
+// own name show as the system, under one group.
+func TestDeliverersShowAsTheSystem(t *testing.T) {
+	system := i18n.T("notification-source-system")
+	if system == "" || system == "notification-source-system" {
+		t.Fatalf("the system's name is not translated: %q", system)
+	}
+	for _, name := range []string{"notify-send", version.Name} {
+		if got := AppLabel(name); got != system {
+			t.Errorf("AppLabel(%q) = %q, want %q", name, got, system)
+		}
+	}
+	base := time.Unix(1000, 0)
+	groups := GroupBy([]*notifications.Notification{
+		{ID: 1, AppName: "notify-send", Added: base},
+		{ID: 2, AppName: version.Name, Added: base.Add(time.Second)},
+	}, AppKey)
+	if len(groups) != 1 || groups[0].Key != system || len(groups[0].Notifs) != 2 {
+		t.Errorf("groups %+v, want both under %q", groups, system)
+	}
+}
+
+// An app's own name is its heading, and no name stays no name for the
+// surfaces to call unknown.
+func TestOtherAppsKeepTheirNames(t *testing.T) {
+	for _, name := range []string{"firefox", "Notify-Send2", "lys-shell-extra", ""} {
+		if got := AppLabel(name); got != name {
+			t.Errorf("AppLabel(%q) = %q", name, got)
+		}
 	}
 }

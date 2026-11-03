@@ -28,6 +28,7 @@ import (
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/colorpicker"
@@ -192,7 +193,7 @@ func (h *Host) save(img *image.RGBA) (string, error) {
 		if h.Notify != nil {
 			h.Notify(n)
 		} else {
-			desktopnotify.Notify(version.Name, n.Summary, n.Body, n.Icon)
+			desktopnotify.Notify(i18n.T("notification-source-screenshot"), n.Summary, n.Body, n.Icon)
 		}
 	}
 	return path, nil

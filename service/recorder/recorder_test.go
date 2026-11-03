@@ -22,6 +22,7 @@ type hookLog struct {
 	mu      sync.Mutex
 	toasts  []string
 	notices []string
+	apps    []string
 }
 
 func (h *hookLog) hooks() recorder.Hooks {
@@ -31,8 +32,9 @@ func (h *hookLog) hooks() recorder.Hooks {
 			h.toasts = append(h.toasts, label)
 			h.mu.Unlock()
 		},
-		Notify: func(_, summary, body, _ string) {
+		Notify: func(app, summary, body, _ string) {
 			h.mu.Lock()
+			h.apps = append(h.apps, app)
 			h.notices = append(h.notices, summary+": "+body)
 			h.mu.Unlock()
 		},
@@ -187,6 +189,12 @@ func TestFailedStartsResetWithTheirReason(t *testing.T) {
 		}
 		if _, n := log.snapshot(); !strings.Contains(n[0], want) {
 			t.Errorf("%s: notice %q does not say %q", name, n[0], want)
+		}
+		log.mu.Lock()
+		app := log.apps[0]
+		log.mu.Unlock()
+		if want := i18n.T("notification-source-recorder"); app != want || app == "lys-shell" {
+			t.Errorf("%s: notified as %q, want %q", name, app, want)
 		}
 		engine.OpenErr, engine.StartErr = nil, nil
 		s.Start()

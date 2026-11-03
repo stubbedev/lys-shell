@@ -469,7 +469,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 		c.root.AddClass("urgency-bar")
 	}
 
-	appName := n.AppName
+	appName := notifyui.AppLabel(n.AppName)
 	if appName == "" {
 		appName = i18n.T("notification-popup-unknown-app")
 	}

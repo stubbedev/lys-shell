@@ -9,7 +9,6 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
 
@@ -142,14 +141,14 @@ func (n *btPairingNotifier) notify(req bluetooth.PairingRequest, display deviceD
 	body := btNotifyBody(req, display)
 	respond := btNotifyResponder(n.src, req)
 	if respond == nil {
-		if _, err := n.sender.Send(ctx, version.Name, title, body, "ld-bluetooth-symbolic"); err != nil {
+		if _, err := n.sender.Send(ctx, btText("notification-source-bluetooth"), title, body, "ld-bluetooth-symbolic"); err != nil {
 			log.Printf("bluetooth: pairing notification: %v", err)
 		}
 		return
 	}
 	ctx, cancel := context.WithTimeout(ctx, btAgentTimeout+5*time.Second)
 	defer cancel()
-	key, ok, err := n.sender.Ask(ctx, version.Name, title, body, "ld-bluetooth-symbolic", []desktopnotify.Action{
+	key, ok, err := n.sender.Ask(ctx, btText("notification-source-bluetooth"), title, body, "ld-bluetooth-symbolic", []desktopnotify.Action{
 		{Key: "deny", Label: btText("dropdown-bluetooth-deny")},
 		{Key: "allow", Label: btText("dropdown-bluetooth-allow")},
 	}, btAgentTimeout)

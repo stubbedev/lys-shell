@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -178,8 +179,21 @@ type Group struct {
 	Notifs []*notifications.Notification
 }
 
-// AppKey groups notifications by app name.
-func AppKey(n *notifications.Notification) string { return n.AppName }
+// notifySendName is what notify-send calls itself without -a.
+const notifySendName = "notify-send"
+
+// AppLabel is the name a notification goes by on screen. notify-send and
+// the shell's own name say who delivered it, not what it is about, so
+// those show as the system. Everything else is the app's own name.
+func AppLabel(appName string) string {
+	if appName == notifySendName || appName == version.Name {
+		return i18n.T("notification-source-system")
+	}
+	return appName
+}
+
+// AppKey groups notifications by the name they show under.
+func AppKey(n *notifications.Notification) string { return AppLabel(n.AppName) }
 
 // GroupBy is group_by_app over any key: one group per key, each newest
 // first, the groups ordered by their newest notification; ties keep the

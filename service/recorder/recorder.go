@@ -55,7 +55,6 @@ const (
 	savedIcon      = "ld-video-symbolic"
 	startToastMS   = 1000
 	stopToastMS    = 1500
-	notifyAppName  = version.Name
 	elapsedTick    = time.Second
 	outputDirPerms = 0o755
 )
@@ -346,7 +345,7 @@ func (s *State) Stop() {
 		if info, err := os.Stat(path); err == nil && info.Size() > 0 {
 			s.toast(i18n.T("recorder-toast-stopped"), toastIcon, stopToastMS)
 			if s.hooks.Notify != nil {
-				s.hooks.Notify(notifyAppName, i18n.T("recorder-notification-saved"), path, savedIcon)
+				s.hooks.Notify(i18n.T("notification-source-recorder"), i18n.T("recorder-notification-saved"), path, savedIcon)
 			}
 			return
 		}
@@ -429,7 +428,7 @@ func (s *State) toast(label, icon string, ms uint32) {
 func (s *State) showError(message string) {
 	s.toast(message, errorIcon, stopToastMS)
 	if s.hooks.Notify != nil {
-		s.hooks.Notify(notifyAppName, i18n.T("recorder-notification-failed"), message, errorIcon)
+		s.hooks.Notify(i18n.T("notification-source-recorder"), i18n.T("recorder-notification-failed"), message, errorIcon)
 	}
 }
 
