@@ -13,6 +13,7 @@ import (
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
+	"github.com/stubbedev/lys-shell/service/launcher/typetext"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/launcher"
 	"github.com/stubbedev/lys-shell/shell/settings"
@@ -56,6 +57,7 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 				}
 			}
 		},
+		Type:        typetext.Type,
 		OpenHistory: engine.OpenHistory,
 		OpenFrecency: func() (*search.Frecency, error) {
 			path, ok := search.FrecencyPath()

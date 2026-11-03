@@ -18,6 +18,7 @@ launcher-failed = { $what } failed: { $error }
 launcher-action-open = Open
 launcher-action-run = Run
 launcher-action-run-in-terminal = Run in Terminal
+launcher-action-type = Insert
 launcher-action-copy = Copy
 launcher-action-copy-url = Copy URL
 launcher-action-copy-name = Copy Name

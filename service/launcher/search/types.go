@@ -135,6 +135,8 @@ type (
 	Cancel struct{}
 	// Copy puts Text on the clipboard and ends the session.
 	Copy struct{ Text string }
+	// Type ends the session and enters Text in the window it leaves focused.
+	Type struct{ Text string }
 	// SetQuery replaces the search field's text.
 	SetQuery struct{ Text string }
 	// Push enters a level; Esc comes back.
@@ -151,6 +153,7 @@ type (
 func (Close) isOutcome()    {}
 func (Cancel) isOutcome()   {}
 func (Copy) isOutcome()     {}
+func (Type) isOutcome()     {}
 func (SetQuery) isOutcome() {}
 func (Push) isOutcome()     {}
 func (Replace) isOutcome()  {}

@@ -534,7 +534,7 @@ func TestTheEmbeddedEmojiTableLoads(t *testing.T) {
 		t.Error("grinning face missing from GTK's table")
 	}
 	m := NewEmoji()
-	if c, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateDefault{}, "").(launcher.ActionCopy); !ok || c.Text != emojis[0].Glyph {
+	if c, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateDefault{}, "").(launcher.ActionType); !ok || c.Text != emojis[0].Glyph {
 		t.Errorf("accept copies the glyph: %#v", c)
 	}
 }

@@ -457,7 +457,7 @@ func (e *Engine) pushActions(ctx context.Context, id string, loads *sync.WaitGro
 func (e *Engine) apply(ctx context.Context, o Outcome, loads *sync.WaitGroup) {
 	switch v := o.(type) {
 	case nil:
-	case Close, Copy:
+	case Close, Copy, Type:
 		e.deliver(func() { e.sink.Finish(o) })
 	case SetQuery:
 		// A query typed in an actions panel belongs to that panel: setting

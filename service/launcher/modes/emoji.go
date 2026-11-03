@@ -196,7 +196,7 @@ func readGzip(r io.Reader) ([]byte, error) {
 
 // emojiItem is the row for one emoji: the glyph and name shown, the
 // keywords invisible but matchable, and the glyph alone as its info so
-// an accept copies the emoji and not its name.
+// an accept enters the emoji and not its name.
 func emojiItem(e Emoji) launcher.Item {
 	glyph := e.Glyph
 	return launcher.Item{
@@ -206,7 +206,7 @@ func emojiItem(e Emoji) launcher.Item {
 	}
 }
 
-// EmojiMode picks an emoji by name; accept copies it (emoji.rs).
+// EmojiMode picks an emoji by name; accept enters it in the focused window.
 type EmojiMode struct {
 	emojis []Emoji
 }
@@ -226,13 +226,13 @@ func (m *EmojiMode) Load(context.Context) launcher.ModeState {
 	return launcher.ModeState{Items: items, Prompt: "emoji"}
 }
 
-// Activate copies the glyph.
+// Activate enters the glyph.
 func (m *EmojiMode) Activate(_ context.Context, target launcher.Target, _ launcher.ActivateKind, _ string) launcher.Action {
 	i, ok := target.Row()
 	if !ok || int(i) >= len(m.emojis) {
 		return launcher.ActionNothing{}
 	}
-	return launcher.ActionCopy{Text: m.emojis[i].Glyph}
+	return launcher.ActionType{Text: m.emojis[i].Glyph}
 }
 
 // AllowsCustom is false: typed text matching no emoji is not an emoji.

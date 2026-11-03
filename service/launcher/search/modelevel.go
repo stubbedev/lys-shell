@@ -37,6 +37,8 @@ func modeOutcome(mode launcher.Mode, title string, a launcher.Action) Outcome {
 		return Close{}
 	case launcher.ActionCopy:
 		return Copy{Text: v.Text}
+	case launcher.ActionType:
+		return Type{Text: v.Text}
 	case launcher.ActionSetInput:
 		return SetQuery{Text: v.Text}
 	case launcher.ActionReload:

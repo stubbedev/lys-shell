@@ -150,18 +150,21 @@ func fakeEmoji() []modes.Emoji {
 	}
 }
 
-func TestEmojiRowsSearchTheirKeywordsAndCopyTheGlyph(t *testing.T) {
+func TestEmojiRowsSearchTheirKeywordsAndEnterTheGlyph(t *testing.T) {
 	p := NewEmoji(fakeEmoji)
 	got := loaded(t, p)
 	if len(got) != 2 || got[1].Glyph != "🚀" || !strings.Contains(got[1].Keywords, "launch") {
 		t.Fatalf("rows %+v", got)
 	}
 	actions := p.Actions(got[1])
-	if c, ok := actions[0].Run(ctx).(Copy); !ok || c.Text != "🚀" {
-		t.Errorf("copy %+v", c)
+	if c, ok := actions[0].Run(ctx).(Type); !ok || c.Text != "🚀" {
+		t.Errorf("the default action %+v, want the glyph entered", actions[0].Run(ctx))
 	}
-	if c, ok := actions[1].Run(ctx).(Copy); !ok || c.Text != "rocket" {
-		t.Errorf("copy name %+v", c)
+	if c, ok := actions[1].Run(ctx).(Copy); !ok || c.Text != "🚀" {
+		t.Errorf("copy %+v", actions[1].Run(ctx))
+	}
+	if c, ok := actions[2].Run(ctx).(Copy); !ok || c.Text != "rocket" {
+		t.Errorf("copy name %+v", actions[2].Run(ctx))
 	}
 	if got := p.Spec(); got.MinQuery < 2 {
 		t.Errorf("one letter must not list emoji: %+v", got)

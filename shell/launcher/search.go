@@ -71,6 +71,8 @@ type panel struct {
 	thumbs      search.Thumbnailing
 	previewStop func()
 	previewFor  string
+	// afterClose runs once the surface has gone and the keyboard with it.
+	afterClose func()
 }
 
 // openPanel starts a search session.
@@ -493,6 +495,9 @@ func (p *panel) finish(o search.Outcome) {
 			p.s.d.Copy(v.Text)
 		}
 		frame.Selected = []launcheripc.Selected{{Index: 0, Text: v.Text}}
+	case search.Type:
+		p.afterClose = func() { p.s.typeOnceClosed(v.Text) }
+		frame.Selected = []launcheripc.Selected{{Index: 0, Text: v.Text}}
 	}
 	p.teardown()
 	p.sess.Reply(frame)
@@ -523,7 +528,12 @@ func (p *panel) teardown() {
 		return
 	}
 	win := p.win
-	p.v.motion.close(p.s.d.Config().Animations, win.Close)
+	p.v.motion.close(p.s.d.Config().Animations, func() {
+		win.Close()
+		if p.afterClose != nil {
+			p.afterClose()
+		}
+	})
 }
 
 // panelAction is what a panel key does.

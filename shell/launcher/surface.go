@@ -24,6 +24,11 @@ import (
 // dumpDebounce is how long -dump waits for the matches to settle.
 const dumpDebounce = 150 * time.Millisecond
 
+// typeSettle is what the compositor gets to hand the keyboard back to
+// the window under a closed surface: closing and typing go over separate
+// connections, so nothing orders them.
+const typeSettle = 40 * time.Millisecond
+
 // Window is the launcher's layer surface (*app.LayerWindow).
 type Window interface {
 	Close()
@@ -65,6 +70,8 @@ type Deps struct {
 	Vault func() engine.Mode
 	// Copy puts calc's result on the clipboard.
 	Copy func(text string)
+	// Type enters text in the focused window (typetext.Type).
+	Type func(text string) error
 	// OpenHistory opens the launch history (a test seam).
 	OpenHistory func() (*engine.History, error)
 	// Search is what the search panel's providers draw on.
@@ -108,6 +115,8 @@ type active struct {
 	cancel   context.CancelFunc
 	keys     []keyBinding
 	mouse    []mouseEntry
+	// afterClose runs once the surface has gone and the keyboard with it.
+	afterClose func()
 }
 
 // Surface is the launcher (shell/launcher/mod.rs): it serves the
@@ -343,6 +352,12 @@ func (s *Surface) onAction(act engine.Action) {
 			sel[i] = launcheripc.Selected{Index: x.Index, Text: x.Text}
 		}
 		s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameResult, Code: v.Code, Selected: sel, Filter: filter})
+	case engine.ActionType:
+		s.cur.afterClose = func() { s.typeOnceClosed(v.Text) }
+		s.end(&launcheripc.ServerFrame{
+			Type:     launcheripc.FrameResult,
+			Selected: []launcheripc.Selected{{Index: 0, Text: v.Text}}, Filter: filter,
+		})
 	case engine.ActionSetInput:
 		s.cur.views.entry.SetText(v.Text)
 	case engine.ActionCopy:
@@ -662,11 +677,38 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 	if a.win != nil {
 		// The surface plays its exit, then goes (hide_animated); a new
 		// session meanwhile opens its own.
-		reveal.Hide(a.views.rev, s.d.Config().Animations, config.AnimLauncher, a.win.Close)
+		reveal.Hide(a.views.rev, s.d.Config().Animations, config.AnimLauncher, func() {
+			a.win.Close()
+			if a.afterClose != nil {
+				a.afterClose()
+			}
+		})
 	}
 	clear(s.multi.picked)
 	s.model.update(nil, nil)
 	s.sel = -1
+}
+
+// typeOnceClosed enters text in the window the closed surface leaves
+// focused. A failure copies it instead, so the pick is not lost.
+func (s *Surface) typeOnceClosed(text string) {
+	if s.d.Type == nil {
+		return
+	}
+	s.d.After(typeSettle, func() {
+		go func() {
+			err := s.d.Type(text)
+			if err == nil {
+				return
+			}
+			log.Printf("launcher: cannot enter the pick, copying it instead: %v", err)
+			s.d.Invoke(func() {
+				if s.d.Copy != nil {
+					s.d.Copy(text)
+				}
+			})
+		}()
+	})
 }
 
 // scale is the device scale to decode icons for.

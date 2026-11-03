@@ -775,8 +775,8 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 	if c := h.s.cur.views.entry.Color(); c != 0 {
 		t.Errorf("the entry pins ink %#08x", uint32(c))
 	}
-	win, ok := root.(*widget.Box)
-	if !ok || win.Element() != "window" || !widget.HasClass(win, "launcher-window") {
+	win := h.s.cur.views.root
+	if root != widget.Widget(win) || win.Element() != "window" || !widget.HasClass(win, "launcher-window") {
 		t.Fatalf("root %T, want window.launcher-window", root)
 	}
 	if rev, ok := win.Children()[0].(*widget.Revealer); !ok || rev != h.s.cur.views.rev || !widget.HasClass(rev.Child(), "launcher-surface") {
@@ -894,4 +894,28 @@ func TestMaskedModeKeepsTheSecretFromHooks(t *testing.T) {
 	if e := h.s.cur.views.entry; e.Echo() != widget.EchoNormal || e.Text() != "" {
 		t.Errorf("after the secret: echo %v, text %q", e.Echo(), e.Text())
 	}
+}
+
+// A rofi session blurs behind its panel as the search panel does, and
+// only behind its panel: the shadow's gutter stays clear.
+// The rofi emoji mode enters its pick too.
+func TestAnEmojiModeEntersItsPick(t *testing.T) {
+	h := newHarness(t)
+	var typed []string
+	h.s.d.Type = func(text string) error {
+		h.s.d.Invoke(func() { typed = append(typed, text) })
+		return nil
+	}
+	mode := "emoji"
+	_, reply := h.open(launcheripc.SessionOptions{Mode: &mode}, false)
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() > 0 })
+	win := h.windows[0]
+	h.key("Return")
+	f := h.frame(reply)
+	if f.Type != launcheripc.FrameResult || len(f.Selected) != 1 || f.Selected[0].Text == "" {
+		t.Fatalf("frame %+v", f)
+	}
+	h.until("the surface closing", func() bool { return win.closed })
+	h.timers[len(h.timers)-1].fn()
+	h.until("the glyph typed", func() bool { return len(typed) == 1 && typed[0] == f.Selected[0].Text })
 }

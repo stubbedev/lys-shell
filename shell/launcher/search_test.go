@@ -945,3 +945,69 @@ func TestAFrameForTheSameRowLeavesItsPreviewLoading(t *testing.T) {
 	waiting.fn()
 	h.until("the text", func() bool { return p.v.text.Visible() && strings.Contains(p.v.text.Text(), "truly") })
 }
+
+// A selected row with nothing to load shows itself, never an empty pane;
+// one with content shows that instead.
+// A preview that fails to load says what the row is, and logs the rest.
+// The pane is its width whatever it shows: a large picture or a long line
+// neither squeezes the list nor runs past the panel.
+func emojiPanel(t *testing.T) (*panelHarness, *panel, <-chan launcheripc.ServerFrame, *[]string, *[]string) {
+	t.Helper()
+	h := newPanelHarness(t)
+	h.cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchEmoji}
+	var typed, copied []string
+	h.s.d.Type = func(text string) error {
+		h.s.d.Invoke(func() { typed = append(typed, text) })
+		return nil
+	}
+	h.s.d.Copy = func(text string) { copied = append(copied, text) }
+	p, reply := h.openPanel()
+	h.typed(p, "rocket")
+	h.until("the emoji", func() bool { return p.selectedTitle() == "rocket" })
+	return h, p, reply, &typed, &copied
+}
+
+// The glyph sits in the middle of its row, as an icon does.
+// Enter enters the emoji in the window the panel leaves focused, after
+// the surface has gone, and leaves the clipboard alone.
+func TestEnterTypesTheEmojiOnceTheSurfaceIsGone(t *testing.T) {
+	h, _, reply, typed, copied := emojiPanel(t)
+	win := h.harness.windows[len(h.harness.windows)-1]
+	h.key("Return")
+	f := h.frame(reply)
+	if f.Type != launcheripc.FrameResult || len(f.Selected) != 1 || f.Selected[0].Text != "🚀" {
+		t.Fatalf("frame %+v, want the glyph answered to the CLI", f)
+	}
+	h.until("the surface closing", func() bool { return win.closed })
+	if len(*typed) != 0 {
+		t.Fatalf("typed %q before the focus could return", *typed)
+	}
+	h.timers[len(h.timers)-1].fn()
+	h.until("the glyph typed", func() bool { return slices.Equal(*typed, []string{"🚀"}) })
+	if len(*copied) != 0 {
+		t.Errorf("copied %q: the clipboard is not what was asked for", *copied)
+	}
+}
+
+// The second action still copies, and enters nothing.
+func TestCtrlEnterCopiesTheEmojiInstead(t *testing.T) {
+	h, _, reply, typed, copied := emojiPanel(t)
+	h.key("Control+Return")
+	h.frame(reply)
+	h.until("the copy", func() bool { return slices.Equal(*copied, []string{"🚀"}) })
+	if len(*typed) != 0 {
+		t.Errorf("typed %q on a copy", *typed)
+	}
+}
+
+// A compositor that cannot take the keys keeps the pick on the clipboard.
+func TestAFailedTypeCopiesThePick(t *testing.T) {
+	h, _, reply, _, copied := emojiPanel(t)
+	h.s.d.Type = func(string) error { return errors.New("no virtual keyboard") }
+	win := h.harness.windows[len(h.harness.windows)-1]
+	h.key("Return")
+	h.frame(reply)
+	h.until("the surface closing", func() bool { return win.closed })
+	h.timers[len(h.timers)-1].fn()
+	h.until("the copy", func() bool { return slices.Equal(*copied, []string{"🚀"}) })
+}

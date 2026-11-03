@@ -68,9 +68,12 @@ type ActionSwitchMode struct{ Name string }
 // ActionSetInput replaces the query text.
 type ActionSetInput struct{ Text string }
 
-// ActionCopy puts Text on the clipboard and ends the session (calc,
-// emoji).
+// ActionCopy puts Text on the clipboard and ends the session (calc).
 type ActionCopy struct{ Text string }
+
+// ActionType ends the session and enters Text in the window it leaves
+// focused (emoji).
+type ActionType struct{ Text string }
 
 // ActionExit ends the session with an exit code and the accepted rows
 // (dmenu), forwarded to the waiting CLI.
@@ -87,6 +90,7 @@ func (ActionReload) isAction()     {}
 func (ActionSwitchMode) isAction() {}
 func (ActionSetInput) isAction()   {}
 func (ActionCopy) isAction()       {}
+func (ActionType) isAction()       {}
 func (ActionExit) isAction()       {}
 
 // ModeState is everything the surface needs to render a mode's list.

@@ -18,6 +18,7 @@ launcher-failed = { $what } a échoué : { $error }
 launcher-action-open = Ouvrir
 launcher-action-run = Exécuter
 launcher-action-run-in-terminal = Exécuter dans un terminal
+launcher-action-type = Insérer
 launcher-action-copy = Copier
 launcher-action-copy-url = Copier l'URL
 launcher-action-copy-name = Copier le nom

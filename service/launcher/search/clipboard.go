@@ -170,6 +170,7 @@ func (*Emoji) Actions(e Entry) []Action {
 		return nil
 	}
 	return []Action{
+		{Title: i18n.T("launcher-action-type"), Icon: "ld-keyboard-symbolic", Run: func(context.Context) Outcome { return Type{Text: em.Glyph} }},
 		copyAction(i18n.T("launcher-action-copy"), em.Glyph),
 		copyAction(i18n.T("launcher-action-copy-name"), em.Name),
 	}
