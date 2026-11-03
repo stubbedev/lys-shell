@@ -21,6 +21,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // Bucket is the coarse worktree state, mirroring treeman's bucket
@@ -355,14 +356,11 @@ func (s *System) consume(ctx context.Context) {
 	if !ok {
 		return
 	}
-	conn, err := dial(path)
+	conn, err := ipcsock.Standard.Stream(path, []byte(subscribeRequest))
 	if err != nil {
 		return
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := conn.Write([]byte(subscribeRequest)); err != nil {
-		return
-	}
 	lines := make(chan string, 8)
 	go readLines(conn, lines, ctx.Done())
 	timer := time.NewTimer(debounce)
