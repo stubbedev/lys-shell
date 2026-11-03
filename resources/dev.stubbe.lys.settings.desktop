@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=lys-shell Settings
+Name=Lys Settings
 GenericName=Shell Settings
 Comment=Configure the lys-shell desktop shell
 Exec=lys-settings
