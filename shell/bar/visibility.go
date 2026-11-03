@@ -106,7 +106,7 @@ func (b *barSet) sync(name string, entry *barEntry) {
 // serveShellIPC takes the application id (its quit action ends the
 // loop) and serves dev.stubbe.lys.Shell1 over bars, with lock as its Lock hook. A shell already owning
 // the id is logged: the single-instance check runs before RunWith.
-func serveShellIPC(application *app.Application, bars *barSet, lock func() bool) func() {
+func serveShellIPC(application *app.Application, bars *barSet, lock func() bool, dashboardToggle func(monitor string) error) func() {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("shell ipc: session bus: %v", err)
@@ -131,7 +131,8 @@ func serveShellIPC(application *app.Application, bars *barSet, lock func() bool)
 		// The VPN callback goes straight to the native sign-in, whose
 		// waiting browser sign-ins are process-wide, as the Rust
 		// daemon's are.
-		VPNSSOCallback: network.NativeSignIn.DeliverSSOCallback,
+		VPNSSOCallback:  network.NativeSignIn.DeliverSSOCallback,
+		DashboardToggle: dashboardToggle,
 	}); err == nil {
 		releases = append(releases, release)
 	} else {

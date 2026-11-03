@@ -410,6 +410,9 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		handler = h
 	}
 	btn := asBarButton(ctx, root)
+	if item.Module == "dashboard" && ctx.Dropdowns != nil {
+		ctx.Dropdowns.setDashboardAnchor(ctx.Connector, btn)
+	}
 	follower, _ := module.(interface {
 		followAction(action config.ClickAction, scroll bool)
 	})

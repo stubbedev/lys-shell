@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"errors"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
@@ -54,6 +57,44 @@ func TestPanelLifecycleCommands(t *testing.T) {
 	}
 	if stdout, _, _ := runCaptured(t, false, "panel", "status"); stdout != "Panel is not running\n" {
 		t.Errorf("status after stop: %q", stdout)
+	}
+}
+
+func TestPanelDashboard(t *testing.T) {
+	dbustest.Session(t)
+	if _, stderr, code := runCaptured(t, false, "panel", "dashboard"); code != 1 || stderr != "Error: Shell service not running. Start lys-shell shell first.\n" {
+		t.Errorf("shell down: %d %q", code, stderr)
+	}
+	var monitors []string
+	var mu sync.Mutex
+	release, err := shellipc.Serve(dbustest.SessionConn(t), shellipc.NewState(nil), shellipc.Hooks{
+		DashboardToggle: func(m string) error {
+			mu.Lock()
+			defer mu.Unlock()
+			monitors = append(monitors, m)
+			if m == "NOPE" {
+				return errors.New("no dashboard module in the bar on NOPE")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if stdout, stderr, code := runCaptured(t, false, "panel", "dashboard"); code != 0 || stdout != "" {
+		t.Errorf("toggle: %d %q %q", code, stdout, stderr)
+	}
+	if stdout, stderr, code := runCaptured(t, false, "panel", "dashboard", "DP-2"); code != 0 || stdout != "" {
+		t.Errorf("toggle on DP-2: %d %q %q", code, stdout, stderr)
+	}
+	if _, stderr, code := runCaptured(t, false, "panel", "dashboard", "NOPE"); code != 1 || !strings.Contains(stderr, "no dashboard module") {
+		t.Errorf("refused: %d %q, want the shell's reason", code, stderr)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []string{"", "DP-2", "NOPE"}; !slices.Equal(monitors, want) {
+		t.Errorf("the shell was asked for %q, want %q", monitors, want)
 	}
 }
 

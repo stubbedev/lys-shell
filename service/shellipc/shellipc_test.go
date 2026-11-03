@@ -3,6 +3,7 @@ package shellipc
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
@@ -103,6 +104,44 @@ func TestShell1HooksAnswer(t *testing.T) {
 	}
 	if err := obj.Call(ServiceName+".VpnSsoCallback", 0, "globalprotectcallback:ok").Err; err != nil || uri.Load() != "globalprotectcallback:ok" {
 		t.Errorf("VpnSsoCallback: %v %q", err, uri.Load())
+	}
+}
+
+func TestShell1DashboardToggle(t *testing.T) {
+	dbustest.Session(t)
+	var monitor dbustest.Var[string]
+	release, err := Serve(dbustest.SessionConn(t), NewState(nil), Hooks{
+		DashboardToggle: func(m string) error {
+			monitor.Store(m)
+			if m == "NOPE" {
+				return errors.New("no dashboard module in the bar on NOPE")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	obj := dbustest.SessionConn(t).Object(ServiceName, ServicePath)
+	if err := obj.Call(ServiceName+".DashboardToggle", 0, "DP-1").Err; err != nil || monitor.Load() != "DP-1" {
+		t.Errorf("toggle: %v on %q", err, monitor.Load())
+	}
+	if err := obj.Call(ServiceName+".DashboardToggle", 0, "NOPE").Err; err == nil || !strings.Contains(err.Error(), "no dashboard module") {
+		t.Errorf("a refused toggle answered %v, want its reason", err)
+	}
+}
+
+func TestShell1DashboardToggleBeforeTheUI(t *testing.T) {
+	dbustest.Session(t)
+	release, err := Serve(dbustest.SessionConn(t), NewState(nil), Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	err = dbustest.SessionConn(t).Object(ServiceName, ServicePath).Call(ServiceName+".DashboardToggle", 0, "").Err
+	if err == nil || !strings.Contains(err.Error(), "not ready") {
+		t.Errorf("with no hook = %v, want not ready", err)
 	}
 }
 

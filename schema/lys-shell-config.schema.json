@@ -2309,7 +2309,7 @@
       ]
     },
     "DashboardConfig": {
-      "description": "Quick-access button with a distro icon; opens the dashboard dropdown.\n\nWhile it holds the keyboard, the arrow keys move between its controls,\nHome and End go to the first and the last, Return or Space press the\nfocused one, Escape closes it, and on a slider Left and Right change the\nvalue while Up and Down leave it.",
+      "description": "Quick-access button with a distro icon; opens the dashboard dropdown.\n\n`lys-shell panel dashboard` opens or closes it from a compositor bind, on\nthe focused monitor or the one named.\n\nWhile it holds the keyboard, the arrow keys move between its controls,\nHome and End go to the first and the last, Return or Space press the\nfocused one, Escape closes it, and on a slider Left and Right change the\nvalue while Up and Down leave it.",
       "properties": {
         "battery-critical": {
           "$ref": "#/$defs/float",

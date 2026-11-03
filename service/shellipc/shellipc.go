@@ -167,7 +167,8 @@ type Hooks struct {
 	Lock func() bool
 	// VPNSSOCallback hands a browser callback to a waiting sign-in;
 	// false means none is waiting.
-	VPNSSOCallback func(uri string) bool
+	VPNSSOCallback  func(uri string) bool
+	DashboardToggle func(monitor string) error
 }
 
 // daemon is the dev.stubbe.lys.Shell1 object (ShellIpcDaemon).
@@ -200,6 +201,16 @@ func (d *daemon) Lock() *dbus.Error {
 		return nil
 	}
 	return dbusx.Failed("lock screen not ready (shell UI not initialized)")
+}
+
+func (d *daemon) DashboardToggle(monitor string) *dbus.Error {
+	if d.hooks.DashboardToggle == nil {
+		return dbusx.Failed("dashboard not ready (shell UI not initialized)")
+	}
+	if err := d.hooks.DashboardToggle(monitor); err != nil {
+		return dbusx.Failed(err.Error())
+	}
+	return nil
 }
 
 // VpnSsoCallback delivers a browser sign-in callback.

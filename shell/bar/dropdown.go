@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -40,7 +41,8 @@ type dropdownRegistry struct {
 	// the scroll, a half-filled form) and its service subscriptions
 	// persist across open and close. A config change or a rebuild of
 	// the bars releases them.
-	instances map[string]widget.Widget
+	instances        map[string]widget.Widget
+	dashboardAnchors map[string]widget.Widget
 }
 
 // dropdownOpener is content that acts each time its popover opens
@@ -134,8 +136,40 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		openName: make(map[string]string),
 		monH:     make(map[string]int),
 
-		instances: make(map[string]widget.Widget),
+		instances:        make(map[string]widget.Widget),
+		dashboardAnchors: make(map[string]widget.Widget),
 	}
+}
+
+func (r *dropdownRegistry) setDashboardAnchor(connector string, anchor widget.Widget) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.dashboardAnchors[connector] = anchor
+}
+
+func (r *dropdownRegistry) toggleDashboard(connector, preferred string) error {
+	r.mu.Lock()
+	target := connector
+	if target == "" {
+		target = preferred
+		if _, ok := r.dashboardAnchors[target]; !ok {
+			target = ""
+			for name := range r.dashboardAnchors {
+				if target == "" || name < target {
+					target = name
+				}
+			}
+		}
+	}
+	anchor, ok := r.dashboardAnchors[target]
+	r.mu.Unlock()
+	if !ok {
+		if connector != "" {
+			return fmt.Errorf("no dashboard module in the bar on %s", connector)
+		}
+		return errors.New("no dashboard module in any bar")
+	}
+	return r.open(target, "dashboard", anchor)
 }
 
 // instance is name's content, built on first use with the registry's
@@ -210,6 +244,7 @@ func (r *dropdownRegistry) detachHost(connector string) {
 	delete(r.openPop, connector)
 	delete(r.openName, connector)
 	delete(r.monH, connector)
+	delete(r.dashboardAnchors, connector)
 	r.mu.Unlock()
 }
 
@@ -287,6 +322,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	var rev *widget.Revealer
 	cfg.Content, rev = dropdownTree(content, r.cfg)
 	cfg.Exit = dropdownExit(rev, r.cfg.Animations)
+	reveal.Show(rev, r.cfg.Animations, config.AnimDropdown)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -300,7 +336,6 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if o, ok := content.(dropdownOpener); ok {
 		o.dropdownOpened()
 	}
-	reveal.Show(rev, r.cfg.Animations, config.AnimDropdown)
 	r.mu.Lock()
 	r.openPop[connector] = pop
 	r.openName[connector] = name

@@ -493,6 +493,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
             [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('dashboard', 'dashboard', [CompletionResultType]::ParameterValue, 'Open or close the dashboard dropdown')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -541,6 +542,11 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'lys-shell;panel;dashboard' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'lys-shell;panel;help' {
             [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
             [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
@@ -551,6 +557,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
             [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('dashboard', 'dashboard', [CompletionResultType]::ParameterValue, 'Open or close the dashboard dropdown')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -579,6 +586,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;panel;help;toggle' {
+            break
+        }
+        'lys-shell;panel;help;dashboard' {
             break
         }
         'lys-shell;panel;help;help' {
@@ -1451,6 +1461,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
             [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('dashboard', 'dashboard', [CompletionResultType]::ParameterValue, 'Open or close the dashboard dropdown')
             break
         }
         'lys-shell;help;panel;start' {
@@ -1478,6 +1489,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;panel;toggle' {
+            break
+        }
+        'lys-shell;help;panel;dashboard' {
             break
         }
         'lys-shell;help;power' {

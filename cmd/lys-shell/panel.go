@@ -34,6 +34,7 @@ func panelCommand() *cli.Command {
 			{Name: "hide", About: "Hide the bar on a monitor", Args: monitor("hide"), Run: barVisibility("hide bar", "BarHide", "All bars hidden", "Bar hidden on ")},
 			{Name: "show", About: "Show the bar on a monitor", Args: monitor("show"), Run: barVisibility("show bar", "BarShow", "All bars shown", "Bar shown on ")},
 			{Name: "toggle", About: "Toggle bar visibility on a monitor", Args: monitor("toggle"), Run: barVisibility("toggle bar", "BarToggle", "All bars toggled", "Bar toggled on ")},
+			{Name: "dashboard", About: "Open or close the dashboard dropdown", Args: []*cli.Arg{{ID: "monitor", Help: `Monitor connector name (e.g., "DP-1"). Omit for the focused monitor`}}, Run: panelDashboard},
 		},
 	}
 }
@@ -200,6 +201,17 @@ func panelInspect(m *cli.Matches) error {
 	}
 	fmt.Fprintln(m.Stdout(), "Inspector opened")
 	return nil
+}
+
+func panelDashboard(m *cli.Matches) error {
+	conn, err := panelConnect()
+	if err != nil {
+		return err
+	}
+	p := &daemonProxy{label: "Shell", iface: shellipc.ServiceName, conn: conn, obj: conn.Object(shellipc.ServiceName, shellipc.ServicePath)}
+	defer p.Close()
+	monitor, _ := cli.Value[string](m, "monitor")
+	return p.call("toggle dashboard", "DashboardToggle", nil, monitor)
 }
 
 // barVisibility is hide.rs / show.rs / toggle.rs.

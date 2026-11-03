@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
@@ -900,6 +902,21 @@ func (v *dashboardView) systemStats() widget.Widget {
 	return card
 }
 
+func toggleDashboardOnLoop(application *app.Application, rt *barRuntime, monitor string, focused func() (string, bool)) error {
+	preferred := ""
+	if monitor == "" {
+		preferred, _ = focused()
+	}
+	done := make(chan error, 1)
+	application.Invoke(func() { done <- rt.ctx.Dropdowns.toggleDashboard(monitor, preferred) })
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(dashboardReadTimeout):
+		return fmt.Errorf("toggle the dashboard on %q: the shell did not answer in %v", monitor, dashboardReadTimeout)
+	}
+}
+
 var dashboardRootMount = []string{"/"}
 
 func dashboardGlyph(on bool, onIcon, offIcon string) string {
@@ -1061,6 +1078,8 @@ func (v *dashboardView) follow() {
 		}
 	}()
 }
+
+func (v *dashboardView) dropdownFocus() widget.Widget { return v.firstControl() }
 
 func (v *dashboardView) firstControl() widget.Widget {
 	if quick := focusablesUnder(v.quick, nil); len(quick) > 0 {

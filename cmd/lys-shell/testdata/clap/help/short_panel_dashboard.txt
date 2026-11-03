@@ -1,0 +1,9 @@
+Open or close the dashboard dropdown
+
+Usage: lys-shell panel dashboard [MONITOR]
+
+Arguments:
+  [MONITOR]  Monitor connector name (e.g., "DP-1"). Omit for the focused monitor
+
+Options:
+  -h, --help  Print help

@@ -16,6 +16,10 @@ lys-shell panel inspect
 lys-shell panel hide DP-1
 lys-shell panel show DP-1
 lys-shell panel toggle
+
+# Open or close the dashboard, on the focused monitor or the one named
+lys-shell panel dashboard
+lys-shell panel dashboard DP-1
 ```
 
 Read and edit config values from the command line:

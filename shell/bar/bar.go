@@ -526,6 +526,8 @@ func run(cfg *config.Config, svc *config.Service) error {
 	defer serveShellIPC(application, bars, func() bool {
 		locker.Lock()
 		return true
+	}, func(monitor string) error {
+		return toggleDashboardOnLoop(application, rt, monitor, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput)
 	})()
 	// The launcher surface serves `lys-shell launcher` sessions.
 	defer startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font)()
