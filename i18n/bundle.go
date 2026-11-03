@@ -60,6 +60,9 @@ func (e *entry) attribute(name string) *pattern {
 // (FluentBundle::format_pattern); resolution errors are swallowed the
 // way i18n-embed only logs them, leaving fluent's inline {...} markers.
 func (b *bundle) format(p *pattern, args map[string]value) string {
+	if len(p.elements) == 1 && p.elements[0].expr == nil {
+		return p.elements[0].text
+	}
 	s := &scope{bundle: b, args: args}
 	var out strings.Builder
 	s.writePattern(&out, p)

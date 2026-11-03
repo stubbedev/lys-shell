@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -260,5 +261,19 @@ func TestSelectFailsWithoutFallback(t *testing.T) {
 	m := fstest.MapFS{"fr/_a.ftl": {Data: []byte("x = y\n")}}
 	if _, err := Select(NewAssets(m), []LangID{MustLangID("fr")}); err == nil {
 		t.Fatal("a tree without en-US partials must fail to load")
+	}
+}
+
+func TestAMessageWithoutPlaceablesAllocatesNothing(t *testing.T) {
+	want := T("launcher-footer-close")
+	if strings.HasPrefix(want, "No localization") {
+		t.Fatalf("no message: %s", want)
+	}
+	var got string
+	if allocs := testing.AllocsPerRun(100, func() { got = T("launcher-footer-close") }); allocs > 0 {
+		t.Errorf("%v allocations for a message of plain text", allocs)
+	}
+	if got != want {
+		t.Errorf("T = %q, want %q", got, want)
 	}
 }
