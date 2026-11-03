@@ -526,9 +526,9 @@ func TestCwsSegmentMinSize(t *testing.T) {
 	}
 }
 
-// Down a side bar, as wide as its widest module, the segments span
-// the row's width, as they span its height across a top bar, and each
-// workspace's label sits centered in its segment.
+// Down a side bar, as wide as its widest module, the segments stay
+// circles centered across the row's width, and each workspace's label
+// sits centered in its segment.
 func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Bar.Location = config.LocationLeft
@@ -549,8 +549,8 @@ func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	data := make([]byte, render.Stride(size.W)*size.H)
 	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
 	box, seg := m.segs.Bounds(), m.segs.Segment(1).Bounds()
-	if seg.X != box.X || seg.W != box.W {
-		t.Errorf("segment %v in the row %v: want it spanning the row's width", seg, box)
+	if d := (seg.X + seg.W/2) - (box.X + box.W/2); d < -1 || d > 1 || seg.W != seg.H {
+		t.Errorf("segment %v in the row %v: want a circle centered across the row", seg, box)
 	}
 	occupied, _ := styling.ResolveColor(wcfg.OccupiedColor, palette)
 	left, right := seg.X+seg.W, seg.X
@@ -586,12 +586,12 @@ func TestCwsSegmentContent(t *testing.T) {
 	cfg := config.DefaultsNiriWorkspaces().View()
 	m := newTestCws(t, cfg, newFakeCws(nil, nil))
 	labelled := cwsButtonModel{label: "1", hasLabel: true}
-	if got := classesIn(m.segmentContent(labelled)); !slices.Contains(got, "workspace-label") || slices.Contains(got, "workspace-icons") || slices.Contains(got, "workspace-divider") {
+	if got := classesIn(m.segmentContent(labelled, m.measureCircle())); !slices.Contains(got, "workspace-label") || slices.Contains(got, "workspace-icons") || slices.Contains(got, "workspace-divider") {
 		t.Errorf("app icons off: content classes %v, want the label alone", got)
 	}
 	m.cfg.AppIconsShow = true
 	apps := cwsButtonModel{label: "1", hasLabel: true, appIcons: []cwsAppIcon{{name: "foot"}, {name: "firefox", urgent: true}}}
-	got := classesIn(m.segmentContent(apps))
+	got := classesIn(m.segmentContent(apps, m.measureCircle()))
 	for _, c := range []string{"workspace-label", "workspace-divider", "workspace-icons", "urgent"} {
 		if !slices.Contains(got, c) {
 			t.Errorf("app icons on: content classes %v miss %q", got, c)
@@ -600,16 +600,16 @@ func TestCwsSegmentContent(t *testing.T) {
 	if slices.Contains(got, "workspace-icon-empty") || strings.Count(strings.Join(got, " "), "workspace-icon ") != 2 {
 		t.Errorf("two apps: content classes %v, want their two icons and no empty one", got)
 	}
-	if got := classesIn(m.segmentContent(cwsButtonModel{label: "1", hasLabel: true})); !slices.Contains(got, "workspace-icon-empty") {
+	if got := classesIn(m.segmentContent(cwsButtonModel{label: "1", hasLabel: true}, m.measureCircle())); !slices.Contains(got, "workspace-icon-empty") {
 		t.Errorf("no apps: content classes %v, want the empty icon", got)
 	}
 	m.cfg.AppIconsShow = false
 	mapped := cwsButtonModel{label: "1", hasLabel: true, icon: "ld-globe-symbolic"}
-	if got := classesIn(m.segmentContent(mapped)); slices.Contains(got, "workspace-label") || !slices.Contains(got, "workspace-icon") {
+	if got := classesIn(m.segmentContent(mapped, m.measureCircle())); slices.Contains(got, "workspace-label") || !slices.Contains(got, "workspace-icon") {
 		t.Errorf("mapped icon: content classes %v, want the icon in the label's place", got)
 	}
 	mapped.flavor = cwsHyprland
-	if got := classesIn(m.segmentContent(mapped)); !slices.Contains(got, "workspace-custom-icon") || slices.Contains(got, "workspace-icon") {
+	if got := classesIn(m.segmentContent(mapped, m.measureCircle())); !slices.Contains(got, "workspace-custom-icon") || slices.Contains(got, "workspace-icon") {
 		t.Errorf("hyprland mapped icon: content classes %v, want the custom icon", got)
 	}
 }
@@ -753,35 +753,6 @@ func TestCwsFactoriesRequireTheirCompositor(t *testing.T) {
 	for _, name := range []string{"sway-workspaces", "niri-workspaces"} {
 		if _, err := Create(name, ctx); err == nil {
 			t.Errorf("%s without its compositor: want an error", name)
-		}
-	}
-}
-
-// The active workspace's fill covers its whole segment, the row's full
-// height with the bar buttons' rounding, not a pill inside it: a point
-// a quarter in from the left, a pixel under the top edge, is the same
-// fill as the segment's middle.
-func TestCwsActiveFillCoversTheSegment(t *testing.T) {
-	ctx := styledContext(t, config.Defaults())
-	ctx.Connector = "DP-1"
-	active := occupiedWS(1, 1, "DP-1")
-	active.active, active.focused = true, true
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1")}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	bar, size := cwsBar(t, ctx, m)
-	_, rest := paintCwsBar(m, bar, size)
-	data := make([]byte, render.Stride(size.W)*size.H)
-	bar.Paint(render.New(data, render.Stride(size.W), size.W, size.H))
-	seg, row := m.segs.Segment(0).Bounds(), m.segs.Bounds()
-	if seg.Y != row.Y || seg.H != row.H {
-		t.Errorf("the active segment %v, want the row's full height %v", seg, row)
-	}
-	fill := rest(0)
-	for _, p := range []widget.Point{{X: seg.X + seg.W/4, Y: seg.Y + 1}, {X: seg.X + seg.W/4, Y: seg.Y + seg.H - 2}} {
-		if got := pixelAt(data, size.W, p.X, p.Y); got != fill {
-			t.Errorf("at %v the segment paints %#08x, want its fill %#08x", p, uint32(got), uint32(fill))
 		}
 	}
 }

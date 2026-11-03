@@ -19,26 +19,36 @@
 }
 
 .workspace {
-  min-width: var(--bar-space-lg);
-  min-height: var(--bar-space-lg);
+  min-width: max(var(--bar-space-lg), var(--ws-circle));
+  min-height: max(var(--bar-space-lg), var(--ws-circle));
   background-color: transparent;
   transition: background-color var(--duration-fast);
 }
-segments.workspaces button.segment.workspace {
-  align-self: stretch;
-  border-radius: var(--bar-button-rounding-element);
+segments.workspaces > indicator {
+  border-radius: 9999px;
+  transition: background-color var(--duration-fast);
 }
-.workspace.indicator-background.active {
+segments.workspaces > indicator.indicator-background {
   background-color: var(--ws-override-color, var(--ws-active-color));
+}
+segments.workspaces > indicator.indicator-underline {
+  border-radius: 0;
+  background-image: linear-gradient(to top, var(--ws-override-color, var(--ws-active-color)) 2px, transparent 2px);
+}
+segments.workspaces > indicator.indicator-underline.vertical {
+  background-image: linear-gradient(to right, var(--ws-override-color, var(--ws-active-color)) 2px, transparent 2px);
+}
+segments.workspaces > indicator.urgent {
+  opacity: 0.5;
+}
+segments.workspaces > indicator.special {
+  opacity: 0.8;
 }
 .workspace.indicator-background.active-other-monitor {
   background-color: var(--ws-override-color, var(--ws-active-other-monitor-color));
 }
-.workspace.indicator-underline.active {
-  background-image: linear-gradient(to top, var(--ws-override-color, var(--ws-active-color)) 2px, transparent 2px);
-}
-.workspace.indicator-underline.active.vertical {
-  background-image: linear-gradient(to right, var(--ws-override-color, var(--ws-active-color)) 2px, transparent 2px);
+segments.workspaces button.segment.workspace.indicator-underline.active-other-monitor {
+  border-radius: 0;
 }
 .workspace.indicator-underline.active-other-monitor {
   background-image: linear-gradient(to top, var(--ws-override-color, var(--ws-active-other-monitor-color)) 2px, transparent 2px);

@@ -2,6 +2,7 @@ package bar
 
 import (
 	"slices"
+	"strconv"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
@@ -13,8 +14,9 @@ import (
 // which paints the box workspaces.css styles —
 //
 //	segments.workspaces.<kind>[.border-*]    (the --ws-* variables inline)
+//	├ indicator.indicator-<kind>[.vertical]  (the travelling active mark)
 //	└ button.segment.workspace.<state>[...]  (--ws-override-color inline)
-//	  └ box (workspace-padding)
+//	  └ [box (workspace-padding), for content past the circle]
 //	    └ box.workspace-content
 //	      ├ box: label.workspace-label, the mapped icon, label.workspace-divider
 //	      └ box.workspace-icons > image.workspace-icon...
@@ -33,20 +35,37 @@ func newCwsRow(m *cwsView) {
 	if c, ok := bar.ButtonBorderLocation.CSSClass(); ok && m.cfg.BorderShow {
 		m.segs.AddClass(c)
 	}
-	m.segs.SetInlineStyle(inlineDecls(styling.WorkspacesCSS(m.cfg, m.otherMonitor, bar)))
+	m.segs.SetInlineStyle(inlineDecls(styling.WorkspacesCSS(m.cfg, m.otherMonitor, bar)) + " --ws-circle: " + strconv.Itoa(m.measureCircle()) + "px;")
+	drop := m.segs.EnableDrop()
+	drop.AddClass(m.cfg.ActiveIndicator.CSSClass())
+	drop.SetClass("vertical", m.vertical())
+}
+
+func (m *cwsView) measureCircle() int {
+	digit := m.measureLabel("8")
+	return max(m.measureLabel("88").W, digit.W+2*m.paddingPx(), digit.H, m.iconPx())
+}
+
+func (m *cwsView) measureLabel(text string) widget.Size {
+	label := widget.NewLabel(m.boldFace, m.labelPx(), text, 0)
+	width := label.Measure(widget.Row, widget.Unknown).Nat
+	return widget.Size{W: width, H: label.Measure(widget.Column, width).Nat}
 }
 
 // setSegments shows one segment per model: the active one through
-// SetActive, its occupancy through SetSegmentState and its urgency
+// SetActive, or ShiftActive for the same workspace at a new index, its
+// occupancy through SetSegmentState and its urgency
 // through SetSegmentUrgent, then the model's classes, the
 // workspace-map color, and its content.
 func (m *cwsView) setSegments(models []cwsButtonModel) {
 	s := m.segs
+	previous, hadActive := m.shownActive()
+	circle := m.measureCircle()
 	s.SetCount(len(models))
 	for len(m.segClasses) < len(models) {
 		m.segClasses = append(m.segClasses, nil)
 	}
-	active := -1
+	active, activeOverride := -1, ""
 	for i, model := range models {
 		seg := s.Segment(i)
 		seg.RemoveClass(m.segClasses[i]...)
@@ -54,20 +73,44 @@ func (m *cwsView) setSegments(models []cwsButtonModel) {
 		s.SetSegmentUrgent(i, hasClass(model.classes, "urgent"))
 		m.segClasses[i] = slices.DeleteFunc(slices.Clone(model.classes), segmentOwned)
 		seg.AddClass(m.segClasses[i]...)
-		if hasClass(model.classes, "active") {
-			active = i
-		}
 		override := ""
 		if color, ok := cwsOverrideColor(model.classes, m.cfg.WorkspaceMap); ok {
 			override = "--ws-override-color: " + color.ToCSS() + ";"
 		}
+		if hasClass(model.classes, "active") {
+			active, activeOverride = i, override
+		}
 		seg.SetInlineStyle(override)
 		seg.SetOnPointer(func(e widget.PointerEvent) bool { return m.pointer(i, e) })
 		seg.SetOnScroll(m.scroll)
-		s.SetSegmentContent(i, m.segmentContent(model))
+		s.SetSegmentContent(i, m.segmentContent(model, circle))
 	}
-	s.SetActive(active)
+	if active >= 0 && hadActive && models[active].ws.id == previous {
+		s.ShiftActive(active)
+	} else {
+		s.SetActive(active)
+	}
+	m.dressDrop(models, active, activeOverride)
 	m.shown = models
+}
+
+func (m *cwsView) shownActive() (uint64, bool) {
+	i := m.segs.Active()
+	if i < 0 {
+		return 0, false
+	}
+	return m.shown[i].ws.id, true
+}
+
+func (m *cwsView) dressDrop(models []cwsButtonModel, active int, override string) {
+	var classes []string
+	if active >= 0 {
+		classes = models[active].classes
+	}
+	drop := m.segs.EnableDrop()
+	drop.SetInlineStyle(override)
+	drop.SetClass("urgent", hasClass(classes, "urgent") && !hasClass(classes, "urgent-application"))
+	drop.SetClass("special", hasClass(classes, "special"))
 }
 
 // segmentOwned reports a state class lys-ui's SegmentIndicator sets
@@ -85,10 +128,12 @@ func cwsSegmentState(model cwsButtonModel) widget.SegmentState {
 }
 
 // segmentContent is the button view!: the identity row (label, mapped
-// icon, divider) and the app-icon box, padded by workspace-padding
-// along the bar; lys-ui centers it in the segment. Their colors are
-// the stylesheet's.
-func (m *cwsView) segmentContent(model cwsButtonModel) widget.Widget {
+// icon, divider) and the app-icon box; lys-ui centers it in the
+// segment. Content that fits the circle stands alone. Content past it,
+// app icons, a divider or a long name, takes workspace-padding along
+// the bar and so makes the segment a pill of the same end radius.
+// Their colors are the stylesheet's.
+func (m *cwsView) segmentContent(model cwsButtonModel, circle int) widget.Widget {
 	cfg := m.cfg
 	vertical := m.vertical()
 	axis := widget.Row
@@ -99,12 +144,14 @@ func (m *cwsView) segmentContent(model cwsButtonModel) widget.Widget {
 	content.AddClass("workspace-content")
 
 	labelPx := m.labelPx()
+	fits := !cfg.AppIconsShow
 	if model.showLabel(cfg.DisplayMode) || model.showIcon(cfg.DisplayMode) || model.showDivider(cfg) {
 		identity := widget.NewBox(widget.Row, 0, 0)
 		if model.showLabel(cfg.DisplayMode) {
 			label := widget.NewLabel(m.boldFace, labelPx, model.label, 0)
 			label.AddClass("workspace-label")
 			identity.Append(label, false)
+			fits = fits && m.measureLabel(model.label).W <= circle
 		}
 		if model.showIcon(cfg.DisplayMode) {
 			icon := widget.NewThemeIcon(model.icon, m.iconPx())
@@ -139,6 +186,9 @@ func (m *cwsView) segmentContent(model cwsButtonModel) widget.Widget {
 			icons.Append(icon, false)
 		}
 		content.Append(icons, false)
+	}
+	if fits {
+		return content
 	}
 	pad := m.paddingPx()
 	padded := widget.NewBox(widget.Row, 0, 0)

@@ -445,7 +445,7 @@ func (m *hyprlandWorkspaces) render() {
 	for _, ws := range m.workspaces {
 		windows[ws.ID] = ws.Windows
 	}
-	m.models = m.models[:0]
+	m.models = make([]cwsButtonModel, 0, len(m.filtered))
 	for _, ws := range m.filtered {
 		isUrgent := m.blinkOn && m.cfg.UrgentShow && m.hasUrgentWindow(ws.id)
 		var urgentAddrs map[string]bool
