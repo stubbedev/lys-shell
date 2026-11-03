@@ -4,3 +4,25 @@
 .region-overlay-window .region-overlay-area {
   color: var(--palette-primary);
 }
+.region-overlay-legend {
+  padding: calc(10px * var(--global-scale)) calc(16px * var(--global-scale));
+  background-color: color-mix(in srgb, var(--palette-elevated) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg-default) 14%, transparent);
+  border-radius: calc(14px * var(--global-scale));
+  box-shadow: var(--shadow);
+  color: var(--fg-default);
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+.region-overlay-legend-text {
+  color: var(--fg-muted);
+}
+.region-overlay-key {
+  padding: calc(3px * var(--global-scale)) calc(7px * var(--global-scale));
+  background-color: color-mix(in srgb, var(--fg-default) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg-default) 22%, transparent);
+  border-bottom-width: 2px;
+  border-radius: calc(6px * var(--global-scale));
+  color: var(--fg-default);
+  font-weight: 600;
+}

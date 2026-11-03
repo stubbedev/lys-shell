@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -105,21 +106,27 @@ func pick(p image.Point, windows []image.Rectangle, mons []Monitor) (image.Recta
 
 // Paint constants of region_overlay/mod.rs's draw func.
 const (
-	// dimAlpha is the wash: rgba(0, 0, 0, 0.35).
-	dimAlpha    = 89
+	// dimAlpha is the wash: rgba(0, 0, 0, 0.45).
+	dimAlpha    = 115
 	borderWidth = 2
 	labelGap    = 4
-	// handleSize is the edge of the square handles on the corners and
+	// handleSize is the diameter of the round handles on the corners and
 	// edge midpoints of a selection up for adjustment.
-	handleSize = 7
-	hintMargin = 24
+	handleSize   = 11
+	legendMargin = 24
+	// keyIconPx is a keycap's icon.
+	keyIconPx = 16
 )
 
-// hintText tells how to finish once a selection is up for adjustment.
-const hintText = "Drag to adjust · Enter or double-click to confirm · Esc to cancel"
-
-// labelBacking is the pills' dark backing, rgba(0, 0, 0, 0.75).
+// labelBacking is the dark ring that keeps the selection's edge and
+// handles readable on any content, rgba(0, 0, 0, 0.75).
 var labelBacking = render.Color(191 << 24)
+
+// labelInk is the size label's text on its accent chip.
+var labelInk = render.RGB(0x11, 0x11, 0x1b)
+
+// handleCore is a handle's middle, inside its accent ring.
+var handleCore = render.RGB(0xff, 0xff, 0xff)
 
 // nudgeStep is how far an arrow key moves the selection; Shift moves
 // it nudgeStepShift.
@@ -173,6 +180,17 @@ func New(a *app.Application, outputs func() []*app.Output, windows func() []imag
 // .region-overlay-area, on the stylesheet.
 func (o *Overlay) surfaceRoot(a *area) widget.Widget {
 	a.AddClass("region-overlay-area")
+	if o.font != nil {
+		a.selecting = o.legend(legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-drag-select"},
+			legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-click-pick"},
+			legendItem{[]keyCap{{text: "Esc"}}, "region-overlay-cancel"})
+		a.adjust = o.legend(legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-drag-adjust"},
+			legendItem{[]keyCap{{icon: "ld-corner-down-left-symbolic"}}, "region-overlay-confirm"},
+			legendItem{[]keyCap{{icon: "ld-arrow-left-right-symbolic"}, {icon: "ld-arrow-up-down-symbolic"}}, "region-overlay-nudge"},
+			legendItem{[]keyCap{{text: "Esc"}}, "region-overlay-cancel"})
+		a.legends = []widget.Widget{a.selecting, a.adjust}
+		a.syncLegend()
+	}
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.SetElement("window")
 	root.AddClass("region-overlay-window")
@@ -318,8 +336,50 @@ func (o *Overlay) release() {
 
 func (o *Overlay) redraw() {
 	for _, a := range o.areas {
+		a.syncLegend()
 		a.Invalidate()
 	}
+}
+
+// keyCap is one key of a legend entry: an icon or the key's name.
+type keyCap struct{ icon, text string }
+
+// legendItem is one legend entry: its keys and the message saying what
+// they do.
+type legendItem struct {
+	keys []keyCap
+	does string
+}
+
+// legend is the row of keycaps and what each does.
+func (o *Overlay) legend(items ...legendItem) *widget.Box {
+	th := widget.Current()
+	px := widgets.TextPx(styling.Body, 1)
+	box := widget.NewBox(widget.Row, th.Spacing*3, 0)
+	box.AddClass("region-overlay-legend")
+	for _, it := range items {
+		entry := widget.NewBox(widget.Row, th.Spacing, 0)
+		for _, k := range it.keys {
+			entry.AppendAligned(o.keycap(k, px), false, widget.AlignCenter)
+		}
+		label := widget.NewLabel(o.font, px, i18n.T(it.does), 0)
+		label.AddClass("region-overlay-legend-text")
+		entry.AppendAligned(label, false, widget.AlignCenter)
+		box.AppendAligned(entry, false, widget.AlignCenter)
+	}
+	return box
+}
+
+func (o *Overlay) keycap(k keyCap, px float64) *widget.Box {
+	key := widget.NewBox(widget.Row, 0, 0)
+	key.AddClass("region-overlay-key")
+	if k.icon != "" {
+		key.AppendAligned(widget.NewThemeIconFallback(k.icon, keyIconPx), false, widget.AlignCenter)
+		return key
+	}
+	label := widget.NewLabel(o.font, px, k.text, 0)
+	key.AppendAligned(label, false, widget.AlignCenter)
+	return key
 }
 
 // area is one monitor's drawing area: the frozen frame (if any), the
@@ -330,6 +390,34 @@ type area struct {
 	mon Monitor
 	// frame is the frozen frame, without pixels over the live screen.
 	frame render.StillImage
+	// selecting and adjust are the legends before and after there is a
+	// selection; legends both, or none without a font.
+	selecting, adjust *widget.Box
+	legends           []widget.Widget
+}
+
+// syncLegend shows the legend for where the selection is, none while one
+// is being drawn.
+func (a *area) syncLegend() {
+	if a.legends == nil {
+		return
+	}
+	ed := &a.o.ed
+	a.selecting.SetVisible(ed.sel.Empty() && ed.gesture != gestureCreate)
+	a.adjust.SetVisible(ed.adjusting())
+}
+
+// Children are the legends.
+func (a *area) Children() []widget.Widget { return a.legends }
+
+// Arrange lays each legend centred at the bottom of the surface.
+func (a *area) Arrange(r render.Rect) {
+	a.ArrangeSelf(r)
+	widget.SetParents(a, a.legends...)
+	for _, l := range a.legends {
+		size := widget.SizeWithin(l, widget.Size{W: r.W, H: r.H})
+		l.Arrange(render.Rect{X: r.X + (r.W-size.W)/2, Y: r.Y + r.H - legendMargin - size.H, W: size.W, H: size.H})
+	}
 }
 
 // frozen reports whether the area paints a frozen frame.
@@ -419,7 +507,11 @@ func (a *area) Paint(cv *render.Canvas) {
 	}
 	if ed.adjusting() {
 		a.paintHandles(cv, sel)
-		a.paintHint(cv, b)
+	}
+	for _, l := range a.legends {
+		if widget.IsVisible(l) {
+			widget.PaintChild(cv, l)
+		}
 	}
 	if a.magnifying() {
 		p := a.o.pointer
@@ -464,6 +556,7 @@ func around(outer, hole render.Rect) []render.Rect {
 // it, so it follows the palette.
 func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
 	accent := widget.CascadeColor(a)
+	cv.BorderRect(render.Rect{X: sel.X - borderWidth/2 - 1, Y: sel.Y - borderWidth/2 - 1, W: sel.W + borderWidth + 2, H: sel.H + borderWidth + 2}, 1, labelBacking)
 	cv.BorderRect(render.Rect{X: sel.X - borderWidth/2, Y: sel.Y - borderWidth/2, W: sel.W + borderWidth, H: sel.H + borderWidth}, borderWidth, accent)
 	if a.o.font == nil {
 		return
@@ -473,8 +566,8 @@ func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
 	p.paint(cv, bx, by, accent)
 }
 
-// pill is text shaped at the body size on a dark backing padded
-// and rounded by the theme.
+// pill is text shaped at the body size on a chip padded and rounded by
+// the theme.
 type pill struct {
 	font   render.Font
 	shaped *render.ShapedText
@@ -495,12 +588,12 @@ func (a *area) pill(text string) pill {
 	}
 }
 
-func (p pill) paint(cv *render.Canvas, x, y int, ink render.Color) {
-	cv.RoundedRect(render.Rect{X: x, Y: y, W: p.w, H: p.h}, p.radius, labelBacking)
-	p.font.Draw(cv, p.shaped, x+p.pad, y+p.pad+p.ascent, ink)
+func (p pill) paint(cv *render.Canvas, x, y int, chip render.Color) {
+	cv.RoundedRect(render.Rect{X: x, Y: y, W: p.w, H: p.h}, p.radius, chip)
+	p.font.Draw(cv, p.shaped, x+p.pad, y+p.pad+p.ascent, labelInk)
 }
 
-// handleRects are the handles' squares: the four corners, then the
+// handleRects are the handles' boxes: the four corners, then the
 // four edge midpoints, centred on the selection's edge.
 func handleRects(sel render.Rect) []render.Rect {
 	h := handleSize
@@ -513,23 +606,15 @@ func handleRects(sel render.Rect) []render.Rect {
 	}
 }
 
-// paintHandles fills the handles in the accent, ringed in the label's
-// dark backing so they read on any content.
+// paintHandles draws the handles as white dots in an accent ring, the
+// dark backing around them so they read on any content.
 func (a *area) paintHandles(cv *render.Canvas, sel render.Rect) {
 	accent := widget.CascadeColor(a)
 	for _, r := range handleRects(sel) {
-		cv.FillRect(render.Rect{X: r.X - 1, Y: r.Y - 1, W: r.W + 2, H: r.H + 2}, labelBacking)
-		cv.FillRect(r, accent)
+		cv.RoundedRect(render.Rect{X: r.X - 1, Y: r.Y - 1, W: r.W + 2, H: r.H + 2}, r.W/2+1, labelBacking)
+		cv.RoundedRect(r, r.W/2, accent)
+		cv.RoundedRect(render.Rect{X: r.X + 2, Y: r.Y + 2, W: r.W - 4, H: r.H - 4}, (r.W-4)/2, handleCore)
 	}
-}
-
-// paintHint draws how to finish, centred at the bottom of the surface.
-func (a *area) paintHint(cv *render.Canvas, b render.Rect) {
-	if a.o.font == nil {
-		return
-	}
-	p := a.pill(hintText)
-	p.paint(cv, b.X+(b.W-p.w)/2, b.Y+b.H-hintMargin-p.h, widget.CascadeColor(a))
 }
 
 // labelText is the size label in logical pixels.

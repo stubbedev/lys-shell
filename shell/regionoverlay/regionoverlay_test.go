@@ -11,6 +11,8 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -224,7 +226,8 @@ func TestPaintLive(t *testing.T) {
 	if got := px(data, 2, 2); got != render.Color(dimAlpha<<24) {
 		t.Fatalf("outside the hole %#x, want the wash", uint32(got))
 	}
-	if got := px(data, 10, 18); got != render.RGB(0xb4, 0xbe, 0xfe) {
+	o.ed.gesture = gestureCreate
+	if got := px(paint(a), 10, 18); got != render.RGB(0xb4, 0xbe, 0xfe) {
 		t.Fatalf("border %#x, want the area's color", uint32(got))
 	}
 }
@@ -272,11 +275,14 @@ func TestPaintHandles(t *testing.T) {
 	o, a, _ := harness(nil)
 	o.ed.sel = image.Rect(10, 10, 30, 25)
 	data := paint(a)
-	if got := px(data, 30, 25); got != render.RGB(0xb4, 0xbe, 0xfe) {
-		t.Errorf("bottom-right handle %#x, want the accent", uint32(got))
+	if got := px(data, 30, 25); got != handleCore {
+		t.Errorf("bottom-right handle's middle %#x, want its core", uint32(got))
 	}
-	if got := px(data, 20, 25); got != render.RGB(0xb4, 0xbe, 0xfe) {
-		t.Errorf("bottom-middle handle %#x, want the accent", uint32(got))
+	if got := px(data, 34, 25); got != render.RGB(0xb4, 0xbe, 0xfe) {
+		t.Errorf("bottom-right handle's ring %#x, want the accent", uint32(got))
+	}
+	if got := px(data, 20, 25); got != handleCore {
+		t.Errorf("bottom-middle handle's middle %#x, want its core", uint32(got))
 	}
 	o.ed.gesture = gestureCreate
 	if got := px(paint(a), 32, 27); got != render.Color(dimAlpha<<24) {
@@ -422,5 +428,70 @@ func TestAround(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// The legend says what the keys do now: how to start before there is a
+// selection, nothing while one is being drawn, how to finish after.
+func TestLegendFollowsTheSelection(t *testing.T) {
+	o := &Overlay{font: treetest.Font(t), sheet: widget.NewStylesheet(accentCSS, 0), monitors: mons[:1]}
+	o.ed = editor{bounds: layout(o.monitors)}
+	a := &area{o: o, mon: mons[0]}
+	o.areas = []*area{a}
+	root := o.surfaceRoot(a)
+	root.Arrange(render.Rect{W: 1000, H: 600})
+	shown := func() (selecting, adjust bool) {
+		return widget.IsVisible(a.selecting), widget.IsVisible(a.adjust)
+	}
+	if s, ad := shown(); !s || ad {
+		t.Errorf("no selection: selecting %v, adjust %v", s, ad)
+	}
+	o.ed.press(image.Pt(100, 100))
+	o.move(image.Pt(300, 300))
+	if s, ad := shown(); s || ad {
+		t.Errorf("drawing: selecting %v, adjust %v, want neither", s, ad)
+	}
+	o.release()
+	if s, ad := shown(); s || !ad {
+		t.Errorf("selected: selecting %v, adjust %v", s, ad)
+	}
+	root.Arrange(render.Rect{W: 1000, H: 600})
+	b := a.adjust.Bounds()
+	if b.Empty() || b.X != (1000-b.W)/2 || b.Y+b.H != 600-legendMargin {
+		t.Errorf("legend at %v, want centred %dpx off the bottom", b, legendMargin)
+	}
+	if got := len(treetest.WithClass(a.adjust, "region-overlay-key")); got != 5 {
+		t.Errorf("%d keycaps, want the mouse, enter, two arrows and esc", got)
+	}
+}
+
+// Without a font there is no legend to lay out, and painting still works.
+func TestNoFontNoLegend(t *testing.T) {
+	_, a, _ := harness(nil)
+	if len(a.Children()) != 0 {
+		t.Errorf("%d legends without a font", len(a.Children()))
+	}
+	paint(a)
+}
+
+// A keycap reads as a key: on the theme it has its own face against the
+// legend's, and it is not in the overlay's accent.
+func TestAKeycapHasItsOwnFace(t *testing.T) {
+	o := &Overlay{font: treetest.Font(t), sheet: apptheme.New(config.Defaults()).Sheet}
+	o.monitors = []Monitor{{Connector: "A", Width: 800, Height: 400}}
+	o.ed = editor{bounds: layout(o.monitors)}
+	a := &area{o: o, mon: o.monitors[0]}
+	root := o.surfaceRoot(a)
+	root.Arrange(render.Rect{W: 800, H: 400})
+	key := treetest.WithClass(a.selecting, "region-overlay-key")[0]
+	if widget.CascadeColor(key) == widget.CascadeColor(a) {
+		t.Errorf("the keycap's ink %#x is the overlay's accent", uint32(widget.CascadeColor(key)))
+	}
+	data := make([]byte, render.Stride(800)*400)
+	widget.PaintChild(render.NewScaled(data, render.Stride(800), 800, 400, 1, 1), root)
+	at := func(x, y int) render.Color { return render.ColorFromBytes(data[y*render.Stride(800)+x*4:]) }
+	kb, lb := key.(*widget.Box).Bounds(), a.selecting.Bounds()
+	if face, around := at(kb.X+2, kb.Y+kb.H/2), at(lb.X+4, lb.Y+lb.H/2); face == around {
+		t.Errorf("the keycap's face %#x is the legend's own", uint32(face))
 	}
 }
