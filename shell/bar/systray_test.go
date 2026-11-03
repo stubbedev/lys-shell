@@ -296,7 +296,7 @@ const (
 // in the pixmap picked for it, forgetting each replaced raster.
 func TestSystrayScaleChangeRepicksWithoutABlankIcon(t *testing.T) {
 	it := &sni.Item{Bus: ":1.1", Path: "/a", ID: "app", IconPixmap: []sni.Pixmap{solidPixmap(20, red), solidPixmap(40, blue)}}
-	m, tray, store, f := newPixmapTray(t, it)
+	m, tray, _, f := newPixmapTray(t, it)
 	if got := tray.wantedSizes(); !slices.Equal(got, []int{20}) {
 		t.Fatalf("wanted %v at 1x, want [20]", got)
 	}
@@ -315,9 +315,6 @@ func TestSystrayScaleChangeRepicksWithoutABlankIcon(t *testing.T) {
 	if got := tray.wantedSizes(); !slices.Equal(got, []int{40}) {
 		t.Fatalf("wanted %v at 2x, want [40] alone", got)
 	}
-	second := onHeadlessLoop(func() render.ImageID { return first.ic.Still().ID })
-
-	store.Put(it)
 	waitHeadless(t, "the 40 px pixmap", func() bool {
 		g, ok := m.entries[it.Key()].icon.(*trayPixmap)
 		return ok && g.pixmap.Width == 40
@@ -325,8 +322,8 @@ func TestSystrayScaleChangeRepicksWithoutABlankIcon(t *testing.T) {
 	if c := paintTray(m, deviceScale{2, 1}); c != render.RGBA(0, 0, 255, 255) {
 		t.Errorf("2x icon center = %#x after the refresh, want the 40 px blue pixmap", uint32(c))
 	}
-	if !f.has(second) {
-		t.Error("the replaced glyph's raster was not forgotten")
+	if got := f.count(); got != 2 {
+		t.Errorf("%d rasters forgotten, want the 1x one and the replaced glyph's 2x one", got)
 	}
 }
 

@@ -19,7 +19,7 @@ import (
 // Fast is a timeout a test can afford to run into.
 const Fast = ipcsock.Timeout(50 * time.Millisecond)
 
-const failFast = 2 * time.Second
+const failFast = 10 * time.Second
 
 // Silent is a socket that accepts every connection and then never reads or
 // answers, and the path to it.

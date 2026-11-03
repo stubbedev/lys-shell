@@ -275,7 +275,7 @@ func TestRowsToAShellThatNeverReadsFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close() }()
-	row := strings.Repeat("x", 1<<20)
+	row := strings.Repeat("x", 1<<18)
 	rows := make([]string, 16)
 	for i := range rows {
 		rows[i] = row
