@@ -16,8 +16,8 @@ import (
 	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
-// Fast is limits a test can afford to run into.
-var Fast = ipcsock.Limits{Connect: 50 * time.Millisecond, Request: 50 * time.Millisecond}
+// Fast is a timeout a test can afford to run into.
+const Fast = ipcsock.Timeout(50 * time.Millisecond)
 
 const failFast = 2 * time.Second
 

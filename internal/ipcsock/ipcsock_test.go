@@ -36,15 +36,18 @@ func fullBacklog(t *testing.T) string {
 	return path
 }
 
-func TestConnectingToAFullBacklogFailsInsteadOfWaiting(t *testing.T) {
+func TestConnectingToAFullBacklogFailsAtOnce(t *testing.T) {
 	path := fullBacklog(t)
 	start := time.Now()
-	conn, err := ipcsocktest.Fast.Open(path)
+	conn, err := ipcsock.Dial(path)
 	if err == nil {
 		_ = conn.Close()
 		t.Fatal("connected to a socket with a full backlog")
 	}
-	if took := time.Since(start); took > time.Second {
+	if !errors.Is(err, syscall.EAGAIN) {
+		t.Errorf("error = %v, want EAGAIN", err)
+	}
+	if took := time.Since(start); took > time.Duration(ipcsock.Standard)/10 {
 		t.Errorf("gave up after %v", took)
 	}
 }
@@ -79,7 +82,7 @@ func TestADisarmedConnectionWaitsPastTheDeadline(t *testing.T) {
 	select {
 	case err := <-read:
 		t.Fatalf("a disarmed read ended: %v", err)
-	case <-time.After(3 * ipcsocktest.Fast.Request):
+	case <-time.After(3 * time.Duration(ipcsocktest.Fast)):
 	}
 }
 
@@ -121,5 +124,34 @@ func TestAClosedSessionStaysClosed(t *testing.T) {
 	}
 	if _, _, err := session.Acquire(); !errors.Is(err, net.ErrClosed) {
 		t.Errorf("Acquire after Close = %v", err)
+	}
+}
+
+func TestAStreamGivesUpOnAPeerThatNeverReads(t *testing.T) {
+	path := ipcsocktest.Silent(t)
+	ipcsocktest.GivesUp(t, func() error {
+		conn, err := ipcsocktest.Fast.Stream(path, make([]byte, 16<<20))
+		if err == nil {
+			_ = conn.Close()
+		}
+		return err
+	}, "subscription")
+}
+
+func TestAStreamMayStaySilentPastTheDeadline(t *testing.T) {
+	conn, err := ipcsocktest.Fast.Stream(ipcsocktest.Silent(t), []byte("subscribe\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	read := make(chan error, 1)
+	go func() {
+		_, err := conn.Read(make([]byte, 1))
+		read <- err
+	}()
+	select {
+	case err := <-read:
+		t.Fatalf("a stream's read ended: %v", err)
+	case <-time.After(3 * time.Duration(ipcsocktest.Fast)):
 	}
 }

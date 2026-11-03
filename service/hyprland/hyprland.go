@@ -100,7 +100,7 @@ type WorkspaceRule struct {
 type Connection struct {
 	commandPath string
 	eventPath   string
-	limits      ipcsock.Limits
+	timeout     ipcsock.Timeout
 }
 
 // Connect resolves the sockets for the running instance. No connection
@@ -117,12 +117,12 @@ func Connect() (*Connection, error) {
 // ConnectTo builds a connection to explicit socket paths — the test
 // seam and the way for embedders that already resolved the paths.
 func ConnectTo(commandPath, eventPath string) *Connection {
-	return &Connection{commandPath: commandPath, eventPath: eventPath, limits: ipcsock.Standard()}
+	return &Connection{commandPath: commandPath, eventPath: eventPath, timeout: ipcsock.Standard}
 }
 
 // Command sends one request and returns the reply up to the EOT byte.
 func (c *Connection) Command(request string) (string, error) {
-	conn, err := c.limits.Open(c.commandPath)
+	conn, err := c.timeout.Open(c.commandPath)
 	if err != nil {
 		return "", fmt.Errorf("hyprland: connect for %q: %w", request, err)
 	}

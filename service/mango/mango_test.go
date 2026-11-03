@@ -246,7 +246,7 @@ func TestAWatchStreamMayStaySilentPastTheRequestDeadline(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	time.Sleep(3 * ipcsocktest.Fast.Request)
+	time.Sleep(3 * time.Duration(ipcsocktest.Fast))
 	f.send(watchMonitors)
 	f.send(watchClients)
 	deadline := time.After(2 * time.Second)

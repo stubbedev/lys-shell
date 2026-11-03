@@ -96,12 +96,12 @@ type RejectedError struct{ Message string }
 
 func (e *RejectedError) Error() string { return "mango rejected the request: " + e.Message }
 
-func open(limits ipcsock.Limits) (net.Conn, error) {
+func open(timeout ipcsock.Timeout) (net.Conn, error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, ErrNotRunning
 	}
-	conn, err := limits.Open(path)
+	conn, err := timeout.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("mango: %w", err)
 	}
@@ -110,8 +110,8 @@ func open(limits ipcsock.Limits) (net.Conn, error) {
 
 // request sends one command line on a fresh connection and fails on
 // the reply's "error" field, the rejection.
-func request(limits ipcsock.Limits, command string) error {
-	conn, err := open(limits)
+func request(timeout ipcsock.Timeout, command string) error {
+	conn, err := open(timeout)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func request(limits ipcsock.Limits, command string) error {
 
 // Dispatch runs one mango dispatcher.
 func Dispatch(command string) error {
-	return request(ipcsock.Standard(), "dispatch "+command)
+	return request(ipcsock.Standard, "dispatch "+command)
 }
 
 // ViewTag is view_tag: "view,<index>".
@@ -174,24 +174,19 @@ type Watcher struct {
 }
 
 // Watch connects both watch streams (start_monitoring).
-func Watch() (*Watcher, error) { return watch(ipcsock.Standard()) }
+func Watch() (*Watcher, error) { return watch(ipcsock.Standard) }
 
-func watch(limits ipcsock.Limits) (*Watcher, error) {
+func watch(timeout ipcsock.Timeout) (*Watcher, error) {
 	w := &Watcher{ticks: make(chan struct{}, 1)}
 	var wg sync.WaitGroup
 	for _, sub := range []string{watchMonitors, watchClients} {
-		conn, err := open(limits)
+		path := SocketPath()
+		if path == "" {
+			w.Close()
+			return nil, ErrNotRunning
+		}
+		conn, err := timeout.Stream(path, []byte(sub+"\n"))
 		if err != nil {
-			w.Close()
-			return nil, err
-		}
-		if _, werr := conn.Write([]byte(sub + "\n")); werr != nil {
-			_ = conn.Close()
-			w.Close()
-			return nil, fmt.Errorf("mango: %s: %w", sub, werr)
-		}
-		if err := ipcsock.Disarm(conn); err != nil {
-			_ = conn.Close()
 			w.Close()
 			return nil, fmt.Errorf("mango: %s: %w", sub, err)
 		}

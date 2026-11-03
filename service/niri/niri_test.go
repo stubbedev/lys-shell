@@ -349,7 +349,7 @@ func TestAnEventStreamMayStaySilentPastTheRequestDeadline(t *testing.T) {
 		defer conn.Close()
 		_, _ = bufio.NewReader(conn).ReadBytes('\n')
 		_, _ = conn.Write([]byte("{\"Ok\":\"Handled\"}\n"))
-		time.Sleep(3 * ipcsocktest.Fast.Request)
+		time.Sleep(3 * time.Duration(ipcsocktest.Fast))
 		_, _ = conn.Write([]byte("{\"WorkspaceActivated\":{\"id\":2,\"focused\":true}}\n"))
 		time.Sleep(time.Second)
 	}()

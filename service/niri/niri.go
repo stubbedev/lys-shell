@@ -114,14 +114,14 @@ type Conn struct {
 }
 
 // Connect dials $NIRI_SOCKET.
-func Connect() (*Conn, error) { return connect(ipcsock.Standard()) }
+func Connect() (*Conn, error) { return connect(ipcsock.Standard) }
 
-func connect(limits ipcsock.Limits) (*Conn, error) {
+func connect(timeout ipcsock.Timeout) (*Conn, error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, ErrNotRunning
 	}
-	session, err := ipcsock.Connect(path, limits)
+	session, err := ipcsock.Connect(path, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("niri: command socket: %w", err)
 	}
@@ -258,14 +258,14 @@ func (c *Conn) FocusWorkspacePrevious(ctx context.Context) error {
 // checks the Handled ack, and ticks once per event line; each tick is
 // the cue to re-query. The channel closes when the stream ends; stop
 // closes the socket.
-func Subscribe() (<-chan struct{}, func(), error) { return subscribe(ipcsock.Standard()) }
+func Subscribe() (<-chan struct{}, func(), error) { return subscribe(ipcsock.Standard) }
 
-func subscribe(limits ipcsock.Limits) (<-chan struct{}, func(), error) {
+func subscribe(timeout ipcsock.Timeout) (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, ErrNotRunning
 	}
-	conn, err := limits.Open(path)
+	conn, err := timeout.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("niri: event socket: %w", err)
 	}

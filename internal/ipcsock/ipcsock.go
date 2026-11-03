@@ -1,5 +1,5 @@
-// Package ipcsock bounds a request on a compositor's unix socket, so a hung
-// compositor costs its client an error instead of the client's thread.
+// Package ipcsock bounds a request on a local unix socket, so a hung peer
+// costs its client an error instead of the client's thread.
 package ipcsock
 
 import (
@@ -9,43 +9,74 @@ import (
 	"time"
 )
 
-// Limits is how long a connect may take, and a request once connected.
-type Limits struct {
-	Connect time.Duration
-	Request time.Duration
-}
+// Timeout is how long one request may take to write and read.
+type Timeout time.Duration
 
-// Standard is what every compositor client runs with.
-func Standard() Limits { return Limits{Connect: 2 * time.Second, Request: 5 * time.Second} }
+// Standard is what every client runs with.
+const Standard = Timeout(5 * time.Second)
 
-// Dial connects with no deadline on the connection, for a stream.
-func (l Limits) Dial(path string) (net.Conn, error) {
-	return net.DialTimeout("unix", path, l.Connect)
-}
+// Dial connects without waiting: a unix connect on Go's non-blocking socket
+// either succeeds at once or fails at once with EAGAIN on a full backlog.
+func Dial(path string) (net.Conn, error) { return net.Dial("unix", path) }
+
+func (t Timeout) deadline() time.Time { return time.Now().Add(time.Duration(t)) }
 
 // Arm gives conn one request's time from now, for writing and reading.
-func (l Limits) Arm(conn net.Conn) error {
-	if err := conn.SetDeadline(time.Now().Add(l.Request)); err != nil {
+func (t Timeout) Arm(conn net.Conn) error {
+	if err := conn.SetDeadline(t.deadline()); err != nil {
 		return fmt.Errorf("arm the request deadline: %w", err)
 	}
 	return nil
 }
 
+// ArmWrite is Arm for a connection whose reads have a life of their own.
+func (t Timeout) ArmWrite(conn net.Conn) error {
+	if err := conn.SetWriteDeadline(t.deadline()); err != nil {
+		return fmt.Errorf("arm the write deadline: %w", err)
+	}
+	return nil
+}
+
+// ArmRead is ArmWrite's other half.
+func (t Timeout) ArmRead(conn net.Conn) error {
+	if err := conn.SetReadDeadline(t.deadline()); err != nil {
+		return fmt.Errorf("arm the read deadline: %w", err)
+	}
+	return nil
+}
+
 // Open connects and arms the connection for one request.
-func (l Limits) Open(path string) (net.Conn, error) {
-	conn, err := l.Dial(path)
+func (t Timeout) Open(path string) (net.Conn, error) {
+	conn, err := Dial(path)
 	if err != nil {
 		return nil, err
 	}
-	if err := l.Arm(conn); err != nil {
+	if err := t.Arm(conn); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
 	return conn, nil
 }
 
-// Disarm turns a connection that finished its handshake into a stream, which
-// may stay silent for as long as nothing happens.
+// Stream connects, writes request under the deadline, and hands back a
+// connection that may stay silent for as long as nothing happens.
+func (t Timeout) Stream(path string, request []byte) (net.Conn, error) {
+	conn, err := t.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.Write(request); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("write the subscription: %w", err)
+	}
+	if err := Disarm(conn); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// Disarm turns a connection that finished its handshake into a stream.
 func Disarm(conn net.Conn) error {
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		return fmt.Errorf("disarm the request deadline: %w", err)
@@ -56,8 +87,8 @@ func Disarm(conn net.Conn) error {
 // Session is a connection kept for one request after another, replaced after a
 // request that failed. The caller serializes requests; Close may come at any time.
 type Session struct {
-	path   string
-	limits Limits
+	path    string
+	timeout Timeout
 
 	mu     sync.Mutex
 	conn   net.Conn
@@ -66,12 +97,12 @@ type Session struct {
 }
 
 // Connect opens a session, failing if the socket cannot be reached now.
-func Connect(path string, limits Limits) (*Session, error) {
-	conn, err := limits.Dial(path)
+func Connect(path string, timeout Timeout) (*Session, error) {
+	conn, err := Dial(path)
 	if err != nil {
 		return nil, err
 	}
-	return &Session{path: path, limits: limits, conn: conn, fresh: true}, nil
+	return &Session{path: path, timeout: timeout, conn: conn, fresh: true}, nil
 }
 
 // Acquire is the connection armed for one request, and whether it is new since
@@ -83,13 +114,13 @@ func (s *Session) Acquire() (net.Conn, bool, error) {
 		return nil, false, net.ErrClosed
 	}
 	if s.conn == nil {
-		conn, err := s.limits.Dial(s.path)
+		conn, err := Dial(s.path)
 		if err != nil {
 			return nil, false, err
 		}
 		s.conn, s.fresh = conn, true
 	}
-	if err := s.limits.Arm(s.conn); err != nil {
+	if err := s.timeout.Arm(s.conn); err != nil {
 		_ = s.conn.Close()
 		s.conn = nil
 		return nil, false, err

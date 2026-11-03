@@ -316,7 +316,7 @@ func TestClientsRulesAndActiveWorkspace(t *testing.T) {
 
 func TestCommandGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
 	conn := ConnectTo(ipcsocktest.Silent(t), "")
-	conn.limits = ipcsocktest.Fast
+	conn.timeout = ipcsocktest.Fast
 	ipcsocktest.GivesUp(t, func() error {
 		_, err := conn.Command("j/clients")
 		return err
@@ -325,7 +325,7 @@ func TestCommandGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
 
 func TestCommandGivesUpOnACompositorThatNeverReads(t *testing.T) {
 	conn := ConnectTo(ipcsocktest.Silent(t), "")
-	conn.limits = ipcsocktest.Fast
+	conn.timeout = ipcsocktest.Fast
 	request := strings.Repeat("x", 16<<20)
 	ipcsocktest.GivesUp(t, func() error {
 		_, err := conn.Command(request)

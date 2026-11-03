@@ -107,14 +107,14 @@ type Conn struct {
 }
 
 // Connect dials $SWAYSOCK.
-func Connect() (*Conn, error) { return connect(ipcsock.Standard()) }
+func Connect() (*Conn, error) { return connect(ipcsock.Standard) }
 
-func connect(limits ipcsock.Limits) (*Conn, error) {
+func connect(timeout ipcsock.Timeout) (*Conn, error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, errors.New("sway: SWAYSOCK is not set")
 	}
-	session, err := ipcsock.Connect(path, limits)
+	session, err := ipcsock.Connect(path, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("sway: %w", err)
 	}
@@ -358,15 +358,15 @@ func Subscribe() (<-chan struct{}, func(), error) {
 
 // SubscribeTo is Subscribe over the named event streams.
 func SubscribeTo(events ...string) (<-chan struct{}, func(), error) {
-	return subscribeTo(ipcsock.Standard(), events)
+	return subscribeTo(ipcsock.Standard, events)
 }
 
-func subscribeTo(limits ipcsock.Limits, events []string) (<-chan struct{}, func(), error) {
+func subscribeTo(timeout ipcsock.Timeout, events []string) (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, errors.New("sway: SWAYSOCK is not set")
 	}
-	conn, err := limits.Open(path)
+	conn, err := timeout.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("sway: %w", err)
 	}

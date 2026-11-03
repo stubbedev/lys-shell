@@ -113,7 +113,7 @@ func open(req request) (net.Conn, *bufio.Reader, error) {
 	if path == "" {
 		return nil, nil, ErrNotRunning
 	}
-	conn, err := ipcsock.Standard().Open(path)
+	conn, err := ipcsock.Standard.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("lys-wm: %s: %w", req.Request, err)
 	}

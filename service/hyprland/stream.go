@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // Events subscribes to the event socket and returns a stream of parsed
@@ -12,7 +14,7 @@ import (
 // dropped, matching the Rust
 // shell's warn-and-drop.
 func (c *Connection) Events(ctx context.Context) (<-chan Event, error) {
-	conn, err := c.limits.Dial(c.eventPath)
+	conn, err := ipcsock.Dial(c.eventPath)
 	if err != nil {
 		return nil, fmt.Errorf("hyprland: connect the event socket: %w", err)
 	}
