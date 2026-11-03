@@ -15,6 +15,10 @@ import (
 // take before the stylesheet (or -font) sizes them.
 func fontPx() float64 { return widgets.TextPx(styling.Body, 1) }
 
+// shadowGutter is the room around a session's panel its shadow paints
+// in, in logical pixels at scale 1.
+const shadowGutter = 24
+
 // sessionCSSPriority puts a session's -font/-style CSS above the
 // shell's own stylesheet, as the Rust provider sits above the shell's
 // (PRIORITY_USER + 200 over + 100): at anything below, a -font simply
@@ -23,7 +27,7 @@ const sessionCSSPriority = 100
 
 // views is one session's widget tree (the view! of mod.rs).
 type views struct {
-	root     *widget.Box
+	root     *surfaceRoot
 	rev      *widget.Revealer
 	surface  *widget.Box
 	inputRow *widget.Box
@@ -33,16 +37,30 @@ type views struct {
 	frame    *widget.Box
 	list     *resultList
 	tabs     *widget.Box
-	// width is the surface width it was mapped at; lastH the height it
-	// was last sized to.
-	width, lastH int
+	// width is the panel's width, the surface being wider by its gutter;
+	// lastH the surface height it was last sized to; gutter the room left
+	// around the panel for its shadow.
+	width, lastH, gutter int
+}
+
+// surfaceRoot is a session's root, the panel inside its shadow's gutter.
+// What the compositor blurs is the panel, not the gutter.
+type surfaceRoot struct {
+	*widget.Box
+	panel *widget.Box
+}
+
+// BackdropRegion is the panel's rounded box as it shows this frame.
+func (r *surfaceRoot) BackdropRegion() []render.Rect {
+	return render.RoundedRectRegion(widget.ShownRect(r.panel), widget.CornerRadii(r.panel))
 }
 
 // buildViews builds and fills the tree for session a (apply_ui).
 func (s *Surface) buildViews(a *active) *views {
 	ui := a.ui
-	v := &views{}
-	v.root = widget.NewBox(widget.Column, 0, 0)
+	v := &views{gutter: int(math.Round(shadowGutter * float64(s.d.Config().Styling.Scale)))}
+	v.root = &surfaceRoot{Box: widget.NewBox(widget.Column, 0, 0)}
+	v.root.SetPadding(render.Insets{Top: v.gutter, Left: v.gutter, Right: v.gutter, Bottom: v.gutter})
 	v.root.SetElement("window")
 	v.root.AddClass("launcher-window")
 	if s.d.Sheet != nil {
@@ -57,16 +75,18 @@ func (s *Surface) buildViews(a *active) *views {
 	v.surface = widget.NewBox(widget.Column, 0, 0)
 	v.surface.SetElement("command")
 	v.surface.AddClass("launcher-surface")
+	v.root.panel = v.surface
 	v.rev = widget.NewRevealer(v.surface)
 	v.root.Append(v.rev, true)
 
 	v.inputRow = widget.NewBox(widget.Row, th.Spacing, 0)
+	v.inputRow.SetSizeRequest(0, int(math.Round(inputRowHeight*float64(s.d.Config().Styling.Scale))))
 	v.inputRow.SetPadding(render.Insets{Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
 	v.inputRow.AddClass("input", "launcher-input")
 	v.prompt = widget.NewLabel(s.d.Font, fontPx(), "", 0)
 	v.prompt.AddClass("launcher-prompt")
-	v.inputRow.Append(v.prompt, false)
-	v.entry = widget.NewEntry(s.d.Font, fontPx(), 0)
+	v.inputRow.AppendAligned(v.prompt, false, widget.AlignCenter)
+	v.entry = widget.NewEntry(s.d.Font, math.Round(fontPx()*entryFontFactor), 0)
 	v.entry.AddClass("launcher-entry")
 	if ui.filter != nil {
 		v.entry.SetText(*ui.filter)
@@ -77,7 +97,7 @@ func (s *Surface) buildViews(a *active) *views {
 			s.send(cmdSetQuery{query: text})
 		}
 	}
-	v.inputRow.Append(v.entry, true)
+	v.inputRow.AppendAligned(v.entry, true, widget.AlignCenter)
 	v.surface.Append(v.inputRow, false)
 
 	v.message = widget.NewRichLabel(s.d.Font, fontPx(), "", 0)
@@ -170,9 +190,10 @@ func (v *views) setMessage(markup *string) {
 	v.message.SetVisible(true)
 }
 
-// height is the tree's natural height at width.
-func (v *views) height(width int) int {
-	return v.surface.Measure(widget.Column, width).Nat
+// surfaceSize is the surface a panel of width takes: its natural height
+// and its gutter around it.
+func (v *views) surfaceSize(width int) (w, h int) {
+	return width + 2*v.gutter, v.surface.Measure(widget.Column, width).Nat + 2*v.gutter
 }
 
 // iconPx is -gtk-icon-size: 1.5rem at the styling scale.

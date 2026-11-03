@@ -2,11 +2,6 @@
   background: transparent;
 }
 
-.launcher-surface {
-  font-family: var(--font-sans);
-  box-shadow: var(--shadow);
-}
-
 .launcher-prompt {
   color: var(--accent);
   font-weight: 600;
@@ -22,15 +17,45 @@
   opacity: 0.5;
 }
 
-.launcher-panel {
+.launcher-panel,
+.launcher-surface {
   font-family: var(--font-sans);
   background-color: var(--dropdown-surface);
   border-radius: calc(16px * var(--global-scale));
-  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg-default) 12%, transparent);
   box-shadow: var(--shadow);
 }
-.blur-unavailable .launcher-panel {
+.blur-unavailable .launcher-panel,
+.blur-unavailable .launcher-surface {
   background-color: var(--palette-elevated);
+}
+
+.launcher-surface .launcher-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg-default) 10%, transparent);
+  box-shadow: none;
+}
+.launcher-surface .launcher-entry,
+.launcher-surface .launcher-entry:focus {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+.launcher-surface .launcher-list {
+  background: transparent;
+}
+.launcher-surface .launcher-row {
+  border-radius: calc(10px * var(--global-scale));
+  color: var(--fg-default);
+}
+.launcher-surface .launcher-row:hover {
+  background-color: color-mix(in srgb, var(--fg-default) 6%, transparent);
+}
+.launcher-surface .launcher-row:selected {
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--fg-default);
 }
 
 .launcher-search-icon,
@@ -41,7 +66,7 @@
   padding: calc(3px * var(--global-scale)) calc(10px * var(--global-scale));
   border-radius: calc(8px * var(--global-scale));
   background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--fg);
+  color: var(--fg-default);
   font-weight: 600;
 }
 .launcher-search-entry,
@@ -53,7 +78,7 @@
   padding: 0;
 }
 .launcher-search-separator {
-  background-color: color-mix(in srgb, var(--fg) 10%, transparent);
+  background-color: color-mix(in srgb, var(--fg-default) 10%, transparent);
 }
 .launcher-search-list {
   background: transparent;
@@ -61,10 +86,10 @@
 .launcher-search-row {
   border-radius: calc(10px * var(--global-scale));
   margin: 0 calc(8px * var(--global-scale));
-  color: var(--fg);
+  color: var(--fg-default);
 }
 .launcher-search-row:hover {
-  background-color: color-mix(in srgb, var(--fg) 6%, transparent);
+  background-color: color-mix(in srgb, var(--fg-default) 6%, transparent);
 }
 .launcher-search-row:selected {
   background-color: color-mix(in srgb, var(--accent) 22%, transparent);
@@ -87,7 +112,7 @@
   font-family: var(--font-mono);
 }
 .launcher-search-footer {
-  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--fg-default) 10%, transparent);
 }
 .launcher-search-notice {
   color: var(--status-error);

@@ -898,6 +898,41 @@ func TestMaskedModeKeepsTheSecretFromHooks(t *testing.T) {
 
 // A rofi session blurs behind its panel as the search panel does, and
 // only behind its panel: the shadow's gutter stays clear.
+func TestASessionIsTheSameGlassAsThePanel(t *testing.T) {
+	h := newHarness(t)
+	mode := "run"
+	h.open(launcheripc.SessionOptions{Mode: &mode}, false)
+	h.until("the surface", func() bool { return len(h.windows) == 1 })
+	cfg := h.windows[0].cfg
+	if !cfg.BackgroundBlur {
+		t.Error("the session does not ask for the blur")
+	}
+	v := h.s.cur.views
+	if v.gutter <= 0 || int(cfg.Width) != v.width+2*v.gutter {
+		t.Errorf("surface %d wide, panel %d, gutter %d", cfg.Width, v.width, v.gutter)
+	}
+	v.root.Arrange(render.Rect{W: int(cfg.Width), H: int(cfg.Height)})
+	want := v.surface.Bounds()
+	if want.X != v.gutter || want.Y != v.gutter {
+		t.Errorf("panel at %v, want inside the %dpx gutter", want, v.gutter)
+	}
+	for _, r := range widget.BackdropRegion(v.root) {
+		if r.X < want.X || r.Y < want.Y || r.X+r.W > want.X+want.W || r.Y+r.H > want.Y+want.H {
+			t.Errorf("blur region %v reaches past the panel %v", r, want)
+		}
+	}
+}
+
+func TestTheGutterKeepsThePanelAtTheLocationsMargins(t *testing.T) {
+	got := intoGutter(app.AnchorTop|app.AnchorLeft, app.Margins{Top: 30, Left: 10}, 24)
+	if want := (app.Margins{Top: 6, Left: -14}); got != want {
+		t.Errorf("anchored margins %+v, want %+v", got, want)
+	}
+	if got := intoGutter(0, app.Margins{}, 24); got != (app.Margins{}) {
+		t.Errorf("a centred surface has no margins to adjust: %+v", got)
+	}
+}
+
 // The rofi emoji mode enters its pick too.
 func TestAnEmojiModeEntersItsPick(t *testing.T) {
 	h := newHarness(t)

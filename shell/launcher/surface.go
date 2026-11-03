@@ -742,19 +742,20 @@ func (s *Surface) outputFor(name string) *app.Output {
 func (s *Surface) reveal(a *active) {
 	width := s.resolveWidth(a.ui)
 	anchor, margin := locationAnchors(a.ui.location, a.ui.offsetX, a.ui.offsetY)
-	h := a.views.height(width)
+	w, h := a.views.surfaceSize(width)
 	win, err := s.d.Open(app.LayerConfig{
-		Output:        s.outputFor(s.d.Config().Launcher.Monitor),
-		Layer:         app.LayerOverlay,
-		Anchor:        anchor,
-		Margin:        margin,
-		Width:         intconv.Clamp[uint32](width),
-		Height:        intconv.Clamp[uint32](max(h, 1)),
-		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardExclusive,
-		Namespace:     "lys-shell-launcher",
-		Root:          a.views.root,
-		KeyCapture:    s.keyCaptured,
+		Output:         s.outputFor(s.d.Config().Launcher.Monitor),
+		Layer:          app.LayerOverlay,
+		Anchor:         anchor,
+		Margin:         intoGutter(anchor, margin, a.views.gutter),
+		Width:          intconv.Clamp[uint32](w),
+		Height:         intconv.Clamp[uint32](h),
+		ExclusiveZone:  -1,
+		Keyboard:       app.KeyboardExclusive,
+		Namespace:      "lys-shell-launcher",
+		Root:           a.views.root,
+		BackgroundBlur: true,
+		KeyCapture:     s.keyCaptured,
 		OnClosed: func() {
 			// The compositor took the surface away (output gone).
 			if s.cur == a {
@@ -784,10 +785,10 @@ func (s *Surface) resize() {
 	if a == nil || a.win == nil {
 		return
 	}
-	h := a.views.height(a.views.width)
+	w, h := a.views.surfaceSize(a.views.width)
 	if h != a.views.lastH {
 		a.views.lastH = h
-		if err := a.win.SetSize(intconv.Clamp[uint32](a.views.width), intconv.Clamp[uint32](max(h, 1))); err != nil {
+		if err := a.win.SetSize(intconv.Clamp[uint32](w), intconv.Clamp[uint32](h)); err != nil {
 			log.Printf("launcher: resize: %v", err)
 		}
 	}
@@ -856,6 +857,25 @@ func locationAnchors(loc config.LauncherLocation, x, y int) (app.Anchor, app.Mar
 		m.Bottom = intconv.Clamp[int32](-y)
 	}
 	return anchor, m
+}
+
+// intoGutter lets the surface's gutter hang past the anchored edges, so
+// the panel, not the empty room around it, keeps the location's margins.
+func intoGutter(anchor app.Anchor, m app.Margins, gutter int) app.Margins {
+	g := intconv.Clamp[int32](gutter)
+	if anchor&app.AnchorLeft != 0 {
+		m.Left -= g
+	}
+	if anchor&app.AnchorRight != 0 {
+		m.Right -= g
+	}
+	if anchor&app.AnchorTop != 0 {
+		m.Top -= g
+	}
+	if anchor&app.AnchorBottom != 0 {
+		m.Bottom -= g
+	}
+	return m
 }
 
 // rebuildTabs is rebuild_tabs: one button per mode, the active one

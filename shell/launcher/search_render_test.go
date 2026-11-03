@@ -350,3 +350,18 @@ func TestWholeKeystrokeAllocations(t *testing.T) {
 		t.Errorf("%v allocations per keystroke frame", got)
 	}
 }
+
+// The panel's border comes from a token the theme defines: a misspelt one
+// drops the declaration without a word.
+func TestThePanelHasItsBorder(t *testing.T) {
+	h := newPanelHarness(t)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	p, _ := h.openPanel()
+	data := make([]byte, render.Stride(renderW)*renderH)
+	paintPanel(p, data)
+	b := p.v.box.Bounds()
+	at := func(x, y int) render.Color { return render.ColorFromBytes(data[(y*renderW+x)*4:]) }
+	if edge, inside := at(b.X+b.W/2, b.Y), at(b.X+b.W/2, b.Y+4); edge == inside {
+		t.Errorf("the panel's top edge %#x is its fill: no border", uint32(edge))
+	}
+}
