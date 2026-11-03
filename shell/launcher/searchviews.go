@@ -14,9 +14,9 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The panel's measures, in logical pixels at scale 1.
@@ -37,6 +37,8 @@ const (
 	headerRowHeight  = 28
 	searchIconSize   = 26
 	entryFontFactor  = 1.45
+	// glyphFontFactor sizes an emoji to read as large as an icon box.
+	glyphFontFactor = 0.8
 )
 
 func hexColor(c render.Color) string {
@@ -59,7 +61,7 @@ type panelViews struct {
 	pane       *widget.Box
 	image      *widget.Image
 	text       *widget.Label
-	empty      *widget.Label
+	summary    *rowSummary
 	footer     *widget.Box
 	notice     *widget.Label
 	hints      *widget.RichLabel
@@ -121,19 +123,18 @@ func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	v.list.bindAsync(v.searchIcon, "ld-search-symbolic")
 	v.pane = widget.NewBox(widget.Column, 0, px(12))
 	v.pane.AddClass("launcher-search-preview")
-	v.pane.SetSizeRequest(v.previewW, 0)
+	v.pane.SetInlineStyle(styling.WidthStyle(v.previewW))
 	v.image = widget.NewImage(nil)
 	v.image.SetScale(widget.ImageFit)
 	v.image.AddClass("launcher-search-preview-image")
 	v.text = widget.NewLabel(d.Font, body, "", 0)
 	v.text.AddClass("launcher-search-preview-text")
 	v.text.SetWrap(true)
-	v.empty = widget.NewLabel(d.Font, body, i18n.T("launcher-preview-unavailable"), 0)
-	v.empty.AddClass("launcher-search-preview-empty", css.DimLabel)
+	v.summary = newRowSummary(d.Font, px)
 	v.pane.Append(v.image, true)
 	v.pane.Append(v.text, false)
-	v.pane.Append(v.empty, false)
-	v.showPreview(search.PreviewContent{}, nil, p)
+	v.pane.Append(v.summary.box, false)
+	v.showPreview(search.PreviewContent{}, nil, nil)
 	v.pane.SetVisible(false)
 	v.body = widget.NewBox(widget.Row, 0, 0)
 	v.body.Append(v.list, true)
@@ -294,8 +295,9 @@ func (v *panelViews) setFooter(p *panel) {
 	}
 }
 
-// showPreview shows content; err or nothing shows the empty note.
-func (v *panelViews) showPreview(c search.PreviewContent, err error, _ *panel) {
+// showPreview shows content; err or nothing shows what the row says of
+// itself, so the pane is never blank while a row is selected.
+func (v *panelViews) showPreview(c search.PreviewContent, err error, entry *search.Entry) {
 	var img image.Image
 	text := ""
 	if err == nil {
@@ -309,7 +311,56 @@ func (v *panelViews) showPreview(c search.PreviewContent, err error, _ *panel) {
 	if text != "" {
 		v.text.SetText(previewLines(text))
 	}
-	v.empty.SetVisible(img == nil && text == "")
+	v.summary.box.SetVisible(img == nil && text == "" && entry != nil)
+	if img == nil && text == "" && entry != nil {
+		v.summary.show(v.list, entry)
+	}
+}
+
+// heroIconSize is the summary's picture, in logical pixels at scale 1.
+const heroIconSize = 72
+
+// rowSummary is the pane for a row with nothing to load: its picture
+// large, its title and its subtitle.
+type rowSummary struct {
+	box      *widget.Box
+	icon     *asyncIcon
+	glyph    *widget.Label
+	title    *widget.Label
+	subtitle *widget.Label
+}
+
+func newRowSummary(font render.Font, px func(int) int) *rowSummary {
+	s := &rowSummary{box: widget.NewBox(widget.Column, px(8), 0)}
+	s.box.AddClass("launcher-search-preview-summary")
+	s.box.SetPadding(render.Insets{Top: px(24)})
+	s.icon = newAsyncIcon(px(heroIconSize), "launcher-search-preview-icon")
+	s.box.AppendAligned(s.icon.slot, false, widget.AlignCenter)
+	s.glyph = widget.NewLabel(font, float64(px(heroIconSize))*glyphFontFactor, "", 0)
+	s.box.AppendAligned(s.glyph, false, widget.AlignCenter)
+	s.title = widget.NewLabel(font, math.Round(fontPx()*1.15), "", 0)
+	s.title.AddClass("launcher-search-preview-title")
+	s.title.SetWrap(true)
+	s.title.SetAlignment(render.AlignCenter)
+	s.box.Append(s.title, false)
+	s.subtitle = widget.NewLabel(font, widgetsSmallPx(), "", 0)
+	s.subtitle.AddClass(css.DimLabel)
+	s.subtitle.SetWrap(true)
+	s.subtitle.SetAlignment(render.AlignCenter)
+	s.box.Append(s.subtitle, false)
+	return s
+}
+
+func (s *rowSummary) show(l *searchList, e *search.Entry) {
+	s.glyph.SetVisible(e.Glyph != "")
+	s.glyph.SetText(e.Glyph)
+	s.icon.slot.SetVisible(e.Glyph == "")
+	if e.Glyph == "" {
+		l.bindAsync(s.icon, iconSource(e.Icon))
+	}
+	s.title.SetText(e.Title)
+	s.subtitle.SetText(e.Subtitle)
+	s.subtitle.SetVisible(e.Subtitle != "")
 }
 
 // previewLines cuts text to what a pane can show, so laying it out stays
@@ -876,9 +927,10 @@ func newSearchRow(l *searchList) *searchRow {
 	r.AddClass("launcher-search-row")
 	r.icon = newAsyncIcon(l.iconSize, "launcher-search-row-icon")
 	r.AppendAligned(r.icon.slot, false, widget.AlignCenter)
-	r.glyph = widget.NewLabel(l.font, float64(l.iconSize)*0.8, "", 0)
+	r.glyph = widget.NewLabel(l.font, float64(l.iconSize)*glyphFontFactor, "", 0)
 	r.glyph.SetVisible(false)
-	r.glyph.SetSizeRequest(l.iconSize, l.iconSize)
+	r.glyph.SetSizeRequest(l.iconSize, 0)
+	r.glyph.SetAlignment(render.AlignCenter)
 	r.AppendAligned(r.glyph, false, widget.AlignCenter)
 	r.title = widget.NewRichLabel(l.font, px, "", 0)
 	r.title.AddClass("launcher-search-row-title")
@@ -1057,5 +1109,9 @@ func (l *searchList) setScale(num, denom int) {
 	}
 	l.p.v.searchIcon.name = ""
 	l.bindAsync(l.p.v.searchIcon, "ld-search-symbolic")
+	hero := l.p.v.summary.icon
+	name := hero.name
+	hero.name = ""
+	l.bindAsync(hero, name)
 	l.InvalidateLayout()
 }

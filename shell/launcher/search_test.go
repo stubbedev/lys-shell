@@ -3,6 +3,7 @@ package launcher
 import (
 	"context"
 	"errors"
+	"image"
 	"slices"
 	"strings"
 	"testing"
@@ -948,9 +949,76 @@ func TestAFrameForTheSameRowLeavesItsPreviewLoading(t *testing.T) {
 
 // A selected row with nothing to load shows itself, never an empty pane;
 // one with content shows that instead.
+func TestARowWithNothingToLoadShowsItselfInThePane(t *testing.T) {
+	h := newPanelHarness(t)
+	p, _ := h.openPanel()
+	h.typed(p, "signature")
+	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
+	h.timers[len(h.timers)-1].fn()
+	h.until("the text", func() bool { return p.v.text.Visible() })
+	if p.v.summary.box.Visible() {
+		t.Error("a loaded preview must replace the summary")
+	}
+	h.key("Down")
+	row, _ := p.selected()
+	if row.Entry.Preview.Any() {
+		t.Fatalf("%q has a preview; the test wants a row without one", row.Entry.Title)
+	}
+	if !p.v.summary.box.Visible() || p.v.summary.title.Text() != row.Entry.Title {
+		t.Errorf("summary shown %v, title %q, want %q", p.v.summary.box.Visible(), p.v.summary.title.Text(), row.Entry.Title)
+	}
+	if p.v.text.Visible() || p.v.image.Visible() {
+		t.Error("the previous row's content stayed in the pane")
+	}
+}
+
 // A preview that fails to load says what the row is, and logs the rest.
+func TestAPreviewThatCannotLoadShowsTheRow(t *testing.T) {
+	h := newPanelHarness(t)
+	p, _ := h.openPanel()
+	entry := &search.Entry{Title: "broken.bin", Subtitle: "/tmp"}
+	p.v.showPreview(search.PreviewContent{}, errors.New("no"), entry)
+	if !p.v.summary.box.Visible() || p.v.summary.title.Text() != "broken.bin" || p.v.summary.subtitle.Text() != "/tmp" {
+		t.Errorf("summary %v %q %q", p.v.summary.box.Visible(), p.v.summary.title.Text(), p.v.summary.subtitle.Text())
+	}
+	p.v.showPreview(search.PreviewContent{}, nil, nil)
+	if p.v.summary.box.Visible() {
+		t.Error("with no row selected there is nothing to say")
+	}
+}
+
 // The pane is its width whatever it shows: a large picture or a long line
 // neither squeezes the list nor runs past the panel.
+func TestThePreviewPaneHoldsItsWidth(t *testing.T) {
+	h := newPanelHarness(t)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	p, _ := h.openPanel()
+	h.typed(p, "signature")
+	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
+	data := make([]byte, render.Stride(renderW)*renderH)
+	widths := func(c search.PreviewContent) (list, pane, textH int) {
+		p.v.showPreview(c, nil, nil)
+		p.v.motion.snapSize(p.v.targetW(), p.v.targetH())
+		paintPanel(p, data)
+		return p.v.list.Bounds().W, p.v.pane.Bounds().W, p.v.text.Bounds().H
+	}
+	short, wantPane, oneLine := widths(search.PreviewContent{Text: "x"})
+	if wantPane != p.v.previewW {
+		t.Errorf("pane %d wide, want %d", wantPane, p.v.previewW)
+	}
+	list, pane, _ := widths(search.PreviewContent{Image: image.NewRGBA(image.Rect(0, 0, 4000, 300))})
+	if list != short || pane != wantPane {
+		t.Errorf("with a wide picture list %d and pane %d, want %d and %d", list, pane, short, wantPane)
+	}
+	list, pane, wrapped := widths(search.PreviewContent{Text: strings.Repeat("a long line of text ", 40)})
+	if list != short || pane != wantPane {
+		t.Errorf("with a long line list %d and pane %d, want %d and %d", list, pane, short, wantPane)
+	}
+	if wrapped <= oneLine {
+		t.Errorf("a long line is %dpx tall, one line %dpx: it did not wrap", wrapped, oneLine)
+	}
+}
+
 func emojiPanel(t *testing.T) (*panelHarness, *panel, <-chan launcheripc.ServerFrame, *[]string, *[]string) {
 	t.Helper()
 	h := newPanelHarness(t)
@@ -968,6 +1036,33 @@ func emojiPanel(t *testing.T) (*panelHarness, *panel, <-chan launcheripc.ServerF
 }
 
 // The glyph sits in the middle of its row, as an icon does.
+func TestAnEmojiIsCentredInItsRow(t *testing.T) {
+	_, p, _, _, _ := emojiPanel(t)
+	data := make([]byte, render.Stride(renderW)*renderH)
+	paintPanel(p, data)
+	savePanel(t, data, "emoji")
+	var row *searchRow
+	for _, r := range p.v.list.pool {
+		if r.glyph.Visible() {
+			row = r
+			break
+		}
+	}
+	if row == nil {
+		t.Fatal("no row shows a glyph")
+	}
+	rb, gb := row.Bounds(), row.glyph.Bounds()
+	if got := gb.Y + gb.H/2 - (rb.Y + rb.H/2); got < -1 || got > 1 {
+		t.Errorf("glyph %v is %dpx off the middle of row %v", gb, got, rb)
+	}
+	if gb.W != p.v.list.iconSize {
+		t.Errorf("glyph %dpx wide, want the icon column's %d", gb.W, p.v.list.iconSize)
+	}
+	if row.glyph.Alignment() != render.AlignCenter {
+		t.Error("the glyph does not centre across its column")
+	}
+}
+
 // Enter enters the emoji in the window the panel leaves focused, after
 // the surface has gone, and leaves the clipboard alone.
 func TestEnterTypesTheEmojiOnceTheSurfaceIsGone(t *testing.T) {

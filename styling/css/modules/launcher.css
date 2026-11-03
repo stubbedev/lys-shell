@@ -78,7 +78,10 @@
   letter-spacing: 0.04em;
 }
 .launcher-search-preview {
-  border-left: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--fg-default) 10%, transparent);
+}
+.launcher-search-preview-title {
+  font-weight: 600;
 }
 .launcher-search-preview-text {
   font-family: var(--font-mono);

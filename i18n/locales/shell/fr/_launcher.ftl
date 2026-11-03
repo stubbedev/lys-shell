@@ -54,4 +54,3 @@ launcher-footer-actions = Actions
 launcher-footer-complete = Compléter
 launcher-footer-back = Retour
 launcher-footer-close = Fermer
-launcher-preview-unavailable = Aucun aperçu

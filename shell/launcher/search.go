@@ -232,7 +232,7 @@ func rowIndexOf(rows []search.Row, id string) int {
 
 func hasPreview(rows []search.Row) bool {
 	for _, r := range rows {
-		if r.Header == "" && r.Entry.Preview.Any() {
+		if r.Header == "" && (r.Entry.Preview.Any() || r.Entry.Glyph != "") {
 			return true
 		}
 	}
@@ -439,8 +439,12 @@ func (p *panel) rowPressed(i int, button uint32) {
 func (p *panel) schedulePreview() {
 	row, ok := p.selected()
 	id := ""
-	if ok && row.Entry.Preview.Any() {
-		id = row.Entry.ID
+	var entry *search.Entry
+	if ok {
+		entry = row.Entry
+	}
+	if entry != nil && entry.Preview.Any() {
+		id = entry.ID
 	}
 	// The same row again, as a frame for rows arriving late: whatever is
 	// loading or loaded for it stands.
@@ -453,7 +457,7 @@ func (p *panel) schedulePreview() {
 	}
 	if id == "" {
 		p.previewFor = ""
-		p.v.showPreview(search.PreviewContent{}, nil, p)
+		p.v.showPreview(search.PreviewContent{}, nil, entry)
 		return
 	}
 	p.previewFor = id
@@ -469,7 +473,7 @@ func (p *panel) schedulePreview() {
 				if err != nil && !errors.Is(err, search.ErrNoPreview) {
 					log.Printf("launcher: preview: %v", err)
 				}
-				p.v.showPreview(content, err, p)
+				p.v.showPreview(content, err, entry)
 			})
 		}()
 	})
