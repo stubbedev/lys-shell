@@ -4,17 +4,27 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
-type fakeWindow struct{ closed bool }
+type fakeWindow struct {
+	closed  bool
+	focused widget.Widget
+}
 
 func (w *fakeWindow) Close() { w.closed = true }
+
+func (w *fakeWindow) SetFocus(t widget.Widget) error {
+	w.focused = t
+	return nil
+}
 
 type harness struct {
 	cfg     *config.Config
@@ -87,6 +97,85 @@ func TestShowMapsTheOverlay(t *testing.T) {
 	h.m.Show() // already up
 	if len(h.opened) != 1 {
 		t.Error("a second Show while up mapped another surface")
+	}
+}
+
+func TestTheMenuFrostsBehindItsSurfaceAlone(t *testing.T) {
+	h := newHarness(t)
+	h.m.d.Sheet = apptheme.New(h.cfg).Sheet
+	h.m.Show()
+	cfg := h.opened[0]
+	if !cfg.BackgroundBlur {
+		t.Error("the menu does not ask for the blur")
+	}
+	out := render.Rect{W: 1600, H: 1000}
+	cfg.Root.Arrange(out)
+	cfg.Root.Arrange(out)
+	h.m.rev.Finish()
+	cfg.Root.Arrange(out)
+	region := widget.BackdropRegion(cfg.Root)
+	if len(region) == 0 {
+		t.Fatal("no blur region")
+	}
+	bound := region[0]
+	for _, r := range region[1:] {
+		bound = bound.Union(r)
+	}
+	if bound.W >= out.W || bound.H >= out.H {
+		t.Errorf("the blur covers %+v of %+v, the dim around the surface as well", bound, out)
+	}
+}
+
+func TestArrowsWalkTheButtonsAndWrap(t *testing.T) {
+	h := newHarness(t)
+	h.cfg.Power.ShowReboot = false
+	h.m.Show()
+	buttons := h.buttons(t)
+	press := func(name string) bool {
+		t.Helper()
+		a, err := app.ParseAccel(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return h.opened[0].KeyCapture(a)
+	}
+	for i, step := range []struct {
+		key  string
+		want int
+	}{{"Right", 0}, {"Right", 1}, {"Left", 0}, {"Left", len(buttons) - 1}, {"Right", 0}} {
+		if !press(step.key) {
+			t.Fatalf("step %d: %s was not taken", i, step.key)
+		}
+		if h.windows[0].focused != widget.Widget(buttons[step.want]) {
+			t.Errorf("step %d: %s did not focus button %d", i, step.key, step.want)
+		}
+	}
+	if press("a") {
+		t.Error("the menu took a key it has no use for")
+	}
+}
+
+func TestTheFirstLeftLandsOnTheLastButton(t *testing.T) {
+	h := newHarness(t)
+	h.m.Show()
+	buttons := h.buttons(t)
+	a, err := app.ParseAccel("Left")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.opened[0].KeyCapture(a)
+	if h.windows[0].focused != widget.Widget(buttons[len(buttons)-1]) {
+		t.Error("the first Left did not land on the last button")
+	}
+}
+
+func TestOnlyActionsThatEndTheSessionAreDangerous(t *testing.T) {
+	h := newHarness(t)
+	h.m.Show()
+	for i, want := range []bool{false, true, false, true, true} {
+		if got := h.buttons(t)[i].HasClass("danger"); got != want {
+			t.Errorf("button %d danger = %v, want %v", i, got, want)
+		}
 	}
 }
 
@@ -172,18 +261,18 @@ func TestRowIsHomogeneousAndUnpinned(t *testing.T) {
 	}
 }
 
-// The surface is lys-ui's card and each action lys-ui's outline button,
+// The surface is lys-ui's glass and each action a flat button,
 // a square tile of the menu's own size.
-func TestActionsAreOutlineTilesInACard(t *testing.T) {
+func TestActionsAreFlatTilesOnGlass(t *testing.T) {
 	h := newHarness(t)
 	h.m.Show()
 	root := h.opened[0].Root
-	if surface := treetest.WithClass(root, "power-menu-surface"); len(surface) != 1 || !widget.HasClass(surface[0], css.Card) {
-		t.Error("the surface is not lys-ui's card")
+	if surface := treetest.WithClass(root, "power-menu-surface"); len(surface) != 1 || !widget.HasClass(surface[0], css.Glass) {
+		t.Error("the surface is not lys-ui's glass")
 	}
 	for _, b := range h.buttons(t) {
-		if !b.HasClass(css.Outline) || b.SizeRequest() != (widget.Size{W: buttonPx, H: buttonPx}) {
-			t.Errorf("an action button = classes %v size %v, want a %dpx outline tile", b.Classes(), b.SizeRequest(), buttonPx)
+		if !b.HasClass(css.Flat) || b.SizeRequest() != (widget.Size{W: buttonPx, H: buttonPx}) {
+			t.Errorf("an action button = classes %v size %v, want a %dpx flat tile", b.Classes(), b.SizeRequest(), buttonPx)
 		}
 	}
 }

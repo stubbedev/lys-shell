@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/powermenu"
@@ -44,6 +45,8 @@ func TestNewPowerRequiresAnIcon(t *testing.T) {
 type powerMenuWindow struct{}
 
 func (powerMenuWindow) Close() {}
+
+func (powerMenuWindow) SetFocus(widget.Widget) error { return nil }
 
 // TestPowerMenuVerbOpensTheMenu pins show_power_menu: :menu opens the
 // native power menu, and with none it does nothing (no dropdown).

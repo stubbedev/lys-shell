@@ -1,7 +1,45 @@
 .power-menu-window {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .power-menu-surface {
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
+}
+
+button.power-menu-button {
+  background: transparent;
+  border-radius: var(--radius-lg);
+  transition: background-color var(--duration-fast);
+}
+
+button.power-menu-button:hover,
+button.power-menu-button:focus {
+  background: color-mix(in srgb, var(--fg-default) 8%, transparent);
+}
+
+.power-menu-chip {
+  background: color-mix(in srgb, var(--fg-default) 10%, transparent);
+  border-radius: var(--radius-full);
+  transition: background-color var(--duration-fast);
+}
+
+.power-menu-icon {
+  color: var(--fg-default);
+  transition: color var(--duration-fast);
+}
+
+button.power-menu-button:hover .power-menu-chip,
+button.power-menu-button:focus .power-menu-chip {
+  background: var(--accent);
+}
+
+button.power-menu-button.danger:hover .power-menu-chip,
+button.power-menu-button.danger:focus .power-menu-chip {
+  background: var(--status-error);
+}
+
+button.power-menu-button:hover .power-menu-icon,
+button.power-menu-button:focus .power-menu-icon {
+  color: var(--fg-on-accent);
 }
