@@ -3,7 +3,7 @@ package hyprland
 import (
 	"bufio"
 	"context"
-	"net"
+	"fmt"
 )
 
 // Events subscribes to the event socket and returns a stream of parsed
@@ -12,9 +12,9 @@ import (
 // dropped, matching the Rust
 // shell's warn-and-drop.
 func (c *Connection) Events(ctx context.Context) (<-chan Event, error) {
-	conn, err := net.Dial("unix", c.eventPath)
+	conn, err := c.limits.Dial(c.eventPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hyprland: connect the event socket: %w", err)
 	}
 	out := make(chan Event, 64)
 	go func() {

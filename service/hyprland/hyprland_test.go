@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock/ipcsocktest"
 )
 
 // fakeHyprland is a scriptable IPC server: it answers command-socket
@@ -309,5 +311,32 @@ func TestClientsRulesAndActiveWorkspace(t *testing.T) {
 	ws, err := conn.ActiveWorkspace()
 	if err != nil || ws.ID != 4 {
 		t.Errorf("active = %+v %v", ws, err)
+	}
+}
+
+func TestCommandGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
+	conn := ConnectTo(ipcsocktest.Silent(t), "")
+	conn.limits = ipcsocktest.Fast
+	ipcsocktest.GivesUp(t, func() error {
+		_, err := conn.Command("j/clients")
+		return err
+	}, "hyprland", "read", "j/clients")
+}
+
+func TestCommandGivesUpOnACompositorThatNeverReads(t *testing.T) {
+	conn := ConnectTo(ipcsocktest.Silent(t), "")
+	conn.limits = ipcsocktest.Fast
+	request := strings.Repeat("x", 16<<20)
+	ipcsocktest.GivesUp(t, func() error {
+		_, err := conn.Command(request)
+		return err
+	}, "hyprland", "write")
+}
+
+func TestCommandNamesWhatItCouldNotConnectFor(t *testing.T) {
+	conn := ConnectTo(filepath.Join(t.TempDir(), "gone.sock"), "")
+	_, err := conn.Command("j/clients")
+	if err == nil || !strings.Contains(err.Error(), "j/clients") || !strings.Contains(err.Error(), "gone.sock") {
+		t.Errorf("error = %v, want the request and the socket", err)
 	}
 }
