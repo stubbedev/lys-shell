@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock/ipcsocktest"
 )
 
 // dialRaw connects the socket without sending an open frame.
@@ -248,5 +252,88 @@ func TestAConnectionWithoutAnOpenFrameIsDropped(t *testing.T) {
 	case <-h.opened:
 		t.Fatal("a first frame that is not open must not start a session")
 	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestASilentShellFailsTheFirstFrame(t *testing.T) {
+	silentShell(t)
+	c, err := open(ipcsocktest.Fast, SessionOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	ipcsocktest.GivesUp(t, func() error {
+		_, err := c.NextFrame()
+		return err
+	}, "launcher socket")
+}
+
+func TestRowsToAShellThatNeverReadsFail(t *testing.T) {
+	silentShell(t)
+	c, err := open(ipcsocktest.Fast, SessionOptions{Dmenu: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	row := strings.Repeat("x", 1<<20)
+	rows := make([]string, 16)
+	for i := range rows {
+		rows[i] = row
+	}
+	ipcsocktest.GivesUp(t, func() error { return c.SendRows(rows) }, "launcher socket")
+}
+
+func TestASessionWaitsPastTheDeadlineOnceTheShellAnswered(t *testing.T) {
+	dir := sockdir.Dir(t)
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	path, err := SocketPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = conn.Write([]byte(`{"type":"opened"}` + "\n"))
+		time.Sleep(3 * time.Duration(ipcsocktest.Fast))
+		_, _ = conn.Write([]byte(`{"type":"cancelled","code":1}` + "\n"))
+		time.Sleep(time.Second)
+	}()
+	c, err := open(ipcsocktest.Fast, SessionOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	for _, want := range []string{FrameOpened, FrameCancelled} {
+		f, err := c.NextFrame()
+		if err != nil || f.Type != want {
+			t.Fatalf("frame %q, %v, want %q", f.Type, err, want)
+		}
+	}
+}
+
+func silentShell(t *testing.T) {
+	t.Helper()
+	silent := ipcsocktest.Silent(t)
+	t.Setenv("XDG_RUNTIME_DIR", filepath.Dir(silent))
+	path, err := SocketPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(silent, path); err != nil {
+		t.Fatal(err)
 	}
 }

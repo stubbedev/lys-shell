@@ -9,6 +9,9 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // ErrDisconnected is the shell closing the connection without a
@@ -20,22 +23,32 @@ var ErrDisconnected = errors.New("launcher session ended unexpectedly")
 // the socket, and the shell reads that EOF as the client dying and
 // tears the surface down.
 type Client struct {
-	conn   net.Conn
-	reader *bufio.Reader
-	mu     sync.Mutex
+	conn     net.Conn
+	reader   *bufio.Reader
+	timeout  ipcsock.Timeout
+	answered bool
+	mu       sync.Mutex
 }
 
 // Open connects the launcher socket and sends the open frame.
 func Open(options SessionOptions, replace bool) (*Client, error) {
+	return open(ipcsock.Standard, options, replace)
+}
+
+func open(timeout ipcsock.Timeout, options SessionOptions, replace bool) (*Client, error) {
 	path, err := SocketPath()
 	if err != nil {
 		return nil, err
 	}
-	conn, err := net.Dial("unix", path)
+	conn, err := ipcsock.Dial(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to lys-shell launcher socket at %s: %w", path, err)
 	}
-	c := &Client{conn: conn, reader: bufio.NewReaderSize(conn, 64*1024)}
+	if err := timeout.ArmRead(conn); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("launcher socket I/O failed: %w", err)
+	}
+	c := &Client{conn: conn, reader: bufio.NewReaderSize(conn, 64*1024), timeout: timeout}
 	if err := c.send(ClientFrame{Type: FrameOpen, Options: &options, Replace: replace}); err != nil {
 		_ = conn.Close()
 		return nil, err
@@ -58,6 +71,9 @@ func (c *Client) send(f ClientFrame) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if err := c.timeout.ArmWrite(c.conn); err != nil {
+		return fmt.Errorf("launcher socket I/O failed: %w", err)
+	}
 	if _, err := c.conn.Write(append(line, '\n')); err != nil {
 		return fmt.Errorf("launcher socket I/O failed: %w", err)
 	}
@@ -65,6 +81,7 @@ func (c *Client) send(f ClientFrame) error {
 }
 
 // NextFrame reads the next shell frame; EOF is ErrDisconnected.
+// The shell owes its first frame at once, and the rest whenever the person acts.
 func (c *Client) NextFrame() (ServerFrame, error) {
 	line, err := c.reader.ReadString('\n')
 	if errors.Is(err, io.EOF) && strings.TrimSpace(line) == "" {
@@ -76,6 +93,12 @@ func (c *Client) NextFrame() (ServerFrame, error) {
 	var f ServerFrame
 	if err := json.Unmarshal([]byte(strings.TrimSpace(line)), &f); err != nil {
 		return ServerFrame{}, fmt.Errorf("launcher socket protocol error: %w", err)
+	}
+	if !c.answered {
+		c.answered = true
+		if err := c.conn.SetReadDeadline(time.Time{}); err != nil {
+			return ServerFrame{}, fmt.Errorf("launcher socket I/O failed: %w", err)
+		}
 	}
 	return f, nil
 }
