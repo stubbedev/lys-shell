@@ -147,6 +147,8 @@ type mountGen struct {
 	done    chan struct{}
 	life    context.Context
 	cancel  context.CancelFunc
+	// releases run when the generation retires, before retire returns.
+	releases []func()
 }
 
 func newMountGen() *mountGen {
@@ -172,7 +174,20 @@ func (g *mountGen) retire() {
 		g.retired.Store(true)
 		close(g.done)
 		g.cancel()
+		for _, release := range g.releases {
+			release()
+		}
 	})
+}
+
+// OnRetire runs release as the module's generation retires, before retire
+// returns and so before the next generation mounts: for what only one
+// holder can have, which the next generation's module would be refused.
+// Call it on the loop, as mounting does. Outside a generation nothing retires.
+func (c ModuleContext) OnRetire(release func()) {
+	if c.gen != nil {
+		c.gen.releases = append(c.gen.releases, release)
+	}
 }
 
 // ended is closed once the generation retires; nil (never) for a

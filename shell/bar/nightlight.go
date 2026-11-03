@@ -176,6 +176,7 @@ func newNightlightWith(ctx ModuleContext, env sunsetEnv) (*nightlightModule, err
 		return nil, err
 	}
 	m.filter = filter
+	ctx.OnRetire(m.Stop)
 	m.icon = moduleIcon(ctx, cfg.IconOffView())
 	m.btn = newBarButton(ctx, m.icon, "")
 

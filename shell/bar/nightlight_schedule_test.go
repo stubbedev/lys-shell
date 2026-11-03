@@ -1181,3 +1181,37 @@ func TestNightlightFailsWithoutAColourProtocol(t *testing.T) {
 		t.Errorf("err = %v, want ErrUnsupported", err)
 	}
 }
+
+// A rebuilt bar must not leave the old module owning the display colours:
+// the compositor would refuse the new one for as long as the shell runs, and
+// its toggle would do nothing on the screen.
+func TestRetiringTheBarLetsGoOfTheColoursBeforeTheNextMounts(t *testing.T) {
+	fake := &fakeSunset{clock: sunsetDay}
+	ctx := newTestContext(t, sunsetConfig(true))
+	ctx.gen = newMountGen()
+	m, err := newNightlightWith(ctx, fake.env(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.toggle()
+	if !fake.running {
+		t.Fatal("the toggle did not start the filter")
+	}
+	if fake.closed {
+		t.Fatal("a live generation closed its filter")
+	}
+	ctx.gen.retire()
+	if !fake.closed {
+		t.Error("retire returned with the old module still owning the colours")
+	}
+	ctx.gen.retire()
+}
+
+// Outside a generation nothing retires, so nothing releases on its own.
+func TestOnRetireOutsideAGenerationDoesNothing(t *testing.T) {
+	ran := false
+	ModuleContext{}.OnRetire(func() { ran = true })
+	if ran {
+		t.Error("release ran with no generation retiring")
+	}
+}
