@@ -74,9 +74,9 @@ func disks(wanted func(mount string) bool) []Disk {
 	return out
 }
 
-func unescapeMount(s string) string {
-	return strings.NewReplacer(`\134`, `\`, `\040`, " ", `\011`, "\t", `\012`, "\n").Replace(s)
-}
+var mountEscapes = strings.NewReplacer(`\134`, `\`, `\040`, " ", `\011`, "\t", `\012`, "\n")
+
+func unescapeMount(s string) string { return mountEscapes.Replace(s) }
 
 // statvfs is load_statvfs_values: block size times blocks and times
 // available blocks; a zero total is no disk.

@@ -404,7 +404,7 @@ var schemaDocs = map[string]string{
 	"CyclingMode":                                            "Wallpaper cycling order.",
 	"CyclingMode=sequential":                                 "Alphabetical order.",
 	"CyclingMode=shuffle":                                    "Random order.",
-	"DashboardConfig":                                        "Quick-access button with a distro icon; opens the dashboard dropdown.",
+	"DashboardConfig":                                        "Quick-access button with a distro icon; opens the dashboard dropdown.\n\nWhile it holds the keyboard, the arrow keys move between its controls,\nHome and End go to the first and the last, Return or Space press the\nfocused one, Escape closes it, and on a slider Left and Right change the\nvalue while Up and Down leave it.",
 	"DashboardConfig.BatteryCritical":                        "Battery percent at or below which the dashboard battery shows critical.",
 	"DashboardConfig.BatteryWarning":                         "Battery percent at or below which the dashboard battery shows warning.",
 	"DashboardConfig.BorderColor":                            "Border color token.",

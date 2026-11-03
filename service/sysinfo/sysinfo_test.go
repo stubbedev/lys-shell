@@ -579,6 +579,15 @@ func TestCPUReaderOmitsWhatItIsToldTo(t *testing.T) {
 	}
 }
 
+func TestUnescapeMount(t *testing.T) {
+	if got := unescapeMount(`/mnt/a\040b\134c`); got != `/mnt/a b\c` {
+		t.Errorf("unescaped = %q", got)
+	}
+	if allocs := testing.AllocsPerRun(10, func() { unescapeMount("/mnt/plain") }); allocs > 5 {
+		t.Errorf("a plain mount allocates %.0f times, want at most 5", allocs)
+	}
+}
+
 func TestDisksAtStatsOnlyTheMountsAskedFor(t *testing.T) {
 	all := Disks()
 	if len(all) == 0 {

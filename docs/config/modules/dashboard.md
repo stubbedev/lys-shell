@@ -9,6 +9,11 @@ outline: [2, 3]
 
 Quick-access button with a distro icon; opens the dashboard dropdown.
 
+While it holds the keyboard, the arrow keys move between its controls,
+Home and End go to the first and the last, Return or Space press the
+focused one, Escape closes it, and on a slider Left and Right change the
+value while Up and Down leave it.
+
 Add it to your layout with `dashboard`:
 
 ```yaml

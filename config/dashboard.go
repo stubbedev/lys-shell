@@ -3,6 +3,11 @@ package config
 // DashboardConfig is ported from crates/wayle-config/src/schemas/modules/dashboard/mod.rs.
 //
 // Quick-access button with a distro icon; opens the dashboard dropdown.
+//
+// While it holds the keyboard, the arrow keys move between its controls,
+// Home and End go to the first and the last, Return or Space press the
+// focused one, Escape closes it, and on a slider Left and Right change the
+// value while Up and Down leave it.
 type DashboardConfig struct {
 	// Override the auto-detected distro icon.
 	IconOverride string `cfg:"icon-override"`

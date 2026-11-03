@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"math"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,10 @@ import (
 // open: system stats, network rates, and the media position.
 const dashboardPoll = time.Second
 
+const dashboardDiskPolls = 30
+
+const dashboardReadTimeout = 2 * time.Second
+
 // dashboardArtInstances numbers the media art's per-instance class
 // (media_section's dashboard-media-art-instance-N); the stylesheet
 // hangs the cover's background-image off it per section.
@@ -37,24 +42,70 @@ var dashboardArtInstances atomic.Uint64
 // system rings, and the user session, following their services while
 // open.
 type dashboardView struct {
+	widget.Base
 	ctx  ModuleContext
 	font render.Font
 	px   float64
 
-	*widget.Box
-	refreshers []func()
+	root       *widget.Box
+	scroll     *widget.Scroll
+	quick      *widget.Grid
+	refreshers []func(dashboardReadings)
 	pollers    []func()
+	pollStats  func()
 	stops      []func()
 	once       sync.Once
 	stop       chan struct{}
+
+	followOnce sync.Once
+	shownCount int
+	shown      atomic.Bool
+	pollStop   chan struct{}
+	stale      bool
+	refreshes  atomic.Int64
+	diskIn     int
+}
+
+type dashboardReadings struct {
+	network   network.Snapshot
+	networkOK bool
+	profiles  powerprofiles.Snapshot
+	battery   upower.Device
+	batteryOK bool
+}
+
+func (v *dashboardView) read() dashboardReadings {
+	ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+	defer cancel()
+	var r dashboardReadings
+	var err error
+	if v.ctx.Network != nil {
+		if r.network, err = v.ctx.Network.Read(ctx); err != nil {
+			log.Printf("dashboard: read network: %v", err)
+		}
+		r.networkOK = err == nil
+	}
+	if v.ctx.PowerProfiles != nil {
+		if r.profiles, err = v.ctx.PowerProfiles.Read(ctx); err != nil {
+			log.Printf("dashboard: read power profile: %v", err)
+			r.profiles.Available = false
+		}
+	}
+	if v.ctx.Battery != nil {
+		if r.battery, err = v.ctx.Battery.Read(ctx); err != nil {
+			log.Printf("dashboard: read battery: %v", err)
+		}
+		r.batteryOK = err == nil
+	}
+	return r
 }
 
 func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &dashboardView{ctx: ctx, font: font, px: px, stop: make(chan struct{})}
-	v.Box = widget.NewBox(widget.Column, 0, 0)
-	v.AddClass("dropdown", "dashboard-dropdown")
-	v.Append(v.header(), false)
+	v.root = widget.NewBox(widget.Column, 0, 0)
+	v.root.AddClass("dropdown", "dashboard-dropdown")
+	v.root.Append(v.header(), false)
 	// The content's inset sits outside the scroll: .dropdown-content >
 	// .dashboard-scroll > .dashboard-content-box (dashboard/mod.rs).
 	content := dropdownContent()
@@ -68,14 +119,31 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	sections.Append(v.infoRow(), false)
 	sections.Append(v.systemStats(), false)
 	sections.Append(userSessionSection(ctx), false)
-	content.Append(growingScroll(dropdownScroll(sections, "dashboard-scroll")), true)
-	v.Append(content, true)
-	for _, refresh := range v.refreshers {
-		refresh()
-	}
-	v.follow()
+	v.scroll = growingScroll(dropdownScroll(sections, "dashboard-scroll"))
+	content.Append(v.scroll, true)
+	v.root.Append(content, true)
+	v.apply(dashboardReadings{})
+	v.refreshAll()
+	v.pollStats()
 	return v
 }
+
+func (v *dashboardView) Measure(axis widget.Axis, forSize int) widget.Sizes {
+	widget.SetParents(v, v.root)
+	return v.root.Measure(axis, forSize)
+}
+
+func (v *dashboardView) Arrange(r render.Rect) {
+	v.ArrangeSelf(r)
+	widget.SetParents(v, v.root)
+	v.root.Arrange(r)
+}
+
+func (v *dashboardView) Paint(cv *render.Canvas) { widget.PaintChild(cv, v.root) }
+
+func (v *dashboardView) Children() []widget.Widget { return []widget.Widget{v.root} }
+
+func (v *dashboardView) HitTest(pt widget.Point) widget.Widget { return v.root.HitTest(pt) }
 
 // label builds the panel's labels at the dropdown's text size; their
 // classes ink and size them, so no color is set here.
@@ -152,6 +220,7 @@ func (v *dashboardView) quickActions() widget.Widget {
 	grid := widget.NewGrid(th.Spacing, th.Spacing).SetColumnHomogeneous(true).SetRowHomogeneous(true)
 	grid.AddClass("quick-actions")
 	card.Append(grid, false)
+	v.quick = grid
 
 	type toggle struct {
 		btn  *widget.Button
@@ -254,12 +323,10 @@ func (v *dashboardView) quickActions() widget.Widget {
 		}()
 	})
 
-	v.refreshers = append(v.refreshers, func() {
+	v.refreshers = append(v.refreshers, func(r dashboardReadings) {
 		state.hasWifi = wifiDev()
-		if v.ctx.Network != nil {
-			if snap, err := v.ctx.Network.Read(bctx); err == nil {
-				state.wifiOn = snap.WifiEnabled
-			}
+		if r.networkOK {
+			state.wifiOn = r.network.WifiEnabled
 		}
 		if v.ctx.Bluetooth != nil {
 			bs := v.ctx.Bluetooth.State()
@@ -271,11 +338,8 @@ func (v *dashboardView) quickActions() widget.Widget {
 		if v.ctx.IdleInhibit != nil {
 			state.idleOn = v.ctx.IdleInhibit.Active()
 		}
-		if v.ctx.PowerProfiles != nil {
-			if snap, err := v.ctx.PowerProfiles.Read(bctx); err == nil && snap.Available {
-				state.hasPP, state.saverOn = true, snap.Active == powerprofiles.ProfilePowerSaver
-			}
-		}
+		state.hasPP = r.profiles.Available
+		state.saverOn = r.profiles.Available && r.profiles.Active == powerprofiles.ProfilePowerSaver
 		quickActionsState.Lock()
 		air := quickActionsState.airplane
 		quickActionsState.Unlock()
@@ -284,12 +348,12 @@ func (v *dashboardView) quickActions() widget.Widget {
 			t.btn.SetEnabled(sensitive)
 		}
 		apply(wifi, state.wifiOn, state.hasWifi && !air)
-		wifi.icon.SetThemeName(map[bool]string{true: "ld-wifi-symbolic", false: "ld-wifi-off-symbolic"}[state.wifiOn])
+		wifi.icon.SetThemeName(dashboardGlyph(state.wifiOn, "ld-wifi-symbolic", "ld-wifi-off-symbolic"))
 		apply(bt, state.btOn, state.hasBT && !air)
-		bt.icon.SetThemeName(map[bool]string{true: "ld-bluetooth-symbolic", false: "ld-bluetooth-off-symbolic"}[state.btOn])
+		bt.icon.SetThemeName(dashboardGlyph(state.btOn, "ld-bluetooth-symbolic", "ld-bluetooth-off-symbolic"))
 		apply(airplane, air, state.hasWifi || state.hasBT)
 		apply(dnd, state.dndOn, v.ctx.Notifications != nil)
-		dnd.icon.SetThemeName(map[bool]string{true: "ld-bell-off-symbolic", false: "ld-bell-symbolic"}[state.dndOn])
+		dnd.icon.SetThemeName(dashboardGlyph(state.dndOn, "ld-bell-off-symbolic", "ld-bell-symbolic"))
 		apply(idle, state.idleOn, true)
 		apply(saver, state.saverOn, state.hasPP)
 	})
@@ -320,6 +384,7 @@ func (v *dashboardView) controls() widget.Widget {
 	row.AppendAligned(mute, false, widget.AlignCenter)
 	slider := widgets.NewDebouncedSlider(0, v.font, v.px, 0, v.ctx.Invoke)
 	slider.ValueLabel().AddClass("dashboard-slider-value", css.Numeric)
+	slider.Knob.AddClass("dashboard-slider")
 	slider.Write = func(pct float64) func() {
 		return func() {
 			if err := v.ctx.Pulse.SetVolume(bctx, pct); err != nil {
@@ -335,7 +400,7 @@ func (v *dashboardView) controls() widget.Widget {
 	device.SetAlignment(render.AlignEnd)
 	controls.Append(device, false)
 	card.Append(controls, false)
-	v.refreshers = append(v.refreshers, func() {
+	v.refreshers = append(v.refreshers, func(dashboardReadings) {
 		// No service: the no-device state, like ControlsSection without
 		// an AudioService.
 		if v.ctx.Pulse == nil {
@@ -355,7 +420,7 @@ func (v *dashboardView) controls() widget.Widget {
 		muted = sink.Muted
 		device.SetText(sink.Description)
 		slider.Set(sink.Volume.AveragePercentage())
-		muteIcon.SetThemeName(map[bool]string{true: "ld-volume-x-symbolic", false: "ld-volume-2-symbolic"}[muted])
+		muteIcon.SetThemeName(dashboardGlyph(muted, "ld-volume-x-symbolic", "ld-volume-2-symbolic"))
 	})
 	return card
 }
@@ -445,7 +510,7 @@ func (v *dashboardView) media() widget.Widget {
 	compact.AppendAligned(controls, false, widget.AlignCenter)
 
 	seek := widgets.NewDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
-	seek.Knob.AddClass("media-seek-slider")
+	seek.Knob.AddClass("media-seek-slider", "dashboard-slider")
 	elapsed := v.label("0:00")
 	elapsed.AddClass("media-time", css.Caption, css.DimLabel, css.Numeric)
 	length := v.label("0:00")
@@ -489,7 +554,7 @@ func (v *dashboardView) media() widget.Widget {
 		elapsed.SetText(formatMediaDuration(pos))
 		seek.Set(mediaProgress(pos, current.Length))
 	}
-	v.refreshers = append(v.refreshers, func() {
+	v.refreshers = append(v.refreshers, func(dashboardReadings) {
 		src := v.ctx.Media
 		if src == nil {
 			current, has = mpris.Player{}, false
@@ -513,7 +578,7 @@ func (v *dashboardView) media() widget.Widget {
 			art.Clear()
 			art.Append(widgets.Center(mediaArt(artURL, "ld-music-symbolic", "dashboard-media-art-placeholder", "", int(v.px*1.4))), true)
 		}
-		playIcon.SetThemeName(map[bool]string{true: "ld-pause-symbolic", false: "ld-play-symbolic"}[current.State == mpris.StatePlaying])
+		playIcon.SetThemeName(dashboardGlyph(current.State == mpris.StatePlaying, "ld-pause-symbolic", "ld-play-symbolic"))
 		prev.SetEnabled(current.CanGoPrevious)
 		next.SetEnabled(current.CanGoNext)
 		seek.SetEnabled(current.CanSeek)
@@ -624,10 +689,9 @@ func (v *dashboardView) battery() widget.Widget {
 	profileRow.AppendAligned(profileIcon, false, widget.AlignCenter)
 	profileRow.AppendAligned(profileLabel, false, widget.AlignCenter)
 	card.Append(profileRow, false)
-	bctx := context.Background()
-	v.refreshers = append(v.refreshers, func() {
-		dev, err := v.ctx.Battery.Read(bctx)
-		card.SetVisible(err == nil && dev.IsPresent)
+	v.refreshers = append(v.refreshers, func(r dashboardReadings) {
+		dev := r.battery
+		card.SetVisible(r.batteryOK && dev.IsPresent)
 		if !card.Visible() {
 			return
 		}
@@ -660,16 +724,12 @@ func (v *dashboardView) battery() widget.Widget {
 		// percent (battery_section/mod.rs).
 		setClass(remaining, "warning", warning)
 		setClass(remaining, "critical", critical)
-		if v.ctx.PowerProfiles != nil {
-			if snap, err := v.ctx.PowerProfiles.Read(bctx); err == nil && snap.Available {
-				label, glyph := dashboardProfile(snap.Active)
-				profileLabel.SetText(label)
-				profileIcon.SetThemeName(glyph)
-				profileRow.SetVisible(true)
-				return
-			}
+		profileRow.SetVisible(r.profiles.Available)
+		if r.profiles.Available {
+			label, glyph := dashboardProfile(r.profiles.Active)
+			profileLabel.SetText(label)
+			profileIcon.SetThemeName(glyph)
 		}
-		profileRow.SetVisible(false)
 	})
 	return card
 }
@@ -714,6 +774,7 @@ func (v *dashboardView) network() widget.Widget {
 	var prev map[string]sysinfo.NetTotals
 	var prevAt time.Time
 	var connected bool
+	var lastRx, lastTx uint64
 	unit := func(mega bool) string {
 		if mega {
 			return i18n.T("dropdown-dashboard-network-speed-mbs")
@@ -737,18 +798,16 @@ func (v *dashboardView) network() widget.Widget {
 			setClass(s.box, "muted", !connected)
 		}
 	}
-	v.refreshers = append(v.refreshers, func() {
-		connected = false
-		if v.ctx.Network != nil {
-			if snap, err := v.ctx.Network.Read(context.Background()); err == nil {
-				connected = dashboardConnected(snap)
-			}
-		}
-		show(0, 0)
+	v.refreshers = append(v.refreshers, func(r dashboardReadings) {
+		connected = r.networkOK && dashboardConnected(r.network)
+		show(lastRx, lastTx)
 	})
+	reader := &sysinfo.NetReader{}
+	v.stops = append(v.stops, reader.Close)
 	v.pollers = append(v.pollers, func() {
-		totals, err := sysinfo.ReadNetTotals()
+		totals, err := reader.Read()
 		if err != nil {
+			log.Printf("dashboard: read network totals: %v", err)
 			return
 		}
 		now := time.Now()
@@ -764,6 +823,7 @@ func (v *dashboardView) network() widget.Widget {
 			}
 		}
 		prev, prevAt = totals, now
+		lastRx, lastTx = rx, tx
 		show(rx, tx)
 	})
 	return card
@@ -806,43 +866,134 @@ func (v *dashboardView) systemStats() widget.Widget {
 	usage := func(r *statRing, pct float32) {
 		r.set(float64(pct/100), strconv.FormatFloat(float64(pct), 'f', 0, 32)+"%", dashboardThresholdClass(pct, cfg.UsageWarning, cfg.UsageError))
 	}
-	reader := &sysinfo.CPUReader{Sensor: v.ctx.Config.CPU.TempSensor}
-	v.stops = append(v.stops, reader.Close)
-	poll := func() {
-		if cpu, err := reader.Read(); err == nil {
+	cpuReader := &sysinfo.CPUReader{Sensor: v.ctx.Config.CPU.TempSensor, OmitFrequency: true}
+	memReader := &sysinfo.MemoryReader{}
+	v.stops = append(v.stops, cpuReader.Close, memReader.Close)
+	v.pollStats = func() {
+		cpu, err := cpuReader.Read()
+		if err != nil {
+			log.Printf("dashboard: read cpu: %v", err)
+		} else {
 			usage(cpuRing, cpu.UsagePercent)
 			if cpu.HasTemperature {
 				c := cpu.TemperatureC
 				tempRing.set(float64(min(max(c/100, 0), 1)), strconv.FormatFloat(float64(c), 'f', 0, 32)+"°", dashboardThresholdClass(c, cfg.TempWarning, cfg.TempError))
 			}
 		}
-		if mem, err := sysinfo.ReadMemory(); err == nil {
+		mem, err := memReader.Read()
+		if err != nil {
+			log.Printf("dashboard: read memory: %v", err)
+		} else {
 			pct, _ := memoryPercents(mem)
 			usage(memRing, pct)
 		}
-		root := float32(0)
-		for _, d := range sysinfo.Disks() {
-			if d.MountPoint == "/" {
-				root = float32(d.UsedBytes) / float32(d.TotalBytes) * 100
-			}
+		if v.diskIn > 0 {
+			v.diskIn--
+			return
 		}
-		usage(diskRing, root)
+		v.diskIn = dashboardDiskPolls - 1
+		for _, d := range sysinfo.DisksAt(dashboardRootMount) {
+			usage(diskRing, float32(d.UsedBytes)/float32(d.TotalBytes)*100)
+		}
 	}
-	v.refreshers = append(v.refreshers, poll)
-	v.pollers = append(v.pollers, poll)
+	v.pollers = append(v.pollers, v.pollStats)
 	return card
 }
 
-// refreshAll re-reads every section.
+var dashboardRootMount = []string{"/"}
+
+func dashboardGlyph(on bool, onIcon, offIcon string) string {
+	if on {
+		return onIcon
+	}
+	return offIcon
+}
+
 func (v *dashboardView) refreshAll() {
+	if v.ctx.App == nil {
+		v.apply(v.read())
+		return
+	}
+	if v.refreshes.Add(1) > 1 {
+		return
+	}
+	go func() {
+		for {
+			asked := v.refreshes.Load()
+			readings := v.read()
+			v.ctx.Invoke(func() { v.apply(readings) })
+			if v.refreshes.CompareAndSwap(asked, 0) {
+				return
+			}
+		}
+	}()
+}
+
+func (v *dashboardView) apply(readings dashboardReadings) {
 	for _, refresh := range v.refreshers {
-		refresh()
+		refresh(readings)
 	}
 }
 
-// follow keeps the dashboard current while open: every service change
-// re-reads the sections, and the poll paces stats, rates, and the
-// media position.
+func (v *dashboardView) poll() {
+	for _, poll := range v.pollers {
+		poll()
+	}
+}
+
+func (v *dashboardView) dropdownOpened() {
+	v.followOnce.Do(v.follow)
+	v.shownCount++
+	v.shown.Store(true)
+	if v.shownCount == 1 {
+		v.startPolling()
+	}
+	if v.stale {
+		v.stale = false
+		v.diskIn = 0
+		v.refreshAll()
+		v.poll()
+	}
+}
+
+func (v *dashboardView) dropdownHidden() {
+	if v.shownCount == 0 {
+		return
+	}
+	v.shownCount--
+	if v.shownCount > 0 {
+		return
+	}
+	v.shown.Store(false)
+	v.stale = true
+	if v.pollStop != nil {
+		close(v.pollStop)
+		v.pollStop = nil
+	}
+}
+
+func (v *dashboardView) startPolling() {
+	if v.ctx.App == nil {
+		return
+	}
+	stop := make(chan struct{})
+	v.pollStop = stop
+	go func() {
+		ticker := time.NewTicker(dashboardPoll)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-v.stop:
+				return
+			case <-ticker.C:
+				v.ctx.Invoke(v.poll)
+			}
+		}
+	}()
+}
+
 func (v *dashboardView) follow() {
 	if v.ctx.App == nil {
 		return
@@ -898,23 +1049,133 @@ func (v *dashboardView) follow() {
 		}()
 	}
 	go func() {
-		ticker := time.NewTicker(dashboardPoll)
-		defer ticker.Stop()
 		for {
 			select {
 			case <-v.stop:
 				return
 			case <-merged:
-				v.ctx.Invoke(v.refreshAll)
-			case <-ticker.C:
-				v.ctx.Invoke(func() {
-					for _, poll := range v.pollers {
-						poll()
-					}
-				})
+				if v.shown.Load() {
+					v.refreshAll()
+				}
 			}
 		}
 	}()
+}
+
+func (v *dashboardView) firstControl() widget.Widget {
+	if quick := focusablesUnder(v.quick, nil); len(quick) > 0 {
+		return quick[0]
+	}
+	if all := focusablesUnder(v.root, nil); len(all) > 0 {
+		return all[0]
+	}
+	return nil
+}
+
+func focusablesUnder(w widget.Widget, out []widget.Widget) []widget.Widget {
+	if widget.Describe(w).Focusable {
+		out = append(out, w)
+	}
+	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
+		for _, kid := range c.Children() {
+			out = focusablesUnder(kid, out)
+		}
+	}
+	return out
+}
+
+func (v *dashboardView) NavigateFocus(target widget.Widget, k widget.KeyAction) widget.Widget {
+	if widget.RoleOf(target) == widget.RoleSlider && k != widget.KeyUp && k != widget.KeyDown {
+		return nil
+	}
+	switch k {
+	case widget.KeyUp, widget.KeyDown, widget.KeyLeft, widget.KeyRight, widget.KeyHome, widget.KeyEnd:
+	default:
+		return nil
+	}
+	order := focusablesUnder(v.root, nil)
+	if len(order) == 0 {
+		return nil
+	}
+	var next widget.Widget
+	switch k {
+	case widget.KeyHome:
+		next = order[0]
+	case widget.KeyEnd:
+		next = order[len(order)-1]
+	default:
+		next = nearestToward(target, order, k)
+	}
+	if next == nil {
+		if slices.Contains(order, target) {
+			return target
+		}
+		return nil
+	}
+	v.scrollTo(next)
+	return next
+}
+
+func nearestToward(target widget.Widget, order []widget.Widget, k widget.KeyAction) widget.Widget {
+	at, ok := target.(widget.Boundser)
+	if !ok {
+		return nil
+	}
+	from := at.Bounds()
+	var best widget.Widget
+	bestScore := 0
+	for _, w := range order {
+		if w == target {
+			continue
+		}
+		other, ok := w.(widget.Boundser)
+		if !ok {
+			continue
+		}
+		b := other.Bounds()
+		var along, across int
+		switch k {
+		case widget.KeyDown:
+			along, across = b.Y-(from.Y+from.H), spanGap(from.X, from.W, b.X, b.W)
+		case widget.KeyUp:
+			along, across = from.Y-(b.Y+b.H), spanGap(from.X, from.W, b.X, b.W)
+		case widget.KeyRight:
+			along, across = b.X-(from.X+from.W), spanGap(from.Y, from.H, b.Y, b.H)
+		default:
+			along, across = from.X-(b.X+b.W), spanGap(from.Y, from.H, b.Y, b.H)
+		}
+		sideways := k == widget.KeyLeft || k == widget.KeyRight
+		if along < 0 || (sideways && across > 0) {
+			continue
+		}
+		if score := along + 3*across; best == nil || score < bestScore {
+			best, bestScore = w, score
+		}
+	}
+	return best
+}
+
+func spanGap(a, aLen, b, bLen int) int {
+	return max(0, max(b-(a+aLen), a-(b+bLen)))
+}
+
+func (v *dashboardView) scrollTo(w widget.Widget) {
+	if !slices.Contains(focusablesUnder(v.scroll, nil), w) {
+		v.scroll.SetOffset(0, 0)
+		return
+	}
+	control, ok := w.(widget.Boundser)
+	if !ok {
+		return
+	}
+	view, b := v.scroll.Bounds(), control.Bounds()
+	_, y := v.scroll.Offset()
+	switch {
+	case b.Y < view.Y:
+		v.scroll.SetOffset(0, y-(view.Y-b.Y))
+	case b.Y+b.H > view.Y+view.H:
+		v.scroll.SetOffset(0, y+(b.Y+b.H)-(view.Y+view.H))
+	}
 }
 
 // subscriber is the Subscribe seam the pulse, network, power-profiles,
