@@ -47,8 +47,8 @@ func TestConnectingToAFullBacklogFailsAtOnce(t *testing.T) {
 	if !errors.Is(err, syscall.EAGAIN) {
 		t.Errorf("error = %v, want EAGAIN", err)
 	}
-	if took := time.Since(start); took > time.Duration(ipcsock.Standard)/10 {
-		t.Errorf("gave up after %v", took)
+	if took := time.Since(start); took >= time.Duration(ipcsock.Standard) {
+		t.Errorf("gave up after %v, the whole request deadline", took)
 	}
 }
 

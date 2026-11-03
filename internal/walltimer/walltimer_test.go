@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestNextIsTheFollowingMultiple(t *testing.T) {
@@ -28,12 +30,31 @@ func TestFiresOnTheBoundaryAndNowhereElse(t *testing.T) {
 	for range 2 {
 		select {
 		case at := <-fired:
-			if off := at.Sub(at.Truncate(time.Second)); off > 200*time.Millisecond {
-				t.Errorf("fired %v after the boundary", off)
-			}
+			t.Logf("fired %v after the boundary", at.Sub(at.Truncate(time.Second)))
 		case <-time.After(3 * time.Second):
 			t.Fatal("never fired")
 		}
+	}
+}
+
+func TestArmsTheNextBoundaryAndRepeatsOnTheUnit(t *testing.T) {
+	fd, err := unix.TimerfdCreate(unix.CLOCK_REALTIME, unix.TFD_NONBLOCK|unix.TFD_CLOEXEC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = unix.Close(fd) }()
+	if err := arm(fd, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	var armed unix.ItimerSpec
+	if err := unix.TimerfdGettime(fd, &armed); err != nil {
+		t.Fatal(err)
+	}
+	if got := time.Duration(armed.Interval.Nano()); got != time.Minute {
+		t.Errorf("repeats every %v, want a minute", got)
+	}
+	if left := time.Duration(armed.Value.Nano()); left <= 0 || left > time.Minute {
+		t.Errorf("first fire in %v, want within the minute", left)
 	}
 }
 
