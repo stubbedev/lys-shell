@@ -74,7 +74,7 @@ func newTestMango(t *testing.T, cfg *config.Config, connector string) *cwsModule
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	return m

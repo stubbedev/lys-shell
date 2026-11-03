@@ -199,10 +199,7 @@ func (g *mountGen) ended() <-chan struct{} {
 	return g.done
 }
 
-// follow runs fn for every value from ch until the module's
-// generation retires or ch closes, then stops the subscription. fn
-// runs through Invoke.
-func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
+func drain[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 	go func() {
 		if stop != nil {
 			defer stop()
@@ -215,10 +212,39 @@ func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 				if !ok {
 					return
 				}
-				ctx.Invoke(func() { fn(v) })
+				fn(v)
 			}
 		}
 	}()
+}
+
+// follow runs fn through Invoke with the values from ch until the module's
+// generation retires or ch closes, then stops the subscription. One call waits
+// on the loop at a time, with the latest value: values a stalled loop did not
+// get to coalesce, so no feed follows it may need every value.
+func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
+	var (
+		mu      sync.Mutex
+		latest  T
+		waiting bool
+	)
+	drain(ctx, ch, stop, func(v T) {
+		mu.Lock()
+		latest = v
+		queue := !waiting
+		waiting = true
+		mu.Unlock()
+		if !queue {
+			return
+		}
+		ctx.Invoke(func() {
+			mu.Lock()
+			next := latest
+			waiting = false
+			mu.Unlock()
+			fn(next)
+		})
+	})
 }
 
 func followRefresh(ctx ModuleContext, module string, subscribe func(context.Context) (<-chan struct{}, func(), error), refresh func() error) error {

@@ -111,7 +111,7 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.source.Devices, m.apply); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.btn.Label().Text(); got != "50%" {
@@ -122,7 +122,7 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 	}
 
 	source.setDevices([]brightness.Device{{Brightness: 9000, Max: 10000}})
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.source.Devices, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := m.btn.Label().Text(); got != "90%" {
@@ -142,7 +142,7 @@ func TestBrightnessNoDevicesShowsDashes(t *testing.T) {
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.source.Devices, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := m.btn.Label().Text(); got != "--%" {
@@ -205,7 +205,7 @@ func TestBrightnessModuleIconFollowsTheLevel(t *testing.T) {
 		t.Fatalf("icon at 90%% = %v, want high", m.icon)
 	}
 	source.setDevices(nil)
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.source.Devices, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if m.icon.Name() != "low" || m.btn.Label().Text() != "--%" {

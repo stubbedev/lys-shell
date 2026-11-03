@@ -339,3 +339,67 @@ func TestFollowReducedMotionSeedsFollowsAndSaysWhenItEnds(t *testing.T) {
 		t.Fatal("gone was not called when the stream ended")
 	}
 }
+
+func TestWatchTitlesDropsHiddenWindows(t *testing.T) {
+	f := lyswmtest.Start(t)
+	announced := make(chan struct{}, 4)
+	w, err := lyswm.WatchTitles(func(window uint64) bool { return window == 9 }, func() { announced <- struct{}{} }, lyswm.EventWorkspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	f.AwaitWatch(t)
+	expect := func(what string, ticks bool) {
+		t.Helper()
+		wait := 2 * time.Second
+		if !ticks {
+			wait = 200 * time.Millisecond
+		}
+		select {
+		case <-w.Ticks():
+			if !ticks {
+				t.Errorf("%s ticked", what)
+			}
+			if len(announced) != 1 {
+				t.Errorf("%s: %d announcements ahead of its tick", what, len(announced))
+			}
+			<-announced
+		case <-time.After(wait):
+			if ticks {
+				t.Errorf("%s never ticked", what)
+			}
+		}
+	}
+	f.Events <- `{"event":"title","window":9,"title":"hidden"}`
+	expect("a hidden window's title", false)
+	f.Events <- `{"event":"title","window":4,"title":"shown"}`
+	expect("a shown window's title", true)
+	f.Events <- `{"event":"workspace","output":"DP-1","workspace":3}`
+	expect("a workspace", true)
+	f.Events <- `{"event":"submap","submap":"resize"}`
+	expect("another kind", false)
+}
+
+func TestWatchSurvivesAnEventWithAWindowObject(t *testing.T) {
+	f := lyswmtest.Start(t)
+	w, err := lyswm.WatchState(lyswm.LayoutState)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	f.AwaitWatch(t)
+	f.Events <- `{"event":"open","window":{"id":7,"app_id":"foot"}}`
+	f.Events <- `{"event":"focus","window":null}`
+	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
+	select {
+	case _, ok := <-w.Ticks():
+		if !ok {
+			t.Fatal("the stream ended on the window object")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no tick for the layout after the window object")
+	}
+	if got := w.Value(); got.Name != "German" {
+		t.Errorf("the layout reads %q", got.Name)
+	}
+}

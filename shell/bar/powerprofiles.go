@@ -37,20 +37,15 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles}
 	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons()[config.ProfileBalanced])
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followRefresh(ctx, "power-profiles", ctx.PowerProfiles.Subscribe, m.refresh); err != nil {
+	if _, err := followReads(ctx, "power-profiles", ctx.PowerProfiles.Subscribe, m.src.Read, m.apply); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-// refresh re-reads the daemon and restyles label and icon for the
-// active profile.
-func (m *powerProfilesModule) refresh() error {
+// apply restyles label and icon for the active profile.
+func (m *powerProfilesModule) apply(snap powerprofiles.Snapshot) {
 	cfg := m.ctx.Config.PowerProfiles
-	snap, err := m.src.Read(context.Background())
-	if err != nil {
-		return err
-	}
 	m.snap = snap
 	text := ""
 	if cfg.LabelShow && snap.Available {
@@ -63,7 +58,6 @@ func (m *powerProfilesModule) refresh() error {
 	}
 	color := cfg.Colors()[profile]
 	m.btn.SetThresholds(config.ThresholdColors{IconColor: &color, LabelColor: &color})
-	return nil
 }
 
 // profileOf is select_icon/select_colors' profile: power-saver and
@@ -87,14 +81,17 @@ func (m *powerProfilesModule) RunAction(action config.ClickAction) {
 	runClickAction(m.ctx, action)
 }
 
-// cycle writes the next profile; the daemon's PropertiesChanged tick
-// redraws. Synchronous: the click handler runs on the loop and the
-// tick repaints.
+// cycle writes the next profile off the loop; the daemon's
+// PropertiesChanged tick redraws.
 func (m *powerProfilesModule) cycle() {
 	next := powerprofiles.NextProfile(m.snap.Active, m.snap.Profiles)
-	if err := m.src.SetActive(context.Background(), next); err != nil {
-		log.Printf("power-profiles: cycle: %v", err)
-	}
+	go func() {
+		ctx, cancel := context.WithTimeout(m.ctx.Life(), offLoopTimeout)
+		defer cancel()
+		if err := m.src.SetActive(ctx, next); err != nil {
+			log.Printf("power-profiles: cycle to %s: %v", next, err)
+		}
+	}()
 }
 
 func (m *powerProfilesModule) Root() widget.Widget { return m.btn }

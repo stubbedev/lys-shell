@@ -351,7 +351,7 @@ func TestCwsRefreshMovesTheStates(t *testing.T) {
 	m := newTestCws(t, config.DefaultsSwayWorkspaces().View(), f)
 	one.active, one.focused, two.active, two.focused, two.hasWindows = false, false, true, true, true
 	f.workspaces = []cwsWorkspace{one, two, emptyWS(5, 5, "DP-1")}
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	first, second, third := m.segs.Segment(0), m.segs.Segment(1), m.segs.Segment(2)
@@ -676,7 +676,7 @@ func TestCwsBlinkRunsOnlyWhileUrgent(t *testing.T) {
 	}
 	// Urgency clears: the blink stops and stays off.
 	f.workspaces = []cwsWorkspace{occupiedWS(1, 1, "DP-1")}
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if m.blinkStop != nil || m.blinkOn {
@@ -685,12 +685,12 @@ func TestCwsBlinkRunsOnlyWhileUrgent(t *testing.T) {
 	// An urgent window on a displayed workspace also starts it; one on
 	// a hidden workspace does not.
 	f.windows = []cwsWindow{{id: 7, workspace: 99, hasWorkspace: true, urgent: true}}
-	_ = m.refresh()
+	_ = renderOnce(m.read, m.apply)
 	if m.blinkStop != nil {
 		t.Error("an urgent window on an undisplayed workspace started the blink")
 	}
 	f.windows[0].workspace = 1
-	_ = m.refresh()
+	_ = renderOnce(m.read, m.apply)
 	if m.blinkStop == nil {
 		t.Error("an urgent window on a displayed workspace did not start the blink")
 	}
@@ -754,5 +754,112 @@ func TestCwsFactoriesRequireTheirCompositor(t *testing.T) {
 		if _, err := Create(name, ctx); err == nil {
 			t.Errorf("%s without its compositor: want an error", name)
 		}
+	}
+}
+
+func segmentLabel(m *cwsModule, i int) *widget.Label { return findLabel(m.segs.Segment(i)) }
+
+func TestCwsKeepsContentThatStillShowsTheSame(t *testing.T) {
+	urgent := occupiedWS(1, 1, "DP-1")
+	urgent.urgent = true
+	other := occupiedWS(2, 2, "DP-1")
+	f := newFakeCws([]cwsWorkspace{urgent, other}, nil)
+	m := newTestCws(t, config.DefaultsSwayWorkspaces().View(), f)
+	first, second := segmentLabel(m, 0), segmentLabel(m, 1)
+	for range 3 {
+		m.blinkTick()
+		if segmentLabel(m, 0) != first || segmentLabel(m, 1) != second {
+			t.Fatal("a blink rebuilt the labels")
+		}
+	}
+	other.active = true
+	f.workspaces = []cwsWorkspace{urgent, other}
+	if err := renderOnce(m.read, m.apply); err != nil {
+		t.Fatal(err)
+	}
+	if segmentLabel(m, 0) != first || segmentLabel(m, 1) != second {
+		t.Fatal("a change of state rebuilt the labels")
+	}
+	other.num = 7
+	f.workspaces = []cwsWorkspace{urgent, other}
+	if err := renderOnce(m.read, m.apply); err != nil {
+		t.Fatal(err)
+	}
+	if segmentLabel(m, 0) != first {
+		t.Fatal("a change to another segment rebuilt this one's label")
+	}
+	if got := segmentLabel(m, 1); got == second || got.Text() != "7" {
+		t.Fatalf("the renumbered segment shows %q from the old label: %v", got.Text(), got == second)
+	}
+}
+
+func TestCwsAppIconUrgencyBlinksOnTheKeptIcon(t *testing.T) {
+	cfg := config.DefaultsSwayWorkspaces().View()
+	cfg.AppIconsShow = true
+	f := newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1")}, []cwsWindow{{id: 9, workspace: 1, hasWorkspace: true, urgent: true}})
+	m := newTestCws(t, cfg, f)
+	icons := func() []widget.Widget { return treetest.WithClass(m.segs, "workspace-icon") }
+	icon := icons()[0]
+	if !widget.HasClass(icon, "urgent") {
+		t.Fatal("the urgent window's icon starts unmarked with the blink on")
+	}
+	m.blinkTick()
+	if icons()[0] != icon || widget.HasClass(icon, "urgent") {
+		t.Errorf("the blink off left %v, kept %v", icon.(interface{ Classes() []string }).Classes(), icons()[0] == icon)
+	}
+	m.blinkTick()
+	if icons()[0] != icon || !widget.HasClass(icon, "urgent") {
+		t.Errorf("the blink on left %v, kept %v", icon.(interface{ Classes() []string }).Classes(), icons()[0] == icon)
+	}
+}
+
+func TestCwsSwitchMovesTheLabelColors(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bar = config.PlainBar()
+	ctx := styledContext(t, cfg)
+	ctx.Connector = "DP-1"
+	palette := ctx.Theme.RenderPalette()
+	resolve := func(cv config.ColorValue) render.Color { c, _ := styling.ResolveColor(cv, palette); return c }
+	wcfg := config.DefaultsNiriWorkspaces().View()
+	one, two := occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")
+	one.active = true
+	f := newFakeCws([]cwsWorkspace{one, two}, nil)
+	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bar, size := cwsBar(t, ctx, m)
+	has, _ := paintCwsBar(m, bar, size)
+	occupied := resolve(wcfg.OccupiedColor)
+	if has(0, occupied) || !has(1, occupied) {
+		t.Fatal("before the switch only the second label should hold the occupied color")
+	}
+	switchTo := func(oneActive bool) {
+		one.active, two.active = oneActive, !oneActive
+		f.workspaces = []cwsWorkspace{one, two}
+		if err := renderOnce(m.read, m.apply); err != nil {
+			t.Fatal(err)
+		}
+	}
+	switchTo(false)
+	has, _ = paintCwsBar(m, bar, size)
+	if has(0, occupied) || !has(1, occupied) {
+		t.Error("the labels flipped as the switch began")
+	}
+	restore := anim.SetInstant(true)
+	defer restore()
+	switchTo(true)
+	paintCwsBar(m, bar, size)
+	switchTo(false)
+	has, _ = paintCwsBar(m, bar, size)
+	if !has(0, occupied) || has(1, occupied) {
+		t.Error("with the motion finished the labels miss their new state's colors")
+	}
+}
+
+func TestCwsBlinkAllocatesLittle(t *testing.T) {
+	m := newTestCws(t, config.DefaultsSwayWorkspaces().View(), newFakeCws(cwsCostWorkspaces(), nil))
+	if got := testing.AllocsPerRun(100, m.blinkTick); got > 100 {
+		t.Fatalf("a blink allocates %.0f times, want at most 100", got)
 	}
 }

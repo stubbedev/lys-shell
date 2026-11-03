@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/stubbedev/lys-lib/intconv"
 
@@ -25,7 +27,8 @@ func newSwayWorkspaces(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "sway", cwsWorkspaces, ctx.Config.SwayWorkspaces.View(), &swayBackend{conn: conn})
+	cfg := ctx.Config.SwayWorkspaces.View()
+	return newCwsModule(ctx, "sway", cwsWorkspaces, cfg, &swayBackend{conn: conn, titles: cwsFollowsTitles(cfg)})
 }
 
 // newNiriWorkspaces is the niri-workspaces factory.
@@ -45,9 +48,10 @@ func newNiriWorkspaces(ctx ModuleContext) (Module, error) {
 // sway's visible flag, and every workspace carries its name and
 // output.
 type swayBackend struct {
-	conn *sway.Conn
-	mu   sync.Mutex
-	byID map[uint64]sway.Workspace
+	conn   *sway.Conn
+	titles bool
+	mu     sync.Mutex
+	byID   map[uint64]sway.Workspace
 }
 
 func (b *swayBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
@@ -111,7 +115,10 @@ func (b *swayBackend) focusPrevious(ctx context.Context) error { return b.conn.F
 func (b *swayBackend) focusLast(ctx context.Context) error { return b.conn.FocusBackAndForth(ctx) }
 
 func (b *swayBackend) subscribe() (<-chan struct{}, func(), error) {
-	return sway.Subscribe()
+	if b.titles {
+		return sway.Subscribe()
+	}
+	return sway.SubscribeWithoutTitles()
 }
 func (b *swayBackend) close() { _ = b.conn.Close() }
 
@@ -285,17 +292,42 @@ func newLysWMWorkspaces(ctx ModuleContext) (Module, error) {
 	if err := requireCompositor("lys-wm-workspaces", compositorLysWM); err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "lys-wm", cwsWorkspaces, ctx.Config.LysWMWorkspaces.View(), lysWMBackend{})
+	cfg := ctx.Config.LysWMWorkspaces.View()
+	var titles *lysWMTitles
+	if cwsFollowsTitles(cfg) {
+		titles = &lysWMTitles{}
+	}
+	return newCwsModule(ctx, "lys-wm", cwsWorkspaces, cfg, lysWMBackend{titles: titles})
 }
 
 var lysWMWorkspaceEvents = []lyswm.EventKind{
 	lyswm.EventOutput, lyswm.EventWorkspace, lyswm.EventFocusedOutput,
-	lyswm.EventOpen, lyswm.EventClose, lyswm.EventMove, lyswm.EventTitle, lyswm.EventUrgent,
+	lyswm.EventOpen, lyswm.EventClose, lyswm.EventMove, lyswm.EventUrgent,
 }
 
 var errNoPreviousWorkspace = errors.New("lys-wm has no action that returns to the previous workspace")
 
-type lysWMBackend struct{}
+type lysWMBackend struct{ titles *lysWMTitles }
+
+type lysWMTitles struct {
+	hidden atomic.Pointer[map[uint64]bool]
+}
+
+func (t *lysWMTitles) hides(window uint64) bool {
+	hidden := t.hidden.Load()
+	return hidden != nil && (*hidden)[window]
+}
+
+func (b lysWMBackend) hideTitles(shown []cwsButtonModel, windows []cwsWindow) {
+	if b.titles == nil {
+		return
+	}
+	hidden := make(map[uint64]bool, len(windows))
+	for _, w := range windows {
+		hidden[w.id] = !w.hasWorkspace || !slices.ContainsFunc(shown, func(m cwsButtonModel) bool { return m.ws.id == w.workspace })
+	}
+	b.titles.hidden.Store(&hidden)
+}
 
 func (lysWMBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
 	replies, err := lyswm.Workspaces()
@@ -342,8 +374,15 @@ func (lysWMBackend) focusPrevious(context.Context) error { return lyswm.Dispatch
 
 func (lysWMBackend) focusLast(context.Context) error { return errNoPreviousWorkspace }
 
-func (lysWMBackend) subscribe() (<-chan struct{}, func(), error) {
-	w, err := lyswm.Watch(lysWMWorkspaceEvents...)
+func (b lysWMBackend) subscribe() (<-chan struct{}, func(), error) {
+	if b.titles == nil {
+		w, err := lyswm.Watch(lysWMWorkspaceEvents...)
+		if err != nil {
+			return nil, nil, err
+		}
+		return w.Ticks(), w.Close, nil
+	}
+	w, err := lyswm.WatchTitles(b.titles.hides, func() { b.titles.hidden.Store(nil) }, lysWMWorkspaceEvents...)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -4,7 +4,9 @@
 package sni
 
 import (
+	"bytes"
 	"math"
+	"slices"
 	"strings"
 	"sync"
 
@@ -147,6 +149,20 @@ type Item struct {
 	MenuPath            string
 }
 
+func (it *Item) same(o *Item) bool {
+	return it.Bus == o.Bus && it.Path == o.Path && it.ID == o.ID && it.Title == o.Title &&
+		it.Category == o.Category && it.Status == o.Status && it.ItemIsMenu == o.ItemIsMenu &&
+		it.IconName == o.IconName && it.OverlayIconName == o.OverlayIconName && it.AttentionName == o.AttentionName &&
+		it.IconThemePath == o.IconThemePath && it.Tooltip == o.Tooltip && it.MenuPath == o.MenuPath &&
+		slices.EqualFunc(it.IconPixmap, o.IconPixmap, Pixmap.same) &&
+		slices.EqualFunc(it.OverlayIconPixmap, o.OverlayIconPixmap, Pixmap.same) &&
+		slices.EqualFunc(it.AttentionIconPixmap, o.AttentionIconPixmap, Pixmap.same)
+}
+
+func (p Pixmap) same(o Pixmap) bool {
+	return p.Width == o.Width && p.Height == o.Height && bytes.Equal(p.Data, o.Data)
+}
+
 // Key is the store's identity for an item.
 func (it *Item) Key() string { return it.Bus + it.Path }
 
@@ -206,11 +222,17 @@ func (s *Store) Get(key string) (Item, bool) {
 	return *it, true
 }
 
-// Put inserts or replaces an item, preserving registration order.
+// Put inserts or replaces an item, preserving registration order. An item
+// that reads as it did changes nothing, so no feed ticks.
 func (s *Store) Put(it *Item) {
 	s.mu.Lock()
 	key := it.Key()
-	if _, ok := s.items[key]; !ok {
+	old, ok := s.items[key]
+	if ok && old.same(it) {
+		s.mu.Unlock()
+		return
+	}
+	if !ok {
 		s.order = append(s.order, key)
 	}
 	s.items[key] = it

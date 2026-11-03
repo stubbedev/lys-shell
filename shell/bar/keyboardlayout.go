@@ -211,7 +211,7 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 	}
 	m := &keyboardLayout{ctx: ctx, source: source}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, ctx.Config.KeyboardInput.Icon()), "")
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.show); err != nil {
 		log.Printf("keyboard-input: %v", err)
 		m.show(unknownLayout)
 	}
@@ -220,31 +220,26 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 		source.close()
 		return nil, err
 	}
-	follow(ctx, ticks, func() {
+	newOffLoopRead(ctx, "keyboard-input", m.read, m.show).on(ticks, func() {
 		if stop != nil {
 			stop()
 		}
 		source.close()
-	}, func(struct{}) {
-		if err := m.refresh(); err != nil {
-			log.Printf("keyboard-input: %v", err)
-		}
 	})
 	return m, nil
 }
 
-// refresh re-reads the layout and shows it; on a read error the label
-// keeps the last known layout.
-func (m *keyboardLayout) refresh() error {
+// read reads the layout, off the loop; on an error the label keeps the
+// last known layout.
+func (m *keyboardLayout) read(context.Context) (string, error) {
 	layout, err := m.source.read()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if layout == "" {
-		layout = unknownLayout
+		return unknownLayout, nil
 	}
-	m.show(layout)
-	return nil
+	return layout, nil
 }
 
 // show renders layout into the label.

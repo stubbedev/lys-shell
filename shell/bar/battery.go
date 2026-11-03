@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"math"
 
@@ -59,18 +58,14 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	m := &battery{ctx: ctx, source: ctx.Battery}
 	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followRefresh(ctx, "battery", m.source.Subscribe, m.refresh); err != nil {
+	if _, err := followReads(ctx, "battery", m.source.Subscribe, m.source.Read, m.apply); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-// refresh reads the device and updates the label and state icon.
-func (m *battery) refresh() error {
-	dev, err := m.source.Read(context.Background())
-	if err != nil {
-		return err
-	}
+// apply updates the label and state icon for the device.
+func (m *battery) apply(dev upower.Device) {
 	cfg := m.ctx.Config.Battery
 	label := ""
 	if cfg.LabelShow {
@@ -79,7 +74,6 @@ func (m *battery) refresh() error {
 	m.btn.applyThresholds(dev.Percentage, cfg.Thresholds)
 	m.btn.SetLabel(label)
 	m.setIcon(cfg, dev)
-	return nil
 }
 
 // setIcon follows battery helpers.rs's select_icon: alert when absent

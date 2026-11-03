@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -83,7 +84,7 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 	m.actions = cwsActions{focus: backend.focus, next: backend.focusNext, previous: backend.focusPrevious, last: backend.focusLast}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		backend.close()
 		return nil, err
 	}
@@ -96,11 +97,7 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 		return nil, err
 	}
 	m.stopEvents = stop
-	follow(m.ctx, ticks, func() { m.Stop() }, func(struct{}) {
-		if err := m.refresh(); err != nil {
-			log.Printf("%s-workspaces: %v", m.kind, err)
-		}
-	})
+	newOffLoopRead(m.ctx, m.kind+"-workspaces", m.read, m.apply).on(ticks, m.Stop)
 	return m, nil
 }
 
@@ -117,29 +114,45 @@ func cwsBoldFace(ctx ModuleContext, px float64) render.Font {
 	return app.FontFallback(face)
 }
 
-// refresh re-queries the compositor and rebuilds (the WorkspacesChanged
-// arm of update_cmd).
-func (m *cwsModule) refresh() error {
+type cwsSnapshot struct {
+	workspaces []cwsWorkspace
+	windows    []cwsWindow
+}
+
+func (m *cwsModule) read(context.Context) (cwsSnapshot, error) {
 	workspaces, windows, err := m.backend.snapshot()
-	if err != nil {
-		return err
-	}
-	m.workspaces, m.windows = workspaces, windows
+	return cwsSnapshot{workspaces, windows}, err
+}
+
+// apply takes a snapshot on the loop and rebuilds (the WorkspacesChanged
+// arm of update_cmd).
+func (m *cwsModule) apply(s cwsSnapshot) {
+	m.workspaces, m.windows = s.workspaces, s.windows
 	m.rebuild()
 	m.syncBlink()
-	return nil
+	if f, ok := m.backend.(cwsTitleFilter); ok {
+		f.hideTitles(m.models, m.windows)
+	}
+}
+
+type cwsTitleFilter interface {
+	hideTitles(shown []cwsButtonModel, windows []cwsWindow)
 }
 
 // rebuild recomputes the button models from the cached snapshot and
-// swaps the buttons in.
+// shows them; models equal to those shown touch no widget.
 func (m *cwsModule) rebuild() {
-	m.models = cwsBuildModels(m.flavor, m.workspaces, m.windows, m.cfg, m.ctx.Connector, m.vertical(), m.blinkOn)
-	displayed := make([]cwsWorkspace, len(m.models))
-	for i, model := range m.models {
+	models := cwsBuildModels(m.flavor, m.workspaces, m.windows, m.cfg, m.ctx.Connector, m.vertical(), m.blinkOn)
+	displayed := make([]cwsWorkspace, len(models))
+	for i, model := range models {
 		displayed[i] = model.ws
 	}
 	m.urgentSeen = m.cfg.UrgentShow && cwsAnyUrgent(displayed, m.windows)
 	m.setSegments(m.models)
+	if m.models != nil && slices.EqualFunc(models, m.models, cwsButtonModel.same) {
+		return
+	}
+	m.models = models
 }
 
 // syncBlink is sync_blink: the pulse runs exactly while something

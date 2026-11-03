@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"math"
 
@@ -48,39 +47,32 @@ func newBrightness(ctx ModuleContext) (Module, error) {
 	m := &brightnessModule{ctx: ctx, source: ctx.Brightness}
 	m.icon = moduleIcon(ctx, config.IconWith(cfg.IconShow, brightnessIcon(cfg.LevelIcons, 0), cfg.IconColor))
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
-		return nil, err
-	}
 	if ctx.App == nil {
+		if err := renderOnce(m.source.Devices, m.apply); err != nil {
+			return nil, err
+		}
 		return m, nil
 	}
-	ticks, stop, err := ctx.Brightness.Subscribe(ctx.Life())
-	if err != nil {
+	if _, err := followReads(ctx, "brightness", ctx.Brightness.Subscribe, m.source.Devices, m.apply); err != nil {
 		return nil, err
 	}
-	follow(ctx, ticks, stop, func(struct{}) { logRefresh("brightness", m.refresh) })
 	return m, nil
 }
 
-// refresh is refresh_display: the label and icon for the mean level
+// apply is refresh_display: the label and icon for the mean level
 // and its threshold colors, or "--%" and the first icon without a
 // device.
-func (m *brightnessModule) refresh() error {
-	devices, err := m.source.Devices(context.Background())
-	if err != nil {
-		return err
-	}
+func (m *brightnessModule) apply(devices []brightness.Device) {
 	cfg := m.ctx.Config.Brightness
 	percent, ok := brightness.AveragePercentage(devices)
 	if !ok {
 		m.btn.SetLabel(brightnessNoDevice)
 		m.setIcon(brightnessIcon(cfg.LevelIcons, 0))
-		return nil
+		return
 	}
 	m.btn.SetLabel(brightnessLabel(cfg.Format, percent))
 	m.setIcon(brightnessIcon(cfg.LevelIcons, percent))
 	m.btn.applyThresholds(percent, cfg.Thresholds)
-	return nil
 }
 
 func (m *brightnessModule) setIcon(name string) {

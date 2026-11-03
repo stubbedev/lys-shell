@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,8 +9,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -166,12 +168,10 @@ type trayIconSource struct {
 	pixmap sni.Pixmap
 }
 
-// signature identifies the source: equal sources keep the widget.
-func (s trayIconSource) signature() string {
-	if s.kind == trayIconPixmap {
-		return "pixmap:" + strconv.Itoa(int(s.pixmap.Width)) + "x" + strconv.Itoa(int(s.pixmap.Height)) + ":" + string(s.pixmap.Data)
-	}
-	return strconv.Itoa(int(s.kind)) + ":" + s.name
+// same reports equal sources, which keep the widget.
+func (s trayIconSource) same(o trayIconSource) bool {
+	return s.kind == o.kind && s.name == o.name && s.pixmap.Width == o.pixmap.Width &&
+		s.pixmap.Height == o.pixmap.Height && bytes.Equal(s.pixmap.Data, o.pixmap.Data)
 }
 
 // iconSource is the source of one SNI name and pixmap pair: the name -
@@ -202,12 +202,9 @@ type trayLook struct {
 	hasOverlay bool
 }
 
-// signature identifies the look: equal looks keep the widgets.
-func (l trayLook) signature() string {
-	if !l.hasOverlay {
-		return l.icon.signature()
-	}
-	return l.icon.signature() + "\x00" + l.overlay.signature()
+// same reports equal looks, which keep the widgets.
+func (l trayLook) same(o trayLook) bool {
+	return l.icon.same(o.icon) && l.hasOverlay == o.hasOverlay && (!l.hasOverlay || l.overlay.same(o.overlay))
 }
 
 // resolveTrayLook is update_icon's source pick. A NeedsAttention item
@@ -358,7 +355,7 @@ type trayEntry struct {
 	// overlay is the glyph composited over icon's bottom-right quarter,
 	// nil without one.
 	overlay trayGlyph
-	sig     string
+	look    trayLook
 }
 
 // retireIcon drops the entry's glyphs, forgetting their pixmap rasters.
@@ -398,6 +395,9 @@ type systrayModule struct {
 	// the pixmap size wanted for it.
 	scale  deviceScale
 	unwant func()
+	px     atomic.Int64
+	reads  *offLoopRead[[]trayView]
+	order  []*trayEntry
 	// forget drops a raster's GPU copy (nil: the application's).
 	forget func(render.ImageID)
 }
@@ -431,10 +431,15 @@ func newSystray(ctx ModuleContext) (Module, error) {
 		scale:   deviceScale{1, 1},
 	}
 	m.root.AddClass("systray")
+	m.px.Store(int64(m.devicePx()))
 	m.want()
 	ticks, stop := ctx.SNI.Subscribe()
-	m.refresh()
-	follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
+	m.reads = newOffLoopRead(ctx, "systray", m.read, m.apply)
+	if err := renderOnce(m.read, m.apply); err != nil {
+		stop()
+		return nil, fmt.Errorf("systray: %w", err)
+	}
+	m.reads.on(ticks, stop)
 	go func() {
 		<-ctx.gen.ended()
 		m.onLoop(m.retire)
@@ -466,7 +471,9 @@ func (m *systrayModule) scaled(s deviceScale) {
 		return
 	}
 	m.scale = s
+	m.px.Store(int64(m.devicePx()))
 	m.want()
+	m.reads.request()
 }
 
 // pixmapHooks wire a pixmap glyph to the tray.
@@ -524,26 +531,39 @@ func (m *systrayModule) Attach(host app.Host) { m.host = host }
 // item is its own button.
 func (m *systrayModule) ownsChrome() {}
 
-// refresh reconciles the buttons with the store (update_items): the
-// blacklist hides items, the rest keep registration order, and each
-// icon rebuilds only when its source changed.
-func (m *systrayModule) refresh() {
+type trayView struct {
+	item sni.Item
+	look trayLook
+}
+
+func (m *systrayModule) read(context.Context) ([]trayView, error) {
 	cfg := m.ctx.Config.Systray
-	live := make(map[string]bool)
-	var order []*trayEntry
-	for _, it := range m.store.Items() {
-		if systrayBlacklisted(cfg.Blacklist, it) {
-			continue
+	px := int(m.px.Load())
+	items := m.store.Items()
+	views := make([]trayView, 0, len(items))
+	for _, it := range items {
+		if !systrayBlacklisted(cfg.Blacklist, it) {
+			views = append(views, trayView{item: it, look: resolveTrayLook(cfg, it, px)})
 		}
-		key := it.Key()
+	}
+	return views, nil
+}
+
+// apply reconciles the buttons with the store (update_items): each icon
+// rebuilds only when its source changed, and the row only when its order did.
+func (m *systrayModule) apply(views []trayView) {
+	live := make(map[string]bool, len(views))
+	order := make([]*trayEntry, 0, len(views))
+	for _, v := range views {
+		key := v.item.Key()
 		live[key] = true
 		e, ok := m.entries[key]
 		if !ok {
-			e = m.newEntry(it)
+			e = m.newEntry(v.item)
 			m.entries[key] = e
 		}
-		e.item = it
-		m.updateIcon(e)
+		e.item = v.item
+		m.updateIcon(e, v.look)
 		order = append(order, e)
 	}
 	for key := range m.entries {
@@ -555,9 +575,12 @@ func (m *systrayModule) refresh() {
 			}
 		}
 	}
-	m.root.Clear()
-	for _, e := range order {
-		m.root.Append(e.button, false)
+	if !slices.Equal(order, m.order) {
+		m.root.Clear()
+		for _, e := range order {
+			m.root.Append(e.button, false)
+		}
+		m.order = order
 	}
 	m.shown = len(order) > 0
 	m.showChrome()
@@ -604,13 +627,12 @@ func (m *systrayModule) newEntry(it sni.Item) *trayEntry {
 // updateIcon applies the resolved look and the override tint, which
 // recolors the item's own icon but neither its attention icon nor its
 // overlay.
-func (m *systrayModule) updateIcon(e *trayEntry) {
+func (m *systrayModule) updateIcon(e *trayEntry, look trayLook) {
 	cfg := m.ctx.Config.Systray
-	look := resolveTrayLook(cfg, e.item, m.devicePx())
-	if sig := look.signature(); sig != e.sig || e.icon == nil {
+	if e.icon == nil || !look.same(e.look) {
 		e.retireIcon()
 		m.buildLook(e, look)
-		e.sig = sig
+		e.look = look
 	}
 	var tint render.Color
 	if o, ok := systrayOverride(cfg.Overrides, e.item); ok && o.Color != nil && !look.attention {

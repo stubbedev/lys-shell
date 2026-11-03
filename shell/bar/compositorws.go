@@ -289,6 +289,26 @@ type cwsButtonModel struct {
 	classes  []string
 }
 
+func (m cwsButtonModel) same(o cwsButtonModel) bool {
+	return m.flavor == o.flavor && m.ws == o.ws && m.label == o.label && m.hasLabel == o.hasLabel &&
+		m.icon == o.icon && m.urgent == o.urgent && slices.Equal(m.classes, o.classes) &&
+		slices.EqualFunc(m.appIcons, o.appIcons, func(a, b cwsAppIcon) bool {
+			return a.name == b.name && a.urgent == b.urgent && slices.Equal(a.windowIDs, b.windowIDs)
+		})
+}
+
+func cwsFollowsTitles(cfg config.CompositorWorkspacesConfig) bool {
+	if !cfg.AppIconsShow {
+		return false
+	}
+	for key := range cfg.AppIconMap {
+		if strings.HasPrefix(key, "title:") {
+			return true
+		}
+	}
+	return false
+}
+
 // cwsWindowsOn is windows_on_workspace: the workspace's windows in the
 // backend's order, id breaking ties.
 func cwsWindowsOn(windows []cwsWindow, workspace uint64) []cwsWindow {

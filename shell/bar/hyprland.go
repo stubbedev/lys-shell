@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -283,6 +284,9 @@ type hyprlandWorkspaces struct {
 	urgent         map[string]bool
 	blinkOn        bool
 	blinkStop      func()
+	reads          *offLoopRead[hyprSnapshot]
+	pending        []hyprland.Event
+	rulesDue       atomic.Bool
 
 	filtered []hyprFiltered
 	models   []cwsButtonModel
@@ -310,11 +314,13 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
-	if err := m.query(); err != nil {
+	first, err := m.read(context.Background())
+	if err != nil {
 		return nil, err
 	}
+	m.take(first)
 	m.initActive()
-	m.loadRules()
+	m.rules = m.readRules()
 	m.rebuild()
 	if ctx.App == nil {
 		return m, nil
@@ -323,48 +329,88 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, fmt.Errorf("hyprland-workspaces: events: %w", err)
 	}
+	m.reads = newOffLoopRead(ctx, "hyprland-workspaces", m.read, m.apply)
 	go func() {
 		for ev := range events {
-			m.ctx.Invoke(func() { m.handle(ev) })
+			m.ctx.Invoke(func() { m.enqueue(ev) })
 		}
 	}()
 	return m, nil
 }
 
-// query re-reads the compositor state the Rust service keeps.
-func (m *hyprlandWorkspaces) query() error {
-	workspaces, err := m.conn.Workspaces()
-	if err != nil {
-		return err
-	}
-	monitors, err := m.conn.Monitors()
-	if err != nil {
-		return err
-	}
-	clients, err := m.conn.Clients()
-	if err != nil {
-		return err
-	}
-	m.workspaces, m.monitors, m.clients = workspaces, monitors, clients
-	return nil
+type hyprSnapshot struct {
+	workspaces []hyprland.Workspace
+	monitors   []hyprland.Monitor
+	clients    []hyprland.Client
+	rules      map[int]string
 }
 
-// loadRules is spawn_load_workspace_rules: positive numeric rules
+func (m *hyprlandWorkspaces) read(context.Context) (hyprSnapshot, error) {
+	var s hyprSnapshot
+	var err error
+	if s.workspaces, err = m.conn.Workspaces(); err != nil {
+		return s, err
+	}
+	if s.monitors, err = m.conn.Monitors(); err != nil {
+		return s, err
+	}
+	if s.clients, err = m.conn.Clients(); err != nil {
+		return s, err
+	}
+	if m.rulesDue.Swap(false) {
+		s.rules = m.readRules()
+	}
+	return s, nil
+}
+
+func (m *hyprlandWorkspaces) take(s hyprSnapshot) {
+	m.workspaces, m.monitors, m.clients = s.workspaces, s.monitors, s.clients
+	if s.rules != nil {
+		m.rules = s.rules
+	}
+}
+
+func (m *hyprlandWorkspaces) enqueue(ev hyprland.Event) {
+	if !m.relevant(ev) {
+		return
+	}
+	if ev.Kind == hyprland.EventConfigReloaded {
+		m.rulesDue.Store(true)
+	}
+	m.pending = append(m.pending, ev)
+	m.reads.request()
+}
+
+func (m *hyprlandWorkspaces) apply(s hyprSnapshot) {
+	m.take(s)
+	events := m.pending
+	m.pending = nil
+	if len(events) == 0 {
+		m.rebuild()
+		return
+	}
+	for _, ev := range events {
+		m.handle(ev)
+	}
+}
+
+// readRules is spawn_load_workspace_rules: positive numeric rules
 // bound to a monitor; a failed load leaves no rules.
-func (m *hyprlandWorkspaces) loadRules() {
-	m.rules = map[int]string{}
+func (m *hyprlandWorkspaces) readRules() map[int]string {
+	out := map[int]string{}
 	rules, err := m.conn.WorkspaceRules()
 	if err != nil {
 		log.Printf("hyprland-workspaces: cannot load workspace rules: %v", err)
-		return
+		return out
 	}
 	for _, rule := range rules {
 		id, err := strconv.Atoi(rule.WorkspaceString)
 		if err != nil || id <= 0 || rule.Monitor == nil {
 			continue
 		}
-		m.rules[id] = *rule.Monitor
+		out[id] = *rule.Monitor
 	}
+	return out
 }
 
 // trackActive reports whether the bar's own monitor decides the active
@@ -629,28 +675,13 @@ func (m *hyprlandWorkspaces) relevant(ev hyprland.Event) bool {
 	case hyprland.EventActiveWindowV2:
 		return m.urgent[ev.Address]
 	case hyprland.EventWindowTitleV2:
-		// update_app_icons_on_title_change: only title: patterns care.
-		if !m.cfg.AppIconsShow {
-			return false
-		}
-		for key := range m.cfg.AppIconMap {
-			if strings.HasPrefix(key, "title:") {
-				return true
-			}
-		}
+		return cwsFollowsTitles(m.cfg)
 	}
 	return false
 }
 
 // handle is update_cmd over the watched events, on a fresh snapshot.
 func (m *hyprlandWorkspaces) handle(ev hyprland.Event) {
-	if !m.relevant(ev) {
-		return
-	}
-	if err := m.query(); err != nil {
-		log.Printf("hyprland-workspaces: %v", err)
-		return
-	}
 	switch ev.Kind {
 	case hyprland.EventWorkspaceV2:
 		tracked := m.trackActive()
@@ -694,7 +725,6 @@ func (m *hyprlandWorkspaces) handle(ev hyprland.Event) {
 		m.stopBlinkIfNoUrgent()
 		m.render()
 	case hyprland.EventConfigReloaded:
-		m.loadRules()
 		m.rebuild()
 	case hyprland.EventWindowTitleV2:
 		m.rebuild()

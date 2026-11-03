@@ -358,10 +358,22 @@ func Subscribe() (<-chan struct{}, func(), error) {
 
 // SubscribeTo is Subscribe over the named event streams.
 func SubscribeTo(events ...string) (<-chan struct{}, func(), error) {
-	return subscribeTo(ipcsock.Standard, events)
+	return subscribeTo(ipcsock.Standard, events, func([]byte) bool { return true })
 }
 
-func subscribeTo(timeout ipcsock.Timeout, events []string) (<-chan struct{}, func(), error) {
+// SubscribeWithoutTitles is Subscribe but for a window's title changes.
+func SubscribeWithoutTitles() (<-chan struct{}, func(), error) {
+	return subscribeTo(ipcsock.Standard, []string{"workspace", "window"}, notTitleChange)
+}
+
+func notTitleChange(event []byte) bool {
+	var e struct {
+		Change string `json:"change"`
+	}
+	return json.Unmarshal(event, &e) != nil || e.Change != "title"
+}
+
+func subscribeTo(timeout ipcsock.Timeout, events []string, wanted func(event []byte) bool) (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, errors.New("sway: SWAYSOCK is not set")
@@ -406,8 +418,12 @@ func subscribeTo(timeout ipcsock.Timeout, events []string) (<-chan struct{}, fun
 	go func() {
 		defer close(ticks)
 		for {
-			if _, _, err := readFrame(conn); err != nil {
+			_, body, err := readFrame(conn)
+			if err != nil {
 				return
+			}
+			if !wanted(body) {
+				continue
 			}
 			select {
 			case ticks <- struct{}{}:

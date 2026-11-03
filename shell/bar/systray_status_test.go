@@ -116,8 +116,8 @@ func TestResolveTrayLookOverlay(t *testing.T) {
 	if plain.hasOverlay {
 		t.Errorf("an item without an overlay has one: %+v", plain.overlay)
 	}
-	if a, b := plain.signature(), resolveTrayLook(cfg, sni.Item{IconName: "app", OverlayIconName: "badge"}, 20).signature(); a == b {
-		t.Errorf("adding an overlay keeps the signature %q", a)
+	if plain.same(resolveTrayLook(cfg, sni.Item{IconName: "app", OverlayIconName: "badge"}, 20)) {
+		t.Error("adding an overlay reads as the same look")
 	}
 }
 

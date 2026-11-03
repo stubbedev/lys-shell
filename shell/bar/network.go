@@ -130,9 +130,15 @@ type networkModule struct {
 	ctx    ModuleContext
 	source network.Source
 	// vpn is the VPN service the icon overlays; nil without NM.
-	vpn  *network.VPNService
-	btn  *barButton
-	icon *widget.Icon
+	vpn                   *network.VPNService
+	btn                   *barButton
+	icon                  *widget.Icon
+	shownIcon, shownLabel string
+}
+
+type networkRead struct {
+	snap network.Snapshot
+	vpn  vpnView
 }
 
 func newNetwork(ctx ModuleContext) (Module, error) {
@@ -148,35 +154,43 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	}
 	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followRefresh(ctx, "network", ctx.Network.Subscribe, m.refresh); err != nil {
+	reads, err := followReads(ctx, "network", ctx.Network.Subscribe, m.read, m.apply)
+	if err != nil {
 		return nil, err
 	}
 	if m.vpn != nil {
-		follow(ctx, m.vpn.Changes(ctx.Life()), nil, func(struct{}) { logRefresh("network", m.refresh) })
+		reads.on(m.vpn.Changes(ctx.Life()), nil)
 	}
 	return m, nil
 }
 
-// refresh re-reads and restyles the label and state icon.
-func (m *networkModule) refresh() error {
-	snap, err := m.source.Read(context.Background())
+func (m *networkModule) read(ctx context.Context) (networkRead, error) {
+	snap, err := m.source.Read(ctx)
 	if err != nil {
-		return err
+		return networkRead{}, err
 	}
-	cfg := m.ctx.Config.Network
-	var vpn vpnView
+	r := networkRead{snap: snap}
 	if m.vpn != nil {
-		vpn = vpnView{configured: !m.vpn.IsEmpty(), state: m.vpn.Aggregate()}
+		r.vpn = vpnView{configured: !m.vpn.IsEmpty(), state: m.vpn.Aggregate()}
 	}
-	icon, label := networkDisplay(cfg, snap, vpn)
+	return r, nil
+}
+
+// apply restyles the label and state icon; the same display touches nothing.
+func (m *networkModule) apply(r networkRead) {
+	cfg := m.ctx.Config.Network
+	icon, label := networkDisplay(cfg, r.snap, r.vpn)
 	if !cfg.LabelShow {
 		label = ""
 	}
+	if icon == m.shownIcon && label == m.shownLabel {
+		return
+	}
+	m.shownIcon, m.shownLabel = icon, label
 	m.btn.SetLabel(label)
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
 	}
-	return nil
 }
 
 func (m *networkModule) Root() widget.Widget { return m.btn }

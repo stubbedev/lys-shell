@@ -25,6 +25,7 @@ type fakeSway struct {
 	tree       string
 	inputs     string
 	failWith   string
+	afterAck   string
 
 	mu        sync.Mutex
 	commands  []string
@@ -94,7 +95,11 @@ func (f *fakeSway) serve(conn net.Conn) {
 			_ = writeFrame(conn, eventBit, []byte(`{"change":"init"}`))
 			_ = writeFrame(conn, msgType, []byte(`{"success": true}`))
 			time.Sleep(20 * time.Millisecond)
-			_ = writeFrame(conn, eventBit|3, []byte(`{"change":"new"}`))
+			after := f.afterAck
+			if after == "" {
+				after = `{"change":"new"}`
+			}
+			_ = writeFrame(conn, eventBit|3, []byte(after))
 		}
 	}
 }
@@ -289,6 +294,43 @@ func TestKeyboardLayoutIsTheFirstKeyboardWithALayout(t *testing.T) {
 	}
 }
 
+func TestSubscribeWithoutTitles(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		subscribe func() (<-chan struct{}, func(), error)
+		event     string
+		ticks     bool
+	}{
+		{"new window, without titles", SubscribeWithoutTitles, `{"change":"new"}`, true},
+		{"title, without titles", SubscribeWithoutTitles, `{"change":"title"}`, false},
+		{"title, with them", Subscribe, `{"change":"title"}`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFakeSway(t, nil, "{}")
+			f.afterAck = tc.event
+			ticks, stop, err := tc.subscribe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stop()
+			wait := 2 * time.Second
+			if !tc.ticks {
+				wait = 200 * time.Millisecond
+			}
+			select {
+			case <-ticks:
+				if !tc.ticks {
+					t.Error("the title change ticked")
+				}
+			case <-time.After(wait):
+				if tc.ticks {
+					t.Error("the event never ticked")
+				}
+			}
+		})
+	}
+}
+
 func TestSubscribeToNamesItsStreams(t *testing.T) {
 	f := newFakeSway(t, nil, "{}")
 	_, stop, err := SubscribeTo("input")
@@ -320,7 +362,7 @@ func TestARequestGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
 func TestSubscribeGivesUpOnACompositorThatNeverAcknowledges(t *testing.T) {
 	t.Setenv("SWAYSOCK", ipcsocktest.Silent(t))
 	ipcsocktest.GivesUp(t, func() error {
-		_, _, err := subscribeTo(ipcsocktest.Fast, []string{"workspace"})
+		_, _, err := subscribeTo(ipcsocktest.Fast, []string{"workspace"}, notTitleChange)
 		return err
 	})
 }

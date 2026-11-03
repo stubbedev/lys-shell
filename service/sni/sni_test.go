@@ -176,3 +176,35 @@ func pixmapWidths(ps []Pixmap) []int32 {
 	}
 	return out
 }
+
+func TestStorePutTicksOnlyForAChange(t *testing.T) {
+	s := NewStore()
+	feed, stop := s.Subscribe()
+	defer stop()
+	item := func(b byte) *Item {
+		return &Item{Bus: ":1.1", Path: "/StatusNotifierItem", ID: "a", IconPixmap: []Pixmap{{Width: 1, Height: 1, Data: []byte{b, 0, 0, 0}}}}
+	}
+	ticked := func() bool {
+		select {
+		case <-feed:
+			return true
+		default:
+			return false
+		}
+	}
+	s.Put(item(1))
+	if !ticked() {
+		t.Fatal("a new item did not tick")
+	}
+	s.Put(item(1))
+	if ticked() {
+		t.Error("the same item read again ticked")
+	}
+	s.Put(item(2))
+	if !ticked() {
+		t.Error("another pixmap did not tick")
+	}
+	if got := s.Items()[0].IconPixmap[0].Data[0]; got != 2 {
+		t.Errorf("the store holds pixmap %d, want the last", got)
+	}
+}

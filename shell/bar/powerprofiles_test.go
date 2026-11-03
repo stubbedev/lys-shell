@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 )
 
@@ -112,7 +113,8 @@ func TestPowerProfilesModuleCycles(t *testing.T) {
 	}
 	// The :cycle shell action is the module's own.
 	pp.RunAction(config.ParseClickAction(":cycle"))
-	if len(src.sets()) != 1 || src.sets()[0] != powerprofiles.ProfilePerformance {
+	waitHeadless(t, "the cycle reached the daemon", func() bool { return len(src.sets()) == 1 })
+	if src.sets()[0] != powerprofiles.ProfilePerformance {
 		t.Errorf("set = %v, want [performance]", src.sets())
 	}
 	// A dropdown action falls through to the shared executor (a no-op
@@ -156,8 +158,25 @@ func TestPowerProfilesColorsAndUnknown(t *testing.T) {
 	}
 	check("performance", cfg.PowerProfiles.ColorPerformance, cfg.PowerProfiles.Icons()[config.ProfilePerformance].Name)
 	src.snap = powerprofiles.Snapshot{Available: true, Active: "mystery"}
-	if err := pp.refresh(); err != nil {
+	if err := renderOnce(pp.src.Read, pp.apply); err != nil {
 		t.Fatal(err)
 	}
 	check("unknown", cfg.PowerProfiles.ColorBalanced, cfg.PowerProfiles.Icons()[config.ProfileBalanced].Name)
+}
+
+func TestPowerProfilesCycleLeavesTheLoop(t *testing.T) {
+	h := newHeldRead(t)
+	src := &fakePPSource{snap: powerprofiles.Snapshot{Available: true, Active: powerprofiles.ProfileBalanced, Profiles: []string{powerprofiles.ProfileBalanced, powerprofiles.ProfilePerformance}}}
+	ctx := newTestContext(t, config.Defaults())
+	m := &powerProfilesModule{ctx: ctx, src: heldPower{src, h}, snap: src.snap}
+	h.held.Store(true)
+	returned := make(chan struct{})
+	go func() {
+		m.cycle()
+		close(returned)
+	}()
+	apptest.Answer(t, "the click returned", returned)
+	apptest.Answer(t, "the write reached the daemon", h.started)
+	h.free()
+	waitHeadless(t, "the write finished", func() bool { return len(src.sets()) == 1 })
 }

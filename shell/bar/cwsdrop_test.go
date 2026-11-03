@@ -221,7 +221,7 @@ func TestCwsIndicatorEndsOnTheActiveSegment(t *testing.T) {
 			restore := widget.SetAnimationsInstant(true)
 			defer restore()
 			f.workspaces = threeWorkspaces(2)
-			if err := m.refresh(); err != nil {
+			if err := renderOnce(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			relayCwsBar(bar, size)
@@ -239,7 +239,7 @@ func TestCwsSwitchStartsTheIndicatorTravelling(t *testing.T) {
 			relayCwsBar(bar, size)
 			start := m.segs.EnableDrop().Bounds()
 			f.workspaces = threeWorkspaces(2)
-			if err := m.refresh(); err != nil {
+			if err := renderOnce(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			relayCwsBar(bar, size)
@@ -276,14 +276,14 @@ func TestCwsNoIndicatorWhenNothingIsActive(t *testing.T) {
 	}
 	assertNone("never active")
 	f.workspaces = []cwsWorkspace{activeWS(1), occupiedWS(2, 2, "DP-1")}
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
 	assertDropOn(t, m.segs, 0)
 	assertDropAtRest(t, m.segs)
 	f.workspaces = []cwsWorkspace{occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")}
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	assertNone("active gone")
@@ -295,7 +295,7 @@ func TestCwsRebuildWithTheSameActiveDoesNotAnimate(t *testing.T) {
 	relayCwsBar(bar, size)
 	before := m.segs.EnableDrop().Bounds()
 	for range 3 {
-		if err := m.refresh(); err != nil {
+		if err := renderOnce(m.read, m.apply); err != nil {
 			t.Fatal(err)
 		}
 		relayCwsBar(bar, size)
@@ -312,7 +312,7 @@ func TestCwsWorkspaceRemovedBeforeTheActiveDoesNotAnimate(t *testing.T) {
 	relayCwsBar(bar, size)
 	assertDropOn(t, m.segs, 2)
 	f.workspaces = f.workspaces[1:]
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
@@ -325,7 +325,7 @@ func TestCwsWorkspaceRemovedMidFlightLandsOnTheRightSegment(t *testing.T) {
 	m, f, bar, size := cwsDropModule(t, ctx, config.DefaultsNiriWorkspaces().View(), threeWorkspaces(0))
 	relayCwsBar(bar, size)
 	f.workspaces = threeWorkspaces(2)
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
@@ -335,7 +335,7 @@ func TestCwsWorkspaceRemovedMidFlightLandsOnTheRightSegment(t *testing.T) {
 	restore := widget.SetAnimationsInstant(true)
 	defer restore()
 	f.workspaces = f.workspaces[1:]
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
@@ -360,7 +360,7 @@ func TestCwsWorkspaceMapTintsTheIndicator(t *testing.T) {
 	restore := widget.SetAnimationsInstant(true)
 	defer restore()
 	f.workspaces = threeWorkspaces(1)
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	accent, _ := styling.ResolveColor(wcfg.ActiveColor, ctx.Theme.RenderPalette())
@@ -432,7 +432,7 @@ func TestCwsUnderlineTravelsAsTheIndicator(t *testing.T) {
 				t.Error("the underlined workspace is filled")
 			}
 			f.workspaces = threeWorkspaces(1)
-			if err := m.refresh(); err != nil {
+			if err := renderOnce(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			relayCwsBar(bar, size)
@@ -442,7 +442,7 @@ func TestCwsUnderlineTravelsAsTheIndicator(t *testing.T) {
 			restore := widget.SetAnimationsInstant(true)
 			defer restore()
 			f.workspaces = threeWorkspaces(2)
-			if err := m.refresh(); err != nil {
+			if err := renderOnce(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			data = paintCwsPixels(bar, size)
@@ -468,7 +468,7 @@ func TestHyprlandIndicatorIgnoresAnotherMonitorsSwitch(t *testing.T) {
 	if before.Empty() || active < 0 {
 		t.Fatalf("the bar's monitor shows no active workspace: indicator %v, active %d", before, active)
 	}
-	m.handle(hyprland.Event{Kind: hyprland.EventWorkspaceV2, ID: 3, Name: "3"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventWorkspaceV2, ID: 3, Name: "3"})
 	layout()
 	assertDropAtRest(t, m.segs)
 	if m.segs.Active() != active || m.segs.EnableDrop().Bounds() != before {
@@ -494,7 +494,7 @@ func TestHyprlandIndicatorTravelsOnTheBarsMonitor(t *testing.T) {
 	}
 	id := m.shown[target].ws.num
 	m.monitors[0].ActiveWS.ID = id
-	m.handle(hyprland.Event{Kind: hyprland.EventWorkspaceV2, ID: id})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventWorkspaceV2, ID: id})
 	layout()
 	if m.segs.Active() != target {
 		t.Fatalf("active %d, want %d", m.segs.Active(), target)
@@ -544,14 +544,14 @@ func TestHyprlandWorkspaceDestroyedBeforeTheActiveDoesNotAnimate(t *testing.T) {
 		row.Arrange(render.Rect{W: 400, H: 40})
 	}
 	defer widget.SetAnimationsInstant(true)()
-	m.handle(hyprland.Event{Kind: hyprland.EventCreateWspcV2, ID: 4, Name: "4"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventCreateWspcV2, ID: 4, Name: "4"})
 	layout()
 	if m.segs.Active() != 1 {
 		t.Fatalf("active %d of %d, want workspace 2 at index 1", m.segs.Active(), m.segs.Count())
 	}
 	widget.SetAnimationsInstant(false)
 	f.set("j/workspaces", `[{"id":2,"name":"2","monitor":"DP-1","windows":1},{"id":4,"name":"4","monitor":"DP-1","windows":1}]`)
-	m.handle(hyprland.Event{Kind: hyprland.EventDestroyWspcV2, ID: 1, Name: "1"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventDestroyWspcV2, ID: 1, Name: "1"})
 	layout()
 	assertDropAtRest(t, m.segs)
 	assertDropOn(t, m.segs, 0)
@@ -629,7 +629,7 @@ func TestCwsSecondRebuildBeforeTheNextFrameKeepsTheTravel(t *testing.T) {
 	relayCwsBar(bar, size)
 	f.workspaces = threeWorkspaces(2)
 	for range 2 {
-		if err := m.refresh(); err != nil {
+		if err := renderOnce(m.read, m.apply); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -650,7 +650,7 @@ func TestCwsLeavingAnEmptyWorkspaceTravelsFromInsideTheRow(t *testing.T) {
 	assertDropOn(t, m.segs, 2)
 	first := activeWS(1)
 	f.workspaces = []cwsWorkspace{first, occupiedWS(2, 2, "DP-1")}
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)

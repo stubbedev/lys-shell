@@ -29,6 +29,7 @@ type WM struct {
 	mu       sync.Mutex
 	answers  map[string]string
 	requests []string
+	holds    map[string]chan struct{}
 
 	dispatched chan string
 	watching   chan struct{}
@@ -48,6 +49,7 @@ func Start(t *testing.T) *WM {
 	t.Cleanup(func() { _ = ln.Close() })
 	w := &WM{
 		answers:    map[string]string{},
+		holds:      map[string]chan struct{}{},
 		dispatched: make(chan string, 16),
 		watching:   make(chan struct{}, 16),
 		Events:     make(chan string, 16),
@@ -93,6 +95,21 @@ func (w *WM) Result(request, result string) {
 	w.Answer(request, `{"version":1,"result":`+result+`}`)
 }
 
+// Hold keeps the answers to a request back until the returned free, which may
+// run more than once, as a lys-wm too busy to answer does.
+func (w *WM) Hold(request string) (free func()) {
+	held := make(chan struct{})
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.holds[request] = held
+	return sync.OnceFunc(func() {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		delete(w.holds, request)
+		close(held)
+	})
+}
+
 // Requests are the request lines received so far, in order.
 func (w *WM) Requests() []string {
 	w.mu.Lock()
@@ -116,7 +133,15 @@ func (w *WM) serve(conn net.Conn, done <-chan struct{}) {
 	w.mu.Lock()
 	w.requests = append(w.requests, string(line[:len(line)-1]))
 	answer, ok := w.answers[req.Request]
+	held := w.holds[req.Request]
 	w.mu.Unlock()
+	if held != nil {
+		select {
+		case <-held:
+		case <-done:
+			return
+		}
+	}
 	if !ok {
 		answer = unknown
 	}

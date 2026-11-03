@@ -239,30 +239,40 @@ const (
 )
 
 type event struct {
-	Event  EventKind `json:"event"`
-	Submap *string   `json:"submap"`
-	Layout *Layout   `json:"layout"`
-	Locks  *Locks    `json:"locks"`
-	Motion *bool     `json:"reduced_motion"`
+	Event  EventKind       `json:"event"`
+	Submap *string         `json:"submap"`
+	Layout *Layout         `json:"layout"`
+	Locks  *Locks          `json:"locks"`
+	Motion *bool           `json:"reduced_motion"`
+	Window json.RawMessage `json:"window"`
 }
 
 // Watcher follows the watch stream and ticks after each event of the
 // kinds it was asked for.
 type Watcher struct {
-	conn    net.Conn
-	kinds   []EventKind
-	onEvent func(event)
-	ticks   chan struct{}
-	once    sync.Once
+	conn       net.Conn
+	kinds      []EventKind
+	onEvent    func(event)
+	hidesTitle func(window uint64) bool
+	beforeTick func()
+	ticks      chan struct{}
+	once       sync.Once
 }
 
 // Watch opens the event stream. It ticks on the given kinds, or on
 // every event when none is given; Ticks closes when the stream ends.
 func Watch(kinds ...EventKind) (*Watcher, error) {
-	return watch(kinds, nil, nil)
+	return watch(kinds, nil, nil, nil, nil)
 }
 
-func watch(kinds []EventKind, seed func() error, onEvent func(event)) (*Watcher, error) {
+// WatchTitles is Watch on the given kinds and the title events, but for those
+// of the windows hidden reports; before runs ahead of every tick, while the
+// event that caused it has not been read back yet.
+func WatchTitles(hidden func(window uint64) bool, before func(), kinds ...EventKind) (*Watcher, error) {
+	return watch(append(slices.Clone(kinds), EventTitle), nil, nil, hidden, before)
+}
+
+func watch(kinds []EventKind, seed func() error, onEvent func(event), hidesTitle func(uint64) bool, beforeTick func()) (*Watcher, error) {
 	req := request{Request: "watch"}
 	conn, reader, err := open(req)
 	if err != nil {
@@ -282,7 +292,7 @@ func watch(kinds []EventKind, seed func() error, onEvent func(event)) (*Watcher,
 			return nil, fmt.Errorf("lys-wm: watch: %w", err)
 		}
 	}
-	w := &Watcher{conn: conn, kinds: kinds, onEvent: onEvent, ticks: make(chan struct{}, 1)}
+	w := &Watcher{conn: conn, kinds: kinds, onEvent: onEvent, hidesTitle: hidesTitle, beforeTick: beforeTick, ticks: make(chan struct{}, 1)}
 	go w.pump(reader)
 	return w, nil
 }
@@ -305,11 +315,25 @@ func (w *Watcher) pump(reader *bufio.Reader) {
 		if len(w.kinds) > 0 && !slices.Contains(w.kinds, e.Event) {
 			continue
 		}
+		if w.dropsTitle(e) {
+			continue
+		}
+		if w.beforeTick != nil {
+			w.beforeTick()
+		}
 		select {
 		case w.ticks <- struct{}{}:
 		default:
 		}
 	}
+}
+
+func (w *Watcher) dropsTitle(e event) bool {
+	if w.hidesTitle == nil || e.Event != EventTitle {
+		return false
+	}
+	var window uint64
+	return json.Unmarshal(e.Window, &window) == nil && w.hidesTitle(window)
 }
 
 // State is one piece of lys-wm state a client can follow: the request
@@ -379,7 +403,7 @@ func WatchState[T any](s State[T]) (*StateWatcher[T], error) {
 			sw.mu.Unlock()
 		}
 	}
-	w, err := watch([]EventKind{s.kind}, seed, onEvent)
+	w, err := watch([]EventKind{s.kind}, seed, onEvent, nil, nil)
 	if err != nil {
 		return nil, err
 	}

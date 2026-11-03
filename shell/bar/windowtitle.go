@@ -1,8 +1,8 @@
 package bar
 
 import (
+	"context"
 	"errors"
-	"log"
 	"strings"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -218,7 +218,7 @@ func newWindowTitle(ctx ModuleContext) (Module, error) {
 	m := &windowTitleModule{ctx: ctx, source: source}
 	m.icon = moduleIcon(ctx, ctx.Config.WindowTitle.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := renderOnce(m.read, m.apply); err != nil {
 		source.close()
 		return nil, err
 	}
@@ -227,28 +227,24 @@ func newWindowTitle(ctx ModuleContext) (Module, error) {
 		source.close()
 		return nil, err
 	}
-	follow(ctx, ticks, func() {
+	newOffLoopRead(ctx, "window-title", m.read, m.apply).on(ticks, func() {
 		if stop != nil {
 			stop()
 		}
 		source.close()
-	}, func(struct{}) {
-		if err := m.refresh(); err != nil {
-			log.Printf("window-title: %v", err)
-		}
 	})
 	return m, nil
 }
 
-// refresh reads the focused window (none reads as blank) and renders.
-func (m *windowTitleModule) refresh() error {
+// read reads the focused window, none reading as blank.
+func (m *windowTitleModule) read(context.Context) (focusedWindow, error) {
 	w, _, err := m.source.read()
-	if err != nil {
-		return err
-	}
+	return w, err
+}
+
+func (m *windowTitleModule) apply(w focusedWindow) {
 	m.window = w
 	m.render()
-	return nil
 }
 
 // render is update_display: the label and the resolved icon.

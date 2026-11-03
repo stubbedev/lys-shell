@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -236,12 +237,14 @@ type fakeHypr struct {
 	dispatch []string
 	events   chan net.Conn
 	sub      net.Conn
+	held     map[string]chan struct{}
+	arrived  chan string
 }
 
 func startFakeHypr(t *testing.T, replies map[string]string) (*fakeHypr, *hyprland.Connection) {
 	t.Helper()
 	dir := sockdir.Dir(t)
-	f := &fakeHypr{replies: replies, events: make(chan net.Conn, 1)}
+	f := &fakeHypr{replies: replies, events: make(chan net.Conn, 1), held: map[string]chan struct{}{}, arrived: make(chan string, 16)}
 	cmdPath, evPath := filepath.Join(dir, ".socket.sock"), filepath.Join(dir, ".socket2.sock")
 	serve := func(path string, fn func(net.Conn)) {
 		ln, err := net.Listen("unix", path)
@@ -274,11 +277,32 @@ func startFakeHypr(t *testing.T, replies map[string]string) (*fakeHypr, *hyprlan
 		} else if !ok {
 			reply = "[]"
 		}
+		held := f.held[req]
 		f.mu.Unlock()
+		if held != nil {
+			f.arrived <- req
+			<-held
+		}
 		_, _ = conn.Write(append([]byte(reply), '\x04'))
 	})
 	serve(evPath, func(conn net.Conn) { f.events <- conn })
 	return f, hyprland.ConnectTo(cmdPath, evPath)
+}
+
+func (f *fakeHypr) hold(t *testing.T, req string) (free func()) {
+	t.Helper()
+	held := make(chan struct{})
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.held[req] = held
+	free = sync.OnceFunc(func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		delete(f.held, req)
+		close(held)
+	})
+	t.Cleanup(free)
+	return free
 }
 
 func (f *fakeHypr) set(req, reply string) {
@@ -321,15 +345,19 @@ const (
 		`{"address":"0xcc","class":"foot","title":"x","workspace":{"id":3,"name":"3"}}]`
 )
 
-func newTestHypr(t *testing.T, mutate func(*config.Config)) (*fakeHypr, *hyprlandWorkspaces) {
-	t.Helper()
-	f, conn := startFakeHypr(t, map[string]string{
+func hyprReplies() map[string]string {
+	return map[string]string{
 		"j/workspaces":      hyprWorkspacesJSON,
 		"j/monitors":        hyprMonitorsJSON,
 		"j/clients":         hyprClientsJSON,
 		"j/workspacerules":  `[]`,
 		"j/activeworkspace": `{"id":1,"name":"1","monitor":"DP-1","windows":2}`,
-	})
+	}
+}
+
+func newTestHypr(t *testing.T, mutate func(*config.Config)) (*fakeHypr, *hyprlandWorkspaces) {
+	t.Helper()
+	f, conn := startFakeHypr(t, hyprReplies())
 	cfg := config.Defaults()
 	if mutate != nil {
 		mutate(cfg)
@@ -413,7 +441,7 @@ func TestHyprlandActiveOnOtherMonitor(t *testing.T) {
 
 func TestHyprlandUrgencyFromEvents(t *testing.T) {
 	_, m := newTestHypr(t, nil)
-	m.handle(hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
 	if m.blinkStop == nil || !m.blinkOn {
 		t.Fatal("urgent window did not start the blink")
 	}
@@ -421,17 +449,17 @@ func TestHyprlandUrgencyFromEvents(t *testing.T) {
 		t.Errorf("workspace 1 classes %v miss urgent", m.models[1].classes)
 	}
 	// Focusing another window keeps it; focusing the urgent one clears.
-	m.handle(hyprland.Event{Kind: hyprland.EventActiveWindowV2, Address: "aa"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventActiveWindowV2, Address: "aa"})
 	if len(m.urgent) != 1 {
 		t.Fatal("focusing an unrelated window cleared urgency")
 	}
-	m.handle(hyprland.Event{Kind: hyprland.EventActiveWindowV2, Address: "bb"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventActiveWindowV2, Address: "bb"})
 	if len(m.urgent) != 0 || m.blinkStop != nil || hasClass(m.models[1].classes, "urgent") {
 		t.Error("focusing the urgent window left the pulse running")
 	}
 	// Switching to the urgent window's workspace clears it too.
-	m.handle(hyprland.Event{Kind: hyprland.EventUrgent, Address: "aa"})
-	m.handle(hyprland.Event{Kind: hyprland.EventWorkspaceV2, ID: 1, Name: "1"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventUrgent, Address: "aa"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventWorkspaceV2, ID: 1, Name: "1"})
 	if len(m.urgent) != 0 || m.blinkStop != nil {
 		t.Error("activating the workspace kept its urgency")
 	}
@@ -442,7 +470,7 @@ func TestHyprlandPerIconUrgency(t *testing.T) {
 		c.HyprlandWorkspaces.AppIconsShow = true
 		c.HyprlandWorkspaces.UrgentMode = config.UrgentApplication
 	})
-	m.handle(hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
 	one := m.models[1]
 	if hasClass(one.classes, "urgent") {
 		t.Error("per-icon mode marked the whole button")
@@ -460,9 +488,9 @@ func TestHyprlandPerIconUrgency(t *testing.T) {
 
 func TestHyprlandStaleUrgencyPrunedOnClientChange(t *testing.T) {
 	f, m := newTestHypr(t, nil)
-	m.handle(hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
 	f.set("j/clients", `[{"address":"0xaa","class":"kitty","title":"t","workspace":{"id":1,"name":"1"}}]`)
-	m.handle(hyprland.Event{Kind: hyprland.EventCloseWindow, Address: "bb"})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventCloseWindow, Address: "bb"})
 	if len(m.urgent) != 0 || m.blinkStop != nil {
 		t.Error("closed urgent window still tracked")
 	}
@@ -478,7 +506,7 @@ func TestHyprlandMinCountPlaceholdersAndRelativeRules(t *testing.T) {
 		t.Errorf("without rules = %v", got)
 	}
 	f.set("j/workspacerules", `[{"workspaceString":"2","monitor":"DP-1"},{"workspaceString":"4","monitor":"DP-1"},{"workspaceString":"3","monitor":"DP-2"}]`)
-	m.handle(hyprland.Event{Kind: hyprland.EventConfigReloaded})
+	handleNow(t, m, hyprland.Event{Kind: hyprland.EventConfigReloaded})
 	if got := modelIDs(m.models); !reflect.DeepEqual(got, []int{-98, 1, 2, 4}) {
 		t.Errorf("with rules = %v, want placeholder 4", got)
 	}
@@ -628,4 +656,20 @@ func TestHyprlandIgnoredEventsCostNoQuery(t *testing.T) {
 	if !m.relevant(hyprland.Event{Kind: hyprland.EventWindowTitleV2}) {
 		t.Error("title event ignored despite a title: pattern")
 	}
+}
+
+func handleNow(t *testing.T, m *hyprlandWorkspaces, ev hyprland.Event) {
+	t.Helper()
+	if !m.relevant(ev) {
+		return
+	}
+	if ev.Kind == hyprland.EventConfigReloaded {
+		m.rulesDue.Store(true)
+	}
+	s, err := m.read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.take(s)
+	m.handle(ev)
 }
