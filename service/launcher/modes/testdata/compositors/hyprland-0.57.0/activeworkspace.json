@@ -1,0 +1,14 @@
+{
+    "address": "1",
+    "id": 1,
+    "type": "normal",
+    "name": "1",
+    "monitor": "Virtual-1",
+    "monitorID": 0,
+    "windows": 2,
+    "hasfullscreen": false,
+    "lastwindow": "0x5fb84d789080",
+    "lastwindowtitle": "live-b",
+    "ispersistent": false,
+    "tiledLayout": "dwindle"
+}

@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -204,8 +205,64 @@ func (c *Connection) ActiveWindow() (Client, bool, error) {
 	return client, client.Class != "" || client.Title != "", nil
 }
 
-// Dispatch runs a dispatcher command ("workspace 3") and returns the
-// compositor's ack.
-func (c *Connection) Dispatch(command string) (string, error) {
-	return c.Command("dispatch " + command)
+const (
+	replyOK                = "ok"
+	replyInvalidDispatcher = "Invalid dispatcher"
+)
+
+// Action is one dispatcher in both of Hyprland's command languages.
+type Action struct{ lua, legacy string }
+
+func luaString(s string) string {
+	return `"` + strings.ReplaceAll(strings.ReplaceAll(s, `\`, `\\`), `"`, `\"`) + `"`
+}
+
+// FocusWindow focuses a window by its address, switching to its
+// workspace.
+func FocusWindow(address string) Action {
+	selector := "address:" + address
+	return Action{lua: "hl.dsp.focus({window = " + luaString(selector) + "})", legacy: "focuswindow " + selector}
+}
+
+// CloseWindow asks a window to close by its address.
+func CloseWindow(address string) Action {
+	selector := "address:" + address
+	return Action{lua: "hl.dsp.window.close({window = " + luaString(selector) + "})", legacy: "closewindow " + selector}
+}
+
+// FocusWorkspace switches to a workspace by number.
+func FocusWorkspace(id int) Action {
+	n := strconv.Itoa(id)
+	return Action{lua: "hl.dsp.focus({workspace = " + n + "})", legacy: "workspace " + n}
+}
+
+// FocusNamedWorkspace switches to a workspace by name.
+func FocusNamedWorkspace(name string) Action {
+	selector := "name:" + name
+	return Action{lua: "hl.dsp.focus({workspace = " + luaString(selector) + "})", legacy: "workspace " + selector}
+}
+
+// FocusPreviousWorkspace switches back to the workspace focused before.
+func FocusPreviousWorkspace() Action {
+	return Action{lua: `hl.dsp.focus({workspace = "previous"})`, legacy: "workspace previous"}
+}
+
+// Dispatch runs an action, in the legacy language on an instance that
+// has no Lua, and fails on any reply but the ack.
+func (c *Connection) Dispatch(action Action) error {
+	request := "dispatch " + action.lua
+	reply, err := c.Command(request)
+	if err != nil {
+		return err
+	}
+	if reply == replyInvalidDispatcher {
+		request = "dispatch " + action.legacy
+		if reply, err = c.Command(request); err != nil {
+			return err
+		}
+	}
+	if reply != replyOK {
+		return fmt.Errorf("hyprland: %q: %s", request, reply)
+	}
+	return nil
 }

@@ -305,8 +305,7 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 		next:     func(context.Context) error { return m.navigate(1) },
 		previous: func(context.Context) error { return m.navigate(-1) },
 		last: func(context.Context) error {
-			_, err := m.conn.Dispatch("workspace previous")
-			return err
+			return m.conn.Dispatch(hyprland.FocusPreviousWorkspace())
 		},
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
@@ -702,33 +701,25 @@ func (m *hyprlandWorkspaces) handle(ev hyprland.Event) {
 	}
 }
 
-// switchTo is switch_to_workspace: a special workspace dispatches by
-// name, and the Lua dispatcher falls back to the legacy one.
+func (m *hyprlandWorkspaces) switchAction(id int) (hyprland.Action, error) {
+	if id >= 0 {
+		return hyprland.FocusWorkspace(id), nil
+	}
+	for _, ws := range m.workspaces {
+		if ws.ID == id && ws.Name != "" {
+			return hyprland.FocusNamedWorkspace(ws.Name), nil
+		}
+	}
+	return hyprland.Action{}, fmt.Errorf("workspace %d: no resolvable selector, skipping dispatch", id)
+}
+
 func (m *hyprlandWorkspaces) switchTo(id int) error {
-	selector := strconv.Itoa(id)
-	if id < 0 {
-		selector = ""
-		for _, ws := range m.workspaces {
-			if ws.ID == id && ws.Name != "" {
-				selector = "name:" + ws.Name
-			}
-		}
-		if selector == "" {
-			return fmt.Errorf("workspace %d: no resolvable selector, skipping dispatch", id)
-		}
-	}
-	arg := selector
-	if strings.HasPrefix(selector, "name:") {
-		arg = `"` + strings.ReplaceAll(strings.ReplaceAll(selector, `\`, `\\`), `"`, `\"`) + `"`
-	}
-	resp, err := m.conn.Dispatch("hl.dsp.focus({workspace = " + arg + "})")
+	action, err := m.switchAction(id)
 	if err != nil {
-		return fmt.Errorf("cannot switch workspace %d: %w", id, err)
+		return err
 	}
-	if strings.HasPrefix(resp, "error:") || strings.Contains(resp, "Invalid dispatcher") {
-		if _, err := m.conn.Dispatch("workspace " + selector); err != nil {
-			return fmt.Errorf("cannot switch workspace %d: %w", id, err)
-		}
+	if err := m.conn.Dispatch(action); err != nil {
+		return fmt.Errorf("cannot switch workspace %d: %w", id, err)
 	}
 	return nil
 }

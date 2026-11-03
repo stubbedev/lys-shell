@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,9 +103,9 @@ func (f *fakeHyprland) PushEvents(t *testing.T, lines ...string) {
 
 func TestCommandRoundTrip(t *testing.T) {
 	fake := startFake(t, map[string]string{
-		"j/workspaces":         `[{"id":1,"name":"1","monitor":"DP-1","monitorID":0,"windows":2,"hasfullscreen":false,"ispersistent":false,"lastwindow":"0x1","lastwindowtitle":"term","tiled_layout":"dwindle"}]`,
-		"j/monitors":           `[{"id":0,"name":"DP-1","activeWorkspace":{"id":2,"name":"2"},"focused":true}]`,
-		"dispatch workspace 3": "ok",
+		"j/workspaces":                           `[{"id":1,"name":"1","monitor":"DP-1","monitorID":0,"windows":2,"hasfullscreen":false,"ispersistent":false,"lastwindow":"0x1","lastwindowtitle":"term","tiled_layout":"dwindle"}]`,
+		"j/monitors":                             `[{"id":0,"name":"DP-1","activeWorkspace":{"id":2,"name":"2"},"focused":true}]`,
+		`dispatch hl.dsp.focus({workspace = 3})`: "ok",
 	})
 	conn := ConnectTo(fake.commandPath, fake.eventPath)
 
@@ -130,14 +131,10 @@ func TestCommandRoundTrip(t *testing.T) {
 		t.Errorf("monitors request = %q", got)
 	}
 
-	ack, err := conn.Dispatch("workspace 3")
-	if err != nil {
+	if err := conn.Dispatch(FocusWorkspace(3)); err != nil {
 		t.Fatalf("Dispatch: %v", err)
 	}
-	if ack != "ok" {
-		t.Errorf("ack = %q", ack)
-	}
-	if got := <-fake.requests; got != "dispatch workspace 3" {
+	if got := <-fake.requests; got != "dispatch hl.dsp.focus({workspace = 3})" {
 		t.Errorf("dispatch request = %q", got)
 	}
 }
@@ -147,6 +144,42 @@ func TestCommandBadJSONIsAnError(t *testing.T) {
 	conn := ConnectTo(fake.commandPath, fake.eventPath)
 	if _, err := conn.Workspaces(); err == nil {
 		t.Fatal("malformed reply: want an error, got nil")
+	}
+}
+
+func TestDispatchFallsBackOnlyWithoutLua(t *testing.T) {
+	const lua, legacy = `dispatch hl.dsp.focus({window = "address:0x1"})`, "dispatch focuswindow address:0x1"
+	for _, tc := range []struct {
+		name         string
+		replies      map[string]string
+		wantRequests []string
+		wantErr      string
+	}{
+		{"lua ack", map[string]string{lua: "ok"}, []string{lua}, ""},
+		{"no lua, legacy ack", map[string]string{lua: "Invalid dispatcher", legacy: "ok"}, []string{lua, legacy}, ""},
+		{"no lua, legacy refusal", map[string]string{lua: "Invalid dispatcher", legacy: "No such window found"}, []string{lua, legacy}, "No such window found"},
+		{"lua refusal stays lua", map[string]string{lua: "warning: =[C]:-1: hl.focus: window not found"}, []string{lua}, "window not found"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := startFake(t, tc.replies)
+			err := ConnectTo(fake.commandPath, fake.eventPath).Dispatch(FocusWindow("0x1"))
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Errorf("Dispatch: %v", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Errorf("Dispatch = %v, want %q", err, tc.wantErr)
+			}
+			for _, want := range tc.wantRequests {
+				if got := <-fake.requests; got != want {
+					t.Errorf("request = %q, want %q", got, want)
+				}
+			}
+			select {
+			case got := <-fake.requests:
+				t.Errorf("extra request %q", got)
+			default:
+			}
+		})
 	}
 }
 

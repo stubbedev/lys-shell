@@ -508,8 +508,8 @@ func TestHyprlandClicksDispatch(t *testing.T) {
 	if got := wait(1); got[0] != "hl.dsp.focus({workspace = 2})" {
 		t.Errorf("focus = %q", got[0])
 	}
-	// The special dispatches by quoted name; a Lua error falls back.
-	f.set(`dispatch hl.dsp.focus({workspace = "name:special:magic"})`, "error: unknown")
+	// The special dispatches by quoted name; an instance without Lua falls back.
+	f.set(`dispatch hl.dsp.focus({workspace = "name:special:magic"})`, "Invalid dispatcher")
 	buttons[0].ClickAt(widget.Point{})
 	got := wait(3)
 	if got[1] != `hl.dsp.focus({workspace = "name:special:magic"})` || got[2] != "workspace name:special:magic" {
@@ -523,7 +523,7 @@ func TestHyprlandClicksDispatch(t *testing.T) {
 	}
 	m.cfg.Click.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
 	router.Press(widget.BTNMiddle, p, 0)
-	if got := wait(5); got[4] != "workspace previous" {
+	if got := wait(5); got[4] != `hl.dsp.focus({workspace = "previous"})` {
 		t.Errorf("last = %q", got[4])
 	}
 }

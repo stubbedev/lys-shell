@@ -285,8 +285,7 @@ func (b hyprlandBackend) Focus(_ context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.Dispatch("focuswindow address:" + id)
-	return err
+	return c.Dispatch(hyprland.FocusWindow(id))
 }
 
 func (b hyprlandBackend) Close(_ context.Context, id string) error {
@@ -294,8 +293,7 @@ func (b hyprlandBackend) Close(_ context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.Dispatch("closewindow address:" + id)
-	return err
+	return c.Dispatch(hyprland.CloseWindow(id))
 }
 
 type niriBackend struct{}
