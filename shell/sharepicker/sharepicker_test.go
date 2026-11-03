@@ -48,21 +48,11 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	return p, ch
 }
 
-// fakeRegion is the region overlay; it records cancels.
-type fakeRegion struct{ cancels int }
-
-func (*fakeRegion) Request(map[string]render.StillImage) (regionoverlay.Selection, bool) {
-	return regionoverlay.Selection{}, false
-}
-func (f *fakeRegion) Cancel() { f.cancels++ }
-
 // Dismissing the request the picker shows answers it cancelled, the
 // region overlay it opened included; another request's dismissal does
 // nothing.
 func TestDismissCancelsItsRequestOnly(t *testing.T) {
 	p, ch := testPicker(t, config.DefaultsSharePicker(), false, false)
-	region := &fakeRegion{}
-	p.region = region
 	p.invoke = func(fn func()) { fn() }
 	p.Dismiss("/r/other")
 	if p.reply == nil {
@@ -74,13 +64,14 @@ func TestDismissCancelsItsRequestOnly(t *testing.T) {
 	if got := <-queued; got != "" {
 		t.Errorf("a dismissed waiting request replied %q", got)
 	}
-	p.selecting = true
+	cancels := 0
+	p.cancelSelect = func() { cancels++ }
 	p.Dismiss("/r/test")
 	if got := <-ch; got != "" {
 		t.Errorf("a dismissed picker replied %q, want the cancel", got)
 	}
-	if region.cancels != 1 {
-		t.Errorf("region overlay cancels = %d, want the open overlay taken down", region.cancels)
+	if cancels != 1 {
+		t.Errorf("region selection cancels = %d, want the open overlay taken down", cancels)
 	}
 }
 

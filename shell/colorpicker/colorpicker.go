@@ -9,6 +9,7 @@
 package colorpicker
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"log"
@@ -71,6 +72,7 @@ type result struct {
 // runs on the lys-ui loop goroutine.
 type Picker struct {
 	app     *app.Application
+	gate    *regionoverlay.Gate
 	outputs func() []*app.Output
 	font    render.Font
 	// historyPath is where the swatches persist; empty disables it.
@@ -81,10 +83,11 @@ type Picker struct {
 	surfaces []*app.LayerWindow
 }
 
-// New builds the picker. font is the readout's monospace bold face;
-// the history loads from historyPath (HistoryPath for the real one).
-func New(a *app.Application, outputs func() []*app.Output, font render.Font, historyPath string) *Picker {
-	return &Picker{app: a, outputs: outputs, font: font, historyPath: historyPath, history: loadHistory(historyPath)}
+// New builds the picker. gate is the shell's one capture gate; font is
+// the readout's monospace bold face; the history loads from historyPath
+// (HistoryPath for the real one).
+func New(a *app.Application, gate *regionoverlay.Gate, outputs func() []*app.Output, font render.Font, historyPath string) *Picker {
+	return &Picker{app: a, gate: gate, outputs: outputs, font: font, historyPath: historyPath, history: loadHistory(historyPath)}
 }
 
 // HistoryPath is the persisted swatch file:
@@ -98,26 +101,31 @@ func HistoryPath() string {
 	return filepath.Join(dir, "color-history")
 }
 
-// Request opens the picker over the frozen frames (keyed by connector)
-// and blocks until a click picks a pixel (ok) or the user cancels. A
-// monitor without a frame gets no surface; when no frame matches any
-// monitor there is nothing to pick from, and that is an error naming
-// both, not a cancel. Call it from any goroutine but the loop's.
-func (p *Picker) Request(frames map[string]render.StillImage) (RGB, bool, error) {
-	ch := make(chan result, 1)
-	p.app.Invoke(func() { p.show(ch, frames) })
-	r := <-ch
+// Request opens the picker over the frozen frames (keyed by connector),
+// which frames captures once the gate admits the request, and blocks until
+// a click picks a pixel (ok), or the user cancels or ctx ends (not ok, no
+// error). A monitor without a frame gets no surface; when no frame matches
+// any monitor there is nothing to pick from, and that is an error naming
+// both, not a cancel. While another session holds the gate the request
+// opens nothing, takes no frames and answers regionoverlay.ErrBusy. Call it
+// from any goroutine but the loop's.
+func (p *Picker) Request(ctx context.Context, frames regionoverlay.Frames) (RGB, bool, error) {
+	r, err := regionoverlay.OpenSession(ctx, p.gate, p.app.Invoke, frames, p.show, p.cancel)
+	if err != nil {
+		return RGB{}, false, err
+	}
 	return r.color, r.ok, r.err
 }
 
-// Cancel answers the open request, if any, as cancelled and takes the
-// surfaces down. Call it from any goroutine but the loop's.
-func (p *Picker) Cancel() {
-	p.app.Invoke(func() { p.finish(RGB{}, false) })
+// cancel answers the request at ch, if it is still the open one, as
+// cancelled.
+func (p *Picker) cancel(ch chan result) {
+	if p.reply == ch {
+		p.finish(RGB{}, false)
+	}
 }
 
-func (p *Picker) show(ch chan result, frames map[string]render.StillImage) {
-	p.finish(RGB{}, false)
+func (p *Picker) show(frames map[string]render.StillImage, ch chan result) {
 	p.reply = ch
 	for _, out := range p.outputs() {
 		mon := regionoverlay.MonitorOf(out)

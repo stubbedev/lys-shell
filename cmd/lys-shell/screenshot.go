@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -46,6 +47,9 @@ func captureScreenshot(mode string) func(*cli.Matches) error {
 		defer func() { _ = conn.Close() }()
 		// No timeout: a region capture waits for the user's drag.
 		path, err := screenshot.NewClient(conn).Capture(context.Background(), portaldialogs.Caller{}, mode, target)
+		if errors.Is(err, screenshot.ErrBusy) {
+			return dbuscli.Message("Screenshot not taken: " + err.Error())
+		}
 		if err != nil {
 			return dbuscli.FormatError("Screenshot", "capture screenshot", err)
 		}

@@ -1,6 +1,8 @@
 package sharepicker
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"image"
 	"slices"
@@ -18,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -25,6 +28,7 @@ import (
 const (
 	physicalTab   = 15
 	physicalRight = 106
+	buttonLeft    = 0x110
 )
 
 // keyRig is a picker on a private sway with a toplevel of the same
@@ -335,4 +339,117 @@ func (p *Picker) windowCardLayouts() []cardLayout {
 		})
 	}
 	return out
+}
+
+// regionRig is a share picker on its Region page with the real region overlay,
+// and that overlay's gate as a screenshot press reaches it.
+type regionRig struct {
+	*keyRig
+	gate   *regionoverlay.Gate
+	region *regionoverlay.Overlay
+}
+
+func regionPicker(t *testing.T) *regionRig {
+	t.Helper()
+	k := keyPicker(t, config.SharePickerRegion, Request{Sources: SourceRegions})
+	gate := &regionoverlay.Gate{}
+	region := regionoverlay.New(k.a, gate, k.a.Session().Outputs, nil, treetest.Font(t), nil)
+	apptest.On(k.a, func() bool { k.p.region = region; return true })
+	return &regionRig{keyRig: k, gate: gate, region: region}
+}
+
+// selectRegion presses the Select region button.
+func (r *regionRig) selectRegion(t *testing.T) {
+	t.Helper()
+	apptest.On(r.a, func() bool {
+		r.p.choices[pageRegion][0].(*widget.Button).OnClick()
+		return true
+	})
+}
+
+// open reports whether a capture overlay session is open.
+func (r *regionRig) open() bool {
+	end, err := r.gate.Instant()
+	if err != nil {
+		return true
+	}
+	end()
+	return false
+}
+
+// A screenshot press during the share picker's region selection does not
+// cancel it: it opens nothing and captures nothing, and the selection the
+// user drew reaches the requester.
+func TestHeadlessScreenshotPressLeavesTheRegionSelection(t *testing.T) {
+	r := regionPicker(t)
+	r.selectRegion(t)
+	apptest.Until(t, r.a, "the overlay took the keyboard", func() bool {
+		return r.open() && r.p.layer == nil && r.a.Session().KeyboardFocus() != nil
+	})
+	w, h := r.kb.OutputSize()
+	for _, step := range []func() error{
+		func() error { return r.kb.MotionAbsolute(100, 100, uint32(w), uint32(h)) },
+		func() error { return r.kb.Button(buttonLeft, true) },
+		func() error { return r.kb.MotionAbsolute(300, 200, uint32(w), uint32(h)) },
+		func() error { return r.kb.Button(buttonLeft, false) },
+	} {
+		if err := step(); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.kb.Roundtrip(); err != nil {
+			t.Fatal(err)
+		}
+		apptest.Dispatched(t, r.a)
+	}
+	err := within(t, "the press's refusal", func() error {
+		_, _, err := r.region.Request(context.Background(), func() (map[string]render.StillImage, error) {
+			t.Error("the refused press took a capture")
+			return nil, nil
+		})
+		return err
+	})
+	if !errors.Is(err, regionoverlay.ErrBusy) {
+		t.Fatalf("the press answered %v, want ErrBusy", err)
+	}
+	apptest.Never(t, "the picker after a refused press", r.answers)
+	r.kb.Tap(keytest.Return)
+	got := apptest.Answer(t, "the picker after Return", r.answers)
+	if want := "/region:" + apptest.On(r.a, func() string { return r.a.Session().Outputs()[0].Name }) + "@100,100,200,100"; got != want {
+		t.Fatalf("the picker answered %q, want %q", got, want)
+	}
+}
+
+// Select region while another capture holds the gate opens nothing: the picker
+// comes back unanswered, and dismissing it leaves the other capture's session.
+func TestHeadlessSelectRegionRefusedLeavesTheOtherSession(t *testing.T) {
+	r := regionPicker(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	other := make(chan error, 1)
+	go func() {
+		_, _, err := r.region.Request(ctx, nil)
+		other <- err
+	}()
+	apptest.Until(t, r.a, "the other capture holds the gate", r.open)
+	r.selectRegion(t)
+	apptest.Until(t, r.a, "the refused picker came back", func() bool { return r.p.layer != nil && r.p.cancelSelect == nil })
+	apptest.Never(t, "the picker after a refused Select region", r.answers)
+	r.p.Dismiss("/r/keys")
+	if got := apptest.Answer(t, "the dismissed picker", r.answers); got != "" {
+		t.Fatalf("the dismissed picker answered %q", got)
+	}
+	apptest.Never(t, "the other capture's session after the dismissal", other)
+	cancel()
+	if err := apptest.Answer(t, "the other capture's session", other); err != nil {
+		t.Fatalf("the other session answered %v", err)
+	}
+}
+
+// within runs fn, failing the test with what if it does not return in
+// apptest.Answer's bound: a request wrongly admitted would block on its overlay.
+func within[T any](t *testing.T, what string, fn func() T) T {
+	t.Helper()
+	answered := make(chan T, 1)
+	go func() { answered <- fn() }()
+	return apptest.Answer(t, what, answered)
 }

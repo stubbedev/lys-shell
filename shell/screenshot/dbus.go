@@ -2,6 +2,7 @@ package screenshot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -13,7 +14,26 @@ const (
 	ServiceName = "dev.stubbe.lys.Screenshot1"
 	ServicePath = "/dev/stubbe/lys/Screenshot"
 	iface       = "dev.stubbe.lys.Screenshot1"
+	// busyError is the error reply carrying ErrBusy, distinct from a
+	// failed capture.
+	busyError = iface + ".Error.Busy"
 )
+
+// errorReply is err on the wire.
+func errorReply(err error) *dbus.Error {
+	if errors.Is(err, ErrBusy) {
+		return dbus.NewError(busyError, []any{err.Error()})
+	}
+	return dbus.MakeFailedError(err)
+}
+
+// replyErr reads an error reply back: busyError is ErrBusy.
+func replyErr(err error) error {
+	if e, ok := errors.AsType[dbus.Error](err); ok && e.Name == busyError {
+		return ErrBusy
+	}
+	return err
+}
 
 // capturer is what the daemon serves: the Host, or a fake in tests.
 type capturer interface {
@@ -51,11 +71,12 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 // cancelled. mode is region, output, screen, or window; target is an
 // output connector name (output mode), a window's ext toplevel
 // identifier (window mode; the active window when empty), or empty. Replies the saved PNG
-// path, empty when a region selection was cancelled or dismissed.
+// path, empty when a region selection was cancelled or dismissed; every
+// mode fails with the Busy error while a capture overlay is open.
 func (d *Daemon) Capture(c portaldialogs.Caller, mode, target string) (string, *dbus.Error) {
 	path, err := d.host.Capture(c, mode, target)
 	if err != nil {
-		return "", dbus.MakeFailedError(err)
+		return "", errorReply(err)
 	}
 	return path, nil
 }
@@ -66,18 +87,18 @@ func (d *Daemon) Capture(c portaldialogs.Caller, mode, target string) (string, *
 func (d *Daemon) CapturePrivate(c portaldialogs.Caller, mode, target string, pointer bool) (string, *dbus.Error) {
 	path, err := d.host.CapturePrivate(c, mode, target, pointer)
 	if err != nil {
-		return "", dbus.MakeFailedError(err)
+		return "", errorReply(err)
 	}
 	return path, nil
 }
 
 // PickColor picks one screen color interactively, replying whether the
 // user picked one and its sRGB (r, g, b) in [0, 1]; a failure is an
-// error.
+// error, the Busy error while a capture overlay is open.
 func (d *Daemon) PickColor(c portaldialogs.Caller) (bool, float64, float64, float64, *dbus.Error) {
 	color, picked, err := d.host.PickColor(c)
 	if err != nil {
-		return false, 0, 0, 0, dbus.MakeFailedError(err)
+		return false, 0, 0, 0, errorReply(err)
 	}
 	return picked, color[0], color[1], color[2], nil
 }
@@ -100,26 +121,27 @@ func NewClient(conn *dbus.Conn) *Client {
 	return &Client{obj: conn.Object(ServiceName, ServicePath)}
 }
 
-// Capture asks the shell for a screenshot; see Daemon.Capture.
+// Capture asks the shell for a screenshot; see Daemon.Capture. A refused
+// request is ErrBusy.
 func (c *Client) Capture(ctx context.Context, caller portaldialogs.Caller, mode, target string) (string, error) {
 	var path string
 	err := c.obj.CallWithContext(ctx, iface+".Capture", 0, caller, mode, target).Store(&path)
-	return path, err
+	return path, replyErr(err)
 }
 
 // CapturePrivate asks the shell for an app's screenshot; see
-// Daemon.CapturePrivate.
+// Daemon.CapturePrivate. A refused request is ErrBusy.
 func (c *Client) CapturePrivate(ctx context.Context, caller portaldialogs.Caller, mode, target string, pointer bool) (string, error) {
 	var path string
 	err := c.obj.CallWithContext(ctx, iface+".CapturePrivate", 0, caller, mode, target, pointer).Store(&path)
-	return path, err
+	return path, replyErr(err)
 }
 
 // PickColor asks the shell for an interactive color pick; picked is
-// false for the user's cancel.
+// false for the user's cancel, and a refused request is ErrBusy.
 func (c *Client) PickColor(ctx context.Context, caller portaldialogs.Caller) (color [3]float64, picked bool, err error) {
 	err = c.obj.CallWithContext(ctx, iface+".PickColor", 0, caller).Store(&picked, &color[0], &color[1], &color[2])
-	return color, picked, err
+	return color, picked, replyErr(err)
 }
 
 // Dismiss cancels the selection or pick showing for the request at

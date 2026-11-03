@@ -13,6 +13,7 @@
 package regionoverlay
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"log"
@@ -145,6 +146,7 @@ type result struct {
 // everything else runs on the lys-ui loop goroutine.
 type Overlay struct {
 	app     *app.Application
+	gate    *Gate
 	outputs func() []*app.Output
 	// windows lists the visible windows' global logical rectangles,
 	// topmost first, that a click picks from; nil picks outputs only.
@@ -169,11 +171,11 @@ type Overlay struct {
 	onSurface bool
 }
 
-// New builds the overlay on the application; outputs lists the
-// monitors to cover at each request, windows (nil for none) the
-// windows a click can pick.
-func New(a *app.Application, outputs func() []*app.Output, windows func() []image.Rectangle, font render.Font, sheet *widget.Stylesheet) *Overlay {
-	return &Overlay{app: a, outputs: outputs, windows: windows, font: font, sheet: sheet}
+// New builds the overlay on the application; gate is the shell's one
+// capture gate, outputs lists the monitors to cover at each request,
+// windows (nil for none) the windows a click can pick.
+func New(a *app.Application, gate *Gate, outputs func() []*app.Output, windows func() []image.Rectangle, font render.Font, sheet *widget.Stylesheet) *Overlay {
+	return &Overlay{app: a, gate: gate, outputs: outputs, windows: windows, font: font, sheet: sheet}
 }
 
 // surfaceRoot is one surface's tree, window.region-overlay-window >
@@ -201,29 +203,29 @@ func (o *Overlay) surfaceRoot(a *area) widget.Widget {
 	return root
 }
 
-// Request opens the overlay and blocks until the user confirms a
-// region (ok) or cancels with Escape (not ok). frames maps
-// connector names to frozen frames painted behind the wash; nil or a
-// missing connector leaves that surface transparent over the live
-// screen. A request arriving while one is open cancels the older one.
-// Call it from any goroutine but the loop's.
-func (o *Overlay) Request(frames map[string]render.StillImage) (Selection, bool) {
-	ch := make(chan result, 1)
-	o.app.Invoke(func() { o.show(ch, frames) })
-	r := <-ch
-	return r.sel, r.ok
+// Request opens the overlay and blocks until the user confirms a region
+// (ok), or cancels with Escape or ctx ends (not ok, no error). frames runs
+// once the gate admits the request and before any surface maps; what it
+// returns is painted behind the wash, and nil or a missing connector leaves
+// that surface transparent over the live screen. While another session holds
+// the gate the request opens nothing, takes no frames, leaves that session
+// and its selection as they are, and answers ErrBusy. Call it from any
+// goroutine but the loop's.
+func (o *Overlay) Request(ctx context.Context, frames Frames) (Selection, bool, error) {
+	r, err := OpenSession(ctx, o.gate, o.app.Invoke, frames, o.show, o.cancel)
+	return r.sel, r.ok, err
 }
 
-// Cancel answers the open request, if any, as cancelled and takes the
-// surfaces down. Call it from any goroutine but the loop's.
-func (o *Overlay) Cancel() {
-	o.app.Invoke(func() { o.finish(Selection{}, false) })
+// cancel answers the request at ch, if it is still the open one, as
+// cancelled.
+func (o *Overlay) cancel(ch chan result) {
+	if o.reply == ch {
+		o.finish(Selection{}, false)
+	}
 }
 
-// show replaces any open request with a fresh one and maps the
-// surfaces.
-func (o *Overlay) show(ch chan result, frames map[string]render.StillImage) {
-	o.finish(Selection{}, false)
+// show maps the surfaces for the session's request.
+func (o *Overlay) show(frames map[string]render.StillImage, ch chan result) {
 	o.reply = ch
 	o.open(frames)
 	if len(o.surfaces) == 0 {

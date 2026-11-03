@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -66,5 +67,32 @@ func TestDaemonOverTheBus(t *testing.T) {
 	if !errors.As(err, &dbusErr) || dbusErr.Name != "org.freedesktop.DBus.Error.Failed" ||
 		dbusErr.Body[0] != "window capture not supported on this compositor" {
 		t.Fatalf("Capture error = %#v", err)
+	}
+}
+
+// A refused request crosses the bus as its own error and reads back as
+// ErrBusy; a failure stays a failure.
+func TestBusyCrossesTheBus(t *testing.T) {
+	bus := dbustest.Start(t)
+	host := &switchCapturer{}
+	host.err.Store(ErrBusy)
+	if _, err := (&Daemon{host: host}).Export(bus.Conn(t)); err != nil {
+		t.Fatal(err)
+	}
+	c := NewClient(bus.Conn(t))
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	if path, err := c.Capture(ctx, portaldialogs.Caller{}, ModeRegion, ""); !errors.Is(err, ErrBusy) || path != "" {
+		t.Errorf("Capture = %q %v, want ErrBusy", path, err)
+	}
+	if path, err := c.CapturePrivate(ctx, portaldialogs.Caller{}, ModeOutput, "", false); !errors.Is(err, ErrBusy) || path != "" {
+		t.Errorf("CapturePrivate = %q %v, want ErrBusy", path, err)
+	}
+	if _, picked, err := c.PickColor(ctx, portaldialogs.Caller{}); !errors.Is(err, ErrBusy) || picked {
+		t.Errorf("PickColor = %v %v, want ErrBusy", picked, err)
+	}
+	host.err.Store(errors.New("no outputs available"))
+	if _, err := c.Capture(ctx, portaldialogs.Caller{}, ModeOutput, ""); err == nil || errors.Is(err, ErrBusy) {
+		t.Errorf("a failed capture = %v, want it distinct from ErrBusy", err)
 	}
 }

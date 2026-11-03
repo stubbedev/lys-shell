@@ -11,6 +11,7 @@
 package sharepicker
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"log"
@@ -70,8 +71,7 @@ type Picker struct {
 	app    *app.Application
 	d      Deps
 	region interface {
-		Request(frames map[string]render.StillImage) (regionoverlay.Selection, bool)
-		Cancel()
+		Request(ctx context.Context, frames regionoverlay.Frames) (regionoverlay.Selection, bool, error)
 	}
 
 	// cfg, anims, and scale are the request's config snapshot
@@ -80,21 +80,23 @@ type Picker struct {
 	anims config.AnimationsConfig
 	scale float64
 
-	reply      chan string
-	queue      dialogqueue.Queue
-	requester  string
-	selecting  bool
-	allowToken bool
-	multiple   bool
-	pending    []string
-	root       widget.Widget
-	nb         *widget.Notebook
-	pages      []string
-	choices    map[string][]widget.Widget
-	rev        *widget.Revealer
-	layer      *app.LayerWindow
-	confirm    *widget.Button
-	confirmLbl *widget.Label
+	reply     chan string
+	queue     dialogqueue.Queue
+	requester string
+	// cancelSelect ends the region selection this request opened, nil
+	// without one.
+	cancelSelect context.CancelFunc
+	allowToken   bool
+	multiple     bool
+	pending      []string
+	root         widget.Widget
+	nb           *widget.Notebook
+	pages        []string
+	choices      map[string][]widget.Widget
+	rev          *widget.Revealer
+	layer        *app.LayerWindow
+	confirm      *widget.Button
+	confirmLbl   *widget.Label
 
 	// invoke marshals onto the loop (Application.Invoke).
 	invoke func(func())
@@ -140,8 +142,9 @@ func (p *Picker) Dismiss(handle string) {
 		if !p.queue.Dismiss(handle) {
 			return
 		}
-		if p.selecting {
-			p.region.Cancel()
+		if p.cancelSelect != nil {
+			p.cancelSelect()
+			p.cancelSelect = nil
 		}
 		p.answer("")
 	})
@@ -674,7 +677,8 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 
 // regionPage is build_region_page: the Select region button. The picker
 // steps aside while the live overlay is up, then comes back to take the
-// selection (or to stay open after a cancel).
+// selection (or to stay open after a cancel, or when another capture
+// refuses the overlay).
 func (p *Picker) regionPage() widget.Widget {
 	lbl := p.label("Select region")
 	lbl.SetAlignment(render.AlignCenter)
@@ -683,13 +687,19 @@ func (p *Picker) regionPage() widget.Widget {
 	btn.SetCursorName("pointer")
 	btn.OnClick = func() {
 		p.hide()
-		p.selecting = true
+		reply := p.reply
+		ctx, cancel := context.WithCancel(context.Background())
+		p.cancelSelect = cancel
 		go func() {
-			sel, ok := p.region.Request(nil)
+			defer cancel()
+			sel, ok, err := p.region.Request(ctx, nil)
 			p.invoke(func() {
-				p.selecting = false
-				if p.reply == nil {
+				if p.reply != reply {
 					return // the request was answered meanwhile
+				}
+				p.cancelSelect = nil
+				if err != nil {
+					log.Printf("share picker: region selection: %v", err)
 				}
 				if err := p.mapSurface(); err != nil {
 					log.Printf("share picker: %v", err)

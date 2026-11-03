@@ -1,11 +1,42 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
+
+// stubRegion answers every region request err, not ok.
+type stubRegion struct{ err error }
+
+func (s stubRegion) Request(context.Context, regionoverlay.Frames) (regionoverlay.Selection, bool, error) {
+	return regionoverlay.Selection{}, false, s.err
+}
+
+// A request refused while a capture overlay is open is an error naming that,
+// not the "Screenshot cancelled" the user's cancel reports.
+func TestScreenshotRefusedIsNotACancel(t *testing.T) {
+	dbustest.Session(t)
+	export(t, screenshot.NewDaemon(&screenshot.Host{Region: stubRegion{err: screenshot.ErrBusy}}).Export)
+	stdout, stderr, code := runCaptured(t, false, "screenshot", "region")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "Screenshot not taken: another capture is in progress") {
+		t.Fatalf("refused: code %d stdout %q stderr %q", code, stdout, stderr)
+	}
+}
+
+func TestScreenshotCancelledStaysACancel(t *testing.T) {
+	dbustest.Session(t)
+	export(t, screenshot.NewDaemon(&screenshot.Host{Region: stubRegion{}}).Export)
+	stdout, stderr, code := runCaptured(t, false, "screenshot", "region")
+	if code != 0 || stdout != "Screenshot cancelled\n" || stderr != "" {
+		t.Fatalf("cancelled: code %d stdout %q stderr %q", code, stdout, stderr)
+	}
+}
 
 func TestScreenshotSubcommandsReachTheService(t *testing.T) {
 	bus := dbustest.Start(t)

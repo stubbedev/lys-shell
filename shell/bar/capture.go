@@ -47,7 +47,8 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 		log.Printf("screenshot: overlay font %q: %v", cfg.General.FontMono, err)
 	}
 	focus := screenshot.CompositorFocus{Hyprland: hypr}
-	region := regionoverlay.New(application, outputs, focus.Windows, font, sheet)
+	gate := &regionoverlay.Gate{}
+	region := regionoverlay.New(application, gate, outputs, focus.Windows, font, sheet)
 	monitors := func() []regionoverlay.Monitor {
 		outs := outputs()
 		mons := make([]regionoverlay.Monitor, len(outs))
@@ -59,8 +60,9 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 	s := &captureServices{host: &screenshot.Host{
 		Config:   func() config.ScreenshotConfig { return current().Screenshot },
 		Monitors: monitors,
+		Gate:     gate,
 		Region:   region,
-		Picker:   colorpicker.New(application, outputs, font, colorpicker.HistoryPath()),
+		Picker:   colorpicker.New(application, gate, outputs, font, colorpicker.HistoryPath()),
 		Focus:    focus,
 		Copy:     clipboardCopier(application, clip),
 		Forget: func(ids []render.ImageID) {
@@ -93,7 +95,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 
 // trigger is the `lys-shell screenshot ...` builtin: a fire-and-forget
 // capture whose reply nobody awaits, like the Rust trigger's dropped
-// oneshot.
+// oneshot. A press refused during an open overlay is only logged.
 func (s *captureServices) trigger(mode, target string) {
 	go func() {
 		if _, err := s.host.Capture(portaldialogs.Caller{}, mode, target); err != nil {

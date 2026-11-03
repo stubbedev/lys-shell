@@ -181,13 +181,28 @@ func TestLoupePaints(t *testing.T) {
 func TestNoMatchingFrameFails(t *testing.T) {
 	p := &Picker{outputs: func() []*app.Output { return []*app.Output{{Name: "DP-1"}} }}
 	ch := make(chan result, 1)
-	p.show(ch, map[string]render.StillImage{"HDMI-A-1": render.NewStillImage(gradient())})
+	p.show(map[string]render.StillImage{"HDMI-A-1": render.NewStillImage(gradient())}, ch)
 	r := <-ch
 	if r.ok || r.err == nil || !strings.Contains(r.err.Error(), "HDMI-A-1") || !strings.Contains(r.err.Error(), "DP-1") {
 		t.Fatalf("unmatched frames answered %+v, want an error naming the frame and the output", r)
 	}
 	if p.reply != nil {
 		t.Error("the failed request stayed open")
+	}
+}
+
+// A cancel for a request already over leaves the one open now alone.
+func TestCancelIsForItsOwnRequest(t *testing.T) {
+	p := &Picker{}
+	open, over := make(chan result, 1), make(chan result, 1)
+	p.reply = open
+	p.cancel(over)
+	if p.reply != open || len(open) != 0 || len(over) != 0 {
+		t.Fatal("a stale cancel answered the open request")
+	}
+	p.cancel(open)
+	if r := <-open; r.ok || r.err != nil {
+		t.Fatalf("the cancel answered %+v", r)
 	}
 }
 

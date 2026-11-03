@@ -1,6 +1,7 @@
 package screenshot
 
 import (
+	"context"
 	"errors"
 	"image"
 	"image/color"
@@ -167,30 +168,20 @@ func TestParseHyprlandActiveWindow(t *testing.T) {
 	}
 }
 
-// fakeRegion answers the region overlay; block, when set, holds the
-// request until Cancel.
+// fakeRegion answers the region overlay at once, after taking the frames.
 type fakeRegion struct {
-	sel     regionoverlay.Selection
-	ok      bool
-	frames  map[string]render.StillImage
-	block   chan struct{}
-	cancels int
+	sel    regionoverlay.Selection
+	ok     bool
+	frames map[string]render.StillImage
 }
 
-func (f *fakeRegion) Request(frames map[string]render.StillImage) (regionoverlay.Selection, bool) {
-	f.frames = frames
-	if f.block != nil {
-		<-f.block
-		return regionoverlay.Selection{}, false
+func (f *fakeRegion) Request(_ context.Context, frames regionoverlay.Frames) (regionoverlay.Selection, bool, error) {
+	captured, err := frames()
+	if err != nil {
+		return regionoverlay.Selection{}, false, err
 	}
-	return f.sel, f.ok
-}
-
-func (f *fakeRegion) Cancel() {
-	f.cancels++
-	if f.block != nil {
-		close(f.block)
-	}
+	f.frames = captured
+	return f.sel, f.ok, nil
 }
 
 type fakePicker struct {
@@ -199,10 +190,12 @@ type fakePicker struct {
 	err error
 }
 
-func (f fakePicker) Request(map[string]render.StillImage) (colorpicker.RGB, bool, error) {
+func (f fakePicker) Request(_ context.Context, frames regionoverlay.Frames) (colorpicker.RGB, bool, error) {
+	if _, err := frames(); err != nil {
+		return colorpicker.RGB{}, false, err
+	}
 	return f.c, f.ok, f.err
 }
-func (fakePicker) Cancel() {}
 
 // fixed is a Config that never reloads.
 func fixed(cfg config.ScreenshotConfig) func() config.ScreenshotConfig {
@@ -220,6 +213,7 @@ func testHost(t *testing.T, region *fakeRegion) (*Host, *[]Notice, *int) {
 		Monitors: func() []regionoverlay.Monitor {
 			return []regionoverlay.Monitor{{Connector: "DP-1", Width: 100, Height: 50}, {Connector: "DP-2", X: 100, Width: 100, Height: 50}}
 		},
+		Gate:   &regionoverlay.Gate{},
 		Region: region,
 		Picker: fakePicker{c: colorpicker.RGB{R: 255, G: 51, B: 0}, ok: true},
 		Copy:   func(image.Image) error { copies++; return nil },
@@ -584,44 +578,6 @@ func TestDaemonMethods(t *testing.T) {
 	}
 	if _, _, _, _, err := d.PickColor(portaldialogs.Caller{}); err == nil || err.Name != "org.freedesktop.DBus.Error.Failed" {
 		t.Fatalf("PickColor error = %v", err)
-	}
-}
-
-// Dismissing the request whose region selection is open cancels the
-// overlay; another request's dismissal leaves it.
-func TestDismissCancelsItsOverlayOnly(t *testing.T) {
-	region := &fakeRegion{block: make(chan struct{})}
-	h, _, _ := testHost(t, region)
-	done := make(chan string, 1)
-	go func() {
-		path, _ := h.Capture(portaldialogs.Caller{Handle: "/r/mine"}, ModeRegion, "")
-		done <- path
-	}()
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		h.mu.Lock()
-		open := h.interactive.handle == "/r/mine"
-		h.mu.Unlock()
-		if open {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the region request never opened")
-		}
-		time.Sleep(time.Millisecond)
-	}
-	h.Dismiss("/r/other")
-	if region.cancels != 0 {
-		t.Error("another request's dismissal cancelled the overlay")
-	}
-	h.Dismiss("/r/mine")
-	select {
-	case path := <-done:
-		if path != "" {
-			t.Errorf("a dismissed selection saved %q", path)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Dismiss left the selection open")
 	}
 }
 

@@ -5,13 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/memory-go"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
+	"github.com/stubbedev/lys-shell/internal/keytest"
+	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
@@ -78,6 +83,7 @@ func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 	cfg := config.DefaultsScreenshot()
 	cfg.OutputDirectory = t.TempDir()
 	h := &Host{
+		Gate:   &regionoverlay.Gate{},
 		Forget: func([]render.ImageID) {},
 		Config: fixed(cfg),
 		Monitors: func() []regionoverlay.Monitor {
@@ -101,5 +107,86 @@ func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 	}
 	if img.Bounds().Dx() != 30 || img.Bounds().Dy() != 20 {
 		t.Fatalf("saved %v, want the 30x20 crop", img.Bounds())
+	}
+}
+
+// The real overlays on a private compositor, on one gate as the shell builds
+// them: during a region selection every other request is refused before it
+// captures, and Dismiss with a refused request's handle leaves the selection,
+// which its own handle then closes; the same goes for a color pick; and the
+// next request opens. The capture itself is stood in for, so no compositor
+// frame is taken.
+func TestHeadlessHostOverlaysAdmitOneSession(t *testing.T) {
+	a := apptest.Run(t)
+	apptest.On(a, func() bool { a.SetSurfaceMotion(false); return true })
+	t.Cleanup(func() { apptest.On(a, func() bool { a.SetSurfaceMotion(true); return true }) })
+	font, err := app.Font("monospace", 13)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := a.Session().Outputs
+	gate := &regionoverlay.Gate{}
+	h, _, _ := testHost(t, nil)
+	h.Gate = gate
+	h.Region = regionoverlay.New(a, gate, outputs, nil, font, nil)
+	h.Picker = colorpicker.New(a, gate, outputs, font, "")
+	h.Monitors = func() []regionoverlay.Monitor {
+		return apptest.On(a, func() []regionoverlay.Monitor {
+			var mons []regionoverlay.Monitor
+			for _, o := range outputs() {
+				mons = append(mons, regionoverlay.MonitorOf(o))
+			}
+			return mons
+		})
+	}
+	var captures atomic.Int32
+	h.frozen = func(bool) ([]frozenOutput, error) {
+		captures.Add(1)
+		var frozen []frozenOutput
+		for _, m := range h.Monitors() {
+			frozen = append(frozen, offHeap(t, h, m.Connector, solid(m.Width, m.Height, red)))
+		}
+		return frozen, nil
+	}
+	kb := keytest.Dial(t, a)
+	apptest.Until(t, a, "an output appeared", func() bool { return len(outputs()) > 0 })
+
+	selection := make(chan string, 1)
+	go func() {
+		path, err := h.Capture(portaldialogs.Caller{Handle: "/r/region"}, ModeRegion, "")
+		if err != nil {
+			t.Errorf("the region request failed: %v", err)
+		}
+		selection <- path
+	}()
+	keytest.AwaitFocus(t, a)
+	assertRefused(t, h, "/r/refused")
+	if n := captures.Load(); n != 1 {
+		t.Errorf("%d captures with one session admitted, want its one", n)
+	}
+	h.Dismiss("/r/refused")
+	apptest.Never(t, "the selection after a refused request's Dismiss", selection)
+	h.Dismiss("/r/region")
+	if path := apptest.Answer(t, "the dismissed selection", selection); path != "" {
+		t.Fatalf("the dismissed selection saved %q", path)
+	}
+
+	picked := make(chan bool, 1)
+	go func() {
+		_, ok, err := h.PickColor(portaldialogs.Caller{Handle: "/r/pick"})
+		if err != nil {
+			t.Errorf("the color pick failed: %v", err)
+		}
+		picked <- ok
+	}()
+	apptest.Until(t, a, "the picker took the keyboard", func() bool { return captures.Load() == 2 && a.Session().KeyboardFocus() != nil })
+	assertRefused(t, h, "/r/refused")
+	apptest.Never(t, "the pick after refused requests", picked)
+	kb.Tap(keytest.Escape)
+	if apptest.Answer(t, "the pick after Escape", picked) {
+		t.Fatal("Escape picked")
+	}
+	if n := captures.Load(); n != 2 {
+		t.Errorf("%d captures with two sessions admitted", n)
 	}
 }

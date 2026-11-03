@@ -1,9 +1,14 @@
 package regionoverlay
 
 import (
+	"context"
+	"errors"
+	"image"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -17,21 +22,46 @@ const buttonLeft = 0x110
 // request; the answer arrives on the returned channel.
 func startOverlay(t *testing.T) (*keytest.Keyboard, chan result) {
 	t.Helper()
+	r := newRig(t)
+	return r.kb, r.request(t, context.Background())
+}
+
+// rig is an overlay on a private headless sway, its keyboard dialled.
+type rig struct {
+	a  *app.Application
+	o  *Overlay
+	kb *keytest.Keyboard
+}
+
+func newRig(t *testing.T) *rig {
+	t.Helper()
 	a := apptest.Run(t)
 	font, err := app.Font("sans", 14)
 	if err != nil {
 		t.Fatal(err)
 	}
-	o := New(a, a.Session().Outputs, nil, font, widget.NewStylesheet("", 0))
-	t.Cleanup(o.Cancel)
+	o := New(a, &Gate{}, a.Session().Outputs, nil, font, widget.NewStylesheet("", 0))
+	return &rig{a: a, o: o, kb: keytest.Dial(t, a)}
+}
+
+// request opens a request and waits until its surface holds the keyboard;
+// the answer arrives on the returned channel. It ends with the test.
+func (r *rig) request(t *testing.T, ctx context.Context) chan result {
+	t.Helper()
+	ctx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
 	answers := make(chan result, 1)
 	go func() {
-		sel, ok := o.Request(nil)
+		sel, ok, err := r.o.Request(ctx, nil)
+		if err != nil {
+			t.Errorf("the request was refused: %v", err)
+		}
 		answers <- result{sel: sel, ok: ok}
 	}()
-	kb := keytest.Dial(t, a)
-	keytest.AwaitFocus(t, a)
-	return kb, answers
+	apptest.Until(t, r.a, "the overlay's surface took the keyboard", func() bool {
+		return len(r.o.surfaces) > 0 && r.a.Session().KeyboardFocus() == r.o.surfaces[0].HostSurface()
+	})
+	return answers
 }
 
 // dragOn presses at (x0, y0) and releases at (x1, y1) on the output.
@@ -75,4 +105,86 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	if r := apptest.Answer(t, "the region after Escape", answers); r.ok {
 		t.Fatalf("Escape confirmed %+v", r.sel)
 	}
+}
+
+// A second request while a selection is being made maps no surface, takes
+// no capture and leaves the selection: the first request then answers the
+// region the user had drawn.
+func TestHeadlessSecondRequestOpensNothing(t *testing.T) {
+	r := newRig(t)
+	first := r.request(t, context.Background())
+	dragOn(t, r.kb, 100, 100, 300, 200)
+	type state struct {
+		surfaces []*app.LayerWindow
+		sel      image.Rectangle
+		reply    chan result
+	}
+	read := func() state {
+		return apptest.On(r.a, func() state { return state{slices.Clone(r.o.surfaces), r.o.ed.sel, r.o.reply} })
+	}
+	before := read()
+	if len(before.surfaces) == 0 || before.sel.Empty() {
+		t.Fatalf("nothing open to refuse over: %+v", before)
+	}
+	captures := 0
+	err := within(t, "the second request's refusal", func() error {
+		_, _, err := r.o.Request(context.Background(), func() (map[string]render.StillImage, error) {
+			captures++
+			return nil, nil
+		})
+		return err
+	})
+	if !errors.Is(err, ErrBusy) {
+		t.Fatalf("the second request answered %v, want ErrBusy", err)
+	}
+	if captures != 0 {
+		t.Errorf("the refused request took %d captures", captures)
+	}
+	after := read()
+	if !slices.Equal(after.surfaces, before.surfaces) || after.sel != before.sel || after.reply != before.reply {
+		t.Fatalf("the refused request changed the session: %+v, was %+v", after, before)
+	}
+	apptest.Never(t, "the first request after the refusal", first)
+	r.kb.Tap(keytest.Return)
+	got := apptest.Answer(t, "the first request after Return", first)
+	if !got.ok || got.sel.Width != 200 || got.sel.Height != 100 || got.sel.X != 100 || got.sel.Y != 100 {
+		t.Fatalf("answer = %+v, want the region drawn before the refusal", got)
+	}
+}
+
+// A new request opens once the previous session ended, however it ended.
+func TestHeadlessNewRequestAfterTheSessionEnded(t *testing.T) {
+	r := newRig(t)
+	confirmed := r.request(t, context.Background())
+	dragOn(t, r.kb, 100, 100, 300, 200)
+	r.kb.Tap(keytest.Return)
+	if got := apptest.Answer(t, "the confirmed session", confirmed); !got.ok {
+		t.Fatalf("confirm answered %+v", got)
+	}
+	cancelled := r.request(t, context.Background())
+	r.kb.Tap(keytest.Escape)
+	if got := apptest.Answer(t, "the cancelled session", cancelled); got.ok {
+		t.Fatalf("Escape answered %+v", got)
+	}
+	ctx, dismiss := context.WithCancel(context.Background())
+	dismissed := r.request(t, ctx)
+	dismiss()
+	if got := apptest.Answer(t, "the dismissed session", dismissed); got.ok {
+		t.Fatalf("the dismissal answered %+v", got)
+	}
+	if n := apptest.On(r.a, func() int { return len(r.o.surfaces) }); n != 0 {
+		t.Fatalf("%d surfaces left after the dismissal", n)
+	}
+	last := r.request(t, context.Background())
+	r.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the session after a dismissal", last)
+}
+
+// within runs fn, failing the test with what if it does not return in
+// apptest.Answer's bound: a request wrongly admitted would block on its overlay.
+func within[T any](t *testing.T, what string, fn func() T) T {
+	t.Helper()
+	answered := make(chan T, 1)
+	go func() { answered <- fn() }()
+	return apptest.Answer(t, what, answered)
 }
