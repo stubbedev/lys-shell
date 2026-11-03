@@ -709,7 +709,7 @@ func (s *Surface) reveal(a *active) {
 		Width:         intconv.Clamp[uint32](width),
 		Height:        intconv.Clamp[uint32](max(h, 1)),
 		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardOnDemand,
+		Keyboard:      app.KeyboardExclusive,
 		Namespace:     "lys-shell-launcher",
 		Root:          a.views.root,
 		KeyCapture:    s.keyCaptured,

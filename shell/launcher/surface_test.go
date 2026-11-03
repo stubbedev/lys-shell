@@ -241,7 +241,7 @@ func TestDmenuSessionFiltersAndAccepts(t *testing.T) {
 		t.Fatalf("windows = %d", len(h.windows))
 	}
 	w := h.windows[0]
-	if w.cfg.Namespace != "lys-shell-launcher" || w.cfg.Keyboard != app.KeyboardOnDemand || w.cfg.Anchor != 0 || w.cfg.Layer != app.LayerOverlay {
+	if w.cfg.Namespace != "lys-shell-launcher" || w.cfg.Keyboard != app.KeyboardExclusive || w.cfg.Anchor != 0 || w.cfg.Layer != app.LayerOverlay {
 		t.Errorf("layer = %+v", w.cfg)
 	}
 	if w.focused() != widget.Widget(h.s.cur.views.entry) || h.s.sel != 0 {
