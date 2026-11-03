@@ -3,7 +3,6 @@ package modes
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -81,10 +80,6 @@ type WindowBackend interface {
 	Focus(ctx context.Context, id string) error
 	Close(ctx context.Context, id string) error
 }
-
-// ErrWindowCloseUnsupported is a compositor whose IPC cannot close a
-// window by id: mango dispatches to the focused client only.
-var ErrWindowCloseUnsupported = errors.New("launcher: this compositor cannot close a window by id")
 
 // DetectWindows picks the compositor from the environment, nil when
 // none it can talk to is running.
@@ -576,20 +571,26 @@ func mangoWindows(clients []mango.Client) []WindowInfo {
 	return out
 }
 
-// Focus shows the client's tag: mango's dispatchers name no client, so
-// the window's tag is as close as its IPC goes.
-func (b mangoBackend) Focus(ctx context.Context, id string) error {
-	clients, err := b.state(ctx)
+func mangoClientID(id string) (uint32, error) {
+	n, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("mango: client id %q: %w", id, err)
+	}
+	return uint32(n), nil
+}
+
+func (mangoBackend) Focus(_ context.Context, id string) error {
+	n, err := mangoClientID(id)
 	if err != nil {
 		return err
 	}
-	for _, c := range clients {
-		if strconv.FormatUint(uint64(c.ID), 10) == id && len(c.Tags) > 0 {
-			return mango.ViewTag(c.Tags[0])
-		}
-	}
-	return fmt.Errorf("mango: no client %s with a tag", id)
+	return mango.FocusClient(n)
 }
 
-// Close cannot be done: see ErrWindowCloseUnsupported.
-func (mangoBackend) Close(context.Context, string) error { return ErrWindowCloseUnsupported }
+func (mangoBackend) Close(_ context.Context, id string) error {
+	n, err := mangoClientID(id)
+	if err != nil {
+		return err
+	}
+	return mango.KillClient(n)
+}

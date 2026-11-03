@@ -2,7 +2,6 @@ package modes
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -675,11 +674,5 @@ func TestMangoWindows(t *testing.T) {
 	}
 	if got[1].OnCurrentWorkspace || got[2].OnCurrentWorkspace || got[2].Workspace != "" {
 		t.Errorf("others: %+v", got[1:])
-	}
-}
-
-func TestMangoCloseIsAnError(t *testing.T) {
-	if err := (mangoBackend{}).Close(context.Background(), "1"); !errors.Is(err, ErrWindowCloseUnsupported) {
-		t.Errorf("close = %v", err)
 	}
 }

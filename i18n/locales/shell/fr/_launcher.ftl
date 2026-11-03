@@ -35,7 +35,6 @@ launcher-action-close-window = Fermer la fenêtre
 launcher-action-forget = Oublier
 launcher-action-clear-history = Effacer l'historique
 launcher-window-on-workspace = { $class } sur l'espace de travail { $workspace }
-launcher-window-close-unsupported = Ce compositeur ne peut pas fermer une fenêtre qui n'a pas le focus
 launcher-web-search = Rechercher « { $query } » sur { $engine }
 launcher-shell-subtitle = Commande shell
 launcher-system-lock = Verrouiller l'écran

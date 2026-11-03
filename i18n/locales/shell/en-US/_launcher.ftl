@@ -35,7 +35,6 @@ launcher-action-close-window = Close Window
 launcher-action-forget = Forget
 launcher-action-clear-history = Clear History
 launcher-window-on-workspace = { $class } on workspace { $workspace }
-launcher-window-close-unsupported = This compositor cannot close a window it has not focused
 launcher-web-search = Search { $engine } for “{ $query }”
 launcher-shell-subtitle = Shell command
 launcher-system-lock = Lock Screen

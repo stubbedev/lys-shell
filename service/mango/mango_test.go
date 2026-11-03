@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -132,6 +133,21 @@ func TestDispatchCommands(t *testing.T) {
 		if f.commands[i] != want[i] {
 			t.Errorf("command %d = %q, want %q", i, f.commands[i], want[i])
 		}
+	}
+}
+
+func TestClientDispatches(t *testing.T) {
+	f := newFakeMango(t)
+	if err := FocusClient(7); err != nil {
+		t.Fatal(err)
+	}
+	if err := KillClient(7); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if want := []string{"dispatch focusid client,7", "dispatch killclient client,7"}; !slices.Equal(f.commands, want) {
+		t.Errorf("commands = %q, want %q", f.commands, want)
 	}
 }
 

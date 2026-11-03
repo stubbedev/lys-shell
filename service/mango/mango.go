@@ -144,6 +144,16 @@ func Dispatch(command string) error {
 // ViewTag is view_tag: "view,<index>".
 func ViewTag(index uint32) error { return Dispatch("view," + strconv.FormatUint(uint64(index), 10)) }
 
+// FocusClient focuses a client by id, showing its tag.
+func FocusClient(id uint32) error { return dispatchClient("focusid", id) }
+
+// KillClient asks a client to close by id.
+func KillClient(id uint32) error { return dispatchClient("killclient", id) }
+
+func dispatchClient(function string, id uint32) error {
+	return Dispatch(function + " client," + strconv.FormatUint(uint64(id), 10))
+}
+
 // ViewLeft is view_left (focus:previous).
 func ViewLeft() error { return Dispatch("viewtoleft") }
 

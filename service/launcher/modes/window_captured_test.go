@@ -1,7 +1,9 @@
 package modes
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/service/mango"
 )
 
 func captured(t *testing.T, compositor, name string) string {
@@ -58,6 +62,31 @@ func serve(t *testing.T, path string, handle func(net.Conn)) {
 			}()
 		}
 	}()
+}
+
+func serveLines(t *testing.T, path string, replies map[string]string) *replay {
+	t.Helper()
+	r := &replay{}
+	serve(t, path, func(conn net.Conn) {
+		reader := bufio.NewReader(conn)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			request := strings.TrimSuffix(line, "\n")
+			r.note(request)
+			reply, ok := replies[request]
+			if !ok {
+				t.Errorf("unexpected request %q", request)
+				return
+			}
+			if _, err := conn.Write([]byte(reply)); err != nil {
+				return
+			}
+		}
+	})
+	return r
 }
 
 func serveHyprland(t *testing.T, replies map[string]string) *replay {
@@ -198,5 +227,49 @@ func TestCapturedHyprland057RefusesLegacyDispatch(t *testing.T) {
 	}
 	if got := r.recorded(); len(got) != 1 {
 		t.Errorf("a Lua instance's failure must not retry in the legacy language: %q", got)
+	}
+}
+
+func TestCapturedMangoWindows(t *testing.T) {
+	const compositor = "mango-0.18.3"
+	socket := filepath.Join(sockdir.Dir(t), "mango.sock")
+	t.Setenv(mango.SocketEnv, socket)
+	missing := captured(t, compositor, "focus-missing-reply.json")
+	r := serveLines(t, socket, map[string]string{
+		"watch all-clients":            captured(t, compositor, "watch-all-clients.json"),
+		"watch all-monitors":           captured(t, compositor, "watch-all-monitors.json"),
+		"dispatch focusid client,1":    `{"success":true}` + "\n",
+		"dispatch killclient client,1": `{"success":true}` + "\n",
+		"dispatch focusid client,99":   missing,
+	})
+	var b mangoBackend
+	got, err := b.List(bg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(titles(got), []string{"live-c", "live-b", "live-a"}) {
+		t.Fatalf("listed %+v", got)
+	}
+	if got[2].ID != "1" || got[2].Class != "live-a" || got[2].Workspace != "1" || got[2].OnCurrentWorkspace {
+		t.Errorf("live-a = %+v", got[2])
+	}
+	if !got[0].Focused || got[0].Workspace != "2" || !got[0].OnCurrentWorkspace {
+		t.Errorf("live-c = %+v", got[0])
+	}
+	if err := b.Focus(bg, "1"); err != nil {
+		t.Errorf("focus: %v", err)
+	}
+	if err := b.Close(bg, "1"); err != nil {
+		t.Errorf("close: %v", err)
+	}
+	if got := r.recorded(); !slices.Contains(got, "dispatch focusid client,1") || !slices.Contains(got, "dispatch killclient client,1") {
+		t.Errorf("requests = %q", got)
+	}
+	var rejected *mango.RejectedError
+	if err := b.Focus(bg, "99"); !errors.As(err, &rejected) {
+		t.Errorf("focusing a missing client = %v", err)
+	}
+	if err := b.Focus(bg, "not-a-number"); err == nil {
+		t.Error("a malformed client id is an error")
 	}
 }

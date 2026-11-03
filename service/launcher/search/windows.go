@@ -2,7 +2,6 @@ package search
 
 import (
 	"context"
-	"errors"
 	"log"
 	"strings"
 
@@ -68,11 +67,7 @@ func (w *Windows) Actions(e Entry) []Action {
 			return Close{}
 		}},
 		{Title: i18n.T("launcher-action-close-window"), Icon: "ld-x-symbolic", Run: func(ctx context.Context) Outcome {
-			err := w.backend.Close(ctx, win.ID)
-			switch {
-			case errors.Is(err, modes.ErrWindowCloseUnsupported):
-				return Stay{Message: i18n.T("launcher-window-close-unsupported")}
-			case err != nil:
+			if err := w.backend.Close(ctx, win.ID); err != nil {
 				return Stay{Message: i18n.T("launcher-failed", i18n.Str("what", win.Title), i18n.Str("error", err.Error()))}
 			}
 			return Close{}

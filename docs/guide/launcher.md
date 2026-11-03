@@ -31,7 +31,7 @@ be running, as it hosts the panel.
 | Source | Notes |
 | --- | --- |
 | Applications | Desktop entries; their desktop actions are in the actions panel |
-| Open windows | lys-wm, Hyprland, sway and niri. On mango, jumping shows the window's tag and closing is refused, as its IPC names no client |
+| Open windows | lys-wm, Hyprland, sway, niri and mango |
 | Files | Recent files and an index, see below; a query starting with `/` or `~` lists that folder |
 | Calculator | `6*7`, `sqrt(16)`, and conversions: `5 km to mi`, `100 f in c`, `1 GiB to MB`. No currencies |
 | System | Lock, sleep, log out, restart, shut down, through the [`power`](/config/modules/power) commands. Those that end the session ask for a second Enter |
