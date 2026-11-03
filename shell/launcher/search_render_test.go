@@ -123,6 +123,8 @@ func TestPanelPaintsOnlyThePanel(t *testing.T) {
 	check("5-answer")
 }
 
+const keystrokeBudget = 50 * time.Millisecond
+
 func percentile(sorted []time.Duration, p int) time.Duration { return sorted[len(sorted)*p/100] }
 
 // typingWorkload types queries into a panel over 5,000 searchable rows on
@@ -163,13 +165,7 @@ func typingWorkload(t *testing.T, observe func(answer, paint time.Duration)) {
 	}
 }
 
-// TestKeystrokeToPaintIsMeasured logs what a keystroke takes. It asserts no
-// time, which would measure the runner and the race detector rather than
-// this code. What keeps a keystroke cheap is held by what does not depend
-// on the clock: TestTypingDoesNoFileIO, TestAnsweringAQueryAllocatesNothing,
-// TestTypingRescansOnlyWhatMatched, TestLayoutBindsOnlyTheRowsInView and
-// TestWholeKeystrokeAllocations.
-func TestKeystrokeToPaintIsMeasured(t *testing.T) {
+func TestKeystrokeToPaintBudget(t *testing.T) {
 	var answer, paint, total []time.Duration
 	typingWorkload(t, func(a, p time.Duration) {
 		answer, paint, total = append(answer, a), append(paint, p), append(total, a+p)
@@ -179,6 +175,9 @@ func TestKeystrokeToPaintIsMeasured(t *testing.T) {
 	}
 	t.Logf("answer p50 %v p99 %v; layout+paint p50 %v p99 %v; total p50 %v p99 %v",
 		percentile(answer, 50), percentile(answer, 99), percentile(paint, 50), percentile(paint, 99), percentile(total, 50), percentile(total, 99))
+	if got := percentile(total, 50); !raceEnabled && got > keystrokeBudget {
+		t.Errorf("median keystroke to paint %v, over %v", got, keystrokeBudget)
+	}
 }
 
 // fileIO is the process's read and write syscalls so far, from the kernel's
