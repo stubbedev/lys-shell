@@ -122,8 +122,15 @@ func TestHeadlessSecondRequestOpensNothing(t *testing.T) {
 	read := func() state {
 		return apptest.On(r.a, func() state { return state{slices.Clone(r.o.surfaces), r.o.ed.sel, r.o.reply} })
 	}
+	drawn := image.Rect(100, 100, 300, 200)
 	before := read()
-	if len(before.surfaces) == 0 || before.sel.Empty() {
+	for deadline := time.Now().Add(10 * time.Second); before.sel != drawn; before = read() {
+		if time.Now().After(deadline) {
+			t.Fatalf("the drag never reached %v: %+v", drawn, before)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(before.surfaces) == 0 {
 		t.Fatalf("nothing open to refuse over: %+v", before)
 	}
 	captures := 0
