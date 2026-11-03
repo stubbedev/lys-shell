@@ -29,7 +29,7 @@ jobs:
     # the lint stack, and the sway, dbus and pipewire the tests start private
     # instances of.
     check:
-        name: Check (vet + lint + test + race + schema + build)
+        name: Check (vet + lint + test + schema + build)
         strategy:
             fail-fast: false
             matrix:
@@ -43,8 +43,26 @@ jobs:
             - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
-            - name: just check
-              run: nix develop --accept-flake-config -c just check
+            - name: just plain
+              run: nix develop --accept-flake-config -c just plain
+
+    race:
+        name: Race detector
+        strategy:
+            fail-fast: false
+            matrix:
+                runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runs-on: ${{ matrix.runner }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+              with:
+                github-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: just race
+              run: nix develop --accept-flake-config -c just race
 
     # The release archive and the .deb, built the way release.yml builds
     # them, so a packaging break shows up before a tag does.
@@ -170,12 +188,13 @@ jobs:
     ci-status:
         name: CI Status
         if: always()
-        needs: [check, package, rpm, nix, hyprland-vm]
+        needs: [check, race, package, rpm, nix, hyprland-vm]
         runs-on: ubuntu-latest
         steps:
             - name: Check results
               run: |
                   if [[ "${{ needs.check.result }}" != "success" || \
+                        "${{ needs.race.result }}" != "success" || \
                         "${{ needs.package.result }}" != "success" || \
                         "${{ needs.rpm.result }}" != "success" || \
                         "${{ needs.nix.result }}" != "success" || \

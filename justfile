@@ -150,9 +150,13 @@ lys-wm-vm:
 clockwatch-vm:
     nix build -L .#checks.{{ arch() }}-{{ os() }}.lys-shell-clockwatch-vm
 
-# Every release gate in order: vet, lint, test, race, the schema
-# check, and the release build.
-check: vet lint no-fused test race schema-check build
+# Every release gate: the ones CI runs in `plain` and the race detector, which
+# it runs as a separate job.
+check: plain race
+
+# Every release gate but the race detector, in order: vet, lint, test, the
+# schema check, and the release build.
+plain: vet lint no-fused test schema-check build
 
 # Check the screen recorder on this machine's GPU (run it in the dev
 # shell): a private headless sway renders on the first render node with
