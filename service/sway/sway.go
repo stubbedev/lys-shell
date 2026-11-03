@@ -15,9 +15,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/stubbedev/lys-lib/intconv"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // SocketPath reads $SWAYSOCK; empty when sway is not running.
@@ -101,35 +102,46 @@ func readFull(conn net.Conn, buf []byte) error {
 // Conn is one IPC connection. Requests serialize; events read on
 // their own connection.
 type Conn struct {
-	mu   sync.Mutex
-	conn net.Conn
+	mu      sync.Mutex
+	session *ipcsock.Session
 }
 
 // Connect dials $SWAYSOCK.
-func Connect() (*Conn, error) {
+func Connect() (*Conn, error) { return connect(ipcsock.Standard()) }
+
+func connect(limits ipcsock.Limits) (*Conn, error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, errors.New("sway: SWAYSOCK is not set")
 	}
-	conn, err := net.DialTimeout("unix", path, 2*time.Second)
+	session, err := ipcsock.Connect(path, limits)
 	if err != nil {
 		return nil, fmt.Errorf("sway: %w", err)
 	}
-	return &Conn{conn: conn}, nil
+	return &Conn{session: session}, nil
 }
 
 // Close drops the connection.
-func (c *Conn) Close() error { return c.conn.Close() }
+func (c *Conn) Close() error { return c.session.Close() }
 
 // request sends one message and returns the first reply's payload.
 func (c *Conn) request(msgType uint32, payload []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := writeFrame(c.conn, msgType, payload); err != nil {
-		return nil, err
+	conn, _, err := c.session.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("sway: connect for message type %d: %w", msgType, err)
 	}
-	_, body, err := readFrame(c.conn)
-	return body, err
+	if err := writeFrame(conn, msgType, payload); err != nil {
+		c.session.Drop(conn)
+		return nil, fmt.Errorf("sway: write message type %d: %w", msgType, err)
+	}
+	_, body, err := readFrame(conn)
+	if err != nil {
+		c.session.Drop(conn)
+		return nil, fmt.Errorf("sway: read the reply to message type %d: %w", msgType, err)
+	}
+	return body, nil
 }
 
 // Workspaces lists the workspaces.
@@ -346,11 +358,15 @@ func Subscribe() (<-chan struct{}, func(), error) {
 
 // SubscribeTo is Subscribe over the named event streams.
 func SubscribeTo(events ...string) (<-chan struct{}, func(), error) {
+	return subscribeTo(ipcsock.Standard(), events)
+}
+
+func subscribeTo(limits ipcsock.Limits, events []string) (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, errors.New("sway: SWAYSOCK is not set")
 	}
-	conn, err := net.DialTimeout("unix", path, 2*time.Second)
+	conn, err := limits.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("sway: %w", err)
 	}
@@ -381,6 +397,10 @@ func SubscribeTo(events ...string) (<-chan struct{}, func(), error) {
 			return nil, nil, errors.New("sway: subscribe rejected")
 		}
 		break
+	}
+	if err := ipcsock.Disarm(conn); err != nil {
+		_ = conn.Close()
+		return nil, nil, fmt.Errorf("sway: subscribe: %w", err)
 	}
 	ticks := make(chan struct{}, 1)
 	go func() {

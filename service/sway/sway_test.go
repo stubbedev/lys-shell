@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock/ipcsocktest"
 )
 
 // fakeSway speaks the i3-ipc protocol: canned GET_WORKSPACES and
@@ -300,4 +302,25 @@ func TestSubscribeToNamesItsStreams(t *testing.T) {
 	if sub != `["input"]` {
 		t.Errorf("subscribed to %s, want input only", sub)
 	}
+}
+
+func TestARequestGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
+	t.Setenv("SWAYSOCK", ipcsocktest.Silent(t))
+	c, err := connect(ipcsocktest.Fast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	ipcsocktest.GivesUp(t, func() error {
+		_, err := c.Workspaces()
+		return err
+	}, "sway", "read")
+}
+
+func TestSubscribeGivesUpOnACompositorThatNeverAcknowledges(t *testing.T) {
+	t.Setenv("SWAYSOCK", ipcsocktest.Silent(t))
+	ipcsocktest.GivesUp(t, func() error {
+		_, _, err := subscribeTo(ipcsocktest.Fast, []string{"workspace"})
+		return err
+	})
 }
