@@ -12,18 +12,14 @@ import (
 	"os"
 	"slices"
 	"sync"
-	"time"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // SocketEnv is the variable lys-wm exports its socket path in.
 const SocketEnv = "LYS_WM_SOCKET"
 
 const protocolVersion = 1
-
-const (
-	dialTimeout    = 2 * time.Second
-	requestTimeout = 5 * time.Second
-)
 
 // ErrNotRunning is a request made while no lys-wm socket is advertised.
 var ErrNotRunning = errors.New("lys-wm: " + SocketEnv + " is not set")
@@ -117,7 +113,7 @@ func open(req request) (net.Conn, *bufio.Reader, error) {
 	if path == "" {
 		return nil, nil, ErrNotRunning
 	}
-	conn, err := net.DialTimeout("unix", path, dialTimeout)
+	conn, err := ipcsock.Standard().Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("lys-wm: %s: %w", req.Request, err)
 	}
@@ -125,10 +121,6 @@ func open(req request) (net.Conn, *bufio.Reader, error) {
 	if err != nil {
 		_ = conn.Close()
 		return nil, nil, fmt.Errorf("lys-wm: encode %s: %w", req.Request, err)
-	}
-	if err := conn.SetDeadline(time.Now().Add(requestTimeout)); err != nil {
-		_ = conn.Close()
-		return nil, nil, fmt.Errorf("lys-wm: %s: %w", req.Request, err)
 	}
 	if _, err := conn.Write(append(line, '\n')); err != nil {
 		_ = conn.Close()
@@ -280,7 +272,7 @@ func watch(kinds []EventKind, seed func() error, onEvent func(event)) (*Watcher,
 		_ = conn.Close()
 		return nil, err
 	}
-	if err := conn.SetDeadline(time.Time{}); err != nil {
+	if err := ipcsock.Disarm(conn); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("lys-wm: watch: %w", err)
 	}
