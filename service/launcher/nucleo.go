@@ -57,6 +57,7 @@ type matchConfig struct {
 
 // matchScratch holds fuzzyOptimal's buffers between items.
 type matchScratch struct {
+	work      uint64
 	hs        []rune
 	bonus     []int
 	rowOffs   []int
@@ -549,7 +550,14 @@ func (cfg matchConfig) prefilter(hay, needle []rune) (start, greedyEnd, end int,
 	return start, greedyEnd, end, true
 }
 
+func (cfg matchConfig) spend(cells int) {
+	if cfg.scratch != nil {
+		cfg.scratch.work += uint64(cells) //nolint:gosec // never negative
+	}
+}
+
 func (cfg matchConfig) fuzzyMatch(hay, needle []rune) (int, bool) {
+	cfg.spend(len(hay))
 	switch {
 	case len(needle) > len(hay):
 		return 0, false
@@ -568,8 +576,10 @@ func (cfg matchConfig) fuzzyMatch(hay, needle []rune) (int, bool) {
 		return cfg.calculateScore(hay, needle, start, greedyEnd), true
 	}
 	if (end-start)*len(needle) > maxMatrixSize || end-start > 0xffff {
+		cfg.spend(greedyEnd - start)
 		return cfg.fuzzyGreedy(hay, needle, start, greedyEnd), true
 	}
+	cfg.spend((end - start) * len(needle))
 	return cfg.fuzzyOptimal(hay, needle, start, end)
 }
 

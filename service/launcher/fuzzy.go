@@ -86,6 +86,18 @@ func (a *atom) setLiteral(word string, ignoreCase bool) {
 // Empty reports a query with no words.
 func (q *FuzzyQuery) Empty() bool { return len(q.atoms) == 0 }
 
+// Work is how many characters and matrix cells Score has examined so far,
+// which no clock or load changes.
+func (q *FuzzyQuery) Work() uint64 {
+	var total uint64
+	for _, a := range q.atoms[:cap(q.atoms)] {
+		if a.cfg.scratch != nil {
+			total += a.cfg.scratch.work
+		}
+	}
+	return total
+}
+
 // Score is hay's match quality, false when any word does not match.
 func (q *FuzzyQuery) Score(hay []rune) (int, bool) { return patternScore(q.atoms, hay) }
 

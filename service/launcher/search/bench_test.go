@@ -148,6 +148,27 @@ func TestHighlightsAllocateNothing(t *testing.T) {
 	}
 }
 
+// The work one keystroke does per row it tests: a matcher that scans more of
+// each row or fills a larger matrix fails here, however fast the machine.
+func TestMatchingWorkPerRowStaysWithinItsLimit(t *testing.T) {
+	const limit = 170
+	e, st := benchEngine(5000)
+	c := st.corpora[0]
+	rows := make([]Row, 0, 64)
+	var worst uint64
+	for _, q := range []string{"f", "fi", "fir", "fire", "firef", "firefo", "firefox", "firefox-", "report", "notes 12", "project-1"} {
+		tested, work := c.tested, e.query.Work()
+		st.query = q
+		rows = e.compute(st, false, rows[:0])
+		if n := c.tested - tested; n > 0 {
+			worst = max(worst, (e.query.Work()-work)/n)
+		}
+	}
+	if worst > limit {
+		t.Errorf("a keystroke did %d cells of matching work per row, limit %d", worst, limit)
+	}
+}
+
 // A query extending the last one rematches only the rows that matched it:
 // what makes typing over a long list cheap, counted rather than timed.
 func TestTypingRescansOnlyWhatMatched(t *testing.T) {
