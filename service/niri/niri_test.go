@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock/ipcsocktest"
 )
 
 // fakeNiri answers the JSON-lines protocol: canned workspace/window
@@ -264,5 +267,103 @@ func TestKeyboardLayoutsDecodeAndPickTheCurrent(t *testing.T) {
 	// An index past the names is no layout, not a panic.
 	if got, ok := (KeyboardLayouts{Names: []string{"us"}, CurrentIdx: 1}).Current(); ok || got != "" {
 		t.Errorf("out of range = %q, %v; want none", got, ok)
+	}
+}
+
+func TestARequestGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
+	t.Setenv(SocketEnv, ipcsocktest.Silent(t))
+	c, err := connect(ipcsocktest.Fast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	ipcsocktest.GivesUp(t, func() error {
+		_, err := c.Windows()
+		return err
+	}, "niri", "read", "Windows")
+}
+
+func TestSubscribeGivesUpOnACompositorThatNeverAcknowledges(t *testing.T) {
+	t.Setenv(SocketEnv, ipcsocktest.Silent(t))
+	ipcsocktest.GivesUp(t, func() error {
+		_, _, err := subscribe(ipcsocktest.Fast)
+		return err
+	}, "niri", "handshake")
+}
+
+func TestAConnectionAnswersAgainAfterATimeoutWithoutAStaleReply(t *testing.T) {
+	path := filepath.Join(sockdir.Dir(t), "niri.sock")
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	t.Setenv(SocketEnv, path)
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	go func() {
+		late, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer late.Close()
+		_, _ = bufio.NewReader(late).ReadBytes('\n')
+		<-release
+	}()
+	c, err := connect(ipcsocktest.Fast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	if _, err := c.Workspaces(); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("first request = %v, want a deadline exceeded", err)
+	}
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = bufio.NewReader(conn).ReadBytes('\n')
+		_, _ = conn.Write([]byte(`{"Ok":{"Windows":[]}}` + "\n"))
+		<-release
+	}()
+	if _, err := c.Windows(); err != nil {
+		t.Fatalf("the request after the timeout: %v", err)
+	}
+}
+
+func TestAnEventStreamMayStaySilentPastTheRequestDeadline(t *testing.T) {
+	path := filepath.Join(sockdir.Dir(t), "niri.sock")
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	t.Setenv(SocketEnv, path)
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = bufio.NewReader(conn).ReadBytes('\n')
+		_, _ = conn.Write([]byte("{\"Ok\":\"Handled\"}\n"))
+		time.Sleep(3 * ipcsocktest.Fast.Request)
+		_, _ = conn.Write([]byte("{\"WorkspaceActivated\":{\"id\":2,\"focused\":true}}\n"))
+		time.Sleep(time.Second)
+	}()
+	ticks, stop, err := subscribe(ipcsocktest.Fast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	select {
+	case _, open := <-ticks:
+		if !open {
+			t.Fatal("the stream ended at the handshake's deadline")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no event after the handshake's deadline passed")
 	}
 }

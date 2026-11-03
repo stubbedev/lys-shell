@@ -10,10 +10,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"sync"
-	"time"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // SocketEnv is niri_ipc::socket::SOCKET_PATH_ENV.
@@ -108,26 +108,28 @@ func expectHandled(resp json.RawMessage, request string) error {
 // Conn is the persistent command socket; niri answers requests in
 // order, so one write + one reply line runs under the mutex.
 type Conn struct {
-	mu     sync.Mutex
-	conn   net.Conn
-	reader *bufio.Reader
+	mu      sync.Mutex
+	session *ipcsock.Session
+	reader  *bufio.Reader
 }
 
 // Connect dials $NIRI_SOCKET.
-func Connect() (*Conn, error) {
+func Connect() (*Conn, error) { return connect(ipcsock.Standard()) }
+
+func connect(limits ipcsock.Limits) (*Conn, error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, ErrNotRunning
 	}
-	conn, err := net.DialTimeout("unix", path, 2*time.Second)
+	session, err := ipcsock.Connect(path, limits)
 	if err != nil {
 		return nil, fmt.Errorf("niri: command socket: %w", err)
 	}
-	return &Conn{conn: conn, reader: bufio.NewReader(conn)}, nil
+	return &Conn{session: session, reader: bufio.NewReader(nil)}, nil
 }
 
 // Close drops the connection.
-func (c *Conn) Close() error { return c.conn.Close() }
+func (c *Conn) Close() error { return c.session.Close() }
 
 // request sends one serialized Request and returns the Response.
 func (c *Conn) request(req any) (json.RawMessage, error) {
@@ -137,15 +139,21 @@ func (c *Conn) request(req any) (json.RawMessage, error) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, werr := c.conn.Write(append(body, '\n')); werr != nil {
-		return nil, fmt.Errorf("niri: write: %w", werr)
+	conn, fresh, err := c.session.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("niri: connect for %s: %w", body, err)
+	}
+	if fresh {
+		c.reader.Reset(conn)
+	}
+	if _, werr := conn.Write(append(body, '\n')); werr != nil {
+		c.session.Drop(conn)
+		return nil, fmt.Errorf("niri: write %s: %w", body, werr)
 	}
 	line, err := c.reader.ReadBytes('\n')
 	if err != nil {
-		if len(line) == 0 {
-			return nil, errors.New("niri: command socket closed")
-		}
-		return nil, fmt.Errorf("niri: read: %w", err)
+		c.session.Drop(conn)
+		return nil, fmt.Errorf("niri: read the reply to %s: %w", body, err)
 	}
 	return decodeReply(line)
 }
@@ -250,12 +258,14 @@ func (c *Conn) FocusWorkspacePrevious(ctx context.Context) error {
 // checks the Handled ack, and ticks once per event line; each tick is
 // the cue to re-query. The channel closes when the stream ends; stop
 // closes the socket.
-func Subscribe() (<-chan struct{}, func(), error) {
+func Subscribe() (<-chan struct{}, func(), error) { return subscribe(ipcsock.Standard()) }
+
+func subscribe(limits ipcsock.Limits) (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, ErrNotRunning
 	}
-	conn, err := net.DialTimeout("unix", path, 2*time.Second)
+	conn, err := limits.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("niri: event socket: %w", err)
 	}
@@ -267,11 +277,14 @@ func Subscribe() (<-chan struct{}, func(), error) {
 	ack, err := reader.ReadBytes('\n')
 	if err != nil {
 		_ = conn.Close()
-		return nil, nil, errors.New("niri: event stream closed before the handshake")
+		return nil, nil, fmt.Errorf("niri: read the event stream's handshake: %w", err)
 	}
 	resp, err := decodeReply(ack)
 	if err == nil {
 		err = expectHandled(resp, "event-stream")
+	}
+	if err == nil {
+		err = ipcsock.Disarm(conn)
 	}
 	if err != nil {
 		_ = conn.Close()
