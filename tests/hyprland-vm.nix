@@ -319,7 +319,7 @@ pkgs.testers.nixosTest {
     click(640, 22)
     time.sleep(2)
     machine.screenshot("06b-calendar-dropdown")
-    machine.send_key("esc")
+    click(1100, 700)
     time.sleep(1)
 
     # The portal on Hyprland: an application's screenshot comes back as
