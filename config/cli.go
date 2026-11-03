@@ -1,15 +1,15 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/lys-lib/atomicfile"
 	"go.yaml.in/yaml/v3"
-
-	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // Helpers behind `lys-shell config`, kept here so the output forms live
@@ -85,16 +85,20 @@ func ExamplePath(dir string) string { return filepath.Join(dir, "config.yaml.exa
 // yaml-language-server modeline points editors at.
 func SchemaPath(dir string) string { return filepath.Join(dir, "schema.json") }
 
-// EnsureSchemaCurrent writes schema.json when it is missing or from
-// another version.
+// EnsureSchemaCurrent writes schema.json unless it already holds what
+// this binary generates.
 func EnsureSchemaCurrent(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the user's config dir
-		return err
+		return fmt.Errorf("create the config dir %s: %w", dir, err)
 	}
 	schemaPath := SchemaPath(dir)
+	current := []byte(GenerateSchema())
 	existing, err := os.ReadFile(schemaPath) //nolint:gosec // schema.json in the config dir
-	if err == nil && strings.Contains(string(existing), "lys-shell-config-"+version.Version) {
+	if err == nil && bytes.Equal(existing, current) {
 		return nil
 	}
-	return os.WriteFile(schemaPath, []byte(GenerateSchema()), 0o644) //nolint:gosec // an editor schema, not secret
+	if err := atomicfile.WriteFile(schemaPath, current, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", schemaPath, err)
+	}
+	return nil
 }

@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/logging"
 	"github.com/stubbedev/lys-shell/service/shellipc"
@@ -26,8 +28,26 @@ func shellCommand() *cli.Command {
 				return err
 			}
 			defer func() { _ = closer.Close() }()
-			return runShell(os.Stderr, bar.Run)
+			return runShell(os.Stderr, refreshingSchema(bar.Run))
 		},
+	}
+}
+
+func refreshingSchema(start func() error) func() error {
+	return func() error {
+		go refreshSchema()
+		return start()
+	}
+}
+
+func refreshSchema() {
+	dir, err := config.Dir()
+	if err != nil {
+		log.Printf("schema: cannot find the config dir: %v", err)
+		return
+	}
+	if err := config.EnsureSchemaCurrent(dir); err != nil {
+		log.Printf("schema: editors keep the old schema: %v", err)
 	}
 }
 
