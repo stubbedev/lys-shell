@@ -52,3 +52,13 @@ settings-modules-clock-scroll-down = Défilement vers le bas
 
 settings-modules-clock-dropdown-show-seconds = Afficher les secondes
     .description = Afficher les secondes dans l'horloge du calendrier déroulant
+
+settings-modules-clock-calendar-weekday-start = Début de semaine du calendrier
+    .description = Premier jour de la semaine dans le menu déroulant du calendrier
+enum-week-start-monday = Lundi
+enum-week-start-tuesday = Mardi
+enum-week-start-wednesday = Mercredi
+enum-week-start-thursday = Jeudi
+enum-week-start-friday = Vendredi
+enum-week-start-saturday = Samedi
+enum-week-start-sunday = Dimanche

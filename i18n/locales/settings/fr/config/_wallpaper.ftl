@@ -62,3 +62,10 @@ enum-transition-type-random = Aléatoire
 ## Variantes de CyclingMode
 enum-cycling-mode-sequential = Séquentiel
 enum-cycling-mode-shuffle = Aléatoire
+
+settings-wallpaper-wallpaper = Image du fond d'écran
+    .description = Un seul fichier image pour tous les moniteurs (laisser vide pour la rotation ou un fond par moniteur)
+settings-wallpaper-fit-mode = Mise à l'échelle
+    .description = Manière d'adapter le fond d'écran à l'écran (remplir, ajuster, centrer, étirer)
+settings-wallpaper-cycling-options = Options de rotation
+    .description = Ordre, intervalle et comportement multi-moniteurs pendant la rotation

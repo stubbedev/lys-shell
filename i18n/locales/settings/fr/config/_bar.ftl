@@ -165,3 +165,8 @@ enum-bar-button-variant-icon-square = Icône carrée
 ## Variantes de IconPosition
 enum-icon-position-start = Début
 enum-icon-position-end = Fin
+
+settings-bar-exclusive = Exclusive
+    .description = Réserver l'espace de l'écran pour la barre au lieu de la dessiner par-dessus les fenêtres
+settings-bar-layer = Couche
+    .description = Couche layer-shell sur laquelle la barre est placée

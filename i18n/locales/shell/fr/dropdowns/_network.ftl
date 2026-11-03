@@ -89,7 +89,7 @@ dropdown-network-vpn-public-key = Clé publique : { $key }
 dropdown-network-vpn-public-key-empty = La clé publique apparaît ici une fois la clé privée définie. Transmettez-la à la personne qui gère l'autre extrémité.
 dropdown-network-vpn-raw-hint = Une paire clé = valeur par ligne
 dropdown-network-vpn-name-required = Un nom est requis
-dropdown-network-vpn-field-required = { $field } est requis
+dropdown-network-vpn-field-required = { $field } : valeur requise
 dropdown-network-vpn-invalid-text = { $field } n'est pas valide
 dropdown-network-vpn-invalid-host = { $field } doit être un nom d'hôte ou une adresse, sans https:// ni chemin
 dropdown-network-vpn-invalid-host-port = { $field } doit être un hôte et un port, comme vpn.example.com:51820

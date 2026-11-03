@@ -43,3 +43,22 @@ settings-modules-dashboard-dropdown-reboot-command = Commande de redémarrage
 
 settings-modules-dashboard-dropdown-poweroff-command = Commande d'extinction
     .description = Commande pour le bouton d'extinction
+
+settings-modules-dashboard-usage-warning = Alerte d'utilisation
+    .description = Pourcentage d'utilisation processeur, mémoire ou disque à partir duquel les anneaux passent en alerte
+settings-modules-dashboard-usage-error = Erreur d'utilisation
+    .description = Pourcentage d'utilisation processeur, mémoire ou disque à partir duquel les anneaux passent en erreur
+settings-modules-dashboard-temp-warning = Alerte de température
+    .description = Température du processeur (°C) à partir de laquelle l'anneau de température passe en alerte
+settings-modules-dashboard-temp-error = Erreur de température
+    .description = Température du processeur (°C) à partir de laquelle l'anneau de température passe en erreur
+settings-modules-dashboard-battery-warning = Alerte de batterie
+    .description = Pourcentage de batterie à partir duquel, ou en dessous, le tableau de bord affiche une alerte
+settings-modules-dashboard-battery-critical = Batterie critique
+    .description = Pourcentage de batterie à partir duquel, ou en dessous, le tableau de bord affiche l'état critique
+settings-modules-dashboard-user-session-actions = Actions de session
+    .description = Actions de session affichées dans le tableau de bord (verrouiller, déconnecter, redémarrer, éteindre)
+enum-session-action-lock = Verrouiller
+enum-session-action-logout = Se déconnecter
+enum-session-action-reboot = Redémarrer
+enum-session-action-power-off = Éteindre

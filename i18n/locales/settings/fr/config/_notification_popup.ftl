@@ -60,3 +60,6 @@ settings-modules-notifications-popup-urgency-bar = Barre d'urgence
 notification-popup-time-just-now = À l'instant
 notification-popup-time-minutes-ago = il y a { $minutes } min
 notification-popup-time-hours-ago = il y a { $hours } h
+
+settings-modules-notifications-popup-layer = Couche des fenêtres contextuelles
+    .description = Couche layer-shell sur laquelle les notifications contextuelles sont placées. Le mode de déchirement rétrograde la superposition en haut.

@@ -164,3 +164,11 @@ enum-rounding-level-sm = Petit
 enum-rounding-level-md = Moyen
 enum-rounding-level-lg = Grand
 enum-rounding-level-full = Complet
+
+settings-styling-appearance = Apparence
+    .description = Mode clair ou sombre. Auto suit la palette ou le fournisseur ; Clair et Sombre l'imposent
+settings-styling-high-contrast = Contraste élevé
+    .description = Demander aux applications un contraste plus élevé via le portail du bureau
+enum-appearance-auto = Auto
+enum-appearance-light = Clair
+enum-appearance-dark = Sombre

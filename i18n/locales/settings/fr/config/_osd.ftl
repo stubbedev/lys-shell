@@ -28,3 +28,13 @@ enum-osd-position-bottom-right = Bas droite
 enum-osd-position-bottom = Bas
 enum-osd-position-bottom-left = Bas gauche
 enum-osd-position-left = Gauche
+
+settings-osd-presets = Préréglages de toasts
+    .description = Toasts réutilisables à déclencher avec `lys-shell toast --preset <id>`
+settings-osd-layer = Couche
+    .description = Couche layer-shell sur laquelle l'OSD est placé. Le mode de déchirement rétrograde la superposition en haut.
+settings-osd-text-align = Alignement du texte
+    .description = Alignement horizontal du contenu des toasts et bascules de l'OSD
+enum-osd-text-align-start = Début
+enum-osd-text-align-center = Centre
+enum-osd-text-align-end = Fin

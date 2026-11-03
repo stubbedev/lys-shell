@@ -92,3 +92,18 @@ enum-display-mode-none = Aucun
 ## Variantes de ActiveIndicator
 enum-active-indicator-background = Arrière-plan
 enum-active-indicator-underline = Soulignement
+
+settings-modules-hyprland-workspaces-highlight-active-on-other-monitor = Surligner l'actif sur un autre moniteur
+    .description = Utiliser une couleur différente pour les espaces de travail actifs sur d'autres moniteurs (uniquement si { settings-modules-hyprland-workspaces-monitor-specific } est désactivé)
+settings-modules-hyprland-workspaces-active-on-other-monitor-color = Couleur de l'actif sur un autre moniteur
+    .description = Couleur des icônes et libellés des espaces de travail actifs sur d'autres moniteurs (uniquement si { settings-modules-hyprland-workspaces-highlight-active-on-other-monitor } est activé)
+settings-modules-hyprland-workspaces-left-click = Clic gauche
+    .description = Action au clic gauche
+settings-modules-hyprland-workspaces-right-click = Clic droit
+    .description = Action au clic droit
+settings-modules-hyprland-workspaces-middle-click = Clic central
+    .description = Action au clic central
+settings-modules-hyprland-workspaces-scroll-up = Défilement vers le haut
+    .description = Action au défilement vers le haut
+settings-modules-hyprland-workspaces-scroll-down = Défilement vers le bas
+    .description = Action au défilement vers le bas
