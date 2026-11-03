@@ -213,6 +213,8 @@ func windowItem(win WindowInfo, cfg WindowConfig) launcher.Item {
 	}
 }
 
+const neverFocused = int64(1<<63 - 1)
+
 type hyprlandBackend struct{}
 
 // hyprClient is the part of j/clients the mode reads.
@@ -261,7 +263,7 @@ func parseHyprlandClients(raw []byte, active *int64) ([]WindowInfo, error) {
 		if c.Mapped != nil && !*c.Mapped {
 			continue
 		}
-		order := int64(1<<63 - 1)
+		order := neverFocused
 		if c.FocusHistoryID != nil {
 			order = *c.FocusHistoryID
 		}
@@ -303,31 +305,40 @@ func (niriBackend) List(context.Context) ([]WindowInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return niriWindows(windows), nil
+	workspaces, err := c.Workspaces()
+	if err != nil {
+		return nil, err
+	}
+	return niriWindows(windows, workspaces), nil
 }
 
-// niriWindows maps niri's list; niri reports no MRU, so list order
-// stands in for focus order.
-func niriWindows(windows []niri.Window) []WindowInfo {
-	var focusedWS *uint64
-	for _, w := range windows {
-		if w.IsFocused {
-			focusedWS = w.WorkspaceID
-			break
-		}
+func niriWorkspaceLabel(w niri.Workspace) string {
+	if w.Name != nil {
+		return *w.Name
+	}
+	return strconv.Itoa(int(w.Idx))
+}
+
+func niriWindows(windows []niri.Window, workspaces []niri.Workspace) []WindowInfo {
+	byID := make(map[uint64]niri.Workspace, len(workspaces))
+	for _, w := range workspaces {
+		byID[w.ID] = w
 	}
 	out := make([]WindowInfo, len(windows))
 	for i, w := range windows {
-		ws := ""
+		info := WindowInfo{
+			ID: strconv.FormatUint(w.ID, 10), Title: deref(w.Title), Class: deref(w.AppID),
+			Focused: w.IsFocused, FocusOrder: neverFocused,
+		}
+		if w.FocusTimestamp != nil {
+			info.FocusOrder = -w.FocusTimestamp.Nanoseconds()
+		}
 		if w.WorkspaceID != nil {
-			ws = strconv.FormatUint(*w.WorkspaceID, 10)
+			if ws, ok := byID[*w.WorkspaceID]; ok {
+				info.Workspace, info.OnCurrentWorkspace = niriWorkspaceLabel(ws), ws.IsFocused
+			}
 		}
-		sameWS := (w.WorkspaceID == nil && focusedWS == nil) ||
-			(w.WorkspaceID != nil && focusedWS != nil && *w.WorkspaceID == *focusedWS)
-		out[i] = WindowInfo{
-			ID: strconv.FormatUint(w.ID, 10), Title: deref(w.Title), Class: deref(w.AppID), Workspace: ws,
-			Focused: w.IsFocused, FocusOrder: int64(i), OnCurrentWorkspace: sameWS,
-		}
+		out[i] = info
 	}
 	return out
 }
@@ -448,7 +459,7 @@ func walkSway(raw json.RawMessage, workspace string, hasWS bool, out *[]WindowIn
 		}
 		*out = append(*out, WindowInfo{
 			ID: strconv.FormatInt(n.ID, 10), Title: name, Class: class, Workspace: ws,
-			Focused: n.Focused, FocusOrder: 1<<63 - 1,
+			Focused: n.Focused, FocusOrder: neverFocused,
 		})
 	}
 	for _, child := range append(n.Nodes, n.FloatingNodes...) {

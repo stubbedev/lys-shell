@@ -47,17 +47,27 @@ type WindowLayout struct {
 	PosInScrollingLayout *[2]int `json:"pos_in_scrolling_layout"`
 }
 
+// Timestamp is niri_ipc::Timestamp, time since boot.
+type Timestamp struct {
+	Secs  int64 `json:"secs"`
+	Nanos int32 `json:"nanos"`
+}
+
+// Nanoseconds is the timestamp as one count.
+func (t Timestamp) Nanoseconds() int64 { return t.Secs*1e9 + int64(t.Nanos) }
+
 // Window is niri_ipc::Window.
 type Window struct {
-	ID          uint64       `json:"id"`
-	Title       *string      `json:"title"`
-	AppID       *string      `json:"app_id"`
-	PID         *int32       `json:"pid"`
-	WorkspaceID *uint64      `json:"workspace_id"`
-	IsFocused   bool         `json:"is_focused"`
-	IsFloating  bool         `json:"is_floating"`
-	IsUrgent    bool         `json:"is_urgent"`
-	Layout      WindowLayout `json:"layout"`
+	ID             uint64       `json:"id"`
+	Title          *string      `json:"title"`
+	AppID          *string      `json:"app_id"`
+	PID            *int32       `json:"pid"`
+	WorkspaceID    *uint64      `json:"workspace_id"`
+	IsFocused      bool         `json:"is_focused"`
+	IsFloating     bool         `json:"is_floating"`
+	IsUrgent       bool         `json:"is_urgent"`
+	Layout         WindowLayout `json:"layout"`
+	FocusTimestamp *Timestamp   `json:"focus_timestamp"`
 }
 
 // RejectedError is Error::NiriRejected: niri replied Err(message).

@@ -14,6 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/sockdir"
 
+	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/mango"
 )
 
@@ -126,6 +127,14 @@ func titles(windows []WindowInfo) []string {
 	return out
 }
 
+func displays(items []launcher.Item) []string {
+	out := make([]string, len(items))
+	for i, item := range items {
+		out[i] = item.Display
+	}
+	return out
+}
+
 func TestCapturedHyprlandWindows(t *testing.T) {
 	const (
 		missingFocusLua = `dispatch hl.dsp.focus({window = "address:0xdead"})`
@@ -227,6 +236,39 @@ func TestCapturedHyprland057RefusesLegacyDispatch(t *testing.T) {
 	}
 	if got := r.recorded(); len(got) != 1 {
 		t.Errorf("a Lua instance's failure must not retry in the legacy language: %q", got)
+	}
+}
+
+func TestCapturedNiriWindows(t *testing.T) {
+	const compositor = "niri-26.04"
+	socket := filepath.Join(sockdir.Dir(t), "niri.sock")
+	t.Setenv("NIRI_SOCKET", socket)
+	r := serveLines(t, socket, map[string]string{
+		`"Windows"`:                           captured(t, compositor, "windows.json"),
+		`"Workspaces"`:                        captured(t, compositor, "workspaces.json"),
+		`{"Action":{"FocusWindow":{"id":2}}}`: `{"Ok":"Handled"}` + "\n",
+		`{"Action":{"CloseWindow":{"id":2}}}`: `{"Ok":"Handled"}` + "\n",
+	})
+	m := &Window{cfg: DefaultWindowConfig(), backend: niriBackend{}}
+	st := m.Load(bg)
+	if want := []string{"two   live-b   live-b", "two   live-a   live-a", "2   live-c   live-c"}; !slices.Equal(displays(st.Items), want) {
+		t.Errorf("rows = %q, want the most recently focused first and the focused window last, %q", displays(st.Items), want)
+	}
+	focused := m.windows[len(m.windows)-1]
+	if !focused.Focused || !focused.OnCurrentWorkspace {
+		t.Errorf("the focused window = %+v", focused)
+	}
+	if m.windows[0].OnCurrentWorkspace {
+		t.Errorf("a window on the unfocused workspace = %+v", m.windows[0])
+	}
+	if err := (niriBackend{}).Focus(bg, "2"); err != nil {
+		t.Errorf("focus: %v", err)
+	}
+	if err := (niriBackend{}).Close(bg, "2"); err != nil {
+		t.Errorf("close: %v", err)
+	}
+	if got := r.recorded(); !slices.Contains(got, `{"Action":{"FocusWindow":{"id":2}}}`) || !slices.Contains(got, `{"Action":{"CloseWindow":{"id":2}}}`) {
+		t.Errorf("requests = %q", got)
 	}
 }
 
