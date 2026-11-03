@@ -36,7 +36,7 @@ bar:
 | `app-icons-fallback` | string | `"ld-app-window-symbolic"` | Fallback icon for applications not matched by `app-icon-map`. |
 | `app-icons-empty` | string | `"ld-minus-symbolic"` | Icon shown for empty workspaces when `app-icons-show` is enabled. |
 | `icon-gap` | [`Size`](/config/types#size) | `0.3` | Gap between app icons within a workspace button. |
-| `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
+| `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding along the bar direction for content wider than the circle: app icons, a divider or a long name. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `icon-size` | [`Size`](/config/types#size) | `1` | Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `label-size` | [`Size`](/config/types#size) | `1` | Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `workspace-ignore` | array of string | `[]` | Workspaces to hide from the display. |
@@ -152,6 +152,8 @@ Only applies to spacing between app icons.
 :::
 
 ::: details More about `workspace-padding`
+
+A short label takes no padding. It sets the circle's size instead: at least a digit's width plus this padding on each side.
 
 For horizontal bars, controls horizontal (left/right) padding.
 For vertical bars, controls vertical (top/bottom) padding.

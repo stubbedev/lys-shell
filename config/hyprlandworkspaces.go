@@ -155,7 +155,9 @@ type HyprlandWorkspacesConfig struct {
 	//
 	// Only applies to spacing between app icons.
 	IconGap Size `cfg:"icon-gap"`
-	// Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	// Padding along the bar direction for content wider than the circle: app icons, a divider or a long name. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	//
+	// A short label takes no padding. It sets the circle's size instead: at least a digit's width plus this padding on each side.
 	//
 	// For horizontal bars, controls horizontal (left/right) padding.
 	// For vertical bars, controls vertical (top/bottom) padding.

@@ -41,7 +41,9 @@ type LysWMWorkspacesConfig struct {
 	AppIconsEmpty string `cfg:"app-icons-empty"`
 	// Gap between app icons within a workspace button. Accepts a scale multiplier or pixels (e.g. `"4px"`).
 	IconGap Size `cfg:"icon-gap"`
-	// Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	// Padding along the bar direction for content wider than the circle: app icons, a divider or a long name. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	//
+	// A short label takes no padding. It sets the circle's size instead: at least a digit's width plus this padding on each side.
 	WorkspacePadding Size `cfg:"workspace-padding"`
 	// Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
 	//

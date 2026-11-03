@@ -29,7 +29,9 @@ type MangoWorkspacesConfig struct {
 	UrgentMode UrgentMode `cfg:"urgent-mode"`
 	// How the active tag is marked.
 	ActiveIndicator ActiveIndicator `cfg:"active-indicator"`
-	// Padding around each tag button, in rem.
+	// Padding along the bar direction for content wider than the circle: app icons, a divider or a long name. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	//
+	// A short label takes no padding. It sets the circle's size instead: at least a digit's width plus this padding on each side.
 	TagPadding Size `cfg:"tag-padding"`
 	// Spacing between application icons. Accepts a scale multiplier or pixels (e.g. `"4px"`).
 	IconGap Size `cfg:"icon-gap"`

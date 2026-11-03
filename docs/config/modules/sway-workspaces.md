@@ -35,7 +35,7 @@ bar:
 | `app-icons-fallback` | string | `"ld-app-window-symbolic"` | Fallback icon for applications not matched by `app-icon-map`. |
 | `app-icons-empty` | string | `"ld-minus-symbolic"` | Icon shown when a workspace has no application windows. |
 | `icon-gap` | [`Size`](/config/types#size) | `0.3` | Gap between app icons within a workspace button. Accepts a scale multiplier or pixels (e.g. `"4px"`). |
-| `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
+| `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding along the bar direction for content wider than the circle: app icons, a divider or a long name. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `icon-size` | [`Size`](/config/types#size) | `1` | Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `label-size` | [`Size`](/config/types#size) | `1` | Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `workspace-ignore` | array of string | `[]` | Workspaces to hide from the display. |
@@ -96,6 +96,12 @@ workspace the way niri does. Enable it if your config keeps one around.
 
 When `true`, one icon per unique `app_id`. When `false`, one icon
 per window.
+
+:::
+
+::: details More about `workspace-padding`
+
+A short label takes no padding. It sets the circle's size instead: at least a digit's width plus this padding on each side.
 
 :::
 

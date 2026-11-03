@@ -54,10 +54,11 @@ type cwsView struct {
 	// otherMonitor is hyprland's active-on-other-monitor-color, nil for
 	// the other compositors.
 	otherMonitor *config.ColorValue
-	// shown are the models the segments show, in order; segClasses the
-	// classes each segment took from its model.
-	shown      []cwsButtonModel
-	segClasses [][]string
+	circle       int
+	// shown are the models the segments show, in order; segShown what
+	// each segment holds of its model.
+	shown    []cwsButtonModel
+	segShown []cwsSegmentShown
 }
 
 // cwsModule is the sway/niri/mango workspaces component: the container,
@@ -148,11 +149,11 @@ func (m *cwsModule) rebuild() {
 		displayed[i] = model.ws
 	}
 	m.urgentSeen = m.cfg.UrgentShow && cwsAnyUrgent(displayed, m.windows)
-	m.setSegments(m.models)
 	if m.models != nil && slices.EqualFunc(models, m.models, cwsButtonModel.same) {
 		return
 	}
 	m.models = models
+	m.setSegments(m.models)
 }
 
 // syncBlink is sync_blink: the pulse runs exactly while something

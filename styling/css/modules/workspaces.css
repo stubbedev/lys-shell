@@ -94,6 +94,12 @@ segments.workspaces button.segment.workspace.indicator-underline.active-other-mo
 .workspace.empty .workspace-icon-empty {
   color: var(--ws-override-color, var(--ws-empty-color));
 }
+.workspace-label,
+.workspace-icon,
+.workspace-custom-icon,
+.workspace-divider {
+  transition: color var(--duration-normal);
+}
 .workspace.urgent:not(.urgent-application) {
   opacity: 0.5;
 }
