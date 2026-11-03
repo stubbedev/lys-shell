@@ -72,7 +72,7 @@ modules:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `left-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on left click. |
+| `left-click` | [`ClickAction`](/config/types#click-action) | `":next-layout"` | Action on left click. |
 | `right-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on right click. |
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
@@ -94,7 +94,7 @@ modules:
     label-color: fg-default
     label-max-length: 0
     button-bg-color: bg-surface-elevated
-    left-click: ""
+    left-click: :next-layout
     right-click: ""
     middle-click: ""
     scroll-up: ""

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/lyswm"
@@ -68,6 +69,9 @@ type layoutSource struct {
 	read      func() (string, error)
 	subscribe func(ctx context.Context) (<-chan struct{}, func(), error)
 	close     func()
+	// next moves the compositor to the next layout; the layout event that
+	// follows updates the label.
+	next func(ctx context.Context) error
 }
 
 // keyboardLayoutSource is factory.rs's build_source: the compositor's
@@ -91,6 +95,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 			},
 			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },
 			close:     w.Close,
+			next:      func(context.Context) error { return lyswm.Dispatch("nextlayout") },
 		}, nil
 	case detectCompositor() == compositorNiri:
 		conn, err := niri.Connect()
@@ -108,6 +113,9 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 			},
 			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return niri.Subscribe() },
 			close:     func() { _ = conn.Close() },
+			next: func(ctx context.Context) error {
+				return conn.Action(ctx, "SwitchLayout", map[string]any{"layout": "Next"})
+			},
 		}, nil
 	case detectCompositor() == compositorMango:
 		w, err := mango.Watch()
@@ -121,6 +129,7 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 			},
 			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return w.Ticks(), nil, nil },
 			close:     w.Close,
+			next:      func(context.Context) error { return mango.Dispatch("switch_keyboard_layout") },
 		}, nil
 	case detectCompositor() == compositorSway:
 		conn, err := sway.Connect()
@@ -137,6 +146,9 @@ func keyboardLayoutSource(ctx ModuleContext) (layoutSource, error) {
 			},
 			subscribe: func(context.Context) (<-chan struct{}, func(), error) { return sway.SubscribeTo("input") },
 			close:     func() { _ = conn.Close() },
+			next: func(ctx context.Context) error {
+				return conn.RunCommand(ctx, "input type:keyboard xkb_switch_layout next")
+			},
 		}, nil
 	}
 	return layoutSource{}, errors.New("keyboard-input: unsupported compositor")
@@ -181,6 +193,7 @@ func hyprlandLayoutSource(conn *hyprland.Connection) layoutSource {
 			return ticks, nil, nil
 		},
 		close: func() {},
+		next:  func(context.Context) error { return conn.NextKeyboardLayout() },
 	}
 }
 
@@ -245,3 +258,17 @@ func (m *keyboardLayout) show(layout string) {
 }
 
 func (m *keyboardLayout) Root() widget.Widget { return m.btn }
+
+// RunAction handles the module's own :next-layout; the rest fall through.
+func (m *keyboardLayout) RunAction(action config.ClickAction) {
+	if action.Kind != config.ClickShell || action.Command != config.KeyboardNextLayoutAction {
+		runClickAction(m.ctx, action)
+		return
+	}
+	life := m.ctx.Life()
+	go func() {
+		if err := m.source.next(life); err != nil {
+			log.Printf("keyboard-input: switch to the next layout: %v", err)
+		}
+	}()
+}

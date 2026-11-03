@@ -226,3 +226,37 @@ func TestKeybindModeFollowsLysWMSubmaps(t *testing.T) {
 		t.Error("the default binds still read as resize")
 	}
 }
+
+// A click on the keyboard layout asks lys-wm for the next layout, and the
+// label follows lys-wm's event, not the click.
+func TestKeyboardLayoutClickCyclesThroughLysWM(t *testing.T) {
+	f := newFakeLysWM(t)
+	module, err := Create("keyboard-input", newTestContext(t, config.Defaults()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	label := findLabel(module.Root())
+	f.AwaitWatch(t)
+	run := module.(interface{ RunAction(config.ClickAction) })
+	run.RunAction(config.Defaults().KeyboardInput.Clicks().LeftClick)
+	f.ExpectDispatch(t, "nextlayout")
+	if got := onHeadlessLoop(label.Text); got != "English (US)" {
+		t.Errorf("the click moved the label to %q before the compositor said so", got)
+	}
+	f.Events <- `{"event":"layout","layout":{"index":1,"name":"German"}}`
+	waitLabel(t, label, "German")
+}
+
+// Any other action on the module is not a layout switch.
+func TestKeyboardLayoutOtherActionsDoNotCycle(t *testing.T) {
+	f := newFakeLysWM(t)
+	module, err := Create("keyboard-input", newTestContext(t, config.Defaults()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.AwaitWatch(t)
+	run := module.(interface{ RunAction(config.ClickAction) })
+	run.RunAction(config.ClickAction{})
+	run.RunAction(config.ParseClickAction("dropdown:audio"))
+	f.ExpectNoDispatch(t)
+}

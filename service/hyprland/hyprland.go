@@ -249,6 +249,20 @@ func FocusPreviousWorkspace() Action {
 	return Action{lua: `hl.dsp.focus({workspace = "previous"})`, legacy: "workspace previous"}
 }
 
+// NextKeyboardLayout moves every keyboard to its next layout. It is a
+// request of its own, not a dispatcher, and fails on any reply but the ack.
+func (c *Connection) NextKeyboardLayout() error {
+	const request = "switchxkblayout all next"
+	reply, err := c.Command(request)
+	if err != nil {
+		return err
+	}
+	if reply != "ok" {
+		return fmt.Errorf("hyprland: %s: %s", request, reply)
+	}
+	return nil
+}
+
 // Dispatch runs an action, in the legacy language on an instance that
 // has no Lua, and fails on any reply but the ack.
 func (c *Connection) Dispatch(action Action) error {

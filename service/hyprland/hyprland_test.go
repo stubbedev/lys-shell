@@ -361,3 +361,22 @@ func TestEventsCloseOnCancelWhileTheCompositorIsSilent(t *testing.T) {
 		t.Fatal("the channel stayed open after the cancel")
 	}
 }
+
+func TestNextKeyboardLayoutAsksForEveryKeyboardsNextLayout(t *testing.T) {
+	const request = "switchxkblayout all next"
+	fake := startFake(t, map[string]string{request: "ok"})
+	if err := ConnectTo(fake.commandPath, fake.eventPath).NextKeyboardLayout(); err != nil {
+		t.Fatalf("NextKeyboardLayout: %v", err)
+	}
+	if got := <-fake.requests; got != request {
+		t.Errorf("request = %q, want %q", got, request)
+	}
+}
+
+func TestNextKeyboardLayoutRefusedIsAnError(t *testing.T) {
+	fake := startFake(t, map[string]string{"switchxkblayout all next": "device not found"})
+	err := ConnectTo(fake.commandPath, fake.eventPath).NextKeyboardLayout()
+	if err == nil || !strings.Contains(err.Error(), "device not found") {
+		t.Errorf("NextKeyboardLayout = %v, want the refusal", err)
+	}
+}

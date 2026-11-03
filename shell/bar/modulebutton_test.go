@@ -63,8 +63,11 @@ func TestModuleClickDefaultsMatchSchema(t *testing.T) {
 	if got := cfg.Clock.Clicks().RightClick.String(); got != "dropdown:weather" {
 		t.Errorf("clock right-click = %q", got)
 	}
-	if cfg.KeyboardInput.Clicks().LeftClick.Kind != config.ClickNone {
-		t.Errorf("keyboard-input left-click = %+v, want none", cfg.KeyboardInput.Clicks().LeftClick)
+	if got := cfg.KeyboardInput.Clicks().LeftClick.String(); got != config.KeyboardNextLayoutAction {
+		t.Errorf("keyboard-input left-click = %q, want the next layout", got)
+	}
+	if cfg.KeyboardInput.Clicks().RightClick.Kind != config.ClickNone {
+		t.Errorf("keyboard-input right-click = %+v, want none", cfg.KeyboardInput.Clicks().RightClick)
 	}
 }
 

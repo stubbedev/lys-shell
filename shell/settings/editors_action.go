@@ -196,6 +196,8 @@ func actionChoices(module string) []actionChoice {
 		return []actionChoice{shell("Cycle profile", ":cycle")}
 	case "power":
 		return []actionChoice{shell("Open power menu", ":menu")}
+	case "keyboard-input":
+		return []actionChoice{shell("Next layout", config.KeyboardNextLayoutAction)}
 	case "idle-inhibit":
 		return []actionChoice{
 			shell("Toggle idle inhibit", "lys-shell idle toggle"),

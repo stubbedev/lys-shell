@@ -3196,7 +3196,7 @@
         },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
-          "default": "",
+          "default": ":next-layout",
           "description": "Action on left click."
         },
         "middle-click": {
@@ -5460,7 +5460,7 @@
             "label-max-length": 0,
             "label-show": true,
             "layout-alias-map": {},
-            "left-click": "",
+            "left-click": ":next-layout",
             "middle-click": "",
             "right-click": "",
             "scroll-down": "",
@@ -10544,7 +10544,7 @@
           "label-max-length": 0,
           "label-show": true,
           "layout-alias-map": {},
-          "left-click": "",
+          "left-click": ":next-layout",
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",

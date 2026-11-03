@@ -1,5 +1,8 @@
 package config
 
+// KeyboardNextLayoutAction is the module's own click verb: the next layout.
+const KeyboardNextLayoutAction = ":next-layout"
+
 // KeyboardInputConfig is ported from crates/wayle-config/src/schemas/modules/keyboard_input/mod.rs.
 //
 // Active keyboard layout indicator.
@@ -74,7 +77,7 @@ func DefaultsKeyboardInput() KeyboardInputConfig {
 		LabelColor:     mustColor("fg-default"),
 		LabelMaxLength: 0,
 		ButtonBgColor:  mustColor("bg-surface-elevated"),
-		LeftClick:      ClickAction{},
+		LeftClick:      ParseClickAction(KeyboardNextLayoutAction),
 		RightClick:     ClickAction{},
 		MiddleClick:    ClickAction{},
 		ScrollUp:       ClickAction{},
