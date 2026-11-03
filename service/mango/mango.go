@@ -14,7 +14,8 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // SocketEnv is constants.rs's SOCKET_PATH_ENV.
@@ -95,50 +96,49 @@ type RejectedError struct{ Message string }
 
 func (e *RejectedError) Error() string { return "mango rejected the request: " + e.Message }
 
-func dial() (net.Conn, error) {
+func open(limits ipcsock.Limits) (net.Conn, error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, ErrNotRunning
 	}
-	conn, err := net.DialTimeout("unix", path, 2*time.Second)
+	conn, err := limits.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("mango: %w", err)
 	}
 	return conn, nil
 }
 
-// request sends one command line on a fresh connection and returns
-// the JSON reply; an "error" field is the rejection.
-func request(command string) (map[string]any, error) {
-	conn, err := dial()
+// request sends one command line on a fresh connection and fails on
+// the reply's "error" field, the rejection.
+func request(limits ipcsock.Limits, command string) error {
+	conn, err := open(limits)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = conn.Close() }()
 	if _, werr := conn.Write([]byte(command + "\n")); werr != nil {
-		return nil, fmt.Errorf("mango: write: %w", werr)
+		return fmt.Errorf("mango: write %q: %w", command, werr)
 	}
 	line, rerr := bufio.NewReader(conn).ReadBytes('\n')
 	if len(line) == 0 {
 		if rerr == nil {
 			rerr = errors.New("empty reply")
 		}
-		return nil, fmt.Errorf("mango: command socket closed: %w", rerr)
+		return fmt.Errorf("mango: read the reply to %q: %w", command, rerr)
 	}
 	var reply map[string]any
 	if err := json.Unmarshal(line, &reply); err != nil {
-		return nil, fmt.Errorf("mango: parse reply: %w", err)
+		return fmt.Errorf("mango: parse reply: %w", err)
 	}
 	if msg, ok := reply["error"].(string); ok {
-		return nil, &RejectedError{Message: msg}
+		return &RejectedError{Message: msg}
 	}
-	return reply, nil
+	return nil
 }
 
 // Dispatch runs one mango dispatcher.
 func Dispatch(command string) error {
-	_, err := request("dispatch " + command)
-	return err
+	return request(ipcsock.Standard(), "dispatch "+command)
 }
 
 // ViewTag is view_tag: "view,<index>".
@@ -174,11 +174,13 @@ type Watcher struct {
 }
 
 // Watch connects both watch streams (start_monitoring).
-func Watch() (*Watcher, error) {
+func Watch() (*Watcher, error) { return watch(ipcsock.Standard()) }
+
+func watch(limits ipcsock.Limits) (*Watcher, error) {
 	w := &Watcher{ticks: make(chan struct{}, 1)}
 	var wg sync.WaitGroup
 	for _, sub := range []string{watchMonitors, watchClients} {
-		conn, err := dial()
+		conn, err := open(limits)
 		if err != nil {
 			w.Close()
 			return nil, err
@@ -187,6 +189,11 @@ func Watch() (*Watcher, error) {
 			_ = conn.Close()
 			w.Close()
 			return nil, fmt.Errorf("mango: %s: %w", sub, werr)
+		}
+		if err := ipcsock.Disarm(conn); err != nil {
+			_ = conn.Close()
+			w.Close()
+			return nil, fmt.Errorf("mango: %s: %w", sub, err)
 		}
 		w.conns = append(w.conns, conn)
 		wg.Add(1)

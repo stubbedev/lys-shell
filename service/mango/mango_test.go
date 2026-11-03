@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/sockdir"
+
+	"github.com/stubbedev/lys-shell/internal/ipcsock/ipcsocktest"
 )
 
 // monitorsFrame is types.rs's ALL_MONITORS_FRAME fixture.
@@ -227,5 +229,35 @@ func TestWatchDecodesTheKeyboardLayout(t *testing.T) {
 	monitors, _ := w.State()
 	if got := KeyboardLayout(monitors); got != "English (US)" {
 		t.Fatalf("layout = %q, want English (US)", got)
+	}
+}
+
+func TestARequestGivesUpOnACompositorThatNeverAnswers(t *testing.T) {
+	t.Setenv(SocketEnv, ipcsocktest.Silent(t))
+	ipcsocktest.GivesUp(t, func() error {
+		return request(ipcsocktest.Fast, "dispatch view,1")
+	}, "mango", "read", "dispatch view,1")
+}
+
+func TestAWatchStreamMayStaySilentPastTheRequestDeadline(t *testing.T) {
+	f := newFakeMango(t)
+	w, err := watch(ipcsocktest.Fast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	time.Sleep(3 * ipcsocktest.Fast.Request)
+	f.send(watchMonitors)
+	f.send(watchClients)
+	deadline := time.After(2 * time.Second)
+	for !w.Ready() {
+		select {
+		case _, open := <-w.Ticks():
+			if !open && !w.Ready() {
+				t.Fatal("the streams ended at the request deadline")
+			}
+		case <-deadline:
+			t.Fatal("no frames after the request deadline passed")
+		}
 	}
 }
