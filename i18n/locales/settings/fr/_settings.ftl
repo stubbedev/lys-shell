@@ -91,10 +91,13 @@ settings-reset-all-cancel = Annuler
 settings-nav-appearance = Apparence
 settings-nav-bar-section = Barre
 settings-nav-overlays = Superpositions
+settings-nav-launcher = Lanceur
 settings-nav-modules = Modules
 settings-nav-system = Système
 
 ## Éléments de navigation
+settings-nav-launcher-page = Lanceur
+settings-nav-launcher-modes-page = Modes du lanceur
 settings-nav-theme = Thème
 settings-nav-wallpaper = Fond d'écran
 settings-nav-general = Général
@@ -139,6 +142,10 @@ settings-nav-window-title = Titre de fenêtre
 settings-nav-world-clock = Horloge mondiale
 
 ## Titres de page
+settings-page-launcher = Lanceur
+    .breadcrumb = Lanceur
+settings-page-launcher-modes = Modes du lanceur
+    .breadcrumb = Lanceur
 settings-page-general = Général
     .breadcrumb = Paramètres
 settings-page-theme = Thème
@@ -262,4 +269,15 @@ settings-section-urgent = Urgence
 settings-section-commands = Commandes
 settings-section-fonts = Polices
 settings-section-mappings = Correspondances
+settings-section-launcher-matching = Correspondance
+settings-section-launcher-appearance = Apparence
+settings-section-launcher-history = Historique
+settings-section-launcher-keybindings = Raccourcis clavier
+settings-section-launcher-drun = Applications (drun)
+settings-section-launcher-run = Commandes (run)
+settings-section-launcher-window = Fenêtres
+settings-section-launcher-ssh = SSH
+settings-section-launcher-filebrowser = Explorateur de fichiers
+settings-section-launcher-combi = Combi
 settings-section-launcher-search = Panneau de recherche
+settings-section-launcher-scripts = Modes de script
