@@ -16,6 +16,8 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/search"
+	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -56,7 +58,6 @@ type fakeWindow struct {
 	cfg    app.LayerConfig
 	closed bool
 	router *widget.Router
-	sizes  [][2]uint32
 	// opacity records every fade step.
 	opacity []float64
 	// opacityErr is a compositor without the alpha modifier.
@@ -78,11 +79,6 @@ func (w *fakeWindow) SetOpacity(alpha float64) error {
 		return w.opacityErr
 	}
 	w.opacity = append(w.opacity, alpha)
-	return nil
-}
-
-func (w *fakeWindow) SetSize(width, height uint32) error {
-	w.sizes = append(w.sizes, [2]uint32{width, height})
 	return nil
 }
 
@@ -204,12 +200,12 @@ func (h *harness) key(spec string) bool {
 func (h *harness) pointAt(pos int) (*widget.Router, widget.Point) {
 	h.t.Helper()
 	v := h.s.cur.views
-	treetest.Pointer(v.surface, v.list, 800, 600)
+	treetest.Pointer(v.box, v.list, 800, 600)
 	row, ok := v.list.rows[pos].(*launcherRow)
 	if !ok {
 		h.t.Fatalf("row %d is not laid out", pos)
 	}
-	return treetest.Pointer(v.surface, row, 800, 600)
+	return treetest.Pointer(v.box, row, 800, 600)
 }
 
 // frame pumps the loop until the session's terminal frame arrives.
@@ -241,7 +237,7 @@ func TestDmenuSessionFiltersAndAccepts(t *testing.T) {
 		t.Fatalf("windows = %d", len(h.windows))
 	}
 	w := h.windows[0]
-	if w.cfg.Namespace != "lys-shell-launcher" || w.cfg.Keyboard != app.KeyboardExclusive || w.cfg.Anchor != 0 || w.cfg.Layer != app.LayerOverlay {
+	if w.cfg.Namespace != "lys-shell-launcher" || w.cfg.Keyboard != app.KeyboardExclusive || w.cfg.Anchor != app.AnchorTop|app.AnchorBottom|app.AnchorLeft|app.AnchorRight || w.cfg.Layer != app.LayerOverlay {
 		t.Errorf("layer = %+v", w.cfg)
 	}
 	if w.focused() != widget.Widget(h.s.cur.views.entry) || h.s.sel != 0 {
@@ -401,8 +397,8 @@ func TestErrorDialogClosesOnAnyBinding(t *testing.T) {
 	_, reply := h.open(launcheripc.SessionOptions{ErrorMessage: &msg}, false)
 	h.loop.pump()
 	v := h.s.cur.views
-	if v.inputRow.Visible() || v.frame.Visible() || !v.message.Visible() || v.message.Text() != "no network" {
-		t.Errorf("dialog: input %v list %v message %q", v.inputRow.Visible(), v.frame.Visible(), v.message.Text())
+	if v.input.Visible() || v.frame.Visible() || !v.message.Visible() || v.message.Text() != "no network" {
+		t.Errorf("dialog: input %v list %v message %q", v.input.Visible(), v.frame.Visible(), v.message.Text())
 	}
 	// The line renders the markup (its weight kept), not its text.
 	if !strings.Contains(v.message.Markup(), "<b>") {
@@ -561,27 +557,34 @@ func TestMoveSelectionCyclesOnlyUnderCycle(t *testing.T) {
 	}
 }
 
-func TestLocationAnchorsAndWidth(t *testing.T) {
-	for loc, want := range map[config.LauncherLocation]app.Anchor{
-		config.LauncherCenter:    0,
-		config.LauncherNorth:     app.AnchorTop,
-		config.LauncherSouthEast: app.AnchorBottom | app.AnchorRight,
-		config.LauncherWest:      app.AnchorLeft,
+// Centre is the search panel's place, whatever the panel's size; the rest sit
+// against their edges, offset from there.
+func TestPlacePanel(t *testing.T) {
+	out := render.Rect{W: 1000, H: 1000}
+	for _, c := range []struct {
+		loc  config.LauncherLocation
+		x, y int
+		want render.Rect
+	}{
+		{config.LauncherCenter, 0, 0, render.Rect{X: 400, Y: 220, W: 200, H: 100}},
+		{config.LauncherCenter, 10, 20, render.Rect{X: 400, Y: 220, W: 200, H: 100}},
+		{config.LauncherNorth, 10, 20, render.Rect{X: 400, Y: 20, W: 200, H: 100}},
+		{config.LauncherSouthEast, -10, -20, render.Rect{X: 790, Y: 880, W: 200, H: 100}},
+		{config.LauncherWest, 10, 20, render.Rect{X: 10, Y: 450, W: 200, H: 100}},
 	} {
-		if a, _ := locationAnchors(loc, 0, 0); a != want {
-			t.Errorf("%s anchors = %v", loc, a)
+		if got := placePanel(out, 200, 100, c.loc, c.x, c.y); got != c.want {
+			t.Errorf("%s offset %d,%d: %v, want %v", c.loc, c.x, c.y, got, c.want)
 		}
 	}
-	// Offsets sign from the anchor; a centered axis ignores its own.
-	if _, m := locationAnchors(config.LauncherSouthEast, 10, 20); m != (app.Margins{Right: -10, Bottom: -20}) {
-		t.Errorf("south-east margins = %+v", m)
+	if a, b := placePanel(out, 200, 100, config.LauncherCenter, 0, 0), placePanel(out, 200, 500, config.LauncherCenter, 0, 0); a.Y != b.Y {
+		t.Errorf("the field moved as the panel grew: %d, %d", a.Y, b.Y)
 	}
-	if _, m := locationAnchors(config.LauncherNorth, 10, 20); m != (app.Margins{Top: 20}) {
-		t.Errorf("north margins = %+v", m)
-	}
+}
+
+func TestResolveWidth(t *testing.T) {
 	h := newHarness(t)
 	ui := uiSettings{width: 600}
-	if h.s.resolveWidth(ui) != 600 {
+	if h.s.resolveWidth(ui) != ui.width {
 		t.Error("no -width keeps the configured width")
 	}
 	ui.widthOverride = &launcheripc.Width{Unit: launcheripc.WidthPercent, Value: 50}
@@ -673,21 +676,20 @@ func TestSurfacePlaysItsExit(t *testing.T) {
 	_, _ = h.open(dmenu(), false, "a")
 	h.until("the first session", func() bool { return h.s.cur != nil && h.s.cur.win != nil })
 	first := h.s.cur
-	if !first.views.rev.Revealed() || first.views.rev.Transition() != widget.RevealFade {
-		t.Errorf("entering: revealed %v, transition %v", first.views.rev.Revealed(), first.views.rev.Transition())
-	}
 	_, _ = h.open(dmenu(), true, "b")
 	h.loop.pump()
 	if h.windows[0].closed {
 		t.Fatal("the replaced surface closed before its exit played")
 	}
-	if first.views.rev.Revealed() || first.views.rev.Transition() != widget.RevealZoom {
-		t.Errorf("exiting: revealed %v, transition %v; want the launcher's zoom exit", first.views.rev.Revealed(), first.views.rev.Transition())
-	}
 	if len(h.windows) != 2 {
 		t.Fatalf("windows = %d, want the replacement mapped meanwhile", len(h.windows))
 	}
-	first.views.rev.Finish()
+	done := first.views.motion.done
+	if done == nil {
+		t.Fatal("the replaced session is not playing its exit")
+	}
+	first.views.motion.done = nil
+	done()
 	if !h.windows[0].closed || h.windows[1].closed {
 		t.Errorf("after the exit: first closed %v, second closed %v", h.windows[0].closed, h.windows[1].closed)
 	}
@@ -779,8 +781,8 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 	if root != widget.Widget(win) || win.Element() != "window" || !widget.HasClass(win, "launcher-window") {
 		t.Fatalf("root %T, want window.launcher-window", root)
 	}
-	if rev, ok := win.Children()[0].(*widget.Revealer); !ok || rev != h.s.cur.views.rev || !widget.HasClass(rev.Child(), "launcher-surface") {
-		t.Errorf("window child %T, want the revealer around .launcher-surface", win.Children()[0])
+	if box := h.s.cur.views.box; win.Children()[0] != widget.Widget(box) || !widget.HasClass(box, "launcher-panel") {
+		t.Errorf("window child %T, want .launcher-panel", win.Children()[0])
 	}
 	if !h.s.cur.views.tabs.Homogeneous() {
 		t.Error("the mode tabs are not homogeneous")
@@ -828,20 +830,12 @@ func TestMessageLineKeepsItsPadding(t *testing.T) {
 	}
 }
 
-// The surface is lys-ui's command palette: the command element, its
-// .input row, and .item rows carrying the selected state, so the
-// palette's own rules style them.
-func TestSurfaceIsTheCommandPalette(t *testing.T) {
-	h := newHarness(t)
-	h.open(dmenu(), false, "alpha", "beta")
-	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 2 })
-	v := h.s.cur.views
-	if v.surface.Element() != "command" || !v.inputRow.HasClass("input") {
-		t.Errorf("surface element %q, input row classes %v; want the command palette's", v.surface.Element(), v.inputRow.Classes())
-	}
+// A session's rows are the search panel's row box, carrying the selected
+// state.
+func TestASessionsRowsAreTheSharedRowBox(t *testing.T) {
 	row := buildRow(0, engine.Item{Display: "alpha"}, true, rowStyle{font: treetest.Font(t), px: 14}, nil, 0)
-	if !row.content.HasClass("item") || !row.content.HasState(widget.StateSelected) {
-		t.Error("a selected row is not a selected .item")
+	if !row.content.HasClass("launcher-search-row") || !row.content.HasState(widget.StateSelected) {
+		t.Error("a selected row is not a selected .launcher-search-row")
 	}
 	if idle := buildRow(1, engine.Item{Display: "beta"}, false, rowStyle{font: treetest.Font(t), px: 14}, nil, 1); idle.content.HasState(widget.StateSelected) {
 		t.Error("an unselected row carries the selected state")
@@ -896,40 +890,102 @@ func TestMaskedModeKeepsTheSecretFromHooks(t *testing.T) {
 	}
 }
 
-// A rofi session blurs behind its panel as the search panel does, and
-// only behind its panel: the shadow's gutter stays clear.
-func TestASessionIsTheSameGlassAsThePanel(t *testing.T) {
+// A rofi session is the search panel: the same surface, the same place,
+// width and measures, and the blur behind the panel alone.
+func TestASessionIsTheSamePanelAsTheSearchPanel(t *testing.T) {
+	useBundledIcons(t)
+	out := render.Rect{W: 1600, H: 1000}
+	ph := newPanelHarness(t)
+	ph.s.d.Sheet = apptheme.New(ph.cfg).Sheet
+	ph.cfg.Launcher.Width = config.Defaults().Launcher.Width
+	p, _ := ph.openPanel()
+	ph.typed(p, "alpha")
+	ph.waitTitles(p, "Alpha Docs", "Alpha Issues", webRow("alpha"))
+	data := make([]byte, render.Stride(renderW)*renderH)
+	paintPanel(p, data)
+	panelCfg := ph.harness.windows[0].cfg
+	wantBox := p.v.box.Bounds()
+	wantInput, wantFooter := p.v.input.Bounds(), p.v.footer.Bounds()
+	var wantRow render.Rect
+	for _, r := range p.v.list.pool {
+		if r.title.Visible() {
+			wantRow = r.Bounds()
+			break
+		}
+	}
+	p.finish(search.Cancel{})
+	ph.loop.pump()
+
 	h := newHarness(t)
-	mode := "run"
-	h.open(launcheripc.SessionOptions{Mode: &mode}, false)
-	h.until("the surface", func() bool { return len(h.windows) == 1 })
-	cfg := h.windows[0].cfg
-	if !cfg.BackgroundBlur {
-		t.Error("the session does not ask for the blur")
-	}
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	h.cfg.Launcher.Width = config.Defaults().Launcher.Width
+	h.open(dmenu(), false, "alpha", "beta", "gamma")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.cur.win != nil && h.s.model.len() == 3 })
 	v := h.s.cur.views
-	if v.gutter <= 0 || int(cfg.Width) != v.width+2*v.gutter {
-		t.Errorf("surface %d wide, panel %d, gutter %d", cfg.Width, v.width, v.gutter)
+	cfg := h.windows[0].cfg
+	if cfg.Anchor != panelCfg.Anchor || cfg.Width != panelCfg.Width || cfg.Height != panelCfg.Height || cfg.Margin != panelCfg.Margin ||
+		cfg.Layer != panelCfg.Layer || cfg.OwnMotion != panelCfg.OwnMotion || !cfg.BackgroundBlur {
+		t.Errorf("session surface %+v, want the panel's %+v", cfg, panelCfg)
 	}
-	v.root.Arrange(render.Rect{W: int(cfg.Width), H: int(cfg.Height)})
-	want := v.surface.Bounds()
-	if want.X != v.gutter || want.Y != v.gutter {
-		t.Errorf("panel at %v, want inside the %dpx gutter", want, v.gutter)
+	v.motion.snapSize(v.target(out))
+	v.root.Arrange(out)
+	v.root.Arrange(out)
+	v.root.Paint(render.NewScaled(data, render.Stride(renderW), renderW, renderH, 1, 1))
+	got := v.box.Bounds()
+	if got.X != wantBox.X || got.Y != wantBox.Y || got.W != wantBox.W {
+		t.Errorf("panel at %v, want the search panel's place and width %v", got, wantBox)
+	}
+	if b := v.input.Bounds(); b.H != wantInput.H || b.Y != wantInput.Y {
+		t.Errorf("field %v, want %v", b, wantInput)
+	}
+	if b := v.footer.Bounds(); b.H != wantFooter.H || !widget.IsVisible(v.footer) {
+		t.Errorf("footer %v visible %v, want %v", b, widget.IsVisible(v.footer), wantFooter)
+	}
+	row, ok := v.list.rows[0].(*launcherRow)
+	if !ok {
+		t.Fatal("no first row")
+	}
+	if b := row.Bounds(); b.H != wantRow.H {
+		t.Errorf("row %dpx tall, want the search panel's %d", b.H, wantRow.H)
 	}
 	for _, r := range widget.BackdropRegion(v.root) {
-		if r.X < want.X || r.Y < want.Y || r.X+r.W > want.X+want.W || r.Y+r.H > want.Y+want.H {
-			t.Errorf("blur region %v reaches past the panel %v", r, want)
+		if r.X < got.X || r.Y < got.Y || r.X+r.W > got.X+got.W || r.Y+r.H > got.Y+got.H {
+			t.Errorf("blur region %v reaches past the panel %v", r, got)
 		}
 	}
 }
 
-func TestTheGutterKeepsThePanelAtTheLocationsMargins(t *testing.T) {
-	got := intoGutter(app.AnchorTop|app.AnchorLeft, app.Margins{Top: 30, Left: 10}, 24)
-	if want := (app.Margins{Top: 6, Left: -14}); got != want {
-		t.Errorf("anchored margins %+v, want %+v", got, want)
+// A press outside the panel leaves, as it does the search panel; one on it
+// does not.
+func TestAPressOutsideASessionCancelsIt(t *testing.T) {
+	h := newHarness(t)
+	_, reply := h.open(dmenu(), false, "a")
+	h.until("the surface", func() bool { return h.s.cur != nil && h.s.cur.win != nil })
+	v := h.s.cur.views
+	press := h.windows[0].cfg.OnPress
+	press(1, v.box)
+	if h.s.cur == nil {
+		t.Fatal("a press on the panel ended the session")
 	}
-	if got := intoGutter(0, app.Margins{}, 24); got != (app.Margins{}) {
-		t.Errorf("a centred surface has no margins to adjust: %+v", got)
+	press(1, v.root)
+	if f := h.frame(reply); f.Type != launcheripc.FrameCancelled {
+		t.Errorf("frame %+v, want a cancel", f)
+	}
+}
+
+// Rows carry their hints only while there are rows to act on.
+func TestASessionsFooterFollowsItsRows(t *testing.T) {
+	h := newHarness(t)
+	h.open(dmenu(), false, "alpha")
+	h.until("the row", func() bool { return h.s.cur != nil && h.s.model.len() == 1 })
+	v := h.s.cur.views
+	if !v.footer.Visible() || !strings.Contains(v.hints.Markup(), "Esc") {
+		t.Errorf("with a row: footer %v, hints %q", v.footer.Visible(), v.hints.Markup())
+	}
+	v.entry.SetText("nothing matches this")
+	h.until("no rows", func() bool { return h.s.model.len() == 0 })
+	if v.footer.Visible() {
+		t.Error("the footer stayed with no rows to act on")
 	}
 }
 

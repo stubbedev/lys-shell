@@ -1,12 +1,10 @@
 package launcher
 
 import (
-	"math"
-
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
-	"github.com/stubbedev/lys-ui/widget/css"
 
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -15,110 +13,53 @@ import (
 // take before the stylesheet (or -font) sizes them.
 func fontPx() float64 { return widgets.TextPx(styling.Body, 1) }
 
-// shadowGutter is the room around a session's panel its shadow paints
-// in, in logical pixels at scale 1.
-const shadowGutter = 24
-
 // sessionCSSPriority puts a session's -font/-style CSS above the
 // shell's own stylesheet, as the Rust provider sits above the shell's
 // (PRIORITY_USER + 200 over + 100): at anything below, a -font simply
 // lost to [styling] and looked like it did nothing.
 const sessionCSSPriority = 100
 
-// views is one session's widget tree (the view! of mod.rs).
+// views is one session's widget tree: the frame and chrome every session
+// has, around the list a rofi session shows.
 type views struct {
-	root     *surfaceRoot
-	rev      *widget.Revealer
-	surface  *widget.Box
-	inputRow *widget.Box
-	prompt   *widget.Label
-	entry    *widget.Entry
-	message  *widget.RichLabel
-	frame    *widget.Box
-	list     *resultList
-	tabs     *widget.Box
-	// width is the panel's width, the surface being wider by its gutter;
-	// lastH the surface height it was last sized to; gutter the room left
-	// around the panel for its shadow.
-	width, lastH, gutter int
-}
-
-// surfaceRoot is a session's root, the panel inside its shadow's gutter.
-// What the compositor blurs is the panel, not the gutter.
-type surfaceRoot struct {
-	*widget.Box
-	panel *widget.Box
-}
-
-// BackdropRegion is the panel's rounded box as it shows this frame.
-func (r *surfaceRoot) BackdropRegion() []render.Rect {
-	return render.RoundedRectRegion(widget.ShownRect(r.panel), widget.CornerRadii(r.panel))
+	*panelFrame
+	*panelChrome
+	frame *widget.Box
+	list  *resultList
+	tabs  *widget.Box
+	// width is the panel's width before the output holds it in.
+	width int
 }
 
 // buildViews builds and fills the tree for session a (apply_ui).
 func (s *Surface) buildViews(a *active) *views {
 	ui := a.ui
-	v := &views{gutter: int(math.Round(shadowGutter * float64(s.d.Config().Styling.Scale)))}
-	v.root = &surfaceRoot{Box: widget.NewBox(widget.Column, 0, 0)}
-	v.root.SetPadding(render.Insets{Top: v.gutter, Left: v.gutter, Right: v.gutter, Bottom: v.gutter})
-	v.root.SetElement("window")
-	v.root.AddClass("launcher-window")
-	if s.d.Sheet != nil {
-		v.root.AttachStylesheet(s.d.Sheet)
-	}
-	if ui.css != "" {
-		v.root.AttachStylesheet(widget.NewStylesheet(ui.css, s.d.SheetPriority+sessionCSSPriority))
-	}
-	// The surface is lys-ui's command palette: the command element and
-	// its .input and .item parts take the palette's look.
+	cfg := s.d.Config()
+	px := scaledPx(cfg)
 	th := widget.Current()
-	v.surface = widget.NewBox(widget.Column, 0, 0)
-	v.surface.SetElement("command")
-	v.surface.AddClass("launcher-surface")
-	v.root.panel = v.surface
-	v.rev = widget.NewRevealer(v.surface)
-	v.root.Append(v.rev, true)
-
-	v.inputRow = widget.NewBox(widget.Row, th.Spacing, 0)
-	v.inputRow.SetSizeRequest(0, int(math.Round(inputRowHeight*float64(s.d.Config().Styling.Scale))))
-	v.inputRow.SetPadding(render.Insets{Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
-	v.inputRow.AddClass("input", "launcher-input")
-	v.prompt = widget.NewLabel(s.d.Font, fontPx(), "", 0)
-	v.prompt.AddClass("launcher-prompt")
-	v.inputRow.AppendAligned(v.prompt, false, widget.AlignCenter)
-	v.entry = widget.NewEntry(s.d.Font, math.Round(fontPx()*entryFontFactor), 0)
-	v.entry.AddClass("launcher-entry")
+	v := &views{width: s.resolveWidth(ui)}
+	v.panelChrome = newPanelChrome(s.d, cfg, func(text string) {
+		if s.cur == a {
+			s.send(cmdSetQuery{query: text})
+		}
+	})
+	v.searchIcon.show("ld-search-symbolic")
 	if ui.filter != nil {
 		v.entry.SetText(*ui.filter)
 	}
 	v.setMasked(ui.password)
-	v.entry.OnChanged = func(text string) {
-		if s.cur == a {
-			s.send(cmdSetQuery{query: text})
-		}
-	}
-	v.inputRow.AppendAligned(v.entry, true, widget.AlignCenter)
-	v.surface.Append(v.inputRow, false)
-
-	v.message = widget.NewRichLabel(s.d.Font, fontPx(), "", 0)
-	v.message.AddClass("launcher-message", css.DimLabel)
-	v.message.SetMargin(render.Insets{Top: th.Padding, Left: th.Padding + th.Padding/2, Right: th.Padding + th.Padding/2})
-	v.message.SetVariants(s.d.Variants)
-	v.message.SetWrap(true)
-	v.surface.Append(v.message, false)
 
 	st := rowStyle{
-		font: s.d.Font, variants: s.d.Variants, px: fontPx(), iconPx: iconPx(s.d), showIcons: ui.showIcons,
+		font: s.d.Font, variants: s.d.Variants, px: fontPx(), iconPx: px(searchIconSize), showIcons: ui.showIcons,
 		display: rowDisplay{columns: ui.displayColumns, separator: ui.columnSeparator, ellipsize: ui.ellipsize},
 	}
-	v.list = newResultList(func(pos int) widget.Widget { return s.makeRow(a, pos, st) })
+	v.list = newResultList(px(searchRowHeight), func(pos int) widget.Widget { return s.makeRow(a, pos, st) })
 	v.list.visibleRows = max(ui.lines, 1)
 	v.list.fixed = ui.fixedNumLines
 	v.list.SetOnScroll(func(e widget.ScrollEvent) bool { return s.listScrolled(e.DY, mouseMods(e.Mods)) })
-	v.frame = widget.NewBox(widget.Column, 0, th.Padding/2)
+	v.frame = widget.NewBox(widget.Column, 0, 0)
 	v.frame.AddClass("launcher-list")
 	v.frame.Append(v.list, true)
-	v.surface.Append(v.frame, true)
 
 	v.tabs = widget.NewBox(widget.Row, 0, 0)
 	v.tabs.SetElement("togglegroup")
@@ -126,16 +67,33 @@ func (s *Surface) buildViews(a *active) *views {
 	v.tabs.SetMargin(render.Insets{Left: th.Padding, Right: th.Padding, Bottom: th.Padding})
 	v.tabs.SetHomogeneous(true)
 	v.tabs.SetVisible(ui.sidebar)
-	v.surface.Append(v.tabs, false)
+
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.Append(v.input, false)
+	content.Append(v.message, false)
+	content.Append(v.sep, false)
+	content.Append(v.frame, true)
+	content.Append(v.tabs, false)
+	content.Append(v.footer, false)
+
+	v.panelFrame = newPanelFrame(s.d, content, panelWidthIn(render.Rect{}, v.width), px(inputRowHeight), func() Window { return a.win })
+	if ui.css != "" {
+		v.root.AttachStylesheet(widget.NewStylesheet(ui.css, s.d.SheetPriority+sessionCSSPriority))
+	}
+	v.target = v.targetIn
+	v.place = func(out render.Rect, w, h int) render.Rect {
+		return placePanel(out, w, h, ui.location, ui.offsetX, ui.offsetY)
+	}
 
 	v.setPrompt(deref(ui.prompt, ""))
 	message := ui.errorMessage
 	if message == nil {
 		message = ui.mesg
 	}
-	v.setMessage(message)
-	v.inputRow.SetVisible(!a.dialog)
+	v.showMessage(message)
+	v.input.SetVisible(!a.dialog)
 	v.frame.SetVisible(!a.dialog)
+	v.setRows(0)
 	return v
 }
 
@@ -165,7 +123,6 @@ func (s *Surface) makeRow(a *active, pos int, st rowStyle) widget.Widget {
 	return row
 }
 
-// setPrompt shows the prompt, hidden when empty.
 // setMasked shows the input as dots while it is a secret.
 func (v *views) setMasked(on bool) {
 	echo := widget.EchoNormal
@@ -175,28 +132,29 @@ func (v *views) setMasked(on bool) {
 	v.entry.SetEcho(echo)
 }
 
-func (v *views) setPrompt(text string) {
-	v.prompt.SetText(text)
-	v.prompt.SetVisible(text != "")
-}
+func (v *views) setPrompt(text string) { v.setChip(text) }
 
-// setMessage shows the message line, hidden without one.
-func (v *views) setMessage(markup *string) {
-	if markup == nil {
-		v.message.SetVisible(false)
-		return
+// showMessage shows the message line, hidden without one.
+func (v *views) showMessage(markup *string) { v.setMessage(deref(markup, "")) }
+
+// setRows shows the separator and the footer's hints while there are rows
+// to act on, as the search panel does.
+func (v *views) setRows(n int) {
+	v.sep.SetVisible(n > 0)
+	v.footer.SetVisible(n > 0)
+	if n > 0 {
+		v.hintBuf = append(v.hintBuf[:0], footerHint{"Enter", i18n.T("launcher-footer-select")}, closeHint())
+		v.showHints()
 	}
-	v.message.SetMarkup(messageMarkup(*markup))
-	v.message.SetVisible(true)
 }
 
-// surfaceSize is the surface a panel of width takes: its natural height
-// and its gutter around it.
-func (v *views) surfaceSize(width int) (w, h int) {
-	return width + 2*v.gutter, v.surface.Measure(widget.Column, width).Nat + 2*v.gutter
-}
-
-// iconPx is -gtk-icon-size: 1.5rem at the styling scale.
-func iconPx(d Deps) int {
-	return int(math.Round(1.5 * styling.RemBase * float64(d.Config().Styling.Scale)))
+// targetIn is the panel's size in an output: as tall as its content, up to
+// the room below where the panel sits.
+func (v *views) targetIn(out render.Rect) (w, h int) {
+	w = panelWidthIn(out, v.width)
+	h = v.content.Measure(widget.Column, w).Nat
+	if out.H > 0 {
+		h = min(h, int(float64(out.H)*(1-panelTopFraction))-panelEdgeGap)
+	}
+	return w, max(h, 1)
 }

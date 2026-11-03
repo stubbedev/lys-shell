@@ -19,26 +19,13 @@ import (
 	"github.com/stubbedev/lys-shell/styling"
 )
 
-// The panel's measures, in logical pixels at scale 1.
+// The panel's measures of its own, in logical pixels at scale 1; frame.go
+// holds what every session shares.
 const (
-	// panelTopFraction is how far down the output the field sits: above
-	// centre, so results grow into the room below without the field
-	// moving.
-	panelTopFraction = 0.22
-	panelEdgeGap     = 32
 	// previewMinRows is the least the list area is tall beside a preview:
 	// a pane one row high shows nothing.
-	previewMinRows   = 7
-	panelWidthFactor = 1.2
-	previewWidth     = 360
-	inputRowHeight   = 62
-	footerHeight     = 36
-	searchRowHeight  = 46
-	headerRowHeight  = 28
-	searchIconSize   = 26
-	entryFontFactor  = 1.45
-	// glyphFontFactor sizes an emoji to read as large as an icon box.
-	glyphFontFactor = 0.8
+	previewMinRows = 7
+	previewWidth   = 360
 )
 
 func hexColor(c render.Color) string {
@@ -47,77 +34,38 @@ func hexColor(c render.Color) string {
 
 // panelViews is the panel's widget tree.
 type panelViews struct {
-	p          *panel
-	root       *panelRoot
-	box        *widget.Box
-	content    *widget.Box
-	input      *widget.Box
-	chip       *widget.Label
-	entry      *widget.Entry
-	message    *widget.RichLabel
-	sep        *widget.Box
-	body       *widget.Box
-	list       *searchList
-	pane       *widget.Box
-	image      *widget.Image
-	text       *widget.Label
-	summary    *rowSummary
-	footer     *widget.Box
-	notice     *widget.Label
-	hints      *widget.RichLabel
-	motion     *panelMotion
-	searchIcon *asyncIcon
-	font       render.Font
-	scale      float64
-	lines      int
+	*panelFrame
+	*panelChrome
+	p       *panel
+	body    *widget.Box
+	list    *searchList
+	pane    *widget.Box
+	image   *widget.Image
+	text    *widget.Label
+	summary *rowSummary
+	font    render.Font
+	scale   float64
+	lines   int
 	// baseW is the width without the preview pane, previewW the pane's.
 	baseW, previewW int
-	hintBuf         []footerHint
-	markup          []byte
 	withPreview     bool
 }
 
 func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	d := p.s.d
 	scale := float64(cfg.Styling.Scale)
-	px := func(v int) int { return int(math.Round(float64(v) * scale)) }
+	px := scaledPx(cfg)
+	body := fontPx()
 	v := &panelViews{
 		p: p, font: d.Font, scale: scale, lines: max(int(cfg.Launcher.Lines), 1),
-		baseW:    int(math.Round(cfg.Launcher.Width.ResolvePx(config.LauncherWidthBaseRem*16, scale) * panelWidthFactor)),
-		previewW: px(previewWidth),
+		baseW: launcherWidthPx(cfg), previewW: px(previewWidth),
 	}
-	body := fontPx()
-	v.input = widget.NewBox(widget.Row, px(10), 0)
-	v.input.AddClass("launcher-search-input")
-	v.input.SetSizeRequest(0, px(inputRowHeight))
-	v.input.SetPadding(render.Insets{Left: px(18), Right: px(18)})
-	v.searchIcon = newAsyncIcon(px(22), "launcher-search-icon")
-	v.input.AppendAligned(v.searchIcon.slot, false, widget.AlignCenter)
-	v.chip = widget.NewLabel(d.Font, body, "", 0)
-	v.chip.AddClass("launcher-search-chip")
-	v.chip.SetVisible(false)
-	v.input.AppendAligned(v.chip, false, widget.AlignCenter)
-	v.entry = widget.NewEntry(d.Font, math.Round(body*entryFontFactor), 0)
-	v.entry.AddClass("launcher-search-entry")
-	v.entry.OnChanged = func(text string) {
+	v.panelChrome = newPanelChrome(d, cfg, func(text string) {
 		if p.eng != nil && !p.closing {
 			p.querySeq++
 			p.eng.SetQuery(text, p.querySeq)
 		}
-	}
-	v.input.AppendAligned(v.entry, true, widget.AlignCenter)
-
-	v.message = widget.NewRichLabel(d.Font, body, "", 0)
-	v.message.AddClass("launcher-search-message", css.DimLabel)
-	v.message.SetMargin(render.Insets{Left: px(20), Right: px(20), Bottom: px(8)})
-	v.message.SetVariants(d.Variants)
-	v.message.SetWrap(true)
-	v.message.SetVisible(false)
-
-	v.sep = widget.NewBox(widget.Column, 0, 0)
-	v.sep.AddClass("launcher-search-separator")
-	v.sep.SetSizeRequest(0, 1)
-	v.sep.SetVisible(false)
+	})
 
 	v.list = newSearchList(p, cfg, d.Font, d.Variants, px(searchRowHeight), px(headerRowHeight), px(searchIconSize))
 	v.list.bindAsync(v.searchIcon, "ld-search-symbolic")
@@ -140,38 +88,17 @@ func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	v.body.Append(v.list, true)
 	v.body.Append(v.pane, false)
 
-	v.footer = widget.NewBox(widget.Row, px(12), 0)
-	v.footer.AddClass("launcher-search-footer")
-	v.footer.SetSizeRequest(0, px(footerHeight))
-	v.footer.SetPadding(render.Insets{Left: px(16), Right: px(16)})
-	v.notice = widget.NewLabel(d.Font, widgetsSmallPx(), "", 0)
-	v.notice.AddClass("launcher-search-notice")
-	v.notice.SetEllipsize(widget.EllipsizeEnd)
-	v.footer.AppendAligned(v.notice, true, widget.AlignCenter)
-	v.hints = widget.NewRichLabel(d.Font, widgetsSmallPx(), "", 0)
-	v.hints.AddClass("launcher-search-hints", css.DimLabel)
-	v.hints.SetVariants(d.Variants)
-	v.footer.AppendAligned(v.hints, false, widget.AlignCenter)
-	v.footer.SetVisible(false)
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.Append(v.input, false)
+	content.Append(v.message, false)
+	content.Append(v.sep, false)
+	content.Append(v.body, true)
+	content.Append(v.footer, false)
 
-	v.content = widget.NewBox(widget.Column, 0, 0)
-	v.content.Append(v.input, false)
-	v.content.Append(v.message, false)
-	v.content.Append(v.sep, false)
-	v.content.Append(v.body, true)
-	v.content.Append(v.footer, false)
-
-	v.box = widget.NewBox(widget.Column, 0, 0)
-	v.box.AddClass("launcher-panel")
-	v.box.Append(&panelStage{v: v}, true)
-
-	v.root = &panelRoot{v: v}
-	v.root.SetElement("window")
-	v.root.AddClass("launcher-window")
-	if d.Sheet != nil {
-		v.root.AttachStylesheet(d.Sheet)
-	}
-	v.motion = newPanelMotion(v)
+	v.panelFrame = newPanelFrame(d, content, v.baseW, v.fieldH(), func() Window { return p.win })
+	v.target = func(render.Rect) (int, int) { return v.targetW(), v.targetH() }
+	v.place = func(out render.Rect, w, h int) render.Rect { return placePanel(out, w, h, config.LauncherCenter, 0, 0) }
+	v.scaledTo = func(num, denom int) { v.list.setScale(num, denom) }
 	return v
 }
 
@@ -220,10 +147,7 @@ func (v *panelViews) targetW() int {
 	if v.withPreview {
 		w += v.previewW
 	}
-	if out := v.root.bounds().W; out > 0 {
-		w = min(w, out-2*panelEdgeGap)
-	}
-	return max(w, 1)
+	return panelWidthIn(v.root.bounds(), w)
 }
 
 // pageRows is how many rows PageUp and PageDown move.
@@ -231,7 +155,7 @@ func (v *panelViews) pageRows() int { return max(v.lines-1, 1) }
 
 // retarget sends the panel toward its size for the current content.
 func (v *panelViews) retarget(*panel) {
-	v.motion.resize(v.targetW(), v.targetH())
+	v.panelFrame.retarget()
 }
 
 func (v *panelViews) setField(text string) {
@@ -243,20 +167,14 @@ func (v *panelViews) setField(text string) {
 
 // setLevel shows what the level says about itself.
 func (v *panelViews) setLevel(f search.Frame) {
-	v.chip.SetText(f.Title)
-	v.chip.SetVisible(f.Title != "")
+	v.setChip(f.Title)
 	v.entry.SetPlaceholder(f.Placeholder)
 	echo := widget.EchoNormal
 	if f.Mask {
 		echo = widget.EchoPassword
 	}
 	v.entry.SetEcho(echo)
-	if f.Message == "" {
-		v.message.SetVisible(false)
-	} else {
-		v.message.SetMarkup(messageMarkup(f.Message))
-		v.message.SetVisible(true)
-	}
+	v.setMessage(f.Message)
 	v.sep.SetVisible(len(f.Rows) > 0)
 }
 
@@ -278,21 +196,7 @@ func (v *panelViews) setFooter(p *panel) {
 		return
 	}
 	v.hintBuf = hintFor(p, v.hintBuf[:0])
-	b := v.markup[:0]
-	for i, h := range v.hintBuf {
-		if i > 0 {
-			b = append(b, "     "...)
-		}
-		b = append(b, "<b>"...)
-		b = appendEscaped(b, h.key)
-		b = append(b, "</b> "...)
-		b = appendEscaped(b, h.does)
-	}
-	v.markup = b
-	// The comparison allocates nothing, and the same footer is the usual case.
-	if string(b) != v.hints.Markup() {
-		v.hints.SetMarkup(string(b))
-	}
+	v.showHints()
 }
 
 // showPreview shows content; err or nothing shows what the row says of
@@ -375,334 +279,6 @@ func previewLines(text string) string {
 		lines = lines[:maxLines]
 	}
 	return strings.Join(lines, "\n")
-}
-
-// panelRoot fills the output: transparent, the panel laid where the
-// motion says, and a press on it (outside the panel) dismissing. The
-// surface does not resize as the panel does, so its height can spring
-// every frame with no round trip to the compositor, the field never
-// moves, and the blur region follows the panel's own rect.
-type panelRoot struct {
-	widget.Base
-	v    *panelViews
-	kids [1]widget.Widget
-}
-
-func (r *panelRoot) bounds() render.Rect { return r.Bounds() }
-
-// Measure wants nothing: the surface is the output.
-func (r *panelRoot) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
-
-// Arrange lays the panel at its shown rect, and retargets when the
-// output's size first arrives.
-func (r *panelRoot) Arrange(rect render.Rect) {
-	first := r.Bounds().W != rect.W || r.Bounds().H != rect.H
-	r.ArrangeSelf(rect)
-	if first {
-		r.v.motion.snapSize(r.v.targetW(), r.v.targetH())
-	}
-	r.v.box.Arrange(r.v.motion.shownRect(rect))
-	r.kids[0] = r.v.box
-	widget.SetParents(r, r.kids[:]...)
-}
-
-// ArrangeRoot mirrors Arrange for the root path.
-func (r *panelRoot) ArrangeRoot(rect render.Rect) { r.Arrange(rect) }
-
-// Paint paints the panel, carrying the fade itself where the compositor
-// cannot.
-func (r *panelRoot) Paint(cv *render.Canvas) {
-	r.v.list.setScale(cv.DeviceScale())
-	if alpha := r.v.motion.paintAlpha(); alpha < 1 {
-		prev := cv.PushAlpha(alpha)
-		widget.PaintChild(cv, r.v.box)
-		cv.PopAlpha(prev)
-		return
-	}
-	widget.PaintChild(cv, r.v.box)
-}
-
-// Children is the panel.
-func (r *panelRoot) Children() []widget.Widget { r.kids[0] = r.v.box; return r.kids[:] }
-
-// BackdropRegion is what the compositor blurs: the panel's rounded box as
-// it shows this frame, never the output around it.
-func (r *panelRoot) BackdropRegion() []render.Rect {
-	return render.RoundedRectRegion(r.v.box.Bounds(), widget.CornerRadii(r.v.box))
-}
-
-// HitTest is the panel's, else the root itself: a press to dismiss with.
-func (r *panelRoot) HitTest(p widget.Point) widget.Widget {
-	if hit := r.v.box.HitTest(p); hit != nil {
-		return hit
-	}
-	return r.HitLeaf(r, p)
-}
-
-// panelStage clips the content to the panel while it moves: the content
-// is laid out at its destination, so text never reflows or stretches.
-type panelStage struct {
-	widget.Base
-	v    *panelViews
-	kids [1]widget.Widget
-}
-
-// Measure wants nothing: the motion sizes the panel.
-func (s *panelStage) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
-
-// Arrange lays the content at the panel's resting place.
-func (s *panelStage) Arrange(rect render.Rect) {
-	s.ArrangeSelf(rect)
-	s.v.content.Arrange(s.v.motion.contentRect(s.v.root.bounds()))
-	s.kids[0] = s.v.content
-	widget.SetParents(s, s.kids[:]...)
-}
-
-// ArrangeRoot mirrors Arrange for the root path.
-func (s *panelStage) ArrangeRoot(rect render.Rect) { s.Arrange(rect) }
-
-// Paint paints the content inside the panel.
-func (s *panelStage) Paint(cv *render.Canvas) {
-	prev := cv.PushClip(s.Bounds())
-	widget.PaintChild(cv, s.v.content)
-	cv.PopClip(prev)
-}
-
-// Children is the content.
-func (s *panelStage) Children() []widget.Widget { s.kids[0] = s.v.content; return s.kids[:] }
-
-// HitTest descends into the content.
-func (s *panelStage) HitTest(p widget.Point) widget.Widget {
-	b := s.Bounds()
-	if p.X < b.X || p.Y < b.Y || p.X >= b.X+b.W || p.Y >= b.Y+b.H {
-		return nil
-	}
-	return s.v.content.HitTest(p)
-}
-
-// panelMotion is the panel's movement: a spring for how far open it is
-// and one for its size, each carrying its velocity when retargeted, so a
-// close during an open or a list that changes mid-grow flows on. Reduced
-// motion and disabled animations land at once (anim.Instant, the
-// animations config).
-type panelMotion struct {
-	v     *panelViews
-	alive bool
-	// reveal is 0 closed through 1 open, past 1 on the overshoot.
-	reveal float64
-	w, h   float64
-	revS   *anim.Spring
-	sizeS  *anim.Spring
-	style  panelStyle
-	done   func()
-	// compositorFade is the surface's opacity carrying the fade; false
-	// where the compositor has no alpha modifier.
-	compositorFade bool
-	fadeStop       func()
-	// instant is animations being off for this surface: nothing springs.
-	instant bool
-	targetW int
-	targetH int
-}
-
-// panelStyle is how a configured transition moves the panel.
-type panelStyle struct {
-	grow  bool
-	shift int
-}
-
-func panelStyleFor(t config.AnimationType) panelStyle {
-	const slide = 24
-	switch t {
-	case config.AnimationFade:
-		return panelStyle{}
-	case config.AnimationSlideUp, config.AnimationSwingUp:
-		return panelStyle{shift: slide}
-	case config.AnimationSlideDown, config.AnimationSwingDown:
-		return panelStyle{shift: -slide}
-	}
-	return panelStyle{grow: true}
-}
-
-// panelSizeSpring is a touch quicker than a window's: the list follows
-// typing, and a slow height reads as lag.
-var panelSizeSpring = anim.SpringParams{Response: 220 * time.Millisecond, Damping: 1}
-
-func newPanelMotion(v *panelViews) *panelMotion {
-	m := &panelMotion{v: v, alive: true, compositorFade: true}
-	m.revS = anim.NewSpring(anim.SpringSnappy, []float64{0}, func(pos []float64) {
-		m.reveal = pos[0]
-		m.applyReveal()
-		if m.done != nil && pos[0] <= 0 {
-			done := m.done
-			m.done = nil
-			m.alive = false
-			done()
-		}
-	})
-	m.revS.SetPrecision(0.002)
-	m.sizeS = anim.NewSpring(panelSizeSpring, []float64{0, 0}, func(pos []float64) {
-		m.w, m.h = pos[0], pos[1]
-		if m.alive {
-			v.root.InvalidateLayout()
-		}
-	})
-	m.sizeS.SetPrecision(0.2)
-	m.w, m.h = float64(v.baseW), float64(v.fieldH())
-	m.targetW, m.targetH = v.baseW, v.fieldH()
-	return m
-}
-
-// springFor shapes a reveal from the configured duration: the duration
-// is the spring's response, overshoot only on the way in.
-func springFor(d uint32, entering bool) anim.SpringParams {
-	damping := 1.0
-	if entering {
-		damping = anim.SpringSnappy.Damping
-	}
-	return anim.SpringParams{Response: time.Duration(d) * time.Millisecond, Damping: damping}
-}
-
-// open plays the enter.
-func (m *panelMotion) open(anims config.AnimationsConfig) {
-	t := anims.TransitionFor(config.AnimLauncher, false)
-	m.style = panelStyleFor(t)
-	d := anims.DurationFor(config.AnimLauncher, false)
-	m.instant = t == config.AnimationNone || d == 0 || anim.NoFades()
-	if m.instant {
-		m.revS.Snap(1)
-		return
-	}
-	if anim.Reduced() {
-		m.fade(0, 1, d, nil)
-		return
-	}
-	m.revS.SetParams(springFor(d, true))
-	m.revS.Snap(0)
-	m.revS.SetTarget(1)
-}
-
-// close plays the exit, then runs done. Done runs at once when there is
-// nothing to play.
-func (m *panelMotion) close(anims config.AnimationsConfig, done func()) {
-	t := anims.TransitionFor(config.AnimLauncher, true)
-	d := anims.DurationFor(config.AnimLauncher, true)
-	if t == config.AnimationNone || d == 0 || anim.NoFades() {
-		m.stop()
-		m.alive = false
-		done()
-		return
-	}
-	if anim.Reduced() {
-		m.fade(m.reveal, 0, d, func() {
-			m.alive = false
-			done()
-		})
-		return
-	}
-	m.style = panelStyleFor(t)
-	m.done = done
-	m.revS.SetParams(springFor(d, false))
-	m.revS.SetTarget(0)
-}
-
-// stop halts everything moving.
-func (m *panelMotion) stop() {
-	m.revS.Stop()
-	m.sizeS.Stop()
-	if m.fadeStop != nil {
-		m.fadeStop()
-		m.fadeStop = nil
-	}
-}
-
-// fade is reduced motion's reveal: a tween of the opacity alone, the
-// panel where it rests, which is what the preference keeps.
-func (m *panelMotion) fade(from, to float64, d uint32, done func()) {
-	m.style = panelStyle{}
-	if m.fadeStop != nil {
-		m.fadeStop()
-	}
-	m.fadeStop = anim.Start(time.Duration(d)*time.Millisecond, func(t float64) {
-		m.reveal = from + float64((to-from)*t)
-		m.applyReveal()
-		if t >= 1 && done != nil {
-			done()
-		}
-	})
-}
-
-// resize retargets the size.
-func (m *panelMotion) resize(w, h int) {
-	if w == m.targetW && h == m.targetH {
-		return
-	}
-	m.targetW, m.targetH = w, h
-	if m.instant || m.reveal <= 0.01 {
-		m.snapSize(w, h)
-		return
-	}
-	m.sizeS.SetTarget(float64(w), float64(h))
-}
-
-// snapSize lands the size at once: before anything is showing.
-func (m *panelMotion) snapSize(w, h int) {
-	m.targetW, m.targetH = w, h
-	m.sizeS.Snap(float64(w), float64(h))
-}
-
-func (m *panelMotion) applyReveal() {
-	if !m.alive {
-		return
-	}
-	if win := m.v.p.win; win != nil && m.compositorFade {
-		if err := win.SetOpacity(min(max(m.reveal, 0), 1)); err != nil {
-			m.compositorFade = false
-		}
-	}
-	m.v.root.InvalidateLayout()
-	m.v.root.Invalidate()
-}
-
-// paintAlpha is the fade the paint must carry.
-func (m *panelMotion) paintAlpha() float64 {
-	if m.compositorFade {
-		return 1
-	}
-	return min(max(m.reveal, 0), 1)
-}
-
-// restRect is the panel's place at its current size in an output: the
-// top fixed, so growing goes down.
-func (m *panelMotion) restRect(out render.Rect) render.Rect {
-	w, h := int(math.Round(m.w)), int(math.Round(m.h))
-	return render.Rect{X: out.X + (out.W-w)/2, Y: out.Y + int(float64(out.H)*panelTopFraction), W: w, H: h}
-}
-
-// shownRect is the panel's rect this frame.
-func (m *panelMotion) shownRect(out render.Rect) render.Rect {
-	r := m.restRect(out)
-	if m.style.shift != 0 {
-		r.Y += int(math.Round((1 - m.reveal) * float64(m.style.shift)))
-		return r
-	}
-	if !m.style.grow {
-		return r
-	}
-	const from = 0.94
-	s := from + float64((1-from)*m.reveal)
-	w, h := int(math.Round(float64(r.W)*s)), int(math.Round(float64(r.H)*s))
-	return render.Rect{X: r.X + (r.W-w)/2, Y: r.Y + (r.H-h)/2, W: w, H: h}
-}
-
-// contentRect is the content's rect: at rest, whatever the panel is
-// doing around it.
-func (m *panelMotion) contentRect(out render.Rect) render.Rect {
-	r := m.restRect(out)
-	if m.style.shift != 0 {
-		r.Y += int(math.Round((1 - m.reveal) * float64(m.style.shift)))
-	}
-	return r
 }
 
 // searchList is the virtualized result list: a fixed height per row kind,
@@ -920,11 +496,8 @@ type searchRow struct {
 }
 
 func newSearchRow(l *searchList) *searchRow {
-	th := widget.Current()
 	px := fontPx()
-	r := &searchRow{Box: widget.NewBox(widget.Row, th.Spacing+4, 0), l: l}
-	r.SetPadding(render.Insets{Left: th.Padding + 6, Right: th.Padding + 6})
-	r.AddClass("launcher-search-row")
+	r := &searchRow{Box: newRowBox(), l: l}
 	r.icon = newAsyncIcon(l.iconSize, "launcher-search-row-icon")
 	r.AppendAligned(r.icon.slot, false, widget.AlignCenter)
 	r.glyph = widget.NewLabel(l.font, float64(l.iconSize)*glyphFontFactor, "", 0)

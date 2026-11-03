@@ -50,6 +50,7 @@ launcher-picker-clipboard = Historique du presse-papiers
 launcher-picker-emoji = Sélecteur d'émojis
 launcher-picker-vault = Coffre Bitwarden
 launcher-script-argument-required = { $name } : valeur requise
+launcher-footer-select = Sélectionner
 launcher-footer-actions = Actions
 launcher-footer-complete = Compléter
 launcher-footer-back = Retour

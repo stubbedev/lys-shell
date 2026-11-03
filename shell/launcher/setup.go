@@ -126,7 +126,7 @@ func buildSession(opts launcheripc.SessionOptions, cfg *config.Config, rows <-ch
 			}
 		}
 	}
-	width := int(l.Width.ResolvePx(config.LauncherWidthBaseRem*16, float64(cfg.Styling.Scale)))
+	width := launcherWidthPx(cfg)
 	location := l.Location
 	if opts.Location != nil {
 		if loc, ok := config.LauncherLocationFromRofi(int(*opts.Location)); ok {

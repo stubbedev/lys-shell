@@ -2,60 +2,25 @@
   background: transparent;
 }
 
-.launcher-prompt {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.launcher-row.urgent {
+.launcher-search-row.urgent {
   color: var(--status-error);
 }
-.launcher-row.active {
+.launcher-search-row.active {
   color: var(--accent);
 }
-.launcher-row.nonselectable {
+.launcher-search-row.nonselectable {
   opacity: 0.5;
 }
 
-.launcher-panel,
-.launcher-surface {
+.launcher-panel {
   font-family: var(--font-sans);
   background-color: var(--dropdown-surface);
   border-radius: calc(16px * var(--global-scale));
   border: 1px solid color-mix(in srgb, var(--fg-default) 12%, transparent);
   box-shadow: var(--shadow);
 }
-.blur-unavailable .launcher-panel,
-.blur-unavailable .launcher-surface {
+.blur-unavailable .launcher-panel {
   background-color: var(--palette-elevated);
-}
-
-.launcher-surface .launcher-input {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--fg-default) 10%, transparent);
-  box-shadow: none;
-}
-.launcher-surface .launcher-entry,
-.launcher-surface .launcher-entry:focus {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  outline: none;
-}
-.launcher-surface .launcher-list {
-  background: transparent;
-}
-.launcher-surface .launcher-row {
-  border-radius: calc(10px * var(--global-scale));
-  color: var(--fg-default);
-}
-.launcher-surface .launcher-row:hover {
-  background-color: color-mix(in srgb, var(--fg-default) 6%, transparent);
-}
-.launcher-surface .launcher-row:selected {
-  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--fg-default);
 }
 
 .launcher-search-icon,
@@ -88,6 +53,7 @@
   margin: 0 calc(8px * var(--global-scale));
   color: var(--fg-default);
 }
+row:hover > .launcher-search-row,
 .launcher-search-row:hover {
   background-color: color-mix(in srgb, var(--fg-default) 6%, transparent);
 }

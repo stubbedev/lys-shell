@@ -5,10 +5,6 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 )
 
-// rowPx is the fixed row height the list is sized and laid out with
-// (views.rs ROW_PX).
-const rowPx = 40
-
 // resultList is the virtualized results view: only the rows inside the
 // viewport exist as widgets, so a ten-thousand-row dmenu costs a
 // viewport's worth. It owns the selection and the scroll offset; the
@@ -21,6 +17,8 @@ type resultList struct {
 	factory  func(i int) widget.Widget
 	selected int
 	offset   int
+	// rowH is every row's height.
+	rowH int
 	// visibleRows is how many rows the viewport shows.
 	visibleRows int
 	// fixed holds the viewport at visibleRows rows (-fixed-num-lines);
@@ -29,8 +27,8 @@ type resultList struct {
 	rows  map[int]widget.Widget
 }
 
-func newResultList(factory func(i int) widget.Widget) *resultList {
-	l := &resultList{factory: factory, rows: map[int]widget.Widget{}, visibleRows: 10, selected: -1}
+func newResultList(rowH int, factory func(i int) widget.Widget) *resultList {
+	l := &resultList{rowH: rowH, factory: factory, rows: map[int]widget.Widget{}, visibleRows: 10, selected: -1}
 	// GTK's ListView element, so the stylesheet's listview > row rules
 	// reach the rows, with mod.rs's class.
 	l.SetElement("listview")
@@ -105,7 +103,7 @@ func (l *resultList) Measure(axis widget.Axis, _ int) widget.Sizes {
 	if !l.fixed {
 		rows = min(l.count, l.visibleRows)
 	}
-	return widget.FixedSizes(rows * rowPx)
+	return widget.FixedSizes(rows * l.rowH)
 }
 
 // Arrange lays the visible rows out and evicts the rest.
@@ -120,7 +118,7 @@ func (l *resultList) Arrange(r render.Rect) {
 	kids := make([]widget.Widget, 0, last-first)
 	for i := first; i < last; i++ {
 		w := l.rowAt(i)
-		w.Arrange(render.Rect{X: r.X, Y: r.Y + (i-first)*rowPx, W: r.W, H: rowPx})
+		w.Arrange(render.Rect{X: r.X, Y: r.Y + (i-first)*l.rowH, W: r.W, H: l.rowH})
 		kids = append(kids, w)
 	}
 	widget.SetParents(l, kids...)
@@ -160,7 +158,7 @@ func (l *resultList) HitTest(p widget.Point) widget.Widget {
 		return nil
 	}
 	first, last := l.visible()
-	if i := first + (p.Y-b.Y)/rowPx; i < last {
+	if i := first + (p.Y-b.Y)/l.rowH; i < last {
 		if w, ok := l.rows[i]; ok {
 			if hit := w.HitTest(p); hit != nil {
 				return hit

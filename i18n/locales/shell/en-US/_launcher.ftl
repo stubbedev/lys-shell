@@ -50,6 +50,7 @@ launcher-picker-clipboard = Clipboard History
 launcher-picker-emoji = Emoji Picker
 launcher-picker-vault = Bitwarden Vault
 launcher-script-argument-required = { $name } is required
+launcher-footer-select = Select
 launcher-footer-actions = Actions
 launcher-footer-complete = Complete
 launcher-footer-back = Back

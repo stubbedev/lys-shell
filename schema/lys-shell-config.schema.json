@@ -3353,7 +3353,7 @@
         },
         "fixed-num-lines": {
           "$ref": "#/$defs/boolean",
-          "default": true,
+          "default": false,
           "description": "Keep the list height fixed at `lines` rows."
         },
         "font": {
@@ -3524,7 +3524,7 @@
         "width": {
           "$ref": "#/$defs/Size",
           "default": 1.0,
-          "description": "Surface width: a multiplier of the default 600px (`1.0` = default)\nor absolute pixels (e.g. `\"800px\"`)."
+          "description": "Surface width: a multiplier of the default 720px (`1.0` = default)\nor absolute pixels (e.g. `\"800px\"`)."
         },
         "window": {
           "$ref": "#/$defs/LauncherWindowConfig",
@@ -10129,7 +10129,7 @@
           "show-hidden": false,
           "sorting-method": "name"
         },
-        "fixed-num-lines": true,
+        "fixed-num-lines": false,
         "font": "",
         "history": {
           "enable": true,

@@ -80,10 +80,7 @@ func (r *launcherRow) HitTest(p widget.Point) widget.Widget { return r.HitLeaf(r
 
 // buildRow is the factory's setup and bind for list position pos.
 func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiSelect, itemIndex uint32) *launcherRow {
-	th := widget.Current()
-	content := widget.NewBox(widget.Row, th.Spacing, 0)
-	content.SetPadding(render.Insets{Left: th.Padding, Right: th.Padding})
-	content.AddClass("item", "launcher-row")
+	content := newRowBox()
 	content.SetState(widget.StateSelected, selected)
 	for flag, class := range map[engine.ItemFlags]string{
 		engine.FlagUrgent: "urgent", engine.FlagActive: "active", engine.FlagNonselectable: "nonselectable",

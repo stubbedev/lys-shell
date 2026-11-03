@@ -14,7 +14,7 @@ Application launcher / dmenu (rofi replacement).
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `location` | [`LauncherLocation`](/config/types#launcher-location) | `"center"` | Surface position on screen. |
-| `width` | [`Size`](/config/types#size) | `1` | Surface width: a multiplier of the default 600px (`1.0` = default) or absolute pixels (e.g. `"800px"`). |
+| `width` | [`Size`](/config/types#size) | `1` | Surface width: a multiplier of the default 720px (`1.0` = default) or absolute pixels (e.g. `"800px"`). |
 | `lines` | u32 | `10` | Visible result lines. |
 | `monitor` | string | `""` | Output connector to show on ("" = focused output). |
 | `modes` | array of string | `[...]` | Modes enabled by default (order = tab/kb-mode-next order). Script modes are referenced by their `[launcher.scripts]` key. |
@@ -32,7 +32,7 @@ Application launcher / dmenu (rofi replacement).
 | `sidebar-mode` | bool | `false` | Show mode tabs at the bottom of the surface. |
 | `auto-select` | bool | `false` | Accept automatically when exactly one result remains. |
 | `hover-select` | bool | `false` | Select the row under the mouse cursor. |
-| `fixed-num-lines` | bool | `true` | Keep the list height fixed at `lines` rows. |
+| `fixed-num-lines` | bool | `false` | Keep the list height fixed at `lines` rows. |
 | `display-names` | map of string | `{}` | Per-mode display-name overrides (rofi `display-{mode}`), e.g. `drun: apps`. |
 | `scripts` | map of string | `{}` | Custom script modes: name → executable (rofi `name:script`). |
 | `keybindings` | map of string | `{}` | Keybinding overrides: action (rofi `kb-` name without the prefix, e.g. `accept`, `cancel`, `mode-next`, `custom-1`) → comma-separated key list (e.g. `"Control+Tab,F3"`). Unset actions keep rofi's defaults. |
@@ -84,7 +84,7 @@ launcher:
   sidebar-mode: false
   auto-select: false
   hover-select: false
-  fixed-num-lines: true
+  fixed-num-lines: false
   display-names: {}
   scripts: {}
   keybindings: {}

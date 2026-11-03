@@ -82,29 +82,15 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, thumbs: engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher))}
 	s.panel = p
 	p.v = newPanelViews(p, cfg)
-	win, err := s.d.Open(app.LayerConfig{
-		Layer:          app.LayerOverlay,
-		Anchor:         app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
-		ExclusiveZone:  -1,
-		Keyboard:       app.KeyboardExclusive,
-		Namespace:      "lys-shell-launcher",
-		Root:           p.v.root,
-		Output:         s.outputFor(cfg.Launcher.Monitor),
-		OwnMotion:      true,
-		BackgroundBlur: true,
-		KeyCapture:     p.keyCaptured,
-		OnPress: func(_ uint32, over widget.Widget) {
-			if over == widget.Widget(p.v.root) {
-				p.finish(search.Cancel{})
-			}
-		},
-		OnClosed: func() {
+	win, err := s.d.Open(panelLayer(s.outputFor(cfg.Launcher.Monitor), p.v.panelFrame, p.keyCaptured,
+		func() { p.finish(search.Cancel{}) },
+		func() {
 			if s.panel == p {
 				p.win = nil
 				p.finish(search.Cancel{})
 			}
 		},
-	})
+	))
 	if err != nil {
 		log.Printf("launcher: cannot map the surface: %v", err)
 		p.finish(search.Cancel{})
@@ -611,11 +597,10 @@ func hintFor(p *panel, hints []footerHint) []footerHint {
 	case !ok && p.frame.CanSubmit && p.frame.SubmitTitle != "":
 		hints = append(hints, footerHint{"Enter", p.frame.SubmitTitle})
 	}
-	esc := i18n.T("launcher-footer-close")
 	if p.depth > 0 {
-		esc = i18n.T("launcher-footer-back")
+		return append(hints, footerHint{"Esc", i18n.T("launcher-footer-back")})
 	}
-	return append(hints, footerHint{"Esc", esc})
+	return append(hints, closeHint())
 }
 
 // footerHint is one key and what it does.

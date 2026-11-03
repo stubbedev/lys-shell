@@ -624,7 +624,7 @@ var schemaDocs = map[string]string{
 	"LauncherConfig.Styles":                                  "Named looks selectable per invocation with `-style <name>`: name →\nthe CSS applied for that session, on top of `[styling]`.\n\nCSS rather than a second copy of the display keys: a preset exists to\nsay \"this invocation looks different\", and there is no list of the\nways someone might want that. `-style compact` then costs one config\nentry instead of a schema change.",
 	"LauncherConfig.Terminal":                                "Terminal emulator for terminal apps (\"\" = autodetect).",
 	"LauncherConfig.Tokenize":                                "Split the query into independently matched words.",
-	"LauncherConfig.Width":                                   "Surface width: a multiplier of the default 600px (`1.0` = default)\nor absolute pixels (e.g. `\"800px\"`).",
+	"LauncherConfig.Width":                                   "Surface width: a multiplier of the default 720px (`1.0` = default)\nor absolute pixels (e.g. `\"800px\"`).",
 	"LauncherConfig.Window":                                  "window switcher mode.",
 	"LauncherDrunConfig":                                     "drun (application) mode settings.",
 	"LauncherDrunConfig.Categories":                          "Only show apps within these categories (empty = all).",

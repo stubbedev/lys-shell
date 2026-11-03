@@ -7,7 +7,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -18,7 +17,6 @@ import (
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
-	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // dumpDebounce is how long -dump waits for the matches to settle.
@@ -32,7 +30,6 @@ const typeSettle = 40 * time.Millisecond
 // Window is the launcher's layer surface (*app.LayerWindow).
 type Window interface {
 	Close()
-	SetSize(width, height uint32) error
 	SetFocus(w widget.Widget) error
 	// SetOpacity fades the surface in the compositor, with the blur behind
 	// it; an error is a compositor without the protocol.
@@ -267,6 +264,7 @@ func (s *Surface) onMatches(m engineMatches) {
 	previous := s.sel
 	s.model.update(m.items, m.matched)
 	a.views.list.reset(s.model.len())
+	a.views.setRows(s.model.len())
 	if n := s.model.len(); n > 0 {
 		target := 0
 		switch {
@@ -333,7 +331,7 @@ func (s *Surface) onState(st engineState) {
 	} else if a.ui.mesg != nil {
 		message = a.ui.mesg
 	}
-	a.views.setMessage(message)
+	a.views.showMessage(message)
 	if a.ui.sidebar {
 		s.rebuildTabs(st.modeNames, st.activeMode)
 	}
@@ -675,9 +673,9 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 		_ = a.history.Close()
 	}
 	if a.win != nil {
-		// The surface plays its exit, then goes (hide_animated); a new
-		// session meanwhile opens its own.
-		reveal.Hide(a.views.rev, s.d.Config().Animations, config.AnimLauncher, func() {
+		// The panel plays its exit, then the surface goes; a new session
+		// meanwhile opens its own.
+		a.views.motion.close(s.d.Config().Animations, func() {
 			a.win.Close()
 			if a.afterClose != nil {
 				a.afterClose()
@@ -737,60 +735,37 @@ func (s *Surface) outputFor(name string) *app.Output {
 	return nil
 }
 
-// reveal maps the surface over the configured location, shows it, then
-// focuses the entry in the shown tree.
+// reveal maps the surface, focuses the entry and plays the panel's enter.
 func (s *Surface) reveal(a *active) {
-	width := s.resolveWidth(a.ui)
-	anchor, margin := locationAnchors(a.ui.location, a.ui.offsetX, a.ui.offsetY)
-	w, h := a.views.surfaceSize(width)
-	win, err := s.d.Open(app.LayerConfig{
-		Output:         s.outputFor(s.d.Config().Launcher.Monitor),
-		Layer:          app.LayerOverlay,
-		Anchor:         anchor,
-		Margin:         intoGutter(anchor, margin, a.views.gutter),
-		Width:          intconv.Clamp[uint32](w),
-		Height:         intconv.Clamp[uint32](h),
-		ExclusiveZone:  -1,
-		Keyboard:       app.KeyboardExclusive,
-		Namespace:      "lys-shell-launcher",
-		Root:           a.views.root,
-		BackgroundBlur: true,
-		KeyCapture:     s.keyCaptured,
-		OnClosed: func() {
+	cfg := s.d.Config()
+	win, err := s.d.Open(panelLayer(s.outputFor(cfg.Launcher.Monitor), a.views.panelFrame, s.keyCaptured,
+		func() { s.onKey(keyBinding{action: keyCancel}) },
+		func() {
 			// The compositor took the surface away (output gone).
 			if s.cur == a {
 				a.win = nil
 				s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
 			}
 		},
-	})
+	))
 	if err != nil {
 		log.Printf("launcher: cannot map the surface: %v", err)
 		s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
 		return
 	}
 	a.win = win
-	a.views.width = width
-	reveal.Show(a.views.rev, s.d.Config().Animations, config.AnimLauncher)
 	if err := win.SetFocus(a.views.entry); err != nil {
 		log.Printf("launcher: cannot focus the entry: %v", err)
 		s.end(&launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
-	}
-}
-
-// resize keeps the surface as tall as its content: the list grows to
-// -lines rows unless -fixed-num-lines holds it there.
-func (s *Surface) resize() {
-	a := s.cur
-	if a == nil || a.win == nil {
 		return
 	}
-	w, h := a.views.surfaceSize(a.views.width)
-	if h != a.views.lastH {
-		a.views.lastH = h
-		if err := a.win.SetSize(intconv.Clamp[uint32](w), intconv.Clamp[uint32](h)); err != nil {
-			log.Printf("launcher: resize: %v", err)
-		}
+	a.views.motion.open(cfg.Animations)
+}
+
+// resize sends the panel toward its size for what the session now shows.
+func (s *Surface) resize() {
+	if a := s.cur; a != nil && a.win != nil {
+		a.views.retarget()
 	}
 }
 
@@ -818,64 +793,6 @@ func (s *Surface) resolveWidth(ui uiSettings) int {
 		return max(advance*int(w.Value), 1)
 	}
 	return max(ui.width, 1)
-}
-
-// locationAnchors is apply_location: the edges a location anchors and
-// the -xoffset/-yoffset margins, signed from the anchor (a positive x
-// moves right: away from Left, into Right).
-func locationAnchors(loc config.LauncherLocation, x, y int) (app.Anchor, app.Margins) {
-	var anchor app.Anchor
-	switch loc {
-	case config.LauncherNorth:
-		anchor = app.AnchorTop
-	case config.LauncherNorthEast:
-		anchor = app.AnchorTop | app.AnchorRight
-	case config.LauncherEast:
-		anchor = app.AnchorRight
-	case config.LauncherSouthEast:
-		anchor = app.AnchorBottom | app.AnchorRight
-	case config.LauncherSouth:
-		anchor = app.AnchorBottom
-	case config.LauncherSouthWest:
-		anchor = app.AnchorBottom | app.AnchorLeft
-	case config.LauncherWest:
-		anchor = app.AnchorLeft
-	case config.LauncherNorthWest:
-		anchor = app.AnchorTop | app.AnchorLeft
-	}
-	var m app.Margins
-	if anchor&app.AnchorLeft != 0 {
-		m.Left = intconv.Clamp[int32](x)
-	}
-	if anchor&app.AnchorRight != 0 {
-		m.Right = intconv.Clamp[int32](-x)
-	}
-	if anchor&app.AnchorTop != 0 {
-		m.Top = intconv.Clamp[int32](y)
-	}
-	if anchor&app.AnchorBottom != 0 {
-		m.Bottom = intconv.Clamp[int32](-y)
-	}
-	return anchor, m
-}
-
-// intoGutter lets the surface's gutter hang past the anchored edges, so
-// the panel, not the empty room around it, keeps the location's margins.
-func intoGutter(anchor app.Anchor, m app.Margins, gutter int) app.Margins {
-	g := intconv.Clamp[int32](gutter)
-	if anchor&app.AnchorLeft != 0 {
-		m.Left -= g
-	}
-	if anchor&app.AnchorRight != 0 {
-		m.Right -= g
-	}
-	if anchor&app.AnchorTop != 0 {
-		m.Top -= g
-	}
-	if anchor&app.AnchorBottom != 0 {
-		m.Bottom -= g
-	}
-	return m
 }
 
 // rebuildTabs is rebuild_tabs: one button per mode, the active one

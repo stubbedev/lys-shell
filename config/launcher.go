@@ -1,7 +1,7 @@
 package config
 
-// LauncherWidthBaseRem is the rem the width multiplier scales (600px).
-const LauncherWidthBaseRem = 37.5
+// LauncherWidthBaseRem is the rem the width multiplier scales (720px).
+const LauncherWidthBaseRem = 45
 
 // LauncherConfig is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
 //
@@ -9,7 +9,7 @@ const LauncherWidthBaseRem = 37.5
 type LauncherConfig struct {
 	// Surface position on screen.
 	Location LauncherLocation `cfg:"location"`
-	// Surface width: a multiplier of the default 600px (`1.0` = default)
+	// Surface width: a multiplier of the default 720px (`1.0` = default)
 	// or absolute pixels (e.g. `"800px"`).
 	Width Size `cfg:"width"`
 	// Visible result lines.
@@ -457,7 +457,7 @@ func DefaultsLauncher() LauncherConfig {
 		SortingMethod:  SortingLevenshtein,
 		Case:           CaseInsensitive,
 		ShowIcons:      true,
-		FixedNumLines:  true,
+		FixedNumLines:  false,
 		DisplayNames:   map[string]string{},
 		Scripts:        map[string]string{},
 		Keybindings:    map[string]string{},
