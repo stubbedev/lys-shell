@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -108,6 +109,8 @@ func (m LoopMode) Next() (LoopMode, bool) {
 	}
 	return LoopUnsupported, false
 }
+
+const playerCallTimeout = 5 * time.Second
 
 // Player is one player's snapshot.
 type Player struct {
@@ -327,12 +330,17 @@ func (s *Service) handle(sig *dbus.Signal) {
 // add reads a new player and re-selects the active one, as
 // handle_player_added does on every arrival.
 func (s *Service) add(name string) {
-	p, err := s.read(context.Background(), name)
+	ctx, cancel := context.WithTimeout(context.Background(), playerCallTimeout)
+	defer cancel()
+	p, err := s.read(ctx, name)
 	if err != nil {
+		log.Printf("mpris: read new player: %v", err)
 		return
 	}
 	var owner string
-	_ = s.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, name).Store(&owner)
+	if err := s.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, name).Store(&owner); err != nil {
+		log.Printf("mpris: owner of %s: %v", name, err)
+	}
 	s.mu.Lock()
 	s.dropLocked(name)
 	s.players = append(s.players, p)
@@ -380,22 +388,30 @@ func (s *Service) dropLocked(name string) bool {
 	return false
 }
 
-// refresh re-reads one player's snapshot in place.
-func (s *Service) refresh(name string) {
-	p, err := s.read(context.Background(), name)
-	if err != nil {
-		return
-	}
+// store replaces the player's snapshot, reporting whether that changed it.
+func (s *Service) store(p Player) bool {
 	s.mu.Lock()
-	found := false
+	defer s.mu.Unlock()
 	for i := range s.players {
-		if s.players[i].BusName == name {
+		if s.players[i].BusName == p.BusName {
+			changed := s.players[i] != p
 			s.players[i] = p
-			found = true
+			return changed
 		}
 	}
-	s.mu.Unlock()
-	if found {
+	return false
+}
+
+// refresh re-reads one player's snapshot in place.
+func (s *Service) refresh(name string) {
+	ctx, cancel := context.WithTimeout(context.Background(), playerCallTimeout)
+	defer cancel()
+	p, err := s.read(ctx, name)
+	if err != nil {
+		log.Printf("mpris: refresh: %v", err)
+		return
+	}
+	if s.store(p) {
 		s.notify()
 	}
 }

@@ -302,3 +302,18 @@ func TestServiceFollowsPlayersOnABus(t *testing.T) {
 		t.Errorf("active after mpv left = %q, want vlc", p.BusName)
 	}
 }
+
+func TestStoreReportsOnlyARealChange(t *testing.T) {
+	p := Player{BusName: BusNamePrefix + ".x", Title: "a"}
+	s := &Service{players: []Player{p}}
+	if s.store(p) {
+		t.Error("an identical read counted as a change, which would notify every subscriber")
+	}
+	p.Title = "b"
+	if !s.store(p) {
+		t.Error("a new title did not count as a change")
+	}
+	if s.store(Player{BusName: BusNamePrefix + ".gone"}) {
+		t.Error("a player no longer listed counted as a change")
+	}
+}

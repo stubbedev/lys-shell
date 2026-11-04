@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -586,5 +588,32 @@ func TestMediaEmptyStateKeepsThePlayersHeight(t *testing.T) {
 	}
 	if page != max(bare, player) {
 		t.Errorf("the empty main page is %dpx, want the taller page's %dpx", page, max(bare, player))
+	}
+}
+
+func TestDesktopIconLookupRunsOffTheLoopAndOncePerEntry(t *testing.T) {
+	release := make(chan struct{})
+	var finds atomic.Int32
+	memo := newDesktopIconMemo(func(entry string) (string, bool) {
+		finds.Add(1)
+		<-release
+		return entry + "-icon", true
+	})
+	resolved := make(chan struct{}, 8)
+	for range 5 {
+		if icon, ok := memo.lookup("spotify", func() { resolved <- struct{}{} }); ok {
+			t.Fatalf("an unresolved entry answered %q", icon)
+		}
+	}
+	close(release)
+	apptest.Answer(t, "the lookup finished", resolved)
+	for range 100 {
+		icon, ok := memo.lookup("spotify", func() { t.Error("a known entry resolved again") })
+		if !ok || icon != "spotify-icon" {
+			t.Fatalf("known entry = %q, %v", icon, ok)
+		}
+	}
+	if got := finds.Load(); got != 1 {
+		t.Errorf("%d walks for one entry, want 1", got)
 	}
 }

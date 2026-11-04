@@ -111,6 +111,7 @@ func TestDropdownBuildersReturnWhileEveryServiceHolds(t *testing.T) {
 	ctx := styledContext(t, cfg)
 	a := apptest.Run(t)
 	ctx.App = a
+	t.Cleanup(widget.SetAnimationsInstant(true))
 	h := &stuckCalls{release: make(chan struct{})}
 	t.Cleanup(func() { close(h.release) })
 	stuckServices(&ctx, h)
@@ -153,6 +154,7 @@ func TestRecorderCameraProbeFillsThePickerWhenItEnds(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	a := apptest.Run(t)
 	ctx.App = a
+	t.Cleanup(widget.SetAnimationsInstant(true))
 	release := make(chan struct{})
 	prev := recorderCameras
 	recorderCameras = func() []recorder.DeviceChoice {
@@ -206,6 +208,7 @@ func TestClosedDropdownsAskNothingOfTheirServices(t *testing.T) {
 	ctx := styledContext(t, cfg)
 	a := apptest.Run(t)
 	ctx.App = a
+	t.Cleanup(widget.SetAnimationsInstant(true))
 	media := &countedMedia{fakeMediaSource: newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", State: mpris.StatePlaying})}
 	net := newCountedNetwork()
 	bat := &countedBattery{fakeBattery: newFakeBattery(upower.Device{IsPresent: true})}

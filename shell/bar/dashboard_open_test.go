@@ -109,12 +109,12 @@ const (
 
 func newDashboardRig(t *testing.T) *dashboardRig {
 	t.Helper()
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
 	a := apptest.Run(t)
 	apptest.On(a, func() bool { a.SetSurfaceMotion(false); return true })
 	restore := widget.SetAnimationsInstant(true)
 	t.Cleanup(restore)
-	cfg := config.Defaults()
-	ctx := styledContext(t, cfg)
 	ctx.App = a
 	warmDashboard()
 	rig := &dashboardRig{

@@ -526,6 +526,7 @@ func TestMountingAFullLayoutCompletesWhileEverySourceHolds(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	a := apptest.Run(t)
 	ctx.App = a
+	t.Cleanup(widget.SetAnimationsInstant(true))
 	h := &stuckCalls{release: make(chan struct{})}
 	t.Cleanup(func() { close(h.release) })
 	stuckServices(&ctx, h)

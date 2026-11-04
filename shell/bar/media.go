@@ -2,6 +2,7 @@ package bar
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -61,13 +62,62 @@ type mediaIconEnv struct {
 	desktopIcon func(entry string) (string, bool)
 }
 
-// liveMediaIconEnv reads the real icon theme and XDG applications dirs.
-func liveMediaIconEnv() mediaIconEnv {
+var mediaDesktopIcons = newDesktopIconMemo(func(entry string) (string, bool) {
+	return desktopentry.Icon(entry, desktopentry.ApplicationDirs())
+})
+
+// liveMediaIconEnv reads the real icon theme and the XDG applications dirs,
+// off the loop and once per entry; resolved runs when an entry asked for
+// has been looked up.
+func liveMediaIconEnv(resolved func()) mediaIconEnv {
 	return mediaIconEnv{
 		exists: widget.ThemeIconExists,
 		desktopIcon: func(entry string) (string, bool) {
-			return desktopentry.Icon(entry, desktopentry.ApplicationDirs())
+			return mediaDesktopIcons.lookup(entry, resolved)
 		},
+	}
+}
+
+type desktopIconAnswer struct {
+	icon string
+	ok   bool
+}
+
+type desktopIconMemo struct {
+	find func(entry string) (string, bool)
+
+	mu      sync.Mutex
+	known   map[string]desktopIconAnswer
+	waiting map[string][]func()
+}
+
+func newDesktopIconMemo(find func(entry string) (string, bool)) *desktopIconMemo {
+	return &desktopIconMemo{find: find, known: map[string]desktopIconAnswer{}, waiting: map[string][]func(){}}
+}
+
+func (m *desktopIconMemo) lookup(entry string, resolved func()) (string, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if a, ok := m.known[entry]; ok {
+		return a.icon, a.ok
+	}
+	waiters, finding := m.waiting[entry]
+	m.waiting[entry] = append(waiters, resolved)
+	if !finding {
+		go m.resolve(entry)
+	}
+	return "", false
+}
+
+func (m *desktopIconMemo) resolve(entry string) {
+	icon, ok := m.find(entry)
+	m.mu.Lock()
+	m.known[entry] = desktopIconAnswer{icon, ok}
+	waiters := m.waiting[entry]
+	delete(m.waiting, entry)
+	m.mu.Unlock()
+	for _, resolved := range waiters {
+		resolved()
 	}
 }
 
@@ -140,7 +190,8 @@ func newMedia(ctx ModuleContext) (Module, error) {
 	if ctx.Media == nil {
 		return nil, errors.New("media: no MPRIS source available")
 	}
-	m := &mediaModule{ctx: ctx, source: ctx.Media, env: liveMediaIconEnv()}
+	m := &mediaModule{ctx: ctx, source: ctx.Media}
+	m.env = liveMediaIconEnv(func() { ctx.Invoke(m.refresh) })
 	m.build()
 	ticks, stop := ctx.Media.Subscribe()
 	follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
