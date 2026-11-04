@@ -210,12 +210,9 @@ func saveFaviconBatch(ctx context.Context, db *sql.DB, dataQuery string, ids []a
 	return rows.Err()
 }
 
-// readFavicons brings iconDir up to date with the icons of the pages'
-// hosts and returns the host of each icon it holds. An icon once saved is
-// kept: sites rarely change theirs, and this runs whenever a browser
-// writes to its icon database.
-func readFavicons(ctx context.Context, kind browserKind, dir, iconDir string, pages browserPages) (map[string]string, error) {
-	wanted := map[string]bool{}
+// wantedHosts are the hosts whose icons a profile's pages show.
+func wantedHosts(pages browserPages) map[string]bool {
+	wanted := make(map[string]bool, len(pages.visited))
 	for _, list := range [][]browserPage{pages.bookmarks, pages.visited} {
 		for _, p := range list {
 			if isWebURL(p.url) {
@@ -223,6 +220,24 @@ func readFavicons(ctx context.Context, kind browserKind, dir, iconDir string, pa
 			}
 		}
 	}
+	return wanted
+}
+
+// containsHosts reports whether known holds every host of wanted.
+func containsHosts(known, wanted map[string]bool) bool {
+	for host := range wanted {
+		if !known[host] {
+			return false
+		}
+	}
+	return true
+}
+
+// readFavicons brings iconDir up to date with the icons of the wanted
+// hosts and returns the file of each icon it holds. An icon once saved is
+// kept: sites rarely change theirs, and this runs whenever a browser
+// writes to its icon database.
+func readFavicons(ctx context.Context, kind browserKind, dir, iconDir string, wanted map[string]bool) (map[string]string, error) {
 	src := faviconsOf[kind]
 	var saved map[string]string
 	err := withDatabaseCopy(ctx, filepath.Join(dir, src.database), func(db *sql.DB) error {

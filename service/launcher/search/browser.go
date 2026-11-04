@@ -105,8 +105,10 @@ type fileStamp struct {
 
 // browserProfile is a profile's last reading and the files it came from.
 type browserProfile struct {
-	stamps map[string]fileStamp
-	pages  browserPages
+	pageStamps, iconStamps map[string]fileStamp
+	// iconHosts are the hosts the last reading of the icons looked for.
+	iconHosts map[string]bool
+	pages     browserPages
 }
 
 // BrowserIndex reads the browsers' bookmarks and history, rereading a
@@ -138,18 +140,25 @@ func databaseOf(kind browserKind) string {
 	return "History"
 }
 
-// watchedFiles are every file a profile's reading depends on: the
-// databases with their write-ahead logs or rollback journals.
-func watchedFiles(kind browserKind, dir string) []string {
-	var files []string
-	for _, name := range []string{databaseOf(kind), faviconsOf[kind].database} {
-		db := filepath.Join(dir, name)
-		files = append(files, db, db+"-wal", db+"-journal")
-	}
+// databaseFiles are a sqlite database with its write-ahead log and
+// rollback journal.
+func databaseFiles(dir, name string) []string {
+	db := filepath.Join(dir, name)
+	return []string{db, db + "-wal", db + "-journal"}
+}
+
+// pageFiles are the files a profile's pages come from.
+func pageFiles(kind browserKind, dir string) []string {
+	files := databaseFiles(dir, databaseOf(kind))
 	if kind == browserChromium {
 		files = append(files, filepath.Join(dir, "Bookmarks"))
 	}
 	return files
+}
+
+// iconFiles are the files a profile's favicons come from.
+func iconFiles(kind browserKind, dir string) []string {
+	return databaseFiles(dir, faviconsOf[kind].database)
 }
 
 // stampsOf stamps the files that exist.
@@ -216,31 +225,34 @@ func (b *BrowserIndex) read(ctx context.Context) *browserPages {
 			continue
 		}
 		for _, dir := range dirs {
-			stamps, err := stampsOf(watchedFiles(root.kind, dir))
+			pageStamps, err := stampsOf(pageFiles(root.kind, dir))
 			if err != nil {
 				log.Printf("launcher: browser profile %s: %v", dir, err)
 				continue
 			}
-			if len(stamps) == 0 {
+			iconStamps, err := stampsOf(iconFiles(root.kind, dir))
+			if err != nil {
+				log.Printf("launcher: browser profile %s: %v", dir, err)
+				continue
+			}
+			if len(pageStamps)+len(iconStamps) == 0 {
 				continue
 			}
 			seen[dir] = true
-			order = append(order, dir)
-			if old, ok := b.profiles[dir]; ok && sameStamps(old.stamps, stamps) {
-				continue
-			}
-			pages, err := b.readProfile(ctx, root.kind, dir)
+			old := b.profiles[dir]
+			next, updated, err := b.refreshProfile(ctx, root.kind, dir, old, pageStamps, iconStamps)
 			if err != nil {
 				if ctx.Err() == nil {
 					log.Printf("launcher: reading browser profile %s: %v", dir, err)
 				}
-				if _, ok := b.profiles[dir]; !ok {
-					order = order[:len(order)-1]
+				if old != nil {
+					order = append(order, dir)
 				}
 				continue
 			}
-			b.profiles[dir] = &browserProfile{stamps: stamps, pages: pages}
-			changed = true
+			order = append(order, dir)
+			b.profiles[dir] = next
+			changed = changed || updated
 		}
 	}
 	for dir := range b.profiles {
@@ -274,23 +286,49 @@ func (b *BrowserIndex) publishPages(ctx context.Context, show func(*browserPages
 	}
 }
 
-// readProfile reads one profile's pages and their favicons. Pages without
-// icons are still pages, so a failure among the icons is only logged.
-func (b *BrowserIndex) readProfile(ctx context.Context, kind browserKind, dir string) (browserPages, error) {
-	read := readChromium
-	if kind == browserFirefox {
-		read = readFirefox
+// refreshProfile rereads only what changed. A browser writes its history
+// on every visit and its icons far less often: the icons are read when
+// their database changed or a host they were not looked for has appeared.
+// Pages without icons are still pages, so a failure among the icons is
+// only logged, and clearing their stamps tries them again next time.
+func (b *BrowserIndex) refreshProfile(ctx context.Context, kind browserKind, dir string, old *browserProfile, pageStamps, iconStamps map[string]fileStamp) (*browserProfile, bool, error) {
+	next := browserProfile{}
+	if old != nil {
+		next = *old
 	}
-	pages, err := read(ctx, dir)
-	if err != nil {
-		return pages, err
+	updated := false
+	if old == nil || !sameStamps(old.pageStamps, pageStamps) {
+		read := readChromium
+		if kind == browserFirefox {
+			read = readFirefox
+		}
+		pages, err := read(ctx, dir)
+		if err != nil {
+			return nil, false, err
+		}
+		pages.icons = next.pages.icons
+		next.pages, next.pageStamps = pages, pageStamps
+		updated = true
 	}
-	icons, err := readFavicons(ctx, kind, dir, b.iconDir, pages)
-	if err != nil && ctx.Err() == nil {
-		log.Printf("launcher: reading favicons of browser profile %s: %v", dir, err)
+	hosts := wantedHosts(next.pages)
+	if old != nil && sameStamps(old.iconStamps, iconStamps) && containsHosts(old.iconHosts, hosts) {
+		return &next, updated, nil
 	}
-	pages.icons = icons
-	return pages, nil
+	icons, err := readFavicons(ctx, kind, dir, b.iconDir, hosts)
+	switch {
+	case err != nil:
+		if ctx.Err() == nil {
+			log.Printf("launcher: reading favicons of browser profile %s: %v", dir, err)
+		}
+		next.iconStamps, next.iconHosts = nil, nil
+	default:
+		next.iconStamps, next.iconHosts = iconStamps, hosts
+	}
+	if icons != nil {
+		next.pages.icons = icons
+		updated = true
+	}
+	return &next, updated, nil
 }
 
 func readFirefox(ctx context.Context, dir string) (browserPages, error) {

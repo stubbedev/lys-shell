@@ -616,3 +616,90 @@ func TestTheLastReadingShowsAtOnceThenTheFreshOne(t *testing.T) {
 		t.Errorf("after a write it published %q", changed)
 	}
 }
+
+// iconedProfile has one visited page with its icon saved, and its icon
+// database still to be written to.
+func iconedProfile(t *testing.T) (index *BrowserIndex, dir string, db, icons *sql.DB, iconFile string) {
+	t.Helper()
+	index, root := firefoxIndex(t)
+	dir, db = firefoxProfile(t, root, "p.default")
+	addPlace(t, db, 1, "https://one.example/", "One", 1)
+	addPlace(t, db, 2, "https://unknown.example/", "Icon later", 1)
+	icons = openFixture(t, filepath.Join(dir, "favicons.sqlite"), firefoxFaviconSchema)
+	addPageIcon(t, icons, 1, "https://one.example/", 32, testPNG(t, 32))
+	iconFile = index.read(context.Background()).icons["one.example"]
+	if iconFile == "" {
+		t.Fatal("no icon saved")
+	}
+	return index, dir, db, icons, iconFile
+}
+
+func TestAVisitToAKnownSiteLeavesTheIconsAlone(t *testing.T) {
+	index, _, db, _, iconFile := iconedProfile(t)
+	if err := os.Remove(iconFile); err != nil {
+		t.Fatal(err)
+	}
+	addPlace(t, db, 3, "https://one.example/other", "Another page", 1)
+	pages := index.read(context.Background())
+	if len(pages.visited) != 3 {
+		t.Fatalf("the history was not reread: %+v", pages.visited)
+	}
+	if _, err := os.Stat(iconFile); err == nil {
+		t.Error("the icons were read again")
+	}
+}
+
+func TestAVisitToANewSiteLooksForItsIcon(t *testing.T) {
+	index, _, db, icons, _ := iconedProfile(t)
+	addPageIcon(t, icons, 2, "https://new.example/", 32, testPNG(t, 32))
+	index.read(context.Background())
+	addPlace(t, db, 3, "https://new.example/", "New", 1)
+	if _, ok := index.read(context.Background()).icons["new.example"]; !ok {
+		t.Error("the new site has no icon")
+	}
+}
+
+func TestANewIconLeavesTheHistoryAlone(t *testing.T) {
+	index, dir, _, icons, _ := iconedProfile(t)
+	path := filepath.Join(dir, "places.sqlite")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, make([]byte, info.Size()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	addPageIcon(t, icons, 2, "https://unknown.example/", 32, testPNG(t, 32))
+	pages := index.read(context.Background())
+	if _, ok := pages.icons["unknown.example"]; !ok {
+		t.Error("the new icon was not read")
+	}
+	if len(pages.visited) != 2 {
+		t.Errorf("the unchanged history was lost: %+v", pages.visited)
+	}
+}
+
+func TestAFailedIconReadIsTriedAgain(t *testing.T) {
+	home := t.TempDir()
+	iconDir := filepath.Join(home, "icons")
+	index := NewBrowserIndex(home, filepath.Join(home, ".config"), iconDir)
+	dir, db := firefoxProfile(t, filepath.Join(home, ".mozilla", "firefox"), "p.default")
+	addPlace(t, db, 1, "https://one.example/", "One", 1)
+	icons := openFixture(t, filepath.Join(dir, "favicons.sqlite"), firefoxFaviconSchema)
+	addPageIcon(t, icons, 1, "https://one.example/", 32, testPNG(t, 32))
+	if err := os.WriteFile(iconDir, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := index.read(context.Background()); len(got.icons) != 0 || len(got.visited) != 1 {
+		t.Fatalf("pages = %+v", got)
+	}
+	if err := os.Remove(iconDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := index.read(context.Background()).icons["one.example"]; !ok {
+		t.Error("with nothing changed in the browser, the icons were not tried again")
+	}
+}
