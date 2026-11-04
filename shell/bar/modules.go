@@ -226,27 +226,36 @@ func drain[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 // on the loop at a time, with the latest value: values a stalled loop did not
 // get to coalesce, so no feed follows it may need every value.
 func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
-	var (
-		mu      sync.Mutex
-		latest  T
-		waiting bool
-	)
-	drain(ctx, ch, stop, func(v T) {
-		mu.Lock()
-		latest = v
-		queue := !waiting
-		waiting = true
-		mu.Unlock()
-		if !queue {
-			return
-		}
-		ctx.Invoke(func() {
-			mu.Lock()
-			next := latest
-			waiting = false
-			mu.Unlock()
-			fn(next)
-		})
+	latest := latestOnLoop[T]{post: ctx.Invoke, show: fn}
+	drain(ctx, ch, stop, latest.give)
+}
+
+// latestOnLoop hands values to the loop latest-only: one call waits on post at
+// a time, and it takes whatever is newest when it runs.
+type latestOnLoop[T any] struct {
+	post func(func())
+	show func(T)
+
+	mu      sync.Mutex
+	latest  T
+	waiting bool
+}
+
+func (l *latestOnLoop[T]) give(v T) {
+	l.mu.Lock()
+	l.latest = v
+	queue := !l.waiting
+	l.waiting = true
+	l.mu.Unlock()
+	if !queue {
+		return
+	}
+	l.post(func() {
+		l.mu.Lock()
+		next := l.latest
+		l.waiting = false
+		l.mu.Unlock()
+		l.show(next)
 	})
 }
 

@@ -289,7 +289,7 @@ func (c *customUpdates) dispatch(id, output string) {
 	targets := slices.Clone(c.modules[id])
 	c.mu.Unlock()
 	for _, m := range targets {
-		m.ctx.Invoke(func() { m.apply(output) })
+		m.deliver(output)
 	}
 }
 
@@ -306,6 +306,10 @@ type customModule struct {
 	command context.CancelFunc // the in-flight command (poll or on-action)
 	scroll  *time.Timer        // the on-action scroll debounce
 	classes []string
+
+	views   latestOnLoop[customView]
+	lastRaw string
+	hasRaw  bool
 }
 
 // newCustomByID resolves the definition behind a "custom-<id>" layout
@@ -318,11 +322,17 @@ func newCustomByID(ctx ModuleContext, id string) (Module, error) {
 	return newCustom(ctx, def)
 }
 
+func newCustomModule(ctx ModuleContext, def config.CustomModuleDefinition) *customModule {
+	m := &customModule{ctx: ctx, def: def}
+	m.views = latestOnLoop[customView]{post: ctx.Invoke, show: m.show}
+	return m
+}
+
 func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, error) {
 	if ctx.App == nil {
 		return nil, errors.New("custom: requires the application loop")
 	}
-	m := &customModule{ctx: ctx, def: def}
+	m := newCustomModule(ctx, def)
 	m.icon = moduleIcon(ctx, def.Icon())
 	m.btn = newBarButton(ctx, m.icon, formatCustomLabel(def, parsedOutput{}))
 	m.life, m.stop = context.WithCancel(ctx.Life())
@@ -332,7 +342,7 @@ func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, er
 			initial = last
 		}
 	}
-	m.apply(initial)
+	go m.deliver(initial)
 	if def.Command != nil {
 		switch def.Mode {
 		case config.ExecutionModeWatch:
@@ -391,8 +401,7 @@ func (m *customModule) runCommand(command string) {
 			}
 			// A nonzero exit still has its output, as tokio's output().
 		}
-		output := strings.TrimSpace(strings.ToValidUTF8(out.String(), "�"))
-		m.ctx.Invoke(func() { m.apply(output) })
+		m.deliver(strings.TrimSpace(strings.ToValidUTF8(out.String(), "�")))
 	}()
 }
 
@@ -446,8 +455,7 @@ func (m *customModule) watchOnce(command string) (exitErr error, ran bool) {
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64*1024), 1<<20)
 	for scanner.Scan() {
-		line := scanner.Text()
-		m.ctx.Invoke(func() { m.apply(line) })
+		m.deliver(scanner.Text())
 	}
 	return cmd.Wait(), true
 }
@@ -476,31 +484,70 @@ func (m *customModule) followAction(action config.ClickAction, scroll bool) {
 	})
 }
 
-// apply is apply_output: label, icon, tooltip, visibility, the
-// color-map colors, and the dynamic classes from one output.
-func (m *customModule) apply(output string) {
+// deliver takes one output on the producing goroutine: an output equal to the
+// last costs a compare, any other is parsed and rendered here and reaches the
+// loop latest-only.
+func (m *customModule) deliver(output string) {
+	m.mu.Lock()
+	same := m.hasRaw && m.lastRaw == output
+	m.lastRaw, m.hasRaw = output, true
+	m.mu.Unlock()
+	if same {
+		return
+	}
+	m.views.give(m.view(output))
+}
+
+// customView is apply_output's result: what one output shows.
+type customView struct {
+	label     string
+	icon      string
+	tooltip   string
+	visible   bool
+	colors    config.ThresholdColors
+	hasColors bool
+	classes   []string
+}
+
+func (m *customModule) view(output string) customView {
 	if m.ctx.CustomUpdates != nil && output != "" {
 		m.ctx.CustomUpdates.remember(m.def.Id, output)
 	}
 	p := parseCustomOutput(output)
-	m.btn.SetLabel(formatCustomLabel(m.def, p))
+	v := customView{
+		label:   formatCustomLabel(m.def, p),
+		visible: !shouldHideCustom(p.raw, m.def.HideIfEmpty),
+		classes: resolveCustomClasses(m.def, p),
+	}
 	if m.icon != nil {
-		m.icon.SetThemeName(resolveCustomIcon(m.def, p))
+		v.icon = resolveCustomIcon(m.def, p)
 	}
-	btn := m.btn
 	if tip, ok := formatCustomTooltip(m.def, p); ok {
-		btn.SetTooltip(tip)
-	} else {
-		btn.SetTooltip("")
+		v.tooltip = tip
 	}
-	btn.SetVisible(!shouldHideCustom(p.raw, m.def.HideIfEmpty))
-	if colors, ok := resolveCustomColors(m.def, p); ok {
-		btn.SetThresholds(colors)
+	v.colors, v.hasColors = resolveCustomColors(m.def, p)
+	return v
+}
+
+// apply is apply_output on the loop.
+func (m *customModule) apply(output string) { m.show(m.view(output)) }
+
+func (m *customModule) show(v customView) {
+	btn := m.btn
+	btn.SetLabel(v.label)
+	if m.icon != nil {
+		m.icon.SetThemeName(v.icon)
 	}
-	classes := resolveCustomClasses(m.def, p)
-	btn.RemoveClass(m.classes...)
-	btn.AddClass(classes...)
-	m.classes = classes
+	btn.SetTooltip(v.tooltip)
+	btn.SetVisible(v.visible)
+	if v.hasColors {
+		btn.SetThresholds(v.colors)
+	}
+	if !slices.Equal(v.classes, m.classes) {
+		btn.RemoveClass(m.classes...)
+		btn.AddClass(v.classes...)
+		m.classes = v.classes
+	}
 }
 
 func (m *customModule) Root() widget.Widget { return m.btn }

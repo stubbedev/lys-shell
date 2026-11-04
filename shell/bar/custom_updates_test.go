@@ -16,7 +16,7 @@ func TestCustomUpdatesDispatch(t *testing.T) {
 	upd := ctx.CustomUpdates
 
 	// Build the module the way newCustom would, minus the loop.
-	m := &customModule{ctx: ctx, def: def}
+	m := newCustomModule(ctx, def)
 	m.btn = newBarButton(ctx, nil, "")
 	upd.register(m)
 
@@ -28,7 +28,7 @@ func TestCustomUpdatesDispatch(t *testing.T) {
 	def2 := def
 	def2.Id = "raw"
 	def2.Format = "{{ output }}"
-	m2 := &customModule{ctx: ctx, def: def2}
+	m2 := newCustomModule(ctx, def2)
 	m2.btn = newBarButton(ctx, nil, "")
 	upd.register(m2)
 	upd.dispatch("raw", "plain text")

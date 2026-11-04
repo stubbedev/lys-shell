@@ -170,7 +170,7 @@ func newTestCustom(t *testing.T, def config.CustomModuleDefinition) *customModul
 	ctx.CustomUpdates = newCustomUpdates()
 	ctx.gen = newMountGen()
 	t.Cleanup(ctx.gen.retire)
-	m := &customModule{ctx: ctx, def: def}
+	m := newCustomModule(ctx, def)
 	m.icon = widget.NewThemeIcon("x", 16)
 	m.btn = newBarButton(ctx, m.icon, "")
 	m.life, m.stop = context.WithCancel(ctx.Life())
@@ -344,4 +344,48 @@ func TestCustomWatchStopsItsScriptWithTheModule(t *testing.T) {
 	}
 	m.Stop()
 	waitHeadless(t, "the script's child to stop with the module", func() bool { return !running() })
+}
+
+func TestCustomIdenticalOutputCausesNoDamage(t *testing.T) {
+	def := config.DefaultsCustomModuleDefinition()
+	def.Id = "t"
+	m := newTestCustom(t, def)
+	root := widget.NewBox(widget.Row, 0, 0)
+	root.Append(m.btn, false)
+	widget.SizeWithin(root, widget.Size{W: 400, H: 40})
+	line := `{"text":"hi","class":"c1"}`
+	m.deliver(line)
+	waitForText(t, m.btn.Label(), "hi")
+	onHeadlessLoop(func() bool {
+		widget.CollectDamage(root)
+		return true
+	})
+	onHeadlessLoop(func() bool {
+		m.apply(line)
+		return true
+	})
+	m.deliver(line)
+	if onHeadlessLoop(func() bool { _, damaged := widget.CollectDamage(root); return damaged }) {
+		t.Error("an identical line damaged the bar")
+	}
+}
+
+func TestLatestOnLoopKeepsOneCallPendingWithTheNewest(t *testing.T) {
+	var posted []func()
+	var shown []int
+	l := latestOnLoop[int]{post: func(fn func()) { posted = append(posted, fn) }, show: func(v int) { shown = append(shown, v) }}
+	for v := range 100 {
+		l.give(v)
+	}
+	if len(posted) != 1 {
+		t.Fatalf("%d calls waiting on the loop, want 1", len(posted))
+	}
+	posted[0]()
+	if len(shown) != 1 || shown[0] != 99 {
+		t.Errorf("shown %v, want the newest alone", shown)
+	}
+	l.give(100)
+	if len(posted) != 2 {
+		t.Error("a value after the call ran queued nothing")
+	}
 }
