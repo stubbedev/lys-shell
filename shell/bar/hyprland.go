@@ -305,11 +305,11 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 		rules:  map[int]string{},
 	}
 	m.actions = cwsActions{
-		focus:    func(_ context.Context, ws cwsWorkspace) error { return m.switchTo(ws.num) },
-		next:     func(context.Context) error { return m.navigate(1) },
-		previous: func(context.Context) error { return m.navigate(-1) },
-		last: func(context.Context) error {
-			return m.conn.Dispatch(hyprland.FocusPreviousWorkspace())
+		focus:    func(ws cwsWorkspace) cwsAction { return m.switchTo(ws.num) },
+		next:     func() cwsAction { return m.navigate(1) },
+		previous: func() cwsAction { return m.navigate(-1) },
+		last: func() cwsAction {
+			return func(context.Context) error { return m.conn.Dispatch(hyprland.FocusPreviousWorkspace()) }
 		},
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
@@ -743,23 +743,26 @@ func (m *hyprlandWorkspaces) switchAction(id int) (hyprland.Action, error) {
 	return hyprland.Action{}, fmt.Errorf("workspace %d: no resolvable selector, skipping dispatch", id)
 }
 
-func (m *hyprlandWorkspaces) switchTo(id int) error {
+// switchTo resolves the workspace on the loop; what it returns dispatches off it.
+func (m *hyprlandWorkspaces) switchTo(id int) cwsAction {
 	action, err := m.switchAction(id)
-	if err != nil {
-		return err
+	return func(context.Context) error {
+		if err != nil {
+			return err
+		}
+		if err := m.conn.Dispatch(action); err != nil {
+			return fmt.Errorf("cannot switch workspace %d: %w", id, err)
+		}
+		return nil
 	}
-	if err := m.conn.Dispatch(action); err != nil {
-		return fmt.Errorf("cannot switch workspace %d: %w", id, err)
-	}
-	return nil
 }
 
 // navigate is navigate_workspace: the next or previous displayed
 // workspace, wrapping.
-func (m *hyprlandWorkspaces) navigate(direction int) error {
+func (m *hyprlandWorkspaces) navigate(direction int) cwsAction {
 	list := hyprFilterWorkspaces(m.workspaces, m.filter())
 	if len(list) == 0 {
-		return nil
+		return func(context.Context) error { return nil }
 	}
 	current := 0
 	for i, ws := range list {

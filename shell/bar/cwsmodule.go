@@ -34,11 +34,16 @@ type cwsBackend interface {
 
 // cwsActions are the compositor requests the bindings map to.
 type cwsActions struct {
-	focus    func(ctx context.Context, ws cwsWorkspace) error
-	next     func(ctx context.Context) error
-	previous func(ctx context.Context) error
-	last     func(ctx context.Context) error
+	focus    func(ws cwsWorkspace) cwsAction
+	next     func() cwsAction
+	previous func() cwsAction
+	last     func() cwsAction
 }
+
+// cwsAction is what an input asks the compositor for. The fields above run
+// on the loop, where the module's state may be read, and hand back this, which
+// runs off it, where the compositor may be waited on.
+type cwsAction func(ctx context.Context) error
 
 // cwsView is what the segments read: the module context and shared
 // config, the resolved face, and the actions. The sway/niri/mango
@@ -82,7 +87,14 @@ type cwsModule struct {
 // live loop, subscribes to its events.
 func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.CompositorWorkspacesConfig, backend cwsBackend) (*cwsModule, error) {
 	m := &cwsModule{ctx: ctx, cfg: cfg, kind: kind, flavor: flavor, backend: backend}
-	m.actions = cwsActions{focus: backend.focus, next: backend.focusNext, previous: backend.focusPrevious, last: backend.focusLast}
+	m.actions = cwsActions{
+		focus: func(ws cwsWorkspace) cwsAction {
+			return func(ctx context.Context) error { return backend.focus(ctx, ws) }
+		},
+		next:     func() cwsAction { return backend.focusNext },
+		previous: func() cwsAction { return backend.focusPrevious },
+		last:     func() cwsAction { return backend.focusLast },
+	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
 	if err := renderOnce(m.read, m.apply); err != nil {
@@ -234,7 +246,7 @@ func (m *cwsView) paddingPx() int {
 // dispatchClick is dispatch_click_action for a clicked workspace.
 func (m *cwsView) dispatchClick(action config.WorkspaceClickAction, ws cwsWorkspace) {
 	if action.Kind == config.WorkspaceClickFocusThis {
-		m.run(func(ctx context.Context) error { return m.actions.focus(ctx, ws) })
+		m.run(m.actions.focus(ws))
 		return
 	}
 	m.dispatchScroll(action)
@@ -248,11 +260,11 @@ func (m *cwsView) dispatchScroll(action config.WorkspaceClickAction) {
 	case config.WorkspaceClickFocusThis:
 		log.Printf("%s-workspaces: focus:this requires a clicked workspace; scroll ignored", m.kind)
 	case config.WorkspaceClickFocusNext:
-		m.run(m.actions.next)
+		m.run(m.actions.next())
 	case config.WorkspaceClickFocusPrevious:
-		m.run(m.actions.previous)
+		m.run(m.actions.previous())
 	case config.WorkspaceClickFocusLast:
-		m.run(m.actions.last)
+		m.run(m.actions.last())
 	case config.WorkspaceClickDropdown:
 		if m.ctx.Dropdowns != nil {
 			if err := m.ctx.Dropdowns.open(m.ctx.Connector, action.Arg, m.segs); err != nil {

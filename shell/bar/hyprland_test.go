@@ -673,3 +673,22 @@ func handleNow(t *testing.T, m *hyprlandWorkspaces, ev hyprland.Event) {
 	m.take(s)
 	m.handle(ev)
 }
+
+// A click reads the module's state on the loop and dispatches off it: what
+// the action does is settled when it is made, whatever the state does next.
+func TestHyprlandActionsResolveWhenMade(t *testing.T) {
+	m := &hyprlandWorkspaces{}
+	m.workspaces = []hyprland.Workspace{{ID: -98, Name: "special:term"}}
+	action, err := m.switchAction(-98)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := hyprland.FocusNamedWorkspace("special:term"); action != want {
+		t.Errorf("action %+v, want %+v", action, want)
+	}
+	unresolved := m.switchTo(-7)
+	m.workspaces = []hyprland.Workspace{{ID: -7, Name: "special:late"}}
+	if err := unresolved(t.Context()); err == nil || !strings.Contains(err.Error(), "no resolvable selector") {
+		t.Errorf("a workspace unknown at the click ran with %v, want the selector error", err)
+	}
+}
