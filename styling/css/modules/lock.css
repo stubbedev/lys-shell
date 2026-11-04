@@ -17,7 +17,6 @@
 .lock-window .lock-clock {
   color: var(--palette-fg);
   font-weight: 300;
-  font-size: calc(5.5rem * var(--global-scale));
 }
 .lock-window .lock-date {
   color: var(--palette-fg);
