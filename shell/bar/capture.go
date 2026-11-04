@@ -104,6 +104,21 @@ func (s *captureServices) trigger(mode, target string) {
 	}()
 }
 
+// pickColor lets the user pick a pixel and hands its color to copied, on
+// its own goroutine; cancelling hands over nothing.
+func (s *captureServices) pickColor(copied func(hex string)) {
+	go func() {
+		color, picked, err := s.host.PickColor(portaldialogs.Caller{})
+		if err != nil {
+			log.Printf("launcher: picking a color: %v", err)
+			return
+		}
+		if picked {
+			copied(hexOfColor(color))
+		}
+	}()
+}
+
 // close drops the bus name and connection.
 func (s *captureServices) close() {
 	for _, release := range slices.Backward(s.release) {

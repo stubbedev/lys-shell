@@ -149,6 +149,10 @@ launcher:
       - links
       - browser-bookmarks
       - browser-history
+      - quick-toggles
+      - media
+      - capture
+      - processes
       - scripts
       - shell
       - web

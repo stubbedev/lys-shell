@@ -72,12 +72,16 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 		},
 	}
 	browser := newBrowserIndex()
+	controls := controlSourcesOf(ctx)
 	deps.Search = func() search.Deps {
 		cfg := current()
 		d := search.Deps{
 			Env:     search.RealEnv(cfg.Launcher.Terminal),
 			Windows: modes.DetectWindows(),
 			Browser: browser,
+			Toggles: controls.toggles,
+			Media:   controls.mediaControls,
+			Capture: controls.captureControls,
 			SettingsPages: func() []search.SettingsPage {
 				pages := settings.Pages(cfg)
 				out := make([]search.SettingsPage, len(pages))

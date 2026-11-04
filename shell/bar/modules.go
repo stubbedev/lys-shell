@@ -92,6 +92,9 @@ type ModuleContext struct {
 	// Screenshot starts a capture on the in-process screenshot host
 	// (the `lys-shell screenshot ...` builtin); nil before the host is up.
 	Screenshot func(mode, target string)
+	// PickColor picks a pixel of the screen and copies its color; nil
+	// before the host is up.
+	PickColor func()
 	// Theme is the bar stylesheet every bar root attaches; nil in
 	// headless construction, where the tree builds unstyled.
 	Theme *apptheme.Theme

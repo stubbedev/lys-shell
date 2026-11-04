@@ -278,6 +278,14 @@ const (
 	SearchBookmarks LauncherSearchProvider = "browser-bookmarks"
 	// The most visited pages in the installed browsers' history.
 	SearchVisited LauncherSearchProvider = "browser-history"
+	// Do not disturb, Wi-Fi, Bluetooth and the audio output.
+	SearchToggles LauncherSearchProvider = "quick-toggles"
+	// Play, pause and skip on the active media player.
+	SearchMedia LauncherSearchProvider = "media"
+	// Screenshots, screen recording and the color picker.
+	SearchCapture LauncherSearchProvider = "capture"
+	// A list of your running processes to end one.
+	SearchProcesses LauncherSearchProvider = "processes"
 	// Script commands from the commands directory.
 	SearchScripts LauncherSearchProvider = "scripts"
 	// `>command` runs a shell command.
@@ -427,7 +435,7 @@ var (
 	_ = registerEnum(WindowFieldTitle, WindowFieldClass, WindowFieldName, WindowFieldRole, WindowFieldDesktop)
 	_ = registerEnum(FileSortName, FileSortMtime, FileSortAtime, FileSortCtime)
 	_ = registerEnum(SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
-		SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchScripts, SearchShell, SearchWeb)
+		SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb)
 )
 
 // launcherLocations is rofi's -location numbering: 0 center, then
@@ -500,7 +508,7 @@ func DefaultsLauncher() LauncherConfig {
 		Search: LauncherSearchConfig{
 			Providers: []LauncherSearchProvider{
 				SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
-				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchScripts, SearchShell, SearchWeb,
+				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb,
 			},
 			WebEngine:   "DuckDuckGo",
 			WebURL:      "https://duckduckgo.com/?q={query}",

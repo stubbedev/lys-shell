@@ -134,6 +134,9 @@ type (
 	Close struct{}
 	// Cancel ends the session with nothing done (Esc at the root).
 	Cancel struct{}
+	// CloseThen ends the session and runs Run on the UI loop once the panel
+	// has left the screen.
+	CloseThen struct{ Run func() }
 	// Copy puts Text on the clipboard and ends the session.
 	Copy struct{ Text string }
 	// Type ends the session and enters Text in the window it leaves focused.
@@ -151,15 +154,16 @@ type (
 	Reload struct{}
 )
 
-func (Close) isOutcome()    {}
-func (Cancel) isOutcome()   {}
-func (Copy) isOutcome()     {}
-func (Type) isOutcome()     {}
-func (SetQuery) isOutcome() {}
-func (Push) isOutcome()     {}
-func (Replace) isOutcome()  {}
-func (Stay) isOutcome()     {}
-func (Reload) isOutcome()   {}
+func (Close) isOutcome()     {}
+func (CloseThen) isOutcome() {}
+func (Cancel) isOutcome()    {}
+func (Copy) isOutcome()      {}
+func (Type) isOutcome()      {}
+func (SetQuery) isOutcome()  {}
+func (Push) isOutcome()      {}
+func (Replace) isOutcome()   {}
+func (Stay) isOutcome()      {}
+func (Reload) isOutcome()    {}
 
 // Spec says how a provider's rows take part in a list.
 type Spec struct {

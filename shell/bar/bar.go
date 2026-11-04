@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/spawn"
 	"github.com/stubbedev/lys-shell/internal/version"
@@ -467,6 +468,22 @@ func (s *shellStart) mount() {
 	s.down.add(servePortalHosts(application, sess.Outputs, current.Load, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput, font, theme.Sheet))
 	s.down.add(captureSvc.close)
 	baseCtx.Screenshot = captureSvc.trigger
+	baseCtx.PickColor = func() {
+		captureSvc.pickColor(func(hex string) {
+			application.Invoke(func() {
+				c := application.Clipboard()
+				if c == nil {
+					log.Printf("launcher: picked %s, but there is no clipboard to copy it to", hex)
+					return
+				}
+				if err := c.WriteText(hex); err != nil {
+					log.Printf("launcher: copying the picked color: %v", err)
+					return
+				}
+				baseCtx.Toast(i18n.T("launcher-control-color-copied", i18n.Str("color", hex)), "ld-palette-symbolic")
+			})
+		})
+	}
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
 	// Notification popups render on one monitor, bar or not.

@@ -1,6 +1,7 @@
 package search
 
 import (
+	"context"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -29,6 +30,9 @@ type Deps struct {
 	Windows modes.WindowBackend
 	// Browser reads the browsers' bookmarks and history; nil offers neither.
 	Browser *BrowserIndex
+	// Toggles, Media and Capture read the rows of the shell's services; a
+	// nil one offers none.
+	Toggles, Media, Capture func(ctx context.Context) []Control
 }
 
 // frecencyFileName and fileIndexFileName are the session's files, under
@@ -83,7 +87,18 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 		root.Providers = append(root.Providers, NewClipboard(d.Clipboard, cfg.Previews))
 	}
 	add(config.SearchEmoji, func() Provider { return NewEmoji(modes.AvailableEmoji) })
+	for _, group := range []struct {
+		provider config.LauncherSearchProvider
+		load     func(ctx context.Context) []Control
+	}{{config.SearchToggles, d.Toggles}, {config.SearchMedia, d.Media}, {config.SearchCapture, d.Capture}} {
+		if has(group.provider) && group.load != nil {
+			root.Providers = append(root.Providers, NewControls(group.load))
+		}
+	}
 	levels := PickerLevels{}
+	if has(config.SearchProcesses) {
+		levels.Processes = processesLevel
+	}
 	if d.Browser != nil {
 		if has(config.SearchBookmarks) {
 			root.Providers = append(root.Providers, NewBookmarks(d.Env, d.Browser))

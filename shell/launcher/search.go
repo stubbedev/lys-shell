@@ -485,6 +485,8 @@ func (p *panel) finish(o search.Outcome) {
 			p.s.d.Copy(v.Text)
 		}
 		frame.Selected = []launcheripc.Selected{{Index: 0, Text: v.Text}}
+	case search.CloseThen:
+		p.afterClose = func() { p.s.d.After(typeSettle, v.Run) }
 	case search.Type:
 		p.afterClose = func() { p.s.typeOnceClosed(v.Text) }
 		frame.Selected = []launcheripc.Selected{{Index: 0, Text: v.Text}}

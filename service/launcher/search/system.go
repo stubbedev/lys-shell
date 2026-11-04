@@ -20,7 +20,7 @@ type System struct {
 func NewSystem(env Env, power config.PowerConfig) *System { return &System{env: env, power: power} }
 
 // Spec implements Provider.
-func (*System) Spec() Spec { return Spec{Section: SectionCommands, Limit: 5, MinQuery: 2} }
+func (*System) Spec() Spec { return Spec{Section: SectionCommands, Limit: commandRows, MinQuery: 2} }
 
 type systemCommand struct {
 	id, titleKey, keywords, icon string
@@ -69,14 +69,18 @@ func (s *System) Actions(e Entry) []Action {
 	if !c.confirm {
 		return []Action{run}
 	}
-	title := e.Title
-	return []Action{{Title: title, Icon: c.icon, Run: func(context.Context) Outcome {
+	return []Action{confirmed(run)}
+}
+
+// confirmed is run behind a level that asks first.
+func confirmed(run Action) Action {
+	return Action{Title: run.Title, Icon: run.Icon, Run: func(context.Context) Outcome {
 		return Push{Level: &Level{
-			Title:     title,
-			Message:   i18n.T("launcher-system-confirm", i18n.Str("what", title)),
-			Providers: []Provider{&fixedProvider{entries: []Entry{{ID: "confirm", Title: title, Icon: launcher.IconName(c.icon), Data: run}}}},
+			Title:     run.Title,
+			Message:   i18n.T("launcher-system-confirm", i18n.Str("what", run.Title)),
+			Providers: []Provider{&fixedProvider{entries: []Entry{{ID: "confirm", Title: run.Title, Icon: launcher.IconName(run.Icon), Data: run}}}},
 		}}
-	}}}
+	}}
 }
 
 // fixedProvider offers rows whose Data is the Action to run: a flat list

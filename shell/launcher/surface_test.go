@@ -1010,3 +1010,34 @@ func TestAnEmojiModeEntersItsPick(t *testing.T) {
 	h.timers[len(h.timers)-1].fn()
 	h.until("the glyph typed", func() bool { return len(typed) == 1 && typed[0] == f.Selected[0].Text })
 }
+
+func TestWhatRunsOnceClosedWaitsForThePanelToLeave(t *testing.T) {
+	ph := newPanelHarness(t)
+	p, _ := ph.openPanel()
+	ran := false
+	before := len(ph.timers)
+	p.finish(search.CloseThen{Run: func() { ran = true }})
+	if !ph.harness.windows[0].closed {
+		t.Fatal("the surface did not close")
+	}
+	if ran {
+		t.Fatal("it ran before the compositor could take the surface away")
+	}
+	if len(ph.timers) != before+1 || ph.timers[before].d != typeSettle {
+		t.Fatalf("timers %d, was %d", len(ph.timers), before)
+	}
+	ph.timers[before].fn()
+	if !ran {
+		t.Error("the settle did not run it")
+	}
+}
+
+func TestClosingWithoutAnEffectRunsNothingLater(t *testing.T) {
+	ph := newPanelHarness(t)
+	p, _ := ph.openPanel()
+	before := len(ph.timers)
+	p.finish(search.Close{})
+	if len(ph.timers) != before {
+		t.Error("a plain close left something to run")
+	}
+}

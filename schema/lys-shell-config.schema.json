@@ -3467,6 +3467,10 @@
               "links",
               "browser-bookmarks",
               "browser-history",
+              "quick-toggles",
+              "media",
+              "capture",
+              "processes",
               "scripts",
               "shell",
               "web"
@@ -3858,6 +3862,10 @@
             "links",
             "browser-bookmarks",
             "browser-history",
+            "quick-toggles",
+            "media",
+            "capture",
+            "processes",
             "scripts",
             "shell",
             "web"
@@ -3948,6 +3956,26 @@
         {
           "const": "browser-history",
           "description": "The most visited pages in the installed browsers' history.",
+          "type": "string"
+        },
+        {
+          "const": "quick-toggles",
+          "description": "Do not disturb, Wi-Fi, Bluetooth and the audio output.",
+          "type": "string"
+        },
+        {
+          "const": "media",
+          "description": "Play, pause and skip on the active media player.",
+          "type": "string"
+        },
+        {
+          "const": "capture",
+          "description": "Screenshots, screen recording and the color picker.",
+          "type": "string"
+        },
+        {
+          "const": "processes",
+          "description": "A list of your running processes to end one.",
           "type": "string"
         },
         {
@@ -10189,6 +10217,10 @@
             "links",
             "browser-bookmarks",
             "browser-history",
+            "quick-toggles",
+            "media",
+            "capture",
+            "processes",
             "scripts",
             "shell",
             "web"

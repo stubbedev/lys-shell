@@ -706,6 +706,10 @@ A source of rows in the search panel.
 | `"links"` | Quick links and snippets. |
 | `"browser-bookmarks"` | Bookmarks of the installed browsers (Firefox and Chromium families). |
 | `"browser-history"` | The most visited pages in the installed browsers' history. |
+| `"quick-toggles"` | Do not disturb, Wi-Fi, Bluetooth and the audio output. |
+| `"media"` | Play, pause and skip on the active media player. |
+| `"capture"` | Screenshots, screen recording and the color picker. |
+| `"processes"` | A list of your running processes to end one. |
 | `"scripts"` | Script commands from the commands directory. |
 | `"shell"` | `>command` runs a shell command. |
 | `"web"` | The web search fallback. |

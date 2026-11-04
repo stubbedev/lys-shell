@@ -178,7 +178,7 @@ func (*Emoji) Actions(e Entry) []Action {
 
 // Pickers are root rows that open a whole list of their own: the full
 // clipboard history, every emoji, the vault, every bookmark, the most
-// visited pages.
+// visited pages, the running processes.
 type Pickers struct {
 	items []picker
 }
@@ -191,7 +191,7 @@ type picker struct {
 // PickerLevels are the levels of the pickers with nothing to configure;
 // a nil one leaves its row out.
 type PickerLevels struct {
-	Vault, Bookmarks, Visited func() *Level
+	Vault, Bookmarks, Visited, Processes func() *Level
 }
 
 // NewPickers builds the rows for what is available. A nil history leaves
@@ -219,11 +219,14 @@ func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, leve
 	if levels.Visited != nil {
 		p.items = append(p.items, picker{"visited", i18n.T("launcher-picker-visited"), "browser firefox chrome history frequent top sites", "ld-history-symbolic", levels.Visited})
 	}
+	if levels.Processes != nil {
+		p.items = append(p.items, picker{"processes", i18n.T("launcher-picker-processes"), "end task terminate force quit stop", "ld-activity-symbolic", levels.Processes})
+	}
 	return p
 }
 
 // Spec implements Provider.
-func (*Pickers) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2, Limit: 5} }
+func (*Pickers) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2, Limit: commandRows} }
 
 // Load implements Provider.
 func (p *Pickers) Load(_ context.Context, publish func([]Entry)) {
