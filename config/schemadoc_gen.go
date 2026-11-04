@@ -696,6 +696,8 @@ var schemaDocs = map[string]string{
 	"LauncherSearchConfig.WebURL":                            "Web search fallback: the URL, with `{query}` where the search goes.",
 	"LauncherSearchProvider":                                 "A source of rows in the search panel.",
 	"LauncherSearchProvider=apps":                            "Desktop entries, with their actions.",
+	"LauncherSearchProvider=browser-bookmarks":               "Bookmarks of the installed browsers (Firefox and Chromium families).",
+	"LauncherSearchProvider=browser-history":                 "The most visited pages in the installed browsers' history.",
 	"LauncherSearchProvider=calculator":                      "Inline arithmetic and unit conversion.",
 	"LauncherSearchProvider=clipboard":                       "The clipboard history.",
 	"LauncherSearchProvider=emoji":                           "The emoji table.",

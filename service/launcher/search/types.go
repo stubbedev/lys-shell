@@ -26,6 +26,7 @@ const (
 	SectionWindows
 	SectionCommands
 	SectionLinks
+	SectionBrowser
 	SectionSettings
 	SectionFiles
 	SectionClipboard
@@ -40,7 +41,7 @@ const (
 var sectionKeys = [sectionCount]string{
 	SectionAnswer: "launcher-section-answer", SectionRecent: "launcher-section-recent", SectionApps: "launcher-section-apps",
 	SectionWindows: "launcher-section-windows", SectionCommands: "launcher-section-commands",
-	SectionLinks: "launcher-section-links", SectionSettings: "launcher-section-settings",
+	SectionLinks: "launcher-section-links", SectionBrowser: "launcher-section-browser", SectionSettings: "launcher-section-settings",
 	SectionFiles: "launcher-section-files", SectionClipboard: "launcher-section-clipboard",
 	SectionEmoji: "launcher-section-emoji", SectionVault: "launcher-section-vault",
 	SectionWeb: "launcher-section-web",

@@ -193,12 +193,12 @@ func pickerTitles(t *testing.T, p *Pickers) []string {
 }
 
 func TestPickersOfferOnlyWhatIsThereAndOpenALevel(t *testing.T) {
-	if got := pickerTitles(t, NewPickers(nil, nil, nil, true)); got != nil {
+	if got := pickerTitles(t, NewPickers(nil, nil, PickerLevels{}, true)); got != nil {
 		t.Errorf("nothing available: %v", got)
 	}
 	h := newFakeHistory(t, [2]string{"text/plain", "one"})
 	vault := &Level{Title: "V"}
-	p := NewPickers(h, fakeEmoji, func() *Level { return vault }, true)
+	p := NewPickers(h, fakeEmoji, PickerLevels{Vault: func() *Level { return vault }}, true)
 	if got := pickerTitles(t, p); !slices.Equal(got, []string{"picker:clipboard", "picker:emoji", "picker:vault"}) {
 		t.Fatalf("rows %v", got)
 	}

@@ -198,7 +198,7 @@ func searchUntil(t *testing.T, what string, cond func() bool) {
 func startVaultSearch(t *testing.T, v *fakeVault) (*search.Engine, *searchSink, *[]copied) {
 	t.Helper()
 	m, copies := vaultModeOver(v)
-	pickers := search.NewPickers(nil, nil, func() *search.Level { return search.ModeLevel(m, "Vault") }, false)
+	pickers := search.NewPickers(nil, nil, search.PickerLevels{Vault: func() *search.Level { return search.ModeLevel(m, "Vault") }}, false)
 	s := &searchSink{}
 	e := search.Start(&search.Level{Providers: []search.Provider{pickers}}, nil, s, func(fn func()) { fn() })
 	t.Cleanup(e.Stop)

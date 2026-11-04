@@ -147,6 +147,8 @@ launcher:
       - emoji
       - vault
       - links
+      - browser-bookmarks
+      - browser-history
       - scripts
       - shell
       - web

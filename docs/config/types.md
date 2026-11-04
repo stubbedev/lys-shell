@@ -704,6 +704,8 @@ A source of rows in the search panel.
 | `"emoji"` | The emoji table. |
 | `"vault"` | The Bitwarden vault. |
 | `"links"` | Quick links and snippets. |
+| `"browser-bookmarks"` | Bookmarks of the installed browsers (Firefox and Chromium families). |
+| `"browser-history"` | The most visited pages in the installed browsers' history. |
 | `"scripts"` | Script commands from the commands directory. |
 | `"shell"` | `>command` runs a shell command. |
 | `"web"` | The web search fallback. |

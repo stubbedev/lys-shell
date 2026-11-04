@@ -274,6 +274,10 @@ const (
 	SearchVault LauncherSearchProvider = "vault"
 	// Quick links and snippets.
 	SearchLinks LauncherSearchProvider = "links"
+	// Bookmarks of the installed browsers (Firefox and Chromium families).
+	SearchBookmarks LauncherSearchProvider = "browser-bookmarks"
+	// The most visited pages in the installed browsers' history.
+	SearchVisited LauncherSearchProvider = "browser-history"
 	// Script commands from the commands directory.
 	SearchScripts LauncherSearchProvider = "scripts"
 	// `>command` runs a shell command.
@@ -423,7 +427,7 @@ var (
 	_ = registerEnum(WindowFieldTitle, WindowFieldClass, WindowFieldName, WindowFieldRole, WindowFieldDesktop)
 	_ = registerEnum(FileSortName, FileSortMtime, FileSortAtime, FileSortCtime)
 	_ = registerEnum(SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
-		SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchScripts, SearchShell, SearchWeb)
+		SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchScripts, SearchShell, SearchWeb)
 )
 
 // launcherLocations is rofi's -location numbering: 0 center, then
@@ -496,7 +500,7 @@ func DefaultsLauncher() LauncherConfig {
 		Search: LauncherSearchConfig{
 			Providers: []LauncherSearchProvider{
 				SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
-				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchScripts, SearchShell, SearchWeb,
+				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchScripts, SearchShell, SearchWeb,
 			},
 			WebEngine:   "DuckDuckGo",
 			WebURL:      "https://duckduckgo.com/?q={query}",

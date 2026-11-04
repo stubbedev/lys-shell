@@ -3,13 +3,17 @@ package bar
 import (
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	"github.com/stubbedev/lys-shell/internal/version"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
@@ -67,11 +71,13 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 			return search.OpenFrecency(path, time.Now)
 		},
 	}
+	browser := newBrowserIndex()
 	deps.Search = func() search.Deps {
 		cfg := current()
 		d := search.Deps{
 			Env:     search.RealEnv(cfg.Launcher.Terminal),
 			Windows: modes.DetectWindows(),
+			Browser: browser,
 			SettingsPages: func() []search.SettingsPage {
 				pages := settings.Pages(cfg)
 				out := make([]search.SettingsPage, len(pages))
@@ -101,4 +107,16 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 		return func() {}
 	}
 	return stop
+}
+
+// newBrowserIndex reads the browsers of this home directory; without one
+// the panel offers neither bookmarks nor history.
+func newBrowserIndex() *search.BrowserIndex {
+	configDir, ok := xdg.OS.ConfigDir(version.Name)
+	home := os.Getenv("HOME")
+	if !ok || !filepath.IsAbs(home) {
+		log.Print("launcher: neither XDG_CONFIG_HOME nor HOME is an absolute path: browser bookmarks and history are unavailable")
+		return nil
+	}
+	return search.NewBrowserIndex(home, filepath.Dir(configDir))
 }

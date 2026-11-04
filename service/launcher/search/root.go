@@ -27,6 +27,8 @@ type Deps struct {
 	SettingsPages func() []SettingsPage
 	// Windows is the compositor's; nil where none is known.
 	Windows modes.WindowBackend
+	// Browser reads the browsers' bookmarks and history; nil offers neither.
+	Browser *BrowserIndex
 }
 
 // frecencyFileName and fileIndexFileName are the session's files, under
@@ -81,6 +83,17 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 		root.Providers = append(root.Providers, NewClipboard(d.Clipboard, cfg.Previews))
 	}
 	add(config.SearchEmoji, func() Provider { return NewEmoji(modes.AvailableEmoji) })
+	levels := PickerLevels{}
+	if d.Browser != nil {
+		if has(config.SearchBookmarks) {
+			root.Providers = append(root.Providers, NewBookmarks(d.Env, d.Browser))
+			levels.Bookmarks = func() *Level { return bookmarksLevel(d.Env, d.Browser) }
+		}
+		if has(config.SearchVisited) {
+			root.Providers = append(root.Providers, NewVisitedPages(d.Env, d.Browser, has(config.SearchBookmarks)))
+			levels.Visited = func() *Level { return visitedLevel(d.Env, d.Browser) }
+		}
+	}
 	var history modes.ClipboardHistory
 	if has(config.SearchClipboard) {
 		history = d.Clipboard
@@ -89,11 +102,10 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	if has(config.SearchEmoji) {
 		emoji = modes.AvailableEmoji
 	}
-	var vault func() *Level
 	if has(config.SearchVault) && d.Vault != nil {
-		vault = func() *Level { return ModeLevel(d.Vault(), i18n.T("launcher-picker-vault")) }
+		levels.Vault = func() *Level { return ModeLevel(d.Vault(), i18n.T("launcher-picker-vault")) }
 	}
-	if pickers := NewPickers(history, emoji, vault, cfg.Previews); len(pickers.items) > 0 {
+	if pickers := NewPickers(history, emoji, levels, cfg.Previews); len(pickers.items) > 0 {
 		root.Providers = append(root.Providers, pickers)
 	}
 	add(config.SearchWeb, func() Provider { return NewWeb(d.Env, cfg.WebEngine, cfg.WebURL) })

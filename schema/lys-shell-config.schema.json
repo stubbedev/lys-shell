@@ -3465,6 +3465,8 @@
               "emoji",
               "vault",
               "links",
+              "browser-bookmarks",
+              "browser-history",
               "scripts",
               "shell",
               "web"
@@ -3854,6 +3856,8 @@
             "emoji",
             "vault",
             "links",
+            "browser-bookmarks",
+            "browser-history",
             "scripts",
             "shell",
             "web"
@@ -3934,6 +3938,16 @@
         {
           "const": "links",
           "description": "Quick links and snippets.",
+          "type": "string"
+        },
+        {
+          "const": "browser-bookmarks",
+          "description": "Bookmarks of the installed browsers (Firefox and Chromium families).",
+          "type": "string"
+        },
+        {
+          "const": "browser-history",
+          "description": "The most visited pages in the installed browsers' history.",
           "type": "string"
         },
         {
@@ -10173,6 +10187,8 @@
             "emoji",
             "vault",
             "links",
+            "browser-bookmarks",
+            "browser-history",
             "scripts",
             "shell",
             "web"

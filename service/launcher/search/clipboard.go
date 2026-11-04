@@ -177,7 +177,8 @@ func (*Emoji) Actions(e Entry) []Action {
 }
 
 // Pickers are root rows that open a whole list of their own: the full
-// clipboard history, every emoji, the vault.
+// clipboard history, every emoji, the vault, every bookmark, the most
+// visited pages.
 type Pickers struct {
 	items []picker
 }
@@ -187,9 +188,15 @@ type picker struct {
 	level                     func() *Level
 }
 
-// NewPickers builds the rows for what is available. A nil history or
-// vault leaves its row out.
-func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, vault func() *Level, previews bool) *Pickers {
+// PickerLevels are the levels of the pickers with nothing to configure;
+// a nil one leaves its row out.
+type PickerLevels struct {
+	Vault, Bookmarks, Visited func() *Level
+}
+
+// NewPickers builds the rows for what is available. A nil history leaves
+// its row out, as does a nil level.
+func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, levels PickerLevels, previews bool) *Pickers {
 	p := &Pickers{}
 	if history != nil {
 		title := i18n.T("launcher-picker-clipboard")
@@ -203,8 +210,14 @@ func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, vaul
 			return &Level{Title: title, Placeholder: i18n.T("launcher-placeholder-filter"), Providers: []Provider{&Emoji{load: emoji, flat: true}}}
 		}})
 	}
-	if vault != nil {
-		p.items = append(p.items, picker{"vault", i18n.T("launcher-picker-vault"), "bitwarden bw password vault secrets", "ld-shield-check-symbolic", vault})
+	if levels.Vault != nil {
+		p.items = append(p.items, picker{"vault", i18n.T("launcher-picker-vault"), "bitwarden bw password vault secrets", "ld-shield-check-symbolic", levels.Vault})
+	}
+	if levels.Bookmarks != nil {
+		p.items = append(p.items, picker{"bookmarks", i18n.T("launcher-picker-bookmarks"), "browser firefox chrome favorites", "ld-bookmark-symbolic", levels.Bookmarks})
+	}
+	if levels.Visited != nil {
+		p.items = append(p.items, picker{"visited", i18n.T("launcher-picker-visited"), "browser firefox chrome history frequent top sites", "ld-history-symbolic", levels.Visited})
 	}
 	return p
 }
