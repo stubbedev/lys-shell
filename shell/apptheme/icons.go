@@ -98,3 +98,7 @@ func ReportMissingIcons(cfg *config.Config, sink config.DiagnosticSink) {
 		sink(d)
 	}
 }
+
+// IconNames lists the action icons on the icon search path, for a
+// picker that offers them.
+func IconNames() ([]string, error) { return icons.List(widget.IconSearchPaths()) }

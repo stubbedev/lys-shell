@@ -47,6 +47,7 @@ let
       ../portal
       ../resources
       ../service
+      ../settingspage
       ../shell
       ../shlex
       ../strftime

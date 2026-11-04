@@ -34,13 +34,13 @@ func TestEmbeddedPartialsParseCleanly(t *testing.T) {
 				t.Errorf("%s/%s: no partials", name, loc)
 			}
 			for _, f := range files {
-				data, err := fs.ReadFile(assets.fsys, f)
+				data, err := fs.ReadFile(f.tree, f.path)
 				if err != nil {
 					t.Fatal(err)
 				}
 				res := parseResource(strings.ReplaceAll(string(data), "\r\n", "\n"))
 				for _, j := range res.junk {
-					t.Errorf("%s/%s: junk (%v): %q", name, f, j.err, j.content)
+					t.Errorf("%s/%s: junk (%v): %q", name, f.path, j.err, j.content)
 				}
 			}
 			if chosen, _ := pluralRuleFor(loc); chosen.language != loc.language {

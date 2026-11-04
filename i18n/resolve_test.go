@@ -277,3 +277,36 @@ func TestAMessageWithoutPlaceablesAllocatesNothing(t *testing.T) {
 		t.Errorf("T = %q, want %q", got, want)
 	}
 }
+
+func TestAssetsWithAnotherTreeResolveBoth(t *testing.T) {
+	base := fstest.MapFS{"en-US/_base.ftl": {Data: []byte("from-base = base\n")}}
+	extra := fstest.MapFS{
+		"en-US/_extra.ftl": {Data: []byte("from-extra = extra\n")},
+		"fr/_extra.ftl":    {Data: []byte("from-extra = supplement\n")},
+	}
+	loader, err := Select(NewAssets(base).With(extra), []LangID{MustLangID("fr")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loader.Get("from-base"); got != "base" {
+		t.Errorf("a message of the base tree, through the fallback: %q", got)
+	}
+	if got := loader.Get("from-extra"); got != "supplement" {
+		t.Errorf("a message of the added tree in the asked language: %q", got)
+	}
+	if loader.Has("no-such-message") {
+		t.Error("a message neither tree has")
+	}
+}
+
+func TestAssetsWithLeaveTheOriginalAlone(t *testing.T) {
+	base := NewAssets(fstest.MapFS{"en-US/_base.ftl": {Data: []byte("a = 1\n")}})
+	_ = base.With(fstest.MapFS{"en-US/_extra.ftl": {Data: []byte("b = 2\n")}})
+	loader, err := Select(base, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loader.Has("b") {
+		t.Error("With changed the assets it was called on")
+	}
+}

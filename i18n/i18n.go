@@ -65,6 +65,14 @@ func Shell() *Loader { return shellDomain.get() }
 // Settings returns the settings-domain loader (wayle-i18n's loader()).
 func Settings() *Loader { return settingsDomain.get() }
 
+// ConfigAssets is the config's field labels and common messages, for
+// a program that edits the config and adds messages of its own.
+func ConfigAssets() Assets { return settingsDomain.assets }
+
+// RequestedLanguages is the desktop locale's languages, as every
+// domain negotiates them.
+func RequestedLanguages() []LangID { return requestedLanguages(os.Getenv) }
+
 // Greeter returns the greeter-domain loader (lys-greeter's loader()).
 func Greeter() *Loader { return greeterDomain.get() }
 

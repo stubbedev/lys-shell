@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"slices"
@@ -56,10 +57,23 @@ type Assets struct {
 	// whose locales are plain files, as lys-greeter's are, loaded by
 	// i18n-embed under the crate's name) instead of `_*.ftl` partials.
 	file string
+	// more are further trees of partials (With).
+	more []fs.FS
 }
 
 // NewAssets wraps a locale tree of `_*.ftl` partials.
 func NewAssets(fsys fs.FS) Assets { return Assets{fsys: fsys} }
+
+// With adds another locale tree of partials after these: a locale's
+// source is both trees' partials, for a program that adds its own
+// messages to a domain it does not own.
+func (a Assets) With(fsys fs.FS) Assets {
+	a.more = append(slices.Clone(a.more), fsys)
+	return a
+}
+
+// trees is every locale tree, in the order their partials concatenate.
+func (a Assets) trees() []fs.FS { return append([]fs.FS{a.fsys}, a.more...) }
 
 // NewFileAssets wraps a locale tree holding one file per locale,
 // <locale>/<file>.
@@ -69,25 +83,31 @@ func NewFileAssets(fsys fs.FS, file string) Assets { return Assets{fsys: fsys, f
 // like rust-embed's file list, with the fallback first when missing
 // (i18n-embed's available_languages).
 func (a Assets) Available() ([]LangID, error) {
-	dirs, err := fs.ReadDir(a.fsys, ".")
-	if err != nil {
-		return nil, err
-	}
-	var ids []LangID
-	for _, d := range dirs {
-		if !d.IsDir() {
-			continue
+	var names []string
+	for _, tree := range a.trees() {
+		dirs, err := fs.ReadDir(tree, ".")
+		if err != nil {
+			return nil, err
 		}
-		parts, err := a.partials(d.Name())
+		for _, d := range dirs {
+			if d.IsDir() && !slices.Contains(names, d.Name()) {
+				names = append(names, d.Name())
+			}
+		}
+	}
+	slices.Sort(names)
+	var ids []LangID
+	for _, name := range names {
+		parts, err := a.partials(name)
 		if err != nil {
 			return nil, err
 		}
 		if len(parts) == 0 {
 			continue
 		}
-		id, err := ParseLangID(d.Name())
+		id, err := ParseLangID(name)
 		if err != nil {
-			return nil, fmt.Errorf("i18n: locale dir %q: %w", d.Name(), err)
+			return nil, fmt.Errorf("i18n: locale dir %q: %w", name, err)
 		}
 		ids = append(ids, id)
 	}
@@ -99,30 +119,53 @@ func (a Assets) Available() ([]LangID, error) {
 
 // partials lists a locale's `_*.ftl` files in the order the Rust build
 // scripts concatenate them: PathBuf order, compared component-wise.
-func (a Assets) partials(locale string) ([]string, error) {
+func (a Assets) partials(locale string) ([]partial, error) {
 	if a.file != "" {
 		p := locale + "/" + a.file
 		if _, err := fs.Stat(a.fsys, p); err != nil {
 			return nil, nil // a locale without the file offers nothing
 		}
-		return []string{p}, nil
+		return []partial{{a.fsys, p}}, nil
 	}
-	var files []string
-	err := fs.WalkDir(a.fsys, locale, func(p string, d fs.DirEntry, err error) error {
+	var all []partial
+	for _, tree := range a.trees() {
+		files, err := treePartials(tree, locale)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, files...)
+	}
+	return all, nil
+}
+
+// partial is one FTL file and the tree holding it.
+type partial struct {
+	tree fs.FS
+	path string
+}
+
+// treePartials is one tree's partials of a locale, sorted; a tree
+// without the locale has none.
+func treePartials(tree fs.FS, locale string) ([]partial, error) {
+	if _, err := fs.Stat(tree, locale); errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	var files []partial
+	err := fs.WalkDir(tree, locale, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		name := d.Name()
 		if !d.IsDir() && strings.HasPrefix(name, "_") && strings.HasSuffix(name, ".ftl") {
-			files = append(files, p)
+			files = append(files, partial{tree, p})
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	slices.SortFunc(files, func(x, y string) int {
-		return slices.Compare(strings.Split(x, "/"), strings.Split(y, "/"))
+	slices.SortFunc(files, func(x, y partial) int {
+		return slices.Compare(strings.Split(x.path, "/"), strings.Split(y.path, "/"))
 	})
 	return files, nil
 }
@@ -137,7 +180,7 @@ func (a Assets) Source(locale string) (string, error) {
 	}
 	var b strings.Builder
 	for _, f := range files {
-		data, err := fs.ReadFile(a.fsys, f)
+		data, err := fs.ReadFile(f.tree, f.path)
 		if err != nil {
 			return "", err
 		}
