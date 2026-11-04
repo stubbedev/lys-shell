@@ -203,7 +203,7 @@ func (hs *harness) do(fn func()) {
 func (hs *harness) settle() {
 	for deadline := time.Now().Add(treetest.Liveness); ; time.Sleep(time.Millisecond) {
 		var loading bool
-		hs.run(func() { loading = hs.c.s != nil && hs.c.s.loading })
+		hs.run(func() { loading = hs.c.checking > 0 || hs.c.s != nil && hs.c.s.loading })
 		if !loading {
 			hs.flush()
 			return
@@ -2143,4 +2143,34 @@ func TestColumnsGiveWayToTheName(t *testing.T) {
 	if name.W < nameMinW {
 		t.Errorf("name column = %dpx, want at least %d", name.W, nameMinW)
 	}
+}
+
+func TestTheChooserMapsWhilePlacesAndLocationsHold(t *testing.T) {
+	hs := newHarness(t, "")
+	release := make(chan struct{})
+	t.Cleanup(sync.OnceFunc(func() { close(release) }))
+	asked := make(chan string, 4)
+	hs.c.d.Places = func() []Place {
+		asked <- "places"
+		<-release
+		return []Place{{"Held", hs.root, "user-home-symbolic"}}
+	}
+	hs.c.d.Locations = func() []Place {
+		asked <- "locations"
+		<-release
+		return nil
+	}
+	got := make(chan []string, 1)
+	go func() { got <- hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}).URIs }()
+	select {
+	case <-hs.opened:
+	case <-time.After(treetest.Liveness):
+		t.Fatal("the chooser waited on its sidebar to map")
+	}
+	select {
+	case <-asked:
+	case <-time.After(treetest.Liveness):
+		t.Fatal("the sidebar was never read")
+	}
+	hs.flush()
 }

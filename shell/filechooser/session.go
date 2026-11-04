@@ -60,11 +60,20 @@ func newSession(mode Mode, folder string, filters []Filter, db *mime.Database, h
 	return s
 }
 
+// usableFolder is folder when it is one, else "": a stat, for off the loop.
+func usableFolder(folder string) string {
+	if folder == "" {
+		return ""
+	}
+	if info, err := os.Stat(folder); err != nil || !info.IsDir() {
+		return ""
+	}
+	return folder
+}
+
 func startDir(folder, home string) string {
 	if folder != "" {
-		if info, err := os.Stat(folder); err == nil && info.IsDir() {
-			return folder
-		}
+		return folder
 	}
 	if home != "" {
 		return home
@@ -232,8 +241,8 @@ func (s *session) up() bool {
 
 // dropped navigates to a dropped folder, or reveals a dropped file in
 // its folder.
-func (s *session) dropped(path string) {
-	if info, err := os.Stat(path); err == nil && info.IsDir() {
+func (s *session) dropped(path string, isDir bool) {
+	if isDir {
 		s.goTo(path)
 		return
 	}

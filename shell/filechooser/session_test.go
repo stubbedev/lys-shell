@@ -25,10 +25,10 @@ func open(t *testing.T, mode Mode, folder string, filters []Filter) *session {
 
 func TestSessionStartsInTheRequestedFolderElseHome(t *testing.T) {
 	root := tree(t)
-	if s := open(t, ModeOpenFile, root, nil); s.dir != root {
+	if s := open(t, ModeOpenFile, usableFolder(root), nil); s.dir != root {
 		t.Errorf("dir = %s, want the requested %s", s.dir, root)
 	}
-	if s := open(t, ModeOpenFile, filepath.Join(root, "b.txt"), nil); s.dir != "/nonexistent-home" {
+	if s := open(t, ModeOpenFile, usableFolder(filepath.Join(root, "b.txt")), nil); s.dir != "/nonexistent-home" {
 		t.Errorf("a file as the folder = %s, want home", s.dir)
 	}
 	if s := newSession(ModeOpenFile, "", nil, testDB(t), "", defaultView); s.dir != "/" {
@@ -161,11 +161,11 @@ func TestSessionRecursiveResultsAreForTheCurrentQueryOnly(t *testing.T) {
 func TestSessionDroppedRevealsFilesAndEntersFolders(t *testing.T) {
 	root := tree(t)
 	s := open(t, ModeOpenFile, root, nil)
-	s.dropped(filepath.Join(root, "pics", "a.png"))
+	s.dropped(filepath.Join(root, "pics", "a.png"), false)
 	if s.dir != filepath.Join(root, "pics") {
 		t.Errorf("a dropped file = %s, want its folder", s.dir)
 	}
-	s.dropped(filepath.Join(root, "docs"))
+	s.dropped(filepath.Join(root, "docs"), true)
 	if s.dir != filepath.Join(root, "docs") {
 		t.Errorf("a dropped folder = %s", s.dir)
 	}

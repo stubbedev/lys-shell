@@ -115,8 +115,10 @@ type Deps struct {
 // a request answers it with nothing, showing or waiting. Open and Save
 // may be called from any goroutine; the rest runs on the loop.
 type Chooser struct {
-	d   Deps
-	win Window
+	// checking counts the disk checks out off the loop.
+	checking int
+	d        Deps
+	win      Window
 	// rev reveals the panel on the overlay; closing is set while it
 	// hides before the overlay closes.
 	rev     *widget.Revealer
@@ -242,7 +244,36 @@ func (c *Chooser) Dismiss(handle string) {
 }
 
 // ask queues a request on the loop and waits for its answer.
+// offLoopFor runs check off the loop and then on the dialog showing when it
+// started, for what a dead mount could hang.
+func offLoopFor[T any](c *Chooser, check func() T, then func(T)) {
+	u := c.ui
+	c.checking++
+	go func() {
+		v := check()
+		c.d.Invoke(func() {
+			c.checking--
+			if c.ui == u && c.reply != nil {
+				then(v)
+			}
+		})
+	}()
+}
+
+type pathStat struct {
+	info os.FileInfo
+	err  error
+}
+
+func statPath(path string) func() pathStat {
+	return func() pathStat {
+		info, err := os.Stat(path)
+		return pathStat{info, err}
+	}
+}
+
 func (c *Chooser) ask(caller portaldialogs.Caller, r request) Result {
+	r.folder = usableFolder(r.folder)
 	ch := make(chan Result, 1)
 	c.d.Invoke(func() {
 		c.queue.Enqueue(caller.Handle, func() {
@@ -299,7 +330,10 @@ func (c *Chooser) begin(r request) {
 	c.relist()
 	c.show()
 	if c.d.WatchLocations != nil {
-		c.stopMounts = c.d.WatchLocations(func() { c.d.Invoke(c.refreshLocations) })
+		c.stopMounts = c.d.WatchLocations(func() {
+			locations := c.d.Locations()
+			c.d.Invoke(func() { c.refreshLocations(locations) })
+		})
 	}
 }
 
@@ -634,17 +668,21 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 		box.Append(list, false)
 		return list
 	}
-	favorites := c.d.Places()
 	// Recent and Trash list files to open, never a folder to save in.
 	opening := c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple
-	if c.d.RecentFile != "" && opening {
-		favorites = append([]Place{{"Recent", recentLocation, "ld-history-symbolic"}}, favorites...)
-	}
-	if c.d.TrashDirs != nil && opening {
-		favorites = append(favorites, Place{"Trash", trashLocation, "ld-trash-2-symbolic"})
-	}
-	section("Favorites", favorites)
-	u.locations = section("Locations", c.d.Locations())
+	favorites := c.favorites(nil, opening)
+	favoritesList := section("Favorites", favorites)
+	u.locations = section("Locations", nil)
+	go func() {
+		places, locations := c.d.Places(), c.d.Locations()
+		c.d.Invoke(func() {
+			if c.ui != u {
+				return
+			}
+			c.fillPlaces(favoritesList, c.favorites(places, opening))
+			c.fillPlaces(u.locations, locations)
+		})
+	}()
 	box.Append(widget.NewSpacer(0, 0), true)
 	scroll := widget.NewScroll(box)
 	// Filled, so the sections pack at the top instead of floating mid-view.
@@ -653,6 +691,19 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	scroll.AddClass("file-chooser-sidebar-scroll")
 	scroll.SetSizeRequest(sidebarW, 0)
 	return scroll
+}
+
+// favorites is the Favorites list around the user's places.
+func (c *Chooser) favorites(places []Place, opening bool) []Place {
+	var favorites []Place
+	if c.d.RecentFile != "" && opening {
+		favorites = append(favorites, Place{"Recent", recentLocation, "ld-history-symbolic"})
+	}
+	favorites = append(favorites, places...)
+	if c.d.TrashDirs != nil && opening {
+		favorites = append(favorites, Place{"Trash", trashLocation, "ld-trash-2-symbolic"})
+	}
+	return favorites
 }
 
 // placeIcon is a place's icon, through GTK's dash fallbacks as the GTK
@@ -681,9 +732,9 @@ func (c *Chooser) fillPlaces(list *widget.Box, places []Place) {
 }
 
 // refreshLocations rebuilds Locations: a mount came or went.
-func (c *Chooser) refreshLocations() {
+func (c *Chooser) refreshLocations(locations []Place) {
 	if c.reply != nil && c.ui != nil {
-		c.fillPlaces(c.ui.locations, c.d.Locations())
+		c.fillPlaces(c.ui.locations, locations)
 	}
 }
 
@@ -1262,12 +1313,14 @@ func (c *Chooser) step(back bool) {
 // dropped opens a dropped folder, or the folder of a dropped file with
 // the file selected.
 func (c *Chooser) dropped(path string) {
-	c.selectNext = path
-	c.s.dropped(path)
-	c.afterNavigate()
-	if !c.s.loading {
-		c.applySelectNext()
-	}
+	offLoopFor(c, statPath(path), func(st pathStat) {
+		c.selectNext = path
+		c.s.dropped(path, st.err == nil && st.info.IsDir())
+		c.afterNavigate()
+		if !c.s.loading {
+			c.applySelectNext()
+		}
+	})
 }
 
 // applySelectNext selects the entry waiting to be, once listed.
@@ -1323,21 +1376,22 @@ func (c *Chooser) goToLocation(text string) {
 	if path == "" {
 		return
 	}
-	info, err := os.Stat(path)
-	switch {
-	case err == nil && info.IsDir():
-		c.hideLocation()
-		c.goTo(path)
-	case c.s.mode == ModeSave:
-		c.hideLocation()
-		c.goTo(filepath.Dir(path))
-		c.ui.name.SetText(filepath.Base(path))
-		c.focus(c.ui.name)
-	case err == nil && !c.s.mode.folders():
-		c.finish([]string{fileuri.FromPath(path)})
-	default:
-		c.warn("No folder or file at " + path + ".")
-	}
+	offLoopFor(c, statPath(path), func(st pathStat) {
+		switch {
+		case st.err == nil && st.info.IsDir():
+			c.hideLocation()
+			c.goTo(path)
+		case c.s.mode == ModeSave:
+			c.hideLocation()
+			c.goTo(filepath.Dir(path))
+			c.ui.name.SetText(filepath.Base(path))
+			c.focus(c.ui.name)
+		case st.err == nil && !c.s.mode.folders():
+			c.finish([]string{fileuri.FromPath(path)})
+		default:
+			c.warn("No folder or file at " + path + ".")
+		}
+	})
 }
 
 // showNewFolder opens the row naming a folder to create.
@@ -1535,29 +1589,42 @@ func (c *Chooser) confirmSave() {
 	if path == "" {
 		return
 	}
+	dir := filepath.Dir(path)
+	offLoopFor(c, func() saveCheck { return checkSave(path, dir) }, func(check saveCheck) {
+		switch {
+		case check.isDir:
+			c.ui.name.SetText("")
+			c.goTo(path)
+		case check.noFolder:
+			c.warn("The folder " + dir + " does not exist.")
+		case check.notWritable:
+			c.warn("You cannot save in " + dir + ".")
+		case check.exists && c.replacing != path:
+			c.replacing = path
+			c.ui.noticeLabel.SetText("“" + filepath.Base(path) + "” already exists in “" + filepath.Base(dir) + "”. Replace it?")
+			c.ui.replace.SetVisible(true)
+			c.ui.notice.SetVisible(true)
+		default:
+			c.finish([]string{fileuri.FromPath(path)})
+		}
+	})
+}
+
+// saveCheck is what the disk says about saving to a path.
+type saveCheck struct{ isDir, exists, noFolder, notWritable bool }
+
+func checkSave(path, dir string) saveCheck {
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
-		c.ui.name.SetText("")
-		c.goTo(path)
-		return
+		return saveCheck{isDir: true}
 	}
-	dir := filepath.Dir(path)
 	if d, derr := os.Stat(dir); derr != nil || !d.IsDir() {
-		c.warn("The folder " + dir + " does not exist.")
-		return
+		return saveCheck{noFolder: true}
 	}
 	if unix.Access(dir, unix.W_OK) != nil {
-		c.warn("You cannot save in " + dir + ".")
-		return
+		return saveCheck{notWritable: true}
 	}
-	if err == nil && c.replacing != path {
-		c.replacing = path
-		c.ui.noticeLabel.SetText("“" + filepath.Base(path) + "” already exists in “" + filepath.Base(dir) + "”. Replace it?")
-		c.ui.replace.SetVisible(true)
-		c.ui.notice.SetVisible(true)
-		return
-	}
-	c.finish([]string{fileuri.FromPath(path)})
+	return saveCheck{exists: err == nil}
 }
 
 // warn shows a warning in the notice.

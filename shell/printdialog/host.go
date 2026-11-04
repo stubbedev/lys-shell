@@ -487,16 +487,26 @@ func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
 			landscape: orientation.Selected() == 1, paper: papersOf[paperDrop.value()],
 			color: colorDrop.value(), side: sideDrop.value(), quality: qualityDrop.value(),
 		}
-		if queues[sel].name == fileQueue {
-			if _, err := os.Stat(output); err == nil && !confirmedReplace {
-				confirmedReplace = true
-				replaceNote.SetText(filepath.Base(output) + " exists. " + acceptLabel + " again to replace it.")
-				replaceNote.SetVisible(true)
-				return
-			}
-			f.output = output
+		printer := queues[sel].name
+		if printer != fileQueue {
+			h.finish(prepared{printer: printer, form: f}, true)
+			return
 		}
-		h.finish(prepared{printer: queues[sel].name, form: f}, true)
+		file := output
+		go func() {
+			_, err := os.Stat(file)
+			exists := err == nil
+			h.d.Invoke(func() {
+				if exists && !confirmedReplace {
+					confirmedReplace = true
+					replaceNote.SetText(filepath.Base(file) + " exists. " + acceptLabel + " again to replace it.")
+					replaceNote.SetVisible(true)
+					return
+				}
+				f.output = file
+				h.finish(prepared{printer: printer, form: f}, true)
+			})
+		}()
 	}
 	surface := widgets.DialogCard(h.d.Font, "Print", "print-surface", surfaceWidth)
 	surface.SetContent(widgets.DialogBody(printers, grid, outputRow, replaceNote))
