@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
 )
@@ -103,11 +104,7 @@ func (w *clockWatch) jump(t *testing.T) func() {
 
 func newTestNightlight(t *testing.T, cfg *config.Config, env sunsetEnv) *nightlightModule {
 	t.Helper()
-	m, err := newNightlightWith(newTestContext(t, cfg), env)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return m
+	return newNightlightWith(newTestContext(t, cfg), env)
 }
 
 // Copenhagen, where 2024-06-21 01:00 UTC is night and 12:00 day.
@@ -1177,8 +1174,13 @@ func TestNightlightRejectsAnOutOfRangeStrength(t *testing.T) {
 func TestNightlightFailsWithoutAColourProtocol(t *testing.T) {
 	env := (&fakeSunset{clock: sunsetDay}).env(t)
 	env.open = func(func()) (colourFilter, error) { return nil, nightlight.ErrUnsupported }
-	if _, err := newNightlightWith(newTestContext(t, sunsetConfig(false)), env); !errors.Is(err, nightlight.ErrUnsupported) {
-		t.Errorf("err = %v, want ErrUnsupported", err)
+	logs := captureLog(t)
+	m := newNightlightWith(newTestContext(t, sunsetConfig(false)), env)
+	if m.read {
+		t.Error("a compositor without a colour protocol revealed the module")
+	}
+	if !strings.Contains(logs.String(), nightlight.ErrUnsupported.Error()) {
+		t.Errorf("log = %q, want why the module stays hidden", logs.String())
 	}
 }
 
@@ -1189,10 +1191,7 @@ func TestRetiringTheBarLetsGoOfTheColoursBeforeTheNextMounts(t *testing.T) {
 	fake := &fakeSunset{clock: sunsetDay}
 	ctx := newTestContext(t, sunsetConfig(true))
 	ctx.gen = newMountGen()
-	m, err := newNightlightWith(ctx, fake.env(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newNightlightWith(ctx, fake.env(t))
 	m.toggle()
 	if !fake.running {
 		t.Fatal("the toggle did not start the filter")
@@ -1213,5 +1212,37 @@ func TestOnRetireOutsideAGenerationDoesNothing(t *testing.T) {
 	ModuleContext{}.OnRetire(func() { ran = true })
 	if ran {
 		t.Error("release ran with no generation retiring")
+	}
+}
+
+type heldSunset struct {
+	*fakeSunset
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (f *heldSunset) Apply(s nightlight.Setting) error {
+	f.entered <- struct{}{}
+	<-f.release
+	return f.fakeSunset.Apply(s)
+}
+
+func TestNightlightToggleReturnsWhileTheFilterHolds(t *testing.T) {
+	ctx, a := loopContext(t)
+	ctx.Config = sunsetConfig(false)
+	fake := &fakeSunset{}
+	held := &heldSunset{fakeSunset: fake, entered: make(chan struct{}, 4), release: make(chan struct{})}
+	t.Cleanup(sync.OnceFunc(func() { close(held.release) }))
+	env := fake.env(t)
+	env.open = func(func()) (colourFilter, error) { return held, nil }
+	m := apptest.On(a, func() *nightlightModule { return newNightlightWith(ctx, env) })
+	apptest.Until(t, a, "the filter connected", func() bool { return m.read })
+	apptest.On(a, func() bool {
+		m.RunAction(config.ClickAction{Kind: config.ClickShell, Command: ":toggle"})
+		return m.enabled
+	})
+	apptest.Answer(t, "the Apply reached the filter, off the loop", held.entered)
+	if !apptest.On(a, func() bool { return m.enabled }) {
+		t.Error("the loop did not run while the filter held")
 	}
 }
