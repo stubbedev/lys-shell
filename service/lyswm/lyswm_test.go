@@ -2,8 +2,11 @@ package lyswm_test
 
 import (
 	"errors"
+	"log"
+	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -281,6 +284,9 @@ func TestWatchEndsOnAMalformedLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var logged syncBuffer
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 	f.Events <- `not json`
 	select {
 	case _, ok := <-w.Ticks():
@@ -290,6 +296,48 @@ func TestWatchEndsOnAMalformedLine(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the stream did not end")
 	}
+	if !strings.Contains(logged.String(), "not json") {
+		t.Errorf("the stream ended without saying why: %q", logged.String())
+	}
+}
+
+// Closing a stream is not a failure to report.
+func TestWatchClosedLogsNothing(t *testing.T) {
+	lyswmtest.Start(t)
+	w, err := lyswm.Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logged syncBuffer
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	w.Close()
+	select {
+	case <-w.Ticks():
+	case <-time.After(2 * time.Second):
+		t.Fatal("the stream did not end")
+	}
+	if logged.String() != "" {
+		t.Errorf("logged %q", logged.String())
+	}
+}
+
+// syncBuffer is a log destination the watcher's goroutine and the test share.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
 
 func TestWatchEndsWhenClosed(t *testing.T) {

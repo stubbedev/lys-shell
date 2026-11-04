@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"slices"
@@ -307,6 +308,7 @@ func (w *Watcher) pump(reader *bufio.Reader) {
 		}
 		var e event
 		if err := json.Unmarshal(line, &e); err != nil || e.Event == "" {
+			log.Printf("lys-wm: event stream ended on a line it cannot read (%v): %.200q", err, line)
 			return
 		}
 		if w.onEvent != nil {
