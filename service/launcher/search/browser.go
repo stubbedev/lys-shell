@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"maps"
 	"math/bits"
 	"net/url"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-shell/i18n"
@@ -94,6 +96,8 @@ type browserPage struct {
 // browserPages is what a profile, or all of them, holds.
 type browserPages struct {
 	bookmarks, visited []browserPage
+	// icons holds each host's favicon file.
+	icons map[string]string
 }
 
 // fileStamp tells whether a file changed without reading it.
@@ -113,16 +117,20 @@ type browserProfile struct {
 // opening the panel costs a stat per file while nobody browses.
 type BrowserIndex struct {
 	roots []browserRoot
+	// iconDir is where favicons are kept.
+	iconDir string
 
 	mu       sync.Mutex
 	profiles map[string]*browserProfile
-	merged   browserPages
+	// merged is the last reading, nil before the first; it is read without
+	// mu, as a reading may take a second while the browser is writing.
+	merged atomic.Pointer[browserPages]
 }
 
 // NewBrowserIndex reads the known browsers' profiles under home and
-// configHome.
-func NewBrowserIndex(home, configHome string) *BrowserIndex {
-	return &BrowserIndex{roots: browserRoots(home, configHome), profiles: map[string]*browserProfile{}}
+// configHome, keeping their favicons in iconDir.
+func NewBrowserIndex(home, configHome, iconDir string) *BrowserIndex {
+	return &BrowserIndex{roots: browserRoots(home, configHome), iconDir: iconDir, profiles: map[string]*browserProfile{}}
 }
 
 // databaseOf is the sqlite file a profile keeps its pages in.
@@ -134,10 +142,13 @@ func databaseOf(kind browserKind) string {
 }
 
 // watchedFiles are every file a profile's reading depends on: the
-// database with its write-ahead log or rollback journal.
+// databases with their write-ahead logs or rollback journals.
 func watchedFiles(kind browserKind, dir string) []string {
-	db := filepath.Join(dir, databaseOf(kind))
-	files := []string{db, db + "-wal", db + "-journal"}
+	var files []string
+	for _, name := range []string{databaseOf(kind), faviconsOf[kind].database} {
+		db := filepath.Join(dir, name)
+		files = append(files, db, db+"-wal", db+"-journal")
+	}
 	if kind == browserChromium {
 		files = append(files, filepath.Join(dir, "Bookmarks"))
 	}
@@ -195,7 +206,7 @@ func profileDirs(root string) ([]string, error) {
 // read brings every profile up to date and returns all their pages. The
 // result is never written again. A profile that cannot be read is logged
 // and keeps its last reading: the next read tries it again.
-func (b *BrowserIndex) read(ctx context.Context) browserPages {
+func (b *BrowserIndex) read(ctx context.Context) *browserPages {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	changed := false
@@ -221,7 +232,7 @@ func (b *BrowserIndex) read(ctx context.Context) browserPages {
 			if old, ok := b.profiles[dir]; ok && sameStamps(old.stamps, stamps) {
 				continue
 			}
-			pages, err := readProfile(ctx, root.kind, dir)
+			pages, err := b.readProfile(ctx, root.kind, dir)
 			if err != nil {
 				if ctx.Err() == nil {
 					log.Printf("launcher: reading browser profile %s: %v", dir, err)
@@ -241,22 +252,48 @@ func (b *BrowserIndex) read(ctx context.Context) browserPages {
 			changed = true
 		}
 	}
-	if changed {
-		lists := make([]browserPages, 0, len(order))
-		for _, dir := range order {
-			lists = append(lists, b.profiles[dir].pages)
-		}
-		b.merged = mergeProfiles(lists)
+	if merged := b.merged.Load(); merged != nil && !changed {
+		return merged
 	}
-	return b.merged
+	lists := make([]browserPages, 0, len(order))
+	for _, dir := range order {
+		lists = append(lists, b.profiles[dir].pages)
+	}
+	merged := mergeProfiles(lists)
+	b.merged.Store(&merged)
+	return &merged
 }
 
-// readProfile reads one profile's pages.
-func readProfile(ctx context.Context, kind browserKind, dir string) (browserPages, error) {
-	if kind == browserFirefox {
-		return readFirefox(ctx, dir)
+// publishPages shows the last reading at once, if there is one, and the
+// fresh one when it differs: the panel should not wait for a browser's
+// files to know what it knew a minute ago.
+func (b *BrowserIndex) publishPages(ctx context.Context, show func(*browserPages)) {
+	last := b.merged.Load()
+	if last != nil {
+		show(last)
 	}
-	return readChromium(ctx, dir)
+	if fresh := b.read(ctx); fresh != last {
+		show(fresh)
+	}
+}
+
+// readProfile reads one profile's pages and their favicons. Pages without
+// icons are still pages, so a failure among the icons is only logged.
+func (b *BrowserIndex) readProfile(ctx context.Context, kind browserKind, dir string) (browserPages, error) {
+	read := readChromium
+	if kind == browserFirefox {
+		read = readFirefox
+	}
+	pages, err := read(ctx, dir)
+	if err != nil {
+		return pages, err
+	}
+	icons, err := readFavicons(ctx, kind, dir, b.iconDir, pages)
+	if err != nil && ctx.Err() == nil {
+		log.Printf("launcher: reading favicons of browser profile %s: %v", dir, err)
+	}
+	pages.icons = icons
+	return pages, nil
 }
 
 func readFirefox(ctx context.Context, dir string) (browserPages, error) {
@@ -271,6 +308,9 @@ func readFirefox(ctx context.Context, dir string) (browserPages, error) {
 		}
 		return nil
 	})
+	if errors.Is(err, fs.ErrNotExist) {
+		return pages, nil
+	}
 	return pages, err
 }
 
@@ -417,7 +457,10 @@ func mergeProfiles(profiles []browserPages) browserPages {
 		bookmarks = append(bookmarks, p.bookmarks)
 		visited = append(visited, p.visited)
 	}
-	merged := browserPages{bookmarks: mergePages(bookmarks), visited: mergePages(visited)}
+	merged := browserPages{bookmarks: mergePages(bookmarks), visited: mergePages(visited), icons: map[string]string{}}
+	for _, p := range profiles {
+		maps.Copy(merged.icons, p.icons)
+	}
 	slices.SortFunc(merged.bookmarks, func(a, b browserPage) int {
 		return cmp.Or(cmp.Compare(strings.ToLower(pageTitle(a)), strings.ToLower(pageTitle(b))), cmp.Compare(a.url, b.url))
 	})
@@ -489,7 +532,10 @@ type browserRows struct {
 	flat  bool
 }
 
-func (b browserRows) entry(idPrefix string, icon launcher.Icon, p browserPage) Entry {
+func (b browserRows) entry(idPrefix string, icon launcher.Icon, icons map[string]string, p browserPage) Entry {
+	if path, ok := icons[pageHost(p.url)]; ok {
+		icon = launcher.IconFile(path)
+	}
 	return Entry{
 		ID: idPrefix + p.url, Learn: browserRowLearn + p.url, Title: pageTitle(p), Subtitle: displayURL(p.url),
 		Icon: icon, Rank: visitRank(p.visits), Data: p,
@@ -528,12 +574,13 @@ func (b *Bookmarks) Spec() Spec {
 
 // Load implements Provider.
 func (b *Bookmarks) Load(ctx context.Context, publish func([]Entry)) {
-	pages := b.index.read(ctx).bookmarks
-	entries := make([]Entry, len(pages))
-	for i, p := range pages {
-		entries[i] = b.entry("bookmark:", launcher.IconName("ld-bookmark-symbolic"), p)
-	}
-	publish(entries)
+	b.index.publishPages(ctx, func(pages *browserPages) {
+		entries := make([]Entry, len(pages.bookmarks))
+		for i, p := range pages.bookmarks {
+			entries[i] = b.entry("bookmark:", launcher.IconName("ld-bookmark-symbolic"), pages.icons, p)
+		}
+		publish(entries)
+	})
 }
 
 // Actions implements Provider.
@@ -562,20 +609,21 @@ func (v *VisitedPages) Spec() Spec {
 
 // Load implements Provider.
 func (v *VisitedPages) Load(ctx context.Context, publish func([]Entry)) {
-	pages := v.index.read(ctx)
-	bookmarked := map[string]bool{}
-	if v.hideBookmarked {
-		for _, p := range pages.bookmarks {
-			bookmarked[p.url] = true
+	v.index.publishPages(ctx, func(pages *browserPages) {
+		bookmarked := map[string]bool{}
+		if v.hideBookmarked {
+			for _, p := range pages.bookmarks {
+				bookmarked[p.url] = true
+			}
 		}
-	}
-	entries := make([]Entry, 0, len(pages.visited))
-	for _, p := range pages.visited {
-		if !bookmarked[p.url] {
-			entries = append(entries, v.entry("visited:", launcher.IconName("ld-history-symbolic"), p))
+		entries := make([]Entry, 0, len(pages.visited))
+		for _, p := range pages.visited {
+			if !bookmarked[p.url] {
+				entries = append(entries, v.entry("visited:", launcher.IconName("ld-history-symbolic"), pages.icons, p))
+			}
 		}
-	}
-	publish(entries)
+		publish(entries)
+	})
 }
 
 // Actions implements Provider.

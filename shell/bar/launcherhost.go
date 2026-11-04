@@ -112,11 +112,12 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 // newBrowserIndex reads the browsers of this home directory; without one
 // the panel offers neither bookmarks nor history.
 func newBrowserIndex() *search.BrowserIndex {
-	configDir, ok := xdg.OS.ConfigDir(version.Name)
+	configDir, configOK := xdg.OS.ConfigDir(version.Name)
+	cacheDir, cacheOK := xdg.OS.CacheDir(version.Name)
 	home := os.Getenv("HOME")
-	if !ok || !filepath.IsAbs(home) {
-		log.Print("launcher: neither XDG_CONFIG_HOME nor HOME is an absolute path: browser bookmarks and history are unavailable")
+	if !configOK || !cacheOK || !filepath.IsAbs(home) {
+		log.Print("launcher: XDG_CONFIG_HOME, XDG_CACHE_HOME and HOME are not absolute paths: browser bookmarks and history are unavailable")
 		return nil
 	}
-	return search.NewBrowserIndex(home, filepath.Dir(configDir))
+	return search.NewBrowserIndex(home, filepath.Dir(configDir), filepath.Join(cacheDir, "favicons"))
 }

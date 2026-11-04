@@ -1,17 +1,23 @@
 package search
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 const firefoxSchema = `
@@ -75,7 +81,7 @@ func urlsOf(pages []browserPage) []string {
 func firefoxIndex(t *testing.T) (*BrowserIndex, string) {
 	t.Helper()
 	home := t.TempDir()
-	return NewBrowserIndex(home, filepath.Join(home, ".config")), filepath.Join(home, ".mozilla", "firefox")
+	return NewBrowserIndex(home, filepath.Join(home, ".config"), filepath.Join(home, "icons")), filepath.Join(home, ".mozilla", "firefox")
 }
 
 func TestFirefoxBookmarksAndHistory(t *testing.T) {
@@ -160,7 +166,7 @@ func TestChromiumBookmarksAndHistory(t *testing.T) {
 	db := openFixture(t, filepath.Join(dir, "History"), `CREATE TABLE urls (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER NOT NULL, hidden INTEGER NOT NULL);`)
 	run(t, db, `INSERT INTO urls VALUES (1, 'https://a.example/', 'A', 2, 0), (2, 'https://b.example/', 'B', 8, 0), (3, 'https://c.example/', 'C', 50, 1), (4, 'chrome://version/', 'V', 70, 0)`)
 
-	pages := NewBrowserIndex(home, config).read(context.Background())
+	pages := NewBrowserIndex(home, config, filepath.Join(home, "icons")).read(context.Background())
 	if got, want := urlsOf(pages.bookmarks), []string{"https://deep.example/", "http://other.example/", "https://top.example/"}; !slices.Equal(got, want) {
 		t.Errorf("bookmarks = %q, want %q", got, want)
 	}
@@ -178,7 +184,7 @@ func TestChromiumWithoutABookmarksFileStillHasHistory(t *testing.T) {
 	}
 	db := openFixture(t, filepath.Join(dir, "History"), `CREATE TABLE urls (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER NOT NULL, hidden INTEGER NOT NULL);`)
 	run(t, db, `INSERT INTO urls VALUES (1, 'https://a.example/', 'A', 2, 0)`)
-	pages := NewBrowserIndex(home, config).read(context.Background())
+	pages := NewBrowserIndex(home, config, filepath.Join(home, "icons")).read(context.Background())
 	if len(pages.bookmarks) != 0 || len(pages.visited) != 1 {
 		t.Errorf("pages = %+v", pages)
 	}
@@ -456,4 +462,157 @@ func TestTheBrowserSectionKeepsItsBestRowsWhicheverListFoundThem(t *testing.T) {
 		want = append(want, fmt.Sprintf("Needle mark %d", i))
 	}
 	until(t, s, want...)
+}
+
+func testPNG(t *testing.T, side int) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, side, side))); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+const firefoxFaviconSchema = `
+CREATE TABLE moz_icons (id INTEGER PRIMARY KEY, icon_url TEXT NOT NULL, width INTEGER NOT NULL DEFAULT 0, root INTEGER NOT NULL DEFAULT 0, data BLOB);
+CREATE TABLE moz_pages_w_icons (id INTEGER PRIMARY KEY, page_url TEXT NOT NULL);
+CREATE TABLE moz_icons_to_pages (page_id INTEGER NOT NULL, icon_id INTEGER NOT NULL, PRIMARY KEY (page_id, icon_id));
+`
+
+func addPageIcon(t *testing.T, db *sql.DB, id int, page string, width int, data []byte) {
+	t.Helper()
+	run(t, db, `INSERT INTO moz_icons (id, icon_url, width, data) VALUES (?, ?, ?, ?)`, id, "https://cdn.example/"+strconv.Itoa(id), width, data)
+	run(t, db, `INSERT OR IGNORE INTO moz_pages_w_icons (id, page_url) VALUES ((SELECT id FROM moz_pages_w_icons WHERE page_url = ?), ?)`, page, page)
+	run(t, db, `INSERT INTO moz_icons_to_pages (page_id, icon_id) VALUES ((SELECT id FROM moz_pages_w_icons WHERE page_url = ?), ?)`, page, id)
+}
+
+func TestFaviconsOfFirefoxPages(t *testing.T) {
+	index, root := firefoxIndex(t)
+	dir, db := firefoxProfile(t, root, "p.default")
+	addPlace(t, db, 1, "https://www.sized.example/a", "Sized", 1)
+	addPlace(t, db, 2, "https://svg.example/", "Vector only", 1)
+	addPlace(t, db, 3, "https://root.example/page", "Root icon", 1)
+	addPlace(t, db, 4, "https://bare.example/", "No icon", 1)
+	addPlace(t, db, 5, "https://huge.example/", "Too large", 1)
+	icons := openFixture(t, filepath.Join(dir, "favicons.sqlite"), firefoxFaviconSchema)
+	small, want, large := testPNG(t, 16), testPNG(t, 33), testPNG(t, 64)
+	addPageIcon(t, icons, 1, "https://www.sized.example/a", 16, small)
+	addPageIcon(t, icons, 2, "https://sized.example/b", 64, large)
+	addPageIcon(t, icons, 3, "https://sized.example/c", 33, want)
+	addPageIcon(t, icons, 4, "https://svg.example/", 65535, []byte("<svg/>"))
+	addPageIcon(t, icons, 5, "https://unlisted.example/", 32, small)
+	addPageIcon(t, icons, 6, "https://huge.example/", 32, testPNG(t, faviconMaxSide+1))
+	run(t, icons, `INSERT INTO moz_icons (id, icon_url, width, root, data) VALUES (7, 'https://root.example/favicon.ico', 32, 1, ?)`, small)
+
+	got := index.read(context.Background()).icons
+	if saved, err := os.ReadFile(got["sized.example"]); err != nil || !bytes.Equal(saved, want) {
+		t.Errorf("sized.example kept %q (%v), not the 33 pixel icon", got["sized.example"], err)
+	}
+	if _, ok := got["root.example"]; !ok {
+		t.Error("a site's root icon was not found")
+	}
+	for _, host := range []string{"svg.example", "bare.example", "unlisted.example", "huge.example"} {
+		if path, ok := got[host]; ok {
+			t.Errorf("%s has an icon: %s", host, path)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Dir(got["sized.example"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.Contains(e.Name(), "example") {
+			t.Errorf("the cache names a host: %s", e.Name())
+		}
+	}
+}
+
+func TestFaviconsOfChromiumPages(t *testing.T) {
+	home := t.TempDir()
+	configHome := filepath.Join(home, ".config")
+	dir := filepath.Join(configHome, "chromium", "Default")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	history := openFixture(t, filepath.Join(dir, "History"), `CREATE TABLE urls (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER NOT NULL, hidden INTEGER NOT NULL);`)
+	run(t, history, `INSERT INTO urls VALUES (1, 'https://a.example/x', 'A', 2, 0), (2, 'https://empty.example/', 'Empty', 1, 0)`)
+	icons := openFixture(t, filepath.Join(dir, "Favicons"), `
+		CREATE TABLE icon_mapping (id INTEGER PRIMARY KEY, page_url TEXT NOT NULL, icon_id INTEGER);
+		CREATE TABLE favicon_bitmaps (id INTEGER PRIMARY KEY, icon_id INTEGER NOT NULL, image_data BLOB, width INTEGER DEFAULT 0);`)
+	want := testPNG(t, 32)
+	run(t, icons, `INSERT INTO icon_mapping VALUES (1, 'https://a.example/y', 9), (2, 'https://empty.example/', 10)`)
+	run(t, icons, `INSERT INTO favicon_bitmaps VALUES (1, 9, ?, 16), (2, 9, ?, 32), (3, 10, x'', 0)`, testPNG(t, 16), want)
+	got := NewBrowserIndex(home, configHome, filepath.Join(home, "icons")).read(context.Background()).icons
+	if saved, err := os.ReadFile(got["a.example"]); err != nil || !bytes.Equal(saved, want) {
+		t.Errorf("a.example: %q, %v", got["a.example"], err)
+	}
+	if _, ok := got["empty.example"]; ok {
+		t.Error("an empty bitmap became an icon")
+	}
+}
+
+func TestACorruptIconDatabaseStillListsThePages(t *testing.T) {
+	index, root := firefoxIndex(t)
+	dir, db := firefoxProfile(t, root, "p.default")
+	addPlace(t, db, 1, "https://one.example/", "One", 1)
+	if err := os.WriteFile(filepath.Join(dir, "favicons.sqlite"), []byte("not a database"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pages := index.read(context.Background())
+	if len(pages.visited) != 1 || len(pages.icons) != 0 {
+		t.Errorf("pages = %+v", pages)
+	}
+}
+
+func TestBrowserRowsShowTheSitesIconElseTheGenericOne(t *testing.T) {
+	index, root := firefoxIndex(t)
+	dir, db := firefoxProfile(t, root, "p.default")
+	addPlace(t, db, 1, "https://iconed.example/", "Needle Iconed", 2)
+	addPlace(t, db, 2, "https://plain.example/", "Needle Plain", 1)
+	icons := openFixture(t, filepath.Join(dir, "favicons.sqlite"), firefoxFaviconSchema)
+	addPageIcon(t, icons, 1, "https://iconed.example/", 32, testPNG(t, 32))
+	var entries []Entry
+	NewVisitedPages(Env{}, index, false).Load(context.Background(), func(e []Entry) { entries = e })
+	if len(entries) != 2 {
+		t.Fatalf("entries = %+v", entries)
+	}
+	if _, ok := entries[0].Icon.(launcher.IconFile); !ok {
+		t.Errorf("iconed row: %#v", entries[0].Icon)
+	}
+	if entries[1].Icon != launcher.Icon(launcher.IconName("ld-history-symbolic")) {
+		t.Errorf("plain row: %#v", entries[1].Icon)
+	}
+}
+
+func publishedTitles(load func(publish func([]Entry))) [][]string {
+	var out [][]string
+	load(func(entries []Entry) {
+		row := make([]string, len(entries))
+		for i, e := range entries {
+			row[i] = e.Title
+		}
+		out = append(out, row)
+	})
+	return out
+}
+
+func TestTheLastReadingShowsAtOnceThenTheFreshOne(t *testing.T) {
+	index, root := firefoxIndex(t)
+	_, db := firefoxProfile(t, root, "p.default")
+	addPlace(t, db, 1, "https://one.example/", "One", 1)
+	visited := NewVisitedPages(Env{}, index, false)
+	load := func(publish func([]Entry)) { visited.Load(context.Background(), publish) }
+
+	first := publishedTitles(load)
+	if len(first) != 1 || !slices.Equal(first[0], []string{"One"}) {
+		t.Fatalf("the first open published %q", first)
+	}
+	if again := publishedTitles(load); len(again) != 1 || !slices.Equal(again[0], []string{"One"}) {
+		t.Errorf("nothing changed, yet it published %q", again)
+	}
+	addPlace(t, db, 2, "https://two.example/", "Two", 5)
+	changed := publishedTitles(load)
+	if len(changed) != 2 || !slices.Equal(changed[0], []string{"One"}) || !slices.Equal(changed[1], []string{"Two", "One"}) {
+		t.Errorf("after a write it published %q", changed)
+	}
 }
