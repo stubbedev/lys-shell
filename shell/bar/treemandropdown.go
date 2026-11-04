@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"strconv"
-	"sync"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
@@ -60,13 +59,15 @@ type treemanView struct {
 	detail    string
 	collapsed map[string]bool
 
-	once   sync.Once
-	cancel context.CancelFunc
+	*openFollow
+	reads *refresher[*treeman.Status]
 }
 
 func treemanDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &treemanView{ctx: ctx, font: font, px: px, collapsed: map[string]bool{}, cancel: func() {}}
+	v := &treemanView{ctx: ctx, font: font, px: px, collapsed: map[string]bool{}}
+	v.openFollow = newOpenFollow(v.follow)
+	v.reads = newRefresher(ctx, v.life, v.read, v.apply)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "treeman-dropdown")
 	backIcon := widget.NewThemeIcon("ld-arrow-left-symbolic", int(px))
@@ -90,8 +91,8 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(scroll, true)
 	v.Append(content, true)
 
-	v.apply(v.read(context.Background()))
-	v.follow()
+	v.apply(nil)
+	v.startFollowing()
 	return v
 }
 
@@ -380,15 +381,9 @@ func (v *treemanView) field(key, value string, wrap bool) *widget.Item {
 }
 
 // follow re-renders on every status change until the dropdown closes.
-func (v *treemanView) follow() {
+func (v *treemanView) follow(life context.Context) {
 	if v.ctx.Treeman == nil {
 		return
 	}
-	life, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
-	followTicks(v.ctx, life, "treeman", v.ctx.Treeman.Subscribe, v.read, v.apply)
+	followInto(life, "treeman", v.ctx.Treeman.Subscribe, v.reads)
 }
-
-// dropdownClosed implements dropdownCloser; reopening lands on the
-// list, as the Rust popover's closed handler does.
-func (v *treemanView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }

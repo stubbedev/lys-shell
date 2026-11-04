@@ -54,19 +54,13 @@ type dashboardView struct {
 	scroll     *widget.Scroll
 	quick      *widget.Grid
 	refreshers []func(dashboardReadings)
-	pollers    []func()
-	pollStats  func()
-	stops      []func()
-	once       sync.Once
-	stop       chan struct{}
+	pollers    []func() func()
+	closers    []func()
+	*openFollow
 
-	followOnce sync.Once
-	shownCount int
-	shown      atomic.Bool
-	pollStop   chan struct{}
-	stale      bool
-	refreshes  atomic.Int64
-	diskIn     int
+	refreshes atomic.Int64
+	pollMu    sync.Mutex
+	diskIn    int
 }
 
 type dashboardReadings struct {
@@ -105,7 +99,8 @@ func (v *dashboardView) read() dashboardReadings {
 
 func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &dashboardView{ctx: ctx, font: font, px: px, stop: make(chan struct{})}
+	v := &dashboardView{ctx: ctx, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
 	v.root = widget.NewBox(widget.Column, 0, 0)
 	v.root.AddClass("dropdown", "dashboard-dropdown")
 	v.root.Append(v.header(), false)
@@ -126,8 +121,7 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.scroll, true)
 	v.root.Append(content, true)
 	v.apply(dashboardReadings{})
-	v.refreshAll()
-	v.pollStats()
+	v.startFollowing()
 	return v
 }
 
@@ -552,6 +546,7 @@ func (v *dashboardView) media() widget.Widget {
 	body.Add("empty", emptyPage)
 	card.Append(body, false)
 
+	var polledBus atomic.Value
 	setPosition := func(pos time.Duration) {
 		elapsed.SetText(formatMediaDuration(pos))
 		seek.Set(mediaProgress(pos, current.Length))
@@ -560,6 +555,7 @@ func (v *dashboardView) media() widget.Widget {
 		src := v.ctx.Media
 		if src == nil {
 			current, has = mpris.Player{}, false
+			polledBus.Store("")
 			switchBtn.SetVisible(false)
 			body.Show("empty")
 			seek.Set(0)
@@ -568,10 +564,12 @@ func (v *dashboardView) media() widget.Widget {
 		current, has = src.Active()
 		switchBtn.SetVisible(len(src.Players()) > 1)
 		if !has {
+			polledBus.Store("")
 			body.Show("empty")
 			seek.Set(0)
 			return
 		}
+		polledBus.Store(current.BusName)
 		body.Show("player")
 		title.SetText(current.Title)
 		artist.SetText(current.Artist)
@@ -586,22 +584,21 @@ func (v *dashboardView) media() widget.Widget {
 		seek.SetEnabled(current.CanSeek)
 		length.SetText(lengthText(current.Length))
 	})
-	v.pollers = append(v.pollers, func() {
-		if !has {
-			return
-		}
+	var shownPos time.Duration
+	v.pollers = append(v.pollers, func() func() {
 		src := v.ctx.Media
-		if src == nil {
-			return
+		bus, _ := polledBus.Load().(string)
+		if src == nil || bus == "" {
+			return nil
 		}
-		bus := current.BusName
-		go func() {
-			ctx, cancel := context.WithTimeout(bctx, time.Second)
-			defer cancel()
-			if pos, err := src.Position(ctx, bus); err == nil {
-				v.ctx.Invoke(func() { setPosition(pos) })
-			}
-		}()
+		ctx, cancel := context.WithTimeout(bctx, time.Second)
+		defer cancel()
+		pos, err := src.Position(ctx, bus)
+		if err != nil || pos == shownPos {
+			return nil
+		}
+		shownPos = pos
+		return func() { setPosition(pos) }
 	})
 	return card
 }
@@ -805,12 +802,13 @@ func (v *dashboardView) network() widget.Widget {
 		show(lastRx, lastTx)
 	})
 	reader := &sysinfo.NetReader{}
-	v.stops = append(v.stops, reader.Close)
-	v.pollers = append(v.pollers, func() {
+	v.closers = append(v.closers, reader.Close)
+	var postedRx, postedTx uint64
+	v.pollers = append(v.pollers, func() func() {
 		totals, err := reader.Read()
 		if err != nil {
 			log.Printf("dashboard: read network totals: %v", err)
-			return
+			return nil
 		}
 		now := time.Now()
 		var rx, tx uint64
@@ -825,8 +823,14 @@ func (v *dashboardView) network() widget.Widget {
 			}
 		}
 		prev, prevAt = totals, now
-		lastRx, lastTx = rx, tx
-		show(rx, tx)
+		if rx == postedRx && tx == postedTx {
+			return nil
+		}
+		postedRx, postedTx = rx, tx
+		return func() {
+			lastRx, lastTx = rx, tx
+			show(rx, tx)
+		}
 	})
 	return card
 }
@@ -870,16 +874,16 @@ func (v *dashboardView) systemStats() widget.Widget {
 	}
 	cpuReader := &sysinfo.CPUReader{Sensor: v.ctx.Config.CPU.TempSensor, OmitFrequency: true}
 	memReader := &sysinfo.MemoryReader{}
-	v.stops = append(v.stops, cpuReader.Close, memReader.Close)
-	v.pollStats = func() {
+	v.closers = append(v.closers, cpuReader.Close, memReader.Close)
+	var posted, sampled dashboardStats
+	v.pollers = append(v.pollers, func() func() {
 		cpu, err := cpuReader.Read()
 		if err != nil {
 			log.Printf("dashboard: read cpu: %v", err)
 		} else {
-			usage(cpuRing, cpu.UsagePercent)
+			sampled.cpu = roundedPercent(cpu.UsagePercent)
 			if cpu.HasTemperature {
-				c := cpu.TemperatureC
-				tempRing.set(float64(min(max(c/100, 0), 1)), strconv.FormatFloat(float64(c), 'f', 0, 32)+"°", dashboardThresholdClass(c, cfg.TempWarning, cfg.TempError))
+				sampled.temp = roundedPercent(cpu.TemperatureC)
 			}
 		}
 		mem, err := memReader.Read()
@@ -887,18 +891,37 @@ func (v *dashboardView) systemStats() widget.Widget {
 			log.Printf("dashboard: read memory: %v", err)
 		} else {
 			pct, _ := memoryPercents(mem)
-			usage(memRing, pct)
+			sampled.mem = roundedPercent(pct)
 		}
 		if v.diskIn > 0 {
 			v.diskIn--
-			return
+		} else {
+			v.diskIn = dashboardDiskPolls - 1
+			for _, d := range sysinfo.DisksAt(dashboardRootMount) {
+				sampled.disk = roundedPercent(float32(d.UsedBytes) / float32(d.TotalBytes) * 100)
+			}
 		}
-		v.diskIn = dashboardDiskPolls - 1
-		for _, d := range sysinfo.DisksAt(dashboardRootMount) {
-			usage(diskRing, float32(d.UsedBytes)/float32(d.TotalBytes)*100)
+		if sampled == posted {
+			return nil
 		}
-	}
-	v.pollers = append(v.pollers, v.pollStats)
+		was, now := posted, sampled
+		posted = sampled
+		return func() {
+			if now.cpu != was.cpu {
+				usage(cpuRing, now.cpu.value)
+			}
+			if now.mem != was.mem {
+				usage(memRing, now.mem.value)
+			}
+			if now.disk != was.disk {
+				usage(diskRing, now.disk.value)
+			}
+			if now.temp != was.temp {
+				c := now.temp.value
+				tempRing.set(float64(min(max(c/100, 0), 1)), strconv.FormatFloat(float64(c), 'f', 0, 32)+"°", dashboardThresholdClass(c, cfg.TempWarning, cfg.TempError))
+			}
+		}
+	})
 	return card
 }
 
@@ -952,76 +975,74 @@ func (v *dashboardView) apply(readings dashboardReadings) {
 	}
 }
 
-func (v *dashboardView) poll() {
+func (v *dashboardView) sample() []func() {
+	v.pollMu.Lock()
+	defer v.pollMu.Unlock()
+	var applies []func()
 	for _, poll := range v.pollers {
-		poll()
+		if apply := poll(); apply != nil {
+			applies = append(applies, apply)
+		}
 	}
+	return applies
 }
 
-func (v *dashboardView) dropdownOpened() {
-	v.followOnce.Do(v.follow)
-	v.shownCount++
-	v.shown.Store(true)
-	if v.shownCount == 1 {
-		v.startPolling()
+func (v *dashboardView) poll() {
+	applies := v.sample()
+	if len(applies) == 0 {
+		return
 	}
-	if v.stale {
-		v.stale = false
-		v.diskIn = 0
-		v.refreshAll()
-		v.poll()
-	}
+	v.ctx.Invoke(func() {
+		for _, apply := range applies {
+			apply()
+		}
+	})
 }
 
-func (v *dashboardView) dropdownHidden() {
-	if v.shownCount == 0 {
-		return
-	}
-	v.shownCount--
-	if v.shownCount > 0 {
-		return
-	}
-	v.shown.Store(false)
-	v.stale = true
-	if v.pollStop != nil {
-		close(v.pollStop)
-		v.pollStop = nil
-	}
-}
-
-func (v *dashboardView) startPolling() {
-	if v.ctx.App == nil {
-		return
-	}
-	stop := make(chan struct{})
-	v.pollStop = stop
+func (v *dashboardView) startPolling(life context.Context) {
 	go func() {
+		v.pollMu.Lock()
+		v.diskIn = 0
+		v.pollMu.Unlock()
 		ticker := time.NewTicker(dashboardPoll)
 		defer ticker.Stop()
-		for {
+		for life.Err() == nil {
+			v.poll()
 			select {
-			case <-stop:
-				return
-			case <-v.stop:
-				return
+			case <-life.Done():
 			case <-ticker.C:
-				v.ctx.Invoke(v.poll)
 			}
 		}
 	}()
 }
 
-func (v *dashboardView) follow() {
+func (v *dashboardView) follow(life context.Context) {
+	v.refreshAll()
 	if v.ctx.App == nil {
+		v.poll()
 		return
 	}
-	var feeds []<-chan struct{}
+	v.startPolling(life)
+	merged := make(chan struct{}, 1)
 	add := func(ch <-chan struct{}, stop func()) {
-		feeds = append(feeds, ch)
-		v.stops = append(v.stops, stop)
+		go func() {
+			defer stop()
+			for {
+				select {
+				case <-life.Done():
+					return
+				case _, ok := <-ch:
+					if !ok {
+						return
+					}
+					select {
+					case merged <- struct{}{}:
+					default:
+					}
+				}
+			}
+		}()
 	}
-	life, cancel := context.WithCancel(context.Background())
-	v.stops = append(v.stops, cancel)
 	if v.ctx.Media != nil {
 		add(v.ctx.Media.Subscribe())
 	}
@@ -1050,30 +1071,22 @@ func (v *dashboardView) follow() {
 		if sub == nil {
 			continue
 		}
-		if ch, stop, err := sub(life); err == nil {
-			add(ch, stop)
-		}
-	}
-	merged := make(chan struct{}, 1)
-	for _, ch := range feeds {
 		go func() {
-			for range ch {
-				select {
-				case merged <- struct{}{}:
-				default:
-				}
+			ch, stop, err := sub(life)
+			if err != nil {
+				log.Printf("dashboard: subscribe: %v", err)
+				return
 			}
+			add(ch, stop)
 		}()
 	}
 	go func() {
 		for {
 			select {
-			case <-v.stop:
+			case <-life.Done():
 				return
 			case <-merged:
-				if v.shown.Load() {
-					v.refreshAll()
-				}
+				v.refreshAll()
 			}
 		}
 	}()
@@ -1211,15 +1224,31 @@ func subscribeOf[T subscriber](s T) func(context.Context) (<-chan struct{}, func
 	return s.Subscribe
 }
 
-// dropdownClosed implements dropdownCloser: stop following.
+// dropdownClosed implements dropdownCloser: stop following, and let go of
+// the stat readers once a poll underway is done with them.
 func (v *dashboardView) dropdownClosed() {
-	v.once.Do(func() {
-		close(v.stop)
-		for _, stop := range v.stops {
-			stop()
+	v.openFollow.dropdownClosed()
+	closers := v.closers
+	v.closers = nil
+	go func() {
+		v.pollMu.Lock()
+		defer v.pollMu.Unlock()
+		for _, closeReader := range closers {
+			closeReader()
 		}
-	})
+	}()
 }
+
+type dashboardStat struct {
+	value float32
+	known bool
+}
+
+func roundedPercent(v float32) dashboardStat {
+	return dashboardStat{value: float32(int(v + 0.5)), known: true}
+}
+
+type dashboardStats struct{ cpu, mem, disk, temp dashboardStat }
 
 // dashboardConnected is the network section's resolve_connected: the
 // primary connection's device, nothing without one, and either device

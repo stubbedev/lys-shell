@@ -6,7 +6,6 @@ import (
 	"log"
 	"slices"
 	"strconv"
-	"sync"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
@@ -179,13 +178,13 @@ type batteryView struct {
 	device   *refresher[batteryRead]
 	profiles *refresher[*powerprofiles.Snapshot]
 
-	once   sync.Once
-	cancel context.CancelFunc
+	*openFollow
 }
 
 func batteryDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &batteryView{ctx: ctx, font: font, px: px, cancel: func() {}}
+	v := &batteryView{ctx: ctx, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "battery-dropdown")
 	v.Append(dropdownHeader(font, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
@@ -198,9 +197,18 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.body, false)
 	content.Append(v.profileSection(), false)
 	v.Append(content, true)
-	v.applyDevice(v.readDevice(context.Background()))
-	v.applyProfiles(v.readProfiles(context.Background()))
-	v.follow()
+	v.applyDevice(upower.Device{}, false)
+	v.applyProfiles(nil)
+	if ctx.Battery != nil {
+		v.device = newRefresher(ctx, v.life, func(c context.Context) batteryRead {
+			dev, ok := v.readDevice(c)
+			return batteryRead{dev, ok}
+		}, func(r batteryRead) { v.applyDevice(r.dev, r.ok) })
+	}
+	if ctx.PowerProfiles != nil {
+		v.profiles = newRefresher(ctx, v.life, v.readProfiles, v.applyProfiles)
+	}
+	v.startFollowing()
 	return v
 }
 
@@ -512,21 +520,11 @@ func (v *batteryView) selectProfile(name string) {
 }
 
 // follow tracks both services until the dropdown closes.
-func (v *batteryView) follow() {
-	life, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
+func (v *batteryView) follow(life context.Context) {
 	if src := v.ctx.Battery; src != nil {
-		v.device = followTicks(v.ctx, life, "battery", src.Subscribe,
-			func(ctx context.Context) batteryRead {
-				dev, ok := v.readDevice(ctx)
-				return batteryRead{dev, ok}
-			},
-			func(r batteryRead) { v.applyDevice(r.dev, r.ok) })
+		followInto(life, "battery", src.Subscribe, v.device)
 	}
 	if src := v.ctx.PowerProfiles; src != nil {
-		v.profiles = followTicks(v.ctx, life, "power profiles", src.Subscribe, v.readProfiles, v.applyProfiles)
+		followInto(life, "power profiles", src.Subscribe, v.profiles)
 	}
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *batteryView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }

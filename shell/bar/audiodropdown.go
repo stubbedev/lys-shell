@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -257,13 +256,14 @@ type audioView struct {
 	apps          *appVolumes
 	pickers       [2]*devicePicker
 
-	once   sync.Once
-	cancel context.CancelFunc
+	*openFollow
+	reads *refresher[audioState]
 }
 
 func audioDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &audioView{ctx: ctx, font: font, px: px, cancel: func() {}}
+	v := &audioView{ctx: ctx, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "audio-dropdown")
 	v.Append(dropdownHeader(font, "ld-volume-2-symbolic", i18n.T("dropdown-audio-title")), false)
@@ -296,11 +296,10 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	page.Append(v.pages, true)
 	v.Append(page, true)
 
-	if ctx.Pulse != nil {
-		v.apply(readAudioState(context.Background(), ctx.Pulse))
-		v.follow()
-	} else {
-		v.apply(audioState{})
+	v.apply(audioState{})
+	if src := ctx.Pulse; src != nil {
+		v.reads = newRefresher(ctx, v.life, func(c context.Context) audioState { return readAudioState(c, src) }, v.apply)
+		v.startFollowing()
 	}
 	return v
 }
@@ -344,16 +343,11 @@ func (v *audioView) call(what string, fn func(context.Context, pulse.Source) err
 	}
 }
 
-func (v *audioView) follow() {
-	life, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
-	src := v.ctx.Pulse
-	followTicks(v.ctx, life, "audio", src.Subscribe,
-		func(ctx context.Context) audioState { return readAudioState(ctx, src) }, v.apply)
+func (v *audioView) follow(life context.Context) {
+	if src := v.ctx.Pulse; src != nil {
+		followInto(life, "audio", src.Subscribe, v.reads)
+	}
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *audioView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }
 
 // volumeSection is VolumeSection: the default device as an Item (its
 // icon, its name over the kind, the row opening the picker, the mute

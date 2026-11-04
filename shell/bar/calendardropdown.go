@@ -1,9 +1,9 @@
 package bar
 
 import (
+	"context"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -91,14 +91,14 @@ type calendarView struct {
 
 	today widget.Date
 
-	once sync.Once
-	stop chan struct{}
-	now  func() time.Time
+	*openFollow
+	now func() time.Time
 }
 
 func calendarDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &calendarView{ctx: ctx, font: font, px: px, stop: make(chan struct{}), now: time.Now}
+	v := &calendarView{ctx: ctx, font: font, px: px, now: time.Now}
+	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "calendar-dropdown")
 	v.Append(dropdownHeader(font, "ld-calendar-clock-symbolic", i18n.T("dropdown-calendar-title")), false)
@@ -107,8 +107,7 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(widget.NewSeparator(widget.Horizontal), false)
 	content.Append(v.calendar(), false)
 	v.Append(content, false)
-	v.tick()
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
@@ -207,7 +206,8 @@ func (v *calendarView) tick() {
 	}
 }
 
-func (v *calendarView) follow() {
+func (v *calendarView) follow(life context.Context) {
+	v.tick()
 	if v.ctx.App == nil {
 		return
 	}
@@ -216,7 +216,7 @@ func (v *calendarView) follow() {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-v.stop:
+			case <-life.Done():
 				return
 			case <-ticker.C:
 				v.ctx.Invoke(v.tick)
@@ -224,6 +224,3 @@ func (v *calendarView) follow() {
 		}
 	}()
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *calendarView) dropdownClosed() { v.once.Do(func() { close(v.stop) }) }

@@ -49,10 +49,13 @@ func Cameras() []DeviceChoice {
 	return cameras("/sys/class/video4linux", "/dev", v4l2.CaptureCard)
 }
 
+// NoCameras is the camera list before any camera is known: automatic alone.
+func NoCameras() []DeviceChoice { return []DeviceChoice{{"", "Automatic"}} }
+
 // cameras lists the nodes from sysDir (/sys/class/video4linux) and
 // probes them in devDir (/dev).
 func cameras(sysDir, devDir string, probe func(path string) (string, bool)) []DeviceChoice {
-	choices := []DeviceChoice{{"", "Automatic"}}
+	choices := NoCameras()
 	entries, err := os.ReadDir(sysDir)
 	if err != nil {
 		return choices

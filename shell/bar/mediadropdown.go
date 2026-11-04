@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -134,8 +133,7 @@ type mediaView struct {
 	// clear_fields re-set the slider from the (new) player's progress.
 	seekBus string
 
-	once sync.Once
-	stop chan struct{}
+	*openFollow
 }
 
 // mediaDropdown builds the live media card.
@@ -144,7 +142,8 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	if ctx.Media == nil {
 		return mediaEmptyState(ctx)
 	}
-	v := &mediaView{ctx: ctx, src: ctx.Media, stop: make(chan struct{})}
+	v := &mediaView{ctx: ctx, src: ctx.Media}
+	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "media-dropdown")
 	v.main = widget.NewStack()
@@ -158,8 +157,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	v.buildPlayer(font, px)
 	v.main.Add("player", v.player)
 	v.main.Add("empty", v.empty)
-	v.refresh()
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
@@ -474,7 +472,8 @@ func (v *mediaView) buildPicker() {
 // follow keeps the view current while open: service ticks refresh,
 // and the position polls once a second (MPRIS signals no position
 // changes; the Rust player polls at position_poll_interval).
-func (v *mediaView) follow() {
+func (v *mediaView) follow(life context.Context) {
+	v.refresh()
 	ticks, unsubscribe := v.src.Subscribe()
 	v.pollPosition()
 	go func() {
@@ -483,7 +482,7 @@ func (v *mediaView) follow() {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-v.stop:
+			case <-life.Done():
 				return
 			case <-ticks:
 				v.ctx.Invoke(v.refresh)
@@ -510,7 +509,3 @@ func (v *mediaView) pollPosition() {
 		v.ctx.Invoke(func() { v.setPosition(pos) })
 	}()
 }
-
-// dropdownClosed implements dropdownCloser: stop following the
-// service once the popover went away.
-func (v *mediaView) dropdownClosed() { v.once.Do(func() { close(v.stop) }) }

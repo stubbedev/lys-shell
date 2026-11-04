@@ -271,6 +271,14 @@ func (r *refresher[T]) requestThen(then func()) {
 	go r.loop()
 }
 
+func (r *refresher[T]) first() {
+	if r.mc.App == nil {
+		r.apply(r.read(r.life))
+		return
+	}
+	r.request()
+}
+
 func (r *refresher[T]) loop() {
 	for {
 		r.mu.Lock()
@@ -301,46 +309,86 @@ func (r *refresher[T]) loop() {
 	}
 }
 
-// followTicks is a dropdown's watcher: each tick from subscribe asks
-// the view's refresher for a read, until life ends or the tick channel
-// closes. It returns the refresher, which the view's own refreshes
-// (after a write) go through too. A failed subscribe logs and follows
-// nothing; the refresher still serves the view's requests.
-func followTicks[T any](
-	mc ModuleContext,
-	life context.Context,
-	what string,
-	subscribe func(context.Context) (<-chan struct{}, func(), error),
-	read func(context.Context) T,
-	apply func(T),
-) *refresher[T] {
-	r := newRefresher(mc, life, read, apply)
-	followInto(life, what, subscribe, r)
-	return r
-}
-
-// followInto feeds subscribe's ticks into an existing refresher, for a
-// view that follows several sources with one reader.
 func followInto[T any](life context.Context, what string, subscribe func(context.Context) (<-chan struct{}, func(), error), r *refresher[T]) {
-	ticks, stop, err := subscribe(life)
-	if err != nil {
-		log.Printf("%s: subscribe: %v", what, err)
+	follow := func() {
+		ticks, stop, err := subscribe(life)
+		r.first()
+		if err != nil {
+			log.Printf("%s: subscribe: %v", what, err)
+			return
+		}
+		go func() {
+			defer stop()
+			for {
+				select {
+				case <-life.Done():
+					return
+				case _, ok := <-ticks:
+					if !ok {
+						return
+					}
+				}
+				r.request()
+			}
+		}()
+	}
+	if r.mc.App == nil {
+		follow()
 		return
 	}
-	go func() {
-		defer stop()
-		for {
-			select {
-			case <-life.Done():
-				return
-			case _, ok := <-ticks:
-				if !ok {
-					return
-				}
-			}
-			r.request()
+	go follow()
+}
+
+type openFollow struct {
+	follow  func(context.Context)
+	life    context.Context
+	end     context.CancelFunc
+	hide    context.CancelFunc
+	shown   int
+	stopped func()
+}
+
+func newOpenFollow(follow func(context.Context)) *openFollow {
+	life, end := context.WithCancel(context.Background())
+	return &openFollow{follow: follow, life: life, end: end}
+}
+
+func (f *openFollow) startFollowing() {
+	if f.hide != nil || f.life.Err() != nil {
+		return
+	}
+	showing, hide := context.WithCancel(f.life)
+	f.hide = hide
+	f.follow(showing)
+}
+
+func (f *openFollow) stopFollowing() {
+	if f.hide != nil {
+		f.hide()
+		f.hide = nil
+		if f.stopped != nil {
+			f.stopped()
 		}
-	}()
+	}
+}
+
+func (f *openFollow) dropdownOpened() {
+	f.shown++
+	f.startFollowing()
+}
+
+func (f *openFollow) dropdownHidden() {
+	if f.shown > 0 {
+		f.shown--
+	}
+	if f.shown == 0 {
+		f.stopFollowing()
+	}
+}
+
+func (f *openFollow) dropdownClosed() {
+	f.stopFollowing()
+	f.end()
 }
 
 // dropdownButton is a flat dropdown button: the class's stylesheet

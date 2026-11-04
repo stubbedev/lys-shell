@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -89,9 +88,8 @@ type networkView struct {
 	// feeds, and every re-read after a write go through it.
 	reads *refresher[netState]
 
-	once   sync.Once
-	life   context.Context
-	cancel context.CancelFunc
+	*openFollow
+	scanDue bool
 }
 
 // wifiControl is the wireless device the dropdown drives
@@ -169,9 +167,8 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	font, px := dropdownFont(ctx)
 	v := &networkView{ctx: ctx, font: font, px: px, netDeps: deps}
-	life, cancel := context.WithCancel(context.Background()) //nolint:gosec // dropdownClosed cancels it
-	v.life, v.cancel = life, cancel
-	v.reads = newRefresher(ctx, life, v.read, v.apply)
+	v.openFollow = newOpenFollow(v.follow)
+	v.reads = newRefresher(ctx, v.life, v.read, v.apply)
 	// The popover frame: the header strip full width over the content
 	// (network/mod.rs:63-183).
 	v.Box = widget.NewBox(widget.Column, 0, 0)
@@ -224,9 +221,8 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.Append(header, false)
 	v.Append(content, true)
 
-	v.apply(v.read(context.Background()))
-	v.scanIfEmpty()
-	v.follow()
+	v.apply(netState{})
+	v.startFollowing()
 	return v
 }
 
@@ -286,6 +282,10 @@ func (v *networkView) apply(s netState) {
 		v.cache = nil
 	}
 	v.rebuildList()
+	if v.scanDue {
+		v.scanDue = false
+		v.scanIfEmpty()
+	}
 }
 
 // rebuildList is rebuild_network_list.
@@ -448,7 +448,10 @@ func (v *networkView) fail(message string) {
 
 // dropdownOpened is NetworkDropdownMsg::Opened: every open of the
 // cached instance scans an empty list.
-func (v *networkView) dropdownOpened() { v.scanIfEmpty() }
+func (v *networkView) dropdownOpened() {
+	v.openFollow.dropdownOpened()
+	v.scanIfEmpty()
+}
 
 // scanIfEmpty is scan_if_empty: an empty list is never the first thing
 // seen.
@@ -530,12 +533,15 @@ func (v *networkView) wifiToggled(on bool) {
 
 // follow re-reads on NetworkManager, saved-profile, and agent changes
 // until the dropdown closes.
-func (v *networkView) follow() {
+func (v *networkView) follow(life context.Context) {
+	v.scanDue = true
 	if v.ctx.Network != nil {
-		followInto(v.life, "network", v.ctx.Network.Subscribe, v.reads)
+		followInto(life, "network", v.ctx.Network.Subscribe, v.reads)
+	} else {
+		v.reads.first()
 	}
 	for _, feed := range v.changes {
-		ch := feed(v.life)
+		ch := feed(life)
 		go func() {
 			for range ch {
 				v.reads.request()
@@ -543,9 +549,6 @@ func (v *networkView) follow() {
 		}()
 	}
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *networkView) dropdownClosed() { v.once.Do(v.cancel) }
 
 // netActive is ActiveConnections: a section of the wired and the wifi
 // rows, whose hover swaps the wifi status for the disconnect/forget (or

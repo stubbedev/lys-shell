@@ -1,10 +1,10 @@
 package bar
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -143,13 +143,13 @@ type weatherView struct {
 	errorText *widget.Label
 	loaded    *widget.Box
 
-	once sync.Once
-	stop chan struct{}
+	*openFollow
 }
 
 func weatherDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &weatherView{ctx: ctx, svc: ctx.Weather, font: font, px: px, stop: make(chan struct{})}
+	v := &weatherView{ctx: ctx, svc: ctx.Weather, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "weather-dropdown")
 	v.Append(v.header(), false)
@@ -169,8 +169,7 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 	content := dropdownContent()
 	content.Append(v.pages, true)
 	v.Append(content, true)
-	v.refresh()
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
@@ -454,7 +453,8 @@ func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) wid
 
 // follow keeps the view current while open: service changes rebuild
 // it, and the data age re-renders every minute (UPDATED_AGO_INTERVAL).
-func (v *weatherView) follow() {
+func (v *weatherView) follow(life context.Context) {
+	v.refresh()
 	if v.ctx.App == nil {
 		return
 	}
@@ -465,7 +465,7 @@ func (v *weatherView) follow() {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-v.stop:
+			case <-life.Done():
 				return
 			case <-changes:
 			case <-ticker.C:
@@ -474,6 +474,3 @@ func (v *weatherView) follow() {
 		}
 	}()
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *weatherView) dropdownClosed() { v.once.Do(func() { close(v.stop) }) }

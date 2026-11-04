@@ -3,7 +3,6 @@ package bar
 import (
 	"context"
 	"slices"
-	"sync"
 
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
@@ -215,13 +214,17 @@ type recorderView struct {
 	webcam     *widget.Box
 	preview    *webcamPreview
 
-	once   sync.Once
-	cancel context.CancelFunc
+	*openFollow
+	micReads *refresher[[]recorder.DeviceChoice]
+	camReads *refresher[[]recorder.DeviceChoice]
+	camSlot  *widget.Box
 }
 
 func recorderDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &recorderView{ctx: ctx, font: font, px: px, cancel: func() {}}
+	v := &recorderView{ctx: ctx, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
+	v.camReads = newRefresher(ctx, v.life, func(context.Context) []recorder.DeviceChoice { return recorderCameras() }, v.syncCams)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "recorder-dropdown")
 	cfg := ctx.Config.Recorder
@@ -247,7 +250,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	audioCard, audio := itemCard()
 	audioCard.AddClass("recorder-card")
 	audio.Append(v.switchRow(i18n.T("dropdown-recorder-microphone"), cfg.Microphone, recorderPathMic))
-	v.mics = microphoneSources(ctx.Pulse)
+	v.mics = microphoneSources(nil)
 	micRow := v.row(i18n.T("dropdown-recorder-microphone-device"))
 	v.micPicker = v.picker(v.mics, cfg.MicrophoneDevice, recorderPathMicDevice, func() []recorder.DeviceChoice { return v.mics })
 	v.micSlot = widget.NewBox(widget.Row, 0, 0)
@@ -257,12 +260,14 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	audio.Append(v.switchRow(i18n.T("dropdown-recorder-system-audio"), cfg.SystemAudio, recorderPathSystem))
 	content.Append(dropdownGroup(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), audioCard), false)
 
-	v.cams = recorderCameras()
+	v.cams = recorder.NoCameras()
 	webcamCard, webcam := itemCard()
 	webcamCard.AddClass("recorder-card")
 	webcam.Append(v.switchRow(i18n.T("dropdown-recorder-webcam"), cfg.WebcamEnabled, recorderPathWebcam))
 	camRow := v.row(i18n.T("dropdown-recorder-webcam-device"))
-	camRow.AddAction(v.picker(v.cams, cfg.WebcamDevice, recorderPathCamDevice, func() []recorder.DeviceChoice { return v.cams }))
+	v.camSlot = widget.NewBox(widget.Row, 0, 0)
+	v.camSlot.Append(v.picker(v.cams, cfg.WebcamDevice, recorderPathCamDevice, func() []recorder.DeviceChoice { return v.cams }), false)
+	camRow.AddAction(v.camSlot)
 	webcam.Append(camRow)
 	position := v.row(i18n.T("dropdown-recorder-position"))
 	position.AddClass("recorder-position")
@@ -274,8 +279,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.webcam.SetVisible(len(v.cams) > 1)
 	content.Append(v.webcam, false)
 
-	v.applyState(v.snapshot())
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
@@ -406,11 +410,19 @@ func (v *recorderView) syncMics(mics []recorder.DeviceChoice) {
 	v.micPicker = next
 }
 
-// follow tracks the recorder state and microphone hotplug until the
-// dropdown closes.
-func (v *recorderView) follow() {
-	life, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
+func (v *recorderView) syncCams(cams []recorder.DeviceChoice) {
+	if slices.Equal(cams, v.cams) {
+		return
+	}
+	v.cams = cams
+	v.camSlot.Clear()
+	v.camSlot.Append(v.picker(cams, v.ctx.Config.Recorder.WebcamDevice, recorderPathCamDevice, func() []recorder.DeviceChoice { return v.cams }), false)
+	v.webcam.SetVisible(len(cams) > 1)
+}
+
+func (v *recorderView) follow(life context.Context) {
+	v.applyState(v.snapshot())
+	v.camReads.first()
 	if r := v.ctx.Recorder; r != nil {
 		changes, stop := r.Changes()
 		go func() {
@@ -429,10 +441,9 @@ func (v *recorderView) follow() {
 		}()
 	}
 	if src := v.ctx.Pulse; src != nil {
-		followTicks(v.ctx, life, "recorder microphones", src.Subscribe,
-			func(context.Context) []recorder.DeviceChoice { return microphoneSources(src) }, v.syncMics)
+		if v.micReads == nil {
+			v.micReads = newRefresher(v.ctx, v.life, func(context.Context) []recorder.DeviceChoice { return microphoneSources(src) }, v.syncMics)
+		}
+		followInto(life, "recorder microphones", src.Subscribe, v.micReads)
 	}
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *recorderView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }

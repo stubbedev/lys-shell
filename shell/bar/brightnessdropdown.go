@@ -5,7 +5,6 @@ import (
 	"log"
 	"slices"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -89,8 +88,8 @@ type brightnessView struct {
 	devices []brightness.Device
 	sliders map[string]*widgets.DebouncedSlider
 
-	once   sync.Once
-	cancel context.CancelFunc
+	*openFollow
+	reads *refresher[[]brightness.Device]
 }
 
 // templateEmptyState is the EmptyState widget template, the shared
@@ -99,7 +98,9 @@ type brightnessView struct {
 
 func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &brightnessView{ctx: ctx, font: font, px: px, cancel: func() {}}
+	v := &brightnessView{ctx: ctx, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
+	v.reads = newRefresher(ctx, v.life, v.read, v.apply)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "brightness-dropdown")
 	v.Append(dropdownHeader(font, brightnessDeviceIcon, i18n.T("dropdown-brightness-title")), false)
@@ -117,8 +118,8 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	v.body.Add("empty", empty)
 	content.Append(v.body, true)
 	v.Append(content, true)
-	v.apply(v.read(context.Background()))
-	v.follow()
+	v.apply(nil)
+	v.startFollowing()
 	return v
 }
 
@@ -198,14 +199,9 @@ func (v *brightnessView) write(name string, pct float64) func() {
 
 // follow re-reads the devices on every service tick until the
 // dropdown closes.
-func (v *brightnessView) follow() {
+func (v *brightnessView) follow(life context.Context) {
 	if v.ctx.Brightness == nil {
 		return
 	}
-	life, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
-	followTicks(v.ctx, life, "brightness", v.ctx.Brightness.Subscribe, v.read, v.apply)
+	followInto(life, "brightness", v.ctx.Brightness.Subscribe, v.reads)
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *brightnessView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }

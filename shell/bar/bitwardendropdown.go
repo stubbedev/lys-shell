@@ -8,7 +8,6 @@ import (
 	"log"
 	"slices"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -178,9 +177,7 @@ type bitwardenView struct {
 	now    func() time.Time
 	random io.Reader
 
-	life   context.Context
-	cancel context.CancelFunc
-	once   sync.Once
+	*openFollow
 
 	busy bool
 	// state is the vault's state at the last apply; started says there
@@ -258,6 +255,7 @@ type bitwardenView struct {
 func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &bitwardenView{ctx: ctx, host: ctx.Bitwarden, font: font, px: px, now: time.Now, random: rand.Reader}
+	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "bitwarden-dropdown")
 	v.spinner = widget.NewSpinner(int(px))
@@ -291,17 +289,17 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 		return v
 	}
 	v.vault = vt
-	v.apply()
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
 // follow re-applies on every change of the vault until the instance is
 // released; the life also bounds the view's operations.
-func (v *bitwardenView) follow() {
-	life, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
-	v.life = life
+func (v *bitwardenView) follow(life context.Context) {
+	if v.vault == nil {
+		return
+	}
+	v.apply()
 	ticks, stop := v.vault.Subscribe()
 	second := time.NewTicker(time.Second)
 	go func() {
@@ -359,7 +357,7 @@ func (v *bitwardenView) refreshTOTP() {
 // readTOTP reads item id's current code off the loop; a code that does
 // not come stops the row following the item.
 func (v *bitwardenView) readTOTP(id string) {
-	if v.totpReading || v.life == nil {
+	if v.totpReading {
 		return
 	}
 	v.totpReading = true
@@ -657,6 +655,7 @@ func (v *bitwardenView) clearSecrets() {
 // dropdownHidden implements dropdownHider: nothing typed into a secret
 // box outlives the popover.
 func (v *bitwardenView) dropdownHidden() {
+	v.openFollow.dropdownHidden()
 	v.clearSecrets()
 	v.generating = false
 	v.sending = false
@@ -694,13 +693,6 @@ func (v *bitwardenView) dropdownFocus() widget.Widget {
 		return v.sendName
 	}
 	return nil
-}
-
-// dropdownClosed implements dropdownCloser.
-func (v *bitwardenView) dropdownClosed() {
-	if v.cancel != nil {
-		v.once.Do(func() { v.cancel() })
-	}
 }
 
 // run runs op off the loop with the form disabled, then shows its

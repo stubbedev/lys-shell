@@ -1,8 +1,8 @@
 package bar
 
 import (
+	"context"
 	"strconv"
-	"sync"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
@@ -24,13 +24,13 @@ type mailView struct {
 	pages *widget.Stack
 	list  *widget.ItemGroup
 
-	once sync.Once
-	stop chan struct{}
+	*openFollow
 }
 
 func mailDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &mailView{ctx: ctx, font: font, px: px, stop: make(chan struct{})}
+	v := &mailView{ctx: ctx, font: font, px: px}
+	v.openFollow = newOpenFollow(v.follow)
 	// The popover frame: the header strip full width over the content
 	// (mail/mod.rs:36-78).
 	v.Box = widget.NewBox(widget.Column, 0, 0)
@@ -45,8 +45,7 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	content := dropdownContent()
 	content.Append(v.pages, true)
 	v.Append(content, true)
-	v.rebuild()
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
@@ -89,7 +88,8 @@ func (v *mailView) row(a mail.AccountUnread) *widget.Item {
 	return row
 }
 
-func (v *mailView) follow() {
+func (v *mailView) follow(life context.Context) {
+	v.rebuild()
 	if v.ctx.App == nil || v.ctx.Mail == nil {
 		return
 	}
@@ -98,7 +98,7 @@ func (v *mailView) follow() {
 		defer stop()
 		for {
 			select {
-			case <-v.stop:
+			case <-life.Done():
 				return
 			case _, ok := <-ticks:
 				if !ok {
@@ -109,6 +109,3 @@ func (v *mailView) follow() {
 		}
 	}()
 }
-
-// dropdownClosed implements dropdownCloser.
-func (v *mailView) dropdownClosed() { v.once.Do(func() { close(v.stop) }) }

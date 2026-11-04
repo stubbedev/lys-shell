@@ -75,7 +75,7 @@ type btDropdown struct {
 	shownPairing bluetooth.PairingRequest
 	myKeys       []string
 	availKeys    []string
-	stop         func()
+	*openFollow
 }
 
 // btDropdownRoot is the popover content; it releases the subscription
@@ -90,10 +90,21 @@ type btDropdownRoot struct {
 // dropdownClosed implements dropdownCloser; the no-adapter shell has
 // no dropdown behind it and holds nothing.
 func (r *btDropdownRoot) dropdownClosed() {
-	if r.d == nil {
-		return
+	if r.d != nil {
+		r.d.dropdownClosed()
 	}
-	r.d.close()
+}
+
+func (r *btDropdownRoot) dropdownOpened() {
+	if r.d != nil {
+		r.d.dropdownOpened()
+	}
+}
+
+func (r *btDropdownRoot) dropdownHidden() {
+	if r.d != nil {
+		r.d.dropdownHidden()
+	}
 }
 
 // btNoAdapterDropdown is the dropdown shell for a machine without an
@@ -129,14 +140,9 @@ func bluetoothDropdown(ctx ModuleContext) widget.Widget {
 		return btNoAdapterDropdown(ctx)
 	}
 	d := newBtDropdown(ctx, ctx.Bluetooth)
-	ticks, stop := ctx.Bluetooth.Subscribe()
-	d.stop = stop
-	btDropdownOpened(ctx.Bluetooth)
-	go func() {
-		for range ticks {
-			ctx.Invoke(d.sync)
-		}
-	}()
+	d.openFollow = newOpenFollow(d.follow)
+	d.stopped = func() { btDropdownClosed(d.src) }
+	d.startFollowing()
 	return d.root
 }
 
@@ -195,13 +201,24 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	return d
 }
 
-// close releases the subscription (the popover went away).
-func (d *btDropdown) close() {
-	if d.stop != nil {
-		d.stop()
-		d.stop = nil
-		btDropdownClosed(d.src)
-	}
+func (d *btDropdown) follow(life context.Context) {
+	d.sync()
+	ticks, stop := d.src.Subscribe()
+	btDropdownOpened(d.src)
+	go func() {
+		defer stop()
+		for {
+			select {
+			case <-life.Done():
+				return
+			case _, ok := <-ticks:
+				if !ok {
+					return
+				}
+				d.ctx.Invoke(d.sync)
+			}
+		}
+	}()
 }
 
 // async runs work off the loop and then back on it; headless (no
