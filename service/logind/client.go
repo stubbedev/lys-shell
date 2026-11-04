@@ -9,13 +9,9 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
-// The session's Lock and Unlock signals drive the lock screen, so
-// `loginctl lock-session`, idle daemons, and `lys-shell lock` all end up
-// there; SetLockedHint reports the state back, and LockedHint - kept by
-// logind across restarts - says whether a dead lock client held the lock.
-
-// logindTimeout bounds resolving the session.
-const logindTimeout = 5 * time.Second
+// CallTimeout is how long one call to logind may take: callers on a path
+// that must not hang give their calls this deadline.
+const CallTimeout = 5 * time.Second
 
 // Client is the caller's logind session on the system bus.
 type Client struct {
@@ -23,11 +19,9 @@ type Client struct {
 	path dbus.ObjectPath
 }
 
-// NewClient resolves the user's session object once (Session); every
-// call and signal match uses its real path.
-func NewClient(conn *dbus.Conn) (*Client, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
-	defer cancel()
+// NewClient resolves the user's session object once (Session) under ctx;
+// every call and signal match uses its real path.
+func NewClient(ctx context.Context, conn *dbus.Conn) (*Client, error) {
 	path, err := Session(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("logind: resolve session: %w", err)
@@ -38,20 +32,22 @@ func NewClient(conn *dbus.Conn) (*Client, error) {
 // Path is the resolved session object path.
 func (l *Client) Path() dbus.ObjectPath { return l.path }
 
-// SetLockedHint tells logind whether the session is locked.
-func (l *Client) SetLockedHint(locked bool) error {
-	return l.conn.Object(Service, l.path).Call(SessionIf+".SetLockedHint", 0, locked).Err
+// SetLockedHint tells logind whether the session is locked, waiting no
+// longer than ctx.
+func (l *Client) SetLockedHint(ctx context.Context, locked bool) error {
+	if err := l.conn.Object(Service, l.path).CallWithContext(ctx, SessionIf+".SetLockedHint", 0, locked).Err; err != nil {
+		return fmt.Errorf("logind: SetLockedHint(%t) on %s: %w", locked, l.path, err)
+	}
+	return nil
 }
 
-// LockedHint reads the session's LockedHint property.
-func (l *Client) LockedHint() (bool, error) {
-	v, err := l.conn.Object(Service, l.path).GetProperty(SessionIf + ".LockedHint")
+// LockedHint reads the session's LockedHint property, waiting no longer
+// than ctx.
+func (l *Client) LockedHint(ctx context.Context) (bool, error) {
+	var locked bool
+	err := l.conn.Object(Service, l.path).CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, SessionIf, "LockedHint").Store(&locked)
 	if err != nil {
-		return false, err
-	}
-	locked, ok := v.Value().(bool)
-	if !ok {
-		return false, fmt.Errorf("logind: LockedHint is %s, want a bool", v.Signature())
+		return false, fmt.Errorf("logind: read LockedHint of %s: %w", l.path, err)
 	}
 	return locked, nil
 }
@@ -63,10 +59,17 @@ func (l *Client) Listen(ctx context.Context, onLock, onUnlock func()) error {
 		dbus.WithMatchObjectPath(l.path),
 		dbus.WithMatchInterface(SessionIf),
 	}
-	if err := l.conn.AddMatchSignal(opts...); err != nil {
+	subscribing, subscribed := context.WithTimeout(ctx, CallTimeout)
+	err := l.conn.AddMatchSignalContext(subscribing, opts...)
+	subscribed()
+	if err != nil {
 		return fmt.Errorf("logind: subscribe: %w", err)
 	}
-	defer func() { _ = l.conn.RemoveMatchSignal(opts...) }()
+	defer func() {
+		removing, removed := context.WithTimeout(context.Background(), CallTimeout)
+		defer removed()
+		_ = l.conn.RemoveMatchSignalContext(removing, opts...)
+	}()
 	signals := make(chan *dbus.Signal, 8)
 	l.conn.Signal(signals)
 	defer l.conn.RemoveSignal(signals)
@@ -91,19 +94,27 @@ func (l *Client) Listen(ctx context.Context, onLock, onUnlock func()) error {
 	}
 }
 
-// SystemClient connects to logind on the system bus, logging (not
-// failing) when it is unavailable, as what without it is optional; what
-// names the user of the client in the log line.
-func SystemClient(what string) *Client {
-	conn, err := dbus.ConnectSystemBus()
+// SystemClient connects to logind on the system bus under ctx, logging
+// (not failing) when it is unavailable, as what without it is optional;
+// what names the user of the client in the log line. The connection
+// outlives ctx once made.
+func SystemClient(ctx context.Context, what string) *Client {
+	life, closeConn := context.WithCancel(context.Background())
+	giveUp := context.AfterFunc(ctx, closeConn)
+	conn, err := dbus.ConnectSystemBus(dbus.WithContext(life))
 	if err != nil {
+		giveUp()
+		closeConn()
 		log.Printf("%s: logind unavailable: %v", what, err)
 		return nil
 	}
-	l, err := NewClient(conn)
+	l, err := NewClient(ctx, conn)
+	if !giveUp() && err == nil {
+		err = ctx.Err()
+	}
 	if err != nil {
 		log.Printf("%s: logind unavailable: %v", what, err)
-		_ = conn.Close()
+		closeConn()
 		return nil
 	}
 	return l

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/xdg"
+
+	"github.com/stubbedev/lys-shell/config"
 )
 
 // TestMain lets the test binary play `lys-login lock`: FAKE_LOCK names
@@ -212,5 +215,23 @@ func TestShouldRelock(t *testing.T) {
 	}
 	if shouldRelock(true, errors.New("no logind")) {
 		t.Error("probe unavailable: fail soft")
+	}
+}
+
+func TestStartReturnsWhileTheSystemBusIsSilent(t *testing.T) {
+	sock := filepath.Join(t.TempDir(), "silent")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path="+sock)
+	cfg := config.Defaults()
+	cfg.Login.Lock.LockOnStart = false
+	current := func() *config.Config { return cfg }
+	_, stop := Start(current, func() {})
+	defer stop()
+	if _, err := ln.Accept(); err != nil {
+		t.Fatal(err)
 	}
 }

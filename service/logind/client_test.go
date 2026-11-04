@@ -2,6 +2,9 @@ package logind
 
 import (
 	"context"
+	"errors"
+	"net"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -76,17 +79,17 @@ func startFakeLogind(t *testing.T) (*dbustest.Bus, *dbus.Conn, *fakeLogindSessio
 // the hint round-trips.
 func TestLogindHint(t *testing.T) {
 	bus, _, sess := startFakeLogind(t)
-	l, err := NewClient(bus.Conn(t))
+	l, err := NewClient(t.Context(), bus.Conn(t))
 	if err != nil {
 		t.Fatalf("NewLogind: %v", err)
 	}
 	if l.Path() != fakeSessionPath {
 		t.Errorf("session path = %s, want the real path behind auto", l.Path())
 	}
-	if locked, err := l.LockedHint(); err != nil || locked {
+	if locked, err := l.LockedHint(t.Context()); err != nil || locked {
 		t.Fatalf("LockedHint = %v, %v", locked, err)
 	}
-	if err := l.SetLockedHint(true); err != nil {
+	if err := l.SetLockedHint(t.Context(), true); err != nil {
 		t.Fatal(err)
 	}
 	sess.mu.Lock()
@@ -95,7 +98,7 @@ func TestLogindHint(t *testing.T) {
 	if !got {
 		t.Error("SetLockedHint did not reach logind")
 	}
-	if locked, err := l.LockedHint(); err != nil || !locked {
+	if locked, err := l.LockedHint(t.Context()); err != nil || !locked {
 		t.Errorf("LockedHint after set = %v, %v", locked, err)
 	}
 }
@@ -104,7 +107,7 @@ func TestLogindHint(t *testing.T) {
 // callbacks; the same signals from another session do not.
 func TestLogindSignals(t *testing.T) {
 	bus, server, _ := startFakeLogind(t)
-	l, err := NewClient(bus.Conn(t))
+	l, err := NewClient(t.Context(), bus.Conn(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,9 +148,94 @@ func TestLogindSignals(t *testing.T) {
 	}
 }
 
+type heldSession struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *heldSession) SetLockedHint(bool) *dbus.Error {
+	s.entered <- struct{}{}
+	<-s.release
+	return nil
+}
+
+func (s *heldSession) Get(string, string) (dbus.Variant, *dbus.Error) {
+	s.entered <- struct{}{}
+	<-s.release
+	return dbus.MakeVariant(true), nil
+}
+
+func TestLogindCallsEndWithTheirContext(t *testing.T) {
+	bus := dbustest.Start(t)
+	server := bus.Conn(t)
+	held := &heldSession{entered: make(chan struct{}, 4), release: make(chan struct{})}
+	t.Cleanup(func() { close(held.release) })
+	const path = dbus.ObjectPath("/held")
+	if err := server.Export(held, path, SessionIf); err != nil {
+		t.Fatal(err)
+	}
+	if err := server.Export(held, path, "org.freedesktop.DBus.Properties"); err != nil {
+		t.Fatal(err)
+	}
+	l := &Client{conn: bus.Conn(t), path: dbus.ObjectPath(path)}
+	if _, err := server.RequestName(Service, dbus.NameFlagDoNotQueue); err != nil {
+		t.Fatal(err)
+	}
+	for _, call := range []struct {
+		name string
+		run  func(context.Context) error
+	}{
+		{"SetLockedHint", func(ctx context.Context) error { return l.SetLockedHint(ctx, true) }},
+		{"LockedHint", func(ctx context.Context) error { _, err := l.LockedHint(ctx); return err }},
+	} {
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- call.run(ctx) }()
+		select {
+		case <-held.entered:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s never reached logind", call.name)
+		}
+		cancel()
+		select {
+		case err := <-done:
+			if !errors.Is(err, context.Canceled) {
+				t.Errorf("%s = %v, want its context's end", call.name, err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s outlived its context with logind silent", call.name)
+		}
+	}
+}
+
 func TestNewLogindWithoutLogind(t *testing.T) {
 	bus := dbustest.Start(t)
-	if _, err := NewClient(bus.Conn(t)); err == nil {
+	if _, err := NewClient(t.Context(), bus.Conn(t)); err == nil {
 		t.Error("NewLogind succeeded with no logind on the bus")
+	}
+}
+
+func TestSystemClientEndsWithItsContextOnASilentBus(t *testing.T) {
+	sock := filepath.Join(t.TempDir(), "silent")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path="+sock)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan *Client, 1)
+	go func() { done <- SystemClient(ctx, "test") }()
+	if _, err := ln.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	select {
+	case l := <-done:
+		if l != nil {
+			t.Error("a client from a bus that never answered")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SystemClient outlived its context on a silent bus")
 	}
 }
