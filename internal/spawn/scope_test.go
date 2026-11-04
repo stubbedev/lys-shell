@@ -149,6 +149,8 @@ func TestQuietReturnsWhileTheBusHolds(t *testing.T) {
 	}
 	release()
 	scopes.moves.Wait()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if got := len(m.senders); got != 1 {
 		t.Errorf("%d session bus connections for %d commands, want 1", got, commands)
 	}

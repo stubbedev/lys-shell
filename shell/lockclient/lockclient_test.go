@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/sockdir"
 	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -219,7 +220,7 @@ func TestShouldRelock(t *testing.T) {
 }
 
 func TestStartReturnsWhileTheSystemBusIsSilent(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "silent")
+	sock := filepath.Join(sockdir.Dir(t), "silent")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)

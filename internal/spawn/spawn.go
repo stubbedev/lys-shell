@@ -16,6 +16,7 @@ func Quiet(cmd string) {
 	if strings.TrimSpace(cmd) == "" {
 		return
 	}
+	scopes.moves.Add(1)
 	go runQuiet(cmd)
 }
 
@@ -23,11 +24,13 @@ func runQuiet(cmd string) {
 	c := exec.Command("sh", "-c", cmd) //nolint:gosec // the command comes from the user's own config
 	var stderr bytes.Buffer
 	c.Stderr = &stderr
-	if err := Scoped(c, strings.Fields(cmd)[0]); err != nil {
+	err := Scoped(c, strings.Fields(cmd)[0])
+	scopes.moves.Done()
+	if err != nil {
 		log.Printf("cannot spawn command %q: %v", cmd, err)
 		return
 	}
-	err := c.Wait()
+	err = c.Wait()
 	var exit *exec.ExitError
 	switch {
 	case errors.As(err, &exit):

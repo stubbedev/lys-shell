@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/sockdir"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -177,7 +178,7 @@ func TestLogindCallsEndWithTheirContext(t *testing.T) {
 	if err := server.Export(held, path, "org.freedesktop.DBus.Properties"); err != nil {
 		t.Fatal(err)
 	}
-	l := &Client{conn: bus.Conn(t), path: dbus.ObjectPath(path)}
+	l := &Client{conn: bus.Conn(t), path: path}
 	if _, err := server.RequestName(Service, dbus.NameFlagDoNotQueue); err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +217,7 @@ func TestNewLogindWithoutLogind(t *testing.T) {
 }
 
 func TestSystemClientEndsWithItsContextOnASilentBus(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "silent")
+	sock := filepath.Join(sockdir.Dir(t), "silent")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
