@@ -437,7 +437,7 @@ func (p *Popups) clearStack(st *stack) {
 			ids = append(ids, n.ID)
 		}
 	}
-	p.svc.Dismiss(ids)
+	go p.svc.Dismiss(ids)
 }
 
 // liveIDs are the ids of the stack's cards not leaving, front first.

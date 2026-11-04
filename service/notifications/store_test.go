@@ -424,7 +424,7 @@ func TestHotQueriesUseTheirIndexes(t *testing.T) {
 		{"sweep", sweepSQL, []any{int64(1), 500}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)", "SEARCH notifications USING INDEX notifications_expiry (<expr><?)"}},
 		{"expiries", expiriesSQL, []any{int64(1)}, []string{"SEARCH notifications USING INDEX notifications_expiry (<expr>>?)"}},
 		{"find", findSQL, []any{1}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)"}},
-		{"remove", removeSQL, []any{1}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)"}},
+		{"remove", removeSQL, []any{"[1, 2]"}, []string{"SEARCH notifications USING INTEGER PRIMARY KEY (rowid=?)"}},
 	} {
 		plan := queryPlan(t, st.db, tc.query, tc.args...)
 		t.Logf("%s:\n%s", tc.name, plan)
@@ -853,5 +853,46 @@ func TestStorePathFollowsTheDataDirectory(t *testing.T) {
 	t.Setenv("HOME", "")
 	if got, err := StorePath(); err == nil {
 		t.Errorf("StorePath = %q with neither base absolute, want an error", got)
+	}
+}
+
+// Remove takes more ids than sqlite's bound variable limit in one
+// statement, reports each stored one once, and touches nothing else.
+func TestStoreRemoveReportsWhatWasStored(t *testing.T) {
+	st, _ := openTestStore(t)
+	seedRows(t, st.db, 60, 1, time.Now())
+
+	const sqliteVariableLimit = 32766
+	ids := []uint32{5, 5}
+	for id := range uint32(sqliteVariableLimit) {
+		ids = append(ids, 1000+id)
+	}
+	for id := range uint32(50) {
+		ids = append(ids, id+1)
+	}
+	got, err := st.Remove(ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(got)
+	want := make([]uint32, 0, 50)
+	for id := range uint32(50) {
+		want = append(want, id+1)
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("stored = %v, want %v", got, want)
+	}
+	if n, err := st.Count(); err != nil || n != 10 {
+		t.Errorf("count = %d, %v; want the 10 not named", n, err)
+	}
+
+	for _, unknown := range [][]uint32{{9999}, {}, nil} {
+		got, err := st.Remove(unknown)
+		if err != nil || len(got) != 0 {
+			t.Errorf("removing %v = %v, %v; want nothing", unknown, got, err)
+		}
+	}
+	if n, err := st.Count(); err != nil || n != 10 {
+		t.Errorf("after removing what is not there: count = %d, %v", n, err)
 	}
 }

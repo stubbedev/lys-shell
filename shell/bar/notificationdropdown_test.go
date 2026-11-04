@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -616,4 +617,89 @@ func TestNotificationDropdownPagesTheHistory(t *testing.T) {
 	waitHeadless(t, "the same depth reread from the newest", func() bool {
 		return len(v.notifs) == sent && v.notifs[0].ID == sent+1 && v.more
 	})
+}
+
+// Both clears leave the loop free and the dropdown follows them at once,
+// however long the bus takes; each app still gets its closed signal, and
+// the other group's do not go out.
+func TestNotificationClearsDoNotWaitForTheBus(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		target func(*notificationView) widget.Widget
+		done   func(*notificationView) bool
+		closed int32
+	}{
+		{"clear all", func(v *notificationView) widget.Widget { return v.clearAll }, func(v *notificationView) bool { return len(v.groups) == 0 }, 5},
+		{"group clear", func(v *notificationView) widget.Widget {
+			for _, g := range v.groups {
+				if g.app == "mail" {
+					return findByClass(g, "notification-dropdown-group-clear")
+				}
+			}
+			return nil
+		}, func(v *notificationView) bool { return len(v.groups) == 1 && v.groups[0].app == "chat" }, 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v, svc, _ := clearableDropdown(t)
+			release := make(chan struct{})
+			var closed atomic.Int32
+			svc.SetEmitter(func(string, ...any) {
+				<-release
+				closed.Add(1)
+			})
+			clicked := make(chan struct{})
+			go func() {
+				defer close(clicked)
+				onHeadlessLoop(func() bool {
+					routeClick(v, tc.target(v))
+					return true
+				})
+			}()
+			select {
+			case <-clicked:
+			case <-time.After(2 * time.Second):
+				close(release)
+				t.Fatal("the click waited for the bus")
+			}
+			waitHeadless(t, "the dropdown updated while the bus blocks", func() bool { return tc.done(v) })
+			if got := closed.Load(); got != 0 {
+				t.Errorf("%d signals before the bus took any", got)
+			}
+			close(release)
+			waitHeadless(t, "every closed signal", func() bool { return closed.Load() == tc.closed })
+			time.Sleep(20 * time.Millisecond)
+			if got := closed.Load(); got != tc.closed {
+				t.Errorf("closed signals = %d, want %d", got, tc.closed)
+			}
+		})
+	}
+}
+
+// The dropdown rereads the history when it changes, not when only a
+// popup left, and not after it closed.
+func TestNotificationDropdownRereadsOnlyTheHistory(t *testing.T) {
+	v, svc, _ := clearableDropdown(t)
+	read := onHeadlessLoop(func() *notifications.Notification { return v.notifs[0] })
+	firstRead := onHeadlessLoop(func() *[]*notifications.Notification { s := v.notifs; return &s })
+
+	svc.DismissPopup(read.ID)
+	svc.SetDND(true)
+	t.Cleanup(func() { svc.SetDND(false) })
+	waitHeadless(t, "the feed caught up to the DND change", func() bool { return v.dnd.On() })
+	if same := onHeadlessLoop(func() bool { return &v.notifs[0] == &(*firstRead)[0] }); !same {
+		t.Error("a popup leaving reread the history")
+	}
+
+	svc.Close(read.ID, notifications.Dismissed)
+	waitHeadless(t, "the reread", func() bool { return len(v.notifs) == 4 })
+
+	onHeadlessLoop(func() bool {
+		v.dropdownClosed()
+		return true
+	})
+	svc.Notify("mail", 0, "", "after", "", nil, 0)
+	time.Sleep(20 * time.Millisecond)
+	if got := onHeadlessLoop(func() int { return len(v.notifs) }); got != 4 {
+		t.Errorf("a closed dropdown reread the history: %d notifications", got)
+	}
 }

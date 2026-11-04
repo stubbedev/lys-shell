@@ -2,6 +2,9 @@ package notifications
 
 import (
 	"fmt"
+	"path/filepath"
+	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -260,4 +263,217 @@ func history(t *testing.T, s *Service) []*Notification {
 		t.Fatal(err)
 	}
 	return got
+}
+
+// A dismissal is one change to the shell however much it took: one
+// event naming the ids, past the feed's buffer, and one closed signal
+// for each app. The rest of the window keeps its order, and what the
+// service does not hold announces nothing.
+func TestDismissIsOneRemoval(t *testing.T) {
+	s := newTestService(t)
+	var ids, kept []uint32
+	for i := range 80 {
+		id := s.Notify("app", 0, "", "n", "", nil, 0)
+		if i%2 == 0 {
+			ids = append(ids, id)
+		} else {
+			kept = append(kept, id)
+		}
+	}
+	feed, _ := s.Subscribe()
+	closed := closedSignals(s)
+
+	s.Dismiss(append(slices.Clone(ids), ids[0], 9999))
+	ev := collect(t, feed, 1)[0]
+	if ev.Kind != EventRemove || ev.Reason != Dismissed || !slices.Equal(ev.IDs, ids) {
+		t.Errorf("event = %+v, want one removal of %v", ev, ids)
+	}
+	if len(feed) != 0 {
+		t.Errorf("%d events past the one removal", len(feed))
+	}
+	if !slices.Equal(*closed, ids) {
+		t.Errorf("closed signals = %v, want one each for %v", *closed, ids)
+	}
+	var left []uint32
+	for _, n := range slices.Backward(history(t, s)) {
+		left = append(left, n.ID)
+	}
+	if !slices.Equal(left, kept) || s.Count() != len(kept) || len(s.Popups()) != len(kept) {
+		t.Errorf("left %v (count %d, popups %d), want %v", left, s.Count(), len(s.Popups()), kept)
+	}
+
+	s.Dismiss(ids)
+	s.Dismiss([]uint32{9999})
+	s.Dismiss(nil)
+	if len(feed) != 0 || len(*closed) != len(ids) {
+		t.Errorf("dismissing what is gone: %d events, closed %v", len(feed), *closed)
+	}
+}
+
+// Dismissing popups stops their countdowns and only theirs.
+func TestDismissStopsOnlyItsPopupTimers(t *testing.T) {
+	s := newTestService(t)
+	gone := s.Notify("app", 0, "", "gone", "", nil, -1)
+	stays := s.Notify("app", 0, "", "stays", "", nil, -1)
+	s.Dismiss([]uint32{gone})
+	if _, armed := s.timers[gone]; armed {
+		t.Error("a dismissed popup kept its countdown")
+	}
+	if got := s.Popups(); len(got) != 1 || got[0].ID != stays {
+		t.Fatalf("popups = %v, want the other one", got)
+	}
+	advance(s, DefaultPopupDuration)
+	if got := len(s.Popups()); got != 0 {
+		t.Errorf("the other popup's countdown no longer runs: %d popups", got)
+	}
+}
+
+// Clear all is one removal too, naming the in-memory window; with only
+// disk left it still tells the shell, and an empty history tells nobody.
+func TestDismissAllIsOneRemoval(t *testing.T) {
+	st, _ := openTestStore(t)
+	s := newStoredService(t, st)
+	memory, err := NewMemoryLimit(MinHistoryMemory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.SetHistoryLimits(memory, DefaultStoredLimit())
+	var ids []uint32
+	for range 2 * MinHistoryMemory {
+		advance(s, time.Millisecond)
+		ids = append(ids, s.Notify("app", 0, "", "n", "", nil, 0))
+	}
+	window := ids[MinHistoryMemory:]
+	feed, _ := s.Subscribe()
+	closed := closedSignals(s)
+
+	s.DismissAll()
+	ev := collect(t, feed, 1)[0]
+	if ev.Kind != EventRemove || !slices.Equal(ev.IDs, window) || len(feed) != 0 {
+		t.Errorf("event = %+v with %d more, want one removal of %v", ev, len(feed), window)
+	}
+	if !slices.Equal(*closed, window) || s.Count() != 0 || len(stored(t, st)) != 0 {
+		t.Errorf("closed %v, count %d, stored %d", *closed, s.Count(), len(stored(t, st)))
+	}
+
+	s.DismissAll()
+	if len(feed) != 0 || len(*closed) != len(window) {
+		t.Errorf("clearing an empty history: %d events, closed %v", len(feed), *closed)
+	}
+
+	for range 2 * MinHistoryMemory {
+		advance(s, time.Millisecond)
+		s.Notify("app", 0, "", "n", "", nil, 0)
+	}
+	collect(t, feed, 2*MinHistoryMemory)
+	inWindow := history(t, s)[:MinHistoryMemory]
+	shown := make([]uint32, 0, len(inWindow))
+	for _, n := range inWindow {
+		shown = append(shown, n.ID)
+	}
+	s.Dismiss(shown)
+	collect(t, feed, 1)
+	*closed = nil
+
+	s.DismissAll()
+	ev = collect(t, feed, 1)[0]
+	if ev.Kind != EventRemove || len(ev.IDs) != 0 || len(*closed) != 0 || s.Count() != 0 {
+		t.Errorf("clearing only disk: event %+v, closed %v, count %d", ev, *closed, s.Count())
+	}
+}
+
+// The shell learns of a dismissal while the bus is still taking the
+// signals, and the service stays usable meanwhile.
+func TestClosedSignalsDoNotHoldTheService(t *testing.T) {
+	s := newTestService(t)
+	ids := []uint32{s.Notify("app", 0, "", "a", "", nil, 0), s.Notify("app", 0, "", "b", "", nil, 0)}
+	feed, _ := s.Subscribe()
+	release := make(chan struct{})
+	var sent []uint32
+	s.SetEmitter(func(_ string, args ...any) {
+		<-release
+		sent = append(sent, args[0].(uint32))
+	})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.Dismiss(ids)
+	}()
+
+	ev := collect(t, feed, 1)[0]
+	if ev.Kind != EventRemove || s.Count() != 0 || len(s.Popups()) != 0 {
+		t.Errorf("while the bus blocks: event %+v, count %d, popups %d", ev, s.Count(), len(s.Popups()))
+	}
+	close(release)
+	<-done
+	if !slices.Equal(sent, ids) {
+		t.Errorf("signals = %v, want %v", sent, ids)
+	}
+}
+
+// A subscriber that rereads the history on HistoryChanges sees the last
+// change even when the event feed is full and drops it; popup and DND
+// changes leave the history alone and do not tick.
+func TestHistoryChangesSurviveAFullFeed(t *testing.T) {
+	s := newTestService(t)
+	const popups = 40
+	var ids []uint32
+	for range popups {
+		ids = append(ids, s.Notify("app", 0, "", "n", "", nil, 0))
+	}
+	feed, _ := s.Subscribe()
+	history, _ := s.HistoryChanges()
+	for _, id := range ids {
+		s.DismissPopup(id)
+	}
+	s.SetDND(false)
+	if len(history) != 0 {
+		t.Fatal("a popup or DND change ticked the history")
+	}
+
+	s.Close(ids[0], Dismissed)
+	s.Close(ids[1], Dismissed)
+	if len(history) != 1 {
+		t.Errorf("history ticks pending = %d, want the two closes as one", len(history))
+	}
+	for len(feed) > 0 {
+		if ev := <-feed; ev.Kind == EventRemove {
+			t.Fatal("the feed kept the removal, so this does not test a drop")
+		}
+	}
+}
+
+func BenchmarkDismiss(b *testing.B) {
+	b.Setenv("XDG_STATE_HOME", b.TempDir())
+	for _, n := range []int{1000, 5000} {
+		b.Run(strconv.Itoa(n), func(b *testing.B) {
+			memory, err := NewMemoryLimit(MaxHistoryMemory)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for b.Loop() {
+				b.StopTimer()
+				st, err := OpenStore(filepath.Join(b.TempDir(), "notifications.db"))
+				if err != nil {
+					b.Fatal(err)
+				}
+				s := NewService()
+				s.SetHistoryLimits(memory, DefaultStoredLimit())
+				if err := s.AttachStore(st); err != nil {
+					b.Fatal(err)
+				}
+				ids := make([]uint32, 0, n)
+				for range n {
+					ids = append(ids, s.Notify("app", 0, "", "n", "", nil, 0))
+				}
+				b.StartTimer()
+				s.Dismiss(ids)
+				b.StopTimer()
+				if err := st.Close(); err != nil {
+					b.Fatal(err)
+				}
+				b.StartTimer()
+			}
+		})
+	}
 }

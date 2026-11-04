@@ -67,6 +67,8 @@ type notificationView struct {
 
 	once sync.Once
 	stop chan struct{}
+	// stopHistory ends the history feed, and with it the rereads.
+	stopHistory func()
 }
 
 func notificationDropdown(ctx ModuleContext) widget.Widget {
@@ -132,9 +134,11 @@ func (v *notificationView) dndToggled(on bool) {
 	v.svc.SetDND(on)
 }
 
+// dismissAll leaves the loop to the store write and a closed signal per
+// notification; the history's change comes back to rebuild.
 func (v *notificationView) dismissAll() {
 	if v.svc != nil {
-		v.svc.DismissAll()
+		go v.svc.DismissAll()
 	}
 }
 
@@ -242,6 +246,9 @@ func (v *notificationView) follow() {
 	if v.svc == nil {
 		return
 	}
+	history, stopHistory := v.svc.HistoryChanges()
+	v.stopHistory = stopHistory
+	follow(v.ctx, history, stopHistory, func(struct{}) { v.rebuild() })
 	events, stop := v.svc.Subscribe()
 	go func() {
 		defer stop()
@@ -257,11 +264,8 @@ func (v *notificationView) follow() {
 				if !ok {
 					return
 				}
-				switch ev.Kind {
-				case notifications.EventDnd:
+				if ev.Kind == notifications.EventDnd {
 					v.ctx.Invoke(v.syncDND)
-				case notifications.EventAdd, notifications.EventRemove:
-					v.ctx.Invoke(v.rebuild)
 				}
 			}
 		}
@@ -269,7 +273,14 @@ func (v *notificationView) follow() {
 }
 
 // dropdownClosed implements dropdownCloser.
-func (v *notificationView) dropdownClosed() { v.once.Do(func() { close(v.stop) }) }
+func (v *notificationView) dropdownClosed() {
+	v.once.Do(func() {
+		close(v.stop)
+		if v.stopHistory != nil {
+			v.stopHistory()
+		}
+	})
+}
 
 // notifGroup is NotificationGroup: lys-ui's card whose header Item
 // (the app's icon and name, the newest summary while collapsed, the
@@ -406,13 +417,13 @@ func (g *notifGroup) showAll() {
 	g.sync()
 }
 
-// clear is ClearGroup.
+// clear is ClearGroup, off the loop as dismissAll is.
 func (g *notifGroup) clear() {
 	ids := make([]uint32, len(g.notifs))
 	for i, n := range g.notifs {
 		ids[i] = n.ID
 	}
-	g.view.svc.Dismiss(ids)
+	go g.view.svc.Dismiss(ids)
 }
 
 // notifItem is NotificationItem: the notification as lys-ui's Item

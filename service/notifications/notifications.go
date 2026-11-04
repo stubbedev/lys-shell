@@ -101,9 +101,13 @@ func (n *Notification) Expired(now time.Time) bool {
 
 // Event is the service's change feed.
 type Event struct {
-	Kind   EventKind
-	Notif  *Notification
-	ID     uint32
+	Kind  EventKind
+	Notif *Notification
+	ID    uint32
+	// IDs names what one EventRemove took out of the history, in the
+	// order it was asked to. Entries a clear-all found only on disk are
+	// not named, so it can be empty.
+	IDs    []uint32
 	Reason ClosedReason
 }
 
@@ -159,6 +163,7 @@ type Service struct {
 	removeExpired bool
 	block         []string
 	events        *feed.Feed[Event]
+	history       *feed.Tick
 	owners        map[uint32]string
 	emit          func(signal string, args ...any)
 	// cacheImage turns inline image data into a file path.
@@ -218,6 +223,7 @@ func NewService() *Service {
 		owners:        make(map[uint32]string),
 		cacheImage:    cacheImage,
 		events:        feed.New[Event](32),
+		history:       feed.NewTick(),
 		clock:         wallClock{},
 	}
 }
@@ -232,13 +238,24 @@ func (s *Service) SetEmitter(fn func(signal string, args ...any)) {
 // Subscribe returns a new change feed. Every subscriber sees every
 // event (the bar modules on each output and the popup host all follow
 // the one service); a subscriber that falls behind drops events rather
-// than stalling the service, and re-reads the snapshot on the next.
+// than stalling the service, and re-reads the snapshot on the next, so
+// one that acts only on some kinds follows HistoryChanges instead.
 // stop ends the feed.
 func (s *Service) Subscribe() (<-chan Event, func()) { return s.events.Subscribe() }
 
+// HistoryChanges ticks after the history changed. A pending tick
+// absorbs the next, so nothing is dropped: whoever rereads the history
+// on a tick has seen the last change. stop ends the feed.
+func (s *Service) HistoryChanges() (<-chan struct{}, func()) { return s.history.Subscribe() }
+
 // notify fans an event out to every subscriber, dropping it for the
 // ones whose buffer is full.
-func (s *Service) notify(ev Event) { s.events.Publish(ev) }
+func (s *Service) notify(ev Event) {
+	if ev.Kind == EventAdd || ev.Kind == EventRemove {
+		feed.Notify(s.history)
+	}
+	s.events.Publish(ev)
+}
 
 // Page reads up to limit history entries strictly older than before
 // (nil: from the newest), newest first: from memory, then, past the
@@ -426,7 +443,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 			return id
 		}
 	}
-	replaced := s.removeHistoryLocked(id) || onDisk
+	replaced := len(s.removeHistoryLocked(map[uint32]bool{id: true})) > 0 || onDisk
 	n := &Notification{
 		ID:           id,
 		AppName:      appName,
@@ -572,7 +589,9 @@ func (s *Service) DismissAll() {
 	for id := range s.expiry {
 		s.stopExpiryLocked(id)
 	}
+	emptied := s.total > 0
 	c := s.forgetLocked(s.shownLocked(), Dismissed)
+	c.emptied = emptied
 	s.total = 0
 	s.persistUnlock(func(st *Store) { storeErr("remove all", st.RemoveAll()) })
 	s.announce(c)
@@ -583,21 +602,26 @@ type closing struct {
 	reason ClosedReason
 	closed map[uint32]bool
 	popped bool
-	emit   func(signal string, args ...any)
+	// emptied is a clear-all that found a history, whichever part of it
+	// was in memory.
+	emptied bool
+	emit    func(signal string, args ...any)
 }
 
 func (s *Service) forgetLocked(ids []uint32, reason ClosedReason) *closing {
-	c := &closing{ids: ids, reason: reason, closed: make(map[uint32]bool, len(ids)), emit: s.emit}
+	wanted := make(map[uint32]bool, len(ids))
 	for _, id := range ids {
-		if s.removeHistoryLocked(id) {
-			c.closed[id] = true
-			s.total--
-		}
-		if reason != Expired && s.dropPopupLocked(id) {
-			c.popped = true
-		}
+		wanted[id] = true
 	}
-	return c
+	closed := s.removeHistoryLocked(wanted)
+	s.total -= len(closed)
+	return &closing{
+		ids:    ids,
+		reason: reason,
+		closed: closed,
+		popped: reason != Expired && s.dropPopupsLocked(wanted),
+		emit:   s.emit,
+	}
 }
 
 func (s *Service) shownLocked() []uint32 {
@@ -615,21 +639,27 @@ func (s *Service) shownLocked() []uint32 {
 	return ids
 }
 
+// announce tells the subscribers once, then each app its closed
+// notification: the shell is up to date however long the bus takes.
 func (s *Service) announce(c *closing) {
-	announced := false
+	removed := make([]uint32, 0, len(c.closed))
 	for _, id := range c.ids {
-		if !c.closed[id] {
-			continue
+		if c.closed[id] {
+			delete(c.closed, id)
+			removed = append(removed, id)
 		}
-		delete(c.closed, id)
-		announced = true
-		if c.emit != nil {
-			c.emit(Interface+".NotificationClosed", id, uint32(c.reason))
-		}
-		s.notify(Event{Kind: EventRemove, ID: id, Reason: c.reason})
 	}
-	if !announced && c.popped {
+	switch {
+	case len(removed) > 0 || c.emptied:
+		s.notify(Event{Kind: EventRemove, IDs: removed, Reason: c.reason})
+	case c.popped:
 		s.notify(Event{Kind: EventPopups})
+	}
+	if c.emit == nil {
+		return
+	}
+	for _, id := range removed {
+		c.emit(Interface+".NotificationClosed", id, uint32(c.reason))
 	}
 }
 
@@ -737,33 +767,44 @@ func (s *Service) startPopupTimerLocked(id uint32, d time.Duration) {
 // dropPopupLocked removes a popup and its countdown, reporting whether
 // it was on the list. The caller holds mu.
 func (s *Service) dropPopupLocked(id uint32) bool {
-	if t, ok := s.timers[id]; ok {
-		if t.stop != nil {
-			t.stop()
-		}
-		delete(s.timers, id)
-	}
-	for i, n := range s.popups {
-		if n.ID == id {
-			s.popups = append(s.popups[:i], s.popups[i+1:]...)
-			return true
-		}
-	}
-	return false
+	return s.dropPopupsLocked(map[uint32]bool{id: true})
 }
 
-// removeHistoryLocked drops a notification from the in-memory window,
-// its owner and its expiry timer, reporting whether the window held it.
-// The total is the caller's to adjust. The caller holds mu.
-func (s *Service) removeHistoryLocked(id uint32) bool {
-	s.stopExpiryLocked(id)
-	delete(s.owners, id)
-	i := slices.IndexFunc(s.recent, func(n *Notification) bool { return n.ID == id })
-	if i < 0 {
-		return false
+// dropPopupsLocked removes the popups wanted names and their countdowns
+// in one pass over the list, reporting whether it held any. The caller
+// holds mu.
+func (s *Service) dropPopupsLocked(wanted map[uint32]bool) bool {
+	for id := range wanted {
+		if t, ok := s.timers[id]; ok {
+			if t.stop != nil {
+				t.stop()
+			}
+			delete(s.timers, id)
+		}
 	}
-	s.recent = slices.Delete(s.recent, i, i+1)
-	return true
+	before := len(s.popups)
+	s.popups = slices.DeleteFunc(s.popups, func(n *Notification) bool { return wanted[n.ID] })
+	return len(s.popups) < before
+}
+
+// removeHistoryLocked drops the notifications wanted names from the
+// in-memory window, with their owners and expiry timers, in one pass
+// over the window. It returns the ones the window held; the total is
+// the caller's to adjust. The caller holds mu.
+func (s *Service) removeHistoryLocked(wanted map[uint32]bool) map[uint32]bool {
+	for id := range wanted {
+		s.stopExpiryLocked(id)
+		delete(s.owners, id)
+	}
+	held := make(map[uint32]bool, len(wanted))
+	s.recent = slices.DeleteFunc(s.recent, func(n *Notification) bool {
+		if !wanted[n.ID] {
+			return false
+		}
+		held[n.ID] = true
+		return true
+	})
+	return held
 }
 
 // startExpiryLocked schedules the remove-expired cleanup: the history

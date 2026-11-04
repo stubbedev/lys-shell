@@ -58,7 +58,7 @@ const (
 	countSQL     = `SELECT COUNT(*) FROM notifications`
 	maxIDSQL     = `SELECT MAX(id) FROM notifications`
 	insertSQL    = `INSERT OR REPLACE INTO notifications (` + columns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	removeSQL    = `DELETE FROM notifications WHERE id = ?`
+	removeSQL    = `DELETE FROM notifications WHERE id IN (SELECT value FROM json_each(?)) RETURNING id`
 	removeAllSQL = `DELETE FROM notifications`
 )
 
@@ -139,34 +139,28 @@ func (st *Store) Add(n *Notification, prune int) error {
 	return nil
 }
 
-// Remove deletes the notifications ids names in one transaction,
-// returning the ones that were stored, in the order of ids.
+// Remove deletes the notifications ids names in one statement, which
+// takes them as one JSON array so their number is not held to sqlite's
+// bound variable limit, returning the ones that were stored.
 func (st *Store) Remove(ids []uint32) ([]uint32, error) {
-	tx, err := st.db.Begin()
+	list, err := json.Marshal(ids)
 	if err != nil {
 		return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
 	}
-	defer func() { _ = tx.Rollback() }()
-	stmt, err := tx.Prepare(removeSQL)
+	rows, err := st.db.Query(removeSQL, string(list))
 	if err != nil {
 		return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
 	}
-	defer func() { _ = stmt.Close() }()
+	defer func() { _ = rows.Close() }()
 	stored := make([]uint32, 0, len(ids))
-	for _, id := range ids {
-		res, err := stmt.Exec(id)
-		if err != nil {
-			return nil, fmt.Errorf("removing notification %d: %w", id, err)
+	for rows.Next() {
+		var id uint32
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
 		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return nil, fmt.Errorf("removing notification %d: %w", id, err)
-		}
-		if n > 0 {
-			stored = append(stored, id)
-		}
+		stored = append(stored, id)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("removing %d notifications: %w", len(ids), err)
 	}
 	return stored, nil

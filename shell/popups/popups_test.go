@@ -738,6 +738,7 @@ func TestClearAllRemovesTheStacksNotifications(t *testing.T) {
 		}
 		s.hover(s.card(mail[2]).summary)
 		s.click(stack.clear)
+		waitFor(t, "the mail stack leaving the store", func() bool { return !notifytest.IDs(notifytest.Stored(t, st))[mail[0]] })
 		s.p.sync()
 		up, kept, onDisk := notifytest.IDs(s.svc.Popups()), notifytest.IDs(notifytest.History(t, s.svc)), notifytest.IDs(notifytest.Stored(t, st))
 		for _, id := range mail {
@@ -757,6 +758,59 @@ func TestClearAllRemovesTheStacksNotifications(t *testing.T) {
 		}
 		if s.svc.Count() != len(chat)+1 {
 			t.Errorf("%s: count = %d, want %d", behavior, s.svc.Count(), len(chat)+1)
+		}
+	}
+}
+
+// waitFor polls cond until it holds or the deadline passes.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// Clear all leaves the loop free however long the bus takes, and each
+// of the stack's apps still gets its closed signal, no other's.
+func TestClearAllDoesNotWaitForTheBus(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	mail, _ := s.burst()
+	stack := s.stackOf(mail[2])
+	s.hover(s.card(mail[2]).summary)
+	release := make(chan struct{})
+	var closed sync.Map
+	s.svc.SetEmitter(func(signal string, args ...any) {
+		<-release
+		if signal == notifications.Interface+".NotificationClosed" {
+			closed.Store(args[0], true)
+		}
+	})
+	clicked := make(chan struct{})
+	go func() {
+		defer close(clicked)
+		s.click(stack.clear)
+	}()
+	select {
+	case <-clicked:
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("the click waited for the bus")
+	}
+	waitFor(t, "the popups leaving while the bus blocks", func() bool { return len(s.svc.Popups()) == 3 })
+	close(release)
+	count := func() int {
+		n := 0
+		closed.Range(func(_, _ any) bool { n++; return true })
+		return n
+	}
+	waitFor(t, "the mail stack's closed signals", func() bool { return count() == len(mail) })
+	for _, id := range mail {
+		if _, ok := closed.Load(id); !ok {
+			t.Errorf("mail %d got no closed signal", id)
 		}
 	}
 }
