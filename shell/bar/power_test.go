@@ -60,7 +60,7 @@ func TestPowerMenuVerbOpensTheMenu(t *testing.T) {
 			opened++
 			return powerMenuWindow{}, nil
 		},
-		Run:  func(string) error { return nil },
+		Run:  func(string) {},
 		Font: ctx.Font,
 	})
 	mod, err := Create("power", ctx)

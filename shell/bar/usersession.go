@@ -105,7 +105,7 @@ func userSessionSection(ctx ModuleContext) widget.Widget {
 		button.SetTooltip(spec.tooltip)
 		command := spec.command
 		// process::run_if_set: an empty command is a no-op.
-		button.OnClick = func() { _ = spawn.Quiet(command) }
+		button.OnClick = func() { spawn.Quiet(command) }
 		row.AddAction(button)
 	}
 	card.Append(row, false)

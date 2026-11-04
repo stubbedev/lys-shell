@@ -200,10 +200,7 @@ func (v *dashboardView) card(iconName, heading string, extra ...widget.Widget) *
 // header is the DropdownHeader with the open-settings action.
 func (v *dashboardView) header() widget.Widget {
 	settings := dropdownButton(widget.NewThemeIcon("ld-settings-symbolic", itemIconPx), func() {
-		// spawn_settings_app; the popover closes on the click.
-		if err := spawn.Quiet(settingspage.Program); err != nil {
-			log.Printf("dashboard: open settings: %v", err)
-		}
+		spawn.Quiet(settingspage.Program)
 	}, css.Ghost, css.Icon)
 	settings.AddClass("dashboard-settings-btn")
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))

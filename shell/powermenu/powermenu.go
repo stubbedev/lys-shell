@@ -62,8 +62,8 @@ type Deps struct {
 	Config func() *config.Config
 	// Open maps the overlay.
 	Open func(cfg app.LayerConfig) (Window, error)
-	// Run runs a command (spawn.Quiet).
-	Run func(cmd string) error
+	// Run runs a command without waiting for it (spawn.Quiet).
+	Run func(cmd string)
 	// Font shapes the labels; Sheet (the power-menu-* rules) styles
 	// the overlay.
 	Font  render.Font
@@ -211,7 +211,7 @@ func (m *Menu) hide(then string) {
 			m.win, m.rev, m.closing = nil, nil, false
 		}
 		if then != "" {
-			_ = m.d.Run(then)
+			m.d.Run(then)
 		}
 	})
 }

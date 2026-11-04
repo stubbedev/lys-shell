@@ -50,7 +50,7 @@ func newHarness(t *testing.T) *harness {
 			h.windows = append(h.windows, w)
 			return w, nil
 		},
-		Run:  func(cmd string) error { h.ran = append(h.ran, cmd); return nil },
+		Run:  func(cmd string) { h.ran = append(h.ran, cmd) },
 		Font: face,
 	})
 	return h

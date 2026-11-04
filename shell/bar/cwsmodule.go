@@ -273,7 +273,7 @@ func (m *cwsView) dispatchScroll(action config.WorkspaceClickAction) {
 			}
 		}
 	case config.WorkspaceClickShell:
-		_ = spawn.Quiet(action.Arg) // process::run_if_set
+		spawn.Quiet(action.Arg)
 	}
 }
 

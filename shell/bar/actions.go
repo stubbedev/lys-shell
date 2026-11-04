@@ -49,7 +49,7 @@ func runShellBuiltin(ctx ModuleContext, cmd string) {
 		if verb != "" {
 			log.Printf("click: builtin %q not available yet, shelling out", verb)
 		}
-		_ = spawn.Quiet(cmd)
+		spawn.Quiet(cmd)
 	}
 }
 

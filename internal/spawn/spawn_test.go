@@ -51,9 +51,7 @@ func waitFor(t *testing.T, what string, ok func() bool) {
 func TestQuietRunsTheCommand(t *testing.T) {
 	onBus(t, nil)
 	marker := filepath.Join(t.TempDir(), "ran")
-	if err := Quiet("echo hello > " + marker); err != nil {
-		t.Fatal(err)
-	}
+	Quiet("echo hello > " + marker)
 	waitFor(t, "the command", func() bool {
 		data, _ := os.ReadFile(marker)
 		return strings.TrimSpace(string(data)) == "hello"
@@ -63,18 +61,14 @@ func TestQuietRunsTheCommand(t *testing.T) {
 func TestQuietLogsFailures(t *testing.T) {
 	onBus(t, nil)
 	logs := captureLog(t)
-	if err := Quiet("echo oops >&2; exit 3"); err != nil {
-		t.Fatal(err)
-	}
+	Quiet("echo oops >&2; exit 3")
 	waitFor(t, "the failure log", func() bool { return strings.Contains(logs.String(), "exit 3: oops") })
 }
 
 func TestQuietEmptyRunsNothing(t *testing.T) {
 	logs := captureLog(t)
-	if err := Quiet(""); err != nil {
-		t.Errorf("empty command: %v", err)
-	}
-	time.Sleep(20 * time.Millisecond)
+	Quiet("")
+	scopes.moves.Wait()
 	if logs.String() != "" {
 		t.Errorf("an empty command logged %q", logs.String())
 	}
