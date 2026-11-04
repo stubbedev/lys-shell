@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"errors"
 	"math"
 	"path/filepath"
 	"reflect"
@@ -106,5 +107,45 @@ func TestDataDirIgnoresARelativeXDGDataHome(t *testing.T) {
 func TestAnUnopenableHistoryIsAnError(t *testing.T) {
 	if _, err := OpenHistoryAt(filepath.Join(t.TempDir(), "missing-dir", "x.db")); err == nil {
 		t.Error("a database in a missing directory must fail to open")
+	}
+}
+
+func TestDeferredHistoryOpensOnFirstUse(t *testing.T) {
+	opens := 0
+	h := DeferHistory(func() (*History, error) {
+		opens++
+		return OpenHistoryAt(":memory:")
+	})
+	if opens != 0 {
+		t.Fatal("deferring the history opened it")
+	}
+	if err := h.RecordAt("drun", "a", 1, 10); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := h.Recent("drun"); err != nil || len(got) != 1 {
+		t.Errorf("Recent = %v, %v", got, err)
+	}
+	if opens != 1 {
+		t.Errorf("opened %d times, want once", opens)
+	}
+	if err := h.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestDeferredHistoryNobodyUsedNeverOpens(t *testing.T) {
+	opens := 0
+	h := DeferHistory(func() (*History, error) {
+		opens++
+		return OpenHistoryAt(":memory:")
+	})
+	if err := h.Close(); err != nil {
+		t.Error(err)
+	}
+	if _, err := h.Recent("drun"); !errors.Is(err, errHistoryClosed) {
+		t.Errorf("a use after Close = %v, want its refusal", err)
+	}
+	if opens != 0 {
+		t.Errorf("closing an unused history opened it %d times", opens)
 	}
 }

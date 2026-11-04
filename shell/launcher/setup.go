@@ -96,12 +96,7 @@ func buildSession(opts launcheripc.SessionOptions, cfg *config.Config, rows <-ch
 	l := cfg.Launcher
 	var history *engine.History
 	if l.History.Enable && deps.openHistory != nil {
-		h, err := deps.openHistory()
-		if err != nil {
-			log.Printf("launcher: history unavailable: %v", err)
-		} else {
-			history = h
-		}
+		history = engine.DeferHistory(deps.openHistory)
 	}
 	bindings := engine.EffectiveKeybindings(engine.MergeOverrides(l.Keybindings, opts.KbOverrides))
 

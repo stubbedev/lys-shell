@@ -1054,3 +1054,21 @@ func TestARowsFileIconPointingAtAFIFODrawsNothingAndDoesNotBlock(t *testing.T) {
 		t.Errorf("the row drew %d pixels for a file that is not one", ink)
 	}
 }
+
+func TestASessionOpensWhileItsHistoryHolds(t *testing.T) {
+	h := newHarness(t)
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	asked := make(chan struct{}, 1)
+	h.cfg.Launcher.History.Enable = true
+	h.s.d.OpenHistory = func() (*engine.History, error) {
+		asked <- struct{}{}
+		<-release
+		return nil, errors.New("held")
+	}
+	mode := "run"
+	opts := launcheripc.SessionOptions{Mode: &mode, Modes: []string{"run"}}
+	h.open(opts, false)
+	h.until("the surface, with the history held", func() bool { return len(h.windows) == 1 })
+	h.until("the actor asking for the history, off the loop", func() bool { return len(asked) == 1 })
+}

@@ -194,9 +194,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 		// asked for a menu it cannot build.
 		s.d.FireHook(setup.ui.hooks.MenuError, engine.HookContext{Error: "no usable modes"})
 		sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
-		if setup.history != nil {
-			_ = setup.history.Close()
-		}
+		closeHistory(setup.history)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -669,9 +667,7 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 	} else {
 		a.sess.Release()
 	}
-	if a.history != nil {
-		_ = a.history.Close()
-	}
+	closeHistory(a.history)
 	if a.win != nil {
 		// The panel plays its exit, then the surface goes; a new session
 		// meanwhile opens its own.
@@ -825,4 +821,17 @@ func messageMarkup(markup string) string {
 		return translated
 	}
 	return pango.Escape(markup)
+}
+
+// closeHistory closes off the loop, behind whatever the session's actor is
+// still doing with the database.
+func closeHistory(h *engine.History) {
+	if h == nil {
+		return
+	}
+	go func() {
+		if err := h.Close(); err != nil {
+			log.Printf("launcher: close the history: %v", err)
+		}
+	}()
 }

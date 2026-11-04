@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/xdg"
@@ -20,8 +21,14 @@ const day = 86_400
 // last use, in the same sqlite file and schema the Rust shell writes
 // ($XDG_DATA_HOME/lys-shell/launcher.db), so an upgrade keeps it.
 type History struct {
-	db *sql.DB
+	db       *sql.DB
+	deferred func() (*History, error)
+
+	mu           sync.Mutex
+	used, closed bool
 }
+
+var errHistoryClosed = errors.New("history database: closed")
 
 // DataDir resolves lys-shell's data directory, $XDG_DATA_HOME/lys-shell or
 // ~/.local/share/lys-shell, creating it (wayle-core ConfigPaths::data_dir).
@@ -70,8 +77,48 @@ func OpenHistoryAt(path string) (*History, error) {
 	return &History{db: db}, nil
 }
 
-// Close releases the database.
-func (h *History) Close() error { return h.db.Close() }
+// DeferHistory is a history that opens through open on its first use, on the
+// goroutine that uses it, so whoever only holds it never touches the disk. A
+// failed open fails every use.
+func DeferHistory(open func() (*History, error)) *History {
+	return &History{deferred: sync.OnceValues(open)}
+}
+
+// conn is the database, opened now when the history was deferred.
+func (h *History) conn() (*sql.DB, error) {
+	if h.deferred == nil {
+		return h.db, nil
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed {
+		return nil, errHistoryClosed
+	}
+	h.used = true
+	opened, err := h.deferred()
+	if err != nil {
+		return nil, fmt.Errorf("history database: %w", err)
+	}
+	return opened.db, nil
+}
+
+// Close releases the database; a deferred history no one used stays unopened.
+func (h *History) Close() error {
+	if h.deferred == nil {
+		return h.db.Close()
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.closed = true
+	if !h.used {
+		return nil
+	}
+	opened, err := h.deferred()
+	if err != nil {
+		return nil //nolint:nilerr // conn already reported the failed open; nothing is open to close
+	}
+	return opened.db.Close()
+}
 
 // Record counts one launch, pruning the mode's history beyond maxSize.
 func (h *History) Record(mode, entry string, maxSize uint32) error {
@@ -80,11 +127,15 @@ func (h *History) Record(mode, entry string, maxSize uint32) error {
 
 // RecordAt is Record with an explicit timestamp.
 func (h *History) RecordAt(mode, entry string, now int64, maxSize uint32) error {
-	if _, err := h.db.Exec(`INSERT INTO history (mode, entry, uses, last_used) VALUES (?1, ?2, 1, ?3)
+	db, err := h.conn()
+	if err != nil {
+		return err
+	}
+	if _, err := db.Exec(`INSERT INTO history (mode, entry, uses, last_used) VALUES (?1, ?2, 1, ?3)
 		ON CONFLICT (mode, entry) DO UPDATE SET uses = uses + 1, last_used = ?3`, mode, entry, now); err != nil {
 		return fmt.Errorf("history database: %w", err)
 	}
-	if _, err := h.db.Exec(`DELETE FROM history WHERE mode = ?1 AND entry NOT IN (
+	if _, err := db.Exec(`DELETE FROM history WHERE mode = ?1 AND entry NOT IN (
 			SELECT entry FROM history WHERE mode = ?1
 			ORDER BY last_used DESC, uses DESC LIMIT ?2
 		)`, mode, maxSize); err != nil {
@@ -95,7 +146,11 @@ func (h *History) RecordAt(mode, entry string, now int64, maxSize uint32) error 
 
 // Remove forgets one entry (rofi shift-delete).
 func (h *History) Remove(mode, entry string) error {
-	if _, err := h.db.Exec(`DELETE FROM history WHERE mode = ?1 AND entry = ?2`, mode, entry); err != nil {
+	db, err := h.conn()
+	if err != nil {
+		return err
+	}
+	if _, err := db.Exec(`DELETE FROM history WHERE mode = ?1 AND entry = ?2`, mode, entry); err != nil {
 		return fmt.Errorf("history database: %w", err)
 	}
 	return nil
@@ -109,7 +164,11 @@ func (h *History) Frecency(mode string) (map[string]float64, error) {
 
 // FrecencyAt is Frecency with an explicit "now".
 func (h *History) FrecencyAt(mode string, now int64) (map[string]float64, error) {
-	rows, err := h.db.Query(`SELECT entry, uses, last_used FROM history WHERE mode = ?1`, mode)
+	db, err := h.conn()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(`SELECT entry, uses, last_used FROM history WHERE mode = ?1`, mode)
 	if err != nil {
 		return nil, fmt.Errorf("history database: %w", err)
 	}
@@ -129,7 +188,11 @@ func (h *History) FrecencyAt(mode string, now int64) (map[string]float64, error)
 // Recent lists a mode's entries, most recently used first (rofi run
 // ordering).
 func (h *History) Recent(mode string) ([]string, error) {
-	rows, err := h.db.Query(`SELECT entry FROM history WHERE mode = ?1 ORDER BY last_used DESC`, mode)
+	db, err := h.conn()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(`SELECT entry FROM history WHERE mode = ?1 ORDER BY last_used DESC`, mode)
 	if err != nil {
 		return nil, fmt.Errorf("history database: %w", err)
 	}
