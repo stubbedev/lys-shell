@@ -216,6 +216,9 @@ func (o *Overlay) Request(ctx context.Context, frames Frames) (Selection, bool, 
 	return r.sel, r.ok, err
 }
 
+// Selected is the region drawn so far, on the loop.
+func (o *Overlay) Selected() image.Rectangle { return o.ed.sel }
+
 // cancel answers the request at ch, if it is still the open one, as
 // cancelled.
 func (o *Overlay) cancel(ch chan result) {

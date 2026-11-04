@@ -370,6 +370,39 @@ func (r *regionRig) selectRegion(t *testing.T) {
 // open reports whether a capture overlay session is open.
 func (r *regionRig) open() bool { return r.gate.Open() }
 
+// drawRegion drags out 100,100 to 300,200 on the overlay. The picker's surface
+// can still hold the keyboard while the overlay maps, so a drag that reached
+// nothing is repeated until one lands; one that lands must draw exactly this.
+func (r *regionRig) drawRegion(t *testing.T) {
+	t.Helper()
+	w, h := r.kb.OutputSize()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		for _, step := range []func() error{
+			func() error { return r.kb.MotionAbsolute(100, 100, uint32(w), uint32(h)) },
+			func() error { return r.kb.Button(buttonLeft, true) },
+			func() error { return r.kb.MotionAbsolute(300, 200, uint32(w), uint32(h)) },
+			func() error { return r.kb.Button(buttonLeft, false) },
+		} {
+			if err := step(); err != nil {
+				t.Fatal(err)
+			}
+			if err := r.kb.Roundtrip(); err != nil {
+				t.Fatal(err)
+			}
+			apptest.Dispatched(t, r.a)
+		}
+		got := apptest.On(r.a, r.region.Selected)
+		if got.Empty() {
+			continue
+		}
+		if want := image.Rect(100, 100, 300, 200); got != want {
+			t.Fatalf("the drag drew %v, want %v", got, want)
+		}
+		return
+	}
+	t.Fatal("no drag reached the overlay")
+}
+
 // A screenshot press during the share picker's region selection does not
 // cancel it: it opens nothing and captures nothing, and the selection the
 // user drew reaches the requester.
@@ -379,21 +412,7 @@ func TestHeadlessScreenshotPressLeavesTheRegionSelection(t *testing.T) {
 	apptest.Until(t, r.a, "the overlay took the keyboard", func() bool {
 		return r.open() && r.p.layer == nil && r.a.Session().KeyboardFocus() != nil
 	})
-	w, h := r.kb.OutputSize()
-	for _, step := range []func() error{
-		func() error { return r.kb.MotionAbsolute(100, 100, uint32(w), uint32(h)) },
-		func() error { return r.kb.Button(buttonLeft, true) },
-		func() error { return r.kb.MotionAbsolute(300, 200, uint32(w), uint32(h)) },
-		func() error { return r.kb.Button(buttonLeft, false) },
-	} {
-		if err := step(); err != nil {
-			t.Fatal(err)
-		}
-		if err := r.kb.Roundtrip(); err != nil {
-			t.Fatal(err)
-		}
-		apptest.Dispatched(t, r.a)
-	}
+	r.drawRegion(t)
 	err := within(t, "the press's refusal", func() error {
 		_, _, err := r.region.Request(context.Background(), func() (map[string]render.StillImage, error) {
 			t.Error("the refused press took a capture")
