@@ -235,12 +235,12 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	if s, _ := srv.Sink(1); !s.Mute {
 		t.Error("the server sink is not muted")
 	}
-	if v.output.muteIcon.Name() != "ld-volume-x-symbolic" {
-		t.Errorf("muted icon = %q", v.output.muteIcon.Name())
+	if name := onHeadlessLoop(v.output.muteIcon.Name); name != "ld-volume-x-symbolic" {
+		t.Errorf("muted icon = %q", name)
 	}
 
 	// A slider commit sets the device volume.
-	v.output.slider.Knob.SetValue(30)
+	onHeadlessLoop(func() bool { v.output.slider.Knob.SetValue(30); return true })
 	waitHeadless(t, "the volume write", func() bool {
 		s, _ := srv.Sink(1)
 		return s.Volume[0] < 0x8000
@@ -248,7 +248,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 
 	// An app commit sets the stream volume; the row survives (no
 	// rebuild on a property change).
-	app.slider.Knob.SetValue(40)
+	onHeadlessLoop(func() bool { app.slider.Knob.SetValue(40); return true })
 	waitHeadless(t, "the app volume", func() bool {
 		st, _ := srv.SinkInput(40)
 		return st.Volume[0] < native.VolumeNorm
@@ -258,23 +258,26 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	}
 
 	// Picking the headset returns to main and changes the default.
-	v.showPage("output")
-	var headsetRow *widget.Item
-	for _, c := range pickerRows(v.pickers[audioOutput]) {
-		if it := c.(*widget.Item); !it.HasClass("selected") {
-			headsetRow = it
+	page := onHeadlessLoop(func() string {
+		v.showPage("output")
+		var headsetRow *widget.Item
+		for _, c := range pickerRows(v.pickers[audioOutput]) {
+			if it := c.(*widget.Item); !it.HasClass("selected") {
+				headsetRow = it
+			}
 		}
-	}
-	headsetRow.ClickAt(widget.Point{})
-	if v.pages.Visible() != "main" {
-		t.Errorf("after pick page = %q", v.pages.Visible())
+		headsetRow.ClickAt(widget.Point{})
+		return v.pages.Visible()
+	})
+	if page != "main" {
+		t.Errorf("after pick page = %q", page)
 	}
 	waitHeadless(t, "the new default", func() bool { return itemText(v.output.item, "title") == "Headset" })
 	if sink, _ := srv.Defaults(); sink != "bt" {
 		t.Errorf("default sink = %q", sink)
 	}
-	if v.output.icon.Name() != "ld-headset-symbolic" {
-		t.Errorf("headset icon = %q", v.output.icon.Name())
+	if name := onHeadlessLoop(v.output.icon.Name); name != "ld-headset-symbolic" {
+		t.Errorf("headset icon = %q", name)
 	}
 
 	// The stream going away shows the no-apps state.
