@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"image/color"
@@ -17,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/icons"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
@@ -364,4 +366,60 @@ func TestThePanelHasItsBorder(t *testing.T) {
 	if edge, inside := at(b.X+b.W/2, b.Y), at(b.X+b.W/2, b.Y+4); edge == inside {
 		t.Errorf("the panel's top edge %#x is its fill: no border", uint32(edge))
 	}
+}
+
+// A site's icon is a file on disk: it paints in its row like a theme's.
+func TestAFileIconPaintsInItsRow(t *testing.T) {
+	useBundledIcons(t)
+	const side = 32
+	icon := image.NewNRGBA(image.Rect(0, 0, side, side))
+	for y := range side {
+		for x := range side {
+			icon.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+	path := filepath.Join(t.TempDir(), "site.png")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, icon); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	h := newPanelHarness(t)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	h.cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchLinks, config.SearchToggles}
+	h.cfg.Launcher.Search.Quicklinks = []config.LauncherQuicklink{{Name: "Needle Site", URL: "https://site.example/", Icon: path}, {Name: "Needle Plain", URL: "https://plain.example/"}}
+	base := h.s.d.Search
+	h.s.d.Search = func() search.Deps {
+		d := base()
+		d.Toggles = func(context.Context) []search.Control {
+			return []search.Control{{
+				ID: "x", Title: i18n.T("launcher-control-audio", i18n.Str("device", "Needle Headset")), Subtitle: i18n.T("launcher-control-audio-subtitle"),
+				Icon: "ld-volume-2-symbolic", Effect: search.RunNow(func(context.Context) error { return nil }),
+			}}
+		}
+		return d
+	}
+	p, _ := h.openPanel()
+	h.typed(p, "needle")
+	h.until("the rows", func() bool { return len(p.rowTitles()) == 3 })
+	data := make([]byte, render.Stride(renderW)*renderH)
+	red := func() int {
+		n := 0
+		for i := 0; i+3 < len(data); i += 4 {
+			if data[i+3] == 255 && data[i+2] > 240 && data[i+1] < 16 && data[i] < 16 {
+				n++
+			}
+		}
+		return n
+	}
+	h.until("the icon", func() bool {
+		paintPanel(p, data)
+		return red() > 64
+	})
+	savePanel(t, data, "file-icon")
 }
