@@ -393,23 +393,27 @@ func TestNotificationItemFileIconFallsBack(t *testing.T) {
 	cfg.Notification.IconSource = config.IconSourceAutomatic
 	ctx := newTestContext(t, cfg)
 	ctx.Notifications = svc
-	v := notificationDropdown(ctx).(*notificationView)
-	defer v.dropdownClosed()
-
-	var missing, loaded *notifItem
-	for _, g := range v.groups {
-		switch g.app {
-		case "a":
-			missing = g.items[0]
-		case "b":
-			loaded = g.items[0]
+	var missIcon, keepIcon *widget.Icon
+	var v *notificationView
+	onHeadlessLoop(func() bool {
+		v = notificationDropdown(ctx).(*notificationView)
+		var missing, loaded *notifItem
+		for _, g := range v.groups {
+			switch g.app {
+			case "a":
+				missing = g.items[0]
+			case "b":
+				loaded = g.items[0]
+			}
 		}
-	}
-	missIcon := findByClass(missing, "notification-dropdown-item-icon").(*widget.Icon)
-	if missIcon.Name() != notifyui.FallbackIcon || missIcon.HasClass("file-icon") {
-		t.Errorf("the unloadable file icon = %q (file-icon %v), want the bell", missIcon.Name(), missIcon.HasClass("file-icon"))
-	}
-	keepIcon := findByClass(loaded, "notification-dropdown-item-icon").(*widget.Icon)
+		missIcon = findByClass(missing, "notification-dropdown-item-icon").(*widget.Icon)
+		if missIcon.Name() != notifyui.FallbackIcon || missIcon.HasClass("file-icon") {
+			t.Errorf("the unloadable file icon = %q (file-icon %v), want the bell", missIcon.Name(), missIcon.HasClass("file-icon"))
+		}
+		keepIcon = findByClass(loaded, "notification-dropdown-item-icon").(*widget.Icon)
+		return true
+	})
+	defer v.dropdownClosed()
 	waitHeadless(t, "the loadable file shows, as a picture", func() bool {
 		return keepIcon.Name() != notifyui.FallbackIcon && keepIcon.HasClass("file-icon")
 	})

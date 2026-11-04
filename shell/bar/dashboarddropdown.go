@@ -1245,7 +1245,7 @@ type dashboardStat struct {
 }
 
 func roundedPercent(v float32) dashboardStat {
-	return dashboardStat{value: float32(int(v + 0.5)), known: true}
+	return dashboardStat{value: float32(int(float32(v) + 0.5)), known: true}
 }
 
 type dashboardStats struct{ cpu, mem, disk, temp dashboardStat }
