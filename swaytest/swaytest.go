@@ -3,6 +3,7 @@
 package swaytest
 
 import (
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,12 +57,21 @@ func Start(t *testing.T, env ...string) *os.Process {
 		}
 		sockets, _ := filepath.Glob(filepath.Join(dir, "wayland-*"))
 		sockets = slices.DeleteFunc(sockets, func(s string) bool { return strings.HasSuffix(s, ".lock") })
-		if len(sockets) > 0 {
+		if len(sockets) > 0 && listening(sockets[0]) {
 			t.Setenv("XDG_RUNTIME_DIR", dir)
 			t.Setenv("WAYLAND_DISPLAY", filepath.Base(sockets[0]))
 			return cmd.Process
 		}
 	}
+}
+
+func listening(socket string) bool {
+	conn, err := net.Dial("unix", socket)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 // Msg runs swaymsg with args against the sway Start ran for this test
