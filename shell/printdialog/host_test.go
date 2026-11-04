@@ -122,6 +122,7 @@ func (hs *harness) open(t *testing.T) app.LayerConfig {
 	t.Helper()
 	select {
 	case c := <-hs.opened:
+		hs.do(func() {})
 		return c
 	case <-time.After(treetest.Liveness):
 		t.Fatal("no dialog opened")
@@ -346,13 +347,21 @@ func TestPrintToFileAndAMissingScheduler(t *testing.T) {
 		treetest.Button(t, c.Root, "Choose…").OnClick()
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
+	note := "report.pdf exists. Print again to replace it."
+	for deadline := time.Now().Add(treetest.Liveness); ; time.Sleep(time.Millisecond) {
+		var shown bool
+		hs.do(func() { shown = slices.Contains(treetest.Labels(c.Root), note) })
+		if shown {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the replace note never showed")
+		}
+	}
 	select {
 	case r := <-got:
 		t.Fatalf("an existing file was replaced without asking: %+v", r)
-	case <-time.After(50 * time.Millisecond):
-	}
-	if !slices.Contains(treetest.Labels(c.Root), "report.pdf exists. Print again to replace it.") {
-		t.Errorf("labels %q lack the replace note", treetest.Labels(c.Root))
+	default:
 	}
 	hs.do(func() { treetest.Button(t, c.Root, "Print").OnClick() })
 	if r := <-got; !r.ok {
