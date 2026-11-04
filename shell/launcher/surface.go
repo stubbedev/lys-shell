@@ -17,6 +17,7 @@ import (
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // dumpDebounce is how long -dump waits for the matches to settle.
@@ -713,7 +714,10 @@ func (s *Surface) scale() (int, int) {
 	return s.scaleNum, s.scaleDenom
 }
 
-func (s *Surface) setScale(num, denom int) { s.scaleNum, s.scaleDenom = num, denom }
+func (s *Surface) setScale(num, denom int) {
+	s.scaleNum, s.scaleDenom = num, denom
+	widgets.NoteDeviceScale(num, denom)
+}
 
 // outputFor is the output launcher.monitor names; empty is the focused
 // output, the compositor's choice. A name no output has is said in the

@@ -54,8 +54,8 @@ type Theme struct {
 	userStamp string
 	// loaded is the bundle Sheet holds; a reload to the same text leaves
 	// every root's style alone.
-	loaded string
-	load   func(css string)
+	loaded  string
+	install func(*widget.ParsedStylesheet)
 	// ready is the bundle Precompile made ahead of SetConfig.
 	ready atomic.Pointer[readyBundle]
 
@@ -70,9 +70,13 @@ type readyBundle struct {
 	bundle CompiledBundle
 }
 
+// parseStylesheet parses a bundle, a seam the tests count.
+var parseStylesheet = widget.ParseStylesheet
+
 // CompiledBundle is a bundle compiled off the loop, for Apply on it.
 type CompiledBundle struct {
 	css     string
+	parsed  *widget.ParsedStylesheet
 	palette config.Palette
 }
 
@@ -84,7 +88,7 @@ func New(cfg *config.Config) *Theme {
 	t := &Theme{cfg: cfg}
 	t.loaded = t.Bundle()
 	t.Sheet = widget.NewStylesheet(t.loaded, Priority)
-	t.load = t.Sheet.Load
+	t.install = t.Sheet.LoadParsed
 	t.installWidgetTheme()
 	t.userStamp = userStylesStamp()
 	return t
@@ -123,10 +127,8 @@ func Compile(cfg *config.Config) CompiledBundle {
 		log.Printf("styling: palette: %v", err)
 		rendered = styling.Default()
 	}
-	return CompiledBundle{
-		css:     styling.BundleCSS(cfg, palette, rendered) + "\n" + cfg.Animations.CSSOverrides() + "\n" + user,
-		palette: palette,
-	}
+	bundle := styling.BundleCSS(cfg, palette, rendered) + "\n" + cfg.Animations.CSSOverrides() + "\n" + user
+	return CompiledBundle{css: bundle, parsed: parseStylesheet(bundle), palette: palette}
 }
 
 // Apply takes a compiled bundle on the loop. A bundle equal to the loaded one
@@ -141,7 +143,7 @@ func (t *Theme) Apply(b CompiledBundle) {
 		t.scope.AttachStylesheet(t.Sheet)
 	}
 	t.loaded = b.css
-	t.load(b.css)
+	t.install(b.parsed)
 	t.installWidgetTheme()
 }
 

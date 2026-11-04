@@ -3,14 +3,42 @@ package widgets
 import (
 	"log"
 	"os"
+	"slices"
 	"sync"
 
 	"github.com/stubbedev/lys-ui/widget"
 )
 
-// fileIconScales are the device scales a file icon decodes at ahead of its
-// first paint; a surface at another one decodes once more as it paints.
-var fileIconScales = [][2]int{{1, 1}, {2, 1}}
+// fileIconScales are the device scales the shell's surfaces have painted at,
+// which a file icon decodes at ahead of its first paint. lys-ui tells a scale
+// only through the canvas a surface paints, so a surface at a scale not seen
+// before shows the nearest raster resampled while the exact one decodes.
+var fileIconScales = struct {
+	sync.Mutex
+	seen []deviceScale
+}{seen: []deviceScale{{1, 1}}}
+
+type deviceScale struct{ num, denom int }
+
+// NoteDeviceScale records a device scale a surface painted at, num/denom device
+// pixels per logical one, so the icons made from now on decode at it too.
+func NoteDeviceScale(num, denom int) {
+	if num <= 0 || denom <= 0 {
+		return
+	}
+	s := deviceScale{num, denom}
+	fileIconScales.Lock()
+	defer fileIconScales.Unlock()
+	if !slices.Contains(fileIconScales.seen, s) {
+		fileIconScales.seen = append(fileIconScales.seen, s)
+	}
+}
+
+func seenScales() []deviceScale {
+	fileIconScales.Lock()
+	defer fileIconScales.Unlock()
+	return slices.Clone(fileIconScales.seen)
+}
 
 // maxFileIconDecodes bounds the decodes running at once, so a dead mount holds a
 // few goroutines rather than one per icon.
@@ -41,27 +69,28 @@ func NewAsyncFileIcon(path, fallback string, size int, post func(func()), ready 
 			ready()
 		}
 	}
-	if widget.ThemeIconPreloaded(path, size, 1, 1) && widget.ThemeIconPreloaded(path, size, 2, 1) {
-		show()
+	scales := seenScales()
+	if slices.ContainsFunc(scales, func(s deviceScale) bool { return !widget.ThemeIconPreloaded(path, size, s.num, s.denom) }) {
+		requestFileIcon(fileIconKey{path, size}, scales, func() { post(show) })
 		return icon
 	}
-	requestFileIcon(fileIconKey{path, size}, func() { post(show) })
+	show()
 	return icon
 }
 
-func requestFileIcon(key fileIconKey, done func()) {
+func requestFileIcon(key fileIconKey, scales []deviceScale, done func()) {
 	fileIconWaiters.Lock()
 	defer fileIconWaiters.Unlock()
 	waiters, running := fileIconWaiters.byKey[key]
 	fileIconWaiters.byKey[key] = append(waiters, done)
 	if !running {
-		go loadFileIcon(key)
+		go loadFileIcon(key, scales)
 	}
 }
 
-func loadFileIcon(key fileIconKey) {
+func loadFileIcon(key fileIconKey, scales []deviceScale) {
 	fileIconLoads <- struct{}{}
-	ok := decodeFileIcon(key)
+	ok := decodeFileIcon(key, scales)
 	<-fileIconLoads
 	fileIconWaiters.Lock()
 	waiters := fileIconWaiters.byKey[key]
@@ -75,7 +104,7 @@ func loadFileIcon(key fileIconKey) {
 	}
 }
 
-func decodeFileIcon(key fileIconKey) bool {
+func decodeFileIcon(key fileIconKey, scales []deviceScale) bool {
 	info, err := os.Stat(key.path)
 	if err != nil {
 		return false
@@ -84,8 +113,8 @@ func decodeFileIcon(key fileIconKey) bool {
 		log.Printf("icon: %s is not a regular file", key.path)
 		return false
 	}
-	for _, scale := range fileIconScales {
-		widget.PreloadThemeIcon(key.path, key.size, scale[0], scale[1])
+	for _, s := range scales {
+		widget.PreloadThemeIcon(key.path, key.size, s.num, s.denom)
 	}
 	return true
 }

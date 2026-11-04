@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -183,7 +184,7 @@ func TestAnIdenticalBundleTouchesNoStylesheet(t *testing.T) {
 	isolateConfigDir(t)
 	theme := New(config.Defaults())
 	loads := 0
-	theme.load = func(string) { loads++ }
+	theme.install = func(*widget.ParsedStylesheet) { loads++ }
 	for range 3 {
 		theme.Apply(Compile(theme.cfg))
 	}
@@ -195,5 +196,38 @@ func TestAnIdenticalBundleTouchesNoStylesheet(t *testing.T) {
 	theme.SetConfig(next)
 	if loads != 1 {
 		t.Errorf("%d stylesheet loads for a changed bundle, want 1", loads)
+	}
+}
+
+func TestAChangedBundleInstallsWithNoParseOnTheLoop(t *testing.T) {
+	isolateConfigDir(t)
+	theme := New(config.Defaults())
+	var parses atomic.Int32
+	prev := parseStylesheet
+	parseStylesheet = func(css string) *widget.ParsedStylesheet {
+		parses.Add(1)
+		return prev(css)
+	}
+	t.Cleanup(func() { parseStylesheet = prev })
+	next := config.Defaults()
+	next.Bar.Scale = 2
+	compiled := make(chan CompiledBundle, 1)
+	go func() { compiled <- Compile(next) }()
+	b := <-compiled
+	if got := parses.Load(); got != 1 {
+		t.Fatalf("%d parses compiling, want 1 off the loop", got)
+	}
+	installs := 0
+	install := theme.install
+	theme.install = func(p *widget.ParsedStylesheet) {
+		installs++
+		install(p)
+	}
+	theme.Apply(b)
+	if got := parses.Load(); got != 1 {
+		t.Errorf("%d parses applying a changed bundle on the loop, want 0", got-1)
+	}
+	if installs != 1 || theme.loaded != b.css {
+		t.Errorf("%d installs, want the changed bundle installed once", installs)
 	}
 }
