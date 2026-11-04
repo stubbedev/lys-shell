@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -31,12 +32,14 @@ const (
 )
 
 // paintPanel lays the panel out on an output and paints it.
-func paintPanel(p *panel, data []byte) {
+func paintPanel(p *panel, data []byte) { paintFrame(p.v.panelFrame, data) }
+
+func paintFrame(f *panelFrame, data []byte) {
 	clear(data)
 	out := render.Rect{W: renderW, H: renderH}
-	p.v.root.Arrange(out)
-	p.v.root.Arrange(out)
-	p.v.root.Paint(render.NewScaled(data, render.Stride(renderW), renderW, renderH, 1, 1))
+	f.root.Arrange(out)
+	f.root.Arrange(out)
+	f.root.Paint(render.NewScaled(data, render.Stride(renderW), renderW, renderH, 1, 1))
 }
 
 // savePanel writes the frame over a test backdrop when
@@ -422,4 +425,208 @@ func TestAFileIconPaintsInItsRow(t *testing.T) {
 		return red() > 64
 	})
 	savePanel(t, data, "file-icon")
+}
+
+func pixelAt(data []byte, x, y int) uint32 {
+	i := (y*renderW + x) * 4
+	return uint32(data[i]) | uint32(data[i+1])<<8 | uint32(data[i+2])<<16 | uint32(data[i+3])<<24
+}
+
+func highlightRect(t *testing.T, data []byte, list render.Rect, rowY int) render.Rect {
+	t.Helper()
+	ref := list.X + 1
+	y := rowY
+	left := list.X + 2
+	for left < list.X+list.W && pixelAt(data, left, y) == pixelAt(data, ref, y) {
+		left++
+	}
+	if left == list.X+list.W {
+		t.Fatalf("no highlight on line %d of list %v", y, list)
+	}
+	right := list.X + list.W - 2
+	for pixelAt(data, right, y) == pixelAt(data, ref, y) {
+		right--
+	}
+	x := left + 12
+	top := y
+	for top > list.Y && pixelAt(data, x, top-1) != pixelAt(data, ref, top-1) {
+		top--
+	}
+	bottom := y
+	for bottom+1 < list.Y+list.H && pixelAt(data, x, bottom+1) != pixelAt(data, ref, bottom+1) {
+		bottom++
+	}
+	return render.Rect{X: left, Y: top, W: right - left + 1, H: bottom - top + 1}
+}
+
+func assertRoomBeside(t *testing.T, what string, hl, list render.Rect) {
+	t.Helper()
+	if got := hl.X - list.X; got != rowEdgeGap {
+		t.Errorf("%s: highlight %v is %dpx from the left of list %v, want %d", what, hl, got, list, rowEdgeGap)
+	}
+	if got := list.X + list.W - (hl.X + hl.W); got != rowEdgeGap {
+		t.Errorf("%s: highlight %v is %dpx from the right of list %v, want %d", what, hl, got, list, rowEdgeGap)
+	}
+}
+
+func assertRoomAbove(t *testing.T, what string, hl, list render.Rect) {
+	t.Helper()
+	if got := hl.Y - list.Y; got != rowEdgeGap {
+		t.Errorf("%s: highlight %v is %dpx from the top of list %v, want %d", what, hl, got, list, rowEdgeGap)
+	}
+}
+
+func assertRoomBelow(t *testing.T, what string, hl, list render.Rect) {
+	t.Helper()
+	if got := list.Y + list.H - (hl.Y + hl.H); got != rowEdgeGap {
+		t.Errorf("%s: highlight %v is %dpx from the bottom of list %v, want %d", what, hl, got, list, rowEdgeGap)
+	}
+}
+
+func searchPanelOf(t *testing.T, rows int) (*panelHarness, *panel) {
+	t.Helper()
+	h := newPanelHarness(t)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	h.cfg.Launcher.Lines = 4
+	h.cfg.Launcher.Search.Previews = false
+	h.cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchLinks}
+	links := make([]config.LauncherQuicklink, rows)
+	for i := range links {
+		links[i] = config.LauncherQuicklink{Name: "needle " + strconv.Itoa(i), URL: "https://x/" + strconv.Itoa(i)}
+	}
+	h.cfg.Launcher.Search.Quicklinks = links
+	p, _ := h.openPanel()
+	h.typed(p, "needle")
+	h.until("the rows", func() bool { return len(p.rowTitles()) >= 1 && p.sel >= 0 })
+	return h, p
+}
+
+func (p *panel) showFlat(h *panelHarness, n int) {
+	frame := p.frame
+	frame.Rows = make([]search.Row, n)
+	for i := range frame.Rows {
+		id := strconv.Itoa(i)
+		frame.Rows[i] = search.Row{Entry: &search.Entry{ID: id, Title: "needle " + id}}
+	}
+	p.results(frame)
+	h.until("a selection", func() bool { return p.sel >= 0 })
+}
+
+func (p *panel) selectedHighlight(t *testing.T, data []byte) (hl, list render.Rect) {
+	t.Helper()
+	paintPanel(p, data)
+	for _, r := range p.v.list.pool {
+		if r.index == p.sel && r.Parent() != nil && r.Visible() {
+			rb := r.Bounds()
+			return highlightRect(t, data, p.v.list.Bounds(), rb.Y+rb.H/2), p.v.list.Bounds()
+		}
+	}
+	t.Fatalf("row %d is not in view", p.sel)
+	return hl, list
+}
+
+func TestASearchHighlightHasRoomOnEverySideThroughAScroll(t *testing.T) {
+	restore := anim.SetInstant(true)
+	defer restore()
+	const rows = 12
+	h, p := searchPanelOf(t, rows)
+	p.showFlat(h, rows)
+	data := make([]byte, render.Stride(renderW)*renderH)
+	hl, list := p.selectedHighlight(t, data)
+	savePanel(t, data, "selection-first")
+	assertRoomBeside(t, "the first row", hl, list)
+	assertRoomAbove(t, "the first row", hl, list)
+	for range rows - 1 {
+		h.key("Down")
+	}
+	if p.sel != rows-1 {
+		t.Fatalf("selection at %d, want the last row", p.sel)
+	}
+	hl, list = p.selectedHighlight(t, data)
+	savePanel(t, data, "selection-last")
+	assertRoomBeside(t, "the last row", hl, list)
+	assertRoomBelow(t, "the last row", hl, list)
+	for range 4 {
+		h.key("Up")
+	}
+	hl, list = p.selectedHighlight(t, data)
+	assertRoomAbove(t, "a row scrolled back to the top", hl, list)
+	for range 4 {
+		h.key("Down")
+	}
+	hl, list = p.selectedHighlight(t, data)
+	assertRoomBelow(t, "a row scrolled down to the bottom", hl, list)
+}
+
+func TestSearchHighlightsLeaveAGapBetweenThem(t *testing.T) {
+	h, p := searchPanelOf(t, 3)
+	p.showFlat(h, 3)
+	data := make([]byte, render.Stride(renderW)*renderH)
+	first, _ := p.selectedHighlight(t, data)
+	h.key("Down")
+	second, list := p.selectedHighlight(t, data)
+	if got := second.Y - (first.Y + first.H); got != 2*rowHalfGap {
+		t.Errorf("highlights %v and %v are %dpx apart, want %d", first, second, got, 2*rowHalfGap)
+	}
+	x := first.X + 12
+	if pixelAt(data, x, first.Y+first.H/2) != pixelAt(data, list.X+1, first.Y+first.H/2) {
+		t.Error("the row left behind still paints a highlight")
+	}
+}
+
+func TestAnEmptySearchListKeepsNoRoom(t *testing.T) {
+	h, p := searchPanelOf(t, 3)
+	h.typed(p, "nothing matches this")
+	h.until("no rows", func() bool { return len(p.frame.Rows) == 0 })
+	if got := p.v.list.contentH(); got != 0 {
+		t.Errorf("an empty list wants %dpx", got)
+	}
+}
+
+func rofiHighlight(t *testing.T, h *harness, data []byte) (hl, list render.Rect) {
+	t.Helper()
+	v := h.s.cur.views
+	paintFrame(v.panelFrame, data)
+	row, ok := v.list.rows[h.s.sel].(*launcherRow)
+	if !ok {
+		t.Fatalf("row %d is not laid out", h.s.sel)
+	}
+	rb := row.Bounds()
+	return highlightRect(t, data, v.list.Bounds(), rb.Y+rb.H/2), v.list.Bounds()
+}
+
+func TestARofiHighlightHasRoomOnEverySideThroughAScroll(t *testing.T) {
+	h := newHarness(t)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+	rows := make([]string, 30)
+	for i := range rows {
+		rows[i] = "row " + strconv.Itoa(i)
+	}
+	h.open(dmenu(), false, rows...)
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == len(rows) })
+	data := make([]byte, render.Stride(renderW)*renderH)
+	hl, list := rofiHighlight(t, h, data)
+	savePanel(t, data, "rofi-selection-first")
+	assertRoomBeside(t, "the first row", hl, list)
+	assertRoomAbove(t, "the first row", hl, list)
+	for range len(rows) - 1 {
+		h.key("Down")
+	}
+	h.until("the last row", func() bool { return h.s.sel == len(rows)-1 })
+	hl, list = rofiHighlight(t, h, data)
+	savePanel(t, data, "rofi-selection-last")
+	assertRoomBeside(t, "the last row", hl, list)
+	assertRoomBelow(t, "the last row", hl, list)
+}
+
+func TestARofiListWithNoRowsKeepsNoRoom(t *testing.T) {
+	h := newHarness(t)
+	h.open(dmenu(), false, "alpha")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 1 })
+	v := h.s.cur.views
+	v.entry.SetText("nothing matches this")
+	h.until("no rows", func() bool { return h.s.model.len() == 0 })
+	if got := v.list.Measure(widget.Column, 0).Nat; got != 0 {
+		t.Errorf("an empty list wants %dpx", got)
+	}
 }

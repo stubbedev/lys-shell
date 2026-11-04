@@ -30,6 +30,8 @@ const (
 	entryFontFactor  = 1.45
 	// glyphFontFactor sizes an emoji to read as large as an icon box.
 	glyphFontFactor = 0.8
+	rowEdgeGap      = 8
+	rowHalfGap      = 2
 )
 
 // scaledPx is the styling scale's measure of logical pixels.
@@ -244,6 +246,10 @@ func (c *panelChrome) setChip(text string) {
 
 // closeHint is the footer's way out of a level.
 func closeHint() footerHint { return footerHint{"Esc", i18n.T("launcher-footer-close")} }
+
+func rowMargin(px func(int) int) render.Insets {
+	return render.Insets{Top: px(rowHalfGap), Bottom: px(rowHalfGap), Left: px(rowEdgeGap), Right: px(rowEdgeGap)}
+}
 
 // newRowBox is a list row's box, in any session.
 func newRowBox() *widget.Box {

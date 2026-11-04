@@ -53,7 +53,7 @@ func (s *Surface) buildViews(a *active) *views {
 		font: s.d.Font, variants: s.d.Variants, px: fontPx(), iconPx: px(searchIconSize), showIcons: ui.showIcons,
 		display: rowDisplay{columns: ui.displayColumns, separator: ui.columnSeparator, ellipsize: ui.ellipsize},
 	}
-	v.list = newResultList(px(searchRowHeight), func(pos int) widget.Widget { return s.makeRow(a, pos, st) })
+	v.list = newResultList(px(searchRowHeight), rowMargin(px), func(pos int) widget.Widget { return s.makeRow(a, pos, st) })
 	v.list.visibleRows = max(ui.lines, 1)
 	v.list.fixed = ui.fixedNumLines
 	v.list.SetOnScroll(func(e widget.ScrollEvent) bool { return s.listScrolled(e.DY, mouseMods(e.Mods)) })

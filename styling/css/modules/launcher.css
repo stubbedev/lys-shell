@@ -50,7 +50,6 @@
 }
 .launcher-search-row {
   border-radius: calc(10px * var(--global-scale));
-  margin: 0 calc(8px * var(--global-scale));
   color: var(--fg-default);
 }
 row:hover > .launcher-search-row,

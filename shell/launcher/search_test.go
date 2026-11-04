@@ -410,7 +410,7 @@ func TestListHeightIsCappedByLinesAndScrollsToTheSelection(t *testing.T) {
 	h.typed(p, "a")
 	h.until("rows", func() bool { return len(p.frame.Rows) >= 4 })
 	v.root.Arrange(out)
-	limit := v.fieldH() + 1 + 2*v.list.rowH + v.footerH()
+	limit := v.fieldH() + 1 + v.list.linesH(2) + v.footerH()
 	if v.motion.targetH > limit {
 		t.Errorf("height %d over the cap %d", v.motion.targetH, limit)
 	}

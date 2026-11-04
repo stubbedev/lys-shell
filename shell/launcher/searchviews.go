@@ -129,16 +129,16 @@ func (v *panelViews) targetH() int {
 		return h
 	}
 	if v.withPreview {
-		listH = max(listH, previewMinRows*v.list.rowH)
+		listH = max(listH, v.list.linesH(previewMinRows))
 	}
-	limit := v.lines * v.list.rowH
+	limit := v.list.linesH(v.lines)
 	if v.withPreview {
-		limit = max(limit, previewMinRows*v.list.rowH)
+		limit = max(limit, v.list.linesH(previewMinRows))
 	}
 	if v.root.bounds().H > 0 {
 		limit = min(limit, int(float64(v.root.bounds().H)*(1-panelTopFraction))-h-v.footerH()-panelEdgeGap)
 	}
-	return h + 1 + min(listH, max(limit, v.list.rowH)) + v.footerH()
+	return h + 1 + min(listH, max(limit, v.list.linesH(1))) + v.footerH()
 }
 
 // targetW is the width it springs to.
@@ -291,6 +291,7 @@ type searchList struct {
 	variants widget.VariantFunc
 	rowH     int
 	headerH  int
+	margin   render.Insets
 	iconSize int
 	icons    bool
 	rows     []search.Row
@@ -311,7 +312,7 @@ type searchList struct {
 }
 
 func newSearchList(p *panel, cfg *config.Config, font render.Font, variants widget.VariantFunc, rowH, headerH, iconSize int) *searchList {
-	l := &searchList{p: p, font: font, variants: variants, rowH: rowH, headerH: headerH, iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
+	l := &searchList{p: p, font: font, variants: variants, rowH: rowH, headerH: headerH, margin: rowMargin(scaledPx(cfg)), iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
 	l.num, l.denom = p.s.scale()
 	l.loader = newIconLoader(p.ctx, p.s.d.Invoke, l.iconReady)
 	l.SetElement("listview")
@@ -330,12 +331,19 @@ func newSearchList(p *panel, cfg *config.Config, font render.Font, variants widg
 
 // contentH is every row's height together.
 func (l *searchList) contentH() int {
-	h := 0
+	if len(l.rows) == 0 {
+		return 0
+	}
+	h := 2 * l.edge()
 	for i := range l.rows {
 		h += l.heightOf(i)
 	}
 	return h
 }
+
+func (l *searchList) edge() int { return l.margin.Left - l.margin.Top }
+
+func (l *searchList) linesH(n int) int { return n*l.rowH + 2*l.edge() }
 
 func (l *searchList) heightOf(i int) int {
 	if l.rows[i].Header != "" {
@@ -345,7 +353,7 @@ func (l *searchList) heightOf(i int) int {
 }
 
 func (l *searchList) topOf(i int) int {
-	y := 0
+	y := l.edge()
 	for k := range i {
 		y += l.heightOf(k)
 	}
@@ -385,11 +393,11 @@ func (l *searchList) reveal(i int) {
 	if i < 0 || i >= len(l.rows) || l.Bounds().H == 0 {
 		return
 	}
-	top := l.topOf(i)
+	top := l.topOf(i) - l.edge()
 	if i > 0 && l.rows[i-1].Header != "" {
 		top -= l.headerH
 	}
-	bottom := l.topOf(i) + l.rowH
+	bottom := l.topOf(i) + l.rowH + l.edge()
 	switch {
 	case float64(top) < l.offset:
 		l.scrollTo(float64(top))
@@ -400,7 +408,7 @@ func (l *searchList) reveal(i int) {
 
 // firstShown is the first row index in view.
 func (l *searchList) firstShown() int {
-	y := 0
+	y := l.edge()
 	for i := range l.rows {
 		y += l.heightOf(i)
 		if float64(y) > l.offset {
@@ -423,7 +431,7 @@ func (l *searchList) Arrange(r render.Rect) {
 	l.ArrangeSelf(r)
 	l.shown = l.shown[:0]
 	off := int(math.Round(l.offset))
-	y := 0
+	y := l.edge()
 	used := 0
 	number := 0
 	for i := range l.rows {
@@ -439,7 +447,7 @@ func (l *searchList) Arrange(r render.Rect) {
 			row := l.pool[used]
 			used++
 			row.bind(i, l.rows[i], i == l.selected, number)
-			row.Arrange(render.Rect{X: r.X, Y: r.Y + y - off, W: r.W, H: h})
+			row.Arrange(l.margin.Shrink(render.Rect{X: r.X, Y: r.Y + y - off, W: r.W, H: h}))
 			l.shown = append(l.shown, row)
 		}
 		y += h

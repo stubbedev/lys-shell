@@ -18,7 +18,8 @@ type resultList struct {
 	selected int
 	offset   int
 	// rowH is every row's height.
-	rowH int
+	rowH   int
+	margin render.Insets
 	// visibleRows is how many rows the viewport shows.
 	visibleRows int
 	// fixed holds the viewport at visibleRows rows (-fixed-num-lines);
@@ -27,8 +28,8 @@ type resultList struct {
 	rows  map[int]widget.Widget
 }
 
-func newResultList(rowH int, factory func(i int) widget.Widget) *resultList {
-	l := &resultList{rowH: rowH, factory: factory, rows: map[int]widget.Widget{}, visibleRows: 10, selected: -1}
+func newResultList(rowH int, margin render.Insets, factory func(i int) widget.Widget) *resultList {
+	l := &resultList{rowH: rowH, margin: margin, factory: factory, rows: map[int]widget.Widget{}, visibleRows: 10, selected: -1}
 	// GTK's ListView element, so the stylesheet's listview > row rules
 	// reach the rows, with mod.rs's class.
 	l.SetElement("listview")
@@ -76,6 +77,8 @@ func (l *resultList) setSelected(i int) {
 	l.InvalidateLayout()
 }
 
+func (l *resultList) edge() int { return l.margin.Left - l.margin.Top }
+
 // visible is the half-open range of rows in the viewport.
 func (l *resultList) visible() (int, int) {
 	first := min(l.offset, max(0, l.count-1))
@@ -103,7 +106,10 @@ func (l *resultList) Measure(axis widget.Axis, _ int) widget.Sizes {
 	if !l.fixed {
 		rows = min(l.count, l.visibleRows)
 	}
-	return widget.FixedSizes(rows * l.rowH)
+	if rows == 0 {
+		return widget.FixedSizes(0)
+	}
+	return widget.FixedSizes(rows*l.rowH + 2*l.edge())
 }
 
 // Arrange lays the visible rows out and evicts the rest.
@@ -118,7 +124,7 @@ func (l *resultList) Arrange(r render.Rect) {
 	kids := make([]widget.Widget, 0, last-first)
 	for i := first; i < last; i++ {
 		w := l.rowAt(i)
-		w.Arrange(render.Rect{X: r.X, Y: r.Y + (i-first)*l.rowH, W: r.W, H: l.rowH})
+		w.Arrange(l.margin.Shrink(render.Rect{X: r.X, Y: r.Y + l.edge() + (i-first)*l.rowH, W: r.W, H: l.rowH}))
 		kids = append(kids, w)
 	}
 	widget.SetParents(l, kids...)
@@ -158,7 +164,8 @@ func (l *resultList) HitTest(p widget.Point) widget.Widget {
 		return nil
 	}
 	first, last := l.visible()
-	if i := first + (p.Y-b.Y)/l.rowH; i < last {
+	y := p.Y - b.Y - l.edge()
+	if i := first + y/l.rowH; y >= 0 && i < last {
 		if w, ok := l.rows[i]; ok {
 			if hit := w.HitTest(p); hit != nil {
 				return hit
