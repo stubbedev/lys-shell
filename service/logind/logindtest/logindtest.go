@@ -30,7 +30,11 @@ type Logind struct {
 	Terminated dbustest.Var[[]dbus.ObjectPath]
 	// Locked lists the session paths Lock was called on, aliases
 	// resolved.
-	Locked  dbustest.Var[[]dbus.ObjectPath]
+	Locked dbustest.Var[[]dbus.ObjectPath]
+	// LockedHint is what the sessions report for LockedHint.
+	LockedHint dbustest.Var[bool]
+	// Asked counts the GetSession calls, so a test can tell nobody came.
+	Asked   dbustest.Var[int]
 	display dbus.ObjectPath
 }
 
@@ -47,6 +51,9 @@ func Start(t *testing.T, display dbus.ObjectPath) *Logind {
 		for _, path := range []dbus.ObjectPath{display, autoPath} {
 			if err := conn.Export(session{l, display}, path, logind.SessionIf); err != nil {
 				t.Fatalf("logindtest: export %s: %v", path, err)
+			}
+			if err := conn.Export(properties{l}, path, "org.freedesktop.DBus.Properties"); err != nil {
+				t.Fatalf("logindtest: export the properties of %s: %v", path, err)
 			}
 		}
 	}
@@ -74,6 +81,7 @@ func StartUnit(t *testing.T, display dbus.ObjectPath) *Logind {
 type manager struct{ l *Logind }
 
 func (m manager) GetSession(name string) (dbus.ObjectPath, *dbus.Error) {
+	m.l.Asked.Update(func(n int) int { return n + 1 })
 	if name != "auto" || m.l.display == "" {
 		return "", dbus.NewError(errNoSuchSession, []any{"no session " + name})
 	}
@@ -101,4 +109,13 @@ func (s session) Terminate() *dbus.Error {
 func (s session) Lock() *dbus.Error {
 	s.l.Locked.Update(func(paths []dbus.ObjectPath) []dbus.ObjectPath { return append(paths, s.path) })
 	return nil
+}
+
+type properties struct{ l *Logind }
+
+func (p properties) Get(iface, name string) (dbus.Variant, *dbus.Error) {
+	if iface != logind.SessionIf || name != "LockedHint" {
+		return dbus.Variant{}, dbus.NewError("org.freedesktop.DBus.Error.UnknownProperty", []any{iface + "." + name})
+	}
+	return dbus.MakeVariant(p.l.LockedHint.Load()), nil
 }

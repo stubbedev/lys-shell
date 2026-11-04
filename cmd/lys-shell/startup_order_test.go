@@ -22,6 +22,10 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/sockdir"
 
+	"github.com/stubbedev/lys-shell/service/logind/logindtest"
+	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/mango"
+	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/swaytest"
 )
@@ -64,7 +68,7 @@ func startShellProcess(t *testing.T, wallpaper string, env ...string) *startedSh
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	config := fmt.Sprintf("wallpaper:\n  wallpaper: %s\n", strconv.Quote(wallpaper))
+	config := fmt.Sprintf("wallpaper:\n  wallpaper: %s\nosd:\n  enabled: false\nmodules:\n  brightness:\n    enable-external: false\n", strconv.Quote(wallpaper))
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -184,10 +188,51 @@ func await(t *testing.T, s *startedShell, what string, cond func() bool) {
 
 func isBlack(c color.RGBA) bool { return c.R == 0 && c.G == 0 && c.B == 0 }
 
-func startBareSession(t *testing.T) {
+func startBareSession(t *testing.T) (loginCalls string) {
 	t.Helper()
+	for _, name := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK", "XDG_SESSION_ID"} {
+		t.Setenv(name, "")
+	}
 	swaytest.Start(t)
 	dbustest.Session(t)
+	dbustest.Start(t).UseAsSystemBus(t)
+	bin := t.TempDir()
+	loginCalls = filepath.Join(bin, "calls")
+	script := fmt.Sprintf("#!/bin/sh\necho \"$*\" >> %s\nexit 1\n", strconv.Quote(loginCalls))
+	if err := os.WriteFile(filepath.Join(bin, "lys-login"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return loginCalls
+}
+
+func TestShellUnderTestNeverReachesTheHostsLogind(t *testing.T) {
+	host := logindtest.Start(t, "/org/freedesktop/login1/session/c1")
+	host.LockedHint.Store(true)
+	host.Bus.UseAsSystemBus(t)
+	loginCalls := startBareSession(t)
+	image := filepath.Join(t.TempDir(), "red.jpg")
+	if err := os.WriteFile(image, redJPEG(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := startShellProcess(t, image)
+	await(t, s, "the lock client to look for logind", func() bool {
+		logs := s.logs(t)
+		return strings.Contains(logs, "lock: logind unavailable") || strings.Contains(logs, "session was locked at startup")
+	})
+	if strings.Contains(s.logs(t), "session was locked at startup") {
+		t.Error("the shell read a locked session off the host's logind")
+	}
+	if n := host.Asked.Load(); n != 0 {
+		t.Errorf("the shell asked the host's logind for its session %d times", n)
+	}
+	if calls, err := os.ReadFile(loginCalls); err == nil && strings.Contains(string(calls), "lock") {
+		t.Errorf("the shell started the lock screen: %s", calls)
+	}
+	awaitBar(t, s)
+	if got := captureCenter(t); !isRed(got) {
+		t.Errorf("the bar mapped over %v, want the red wallpaper", got)
+	}
 }
 
 func TestBarLandsOnAVisibleWallpaper(t *testing.T) {
