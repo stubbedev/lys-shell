@@ -499,3 +499,24 @@ type closedCounter struct {
 }
 
 func (c closedCounter) close() { *c.closed++ }
+
+func TestHeadlessRetiringAGenerationStopsTheWorkspacesBlink(t *testing.T) {
+	ctx, a := loopContext(t)
+	ctx.Connector = "DP-1"
+	ctx.gen = newMountGen()
+	f := newFakeLysWM(t)
+	f.Result("workspaces", lysWMTwoOutputs)
+	f.Result("windows", lysWMWindows)
+	r := apptest.On(a, func() moduleResult { return createResult("lys-wm-workspaces", ctx) })
+	if r.err != nil {
+		t.Fatal(r.err)
+	}
+	m := r.module.(*cwsModule)
+	if !apptest.On(a, func() bool { return m.blinkStop != nil }) {
+		t.Fatal("an urgent window started no blink")
+	}
+	apptest.On(a, func() struct{} { ctx.gen.retire(); return struct{}{} })
+	if apptest.On(a, func() bool { return m.blinkStop != nil }) {
+		t.Error("the blink timer outlived its generation")
+	}
+}

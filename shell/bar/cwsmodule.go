@@ -110,6 +110,7 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 		return nil, err
 	}
 	m.stopEvents = stop
+	ctx.OnRetire(m.Stop)
 	newOffLoopRead(m.ctx, m.kind+"-workspaces", m.read, m.apply).on(ticks, m.closeIPC)
 	return m, nil
 }
