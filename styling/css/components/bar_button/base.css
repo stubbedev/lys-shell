@@ -11,6 +11,7 @@ button.bar-button > box {
   border-spacing: var(--bar-btn-gap);
 }
 button.bar-button .bar-button-label {
+  font-variant-numeric: tabular-nums;
   color: var(--bar-btn-label-color);
   font-size: var(--bar-btn-label-size);
   font-weight: var(--bar-btn-label-weight);

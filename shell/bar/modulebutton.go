@@ -24,6 +24,7 @@ import (
 // the text is blank or the label is frozen. The button is the router's
 // hit leaf, so the five click and scroll bindings route through it.
 type barButton struct {
+	labelFloor int
 	*widget.BarButton
 
 	// icon is the module's icon, nil for none and for a content
@@ -102,6 +103,25 @@ func (b *barButton) showLabel() {
 		shown = ""
 	}
 	b.BarButton.SetLabel(shown)
+	b.ratchetLabel(shown)
+}
+
+// ratchetLabel keeps a numeric label at the widest it has been: a digit changing
+// repaints the label, where a width changing would move every module beside
+// it. Text with no digit in it lets go.
+func (b *barButton) ratchetLabel(shown string) {
+	if !strings.ContainsAny(shown, "0123456789") {
+		if b.labelFloor != 0 {
+			b.labelFloor = 0
+			b.Label().SetSizeRequest(0, 0)
+		}
+		return
+	}
+	width := b.Label().Measure(widget.Row, widget.Unknown).Nat
+	if width > b.labelFloor {
+		b.labelFloor = width
+		b.Label().SetSizeRequest(width, 0)
+	}
 }
 
 // showIcon puts the module's icon in the button while icon-show is on.

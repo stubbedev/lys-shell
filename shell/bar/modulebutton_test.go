@@ -447,3 +447,42 @@ func TestBarButtonHoldsOpenWhileItsDropdownIs(t *testing.T) {
 		}
 	}
 }
+
+func TestADigitChangeDamagesTheLabelAlone(t *testing.T) {
+	ctx := styledContext(t, config.Defaults())
+	button := newBarButton(ctx, nil, "99%")
+	button.configure(config.ButtonConfig{IconShow: true, LabelShow: true}, config.ClickConfig{}, nil)
+	beside := widget.NewLabel(ctx.Font, 14, "beside", 0)
+	root := widget.NewBox(widget.Row, 4, 0)
+	ctx.Theme.Attach(root)
+	root.Append(button, false)
+	root.Append(beside, false)
+	settle := func() ([]render.Rect, bool) {
+		sz := widget.SizeWithin(root, widget.Size{W: 800, H: 100})
+		root.Arrange(render.Rect{W: 800, H: max(sz.H, 40)})
+		return widget.CollectDamage(root)
+	}
+	settle()
+	besideAt := beside.Bounds()
+	if besideAt.X == 0 {
+		t.Fatal("the row did not lay out")
+	}
+	for _, text := range []string{"11%", "1%", "88%", "7%"} {
+		button.SetLabel(text)
+		rects, _ := settle()
+		label := button.Label().Bounds()
+		if area := widget.DamageArea(rects); area > label.W*label.H {
+			t.Errorf("%q damaged %d px, more than the label's %d (%v)", text, area, label.W*label.H, rects)
+		}
+		if beside.Bounds() != besideAt {
+			t.Errorf("%q moved the module beside it from %v to %v", text, besideAt, beside.Bounds())
+		}
+	}
+	button.SetLabel("off")
+	if _, damaged := settle(); !damaged {
+		t.Error("a label without digits repainted nothing")
+	}
+	if got := button.labelFloor; got != 0 {
+		t.Errorf("a label without digits keeps a floor of %d", got)
+	}
+}
