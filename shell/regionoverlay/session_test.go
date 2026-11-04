@@ -250,3 +250,32 @@ func TestBackgroundCaptureFailure(t *testing.T) {
 		t.Fatalf("answered %v", err)
 	}
 }
+
+func TestAskingWhetherASessionIsOpenRefusesNobody(t *testing.T) {
+	g := &Gate{}
+	if g.Open() {
+		t.Fatal("a new gate reports an open session")
+	}
+	release := make(chan struct{})
+	opened := make(chan error, 1)
+	go func() {
+		_, err := OpenSession(context.Background(), g, func(f func()) { f() }, nil, func(_ map[string]render.StillImage, reply chan struct{}) {
+			opened <- nil
+			go func() { <-release; reply <- struct{}{} }()
+		}, func(chan struct{}) {})
+		opened <- err
+	}()
+	if err := <-opened; err != nil {
+		t.Fatal(err)
+	}
+	if !g.Open() {
+		t.Error("an open session reads as closed")
+	}
+	close(release)
+	if err := <-opened; err != nil {
+		t.Fatal(err)
+	}
+	if g.Open() {
+		t.Error("an ended session reads as open")
+	}
+}

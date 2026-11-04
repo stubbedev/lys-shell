@@ -39,6 +39,14 @@ func (g *Gate) end() {
 	g.ended = nil
 }
 
+// Open reports whether a session is open. It takes no part in admission, so
+// asking never refuses a request, as Instant can.
+func (g *Gate) Open() bool {
+	g.state.Lock()
+	defer g.state.Unlock()
+	return g.ended != nil
+}
+
 func (g *Gate) awaitNoSession(ctx context.Context) (uint64, error) {
 	for {
 		g.state.Lock()

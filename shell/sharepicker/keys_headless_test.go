@@ -368,14 +368,7 @@ func (r *regionRig) selectRegion(t *testing.T) {
 }
 
 // open reports whether a capture overlay session is open.
-func (r *regionRig) open() bool {
-	end, err := r.gate.Instant()
-	if err != nil {
-		return true
-	}
-	end()
-	return false
-}
+func (r *regionRig) open() bool { return r.gate.Open() }
 
 // A screenshot press during the share picker's region selection does not
 // cancel it: it opens nothing and captures nothing, and the selection the

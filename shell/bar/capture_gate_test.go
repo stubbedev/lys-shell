@@ -39,12 +39,7 @@ func TestHeadlessCaptureServicesAdmitOneOverlaySession(t *testing.T) {
 	defer svc.close()
 	runLoop(t, application)
 	open := func() bool {
-		end, err := svc.host.Gate.Instant()
-		if err != nil {
-			return true
-		}
-		end()
-		return false
+		return svc.host.Gate.Open()
 	}
 	awaitOpen := func(want bool) {
 		t.Helper()
