@@ -21,6 +21,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/appicons"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // FallbackIcon is the bell every unresolved notification shows.
@@ -142,10 +143,11 @@ func BodyMarkup(body string) string {
 }
 
 // NewIcon builds the widget for a resolved icon at size pixels: a file
-// image, or a theme icon tinted when its name is symbolic.
-func NewIcon(icon Icon, size int, tint render.Color) *widget.Icon {
+// image, decoded off the loop with the generic glyph until post delivers it, or
+// a theme icon tinted when its name is symbolic. ready runs once a file shows.
+func NewIcon(icon Icon, size int, tint render.Color, post func(func()), ready func()) *widget.Icon {
 	if icon.File != "" {
-		return widget.NewFileIcon(icon.File, size)
+		return widgets.NewAsyncFileIcon(icon.File, FallbackIcon, size, post, ready)
 	}
 	w := widget.NewThemeIconFallback(icon.Name, size)
 	if strings.HasSuffix(icon.Name, "-symbolic") {

@@ -132,13 +132,13 @@ func TestBodyMarkup(t *testing.T) {
 
 func TestNewIcon(t *testing.T) {
 	tint := render.RGB(1, 2, 3)
-	if w := NewIcon(Icon{Name: "ld-bell-symbolic"}, 16, tint); w.Name() != "ld-bell-symbolic" || w.Tint() != tint {
+	if w := NewIcon(Icon{Name: "ld-bell-symbolic"}, 16, tint, func(fn func()) { fn() }, nil); w.Name() != "ld-bell-symbolic" || w.Tint() != tint {
 		t.Errorf("symbolic: name %q tint %v", w.Name(), w.Tint())
 	}
-	if w := NewIcon(Icon{Name: "firefox"}, 16, tint); w.Tint() != 0 {
+	if w := NewIcon(Icon{Name: "firefox"}, 16, tint, func(fn func()) { fn() }, nil); w.Tint() != 0 {
 		t.Error("a full-color theme icon was tinted")
 	}
-	if w := NewIcon(Icon{File: "/no/such.png"}, 16, tint); w.Name() != "" || w.Tint() != 0 {
+	if w := NewIcon(Icon{File: "/no/such.png"}, 16, tint, func(fn func()) { fn() }, nil); w.Name() != FallbackIcon || w.Tint() != 0 {
 		t.Errorf("file icon: name %q tint %v", w.Name(), w.Tint())
 	}
 }
@@ -177,10 +177,10 @@ func TestWithActivationToken(t *testing.T) {
 // daemon's GThemedIcon does.
 func TestNewIconFallsBackAlongTheName(t *testing.T) {
 	treetest.IconTheme(t, "org.example")
-	if ink := treetest.Ink(NewIcon(Icon{Name: "org.example-app"}, 24, 0)); ink == 0 {
+	if ink := treetest.Ink(NewIcon(Icon{Name: "org.example-app"}, 24, 0, func(fn func()) { fn() }, nil)); ink == 0 {
 		t.Error("an app icon with a present dash-shortened form drew nothing")
 	}
-	if ink := treetest.Ink(NewIcon(Icon{Name: "missing"}, 24, 0)); ink != 0 {
+	if ink := treetest.Ink(NewIcon(Icon{Name: "missing"}, 24, 0, func(fn func()) { fn() }, nil)); ink != 0 {
 		t.Error("an absent icon drew something")
 	}
 }

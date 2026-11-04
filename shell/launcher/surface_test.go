@@ -3,6 +3,7 @@ package launcher
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
@@ -799,10 +801,10 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 // nothing.
 func TestRowIconFallsBackAlongTheName(t *testing.T) {
 	treetest.IconTheme(t, "preferences-system")
-	if ink := treetest.Ink(rowIcon(engine.IconName("preferences-system-network"), 24)); ink == 0 {
+	if ink := treetest.Ink(rowIcon(engine.IconName("preferences-system-network"), 24, func(fn func()) { fn() })); ink == 0 {
 		t.Error("the row drew no icon for a name whose dash-shortened form exists")
 	}
-	if ink := treetest.Ink(rowIcon(engine.IconName("unrelated-app"), 24)); ink != 0 {
+	if ink := treetest.Ink(rowIcon(engine.IconName("unrelated-app"), 24, func(fn func()) { fn() })); ink != 0 {
 		t.Error("a name with no present form drew an icon")
 	}
 }
@@ -1039,5 +1041,16 @@ func TestClosingWithoutAnEffectRunsNothingLater(t *testing.T) {
 	p.finish(search.Close{})
 	if len(ph.timers) != before {
 		t.Error("a plain close left something to run")
+	}
+}
+
+func TestARowsFileIconPointingAtAFIFODrawsNothingAndDoesNotBlock(t *testing.T) {
+	fifo := filepath.Join(t.TempDir(), "icon.png")
+	if err := unix.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	icon := rowIcon(engine.IconFile(fifo), 24, func(func()) { t.Error("a FIFO reached the loop as a ready icon") })
+	if ink := treetest.Ink(icon); ink != 0 {
+		t.Errorf("the row drew %d pixels for a file that is not one", ink)
 	}
 }

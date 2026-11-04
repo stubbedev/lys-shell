@@ -50,6 +50,7 @@ func (s *Surface) buildViews(a *active) *views {
 	v.setMasked(ui.password)
 
 	st := rowStyle{
+		post: s.d.Invoke,
 		font: s.d.Font, variants: s.d.Variants, px: fontPx(), iconPx: px(searchIconSize), showIcons: ui.showIcons,
 		display: rowDisplay{columns: ui.displayColumns, separator: ui.columnSeparator, ellipsize: ui.ellipsize},
 	}
@@ -114,7 +115,7 @@ func (s *Surface) makeRow(a *active, pos int, st rowStyle) widget.Widget {
 					return
 				}
 				row.iconSlot.Clear()
-				icon := widget.NewFileIcon(made, st.iconPx)
+				icon := widgets.NewAsyncFileIcon(made, "", st.iconPx, s.d.Invoke, nil)
 				icon.AddClass("launcher-row-icon")
 				row.iconSlot.Append(icon, false)
 			})

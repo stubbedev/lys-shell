@@ -399,12 +399,12 @@ func TestResolveTrayIcon(t *testing.T) {
 	}
 	hooks := trayPixmapHooks{scaled: func(deviceScale) {}, forget: func(render.ImageID) {}}
 	// A pixmap icon is a raster at the icon size.
-	icon := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: pixmap}, 20, deviceScale{1, 1}, hooks)
+	icon := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: pixmap}, 20, deviceScale{1, 1}, hooks, func(fn func()) { fn() })
 	if sz := widget.SizeWithin(icon, widget.Size{W: 100, H: 100}); sz.W != 20 {
 		t.Errorf("pixmap icon = %v, want 20px", sz)
 	}
 	// A short pixmap is the fallback glyph, not a crash.
-	short := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: sni.Pixmap{Width: 4, Height: 4}}, 20, deviceScale{1, 1}, hooks)
+	short := buildTrayIcon(trayIconSource{kind: trayIconPixmap, pixmap: sni.Pixmap{Width: 4, Height: 4}}, 20, deviceScale{1, 1}, hooks, func(fn func()) { fn() })
 	if icon, ok := short.(*widget.Icon); !ok || icon.Name() != trayFallbackIcon {
 		t.Errorf("short pixmap = %T, want the fallback glyph", short)
 	}

@@ -410,9 +410,9 @@ func TestNotificationItemFileIconFallsBack(t *testing.T) {
 		t.Errorf("the unloadable file icon = %q (file-icon %v), want the bell", missIcon.Name(), missIcon.HasClass("file-icon"))
 	}
 	keepIcon := findByClass(loaded, "notification-dropdown-item-icon").(*widget.Icon)
-	if keepIcon.Name() != "" || !keepIcon.HasClass("file-icon") {
-		t.Errorf("the loadable file lost its icon (name %q, file-icon %v)", keepIcon.Name(), keepIcon.HasClass("file-icon"))
-	}
+	waitHeadless(t, "the loadable file shows, as a picture", func() bool {
+		return keepIcon.Name() != notifyui.FallbackIcon && keepIcon.HasClass("file-icon")
+	})
 }
 
 // The sized panel forwards the popover handle to content that acts on

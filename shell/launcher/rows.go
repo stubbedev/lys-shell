@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/pango"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // rowDisplay is RowDisplay: which columns of a row show, split on what,
@@ -63,6 +64,7 @@ type rowStyle struct {
 	iconPx    int
 	showIcons bool
 	display   rowDisplay
+	post      func(func())
 }
 
 // launcherRow is one list row: GTK's listview `row` element (selected
@@ -100,7 +102,7 @@ func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiS
 	}
 	slot := widget.NewBox(widget.Row, 0, 0)
 	if st.showIcons {
-		if icon := rowIcon(it.Icon, st.iconPx); icon != nil {
+		if icon := rowIcon(it.Icon, st.iconPx, st.post); icon != nil {
 			slot.Append(icon, false)
 		}
 		content.Append(slot, false)
@@ -133,21 +135,17 @@ func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiS
 	return row
 }
 
-// rowIcon is the icon a row shows right away: a theme name, a file, a
-// cached thumbnail, or a thumbnail's fallback until one is made.
-func rowIcon(icon engine.Icon, px int) *widget.Icon {
+// rowIcon is the icon a row shows right away: a theme name, a file decoded off
+// the loop, or a thumbnail's fallback until thumbnailPending's file is ready.
+func rowIcon(icon engine.Icon, px int, post func(func())) *widget.Icon {
 	var w *widget.Icon
 	switch ic := icon.(type) {
 	case engine.IconName:
 		w = widget.NewThemeIconFallback(string(ic), px)
 	case engine.IconFile:
-		w = widget.NewFileIcon(string(ic), px)
+		w = widgets.NewAsyncFileIcon(string(ic), "", px, post, nil)
 	case engine.IconThumbnail:
-		if cached, ok := engine.CachedThumbnail(ic.Path); ok {
-			w = widget.NewFileIcon(cached, px)
-		} else {
-			w = widget.NewThemeIconFallback(ic.Fallback, px)
-		}
+		w = widget.NewThemeIconFallback(ic.Fallback, px)
 	default:
 		return nil
 	}
@@ -159,17 +157,19 @@ func rowIcon(icon engine.Icon, px int) *widget.Icon {
 // its final icon.
 func thumbnailPending(icon engine.Icon) string {
 	if ic, ok := icon.(engine.IconThumbnail); ok {
-		if _, cached := engine.CachedThumbnail(ic.Path); !cached {
-			return ic.Path
-		}
+		return ic.Path
 	}
 	return ""
 }
 
-// generateThumbnail makes path's thumbnail off the loop and hands the
-// made file to done (nothing when none could be made).
+// generateThumbnail finds or makes path's thumbnail off the loop and hands the
+// file to done (nothing when none could be made).
 func generateThumbnail(ctx context.Context, t engine.Thumbnailer, path string, done func(string)) {
 	go func() {
+		if cached, ok := engine.CachedThumbnail(path); ok {
+			done(cached)
+			return
+		}
 		if made, ok := t.Generate(ctx, path); ok {
 			done(made)
 		}

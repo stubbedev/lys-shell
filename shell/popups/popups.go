@@ -482,7 +482,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	if notifyui.IsFileIcon(icon) {
 		size = cardIconPx
 	}
-	glyph := notifyui.NewIcon(icon, size, 0)
+	glyph := notifyui.NewIcon(icon, size, 0, p.onLoop, nil)
 	glyph.AddClass("notification-popup-icon")
 	if notifyui.IsFileIcon(icon) {
 		glyph.AddClass("file-icon")
@@ -768,4 +768,12 @@ func (p *Popups) stackOrder() [][]uint32 {
 		}
 	}
 	return out
+}
+
+func (p *Popups) onLoop(fn func()) {
+	if p.app == nil {
+		fn()
+		return
+	}
+	p.app.Invoke(fn)
 }

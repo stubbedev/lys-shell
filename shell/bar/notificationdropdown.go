@@ -2,7 +2,6 @@ package bar
 
 import (
 	"log"
-	"os"
 	"slices"
 	"strconv"
 	"sync"
@@ -443,13 +442,8 @@ type notifItem struct {
 // back to the themed bell (apply_icon's load failure) and reports
 // whether the glyph still draws a picture, so it sits bare, without
 // the media tile, only when the file actually shows.
-func itemIcon(icon notifyui.Icon, size int) (*widget.Icon, bool) {
-	if icon.File != "" {
-		if _, err := os.Stat(icon.File); err != nil {
-			icon = notifyui.Icon{Name: notifyui.FallbackIcon}
-		}
-	}
-	return notifyui.NewIcon(icon, size, 0), notifyui.IsFileIcon(icon)
+func itemIcon(icon notifyui.Icon, size int, post func(func()), fileShows func()) (*widget.Icon, bool) {
+	return notifyui.NewIcon(icon, size, 0, post, fileShows), icon.File == "" && notifyui.IsFileIcon(icon)
 }
 
 func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem {
@@ -465,9 +459,16 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	if notifyui.IsFileIcon(icon) {
 		size = notifIconPx
 	}
-	glyph, isFile := itemIcon(icon, size)
+	var glyph *widget.Icon
+	glyph, isFile := itemIcon(icon, size, v.ctx.Invoke, func() {
+		if glyph != nil {
+			glyph.AddClass("file-icon")
+			it.main.SetMedia(glyph, true)
+		}
+	})
 	glyph.AddClass("notification-dropdown-item-icon")
-	if isFile {
+	if isFile || (icon.File != "" && glyph.Name() == icon.File) {
+		isFile = true
 		glyph.AddClass("file-icon")
 	}
 	it.main.SetMedia(glyph, isFile)

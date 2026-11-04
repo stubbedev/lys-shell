@@ -415,7 +415,7 @@ func (h *Dialogs) icon(name string, px int) *widget.Icon {
 		return nil
 	}
 	if filepath.IsAbs(name) {
-		return widget.NewFileIcon(name, px)
+		return widgets.NewAsyncFileIcon(name, "", px, h.d.Invoke, nil)
 	}
 	return widget.NewThemeIconFallback(name, px)
 }

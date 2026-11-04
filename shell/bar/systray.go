@@ -244,10 +244,10 @@ type trayGlyph interface {
 // buildTrayIcon makes the widget for a source at px logical pixels; a
 // pixmap rasterizes at scale, the device scale the tray last drew at,
 // and falls back to the generic glyph when it does not decode.
-func buildTrayIcon(src trayIconSource, px int, scale deviceScale, hooks trayPixmapHooks) trayGlyph {
+func buildTrayIcon(src trayIconSource, px int, scale deviceScale, hooks trayPixmapHooks, post func(func())) trayGlyph {
 	switch src.kind {
 	case trayIconFile:
-		return widget.NewFileIcon(src.name, px)
+		return widgets.NewAsyncFileIcon(src.name, trayFallbackIcon, px, post, nil)
 	case trayIconPixmap:
 		if g, err := newTrayPixmap(src.pixmap, px, scale, hooks); err == nil {
 			return g
@@ -642,13 +642,13 @@ func (m *systrayModule) updateIcon(e *trayEntry, look trayLook) {
 // at half the icon size in its bottom-right corner.
 func (m *systrayModule) buildLook(e *trayEntry, look trayLook) {
 	px, hooks := m.iconPx(), m.pixmapHooks()
-	e.icon = buildTrayIcon(look.icon, px, m.scale, hooks)
+	e.icon = buildTrayIcon(look.icon, px, m.scale, hooks, m.ctx.Invoke)
 	e.slot.Clear()
 	if !look.hasOverlay {
 		e.slot.Append(widgets.Center(e.icon), true)
 		return
 	}
-	e.overlay = buildTrayIcon(look.overlay, px/2, m.scale, hooks)
+	e.overlay = buildTrayIcon(look.overlay, px/2, m.scale, hooks, m.ctx.Invoke)
 	stack := widget.NewOverlay().
 		Append(widgets.Center(e.icon)).
 		AppendAligned(e.overlay, widget.AlignEnd, widget.AlignEnd)
