@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/service/sysinfo"
 	"github.com/stubbedev/lys-shell/service/upower"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -101,8 +103,8 @@ const dashboardRigOutput = "RIG-1"
 const (
 	dashboardFirstOpenMallocs = 20000
 	dashboardReopenMallocs    = 3000
-	dashboardPollAllocs       = 60
-	dashboardPollReads        = 10
+	dashboardPollAllocs       = 30
+	dashboardPollReads        = 6
 )
 
 func newDashboardRig(t *testing.T) *dashboardRig {
@@ -290,6 +292,7 @@ func TestDashboardPollCounts(t *testing.T) {
 	if raceEnabled {
 		t.Skip("the race detector's own allocations and reads swamp the count")
 	}
+	fixedProc(t)
 	ctx := styledContext(t, config.Defaults())
 	v := dashboardDropdown(ctx).(*dashboardView)
 	v.poll()
@@ -308,6 +311,27 @@ func TestDashboardPollCounts(t *testing.T) {
 	if reads > dashboardPollReads {
 		t.Errorf("a poll makes %d read syscalls, want at most %d", reads, dashboardPollReads)
 	}
+}
+
+func fixedProc(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "net"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{
+		"net/dev": "Inter-|   Receive\n face |bytes\n  eth0: 100 1 0 0 0 0 0 0 200 1 0 0 0 0 0 0\n",
+		"stat":    "cpu  100 0 100 800 0 0 0 0 0 0\ncpu0 50 0 50 400 0 0 0 0 0 0\ncpu1 50 0 50 400 0 0 0 0 0 0\nintr 0\n",
+		"meminfo": "MemTotal: 1000 kB\nMemFree: 500 kB\nMemAvailable: 600 kB\nBuffers: 0 kB\nCached: 0 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n",
+		"mounts":  "/dev/root / ext4 rw 0 0\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	proc, sys := sysinfo.ProcRoot, sysinfo.SysRoot
+	sysinfo.ProcRoot, sysinfo.SysRoot = dir, t.TempDir()
+	t.Cleanup(func() { sysinfo.ProcRoot, sysinfo.SysRoot = proc, sys })
 }
 
 func procReads(t *testing.T, fn func()) int64 {
