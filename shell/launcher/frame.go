@@ -59,8 +59,6 @@ type panelFrame struct {
 	target func(out render.Rect) (w, h int)
 	// place is where a panel of a size goes in an output.
 	place func(out render.Rect, w, h int) render.Rect
-	// scaled hears the device scale it paints at; nil for no one.
-	scaledTo func(num, denom int)
 }
 
 func newPanelFrame(d Deps, content *widget.Box, w, h int, win func() Window) *panelFrame {
@@ -76,12 +74,6 @@ func newPanelFrame(d Deps, content *widget.Box, w, h int, win func() Window) *pa
 	}
 	f.motion = newPanelMotion(f, w, h)
 	return f
-}
-
-func (f *panelFrame) scaled(num, denom int) {
-	if f.scaledTo != nil {
-		f.scaledTo(num, denom)
-	}
 }
 
 // retarget sends the panel toward its size for what it now shows.
@@ -295,7 +287,6 @@ func (r *panelRoot) ArrangeRoot(rect render.Rect) { r.Arrange(rect) }
 // Paint paints the panel, carrying the fade itself where the compositor
 // cannot.
 func (r *panelRoot) Paint(cv *render.Canvas) {
-	r.f.scaled(cv.DeviceScale())
 	if alpha := r.f.motion.paintAlpha(); alpha < 1 {
 		prev := cv.PushAlpha(alpha)
 		widget.PaintChild(cv, r.f.box)

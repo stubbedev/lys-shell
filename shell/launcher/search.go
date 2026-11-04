@@ -34,17 +34,19 @@ const previewSettle = 40 * time.Millisecond
 // panel is one search session on the UI loop: the widgets, the frame
 // they show, and the engine behind them.
 type panel struct {
-	s       *Surface
-	sess    *launcheripc.Session
-	eng     *search.Engine
-	v       *panelViews
-	win     Window
-	ctx     context.Context
-	cancel  context.CancelFunc
-	frame   search.Frame
-	sel     int
-	depth   int
-	selBack []string
+	s    *Surface
+	sess *launcheripc.Session
+	eng  *search.Engine
+	v    *panelViews
+	win  Window
+	// stopScale ends following the window's scale.
+	stopScale func()
+	ctx       context.Context
+	cancel    context.CancelFunc
+	frame     search.Frame
+	sel       int
+	depth     int
+	selBack   []string
 	// moved is the person having chosen a row for this query: only then do
 	// rows arriving late leave the selection where it is. Otherwise the
 	// best row takes it, or typing fast and pressing Enter would take the
@@ -97,6 +99,8 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 		return
 	}
 	p.win = win
+	p.v.list.setScale(win.Scale())
+	p.stopScale = win.OnScaleChanged(p.v.list.setScale)
 	if err := win.SetFocus(p.v.entry); err != nil {
 		log.Printf("launcher: cannot focus the entry: %v", err)
 		p.finish(search.Cancel{})
@@ -515,6 +519,10 @@ func (p *panel) teardown() {
 	p.cancel()
 	if p.eng != nil {
 		p.eng.Stop()
+	}
+	if p.stopScale != nil {
+		p.stopScale()
+		p.stopScale = nil
 	}
 	if p.win == nil {
 		return

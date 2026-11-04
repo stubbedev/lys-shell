@@ -98,7 +98,6 @@ func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	v.panelFrame = newPanelFrame(d, content, v.baseW, v.fieldH(), func() Window { return p.win })
 	v.target = func(render.Rect) (int, int) { return v.targetW(), v.targetH() }
 	v.place = func(out render.Rect, w, h int) render.Rect { return placePanel(out, w, h, config.LauncherCenter, 0, 0) }
-	v.scaledTo = func(num, denom int) { v.list.setScale(num, denom) }
 	return v
 }
 
@@ -302,7 +301,8 @@ type searchList struct {
 	pool   []*searchRow
 	shown  []widget.Widget
 	loader *iconLoader
-	// num and denom are the device scale icons are decoded for.
+	// num and denom are the device scale icons are decoded for, its
+	// window's; num is 0 until the window exists.
 	num, denom int
 	// waiting are the icons shown once decoded.
 	waiting []*asyncIcon
@@ -313,7 +313,6 @@ type searchList struct {
 
 func newSearchList(p *panel, cfg *config.Config, font render.Font, variants widget.VariantFunc, rowH, headerH, iconSize int) *searchList {
 	l := &searchList{p: p, font: font, variants: variants, rowH: rowH, headerH: headerH, margin: rowMargin(scaledPx(cfg)), iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
-	l.num, l.denom = p.s.scale()
 	l.loader = newIconLoader(p.ctx, p.s.d.Invoke, l.iconReady)
 	l.SetElement("listview")
 	l.AddClass("launcher-search-list")
@@ -653,13 +652,16 @@ func (l *searchList) bindAsync(a *asyncIcon, name string) {
 		a.blank()
 		return
 	}
-	if widget.ThemeIconPreloaded(name, a.size, l.num, l.denom) {
+	if l.num != 0 && widget.ThemeIconPreloaded(name, a.size, l.num, l.denom) {
 		a.show(name)
 		return
 	}
 	a.blank()
 	if !slices.Contains(l.waiting, a) {
 		l.waiting = append(l.waiting, a)
+	}
+	if l.num == 0 {
+		return
 	}
 	l.loader.request(iconRequest{name: name, size: a.size, num: l.num, denom: l.denom})
 }
@@ -678,13 +680,13 @@ func (l *searchList) iconReady(req iconRequest) {
 	l.waiting = kept
 }
 
-// setScale follows the canvas: another device scale is another raster.
+// setScale follows the window: another device scale is another raster.
 func (l *searchList) setScale(num, denom int) {
 	if num == l.num && denom == l.denom {
 		return
 	}
 	l.num, l.denom = num, denom
-	l.p.s.setScale(num, denom)
+	l.waiting = l.waiting[:0]
 	for _, row := range l.pool {
 		row.icon.name = ""
 	}

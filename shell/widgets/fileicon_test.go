@@ -1,7 +1,6 @@
 package widgets
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -9,6 +8,8 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"golang.org/x/sys/unix"
+
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func paintOnce(t *testing.T, icon *widget.Icon) {
@@ -38,39 +39,14 @@ func TestAFIFOKeepsTheFallbackAndThePaintFinishes(t *testing.T) {
 	}
 }
 
-const greenSquareSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#00ff00"/></svg>`
-
 func TestAFileIconsFirstPaintAtAFractionalScaleIsExactAndDecodesNothing(t *testing.T) {
-	for _, sc := range []struct {
-		name       string
-		num, denom int
-	}{{"1.25", 5, 4}, {"1.5", 3, 2}} {
-		t.Run(sc.name, func(t *testing.T) {
-			NoteDeviceScale(sc.num, sc.denom)
-			path := filepath.Join(t.TempDir(), "green.svg")
-			if err := os.WriteFile(path, []byte(greenSquareSVG), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			posted := make(chan func(), 1)
-			icon := NewAsyncFileIcon(path, "", 16, func(fn func()) { posted <- fn }, nil)
-			select {
-			case show := <-posted:
-				show()
-			case <-time.After(10 * time.Second):
-				t.Fatal("the icon never decoded")
-			}
-			if !widget.ThemeIconPreloaded(path, 16, sc.num, sc.denom) {
-				t.Fatal("the first paint would decode: the icon is not cached at the surface's scale")
-			}
-			const px = 16
-			dev := (px*sc.num + sc.denom - 1) / sc.denom
-			icon.Arrange(render.Rect{W: px, H: px})
-			data := make([]byte, render.Stride(dev)*dev)
-			icon.Paint(render.NewScaled(data, render.Stride(dev), dev, dev, sc.num, sc.denom))
-			at := (dev/2)*render.Stride(dev) + (dev/2)*4
-			if got := data[at : at+4]; got[1] != 0xff || got[0] != 0 || got[2] != 0 {
-				t.Errorf("first paint at %s: center %v, want the exact green", sc.name, got)
-			}
+	for _, sc := range treetest.FractionalScales {
+		t.Run(sc.Name, func(t *testing.T) {
+			path := treetest.GreenSVG(t)
+			center := treetest.FractionalFirstPaint(t, sc.Num, func(post func(func())) *widget.Icon {
+				return NewAsyncFileIcon(path, "", 16, post, nil)
+			})
+			treetest.ExpectGreen(t, sc.Name, center)
 		})
 	}
 }

@@ -17,7 +17,6 @@ import (
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // dumpDebounce is how long -dump waits for the matches to settle.
@@ -35,6 +34,10 @@ type Window interface {
 	// SetOpacity fades the surface in the compositor, with the blur behind
 	// it; an error is a compositor without the protocol.
 	SetOpacity(alpha float64) error
+	// Scale is the device scale the surface presents at, num device pixels
+	// per denom logical ones; OnScaleChanged hears each change.
+	Scale() (num, denom int)
+	OnScaleChanged(fn func(num, denom int)) (cancel func())
 }
 
 // Deps are what the shell hands the surface.
@@ -124,12 +127,9 @@ type Surface struct {
 	cur *active
 	// panel is the live search session; cur and panel never both live.
 	panel *panel
-	// scaleNum and scaleDenom are the device scale the last panel painted
-	// at, so the next decodes its icons for it from the start.
-	scaleNum, scaleDenom int
-	model                matchModel
-	multi                multiSelect
-	sel                  int
+	model matchModel
+	multi multiSelect
+	sel   int
 }
 
 // New builds the surface over its collaborators.
@@ -707,18 +707,6 @@ func (s *Surface) typeOnceClosed(text string) {
 }
 
 // scale is the device scale to decode icons for.
-func (s *Surface) scale() (int, int) {
-	if s.scaleNum == 0 {
-		return 1, 1
-	}
-	return s.scaleNum, s.scaleDenom
-}
-
-func (s *Surface) setScale(num, denom int) {
-	s.scaleNum, s.scaleDenom = num, denom
-	widgets.NoteDeviceScale(num, denom)
-}
-
 // outputFor is the output launcher.monitor names; empty is the focused
 // output, the compositor's choice. A name no output has is said in the
 // log and the launcher still opens: it may be how you would fix it.

@@ -1072,3 +1072,7 @@ func TestASessionOpensWhileItsHistoryHolds(t *testing.T) {
 	h.until("the surface, with the history held", func() bool { return len(h.windows) == 1 })
 	h.until("the actor asking for the history, off the loop", func() bool { return len(asked) == 1 })
 }
+
+func (w *fakeWindow) Scale() (num, denom int) { return 120, 120 }
+
+func (w *fakeWindow) OnScaleChanged(func(num, denom int)) (cancel func()) { return func() {} }

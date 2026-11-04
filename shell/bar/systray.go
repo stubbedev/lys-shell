@@ -468,7 +468,6 @@ func (m *systrayModule) scaled(s deviceScale) {
 		return
 	}
 	m.scale = s
-	widgets.NoteDeviceScale(s.num, s.denom)
 	m.px.Store(int64(m.devicePx()))
 	m.want()
 	m.reads.request()
