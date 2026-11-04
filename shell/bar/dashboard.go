@@ -129,10 +129,17 @@ type dashboardModule struct {
 
 func newDashboard(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.Dashboard
-	name := dashboardIcon(cfg.IconOverride, detectDistro, widget.ThemeIconExists)
-	// The icon always shows and the label never does (the schema's
-	// hidden icon-show/label-show).
-	icon := moduleIcon(ctx, config.IconConfig{Show: true, Name: name, Color: cfg.IconColor})
+	first := cfg.IconOverride
+	if first == "" {
+		first = dashboardFallbackIcon
+	}
+	icon := moduleIcon(ctx, config.IconConfig{Show: true, Name: first, Color: cfg.IconColor})
+	if cfg.IconOverride == "" {
+		mountOffLoop(ctx, func() {
+			name := dashboardIcon(cfg.IconOverride, detectDistro, widget.ThemeIconExists)
+			ctx.Invoke(func() { icon.SetThemeName(name) })
+		})
+	}
 	return &dashboardModule{icon: icon}, nil
 }
 

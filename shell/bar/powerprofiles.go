@@ -28,6 +28,7 @@ type powerProfilesModule struct {
 	// btn takes the active profile's color as threshold colors.
 	btn  *barButton
 	snap powerprofiles.Snapshot
+	firstRead
 }
 
 func newPowerProfiles(ctx ModuleContext) (Module, error) {
@@ -37,9 +38,7 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles}
 	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons()[config.ProfileBalanced])
 	m.btn = newBarButton(ctx, m.icon, "")
-	if _, err := followReads(ctx, "power-profiles", ctx.PowerProfiles.Subscribe, m.src.Read, m.apply); err != nil {
-		return nil, err
-	}
+	followReads(ctx, "power-profiles", &m.firstRead, ctx.PowerProfiles.Subscribe, m.src.Read, m.apply)
 	return m, nil
 }
 

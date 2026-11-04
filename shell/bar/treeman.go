@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"log"
 	"strconv"
 	"strings"
 
@@ -54,7 +55,6 @@ type treemanModule struct {
 	src  treeman.Source
 	btn  *barButton
 	icon *widget.Icon
-	stop func()
 	// chrome is the module root the severity class and visibility go
 	// on; view is what was last shown, applied when the chrome arrives.
 	chrome moduleChrome
@@ -71,15 +71,14 @@ func newTreeman(ctx ModuleContext) (Module, error) {
 		// follow events on.
 		return m, nil
 	}
-	ticks, stop, err := ctx.Treeman.Subscribe(ctx.Life())
-	if err != nil {
-		return nil, err
-	}
-	m.stop = stop
 	go func() {
-		for range ticks {
-			m.ctx.Invoke(m.refresh)
+		ticks, stop, err := ctx.Treeman.Subscribe(ctx.Life())
+		if err != nil {
+			log.Printf("treeman: subscribe: %v", err)
+			return
 		}
+		follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
+		m.ctx.Invoke(m.refresh)
 	}()
 	return m, nil
 }
@@ -126,10 +125,3 @@ func (m *treemanModule) setChrome(c moduleChrome) {
 }
 
 func (m *treemanModule) Root() widget.Widget { return m.btn }
-
-// Stop releases the event subscription.
-func (m *treemanModule) Stop() {
-	if m.stop != nil {
-		m.stop()
-	}
-}

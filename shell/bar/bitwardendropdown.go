@@ -280,15 +280,11 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.pages, true)
 	v.Append(content, true)
 	if v.host == nil {
+		v.pages.SetVisible(false)
 		v.showError(errBitwardenNoHost)
 		return v
 	}
-	vt, err := v.host.vault()
-	if err != nil {
-		v.showError(err)
-		return v
-	}
-	v.vault = vt
+	v.pages.SetVisible(false)
 	v.startFollowing()
 	return v
 }
@@ -296,11 +292,28 @@ func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 // follow re-applies on every change of the vault until the instance is
 // released; the life also bounds the view's operations.
 func (v *bitwardenView) follow(life context.Context) {
-	if v.vault == nil {
+	if v.host == nil {
 		return
 	}
-	v.apply()
-	ticks, stop := v.vault.Subscribe()
+	mountOffLoop(v.ctx, func() {
+		vt, err := v.host.vault()
+		v.ctx.Invoke(func() {
+			if err != nil {
+				v.showError(err)
+				return
+			}
+			v.vault = vt
+			v.pages.SetVisible(true)
+			v.apply()
+		})
+		if err == nil {
+			v.followVault(life, vt)
+		}
+	})
+}
+
+func (v *bitwardenView) followVault(life context.Context, vt bwVault) {
+	ticks, stop := vt.Subscribe()
 	second := time.NewTicker(time.Second)
 	go func() {
 		defer stop()

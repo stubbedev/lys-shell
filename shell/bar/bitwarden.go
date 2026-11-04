@@ -303,6 +303,7 @@ type bitwardenModule struct {
 	vault bwVault
 	btn   *barButton
 	icon  *widget.Icon
+	firstRead
 }
 
 var errBitwardenNoHost = errors.New("bitwarden: requires the shared vault host")
@@ -311,16 +312,23 @@ func newBitwarden(ctx ModuleContext) (Module, error) {
 	if ctx.Bitwarden == nil {
 		return nil, errBitwardenNoHost
 	}
-	v, err := ctx.Bitwarden.vault()
-	if err != nil {
-		return nil, err
-	}
-	m := &bitwardenModule{ctx: ctx, vault: v}
+	m := &bitwardenModule{ctx: ctx}
 	m.icon = moduleIcon(ctx, ctx.Config.Bitwarden.Icons()[config.BitwardenLocked])
 	m.btn = newBarButton(ctx, m.icon, "")
-	m.render()
-	ticks, stop := v.Subscribe()
-	follow(ctx, ticks, stop, func(struct{}) { m.render() })
+	mountOffLoop(ctx, func() {
+		v, err := ctx.Bitwarden.vault()
+		if err != nil {
+			log.Printf("bitwarden: %v", err)
+			return
+		}
+		ticks, stop := v.Subscribe()
+		ctx.Invoke(func() {
+			m.vault = v
+			m.render()
+			m.reveal()
+		})
+		follow(ctx, ticks, stop, func(struct{}) { m.render() })
+	})
 	return m, nil
 }
 

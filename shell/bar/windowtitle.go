@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -69,6 +70,10 @@ type focusSource struct {
 	read      func() (focusedWindow, bool, error)
 	subscribe func(ctx ModuleContext) (<-chan struct{}, func(), error)
 	close     func()
+}
+
+func focusAvailable(ctx ModuleContext) bool {
+	return ctx.Hyprland != nil || compositorHasClient()
 }
 
 // windowTitleSource is factory.rs's build_source: the compositor's
@@ -204,47 +209,50 @@ func lysWMFocusSource() focusSource {
 // icon its class or title maps to.
 type windowTitleModule struct {
 	ctx    ModuleContext
-	source focusSource
 	btn    *barButton
 	icon   *widget.Icon
 	window focusedWindow
+	firstRead
 }
 
 func newWindowTitle(ctx ModuleContext) (Module, error) {
-	source, err := windowTitleSource(ctx)
-	if err != nil {
-		return nil, err
+	if !focusAvailable(ctx) {
+		return nil, errors.New("window-title: unsupported compositor")
 	}
-	m := &windowTitleModule{ctx: ctx, source: source}
+	m := &windowTitleModule{ctx: ctx}
 	m.icon = moduleIcon(ctx, ctx.Config.WindowTitle.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := renderOnce(m.read, m.apply); err != nil {
-		source.close()
-		return nil, err
-	}
-	ticks, stop, err := source.subscribe(ctx)
-	if err != nil {
-		source.close()
-		return nil, err
-	}
-	newOffLoopRead(ctx, "window-title", m.read, m.apply).on(ticks, func() {
-		if stop != nil {
-			stop()
+	mountOffLoop(ctx, func() {
+		source, err := windowTitleSource(ctx)
+		if err != nil {
+			log.Printf("window-title: %v", err)
+			return
 		}
-		source.close()
+		reads := newOffLoopRead(ctx, "window-title", func(context.Context) (focusedWindow, error) {
+			w, _, err := source.read()
+			return w, err
+		}, m.apply)
+		ticks, stop, err := source.subscribe(ctx)
+		if err != nil {
+			log.Printf("window-title: subscribe: %v", err)
+			source.close()
+			return
+		}
+		reads.on(ticks, func() {
+			if stop != nil {
+				stop()
+			}
+			source.close()
+		})
+		reads.first()
 	})
 	return m, nil
-}
-
-// read reads the focused window, none reading as blank.
-func (m *windowTitleModule) read(context.Context) (focusedWindow, error) {
-	w, _, err := m.source.read()
-	return w, err
 }
 
 func (m *windowTitleModule) apply(w focusedWindow) {
 	m.window = w
 	m.render()
+	m.reveal()
 }
 
 // render is update_display: the label and the resolved icon.

@@ -66,7 +66,7 @@ func newTestMango(t *testing.T, cfg *config.Config, connector string) *cwsModule
 	}
 	m := module.(*cwsModule)
 	t.Cleanup(m.Stop)
-	backend := m.backend.(*mangoBackend)
+	backend := m.backend.(*connectingBackend).conn.(*mangoBackend)
 	deadline := time.Now().Add(2 * time.Second)
 	for !backend.watch.Ready() {
 		if time.Now().After(deadline) {
@@ -74,7 +74,7 @@ func newTestMango(t *testing.T, cfg *config.Config, connector string) *cwsModule
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	return m

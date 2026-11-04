@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/appicons"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
@@ -266,7 +267,7 @@ func TestHeadlessLoopRunsWhileAReadIsBlocked(t *testing.T) {
 			return Create("battery", ctx)
 		}},
 		{name: "workspaces", create: func(ctx ModuleContext, h *heldRead, ticks chan struct{}) (Module, error) {
-			return newCwsModule(ctx, "niri", cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), heldCws{newFakeCws(nil, nil), h, ticks})
+			return newCwsModule(ctx, "niri", cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), heldCws{newFakeCws(nil, nil), h, ticks}), nil
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -351,10 +352,13 @@ func lysWMTitleBar(t *testing.T, edit func(*config.Config)) *lyswmtest.WM {
 	f := newFakeLysWM(t)
 	f.Result("workspaces", lysWMTwoOutputs)
 	f.Result("windows", lysWMWindows)
-	if r := apptest.On(a, func() moduleResult { return createResult("lys-wm-workspaces", ctx) }); r.err != nil {
+	r := apptest.On(a, func() moduleResult { return createResult("lys-wm-workspaces", ctx) })
+	if r.err != nil {
 		t.Fatal(r.err)
 	}
 	f.AwaitWatch(t)
+	m := r.module.(*cwsModule)
+	apptest.Until(t, a, "the first read is on the row", func() bool { return m.firstRead.read })
 	return f
 }
 
@@ -435,7 +439,7 @@ func TestCwsEqualModelsAllocateLittle(t *testing.T) {
 	shown, models := icon(), &m.models[0]
 	f.windows = []cwsWindow{{id: 1, workspace: 1, hasWorkspace: true, app: appicons.Window{Title: "another", HasTitle: true}}}
 	got := testing.AllocsPerRun(100, func() {
-		if err := renderOnce(m.read, m.apply); err != nil {
+		if err := readAndApply(m.read, m.apply); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -473,22 +477,21 @@ func TestHeadlessHyprlandLoopRunsWhileAReadIsBlocked(t *testing.T) {
 func TestWorkspacesEndOfStreamLeavesTheBlinkToTheLoop(t *testing.T) {
 	stopped, closed := 0, 0
 	m := &cwsModule{
-		blinkStop:  func() { stopped++ },
-		stopEvents: func() { closed++ },
-		backend:    closedCounter{closed: &closed},
+		blinkStop: func() { stopped++ },
+		backend:   closedCounter{closed: &closed},
 	}
 	m.closeIPC()
 	if stopped != 0 || m.blinkStop == nil {
 		t.Errorf("the event stream's goroutine stopped the blink timer %d times", stopped)
 	}
-	if closed != 2 {
-		t.Errorf("closing the IPC closed %d of the events and the backend, want 2", closed)
+	if closed != 1 {
+		t.Errorf("closing the IPC closed the backend %d times, want once", closed)
 	}
 	m.Stop()
 	if stopped != 1 || m.blinkStop != nil {
 		t.Errorf("Stop stopped the blink timer %d times, want 1", stopped)
 	}
-	if closed != 2 {
+	if closed != 1 {
 		t.Errorf("Stop closed the IPC again: %d", closed)
 	}
 }
@@ -512,11 +515,93 @@ func TestHeadlessRetiringAGenerationStopsTheWorkspacesBlink(t *testing.T) {
 		t.Fatal(r.err)
 	}
 	m := r.module.(*cwsModule)
-	if !apptest.On(a, func() bool { return m.blinkStop != nil }) {
-		t.Fatal("an urgent window started no blink")
-	}
+	apptest.Until(t, a, "an urgent window starts the blink", func() bool { return m.blinkStop != nil })
 	apptest.On(a, func() struct{} { ctx.gen.retire(); return struct{}{} })
 	if apptest.On(a, func() bool { return m.blinkStop != nil }) {
 		t.Error("the blink timer outlived its generation")
+	}
+}
+
+func TestMountingAFullLayoutCompletesWhileEverySourceHolds(t *testing.T) {
+	ctx, a := loopContext(t)
+	styled := styledContext(t, config.Defaults())
+	ctx.Config, ctx.Theme, ctx.Font, ctx.Style = styled.Config, styled.Theme, styled.Font, styled.Style
+	h := &stuckCalls{release: make(chan struct{})}
+	t.Cleanup(func() { close(h.release) })
+	stuckServices(&ctx, h)
+	f, conn := startFakeHypr(t, hyprReplies())
+	free := f.hold(t, "j/workspaces")
+	t.Cleanup(free)
+	ctx.Hyprland = conn
+	ctx.Treeman = &fakeTreeman{}
+	ctx.Connector = "DP-1"
+	items := []config.BarItem{}
+	for _, name := range []string{"battery", "brightness", "network", "power-profiles", "volume", "microphone", "bluetooth", "window-title", "keyboard-input", "hyprland-workspaces", "workspaces", "systray", "media", "keybind-mode", "treeman", "dashboard", "bitwarden", "mail", "weather", "cpu", "ram", "storage", "netstat"} {
+		items = append(items, config.BarItem{Module: config.BarModule(name)})
+	}
+	mounted := make(chan *widget.Box, 1)
+	a.Invoke(func() {
+		box := widget.NewBox(widget.Row, 0, 0)
+		appendItems(box, items, ctx)
+		mounted <- box
+	})
+	box := apptest.Answer(t, "the layout mounted with every source held", mounted)
+	apptest.Until(t, a, "a source is being read off the loop", func() bool { return h.calls.Load() > 0 })
+	if got := len(box.Children()); got != len(items) {
+		t.Errorf("mounted %d items, want %d", got, len(items))
+	}
+}
+
+func TestAModuleStaysHiddenUntilItsFirstRead(t *testing.T) {
+	ctx, a := loopContext(t)
+	source := heldBattery{newFakeBattery(upower.Device{IsPresent: true, Percentage: 50}), newHeldRead(t)}
+	source.h.held.Store(true)
+	ctx.Battery = source
+	var chrome *widget.Box
+	apptest.On(a, func() bool {
+		row := widget.NewBox(widget.Row, 0, 0)
+		if err := appendModule(row, config.BarItem{Module: "battery"}, ctx); err != nil {
+			t.Error(err)
+			return false
+		}
+		chrome = row.Children()[0].(*widget.Box)
+		return true
+	})
+	apptest.Answer(t, "the first read", source.h.started)
+	if apptest.On(a, func() bool { return chrome.Visible() }) {
+		t.Error("the battery module shows before anything was read")
+	}
+	source.h.free()
+	apptest.Until(t, a, "the module shows once read", func() bool { return chrome.Visible() })
+}
+
+func TestHyprlandPumpPostsOnlyWhatMatters(t *testing.T) {
+	_, m := newTestHypr(t, nil)
+	events := make(chan hyprland.Event)
+	var posted []func()
+	var delivered []hyprland.Event
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pumpHyprEvents(events, m.worthPosting, func(fn func()) { posted = append(posted, fn) }, func(ev hyprland.Event) { delivered = append(delivered, ev) })
+	}()
+	for _, ev := range []hyprland.Event{
+		{Kind: hyprland.EventWindowTitleV2, Address: "aa", Title: "x"},
+		{Kind: hyprland.EventActiveWindowV2, Address: "aa"},
+		{Kind: hyprland.EventSubmap, Name: "resize"},
+	} {
+		events <- ev
+	}
+	events <- hyprland.Event{Kind: hyprland.EventOpenWindow}
+	events <- hyprland.Event{Kind: hyprland.EventCloseWindow}
+	events <- hyprland.Event{Kind: hyprland.EventMoveWindow}
+	close(events)
+	<-done
+	if len(posted) != 1 {
+		t.Fatalf("%d calls on the loop, want the one the first relevant event queued", len(posted))
+	}
+	posted[0]()
+	if len(delivered) != 3 {
+		t.Errorf("the loop's call delivered %d events, want the three that matter", len(delivered))
 	}
 }

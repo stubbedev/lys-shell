@@ -1,8 +1,11 @@
 package bar
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -16,13 +19,13 @@ import (
 type audioPresenceModule interface {
 	Module
 	setChrome(moduleChrome)
-	refresh() error
 }
 
 func audioPresenceCases(ctx ModuleContext, source pulse.Source) []struct {
 	name   string
 	module audioPresenceModule
 	btn    func() *barButton
+	follow func()
 } {
 	v := &volumeModule{ctx: ctx, source: source}
 	v.btn = newBarButton(ctx, nil, "")
@@ -32,9 +35,14 @@ func audioPresenceCases(ctx ModuleContext, source pulse.Source) []struct {
 		name   string
 		module audioPresenceModule
 		btn    func() *barButton
+		follow func()
 	}{
-		{"volume", v, func() *barButton { return v.btn }},
-		{"microphone", mic, func() *barButton { return mic.btn }},
+		{"volume", v, func() *barButton { return v.btn }, func() {
+			followReads(ctx, "volume", &firstRead{}, source.Subscribe, v.read, v.apply)
+		}},
+		{"microphone", mic, func() *barButton { return mic.btn }, func() {
+			followReads(ctx, "microphone", &firstRead{}, source.Subscribe, mic.read, mic.apply)
+		}},
 	}
 }
 
@@ -57,10 +65,11 @@ func TestAudioModulesFollowTheDefaultDevice(t *testing.T) {
 		chromes[i] = widget.NewBox(widget.Row, 0, 0)
 		if err := onHeadlessLoop(func() error {
 			tc.module.setChrome(chromes[i])
-			return followRefresh(ctx, tc.name, ctx.Pulse.Subscribe, tc.module.refresh)
+			return nil
 		}); err != nil {
 			t.Fatalf("%s without a default device: want a module, got %v", tc.name, err)
 		}
+		tc.follow()
 		if onHeadlessLoop(chromes[i].Visible) {
 			t.Errorf("%s without a default device is shown", tc.name)
 		}
@@ -82,15 +91,23 @@ func TestAudioModulesFollowTheDefaultDevice(t *testing.T) {
 	}
 }
 
-func TestAudioModulesFailOnOtherErrors(t *testing.T) {
-	broken := errors.New("broken pipe")
-	source := &fakePulseSource{err: broken, ticks: make(chan struct{})}
+func TestAudioModulesStayHiddenOnOtherErrors(t *testing.T) {
+	var buf bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	source := &fakePulseSource{err: errors.New("broken pipe"), ticks: make(chan struct{})}
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Pulse = source
 	for _, tc := range audioPresenceCases(ctx, source) {
-		err := onHeadlessLoop(func() error { return followRefresh(ctx, tc.name, ctx.Pulse.Subscribe, tc.module.refresh) })
-		if !errors.Is(err, broken) {
-			t.Errorf("%s: error = %v, want it to wrap %v", tc.name, err, broken)
+		chrome := widget.NewBox(widget.Row, 0, 0)
+		tc.module.setChrome(chrome)
+		tc.follow()
+		if chrome.Visible() {
+			t.Errorf("%s: shown after a failed read", tc.name)
+		}
+		if got := onHeadlessLoop(buf.String); !strings.Contains(got, tc.name+": first read: ") || !strings.Contains(got, "broken pipe") {
+			t.Errorf("%s: log = %q, want the failure with its module", tc.name, got)
 		}
 	}
 }

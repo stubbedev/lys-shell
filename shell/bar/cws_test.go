@@ -310,10 +310,7 @@ func newTestCws(t *testing.T, cfg config.CompositorWorkspacesConfig, backend cws
 	t.Helper()
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Connector = "DP-1"
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, cfg, backend)
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, cfg, backend)
 	return m
 }
 
@@ -352,7 +349,7 @@ func TestCwsRefreshMovesTheStates(t *testing.T) {
 	m := newTestCws(t, config.DefaultsSwayWorkspaces().View(), f)
 	one.active, one.focused, two.active, two.focused, two.hasWindows = false, false, true, true, true
 	f.workspaces = []cwsWorkspace{one, two, emptyWS(5, 5, "DP-1")}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	first, second, third := m.segs.Segment(0), m.segs.Segment(1), m.segs.Segment(2)
@@ -420,10 +417,7 @@ func TestCwsPaintsTheConfiguredColors(t *testing.T) {
 	wcfg.WorkspaceMap = map[string]config.WorkspaceStyle{"4": {Color: &red}}
 	active := occupiedWS(1, 1, "DP-1")
 	active.active = true
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1"), emptyWS(3, 3, "DP-1"), occupiedWS(4, 4, "DP-1")}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1"), emptyWS(3, 3, "DP-1"), occupiedWS(4, 4, "DP-1")}, nil))
 	bar, size := cwsBar(t, ctx, m)
 	has, rest := paintCwsBar(m, bar, size)
 	accent, onAccent := resolve(wcfg.ActiveColor), resolve(mustToken(config.TokenFgOnAccent))
@@ -454,10 +448,7 @@ func TestCwsUnderlinesTheActiveWorkspace(t *testing.T) {
 	wcfg.ActiveIndicator = config.ActiveUnderline
 	active := occupiedWS(1, 1, "DP-1")
 	active.active = true
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{active}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{active}, nil))
 	bar, size := cwsBar(t, ctx, m)
 	accent, _ := styling.ResolveColor(wcfg.ActiveColor, palette)
 	widget.SizeWithin(bar, availSize(size.W, size.H))
@@ -486,10 +477,7 @@ func TestCwsSegmentShadesUnderThePointer(t *testing.T) {
 	ctx.Connector = "DP-1"
 	active := occupiedWS(1, 1, "DP-1")
 	active.active = true
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1")}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1")}, nil))
 	bar, size := cwsBar(t, ctx, m)
 	_, rest := paintCwsBar(m, bar, size)
 	before, activeRest := rest(1), rest(0)
@@ -516,10 +504,7 @@ func TestCwsSegmentMinSize(t *testing.T) {
 		wcfg := config.DefaultsNiriWorkspaces().View()
 		wcfg.LabelSize = config.Size{Value: tc.label, Unit: config.SizePixels}
 		wcfg.WorkspacePad = config.Size{Value: tc.pad, Unit: config.SizePixels}
-		m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1")}, nil))
-		if err != nil {
-			t.Fatal(err)
-		}
+		m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1")}, nil))
 		cwsBar(t, ctx, m)
 		if r := m.segs.Segment(0).Bounds(); r.W < tc.atLeast || r.H < 24 || (tc.atLeast == 24 && (r.W != 24 || r.H != 24)) {
 			t.Errorf("label %vpx, padding %vpx: segment %v, want at least %dx24", tc.label, tc.pad, r, tc.atLeast)
@@ -537,10 +522,7 @@ func TestCwsSegmentsCenterInASideBar(t *testing.T) {
 	ctx.Connector = "DP-1"
 	palette := ctx.Theme.RenderPalette()
 	wcfg := config.DefaultsNiriWorkspaces().View()
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")}, nil))
 	factories["test-cws"] = func(ModuleContext) (Module, error) { return m, nil }
 	defer delete(factories, "test-cws")
 	bar := buildRoot(ctx, config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "test-cws"}, {Module: "clock"}}}, "DP-1")
@@ -677,7 +659,7 @@ func TestCwsBlinkRunsOnlyWhileUrgent(t *testing.T) {
 	}
 	// Urgency clears: the blink stops and stays off.
 	f.workspaces = []cwsWorkspace{occupiedWS(1, 1, "DP-1")}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if m.blinkStop != nil || m.blinkOn {
@@ -686,12 +668,12 @@ func TestCwsBlinkRunsOnlyWhileUrgent(t *testing.T) {
 	// An urgent window on a displayed workspace also starts it; one on
 	// a hidden workspace does not.
 	f.windows = []cwsWindow{{id: 7, workspace: 99, hasWorkspace: true, urgent: true}}
-	_ = renderOnce(m.read, m.apply)
+	_ = readAndApply(m.read, m.apply)
 	if m.blinkStop != nil {
 		t.Error("an urgent window on an undisplayed workspace started the blink")
 	}
 	f.windows[0].workspace = 1
-	_ = renderOnce(m.read, m.apply)
+	_ = readAndApply(m.read, m.apply)
 	if m.blinkStop == nil {
 		t.Error("an urgent window on a displayed workspace did not start the blink")
 	}
@@ -706,10 +688,7 @@ func TestCwsUrgentPulseFadesTheSegment(t *testing.T) {
 	wcfg := config.DefaultsNiriWorkspaces().View()
 	urgent := occupiedWS(1, 1, "DP-1")
 	urgent.urgent = true
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{urgent}, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, newFakeCws([]cwsWorkspace{urgent}, nil))
 	occupied, _ := styling.ResolveColor(wcfg.OccupiedColor, palette)
 	bar, size := cwsBar(t, ctx, m)
 	if has, _ := paintCwsBar(m, bar, size); has(0, occupied) {
@@ -775,7 +754,7 @@ func TestCwsKeepsContentThatStillShowsTheSame(t *testing.T) {
 	}
 	other.active = true
 	f.workspaces = []cwsWorkspace{urgent, other}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if segmentLabel(m, 0) != first || segmentLabel(m, 1) != second {
@@ -783,7 +762,7 @@ func TestCwsKeepsContentThatStillShowsTheSame(t *testing.T) {
 	}
 	other.num = 7
 	f.workspaces = []cwsWorkspace{urgent, other}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if segmentLabel(m, 0) != first {
@@ -825,10 +804,7 @@ func TestCwsSwitchMovesTheLabelColors(t *testing.T) {
 	one, two := occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")
 	one.active = true
 	f := newFakeCws([]cwsWorkspace{one, two}, nil)
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, f)
 	bar, size := cwsBar(t, ctx, m)
 	has, _ := paintCwsBar(m, bar, size)
 	occupied := resolve(wcfg.OccupiedColor)
@@ -838,7 +814,7 @@ func TestCwsSwitchMovesTheLabelColors(t *testing.T) {
 	switchTo := func(oneActive bool) {
 		one.active, two.active = oneActive, !oneActive
 		f.workspaces = []cwsWorkspace{one, two}
-		if err := renderOnce(m.read, m.apply); err != nil {
+		if err := readAndApply(m.read, m.apply); err != nil {
 			t.Fatal(err)
 		}
 	}

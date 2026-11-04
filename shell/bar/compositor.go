@@ -60,6 +60,16 @@ func detectCompositor() compositor {
 	return compositorUnknown
 }
 
+func compositorHasClient() bool {
+	switch detectCompositor() {
+	case compositorLysWM, compositorNiri, compositorMango, compositorSway:
+		return true
+	case compositorHyprland, compositorUnknown:
+		return false
+	}
+	return false
+}
+
 // requireCompositor is module_registry.rs's require_hyprland and
 // siblings: module builds only under want.
 func requireCompositor(module string, want compositor) error {

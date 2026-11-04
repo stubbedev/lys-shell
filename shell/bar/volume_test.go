@@ -99,7 +99,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.btn.Label().Text(); got != "42%" {
@@ -110,7 +110,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 	}
 
 	source.dev.Volume = pct(100)
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := m.btn.Label().Text(); got != "100%" {
@@ -130,7 +130,7 @@ func newVolumeForTest(t *testing.T, cfg *config.Config, source *fakePulseSource)
 	m := &volumeModule{ctx: ctx, source: source}
 	m.icon = moduleIcon(ctx, cfg.Volume.Icon())
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	return m
@@ -158,7 +158,7 @@ func TestVolumeMutedSwapsTheIconInTheTree(t *testing.T) {
 
 	// Unmuting leaves icon-muted for the level icon.
 	source.dev.Muted = false
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if want := cfg.Volume.LevelIcons[1]; icon.Name() != want {

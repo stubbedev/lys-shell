@@ -250,24 +250,6 @@ func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 	})
 }
 
-func followRefresh(ctx ModuleContext, module string, subscribe func(context.Context) (<-chan struct{}, func(), error), refresh func() error) error {
-	if err := refresh(); err != nil {
-		return fmt.Errorf("%s: %w", module, err)
-	}
-	ticks, stop, err := subscribe(ctx.Life())
-	if err != nil {
-		return fmt.Errorf("%s: subscribe: %w", module, err)
-	}
-	follow(ctx, ticks, stop, func(struct{}) { logRefresh(module, refresh) })
-	return nil
-}
-
-func logRefresh(module string, refresh func() error) {
-	if err := refresh(); err != nil {
-		log.Printf("%s: refresh: %v", module, err)
-	}
-}
-
 // Module is one bar module: a live widget tree plus whatever timers
 // keep it current. The interface grows update/message plumbing as
 // services land.

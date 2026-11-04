@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -98,4 +99,13 @@ func routeClick(root widget.Widget, w widget.Widget) {
 	r.Move(p)
 	r.Press(widget.BTNLeft, p, 0)
 	r.Release(widget.BTNLeft, p)
+}
+
+func readAndApply[T any](read func(context.Context) (T, error), apply func(T)) error {
+	v, err := read(context.Background())
+	if err != nil {
+		return err
+	}
+	apply(v)
+	return nil
 }

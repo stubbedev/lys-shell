@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -287,6 +288,9 @@ type hyprlandWorkspaces struct {
 	reads          *offLoopRead[hyprSnapshot]
 	pending        []hyprland.Event
 	rulesDue       atomic.Bool
+	firstDue       atomic.Bool
+	anyUrgent      atomic.Bool
+	firstRead
 
 	filtered []hyprFiltered
 	models   []cwsButtonModel
@@ -314,28 +318,57 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
-	first, err := m.read(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	m.take(first)
-	m.initActive()
-	m.rules = m.readRules()
-	m.rebuild()
+	m.hideUntilRead(m.segs)
+	m.firstDue.Store(true)
+	m.rulesDue.Store(true)
+	m.reads = newOffLoopRead(ctx, "hyprland-workspaces", m.read, m.apply)
 	if ctx.App == nil {
+		m.reads.first()
 		return m, nil
 	}
-	events, err := ctx.Hyprland.Events(ctx.Life())
-	if err != nil {
-		return nil, fmt.Errorf("hyprland-workspaces: events: %w", err)
-	}
-	m.reads = newOffLoopRead(ctx, "hyprland-workspaces", m.read, m.apply)
 	go func() {
-		for ev := range events {
-			m.ctx.Invoke(func() { m.enqueue(ev) })
+		events, err := ctx.Hyprland.Events(ctx.Life())
+		if err != nil {
+			log.Printf("hyprland-workspaces: events: %v", err)
+			m.reads.first()
+			return
 		}
+		m.reads.first()
+		pumpHyprEvents(events, m.worthPosting, m.ctx.Invoke, m.enqueue)
 	}()
 	return m, nil
+}
+
+// pumpHyprEvents hands the events worth a read to deliver on the loop: one
+// call waits on the loop at a time, with every event since the last.
+func pumpHyprEvents(events <-chan hyprland.Event, worth func(hyprland.Event) bool, onLoop func(func()), deliver func(hyprland.Event)) {
+	var (
+		mu      sync.Mutex
+		batch   []hyprland.Event
+		waiting bool
+	)
+	for ev := range events {
+		if !worth(ev) {
+			continue
+		}
+		mu.Lock()
+		batch = append(batch, ev)
+		queue := !waiting
+		waiting = true
+		mu.Unlock()
+		if !queue {
+			continue
+		}
+		onLoop(func() {
+			mu.Lock()
+			due := batch
+			batch, waiting = nil, false
+			mu.Unlock()
+			for _, ev := range due {
+				deliver(ev)
+			}
+		})
+	}
 }
 
 type hyprSnapshot struct {
@@ -343,6 +376,9 @@ type hyprSnapshot struct {
 	monitors   []hyprland.Monitor
 	clients    []hyprland.Client
 	rules      map[int]string
+	first      bool
+	active     int
+	activeOK   bool
 }
 
 func (m *hyprlandWorkspaces) read(context.Context) (hyprSnapshot, error) {
@@ -359,6 +395,12 @@ func (m *hyprlandWorkspaces) read(context.Context) (hyprSnapshot, error) {
 	}
 	if m.rulesDue.Swap(false) {
 		s.rules = m.readRules()
+	}
+	if m.firstDue.Swap(false) {
+		s.first = true
+		if ws, err := m.conn.ActiveWorkspace(); err == nil {
+			s.active, s.activeOK = ws.ID, true
+		}
 	}
 	return s, nil
 }
@@ -383,6 +425,11 @@ func (m *hyprlandWorkspaces) enqueue(ev hyprland.Event) {
 
 func (m *hyprlandWorkspaces) apply(s hyprSnapshot) {
 	m.take(s)
+	if s.first {
+		m.initActive(s.active, s.activeOK)
+	}
+	m.reveal()
+	defer func() { m.anyUrgent.Store(len(m.urgent) > 0) }()
 	events := m.pending
 	m.pending = nil
 	if len(events) == 0 {
@@ -421,7 +468,7 @@ func (m *hyprlandWorkspaces) trackActive() bool {
 
 // initActive is initial_active_workspace, the other-monitor set, and
 // the focused monitor.
-func (m *hyprlandWorkspaces) initActive() {
+func (m *hyprlandWorkspaces) initActive(active int, activeOK bool) {
 	m.activeID = 1
 	m.activeAny = map[int]bool{}
 	found := false
@@ -434,10 +481,8 @@ func (m *hyprlandWorkspaces) initActive() {
 			m.activeID, found = mon.ActiveWS.ID, true
 		}
 	}
-	if !found {
-		if ws, err := m.conn.ActiveWorkspace(); err == nil {
-			m.activeID = ws.ID
-		}
+	if !found && activeOK {
+		m.activeID = active
 	}
 }
 
@@ -664,16 +709,29 @@ func (m *hyprlandWorkspaces) syncAfterActiveChange() {
 // ones it ignores (titles without title: patterns, focus of a window
 // that was never urgent, everything unwatched) cost no query.
 func (m *hyprlandWorkspaces) relevant(ev hyprland.Event) bool {
+	if ev.Kind == hyprland.EventActiveWindowV2 {
+		return m.urgent[ev.Address]
+	}
+	return m.worthPosting(ev)
+}
+
+// worthPosting filters off the loop, where the urgent windows cannot be
+// read: an active window counts while any window may be urgent, the loop's
+// relevant deciding for the one it names.
+func (m *hyprlandWorkspaces) worthPosting(ev hyprland.Event) bool {
 	switch ev.Kind {
 	case hyprland.EventWorkspaceV2, hyprland.EventFocusedMonV2,
 		hyprland.EventCreateWspcV2, hyprland.EventDestroyWspcV2, hyprland.EventMoveWorkspaceV2,
 		hyprland.EventRenameWorkspace, hyprland.EventActiveSpecialV2,
 		hyprland.EventMonitorAddedV2, hyprland.EventMonitorRemovedV2,
 		hyprland.EventOpenWindow, hyprland.EventCloseWindow, hyprland.EventMoveWindow, hyprland.EventMoveWindowV2,
-		hyprland.EventUrgent, hyprland.EventConfigReloaded:
+		hyprland.EventConfigReloaded:
+		return true
+	case hyprland.EventUrgent:
+		m.anyUrgent.Store(true)
 		return true
 	case hyprland.EventActiveWindowV2:
-		return m.urgent[ev.Address]
+		return m.anyUrgent.Load()
 	case hyprland.EventWindowTitleV2:
 		return cwsFollowsTitles(m.cfg)
 	}

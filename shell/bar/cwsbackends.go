@@ -23,12 +23,14 @@ func newSwayWorkspaces(ctx ModuleContext) (Module, error) {
 	if err := requireCompositor("sway-workspaces", compositorSway); err != nil {
 		return nil, err
 	}
-	conn, err := sway.Connect()
-	if err != nil {
-		return nil, err
-	}
 	cfg := ctx.Config.SwayWorkspaces.View()
-	return newCwsModule(ctx, "sway", cwsWorkspaces, cfg, &swayBackend{conn: conn, titles: cwsFollowsTitles(cfg)})
+	return newCwsModule(ctx, "sway", cwsWorkspaces, cfg, &connectingBackend{connect: func() (cwsBackend, error) {
+		conn, err := sway.Connect()
+		if err != nil {
+			return nil, err
+		}
+		return &swayBackend{conn: conn, titles: cwsFollowsTitles(cfg)}, nil
+	}}), nil
 }
 
 // newNiriWorkspaces is the niri-workspaces factory.
@@ -36,11 +38,97 @@ func newNiriWorkspaces(ctx ModuleContext) (Module, error) {
 	if err := requireCompositor("niri-workspaces", compositorNiri); err != nil {
 		return nil, err
 	}
-	conn, err := niri.Connect()
+	return newCwsModule(ctx, "niri", cwsWorkspaces, ctx.Config.NiriWorkspaces.View(), &connectingBackend{connect: func() (cwsBackend, error) {
+		conn, err := niri.Connect()
+		if err != nil {
+			return nil, err
+		}
+		return &niriBackend{conn: conn}, nil
+	}}), nil
+}
+
+var errBackendClosed = errors.New("the workspaces module was stopped")
+
+type connectingBackend struct {
+	connect func() (cwsBackend, error)
+
+	mu     sync.Mutex
+	conn   cwsBackend
+	closed bool
+}
+
+func (b *connectingBackend) connected() (cwsBackend, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return nil, errBackendClosed
+	}
+	if b.conn != nil {
+		return b.conn, nil
+	}
+	conn, err := b.connect()
 	if err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "niri", cwsWorkspaces, ctx.Config.NiriWorkspaces.View(), &niriBackend{conn: conn})
+	b.conn = conn
+	return conn, nil
+}
+
+func (b *connectingBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
+	conn, err := b.connected()
+	if err != nil {
+		return nil, nil, err
+	}
+	return conn.snapshot()
+}
+
+func (b *connectingBackend) focus(ctx context.Context, ws cwsWorkspace) error {
+	conn, err := b.connected()
+	if err != nil {
+		return err
+	}
+	return conn.focus(ctx, ws)
+}
+
+func (b *connectingBackend) focusNext(ctx context.Context) error {
+	conn, err := b.connected()
+	if err != nil {
+		return err
+	}
+	return conn.focusNext(ctx)
+}
+
+func (b *connectingBackend) focusPrevious(ctx context.Context) error {
+	conn, err := b.connected()
+	if err != nil {
+		return err
+	}
+	return conn.focusPrevious(ctx)
+}
+
+func (b *connectingBackend) focusLast(ctx context.Context) error {
+	conn, err := b.connected()
+	if err != nil {
+		return err
+	}
+	return conn.focusLast(ctx)
+}
+
+func (b *connectingBackend) subscribe() (<-chan struct{}, func(), error) {
+	conn, err := b.connected()
+	if err != nil {
+		return nil, nil, err
+	}
+	return conn.subscribe()
+}
+
+func (b *connectingBackend) close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.closed = true
+	if b.conn != nil {
+		b.conn.close()
+	}
 }
 
 // swayBackend maps sway's GET_WORKSPACES/GET_TREE onto the shared
@@ -195,13 +283,14 @@ func newMangoWorkspaces(ctx ModuleContext) (Module, error) {
 	if err := requireCompositor("mango-workspaces", compositorMango); err != nil {
 		return nil, err
 	}
-	w, err := mango.Watch()
-	if err != nil {
-		return nil, err
-	}
 	cfg := ctx.Config.MangoWorkspaces
-	backend := &mangoBackend{watch: w, connector: ctx.Connector, hideEmpty: cfg.HideEmpty, minTagCount: int(cfg.MinTagCount)}
-	return newCwsModule(ctx, "mango", cwsTags, cfg.View(), backend)
+	return newCwsModule(ctx, "mango", cwsTags, cfg.View(), &connectingBackend{connect: func() (cwsBackend, error) {
+		w, err := mango.Watch()
+		if err != nil {
+			return nil, err
+		}
+		return &mangoBackend{watch: w, connector: ctx.Connector, hideEmpty: cfg.HideEmpty, minTagCount: int(cfg.MinTagCount)}, nil
+	}}), nil
 }
 
 // mangoBackend selects one monitor's tags (rebuild_tags): the bar's
@@ -297,7 +386,7 @@ func newLysWMWorkspaces(ctx ModuleContext) (Module, error) {
 	if cwsFollowsTitles(cfg) {
 		titles = &lysWMTitles{}
 	}
-	return newCwsModule(ctx, "lys-wm", cwsWorkspaces, cfg, lysWMBackend{titles: titles})
+	return newCwsModule(ctx, "lys-wm", cwsWorkspaces, cfg, lysWMBackend{titles: titles}), nil
 }
 
 var lysWMWorkspaceEvents = []lyswm.EventKind{

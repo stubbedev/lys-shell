@@ -36,24 +36,34 @@ func newMicrophone(ctx ModuleContext) (Module, error) {
 	m := &microphoneModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followRefresh(ctx, "microphone", ctx.Pulse.Subscribe, m.refresh); err != nil {
-		return nil, err
-	}
+	followReads(ctx, "microphone", &firstRead{}, ctx.Pulse.Subscribe, m.read, m.apply)
 	return m, nil
 }
 
-// refresh re-reads and restyles the label and state icon; with no
-// default source the module hides until one appears.
-func (m *microphoneModule) refresh() error {
-	dev, err := m.source.DefaultSource(context.Background())
+type microphoneRead struct {
+	dev     pulse.InputDevice
+	present bool
+}
+
+func (m *microphoneModule) read(ctx context.Context) (microphoneRead, error) {
+	dev, err := m.source.DefaultSource(ctx)
 	if errors.Is(err, pulse.ErrNoDefaultDevice) {
-		m.setPresent(false)
-		return nil
+		return microphoneRead{}, nil
 	}
 	if err != nil {
-		return err
+		return microphoneRead{}, err
 	}
-	m.setPresent(true)
+	return microphoneRead{dev, true}, nil
+}
+
+// apply restyles the label and state icon; with no default source the
+// module hides until one appears.
+func (m *microphoneModule) apply(r microphoneRead) {
+	m.setPresent(r.present)
+	if !r.present {
+		return
+	}
+	dev := r.dev
 	cfg := m.ctx.Config.Microphone
 	label := ""
 	if cfg.LabelShow {
@@ -70,7 +80,6 @@ func (m *microphoneModule) refresh() error {
 		}
 		setter.SetThemeName(name)
 	}
-	return nil
 }
 
 func (m *microphoneModule) Root() widget.Widget { return m.btn }

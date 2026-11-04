@@ -160,7 +160,7 @@ func TestVPNOverlaysTheIcon(t *testing.T) {
 func TestNetworkModuleLabel(t *testing.T) {
 	cfg := config.Defaults()
 	offline := newTestNetworkModule(t, cfg, network.Snapshot{})
-	if err := renderOnce(offline.read, offline.apply); err != nil {
+	if err := readAndApply(offline.read, offline.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := offline.btn.Label().Text(); got != i18n.T("bar-network-offline") || offline.btn.Label().Color() != 0 {
@@ -168,7 +168,7 @@ func TestNetworkModuleLabel(t *testing.T) {
 	}
 	cfg.Network.LabelShow = false
 	hidden := newTestNetworkModule(t, cfg, network.Snapshot{Primary: network.ConnectionWifi, WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "x"})
-	if err := renderOnce(hidden.read, hidden.apply); err != nil {
+	if err := readAndApply(hidden.read, hidden.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := hidden.btn.Label().Text(); got != "" {

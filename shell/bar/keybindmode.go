@@ -2,6 +2,7 @@ package bar
 
 import (
 	"errors"
+	"log"
 
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -36,18 +37,26 @@ type keybindModeModule struct {
 	submap string
 }
 
+var errKeybindModeUnsupported = errors.New("keybind-mode: the compositor is neither Hyprland nor lys-wm")
+
 func newKeybindMode(ctx ModuleContext) (Module, error) {
-	submaps, stop, err := submapSource(ctx)
-	if err != nil {
-		return nil, err
+	if ctx.Hyprland == nil && detectCompositor() != compositorLysWM {
+		return nil, errKeybindModeUnsupported
 	}
 	m := &keybindModeModule{ctx: ctx}
 	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
 	m.render()
-	follow(ctx, submaps, stop, func(submap string) {
-		m.submap = submap
-		m.render()
+	mountOffLoop(ctx, func() {
+		submaps, stop, err := submapSource(ctx)
+		if err != nil {
+			log.Printf("keybind-mode: %v", err)
+			return
+		}
+		follow(ctx, submaps, stop, func(submap string) {
+			m.submap = submap
+			m.render()
+		})
 	})
 	return m, nil
 }
@@ -96,7 +105,7 @@ func submapSource(ctx ModuleContext) (<-chan string, func(), error) {
 		}()
 		return submaps, w.Close, nil
 	}
-	return nil, nil, errors.New("keybind-mode: the compositor is neither Hyprland nor lys-wm")
+	return nil, nil, errKeybindModeUnsupported
 }
 
 // render applies the current submap to the label and, under auto-hide,

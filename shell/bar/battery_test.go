@@ -162,7 +162,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	m := &battery{ctx: ctx, source: source}
 	m.icon = moduleIcon(ctx, cfg.Battery.Icon())
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.btn.Label().Text(); got != "75%" {
@@ -174,7 +174,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 
 	// Drop below the threshold: same template, error color.
 	source.update(func(d *upower.Device) { d.Percentage = 12 })
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := m.btn.Label().Text(); got != "12%" {
@@ -185,7 +185,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	}
 	// Back above: the defaults return.
 	source.update(func(d *upower.Device) { d.Percentage = 60 })
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(m.btn.InlineStyle(), cv.ToCSS()) {
@@ -207,7 +207,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	icon := m.icon
 
 	// Discharging: the level list bucketed over the percentage.
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := icon.Name(); got != "ld-battery-full-symbolic" {
@@ -215,7 +215,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	}
 	// Charging overrides the level list.
 	source.update(func(d *upower.Device) { d.State = upower.StateCharging })
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := icon.Name(); got != cfg.Battery.ChargingIcon {
@@ -223,7 +223,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	}
 	// Absent falls back to the alert icon.
 	source.update(func(d *upower.Device) { d.State, d.Percentage, d.IsPresent = upower.StateUnknown, 0, false })
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := icon.Name(); got != cfg.Battery.AlertIcon {
@@ -237,7 +237,7 @@ func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
 	style := computeStyle(cfg, styling.Default())
 	m := &battery{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}, source: source}
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := renderOnce(m.source.Read, m.apply); err != nil {
+	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := m.btn.Label().Text(); got != i18n.T("bar-battery-unavailable") {

@@ -32,7 +32,7 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.btn.Label().Text(); got != "65%" {
@@ -44,7 +44,7 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 
 	// Muted changes the icon only; the label keeps label-color.
 	source.dev.Muted = true
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if m.btn.Label().Color() != 0 {
@@ -90,14 +90,14 @@ func TestMicrophoneThresholds(t *testing.T) {
 	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
 	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
 	m.btn = newBarButton(m.ctx, m.icon, "")
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := m.btn.thresholds; got.LabelColor == nil || *got.LabelColor != warn || got.IconColor == nil {
 		t.Errorf("at 65%%: thresholds %+v, want the warning colors", got)
 	}
 	source.dev.Volume = pct(30)
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if !m.btn.thresholds.IsEmpty() {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync/atomic"
 
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -199,40 +200,47 @@ func hyprlandLayoutSource(conn *hyprland.Connection) layoutSource {
 
 // keyboardLayout is the module: the active keyboard layout.
 type keyboardLayout struct {
-	ctx    ModuleContext
-	source layoutSource
-	btn    *barButton
+	ctx  ModuleContext
+	btn  *barButton
+	next atomic.Pointer[func(context.Context) error]
+	firstRead
 }
 
 func newKeyboardLayout(ctx ModuleContext) (Module, error) {
-	source, err := keyboardLayoutSource(ctx)
-	if err != nil {
-		return nil, err
+	if !focusAvailable(ctx) {
+		return nil, errors.New("keyboard-input: unsupported compositor")
 	}
-	m := &keyboardLayout{ctx: ctx, source: source}
+	m := &keyboardLayout{ctx: ctx}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, ctx.Config.KeyboardInput.Icon()), "")
-	if err := renderOnce(m.read, m.show); err != nil {
-		log.Printf("keyboard-input: %v", err)
-		m.show(unknownLayout)
-	}
-	ticks, stop, err := source.subscribe(ctx.Life())
-	if err != nil {
-		source.close()
-		return nil, err
-	}
-	newOffLoopRead(ctx, "keyboard-input", m.read, m.show).on(ticks, func() {
-		if stop != nil {
-			stop()
+	m.show(unknownLayout)
+	mountOffLoop(ctx, func() {
+		source, err := keyboardLayoutSource(ctx)
+		if err != nil {
+			log.Printf("keyboard-input: %v", err)
+			return
 		}
-		source.close()
+		m.next.Store(&source.next)
+		ctx.Invoke(m.reveal)
+		reads := newOffLoopRead(ctx, "keyboard-input", func(context.Context) (string, error) { return readLayout(source) }, m.show)
+		ticks, stop, err := source.subscribe(ctx.Life())
+		if err != nil {
+			log.Printf("keyboard-input: subscribe: %v", err)
+			source.close()
+			return
+		}
+		reads.on(ticks, func() {
+			if stop != nil {
+				stop()
+			}
+			source.close()
+		})
+		reads.first()
 	})
 	return m, nil
 }
 
-// read reads the layout, off the loop; on an error the label keeps the
-// last known layout.
-func (m *keyboardLayout) read(context.Context) (string, error) {
-	layout, err := m.source.read()
+func readLayout(source layoutSource) (string, error) {
+	layout, err := source.read()
 	if err != nil {
 		return "", err
 	}
@@ -260,9 +268,14 @@ func (m *keyboardLayout) RunAction(action config.ClickAction) {
 		runClickAction(m.ctx, action)
 		return
 	}
+	next := m.next.Load()
+	if next == nil {
+		log.Printf("keyboard-input: no connection to the compositor yet; next-layout ignored")
+		return
+	}
 	life := m.ctx.Life()
 	go func() {
-		if err := m.source.next(life); err != nil {
+		if err := (*next)(life); err != nil {
 			log.Printf("keyboard-input: switch to the next layout: %v", err)
 		}
 	}()

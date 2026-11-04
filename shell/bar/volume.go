@@ -45,9 +45,7 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if err := followRefresh(ctx, "volume", ctx.Pulse.Subscribe, m.refresh); err != nil {
-		return nil, err
-	}
+	followReads(ctx, "volume", &firstRead{}, ctx.Pulse.Subscribe, m.read, m.apply)
 	return m, nil
 }
 
@@ -72,19 +70,30 @@ func (c *defaultDeviceChrome) show() {
 	}
 }
 
-// refresh re-reads and restyles the label and state icon; with no
-// default sink the module hides until one appears.
-func (m *volumeModule) refresh() error {
-	out, err := m.source.DefaultSink(context.Background())
+type volumeRead struct {
+	dev     pulse.Device
+	present bool
+}
+
+func (m *volumeModule) read(ctx context.Context) (volumeRead, error) {
+	out, err := m.source.DefaultSink(ctx)
 	if errors.Is(err, pulse.ErrNoDefaultDevice) {
-		m.setPresent(false)
-		return nil
+		return volumeRead{}, nil
 	}
 	if err != nil {
-		return err
+		return volumeRead{}, err
 	}
-	m.setPresent(true)
-	dev := out.Device
+	return volumeRead{out.Device, true}, nil
+}
+
+// apply restyles the label and state icon; with no default sink the module
+// hides until one appears.
+func (m *volumeModule) apply(r volumeRead) {
+	m.setPresent(r.present)
+	if !r.present {
+		return
+	}
+	dev := r.dev
 	cfg := m.ctx.Config.Volume
 	label := ""
 	if cfg.LabelShow {
@@ -95,7 +104,6 @@ func (m *volumeModule) refresh() error {
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(volumeIconName(cfg, dev))
 	}
-	return nil
 }
 
 // volumeIconName is volume helpers.rs's select_icon: the muted icon

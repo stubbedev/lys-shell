@@ -45,10 +45,7 @@ func threeWorkspaces(active int) []cwsWorkspace {
 func cwsDropModule(t *testing.T, ctx ModuleContext, wcfg config.CompositorWorkspacesConfig, workspaces []cwsWorkspace) (*cwsModule, *fakeCws, *widget.Bar, widget.Size) {
 	t.Helper()
 	f := newFakeCws(workspaces, nil)
-	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, f)
 	bar, size := cwsBar(t, ctx, m)
 	return m, f, bar, size
 }
@@ -221,7 +218,7 @@ func TestCwsIndicatorEndsOnTheActiveSegment(t *testing.T) {
 			restore := widget.SetAnimationsInstant(true)
 			defer restore()
 			f.workspaces = threeWorkspaces(2)
-			if err := renderOnce(m.read, m.apply); err != nil {
+			if err := readAndApply(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			relayCwsBar(bar, size)
@@ -239,7 +236,7 @@ func TestCwsSwitchStartsTheIndicatorTravelling(t *testing.T) {
 			relayCwsBar(bar, size)
 			start := m.segs.EnableDrop().Bounds()
 			f.workspaces = threeWorkspaces(2)
-			if err := renderOnce(m.read, m.apply); err != nil {
+			if err := readAndApply(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			relayCwsBar(bar, size)
@@ -276,14 +273,14 @@ func TestCwsNoIndicatorWhenNothingIsActive(t *testing.T) {
 	}
 	assertNone("never active")
 	f.workspaces = []cwsWorkspace{activeWS(1), occupiedWS(2, 2, "DP-1")}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
 	assertDropOn(t, m.segs, 0)
 	assertDropAtRest(t, m.segs)
 	f.workspaces = []cwsWorkspace{occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	assertNone("active gone")
@@ -295,7 +292,7 @@ func TestCwsRebuildWithTheSameActiveDoesNotAnimate(t *testing.T) {
 	relayCwsBar(bar, size)
 	before := m.segs.EnableDrop().Bounds()
 	for range 3 {
-		if err := renderOnce(m.read, m.apply); err != nil {
+		if err := readAndApply(m.read, m.apply); err != nil {
 			t.Fatal(err)
 		}
 		relayCwsBar(bar, size)
@@ -312,7 +309,7 @@ func TestCwsWorkspaceRemovedBeforeTheActiveDoesNotAnimate(t *testing.T) {
 	relayCwsBar(bar, size)
 	assertDropOn(t, m.segs, 2)
 	f.workspaces = f.workspaces[1:]
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
@@ -325,7 +322,7 @@ func TestCwsWorkspaceRemovedMidFlightLandsOnTheRightSegment(t *testing.T) {
 	m, f, bar, size := cwsDropModule(t, ctx, config.DefaultsNiriWorkspaces().View(), threeWorkspaces(0))
 	relayCwsBar(bar, size)
 	f.workspaces = threeWorkspaces(2)
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
@@ -335,7 +332,7 @@ func TestCwsWorkspaceRemovedMidFlightLandsOnTheRightSegment(t *testing.T) {
 	restore := widget.SetAnimationsInstant(true)
 	defer restore()
 	f.workspaces = f.workspaces[1:]
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)
@@ -360,7 +357,7 @@ func TestCwsWorkspaceMapTintsTheIndicator(t *testing.T) {
 	restore := widget.SetAnimationsInstant(true)
 	defer restore()
 	f.workspaces = threeWorkspaces(1)
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	accent, _ := styling.ResolveColor(wcfg.ActiveColor, ctx.Theme.RenderPalette())
@@ -432,7 +429,7 @@ func TestCwsUnderlineTravelsAsTheIndicator(t *testing.T) {
 				t.Error("the underlined workspace is filled")
 			}
 			f.workspaces = threeWorkspaces(1)
-			if err := renderOnce(m.read, m.apply); err != nil {
+			if err := readAndApply(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			relayCwsBar(bar, size)
@@ -442,7 +439,7 @@ func TestCwsUnderlineTravelsAsTheIndicator(t *testing.T) {
 			restore := widget.SetAnimationsInstant(true)
 			defer restore()
 			f.workspaces = threeWorkspaces(2)
-			if err := renderOnce(m.read, m.apply); err != nil {
+			if err := readAndApply(m.read, m.apply); err != nil {
 				t.Fatal(err)
 			}
 			data = paintCwsPixels(bar, size)
@@ -517,17 +514,11 @@ func assertSharedLook(t *testing.T, name string, segs *widget.SegmentIndicator) 
 func TestEveryWorkspacesModuleSharesTheLook(t *testing.T) {
 	for _, kind := range []string{"sway", "niri", "lys-wm"} {
 		ctx := cwsDropContext(t, config.LocationTop, 1)
-		m, err := newCwsModule(ctx, kind, cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
-		if err != nil {
-			t.Fatal(err)
-		}
+		m := newCwsModule(ctx, kind, cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
 		assertSharedLook(t, kind, m.segs)
 	}
 	ctx := cwsDropContext(t, config.LocationTop, 1)
-	tags, err := newCwsModule(ctx, "mango", cwsTags, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	tags := newCwsModule(ctx, "mango", cwsTags, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
 	assertSharedLook(t, "mango", tags.segs)
 	_, hypr := newTestHypr(t, nil)
 	assertSharedLook(t, "hyprland", hypr.segs)
@@ -629,7 +620,7 @@ func TestCwsSecondRebuildBeforeTheNextFrameKeepsTheTravel(t *testing.T) {
 	relayCwsBar(bar, size)
 	f.workspaces = threeWorkspaces(2)
 	for range 2 {
-		if err := renderOnce(m.read, m.apply); err != nil {
+		if err := readAndApply(m.read, m.apply); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -650,7 +641,7 @@ func TestCwsLeavingAnEmptyWorkspaceTravelsFromInsideTheRow(t *testing.T) {
 	assertDropOn(t, m.segs, 2)
 	first := activeWS(1)
 	f.workspaces = []cwsWorkspace{first, occupiedWS(2, 2, "DP-1")}
-	if err := renderOnce(m.read, m.apply); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	relayCwsBar(bar, size)

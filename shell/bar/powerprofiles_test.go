@@ -158,7 +158,7 @@ func TestPowerProfilesColorsAndUnknown(t *testing.T) {
 	}
 	check("performance", cfg.PowerProfiles.ColorPerformance, cfg.PowerProfiles.Icons()[config.ProfilePerformance].Name)
 	src.snap = powerprofiles.Snapshot{Available: true, Active: "mystery"}
-	if err := renderOnce(pp.src.Read, pp.apply); err != nil {
+	if err := readAndApply(pp.src.Read, pp.apply); err != nil {
 		t.Fatal(err)
 	}
 	check("unknown", cfg.PowerProfiles.ColorBalanced, cfg.PowerProfiles.Icons()[config.ProfileBalanced].Name)

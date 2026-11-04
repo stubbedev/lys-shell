@@ -121,14 +121,14 @@ func TestMicrophoneStateIcon(t *testing.T) {
 	}
 	icon := m.icon
 
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := icon.Name(); got != cfg.Microphone.Icon().Name {
 		t.Errorf("active icon = %q", got)
 	}
 	source.dev.Muted = true
-	if err := m.refresh(); err != nil {
+	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := icon.Name(); got != cfg.Microphone.IconMuted {

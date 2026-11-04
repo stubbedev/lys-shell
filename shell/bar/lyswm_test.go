@@ -193,8 +193,16 @@ func TestKeyboardLayoutLysWMUnnamedLayoutIsAnError(t *testing.T) {
 func TestKeyboardLayoutLysWMWithoutALayoutAnswerFails(t *testing.T) {
 	f := newFakeLysWM(t)
 	f.Result("layout", `null`)
-	if _, err := Create("keyboard-input", newTestContext(t, config.Defaults())); err == nil || !strings.Contains(err.Error(), "seed the layout") {
-		t.Errorf("Create = %v, want the seed error", err)
+	ctx := newTestContext(t, config.Defaults())
+	if _, err := keyboardLayoutSource(ctx); err == nil || !strings.Contains(err.Error(), "seed the layout") {
+		t.Errorf("the source = %v, want the seed error", err)
+	}
+	m, err := Create("keyboard-input", ctx)
+	if err != nil {
+		t.Fatalf("Create decides nothing from the compositor's answer: %v", err)
+	}
+	if m.(*keyboardLayout).read {
+		t.Error("a compositor without a layout revealed the module")
 	}
 }
 

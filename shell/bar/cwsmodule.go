@@ -80,12 +80,12 @@ type cwsModule struct {
 	blinkOn    bool
 	blinkStop  func()
 	urgentSeen bool
-	stopEvents func()
+	firstRead
 }
 
 // newCwsModule builds the module over a connected backend and, with a
 // live loop, subscribes to its events.
-func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.CompositorWorkspacesConfig, backend cwsBackend) (*cwsModule, error) {
+func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.CompositorWorkspacesConfig, backend cwsBackend) *cwsModule {
 	m := &cwsModule{ctx: ctx, cfg: cfg, kind: kind, flavor: flavor, backend: backend}
 	m.actions = cwsActions{
 		focus: func(ws cwsWorkspace) cwsAction {
@@ -97,22 +97,27 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
-	if err := renderOnce(m.read, m.apply); err != nil {
-		backend.close()
-		return nil, err
-	}
+	m.hideUntilRead(m.segs)
+	reads := newOffLoopRead(ctx, kind+"-workspaces", m.read, m.apply)
 	if ctx.App == nil {
-		return m, nil
+		reads.first()
+		return m
 	}
-	ticks, stop, err := backend.subscribe()
-	if err != nil {
-		backend.close()
-		return nil, err
-	}
-	m.stopEvents = stop
 	ctx.OnRetire(m.Stop)
-	newOffLoopRead(m.ctx, m.kind+"-workspaces", m.read, m.apply).on(ticks, m.closeIPC)
-	return m, nil
+	go func() {
+		ticks, stop, err := backend.subscribe()
+		if err != nil {
+			log.Printf("%s-workspaces: subscribe: %v", kind, err)
+			reads.first()
+			return
+		}
+		reads.on(ticks, func() {
+			stop()
+			m.closeIPC()
+		})
+		reads.first()
+	}()
+	return m
 }
 
 // cwsBoldFace resolves the .workspace-label face: font-sans at
@@ -147,6 +152,7 @@ func (m *cwsModule) apply(s cwsSnapshot) {
 	if f, ok := m.backend.(cwsTitleFilter); ok {
 		f.hideTitles(m.models, m.windows)
 	}
+	m.reveal()
 }
 
 type cwsTitleFilter interface {
@@ -299,14 +305,9 @@ func (m *cwsModule) Stop() {
 		m.blinkStop()
 		m.blinkStop = nil
 	}
-	m.closeIPC()
+	mountOffLoop(m.ctx, m.closeIPC)
 }
 
 func (m *cwsModule) closeIPC() {
-	m.stopOnce.Do(func() {
-		if m.stopEvents != nil {
-			m.stopEvents()
-		}
-		m.backend.close()
-	})
+	m.stopOnce.Do(m.backend.close)
 }

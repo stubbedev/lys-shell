@@ -134,6 +134,7 @@ type networkModule struct {
 	btn                   *barButton
 	icon                  *widget.Icon
 	shownIcon, shownLabel string
+	firstRead
 }
 
 type networkRead struct {
@@ -154,10 +155,7 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	}
 	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	reads, err := followReads(ctx, "network", ctx.Network.Subscribe, m.read, m.apply)
-	if err != nil {
-		return nil, err
-	}
+	reads := followReads(ctx, "network", &m.firstRead, ctx.Network.Subscribe, m.read, m.apply)
 	if m.vpn != nil {
 		reads.on(m.vpn.Changes(ctx.Life()), nil)
 	}

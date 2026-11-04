@@ -37,6 +37,7 @@ type brightnessModule struct {
 	source brightness.Source
 	btn    *barButton
 	icon   *widget.Icon
+	firstRead
 }
 
 func newBrightness(ctx ModuleContext) (Module, error) {
@@ -47,15 +48,7 @@ func newBrightness(ctx ModuleContext) (Module, error) {
 	m := &brightnessModule{ctx: ctx, source: ctx.Brightness}
 	m.icon = moduleIcon(ctx, config.IconWith(cfg.IconShow, brightnessIcon(cfg.LevelIcons, 0), cfg.IconColor))
 	m.btn = newBarButton(ctx, m.icon, "")
-	if ctx.App == nil {
-		if err := renderOnce(m.source.Devices, m.apply); err != nil {
-			return nil, err
-		}
-		return m, nil
-	}
-	if _, err := followReads(ctx, "brightness", ctx.Brightness.Subscribe, m.source.Devices, m.apply); err != nil {
-		return nil, err
-	}
+	followReads(ctx, "brightness", &m.firstRead, ctx.Brightness.Subscribe, m.source.Devices, m.apply)
 	return m, nil
 }
 

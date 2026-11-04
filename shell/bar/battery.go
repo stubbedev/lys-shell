@@ -45,6 +45,7 @@ type battery struct {
 	source upower.Source
 	btn    *barButton
 	icon   *widget.Icon
+	firstRead
 }
 
 func newBattery(ctx ModuleContext) (Module, error) {
@@ -58,9 +59,7 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	m := &battery{ctx: ctx, source: ctx.Battery}
 	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	if _, err := followReads(ctx, "battery", m.source.Subscribe, m.source.Read, m.apply); err != nil {
-		return nil, err
-	}
+	followReads(ctx, "battery", &m.firstRead, m.source.Subscribe, m.source.Read, m.apply)
 	return m, nil
 }
 
