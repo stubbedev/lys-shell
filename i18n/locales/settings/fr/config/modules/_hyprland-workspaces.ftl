@@ -42,7 +42,7 @@ settings-modules-hyprland-workspaces-icon-gap = Écart entre icônes
     .description = Espacement entre les icônes d'applications (rem)
 
 settings-modules-hyprland-workspaces-workspace-padding = Marge intérieure de l'espace de travail
-    .description = Marge intérieure dans la direction de la barre (rem)
+    .description = Marge pour le contenu plus large que le cercle : icônes d'applications, séparateur ou nom long. Un libellé court n'en prend pas : elle dimensionne alors le cercle
 
 settings-modules-hyprland-workspaces-icon-size = Taille des icônes
     .description = Multiplicateur d'échelle pour les icônes d'espaces de travail (0.25-3.0)

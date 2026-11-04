@@ -33,7 +33,7 @@ settings-modules-lys-wm-workspaces-icon-gap = Icon Gap
     .description = Spacing between app icons
 
 settings-modules-lys-wm-workspaces-workspace-padding = Workspace Padding
-    .description = Padding along the bar direction
+    .description = Padding for content wider than the circle: app icons, a divider or a long name. A short label takes none: this sizes the circle instead
 
 settings-modules-lys-wm-workspaces-icon-size = Icon Size
     .description = Scale multiplier for workspace icons (0.25-3.0)
