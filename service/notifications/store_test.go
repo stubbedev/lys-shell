@@ -56,6 +56,7 @@ func TestStoreRoundTrip(t *testing.T) {
 			"image-data":     dbus.MakeVariant([]any{int32(1), int32(1), int32(4), true, int32(8), int32(4), []byte{1, 2, 3, 4}}),
 			"x-list":         dbus.MakeVariant([]string{"a", "b"}),
 		}, 5000)
+	settle(svc)
 
 	got, err := st.Page(nil, MaxPage)
 	if err != nil || len(got) != 1 {
@@ -93,6 +94,7 @@ func TestStoreRoundTrip(t *testing.T) {
 		t.Fatalf("store before the expiry = %v, %v", got, err)
 	}
 	advance(svc, time.Millisecond)
+	settle(svc)
 	if got, err := st.Page(nil, MaxPage); err != nil || len(got) != 0 {
 		t.Errorf("store after the expiry = %v, %v", got, err)
 	}
@@ -124,6 +126,7 @@ func TestStoreFollowsAnExpiryRacingTheArrival(t *testing.T) {
 			t.Fatal(err)
 		}
 		wg.Wait()
+		settle(svc)
 		if got, err := st.Page(nil, MaxPage); err != nil || len(got) != 0 {
 			t.Fatalf("store after the history expired = %v, %v", got, err)
 		}
@@ -293,9 +296,11 @@ func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 	svc := newStoredService(t, st)
 	memory, _ := NewMemoryLimit(MinHistoryMemory)
 	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	settle(svc)
 	const sent = 37
 	for i := range sent {
 		svc.Notify("app"+strconv.Itoa(i%3), 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+		settle(svc)
 		// Three arrivals share each millisecond: the id breaks the tie.
 		if i%3 == 2 {
 			advance(svc, time.Millisecond)
@@ -324,6 +329,7 @@ func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 	t.Cleanup(func() { _ = st2.Close() })
 	svc2 := newTestService(t)
 	svc2.SetHistoryLimits(memory, DefaultStoredLimit())
+	settle(svc2)
 	if err := svc2.AttachStore(st2); err != nil {
 		t.Fatal(err)
 	}
@@ -340,8 +346,10 @@ func TestMemoryOnlyHistoryIsBounded(t *testing.T) {
 	svc := newTestService(t)
 	memory, _ := NewMemoryLimit(MinHistoryMemory)
 	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	settle(svc)
 	for i := range 3 * MinHistoryMemory {
 		svc.Notify("app", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+		settle(svc)
 	}
 	if svc.Count() != MinHistoryMemory {
 		t.Errorf("count = %d, want the memory limit %d", svc.Count(), MinHistoryMemory)
@@ -570,6 +578,7 @@ func TestRetentionDropsTheOldest(t *testing.T) {
 	}
 	least, _ := NewStoredLimit(MinHistoryStored)
 	svc.SetHistoryLimits(DefaultMemoryLimit(), least)
+	settle(svc)
 	got := stored(t, st)
 	checkNewestFirst(t, got, MinHistoryStored)
 	if got[len(got)-1].ID != 1235 || svc.Count() != MinHistoryStored {
@@ -577,6 +586,7 @@ func TestRetentionDropsTheOldest(t *testing.T) {
 	}
 	// Each arrival past the limit drops the oldest in its own write.
 	id := svc.Notify("app", 0, "", "new", "", nil, 0)
+	settle(svc)
 	got = stored(t, st)
 	if len(got) != MinHistoryStored || got[0].ID != id || got[len(got)-1].ID != 1236 || svc.Count() != MinHistoryStored {
 		t.Errorf("after an arrival: %d rows, newest %d oldest %d, count %d", len(got), got[0].ID, got[len(got)-1].ID, svc.Count())
@@ -588,6 +598,7 @@ func TestStoredOnlyEntriesCloseReplaceAndInvoke(t *testing.T) {
 	svc := newStoredService(t, st)
 	memory, _ := NewMemoryLimit(MinHistoryMemory)
 	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	settle(svc)
 	var closed []uint32
 	var invoked []uint32
 	svc.SetEmitter(func(signal string, args ...any) {
@@ -599,29 +610,36 @@ func TestStoredOnlyEntriesCloseReplaceAndInvoke(t *testing.T) {
 		}
 	})
 	old := svc.Notify("mail", 0, "", "old", "", []string{"default", "Open"}, 0)
+	settle(svc)
 	gone := svc.Notify("mail", 0, "", "to close", "", nil, 0)
+	settle(svc)
 	for i := range MinHistoryMemory {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+		settle(svc)
 	}
 	total := svc.Count()
 
 	// The owner replaces an entry only on disk: same id, same count.
 	if id := svc.Notify("mail", old, "", "old again", "", []string{"default", "Open"}, 0); id != old || svc.Count() != total {
+		settle(svc)
 		t.Errorf("replacing a stored entry: id %d (want %d), count %d (want %d)", id, old, svc.Count(), total)
 	}
 	// Another app cannot.
 	if id := svc.Notify("chat", gone, "", "hijack", "", nil, 0); id == gone {
+		settle(svc)
 		t.Error("another app replaced a stored entry it does not own")
 	}
 	total = svc.Count()
 
 	svc.Close(gone, Dismissed)
+	settle(svc)
 	if svc.Count() != total-1 || !slices.Equal(closed, []uint32{gone}) || storedIDs(t, st)[gone] {
 		t.Errorf("closing a stored entry: count %d, closed %v", svc.Count(), closed)
 	}
 	// Closing it again changes nothing.
 	svc.Close(gone, Dismissed)
+	settle(svc)
 	if svc.Count() != total-1 || len(closed) != 1 {
 		t.Errorf("a second close: count %d, closed %v", svc.Count(), closed)
 	}
@@ -629,8 +647,10 @@ func TestStoredOnlyEntriesCloseReplaceAndInvoke(t *testing.T) {
 	for i := range MinHistoryMemory {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "m"+strconv.Itoa(i), "", nil, 0)
+		settle(svc)
 	}
 	svc.InvokeAction(old, DefaultActionID, "")
+	settle(svc)
 	if !slices.Equal(invoked, []uint32{old}) || storedIDs(t, st)[old] {
 		t.Errorf("invoking a stored entry: invoked %v", invoked)
 	}
@@ -653,6 +673,7 @@ func TestHintsAreParsedNotKept(t *testing.T) {
 		"image-path":    dbus.MakeVariant("/tmp/pic.png"),
 		"category":      dbus.MakeVariant("email.arrived"),
 	}, 0)
+	settle(svc)
 	n := history(t, svc)[0]
 	if n.ID != id || n.Urgency != UrgencyLow || n.DesktopEntry != "org.mail" || !n.Resident || n.Transient || n.ImagePath != "/tmp/pic.png" {
 		t.Errorf("typed fields = %+v", n)
@@ -666,9 +687,13 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 	st, path := openTestStore(t)
 	svc := newStoredService(t, st)
 	a := svc.Notify("mail", 0, "", "A", "", nil, 0)
+	settle(svc)
 	b := svc.Notify("chat", 0, "", "B", "", nil, 0)
+	settle(svc)
 	svc.NotifyHints("tmp", 0, "", "Transient", "", nil, map[string]dbus.Variant{"transient": dbus.MakeVariant(true)}, 0)
+	settle(svc)
 	svc.Close(a, Dismissed)
+	settle(svc)
 	got, _ := st.Page(nil, MaxPage)
 	if len(got) != 1 || got[0].ID != b {
 		t.Fatalf("store = %v, want only B (A closed, the transient never stored)", got)
@@ -676,6 +701,7 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 
 	// A transient replacement takes the stored one off the disk too.
 	svc.NotifyHints("chat", b, "", "B again", "", nil, map[string]dbus.Variant{"transient": dbus.MakeVariant(true)}, 0)
+	settle(svc)
 	if got, _ := st.Page(nil, MaxPage); len(got) != 0 {
 		t.Errorf("store after a transient replacement = %v", got)
 	}
@@ -683,6 +709,7 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 	// A restart: ids continue past the stored ones and their apps own
 	// them again.
 	c := svc.Notify("mail", 0, "", "C", "", nil, 0)
+	settle(svc)
 	_ = st.Close()
 	st2, err := OpenStore(path)
 	if err != nil {
@@ -697,12 +724,15 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 		t.Error("a restored notification popped up again")
 	}
 	if id := svc2.Notify("mail", c, "", "C updated", "", nil, 0); id != c {
+		settle(svc2)
 		t.Errorf("the owner's replacement got id %d, want %d", id, c)
 	}
 	if id := svc2.Notify("other", c, "", "hijack", "", nil, 0); id <= c {
+		settle(svc2)
 		t.Errorf("another app's replaces_id got %d, want a fresh id past %d", id, c)
 	}
 	svc2.DismissAll()
+	settle(svc2)
 	if got, _ := st2.Page(nil, MaxPage); len(got) != 0 {
 		t.Errorf("store after dismiss all = %v", got)
 	}
@@ -731,18 +761,25 @@ func TestDismissClosesTheGivenNotifications(t *testing.T) {
 	svc := newStoredService(t, st)
 	memory, _ := NewMemoryLimit(MinHistoryMemory)
 	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	settle(svc)
 	old := svc.Notify("mail", 0, "", "old", "", nil, 0)
+	settle(svc)
 	for i := range MinHistoryMemory {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+		settle(svc)
 	}
 	a := svc.Notify("mail", 0, "", "A", "", nil, 0)
+	settle(svc)
 	b := svc.Notify("mail", 0, "", "B", "", nil, 0)
+	settle(svc)
 	keep := svc.Notify("chat", 0, "", "keep", "", nil, 0)
+	settle(svc)
 	closed := closedSignals(svc)
 	total := svc.Count()
 
 	svc.Dismiss([]uint32{old, a, b, 9999})
+	settle(svc)
 	if svc.Count() != total-3 || !slices.Equal(*closed, []uint32{old, a, b}) {
 		t.Errorf("dismiss: count %d (want %d), closed %v", svc.Count(), total-3, *closed)
 	}
@@ -757,6 +794,7 @@ func TestDismissClosesTheGivenNotifications(t *testing.T) {
 	}
 
 	svc.Dismiss([]uint32{old, a, b})
+	settle(svc)
 	if svc.Count() != total-3 || len(*closed) != 3 {
 		t.Errorf("a second dismiss: count %d, closed %v", svc.Count(), *closed)
 	}
@@ -767,20 +805,24 @@ func TestDismissAllEmptiesThePopupsPastTheWindow(t *testing.T) {
 	svc := newStoredService(t, st)
 	memory, _ := NewMemoryLimit(MinHistoryMemory)
 	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	settle(svc)
 	for i := range MinHistoryMemory + 2 {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
+		settle(svc)
 	}
 	if got := len(svc.Popups()); got != MinHistoryMemory+2 {
 		t.Fatalf("popups = %d, want every sticky one up", got)
 	}
 
 	svc.DismissAll()
+	settle(svc)
 	if svc.Count() != 0 || len(history(t, svc)) != 0 || len(stored(t, st)) != 0 || len(svc.Popups()) != 0 {
 		t.Errorf("dismiss all left count %d, history %d, store %d, popups %d", svc.Count(), len(history(t, svc)), len(stored(t, st)), len(svc.Popups()))
 	}
 
 	next := svc.Notify("chat", 0, "", "after", "", nil, 0)
+	settle(svc)
 	if svc.Count() != 1 || !storedIDs(t, st)[next] || !popupIDs(svc)[next] {
 		t.Errorf("a notification after dismiss all: count %d", svc.Count())
 	}
@@ -791,15 +833,18 @@ func TestClosingAPopupOutsideTheHistoryUpdatesThePopups(t *testing.T) {
 	svc := newStoredService(t, st)
 	feed, _ := svc.Subscribe()
 	id := svc.NotifyHints("tmp", 0, "", "Transient", "", nil, map[string]dbus.Variant{"transient": dbus.MakeVariant(true)}, 0)
+	settle(svc)
 	collect(t, feed, 1)
 	closed := closedSignals(svc)
 
 	svc.Close(id, Dismissed)
+	settle(svc)
 	if ev := collect(t, feed, 1)[0]; ev.Kind != EventPopups || len(svc.Popups()) != 0 || len(*closed) != 0 {
 		t.Errorf("closing a transient popup: event %+v, popups %d, closed %v", ev, len(svc.Popups()), *closed)
 	}
 
 	svc.Close(id, Dismissed)
+	settle(svc)
 	select {
 	case ev := <-feed:
 		t.Errorf("closing a popup already gone emitted %+v", ev)
@@ -824,10 +869,12 @@ func TestRestoredExpiryStillFires(t *testing.T) {
 	}
 	// 100ms of its 1500 had passed before the restore.
 	clock.Advance(1399 * time.Millisecond)
+	settle(svc)
 	if svc.Count() != 1 {
 		t.Fatal("a restored notification expired early")
 	}
 	clock.Advance(time.Millisecond)
+	settle(svc)
 	if svc.Count() != 0 {
 		t.Error("a restored notification never expired")
 	}
@@ -896,3 +943,43 @@ func TestStoreRemoveReportsWhatWasStored(t *testing.T) {
 		t.Errorf("after removing what is not there: count = %d, %v", n, err)
 	}
 }
+
+func TestServiceCallsReturnWhileTheStoreHolds(t *testing.T) {
+	s := NewService()
+	st, err := OpenStore(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if err := s.AttachStore(st); err != nil {
+		t.Fatal(err)
+	}
+	id := s.Notify("app", 0, "", "a", "", nil, -1)
+	release := make(chan struct{})
+	started := make(chan struct{})
+	s.mu.Lock()
+	s.enqueueLocked(func() {
+		close(started)
+		<-release
+	})
+	s.mu.Unlock()
+	<-started
+	returned := make(chan struct{})
+	go func() {
+		defer close(returned)
+		s.Close(id, Dismissed)
+		s.DismissAll()
+		s.SetDND(true)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(10 * time.Second):
+		t.Fatal("a service call waited on the held store")
+	}
+	close(release)
+	s.FlushWrites(10 * time.Second)
+}
+
+// settle waits for the writes svc queued so far: a call returns before its
+// write reaches the disk.
+func settle(svc *Service) { svc.FlushWrites(10 * time.Second) }

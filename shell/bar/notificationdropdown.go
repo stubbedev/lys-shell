@@ -1,10 +1,10 @@
 package bar
 
 import (
+	"context"
 	"log"
 	"slices"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -64,15 +64,20 @@ type notificationView struct {
 	notifs []*notifications.Notification
 	more   bool
 
-	once sync.Once
-	stop chan struct{}
-	// stopHistory ends the history feed, and with it the rereads.
-	stopHistory func()
+	*openFollow
+	// pageOf reads the history; reads are v.reading's alone, off the loop.
+	pageOf  func(before *notifications.Key, limit int) ([]*notifications.Notification, error)
+	reading uint64
+	loading bool
 }
 
 func notificationDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	v := &notificationView{ctx: ctx, svc: ctx.Notifications, font: font, px: px, now: time.Now, minter: notifyui.Minter(ctx.App), stop: make(chan struct{})}
+	v := &notificationView{ctx: ctx, svc: ctx.Notifications, font: font, px: px, now: time.Now, minter: notifyui.Minter(ctx.App)}
+	v.openFollow = newOpenFollow(v.follow)
+	if v.svc != nil {
+		v.pageOf = v.svc.Page
+	}
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "notification-dropdown")
 
@@ -105,9 +110,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	v.body.Append(scroll, true)
 	v.Append(v.body, true)
 
-	v.syncDND()
-	v.rebuild()
-	v.follow()
+	v.startFollowing()
 	return v
 }
 
@@ -149,37 +152,61 @@ func (v *notificationView) dismiss(id uint32) {
 // rebuild rereads the history as deep as the dropdown has read it,
 // at least a page, after a change.
 func (v *notificationView) rebuild() {
-	depth := max(notifPageSize, len(v.notifs))
-	v.notifs, v.more = nil, false
-	if v.svc != nil {
-		v.read(depth)
+	if v.pageOf == nil {
+		v.regroup()
+		return
 	}
-	v.regroup()
+	v.readInto(nil, max(notifPageSize, len(v.notifs)))
 }
 
-// read appends up to n more notifications older than the ones read,
-// a page at a time, noting whether more may follow.
-func (v *notificationView) read(n int) {
+// readInto reads up to n notifications older than the last of kept, off the
+// loop, and shows kept and them; a read that a newer one replaced shows nothing.
+func (v *notificationView) readInto(kept []*notifications.Notification, n int) {
+	v.reading++
+	asked := v.reading
+	v.loading = true
+	mountOffLoop(v.ctx, func() {
+		more := readNotifPages(v.pageOf, &kept, n)
+		show := func() {
+			if asked != v.reading {
+				return
+			}
+			v.loading = false
+			v.notifs, v.more = kept, more
+			v.regroup()
+		}
+		if v.ctx.App == nil {
+			show()
+			return
+		}
+		v.ctx.Invoke(show)
+	})
+}
+
+// readNotifPages appends up to n notifications older than the last of notifs, a
+// page at a time, reporting whether more may follow.
+func readNotifPages(pageOf func(*notifications.Key, int) ([]*notifications.Notification, error), notifs *[]*notifications.Notification, n int) bool {
+	more := false
 	for n > 0 {
 		var before *notifications.Key
-		if len(v.notifs) > 0 {
-			k := v.notifs[len(v.notifs)-1].Key()
+		if len(*notifs) > 0 {
+			k := (*notifs)[len(*notifs)-1].Key()
 			before = &k
 		}
 		limit := min(n, notifications.MaxPage)
-		page, err := v.svc.Page(before, limit)
+		page, err := pageOf(before, limit)
 		if err != nil {
 			log.Printf("notification dropdown: %v", err)
-			v.more = false
-			return
+			return false
 		}
-		v.notifs = append(v.notifs, page...)
-		v.more = len(page) == limit
-		if !v.more {
-			return
+		*notifs = append(*notifs, page...)
+		more = len(page) == limit
+		if !more {
+			return false
 		}
 		n -= limit
 	}
+	return more
 }
 
 // scrolled reads the next page once the list scrolls near its end.
@@ -193,11 +220,10 @@ func (v *notificationView) scrolled() {
 
 // loadMore reads the next page into the groups.
 func (v *notificationView) loadMore() {
-	if !v.more {
+	if !v.more || v.loading {
 		return
 	}
-	v.read(notifPageSize)
-	v.regroup()
+	v.readInto(slices.Clone(v.notifs), notifPageSize)
 }
 
 // regroup is rebuild_groups over what has been read: stale groups go,
@@ -241,13 +267,28 @@ func (v *notificationView) refreshTimes() {
 
 // follow rebuilds on history changes, syncs DND, and refreshes the
 // relative times every 30s, until the dropdown closes.
-func (v *notificationView) follow() {
+func (v *notificationView) follow(life context.Context) {
+	v.syncDND()
+	v.rebuild()
 	if v.svc == nil {
 		return
 	}
 	history, stopHistory := v.svc.HistoryChanges()
-	v.stopHistory = stopHistory
-	follow(v.ctx, history, stopHistory, func(struct{}) { v.rebuild() })
+	rebuilds := latestOnLoop[struct{}]{post: v.ctx.Invoke, show: func(struct{}) { v.rebuild() }}
+	go func() {
+		defer stopHistory()
+		for {
+			select {
+			case <-life.Done():
+				return
+			case _, ok := <-history:
+				if !ok {
+					return
+				}
+				rebuilds.give(struct{}{})
+			}
+		}
+	}()
 	events, stop := v.svc.Subscribe()
 	go func() {
 		defer stop()
@@ -255,7 +296,7 @@ func (v *notificationView) follow() {
 		defer tick.Stop()
 		for {
 			select {
-			case <-v.stop:
+			case <-life.Done():
 				return
 			case <-tick.C:
 				v.ctx.Invoke(v.refreshTimes)
@@ -269,16 +310,6 @@ func (v *notificationView) follow() {
 			}
 		}
 	}()
-}
-
-// dropdownClosed implements dropdownCloser.
-func (v *notificationView) dropdownClosed() {
-	v.once.Do(func() {
-		close(v.stop)
-		if v.stopHistory != nil {
-			v.stopHistory()
-		}
-	})
 }
 
 // notifGroup is NotificationGroup: lys-ui's card whose header Item
@@ -542,8 +573,10 @@ func (it *notifItem) actionRows() widget.Widget {
 func (it *notifItem) invoke(key string) {
 	svc, id := it.view.svc, it.n.ID
 	notifyui.WithActivationToken(it.view.minter, func(token string) {
-		svc.InvokeAction(id, key, token)
-		svc.Close(id, notifications.Dismissed)
+		mountOffLoop(it.view.ctx, func() {
+			svc.InvokeAction(id, key, token)
+			svc.Close(id, notifications.Dismissed)
+		})
 	})
 }
 

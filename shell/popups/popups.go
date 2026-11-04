@@ -615,8 +615,10 @@ func (p *Popups) closeCard(id uint32) {
 func (p *Popups) invokeAction(id uint32, key string) {
 	notifyui.WithActivationToken(p.minter, func(token string) {
 		p.svc.DismissPopup(id)
-		p.svc.InvokeAction(id, key, token)
-		p.svc.Close(id, notifications.Dismissed)
+		p.offLoop(func() {
+			p.svc.InvokeAction(id, key, token)
+			p.svc.Close(id, notifications.Dismissed)
+		})
 	})
 }
 
@@ -625,8 +627,15 @@ func (p *Popups) invokeAction(id uint32, key string) {
 // notification still exists for the service to emit ActionInvoked on.
 func (p *Popups) invokeDefault(id uint32) {
 	notifyui.WithActivationToken(p.minter, func(token string) {
-		p.svc.InvokeAction(id, notifications.DefaultActionID, token)
-		p.closeCard(id)
+		remove := p.cfg.Notification.PopupCloseBehavior == config.PopupCloseBehaviorRemove
+		p.offLoop(func() {
+			p.svc.InvokeAction(id, notifications.DefaultActionID, token)
+			if remove {
+				p.svc.Close(id, notifications.Dismissed)
+				return
+			}
+			p.svc.DismissPopup(id)
+		})
 	})
 }
 
@@ -776,4 +785,12 @@ func (p *Popups) onLoop(fn func()) {
 		return
 	}
 	p.app.Invoke(fn)
+}
+
+func (p *Popups) offLoop(fn func()) {
+	if p.app == nil {
+		fn()
+		return
+	}
+	go fn()
 }

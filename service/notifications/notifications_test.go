@@ -111,6 +111,7 @@ func TestDNDSuppressesPopups(t *testing.T) {
 		t.Fatal("no dnd: the notification should be a popup")
 	}
 	s.SetDND(true)
+	settle(s)
 	if !s.DND() {
 		t.Fatal("dnd flag lost")
 	}
@@ -176,6 +177,7 @@ func TestDismissAll(t *testing.T) {
 	s.Notify("app", 0, "", "two", "", nil, 0)
 	collect(t, feed, 2)
 	s.DismissAll()
+	settle(s)
 	deadline := time.Now().Add(2 * time.Second)
 	for s.Count() > 0 && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
@@ -244,11 +246,13 @@ func TestDNDPersistence(t *testing.T) {
 		t.Fatal("a fresh state dir starts with dnd off")
 	}
 	s.SetDND(true)
+	settle(s)
 	restored := NewService()
 	if !restored.DND() {
 		t.Fatal("the dnd flag did not survive a restart")
 	}
 	s.SetDND(false)
+	settle(s)
 	restored = NewService()
 	if restored.DND() {
 		t.Fatal("dnd off did not persist")
@@ -348,6 +352,7 @@ func TestDismissAllIsOneRemoval(t *testing.T) {
 	closed := closedSignals(s)
 
 	s.DismissAll()
+	settle(s)
 	ev := collect(t, feed, 1)[0]
 	if ev.Kind != EventRemove || !slices.Equal(ev.IDs, window) || len(feed) != 0 {
 		t.Errorf("event = %+v with %d more, want one removal of %v", ev, len(feed), window)
@@ -357,6 +362,7 @@ func TestDismissAllIsOneRemoval(t *testing.T) {
 	}
 
 	s.DismissAll()
+	settle(s)
 	if len(feed) != 0 || len(*closed) != len(window) {
 		t.Errorf("clearing an empty history: %d events, closed %v", len(feed), *closed)
 	}
@@ -372,10 +378,12 @@ func TestDismissAllIsOneRemoval(t *testing.T) {
 		shown = append(shown, n.ID)
 	}
 	s.Dismiss(shown)
+	settle(s)
 	collect(t, feed, 1)
 	*closed = nil
 
 	s.DismissAll()
+	settle(s)
 	ev = collect(t, feed, 1)[0]
 	if ev.Kind != EventRemove || len(ev.IDs) != 0 || len(*closed) != 0 || s.Count() != 0 {
 		t.Errorf("clearing only disk: event %+v, closed %v, count %d", ev, *closed, s.Count())
@@ -427,6 +435,7 @@ func TestHistoryChangesSurviveAFullFeed(t *testing.T) {
 		s.DismissPopup(id)
 	}
 	s.SetDND(false)
+	settle(s)
 	if len(history) != 0 {
 		t.Fatal("a popup or DND change ticked the history")
 	}

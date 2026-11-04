@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/notifyui"
@@ -705,5 +707,42 @@ func TestNotificationDropdownRereadsOnlyTheHistory(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if got := onHeadlessLoop(func() int { return len(v.notifs) }); got != 4 {
 		t.Errorf("a closed dropdown reread the history: %d notifications", got)
+	}
+}
+
+func TestNotificationDropdownReadsTheHistoryOffTheLoop(t *testing.T) {
+	ctx, a := loopContext(t)
+	svc := newNotifTestService(t)
+	svc.Notify("app", 0, "", "one", "", nil, -1)
+	ctx.Notifications = svc
+	release := make(chan struct{})
+	t.Cleanup(sync.OnceFunc(func() { close(release) }))
+	var reads atomic.Int32
+	loopGoroutine := make(chan struct{}, 1)
+	v := apptest.On(a, func() *notificationView {
+		v := notificationDropdown(ctx).(*notificationView)
+		return v
+	})
+	t.Cleanup(func() { apptest.On(a, func() bool { v.dropdownClosed(); return true }) })
+	apptest.Until(t, a, "the first page shows", func() bool { return len(v.notifs) == 1 })
+	apptest.On(a, func() bool {
+		v.pageOf = func(before *notifications.Key, limit int) ([]*notifications.Notification, error) {
+			reads.Add(1)
+			select {
+			case loopGoroutine <- struct{}{}:
+			default:
+			}
+			<-release
+			return svc.Page(before, limit)
+		}
+		v.rebuild()
+		return true
+	})
+	apptest.Answer(t, "the held read started", loopGoroutine)
+	ran := make(chan struct{})
+	a.Invoke(func() { close(ran) })
+	apptest.Answer(t, "the loop ran while the read held", ran)
+	if got := reads.Load(); got != 1 {
+		t.Errorf("%d page reads for one rebuild, want 1", got)
 	}
 }

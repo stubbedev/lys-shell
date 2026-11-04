@@ -170,8 +170,9 @@ type Service struct {
 	cacheImage func(imageData) (string, bool)
 	// store persists the history; nil keeps it in memory only.
 	store *Store
-	// storeTail closes once the last queued store write is done; each
-	// write waits for the one before it (persistUnlock).
+	// writes queues the store and state-file writes; storeTail closes once
+	// the last queued one is done, which a store read waits for.
+	writes    writeQueue
 	storeTail chan struct{}
 	// clock stamps arrivals and arms the countdowns and expiries.
 	clock Clock
@@ -274,7 +275,7 @@ func (s *Service) Page(before *Key, limit int) ([]*Notification, error) {
 	for i := end - 1; i >= 0 && len(out) < limit; i-- {
 		out = append(out, s.recent[i])
 	}
-	st, onDisk := s.store, s.total > len(s.recent)
+	st, onDisk, tail := s.store, s.total > len(s.recent), s.storeTail
 	cursor := before
 	if end > 0 {
 		k := s.recent[0].Key()
@@ -284,6 +285,7 @@ func (s *Service) Page(before *Key, limit int) ([]*Notification, error) {
 	if len(out) == limit || st == nil || !onDisk {
 		return out, nil
 	}
+	<-tail
 	older, err := st.Page(cursor, limit-len(out))
 	if err != nil {
 		return nil, err
@@ -382,8 +384,8 @@ func (s *Service) DND() bool {
 func (s *Service) SetDND(on bool) {
 	s.mu.Lock()
 	s.dnd = on
+	s.enqueueLocked(func() { saveDND(on) })
 	s.mu.Unlock()
-	saveDND(on)
 	s.notify(Event{Kind: EventDnd})
 }
 
@@ -392,8 +394,8 @@ func (s *Service) ToggleDND() bool {
 	s.mu.Lock()
 	s.dnd = !s.dnd
 	on := s.dnd
+	s.enqueueLocked(func() { saveDND(on) })
 	s.mu.Unlock()
-	saveDND(on)
 	s.notify(Event{Kind: EventDnd})
 	return on
 }
@@ -514,11 +516,12 @@ func (s *Service) storedOnly(id uint32) (*Notification, bool) {
 	}
 	s.mu.Lock()
 	_, known := s.owners[id]
-	st := s.store
+	st, tail := s.store, s.storeTail
 	s.mu.Unlock()
 	if known || st == nil {
 		return nil, false
 	}
+	<-tail
 	n, ok, err := st.Find(id)
 	if err != nil {
 		log.Printf("notifications: %v", err)
@@ -565,6 +568,11 @@ func (s *Service) Dismiss(ids []uint32) {
 func (s *Service) close(ids []uint32, reason ClosedReason) {
 	s.mu.Lock()
 	c := s.forgetLocked(ids, reason)
+	if s.store == nil {
+		s.mu.Unlock()
+		s.announce(c)
+		return
+	}
 	s.persistUnlock(func(st *Store) {
 		onDisk, err := st.Remove(ids)
 		storeErr("remove", err)
@@ -576,8 +584,8 @@ func (s *Service) close(ids []uint32, reason ClosedReason) {
 			}
 		}
 		s.mu.Unlock()
+		s.announce(c)
 	})
-	s.announce(c)
 }
 
 // DismissAll empties the history, the store included, and the popup
@@ -593,8 +601,15 @@ func (s *Service) DismissAll() {
 	c := s.forgetLocked(s.shownLocked(), Dismissed)
 	c.emptied = emptied
 	s.total = 0
-	s.persistUnlock(func(st *Store) { storeErr("remove all", st.RemoveAll()) })
-	s.announce(c)
+	if s.store == nil {
+		s.mu.Unlock()
+		s.announce(c)
+		return
+	}
+	s.persistUnlock(func(st *Store) {
+		storeErr("remove all", st.RemoveAll())
+		s.announce(c)
+	})
 }
 
 type closing struct {
@@ -950,24 +965,76 @@ func (s *Service) AttachStore(st *Store) error {
 	return nil
 }
 
-// persistUnlock releases mu and writes the change it guarded to the
-// attached store. The write takes its place in line while mu is still
-// held and waits for the one before it, so the writes reach the disk
-// in the order the history changed: an expiry or close racing an
-// arrival cannot remove the row before it is added and leave it on
-// disk. The caller holds mu.
+// persistUnlock releases mu and queues the store write of the change it
+// guarded, returning at once. The write takes its place in line while mu is
+// still held, so the writes reach the disk in the order the history changed:
+// an expiry or close racing an arrival cannot remove the row before it is added
+// and leave it on disk. The caller holds mu.
 func (s *Service) persistUnlock(write func(*Store)) {
 	st := s.store
 	if st == nil {
 		s.mu.Unlock()
 		return
 	}
-	prev, done := s.storeTail, make(chan struct{})
-	s.storeTail = done
+	s.enqueueLocked(func() { write(st) })
 	s.mu.Unlock()
-	defer close(done)
-	<-prev
-	write(st)
+}
+
+// enqueueLocked puts job in line behind every write queued before it. The
+// caller holds mu.
+func (s *Service) enqueueLocked(job func()) {
+	done := make(chan struct{})
+	s.storeTail = done
+	s.writes.push(func() {
+		defer close(done)
+		job()
+	})
+}
+
+// FlushWrites waits for the writes queued so far, or for timeout. It is for
+// shutdown, off the loop.
+func (s *Service) FlushWrites(timeout time.Duration) {
+	s.mu.Lock()
+	tail := s.storeTail
+	s.mu.Unlock()
+	select {
+	case <-tail:
+	case <-time.After(timeout):
+		log.Printf("notifications: a queued write did not finish in %v", timeout)
+	}
+}
+
+// writeQueue runs jobs in order on one goroutine, there only while it has work:
+// the callers never wait on the disk.
+type writeQueue struct {
+	mu      sync.Mutex
+	jobs    []func()
+	running bool
+}
+
+func (q *writeQueue) push(job func()) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.jobs = append(q.jobs, job)
+	if !q.running {
+		q.running = true
+		go q.run()
+	}
+}
+
+func (q *writeQueue) run() {
+	for {
+		q.mu.Lock()
+		if len(q.jobs) == 0 {
+			q.running = false
+			q.mu.Unlock()
+			return
+		}
+		job := q.jobs[0]
+		q.jobs = q.jobs[1:]
+		q.mu.Unlock()
+		job()
+	}
 }
 
 // storeErr logs a failed write: the in-memory history stays right, the
