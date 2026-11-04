@@ -6,7 +6,7 @@ title: Getting started
 
 lys-shell is a Wayland desktop shell written in Go on [lys-ui](https://github.com/stubbedev/lys-ui), a pure-Go Wayland toolkit. It provides a top bar, notification center, on-screen display, wallpaper management and much more. Built-in mechanisms to handle audio, Bluetooth, network, media, battery and power controls.
 
-Settings can be edited in `config.yaml`, through the `lys-settings` GUI, or with the `lys-shell config` CLI. All three apply live: changes reach the running shell without a restart.
+Settings can be edited in `config.yaml`, through the [`lys-settings`](https://github.com/stubbedev/lys-settings) GUI, or with the `lys-shell config` CLI. All three apply live: changes reach the running shell without a restart.
 
 lys-shell requires a Wayland compositor that implements the `wlr-layer-shell` protocol. Compositor-specific modules target lys-wm, Hyprland, Niri, Mango and Sway.
 

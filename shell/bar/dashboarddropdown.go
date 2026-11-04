@@ -23,6 +23,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-shell/settingspage"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
@@ -200,7 +201,9 @@ func (v *dashboardView) card(iconName, heading string, extra ...widget.Widget) *
 func (v *dashboardView) header() widget.Widget {
 	settings := dropdownButton(widget.NewThemeIcon("ld-settings-symbolic", itemIconPx), func() {
 		// spawn_settings_app; the popover closes on the click.
-		_ = spawn.Quiet("lys-settings")
+		if err := spawn.Quiet(settingspage.Program); err != nil {
+			log.Printf("dashboard: open settings: %v", err)
+		}
 	}, css.Ghost, css.Icon)
 	settings.AddClass("dashboard-settings-btn")
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))

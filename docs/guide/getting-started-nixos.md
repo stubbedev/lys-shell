@@ -38,7 +38,7 @@ home-manager:
 {
   imports = [ inputs.lys-shell.homeManagerModules.default ];
   programs.lys-shell = {
-    enable = true; # installs lys-shell + lys-settings, runs it as a user service
+    enable = true; # installs lys-shell + lys-settings (settingsApp.enable = false leaves it out), runs it as a user service
     # install user-space soft deps implied by the config (theme-provider tool,
     # wl-clipboard, xdg-utils)
     autoInstallDependencies = true;
@@ -141,7 +141,7 @@ The lock screen is [lys-login](https://github.com/stubbedev/lys-login), with a f
 lys-shell panel settings
 ```
 
-This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
+This launches [`lys-settings`](https://github.com/stubbedev/lys-settings), a package of its own, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
 
 > [!WARNING]
 > If you configured theming using matugen/wallust/pywal, do not forget to install these dependencies! With `autoInstallDependencies = true` the home-manager module installs the matching theme-provider tool for you.

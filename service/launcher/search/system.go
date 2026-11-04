@@ -2,10 +2,14 @@ package search
 
 import (
 	"context"
+	"errors"
+	"log"
+	"sync"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/settingspage"
 )
 
 // System offers the session commands, through the commands the power
@@ -101,28 +105,35 @@ func (*fixedProvider) Actions(e Entry) []Action {
 	return []Action{a}
 }
 
-// SettingsPage is one page of lys-settings.
-type SettingsPage struct {
-	ID, Title, Icon string
-}
-
 // Settings offers lys-settings' pages.
 type Settings struct {
 	env   Env
-	pages func() []SettingsPage
+	pages func(context.Context) ([]settingspage.Page, error)
 }
 
 // NewSettings offers pages.
-func NewSettings(env Env, pages func() []SettingsPage) *Settings {
+func NewSettings(env Env, pages func(context.Context) ([]settingspage.Page, error)) *Settings {
 	return &Settings{env: env, pages: pages}
 }
+
+// notInstalled says once a session that lys-settings is missing, which every
+// opening of the launcher would otherwise repeat.
+var notInstalled sync.Once
 
 // Spec implements Provider.
 func (*Settings) Spec() Spec { return Spec{Section: SectionSettings, MinQuery: 2} }
 
 // Load implements Provider.
-func (s *Settings) Load(_ context.Context, publish func([]Entry)) {
-	pages := s.pages()
+func (s *Settings) Load(ctx context.Context, publish func([]Entry)) {
+	pages, err := s.pages(ctx)
+	switch {
+	case errors.Is(err, settingspage.ErrNotInstalled):
+		notInstalled.Do(func() { log.Printf("launcher: no settings pages to offer: %v", err) })
+		return
+	case err != nil:
+		log.Printf("launcher: no settings pages to offer: %v", err)
+		return
+	}
 	entries := make([]Entry, 0, len(pages))
 	for _, p := range pages {
 		id := "settings:" + p.ID
@@ -133,12 +144,12 @@ func (s *Settings) Load(_ context.Context, publish func([]Entry)) {
 
 // Actions implements Provider.
 func (s *Settings) Actions(e Entry) []Action {
-	p, ok := e.Data.(SettingsPage)
+	p, ok := e.Data.(settingspage.Page)
 	if !ok {
 		return nil
 	}
 	return []Action{{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-		s.env.Spawn([]string{"lys-settings", "--page", p.ID})
+		s.env.Spawn(p.Argv())
 		return Close{}
 	}}}
 }

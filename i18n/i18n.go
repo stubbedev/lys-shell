@@ -8,7 +8,8 @@
 //     macros): bar labels, dropdowns, OSD, notification popups. T and
 //     Attr read it.
 //   - the settings domain (crates/wayle-i18n/src/lib.rs, t/t_attr): the
-//     settings GUI and config field labels. Settings returns it.
+//     config's field labels, which lys-settings adds its own messages to
+//     (ConfigAssets). Settings returns it.
 //   - the greeter domain (crates/lys-greeter/src/i18n.rs, t!): the
 //     login screen's labels. Greeter returns it.
 //

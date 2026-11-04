@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
+	"github.com/stubbedev/lys-shell/settingspage"
 )
 
 // Deps are the shell services a search session draws on.
@@ -24,8 +25,8 @@ type Deps struct {
 	Clipboard modes.ClipboardHistory
 	// Vault builds a vault level; nil without a vault.
 	Vault func() launcher.Mode
-	// SettingsPages are lys-settings' pages.
-	SettingsPages func() []SettingsPage
+	// SettingsPages asks lys-settings for its pages.
+	SettingsPages func(context.Context) ([]settingspage.Page, error)
 	// Windows is the compositor's; nil where none is known.
 	Windows modes.WindowBackend
 	// Browser reads the browsers' bookmarks and history; nil offers neither.

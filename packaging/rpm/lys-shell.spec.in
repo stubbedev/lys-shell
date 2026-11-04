@@ -24,6 +24,7 @@ Recommends:     intel-media-driver
 Recommends:     mesa-va-drivers
 Recommends:     xdg-desktop-portal
 Recommends:     geoclue2
+Recommends:     lys-settings
 Suggests:       pipewire-pulseaudio
 Suggests:       wireplumber
 Suggests:       NetworkManager
@@ -32,7 +33,7 @@ Suggests:       upower
 Suggests:       power-profiles-daemon
 
 %description
-lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns, launcher, notifications, OSD and an xdg-desktop-portal backend, configured in YAML or through the lys-settings GUI.
+lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns, launcher, notifications, OSD and an xdg-desktop-portal backend, configured in YAML or through lys-settings, a package of its own.
 
 %prep
 %setup -q -n lys-shell-%{version}-%{_arch}-linux
@@ -42,7 +43,7 @@ lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns, launch
 
 %install
 install -d %{buildroot}%{_bindir}
-install -m 0755 lys-shell lys-lock lys-settings %{buildroot}%{_bindir}/
+install -m 0755 lys-shell lys-lock %{buildroot}%{_bindir}/
 
 install -d %{buildroot}%{_userunitdir}
 install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service %{buildroot}%{_userunitdir}/
@@ -58,13 +59,10 @@ install -d %{buildroot}%{_sysconfdir}/geoclue/conf.d
 install -m 0644 geoclue-lys-shell.conf %{buildroot}%{_sysconfdir}/geoclue/conf.d/50-lys-shell.conf
 
 install -d %{buildroot}%{_datadir}/applications
-install -m 0644 dev.stubbe.lys.settings.desktop %{buildroot}%{_datadir}/applications/dev.stubbe.lys.settings.desktop
-desktop-file-validate %{buildroot}%{_datadir}/applications/dev.stubbe.lys.settings.desktop
 install -m 0644 dev.stubbe.lys.vpn-sso-callback.desktop %{buildroot}%{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
 desktop-file-validate %{buildroot}%{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
 
 install -d %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
-install -m 0644 lys-settings.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/lys-settings.svg
 
 install -d %{buildroot}%{_datadir}/icons/hicolor/scalable/actions
 install -m 0644 icons/hicolor/scalable/actions/*.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/actions/
@@ -82,7 +80,6 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %license LICENSE eff_large_wordlist.NOTICE
 %{_bindir}/lys-shell
 %{_bindir}/lys-lock
-%{_bindir}/lys-settings
 %dir %{_sysconfdir}/geoclue
 %dir %{_sysconfdir}/geoclue/conf.d
 %config(noreplace) %{_sysconfdir}/geoclue/conf.d/50-lys-shell.conf
@@ -91,9 +88,7 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
 %{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
 %{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service
-%{_datadir}/applications/dev.stubbe.lys.settings.desktop
 %{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
-%{_datadir}/icons/hicolor/scalable/apps/lys-settings.svg
 %{_datadir}/icons/hicolor/scalable/actions/*.svg
 %{_datadir}/bash-completion/completions/lys-shell
 %{_datadir}/zsh/site-functions/_lys-shell

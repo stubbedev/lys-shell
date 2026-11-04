@@ -41,6 +41,15 @@
       inputs.lys-shell.follows = "";
       inputs.lys-wm.follows = "lys-wm";
     };
+    # The settings app, which the modules install beside the shell. Its Go side
+    # builds on this repository's public packages through go.mod, not this flake.
+    lys-settings = {
+      url = "github:stubbedev/lys-settings";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.lys-ci.follows = "lys-ci";
+      inputs.lys-wm.follows = "lys-wm";
+    };
     # The compositor the lys-wm VM check runs the shell on.
     lys-wm = {
       url = "github:stubbedev/lys-wm";

@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -14,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/internal/rusterr"
 	"github.com/stubbedev/lys-shell/service/shellipc"
+	"github.com/stubbedev/lys-shell/settingspage"
 )
 
 // panelCommand is lys-shell/src/cli/panel/commands.rs.
@@ -162,21 +162,13 @@ func panelStatus(m *cli.Matches) error {
 	return nil
 }
 
-// panelSettings is settings.rs: lys-settings beside this binary,
-// else from PATH.
+// panelSettings starts lys-settings, a package of its own, from the path.
 func panelSettings(*cli.Matches) error {
-	program := "lys-settings"
-	if exe, err := os.Executable(); err == nil {
-		sibling := filepath.Join(filepath.Dir(exe), "lys-settings")
-		if _, err := os.Stat(sibling); err == nil {
-			program = sibling
-		}
-	}
-	cmd := exec.Command(program)
+	cmd := exec.Command(settingspage.Program) //nolint:gosec // a constant program name
 	if err := cmd.Start(); err != nil {
 		switch {
 		case errors.Is(err, exec.ErrNotFound), errors.Is(err, fs.ErrNotExist):
-			return cliMessage("lys-settings not found. Is lys-shell installed correctly?")
+			return cliMessage("lys-settings not found. Install it: https://github.com/stubbedev/lys-settings")
 		case errors.Is(err, fs.ErrPermission):
 			return cliMessage("Permission denied when starting lys-settings")
 		default:

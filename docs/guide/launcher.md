@@ -35,7 +35,7 @@ be running, as it hosts the panel.
 | Files | Recent files and an index, see below; a query starting with `/` or `~` lists that folder |
 | Calculator | `6*7`, `sqrt(16)`, and conversions: `5 km to mi`, `100 f in c`, `1 GiB to MB`. No currencies |
 | System | Lock, sleep, log out, restart, shut down, through the [`power`](/config/modules/power) commands. Those that end the session ask for a second Enter |
-| Settings | Each page of `lys-settings` |
+| Settings | Each page of [`lys-settings`](https://github.com/stubbedev/lys-settings), when it is installed |
 | Clipboard | The history, in the list from three typed letters; `Clipboard History` lists it all |
 | Emoji | In the list from two typed letters; `Emoji Picker` lists them all |
 | Bitwarden | `Bitwarden Vault` opens the vault, asking for the master password if it is locked |

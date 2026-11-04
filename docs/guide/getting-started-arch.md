@@ -32,7 +32,7 @@ toolchain on its own.
 git clone https://github.com/stubbedev/lys-shell
 cd lys-shell
 just build   # or: CGO_ENABLED=0 go build -o dist/ ./cmd/...
-sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-lock -t /usr/local/bin
 ```
 
 ## Icon assets
@@ -66,7 +66,7 @@ lys-shell shell
 lys-shell panel settings
 ```
 
-This launches `lys-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
+This launches [`lys-settings`](https://github.com/stubbedev/lys-settings), a package of its own, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
 
 ## Configuration
 

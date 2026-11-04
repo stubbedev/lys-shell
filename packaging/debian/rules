@@ -15,7 +15,7 @@ override_dh_strip:
 
 override_dh_auto_install:
 	install -d debian/lys-shell/usr/bin
-	install -m 0755 lys-shell lys-lock lys-settings debian/lys-shell/usr/bin/
+	install -m 0755 lys-shell lys-lock debian/lys-shell/usr/bin/
 
 	install -d debian/lys-shell/usr/lib/systemd/user
 	install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service debian/lys-shell/usr/lib/systemd/user/
@@ -31,13 +31,10 @@ override_dh_auto_install:
 	install -m 0644 geoclue-lys-shell.conf debian/lys-shell/etc/geoclue/conf.d/50-lys-shell.conf
 
 	install -d debian/lys-shell/usr/share/applications
-	install -m 0644 dev.stubbe.lys.settings.desktop debian/lys-shell/usr/share/applications/dev.stubbe.lys.settings.desktop
-	desktop-file-validate debian/lys-shell/usr/share/applications/dev.stubbe.lys.settings.desktop
 	install -m 0644 dev.stubbe.lys.vpn-sso-callback.desktop debian/lys-shell/usr/share/applications/dev.stubbe.lys.vpn-sso-callback.desktop
 	desktop-file-validate debian/lys-shell/usr/share/applications/dev.stubbe.lys.vpn-sso-callback.desktop
 
 	install -d debian/lys-shell/usr/share/icons/hicolor/scalable/apps
-	install -m 0644 lys-settings.svg debian/lys-shell/usr/share/icons/hicolor/scalable/apps/lys-settings.svg
 
 	install -d debian/lys-shell/usr/share/icons/hicolor/scalable/actions
 	install -m 0644 icons/hicolor/scalable/actions/*.svg debian/lys-shell/usr/share/icons/hicolor/scalable/actions/

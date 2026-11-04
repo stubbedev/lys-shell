@@ -127,9 +127,6 @@ func TestTheFrenchLauncherSettingsResolve(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := l.Get("settings-page-launcher"), "Lanceur"; got != want {
-		t.Errorf("settings-page-launcher = %q, want %q", got, want)
-	}
 	if got, want := l.Attr("settings-launcher-window-format", "description"), `{w}`; !strings.Contains(got, want) {
 		t.Errorf("the window format's description %q lost %s", got, want)
 	}

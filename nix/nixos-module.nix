@@ -47,6 +47,25 @@ in
       '';
     };
 
+    settingsApp = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Install lys-settings, the settings app the launcher, the dashboard and
+          `lys-shell panel settings` open. It is a package of its own; without it
+          those find nothing to open, and the launcher offers no settings pages.
+        '';
+      };
+
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = self.inputs.lys-settings.packages.${pkgs.stdenv.hostPlatform.system}.default;
+        defaultText = lib.literalExpression "lys-settings.packages.\${system}.default";
+        description = "The lys-settings package to install.";
+      };
+    };
+
     systemd = {
       enable = lib.mkEnableOption ''
         a systemd user service that runs `lys-shell shell` in the graphical session.
@@ -82,7 +101,7 @@ in
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
       {
-        environment.systemPackages = [ cfg.package ];
+        environment.systemPackages = [ cfg.package ] ++ lib.optional cfg.settingsApp.enable cfg.settingsApp.package;
 
         systemd.user.services.lys-shell = lib.mkIf cfg.systemd.enable {
           description = "lys-shell desktop shell";

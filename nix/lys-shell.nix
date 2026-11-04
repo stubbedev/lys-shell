@@ -64,7 +64,6 @@ let
   wrapped = [
     "lys-shell"
     "lys-lock"
-    "lys-settings"
   ];
 in
 buildGo127Module {
@@ -74,12 +73,11 @@ buildGo127Module {
   # The module cache's hash: every go.mod change (a lys-ui bump) changes
   # it; `just vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-sZrCpXvNnIDB7yp3oQYWqGF5QVOndQ01OjeCvVsFt8g=";
+  vendorHash = "sha256-ft7xxbm/7ye74lAVolWlu6bDWiu05KDe3Gpe6d0XLtc=";
 
   subPackages = [
     "cmd/lys-shell"
     "cmd/lys-lock"
-    "cmd/lys-settings"
   ];
 
   # lys-ui and the purego bindings are pure Go; cgo stays off, as in the
@@ -110,9 +108,6 @@ buildGo127Module {
     # Handler for the globalprotectcallback: URI scheme (GlobalProtect
     # SAML sign-in answers).
     install -Dm0644 resources/dev.stubbe.lys.vpn-sso-callback.desktop -t $out/share/applications
-    install -Dm0644 resources/dev.stubbe.lys.settings.desktop -t $out/share/applications
-    install -Dm0644 resources/lys-settings.svg \
-      $out/share/icons/hicolor/scalable/apps/lys-settings.svg
     install -Dm0644 resources/icons/hicolor/scalable/actions/*.svg \
       -t $out/share/icons/hicolor/scalable/actions
     # Reference copy of the systemd user unit; the modules define their own.

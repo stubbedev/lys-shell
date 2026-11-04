@@ -23,7 +23,8 @@ Recommends:
  libva-drm2,
  intel-media-va-driver | mesa-va-drivers,
  xdg-desktop-portal,
- geoclue-2.0
+ geoclue-2.0,
+ lys-settings
 Suggests:
  dbus-user-session,
  bluez,
@@ -35,7 +36,7 @@ Suggests:
 Description: Wayland desktop shell
  lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns,
  launcher, notifications, OSD, and an xdg-desktop-portal
- backend, configured in YAML or through the lys-settings GUI.
+ backend, configured in YAML or through lys-settings, a package of its own.
  .
  The binaries are Go with no cgo; they load Vulkan at runtime when
  it is installed (the screen recorder needs it, with a GPU that

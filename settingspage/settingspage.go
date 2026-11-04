@@ -5,10 +5,14 @@ package settingspage
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"slices"
+	"sync"
+	"time"
 )
 
 const (
@@ -29,6 +33,50 @@ type Page struct {
 
 // Argv opens the app on a page.
 func (p Page) Argv() []string { return []string{Program, PageFlag, p.ID} }
+
+// ErrNotInstalled is the app missing from the path, which is a choice and not a
+// failure: lys-settings is a package of its own.
+var ErrNotInstalled = errors.New("settingspage: lys-settings is not installed")
+
+const listLimit = 5 * time.Second
+
+// List asks the installed app for its pages.
+func List(ctx context.Context) ([]Page, error) {
+	ctx, cancel := context.WithTimeout(ctx, listLimit)
+	defer cancel()
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, Program, ListFlag)
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	switch {
+	case errors.Is(err, exec.ErrNotFound):
+		return nil, ErrNotInstalled
+	case err != nil:
+		return nil, fmt.Errorf("settingspage: %s %s: %w: %s", Program, ListFlag, err, bytes.TrimSpace(stderr.Bytes()))
+	}
+	return Decode(out)
+}
+
+// NewLister is List for a long-lived process that asks every time its launcher
+// opens: the pages of an installed app do not change, so the first list is kept.
+// An app that is missing or failing is asked again.
+func NewLister() func(context.Context) ([]Page, error) {
+	var mu sync.Mutex
+	var kept []Page
+	return func(ctx context.Context) ([]Page, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if kept != nil {
+			return kept, nil
+		}
+		pages, err := List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		kept = pages
+		return pages, nil
+	}
+}
 
 // Encode is the list as ListFlag prints it.
 func Encode(pages []Page) ([]byte, error) {

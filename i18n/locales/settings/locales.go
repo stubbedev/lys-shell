@@ -1,5 +1,5 @@
-// Package locales embeds the settings app's and the config schema's
-// Fluent partials.
+// Package locales embeds the config schema's Fluent partials, which
+// lys-settings reads through i18n.ConfigAssets.
 package locales
 
 import "embed"

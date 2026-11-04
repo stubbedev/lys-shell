@@ -30,7 +30,7 @@ To build from source, with Go and [just](https://github.com/casey/just) installe
 git clone https://github.com/stubbedev/lys-shell
 cd lys-shell
 just build
-sudo install -Dm755 dist/lys-shell dist/lys-settings dist/lys-lock -t /usr/local/bin
+sudo install -Dm755 dist/lys-shell dist/lys-lock -t /usr/local/bin
 lys-shell icons setup
 ```
 
@@ -40,7 +40,7 @@ lys-shell icons setup
 
 ```sh
 lys-shell panel start     # run the shell in the background
-lys-shell panel settings  # open the settings GUI
+lys-shell panel settings  # open the settings GUI, https://github.com/stubbedev/lys-settings
 ```
 
 lys-shell reads `~/.config/lys-shell/config.yaml` and applies changes on save:

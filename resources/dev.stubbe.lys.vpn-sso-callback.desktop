@@ -3,7 +3,7 @@ Type=Application
 Name=lys-shell VPN Sign-in
 Comment=Completes a GlobalProtect browser sign-in started by lys-shell
 Exec=lys-shell vpn sso-callback %u
-Icon=lys-settings
+Icon=network-vpn
 Terminal=false
 # Not a launchable application: it exists so the browser has somewhere to send
 # the globalprotectcallback: URI the portal redirects to at the end of a SAML

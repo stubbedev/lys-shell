@@ -18,9 +18,9 @@ import (
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/service/launcher/typetext"
+	"github.com/stubbedev/lys-shell/settingspage"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/launcher"
-	"github.com/stubbedev/lys-shell/shell/settings"
 )
 
 // startLauncher serves the launcher socket from the shell, as the Rust
@@ -104,24 +104,18 @@ func newBrowserIndex() *search.BrowserIndex {
 // on the UI loop as a session opens: a service that started after the
 // shell did is in the context by then.
 func panelDeps(current func() *config.Config, live func() ModuleContext, browser *search.BrowserIndex, deps *launcher.Deps) func() search.Deps {
+	settingsPages := settingspage.NewLister()
 	return func() search.Deps {
 		cfg := current()
 		controls := controlSourcesOf(live())
 		d := search.Deps{
-			Env:     search.RealEnv(cfg.Launcher.Terminal),
-			Windows: modes.DetectWindows(),
-			Browser: browser,
-			Toggles: controls.toggles,
-			Media:   controls.mediaControls,
-			Capture: controls.captureControls,
-			SettingsPages: func() []search.SettingsPage {
-				pages := settings.Pages(cfg)
-				out := make([]search.SettingsPage, len(pages))
-				for i, p := range pages {
-					out[i] = search.SettingsPage{ID: p.ID, Title: p.Title, Icon: p.Icon}
-				}
-				return out
-			},
+			Env:           search.RealEnv(cfg.Launcher.Terminal),
+			Windows:       modes.DetectWindows(),
+			Browser:       browser,
+			Toggles:       controls.toggles,
+			Media:         controls.mediaControls,
+			Capture:       controls.captureControls,
+			SettingsPages: settingsPages,
 		}
 		if deps.Clipboard != nil {
 			d.Clipboard = deps.Clipboard
