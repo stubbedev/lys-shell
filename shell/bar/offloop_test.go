@@ -469,3 +469,33 @@ func TestHeadlessHyprlandLoopRunsWhileAReadIsBlocked(t *testing.T) {
 		return slices.ContainsFunc(m.models, func(b cwsButtonModel) bool { return b.ws.id == 7 })
 	})
 }
+
+func TestWorkspacesEndOfStreamLeavesTheBlinkToTheLoop(t *testing.T) {
+	stopped, closed := 0, 0
+	m := &cwsModule{
+		blinkStop:  func() { stopped++ },
+		stopEvents: func() { closed++ },
+		backend:    closedCounter{closed: &closed},
+	}
+	m.closeIPC()
+	if stopped != 0 || m.blinkStop == nil {
+		t.Errorf("the event stream's goroutine stopped the blink timer %d times", stopped)
+	}
+	if closed != 2 {
+		t.Errorf("closing the IPC closed %d of the events and the backend, want 2", closed)
+	}
+	m.Stop()
+	if stopped != 1 || m.blinkStop != nil {
+		t.Errorf("Stop stopped the blink timer %d times, want 1", stopped)
+	}
+	if closed != 2 {
+		t.Errorf("Stop closed the IPC again: %d", closed)
+	}
+}
+
+type closedCounter struct {
+	cwsBackend
+	closed *int
+}
+
+func (c closedCounter) close() { *c.closed++ }
