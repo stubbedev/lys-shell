@@ -107,9 +107,9 @@ func stuckServices(ctx *ModuleContext, h *stuckCalls) {
 }
 
 func TestDropdownBuildersReturnWhileEveryServiceHolds(t *testing.T) {
-	a := apptest.Run(t)
 	cfg := config.Defaults()
 	ctx := styledContext(t, cfg)
+	a := apptest.Run(t)
 	ctx.App = a
 	h := &stuckCalls{release: make(chan struct{})}
 	t.Cleanup(func() { close(h.release) })
@@ -150,8 +150,8 @@ func TestDropdownBuildersReturnWhileEveryServiceHolds(t *testing.T) {
 }
 
 func TestRecorderCameraProbeFillsThePickerWhenItEnds(t *testing.T) {
-	a := apptest.Run(t)
 	ctx := styledContext(t, config.Defaults())
+	a := apptest.Run(t)
 	ctx.App = a
 	release := make(chan struct{})
 	prev := recorderCameras
@@ -202,9 +202,9 @@ func TestFollowingEndsWithThePopover(t *testing.T) {
 }
 
 func TestClosedDropdownsAskNothingOfTheirServices(t *testing.T) {
-	a := apptest.Run(t)
 	cfg := config.Defaults()
 	ctx := styledContext(t, cfg)
+	a := apptest.Run(t)
 	ctx.App = a
 	media := &countedMedia{fakeMediaSource: newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", State: mpris.StatePlaying})}
 	net := newCountedNetwork()
@@ -241,9 +241,9 @@ func TestClosedDropdownsAskNothingOfTheirServices(t *testing.T) {
 
 func TestDashboardPollSamplesOffTheLoopAndPostsOnlyChanges(t *testing.T) {
 	fixedProc(t)
-	a := apptest.Run(t)
 	ctx := styledContext(t, config.Defaults())
 	v := dashboardDropdown(ctx).(*dashboardView)
+	a := apptest.Run(t)
 	t.Cleanup(v.dropdownClosed)
 	v.sample()
 	if got := len(v.sample()); got != 0 {

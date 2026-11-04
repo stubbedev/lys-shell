@@ -435,8 +435,8 @@ func newSystray(ctx ModuleContext) (Module, error) {
 	m.want()
 	ticks, stop := ctx.SNI.Subscribe()
 	m.reads = newOffLoopRead(ctx, "systray", m.read, m.apply)
-	m.reads.on(ticks, stop)
 	m.reads.first()
+	m.reads.on(ticks, stop)
 	go func() {
 		<-ctx.gen.ended()
 		m.onLoop(m.retire)

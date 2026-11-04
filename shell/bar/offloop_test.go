@@ -523,9 +523,9 @@ func TestHeadlessRetiringAGenerationStopsTheWorkspacesBlink(t *testing.T) {
 }
 
 func TestMountingAFullLayoutCompletesWhileEverySourceHolds(t *testing.T) {
-	ctx, a := loopContext(t)
-	styled := styledContext(t, config.Defaults())
-	ctx.Config, ctx.Theme, ctx.Font, ctx.Style = styled.Config, styled.Theme, styled.Font, styled.Style
+	ctx := styledContext(t, config.Defaults())
+	a := apptest.Run(t)
+	ctx.App = a
 	h := &stuckCalls{release: make(chan struct{})}
 	t.Cleanup(func() { close(h.release) })
 	stuckServices(&ctx, h)

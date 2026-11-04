@@ -111,11 +111,11 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 			reads.first()
 			return
 		}
+		reads.first()
 		reads.on(ticks, func() {
 			stop()
 			m.closeIPC()
 		})
-		reads.first()
 	}()
 	return m
 }

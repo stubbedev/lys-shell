@@ -228,13 +228,13 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 			source.close()
 			return
 		}
+		reads.first()
 		reads.on(ticks, func() {
 			if stop != nil {
 				stop()
 			}
 			source.close()
 		})
-		reads.first()
 	})
 	return m, nil
 }

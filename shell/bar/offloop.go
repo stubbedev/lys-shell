@@ -116,12 +116,12 @@ func followReads[T any](ctx ModuleContext, module string, gate *firstRead, subsc
 	})
 	mountOffLoop(ctx, func() {
 		ticks, stop, err := subscribe(ctx.Life())
+		reads.first()
 		if err != nil {
 			log.Printf("%s: subscribe: %v", module, err)
-		} else {
-			reads.on(ticks, stop)
+			return
 		}
-		reads.first()
+		reads.on(ticks, stop)
 	})
 	return reads
 }
