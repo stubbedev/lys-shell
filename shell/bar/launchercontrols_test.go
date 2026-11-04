@@ -6,11 +6,13 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/shell/launcher"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
@@ -250,4 +252,33 @@ func TestAPickedColorIsHex(t *testing.T) {
 			t.Errorf("hexOfColor(%v) = %s, want %s", tc.c, got, tc.want)
 		}
 	}
+}
+
+func TestAServiceStartingAfterTheShellReachesTheNextSession(t *testing.T) {
+	var ctx ModuleContext
+	cfg := config.Defaults()
+	deps := panelDeps(func() *config.Config { return cfg }, func() ModuleContext { return ctx }, nil, &launcher.Deps{})
+	if got := deps().Toggles(context.Background()); len(got) != 0 {
+		t.Fatalf("no service, rows %q", titlesOf(got))
+	}
+	ctx.Bluetooth = newFakeBluetooth(bluetooth.State{Available: true})
+	got := deps().Toggles(context.Background())
+	if want := []string{"Turn On Bluetooth"}; !slices.Equal(titlesOf(got), want) {
+		t.Errorf("rows %q, want %q", titlesOf(got), want)
+	}
+}
+
+func TestAPickedColorIsHandedOver(t *testing.T) {
+	var got []string
+	copied := func(hex string) { got = append(got, hex) }
+	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{1, 0, 0}, true, nil }, copied)
+	if !slices.Equal(got, []string{"#FF0000"}) {
+		t.Errorf("picked: %q", got)
+	}
+}
+
+func TestCancellingOrFailingToPickCopiesNothing(t *testing.T) {
+	copied := func(hex string) { t.Errorf("copied %s", hex) }
+	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{}, false, nil }, copied)
+	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{1, 1, 1}, false, errors.New("busy") }, copied)
 }

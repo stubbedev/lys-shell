@@ -107,16 +107,20 @@ func (s *captureServices) trigger(mode, target string) {
 // pickColor lets the user pick a pixel and hands its color to copied, on
 // its own goroutine; cancelling hands over nothing.
 func (s *captureServices) pickColor(copied func(hex string)) {
-	go func() {
-		color, picked, err := s.host.PickColor(portaldialogs.Caller{})
-		if err != nil {
-			log.Printf("launcher: picking a color: %v", err)
-			return
-		}
-		if picked {
-			copied(hexOfColor(color))
-		}
-	}()
+	go deliverPickedColor(func() ([3]float64, bool, error) { return s.host.PickColor(portaldialogs.Caller{}) }, copied)
+}
+
+// deliverPickedColor hands over what pick picked: cancelling hands over
+// nothing, and a failure is logged rather than pretending a color.
+func deliverPickedColor(pick func() ([3]float64, bool, error), copied func(hex string)) {
+	color, picked, err := pick()
+	if err != nil {
+		log.Printf("launcher: picking a color: %v", err)
+		return
+	}
+	if picked {
+		copied(hexOfColor(color))
+	}
 }
 
 // close drops the bus name and connection.

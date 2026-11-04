@@ -637,7 +637,7 @@ func (s *shellStart) mount() {
 		return toggleDashboardOnLoop(application, rt, monitor, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput)
 	}))
 	// The launcher surface serves `lys-shell launcher` sessions.
-	s.down.add(startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font))
+	s.down.add(startLauncher(application, sess.Outputs, current.Load, func() ModuleContext { return rt.ctx }, theme, font))
 	// The widget socket carries out-of-process pushes (`lys-shell toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {

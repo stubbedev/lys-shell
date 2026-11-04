@@ -28,7 +28,8 @@ import (
 // surface on the UI loop, which reads the live config on every session
 // (so a reload reaches the next one). The returned stop closes the
 // socket.
-func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, ctx ModuleContext, theme *apptheme.Theme, font render.Font) func() {
+func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, live func() ModuleContext, theme *apptheme.Theme, font render.Font) func() {
+	ctx := live()
 	deps := launcher.Deps{
 		Invoke: application.Invoke,
 		After: func(d time.Duration, fn func()) func() {
@@ -71,34 +72,7 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 			return search.OpenFrecency(path, time.Now)
 		},
 	}
-	browser := newBrowserIndex()
-	controls := controlSourcesOf(ctx)
-	deps.Search = func() search.Deps {
-		cfg := current()
-		d := search.Deps{
-			Env:     search.RealEnv(cfg.Launcher.Terminal),
-			Windows: modes.DetectWindows(),
-			Browser: browser,
-			Toggles: controls.toggles,
-			Media:   controls.mediaControls,
-			Capture: controls.captureControls,
-			SettingsPages: func() []search.SettingsPage {
-				pages := settings.Pages(cfg)
-				out := make([]search.SettingsPage, len(pages))
-				for i, p := range pages {
-					out[i] = search.SettingsPage{ID: p.ID, Title: p.Title, Icon: p.Icon}
-				}
-				return out
-			},
-		}
-		if deps.Clipboard != nil {
-			d.Clipboard = deps.Clipboard
-		}
-		if deps.Vault != nil {
-			d.Vault = deps.Vault
-		}
-		return d
-	}
+	deps.Search = panelDeps(current, live, newBrowserIndex(), &deps)
 	if ctx.Clipboard != nil {
 		deps.Clipboard = ctx.Clipboard
 	}
@@ -124,4 +98,37 @@ func newBrowserIndex() *search.BrowserIndex {
 		return nil
 	}
 	return search.NewBrowserIndex(home, filepath.Dir(configDir), filepath.Join(cacheDir, "favicons"))
+}
+
+// panelDeps is what each search session draws on. It asks live each time,
+// on the UI loop as a session opens: a service that started after the
+// shell did is in the context by then.
+func panelDeps(current func() *config.Config, live func() ModuleContext, browser *search.BrowserIndex, deps *launcher.Deps) func() search.Deps {
+	return func() search.Deps {
+		cfg := current()
+		controls := controlSourcesOf(live())
+		d := search.Deps{
+			Env:     search.RealEnv(cfg.Launcher.Terminal),
+			Windows: modes.DetectWindows(),
+			Browser: browser,
+			Toggles: controls.toggles,
+			Media:   controls.mediaControls,
+			Capture: controls.captureControls,
+			SettingsPages: func() []search.SettingsPage {
+				pages := settings.Pages(cfg)
+				out := make([]search.SettingsPage, len(pages))
+				for i, p := range pages {
+					out[i] = search.SettingsPage{ID: p.ID, Title: p.Title, Icon: p.Icon}
+				}
+				return out
+			},
+		}
+		if deps.Clipboard != nil {
+			d.Clipboard = deps.Clipboard
+		}
+		if deps.Vault != nil {
+			d.Vault = deps.Vault
+		}
+		return d
+	}
 }
