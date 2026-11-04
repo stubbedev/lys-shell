@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -25,8 +26,16 @@ func newClock(ctx ModuleContext) (Module, error) {
 	if ctx.App == nil {
 		return &clock{btn: btn}, nil
 	}
-	update := func() { btn.SetLabel(layout.Format(time.Now())) }
-	if err := walltimer.Start(ctx.Life(), layout.Resolution(), func() { ctx.Invoke(update) }); err != nil {
+	spec := samplerSpec[string]{
+		key:   configKey("clock", ctx.Config),
+		pause: pauseLocked,
+		source: func(life context.Context, fire func()) error {
+			return walltimer.Start(life, layout.Resolution(), fire)
+		},
+		sample: func() (string, bool) { return layout.Format(time.Now()), true },
+		same:   func(a, b string) bool { return a == b },
+	}
+	if err := joinSampler(ctx.Life(), ctx.Polls, spec, func(text string) { ctx.Invoke(func() { btn.SetLabel(text) }) }); err != nil {
 		return nil, err
 	}
 	return &clock{btn: btn}, nil

@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -118,12 +117,11 @@ type reading struct {
 // interval, render the format, and apply the threshold colors. A reading
 // that would change nothing on the button stays off the loop.
 type pollModule struct {
-	ctx    ModuleContext
-	cfg    pollConfig
-	btn    *barButton
-	icon   *widget.Icon
-	read   func() (reading, error)
-	cancel context.CancelFunc
+	ctx  ModuleContext
+	cfg  pollConfig
+	btn  *barButton
+	icon *widget.Icon
+	read func() (reading, error)
 }
 
 // shown is what a reading puts on the button.
@@ -148,55 +146,44 @@ type pollConfig struct {
 	pollMs     uint64
 }
 
-func newPollModule(ctx ModuleContext, cfg pollConfig, initial string, read func() (reading, error), closeRead func()) (*pollModule, error) {
+func newPollModule(ctx ModuleContext, kind string, cfg pollConfig, initial string, read func() (reading, error), closeRead func()) (*pollModule, error) {
 	if ctx.App == nil {
 		return nil, errors.New("poll: requires the application loop")
 	}
 	m := &pollModule{ctx: ctx, cfg: cfg, read: read}
 	m.icon = moduleIcon(ctx, cfg.icon)
 	m.btn = newBarButton(ctx, m.icon, initial)
-	runCtx, cancel := context.WithCancel(ctx.Life())
-	m.cancel = cancel
-	if cfg.pollMs == 0 {
-		if r, err := read(); err == nil && r.ok {
-			m.show(m.shows(r))
+	sample := func() (shown, bool) {
+		r, err := m.read()
+		if err != nil || !r.ok {
+			return shown{}, false
 		}
-		closeRead()
+		return m.shows(r), true
+	}
+	if cfg.pollMs == 0 {
+		go func() {
+			defer closeRead()
+			if s, ok := sample(); ok {
+				ctx.Invoke(func() { m.show(s) })
+			}
+		}()
 		return m, nil
 	}
-	go func() {
-		defer closeRead()
-		timer := time.NewTimer(0)
-		defer timer.Stop()
-		var last shown
-		first := true
-		for {
-			select {
-			case <-runCtx.Done():
-				return
-			case <-timer.C:
-			}
-			if r, err := m.read(); err == nil && r.ok {
-				if next := m.shows(r); first || !next.same(last) {
-					first, last = false, next
-					m.ctx.Invoke(func() { m.show(next) })
-				}
-			}
-			timer.Reset(untilPollGrid(time.Now(), intconv.Duration(cfg.pollMs, time.Millisecond)))
-		}
-	}()
+	spec := samplerSpec[shown]{
+		key:       configKey(kind, ctx.Config),
+		source:    pollGrid(intconv.Duration(cfg.pollMs, time.Millisecond)),
+		sample:    sample,
+		same:      shown.same,
+		closeRead: closeRead,
+	}
+	if err := joinSampler(ctx.Life(), ctx.Polls, spec, func(s shown) { ctx.Invoke(func() { m.show(s) }) }); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 
 // Root is the icon beside the label (the label alone without an icon).
 func (m *pollModule) Root() widget.Widget { return m.btn }
-
-// Stop ends the poll loop.
-func (m *pollModule) Stop() {
-	if m.cancel != nil {
-		m.cancel()
-	}
-}
 
 // render applies one reading: the rendered format, then the threshold
 // colors over the defaults.
@@ -227,7 +214,7 @@ func newCpu(ctx ModuleContext) (Module, error) {
 		return reading{vars: cpuContext(cpu), value: float64(cpu.UsagePercent), ok: true}, nil
 	}
 	initial := jinja.RenderOr(c.Format, cpuContext(sysinfo.CPU{}))
-	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read, reader.Close)
+	return newPollModule(ctx, "cpu", pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read, reader.Close)
 }
 
 // newRam builds the ram module (polling/memory.rs and helpers.rs).
@@ -243,7 +230,7 @@ func newRam(ctx ModuleContext) (Module, error) {
 		return reading{vars: ramContext(mem), value: float64(usage), ok: true}, nil
 	}
 	initial := jinja.RenderOr(c.Format, ramContext(sysinfo.Memory{}))
-	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read, reader.Close)
+	return newPollModule(ctx, "ram", pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, initial, read, reader.Close)
 }
 
 // newStorage builds the storage module: the configured mount points
@@ -258,5 +245,5 @@ func newStorage(ctx ModuleContext) (Module, error) {
 		}
 		return reading{vars: storageContext(s), value: float64(s.UsagePercent), ok: true}, nil
 	}
-	return newPollModule(ctx, pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, "--", read, func() {})
+	return newPollModule(ctx, "storage", pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}, "--", read, func() {})
 }

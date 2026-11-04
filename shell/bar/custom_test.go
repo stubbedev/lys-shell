@@ -327,7 +327,7 @@ func TestCustomWatchStopsItsScriptWithTheModule(t *testing.T) {
 	def := config.DefaultsCustomModuleDefinition()
 	def.Id = "w"
 	m := newTestCustom(t, def)
-	go m.supervise("sleep 30 & echo $! > " + pidFile + "; wait")
+	go m.supervise(m.life, "sleep 30 & echo $! > "+pidFile+"; wait", m.deliver)
 	var child int
 	waitHeadless(t, "the script's child", func() bool {
 		data, _ := os.ReadFile(pidFile)

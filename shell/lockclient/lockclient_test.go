@@ -230,7 +230,7 @@ func TestStartReturnsWhileTheSystemBusIsSilent(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Login.Lock.LockOnStart = false
 	current := func() *config.Config { return cfg }
-	_, stop := Start(current, func() {})
+	_, stop := Start(current, func() {}, func() {})
 	defer stop()
 	if _, err := ln.Accept(); err != nil {
 		t.Fatal(err)

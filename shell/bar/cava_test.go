@@ -202,10 +202,10 @@ func TestNewCavaBuildsEveryStyleAndStereo(t *testing.T) {
 			t.Fatalf("%s: %v", style, err)
 		}
 		m := module.(*cavaModule)
-		if m.plan.Channels() != 2 || len(m.paint.values) != 10 {
-			t.Errorf("%s stereo: %d channels, %d values", style, m.plan.Channels(), len(m.paint.values))
+		if m.analyzer.plan.Channels() != 2 || len(m.paint.values) != 10 {
+			t.Errorf("%s stereo: %d channels, %d values", style, m.analyzer.plan.Channels(), len(m.paint.values))
 		}
-		if got := len(m.plan.Execute(nil, nil)); got != 10 {
+		if got := len(m.analyzer.plan.Execute(nil, nil)); got != 10 {
 			t.Errorf("a stereo frame has %d values, want 10", got)
 		}
 	}
@@ -346,13 +346,11 @@ func TestCavaModuleEndsWithItsGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := &fakeCavaInput{stopped: make(chan struct{})}
-	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), plan: plan, source: in}
 	life, retire := context.WithCancel(context.Background())
 	ticking := true
-	var invoked int
-	m.follow(life, time.Second/60,
-		func(time.Duration, func()) func() { return func() { ticking = false } },
-		func(fn func()) { invoked++; fn() })
+	a := newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, nil, time.Second/60,
+		func(time.Duration, func()) func() { return func() { ticking = false } })
+	a.join(life, newCavaBarSlot(newSpectrum(config.DefaultsCava(), 10, 0, 1, false), func(fn func()) { fn() }))
 	if !ticking {
 		t.Fatal("the ticker stopped before the generation retired")
 	}
@@ -362,8 +360,8 @@ func TestCavaModuleEndsWithItsGeneration(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the capture outlived its generation")
 	}
-	if ticking || invoked != 1 {
-		t.Errorf("after retiring: ticking %v, %d invokes; want stopped on the loop once", ticking, invoked)
+	if ticking {
+		t.Error("the ticker outlived its generation")
 	}
 }
 
@@ -387,9 +385,10 @@ func newLoopedCava(t *testing.T) (*cavaModule, *fakeCavaInput, *cavaLoop) {
 		t.Fatal(err)
 	}
 	in := &fakeCavaInput{stopped: make(chan struct{})}
-	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), plan: plan, source: in}
 	loop := &cavaLoop{}
-	m.follow(t.Context(), time.Second/60, loop.every, func(fn func()) { fn() })
+	a := newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, nil, time.Second/60, loop.every)
+	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), analyzer: a}
+	a.join(t.Context(), newCavaBarSlot(m.paint, func(fn func()) { fn() }))
 	return m, in, loop
 }
 
@@ -414,7 +413,7 @@ func TestCavaParksInSilenceAndWakesForSound(t *testing.T) {
 	if loop.tick == nil || loop.started != 2 {
 		t.Fatalf("sound did not restart the frame timer (started %d times)", loop.started)
 	}
-	in.next = loudSamples(m.plan.InputSize())
+	in.next = loudSamples(m.analyzer.plan.InputSize())
 	for range 5 {
 		loop.tick()
 		if loop.tick == nil {
@@ -425,14 +424,14 @@ func TestCavaParksInSilenceAndWakesForSound(t *testing.T) {
 
 func TestCavaFallsToRestBeforeParking(t *testing.T) {
 	m, in, loop := newLoopedCava(t)
-	in.next = loudSamples(m.plan.InputSize())
+	in.next = loudSamples(m.analyzer.plan.InputSize())
 	for range 30 {
 		loop.tick()
 	}
 	if !slices.ContainsFunc(m.paint.values, func(v float64) bool { return v > cavaStill }) {
 		t.Fatal("the bars never rose")
 	}
-	in.next = make([]float64, m.plan.InputSize())
+	in.next = make([]float64, m.analyzer.plan.InputSize())
 	frames := 0
 	for loop.tick != nil {
 		if frames++; frames > 2000 {
@@ -451,10 +450,10 @@ func TestCavaStaysStoppedWhenSoundFollowsItsGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := &fakeCavaInput{stopped: make(chan struct{})}
-	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), plan: plan, source: in}
 	loop := &cavaLoop{}
 	life, retire := context.WithCancel(context.Background())
-	m.follow(life, time.Second/60, loop.every, func(fn func()) { fn() })
+	a := newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, nil, time.Second/60, loop.every)
+	a.join(life, newCavaBarSlot(newSpectrum(config.DefaultsCava(), 10, 0, 1, false), func(fn func()) { fn() }))
 	loop.tick()
 	retire()
 	select {
@@ -488,5 +487,56 @@ func TestSpectrumIgnoresChangesBelowAPixel(t *testing.T) {
 	}
 	if !p.SetFrame([]float64{0.9 - 0.3}) {
 		t.Error("a falling cap must keep painting while the bar holds still")
+	}
+}
+
+func TestCavaOneCaptureAndAnalyzerForTwoBars(t *testing.T) {
+	plan, err := analyzer.NewPlan(10, 44100, 1, 0.77, true, 50, 10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := newPollHub()
+	in := &fakeCavaInput{stopped: make(chan struct{})}
+	loop := &cavaLoop{}
+	builds := 0
+	build := func() (*cavaAnalyzer, error) {
+		builds++
+		return newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, hub, time.Second/60, loop.every), nil
+	}
+	var posted []func()
+	post := func(fn func()) { posted = append(posted, fn) }
+	bar1 := newSpectrum(config.DefaultsCava(), 10, 0, 1, false)
+	bar2 := newSpectrum(config.DefaultsCava(), 10, 0, 1, false)
+	first, err := hub.cavaAnalyzer("cava/x", build)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := hub.cavaAnalyzer("cava/x", build)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || builds != 1 {
+		t.Fatalf("%d captures for two bars, want one analyzer", builds)
+	}
+	first.join(t.Context(), newCavaBarSlot(bar1, post))
+	second.join(t.Context(), newCavaBarSlot(bar2, post))
+	if loop.started != 1 {
+		t.Errorf("%d frame timers for two bars, want 1", loop.started)
+	}
+	in.next = loudSamples(plan.InputSize())
+	for range 3 {
+		loop.tick()
+	}
+	if len(posted) != 2 {
+		t.Fatalf("%d calls waiting on the loop after three frames, want one per bar", len(posted))
+	}
+	if slices.ContainsFunc(bar1.values, func(v float64) bool { return v != 0 }) {
+		t.Fatal("the analyzer touched a bar's widget off the loop")
+	}
+	for _, apply := range posted {
+		apply()
+	}
+	if !slices.ContainsFunc(bar1.values, func(v float64) bool { return v > cavaStill }) || !slices.Equal(bar1.values, bar2.values) {
+		t.Errorf("the bars show %v and %v, want the same frame", bar1.values, bar2.values)
 	}
 }

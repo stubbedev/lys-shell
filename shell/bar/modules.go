@@ -89,6 +89,9 @@ type ModuleContext struct {
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
+	// Polls shares each config key's sampling across the bars and holds it
+	// back while the session is idle or locked; nil samples alone, unpaused.
+	Polls *pollHub
 	// Screenshot starts a capture on the in-process screenshot host
 	// (the `lys-shell screenshot ...` builtin); nil before the host is up.
 	Screenshot func(mode, target string)
@@ -126,6 +129,10 @@ func (c ModuleContext) Invoke(fn func()) {
 		}
 	})
 }
+
+// configKey names what a snapshot's module samples: bars of one snapshot share
+// it, and a reload starts afresh.
+func configKey(kind string, cfg *config.Config) string { return fmt.Sprintf("%s/%p", kind, cfg) }
 
 // Every schedules fn on the application loop; a no-op when the context
 // is headless.

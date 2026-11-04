@@ -80,9 +80,7 @@ func worldClockRender(format string, now time.Time) string {
 // worldClock is the module: the format re-renders when its text can
 // change.
 type worldClockModule struct {
-	ctx  ModuleContext
-	btn  *barButton
-	stop func()
+	btn *barButton
 }
 
 func newWorldClock(ctx ModuleContext) (Module, error) {
@@ -90,32 +88,31 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("world-clock: requires the application loop")
 	}
 	cfg := ctx.Config.WorldClock
-	m := &worldClockModule{ctx: ctx}
+	m := &worldClockModule{}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
-	runCtx, cancel := context.WithCancel(ctx.Life())
-	m.stop = cancel
 	if !cfg.LabelShow {
 		return m, nil
 	}
 	template := newWorldClockTemplate(cfg.Format, time.LoadLocation)
-	go func() {
-		shown := template.render(time.Now())
-		ctx.Invoke(func() { m.btn.SetLabel(shown) })
-		err := walltimer.Start(runCtx, template.finest, func() {
-			next := template.render(time.Now())
-			if next != shown {
-				shown = next
-				ctx.Invoke(func() { m.btn.SetLabel(next) })
-			}
-		})
-		if err != nil {
-			log.Printf("world-clock: %v", err)
-		}
-	}()
+	spec := samplerSpec[string]{
+		key:   configKey("world-clock", ctx.Config),
+		pause: pauseLocked,
+		source: func(life context.Context, fire func()) error {
+			go func() {
+				fire()
+				if err := walltimer.Start(life, template.finest, fire); err != nil {
+					log.Printf("world-clock: %v", err)
+				}
+			}()
+			return nil
+		},
+		sample: func() (string, bool) { return template.render(time.Now()), true },
+		same:   func(a, b string) bool { return a == b },
+	}
+	if err := joinSampler(ctx.Life(), ctx.Polls, spec, func(text string) { ctx.Invoke(func() { m.btn.SetLabel(text) }) }); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 
 func (m *worldClockModule) Root() widget.Widget { return m.btn }
-
-// Stop ends the render ticker.
-func (m *worldClockModule) Stop() { m.stop() }

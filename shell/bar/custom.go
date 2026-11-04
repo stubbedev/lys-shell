@@ -6,12 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"maps"
 	"os/exec"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/intconv"
@@ -344,39 +346,57 @@ func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, er
 	}
 	go m.deliver(initial)
 	if def.Command != nil {
-		switch def.Mode {
-		case config.ExecutionModeWatch:
-			go m.supervise(*def.Command)
-		default:
-			m.runCommand(*def.Command)
-			if def.IntervalMs > 0 {
-				go m.poll(intconv.Duration(def.IntervalMs, time.Millisecond))
-			}
+		if err := m.followCommand(*def.Command); err != nil {
+			m.stop()
+			return nil, fmt.Errorf("custom %s: %w", def.Id, err)
 		}
 	}
 	return m, nil
 }
 
-// poll is spawn_command_poller: the command every interval, the first
-// one interval after the start (the start itself already ran it).
-func (m *customModule) poll(every time.Duration) {
-	ticker := time.NewTicker(every)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-m.life.Done():
-			return
-		case <-ticker.C:
-		}
-		m.runCommand(*m.def.Command)
+// followCommand shares the definition's command across the bars: a watch
+// command's lines, or its output at the start and on the interval.
+func (m *customModule) followCommand(command string) error {
+	spec := samplerSpec[string]{
+		key:  configKey("custom/"+m.def.Id, m.ctx.Config),
+		same: func(a, b string) bool { return a == b },
 	}
+	if m.def.Mode == config.ExecutionModeWatch {
+		var latest atomic.Pointer[string]
+		spec.source = func(life context.Context, fire func()) error {
+			go m.supervise(life, command, func(line string) {
+				latest.Store(&line)
+				fire()
+			})
+			return nil
+		}
+		spec.sample = func() (string, bool) {
+			line := latest.Load()
+			if line == nil {
+				return "", false
+			}
+			return *line, true
+		}
+	} else {
+		var running context.Context
+		spec.sample = func() (string, bool) { return m.commandOutput(running, command) }
+		grid := pollGrid(intconv.Duration(m.def.IntervalMs, time.Millisecond))
+		spec.source = func(life context.Context, fire func()) error {
+			running = life
+			if m.def.IntervalMs > 0 {
+				return grid(life, fire)
+			}
+			go fire()
+			return nil
+		}
+	}
+	return joinSampler(m.life, m.ctx.Polls, spec, m.deliver)
 }
 
-// runCommand is run_command_async: the command through sh -c with the
-// 30s timeout, replacing any command still in flight; its trimmed
-// stdout is the module's output. A failure or timeout changes nothing.
+// runCommand is run_command_async: the command through sh -c, replacing any
+// command still in flight.
 func (m *customModule) runCommand(command string) {
-	ctx, cancel := context.WithTimeout(m.life, commandTimeout)
+	ctx, cancel := context.WithCancel(m.life)
 	m.mu.Lock()
 	if m.command != nil {
 		m.command()
@@ -385,24 +405,33 @@ func (m *customModule) runCommand(command string) {
 	m.mu.Unlock()
 	go func() {
 		defer cancel()
-		cmd := spawn.Owned(ctx, command)
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		if err := cmd.Run(); err != nil {
-			switch {
-			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				log.Printf("custom %s: command timed out after %s", m.def.Id, commandTimeout)
-				return
-			case ctx.Err() != nil:
-				return // superseded or the module went away
-			case !exitedWithOutput(err):
-				log.Printf("custom %s: command execution failed: %v", m.def.Id, err)
-				return
-			}
-			// A nonzero exit still has its output, as tokio's output().
+		if output, ok := m.commandOutput(ctx, command); ok {
+			m.deliver(output)
 		}
-		m.deliver(strings.TrimSpace(strings.ToValidUTF8(out.String(), "�")))
 	}()
+}
+
+// commandOutput runs the command with the 30s timeout; its trimmed stdout is
+// the module's output. A failure or timeout gives none.
+func (m *customModule) commandOutput(parent context.Context, command string) (string, bool) {
+	ctx, cancel := context.WithTimeout(parent, commandTimeout)
+	defer cancel()
+	cmd := spawn.Owned(ctx, command)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		switch {
+		case errors.Is(ctx.Err(), context.DeadlineExceeded):
+			log.Printf("custom %s: command timed out after %s", m.def.Id, commandTimeout)
+			return "", false
+		case ctx.Err() != nil:
+			return "", false
+		case !exitedWithOutput(err):
+			log.Printf("custom %s: command execution failed: %v", m.def.Id, err)
+			return "", false
+		}
+	}
+	return strings.TrimSpace(strings.ToValidUTF8(out.String(), "�")), true
 }
 
 // exitedWithOutput reports a command that ran and exited nonzero: its
@@ -415,11 +444,11 @@ func exitedWithOutput(err error) bool {
 // supervise is spawn_command_watcher: each stdout line of the running
 // command is an output; on exit the restart policy decides, after
 // restart-interval-ms, whether it runs again.
-func (m *customModule) supervise(command string) {
+func (m *customModule) supervise(ctx context.Context, command string, line func(string)) {
 	delay := intconv.Duration(m.def.RestartIntervalMs, time.Millisecond)
 	for {
-		exitErr, ran := m.watchOnce(command)
-		if !ran || m.life.Err() != nil {
+		exitErr, ran := m.watchOnce(ctx, command, line)
+		if !ran || ctx.Err() != nil {
 			return
 		}
 		switch m.def.RestartPolicy {
@@ -432,7 +461,7 @@ func (m *customModule) supervise(command string) {
 			return
 		}
 		select {
-		case <-m.life.Done():
+		case <-ctx.Done():
 			return
 		case <-time.After(delay):
 		}
@@ -441,8 +470,8 @@ func (m *customModule) supervise(command string) {
 
 // watchOnce runs the command once, streaming its lines; ran is false
 // when it could not start.
-func (m *customModule) watchOnce(command string) (exitErr error, ran bool) {
-	cmd := spawn.Owned(m.life, command)
+func (m *customModule) watchOnce(ctx context.Context, command string, line func(string)) (exitErr error, ran bool) {
+	cmd := spawn.Owned(ctx, command)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Printf("custom %s: watch command started without stdout: %v", m.def.Id, err)
@@ -455,7 +484,7 @@ func (m *customModule) watchOnce(command string) (exitErr error, ran bool) {
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64*1024), 1<<20)
 	for scanner.Scan() {
-		m.deliver(scanner.Text())
+		line(scanner.Text())
 	}
 	return cmd.Wait(), true
 }

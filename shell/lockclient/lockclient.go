@@ -58,6 +58,9 @@ type Client struct {
 	// onLocked runs when the compositor confirms a lock this client
 	// started (the vault locks with the session).
 	onLocked func()
+	// onUnlocked runs when the lock process this client started is gone for
+	// good; nil without a watcher.
+	onUnlocked func()
 	// locked reports logind's LockedHint; nil without logind.
 	locked func() (bool, error)
 	// start starts a command and returns its stdout; tests swap it.
@@ -148,10 +151,12 @@ func (c *Client) follow(cmd *exec.Cmd, out io.Reader) {
 	defer c.mu.Unlock()
 	c.running = false
 	if !locked {
+		c.unlocked()
 		return
 	}
 	if !c.mayRespawn() {
 		log.Printf("lock: lys-login lock died %d times within %s; not starting it again", maxRespawns, respawnWindow)
+		c.unlocked()
 		return
 	}
 	log.Printf("lock: the session is still locked; re-acquiring")
@@ -162,6 +167,13 @@ func (c *Client) ended() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.running = false
+	c.unlocked()
+}
+
+func (c *Client) unlocked() {
+	if c.onUnlocked != nil {
+		c.onUnlocked()
+	}
 }
 
 // stillLocked reports logind's LockedHint; without logind (or a failed
@@ -196,7 +208,7 @@ func (c *Client) mayRespawn() bool {
 // held at startup (a lock client that died with the session locked), and
 // lock-on-start once per login session. It returns the client, for
 // `lys-shell lock`, and the stop that ends the logind listener.
-func Start(current func() *config.Config, onLocked func()) (*Client, func()) {
+func Start(current func() *config.Config, onLocked, onUnlocked func()) (*Client, func()) {
 	var session atomic.Pointer[logind.Client]
 	c := New(func() bool { return current().Login.Lock.Enabled }, onLocked, func() (bool, error) {
 		ld := session.Load()
@@ -205,6 +217,7 @@ func Start(current func() *config.Config, onLocked func()) (*Client, func()) {
 		}
 		return hint(ld)
 	})
+	c.onUnlocked = onUnlocked
 	life, stop := context.WithCancel(context.Background())
 	go func() {
 		if current().Login.Lock.LockOnStart && claimLockOnStart(xdg.OS) {

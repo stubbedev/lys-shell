@@ -151,7 +151,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 	return err
 }
 
-const configFlushTimeout = 5 * time.Second
+const (
+	configFlushTimeout = 5 * time.Second
+	pollIdleAfter      = 5 * time.Minute
+)
 
 type startGate struct {
 	pending int
@@ -400,6 +403,16 @@ func (s *shellStart) mount() {
 	font := rt.font
 	baseCtx := s.ctx
 	baseCtx.Font, baseCtx.Style, baseCtx.Theme = font, &rt.moduleStyle, theme
+	polls := newPollHub()
+	baseCtx.Polls = polls
+	if application.IdleNotifyAvailable() {
+		stopIdle, err := application.OnIdle(pollIdleAfter, func() { polls.setIdle(true) }, func() { polls.setIdle(false) })
+		if err != nil {
+			log.Printf("bar: polls run through idle: %v", err)
+		} else {
+			s.down.add(stopIdle)
+		}
+	}
 	if svc != nil {
 		writer := &configWriter{store: svc}
 		s.down.add(func() { writer.flush(configFlushTimeout) })
@@ -632,10 +645,11 @@ func (s *shellStart) mount() {
 	// through Shell1) start `lys-login lock`, the login screen in its
 	// lock mode, as a process of its own.
 	locker, stopLock := lockclient.Start(current.Load, func() {
+		polls.setLocked(true)
 		if current.Load().Bitwarden.LockWithSession {
 			baseCtx.Bitwarden.lockVault()
 		}
-	})
+	}, func() { polls.setLocked(false) })
 	s.down.add(stopLock)
 	s.down.add(serveShellIPC(application, bars, func() bool {
 		locker.Lock()

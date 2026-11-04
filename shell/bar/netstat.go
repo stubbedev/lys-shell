@@ -1,13 +1,13 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"time"
 
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
@@ -26,16 +26,7 @@ func netstatLabel(format string, rate sysinfo.Rate) string {
 
 // netstat is the module: per-interface traffic rates.
 type netstatModule struct {
-	ctx     ModuleContext
-	btn     *barButton
-	cancel  context.CancelFunc
-	prev    map[string]sysinfo.NetTotals
-	current sysinfo.Rate
-	reader  sysinfo.NetReader
-	// shownLabel is the last text sent to the loop, so an unchanged rate
-	// does not wake it; shownOnce marks that one was sent.
-	shownLabel string
-	shownOnce  bool
+	btn *barButton
 }
 
 func newNetstat(ctx ModuleContext) (Module, error) {
@@ -43,74 +34,60 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("netstat: requires the application loop")
 	}
 	cfg := ctx.Config.Netstat
-	m := &netstatModule{ctx: ctx}
+	m := &netstatModule{}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
-	runCtx, cancel := context.WithCancel(ctx.Life())
-	m.cancel = cancel
-	if cfg.PollIntervalMs > 0 {
-		go func() {
-			interval := intconv.Duration(cfg.PollIntervalMs, time.Millisecond)
-			timer := time.NewTimer(untilPollGrid(time.Now(), interval))
-			defer timer.Stop()
-			defer m.reader.Close()
-			last := time.Now()
-			for {
-				select {
-				case <-runCtx.Done():
-					return
-				case now := <-timer.C:
-					m.sample(now.Sub(last))
-					last = now
-					timer.Reset(untilPollGrid(time.Now(), interval))
-				}
-			}
-		}()
+	if cfg.PollIntervalMs == 0 {
+		return m, nil
+	}
+	sampling := &netstatSampling{cfg: cfg, last: time.Now()}
+	spec := samplerSpec[string]{
+		key:       configKey("netstat", ctx.Config),
+		source:    pollGrid(intconv.Duration(cfg.PollIntervalMs, time.Millisecond)),
+		sample:    sampling.sample,
+		same:      func(a, b string) bool { return a == b },
+		closeRead: sampling.reader.Close,
+	}
+	if err := joinSampler(ctx.Life(), ctx.Polls, spec, func(text string) { ctx.Invoke(func() { m.btn.SetLabel(text) }) }); err != nil {
+		return nil, err
 	}
 	return m, nil
 }
 
-// sample reads the counters and re-renders; the first pass primes the
+type netstatSampling struct {
+	cfg    config.NetstatConfig
+	reader sysinfo.NetReader
+	prev   map[string]sysinfo.NetTotals
+	last   time.Time
+}
+
+// sample reads the counters and renders the label; the first pass primes the
 // previous snapshot without a rate.
-func (m *netstatModule) sample(elapsed time.Duration) {
-	cfg := m.ctx.Config.Netstat
-	totals, err := m.reader.Read()
+func (s *netstatSampling) sample() (string, bool) {
+	at := time.Now()
+	elapsed := at.Sub(s.last)
+	s.last = at
+	totals, err := s.reader.Read()
 	if err != nil {
-		return
+		return "", false
 	}
-	name, ok := sysinfo.SelectInterface(totals, cfg.Interface)
+	name, ok := sysinfo.SelectInterface(totals, s.cfg.Interface)
 	if !ok {
-		m.show("")
-		return
+		return "", true
 	}
 	now := totals[name]
-	prev, seen := m.prev[name]
-	m.prev = totals
+	prev, seen := s.prev[name]
+	s.prev = totals
 	if !seen {
-		m.show("")
-		return
+		return "", true
 	}
 	rate, err := sysinfo.NetRate(name, prev, now, elapsed.Seconds())
 	if err != nil {
-		return
+		return "", false
 	}
-	m.current = rate
-	text := ""
-	if cfg.LabelShow {
-		text = netstatLabel(cfg.Format, rate)
+	if !s.cfg.LabelShow {
+		return "", true
 	}
-	m.show(text)
-}
-
-// show sends a text that differs from the last one to the button.
-func (m *netstatModule) show(text string) {
-	if m.shownOnce && text == m.shownLabel {
-		return
-	}
-	m.shownOnce, m.shownLabel = true, text
-	m.ctx.Invoke(func() { m.btn.SetLabel(text) })
+	return netstatLabel(s.cfg.Format, rate), true
 }
 
 func (m *netstatModule) Root() widget.Widget { return m.btn }
-
-// Stop ends the sampling loop.
-func (m *netstatModule) Stop() { m.cancel() }
