@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -128,7 +127,6 @@ type Source interface {
 
 // System reads the real NetworkManager.
 type System struct {
-	mu   sync.Mutex
 	conn *dbus.Conn
 }
 
@@ -151,9 +149,6 @@ func (s *System) prop(ctx context.Context, iface, name string, out any) error {
 
 // Read collects the snapshot.
 func (s *System) Read(ctx context.Context) (Snapshot, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	snap := Snapshot{}
 	// WirelessEnabled is best-effort: a missing property means wifi is
 	// absent, not fatal.

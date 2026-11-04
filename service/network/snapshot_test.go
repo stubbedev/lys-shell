@@ -2,7 +2,9 @@ package network
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 )
 
 func TestReadSnapshotWifiAndWired(t *testing.T) {
@@ -62,5 +64,40 @@ func TestConnectionTypeOf(t *testing.T) {
 		if got := connectionTypeOf(in); got != want {
 			t.Errorf("connectionTypeOf(%q) = %d, want %d", in, got, want)
 		}
+	}
+}
+
+func TestAHeldReadHoldsNoOtherReader(t *testing.T) {
+	f := startFakeNM(t)
+	sys := &System{conn: f.client()}
+	release := make(chan struct{})
+	f.mu.Lock()
+	f.devicesHeld = release
+	f.mu.Unlock()
+	t.Cleanup(func() { close(release) })
+	first := make(chan error, 1)
+	go func() {
+		_, err := sys.Read(context.Background())
+		first <- err
+	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	second := make(chan error, 1)
+	go func() {
+		_, err := sys.Read(ctx)
+		second <- err
+	}()
+	cancel()
+	select {
+	case err := <-second:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("the second read = %v, want its context's end", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a second read waited behind the held one past its context")
+	}
+	select {
+	case err := <-first:
+		t.Errorf("the held read returned early: %v", err)
+	default:
 	}
 }
