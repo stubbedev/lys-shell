@@ -25,7 +25,7 @@ func benchEntries(n int) []Entry {
 func benchEngine(n int) (*Engine, *levelState) {
 	e := newEngine()
 	st := &levelState{level: &Level{}}
-	c := newCorpus(&fakeProvider{spec: Spec{Section: SectionFiles, Limit: 6}})
+	c := newCorpus(&fakeProvider{spec: Spec{Section: SectionFiles}})
 	c.set(benchEntries(n), func(string) int { return 0 })
 	st.corpora = []*corpus{c}
 	e.stack = []*levelState{st}

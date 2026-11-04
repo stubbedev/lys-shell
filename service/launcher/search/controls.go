@@ -8,13 +8,8 @@ import (
 	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
-const (
-	// commandRows caps the commands section. Every provider in it states
-	// the same cap, as a section keeps only one.
-	commandRows = 5
-	// controlTimeout bounds a control's call to the service behind it.
-	controlTimeout = 5 * time.Second
-)
+// controlTimeout bounds a control's call to the service behind it.
+const controlTimeout = 5 * time.Second
 
 // ControlEffect is what choosing a control does.
 type ControlEffect interface{ isControlEffect() }
@@ -53,7 +48,7 @@ type Controls struct {
 func NewControls(load func(ctx context.Context) []Control) *Controls { return &Controls{load: load} }
 
 // Spec implements Provider.
-func (*Controls) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2, Limit: commandRows} }
+func (*Controls) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2} }
 
 // Load implements Provider.
 func (c *Controls) Load(ctx context.Context, publish func([]Entry)) {

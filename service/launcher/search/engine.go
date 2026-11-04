@@ -583,10 +583,7 @@ func (e *Engine) compute(st *levelState, late bool, rows []Row) []Row {
 	}
 	for _, c := range st.corpora {
 		spec := c.spec
-		limit := spec.Limit
-		if limit == 0 {
-			limit = flatRowCap
-		}
+		limit := spec.Section.rowCap()
 		if a, ok := c.prov.(Answerer); ok {
 			if answers := a.Answer(st.query); len(answers) > 0 {
 				sec := e.sectionOf(spec.Section)

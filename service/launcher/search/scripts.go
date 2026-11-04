@@ -118,7 +118,7 @@ type Scripts struct {
 func NewScripts(env Env, dir string) *Scripts { return &Scripts{env: env, dir: dir} }
 
 // Spec implements Provider.
-func (*Scripts) Spec() Spec { return Spec{Section: SectionCommands, Limit: 5, Weight: 8} }
+func (*Scripts) Spec() Spec { return Spec{Section: SectionCommands, Weight: 8} }
 
 // Load implements Provider.
 func (s *Scripts) Load(_ context.Context, publish func([]Entry)) {

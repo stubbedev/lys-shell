@@ -134,7 +134,7 @@ func TestNoHistoryOffersNothing(t *testing.T) {
 
 func TestClipboardStaysOutOfTheRootUntilItIsAskedFor(t *testing.T) {
 	root := NewClipboard(newFakeHistory(t), true).Spec()
-	if root.MinQuery < 3 || root.Limit == 0 {
+	if root.MinQuery < 3 || root.Section != SectionClipboard {
 		t.Errorf("root spec %+v", root)
 	}
 	flat := (&Clipboard{flat: true}).Spec()

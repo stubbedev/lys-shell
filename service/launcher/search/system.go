@@ -20,7 +20,7 @@ type System struct {
 func NewSystem(env Env, power config.PowerConfig) *System { return &System{env: env, power: power} }
 
 // Spec implements Provider.
-func (*System) Spec() Spec { return Spec{Section: SectionCommands, Limit: commandRows, MinQuery: 2} }
+func (*System) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2} }
 
 type systemCommand struct {
 	id, titleKey, keywords, icon string
@@ -118,7 +118,7 @@ func NewSettings(env Env, pages func() []SettingsPage) *Settings {
 }
 
 // Spec implements Provider.
-func (*Settings) Spec() Spec { return Spec{Section: SectionSettings, Limit: 4, MinQuery: 2} }
+func (*Settings) Spec() Spec { return Spec{Section: SectionSettings, MinQuery: 2} }
 
 // Load implements Provider.
 func (s *Settings) Load(_ context.Context, publish func([]Entry)) {

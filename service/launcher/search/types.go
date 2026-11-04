@@ -47,6 +47,21 @@ var sectionKeys = [sectionCount]string{
 	SectionWeb: "launcher-section-web",
 }
 
+// sectionCaps bound what a section shows, whichever providers fill it; a
+// section without one is bound only by flatRowCap.
+var sectionCaps = [sectionCount]int{
+	SectionApps: 6, SectionWindows: 5, SectionCommands: 5, SectionLinks: 6, SectionBrowser: 6,
+	SectionSettings: 4, SectionFiles: 6, SectionClipboard: 3, SectionEmoji: 4,
+}
+
+// rowCap is how many rows the section shows.
+func (s Section) rowCap() int {
+	if c := sectionCaps[s]; c > 0 {
+		return c
+	}
+	return flatRowCap
+}
+
 // Title is the section's heading, "" for a flat list.
 func (s Section) Title() string {
 	if s == SectionNone {
@@ -171,8 +186,6 @@ type Spec struct {
 	// MinQuery is the query length, in characters, below which its rows
 	// stay out: a one-letter query should not list every emoji.
 	MinQuery int
-	// Limit caps its rows in a sectioned list; zero is no cap.
-	Limit int
 	// Weight is added to its rows' score: a good app beats an equally
 	// good match in a file name.
 	Weight int

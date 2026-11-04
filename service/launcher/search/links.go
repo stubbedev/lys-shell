@@ -25,7 +25,7 @@ func NewLinks(env Env, links []config.LauncherQuicklink, snippets []config.Launc
 }
 
 // Spec implements Provider.
-func (*Links) Spec() Spec { return Spec{Section: SectionLinks, Limit: 6, Weight: 8} }
+func (*Links) Spec() Spec { return Spec{Section: SectionLinks, Weight: 8} }
 
 func linkIcon(raw string) launcher.Icon {
 	if raw == "" {

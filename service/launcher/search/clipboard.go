@@ -34,7 +34,7 @@ func (c *Clipboard) Spec() Spec {
 	if c.flat {
 		return Spec{Section: SectionNone}
 	}
-	return Spec{Section: SectionClipboard, Limit: 3, MinQuery: 3, Weight: -16}
+	return Spec{Section: SectionClipboard, MinQuery: 3, Weight: -16}
 }
 
 // Load implements Provider.
@@ -149,7 +149,7 @@ func (e *Emoji) Spec() Spec {
 	if e.flat {
 		return Spec{Section: SectionNone}
 	}
-	return Spec{Section: SectionEmoji, Limit: 4, MinQuery: 2, Weight: -24}
+	return Spec{Section: SectionEmoji, MinQuery: 2, Weight: -24}
 }
 
 // Load implements Provider.
@@ -226,7 +226,7 @@ func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, leve
 }
 
 // Spec implements Provider.
-func (*Pickers) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2, Limit: commandRows} }
+func (*Pickers) Spec() Spec { return Spec{Section: SectionCommands, MinQuery: 2} }
 
 // Load implements Provider.
 func (p *Pickers) Load(_ context.Context, publish func([]Entry)) {

@@ -450,7 +450,7 @@ func TestBookmarksPickerListsEveryBookmark(t *testing.T) {
 func TestTheBrowserSectionKeepsItsBestRowsWhicheverListFoundThem(t *testing.T) {
 	index, root := firefoxIndex(t)
 	_, db := firefoxProfile(t, root, "p.default")
-	for i := 1; i <= browserSectionRows; i++ {
+	for i := 1; i <= SectionBrowser.rowCap(); i++ {
 		addPlace(t, db, i, fmt.Sprintf("https://mark%d.example/", i), fmt.Sprintf("Needle mark %d", i), 0)
 		addBookmark(t, db, i, fmt.Sprintf("Needle mark %d", i))
 		addPlace(t, db, 100+i, fmt.Sprintf("https://seen%d.example/", i), fmt.Sprintf("Needle seen %d", i), 1)
@@ -458,7 +458,7 @@ func TestTheBrowserSectionKeepsItsBestRowsWhicheverListFoundThem(t *testing.T) {
 	e, s := rootOver(t, Env{}, index, config.SearchBookmarks, config.SearchVisited)
 	e.SetQuery("needle", 1)
 	want := []string{"#Browser"}
-	for i := 1; i <= browserSectionRows; i++ {
+	for i := 1; i <= SectionBrowser.rowCap(); i++ {
 		want = append(want, fmt.Sprintf("Needle mark %d", i))
 	}
 	until(t, s, want...)

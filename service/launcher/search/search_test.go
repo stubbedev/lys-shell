@@ -142,8 +142,8 @@ func tempFrecency(t *testing.T, now func() time.Time) *Frecency {
 
 func TestOneListAcrossProvidersWithSections(t *testing.T) {
 	s := &sink{}
-	apps := &fakeProvider{spec: Spec{Section: SectionApps, Limit: 6, Weight: appWeight}, entries: []Entry{entry("Firefox"), entry("Files")}}
-	windows := &fakeProvider{spec: Spec{Section: SectionWindows, Limit: 5}, entries: []Entry{entry("firefox: news")}}
+	apps := &fakeProvider{spec: Spec{Section: SectionApps, Weight: appWeight}, entries: []Entry{entry("Firefox"), entry("Files")}}
+	windows := &fakeProvider{spec: Spec{Section: SectionWindows}, entries: []Entry{entry("firefox: news")}}
 	e := start(t, s, nil, apps, windows)
 	waitFor(t, "both providers", func() bool {
 		s.mu.Lock()
@@ -820,4 +820,22 @@ func boostsFor(f *Frecency, q string) map[string]int {
 	m := map[string]int{}
 	f.QueryBoostsInto(m, q)
 	return m
+}
+
+func TestASectionKeepsItsCapHoweverManyProvidersFillIt(t *testing.T) {
+	rows := func(prefix string) *fakeProvider {
+		p := &fakeProvider{spec: Spec{Section: SectionSettings}}
+		for i := range 9 {
+			p.entries = append(p.entries, entry(fmt.Sprintf("needle %s%d", prefix, i)))
+		}
+		return p
+	}
+	short := &fakeProvider{spec: Spec{Section: SectionSettings}, entries: []Entry{entry("needle")}}
+	s := &sink{}
+	e := start(t, s, nil, rows("a"), rows("b"), short)
+	e.SetQuery("needle", 1)
+	until(t, s, "#Settings", "needle", "needle a0", "needle a1", "needle a2")
+	if SectionSettings.rowCap() != 4 {
+		t.Errorf("the expected rows assume a cap of 4, not %d", SectionSettings.rowCap())
+	}
 }

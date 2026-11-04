@@ -20,7 +20,7 @@ type Windows struct {
 func NewWindows(backend modes.WindowBackend) *Windows { return &Windows{backend: backend} }
 
 // Spec implements Provider.
-func (*Windows) Spec() Spec { return Spec{Section: SectionWindows, Limit: 5, Weight: 8} }
+func (*Windows) Spec() Spec { return Spec{Section: SectionWindows, Weight: 8} }
 
 // Load implements Provider.
 func (w *Windows) Load(ctx context.Context, publish func([]Entry)) {

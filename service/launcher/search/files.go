@@ -35,7 +35,6 @@ const (
 	recentRank = 24
 	// pathRowsMax bounds a directory listing answered for a typed path.
 	pathRowsMax = 30
-	filesLimit  = 6
 )
 
 // skippedDirs are trees full of files nobody searches for by name.
@@ -74,7 +73,7 @@ func NewFiles(env Env, cfg FilesConfig) *Files { return &Files{env: env, cfg: cf
 
 // Spec implements Provider.
 func (*Files) Spec() Spec {
-	return Spec{Section: SectionFiles, MinQuery: 2, Limit: filesLimit, Weight: -8}
+	return Spec{Section: SectionFiles, MinQuery: 2, Weight: -8}
 }
 
 // Load implements Provider: what it can have at once first, the walk

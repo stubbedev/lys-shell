@@ -29,9 +29,6 @@ const (
 	// browserListMax bounds each list a profile yields and the merged
 	// list: past this a person's next letter finds it, or nothing would.
 	browserListMax = 2000
-	// browserSectionRows caps the section both browser providers share: a
-	// section keeps one cap, so they state the same one.
-	browserSectionRows = 6
 	// visitRankStep turns each doubling of a page's visits into rank.
 	visitRankStep = 2
 	// visitRankMax keeps visits from outranking a better match.
@@ -569,7 +566,7 @@ func (b *Bookmarks) Spec() Spec {
 	if b.flat {
 		return Spec{Section: SectionNone}
 	}
-	return Spec{Section: SectionBrowser, MinQuery: 2, Limit: browserSectionRows}
+	return Spec{Section: SectionBrowser, MinQuery: 2}
 }
 
 // Load implements Provider.
@@ -604,7 +601,7 @@ func (v *VisitedPages) Spec() Spec {
 	if v.flat {
 		return Spec{Section: SectionNone}
 	}
-	return Spec{Section: SectionBrowser, MinQuery: 3, Limit: browserSectionRows, Weight: -12}
+	return Spec{Section: SectionBrowser, MinQuery: 3, Weight: -12}
 }
 
 // Load implements Provider.

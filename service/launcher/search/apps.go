@@ -37,7 +37,7 @@ type Apps struct {
 func NewApps(env Env, dirs []string) *Apps { return &Apps{env: env, dirs: dirs} }
 
 // Spec implements Provider.
-func (*Apps) Spec() Spec { return Spec{Section: SectionApps, Limit: 6, Weight: appWeight} }
+func (*Apps) Spec() Spec { return Spec{Section: SectionApps, Weight: appWeight} }
 
 // appData is what a row launches: an app, or a Type=Link's URL.
 type appData struct {
