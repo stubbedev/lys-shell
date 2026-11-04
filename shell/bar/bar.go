@@ -151,6 +151,8 @@ func run(cfg *config.Config, svc *config.Service) error {
 	return err
 }
 
+const configFlushTimeout = 5 * time.Second
+
 type startGate struct {
 	pending int
 	open    func()
@@ -399,7 +401,9 @@ func (s *shellStart) mount() {
 	baseCtx := s.ctx
 	baseCtx.Font, baseCtx.Style, baseCtx.Theme = font, &rt.moduleStyle, theme
 	if svc != nil {
-		baseCtx.SetConfig = configSetter(svc)
+		writer := &configWriter{store: svc}
+		s.down.add(func() { writer.flush(configFlushTimeout) })
+		baseCtx.SetConfig = writer.set
 	}
 	baseCtx.Toast = func(label, icon string) {
 		if o := osdRef.Load(); o != nil {

@@ -3,21 +3,87 @@ package bar
 import (
 	"log"
 	"reflect"
+	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-shell/config"
 )
 
-// configSetter is ModuleContext.SetConfig over a config service: the
-// runtime override, then runtime.yaml.
-func configSetter(svc *config.Service) func(path string, value any) {
-	return func(path string, value any) {
-		if err := svc.SetByPath(path, value); err != nil {
-			log.Printf("config: set %s: %v", path, err)
+type configStore interface {
+	SetByPath(path string, value any) error
+	Save() error
+}
+
+type configChange struct {
+	path  string
+	value any
+}
+
+// configWriter applies config changes in order on a goroutine of its own and
+// saves once whatever queued meanwhile is applied, so neither the bus nor the
+// fsync sits on the loop.
+type configWriter struct {
+	store configStore
+
+	mu      sync.Mutex
+	queue   []configChange
+	writing bool
+	idle    chan struct{}
+}
+
+func (w *configWriter) set(path string, value any) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.queue = append(w.queue, configChange{path, value})
+	if !w.writing {
+		w.writing = true
+		w.idle = make(chan struct{})
+		go w.write()
+	}
+}
+
+func (w *configWriter) write() {
+	dirty := false
+	for {
+		w.mu.Lock()
+		if len(w.queue) == 0 && !dirty {
+			w.writing = false
+			close(w.idle)
+			w.mu.Unlock()
 			return
 		}
-		if err := svc.Save(); err != nil {
-			log.Printf("config: save: %v", err)
+		if len(w.queue) == 0 {
+			w.mu.Unlock()
+			if err := w.store.Save(); err != nil {
+				log.Printf("config: save: %v", err)
+			}
+			dirty = false
+			continue
 		}
+		next := w.queue[0]
+		w.queue = w.queue[1:]
+		w.mu.Unlock()
+		if err := w.store.SetByPath(next.path, next.value); err != nil {
+			log.Printf("config: set %s: %v", next.path, err)
+			continue
+		}
+		dirty = true
+	}
+}
+
+// flush waits for what was asked so far to reach the disk, or for timeout.
+func (w *configWriter) flush(timeout time.Duration) {
+	w.mu.Lock()
+	idle := w.idle
+	writing := w.writing
+	w.mu.Unlock()
+	if !writing {
+		return
+	}
+	select {
+	case <-idle:
+	case <-time.After(timeout):
+		log.Printf("config: a save did not finish in %v", timeout)
 	}
 }
 

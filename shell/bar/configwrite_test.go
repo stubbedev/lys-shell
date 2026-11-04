@@ -3,10 +3,14 @@ package bar
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 )
 
 func TestBarsAffected(t *testing.T) {
@@ -46,7 +50,11 @@ func TestConfigSetterPersists(t *testing.T) {
 	dir := t.TempDir()
 	svc := config.Load(dir, config.DiscardDiagnostics)
 	defer svc.Close()
-	set := configSetter(svc)
+	w := &configWriter{store: svc}
+	set := func(path string, value any) {
+		w.set(path, value)
+		w.flush(10 * time.Second)
+	}
 	set("modules.recorder.microphone-device", "mic0")
 	if got := svc.Config().Recorder.MicrophoneDevice; got != "mic0" {
 		t.Errorf("live value = %q", got)
@@ -62,4 +70,46 @@ func TestConfigSetterPersists(t *testing.T) {
 	}
 	var nilCtx ModuleContext
 	nilCtx.setConfig("modules.recorder.microphone", true) // no service: a no-op
+}
+
+type heldConfigStore struct {
+	mu      sync.Mutex
+	sets    []string
+	saves   int
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *heldConfigStore) SetByPath(path string, _ any) error {
+	s.entered <- struct{}{}
+	<-s.release
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sets = append(s.sets, path)
+	return nil
+}
+
+func (s *heldConfigStore) Save() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.saves++
+	return nil
+}
+
+func TestConfigWriterCoalescesSavesAndNeverHoldsItsCaller(t *testing.T) {
+	store := &heldConfigStore{entered: make(chan struct{}, 8), release: make(chan struct{})}
+	w := &configWriter{store: store}
+	w.set("a", 1)
+	apptest.Answer(t, "the first set reached the store", store.entered)
+	w.set("b", 2)
+	close(store.release)
+	w.flush(10 * time.Second)
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if !slices.Equal(store.sets, []string{"a", "b"}) {
+		t.Errorf("sets %v, want both in order", store.sets)
+	}
+	if store.saves != 1 {
+		t.Errorf("%d saves for two sets, want one", store.saves)
+	}
 }
