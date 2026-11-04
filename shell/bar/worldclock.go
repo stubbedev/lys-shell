@@ -14,51 +14,67 @@ import (
 	"github.com/stubbedev/lys-shell/strftime"
 )
 
-// worldClockRender is helpers.rs's format_world_clock: the format
-// renders as a template with tz(zone, strftime) formatting now in that
-// zone. An unknown zone fails the render, which shows as nothing
-// (format_world_clock(...).unwrap_or_default()).
-func worldClockRender(format string, now time.Time) string {
-	return worldClockRenderTracking(format, now, func(*strftime.Layout) {})
+// worldClockTemplate is helpers.rs's format_world_clock over one format:
+// the format renders as a template with tz(zone, strftime) formatting now in
+// that zone. An unknown zone fails the render, which shows as nothing
+// (format_world_clock(...).unwrap_or_default()). Each zone and layout loads
+// once; one goroutine renders it.
+type worldClockTemplate struct {
+	format  string
+	env     jinja.Env
+	load    func(string) (*time.Location, error)
+	zones   map[string]*time.Location
+	layouts map[string]*strftime.Layout
+	now     time.Time
+	finest  time.Duration
 }
 
-// worldClockRenderTracking is worldClockRender, reporting each strftime
-// layout the template uses.
-func worldClockRenderTracking(format string, now time.Time, used func(*strftime.Layout)) string {
-	var env jinja.Env
-	env.AddFunction("tz", func(args []any, _ map[string]any) (any, error) {
-		if len(args) != 2 {
-			return nil, errors.New("tz takes a timezone and a format")
-		}
-		zone, _ := args[0].(string)
-		layout, _ := args[1].(string)
-		location, err := time.LoadLocation(zone)
+func newWorldClockTemplate(format string, load func(string) (*time.Location, error)) *worldClockTemplate {
+	t := &worldClockTemplate{format: format, load: load, zones: map[string]*time.Location{}, layouts: map[string]*strftime.Layout{}, finest: time.Minute}
+	t.env.AddFunction("tz", t.tz)
+	return t
+}
+
+func (t *worldClockTemplate) tz(args []any, _ map[string]any) (any, error) {
+	if len(args) != 2 {
+		return nil, errors.New("tz takes a timezone and a format")
+	}
+	zone, _ := args[0].(string)
+	layout, _ := args[1].(string)
+	location, ok := t.zones[zone]
+	if !ok {
+		loaded, err := t.load(zone)
 		if err != nil || zone == "" {
 			log.Printf("world-clock: invalid timezone identifier %q", zone)
 			return nil, fmt.Errorf("invalid timezone: %s", zone)
 		}
-		formatted, err := strftime.Compile(layout)
+		location = loaded
+		t.zones[zone] = loaded
+	}
+	formatted, ok := t.layouts[layout]
+	if !ok {
+		compiled, err := strftime.Compile(layout)
 		if err != nil {
-			return "", nil
+			return "", nil //nolint:nilerr // a bad layout renders as nothing, as the Rust module does
 		}
-		used(formatted)
-		return formatted.Format(now.In(location)), nil
-	})
-	out, err := env.Render(format, nil)
+		formatted = compiled
+		t.layouts[layout] = compiled
+	}
+	t.finest = min(t.finest, formatted.Resolution())
+	return formatted.Format(t.now.In(location)), nil
+}
+
+func (t *worldClockTemplate) render(now time.Time) string {
+	t.now = now
+	out, err := t.env.Render(t.format, nil)
 	if err != nil {
 		return ""
 	}
 	return out
 }
 
-// worldClockResolution is how often the template's text can change: the
-// finest of the layouts it formats with.
-func worldClockResolution(format string) time.Duration {
-	resolution := time.Minute
-	worldClockRenderTracking(format, time.Now(), func(l *strftime.Layout) {
-		resolution = min(resolution, l.Resolution())
-	})
-	return resolution
+func worldClockRender(format string, now time.Time) string {
+	return newWorldClockTemplate(format, time.LoadLocation).render(now)
 }
 
 // worldClock is the module: the format re-renders when its text can
@@ -76,25 +92,27 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.WorldClock
 	m := &worldClockModule{ctx: ctx}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
-	m.apply(cfg.Format)
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.stop = cancel
-	update := func() { m.apply(m.ctx.Config.WorldClock.Format) }
-	if err := walltimer.Start(runCtx, worldClockResolution(cfg.Format), func() { m.ctx.Invoke(update) }); err != nil {
-		cancel()
-		return nil, err
+	if !cfg.LabelShow {
+		return m, nil
 	}
+	template := newWorldClockTemplate(cfg.Format, time.LoadLocation)
+	go func() {
+		shown := template.render(time.Now())
+		ctx.Invoke(func() { m.btn.SetLabel(shown) })
+		err := walltimer.Start(runCtx, template.finest, func() {
+			next := template.render(time.Now())
+			if next != shown {
+				shown = next
+				ctx.Invoke(func() { m.btn.SetLabel(next) })
+			}
+		})
+		if err != nil {
+			log.Printf("world-clock: %v", err)
+		}
+	}()
 	return m, nil
-}
-
-// apply renders the current format; an unchanged label is a no-op for
-// the damage collector.
-func (m *worldClockModule) apply(format string) {
-	text := ""
-	if m.ctx.Config.WorldClock.LabelShow {
-		text = worldClockRender(format, time.Now())
-	}
-	m.btn.SetLabel(text)
 }
 
 func (m *worldClockModule) Root() widget.Widget { return m.btn }

@@ -159,8 +159,41 @@ func TestWorldClockResolutionIsTheFinestLayoutUsed(t *testing.T) {
 		"{{ tz('UTC', '%H:%M') }} {{ tz('Asia/Tokyo', '%H:%M:%S') }}": time.Second,
 		"{{ tz('Not/AZone', '%S') }}":                                 time.Minute,
 	} {
-		if got := worldClockResolution(format); got != want {
+		if got := worldClockFinest(format); got != want {
 			t.Errorf("%q: resolution %v, want %v", format, got, want)
 		}
+	}
+}
+
+func worldClockFinest(format string) time.Duration {
+	template := newWorldClockTemplate(format, time.LoadLocation)
+	template.render(time.Now())
+	return template.finest
+}
+
+func TestWorldClockLoadsEachZoneOnceAndRendersWithinItsBudget(t *testing.T) {
+	loads := map[string]int{}
+	template := newWorldClockTemplate("{{ tz('UTC', '%H:%M') }} {{ tz('Asia/Tokyo', '%H:%M') }} {{ tz('UTC', '%H') }}", func(zone string) (*time.Location, error) {
+		loads[zone]++
+		return time.LoadLocation(zone)
+	})
+	now := time.Date(2026, 9, 29, 14, 5, 0, 0, time.UTC)
+	template.render(now)
+	allocs := testing.AllocsPerRun(50, func() { template.render(now) })
+	for zone, n := range loads {
+		if n != 1 {
+			t.Errorf("%s loaded %d times, want once", zone, n)
+		}
+	}
+	if len(loads) != 2 {
+		t.Errorf("loaded %v, want the two zones", loads)
+	}
+	if raceEnabled {
+		return
+	}
+	const budget = 120
+	t.Logf("a render makes %.0f allocations", allocs)
+	if allocs > budget {
+		t.Errorf("a render makes %.0f allocations, want at most %d", allocs, budget)
 	}
 }
