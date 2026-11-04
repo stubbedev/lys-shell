@@ -37,8 +37,10 @@ type fakeNM struct {
 	addAndActive  []ConnectionDict
 	// stopping refuses new calls while stop waits out the ones in flight.
 	stopping bool
-	// devicesHeld, when set, holds every GetDevices until it closes.
-	devicesHeld chan struct{}
+	// devicesHeld, when set, holds every GetDevices until it closes;
+	// devicesEntered hears each one arrive.
+	devicesHeld    chan struct{}
+	devicesEntered chan struct{}
 	// held, when set, holds ActivateConnection after it is recorded and
 	// before it answers, until the channel closes.
 	held chan struct{}
@@ -416,9 +418,10 @@ func (m fakeManager) DeactivateConnection(active dbus.ObjectPath) *dbus.Error {
 
 func (m fakeManager) GetDevices() ([]dbus.ObjectPath, *dbus.Error) {
 	m.f.mu.Lock()
-	held := m.f.devicesHeld
+	held, entered := m.f.devicesHeld, m.f.devicesEntered
 	m.f.mu.Unlock()
 	if held != nil {
+		entered <- struct{}{}
 		<-held
 	}
 	var devices []dbus.ObjectPath

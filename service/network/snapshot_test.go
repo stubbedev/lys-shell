@@ -72,7 +72,7 @@ func TestAHeldReadHoldsNoOtherReader(t *testing.T) {
 	sys := &System{conn: f.client()}
 	release := make(chan struct{})
 	f.mu.Lock()
-	f.devicesHeld = release
+	f.devicesHeld, f.devicesEntered = release, make(chan struct{}, 4)
 	f.mu.Unlock()
 	t.Cleanup(func() { close(release) })
 	first := make(chan error, 1)
@@ -80,6 +80,11 @@ func TestAHeldReadHoldsNoOtherReader(t *testing.T) {
 		_, err := sys.Read(context.Background())
 		first <- err
 	}()
+	select {
+	case <-f.devicesEntered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the first read never reached NetworkManager")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	second := make(chan error, 1)
 	go func() {
