@@ -45,7 +45,8 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	p.snapshot()
 	p.queue.Enqueue("/r/test", func() {}, func() {})
 	p.reply, p.allowToken, p.multiple = ch, allowToken, multiple
-	p.root = p.build(nil, AllSources)
+	p.previews, p.endPreviews = context.WithCancel(context.Background())
+	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
 	return p, ch
 }
 
@@ -170,7 +171,7 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-card")); n != 2 {
 		t.Errorf("%d window cards, want 2", n)
 	}
-	if n := len(treetest.All[*widget.Button](p.outputsPage())); n != 2 {
+	if n := len(treetest.All[*widget.Button](p.outputsPage(p.readOutputs(p.previews, 8)))); n != 2 {
 		t.Errorf("%d output buttons, want 2", n)
 	}
 }
@@ -243,7 +244,7 @@ func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {
 		{SourceWindows, []string{pageWindows}, pageWindows},
 		{SourceRegions, []string{pageRegion}, pageRegion},
 	} {
-		p.root = p.build(nil, tc.sources)
+		p.root = p.build(nil, tc.sources, p.readOutputs(p.previews, 8))
 		nb := treetest.First[*widget.Notebook](t, p.root)
 		if got := tabs(nb); !slices.Equal(got, tc.tabs) || nb.SelectedTab() != tc.selected {
 			t.Errorf("sources %#x: tabs %v on %q, want %v on %q", tc.sources, got, nb.SelectedTab(), tc.tabs, tc.selected)
@@ -255,8 +256,8 @@ func TestEmptyPagesShowPlaceholders(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	p.outputs = func() []outputInfo { return nil }
-	p.root = p.build(nil, AllSources)
-	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-placeholder")) + len(treetest.WithClass(p.outputsPage(), "share-picker-placeholder")); n != 2 {
+	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
+	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-placeholder")) + len(treetest.WithClass(p.outputsPage(p.readOutputs(p.previews, 8)), "share-picker-placeholder")); n != 2 {
 		t.Fatalf("%d placeholders, want 2", n)
 	}
 }
@@ -399,7 +400,7 @@ func TestPickerNamesTheRequester(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.d.Describe = func(appID string) (string, string) { return "Meet " + appID, "" }
 	p.requester = p.describe(portaldialogs.Caller{Handle: "/r/9", AppID: "org.meet"})
-	p.root = p.build(nil, AllSources)
+	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
 	if labels := treetest.Labels(p.root); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
 		t.Errorf("labels = %q", labels)
 	}
@@ -458,7 +459,7 @@ func TestFocusedChoiceIsHighlighted(t *testing.T) {
 	cfg.DefaultPage = config.SharePickerOutputs
 	p, _ := testPicker(t, cfg, false, false)
 	p.d.Sheet = apptheme.New(config.Defaults()).Sheet
-	p.root = p.build(nil, AllSources)
+	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
 	reveal.Show(p.rev, p.anims, config.AnimSharePicker)
 	const w, h = 1000, 500
 	p.root.Arrange(render.Rect{W: w, H: h})

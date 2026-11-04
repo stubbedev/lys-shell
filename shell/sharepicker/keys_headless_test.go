@@ -584,3 +584,73 @@ func TestHeadlessOutputThumbShowsNoOverlay(t *testing.T) {
 		t.Fatal("the thumbnail shows the overlay's frame")
 	}
 }
+
+// The outputs and their thumbnails are read before the surface maps: the
+// picker is in no thumbnail, and the loop waits on neither.
+func TestHeadlessOutputsAreReadOffTheLoopBeforeThePickerMaps(t *testing.T) {
+	a := apptest.Run(t)
+	p, _ := headlessPicker(t, a, config.SharePickerOutputs)
+	release := make(chan struct{})
+	p.outputs = func() []outputInfo {
+		<-release
+		return []outputInfo{{name: "DP-1", width: 100, height: 100}}
+	}
+	mappedAtCapture := make(chan bool, 1)
+	p.outputPreview = func(string, int) (*image.RGBA, error) {
+		mappedAtCapture <- apptest.On(a, func() bool { return p.layer != nil })
+		return image.NewRGBA(image.Rect(0, 0, 8, 8)), nil
+	}
+	answers := make(chan string, 1)
+	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/read"}, Request{Sources: AllSources}) }()
+	apptest.Until(t, a, "the request reached the picker", func() bool { return p.reply != nil })
+	if apptest.On(a, func() bool { return p.layer != nil }) {
+		t.Error("the picker mapped before its outputs were read")
+	}
+	close(release)
+	if apptest.Answer(t, "the capture", mappedAtCapture) {
+		t.Error("the output was captured with the picker on it")
+	}
+	apptest.Until(t, a, "the picker mapped", func() bool { return p.layer != nil })
+	p.Dismiss("/r/read")
+	apptest.Answer(t, "the dismissed request", answers)
+}
+
+// A request dismissed while its outputs are read never maps.
+func TestHeadlessDismissedWhileReadingMapsNothing(t *testing.T) {
+	a := apptest.Run(t)
+	p, _ := headlessPicker(t, a, config.SharePickerOutputs)
+	release := make(chan struct{})
+	p.outputs = func() []outputInfo {
+		<-release
+		return []outputInfo{{name: "DP-1", width: 100, height: 100}}
+	}
+	answers := make(chan string, 1)
+	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/gone"}, Request{Sources: AllSources}) }()
+	apptest.Until(t, a, "the request reached the picker", func() bool { return p.reply != nil })
+	p.Dismiss("/r/gone")
+	if got := apptest.Answer(t, "the dismissed request", answers); got != "" {
+		t.Errorf("answered %q", got)
+	}
+	close(release)
+	apptest.Dispatched(t, a)
+	if apptest.On(a, func() bool { return p.layer != nil }) {
+		t.Error("the dismissed request mapped a surface")
+	}
+}
+
+// A capture that does not finish does not hold the picker back for good.
+func TestHeadlessASlowThumbnailDoesNotHoldThePickerBack(t *testing.T) {
+	a := apptest.Run(t)
+	p, _ := headlessPicker(t, a, config.SharePickerOutputs)
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	p.outputPreview = func(string, int) (*image.RGBA, error) {
+		<-release
+		return nil, errors.New("released")
+	}
+	answers := make(chan string, 1)
+	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/slow"}, Request{Sources: AllSources}) }()
+	apptest.Until(t, a, "the picker mapped", func() bool { return p.layer != nil })
+	p.Dismiss("/r/slow")
+	apptest.Answer(t, "the dismissed request", answers)
+}

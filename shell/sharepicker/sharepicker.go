@@ -18,6 +18,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/intconv"
@@ -160,7 +162,90 @@ func (p *Picker) show(c portaldialogs.Caller, ch chan string, toplevels []sharep
 	p.snapshot()
 	p.reply, p.allowToken, p.multiple, p.pending = ch, r.AllowToken, r.Multiple, nil
 	p.requester = p.describe(c)
-	p.root = p.build(toplevels, r.Sources)
+	p.previews, p.endPreviews = context.WithCancel(context.Background())
+	if r.Sources&SourceOutputs == 0 {
+		p.open(toplevels, r.Sources, outputsRead{})
+		return
+	}
+	life, size := p.previews, int(p.cfg.ResizeSize)
+	go func() {
+		read := p.readOutputs(life, size)
+		p.invoke(func() {
+			// Answered meanwhile (a dismissal): nothing maps for it.
+			if p.reply == ch {
+				p.open(toplevels, r.Sources, read)
+			}
+		})
+	}()
+}
+
+// outputsMapLimit is how long the surface waits for output thumbnails: past
+// it the picker shows and they land when they land, perhaps with it in them.
+const outputsMapLimit = 500 * time.Millisecond
+
+// outputsRead is what the outputs page needs from the compositor, read off
+// the loop: the outputs, and each one's thumbnail on its way.
+type outputsRead struct {
+	infos  []outputInfo
+	thumbs map[string]<-chan outputThumbResult
+}
+
+type outputThumbResult struct {
+	img *image.RGBA
+	err error
+}
+
+// readOutputs lists the outputs and captures them, waiting for the captures
+// up to outputsMapLimit: they run before the picker maps so that it is not in
+// its own thumbnails. Run it off the loop.
+func (p *Picker) readOutputs(life context.Context, size int) outputsRead {
+	list := p.outputs
+	if list == nil {
+		list = compositorOutputs
+	}
+	grab := p.outputPreview
+	if grab == nil {
+		grab = outputThumb
+	}
+	read := outputsRead{infos: list(), thumbs: map[string]<-chan outputThumbResult{}}
+	var pending sync.WaitGroup
+	for _, o := range read.infos {
+		thumb := make(chan outputThumbResult, 1)
+		read.thumbs[o.name] = thumb
+		pending.Go(func() {
+			img, err := regionoverlay.BackgroundCapture(life, p.gate, func() (*image.RGBA, error) { return grab(o.name, size) })
+			thumb <- outputThumbResult{img, err}
+		})
+	}
+	settled := make(chan struct{})
+	go func() {
+		pending.Wait()
+		close(settled)
+	}()
+	limit := time.NewTimer(outputsMapLimit)
+	defer limit.Stop()
+	select {
+	case <-settled:
+	case <-limit.C:
+	case <-life.Done():
+	}
+	return read
+}
+
+// compositorOutputs asks the compositor for its outputs.
+func compositorOutputs() []outputInfo {
+	c, err := capture.Connect()
+	if err != nil {
+		log.Printf("share picker: outputs: %v", err)
+		return nil
+	}
+	defer func() { _ = c.Close() }()
+	return outputInfos(c.Outputs())
+}
+
+// open builds and maps the surface.
+func (p *Picker) open(toplevels []sharepreview.Toplevel, sources Sources, read outputsRead) {
+	p.root = p.build(toplevels, sources, read)
 	if err := p.mapSurface(); err != nil {
 		log.Printf("share picker: %v", err)
 		p.answer("")
@@ -391,8 +476,7 @@ func regionPayload(sel regionoverlay.Selection) string {
 //
 // The configured default page opens when it is offered, else the first
 // page offered.
-func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widget.Widget {
-	p.previews, p.endPreviews = context.WithCancel(context.Background())
+func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read outputsRead) widget.Widget {
 	nb := widget.NewNotebook(p.d.Font)
 	nb.AddClass("share-picker-notebook")
 	nb.SetVExpand(true)
@@ -404,7 +488,7 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources) widge
 		build  func() widget.Widget
 	}{
 		{pageWindows, SourceWindows, func() widget.Widget { return p.windowsPage(toplevels) }},
-		{pageOutputs, SourceOutputs, p.outputsPage},
+		{pageOutputs, SourceOutputs, func() widget.Widget { return p.outputsPage(read) }},
 		{pageRegion, SourceRegions, p.regionPage},
 	} {
 		if sources&page.source != 0 {
@@ -629,20 +713,8 @@ func (p *Picker) loadPreview(preview *widget.Image, card *widget.Box, spinner *w
 }
 
 // outputsPage maps the outputs as the compositor lays them out.
-func (p *Picker) outputsPage() widget.Widget {
-	list := p.outputs
-	if list == nil {
-		list = func() []outputInfo {
-			c, err := capture.Connect()
-			if err != nil {
-				log.Printf("share picker: outputs: %v", err)
-				return nil
-			}
-			defer func() { _ = c.Close() }()
-			return outputInfos(c.Outputs())
-		}
-	}
-	infos := list()
+func (p *Picker) outputsPage(read outputsRead) widget.Widget {
+	infos := read.infos
 	if len(infos) == 0 {
 		return p.placeholder("ld-monitor-symbolic", "No outputs available")
 	}
@@ -659,14 +731,14 @@ func (p *Picker) outputsPage() widget.Widget {
 		spacing: p.px(p.cfg.OutputsSpacing, config.SharePickerOutputsSpacingBaseRem),
 	}
 	for _, o := range infos {
-		m.cards = append(m.cards, p.outputCard(o))
+		m.cards = append(m.cards, p.outputCard(o, read.thumbs[o.name]))
 	}
 	return page(m)
 }
 
 // outputCard is build_output_card: a button around the card with the
 // output's frame filling it, and the connector name when configured.
-func (p *Picker) outputCard(o outputInfo) widget.Widget {
+func (p *Picker) outputCard(o outputInfo, thumb <-chan outputThumbResult) widget.Widget {
 	preview := widget.NewImage(nil)
 	preview.AddClass("share-picker-image")
 	preview.SetScale(widget.ImageStretch)
@@ -681,13 +753,9 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 	button.SetCursorName("pointer")
 	payload := Target{Kind: TargetOutput, Name: o.name}.Payload()
 	button.OnClick = func() { p.selectPayload(payload) }
-	grab := p.outputPreview
-	if grab == nil {
-		grab = outputThumb
-	}
-	life, gate := p.previews, p.gate
-	p.loadPreview(preview, card, nil, life, func(size int) (*image.RGBA, error) {
-		return regionoverlay.BackgroundCapture(life, gate, func() (*image.RGBA, error) { return grab(o.name, size) })
+	p.loadPreview(preview, card, nil, p.previews, func(int) (*image.RGBA, error) {
+		r := <-thumb
+		return r.img, r.err
 	})
 	return button
 }
