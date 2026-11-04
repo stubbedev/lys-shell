@@ -3,6 +3,7 @@ package bar
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/notifytest"
@@ -51,6 +52,7 @@ func TestNotificationHistorySurvivesARestart(t *testing.T) {
 	cfg.Enabled = true
 	first := startNotifications(cfg)
 	first.Notify("mail", 0, "", "Kept", "body", nil, 0)
+	first.FlushWrites(10 * time.Second)
 	if again := startNotifications(cfg); again.Count() != 1 || notifytest.History(t, again)[0].Summary != "Kept" {
 		t.Fatalf("restarted history = %v, want the stored notification", notifytest.History(t, again))
 	}
