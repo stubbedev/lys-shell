@@ -106,7 +106,7 @@ func startShellProcess(t *testing.T, wallpaper string, env ...string) *startedSh
 	return s
 }
 
-func captureCenter(t *testing.T) color.RGBA {
+func captureCenters(t *testing.T) []color.RGBA {
 	t.Helper()
 	c, err := capture.Connect()
 	if err != nil {
@@ -117,16 +117,25 @@ func captureCenter(t *testing.T) color.RGBA {
 	if len(outs) == 0 {
 		t.Fatal("the compositor has no output")
 	}
-	f, err := c.CaptureOutput(outs[0], capture.Options{})
-	if err != nil {
-		t.Fatal(err)
+	centers := make([]color.RGBA, 0, len(outs))
+	for _, out := range outs {
+		f, err := c.CaptureOutput(out, capture.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		img, err := sharepreview.FrameImage(f, out.Transform)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := img.Bounds()
+		centers = append(centers, img.RGBAAt(b.Min.X+b.Dx()/2, b.Min.Y+b.Dy()/2))
 	}
-	img, err := sharepreview.FrameImage(f, outs[0].Transform)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b := img.Bounds()
-	return img.RGBAAt(b.Min.X+b.Dx()/2, b.Min.Y+b.Dy()/2)
+	return centers
+}
+
+func captureCenter(t *testing.T) color.RGBA {
+	t.Helper()
+	return captureCenters(t)[0]
 }
 
 func swayUsableHeight(t *testing.T) (usable, whole int) {
@@ -191,6 +200,26 @@ func TestBarLandsOnAVisibleWallpaper(t *testing.T) {
 	awaitBar(t, s)
 	if got := captureCenter(t); !isRed(got) {
 		t.Errorf("the bar mapped over %v, want the red wallpaper", got)
+	}
+}
+
+func TestBarsLandOnAVisibleWallpaperOnEveryOutput(t *testing.T) {
+	startBareSession(t)
+	swaytest.Msg(t, "create_output")
+	image := filepath.Join(t.TempDir(), "red.jpg")
+	if err := os.WriteFile(image, redJPEG(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := startShellProcess(t, image)
+	awaitBar(t, s)
+	centers := captureCenters(t)
+	if len(centers) != 2 {
+		t.Fatalf("%d outputs, want 2", len(centers))
+	}
+	for i, got := range centers {
+		if !isRed(got) {
+			t.Errorf("output %d shows %v under the bar, want the red wallpaper", i, got)
+		}
 	}
 }
 
