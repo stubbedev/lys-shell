@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -50,6 +52,28 @@ type Theme struct {
 	// userStamp fingerprints the user styles tree for the hot-reload
 	// poll.
 	userStamp string
+	// loaded is the bundle Sheet holds; a reload to the same text leaves
+	// every root's style alone.
+	loaded string
+	load   func(css string)
+	// ready is the bundle Precompile made ahead of SetConfig.
+	ready atomic.Pointer[readyBundle]
+
+	styleCheck struct {
+		sync.Mutex
+		running, again bool
+	}
+}
+
+type readyBundle struct {
+	cfg    *config.Config
+	bundle CompiledBundle
+}
+
+// CompiledBundle is a bundle compiled off the loop, for Apply on it.
+type CompiledBundle struct {
+	css     string
+	palette config.Palette
 }
 
 // New resolves the palette, compiles the bundle and installs lys-ui's
@@ -58,7 +82,9 @@ type Theme struct {
 // the Rust shell's behavior.
 func New(cfg *config.Config) *Theme {
 	t := &Theme{cfg: cfg}
-	t.Sheet = widget.NewStylesheet(t.Bundle(), Priority)
+	t.loaded = t.Bundle()
+	t.Sheet = widget.NewStylesheet(t.loaded, Priority)
+	t.load = t.Sheet.Load
 	t.installWidgetTheme()
 	t.userStamp = userStylesStamp()
 	return t
@@ -74,35 +100,68 @@ func (t *Theme) installWidgetTheme() {
 // indicators off, the frozen looping animations), then user styles,
 // resolving the palette on the way.
 func (t *Theme) Bundle() string {
-	palette, err := styling.ResolvePalette(t.cfg.Styling.ActivePalette(), t.cfg.Styling)
+	b := Compile(t.cfg)
+	t.palette = b.palette
+	return b.css
+}
+
+// Compile reads the provider palette and the user's stylesheet and builds the
+// bundle: file reads and string work, safe off the loop.
+func Compile(cfg *config.Config) CompiledBundle {
+	palette, err := styling.ResolvePalette(cfg.Styling.ActivePalette(), cfg.Styling)
 	if err != nil {
 		log.Printf("styling: %v", err)
 	}
-	t.palette = palette
 	user := ""
 	if dir, err := config.Dir(); err == nil {
 		user = styling.UserCSS(dir)
 	} else {
 		log.Printf("styling: cannot resolve config dir; user styles disabled: %v", err)
 	}
-	return styling.BundleCSS(t.cfg, palette, t.RenderPalette()) + "\n" + t.cfg.Animations.CSSOverrides() + "\n" + user
+	rendered, err := styling.PaletteFromHex(palette)
+	if err != nil {
+		log.Printf("styling: palette: %v", err)
+		rendered = styling.Default()
+	}
+	return CompiledBundle{
+		css:     styling.BundleCSS(cfg, palette, rendered) + "\n" + cfg.Animations.CSSOverrides() + "\n" + user,
+		palette: palette,
+	}
 }
 
-// Reload recompiles the bundle into the attached stylesheet and
-// reinstalls lys-ui's theme: every root restyles on the next frame.
-func (t *Theme) Reload() {
+// Apply takes a compiled bundle on the loop. A bundle equal to the loaded one
+// touches nothing: no parse, no restyle of any root.
+func (t *Theme) Apply(b CompiledBundle) {
+	t.palette = b.palette
+	if b.css == t.loaded {
+		return
+	}
 	if t.scope == nil {
 		t.scope = widget.NewBox(widget.Row, 0, 0)
 		t.scope.AttachStylesheet(t.Sheet)
 	}
-	t.Sheet.Load(t.Bundle())
+	t.loaded = b.css
+	t.load(b.css)
 	t.installWidgetTheme()
 }
+
+// Reload recompiles the bundle into the attached stylesheet and
+// reinstalls lys-ui's theme: every root restyles on the next frame.
+func (t *Theme) Reload() { t.Apply(Compile(t.cfg)) }
 
 // SetConfig recompiles the bundle for a new config snapshot.
 func (t *Theme) SetConfig(cfg *config.Config) {
 	t.cfg = cfg
+	if ready := t.ready.Load(); ready != nil && ready.cfg == cfg {
+		t.Apply(ready.bundle)
+		return
+	}
 	t.Reload()
+}
+
+// Precompile compiles cfg's bundle off the loop, for the SetConfig to come.
+func (t *Theme) Precompile(cfg *config.Config) {
+	t.ready.Store(&readyBundle{cfg, Compile(cfg)})
 }
 
 // RenderPalette is the resolved palette as render colors, for the
@@ -136,17 +195,12 @@ func (t *Theme) Attach(root interface{ AttachStylesheet(*widget.Stylesheet) }) {
 // once a second. A failed read keeps the stylesheet running: UserCSS
 // logs and contributes nothing.
 func (t *Theme) WatchUserStyles(application *app.Application) {
-	t.watchStyles(application.WatchFiles, func(fn func()) { application.Every(time.Second, fn) })
+	t.watchStyles(application.WatchFiles, func(fn func()) { application.Every(time.Second, fn) }, application.Invoke)
 }
 
 // watchStyles is WatchUserStyles over its two mechanisms.
-func (t *Theme) watchStyles(watch func(paths []string, recursive bool, fn func()) (func(), error), poll func(fn func())) {
-	check := func() {
-		if stamp := userStylesStamp(); stamp != t.userStamp {
-			t.userStamp = stamp
-			t.Reload()
-		}
-	}
+func (t *Theme) watchStyles(watch func(paths []string, recursive bool, fn func()) (func(), error), poll func(fn func()), onLoop func(func())) {
+	check := func() { t.checkStyles(t.cfg, onLoop) }
 	if dir, err := config.Dir(); err == nil {
 		if styles, ok := styling.UserStylesDir(dir); ok {
 			if _, err := watch([]string{styles}, false, check); err == nil {
@@ -155,6 +209,35 @@ func (t *Theme) watchStyles(watch func(paths []string, recursive bool, fn func()
 		}
 	}
 	poll(check)
+}
+
+// checkStyles stats and reads the user's styles off the loop; one check runs
+// at a time, a change seen meanwhile asking for one more.
+func (t *Theme) checkStyles(cfg *config.Config, onLoop func(func())) {
+	t.styleCheck.Lock()
+	defer t.styleCheck.Unlock()
+	if t.styleCheck.running {
+		t.styleCheck.again = true
+		return
+	}
+	t.styleCheck.running = true
+	go func() {
+		for {
+			if stamp := userStylesStamp(); stamp != t.userStamp {
+				t.userStamp = stamp
+				compiled := Compile(cfg)
+				onLoop(func() { t.Apply(compiled) })
+			}
+			t.styleCheck.Lock()
+			if !t.styleCheck.again {
+				t.styleCheck.running = false
+				t.styleCheck.Unlock()
+				return
+			}
+			t.styleCheck.again = false
+			t.styleCheck.Unlock()
+		}
+	}()
 }
 
 // userStylesStamp fingerprints the files UserCSS reads, the stylesheet

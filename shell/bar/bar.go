@@ -558,7 +558,6 @@ func (s *shellStart) mount() {
 		// them apply once, as the latest.
 		reloads := newReloadQueue(application.Invoke, func(old, next *config.Config) {
 			current.Store(next)
-			apptheme.ReportMissingIcons(next, config.StderrDiagnostics)
 			theme.SetConfig(next)
 			if barsAffected(old, next) {
 				restyle(next)
@@ -584,7 +583,11 @@ func (s *shellStart) mount() {
 				}
 			}
 		})
-		s.down.add(svc.Subscribe(reloads.push))
+		s.down.add(svc.Subscribe(func(old, next *config.Config) {
+			apptheme.ReportMissingIcons(next, config.StderrDiagnostics)
+			theme.Precompile(next)
+			reloads.push(old, next)
+		}))
 		// A secrets reload re-resolves the weather API keys
 		// (spawn_secrets_reload_watcher).
 		s.down.add(svc.SubscribeSecrets(func() { s.weatherSvc.Configure(weatherSettings(current.Load().Weather)) }))
@@ -596,12 +599,12 @@ func (s *shellStart) mount() {
 		s.down.add(stopTicks)
 		go func() {
 			for range ticks {
+				compiled := apptheme.Compile(current.Load())
 				application.Invoke(func() {
-					// The bundle recompiles regardless (the Rust CSS
-					// watcher); the bars rebuild only for a new palette, so
-					// an extraction that changed nothing (a monitor plugged
-					// in) leaves them open.
-					theme.Reload()
+					// The bars rebuild only for a new palette, so an
+					// extraction that changed nothing (a monitor plugged in)
+					// leaves them open.
+					theme.Apply(compiled)
 					if rt.paletteStale() {
 						restyle(current.Load())
 					}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -109,6 +110,7 @@ func TestUserStylesReloadOnAWatchedChange(t *testing.T) {
 	theme := New(config.Defaults())
 	var changed func()
 	var watched []string
+	applied := make(chan struct{}, 1)
 	polled := false
 	theme.watchStyles(func(paths []string, recursive bool, fn func()) (func(), error) {
 		watched, changed = paths, fn
@@ -116,22 +118,29 @@ func TestUserStylesReloadOnAWatchedChange(t *testing.T) {
 			t.Error("the styles directory is watched recursively; only its top-level files load")
 		}
 		return func() {}, nil
-	}, func(func()) { polled = true })
+	}, func(func()) { polled = true }, func(fn func()) {
+		fn()
+		applied <- struct{}{}
+	})
 	if len(watched) != 1 || watched[0] != styles || polled {
 		t.Fatalf("watched %v polled %v, want the styles directory watched", watched, polled)
 	}
 	if err := os.WriteFile(filepath.Join(styles, "index.css"), []byte(".bar .x { color: red; }"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	before := theme.userStamp
 	changed()
-	if theme.userStamp == before || theme.userStamp != userStylesStamp() {
-		t.Error("a watched edit did not reload the stylesheet")
+	select {
+	case <-applied:
+	case <-time.After(10 * time.Second):
+		t.Fatal("a watched edit did not reload the stylesheet")
+	}
+	if !strings.Contains(theme.loaded, ".bar .x { color: red; }") {
+		t.Error("the reload did not carry the edit")
 	}
 
 	// No watcher: the styles poll instead.
 	theme.watchStyles(func([]string, bool, func()) (func(), error) { return nil, errors.New("no inotify") },
-		func(func()) { polled = true })
+		func(func()) { polled = true }, func(func()) {})
 	if !polled {
 		t.Error("a failed watch did not fall back to polling")
 	}
@@ -167,5 +176,24 @@ func TestReloadStylesOnlyAttachedRoots(t *testing.T) {
 	theme.Reload()
 	if got := spacedWidth(func(b *widget.Box) { theme.Attach(b) }); got != styled {
 		t.Errorf("an attached root measures %d after a reload, want %d", got, styled)
+	}
+}
+
+func TestAnIdenticalBundleTouchesNoStylesheet(t *testing.T) {
+	isolateConfigDir(t)
+	theme := New(config.Defaults())
+	loads := 0
+	theme.load = func(string) { loads++ }
+	for range 3 {
+		theme.Apply(Compile(theme.cfg))
+	}
+	if loads != 0 {
+		t.Errorf("%d stylesheet loads for an unchanged bundle, want none", loads)
+	}
+	next := config.Defaults()
+	next.Bar.Scale = 2
+	theme.SetConfig(next)
+	if loads != 1 {
+		t.Errorf("%d stylesheet loads for a changed bundle, want 1", loads)
 	}
 }
