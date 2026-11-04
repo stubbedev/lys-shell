@@ -311,6 +311,9 @@ func (s *shellStart) startServices() {
 	// bus; other senders deliver through it.
 	s.notifSvc = startNotifications(s.cfg.Notification)
 	s.ctx.Notifications = s.notifSvc
+	if svc := s.notifSvc; svc != nil {
+		s.down.add(func() { svc.FlushWrites(configFlushTimeout) })
+	}
 	sniStore := sni.NewStore()
 	s.ctx.SNI = sniStore
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
