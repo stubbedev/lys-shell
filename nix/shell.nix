@@ -61,6 +61,7 @@
         # The real xdg-desktop-portal frontend the portal contract tests
         # route through to the backend.
         XDG_DESKTOP_PORTAL = "${pkgs.xdg-desktop-portal}/libexec/xdg-desktop-portal";
+        LYS_SHELL_TEST_EMOJI_FONT = "${pkgs.noto-fonts-color-emoji}/share/fonts/noto/NotoColorEmoji.ttf";
         XKB_CONFIG_ROOT = "${pkgs.xkeyboard-config}/share/X11/xkb";
         XLOCALEDIR = "${pkgs.libX11}/share/X11/locale";
 

@@ -1035,34 +1035,6 @@ func emojiPanel(t *testing.T) (*panelHarness, *panel, <-chan launcheripc.ServerF
 	return h, p, reply, &typed, &copied
 }
 
-// The glyph sits in the middle of its row, as an icon does.
-func TestAnEmojiIsCentredInItsRow(t *testing.T) {
-	_, p, _, _, _ := emojiPanel(t)
-	data := make([]byte, render.Stride(renderW)*renderH)
-	paintPanel(p, data)
-	savePanel(t, data, "emoji")
-	var row *searchRow
-	for _, r := range p.v.list.pool {
-		if r.glyph.Visible() {
-			row = r
-			break
-		}
-	}
-	if row == nil {
-		t.Fatal("no row shows a glyph")
-	}
-	rb, gb := row.Bounds(), row.glyph.Bounds()
-	if got := gb.Y + gb.H/2 - (rb.Y + rb.H/2); got < -1 || got > 1 {
-		t.Errorf("glyph %v is %dpx off the middle of row %v", gb, got, rb)
-	}
-	if gb.W != p.v.list.iconSize {
-		t.Errorf("glyph %dpx wide, want the icon column's %d", gb.W, p.v.list.iconSize)
-	}
-	if row.glyph.Alignment() != render.AlignCenter {
-		t.Error("the glyph does not centre across its column")
-	}
-}
-
 // Enter enters the emoji in the window the panel leaves focused, after
 // the surface has gone, and leaves the clipboard alone.
 func TestEnterTypesTheEmojiOnceTheSurfaceIsGone(t *testing.T) {

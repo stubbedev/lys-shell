@@ -427,9 +427,124 @@ func TestAFileIconPaintsInItsRow(t *testing.T) {
 	savePanel(t, data, "file-icon")
 }
 
+func useEmojiFont(t *testing.T, h *panelHarness) {
+	t.Helper()
+	path := os.Getenv("LYS_SHELL_TEST_EMOJI_FONT")
+	if path == "" {
+		t.Fatal("LYS_SHELL_TEST_EMOJI_FONT is unset: the dev shell names a real colour emoji font")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emoji, err := render.LoadFont(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.s.d.Font = render.NewChain(h.s.d.Font.(*render.Typeface), emoji)
+	h.s.d.Sheet = apptheme.New(h.cfg).Sheet
+}
+
 func pixelAt(data []byte, x, y int) uint32 {
 	i := (y*renderW + x) * 4
 	return uint32(data[i]) | uint32(data[i+1])<<8 | uint32(data[i+2])<<16 | uint32(data[i+3])<<24
+}
+
+func inkRows(data []byte, x0, x1, ref, y0, y1 int) (top, bottom int, found bool) {
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			if pixelAt(data, x, y) != pixelAt(data, ref, y) {
+				if !found {
+					top, found = y, true
+				}
+				bottom = y
+				break
+			}
+		}
+	}
+	return top, bottom, found
+}
+
+func TestAnEmojisInkIsCentredInItsRow(t *testing.T) {
+	h := newPanelHarness(t)
+	useEmojiFont(t, h)
+	h.cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchEmoji}
+	p, _ := h.openPanel()
+	h.typed(p, "grinning")
+	h.until("the faces", func() bool { return len(p.rowTitles()) >= 3 })
+	data := make([]byte, render.Stride(renderW)*renderH)
+	paintPanel(p, data)
+	savePanel(t, data, "emoji")
+	measured := 0
+	for _, r := range p.v.list.pool {
+		if !r.glyph.Visible() {
+			continue
+		}
+		measured++
+		rb, gb := r.Bounds(), r.glyph.Bounds()
+		if gb.W != p.v.list.iconSize {
+			t.Errorf("glyph %dpx wide, want the icon column's %d", gb.W, p.v.list.iconSize)
+		}
+		if r.glyph.Alignment() != render.AlignCenter {
+			t.Error("the glyph does not centre across its column")
+		}
+		top, bottom, found := inkRows(data, gb.X, gb.X+gb.W, gb.X-2, rb.Y, rb.Y+rb.H)
+		if !found {
+			t.Fatalf("%q paints no ink in row %v", r.glyph.Text(), rb)
+		}
+		const tolerance = 1
+		if off := (top + bottom + 1) - (2*rb.Y + rb.H); off < -2*tolerance || off > 2*tolerance {
+			t.Errorf("%q ink [%d,%d] is %d half-pixels off the middle of row %v", r.glyph.Text(), top, bottom, off, rb)
+		}
+		if top <= rb.Y || bottom >= rb.Y+rb.H-1 {
+			t.Errorf("%q ink [%d,%d] reaches the edge of row %v", r.glyph.Text(), top, bottom, rb)
+		}
+	}
+	if measured < 3 {
+		t.Fatalf("%d rows show a glyph", measured)
+	}
+}
+
+func TestAnIconRowShowsNoGlyphInk(t *testing.T) {
+	h := newPanelHarness(t)
+	useEmojiFont(t, h)
+	useBundledIcons(t)
+	p, _ := h.openPanel()
+	h.typed(p, "alpha")
+	h.until("the rows", func() bool { return p.selectedTitle() == "Alpha Docs" })
+	data := make([]byte, render.Stride(renderW)*renderH)
+	paintPanel(p, data)
+	for _, r := range p.v.list.pool {
+		if r.glyph.Visible() {
+			t.Errorf("the icon row %v shows a glyph", r.Bounds())
+		}
+	}
+}
+
+func TestAHeroEmojisInkStaysInsideItsLabel(t *testing.T) {
+	h := newPanelHarness(t)
+	useEmojiFont(t, h)
+	h.cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchEmoji}
+	p, _ := h.openPanel()
+	h.typed(p, "grinning")
+	h.until("the faces", func() bool { return p.v.summary.glyph.Visible() && p.v.summary.glyph.Text() != "" })
+	data := make([]byte, render.Stride(renderW)*renderH)
+	paintPanel(p, data)
+	paintPanel(p, data)
+	savePanel(t, data, "emoji-hero")
+	gb := p.v.summary.glyph.Bounds()
+	titleTop := p.v.summary.title.Bounds().Y
+	top, bottom, found := inkRows(data, gb.X, gb.X+gb.W, gb.X-1, p.v.pane.Bounds().Y, titleTop)
+	if !found {
+		t.Fatalf("the hero %q paints no ink", p.v.summary.glyph.Text())
+	}
+	if top < gb.Y || bottom >= gb.Y+gb.H {
+		t.Errorf("hero ink [%d,%d] leaves its label %v", top, bottom, gb)
+	}
+	const tolerance = 2
+	if off := (top + bottom + 1) - (2*gb.Y + gb.H); off < -2*tolerance || off > 2*tolerance {
+		t.Errorf("hero ink [%d,%d] is %d half-pixels off the middle of its label %v", top, bottom, off, gb)
+	}
 }
 
 func highlightRect(t *testing.T, data []byte, list render.Rect, rowY int) render.Rect {
