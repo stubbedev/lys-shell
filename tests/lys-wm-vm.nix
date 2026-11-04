@@ -311,6 +311,9 @@ pkgs.testers.nixosTest {
     click(centre, bar_y)
     wait("the clock's dropdown to open", lambda: region(*below_clock) != closed, tries=20)
     time.sleep(1)
+    seconds = int(machine.succeed("date +%S"))
+    if seconds > 40:
+        time.sleep(61 - seconds)
     opened = region(*below_clock)
     shot("06a-dropdown-open")
     typed_reaches_foot("key-beside-dropdown")
