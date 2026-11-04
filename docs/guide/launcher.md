@@ -44,7 +44,7 @@ be running, as it hosts the panel.
 | Quick toggles | Do not disturb, Wi-Fi, Bluetooth, and switching the audio output |
 | Media | Play, pause and skip on the active player |
 | Capture | Screenshots, screen recording and the color picker, which copies the hex value. They start once the panel has closed |
-| Processes | `Kill Process` lists your processes, largest first; ending one asks for a second Enter |
+| Processes | `Kill Process` lists your processes, largest first; ending one asks for a second Enter. The compositor, the shell and what started them are not listed |
 | Script commands | From a folder, see below |
 | Shell | `>command` runs a command; the actions panel can run it in a terminal |
 | Web | The last row, always: search the web for what you typed |

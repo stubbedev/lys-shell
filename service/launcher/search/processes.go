@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -23,9 +25,15 @@ import (
 const (
 	// procDir is where the kernel lists processes.
 	procDir = "/proc"
-	// procStartTimeField is starttime's place in /proc/pid/stat, counted
-	// from the state field that follows the command name.
+	// procParentField and procStartTimeField are ppid's and starttime's
+	// places in /proc/pid/stat, counted from the state field that follows
+	// the command name.
+	procParentField    = 1
 	procStartTimeField = 19
+	// waylandDefaultDisplay is the socket libwayland falls back to.
+	waylandDefaultDisplay = "wayland-0"
+	// waylandDialTimeout bounds asking who the compositor is.
+	waylandDialTimeout = time.Second
 )
 
 // process is one process the user can signal. startTime tells it from a
@@ -38,18 +46,28 @@ type process struct {
 	startTime string
 }
 
-// parseProcStat reads the name, state and start time of a /proc/pid/stat.
-// The name may hold spaces and parentheses, so it ends at the last ')'.
-func parseProcStat(stat string) (name, state, startTime string, err error) {
+// procStat is what a /proc/pid/stat says.
+type procStat struct {
+	name, state, startTime string
+	parent                 int
+}
+
+// parseProcStat reads a /proc/pid/stat. The name may hold spaces and
+// parentheses, so it ends at the last ')'.
+func parseProcStat(stat string) (procStat, error) {
 	open, end := strings.IndexByte(stat, '('), strings.LastIndexByte(stat, ')')
 	if open < 0 || end < open {
-		return "", "", "", fmt.Errorf("no command name in %q", stat)
+		return procStat{}, fmt.Errorf("no command name in %q", stat)
 	}
 	fields := strings.Fields(stat[end+1:])
 	if len(fields) <= procStartTimeField {
-		return "", "", "", fmt.Errorf("%d fields after the command name in %q", len(fields), stat)
+		return procStat{}, fmt.Errorf("%d fields after the command name in %q", len(fields), stat)
 	}
-	return stat[open+1 : end], fields[0], fields[procStartTimeField], nil
+	parent, err := strconv.Atoi(fields[procParentField])
+	if err != nil {
+		return procStat{}, fmt.Errorf("parent in %q: %w", stat, err)
+	}
+	return procStat{name: stat[open+1 : end], state: fields[0], startTime: fields[procStartTimeField], parent: parent}, nil
 }
 
 // readProcess reads one /proc entry; false for what is not the user's to
@@ -70,7 +88,7 @@ func readProcess(dir string, uid uint32, pageSize uint64) (process, bool, error)
 	if err != nil {
 		return process{}, false, err
 	}
-	name, state, start, err := parseProcStat(string(stat))
+	parsed, err := parseProcStat(string(stat))
 	if err != nil {
 		return process{}, false, err
 	}
@@ -78,7 +96,7 @@ func readProcess(dir string, uid uint32, pageSize uint64) (process, bool, error)
 	if err != nil {
 		return process{}, false, err
 	}
-	if len(cmdline) == 0 || state == "Z" {
+	if len(cmdline) == 0 || parsed.state == "Z" {
 		return process{}, false, nil
 	}
 	statm, err := os.ReadFile(filepath.Join(dir, "statm")) //nolint:gosec // under /proc
@@ -92,15 +110,81 @@ func readProcess(dir string, uid uint32, pageSize uint64) (process, bool, error)
 		}
 	}
 	return process{
-		pid: pid, name: name, startTime: start, rss: rss * pageSize,
+		pid: pid, name: parsed.name, startTime: parsed.startTime, rss: rss * pageSize,
 		cmdline: strings.TrimSpace(strings.ReplaceAll(string(cmdline), "\x00", " ")),
 	}, true, nil
 }
 
-// listProcesses lists the user's processes under root, the largest first.
-// The shell itself is left out: nothing the panel does should end the
-// panel. A process that exits while being read is simply not listed.
-func listProcesses(root string, uid uint32, self int) ([]process, error) {
+// waylandCompositorPid asks the kernel who listens on the display's socket
+// (libwayland's rules for finding it): that process is the compositor, and
+// no name has to be guessed.
+func waylandCompositorPid(ctx context.Context, runtimeDir, display string) (int, error) {
+	if display == "" {
+		display = waylandDefaultDisplay
+	}
+	path := display
+	if !filepath.IsAbs(path) {
+		if !filepath.IsAbs(runtimeDir) {
+			return 0, fmt.Errorf("display %q: XDG_RUNTIME_DIR %q is not an absolute path", display, runtimeDir)
+		}
+		path = filepath.Join(runtimeDir, display)
+	}
+	dialer := net.Dialer{Timeout: waylandDialTimeout}
+	conn, err := dialer.DialContext(ctx, "unix", path)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = conn.Close() }()
+	unixConn, ok := conn.(*net.UnixConn)
+	if !ok {
+		return 0, fmt.Errorf("%s is not a unix socket", path)
+	}
+	raw, err := unixConn.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	var cred *unix.Ucred
+	var credErr error
+	if err := raw.Control(func(fd uintptr) {
+		cred, credErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
+	}); err != nil {
+		return 0, err
+	}
+	if credErr != nil {
+		return 0, fmt.Errorf("peer of %s: %w", path, credErr)
+	}
+	if cred.Pid <= 0 {
+		return 0, fmt.Errorf("peer of %s is outside this pid namespace", path)
+	}
+	return int(cred.Pid), nil
+}
+
+// sessionPids are the given processes and everything that started them:
+// ending any of them ends the session or the panel, so they are not
+// offered. A process gone while walking ends its chain.
+func sessionPids(root string, pids ...int) map[int]bool {
+	session := make(map[int]bool, len(pids)*4)
+	for _, pid := range pids {
+		for pid > 1 && !session[pid] {
+			session[pid] = true
+			stat, err := os.ReadFile(filepath.Join(root, strconv.Itoa(pid), "stat")) //nolint:gosec // under /proc
+			if err != nil {
+				break
+			}
+			parsed, err := parseProcStat(string(stat))
+			if err != nil {
+				break
+			}
+			pid = parsed.parent
+		}
+	}
+	return session
+}
+
+// listProcesses lists the user's processes under root but those of
+// hidden, the largest first. A process that exits while being read is
+// simply not listed.
+func listProcesses(root string, uid uint32, hidden map[int]bool) ([]process, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
@@ -115,7 +199,7 @@ func listProcesses(root string, uid uint32, self int) ([]process, error) {
 		case err != nil:
 			log.Printf("launcher: reading process %s: %v", e.Name(), err)
 			continue
-		case ok && p.pid != self:
+		case ok && !hidden[p.pid]:
 			out = append(out, p)
 		}
 	}
@@ -138,11 +222,11 @@ func signalProcess(root string, p process, sig unix.Signal) (err error) {
 	if err != nil {
 		return fmt.Errorf("process %d: %w", p.pid, err)
 	}
-	_, _, start, err := parseProcStat(string(stat))
+	parsed, err := parseProcStat(string(stat))
 	if err != nil {
 		return fmt.Errorf("process %d: %w", p.pid, err)
 	}
-	if start != p.startTime {
+	if parsed.startTime != p.startTime {
 		return fmt.Errorf("process %d has already exited", p.pid)
 	}
 	if err := unix.PidfdSendSignal(fd, sig, nil, 0); err != nil {
@@ -155,14 +239,22 @@ func signalProcess(root string, p process, sig unix.Signal) (err error) {
 // ever a picker's level: a search for an app should not offer to kill it.
 type Processes struct {
 	root string
+	// compositor names the session's compositor.
+	compositor func(ctx context.Context) (int, error)
 }
 
 // Spec implements Provider.
 func (*Processes) Spec() Spec { return Spec{Section: SectionNone} }
 
 // Load implements Provider.
-func (p *Processes) Load(_ context.Context, publish func([]Entry)) {
-	list, err := listProcesses(p.root, uint32(os.Getuid()), os.Getpid()) //nolint:gosec // a uid fits
+func (p *Processes) Load(ctx context.Context, publish func([]Entry)) {
+	session := []int{os.Getpid()}
+	if pid, err := p.compositor(ctx); err != nil {
+		log.Printf("launcher: finding the compositor, which the process list may now show: %v", err)
+	} else {
+		session = append(session, pid)
+	}
+	list, err := listProcesses(p.root, uint32(os.Getuid()), sessionPids(p.root, session...)) //nolint:gosec // a uid fits
 	if err != nil {
 		log.Printf("launcher: listing processes: %v", err)
 		return
@@ -201,5 +293,10 @@ func (p *Processes) Actions(e Entry) []Action {
 
 // processesLevel lists what can be ended.
 func processesLevel() *Level {
-	return &Level{Title: i18n.T("launcher-picker-processes"), Placeholder: i18n.T("launcher-placeholder-filter"), Providers: []Provider{&Processes{root: procDir}}}
+	return &Level{Title: i18n.T("launcher-picker-processes"), Placeholder: i18n.T("launcher-placeholder-filter"), Providers: []Provider{&Processes{
+		root: procDir,
+		compositor: func(ctx context.Context) (int, error) {
+			return waylandCompositorPid(ctx, os.Getenv("XDG_RUNTIME_DIR"), os.Getenv("WAYLAND_DISPLAY"))
+		},
+	}}}
 }

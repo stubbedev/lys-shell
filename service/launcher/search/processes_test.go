@@ -1,9 +1,13 @@
 package search
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,15 +21,15 @@ import (
 
 func TestParseProcStat(t *testing.T) {
 	const tail = " S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 987654 20 21"
-	name, state, start, err := parseProcStat("42 (Web (Content) x)" + tail)
+	got, err := parseProcStat("42 (Web (Content) x)" + tail)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if name != "Web (Content) x" || state != "S" || start != "987654" {
-		t.Errorf("name %q state %q start %q", name, state, start)
+	if want := (procStat{name: "Web (Content) x", state: "S", startTime: "987654", parent: 1}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
-	for _, bad := range []string{"", "42 no name S 1", "42 (short) S 1 2"} {
-		if _, _, _, err := parseProcStat(bad); err == nil {
+	for _, bad := range []string{"", "42 no name S 1", "42 (short) S 1 2", "42 (x) S nan" + tail[8:]} {
+		if _, err := parseProcStat(bad); err == nil {
 			t.Errorf("parseProcStat(%q) took it", bad)
 		}
 	}
@@ -46,7 +50,7 @@ func startSleeper(t *testing.T) *exec.Cmd {
 
 func listedPids(t *testing.T, self int) map[int]process {
 	t.Helper()
-	list, err := listProcesses(procDir, uint32(os.Getuid()), self)
+	list, err := listProcesses(procDir, uint32(os.Getuid()), map[int]bool{self: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,11 +179,120 @@ func TestTheProcessesPickerListsARealProcess(t *testing.T) {
 	cmd := startSleeper(t)
 	sleeperListed(t, cmd.Process.Pid)
 	var entries []Entry
-	(&Processes{root: procDir}).Load(context.Background(), func(e []Entry) { entries = e })
+	(&Processes{root: procDir, compositor: func(context.Context) (int, error) { return 0, errors.New("no compositor here") }}).Load(context.Background(), func(e []Entry) { entries = e })
 	found := slices.ContainsFunc(entries, func(e Entry) bool {
 		return e.ID == "process:"+strconv.Itoa(cmd.Process.Pid) && strings.Contains(e.Subtitle, strconv.Itoa(cmd.Process.Pid))
 	})
 	if !found {
 		t.Errorf("not among %d rows", len(entries))
+	}
+}
+
+func TestTheCompositorIsWhoListensOnTheDisplay(t *testing.T) {
+	dir := t.TempDir()
+	listener, err := net.Listen("unix", filepath.Join(dir, "wayland-7"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	ctx := context.Background()
+	for name, display := range map[string]string{"relative": "wayland-7", "absolute": filepath.Join(dir, "wayland-7")} {
+		pid, err := waylandCompositorPid(ctx, dir, display)
+		if err != nil || pid != os.Getpid() {
+			t.Errorf("%s display: pid %d, err %v", name, pid, err)
+		}
+	}
+}
+
+func TestNoCompositorToFindIsAnError(t *testing.T) {
+	ctx := context.Background()
+	if _, err := waylandCompositorPid(ctx, t.TempDir(), "wayland-7"); err == nil {
+		t.Error("no socket: no error")
+	}
+	if _, err := waylandCompositorPid(ctx, "", "wayland-7"); err == nil {
+		t.Error("no runtime directory: no error")
+	}
+	if _, err := waylandCompositorPid(ctx, t.TempDir(), ""); err == nil {
+		t.Error("no default socket: no error")
+	}
+}
+
+// startFamily runs a shell with a sleep under it, returning both pids.
+func startFamily(t *testing.T) (parent, child int) {
+	t.Helper()
+	cmd := exec.Command("sh", "-c", "sleep 300 & echo $!; wait")
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	line, err := bufio.NewReader(out).ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err = strconv.Atoi(strings.TrimSpace(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = unix.Kill(child, unix.SIGKILL)
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+	return cmd.Process.Pid, child
+}
+
+func TestSessionPidsFollowEveryoneWhoStartedThem(t *testing.T) {
+	parent, child := startFamily(t)
+	other := startSleeper(t)
+	session := sessionPids(procDir, child)
+	for name, pid := range map[string]int{"the process": child, "its parent": parent, "this test": os.Getpid(), "this test's parent": os.Getppid()} {
+		if !session[pid] {
+			t.Errorf("%s (%d) is not in %v", name, pid, session)
+		}
+	}
+	if session[other.Process.Pid] || session[1] {
+		t.Errorf("an unrelated process or init is in %v", session)
+	}
+}
+
+func loadedProcessIDs(t *testing.T, compositor func(context.Context) (int, error)) []string {
+	t.Helper()
+	var entries []Entry
+	(&Processes{root: procDir, compositor: compositor}).Load(context.Background(), func(e []Entry) { entries = e })
+	ids := make([]string, len(entries))
+	for i, e := range entries {
+		ids[i] = e.ID
+	}
+	return ids
+}
+
+func TestTheListHidesTheCompositorAndWhatStartedIt(t *testing.T) {
+	parent, compositor := startFamily(t)
+	other := startSleeper(t)
+	sleeperListed(t, compositor)
+	sleeperListed(t, other.Process.Pid)
+	ids := loadedProcessIDs(t, func(context.Context) (int, error) { return compositor, nil })
+	for name, pid := range map[string]int{"the compositor": compositor, "its parent": parent, "the shell": os.Getpid()} {
+		if slices.Contains(ids, "process:"+strconv.Itoa(pid)) {
+			t.Errorf("%s (%d) is offered", name, pid)
+		}
+	}
+	if !slices.Contains(ids, "process:"+strconv.Itoa(other.Process.Pid)) {
+		t.Error("an unrelated process is not offered")
+	}
+}
+
+func TestACompositorThatCannotBeFoundLeavesTheListUsable(t *testing.T) {
+	_, compositor := startFamily(t)
+	sleeperListed(t, compositor)
+	ids := loadedProcessIDs(t, func(context.Context) (int, error) { return 0, errors.New("no socket") })
+	if !slices.Contains(ids, "process:"+strconv.Itoa(compositor)) {
+		t.Error("the list is not usable")
+	}
+	if slices.Contains(ids, "process:"+strconv.Itoa(os.Getpid())) {
+		t.Error("the shell is offered")
 	}
 }
