@@ -108,6 +108,8 @@ func (k *Keyboard) Tap(code uint32) {
 		k.t.Fatal(err)
 	}
 	apptest.Dispatched(k.t, k.a)
+	apptest.Until(k.t, k.a, "the keys behind a compiling keymap", func() bool { return !k.a.Session().KeymapPending() })
+	apptest.Dispatched(k.t, k.a)
 }
 
 // CtrlTap taps the key on code with Control held.

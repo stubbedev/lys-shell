@@ -37,6 +37,8 @@ func (w *waylandLoop) onEnd(fn func()) {
 
 // do runs fn on the loop goroutine, starting the loop first, and waits
 // for it.
+var errConnectionGone = errors.New("the wayland connection is gone")
+
 func (w *waylandLoop) do(fn func(*app.Application) error) error {
 	a, ended, err := w.start()
 	if err != nil {
@@ -48,7 +50,26 @@ func (w *waylandLoop) do(fn func(*app.Application) error) error {
 	case err := <-done:
 		return err
 	case <-ended:
-		return errors.New("the wayland connection is gone")
+		return errConnectionGone
+	}
+}
+
+// answerOnLoop starts an asynchronous call on the loop and waits off it for the
+// answer it delivers, or for the connection to end: a call that answers later
+// must not hold the loop while it does.
+func answerOnLoop[T any](w *waylandLoop, ask func(a *app.Application, reply func(T))) (T, error) {
+	var zero T
+	a, ended, err := w.start()
+	if err != nil {
+		return zero, err
+	}
+	answer := make(chan T, 1)
+	a.Invoke(func() { ask(a, func(v T) { answer <- v }) })
+	select {
+	case v := <-answer:
+		return v, nil
+	case <-ended:
+		return zero, errConnectionGone
 	}
 }
 

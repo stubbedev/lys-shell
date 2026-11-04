@@ -131,6 +131,7 @@ func (hs *harness) open(t *testing.T) app.LayerConfig {
 	t.Helper()
 	select {
 	case c := <-hs.opened:
+		hs.do(func() {})
 		return c
 	case <-time.After(treetest.Liveness):
 		t.Fatal("no dialog opened")

@@ -13,30 +13,35 @@ type waylandShortcuts struct {
 // the loop for each press and release of a registered key.
 func waylandShortcutsStarter(loop *waylandLoop) func(func(string, bool)) (shortcutDevice, error) {
 	return func(onEvent func(key string, pressed bool)) (shortcutDevice, error) {
-		err := loop.do(func(a *app.Application) error {
-			if !a.GlobalShortcutsAvailable() {
-				return app.ErrGlobalShortcutsUnavailable
-			}
-			return nil
+		available, err := answerOnLoop(loop, func(a *app.Application, reply func(bool)) {
+			a.GlobalShortcutsAvailable(reply)
 		})
 		if err != nil {
 			return nil, err
+		}
+		if !available {
+			return nil, app.ErrGlobalShortcutsUnavailable
 		}
 		return waylandShortcuts{loop, onEvent}, nil
 	}
 }
 
 func (w waylandShortcuts) register(key, id, appID, description, trigger string) (func(), error) {
-	var s *app.GlobalShortcut
-	err := w.loop.do(func(a *app.Application) error {
-		var err error
-		s, err = a.RegisterGlobalShortcut(id, appID, description, trigger, func(pressed bool, _ uint64) {
+	type registered struct {
+		shortcut *app.GlobalShortcut
+		err      error
+	}
+	r, err := answerOnLoop(w.loop, func(a *app.Application, reply func(registered)) {
+		a.RegisterGlobalShortcut(id, appID, description, trigger, func(pressed bool, _ uint64) {
 			go w.onEvent(key, pressed)
-		})
-		return err
+		}, func(s *app.GlobalShortcut, err error) { reply(registered{s, err}) })
 	})
 	if err != nil {
 		return nil, err
 	}
+	if r.err != nil {
+		return nil, r.err
+	}
+	s := r.shortcut
 	return func() { _ = w.loop.do(func(*app.Application) error { s.Destroy(); return nil }) }, nil
 }
