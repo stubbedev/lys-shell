@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -119,16 +120,262 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// as the Rust shell's revealers do; lys-ui's own surface fades would
 	// stack on top of them.
 	application.SetSurfaceMotion(false)
-	// current is the live config snapshot the long-lived services read.
-	current := &atomic.Pointer[config.Config]{}
-	current.Store(cfg)
-	// osdRef is the OSD once it exists; the recorder toasts through it.
-	osdRef := &atomic.Pointer[osd.Osd]{}
+	outputs := sess.Outputs()
+	if len(outputs) == 0 {
+		return errors.New("bar: no output to draw on")
+	}
 	// Programmatic copies (the screenshot host) and the ctrl+c/v keys
 	// share one clipboard.
 	if application.Clipboard() == nil {
 		application.SetClipboard(app.NewClipboard(sess))
 	}
+	s := newShellStart(application, sess, cfg, svc)
+	defer s.down.run()
+	s.releaseHold = application.Hold()
+	gate := newStartGate(s.mount)
+	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess, gate.done)
+	defer stopWallpaper()
+	s.wall = wall
+	servicesUp := make(chan struct{})
+	go func() {
+		defer close(servicesUp)
+		s.startServices()
+		application.Invoke(gate.done)
+	}()
+	err = application.Run()
+	<-servicesUp
+	if s.err != nil {
+		return s.err
+	}
+	return err
+}
+
+type startGate struct {
+	pending int
+	open    func()
+}
+
+func newStartGate(open func()) *startGate { return &startGate{pending: 2, open: open} }
+
+func (g *startGate) done() {
+	g.pending--
+	if g.pending == 0 {
+		g.open()
+	}
+}
+
+type teardown []func()
+
+func (t *teardown) add(fn func()) { *t = append(*t, fn) }
+
+func (t *teardown) run() {
+	for _, fn := range slices.Backward(*t) {
+		fn()
+	}
+}
+
+type shellSession interface {
+	Outputs() []*app.Output
+	wallpapershell.OutputWatcher
+}
+
+type shellStart struct {
+	application *app.Application
+	sess        shellSession
+	cfg         *config.Config
+	svc         *config.Service
+	// current is the live config snapshot the long-lived services read.
+	current *atomic.Pointer[config.Config]
+	// osdRef is the OSD once it exists; the recorder toasts through it.
+	osdRef *atomic.Pointer[osd.Osd]
+	ctx    ModuleContext
+	// lateStarts are the clients that could not start without their
+	// service; each starts when the service appears.
+	lateStarts   map[string]lateStart
+	backlights   *brightness.System
+	inhibitState *idleinhibit.State
+	weatherSvc   *weather.Service
+	notifSvc     *notifications.Service
+	customUpd    *customUpdates
+	wall         *wallpapershell.Shell
+	releaseHold  func()
+	down         teardown
+	err          error
+}
+
+func newShellStart(application *app.Application, sess shellSession, cfg *config.Config, svc *config.Service) *shellStart {
+	s := &shellStart{
+		application: application, sess: sess, cfg: cfg, svc: svc,
+		current: &atomic.Pointer[config.Config]{},
+		osdRef:  &atomic.Pointer[osd.Osd]{},
+		ctx:     ModuleContext{Config: cfg, App: application},
+	}
+	s.current.Store(cfg)
+	return s
+}
+
+func (s *shellStart) fail(err error) {
+	s.err = err
+	s.application.Quit()
+}
+
+func (s *shellStart) startServices() {
+	if detectCompositor() == compositorHyprland {
+		if conn, err := hyprland.Connect(); err != nil {
+			log.Printf("bar: Hyprland modules will not appear: %v", err)
+		} else {
+			s.ctx.Hyprland = conn
+		}
+	}
+	if battery, err := upower.NewSystem(); err == nil {
+		s.down.add(func() { _ = battery.Close() })
+		s.ctx.Battery = battery
+	}
+	backlights := brightness.NewSystem(s.cfg.Brightness.EnableExternal)
+	s.backlights = backlights
+	s.down.add(func() { _ = backlights.Close() })
+	s.ctx.Brightness = backlights
+	audio := pulse.Start("")
+	s.down.add(func() { _ = audio.Close() })
+	s.ctx.Pulse = audio
+	// lateStarts are the clients that could not start without their
+	// service; each starts when the service appears.
+	s.lateStarts = map[string]lateStart{}
+	if bt, err := bluetooth.NewSystem(); err == nil {
+		s.down.add(func() { _ = bt.Close() })
+		s.ctx.Bluetooth = bt
+		// Every Rust bar warms all its dropdowns, so the bluetooth
+		// dropdown's pairing watcher runs whether or not a bluetooth
+		// module is placed: a request still reaches the user.
+		startBtPairingNotifier(bt)
+	} else {
+		log.Printf("bluetooth: %v", err)
+		s.lateStarts[bluetooth.BusName] = func() (func(*ModuleContext), func(), error) {
+			bt, err := bluetooth.NewSystem()
+			if err != nil {
+				return nil, nil, err
+			}
+			return func(c *ModuleContext) {
+				c.Bluetooth = bt
+				startBtPairingNotifier(bt)
+			}, func() { _ = bt.Close() }, nil
+		}
+	}
+	if nm, err := network.NewSystem(); err == nil {
+		s.down.add(func() { _ = nm.Close() })
+		s.ctx.Network = nm
+	}
+	bwLife, stopBitwarden := context.WithCancel(context.Background())
+	s.down.add(stopBitwarden)
+	s.ctx.Bitwarden = newBitwardenHost(bwLife, s.application, s.current.Load)
+	networkVault := s.ctx.Bitwarden.networkVault()
+	if svc, stop, err := startNetworkService(networkVault); err == nil {
+		s.down.add(stop)
+		s.ctx.Networking = svc
+	} else {
+		log.Printf("network: %v", err)
+		s.lateStarts[network.BusName] = func() (func(*ModuleContext), func(), error) {
+			svc, stop, err := startNetworkService(networkVault)
+			if err != nil {
+				return nil, nil, err
+			}
+			return func(c *ModuleContext) { c.Networking = svc }, stop, nil
+		}
+	}
+	if pp, err := powerprofiles.NewSystem(); err == nil {
+		s.down.add(func() { _ = pp.Close() })
+		s.ctx.PowerProfiles = pp
+	}
+	if media, err := mpris.NewSession(s.cfg.Media.PlayersIgnored, s.cfg.Media.PlayerPriority); err == nil {
+		s.down.add(func() { _ = media.Close() })
+		s.ctx.Media = media
+	}
+	// The idle-inhibit service owns its state here and serves it on the
+	// session bus for the `lys-shell idle` CLI.
+	s.inhibitState = idleinhibit.NewState(s.cfg.IdleInhibit.StartupDuration.Duration())
+	s.ctx.IdleInhibit = s.inhibitState
+	s.ctx.Treeman = treeman.New("treeman")
+	// The weather service polls for the whole session (bootstrap/weather.rs);
+	// after its first fetch it only polls while a module or dropdown
+	// follows it.
+	s.weatherSvc = weather.New(weatherSettings(s.cfg.Weather))
+	s.down.add(s.weatherSvc.Close)
+	s.ctx.Weather = s.weatherSvc
+	// The notification service owns the well-known name on the session
+	// bus; other senders deliver through it.
+	s.notifSvc = startNotifications(s.cfg.Notification)
+	s.ctx.Notifications = s.notifSvc
+	sniStore := sni.NewStore()
+	s.ctx.SNI = sniStore
+	if conn, err := dbus.ConnectSessionBus(); err == nil {
+		s.down.add(func() { _ = conn.Close() })
+		if s.notifSvc != nil {
+			server, err := notifications.Serve(conn, s.notifSvc)
+			if err != nil {
+				log.Printf("notifications: daemon: %v", err)
+			} else {
+				s.down.add(func() { _ = server.Release() })
+			}
+		}
+		// The recorder asks the share picker on this bus for an output or
+		// a region, records it on the GPU with audio from the audio service,
+		// and reports through the OSD and desktop notifications.
+		stateDir, ok := xdg.OS.StateDir(version.Name)
+		if !ok {
+			log.Print("recorder: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path; a picked source is not remembered")
+		}
+		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(s.application, s.sess.Outputs), stateDir),
+			func() config.RecorderConfig { return s.current.Load().Recorder },
+			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
+				if o := s.osdRef.Load(); o != nil {
+					o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon, DurationMS: &ms})
+				}
+			}, Notify: desktopnotify.Notify})
+		s.ctx.Recorder = recState
+		if release, err := recorder.NewDaemon(recState).Export(conn); err == nil {
+			s.down.add(release)
+		} else {
+			log.Printf("recorder: daemon: %v", err)
+		}
+		floor := func() float64 { return float64(s.current.Load().Brightness.MinBrightness) }
+		focus := screenshot.CompositorFocus{Hyprland: s.ctx.Hyprland}
+		if release, err := brightness.NewDaemon(backlights, focus.FocusedOutput, floor).Export(conn); err == nil {
+			s.down.add(release)
+		} else {
+			log.Printf("brightness: daemon: %v", err)
+		}
+		if release, err := pulse.NewDaemon(audio).Export(conn); err == nil {
+			s.down.add(release)
+		} else {
+			log.Printf("audio: daemon: %v", err)
+		}
+	}
+	s.down.add(startMail(&s.ctx))
+	sniHost, err := sni.NewHost(sniStore)
+	if err == nil {
+		s.down.add(func() { _ = sniHost.Close() })
+		s.ctx.Tray = NewTrayService(sniHost)
+	} else {
+		log.Printf("systray: host: %v", err)
+	}
+	s.down.add(serveCLIDaemons(s.ctx, sniHost))
+	s.customUpd = newCustomUpdates()
+	s.ctx.CustomUpdates = s.customUpd
+	s.ctx.Attachers = &[]interface{ Attach(app.Host) }{}
+	if conn, err := dbus.ConnectSessionBus(); err == nil {
+		s.down.add(func() { _ = conn.Close() })
+		daemon := idleinhibit.NewDaemon(s.inhibitState)
+		if release, err := daemon.Export(conn); err == nil {
+			s.down.add(release)
+		} else {
+			log.Printf("idle-inhibit: daemon: %v", err)
+		}
+	}
+}
+
+func (s *shellStart) mount() {
+	application, sess, cfg, svc := s.application, s.sess, s.cfg, s.svc
+	current, osdRef := s.current, s.osdRef
 	// The bars load the stylesheet bundle; the surfaces it does not
 	// reach (OSD, popups, dropdowns) paint from the same resolved
 	// palette. The shell gives the user a starter stylesheet to edit.
@@ -137,17 +384,19 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	theme := apptheme.New(cfg)
 	theme.WatchUserStyles(application)
-	defer apptheme.Setup(application)()
+	s.down.add(apptheme.Setup(application))
 	apptheme.ReportMissingIcons(cfg, config.StderrDiagnostics)
-	defer followReducedMotion(application, cfg, svc)()
+	s.down.add(followReducedMotion(application, cfg, svc))
 	// rt is what the bars are built from; a config reload or a new
 	// palette re-derives it and rebuilds them.
 	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}
 	if err := rt.derive(cfg); err != nil {
-		return err
+		s.fail(err)
+		return
 	}
 	font := rt.font
-	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &rt.moduleStyle, Theme: theme}
+	baseCtx := s.ctx
+	baseCtx.Font, baseCtx.Style, baseCtx.Theme = font, &rt.moduleStyle, theme
 	if svc != nil {
 		baseCtx.SetConfig = configSetter(svc)
 	}
@@ -174,190 +423,31 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// without data-control simply has none (bootstrap/mod.rs).
 	history, err := clipboard.DefaultHistory(cfg.Clipboard.HistoryMiB.Budget())
 	if err != nil {
-		return fmt.Errorf("bar: clipboard history: %w", err)
+		s.fail(fmt.Errorf("bar: clipboard history: %w", err))
+		return
 	}
 	if clip, err := clipboard.Start(application, history); err == nil {
 		baseCtx.Clipboard = clip
-		defer clip.Close()
+		s.down.add(clip.Close)
 	} else {
 		history.Close()
 		if !errors.Is(err, clipboard.ErrNoDataControl) {
 			log.Printf("bar: clipboard history: %v", err)
 		}
 	}
-	if detectCompositor() == compositorHyprland {
-		if conn, err := hyprland.Connect(); err != nil {
-			log.Printf("bar: Hyprland modules will not appear: %v", err)
-		} else {
-			baseCtx.Hyprland = conn
-		}
-	}
-	if battery, err := upower.NewSystem(); err == nil {
-		defer func() { _ = battery.Close() }()
-		baseCtx.Battery = battery
-	}
-	backlights := brightness.NewSystem(cfg.Brightness.EnableExternal)
-	defer func() { _ = backlights.Close() }()
-	baseCtx.Brightness = backlights
-	audio := pulse.Start("")
-	defer func() { _ = audio.Close() }()
-	baseCtx.Pulse = audio
-	// lateStarts are the clients that could not start without their
-	// service; each starts when the service appears.
-	lateStarts := map[string]lateStart{}
-	if bt, err := bluetooth.NewSystem(); err == nil {
-		defer func() { _ = bt.Close() }()
-		baseCtx.Bluetooth = bt
-		// Every Rust bar warms all its dropdowns, so the bluetooth
-		// dropdown's pairing watcher runs whether or not a bluetooth
-		// module is placed: a request still reaches the user.
-		startBtPairingNotifier(bt)
-	} else {
-		log.Printf("bluetooth: %v", err)
-		lateStarts[bluetooth.BusName] = func() (func(*ModuleContext), func(), error) {
-			bt, err := bluetooth.NewSystem()
-			if err != nil {
-				return nil, nil, err
-			}
-			return func(c *ModuleContext) {
-				c.Bluetooth = bt
-				startBtPairingNotifier(bt)
-			}, func() { _ = bt.Close() }, nil
-		}
-	}
-	if nm, err := network.NewSystem(); err == nil {
-		defer func() { _ = nm.Close() }()
-		baseCtx.Network = nm
-	}
-	bwLife, stopBitwarden := context.WithCancel(context.Background())
-	defer stopBitwarden()
-	baseCtx.Bitwarden = newBitwardenHost(bwLife, application, current.Load)
-	networkVault := baseCtx.Bitwarden.networkVault()
-	if svc, stop, err := startNetworkService(networkVault); err == nil {
-		defer stop()
-		baseCtx.Networking = svc
-	} else {
-		log.Printf("network: %v", err)
-		lateStarts[network.BusName] = func() (func(*ModuleContext), func(), error) {
-			svc, stop, err := startNetworkService(networkVault)
-			if err != nil {
-				return nil, nil, err
-			}
-			return func(c *ModuleContext) { c.Networking = svc }, stop, nil
-		}
-	}
-	if pp, err := powerprofiles.NewSystem(); err == nil {
-		defer func() { _ = pp.Close() }()
-		baseCtx.PowerProfiles = pp
-	}
-	if media, err := mpris.NewSession(cfg.Media.PlayersIgnored, cfg.Media.PlayerPriority); err == nil {
-		defer func() { _ = media.Close() }()
-		baseCtx.Media = media
-	}
-	// The idle-inhibit service owns its state here and serves it on the
-	// session bus for the `lys-shell idle` CLI.
-	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration.Duration())
-	baseCtx.IdleInhibit = inhibitState
 	// One inhibitor, held on a bar surface while the user's toggle or an
 	// app's portal hold asks for it.
 	var holder *idleHolder
 	if application.IdleInhibitAvailable() {
-		holder = &idleHolder{state: inhibitState, inhibit: application.InhibitIdle}
-		changes, stop := inhibitState.Changes()
-		defer stop()
+		holder = &idleHolder{state: s.inhibitState, inhibit: application.InhibitIdle}
+		changes, stop := s.inhibitState.Changes()
+		s.down.add(stop)
 		go func() {
 			for range changes {
 				application.Invoke(holder.sync)
 			}
 		}()
 	}
-	baseCtx.Treeman = treeman.New("treeman")
-	// The weather service polls for the whole session (bootstrap/weather.rs);
-	// after its first fetch it only polls while a module or dropdown
-	// follows it.
-	weatherSvc := weather.New(weatherSettings(cfg.Weather))
-	defer weatherSvc.Close()
-	baseCtx.Weather = weatherSvc
-	// The notification service owns the well-known name on the session
-	// bus; other senders deliver through it.
-	notifSvc := startNotifications(cfg.Notification)
-	baseCtx.Notifications = notifSvc
-	sniStore := sni.NewStore()
-	baseCtx.SNI = sniStore
-	if conn, err := dbus.ConnectSessionBus(); err == nil {
-		defer func() { _ = conn.Close() }()
-		if notifSvc != nil {
-			server, err := notifications.Serve(conn, notifSvc)
-			if err != nil {
-				log.Printf("notifications: daemon: %v", err)
-			} else {
-				defer func() { _ = server.Release() }()
-			}
-		}
-		// The recorder asks the share picker on this bus for an output or
-		// a region, records it on the GPU with audio from the audio service,
-		// and reports through the OSD and desktop notifications.
-		stateDir, ok := xdg.OS.StateDir(version.Name)
-		if !ok {
-			log.Print("recorder: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path; a picked source is not remembered")
-		}
-		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(application, sess.Outputs), stateDir),
-			func() config.RecorderConfig { return current.Load().Recorder },
-			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
-				if o := osdRef.Load(); o != nil {
-					o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon, DurationMS: &ms})
-				}
-			}, Notify: desktopnotify.Notify})
-		baseCtx.Recorder = recState
-		if release, err := recorder.NewDaemon(recState).Export(conn); err == nil {
-			defer release()
-		} else {
-			log.Printf("recorder: daemon: %v", err)
-		}
-		floor := func() float64 { return float64(current.Load().Brightness.MinBrightness) }
-		focus := screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}
-		if release, err := brightness.NewDaemon(backlights, focus.FocusedOutput, floor).Export(conn); err == nil {
-			defer release()
-		} else {
-			log.Printf("brightness: daemon: %v", err)
-		}
-		if release, err := pulse.NewDaemon(audio).Export(conn); err == nil {
-			defer release()
-		} else {
-			log.Printf("audio: daemon: %v", err)
-		}
-	}
-	stopMail := startMail(&baseCtx)
-	defer stopMail()
-	sniHost, err := sni.NewHost(sniStore)
-	if err == nil {
-		defer func() { _ = sniHost.Close() }()
-		baseCtx.Tray = NewTrayService(sniHost)
-	} else {
-		log.Printf("systray: host: %v", err)
-	}
-	defer serveCLIDaemons(baseCtx, sniHost)()
-	customUpd := newCustomUpdates()
-	baseCtx.CustomUpdates = customUpd
-	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
-	if conn, err := dbus.ConnectSessionBus(); err == nil {
-		defer func() { _ = conn.Close() }()
-		daemon := idleinhibit.NewDaemon(inhibitState)
-		if release, err := daemon.Export(conn); err == nil {
-			defer release()
-		} else {
-			log.Printf("idle-inhibit: daemon: %v", err)
-		}
-	}
-
-	outputs := sess.Outputs()
-	if len(outputs) == 0 {
-		return errors.New("bar: no output to draw on")
-	}
-	// Wallpapers render on their own Background layers; hotplugged
-	// outputs join once their connector name is known.
-	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess)
-	defer stopWallpaper()
 	osdSrv := osd.New(osd.Deps{
 		Open: func(lc app.LayerConfig) (osd.Window, error) {
 			w, err := application.NewLayer(lc)
@@ -374,15 +464,15 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}, cfg)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, current.Load, baseCtx.Hyprland, baseCtx.Clipboard, font, theme.Sheet)
-	defer servePortalHosts(application, sess.Outputs, current.Load, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput, font, theme.Sheet)()
-	defer captureSvc.close()
+	s.down.add(servePortalHosts(application, sess.Outputs, current.Load, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput, font, theme.Sheet))
+	s.down.add(captureSvc.close)
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
-	if notifSvc != nil {
-		popupHost = popups.New(application, notifSvc, cfg, font, theme.Sheet, sess.Outputs)
+	if s.notifSvc != nil {
+		popupHost = popups.New(application, s.notifSvc, cfg, font, theme.Sheet, sess.Outputs)
 		go popupHost.Run()
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
@@ -398,18 +488,18 @@ func run(cfg *config.Config, svc *config.Service) error {
 		layout, show := barLayoutFor(current.Load(), output.Name)
 		bars.plug(output, layout, show)
 	}
-	for _, output := range outputs {
+	for _, output := range sess.Outputs() {
 		plugOutput(output)
 	}
-	defer sess.WatchOutputIdentity(plugOutput)()
-	defer sess.WatchOutputs(nil, func(output *app.Output) {
+	s.down.add(sess.WatchOutputIdentity(plugOutput))
+	s.down.add(sess.WatchOutputs(nil, func(output *app.Output) {
 		bars.unplug(output)
 		osdSrv.DetachOutput(output.Name)
 		if popupHost != nil {
 			popupHost.DetachOutput(output.Name)
 		}
 		rt.ctx.Dropdowns.detachHost(output.Name)
-	})()
+	}))
 	// restyle re-derives the palette, styles, and font from cfg and
 	// rebuilds the bars from them (the Rust modules re-render from their
 	// property watches, and the CSS watcher recompiles the bundle).
@@ -426,12 +516,12 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if sysConn, err := dbus.ConnectSystemBus(); err != nil {
 		log.Printf("bar: system bus: %v; modules of services that start later will not appear", err)
 	} else {
-		defer func() { _ = sysConn.Close() }()
+		s.down.add(func() { _ = sysConn.Close() })
 		late := &lateServices{}
-		defer late.stop()
+		s.down.add(late.stop)
 		lateCtx, stopLate := context.WithCancel(context.Background())
-		defer stopLate()
-		if err := late.watch(lateCtx, sysConn, lateStarts, application.Invoke, func(apply func(*ModuleContext)) {
+		s.down.add(stopLate)
+		if err := late.watch(lateCtx, sysConn, s.lateStarts, application.Invoke, func(apply func(*ModuleContext)) {
 			if apply != nil {
 				apply(&rt.ctx)
 			}
@@ -458,11 +548,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 				rt.ctx.Dropdowns.setConfig(next)
 			}
 			osdSrv.SetConfig(next)
-			backlights.SetExternal(next.Brightness.EnableExternal)
-			applyNotificationConfig(notifSvc, next.Notification)
-			weatherSvc.Configure(weatherSettings(next.Weather))
-			if wall != nil {
-				wall.SetConfig(next)
+			s.backlights.SetExternal(next.Brightness.EnableExternal)
+			applyNotificationConfig(s.notifSvc, next.Notification)
+			s.weatherSvc.Configure(weatherSettings(next.Weather))
+			if s.wall != nil {
+				s.wall.SetConfig(next)
 			}
 			if popupHost != nil {
 				popupHost.SetConfig(next)
@@ -473,16 +563,16 @@ func run(cfg *config.Config, svc *config.Service) error {
 				}
 			}
 		})
-		defer svc.Subscribe(reloads.push)()
+		s.down.add(svc.Subscribe(reloads.push))
 		// A secrets reload re-resolves the weather API keys
 		// (spawn_secrets_reload_watcher).
-		defer svc.SubscribeSecrets(func() { weatherSvc.Configure(weatherSettings(current.Load().Weather)) })()
+		s.down.add(svc.SubscribeSecrets(func() { s.weatherSvc.Configure(weatherSettings(current.Load().Weather)) }))
 	}
 	// A fresh color extraction re-resolves the provider palette and
 	// recompiles the bundle, the Rust shell's theme hot-apply.
-	if wall != nil {
-		ticks, stopTicks := wall.Service().Extracted()
-		defer stopTicks()
+	if s.wall != nil {
+		ticks, stopTicks := s.wall.Service().Extracted()
+		s.down.add(stopTicks)
 		go func() {
 			for range ticks {
 				application.Invoke(func() {
@@ -503,7 +593,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// or off (the Rust OsdEnabledChanged). The lock-key source, which opens
 	// input devices, follows the setting instead.
 	osdCtx, stopOsd := context.WithCancel(context.Background())
-	defer stopOsd()
+	s.down.add(stopOsd)
 	go func() {
 		var layouts osd.Layouts
 		if source, err := keyboardLayoutSource(baseCtx); err == nil {
@@ -522,19 +612,19 @@ func run(cfg *config.Config, svc *config.Service) error {
 			baseCtx.Bitwarden.lockVault()
 		}
 	})
-	defer stopLock()
-	defer serveShellIPC(application, bars, func() bool {
+	s.down.add(stopLock)
+	s.down.add(serveShellIPC(application, bars, func() bool {
 		locker.Lock()
 		return true
 	}, func(monitor string) error {
 		return toggleDashboardOnLoop(application, rt, monitor, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput)
-	})()
+	}))
 	// The launcher surface serves `lys-shell launcher` sessions.
-	defer startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font)()
+	s.down.add(startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font))
 	// The widget socket carries out-of-process pushes (`lys-shell toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {
-		defer stop()
+		s.down.add(stop)
 	} else {
 		log.Printf("widget socket: %v", err)
 	}
@@ -545,10 +635,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}()
 	go func() {
 		for update := range widgetSrv.Updates() {
-			customUpd.dispatch(update.ID, update.Output)
+			s.customUpd.dispatch(update.ID, update.Output)
 		}
 	}()
-	return application.Run()
+	s.releaseHold()
 }
 
 // barConfigFor shows one output's bar on lys-ui's bar window: anchored

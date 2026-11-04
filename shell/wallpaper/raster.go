@@ -29,11 +29,12 @@ type rasterKey struct {
 // raster is a wallpaper ready to draw, its pixels off the Go heap, and
 // the number of surfaces that hold it.
 type raster struct {
-	key   rasterKey
-	image render.StillImage
-	scale widget.ImageScale
-	pix   memory.Slice[byte]
-	refs  int
+	key     rasterKey
+	image   render.StillImage
+	scale   widget.ImageScale
+	pix     memory.Slice[byte]
+	refs    int
+	unsaved *sourceID
 }
 
 // size is the raster's pixel size.
@@ -50,6 +51,12 @@ type rasterDeps struct {
 	// forget drops the renderer's copy of a raster nothing draws any
 	// more, before its pixels are freed.
 	forget func(render.ImageID)
+	cache  *rasterCache
+}
+
+type waiter struct {
+	ready  func(*raster)
+	failed func()
 }
 
 // rasters makes, shares and frees the wallpaper rasters. A file is
@@ -66,7 +73,7 @@ type rasters struct {
 	// live are the rasters held now.
 	live map[rasterKey]*raster
 	// waiting are the keys being made and who waits for each.
-	waiting map[rasterKey][]func(*raster)
+	waiting map[rasterKey][]waiter
 	// decoding are the files being decoded and the keys to make from
 	// each.
 	decoding map[string][]rasterKey
@@ -76,30 +83,52 @@ func newRasters(d rasterDeps) *rasters {
 	return &rasters{
 		d:        d,
 		live:     map[rasterKey]*raster{},
-		waiting:  map[rasterKey][]func(*raster){},
+		waiting:  map[rasterKey][]waiter{},
 		decoding: map[string][]rasterKey{},
 	}
 }
 
-// acquire hands done the raster for key, on the loop, once it is made:
-// at once when it is live. done holds one reference, which it gives
+// acquire hands ready the raster for key, on the loop, once it is made:
+// at once when it is live. ready holds one reference, which it gives
 // back with release, whether it shows the raster or not. A file that
-// cannot be decoded or rasterized is logged and done is never called.
-func (rs *rasters) acquire(key rasterKey, done func(*raster)) {
+// cannot be decoded or rasterized is logged and failed runs instead.
+func (rs *rasters) acquire(key rasterKey, ready func(*raster), failed func()) {
 	if r, ok := rs.live[key]; ok {
 		r.refs++
-		done(r)
+		ready(r)
 		return
 	}
+	w := waiter{ready: ready, failed: failed}
 	if waiters, ok := rs.waiting[key]; ok {
-		rs.waiting[key] = append(waiters, done)
+		rs.waiting[key] = append(waiters, w)
 		return
 	}
-	rs.waiting[key] = []func(*raster){done}
+	rs.waiting[key] = []waiter{w}
 	if key.path == builtinWallpaper {
 		rs.work.Go(rs.d.spawn, func() { rs.deliver(key, func() (*raster, error) { return builtinRaster(&rs.mem, key.box, key.known) }) })
 		return
 	}
+	if rs.d.cache == nil || !key.known {
+		rs.decode(key)
+		return
+	}
+	rs.work.Go(rs.d.spawn, func() {
+		if rs.work.Closed() {
+			return
+		}
+		r, err := rs.d.cache.load(&rs.mem, key)
+		if err != nil {
+			log.Printf("wallpaper: decoding %s again: %v", key.path, err)
+		}
+		if r == nil {
+			rs.d.invoke(func() { rs.decode(key) })
+			return
+		}
+		rs.work.Deliver(rs.d.invoke, func() { rs.made(key, r, nil) }, func() { rs.free(key, r) })
+	})
+}
+
+func (rs *rasters) decode(key rasterKey) {
 	if keys, ok := rs.decoding[key.path]; ok {
 		rs.decoding[key.path] = append(keys, key)
 		return
@@ -109,28 +138,42 @@ func (rs *rasters) acquire(key rasterKey, done func(*raster)) {
 		if rs.work.Closed() {
 			return
 		}
+		source, cacheable := statSource(key.path)
 		src, err := rs.d.decode(&rs.mem, key.path)
 		if err != nil {
 			rs.d.invoke(func() { rs.undecodable(key.path, err) })
 			return
 		}
-		rs.work.Deliver(rs.d.invoke, func() { rs.decoded(key.path, src) }, func() { freeSource(key.path, src) })
+		var saved *sourceID
+		if cacheable {
+			saved = &source
+		}
+		rs.work.Deliver(rs.d.invoke, func() { rs.decoded(key.path, src, saved) }, func() { freeSource(key.path, src) })
 	})
 }
 
-// undecodable drops every key asked of path.
+// undecodable fails every key asked of path.
 func (rs *rasters) undecodable(path string, err error) {
 	log.Printf("wallpaper: cannot decode wallpaper %s: %v", path, err)
-	for _, key := range rs.decoding[path] {
-		delete(rs.waiting, key)
-	}
+	keys := rs.decoding[path]
 	delete(rs.decoding, path)
+	for _, key := range keys {
+		rs.fail(key)
+	}
+}
+
+func (rs *rasters) fail(key rasterKey) {
+	waiters := rs.waiting[key]
+	delete(rs.waiting, key)
+	for _, w := range waiters {
+		w.failed()
+	}
 }
 
 // decoded makes every key asked of path from its decoded image, each
 // off the loop, and frees the image once the last of them is made or
 // never starts.
-func (rs *rasters) decoded(path string, src imagedecode.Decoded) {
+func (rs *rasters) decoded(path string, src imagedecode.Decoded, source *sourceID) {
 	keys := rs.decoding[path]
 	delete(rs.decoding, path)
 	var users atomic.Int64
@@ -143,7 +186,7 @@ func (rs *rasters) decoded(path string, src imagedecode.Decoded) {
 	for _, key := range keys {
 		if !rs.work.Go(rs.d.spawn, func() {
 			defer done()
-			rs.make(key, src.Image)
+			rs.make(key, src.Image, source)
 		}) {
 			done()
 		}
@@ -162,8 +205,14 @@ func freeSource(path string, src imagedecode.Decoded) {
 // make rasterizes key from img off the loop and hands the raster to
 // the loop, which frees it instead when it never takes it. Nothing is
 // made once the rasters are closing.
-func (rs *rasters) make(key rasterKey, img image.Image) {
-	rs.deliver(key, func() (*raster, error) { return rasterize(&rs.mem, img, key.fit, key.box, key.known) })
+func (rs *rasters) make(key rasterKey, img image.Image, source *sourceID) {
+	rs.deliver(key, func() (*raster, error) {
+		r, err := rasterize(&rs.mem, img, key.fit, key.box, key.known)
+		if err == nil && key.known {
+			r.unsaved = source
+		}
+		return r, err
+	})
 }
 
 // deliver runs draw off the loop and hands its raster to the loop, which
@@ -180,18 +229,38 @@ func (rs *rasters) deliver(key rasterKey, draw func() (*raster, error)) {
 	rs.work.Deliver(rs.d.invoke, func() { rs.made(key, r, nil) }, func() { rs.free(key, r) })
 }
 
-// made hands a new raster to everyone waiting for its key.
+// made hands a new raster to everyone waiting for its key, and saves it
+// when it came from a decode.
 func (rs *rasters) made(key rasterKey, r *raster, err error) {
-	waiters := rs.waiting[key]
-	delete(rs.waiting, key)
 	if err != nil {
 		log.Printf("wallpaper: cannot prepare wallpaper %s: %v", key.path, err)
+		rs.fail(key)
 		return
 	}
+	waiters := rs.waiting[key]
+	delete(rs.waiting, key)
 	r.key, r.refs = key, len(waiters)
 	rs.live[key] = r
-	for _, done := range waiters {
-		done(r)
+	rs.save(r)
+	for _, w := range waiters {
+		w.ready(r)
+	}
+}
+
+func (rs *rasters) save(r *raster) {
+	if rs.d.cache == nil || r.unsaved == nil {
+		return
+	}
+	source := *r.unsaved
+	r.unsaved = nil
+	r.refs++
+	if !rs.work.Go(rs.d.spawn, func() {
+		if err := rs.d.cache.store(r, source); err != nil {
+			log.Printf("wallpaper: next login decodes %s again: %v", r.key.path, err)
+		}
+		rs.work.Deliver(rs.d.invoke, func() { rs.release(r) }, func() { rs.free(r.key, r) })
+	}) {
+		rs.release(r)
 	}
 }
 

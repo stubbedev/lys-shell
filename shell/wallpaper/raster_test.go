@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"log"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -112,10 +113,14 @@ type harness struct {
 	forgotten []render.ImageID
 	// closed counts each output's closed layers; onClosed is its
 	// compositor-side close.
-	closed   map[string]int
-	onClosed map[string]func()
-	ticks    map[string]func()
-	ended    atomic.Bool
+	refuseLayers bool
+	opened       map[string]int
+	onPresented  map[string]func()
+	closed       map[string]int
+	onClosed     map[string]func()
+	ticks        map[string]func()
+	limit        func()
+	ended        atomic.Bool
 }
 
 // newHarness starts a shell on monitors, all showing a.png, with the
@@ -126,6 +131,7 @@ func newHarness(t *testing.T, kind config.AnimationType, monitors ...string) *ha
 		t: t, dir: files(t, "a.png", "b.png", "c.png"),
 		decodable: map[string]bool{}, decodes: map[string]int{},
 		closed: map[string]int{}, onClosed: map[string]func(){}, ticks: map[string]func(){},
+		opened: map[string]int{}, onPresented: map[string]func(){},
 	}
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, photo(120, 80), nil); err != nil {
@@ -146,13 +152,22 @@ func newHarness(t *testing.T, kind config.AnimationType, monitors ...string) *ha
 	ui := loop{
 		newLayer: func(c app.LayerConfig) (func(), error) {
 			name := c.Output.Name
+			if h.refuseLayers {
+				return nil, errors.New("no layer for you")
+			}
 			h.onClosed[name] = c.OnClosed
+			h.opened[name]++
+			h.onPresented[name] = c.OnPresented
 			return func() { h.closed[name]++ }, nil
 		},
 		every: func(_ time.Duration, fn func()) func() {
 			name := h.tickingOutput()
 			h.ticks[name] = fn
 			return func() { delete(h.ticks, name) }
+		},
+		after: func(_ time.Duration, fn func()) func() {
+			h.limit = fn
+			return func() { h.limit = nil }
 		},
 	}
 	h.s = newShell(ui, svc, cfg, rasterDeps{
@@ -200,7 +215,7 @@ func (h *harness) tickingOutput() string {
 
 // plug adds an output of w x h device pixels at scale 1.
 func (h *harness) plug(name string, w, ht int) *app.Output {
-	out := &app.Output{Name: name, ModeW: w, ModeH: ht, Scale: 1, LogicalW: int32(w), LogicalH: int32(ht)}
+	out := testOutput(name, w, ht)
 	h.s.AddOutput(out)
 	return out
 }
@@ -612,4 +627,29 @@ func TestReleaseOfAnUnheldRasterPanics(t *testing.T) {
 		}
 	}()
 	rs.release(&raster{})
+}
+
+func testOutput(name string, w, ht int) *app.Output {
+	return &app.Output{Name: name, ModeW: w, ModeH: ht, Scale: 1, LogicalW: int32(w), LogicalH: int32(ht)}
+}
+
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	return &buf
+}
+
+func (h *harness) useFile(t *testing.T, image string) {
+	t.Helper()
+	if image == "" {
+		return
+	}
+	h.decodable[image] = true
+	h.s.cfg.Wallpaper = image
+	if err := h.s.svc.SetWallpaper(image, ""); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -128,6 +128,8 @@ lys-shell wallpaper info --monitor DP-1
 lys-shell wallpaper theming-monitor DP-1
 ```
 
+At login the wallpaper lands before the bars, on every output. A wallpaper resampled for an output is kept in `$XDG_CACHE_HOME/lys-shell/wallpaper` (256 MiB at most, oldest out first), so a later login with the same file and output size shows it without decoding it. An image that cannot be decoded, or is not ready after a second, shows the built-in wallpaper until it is, says why in the log, and does not hold up the bars.
+
 `--fit` accepts `fill`, `fit`, `center`, `tile`, `stretch`; `--mode` accepts
 `sequential` or `shuffle`.
 

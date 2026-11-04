@@ -25,16 +25,21 @@ import (
 // frameInterval paces transition steps.
 const frameInterval = 16 * time.Millisecond
 
+const firstFrameLimit = time.Second
+
 // Shell owns the wallpaper service and its surfaces. Its methods run
 // on the lys-ui loop goroutine.
 type Shell struct {
-	ui       loop
-	svc      *wallpaper.Service
-	cfg      config.WallpaperConfig
-	anims    config.AnimationsConfig
-	outputs  map[string]*app.Output
-	surfaces map[string]*surface
-	rasters  *rasters
+	ui          loop
+	svc         *wallpaper.Service
+	cfg         config.WallpaperConfig
+	anims       config.AnimationsConfig
+	outputs     map[string]*app.Output
+	surfaces    map[string]*surface
+	rasters     *rasters
+	firstFrame  func()
+	unpresented map[*surface]struct{}
+	cancelLimit func()
 }
 
 // loop is what the shell does through the application: open a
@@ -42,6 +47,7 @@ type Shell struct {
 type loop struct {
 	newLayer func(app.LayerConfig) (closeLayer func(), err error)
 	every    func(d time.Duration, fn func()) (cancel func())
+	after    func(d time.Duration, fn func()) (cancel func())
 }
 
 // appLoop is the application's loop.
@@ -55,6 +61,14 @@ func appLoop(application *app.Application) loop {
 			return layer.Close, nil
 		},
 		every: application.Every,
+		after: func(d time.Duration, fn func()) func() {
+			var stop func()
+			stop = application.Every(d, func() {
+				stop()
+				fn()
+			})
+			return stop
+		},
 	}
 }
 
@@ -62,7 +76,7 @@ func newShell(ui loop, svc *wallpaper.Service, cfg *config.Config, d rasterDeps)
 	return &Shell{
 		ui: ui, svc: svc, cfg: cfg.Wallpaper, anims: cfg.Animations,
 		outputs: map[string]*app.Output{}, surfaces: map[string]*surface{},
-		rasters: newRasters(d),
+		rasters: newRasters(d), unpresented: map[*surface]struct{}{},
 	}
 }
 
@@ -71,9 +85,11 @@ func newShell(ui loop, svc *wallpaper.Service, cfg *config.Config, d rasterDeps)
 // dev.stubbe.lys.Wallpaper1 on conn, and starts the cycling and extraction
 // loops and the surfaces. It fails like the Rust service init when
 // the D-Bus name is taken (another shell is running): no wallpaper is
-// drawn then. The returned stop function ends the loops, releases
-// the name, and lets go of the wallpapers once the loop has ended.
-func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn) (*Shell, func(), error) {
+// drawn then. firstFrame runs on the loop once the outputs show a
+// wallpaper, or firstFrameLimit gave up waiting for them. The returned
+// stop function ends the loops, releases the name, and lets go of the
+// wallpapers once the loop has ended.
+func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, firstFrame func()) (*Shell, func(), error) {
 	svc := wallpaper.New(wallpaper.Options{
 		Extractor:      extract.FromConfig(cfg.Styling.ColorExtractor),
 		ThemingMonitor: cfg.Styling.ColorExtractor.ThemingMonitor,
@@ -88,6 +104,7 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 		spawn:  func(fn func()) { go fn() },
 		invoke: application.Invoke,
 		forget: application.ForgetImage,
+		cache:  openRasterCache(),
 	})
 	for _, out := range outputs {
 		if out.Name != "" {
@@ -110,7 +127,7 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 			}
 		}
 	}()
-	s.reconcile()
+	s.awaitFirstFrame(firstFrame)
 	return s, func() {
 		cancel()
 		unsubscribe()
@@ -138,17 +155,19 @@ type OutputWatcher interface {
 }
 
 // Launch is Start on the session bus, following hotplugged outputs
-// through watch. A failure is logged and leaves the shell without
-// wallpapers (nil).
-func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, watch OutputWatcher) (*Shell, func()) {
+// through watch. A failure is logged, runs firstFrame, and leaves the
+// shell without wallpapers (nil).
+func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, watch OutputWatcher, firstFrame func()) (*Shell, func()) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("wallpaper: cannot initialize wallpaper service: D-Bus connection failed: %v", err)
+		firstFrame()
 		return nil, func() {}
 	}
-	s, stop, err := Start(application, outputs, cfg, conn)
+	s, stop, err := Start(application, outputs, cfg, conn, firstFrame)
 	if err != nil {
 		log.Printf("wallpaper: cannot initialize wallpaper service: %v", err)
+		firstFrame()
 		return nil, func() {}
 	}
 	stopIdentity := watch.WatchOutputIdentity(s.AddOutput)
@@ -282,6 +301,7 @@ func (s *Shell) reconcile() {
 		_, registered := monitors[name]
 		if out, ok := s.outputs[name]; !registered || !ok || surf.out != out {
 			surf.close()
+			s.presented(surf)
 			delete(s.surfaces, name)
 		}
 	}
@@ -292,11 +312,7 @@ func (s *Shell) reconcile() {
 		}
 		surf, ok := s.surfaces[name]
 		if !ok {
-			var err error
-			if surf, err = s.newSurface(name, out); err != nil {
-				log.Printf("wallpaper: surface for %s: %v", name, err)
-				continue
-			}
+			surf = s.newSurface(name, out)
 			s.surfaces[name] = surf
 		}
 		path, fit := resolve(s.cfg, name, st)
@@ -304,11 +320,55 @@ func (s *Shell) reconcile() {
 	}
 }
 
+func (s *Shell) awaitFirstFrame(done func()) {
+	s.firstFrame = done
+	s.reconcile()
+	s.cancelLimit = s.ui.after(firstFrameLimit, func() {
+		for surf := range s.unpresented {
+			log.Printf("wallpaper: %s: %s is not ready after %v; showing the built-in wallpaper until it is", surf.name, surf.path, firstFrameLimit)
+			surf.fallback()
+		}
+		if s.firstFrame == nil {
+			return
+		}
+		s.cancelLimit = s.ui.after(firstFrameLimit, func() {
+			log.Printf("wallpaper: %d outputs have shown no frame after %v; the shell starts without waiting for them", len(s.unpresented), 2*firstFrameLimit)
+			s.finishFirstFrame()
+		})
+	})
+	s.settleFirstFrame()
+}
+
+func (s *Shell) presented(surf *surface) {
+	delete(s.unpresented, surf)
+	s.settleFirstFrame()
+}
+
+func (s *Shell) settleFirstFrame() {
+	if len(s.unpresented) == 0 {
+		s.finishFirstFrame()
+	}
+}
+
+func (s *Shell) finishFirstFrame() {
+	if s.firstFrame == nil {
+		return
+	}
+	done := s.firstFrame
+	s.firstFrame = nil
+	clear(s.unpresented)
+	if s.cancelLimit != nil {
+		s.cancelLimit()
+	}
+	done()
+}
+
 // surface is one output's Background layer.
 type surface struct {
 	shell *Shell
+	name  string
 	out   *app.Output
-	// closeLayer closes the layer surface.
+	// closeLayer closes the layer surface; nil until it opens.
 	closeLayer func()
 	view       *view
 	// path and fit are what was last asked for; gen invalidates a
@@ -317,12 +377,22 @@ type surface struct {
 	fit      wallpaper.FitMode
 	gen      uint64
 	stopAnim func()
+	falling  bool
+	dropped  bool
 }
 
-func (s *Shell) newSurface(name string, out *app.Output) (*surface, error) {
-	surf := &surface{shell: s, out: out, view: newView()}
+func (s *Shell) newSurface(name string, out *app.Output) *surface {
+	surf := &surface{shell: s, name: name, out: out, view: newView()}
+	if s.firstFrame != nil {
+		s.unpresented[surf] = struct{}{}
+	}
+	return surf
+}
+
+func (surf *surface) openLayer() {
+	s := surf.shell
 	closeLayer, err := s.ui.newLayer(app.LayerConfig{
-		Output:        out,
+		Output:        surf.out,
 		Layer:         app.LayerBackground,
 		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 		ExclusiveZone: -1,
@@ -330,25 +400,34 @@ func (s *Shell) newSurface(name string, out *app.Output) (*surface, error) {
 		Namespace:     "lys-shell-wallpaper",
 		Root:          surf.view,
 		Background:    backdrop,
+		OnPresented:   func() { s.presented(surf) },
 		OnClosed: func() {
 			// The output went away (or the compositor closed us): the
 			// next reconcile rebuilds it if the monitor is still known.
 			surf.drop()
-			if s.surfaces[name] == surf {
-				delete(s.surfaces, name)
+			if s.surfaces[surf.name] == surf {
+				delete(s.surfaces, surf.name)
 			}
+			s.presented(surf)
 		},
 	})
 	if err != nil {
-		return nil, err
+		log.Printf("wallpaper: surface for %s: %v", surf.name, err)
+		surf.drop()
+		if s.surfaces[surf.name] == surf {
+			delete(s.surfaces, surf.name)
+		}
+		s.presented(surf)
+		return
 	}
 	surf.closeLayer = closeLayer
-	return surf, nil
 }
 
 func (surf *surface) close() {
 	surf.drop()
-	surf.closeLayer()
+	if surf.closeLayer != nil {
+		surf.closeLayer()
+	}
 }
 
 // drop stops what the surface has in flight and lets go of its
@@ -359,7 +438,24 @@ func (surf *surface) drop() {
 		surf.stopAnim = nil
 	}
 	surf.gen++
+	surf.dropped = true
 	surf.view.clear()
+}
+
+func (surf *surface) fallback() {
+	if surf.view.cur != nil || surf.falling || surf.path == builtinWallpaper {
+		return
+	}
+	surf.falling = true
+	box, known := outputTarget(surf.out)
+	rs := surf.shell.rasters
+	rs.acquire(rasterKey{path: builtinWallpaper, fit: surf.fit, box: box, known: known}, func(r *raster) {
+		if surf.dropped || surf.view.cur != nil {
+			rs.release(r)
+			return
+		}
+		surf.swap(r, false)
+	}, func() {})
 }
 
 // outputTarget is the output's device-pixel size and scale; false when
@@ -395,6 +491,10 @@ func (surf *surface) render(path string, fit wallpaper.FitMode) {
 			return
 		}
 		surf.swap(r, animate)
+	}, func() {
+		if gen == surf.gen {
+			surf.fallback()
+		}
 	})
 }
 
@@ -411,7 +511,11 @@ func (surf *surface) swap(r *raster, animate bool) {
 		kind = TransitionNone
 	}
 	rs := surf.shell.rasters
-	if !surf.view.show(&shown{pic: pic, size: r.size(), release: func() { rs.release(r) }}, kind) {
+	transitions := surf.view.show(&shown{pic: pic, size: r.size(), release: func() { rs.release(r) }}, kind)
+	if surf.closeLayer == nil {
+		surf.openLayer()
+	}
+	if !transitions || surf.dropped {
 		return
 	}
 	start := time.Now()
