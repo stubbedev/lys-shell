@@ -623,17 +623,31 @@ func TestAClickBesideTheFrontWindowSharesTheOneBehindNotAHiddenOne(t *testing.T)
 	}
 }
 
-func TestEscapeInTheClickToPickFallsBackToThePicker(t *testing.T) {
+// Escape in the click-to-pick fails the request with the code a
+// cancelled picker's does, and does not go on to the picker, which
+// would share what it replies.
+func TestEscapeInTheClickToPickCancelsTheRequestAsACancelledPickerDoes(t *testing.T) {
+	cancelled, _ := castRig(t)
+	serveSharePicker(t, cancelled, "")
+	cancelled.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
+	want, _ := cancelled.castStart(t)
+	if want != ResponseCancelled {
+		t.Fatalf("a cancelled picker's Start = %d, want cancelled", want)
+	}
+
 	r, f, p := windowRig(t, "/window:lys-wm-5")
 	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
-	if code, _ := r.castStart(t); code != ResponseSuccess {
-		t.Fatalf("Start = %d", code)
+	if code, _ := r.castStart(t); code != want {
+		t.Errorf("Start = %d after Escape, want %d as a cancelled picker's", code, want)
 	}
-	if len(p.windowAsked.Load()) != 1 || len(p.asked.Load()) != 1 {
-		t.Errorf("the overlay was asked %d times and the picker %d, want once each", len(p.windowAsked.Load()), len(p.asked.Load()))
+	if len(p.windowAsked.Load()) != 1 {
+		t.Errorf("the overlay was asked %d times, want once", len(p.windowAsked.Load()))
 	}
-	if got := f.started.Load(); !slices.Equal(got, []string{"window:lys-wm-5"}) {
-		t.Errorf("started %v, want the picker's choice", got)
+	if len(p.asked.Load()) != 0 {
+		t.Errorf("the picker was asked %d times after Escape, want never", len(p.asked.Load()))
+	}
+	if got := f.started.Load(); len(got) != 0 {
+		t.Errorf("started %v after Escape, want nothing", got)
 	}
 }
 

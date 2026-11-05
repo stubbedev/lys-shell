@@ -91,8 +91,8 @@ func (d *Daemon) Pick(c portaldialogs.Caller, r Request) (string, *dbus.Error) {
 
 // PickWindow opens the click-to-pick overlay and blocks until a click
 // picks a window, replying /window:<id>, or Enter shares the screen,
-// replying /screen:<name>; Escape replies an empty string, after which
-// the caller asks Pick. A request offering nothing to pick is refused.
+// replying /screen:<name>; Escape replies an empty string, which
+// cancels, as Pick's does. A request offering nothing to pick is refused.
 func (d *Daemon) PickWindow(c portaldialogs.Caller, r WindowRequest) (string, *dbus.Error) {
 	if len(r.Windows) == 0 {
 		return "", dbus.MakeFailedError(errors.New("share picker: no window to pick from"))
