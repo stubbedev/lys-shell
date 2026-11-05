@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
@@ -43,7 +45,21 @@ type dropdownRegistry struct {
 	// the bars releases them.
 	instances        map[string]widget.Widget
 	dashboardAnchors map[string]widget.Widget
+	// idle runs fn on the loop once the bars have had their first frames,
+	// and invoke on the loop's next turn; nil idle builds nothing ahead
+	// of an open (buildAhead sets them). prebuilt is the build of the
+	// bars' dropdowns having been asked for.
+	idle     func(fn func())
+	invoke   func(fn func())
+	prebuilt bool
+	// released counts the releases, which end a prebuild under way.
+	released uint64
 }
+
+// dropdownPrebuildDelay is how long after the first bar attaches its
+// dropdowns start building, one per loop turn: the bars' first frames
+// come first.
+const dropdownPrebuildDelay = 500 * time.Millisecond
 
 // dropdownOpener is content that acts each time its popover opens
 // (the Rust dropdowns' connect_map: the network list scanning when
@@ -141,6 +157,25 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 	}
 }
 
+// buildAhead has the bars' dropdowns built while the loop is idle, from
+// once a bar has attached, so a dropdown's first open builds nothing.
+func (r *dropdownRegistry) buildAhead() {
+	if r.app == nil {
+		return
+	}
+	application := r.app
+	r.mu.Lock()
+	r.invoke = application.Invoke
+	r.idle = func(fn func()) {
+		time.AfterFunc(dropdownPrebuildDelay, func() { application.Invoke(fn) })
+	}
+	hosted := len(r.hosts) > 0
+	r.mu.Unlock()
+	if hosted {
+		r.prebuild()
+	}
+}
+
 func (r *dropdownRegistry) setDashboardAnchor(connector string, anchor widget.Widget) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -217,6 +252,7 @@ func dropdownPanel(name string, cfg *config.Config, content widget.Widget) widge
 func (r *dropdownRegistry) release() {
 	r.closeAll()
 	r.mu.Lock()
+	r.released++
 	instances := r.instances
 	r.instances = make(map[string]widget.Widget)
 	r.mu.Unlock()
@@ -234,6 +270,72 @@ func (r *dropdownRegistry) attachHost(connector string, host app.Host, monH int)
 	r.hosts[connector] = host
 	r.monH[connector] = monH
 	r.mu.Unlock()
+	r.prebuild()
+}
+
+// prebuild builds the content of every dropdown the bars' modules open,
+// one per loop turn once the bars are up, so a first open builds
+// nothing. It runs once per config.
+func (r *dropdownRegistry) prebuild() {
+	r.mu.Lock()
+	if r.prebuilt || r.idle == nil {
+		r.mu.Unlock()
+		return
+	}
+	r.prebuilt = true
+	cfg, released := r.cfg, r.released
+	r.mu.Unlock()
+	names := barDropdowns(cfg, r.builders)
+	var step func()
+	step = func() {
+		r.mu.Lock()
+		stale := r.released != released
+		r.mu.Unlock()
+		if stale || len(names) == 0 {
+			return
+		}
+		name := names[0]
+		names = names[1:]
+		if h, ok := r.instance(name, r.builders[name]).(dropdownHider); ok {
+			h.dropdownHidden()
+		}
+		if len(names) > 0 {
+			r.invoke(step)
+		}
+	}
+	r.idle(step)
+}
+
+// barDropdowns are the registered dropdowns a click on one of cfg's bar
+// modules opens, each once, in the bars' order.
+func barDropdowns(cfg *config.Config, builders map[string]func(ModuleContext) widget.Widget) []string {
+	var names []string
+	add := func(item config.BarItem) {
+		c := moduleBinding(string(item.Module), cfg)
+		for _, a := range [...]config.ClickAction{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown} {
+			if _, ok := builders[a.Dropdown]; ok && a.Kind == config.ClickDropdown && !slices.Contains(names, a.Dropdown) {
+				names = append(names, a.Dropdown)
+			}
+		}
+	}
+	for _, l := range cfg.Bar.Layout {
+		layout, ok := barLayoutFor(cfg, l.Monitor)
+		if !ok {
+			continue
+		}
+		for _, section := range [...][]config.BarItem{layout.Left, layout.Center, layout.Right} {
+			for _, item := range section {
+				if item.IsGroup() {
+					for _, member := range item.Group.Modules {
+						add(member)
+					}
+					continue
+				}
+				add(item)
+			}
+		}
+	}
+	return names
 }
 
 // detachHost forgets an unplugged connector's layer and its open
@@ -437,8 +539,15 @@ func dropdownGenieEdge(location config.Location) widget.Edge {
 // old one are released.
 func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 	r.release()
+	r.mu.Lock()
 	r.cfg = cfg
 	r.ctx.Config = cfg
+	r.prebuilt = false
+	hosted := len(r.hosts) > 0
+	r.mu.Unlock()
+	if hosted {
+		r.prebuild()
+	}
 }
 
 // dropdownTree is the popover's tree around content: the revealer the

@@ -50,10 +50,13 @@ type Deps struct {
 	Font  render.Font
 }
 
-// face is the mapped surface and the widgets an event updates.
+// face is the mapped surface and the widgets an event updates; the
+// widgets outlive the surface.
 type face struct {
 	win          Window
 	output       *app.Output
+	host         widget.Widget
+	scale        float64
 	rev          *widget.Revealer
 	container    *widget.Box
 	sliderHeader *widget.Box
@@ -74,6 +77,8 @@ type Osd struct {
 	ready     bool
 	dismissID uint32
 	face      *face
+	// idle is the tree of a surface that closed, kept for the next one.
+	idle *face
 
 	lockKeysWanted  atomic.Bool
 	lockKeysChanged chan struct{}
@@ -154,11 +159,17 @@ func (o *Osd) beginDismiss(id uint32) {
 }
 
 func (o *Osd) closeFace() {
-	if o.face == nil {
+	f := o.face
+	if f == nil {
 		return
 	}
-	o.face.win.Close()
 	o.face = nil
+	f.win.Close()
+	f.win, f.output = nil, nil
+	f.rev.SetOnTransitionDone(nil)
+	f.rev.SetDuration(0)
+	f.rev.SetRevealed(false)
+	o.idle = f
 }
 
 // place is apply_position and apply_layer: the surface sits on the
@@ -181,7 +192,11 @@ func (o *Osd) place() bool {
 		return true
 	}
 	o.closeFace()
-	f := o.build()
+	f := o.idle
+	if f == nil || f.scale != o.scale() {
+		f = o.build()
+	}
+	o.idle = nil
 	win, err := o.d.Open(app.LayerConfig{
 		Output:         output,
 		Layer:          layer,
@@ -189,11 +204,12 @@ func (o *Osd) place() bool {
 		Margin:         margin,
 		Keyboard:       app.KeyboardNone,
 		Namespace:      "lys-shell-osd",
-		Root:           f.root(o.d.Sheet),
+		Root:           f.host,
 		BackgroundBlur: true,
 	})
 	if err != nil {
 		log.Printf("osd: cannot map on %s: %v", output.Name, err)
+		o.idle = f
 		return false
 	}
 	f.win, f.output = win, output

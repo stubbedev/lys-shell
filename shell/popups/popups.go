@@ -59,16 +59,26 @@ type Popups struct {
 	now     func() time.Time
 	// minter mints the activation tokens action presses carry.
 	minter notifyui.TokenMinter
-	win    *app.LayerWindow
+	// open maps a layer surface; nil maps none (headless).
+	open func(app.LayerConfig) (window, error)
+	win  window
 	// winOut is the output win is on.
 	winOut *app.Output
 	root   *widget.Box
+	// host and list are the surface's tree, kept while no surface shows
+	// it; idle are stacks whose last card went, kept for the next.
+	host, list *widget.Box
+	idle       []*stack
 	// cards are the live popups by id; stacks are every stack on
 	// screen top to bottom, those whose cards are all still playing
 	// their exit included.
 	cards  map[uint32]*card
 	stacks []*stack
 }
+
+// window is the part of a layer window the popups drive
+// (app.LayerWindow).
+type window interface{ Close() }
 
 // stack is the cards one popup-stack key groups: the newest in front,
 // the older ones behind it, fanned out into a list while hovered.
@@ -114,7 +124,7 @@ type card struct {
 // styles the cards (nil leaves them unstyled).
 func New(application *app.Application, svc *notifications.Service, cfg *config.Config, font render.Font, sheet *widget.Stylesheet, outputs func() []*app.Output) *Popups {
 	svc.SetPopupDuration(time.Duration(cfg.Notification.PopupDuration) * time.Millisecond)
-	return &Popups{
+	p := &Popups{
 		app:     application,
 		svc:     svc,
 		cfg:     cfg,
@@ -125,6 +135,10 @@ func New(application *app.Application, svc *notifications.Service, cfg *config.C
 		minter:  notifyui.Minter(application),
 		cards:   make(map[uint32]*card),
 	}
+	if application != nil {
+		p.open = func(c app.LayerConfig) (window, error) { return application.NewLayer(c) }
+	}
+	return p
 }
 
 // DetachOutput closes the surface when its output went away; the
@@ -136,9 +150,9 @@ func (p *Popups) DetachOutput(name string) {
 	}
 	win := p.win
 	p.win, p.winOut, p.root = nil, nil, nil
+	win.Close()
 	p.unhover()
 	p.layout()
-	win.Close()
 }
 
 // unhover collapses every hovered stack, as when the pointer leaves it,
@@ -161,6 +175,7 @@ func (p *Popups) SetConfig(cfg *config.Config) {
 	p.cfg = cfg
 	win := p.win
 	p.win, p.winOut, p.root = nil, nil, nil
+	p.host, p.list, p.idle = nil, nil, nil
 	p.cards = make(map[uint32]*card)
 	p.stacks = nil
 	if win != nil {
@@ -288,6 +303,9 @@ func (p *Popups) dropCard(c *card) {
 		st.cards = slices.Delete(st.cards, j, j+1)
 		if len(st.cards) == 0 {
 			p.stacks = slices.Delete(p.stacks, i, i+1)
+			st.hovered = false
+			p.refreshStack(st)
+			p.idle = append(p.idle, st)
 		} else {
 			p.refreshStack(st)
 		}
@@ -299,6 +317,12 @@ func (p *Popups) dropCard(c *card) {
 // newStack builds an empty stack for key: the clear-all button over
 // the pile of cards.
 func (p *Popups) newStack(key string) *stack {
+	if n := len(p.idle); n > 0 {
+		st := p.idle[n-1]
+		p.idle = p.idle[:n-1]
+		st.key = key
+		return st
+	}
 	th := widget.Current()
 	st := &stack{key: key}
 	st.root = widget.NewBox(widget.Column, th.Spacing, 0)
@@ -645,12 +669,13 @@ func (p *Popups) layout() {
 	if len(p.stacks) == 0 {
 		if p.win != nil {
 			win := p.win
+			reconcileChildren(boxChildren(p.root), nil)
 			p.win, p.winOut, p.root = nil, nil, nil
 			win.Close()
 		}
 		return
 	}
-	if p.win == nil && p.app != nil {
+	if p.win == nil && p.open != nil {
 		out := layering.Output(p.outputs(), p.cfg.Notification.PopupMonitor)
 		if out == nil {
 			return
@@ -679,21 +704,24 @@ func (p *Popups) layout() {
 // transparent (.notification-popup-host) and asks the compositor to
 // blur behind its frosted cards; the list spaces the stacks by
 // popup-gap and each card draws its own plate from the stylesheet. It
-// returns the list the stacks go into.
-func (p *Popups) ensureWindow(out *app.Output) (*app.LayerWindow, *widget.Box, error) {
+// returns the list the stacks go into. The tree is the one the last
+// surface showed, when there was one.
+func (p *Popups) ensureWindow(out *app.Output) (window, *widget.Box, error) {
 	cfg := p.cfg.Notification
 	scale := float64(p.cfg.Styling.Scale)
-	host, list := p.newHost()
-	win, err := p.app.NewLayer(app.LayerConfig{
+	if p.host == nil {
+		p.host, p.list = p.newHost()
+	}
+	win, err := p.open(app.LayerConfig{
 		Output:         out,
 		Layer:          layering.For(p.cfg.General, cfg.PopupLayer),
 		Anchor:         popupAnchors(cfg.PopupPosition),
 		Margin:         popupMargins(cfg, scale),
 		Namespace:      "lys-shell-notification-popup",
-		Root:           host,
+		Root:           p.host,
 		BackgroundBlur: true,
 	})
-	return win, list, err
+	return win, p.list, err
 }
 
 // newHost builds the surface's widget tree: the transparent host

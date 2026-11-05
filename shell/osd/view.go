@@ -48,6 +48,8 @@ func (o *Osd) build() *face {
 	f.container.Append(f.toggleHeader, false)
 	f.container.Append(f.bar, false)
 	f.rev = widget.NewRevealer(f.container)
+	f.host = f.root(o.d.Sheet)
+	f.scale = o.scale()
 	return f
 }
 

@@ -660,3 +660,50 @@ func TestFailedLockKeySourceRetriesOnTheNextEnable(t *testing.T) {
 	h.osd.SetConfig(on)
 	awaitSignal(t, "enabling the OSD to retry", attempts)
 }
+
+// A show after a dismissal maps a new surface over the tree the last one
+// showed: nothing is built again.
+func TestAShowAfterADismissalReusesTheTree(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	dismiss := time.Duration(config.DefaultsOsd().Duration) * time.Millisecond
+	h.osd.Show(Slider("a", "", 1, false))
+	h.fire(t, dismiss)
+	h.osd.Show(Slider("b", "", 2, false))
+	if len(h.opened) != 2 {
+		t.Fatalf("%d surfaces, want a new one after the dismissal", len(h.opened))
+	}
+	if h.opened[1].cfg.Root != h.opened[0].cfg.Root {
+		t.Error("the second surface built its tree again")
+	}
+	if got := h.osd.face.sliderLabel.Text(); got != "b" {
+		t.Errorf("the kept tree shows %q, want the new event", got)
+	}
+	if !h.osd.face.rev.Revealed() {
+		t.Error("the kept tree must reveal again")
+	}
+	h.fire(t, dismiss)
+	allocs := testing.AllocsPerRun(20, func() {
+		h.osd.Show(Slider("c", "", 3, false))
+		h.fire(t, dismiss)
+	})
+	t.Logf("a show after a dismissal: %v allocations", allocs)
+	if allocs > 16 {
+		t.Errorf("a show after a dismissal allocates %v, want the tree kept", allocs)
+	}
+}
+
+// A new styling scale is a new tree: the labels and the width are built
+// at the scale.
+func TestAScaleChangeBuildsTheTreeAgain(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	dismiss := time.Duration(config.DefaultsOsd().Duration) * time.Millisecond
+	h.osd.Show(Slider("a", "", 1, false))
+	h.fire(t, dismiss)
+	next := quietConfig()
+	next.Styling.Scale = 2
+	h.osd.SetConfig(next)
+	h.osd.Show(Slider("b", "", 2, false))
+	if h.opened[1].cfg.Root == h.opened[0].cfg.Root {
+		t.Error("a tree built at scale 1 showed at scale 2")
+	}
+}
