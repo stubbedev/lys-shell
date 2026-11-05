@@ -33,10 +33,10 @@ func shellCommand() *cli.Command {
 	}
 }
 
-func refreshingSchema(start func() error) func() error {
-	return func() error {
+func refreshingSchema(start func(*dbus.Conn) error) func(*dbus.Conn) error {
+	return func(session *dbus.Conn) error {
 		go refreshSchema()
-		return start()
+		return start(session)
 	}
 }
 
@@ -51,16 +51,19 @@ func refreshSchema() {
 	}
 }
 
-// runShell is wayle_shell::run's single-instance guard: a second shell
-// says so and exits successfully instead of fighting over the bus names.
-func runShell(stderr io.Writer, start func() error) error {
-	if conn, err := dbus.ConnectSessionBus(); err == nil {
-		running, _ := shellipc.IsRunning(conn)
-		_ = conn.Close()
-		if running {
-			fmt.Fprintln(stderr, "lys-shell shell is already running")
-			return nil
-		}
+// runShell is wayle_shell::run's single-instance guard on the session
+// connection the shell then runs on: a second shell, refused the
+// application id, says so and exits successfully instead of fighting over
+// the bus names.
+func runShell(stderr io.Writer, start func(*dbus.Conn) error) error {
+	session, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return start(nil)
 	}
-	return start()
+	defer func() { _ = session.Close() }()
+	if claimed, err := shellipc.Claim(session); err == nil && !claimed {
+		fmt.Fprintln(stderr, "lys-shell shell is already running")
+		return nil
+	}
+	return start(session)
 }

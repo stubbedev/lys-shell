@@ -93,10 +93,6 @@ func (s audioSide) volume(m *cli.Matches, p *daemonProxy) error {
 		printVolume(m, volume, muted)
 		return nil
 	}
-	var muted bool
-	if err := p.prop("get "+s.opQualifier+"mute state", s.member+"Muted", &muted); err != nil {
-		return err
-	}
 	var next float64
 	switch {
 	case strings.HasPrefix(value, "+") || strings.HasPrefix(value, "-"):
@@ -118,6 +114,10 @@ func (s audioSide) volume(m *cli.Matches, p *daemonProxy) error {
 		if err := p.call("set "+s.opQualifier+"volume", "Set"+s.member+"Volume", []any{&next}, level); err != nil {
 			return err
 		}
+	}
+	var muted bool
+	if err := p.prop("get "+s.opQualifier+"mute state", s.member+"Muted", &muted); err != nil {
+		return err
 	}
 	printVolume(m, next, muted)
 	return nil

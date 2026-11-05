@@ -55,7 +55,7 @@ import (
 // failure logs and falls back to defaults — the Rust shell's behavior —
 // rather than refusing to start; a failed cursor record only logs, as
 // the greeter then keeps its own cursor.
-func Run() error {
+func Run(session *dbus.Conn) error {
 	go func() {
 		if err := recordCursor(context.Background()); err != nil {
 			log.Printf("lys-shell: %v", err)
@@ -66,10 +66,10 @@ func Run() error {
 		log.Printf("lys-shell: config: %v", err)
 	}
 	if svc == nil {
-		return RunWith(config.Defaults())
+		return RunWith(config.Defaults(), session)
 	}
 	defer svc.Close()
-	return run(svc.Config(), svc)
+	return run(svc.Config(), svc, session)
 }
 
 // followReducedMotion keeps the toolkit's reduced motion on while the
@@ -102,10 +102,10 @@ func followReducedMotion(application *app.Application, cfg *config.Config, svc *
 
 // RunWith shows the bar from a prepared config: one layer surface per
 // output the layout gives a visible bar, then the lys-ui loop.
-func RunWith(cfg *config.Config) error { return run(cfg, nil) }
+func RunWith(cfg *config.Config, session *dbus.Conn) error { return run(cfg, nil, session) }
 
 // run shows the bar; with a service it follows config reloads.
-func run(cfg *config.Config, svc *config.Service) error {
+func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	app.SetLogger(logging.Library())
 	sess, err := app.Connect()
 	if err != nil {
@@ -130,7 +130,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if application.Clipboard() == nil {
 		application.SetClipboard(app.NewClipboard(sess))
 	}
-	s := newShellStart(application, sess, cfg, svc)
+	s := newShellStart(application, sess, cfg, svc, session)
 	defer s.down.run()
 	s.releaseHold = application.Hold()
 	gate := newStartGate(s.mount)
@@ -190,6 +190,7 @@ type shellStart struct {
 	sess        shellSession
 	cfg         *config.Config
 	svc         *config.Service
+	session     *dbus.Conn
 	// current is the live config snapshot the long-lived services read.
 	current *atomic.Pointer[config.Config]
 	// osdRef is the OSD once it exists; the recorder toasts through it.
@@ -209,9 +210,9 @@ type shellStart struct {
 	err          error
 }
 
-func newShellStart(application *app.Application, sess shellSession, cfg *config.Config, svc *config.Service) *shellStart {
+func newShellStart(application *app.Application, sess shellSession, cfg *config.Config, svc *config.Service, session *dbus.Conn) *shellStart {
 	s := &shellStart{
-		application: application, sess: sess, cfg: cfg, svc: svc,
+		application: application, sess: sess, cfg: cfg, svc: svc, session: session,
 		current: &atomic.Pointer[config.Config]{},
 		osdRef:  &atomic.Pointer[osd.Osd]{},
 		ctx:     ModuleContext{Config: cfg, App: application},
@@ -654,7 +655,7 @@ func (s *shellStart) mount() {
 		}
 	}, func() { polls.setLocked(false) })
 	s.down.add(stopLock)
-	s.down.add(serveShellIPC(application, bars, func() bool {
+	s.down.add(serveShellIPC(s.session, application, bars, func() bool {
 		locker.Lock()
 		return true
 	}, func(monitor string) error {

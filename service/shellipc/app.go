@@ -93,8 +93,9 @@ func (a *actions) SetState(name string, _ dbus.Variant, _ map[string]dbus.Varian
 	return dbusx.InvalidArgs("action '" + name + "' is stateless")
 }
 
-// ServeApplication takes the application id and exports run as its
-// actions. A shell already holding the id is an error.
+// ServeApplication takes the application id, or keeps the one conn
+// claimed, and exports run as its actions. Another shell holding the id
+// is an error.
 func ServeApplication(conn *dbus.Conn, run Actions) (func(), error) {
 	a := &actions{run: run}
 	if err := conn.Export(a, AppPath, ActionsIface); err != nil {
@@ -110,12 +111,22 @@ func ServeApplication(conn *dbus.Conn, run Actions) (func(), error) {
 	if err := conn.Export(introspect.NewIntrospectable(node), AppPath, "org.freedesktop.DBus.Introspectable"); err != nil {
 		return nil, fmt.Errorf("export introspection: %w", err)
 	}
-	reply, err := conn.RequestName(AppID, dbus.NameFlagDoNotQueue)
+	claimed, err := Claim(conn)
 	if err != nil {
-		return nil, fmt.Errorf("request %s: %w", AppID, err)
+		return nil, err
 	}
-	if reply != dbus.RequestNameReplyPrimaryOwner {
+	if !claimed {
 		return nil, fmt.Errorf("%s is already owned", AppID)
 	}
 	return func() { _, _ = conn.ReleaseName(AppID) }, nil
+}
+
+// Claim takes the application id on conn, or keeps it when conn holds it
+// already. False means another shell holds it.
+func Claim(conn *dbus.Conn) (bool, error) {
+	reply, err := conn.RequestName(AppID, dbus.NameFlagDoNotQueue)
+	if err != nil {
+		return false, fmt.Errorf("request %s: %w", AppID, err)
+	}
+	return reply == dbus.RequestNameReplyPrimaryOwner || reply == dbus.RequestNameReplyAlreadyOwner, nil
 }

@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
@@ -140,5 +143,78 @@ func TestAudioEmptyLists(t *testing.T) {
 	}
 	if stdout, _, _ := runUntil(t, "No audio sources found\n", "audio", "sources"); stdout != "No audio sources found\n" {
 		t.Errorf("sources: %q", stdout)
+	}
+}
+
+type recordingAudio struct {
+	mu    sync.Mutex
+	calls []string
+	muted bool
+}
+
+func (a *recordingAudio) record(call string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.calls = append(a.calls, call)
+}
+
+func (a *recordingAudio) recorded() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.calls)
+}
+
+func (a *recordingAudio) AdjustOutputVolume(delta float64) (float64, *dbus.Error) {
+	a.record("AdjustOutputVolume")
+	return 50 + delta, nil
+}
+
+func (a *recordingAudio) SetInputVolume(level float64) (float64, *dbus.Error) {
+	a.record("SetInputVolume")
+	return level, nil
+}
+
+type recordingAudioProps struct{ audio *recordingAudio }
+
+func (p recordingAudioProps) Get(_, name string) (dbus.Variant, *dbus.Error) {
+	p.audio.record("Get " + name)
+	return dbus.MakeVariant(p.audio.muted), nil
+}
+
+func serveRecordingAudio(t *testing.T, muted bool) *recordingAudio {
+	t.Helper()
+	dbustest.Session(t)
+	conn := dbustest.SessionConn(t)
+	audio := &recordingAudio{muted: muted}
+	if err := conn.Export(audio, pulse.ServicePath, pulse.Interface); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Export(recordingAudioProps{audio}, pulse.ServicePath, "org.freedesktop.DBus.Properties"); err != nil {
+		t.Fatal(err)
+	}
+	if reply, err := conn.RequestName(pulse.ServiceName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("request %s: %v %v", pulse.ServiceName, reply, err)
+	}
+	return audio
+}
+
+func TestAVolumeChangeIsTheFirstCall(t *testing.T) {
+	for _, c := range []struct {
+		args  []string
+		muted bool
+		calls []string
+		want  string
+	}{
+		{[]string{"audio", "output-volume", "+5"}, false, []string{"AdjustOutputVolume", "Get OutputMuted"}, "Volume: 55%\n"},
+		{[]string{"audio", "input-volume", "30"}, true, []string{"SetInputVolume", "Get InputMuted"}, "Volume: 30% (muted)\n"},
+	} {
+		audio := serveRecordingAudio(t, c.muted)
+		stdout, stderr, code := runCaptured(t, false, c.args...)
+		if code != 0 || stdout != c.want {
+			t.Errorf("%v: code %d stdout %q stderr %q, want %q", c.args, code, stdout, stderr, c.want)
+		}
+		if got := audio.recorded(); !slices.Equal(got, c.calls) {
+			t.Errorf("%v: the daemon saw %v, want %v", c.args, got, c.calls)
+		}
 	}
 }

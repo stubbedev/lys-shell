@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
@@ -140,7 +141,7 @@ func TestPanelBarVisibility(t *testing.T) {
 func TestShellRefusesASecondInstance(t *testing.T) {
 	dbustest.Session(t)
 	started := 0
-	start := func() error { started++; return nil }
+	start := func(*dbus.Conn) error { started++; return nil }
 	var stderr bytes.Buffer
 	if err := runShell(&stderr, start); err != nil || started != 1 || stderr.Len() != 0 {
 		t.Fatalf("first shell: %v started=%d %q", err, started, stderr.String())
@@ -152,7 +153,7 @@ func TestShellRefusesASecondInstance(t *testing.T) {
 	// A start failure is the shell's error.
 	stderr.Reset()
 	dbustest.Session(t)
-	if err := runShell(&stderr, func() error { return errors.New("no output") }); err == nil {
+	if err := runShell(&stderr, func(*dbus.Conn) error { return errors.New("no output") }); err == nil {
 		t.Error("start error swallowed")
 	}
 }

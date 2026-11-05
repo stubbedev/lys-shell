@@ -192,3 +192,19 @@ func TestApplicationActions(t *testing.T) {
 		t.Error("a second shell took the application id")
 	}
 }
+
+func TestTheClaimingConnectionServesTheApplication(t *testing.T) {
+	dbustest.Session(t)
+	conn := dbustest.SessionConn(t)
+	if claimed, err := Claim(conn); err != nil || !claimed {
+		t.Fatalf("claim = %v %v", claimed, err)
+	}
+	release, err := ServeApplication(conn, Actions{Quit: func() {}, Inspect: func() {}})
+	if err != nil {
+		t.Fatalf("the claiming connection could not serve: %v", err)
+	}
+	defer release()
+	if claimed, err := Claim(dbustest.SessionConn(t)); err != nil || claimed {
+		t.Errorf("another connection's claim = %v %v, want refused", claimed, err)
+	}
+}

@@ -103,13 +103,13 @@ func (b *barSet) sync(name string, entry *barEntry) {
 	}
 }
 
-// serveShellIPC takes the application id (its quit action ends the
-// loop) and serves dev.stubbe.lys.Shell1 over bars, with lock as its Lock hook. A shell already owning
-// the id is logged: the single-instance check runs before RunWith.
-func serveShellIPC(application *app.Application, bars *barSet, lock func() bool, dashboardToggle func(monitor string) error) func() {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		log.Printf("shell ipc: session bus: %v", err)
+// serveShellIPC keeps the application id on conn (its quit action ends
+// the loop) and serves dev.stubbe.lys.Shell1 over bars, with lock as its
+// Lock hook. The single-instance check claimed the id before RunWith; a
+// shell without a session bus serves neither.
+func serveShellIPC(conn *dbus.Conn, application *app.Application, bars *barSet, lock func() bool, dashboardToggle func(monitor string) error) func() {
+	if conn == nil {
+		log.Print("shell ipc: no session bus")
 		return func() {}
 	}
 	var releases []func()
@@ -142,7 +142,6 @@ func serveShellIPC(application *app.Application, bars *barSet, lock func() bool,
 		for _, release := range releases {
 			release()
 		}
-		_ = conn.Close()
 	}
 }
 
