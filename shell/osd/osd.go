@@ -55,7 +55,6 @@ type Deps struct {
 type face struct {
 	win          Window
 	output       *app.Output
-	host         widget.Widget
 	scale        float64
 	rev          *widget.Revealer
 	container    *widget.Box
@@ -204,7 +203,7 @@ func (o *Osd) place() bool {
 		Margin:         margin,
 		Keyboard:       app.KeyboardNone,
 		Namespace:      "lys-shell-osd",
-		Root:           f.host,
+		Root:           f.rev,
 		BackgroundBlur: true,
 	})
 	if err != nil {

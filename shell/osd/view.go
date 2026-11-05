@@ -18,12 +18,11 @@ const widthPx = 288
 
 // build is the OSD's view! tree:
 //
-//	window.background.osd-host
-//	└ revealer
-//	  └ box.osd (vertical; muted, toggle-off, bordered, a toast's class)
-//	    ├ box.osd-header        (sliders)  image.osd-icon, label.osd-label, label.osd-value
-//	    ├ box.osd-header        (toggles)  image.osd-icon, label.osd-label
-//	    └ progressbar.osd-bar   (sliders)
+//	window.background.osd-host (the revealer)
+//	└ box.osd (vertical; muted, toggle-off, bordered, a toast's class)
+//	  ├ box.osd-header        (sliders)  image.osd-icon, label.osd-label, label.osd-value
+//	  ├ box.osd-header        (toggles)  image.osd-icon, label.osd-label
+//	  └ progressbar.osd-bar   (sliders)
 func (o *Osd) build() *face {
 	f := &face{}
 	f.sliderIcon = o.icon()
@@ -50,22 +49,20 @@ func (o *Osd) build() *face {
 	f.container.Append(f.bar, false)
 	f.rev = widget.NewRevealer(f.container)
 	f.rev.SetFadeFrom(reveal.FadeFrom)
-	f.host = f.root(o.d.Sheet)
+	f.root(o.d.Sheet)
 	f.scale = o.scale()
 	return f
 }
 
-// root wraps the revealer in the window node the stylesheet's
-// window.background.osd-host rule clears.
-func (f *face) root(sheet *widget.Stylesheet) widget.Widget {
-	root := widget.NewBox(widget.Column, 0, 0)
-	root.SetElement("window")
-	root.AddClass("background", "osd-host")
+// root makes the revealer the window node the stylesheet's
+// window.background.osd-host rule clears: the surface's root, so its
+// fade runs as the surface's opacity instead of repainting the card.
+func (f *face) root(sheet *widget.Stylesheet) {
+	f.rev.SetElement("window")
+	f.rev.AddClass("background", "osd-host")
 	if sheet != nil {
-		root.AttachStylesheet(sheet)
+		f.rev.AttachStylesheet(sheet)
 	}
-	root.Append(f.rev, false)
-	return root
 }
 
 // scale is the styling scale.
