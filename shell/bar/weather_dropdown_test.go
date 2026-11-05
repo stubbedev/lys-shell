@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/weather"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -477,4 +478,22 @@ func TestWeatherTodayIsTheLocations(t *testing.T) {
 			t.Errorf("day %v reads %q (location today %v)", d.Date, got, locToday)
 		}
 	}
+}
+
+func TestWeatherDropdownWithoutTheServiceFollowsNothing(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	a := apptest.Run(t)
+	ctx.App = a
+	v := apptest.On(a, func() *weatherView { return weatherDropdown(ctx).(*weatherView) })
+	t.Cleanup(func() { apptest.On(a, func() bool { v.dropdownClosed(); return true }) })
+	if got := apptest.On(a, func() string { v.dropdownHidden(); v.dropdownOpened(); return v.pages.Visible() }); got != "loading" {
+		t.Errorf("page = %q, want loading with no service to read", got)
+	}
+
+	svc := fixedWeather(&weather.Weather{Zone: time.Local, Current: weather.Current{Temperature: 7, Condition: weather.CondClear}}, nil)
+	defer svc.Close()
+	ctx.Weather = svc
+	followed := apptest.On(a, func() *weatherView { return weatherDropdown(ctx).(*weatherView) })
+	t.Cleanup(func() { apptest.On(a, func() bool { followed.dropdownClosed(); return true }) })
+	apptest.Until(t, a, "the service's data on the followed dropdown", func() bool { return followed.pages.Visible() == "loaded" })
 }

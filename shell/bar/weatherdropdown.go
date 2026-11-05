@@ -455,7 +455,7 @@ func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) wid
 // it, and the data age re-renders every minute (UPDATED_AGO_INTERVAL).
 func (v *weatherView) follow(life context.Context) {
 	v.refresh()
-	if v.ctx.App == nil {
+	if v.ctx.App == nil || v.svc == nil {
 		return
 	}
 	changes, unsubscribe := v.svc.Subscribe()
