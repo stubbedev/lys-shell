@@ -876,6 +876,7 @@
             "power-profiles",
             "ram",
             "recorder",
+            "screen-share",
             "screenshot",
             "separator",
             "storage",
@@ -6243,6 +6244,27 @@
           },
           "description": "Screen recorder module."
         },
+        "screen-share": {
+          "$ref": "#/$defs/ScreenShareConfig",
+          "default": {
+            "border-color": "red",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "icon": "ld-monitor-symbolic",
+            "icon-bg-color": "red",
+            "icon-color": "auto",
+            "icon-show": true,
+            "label-color": "fg-default",
+            "label-max-length": 0,
+            "label-show": false,
+            "left-click": "dropdown:screen-share",
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Screen share indicator module."
+        },
         "screenshot": {
           "$ref": "#/$defs/ScreenshotConfig",
           "default": {
@@ -8400,6 +8422,87 @@
       "maximum": 3.0,
       "minimum": 0.25,
       "type": "number"
+    },
+    "ScreenShareConfig": {
+      "description": "Screen share indicator.\n\nShows while an app captures the screen or a window through the desktop\nportal; its dropdown lists each share's app and what it captures, with\na button that stops it.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-monitor-symbolic",
+          "description": "Bar button icon."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "fg-default",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display the number of shares beside the icon."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "dropdown:screen-share",
+          "description": "Action on left click. Default opens the dropdown."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
     },
     "ScreenshotConfig": {
       "description": "Screenshot capture button.\n\nClick the bar button to capture a region, output, or window. Controllable\nfrom the CLI / RPC socket: `lys-shell screenshot region|output|window`.",
@@ -11693,6 +11796,23 @@
           "webcam-size": 20,
           "webcam-x": 100,
           "webcam-y": 100
+        },
+        "screen-share": {
+          "border-color": "red",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "icon": "ld-monitor-symbolic",
+          "icon-bg-color": "red",
+          "icon-color": "auto",
+          "icon-show": true,
+          "label-color": "fg-default",
+          "label-max-length": 0,
+          "label-show": false,
+          "left-click": "dropdown:screen-share",
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
         },
         "screenshot": {
           "border-color": "accent",

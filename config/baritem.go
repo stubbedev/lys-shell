@@ -191,6 +191,7 @@ const (
 	ModulePowerProfiles      BarModule = "power-profiles"
 	ModuleRAM                BarModule = "ram"
 	ModuleRecorder           BarModule = "recorder"
+	ModuleScreenShare        BarModule = "screen-share"
 	ModuleScreenshot         BarModule = "screenshot"
 	ModuleSeparator          BarModule = "separator"
 	ModuleStorage            BarModule = "storage"
@@ -212,7 +213,7 @@ var BuiltinModules = []BarModule{
 	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleLysWMWorkspaces, ModuleMail,
 	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleNetstat,
 	ModuleNetwork, ModuleNightlight, ModuleNiriWorkspaces, ModuleNotifications, ModulePower,
-	ModulePowerProfiles, ModuleRAM, ModuleRecorder, ModuleScreenshot,
+	ModulePowerProfiles, ModuleRAM, ModuleRecorder, ModuleScreenShare, ModuleScreenshot,
 	ModuleSeparator, ModuleStorage, ModuleSwayWorkspaces, ModuleSystray,
 	ModuleTreeman, ModuleUpdates, ModuleVolume, ModuleWeather,
 	ModuleWindowTitle, ModuleWorkspaces, ModuleWorldClock,

@@ -86,6 +86,16 @@ type sessions struct {
 	conn *dbus.Conn
 	mu   sync.Mutex
 	live map[dbus.ObjectPath]*session
+	// sharesChanged runs when a session starts streaming the screen or
+	// one that streamed ends; nil tells nobody.
+	sharesChanged func()
+}
+
+// notifyShares says the screen shares changed.
+func (r *sessions) notifyShares() {
+	if r.sharesChanged != nil {
+		r.sharesChanged()
+	}
 }
 
 func newSessions(conn *dbus.Conn) *sessions {

@@ -53,6 +53,7 @@ var i18nPrefixes = map[string]string{
 	"PowerProfilesConfig":       "settings-modules-power-profiles",
 	"RamConfig":                 "settings-modules-ram",
 	"RecorderConfig":            "settings-modules-recorder",
+	"ScreenShareConfig":         "settings-modules-screen-share",
 	"ScreenshotConfig":          "settings-modules-screenshot",
 	"SeparatorConfig":           "settings-modules-separator",
 	"SharePickerConfig":         "settings-share-picker",

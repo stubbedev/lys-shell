@@ -17,13 +17,14 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/screenshare"
 )
 
 // BusName is the backend's well-known name (lys-shell.portal's DBusName).
-const BusName = "org.freedesktop.impl.portal.desktop.lys"
+const BusName = screenshare.BusName
 
 // ObjectPath is where every interface is mounted.
-const ObjectPath = dbus.ObjectPath("/org/freedesktop/portal/desktop")
+const ObjectPath = screenshare.Path
 
 // shellName is what the portal's PipeWire client and EIS seat are
 // called, and what its ScreenCast streams are named after.
@@ -48,6 +49,7 @@ type Backend struct {
 	shortcuts  *globalShortcuts
 	screenCast *screenCast
 	remote     *remoteDesktop
+	shares     *shares
 	// windows is the compositor's window list (a fake in tests).
 	windows windowSource
 	// dataDir is lys-shell's data directory, "" when none resolves.
@@ -71,6 +73,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	loop := &waylandLoop{}
 	b.screenCast = newScreenCast(conn, b.sessions, screenStreams{openDevice: openVulkanAllocator}.start, loop.outputs)
 	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput)
+	b.shares = newShares(conn, b.sessions)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, shortcutStorePath(), waylandShortcutsStarter(loop))
 	loop.onEnd(b.clipboard.loopEnded)
@@ -95,6 +98,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		b.shortcuts.iface(),
 		b.screenCast.iface(),
 		b.remote.iface(),
+		b.shares.iface(),
 		b.notifier.iface(),
 		wallpaperIface(b.conn, b.cfg, b.dataDir),
 	}, dialogIfaces(b.conn, b.cfg)...)

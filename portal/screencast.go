@@ -147,6 +147,9 @@ func (c *screenCast) sharing(s *session) {
 			s.cast.streams = nil
 			s.mu.Unlock()
 			c.stopStreams(streams)
+			if len(streams) > 0 {
+				c.sessions.notifyShares()
+			}
 		})
 	}
 }
@@ -223,6 +226,7 @@ func (c *screenCast) begin(session *session, targets []sharepicker.Target, curso
 	session.mu.Lock()
 	session.cast.streams = append(session.cast.streams, started...)
 	session.mu.Unlock()
+	c.sessions.notifyShares()
 	return started, nil
 }
 

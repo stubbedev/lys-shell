@@ -15,11 +15,14 @@ const implPrefix = "org.freedesktop.impl.portal."
 // by the Go backend; the list only shrinks.
 var pendingInterfaces []string
 
-// mounted is the short names of the interfaces the backend serves.
+// mounted is the short names of the portal interfaces the backend
+// serves; the shell's own (screen shares) are not the frontend's.
 func mounted() []string {
 	var names []string
 	for _, iface := range New(nil, config.Load("", config.DiscardDiagnostics)).interfaces() {
-		names = append(names, strings.TrimPrefix(iface.Name, implPrefix))
+		if name, ok := strings.CutPrefix(iface.Name, implPrefix); ok {
+			names = append(names, name)
+		}
 	}
 	slices.Sort(names)
 	return names

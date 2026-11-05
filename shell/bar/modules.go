@@ -312,6 +312,7 @@ var factories = map[string]Factory{
 	"mango-workspaces":    newMangoWorkspaces,
 	"lys-wm-workspaces":   newLysWMWorkspaces,
 	"workspaces":          newWorkspaces,
+	"screen-share":        newScreenShare,
 	"screenshot":          newScreenshot,
 	"separator":           newSeparator,
 }

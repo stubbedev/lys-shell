@@ -170,6 +170,7 @@ func docSpecs() []docSpec {
 		m("power-profiles", bar, func(c *Config) any { return &c.PowerProfiles }),
 		m("ram", bar, func(c *Config) any { return &c.RAM }),
 		m("recorder", bar, func(c *Config) any { return &c.Recorder }),
+		m("screen-share", bar, func(c *Config) any { return &c.ScreenShare }),
 		m("screenshot", bar, func(c *Config) any { return &c.Screenshot }),
 		m("separator", docStandard, func(c *Config) any { return &c.Separator }),
 		m("storage", bar, func(c *Config) any { return &c.Storage }),

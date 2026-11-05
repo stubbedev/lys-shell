@@ -60,6 +60,8 @@ type ModulesConfig struct {
 	RAM RamConfig `cfg:"ram"`
 	// Screen recorder module.
 	Recorder RecorderConfig `cfg:"recorder"`
+	// Screen share indicator module.
+	ScreenShare ScreenShareConfig `cfg:"screen-share"`
 	// Screenshot capture module.
 	Screenshot ScreenshotConfig `cfg:"screenshot"`
 	// Storage usage module.
@@ -152,6 +154,7 @@ func DefaultsModules() ModulesConfig {
 		PowerProfiles:      DefaultsPowerProfiles(),
 		RAM:                DefaultsRam(),
 		Recorder:           DefaultsRecorder(),
+		ScreenShare:        DefaultsScreenShare(),
 		Screenshot:         DefaultsScreenshot(),
 		Storage:            DefaultsStorage(),
 		Separator:          DefaultsSeparator(),
