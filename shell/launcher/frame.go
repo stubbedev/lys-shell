@@ -437,6 +437,10 @@ func springFor(d uint32, entering bool) anim.SpringParams {
 	return anim.SpringParams{Response: time.Duration(d) * time.Millisecond, Damping: damping}
 }
 
+// revealFrom is where an opening panel's reveal starts: its first frame
+// is already readable rather than nearly transparent.
+const revealFrom = 0.4
+
 // open plays the enter.
 func (m *panelMotion) open(anims config.AnimationsConfig) {
 	t := anims.TransitionFor(config.AnimLauncher, false)
@@ -448,11 +452,11 @@ func (m *panelMotion) open(anims config.AnimationsConfig) {
 		return
 	}
 	if anim.Reduced() {
-		m.fade(0, 1, d, nil)
+		m.fade(revealFrom, 1, d, nil)
 		return
 	}
 	m.revS.SetParams(springFor(d, true))
-	m.revS.Snap(0)
+	m.revS.Snap(revealFrom)
 	m.revS.SetTarget(1)
 }
 
@@ -497,6 +501,8 @@ func (m *panelMotion) fade(from, to float64, d uint32, done func()) {
 	if m.fadeStop != nil {
 		m.fadeStop()
 	}
+	m.reveal = from
+	m.applyReveal()
 	m.fadeStop = anim.Start(time.Duration(d)*time.Millisecond, func(t float64) {
 		m.reveal = from + float64((to-from)*t)
 		m.applyReveal()
@@ -512,7 +518,7 @@ func (m *panelMotion) resize(w, h int) {
 		return
 	}
 	m.targetW, m.targetH = w, h
-	if m.instant || m.reveal <= 0.01 {
+	if m.instant || m.reveal <= revealFrom {
 		m.snapSize(w, h)
 		return
 	}
