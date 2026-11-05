@@ -8,6 +8,7 @@ package search
 
 import (
 	"context"
+	"image"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/i18n"
@@ -94,10 +95,13 @@ type Preview struct {
 	// and only when the row is selected.
 	Load      func() ([]byte, error)
 	LoadsText bool
+	// Image produces a decoded image off the UI loop, only when the row is
+	// selected: a window's contents, captured from the compositor.
+	Image func(context.Context) (image.Image, error)
 }
 
 // Any reports whether there is anything to preview.
-func (p Preview) Any() bool { return p.Path != "" || p.Text != "" || p.Load != nil }
+func (p Preview) Any() bool { return p.Path != "" || p.Text != "" || p.Load != nil || p.Image != nil }
 
 // Entry is one row a provider offers.
 type Entry struct {

@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/internal/ipcsock"
@@ -184,6 +185,10 @@ func Windows() ([]Window, error) {
 	var out []Window
 	return out, call(request{Request: "windows"}, &out)
 }
+
+// ToplevelIdentifier is the ext-foreign-toplevel-list identifier lys-wm
+// gives the window with IPC id id.
+func ToplevelIdentifier(id uint64) string { return "lys-wm-" + strconv.FormatUint(id, 10) }
 
 // ActiveWindow is the focused window; false when none has focus.
 func ActiveWindow() (Window, bool, error) {

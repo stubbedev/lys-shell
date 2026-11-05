@@ -279,9 +279,12 @@ func TestHyprlandClientsParse(t *testing.T) {
 	windows, err := parseHyprlandClients([]byte(`[
 		{"address":"0x1","title":"a","class":"foot","mapped":true,"workspace":{"id":2,"name":"2"},"focusHistoryID":0},
 		{"address":"0x2","title":"b","class":"kitty","mapped":false,"workspace":{"id":2,"name":"2"},"focusHistoryID":1},
-		{"address":"0x3","title":"c","class":"zen","workspace":{"id":3,"name":"web"},"focusHistoryID":2}]`), &active)
+		{"address":"0x5a3f","title":"c","class":"zen","workspace":{"id":3,"name":"web"},"focusHistoryID":2}]`), &active)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if windows[0].HyprlandAddress != 0x1 || windows[1].HyprlandAddress != 0x5a3f {
+		t.Errorf("addresses %#x %#x, want the clients' to capture them by", windows[0].HyprlandAddress, windows[1].HyprlandAddress)
 	}
 	if len(windows) != 2 || !windows[0].Focused || !windows[0].OnCurrentWorkspace || windows[1].OnCurrentWorkspace || windows[1].Workspace != "web" {
 		t.Errorf("windows = %+v (an unmapped client is left out)", windows)
@@ -651,6 +654,9 @@ func TestLysWMWindows(t *testing.T) {
 	})
 	if len(got) != 3 || got[1].ID != "2" || got[1].Class != "firefox" || got[1].Workspace != "2" || !got[1].Focused {
 		t.Fatalf("mapped %+v", got)
+	}
+	if got[1].ToplevelIdentifier != "lys-wm-2" || got[1].HyprlandAddress != 0 {
+		t.Errorf("window 2 captures as %q/%#x, want lys-wm's foreign-toplevel identifier", got[1].ToplevelIdentifier, got[1].HyprlandAddress)
 	}
 	if got[0].OnCurrentWorkspace || !got[2].OnCurrentWorkspace {
 		t.Errorf("current workspace: %+v", got)

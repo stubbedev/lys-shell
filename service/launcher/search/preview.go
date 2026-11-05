@@ -44,6 +44,12 @@ type Thumbnailing interface {
 // LoadPreview loads a preview, off the UI loop.
 func LoadPreview(ctx context.Context, p Preview, thumbs Thumbnailing) (PreviewContent, error) {
 	switch {
+	case p.Image != nil:
+		img, err := p.Image(ctx)
+		if err != nil {
+			return PreviewContent{}, err
+		}
+		return PreviewContent{Image: img}, nil
 	case p.Load != nil:
 		data, err := p.Load()
 		if err != nil {

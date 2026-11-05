@@ -34,7 +34,7 @@ func TestHeadlessPreviews(t *testing.T) {
 	if _, err := outputThumb("NOPE-1", 100); err == nil {
 		t.Fatal("a missing output previewed")
 	}
-	if _, err := windowThumb(sharepreview.Toplevel{Class: "no.such.app", Title: "x"}, 100); err == nil {
+	if _, err := sharepreview.WindowThumb(sharepreview.Toplevel{Class: "no.such.app", Title: "x"}, 100); err == nil {
 		t.Fatal("a missing window previewed")
 	}
 	_ = fallbackToplevels() // must not fail on a compositor with no windows

@@ -169,3 +169,21 @@ func TestTransformInto(t *testing.T) {
 		}
 	}
 }
+
+func TestAWindowWithAnIdentifierMatchesByItAlone(t *testing.T) {
+	tl := Toplevel{Class: "Alacritty", Title: "Alacritty", Identifier: "lys-wm-7"}
+	twin := capture.Toplevel{AppID: "Alacritty", Title: "Alacritty", Identifier: "lys-wm-3"}
+	if tl.matches(twin) {
+		t.Error("a twin with the same class and title matched a window known by its identifier")
+	}
+	if !tl.matches(capture.Toplevel{AppID: "Alacritty", Title: "renamed", Identifier: "lys-wm-7"}) {
+		t.Error("the window itself, retitled, did not match its identifier")
+	}
+}
+
+func TestAWindowWithoutAnIdentifierMatchesByClassAndTitle(t *testing.T) {
+	tl := Toplevel{Class: "foot", Title: "vim"}
+	if !tl.matches(capture.Toplevel{AppID: "foot", Title: "vim", Identifier: "x"}) || tl.matches(capture.Toplevel{AppID: "foot", Title: "htop"}) {
+		t.Error("class and title matching")
+	}
+}

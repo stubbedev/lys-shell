@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
 	"log"
 	"os"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/service/sway"
 )
 
@@ -70,6 +72,27 @@ type WindowInfo struct {
 	// FocusOrder is lower for more recently focused windows.
 	FocusOrder         int64
 	OnCurrentWorkspace bool
+	// HyprlandAddress is the window's Hyprland address, 0 elsewhere: it
+	// captures the window through Hyprland's toplevel export.
+	HyprlandAddress uint64
+	// ToplevelIdentifier is the window's ext-foreign-toplevel-list
+	// identifier where the compositor's IPC names it, "" elsewhere, where
+	// a capture matches the window by class and title.
+	ToplevelIdentifier string
+}
+
+// windowPreviewPx is the longer side a window preview is captured at:
+// the preview pane's width at a 2x scale.
+const windowPreviewPx = 720
+
+// Preview captures the window's contents, scaled to fit the preview
+// pane.
+func (win WindowInfo) Preview(context.Context) (image.Image, error) {
+	return sharepreview.WindowThumb(sharepreview.Toplevel{
+		Class: win.Class, Title: win.Title,
+		WindowAddress: win.HyprlandAddress, HasAddress: win.HyprlandAddress != 0,
+		Identifier: win.ToplevelIdentifier,
+	}, windowPreviewPx)
 }
 
 // WindowBackend talks to one compositor. The Rust mode shelled out to
@@ -189,6 +212,14 @@ func (w *Window) Delete(ctx context.Context, index uint32) launcher.Action {
 // AllowsCustom is false.
 func (*Window) AllowsCustom() bool { return false }
 
+// RowPreview captures the row's window.
+func (w *Window) RowPreview(index uint32) (func(context.Context) (image.Image, error), bool) {
+	if int(index) >= len(w.windows) {
+		return nil, false
+	}
+	return w.windows[index].Preview, true
+}
+
 func windowItem(win WindowInfo, cfg WindowConfig) launcher.Item {
 	display := launcher.Render(cfg.Format, launcher.Values(map[string]string{
 		"w": win.Workspace, "c": win.Class, "t": win.Title, "n": win.Class, "r": "",
@@ -267,8 +298,9 @@ func parseHyprlandClients(raw []byte, active *int64) ([]WindowInfo, error) {
 		if c.FocusHistoryID != nil {
 			order = *c.FocusHistoryID
 		}
+		address, _ := strconv.ParseUint(strings.TrimPrefix(c.Address, "0x"), 16, 64)
 		out = append(out, WindowInfo{
-			ID: c.Address, Title: c.Title, Class: c.Class, Workspace: c.Workspace.Name,
+			ID: c.Address, Title: c.Title, Class: c.Class, Workspace: c.Workspace.Name, HyprlandAddress: address,
 			Focused:            c.FocusHistoryID != nil && *c.FocusHistoryID == 0,
 			FocusOrder:         order,
 			OnCurrentWorkspace: c.Workspace.ID != nil && active != nil && *c.Workspace.ID == *active,
@@ -512,6 +544,7 @@ func lysWMWindows(windows []lyswm.Window) []WindowInfo {
 		out[i] = WindowInfo{
 			ID: strconv.FormatUint(w.ID, 10), Title: w.Title, Class: w.AppID, Workspace: strconv.Itoa(w.Workspace),
 			Focused: w.Focused, FocusOrder: int64(len(windows) - i), OnCurrentWorkspace: found && w.Workspace == focusedWS,
+			ToplevelIdentifier: lyswm.ToplevelIdentifier(w.ID),
 		}
 	}
 	return out

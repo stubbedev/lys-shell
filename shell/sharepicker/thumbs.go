@@ -1,7 +1,6 @@
 package sharepicker
 
 import (
-	"errors"
 	"fmt"
 	"image"
 
@@ -30,51 +29,6 @@ func fallbackToplevels() []sharepreview.Toplevel {
 		out[i] = sharepreview.Toplevel{ID: uint64(i), Class: tl.AppID, Title: tl.Title, Identifier: tl.Identifier}
 	}
 	return out
-}
-
-// windowThumb captures a window preview: Hyprland's toplevel-export
-// when XDPH sent the address, otherwise (or when that fails) the ext
-// path matched by class and title. The frame is converted without an
-// output transform and downscaled to size.
-func windowThumb(tl sharepreview.Toplevel, size int) (*image.RGBA, error) {
-	c, err := capture.Connect()
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
-	}
-	defer func() { _ = c.Close() }()
-	var f *capture.Frame
-	if tl.HasAddress && c.HasHyprlandExport() {
-		f, err = c.CaptureHyprlandWindow(tl.WindowAddress, capture.Options{})
-		if err != nil {
-			f = nil
-		}
-	}
-	if f == nil {
-		if !c.HasToplevelCapture() {
-			return nil, errors.New("window capture not supported on this compositor")
-		}
-		tls, err := c.Toplevels()
-		if err != nil {
-			return nil, err
-		}
-		for _, cand := range tls {
-			if cand.AppID == tl.Class && cand.Title == tl.Title {
-				f, err = c.CaptureToplevel(cand, capture.Options{})
-				if err != nil {
-					return nil, fmt.Errorf("window capture failed: %w", err)
-				}
-				break
-			}
-		}
-		if f == nil {
-			return nil, errors.New("could not match the window to capture")
-		}
-	}
-	img, err := f.Image()
-	if err != nil {
-		return nil, err
-	}
-	return sharepreview.ResizeToFit(img, size), nil
 }
 
 // outputInfo is one output as the outputs page lays it out: the

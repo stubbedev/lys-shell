@@ -670,7 +670,7 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	button.OnClick = func() { p.selectPayload(payload) }
 	grab := p.windowPreview
 	if grab == nil {
-		grab = windowThumb
+		grab = sharepreview.WindowThumb
 	}
 	p.loadPreview(preview, card, spinner, p.previews, func(size int) (*image.RGBA, error) { return grab(tl, size) })
 	return button
