@@ -474,3 +474,29 @@ func TestDropdownPopoverAsksForBlurWhenTranslucent(t *testing.T) {
 		t.Error("an opaque panel asks for blur")
 	}
 }
+
+// A dropdown fading in shows from the shared start opacity, readable
+// from its first frame; a slide still enters from hidden, and the exit
+// still fades all the way out.
+func TestDropdownFadesInFromAReadableOpacity(t *testing.T) {
+	cfg := config.Defaults()
+	_, rev := dropdownTree(widget.NewBox(widget.Row, 0, 0), cfg)
+	reveal.Show(rev, cfg.Animations, config.AnimDropdown)
+	if got := rev.Progress(); got != reveal.FadeFrom {
+		t.Errorf("the dropdown fade starts at %v, want %v", got, reveal.FadeFrom)
+	}
+	rev.Finish()
+	dropdownExit(rev, cfg.Animations)(nil)
+	rev.Finish()
+	if got := rev.Progress(); got != 0 {
+		t.Errorf("the exit lands at %v, want hidden", got)
+	}
+
+	enter := config.AnimationSlideDown
+	cfg.Animations.Dropdown.Enter = &enter
+	_, rev = dropdownTree(widget.NewBox(widget.Row, 0, 0), cfg)
+	reveal.Show(rev, cfg.Animations, config.AnimDropdown)
+	if got := rev.Progress(); got != 0 {
+		t.Errorf("a sliding dropdown starts at %v, want hidden", got)
+	}
+}

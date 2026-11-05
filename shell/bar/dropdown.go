@@ -560,6 +560,7 @@ func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 // the bar and the surface edges.
 func dropdownTree(content widget.Widget, cfg *config.Config) (*widget.Box, *widget.Revealer) {
 	rev := widget.NewRevealer(content)
+	rev.SetFadeFrom(reveal.FadeFrom)
 	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
 	return popoverCard(rev, cfg.Bar.DropdownShadow), rev
 }

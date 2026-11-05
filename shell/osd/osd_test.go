@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/keytoggles"
 	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -705,5 +706,33 @@ func TestAScaleChangeBuildsTheTreeAgain(t *testing.T) {
 	h.osd.Show(Slider("b", "", 2, false))
 	if h.opened[1].cfg.Root == h.opened[0].cfg.Root {
 		t.Error("a tree built at scale 1 showed at scale 2")
+	}
+}
+
+// An OSD fading in shows from the shared start opacity, readable from
+// its first frame; a slide still enters from hidden, and the exit still
+// fades all the way out.
+func TestOsdFadesInFromAReadableOpacity(t *testing.T) {
+	cfg := config.Defaults()
+	h := readyHarness(t, cfg)
+	h.osd.Show(Slider("Speakers", "", 40, false))
+	rev := h.osd.face.rev
+	if got := rev.Progress(); got != reveal.FadeFrom {
+		t.Errorf("the OSD fade starts at %v, want %v", got, reveal.FadeFrom)
+	}
+	rev.Finish()
+	h.fire(t, time.Duration(cfg.Osd.Duration)*time.Millisecond)
+	rev.Finish()
+	if got := rev.Progress(); got != 0 {
+		t.Errorf("the exit lands at %v, want hidden", got)
+	}
+
+	slide := config.Defaults()
+	enter := config.AnimationSlideDown
+	slide.Animations.Osd.Enter = &enter
+	h = readyHarness(t, slide)
+	h.osd.Show(Slider("Speakers", "", 40, false))
+	if got := h.osd.face.rev.Progress(); got != 0 {
+		t.Errorf("a sliding OSD starts at %v, want hidden", got)
 	}
 }

@@ -12,6 +12,10 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 )
 
+// FadeFrom is the opacity an opening surface fades in from: its first
+// frame is already readable rather than nearly transparent.
+const FadeFrom = 0.4
+
 // Transition is the revealer transition for a config animation style.
 func Transition(t config.AnimationType) widget.RevealTransition {
 	switch t {

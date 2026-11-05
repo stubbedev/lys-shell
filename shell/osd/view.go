@@ -5,6 +5,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -48,6 +49,7 @@ func (o *Osd) build() *face {
 	f.container.Append(f.toggleHeader, false)
 	f.container.Append(f.bar, false)
 	f.rev = widget.NewRevealer(f.container)
+	f.rev.SetFadeFrom(reveal.FadeFrom)
 	f.host = f.root(o.d.Sheet)
 	f.scale = o.scale()
 	return f

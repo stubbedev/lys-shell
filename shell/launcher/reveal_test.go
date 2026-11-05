@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-ui/anim"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // openingOpacities are the opacities an opening panel commits, its map
@@ -37,8 +38,8 @@ func TestAnOpeningPanelIsReadableFromItsFirstFrame(t *testing.T) {
 	h := newPanelHarness(t)
 	h.cfg.Animations.Enabled = true
 	ops := openingOpacities(t, h)
-	if ops[0] < 0.4 {
-		t.Errorf("the map commits at %v, want 0.4", ops[0])
+	if ops[0] < reveal.FadeFrom {
+		t.Errorf("the map commits at %v, want %v", ops[0], reveal.FadeFrom)
 	}
 	below := 0
 	for _, o := range ops[1:] {
@@ -57,8 +58,8 @@ func TestAReducedMotionFadeStartsReadableAndAClosedPanelEndsAtZero(t *testing.T)
 	h := newPanelHarness(t)
 	h.cfg.Animations.Enabled = true
 	p, _ := h.openPanel()
-	if r := p.v.motion.reveal; r < 0.4 {
-		t.Errorf("reduced motion fades in from %v, want 0.4", r)
+	if r := p.v.motion.reveal; r < reveal.FadeFrom {
+		t.Errorf("reduced motion fades in from %v, want %v", r, reveal.FadeFrom)
 	}
 
 	anim.SetReduced(false)

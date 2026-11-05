@@ -12,6 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // The launcher's measures, in logical pixels at scale 1: every session is
@@ -437,10 +438,6 @@ func springFor(d uint32, entering bool) anim.SpringParams {
 	return anim.SpringParams{Response: time.Duration(d) * time.Millisecond, Damping: damping}
 }
 
-// revealFrom is where an opening panel's reveal starts: its first frame
-// is already readable rather than nearly transparent.
-const revealFrom = 0.4
-
 // open plays the enter.
 func (m *panelMotion) open(anims config.AnimationsConfig) {
 	t := anims.TransitionFor(config.AnimLauncher, false)
@@ -452,11 +449,11 @@ func (m *panelMotion) open(anims config.AnimationsConfig) {
 		return
 	}
 	if anim.Reduced() {
-		m.fade(revealFrom, 1, d, nil)
+		m.fade(reveal.FadeFrom, 1, d, nil)
 		return
 	}
 	m.revS.SetParams(springFor(d, true))
-	m.revS.Snap(revealFrom)
+	m.revS.Snap(reveal.FadeFrom)
 	m.revS.SetTarget(1)
 }
 
@@ -518,7 +515,7 @@ func (m *panelMotion) resize(w, h int) {
 		return
 	}
 	m.targetW, m.targetH = w, h
-	if m.instant || m.reveal <= revealFrom {
+	if m.instant || m.reveal <= reveal.FadeFrom {
 		m.snapSize(w, h)
 		return
 	}
