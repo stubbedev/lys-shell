@@ -310,7 +310,7 @@ func (p *Popups) newStack(key string) *stack {
 	st.root.SetInlineStyle(styling.WidthStyle(int(cardWidthPx * float64(p.cfg.Styling.Scale))))
 	label := widget.NewLabel(p.font, widgets.TextPx(styling.Body, float64(p.cfg.Styling.Scale)), i18n.T("notification-popup-clear-all"), 0)
 	st.clear = widget.NewButton(label, 0, 0)
-	st.clear.AddClass("notification-popup-clear-all", css.Ghost, css.Small)
+	st.clear.AddClass("notification-popup-clear-all", css.Glass, css.Small)
 	st.clear.SetHAlign(widget.AlignEnd)
 	st.clear.OnClick = func() { p.clearStack(st) }
 	st.root.Append(st.clear, false)

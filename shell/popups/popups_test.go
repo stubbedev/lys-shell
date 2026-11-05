@@ -477,6 +477,32 @@ func TestHoverExpandsTheStackAndLeavingRestoresIt(t *testing.T) {
 	}
 }
 
+func (s *surface) plate(w widget.Boundser) [4]byte {
+	s.t.Helper()
+	b := w.Bounds()
+	return s.pixel(b.X+b.W/2, b.Y+1)
+}
+
+func TestTheClearAllButtonIsFrostedAtRestAndOpaqueUnderThePointer(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupMaxVisible = 6
+	s := newSurface(t, cfg)
+	mail, _ := s.burst()
+	s.hover(s.card(mail[2]).summary)
+	st := s.stackOf(mail[2])
+	if !st.clear.Visible() {
+		t.Fatal("the hovered stack shows no clear-all button")
+	}
+	rest := s.plate(st.clear)
+	if rest[3] == 0 || rest[3] == 0xff {
+		t.Errorf("clear all at rest has plate %v, want frosted like the cards", rest)
+	}
+	s.hover(st.clear)
+	if hovered := s.plate(st.clear); hovered[3] != 0xff {
+		t.Errorf("clear all under the pointer has plate %v, want opaque", hovered)
+	}
+}
+
 // The stacks keep popup-gap from every edge of the surface, as from
 // each other, so no card or clear-all button touches the screen edge
 // the surface is anchored to; the gap follows popup-gap.
