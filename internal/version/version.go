@@ -9,4 +9,4 @@ package version
 const Name = "lys-shell"
 
 // Version is the lys-shell release version.
-const Version = "0.3.9"
+const Version = "0.3.10"
