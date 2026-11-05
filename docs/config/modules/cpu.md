@@ -52,11 +52,11 @@ Run `sensors` to see available labels.
 #### Placeholders
 
 - `{{ percent }}` - CPU usage (0-100)
-- `{{ freq_ghz }}` - Frequency of the busiest core (highest usage)
-- `{{ avg_freq_ghz }}` - Average frequency across cores
-- `{{ max_freq_ghz }}` - Maximum frequency among cores
-- `{{ temp_c }}` - Temperature in Celsius (if available)
-- `{{ temp_f }}` - Temperature in Fahrenheit (if available)
+- `{{ freq_ghz }}` - Frequency of the busiest core in GHz
+- `{{ avg_freq_ghz }}` - Average frequency across cores in GHz
+- `{{ max_freq_ghz }}` - Highest frequency among cores in GHz
+- `{{ temp_c }}` - Temperature in Celsius (0 when unavailable)
+- `{{ temp_f }}` - Temperature in Fahrenheit (32 when unavailable)
 
 #### Examples
 

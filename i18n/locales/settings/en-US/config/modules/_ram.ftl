@@ -55,3 +55,19 @@ settings-modules-ram-scroll-down = Scroll Down
 
 settings-modules-ram-thresholds = Thresholds
     .description = Color thresholds that change based on value levels
+
+## Format placeholders
+
+settings-modules-ram-format-placeholder-percent = Memory usage (0-100)
+
+settings-modules-ram-format-placeholder-used-gib = Used memory in GiB
+
+settings-modules-ram-format-placeholder-total-gib = Total memory in GiB
+
+settings-modules-ram-format-placeholder-available-gib = Available memory in GiB
+
+settings-modules-ram-format-placeholder-swap-percent = Swap usage (0-100)
+
+settings-modules-ram-format-placeholder-swap-used-gib = Used swap in GiB
+
+settings-modules-ram-format-placeholder-swap-total-gib = Total swap in GiB

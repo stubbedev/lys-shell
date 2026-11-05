@@ -73,3 +73,23 @@ settings-modules-weather-left-click = Left Click
 
 settings-modules-weather-refresh-interval-seconds = Refresh Interval
     .description = How often weather data is fetched (seconds)
+
+## Format placeholders
+
+settings-modules-weather-format-placeholder-temp = Current temperature
+
+settings-modules-weather-format-placeholder-temp-unit = Temperature unit symbol (°F or °C)
+
+settings-modules-weather-format-placeholder-feels-like = Feels-like temperature
+
+settings-modules-weather-format-placeholder-condition = Weather condition (e.g. Cloudy)
+
+settings-modules-weather-format-placeholder-humidity = Humidity percentage (e.g. 65%)
+
+settings-modules-weather-format-placeholder-wind-speed = Wind speed with its unit (e.g. 12 km/h)
+
+settings-modules-weather-format-placeholder-wind-dir = Wind direction (e.g. NW)
+
+settings-modules-weather-format-placeholder-high = Today's high temperature (empty without a forecast)
+
+settings-modules-weather-format-placeholder-low = Today's low temperature (empty without a forecast)

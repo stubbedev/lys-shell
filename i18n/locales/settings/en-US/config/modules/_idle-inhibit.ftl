@@ -55,3 +55,11 @@ settings-modules-idle-inhibit-scroll-up = Scroll Up
 
 settings-modules-idle-inhibit-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-idle-inhibit-format-placeholder-state = Inhibitor state (On, Off)
+
+settings-modules-idle-inhibit-format-placeholder-remaining = Time remaining as M:SS or H:MM:SS (∞ when indefinite, - when off)
+
+settings-modules-idle-inhibit-format-placeholder-duration = Total duration in minutes (∞ when indefinite)

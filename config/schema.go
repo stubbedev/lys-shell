@@ -333,6 +333,11 @@ func (g *schemaGen) structSchema(t reflect.Type) Schema {
 		if doc := schemaDocs[f.owner.Name()+"."+f.goName]; doc != "" {
 			prop["description"] = doc
 		}
+		if ps := placeholdersOf(t, f); ps != nil {
+			doc, _ := prop["description"].(string)
+			prop["description"] = withPlaceholderDocs(doc, ps)
+			prop["x-placeholders"] = placeholderSchema(ps)
+		}
 		if !container && !structDefault && f.required {
 			required = append(required, f.key)
 		}

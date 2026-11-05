@@ -25,10 +25,6 @@ type BrightnessConfig struct {
 	LabelColor ColorValue `cfg:"label-color"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ percent }}` - Brightness (0-100)
-	//
 	// ## Examples
 	//
 	// - `"{{ percent }}%"` - "65%"

@@ -34,8 +34,8 @@ bar:
 
 #### Placeholders
 
-- `{{ layout }}` - Raw layout name from the compositor (e.g., "English (US)")
-- `{{ alias }}` - User-defined alias from `layout-alias-map`, falls back to `{{ layout }}`
+- `{{ layout }}` - Layout name from the compositor (e.g. English (US))
+- `{{ alias }}` - Alias from the layout alias map, else the layout name
 
 #### Examples
 

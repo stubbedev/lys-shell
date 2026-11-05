@@ -40,7 +40,7 @@ func TestCalendarNamesAreTheShells(t *testing.T) {
 // both back after a month step and another pick.
 func TestCalendarViewNavigatesAndSelects(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Clock.Format = "%I:%M %p"
+	cfg.Clock.Format = mustStrftimeFormat(t, "%I:%M %p")
 	cfg.Clock.DropdownShowSeconds = false
 	v := calendarDropdown(newTestContext(t, cfg)).(*calendarView)
 	today := widget.DateOf(time.Now())
@@ -107,14 +107,14 @@ func TestCalendarSectionIsTheLysUICalendar(t *testing.T) {
 // stops the separator blink; the ampm shows only in 12h.
 func TestCalendarClockRowCarriesTheStateClasses(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Clock.Format = "%I:%M %p"
+	cfg.Clock.Format = mustStrftimeFormat(t, "%I:%M %p")
 	cfg.Clock.DropdownShowSeconds = true
 	ctx := newTestContext(t, cfg)
 	v := calendarDropdown(ctx).(*calendarView)
 	if !v.timeRow.HasClass("show-seconds") || !v.ampm.Visible() {
 		t.Errorf("12h with seconds: classes = %v, ampm %v; want show-seconds and the ampm", v.timeRow.Classes(), v.ampm.Visible())
 	}
-	cfg.Clock.Format = "%H:%M"
+	cfg.Clock.Format = mustStrftimeFormat(t, "%H:%M")
 	cfg.Clock.DropdownShowSeconds = false
 	v.tick()
 	if v.timeRow.HasClass("show-seconds") || v.ampm.Visible() {
@@ -141,4 +141,13 @@ func TestCalendarFillsItsSection(t *testing.T) {
 	if cal.X != section.X || cal.W != section.W {
 		t.Errorf("the grid spans x %d..%d, want the section's %d..%d", cal.X, cal.X+cal.W, section.X, section.X+section.W)
 	}
+}
+
+func mustStrftimeFormat(t *testing.T, s string) config.StrftimeFormat {
+	t.Helper()
+	f, err := config.ParseStrftimeFormat(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
 }

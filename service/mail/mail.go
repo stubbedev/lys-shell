@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/icons"
+	"github.com/stubbedev/lys-shell/internal/jinja"
 )
 
 // Debounce coalesces a maildir-sync burst into one re-query.
@@ -233,12 +233,14 @@ func (s *Service) buildBatch(ctx context.Context, query, icon, fallbackSender st
 // renderNotification substitutes {{ sender }}, {{ subject }},
 // {{ count }} and {{ new }}.
 func renderNotification(format string, m newMail) string {
-	return strings.NewReplacer(
-		"{{ sender }}", m.sender,
-		"{{ subject }}", m.subject,
-		"{{ count }}", strconv.FormatUint(uint64(m.count), 10),
-		"{{ new }}", strconv.FormatUint(uint64(m.new), 10),
-	).Replace(format)
+	return jinja.ReplaceVars(format, notificationVars(m))
+}
+
+func notificationVars(m newMail) map[string]string {
+	return map[string]string{
+		"sender": m.sender, "subject": m.subject,
+		"count": strconv.FormatUint(uint64(m.count), 10), "new": strconv.FormatUint(uint64(m.new), 10),
+	}
 }
 
 // notifyIconArg resolves an icon name to its SVG in lys-shell's icon

@@ -2,12 +2,12 @@ package bar
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/walltimer"
-	"github.com/stubbedev/lys-shell/strftime"
 )
 
 // clock renders the time through the configured strftime format beside
@@ -18,9 +18,9 @@ type clock struct {
 }
 
 func newClock(ctx ModuleContext) (Module, error) {
-	layout, err := strftime.Compile(ctx.Config.Clock.Format)
-	if err != nil {
-		return nil, err
+	layout := ctx.Config.Clock.Format.Layout()
+	if layout == nil {
+		return nil, errors.New("clock: no format")
 	}
 	btn := newBarButton(ctx, moduleIcon(ctx, ctx.Config.Clock.Icon()), layout.Format(time.Now()))
 	if ctx.App == nil {

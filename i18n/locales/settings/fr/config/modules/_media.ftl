@@ -71,3 +71,15 @@ enum-media-icon-type-default = Par défaut
 enum-media-icon-type-application = Application
 enum-media-icon-type-spinning-disc = Disque tournant
 enum-media-icon-type-application-mapped = Application associée
+
+## Format placeholders
+
+settings-modules-media-format-placeholder-title = Titre du morceau
+
+settings-modules-media-format-placeholder-artist = Nom de l'artiste ou des artistes
+
+settings-modules-media-format-placeholder-album = Nom de l'album
+
+settings-modules-media-format-placeholder-status = État de lecture (lecture, pause, arrêt)
+
+settings-modules-media-format-placeholder-status-icon = Symbole de l'état de lecture

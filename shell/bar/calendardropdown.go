@@ -181,7 +181,7 @@ func (v *calendarView) goToToday() { v.cal.Select(v.today) }
 func (v *calendarView) tick() {
 	now := v.now()
 	clock := v.ctx.Config.Clock
-	use12h := calendarIs12h(clock.Format)
+	use12h := calendarIs12h(clock.Format.String())
 	if use12h {
 		v.hours.SetText(strftimeOf("%I", now))
 	} else {

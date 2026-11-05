@@ -16,7 +16,7 @@ import (
 // modules. A muted sink keeps its percent label: mute shows through
 // the icon (icon-muted), exactly as methods.rs's update_display.
 func volumeLabel(format string, percent float64) string {
-	return jinja.RenderOr(format, map[string]any{"percent": int64(math.Round(percent))})
+	return jinja.RenderOr(format, percentVars(percent))
 }
 
 // volumePercent is the level the Rust modules display: the channel

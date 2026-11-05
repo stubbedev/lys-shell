@@ -84,3 +84,7 @@ settings-modules-bitwarden-scroll-up = Scroll Up
 
 settings-modules-bitwarden-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-bitwarden-format-placeholder-count = Number of items in the open vault (empty while locked)

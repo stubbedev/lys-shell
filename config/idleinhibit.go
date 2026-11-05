@@ -16,12 +16,6 @@ type IdleInhibitConfig struct {
 	IconActive string `cfg:"icon-active"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ state }}` - Inhibitor state text (On, Off)
-	// - `{{ remaining }}` - Time remaining (e.g., "45m", shows "--" when indefinite)
-	// - `{{ duration }}` - Total duration (e.g., "60m", shows "--" when indefinite)
-	//
 	// ## Examples
 	//
 	// - `"{{ state }}"` - "On"

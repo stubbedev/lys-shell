@@ -23,11 +23,15 @@ import (
 // title/app, falling back to the _bar.ftl "Desktop" when the render is
 // blank.
 func windowTitleLabel(format, title, appID string) string {
-	label := jinja.RenderOr(format, map[string]any{"title": title, "app": appID})
+	label := jinja.RenderOr(format, windowTitleVars(title, appID))
 	if strings.TrimSpace(label) == "" {
 		return i18n.T("bar-window-title-empty")
 	}
 	return label
+}
+
+func windowTitleVars(title, appID string) map[string]any {
+	return map[string]any{"title": title, "app": appID}
 }
 
 // titlePrefix marks an icon mapping that matches the window title

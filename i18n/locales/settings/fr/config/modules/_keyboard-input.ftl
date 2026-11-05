@@ -52,3 +52,9 @@ settings-modules-keyboard-input-scroll-down = Défilement vers le bas
 
 settings-modules-keyboard-input-layout-alias-map = Alias de disposition
     .description = Remplacements de noms d'affichage des dispositions clavier
+
+## Format placeholders
+
+settings-modules-keyboard-input-format-placeholder-layout = Nom de la disposition donné par le compositeur (ex. : English (US))
+
+settings-modules-keyboard-input-format-placeholder-alias = Alias de la table des alias de disposition, sinon le nom de la disposition

@@ -132,11 +132,6 @@ type BitwardenConfig struct {
 	GeneratorPassphrases []BitwardenPassphrasePreset `cfg:"generator-passphrases"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ count }}` - Number of items in the open vault (empty while
-	//   locked)
-	//
 	// ## Examples
 	//
 	// - `"{{ count }}"` - "142"

@@ -19,11 +19,6 @@ type RecorderConfig struct {
 	// Icon while recording is paused.
 	IconPaused string `cfg:"icon-paused"`
 	// Format string for the label.
-	//
-	// ## Placeholders
-	//
-	// - `{{ state }}` - Recorder state text (Idle, Recording, Paused)
-	// - `{{ elapsed }}` - Elapsed recording time (e.g., "01:23", "--" when idle)
 	Format string `cfg:"format"`
 	// Capture the microphone in the recording.
 	Microphone bool `cfg:"microphone"`

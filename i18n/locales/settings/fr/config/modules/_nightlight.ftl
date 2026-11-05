@@ -70,3 +70,15 @@ settings-modules-nightlight-scroll-up = Défilement vers le haut
 
 settings-modules-nightlight-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-nightlight-format-placeholder-status = État du filtre (activé, désactivé)
+
+settings-modules-nightlight-format-placeholder-temp = Température actuelle en kelvins (-- si désactivé)
+
+settings-modules-nightlight-format-placeholder-gamma = Gamma actuel en pourcentage (-- si désactivé)
+
+settings-modules-nightlight-format-placeholder-config-temp = Température configurée en kelvins
+
+settings-modules-nightlight-format-placeholder-config-gamma = Gamma configuré en pourcentage

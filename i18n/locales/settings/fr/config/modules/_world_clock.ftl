@@ -49,3 +49,7 @@ settings-modules-world-clock-scroll-up = Défilement vers le haut
 
 settings-modules-world-clock-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-world-clock-format-placeholder-tz = L'heure dans un fuseau horaire, selon un motif strftime

@@ -33,8 +33,7 @@ func (c *Combi) merge(states []launcher.ModeState) launcher.ModeState {
 		mode := c.children[ci].Name()
 		for li, it := range state.Items {
 			if c.displayFormat != "{text}" {
-				text := it.Display
-				it.Display = launcher.Render(c.displayFormat, launcher.Values(map[string]string{"mode": mode, "text": text}))
+				it.Display = launcher.Render(c.displayFormat, launcher.Values(combiVars(mode, it.Display)))
 			}
 			items = append(items, it)
 			c.owners = append(c.owners, ci)
@@ -42,6 +41,10 @@ func (c *Combi) merge(states []launcher.ModeState) launcher.ModeState {
 		}
 	}
 	return launcher.ModeState{Items: items, Prompt: "combi"}
+}
+
+func combiVars(mode, text string) map[string]string {
+	return map[string]string{"mode": mode, "text": text}
 }
 
 func (c *Combi) locate(index uint32) (int, uint32, bool) {

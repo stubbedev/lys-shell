@@ -34,7 +34,7 @@ bar:
 
 #### Placeholders
 
-- `{{ mode }}` - Current keybind mode name (shows "default" when inactive)
+- `{{ mode }}` - Current keybind mode name (default when none is active)
 
 #### Examples
 

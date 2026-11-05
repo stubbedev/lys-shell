@@ -84,3 +84,7 @@ settings-modules-bitwarden-scroll-up = Défilement vers le haut
 
 settings-modules-bitwarden-scroll-down = Défilement vers le bas
     .description = Commande shell au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-bitwarden-format-placeholder-count = Nombre d'éléments du coffre ouvert (vide tant qu'il est verrouillé)

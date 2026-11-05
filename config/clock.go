@@ -50,7 +50,7 @@ type ClockConfig struct {
 	// - `"%H:%M"` - "14:30"
 	// - `"%I:%M %p"` - "02:30 PM"
 	// - `"%a %b %d %I:%M %p"` - "Mon Jan 15 02:30 PM"
-	Format string `cfg:"format"`
+	Format StrftimeFormat `cfg:"format"`
 	// Symbolic icon name.
 	IconName string `cfg:"icon-name"`
 	// Display border around button.
@@ -90,7 +90,7 @@ type ClockConfig struct {
 // DefaultsClock returns the schema defaults.
 func DefaultsClock() ClockConfig {
 	return ClockConfig{
-		Format:               "%a %b %d %I:%M %p",
+		Format:               mustStrftime("%a %b %d %I:%M %p"),
 		IconName:             "ld-calendar-clock-symbolic",
 		BorderShow:           false,
 		BorderColor:          mustColor("border-accent"),

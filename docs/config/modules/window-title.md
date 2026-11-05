@@ -35,7 +35,7 @@ bar:
 #### Placeholders
 
 - `{{ title }}` - Window title
-- `{{ app }}` - Application name (WM_CLASS on Hyprland)
+- `{{ app }}` - Application id (WM_CLASS on Hyprland)
 
 #### Examples
 

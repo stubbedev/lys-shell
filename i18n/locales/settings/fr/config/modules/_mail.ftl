@@ -75,3 +75,23 @@ settings-modules-mail-scroll-up = Défilement vers le haut
 
 settings-modules-mail-scroll-down = Défilement vers le bas
     .description = Commande shell au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-mail-format-placeholder-count = Nombre de messages correspondant à la requête
+
+settings-modules-mail-notify-summary-placeholder-sender = Expéditeur du message (nom ou adresse)
+
+settings-modules-mail-notify-summary-placeholder-subject = Objet du message
+
+settings-modules-mail-notify-summary-placeholder-count = Nombre total de messages correspondant à la requête
+
+settings-modules-mail-notify-summary-placeholder-new = Nombre de messages arrivés depuis le dernier décompte
+
+settings-modules-mail-notify-body-placeholder-sender = Expéditeur du message (nom ou adresse)
+
+settings-modules-mail-notify-body-placeholder-subject = Objet du message
+
+settings-modules-mail-notify-body-placeholder-count = Nombre total de messages correspondant à la requête
+
+settings-modules-mail-notify-body-placeholder-new = Nombre de messages arrivés depuis le dernier décompte

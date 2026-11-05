@@ -55,3 +55,11 @@ settings-modules-idle-inhibit-scroll-up = Défilement vers le haut
 
 settings-modules-idle-inhibit-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-idle-inhibit-format-placeholder-state = État de l'inhibiteur (activé, désactivé)
+
+settings-modules-idle-inhibit-format-placeholder-remaining = Temps restant en M:SS ou H:MM:SS (∞ si illimité, - si désactivé)
+
+settings-modules-idle-inhibit-format-placeholder-duration = Durée totale en minutes (∞ si illimitée)

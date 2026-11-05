@@ -17,7 +17,11 @@ const brightnessNoDevice = "--%"
 // brightnessLabel is helpers.rs's format_label: the one variable is
 // the rounded percent.
 func brightnessLabel(format string, percent float64) string {
-	return jinja.RenderOr(format, map[string]any{"percent": int64(math.Round(percent))})
+	return jinja.RenderOr(format, percentVars(percent))
+}
+
+func percentVars(percent float64) map[string]any {
+	return map[string]any{"percent": int64(math.Round(percent))}
 }
 
 // brightnessIcon is select_icon: level-icons split 0-100% into equal

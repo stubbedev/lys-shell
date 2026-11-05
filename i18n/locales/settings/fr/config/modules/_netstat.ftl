@@ -55,3 +55,23 @@ settings-modules-netstat-scroll-up = Défilement vers le haut
 
 settings-modules-netstat-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-netstat-format-placeholder-down-kib = Débit descendant en Kio/s
+
+settings-modules-netstat-format-placeholder-down-mib = Débit descendant en Mio/s
+
+settings-modules-netstat-format-placeholder-down-gib = Débit descendant en Gio/s
+
+settings-modules-netstat-format-placeholder-down-auto = Débit descendant avec son unité (ex. : 1.5 MiB/s)
+
+settings-modules-netstat-format-placeholder-up-kib = Débit montant en Kio/s
+
+settings-modules-netstat-format-placeholder-up-mib = Débit montant en Mio/s
+
+settings-modules-netstat-format-placeholder-up-gib = Débit montant en Gio/s
+
+settings-modules-netstat-format-placeholder-up-auto = Débit montant avec son unité (ex. : 256 KiB/s)
+
+settings-modules-netstat-format-placeholder-interface = Nom de l'interface (ex. : wlan0)

@@ -49,10 +49,14 @@ func mediaStatusGlyph(state mpris.PlaybackState) string {
 // mediaLabel is helpers.rs format_label: title, artist, album, status,
 // and status_icon.
 func mediaLabel(format string, p mpris.Player) string {
-	return jinja.RenderOr(format, map[string]any{
+	return jinja.RenderOr(format, mediaVars(p))
+}
+
+func mediaVars(p mpris.Player) map[string]any {
+	return map[string]any{
 		"title": p.Title, "artist": p.Artist, "album": p.Album,
 		"status": mediaStatusText(p.State), "status_icon": mediaStatusGlyph(p.State),
-	})
+	}
 }
 
 // mediaIconEnv is what the icon pick reads beyond the config: whether

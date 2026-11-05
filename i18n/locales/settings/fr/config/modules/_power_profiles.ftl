@@ -64,3 +64,7 @@ settings-modules-power-profiles-scroll-up = Défilement vers le haut
 
 settings-modules-power-profiles-scroll-down = Défilement vers le bas
     .description = Commande shell au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-power-profiles-format-placeholder-profile = Nom du profil actif (power-saver, balanced, performance)

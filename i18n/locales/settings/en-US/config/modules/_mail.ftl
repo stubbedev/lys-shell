@@ -75,3 +75,23 @@ settings-modules-mail-scroll-up = Scroll Up
 
 settings-modules-mail-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-mail-format-placeholder-count = Number of messages matching the query
+
+settings-modules-mail-notify-summary-placeholder-sender = Message sender (name or address)
+
+settings-modules-mail-notify-summary-placeholder-subject = Message subject
+
+settings-modules-mail-notify-summary-placeholder-count = Total messages matching the query
+
+settings-modules-mail-notify-summary-placeholder-new = How many arrived since the last count
+
+settings-modules-mail-notify-body-placeholder-sender = Message sender (name or address)
+
+settings-modules-mail-notify-body-placeholder-subject = Message subject
+
+settings-modules-mail-notify-body-placeholder-count = Total messages matching the query
+
+settings-modules-mail-notify-body-placeholder-new = How many arrived since the last count

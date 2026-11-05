@@ -6,14 +6,6 @@ package config
 type TreemanConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ total }}` - Total active worktrees
-	// - `{{ stable }}` - Worktrees in the ready bucket
-	// - `{{ up }}` - Worktrees preparing
-	// - `{{ down }}` - Worktrees tearing down
-	// - `{{ failed }}` - Worktrees whose last finalize errored
-	//
 	// ## Examples
 	//
 	// - `"{{ total }}"` - "7"

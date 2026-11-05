@@ -56,8 +56,8 @@ bar:
 
 #### Placeholders
 
-- `{{ state }}` - Recorder state text (Idle, Recording, Paused)
-- `{{ elapsed }}` - Elapsed recording time (e.g., "01:23", "--" when idle)
+- `{{ state }}` - Recorder state (Idle, Recording, Paused)
+- `{{ elapsed }}` - Elapsed recording time as M:SS or H:MM:SS (- while idle)
 
 :::
 

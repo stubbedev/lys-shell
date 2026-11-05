@@ -40,11 +40,11 @@ bar:
 
 #### Placeholders
 
-- `{{ status }}` - Filter status text (On, Off)
-- `{{ temp }}` - Current temperature in Kelvin (shows "--" when disabled)
-- `{{ gamma }}` - Current gamma percentage (shows "--" when disabled)
-- `{{ config_temp }}` - Configured temperature (always available)
-- `{{ config_gamma }}` - Configured gamma (always available)
+- `{{ status }}` - Filter status (On, Off)
+- `{{ temp }}` - Current temperature in Kelvin (-- while off)
+- `{{ gamma }}` - Current gamma percentage (-- while off)
+- `{{ config_temp }}` - Configured temperature in Kelvin
+- `{{ config_gamma }}` - Configured gamma percentage
 
 #### Examples
 

@@ -52,3 +52,9 @@ settings-modules-window-title-scroll-up = Scroll Up
 
 settings-modules-window-title-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-window-title-format-placeholder-title = Window title
+
+settings-modules-window-title-format-placeholder-app = Application id (WM_CLASS on Hyprland)

@@ -65,3 +65,7 @@ settings-modules-volume-icon-muted = Icône coupée
 ## Variantes de AppIconSource
 enum-app-icon-source-mapped = Associé
 enum-app-icon-source-native = Natif
+
+## Format placeholders
+
+settings-modules-volume-format-placeholder-percent = Volume (0-100)

@@ -40,15 +40,15 @@ bar:
 
 #### Placeholders
 
-- `{{ temp }}` - Current temperature (e.g., "72")
-- `{{ temp_unit }}` - Temperature unit symbol ("°F" or "°C")
+- `{{ temp }}` - Current temperature
+- `{{ temp_unit }}` - Temperature unit symbol (°F or °C)
 - `{{ feels_like }}` - Feels-like temperature
-- `{{ condition }}` - Weather condition text (e.g., "Cloudy")
-- `{{ humidity }}` - Humidity percentage (e.g., "65%")
-- `{{ wind_speed }}` - Wind speed with unit (e.g., "12 km/h")
-- `{{ wind_dir }}` - Wind direction (e.g., "NW")
-- `{{ high }}` - Today's high temperature
-- `{{ low }}` - Today's low temperature
+- `{{ condition }}` - Weather condition (e.g. Cloudy)
+- `{{ humidity }}` - Humidity percentage (e.g. 65%)
+- `{{ wind_speed }}` - Wind speed with its unit (e.g. 12 km/h)
+- `{{ wind_dir }}` - Wind direction (e.g. NW)
+- `{{ high }}` - Today's high temperature (empty without a forecast)
+- `{{ low }}` - Today's low temperature (empty without a forecast)
 
 #### Examples
 

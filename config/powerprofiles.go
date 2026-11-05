@@ -10,10 +10,6 @@ package config
 type PowerProfilesConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ profile }}` - Active profile name (power-saver, balanced, performance)
-	//
 	// ## Examples
 	//
 	// - `"{{ profile }}"` - "balanced"

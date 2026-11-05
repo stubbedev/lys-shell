@@ -58,3 +58,7 @@ settings-modules-battery-left-click = Left Click
 
 settings-modules-battery-thresholds = Thresholds
     .description = Color thresholds that change based on value levels
+
+## Format placeholders
+
+settings-modules-battery-format-placeholder-percent = Battery level (0-100)

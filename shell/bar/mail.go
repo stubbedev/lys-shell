@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
+	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/mail"
 )
 
@@ -31,7 +31,11 @@ func startMail(ctx *ModuleContext) func() {
 
 // mailLabel is format_label: {{ count }} replaced, not a template.
 func mailLabel(format string, count uint32) string {
-	return strings.ReplaceAll(format, "{{ count }}", strconv.FormatUint(uint64(count), 10))
+	return jinja.ReplaceVars(format, mailVars(count))
+}
+
+func mailVars(count uint32) map[string]string {
+	return map[string]string{"count": strconv.FormatUint(uint64(count), 10)}
 }
 
 // mailModule is the module: the shared service's unread total on a bar

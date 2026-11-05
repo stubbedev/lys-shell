@@ -55,3 +55,19 @@ settings-modules-ram-scroll-down = Défilement vers le bas
 
 settings-modules-ram-thresholds = Seuils
     .description = Seuils de couleur qui changent selon le niveau de valeur
+
+## Format placeholders
+
+settings-modules-ram-format-placeholder-percent = Utilisation de la mémoire (0-100)
+
+settings-modules-ram-format-placeholder-used-gib = Mémoire utilisée en Gio
+
+settings-modules-ram-format-placeholder-total-gib = Mémoire totale en Gio
+
+settings-modules-ram-format-placeholder-available-gib = Mémoire disponible en Gio
+
+settings-modules-ram-format-placeholder-swap-percent = Utilisation de la mémoire d'échange (0-100)
+
+settings-modules-ram-format-placeholder-swap-used-gib = Mémoire d'échange utilisée en Gio
+
+settings-modules-ram-format-placeholder-swap-total-gib = Mémoire d'échange totale en Gio

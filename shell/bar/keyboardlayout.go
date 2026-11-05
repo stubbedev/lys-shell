@@ -56,11 +56,15 @@ func mainKeyboardLayout(devices hyprland.Devices) string {
 // keyboardLayoutLabel renders the format with layout and alias (the
 // alias falls back to the layout itself).
 func keyboardLayoutLabel(layout, format string, aliasMap map[string]string) string {
+	return jinja.RenderOr(format, keyboardLayoutVars(layout, aliasMap))
+}
+
+func keyboardLayoutVars(layout string, aliasMap map[string]string) map[string]any {
 	alias, ok := aliasMap[layout]
 	if !ok {
 		alias = layout
 	}
-	return jinja.RenderOr(format, map[string]any{"layout": layout, "alias": alias})
+	return map[string]any{"layout": layout, "alias": alias}
 }
 
 // layoutSource is sources/mod.rs's KeyboardLayoutSource: where the

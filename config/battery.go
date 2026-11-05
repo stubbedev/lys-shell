@@ -35,10 +35,6 @@ type BatteryConfig struct {
 	LabelColor ColorValue `cfg:"label-color"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ percent }}` - Battery level (0-100)
-	//
 	// ## Examples
 	//
 	// - `"{{ percent }}%"` - "45%"

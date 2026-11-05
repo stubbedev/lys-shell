@@ -68,8 +68,7 @@ bar:
 
 #### Placeholders
 
-- `{{ count }}` - Number of items in the open vault (empty while
-  locked)
+- `{{ count }}` - Number of items in the open vault (empty while locked)
 
 #### Examples
 

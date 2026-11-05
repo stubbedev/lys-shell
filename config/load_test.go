@@ -79,7 +79,7 @@ func TestYAMLLoadsSectionsAndModules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Bar.Location != LocationBottom || cfg.Bar.Exclusive || cfg.Clock.Format != "%H" {
+	if cfg.Bar.Location != LocationBottom || cfg.Bar.Exclusive || cfg.Clock.Format.String() != "%H" {
 		t.Errorf("loaded %+v, clock %q", cfg.Bar, cfg.Clock.Format)
 	}
 }
@@ -201,7 +201,7 @@ func TestImportsMergeInOrderAndTheFileWins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Clock.Format != "two" || cfg.Bar.Location != LocationLeft || cfg.Bar.Exclusive {
+	if cfg.Clock.Format.String() != "two" || cfg.Bar.Location != LocationLeft || cfg.Bar.Exclusive {
 		t.Errorf("merged: format %q location %q exclusive %v", cfg.Clock.Format, cfg.Bar.Location, cfg.Bar.Exclusive)
 	}
 }

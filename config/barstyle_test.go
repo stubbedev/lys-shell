@@ -174,7 +174,7 @@ func TestClockTableWithoutFormatKeepsTheDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if cfg.Clock.Format != Defaults().Clock.Format {
+	if cfg.Clock.Format.String() != Defaults().Clock.Format.String() {
 		t.Errorf("format = %q, want the default", cfg.Clock.Format)
 	}
 	if b, ok := cfg.ModuleButton("clock"); !ok || b.Colors.Label.Token != TokenRed || b.Defaults.Label == b.Colors.Label {

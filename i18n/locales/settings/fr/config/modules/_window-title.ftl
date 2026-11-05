@@ -52,3 +52,9 @@ settings-modules-window-title-scroll-up = Défilement vers le haut
 
 settings-modules-window-title-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-window-title-format-placeholder-title = Titre de la fenêtre
+
+settings-modules-window-title-format-placeholder-app = Identifiant de l'application (WM_CLASS sous Hyprland)

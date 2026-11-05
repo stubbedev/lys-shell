@@ -52,3 +52,9 @@ settings-modules-keyboard-input-scroll-down = Scroll Down
 
 settings-modules-keyboard-input-layout-alias-map = Layout Aliases
     .description = Keyboard layout display name overrides
+
+## Format placeholders
+
+settings-modules-keyboard-input-format-placeholder-layout = Layout name from the compositor (e.g. English (US))
+
+settings-modules-keyboard-input-format-placeholder-alias = Alias from the layout alias map, else the layout name

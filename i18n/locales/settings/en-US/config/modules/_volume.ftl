@@ -66,3 +66,7 @@ settings-modules-volume-icon-muted = Muted Icon
 enum-app-icon-source-mapped = Mapped
 enum-app-icon-source-native = Native
 
+
+## Format placeholders
+
+settings-modules-volume-format-placeholder-percent = Volume (0-100)

@@ -42,14 +42,18 @@ const (
 // placeholders otherwise; the configured values are always on their own
 // placeholders.
 func nightlightLabel(format string, live *nightlight.Setting, temp, gamma int) string {
+	return jinja.RenderOr(format, nightlightVars(live, temp, gamma))
+}
+
+func nightlightVars(live *nightlight.Setting, temp, gamma int) map[string]any {
 	status, tempText, gammaText := i18n.T("bar-nightlight-off"), "--", "--"
 	if live != nil {
 		status, tempText, gammaText = i18n.T("bar-nightlight-on"), strconv.Itoa(live.Temp()), strconv.Itoa(live.Gamma())
 	}
-	return jinja.RenderOr(format, map[string]any{
+	return map[string]any{
 		"status": status, "temp": tempText, "gamma": gammaText,
 		"config_temp": strconv.Itoa(temp), "config_gamma": strconv.Itoa(gamma),
-	})
+	}
 }
 
 // colourFilter is the display filter the module drives.

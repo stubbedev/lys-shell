@@ -68,7 +68,7 @@ func TestSetSavesAndReadsBack(t *testing.T) {
 		t.Errorf("runtime.yaml =\n%s\nwant\n%s", data, want)
 	}
 	reloaded := Load(dir, DiscardDiagnostics)
-	if reloaded.Config().Clock.Format != "%H:%M" {
+	if reloaded.Config().Clock.Format.String() != "%H:%M" {
 		t.Errorf("reloaded format = %q", reloaded.Config().Clock.Format)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "runtime.tmp")); err == nil {

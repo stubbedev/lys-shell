@@ -58,3 +58,7 @@ settings-modules-battery-left-click = Clic gauche
 
 settings-modules-battery-thresholds = Seuils
     .description = Seuils de couleur qui changent selon le niveau de valeur
+
+## Format placeholders
+
+settings-modules-battery-format-placeholder-percent = Niveau de la batterie (0-100)

@@ -52,3 +52,7 @@ settings-modules-keybind-mode-scroll-up = Défilement vers le haut
 
 settings-modules-keybind-mode-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-keybind-mode-format-placeholder-mode = Nom du mode de raccourcis actif (default si aucun)

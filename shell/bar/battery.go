@@ -21,7 +21,11 @@ func batteryLabel(format string, percentage float64, present bool) string {
 	if !present {
 		return i18n.T("bar-battery-unavailable")
 	}
-	return jinja.RenderOr(format, map[string]any{"percent": int64(math.Round(percentage))})
+	return jinja.RenderOr(format, batteryVars(percentage))
+}
+
+func batteryVars(percentage float64) map[string]any {
+	return map[string]any{"percent": int64(math.Round(percentage))}
 }
 
 // thresholdColor returns the label-color override the thresholds

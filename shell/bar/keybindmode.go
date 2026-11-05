@@ -15,11 +15,15 @@ import (
 // keybindModeLabel is helpers.rs's format_label: an empty submap
 // renders the "default" vocabulary word through the mode placeholder.
 func keybindModeLabel(format, submap string) string {
+	return jinja.RenderOr(format, keybindModeVars(submap))
+}
+
+func keybindModeVars(submap string) map[string]any {
 	mode := submap
 	if mode == "" {
 		mode = i18n.T("bar-keybind-mode-default")
 	}
-	return jinja.RenderOr(format, map[string]any{"mode": mode})
+	return map[string]any{"mode": mode}
 }
 
 // keybindModeVisible is helpers.rs's compute_visibility: auto-hide

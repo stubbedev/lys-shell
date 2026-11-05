@@ -4,19 +4,22 @@ import (
 	"context"
 	"errors"
 	"log"
-	"strings"
 
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 )
 
 // powerProfilesLabel is helpers.rs's format_label: the only variable
 // is the active profile's name.
 func powerProfilesLabel(format, profile string) string {
-	// A plain replacement, not a template (helpers.rs).
-	return strings.ReplaceAll(format, "{{ profile }}", profile)
+	return jinja.ReplaceVars(format, powerProfilesVars(profile))
+}
+
+func powerProfilesVars(profile string) map[string]string {
+	return map[string]string{"profile": profile}
 }
 
 // powerProfiles is the module: the active power profile, cycling on

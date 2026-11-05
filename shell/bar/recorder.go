@@ -15,6 +15,10 @@ import (
 // for {{ state }}, the H:MM:SS (or M:SS) clock for {{ elapsed }}, a
 // dash while idle.
 func recorderLabel(format string, active, paused bool, elapsedSecs uint32) string {
+	return jinja.RenderOr(format, recorderVars(active, paused, elapsedSecs))
+}
+
+func recorderVars(active, paused bool, elapsedSecs uint32) map[string]any {
 	state := i18n.T("bar-recorder-idle")
 	switch {
 	case active && paused:
@@ -26,7 +30,7 @@ func recorderLabel(format string, active, paused bool, elapsedSecs uint32) strin
 	if active {
 		elapsed = recorder.FormatElapsed(elapsedSecs)
 	}
-	return jinja.RenderOr(format, map[string]any{"state": state, "elapsed": elapsed})
+	return map[string]any{"state": state, "elapsed": elapsed}
 }
 
 // recorderIconName is helpers.rs's select_icon over the state trio.

@@ -118,8 +118,7 @@ type LauncherDrunConfig struct {
 	ExcludeCategories []string `cfg:"exclude-categories"`
 	// Desktop-entry fields fed to the matcher.
 	MatchFields []LauncherDrunField `cfg:"match-fields"`
-	// Row template: `{name}`, `{generic}`, `{exec}`, `{categories}`,
-	// `{comment}`; `[..]` renders only when its placeholders are non-empty.
+	// Row template; `[..]` renders only when its placeholders are non-empty.
 	DisplayFormat string `cfg:"display-format"`
 	// Expose desktop-file actions as extra rows.
 	ShowActions bool `cfg:"show-actions"`
@@ -143,8 +142,7 @@ type LauncherRunConfig struct {
 //
 // window switcher mode settings.
 type LauncherWindowConfig struct {
-	// Row template: `{w}` workspace, `{c}` class, `{t}` title, `{n}` name,
-	// `{r}` role.
+	// Row template.
 	Format string `cfg:"format"`
 	// Window fields fed to the matcher.
 	MatchFields []LauncherWindowField `cfg:"match-fields"`
@@ -190,7 +188,7 @@ type LauncherFilebrowserConfig struct {
 type LauncherCombiConfig struct {
 	// Modes merged into the combined list.
 	Modes []string `cfg:"modes"`
-	// Row template (`{mode}`, `{text}`).
+	// Row template.
 	DisplayFormat string `cfg:"display-format"`
 }
 

@@ -6,11 +6,6 @@ package config
 type WindowTitleConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ title }}` - Window title
-	// - `{{ app }}` - Application name (WM_CLASS on Hyprland)
-	//
 	// ## Examples
 	//
 	// - `"{{ title }}"` - "README.md - VSCode"

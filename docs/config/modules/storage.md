@@ -42,20 +42,20 @@ Faster polling increases CPU usage.
 
 #### Placeholders
 
-- `{{ percent }}` - Disk usage as integer (0-100)
+- `{{ percent }}` - Disk usage (0-100)
 - `{{ used_tib }}` - Used space in TiB
 - `{{ used_gib }}` - Used space in GiB
 - `{{ used_mib }}` - Used space in MiB
-- `{{ used_auto }}` - Used space with auto unit (e.g., "128.5 GiB")
+- `{{ used_auto }}` - Used space with its unit (e.g. 128.5 GiB)
 - `{{ total_tib }}` - Total space in TiB
 - `{{ total_gib }}` - Total space in GiB
 - `{{ total_mib }}` - Total space in MiB
-- `{{ total_auto }}` - Total space with auto unit
+- `{{ total_auto }}` - Total space with its unit
 - `{{ free_tib }}` - Free space in TiB
 - `{{ free_gib }}` - Free space in GiB
 - `{{ free_mib }}` - Free space in MiB
-- `{{ free_auto }}` - Free space with auto unit
-- `{{ filesystem }}` - Filesystem type (e.g., "ext4", "btrfs")
+- `{{ free_auto }}` - Free space with its unit
+- `{{ filesystem }}` - Filesystem type (e.g. ext4, btrfs)
 
 #### Examples
 

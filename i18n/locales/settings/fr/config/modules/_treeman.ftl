@@ -38,3 +38,15 @@ settings-modules-treeman-scroll-up = Défilement vers le haut
     .description = Action au défilement vers le haut
 settings-modules-treeman-scroll-down = Défilement vers le bas
     .description = Action au défilement vers le bas
+
+## Format placeholders
+
+settings-modules-treeman-format-placeholder-total = Nombre total d'arbres de travail actifs
+
+settings-modules-treeman-format-placeholder-stable = Arbres de travail prêts
+
+settings-modules-treeman-format-placeholder-up = Arbres de travail en préparation
+
+settings-modules-treeman-format-placeholder-down = Arbres de travail en cours de suppression
+
+settings-modules-treeman-format-placeholder-failed = Arbres de travail dont la dernière finalisation a échoué

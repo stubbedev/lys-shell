@@ -48,6 +48,8 @@ type FieldMeta struct {
 	Optional bool
 	// Elem describes a list's items (nil for anything else).
 	Elem *FieldMeta
+	// Placeholders are the values a format field substitutes.
+	Placeholders []Placeholder
 }
 
 // Field describes the leaf at a dot path, or a field inside a value
@@ -58,18 +60,21 @@ func Field(path string) (FieldMeta, bool) {
 	if !ok {
 		return FieldMeta{}, false
 	}
-	_, f, ok := fieldAtPath(typeOf[Config](), leaf)
+	holder, f, ok := fieldAtPath(typeOf[Config](), leaf)
 	if !ok || isContainer(f.typ) {
 		return FieldMeta{}, false
 	}
-	if sub != "" {
-		t := f.typ
-		for t.Kind() == reflect.Pointer {
-			t = t.Elem()
-		}
-		if f, ok = valueFieldAt(t, strings.Split(sub, ".")); !ok {
-			return FieldMeta{}, false
-		}
+	if sub == "" {
+		m := describe(f.typ)
+		m.Placeholders = placeholdersOf(holder, f)
+		return m, true
+	}
+	t := f.typ
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if f, ok = valueFieldAt(t, strings.Split(sub, ".")); !ok {
+		return FieldMeta{}, false
 	}
 	return describe(f.typ), true
 }

@@ -34,6 +34,10 @@ bar:
 Use `{{ tz('timezone', 'strftime') }}` to insert a formatted time.
 Anything outside a placeholder stays as literal text.
 
+#### Placeholders
+
+- `{{ tz('UTC', '%H:%M %Z') }}` - The time in a timezone, in a strftime pattern
+
 #### Examples
 
 | Format string | Renders as |

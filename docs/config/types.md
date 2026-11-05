@@ -563,7 +563,7 @@ combi mode settings.
 | Field | Description |
 |---|---|
 | `modes` | Modes merged into the combined list. |
-| `display-format` | Row template (`{mode}`, `{text}`). |
+| `display-format` | Row template. |
 
 ## LauncherDrunConfig {#launcher-drun-config}
 
@@ -574,7 +574,7 @@ drun (application) mode settings.
 | `categories` | Only show apps within these categories (empty = all). |
 | `exclude-categories` | Hide apps within these categories. |
 | `match-fields` | Desktop-entry fields fed to the matcher. |
-| `display-format` | Row template: `{name}`, `{generic}`, `{exec}`, `{categories}`, |
+| `display-format` | Row template; `[..]` renders only when its placeholders are non-empty. |
 | `show-actions` | Expose desktop-file actions as extra rows. |
 | `url-launcher` | Command opening `Type=Link` entries. |
 
@@ -750,7 +750,7 @@ window switcher mode settings.
 
 | Field | Description |
 |---|---|
-| `format` | Row template: `{w}` workspace, `{c}` class, `{t}` title, `{n}` name, |
+| `format` | Row template. |
 | `match-fields` | Window fields fed to the matcher. |
 | `hide-active` | Hide the currently focused window from the list. |
 | `close-on-delete` | Shift-delete closes the selected window. |
@@ -1247,6 +1247,12 @@ the same name. Use the `"default"` key as a fallback state.
 Storage mount targets accepted by `mount-point`.
 
 Supports a single string for backwards compatibility or an array of paths.
+
+String.
+
+## StrftimeFormat {#strftime-format}
+
+A strftime pattern (`%H:%M`).
 
 String.
 

@@ -271,3 +271,29 @@ enum-launcher-search-provider-processes = Tuer un processus
 enum-launcher-search-provider-scripts = Commandes de script
 enum-launcher-search-provider-shell = Commandes shell
 enum-launcher-search-provider-web = Recherche web
+
+## Format placeholders
+
+settings-launcher-drun-display-format-placeholder-name = Nom de l'application
+
+settings-launcher-drun-display-format-placeholder-generic = Nom générique (ex. : navigateur web)
+
+settings-launcher-drun-display-format-placeholder-exec = Commande lancée par l'entrée
+
+settings-launcher-drun-display-format-placeholder-categories = Catégories de l'entrée de bureau
+
+settings-launcher-drun-display-format-placeholder-comment = Commentaire de l'entrée de bureau
+
+settings-launcher-window-format-placeholder-w = Espace de travail
+
+settings-launcher-window-format-placeholder-c = Classe de la fenêtre
+
+settings-launcher-window-format-placeholder-t = Titre de la fenêtre
+
+settings-launcher-window-format-placeholder-n = Nom de la fenêtre (sa classe)
+
+settings-launcher-window-format-placeholder-r = Rôle de la fenêtre (toujours vide)
+
+settings-launcher-combi-display-format-placeholder-mode = Mode d'où provient la ligne
+
+settings-launcher-combi-display-format-placeholder-text = Texte de la ligne

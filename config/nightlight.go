@@ -14,14 +14,6 @@ import (
 type NightlightConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ status }}` - Filter status text (On, Off)
-	// - `{{ temp }}` - Current temperature in Kelvin (shows "--" when disabled)
-	// - `{{ gamma }}` - Current gamma percentage (shows "--" when disabled)
-	// - `{{ config_temp }}` - Configured temperature (always available)
-	// - `{{ config_gamma }}` - Configured gamma (always available)
-	//
 	// ## Examples
 	//
 	// - `"{{ status }}"` - "On"

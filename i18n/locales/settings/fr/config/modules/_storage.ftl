@@ -58,3 +58,33 @@ settings-modules-storage-scroll-down = Défilement vers le bas
 
 settings-modules-storage-thresholds = Seuils
     .description = Seuils de couleur qui changent selon le niveau de valeur
+
+## Format placeholders
+
+settings-modules-storage-format-placeholder-percent = Utilisation du disque (0-100)
+
+settings-modules-storage-format-placeholder-used-tib = Espace utilisé en Tio
+
+settings-modules-storage-format-placeholder-used-gib = Espace utilisé en Gio
+
+settings-modules-storage-format-placeholder-used-mib = Espace utilisé en Mio
+
+settings-modules-storage-format-placeholder-used-auto = Espace utilisé avec son unité (ex. : 128.5 GiB)
+
+settings-modules-storage-format-placeholder-total-tib = Espace total en Tio
+
+settings-modules-storage-format-placeholder-total-gib = Espace total en Gio
+
+settings-modules-storage-format-placeholder-total-mib = Espace total en Mio
+
+settings-modules-storage-format-placeholder-total-auto = Espace total avec son unité
+
+settings-modules-storage-format-placeholder-free-tib = Espace libre en Tio
+
+settings-modules-storage-format-placeholder-free-gib = Espace libre en Gio
+
+settings-modules-storage-format-placeholder-free-mib = Espace libre en Mio
+
+settings-modules-storage-format-placeholder-free-auto = Espace libre avec son unité
+
+settings-modules-storage-format-placeholder-filesystem = Type de système de fichiers (ex. : ext4, btrfs)

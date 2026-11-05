@@ -61,3 +61,15 @@ settings-modules-treeman-scroll-up = Scroll Up
 
 settings-modules-treeman-scroll-down = Scroll Down
     .description = Action on scroll down
+
+## Format placeholders
+
+settings-modules-treeman-format-placeholder-total = Total active worktrees
+
+settings-modules-treeman-format-placeholder-stable = Worktrees in the ready bucket
+
+settings-modules-treeman-format-placeholder-up = Worktrees preparing
+
+settings-modules-treeman-format-placeholder-down = Worktrees tearing down
+
+settings-modules-treeman-format-placeholder-failed = Worktrees whose last finalize errored

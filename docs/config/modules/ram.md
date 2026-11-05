@@ -39,16 +39,13 @@ Faster polling increases CPU usage.
 
 ::: details More about `format`
 
-#### Memory Placeholders
+#### Placeholders
 
-- `{{ percent }}` - Memory usage as integer (0-100)
-- `{{ used_gib }}` - Used memory in GiB (e.g., "7.2")
-- `{{ total_gib }}` - Total memory in GiB (e.g., "16.0")
-- `{{ available_gib }}` - Available memory in GiB (e.g., "8.8")
-
-#### Swap Placeholders
-
-- `{{ swap_percent }}` - Swap usage as integer (0-100)
+- `{{ percent }}` - Memory usage (0-100)
+- `{{ used_gib }}` - Used memory in GiB
+- `{{ total_gib }}` - Total memory in GiB
+- `{{ available_gib }}` - Available memory in GiB
+- `{{ swap_percent }}` - Swap usage (0-100)
 - `{{ swap_used_gib }}` - Used swap in GiB
 - `{{ swap_total_gib }}` - Total swap in GiB
 

@@ -32,7 +32,7 @@ bar:
 | `hide-when-zero` | bool | `true` | Hide the module entirely while the count is zero. |
 | `notify` | bool | `false` | Fire a desktop notification when the unread count rises — i.e. new mail arrives. One notification per newly-arrived message (capped per burst), showing its sender and subject. With `accounts` configured, each notification uses that account's provider icon; otherwise the module icon is used. |
 | `notify-summary` | string | `"{{ sender }}"` | Notification summary when new mail arrives. |
-| `notify-body` | string | `"{{ subject }}"` | Notification body when new mail arrives. Same placeholders as `notify-summary`. |
+| `notify-body` | string | `"{{ subject }}"` | Notification body when new mail arrives. |
 | `icon-name` | string | `"ld-mail-symbolic"` | Module icon. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
@@ -62,6 +62,17 @@ the per-account queries.
 :::
 
 ::: details More about `notify-summary`
+
+#### Placeholders
+
+- `{{ sender }}` - Message sender (name or address)
+- `{{ subject }}` - Message subject
+- `{{ count }}` - Total messages matching the query
+- `{{ new }}` - How many arrived since the last count
+
+:::
+
+::: details More about `notify-body`
 
 #### Placeholders
 

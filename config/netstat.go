@@ -15,24 +15,6 @@ type NetstatConfig struct {
 	Interface string `cfg:"interface"`
 	// Format string for the label.
 	//
-	// ## Download Placeholders
-	//
-	// - `{{ down_kib }}` - Download speed in KiB/s
-	// - `{{ down_mib }}` - Download speed in MiB/s
-	// - `{{ down_gib }}` - Download speed in GiB/s
-	// - `{{ down_auto }}` - Download speed with auto unit (e.g., "1.5 MiB/s")
-	//
-	// ## Upload Placeholders
-	//
-	// - `{{ up_kib }}` - Upload speed in KiB/s
-	// - `{{ up_mib }}` - Upload speed in MiB/s
-	// - `{{ up_gib }}` - Upload speed in GiB/s
-	// - `{{ up_auto }}` - Upload speed with auto unit (e.g., "256 KiB/s")
-	//
-	// ## Other Placeholders
-	//
-	// - `{{ interface }}` - Interface name (e.g., "wlan0")
-	//
 	// ## Examples
 	//
 	// - `"{{ down_auto }} {{ up_auto }}"` - "1.5 MiB/s 256 KiB/s"

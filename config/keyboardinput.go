@@ -9,11 +9,6 @@ const KeyboardNextLayoutAction = ":next-layout"
 type KeyboardInputConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ layout }}` - Raw layout name from the compositor (e.g., "English (US)")
-	// - `{{ alias }}` - User-defined alias from `layout-alias-map`, falls back to `{{ layout }}`
-	//
 	// ## Examples
 	//
 	// - `"{{ layout }}"` - "English (US)"

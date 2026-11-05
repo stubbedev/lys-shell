@@ -55,3 +55,23 @@ settings-modules-netstat-scroll-up = Scroll Up
 
 settings-modules-netstat-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-netstat-format-placeholder-down-kib = Download speed in KiB/s
+
+settings-modules-netstat-format-placeholder-down-mib = Download speed in MiB/s
+
+settings-modules-netstat-format-placeholder-down-gib = Download speed in GiB/s
+
+settings-modules-netstat-format-placeholder-down-auto = Download speed with its unit (e.g. 1.5 MiB/s)
+
+settings-modules-netstat-format-placeholder-up-kib = Upload speed in KiB/s
+
+settings-modules-netstat-format-placeholder-up-mib = Upload speed in MiB/s
+
+settings-modules-netstat-format-placeholder-up-gib = Upload speed in GiB/s
+
+settings-modules-netstat-format-placeholder-up-auto = Upload speed with its unit (e.g. 256 KiB/s)
+
+settings-modules-netstat-format-placeholder-interface = Interface name (e.g. wlan0)

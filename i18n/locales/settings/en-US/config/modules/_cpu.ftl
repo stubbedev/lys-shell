@@ -58,3 +58,17 @@ settings-modules-cpu-scroll-down = Scroll Down
 
 settings-modules-cpu-thresholds = Thresholds
     .description = Color thresholds that change based on value levels
+
+## Format placeholders
+
+settings-modules-cpu-format-placeholder-percent = CPU usage (0-100)
+
+settings-modules-cpu-format-placeholder-freq-ghz = Frequency of the busiest core in GHz
+
+settings-modules-cpu-format-placeholder-avg-freq-ghz = Average frequency across cores in GHz
+
+settings-modules-cpu-format-placeholder-max-freq-ghz = Highest frequency among cores in GHz
+
+settings-modules-cpu-format-placeholder-temp-c = Temperature in Celsius (0 when unavailable)
+
+settings-modules-cpu-format-placeholder-temp-f = Temperature in Fahrenheit (32 when unavailable)

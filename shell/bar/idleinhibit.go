@@ -18,6 +18,10 @@ import (
 // remaining time (H:MM:SS or M:SS, "∞" when indefinite, "-" when
 // off), and the stored duration ("∞" when indefinite).
 func idleInhibitLabel(format string, active bool, duration idleinhibit.Duration, remainingSecs uint32) string {
+	return jinja.RenderOr(format, idleInhibitVars(active, duration, remainingSecs))
+}
+
+func idleInhibitVars(active bool, duration idleinhibit.Duration, remainingSecs uint32) map[string]any {
 	state := i18n.T("bar-idle-inhibit-off")
 	if active {
 		state = i18n.T("bar-idle-inhibit-on")
@@ -35,7 +39,7 @@ func idleInhibitLabel(format string, active bool, duration idleinhibit.Duration,
 	if !duration.Indefinite() {
 		total = strconv.FormatUint(uint64(duration.Minutes()), 10)
 	}
-	return jinja.RenderOr(format, map[string]any{"state": state, "remaining": remaining, "duration": total})
+	return map[string]any{"state": state, "remaining": remaining, "duration": total}
 }
 
 // idleInhibitModule is the module: the shared inhibit state rendered

@@ -52,3 +52,7 @@ settings-modules-keybind-mode-scroll-up = Scroll Up
 
 settings-modules-keybind-mode-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-keybind-mode-format-placeholder-mode = Current keybind mode name (default when none is active)

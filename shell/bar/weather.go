@@ -134,12 +134,16 @@ func weatherSpeed(s weather.Speed, imperial bool) string {
 // nine placeholders; today's high and low render empty without a
 // daily forecast.
 func weatherFormatLabel(format string, w *weather.Weather, imperial bool) string {
+	return jinja.RenderOr(format, weatherVars(w, imperial))
+}
+
+func weatherVars(w *weather.Weather, imperial bool) map[string]any {
 	c := w.Current
 	high, low := "", ""
 	if len(w.Daily) > 0 {
 		high, low = weatherTemp(w.Daily[0].TempHigh, imperial), weatherTemp(w.Daily[0].TempLow, imperial)
 	}
-	return jinja.RenderOr(format, map[string]any{
+	return map[string]any{
 		"temp":       weatherTemp(c.Temperature, imperial),
 		"temp_unit":  weatherUnitSymbol(imperial),
 		"feels_like": weatherTemp(c.FeelsLike, imperial),
@@ -149,7 +153,7 @@ func weatherFormatLabel(format string, w *weather.Weather, imperial bool) string
 		"wind_dir":   c.WindDirection.Cardinal(),
 		"high":       high,
 		"low":        low,
-	})
+	}
 }
 
 // weatherSettings maps [modules.weather] onto the service, resolving

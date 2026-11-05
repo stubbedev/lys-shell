@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/network"
 )
@@ -289,11 +289,15 @@ func (h *bitwardenHost) reportSync(err error) {
 // bitwardenLabel is the label: {{ count }} is the open vault's item
 // count, empty while locked.
 func bitwardenLabel(format string, st vault.Status) string {
+	return jinja.ReplaceVars(format, bitwardenVars(st))
+}
+
+func bitwardenVars(st vault.Status) map[string]string {
 	count := ""
 	if st.State == vault.StateUnlocked {
 		count = strconv.Itoa(st.Items)
 	}
-	return strings.ReplaceAll(format, "{{ count }}", count)
+	return map[string]string{"count": count}
 }
 
 // bitwardenModule is the bar button: the lock state's icon and the

@@ -58,3 +58,7 @@ settings-modules-brightness-scroll-down = Scroll Down
 
 settings-modules-brightness-thresholds = Thresholds
     .description = Color thresholds that change based on brightness levels
+
+## Format placeholders
+
+settings-modules-brightness-format-placeholder-percent = Brightness (0-100)

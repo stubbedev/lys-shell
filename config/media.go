@@ -55,14 +55,6 @@ type MediaConfig struct {
 	PlayerPriority []string `cfg:"player-priority"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ title }}` - Track title
-	// - `{{ artist }}` - Artist name(s)
-	// - `{{ album }}` - Album name
-	// - `{{ status }}` - Playback status text (Playing, Paused, Stopped)
-	// - `{{ status_icon }}` - Playback status icon character
-	//
 	// ## Examples
 	//
 	// - `"{{ title }} - {{ artist }}"` - "Bohemian Rhapsody - Queen"

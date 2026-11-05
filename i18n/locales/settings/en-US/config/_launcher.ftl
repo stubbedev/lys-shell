@@ -283,3 +283,29 @@ enum-launcher-search-provider-processes = Kill Process
 enum-launcher-search-provider-scripts = Script Commands
 enum-launcher-search-provider-shell = Shell Commands
 enum-launcher-search-provider-web = Web Search
+
+## Format placeholders
+
+settings-launcher-drun-display-format-placeholder-name = Application name
+
+settings-launcher-drun-display-format-placeholder-generic = Generic name (e.g. Web Browser)
+
+settings-launcher-drun-display-format-placeholder-exec = Command the entry runs
+
+settings-launcher-drun-display-format-placeholder-categories = Desktop entry categories
+
+settings-launcher-drun-display-format-placeholder-comment = Desktop entry comment
+
+settings-launcher-window-format-placeholder-w = Workspace
+
+settings-launcher-window-format-placeholder-c = Window class
+
+settings-launcher-window-format-placeholder-t = Window title
+
+settings-launcher-window-format-placeholder-n = Window name (its class)
+
+settings-launcher-window-format-placeholder-r = Window role (always empty)
+
+settings-launcher-combi-display-format-placeholder-mode = Mode the row comes from
+
+settings-launcher-combi-display-format-placeholder-text = The row's own text

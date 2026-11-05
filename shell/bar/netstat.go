@@ -15,13 +15,17 @@ import (
 // netstatLabel is helpers.rs's format_label over one interface's
 // rates (kib "{:.0}", mib "{:.1}", gib "{:.2}", and the bytesize display).
 func netstatLabel(format string, rate sysinfo.Rate) string {
-	return jinja.RenderOr(format, map[string]any{
+	return jinja.RenderOr(format, netstatVars(rate))
+}
+
+func netstatVars(rate sysinfo.Rate) map[string]any {
+	return map[string]any{
 		"down_kib": bytesIn(rate.RxPerSec, kib, 0), "down_mib": bytesIn(rate.RxPerSec, mib, 1),
 		"down_gib": bytesIn(rate.RxPerSec, gib, 2), "down_auto": sysinfo.AutoBytes(rate.RxPerSec),
 		"up_kib": bytesIn(rate.TxPerSec, kib, 0), "up_mib": bytesIn(rate.TxPerSec, mib, 1),
 		"up_gib": bytesIn(rate.TxPerSec, gib, 2), "up_auto": sysinfo.AutoBytes(rate.TxPerSec),
 		"interface": rate.Interface,
-	})
+	}
 }
 
 // netstat is the module: per-interface traffic rates.

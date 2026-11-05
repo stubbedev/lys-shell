@@ -17,15 +17,6 @@ type CpuConfig struct {
 	TempSensor string `cfg:"temp-sensor"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ percent }}` - CPU usage (0-100)
-	// - `{{ freq_ghz }}` - Frequency of the busiest core (highest usage)
-	// - `{{ avg_freq_ghz }}` - Average frequency across cores
-	// - `{{ max_freq_ghz }}` - Maximum frequency among cores
-	// - `{{ temp_c }}` - Temperature in Celsius (if available)
-	// - `{{ temp_f }}` - Temperature in Fahrenheit (if available)
-	//
 	// ## Examples
 	//
 	// - `"{{ percent }}%"` - "45%"

@@ -37,9 +37,9 @@ bar:
 
 #### Placeholders
 
-- `{{ state }}` - Inhibitor state text (On, Off)
-- `{{ remaining }}` - Time remaining (e.g., "45m", shows "--" when indefinite)
-- `{{ duration }}` - Total duration (e.g., "60m", shows "--" when indefinite)
+- `{{ state }}` - Inhibitor state (On, Off)
+- `{{ remaining }}` - Time remaining as M:SS or H:MM:SS (∞ when indefinite, - when off)
+- `{{ duration }}` - Total duration in minutes (∞ when indefinite)
 
 #### Examples
 

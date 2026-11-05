@@ -22,8 +22,8 @@ greeter to follow it.
 | `background-color` | [`HexColor`](/config/types#hex-color) | `"#000000"` | Background fill color (used when `background-mode: color`). |
 | `blur` | [`LockBlur`](/config/types#lock-blur) | `0` | Gaussian blur radius applied to image/wallpaper backgrounds (0 = none). |
 | `show-clock` | bool | `true` | Show a clock above the credential prompt. |
-| `clock-format` | string | `"%H:%M"` | `strftime` format for the time. |
-| `date-format` | string | `"%A, %B %-d"` | `strftime` format for the date. |
+| `clock-format` | [`StrftimeFormat`](/config/types#strftime-format) | `"%H:%M"` | `strftime` format for the time. |
+| `date-format` | [`StrftimeFormat`](/config/types#strftime-format) | `"%A, %B %-d"` | `strftime` format for the date. |
 | `max-attempts` | u32 | `0` | Lock screen only. Maximum failed password attempts before further input is blocked (`0` = unlimited). A locked session stays locked regardless. |
 | `show-failed-attempts` | bool | `true` | Lock screen only. Show the failed-attempt count. |
 | `lock` | [`LoginLockConfig`](/config/types#login-lock-config) | `{...}` | The lock screen's own settings. |

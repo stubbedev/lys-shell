@@ -99,3 +99,9 @@ settings-modules-recorder-scroll-down = Scroll Down
 ## RecorderFormat variants
 enum-recorder-format-mp4 = MP4
 enum-recorder-format-mkv = MKV
+
+## Format placeholders
+
+settings-modules-recorder-format-placeholder-state = Recorder state (Idle, Recording, Paused)
+
+settings-modules-recorder-format-placeholder-elapsed = Elapsed recording time as M:SS or H:MM:SS (- while idle)

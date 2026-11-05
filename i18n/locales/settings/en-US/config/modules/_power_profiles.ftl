@@ -64,3 +64,7 @@ settings-modules-power-profiles-scroll-up = Scroll Up
 
 settings-modules-power-profiles-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-power-profiles-format-placeholder-profile = Active profile name (power-saver, balanced, performance)

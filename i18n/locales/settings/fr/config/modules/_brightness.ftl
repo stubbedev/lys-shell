@@ -36,3 +36,7 @@ settings-modules-brightness-scroll-down = Défilement vers le bas
     .description = Action au défilement vers le bas
 settings-modules-brightness-thresholds = Seuils
     .description = Seuils de couleur qui changent selon le niveau de luminosité
+
+## Format placeholders
+
+settings-modules-brightness-format-placeholder-percent = Luminosité (0-100)

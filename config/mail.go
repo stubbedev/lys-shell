@@ -65,10 +65,6 @@ func DefaultsMailAccount() MailAccount {
 type MailConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ count }}` - Number of messages matching the query
-	//
 	// ## Examples
 	//
 	// - `"{{ count }}"` - "3"
@@ -94,16 +90,8 @@ type MailConfig struct {
 	// icon; otherwise the module icon is used.
 	Notify bool `cfg:"notify"`
 	// Notification summary when new mail arrives.
-	//
-	// ## Placeholders
-	//
-	// - `{{ sender }}` - Message sender (name or address)
-	// - `{{ subject }}` - Message subject
-	// - `{{ count }}` - Total messages matching the query
-	// - `{{ new }}` - How many arrived since the last count
 	NotifySummary string `cfg:"notify-summary"`
-	// Notification body when new mail arrives. Same placeholders as
-	// `notify-summary`.
+	// Notification body when new mail arrives.
 	NotifyBody string `cfg:"notify-body"`
 	// Module icon.
 	IconName string `cfg:"icon-name"`

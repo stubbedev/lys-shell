@@ -70,3 +70,15 @@ settings-modules-nightlight-scroll-up = Scroll Up
 
 settings-modules-nightlight-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-nightlight-format-placeholder-status = Filter status (On, Off)
+
+settings-modules-nightlight-format-placeholder-temp = Current temperature in Kelvin (-- while off)
+
+settings-modules-nightlight-format-placeholder-gamma = Current gamma percentage (-- while off)
+
+settings-modules-nightlight-format-placeholder-config-temp = Configured temperature in Kelvin
+
+settings-modules-nightlight-format-placeholder-config-gamma = Configured gamma percentage

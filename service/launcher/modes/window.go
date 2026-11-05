@@ -221,9 +221,7 @@ func (w *Window) RowPreview(index uint32) (func(context.Context) (image.Image, e
 }
 
 func windowItem(win WindowInfo, cfg WindowConfig) launcher.Item {
-	display := launcher.Render(cfg.Format, launcher.Values(map[string]string{
-		"w": win.Workspace, "c": win.Class, "t": win.Title, "n": win.Class, "r": "",
-	}))
+	display := launcher.Render(cfg.Format, launcher.Values(windowVars(win)))
 	parts := make([]string, 0, len(cfg.MatchFields))
 	for _, f := range cfg.MatchFields {
 		switch f {
@@ -637,4 +635,8 @@ func (mangoBackend) Close(_ context.Context, id string) error {
 		return err
 	}
 	return mango.KillClient(n)
+}
+
+func windowVars(win WindowInfo) map[string]string {
+	return map[string]string{"w": win.Workspace, "c": win.Class, "t": win.Title, "n": win.Class, "r": ""}
 }

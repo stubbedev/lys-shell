@@ -88,8 +88,8 @@ modules:
 - `{{ title }}` - Track title
 - `{{ artist }}` - Artist name(s)
 - `{{ album }}` - Album name
-- `{{ status }}` - Playback status text (Playing, Paused, Stopped)
-- `{{ status_icon }}` - Playback status icon character
+- `{{ status }}` - Playback status (Playing, Paused, Stopped)
+- `{{ status_icon }}` - Playback status glyph
 
 #### Examples
 

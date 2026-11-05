@@ -58,3 +58,33 @@ settings-modules-storage-scroll-down = Scroll Down
 
 settings-modules-storage-thresholds = Thresholds
     .description = Color thresholds that change based on value levels
+
+## Format placeholders
+
+settings-modules-storage-format-placeholder-percent = Disk usage (0-100)
+
+settings-modules-storage-format-placeholder-used-tib = Used space in TiB
+
+settings-modules-storage-format-placeholder-used-gib = Used space in GiB
+
+settings-modules-storage-format-placeholder-used-mib = Used space in MiB
+
+settings-modules-storage-format-placeholder-used-auto = Used space with its unit (e.g. 128.5 GiB)
+
+settings-modules-storage-format-placeholder-total-tib = Total space in TiB
+
+settings-modules-storage-format-placeholder-total-gib = Total space in GiB
+
+settings-modules-storage-format-placeholder-total-mib = Total space in MiB
+
+settings-modules-storage-format-placeholder-total-auto = Total space with its unit
+
+settings-modules-storage-format-placeholder-free-tib = Free space in TiB
+
+settings-modules-storage-format-placeholder-free-gib = Free space in GiB
+
+settings-modules-storage-format-placeholder-free-mib = Free space in MiB
+
+settings-modules-storage-format-placeholder-free-auto = Free space with its unit
+
+settings-modules-storage-format-placeholder-filesystem = Filesystem type (e.g. ext4, btrfs)

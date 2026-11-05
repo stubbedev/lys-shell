@@ -249,10 +249,7 @@ func appItem(app desktopentry.App, action string, cfg DrunConfig) launcher.Item 
 	}
 	generic, exec, categories, comment := app.GenericName(), app.Exec(), app.Categories(), app.Comment()
 	keywords := strings.Join(app.Keywords(), " ")
-	display := launcher.Render(cfg.DisplayFormat, launcher.Values(map[string]string{
-		"name": pango.Escape(name), "generic": pango.Escape(generic), "exec": pango.Escape(exec),
-		"categories": pango.Escape(categories), "comment": pango.Escape(comment),
-	}))
+	display := launcher.Render(cfg.DisplayFormat, launcher.Values(drunVars(name, generic, exec, categories, comment)))
 	item := launcher.Item{
 		Display: display,
 		MatchText: buildMatchText(cfg.MatchFields, []fieldValue{
@@ -311,4 +308,11 @@ func (d *Drun) collectLinks() []drunRow {
 		rows = append(rows, drunRow{item: item, entry: drunEntry{desktopID: l.ID, url: l.URL, isLink: true}})
 	}
 	return rows
+}
+
+func drunVars(name, generic, exec, categories, comment string) map[string]string {
+	return map[string]string{
+		"name": pango.Escape(name), "generic": pango.Escape(generic), "exec": pango.Escape(exec),
+		"categories": pango.Escape(categories), "comment": pango.Escape(comment),
+	}
 }

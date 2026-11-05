@@ -6,10 +6,6 @@ package config
 type KeybindModeConfig struct {
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ mode }}` - Current keybind mode name (shows "default" when inactive)
-	//
 	// ## Examples
 	//
 	// - `"{{ mode }}"` - "resize"

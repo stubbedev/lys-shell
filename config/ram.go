@@ -10,19 +10,6 @@ type RamConfig struct {
 	PollIntervalMs uint64 `cfg:"poll-interval-ms"`
 	// Format string for the label.
 	//
-	// ## Memory Placeholders
-	//
-	// - `{{ percent }}` - Memory usage as integer (0-100)
-	// - `{{ used_gib }}` - Used memory in GiB (e.g., "7.2")
-	// - `{{ total_gib }}` - Total memory in GiB (e.g., "16.0")
-	// - `{{ available_gib }}` - Available memory in GiB (e.g., "8.8")
-	//
-	// ## Swap Placeholders
-	//
-	// - `{{ swap_percent }}` - Swap usage as integer (0-100)
-	// - `{{ swap_used_gib }}` - Used swap in GiB
-	// - `{{ swap_total_gib }}` - Total swap in GiB
-	//
 	// ## Examples
 	//
 	// - `"{{ percent }}%"` - "45%"

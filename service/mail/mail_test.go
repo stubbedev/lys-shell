@@ -2,9 +2,11 @@ package mail
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -317,5 +319,23 @@ func TestNotifyIconArgPrefersTheRegistrySVG(t *testing.T) {
 	}
 	if got := notifyIconArg("mail-unread"); got != "mail-unread" {
 		t.Errorf("themed icon = %q, want the bare name", got)
+	}
+}
+
+func TestNotificationsRenderExactlyTheirDeclaredPlaceholders(t *testing.T) {
+	rendered := slices.Sorted(maps.Keys(notificationVars(newMail{})))
+	for _, path := range []string{"modules.mail.notify-summary", "modules.mail.notify-body"} {
+		var declared []string
+		for _, p := range config.Placeholders(path) {
+			declared = append(declared, p.Name)
+		}
+		slices.Sort(declared)
+		if len(declared) == 0 || !slices.Equal(rendered, declared) {
+			t.Errorf("%s: the notification renders %v, declares %v", path, rendered, declared)
+		}
+	}
+	m := newMail{sender: "Ada", subject: "{{ count }}", count: 3, new: 1}
+	if got := renderNotification("{{ sender }}: {{ subject }} ({{ new }}/{{ count }}) {{ pending }}", m); got != "Ada: {{ count }} (1/3) {{ pending }}" {
+		t.Errorf("rendered %q: a value is substituted once and an undeclared placeholder stays literal", got)
 	}
 }

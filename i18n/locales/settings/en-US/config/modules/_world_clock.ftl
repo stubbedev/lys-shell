@@ -49,3 +49,7 @@ settings-modules-world-clock-scroll-up = Scroll Up
 
 settings-modules-world-clock-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+## Format placeholders
+
+settings-modules-world-clock-format-placeholder-tz = The time in a timezone, in a strftime pattern

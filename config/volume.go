@@ -42,10 +42,6 @@ type VolumeConfig struct {
 	LabelColor ColorValue `cfg:"label-color"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ percent }}` - Volume (0-100)
-	//
 	// ## Examples
 	//
 	// - `"{{ percent }}%"` - "45%"

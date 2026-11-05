@@ -12,18 +12,6 @@ type WeatherConfig struct {
 	Units TemperatureUnit `cfg:"units"`
 	// Format string for the label.
 	//
-	// ## Placeholders
-	//
-	// - `{{ temp }}` - Current temperature (e.g., "72")
-	// - `{{ temp_unit }}` - Temperature unit symbol ("°F" or "°C")
-	// - `{{ feels_like }}` - Feels-like temperature
-	// - `{{ condition }}` - Weather condition text (e.g., "Cloudy")
-	// - `{{ humidity }}` - Humidity percentage (e.g., "65%")
-	// - `{{ wind_speed }}` - Wind speed with unit (e.g., "12 km/h")
-	// - `{{ wind_dir }}` - Wind direction (e.g., "NW")
-	// - `{{ high }}` - Today's high temperature
-	// - `{{ low }}` - Today's low temperature
-	//
 	// ## Examples
 	//
 	// - `"{{ temp }}{{ temp_unit }}"` - "22°C"

@@ -3,22 +3,25 @@ package bar
 import (
 	"log"
 	"strconv"
-	"strings"
 
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/treeman"
 )
 
 // treemanLabel is helpers.rs's format_label: plain replacements of
-// the exact "{{ name }}" spellings, in order, not a template.
+// the exact "{{ name }}" spellings, not a template.
 func treemanLabel(format string, status *treeman.Status) string {
-	out := strings.ReplaceAll(format, "{{ total }}", treemanCount(status.Total))
-	out = strings.ReplaceAll(out, "{{ stable }}", treemanCount(status.Stable))
-	out = strings.ReplaceAll(out, "{{ up }}", treemanCount(status.Up))
-	out = strings.ReplaceAll(out, "{{ down }}", treemanCount(status.Down))
-	return strings.ReplaceAll(out, "{{ failed }}", treemanCount(status.Failed))
+	return jinja.ReplaceVars(format, treemanVars(status))
+}
+
+func treemanVars(status *treeman.Status) map[string]string {
+	return map[string]string{
+		"total": treemanCount(status.Total), "stable": treemanCount(status.Stable), "up": treemanCount(status.Up),
+		"down": treemanCount(status.Down), "failed": treemanCount(status.Failed),
+	}
 }
 
 func treemanCount(v uint32) string { return strconv.FormatUint(uint64(v), 10) }

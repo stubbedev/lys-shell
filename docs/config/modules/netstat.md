@@ -46,23 +46,17 @@ interface name like `"eth0"` or `"wlan0"`.
 
 ::: details More about `format`
 
-#### Download Placeholders
+#### Placeholders
 
 - `{{ down_kib }}` - Download speed in KiB/s
 - `{{ down_mib }}` - Download speed in MiB/s
 - `{{ down_gib }}` - Download speed in GiB/s
-- `{{ down_auto }}` - Download speed with auto unit (e.g., "1.5 MiB/s")
-
-#### Upload Placeholders
-
+- `{{ down_auto }}` - Download speed with its unit (e.g. 1.5 MiB/s)
 - `{{ up_kib }}` - Upload speed in KiB/s
 - `{{ up_mib }}` - Upload speed in MiB/s
 - `{{ up_gib }}` - Upload speed in GiB/s
-- `{{ up_auto }}` - Upload speed with auto unit (e.g., "256 KiB/s")
-
-#### Other Placeholders
-
-- `{{ interface }}` - Interface name (e.g., "wlan0")
+- `{{ up_auto }}` - Upload speed with its unit (e.g. 256 KiB/s)
+- `{{ interface }}` - Interface name (e.g. wlan0)
 
 #### Examples
 

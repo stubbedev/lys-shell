@@ -58,3 +58,17 @@ settings-modules-cpu-scroll-down = Défilement vers le bas
 
 settings-modules-cpu-thresholds = Seuils
     .description = Seuils de couleur qui changent selon le niveau de valeur
+
+## Format placeholders
+
+settings-modules-cpu-format-placeholder-percent = Utilisation du processeur (0-100)
+
+settings-modules-cpu-format-placeholder-freq-ghz = Fréquence du cœur le plus sollicité en GHz
+
+settings-modules-cpu-format-placeholder-avg-freq-ghz = Fréquence moyenne des cœurs en GHz
+
+settings-modules-cpu-format-placeholder-max-freq-ghz = Fréquence la plus élevée parmi les cœurs en GHz
+
+settings-modules-cpu-format-placeholder-temp-c = Température en Celsius (0 si indisponible)
+
+settings-modules-cpu-format-placeholder-temp-f = Température en Fahrenheit (32 si indisponible)

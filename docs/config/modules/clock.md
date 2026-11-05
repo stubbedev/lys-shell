@@ -22,7 +22,7 @@ bar:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `format` | string | `"%a %b %d %I:%M %p"` | Format string using strftime syntax. |
+| `format` | [`StrftimeFormat`](/config/types#strftime-format) | `"%a %b %d %I:%M %p"` | Format string using strftime syntax. |
 | `icon-name` | string | `"ld-calendar-clock-symbolic"` | Symbolic icon name. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |

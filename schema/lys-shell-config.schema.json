@@ -922,7 +922,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Battery level (0-100)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Battery level (0-100)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"",
+          "x-placeholders": [
+            {
+              "description": "Battery level (0-100)",
+              "name": "percent",
+              "sample": "45",
+              "token": "{{ percent }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -1028,7 +1036,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ count }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of items in the open vault (empty while\n  locked)\n\n## Examples\n\n- `\"{{ count }}\"` - \"142\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of items in the open vault (empty while locked)\n\n## Examples\n\n- `\"{{ count }}\"` - \"142\"",
+          "x-placeholders": [
+            {
+              "description": "Number of items in the open vault (empty while locked)",
+              "name": "count",
+              "sample": "142",
+              "token": "{{ count }}"
+            }
+          ]
         },
         "generator-passphrases": {
           "$ref": "#/$defs/Array_of_BitwardenPassphrasePreset",
@@ -1380,7 +1396,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Brightness (0-100)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"65%\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Brightness (0-100)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"65%\"",
+          "x-placeholders": [
+            {
+              "description": "Brightness (0-100)",
+              "name": "percent",
+              "sample": "65",
+              "token": "{{ percent }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -1748,7 +1772,7 @@
           "description": "Show seconds in the calendar dropdown clock display."
         },
         "format": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/StrftimeFormat",
           "default": "%a %b %d %I:%M %p",
           "description": "Format string using strftime syntax.\n\n## Common Specifiers\n\n- `%H` - Hour (00-23)\n- `%I` - Hour (01-12)\n- `%M` - Minute (00-59)\n- `%S` - Second (00-59)\n- `%p` - AM/PM\n- `%a` - Abbreviated weekday (Mon, Tue)\n- `%A` - Full weekday (Monday)\n- `%b` - Abbreviated month (Jan, Feb)\n- `%B` - Full month (January)\n- `%d` - Day of month (01-31)\n- `%Y` - Year (2024)\n\n## Examples\n\n- `\"%H:%M\"` - \"14:30\"\n- `\"%I:%M %p\"` - \"02:30 PM\"\n- `\"%a %b %d %I:%M %p\"` - \"Mon Jan 15 02:30 PM\""
         },
@@ -2020,7 +2044,45 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - CPU usage (0-100)\n- `{{ freq_ghz }}` - Frequency of the busiest core (highest usage)\n- `{{ avg_freq_ghz }}` - Average frequency across cores\n- `{{ max_freq_ghz }}` - Maximum frequency among cores\n- `{{ temp_c }}` - Temperature in Celsius (if available)\n- `{{ temp_f }}` - Temperature in Fahrenheit (if available)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"\n- `\"{{ percent }}% @ {{ freq_ghz }}GHz\"` - \"45% @ 3.2GHz\"\n- `\"{{ percent }}% {{ temp_c }}C\"` - \"45% 62C\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - CPU usage (0-100)\n- `{{ freq_ghz }}` - Frequency of the busiest core in GHz\n- `{{ avg_freq_ghz }}` - Average frequency across cores in GHz\n- `{{ max_freq_ghz }}` - Highest frequency among cores in GHz\n- `{{ temp_c }}` - Temperature in Celsius (0 when unavailable)\n- `{{ temp_f }}` - Temperature in Fahrenheit (32 when unavailable)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"\n- `\"{{ percent }}% @ {{ freq_ghz }}GHz\"` - \"45% @ 3.2GHz\"\n- `\"{{ percent }}% {{ temp_c }}C\"` - \"45% 62C\"",
+          "x-placeholders": [
+            {
+              "description": "CPU usage (0-100)",
+              "name": "percent",
+              "sample": "45",
+              "token": "{{ percent }}"
+            },
+            {
+              "description": "Frequency of the busiest core in GHz",
+              "name": "freq_ghz",
+              "sample": "3.2",
+              "token": "{{ freq_ghz }}"
+            },
+            {
+              "description": "Average frequency across cores in GHz",
+              "name": "avg_freq_ghz",
+              "sample": "2.8",
+              "token": "{{ avg_freq_ghz }}"
+            },
+            {
+              "description": "Highest frequency among cores in GHz",
+              "name": "max_freq_ghz",
+              "sample": "4.1",
+              "token": "{{ max_freq_ghz }}"
+            },
+            {
+              "description": "Temperature in Celsius (0 when unavailable)",
+              "name": "temp_c",
+              "sample": "62",
+              "token": "{{ temp_c }}"
+            },
+            {
+              "description": "Temperature in Fahrenheit (32 when unavailable)",
+              "name": "temp_f",
+              "sample": "144",
+              "token": "{{ temp_f }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -2958,7 +3020,27 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ state }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Inhibitor state text (On, Off)\n- `{{ remaining }}` - Time remaining (e.g., \"45m\", shows \"--\" when indefinite)\n- `{{ duration }}` - Total duration (e.g., \"60m\", shows \"--\" when indefinite)\n\n## Examples\n\n- `\"{{ state }}\"` - \"On\"\n- `\"{{ remaining }}/{{ duration }}\"` - \"45m/60m\"\n- `\"{{ state }} ({{ remaining }})\"` - \"On (45m)\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Inhibitor state (On, Off)\n- `{{ remaining }}` - Time remaining as M:SS or H:MM:SS (∞ when indefinite, - when off)\n- `{{ duration }}` - Total duration in minutes (∞ when indefinite)\n\n## Examples\n\n- `\"{{ state }}\"` - \"On\"\n- `\"{{ remaining }}/{{ duration }}\"` - \"45m/60m\"\n- `\"{{ state }} ({{ remaining }})\"` - \"On (45m)\"",
+          "x-placeholders": [
+            {
+              "description": "Inhibitor state (On, Off)",
+              "name": "state",
+              "sample": "On",
+              "token": "{{ state }}"
+            },
+            {
+              "description": "Time remaining as M:SS or H:MM:SS (∞ when indefinite, - when off)",
+              "name": "remaining",
+              "sample": "44:59",
+              "token": "{{ remaining }}"
+            },
+            {
+              "description": "Total duration in minutes (∞ when indefinite)",
+              "name": "duration",
+              "sample": "60",
+              "token": "{{ duration }}"
+            }
+          ]
         },
         "icon-active": {
           "$ref": "#/$defs/string",
@@ -3066,7 +3148,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ mode }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ mode }}` - Current keybind mode name (shows \"default\" when inactive)\n\n## Examples\n\n- `\"{{ mode }}\"` - \"resize\"\n- `\"Mode: {{ mode }}\"` - \"Mode: resize\"\n- `\"[{{ mode }}]\"` - \"[resize]\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ mode }}` - Current keybind mode name (default when none is active)\n\n## Examples\n\n- `\"{{ mode }}\"` - \"resize\"\n- `\"Mode: {{ mode }}\"` - \"Mode: resize\"\n- `\"[{{ mode }}]\"` - \"[resize]\"",
+          "x-placeholders": [
+            {
+              "description": "Current keybind mode name (default when none is active)",
+              "name": "mode",
+              "sample": "resize",
+              "token": "{{ mode }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -3152,7 +3242,21 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ alias }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ layout }}` - Raw layout name from the compositor (e.g., \"English (US)\")\n- `{{ alias }}` - User-defined alias from `layout-alias-map`, falls back to `{{ layout }}`\n\n## Examples\n\n- `\"{{ layout }}\"` - \"English (US)\"\n- `\"{{ alias }}\"` - \"EN\" (with alias map configured)"
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ layout }}` - Layout name from the compositor (e.g. English (US))\n- `{{ alias }}` - Alias from the layout alias map, else the layout name\n\n## Examples\n\n- `\"{{ layout }}\"` - \"English (US)\"\n- `\"{{ alias }}\"` - \"EN\" (with alias map configured)",
+          "x-placeholders": [
+            {
+              "description": "Layout name from the compositor (e.g. English (US))",
+              "name": "layout",
+              "sample": "English (US)",
+              "token": "{{ layout }}"
+            },
+            {
+              "description": "Alias from the layout alias map, else the layout name",
+              "name": "alias",
+              "sample": "EN",
+              "token": "{{ alias }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -3273,7 +3377,21 @@
         "display-format": {
           "$ref": "#/$defs/string",
           "default": "{text}",
-          "description": "Row template (`{mode}`, `{text}`)."
+          "description": "Row template.\n\n## Placeholders\n\n- `{mode}` - Mode the row comes from\n- `{text}` - The row's own text",
+          "x-placeholders": [
+            {
+              "description": "Mode the row comes from",
+              "name": "mode",
+              "sample": "drun",
+              "token": "{mode}"
+            },
+            {
+              "description": "The row's own text",
+              "name": "text",
+              "sample": "Firefox",
+              "token": "{text}"
+            }
+          ]
         },
         "modes": {
           "$ref": "#/$defs/Array_of_string",
@@ -3559,7 +3677,39 @@
         "display-format": {
           "$ref": "#/$defs/string",
           "default": "{name} [<span weight='light' size='small'><i>({generic})</i></span>]",
-          "description": "Row template: `{name}`, `{generic}`, `{exec}`, `{categories}`,\n`{comment}`; `[..]` renders only when its placeholders are non-empty."
+          "description": "Row template; `[..]` renders only when its placeholders are non-empty.\n\n## Placeholders\n\n- `{name}` - Application name\n- `{generic}` - Generic name (e.g. Web Browser)\n- `{exec}` - Command the entry runs\n- `{categories}` - Desktop entry categories\n- `{comment}` - Desktop entry comment",
+          "x-placeholders": [
+            {
+              "description": "Application name",
+              "name": "name",
+              "sample": "Firefox",
+              "token": "{name}"
+            },
+            {
+              "description": "Generic name (e.g. Web Browser)",
+              "name": "generic",
+              "sample": "Web Browser",
+              "token": "{generic}"
+            },
+            {
+              "description": "Command the entry runs",
+              "name": "exec",
+              "sample": "firefox %u",
+              "token": "{exec}"
+            },
+            {
+              "description": "Desktop entry categories",
+              "name": "categories",
+              "sample": "Network;WebBrowser;",
+              "token": "{categories}"
+            },
+            {
+              "description": "Desktop entry comment",
+              "name": "comment",
+              "sample": "Browse the Web",
+              "token": "{comment}"
+            }
+          ]
         },
         "exclude-categories": {
           "$ref": "#/$defs/Array_of_string",
@@ -4068,7 +4218,39 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{w}   {c}   {t}",
-          "description": "Row template: `{w}` workspace, `{c}` class, `{t}` title, `{n}` name,\n`{r}` role."
+          "description": "Row template.\n\n## Placeholders\n\n- `{w}` - Workspace\n- `{c}` - Window class\n- `{t}` - Window title\n- `{n}` - Window name (its class)\n- `{r}` - Window role (always empty)",
+          "x-placeholders": [
+            {
+              "description": "Workspace",
+              "name": "w",
+              "sample": "1",
+              "token": "{w}"
+            },
+            {
+              "description": "Window class",
+              "name": "c",
+              "sample": "firefox",
+              "token": "{c}"
+            },
+            {
+              "description": "Window title",
+              "name": "t",
+              "sample": "GitHub",
+              "token": "{t}"
+            },
+            {
+              "description": "Window name (its class)",
+              "name": "n",
+              "sample": "firefox",
+              "token": "{n}"
+            },
+            {
+              "description": "Window role (always empty)",
+              "name": "r",
+              "sample": "",
+              "token": "{r}"
+            }
+          ]
         },
         "hide-active": {
           "$ref": "#/$defs/boolean",
@@ -4258,12 +4440,12 @@
           "description": "Gaussian blur radius applied to image/wallpaper backgrounds (0 = none)."
         },
         "clock-format": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/StrftimeFormat",
           "default": "%H:%M",
           "description": "`strftime` format for the time."
         },
         "date-format": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/StrftimeFormat",
           "default": "%A, %B %-d",
           "description": "`strftime` format for the date."
         },
@@ -4566,7 +4748,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ count }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of messages matching the query\n\n## Examples\n\n- `\"{{ count }}\"` - \"3\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of messages matching the query\n\n## Examples\n\n- `\"{{ count }}\"` - \"3\"",
+          "x-placeholders": [
+            {
+              "description": "Number of messages matching the query",
+              "name": "count",
+              "sample": "3",
+              "token": "{{ count }}"
+            }
+          ]
         },
         "hide-when-zero": {
           "$ref": "#/$defs/boolean",
@@ -4626,12 +4816,64 @@
         "notify-body": {
           "$ref": "#/$defs/string",
           "default": "{{ subject }}",
-          "description": "Notification body when new mail arrives. Same placeholders as\n`notify-summary`."
+          "description": "Notification body when new mail arrives.\n\n## Placeholders\n\n- `{{ sender }}` - Message sender (name or address)\n- `{{ subject }}` - Message subject\n- `{{ count }}` - Total messages matching the query\n- `{{ new }}` - How many arrived since the last count",
+          "x-placeholders": [
+            {
+              "description": "Message sender (name or address)",
+              "name": "sender",
+              "sample": "Ada Lovelace",
+              "token": "{{ sender }}"
+            },
+            {
+              "description": "Message subject",
+              "name": "subject",
+              "sample": "Lunch on Friday?",
+              "token": "{{ subject }}"
+            },
+            {
+              "description": "Total messages matching the query",
+              "name": "count",
+              "sample": "3",
+              "token": "{{ count }}"
+            },
+            {
+              "description": "How many arrived since the last count",
+              "name": "new",
+              "sample": "1",
+              "token": "{{ new }}"
+            }
+          ]
         },
         "notify-summary": {
           "$ref": "#/$defs/string",
           "default": "{{ sender }}",
-          "description": "Notification summary when new mail arrives.\n\n## Placeholders\n\n- `{{ sender }}` - Message sender (name or address)\n- `{{ subject }}` - Message subject\n- `{{ count }}` - Total messages matching the query\n- `{{ new }}` - How many arrived since the last count"
+          "description": "Notification summary when new mail arrives.\n\n## Placeholders\n\n- `{{ sender }}` - Message sender (name or address)\n- `{{ subject }}` - Message subject\n- `{{ count }}` - Total messages matching the query\n- `{{ new }}` - How many arrived since the last count",
+          "x-placeholders": [
+            {
+              "description": "Message sender (name or address)",
+              "name": "sender",
+              "sample": "Ada Lovelace",
+              "token": "{{ sender }}"
+            },
+            {
+              "description": "Message subject",
+              "name": "subject",
+              "sample": "Lunch on Friday?",
+              "token": "{{ subject }}"
+            },
+            {
+              "description": "Total messages matching the query",
+              "name": "count",
+              "sample": "3",
+              "token": "{{ count }}"
+            },
+            {
+              "description": "How many arrived since the last count",
+              "name": "new",
+              "sample": "1",
+              "token": "{{ new }}"
+            }
+          ]
         },
         "query": {
           "$ref": "#/$defs/string",
@@ -4925,7 +5167,39 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ title }} - {{ artist }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ title }}` - Track title\n- `{{ artist }}` - Artist name(s)\n- `{{ album }}` - Album name\n- `{{ status }}` - Playback status text (Playing, Paused, Stopped)\n- `{{ status_icon }}` - Playback status icon character\n\n## Examples\n\n- `\"{{ title }} - {{ artist }}\"` - \"Bohemian Rhapsody - Queen\"\n- `\"{{ status_icon }} {{ title }}\"` - \"▶ Bohemian Rhapsody\"\n- `\"{{ artist }}: {{ title }} ({{ album }})\"` - \"Queen: Bohemian Rhapsody (A Night at the Opera)\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ title }}` - Track title\n- `{{ artist }}` - Artist name(s)\n- `{{ album }}` - Album name\n- `{{ status }}` - Playback status (Playing, Paused, Stopped)\n- `{{ status_icon }}` - Playback status glyph\n\n## Examples\n\n- `\"{{ title }} - {{ artist }}\"` - \"Bohemian Rhapsody - Queen\"\n- `\"{{ status_icon }} {{ title }}\"` - \"▶ Bohemian Rhapsody\"\n- `\"{{ artist }}: {{ title }} ({{ album }})\"` - \"Queen: Bohemian Rhapsody (A Night at the Opera)\"",
+          "x-placeholders": [
+            {
+              "description": "Track title",
+              "name": "title",
+              "sample": "Bohemian Rhapsody",
+              "token": "{{ title }}"
+            },
+            {
+              "description": "Artist name(s)",
+              "name": "artist",
+              "sample": "Queen",
+              "token": "{{ artist }}"
+            },
+            {
+              "description": "Album name",
+              "name": "album",
+              "sample": "A Night at the Opera",
+              "token": "{{ album }}"
+            },
+            {
+              "description": "Playback status (Playing, Paused, Stopped)",
+              "name": "status",
+              "sample": "Playing",
+              "token": "{{ status }}"
+            },
+            {
+              "description": "Playback status glyph",
+              "name": "status_icon",
+              "sample": "󰐊",
+              "token": "{{ status_icon }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -6226,7 +6500,63 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ down_auto }} {{ up_auto }}",
-          "description": "Format string for the label.\n\n## Download Placeholders\n\n- `{{ down_kib }}` - Download speed in KiB/s\n- `{{ down_mib }}` - Download speed in MiB/s\n- `{{ down_gib }}` - Download speed in GiB/s\n- `{{ down_auto }}` - Download speed with auto unit (e.g., \"1.5 MiB/s\")\n\n## Upload Placeholders\n\n- `{{ up_kib }}` - Upload speed in KiB/s\n- `{{ up_mib }}` - Upload speed in MiB/s\n- `{{ up_gib }}` - Upload speed in GiB/s\n- `{{ up_auto }}` - Upload speed with auto unit (e.g., \"256 KiB/s\")\n\n## Other Placeholders\n\n- `{{ interface }}` - Interface name (e.g., \"wlan0\")\n\n## Examples\n\n- `\"{{ down_auto }} {{ up_auto }}\"` - \"1.5 MiB/s 256 KiB/s\"\n- `\"D:{{ down_mib }} U:{{ up_mib }}\"` - \"D:1.5 U:0.2\"\n- `\"{{ interface }}: {{ down_auto }}\"` - \"wlan0: 1.5 MiB/s\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ down_kib }}` - Download speed in KiB/s\n- `{{ down_mib }}` - Download speed in MiB/s\n- `{{ down_gib }}` - Download speed in GiB/s\n- `{{ down_auto }}` - Download speed with its unit (e.g. 1.5 MiB/s)\n- `{{ up_kib }}` - Upload speed in KiB/s\n- `{{ up_mib }}` - Upload speed in MiB/s\n- `{{ up_gib }}` - Upload speed in GiB/s\n- `{{ up_auto }}` - Upload speed with its unit (e.g. 256 KiB/s)\n- `{{ interface }}` - Interface name (e.g. wlan0)\n\n## Examples\n\n- `\"{{ down_auto }} {{ up_auto }}\"` - \"1.5 MiB/s 256 KiB/s\"\n- `\"D:{{ down_mib }} U:{{ up_mib }}\"` - \"D:1.5 U:0.2\"\n- `\"{{ interface }}: {{ down_auto }}\"` - \"wlan0: 1.5 MiB/s\"",
+          "x-placeholders": [
+            {
+              "description": "Download speed in KiB/s",
+              "name": "down_kib",
+              "sample": "1536",
+              "token": "{{ down_kib }}"
+            },
+            {
+              "description": "Download speed in MiB/s",
+              "name": "down_mib",
+              "sample": "1.5",
+              "token": "{{ down_mib }}"
+            },
+            {
+              "description": "Download speed in GiB/s",
+              "name": "down_gib",
+              "sample": "0.00",
+              "token": "{{ down_gib }}"
+            },
+            {
+              "description": "Download speed with its unit (e.g. 1.5 MiB/s)",
+              "name": "down_auto",
+              "sample": "1.5 MiB/s",
+              "token": "{{ down_auto }}"
+            },
+            {
+              "description": "Upload speed in KiB/s",
+              "name": "up_kib",
+              "sample": "256",
+              "token": "{{ up_kib }}"
+            },
+            {
+              "description": "Upload speed in MiB/s",
+              "name": "up_mib",
+              "sample": "0.2",
+              "token": "{{ up_mib }}"
+            },
+            {
+              "description": "Upload speed in GiB/s",
+              "name": "up_gib",
+              "sample": "0.00",
+              "token": "{{ up_gib }}"
+            },
+            {
+              "description": "Upload speed with its unit (e.g. 256 KiB/s)",
+              "name": "up_auto",
+              "sample": "256 KiB/s",
+              "token": "{{ up_auto }}"
+            },
+            {
+              "description": "Interface name (e.g. wlan0)",
+              "name": "interface",
+              "sample": "wlan0",
+              "token": "{{ interface }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -6468,7 +6798,39 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ status }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ status }}` - Filter status text (On, Off)\n- `{{ temp }}` - Current temperature in Kelvin (shows \"--\" when disabled)\n- `{{ gamma }}` - Current gamma percentage (shows \"--\" when disabled)\n- `{{ config_temp }}` - Configured temperature (always available)\n- `{{ config_gamma }}` - Configured gamma (always available)\n\n## Examples\n\n- `\"{{ status }}\"` - \"On\"\n- `\"{{ temp }}K {{ gamma }}%\"` - \"4500K 80%\"\n- `\"{{ status }} ({{ temp }}K)\"` - \"On (4500K)\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ status }}` - Filter status (On, Off)\n- `{{ temp }}` - Current temperature in Kelvin (-- while off)\n- `{{ gamma }}` - Current gamma percentage (-- while off)\n- `{{ config_temp }}` - Configured temperature in Kelvin\n- `{{ config_gamma }}` - Configured gamma percentage\n\n## Examples\n\n- `\"{{ status }}\"` - \"On\"\n- `\"{{ temp }}K {{ gamma }}%\"` - \"4500K 80%\"\n- `\"{{ status }} ({{ temp }}K)\"` - \"On (4500K)\"",
+          "x-placeholders": [
+            {
+              "description": "Filter status (On, Off)",
+              "name": "status",
+              "sample": "On",
+              "token": "{{ status }}"
+            },
+            {
+              "description": "Current temperature in Kelvin (-- while off)",
+              "name": "temp",
+              "sample": "4500",
+              "token": "{{ temp }}"
+            },
+            {
+              "description": "Current gamma percentage (-- while off)",
+              "name": "gamma",
+              "sample": "80",
+              "token": "{{ gamma }}"
+            },
+            {
+              "description": "Configured temperature in Kelvin",
+              "name": "config_temp",
+              "sample": "4500",
+              "token": "{{ config_temp }}"
+            },
+            {
+              "description": "Configured gamma percentage",
+              "name": "config_gamma",
+              "sample": "80",
+              "token": "{{ config_gamma }}"
+            }
+          ]
         },
         "gamma": {
           "$ref": "#/$defs/uint32",
@@ -7477,7 +7839,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ profile }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ profile }}` - Active profile name (power-saver, balanced, performance)\n\n## Examples\n\n- `\"{{ profile }}\"` - \"balanced\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ profile }}` - Active profile name (power-saver, balanced, performance)\n\n## Examples\n\n- `\"{{ profile }}\"` - \"balanced\"",
+          "x-placeholders": [
+            {
+              "description": "Active profile name (power-saver, balanced, performance)",
+              "name": "profile",
+              "sample": "balanced",
+              "token": "{{ profile }}"
+            }
+          ]
         },
         "icon-balanced": {
           "$ref": "#/$defs/string",
@@ -7580,7 +7950,51 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
-          "description": "Format string for the label.\n\n## Memory Placeholders\n\n- `{{ percent }}` - Memory usage as integer (0-100)\n- `{{ used_gib }}` - Used memory in GiB (e.g., \"7.2\")\n- `{{ total_gib }}` - Total memory in GiB (e.g., \"16.0\")\n- `{{ available_gib }}` - Available memory in GiB (e.g., \"8.8\")\n\n## Swap Placeholders\n\n- `{{ swap_percent }}` - Swap usage as integer (0-100)\n- `{{ swap_used_gib }}` - Used swap in GiB\n- `{{ swap_total_gib }}` - Total swap in GiB\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"\n- `\"{{ used_gib }}/{{ total_gib }} GiB\"` - \"7.2/16.0 GiB\"\n- `\"{{ percent }}% (Swap: {{ swap_percent }}%)\"` - \"45% (Swap: 12%)\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Memory usage (0-100)\n- `{{ used_gib }}` - Used memory in GiB\n- `{{ total_gib }}` - Total memory in GiB\n- `{{ available_gib }}` - Available memory in GiB\n- `{{ swap_percent }}` - Swap usage (0-100)\n- `{{ swap_used_gib }}` - Used swap in GiB\n- `{{ swap_total_gib }}` - Total swap in GiB\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"\n- `\"{{ used_gib }}/{{ total_gib }} GiB\"` - \"7.2/16.0 GiB\"\n- `\"{{ percent }}% (Swap: {{ swap_percent }}%)\"` - \"45% (Swap: 12%)\"",
+          "x-placeholders": [
+            {
+              "description": "Memory usage (0-100)",
+              "name": "percent",
+              "sample": "45",
+              "token": "{{ percent }}"
+            },
+            {
+              "description": "Used memory in GiB",
+              "name": "used_gib",
+              "sample": "7.2",
+              "token": "{{ used_gib }}"
+            },
+            {
+              "description": "Total memory in GiB",
+              "name": "total_gib",
+              "sample": "16.0",
+              "token": "{{ total_gib }}"
+            },
+            {
+              "description": "Available memory in GiB",
+              "name": "available_gib",
+              "sample": "8.8",
+              "token": "{{ available_gib }}"
+            },
+            {
+              "description": "Swap usage (0-100)",
+              "name": "swap_percent",
+              "sample": "12",
+              "token": "{{ swap_percent }}"
+            },
+            {
+              "description": "Used swap in GiB",
+              "name": "swap_used_gib",
+              "sample": "1.0",
+              "token": "{{ swap_used_gib }}"
+            },
+            {
+              "description": "Total swap in GiB",
+              "name": "swap_total_gib",
+              "sample": "8.0",
+              "token": "{{ swap_total_gib }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -7676,7 +8090,21 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ elapsed }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Recorder state text (Idle, Recording, Paused)\n- `{{ elapsed }}` - Elapsed recording time (e.g., \"01:23\", \"--\" when idle)"
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Recorder state (Idle, Recording, Paused)\n- `{{ elapsed }}` - Elapsed recording time as M:SS or H:MM:SS (- while idle)",
+          "x-placeholders": [
+            {
+              "description": "Recorder state (Idle, Recording, Paused)",
+              "name": "state",
+              "sample": "Recording",
+              "token": "{{ state }}"
+            },
+            {
+              "description": "Elapsed recording time as M:SS or H:MM:SS (- while idle)",
+              "name": "elapsed",
+              "sample": "1:23",
+              "token": "{{ elapsed }}"
+            }
+          ]
         },
         "framerate": {
           "$ref": "#/$defs/uint32",
@@ -7923,7 +8351,7 @@
           "description": "Copy the captured image to the clipboard."
         },
         "filename-format": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/StrftimeFormat",
           "default": "Screenshot_%Y-%m-%d_%H-%M-%S.png",
           "description": "Saved file name, formatted with `chrono`/`strftime` specifiers."
         },
@@ -8279,7 +8707,93 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Disk usage as integer (0-100)\n- `{{ used_tib }}` - Used space in TiB\n- `{{ used_gib }}` - Used space in GiB\n- `{{ used_mib }}` - Used space in MiB\n- `{{ used_auto }}` - Used space with auto unit (e.g., \"128.5 GiB\")\n- `{{ total_tib }}` - Total space in TiB\n- `{{ total_gib }}` - Total space in GiB\n- `{{ total_mib }}` - Total space in MiB\n- `{{ total_auto }}` - Total space with auto unit\n- `{{ free_tib }}` - Free space in TiB\n- `{{ free_gib }}` - Free space in GiB\n- `{{ free_mib }}` - Free space in MiB\n- `{{ free_auto }}` - Free space with auto unit\n- `{{ filesystem }}` - Filesystem type (e.g., \"ext4\", \"btrfs\")\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"\n- `\"{{ used_auto }}/{{ total_auto }}\"` - \"128.5 GiB/512.0 GiB\"\n- `\"{{ free_gib }} GiB free\"` - \"383.5 GiB free\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Disk usage (0-100)\n- `{{ used_tib }}` - Used space in TiB\n- `{{ used_gib }}` - Used space in GiB\n- `{{ used_mib }}` - Used space in MiB\n- `{{ used_auto }}` - Used space with its unit (e.g. 128.5 GiB)\n- `{{ total_tib }}` - Total space in TiB\n- `{{ total_gib }}` - Total space in GiB\n- `{{ total_mib }}` - Total space in MiB\n- `{{ total_auto }}` - Total space with its unit\n- `{{ free_tib }}` - Free space in TiB\n- `{{ free_gib }}` - Free space in GiB\n- `{{ free_mib }}` - Free space in MiB\n- `{{ free_auto }}` - Free space with its unit\n- `{{ filesystem }}` - Filesystem type (e.g. ext4, btrfs)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"\n- `\"{{ used_auto }}/{{ total_auto }}\"` - \"128.5 GiB/512.0 GiB\"\n- `\"{{ free_gib }} GiB free\"` - \"383.5 GiB free\"",
+          "x-placeholders": [
+            {
+              "description": "Disk usage (0-100)",
+              "name": "percent",
+              "sample": "45",
+              "token": "{{ percent }}"
+            },
+            {
+              "description": "Used space in TiB",
+              "name": "used_tib",
+              "sample": "0.13",
+              "token": "{{ used_tib }}"
+            },
+            {
+              "description": "Used space in GiB",
+              "name": "used_gib",
+              "sample": "128.5",
+              "token": "{{ used_gib }}"
+            },
+            {
+              "description": "Used space in MiB",
+              "name": "used_mib",
+              "sample": "131584",
+              "token": "{{ used_mib }}"
+            },
+            {
+              "description": "Used space with its unit (e.g. 128.5 GiB)",
+              "name": "used_auto",
+              "sample": "128.5 GiB",
+              "token": "{{ used_auto }}"
+            },
+            {
+              "description": "Total space in TiB",
+              "name": "total_tib",
+              "sample": "0.50",
+              "token": "{{ total_tib }}"
+            },
+            {
+              "description": "Total space in GiB",
+              "name": "total_gib",
+              "sample": "512.0",
+              "token": "{{ total_gib }}"
+            },
+            {
+              "description": "Total space in MiB",
+              "name": "total_mib",
+              "sample": "524288",
+              "token": "{{ total_mib }}"
+            },
+            {
+              "description": "Total space with its unit",
+              "name": "total_auto",
+              "sample": "512.0 GiB",
+              "token": "{{ total_auto }}"
+            },
+            {
+              "description": "Free space in TiB",
+              "name": "free_tib",
+              "sample": "0.37",
+              "token": "{{ free_tib }}"
+            },
+            {
+              "description": "Free space in GiB",
+              "name": "free_gib",
+              "sample": "383.5",
+              "token": "{{ free_gib }}"
+            },
+            {
+              "description": "Free space in MiB",
+              "name": "free_mib",
+              "sample": "392704",
+              "token": "{{ free_mib }}"
+            },
+            {
+              "description": "Free space with its unit",
+              "name": "free_auto",
+              "sample": "383.5 GiB",
+              "token": "{{ free_auto }}"
+            },
+            {
+              "description": "Filesystem type (e.g. ext4, btrfs)",
+              "name": "filesystem",
+              "sample": "ext4",
+              "token": "{{ filesystem }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -8374,6 +8888,11 @@
         }
       ],
       "description": "Storage mount targets accepted by `mount-point`.\n\nSupports a single string for backwards compatibility or an array of paths."
+    },
+    "StrftimeFormat": {
+      "description": "A strftime pattern (`%H:%M`).",
+      "format": "strftime",
+      "type": "string"
     },
     "StylingConfig": {
       "description": "Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet.",
@@ -8974,7 +9493,39 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ total }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ total }}` - Total active worktrees\n- `{{ stable }}` - Worktrees in the ready bucket\n- `{{ up }}` - Worktrees preparing\n- `{{ down }}` - Worktrees tearing down\n- `{{ failed }}` - Worktrees whose last finalize errored\n\n## Examples\n\n- `\"{{ total }}\"` - \"7\"\n- `\"{{ total }} ({{ failed }}!)\"` - \"7 (1!)\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ total }}` - Total active worktrees\n- `{{ stable }}` - Worktrees in the ready bucket\n- `{{ up }}` - Worktrees preparing\n- `{{ down }}` - Worktrees tearing down\n- `{{ failed }}` - Worktrees whose last finalize errored\n\n## Examples\n\n- `\"{{ total }}\"` - \"7\"\n- `\"{{ total }} ({{ failed }}!)\"` - \"7 (1!)\"",
+          "x-placeholders": [
+            {
+              "description": "Total active worktrees",
+              "name": "total",
+              "sample": "7",
+              "token": "{{ total }}"
+            },
+            {
+              "description": "Worktrees in the ready bucket",
+              "name": "stable",
+              "sample": "4",
+              "token": "{{ stable }}"
+            },
+            {
+              "description": "Worktrees preparing",
+              "name": "up",
+              "sample": "1",
+              "token": "{{ up }}"
+            },
+            {
+              "description": "Worktrees tearing down",
+              "name": "down",
+              "sample": "1",
+              "token": "{{ down }}"
+            },
+            {
+              "description": "Worktrees whose last finalize errored",
+              "name": "failed",
+              "sample": "1",
+              "token": "{{ failed }}"
+            }
+          ]
         },
         "hide-if-empty": {
           "$ref": "#/$defs/boolean",
@@ -9141,7 +9692,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Volume (0-100)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ percent }}` - Volume (0-100)\n\n## Examples\n\n- `\"{{ percent }}%\"` - \"45%\"",
+          "x-placeholders": [
+            {
+              "description": "Volume (0-100)",
+              "name": "percent",
+              "sample": "45",
+              "token": "{{ percent }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -9482,7 +10041,63 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ temp }}{{ temp_unit }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ temp }}` - Current temperature (e.g., \"72\")\n- `{{ temp_unit }}` - Temperature unit symbol (\"°F\" or \"°C\")\n- `{{ feels_like }}` - Feels-like temperature\n- `{{ condition }}` - Weather condition text (e.g., \"Cloudy\")\n- `{{ humidity }}` - Humidity percentage (e.g., \"65%\")\n- `{{ wind_speed }}` - Wind speed with unit (e.g., \"12 km/h\")\n- `{{ wind_dir }}` - Wind direction (e.g., \"NW\")\n- `{{ high }}` - Today's high temperature\n- `{{ low }}` - Today's low temperature\n\n## Examples\n\n- `\"{{ temp }}{{ temp_unit }}\"` - \"22°C\"\n- `\"{{ temp }}{{ temp_unit }} {{ condition }}\"` - \"22°C Partly Cloudy\"\n- `\"{{ temp }}{{ temp_unit }} H:{{ high }} L:{{ low }}\"` - \"22°C H:25 L:18\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ temp }}` - Current temperature\n- `{{ temp_unit }}` - Temperature unit symbol (°F or °C)\n- `{{ feels_like }}` - Feels-like temperature\n- `{{ condition }}` - Weather condition (e.g. Cloudy)\n- `{{ humidity }}` - Humidity percentage (e.g. 65%)\n- `{{ wind_speed }}` - Wind speed with its unit (e.g. 12 km/h)\n- `{{ wind_dir }}` - Wind direction (e.g. NW)\n- `{{ high }}` - Today's high temperature (empty without a forecast)\n- `{{ low }}` - Today's low temperature (empty without a forecast)\n\n## Examples\n\n- `\"{{ temp }}{{ temp_unit }}\"` - \"22°C\"\n- `\"{{ temp }}{{ temp_unit }} {{ condition }}\"` - \"22°C Partly Cloudy\"\n- `\"{{ temp }}{{ temp_unit }} H:{{ high }} L:{{ low }}\"` - \"22°C H:25 L:18\"",
+          "x-placeholders": [
+            {
+              "description": "Current temperature",
+              "name": "temp",
+              "sample": "22",
+              "token": "{{ temp }}"
+            },
+            {
+              "description": "Temperature unit symbol (°F or °C)",
+              "name": "temp_unit",
+              "sample": "°C",
+              "token": "{{ temp_unit }}"
+            },
+            {
+              "description": "Feels-like temperature",
+              "name": "feels_like",
+              "sample": "21",
+              "token": "{{ feels_like }}"
+            },
+            {
+              "description": "Weather condition (e.g. Cloudy)",
+              "name": "condition",
+              "sample": "Partly cloudy",
+              "token": "{{ condition }}"
+            },
+            {
+              "description": "Humidity percentage (e.g. 65%)",
+              "name": "humidity",
+              "sample": "65%",
+              "token": "{{ humidity }}"
+            },
+            {
+              "description": "Wind speed with its unit (e.g. 12 km/h)",
+              "name": "wind_speed",
+              "sample": "12 km/h",
+              "token": "{{ wind_speed }}"
+            },
+            {
+              "description": "Wind direction (e.g. NW)",
+              "name": "wind_dir",
+              "sample": "NW",
+              "token": "{{ wind_dir }}"
+            },
+            {
+              "description": "Today's high temperature (empty without a forecast)",
+              "name": "high",
+              "sample": "25",
+              "token": "{{ high }}"
+            },
+            {
+              "description": "Today's low temperature (empty without a forecast)",
+              "name": "low",
+              "sample": "18",
+              "token": "{{ low }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -9663,7 +10278,21 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ title }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ title }}` - Window title\n- `{{ app }}` - Application name (WM_CLASS on Hyprland)\n\n## Examples\n\n- `\"{{ title }}\"` - \"README.md - VSCode\"\n- `\"{{ app }}: {{ title }}\"` - \"firefox: GitHub\""
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ title }}` - Window title\n- `{{ app }}` - Application id (WM_CLASS on Hyprland)\n\n## Examples\n\n- `\"{{ title }}\"` - \"README.md - VSCode\"\n- `\"{{ app }}: {{ title }}\"` - \"firefox: GitHub\"",
+          "x-placeholders": [
+            {
+              "description": "Window title",
+              "name": "title",
+              "sample": "README.md - VSCode",
+              "token": "{{ title }}"
+            },
+            {
+              "description": "Application id (WM_CLASS on Hyprland)",
+              "name": "app",
+              "sample": "firefox",
+              "token": "{{ app }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",
@@ -9799,7 +10428,15 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ tz('UTC', '%H:%M %Z') }}",
-          "description": "Format string with embedded timezone blocks.\n\nUse `{{ tz('timezone', 'strftime') }}` to insert a formatted time.\nAnything outside a placeholder stays as literal text.\n\n## Examples\n\n| Format string | Renders as |\n|---|---|\n| `\"{{ tz('UTC', '%H:%M %Z') }}\"` | `14:30 UTC` |\n| `\"NYC {{ tz('America/New_York', '%H:%M') }}  TYO {{ tz('Asia/Tokyo', '%H:%M') }}\"` | `NYC 09:30  TYO 23:30` |\n| `\"{{ tz('America/New_York', '%H:%M %Z') }} \\| {{ tz('Europe/London', '%H:%M %Z') }}\"` | `09:30 EST \\| 14:30 GMT` |"
+          "description": "Format string with embedded timezone blocks.\n\nUse `{{ tz('timezone', 'strftime') }}` to insert a formatted time.\nAnything outside a placeholder stays as literal text.\n\n## Placeholders\n\n- `{{ tz('UTC', '%H:%M %Z') }}` - The time in a timezone, in a strftime pattern\n\n## Examples\n\n| Format string | Renders as |\n|---|---|\n| `\"{{ tz('UTC', '%H:%M %Z') }}\"` | `14:30 UTC` |\n| `\"NYC {{ tz('America/New_York', '%H:%M') }}  TYO {{ tz('Asia/Tokyo', '%H:%M') }}\"` | `NYC 09:30  TYO 23:30` |\n| `\"{{ tz('America/New_York', '%H:%M %Z') }} \\| {{ tz('Europe/London', '%H:%M %Z') }}\"` | `09:30 EST \\| 14:30 GMT` |",
+          "x-placeholders": [
+            {
+              "description": "The time in a timezone, in a strftime pattern",
+              "name": "tz",
+              "sample": "14:30 UTC",
+              "token": "{{ tz('UTC', '%H:%M %Z') }}"
+            }
+          ]
         },
         "icon-bg-color": {
           "$ref": "#/$defs/ColorValue",

@@ -73,3 +73,23 @@ settings-modules-weather-left-click = Clic gauche
 
 settings-modules-weather-refresh-interval-seconds = Intervalle de rafraîchissement
     .description = Fréquence de récupération des données météo (secondes)
+
+## Format placeholders
+
+settings-modules-weather-format-placeholder-temp = Température actuelle
+
+settings-modules-weather-format-placeholder-temp-unit = Symbole de l'unité de température (°F ou °C)
+
+settings-modules-weather-format-placeholder-feels-like = Température ressentie
+
+settings-modules-weather-format-placeholder-condition = Conditions météo (ex. : nuageux)
+
+settings-modules-weather-format-placeholder-humidity = Humidité en pourcentage (ex. : 65%)
+
+settings-modules-weather-format-placeholder-wind-speed = Vitesse du vent avec son unité (ex. : 12 km/h)
+
+settings-modules-weather-format-placeholder-wind-dir = Direction du vent (ex. : NW)
+
+settings-modules-weather-format-placeholder-high = Température maximale du jour (vide sans prévisions)
+
+settings-modules-weather-format-placeholder-low = Température minimale du jour (vide sans prévisions)

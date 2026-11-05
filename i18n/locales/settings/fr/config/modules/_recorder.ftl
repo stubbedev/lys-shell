@@ -62,3 +62,9 @@ settings-modules-recorder-scroll-down = Défilement vers le bas
     .description = Commande shell au défilement vers le bas
 enum-recorder-format-mp4 = MP4
 enum-recorder-format-mkv = MKV
+
+## Format placeholders
+
+settings-modules-recorder-format-placeholder-state = État de l'enregistreur (inactif, enregistrement, pause)
+
+settings-modules-recorder-format-placeholder-elapsed = Durée d'enregistrement écoulée en M:SS ou H:MM:SS (- si inactif)

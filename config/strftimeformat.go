@@ -1,11 +1,15 @@
 package config
 
-import "github.com/stubbedev/lys-shell/strftime"
+import (
+	"time"
+
+	"github.com/stubbedev/lys-shell/strftime"
+)
 
 // StrftimeFormat is a chrono strftime format string compiled at load,
 // so an unsupported specifier is a diagnostic for its field instead of
-// garbage at render time. In the schema it is the plain String the
-// Rust field holds.
+// garbage at render time. In the schema it is a string of format
+// strftime.
 type StrftimeFormat struct {
 	src    string
 	layout *strftime.Layout
@@ -36,6 +40,9 @@ func (f StrftimeFormat) String() string { return f.src }
 // Layout is the compiled format.
 func (f StrftimeFormat) Layout() *strftime.Layout { return f.layout }
 
+// Format renders t through the format, the sample an editor previews.
+func (f StrftimeFormat) Format(t time.Time) string { return f.layout.Format(t) }
+
 // UnmarshalConfig implements Unmarshaler.
 func (f *StrftimeFormat) UnmarshalConfig(v any) error {
 	s, ok := v.(string)
@@ -53,7 +60,6 @@ func (f *StrftimeFormat) UnmarshalConfig(v any) error {
 // MarshalConfig implements Marshaler.
 func (f StrftimeFormat) MarshalConfig() any { return f.src }
 
-// configSchemaName keeps the Rust def name: the field is a String.
-func (StrftimeFormat) configSchemaName() string { return "string" }
-
-func (StrftimeFormat) configSchema(*schemaGen) Schema { return Schema{"type": "string"} }
+func (StrftimeFormat) configSchema(*schemaGen) Schema {
+	return Schema{"type": "string", "format": "strftime", "description": "A strftime pattern (`%H:%M`)."}
+}
