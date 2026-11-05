@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/apptest"
 )
 
 // loopQueue is the loop: what is handed to it runs when drained.
@@ -120,5 +121,45 @@ func TestWithoutBuildAheadNothingBuildsBeforeAnOpen(t *testing.T) {
 	r.attachHost("DP-1", fakeHost{}, 1000)
 	if r.idle != nil || len(r.instances) != 0 {
 		t.Error("a registry without an application built ahead")
+	}
+}
+
+func TestAMountedBarBuildsItsDropdownsAhead(t *testing.T) {
+	cfg := clockOnly()
+	ctx := styledContext(t, cfg)
+	a := apptest.Run(t)
+	ctx.App = a
+	rt := &barRuntime{ctx: ctx, font: ctx.Font, style: *ctx.Style, moduleStyle: *ctx.Style}
+	host := &barHost{app: a, rt: rt}
+	outputs := a.Session().Outputs()
+	if len(outputs) == 0 {
+		t.Fatal("the headless sway shows no outputs")
+	}
+	built := func() int {
+		r := rt.ctx.Dropdowns
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return len(r.instances)
+	}
+	if n := apptest.On(a, func() int { rt.mount(a, cfg); return built() }); n != 0 {
+		t.Fatalf("%d dropdowns built before a bar attached", n)
+	}
+	var bar barLayer
+	if err := apptest.On(a, func() (err error) { bar, err = host.open(outputs[0], cfg.Bar.Layout[0]); return err }); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { apptest.On(a, func() bool { bar.Close(); return true }) })
+	apptest.Until(t, a, "the calendar and the weather built ahead", func() bool {
+		r := rt.ctx.Dropdowns
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return r.instances["calendar"] != nil && r.instances["weather"] != nil
+	})
+
+	unmounted := &barRuntime{ctx: ctx, font: ctx.Font, style: *ctx.Style, moduleStyle: *ctx.Style}
+	unmounted.mount(nil, cfg)
+	unmounted.ctx.Dropdowns.attachHost("DP-1", fakeHost{}, 1000)
+	if r := unmounted.ctx.Dropdowns; r.idle != nil || len(r.instances) != 0 {
+		t.Error("a bar mounted without an application built its dropdowns ahead")
 	}
 }

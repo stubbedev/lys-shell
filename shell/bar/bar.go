@@ -859,6 +859,7 @@ func (r *barRuntime) mount(application *app.Application, cfg *config.Config) {
 		r.ctx.Dropdowns.release()
 	}
 	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, r.font, &r.style, r.ctx)
+	r.ctx.Dropdowns.buildAhead()
 }
 
 // barLayoutFor is the output's layout and whether it shows a bar.
