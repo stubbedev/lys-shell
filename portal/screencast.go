@@ -1,12 +1,14 @@
 package portal
 
 import (
+	"errors"
 	"slices"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -44,6 +46,9 @@ type screenCast struct {
 	// outputs is the outputs' logical geometry (the Wayland loop's; a
 	// fake in tests).
 	outputs func() ([]outputGeometry, error)
+	// focused is the focused output's connector (lys-wm's; a fake in
+	// tests).
+	focused func() (string, error)
 }
 
 // startedStream is a running stream and what Start reported of it;
@@ -57,7 +62,57 @@ type startedStream struct {
 }
 
 func newScreenCast(conn *dbus.Conn, s *sessions, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
-	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs}
+	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput}
+}
+
+// lysWMFocusedOutput is the output lys-wm says is focused.
+func lysWMFocusedOutput() (string, error) {
+	outs, err := lyswm.Outputs()
+	if err != nil {
+		return "", err
+	}
+	for _, o := range outs {
+		if o.Focused {
+			return o.Name, nil
+		}
+	}
+	return "", errors.New("lys-wm focuses no output")
+}
+
+// choose is the session's sources: the one output a request for a
+// single monitor can only mean, or else what the share picker replies.
+func (c *screenCast) choose(call *call, cfg castState) (token bool, targets []sharepicker.Target, code uint32) {
+	if t, ok := c.onlyMonitor(cfg); ok {
+		return false, []sharepicker.Target{t}, ResponseSuccess
+	}
+	return c.pick(call, cfg)
+}
+
+// onlyMonitor is the output a request for one monitor shares without
+// asking again: the app's own dialog already chose the entire screen.
+// It is the one output there is, or the focused one where lys-wm says
+// which; on another compositor with several, the picker asks.
+func (c *screenCast) onlyMonitor(cfg castState) (sharepicker.Target, bool) {
+	if cfg.types != sourceMonitor || cfg.multiple {
+		return sharepicker.Target{}, false
+	}
+	outputs, err := c.outputs()
+	if err != nil || len(outputs) == 0 {
+		return sharepicker.Target{}, false
+	}
+	name := outputs[0].name
+	if len(outputs) > 1 {
+		if name, err = c.focused(); err != nil {
+			if !errors.Is(err, lyswm.ErrNotRunning) {
+				warnf("screencast: no focused output, so the picker asks: %v", err)
+			}
+			return sharepicker.Target{}, false
+		}
+		if !slices.ContainsFunc(outputs, func(o outputGeometry) bool { return o.name == name }) {
+			return sharepicker.Target{}, false
+		}
+	}
+	return sharepicker.Target{Kind: sharepicker.TargetOutput, Name: name}, true
 }
 
 func (c *screenCast) iface() dbusx.Interface {
@@ -338,7 +393,7 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	allowToken, targets := restoring, cfg.restore
 	if !restoring {
 		var code uint32
-		if allowToken, targets, code = c.pick(call, cfg); code != ResponseSuccess {
+		if allowToken, targets, code = c.choose(call, cfg); code != ResponseSuccess {
 			return sharedScreens{}, code
 		}
 	}
@@ -346,7 +401,7 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	if err != nil && restoring {
 		warnf("screencast: restored target unavailable, re-prompting: %v", err)
 		var code uint32
-		if allowToken, targets, code = c.pick(call, cfg); code != ResponseSuccess {
+		if allowToken, targets, code = c.choose(call, cfg); code != ResponseSuccess {
 			return sharedScreens{}, code
 		}
 		streams, err = c.begin(s, targets, cfg.cursorMode)

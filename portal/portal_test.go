@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-ui/gtksettings"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // rig is a backend serving on a private bus, with a client connection
@@ -37,6 +38,7 @@ func newRig(t *testing.T, edit func(*Backend)) *rig {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv(lyswm.SocketEnv, "")
 	if os.Getenv("XDG_DATA_HOME") == processDataHome {
 		t.Setenv("XDG_DATA_HOME", t.TempDir())
 	}

@@ -74,12 +74,17 @@ type fakeStarts struct {
 	// slowOutputs delays the layout query, as a compositor round trip
 	// does.
 	slowOutputs dbustest.Var[time.Duration]
+	// layout replaces the two outputs when set.
+	layout dbustest.Var[[]outputGeometry]
 }
 
 func (f *fakeStarts) outputs() ([]outputGeometry, error) {
 	time.Sleep(f.slowOutputs.Load())
 	if f.noOutputs.Load() {
 		return nil, errors.New("no compositor")
+	}
+	if layout := f.layout.Load(); layout != nil {
+		return layout, nil
 	}
 	return []outputGeometry{
 		{name: "DP-1", x: 0, y: 0, width: 1280, height: 720},
