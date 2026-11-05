@@ -51,6 +51,7 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 		Sheet:         theme.Sheet,
 		SheetPriority: apptheme.Priority,
 		Outputs:       outputs,
+		WatchFiles:    application.WatchFiles,
 		MonitorWidth: func() int {
 			if outs := outputs(); len(outs) > 0 {
 				return int(outs[0].LogicalW)
