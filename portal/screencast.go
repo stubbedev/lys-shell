@@ -5,10 +5,12 @@ import (
 	"slices"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -49,6 +51,8 @@ type screenCast struct {
 	// focused is the focused output's connector (lys-wm's; a fake in
 	// tests).
 	focused func() (string, error)
+	// windows are lys-wm's windows.
+	windows func() ([]lyswm.Window, error)
 }
 
 // startedStream is a running stream and what Start reported of it;
@@ -62,7 +66,7 @@ type startedStream struct {
 }
 
 func newScreenCast(conn *dbus.Conn, s *sessions, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
-	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput}
+	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows}
 }
 
 // lysWMFocusedOutput is the output lys-wm says is focused.
@@ -80,12 +84,75 @@ func lysWMFocusedOutput() (string, error) {
 }
 
 // choose is the session's sources: the one output a request for a
-// single monitor can only mean, or else what the share picker replies.
+// single monitor can only mean, the window a click picks, or else what
+// the share picker replies.
 func (c *screenCast) choose(call *call, cfg castState) (token bool, targets []sharepicker.Target, code uint32) {
 	if t, ok := c.onlyMonitor(cfg); ok {
 		return false, []sharepicker.Target{t}, ResponseSuccess
 	}
+	if targets, code, ok := c.clickWindow(call, cfg); ok {
+		return false, targets, code
+	}
 	return c.pick(call, cfg)
+}
+
+// clickWindow lets a click pick the window a request for one window
+// shares, over the windows lys-wm shows, front to back by its stacking
+// order; where the request takes a monitor too, Enter shares the
+// focused output. It is not ok, so the picker asks, without lys-wm, a
+// shown window or the shell's overlay, and when Escape gives up.
+func (c *screenCast) clickWindow(call *call, cfg castState) ([]sharepicker.Target, uint32, bool) {
+	if cfg.types&sourceWindow == 0 || cfg.multiple {
+		return nil, 0, false
+	}
+	all, err := c.windows()
+	if err != nil {
+		if !errors.Is(err, lyswm.ErrNotRunning) {
+			warnf("screencast: no lys-wm windows, so the picker asks: %v", err)
+		}
+		return nil, 0, false
+	}
+	var req sharepicker.WindowRequest
+	for _, w := range lyswm.Stacked(all) {
+		req.Windows = append(req.Windows, regionoverlay.Window{
+			ID: lyswm.ToplevelIdentifier(w.ID), Output: w.Output,
+			X: intconv.Clamp[int32](w.Rect.X), Y: intconv.Clamp[int32](w.Rect.Y),
+			Width: intconv.Clamp[int32](w.Rect.Width), Height: intconv.Clamp[int32](w.Rect.Height),
+		})
+	}
+	if len(req.Windows) == 0 {
+		return nil, 0, false
+	}
+	if cfg.types&sourceMonitor != 0 {
+		if name, err := c.focused(); err == nil {
+			req.Screen = name
+		}
+	}
+	reply, err := sharepicker.NewClient(c.conn).PickWindow(call.ctx, call.caller, req)
+	switch {
+	case call.closed():
+		return nil, ResponseCancelled, true
+	case err != nil:
+		warnf("screencast: no click-to-pick, so the picker asks: %v", err)
+		return nil, 0, false
+	case reply == "":
+		return nil, 0, false
+	}
+	_, targets, ok := sharepicker.ParseReply(reply)
+	if !ok || len(targets) != 1 || !offered(targets[0], req) {
+		warnf("screencast: the click-to-pick replied %q for what it was offered", reply)
+		return nil, ResponseOther, true
+	}
+	return targets, ResponseSuccess, true
+}
+
+// offered reports whether a click-to-pick request offered t: one of its
+// windows, or its screen.
+func offered(t sharepicker.Target, req sharepicker.WindowRequest) bool {
+	if t.Kind == sharepicker.TargetOutput {
+		return req.Screen != "" && t.Name == req.Screen
+	}
+	return t.Kind == sharepicker.TargetWindow && slices.ContainsFunc(req.Windows, func(w regionoverlay.Window) bool { return w.ID == t.Name })
 }
 
 // onlyMonitor is the output a request for one monitor shares without

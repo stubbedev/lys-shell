@@ -20,6 +20,10 @@ type fakeSharePicker struct {
 	gate
 	reply dbustest.Var[string]
 	asked dbustest.Var[[]any]
+	// windowAsked are the click-to-pick requests; click is where the
+	// user clicks in them, nil for Escape.
+	windowAsked dbustest.Var[[]sharepicker.WindowRequest]
+	click       dbustest.Var[*windowClick]
 }
 
 func (f *fakeSharePicker) Pick(c portaldialogs.Caller, r sharepicker.Request) (string, *dbus.Error) {

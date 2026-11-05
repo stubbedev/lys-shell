@@ -64,7 +64,7 @@ func TestWithoutLysWMSeveralOutputsStillAskThePicker(t *testing.T) {
 	}
 }
 
-func TestWindowsAndSeveralSourcesStillAskThePickerOnLysWM(t *testing.T) {
+func TestSeveralSourcesOrNoShownWindowStillAskThePickerOnLysWM(t *testing.T) {
 	for name, options := range map[string]Vardict{
 		"a window":         {"types": dbus.MakeVariant(sourceWindow)},
 		"a window or more": {"types": dbus.MakeVariant(sourceMonitor | sourceWindow)},

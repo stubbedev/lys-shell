@@ -2,6 +2,8 @@ package portal
 
 import (
 	"errors"
+	"image"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +12,12 @@ import (
 	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/fourcc"
 	"github.com/stubbedev/lys-lib/pipewire"
+	"github.com/stubbedev/lys-lib/portaldialogs"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 // fakeSession is a window's capture session whose copies the test
@@ -510,4 +518,215 @@ func TestWindowSourceWakesTheProducerWhenACopyEnds(t *testing.T) {
 	sess.land(t, src, nil)
 	<-woken
 	a.Release()
+}
+
+// windowClick is what the user does in the click-to-pick overlay: a
+// click at a global point on an output, Enter, or a reply of its own.
+type windowClick struct {
+	output string
+	at     image.Point
+	enter  bool
+	reply  string
+}
+
+// PickWindow answers as the shell's overlay does: a click picks the
+// front window there, Enter the offered screen, no click is Escape.
+func (f *fakeSharePicker) PickWindow(c portaldialogs.Caller, r sharepicker.WindowRequest) (string, *dbus.Error) {
+	f.windowAsked.Update(func(a []sharepicker.WindowRequest) []sharepicker.WindowRequest { return append(a, r) })
+	if f.enter(c) {
+		return "", nil
+	}
+	click := f.click.Load()
+	switch {
+	case click == nil:
+		return "", nil
+	case click.reply != "":
+		return click.reply, nil
+	case click.enter:
+		return "/screen:" + r.Screen, nil
+	}
+	w, ok := regionoverlay.WindowAt(r.Windows, click.output, click.at)
+	if !ok {
+		return "", nil
+	}
+	return "/window:" + w.ID, nil
+}
+
+// stackedWindows has lys-wm show a full-screen-sized window 3 behind a
+// smaller 7 on DP-1, a window 9 no output shows over both, and 5 alone
+// on DP-2.
+const stackedWindows = `[{"id":9,"output":"DP-1","rect":{"x":40,"y":40,"width":100,"height":100}},` +
+	`{"id":3,"output":"DP-1","rect":{"x":0,"y":0,"width":1280,"height":720},"stack":1},` +
+	`{"id":7,"output":"DP-1","rect":{"x":100,"y":100,"width":400,"height":300},"stack":0},` +
+	`{"id":5,"output":"DP-2","rect":{"x":1280,"y":0,"width":1920,"height":1080},"stack":0}]`
+
+// windowRig is a cast rig on a lys-wm showing stackedWindows, with
+// DP-2 focused, and the share picker replying grid.
+func windowRig(t *testing.T, grid string) (*rig, *fakeStarts, *fakeSharePicker) {
+	t.Helper()
+	r, f := castRig(t)
+	wm := lyswmtest.Start(t)
+	wm.Result("outputs", twoOutputsDP2Focused)
+	wm.Result("windows", stackedWindows)
+	return r, f, serveSharePicker(t, r, grid)
+}
+
+func windowIDs(r sharepicker.WindowRequest) []string {
+	ids := make([]string, len(r.Windows))
+	for i, w := range r.Windows {
+		ids[i] = w.ID
+	}
+	return ids
+}
+
+func TestAWindowRequestOnLysWMSharesTheFrontWindowAClickPicks(t *testing.T) {
+	r, f, p := windowRig(t, "/window:lys-wm-3")
+	p.click.Store(&windowClick{output: "DP-1", at: image.Pt(200, 200)})
+	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow), "persist_mode": dbus.MakeVariant(uint32(2))})
+	code, res := r.castStart(t)
+	if code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if got := f.started.Load(); !slices.Equal(got, []string{"window:lys-wm-7"}) {
+		t.Errorf("started %v, want the front window 7 under the click", got)
+	}
+	asked := p.windowAsked.Load()
+	if len(asked) != 1 {
+		t.Fatalf("the overlay was asked %d times, want once", len(asked))
+	}
+	if got, want := windowIDs(asked[0]), []string{"lys-wm-7", "lys-wm-5", "lys-wm-3"}; !slices.Equal(got, want) {
+		t.Errorf("the overlay was offered %v, want the shown windows front to back %v", got, want)
+	}
+	if got, want := asked[0].Windows[0], (regionoverlay.Window{ID: "lys-wm-7", Output: "DP-1", X: 100, Y: 100, Width: 400, Height: 300}); got != want {
+		t.Errorf("window 7 offered as %+v, want %+v", got, want)
+	}
+	if asked[0].Screen != "" {
+		t.Errorf("a window request offered the screen %q", asked[0].Screen)
+	}
+	if len(p.asked.Load()) != 0 {
+		t.Error("the picker asked after the click")
+	}
+	if _, ok := res["restore_data"]; ok {
+		t.Error("a click granted a restore token")
+	}
+}
+
+func TestAClickBesideTheFrontWindowSharesTheOneBehindNotAHiddenOne(t *testing.T) {
+	r, f, p := windowRig(t, "")
+	p.click.Store(&windowClick{output: "DP-1", at: image.Pt(50, 50)})
+	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if got := f.started.Load(); !slices.Equal(got, []string{"window:lys-wm-3"}) {
+		t.Errorf("started %v, want window 3, not the unshown 9 over it", got)
+	}
+}
+
+func TestEscapeInTheClickToPickFallsBackToThePicker(t *testing.T) {
+	r, f, p := windowRig(t, "/window:lys-wm-5")
+	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if len(p.windowAsked.Load()) != 1 || len(p.asked.Load()) != 1 {
+		t.Errorf("the overlay was asked %d times and the picker %d, want once each", len(p.windowAsked.Load()), len(p.asked.Load()))
+	}
+	if got := f.started.Load(); !slices.Equal(got, []string{"window:lys-wm-5"}) {
+		t.Errorf("started %v, want the picker's choice", got)
+	}
+}
+
+func TestAWindowOrMonitorRequestSharesTheFocusedOutputOnEnter(t *testing.T) {
+	r, f, p := windowRig(t, "")
+	p.click.Store(&windowClick{enter: true})
+	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceMonitor | sourceWindow)})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if asked := p.windowAsked.Load(); len(asked) != 1 || asked[0].Screen != "DP-2" {
+		t.Fatalf("the overlay was asked %+v, want the focused DP-2 offered", asked)
+	}
+	if got := f.started.Load(); !slices.Equal(got, []string{"screen:DP-2"}) {
+		t.Errorf("started %v, want the focused output", got)
+	}
+}
+
+func TestAClickToPickReplyNotOfferedFailsTheRequest(t *testing.T) {
+	for _, reply := range []string{"/window:lys-wm-9", "/screen:DP-2", "/window:lys-wm-7;window:lys-wm-3", "garbage"} {
+		t.Run(reply, func(t *testing.T) {
+			r, f, p := windowRig(t, "/window:lys-wm-3")
+			p.click.Store(&windowClick{reply: reply})
+			r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
+			if code, _ := r.castStart(t); code != ResponseOther {
+				t.Errorf("Start = %d, want other", code)
+			}
+			if got := f.started.Load(); len(got) != 0 || len(p.asked.Load()) != 0 {
+				t.Errorf("started %v after %d picker calls, want nothing", got, len(p.asked.Load()))
+			}
+		})
+	}
+}
+
+func TestWindowRequestsTheClickToPickCannotServeAskThePicker(t *testing.T) {
+	for name, tc := range map[string]struct {
+		lysWM   bool
+		windows string
+		options Vardict
+	}{
+		"without lys-wm":     {options: Vardict{"types": dbus.MakeVariant(sourceWindow)}},
+		"with no window":     {lysWM: true, windows: `[{"id":9,"output":"DP-1","rect":{"x":0,"y":0,"width":9,"height":9}}]`, options: Vardict{"types": dbus.MakeVariant(sourceWindow)}},
+		"for several":        {lysWM: true, windows: stackedWindows, options: Vardict{"types": dbus.MakeVariant(sourceWindow), "multiple": dbus.MakeVariant(true)}},
+		"for a monitor only": {lysWM: true, windows: stackedWindows, options: Vardict{"multiple": dbus.MakeVariant(true)}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, _ := castRig(t)
+			if tc.lysWM {
+				wm := lyswmtest.Start(t)
+				wm.Result("outputs", twoOutputsDP2Focused)
+				wm.Result("windows", tc.windows)
+			}
+			p := serveSharePicker(t, r, "/window:lys-wm-3")
+			p.click.Store(&windowClick{output: "DP-1", at: image.Pt(200, 200)})
+			r.castSession(t, tc.options)
+			if code, _ := r.castStart(t); code != ResponseSuccess && code != ResponseOther {
+				t.Fatalf("Start = %d", code)
+			}
+			if asked := p.windowAsked.Load(); len(asked) != 0 {
+				t.Errorf("the overlay was asked %+v", asked)
+			}
+			if len(p.asked.Load()) != 1 {
+				t.Errorf("the picker was asked %d times, want once", len(p.asked.Load()))
+			}
+		})
+	}
+}
+
+func TestClosingTheRequestDuringTheClickToPickCancelsIt(t *testing.T) {
+	r, f, p := windowRig(t, "/window:lys-wm-3")
+	p.hold.Store(true)
+	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
+	done := make(chan uint32, 1)
+	go func() {
+		code, _ := r.castStart(t)
+		done <- code
+	}()
+	p.waitOpen(t, handle)
+	if err := r.client.Object(BusName, handle).Call(RequestIface+".Close", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case code := <-done:
+		if code != ResponseCancelled {
+			t.Errorf("Start = %d after Close, want cancelled", code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Close did not end the click-to-pick")
+	}
+	if got := p.dismissed.Load(); !slices.Equal(got, []string{string(handle)}) {
+		t.Errorf("dismissed %v, want the request's handle", got)
+	}
+	if len(p.asked.Load()) != 0 || len(f.started.Load()) != 0 {
+		t.Error("a closed request went on to the picker or a stream")
+	}
 }
