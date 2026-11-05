@@ -5,7 +5,7 @@
   background: transparent;
 }
 .lock-window .lock-bg-scrim {
-  background: rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.32);
 }
 
 .lock-window .lock-stack {
@@ -23,28 +23,23 @@
   opacity: 0.8;
 }
 
-.lock-window .lock-center,
-.lock-window .lock-power {
-  background-color: color-mix(in srgb, var(--palette-surface) 26%, transparent);
-  background-image: -lys-grain(0.04);
-  backdrop-filter: -lys-refract(18px 10px) blur(22px) saturate(1.7);
-}
 .lock-window .lock-center {
-  border-radius: calc(28px * var(--global-scale));
   -lys-layout-motion: smooth;
 }
+.lock-window .lock-center label {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
 .lock-window .lock-center entry {
-  background-color: color-mix(in srgb, var(--palette-fg) 8%, transparent);
-  border-radius: var(--radius-full);
-  box-shadow: none;
-  transition: background-color var(--duration-fast), box-shadow var(--duration-fast);
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--palette-fg) 40%, transparent);
+  transition: box-shadow var(--duration-fast);
 }
 .lock-window .lock-center entry:hover {
-  background-color: color-mix(in srgb, var(--palette-fg) 12%, transparent);
+  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--palette-fg) 60%, transparent);
 }
 .lock-window .lock-center entry:focus {
-  background-color: color-mix(in srgb, var(--palette-fg) 14%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-fg) 30%, transparent);
+  box-shadow: inset 0 -2px 0 0 var(--palette-fg);
 }
 .lock-window .lock-session > button {
   background-color: transparent;
@@ -61,12 +56,10 @@
   transition: background-color var(--duration-fast);
 }
 .lock-window .lock-users .lock-user-button.selected {
-  background: color-mix(in srgb, var(--palette-fg) 10%, transparent);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-fg) 45%, transparent);
 }
 
-.lock-window .lock-power {
-  border-radius: var(--radius-full);
-}
 .lock-window .lock-power .lock-power-button {
   color: var(--palette-fg-muted);
   border-radius: var(--radius-full);
