@@ -1,7 +1,9 @@
 greeter-username = Username
+greeter-password = Enter Password
 greeter-enter-username = Enter a username
 greeter-shutdown = Shut down
 greeter-restart = Restart
+greeter-sleep = Sleep
 greeter-custom-session = Custom
 greeter-caps-lock = Caps Lock is on
 greeter-greetd-unavailable = greetd unavailable: { $error }

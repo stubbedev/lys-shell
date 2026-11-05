@@ -20,8 +20,10 @@ const (
 	Title
 	// Display is a large readout: a percentage, a temperature, a PIN.
 	Display
-	// Hero is a full-screen readout: the lock and dropdown clocks.
+	// Hero is a prominent readout: the dropdown clock.
 	Hero
+	// Poster is a readout read from across the room: the lock screen clock.
+	Poster
 )
 
 // textRoles is the scale: each role's token name and its ratio of body.
@@ -35,6 +37,7 @@ var textRoles = [...]struct {
 	Title:    {"title", 1.375},
 	Display:  {"display", 2.25},
 	Hero:     {"hero", 4},
+	Poster:   {"poster", 7},
 }
 
 // TextRoles is every role, smallest first.

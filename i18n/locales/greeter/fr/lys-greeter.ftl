@@ -1,7 +1,9 @@
 greeter-username = Nom d'utilisateur
+greeter-password = Saisir le mot de passe
 greeter-enter-username = Saisissez un nom d'utilisateur
 greeter-shutdown = Éteindre
 greeter-restart = Redémarrer
+greeter-sleep = Suspendre
 greeter-custom-session = Personnalisée
 greeter-caps-lock = Verr. Maj activé
 greeter-greetd-unavailable = greetd indisponible : { $error }

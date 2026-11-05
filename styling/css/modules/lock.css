@@ -5,69 +5,102 @@
   background: transparent;
 }
 .lock-window .lock-bg-scrim {
-  background: rgba(0, 0, 0, 0.32);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.04) 45%, rgba(0, 0, 0, 0.3));
 }
 
 .lock-window .lock-stack {
+  padding: calc(48px * var(--global-scale)) calc(16px * var(--global-scale)) calc(64px * var(--global-scale));
   -lys-layout-motion: smooth;
-}
-.lock-window .lock-time {
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
-}
-.lock-window .lock-clock {
-  color: var(--palette-fg);
-  font-weight: 300;
-}
-.lock-window .lock-date {
-  color: var(--palette-fg);
-  opacity: 0.8;
 }
 
-.lock-window .lock-center {
+.lock-window .lock-time {
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.28);
+}
+.lock-window .lock-date {
+  color: color-mix(in srgb, var(--palette-fg) 92%, transparent);
+  font-weight: 600;
+}
+.lock-window .lock-clock {
+  color: color-mix(in srgb, var(--palette-fg) 88%, transparent);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.lock-window .lock-credentials {
   -lys-layout-motion: smooth;
 }
-.lock-window .lock-center label {
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+.lock-window .lock-credentials label {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
 }
-.lock-window .lock-center entry {
-  background-color: transparent;
-  border-radius: 0;
-  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--palette-fg) 40%, transparent);
-  transition: box-shadow var(--duration-fast);
+
+.lock-window .lock-avatar {
+  background-color: color-mix(in srgb, var(--palette-fg) 30%, transparent);
+  color: var(--palette-fg);
 }
-.lock-window .lock-center entry:hover {
-  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--palette-fg) 60%, transparent);
+.lock-window .lock-account-name {
+  color: var(--palette-fg);
+  font-weight: 600;
 }
-.lock-window .lock-center entry:focus {
-  box-shadow: inset 0 -2px 0 0 var(--palette-fg);
+
+.lock-window .lock-users .lock-user-button {
+  background: transparent;
+  opacity: 0.6;
+  transition: opacity var(--duration-fast);
 }
+.lock-window .lock-users .lock-user-button:hover {
+  background: transparent;
+  opacity: 0.85;
+}
+.lock-window .lock-users .lock-user-button.selected {
+  opacity: 1;
+}
+
+.lock-window .lock-credentials entry,
+.lock-window .lock-power .lock-power-button {
+  background-color: color-mix(in srgb, var(--palette-fg) 16%, transparent);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-fg) 12%, transparent);
+  transition: background-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+.lock-window .lock-credentials entry {
+  color: var(--palette-fg);
+  border-radius: var(--radius-full);
+}
+.lock-window .lock-credentials entry::placeholder {
+  color: color-mix(in srgb, var(--palette-fg) 62%, transparent);
+}
+.lock-window .lock-credentials entry:hover {
+  background-color: color-mix(in srgb, var(--palette-fg) 20%, transparent);
+}
+.lock-window .lock-credentials entry:focus {
+  background-color: color-mix(in srgb, var(--palette-fg) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-fg) 24%, transparent);
+}
+
 .lock-window .lock-session > button {
   background-color: transparent;
+  color: color-mix(in srgb, var(--palette-fg) 85%, transparent);
   border-radius: var(--radius-full);
   box-shadow: none;
   transition: background-color var(--duration-fast);
 }
 .lock-window .lock-session > button:hover {
-  background-color: color-mix(in srgb, var(--palette-fg) 8%, transparent);
+  background-color: color-mix(in srgb, var(--palette-fg) 12%, transparent);
 }
 
-.lock-window .lock-users .lock-user-button {
-  border-radius: calc(20px * var(--global-scale));
-  transition: background-color var(--duration-fast);
+.lock-window .lock-power {
+  margin-top: calc(16px * var(--global-scale));
 }
-.lock-window .lock-users .lock-user-button.selected {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-fg) 45%, transparent);
-}
-
 .lock-window .lock-power .lock-power-button {
-  color: var(--palette-fg-muted);
+  color: var(--palette-fg);
   border-radius: var(--radius-full);
-  transition: color var(--duration-fast), background-color var(--duration-fast);
 }
 .lock-window .lock-power .lock-power-button:hover {
-  color: var(--palette-fg);
-  background: color-mix(in srgb, var(--palette-fg) 12%, transparent);
+  background-color: color-mix(in srgb, var(--palette-fg) 26%, transparent);
+}
+.lock-window .lock-power .lock-power-name {
+  color: color-mix(in srgb, var(--palette-fg) 85%, transparent);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
 }
 
 .lock-window .lock-scrim {
