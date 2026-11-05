@@ -451,3 +451,45 @@ func TestWatchSurvivesAnEventWithAWindowObject(t *testing.T) {
 		t.Errorf("the layout reads %q", got.Name)
 	}
 }
+
+func TestWindowsReadTheirStackingOrder(t *testing.T) {
+	f := lyswmtest.Start(t)
+	f.Result("windows", `[{"id":1,"output":"DP-1","stack":2},{"id":2,"output":"DP-1"},{"id":3,"output":"DP-2","stack":0},{"id":4,"output":"DP-1","stack":0},{"id":5,"output":"DP-1","stack":null}]`)
+	windows, err := lyswm.Windows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if windows[0].Stack == nil || *windows[0].Stack != 2 {
+		t.Errorf("window 1 stack = %v, want 2", windows[0].Stack)
+	}
+	if windows[1].Stack != nil || windows[4].Stack != nil {
+		t.Error("a window no output shows read a stack index")
+	}
+	var ids []uint64
+	for _, w := range lyswm.Stacked(windows) {
+		ids = append(ids, w.ID)
+	}
+	if want := []uint64{3, 4, 1}; !slices.Equal(ids, want) {
+		t.Errorf("stacked %v, want %v: the shown ones front to back, oldest first on a tie", ids, want)
+	}
+	if len(windows) != 5 {
+		t.Errorf("Stacked changed the list it was given: %d windows", len(windows))
+	}
+}
+
+func TestWatchTicksOnStackEvents(t *testing.T) {
+	f := lyswmtest.Start(t)
+	w, err := lyswm.Watch(lyswm.EventStack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	f.Events <- `{"event":"focus","window":3}`
+	select {
+	case <-w.Ticks():
+		t.Fatal("ticked on an event it does not follow")
+	case <-time.After(200 * time.Millisecond):
+	}
+	f.Events <- `{"event":"stack","window":3,"stack":null}`
+	awaitTick(t, w)
+}

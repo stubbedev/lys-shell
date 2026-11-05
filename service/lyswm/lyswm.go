@@ -74,6 +74,9 @@ type Window struct {
 	Minimized  bool   `json:"minimized"`
 	Urgent     bool   `json:"urgent"`
 	Focused    bool   `json:"focused"`
+	// Stack is the window's front-to-back index among the windows its
+	// output shows, 0 on top; nil while no output shows it.
+	Stack *int `json:"stack,omitempty"`
 }
 
 // Layout is the active keyboard layout group.
@@ -186,6 +189,14 @@ func Windows() ([]Window, error) {
 	return out, call(request{Request: "windows"}, &out)
 }
 
+// Stacked is the windows an output shows, front to back on each: those
+// with a stack index, by it.
+func Stacked(windows []Window) []Window {
+	shown := slices.DeleteFunc(slices.Clone(windows), func(w Window) bool { return w.Stack == nil })
+	slices.SortStableFunc(shown, func(a, b Window) int { return *a.Stack - *b.Stack })
+	return shown
+}
+
 // ToplevelIdentifier is the ext-foreign-toplevel-list identifier lys-wm
 // gives the window with IPC id id.
 func ToplevelIdentifier(id uint64) string { return "lys-wm-" + strconv.FormatUint(id, 10) }
@@ -237,6 +248,7 @@ const (
 	EventUrgent        EventKind = "urgent"
 	EventMinimized     EventKind = "minimized"
 	EventUnresponsive  EventKind = "unresponsive"
+	EventStack         EventKind = "stack"
 	EventFocus         EventKind = "focus"
 	EventSubmap        EventKind = "submap"
 	EventLayout        EventKind = "layout"
