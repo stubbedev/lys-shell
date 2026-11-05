@@ -74,7 +74,8 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 			})
 		},
 	}}
-	s.picker = sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, gate, region)
+	windows := regionoverlay.NewWindowPick(application, gate, outputs, font, sheet)
+	s.picker = sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, gate, region, windows)
 	return s
 }
 

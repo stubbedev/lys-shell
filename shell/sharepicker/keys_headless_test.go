@@ -80,7 +80,7 @@ func headlessPicker(t *testing.T, a *app.Application, page config.SharePickerPag
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	cfg.SharePicker.DefaultPage = page
-	p = New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil)
+	p = New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil, nil)
 	shown := make(chan struct{})
 	p.presented = sync.OnceFunc(func() { close(shown) })
 	p.windows = func() []sharepreview.Toplevel { return fiveWindows }
@@ -213,7 +213,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	a := apptest.Run(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
-	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil)
+	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil, nil)
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	p.outputs = func() []outputInfo { return []outputInfo{{name: "HEADLESS-1", width: 1920, height: 1080, scale: 1}} }
 	t.Cleanup(func() { p.Dismiss("/r/headless") })

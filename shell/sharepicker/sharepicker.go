@@ -76,6 +76,14 @@ type Picker struct {
 	region interface {
 		Request(ctx context.Context, frames regionoverlay.Frames) (regionoverlay.Selection, bool, error)
 	}
+	// windowPick is the click-to-pick overlay PickWindow opens; nil
+	// answers every PickWindow as given up.
+	windowPick interface {
+		Request(ctx context.Context, windows []regionoverlay.Window, screen string) (regionoverlay.Picked, bool, error)
+	}
+	// picks ends the window pick open for each request handle.
+	picksMu sync.Mutex
+	picks   map[string]context.CancelFunc
 
 	// cfg, anims, and scale are the request's config snapshot
 	// (PickerConfig::from_config).
@@ -120,9 +128,14 @@ type Picker struct {
 }
 
 // New builds the picker on the application; region is the live region
-// overlay the Region page opens, on the shell's one capture gate.
-func New(a *app.Application, d Deps, gate *regionoverlay.Gate, region *regionoverlay.Overlay) *Picker {
-	return &Picker{app: a, d: d, gate: gate, region: region, invoke: a.Invoke}
+// overlay the Region page opens and windows the click-to-pick overlay
+// PickWindow opens (nil for none), on the shell's one capture gate.
+func New(a *app.Application, d Deps, gate *regionoverlay.Gate, region *regionoverlay.Overlay, windows *regionoverlay.WindowPick) *Picker {
+	p := &Picker{app: a, d: d, gate: gate, region: region, invoke: a.Invoke, picks: map[string]context.CancelFunc{}}
+	if windows != nil {
+		p.windowPick = windows
+	}
+	return p
 }
 
 // Pick shows the picker for one portal request and blocks until the
@@ -140,10 +153,47 @@ func (p *Picker) Pick(c portaldialogs.Caller, r Request) string {
 	return <-ch
 }
 
-// Dismiss cancels the request at handle: the picker showing for it,
-// with the region overlay it opened, is taken down; a waiting one never
-// shows. Another request's picker stays.
+// PickWindow opens the click-to-pick overlay for one portal request and
+// blocks until a click picks a window, replying /window:<id>, or Enter
+// shares the request's screen, replying /screen:<name>. Escape, a
+// dismissal, or an overlay that cannot open (another capture session
+// holds the gate) replies "". Call it from any goroutine but the loop's.
+func (p *Picker) PickWindow(c portaldialogs.Caller, r WindowRequest) string {
+	if p.windowPick == nil {
+		return ""
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.picksMu.Lock()
+	p.picks[c.Handle] = cancel
+	p.picksMu.Unlock()
+	defer func() {
+		p.picksMu.Lock()
+		delete(p.picks, c.Handle)
+		p.picksMu.Unlock()
+	}()
+	picked, ok, err := p.windowPick.Request(ctx, r.Windows, r.Screen)
+	switch {
+	case err != nil:
+		log.Printf("share picker: window pick: %v", err)
+		return ""
+	case !ok:
+		return ""
+	case picked.Window != "":
+		return "/" + Target{Kind: TargetWindow, Name: picked.Window}.Payload()
+	}
+	return "/" + Target{Kind: TargetOutput, Name: picked.Screen}.Payload()
+}
+
+// Dismiss cancels the request at handle: the window pick or the picker
+// showing for it, with the region overlay it opened, is taken down; a
+// waiting one never shows. Another request's picker stays.
 func (p *Picker) Dismiss(handle string) {
+	p.picksMu.Lock()
+	if cancel := p.picks[handle]; cancel != nil {
+		cancel()
+	}
+	p.picksMu.Unlock()
 	p.invoke(func() {
 		if !p.queue.Dismiss(handle) {
 			return

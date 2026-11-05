@@ -4,3 +4,6 @@ region-overlay-drag-adjust = Glisser pour ajuster
 region-overlay-confirm = Confirmer
 region-overlay-nudge = Décaler
 region-overlay-cancel = Annuler
+window-pick-click = Cliquer sur une fenêtre pour la partager
+window-pick-screen = Partager l'écran
+window-pick-picker = Afficher le sélecteur

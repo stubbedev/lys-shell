@@ -2,10 +2,13 @@ package sharepicker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
 // D-Bus identity (wayle-ipc's share_picker proxy).
@@ -36,9 +39,18 @@ type Request struct {
 	Multiple   bool
 }
 
+// WindowRequest is one click-to-pick, (a(ssiiii)s): the windows a click
+// can pick, front to back on each output, and the output Enter shares,
+// "" for none.
+type WindowRequest struct {
+	Windows []regionoverlay.Window
+	Screen  string
+}
+
 // picker is what the daemon serves: the Picker, or a fake in tests.
 type picker interface {
 	Pick(portaldialogs.Caller, Request) string
+	PickWindow(portaldialogs.Caller, WindowRequest) string
 	Dismiss(handle string)
 }
 
@@ -77,6 +89,17 @@ func (d *Daemon) Pick(c portaldialogs.Caller, r Request) (string, *dbus.Error) {
 	return d.picker.Pick(c, r), nil
 }
 
+// PickWindow opens the click-to-pick overlay and blocks until a click
+// picks a window, replying /window:<id>, or Enter shares the screen,
+// replying /screen:<name>; Escape replies an empty string, after which
+// the caller asks Pick. A request offering nothing to pick is refused.
+func (d *Daemon) PickWindow(c portaldialogs.Caller, r WindowRequest) (string, *dbus.Error) {
+	if len(r.Windows) == 0 {
+		return "", dbus.MakeFailedError(errors.New("share picker: no window to pick from"))
+	}
+	return d.picker.PickWindow(c, r), nil
+}
+
 // Dismiss cancels the picker showing for the request at handle.
 func (d *Daemon) Dismiss(handle string) *dbus.Error {
 	d.picker.Dismiss(handle)
@@ -98,6 +121,14 @@ func NewClient(conn *dbus.Conn) *Client {
 func (c *Client) Pick(ctx context.Context, caller portaldialogs.Caller, r Request) (string, error) {
 	var selection string
 	err := c.obj.CallWithContext(ctx, iface+".Pick", 0, caller, r).Store(&selection)
+	return selection, err
+}
+
+// PickWindow asks the shell for the click-to-pick overlay; see
+// Daemon.PickWindow.
+func (c *Client) PickWindow(ctx context.Context, caller portaldialogs.Caller, r WindowRequest) (string, error) {
+	var selection string
+	err := c.obj.CallWithContext(ctx, iface+".PickWindow", 0, caller, r).Store(&selection)
 	return selection, err
 }
 

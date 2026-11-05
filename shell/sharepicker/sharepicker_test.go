@@ -3,8 +3,10 @@ package sharepicker
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/capture"
@@ -309,6 +311,14 @@ func (f fakePicker) Pick(c portaldialogs.Caller, r Request) string {
 
 func (fakePicker) Dismiss(string) {}
 
+func (f fakePicker) PickWindow(c portaldialogs.Caller, r WindowRequest) string {
+	ids := make([]string, len(r.Windows))
+	for i, w := range r.Windows {
+		ids[i] = fmt.Sprintf("%s@%s:%d,%d,%d,%d", w.ID, w.Output, w.X, w.Y, w.Width, w.Height)
+	}
+	return f.reply + "|" + c.Handle + "|" + strings.Join(ids, ";") + "|" + r.Screen
+}
+
 func boolStr(b bool) string {
 	if b {
 		return "t"
@@ -332,6 +342,14 @@ func TestDaemonOverTheBus(t *testing.T) {
 	// A request offering nothing to pick is refused, not shown empty.
 	if got, err := NewClient(client).Pick(context.Background(), portaldialogs.Caller{Handle: "/r/2"}, Request{}); err == nil {
 		t.Fatalf("Pick with no sources = %q", got)
+	}
+	windows := WindowRequest{Windows: []regionoverlay.Window{{ID: "lys-wm-7", Output: "DP-1", X: 1, Y: 2, Width: 3, Height: 4}, {ID: "lys-wm-3", Output: "DP-2", X: -5, Width: 6, Height: 7}}, Screen: "DP-2"}
+	got, err = NewClient(client).PickWindow(context.Background(), portaldialogs.Caller{Handle: "/r/3"}, windows)
+	if want := "/screen:DP-1|/r/3|lys-wm-7@DP-1:1,2,3,4;lys-wm-3@DP-2:-5,0,6,7|DP-2"; err != nil || got != want {
+		t.Fatalf("PickWindow = %q %v, want %q", got, err, want)
+	}
+	if got, err := NewClient(client).PickWindow(context.Background(), portaldialogs.Caller{Handle: "/r/4"}, WindowRequest{Screen: "DP-1"}); err == nil {
+		t.Fatalf("PickWindow with no windows = %q", got)
 	}
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {
 		t.Fatal("a second daemon claimed the owned name")

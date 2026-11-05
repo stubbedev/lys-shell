@@ -183,23 +183,29 @@ func New(a *app.Application, gate *Gate, outputs func() []*app.Output, windows f
 func (o *Overlay) surfaceRoot(a *area) widget.Widget {
 	a.AddClass("region-overlay-area")
 	if o.font != nil {
-		a.selecting = o.legend(legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-drag-select"},
+		a.selecting = legend(o.font, legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-drag-select"},
 			legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-click-pick"},
 			legendItem{[]keyCap{{text: "Esc"}}, "region-overlay-cancel"})
-		a.adjust = o.legend(legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-drag-adjust"},
+		a.adjust = legend(o.font, legendItem{[]keyCap{{icon: "ld-mouse-symbolic"}}, "region-overlay-drag-adjust"},
 			legendItem{[]keyCap{{icon: "ld-corner-down-left-symbolic"}}, "region-overlay-confirm"},
 			legendItem{[]keyCap{{icon: "ld-arrow-left-right-symbolic"}, {icon: "ld-arrow-up-down-symbolic"}}, "region-overlay-nudge"},
 			legendItem{[]keyCap{{text: "Esc"}}, "region-overlay-cancel"})
 		a.legends = []widget.Widget{a.selecting, a.adjust}
 		a.syncLegend()
 	}
+	return overlayRoot(a, o.sheet)
+}
+
+// overlayRoot is a capture overlay surface's tree around its area,
+// window.region-overlay-window, on the stylesheet.
+func overlayRoot(area widget.Widget, sheet *widget.Stylesheet) widget.Widget {
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.SetElement("window")
 	root.AddClass("region-overlay-window")
-	if o.sheet != nil {
-		root.AttachStylesheet(o.sheet)
+	if sheet != nil {
+		root.AttachStylesheet(sheet)
 	}
-	root.Append(a, true)
+	root.Append(area, true)
 	return root
 }
 
@@ -349,7 +355,7 @@ type legendItem struct {
 }
 
 // legend is the row of keycaps and what each does.
-func (o *Overlay) legend(items ...legendItem) *widget.Box {
+func legend(font render.Font, items ...legendItem) *widget.Box {
 	th := widget.Current()
 	px := widgets.TextPx(styling.Body, 1)
 	box := widget.NewBox(widget.Row, th.Spacing*3, 0)
@@ -357,9 +363,9 @@ func (o *Overlay) legend(items ...legendItem) *widget.Box {
 	for _, it := range items {
 		entry := widget.NewBox(widget.Row, th.Spacing, 0)
 		for _, k := range it.keys {
-			entry.AppendAligned(o.keycap(k, px), false, widget.AlignCenter)
+			entry.AppendAligned(keycap(font, k, px), false, widget.AlignCenter)
 		}
-		label := widget.NewLabel(o.font, px, i18n.T(it.does), 0)
+		label := widget.NewLabel(font, px, i18n.T(it.does), 0)
 		label.AddClass("region-overlay-legend-text")
 		entry.AppendAligned(label, false, widget.AlignCenter)
 		box.AppendAligned(entry, false, widget.AlignCenter)
@@ -367,14 +373,14 @@ func (o *Overlay) legend(items ...legendItem) *widget.Box {
 	return box
 }
 
-func (o *Overlay) keycap(k keyCap, px float64) *widget.Box {
+func keycap(font render.Font, k keyCap, px float64) *widget.Box {
 	key := widget.NewBox(widget.Row, 0, 0)
 	key.AddClass("region-overlay-key")
 	if k.icon != "" {
 		key.AppendAligned(widget.NewThemeIconFallback(k.icon, keyIconPx), false, widget.AlignCenter)
 		return key
 	}
-	label := widget.NewLabel(o.font, px, k.text, 0)
+	label := widget.NewLabel(font, px, k.text, 0)
 	key.AppendAligned(label, false, widget.AlignCenter)
 	return key
 }
@@ -553,14 +559,21 @@ func around(outer, hole render.Rect) []render.Rect {
 // it, so it follows the palette.
 func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
 	accent := widget.CascadeColor(a)
-	cv.BorderRect(render.Rect{X: sel.X - borderWidth/2 - 1, Y: sel.Y - borderWidth/2 - 1, W: sel.W + borderWidth + 2, H: sel.H + borderWidth + 2}, 1, labelBacking)
-	cv.BorderRect(render.Rect{X: sel.X - borderWidth/2, Y: sel.Y - borderWidth/2, W: sel.W + borderWidth, H: sel.H + borderWidth}, borderWidth, accent)
+	strokeAccent(cv, sel, accent)
 	if a.o.font == nil {
 		return
 	}
 	p := a.pill(labelText(sel.W, sel.H))
 	bx, by := labelOrigin(sel, p.h)
 	p.paint(cv, bx, by, accent)
+}
+
+// strokeAccent strokes the accent border around r, 2px centered on its
+// edge like cairo's stroke, on the dark ring that keeps it readable on
+// any content.
+func strokeAccent(cv *render.Canvas, r render.Rect, accent render.Color) {
+	cv.BorderRect(render.Rect{X: r.X - borderWidth/2 - 1, Y: r.Y - borderWidth/2 - 1, W: r.W + borderWidth + 2, H: r.H + borderWidth + 2}, 1, labelBacking)
+	cv.BorderRect(render.Rect{X: r.X - borderWidth/2, Y: r.Y - borderWidth/2, W: r.W + borderWidth, H: r.H + borderWidth}, borderWidth, accent)
 }
 
 // pill is text shaped at the body size on a chip padded and rounded by
