@@ -1049,7 +1049,16 @@ func TestARowsFileIconPointingAtAFIFODrawsNothingAndDoesNotBlock(t *testing.T) {
 	if err := unix.Mkfifo(fifo, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	icon := rowIcon(engine.IconFile(fifo), 24, func(func()) { t.Error("a FIFO reached the loop as a ready icon") })
+	posted := make(chan func(), 4)
+	icon := rowIcon(engine.IconFile(fifo), 24, func(fn func()) { posted <- fn })
+	for quiet := false; !quiet; {
+		select {
+		case fn := <-posted:
+			fn()
+		case <-time.After(200 * time.Millisecond):
+			quiet = true
+		}
+	}
 	if ink := treetest.Ink(icon); ink != 0 {
 		t.Errorf("the row drew %d pixels for a file that is not one", ink)
 	}

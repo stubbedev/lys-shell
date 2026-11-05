@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -20,22 +21,47 @@ func paintOnce(t *testing.T, icon *widget.Icon) {
 	icon.Paint(render.New(data, render.Stride(px), px, px))
 }
 
-func TestAFIFOKeepsTheFallbackAndThePaintFinishes(t *testing.T) {
-	fifo := filepath.Join(t.TempDir(), "icon.png")
+func runPosted(t *testing.T, path string) (icon *widget.Icon, shown bool) {
+	t.Helper()
+	posted := make(chan func(), 4)
+	icon = NewAsyncFileIcon(path, "ld-file-symbolic", 32, func(fn func()) { posted <- fn }, func() { shown = true })
+	paintOnce(t, icon)
+	if got := icon.Name(); got != "ld-file-symbolic" {
+		t.Errorf("icon shows %q before its load, want the fallback", got)
+	}
+	for {
+		select {
+		case fn := <-posted:
+			fn()
+		case <-time.After(200 * time.Millisecond):
+			return icon, shown
+		}
+	}
+}
+
+func TestAFileThatPaintsNothingKeepsTheFallbackAndThePaintFinishes(t *testing.T) {
+	dir := t.TempDir()
+	fifo := filepath.Join(dir, "icon.png")
 	if err := unix.Mkfifo(fifo, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	posted := make(chan func(), 1)
-	icon := NewAsyncFileIcon(fifo, "ld-file-symbolic", 32, func(fn func()) { posted <- fn }, nil)
-	paintOnce(t, icon)
-	if got := icon.Name(); got != "ld-file-symbolic" {
-		t.Errorf("icon shows %q, want the fallback", got)
+	garbage := filepath.Join(dir, "garbage.png")
+	if err := os.WriteFile(garbage, []byte("not an image"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	select {
-	case fn := <-posted:
-		fn()
-		t.Errorf("a FIFO reached the loop as a ready icon: now %q", icon.Name())
-	case <-time.After(100 * time.Millisecond):
+	for name, path := range map[string]string{"a FIFO": fifo, "undecodable": garbage, "missing": filepath.Join(dir, "gone.png")} {
+		icon, shown := runPosted(t, path)
+		if shown || icon.Name() != "ld-file-symbolic" {
+			t.Errorf("%s: shown %v as %q, want the fallback kept", name, shown, icon.Name())
+		}
+	}
+}
+
+func TestADecodableFileReplacesTheFallback(t *testing.T) {
+	path := treetest.GreenSVG(t)
+	icon, shown := runPosted(t, path)
+	if !shown || icon.Name() != path {
+		t.Errorf("shown %v as %q, want the file", shown, icon.Name())
 	}
 }
 

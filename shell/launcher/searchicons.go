@@ -31,7 +31,7 @@ type iconLoader struct {
 
 func newIconLoader(ctx context.Context, invoke func(func()), ready func(iconRequest)) *iconLoader {
 	return &iconLoader{ctx: ctx, invoke: invoke, ready: ready, decode: func(r iconRequest) {
-		widget.PreloadThemeIcon(r.name, r.size, r.num, r.denom)
+		_ = widget.PreloadThemeIcon(r.name, r.size, r.num, r.denom)
 	}}
 }
 
