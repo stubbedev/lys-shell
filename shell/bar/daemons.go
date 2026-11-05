@@ -14,11 +14,11 @@ import (
 // drives (the Rust services' with_daemon registrations in
 // lys-shell/src/bootstrap). Each is optional, as in Rust: a service
 // that cannot start is logged and its CLI reports it as not running.
-// The returned release drops every name and the connection.
-func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		log.Printf("cli daemons: session bus: %v", err)
+// They share the shell's session connection; the returned release drops
+// every name.
+func serveCLIDaemons(conn *dbus.Conn, ctx ModuleContext, tray *sni.Host) func() {
+	if conn == nil {
+		log.Print("cli daemons: no session bus")
 		return func() {}
 	}
 	var releases []func()
@@ -47,6 +47,5 @@ func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
 		for _, release := range releases {
 			release()
 		}
-		_ = conn.Close()
 	}
 }

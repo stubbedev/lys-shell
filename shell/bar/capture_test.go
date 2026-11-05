@@ -17,11 +17,15 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
+	"github.com/stubbedev/lys-lib/render"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/swaytest"
 )
@@ -217,4 +221,14 @@ func TestHeadlessScreenshotCopyFailureReachesTheNotification(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("no notification")
 	}
+}
+
+func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, hypr *hyprland.Connection, clip *clipboard.Clipboard, sans render.Font, sheet *widget.Stylesheet) *captureServices {
+	s := newCaptureServices(application, outputs, current, hypr, clip, sans, sheet)
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		panic(err)
+	}
+	s.release = append(s.release, func() { _ = conn.Close() }, s.serve(conn))
+	return s
 }

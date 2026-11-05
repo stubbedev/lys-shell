@@ -32,13 +32,14 @@ const overlayLabelPx = 14
 // (bootstrap's screenshot and share picker service starts).
 type captureServices struct {
 	host    *screenshot.Host
+	picker  *sharepicker.Picker
 	release []func()
 }
 
-// startCapture builds the overlays and the host on the application and
-// serves the host on the session bus. A bus failure leaves the
-// in-process builtin working.
-func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, hypr *hyprland.Connection, clip *clipboard.Clipboard, sans render.Font, sheet *widget.Stylesheet) *captureServices {
+// newCaptureServices builds the overlays and the host on the application;
+// serve puts the host and the share picker on the session bus, and a bus
+// failure leaves the in-process builtin working.
+func newCaptureServices(application *app.Application, outputs func() []*app.Output, current func() *config.Config, hypr *hyprland.Connection, clip *clipboard.Clipboard, sans render.Font, sheet *widget.Stylesheet) *captureServices {
 	cfg := current()
 	var font render.Font
 	if face, err := app.FontWeighted(cfg.General.FontMono, overlayLabelPx, 700, false); err == nil {
@@ -73,24 +74,31 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 			})
 		},
 	}}
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		log.Printf("screenshot: session bus: %v", err)
-		return s
+	s.picker = sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, gate, region)
+	return s
+}
+
+func (s *captureServices) serve(conn *dbus.Conn) (stop func()) {
+	if conn == nil {
+		log.Print("screenshot: no session bus")
+		return func() {}
 	}
-	s.release = append(s.release, func() { _ = conn.Close() })
+	var releases []func()
 	if release, err := screenshot.NewDaemon(s.host).Export(conn); err == nil {
-		s.release = append(s.release, release)
+		releases = append(releases, release)
 	} else {
 		log.Printf("screenshot: daemon: %v", err)
 	}
-	picker := sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, gate, region)
-	if release, err := sharepicker.NewDaemon(picker).Export(conn); err == nil {
-		s.release = append(s.release, release)
+	if release, err := sharepicker.NewDaemon(s.picker).Export(conn); err == nil {
+		releases = append(releases, release)
 	} else {
 		log.Printf("share picker: daemon: %v", err)
 	}
-	return s
+	return func() {
+		for _, release := range slices.Backward(releases) {
+			release()
+		}
+	}
 }
 
 // trigger is the `lys-shell screenshot ...` builtin: a fire-and-forget

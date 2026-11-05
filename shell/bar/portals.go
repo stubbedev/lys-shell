@@ -46,20 +46,18 @@ func authSignal(e *portaldialogs.Emitter) func(string, portaldialogs.AuthAction)
 }
 
 // servePortalHosts hosts the shell's halves of the portal backend on
-// one session bus connection: dev.stubbe.lys.PortalDialogs1 (access,
+// the shell's session bus connection: dev.stubbe.lys.PortalDialogs1 (access,
 // account, app chooser, dynamic launcher and the wallpaper preview;
 // services/portal_dialogs), dev.stubbe.lys.FileChooser1 (services/
 // file_chooser) and dev.stubbe.lys.Print1 (services/print, spooling over
-// CUPS' IPP). A bus failure leaves the portal answering those requests
+// CUPS' IPP). Without a bus the portal answers those requests
 // "other". The returned stop ends the hosts once the loop has ended,
 // freeing what the file chooser still holds.
-func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet) (stop func()) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		log.Printf("portal hosts: session bus: %v", err)
+func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet) (stop func()) {
+	if conn == nil {
+		log.Print("portal hosts: no session bus")
 		return func() {}
 	}
-	exported := 0
 	home, _ := os.UserHomeDir()
 	viewFile := ""
 	if dir, ok := xdg.OS.StateDir(version.Name); ok {
@@ -85,8 +83,6 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)
-	} else {
-		exported++
 	}
 	dialogs := dialoghost.New(dialoghost.Deps{
 		Config:     current,
@@ -103,8 +99,6 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	})
 	if _, err := portaldialogs.NewDaemon(dialogs).Export(conn); err != nil {
 		log.Printf("portal dialogs: daemon: %v", err)
-	} else {
-		exported++
 	}
 	cups := ipp.NewClient(ipp.DefaultServer())
 	printer := printdialog.New(printdialog.Deps{
@@ -122,11 +116,6 @@ func servePortalHosts(application *app.Application, outputs func() []*app.Output
 	})
 	if _, err := printdialog.NewDaemon(printer).Export(conn); err != nil {
 		log.Printf("print: daemon: %v", err)
-	} else {
-		exported++
-	}
-	if exported == 0 {
-		_ = conn.Close()
 	}
 	return chooser.Close
 }

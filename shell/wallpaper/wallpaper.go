@@ -154,13 +154,12 @@ type OutputWatcher interface {
 	WatchOutputs(added, removed func(*app.Output)) (stop func())
 }
 
-// Launch is Start on the session bus, following hotplugged outputs
-// through watch. A failure is logged, runs firstFrame, and leaves the
-// shell without wallpapers (nil).
-func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, watch OutputWatcher, firstFrame func()) (*Shell, func()) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		log.Printf("wallpaper: cannot initialize wallpaper service: D-Bus connection failed: %v", err)
+// Launch is Start on the shell's session connection, following
+// hotplugged outputs through watch. A failure is logged, runs firstFrame,
+// and leaves the shell without wallpapers (nil).
+func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, watch OutputWatcher, firstFrame func()) (*Shell, func()) {
+	if conn == nil {
+		log.Print("wallpaper: cannot initialize wallpaper service: no session bus")
 		firstFrame()
 		return nil, func() {}
 	}

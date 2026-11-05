@@ -17,9 +17,9 @@ import (
 // bootstrap does whether or not a mail module is placed. Without a
 // session bus it still counts; it only cannot notify. The returned function
 // stops it.
-func startMail(ctx *ModuleContext) func() {
+func startMail(ctx *ModuleContext, conn *dbus.Conn) func() {
 	var notifier mail.Notifier
-	if conn, err := dbus.ConnectSessionBus(); err == nil {
+	if conn != nil {
 		notifier = mail.DesktopNotifier{Sender: desktopnotify.NewSender(conn)}
 	}
 	svc := mail.New(ctx.Config.Mail, mail.CLI{}, notifier)

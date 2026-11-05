@@ -134,7 +134,7 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	defer s.down.run()
 	s.releaseHold = application.Hold()
 	gate := newStartGate(s.mount)
-	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess, gate.done)
+	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, session, sess, gate.done)
 	defer stopWallpaper()
 	s.wall = wall
 	servicesUp := make(chan struct{})
@@ -174,6 +174,12 @@ type teardown []func()
 
 func (t *teardown) add(fn func()) { *t = append(*t, fn) }
 
+func (t *teardown) addAsync(start func() (stop func())) {
+	stopped := make(chan func(), 1)
+	go func() { stopped <- start() }()
+	t.add(func() { (<-stopped)() })
+}
+
 func (t *teardown) run() {
 	for _, fn := range slices.Backward(*t) {
 		fn()
@@ -191,6 +197,8 @@ type shellStart struct {
 	cfg         *config.Config
 	svc         *config.Service
 	session     *dbus.Conn
+	system      *dbus.Conn
+	rebuild     func(apply func(*ModuleContext))
 	// current is the live config snapshot the long-lived services read.
 	current *atomic.Pointer[config.Config]
 	// osdRef is the OSD once it exists; the recorder toasts through it.
@@ -227,6 +235,12 @@ func (s *shellStart) fail(err error) {
 }
 
 func (s *shellStart) startServices() {
+	if conn, err := dbus.ConnectSystemBus(); err == nil {
+		s.system = conn
+		s.down.add(func() { _ = conn.Close() })
+	} else {
+		log.Printf("bar: system bus: %v", err)
+	}
 	if detectCompositor() == compositorHyprland {
 		if conn, err := hyprland.Connect(); err != nil {
 			log.Printf("bar: Hyprland modules will not appear: %v", err)
@@ -276,13 +290,13 @@ func (s *shellStart) startServices() {
 	s.down.add(stopBitwarden)
 	s.ctx.Bitwarden = newBitwardenHost(bwLife, s.application, s.current.Load)
 	networkVault := s.ctx.Bitwarden.networkVault()
-	if svc, stop, err := startNetworkService(networkVault); err == nil {
+	if svc, stop, err := startNetworkService(s.system, networkVault); err == nil {
 		s.down.add(stop)
 		s.ctx.Networking = svc
 	} else {
 		log.Printf("network: %v", err)
 		s.lateStarts[network.BusName] = func() (func(*ModuleContext), func(), error) {
-			svc, stop, err := startNetworkService(networkVault)
+			svc, stop, err := startNetworkService(s.system, networkVault)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -317,8 +331,7 @@ func (s *shellStart) startServices() {
 	}
 	sniStore := sni.NewStore()
 	s.ctx.SNI = sniStore
-	if conn, err := dbus.ConnectSessionBus(); err == nil {
-		s.down.add(func() { _ = conn.Close() })
+	if conn := s.session; conn != nil {
 		if s.notifSvc != nil {
 			server, err := notifications.Serve(conn, s.notifSvc)
 			if err != nil {
@@ -360,7 +373,7 @@ func (s *shellStart) startServices() {
 			log.Printf("audio: daemon: %v", err)
 		}
 	}
-	s.down.add(startMail(&s.ctx))
+	s.down.add(startMail(&s.ctx, s.session))
 	sniHost, err := sni.NewHost(sniStore)
 	if err == nil {
 		s.down.add(func() { _ = sniHost.Close() })
@@ -368,12 +381,11 @@ func (s *shellStart) startServices() {
 	} else {
 		log.Printf("systray: host: %v", err)
 	}
-	s.down.add(serveCLIDaemons(s.ctx, sniHost))
+	s.down.add(serveCLIDaemons(s.session, s.ctx, sniHost))
 	s.customUpd = newCustomUpdates()
 	s.ctx.CustomUpdates = s.customUpd
 	s.ctx.Attachers = &[]interface{ Attach(app.Host) }{}
-	if conn, err := dbus.ConnectSessionBus(); err == nil {
-		s.down.add(func() { _ = conn.Close() })
+	if conn := s.session; conn != nil {
 		daemon := idleinhibit.NewDaemon(s.inhibitState)
 		if release, err := daemon.Export(conn); err == nil {
 			s.down.add(release)
@@ -381,6 +393,31 @@ func (s *shellStart) startServices() {
 			log.Printf("idle-inhibit: daemon: %v", err)
 		}
 	}
+	s.watchLateServices()
+}
+
+func (s *shellStart) watchLateServices() {
+	if s.system == nil {
+		log.Print("bar: no system bus; modules of services that start later will not appear")
+		return
+	}
+	late := &lateServices{}
+	s.down.add(late.stop)
+	lateCtx, stopLate := context.WithCancel(context.Background())
+	s.down.add(stopLate)
+	if err := late.watch(lateCtx, s.system, s.lateStarts, s.application.Invoke, s.lateAppeared); err != nil {
+		log.Printf("bar: %v; modules of services that start later will not appear", err)
+	}
+}
+
+func (s *shellStart) lateAppeared(apply func(*ModuleContext)) {
+	if s.rebuild == nil {
+		if apply != nil {
+			apply(&s.ctx)
+		}
+		return
+	}
+	s.rebuild(apply)
 }
 
 func (s *shellStart) mount() {
@@ -485,9 +522,13 @@ func (s *shellStart) mount() {
 		Font:    font,
 	}, cfg)
 	osdRef.Store(osdSrv)
-	captureSvc := startCapture(application, sess.Outputs, current.Load, baseCtx.Hyprland, baseCtx.Clipboard, font, theme.Sheet)
-	s.down.add(servePortalHosts(application, sess.Outputs, current.Load, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput, font, theme.Sheet))
+	captureSvc := newCaptureServices(application, sess.Outputs, current.Load, baseCtx.Hyprland, baseCtx.Clipboard, font, theme.Sheet)
 	s.down.add(captureSvc.close)
+	s.down.addAsync(func() func() { return captureSvc.serve(s.session) })
+	focused := screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput
+	s.down.addAsync(func() func() {
+		return servePortalHosts(s.session, application, sess.Outputs, current.Load, focused, font, theme.Sheet)
+	})
 	baseCtx.Screenshot = captureSvc.trigger
 	baseCtx.PickColor = func() {
 		captureSvc.pickColor(func(hex string) {
@@ -551,22 +592,11 @@ func (s *shellStart) mount() {
 	// A service that starts after the shell (or restarts) brings its
 	// modules back: its client starts if it could not before, and the
 	// bars rebuild around it.
-	if sysConn, err := dbus.ConnectSystemBus(); err != nil {
-		log.Printf("bar: system bus: %v; modules of services that start later will not appear", err)
-	} else {
-		s.down.add(func() { _ = sysConn.Close() })
-		late := &lateServices{}
-		s.down.add(late.stop)
-		lateCtx, stopLate := context.WithCancel(context.Background())
-		s.down.add(stopLate)
-		if err := late.watch(lateCtx, sysConn, s.lateStarts, application.Invoke, func(apply func(*ModuleContext)) {
-			if apply != nil {
-				apply(&rt.ctx)
-			}
-			restyle(current.Load())
-		}); err != nil {
-			log.Printf("bar: %v; modules of services that start later will not appear", err)
+	s.rebuild = func(apply func(*ModuleContext)) {
+		if apply != nil {
+			apply(&rt.ctx)
 		}
+		restyle(current.Load())
 	}
 	if svc != nil {
 		// A reload recompiles the stylesheet for the new snapshot,
@@ -655,12 +685,15 @@ func (s *shellStart) mount() {
 		}
 	}, func() { polls.setLocked(false) })
 	s.down.add(stopLock)
-	s.down.add(serveShellIPC(s.session, application, bars, func() bool {
-		locker.Lock()
-		return true
-	}, func(monitor string) error {
-		return toggleDashboardOnLoop(application, rt, monitor, screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput)
-	}))
+	connectors := bars.connectors()
+	s.down.addAsync(func() func() {
+		return serveShellIPC(s.session, application, bars, connectors, func() bool {
+			locker.Lock()
+			return true
+		}, func(monitor string) error {
+			return toggleDashboardOnLoop(application, rt, monitor, focused)
+		})
+	})
 	// The launcher surface serves `lys-shell launcher` sessions.
 	s.down.add(startLauncher(application, sess.Outputs, current.Load, func() ModuleContext { return rt.ctx }, theme, font))
 	// The widget socket carries out-of-process pushes (`lys-shell toast`).
