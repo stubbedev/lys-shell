@@ -79,6 +79,10 @@ type Deps struct {
 	Search func() search.Deps
 	// OpenFrecency opens what the search panel has learned.
 	OpenFrecency func() (*search.Frecency, error)
+	// WatchFiles calls fn on the UI loop when anything under paths changes
+	// (app.WatchFiles); the search panel's kept sources load again then.
+	// Nil loads them again in every session.
+	WatchFiles search.WatchFunc
 	// FireHook runs a -on-* hook (engine.FireHook; a test seam).
 	FireHook func(command string, ctx engine.HookContext)
 }
@@ -127,9 +131,14 @@ type Surface struct {
 	cur *active
 	// panel is the live search session; cur and panel never both live.
 	panel *panel
-	model matchModel
-	multi multiSelect
-	sel   int
+	// views are the search panel's, kept between panels.
+	views *panelViews
+	// sources are the search panel's, kept for the surface's lifetime.
+	sources      *search.Sources
+	openFrecency func() (*search.Frecency, error)
+	model        matchModel
+	multi        multiSelect
+	sel          int
 }
 
 // New builds the surface over its collaborators.
@@ -137,7 +146,9 @@ func New(d Deps) *Surface {
 	if d.FireHook == nil {
 		d.FireHook = engine.FireHook
 	}
-	return &Surface{d: d, sel: -1}
+	s := &Surface{d: d, sel: -1, sources: search.NewSources(d.WatchFiles, time.Now)}
+	s.openFrecency = s.sources.Frecency(func() (*search.Frecency, error) { return s.d.OpenFrecency() })
+	return s
 }
 
 // Open implements launcheripc.Handler: the session moves onto the loop.

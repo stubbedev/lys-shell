@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -34,6 +35,9 @@ type Deps struct {
 	// Toggles, Media and Capture read the rows of the shell's services; a
 	// nil one offers none.
 	Toggles, Media, Capture func(ctx context.Context) []Control
+	// Sources keeps the stable sources' rows between sessions; nil loads
+	// every source in every session.
+	Sources *Sources
 }
 
 // frecencyFileName and fileIndexFileName are the session's files, under
@@ -75,19 +79,37 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	}
 	add(config.SearchCalculator, func() Provider { return Calculator{} })
 	add(config.SearchShell, func() Provider { return NewShell(d.Env) })
-	add(config.SearchApps, func() Provider { return NewApps(d.Env, desktopentry.ApplicationDirs()) })
+	var keys []string
+	keep := func(key string, p Provider, spec keepSpec) Provider {
+		if d.Sources == nil {
+			return p
+		}
+		keys = append(keys, key)
+		return d.Sources.keep(key, p, spec)
+	}
+	add(config.SearchApps, func() Provider {
+		dirs := desktopentry.ApplicationDirs()
+		return keep("apps\x00"+strings.Join(dirs, "\x00"), NewApps(d.Env, dirs), keepSpec{paths: dirs, recursive: true})
+	})
 	add(config.SearchWindows, func() Provider { return NewWindows(d.Windows) })
 	add(config.SearchSystem, func() Provider { return NewSystem(d.Env, power) })
 	add(config.SearchLinks, func() Provider { return NewLinks(d.Env, cfg.Quicklinks, cfg.Snippets, cfg.Previews) })
-	add(config.SearchScripts, func() Provider { return NewScripts(d.Env, commandsDir(cfg.CommandsDir, home)) })
+	add(config.SearchScripts, func() Provider {
+		dir := commandsDir(cfg.CommandsDir, home)
+		return keep("scripts\x00"+dir, NewScripts(d.Env, dir), keepSpec{paths: []string{dir}})
+	})
 	if has(config.SearchSettings) && d.SettingsPages != nil {
-		root.Providers = append(root.Providers, NewSettings(d.Env, d.SettingsPages))
+		root.Providers = append(root.Providers, keep("settings", NewSettings(d.Env, d.SettingsPages), keepSpec{}))
 	}
-	add(config.SearchFiles, func() Provider { return NewFiles(d.Env, filesConfig(cfg, home)) })
+	add(config.SearchFiles, func() Provider {
+		fc := filesConfig(cfg, home)
+		key := fmt.Sprintf("files\x00%q\x00%q\x00%s\x00%s\x00%t", fc.Roots, fc.Exclude, fc.CachePath, fc.RecentPath, fc.Previews)
+		return keep(key, NewFiles(d.Env, fc), keepSpec{paths: []string{filepath.Dir(fc.RecentPath), filepath.Dir(fc.CachePath)}, maxAge: fileIndexMaxAge})
+	})
 	if has(config.SearchClipboard) && d.Clipboard != nil {
 		root.Providers = append(root.Providers, NewClipboard(d.Clipboard, cfg.Previews))
 	}
-	add(config.SearchEmoji, func() Provider { return NewEmoji(modes.AvailableEmoji) })
+	add(config.SearchEmoji, func() Provider { return keep("emoji", NewEmoji(modes.AvailableEmoji), keepSpec{}) })
 	for _, group := range []struct {
 		provider config.LauncherSearchProvider
 		load     func(ctx context.Context) []Control
@@ -125,6 +147,9 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 		root.Providers = append(root.Providers, pickers)
 	}
 	add(config.SearchWeb, func() Provider { return NewWeb(d.Env, cfg.WebEngine, cfg.WebURL) })
+	if d.Sources != nil {
+		d.Sources.retain(keys)
+	}
 	return root
 }
 

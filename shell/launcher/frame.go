@@ -525,6 +525,18 @@ func (m *panelMotion) snapSize(w, h int) {
 	m.sizeS.Snap(float64(w), float64(h))
 }
 
+// reset readies the motion for another surface: closed, nothing moving,
+// the size landed at w by h.
+func (m *panelMotion) reset(w, h int) {
+	m.stop()
+	m.done = nil
+	m.alive = true
+	m.compositorFade = true
+	m.revS.Snap(0)
+	m.reveal = 0
+	m.snapSize(w, h)
+}
+
 func (m *panelMotion) applyReveal() {
 	if !m.alive {
 		return

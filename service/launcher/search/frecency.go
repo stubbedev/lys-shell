@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/atomicfile"
@@ -44,9 +45,11 @@ type useRecord struct {
 // Frecency learns what gets picked: every use adds one to a count that
 // halves every two weeks, kept overall and for the query it was found
 // by, so "f" comes to mean Firefox for someone who keeps choosing it.
-// The file lives in the state directory and is replaced atomically. It
-// is used from one goroutine.
+// The file lives in the state directory and is replaced atomically. The
+// shell keeps one for its lifetime, so a session closing and the next
+// opening may use it at once.
 type Frecency struct {
+	mu      sync.Mutex
 	path    string
 	now     func() time.Time
 	entries map[string]*useRecord
@@ -109,6 +112,8 @@ func (f *Frecency) Record(key, query string) error {
 	if key == "" {
 		return nil
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	now := f.now().Unix()
 	r := f.entries[key]
 	if r == nil {
@@ -157,6 +162,8 @@ func (f *Frecency) prune(now int64) {
 
 // Forget drops key and saves.
 func (f *Frecency) Forget(key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if _, ok := f.entries[key]; !ok {
 		return nil
 	}
@@ -197,6 +204,8 @@ func boostOf(count float64) int {
 
 // Boost is the score key's history adds, overall.
 func (f *Frecency) Boost(key string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	r := f.entries[key]
 	if r == nil {
 		return 0
@@ -213,6 +222,8 @@ func (f *Frecency) QueryBoostsInto(into map[string]int, query string) bool {
 	if q == "" {
 		return false
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var now int64
 	found := false
 	for key, r := range f.entries {

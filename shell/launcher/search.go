@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
@@ -60,8 +61,6 @@ type panel struct {
 	actions     []search.Action
 	actionsFor  *search.Entry
 	actionCache map[*search.Entry][]search.Action
-	// hl is the query's copy for highlighting, on this goroutine.
-	hl engine.FuzzyQuery
 	// accept is an Enter pressed before the rows for the typed text
 	// arrived: it runs when they do, so typing fast and pressing Enter
 	// takes the row the text finds, not the row showing when the key
@@ -83,7 +82,7 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 	ctx, cancel := context.WithCancel(context.Background())
 	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, thumbs: engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher))}
 	s.panel = p
-	p.v = newPanelViews(p, cfg)
+	p.v = s.panelViewsFor(p, cfg)
 	win, err := s.d.Open(panelLayer(s.outputFor(cfg.Launcher.Monitor), p.v.panelFrame, p.keyCaptured,
 		func() { p.finish(search.Cancel{}) },
 		func() {
@@ -106,7 +105,9 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 		p.finish(search.Cancel{})
 		return
 	}
-	root := search.NewRoot(cfg.Launcher.Search, cfg.Power, s.d.Search(), os.Getenv("HOME"))
+	deps := s.d.Search()
+	deps.Sources = s.sources
+	root := search.NewRoot(cfg.Launcher.Search, cfg.Power, deps, os.Getenv("HOME"))
 	if sess.Options.Filter != nil {
 		root.Query = *sess.Options.Filter
 	}
@@ -114,12 +115,22 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 		root.Placeholder = *sess.Options.Prompt
 	}
 	var openFrecency func() (*search.Frecency, error)
-	if cfg.Launcher.History.Enable {
-		openFrecency = s.d.OpenFrecency
+	if cfg.Launcher.History.Enable && s.d.OpenFrecency != nil {
+		openFrecency = s.openFrecency
 	}
 	p.v.entry.SetPlaceholder(root.Placeholder)
 	p.eng = search.Start(root, openFrecency, panelSink{p}, s.d.Invoke)
 	p.v.motion.open(cfg.Animations)
+}
+
+// panelViewsFor is the views kept from the last panel, unless the config
+// changed since or that panel's surface is still leaving.
+func (s *Surface) panelViewsFor(p *panel, cfg *config.Config) *panelViews {
+	if s.views == nil || s.views.cfg != cfg || s.views.p != nil {
+		s.views = newPanelViews(s.d, cfg)
+	}
+	s.views.bind(p, s.d.Invoke)
+	return s.views
 }
 
 // panelSink delivers engine results to a panel still showing.
@@ -175,7 +186,7 @@ func (p *panel) results(f search.Frame) {
 	}
 	p.depth = f.Depth
 	p.frame = f
-	p.hl.Set(f.Query)
+	p.v.hl.Set(f.Query)
 	p.notice = ""
 	if f.SetField && f.QuerySeq >= p.querySeq {
 		p.v.setField(f.Field)
@@ -525,11 +536,13 @@ func (p *panel) teardown() {
 		p.stopScale = nil
 	}
 	if p.win == nil {
+		p.v.release(p)
 		return
 	}
 	win := p.win
 	p.v.motion.close(p.s.d.Config().Animations, func() {
 		win.Close()
+		p.v.release(p)
 		if p.afterClose != nil {
 			p.afterClose()
 		}

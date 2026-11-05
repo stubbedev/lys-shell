@@ -23,6 +23,8 @@ type fakeProvider struct {
 	actions []Action
 	// gate holds Load until closed, as a slow provider.
 	gate chan struct{}
+	// published closes once Load has published.
+	published chan struct{}
 }
 
 func (p *fakeProvider) Spec() Spec { return p.spec }
@@ -35,6 +37,9 @@ func (p *fakeProvider) Load(ctx context.Context, publish func([]Entry)) {
 		}
 	}
 	publish(p.entries)
+	if p.published != nil {
+		close(p.published)
+	}
 }
 
 func (p *fakeProvider) Actions(Entry) []Action { return p.actions }
@@ -142,14 +147,11 @@ func tempFrecency(t *testing.T, now func() time.Time) *Frecency {
 
 func TestOneListAcrossProvidersWithSections(t *testing.T) {
 	s := &sink{}
-	apps := &fakeProvider{spec: Spec{Section: SectionApps, Weight: appWeight}, entries: []Entry{entry("Firefox"), entry("Files")}}
-	windows := &fakeProvider{spec: Spec{Section: SectionWindows}, entries: []Entry{entry("firefox: news")}}
+	apps := &fakeProvider{spec: Spec{Section: SectionApps, Weight: appWeight}, entries: []Entry{entry("Firefox"), entry("Files")}, published: make(chan struct{})}
+	windows := &fakeProvider{spec: Spec{Section: SectionWindows}, entries: []Entry{entry("firefox: news")}, published: make(chan struct{})}
 	e := start(t, s, nil, apps, windows)
-	waitFor(t, "both providers", func() bool {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		return len(s.frames) >= 3
-	})
+	<-apps.published
+	<-windows.published
 	e.SetQuery("firef", 1)
 	until(t, s, "#"+SectionApps.Title(), "Firefox", "#"+SectionWindows.Title(), "firefox: news")
 	e.SetQuery("zzz", 1)
@@ -295,12 +297,11 @@ func TestEmptyQuerySuggestsWhatWasUsed(t *testing.T) {
 
 func TestEmptyQueryAtTheRootShowsNothingWithNoHistory(t *testing.T) {
 	s := &sink{}
-	start(t, s, nil, &fakeProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("Abc")}})
-	waitFor(t, "a frame", func() bool {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		return len(s.frames) > 1
-	})
+	p := &fakeProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("Abc")}, published: make(chan struct{})}
+	e := start(t, s, nil, p)
+	<-p.published
+	e.SetQuery("", 1)
+	waitFor(t, "a frame", func() bool { return s.last().QuerySeq == 1 })
 	if rows := s.last().Rows; len(rows) != 0 {
 		t.Errorf("rows = %v", rows)
 	}

@@ -32,11 +32,16 @@ func hexColor(c render.Color) string {
 	return fmt.Sprintf("#%02x%02x%02x", c.R(), c.G(), c.B())
 }
 
-// panelViews is the panel's widget tree.
+// panelViews is the panel's widget tree, built once per config and
+// handed from one panel to the next.
 type panelViews struct {
 	*panelFrame
 	*panelChrome
-	p       *panel
+	// p is the panel showing them, nil while none does.
+	p   *panel
+	cfg *config.Config
+	// hl is the query's copy for highlighting, on the UI loop.
+	hl      engine.FuzzyQuery
 	body    *widget.Box
 	list    *searchList
 	pane    *widget.Box
@@ -51,23 +56,22 @@ type panelViews struct {
 	withPreview     bool
 }
 
-func newPanelViews(p *panel, cfg *config.Config) *panelViews {
-	d := p.s.d
+func newPanelViews(d Deps, cfg *config.Config) *panelViews {
 	scale := float64(cfg.Styling.Scale)
 	px := scaledPx(cfg)
 	body := fontPx()
 	v := &panelViews{
-		p: p, font: d.Font, scale: scale, lines: max(int(cfg.Launcher.Lines), 1),
+		cfg: cfg, font: d.Font, scale: scale, lines: max(int(cfg.Launcher.Lines), 1),
 		baseW: launcherWidthPx(cfg), previewW: px(previewWidth),
 	}
 	v.panelChrome = newPanelChrome(d, cfg, func(text string) {
-		if p.eng != nil && !p.closing {
+		if p := v.p; p != nil && p.eng != nil && !p.closing {
 			p.querySeq++
 			p.eng.SetQuery(text, p.querySeq)
 		}
 	})
 
-	v.list = newSearchList(p, cfg, d.Font, d.Variants, px(searchRowHeight), px(headerRowHeight), px(searchIconSize))
+	v.list = newSearchList(v, cfg, d.Font, d.Variants, px(searchRowHeight), px(headerRowHeight), px(searchIconSize))
 	v.list.bindAsync(v.searchIcon, "ld-search-symbolic")
 	v.pane = widget.NewBox(widget.Column, 0, px(12))
 	v.pane.AddClass("launcher-search-preview")
@@ -95,10 +99,42 @@ func newPanelViews(p *panel, cfg *config.Config) *panelViews {
 	content.Append(v.body, true)
 	content.Append(v.footer, false)
 
-	v.panelFrame = newPanelFrame(d, content, v.baseW, v.fieldH(), func() Window { return p.win })
+	v.panelFrame = newPanelFrame(d, content, v.baseW, v.fieldH(), func() Window {
+		if v.p == nil {
+			return nil
+		}
+		return v.p.win
+	})
 	v.target = func(render.Rect) (int, int) { return v.targetW(), v.targetH() }
 	v.place = func(out render.Rect, w, h int) render.Rect { return placePanel(out, w, h, config.LauncherCenter, 0, 0) }
 	return v
+}
+
+// bind hands the views to p, showing nothing yet: what the last panel
+// left is cleared, and the size lands on an empty field.
+func (v *panelViews) bind(p *panel, invoke func(func())) {
+	v.p = p
+	v.list.loader = newIconLoader(p.ctx, invoke, v.list.iconReady)
+	v.list.waiting = v.list.waiting[:0]
+	v.list.setRows(nil, -1)
+	v.hl.Set("")
+	v.setField("")
+	v.setChip("")
+	v.setMessage("")
+	v.sep.SetVisible(false)
+	v.notice.SetText("")
+	v.footer.SetVisible(false)
+	v.withPreview = false
+	v.pane.SetVisible(false)
+	v.showPreview(search.PreviewContent{}, nil, nil)
+	v.motion.reset(v.baseW, v.fieldH())
+}
+
+// release ends p's hold on the views once its surface has gone.
+func (v *panelViews) release(p *panel) {
+	if v.p == p {
+		v.p = nil
+	}
 }
 
 // widgetsSmallPx is the footer's text size.
@@ -285,7 +321,7 @@ func previewLines(text string) string {
 // rebound in place, so typing costs a few labels' worth of work.
 type searchList struct {
 	widget.Base
-	p        *panel
+	v        *panelViews
 	font     render.Font
 	variants widget.VariantFunc
 	rowH     int
@@ -311,9 +347,8 @@ type searchList struct {
 	openColor render.Color
 }
 
-func newSearchList(p *panel, cfg *config.Config, font render.Font, variants widget.VariantFunc, rowH, headerH, iconSize int) *searchList {
-	l := &searchList{p: p, font: font, variants: variants, rowH: rowH, headerH: headerH, margin: rowMargin(scaledPx(cfg)), iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
-	l.loader = newIconLoader(p.ctx, p.s.d.Invoke, l.iconReady)
+func newSearchList(v *panelViews, cfg *config.Config, font render.Font, variants widget.VariantFunc, rowH, headerH, iconSize int) *searchList {
+	l := &searchList{v: v, font: font, variants: variants, rowH: rowH, headerH: headerH, margin: rowMargin(scaledPx(cfg)), iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
 	l.SetElement("listview")
 	l.AddClass("launcher-search-list")
 	l.scroll = anim.NewSpring(anim.SpringParams{Response: 160 * time.Millisecond, Damping: 1}, []float64{0}, func(pos []float64) {
@@ -364,7 +399,7 @@ func (l *searchList) scrollTarget() float64 { return l.offset }
 func (l *searchList) scrollTo(y float64) {
 	limit := float64(max(l.contentH()-l.Bounds().H, 0))
 	y = min(max(y, 0), limit)
-	if l.p.v.motion.instant {
+	if l.v.motion.instant {
 		l.scroll.Snap(y)
 		return
 	}
@@ -528,8 +563,8 @@ func newSearchRow(l *searchList) *searchRow {
 	r.header.AddClass("launcher-search-header")
 	r.AppendAligned(r.header, true, widget.AlignCenter)
 	r.SetOnPointer(func(e widget.PointerEvent) bool {
-		if e.Button == widget.BTNLeft || e.Button == widget.BTNRight {
-			l.p.rowPressed(r.index, e.Button)
+		if p := l.v.p; p != nil && (e.Button == widget.BTNLeft || e.Button == widget.BTNRight) {
+			p.rowPressed(r.index, e.Button)
 		}
 		return true
 	})
@@ -555,7 +590,7 @@ func (r *searchRow) bind(i int, row search.Row, selected bool, number int) {
 		return
 	}
 	e := row.Entry
-	r.positions = row.AppendHighlights(r.positions[:0], &r.l.p.hl)
+	r.positions = row.AppendHighlights(r.positions[:0], &r.l.v.hl)
 	r.markup = appendHighlightMarkup(r.markup[:0], e.Title, r.positions, r.l.highlightTag())
 	if string(r.markup) != r.title.Markup() {
 		r.title.SetMarkup(string(r.markup))
@@ -690,9 +725,9 @@ func (l *searchList) setScale(num, denom int) {
 	for _, row := range l.pool {
 		row.icon.name = ""
 	}
-	l.p.v.searchIcon.name = ""
-	l.bindAsync(l.p.v.searchIcon, "ld-search-symbolic")
-	hero := l.p.v.summary.icon
+	l.v.searchIcon.name = ""
+	l.bindAsync(l.v.searchIcon, "ld-search-symbolic")
+	hero := l.v.summary.icon
 	name := hero.name
 	hero.name = ""
 	l.bindAsync(hero, name)

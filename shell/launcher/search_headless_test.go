@@ -35,9 +35,11 @@ func (w headlessWindows) Focus(_ context.Context, id string) error {
 func (headlessWindows) Close(context.Context, string) error { return nil }
 
 type headlessPanel struct {
-	a       *app.Application
-	s       *Surface
-	layer   *app.LayerWindow
+	a     *app.Application
+	s     *Surface
+	layer *app.LayerWindow
+	// layers are every layer the surface opened, on the loop.
+	layers  *[]*app.LayerWindow
 	kb      *keytest.Keyboard
 	focused chan string
 	reply   <-chan launcheripc.ServerFrame
@@ -60,6 +62,7 @@ func startHeadlessPanel(t *testing.T) *headlessPanel {
 	cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchWindows, config.SearchCalculator, config.SearchWeb}
 	focused := make(chan string, 1)
 	var layer *app.LayerWindow
+	var layers []*app.LayerWindow
 	s := New(Deps{
 		Invoke: a.Invoke,
 		After: func(d time.Duration, fn func()) func() {
@@ -70,6 +73,7 @@ func startHeadlessPanel(t *testing.T) *headlessPanel {
 		Open: func(c app.LayerConfig) (Window, error) {
 			w, err := a.NewLayer(c)
 			layer = w
+			layers = append(layers, w)
 			return w, err
 		},
 		Font:  font,
@@ -89,7 +93,7 @@ func startHeadlessPanel(t *testing.T) *headlessPanel {
 		p := s.panel
 		return p != nil && p.eng != nil
 	})
-	return &headlessPanel{a: a, s: s, layer: layer, kb: kb, focused: focused, reply: reply}
+	return &headlessPanel{a: a, s: s, layer: layer, layers: &layers, kb: kb, focused: focused, reply: reply}
 }
 
 // On a real compositor, keys typed into a real layer surface find a row
@@ -173,4 +177,32 @@ func TestHeadlessDesktopReducedMotionReachesThePanel(t *testing.T) {
 	}
 	h.kb.Tap(keytest.Escape)
 	apptest.Answer(t, "the session's reply", h.reply)
+}
+
+// The views the first panel built show the second on a real compositor:
+// a new layer over the same tree takes the keys and draws.
+func TestHeadlessTheSecondPanelDrawsTheKeptViews(t *testing.T) {
+	h := startHeadlessPanel(t)
+	a, s := h.a, h.s
+	first := apptest.On(a, func() *panelViews { return s.panel.v })
+	h.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the first session's reply", h.reply)
+	apptest.Until(t, a, "the first panel gone", func() bool { return s.panel == nil && first.p == nil })
+
+	mode := SearchMode
+	rows := make(chan []string)
+	close(rows)
+	sess, reply := launcheripc.NewSession(2, launcheripc.SessionOptions{Mode: &mode}, false, rows)
+	s.Open(sess)
+	keytest.AwaitFocus(t, a)
+	apptest.Until(t, a, "the second panel", func() bool { return s.panel != nil && s.panel.eng != nil })
+	if v := apptest.On(a, func() *panelViews { return s.panel.v }); v != first {
+		t.Fatal("the second panel built its views again")
+	}
+	h.kb.Tap(keytest.H)
+	apptest.Until(t, a, "the rows for h", func() bool { return s.panel.frame.Query == "h" })
+	layer := apptest.On(a, func() *app.LayerWindow { return (*h.layers)[len(*h.layers)-1] })
+	apptest.Drawn(t, a, layer.HostSurface(), func() { s.panel.v.root.Invalidate() })
+	h.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the second session's reply", reply)
 }

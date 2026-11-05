@@ -174,11 +174,6 @@ func TestEmojiRowsSearchTheirKeywordsAndEnterTheGlyph(t *testing.T) {
 func TestEmojiInAListFindsByKeyword(t *testing.T) {
 	s := &sink{}
 	e := start(t, s, nil, NewEmoji(fakeEmoji))
-	waitFor(t, "the table", func() bool {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		return len(s.frames) >= 2
-	})
 	e.SetQuery("launch", 1)
 	until(t, s, "#"+SectionEmoji.Title(), "rocket")
 }

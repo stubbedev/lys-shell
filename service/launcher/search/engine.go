@@ -344,6 +344,15 @@ func (st *levelState) start(ctx context.Context, e *Engine, loads *sync.WaitGrou
 			p.Load(ctx, func(entries []Entry) { c.set(entries, e.boost) })
 			continue
 		}
+		if k, ok := p.(*kept); ok {
+			entries, has, fresh := k.rows.snapshot(k.now())
+			if has {
+				c.set(entries, e.boost)
+			}
+			if fresh {
+				continue
+			}
+		}
 		loads.Go(func() {
 			p.Load(ctx, func(entries []Entry) {
 				e.send(engineCmd{kind: cmdPublish, state: st, corpus: c, entries: entries})
@@ -538,6 +547,10 @@ func (e *Engine) takeBox() *frameBox {
 func (e *Engine) frame(o frameOpts) {
 	st := e.top()
 	rows := e.compute(st, o.late, e.takeRows())
+	if o.late && sameRows(rows, e.rows) {
+		e.Recycle(rows)
+		return
+	}
 	// e.rows reads the frame's rows; the UI loop only writes them when it
 	// recycles, and it recycles a frame only after a newer one reached it.
 	e.rows = rows
@@ -548,6 +561,21 @@ func (e *Engine) frame(o frameOpts) {
 		Query: st.query, QuerySeq: e.seq, SetField: o.setField, Field: st.query, Late: o.late, Rows: rows,
 	}
 	e.deliver(box.run)
+}
+
+// sameRows reports a list that reads as the one showing: rows arriving
+// late that change nothing on screen are not delivered.
+func sameRows(a, b []Row) bool {
+	return slices.EqualFunc(a, b, func(x, y Row) bool {
+		if x.Header != y.Header || (x.Entry == nil) != (y.Entry == nil) {
+			return false
+		}
+		if x.Entry == nil {
+			return true
+		}
+		ex, ey := x.Entry, y.Entry
+		return ex.ID == ey.ID && ex.Title == ey.Title && ex.Subtitle == ey.Subtitle && ex.Hint == ey.Hint && ex.Glyph == ey.Glyph
+	})
 }
 
 // isRoot is a level that suggests rather than lists when nothing is
