@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/wlr"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -188,6 +189,7 @@ func (t *teardown) run() {
 
 type shellSession interface {
 	Outputs() []*app.Output
+	GlobalShortcutsManager() *wlr.GlobalShortcutsManagerV1
 	wallpapershell.OutputWatcher
 }
 
@@ -695,7 +697,17 @@ func (s *shellStart) mount() {
 		})
 	})
 	// The launcher surface serves `lys-shell launcher` sessions.
-	s.down.add(startLauncher(application, sess.Outputs, current.Load, func() ModuleContext { return rt.ctx }, theme, font))
+	stopLauncher, openLauncher := startLauncher(application, sess.Outputs, current.Load, func() ModuleContext { return rt.ctx }, theme, font)
+	s.down.add(stopLauncher)
+	if sess.GlobalShortcutsManager() != nil {
+		s.down.add(registerShellShortcuts(application.RegisterGlobalShortcut, shellShortcuts(openLauncher, func() {
+			go func() {
+				if err := toggleDashboardOnLoop(application, rt, "", focused); err != nil {
+					log.Printf("dashboard: %v", err)
+				}
+			}()
+		})))
+	}
 	// The widget socket carries out-of-process pushes (`lys-shell toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {

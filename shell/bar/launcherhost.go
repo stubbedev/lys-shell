@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -27,8 +28,9 @@ import (
 // shell's launcher service does: `lys-shell launcher` sessions open the
 // surface on the UI loop, which reads the live config on every session
 // (so a reload reaches the next one). The returned stop closes the
-// socket.
-func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, live func() ModuleContext, theme *apptheme.Theme, font render.Font) func() {
+// socket; open toggles the search panel in process, as a bare
+// `lys-shell launcher` does.
+func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, live func() ModuleContext, theme *apptheme.Theme, font render.Font) (stop, open func()) {
 	ctx := live()
 	deps := launcher.Deps{
 		Invoke: application.Invoke,
@@ -79,12 +81,22 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 	if ctx.Bitwarden != nil {
 		deps.Vault = func() engine.Mode { return newVaultMode(ctx.Bitwarden, application.Invoke, time.Now) }
 	}
-	stop, err := launcheripc.NewServer(launcher.New(deps)).Listen()
+	surface := launcher.New(deps)
+	open = func() { surface.Open(searchSession()) }
+	stop, err := launcheripc.NewServer(surface).Listen()
 	if err != nil {
 		log.Printf("launcher: the launcher socket is unavailable: %v", err)
-		return func() {}
+		return func() {}, open
 	}
-	return stop
+	return stop, open
+}
+
+var inProcessSessions atomic.Uint64
+
+func searchSession() *launcheripc.Session {
+	mode := launcher.SearchMode
+	sess, _ := launcheripc.NewSession(1<<63|inProcessSessions.Add(1), launcheripc.SessionOptions{Mode: &mode}, false, nil)
+	return sess
 }
 
 // newBrowserIndex reads the browsers of this home directory; without one

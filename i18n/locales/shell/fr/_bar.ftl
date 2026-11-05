@@ -47,3 +47,9 @@ bar-storage-multiple = Multiple
 bar-media-playing = Lecture
 bar-media-paused = En pause
 bar-media-stopped = Arrêté
+
+## Global shortcuts the shell registers with the compositor
+
+shortcut-launcher = Ouvrir ou fermer le lanceur
+
+shortcut-dashboard = Ouvrir ou fermer le tableau de bord
