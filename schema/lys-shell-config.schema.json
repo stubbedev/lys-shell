@@ -9895,7 +9895,7 @@
       "type": "integer"
     }
   },
-  "$id": "lys-shell-config-0.3.10",
+  "$id": "lys-shell-config-0.3.11",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for lys-shell.\n\nRepresents the complete configuration schema that can be loaded\nfrom YAML files. All fields have sensible defaults.",
   "properties": {
