@@ -66,7 +66,7 @@ type LoginLockConfig struct {
 	BlankTimeoutMS uint32 `cfg:"blank-timeout-ms"`
 	// PAM service name used to authenticate the unlock. Distro-dependent:
 	// `system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry.
-	PamService string `cfg:"pam-service"`
+	PamService string `cfg:"pam-service,type=PamService"`
 }
 
 // LoginGreeterConfig is login.greeter.
@@ -78,7 +78,7 @@ type LoginGreeterConfig struct {
 	// Show the shutdown/reboot buttons at the bottom of the screen.
 	ShowPowerButtons bool `cfg:"show-power-buttons"`
 	// Xcursor theme used on the login screen (empty = system default).
-	CursorTheme string `cfg:"cursor-theme"`
+	CursorTheme string `cfg:"cursor-theme,type=CursorTheme"`
 	// Logical cursor size on the login screen. Scaled automatically per
 	// display, so HiDPI outputs get a matching high-resolution cursor.
 	CursorSize uint32 `cfg:"cursor-size"`

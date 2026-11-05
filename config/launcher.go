@@ -15,7 +15,7 @@ type LauncherConfig struct {
 	// Visible result lines.
 	Lines uint32 `cfg:"lines"`
 	// Output connector to show on ("" = focused output).
-	Monitor string `cfg:"monitor"`
+	Monitor string `cfg:"monitor,type=Monitor"`
 	// Modes enabled by default (order = tab/kb-mode-next order). Script
 	// modes are referenced by their `[launcher.scripts]` key.
 	Modes []string `cfg:"modes"`
@@ -36,11 +36,11 @@ type LauncherConfig struct {
 	// Case handling.
 	Case LauncherCase `cfg:"case"`
 	// Terminal emulator for terminal apps ("" = autodetect).
-	Terminal string `cfg:"terminal"`
+	Terminal string `cfg:"terminal,type=Program"`
 	// Show row icons.
 	ShowIcons bool `cfg:"show-icons"`
 	// Icon theme override ("" = system theme).
-	IconTheme string `cfg:"icon-theme"`
+	IconTheme string `cfg:"icon-theme,type=IconTheme"`
 	// Show mode tabs at the bottom of the surface.
 	SidebarMode bool `cfg:"sidebar-mode"`
 	// Accept automatically when exactly one result remains.
@@ -123,7 +123,7 @@ type LauncherDrunConfig struct {
 	// Expose desktop-file actions as extra rows.
 	ShowActions bool `cfg:"show-actions"`
 	// Command opening `Type=Link` entries.
-	URLLauncher string `cfg:"url-launcher"`
+	URLLauncher string `cfg:"url-launcher,type=Program"`
 }
 
 // LauncherRunConfig is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
@@ -131,11 +131,11 @@ type LauncherDrunConfig struct {
 // run (command) mode settings.
 type LauncherRunConfig struct {
 	// Plain accept template (`{cmd}`).
-	RunCommand string `cfg:"run-command"`
+	RunCommand string `cfg:"run-command,type=Command"`
 	// Run-in-terminal template (`{terminal}`, `{cmd}`).
-	ShellCommand string `cfg:"shell-command"`
+	ShellCommand string `cfg:"shell-command,type=Command"`
 	// Extra command whose stdout lines add entries.
-	ListCommand string `cfg:"list-command"`
+	ListCommand string `cfg:"list-command,type=Command"`
 }
 
 // LauncherWindowConfig is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
@@ -157,9 +157,9 @@ type LauncherWindowConfig struct {
 // ssh mode settings.
 type LauncherSSHConfig struct {
 	// SSH client binary.
-	Client string `cfg:"client"`
+	Client string `cfg:"client,type=Program"`
 	// Connect template (`{terminal}`, `{ssh-client}`, `{host}`).
-	Command string `cfg:"command"`
+	Command string `cfg:"command,type=Command"`
 	// Include hosts from `/etc/hosts`.
 	ParseHosts bool `cfg:"parse-hosts"`
 	// Include hosts from `~/.ssh/known_hosts`.
@@ -171,7 +171,7 @@ type LauncherSSHConfig struct {
 // file browser mode settings.
 type LauncherFilebrowserConfig struct {
 	// Start directory ("" = home).
-	Directory string `cfg:"directory"`
+	Directory string `cfg:"directory,type=Directory"`
 	// File ordering.
 	SortingMethod LauncherFileSort `cfg:"sorting-method"`
 	// List directories before files.
@@ -179,7 +179,7 @@ type LauncherFilebrowserConfig struct {
 	// Show hidden files.
 	ShowHidden bool `cfg:"show-hidden"`
 	// Command opening the picked file ("" = xdg-open).
-	Command string `cfg:"command"`
+	Command string `cfg:"command,type=Command"`
 }
 
 // LauncherCombiConfig is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
@@ -210,7 +210,7 @@ type LauncherSearchConfig struct {
 	FileExclude []string `cfg:"file-exclude"`
 	// Directory of script commands. Empty uses `launcher/commands` in the
 	// config directory.
-	CommandsDir string `cfg:"commands-dir"`
+	CommandsDir string `cfg:"commands-dir,type=Directory"`
 	// Show the side pane for files, snippets and clipboard entries.
 	Previews bool `cfg:"previews"`
 	// Links to open by name or keyword.

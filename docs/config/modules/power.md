@@ -24,11 +24,11 @@ bar:
 |---|---|---|---|
 | `icon-name` | string | `"ld-power-symbolic"` | Icon name to display. |
 | `border-show` | bool | `false` | Display border around button. |
-| `lock-command` | string | `"loginctl lock-session"` | Command run by the power menu's Lock button. |
-| `logout-command` | string | `"lys-shell logout"` | Command run by the power menu's Log out button. |
-| `suspend-command` | string | `"systemctl suspend"` | Command run by the power menu's Suspend button. |
-| `reboot-command` | string | `"systemctl reboot"` | Command run by the power menu's Reboot button. |
-| `shutdown-command` | string | `"systemctl poweroff"` | Command run by the power menu's Shut down button. |
+| `lock-command` | [`Command`](/config/types#command) | `"loginctl lock-session"` | Command run by the power menu's Lock button. |
+| `logout-command` | [`Command`](/config/types#command) | `"lys-shell logout"` | Command run by the power menu's Log out button. |
+| `suspend-command` | [`Command`](/config/types#command) | `"systemctl suspend"` | Command run by the power menu's Suspend button. |
+| `reboot-command` | [`Command`](/config/types#command) | `"systemctl reboot"` | Command run by the power menu's Reboot button. |
+| `shutdown-command` | [`Command`](/config/types#command) | `"systemctl poweroff"` | Command run by the power menu's Shut down button. |
 | `show-lock` | bool | `true` | Show the Lock button in the power menu. |
 | `show-logout` | bool | `true` | Show the Log out button in the power menu. |
 | `show-suspend` | bool | `true` | Show the Suspend button in the power menu. |

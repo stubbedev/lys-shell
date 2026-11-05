@@ -37,7 +37,7 @@ type CustomModuleDefinition struct {
 	// - **poll**: Executed every `interval-ms` milliseconds
 	// - **watch**: Spawned once, each stdout line triggers a display update.
 	//   Restarts are controlled by `restart-policy`.
-	Command *string `cfg:"command,default"`
+	Command *string `cfg:"command,default,type=Command"`
 	// Execution mode for the command.
 	//
 	// | Mode | Behavior |

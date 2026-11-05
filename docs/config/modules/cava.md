@@ -31,7 +31,7 @@ bar:
 | `low-cutoff` | [`FrequencyHz`](/config/types#frequency-hz) | `50` | Low frequency cutoff in Hz. |
 | `high-cutoff` | [`FrequencyHz`](/config/types#frequency-hz) | `17000` | High frequency cutoff in Hz. |
 | `input` | [`CavaInput`](/config/types#cava-input) | `"pipe-wire"` | Audio capture backend. |
-| `source` | string | `"auto"` | Audio source identifier ("auto" for automatic selection). |
+| `source` | [`AudioSource`](/config/types#audio-source) | `"auto"` | Audio source identifier ("auto" for automatic selection). |
 | `style` | [`CavaStyle`](/config/types#cava-style) | `"bars"` | Visualization rendering style. |
 | `direction` | [`CavaDirection`](/config/types#cava-direction) | `"normal"` | Bar growth direction. |
 | `color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Bar color. |

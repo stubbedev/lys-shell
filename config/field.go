@@ -39,7 +39,8 @@ type FieldMeta struct {
 	// Type is the Rust schema name of the leaf's type (OsdPosition,
 	// uint32, ...).
 	Type string
-	// Variants are an enum's values in schema order.
+	// Variants are an enum's values in schema order, or the special
+	// values a text type takes besides its open set.
 	Variants []string
 	// Min and Max bound a number: the type's own range, narrowed by a
 	// validated newtype's (Percentage 0-100, ScaleFactor 0.25-3).
@@ -65,7 +66,7 @@ func Field(path string) (FieldMeta, bool) {
 		return FieldMeta{}, false
 	}
 	if sub == "" {
-		m := describe(f.typ)
+		m := describeField(f)
 		m.Placeholders = placeholdersOf(holder, f)
 		return m, true
 	}
@@ -76,7 +77,7 @@ func Field(path string) (FieldMeta, bool) {
 	if f, ok = valueFieldAt(t, strings.Split(sub, ".")); !ok {
 		return FieldMeta{}, false
 	}
-	return describe(f.typ), true
+	return describeField(f), true
 }
 
 // MetaOf describes type T as Field would a field of it: for the
@@ -106,7 +107,7 @@ func describe(t reflect.Type) FieldMeta {
 		m.Kind = FieldFloat
 		m.Min, m.Max = schemaRange(t, -spinMax, spinMax)
 	case encodesAsString(t):
-		m.Kind = FieldText
+		m.Kind, m.Variants = FieldText, variantsOf(t)
 	}
 	return m
 }

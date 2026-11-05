@@ -33,13 +33,13 @@ type DashboardConfig struct {
 	// Action on left click.
 	LeftClick ClickAction `cfg:"left-click"`
 	// Shell command for the lock button in the dashboard dropdown.
-	DropdownLockCommand string `cfg:"dropdown-lock-command"`
+	DropdownLockCommand string `cfg:"dropdown-lock-command,type=Command"`
 	// Shell command for the logout button in the dashboard dropdown.
-	DropdownLogoutCommand string `cfg:"dropdown-logout-command"`
+	DropdownLogoutCommand string `cfg:"dropdown-logout-command,type=Command"`
 	// Shell command for the reboot button in the dashboard dropdown.
-	DropdownRebootCommand string `cfg:"dropdown-reboot-command"`
+	DropdownRebootCommand string `cfg:"dropdown-reboot-command,type=Command"`
 	// Shell command for the power-off button in the dashboard dropdown.
-	DropdownPoweroffCommand string `cfg:"dropdown-poweroff-command"`
+	DropdownPoweroffCommand string `cfg:"dropdown-poweroff-command,type=Command"`
 	// CPU/RAM/disk usage percent at which the dashboard rings turn warning.
 	UsageWarning float32 `cfg:"usage-warning"`
 	// CPU/RAM/disk usage percent at which the dashboard rings turn error.

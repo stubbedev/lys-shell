@@ -28,8 +28,8 @@ bar:
 | `format` | string | `"{{ temp }}{{ temp_unit }}"` | Format string for the label. |
 | `time-format` | [`TimeFormat`](/config/types#time-format) | `"12h"` | Time display format for sunrise/sunset and hourly forecast. |
 | `refresh-interval-seconds` | u32 | `1800` | Polling interval in seconds. |
-| `visual-crossing-key` | string or null | `null` | Visual Crossing API key. Supports `$VAR_NAME` syntax to reference environment variables from `.*.env` files in the config directory. |
-| `weatherapi-key` | string or null | `null` | WeatherAPI.com API key. Supports `$VAR_NAME` syntax to reference environment variables from `.*.env` files in the config directory. |
+| `visual-crossing-key` | [`Secret`](/config/types#secret) or null | `null` | Visual Crossing API key. Supports `$VAR_NAME` syntax to reference environment variables from `.*.env` files in the config directory. |
+| `weatherapi-key` | [`Secret`](/config/types#secret) or null | `null` | WeatherAPI.com API key. Supports `$VAR_NAME` syntax to reference environment variables from `.*.env` files in the config directory. |
 | `icon-name` | string | `"ld-sun-symbolic"` | Fallback icon for weather. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |

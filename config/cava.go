@@ -23,7 +23,7 @@ type CavaConfig struct {
 	// Audio capture backend.
 	Input CavaInput `cfg:"input"`
 	// Audio source identifier ("auto" for automatic selection).
-	Source string `cfg:"source"`
+	Source string `cfg:"source,type=AudioSource"`
 	// Visualization rendering style.
 	Style CavaStyle `cfg:"style"`
 	// Bar growth direction.

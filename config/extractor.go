@@ -11,7 +11,7 @@ type ColorExtractorConfig struct {
 	// Theme provider (lys-shell, matugen, pywal, wallust).
 	ThemeProvider ThemeProvider `cfg:"theme-provider"`
 	// Monitor whose wallpaper drives color extraction. Empty uses the first available.
-	ThemingMonitor string `cfg:"theming-monitor"`
+	ThemingMonitor string `cfg:"theming-monitor,type=Monitor"`
 	// Matugen color scheme type.
 	MatugenScheme MatugenScheme `cfg:"matugen-scheme"`
 	// Matugen contrast level (-1.0 to 1.0).

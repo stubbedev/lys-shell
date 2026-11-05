@@ -12,7 +12,7 @@ type NetstatConfig struct {
 	//
 	// Use `"auto"` to select the first active interface, or specify an
 	// interface name like `"eth0"` or `"wlan0"`.
-	Interface string `cfg:"interface"`
+	Interface string `cfg:"interface,type=NetInterface"`
 	// Format string for the label.
 	//
 	// ## Examples

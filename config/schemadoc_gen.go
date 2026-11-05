@@ -464,7 +464,7 @@ var schemaDocs = map[string]string{
 	"FieldMeta.Optional":                                     "Optional is an Option<T> leaf, which may be unset.",
 	"FieldMeta.Placeholders":                                 "Placeholders are the values a format field substitutes.",
 	"FieldMeta.Type":                                         "Type is the Rust schema name of the leaf's type (OsdPosition,\nuint32, ...).",
-	"FieldMeta.Variants":                                     "Variants are an enum's values in schema order.",
+	"FieldMeta.Variants":                                     "Variants are an enum's values in schema order, or the special\nvalues a text type takes besides its open set.",
 	"FitMode":                                                "Image scaling mode.",
 	"FitMode=center":                                         "Display at original size, centered.",
 	"FitMode=fill":                                           "Scale to cover entire display, cropping excess.",

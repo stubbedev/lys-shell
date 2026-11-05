@@ -43,7 +43,7 @@ type RecorderConfig struct {
 	// Webcam frame width as a percentage of the recording width.
 	WebcamSize Percentage `cfg:"webcam-size"`
 	// Output directory for recordings. Empty uses the XDG Videos directory.
-	OutputDirectory string `cfg:"output-directory"`
+	OutputDirectory string `cfg:"output-directory,type=Directory"`
 	// Container format / codec preset.
 	OutputFormat RecorderFormat `cfg:"output-format"`
 	// Draw the mouse cursor in the recording.

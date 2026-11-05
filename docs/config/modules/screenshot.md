@@ -26,7 +26,7 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `icon` | string | `"ld-camera-symbolic"` | Bar button icon. |
-| `output-directory` | string | `""` | Output directory for screenshots. Empty uses the XDG Pictures directory. |
+| `output-directory` | [`Directory`](/config/types#directory) | `""` | Output directory for screenshots. Empty uses the XDG Pictures directory. |
 | `filename-format` | [`StrftimeFormat`](/config/types#strftime-format) | `"Screenshot_%Y-%m-%d_%H-%M-%S.png"` | Saved file name, formatted with `chrono`/`strftime` specifiers. |
 | `copy-to-clipboard` | bool | `true` | Copy the captured image to the clipboard. |
 | `notify` | bool | `true` | Show a desktop notification after capturing. |

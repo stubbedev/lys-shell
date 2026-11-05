@@ -43,7 +43,7 @@ bar:
 | `webcam-x` | [`Percentage`](/config/types#percentage) | `100` | Webcam frame horizontal position, as a percentage of the free horizontal space (0 = flush left, 100 = flush right). Stored relative so it stays correct across monitors of different resolutions. |
 | `webcam-y` | [`Percentage`](/config/types#percentage) | `100` | Webcam frame vertical position, as a percentage of the free vertical space (0 = flush top, 100 = flush bottom). Stored relative so it stays correct across monitors of different resolutions. |
 | `webcam-size` | [`Percentage`](/config/types#percentage) | `20` | Webcam frame width as a percentage of the recording width. |
-| `output-directory` | string | `""` | Output directory for recordings. Empty uses the XDG Videos directory. |
+| `output-directory` | [`Directory`](/config/types#directory) | `""` | Output directory for recordings. Empty uses the XDG Videos directory. |
 | `output-format` | [`RecorderFormat`](/config/types#recorder-format) | `"mkv"` | Container format / codec preset. |
 | `show-cursor` | bool | `true` | Draw the mouse cursor in the recording. |
 | `start-delay-ms` | u32 | `1400` | Delay between choosing the capture source and the recording actually starting, in milliseconds. Gives on-screen UI (the start toast) time to clear so it isn't captured in the video. |

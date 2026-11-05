@@ -10,7 +10,7 @@ type ScreenshotConfig struct {
 	// Bar button icon.
 	Icon string `cfg:"icon"`
 	// Output directory for screenshots. Empty uses the XDG Pictures directory.
-	OutputDirectory string `cfg:"output-directory"`
+	OutputDirectory string `cfg:"output-directory,type=Directory"`
 	// Saved file name, formatted with `chrono`/`strftime` specifiers.
 	FilenameFormat StrftimeFormat `cfg:"filename-format"`
 	// Copy the captured image to the clipboard.

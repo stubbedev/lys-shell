@@ -23,7 +23,7 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `poll-interval-ms` | u64 | `2000` | Polling interval in milliseconds. |
-| `temp-sensor` | string | `"auto"` | Temperature sensor label. |
+| `temp-sensor` | [`TempSensor`](/config/types#temp-sensor) | `"auto"` | Temperature sensor label. |
 | `format` | string | `"{{ percent }}%"` | Format string for the label. |
 | `icon-name` | string | `"ld-cpu-symbolic"` | Icon name. |
 | `border-show` | bool | `false` | Display border around button. |

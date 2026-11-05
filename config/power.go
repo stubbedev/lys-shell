@@ -25,15 +25,15 @@ type PowerConfig struct {
 	// Action on left click. Default opens lys-shell's native power menu (`:menu`).
 	LeftClick ClickAction `cfg:"left-click"`
 	// Command run by the power menu's Lock button.
-	LockCommand string `cfg:"lock-command"`
+	LockCommand string `cfg:"lock-command,type=Command"`
 	// Command run by the power menu's Log out button.
-	LogoutCommand string `cfg:"logout-command"`
+	LogoutCommand string `cfg:"logout-command,type=Command"`
 	// Command run by the power menu's Suspend button.
-	SuspendCommand string `cfg:"suspend-command"`
+	SuspendCommand string `cfg:"suspend-command,type=Command"`
 	// Command run by the power menu's Reboot button.
-	RebootCommand string `cfg:"reboot-command"`
+	RebootCommand string `cfg:"reboot-command,type=Command"`
 	// Command run by the power menu's Shut down button.
-	ShutdownCommand string `cfg:"shutdown-command"`
+	ShutdownCommand string `cfg:"shutdown-command,type=Command"`
 	// Show the Lock button in the power menu.
 	ShowLock bool `cfg:"show-lock"`
 	// Show the Log out button in the power menu.

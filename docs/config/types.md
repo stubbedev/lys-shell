@@ -94,6 +94,12 @@ when one exists.
 | `"light"` | Force the light variant. |
 | `"dark"` | Force the dark variant. |
 
+## AudioSource {#audio-source}
+
+An audio source name.
+
+String.
+
 ## BarButtonVariant {#bar-button-variant}
 
 Visual style variants for bar buttons.
@@ -381,6 +387,18 @@ One of: `"transparent"`, `"auto"`.
 
 String matching `^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$`.
 
+## Command {#command}
+
+A shell command line.
+
+String.
+
+## CursorTheme {#cursor-theme}
+
+An Xcursor theme name.
+
+String.
+
 ## CyclingInterval {#cycling-interval}
 
 Cycling interval in minutes, minimum 1.
@@ -397,6 +415,12 @@ Wallpaper cycling order.
 |---|---|
 | `"sequential"` | Alphabetical order. |
 | `"shuffle"` | Random order. |
+
+## Directory {#directory}
+
+A directory path.
+
+String.
 
 ## DisplayMode {#display-mode}
 
@@ -526,6 +550,12 @@ Source for resolving notification icons.
 | `"automatic"` | Use per-notification images when provided, otherwise lys-shell's mapped icon. |
 | `"mapped"` | Always use lys-shell's mapped icons regardless of what the app provides. |
 | `"application"` | Use the full application icon chain, falling back to mapped if unavailable. |
+
+## IconTheme {#icon-theme}
+
+An icon theme name.
+
+String.
 
 ## IdleInhibitDuration {#idle-inhibit-duration}
 
@@ -925,6 +955,12 @@ left:
   - {module: clock, class: primary-clock}
 ```
 
+## Monitor {#monitor}
+
+An output connector name (`DP-1`).
+
+String.
+
 ## MonitorWallpaperConfig {#monitor-wallpaper-config}
 
 Per-monitor wallpaper configuration.
@@ -934,6 +970,12 @@ Per-monitor wallpaper configuration.
 | `name` | Monitor name (e.g., "HDMI-1", "DP-1"). |
 | `fit-mode` | Image scaling mode for this monitor. |
 | `wallpaper` | Wallpaper image path for this monitor. |
+
+## NetInterface {#net-interface}
+
+A network interface name (`wlan0`).
+
+String.
 
 ## NightlightTransition {#nightlight-transition}
 
@@ -1027,6 +1069,12 @@ Color palette configuration for the active theme.
 | `green` | Green semantic color. |
 | `blue` | Blue semantic color. |
 
+## PamService {#pam-service}
+
+A PAM service name, a file under `/etc/pam.d`.
+
+String.
+
 ## PassphraseWords {#passphrase-words}
 
 A generated passphrase's number of words, 3-20.
@@ -1114,6 +1162,12 @@ Screen position for notification popups.
 | `"all"` | Every popup shares one stack. |
 | `"off"` | Every popup is a card of its own. |
 
+## Program {#program}
+
+A program name on the path, or its path.
+
+String.
+
 ## PywalContrast {#pywal-contrast}
 
 Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).
@@ -1169,6 +1223,12 @@ Scale multiplier clamped to 0.25-3.0.
 Number in `[0.25, 3.0]`.
 
 Serialises as `float`.
+
+## Secret {#secret}
+
+A secret, or `$NAME` to read it from the environment.
+
+String.
 
 ## SessionAction {#session-action}
 
@@ -1267,6 +1327,12 @@ to the global `[animations]` enter/exit, then to `transition`/`duration`.
 | `exit` | Exit transition for this surface. Unset → global `exit`, then `transition`. |
 | `enter-duration` | Enter duration in ms. Unset → global `enter-duration`, then `duration`. |
 | `exit-duration` | Exit duration in ms. Unset → global `exit-duration`, then `duration`. |
+
+## TempSensor {#temp-sensor}
+
+A temperature sensor label as `sensors` prints it.
+
+String.
 
 ## TemperatureUnit {#temperature-unit}
 

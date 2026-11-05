@@ -319,6 +319,8 @@ func (g *schemaGen) structSchema(t reflect.Type) Schema {
 		order = append(order, f.key)
 		var prop Schema
 		switch {
+		case f.semantic != "":
+			prop = copySchema(g.semanticRef(f.typ, f.semantic))
 		case f.nolayer || !container:
 			prop = copySchema(g.subschema(f.typ))
 		case isContainer(f.typ):

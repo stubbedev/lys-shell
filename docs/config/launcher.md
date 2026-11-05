@@ -16,7 +16,7 @@ Application launcher / dmenu (rofi replacement).
 | `location` | [`LauncherLocation`](/config/types#launcher-location) | `"center"` | Surface position on screen. |
 | `width` | [`Size`](/config/types#size) | `1` | Surface width: a multiplier of the default 720px (`1.0` = default) or absolute pixels (e.g. `"800px"`). |
 | `lines` | u32 | `10` | Visible result lines. |
-| `monitor` | string | `""` | Output connector to show on ("" = focused output). |
+| `monitor` | [`Monitor`](/config/types#monitor) | `""` | Output connector to show on ("" = focused output). |
 | `modes` | array of string | `[...]` | Modes enabled by default (order = tab/kb-mode-next order). Script modes are referenced by their `[launcher.scripts]` key. |
 | `cycle` | bool | `true` | Wrap selection at list edges. |
 | `matching` | [`LauncherMatching`](/config/types#launcher-matching) | `"normal"` | Matching method. |
@@ -26,9 +26,9 @@ Application launcher / dmenu (rofi replacement).
 | `sort` | bool | `false` | Rank results by match quality (off = keep list order, rofi default). |
 | `sorting-method` | [`LauncherSorting`](/config/types#launcher-sorting) | `"levenshtein"` | Ranking method when `sort` is on. |
 | `case` | [`LauncherCase`](/config/types#launcher-case) | `"insensitive"` | Case handling. |
-| `terminal` | string | `""` | Terminal emulator for terminal apps ("" = autodetect). |
+| `terminal` | [`Program`](/config/types#program) | `""` | Terminal emulator for terminal apps ("" = autodetect). |
 | `show-icons` | bool | `true` | Show row icons. |
-| `icon-theme` | string | `""` | Icon theme override ("" = system theme). |
+| `icon-theme` | [`IconTheme`](/config/types#icon-theme) | `""` | Icon theme override ("" = system theme). |
 | `sidebar-mode` | bool | `false` | Show mode tabs at the bottom of the surface. |
 | `auto-select` | bool | `false` | Accept automatically when exactly one result remains. |
 | `hover-select` | bool | `false` | Select the row under the mouse cursor. |

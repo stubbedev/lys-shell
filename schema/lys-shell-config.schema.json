@@ -477,6 +477,13 @@
       },
       "type": "array"
     },
+    "AudioSource": {
+      "description": "An audio source name.",
+      "type": "string",
+      "x-variants": [
+        "auto"
+      ]
+    },
     "BarButtonVariant": {
       "description": "Visual style variants for bar buttons.",
       "oneOf": [
@@ -1587,7 +1594,7 @@
           "description": "Action on scroll up."
         },
         "source": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/AudioSource",
           "default": "auto",
           "description": "Audio source identifier (\"auto\" for automatic selection)."
         },
@@ -2023,6 +2030,10 @@
       ],
       "description": "CSS token, hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa), 'transparent', or 'auto'"
     },
+    "Command": {
+      "description": "A shell command line.",
+      "type": "string"
+    },
     "CpuConfig": {
       "description": "CPU usage, frequency, and temperature.",
       "properties": {
@@ -2150,7 +2161,7 @@
           "description": "Action on scroll up."
         },
         "temp-sensor": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/TempSensor",
           "default": "auto",
           "description": "Temperature sensor label.\n\nUse `\"auto\"` for automatic detection, or specify a\nlabel (e.g., `\"Tctl\"`, `\"Package id 0\"`).\n\nRun `sensors` to see available labels."
         },
@@ -2161,6 +2172,13 @@
         }
       },
       "type": "object"
+    },
+    "CursorTheme": {
+      "description": "An Xcursor theme name.",
+      "type": "string",
+      "x-variants": [
+        ""
+      ]
     },
     "CustomModuleDefinition": {
       "description": "User-defined module that runs a shell command and renders the output in the bar.\n\nFull walkthrough with examples in `docs/guide/custom-modules.md`.",
@@ -2200,12 +2218,9 @@
           ]
         },
         "command": {
+          "$ref": "#/$defs/Nullable_Command",
           "default": null,
-          "description": "Shell command to execute.\n\nThe command runs via `sh -c` and should output to stdout.\nStderr is discarded. Commands have a 30-second timeout.\n\n## Output Parsing\n\n- If output starts with `{` or `[`: parsed as JSON\n- Otherwise: treated as plain text\n\n## Behavior by Mode\n\n- **poll**: Executed every `interval-ms` milliseconds\n- **watch**: Spawned once, each stdout line triggers a display update.\n  Restarts are controlled by `restart-policy`.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Shell command to execute.\n\nThe command runs via `sh -c` and should output to stdout.\nStderr is discarded. Commands have a 30-second timeout.\n\n## Output Parsing\n\n- If output starts with `{` or `[`: parsed as JSON\n- Otherwise: treated as plain text\n\n## Behavior by Mode\n\n- **poll**: Executed every `interval-ms` milliseconds\n- **watch**: Spawned once, each stdout line triggers a display update.\n  Restarts are controlled by `restart-policy`."
         },
         "format": {
           "default": "{{ output }}",
@@ -2394,22 +2409,22 @@
           "description": "Display border around button."
         },
         "dropdown-lock-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "loginctl lock-session",
           "description": "Shell command for the lock button in the dashboard dropdown."
         },
         "dropdown-logout-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "lys-shell logout",
           "description": "Shell command for the logout button in the dashboard dropdown."
         },
         "dropdown-poweroff-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "systemctl poweroff",
           "description": "Shell command for the power-off button in the dashboard dropdown."
         },
         "dropdown-reboot-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "systemctl reboot",
           "description": "Shell command for the reboot button in the dashboard dropdown."
         },
@@ -2487,6 +2502,13 @@
         }
       },
       "type": "object"
+    },
+    "Directory": {
+      "description": "A directory path.",
+      "type": "string",
+      "x-variants": [
+        ""
+      ]
     },
     "DisplayMode": {
       "description": "What identifies a workspace in the UI.",
@@ -2999,6 +3021,13 @@
         }
       ]
     },
+    "IconTheme": {
+      "description": "An icon theme name.",
+      "type": "string",
+      "x-variants": [
+        ""
+      ]
+    },
     "IdleInhibitConfig": {
       "description": "Toggle that prevents screen dim, lock, and suspend while active.\n\nControllable from the CLI: `lys-shell idle on|off|duration|remaining|status`.",
       "properties": {
@@ -3493,7 +3522,7 @@
           "description": "Select the row under the mouse cursor."
         },
         "icon-theme": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/IconTheme",
           "default": "",
           "description": "Icon theme override (\"\" = system theme)."
         },
@@ -3527,7 +3556,7 @@
           "description": "Modes enabled by default (order = tab/kb-mode-next order). Script\nmodes are referenced by their `[launcher.scripts]` key."
         },
         "monitor": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Monitor",
           "default": "",
           "description": "Output connector to show on (\"\" = focused output)."
         },
@@ -3636,7 +3665,7 @@
           "description": "Named looks selectable per invocation with `-style <name>`: name →\nthe CSS applied for that session, on top of `[styling]`.\n\nCSS rather than a second copy of the display keys: a preset exists to\nsay \"this invocation looks different\", and there is no list of the\nways someone might want that. `-style compact` then costs one config\nentry instead of a schema change."
         },
         "terminal": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Program",
           "default": "",
           "description": "Terminal emulator for terminal apps (\"\" = autodetect)."
         },
@@ -3733,7 +3762,7 @@
           "description": "Expose desktop-file actions as extra rows."
         },
         "url-launcher": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Program",
           "default": "xdg-open",
           "description": "Command opening `Type=Link` entries."
         }
@@ -3804,7 +3833,7 @@
       "description": "file browser mode settings.",
       "properties": {
         "command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "",
           "description": "Command opening the picked file (\"\" = xdg-open)."
         },
@@ -3814,7 +3843,7 @@
           "description": "List directories before files."
         },
         "directory": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Directory",
           "default": "",
           "description": "Start directory (\"\" = home)."
         },
@@ -3957,17 +3986,17 @@
       "description": "run (command) mode settings.",
       "properties": {
         "list-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "",
           "description": "Extra command whose stdout lines add entries."
         },
         "run-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "{cmd}",
           "description": "Plain accept template (`{cmd}`)."
         },
         "shell-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "{terminal} -e {cmd}",
           "description": "Run-in-terminal template (`{terminal}`, `{cmd}`)."
         }
@@ -3978,7 +4007,7 @@
       "description": "The search panel: one ranked list over apps, windows, files and more.",
       "properties": {
         "commands-dir": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Directory",
           "default": "",
           "description": "Directory of script commands. Empty uses `launcher/commands` in the\nconfig directory."
         },
@@ -4185,12 +4214,12 @@
       "description": "ssh mode settings.",
       "properties": {
         "client": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Program",
           "default": "ssh",
           "description": "SSH client binary."
         },
         "command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "{terminal} -e {ssh-client} {host}",
           "description": "Connect template (`{terminal}`, `{ssh-client}`, `{host}`)."
         },
@@ -4497,7 +4526,7 @@
           "description": "Logical cursor size on the login screen. Scaled automatically per\ndisplay, so HiDPI outputs get a matching high-resolution cursor."
         },
         "cursor-theme": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/CursorTheme",
           "default": "",
           "description": "Xcursor theme used on the login screen (empty = system default)."
         },
@@ -4538,7 +4567,7 @@
           "description": "Lock the session as soon as the shell starts. For autologin setups\n(e.g. greetd with no password at boot) where the lock screen is the\naccess gate: the session comes up locked and requires the password\nbefore use. Off by default — a normal login has already authenticated."
         },
         "pam-service": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/PamService",
           "default": "system-auth",
           "description": "PAM service name used to authenticate the unlock. Distro-dependent:\n`system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry."
         }
@@ -6456,6 +6485,13 @@
       },
       "type": "object"
     },
+    "Monitor": {
+      "description": "An output connector name (`DP-1`).",
+      "type": "string",
+      "x-variants": [
+        ""
+      ]
+    },
     "MonitorWallpaperConfig": {
       "description": "Per-monitor wallpaper configuration.",
       "properties": {
@@ -6478,6 +6514,13 @@
         "name"
       ],
       "type": "object"
+    },
+    "NetInterface": {
+      "description": "A network interface name (`wlan0`).",
+      "type": "string",
+      "x-variants": [
+        "auto"
+      ]
     },
     "NetstatConfig": {
       "description": "Network traffic counters (up/down rates).",
@@ -6579,7 +6622,7 @@
           "description": "Display module icon."
         },
         "interface": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/NetInterface",
           "default": "auto",
           "description": "Network interface to monitor.\n\nUse `\"auto\"` to select the first active interface, or specify an\ninterface name like `\"eth0\"` or `\"wlan0\"`."
         },
@@ -7315,16 +7358,30 @@
         }
       ]
     },
+    "Nullable_Command": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Command"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "Nullable_Secret": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Secret"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "Nullable_double": {
       "format": "double",
       "type": [
         "number",
-        "null"
-      ]
-    },
-    "Nullable_string": {
-      "type": [
-        "string",
         "null"
       ]
     },
@@ -7405,7 +7462,10 @@
     "OsdMonitor": {
       "default": "primary",
       "description": "\"primary\" or a monitor connector name (e.g. \"DP-1\")",
-      "type": "string"
+      "type": "string",
+      "x-variants": [
+        "primary"
+      ]
     },
     "OsdPosition": {
       "description": "Screen anchor for the OSD overlay.",
@@ -7528,6 +7588,10 @@
       },
       "type": "object"
     },
+    "PamService": {
+      "description": "A PAM service name, a file under `/etc/pam.d`.",
+      "type": "string"
+    },
     "PassphraseWords": {
       "description": "A generated passphrase's number of words, 3-20.",
       "format": "uint32",
@@ -7605,7 +7669,10 @@
     "PopupMonitor": {
       "default": "primary",
       "description": "\"primary\" or a monitor connector name (e.g. \"DP-1\")",
-      "type": "string"
+      "type": "string",
+      "x-variants": [
+        "primary"
+      ]
     },
     "PopupPosition": {
       "description": "Screen position for notification popups.",
@@ -7731,12 +7798,12 @@
           "description": "Action on left click. Default opens lys-shell's native power menu (`:menu`)."
         },
         "lock-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "loginctl lock-session",
           "description": "Command run by the power menu's Lock button."
         },
         "logout-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "lys-shell logout",
           "description": "Command run by the power menu's Log out button."
         },
@@ -7746,7 +7813,7 @@
           "description": "Action on middle click."
         },
         "reboot-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "systemctl reboot",
           "description": "Command run by the power menu's Reboot button."
         },
@@ -7791,12 +7858,12 @@
           "description": "Show the Suspend button in the power menu."
         },
         "shutdown-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "systemctl poweroff",
           "description": "Command run by the power menu's Shut down button."
         },
         "suspend-command": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Command",
           "default": "systemctl suspend",
           "description": "Command run by the power menu's Suspend button."
         }
@@ -7921,6 +7988,13 @@
         }
       },
       "type": "object"
+    },
+    "Program": {
+      "description": "A program name on the path, or its path.",
+      "type": "string",
+      "x-variants": [
+        ""
+      ]
     },
     "PywalContrast": {
       "description": "Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).",
@@ -8177,7 +8251,7 @@
           "description": "Action on middle click."
         },
         "output-directory": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Directory",
           "default": "",
           "description": "Output directory for recordings. Empty uses the XDG Videos directory."
         },
@@ -8411,7 +8485,7 @@
           "description": "Show a desktop notification after capturing."
         },
         "output-directory": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Directory",
           "default": "",
           "description": "Output directory for screenshots. Empty uses the XDG Pictures directory."
         },
@@ -8432,6 +8506,10 @@
         }
       },
       "type": "object"
+    },
+    "Secret": {
+      "description": "A secret, or `$NAME` to read it from the environment.",
+      "type": "string"
     },
     "SeparatorConfig": {
       "description": "A vertical rule between bar modules.",
@@ -8984,7 +9062,7 @@
           "description": "Theme provider (lys-shell, matugen, pywal, wallust)."
         },
         "theming-monitor": {
-          "$ref": "#/$defs/string",
+          "$ref": "#/$defs/Monitor",
           "default": "",
           "description": "Monitor whose wallpaper drives color extraction. Empty uses the first available."
         },
@@ -9272,6 +9350,13 @@
         }
       },
       "type": "object"
+    },
+    "TempSensor": {
+      "description": "A temperature sensor label as `sensors` prints it.",
+      "type": "string",
+      "x-variants": [
+        "auto"
+      ]
     },
     "TemperatureUnit": {
       "description": "Temperature unit for display.",
@@ -10185,12 +10270,12 @@
           "description": "Temperature unit."
         },
         "visual-crossing-key": {
-          "$ref": "#/$defs/Nullable_string",
+          "$ref": "#/$defs/Nullable_Secret",
           "default": null,
           "description": "Visual Crossing API key. Supports `$VAR_NAME` syntax to reference\nenvironment variables from `.*.env` files in the config directory."
         },
         "weatherapi-key": {
-          "$ref": "#/$defs/Nullable_string",
+          "$ref": "#/$defs/Nullable_Secret",
           "default": null,
           "description": "WeatherAPI.com API key. Supports `$VAR_NAME` syntax to reference\nenvironment variables from `.*.env` files in the config directory."
         }

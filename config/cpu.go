@@ -14,7 +14,7 @@ type CpuConfig struct {
 	// label (e.g., `"Tctl"`, `"Package id 0"`).
 	//
 	// Run `sensors` to see available labels.
-	TempSensor string `cfg:"temp-sensor"`
+	TempSensor string `cfg:"temp-sensor,type=TempSensor"`
 	// Format string for the label.
 	//
 	// ## Examples

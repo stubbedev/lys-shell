@@ -25,7 +25,7 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `id` | string | required | Unique identifier for this module. |
-| `command` | unknown | `null` | Shell command to execute. |
+| `command` | [`Command`](/config/types#command) or null | `null` | Shell command to execute. |
 | `mode` | [`ExecutionMode`](/config/types#execution-mode) | `"poll"` | Execution mode for the command. |
 | `interval-ms` | u64 | `5000` | Polling interval in milliseconds. |
 | `format` | string | `"{{ output }}"` | Format string for the label using Jinja2 template syntax. |

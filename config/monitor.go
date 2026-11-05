@@ -55,8 +55,11 @@ func (monitorTarget) configSchema(*schemaGen) Schema {
 		"type":        "string",
 		"description": `"primary" or a monitor connector name (e.g. "DP-1")`,
 		"default":     "primary",
+		"x-variants":  []any{"primary"},
 	}
 }
+
+func (monitorTarget) configVariants() []string { return []string{"primary"} }
 
 // OsdMonitor is the OSD's target monitor.
 type OsdMonitor struct{ monitorTarget }

@@ -31,6 +31,8 @@ import (
 //	                  from a layer (#[lys-shell(skip)] with serde, i.e.
 //	                  `imports`)
 //	noi18n            no settings label of its own (#[i18n(skip)])
+//	type=<T>          a string field holding a T (semanticStrings): the
+//	                  type an editor and the schema name it by
 //
 // `cfg:"-"` marks an exported field that is not part of the schema.
 // Every exported field of a schema struct carries one of the two; the
@@ -72,6 +74,7 @@ type fieldInfo struct {
 	hasDefault bool
 	nolayer    bool
 	noI18n     bool
+	semantic   string
 	typ        reflect.Type
 	// goName is the Go field name, for docs lookup.
 	goName string
@@ -153,6 +156,11 @@ func collectFields(t reflect.Type, prefix []int) []fieldInfo {
 				info.aliases = append(info.aliases, value)
 			case "deprecated":
 				info.deprecated = append(info.deprecated, value)
+			case "type":
+				if _, ok := semanticStrings[value]; !ok || !isPlainString(sf.Type) {
+					panic(fmt.Sprintf("config: %s.%s: type=%s needs a declared semantic string type on a string field", t.Name(), sf.Name, value))
+				}
+				info.semantic = value
 			default:
 				panic(fmt.Sprintf("config: %s.%s: unknown cfg option %q", t.Name(), sf.Name, name))
 			}

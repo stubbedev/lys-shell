@@ -23,7 +23,7 @@ bar:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `poll-interval-ms` | u64 | `2000` | Polling interval in milliseconds. |
-| `interface` | string | `"auto"` | Network interface to monitor. |
+| `interface` | [`NetInterface`](/config/types#net-interface) | `"auto"` | Network interface to monitor. |
 | `format` | string | `"{{ down_auto }} {{ up_auto }}"` | Format string for the label. |
 | `icon-name` | string | `"ld-activity-symbolic"` | Icon name. |
 | `border-show` | bool | `false` | Display border around button. |

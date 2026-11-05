@@ -62,10 +62,10 @@ bar:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `dropdown-lock-command` | string | `"loginctl lock-session"` | Shell command for the lock button in the dashboard dropdown. |
-| `dropdown-logout-command` | string | `"lys-shell logout"` | Shell command for the logout button in the dashboard dropdown. |
-| `dropdown-reboot-command` | string | `"systemctl reboot"` | Shell command for the reboot button in the dashboard dropdown. |
-| `dropdown-poweroff-command` | string | `"systemctl poweroff"` | Shell command for the power-off button in the dashboard dropdown. |
+| `dropdown-lock-command` | [`Command`](/config/types#command) | `"loginctl lock-session"` | Shell command for the lock button in the dashboard dropdown. |
+| `dropdown-logout-command` | [`Command`](/config/types#command) | `"lys-shell logout"` | Shell command for the logout button in the dashboard dropdown. |
+| `dropdown-reboot-command` | [`Command`](/config/types#command) | `"systemctl reboot"` | Shell command for the reboot button in the dashboard dropdown. |
+| `dropdown-poweroff-command` | [`Command`](/config/types#command) | `"systemctl poweroff"` | Shell command for the power-off button in the dashboard dropdown. |
 
 ## Default configuration
 

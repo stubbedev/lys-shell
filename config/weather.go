@@ -24,10 +24,10 @@ type WeatherConfig struct {
 	RefreshIntervalSeconds uint32 `cfg:"refresh-interval-seconds"`
 	// Visual Crossing API key. Supports `$VAR_NAME` syntax to reference
 	// environment variables from `.*.env` files in the config directory.
-	VisualCrossingKey *string `cfg:"visual-crossing-key"`
+	VisualCrossingKey *string `cfg:"visual-crossing-key,type=Secret"`
 	// WeatherAPI.com API key. Supports `$VAR_NAME` syntax to reference
 	// environment variables from `.*.env` files in the config directory.
-	WeatherapiKey *string `cfg:"weatherapi-key"`
+	WeatherapiKey *string `cfg:"weatherapi-key,type=Secret"`
 	// Fallback icon for weather.
 	IconName string `cfg:"icon-name"`
 	// Display border around button.

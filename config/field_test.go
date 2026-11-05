@@ -15,8 +15,8 @@ func TestFieldPicksTheEditorFromTheType(t *testing.T) {
 		"osd.duration":                        {Kind: FieldInt, Type: "uint32", Min: 0, Max: math.MaxUint32},
 		"bar.background-opacity":              {Kind: FieldInt, Type: "Percentage", Min: 0, Max: 100},
 		"styling.scale":                       {Kind: FieldFloat, Type: "ScaleFactor", Min: 0.25, Max: 3},
-		"osd.monitor":                         {Kind: FieldText, Type: "OsdMonitor"},
-		"modules.weather.visual-crossing-key": {Kind: FieldText, Type: "string", Optional: true},
+		"osd.monitor":                         {Kind: FieldText, Type: "OsdMonitor", Variants: []string{"primary"}},
+		"modules.weather.visual-crossing-key": {Kind: FieldText, Type: "Secret", Optional: true},
 		"osd.presets":                         {Kind: FieldOther, Type: "Array_of_ToastPreset", Elem: &FieldMeta{Type: "ToastPreset"}},
 	} {
 		got, ok := Field(path)
