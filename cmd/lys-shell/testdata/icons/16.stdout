@@ -1,4 +1,4 @@
-Would install 61 icons:
+Would install 62 icons:
   cm-gone-symbolic (no auto-install: import manually)
   ld-activity-symbolic (from lucide)
   ld-alert-triangle-symbolic (from lucide)
@@ -36,6 +36,7 @@ Would install 61 icons:
   ld-mic-off-symbolic (from lucide)
   ld-mic-symbolic (from lucide)
   ld-minus-symbolic (from lucide)
+  ld-monitor-symbolic (from lucide)
   ld-moon-symbolic (from lucide)
   ld-music-symbolic (from lucide)
   ld-power-symbolic (from lucide)
