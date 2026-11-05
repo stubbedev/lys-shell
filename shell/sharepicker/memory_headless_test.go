@@ -17,6 +17,7 @@ import (
 // application has no other surface whose buffers could come and go
 // meanwhile.
 func TestADismissedPickerReleasesItsPixels(t *testing.T) {
+	t.Setenv("LYS_UI_RENDERER", "cpu")
 	a := apptest.Run(t)
 	p, presented := headlessPicker(t, a, config.SharePickerWindows)
 	t.Cleanup(func() { p.Dismiss("/r/memory") })
@@ -25,11 +26,8 @@ func TestADismissedPickerReleasesItsPixels(t *testing.T) {
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/memory"}, Request{Sources: AllSources}) }()
 	apptest.Answer(t, "the picker presented", presented)
 	shown := apptest.ShmResident(t)
-	for deadline := time.Now().Add(10 * time.Second); shown <= before; time.Sleep(20 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatalf("the presented picker holds %d resident bytes, no more than the %d before it opened", shown, before)
-		}
-		shown = apptest.ShmResident(t)
+	if shown <= before {
+		t.Fatalf("the presented picker holds %d resident bytes, no more than the %d before it opened", shown, before)
 	}
 	p.Dismiss("/r/memory")
 	apptest.Answer(t, "the dismissed picker's answer", answers)
