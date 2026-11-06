@@ -87,7 +87,9 @@ func TestAReleaseEndsAPrebuildAndAReloadStartsAnother(t *testing.T) {
 	if len(r.instances) != 0 {
 		t.Errorf("a released registry built %d dropdowns", len(r.instances))
 	}
-	r.setConfig(clockOnly())
+	moved := clockOnly()
+	moved.Bar.Location = config.LocationBottom
+	r.setConfig(moved)
 	q.drain()
 	if len(r.instances) != 2 {
 		t.Errorf("after a reload %d dropdowns built, want 2", len(r.instances))

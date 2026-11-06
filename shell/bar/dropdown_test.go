@@ -266,7 +266,9 @@ func TestDropdownInstancesAreCachedUntilReleased(t *testing.T) {
 	if built[0].closed != 0 {
 		t.Error("a cached instance was released while cached")
 	}
-	r.setConfig(config.Defaults())
+	moved := config.Defaults()
+	moved.Bar.Location = config.LocationBottom
+	r.setConfig(moved)
 	if built[0].closed != 1 {
 		t.Errorf("released %d times on a config change, want once", built[0].closed)
 	}

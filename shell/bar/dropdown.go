@@ -14,6 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/reveal"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // dropdownRegistry maps the `dropdown:<name>` actions to content
@@ -41,8 +42,8 @@ type dropdownRegistry struct {
 	// DropdownInstance cache: built on the first open and reused by
 	// every later one on any output, so its state (the visible page,
 	// the scroll, a half-filled form) and its service subscriptions
-	// persist across open and close. A config change or a rebuild of
-	// the bars releases them.
+	// persist across open and close. A change to what they are built
+	// from releases them (reconfigure).
 	instances        map[string]widget.Widget
 	dashboardAnchors map[string]widget.Widget
 	// idle runs fn on the loop once the bars have had their first frames,
@@ -54,6 +55,20 @@ type dropdownRegistry struct {
 	prebuilt bool
 	// released counts the releases, which end a prebuild under way.
 	released uint64
+	look     dropdownLook
+}
+
+type dropdownLook struct {
+	style   barStyle
+	palette styling.Palette
+}
+
+func lookOf(style *barStyle) dropdownLook {
+	look := dropdownLook{style: *style}
+	if style.palette != nil {
+		look.palette = *style.palette
+	}
+	return look
 }
 
 // dropdownPrebuildDelay is how long after the first bar attaches its
@@ -139,13 +154,12 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 	// popover), so builders get the full style: the module style the
 	// bar hands its modules leaves fg to the stylesheet (zero), which
 	// would paint every default-colored dropdown label transparent.
-	base.Style = style
-	return &dropdownRegistry{
+	r := &dropdownRegistry{
 		app:      application,
 		cfg:      cfg,
 		font:     font,
 		style:    style,
-		ctx:      base,
+		look:     lookOf(style),
 		hosts:    make(map[string]app.Host),
 		builders: dropdownBuilders(),
 		openPop:  make(map[string]*app.Popover),
@@ -155,6 +169,9 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		instances:        make(map[string]widget.Widget),
 		dashboardAnchors: make(map[string]widget.Widget),
 	}
+	base.Style, base.Dropdowns, base.gen = style, r, newMountGen()
+	r.ctx = base
+	return r
 }
 
 // buildAhead has the bars' dropdowns built while the loop is idle, from
@@ -248,18 +265,51 @@ func dropdownPanel(name string, cfg *config.Config, content widget.Widget) widge
 }
 
 // release closes every open dropdown and drops the cached instances,
-// stopping what each follows; the next open builds afresh.
+// stopping what each follows and ending the generation they ran in; the
+// next open, or the next prebuild, builds afresh.
 func (r *dropdownRegistry) release() {
 	r.closeAll()
 	r.mu.Lock()
 	r.released++
+	r.prebuilt = false
 	instances := r.instances
 	r.instances = make(map[string]widget.Widget)
+	retired := r.ctx.gen
+	r.ctx.gen = newMountGen()
 	r.mu.Unlock()
 	for _, content := range instances {
 		if c, ok := content.(dropdownCloser); ok {
 			c.dropdownClosed()
 		}
+	}
+	retired.retire()
+}
+
+func (r *dropdownRegistry) remount(ctx ModuleContext) {
+	r.closeAll()
+	r.mu.Lock()
+	clear(r.hosts)
+	clear(r.monH)
+	clear(r.dashboardAnchors)
+	r.mu.Unlock()
+	r.reconfigure(ctx)
+}
+
+func (r *dropdownRegistry) reconfigure(ctx ModuleContext) {
+	look := lookOf(r.style)
+	r.mu.Lock()
+	stale := barsAffected(r.cfg, ctx.Config) || look != r.look
+	r.cfg, r.font, r.look = ctx.Config, ctx.Font, look
+	ctx.Style, ctx.Dropdowns, ctx.gen = r.style, r, r.ctx.gen
+	r.ctx = ctx
+	hosted := len(r.hosts) > 0
+	r.mu.Unlock()
+	if !stale {
+		return
+	}
+	r.release()
+	if hosted {
+		r.prebuild()
 	}
 }
 
@@ -535,19 +585,13 @@ func dropdownGenieEdge(location config.Location) widget.Edge {
 }
 
 // setConfig hands dropdowns opened from now on a new snapshot, for a
-// reload that leaves the bars standing: the instances built from the
-// old one are released.
+// reload that leaves the bars standing.
 func (r *dropdownRegistry) setConfig(cfg *config.Config) {
-	r.release()
 	r.mu.Lock()
-	r.cfg = cfg
-	r.ctx.Config = cfg
-	r.prebuilt = false
-	hosted := len(r.hosts) > 0
+	ctx := r.ctx
 	r.mu.Unlock()
-	if hosted {
-		r.prebuild()
-	}
+	ctx.Config = cfg
+	r.reconfigure(ctx)
 }
 
 // dropdownTree is the popover's tree around content: the revealer the

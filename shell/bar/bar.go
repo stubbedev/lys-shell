@@ -597,6 +597,7 @@ func (s *shellStart) mount() {
 	s.rebuild = func(apply func(*ModuleContext)) {
 		if apply != nil {
 			apply(&rt.ctx)
+			rt.ctx.Dropdowns.release()
 		}
 		restyle(current.Load())
 	}
@@ -844,8 +845,9 @@ func (r *barRuntime) derive(cfg *config.Config) error {
 // from the one derive last resolved.
 func (r *barRuntime) paletteStale() bool { return *r.theme.RenderPalette() != *r.palette }
 
-// mount starts a generation for cfg: the previous one is retired, the
-// dropdowns are rebuilt, and the context carries the new snapshot.
+// mount starts a generation for cfg: the previous one is retired and the
+// context carries the new snapshot. The dropdown registry made by the
+// first mount is remounted by every later one.
 func (r *barRuntime) mount(application *app.Application, cfg *config.Config) {
 	if r.ctx.gen != nil {
 		r.ctx.gen.retire()
@@ -855,8 +857,8 @@ func (r *barRuntime) mount(application *app.Application, cfg *config.Config) {
 	r.ctx.Style = &r.moduleStyle
 	r.ctx.gen = newMountGen()
 	if r.ctx.Dropdowns != nil {
-		// The old bars' dropdown instances go with them.
-		r.ctx.Dropdowns.release()
+		r.ctx.Dropdowns.remount(r.ctx)
+		return
 	}
 	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, r.font, &r.style, r.ctx)
 	r.ctx.Dropdowns.buildAhead()
