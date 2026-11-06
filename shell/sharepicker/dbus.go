@@ -50,7 +50,7 @@ type WindowRequest struct {
 // picker is what the daemon serves: the Picker, or a fake in tests.
 type picker interface {
 	Pick(portaldialogs.Caller, Request) string
-	PickWindow(portaldialogs.Caller, WindowRequest) string
+	PickWindow(portaldialogs.Caller, WindowRequest) (string, error)
 	Dismiss(handle string)
 }
 
@@ -92,12 +92,17 @@ func (d *Daemon) Pick(c portaldialogs.Caller, r Request) (string, *dbus.Error) {
 // PickWindow opens the click-to-pick overlay and blocks until a click
 // picks a window, replying /window:<id>, or Enter shares the screen,
 // replying /screen:<name>; Escape replies an empty string, which
-// cancels, as Pick's does. A request offering nothing to pick is refused.
+// cancels, as Pick's does. A request offering nothing to pick is refused,
+// and an overlay that cannot open fails, so the caller asks the picker.
 func (d *Daemon) PickWindow(c portaldialogs.Caller, r WindowRequest) (string, *dbus.Error) {
 	if len(r.Windows) == 0 {
 		return "", dbus.MakeFailedError(errors.New("share picker: no window to pick from"))
 	}
-	return d.picker.PickWindow(c, r), nil
+	selection, err := d.picker.PickWindow(c, r)
+	if err != nil {
+		return "", dbus.MakeFailedError(err)
+	}
+	return selection, nil
 }
 
 // Dismiss cancels the picker showing for the request at handle.

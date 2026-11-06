@@ -1,6 +1,8 @@
 package sharepicker
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -44,7 +46,13 @@ func windowPicker(t *testing.T, screen string) *pickRig {
 		{ID: "back", Output: output, X: 50, Y: 50, Width: 600, Height: 400},
 	}, Screen: screen}
 	t.Cleanup(func() { p.Dismiss("/r/click") })
-	go func() { r.answers <- p.PickWindow(portaldialogs.Caller{Handle: "/r/click"}, req) }()
+	go func() {
+		got, err := p.PickWindow(portaldialogs.Caller{Handle: "/r/click"}, req)
+		if err != nil {
+			t.Errorf("the open window pick failed: %v", err)
+		}
+		r.answers <- got
+	}()
 	apptest.Until(t, a, "the overlay took the keyboard", func() bool { return gate.Open() && a.Session().KeyboardFocus() != nil })
 	return r
 }
@@ -143,10 +151,31 @@ func TestHeadlessDismissTakesTheWindowPickDown(t *testing.T) {
 	apptest.Until(t, r.a, "the overlay went", func() bool { return !r.gate.Open() })
 }
 
-func TestPickWindowWithoutAnOverlayGivesUp(t *testing.T) {
-	p := New(&app.Application{}, Deps{}, &regionoverlay.Gate{}, nil, nil)
+func TestPickWindowFailsWhenTheOverlayCannotOpenAndAnswersEscapeWithNothing(t *testing.T) {
 	req := WindowRequest{Windows: []regionoverlay.Window{{ID: "w", Output: "DP-1", Width: 10, Height: 10}}, Screen: "DP-1"}
-	if got := p.PickWindow(portaldialogs.Caller{Handle: "/r/none"}, req); got != "" {
-		t.Fatalf("a picker without the overlay answered %q, want nothing", got)
+	if got, err := New(&app.Application{}, Deps{}, &regionoverlay.Gate{}, nil, nil).PickWindow(portaldialogs.Caller{Handle: "/r/none"}, req); !errors.Is(err, errNoWindowPick) || got != "" {
+		t.Fatalf("a picker without the overlay answered %q %v, want errNoWindowPick", got, err)
 	}
+	gate := &regionoverlay.Gate{}
+	end, err := gate.Instant()
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &app.Application{}
+	p := New(a, Deps{}, gate, nil, regionoverlay.NewWindowPick(a, gate, nil, nil, nil))
+	if got, err := p.PickWindow(portaldialogs.Caller{Handle: "/r/busy"}, req); !errors.Is(err, regionoverlay.ErrBusy) || got != "" {
+		t.Fatalf("a pick while another capture holds the gate answered %q %v, want ErrBusy", got, err)
+	}
+	end()
+	ended := New(a, Deps{}, gate, nil, nil)
+	ended.windowPick = endedPick{}
+	if got, err := ended.PickWindow(portaldialogs.Caller{Handle: "/r/esc"}, req); err != nil || got != "" {
+		t.Fatalf("Escape answered %q %v, want nothing and no error", got, err)
+	}
+}
+
+type endedPick struct{}
+
+func (endedPick) Request(context.Context, []regionoverlay.Window, string) (regionoverlay.Picked, bool, error) {
+	return regionoverlay.Picked{}, false, nil
 }

@@ -24,6 +24,9 @@ type fakeSharePicker struct {
 	// user clicks in them, nil for Escape.
 	windowAsked dbustest.Var[[]sharepicker.WindowRequest]
 	click       dbustest.Var[*windowClick]
+	// shell, when set, answers the click-to-pick in place of click: the
+	// shell's own daemon over its own picker.
+	shell dbustest.Var[*sharepicker.Daemon]
 }
 
 func (f *fakeSharePicker) Pick(c portaldialogs.Caller, r sharepicker.Request) (string, *dbus.Error) {

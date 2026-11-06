@@ -12,6 +12,7 @@ package sharepicker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"log"
@@ -67,6 +68,8 @@ type Deps struct {
 	Describe func(appID string) (name, icon string)
 }
 
+var errNoWindowPick = errors.New("share picker: no click-to-pick overlay")
+
 // Picker is the share picker component. Pick is its entry point; the
 // rest runs on the lys-ui loop goroutine.
 type Picker struct {
@@ -77,7 +80,7 @@ type Picker struct {
 		Request(ctx context.Context, frames regionoverlay.Frames) (regionoverlay.Selection, bool, error)
 	}
 	// windowPick is the click-to-pick overlay PickWindow opens; nil
-	// answers every PickWindow as given up.
+	// fails every PickWindow with errNoWindowPick.
 	windowPick interface {
 		Request(ctx context.Context, windows []regionoverlay.Window, screen string) (regionoverlay.Picked, bool, error)
 	}
@@ -155,12 +158,13 @@ func (p *Picker) Pick(c portaldialogs.Caller, r Request) string {
 
 // PickWindow opens the click-to-pick overlay for one portal request and
 // blocks until a click picks a window, replying /window:<id>, or Enter
-// shares the request's screen, replying /screen:<name>. Escape, a
-// dismissal, or an overlay that cannot open (another capture session
-// holds the gate) replies "". Call it from any goroutine but the loop's.
-func (p *Picker) PickWindow(c portaldialogs.Caller, r WindowRequest) string {
+// shares the request's screen, replying /screen:<name>. Escape or a
+// dismissal replies "". An overlay that cannot open (none built, or
+// another capture session holds the gate) is an error, so the request
+// goes on to the picker. Call it from any goroutine but the loop's.
+func (p *Picker) PickWindow(c portaldialogs.Caller, r WindowRequest) (string, error) {
 	if p.windowPick == nil {
-		return ""
+		return "", errNoWindowPick
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -175,14 +179,13 @@ func (p *Picker) PickWindow(c portaldialogs.Caller, r WindowRequest) string {
 	picked, ok, err := p.windowPick.Request(ctx, r.Windows, r.Screen)
 	switch {
 	case err != nil:
-		log.Printf("share picker: window pick: %v", err)
-		return ""
+		return "", fmt.Errorf("share picker: window pick for %s: %w", c.Handle, err)
 	case !ok:
-		return ""
+		return "", nil
 	case picked.Window != "":
-		return "/" + Target{Kind: TargetWindow, Name: picked.Window}.Payload()
+		return "/" + Target{Kind: TargetWindow, Name: picked.Window}.Payload(), nil
 	}
-	return "/" + Target{Kind: TargetOutput, Name: picked.Screen}.Payload()
+	return "/" + Target{Kind: TargetOutput, Name: picked.Screen}.Payload(), nil
 }
 
 // Dismiss cancels the request at handle: the window pick or the picker

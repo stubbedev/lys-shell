@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-lib/pipewire"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -533,6 +534,9 @@ type windowClick struct {
 // front window there, Enter the offered screen, no click is Escape.
 func (f *fakeSharePicker) PickWindow(c portaldialogs.Caller, r sharepicker.WindowRequest) (string, *dbus.Error) {
 	f.windowAsked.Update(func(a []sharepicker.WindowRequest) []sharepicker.WindowRequest { return append(a, r) })
+	if shell := f.shell.Load(); shell != nil {
+		return shell.PickWindow(c, r)
+	}
 	if f.enter(c) {
 		return "", nil
 	}
@@ -648,6 +652,31 @@ func TestEscapeInTheClickToPickCancelsTheRequestAsACancelledPickerDoes(t *testin
 	}
 	if got := f.started.Load(); len(got) != 0 {
 		t.Errorf("started %v after Escape, want nothing", got)
+	}
+}
+
+// A click-to-pick that cannot open, because another capture holds the
+// shell's gate, is not the user declining: the picker asks, and what
+// it picks is shared.
+func TestAClickToPickThatCannotOpenAsksThePicker(t *testing.T) {
+	r, f, p := windowRig(t, "/window:lys-wm-5")
+	gate := &regionoverlay.Gate{}
+	end, err := gate.Instant()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer end()
+	a := &app.Application{}
+	p.shell.Store(sharepicker.NewDaemon(sharepicker.New(a, sharepicker.Deps{}, gate, nil, regionoverlay.NewWindowPick(a, gate, nil, nil, nil))))
+	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d, want the picker's pick shared", code)
+	}
+	if len(p.windowAsked.Load()) != 1 || len(p.asked.Load()) != 1 {
+		t.Errorf("the overlay was asked %d times and the picker %d, want once each", len(p.windowAsked.Load()), len(p.asked.Load()))
+	}
+	if got := f.started.Load(); !slices.Equal(got, []string{"window:lys-wm-5"}) {
+		t.Errorf("started %v, want the window the picker picked", got)
 	}
 }
 

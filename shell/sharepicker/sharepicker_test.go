@@ -303,7 +303,10 @@ func TestMonitorAreaPlacement(t *testing.T) {
 	}
 }
 
-type fakePicker struct{ reply string }
+type fakePicker struct {
+	reply   string
+	pickErr error
+}
 
 func (f fakePicker) Pick(c portaldialogs.Caller, r Request) string {
 	return f.reply + "|" + c.Handle + "|" + r.WindowList + "|" + boolStr(r.AllowToken) + boolStr(r.Multiple) + "|" + strconv.Itoa(int(r.Sources))
@@ -311,12 +314,15 @@ func (f fakePicker) Pick(c portaldialogs.Caller, r Request) string {
 
 func (fakePicker) Dismiss(string) {}
 
-func (f fakePicker) PickWindow(c portaldialogs.Caller, r WindowRequest) string {
+func (f fakePicker) PickWindow(c portaldialogs.Caller, r WindowRequest) (string, error) {
+	if f.pickErr != nil {
+		return "", f.pickErr
+	}
 	ids := make([]string, len(r.Windows))
 	for i, w := range r.Windows {
 		ids[i] = fmt.Sprintf("%s@%s:%d,%d,%d,%d", w.ID, w.Output, w.X, w.Y, w.Width, w.Height)
 	}
-	return f.reply + "|" + c.Handle + "|" + strings.Join(ids, ";") + "|" + r.Screen
+	return f.reply + "|" + c.Handle + "|" + strings.Join(ids, ";") + "|" + r.Screen, nil
 }
 
 func boolStr(b bool) string {
@@ -350,6 +356,13 @@ func TestDaemonOverTheBus(t *testing.T) {
 	}
 	if got, err := NewClient(client).PickWindow(context.Background(), portaldialogs.Caller{Handle: "/r/4"}, WindowRequest{Screen: "DP-1"}); err == nil {
 		t.Fatalf("PickWindow with no windows = %q", got)
+	}
+	busy := bus.Conn(t)
+	if err := busy.Export(&Daemon{picker: fakePicker{pickErr: regionoverlay.ErrBusy}}, ServicePath, iface); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := (&Client{obj: client.Object(busy.Names()[0], ServicePath)}).PickWindow(context.Background(), portaldialogs.Caller{Handle: "/r/5"}, windows); err == nil || !strings.Contains(err.Error(), regionoverlay.ErrBusy.Error()) {
+		t.Fatalf("PickWindow on a busy overlay = %q %v, want a D-Bus error naming ErrBusy", got, err)
 	}
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {
 		t.Fatal("a second daemon claimed the owned name")

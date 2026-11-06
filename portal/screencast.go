@@ -100,8 +100,8 @@ func (c *screenCast) choose(call *call, cfg castState) (token bool, targets []sh
 // shares, over the windows lys-wm shows, front to back by its stacking
 // order; where the request takes a monitor too, Enter shares the
 // focused output. It is not ok, so the picker asks, without lys-wm, a
-// shown window or the shell's overlay; Escape cancels the request, as
-// a cancelled picker does.
+// shown window, or the shell's overlay or one that cannot open; only
+// Escape cancels the request, as a cancelled picker does.
 func (c *screenCast) clickWindow(call *call, cfg castState) ([]sharepicker.Target, uint32, bool) {
 	if cfg.types&sourceWindow == 0 || cfg.multiple {
 		return nil, 0, false
