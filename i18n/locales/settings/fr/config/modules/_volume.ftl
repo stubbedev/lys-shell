@@ -48,7 +48,7 @@ settings-modules-volume-scroll-down = Défilement vers le bas
     .description = Action au défilement vers le bas
 
 settings-modules-volume-format = Format
-    .description = Modèle de libellé pour l'affichage du volume (ex. : {"{{"}percentage{"}}"} %)
+    .description = Modèle de libellé pour l'affichage du volume (ex. : {"{{"} percent {"}}"} %)
 
 settings-modules-volume-left-click = Clic gauche
     .description = Action au clic gauche

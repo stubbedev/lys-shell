@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -133,5 +134,46 @@ func TestTheSchemaCarriesThePlaceholdersAndTypes(t *testing.T) {
 	clock := schema.Defs["ClockConfig"].Properties["format"]
 	if clock.Ref != "#/$defs/StrftimeFormat" || schema.Defs["StrftimeFormat"].Format != "strftime" {
 		t.Errorf("clock format = %+v, StrftimeFormat def = %+v", clock, schema.Defs["StrftimeFormat"])
+	}
+}
+
+var helpPlaceholder = map[placeholderSyntax]*regexp.Regexp{
+	jinjaSyntax: regexp.MustCompile(`\{\{\s*(\w+)`),
+	braceSyntax: regexp.MustCompile(`\{(\w+)\}`),
+}
+
+func TestFormatHelpNamesOnlyDeclaredPlaceholders(t *testing.T) {
+	langs, err := i18n.ConfigAssets().Available()
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := 0
+	for _, lang := range langs {
+		loader, err := i18n.Select(i18n.ConfigAssets(), []i18n.LangID{lang})
+		if err != nil {
+			t.Fatal(err)
+		}
+		leafPaths(typeOf[Config](), "", func(path string, _ reflect.Type) {
+			_, f, _ := fieldAtPath(typeOf[Config](), path)
+			decl, ok := formatFields[f.owner.Name()+"."+f.goName]
+			if !ok {
+				return
+			}
+			declared := map[string]bool{}
+			for _, p := range decl.placeholders {
+				declared[p.name] = true
+			}
+			key, _ := I18nKey(path)
+			help := loader.Attr(key, "description")
+			for _, m := range helpPlaceholder[decl.syntax].FindAllStringSubmatch(help, -1) {
+				checked++
+				if !declared[m[1]] {
+					t.Errorf("%s: %s help %q names %q, which is not one of its placeholders", lang, path, help, m[1])
+				}
+			}
+		})
+	}
+	if checked == 0 {
+		t.Error("no format help names a placeholder; the scan matched nothing")
 	}
 }

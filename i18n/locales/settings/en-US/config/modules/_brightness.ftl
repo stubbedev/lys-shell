@@ -39,7 +39,7 @@ settings-modules-brightness-button-bg-color = Button Background
     .description = Button background color
 
 settings-modules-brightness-format = Format
-    .description = Label template for brightness display (e.g. {"{{"}percent{"}}"} %)
+    .description = Label template for brightness display (e.g. {"{{"} percent {"}}"} %)
 
 settings-modules-brightness-left-click = Left Click
     .description = Action on left click

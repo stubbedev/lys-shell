@@ -51,7 +51,7 @@ settings-modules-battery-scroll-down = Défilement vers le bas
     .description = Commande à exécuter au défilement vers le bas
 
 settings-modules-battery-format = Format
-    .description = Modèle de libellé pour l'affichage de la batterie (ex. : {"{{"}percentage{"}}"} %)
+    .description = Modèle de libellé pour l'affichage de la batterie (ex. : {"{{"} percent {"}}"} %)
 
 settings-modules-battery-left-click = Clic gauche
     .description = Action au clic gauche
