@@ -291,8 +291,8 @@ func (v *dashboardView) quickActions() widget.Widget {
 		v.refreshAll()
 	})
 	dnd = make1(0, 1, "ld-bell-symbolic", "dropdown-dashboard-dnd", func() {
-		if v.ctx.Notifications != nil {
-			v.ctx.Notifications.SetDND(!state.dndOn)
+		if n := v.ctx.Notifications; n != nil {
+			n.SetDND(!n.DND())
 		}
 	})
 	idle = make1(1, 1, "ld-eye-symbolic", "dropdown-dashboard-idle-inhibit", func() {

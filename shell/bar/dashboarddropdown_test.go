@@ -163,6 +163,14 @@ func TestDashboardQuickActionsDriveTheServices(t *testing.T) {
 	if !ctx.Notifications.DND() {
 		t.Error("the DND toggle did not reach the service")
 	}
+	dnd.OnClick()
+	if ctx.Notifications.DND() {
+		t.Error("a second press before the dashboard refreshed left DND on")
+	}
+	dnd.OnClick()
+	if !ctx.Notifications.DND() {
+		t.Error("a third press before the dashboard refreshed left DND off")
+	}
 	v.refreshAll()
 	if !dnd.HasClass("active") {
 		t.Error("DND on did not mark its button active")
