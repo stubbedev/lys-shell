@@ -20,6 +20,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -34,9 +35,11 @@ type spooled struct {
 }
 
 type harness struct {
-	mu       sync.Mutex
-	h        *Dialog
-	opened   chan app.LayerConfig
+	mu     sync.Mutex
+	h      *Dialog
+	opened chan app.LayerConfig
+	// specs are the dialogs opened, in order.
+	specs    []dialogsurface.Spec
 	printers []ipp.Printer
 	listErr  error
 	spoolErr error
@@ -56,8 +59,11 @@ func newHarness(t *testing.T) *harness {
 	hs.printers = []ipp.Printer{{Name: "office", Location: "Hall", State: ipp.StateIdle, Accepting: true}}
 	hs.h = New(Deps{
 		Config: func() *config.Config { return cfg },
-		Open: func(c app.LayerConfig) (Window, error) {
-			hs.opened <- c
+		Open: func(s dialogsurface.Spec) (Window, error) {
+			hs.mu.Lock()
+			hs.specs = append(hs.specs, s)
+			hs.mu.Unlock()
+			hs.opened <- s.Overlay
 			return &fakeWindow{}, nil
 		},
 		Invoke: hs.do,
@@ -573,5 +579,24 @@ func TestSheetTakesLysUiParts(t *testing.T) {
 		if widget.HasClass(w, css.DimLabel) {
 			t.Error("a printer's name is dim")
 		}
+	}
+}
+
+// The dialog is opened for the request's window and modality; a
+// dialog that lost its parent and could not map again cancels the
+// request.
+func TestTheDialogIsOpenedForTheRequestWindow(t *testing.T) {
+	hs := newHarness(t)
+	caller := portaldialogs.Caller{Handle: "/r/parent", AppID: "org.app", ParentWindow: "wayland:abc", Modal: true}
+	got, _ := hs.prepareWith(t, caller, PrepareRequest{Title: "Doc"})
+	hs.mu.Lock()
+	spec := hs.specs[len(hs.specs)-1]
+	hs.mu.Unlock()
+	if spec.Caller != caller || spec.Failed == nil {
+		t.Fatalf("opened for %+v (failed set %v), want %+v", spec.Caller, spec.Failed != nil, caller)
+	}
+	hs.do(spec.Failed)
+	if r := <-got; r.ok {
+		t.Error("a dialog nothing shows answered yes")
 	}
 }

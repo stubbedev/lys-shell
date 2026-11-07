@@ -30,6 +30,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -86,11 +87,13 @@ func center(w widget.Boundser) widget.Point {
 // harness runs the chooser with a lock-step loop: Invoke and the
 // test's gestures take turns, as on the one UI goroutine.
 type harness struct {
-	t       *testing.T
-	mu      sync.Mutex
-	c       *Chooser
-	root    string
-	opened  chan app.LayerConfig
+	t      *testing.T
+	mu     sync.Mutex
+	c      *Chooser
+	root   string
+	opened chan app.LayerConfig
+	// specs are the dialogs opened, in order.
+	specs   []dialogsurface.Spec
 	windows []*fakeWindow
 	openErr error
 	// focusErr fails every opened overlay's SetFocus.
@@ -127,15 +130,16 @@ func newHarness(t *testing.T, viewFile string) *harness {
 	t.Cleanup(hs.endLoop)
 	hs.c = New(Deps{
 		Config: func() *config.Config { return hs.conf },
-		Open: func(c app.LayerConfig) (Window, error) {
+		Open: func(s dialogsurface.Spec) (Window, error) {
 			hs.mu.Lock()
 			defer hs.mu.Unlock()
+			hs.specs = append(hs.specs, s)
 			if hs.openErr != nil {
 				return nil, hs.openErr
 			}
 			w := &fakeWindow{refuse: hs.focusErr}
 			hs.windows = append(hs.windows, w)
-			hs.opened <- c
+			hs.opened <- s.Overlay
 			return w, nil
 		},
 		Invoke:    hs.invoke,
@@ -2173,4 +2177,24 @@ func TestTheChooserMapsWhilePlacesAndLocationsHold(t *testing.T) {
 		t.Fatal("the sidebar was never read")
 	}
 	hs.flush()
+}
+
+// The chooser is opened for the request's window, modality and title; a
+// chooser that lost its parent and could not map again cancels.
+func TestTheChooserIsOpenedForTheRequestWindow(t *testing.T) {
+	hs := newHarness(t, "")
+	caller := portaldialogs.Caller{Handle: "/r/parent", AppID: "org.app", ParentWindow: "wayland:abc", Modal: true}
+	got := hs.ask(t, func() []string {
+		return hs.c.Open(caller, OpenRequest{Title: "Pick a file", CurrentFolder: hs.root}).URIs
+	})
+	hs.mu.Lock()
+	spec := hs.specs[len(hs.specs)-1]
+	hs.mu.Unlock()
+	if spec.Caller != caller || spec.Title != "Pick a file" || spec.Failed == nil {
+		t.Fatalf("opened for %+v %q (failed set %v), want %+v", spec.Caller, spec.Title, spec.Failed != nil, caller)
+	}
+	hs.do(spec.Failed)
+	if uris := answer(t, got); uris != nil {
+		t.Errorf("a chooser nothing shows answered %v", uris)
+	}
 }

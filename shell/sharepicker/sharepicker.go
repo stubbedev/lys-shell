@@ -34,6 +34,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/reveal"
@@ -108,9 +109,11 @@ type Picker struct {
 	pages        []string
 	choices      map[string][]widget.Widget
 	rev          *widget.Revealer
-	layer        *app.LayerWindow
-	confirm      *widget.Button
-	confirmLbl   *widget.Label
+	layer        dialogsurface.Window
+	// caller is the request showing's.
+	caller     portaldialogs.Caller
+	confirm    *widget.Button
+	confirmLbl *widget.Label
 
 	// invoke marshals onto the loop (Application.Invoke).
 	invoke func(func())
@@ -214,7 +217,7 @@ func (p *Picker) Dismiss(handle string) {
 func (p *Picker) show(c portaldialogs.Caller, ch chan string, toplevels []sharepreview.Toplevel, r Request) {
 	p.snapshot()
 	p.reply, p.allowToken, p.multiple, p.pending = ch, r.AllowToken, r.Multiple, nil
-	p.requester = p.describe(c)
+	p.requester, p.caller = p.describe(c), c
 	p.previews, p.endPreviews = context.WithCancel(context.Background())
 	if r.Sources&SourceOutputs == 0 {
 		p.open(toplevels, r.Sources, outputsRead{})
@@ -336,17 +339,22 @@ func (p *Picker) widgetSize() int {
 	return p.px(p.cfg.WidgetSize, config.SharePickerWidgetBaseRem)
 }
 
-// mapSurface maps the overlay: unanchored (centered by the compositor)
-// and sized by the surface's size request.
+// mapSurface maps the picker for the request's window, or as an
+// overlay: unanchored (centered by the compositor) and sized by the
+// surface's size request.
 func (p *Picker) mapSurface() error {
-	layer, err := p.app.NewLayer(app.LayerConfig{
-		Layer:         app.LayerOverlay,
-		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardExclusive,
-		Namespace:     "lys-shell-share-picker",
-		Root:          p.root,
-		OnKey:         keys.OnKey(p.app.KeySym, p.key),
-		OnPresented:   p.presented,
+	layer, err := dialogsurface.Open(p.app, dialogsurface.Spec{
+		Caller: p.caller, Title: "Share your screen",
+		Overlay: app.LayerConfig{
+			Layer:         app.LayerOverlay,
+			ExclusiveZone: -1,
+			Keyboard:      app.KeyboardExclusive,
+			Namespace:     "lys-shell-share-picker",
+			Root:          p.root,
+			OnKey:         keys.OnKey(p.app.KeySym, p.key),
+			OnPresented:   p.presented,
+		},
+		Failed: func() { p.answer("") },
 	})
 	if err != nil {
 		return err

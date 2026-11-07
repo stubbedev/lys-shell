@@ -22,6 +22,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -40,10 +41,12 @@ func (w *fakeWindow) SetFocus(f widget.Widget) error {
 // harness runs the host with a synchronous loop: the UI work happens
 // on the asking goroutine, and Open hands the tree to the test.
 type harness struct {
-	mu       sync.Mutex
-	cfg      *config.Config
-	h        *Dialogs
-	opened   chan app.LayerConfig
+	mu     sync.Mutex
+	cfg    *config.Config
+	h      *Dialogs
+	opened chan app.LayerConfig
+	// specs are the dialogs opened, in order.
+	specs    []dialogsurface.Spec
 	windows  []*fakeWindow
 	openErr  error
 	defaults []string
@@ -67,15 +70,16 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 	hs := &harness{cfg: cfg, opened: make(chan app.LayerConfig, 4), signals: make(chan signalled, 4)}
 	hs.h = New(Deps{
 		Config: func() *config.Config { return hs.cfg },
-		Open: func(c app.LayerConfig) (Window, error) {
+		Open: func(s dialogsurface.Spec) (Window, error) {
 			hs.mu.Lock()
 			defer hs.mu.Unlock()
+			hs.specs = append(hs.specs, s)
 			if hs.openErr != nil {
 				return nil, hs.openErr
 			}
 			w := &fakeWindow{}
 			hs.windows = append(hs.windows, w)
-			hs.opened <- c
+			hs.opened <- s.Overlay
 			return w, nil
 		},
 		Invoke: hs.do,
@@ -998,5 +1002,28 @@ func TestPasswordAsksOnceOrTwice(t *testing.T) {
 	})
 	if r.ok || r.password != "" || r.picked != nil {
 		t.Errorf("a cancelled password with a choice = %+v", r)
+	}
+}
+
+// An Access dialog is opened for the request's window and modality; a
+// dialog that lost its parent and could not map again denies.
+func TestAnAccessDialogIsOpenedForTheRequestWindow(t *testing.T) {
+	hs := newHarness(t, nil)
+	caller := portaldialogs.Caller{Handle: "/r/parent", AppID: "org.app", ParentWindow: "wayland:abc", Modal: true}
+	got := make(chan bool, 1)
+	go func() {
+		ok, _ := hs.h.Access(caller, portaldialogs.AccessRequest{Title: "Allow?", GrantLabel: "Allow", DenyLabel: "Deny"})
+		got <- ok
+	}()
+	hs.open(t)
+	hs.mu.Lock()
+	spec := hs.specs[len(hs.specs)-1]
+	hs.mu.Unlock()
+	if spec.Caller != caller || spec.Failed == nil {
+		t.Fatalf("opened for %+v (failed set %v), want %+v", spec.Caller, spec.Failed != nil, caller)
+	}
+	hs.do(spec.Failed)
+	if <-got {
+		t.Error("a dialog nothing shows granted the access")
 	}
 }

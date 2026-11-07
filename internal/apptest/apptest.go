@@ -28,6 +28,13 @@ const settle = 300 * time.Millisecond
 func Run(t *testing.T, env ...string) *app.Application {
 	t.Helper()
 	swaytest.Start(t, env...)
+	return Loop(t)
+}
+
+// Loop runs an application on the compositor WAYLAND_DISPLAY names for
+// the rest of the test, as Run does on its sway.
+func Loop(t *testing.T) *app.Application {
+	t.Helper()
 	sess, err := app.Connect()
 	if err != nil {
 		t.Fatal(err)

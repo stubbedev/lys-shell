@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -50,9 +51,9 @@ type Window interface {
 type Deps struct {
 	// Config is the live config (the dialog animation).
 	Config func() *config.Config
-	// Open maps the overlay; Invoke runs on the UI loop; KeySym reads
+	// Open maps the dialog; Invoke runs on the UI loop; KeySym reads
 	// its keys through the seat's keymap.
-	Open   func(cfg app.LayerConfig) (Window, error)
+	Open   func(dialogsurface.Spec) (Window, error)
 	Invoke func(func())
 	KeySym keys.Translator
 	// Font shapes the text; Sheet styles the surface, the labels'
@@ -130,7 +131,7 @@ func (h *Dialogs) ask(c portaldialogs.Caller, build func(answer func(bool, strin
 			h.answer = func(ok bool, choice string) { ch <- result{ok, choice} }
 			h.app, h.appIcon = h.d.Describe(c.AppID)
 			h.escape = func() { h.finish(false, "") }
-			h.show(build(h.finish))
+			h.show(c, build(h.finish))
 		}, func() { ch <- result{} })
 	})
 	r := <-ch
@@ -622,7 +623,7 @@ func (h *Dialogs) appRow(a desktopentry.App) widget.Widget {
 }
 
 // show maps the overlay with tree and plays the entry.
-func (h *Dialogs) show(tree widget.Widget) {
+func (h *Dialogs) show(caller portaldialogs.Caller, tree widget.Widget) {
 	if h.win != nil {
 		h.win.Close()
 		h.win, h.closing = nil, false
@@ -644,13 +645,17 @@ func (h *Dialogs) show(tree widget.Widget) {
 	if focus != nil || grab {
 		keyboard = app.KeyboardExclusive
 	}
-	win, err := h.d.Open(app.LayerConfig{
-		Layer:         app.LayerOverlay,
-		ExclusiveZone: -1,
-		Keyboard:      keyboard,
-		Namespace:     "lys-shell-portal-dialog",
-		Root:          root,
-		OnKey:         keys.OnEscape(h.d.KeySym, func() { h.escape() }),
+	win, err := h.d.Open(dialogsurface.Spec{
+		Caller: caller, Title: h.app,
+		Overlay: app.LayerConfig{
+			Layer:         app.LayerOverlay,
+			ExclusiveZone: -1,
+			Keyboard:      keyboard,
+			Namespace:     "lys-shell-portal-dialog",
+			Root:          root,
+			OnKey:         keys.OnEscape(h.d.KeySym, func() { h.escape() }),
+		},
+		Failed: func() { h.finish(false, "") },
 	})
 	if err != nil {
 		log.Printf("portal dialogs: cannot map the overlay: %v", err)

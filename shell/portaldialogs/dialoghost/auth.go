@@ -68,7 +68,7 @@ func (h *Dialogs) authStep(c portaldialogs.Caller, r portaldialogs.AuthRequest, 
 			if a.reply != nil {
 				h.focus = a.entry
 			}
-			h.show(tree)
+			h.show(c, tree)
 		}, a.end)
 		return
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -57,9 +58,9 @@ type Window interface{ Close() }
 type Deps struct {
 	// Config is the live config (the print animation).
 	Config func() *config.Config
-	// Open maps the overlay; Invoke runs on the UI loop; KeySym reads
+	// Open maps the dialog; Invoke runs on the UI loop; KeySym reads
 	// its keys through the seat's keymap.
-	Open   func(cfg app.LayerConfig) (Window, error)
+	Open   func(dialogsurface.Spec) (Window, error)
 	Invoke func(func())
 	KeySym keys.Translator
 	// Font shapes the text; Sheet styles the surface, the labels'
@@ -145,7 +146,7 @@ func (h *Dialog) ask(c portaldialogs.Caller, r PrepareRequest) (prepared, bool) 
 	h.d.Invoke(func() {
 		h.queue.Enqueue(c.Handle, func() {
 			h.answer = reply
-			h.show(h.build(queues, r))
+			h.show(c, h.build(queues, r))
 		}, func() { reply(prepared{}, false) })
 	})
 	a := <-ch
@@ -535,7 +536,7 @@ func outputFormat(formats []string) string {
 }
 
 // show maps the overlay with tree and plays the entry.
-func (h *Dialog) show(tree widget.Widget) {
+func (h *Dialog) show(caller portaldialogs.Caller, tree widget.Widget) {
 	if h.win != nil {
 		h.win.Close()
 		h.win, h.closing = nil, false
@@ -550,13 +551,17 @@ func (h *Dialog) show(tree widget.Widget) {
 		root.AttachStylesheet(h.d.Sheet)
 	}
 	root.Append(h.rev, true)
-	win, err := h.d.Open(app.LayerConfig{
-		Layer:         app.LayerOverlay,
-		ExclusiveZone: -1,
-		Keyboard:      app.KeyboardOnDemand,
-		Namespace:     "lys-shell-print",
-		Root:          root,
-		OnKey:         keys.OnEscape(h.d.KeySym, func() { h.finish(prepared{}, false) }),
+	win, err := h.d.Open(dialogsurface.Spec{
+		Caller: caller, Title: "Print",
+		Overlay: app.LayerConfig{
+			Layer:         app.LayerOverlay,
+			ExclusiveZone: -1,
+			Keyboard:      app.KeyboardOnDemand,
+			Namespace:     "lys-shell-print",
+			Root:          root,
+			OnKey:         keys.OnEscape(h.d.KeySym, func() { h.finish(prepared{}, false) }),
+		},
+		Failed: func() { h.finish(prepared{}, false) },
 	})
 	if err != nil {
 		log.Printf("print: cannot map the overlay: %v", err)

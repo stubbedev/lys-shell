@@ -25,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/reveal"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -74,9 +75,9 @@ type Window interface {
 type Deps struct {
 	// Config is the live config (the chooser's reveal animation).
 	Config func() *config.Config
-	// Open maps the overlay; Invoke runs on the UI loop; KeySym reads
+	// Open maps the dialog; Invoke runs on the UI loop; KeySym reads
 	// its keys through the seat's keymap.
-	Open   func(cfg app.LayerConfig) (Window, error)
+	Open   func(dialogsurface.Spec) (Window, error)
 	Invoke func(func())
 	KeySym keys.Translator
 	// Font shapes the text; Sheet styles the surface, the labels'
@@ -130,10 +131,12 @@ type Chooser struct {
 	// replacing is the existing file a save asked to replace, which a
 	// second confirm of the same name replaces.
 	replacing string
-	// modal is whether the request showing holds the keyboard.
-	modal bool
-	s     *session
-	ui    *ui
+	// caller and title are the request showing's: whose window the
+	// dialog is for, whether it is modal, and what it is called.
+	caller portaldialogs.Caller
+	title  string
+	s      *session
+	ui     *ui
 
 	// view, hidden and recursive stick across requests.
 	view              view
@@ -278,7 +281,7 @@ func (c *Chooser) ask(caller portaldialogs.Caller, r request) Result {
 	c.d.Invoke(func() {
 		c.queue.Enqueue(caller.Handle, func() {
 			c.reply = func(res Result) { ch <- res }
-			c.modal = caller.Modal
+			c.caller, c.title = caller, r.title
 			c.begin(r)
 		}, func() { ch <- Result{} })
 	})
@@ -1068,21 +1071,25 @@ func (c *Chooser) show() {
 		c.ui.root.SetPosition(c.at)
 	}
 	keyboard := app.KeyboardExclusive
-	if !c.modal {
+	if !c.caller.Modal {
 		keyboard = app.KeyboardOnDemand
 	}
 	// The overlay spans the output and the panel floats on it, taking
 	// input only over itself through the revealer.
-	win, err := c.d.Open(app.LayerConfig{
-		Output:        output,
-		Layer:         app.LayerOverlay,
-		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
-		ExclusiveZone: -1,
-		Keyboard:      keyboard,
-		Namespace:     "lys-shell-file-chooser",
-		Root:          c.rev,
-		OnKey:         keys.OnKey(c.d.KeySym, c.key),
-		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
+	win, err := c.d.Open(dialogsurface.Spec{
+		Caller: c.caller, Title: c.title,
+		Overlay: app.LayerConfig{
+			Output:        output,
+			Layer:         app.LayerOverlay,
+			Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
+			ExclusiveZone: -1,
+			Keyboard:      keyboard,
+			Namespace:     "lys-shell-file-chooser",
+			Root:          c.rev,
+			OnKey:         keys.OnKey(c.d.KeySym, c.key),
+			OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
+		},
+		Failed: func() { c.finish(nil) },
 	})
 	if err != nil {
 		log.Printf("file chooser: cannot map the overlay: %v", err)

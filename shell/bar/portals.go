@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs/dialoghost"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
@@ -65,7 +66,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 	}
 	chooser := filechooser.New(filechooser.Deps{
 		Config:         current,
-		Open:           layerOpener[filechooser.Window](application),
+		Open:           dialogOpener[filechooser.Window](application),
 		Invoke:         application.Invoke,
 		KeySym:         application.KeySym,
 		Font:           font,
@@ -86,7 +87,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 	}
 	dialogs := dialoghost.New(dialoghost.Deps{
 		Config:     current,
-		Open:       layerOpener[dialoghost.Window](application),
+		Open:       dialogOpener[dialoghost.Window](application),
 		Invoke:     application.Invoke,
 		KeySym:     application.KeySym,
 		Font:       font,
@@ -103,7 +104,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 	cups := ipp.NewClient(ipp.DefaultServer())
 	printer := printdialog.New(printdialog.Deps{
 		Config:     current,
-		Open:       layerOpener[printdialog.Window](application),
+		Open:       dialogOpener[printdialog.Window](application),
 		Invoke:     application.Invoke,
 		KeySym:     application.KeySym,
 		Font:       font,
@@ -188,11 +189,11 @@ func currentUser() string {
 	return ""
 }
 
-// layerOpener maps a host's overlay as its own Window type; a failure
-// is a nil interface, never a typed nil.
-func layerOpener[W interface{ Close() }](application *app.Application) func(app.LayerConfig) (W, error) {
-	return func(cfg app.LayerConfig) (W, error) {
-		w, err := application.NewLayer(cfg)
+// dialogOpener maps a host's dialog (dialogsurface.Open) as its own Window
+// type; a failure is a nil interface, never a typed nil.
+func dialogOpener[W interface{ Close() }](application *app.Application) func(dialogsurface.Spec) (W, error) {
+	return func(s dialogsurface.Spec) (W, error) {
+		w, err := dialogsurface.Open(application, s)
 		if err != nil {
 			var none W
 			return none, err
@@ -203,9 +204,9 @@ func layerOpener[W interface{ Close() }](application *app.Application) func(app.
 	}
 }
 
-// Every host's Window is a layer window.
+// Every host's Window is a dialog surface.
 var (
-	_ dialoghost.Window  = (*app.LayerWindow)(nil)
-	_ filechooser.Window = (*app.LayerWindow)(nil)
-	_ printdialog.Window = (*app.LayerWindow)(nil)
+	_ dialoghost.Window  = dialogsurface.Window(nil)
+	_ filechooser.Window = dialogsurface.Window(nil)
+	_ printdialog.Window = dialogsurface.Window(nil)
 )

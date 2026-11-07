@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/keytest"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -19,22 +20,7 @@ import (
 // Escape, Return in that keymap, leaves the dialog open.
 func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	a := apptest.Run(t)
-	cfg := config.Defaults()
-	cfg.Animations.Enabled = false
-	h := New(Deps{
-		Config: func() *config.Config { return cfg },
-		Open:   func(c app.LayerConfig) (Window, error) { return a.NewLayer(c) },
-		Invoke: a.Invoke,
-		KeySym: a.KeySym,
-		Font:   treetest.Font(t),
-		Printers: func(context.Context) ([]ipp.Printer, error) {
-			return []ipp.Printer{{Name: "office", State: ipp.StateIdle, Accepting: true}}, nil
-		},
-		Spool:      func(context.Context, ipp.Job) error { return nil },
-		PickOutput: func(string, func(string)) {},
-		Home:       t.TempDir(),
-		User:       "u",
-	})
+	h := headlessDialog(t, a)
 	const handle = "/r/headless"
 	t.Cleanup(func() { h.Dismiss(handle) })
 	answers := make(chan bool, 1)
@@ -50,4 +36,26 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	if ok := apptest.Answer(t, "the dialog after Escape", answers); ok {
 		t.Fatal("Escape confirmed the print")
 	}
+}
+
+// headlessDialog is a print dialog on a's compositor over one idle
+// printer, with animations off.
+func headlessDialog(t *testing.T, a *app.Application) *Dialog {
+	t.Helper()
+	cfg := config.Defaults()
+	cfg.Animations.Enabled = false
+	return New(Deps{
+		Config: func() *config.Config { return cfg },
+		Open:   func(s dialogsurface.Spec) (Window, error) { return dialogsurface.Open(a, s) },
+		Invoke: a.Invoke,
+		KeySym: a.KeySym,
+		Font:   treetest.Font(t),
+		Printers: func(context.Context) ([]ipp.Printer, error) {
+			return []ipp.Printer{{Name: "office", State: ipp.StateIdle, Accepting: true}}, nil
+		},
+		Spool:      func(context.Context, ipp.Job) error { return nil },
+		PickOutput: func(string, func(string)) {},
+		Home:       t.TempDir(),
+		User:       "u",
+	})
 }

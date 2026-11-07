@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -17,16 +18,7 @@ import (
 // Return in that keymap, leaves the dialog open.
 func TestHeadlessEscapeDeniesByItsSymbol(t *testing.T) {
 	a := apptest.Run(t)
-	cfg := config.Defaults()
-	cfg.Animations.Enabled = false
-	h := New(Deps{
-		Config:   func() *config.Config { return cfg },
-		Open:     func(c app.LayerConfig) (Window, error) { return a.NewLayer(c) },
-		Invoke:   a.Invoke,
-		KeySym:   a.KeySym,
-		Font:     treetest.Font(t),
-		Describe: func(string) (string, string) { return "App", "" },
-	})
+	h := headlessDialogs(t, a)
 	const handle = "/r/headless"
 	t.Cleanup(func() { h.Dismiss(handle) })
 	answers := make(chan bool, 1)
@@ -42,4 +34,20 @@ func TestHeadlessEscapeDeniesByItsSymbol(t *testing.T) {
 	if ok := apptest.Answer(t, "the dialog after Escape", answers); ok {
 		t.Fatal("Escape granted the access")
 	}
+}
+
+// headlessDialogs is the portal dialogs on a's compositor, with
+// animations off.
+func headlessDialogs(t *testing.T, a *app.Application) *Dialogs {
+	t.Helper()
+	cfg := config.Defaults()
+	cfg.Animations.Enabled = false
+	return New(Deps{
+		Config:   func() *config.Config { return cfg },
+		Open:     func(s dialogsurface.Spec) (Window, error) { return dialogsurface.Open(a, s) },
+		Invoke:   a.Invoke,
+		KeySym:   a.KeySym,
+		Font:     treetest.Font(t),
+		Describe: func(string) (string, string) { return "App", "" },
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
@@ -27,20 +28,8 @@ func TestHeadlessKeysFollowTheKeymap(t *testing.T) {
 		}
 	})
 	a := apptest.Run(t)
-	cfg := config.Defaults()
-	cfg.Animations.Enabled = false
 	home := t.TempDir()
-	c = New(Deps{
-		Config:    func() *config.Config { return cfg },
-		Open:      func(lc app.LayerConfig) (Window, error) { return a.NewLayer(lc) },
-		Invoke:    a.Invoke,
-		KeySym:    a.KeySym,
-		Font:      treetest.Font(t),
-		MIME:      testDB(t),
-		Home:      home,
-		Places:    func() []Place { return []Place{{"Home", home, "user-home-symbolic"}} },
-		Locations: func() []Place { return nil },
-	})
+	c = headlessChooser(t, a, home)
 	const handle = "/r/headless"
 	t.Cleanup(func() { c.Dismiss(handle) })
 	answers := make(chan Result, 1)
@@ -65,4 +54,23 @@ func TestHeadlessKeysFollowTheKeymap(t *testing.T) {
 	if r := apptest.Answer(t, "the chooser after Escape", answers); r.URIs != nil {
 		t.Fatalf("Escape answered %v, want a cancel", r.URIs)
 	}
+}
+
+// headlessChooser is a file chooser on a's compositor over home, with
+// animations off.
+func headlessChooser(t *testing.T, a *app.Application, home string) *Chooser {
+	t.Helper()
+	cfg := config.Defaults()
+	cfg.Animations.Enabled = false
+	return New(Deps{
+		Config:    func() *config.Config { return cfg },
+		Open:      func(s dialogsurface.Spec) (Window, error) { return dialogsurface.Open(a, s) },
+		Invoke:    a.Invoke,
+		KeySym:    a.KeySym,
+		Font:      treetest.Font(t),
+		MIME:      testDB(t),
+		Home:      home,
+		Places:    func() []Place { return []Place{{"Home", home, "user-home-symbolic"}} },
+		Locations: func() []Place { return nil },
+	})
 }
