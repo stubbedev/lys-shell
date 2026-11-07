@@ -4,9 +4,9 @@ go 1.27.3
 
 require (
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.3.11-0.20261107152209-417fe87dfb31
+	github.com/stubbedev/lys-lib v0.3.11-0.20261107161115-f960716d2e61
 	github.com/stubbedev/lys-secrets v0.3.12
-	github.com/stubbedev/lys-ui v0.2.15-0.20261107161134-5fa89197eb07
+	github.com/stubbedev/lys-ui v0.2.15-0.20261107162602-8d18aeb0a1a5
 	github.com/stubbedev/memory-go v0.5.0
 	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.58.0
