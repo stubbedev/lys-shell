@@ -144,7 +144,7 @@ func TestASecretSelectionCannotBePinned(t *testing.T) {
 	if offer.w != nil {
 		offer.finish("hunter2")
 	}
-	if err := c.Put(SecretContent("hunter2")); err != nil {
+	if _, err := c.Put(SecretContent("hunter2")); err != nil {
 		t.Fatal(err)
 	}
 	if got := listed(c); len(got) != 0 {
