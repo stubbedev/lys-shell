@@ -116,7 +116,6 @@ func Open(changed func()) (*Filter, error) {
 		ctx: display.Context(), display: display, changed: changed,
 		ended: make(chan struct{}), outputs: map[uint32]*output{},
 	}
-	display.AddDeleteIdHandler(f)
 	if f.reg, err = display.GetRegistry(); err != nil {
 		_ = f.ctx.Close()
 		return nil, fmt.Errorf("nightlight: registry: %w", err)
@@ -431,11 +430,6 @@ func (f *Filter) HandleRegistryGlobalRemove(ev wl.RegistryGlobalRemoveEvent) {
 	if o.version >= 3 {
 		_ = o.wl.Release()
 	}
-}
-
-// HandleDisplayDeleteId frees a destroyed handle's id.
-func (f *Filter) HandleDisplayDeleteId(ev wl.DisplayDeleteIdEvent) {
-	f.ctx.Unregister(wl.ProxyId(ev.Id))
 }
 
 // HandleCtmControlManagerV1Blocked is another CTM manager owning the

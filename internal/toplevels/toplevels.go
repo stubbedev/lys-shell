@@ -57,7 +57,6 @@ func Watch(changed func()) (*Watcher, error) {
 		return nil, fmt.Errorf("toplevels: connect: %w", err)
 	}
 	w := &Watcher{ctx: display.Context(), tracker: newTracker(), ended: make(chan struct{})}
-	display.AddDeleteIdHandler(w)
 	if w.reg, err = display.GetRegistry(); err != nil {
 		_ = w.ctx.Close()
 		return nil, fmt.Errorf("toplevels: registry: %w", err)
@@ -139,11 +138,6 @@ func (w *Watcher) HandleRegistryGlobal(ev wl.RegistryGlobalEvent) {
 // HandleRegistryGlobalRemove ignores globals going away; the manager's
 // windows close on their own.
 func (w *Watcher) HandleRegistryGlobalRemove(wl.RegistryGlobalRemoveEvent) {}
-
-// HandleDisplayDeleteId frees a destroyed handle's id.
-func (w *Watcher) HandleDisplayDeleteId(ev wl.DisplayDeleteIdEvent) {
-	w.ctx.Unregister(wl.ProxyId(ev.Id))
-}
 
 // HandleZwlrForeignToplevelManagerV1Toplevel follows a new window.
 func (w *Watcher) HandleZwlrForeignToplevelManagerV1Toplevel(ev wlr.ZwlrForeignToplevelManagerV1ToplevelEvent) {
