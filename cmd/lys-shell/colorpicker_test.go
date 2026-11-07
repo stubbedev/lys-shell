@@ -4,7 +4,9 @@ import (
 	"context"
 	"net"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -16,16 +18,36 @@ import (
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
+type pickLog struct {
+	mu     sync.Mutex
+	opts   colorpicker.Options
+	copied []string
+}
+
+func (l *pickLog) Opts() colorpicker.Options {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.opts
+}
+
+func (l *pickLog) Copied() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Clone(l.copied)
+}
+
 // stubPicker answers every pick with its color in the format asked for,
 // or cancels, recording the options it was given.
 type stubPicker struct {
 	color  colorpicker.RGB
 	cancel bool
-	opts   *colorpicker.Options
+	log    *pickLog
 }
 
 func (s stubPicker) Request(_ context.Context, _ regionoverlay.Frames, opts colorpicker.Options) (colorpicker.Pick, bool, error) {
-	*s.opts = opts
+	s.log.mu.Lock()
+	s.log.opts = opts
+	s.log.mu.Unlock()
 	if s.cancel {
 		return colorpicker.Pick{}, false, nil
 	}
@@ -58,30 +80,31 @@ func waylandListener(t *testing.T) *atomic.Int32 {
 	return &connects
 }
 
-func colorpickerShell(t *testing.T, picker stubPicker) *[]string {
+func colorpickerShell(t *testing.T, color colorpicker.RGB, cancel bool) *pickLog {
 	t.Helper()
 	dbustest.Session(t)
-	var copied []string
-	host := &screenshot.Host{Picker: picker, CopyText: func(s string) error {
-		copied = append(copied, s)
+	log := &pickLog{}
+	host := &screenshot.Host{Picker: stubPicker{color: color, cancel: cancel, log: log}, CopyText: func(s string) error {
+		log.mu.Lock()
+		defer log.mu.Unlock()
+		log.copied = append(log.copied, s)
 		return nil
 	}}
 	export(t, screenshot.NewDaemon(host).Export)
-	return &copied
+	return log
 }
 
 func TestColorpickerPrintsTheFormatAskedForWithoutCopying(t *testing.T) {
 	connects := waylandListener(t)
-	var opts colorpicker.Options
-	copied := colorpickerShell(t, stubPicker{color: colorpicker.RGB{R: 255, G: 128}, opts: &opts})
+	log := colorpickerShell(t, colorpicker.RGB{R: 255, G: 128}, false)
 	stdout, stderr, code := runCaptured(t, false, "colorpicker", "--format", "rgb", "--no-copy", "--no-loupe")
 	if code != 0 || stdout != "rgb(255, 128, 0)\n" || stderr != "" {
 		t.Fatalf("code %d stdout %q stderr %q", code, stdout, stderr)
 	}
-	if len(*copied) != 0 {
-		t.Errorf("--no-copy copied %q", *copied)
+	if len(log.Copied()) != 0 {
+		t.Errorf("--no-copy copied %q", log.Copied())
 	}
-	if opts != (colorpicker.Options{Format: config.ColorFormatRGB, NoLoupe: true}) {
+	if opts := log.Opts(); opts != (colorpicker.Options{Format: config.ColorFormatRGB, NoLoupe: true}) {
 		t.Errorf("the shell was asked for %+v", opts)
 	}
 	if n := connects.Load(); n != 0 {
@@ -90,26 +113,24 @@ func TestColorpickerPrintsTheFormatAskedForWithoutCopying(t *testing.T) {
 }
 
 func TestColorpickerCopiesWhatItPrints(t *testing.T) {
-	var opts colorpicker.Options
-	copied := colorpickerShell(t, stubPicker{color: colorpicker.RGB{R: 255}, opts: &opts})
+	log := colorpickerShell(t, colorpicker.RGB{R: 255}, false)
 	stdout, _, code := runCaptured(t, false, "colorpicker", "-f", "hsl")
-	if code != 0 || stdout != "hsl(0, 100%, 50%)\n" || strings.Join(*copied, ",") != "hsl(0, 100%, 50%)" {
-		t.Fatalf("code %d stdout %q copied %q", code, stdout, *copied)
+	if code != 0 || stdout != "hsl(0, 100%, 50%)\n" || strings.Join(log.Copied(), ",") != "hsl(0, 100%, 50%)" {
+		t.Fatalf("code %d stdout %q copied %q", code, stdout, log.Copied())
 	}
-	if opts.NoLoupe {
+	if log.Opts().NoLoupe {
 		t.Error("the loupe was turned off unasked")
 	}
 }
 
 func TestColorpickerCancelledPrintsNothingAndExits1(t *testing.T) {
-	var opts colorpicker.Options
-	copied := colorpickerShell(t, stubPicker{cancel: true, opts: &opts})
+	log := colorpickerShell(t, colorpicker.RGB{}, true)
 	stdout, stderr, code := runCaptured(t, false, "colorpicker")
-	if code != 1 || stdout != "" || stderr != "" || len(*copied) != 0 {
-		t.Fatalf("code %d stdout %q stderr %q copied %q", code, stdout, stderr, *copied)
+	if code != 1 || stdout != "" || stderr != "" || len(log.Copied()) != 0 {
+		t.Fatalf("code %d stdout %q stderr %q copied %q", code, stdout, stderr, log.Copied())
 	}
-	if opts.Format != "" {
-		t.Errorf("no --format asked for %q, want the picker's own", opts.Format)
+	if format := log.Opts().Format; format != "" {
+		t.Errorf("no --format asked for %q, want the picker's own", format)
 	}
 }
 
