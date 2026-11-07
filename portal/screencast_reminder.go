@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"time"
+
+	"github.com/stubbedev/lys-shell/settingspage"
 )
 
 // persistPermanent is persist_mode 2: the grant outlives the app, kept
@@ -13,13 +15,16 @@ const persistPermanent uint32 = 2
 const day = 24 * time.Hour
 
 // Reminder actions: keeping the grant restarts its count, revoking it
-// ends the share and, as Start fails, the frontend's token with it.
+// ends the share and, as Start fails, the frontend's token with it;
+// opening the settings shows every grant on the Privacy page and shares
+// meanwhile, asking again next time.
 const (
-	reminderKeep   = "keep"
-	reminderRevoke = "revoke"
+	reminderKeep     = "keep"
+	reminderRevoke   = "revoke"
+	reminderSettings = "settings"
 )
 
-var reminderActions = []string{reminderKeep, "Keep", reminderRevoke, "Revoke"}
+var reminderActions = []string{reminderKeep, "Keep", reminderRevoke, "Revoke", reminderSettings, "Open Settings"}
 
 // castReminder asks again whether an app may keep sharing the screen
 // without asking, once its persistent grant is days old.
@@ -30,6 +35,8 @@ type castReminder struct {
 	// ask shows a notification and waits for the action picked, "" for
 	// none (notifier.ask; a fake daemon in tests).
 	ask func(ctx context.Context, appID, title, body string, actions []string) (string, error)
+	// openSettings opens lys-settings on its Privacy page.
+	openSettings func() error
 }
 
 // reminderVerdict is what a reminder decided about a replay.
@@ -71,6 +78,10 @@ func (r castReminder) remind(c *call, appID string, issued time.Time) (time.Time
 		return issued, revokeGrant
 	case key == reminderKeep:
 		return now, replayGrant
+	case key == reminderSettings:
+		if err := r.openSettings(); err != nil {
+			warnf("screencast: open the Privacy settings: %v", err)
+		}
 	}
 	return issued, replayGrant
 }
@@ -82,6 +93,9 @@ func (b *Backend) castReminder() castReminder {
 		days: func() uint32 { return b.cfg.Config().Portal.ScreenCast.ReminderDays },
 		now:  time.Now,
 		ask:  b.notifier.ask,
+		openSettings: func() error {
+			return b.spawn(settingspage.Page{ID: settingspage.PrivacyID}.Argv(), nil)
+		},
 	}
 }
 

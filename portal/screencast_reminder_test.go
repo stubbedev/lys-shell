@@ -141,3 +141,32 @@ func TestATransientShareNeverReminds(t *testing.T) {
 		t.Errorf("transient: Start %d, %d reminders", code, len(d.calls.Load()))
 	}
 }
+
+// Open Settings opens lys-settings on the Privacy page and shares,
+// keeping the grant's age so the next replay asks again; a settings app
+// that cannot start still shares.
+func TestTheReminderOpensThePrivacySettings(t *testing.T) {
+	r, f, d, token := reminderRig(t)
+	s := &spawned{fail: map[string]bool{}}
+	r.backend.spawn = s.spawn
+	issued := f.clock.Now()
+	f.clock.Advance(40 * day)
+	done := r.replay(t, token)
+	waitNotify(t, d, 1)
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", d.next.Load(), reminderSettings)
+	if code, g := replied(t, done); code != ResponseSuccess || !g.issued.Equal(issued) {
+		t.Errorf("Open Settings: Start %d, issued %v; want the share and the age kept", code, g.issued)
+	}
+	if got := s.argv.Load(); len(got) != 1 || !slices.Equal(got[0], []string{"lys-settings", "--page", "privacy"}) {
+		t.Errorf("spawned %q, want lys-settings on the Privacy page", got)
+	}
+	r.closeSession(t, sessA)
+
+	s.fail["lys-settings"] = true
+	done = r.replay(t, token)
+	waitNotify(t, d, 2)
+	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", d.next.Load(), reminderSettings)
+	if code, _ := replied(t, done); code != ResponseSuccess {
+		t.Errorf("no settings app: Start %d, want the share", code)
+	}
+}

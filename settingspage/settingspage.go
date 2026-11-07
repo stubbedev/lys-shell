@@ -26,6 +26,11 @@ const (
 	SettingFlag = "--setting"
 )
 
+// PrivacyID is the Privacy page: what apps were granted through the
+// portal, each grant with a revoke control, and the screen-share
+// reminder. The portal's reminder opens it.
+const PrivacyID = "privacy"
+
 // Page is one page of the app, its title in the desktop's language.
 type Page struct {
 	ID       string    `json:"id"`
