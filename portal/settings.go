@@ -1,12 +1,16 @@
 package portal
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
@@ -15,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-ui/gtksettings"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -31,6 +36,14 @@ const AppearanceNS = "org.freedesktop.appearance"
 // GnomeInterfaceNS is the namespace GTK's portal settings backend reads
 // its toolkit settings from.
 const GnomeInterfaceNS = "org.gnome.desktop.interface"
+
+// The other GSettings namespaces GTK 4's portal settings backend reads.
+const (
+	gnomeWMPreferencesNS = "org.gnome.desktop.wm.preferences"
+	gnomeMouseNS         = "org.gnome.desktop.peripherals.mouse"
+	gnomeA11yInterfaceNS = "org.gnome.desktop.a11y.interface"
+	gnomeSoundNS         = "org.gnome.desktop.sound"
+)
 
 // errNotFound is the portal's error for an unknown namespace or key.
 const errNotFound = "org.freedesktop.portal.Error.NotFound"
@@ -78,6 +91,20 @@ var servedSettings = []setting{
 	{GnomeInterfaceNS, "cursor-size", cursorSize},
 	{GnomeInterfaceNS, "font-name", always(func(d desktop) any { return fontName(d) })},
 	{GnomeInterfaceNS, "text-scaling-factor", always(func(d desktop) any { return textScale(d.gtk) })},
+	{GnomeInterfaceNS, "font-antialiasing", nonEmpty(func(d desktop) string { return fontAntialiasing(d.gtk) })},
+	{GnomeInterfaceNS, "font-hinting", nonEmpty(func(d desktop) string { return fontHinting(d.gtk) })},
+	{GnomeInterfaceNS, "font-rgba-order", nonEmpty(func(d desktop) string { return fontRGBAOrders[d.gtk.XftRGBA] })},
+	{GnomeInterfaceNS, "cursor-blink", toggle(func(s gtksettings.Settings) gtksettings.Toggle { return s.CursorBlink })},
+	{GnomeInterfaceNS, "cursor-blink-time", duration(time.Millisecond, func(s gtksettings.Settings) time.Duration { return s.CursorBlinkTime })},
+	{GnomeInterfaceNS, "cursor-blink-timeout", duration(time.Second, func(s gtksettings.Settings) time.Duration { return s.CursorBlinkTimeout })},
+	{GnomeInterfaceNS, "gtk-enable-primary-paste", toggle(func(s gtksettings.Settings) gtksettings.Toggle { return s.EnablePrimaryPaste })},
+	{GnomeInterfaceNS, "overlay-scrolling", toggle(func(s gtksettings.Settings) gtksettings.Toggle { return s.OverlayScrolling })},
+	{gnomeWMPreferencesNS, "button-layout", nonEmpty(func(d desktop) string { return d.gtk.DecorationLayout })},
+	{gnomeMouseNS, "double-click", duration(time.Millisecond, func(s gtksettings.Settings) time.Duration { return s.DoubleClickTime })},
+	{gnomeMouseNS, "drag-threshold", dragThreshold},
+	{gnomeA11yInterfaceNS, "show-status-shapes", toggle(func(s gtksettings.Settings) gtksettings.Toggle { return s.ShowStatusShapes })},
+	{gnomeSoundNS, "theme-name", nonEmpty(func(d desktop) string { return d.gtk.SoundThemeName })},
+	{gnomeSoundNS, "event-sounds", toggle(func(s gtksettings.Settings) gtksettings.Toggle { return s.EnableEventSounds })},
 }
 
 func nonEmpty(read func(desktop) string) func(desktop) (any, bool) {
@@ -85,6 +112,65 @@ func nonEmpty(read func(desktop) string) func(desktop) (any, bool) {
 		s := read(d)
 		return s, s != ""
 	}
+}
+
+// toggle serves a settings.ini boolean as a GSettings boolean when a
+// file sets it.
+func toggle(read func(gtksettings.Settings) gtksettings.Toggle) func(desktop) (any, bool) {
+	return func(d desktop) (any, bool) {
+		t := read(d.gtk)
+		return t == gtksettings.ToggleOn, t != gtksettings.ToggleUnset
+	}
+}
+
+// duration serves a settings.ini duration as the GSettings int32 count
+// of unit when a file sets it.
+func duration(unit time.Duration, read func(gtksettings.Settings) time.Duration) func(desktop) (any, bool) {
+	return func(d desktop) (any, bool) {
+		n, err := intconv.Exact[int32](int64(read(d.gtk) / unit))
+		return n, err == nil && n > 0
+	}
+}
+
+func dragThreshold(d desktop) (any, bool) {
+	n, err := intconv.Exact[int32](d.gtk.DndDragThreshold)
+	return n, err == nil && n > 0
+}
+
+// fontAntialiasing is the GSettings font-antialiasing enum for the Xft
+// antialias switch and subpixel order: none when antialiasing is off,
+// rgba with a subpixel order, else grayscale; "" when no file sets
+// either.
+func fontAntialiasing(s gtksettings.Settings) string {
+	switch {
+	case s.XftAntialias == gtksettings.ToggleOff:
+		return "none"
+	case fontRGBAOrders[s.XftRGBA] != "":
+		return "rgba"
+	case s.XftAntialias == gtksettings.ToggleOn || s.XftRGBA == gtksettings.SubpixelNone:
+		return "grayscale"
+	}
+	return ""
+}
+
+// fontHinting is the GSettings font-hinting enum for the Xft hinting
+// switch and hint style: none when hinting is off, else the hint
+// style's; "" when no file sets a style.
+func fontHinting(s gtksettings.Settings) string {
+	if s.XftHinting == gtksettings.ToggleOff {
+		return "none"
+	}
+	return fontHintStyles[s.XftHintStyle]
+}
+
+var fontHintStyles = map[gtksettings.HintStyle]string{
+	gtksettings.HintNone: "none", gtksettings.HintSlight: "slight", gtksettings.HintMedium: "medium", gtksettings.HintFull: "full",
+}
+
+// fontRGBAOrders is the GSettings font-rgba-order enum for each
+// subpixel order; grayscale has none, font-antialiasing says it.
+var fontRGBAOrders = map[gtksettings.SubpixelOrder]string{
+	gtksettings.SubpixelRGB: "rgb", gtksettings.SubpixelBGR: "bgr", gtksettings.SubpixelVRGB: "vrgb", gtksettings.SubpixelVBGR: "vbgr",
 }
 
 // reducedMotion is what the compositor says when it owns the setting,
@@ -194,22 +280,39 @@ func boolU32(b bool) uint32 {
 	return 0
 }
 
-// settings carries the interface's D-Bus methods: the live config,
-// and the host's GTK settings and environment.
+// settings carries the interface's D-Bus methods: the live config, the
+// session's environment, and the host's GTK settings as last read.
 type settings struct {
-	cfg    *config.Service
-	gtk    func() gtksettings.Settings
-	getenv func(string) string
+	cfg *config.Service
+	env xdg.Env
+	mu  sync.Mutex
+	gtk gtksettings.Settings
 }
 
-// hostGTKSettings reads the settings.ini files GTK 4 reads, logging one
-// it could not.
-func hostGTKSettings() gtksettings.Settings {
-	s, err := gtksettings.Load(xdg.OS)
+func newSettings(cfg *config.Service, env xdg.Env) *settings {
+	return &settings{cfg: cfg, env: env, gtk: loadGTKSettings(env)}
+}
+
+// loadGTKSettings reads the settings.ini files GTK 4 reads under env,
+// logging one it could not.
+func loadGTKSettings(env xdg.Env) gtksettings.Settings {
+	s, err := gtksettings.Load(env)
 	if err != nil {
 		log.Printf("settings: %v", err)
 	}
 	return s
+}
+
+func (s *settings) hostGTK() gtksettings.Settings {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.gtk
+}
+
+func (s *settings) setHostGTK(gtk gtksettings.Settings) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gtk = gtk
 }
 
 func (s *settings) iface() dbusx.Interface {
@@ -221,7 +324,7 @@ func (s *settings) iface() dbusx.Interface {
 }
 
 func (s *settings) desktop(cfg *config.Config) desktop {
-	return desktop{cfg: cfg, palette: resolvedPalette(cfg.Styling), gtk: s.gtk(), getenv: s.getenv}
+	return desktop{cfg: cfg, palette: resolvedPalette(cfg.Styling), gtk: s.hostGTK(), getenv: s.env}
 }
 
 // resolvedPalette is the palette the shell draws with: its theme
@@ -287,9 +390,9 @@ func (s *settings) Read(namespace, key string) (dbus.Variant, *dbus.Error) {
 }
 
 // watch emits SettingChanged for every served key whose value a config
-// change or a finished wallpaper color extraction (the shell's
-// ColorsExtracted) moves, and nothing for keys that kept theirs. The
-// returned func stops.
+// change, a finished wallpaper color extraction (the shell's
+// ColorsExtracted) or an edited settings.ini moves, and nothing for
+// keys that kept theirs. The returned func stops.
 func (s *settings) watch(conn *dbus.Conn) (stop func()) {
 	var mu sync.Mutex
 	last := s.desktop(s.cfg.Config())
@@ -313,10 +416,64 @@ func (s *settings) watch(conn *dbus.Conn) (stop func()) {
 		warnf("settings: the accent color will not follow the wallpaper: %v", err)
 		stopExtracted = func() {}
 	}
+	stopHost, err := watchFiles(gtksettings.Paths(s.env), func() {
+		s.setHostGTK(loadGTKSettings(s.env))
+		update(s.cfg.Config())
+	})
+	if err != nil {
+		warnf("settings: GTK settings.ini edits will not reach apps until the portal restarts: %v", err)
+		stopHost = func() {}
+	}
 	return func() {
+		stopHost()
 		stopExtracted()
 		unsubscribe()
 	}
+}
+
+// watchFiles runs changed after each burst of changes to the
+// directories holding paths, on the watcher's goroutine, until stop. A
+// directory that does not exist yet is waited for in its parent, so a
+// settings.ini written into a new gtk-4.0 directory is still seen.
+func watchFiles(paths []string, changed func()) (stop func(), err error) {
+	w, err := fswatch.New(fswatch.Changes, false)
+	if err != nil {
+		return nil, err
+	}
+	watched := make(map[string]bool, len(paths))
+	add := func() {
+		for _, p := range paths {
+			dir := filepath.Dir(p)
+			if watched[dir] {
+				continue
+			}
+			err := w.Add(dir)
+			if err == nil {
+				watched[dir] = true
+				continue
+			}
+			if !errors.Is(err, fs.ErrNotExist) {
+				warnf("settings: %v", err)
+				continue
+			}
+			if err := w.Add(filepath.Dir(dir)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				warnf("settings: %v", err)
+			}
+		}
+	}
+	add()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range w.Changed() {
+			add()
+			changed()
+		}
+	}()
+	return func() {
+		_ = w.Close()
+		<-done
+	}, nil
 }
 
 // watchColorsExtracted runs extracted for every ColorsExtracted the

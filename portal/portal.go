@@ -8,7 +8,6 @@ package portal
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -60,7 +59,7 @@ type Backend struct {
 func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b := &Backend{
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
-		settings: &settings{cfg: cfg, gtk: hostGTKSettings, getenv: os.Getenv},
+		settings: newSettings(cfg, xdg.OS),
 		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)

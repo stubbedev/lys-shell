@@ -454,3 +454,21 @@ func TestFrontendRelaysANewAccentToApps(t *testing.T) {
 		}
 	}
 }
+
+func TestFrontendServesTheToolkitKeys(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("XDG_CONFIG_DIRS", t.TempDir())
+	writeAtomically(t, filepath.Join(home, "gtk-4.0", "settings.ini"), toolkitIni)
+	f := startFrontend(t, newRig(t, nil), t.TempDir())
+	for _, k := range toolkitKeys {
+		var v dbus.Variant
+		if err := f.obj.Call("org.freedesktop.portal.Settings.ReadOne", 0, k.ns, k.key).Store(&v); err != nil {
+			t.Errorf("ReadOne %s %s: %v", k.ns, k.key, err)
+			continue
+		}
+		if v.Signature().String() != k.signature || v.Value() != k.want {
+			t.Errorf("ReadOne %s %s = %#v (%s), want %#v (%s)", k.ns, k.key, v.Value(), v.Signature(), k.want, k.signature)
+		}
+	}
+}

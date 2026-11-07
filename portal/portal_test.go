@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/gtksettings"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -33,8 +34,13 @@ type rig struct {
 // it: a test that points it elsewhere keeps its own.
 var processDataHome = os.Getenv("XDG_DATA_HOME")
 
-// newRig serves a backend on a private bus, its state, cache and data
-// directories temporary ones so no test writes to the user's.
+// processConfigHome is XDG_CONFIG_HOME as the test process started
+// with it: a test that points it elsewhere keeps its own.
+var processConfigHome = os.Getenv("XDG_CONFIG_HOME")
+
+// newRig serves a backend on a private bus, its state, cache, data and
+// config directories temporary ones so no test reads or writes the
+// user's.
 func newRig(t *testing.T, edit func(*Backend)) *rig {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
@@ -42,6 +48,10 @@ func newRig(t *testing.T, edit func(*Backend)) *rig {
 	t.Setenv(lyswm.SocketEnv, "")
 	if os.Getenv("XDG_DATA_HOME") == processDataHome {
 		t.Setenv("XDG_DATA_HOME", t.TempDir())
+	}
+	if os.Getenv("XDG_CONFIG_HOME") == processConfigHome {
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("XDG_CONFIG_DIRS", t.TempDir())
 	}
 	bus := dbustest.Start(t)
 	cfg := config.Load(t.TempDir(), config.DiscardDiagnostics)
@@ -87,8 +97,10 @@ func (r *rig) changed(t *testing.T) []string {
 func settingsRig(t *testing.T, gtk gtksettings.Settings, env map[string]string) *rig {
 	t.Helper()
 	return newRig(t, func(b *Backend) {
-		b.settings.gtk = func() gtksettings.Settings { return gtk }
-		b.settings.getenv = func(k string) string { return env[k] }
+		vars := map[string]string{"XDG_CONFIG_DIRS": t.TempDir()}
+		maps.Copy(vars, env)
+		b.settings.gtk = gtk
+		b.settings.env = func(k string) string { return vars[k] }
 	})
 }
 
@@ -645,11 +657,11 @@ func TestHostGTKSettingsReadGTK4sFiles(t *testing.T) {
 		}
 	}
 	write("gtk-3.0", "[Settings]\ngtk-icon-theme-name=Old\n")
-	if got := hostGTKSettings(); got.IconThemeName != "" {
+	if got := loadGTKSettings(xdg.OS); got.IconThemeName != "" {
 		t.Errorf("gtk-3.0 was read: %+v", got)
 	}
 	write("gtk-4.0", "[Settings]\ngtk-cursor-theme-name=Vimix\ngtk-cursor-theme-size=22\n")
-	if got := hostGTKSettings(); got.CursorThemeName != "Vimix" || got.CursorThemeSize != 22 {
+	if got := loadGTKSettings(xdg.OS); got.CursorThemeName != "Vimix" || got.CursorThemeSize != 22 {
 		t.Errorf("gtk-4.0 settings = %+v", got)
 	}
 }
