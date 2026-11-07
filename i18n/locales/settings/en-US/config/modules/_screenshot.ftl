@@ -61,3 +61,14 @@ settings-modules-screenshot-scroll-up = Scroll Up
 
 settings-modules-screenshot-scroll-down = Scroll Down
     .description = Shell command on scroll down
+
+settings-modules-screenshot-thumbnail-ms = Thumbnail Duration
+    .description = How long the floating thumbnail stays after a capture, in milliseconds (0 disables it)
+
+settings-modules-screenshot-thumbnail-position = Thumbnail Position
+    .description = Screen corner the floating thumbnail sits in
+
+enum-screenshot-corner-top-left = Top Left
+enum-screenshot-corner-top-right = Top Right
+enum-screenshot-corner-bottom-right = Bottom Right
+enum-screenshot-corner-bottom-left = Bottom Left

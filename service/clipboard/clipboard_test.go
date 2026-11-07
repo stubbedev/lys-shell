@@ -324,7 +324,7 @@ func TestPutClaimsEveryMimeServesEveryReaderAndRemembersTheBest(t *testing.T) {
 		"image/png": []byte("\x89PNG shot"), "image/jpeg": []byte("\xff\xd8 shot"),
 	})
 
-	if err := c.Put(content); err != nil {
+	if _, err := c.Put(content); err != nil {
 		t.Fatal(err)
 	}
 	dev.announce(&fakeOffer{mimes: content.Mimes, own: true})
@@ -352,7 +352,7 @@ func TestPutReportsAFailedClaimAndRemembersNothing(t *testing.T) {
 	c, dev := newTestClipboard(t, nil)
 	dev.claimErr = app.ErrDataControlFinished
 
-	err := c.Put(transfer.Bytes("image/png", []byte("\x89PNG")))
+	_, err := c.Put(transfer.Bytes("image/png", []byte("\x89PNG")))
 
 	if !errors.Is(err, app.ErrDataControlFinished) {
 		t.Fatalf("Put = %v, want the claim's error", err)
@@ -360,7 +360,7 @@ func TestPutReportsAFailedClaimAndRemembersNothing(t *testing.T) {
 	if c.serving != nil || c.history.Len() != 0 {
 		t.Fatalf("a failed claim left serving %v and %d entries", c.serving, c.history.Len())
 	}
-	if err := c.Put(transfer.Content{}); err == nil {
+	if _, err := c.Put(transfer.Content{}); err == nil {
 		t.Fatal("Put of empty content succeeded")
 	}
 }
@@ -368,7 +368,7 @@ func TestPutReportsAFailedClaimAndRemembersNothing(t *testing.T) {
 func TestPutOfSensitiveContentIsServedButNotRemembered(t *testing.T) {
 	c, dev := newTestClipboard(t, nil)
 
-	if err := c.Put(SecretContent("hunter2")); err != nil {
+	if _, err := c.Put(SecretContent("hunter2")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -726,5 +726,48 @@ func TestCloseFreesAReadStillStreaming(t *testing.T) {
 	offer.fail(n, err)
 	if live(h) != 0 || h.Len() != 0 {
 		t.Fatalf("the late end: %d allocations, %d entries", live(h), h.Len())
+	}
+}
+
+func TestRetractForgetsThePutAndGivesTheSelectionUp(t *testing.T) {
+	c, dev := newTestClipboard(t, nil)
+	keep := &fakeOffer{mimes: []string{textMime}}
+	dev.announce(keep)
+	keep.finish("kept")
+
+	retract, err := c.Put(transfer.Bytes("image/png", []byte("\x89PNG shot")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.history.Len() != 2 {
+		t.Fatalf("entries = %v", mimesOf(c.history))
+	}
+	retract()
+
+	if got := texts(c.history); c.history.Len() != 1 || !slices.Equal(got, []string{"kept"}) {
+		t.Fatalf("after retract entries = %v, want only the earlier copy", got)
+	}
+	if claim := dev.claims[len(dev.claims)-1]; claim.live || !claim.released || c.serving != nil {
+		t.Fatalf("the retracted put still holds the selection: live %v released %v", claim.live, claim.released)
+	}
+}
+
+func TestRetractAfterAnotherCopyLeavesTheirSelection(t *testing.T) {
+	c, dev := newTestClipboard(t, nil)
+	retract, err := c.Put(transfer.Bytes("image/png", []byte("\x89PNG shot")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Put(transfer.Bytes("image/png", []byte("\x89PNG later"))); err != nil {
+		t.Fatal(err)
+	}
+	later := c.serving
+	retract()
+
+	if c.serving != later || !dev.claims[1].live {
+		t.Fatal("retracting an older put gave up the newer selection")
+	}
+	if got := mimesOf(c.history); !slices.Equal(got, []string{"image/png=\x89PNG later"}) {
+		t.Fatalf("entries = %v", got)
 	}
 }

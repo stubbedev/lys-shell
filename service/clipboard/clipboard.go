@@ -47,10 +47,12 @@ type Clipboard struct {
 // Once done, buf holds the whole selection when ok, and nothing
 // otherwise.
 type pendingRead struct {
-	mime string
-	buf  *offheap.Buffer
-	done bool
-	ok   bool
+	mime      string
+	buf       *offheap.Buffer
+	done      bool
+	ok        bool
+	id        uint64
+	retracted bool
 }
 
 // discard frees whatever the read holds, a transfer still writing into
@@ -218,7 +220,7 @@ func (c *Clipboard) Copy(id uint64) bool {
 // the entry nor the claim ending can free them mid-paste. Loop
 // goroutine only.
 func (c *Clipboard) claim(mime string, p *payload) {
-	err := c.serve(app.SelectionSource{
+	_, err := c.serve(app.SelectionSource{
 		Mimes: offerMimes(mime),
 		// The receiver may ask under any mime offered; every alias is
 		// an alias for the entry's own type, so the bytes are the same.
@@ -239,41 +241,61 @@ func (c *Clipboard) claim(mime string, p *payload) {
 // Put claims the regular selection with content through data-control,
 // which needs neither keyboard focus nor an input event, serves it to
 // every receiver that asks until another client takes the selection,
-// and remembers it like any other copy. Loop goroutine only.
-func (c *Clipboard) Put(content transfer.Content) error {
+// and remembers it like any other copy. Retract, from any goroutine,
+// takes the copy back: it forgets the history entry and gives the
+// selection up if it still holds it. Loop goroutine only.
+func (c *Clipboard) Put(content transfer.Content) (retract func(), err error) {
 	if content.Empty() {
-		return errors.New("clipboard: put: the content offers no mime type")
+		return nil, errors.New("clipboard: put: the content offers no mime type")
 	}
-	err := c.serve(app.SelectionSource{
+	s, err := c.serve(app.SelectionSource{
 		Mimes: content.Mimes,
 		Send: func(mime string, w io.WriteCloser) {
 			go func() { finishPaste(mime, w, content.Write(mime, w)) }()
 		},
 	}, func() {})
 	if err != nil {
-		return fmt.Errorf("clipboard: put %v: %w", content.Mimes, err)
+		return nil, fmt.Errorf("clipboard: put %v: %w", content.Mimes, err)
 	}
-	c.record(content)
-	return nil
+	read := c.record(content)
+	return func() { c.invoke(func() { c.retract(s, read) }) }, nil
 }
 
-func (c *Clipboard) record(content transfer.Content) {
-	if IsSensitive(content.Mimes) {
+func (c *Clipboard) retract(s *serving, read *pendingRead) {
+	if c.serving == s {
+		c.serving = nil
+		s.claim.Release()
+		s.end()
+	}
+	if read == nil {
 		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	read.retracted = true
+	if read.id != 0 {
+		c.history.Remove(read.id)
+	}
+}
+
+func (c *Clipboard) record(content transfer.Content) *pendingRead {
+	if IsSensitive(content.Mimes) {
+		return nil
 	}
 	mime, ok := BestMime(content.Mimes)
 	if !ok {
-		return
+		return nil
 	}
 	read, _ := c.startRead(mime)
 	if read == nil {
-		return
+		return nil
 	}
 	err := content.Write(mime, read.buf)
 	if err != nil && !errors.Is(err, offheap.ErrBufferFull) {
 		log.Printf("clipboard: cannot remember the %s copy: %v", mime, err)
 	}
 	c.finishRead(read, err == nil)
+	return read
 }
 
 func finishPaste(mime string, w io.WriteCloser, err error) {
@@ -285,11 +307,11 @@ func finishPaste(mime string, w io.WriteCloser, err error) {
 	}
 }
 
-func (c *Clipboard) serve(src app.SelectionSource, release func()) error {
+func (c *Clipboard) serve(src app.SelectionSource, release func()) (*serving, error) {
 	cl, err := c.dev.claim(src)
 	if err != nil {
 		release()
-		return err
+		return nil, err
 	}
 	s := &serving{claim: cl, release: release}
 	c.serving = s
@@ -299,7 +321,7 @@ func (c *Clipboard) serve(src app.SelectionSource, release func()) error {
 			c.serving = nil
 		}
 	})
-	return nil
+	return s, nil
 }
 
 // Close gives up a restored selection and frees the history; the
@@ -411,12 +433,18 @@ func (c *Clipboard) flushReads() {
 
 // remember hands a finished read's bytes to the history. c.mu held.
 func (c *Clipboard) remember(r *pendingRead) {
+	if r.retracted {
+		r.discard()
+		return
+	}
 	buf, err := r.buf.Take()
 	if err != nil {
 		log.Printf("clipboard: cannot take the %s selection read: %v", r.mime, err)
 		return
 	}
-	if _, _, err := c.history.pushOwned(r.mime, buf); err != nil {
+	id, _, err := c.history.pushOwned(r.mime, buf)
+	r.id = id
+	if err != nil {
 		log.Printf("clipboard: cannot remember the selection (%s, %d bytes): %v", r.mime, buf.Len(), err)
 	}
 }

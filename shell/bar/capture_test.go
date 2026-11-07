@@ -113,7 +113,7 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 
 	var fallbackErr error
 	onLoop(func() {
-		fallbackErr = putOnClipboard(application, nil, transfer.Bytes(transfer.MimePNG, []byte("\x89PNG")))
+		_, fallbackErr = putOnClipboard(application, nil, transfer.Bytes(transfer.MimePNG, []byte("\x89PNG")))
 	})
 	if fallbackErr == nil {
 		t.Fatal("wl_data_device claimed the selection with no input event behind it")

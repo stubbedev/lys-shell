@@ -12,6 +12,12 @@ Screenshot capture button.
 Click the bar button to capture a region, output, or window. Controllable
 from the CLI / RPC socket: `lys-shell screenshot region|output|window`.
 
+After a capture a thumbnail floats in a screen corner: click it to mark
+the image up (crop, arrow, rectangle, ellipse, freehand, text,
+highlighter, numbered markers and pixelation, with undo and redo; Enter
+saves over the file and copies it, Ctrl+S saves a copy elsewhere), drag
+it into an app, or delete the capture with its close button.
+
 Add it to your layout with `screenshot`:
 
 ```yaml
@@ -29,7 +35,9 @@ bar:
 | `output-directory` | [`Directory`](/config/types#directory) | `""` | Output directory for screenshots. Empty uses the XDG Pictures directory. |
 | `filename-format` | [`StrftimeFormat`](/config/types#strftime-format) | `"Screenshot_%Y-%m-%d_%H-%M-%S.png"` | Saved file name, formatted with `chrono`/`strftime` specifiers. |
 | `copy-to-clipboard` | bool | `true` | Copy the captured image to the clipboard. |
-| `notify` | bool | `true` | Show a desktop notification after capturing. |
+| `notify` | bool | `true` | Show a desktop notification after capturing. With the thumbnail disabled it carries Edit, Open folder and Delete buttons. |
+| `thumbnail-ms` | u32 | `5000` | How long, in milliseconds, the floating thumbnail stays after a capture; hovering it pauses the countdown. Click it to annotate, drag it into an app, or delete the capture from it. Set to 0 to disable. |
+| `thumbnail-position` | [`ScreenshotCorner`](/config/types#screenshot-corner) | `"bottom-right"` | Screen corner the floating thumbnail sits in. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
 | `label` | string | `""` | Static label text shown beside the icon. |
@@ -66,6 +74,8 @@ modules:
     filename-format: Screenshot_%Y-%m-%d_%H-%M-%S.png
     copy-to-clipboard: true
     notify: true
+    thumbnail-ms: 5000
+    thumbnail-position: bottom-right
     border-show: false
     border-color: accent
     icon-show: true

@@ -6768,7 +6768,9 @@
             "output-directory": "",
             "right-click": "lys-shell screenshot output",
             "scroll-down": "",
-            "scroll-up": ""
+            "scroll-up": "",
+            "thumbnail-ms": 5000,
+            "thumbnail-position": "bottom-right"
           },
           "description": "Screenshot capture module."
         },
@@ -9111,7 +9113,7 @@
       "type": "object"
     },
     "ScreenshotConfig": {
-      "description": "Screenshot capture button.\n\nClick the bar button to capture a region, output, or window. Controllable\nfrom the CLI / RPC socket: `lys-shell screenshot region|output|window`.",
+      "description": "Screenshot capture button.\n\nClick the bar button to capture a region, output, or window. Controllable\nfrom the CLI / RPC socket: `lys-shell screenshot region|output|window`.\n\nAfter a capture a thumbnail floats in a screen corner: click it to mark\nthe image up (crop, arrow, rectangle, ellipse, freehand, text,\nhighlighter, numbered markers and pixelation, with undo and redo; Enter\nsaves over the file and copies it, Ctrl+S saves a copy elsewhere), drag\nit into an app, or delete the capture with its close button.",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -9191,7 +9193,7 @@
         "notify": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Show a desktop notification after capturing."
+          "description": "Show a desktop notification after capturing. With the thumbnail\ndisabled it carries Edit, Open folder and Delete buttons."
         },
         "output-directory": {
           "$ref": "#/$defs/Directory",
@@ -9212,9 +9214,44 @@
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on scroll up."
+        },
+        "thumbnail-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 5000,
+          "description": "How long, in milliseconds, the floating thumbnail stays after a\ncapture; hovering it pauses the countdown. Click it to annotate, drag\nit into an app, or delete the capture from it. Set to 0 to disable."
+        },
+        "thumbnail-position": {
+          "$ref": "#/$defs/ScreenshotCorner",
+          "default": "bottom-right",
+          "description": "Screen corner the floating thumbnail sits in."
         }
       },
       "type": "object"
+    },
+    "ScreenshotCorner": {
+      "description": "Screen corner for the screenshot thumbnail.",
+      "oneOf": [
+        {
+          "const": "top-left",
+          "description": "Top-left corner.",
+          "type": "string"
+        },
+        {
+          "const": "top-right",
+          "description": "Top-right corner.",
+          "type": "string"
+        },
+        {
+          "const": "bottom-right",
+          "description": "Bottom-right corner.",
+          "type": "string"
+        },
+        {
+          "const": "bottom-left",
+          "description": "Bottom-left corner.",
+          "type": "string"
+        }
+      ]
     },
     "Secret": {
       "description": "A secret, or `$NAME` to read it from the environment.",
@@ -12599,7 +12636,9 @@
           "output-directory": "",
           "right-click": "lys-shell screenshot output",
           "scroll-down": "",
-          "scroll-up": ""
+          "scroll-up": "",
+          "thumbnail-ms": 5000,
+          "thumbnail-position": "bottom-right"
         },
         "separator": {
           "color": "fg-subtle",

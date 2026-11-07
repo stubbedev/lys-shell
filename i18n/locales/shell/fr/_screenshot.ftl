@@ -1,0 +1,17 @@
+screenshot-action-edit = Annoter
+screenshot-action-open-folder = Ouvrir le dossier
+screenshot-action-delete = Supprimer
+screenshot-editor-title = Annotation — { $file }
+screenshot-editor-save = Enregistrer et copier (Entrée)
+screenshot-editor-save-as = Enregistrer sous
+screenshot-editor-undo = Annuler (Ctrl+Z)
+screenshot-editor-redo = Rétablir (Ctrl+Maj+Z)
+screenshot-tool-crop = Recadrer
+screenshot-tool-arrow = Flèche
+screenshot-tool-rectangle = Rectangle
+screenshot-tool-ellipse = Ellipse
+screenshot-tool-freehand = Main levée
+screenshot-tool-text = Texte
+screenshot-tool-highlight = Surligneur
+screenshot-tool-marker = Marqueur numéroté
+screenshot-tool-pixelate = Pixeliser

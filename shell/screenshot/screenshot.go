@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -24,8 +25,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/memory-go"
 
@@ -74,11 +77,19 @@ type Host struct {
 	}
 	// Focus resolves the focused output and the active window.
 	Focus Focus
-	// Copy puts an image on the clipboard; nil disables the copy.
-	Copy func(image.Image) error
+	// Copy puts an image on the clipboard and returns what takes that
+	// copy back, nil when nothing can; nil disables the copy.
+	Copy func(image.Image) (retract func(), err error)
 	// Notify announces a saved screenshot, and a failed copy with it;
 	// nil sends the desktop notification.
 	Notify func(Notice)
+	// Present shows the floating thumbnail of a saved capture; nil
+	// shows none.
+	Present func(Saved)
+	// Edit opens the markup editor on a saved capture, and OpenFolder
+	// the folder it was saved in: the notification's buttons.
+	Edit       func(Saved)
+	OpenFolder func(dir string)
 	// Forget drops the GPU textures of the frozen frames with these
 	// identities, once the overlay that drew them has closed.
 	Forget func(ids []render.ImageID)
@@ -194,8 +205,8 @@ func (h *Host) grab(c portaldialogs.Caller, mode, target string, pointer bool) (
 	return nil, false, fmt.Errorf("unknown screenshot mode: %s", mode)
 }
 
-// save writes the PNG under the configured name, then applies the
-// clipboard and notify options.
+// save writes the PNG under the configured name, then copies it,
+// presents its thumbnail and announces it as the section says.
 func (h *Host) save(img *image.RGBA) (string, error) {
 	cfg := h.Config()
 	dir := resolveDir(cfg.OutputDirectory)
@@ -206,28 +217,88 @@ func (h *Host) save(img *image.RGBA) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	shot := Saved{Path: path, Image: img}
 	var copyErr error
 	if cfg.CopyToClipboard && h.Copy != nil {
-		if copyErr = h.Copy(img); copyErr != nil {
+		if shot.Retract, copyErr = h.Copy(img); copyErr != nil {
 			log.Printf("screenshot: clipboard copy: %v", copyErr)
 		}
 	}
+	thumbnail := cfg.ThumbnailMs > 0 && h.Present != nil
+	if thumbnail {
+		h.Present(shot)
+	}
 	if cfg.Notify {
 		n := savedNotice(path, copyErr)
-		if h.Notify != nil {
-			h.Notify(n)
-		} else {
-			desktopnotify.Notify(i18n.T("notification-source-screenshot"), n.Summary, n.Body, n.Icon)
+		if !thumbnail {
+			n.Actions = []Action{ActionEdit, ActionOpenFolder, ActionDelete}
+			n.Respond = func(a Action) { h.act(a, shot) }
 		}
+		h.announce(n)
 	}
 	return path, nil
 }
 
-// Notice is the desktop notification announcing a saved screenshot.
+// Saved is a capture on disk: its file, the pixels it was saved from, and
+// Retract, which takes its clipboard copy back (nil when there is none).
+type Saved struct {
+	Path    string
+	Image   *image.RGBA
+	Retract func()
+}
+
+// Discard deletes a saved capture's file and takes its clipboard copy back.
+func (s Saved) Discard() error {
+	if s.Retract != nil {
+		s.Retract()
+	}
+	if err := os.Remove(s.Path); err != nil {
+		return fmt.Errorf("cannot delete the screenshot %s: %w", s.Path, err)
+	}
+	return nil
+}
+
+// Action is a button on the saved-capture notification.
+type Action string
+
+// The notification's buttons.
+const (
+	ActionEdit       Action = "edit"
+	ActionOpenFolder Action = "open-folder"
+	ActionDelete     Action = "delete"
+)
+
+var actionLabels = map[Action]string{
+	ActionEdit:       "screenshot-action-edit",
+	ActionOpenFolder: "screenshot-action-open-folder",
+	ActionDelete:     "screenshot-action-delete",
+}
+
+func (h *Host) act(a Action, shot Saved) {
+	switch a {
+	case ActionEdit:
+		if h.Edit != nil {
+			h.Edit(shot)
+		}
+	case ActionOpenFolder:
+		if h.OpenFolder != nil {
+			h.OpenFolder(filepath.Dir(shot.Path))
+		}
+	case ActionDelete:
+		if err := shot.Discard(); err != nil {
+			log.Printf("screenshot: %v", err)
+		}
+	}
+}
+
+// Notice is the desktop notification announcing a saved screenshot. With
+// Actions it carries those buttons, and Respond hears the one pressed.
 type Notice struct {
 	Summary string
 	Body    string
 	Icon    string
+	Actions []Action
+	Respond func(Action)
 }
 
 func savedNotice(path string, copyErr error) Notice {
@@ -236,6 +307,49 @@ func savedNotice(path string, copyErr error) Notice {
 		n.Body += "\nNot copied to the clipboard: " + copyErr.Error()
 	}
 	return n
+}
+
+const actionWait = 30 * time.Second
+
+func (h *Host) announce(n Notice) {
+	if h.Notify != nil {
+		h.Notify(n)
+		return
+	}
+	source := i18n.T("notification-source-screenshot")
+	if len(n.Actions) == 0 {
+		desktopnotify.Notify(source, n.Summary, n.Body, n.Icon)
+		return
+	}
+	go func() {
+		a, err := ask(source, n)
+		if err != nil {
+			log.Printf("screenshot: notification: %v", err)
+			return
+		}
+		if a != "" {
+			n.Respond(a)
+		}
+	}()
+}
+
+func ask(source string, n Notice) (Action, error) {
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return "", fmt.Errorf("session bus: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+	buttons := make([]desktopnotify.Action, len(n.Actions))
+	for i, a := range n.Actions {
+		buttons[i] = desktopnotify.Action{Key: string(a), Label: i18n.T(actionLabels[a])}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), actionWait+5*time.Second)
+	defer cancel()
+	key, ok, err := desktopnotify.NewSender(conn).Ask(ctx, source, n.Summary, n.Body, n.Icon, buttons, actionWait)
+	if err != nil || !ok {
+		return "", err
+	}
+	return Action(key), nil
 }
 
 func (h *Host) clock() time.Time {
@@ -379,8 +493,23 @@ const maxNameTries = 100
 
 // saveNew saves under path, or "name-2.png", "name-3.png", ... when
 // that exists: two captures in the same second (the default name's
-// resolution) never overwrite each other.
+// resolution) never overwrite each other. The PNG is written and synced
+// to a temporary file beside it first and linked in under the free name,
+// so no name ever holds a partial image.
 func saveNew(img image.Image, path string) (string, error) {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".screenshot-*.part")
+	if err != nil {
+		return "", fmt.Errorf("cannot create a screenshot in %s: %w", dir, err)
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if err := tmp.Chmod(0o644); err != nil {
+		_ = tmp.Close()
+		return "", fmt.Errorf("cannot save %s: %w", path, err)
+	}
+	if err := writePNG(img, tmp); err != nil {
+		return "", err
+	}
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
 	for i := 1; i <= maxNameTries; i++ {
@@ -388,19 +517,26 @@ func saveNew(img image.Image, path string) (string, error) {
 		if i > 1 {
 			name = fmt.Sprintf("%s-%d%s", base, i, ext)
 		}
-		f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // the configured screenshot path, readable as any picture
+		err := os.Link(tmp.Name(), name)
 		if errors.Is(err, fs.ErrExist) {
 			continue
 		}
 		if err != nil {
-			return "", fmt.Errorf("cannot create %s: %w", name, err)
-		}
-		if err := writePNG(img, f); err != nil {
-			return "", err
+			return "", fmt.Errorf("cannot save %s: %w", name, err)
 		}
 		return name, nil
 	}
 	return "", fmt.Errorf("cannot save %s: %d numbered names taken", path, maxNameTries)
+}
+
+// WritePNG replaces path with img as a PNG, atomically: a reader sees
+// the old file or the new one, never a partial write.
+func WritePNG(img image.Image, path string) error {
+	err := atomicfile.Write(path, 0o644, func(w io.Writer) error { return encodePNG(w, img) })
+	if err != nil {
+		return fmt.Errorf("cannot save %s: %w", path, err)
+	}
+	return nil
 }
 
 // savePrivate saves an app's screenshot to a new private file under
@@ -419,30 +555,33 @@ func (h *Host) savePrivate(img image.Image) (string, error) {
 		return "", fmt.Errorf("cannot create a screenshot in %s: %w", dir, err)
 	}
 	if err := writePNG(img, f); err != nil {
+		_ = os.Remove(f.Name())
 		return "", err
 	}
 	return f.Name(), nil
 }
 
-// writePNG encodes into f with the fastest compression (a snappy save
-// beats the smallest file) and closes it; a failed write removes it.
-// Opaque images encode as RGB, like the Rust RgbImage.
 func writePNG(img image.Image, f *os.File) error {
-	path := f.Name()
-	w := bufio.NewWriter(f)
-	enc := png.Encoder{CompressionLevel: png.BestSpeed}
-	err := enc.Encode(w, img)
+	err := encodePNG(f, img)
 	if err == nil {
-		err = w.Flush()
+		err = f.Sync()
 	}
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
-		_ = os.Remove(path)
-		return fmt.Errorf("cannot save %s: %w", path, err)
+		return fmt.Errorf("cannot save %s: %w", f.Name(), err)
 	}
 	return nil
+}
+
+func encodePNG(w io.Writer, img image.Image) error {
+	bw := bufio.NewWriter(w)
+	enc := png.Encoder{CompressionLevel: png.BestSpeed}
+	if err := enc.Encode(bw, img); err != nil {
+		return err
+	}
+	return bw.Flush()
 }
 
 // resolveDir is the save directory: the configured one, else

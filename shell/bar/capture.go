@@ -32,6 +32,7 @@ const overlayLabelPx = 14
 // (bootstrap's screenshot and share picker service starts).
 type captureServices struct {
 	host    *screenshot.Host
+	shots   *shotUI
 	picker  *sharepicker.Picker
 	release []func()
 }
@@ -58,6 +59,7 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		}
 		return mons
 	}
+	copyImage := clipboardCopier(application, clip)
 	s := &captureServices{host: &screenshot.Host{
 		Config:   func() config.ScreenshotConfig { return current().Screenshot },
 		Monitors: monitors,
@@ -65,7 +67,7 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		Region:   region,
 		Picker:   colorpicker.New(application, gate, outputs, font, colorpicker.HistoryPath()),
 		Focus:    focus,
-		Copy:     clipboardCopier(application, clip),
+		Copy:     copyImage,
 		Forget: func(ids []render.ImageID) {
 			application.Invoke(func() {
 				for _, id := range ids {
@@ -74,6 +76,8 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 			})
 		},
 	}}
+	s.shots = newShotUI(application, outputs, current, focus.FocusedOutput, sans, copyImage)
+	s.shots.wire(s.host)
 	windows := regionoverlay.NewWindowPick(application, gate, outputs, font, sheet)
 	s.picker = sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, gate, region, windows)
 	return s
@@ -162,25 +166,36 @@ func logicalOutputSize(application *app.Application, outputs func() []*app.Outpu
 	}
 }
 
-func clipboardCopier(application *app.Application, clip *clipboard.Clipboard) func(image.Image) error {
-	return func(img image.Image) error {
+func clipboardCopier(application *app.Application, clip *clipboard.Clipboard) func(image.Image) (func(), error) {
+	return func(img image.Image) (func(), error) {
 		content, err := transfer.Image(img)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		errc := make(chan error, 1)
-		application.Invoke(func() { errc <- putOnClipboard(application, clip, content) })
-		return <-errc
+		type put struct {
+			retract func()
+			err     error
+		}
+		done := make(chan put, 1)
+		application.Invoke(func() {
+			retract, err := putOnClipboard(application, clip, content)
+			done <- put{retract, err}
+		})
+		p := <-done
+		return p.retract, p.err
 	}
 }
 
-func putOnClipboard(application *app.Application, clip *clipboard.Clipboard, content transfer.Content) error {
+// putOnClipboard copies content, through the clipboard history when the
+// shell keeps one, which can take the copy back; the plain device
+// cannot, so it returns no retract.
+func putOnClipboard(application *app.Application, clip *clipboard.Clipboard, content transfer.Content) (func(), error) {
 	if clip != nil {
 		return clip.Put(content)
 	}
 	device := application.Clipboard()
 	if device == nil {
-		return app.ErrClipboardUnavailable
+		return nil, app.ErrClipboardUnavailable
 	}
-	return device.Write(content)
+	return nil, device.Write(content)
 }

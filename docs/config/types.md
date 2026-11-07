@@ -1342,6 +1342,17 @@ Number in `[0.25, 3.0]`.
 
 Serialises as `float`.
 
+## ScreenshotCorner {#screenshot-corner}
+
+Screen corner for the screenshot thumbnail.
+
+| Value | Meaning |
+|---|---|
+| `"top-left"` | Top-left corner. |
+| `"top-right"` | Top-right corner. |
+| `"bottom-right"` | Bottom-right corner. |
+| `"bottom-left"` | Bottom-left corner. |
+
 ## Secret {#secret}
 
 A secret, or `$NAME` to read it from the environment.

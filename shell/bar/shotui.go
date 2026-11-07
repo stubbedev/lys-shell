@@ -1,0 +1,146 @@
+package bar
+
+import (
+	"image"
+	"log"
+
+	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/app"
+
+	"github.com/stubbedev/lys-shell/config"
+	timeclock "github.com/stubbedev/lys-shell/internal/clock"
+	"github.com/stubbedev/lys-shell/shell/markup"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
+	"github.com/stubbedev/lys-shell/shell/shotthumb"
+	"github.com/stubbedev/lys-shell/styling"
+)
+
+const toolbarPx = 14
+
+type shotUI struct {
+	app     *app.Application
+	outputs func() []*app.Output
+	current func() *config.Config
+	focused func() (string, bool)
+	font    render.Font
+	copy    func(image.Image) (func(), error)
+
+	thumb   *shotthumb.Thumbnail
+	holders map[render.ImageID]int
+	saved   map[render.ImageID]screenshot.Saved
+}
+
+func newShotUI(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, copyImage func(image.Image) (func(), error)) *shotUI {
+	u := &shotUI{
+		app: application, outputs: outputs, current: current, focused: focused, font: font, copy: copyImage,
+		holders: map[render.ImageID]int{}, saved: map[render.ImageID]screenshot.Saved{},
+	}
+	u.thumb = shotthumb.New(shotthumb.Deps{
+		Open: func(lc app.LayerConfig) (shotthumb.Window, error) {
+			w, err := application.NewLayer(lc)
+			if err != nil {
+				return nil, err
+			}
+			return w, nil
+		},
+		KeySym: application.KeySym,
+		Invoke: application.Invoke,
+		Clock:  timeclock.Wall{},
+		Edit:   u.edit,
+		Delete: u.discard,
+		Done:   u.release,
+	})
+	return u
+}
+
+func (u *shotUI) wire(h *screenshot.Host) {
+	h.Present = u.present
+	h.Edit = func(s screenshot.Saved) {
+		u.app.Invoke(func() {
+			shot := u.hold(s)
+			u.edit(shot)
+			u.release(shot)
+		})
+	}
+	h.OpenFolder = func(dir string) { u.app.Invoke(func() { u.app.OpenPath(dir) }) }
+}
+
+func (u *shotUI) present(s screenshot.Saved) {
+	name, _ := u.focused()
+	u.app.Invoke(func() {
+		shot := u.hold(s)
+		var out *app.Output
+		for _, o := range u.outputs() {
+			if o.Name == name {
+				out = o
+			}
+		}
+		if err := u.thumb.Show(shot, out, u.current().Screenshot); err != nil {
+			log.Printf("screenshot: thumbnail: %v", err)
+		}
+	})
+}
+
+func (u *shotUI) hold(s screenshot.Saved) shotthumb.Shot {
+	shot := shotthumb.Shot{Path: s.Path, Image: render.NewStillImage(s.Image)}
+	u.holders[shot.Image.ID] = 1
+	u.saved[shot.Image.ID] = s
+	return shot
+}
+
+func (u *shotUI) release(shot shotthumb.Shot) {
+	id := shot.Image.ID
+	if u.holders[id]--; u.holders[id] > 0 {
+		return
+	}
+	delete(u.holders, id)
+	delete(u.saved, id)
+	u.app.ForgetImage(id)
+}
+
+func (u *shotUI) discard(shot shotthumb.Shot) {
+	s, ok := u.saved[shot.Image.ID]
+	if !ok {
+		s = screenshot.Saved{Path: shot.Path}
+	}
+	go func() {
+		if err := s.Discard(); err != nil {
+			log.Printf("screenshot: %v", err)
+		}
+	}()
+}
+
+func (u *shotUI) edit(shot shotthumb.Shot) {
+	u.holders[shot.Image.ID]++
+	save := func(img *image.RGBA, path string) error {
+		if err := screenshot.WritePNG(img, path); err != nil {
+			return err
+		}
+		if _, err := u.copy(img); err != nil {
+			log.Printf("screenshot: copying the edited image: %v", err)
+		}
+		return nil
+	}
+	_, err := markup.Open(markup.Deps{
+		App:     u.app,
+		Font:    u.font,
+		Px:      toolbarPx,
+		Palette: markupPalette(u.current().Styling),
+		Save:    save,
+		SaveAs:  func(img *image.RGBA, path string) error { return screenshot.WritePNG(img, path) },
+		Closed:  func() { u.release(shot) },
+	}, shot.Image, shot.Path)
+	if err != nil {
+		log.Printf("screenshot: markup editor: %v", err)
+		u.release(shot)
+	}
+}
+
+func markupPalette(s config.StylingConfig) []render.Color {
+	p, err := styling.ConfigPalette(s)
+	if err != nil {
+		log.Printf("screenshot: markup palette: %v", err)
+		p = styling.Default()
+	}
+	return []render.Color{p.Red, p.Yellow, p.Green, p.Blue, p.Primary, p.Fg, p.Bg}
+}

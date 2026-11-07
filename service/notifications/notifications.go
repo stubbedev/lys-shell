@@ -18,6 +18,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
+	"github.com/stubbedev/lys-shell/internal/clock"
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/version"
@@ -214,20 +215,7 @@ type Service struct {
 
 // Clock is the service's time source: when a notification arrived,
 // and the popup countdowns and history expiries it arms.
-type Clock interface {
-	Now() time.Time
-	// AfterFunc runs fn once d has passed; stop disarms it, reporting
-	// whether it was still armed.
-	AfterFunc(d time.Duration, fn func()) (stop func() bool)
-}
-
-type wallClock struct{}
-
-func (wallClock) Now() time.Time { return time.Now() }
-
-func (wallClock) AfterFunc(d time.Duration, fn func()) func() bool {
-	return time.AfterFunc(d, fn).Stop
-}
+type Clock = clock.Clock
 
 // UseClock makes the service keep time by c instead of the wall clock,
 // for a host that drives time itself; call it before the first
@@ -260,7 +248,7 @@ func NewService() *Service {
 		cacheImage:    cacheImage,
 		events:        feed.New[Event](32),
 		history:       feed.NewTick(),
-		clock:         wallClock{},
+		clock:         clock.Wall{},
 	}
 }
 
