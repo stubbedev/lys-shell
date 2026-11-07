@@ -335,6 +335,15 @@ func TestSettingChangedFollowsTheConfig(t *testing.T) {
 	if got := r.changed(t); len(got) != 0 {
 		t.Errorf("an unchanged effective scheme emitted %v", got)
 	}
+	if err := r.cfg.SetByPath("styling.palette.primary", "#336699"); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyAccentColor}) {
+		t.Errorf("a new palette primary emitted %v, want only the accent", got)
+	}
+	if v, _ := r.read(AppearanceNS, keyAccentColor); !slices.Equal(v.([]any), []any{0x33 / 255.0, 0x66 / 255.0, 0x99 / 255.0}) {
+		t.Errorf("accent-color = %#v after primary #336699", v)
+	}
 	// A setting the portal does not serve emits nothing.
 	if err := r.cfg.SetByPath("styling.scale", 1.5); err != nil {
 		t.Fatal(err)
