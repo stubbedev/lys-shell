@@ -97,7 +97,10 @@ func TestCapabilitiesOf(t *testing.T) {
 func a4() paper { return commonPapers[0] }
 
 func TestFormSettings(t *testing.T) {
-	f := form{copies: 2, pages: pagesRanges, ranges: "1-3", landscape: true, paper: commonPapers[1], color: "monochrome", side: "two-sided-short-edge", quality: qualityDraft}
+	f := form{
+		copies: 2, pages: pagesRanges, ranges: "1-3", landscape: true, paper: commonPapers[1], color: "monochrome", side: "two-sided-short-edge", quality: qualityDraft,
+		numberUp: 1, layout: "lrtb", pageSet: "all", collate: true, scale: 100,
+	}
 	want := []Setting{
 		{"printer", "office"},
 		{"n-copies", "2"},
@@ -108,6 +111,12 @@ func TestFormSettings(t *testing.T) {
 		{"use-color", "false"},
 		{"duplex", "vertical"},
 		{"quality", "draft"},
+		{"number-up", "1"},
+		{"number-up-layout", "lrtb"},
+		{"page-set", "all"},
+		{"reverse", "false"},
+		{"collate", "true"},
+		{"scale", "100"},
 		{"print-pages", "ranges"},
 		{"page-ranges", "0-2"},
 	}

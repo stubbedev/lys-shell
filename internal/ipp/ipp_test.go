@@ -125,8 +125,12 @@ func TestClientListsPrinters(t *testing.T) {
 			Sides: []string{"one-sided", "two-sided-long-edge"}, SidesDefault: "one-sided",
 			ColorModes: []string{"monochrome"}, ColorModeDefault: "monochrome",
 			Qualities: []int32{3, 4}, QualityDefault: 4,
+			Scalings: []string{}, MediaSources: []string{}, MediaTypes: []string{}, OutputBins: []string{},
 		},
-		{Name: "lab", StateMessage: "Out of paper", State: StateStopped, Accepting: false, Media: []string{}, Sides: []string{}, ColorModes: []string{}, Qualities: []int32{}},
+		{
+			Name: "lab", StateMessage: "Out of paper", State: StateStopped, Accepting: false, Media: []string{}, Sides: []string{}, ColorModes: []string{}, Qualities: []int32{},
+			Scalings: []string{}, MediaSources: []string{}, MediaTypes: []string{}, OutputBins: []string{},
+		},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("printers = %+v, want %+v (a nameless queue is skipped)", got, want)
@@ -224,5 +228,29 @@ func TestAValueTooLongForItsLengthFieldIsRefused(t *testing.T) {
 	}
 	if _, err := (&Client{}).do(context.Background(), "/", long, nil); err == nil {
 		t.Error("the client sent a message its length fields cannot hold")
+	}
+}
+
+// A collection, nested too, encodes as begCollection, member names and
+// endCollection, and decodes back to its members.
+func TestCollectionsRoundTrip(t *testing.T) {
+	col := Collection("media-col",
+		Attr{"media-size", []Value{CollectionValue(Int("x-dimension", 21000), Int("y-dimension", 29700))}},
+		String(TagKeyword, "media-source", "tray-2"))
+	m := Message{Code: OpPrintJob, RequestID: 3, Groups: []Group{{Tag: GroupJob, Attrs: []Attr{col, Int("copies", 2)}}}}
+	got, err := Decode(m.Encode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, m) {
+		t.Errorf("decoded %+v, want %+v", got, m)
+	}
+}
+
+// number-up-supported reads as its integers and its ranges spelled out.
+func TestNumberUpSpellsRangesOut(t *testing.T) {
+	g := Group{Tag: GroupPrinter, Attrs: []Attr{{"number-up-supported", []Value{{Tag: TagInteger, Int: 1}, {Tag: TagRange, Low: 2, Int: 4}, {Tag: TagRange, Low: 9, Int: 99}}}}}
+	if got := numberUp(g); !reflect.DeepEqual(got, []int32{1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16}) {
+		t.Errorf("number-up = %v", got)
 	}
 }

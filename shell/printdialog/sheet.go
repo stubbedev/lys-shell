@@ -1,13 +1,16 @@
 package printdialog
 
 import (
+	"cmp"
 	"context"
 	"log"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"time"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/widget"
@@ -28,8 +31,9 @@ const lookingForPrinters = "Looking for printers…"
 // selected printer's state is read again while it is open, until
 // close.
 type sheet struct {
-	h *Dialog
-	r PrepareRequest
+	h     *Dialog
+	r     PrepareRequest
+	appID string
 
 	root   widget.Widget
 	list   *widget.ListBox
@@ -60,6 +64,19 @@ type sheet struct {
 	sideDrop    *choices[string]
 	colorDrop   *choices[string]
 	qualityDrop *choices[int32]
+	// The layout controls, and the rows that hide with what a queue
+	// does not offer.
+	numberUpDrop  *choices[int32]
+	layoutDrop    *choices[string]
+	pageSetDrop   *choices[string]
+	reverse       *widget.CheckButton
+	collate       *widget.CheckButton
+	scale         *widget.SpinButton
+	scalingDrop   *choices[string]
+	sourceDrop    *choices[string]
+	mediaTypeDrop *choices[string]
+	outputBinDrop *choices[string]
+	optional      map[widget.Widget]*widget.Label
 
 	outputRow        *widget.Box
 	outputLabel      *widget.Label
@@ -73,8 +90,8 @@ type sheet struct {
 // the printers still being looked for: the title, the printer list in
 // a scroll that grows with it from 64 to 240px, the .print-form grid
 // of labels and controls, Print to File's output row, and the actions.
-func (h *Dialog) newSheet(r PrepareRequest) *sheet {
-	s := &sheet{h: h, r: r, papersOf: map[string]paper{}}
+func (h *Dialog) newSheet(c portaldialogs.Caller, r PrepareRequest) *sheet {
+	s := &sheet{h: h, r: r, appID: c.AppID, papersOf: map[string]paper{}, optional: map[widget.Widget]*widget.Label{}}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.list = widget.NewListBox()
 	s.list.SetClasses("print-printer-list")
@@ -92,7 +109,7 @@ func (h *Dialog) newSheet(r PrepareRequest) *sheet {
 	printers.SetSizeRequest(0, listMinHeight)
 
 	file := fileQueueRow()
-	initial := initialForm(r, file.caps)
+	initial := initialForm(h.presets.withPreset(r, c.AppID, file.name), file.caps)
 	th := widget.Current()
 	px := widgets.TextPx(styling.Body, 1)
 	s.copies = widget.NewSpinButton(h.d.Font, px, 0, minCopies, maxCopies, 1, 0)
@@ -125,7 +142,20 @@ func (h *Dialog) newSheet(r PrepareRequest) *sheet {
 	s.sideDrop = &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return sideLabels[v] }}
 	s.colorDrop = &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return colorLabels[v] }}
 	s.qualityDrop = &choices[int32]{drop: h.dropdown(nil), label: func(v int32) string { return qualityLabels[v] }}
-	s.offer(file.caps, initial)
+	s.numberUpDrop = &choices[int32]{drop: h.dropdown(nil), label: func(v int32) string { return strconv.Itoa(int(v)) }}
+	s.layoutDrop = &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return layoutLabels[v] }}
+	s.layoutDrop.refill(allLayouts, initial.layout)
+	s.pageSetDrop = &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return pageSetLabels[v] }}
+	s.pageSetDrop.refill(allPageSets, initial.pageSet)
+	s.reverse = widget.NewCheckButton(initial.reverse)
+	s.collate = widget.NewCheckButton(initial.collate)
+	s.scale = widget.NewSpinButton(h.d.Font, px, 0, minScale, maxScale, 1, 0)
+	s.scale.SetValue(float64(initial.scale))
+	s.scalingDrop = &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return scalingLabels[v] }}
+	automatic := func(v string) string { return cmp.Or(keywordLabel(v), "Automatic") }
+	s.sourceDrop = &choices[string]{drop: h.dropdown(nil), label: automatic}
+	s.mediaTypeDrop = &choices[string]{drop: h.dropdown(nil), label: automatic}
+	s.outputBinDrop = &choices[string]{drop: h.dropdown(nil), label: keywordLabel}
 
 	grid := widget.NewGrid(2*th.Spacing, th.Spacing)
 	grid.AddClass("print-form")
@@ -135,20 +165,37 @@ func (h *Dialog) newSheet(r PrepareRequest) *sheet {
 			widget.Widget
 			SetHExpand(bool)
 		}
+		optional bool
 	}{
-		{"Copies", s.copies},
-		{"Pages", s.pagesDrop.drop},
-		{"Range", s.ranges},
-		{"Orientation", s.orientation},
-		{"Paper size", s.paperDrop.drop},
-		{"Color", s.colorDrop.drop},
-		{"Two-sided", s.sideDrop.drop},
-		{"Quality", s.qualityDrop.drop},
+		{"Copies", s.copies, false},
+		{"Pages", s.pagesDrop.drop, false},
+		{"Range", s.ranges, false},
+		{"Orientation", s.orientation, false},
+		{"Paper size", s.paperDrop.drop, false},
+		{"Color", s.colorDrop.drop, false},
+		{"Two-sided", s.sideDrop.drop, false},
+		{"Quality", s.qualityDrop.drop, false},
+		{"Pages per sheet", s.numberUpDrop.drop, true},
+		{"Page order", s.layoutDrop.drop, true},
+		{"Only print", s.pageSetDrop.drop, false},
+		{"Reverse order", s.reverse, false},
+		{"Collate copies", s.collate, false},
+		{"Scale (%)", s.scale, false},
+		{"Scaling", s.scalingDrop.drop, true},
+		{"Paper source", s.sourceDrop.drop, true},
+		{"Paper type", s.mediaTypeDrop.drop, true},
+		{"Output tray", s.outputBinDrop.drop, true},
 	} {
-		grid.Attach(h.label(row.label, "print-form-label", css.DimLabel), 0, i, 1, 1)
+		label := h.label(row.label, "print-form-label", css.DimLabel)
+		grid.Attach(label, 0, i, 1, 1)
 		row.control.SetHExpand(true)
 		grid.Attach(row.control, 1, i, 1, 1)
+		if row.optional {
+			s.optional[row.control] = label
+		}
 	}
+	s.offer(file.caps, initial)
+	reset := widgets.DialogButton(h.d.Font, "Reset to printer defaults", "print-reset", css.Flat, s.reset)
 
 	s.acceptLabel = r.AcceptLabel
 	if s.acceptLabel == "" {
@@ -174,7 +221,7 @@ func (h *Dialog) newSheet(r PrepareRequest) *sheet {
 	s.setQueues([]queue{file}, fileQueue, true)
 
 	surface := widgets.DialogCard(h.d.Font, "Print", "print-surface", surfaceWidth)
-	surface.SetContent(widgets.DialogBody(printers, grid, s.outputRow, s.replaceNote))
+	surface.SetContent(widgets.DialogBody(printers, grid, reset, s.outputRow, s.replaceNote))
 	surface.AppendFooter(widgets.DialogButton(h.d.Font, "Cancel", "portal-dialog-cancel", css.Outline, func() { h.finish(prepared{}, false) }))
 	surface.AppendFooter(widgets.DialogButton(h.d.Font, s.acceptLabel, "portal-dialog-confirm", css.SuggestedAction, s.confirm))
 	s.root = surface
@@ -200,6 +247,60 @@ func (s *sheet) offer(c capabilities, want form) {
 	s.sideDrop.refill(c.sides, pick(c.sides, want.side, c.side))
 	s.colorDrop.refill(c.colors, pick(c.colors, want.color, c.color))
 	s.qualityDrop.refill(c.qualities, pick(c.qualities, want.quality, c.quality))
+	s.numberUpDrop.refill(c.numberUp, pick(c.numberUp, want.numberUp, 1))
+	s.scalingDrop.refill(c.scalings, pick(c.scalings, want.scaling, c.scaling))
+	s.sourceDrop.refill(withAutomatic(c.sources), pick(c.sources, want.source, ""))
+	s.mediaTypeDrop.refill(withAutomatic(c.mediaTypes), pick(c.mediaTypes, want.mediaType, ""))
+	s.outputBinDrop.refill(c.outputBins, pick(c.outputBins, want.outputBin, c.outputBin))
+	s.show(s.numberUpDrop.drop, len(c.numberUp) > 1)
+	s.show(s.layoutDrop.drop, len(c.numberUp) > 1)
+	s.show(s.scalingDrop.drop, len(c.scalings) > 0)
+	s.show(s.sourceDrop.drop, len(c.sources) > 0)
+	s.show(s.mediaTypeDrop.drop, len(c.mediaTypes) > 0)
+	s.show(s.outputBinDrop.drop, len(c.outputBins) > 0)
+}
+
+// withAutomatic is a queue's keywords after "" for its own choice.
+func withAutomatic(keywords []string) []string {
+	if len(keywords) == 0 {
+		return nil
+	}
+	return append([]string{""}, keywords...)
+}
+
+// show shows an optional control and its label, or hides both.
+func (s *sheet) show(control widget.Widget, on bool) {
+	if v, ok := control.(interface{ SetVisible(bool) }); ok {
+		v.SetVisible(on)
+	}
+	s.optional[control].SetVisible(on)
+}
+
+// setForm puts f in the controls; the queue selected offers what it
+// names.
+func (s *sheet) setForm(f form, c capabilities) {
+	s.copies.SetValue(float64(f.copies))
+	s.pagesDrop.set(f.pages)
+	s.ranges.SetText(f.ranges)
+	s.orientation.SetSelected(map[bool]int{false: 0, true: 1}[f.landscape])
+	for _, d := range []interface{ clear() }{s.paperDrop, s.sideDrop, s.colorDrop, s.qualityDrop, s.numberUpDrop, s.scalingDrop, s.sourceDrop, s.mediaTypeDrop, s.outputBinDrop} {
+		d.clear()
+	}
+	s.offer(c, f)
+	s.layoutDrop.set(f.layout)
+	s.pageSetDrop.set(f.pageSet)
+	s.reverse.SetChecked(f.reverse)
+	s.collate.SetChecked(f.collate)
+	s.scale.SetValue(float64(f.scale))
+}
+
+// reset puts the selected queue's defaults in the form.
+func (s *sheet) reset() {
+	q, ok := s.selected()
+	if !ok {
+		return
+	}
+	s.setForm(initialForm(PrepareRequest{HasCurrentPage: s.r.HasCurrentPage, HasSelectedPages: s.r.HasSelectedPages}, q.caps), q.caps)
 }
 
 // form is what the form holds now.
@@ -208,6 +309,9 @@ func (s *sheet) form() form {
 		copies: int(s.copies.Value()), pages: s.pagesDrop.value(), ranges: s.ranges.Text(),
 		landscape: s.orientation.Selected() == 1, paper: s.papersOf[s.paperDrop.value()],
 		color: s.colorDrop.value(), side: s.sideDrop.value(), quality: s.qualityDrop.value(),
+		numberUp: max(s.numberUpDrop.value(), 1), layout: s.layoutDrop.value(), pageSet: s.pageSetDrop.value(),
+		reverse: s.reverse.Checked(), collate: s.collate.Checked(), scale: int(s.scale.Value()),
+		scaling: s.scalingDrop.value(), source: s.sourceDrop.value(), mediaType: s.mediaTypeDrop.value(), outputBin: s.outputBinDrop.value(),
 	}
 }
 
@@ -305,7 +409,11 @@ func (s *sheet) load() {
 				s.cupsQueues = append(s.cupsQueues, cupsQueue(p))
 			}
 			queues := s.compose()
+			picked := s.picked
 			s.setQueues(queues, preferredQueue(queues, settingOf(s.r.Settings, "printer"), user, def), false)
+			if q, ok := s.selected(); ok && !picked {
+				s.setForm(initialForm(s.h.presets.withPreset(s.r, s.appID, q.name), q.caps), q.caps)
+			}
 			go s.follow()
 		})
 	}()
@@ -389,10 +497,10 @@ func (s *sheet) confirm() {
 	f := s.form()
 	switch q.kind {
 	case queueCUPS:
-		s.h.finish(prepared{printer: q.name, form: f}, true)
+		s.done(prepared{printer: q.name, form: f})
 		return
 	case queueNetwork:
-		s.h.finish(prepared{printer: q.name, device: q.device, form: f}, true)
+		s.done(prepared{printer: q.name, device: q.device, form: f})
 		return
 	}
 	file := s.output
@@ -410,7 +518,16 @@ func (s *sheet) confirm() {
 				return
 			}
 			f.output = file
-			s.h.finish(prepared{printer: q.name, form: f}, true)
+			s.done(prepared{printer: q.name, form: f})
 		})
 	}()
+}
+
+// done answers the confirmed form, kept as the app's preset for the
+// printer.
+func (s *sheet) done(p prepared) {
+	if s.appID != "" {
+		s.h.presets.remember(s.appID, p.printer, p.form.settings(p.printer))
+	}
+	s.h.finish(p, true)
 }

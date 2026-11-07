@@ -66,9 +66,9 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 		return func() {}
 	}
 	home, _ := os.UserHomeDir()
-	viewFile := ""
+	viewFile, presetsFile := "", ""
 	if dir, ok := xdg.OS.StateDir(version.Name); ok {
-		viewFile = filepath.Join(dir, "file-chooser-view")
+		viewFile, presetsFile = filepath.Join(dir, "file-chooser-view"), filepath.Join(dir, "print-presets")
 	}
 	chooser := filechooser.New(filechooser.Deps{
 		Config:         current,
@@ -125,6 +125,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 		CUPS:         cups,
 		LPOptions:    filepath.Join(home, ".cups", "lpoptions"),
 		RefreshEvery: printerRefresh,
+		PresetsFile:  presetsFile,
 		DNSSD: func() *dnssd.Client {
 			if conn := system(); conn != nil {
 				return dnssd.New(conn)

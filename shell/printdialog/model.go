@@ -93,6 +93,42 @@ var (
 	orientations  = []string{"Portrait", "Landscape"}
 )
 
+// The layout choices: pages per sheet and their order (GTK's
+// number-up and number-up-layout), the page set, the scalings IPP
+// names; each with its label.
+var (
+	allNumberUp = []int32{1, 2, 4, 6, 9, 16}
+	allLayouts  = []string{"lrtb", "lrbt", "rltb", "rlbt", "tblr", "tbrl", "btlr", "btrl"}
+	allPageSets = []string{"all", "odd", "even"}
+	allScalings = []string{"auto", "auto-fit", "fit", "fill", "none"}
+
+	layoutLabels = map[string]string{
+		"lrtb": "Left to right, top to bottom", "lrbt": "Left to right, bottom to top",
+		"rltb": "Right to left, top to bottom", "rlbt": "Right to left, bottom to top",
+		"tblr": "Top to bottom, left to right", "tbrl": "Top to bottom, right to left",
+		"btlr": "Bottom to top, left to right", "btrl": "Bottom to top, right to left",
+	}
+	pageSetLabels = map[string]string{"all": "All pages", "odd": "Odd pages only", "even": "Even pages only"}
+	scalingLabels = map[string]string{"auto": "Automatic", "auto-fit": "Shrink to fit", "fit": "Fit to page", "fill": "Fill page", "none": "Actual size"}
+)
+
+// The scale bounds, in percent (GTK's scale).
+const (
+	minScale     = 25
+	maxScale     = 400
+	defaultScale = 100
+)
+
+// keywordLabel says an IPP keyword the form has no label for in words:
+// "tray-1" is "Tray 1", "photographic-glossy" "Photographic glossy".
+func keywordLabel(k string) string {
+	if k == "" {
+		return ""
+	}
+	words := strings.ReplaceAll(k, "-", " ")
+	return strings.ToUpper(words[:1]) + words[1:]
+}
+
 // The print-quality enums.
 const (
 	qualityDraft  int32 = 3
@@ -112,13 +148,32 @@ type capabilities struct {
 	// a quality.
 	paper, side, color string
 	quality            int32
+	// numberUp are the pages per sheet offered, scalings the IPP
+	// scalings, sources the trays, mediaTypes the media types and
+	// outputBins the output trays; none hides the control. scaling and
+	// outputBin are the defaults.
+	numberUp           []int32
+	scalings           []string
+	sources            []string
+	mediaTypes         []string
+	outputBins         []string
+	scaling, outputBin string
 }
 
 // capabilitiesOf is a printer's capabilities; nil is Print to File's.
 func capabilitiesOf(p *ipp.Printer) capabilities {
-	c := capabilities{papers: commonPapers, sides: allSides, colors: allColors, qualities: allQualities}
+	c := capabilities{papers: commonPapers, sides: allSides, colors: allColors, qualities: allQualities, numberUp: allNumberUp}
 	if p == nil {
 		return c.withDefaults("", "", "", 0)
+	}
+	c.numberUp = known(p.NumberUp, allNumberUp)
+	c.scalings = known(p.Scalings, allScalings)
+	c.sources, c.mediaTypes, c.outputBins = p.MediaSources, p.MediaTypes, p.OutputBins
+	if len(c.scalings) > 0 {
+		c.scaling = pick(c.scalings, p.ScalingDefault, c.scalings[0])
+	}
+	if len(c.outputBins) > 0 {
+		c.outputBin = pick(c.outputBins, p.OutputBinDefault, c.outputBins[0])
 	}
 	var papers []paper
 	for _, m := range p.Media {
@@ -197,6 +252,17 @@ type form struct {
 	color     string
 	side      string
 	quality   int32
+	// The layout: pages per sheet and their order, the page set, the
+	// order and collation of the copies, the scale in percent and the
+	// printer's scaling, the tray, media type and output tray ("" for
+	// the printer's own choice).
+	numberUp          int32
+	layout, pageSet   string
+	reverse, collate  bool
+	scale             int
+	scaling           string
+	source, mediaType string
+	outputBin         string
 	// output is the file Print to File writes, "" for a printer.
 	output string
 }
@@ -309,6 +375,19 @@ func (f form) settings(printer string) []Setting {
 		{"duplex", gtkDuplex[f.side]},
 		{"quality", gtkQuality[f.quality]},
 	}
+	s = append(s,
+		Setting{"number-up", strconv.Itoa(int(f.numberUp))},
+		Setting{"number-up-layout", f.layout},
+		Setting{"page-set", f.pageSet},
+		Setting{"reverse", strconv.FormatBool(f.reverse)},
+		Setting{"collate", strconv.FormatBool(f.collate)},
+		Setting{"scale", strconv.Itoa(f.scale)},
+	)
+	for _, kv := range [][2]string{{"default-source", f.source}, {"media-type", f.mediaType}, {"output-bin", f.outputBin}} {
+		if kv[1] != "" {
+			s = append(s, Setting{kv[0], kv[1]})
+		}
+	}
 	if f.output != "" {
 		format := strings.TrimPrefix(filepath.Ext(f.output), ".")
 		s = append(s, Setting{"output-uri", fileuri.FromPath(f.output)}, Setting{"output-file-format", format})
@@ -352,7 +431,7 @@ func (f form) jobAttrs() []ipp.Attr {
 	attrs := []ipp.Attr{
 		ipp.Int("copies", intconv.Clamp[int32](f.copies)),
 		ipp.Enum("orientation-requested", orientation),
-		ipp.String(ipp.TagKeyword, "media", f.paper.media),
+		f.media(),
 		ipp.String(ipp.TagKeyword, "print-color-mode", f.color),
 		ipp.String(ipp.TagKeyword, "sides", f.side),
 		ipp.Enum("print-quality", f.quality),
@@ -360,7 +439,51 @@ func (f form) jobAttrs() []ipp.Attr {
 	if rs, ok := f.pageList(); ok {
 		attrs = append(attrs, ipp.Ranges("page-ranges", rs))
 	}
+	if f.numberUp > 1 {
+		attrs = append(attrs, ipp.Int("number-up", f.numberUp), ipp.String(ipp.TagKeyword, "number-up-layout", f.layout))
+	}
+	if f.pageSet == "odd" || f.pageSet == "even" {
+		attrs = append(attrs, ipp.String(ipp.TagKeyword, "page-set", f.pageSet))
+	}
+	if f.reverse {
+		attrs = append(attrs, ipp.String(ipp.TagKeyword, "output-order", "reverse-order"))
+	}
+	if f.copies > 1 {
+		handling := "separate-documents-uncollated-copies"
+		if f.collate {
+			handling = "separate-documents-collated-copies"
+		}
+		attrs = append(attrs, ipp.String(ipp.TagKeyword, "multiple-document-handling", handling))
+	}
+	if f.scaling != "" {
+		attrs = append(attrs, ipp.String(ipp.TagKeyword, "print-scaling", f.scaling))
+	}
+	if f.outputBin != "" {
+		attrs = append(attrs, ipp.String(ipp.TagKeyword, "output-bin", f.outputBin))
+	}
 	return attrs
+}
+
+// hundredthsOfMM is a size in millimetres in IPP's media-size unit.
+func hundredthsOfMM(v float64) int32 { return int32(math.Round(v * 100)) }
+
+// media is the paper as IPP takes it: its PWG name, or, with a tray or
+// a media type chosen, the media-col naming them with the paper's size
+// (a job may not carry both).
+func (f form) media() ipp.Attr {
+	if f.source == "" && f.mediaType == "" {
+		return ipp.String(ipp.TagKeyword, "media", f.paper.media)
+	}
+	members := []ipp.Attr{{Name: "media-size", Values: []ipp.Value{ipp.CollectionValue(
+		ipp.Int("x-dimension", hundredthsOfMM(f.paper.width)), ipp.Int("y-dimension", hundredthsOfMM(f.paper.height)),
+	)}}}
+	if f.source != "" {
+		members = append(members, ipp.String(ipp.TagKeyword, "media-source", f.source))
+	}
+	if f.mediaType != "" {
+		members = append(members, ipp.String(ipp.TagKeyword, "media-type", f.mediaType))
+	}
+	return ipp.Collection("media-col", members...)
 }
 
 // initialForm is the form a request opens on: the queue's defaults,
@@ -371,7 +494,10 @@ func initialForm(r PrepareRequest, c capabilities) form {
 	for _, s := range r.Settings {
 		in[s.Key] = s.Value
 	}
-	f := form{copies: minCopies, side: c.side, color: c.color, quality: c.quality}
+	f := form{
+		copies: minCopies, side: c.side, color: c.color, quality: c.quality,
+		numberUp: 1, layout: allLayouts[0], pageSet: allPageSets[0], scale: defaultScale, scaling: c.scaling, outputBin: c.outputBin,
+	}
 	f.paper = c.papers[slices.IndexFunc(c.papers, func(p paper) bool { return p.gtk == c.paper })]
 	if n, err := strconv.Atoi(in["n-copies"]); err == nil {
 		f.copies = min(max(n, minCopies), maxCopies)
@@ -396,6 +522,19 @@ func initialForm(r PrepareRequest, c capabilities) form {
 			f.quality = pick(c.qualities, q, f.quality)
 		}
 	}
+	if n, err := strconv.ParseInt(in["number-up"], 10, 32); err == nil {
+		f.numberUp = pick(c.numberUp, int32(n), f.numberUp)
+	}
+	f.layout = pick(allLayouts, in["number-up-layout"], f.layout)
+	f.pageSet = pick(allPageSets, in["page-set"], f.pageSet)
+	f.reverse = in["reverse"] == "true"
+	f.collate = in["collate"] == "true"
+	if n, err := strconv.Atoi(in["scale"]); err == nil {
+		f.scale = min(max(n, minScale), maxScale)
+	}
+	f.source = pick(c.sources, in["default-source"], "")
+	f.mediaType = pick(c.mediaTypes, in["media-type"], "")
+	f.outputBin = pick(c.outputBins, in["output-bin"], f.outputBin)
 	switch in["print-pages"] {
 	case "current":
 		if r.HasCurrentPage {

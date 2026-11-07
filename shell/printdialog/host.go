@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
@@ -86,6 +87,9 @@ type Deps struct {
 	// chosen with its path on the loop; never on a cancel. It returns
 	// at once.
 	PickOutput func(suggested string, chosen func(path string))
+	// PresetsFile keeps the form each app last confirmed for each
+	// printer; "" keeps them in memory.
+	PresetsFile string
 	// Home is the home directory, for the suggested output file.
 	Home string
 	// User names the job's owner.
@@ -152,8 +156,10 @@ type Dialog struct {
 	closing bool
 	answer  func(p prepared, ok bool)
 	queue   dialogqueue.Queue
-	// sheet is the request's showing.
-	sheet *sheet
+	// sheet is the request's showing; presets are the forms each app
+	// last confirmed per printer.
+	sheet   *sheet
+	presets *presets
 
 	mu   sync.Mutex
 	jobs map[uint32]prepared
@@ -162,7 +168,9 @@ type Dialog struct {
 }
 
 // New builds the host; nothing maps until a request.
-func New(d Deps) *Dialog { return &Dialog{d: d, jobs: map[uint32]prepared{}, now: time.Now} }
+func New(d Deps) *Dialog {
+	return &Dialog{d: d, jobs: map[uint32]prepared{}, now: time.Now, presets: loadPresets(d.PresetsFile)}
+}
 
 // Prepare shows the printer picker and settings form for the request;
 // a confirmed one is stashed under the returned token, a random one
@@ -191,7 +199,7 @@ func (h *Dialog) ask(c portaldialogs.Caller, r PrepareRequest) (prepared, bool) 
 	h.d.Invoke(func() {
 		h.queue.Enqueue(c.Handle, func() {
 			h.answer = reply
-			s := h.newSheet(r)
+			s := h.newSheet(c, r)
 			h.sheet = s
 			h.show(c, s.root)
 			if h.sheet == s {
@@ -303,21 +311,18 @@ func (h *Dialog) claim(appID string, token uint32) (prepared, bool) {
 }
 
 // toFile writes the document to the file the user chose for Print to
-// File.
+// File, whole: it goes to a temporary file beside it, renamed into
+// place only once the copy is complete, so a document that fails
+// midway leaves a file that was there as it was.
 func toFile(path string, document io.Reader) bool {
 	if path == "" {
 		log.Printf("print: to file: no file chosen")
 		return false
 	}
-	out, err := os.Create(path) //nolint:gosec // the file the user chose
-	if err != nil {
-		log.Printf("print: to file: %v", err)
-		return false
-	}
-	_, err = io.Copy(out, document)
-	if cerr := out.Close(); err == nil {
-		err = cerr
-	}
+	err := atomicfile.Write(path, 0o644, func(w io.Writer) error {
+		_, err := io.Copy(w, document)
+		return err
+	})
 	if err != nil {
 		log.Printf("print: to file %s: %v", path, err)
 		return false
@@ -393,7 +398,25 @@ func (c *choices[T]) refill(values []T, want T) {
 	c.drop.SetItems(labelsOf(values, c.label), max(slices.Index(values, want), 0))
 }
 
-func (c *choices[T]) value() T { return c.values[max(c.drop.Selected(), 0)] }
+// value is the value chosen, the zero value while there are none.
+func (c *choices[T]) value() T {
+	if len(c.values) == 0 {
+		var zero T
+		return zero
+	}
+	return c.values[max(c.drop.Selected(), 0)]
+}
+
+// set chooses want where offered.
+func (c *choices[T]) set(want T) {
+	if i := slices.Index(c.values, want); i >= 0 {
+		c.drop.SetSelected(i)
+	}
+}
+
+// clear forgets the choice, so the next refill takes the value it is
+// asked for.
+func (c *choices[T]) clear() { c.values = nil }
 
 // settingOf is the value of key among settings, "" without one.
 func settingOf(settings []Setting, key string) string {

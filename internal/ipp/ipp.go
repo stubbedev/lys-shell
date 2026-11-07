@@ -33,27 +33,35 @@ const (
 
 // Value tags.
 const (
-	TagInteger    byte = 0x21
-	TagBoolean    byte = 0x22
-	TagEnum       byte = 0x23
-	TagRange      byte = 0x33
-	TagText       byte = 0x41
-	TagName       byte = 0x42
-	TagKeyword    byte = 0x44
-	TagURI        byte = 0x45
-	TagCharset    byte = 0x47
-	TagLanguage   byte = 0x48
-	TagMimeMedia  byte = 0x49
-	tagFirstValue byte = 0x10
+	TagInteger byte = 0x21
+	TagBoolean byte = 0x22
+	TagEnum    byte = 0x23
+	TagRange   byte = 0x33
+	// TagCollection opens a collection value, whose members follow as
+	// memberAttrName values each before its own values, up to
+	// tagEndCollection.
+	TagCollection    byte = 0x34
+	tagEndCollection byte = 0x37
+	tagMemberName    byte = 0x4A
+	TagText          byte = 0x41
+	TagName          byte = 0x42
+	TagKeyword       byte = 0x44
+	TagURI           byte = 0x45
+	TagCharset       byte = 0x47
+	TagLanguage      byte = 0x48
+	TagMimeMedia     byte = 0x49
+	tagFirstValue    byte = 0x10
 )
 
 // Value is one attribute value: an int for integer, enum and boolean
-// (0 or 1), a [2]int32 for a range, a string for the text kinds.
+// (0 or 1), a [2]int32 for a range, a string for the text kinds, the
+// members of a collection.
 type Value struct {
-	Tag  byte
-	Int  int32
-	Low  int32 // range lower bound; Int is the upper
-	Text string
+	Tag     byte
+	Int     int32
+	Low     int32 // range lower bound; Int is the upper
+	Text    string
+	Members []Attr
 }
 
 // Attr is one named attribute with its values.
@@ -76,6 +84,14 @@ func String(tag byte, name string, vs ...string) Attr {
 	}
 	return a
 }
+
+// Collection is a collection attribute of one value, its members.
+func Collection(name string, members ...Attr) Attr {
+	return Attr{name, []Value{CollectionValue(members...)}}
+}
+
+// CollectionValue is a collection value, a member of another one.
+func CollectionValue(members ...Attr) Value { return Value{Tag: TagCollection, Members: members} }
 
 // Ranges is a 1-based rangeOfInteger attribute.
 func Ranges(name string, rs [][2]int32) Attr {
@@ -209,6 +225,21 @@ func writeValue(b *bytes.Buffer, v Value) {
 		_ = binary.Write(b, binary.BigEndian, uint16(8))
 		_ = binary.Write(b, binary.BigEndian, v.Low)
 		_ = binary.Write(b, binary.BigEndian, v.Int)
+	case TagCollection:
+		writeString(b, "")
+		for _, m := range v.Members {
+			b.WriteByte(tagMemberName)
+			writeString(b, "")
+			writeString(b, m.Name)
+			for _, mv := range m.Values {
+				b.WriteByte(mv.Tag)
+				writeString(b, "")
+				writeValue(b, mv)
+			}
+		}
+		b.WriteByte(tagEndCollection)
+		writeString(b, "")
+		writeString(b, "")
 	default:
 		writeString(b, v.Text)
 	}
@@ -258,6 +289,11 @@ func Decode(data []byte) (Message, error) {
 		if err != nil {
 			return Message{}, err
 		}
+		if tag == TagCollection {
+			if v.Members, err = readMembers(r); err != nil {
+				return Message{}, err
+			}
+		}
 		if name == "" {
 			if len(cur.Attrs) == 0 {
 				return Message{}, errors.New("ipp: additional value with no attribute")
@@ -267,6 +303,44 @@ func Decode(data []byte) (Message, error) {
 			continue
 		}
 		cur.Attrs = append(cur.Attrs, Attr{Name: name, Values: []Value{v}})
+	}
+}
+
+// readMembers reads a collection's members up to its end.
+func readMembers(r *bytes.Reader) ([]Attr, error) {
+	var members []Attr
+	for {
+		tag, err := r.ReadByte()
+		if err != nil {
+			return nil, errShort
+		}
+		if _, err := readString(r); err != nil {
+			return nil, err
+		}
+		raw, err := readString(r)
+		if err != nil {
+			return nil, err
+		}
+		switch {
+		case tag == tagEndCollection:
+			return members, nil
+		case tag == tagMemberName:
+			members = append(members, Attr{Name: raw})
+			continue
+		case len(members) == 0:
+			return nil, fmt.Errorf("ipp: collection value tag %#x before a member name", tag)
+		}
+		v, err := parseValue(tag, []byte(raw))
+		if err != nil {
+			return nil, err
+		}
+		if tag == TagCollection {
+			if v.Members, err = readMembers(r); err != nil {
+				return nil, err
+			}
+		}
+		last := &members[len(members)-1]
+		last.Values = append(last.Values, v)
 	}
 }
 

@@ -89,7 +89,21 @@ type Printer struct {
 	ColorModeDefault           string
 	Qualities                  []int32
 	QualityDefault             int32
+	// NumberUp are the pages per sheet it can print (number-up-
+	// supported, its ranges spelled out up to maxNumberUp), Scalings its
+	// print-scaling keywords, MediaSources its trays, MediaTypes its
+	// media types and OutputBins its output trays; each with its default
+	// where IPP has one.
+	NumberUp                 []int32
+	Scalings                 []string
+	ScalingDefault           string
+	MediaSources, MediaTypes []string
+	OutputBins               []string
+	OutputBinDefault         string
 }
+
+// maxNumberUp bounds a number-up-supported range spelled out.
+const maxNumberUp = 16
 
 // Marker is one supply (marker-names, marker-colors, marker-levels):
 // its level in percent, negative when the printer cannot tell.
@@ -111,6 +125,8 @@ var printerAttributes = []string{
 	"printer-is-accepting-jobs", "printer-uuid", "device-uri", "marker-names", "marker-colors", "marker-levels",
 	"media-supported", "media-default", "sides-supported", "sides-default",
 	"print-color-mode-supported", "print-color-mode-default", "print-quality-supported", "print-quality-default",
+	"number-up-supported", "print-scaling-supported", "print-scaling-default", "media-source-supported",
+	"media-type-supported", "output-bin-supported", "output-bin-default",
 }
 
 // operation is the operation group every request opens with.
@@ -286,7 +302,28 @@ func printerOf(g Group) (Printer, bool) {
 	p.ColorModes, p.ColorModeDefault = g.Texts("print-color-mode-supported"), g.Text("print-color-mode-default")
 	p.Qualities = g.Ints("print-quality-supported")
 	p.QualityDefault, _ = g.Int("print-quality-default")
+	p.NumberUp = numberUp(g)
+	p.Scalings, p.ScalingDefault = g.Texts("print-scaling-supported"), g.Text("print-scaling-default")
+	p.MediaSources, p.MediaTypes = g.Texts("media-source-supported"), g.Texts("media-type-supported")
+	p.OutputBins, p.OutputBinDefault = g.Texts("output-bin-supported"), g.Text("output-bin-default")
 	return p, true
+}
+
+// numberUp spells number-up-supported out: its integers, and its
+// ranges up to maxNumberUp.
+func numberUp(g Group) []int32 {
+	a, _ := g.Get("number-up-supported")
+	var out []int32
+	for _, v := range a.Values {
+		if v.Tag != TagRange {
+			out = append(out, v.Int)
+			continue
+		}
+		for n := max(v.Low, 1); n <= min(v.Int, maxNumberUp); n++ {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // Job is one document to spool.
