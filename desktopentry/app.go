@@ -311,9 +311,13 @@ func (a App) ShouldShow() bool {
 // ShownIn is g_desktop_app_info_get_show_in over explicit desktop
 // names: the first desktop listed in OnlyShowIn or NotShowIn decides;
 // none listed means shown unless OnlyShowIn restricts it.
-func (a App) ShownIn(desktops []string) bool {
-	only := a.file.List(DesktopGroup, "OnlyShowIn")
-	not := a.file.List(DesktopGroup, "NotShowIn")
+func (a App) ShownIn(desktops []string) bool { return a.file.ShownIn(desktops) }
+
+// ShownIn is the entry's OnlyShowIn and NotShowIn applied to desktops,
+// for a key file read whatever its Hidden or Type (an autostart entry).
+func (kf *KeyFile) ShownIn(desktops []string) bool {
+	only := kf.List(DesktopGroup, "OnlyShowIn")
+	not := kf.List(DesktopGroup, "NotShowIn")
 	for _, d := range desktops {
 		if slices.Contains(only, d) {
 			return true
