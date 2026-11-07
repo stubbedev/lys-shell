@@ -16,7 +16,7 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 | `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for dropdowns, popovers, and dialogs. |
 | `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"default"` | Corner rounding for dropdowns, popovers, and dialogs. |
 | `appearance` | [`Appearance`](/config/types#appearance) | `"auto"` | Light/dark appearance mode. `Auto` follows each provider / the configured palette; `Light`/`Dark` force the mode (static palettes swap to their built-in light/dark variant when one exists). |
-| `high-contrast` | bool | `false` | High contrast: the shell's own surfaces switch to a high-contrast palette with solid borders and visible focus rings, turn opaque, and apps are asked for it through the desktop portal's `contrast` preference. |
+| `high-contrast` | bool | `false` | High contrast: the shell's own surfaces switch to a high-contrast palette with solid borders and visible focus rings, turn opaque, a module's custom label color yields to its palette default, and apps are asked for it through the desktop portal's `contrast` preference. |
 | `reduce-transparency` | bool | `false` | Reduce transparency: every shell surface is opaque and asks for no background blur, whatever its own opacity setting says. High contrast implies it. |
 | `theming-monitor` | [`Monitor`](/config/types#monitor) | `""` | Monitor whose wallpaper drives color extraction. Empty uses the first available. |
 | `palette_base_theme` | string | `""` | Currently active theme preset name, and/or the base for the palette when the palette has been modified. Persisted backing state for the theme selector; not a labeled setting of its own. |
