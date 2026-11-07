@@ -575,6 +575,11 @@ func (s *shellStart) mount() {
 			})
 		})
 	}
+	if application.ToplevelsAvailable() {
+		tasks := newTaskHub(appToplevels{application}, application.Invoke)
+		s.down.add(tasks.close)
+		baseCtx.Tasks = tasks
+	}
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
 	// Notification popups render on one monitor, bar or not.

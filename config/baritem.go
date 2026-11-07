@@ -182,6 +182,7 @@ const (
 	ModuleMedia              BarModule = "media"
 	ModuleMangoWorkspaces    BarModule = "mango-workspaces"
 	ModuleMicrophone         BarModule = "microphone"
+	ModuleMinimizedWindows   BarModule = "minimized-windows"
 	ModuleNetstat            BarModule = "netstat"
 	ModuleNetwork            BarModule = "network"
 	ModuleNightlight         BarModule = "nightlight"
@@ -211,7 +212,7 @@ var BuiltinModules = []BarModule{
 	ModuleBattery, ModuleBitwarden, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
 	ModuleCPU, ModuleDashboard, ModuleHyprlandWorkspaces,
 	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleLysWMWorkspaces, ModuleMail,
-	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleNetstat,
+	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleMinimizedWindows, ModuleNetstat,
 	ModuleNetwork, ModuleNightlight, ModuleNiriWorkspaces, ModuleNotifications, ModulePower,
 	ModulePowerProfiles, ModuleRAM, ModuleRecorder, ModuleScreenShare, ModuleScreenshot,
 	ModuleSeparator, ModuleStorage, ModuleSwayWorkspaces, ModuleSystray,

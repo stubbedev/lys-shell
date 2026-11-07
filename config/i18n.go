@@ -28,6 +28,7 @@ var i18nPrefixes = map[string]string{
 	"KeybindModeConfig":         "settings-modules-keybind-mode",
 	"KeyboardInputConfig":       "settings-modules-keyboard-input",
 	"LysWMWorkspacesConfig":     "settings-modules-lys-wm-workspaces",
+	"MinimizedWindowsConfig":    "settings-modules-minimized-windows",
 	"LauncherCombiConfig":       "settings-launcher-combi",
 	"LauncherConfig":            "settings-launcher",
 	"LauncherDrunConfig":        "settings-launcher-drun",

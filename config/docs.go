@@ -162,6 +162,7 @@ func docSpecs() []docSpec {
 		m("mango-workspaces", docStandard, func(c *Config) any { return &c.MangoWorkspaces }),
 		m("media", bar, func(c *Config) any { return &c.Media }),
 		m("microphone", bar, func(c *Config) any { return &c.Microphone }),
+		m("minimized-windows", docStandard, func(c *Config) any { return &c.MinimizedWindows }),
 		m("netstat", bar, func(c *Config) any { return &c.Netstat }),
 		m("network", bar, func(c *Config) any { return &c.Network }),
 		m("niri-workspaces", docStandard, func(c *Config) any { return &c.NiriWorkspaces }),

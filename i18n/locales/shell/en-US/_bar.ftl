@@ -48,6 +48,13 @@ bar-media-playing = Playing
 bar-media-paused = Paused
 bar-media-stopped = Stopped
 
+## Minimized windows and the dock
+
+bar-task-restore = Restore
+bar-task-close = Close
+bar-task-launch = Open
+bar-task-none = Nothing is minimized
+
 ## Global shortcuts the shell registers with the compositor
 
 shortcut-launcher = Open or close the launcher

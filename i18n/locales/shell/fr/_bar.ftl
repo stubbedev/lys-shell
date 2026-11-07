@@ -47,6 +47,10 @@ bar-storage-multiple = Multiple
 bar-media-playing = Lecture
 bar-media-paused = En pause
 bar-media-stopped = Arrêté
+bar-task-restore = Restaurer
+bar-task-close = Fermer
+bar-task-launch = Ouvrir
+bar-task-none = Aucune fenêtre réduite
 
 ## Global shortcuts the shell registers with the compositor
 

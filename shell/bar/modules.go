@@ -61,6 +61,9 @@ type ModuleContext struct {
 	Bitwarden     *bitwardenHost
 	SNI           *sni.Store
 	Weather       *weather.Service
+	// Tasks is the window list the minimized-windows modules and the docks
+	// share; nil when the compositor offers no foreign-toplevel list.
+	Tasks *taskHub
 	// System is the shell's one system bus connection, nil without one;
 	// what reads it never closes it.
 	System *dbus.Conn
@@ -285,6 +288,7 @@ var factories = map[string]Factory{
 	"brightness":          newBrightness,
 	"keyboard-input":      newKeyboardLayout,
 	"media":               newMedia,
+	"minimized-windows":   newMinimizedWindows,
 	"bluetooth":           newBluetooth,
 	"microphone":          newMicrophone,
 	"network":             newNetwork,

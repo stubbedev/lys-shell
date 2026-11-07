@@ -57,6 +57,7 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 | [`mango-workspaces`](/config/modules/mango-workspaces) | MangoWM tag switcher module configuration. |
 | [`media`](/config/modules/media) | Now-playing title and playback controls for the active MPRIS player. |
 | [`microphone`](/config/modules/microphone) | Microphone input level and mute toggle. |
+| [`minimized-windows`](/config/modules/minimized-windows) | Minimized windows, like a dock. |
 | [`netstat`](/config/modules/netstat) | Network traffic counters (up/down rates). |
 | [`network`](/config/modules/network) | Network connection status with a dropdown for switching connections. |
 | [`nightlight`](/config/modules/nightlight) | Night light: warms the display colours, by hand or on a dawn/dusk schedule. |

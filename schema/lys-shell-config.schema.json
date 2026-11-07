@@ -867,6 +867,7 @@
             "media",
             "mango-workspaces",
             "microphone",
+            "minimized-windows",
             "netstat",
             "network",
             "nightlight",
@@ -5435,6 +5436,32 @@
       },
       "type": "object"
     },
+    "MinimizedWindowsConfig": {
+      "description": "Minimized windows, like a dock.\n\nLists each minimized window as its app's icon, in the order the windows\nwere minimized, with the window title as tooltip. A click restores and\nfocuses the window, a middle click closes it, and a right click offers\nboth. Windows minimize into their icon and come back out of it. Works\non any compositor with the wlr foreign-toplevel protocol, lys-wm among\nthem.",
+      "properties": {
+        "icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-app-window-symbolic",
+          "description": "Icon for a window whose app has no desktop entry icon, and the\nmodule's own icon while nothing is minimized under show-when-empty."
+        },
+        "icon-size": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Size of each window's icon. Accepts a scale multiplier or pixels (e.g. `\"24px\"`)."
+        },
+        "scope": {
+          "$ref": "#/$defs/WindowScope",
+          "default": "output",
+          "description": "Which outputs' minimized windows the module lists."
+        },
+        "show-when-empty": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Keep the module on the bar, showing its icon, while nothing is\nminimized."
+        }
+      },
+      "type": "object"
+    },
     "ModuleRef": {
       "anyOf": [
         {
@@ -5959,6 +5986,16 @@
             "thresholds": []
           },
           "description": "Microphone input module."
+        },
+        "minimized-windows": {
+          "$ref": "#/$defs/MinimizedWindowsConfig",
+          "default": {
+            "icon": "ld-app-window-symbolic",
+            "icon-size": 1.0,
+            "scope": "output",
+            "show-when-empty": false
+          },
+          "description": "Minimized windows module."
         },
         "netstat": {
           "$ref": "#/$defs/NetstatConfig",
@@ -10445,6 +10482,21 @@
         }
       ]
     },
+    "WindowScope": {
+      "description": "Which outputs' windows the module lists.",
+      "oneOf": [
+        {
+          "const": "output",
+          "description": "Only the windows on the bar's own output.",
+          "type": "string"
+        },
+        {
+          "const": "all",
+          "description": "The windows on every output.",
+          "type": "string"
+        }
+      ]
+    },
     "WindowTitleConfig": {
       "description": "Active window title with optional app-icon prefix.",
       "properties": {
@@ -11548,6 +11600,12 @@
           "scroll-down": "",
           "scroll-up": "",
           "thresholds": []
+        },
+        "minimized-windows": {
+          "icon": "ld-app-window-symbolic",
+          "icon-size": 1.0,
+          "scope": "output",
+          "show-when-empty": false
         },
         "netstat": {
           "border-color": "red",

@@ -1,0 +1,6 @@
+.task-item {
+  all: unset;
+  border-radius: var(--radius-default);
+  padding: var(--space-2xs);
+}
+

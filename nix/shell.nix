@@ -43,6 +43,9 @@
           systemd
           # ffprobe, which the recorder tests read their files back with.
           ffmpeg-headless
+          # The compositor the minimized-windows module and dock tests run on
+          # headless (service/lyswm/lyswmtest.Headless).
+          inputs.lys-wm.packages.${pkgs.stdenv.hostPlatform.system}.default
           # wl-paste, the out-of-process data-control reader the screenshot
           # clipboard tests read the selection back with.
           wl-clipboard

@@ -42,6 +42,8 @@ type ModulesConfig struct {
 	MangoWorkspaces MangoWorkspacesConfig `cfg:"mango-workspaces"`
 	// Media player module.
 	Media MediaConfig `cfg:"media"`
+	// Minimized windows module.
+	MinimizedWindows MinimizedWindowsConfig `cfg:"minimized-windows"`
 	// Microphone input module.
 	Microphone MicrophoneConfig `cfg:"microphone"`
 	// Network connection module.
@@ -145,6 +147,7 @@ func DefaultsModules() ModulesConfig {
 		Mail:               DefaultsMail(),
 		MangoWorkspaces:    DefaultsMangoWorkspaces(),
 		Media:              DefaultsMedia(),
+		MinimizedWindows:   DefaultsMinimizedWindows(),
 		Microphone:         DefaultsMicrophone(),
 		Network:            DefaultsNetwork(),
 		Netstat:            DefaultsNetstat(),

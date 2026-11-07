@@ -227,7 +227,7 @@ bar:
 
 Bar module name. Built-in modules or custom modules with a `custom-<id>` pattern.
 
-One of: `"battery"`, `"bitwarden"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"lys-wm-workspaces"`, `"mail"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"netstat"`, `"network"`, `"nightlight"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"power-profiles"`, `"ram"`, `"recorder"`, `"screen-share"`, `"screenshot"`, `"separator"`, `"storage"`, `"sway-workspaces"`, `"systray"`, `"treeman"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"workspaces"`, `"world-clock"`.
+One of: `"battery"`, `"bitwarden"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"lys-wm-workspaces"`, `"mail"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"minimized-windows"`, `"netstat"`, `"network"`, `"nightlight"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"power-profiles"`, `"ram"`, `"recorder"`, `"screen-share"`, `"screenshot"`, `"separator"`, `"storage"`, `"sway-workspaces"`, `"systray"`, `"treeman"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"workspaces"`, `"world-clock"`.
 
 String matching `^custom-[a-z0-9-]+$`.
 
@@ -1550,6 +1550,15 @@ Which day appears in the first column of the calendar dropdown.
 | `"friday"` | Week starts on Friday. |
 | `"saturday"` | Week starts on Saturday. |
 | `"sunday"` | Week starts on Sunday (default). |
+
+## WindowScope {#window-scope}
+
+Which outputs' windows the module lists.
+
+| Value | Meaning |
+|---|---|
+| `"output"` | Only the windows on the bar's own output. |
+| `"all"` | The windows on every output. |
 
 ## WorkspaceClickAction {#workspace-click-action}
 
