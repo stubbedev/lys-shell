@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/portal/permissions"
 	"github.com/stubbedev/lys-shell/service/screenshare"
 )
 
@@ -74,7 +75,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput)
 	b.shares = newShares(conn, b.sessions)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
-	b.shortcuts = newGlobalShortcuts(conn, b.sessions, shortcutStorePath(), waylandShortcutsStarter(loop))
+	b.shortcuts = newGlobalShortcuts(conn, b.sessions, permissions.ShortcutsPath(), waylandShortcutsStarter(loop))
 	loop.onEnd(b.clipboard.loopEnded)
 	loop.onEnd(b.shortcuts.loopEnded)
 	return b

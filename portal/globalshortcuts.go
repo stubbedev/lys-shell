@@ -2,25 +2,19 @@ package portal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/portal/permissions"
 )
 
 // GlobalShortcutsIface bridges org.freedesktop.impl.portal.GlobalShortcuts
@@ -76,9 +70,8 @@ type globalShortcuts struct {
 	// the spec allows: monotonic since the portal started).
 	now func() uint64
 	// storePath keeps each app's bound shortcuts, "" without a state
-	// directory; storeMu serializes its reads and writes.
+	// directory.
 	storePath string
-	storeMu   sync.Mutex
 
 	mu   sync.Mutex
 	dev  shortcutDevice
@@ -233,40 +226,12 @@ func (g *globalShortcuts) session(path dbus.ObjectPath) (*session, error) {
 	return s, nil
 }
 
-// shortcutStorePath is $XDG_STATE_HOME/lys-shell/portal-shortcuts.json,
-// "" without a state directory.
-func shortcutStorePath() string {
-	dir, ok := xdg.OS.StateDir(version.Name)
-	if !ok {
-		return ""
-	}
-	return filepath.Join(dir, "portal-shortcuts.json")
-}
-
-// storedShortcut is one shortcut an app bound, as the store keeps it.
-type storedShortcut struct {
-	ID          string `json:"id"`
-	Description string `json:"description"`
-}
-
-// stored is the shortcuts each app bound before, by app id; the caller
-// holds storeMu.
-func (g *globalShortcuts) stored() (map[string][]storedShortcut, error) {
-	all := map[string][]storedShortcut{}
+// stored is the shortcuts each app bound before, by app id.
+func (g *globalShortcuts) stored() (map[string][]permissions.Shortcut, error) {
 	if g.storePath == "" {
-		return all, nil
+		return map[string][]permissions.Shortcut{}, nil
 	}
-	data, err := os.ReadFile(g.storePath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return all, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", g.storePath, err)
-	}
-	if err := json.Unmarshal(data, &all); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", g.storePath, err)
-	}
-	return all, nil
+	return permissions.ReadShortcuts(g.storePath)
 }
 
 // remember keeps an identified owner's bound shortcuts for its later
@@ -278,25 +243,11 @@ func (g *globalShortcuts) remember(owner shortcutOwner, shortcuts []shortcut) er
 	if g.storePath == "" {
 		return errors.New("no state directory to keep the shortcuts in")
 	}
-	g.storeMu.Lock()
-	defer g.storeMu.Unlock()
-	all, err := g.stored()
-	if err != nil {
-		return err
-	}
-	kept := make([]storedShortcut, len(shortcuts))
+	kept := make([]permissions.Shortcut, len(shortcuts))
 	for i, s := range shortcuts {
-		kept[i] = storedShortcut{ID: s.ID, Description: stringOr(s.Props, "description", "")}
+		kept[i] = permissions.Shortcut{ID: s.ID, Description: stringOr(s.Props, "description", "")}
 	}
-	all[owner.appID] = kept
-	data, err := json.MarshalIndent(all, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(g.storePath), 0o700); err != nil {
-		return err
-	}
-	return atomicfile.WriteFile(g.storePath, data, 0o600)
+	return permissions.UpdateShortcuts(g.storePath, func(all map[string][]permissions.Shortcut) { all[owner.appID] = kept })
 }
 
 // boundBefore is an identified owner's shortcuts from earlier
@@ -305,9 +256,7 @@ func (g *globalShortcuts) boundBefore(owner shortcutOwner) ([]shortcut, error) {
 	if !owner.identified() {
 		return nil, nil
 	}
-	g.storeMu.Lock()
 	all, err := g.stored()
-	g.storeMu.Unlock()
 	if err != nil {
 		return nil, err
 	}
