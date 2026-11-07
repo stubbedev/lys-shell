@@ -209,6 +209,9 @@ func TestMissingMessageAndAttributeMarkers(t *testing.T) {
 	if l.Has("nope") || !l.Has("menu") {
 		t.Error("Has disagrees with Get")
 	}
+	if !l.HasAttr("menu", "tooltip") || l.HasAttr("menu", "nope") || l.HasAttr("nope", "tooltip") || !l.HasAttr("novalue", "a") {
+		t.Error("HasAttr disagrees with Attr")
+	}
 }
 
 func TestFallbackChainAndDuplicates(t *testing.T) {

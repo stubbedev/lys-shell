@@ -255,3 +255,14 @@ func (l *Loader) Has(id string) bool {
 	}
 	return false
 }
+
+// HasAttr reports whether any loaded bundle defines the message's
+// attribute: an optional attribute is shown only where it exists.
+func (l *Loader) HasAttr(id, attr string) bool {
+	for _, b := range l.bundles {
+		if msg := b.messages[id]; msg != nil && msg.attribute(attr) != nil {
+			return true
+		}
+	}
+	return false
+}
