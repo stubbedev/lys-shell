@@ -97,6 +97,9 @@ func optIndex(raw uint32) OptIndex {
 	return OptIndex{index: raw, ok: raw != native.InvalidIndex}
 }
 
+// IndexOf is a set index.
+func IndexOf(index uint32) OptIndex { return OptIndex{index: index, ok: true} }
+
 // Get returns the index and whether it is set.
 func (o OptIndex) Get() (uint32, bool) { return o.index, o.ok }
 

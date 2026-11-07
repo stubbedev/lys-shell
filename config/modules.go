@@ -60,6 +60,8 @@ type ModulesConfig struct {
 	Power PowerConfig `cfg:"power"`
 	// Power profile indicator/switcher module.
 	PowerProfiles PowerProfilesConfig `cfg:"power-profiles"`
+	// Microphone, camera and screen-share privacy indicator module.
+	Privacy PrivacyConfig `cfg:"privacy"`
 	// RAM usage module.
 	RAM RamConfig `cfg:"ram"`
 	// Screen recorder module.
@@ -158,6 +160,7 @@ func DefaultsModules() ModulesConfig {
 		Notification:       DefaultsNotification(),
 		Power:              DefaultsPower(),
 		PowerProfiles:      DefaultsPowerProfiles(),
+		Privacy:            DefaultsPrivacy(),
 		RAM:                DefaultsRam(),
 		Recorder:           DefaultsRecorder(),
 		ScreenShare:        DefaultsScreenShare(),

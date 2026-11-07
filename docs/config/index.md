@@ -68,6 +68,7 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 | [`notifications`](/config/modules/notifications) | Notification center: icon in the bar, dropdown with history, DND toggle. |
 | [`power`](/config/modules/power) | Shutdown, reboot, and logout menu. |
 | [`power-profiles`](/config/modules/power-profiles) | Power profile indicator and switcher (power-profiles-daemon). |
+| [`privacy`](/config/modules/privacy) | Privacy indicator. |
 | [`ram`](/config/modules/ram) | Memory and swap usage. |
 | [`recorder`](/config/modules/recorder) | Native screen recorder encoding on the GPU's video encoder. |
 | [`screen-share`](/config/modules/screen-share) | Screen share indicator. |

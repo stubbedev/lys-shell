@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -36,6 +37,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
+	"github.com/stubbedev/lys-shell/service/privacy"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/screenshare"
@@ -384,6 +386,12 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 		announcer, stopSounds := startSounds(svc, audio, s.cfg.Notification)
 		s.sounds = announcer
 		s.down.add(stopSounds)
+	}
+	if cams, err := privacy.WatchCameras("/dev", "/proc", os.Getuid()); err == nil {
+		s.ctx.Cameras = cams
+		s.down.add(func() { _ = cams.Close() })
+	} else {
+		log.Printf("cameras: %v; the privacy module shows no camera", err)
 	}
 	sniStore := sni.NewStore()
 	s.ctx.SNI = sniStore

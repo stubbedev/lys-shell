@@ -61,6 +61,7 @@ var i18nPrefixes = map[string]string{
 	"RamConfig":                 "settings-modules-ram",
 	"RecorderConfig":            "settings-modules-recorder",
 	"RecorderReplayConfig":      "settings-modules-recorder-replay",
+	"PrivacyConfig":             "settings-modules-privacy",
 	"ScreenShareConfig":         "settings-modules-screen-share",
 	"ScreenshotConfig":          "settings-modules-screenshot",
 	"SeparatorConfig":           "settings-modules-separator",

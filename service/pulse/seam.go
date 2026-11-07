@@ -29,6 +29,9 @@ type Source interface {
 	OutputDevices() []OutputDevice
 	InputDevices() []InputDevice
 	PlaybackStreams() []AudioStream
+	// RecordingStreams snapshots the record streams, what captures a
+	// source.
+	RecordingStreams() []AudioStream
 	// SetDeviceVolume, SetDeviceMute, and SetDefault control one
 	// device; SetStreamVolume and SetStreamMute one stream.
 	SetDeviceVolume(ctx context.Context, key DeviceKey, v Volume) error

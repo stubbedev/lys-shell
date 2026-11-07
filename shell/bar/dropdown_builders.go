@@ -28,6 +28,7 @@ func dropdownBuilders() map[string]func(ctx ModuleContext) widget.Widget {
 		"bitwarden":       bitwardenDropdown,
 		"weather":         weatherDropdown,
 		"dashboard":       dashboardDropdown,
+		"privacy":         privacyDropdown,
 		"screen-share":    screenShareDropdown,
 		"background-apps": backgroundAppsDropdown,
 	}

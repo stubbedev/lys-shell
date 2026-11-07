@@ -66,6 +66,9 @@ type ModuleContext struct {
 	// ScreenShares follows the portal's screen shares on the shell's
 	// session bus; nil without one.
 	ScreenShares shareSource
+	// Cameras follows the processes holding a camera open; nil when the
+	// video devices cannot be watched.
+	Cameras cameraSource
 	// Idle is the built-in idle policy, nil when it does not run.
 	Idle          *idle.Service
 	Treeman       treeman.Source
@@ -337,6 +340,7 @@ var factories = map[string]Factory{
 	"mango-workspaces":    newMangoWorkspaces,
 	"lys-wm-workspaces":   newLysWMWorkspaces,
 	"workspaces":          newWorkspaces,
+	"privacy":             newPrivacy,
 	"screen-share":        newScreenShare,
 	"background-apps":     newBackgroundApps,
 	"screenshot":          newScreenshot,
