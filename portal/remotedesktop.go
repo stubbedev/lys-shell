@@ -335,7 +335,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		s.mu.Lock()
 		s.cast.persistMode = state.persistMode
 		if restoring && (len(state.restore.targets) > 0 || state.restore.virtual != nil) && state.restore.fits(s.cast.types) {
-			s.cast.restore, s.cast.restoreVirtual = state.restore.targets, state.restore.virtual
+			s.cast.restore, s.cast.restoreVirtual, s.cast.restoreIssued = state.restore.targets, state.restore.virtual, state.restore.issued
 		}
 		s.mu.Unlock()
 	}

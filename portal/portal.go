@@ -71,7 +71,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
 	loop := &waylandLoop{}
-	b.screenCast = newScreenCast(conn, b.sessions, screenStreams{openDevice: openVulkanAllocator}.start, loop.outputs)
+	b.screenCast = newScreenCast(conn, b.sessions, b.castReminder(), screenStreams{openDevice: openVulkanAllocator}.start, loop.outputs)
 	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput)
 	b.shares = newShares(conn, b.sessions)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))

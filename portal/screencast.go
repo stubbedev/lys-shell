@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbusx"
@@ -33,7 +34,10 @@ type castState struct {
 	multiple                       bool
 	restore                        []restoreTarget
 	restoreVirtual                 *virtualSize
-	streams                        []startedStream
+	// restoreIssued is when the replayed grant was given, zero when
+	// its token does not say.
+	restoreIssued time.Time
+	streams       []startedStream
 }
 
 // screenCast is the interface: its sessions' state lives on the
@@ -62,6 +66,8 @@ type screenCast struct {
 	virtualOffered func() (bool, error)
 	createVirtual  func(virtualSize) (string, error)
 	removeVirtual  func(name string) error
+	// reminder asks again about an old persistent grant.
+	reminder castReminder
 }
 
 // startedStream is a running stream and what Start reported of it;
@@ -74,9 +80,9 @@ type startedStream struct {
 	stopped chan struct{}
 }
 
-func newScreenCast(conn *dbus.Conn, s *sessions, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
+func newScreenCast(conn *dbus.Conn, s *sessions, reminder castReminder, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
 	return &screenCast{
-		conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows,
+		conn: conn, sessions: s, reminder: reminder, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows,
 		toplevels: listToplevels, displays: func() (map[string]displayID, error) { return readDisplays(drmconn.Dir) },
 		virtualOffered: lyswm.OffersVirtualOutputs, createVirtual: createLysWMOutput, removeVirtual: lyswm.RemoveOutput,
 	}
@@ -458,14 +464,15 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 	persist, _ := optU32(options, "persist_mode")
 	var restore []restoreTarget
 	var restoreVirtual *virtualSize
+	var issued time.Time
 	if v, ok := options["restore_data"]; ok {
 		if g, ok := decodeRestore(v); ok && g.devices == 0 && g.fits(types) {
-			restore, restoreVirtual = g.targets, g.virtual
+			restore, restoreVirtual, issued = g.targets, g.virtual, g.issued
 		}
 	}
 	s.mu.Lock()
 	streams := s.cast.streams
-	*s.cast = castState{types: types, cursorMode: cursor, persistMode: persist, multiple: multiple, restore: restore, restoreVirtual: restoreVirtual, streams: streams}
+	*s.cast = castState{types: types, cursorMode: cursor, persistMode: persist, multiple: multiple, restore: restore, restoreVirtual: restoreVirtual, restoreIssued: issued, streams: streams}
 	s.mu.Unlock()
 	return ResponseSuccess, Vardict{}, nil
 }
@@ -502,19 +509,21 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 }
 
 // sharedScreens is what share started: the streams Start replies, the
-// sources behind them, the virtual outputs it made, and whether the user
-// granted a restore token.
+// sources behind them, the virtual outputs it made, whether the user
+// granted a restore token, and when that grant was given, as its token
+// keeps it.
 type sharedScreens struct {
 	streams    []castStream
 	targets    []sharepicker.Target
 	virtual    []virtualSize
 	allowToken bool
+	issued     time.Time
 }
 
 // grant is the restore grant of what share started, with the
 // RemoteDesktop device types granted beside it.
 func (c *screenCast) grant(devices uint32, shared sharedScreens) restoreGrant {
-	g := restoreGrant{devices: devices, targets: c.describe(shared.targets)}
+	g := restoreGrant{devices: devices, targets: c.describe(shared.targets), issued: shared.issued}
 	if len(shared.virtual) > 0 {
 		g.virtual = &shared.virtual[0]
 	}
@@ -527,7 +536,13 @@ func (c *screenCast) grant(devices uint32, shared sharedScreens) restoreGrant {
 func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	cfg := c.config(s)
 	if cfg.types == sourceVirtual || cfg.restoreVirtual != nil {
-		return c.shareVirtual(call, s, cfg)
+		issued, code := c.replayed(call, s, cfg, cfg.restoreVirtual != nil)
+		if code != ResponseSuccess {
+			return sharedScreens{}, code
+		}
+		shared, code := c.shareVirtual(call, s, cfg)
+		shared.issued = issued
+		return shared, code
 	}
 	// Replaying a token is the grant it was issued for.
 	var restoring, allowToken bool
@@ -539,6 +554,10 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 		}
 		restoring, allowToken, targets = err == nil, err == nil, resolved
 	}
+	issued, code := c.replayed(call, s, cfg, restoring)
+	if code != ResponseSuccess {
+		return sharedScreens{}, code
+	}
 	if !restoring {
 		var code uint32
 		if allowToken, targets, code = c.choose(call, cfg); code != ResponseSuccess {
@@ -548,6 +567,7 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	streams, err := c.begin(s, targets, cfg.cursorMode)
 	if err != nil && restoring && !errors.Is(err, errSessionClosed) {
 		warnf("screencast: restored target unavailable, re-prompting: %v", err)
+		issued = c.reminder.now().UTC()
 		var code uint32
 		if allowToken, targets, code = c.choose(call, cfg); code != ResponseSuccess {
 			return sharedScreens{}, code
@@ -561,7 +581,9 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 		warnf("screencast: failed to start stream: %v", err)
 		return sharedScreens{}, ResponseOther
 	}
-	return c.reply(streams, targets, allowToken), ResponseSuccess
+	shared := c.reply(streams, targets, allowToken)
+	shared.issued = issued
+	return shared, ResponseSuccess
 }
 
 // reply is what share started, with each stream's properties.

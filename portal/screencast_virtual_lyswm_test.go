@@ -38,7 +38,7 @@ func lysWMOutput(t *testing.T, name string) (lyswm.Output, bool) {
 // stream is that output's size, and closing the session removes it.
 func TestScreenCastVirtualOnLysWM(t *testing.T) {
 	r := newRig(t, func(b *Backend) {
-		b.screenCast = newScreenCast(b.conn, b.sessions, screenStreams{openDevice: openVulkanAllocator}.start, lysWMGeometry)
+		b.screenCast = newScreenCast(b.conn, b.sessions, b.castReminder(), screenStreams{openDevice: openVulkanAllocator}.start, lysWMGeometry)
 	})
 	lyswmtest.Headless(t)
 	pwtest.Start(t)

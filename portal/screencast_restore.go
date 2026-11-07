@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/edid"
@@ -22,7 +23,8 @@ import (
 // Restore tokens are (suv): vendor, version, and the grant. Version 1
 // kept the picker's reply as a string; version 2 keeps each source's
 // identity, so a token outlives the window mapping and the connector it
-// was issued for; version 3 adds the size of a virtual output.
+// was issued for; version 3 adds the size of a virtual output and when
+// the grant was given.
 const (
 	restoreVendor           = version.Name
 	restoreV1        uint32 = 1
@@ -54,12 +56,14 @@ type restoreTarget struct {
 }
 
 // restoreGrant is what a token replays: the RemoteDesktop device types
-// granted (none for a ScreenCast token), the sources shared, and the size
-// of the virtual output streamed, if one was.
+// granted (none for a ScreenCast token), the sources shared, the size of
+// the virtual output streamed, if one was, and when the user gave the
+// grant (zero for a version 1 or 2 token, which does not say).
 type restoreGrant struct {
 	devices uint32
 	targets []restoreTarget
 	virtual *virtualSize
+	issued  time.Time
 }
 
 // fits reports whether a session of the source types may replay the
@@ -83,10 +87,12 @@ type tokenGrant struct {
 	Targets []tokenTarget
 }
 
-// tokenGrantV3 is a version 3 grant on the wire: a version 2 grant and
-// the virtual outputs' sizes, (ua(yssssssiiii)a(ii)).
+// tokenGrantV3 is a version 3 grant on the wire: a version 2 grant, when
+// it was given in Unix seconds (0 for unknown) and the virtual outputs'
+// sizes, (uxa(yssssssiiii)a(ii)).
 type tokenGrantV3 struct {
 	Devices uint32
+	Issued  int64
 	Targets []tokenTarget
 	Virtual []tokenSize
 }
@@ -109,6 +115,9 @@ func encodeRestore(g restoreGrant) restoreToken {
 	wire := tokenGrantV3{Devices: g.devices, Targets: make([]tokenTarget, len(g.targets)), Virtual: []tokenSize{}}
 	if g.virtual != nil {
 		wire.Virtual = append(wire.Virtual, tokenSize{g.virtual.width, g.virtual.height})
+	}
+	if !g.issued.IsZero() {
+		wire.Issued = g.issued.Unix()
 	}
 	for i, t := range g.targets {
 		wire.Targets[i] = tokenTarget{
@@ -176,13 +185,16 @@ func decodeRestoreV1(payload string) (restoreGrant, bool) {
 }
 
 // decodeRestoreV3 reads a version 3 grant: at most one virtual output, of
-// a size above 0.
+// a size above 0, and when the grant was given.
 func decodeRestoreV3(data dbus.Variant) (restoreGrant, bool) {
 	var wire tokenGrantV3
 	if err := dbus.Store([]any{data.Value()}, &wire); err != nil || len(wire.Virtual) > 1 {
 		return restoreGrant{}, false
 	}
 	g, ok := decodeTargets(wire.Devices, wire.Targets)
+	if ok && wire.Issued != 0 {
+		g.issued = time.Unix(wire.Issued, 0).UTC()
+	}
 	if !ok || len(wire.Virtual) == 0 {
 		return g, ok
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -92,11 +93,17 @@ type fakeStarts struct {
 	displays  dbustest.Var[map[string]displayID]
 	// virtual is lys-wm's virtual outputs.
 	virtual fakeVirtual
+	// clock is the reminders' clock.
+	clock *fakeclock.Clock
 }
 
-// screenCast is the interface over these fakes.
+// screenCast is the interface over these fakes, its reminders on
+// f.clock, which it starts.
 func (f *fakeStarts) screenCast(b *Backend) *screenCast {
-	c := newScreenCast(b.conn, b.sessions, f.start, f.outputs)
+	f.clock = fakeclock.New()
+	reminder := b.castReminder()
+	reminder.now = f.clock.Now
+	c := newScreenCast(b.conn, b.sessions, reminder, f.start, f.outputs)
 	c.toplevels = func() ([]capture.Toplevel, error) { return f.toplevels.Load(), nil }
 	c.displays = func() (map[string]displayID, error) { return f.displays.Load(), nil }
 	c.virtualOffered, c.createVirtual, c.removeVirtual = f.virtual.offeredNow, f.virtual.create, f.virtual.remove
