@@ -621,7 +621,7 @@ func serveAgent(ctx context.Context, conn *dbus.Conn, obj *agentObject) error {
 	}
 	// Only a new owner is interesting; NM going away takes the
 	// registration with it and there is nothing to redo.
-	if err := dbusx.WatchOwner(ctx, conn, BusName, func() { register(ctx, conn) }); err != nil {
+	if _, err := dbusx.WatchOwner(ctx, conn, BusName, func() { register(ctx, conn) }); err != nil {
 		return fmt.Errorf("network: %w", err)
 	}
 	register(ctx, conn)

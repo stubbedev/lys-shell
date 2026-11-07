@@ -40,7 +40,7 @@ type lateServices struct {
 func (l *lateServices) watch(ctx context.Context, conn *dbus.Conn, starts map[string]lateStart, invoke func(func()), rebuild func(apply func(*ModuleContext))) error {
 	for _, name := range lateServiceNames {
 		start := starts[name]
-		if err := dbusx.WatchOwner(ctx, conn, name, func() {
+		if _, err := dbusx.WatchOwner(ctx, conn, name, func() {
 			var apply func(*ModuleContext)
 			if start != nil {
 				a, stop, err := start()

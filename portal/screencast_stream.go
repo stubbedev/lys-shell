@@ -200,6 +200,7 @@ func videoFormat(f capture.Format) pipewire.VideoFormat {
 // frame, once each.
 type extSource struct {
 	stream *capture.Stream
+	frame  capture.StreamFrame
 	seq    uint64
 	sent   bool
 	at     time.Time
@@ -210,10 +211,10 @@ type extSource struct {
 func (e *extSource) Restart() { e.sent = false }
 
 func (e *extSource) Fill(dst []byte) ([]pipewire.Rect, bool) {
-	f := e.stream.Latest()
-	if f == nil {
+	if !e.stream.Latest(&e.frame) {
 		return nil, false
 	}
+	f := &e.frame
 	now := time.Now()
 	if e.sent && f.Seq == e.seq && now.Sub(e.at) < stillRefresh {
 		return nil, false
