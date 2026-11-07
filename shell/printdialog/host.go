@@ -8,14 +8,12 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
-	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
@@ -67,9 +65,15 @@ type Deps struct {
 	// and entries' ink included.
 	Font  render.Font
 	Sheet *widget.Stylesheet
-	// Printers lists the CUPS queues and Spool sends a job to one.
-	Printers func(context.Context) ([]ipp.Printer, error)
-	Spool    func(context.Context, ipp.Job) error
+	// CUPS is the scheduler the queues, their state and the jobs go
+	// through (*ipp.Client).
+	CUPS Scheduler
+	// LPOptions is the user's lpoptions file, whose Default names the
+	// printer they chose over the scheduler's; "" for none.
+	LPOptions string
+	// RefreshEvery is how often the selected printer's state is read
+	// again while the dialog is open.
+	RefreshEvery time.Duration
 	// PickOutput lets the user choose the file Print to File writes
 	// (the shell's file chooser), starting from suggested, and calls
 	// chosen with its path on the loop; never on a cancel. It returns
@@ -81,11 +85,21 @@ type Deps struct {
 	User string
 }
 
+// Scheduler is what the dialog asks CUPS: the queues, the default
+// destination, one queue's state, and a job to spool.
+type Scheduler interface {
+	Printers(ctx context.Context) ([]ipp.Printer, error)
+	Default(ctx context.Context) (string, error)
+	Printer(ctx context.Context, name string) (ipp.Printer, error)
+	Print(ctx context.Context, j ipp.Job) (int32, error)
+}
+
 // queue is one printer row: its name, the detail line, and what it
-// offers.
+// offers; cups for a CUPS queue, whose state is followed.
 type queue struct {
 	name, detail string
 	caps         capabilities
+	cups         bool
 }
 
 // prepared is a confirmed form stashed under its token until Print,
@@ -108,6 +122,8 @@ type Dialog struct {
 	closing bool
 	answer  func(p prepared, ok bool)
 	queue   dialogqueue.Queue
+	// sheet is the request's showing.
+	sheet *sheet
 
 	mu   sync.Mutex
 	jobs map[uint32]prepared
@@ -136,7 +152,6 @@ func (h *Dialog) Prepare(c portaldialogs.Caller, r PrepareRequest) (bool, []Sett
 
 // ask shows the dialog for the request and waits for the user.
 func (h *Dialog) ask(c portaldialogs.Caller, r PrepareRequest) (prepared, bool) {
-	queues := h.queues()
 	type answer struct {
 		p  prepared
 		ok bool
@@ -146,7 +161,12 @@ func (h *Dialog) ask(c portaldialogs.Caller, r PrepareRequest) (prepared, bool) 
 	h.d.Invoke(func() {
 		h.queue.Enqueue(c.Handle, func() {
 			h.answer = reply
-			h.show(c, h.build(queues, r))
+			s := h.newSheet(r)
+			h.sheet = s
+			h.show(c, s.root)
+			if h.sheet == s {
+				s.load()
+			}
 		}, func() { reply(prepared{}, false) })
 	})
 	a := <-ch
@@ -208,7 +228,7 @@ func (h *Dialog) Print(c portaldialogs.Caller, title string, document *os.File, 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), spoolTimeout)
 	defer cancel()
-	err := h.d.Spool(ctx, ipp.Job{
+	_, err := h.d.CUPS.Print(ctx, ipp.Job{
 		Printer: job.printer, Title: title, User: h.d.User, Format: documentFormat,
 		Attrs: job.form.jobAttrs(), Document: document,
 	})
@@ -266,22 +286,6 @@ func toFile(path string, document io.Reader) bool {
 	return true
 }
 
-// queues are the CUPS printers, then Print to File; an unreachable
-// scheduler leaves just the file.
-func (h *Dialog) queues() []queue {
-	var out []queue
-	ctx, cancel := context.WithTimeout(context.Background(), listTimeout)
-	defer cancel()
-	printers, err := h.d.Printers(ctx)
-	if err != nil && !ipp.IsNotFound(err) {
-		log.Printf("print: listing printers: %v", err)
-	}
-	for _, p := range printers {
-		out = append(out, queue{p.Name, printerDetail(p.Location, printerStatus(p)), capabilitiesOf(&p)})
-	}
-	return append(out, queue{fileQueue, "", capabilitiesOf(nil)})
-}
-
 // finish answers the request showing, plays the exit, and shows the
 // next request waiting.
 func (h *Dialog) finish(p prepared, ok bool) {
@@ -290,6 +294,10 @@ func (h *Dialog) finish(p prepared, ok bool) {
 	}
 	answer := h.answer
 	h.answer = nil
+	if h.sheet != nil {
+		h.sheet.close()
+		h.sheet = nil
+	}
 	answer(p, ok)
 	h.hide()
 	h.queue.Done()
@@ -316,16 +324,17 @@ func labelsOf[T comparable](items []T, label func(T) string) []string {
 }
 
 // printerRow is printer_row: the name over the location and status as
-// a dim caption, inset by the theme's padding.
-func (h *Dialog) printerRow(q queue) widget.Widget {
+// a dim caption, inset by the theme's padding; the caption hides while
+// there is nothing to say.
+func (h *Dialog) printerRow(q queue) (widget.Widget, *widget.Label) {
 	th := widget.Current()
 	row := widget.NewBox(widget.Column, 0, 0)
 	row.SetMargin(render.Insets{Top: th.Padding, Right: th.Padding + th.Padding/2, Bottom: th.Padding, Left: th.Padding + th.Padding/2})
 	row.Append(h.label(q.name, "print-printer-name"), false)
-	if q.detail != "" {
-		row.Append(h.label(q.detail, "print-printer-detail", css.Caption, css.DimLabel), false)
-	}
-	return row
+	detail := h.label(q.detail, "print-printer-detail", css.Caption, css.DimLabel)
+	detail.SetVisible(q.detail != "")
+	row.Append(detail, false)
+	return row, detail
 }
 
 // choices is one dropdown bound to a queue's list of values: refill
@@ -346,175 +355,6 @@ func (c *choices[T]) refill(values []T, want T) {
 }
 
 func (c *choices[T]) value() T { return c.values[max(c.drop.Selected(), 0)] }
-
-// build is the sheet (the print view!): the title, the printer list in
-// a scroll that grows with it from 64 to 240px, the .print-form grid of
-// labels and controls, Print to File's output row, and the actions.
-// The form starts from the app's settings; the paper, sides, color and
-// quality offered follow the printer selected.
-func (h *Dialog) build(queues []queue, r PrepareRequest) widget.Widget {
-	list := widget.NewListBox()
-	list.SetClasses("print-printer-list")
-	for _, q := range queues {
-		list.Append(h.printerRow(q))
-	}
-	start := max(slices.IndexFunc(queues, func(q queue) bool { return q.name == settingOf(r.Settings, "printer") }), 0)
-	list.Select(start)
-	printers := widget.NewScroll(list)
-	printers.FillX = true
-	printers.PropagateNaturalHeight = true
-	printers.SetMaxContentHeight(listMaxHeight)
-	printers.SetSizeRequest(0, listMinHeight)
-
-	initial := initialForm(r, queues[start].caps)
-	th := widget.Current()
-	copies := widget.NewSpinButton(h.d.Font, widgets.TextPx(styling.Body, 1), 0, minCopies, maxCopies, 1, 0)
-	copies.SetValue(float64(initial.copies))
-	pageKinds := []pagesKind{pagesAll}
-	if r.HasCurrentPage {
-		pageKinds = append(pageKinds, pagesCurrent)
-	}
-	if r.HasSelectedPages {
-		pageKinds = append(pageKinds, pagesSelection)
-	}
-	pageKinds = append(pageKinds, pagesRanges)
-	pagesDrop := &choices[pagesKind]{drop: h.dropdown(nil), label: func(k pagesKind) string {
-		return [...]string{"All pages", "Current page", "Selection", "Range"}[k]
-	}}
-	pagesDrop.refill(pageKinds, initial.pages)
-	ranges := widget.NewEntry(h.d.Font, widgets.TextPx(styling.Body, 1), 0)
-	ranges.SetPlaceholder("e.g. 1-5, 8")
-	ranges.SetText(initial.ranges)
-	ranges.OnChanged = func(text string) {
-		if text != "" {
-			pagesDrop.drop.SetSelected(slices.Index(pagesDrop.values, pagesRanges))
-		}
-	}
-	orientation := h.dropdown(orientations)
-	if initial.landscape {
-		orientation.SetSelected(1)
-	}
-	papersOf := map[string]paper{}
-	paperDrop := &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return papersOf[v].label }}
-	sideDrop := &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return sideLabels[v] }}
-	colorDrop := &choices[string]{drop: h.dropdown(nil), label: func(v string) string { return colorLabels[v] }}
-	qualityDrop := &choices[int32]{drop: h.dropdown(nil), label: func(v int32) string { return qualityLabels[v] }}
-	offer := func(c capabilities, want form) {
-		names := make([]string, len(c.papers))
-		for i, p := range c.papers {
-			names[i] = p.gtk
-			papersOf[p.gtk] = p
-		}
-		paperDrop.refill(names, pick(names, want.paper.gtk, c.paper))
-		sideDrop.refill(c.sides, pick(c.sides, want.side, c.side))
-		colorDrop.refill(c.colors, pick(c.colors, want.color, c.color))
-		qualityDrop.refill(c.qualities, pick(c.qualities, want.quality, c.quality))
-	}
-	offer(queues[start].caps, initial)
-
-	grid := widget.NewGrid(2*th.Spacing, th.Spacing)
-	grid.AddClass("print-form")
-	for i, row := range []struct {
-		label   string
-		control interface {
-			widget.Widget
-			SetHExpand(bool)
-		}
-	}{
-		{"Copies", copies},
-		{"Pages", pagesDrop.drop},
-		{"Range", ranges},
-		{"Orientation", orientation},
-		{"Paper size", paperDrop.drop},
-		{"Color", colorDrop.drop},
-		{"Two-sided", sideDrop.drop},
-		{"Quality", qualityDrop.drop},
-	} {
-		grid.Attach(h.label(row.label, "print-form-label", css.DimLabel), 0, i, 1, 1)
-		row.control.SetHExpand(true)
-		grid.Attach(row.control, 1, i, 1, 1)
-	}
-
-	acceptLabel := r.AcceptLabel
-	if acceptLabel == "" {
-		acceptLabel = "Print"
-	}
-	output, err := SuggestedOutput(xdg.OS, h.d.Home, outputFormat(r.OutputFormats))
-	if err != nil {
-		log.Printf("print dialog: %v", err)
-	}
-	outputLabel := h.label(output, "print-output-path")
-	replaceNote := widgets.DialogText(h.d.Font, "", "print-output-replace", css.Warning)
-	replaceNote.SetVisible(false)
-	confirmedReplace := false
-	setOutput := func(path string) {
-		output, confirmedReplace = path, false
-		outputLabel.SetText(path)
-		replaceNote.SetVisible(false)
-	}
-	outputRow := widget.NewBox(widget.Row, th.Spacing, 0)
-	outputRow.AddClass("print-output")
-	outputRow.Append(outputLabel, true)
-	outputRow.Append(widgets.DialogButton(h.d.Font, "Choose…", "print-output-choose", css.Outline, func() {
-		if h.d.PickOutput != nil {
-			h.d.PickOutput(output, setOutput)
-		}
-	}), false)
-
-	selectQueue := func(i int) {
-		if i < 0 || i >= len(queues) {
-			return
-		}
-		outputRow.SetVisible(queues[i].name == fileQueue)
-		replaceNote.SetVisible(false)
-		confirmedReplace = false
-		offer(queues[i].caps, form{paper: papersOf[paperDrop.value()], side: sideDrop.value(), color: colorDrop.value(), quality: qualityDrop.value()})
-	}
-	list.OnSelectionChanged = func(rows []int) {
-		if len(rows) == 1 {
-			selectQueue(rows[0])
-		}
-	}
-	selectQueue(start)
-
-	confirm := func() {
-		sel := list.Selected()
-		if sel < 0 || sel >= len(queues) {
-			h.finish(prepared{}, false)
-			return
-		}
-		f := form{
-			copies: int(copies.Value()), pages: pagesDrop.value(), ranges: ranges.Text(),
-			landscape: orientation.Selected() == 1, paper: papersOf[paperDrop.value()],
-			color: colorDrop.value(), side: sideDrop.value(), quality: qualityDrop.value(),
-		}
-		printer := queues[sel].name
-		if printer != fileQueue {
-			h.finish(prepared{printer: printer, form: f}, true)
-			return
-		}
-		file := output
-		go func() {
-			_, err := os.Stat(file)
-			exists := err == nil
-			h.d.Invoke(func() {
-				if exists && !confirmedReplace {
-					confirmedReplace = true
-					replaceNote.SetText(filepath.Base(file) + " exists. " + acceptLabel + " again to replace it.")
-					replaceNote.SetVisible(true)
-					return
-				}
-				f.output = file
-				h.finish(prepared{printer: printer, form: f}, true)
-			})
-		}()
-	}
-	surface := widgets.DialogCard(h.d.Font, "Print", "print-surface", surfaceWidth)
-	surface.SetContent(widgets.DialogBody(printers, grid, outputRow, replaceNote))
-	surface.AppendFooter(widgets.DialogButton(h.d.Font, "Cancel", "portal-dialog-cancel", css.Outline, func() { h.finish(prepared{}, false) }))
-	surface.AppendFooter(widgets.DialogButton(h.d.Font, acceptLabel, "portal-dialog-confirm", css.SuggestedAction, confirm))
-	return surface
-}
 
 // settingOf is the value of key among settings, "" without one.
 func settingOf(settings []Setting, key string) string {

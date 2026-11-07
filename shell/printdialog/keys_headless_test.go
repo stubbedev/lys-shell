@@ -1,8 +1,8 @@
 package printdialog
 
 import (
-	"context"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/app"
@@ -45,17 +45,15 @@ func headlessDialog(t *testing.T, a *app.Application) *Dialog {
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	return New(Deps{
-		Config: func() *config.Config { return cfg },
-		Open:   func(s dialogsurface.Spec) (Window, error) { return dialogsurface.Open(a, s) },
-		Invoke: a.Invoke,
-		KeySym: a.KeySym,
-		Font:   treetest.Font(t),
-		Printers: func(context.Context) ([]ipp.Printer, error) {
-			return []ipp.Printer{{Name: "office", State: ipp.StateIdle, Accepting: true}}, nil
-		},
-		Spool:      func(context.Context, ipp.Job) error { return nil },
-		PickOutput: func(string, func(string)) {},
-		Home:       t.TempDir(),
-		User:       "u",
+		Config:       func() *config.Config { return cfg },
+		Open:         func(s dialogsurface.Spec) (Window, error) { return dialogsurface.Open(a, s) },
+		Invoke:       a.Invoke,
+		KeySym:       a.KeySym,
+		Font:         treetest.Font(t),
+		CUPS:         &fakeScheduler{printers: []ipp.Printer{{Name: "office", State: ipp.StateIdle, Accepting: true}}},
+		RefreshEvery: time.Hour,
+		PickOutput:   func(string, func(string)) {},
+		Home:         t.TempDir(),
+		User:         "u",
 	})
 }

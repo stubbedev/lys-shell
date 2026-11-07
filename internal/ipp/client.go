@@ -73,6 +73,10 @@ type Printer struct {
 	// State is printer-state: 3 idle, 4 processing, 5 stopped.
 	State     int32
 	Accepting bool
+	// StateReasons are its printer-state-reasons keywords ("none" left
+	// out), Markers its supplies.
+	StateReasons []string
+	Markers      []Marker
 	// Media are its PWG media names, Sides its sides keywords,
 	// ColorModes its print-color-mode keywords, Qualities its
 	// print-quality enums; each with its default.
@@ -83,12 +87,27 @@ type Printer struct {
 	QualityDefault             int32
 }
 
+// Marker is one supply (marker-names, marker-colors, marker-levels):
+// its level in percent, negative when the printer cannot tell.
+type Marker struct {
+	Name, Color string
+	Level       int32
+}
+
 // The printer-state values.
 const (
 	StateIdle       int32 = 3
 	StateProcessing int32 = 4
 	StateStopped    int32 = 5
 )
+
+// printerAttributes are the attributes a Printer reads.
+var printerAttributes = []string{
+	"printer-name", "printer-location", "printer-state", "printer-state-message", "printer-state-reasons",
+	"printer-is-accepting-jobs", "marker-names", "marker-colors", "marker-levels",
+	"media-supported", "media-default", "sides-supported", "sides-default",
+	"print-color-mode-supported", "print-color-mode-default", "print-quality-supported", "print-quality-default",
+}
 
 // operation is the operation group every request opens with.
 func operation(printerURI string, extra ...Attr) Group {
@@ -97,7 +116,7 @@ func operation(printerURI string, extra ...Attr) Group {
 		String(TagLanguage, "attributes-natural-language", "en"),
 		String(TagURI, "printer-uri", printerURI),
 	}
-	return Group{Tag: tagOperation, Attrs: append(attrs, extra...)}
+	return Group{Tag: GroupOperation, Attrs: append(attrs, extra...)}
 }
 
 // PrinterURI is the queue's URI as CUPS names it.
@@ -106,10 +125,7 @@ func PrinterURI(name string) string { return "ipp://localhost/printers/" + url.P
 // Printers lists the queues (CUPS-Get-Printers).
 func (c *Client) Printers(ctx context.Context) ([]Printer, error) {
 	req := Message{Code: OpCUPSGetPrinters, Groups: []Group{operation("ipp://localhost/",
-		String(TagKeyword, "requested-attributes",
-			"printer-name", "printer-location", "printer-state", "printer-state-message", "printer-is-accepting-jobs",
-			"media-supported", "media-default", "sides-supported", "sides-default",
-			"print-color-mode-supported", "print-color-mode-default", "print-quality-supported", "print-quality-default"),
+		String(TagKeyword, "requested-attributes", printerAttributes...),
 	)}}
 	resp, err := c.do(ctx, "/", req, nil)
 	if err != nil {
@@ -117,27 +133,89 @@ func (c *Client) Printers(ctx context.Context) ([]Printer, error) {
 	}
 	var out []Printer
 	for _, g := range resp.Groups {
-		if g.Tag != tagPrinter {
-			continue
+		if p, ok := printerOf(g); ok {
+			out = append(out, p)
 		}
-		p := Printer{Name: g.Text("printer-name"), Location: g.Text("printer-location"), StateMessage: g.Text("printer-state-message"), Accepting: true}
-		if p.Name == "" {
-			continue
-		}
-		if s, ok := g.Int("printer-state"); ok {
-			p.State = s
-		}
-		if a, ok := g.Int("printer-is-accepting-jobs"); ok {
-			p.Accepting = a != 0
-		}
-		p.Media, p.MediaDefault = g.Texts("media-supported"), g.Text("media-default")
-		p.Sides, p.SidesDefault = g.Texts("sides-supported"), g.Text("sides-default")
-		p.ColorModes, p.ColorModeDefault = g.Texts("print-color-mode-supported"), g.Text("print-color-mode-default")
-		p.Qualities = g.Ints("print-quality-supported")
-		p.QualityDefault, _ = g.Int("print-quality-default")
-		out = append(out, p)
 	}
 	return out, nil
+}
+
+// Printer reads one queue's attributes (Get-Printer-Attributes).
+func (c *Client) Printer(ctx context.Context, name string) (Printer, error) {
+	req := Message{Code: OpGetPrinterAttributes, Groups: []Group{operation(PrinterURI(name),
+		String(TagKeyword, "requested-attributes", printerAttributes...),
+	)}}
+	resp, err := c.do(ctx, "/printers/"+url.PathEscape(name), req, nil)
+	if err != nil {
+		return Printer{}, err
+	}
+	for _, g := range resp.Groups {
+		if p, ok := printerOf(g); ok {
+			return p, nil
+		}
+	}
+	return Printer{}, fmt.Errorf("ipp: no attributes for printer %s", name)
+}
+
+// Default is the scheduler's default destination (CUPS-Get-Default),
+// "" when it has none.
+func (c *Client) Default(ctx context.Context) (string, error) {
+	req := Message{Code: OpCUPSGetDefault, Groups: []Group{operation("ipp://localhost/",
+		String(TagKeyword, "requested-attributes", "printer-name"),
+	)}}
+	resp, err := c.do(ctx, "/", req, nil)
+	if IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	for _, g := range resp.Groups {
+		if g.Tag == GroupPrinter {
+			return g.Text("printer-name"), nil
+		}
+	}
+	return "", nil
+}
+
+// printerOf reads a printer group; false for another group or a
+// nameless printer.
+func printerOf(g Group) (Printer, bool) {
+	if g.Tag != GroupPrinter {
+		return Printer{}, false
+	}
+	p := Printer{Name: g.Text("printer-name"), Location: g.Text("printer-location"), StateMessage: g.Text("printer-state-message"), Accepting: true}
+	if p.Name == "" {
+		return Printer{}, false
+	}
+	if s, ok := g.Int("printer-state"); ok {
+		p.State = s
+	}
+	if a, ok := g.Int("printer-is-accepting-jobs"); ok {
+		p.Accepting = a != 0
+	}
+	for _, r := range g.Texts("printer-state-reasons") {
+		if r != "none" {
+			p.StateReasons = append(p.StateReasons, r)
+		}
+	}
+	names, colors, levels := g.Texts("marker-names"), g.Texts("marker-colors"), g.Ints("marker-levels")
+	for i, name := range names {
+		m := Marker{Name: name, Level: -1}
+		if i < len(colors) {
+			m.Color = colors[i]
+		}
+		if i < len(levels) {
+			m.Level = levels[i]
+		}
+		p.Markers = append(p.Markers, m)
+	}
+	p.Media, p.MediaDefault = g.Texts("media-supported"), g.Text("media-default")
+	p.Sides, p.SidesDefault = g.Texts("sides-supported"), g.Text("sides-default")
+	p.ColorModes, p.ColorModeDefault = g.Texts("print-color-mode-supported"), g.Text("print-color-mode-default")
+	p.Qualities = g.Ints("print-quality-supported")
+	p.QualityDefault, _ = g.Int("print-quality-default")
+	return p, true
 }
 
 // Job is one document to spool.
@@ -158,7 +236,7 @@ func (c *Client) Print(ctx context.Context, j Job) (int32, error) {
 		String(TagMimeMedia, "document-format", j.Format),
 	)}
 	if len(j.Attrs) > 0 {
-		groups = append(groups, Group{Tag: tagJob, Attrs: j.Attrs})
+		groups = append(groups, Group{Tag: GroupJob, Attrs: j.Attrs})
 	}
 	resp, err := c.do(ctx, "/printers/"+url.PathEscape(j.Printer), Message{Code: OpPrintJob, Groups: groups}, j.Document)
 	if err != nil {

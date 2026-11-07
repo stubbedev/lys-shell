@@ -19,7 +19,7 @@ import (
 func TestMessageRoundTrips(t *testing.T) {
 	m := Message{Code: OpPrintJob, RequestID: 7, Groups: []Group{
 		operation(PrinterURI("Office Laser"), String(TagKeyword, "requested-attributes", "a", "b", "c")),
-		{Tag: tagJob, Attrs: []Attr{
+		{Tag: GroupJob, Attrs: []Attr{
 			Int("copies", 3), Enum("print-quality", 5),
 			{"printer-is-accepting-jobs", []Value{{Tag: TagBoolean, Int: 1}}},
 			Ranges("page-ranges", [][2]int32{{1, 5}, {8, 8}}),
@@ -39,14 +39,14 @@ func TestMessageRoundTrips(t *testing.T) {
 }
 
 func TestDecodeRejectsMalformed(t *testing.T) {
-	good := Message{Code: 0, Groups: []Group{{Tag: tagPrinter, Attrs: []Attr{Int("copies", 1)}}}}.Encode()
+	good := Message{Code: 0, Groups: []Group{{Tag: GroupPrinter, Attrs: []Attr{Int("copies", 1)}}}}.Encode()
 	for name, data := range map[string][]byte{
 		"empty":            nil,
 		"no end tag":       good[:len(good)-1],
 		"cut value":        good[:len(good)-3],
-		"value before tag": {2, 0, 0, 0, 0, 0, 0, 1, TagInteger, 0, 1, 'a', 0, 4, 0, 0, 0, 1, tagEnd},
-		"short integer":    {2, 0, 0, 0, 0, 0, 0, 1, tagPrinter, TagInteger, 0, 1, 'a', 0, 2, 0, 1, tagEnd},
-		"orphan extra":     {2, 0, 0, 0, 0, 0, 0, 1, tagPrinter, TagInteger, 0, 0, 0, 4, 0, 0, 0, 1, tagEnd},
+		"value before tag": {2, 0, 0, 0, 0, 0, 0, 1, TagInteger, 0, 1, 'a', 0, 4, 0, 0, 0, 1, groupEnd},
+		"short integer":    {2, 0, 0, 0, 0, 0, 0, 1, GroupPrinter, TagInteger, 0, 1, 'a', 0, 2, 0, 1, groupEnd},
+		"orphan extra":     {2, 0, 0, 0, 0, 0, 0, 1, GroupPrinter, TagInteger, 0, 0, 0, 4, 0, 0, 0, 1, groupEnd},
 	} {
 		if _, err := Decode(data); err == nil {
 			t.Errorf("%s decoded", name)
@@ -84,7 +84,7 @@ func (f *fakeCUPS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch req.Code {
 	case OpCUPSGetPrinters:
 		resp.Groups = append(resp.Groups,
-			Group{Tag: tagPrinter, Attrs: []Attr{
+			Group{Tag: GroupPrinter, Attrs: []Attr{
 				String(TagName, "printer-name", "office"), String(TagText, "printer-location", "2nd floor"),
 				Enum("printer-state", StateIdle),
 				{"printer-is-accepting-jobs", []Value{{Tag: TagBoolean, Int: 1}}},
@@ -97,15 +97,15 @@ func (f *fakeCUPS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				{"print-quality-supported", []Value{{Tag: TagEnum, Int: 3}, {Tag: TagEnum, Int: 4}}},
 				Enum("print-quality-default", 4),
 			}},
-			Group{Tag: tagPrinter, Attrs: []Attr{
+			Group{Tag: GroupPrinter, Attrs: []Attr{
 				String(TagName, "printer-name", "lab"), Enum("printer-state", StateStopped),
 				String(TagText, "printer-state-message", "Out of paper"),
 				{"printer-is-accepting-jobs", []Value{{Tag: TagBoolean, Int: 0}}},
 			}},
-			Group{Tag: tagPrinter, Attrs: []Attr{String(TagText, "printer-location", "nameless")}},
+			Group{Tag: GroupPrinter, Attrs: []Attr{String(TagText, "printer-location", "nameless")}},
 		)
 	case OpPrintJob:
-		resp.Groups = append(resp.Groups, Group{Tag: tagJob, Attrs: []Attr{Int("job-id", 42)}})
+		resp.Groups = append(resp.Groups, Group{Tag: GroupJob, Attrs: []Attr{Int("job-id", 42)}})
 	}
 	w.Header().Set("Content-Type", "application/ipp")
 	_, _ = w.Write(resp.Encode())
@@ -161,7 +161,7 @@ func TestClientPrintsOverTheDomainSocket(t *testing.T) {
 		op.Text("job-name") != "report" || op.Text("document-format") != "application/pdf" || op.Text("requesting-user-name") != "u" {
 		t.Errorf("operation group = %+v", op)
 	}
-	if c, _ := req.Groups[1].Int("copies"); req.Groups[1].Tag != tagJob || c != 2 {
+	if c, _ := req.Groups[1].Int("copies"); req.Groups[1].Tag != GroupJob || c != 2 {
 		t.Errorf("job group = %+v", req.Groups[1])
 	}
 	if string(cups.docs[0]) != "%PDF-1.7 body" {
@@ -210,15 +210,15 @@ func TestDefaultServer(t *testing.T) {
 }
 
 func TestAValueTooLongForItsLengthFieldIsRefused(t *testing.T) {
-	ok := Message{Groups: []Group{{Tag: tagOperation, Attrs: []Attr{String(TagName, "job-name", strings.Repeat("x", 65535))}}}}
+	ok := Message{Groups: []Group{{Tag: GroupOperation, Attrs: []Attr{String(TagName, "job-name", strings.Repeat("x", 65535))}}}}
 	if err := ok.checkLengths(); err != nil {
 		t.Errorf("a 65535-byte value: %v", err)
 	}
-	long := Message{Groups: []Group{{Tag: tagOperation, Attrs: []Attr{String(TagName, "job-name", strings.Repeat("x", 65536))}}}}
+	long := Message{Groups: []Group{{Tag: GroupOperation, Attrs: []Attr{String(TagName, "job-name", strings.Repeat("x", 65536))}}}}
 	if err := long.checkLengths(); err == nil {
 		t.Error("a 65536-byte value passed")
 	}
-	name := Message{Groups: []Group{{Tag: tagOperation, Attrs: []Attr{String(TagKeyword, strings.Repeat("n", 65536), "v")}}}}
+	name := Message{Groups: []Group{{Tag: GroupOperation, Attrs: []Attr{String(TagKeyword, strings.Repeat("n", 65536), "v")}}}}
 	if err := name.checkLengths(); err == nil {
 		t.Error("a 65536-byte name passed")
 	}

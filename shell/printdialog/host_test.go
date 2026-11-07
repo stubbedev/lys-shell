@@ -34,17 +34,55 @@ type spooled struct {
 	doc string
 }
 
-type harness struct {
-	mu     sync.Mutex
-	h      *Dialog
-	opened chan app.LayerConfig
-	// specs are the dialogs opened, in order.
-	specs    []dialogsurface.Spec
+// fakeScheduler is CUPS as the harness sets it: its queues, the
+// default, and the jobs it took.
+type fakeScheduler struct {
+	mu       sync.Mutex
 	printers []ipp.Printer
+	def      string
 	listErr  error
 	spoolErr error
 	jobs     []spooled
-	home     string
+}
+
+func (f *fakeScheduler) Printers(context.Context) ([]ipp.Printer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.printers), f.listErr
+}
+
+func (f *fakeScheduler) Default(context.Context) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.def, nil
+}
+
+func (f *fakeScheduler) Printer(_ context.Context, name string) (ipp.Printer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range f.printers {
+		if p.Name == name {
+			return p, nil
+		}
+	}
+	return ipp.Printer{}, errors.New("no printer " + name)
+}
+
+func (f *fakeScheduler) Print(_ context.Context, j ipp.Job) (int32, error) {
+	b, _ := io.ReadAll(j.Document)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.jobs = append(f.jobs, spooled{j, string(b)})
+	return int32(len(f.jobs)), f.spoolErr
+}
+
+type harness struct {
+	*fakeScheduler
+	h      *Dialog
+	opened chan app.LayerConfig
+	// specs are the dialogs opened, in order.
+	specs []dialogsurface.Spec
+	home  string
 	// picked is the file the file chooser answers, "" for a cancel.
 	picked string
 }
@@ -55,7 +93,7 @@ func newHarness(t *testing.T) *harness {
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	hs := &harness{opened: make(chan app.LayerConfig, 4), home: t.TempDir()}
+	hs := &harness{fakeScheduler: &fakeScheduler{}, opened: make(chan app.LayerConfig, 4), home: t.TempDir()}
 	hs.printers = []ipp.Printer{{Name: "office", Location: "Hall", State: ipp.StateIdle, Accepting: true}}
 	hs.h = New(Deps{
 		Config: func() *config.Config { return cfg },
@@ -66,21 +104,11 @@ func newHarness(t *testing.T) *harness {
 			hs.opened <- s.Overlay
 			return &fakeWindow{}, nil
 		},
-		Invoke: hs.do,
-		KeySym: treetest.KeySym,
-		Font:   face,
-		Printers: func(context.Context) ([]ipp.Printer, error) {
-			hs.mu.Lock()
-			defer hs.mu.Unlock()
-			return hs.printers, hs.listErr
-		},
-		Spool: func(_ context.Context, j ipp.Job) error {
-			b, _ := io.ReadAll(j.Document)
-			hs.mu.Lock()
-			defer hs.mu.Unlock()
-			hs.jobs = append(hs.jobs, spooled{j, string(b)})
-			return hs.spoolErr
-		},
+		Invoke:       hs.do,
+		KeySym:       treetest.KeySym,
+		Font:         face,
+		CUPS:         hs.fakeScheduler,
+		RefreshEvery: time.Hour,
 		PickOutput: func(_ string, chosen func(string)) {
 			hs.mu.Lock()
 			picked := hs.picked
@@ -123,16 +151,24 @@ func (hs *harness) prepareWith(t *testing.T, c portaldialogs.Caller, r PrepareRe
 	return got, hs.open(t)
 }
 
-// open waits for the next dialog.
+// open waits for the next dialog and for its printers to be listed.
 func (hs *harness) open(t *testing.T) app.LayerConfig {
 	t.Helper()
+	var c app.LayerConfig
 	select {
-	case c := <-hs.opened:
-		hs.do(func() {})
-		return c
+	case c = <-hs.opened:
 	case <-time.After(treetest.Liveness):
 		t.Fatal("no dialog opened")
-		return app.LayerConfig{}
+	}
+	for deadline := time.Now().Add(treetest.Liveness); ; time.Sleep(time.Millisecond) {
+		var loading bool
+		hs.do(func() { loading = hs.h.sheet != nil && hs.h.sheet.loading })
+		if !loading {
+			return c
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the printers were never listed")
+		}
 	}
 }
 
@@ -320,12 +356,14 @@ func TestPrintToFileAndAMissingScheduler(t *testing.T) {
 	hs := newHarness(t)
 	hs.listErr = errors.New("connect: no such file")
 	hs.printers = nil
-	if q := hs.h.queues(); len(q) != 1 || q[0].name != fileQueue {
-		t.Errorf("without CUPS the queues are %+v, want only %s", q, fileQueue)
-	}
 	out := filepath.Join(t.TempDir(), "report.pdf")
 	hs.picked = out
 	got, c := hs.prepare(t)
+	hs.do(func() {
+		if q := hs.h.sheet.queues; len(q) != 1 || q[0].name != fileQueue {
+			t.Errorf("without CUPS the queues are %+v, want only %s", q, fileQueue)
+		}
+	})
 	if !slices.Contains(treetest.Labels(c.Root), filepath.Join(hs.home, "output.pdf")) {
 		t.Errorf("labels %q lack the suggested output", treetest.Labels(c.Root))
 	}

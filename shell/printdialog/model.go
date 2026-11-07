@@ -2,6 +2,7 @@ package printdialog
 
 import (
 	"math"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -412,29 +413,126 @@ func initialForm(r PrepareRequest, c capabilities) form {
 	return f
 }
 
-// printerStatus is the row's status: GTK's paused, not accepting, the
-// state message, else ready.
+// printerStatus is the row's status: GTK's paused, not accepting, what
+// is wrong with it (its state reasons said in words), the state
+// message, else ready.
 func printerStatus(p ipp.Printer) string {
-	switch {
+	switch reasons := reasonsText(p.StateReasons); {
+	case p.State == ipp.StateStopped && reasons != "":
+		return "Paused · " + reasons
 	case p.State == ipp.StateStopped:
 		return "Paused"
 	case !p.Accepting:
 		return "Not accepting jobs"
+	case reasons != "":
+		return reasons
 	case p.StateMessage != "":
 		return p.StateMessage
 	}
 	return "Ready"
 }
 
-// printerDetail is the row's muted line: location · status.
-func printerDetail(location, status string) string {
+// reasonWords are the printer-state-reasons keywords said in words,
+// in the order a reason line names them; the rest are not worth
+// showing (connecting, the -report ones).
+var reasonWords = []struct{ keyword, words string }{
+	{"offline", "Offline"},
+	{"media-jam", "Paper jam"},
+	{"media-empty", "Out of paper"},
+	{"media-needed", "Load paper"},
+	{"media-low", "Paper low"},
+	{"toner-empty", "Out of toner"},
+	{"toner-low", "Toner low"},
+	{"marker-supply-empty", "Out of ink"},
+	{"marker-supply-low", "Ink low"},
+	{"door-open", "Door open"},
+	{"cover-open", "Cover open"},
+	{"input-tray-missing", "Paper tray missing"},
+	{"output-area-full", "Output tray full"},
+	{"output-tray-missing", "Output tray missing"},
+	{"marker-waste-full", "Waste container full"},
+	{"spool-area-full", "Spool full"},
+}
+
+// reasonsText is the state reasons worth showing, in words: an error
+// or a warning, not a report.
+func reasonsText(reasons []string) string {
+	present := map[string]bool{}
+	for _, r := range reasons {
+		if strings.HasSuffix(r, "-report") {
+			continue
+		}
+		present[strings.TrimSuffix(strings.TrimSuffix(r, "-error"), "-warning")] = true
+	}
+	var words []string
+	for _, w := range reasonWords {
+		if present[w.keyword] {
+			words = append(words, w.words)
+		}
+	}
+	return strings.Join(words, ", ")
+}
+
+// lowSupply is the level at or below which a supply is low, in percent.
+const lowSupply = 15
+
+// lowSupplies names the supplies running low, with their levels.
+func lowSupplies(markers []ipp.Marker) string {
+	var low []string
+	for _, m := range markers {
+		if m.Level >= 0 && m.Level <= lowSupply {
+			low = append(low, m.Name+" "+strconv.Itoa(int(m.Level))+"%")
+		}
+	}
+	if len(low) == 0 {
+		return ""
+	}
+	return "Low: " + strings.Join(low, ", ")
+}
+
+// printerDetail is the row's muted line: location · status · the
+// supplies running low.
+func printerDetail(p ipp.Printer) string {
 	var parts []string
-	for _, s := range []string{location, status} {
+	for _, s := range []string{p.Location, printerStatus(p), lowSupplies(p.Markers)} {
 		if s != "" {
 			parts = append(parts, s)
 		}
 	}
 	return strings.Join(parts, " · ")
+}
+
+// preferredQueue is the queue a request opens on: the printer the app
+// names, else the user's lpoptions default, else the scheduler's
+// default, each only when listed, else the first queue.
+func preferredQueue(queues []queue, app, user, scheduler string) string {
+	for _, name := range []string{app, user, scheduler} {
+		if name != "" && slices.ContainsFunc(queues, func(q queue) bool { return q.name == name }) {
+			return name
+		}
+	}
+	return queues[0].name
+}
+
+// lpoptionsDefault is the printer the lpoptions file at path names
+// with its Default line (its instance dropped), "" for none or no
+// file.
+func lpoptionsDefault(path string) string {
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path) //nolint:gosec // the user's own lpoptions
+	if err != nil {
+		return ""
+	}
+	for line := range strings.SplitSeq(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && strings.EqualFold(fields[0], "Default") {
+			name, _, _ := strings.Cut(fields[1], "/")
+			return name
+		}
+	}
+	return ""
 }
 
 // fileQueue is GTK's always-present file backend printer.

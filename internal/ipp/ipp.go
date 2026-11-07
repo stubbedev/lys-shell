@@ -16,16 +16,19 @@ import (
 
 // Operations.
 const (
-	OpPrintJob        uint16 = 0x0002
-	OpCUPSGetPrinters uint16 = 0x4002
+	OpPrintJob               uint16 = 0x0002
+	OpGetPrinterAttributes   uint16 = 0x000B
+	OpCUPSGetDefault         uint16 = 0x4001
+	OpCUPSGetPrinters        uint16 = 0x4002
+	OpCUPSCreateLocalPrinter uint16 = 0x4028
 )
 
 // Attribute group delimiters.
 const (
-	tagOperation byte = 0x01
-	tagJob       byte = 0x02
-	tagEnd       byte = 0x03
-	tagPrinter   byte = 0x04
+	GroupOperation byte = 0x01
+	GroupJob       byte = 0x02
+	groupEnd       byte = 0x03
+	GroupPrinter   byte = 0x04
 )
 
 // Value tags.
@@ -181,7 +184,7 @@ func (m Message) Encode() []byte {
 			}
 		}
 	}
-	b.WriteByte(tagEnd)
+	b.WriteByte(groupEnd)
 	return b.Bytes()
 }
 
@@ -234,7 +237,7 @@ func Decode(data []byte) (Message, error) {
 			return Message{}, errShort
 		}
 		switch {
-		case tag == tagEnd:
+		case tag == groupEnd:
 			return m, nil
 		case tag < tagFirstValue:
 			m.Groups = append(m.Groups, Group{Tag: tag})

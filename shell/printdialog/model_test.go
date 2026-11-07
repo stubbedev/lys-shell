@@ -222,11 +222,21 @@ func TestPrinterStatusAndDetail(t *testing.T) {
 			t.Errorf("printerStatus(%+v) = %q, want %q", tc.p, got, tc.want)
 		}
 	}
-	if got := printerDetail("Hall", "Ready"); got != "Hall · Ready" {
+	if got := printerDetail(ipp.Printer{Location: "Hall", State: ipp.StateIdle, Accepting: true}); got != "Hall · Ready" {
 		t.Errorf("detail = %q", got)
 	}
-	if got := printerDetail("", "Ready"); got != "Ready" {
+	if got := printerDetail(ipp.Printer{State: ipp.StateIdle, Accepting: true}); got != "Ready" {
 		t.Errorf("no location = %q", got)
+	}
+	jammed := ipp.Printer{
+		State: ipp.StateStopped, Accepting: true, StateReasons: []string{"media-empty-error", "toner-low-warning", "cups-remote-report"},
+		Markers: []ipp.Marker{{Name: "Black toner", Level: 8}, {Name: "Cyan", Level: 60}, {Name: "Waste", Level: -1}},
+	}
+	if got := printerDetail(jammed); got != "Paused · Out of paper, Toner low · Low: Black toner 8%" {
+		t.Errorf("a stopped printer out of paper reads %q", got)
+	}
+	if got := printerStatus(ipp.Printer{State: ipp.StateIdle, Accepting: true, StateReasons: []string{"offline-report"}, StateMessage: "Sleeping"}); got != "Sleeping" {
+		t.Errorf("a report reason shows %q", got)
 	}
 }
 

@@ -1,11 +1,11 @@
 package bar
 
 import (
-	"context"
 	"log"
 	"os"
 	"os/user"
 	"path/filepath"
+	"time"
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
@@ -46,6 +46,10 @@ func authSignal(e *portaldialogs.Emitter) func(string, portaldialogs.AuthAction)
 		}
 	}
 }
+
+// printerRefresh is how often the print dialog reads the selected
+// printer's state again.
+const printerRefresh = 3 * time.Second
 
 // servePortalHosts hosts the shell's halves of the portal backend on
 // the shell's session bus connection: dev.stubbe.lys.PortalDialogs1 (access,
@@ -106,17 +110,18 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 	}
 	cups := ipp.NewClient(ipp.DefaultServer())
 	printer := printdialog.New(printdialog.Deps{
-		Config:     current,
-		Open:       dialogOpener[printdialog.Window](application),
-		Invoke:     application.Invoke,
-		KeySym:     application.KeySym,
-		Font:       font,
-		Sheet:      sheet,
-		Printers:   cups.Printers,
-		Spool:      func(ctx context.Context, j ipp.Job) error { _, err := cups.Print(ctx, j); return err },
-		PickOutput: func(suggested string, chosen func(string)) { pickOutput(application, chooser, suggested, chosen) },
-		Home:       home,
-		User:       currentUser(),
+		Config:       current,
+		Open:         dialogOpener[printdialog.Window](application),
+		Invoke:       application.Invoke,
+		KeySym:       application.KeySym,
+		Font:         font,
+		Sheet:        sheet,
+		CUPS:         cups,
+		LPOptions:    filepath.Join(home, ".cups", "lpoptions"),
+		RefreshEvery: printerRefresh,
+		PickOutput:   func(suggested string, chosen func(string)) { pickOutput(application, chooser, suggested, chosen) },
+		Home:         home,
+		User:         currentUser(),
 	})
 	if _, err := printdialog.NewDaemon(printer).Export(conn); err != nil {
 		log.Printf("print: daemon: %v", err)
