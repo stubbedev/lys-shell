@@ -6,6 +6,9 @@ package notifyui
 import (
 	"errors"
 	"log"
+	"net/url"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -19,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/internal/spawn"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -164,11 +168,12 @@ func IsFileIcon(icon Icon) bool {
 }
 
 // VisibleActions are the actions a card draws as buttons: all but the
-// default one, which the card itself invokes on a click.
+// default one, which the card itself invokes on a click, and the inline
+// reply, which it draws as a reply field.
 func VisibleActions(n *notifications.Notification) []notifications.Action {
 	var out []notifications.Action
 	for _, a := range n.Actions {
-		if a.ID != notifications.DefaultActionID {
+		if a.ID != notifications.DefaultActionID && a.ID != notifications.InlineReplyActionID {
 			out = append(out, a)
 		}
 	}
@@ -271,4 +276,30 @@ func WithActivationToken(m TokenMinter, then func(token string)) {
 		}
 		then(token)
 	})
+}
+
+// OpenableLink reports whether a notification body's link may open: web
+// and mail links only, never a file or a custom scheme an app slipped in.
+func OpenableLink(href string) bool {
+	u, err := url.Parse(href)
+	if err != nil {
+		return false
+	}
+	switch u.Scheme {
+	case "http", "https":
+		return u.Host != ""
+	case "mailto":
+		return u.Opaque != ""
+	}
+	return false
+}
+
+// OpenLink opens uri with the desktop's handler, in a scope of its own,
+// handing it token to raise its window ("" hands none).
+func OpenLink(uri, token string) error {
+	cmd := exec.Command("xdg-open", uri) //nolint:gosec // an http(s) or mailto link OpenableLink vetted
+	if token != "" {
+		cmd.Env = append(os.Environ(), "XDG_ACTIVATION_TOKEN="+token)
+	}
+	return spawn.Detached(cmd, "xdg-open")
 }

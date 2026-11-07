@@ -59,6 +59,8 @@ type Popups struct {
 	now     func() time.Time
 	// minter mints the activation tokens action presses carry.
 	minter notifyui.TokenMinter
+	// launch opens a link with an activation token.
+	launch func(uri, token string) error
 	// open maps a layer surface; nil maps none (headless).
 	open func(app.LayerConfig) (window, error)
 	win  window
@@ -110,12 +112,16 @@ type card struct {
 	head  *widget.Item
 	// count shows, on a collapsed stack's front card, how many cards
 	// sit behind it.
-	count   *widget.Badge
-	time    *widget.Label
-	summary *widget.Label
-	body    *widget.RichLabel
-	close   *widget.Button
-	actions *widget.Box
+	count    *widget.Badge
+	time     *widget.Label
+	summary  *widget.Label
+	body     *widget.RichLabel
+	progress *widget.ProgressBar
+	reply    *widget.Entry
+	close    *widget.Button
+	actions  *widget.Box
+	content  *widget.Box
+	shown    *notifications.Notification
 }
 
 // New builds the popup host; it maps on popup-monitor among outputs
@@ -133,6 +139,7 @@ func New(application *app.Application, svc *notifications.Service, cfg *config.C
 		outputs: outputs,
 		now:     time.Now,
 		minter:  notifyui.Minter(application),
+		launch:  notifyui.OpenLink,
 		cards:   make(map[uint32]*card),
 	}
 	if application != nil {
@@ -254,7 +261,8 @@ func (p *Popups) sync() {
 			st = p.newStack(g.Key)
 		}
 		for _, n := range slices.Backward(g.Notifs) {
-			if _, ok := p.cards[n.ID]; ok {
+			if c, ok := p.cards[n.ID]; ok {
+				p.updateCard(c, n)
 				continue
 			}
 			c := p.newCard(n)
@@ -483,7 +491,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	scale := float64(p.cfg.Styling.Scale)
 	th := widget.Current()
 	px := widgets.TextPx(styling.Body, scale)
-	c := &card{id: n.ID}
+	c := &card{id: n.ID, shown: n}
 	c.root = widget.NewBox(widget.Column, 0, 0)
 	c.root.AddClass(css.Card, css.Glass, "notification-popup-card", notifyui.UrgencyClass(n.Urgency))
 	if cfg.PopupShadow {
@@ -541,10 +549,20 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	c.body.SetMaxWidthChars(cardMaxWidthChars)
 	c.body.SetEllipsize(widget.EllipsizeEnd)
 	c.body.SetVisible(n.Body != "")
+	c.body.OnLinkClick = p.openLink
 	content.Append(c.body, false)
+	c.progress = widget.NewProgressBar(0)
+	c.progress.AddClass("notification-popup-progress")
+	setProgress(c.progress, n.Progress)
+	content.Append(c.progress, false)
+	if _, ok := n.InlineReply(); ok {
+		c.reply = p.replyEntry(n, px)
+		content.Append(c.reply, false)
+	}
 	c.actions = p.actionRows(n, px)
 	content.Append(c.actions, false)
-	content.SetVisible(c.summary.Visible() || c.body.Visible() || len(c.actions.Children()) > 0)
+	c.content = content
+	c.syncContentVisible()
 	c.root.Append(content, false)
 	c.setFull(false)
 
@@ -718,6 +736,7 @@ func (p *Popups) ensureWindow(out *app.Output) (window, *widget.Box, error) {
 		Anchor:         popupAnchors(cfg.PopupPosition),
 		Margin:         popupMargins(cfg, scale),
 		Namespace:      "lys-shell-notification-popup",
+		Keyboard:       app.KeyboardOnDemand,
 		Root:           p.host,
 		BackgroundBlur: true,
 	})
@@ -821,4 +840,93 @@ func (p *Popups) offLoop(fn func()) {
 		return
 	}
 	go fn()
+}
+
+func setProgress(bar *widget.ProgressBar, p notifications.Progress) {
+	percent, ok := p.Percent()
+	bar.SetVisible(ok)
+	if ok {
+		bar.SetValue(float64(percent) / 100)
+	}
+}
+
+func (c *card) syncContentVisible() {
+	c.content.SetVisible(c.summary.Visible() || c.body.Visible() || c.progress.Visible() || c.reply != nil || len(c.actions.Children()) > 0)
+}
+
+// updateCard shows a replacement in the card it replaces, touching only
+// what changed: a new progress value repaints the bar and lays nothing
+// out again.
+func (p *Popups) updateCard(c *card, n *notifications.Notification) {
+	old := c.shown
+	if old == n {
+		return
+	}
+	c.shown = n
+	c.summary.SetText(n.Summary)
+	c.summary.SetVisible(n.Summary != "")
+	c.body.SetMarkup(notifyui.BodyMarkup(n.Body))
+	c.body.SetVisible(n.Body != "")
+	setProgress(c.progress, n.Progress)
+	if old.Urgency != n.Urgency {
+		c.root.RemoveClass(notifyui.UrgencyClass(old.Urgency))
+		c.root.AddClass(notifyui.UrgencyClass(n.Urgency))
+	}
+	if !slices.Equal(old.Actions, n.Actions) {
+		px := widgets.TextPx(styling.Body, float64(p.cfg.Styling.Scale))
+		rows := p.actionRows(n, px)
+		c.content.Remove(c.actions)
+		c.content.Append(rows, false)
+		c.actions = rows
+		c.setFull(c.summary.MaxLines() == 0)
+	}
+	c.syncContentVisible()
+}
+
+// replyEntry is the inline-reply field: Enter sends a non-empty reply
+// and the card goes, Escape clears the field and sends nothing. While it
+// has the focus the card's countdown pauses.
+func (p *Popups) replyEntry(n *notifications.Notification, px float64) *widget.Entry {
+	e := widget.NewEntry(p.font, px, 0)
+	e.AddClass("notification-popup-reply")
+	placeholder := n.ReplyPlaceholder
+	if placeholder == "" {
+		placeholder = i18n.T("notification-popup-reply-placeholder")
+	}
+	e.SetPlaceholder(placeholder)
+	id := n.ID
+	e.OnActivate = func(text string) {
+		if text == "" {
+			return
+		}
+		p.offLoop(func() { p.svc.Reply(id, text) })
+	}
+	e.OnEscape = func() bool {
+		e.SetText("")
+		return true
+	}
+	e.SetOnFocusChanged(func(focused bool) {
+		if focused {
+			p.svc.InhibitPopup(id)
+			return
+		}
+		p.svc.ReleasePopup(id)
+	})
+	return e
+}
+
+// openLink opens a body link with the system's handler, raised by a token
+// from the click; only web and mail links open.
+func (p *Popups) openLink(href string) {
+	if !notifyui.OpenableLink(href) {
+		log.Printf("notification popups: not opening %q: only http, https and mailto links open", href)
+		return
+	}
+	notifyui.WithActivationToken(p.minter, func(token string) {
+		p.offLoop(func() {
+			if err := p.launch(href, token); err != nil {
+				log.Printf("notification popups: open %s: %v", href, err)
+			}
+		})
+	})
 }

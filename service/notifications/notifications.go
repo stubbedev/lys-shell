@@ -41,9 +41,11 @@ const DefaultPopupDuration = 5000 * time.Millisecond
 var Capabilities = []string{
 	"body",
 	"body-markup",
+	"body-hyperlinks",
 	"actions",
 	"icon-static",
 	"persistence",
+	"inline-reply",
 }
 
 // ClosedReason is the spec's closed reason codes.
@@ -82,6 +84,25 @@ type Notification struct {
 	Resident  bool
 	// ReplacesID is the replaces_id the sender passed.
 	ReplacesID uint32
+	// Progress is the value hint.
+	Progress Progress
+	// StackTag is the x-dunst-stack-tag or x-canonical-private-synchronous
+	// hint: a new notification with the same tag from the same app
+	// replaces this one.
+	StackTag string
+	// ReplyPlaceholder is x-kde-reply-placeholder-text, the reply field's
+	// hint text.
+	ReplyPlaceholder string
+}
+
+// InlineReply is the inline-reply action, when the sender offered one.
+func (n *Notification) InlineReply() (Action, bool) {
+	for _, a := range n.Actions {
+		if a.ID == InlineReplyActionID {
+			return a, true
+		}
+	}
+	return Action{}, false
 }
 
 // DefaultAction is the "default" action, when the sender offered one.
@@ -407,6 +428,9 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 	stored, onDisk := s.storedOwner(replacesID)
 	s.mu.Lock()
 	id := replacesID
+	if id == 0 && h.stackTag != "" {
+		id = s.taggedLocked(appName, h.stackTag)
+	}
 	owner, inMemory := s.owners[id]
 	if !inMemory && onDisk {
 		owner = stored
@@ -424,20 +448,23 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 	}
 	replaced := len(s.removeHistoryLocked(map[uint32]bool{id: true})) > 0 || onDisk
 	n := &Notification{
-		ID:           id,
-		AppName:      appName,
-		AppIcon:      appIcon,
-		Summary:      summary,
-		Body:         body,
-		Actions:      ParseActions(actions),
-		ExpireMS:     expireTimeout,
-		Added:        s.clock.Now(),
-		Urgency:      h.urgency,
-		ImagePath:    h.imagePath,
-		DesktopEntry: h.desktopEntry,
-		Transient:    h.transient,
-		Resident:     h.resident,
-		ReplacesID:   replacesID,
+		ID:               id,
+		AppName:          appName,
+		AppIcon:          appIcon,
+		Summary:          summary,
+		Body:             body,
+		Actions:          ParseActions(actions),
+		ExpireMS:         expireTimeout,
+		Added:            s.clock.Now(),
+		Urgency:          h.urgency,
+		ImagePath:        h.imagePath,
+		DesktopEntry:     h.desktopEntry,
+		Transient:        h.transient,
+		Resident:         h.resident,
+		ReplacesID:       replacesID,
+		Progress:         h.progress,
+		StackTag:         h.stackTag,
+		ReplyPlaceholder: h.replyPlaceholder,
 	}
 	if expireTimeout > 0 {
 		n.Expires = n.Added.Add(time.Duration(expireTimeout) * time.Millisecond)
@@ -1020,4 +1047,42 @@ func storeErr(op string, err error) {
 	if err != nil {
 		log.Printf("notifications: store %s: %v", op, err)
 	}
+}
+
+// taggedLocked is the id of appName's newest notification carrying tag,
+// in the history window or on the popup list; 0 when it has none. The
+// caller holds mu.
+func (s *Service) taggedLocked(appName, tag string) uint32 {
+	for _, n := range slices.Backward(s.recent) {
+		if n.AppName == appName && n.StackTag == tag {
+			return n.ID
+		}
+	}
+	for _, n := range s.popups {
+		if n.AppName == appName && n.StackTag == tag {
+			return n.ID
+		}
+	}
+	return 0
+}
+
+// Reply sends text as the reply to id's inline-reply action
+// (NotificationReplied) and closes it as dismissed; false when id names no
+// notification offering one.
+func (s *Service) Reply(id uint32, text string) bool {
+	s.mu.Lock()
+	n := s.findLocked(id)
+	emit := s.emit
+	s.mu.Unlock()
+	if n == nil {
+		return false
+	}
+	if _, ok := n.InlineReply(); !ok {
+		return false
+	}
+	if emit != nil {
+		emit(Interface+".NotificationReplied", id, text)
+	}
+	s.Close(id, Dismissed)
+	return true
 }

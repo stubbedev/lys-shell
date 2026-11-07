@@ -60,7 +60,7 @@ func TestDecodeHints(t *testing.T) {
 		"transient":     dbus.MakeVariant(true),
 		"resident":      dbus.MakeVariant(true),
 	}, none)
-	want := hints{UrgencyCritical, "/img.png", "firefox", true, true}
+	want := hints{urgency: UrgencyCritical, imagePath: "/img.png", desktopEntry: "firefox", transient: true, resident: true}
 	if h != want {
 		t.Errorf("hints = %+v, want %+v", h, want)
 	}

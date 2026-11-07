@@ -49,11 +49,14 @@ func ParseActions(raw []string) []Action {
 
 // hints are the decoded Notify hints the shell reads (from_props).
 type hints struct {
-	urgency      Urgency
-	imagePath    string
-	desktopEntry string
-	transient    bool
-	resident     bool
+	urgency          Urgency
+	imagePath        string
+	desktopEntry     string
+	transient        bool
+	resident         bool
+	progress         Progress
+	stackTag         string
+	replyPlaceholder string
 }
 
 // decodeHints reads the spec hints; a missing or mistyped hint keeps
@@ -69,6 +72,9 @@ func decodeHints(raw map[string]dbus.Variant, cache func(imageData) (string, boo
 	h.desktopEntry, _ = raw["desktop-entry"].Value().(string)
 	h.transient, _ = raw["transient"].Value().(bool)
 	h.resident, _ = raw["resident"].Value().(bool)
+	h.progress = progressHint(raw["value"])
+	h.stackTag = stackTagHint(raw)
+	h.replyPlaceholder, _ = raw["x-kde-reply-placeholder-text"].Value().(string)
 	for _, key := range []string{"image-data", "image_data", "icon_data"} {
 		v, ok := raw[key]
 		if !ok {
@@ -121,3 +127,57 @@ func parseImageData(v dbus.Variant) (imageData, bool) {
 	}
 	return img, true
 }
+
+// Progress is the value hint: a share of 0-100 percent, or none.
+type Progress struct {
+	percent uint8
+	set     bool
+}
+
+// NewProgress is percent, clamped to 0-100 as every server draws it.
+func NewProgress(percent int64) Progress {
+	return Progress{percent: uint8(min(max(percent, 0), 100)), set: true}
+}
+
+// Percent is the progress; false when the notification has none.
+func (p Progress) Percent() (uint8, bool) { return p.percent, p.set }
+
+func progressHint(v dbus.Variant) Progress {
+	switch n := v.Value().(type) {
+	case int32:
+		return NewProgress(int64(n))
+	case uint32:
+		return NewProgress(int64(n))
+	case int64:
+		return NewProgress(n)
+	case uint64:
+		return NewProgress(int64(min(n, 100)))
+	case int16:
+		return NewProgress(int64(n))
+	case uint16:
+		return NewProgress(int64(n))
+	case byte:
+		return NewProgress(int64(n))
+	}
+	return Progress{}
+}
+
+// The stack-tag hints: a notification carrying one replaces the sender's
+// previous one with the same tag.
+const (
+	stackTagDunst     = "x-dunst-stack-tag"
+	stackTagCanonical = "x-canonical-private-synchronous"
+)
+
+func stackTagHint(raw map[string]dbus.Variant) string {
+	for _, key := range []string{stackTagDunst, stackTagCanonical} {
+		if tag, ok := raw[key].Value().(string); ok && tag != "" {
+			return tag
+		}
+	}
+	return ""
+}
+
+// InlineReplyActionID is KDE's inline-reply action key: the card shows a
+// reply field for it, and the reply comes back as NotificationReplied.
+const InlineReplyActionID = "inline-reply"

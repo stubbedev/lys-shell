@@ -332,19 +332,22 @@ func scanNotification(row interface{ Scan(...any) error }) (*Notification, error
 	h := decodeHints(raw, func(imageData) (string, bool) { return "", false })
 	expire := storedInt(id, "expire_timeout", timeout, int32(-1))
 	n := &Notification{
-		ID:           id,
-		AppName:      appName.String,
-		ReplacesID:   storedInt(id, "replaces_id", replaces, uint32(0)),
-		AppIcon:      appIcon.String,
-		Summary:      summary,
-		Body:         body.String,
-		Actions:      ParseActions(actions),
-		ExpireMS:     expire,
-		Added:        time.UnixMilli(stamp),
-		Urgency:      h.urgency,
-		ImagePath:    h.imagePath,
-		DesktopEntry: h.desktopEntry,
-		Resident:     h.resident,
+		ID:               id,
+		AppName:          appName.String,
+		ReplacesID:       storedInt(id, "replaces_id", replaces, uint32(0)),
+		AppIcon:          appIcon.String,
+		Summary:          summary,
+		Body:             body.String,
+		Actions:          ParseActions(actions),
+		ExpireMS:         expire,
+		Added:            time.UnixMilli(stamp),
+		Urgency:          h.urgency,
+		ImagePath:        h.imagePath,
+		DesktopEntry:     h.desktopEntry,
+		Resident:         h.resident,
+		Progress:         h.progress,
+		StackTag:         h.stackTag,
+		ReplyPlaceholder: h.replyPlaceholder,
 	}
 	if expire > 0 {
 		n.Expires = n.Added.Add(time.Duration(expire) * time.Millisecond)
@@ -367,6 +370,19 @@ func encodeHints(n *Notification) (string, error) {
 	}
 	if n.Resident {
 		out["resident"] = storedHint{Signature: "b", Value: json.RawMessage("true")}
+	}
+	if percent, ok := n.Progress.Percent(); ok {
+		out["value"] = storedHint{Signature: "i", Value: json.RawMessage(strconv.Itoa(int(percent)))}
+	}
+	for key, text := range map[string]string{stackTagDunst: n.StackTag, "x-kde-reply-placeholder-text": n.ReplyPlaceholder} {
+		if text == "" {
+			continue
+		}
+		encoded, err := json.Marshal(text)
+		if err != nil {
+			return "", err
+		}
+		out[key] = storedHint{Signature: "s", Value: encoded}
 	}
 	b, err := json.Marshal(out)
 	return string(b), err

@@ -533,7 +533,13 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 		text.SetWrap(true)
 		text.SetEllipsize(widget.EllipsizeEnd)
 		text.SetMaxLines(2)
+		text.OnLinkClick = it.openLink
 		body.Append(text, false)
+	}
+	if percent, ok := n.Progress.Percent(); ok {
+		bar := widget.NewProgressBar(float64(percent) / 100)
+		bar.AddClass("notification-dropdown-item-progress")
+		body.Append(bar, false)
 	}
 	if actions := it.actionRows(); actions != nil {
 		body.Append(actions, false)
@@ -597,4 +603,21 @@ func (it *notifItem) invokeDefault() {
 // refreshTime is RefreshTime.
 func (it *notifItem) refreshTime() {
 	it.time.SetText(notifTimeLabel(notifyui.RelativeTime(it.view.now(), it.n.Added)))
+}
+
+// openLink opens a body link with a token from the click; only web and
+// mail links open.
+func (it *notifItem) openLink(href string) {
+	if !notifyui.OpenableLink(href) {
+		log.Printf("notifications: not opening %q: only http, https and mailto links open", href)
+		return
+	}
+	it.view.popdown()
+	notifyui.WithActivationToken(it.view.minter, func(token string) {
+		mountOffLoop(it.view.ctx, func() {
+			if err := notifyui.OpenLink(href, token); err != nil {
+				log.Printf("notifications: open %s: %v", href, err)
+			}
+		})
+	})
 }
