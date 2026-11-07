@@ -573,7 +573,7 @@ func TestPreviewLoadsWhenTheSelectionRests(t *testing.T) {
 		t.Fatal("the preview must wait for the selection to rest")
 	}
 	h.timers[timers-1].fn()
-	h.until("the text", func() bool { return p.v.pane.text.Visible() && strings.Contains(p.v.pane.text.Text(), "truly") })
+	h.until("the text", func() bool { return p.v.pane.code.Visible() && strings.Contains(p.v.pane.code.text, "truly") })
 }
 
 func TestPreviewOffStaysOff(t *testing.T) {
@@ -945,7 +945,7 @@ func TestAFrameForTheSameRowLeavesItsPreviewLoading(t *testing.T) {
 		t.Errorf("%d new timers: the same row need not load twice", len(h.timers)-count)
 	}
 	waiting.fn()
-	h.until("the text", func() bool { return p.v.pane.text.Visible() && strings.Contains(p.v.pane.text.Text(), "truly") })
+	h.until("the text", func() bool { return p.v.pane.code.Visible() && strings.Contains(p.v.pane.code.text, "truly") })
 }
 
 // A selected row with nothing to load shows itself, never an empty pane;
@@ -956,7 +956,7 @@ func TestARowWithNothingToLoadShowsItselfInThePane(t *testing.T) {
 	h.typed(p, "signature")
 	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
 	h.timers[len(h.timers)-1].fn()
-	h.until("the text", func() bool { return p.v.pane.text.Visible() })
+	h.until("the text", func() bool { return p.v.pane.code.Visible() })
 	if p.v.pane.summary.box.Visible() {
 		t.Error("a loaded preview must replace the summary")
 	}
@@ -968,7 +968,7 @@ func TestARowWithNothingToLoadShowsItselfInThePane(t *testing.T) {
 	if !p.v.pane.summary.box.Visible() || p.v.pane.summary.title.Text() != row.Entry.Title {
 		t.Errorf("summary shown %v, title %q, want %q", p.v.pane.summary.box.Visible(), p.v.pane.summary.title.Text(), row.Entry.Title)
 	}
-	if p.v.pane.text.Visible() || p.v.pane.image.Visible() {
+	if p.v.pane.code.Visible() || p.v.pane.image.Visible() {
 		t.Error("the previous row's content stayed in the pane")
 	}
 }
@@ -1001,7 +1001,7 @@ func TestThePreviewPaneHoldsItsWidth(t *testing.T) {
 		p.v.showPreview(c, nil, nil)
 		p.v.motion.snapSize(p.v.targetW(), p.v.targetH())
 		paintPanel(p, data)
-		return p.v.list.Bounds().W, p.v.pane.box.Bounds().W, p.v.pane.text.Bounds().H
+		return p.v.list.Bounds().W, p.v.pane.box.Bounds().W, p.v.pane.code.rows[0].code.Bounds().H
 	}
 	short, wantPane, oneLine := widths(engine.PreviewContent{Text: "x"})
 	if wantPane != p.v.pane.width {
@@ -1016,7 +1016,7 @@ func TestThePreviewPaneHoldsItsWidth(t *testing.T) {
 		t.Errorf("with a long line list %d and pane %d, want %d and %d", list, pane, short, wantPane)
 	}
 	if wrapped <= oneLine {
-		t.Errorf("a long line is %dpx tall, one line %dpx: it did not wrap", wrapped, oneLine)
+		t.Errorf("a long line is %dpx tall, a short one %dpx: it did not wrap", wrapped, oneLine)
 	}
 }
 

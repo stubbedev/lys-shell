@@ -56,6 +56,8 @@ func startHeadlessPreview(t *testing.T) *headlessPreview {
 	}
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
+	widget.SetFaceResolver(apptheme.FontResolver)
+	t.Cleanup(func() { widget.SetFaceResolver(nil) })
 	sheet := apptheme.New(cfg).Sheet
 	a := apptest.Run(t)
 	sockets, _ := filepath.Glob(filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sway-ipc.*.sock"))
@@ -167,11 +169,11 @@ func TestHeadlessEveryModePreviewsItsSelectedRow(t *testing.T) {
 
 	clip := "clipboard"
 	reply = h.open(t, 2, launcheripc.SessionOptions{Mode: &clip})
-	apptest.Until(t, a, "the clipboard entry", func() bool { return s.cur != nil && s.cur.views.pane.text.Visible() })
+	apptest.Until(t, a, "the clipboard entry", func() bool { return s.cur != nil && s.cur.views.pane.code.Visible() })
 	h.shoot(t, "clipboard-mode", func() { s.cur.views.root.Invalidate() })
 	h.kb.Tap(keytest.Down)
 	apptest.Until(t, a, "the entry's facts", func() bool {
-		return s.cur.views.pane.facts.Visible() && !s.cur.views.pane.text.Visible()
+		return s.cur.views.pane.facts.Visible() && !s.cur.views.pane.code.Visible()
 	})
 	h.shoot(t, "clipboard-mode-other", func() { s.cur.views.root.Invalidate() })
 	h.kb.Tap(keytest.Escape)
@@ -179,7 +181,7 @@ func TestHeadlessEveryModePreviewsItsSelectedRow(t *testing.T) {
 
 	mode, query := SearchMode, "~/greet"
 	reply = h.open(t, 3, launcheripc.SessionOptions{Mode: &mode, Filter: &query})
-	apptest.Until(t, a, "the file's text", func() bool { return s.panel != nil && s.panel.v.pane.text.Visible() })
+	apptest.Until(t, a, "the file's text", func() bool { return s.panel != nil && s.panel.v.pane.code.Visible() })
 	h.shoot(t, "search-mode", func() { s.panel.v.root.Invalidate() })
 	h.kb.Tap(keytest.Escape)
 	apptest.Answer(t, "the search session's reply", reply)

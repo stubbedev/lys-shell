@@ -126,7 +126,7 @@ func TestPanelPaintsOnlyThePanel(t *testing.T) {
 	h.typed(p, "signature")
 	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
 	h.timers[len(h.timers)-1].fn()
-	h.until("the text", func() bool { return p.v.pane.text.Visible() })
+	h.until("the text", func() bool { return p.v.pane.code.Visible() })
 	check("4-preview")
 	h.typed(p, "6*7")
 	h.until("the answer", func() bool { return p.selectedTitle() == "42" })

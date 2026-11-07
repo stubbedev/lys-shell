@@ -229,12 +229,12 @@ func TestTheClipboardModePreviewsItsEntries(t *testing.T) {
 	h.open(launcheripc.SessionOptions{Mode: &clip}, false)
 	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 2 })
 	v := h.s.cur.views
-	h.rest("the text", func() bool { return v.pane.text.Visible() })
-	if got := v.pane.text.Text(); got != "first line\nsecond line" {
+	h.rest("the text", func() bool { return v.pane.code.Visible() })
+	if got := v.pane.code.text; got != "first line\nsecond line" {
 		t.Errorf("text %q, want the entry with its lines", got)
 	}
 	h.key("Down")
-	h.rest("the facts", func() bool { return v.pane.facts.Visible() && !v.pane.text.Visible() })
+	h.rest("the facts", func() bool { return v.pane.facts.Visible() && !v.pane.code.Visible() })
 	want := [][2]string{{i18n.T("launcher-preview-type"), "application/x-thing"}, {i18n.T("launcher-preview-size"), "5 B"}}
 	for i, w := range want {
 		if r := v.pane.rows[i]; r.label.Text() != w[0] || r.value.Text() != w[1] {

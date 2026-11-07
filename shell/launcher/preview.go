@@ -6,7 +6,6 @@ import (
 	"image"
 	"log"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -38,7 +37,7 @@ const previewSettle = 40 * time.Millisecond
 type previewPane struct {
 	box     *paneBox
 	image   *widget.Image
-	text    *widget.Label
+	code    *codeView
 	facts   *widget.Box
 	rows    []factRow
 	summary *rowSummary
@@ -78,14 +77,12 @@ func newPreviewPane(font render.Font, px func(int) int, height int) *previewPane
 	p.image = widget.NewImage(nil)
 	p.image.SetScale(widget.ImageFit)
 	p.image.AddClass("launcher-preview-image")
-	p.text = widget.NewLabel(font, fontPx(), "", 0)
-	p.text.AddClass("launcher-preview-text")
-	p.text.SetWrap(true)
+	p.code = newCodeView(font, widgetsSmallPx())
 	p.facts = widget.NewBox(widget.Column, px(4), 0)
 	p.facts.AddClass("launcher-preview-facts")
 	p.summary = newRowSummary(font, px)
 	p.box.Append(p.image, true)
-	p.box.Append(p.text, false)
+	p.box.Append(p.code, true)
 	p.box.Append(p.facts, false)
 	p.box.Append(p.summary.box, false)
 	p.show(nil, engine.PreviewContent{}, nil)
@@ -107,9 +104,9 @@ func (p *previewPane) show(facts []engine.PreviewFact, c engine.PreviewContent, 
 		p.shown = img
 		p.image.SetImage(img)
 	}
-	p.text.SetVisible(text != "")
-	if text != "" {
-		p.text.SetText(previewLines(text))
+	p.code.SetVisible(text != "")
+	if text != "" && (text != p.code.text || c.Name != p.code.name) {
+		p.code.setText(text, c.Name)
 	}
 	p.showFacts(facts)
 	p.summary.box.SetVisible(false)
@@ -150,20 +147,6 @@ func (p *previewPane) showSummary(bind func(*asyncIcon, string), icon, glyph, ti
 
 // widgetsSmallPx is the small text size: footers, subtitles, facts.
 func widgetsSmallPx() float64 { return math.Round(fontPx() * 0.85) }
-
-// previewLines cuts text to what a pane can show, so laying it out stays
-// cheap whatever was copied.
-func previewLines(text string) string {
-	const maxLines, maxBytes = 40, 4096
-	if len(text) > maxBytes {
-		text = strings.ToValidUTF8(text[:maxBytes], "")
-	}
-	lines := strings.SplitN(text, "\n", maxLines+1)
-	if len(lines) > maxLines {
-		lines = lines[:maxLines]
-	}
-	return strings.Join(lines, "\n")
-}
 
 // rowSummary is the pane for a row with nothing to load: its picture
 // large, its title and its subtitle.

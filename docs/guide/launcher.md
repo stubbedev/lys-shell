@@ -91,6 +91,15 @@ arrowing through a list reads no files and captures no windows:
 `lys-shell launcher -show window` and `-show clipboard` show the same pane.
 `launcher.search.previews: false` turns it off everywhere.
 
+Text shows as `bat` shows it: line numbers in a gutter and the code highlighted in
+the theme's palette, so it reads in a light theme as in a dark one. The language
+comes from the file name, else the `#!` line, else what the first line gives away
+(`package main`, `<?xml`, `diff --git`), else a vim or Emacs modeline. C, C++, C#,
+CSS, diffs, Dockerfiles, Go, HTML, INI and systemd units, Java, JavaScript, JSON,
+Lua, make, Markdown, Nix, Python, Ruby, Rust, shell, SQL, TOML, TypeScript, XML and
+YAML are known; anything else shows plain. Only the lines that fit are read and
+highlighted, so a large file previews as fast as a small one.
+
 <img src="/launcher-preview-window-mode.png" alt="The window mode previewing a window: its picture, title, app and workspace">
 <img src="/launcher-preview-clipboard-mode.png" alt="The clipboard mode previewing a copied text in full">
 <img src="/launcher-preview-clipboard-mode-other.png" alt="The clipboard mode previewing an entry by its type and size">

@@ -73,8 +73,30 @@ row:hover > .launcher-search-row,
 .launcher-preview-title {
   font-weight: 600;
 }
-.launcher-preview-text {
+.launcher-preview-line,
+.launcher-preview-gutter {
   font-family: var(--font-mono);
+}
+.launcher-preview-gutter {
+  color: var(--palette-fg-muted);
+}
+.launcher-preview-code .hl-comment {
+  color: var(--palette-fg-muted);
+}
+.launcher-preview-code .hl-keyword {
+  color: var(--palette-primary);
+}
+.launcher-preview-code .hl-type {
+  color: var(--palette-blue);
+}
+.launcher-preview-code .hl-string {
+  color: var(--palette-green);
+}
+.launcher-preview-code .hl-constant {
+  color: var(--palette-yellow);
+}
+.launcher-preview-code .hl-special {
+  color: var(--palette-red);
 }
 .launcher-search-footer {
   border-top: 1px solid color-mix(in srgb, var(--fg-default) 10%, transparent);
