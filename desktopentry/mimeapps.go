@@ -56,16 +56,27 @@ type associations struct {
 	removed         map[string]bool
 }
 
-// readAssociations walks the lists, highest priority first. A removal
+// MimeApps is the mimeapps.list files that exist, read once, highest
+// priority first.
+type MimeApps struct{ files []*KeyFile }
+
+// ReadMimeApps reads the lists that exist, in order.
+func ReadMimeApps(lists []string) MimeApps {
+	var m MimeApps
+	for _, path := range lists {
+		if kf, err := LoadKeyFile(path); err == nil {
+			m.files = append(m.files, kf)
+		}
+	}
+	return m
+}
+
+// associations walks the lists, highest priority first. A removal
 // hides an association from its own list and every lower one, so it
 // is applied as the lists are read.
-func readAssociations(lists []string, mimeType string) associations {
+func (m MimeApps) associations(mimeType string) associations {
 	as := associations{removed: map[string]bool{}}
-	for _, path := range lists {
-		kf, err := LoadKeyFile(path)
-		if err != nil {
-			continue
-		}
+	for _, kf := range m.files {
 		for _, id := range kf.List(groupRemoved, mimeType) {
 			as.removed[id] = true
 		}
@@ -88,8 +99,13 @@ func readAssociations(lists []string, mimeType string) associations {
 // and not removed by a list above, else the first installed app that
 // declares the type.
 func Default(dirs, lists []string, mimeType string) (App, bool) {
-	as := readAssociations(lists, mimeType)
-	all := AllApps(dirs)
+	return ReadMimeApps(lists).Default(AllApps(dirs), mimeType)
+}
+
+// Default is the package Default over apps already listed and lists
+// already read, for a caller resolving many types from one scan.
+func (m MimeApps) Default(all []App, mimeType string) (App, bool) {
+	as := m.associations(mimeType)
 	for _, id := range as.defaults {
 		if i := slices.IndexFunc(all, func(a App) bool { return a.ID == id }); i >= 0 {
 			return all[i], true
@@ -107,7 +123,7 @@ func Default(dirs, lists []string, mimeType string) (App, bool) {
 // apps for mimeType - the default first, then the added associations,
 // then every app declaring the type - without the removed ones.
 func RecommendedFor(dirs, lists []string, mimeType string) []App {
-	as := readAssociations(lists, mimeType)
+	as := ReadMimeApps(lists).associations(mimeType)
 	all := AllApps(dirs)
 	byID := make(map[string]App, len(all))
 	for _, a := range all {
