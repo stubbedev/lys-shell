@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -58,7 +59,11 @@ func (s stubPicker) Request(_ context.Context, _ regionoverlay.Frames, opts colo
 // client that connects to it.
 func waylandListener(t *testing.T) *atomic.Int32 {
 	t.Helper()
-	dir := t.TempDir()
+	dir, err := os.MkdirTemp("", "lys-shell-wl-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	t.Setenv("XDG_RUNTIME_DIR", dir)
 	t.Setenv("WAYLAND_DISPLAY", "wayland-test")
 	l, err := net.Listen("unix", filepath.Join(dir, "wayland-test"))
