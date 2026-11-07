@@ -4639,9 +4639,12 @@
           "default": {
             "blank-timeout-ms": 0,
             "enabled": true,
+            "fingerprint": true,
             "grace-period-ms": 0,
             "lock-on-start": false,
-            "pam-service": "system-auth"
+            "pam-service": "system-auth",
+            "show-battery": true,
+            "show-media": true
           },
           "description": "The lock screen's own settings."
         },
@@ -4702,6 +4705,11 @@
           "default": true,
           "description": "Let lys-shell handle session locking. When off, lock requests are ignored\nand an external locker (e.g. hyprlock) stays responsible."
         },
+        "fingerprint": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Accept an enrolled fingerprint (fprintd) alongside the password:\nwhichever succeeds first unlocks, and a fingerprint that does not\nmatch counts as a failed attempt. Nothing changes without fprintd or\nan enrolled finger."
+        },
         "grace-period-ms": {
           "$ref": "#/$defs/uint32",
           "default": 0,
@@ -4716,6 +4724,16 @@
           "$ref": "#/$defs/PamService",
           "default": "system-auth",
           "description": "PAM service name used to authenticate the unlock. Distro-dependent:\n`system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry."
+        },
+        "show-battery": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the battery's charge in the top right corner. Absent on a\nmachine without a battery."
+        },
+        "show-media": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the track a media player is playing, with play/pause and next,\nunder the clock. Only a player's local cover art is shown."
         }
       },
       "type": "object"
@@ -11335,9 +11353,12 @@
         "lock": {
           "blank-timeout-ms": 0,
           "enabled": true,
+          "fingerprint": true,
           "grace-period-ms": 0,
           "lock-on-start": false,
-          "pam-service": "system-auth"
+          "pam-service": "system-auth",
+          "show-battery": true,
+          "show-media": true
         },
         "max-attempts": 0,
         "show-clock": true,

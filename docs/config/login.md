@@ -48,6 +48,9 @@ login:
     grace-period-ms: 0
     blank-timeout-ms: 0
     pam-service: system-auth
+    show-media: true
+    show-battery: true
+    fingerprint: true
   greeter:
     show-user-list: true
     show-power-buttons: true

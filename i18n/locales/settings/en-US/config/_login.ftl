@@ -44,6 +44,15 @@ settings-login-lock-blank-timeout-ms = Blank Timeout
 settings-login-lock-pam-service = PAM Service
     .description = PAM service used to verify the password (e.g. system-auth, login)
 
+settings-login-lock-show-media = Show Now Playing
+    .description = Show the playing track with play/pause and next on the lock screen (local cover art only)
+
+settings-login-lock-show-battery = Show Battery
+    .description = Show the battery's charge on the lock screen; absent without a battery
+
+settings-login-lock-fingerprint = Fingerprint
+    .description = Unlock with an enrolled fingerprint (fprintd) alongside the password
+
 settings-login-greeter-show-user-list = Show User List
     .description = Show clickable avatars for the machine's login users above the username field
 

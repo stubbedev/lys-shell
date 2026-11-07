@@ -26,6 +26,12 @@ settings-login-lock-blank-timeout-ms = Délai avant écran noir
     .description = Noircir l'écran de verrouillage après ce temps d'inactivité (ms, 0 = jamais ; visuel uniquement, le DPMS relève du démon d'inactivité)
 settings-login-lock-pam-service = Service PAM
     .description = Service PAM qui vérifie le mot de passe (ex. : system-auth, login)
+settings-login-lock-show-media = Afficher la lecture en cours
+    .description = Afficher le morceau en cours avec lecture/pause et suivant sur l'écran de verrouillage (pochette locale uniquement)
+settings-login-lock-show-battery = Afficher la batterie
+    .description = Afficher la charge de la batterie sur l'écran de verrouillage ; absent sans batterie
+settings-login-lock-fingerprint = Empreinte digitale
+    .description = Déverrouiller avec une empreinte enregistrée (fprintd) en plus du mot de passe
 settings-login-greeter-show-user-list = Afficher la liste des utilisateurs
     .description = Afficher au-dessus du champ de nom d'utilisateur des avatars cliquables pour les utilisateurs de la machine
 settings-login-greeter-show-power-buttons = Afficher les boutons d'alimentation

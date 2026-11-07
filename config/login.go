@@ -67,6 +67,17 @@ type LoginLockConfig struct {
 	// PAM service name used to authenticate the unlock. Distro-dependent:
 	// `system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry.
 	PamService string `cfg:"pam-service,type=PamService"`
+	// Show the track a media player is playing, with play/pause and next,
+	// under the clock. Only a player's local cover art is shown.
+	ShowMedia bool `cfg:"show-media"`
+	// Show the battery's charge in the top right corner. Absent on a
+	// machine without a battery.
+	ShowBattery bool `cfg:"show-battery"`
+	// Accept an enrolled fingerprint (fprintd) alongside the password:
+	// whichever succeeds first unlocks, and a fingerprint that does not
+	// match counts as a failed attempt. Nothing changes without fprintd or
+	// an enrolled finger.
+	Fingerprint bool `cfg:"fingerprint"`
 }
 
 // LoginGreeterConfig is login.greeter.
@@ -97,7 +108,7 @@ func DefaultsLogin() LoginConfig {
 		ClockFormat:        mustStrftime("%H:%M"),
 		DateFormat:         mustStrftime("%A, %B %-d"),
 		ShowFailedAttempts: true,
-		Lock:               LoginLockConfig{Enabled: true, PamService: "system-auth"},
+		Lock:               LoginLockConfig{Enabled: true, PamService: "system-auth", ShowMedia: true, ShowBattery: true, Fingerprint: true},
 		Greeter:            LoginGreeterConfig{ShowUserList: true, ShowPowerButtons: true, CursorSize: 24},
 	}
 }

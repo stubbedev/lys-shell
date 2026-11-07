@@ -911,6 +911,9 @@ crashes (the compositor shows a solid color), unlike a layer-shell overlay.
 | `grace-period-ms` | Grace window after locking during which the screen unlocks without a |
 | `blank-timeout-ms` | Black out the lock screen after this idle time (milliseconds, `0` = |
 | `pam-service` | PAM service name used to authenticate the unlock. Distro-dependent: |
+| `show-media` | Show the track a media player is playing, with play/pause and next, |
+| `show-battery` | Show the battery's charge in the top right corner. Absent on a |
+| `fingerprint` | Accept an enrolled fingerprint (fprintd) alongside the password: |
 
 ## MailAccount {#mail-account}
 
