@@ -8,11 +8,13 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/eis"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/vinput"
@@ -606,5 +608,48 @@ func TestEISDropsUngrantedAbsoluteInput(t *testing.T) {
 	eisInput{in: &remoteInput{sink: sink, granted: devicePointer}, box: box}.MotionAbsolute(1280+960, 540)
 	if got := sink.events.Load(); !slices.Equal(got, []string{"abs 573440 138240 819200 276480"}) {
 		t.Errorf("absolute motion to DP-2's centre = %q", got)
+	}
+}
+
+// Every stream carries its pipewire-serial; a monitor stream carries a
+// mapping_id, and the session's EIS regions are one per monitor stream
+// with that id, placed in the layout at its output's scale. A window
+// stream carries no mapping_id and gets no region.
+func TestStreamsPairWithTheirEISRegions(t *testing.T) {
+	r, _ := touchRig(t)
+	serveDialogs(t, r, true)
+	res := r.startSharing(t, "/screen:DP-2;region:DP-1@10,20,300,200;window:w1", Vardict{})
+	streams := castStreams(t, res)
+	if len(streams) != 3 {
+		t.Fatalf("streams = %+v", streams)
+	}
+	var mappings []string
+	for _, st := range streams {
+		if st.Props["pipewire-serial"].Value() != uint64(st.Node)+fakeSerialOffset {
+			t.Errorf("stream %d: pipewire-serial %v, want its node's serial %d", st.Node, st.Props["pipewire-serial"], uint64(st.Node)+fakeSerialOffset)
+		}
+		id, has := st.Props["mapping_id"]
+		if st.Props["source_type"].Value() == sourceWindow {
+			if has {
+				t.Errorf("window stream %d has mapping_id %v", st.Node, id)
+			}
+			continue
+		}
+		if want := strconv.FormatUint(uint64(st.Node)+fakeSerialOffset, 10); !has || id.Value() != want {
+			t.Errorf("stream %d: mapping_id %v, want %q", st.Node, id, want)
+		}
+		mappings = append(mappings, id.Value().(string))
+	}
+	s, _ := r.backend.sessions.get(sessA)
+	box, regions, err := r.backend.remote.eisRegions(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []eis.Region{
+		{X: 1280, Y: 0, Width: 1920, Height: 1080, Scale: 1, MappingID: mappings[0]},
+		{X: 10, Y: 20, Width: 300, Height: 200, Scale: 2, MappingID: mappings[1]},
+	}
+	if box != image.Rect(0, 0, 3200, 1080) || !slices.Equal(regions, want) {
+		t.Errorf("EIS layout %v regions %+v, want %+v", box, regions, want)
 	}
 }
