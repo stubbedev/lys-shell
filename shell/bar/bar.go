@@ -36,6 +36,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/screenshare"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 	"github.com/stubbedev/lys-shell/service/sni"
 	"github.com/stubbedev/lys-shell/service/treeman"
@@ -374,6 +375,12 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 	sniStore := sni.NewStore()
 	s.ctx.SNI = sniStore
 	if conn := s.session; conn != nil {
+		if shares, err := screenshare.Follow(conn); err == nil {
+			s.ctx.ScreenShares = shares
+			s.down.add(shares.Close)
+		} else {
+			log.Printf("screen shares: %v; the screen-share module and do-not-disturb while sharing are off", err)
+		}
 		if s.notifSvc != nil {
 			server, err := notifications.Serve(conn, s.notifSvc)
 			if err != nil {
@@ -612,7 +619,7 @@ func (s *shellStart) mount() {
 	if s.notifSvc != nil {
 		popupHost = popups.New(application, s.notifSvc, cfg, font, theme.Sheet, sess.Outputs)
 		go popupHost.Run()
-		s.down.add(followFocusInputs(application, s.notifSvc, s.ctx.Recorder))
+		s.down.add(followFocusInputs(application, s.notifSvc, s.ctx.ScreenShares, s.ctx.Recorder))
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
 	bars := newSurfaceSet(host.open)

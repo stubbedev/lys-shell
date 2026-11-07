@@ -2,10 +2,9 @@ package bar
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
 	"strings"
-	"sync"
 
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -25,22 +24,13 @@ type shareSource interface {
 	Stop(ctx context.Context, session dbus.ObjectPath) error
 }
 
-// screenShareSource follows the portal's shares, once for every bar.
-var screenShareSource = sync.OnceValues(func() (shareSource, error) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		return nil, err
-	}
-	return screenshare.Follow(conn)
-})
-
 // newScreenShare is the screen share indicator: shown while the portal
 // streams the screen or a window, the number of shares beside its icon
 // under label-show.
 func newScreenShare(ctx ModuleContext) (Module, error) {
-	src, err := screenShareSource()
-	if err != nil {
-		return nil, fmt.Errorf("screen-share: %w", err)
+	src := ctx.ScreenShares
+	if src == nil {
+		return nil, errors.New("screen-share: the portal's shares are not followed without a session bus")
 	}
 	cfg := ctx.Config.ScreenShare
 	return newCountIndicator(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor), cfg.LabelShow, func() int { return len(src.List()) }, src.Subscribe), nil
@@ -64,9 +54,7 @@ type screenShareView struct {
 func screenShareDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &screenShareView{ctx: ctx, font: font, px: px}
-	if src, err := screenShareSource(); err == nil {
-		v.src = src
-	}
+	v.src = ctx.ScreenShares
 	v.openFollow = newOpenFollow(v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "screen-share-dropdown")

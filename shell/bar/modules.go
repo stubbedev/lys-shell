@@ -55,6 +55,9 @@ type ModuleContext struct {
 	Networking    *network.Service // secret agent, VPNs, wifi; nil without NM
 	PowerProfiles powerprofiles.Source
 	IdleInhibit   *idleinhibit.State
+	// ScreenShares follows the portal's screen shares on the shell's
+	// session bus; nil without one.
+	ScreenShares shareSource
 	// Idle is the built-in idle policy, nil when it does not run.
 	Idle          *idle.Service
 	Treeman       treeman.Source

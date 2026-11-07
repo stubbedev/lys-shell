@@ -27,7 +27,7 @@ func (s *sharingSignals) set(apply func()) {
 	s.svc.SetSharing(on)
 }
 
-func followFocusInputs(application *app.Application, svc *notifications.Service, rec *recorder.State) func() {
+func followFocusInputs(application *app.Application, svc *notifications.Service, shares shareSource, rec *recorder.State) func() {
 	life, cancel := context.WithCancel(context.Background())
 	var done sync.WaitGroup
 	done.Go(func() {
@@ -36,7 +36,7 @@ func followFocusInputs(application *app.Application, svc *notifications.Service,
 		}
 	})
 	signals := &sharingSignals{svc: svc}
-	if src, err := screenShareSource(); err == nil {
+	if src := shares; src != nil {
 		ticks, stop := src.Subscribe()
 		signals.set(func() { signals.shares = len(src.List()) > 0 })
 		done.Go(func() {
@@ -50,8 +50,6 @@ func followFocusInputs(application *app.Application, svc *notifications.Service,
 				}
 			}
 		})
-	} else {
-		log.Printf("notifications: do-not-disturb will not follow screen shares: %v", err)
 	}
 	if rec != nil {
 		changes, stop := rec.Changes()

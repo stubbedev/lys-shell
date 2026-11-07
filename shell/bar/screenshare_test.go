@@ -55,7 +55,7 @@ func (f *fakeShares) changed() { _ = screenshare.Changed.Emit(f.conn, screenshar
 
 // servePortalShares serves the fake on a private bus and points the bar
 // at it.
-func servePortalShares(t *testing.T) *fakeShares {
+func servePortalShares(t *testing.T) (*fakeShares, shareSource) {
 	t.Helper()
 	bus := dbustest.Start(t)
 	f := &fakeShares{conn: bus.Conn(t)}
@@ -72,10 +72,7 @@ func servePortalShares(t *testing.T) *fakeShares {
 		t.Fatal(err)
 	}
 	t.Cleanup(shares.Close)
-	prev := screenShareSource
-	screenShareSource = func() (shareSource, error) { return shares, nil }
-	t.Cleanup(func() { screenShareSource = prev })
-	return f
+	return f, shares
 }
 
 var chromeShare = screenshare.Share{
@@ -84,10 +81,11 @@ var chromeShare = screenshare.Share{
 }
 
 func TestTheIndicatorShowsWhileAShareRunsAndStopEndsIt(t *testing.T) {
-	f := servePortalShares(t)
+	f, shares := servePortalShares(t)
 	cfg := config.Defaults()
 	cfg.ScreenShare.LabelShow = true
 	ctx := newTestContext(t, cfg)
+	ctx.ScreenShares = shares
 	m, err := newScreenShare(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -126,8 +124,9 @@ func TestTheIndicatorShowsWhileAShareRunsAndStopEndsIt(t *testing.T) {
 }
 
 func TestTheIndicatorStaysWhileAnotherShareRuns(t *testing.T) {
-	f := servePortalShares(t)
+	f, shares := servePortalShares(t)
 	ctx := newTestContext(t, config.Defaults())
+	ctx.ScreenShares = shares
 	m, err := newScreenShare(ctx)
 	if err != nil {
 		t.Fatal(err)
