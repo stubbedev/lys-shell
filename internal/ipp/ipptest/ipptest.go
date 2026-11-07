@@ -8,6 +8,7 @@ package ipptest
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-shell/internal/ipp"
 )
@@ -56,16 +58,28 @@ func Start(t *testing.T) *Server {
 	return s
 }
 
-// StartDevice runs a network printer on loopback, over TLS with a
+// StartDevice runs a network printer on IPv4 loopback, over TLS with a
 // self-signed certificate (ipps) or plain HTTP (ipp), answering its
 // attributes at any URI.
 func StartDevice(t *testing.T, secure bool, attrs ...ipp.Attr) *Server {
 	t.Helper()
+	return StartDeviceAt(t, "127.0.0.1:0", secure, attrs...)
+}
+
+// StartDeviceAt is StartDevice listening at addr ("[::1]:0" for IPv6
+// loopback).
+func StartDeviceAt(t *testing.T, addr string, secure bool, attrs ...ipp.Attr) *Server {
+	t.Helper()
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("ipptest: listen at %s: %v", addr, err)
+	}
 	s := &Server{printers: map[string][]ipp.Attr{}, device: attrs}
+	s.srv = &httptest.Server{Listener: ln, Config: &http.Server{Handler: http.HandlerFunc(s.serve), ReadHeaderTimeout: time.Minute}}
 	if secure {
-		s.srv = httptest.NewTLSServer(http.HandlerFunc(s.serve))
+		s.srv.StartTLS()
 	} else {
-		s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
+		s.srv.Start()
 	}
 	s.cleanup(t)
 	return s

@@ -3,6 +3,8 @@ package printdialog
 import (
 	"bytes"
 	"log"
+	"net"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,21 +25,26 @@ import (
 
 const laserUUID = "6e0a8f10-1234-4abc-9def-00a0c0ffee01"
 
-// laser is a driverless printer announced over ipps on loopback, its
-// own attributes offering A5 only.
+// laser is a driverless printer announced over ipps on IPv4 loopback,
+// its own attributes offering A5 only.
 func laser(t *testing.T) (dnssd.Service, *ipptest.Server) {
 	t.Helper()
-	device := ipptest.StartDevice(t, true, ipp.String(ipp.TagName, "printer-name", "laser"),
+	return laserAt(t, "127.0.0.1:0")
+}
+
+// laserAt is laser listening at addr, announced at its address.
+func laserAt(t *testing.T, addr string) (dnssd.Service, *ipptest.Server) {
+	t.Helper()
+	device := ipptest.StartDeviceAt(t, addr, true, ipp.String(ipp.TagName, "printer-name", "laser"),
 		ipp.Enum("printer-state", ipp.StateIdle),
 		ipp.String(ipp.TagKeyword, "media-supported", "iso_a5_148x210mm"),
 		ipp.String(ipp.TagKeyword, "media-default", "iso_a5_148x210mm"))
-	host, port, _ := strings.Cut(device.Addr, ":")
-	p, err := strconv.ParseUint(port, 10, 16)
+	at, err := netip.ParseAddrPort(device.Addr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return dnssd.Service{
-		Name: "Example Laser", Type: ippsService, Domain: "local", Host: host, Address: host, Port: uint16(p),
+		Name: "Example Laser", Type: ippsService, Domain: "local", Host: at.Addr().String(), Address: at.Addr(), Port: at.Port(),
 		TXT: map[string]string{"ty": "Example Laser", "note": "Lab", "rp": "ipp/print", "UUID": laserUUID, "pdl": "application/octet-stream,image/pwg-raster"},
 	}, device
 }
@@ -73,13 +80,20 @@ func (hs *harness) waitLabel(t *testing.T, c app.LayerConfig, text string) {
 	}
 }
 
-// A driverless printer found over DNS-SD is listed, offers what it
-// reports itself, and prints through the temporary queue CUPS makes
-// for it; closing the dialog frees every browser.
+// A driverless printer found over DNS-SD, at an IPv4 or an IPv6
+// address, is listed, offers what it reports itself, and prints
+// through the temporary queue CUPS makes for it; closing the dialog
+// frees every browser.
 func TestNetworkPrintersAreListedAndPrintedTo(t *testing.T) {
+	for _, addr := range []string{"127.0.0.1:0", "[::1]:0"} {
+		t.Run(addr, func(t *testing.T) { listedAndPrintedTo(t, addr) })
+	}
+}
+
+func listedAndPrintedTo(t *testing.T, addr string) {
 	hs := newHarness(t)
 	srv, avahi := overNetwork(t, hs)
-	svc, device := laser(t)
+	svc, device := laserAt(t, addr)
 	avahi.Announce(t, svc)
 	got, c := hs.prepare(t)
 	hs.waitLabel(t, c, "Example Laser (network)")
@@ -123,7 +137,7 @@ func TestNetworkPrintersAreListedAndPrintedTo(t *testing.T) {
 	if len(jobs) != 1 || jobs[0].Printer != "Example_Laser" || string(jobs[0].Document) != "%PDF net" {
 		t.Fatalf("jobs %+v", jobs)
 	}
-	if uri := srv.Created("Example_Laser"); uri != "ipps://"+svc.Host+":"+strconv.Itoa(int(svc.Port))+"/ipp/print" {
+	if uri := srv.Created("Example_Laser"); uri != "ipps://"+net.JoinHostPort(svc.Host, strconv.Itoa(int(svc.Port)))+"/ipp/print" {
 		t.Errorf("the queue was made for %q", uri)
 	}
 }
@@ -226,5 +240,29 @@ func TestNoAvahiListsTheQueues(t *testing.T) {
 	<-got
 	if n := logs.count("print:"); n != 1 {
 		t.Errorf("%d print log lines, want the one about Avahi:\n%s", n, logs.buf.String())
+	}
+}
+
+// A link-local IPv6 printer is read at a URI carrying its zone,
+// escaped, and the printer answers there; CUPS reaches it by host
+// name.
+func TestLinkLocalPrintersAreReadThroughTheirZone(t *testing.T) {
+	svc, device := laserAt(t, "[::1]:0")
+	svc.Host = "laser.local."
+	ll := svc
+	ll.Address = netip.MustParseAddr("fe80::7%lo")
+	q, ok := networkQueue(ll)
+	port := strconv.Itoa(int(svc.Port))
+	if !ok || q.query != "ipps://[fe80::7%25lo]:"+port+"/ipp/print" || q.device != "ipps://laser.local:"+port+"/ipp/print" {
+		t.Fatalf("the link-local printer is read at %q and printed to at %q", q.query, q.device)
+	}
+	svc.Address = netip.MustParseAddr("::1%lo")
+	q, _ = networkQueue(svc)
+	p, err := ipp.DeviceAttributes(t.Context(), q.query)
+	if err != nil {
+		t.Fatalf("reading %s: %v", q.query, err)
+	}
+	if !slices.Equal(p.Media, []string{"iso_a5_148x210mm"}) || !slices.Contains(device.Ops(), ipp.OpGetPrinterAttributes) {
+		t.Errorf("the printer at %s answered %+v", q.query, p)
 	}
 }

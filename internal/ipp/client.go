@@ -231,9 +231,9 @@ func DeviceAttributes(ctx context.Context, uri string) (Printer, error) {
 	c := &Client{http: &http.Client{Timeout: requestTimeout}}
 	switch u.Scheme {
 	case "ipp":
-		c.base = "http://" + net.JoinHostPort(u.Hostname(), port)
+		c.base = (&url.URL{Scheme: "http", Host: net.JoinHostPort(u.Hostname(), port)}).String()
 	case "ipps":
-		c.base = "https://" + net.JoinHostPort(u.Hostname(), port)
+		c.base = (&url.URL{Scheme: "https", Host: net.JoinHostPort(u.Hostname(), port)}).String()
 		c.http.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // capabilities only, from a printer whose certificate is self-signed
 	default:
 		return Printer{}, fmt.Errorf("ipp: printer URI %q is neither ipp nor ipps", uri)

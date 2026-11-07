@@ -5,9 +5,13 @@
 package dnssd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"net"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -24,7 +28,6 @@ const (
 	serverPath     = dbus.ObjectPath("/")
 	ifaceUnspec    = int32(-1)
 	protoUnspec    = int32(-1)
-	protoInet      = int32(0)
 	resolveTimeout = 5 * time.Second
 )
 
@@ -32,10 +35,13 @@ const (
 var ErrNoAvahi = errors.New("dnssd: no Avahi on the system bus")
 
 // Service is one resolved service: its instance name, type and domain,
-// where it is, and its TXT record by key.
+// its host name, the address it is reached at (with its interface as
+// the zone where link-local) and port,
+// and its TXT record by key.
 type Service struct {
 	Name, Type, Domain string
-	Host, Address      string
+	Host               string
+	Address            netip.Addr
 	Port               uint16
 	TXT                map[string]string
 }
@@ -95,8 +101,33 @@ func (c *Client) Browse(ctx context.Context, types []string, found func(Service)
 	return b, nil
 }
 
-// run hands over what the browsers announce until Stop.
+// instance is one interface and protocol a service is announced on,
+// as Avahi's browser items name them.
+type instance struct{ iface, proto int32 }
+
+// instanceOf reads a browser item's (interface, protocol, name, type,
+// domain, flags) instance and the key of its service.
+func instanceOf(body []any) (instance, string, bool) {
+	if len(body) < 5 {
+		return instance{}, "", false
+	}
+	iface, ok1 := body[0].(int32)
+	proto, ok2 := body[1].(int32)
+	name, ok3 := body[2].(string)
+	typ, ok4 := body[3].(string)
+	domain, ok5 := body[4].(string)
+	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
+		return instance{}, "", false
+	}
+	return instance{iface, proto}, Service{Name: name, Type: typ, Domain: domain}.Key(), true
+}
+
+// run hands over what the browsers announce until Stop. A service is
+// announced once per interface and protocol, each resolved to its own
+// address; found is told the best of them whenever one comes or goes,
+// and removed once the last went.
 func (b *Browser) run(server dbus.BusObject, found func(Service), removed func(string)) {
+	services := map[string]map[instance]Service{}
 	for {
 		select {
 		case <-b.done:
@@ -108,33 +139,59 @@ func (b *Browser) run(server dbus.BusObject, found func(Service), removed func(s
 			if !b.ours(sig.Path) {
 				continue
 			}
+			inst, key, ok := instanceOf(sig.Body)
+			if !ok {
+				continue
+			}
 			switch sig.Name {
 			case BrowserIface + ".ItemNew":
-				if s, ok := b.resolve(server, sig.Body); ok {
-					found(s)
+				s, ok := b.resolve(server, inst, sig.Body)
+				if !ok {
+					continue
 				}
+				if services[key] == nil {
+					services[key] = map[instance]Service{}
+				}
+				services[key][inst] = s
+				found(best(services[key]))
 			case BrowserIface + ".ItemRemove":
-				if len(sig.Body) >= 5 {
-					name, _ := sig.Body[2].(string)
-					typ, _ := sig.Body[3].(string)
-					domain, _ := sig.Body[4].(string)
-					removed(Service{Name: name, Type: typ, Domain: domain}.Key())
+				delete(services[key], inst)
+				if len(services[key]) == 0 {
+					delete(services, key)
+					removed(key)
+					continue
 				}
+				found(best(services[key]))
 			}
 		}
 	}
 }
 
+// best is the instance to reach a service at: an IPv4 address, else a
+// routable IPv6 one, else a link-local one; the lowest interface and
+// protocol break a tie.
+func best(instances map[instance]Service) Service {
+	rank := func(a netip.Addr) int {
+		switch {
+		case a.Is4():
+			return 0
+		case !a.IsLinkLocalUnicast():
+			return 1
+		}
+		return 2
+	}
+	return instances[slices.MinFunc(slices.Collect(maps.Keys(instances)), func(a, b instance) int {
+		return cmp.Or(cmp.Compare(rank(instances[a].Address), rank(instances[b].Address)), cmp.Compare(a.iface, b.iface), cmp.Compare(a.proto, b.proto))
+	})]
+}
+
 func (b *Browser) ours(path dbus.ObjectPath) bool { return slices.Contains(b.paths, path) }
 
-// resolve resolves an ItemNew (interface, protocol, name, type,
-// domain, flags) with Avahi's ResolveService, to an IPv4 address: a
-// LAN printer has one, and an IPv6 link-local address would need its
-// zone.
-func (b *Browser) resolve(server dbus.BusObject, body []any) (Service, bool) {
-	if len(body) < 5 {
-		return Service{}, false
-	}
+// resolve resolves a browser item with Avahi's ResolveService, on its
+// interface and protocol, to an address of that protocol: a link-local
+// IPv6 one carries its interface as its zone, without which it cannot
+// be reached.
+func (b *Browser) resolve(server dbus.BusObject, inst instance, body []any) (Service, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 	defer cancel()
 	go func() {
@@ -152,12 +209,23 @@ func (b *Browser) resolve(server dbus.BusObject, body []any) (Service, bool) {
 		txt                  [][]byte
 		flags                uint32
 	)
-	err := server.CallWithContext(ctx, ServerIface+".ResolveService", 0, body[0], body[1], body[2], body[3], body[4], protoInet, uint32(0)).
+	err := server.CallWithContext(ctx, ServerIface+".ResolveService", 0, inst.iface, inst.proto, body[2], body[3], body[4], inst.proto, uint32(0)).
 		Store(&iface, &proto, &name, &typ, &domain, &host, &aproto, &address, &port, &txt, &flags)
 	if err != nil {
 		return Service{}, false
 	}
-	return Service{Name: name, Type: typ, Domain: domain, Host: host, Address: address, Port: port, TXT: txtRecord(txt)}, true
+	addr, err := netip.ParseAddr(address)
+	if err != nil {
+		return Service{}, false
+	}
+	if addr.Is6() && addr.IsLinkLocalUnicast() {
+		ifc, err := net.InterfaceByIndex(int(iface))
+		if err != nil {
+			return Service{}, false
+		}
+		addr = addr.WithZone(ifc.Name)
+	}
+	return Service{Name: name, Type: typ, Domain: domain, Host: host, Address: addr, Port: port, TXT: txtRecord(txt)}, true
 }
 
 // txtRecord reads TXT strings, key=value each, the first of a key

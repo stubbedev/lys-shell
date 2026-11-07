@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/netip"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -91,6 +93,9 @@ func networkQueue(svc dnssd.Service) (queue, bool) {
 		rp = "ipp/print"
 	}
 	port := strconv.Itoa(int(svc.Port))
+	at := func(host string) string {
+		return (&url.URL{Scheme: scheme, Host: host, Path: "/" + rp}).String()
+	}
 	host := strings.TrimSuffix(svc.Host, ".")
 	name := svc.TXT["ty"]
 	if name == "" {
@@ -99,8 +104,8 @@ func networkQueue(svc dnssd.Service) (queue, bool) {
 	return queue{
 		kind: queueNetwork, name: name + " (network)", detail: svc.TXT["note"], caps: capabilitiesOf(nil),
 		uuid: svc.TXT["UUID"], key: svc.Key(),
-		device: scheme + "://" + net.JoinHostPort(host, port) + "/" + rp,
-		query:  scheme + "://" + net.JoinHostPort(svc.Address, port) + "/" + rp,
+		device: at(net.JoinHostPort(host, port)),
+		query:  at(netip.AddrPortFrom(svc.Address, svc.Port).String()),
 	}, true
 }
 

@@ -1,19 +1,30 @@
 // Package dnssdtest is a fake Avahi on a private bus: the services a
-// test announces are reported to every browser of their type and
-// resolve to what the test set, and the browsers made and freed are
+// test announces are reported to every browser of their type, once per
+// address, on the interface and protocol the address names, and
+// resolve to what the test set; the browsers made and freed are
 // counted.
 package dnssdtest
 
 import (
+	"net"
 	"slices"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/dnssd"
+)
+
+// Avahi's protocols, and the interface an address without a zone is
+// announced on.
+const (
+	protoInet    = int32(0)
+	protoInet6   = int32(1)
+	defaultIface = int32(2)
 )
 
 // Avahi is the fake.
@@ -42,17 +53,33 @@ func Start(t *testing.T) *Avahi {
 	return a
 }
 
-// Announce adds a service, reporting it to the browsers of its type.
+// instance is the interface and protocol s is announced on: its
+// address's zone (an interface name) or defaultIface, and its family.
+func instance(s dnssd.Service) (int32, int32, error) {
+	iface := defaultIface
+	if zone := s.Address.Zone(); zone != "" {
+		ifc, err := net.InterfaceByName(zone)
+		if err != nil {
+			return 0, 0, err
+		}
+		if iface, err = intconv.Exact[int32](ifc.Index); err != nil {
+			return 0, 0, err
+		}
+	}
+	if s.Address.Is6() {
+		return iface, protoInet6, nil
+	}
+	return iface, protoInet, nil
+}
+
+// Announce adds a service at one address, reporting it to the browsers
+// of its type; a service announced at several addresses is one per
+// interface and protocol, as Avahi's are.
 func (a *Avahi) Announce(t *testing.T, s dnssd.Service) {
 	t.Helper()
 	a.mu.Lock()
 	a.services = append(a.services, s)
-	var paths []dbus.ObjectPath
-	for p, typ := range a.browsers {
-		if typ == s.Type {
-			paths = append(paths, p)
-		}
-	}
+	paths := a.browsing(s.Type)
 	a.mu.Unlock()
 	for _, p := range paths {
 		if err := a.item(p, "ItemNew", s); err != nil {
@@ -61,18 +88,13 @@ func (a *Avahi) Announce(t *testing.T, s dnssd.Service) {
 	}
 }
 
-// Withdraw removes a service, reporting it gone to the browsers of its
-// type.
+// Withdraw removes a service at the address s names, reporting it
+// gone from there to the browsers of its type.
 func (a *Avahi) Withdraw(t *testing.T, s dnssd.Service) {
 	t.Helper()
 	a.mu.Lock()
-	a.services = slices.DeleteFunc(a.services, func(o dnssd.Service) bool { return o.Key() == s.Key() })
-	var paths []dbus.ObjectPath
-	for p, typ := range a.browsers {
-		if typ == s.Type {
-			paths = append(paths, p)
-		}
-	}
+	a.services = slices.DeleteFunc(a.services, func(o dnssd.Service) bool { return o.Key() == s.Key() && o.Address == s.Address })
+	paths := a.browsing(s.Type)
 	a.mu.Unlock()
 	for _, p := range paths {
 		if err := a.item(p, "ItemRemove", s); err != nil {
@@ -81,8 +103,23 @@ func (a *Avahi) Withdraw(t *testing.T, s dnssd.Service) {
 	}
 }
 
+// browsing are the browsers of typ, the lock held.
+func (a *Avahi) browsing(typ string) []dbus.ObjectPath {
+	var paths []dbus.ObjectPath
+	for p, bt := range a.browsers {
+		if bt == typ {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
 func (a *Avahi) item(path dbus.ObjectPath, member string, s dnssd.Service) error {
-	return a.conn.Emit(path, dnssd.BrowserIface+"."+member, int32(2), int32(0), s.Name, s.Type, s.Domain, uint32(0))
+	iface, proto, err := instance(s)
+	if err != nil {
+		return err
+	}
+	return a.conn.Emit(path, dnssd.BrowserIface+"."+member, iface, proto, s.Name, s.Type, s.Domain, uint32(0))
 }
 
 type server struct{ a *Avahi }
@@ -113,19 +150,25 @@ func (s server) ServiceBrowserNew(_, _ int32, typ, _ string, _ uint32) (dbus.Obj
 	return path, nil
 }
 
-// ResolveService answers an announced service.
-func (s server) ResolveService(iface, proto int32, name, typ, domain string, _ int32, _ uint32) (int32, int32, string, string, string, string, int32, string, uint16, [][]byte, uint32, *dbus.Error) {
+// ResolveService answers the service announced on the interface and
+// protocol asked, its address without the zone as Avahi gives it; an
+// address of another protocol than aproto times out.
+func (s server) ResolveService(iface, proto int32, name, typ, domain string, aproto int32, _ uint32) (int32, int32, string, string, string, string, int32, string, uint16, [][]byte, uint32, *dbus.Error) {
 	s.a.mu.Lock()
 	defer s.a.mu.Unlock()
 	for _, svc := range s.a.services {
-		if svc.Name != name || svc.Type != typ || svc.Domain != domain {
+		at, family, err := instance(svc)
+		if err != nil {
+			return 0, 0, "", "", "", "", 0, "", 0, nil, 0, dbus.MakeFailedError(err)
+		}
+		if svc.Name != name || svc.Type != typ || svc.Domain != domain || at != iface || family != proto || family != aproto {
 			continue
 		}
 		var txt [][]byte
 		for k, v := range svc.TXT {
 			txt = append(txt, []byte(k+"="+v))
 		}
-		return iface, proto, name, typ, domain, svc.Host, 0, svc.Address, svc.Port, txt, 0, nil
+		return iface, proto, name, typ, domain, svc.Host, family, svc.Address.WithZone("").String(), svc.Port, txt, 0, nil
 	}
 	return 0, 0, "", "", "", "", 0, "", 0, nil, 0, dbus.NewError("org.freedesktop.Avahi.TimeoutError", []any{"Timeout reached"})
 }
