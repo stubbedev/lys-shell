@@ -15,18 +15,17 @@ type subscription func() (<-chan struct{}, func())
 
 // countIndicator is a bar button for a list a service follows (screen
 // shares, background apps): shown while the list holds anything, its
-// length beside the icon under label-show.
+// length beside the icon under label-show and in its name.
 type countIndicator struct {
-	ctx       ModuleContext
-	btn       *barButton
-	labelShow bool
-	chrome    moduleChrome
-	count     int
-	stop      context.CancelFunc
+	ctx    ModuleContext
+	btn    *barButton
+	chrome moduleChrome
+	count  int
+	stop   context.CancelFunc
 }
 
-func newCountIndicator(ctx ModuleContext, icon config.IconConfig, labelShow bool, length func() int, subscribe subscription) *countIndicator {
-	m := &countIndicator{ctx: ctx, labelShow: labelShow}
+func newCountIndicator(ctx ModuleContext, icon config.IconConfig, length func() int, subscribe subscription) *countIndicator {
+	m := &countIndicator{ctx: ctx}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, icon), "")
 	m.apply(length())
 	life, stop := context.WithCancel(context.Background())
@@ -41,11 +40,7 @@ func newCountIndicator(ctx ModuleContext, icon config.IconConfig, labelShow bool
 // apply shows count entries, the indicator hidden at none.
 func (m *countIndicator) apply(count int) {
 	m.count = count
-	text := ""
-	if m.labelShow {
-		text = strconv.Itoa(count)
-	}
-	m.btn.SetLabel(text)
+	m.btn.SetLabel(strconv.Itoa(count))
 	m.showChrome()
 }
 

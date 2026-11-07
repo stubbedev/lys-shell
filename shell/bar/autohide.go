@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"fmt"
 	"slices"
 	"time"
 
@@ -262,3 +263,14 @@ func (w *barWindow) applyHidden(hidden bool) {
 
 // peek reveals the bar for d.
 func (w *barWindow) peek(d time.Duration) { w.hide.peek(d) }
+
+// walkKeyboard hands the bar the keyboard (`lys-shell panel focus`),
+// revealed until the walk ends.
+func (w *barWindow) walkKeyboard() error {
+	release := w.hide.hold()
+	if err := w.layer.WalkKeyboard(release); err != nil {
+		release()
+		return fmt.Errorf("walk the bar on %s: %w", w.output.Name, err)
+	}
+	return nil
+}

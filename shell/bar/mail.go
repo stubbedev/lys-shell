@@ -83,10 +83,7 @@ func newMail(ctx ModuleContext) (Module, error) {
 func (m *mailModule) apply(count uint32) {
 	cfg := m.ctx.Config.Mail
 	m.count = count
-	text := ""
-	if cfg.LabelShow {
-		text = mailLabel(cfg.Format, count)
-	}
+	text := mailLabel(cfg.Format, count)
 	m.btn.SetLabel(text)
 	m.showChrome()
 }

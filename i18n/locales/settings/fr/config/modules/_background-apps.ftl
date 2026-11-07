@@ -6,6 +6,9 @@ settings-modules-background-apps-border-color = Couleur de la bordure
     .description = Jeton de couleur de la bordure
 settings-modules-background-apps-icon-show = Afficher l'icône
     .description = Afficher l'icône du module
+
+settings-modules-background-apps-tooltip = Afficher l'infobulle
+    .description = Afficher l'état du module dans une infobulle au survol
 settings-modules-background-apps-icon-color = Couleur de l'icône
     .description = Couleur de premier plan de l'icône
 settings-modules-background-apps-icon-bg-color = Fond de l'icône

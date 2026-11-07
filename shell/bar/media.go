@@ -230,9 +230,6 @@ func (m *mediaModule) refresh() {
 	if ok {
 		label, icon = mediaLabel(cfg.Format, p), mediaIconName(cfg, p, m.env)
 	}
-	if !cfg.LabelShow {
-		label = ""
-	}
 	m.btn.SetLabel(label)
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)

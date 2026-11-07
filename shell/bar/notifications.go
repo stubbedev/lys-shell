@@ -61,16 +61,13 @@ func (m *notificationModule) refresh() {
 	cfg := m.ctx.Config.Notification
 	count := m.src.Count()
 	dnd := m.src.DND()
-	text := ""
-	if cfg.LabelShow {
-		text = notificationLabel(count)
-	}
+	text := notificationLabel(count)
 	m.btn.SetLabel(text)
 	m.btn.applyThresholds(float64(count), cfg.Thresholds)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(notificationIconName(cfg, count, dnd))
 	}
-	m.btn.SetTooltip(focusText(m.src.Focus()))
+	m.btn.SetDescription(focusText(m.src.Focus()))
 }
 
 func (m *notificationModule) Root() widget.Widget { return m.btn }

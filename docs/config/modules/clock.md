@@ -26,6 +26,7 @@ bar:
 | `icon-name` | string | `"ld-calendar-clock-symbolic"` | Symbolic icon name. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
+| `tooltip` | bool | `true` | Show the module's state in a tooltip on hover. |
 | `label-show` | bool | `true` | Display text label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `calendar-weekday-start` | [`WeekStart`](/config/types#week-start) | `"sunday"` | First day of the week in the calendar dropdown. |
@@ -105,6 +106,7 @@ modules:
     border-show: false
     border-color: border-accent
     icon-show: true
+    tooltip: true
     icon-color: auto
     icon-bg-color: accent
     label-show: true

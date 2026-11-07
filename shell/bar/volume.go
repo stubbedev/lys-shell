@@ -95,10 +95,7 @@ func (m *volumeModule) apply(r volumeRead) {
 	}
 	dev := r.dev
 	cfg := m.ctx.Config.Volume
-	label := ""
-	if cfg.LabelShow {
-		label = volumeLabel(cfg.Format, volumePercent(dev))
-	}
+	label := volumeLabel(cfg.Format, volumePercent(dev))
 	m.btn.SetLabel(label)
 	m.btn.applyThresholds(volumePercent(dev), cfg.Thresholds)
 	if setter := m.icon; setter != nil {

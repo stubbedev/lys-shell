@@ -21,6 +21,7 @@ func panelCommand() *cli.Command {
 	monitor := func(verb string) []*cli.Arg {
 		return []*cli.Arg{{ID: "monitor", Help: `Monitor connector name (e.g., "DP-1"). Omit to ` + verb + " all"}}
 	}
+	focusedMonitor := []*cli.Arg{{ID: "monitor", Help: `Monitor connector name (e.g., "DP-1"). Omit for the focused monitor`}}
 	return &cli.Command{
 		Name:  "panel",
 		About: "Panel management commands",
@@ -35,7 +36,8 @@ func panelCommand() *cli.Command {
 			{Name: "show", About: "Show the bar on a monitor", Args: monitor("show"), Run: barVisibility("show bar", "BarShow", "All bars shown", "Bar shown on ")},
 			{Name: "toggle", About: "Toggle bar visibility on a monitor", Args: monitor("toggle"), Run: barVisibility("toggle bar", "BarToggle", "All bars toggled", "Bar toggled on ")},
 			{Name: "reveal", About: "Show an auto-hiding bar on a monitor for a few seconds", Args: monitor("reveal"), Run: barVisibility("reveal bar", "BarReveal", "All bars revealed", "Bar revealed on ")},
-			{Name: "dashboard", About: "Open or close the dashboard dropdown", Args: []*cli.Arg{{ID: "monitor", Help: `Monitor connector name (e.g., "DP-1"). Omit for the focused monitor`}}, Run: panelDashboard},
+			{Name: "dashboard", About: "Open or close the dashboard dropdown", Args: focusedMonitor, Run: panelOnMonitor("toggle dashboard", "DashboardToggle")},
+			{Name: "focus", About: "Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves", Args: focusedMonitor, Run: panelOnMonitor("focus bar", "BarFocus")},
 		},
 	}
 }
@@ -196,15 +198,19 @@ func panelInspect(m *cli.Matches) error {
 	return nil
 }
 
-func panelDashboard(m *cli.Matches) error {
-	conn, err := panelConnect()
-	if err != nil {
-		return err
+// panelOnMonitor calls method with the monitor argument, "" for the
+// focused monitor.
+func panelOnMonitor(op, method string) func(*cli.Matches) error {
+	return func(m *cli.Matches) error {
+		conn, err := panelConnect()
+		if err != nil {
+			return err
+		}
+		p := &daemonProxy{label: "Shell", iface: shellipc.ServiceName, conn: conn, obj: conn.Object(shellipc.ServiceName, shellipc.ServicePath)}
+		defer p.Close()
+		monitor, _ := cli.Value[string](m, "monitor")
+		return p.call(op, method, nil, monitor)
 	}
-	p := &daemonProxy{label: "Shell", iface: shellipc.ServiceName, conn: conn, obj: conn.Object(shellipc.ServiceName, shellipc.ServicePath)}
-	defer p.Close()
-	monitor, _ := cli.Value[string](m, "monitor")
-	return p.call("toggle dashboard", "DashboardToggle", nil, monitor)
 }
 
 // barVisibility is hide.rs / show.rs / toggle.rs.

@@ -25,9 +25,11 @@ type ButtonColors struct {
 // ButtonConfig is one module's bar-button keys plus their schema
 // defaults (resolve_color's fallback under a non-lys-shell provider).
 type ButtonConfig struct {
-	BorderShow     bool
-	IconShow       bool
-	LabelShow      bool
+	BorderShow bool
+	IconShow   bool
+	LabelShow  bool
+	// Tooltip shows the module's state on hover.
+	Tooltip        bool
 	LabelMaxLength int
 	Colors         ButtonColors
 	Defaults       ButtonColors
@@ -73,6 +75,7 @@ func buttonView(cur, def reflect.Value, module string) ButtonConfig {
 		BorderShow:     keyBool(cur, "border-show", false),
 		IconShow:       keyBool(cur, "icon-show", true),
 		LabelShow:      keyBool(cur, "label-show", true),
+		Tooltip:        keyBool(cur, "tooltip", true),
 		LabelMaxLength: keyInt(cur, "label-max-length"),
 		Colors:         buttonColorsOf(cur),
 		Defaults:       buttonColorsOf(def),

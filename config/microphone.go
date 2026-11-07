@@ -14,6 +14,8 @@ type MicrophoneConfig struct {
 	BorderColor ColorValue `cfg:"border-color"`
 	// Display module icon.
 	IconShow bool `cfg:"icon-show"`
+	// Show the module's state in a tooltip on hover.
+	Tooltip bool `cfg:"tooltip"`
 	// Icon foreground color. Auto selects based on variant for contrast.
 	IconColor ColorValue `cfg:"icon-color"`
 	// Icon container background color token.
@@ -65,6 +67,7 @@ func DefaultsMicrophone() MicrophoneConfig {
 		BorderShow:     false,
 		BorderColor:    mustColor("red"),
 		IconShow:       true,
+		Tooltip:        true,
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("red"),
 		LabelShow:      true,

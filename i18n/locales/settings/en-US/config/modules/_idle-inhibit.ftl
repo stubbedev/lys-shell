@@ -23,6 +23,9 @@ settings-modules-idle-inhibit-border-color = Border Color
 settings-modules-idle-inhibit-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-idle-inhibit-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-idle-inhibit-icon-color = Icon Color
     .description = Icon foreground color
 

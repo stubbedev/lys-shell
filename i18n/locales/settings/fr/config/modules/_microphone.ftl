@@ -17,6 +17,9 @@ settings-modules-microphone-border-color = Couleur de la bordure
 settings-modules-microphone-icon-show = Afficher l'icône
     .description = Afficher l'icône du module
 
+settings-modules-microphone-tooltip = Afficher l'infobulle
+    .description = Afficher l'état du module dans une infobulle au survol
+
 settings-modules-microphone-icon-color = Couleur de l'icône
     .description = Couleur de premier plan de l'icône
 

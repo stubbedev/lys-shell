@@ -20,6 +20,9 @@ settings-modules-window-title-border-color = Border Color
 settings-modules-window-title-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-window-title-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-window-title-icon-color = Icon Color
     .description = Icon foreground color
 

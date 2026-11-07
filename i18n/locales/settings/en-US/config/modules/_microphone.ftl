@@ -17,6 +17,9 @@ settings-modules-microphone-border-color = Border Color
 settings-modules-microphone-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-microphone-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-microphone-icon-color = Icon Color
     .description = Icon foreground color
 

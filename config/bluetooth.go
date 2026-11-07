@@ -18,6 +18,8 @@ type BluetoothConfig struct {
 	BorderColor ColorValue `cfg:"border-color"`
 	// Display module icon.
 	IconShow bool `cfg:"icon-show"`
+	// Show the module's state in a tooltip on hover.
+	Tooltip bool `cfg:"tooltip"`
 	// Icon foreground color. Auto selects based on variant for contrast.
 	IconColor ColorValue `cfg:"icon-color"`
 	// Icon container background color token.
@@ -52,6 +54,7 @@ func DefaultsBluetooth() BluetoothConfig {
 		BorderShow:       false,
 		BorderColor:      mustColor("blue"),
 		IconShow:         true,
+		Tooltip:          true,
 		IconColor:        mustColor("auto"),
 		IconBgColor:      mustColor("blue"),
 		LabelShow:        true,

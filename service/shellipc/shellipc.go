@@ -203,6 +203,8 @@ type Hooks struct {
 	DashboardToggle func(monitor string) error
 	// BarReveal shows an auto-hiding bar ("" every bar) for a few seconds.
 	BarReveal func(monitor string)
+	// BarFocus hands a bar ("" the focused output's) the keyboard.
+	BarFocus func(monitor string) error
 }
 
 // daemon is the dev.stubbe.lys.Shell1 object (ShellIpcDaemon).
@@ -235,6 +237,19 @@ func (d *daemon) BarReveal(monitor string) *dbus.Error {
 		return dbusx.Failed("bars not ready (shell UI not initialized)")
 	}
 	d.hooks.BarReveal(monitor)
+	return nil
+}
+
+// BarFocus hands a bar ("" the focused output's) the keyboard: its
+// modules are walked with the arrows, pressed with Enter, and Esc gives
+// the keyboard back.
+func (d *daemon) BarFocus(monitor string) *dbus.Error {
+	if d.hooks.BarFocus == nil {
+		return dbusx.Failed("bars not ready (shell UI not initialized)")
+	}
+	if err := d.hooks.BarFocus(monitor); err != nil {
+		return dbusx.Failed(err.Error())
+	}
 	return nil
 }
 

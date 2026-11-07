@@ -88,9 +88,6 @@ func (s *netstatSampling) sample() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	if !s.cfg.LabelShow {
-		return "", true
-	}
 	return netstatLabel(s.cfg.Format, rate), true
 }
 

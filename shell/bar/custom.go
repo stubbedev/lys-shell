@@ -567,7 +567,7 @@ func (m *customModule) show(v customView) {
 	if m.icon != nil {
 		m.icon.SetThemeName(v.icon)
 	}
-	btn.SetTooltip(v.tooltip)
+	btn.SetDescription(v.tooltip)
 	btn.SetVisible(v.visible)
 	if v.hasColors {
 		btn.SetThresholds(v.colors)

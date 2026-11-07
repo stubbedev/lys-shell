@@ -63,13 +63,13 @@ func TestScreenshotModule(t *testing.T) {
 	if !ok || shownIcon(btn) == nil {
 		t.Fatalf("labelled root %T, want the icon + label bar button", m.Root())
 	}
-	btn.configure(moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
+	btn.configure(moduleTitle("screenshot", cfg), moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
 	if got := btn.Label().Text(); got != "Capture" || btn.Label().MaxWidthChars() != 4 || btn.Label().Ellipsize() != widget.EllipsizeEnd {
 		t.Fatalf("label %q capped at %d, want Capture capped at 4 chars", got, btn.Label().MaxWidthChars())
 	}
 	// No label-max-length: no cap, no ellipsis.
 	cfg.Screenshot.LabelMaxLength = 0
-	btn.configure(moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
+	btn.configure(moduleTitle("screenshot", cfg), moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
 	if btn.Label().MaxWidthChars() != 0 || btn.Label().Ellipsize() != widget.EllipsizeNone {
 		t.Fatalf("uncapped label: %d chars, ellipsize %v", btn.Label().MaxWidthChars(), btn.Label().Ellipsize())
 	}

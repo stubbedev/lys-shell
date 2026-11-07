@@ -785,13 +785,23 @@ func (s *shellStart) mount() {
 	})
 	bars.publishTo(visibility.SetConnectors)
 	s.down.addAsync(func() func() {
-		return serveShellIPC(s.session, application, visibility, func() bool {
-			locker.Lock()
-			return true
-		}, func(monitor string) error {
-			return toggleDashboardOnLoop(application, rt, monitor, focused)
-		}, func(monitor string) {
-			application.Invoke(func() { bars.peek(monitor, peekDuration) })
+		return serveShellIPC(s.session, application, visibility, shellipc.Hooks{
+			Lock: func() bool {
+				locker.Lock()
+				return true
+			},
+			DashboardToggle: func(monitor string) error {
+				return toggleDashboardOnLoop(application, rt, monitor, focused)
+			},
+			BarReveal: func(monitor string) {
+				application.Invoke(func() { bars.peek(monitor, peekDuration) })
+			},
+			BarFocus: func(monitor string) error {
+				preferred, _ := focused()
+				return answerOnLoop(application, fmt.Sprintf("focus the bar on %q", monitor), func() error {
+					return bars.walk(monitor, preferred)
+				})
+			},
 		})
 	})
 	// The launcher surface serves `lys-shell launcher` sessions.

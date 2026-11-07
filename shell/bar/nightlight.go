@@ -432,16 +432,12 @@ func (m *nightlightModule) render() {
 	}
 	setClass(m.chrome, "nightlight-refused", refusal != "")
 	setClass(m.chrome, "nightlight-no-location", noLocation != "")
-	m.btn.SetTooltip(refusal + noLocation)
+	m.btn.SetDescription(refusal + noLocation)
 }
 
 // renderLabel shows the label alone, all a transition step changes.
 func (m *nightlightModule) renderLabel() {
 	cfg := m.ctx.Config.Nightlight
-	if !cfg.LabelShow {
-		m.btn.SetLabel("")
-		return
-	}
 	var live *nightlight.Setting
 	if m.enabled && m.refused == nil {
 		live = &m.live

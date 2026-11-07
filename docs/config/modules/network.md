@@ -32,6 +32,7 @@ bar:
 | `wired-disconnected-icon` | string | `"ld-unplug-symbolic"` | Wired icon when disconnected. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
+| `tooltip` | bool | `true` | Show the module's state in a tooltip on hover. |
 | `label-show` | bool | `true` | Display connection label (SSID for WiFi, "Wired" for ethernet). |
 | `label-max-length` | u32 | `15` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `vpn-connected-icon` | string | `"ld-lock-symbolic"` | Icon when a VPN is connected. |
@@ -93,6 +94,7 @@ modules:
     border-show: false
     border-color: accent
     icon-show: true
+    tooltip: true
     icon-color: auto
     icon-bg-color: accent
     label-show: true

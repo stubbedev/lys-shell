@@ -17,6 +17,9 @@ settings-modules-keyboard-input-border-color = Border Color
 settings-modules-keyboard-input-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-keyboard-input-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-keyboard-input-icon-color = Icon Color
     .description = Icon foreground color
 

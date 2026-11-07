@@ -1,6 +1,8 @@
 package bar
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"slices"
 	"time"
@@ -123,10 +125,10 @@ func (b *surfaceSet[L]) sync(name string, entry *surfaceEntry[L]) {
 }
 
 // serveShellIPC keeps the application id on conn (its quit action ends
-// the loop) and serves dev.stubbe.lys.Shell1 over state, with lock as its
-// Lock hook. The single-instance check claimed the id before RunWith; a
+// the loop) and serves dev.stubbe.lys.Shell1 over state with the shell's
+// hooks. The single-instance check claimed the id before RunWith; a
 // shell without a session bus serves neither.
-func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellipc.State, lock func() bool, dashboardToggle func(monitor string) error, barReveal func(monitor string)) func() {
+func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellipc.State, hooks shellipc.Hooks) func() {
 	if conn == nil {
 		log.Print("shell ipc: no session bus")
 		return func() {}
@@ -141,15 +143,8 @@ func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellip
 	} else {
 		log.Printf("shell ipc: application id: %v", err)
 	}
-	if release, err := shellipc.Serve(conn, state, shellipc.Hooks{
-		Lock: lock,
-		// The VPN callback goes straight to the native sign-in, whose
-		// waiting browser sign-ins are process-wide, as the Rust
-		// daemon's are.
-		VPNSSOCallback:  network.NativeSignIn.DeliverSSOCallback,
-		DashboardToggle: dashboardToggle,
-		BarReveal:       barReveal,
-	}); err == nil {
+	hooks.VPNSSOCallback = network.NativeSignIn.DeliverSSOCallback
+	if release, err := shellipc.Serve(conn, state, hooks); err == nil {
 		releases = append(releases, release)
 	} else {
 		log.Printf("shell ipc: %v", err)
@@ -261,4 +256,60 @@ func (b *surfaceSet[L]) peek(monitor string, d time.Duration) {
 			p.peek(d)
 		}
 	}
+}
+
+// loopAnswerTimeout bounds how long a Shell1 call waits for the loop.
+const loopAnswerTimeout = 2 * time.Second
+
+// answerOnLoop runs fn on the loop and returns its error, failing with
+// what was asked once the loop leaves it unanswered for
+// loopAnswerTimeout.
+func answerOnLoop(application *app.Application, what string, fn func() error) error {
+	done := make(chan error, 1)
+	application.Invoke(func() { done <- fn() })
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(loopAnswerTimeout):
+		return fmt.Errorf("%s: the shell did not answer in %v", what, loopAnswerTimeout)
+	}
+}
+
+// keyboardWalker is a surface `lys-shell panel focus` hands the
+// keyboard.
+type keyboardWalker interface{ walkKeyboard() error }
+
+// walk hands monitor's bar the keyboard; "" picks the bar on preferred,
+// the focused output, or else the first bar.
+func (b *surfaceSet[L]) walk(monitor, preferred string) error {
+	target := monitor
+	if target == "" {
+		target = preferred
+		if e, ok := b.bars[target]; !ok || e.layer == nil {
+			target = b.firstOpen()
+		}
+	}
+	e, ok := b.bars[target]
+	if !ok || e.layer == nil {
+		if monitor == "" {
+			return errors.New("no bar is open")
+		}
+		return fmt.Errorf("no bar is open on %s", monitor)
+	}
+	w, ok := e.layer.(keyboardWalker)
+	if !ok {
+		return fmt.Errorf("the surface on %s takes no keyboard", target)
+	}
+	return w.walkKeyboard()
+}
+
+// firstOpen is the first output in order with an open surface, "" when
+// none has one.
+func (b *surfaceSet[L]) firstOpen() string {
+	for _, name := range b.order {
+		if b.bars[name].layer != nil {
+			return name
+		}
+	}
+	return ""
 }

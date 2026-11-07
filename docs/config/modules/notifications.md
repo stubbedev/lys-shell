@@ -28,6 +28,7 @@ bar:
 | `icon-dnd` | string | `"ld-bell-off-symbolic"` | Icon shown when Do Not Disturb is active. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
+| `tooltip` | bool | `true` | Show the module's state in a tooltip on hover. |
 | `label-show` | bool | `true` | Display notification count label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `blocklist` | array of string | `[]` | Glob patterns for app names whose notifications are blocked entirely. |
@@ -141,6 +142,7 @@ modules:
     border-show: false
     border-color: green
     icon-show: true
+    tooltip: true
     icon-color: auto
     icon-bg-color: green
     label-show: true

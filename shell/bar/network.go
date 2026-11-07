@@ -178,9 +178,6 @@ func (m *networkModule) read(ctx context.Context) (networkRead, error) {
 func (m *networkModule) apply(r networkRead) {
 	cfg := m.ctx.Config.Network
 	icon, label := networkDisplay(cfg, r.snap, r.vpn)
-	if !cfg.LabelShow {
-		label = ""
-	}
 	if icon == m.shownIcon && label == m.shownLabel {
 		return
 	}

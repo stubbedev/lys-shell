@@ -16,10 +16,12 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestMainKeyboardLayoutPicksMainNonVirtual(t *testing.T) {
@@ -342,8 +344,16 @@ func TestKeyboardLayoutHidesWithLabelShowOff(t *testing.T) {
 	fakeSwayInputs(t, `[{"type":"keyboard","xkb_active_layout_name":"German"}]`, events)
 	cfg := config.Defaults()
 	cfg.KeyboardInput.LabelShow = false
-	if got := newTestKeyboardLayout(t, cfg).Text(); got != "" {
+	row := widget.NewBox(widget.Row, 0, 0)
+	if err := appendModule(row, config.BarItem{Module: "keyboard-input"}, newTestContext(t, cfg)); err != nil {
+		t.Fatal(err)
+	}
+	btn := treetest.WithClass(row, "bar-button")[0].(*barButton)
+	if got := btn.Label().Text(); got != "" {
 		t.Errorf("label = %q, want none with label-show off", got)
+	}
+	if got, want := btn.AccessibleName(), i18n.T("bar-module-keyboard-input")+", German"; got != want {
+		t.Errorf("label-show off names the module %q, want %q", got, want)
 	}
 }
 

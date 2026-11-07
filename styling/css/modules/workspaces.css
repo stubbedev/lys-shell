@@ -128,3 +128,7 @@ segments.workspaces button.segment.workspace.indicator-underline.active-other-mo
 .window-preview-thumbnail {
   border-radius: calc(4px * var(--global-scale));
 }
+segments.workspaces button.segment:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: calc(-0.125rem * var(--global-scale));
+}

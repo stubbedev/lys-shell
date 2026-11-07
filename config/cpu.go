@@ -31,6 +31,8 @@ type CpuConfig struct {
 	BorderColor ColorValue `cfg:"border-color"`
 	// Display module icon.
 	IconShow bool `cfg:"icon-show"`
+	// Show the module's state in a tooltip on hover.
+	Tooltip bool `cfg:"tooltip"`
 	// Icon foreground color.
 	IconColor ColorValue `cfg:"icon-color"`
 	// Icon container background color token.
@@ -84,6 +86,7 @@ func DefaultsCpu() CpuConfig {
 		BorderShow:     false,
 		BorderColor:    mustColor("blue"),
 		IconShow:       true,
+		Tooltip:        true,
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("blue"),
 		LabelShow:      true,

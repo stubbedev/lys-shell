@@ -123,7 +123,7 @@ func (m *privacyModule) apply(s privacyState) {
 	m.camera.SetVisible(len(s.cameras) > 0)
 	m.screen.SetVisible(s.shares > 0)
 	label := ""
-	if m.ctx.Config.Privacy.LabelShow && s.apps() > 0 {
+	if s.apps() > 0 {
 		label = strconv.Itoa(s.apps())
 	}
 	m.btn.SetLabel(label)

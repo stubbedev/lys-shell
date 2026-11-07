@@ -90,9 +90,6 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.WorldClock
 	m := &worldClockModule{}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
-	if !cfg.LabelShow {
-		return m, nil
-	}
 	template := newWorldClockTemplate(cfg.Format, time.LoadLocation)
 	spec := samplerSpec[string]{
 		key:   configKey("world-clock", ctx.Config),

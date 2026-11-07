@@ -339,12 +339,9 @@ func newBitwarden(ctx ModuleContext) (Module, error) {
 func (m *bitwardenModule) render() {
 	cfg := m.ctx.Config.Bitwarden
 	st := m.vault.Status()
-	text := ""
-	if cfg.LabelShow {
-		text = bitwardenLabel(cfg.Format, st)
-	}
+	text := bitwardenLabel(cfg.Format, st)
 	m.btn.SetLabel(text)
-	m.btn.SetTooltip(bitwardenTooltip(st.State))
+	m.btn.SetDescription(bitwardenTooltip(st.State))
 	if m.icon == nil {
 		return
 	}

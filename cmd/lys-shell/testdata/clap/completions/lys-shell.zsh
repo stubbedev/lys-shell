@@ -699,6 +699,13 @@ _arguments "${_arguments_options[@]}" : \
 '::monitor -- Monitor connector name (e.g., "DP-1"). Omit for the focused monitor:_default' \
 && ret=0
 ;;
+(focus)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+'::monitor -- Monitor connector name (e.g., "DP-1"). Omit for the focused monitor:_default' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_lys-shell__panel__help_commands" \
@@ -752,6 +759,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (dashboard)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(focus)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -2235,6 +2246,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(focus)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -3276,6 +3291,7 @@ _lys-shell__help__panel_commands() {
 'toggle:Toggle bar visibility on a monitor' \
 'reveal:Show an auto-hiding bar on a monitor for a few seconds' \
 'dashboard:Open or close the dashboard dropdown' \
+'focus:Move the keyboard into the bar\: arrows walk its modules, Enter opens one, Esc leaves' \
     )
     _describe -t commands 'lys-shell help panel commands' commands "$@"
 }
@@ -3283,6 +3299,11 @@ _lys-shell__help__panel_commands() {
 _lys-shell__help__panel__dashboard_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help panel dashboard commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__panel__focus_commands] )) ||
+_lys-shell__help__panel__focus_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help panel focus commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__panel__hide_commands] )) ||
 _lys-shell__help__panel__hide_commands() {
@@ -4124,6 +4145,7 @@ _lys-shell__panel_commands() {
 'toggle:Toggle bar visibility on a monitor' \
 'reveal:Show an auto-hiding bar on a monitor for a few seconds' \
 'dashboard:Open or close the dashboard dropdown' \
+'focus:Move the keyboard into the bar\: arrows walk its modules, Enter opens one, Esc leaves' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'lys-shell panel commands' commands "$@"
@@ -4132,6 +4154,11 @@ _lys-shell__panel_commands() {
 _lys-shell__panel__dashboard_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell panel dashboard commands' commands "$@"
+}
+(( $+functions[_lys-shell__panel__focus_commands] )) ||
+_lys-shell__panel__focus_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell panel focus commands' commands "$@"
 }
 (( $+functions[_lys-shell__panel__help_commands] )) ||
 _lys-shell__panel__help_commands() {
@@ -4147,6 +4174,7 @@ _lys-shell__panel__help_commands() {
 'toggle:Toggle bar visibility on a monitor' \
 'reveal:Show an auto-hiding bar on a monitor for a few seconds' \
 'dashboard:Open or close the dashboard dropdown' \
+'focus:Move the keyboard into the bar\: arrows walk its modules, Enter opens one, Esc leaves' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'lys-shell panel help commands' commands "$@"
@@ -4155,6 +4183,11 @@ _lys-shell__panel__help_commands() {
 _lys-shell__panel__help__dashboard_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell panel help dashboard commands' commands "$@"
+}
+(( $+functions[_lys-shell__panel__help__focus_commands] )) ||
+_lys-shell__panel__help__focus_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell panel help focus commands' commands "$@"
 }
 (( $+functions[_lys-shell__panel__help__help_commands] )) ||
 _lys-shell__panel__help__help_commands() {

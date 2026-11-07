@@ -82,7 +82,7 @@ func newWrappedModule(t *testing.T, binding config.ClickConfig) (*barButton, *re
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	button := newBarButton(ctx, nil, "x")
-	button.configure(batteryButton(cfg), binding, func(action config.ClickAction, _ bool) {
+	button.configure("", batteryButton(cfg), binding, func(action config.ClickAction, _ bool) {
 		rec.actions = append(rec.actions, action)
 	})
 	return button, rec
@@ -185,7 +185,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	icon := widget.NewThemeIcon("x-symbolic", 16)
 	b := newBarButton(ctx, icon, "42%")
-	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	b.configure("", batteryButton(cfg), config.ClickConfig{}, nil)
 	host := widget.NewBox(widget.Row, 0, 0).Append(b, false)
 	widget.SizeWithin(host, widget.Size{W: 400, H: 40})
 	host.Arrange(render.Rect{W: 400, H: 40})
@@ -223,7 +223,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	bc := batteryButton(cfg)
 	bc.LabelShow, bc.IconShow, bc.BorderShow = false, false, true
 	v := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), "x")
-	v.configure(bc, config.ClickConfig{}, nil)
+	v.configure("", bc, config.ClickConfig{}, nil)
 	for _, c := range []string{"block-prefix", "icon-only", "label-only", "icon-end", "border-all"} {
 		if !v.HasClass(c) {
 			t.Errorf("modified button misses %q in %v", c, v.Classes())
@@ -258,7 +258,7 @@ func TestBarButtonShowsOnlyWhatTheConfigShows(t *testing.T) {
 	cfg := config.Defaults()
 	icon := widget.NewThemeIcon("x", 16)
 	b := newBarButton(newTestContext(t, cfg), icon, " ")
-	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	b.configure("", batteryButton(cfg), config.ClickConfig{}, nil)
 	if b.Label().Visible() {
 		t.Error("a blank label shows")
 	}
@@ -271,11 +271,11 @@ func TestBarButtonShowsOnlyWhatTheConfigShows(t *testing.T) {
 	}
 	hidden := batteryButton(cfg)
 	hidden.IconShow, hidden.LabelShow = false, false
-	b.configure(hidden, config.ClickConfig{}, nil)
+	b.configure("", hidden, config.ClickConfig{}, nil)
 	if shownIcon(b) != nil || b.Label().Visible() {
 		t.Errorf("icon-show and label-show off: icon shown %v, label visible %v", shownIcon(b) != nil, b.Label().Visible())
 	}
-	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	b.configure("", batteryButton(cfg), config.ClickConfig{}, nil)
 	if shownIcon(b) != icon || b.Label().Text() != "50%" {
 		t.Error("turning icon-show and label-show back on did not restore the icon and the label")
 	}
@@ -292,12 +292,12 @@ func TestBarButtonLabelMaxLength(t *testing.T) {
 	b := newBarButton(newTestContext(t, cfg), nil, strings.Repeat("w", 40))
 	capped := batteryButton(cfg)
 	capped.LabelMaxLength = 4
-	b.configure(capped, config.ClickConfig{}, nil)
+	b.configure("", capped, config.ClickConfig{}, nil)
 	short := widget.SizeWithin(b.Label(), widget.Size{W: 2000, H: 100}).W
 	if b.Label().MaxWidthChars() != 4 || b.Label().Ellipsize() != widget.EllipsizeEnd {
 		t.Errorf("capped: %d chars, ellipsize %v; want 4, end", b.Label().MaxWidthChars(), b.Label().Ellipsize())
 	}
-	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	b.configure("", batteryButton(cfg), config.ClickConfig{}, nil)
 	whole := widget.SizeWithin(b.Label(), widget.Size{W: 2000, H: 100}).W
 	if b.Label().Ellipsize() != widget.EllipsizeNone || whole <= short {
 		t.Errorf("uncapped: ellipsize %v, %dpx against the capped %dpx", b.Label().Ellipsize(), whole, short)
@@ -307,7 +307,7 @@ func TestBarButtonLabelMaxLength(t *testing.T) {
 func TestBarButtonThresholdsOverrideTheColors(t *testing.T) {
 	cfg := config.Defaults()
 	b := newBarButton(newTestContext(t, cfg), nil, "x")
-	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	b.configure("", batteryButton(cfg), config.ClickConfig{}, nil)
 	before := b.InlineStyle()
 	red := mustToken(config.TokenRed)
 	b.SetThresholds(config.ThresholdColors{LabelColor: &red})
@@ -382,11 +382,11 @@ func TestBarButtonKeepsTheModulesClasses(t *testing.T) {
 	cfg := config.Defaults()
 	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), "x")
 	b.AddClass("media-disc")
-	b.configure(config.ButtonConfig{IconShow: true, LabelShow: false}, config.ClickConfig{}, nil)
+	b.configure("", config.ButtonConfig{IconShow: true, LabelShow: false}, config.ClickConfig{}, nil)
 	if !b.HasClass("media-disc") || !b.HasClass("bar-button") || !b.HasClass("icon-only") {
 		t.Fatalf("after configure: %v", b.Classes())
 	}
-	b.configure(config.ButtonConfig{IconShow: true, LabelShow: true}, config.ClickConfig{}, nil)
+	b.configure("", config.ButtonConfig{IconShow: true, LabelShow: true}, config.ClickConfig{}, nil)
 	if b.HasClass("icon-only") {
 		t.Error("a stale derived class survived the refresh")
 	}
@@ -451,7 +451,7 @@ func TestBarButtonHoldsOpenWhileItsDropdownIs(t *testing.T) {
 func TestADigitChangeDamagesTheLabelAlone(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	button := newBarButton(ctx, nil, "99%")
-	button.configure(config.ButtonConfig{IconShow: true, LabelShow: true}, config.ClickConfig{}, nil)
+	button.configure("", config.ButtonConfig{IconShow: true, LabelShow: true}, config.ClickConfig{}, nil)
 	beside := widget.NewLabel(ctx.Font, 14, "beside", 0)
 	root := widget.NewBox(widget.Row, 4, 0)
 	ctx.Theme.Attach(root)

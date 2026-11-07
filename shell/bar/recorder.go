@@ -78,10 +78,7 @@ func newRecorder(ctx ModuleContext) (Module, error) {
 func (m *recorderModule) refresh() {
 	cfg := m.ctx.Config.Recorder
 	snap := m.src.Snapshot()
-	text := ""
-	if cfg.LabelShow {
-		text = recorderLabel(cfg.Format, snap)
-	}
+	text := recorderLabel(cfg.Format, snap)
 	m.btn.SetLabel(text)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(recorderIconName(cfg, snap))
@@ -94,7 +91,7 @@ func (m *recorderModule) refresh() {
 	// next start: recorder-failed tints the icon, the tooltip says why.
 	failed := recorderFailure(snap)
 	setClass(m.chrome, "recorder-failed", failed != "")
-	m.btn.SetTooltip(failed)
+	m.btn.SetDescription(failed)
 }
 
 // recorderFailure is the error the idle module shows, "" for none.

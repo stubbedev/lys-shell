@@ -216,9 +216,7 @@ func (m *weatherModule) render() {
 		m.setIcon(cfg.IconName)
 		return
 	}
-	if cfg.LabelShow {
-		m.btn.SetLabel(weatherFormatLabel(cfg.Format, w, cfg.Units == config.TemperatureUnitImperial))
-	}
+	m.btn.SetLabel(weatherFormatLabel(cfg.Format, w, cfg.Units == config.TemperatureUnitImperial))
 	m.setIcon(weatherConditionIcon(w.Current.Condition, w.Current.IsDay))
 }
 

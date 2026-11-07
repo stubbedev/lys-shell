@@ -408,6 +408,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand toggle 'Toggle bar visibility on a monitor'
             cand reveal 'Show an auto-hiding bar on a monitor for a few seconds'
             cand dashboard 'Open or close the dashboard dropdown'
+            cand focus 'Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;panel;start'= {
@@ -454,6 +455,10 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'lys-shell;panel;focus'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'lys-shell;panel;help'= {
             cand start 'Start the panel daemon'
             cand stop 'Stop the panel daemon'
@@ -466,6 +471,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand toggle 'Toggle bar visibility on a monitor'
             cand reveal 'Show an auto-hiding bar on a monitor for a few seconds'
             cand dashboard 'Open or close the dashboard dropdown'
+            cand focus 'Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;panel;help;start'= {
@@ -489,6 +495,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;panel;help;reveal'= {
         }
         &'lys-shell;panel;help;dashboard'= {
+        }
+        &'lys-shell;panel;help;focus'= {
         }
         &'lys-shell;panel;help;help'= {
         }
@@ -1291,6 +1299,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand toggle 'Toggle bar visibility on a monitor'
             cand reveal 'Show an auto-hiding bar on a monitor for a few seconds'
             cand dashboard 'Open or close the dashboard dropdown'
+            cand focus 'Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves'
         }
         &'lys-shell;help;panel;start'= {
         }
@@ -1313,6 +1322,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;panel;reveal'= {
         }
         &'lys-shell;help;panel;dashboard'= {
+        }
+        &'lys-shell;help;panel;focus'= {
         }
         &'lys-shell;help;power'= {
             cand status 'Show current power profile'

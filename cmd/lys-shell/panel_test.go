@@ -197,3 +197,36 @@ func TestShellRefusesASecondInstance(t *testing.T) {
 		t.Error("start error swallowed")
 	}
 }
+
+func TestPanelFocusHandsABarTheKeyboard(t *testing.T) {
+	dbustest.Session(t)
+	state := shellipc.NewState(nil)
+	var mu sync.Mutex
+	var focused []string
+	release, err := shellipc.Serve(dbustest.SessionConn(t), state, shellipc.Hooks{BarFocus: func(monitor string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		focused = append(focused, monitor)
+		if monitor == "HDMI-9" {
+			return errors.New("no bar is open on HDMI-9")
+		}
+		return nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	for _, args := range [][]string{{"panel", "focus"}, {"panel", "focus", "DP-2"}} {
+		if stdout, stderr, code := runCaptured(t, false, args...); code != 0 || stdout != "" {
+			t.Errorf("%v: %d %q %q", args, code, stdout, stderr)
+		}
+	}
+	if _, stderr, code := runCaptured(t, false, "panel", "focus", "HDMI-9"); code != 1 || !strings.Contains(stderr, "no bar is open on HDMI-9") {
+		t.Errorf("a monitor without a bar: %d %q", code, stderr)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []string{"", "DP-2", "HDMI-9"}; !slices.Equal(focused, want) {
+		t.Errorf("focused %q, want %q", focused, want)
+	}
+}

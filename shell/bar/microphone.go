@@ -65,10 +65,7 @@ func (m *microphoneModule) apply(r microphoneRead) {
 	}
 	dev := r.dev
 	cfg := m.ctx.Config.Microphone
-	label := ""
-	if cfg.LabelShow {
-		label = microphoneLabel(volumePercent(dev.Device))
-	}
+	label := microphoneLabel(volumePercent(dev.Device))
 	// The thresholds read the unrounded average, as the Rust watcher
 	// does (the volume module rounds first).
 	m.btn.applyThresholds(dev.Volume.AveragePercentage(), cfg.Thresholds)

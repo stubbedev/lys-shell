@@ -506,6 +506,9 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if f, ok := content.(dropdownFocuser); ok {
 		cfg.Focus = f.dropdownFocus()
 	}
+	if cfg.Focus == nil && widget.FocusVisible(anchor) {
+		cfg.Focus = widget.FirstFocusable(content)
+	}
 	var rev *widget.Revealer
 	cfg.Content, rev = dropdownTree(content, r.cfg)
 	cfg.Exit = dropdownExit(rev, r.cfg.Animations)

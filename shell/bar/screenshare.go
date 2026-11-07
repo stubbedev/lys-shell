@@ -33,7 +33,7 @@ func newScreenShare(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("screen-share: the portal's shares are not followed without a session bus")
 	}
 	cfg := ctx.Config.ScreenShare
-	return newCountIndicator(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor), cfg.LabelShow, func() int { return len(src.List()) }, src.Subscribe), nil
+	return newCountIndicator(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor), func() int { return len(src.List()) }, src.Subscribe), nil
 }
 
 // screenShareView is the screen share dropdown: a row per share, its app

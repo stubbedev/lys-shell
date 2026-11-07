@@ -20,6 +20,9 @@ settings-modules-ram-border-color = Border Color
 settings-modules-ram-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-ram-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-ram-icon-color = Icon Color
     .description = Icon foreground color
 

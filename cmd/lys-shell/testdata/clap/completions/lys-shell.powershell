@@ -498,6 +498,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
             [CompletionResult]::new('reveal', 'reveal', [CompletionResultType]::ParameterValue, 'Show an auto-hiding bar on a monitor for a few seconds')
             [CompletionResult]::new('dashboard', 'dashboard', [CompletionResultType]::ParameterValue, 'Open or close the dashboard dropdown')
+            [CompletionResult]::new('focus', 'focus', [CompletionResultType]::ParameterValue, 'Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -556,6 +557,11 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'lys-shell;panel;focus' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'lys-shell;panel;help' {
             [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
             [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
@@ -568,6 +574,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
             [CompletionResult]::new('reveal', 'reveal', [CompletionResultType]::ParameterValue, 'Show an auto-hiding bar on a monitor for a few seconds')
             [CompletionResult]::new('dashboard', 'dashboard', [CompletionResultType]::ParameterValue, 'Open or close the dashboard dropdown')
+            [CompletionResult]::new('focus', 'focus', [CompletionResultType]::ParameterValue, 'Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -602,6 +609,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;panel;help;dashboard' {
+            break
+        }
+        'lys-shell;panel;help;focus' {
             break
         }
         'lys-shell;panel;help;help' {
@@ -1612,6 +1622,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
             [CompletionResult]::new('reveal', 'reveal', [CompletionResultType]::ParameterValue, 'Show an auto-hiding bar on a monitor for a few seconds')
             [CompletionResult]::new('dashboard', 'dashboard', [CompletionResultType]::ParameterValue, 'Open or close the dashboard dropdown')
+            [CompletionResult]::new('focus', 'focus', [CompletionResultType]::ParameterValue, 'Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves')
             break
         }
         'lys-shell;help;panel;start' {
@@ -1645,6 +1656,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;panel;dashboard' {
+            break
+        }
+        'lys-shell;help;panel;focus' {
             break
         }
         'lys-shell;help;power' {

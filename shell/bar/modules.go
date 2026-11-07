@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/calendar"
@@ -418,6 +419,9 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		if n, ok := root.(interface{ AddClass(...string) }); ok {
 			n.AddClass("module", item.Class)
 		}
+		if n, ok := root.(interface{ SetAccessibleName(string) }); ok {
+			n.SetAccessibleName(moduleTitle(string(item.Module), ctx.Config))
+		}
 		row.Append(root, false)
 		return nil
 	}
@@ -452,7 +456,7 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	follower, _ := module.(interface {
 		followAction(action config.ClickAction, scroll bool)
 	})
-	btn.configure(moduleButton(string(item.Module), ctx.Config), moduleBinding(string(item.Module), ctx.Config), func(action config.ClickAction, scroll bool) {
+	btn.configure(moduleTitle(string(item.Module), ctx.Config), moduleButton(string(item.Module), ctx.Config), moduleBinding(string(item.Module), ctx.Config), func(action config.ClickAction, scroll bool) {
 		switch {
 		case action.Kind == config.ClickDropdown && ctx.Dropdowns != nil:
 			// Dropdown bindings anchor to this module's own button; the
@@ -499,7 +503,18 @@ func moduleButton(name string, cfg *config.Config) config.ButtonConfig {
 			return def.Button()
 		}
 	}
-	return config.ButtonConfig{IconShow: true, LabelShow: true}
+	return config.ButtonConfig{IconShow: true, LabelShow: true, Tooltip: true}
+}
+
+// moduleTitle is the name a module's button gives assistive technology
+// and its tooltip: bar-module-<name> translated, a custom module's id.
+func moduleTitle(name string, cfg *config.Config) string {
+	if cfg != nil {
+		if def, ok := customDefinition(name, cfg); ok {
+			return def.Id
+		}
+	}
+	return i18n.T("bar-module-" + name)
 }
 
 // moduleBinding is the module's click and scroll bindings.

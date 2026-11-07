@@ -262,10 +262,7 @@ func (m *windowTitleModule) apply(w focusedWindow) {
 // render is update_display: the label and the resolved icon.
 func (m *windowTitleModule) render() {
 	cfg := m.ctx.Config.WindowTitle
-	text := ""
-	if cfg.LabelShow {
-		text = windowTitleLabel(cfg.Format, m.window.title, m.window.appID)
-	}
+	text := windowTitleLabel(cfg.Format, m.window.title, m.window.appID)
 	m.btn.SetLabel(text)
 	if m.icon != nil {
 		m.icon.SetThemeName(windowTitleIcon(cfg, m.window.title, m.window.appID))

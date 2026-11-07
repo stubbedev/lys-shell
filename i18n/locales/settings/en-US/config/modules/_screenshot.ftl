@@ -26,6 +26,9 @@ settings-modules-screenshot-border-color = Border Color
 settings-modules-screenshot-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-screenshot-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-screenshot-icon-color = Icon Color
     .description = Icon foreground color
 

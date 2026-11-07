@@ -21,6 +21,11 @@ lys-shell panel reveal DP-1     # an auto-hiding bar shows for a few seconds
 # Open or close the dashboard, on the focused monitor or the one named
 lys-shell panel dashboard
 lys-shell panel dashboard DP-1
+
+# Move the keyboard into the bar: the arrows walk its modules, Enter or
+# Space opens one (its dropdown takes the keys), Esc leaves
+lys-shell panel focus
+lys-shell panel focus DP-1
 ```
 
 Read and edit config values from the command line:

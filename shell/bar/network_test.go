@@ -168,11 +168,15 @@ func TestNetworkModuleLabel(t *testing.T) {
 	}
 	cfg.Network.LabelShow = false
 	hidden := newTestNetworkModule(t, cfg, network.Snapshot{Primary: network.ConnectionWifi, WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "x"})
+	hidden.btn.configure(moduleTitle("network", cfg), moduleButton("network", cfg), config.ClickConfig{}, nil)
 	if err := readAndApply(hidden.read, hidden.apply); err != nil {
 		t.Fatal(err)
 	}
 	if got := hidden.btn.Label().Text(); got != "" {
 		t.Errorf("label-show off: %q", got)
+	}
+	if got, want := hidden.btn.AccessibleName(), i18n.T("bar-module-network")+", x"; got != want {
+		t.Errorf("label-show off names the module %q, want %q", got, want)
 	}
 }
 

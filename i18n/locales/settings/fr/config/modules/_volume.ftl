@@ -17,6 +17,9 @@ settings-modules-volume-border-color = Couleur de la bordure
 settings-modules-volume-icon-show = Afficher l'icône
     .description = Afficher l'icône du module
 
+settings-modules-volume-tooltip = Afficher l'infobulle
+    .description = Afficher l'état du module dans une infobulle au survol
+
 settings-modules-volume-icon-color = Couleur de l'icône
     .description = Couleur de premier plan de l'icône
 

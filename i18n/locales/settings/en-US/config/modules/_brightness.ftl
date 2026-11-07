@@ -14,6 +14,9 @@ settings-modules-brightness-border-color = Border Color
 settings-modules-brightness-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-brightness-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-brightness-icon-color = Icon Color
     .description = Icon foreground color
 

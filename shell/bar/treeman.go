@@ -91,9 +91,6 @@ func (m *treemanModule) refresh() {
 	cfg := m.ctx.Config.Treeman
 	v := treemanDisplay(cfg, m.src.Status())
 	text := v.label
-	if !cfg.LabelShow {
-		text = ""
-	}
 	m.btn.SetLabel(text)
 	if m.icon != nil {
 		m.icon.SetThemeName(v.icon)

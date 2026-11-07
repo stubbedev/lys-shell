@@ -1,0 +1,9 @@
+Move the keyboard into the bar: arrows walk its modules, Enter opens one, Esc leaves
+
+Usage: lys-shell panel focus [MONITOR]
+
+Arguments:
+  [MONITOR]  Monitor connector name (e.g., "DP-1"). Omit for the focused monitor
+
+Options:
+  -h, --help  Print help

@@ -73,10 +73,7 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 func (m *bluetoothModule) refresh() {
 	snap := m.source.State().Snapshot()
 	cfg := m.ctx.Config.Bluetooth
-	label := ""
-	if cfg.LabelShow {
-		label = bluetoothLabel(snap)
-	}
+	label := bluetoothLabel(snap)
 	m.btn.SetLabel(label)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(bluetoothIconName(cfg, snap))

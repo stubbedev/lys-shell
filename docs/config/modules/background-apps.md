@@ -29,6 +29,7 @@ bar:
 | `icon` | string | `"ld-layers-symbolic"` | Bar button icon. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
+| `tooltip` | bool | `true` | Show the module's state in a tooltip on hover. |
 | `label-show` | bool | `true` | Display the number of background apps beside the icon. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 
@@ -61,6 +62,7 @@ modules:
     border-show: false
     border-color: blue
     icon-show: true
+    tooltip: true
     icon-color: auto
     icon-bg-color: blue
     label-show: true

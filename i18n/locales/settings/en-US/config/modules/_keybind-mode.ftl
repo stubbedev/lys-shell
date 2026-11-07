@@ -20,6 +20,9 @@ settings-modules-keybind-mode-border-color = Border Color
 settings-modules-keybind-mode-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-keybind-mode-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-keybind-mode-icon-color = Icon Color
     .description = Icon foreground color
 

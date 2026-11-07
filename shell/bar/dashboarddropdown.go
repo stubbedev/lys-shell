@@ -933,14 +933,9 @@ func toggleDashboardOnLoop(application *app.Application, rt *barRuntime, monitor
 	if monitor == "" {
 		preferred, _ = focused()
 	}
-	done := make(chan error, 1)
-	application.Invoke(func() { done <- rt.ctx.Dropdowns.toggleDashboard(monitor, preferred) })
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(dashboardReadTimeout):
-		return fmt.Errorf("toggle the dashboard on %q: the shell did not answer in %v", monitor, dashboardReadTimeout)
-	}
+	return answerOnLoop(application, fmt.Sprintf("toggle the dashboard on %q", monitor), func() error {
+		return rt.ctx.Dropdowns.toggleDashboard(monitor, preferred)
+	})
 }
 
 var dashboardRootMount = []string{"/"}

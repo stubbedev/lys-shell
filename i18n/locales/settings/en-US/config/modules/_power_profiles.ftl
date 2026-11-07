@@ -32,6 +32,9 @@ settings-modules-power-profiles-border-color = Border Color
 settings-modules-power-profiles-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-power-profiles-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-power-profiles-icon-color = Icon Color
     .description = Icon foreground color (overridden per active profile)
 

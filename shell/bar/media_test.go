@@ -189,7 +189,7 @@ func TestMediaModuleRenders(t *testing.T) {
 		t.Errorf("label = %q, want the whole default format", got)
 	}
 	root := m.btn
-	root.configure(moduleButton("media", cfg), config.ClickConfig{}, nil)
+	root.configure(moduleTitle("media", cfg), moduleButton("media", cfg), config.ClickConfig{}, nil)
 	if root.Label().MaxWidthChars() != int(cfg.Media.LabelMaxLength) || root.Label().Ellipsize() != widget.EllipsizeEnd {
 		t.Errorf("label cap = %d chars, ellipsize %v; want %d, end", root.Label().MaxWidthChars(), root.Label().Ellipsize(), cfg.Media.LabelMaxLength)
 	}

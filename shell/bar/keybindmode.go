@@ -116,10 +116,7 @@ func submapSource(ctx ModuleContext) (<-chan string, func(), error) {
 // the module root's visibility.
 func (m *keybindModeModule) render() {
 	cfg := m.ctx.Config.KeybindMode
-	text := ""
-	if cfg.LabelShow {
-		text = keybindModeLabel(cfg.Format, m.submap)
-	}
+	text := keybindModeLabel(cfg.Format, m.submap)
 	m.btn.SetLabel(text)
 	if m.chrome != nil {
 		m.chrome.SetVisible(keybindModeVisible(m.submap, cfg.AutoHide))

@@ -6,6 +6,9 @@ settings-modules-brightness-border-color = Couleur de la bordure
     .description = Jeton de couleur de la bordure
 settings-modules-brightness-icon-show = Afficher l'icône
     .description = Afficher l'icône du module
+
+settings-modules-brightness-tooltip = Afficher l'infobulle
+    .description = Afficher l'état du module dans une infobulle au survol
 settings-modules-brightness-icon-color = Couleur de l'icône
     .description = Couleur de premier plan de l'icône
 settings-modules-brightness-icon-bg-color = Arrière-plan de l'icône

@@ -48,6 +48,9 @@ settings-modules-network-border-color = Border Color
 settings-modules-network-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-network-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-network-icon-color = Icon Color
     .description = Icon foreground color
 

@@ -20,6 +20,9 @@ settings-modules-window-title-border-color = Couleur de la bordure
 settings-modules-window-title-icon-show = Afficher l'icône
     .description = Afficher l'icône du module
 
+settings-modules-window-title-tooltip = Afficher l'infobulle
+    .description = Afficher l'état du module dans une infobulle au survol
+
 settings-modules-window-title-icon-color = Couleur de l'icône
     .description = Couleur de premier plan de l'icône
 

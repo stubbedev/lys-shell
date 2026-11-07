@@ -35,6 +35,10 @@ type barButton struct {
 	// still while a dropdown is open.
 	text   string
 	frozen bool
+	// title is the module's translated name; detail is the state the
+	// module describes itself with, the label text while it sets none.
+	// Both make the accessible name and the tooltip.
+	title, detail string
 
 	cfg        *config.Config
 	button     config.ButtonConfig
@@ -74,7 +78,7 @@ func newBarButtonOf(ctx ModuleContext, lead widget.Widget) *barButton {
 	b := &barButton{cfg: ctx.Config, BarButton: widget.NewBarButton(ctx.Font, lead, "")}
 	b.Label().AddClass("bar-button-label")
 	if ctx.Config != nil {
-		b.button = config.ButtonConfig{IconShow: true, LabelShow: true, AutoIconColor: config.TokenFgDefault}
+		b.button = config.ButtonConfig{IconShow: true, LabelShow: true, Tooltip: true, AutoIconColor: config.TokenFgDefault}
 		if ctx.Config.Bar.ButtonIconPosition == config.IconEnd {
 			b.SetIconPosition(widget.IconEnd)
 		}
@@ -89,6 +93,44 @@ func newBarButtonOf(ctx ModuleContext, lead widget.Widget) *barButton {
 func (b *barButton) SetLabel(text string) {
 	b.text = text
 	b.showLabel()
+	b.describe()
+}
+
+// SetDescription is the module's state in words for the accessible
+// name and the tooltip, after its title: what the label alone does not
+// say (charging, muted, the network's name). Empty describes the module
+// by its label text.
+func (b *barButton) SetDescription(detail string) {
+	b.detail = detail
+	b.describe()
+}
+
+// describe names the button for assistive technology and, unless the
+// module's tooltip key is off, as its tooltip: the title, then the
+// state. Equal text marks nothing.
+func (b *barButton) describe() {
+	name := moduleDescription(b.title, b.detail, b.text)
+	b.SetAccessibleName(name)
+	if !b.button.Tooltip {
+		name = ""
+	}
+	b.SetTooltip(name)
+}
+
+// moduleDescription is title, then detail or else the label text, comma
+// separated, each left out when blank.
+func moduleDescription(title, detail, label string) string {
+	state := strings.TrimSpace(detail)
+	if state == "" {
+		state = strings.TrimSpace(label)
+	}
+	switch {
+	case state == "":
+		return title
+	case title == "":
+		return state
+	}
+	return title + ", " + state
 }
 
 // showLabel puts the module's text on the button unless the label is
@@ -153,10 +195,11 @@ func (b *barButton) holdOpen(freezeLabel bool) func() {
 	}
 }
 
-// configure applies a module's button config and bindings; appendModule
-// calls it once it knows which module the button belongs to.
-func (b *barButton) configure(button config.ButtonConfig, binding config.ClickConfig, onRun func(action config.ClickAction, scroll bool)) {
-	b.button, b.binding, b.onRun = button, binding, onRun
+// configure applies a module's title, button config and bindings;
+// appendModule calls it once it knows which module the button belongs
+// to.
+func (b *barButton) configure(title string, button config.ButtonConfig, binding config.ClickConfig, onRun func(action config.ClickAction, scroll bool)) {
+	b.title, b.button, b.binding, b.onRun = title, button, binding, onRun
 	// label-max-length is BarButtonBehavior's label_max_chars: the
 	// label's width caps at that many characters and ellipsizes there.
 	b.Label().SetMaxWidthChars(button.LabelMaxLength)
@@ -166,6 +209,7 @@ func (b *barButton) configure(button config.ButtonConfig, binding config.ClickCo
 		b.Label().SetEllipsize(widget.EllipsizeNone)
 	}
 	b.refresh()
+	b.describe()
 }
 
 // SetThresholds applies threshold color overrides over the config
@@ -256,6 +300,22 @@ func (b *barButton) SetPressed(on bool) {
 	was := b.Pressed
 	b.BarButton.SetPressed(on)
 	if on && !was {
+		b.run(b.binding.LeftClick, false)
+	}
+}
+
+// KeyAction runs the primary binding on Enter, as a press does: the bar
+// walked by keyboard opens a module's dropdown from its focused button.
+func (b *barButton) KeyAction(a widget.KeyAction, _ widget.Mods) {
+	if a == widget.KeyEnter {
+		b.run(b.binding.LeftClick, false)
+	}
+}
+
+// InsertRune runs the primary binding on Space, the other half of the
+// activation pair.
+func (b *barButton) InsertRune(r rune) {
+	if r == ' ' {
 		b.run(b.binding.LeftClick, false)
 	}
 }

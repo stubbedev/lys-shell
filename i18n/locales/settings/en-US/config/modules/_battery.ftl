@@ -20,6 +20,9 @@ settings-modules-battery-border-color = Border Color
 settings-modules-battery-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-battery-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-battery-icon-color = Icon Color
     .description = Icon foreground color
 

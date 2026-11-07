@@ -35,6 +35,9 @@ settings-modules-weather-border-color = Border Color
 settings-modules-weather-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-weather-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-weather-icon-color = Icon Color
     .description = Icon foreground color
 

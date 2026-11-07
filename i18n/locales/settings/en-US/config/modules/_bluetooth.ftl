@@ -23,6 +23,9 @@ settings-modules-bluetooth-border-color = Border Color
 settings-modules-bluetooth-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-bluetooth-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-bluetooth-icon-color = Icon Color
     .description = Icon foreground color
 

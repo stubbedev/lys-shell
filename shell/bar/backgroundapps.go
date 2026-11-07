@@ -55,7 +55,7 @@ func newBackgroundApps(ctx ModuleContext) (Module, error) {
 		return nil, errBackgroundAppsNoService
 	}
 	cfg := ctx.Config.BackgroundApps
-	return newCountIndicator(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor), cfg.LabelShow, func() int { return len(src.List()) }, src.Subscribe), nil
+	return newCountIndicator(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor), func() int { return len(src.List()) }, src.Subscribe), nil
 }
 
 // backgroundAppsView is the background apps dropdown: a row per app,

@@ -32,6 +32,7 @@ bar:
 | `spinning-disc-icon` | string | `"ld-disc-3-symbolic"` | Icon shown for spinning-disc mode. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
+| `tooltip` | bool | `true` | Show the module's state in a tooltip on hover. |
 | `label-show` | bool | `true` | Display text label. |
 | `label-max-length` | u32 | `35` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 
@@ -136,6 +137,7 @@ modules:
     border-show: false
     border-color: blue
     icon-show: true
+    tooltip: true
     icon-color: auto
     icon-bg-color: blue
     label-show: true

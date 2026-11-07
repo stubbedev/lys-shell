@@ -24,6 +24,8 @@ type RamConfig struct {
 	BorderColor ColorValue `cfg:"border-color"`
 	// Display module icon.
 	IconShow bool `cfg:"icon-show"`
+	// Show the module's state in a tooltip on hover.
+	Tooltip bool `cfg:"tooltip"`
 	// Icon foreground color.
 	IconColor ColorValue `cfg:"icon-color"`
 	// Icon container background color token.
@@ -76,6 +78,7 @@ func DefaultsRam() RamConfig {
 		BorderShow:     false,
 		BorderColor:    mustColor("green"),
 		IconShow:       true,
+		Tooltip:        true,
 		IconColor:      mustColor("auto"),
 		IconBgColor:    mustColor("green"),
 		LabelShow:      true,

@@ -50,7 +50,7 @@ func (m *powerProfilesModule) apply(snap powerprofiles.Snapshot) {
 	cfg := m.ctx.Config.PowerProfiles
 	m.snap = snap
 	text := ""
-	if cfg.LabelShow && snap.Available {
+	if snap.Available {
 		text = powerProfilesLabel(cfg.Format, snap.Active)
 	}
 	m.btn.SetLabel(text)

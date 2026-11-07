@@ -14,6 +14,9 @@ settings-modules-background-apps-border-color = Border Color
 settings-modules-background-apps-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-background-apps-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-background-apps-icon-color = Icon Color
     .description = Icon foreground color
 

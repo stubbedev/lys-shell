@@ -6,6 +6,9 @@ settings-modules-screen-share-border-color = Couleur de la bordure
     .description = Jeton de couleur de la bordure
 settings-modules-screen-share-icon-show = Afficher l'icône
     .description = Afficher l'icône du module
+
+settings-modules-screen-share-tooltip = Afficher l'infobulle
+    .description = Afficher l'état du module dans une infobulle au survol
 settings-modules-screen-share-icon-color = Couleur de l'icône
     .description = Couleur de premier plan de l'icône
 settings-modules-screen-share-icon-bg-color = Fond de l'icône

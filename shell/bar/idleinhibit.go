@@ -77,12 +77,9 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 func (m *idleInhibitModule) render() {
 	cfg := m.ctx.Config.IdleInhibit
 	snap := m.state.Status()
-	text := ""
-	if cfg.LabelShow {
-		text = idleInhibitLabel(cfg.Format, snap.Active, snap.Duration, snap.RemainingS)
-	}
+	text := idleInhibitLabel(cfg.Format, snap.Active, snap.Duration, snap.RemainingS)
 	m.btn.SetLabel(text)
-	m.btn.SetTooltip(idleTooltip(m.ctx.Idle, m.state))
+	m.btn.SetDescription(idleTooltip(m.ctx.Idle, m.state))
 	if setter := m.icon; setter != nil {
 		icon := cfg.Icons()[config.IdleInhibitInactive]
 		if snap.Active {

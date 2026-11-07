@@ -257,10 +257,7 @@ func readLayout(source layoutSource) (string, error) {
 // show renders layout into the label.
 func (m *keyboardLayout) show(layout string) {
 	cfg := m.ctx.Config.KeyboardInput
-	label := ""
-	if cfg.LabelShow {
-		label = keyboardLayoutLabel(layout, cfg.Format, cfg.LayoutAliasMap)
-	}
+	label := keyboardLayoutLabel(layout, cfg.Format, cfg.LayoutAliasMap)
 	m.btn.SetLabel(label)
 }
 

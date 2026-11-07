@@ -17,6 +17,9 @@ settings-modules-volume-border-color = Border Color
 settings-modules-volume-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-volume-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-volume-icon-color = Icon Color
     .description = Icon foreground color
 

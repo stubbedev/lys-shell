@@ -38,6 +38,9 @@ settings-modules-nightlight-border-color = Border Color
 settings-modules-nightlight-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-nightlight-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-nightlight-icon-color = Icon Color
     .description = Icon foreground color
 

@@ -23,6 +23,9 @@ settings-modules-storage-border-color = Border Color
 settings-modules-storage-icon-show = Show Icon
     .description = Display module icon
 
+settings-modules-storage-tooltip = Show Tooltip
+    .description = Show the module's state in a tooltip on hover
+
 settings-modules-storage-icon-color = Icon Color
     .description = Icon foreground color
 
