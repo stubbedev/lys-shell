@@ -91,7 +91,7 @@ func newWindowPreview(ctx ModuleContext, hold func() func()) *windowPreview {
 		p.open = func(host app.Host, anchor widget.Boundser, content widget.Widget, closed func()) (func(), error) {
 			pop, err := ctx.App.OpenPopover(host, app.PopoverConfig{
 				Anchor: anchor, Content: content, Gap: widget.PopoverGap,
-				Dismissal: app.PopoverClickAway, OnClosed: closed,
+				Dismissal: app.PopoverPassive, OnClosed: closed,
 			})
 			if err != nil {
 				return nil, err
