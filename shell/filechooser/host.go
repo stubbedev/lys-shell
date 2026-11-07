@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
@@ -95,6 +96,10 @@ type Deps struct {
 	// is called; nil watches nothing.
 	Places, Locations func() []Place
 	WatchLocations    func(changed func()) (stop func())
+	// Drives is the UDisks2 client the Locations list the volumes of,
+	// mounted or not, through; nil, or a nil client while the system
+	// bus is not up, lists the mounts alone.
+	Drives func() *udisks.Client
 	// ViewFile persists the sort and layout; "" keeps them in memory.
 	ViewFile string
 	// RecentFile is the recently-used list the Recent place lists
@@ -340,12 +345,7 @@ func (c *Chooser) begin(r request) {
 	c.s.refresh()
 	c.relist()
 	c.show()
-	if c.d.WatchLocations != nil {
-		c.stopMounts = c.d.WatchLocations(func() {
-			locations := c.d.Locations()
-			c.d.Invoke(func() { c.refreshLocations(locations) })
-		})
-	}
+	c.stopMounts = c.watchLocations()
 }
 
 // requestListing reads dir off the loop and lists it once read, unless
@@ -482,8 +482,10 @@ type ui struct {
 	// newFolder is the row naming a folder to create.
 	newFolder     *widget.Box
 	newFolderName *widget.Entry
-	// locations is the sidebar's Locations list.
+	// locations is the sidebar's Locations list, unlock the passphrase
+	// prompt of a locked volume under it.
 	locations *widget.Box
+	unlock    *unlockRow
 }
 
 // label is a one-line label at the body size.
@@ -722,14 +724,16 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	favorites := c.favorites(nil, opening)
 	favoritesList := section("Favorites", favorites)
 	u.locations = section("Locations", nil)
+	u.unlock = c.newUnlockRow()
+	box.Append(u.unlock.box, false)
 	go func() {
-		places, locations := c.d.Places(), c.d.Locations()
+		places, locations := c.d.Places(), c.readLocations()
 		c.d.Invoke(func() {
 			if c.ui != u {
 				return
 			}
 			c.fillPlaces(favoritesList, c.favorites(places, opening))
-			c.fillPlaces(u.locations, locations)
+			c.fillLocations(locations)
 		})
 	}()
 	box.Append(widget.NewSpacer(0, 0), true)
@@ -767,24 +771,22 @@ func placeIcon(p Place) *widget.Icon {
 func (c *Chooser) fillPlaces(list *widget.Box, places []Place) {
 	list.Clear()
 	for _, p := range places {
-		row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
-		row.AppendAligned(placeIcon(p), false, widget.AlignCenter)
-		l := c.label(p.Label)
-		l.SetEllipsize(widget.EllipsizeEnd)
-		row.AppendAligned(l, true, widget.AlignCenter)
-		b := widget.NewButton(row, 0, 0)
-		b.AddClass("file-chooser-place", css.Ghost)
-		path := p.Path
-		b.OnClick = func() { c.goTo(path) }
-		list.Append(b, false)
+		list.Append(c.placeButton(p, func() { c.goTo(p.Path) }), false)
 	}
 }
 
-// refreshLocations rebuilds Locations: a mount came or went.
-func (c *Chooser) refreshLocations(locations []Place) {
-	if c.reply != nil && c.ui != nil {
-		c.fillPlaces(c.ui.locations, locations)
-	}
+// placeButton is a sidebar row: the place's icon and label, open on a
+// click.
+func (c *Chooser) placeButton(p Place, open func()) *widget.Button {
+	row := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
+	row.AppendAligned(placeIcon(p), false, widget.AlignCenter)
+	l := c.label(p.Label)
+	l.SetEllipsize(widget.EllipsizeEnd)
+	row.AppendAligned(l, true, widget.AlignCenter)
+	b := widget.NewButton(row, 0, 0)
+	b.AddClass("file-chooser-place", css.Ghost)
+	b.OnClick = open
+	return b
 }
 
 // views is the column header over the list and grid, with the empty

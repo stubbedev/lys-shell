@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/portaldialogs/dialoghost"
@@ -54,7 +55,7 @@ func authSignal(e *portaldialogs.Emitter) func(string, portaldialogs.AuthAction)
 // CUPS' IPP). Without a bus the portal answers those requests
 // "other". The returned stop ends the hosts once the loop has ended,
 // freeing what the file chooser still holds.
-func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet) (stop func()) {
+func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet, drives func() *udisks.Client) (stop func()) {
 	if conn == nil {
 		log.Print("portal hosts: no session bus")
 		return func() {}
@@ -76,6 +77,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 		Places:         func() []filechooser.Place { return userPlaces(home) },
 		Locations:      filechooser.SystemLocations(home),
 		WatchLocations: filechooser.WatchSystemLocations,
+		Drives:         drives,
 		ViewFile:       viewFile,
 		RecentFile:     filechooser.RecentFile(),
 		TrashDirs:      filechooser.SystemTrashDirs(home),
