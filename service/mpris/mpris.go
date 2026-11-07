@@ -217,6 +217,25 @@ type Service struct {
 	active string
 	ticks  *feed.Tick
 	stop   chan struct{}
+
+	now         func() time.Time
+	requestedAt map[string]time.Time
+	tracks      *feed.Feed[TrackChange]
+}
+
+// TrackChange is the active player moving to another track. Requested
+// marks a change the user asked for through the daemon's Next or
+// Previous (a media key, `lys-shell media next`), not the player
+// advancing on its own.
+type TrackChange struct {
+	Player    Player
+	Requested bool
+}
+
+const requestWindow = 3 * time.Second
+
+func (p Player) sameTrack(q Player) bool {
+	return p.TrackID == q.TrackID && p.Title == q.Title && p.Artist == q.Artist && p.Album == q.Album
 }
 
 // New starts the service on conn, which stays the caller's: it matches the player and bus-owner
@@ -225,12 +244,15 @@ type Service struct {
 // config lists.
 func New(conn *dbus.Conn, ignored, priority []string) (*Service, error) {
 	s := &Service{
-		conn:     conn,
-		ignored:  ignored,
-		priority: priority,
-		owners:   make(map[string]string),
-		stop:     make(chan struct{}),
-		ticks:    feed.NewTick(),
+		conn:        conn,
+		ignored:     ignored,
+		priority:    priority,
+		owners:      make(map[string]string),
+		stop:        make(chan struct{}),
+		ticks:       feed.NewTick(),
+		now:         time.Now,
+		requestedAt: make(map[string]time.Time),
+		tracks:      feed.New[TrackChange](4),
 	}
 	if err := conn.AddMatchSignal(playerMatch()...); err != nil {
 		return nil, fmt.Errorf("mpris: match PropertiesChanged: %w", err)
@@ -258,6 +280,7 @@ func New(conn *dbus.Conn, ignored, priority []string) (*Service, error) {
 func (s *Service) Close() error {
 	close(s.stop)
 	s.ticks.Close()
+	s.tracks.Close()
 	return s.removeMatches()
 }
 
@@ -387,19 +410,48 @@ func (s *Service) dropLocked(name string) bool {
 	return false
 }
 
-// store replaces the player's snapshot, reporting whether that changed it.
-func (s *Service) store(p Player) bool {
+// store replaces the player's snapshot, reporting whether that changed
+// it, and the track change it is when the active player moved to
+// another titled track.
+func (s *Service) store(p Player) (bool, TrackChange, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.players {
-		if s.players[i].BusName == p.BusName {
-			changed := s.players[i] != p
-			s.players[i] = p
-			return changed
+		if s.players[i].BusName != p.BusName {
+			continue
 		}
+		prev := s.players[i]
+		s.players[i] = p
+		if prev.sameTrack(p) || p.Title == "" || p.BusName != s.active {
+			return prev != p, TrackChange{}, false
+		}
+		deadline, asked := s.requestedAt[p.BusName]
+		delete(s.requestedAt, p.BusName)
+		return true, TrackChange{Player: p, Requested: asked && !s.now().After(deadline)}, true
 	}
-	return false
+	return false, TrackChange{}, false
 }
+
+// requested wraps a transport call as one the user asked for: the
+// player's next track change within requestWindow is Requested.
+func (s *Service) requested(run func(context.Context, string) error) func(context.Context, string) error {
+	return func(ctx context.Context, busName string) error {
+		s.mu.Lock()
+		s.requestedAt[busName] = s.now().Add(requestWindow)
+		s.mu.Unlock()
+		err := run(ctx, busName)
+		if err != nil {
+			s.mu.Lock()
+			delete(s.requestedAt, busName)
+			s.mu.Unlock()
+		}
+		return err
+	}
+}
+
+// TrackChanges returns a feed of the active player's track changes;
+// stop ends it.
+func (s *Service) TrackChanges() (<-chan TrackChange, func()) { return s.tracks.Subscribe() }
 
 // refresh re-reads one player's snapshot in place.
 func (s *Service) refresh(name string) {
@@ -410,7 +462,11 @@ func (s *Service) refresh(name string) {
 		log.Printf("mpris: refresh: %v", err)
 		return
 	}
-	if s.store(p) {
+	changed, change, moved := s.store(p)
+	if moved {
+		s.tracks.Publish(change)
+	}
+	if changed {
 		s.notify()
 	}
 }

@@ -53,6 +53,11 @@ type MediaConfig struct {
 	//     player-priority: ["*spotify*", "*firefox*"]
 	// ```
 	PlayerPriority []string `cfg:"player-priority"`
+	// Show synced lyrics for the playing track in the media dropdown, fetched from
+	// LRCLIB (lrclib.net). Off by default: the artist, title, album and length of
+	// every track played go to that third party. Results, misses included, are
+	// cached under $XDG_CACHE_HOME/lys-shell/lyrics.
+	Lyrics bool `cfg:"lyrics"`
 	// Format string for the label.
 	//
 	// ## Examples
@@ -102,6 +107,7 @@ func DefaultsMedia() MediaConfig {
 		PlayerIcons:      map[string]string{},
 		PlayersIgnored:   []string{},
 		PlayerPriority:   []string{},
+		Lyrics:           false,
 		Format:           "{{ title }} - {{ artist }}",
 		IconName:         "ld-music-symbolic",
 		SpinningDiscIcon: "ld-disc-3-symbolic",

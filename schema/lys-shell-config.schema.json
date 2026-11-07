@@ -5600,6 +5600,11 @@
           "default": "dropdown:media",
           "description": "Action on left click."
         },
+        "lyrics": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Show synced lyrics for the playing track in the media dropdown, fetched from\nLRCLIB (lrclib.net). Off by default: the artist, title, album and length of\nevery track played go to that third party. Results, misses included, are\ncached under $XDG_CACHE_HOME/lys-shell/lyrics."
+        },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
@@ -6299,6 +6304,7 @@
             "label-max-length": 35,
             "label-show": true,
             "left-click": "dropdown:media",
+            "lyrics": false,
             "middle-click": "",
             "player-icons": {},
             "player-priority": [],
@@ -7929,6 +7935,11 @@
           "default": 1.0,
           "description": "Margin from screen edges: a multiplier of the default 150px (`1.0` =\ndefault) or absolute pixels (e.g. `\"150px\"`)."
         },
+        "media": {
+          "$ref": "#/$defs/OsdMedia",
+          "default": "requested",
+          "description": "Which track changes of the active media player flash the now-playing OSD\n(art, title and artist)."
+        },
         "monitor": {
           "$ref": "#/$defs/OsdMonitor",
           "default": "primary",
@@ -7951,6 +7962,26 @@
         }
       },
       "type": "object"
+    },
+    "OsdMedia": {
+      "description": "Track changes of the active media player that show the now-playing OSD.",
+      "oneOf": [
+        {
+          "const": "requested",
+          "description": "Only changes the user asked for: a media key or `lys-shell media next|previous`.",
+          "type": "string"
+        },
+        {
+          "const": "always",
+          "description": "Every track change, the player advancing through a playlist included.",
+          "type": "string"
+        },
+        {
+          "const": "never",
+          "description": "Never show the now-playing OSD.",
+          "type": "string"
+        }
+      ]
     },
     "OsdMonitor": {
       "default": "primary",
@@ -12151,6 +12182,7 @@
           "label-max-length": 35,
           "label-show": true,
           "left-click": "dropdown:media",
+          "lyrics": false,
           "middle-click": "",
           "player-icons": {},
           "player-priority": [],
@@ -12671,6 +12703,7 @@
         "enabled": true,
         "layer": "overlay",
         "margin": 1.0,
+        "media": "requested",
         "monitor": "primary",
         "position": "bottom",
         "presets": [],

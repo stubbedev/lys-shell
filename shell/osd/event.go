@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
 	"github.com/stubbedev/lys-shell/service/keytoggles"
+	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 // kind is OsdEvent's variant.
@@ -20,6 +21,7 @@ const (
 	kindSlider kind = iota
 	kindToggle
 	kindToast
+	kindMedia
 )
 
 // Event is one OSD flash (messages.rs OsdEvent): a slider (volume,
@@ -41,7 +43,10 @@ type Event struct {
 	// follows the config.
 	durationMS uint32
 	// class is a toast's extra CSS class.
-	class string
+	class     string
+	artist    string
+	art       string
+	requested bool
 }
 
 // Slider is a level event: a device's volume or the brightness.
@@ -173,3 +178,27 @@ func MicrophoneIcon(muted bool) string {
 
 // BrightnessIcon is the brightness slider's glyph (BRIGHTNESS_ICON).
 const BrightnessIcon = "ld-sun-symbolic"
+
+// NowPlaying is the active player's new track: its art, title and
+// artist.
+func NowPlaying(c mpris.TrackChange) Event {
+	return Event{kind: kindMedia, label: c.Player.Title, artist: c.Player.Artist, art: c.Player.ArtURL, icon: MediaIcon, requested: c.Requested}
+}
+
+// MediaIcon stands in for a track without art.
+const MediaIcon = "ld-music-symbolic"
+
+// wanted is whether osd.media lets ev show: every event but a track
+// change always does.
+func wanted(ev Event, mode config.OsdMedia) bool {
+	if ev.kind != kindMedia {
+		return true
+	}
+	switch mode {
+	case config.OsdMediaAlways:
+		return true
+	case config.OsdMediaRequested:
+		return ev.requested
+	}
+	return false
+}

@@ -73,11 +73,13 @@ func (d *Daemon) PlayPause(player string) *dbus.Error {
 }
 
 // Next skips forward.
-func (d *Daemon) Next(player string) *dbus.Error { return d.control(player, "next", d.s.Next) }
+func (d *Daemon) Next(player string) *dbus.Error {
+	return d.control(player, "next", d.s.requested(d.s.Next))
+}
 
 // Previous skips back.
 func (d *Daemon) Previous(player string) *dbus.Error {
-	return d.control(player, "previous", d.s.Previous)
+	return d.control(player, "previous", d.s.requested(d.s.Previous))
 }
 
 // Seek moves to positionUS within the track; negative clamps to 0.

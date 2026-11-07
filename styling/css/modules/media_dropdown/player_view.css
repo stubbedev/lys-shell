@@ -20,3 +20,14 @@ button.media-control.minor.active {
 button.media-control:disabled {
   opacity: 0.4;
 }
+
+button.media-lyrics-button.active {
+  color: var(--accent);
+}
+.media-lyrics-lines.synced label.media-lyrics-line {
+  color: var(--fg-subtle);
+}
+.media-lyrics-lines.synced label.media-lyrics-line.current {
+  color: var(--accent);
+  font-weight: bold;
+}

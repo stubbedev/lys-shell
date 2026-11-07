@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -29,6 +30,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/lyrics"
 	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
@@ -354,6 +356,11 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 		s.ctx.Media = media
 	} else {
 		log.Printf("media: %v", mediaErr)
+	}
+	if dir, ok := xdg.OS.CacheDir(version.Name); ok {
+		s.ctx.Lyrics = lyrics.New(lyrics.Endpoint, filepath.Join(dir, "lyrics"))
+	} else {
+		log.Print("lyrics: no cache directory (neither XDG_CACHE_HOME nor HOME is set), so no lyrics")
 	}
 	// The idle-inhibit service owns its state here and serves it on the
 	// session bus for the `lys-shell idle` CLI.
@@ -751,7 +758,11 @@ func (s *shellStart) mount() {
 		} else {
 			log.Printf("osd: keyboard layout: %v", err)
 		}
-		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts, lockKeySource())
+		var tracks osd.Tracks
+		if media, ok := baseCtx.Media.(*mpris.Service); ok {
+			tracks = media
+		}
+		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts, tracks, lockKeySource())
 	}()
 	// The lock triggers (logind, lock-on-start, and `lys-shell lock`
 	// through Shell1) start `lys-login lock`, the login screen in its

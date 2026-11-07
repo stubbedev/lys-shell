@@ -83,3 +83,8 @@ label.osd-label {
 .osd.info progressbar.osd-bar trough progress {
   background: var(--status-info);
 }
+
+.osd-media-art {
+  border-radius: var(--radius-default);
+  background-color: var(--bg-overlay);
+}

@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/idle"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/lyrics"
 	"github.com/stubbedev/lys-shell/service/mail"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
@@ -41,15 +42,18 @@ import (
 // builds its tree without scheduling updates. Hyprland is nil when the
 // compositor is not Hyprland; Hyprland-only modules error in that case.
 type ModuleContext struct {
-	Config        *config.Config
-	App           *app.Application
-	Font          render.Font
-	Style         *barStyle
-	Hyprland      *hyprland.Connection
-	Battery       upower.Source
-	Brightness    brightness.Source
-	Pulse         pulse.Source
-	Media         mpris.Source
+	Config     *config.Config
+	App        *app.Application
+	Font       render.Font
+	Style      *barStyle
+	Hyprland   *hyprland.Connection
+	Battery    upower.Source
+	Brightness brightness.Source
+	Pulse      pulse.Source
+	Media      mpris.Source
+	// Lyrics looks up the media dropdown's lyrics; nil when the cache
+	// directory is unknown.
+	Lyrics        *lyrics.Service
 	Bluetooth     bluetooth.Source
 	Network       network.Source
 	Networking    *network.Service // secret agent, VPNs, wifi; nil without NM

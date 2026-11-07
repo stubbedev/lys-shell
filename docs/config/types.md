@@ -1102,6 +1102,16 @@ How workspace numbers are displayed.
 If monitor has workspaces 4, 5, 6 assigned, they display as 1, 2, 3.
 Useful when keybinds use per-monitor numbering (Shift+1 for ws 4, etc.). |
 
+## OsdMedia {#osd-media}
+
+Track changes of the active media player that show the now-playing OSD.
+
+| Value | Meaning |
+|---|---|
+| `"requested"` | Only changes the user asked for: a media key or `lys-shell media next|previous`. |
+| `"always"` | Every track change, the player advancing through a playlist included. |
+| `"never"` | Never show the now-playing OSD. |
+
 ## OsdMonitor {#osd-monitor}
 
 "primary" or a monitor connector name (e.g. "DP-1")

@@ -7,3 +7,7 @@ dropdown-media-sources = Media Sources
 dropdown-media-unknown-title = Unknown Title
 dropdown-media-unknown-artist = Unknown Artist
 dropdown-media-unknown-album = Unknown Album
+dropdown-media-lyrics = Lyrics
+dropdown-media-lyrics-loading = Looking up lyrics…
+dropdown-media-lyrics-none = No lyrics
+dropdown-media-lyrics-unavailable = Lyrics unavailable

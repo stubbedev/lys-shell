@@ -454,7 +454,7 @@ func TestWatchShowsLayoutSwitches(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.osd.Watch(ctx, nil, nil, src, nil)
+		h.osd.Watch(ctx, nil, nil, src, nil, nil)
 	}()
 	t.Cleanup(func() { cancel(); <-done })
 	tick := func() {
@@ -499,7 +499,7 @@ func TestWatchShowsLockKeysFromItsSource(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.osd.Watch(ctx, nil, nil, nil, locks)
+		h.osd.Watch(ctx, nil, nil, nil, nil, locks)
 	}()
 	var report func(keytoggles.Event)
 	select {
@@ -540,7 +540,7 @@ func TestWatchSurvivesAFailedLockKeySource(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.osd.Watch(ctx, nil, nil, nil, func(func(keytoggles.Event)) (func(), error) {
+		h.osd.Watch(ctx, nil, nil, nil, nil, func(func(keytoggles.Event)) (func(), error) {
 			return nil, errors.New("no lys-wm")
 		})
 	}()
@@ -592,7 +592,7 @@ func startWatch(t *testing.T, h *harness, locks LockKeys) (finish func()) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.osd.Watch(ctx, nil, nil, nil, locks)
+		h.osd.Watch(ctx, nil, nil, nil, nil, locks)
 	}()
 	return func() {
 		cancel()

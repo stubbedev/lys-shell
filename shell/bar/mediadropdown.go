@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -106,6 +105,7 @@ type mediaView struct {
 
 	identity   *widget.Label
 	sourceIcon *widget.Icon
+	panel      *widget.Stack
 	art        *widget.Box
 	artURL     string
 	title      *widget.Label
@@ -126,6 +126,10 @@ type mediaView struct {
 	// carries it, like every other stateful widget here).
 	check *widget.Icon
 
+	lyrics       *lyricsPanel
+	lyricsButton *widget.Button
+	showLyrics   bool
+
 	current mpris.Player
 	has     bool
 	// seekBus is the player the seek knob last followed: a switch or a
@@ -144,6 +148,8 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	}
 	v := &mediaView{ctx: ctx, src: ctx.Media}
 	v.openFollow = newOpenFollow(v.follow)
+	v.lyrics = newLyricsPanel(ctx, font, px)
+	v.stopped = v.lyrics.stopTimer
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "media-dropdown")
 	v.main = widget.NewStack()
@@ -206,14 +212,19 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 	source.AppendAligned(v.identity, false, widget.AlignCenter)
 	source.AppendAligned(widget.NewThemeIcon("ld-chevron-right-symbolic", itemIconPx), false, widget.AlignCenter)
 	sourceButton := dropdownButton(source, v.showPicker, "media-source-button", css.Ghost, css.Small)
-	v.player.Append(dropdownHeader(font, "ld-disc-3-symbolic", i18n.T("dropdown-media-title"), sourceButton), false)
+	v.lyricsButton = dropdownButton(widget.NewThemeIcon("ld-mic-vocal-symbolic", itemIconPx), v.toggleLyrics, "media-lyrics-button", css.Ghost, css.Icon, css.Small)
+	v.lyricsButton.SetTooltip(i18n.T("dropdown-media-lyrics"))
+	v.player.Append(dropdownHeader(font, "ld-disc-3-symbolic", i18n.T("dropdown-media-title"), v.lyricsButton, sourceButton), false)
 
 	body := dropdownContent("media-player")
 	// The artwork takes the panel's leftover height (player_view
 	// mod.rs:123-127).
 	v.art = widget.NewBox(widget.Row, 0, 0)
 	v.art.AddClass("media-artwork")
-	body.Append(v.art, true)
+	v.panel = widget.NewStack()
+	v.panel.Add("art", v.art)
+	v.panel.Add("lyrics", v.lyrics)
+	body.Append(v.panel, true)
 
 	info := widget.NewBox(widget.Column, th.Spacing/2, 0)
 	info.AddClass("media-info")
@@ -351,6 +362,7 @@ func (v *mediaView) refresh() {
 	setClass(v.loop, "active", p.Loop != mpris.LoopNone && p.Loop != mpris.LoopUnsupported)
 	v.loopIcon.SetThemeName(mediaLoopIcon(p.Loop))
 	v.playIcon.SetThemeName(mediaPlayPauseIcon(p.State))
+	v.syncLyrics()
 }
 
 // lengthText is the length label: 0:00 without a known length.
@@ -392,18 +404,10 @@ const mediaArtGlyphPx = 48
 // to cover, else the placeholder glyph in its tile box (boxClass, whose
 // rules paint the tile, with imgClass on the glyph).
 func mediaArt(url, placeholder, boxClass, imgClass string, px int) widget.Widget {
-	var img *widget.Image
-	switch {
-	case strings.HasPrefix(url, "file://"):
-		img = widget.NewFileImage(strings.TrimPrefix(url, "file://"))
-	case strings.HasPrefix(url, "http://"), strings.HasPrefix(url, "https://"):
-		img = widget.NewURLImage(url)
+	if img, ok := widgets.MediaArt(url); ok {
+		return img
 	}
-	if img == nil {
-		return iconTile(widget.NewThemeIcon(placeholder, px), imgClass, boxClass)
-	}
-	img.SetScale(widget.ImageCover)
-	return img
+	return iconTile(widget.NewThemeIcon(placeholder, px), imgClass, boxClass)
 }
 
 // setPosition applies a position read.
@@ -413,6 +417,9 @@ func (v *mediaView) setPosition(pos time.Duration) {
 	}
 	v.position.SetText(formatMediaDuration(pos))
 	v.seek.Set(mediaProgress(pos, v.current.Length))
+	if v.showLyrics {
+		v.lyrics.position(pos, v.current.State == mpris.StatePlaying)
+	}
 }
 
 // showPicker is ShowSourcePicker: the list of players.
@@ -508,4 +515,25 @@ func (v *mediaView) pollPosition() {
 		}
 		v.ctx.Invoke(func() { v.setPosition(pos) })
 	}()
+}
+
+func (v *mediaView) lyricsEnabled() bool { return v.ctx.Config.Media.Lyrics }
+
+func (v *mediaView) toggleLyrics() {
+	v.showLyrics = !v.showLyrics
+	v.syncLyrics()
+}
+
+func (v *mediaView) syncLyrics() {
+	enabled := v.lyricsEnabled()
+	v.lyricsButton.SetVisible(enabled)
+	v.showLyrics = v.showLyrics && enabled
+	setClass(v.lyricsButton, "active", v.showLyrics)
+	if !v.showLyrics {
+		v.lyrics.reset()
+		v.panel.Show("art")
+		return
+	}
+	v.panel.Show("lyrics")
+	v.lyrics.follow(v.current)
 }

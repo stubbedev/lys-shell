@@ -16,6 +16,8 @@ const iconPx = 20
 // widthPx is the OSD card's width at scale 1.
 const widthPx = 288
 
+const mediaArtPx = 48
+
 // build is the OSD's view! tree:
 //
 //	window.background.osd-host (the revealer)
@@ -24,6 +26,7 @@ const widthPx = 288
 //	  ├ box.osd-header        (toggles)  image.osd-icon, label.osd-label
 //	  └ progressbar.osd-bar   (sliders)
 func (o *Osd) build() *face {
+	th := widget.Current()
 	f := &face{}
 	f.sliderIcon = o.icon()
 	f.sliderLabel = o.label("osd-label")
@@ -38,14 +41,33 @@ func (o *Osd) build() *face {
 	f.toggleLabel = o.label("osd-label")
 	f.toggleHeader = header(f.toggleIcon, f.toggleLabel)
 
+	f.art = widget.NewBox(widget.Row, 0, 0)
+	f.art.AddClass("osd-media-art")
+	widgets.Pin(f.art, int(mediaArtPx*o.scale()), int(mediaArtPx*o.scale()))
+	f.artURL = "\x00"
+	f.mediaTitle = o.label("osd-media-title")
+	f.mediaTitle.AddClass(css.Heading)
+	f.mediaArtist = o.label("osd-media-artist")
+	f.mediaArtist.AddClass(css.DimLabel)
+	track := widget.NewBox(widget.Column, th.Spacing/2, 0)
+	for _, l := range []*widget.Label{f.mediaTitle, f.mediaArtist} {
+		l.SetEllipsize(widget.EllipsizeEnd)
+		l.SetHAlign(widget.AlignStart)
+		track.Append(l, false)
+	}
+	track.SetVAlign(widget.AlignCenter)
+	track.SetHExpand(true)
+	f.mediaHeader = header(f.art, track)
+	f.mediaHeader.AddClass("osd-media")
+
 	f.bar = widget.NewProgressBar(0)
 	f.bar.AddClass("osd-bar")
 
-	th := widget.Current()
 	f.container = widget.NewBox(widget.Column, th.Spacing, 2*th.Padding)
 	f.container.SetInlineStyle(styling.WidthStyle(int(widthPx * o.scale())))
 	f.container.Append(f.sliderHeader, false)
 	f.container.Append(f.toggleHeader, false)
+	f.container.Append(f.mediaHeader, false)
 	f.container.Append(f.bar, false)
 	f.rev = widget.NewRevealer(f.container)
 	f.rev.SetFadeFrom(reveal.FadeFrom)
@@ -98,12 +120,18 @@ func (f *face) apply(ev Event, cfg config.OsdConfig) {
 	f.container.SetClasses(append(classes(ev, cfg.Border), css.Card)...)
 	f.sliderHeader.SetVisible(ev.bar)
 	f.bar.SetVisible(ev.bar)
-	f.toggleHeader.SetVisible(!ev.bar)
+	media := ev.kind == kindMedia
+	f.toggleHeader.SetVisible(!ev.bar && !media)
+	f.mediaHeader.SetVisible(media)
 	f.toggleHeader.SetHAlign(textAlign(cfg.TextAlign))
 	resolves := widget.ThemeIconExists(ev.icon)
 	for _, icon := range [...]*widget.Icon{f.sliderIcon, f.toggleIcon} {
 		icon.SetThemeName(ev.icon)
 		icon.SetVisible(resolves)
+	}
+	if media {
+		f.showTrack(ev)
+		return
 	}
 	if ev.bar {
 		f.sliderLabel.SetText(ev.label)
@@ -123,4 +151,22 @@ func textAlign(a config.OsdTextAlign) widget.Align {
 		return widget.AlignEnd
 	}
 	return widget.AlignCenter
+}
+
+func (f *face) showTrack(ev Event) {
+	f.mediaTitle.SetText(ev.label)
+	f.mediaArtist.SetText(ev.artist)
+	f.mediaArtist.SetVisible(ev.artist != "")
+	if ev.art == f.artURL {
+		return
+	}
+	f.artURL = ev.art
+	f.art.Clear()
+	if img, ok := widgets.MediaArt(ev.art); ok {
+		f.art.Append(img, true)
+		return
+	}
+	icon := widget.NewThemeIcon(ev.icon, iconPx)
+	icon.AddClass("osd-icon")
+	f.art.Append(widgets.Center(icon), true)
 }

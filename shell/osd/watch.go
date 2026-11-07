@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/keytoggles"
+	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/pulse"
 )
 
@@ -103,16 +104,31 @@ func (l *layoutEvents) next(src Layouts) (Event, bool) {
 	return layoutEvent(name), true
 }
 
+// Tracks is the media service's track changes: each one is offered to
+// the OSD, which osd.media filters.
+type Tracks interface {
+	TrackChanges() (<-chan mpris.TrackChange, func())
+}
+
 // LockKeys follows the lock keys: it calls fn for each key that turns
 // on or off until stop, which waits for the last call.
 type LockKeys func(fn func(keytoggles.Event)) (stop func(), err error)
 
-// Watch follows the audio, brightness, keyboard layout, and lock-key
-// sources until ctx ends (watchers.rs spawn). A nil source is skipped. The levels at
+// Watch follows the audio, brightness, keyboard layout, track
+// change, and lock-key sources until ctx ends (watchers.rs spawn). A nil source is skipped. The levels at
 // start seed the dedupe without flashing, as the Rust watchers' first
 // emission lands inside the quiet period. The lock-key source runs only
 // while the OSD is enabled, since it holds input devices open.
-func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source, layouts Layouts, locks LockKeys) {
+func (o *Osd) Watch(ctx context.Context, audio pulse.Source, light brightness.Source, layouts Layouts, tracks Tracks, locks LockKeys) {
+	if tracks != nil {
+		changes, stop := tracks.TrackChanges()
+		defer stop()
+		go func() {
+			for c := range changes {
+				o.Show(NowPlaying(c))
+			}
+		}()
+	}
 	if audio != nil {
 		if ticks, stop, err := audio.Subscribe(ctx); err == nil {
 			defer stop()

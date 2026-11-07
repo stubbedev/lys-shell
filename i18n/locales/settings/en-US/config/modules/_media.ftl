@@ -14,6 +14,9 @@ settings-modules-media-players-ignored = Ignored Players
 settings-modules-media-player-priority = Player Priority
     .description = Preferred player order as glob patterns matching bus names
 
+settings-modules-media-lyrics = Lyrics
+    .description = Show synced lyrics from LRCLIB in the media dropdown. Sends the artist, title, album and length of every track to lrclib.net
+
 settings-modules-media-format = Format
     .description = Label format with placeholders: {"{{ title }}"}, {"{{ artist }}"}, {"{{ album }}"}, {"{{ status }}"}, {"{{ status_icon }}"}
 

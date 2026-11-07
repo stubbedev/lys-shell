@@ -14,6 +14,9 @@ settings-modules-media-players-ignored = Lecteurs ignorés
 settings-modules-media-player-priority = Priorité des lecteurs
     .description = Ordre de préférence des lecteurs sous forme de motifs glob correspondant aux noms de bus
 
+settings-modules-media-lyrics = Paroles
+    .description = Affiche les paroles synchronisées de LRCLIB dans le menu média. Envoie l'artiste, le titre, l'album et la durée de chaque piste à lrclib.net
+
 settings-modules-media-format = Format
     .description = Format du libellé avec espaces réservés : {"{{ title }}"}, {"{{ artist }}"}, {"{{ album }}"}, {"{{ status }}"}, {"{{ status_icon }}"}
 

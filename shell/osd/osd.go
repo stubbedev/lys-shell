@@ -65,6 +65,11 @@ type face struct {
 	toggleHeader *widget.Box
 	toggleIcon   *widget.Icon
 	toggleLabel  *widget.Label
+	mediaHeader  *widget.Box
+	art          *widget.Box
+	artURL       string
+	mediaTitle   *widget.Label
+	mediaArtist  *widget.Label
 	bar          *widget.ProgressBar
 }
 
@@ -128,7 +133,7 @@ func (o *Osd) DetachOutput(name string) {
 }
 
 func (o *Osd) show(ev Event) {
-	if !o.ready || !o.cfg.Osd.Enabled {
+	if !o.ready || !o.cfg.Osd.Enabled || !wanted(ev, o.cfg.Osd.Media) {
 		return
 	}
 	o.dismissID++

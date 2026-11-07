@@ -26,6 +26,7 @@ bar:
 | `player-icons` | map of string | `{}` | Custom player-to-icon mappings for application-mapped mode. |
 | `players-ignored` | array of string | `[]` | Player bus name patterns to exclude from discovery. Requires a restart to take effect. |
 | `player-priority` | array of string | `[]` | Preferred player priority order as glob patterns matching bus names. |
+| `lyrics` | bool | `false` | Show synced lyrics for the playing track in the media dropdown, fetched from LRCLIB (lrclib.net). Off by default: the artist, title, album and length of every track played go to that third party. Results, misses included, are cached under $XDG_CACHE_HOME/lys-shell/lyrics. |
 | `format` | string | `"{{ title }} - {{ artist }}"` | Format string for the label. |
 | `icon-name` | string | `"ld-music-symbolic"` | Symbolic icon name for default mode. |
 | `spinning-disc-icon` | string | `"ld-disc-3-symbolic"` | Icon shown for spinning-disc mode. |
@@ -128,6 +129,7 @@ modules:
     player-icons: {}
     players-ignored: []
     player-priority: []
+    lyrics: false
     format: '{{ title }} - {{ artist }}'
     icon-name: ld-music-symbolic
     spinning-disc-icon: ld-disc-3-symbolic

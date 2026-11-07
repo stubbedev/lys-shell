@@ -26,6 +26,9 @@ type OsdConfig struct {
 	// When `general.tearing-mode` is enabled, `overlay` is demoted to `top`
 	// to allow fullscreen tearing.
 	Layer Layer `cfg:"layer"`
+	// Which track changes of the active media player flash the now-playing OSD
+	// (art, title and artist).
+	Media OsdMedia `cfg:"media"`
 	// Reusable toast presets, each triggerable with `lys-shell toast --preset <id>`.
 	Presets []ToastPreset `cfg:"presets"`
 }
@@ -43,6 +46,7 @@ func DefaultsOsd() OsdConfig {
 		Margin:    Scale(1),
 		Border:    true,
 		Layer:     LayerOverlay,
+		Media:     OsdMediaRequested,
 		Presets:   []ToastPreset{},
 	}
 }
@@ -129,3 +133,20 @@ type ToastPreset struct {
 }
 
 func (ToastPreset) noStructDefault() {}
+
+// OsdMedia is which track changes flash the now-playing OSD.
+//
+// Track changes of the active media player that show the now-playing OSD.
+type OsdMedia string
+
+// OSD media modes.
+const (
+	// Only changes the user asked for: a media key or `lys-shell media next|previous`.
+	OsdMediaRequested OsdMedia = "requested"
+	// Every track change, the player advancing through a playlist included.
+	OsdMediaAlways OsdMedia = "always"
+	// Never show the now-playing OSD.
+	OsdMediaNever OsdMedia = "never"
+)
+
+var _ = registerEnum(OsdMediaRequested, OsdMediaAlways, OsdMediaNever)

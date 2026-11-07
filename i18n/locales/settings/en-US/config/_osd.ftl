@@ -27,6 +27,9 @@ settings-osd-layer = Layer
 settings-osd-text-align = Text Alignment
     .description = Horizontal alignment of OSD toast/toggle content
 
+settings-osd-media = Now Playing
+    .description = Track changes that show the now-playing OSD: requested (media keys and `lys-shell media next`), always, or never
+
 
 ## OsdPosition variants
 enum-osd-position-top-left = Top Left
@@ -43,3 +46,9 @@ enum-osd-position-left = Left
 enum-osd-text-align-start = Start
 enum-osd-text-align-center = Center
 enum-osd-text-align-end = End
+
+
+## OsdMedia variants
+enum-osd-media-requested = Requested
+enum-osd-media-always = Always
+enum-osd-media-never = Never

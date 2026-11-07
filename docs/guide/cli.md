@@ -76,6 +76,13 @@ lys-shell media active spotify
 lys-shell media info
 ```
 
+Skipping a track with `media next` or `media previous` (which is what media keys
+should be bound to) flashes the now-playing OSD with the new track's art, title
+and artist. Tracks the player moves to on its own do not, unless `osd.media` is
+`always`; `never` turns it off. The media dropdown can show synced lyrics from
+[LRCLIB](https://lrclib.net) once `modules.media.lyrics` is `true`: off by
+default, since every track's artist, title, album and length is sent there.
+
 Idle inhibition:
 
 ```sh

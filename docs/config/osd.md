@@ -21,6 +21,7 @@ On-screen display overlay for transient events like volume and brightness.
 | `margin` | [`Size`](/config/types#size) | `1` | Margin from screen edges: a multiplier of the default 150px (`1.0` = default) or absolute pixels (e.g. `"150px"`). |
 | `border` | bool | `true` | Show a border around the OSD. |
 | `layer` | [`Layer`](/config/types#layer) | `"overlay"` | Layer-shell layer the OSD is placed on. |
+| `media` | [`OsdMedia`](/config/types#osd-media) | `"requested"` | Which track changes of the active media player flash the now-playing OSD (art, title and artist). |
 | `presets` | array of [`ToastPreset`](/config/types#toast-preset) | `[]` | Reusable toast presets, each triggerable with `lys-shell toast --preset <id>`. |
 
 ::: details More about `layer`
@@ -42,6 +43,7 @@ osd:
   margin: 1.0
   border: true
   layer: overlay
+  media: requested
   presets: []
 ```
 
