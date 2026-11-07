@@ -186,10 +186,10 @@ func (r *Rates) Refresh(ctx context.Context) bool {
 		log.Printf("launcher: currency rates from %s: %v", r.feed, err)
 		return changed
 	}
-	r.snap.Store(&Snapshot{Table: table, FetchedAt: now})
 	if err := r.writeCache(data, now); err != nil {
 		log.Printf("launcher: currency rates: %v", err)
 	}
+	r.snap.Store(&Snapshot{Table: table, FetchedAt: now})
 	return true
 }
 
