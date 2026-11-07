@@ -39,7 +39,8 @@ const (
 
 // `panel focus` on a real compositor: the bar takes the keyboard and
 // rings its first module, Right, Right and Enter open the third
-// module's dropdown with the keyboard inside it, the first Esc closes
+// module's dropdown with the keyboard inside it and the ring on its
+// first control at once, the first Esc closes
 // the dropdown back to the bar and the second gives the keyboard back.
 func TestHeadlessPanelFocusWalksTheModules(t *testing.T) {
 	swaytest.Start(t)
@@ -207,6 +208,14 @@ func TestHeadlessPanelFocusWalksTheModules(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the calendar opened without the keyboard inside it")
 	}
+	wait("the ring on the calendar's first control before any Tab", func() error {
+		var ringed bool
+		onLoop(func() { ringed = widget.FocusVisible(inside) })
+		if !ringed {
+			return errors.New("the focused control shows no ring")
+		}
+		return nil
+	})
 
 	tap(walkEsc)
 	wait("the first Esc closing the calendar", func() error {
