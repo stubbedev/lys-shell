@@ -160,22 +160,10 @@ type System struct {
 	conn *dbus.Conn
 }
 
-// NewSystem connects to the system bus and targets the DisplayDevice.
-func NewSystem() (*System, error) {
-	conn, err := dbus.ConnectSystemBus()
-	if err != nil {
-		return nil, fmt.Errorf("upower: system bus: %w", err)
-	}
-	return NewOn(conn), nil
-}
-
-// NewOn targets the DisplayDevice over an existing connection.
+// NewOn targets the DisplayDevice over conn, which stays the caller's.
 func NewOn(conn *dbus.Conn) *System {
 	return &System{path: dbus.ObjectPath(DisplayDevicePath), conn: conn}
 }
-
-// Close drops the bus connection.
-func (s *System) Close() error { return s.conn.Close() }
 
 // Read fetches every DisplayDevice property in one GetAll.
 func (s *System) Read(ctx context.Context) (Device, error) {

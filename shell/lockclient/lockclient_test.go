@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-lib/sockdir"
+	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -219,20 +219,31 @@ func TestShouldRelock(t *testing.T) {
 	}
 }
 
-func TestStartReturnsWhileTheSystemBusIsSilent(t *testing.T) {
-	sock := filepath.Join(sockdir.Dir(t), "silent")
-	ln, err := net.Listen("unix", sock)
-	if err != nil {
+type silentLogind struct{ answer chan struct{} }
+
+func (s silentLogind) GetSession(string) (dbus.ObjectPath, *dbus.Error) {
+	<-s.answer
+	return "", dbus.MakeFailedError(errors.New("never"))
+}
+
+func TestStartReturnsWhileLogindIsSilent(t *testing.T) {
+	bus := dbustest.Start(t)
+	logind := bus.Conn(t)
+	silent := silentLogind{answer: make(chan struct{})}
+	t.Cleanup(func() { close(silent.answer) })
+	if err := logind.Export(silent, "/org/freedesktop/login1", "org.freedesktop.login1.Manager"); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ln.Close() })
-	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path="+sock)
+	if _, err := logind.RequestName("org.freedesktop.login1", dbus.NameFlagDoNotQueue); err != nil {
+		t.Fatal(err)
+	}
 	cfg := config.Defaults()
 	cfg.Login.Lock.LockOnStart = false
 	current := func() *config.Config { return cfg }
-	_, stop := Start(current, func() {}, func() {})
-	defer stop()
-	if _, err := ln.Accept(); err != nil {
-		t.Fatal(err)
+	system := bus.Conn(t)
+	_, stop := Start(system, current, func() {}, func() {})
+	stop()
+	if err := system.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
+		t.Fatalf("the lock client closed the shared connection: %v", err)
 	}
 }

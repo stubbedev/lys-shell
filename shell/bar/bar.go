@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -115,7 +116,11 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	}
 	defer sess.Close()
 
-	application := app.NewApplication(sess)
+	var opts []app.Option
+	if session != nil {
+		opts = append(opts, app.WithSessionBus(session))
+	}
+	application := app.NewApplication(sess, opts...)
 	// lys-ui's Run serves the tree on the accessibility bus while the
 	// desktop asks for assistive technologies (LYS_UI_A11Y=atspi forces it,
 	// as GTK_A11Y does for the Rust shell).
@@ -142,7 +147,11 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	servicesUp := make(chan struct{})
 	go func() {
 		defer close(servicesUp)
-		s.startServices()
+		system, err := dbus.ConnectSystemBus()
+		if err != nil {
+			log.Printf("bar: system bus: %v", err)
+		}
+		s.startServices(system)
 		application.Invoke(gate.done)
 	}()
 	err = application.Run()
@@ -237,67 +246,86 @@ func (s *shellStart) fail(err error) {
 	s.application.Quit()
 }
 
-func (s *shellStart) startServices() {
-	if conn, err := dbus.ConnectSystemBus(); err == nil {
-		s.system = conn
-		s.down.add(func() { _ = conn.Close() })
-	} else {
-		log.Printf("bar: system bus: %v", err)
+// startServices starts the clients and exports, the system ones over
+// system, which it closes with the shell; nil leaves them out.
+func (s *shellStart) startServices(system *dbus.Conn) {
+	if system != nil {
+		s.system = system
+		s.down.add(func() { _ = system.Close() })
+		s.ctx.System = system
 	}
+	s.lateStarts = map[string]lateStart{}
+	bwLife, stopBitwarden := context.WithCancel(context.Background())
+	s.down.add(stopBitwarden)
+	s.ctx.Bitwarden = newBitwardenHost(bwLife, s.application, s.current.Load, s.session)
+	networkVault := s.ctx.Bitwarden.networkVault()
+	var (
+		starts   sync.WaitGroup
+		hypr     *hyprland.Connection
+		audio    *pulse.Service
+		bt       *bluetooth.Service
+		btErr    error
+		netSvc   *network.Service
+		stopNet  func()
+		netErr   error
+		media    *mpris.Service
+		mediaErr error
+		notifs   *notifications.Service
+	)
 	if detectCompositor() == compositorHyprland {
-		if conn, err := hyprland.Connect(); err != nil {
-			log.Printf("bar: Hyprland modules will not appear: %v", err)
-		} else {
-			s.ctx.Hyprland = conn
-		}
+		starts.Go(func() {
+			conn, err := hyprland.Connect()
+			if err != nil {
+				log.Printf("bar: Hyprland modules will not appear: %v", err)
+				return
+			}
+			hypr = conn
+		})
 	}
-	if battery, err := upower.NewSystem(); err == nil {
-		s.down.add(func() { _ = battery.Close() })
-		s.ctx.Battery = battery
+	backlights := brightness.NewSystem(s.system, s.cfg.Brightness.EnableExternal)
+	starts.Go(func() { audio = pulse.Start("") })
+	starts.Go(func() { bt, btErr = startBluetooth(s.system) })
+	starts.Go(func() { netSvc, stopNet, netErr = startNetworkService(s.system, networkVault) })
+	starts.Go(func() { media, mediaErr = startMedia(s.session, s.cfg.Media) })
+	starts.Go(func() { notifs = startNotifications(s.cfg.Notification) })
+	starts.Wait()
+
+	s.ctx.Hyprland = hypr
+	if s.system != nil {
+		s.ctx.Battery = upower.NewOn(s.system)
+		s.ctx.Network = network.NewOn(s.system)
+		s.ctx.PowerProfiles = powerprofiles.NewOn(s.system)
 	}
-	backlights := brightness.NewSystem(s.cfg.Brightness.EnableExternal)
 	s.backlights = backlights
 	s.down.add(func() { _ = backlights.Close() })
 	s.ctx.Brightness = backlights
-	audio := pulse.Start("")
 	s.down.add(func() { _ = audio.Close() })
 	s.ctx.Pulse = audio
-	// lateStarts are the clients that could not start without their
-	// service; each starts when the service appears.
-	s.lateStarts = map[string]lateStart{}
-	if bt, err := bluetooth.NewSystem(); err == nil {
+	if btErr == nil {
 		s.down.add(func() { _ = bt.Close() })
 		s.ctx.Bluetooth = bt
 		// Every Rust bar warms all its dropdowns, so the bluetooth
 		// dropdown's pairing watcher runs whether or not a bluetooth
 		// module is placed: a request still reaches the user.
-		startBtPairingNotifier(bt)
+		startBtPairingNotifier(bt, s.session)
 	} else {
-		log.Printf("bluetooth: %v", err)
+		log.Printf("bluetooth: %v", btErr)
 		s.lateStarts[bluetooth.BusName] = func() (func(*ModuleContext), func(), error) {
-			bt, err := bluetooth.NewSystem()
+			bt, err := startBluetooth(s.system)
 			if err != nil {
 				return nil, nil, err
 			}
 			return func(c *ModuleContext) {
 				c.Bluetooth = bt
-				startBtPairingNotifier(bt)
+				startBtPairingNotifier(bt, s.session)
 			}, func() { _ = bt.Close() }, nil
 		}
 	}
-	if nm, err := network.NewSystem(); err == nil {
-		s.down.add(func() { _ = nm.Close() })
-		s.ctx.Network = nm
-	}
-	bwLife, stopBitwarden := context.WithCancel(context.Background())
-	s.down.add(stopBitwarden)
-	s.ctx.Bitwarden = newBitwardenHost(bwLife, s.application, s.current.Load)
-	networkVault := s.ctx.Bitwarden.networkVault()
-	if svc, stop, err := startNetworkService(s.system, networkVault); err == nil {
-		s.down.add(stop)
-		s.ctx.Networking = svc
+	if netErr == nil {
+		s.down.add(stopNet)
+		s.ctx.Networking = netSvc
 	} else {
-		log.Printf("network: %v", err)
+		log.Printf("network: %v", netErr)
 		s.lateStarts[network.BusName] = func() (func(*ModuleContext), func(), error) {
 			svc, stop, err := startNetworkService(s.system, networkVault)
 			if err != nil {
@@ -306,13 +334,11 @@ func (s *shellStart) startServices() {
 			return func(c *ModuleContext) { c.Networking = svc }, stop, nil
 		}
 	}
-	if pp, err := powerprofiles.NewSystem(); err == nil {
-		s.down.add(func() { _ = pp.Close() })
-		s.ctx.PowerProfiles = pp
-	}
-	if media, err := mpris.NewSession(s.cfg.Media.PlayersIgnored, s.cfg.Media.PlayerPriority); err == nil {
+	if mediaErr == nil {
 		s.down.add(func() { _ = media.Close() })
 		s.ctx.Media = media
+	} else {
+		log.Printf("media: %v", mediaErr)
 	}
 	// The idle-inhibit service owns its state here and serves it on the
 	// session bus for the `lys-shell idle` CLI.
@@ -327,7 +353,7 @@ func (s *shellStart) startServices() {
 	s.ctx.Weather = s.weatherSvc
 	// The notification service owns the well-known name on the session
 	// bus; other senders deliver through it.
-	s.notifSvc = startNotifications(s.cfg.Notification)
+	s.notifSvc = notifs
 	s.ctx.Notifications = s.notifSvc
 	if svc := s.notifSvc; svc != nil {
 		s.down.add(func() { svc.FlushWrites(configFlushTimeout) })
@@ -377,7 +403,7 @@ func (s *shellStart) startServices() {
 		}
 	}
 	s.down.add(startMail(&s.ctx, s.session))
-	sniHost, err := sni.NewHost(sniStore)
+	sniHost, err := startTrayHost(s.session, sniStore)
 	if err == nil {
 		s.down.add(func() { _ = sniHost.Close() })
 		s.ctx.Tray = NewTrayService(sniHost)
@@ -669,7 +695,7 @@ func (s *shellStart) mount() {
 	// The lock triggers (logind, lock-on-start, and `lys-shell lock`
 	// through Shell1) start `lys-login lock`, the login screen in its
 	// lock mode, as a process of its own.
-	locker, stopLock := lockclient.Start(current.Load, func() {
+	locker, stopLock := lockclient.Start(s.system, current.Load, func() {
 		polls.setLocked(true)
 		if current.Load().Bitwarden.LockWithSession {
 			baseCtx.Bitwarden.lockVault()
@@ -954,4 +980,25 @@ func (w *barWindow) Close() {
 	}
 	w.layer.Close()
 	w.gen.retire()
+}
+
+func startBluetooth(system *dbus.Conn) (*bluetooth.Service, error) {
+	if system == nil {
+		return nil, errors.New("no system bus")
+	}
+	return bluetooth.New(system)
+}
+
+func startMedia(session *dbus.Conn, cfg config.MediaConfig) (*mpris.Service, error) {
+	if session == nil {
+		return nil, errors.New("no session bus")
+	}
+	return mpris.New(session, cfg.PlayersIgnored, cfg.PlayerPriority)
+}
+
+func startTrayHost(session *dbus.Conn, store *sni.Store) (*sni.Host, error) {
+	if session == nil {
+		return nil, errors.New("no session bus")
+	}
+	return sni.NewHostOn(session, store)
 }

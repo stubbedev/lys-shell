@@ -1,8 +1,11 @@
 package bluetooth
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
+	"time"
 	"unicode/utf8"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -10,6 +13,8 @@ import (
 
 // agentPath is where the pairing agent lives on the bus (service.rs).
 const agentPath = dbus.ObjectPath("/dev/stubbe/lys/BluetoothAgent")
+
+const agentUnregisterTimeout = 2 * time.Second
 
 // agentCapability is the IO capability lys-shell registers: it can show a
 // code and ask yes/no, and the dropdown also takes PIN/passkey entry.
@@ -334,4 +339,17 @@ func verdict(accepted bool) agentAnswer {
 		return agentAnswer{}
 	}
 	return rejected()
+}
+
+func (s *Service) unregisterAgent() error {
+	ctx, cancel := context.WithTimeout(context.Background(), agentUnregisterTimeout)
+	defer cancel()
+	var errs []error
+	if err := s.conn.Object(BusName, bluezRoot).CallWithContext(ctx, agentManager+".UnregisterAgent", 0, agentPath).Err; err != nil {
+		errs = append(errs, fmt.Errorf("bluetooth: unregister agent: %w", err))
+	}
+	if err := s.conn.Export(nil, agentPath, agentIface); err != nil {
+		errs = append(errs, fmt.Errorf("bluetooth: unexport agent: %w", err))
+	}
+	return errors.Join(errs...)
 }

@@ -168,7 +168,7 @@ type bitwardenHost struct {
 
 // newBitwardenHost is the host over the session clipboard and the
 // session bus.
-func newBitwardenHost(life context.Context, application *app.Application, current func() *config.Config) *bitwardenHost {
+func newBitwardenHost(life context.Context, application *app.Application, current func() *config.Config, session *dbus.Conn) *bitwardenHost {
 	h := &bitwardenHost{
 		life: life, config: func() config.BitwardenConfig { return current().Bitwarden },
 		notify: func(summary, body string) {
@@ -186,11 +186,10 @@ func newBitwardenHost(life context.Context, application *app.Application, curren
 		return clip.WriteExpiring(content, ttl)
 	}
 	h.client = sync.OnceValues(func() (*vault.Client, error) {
-		conn, err := dbus.ConnectSessionBus()
-		if err != nil {
-			return nil, err
+		if session == nil {
+			return nil, errors.New("bitwarden: the shell has no session bus connection")
 		}
-		return vault.NewClient(conn), nil
+		return vault.NewClient(session), nil
 	})
 	h.vault = sync.OnceValues(func() (bwVault, error) {
 		c, err := h.client()

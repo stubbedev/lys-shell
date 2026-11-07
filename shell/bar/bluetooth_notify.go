@@ -70,13 +70,12 @@ var btNotifiers sync.Map
 
 // startBtPairingNotifier starts the source's notifier once; the bar
 // runtime calls it with the BlueZ source, placed module or not.
-func startBtPairingNotifier(src bluetooth.Source) {
+func startBtPairingNotifier(src bluetooth.Source, conn *dbus.Conn) {
 	if _, loaded := btNotifiers.LoadOrStore(src, struct{}{}); loaded {
 		return
 	}
-	conn, err := dbus.SessionBus()
-	if err != nil {
-		log.Printf("bluetooth: pairing notifications off: %v", err)
+	if conn == nil {
+		log.Print("bluetooth: pairing notifications off: no session bus")
 		return
 	}
 	n := &btPairingNotifier{src: src, sender: desktopnotify.NewSender(conn), spawn: func(fn func()) { go fn() }}

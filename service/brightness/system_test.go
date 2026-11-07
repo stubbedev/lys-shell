@@ -51,7 +51,7 @@ func newDriftingSystem(t *testing.T, external bool, drift time.Duration) (*Syste
 	listenUevents = func() (ueventReader, error) { return events, nil }
 	driftInterval = drift
 	t.Cleanup(func() { listenUevents, driftInterval = orig, origDrift })
-	sys := NewSystem(external)
+	sys := NewSystem(nil, external)
 	sys.settle = 0
 	t.Cleanup(func() { _ = sys.Close() })
 	return sys, events.events

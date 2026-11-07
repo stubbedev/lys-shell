@@ -49,18 +49,17 @@ type System struct {
 
 // NewSystem starts the source. external enables DDC/CI discovery
 // (the enable-external key); the first scan runs detached so internal
-// panels are usable at once. A missing logind or uevent socket
-// degrades (sysfs writes, no hotplug) instead of failing.
-func NewSystem(external bool) *System {
+// panels are usable at once. logind is the system bus logind's writes
+// go over, and stays the caller's; nil writes through sysfs. A missing
+// uevent socket degrades to no hotplug instead of failing.
+func NewSystem(logind *dbus.Conn, external bool) *System {
 	s := &System{
+		bus:       logind,
 		subs:      map[chan struct{}]struct{}{},
 		pending:   map[string]uint32{},
 		requested: map[string]uint32{},
 		stop:      make(chan struct{}),
 		settle:    hotplugSettle,
-	}
-	if conn, err := sessionBus(); err == nil {
-		s.bus = conn
 	}
 	s.start()
 	s.SetExternal(external)

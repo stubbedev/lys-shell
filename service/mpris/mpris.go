@@ -219,21 +219,7 @@ type Service struct {
 	stop   chan struct{}
 }
 
-// NewSession connects to the session bus and starts the service.
-func NewSession(ignored, priority []string) (*Service, error) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		return nil, fmt.Errorf("mpris: session bus: %w", err)
-	}
-	s, err := New(conn, ignored, priority)
-	if err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	return s, nil
-}
-
-// New starts the service on conn: it matches the player and bus-owner
+// New starts the service on conn, which stays the caller's: it matches the player and bus-owner
 // signals, discovers the players already on the bus, and follows them.
 // ignored and priority are the players-ignored and player-priority
 // config lists.
@@ -246,17 +232,18 @@ func New(conn *dbus.Conn, ignored, priority []string) (*Service, error) {
 		stop:     make(chan struct{}),
 		ticks:    feed.NewTick(),
 	}
-	if err := conn.AddMatchSignal(dbus.WithMatchInterface(propsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchObjectPath(ObjectPath)); err != nil {
+	if err := conn.AddMatchSignal(playerMatch()...); err != nil {
 		return nil, fmt.Errorf("mpris: match PropertiesChanged: %w", err)
 	}
-	if err := conn.AddMatchSignal(dbus.WithMatchInterface("org.freedesktop.DBus"), dbus.WithMatchMember("NameOwnerChanged"), dbus.WithMatchArg0Namespace("org.mpris.MediaPlayer2")); err != nil {
-		return nil, fmt.Errorf("mpris: match NameOwnerChanged: %w", err)
+	if err := conn.AddMatchSignal(ownerMatch()...); err != nil {
+		return nil, errors.Join(fmt.Errorf("mpris: match NameOwnerChanged: %w", err), conn.RemoveMatchSignal(playerMatch()...))
 	}
 	signals := make(chan *dbus.Signal, 64)
 	conn.Signal(signals)
 	var names []string
 	if err := conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names); err != nil {
-		return nil, fmt.Errorf("mpris: list names: %w", err)
+		conn.RemoveSignal(signals)
+		return nil, errors.Join(fmt.Errorf("mpris: list names: %w", err), s.removeMatches())
 	}
 	for _, name := range names {
 		if strings.HasPrefix(name, BusNamePrefix) && !Ignored(name, ignored) {
@@ -267,11 +254,23 @@ func New(conn *dbus.Conn, ignored, priority []string) (*Service, error) {
 	return s, nil
 }
 
-// Close stops following the bus and drops the connection.
+// Close stops following the bus; the connection stays open.
 func (s *Service) Close() error {
 	close(s.stop)
 	s.ticks.Close()
-	return s.conn.Close()
+	return s.removeMatches()
+}
+
+func (s *Service) removeMatches() error {
+	return errors.Join(s.conn.RemoveMatchSignal(playerMatch()...), s.conn.RemoveMatchSignal(ownerMatch()...))
+}
+
+func playerMatch() []dbus.MatchOption {
+	return []dbus.MatchOption{dbus.WithMatchInterface(propsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchObjectPath(ObjectPath)}
+}
+
+func ownerMatch() []dbus.MatchOption {
+	return []dbus.MatchOption{dbus.WithMatchInterface("org.freedesktop.DBus"), dbus.WithMatchMember("NameOwnerChanged"), dbus.WithMatchArg0Namespace("org.mpris.MediaPlayer2")}
 }
 
 // run consumes the signals until Close.
@@ -312,7 +311,7 @@ func (s *Service) handle(sig *dbus.Signal) {
 			s.add(name)
 		}
 	case propsIface + ".PropertiesChanged":
-		if len(sig.Body) < 1 {
+		if sig.Path != ObjectPath || len(sig.Body) < 1 {
 			return
 		}
 		if iface, _ := sig.Body[0].(string); iface != PlayerIface && iface != RootIface {

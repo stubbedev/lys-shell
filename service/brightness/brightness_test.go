@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // fakeBacklightDir builds a sysfs-looking tree in a temp dir and
@@ -37,12 +35,7 @@ func fakeBacklightDir(t *testing.T, devices map[string]struct {
 	}
 	orig := BacklightDir
 	BacklightDir = dir
-	origBus := sessionBus
-	sessionBus = func() (*dbus.Conn, error) { return nil, os.ErrPermission }
-	t.Cleanup(func() {
-		BacklightDir = orig
-		sessionBus = origBus
-	})
+	t.Cleanup(func() { BacklightDir = orig })
 }
 
 func itoa(v uint32) string {

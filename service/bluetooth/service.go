@@ -7,9 +7,11 @@ package bluetooth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -120,23 +122,9 @@ type Service struct {
 	discSubs map[chan DisconnectedEvent]dbus.ObjectPath
 }
 
-// NewSystem connects to the system bus and starts the service.
-func NewSystem() (*Service, error) {
-	conn, err := dbus.ConnectSystemBus()
-	if err != nil {
-		return nil, fmt.Errorf("bluetooth: cannot initialize bluetooth service: %w", err)
-	}
-	s, err := New(conn)
-	if err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	return s, nil
-}
-
-// New starts the service on conn, which it owns from here on: it
-// exports and registers the agent, reads the object tree, and follows
-// BlueZ's signals (BluetoothService::new).
+// New starts the service on conn, which stays the caller's: it exports
+// and registers the agent, reads the object tree, and follows BlueZ's
+// signals (BluetoothService::new). Close takes back what it put there.
 func New(conn *dbus.Conn) (*Service, error) {
 	s := &Service{
 		conn:     conn,
@@ -148,21 +136,38 @@ func New(conn *dbus.Conn) (*Service, error) {
 	if err := s.registerAgent(); err != nil {
 		return nil, err
 	}
-	// Match before reading the tree so nothing between the two is lost;
-	// replays of what the read already saw are idempotent.
-	for _, opts := range matchRules() {
-		if err := conn.AddMatchSignal(opts...); err != nil {
-			return nil, fmt.Errorf("bluetooth: match signals: %w", err)
-		}
-	}
-	conn.Signal(s.signals)
-	if err := s.discover(); err != nil {
-		conn.RemoveSignal(s.signals)
-		return nil, err
+	if err := s.follow(); err != nil {
+		return nil, errors.Join(err, s.unregisterAgent())
 	}
 	s.wg.Add(1)
 	go s.run()
 	return s, nil
+}
+
+// follow matches before reading the tree so nothing between the two is
+// lost; replays of what the read already saw are idempotent.
+func (s *Service) follow() error {
+	for i, opts := range matchRules() {
+		if err := s.conn.AddMatchSignal(opts...); err != nil {
+			return errors.Join(fmt.Errorf("bluetooth: match signals: %w", err), s.removeMatches(i))
+		}
+	}
+	s.conn.Signal(s.signals)
+	if err := s.discover(); err != nil {
+		s.conn.RemoveSignal(s.signals)
+		return errors.Join(err, s.removeMatches(len(matchRules())))
+	}
+	return nil
+}
+
+func (s *Service) removeMatches(n int) error {
+	var errs []error
+	for _, opts := range matchRules()[:n] {
+		if err := s.conn.RemoveMatchSignal(opts...); err != nil {
+			errs = append(errs, fmt.Errorf("bluetooth: remove match: %w", err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func matchRules() [][]dbus.MatchOption {
@@ -174,7 +179,7 @@ func matchRules() [][]dbus.MatchOption {
 }
 
 // Close stops following BlueZ, cancels a pending agent request, and
-// drops the connection (which unregisters the agent).
+// unregisters the agent; the connection stays open.
 func (s *Service) Close() error {
 	select {
 	case <-s.done:
@@ -192,7 +197,7 @@ func (s *Service) Close() error {
 	}
 	s.discSubs = map[chan DisconnectedEvent]dbus.ObjectPath{}
 	s.mu.Unlock()
-	return s.conn.Close()
+	return errors.Join(s.removeMatches(len(matchRules())), s.unregisterAgent())
 }
 
 type managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
@@ -236,6 +241,9 @@ func (s *Service) run() {
 }
 
 func (s *Service) handle(sig *dbus.Signal) {
+	if !fromBlueZ(sig) {
+		return
+	}
 	switch sig.Name {
 	case objectManager + ".InterfacesAdded":
 		var path dbus.ObjectPath
@@ -582,4 +590,16 @@ func (s *Service) fanDisconnected(path dbus.ObjectPath, ev DisconnectedEvent) {
 		default:
 		}
 	}
+}
+
+func fromBlueZ(sig *dbus.Signal) bool {
+	if sig.Path == objectManagerAt && len(sig.Body) > 0 {
+		path, ok := sig.Body[0].(dbus.ObjectPath)
+		return ok && underBlueZ(path)
+	}
+	return underBlueZ(sig.Path)
+}
+
+func underBlueZ(path dbus.ObjectPath) bool {
+	return path == bluezRoot || strings.HasPrefix(string(path), bluezRoot+"/")
 }

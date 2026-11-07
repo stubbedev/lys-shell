@@ -148,12 +148,6 @@ func setLogind(conn *dbus.Conn, name string, value uint32) error {
 	return obj.Call("org.freedesktop.login1.Session.SetBrightness", 0, "backlight", name, value).Err
 }
 
-// sessionBus connects lazily; a missing session bus is not fatal —
-// the write path falls back to sysfs.
-var sessionBus = func() (*dbus.Conn, error) {
-	return dbus.ConnectSystemBus()
-}
-
 // AveragePercentage is the mean level across devices (helpers.rs): what
 // the bar label and the OSD show, since a brightness action drives every
 // device at once. False when there is none.

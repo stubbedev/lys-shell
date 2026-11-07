@@ -3,9 +3,12 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 var shellSessionNames = []string{
@@ -46,5 +49,40 @@ func TestTheShellServesItsSessionNamesOnOneConnection(t *testing.T) {
 	var pid uint32
 	if err := conn.BusObject().Call("org.freedesktop.DBus.GetConnectionUnixProcessID", 0, shared).Store(&pid); err != nil || int(pid) != s.cmd.Process.Pid {
 		t.Errorf("the shared connection belongs to pid %d (%v), want the shell's %d", pid, err, s.cmd.Process.Pid)
+	}
+}
+
+func connectionSerial(t *testing.T, connect func(...dbus.ConnOption) (*dbus.Conn, error)) int {
+	t.Helper()
+	conn, err := connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	name := conn.Names()[0]
+	_, serial, ok := strings.Cut(name, ".")
+	if !ok {
+		t.Fatalf("unique name %q has no serial", name)
+	}
+	n, err := strconv.Atoi(serial)
+	if err != nil {
+		t.Fatalf("unique name %q: %v", name, err)
+	}
+	return n
+}
+
+func TestTheShellOpensOneConnectionPerBusBeforeItsBarMaps(t *testing.T) {
+	startBareSession(t)
+	image := filepath.Join(t.TempDir(), "red.jpg")
+	if err := os.WriteFile(image, redJPEG(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	session, system := connectionSerial(t, dbus.ConnectSessionBus), connectionSerial(t, dbus.ConnectSystemBus)
+	s := startShellProcess(t, image)
+	awaitBar(t, s)
+	sessionOpened := connectionSerial(t, dbus.ConnectSessionBus) - session - 1
+	systemOpened := connectionSerial(t, dbus.ConnectSystemBus) - system - 1
+	if sessionOpened != 1 || systemOpened != 1 {
+		t.Errorf("by the time the bar mapped the shell had opened %d session and %d system bus connections, want 1 and 1\nshell log:\n%s", sessionOpened, systemOpened, s.logs(t))
 	}
 }

@@ -2,6 +2,7 @@ package sni
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -57,26 +58,13 @@ type Host struct {
 	// when the set of sizes changes.
 	pixmapSizes map[int]int
 	retrack     chan struct{}
+	matched     int
+	exported    bool
 }
 
-// NewHost connects to the session bus and claims the roles: when no
-// watcher is running, this process becomes the watcher and hosts
-// against itself.
-func NewHost(store *Store) (*Host, error) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		return nil, fmt.Errorf("sni: session bus: %w", err)
-	}
-	h, err := NewHostOn(conn, store)
-	if err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	return h, nil
-}
-
-// NewHostOn runs the host on an existing connection (tests use a
-// private bus).
+// NewHostOn runs the host on conn, which stays the caller's, and claims
+// the roles: when no watcher is running, this process becomes the
+// watcher and hosts against itself.
 func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 	h := &Host{
 		conn:        conn,
@@ -89,16 +77,9 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 	}
 	signals := make(chan *dbus.Signal, 64)
 	conn.Signal(signals)
-	if err := h.subscribe(); err != nil {
-		return nil, err
-	}
-	if err := h.claimWatcher(); err != nil {
-		return nil, err
-	}
-	if h.watcher == nil {
-		if err := h.registerHost(); err != nil {
-			return nil, err
-		}
+	if err := h.claim(); err != nil {
+		conn.RemoveSignal(signals)
+		return nil, errors.Join(err, h.release())
 	}
 	go h.run(signals)
 	if h.watcher == nil {
@@ -107,6 +88,19 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 		go h.orphanScan()
 	}
 	return h, nil
+}
+
+func (h *Host) claim() error {
+	if err := h.subscribe(); err != nil {
+		return err
+	}
+	if err := h.claimWatcher(); err != nil {
+		return err
+	}
+	if h.watcher == nil {
+		return h.registerHost()
+	}
+	return nil
 }
 
 // Actions returns the item controls on the host's connection.
@@ -121,6 +115,7 @@ func (h *Host) claimWatcher() error {
 		return nil
 	}
 	w := &watcher{host: h, hosts: []string{h.conn.Names()[0]}}
+	h.exported = true
 	if err := h.conn.Export(w, WatcherPath, WatcherIface); err != nil {
 		return fmt.Errorf("sni: export watcher: %w", err)
 	}
@@ -148,18 +143,48 @@ func (h *Host) registerHost() error {
 // change signals and PropertiesChanged, the menus' change signals, and
 // bus-name ownership changes (for the watcher role and item exits).
 func (h *Host) subscribe() error {
-	for _, rule := range [][]dbus.MatchOption{
+	for _, rule := range hostMatches() {
+		if err := h.conn.AddMatchSignal(rule...); err != nil {
+			return fmt.Errorf("sni: match: %w", err)
+		}
+		h.matched++
+	}
+	return nil
+}
+
+func hostMatches() [][]dbus.MatchOption {
+	return [][]dbus.MatchOption{
 		{dbus.WithMatchInterface(WatcherIface)},
 		{dbus.WithMatchInterface(ItemIface)},
 		{dbus.WithMatchInterface(PropsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, ItemIface)},
 		{dbus.WithMatchInterface(MenuIface)},
 		{dbus.WithMatchInterface("org.freedesktop.DBus"), dbus.WithMatchMember("NameOwnerChanged")},
-	} {
-		if err := h.conn.AddMatchSignal(rule...); err != nil {
-			return fmt.Errorf("sni: match: %w", err)
+	}
+}
+
+func (h *Host) release() error {
+	var errs []error
+	for _, rule := range hostMatches()[:h.matched] {
+		if err := h.conn.RemoveMatchSignal(rule...); err != nil {
+			errs = append(errs, fmt.Errorf("sni: remove match: %w", err))
 		}
 	}
-	return nil
+	h.matched = 0
+	if h.owned {
+		if _, err := h.conn.ReleaseName(WatcherName); err != nil {
+			errs = append(errs, fmt.Errorf("sni: release watcher name: %w", err))
+		}
+		h.owned = false
+	}
+	if h.exported {
+		for _, iface := range []string{WatcherIface, PropsIface} {
+			if err := h.conn.Export(nil, WatcherPath, iface); err != nil {
+				errs = append(errs, fmt.Errorf("sni: unexport watcher: %w", err))
+			}
+		}
+		h.exported = false
+	}
+	return errors.Join(errs...)
 }
 
 // run consumes the signals until Close.
@@ -557,13 +582,11 @@ func parseTooltip(v any) Tooltip {
 	return tip
 }
 
-// Close releases the watcher name when we own it and stops the loop.
+// Close stops the loop and takes back the matches, the watcher object
+// and its name; the connection stays open.
 func (h *Host) Close() error {
 	close(h.stop)
-	if h.owned {
-		_, _ = h.conn.ReleaseName(WatcherName)
-	}
-	return h.conn.Close()
+	return h.release()
 }
 
 // watcher is the exported StatusNotifierWatcher (watcher/mod.rs).

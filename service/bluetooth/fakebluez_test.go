@@ -295,7 +295,15 @@ func (m fakeAgentManager) RequestDefaultAgent(sender dbus.Sender, path dbus.Obje
 	return nil
 }
 
-func (m fakeAgentManager) UnregisterAgent(dbus.ObjectPath) *dbus.Error { return nil }
+func (m fakeAgentManager) UnregisterAgent(sender dbus.Sender, path dbus.ObjectPath) *dbus.Error {
+	m.f.mu.Lock()
+	defer m.f.mu.Unlock()
+	if string(sender) != m.f.agentOwner || path != m.f.agentAt {
+		return dbus.NewError("org.bluez.Error.DoesNotExist", []any{"Does Not Exist"})
+	}
+	m.f.agentOwner, m.f.agentAt, m.f.defaultAgent = "", "", false
+	return nil
+}
 
 type fakeProperties struct {
 	f    *fakeBlueZ

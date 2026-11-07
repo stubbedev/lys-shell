@@ -82,17 +82,8 @@ type System struct {
 	conn *dbus.Conn
 }
 
-// NewSystem connects to the system bus.
-func NewSystem() (*System, error) {
-	conn, err := dbus.ConnectSystemBus()
-	if err != nil {
-		return nil, fmt.Errorf("powerprofiles: system bus: %w", err)
-	}
-	return &System{conn: conn}, nil
-}
-
-// Close drops the bus connection.
-func (s *System) Close() error { return s.conn.Close() }
+// NewOn reads the daemon over conn, which stays the caller's.
+func NewOn(conn *dbus.Conn) *System { return &System{conn: conn} }
 
 // Read collects the snapshot; an absent daemon reads as unavailable
 // with the canonical cycle available.
@@ -135,11 +126,7 @@ func (s *System) SetActive(ctx context.Context, profile string) error {
 
 // Subscribe matches the daemon's PropertiesChanged.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	if err := s.conn.AddMatchSignal(
-		dbus.WithMatchInterface(properties),
-		dbus.WithMatchArg(0, daemonIface),
-		dbus.WithMatchSender(BusName),
-	); err != nil {
+	if err := s.conn.AddMatchSignal(daemonMatch()...); err != nil {
 		return nil, nil, fmt.Errorf("powerprofiles: match properties: %w", err)
 	}
 	ticks := make(chan struct{}, 1)
@@ -155,7 +142,7 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 				if !ok {
 					return
 				}
-				if sig.Name != properties+".PropertiesChanged" {
+				if !daemonChanged(sig) {
 					continue
 				}
 				select {
@@ -165,6 +152,21 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 			}
 		}
 	}()
-	stop := func() { s.conn.RemoveSignal(signals) }
+	stop := func() {
+		_ = s.conn.RemoveMatchSignal(daemonMatch()...)
+		s.conn.RemoveSignal(signals)
+	}
 	return ticks, stop, nil
+}
+
+func daemonMatch() []dbus.MatchOption {
+	return []dbus.MatchOption{dbus.WithMatchInterface(properties), dbus.WithMatchArg(0, daemonIface), dbus.WithMatchSender(BusName)}
+}
+
+func daemonChanged(sig *dbus.Signal) bool {
+	if sig.Path != daemonPath || sig.Name != properties+".PropertiesChanged" || len(sig.Body) == 0 {
+		return false
+	}
+	iface, ok := sig.Body[0].(string)
+	return ok && iface == daemonIface
 }

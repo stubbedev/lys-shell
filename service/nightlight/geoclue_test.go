@@ -31,6 +31,7 @@ type fakeGeoClue struct {
 	agents     chan agentRegistration
 	released   chan struct{}
 	noFix      bool
+	deleted    chan dbus.ObjectPath
 }
 
 type agentRegistration struct {
@@ -43,6 +44,11 @@ func (g *fakeGeoClue) GetClient() (dbus.ObjectPath, *dbus.Error) {
 		<-g.released
 	}
 	return "/org/freedesktop/GeoClue2/Client/1", nil
+}
+
+func (g *fakeGeoClue) DeleteClient(path dbus.ObjectPath) *dbus.Error {
+	g.deleted <- path
+	return nil
 }
 
 func (g *fakeGeoClue) AddAgent(sender dbus.Sender, id string) *dbus.Error {
@@ -85,6 +91,7 @@ func serveFakeGeoClue(t *testing.T, g *fakeGeoClue, latitude, longitude float64)
 	daemon := bus.Conn(t)
 	g.conn = daemon
 	g.agents = make(chan agentRegistration, 1)
+	g.deleted = make(chan dbus.ObjectPath, 4)
 	g.released = make(chan struct{})
 	t.Cleanup(func() {
 		select {
@@ -353,5 +360,26 @@ func TestGeoClueDropInIsPackaged(t *testing.T) {
 	}
 	if docs := readRepoFile(t, "docs/config/modules/nightlight.md"); !strings.Contains(docs, "/etc"+installed) {
 		t.Errorf("the docs do not name /etc%s", installed)
+	}
+}
+
+func TestALookupOnASharedConnectionDeletesItsClient(t *testing.T) {
+	g := &fakeGeoClue{}
+	_, conn := serveFakeGeoClue(t, g, 55.6761, 12.5683)
+	for range 2 {
+		if _, err := QueryLocation(context.Background(), conn); err != nil {
+			t.Fatalf("QueryLocation: %v", err)
+		}
+		select {
+		case path := <-g.deleted:
+			if path != "/org/freedesktop/GeoClue2/Client/1" {
+				t.Errorf("deleted %s, want the lookup's client", path)
+			}
+		default:
+			t.Fatal("the lookup left its client to the connection's end")
+		}
+	}
+	if err := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
+		t.Fatalf("the lookup closed the shared connection: %v", err)
 	}
 }

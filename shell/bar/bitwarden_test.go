@@ -810,7 +810,7 @@ func sessionHost(t *testing.T, cfg *config.Config) *bitwardenHost {
 	t.Helper()
 	life, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	return newBitwardenHost(life, nil, func() *config.Config { return cfg })
+	return newBitwardenHost(life, nil, func() *config.Config { return cfg }, dbustest.SessionConn(t))
 }
 
 // The session lock locks lys-secrets' vault whether or not this shell

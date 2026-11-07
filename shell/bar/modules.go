@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
@@ -60,6 +61,9 @@ type ModuleContext struct {
 	Bitwarden     *bitwardenHost
 	SNI           *sni.Store
 	Weather       *weather.Service
+	// System is the shell's one system bus connection, nil without one;
+	// what reads it never closes it.
+	System *dbus.Conn
 	// SetConfig writes a runtime override and persists it (the Rust
 	// ConfigService property set the dropdowns use); nil without a
 	// config service.

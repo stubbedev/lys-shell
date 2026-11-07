@@ -313,15 +313,18 @@ func TestNightlightLiveEnvNeedsAStateDir(t *testing.T) {
 	vars := func(values map[string]string) xdg.Env {
 		return func(name string) string { return values[name] }
 	}
-	env, err := liveSunsetEnv(vars(map[string]string{"XDG_STATE_HOME": "/state"}))
+	env, err := liveSunsetEnv(vars(map[string]string{"XDG_STATE_HOME": "/state"}), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := filepath.Join("/state", version.Name); env.stateDir != want {
 		t.Errorf("stateDir = %q, want %q", env.stateDir, want)
 	}
+	if _, err := env.locate(context.Background()); err == nil || !strings.Contains(err.Error(), "no system bus") {
+		t.Errorf("locate without a system bus = %v, want it to say there is none", err)
+	}
 	for _, values := range []map[string]string{nil, {"HOME": "relative"}, {"XDG_STATE_HOME": "relative"}} {
-		if _, err := liveSunsetEnv(vars(values)); err == nil || !strings.Contains(err.Error(), "no state directory") {
+		if _, err := liveSunsetEnv(vars(values), nil); err == nil || !strings.Contains(err.Error(), "no state directory") {
 			t.Errorf("%v: err = %v, want no state directory", values, err)
 		}
 	}
@@ -1076,7 +1079,7 @@ func (l *lockedLog) String() string {
 // The shell's real environment watches the kernel's clock, and lets go
 // with the module.
 func TestNightlightLiveEnvWatchesTheClock(t *testing.T) {
-	env, err := liveSunsetEnv(func(string) string { return t.TempDir() })
+	env, err := liveSunsetEnv(func(string) string { return t.TempDir() }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

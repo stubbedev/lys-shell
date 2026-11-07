@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -32,6 +33,8 @@ const (
 	// lookup takes it that no agent is coming and registers as one. A
 	// running agent answers at once, and registering would replace it.
 	agentGrace = 5 * time.Second
+
+	deleteClientTimeout = 2 * time.Second
 )
 
 // geoclueWaits bounds the two waits of a lookup.
@@ -123,6 +126,7 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (Lo
 	if err != nil {
 		return Location{}, err
 	}
+	defer deleteClient(conn, clientPath)
 	client := conn.Object(geoclueService, clientPath)
 	set := func(prop string, value any) error {
 		return client.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Set", 0, geoclueClient, prop, dbus.MakeVariant(value)).Err
@@ -196,4 +200,12 @@ func readCoordinate(ctx context.Context, obj dbus.BusObject, prop string) (float
 		return 0, fmt.Errorf("geoclue: %s is %T, want a double", prop, v.Value())
 	}
 	return f, nil
+}
+
+func deleteClient(conn *dbus.Conn, clientPath dbus.ObjectPath) {
+	ctx, cancel := context.WithTimeout(context.Background(), deleteClientTimeout)
+	defer cancel()
+	if err := conn.Object(geoclueService, geoclueManagerPath).CallWithContext(ctx, geoclueManager+".DeleteClient", 0, clientPath).Err; err != nil {
+		log.Printf("geoclue: delete client %s: %v", clientPath, err)
+	}
 }

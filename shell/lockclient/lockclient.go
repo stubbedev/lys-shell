@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -206,9 +207,11 @@ func (c *Client) mayRespawn() bool {
 
 // Start runs the triggers for a shell: logind's Lock signal, a lock found
 // held at startup (a lock client that died with the session locked), and
-// lock-on-start once per login session. It returns the client, for
-// `lys-shell lock`, and the stop that ends the logind listener.
-func Start(current func() *config.Config, onLocked, onUnlocked func()) (*Client, func()) {
+// lock-on-start once per login session, over the system bus connection
+// system, which stays the caller's (nil leaves logind's triggers off). It
+// returns at once with the client, for `lys-shell lock`, and the stop that
+// ends the logind listener.
+func Start(system *dbus.Conn, current func() *config.Config, onLocked, onUnlocked func()) (*Client, func()) {
 	var session atomic.Pointer[logind.Client]
 	c := New(func() bool { return current().Login.Lock.Enabled }, onLocked, func() (bool, error) {
 		ld := session.Load()
@@ -223,10 +226,15 @@ func Start(current func() *config.Config, onLocked, onUnlocked func()) (*Client,
 		if current().Login.Lock.LockOnStart && claimLockOnStart(xdg.OS) {
 			c.Lock()
 		}
+		if system == nil {
+			log.Print("lock: logind unavailable: no system bus")
+			return
+		}
 		connecting, connected := context.WithTimeout(life, logind.CallTimeout)
-		ld := logind.SystemClient(connecting, "lock")
+		ld, err := logind.NewClient(connecting, system)
 		connected()
-		if ld == nil {
+		if err != nil {
+			log.Printf("lock: logind unavailable: %v", err)
 			return
 		}
 		session.Store(ld)

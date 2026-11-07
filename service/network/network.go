@@ -130,17 +130,8 @@ type System struct {
 	conn *dbus.Conn
 }
 
-// NewSystem connects to the system bus.
-func NewSystem() (*System, error) {
-	conn, err := dbus.ConnectSystemBus()
-	if err != nil {
-		return nil, fmt.Errorf("network: system bus: %w", err)
-	}
-	return &System{conn: conn}, nil
-}
-
-// Close drops the bus connection.
-func (s *System) Close() error { return s.conn.Close() }
+// NewOn reads NetworkManager over conn, which stays the caller's.
+func NewOn(conn *dbus.Conn) *System { return &System{conn: conn} }
 
 func (s *System) prop(ctx context.Context, iface, name string, out any) error {
 	obj := s.conn.Object(BusName, dbus.ObjectPath(nmPath))
@@ -215,16 +206,11 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 // Subscribe matches NM's StateChanged plus property changes on the
 // manager object.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	if err := s.conn.AddMatchSignal(
-		dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)),
-		dbus.WithMatchArg(0, nmIface),
-	); err != nil {
+	if err := s.conn.AddMatchSignal(managerPropertiesMatch()...); err != nil {
 		return nil, nil, fmt.Errorf("network: match signal: %w", err)
 	}
-	if err := s.conn.AddMatchSignal(
-		dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)),
-		dbus.WithMatchInterface(nmIface),
-	); err != nil {
+	if err := s.conn.AddMatchSignal(managerStateMatch()...); err != nil {
+		_ = s.conn.RemoveMatchSignal(managerPropertiesMatch()...)
 		return nil, nil, fmt.Errorf("network: match state signal: %w", err)
 	}
 	ticks := make(chan struct{}, 1)
@@ -240,22 +226,15 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 				if !ok {
 					return
 				}
-				switch sig.Name {
-				case properties + ".PropertiesChanged", nmIface + ".StateChanged":
+				if managerChanged(sig) {
 					tick(ticks)
 				}
 			}
 		}
 	}()
 	stop := func() {
-		_ = s.conn.RemoveMatchSignal(
-			dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)),
-			dbus.WithMatchArg(0, nmIface),
-		)
-		_ = s.conn.RemoveMatchSignal(
-			dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)),
-			dbus.WithMatchInterface(nmIface),
-		)
+		_ = s.conn.RemoveMatchSignal(managerPropertiesMatch()...)
+		_ = s.conn.RemoveMatchSignal(managerStateMatch()...)
 		s.conn.RemoveSignal(signals)
 	}
 	return ticks, stop, nil
@@ -294,4 +273,34 @@ func (s *System) ip4(ctx context.Context, dev dbus.BusObject) string {
 		}
 	}
 	return ""
+}
+
+func managerPropertiesMatch() []dbus.MatchOption {
+	return []dbus.MatchOption{dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)), dbus.WithMatchArg(0, nmIface)}
+}
+
+func managerStateMatch() []dbus.MatchOption {
+	return []dbus.MatchOption{dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)), dbus.WithMatchInterface(nmIface)}
+}
+
+func managerChanged(sig *dbus.Signal) bool {
+	if sig.Path != dbus.ObjectPath(nmPath) {
+		return false
+	}
+	switch sig.Name {
+	case nmIface + ".StateChanged":
+		return true
+	case properties + ".PropertiesChanged":
+		iface, ok := firstString(sig.Body)
+		return ok && iface == nmIface
+	}
+	return false
+}
+
+func firstString(body []any) (string, bool) {
+	if len(body) == 0 {
+		return "", false
+	}
+	s, ok := body[0].(string)
+	return s, ok
 }

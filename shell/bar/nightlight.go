@@ -3,7 +3,6 @@ package bar
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"strconv"
@@ -84,7 +83,7 @@ type sunsetEnv struct {
 // liveSunsetEnv is the real environment, its state dir resolved from
 // vars. It fails when they name none: the records would otherwise land
 // in whatever directory the shell started from.
-func liveSunsetEnv(vars xdg.Env) (sunsetEnv, error) {
+func liveSunsetEnv(vars xdg.Env, system *dbus.Conn) (sunsetEnv, error) {
 	dir, ok := vars.StateDir(version.Name)
 	if !ok {
 		return sunsetEnv{}, errors.New("nightlight: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path")
@@ -100,12 +99,10 @@ func liveSunsetEnv(vars xdg.Env) (sunsetEnv, error) {
 		now:      time.Now,
 		stateDir: dir,
 		locate: func(ctx context.Context) (nightlight.Location, error) {
-			conn, err := dbus.ConnectSystemBus()
-			if err != nil {
-				return nightlight.Location{}, fmt.Errorf("geoclue: connect to the system bus: %w", err)
+			if system == nil {
+				return nightlight.Location{}, errors.New("geoclue: the shell has no system bus connection")
 			}
-			defer func() { _ = conn.Close() }()
-			return nightlight.QueryLocation(ctx, conn)
+			return nightlight.QueryLocation(ctx, system)
 		},
 		clockJumps: clockwatch.Watch,
 	}, nil
@@ -163,7 +160,7 @@ type nightlightModule struct {
 }
 
 func newNightlight(ctx ModuleContext) (Module, error) {
-	env, err := liveSunsetEnv(xdg.OS)
+	env, err := liveSunsetEnv(xdg.OS, ctx.System)
 	if err != nil {
 		return nil, err
 	}
