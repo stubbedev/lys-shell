@@ -1,6 +1,7 @@
-package launcher
+package widgets
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -43,11 +44,11 @@ var codeRoles = [...]codeRole{
 	{class: "hl-special", ids: []string{"def:special-char", "def:preprocessor", "def:error", "def:deleted"}},
 }
 
-// codeView shows text as bat does: line numbers in a gutter and tokens
+// CodeView shows text as bat does: line numbers in a gutter and tokens
 // colored from the theme's palette. Only the lines that fit are found,
 // highlighted and laid out, so a large file costs a pane's worth; the
 // row widgets are pooled and rebound as the text changes.
-type codeView struct {
+type CodeView struct {
 	widget.Base
 	font render.Font
 	px   float64
@@ -87,23 +88,24 @@ type codeRow struct {
 	gen  uint64
 }
 
-func newCodeView(font render.Font, px float64) *codeView {
-	c := &codeView{font: font, px: px, next: -1}
-	c.AddClass("launcher-preview-code")
+// NewCodeView is an empty code view setting text at px.
+func NewCodeView(font render.Font, px float64) *CodeView {
+	c := &CodeView{font: font, px: px, next: -1}
+	c.AddClass("code-view")
 	for i, r := range codeRoles {
 		c.probes[i] = widget.NewBox(widget.Row, 0, 0)
 		c.probes[i].AddClass(r.class)
 		c.probes[i].SetVisible(false)
 	}
 	c.gutter = widget.NewLabel(font, px, "", 0)
-	c.gutter.AddClass("launcher-preview-gutter")
+	c.gutter.AddClass("code-view-gutter")
 	c.gutter.SetVisible(false)
 	return c
 }
 
-// setText shows text, highlighted as the language its name, #! line or
+// SetText shows text, highlighted as the language its name, #! line or
 // modeline says, plain when none does.
-func (c *codeView) setText(text, name string) {
+func (c *CodeView) SetText(text, name string) {
 	c.text, c.name = text, name
 	c.hl, _ = highlight.Detect(name, text)
 	c.lines = c.lines[:0]
@@ -113,9 +115,20 @@ func (c *codeView) setText(text, name string) {
 	c.InvalidateLayout()
 }
 
+// Text is the text shown.
+func (c *CodeView) Text() string { return c.text }
+
+// Name is the file name the text was highlighted for.
+func (c *CodeView) Name() string { return c.name }
+
+// HexColor is c as a #rrggbb markup color.
+func HexColor(c render.Color) string {
+	return fmt.Sprintf("#%02x%02x%02x", c.R(), c.G(), c.B())
+}
+
 // line is line i's byte range, found as far as i and no further; false
 // past the text's end.
-func (c *codeView) line(i int) (start, end int, ok bool) {
+func (c *CodeView) line(i int) (start, end int, ok bool) {
 	for len(c.lines) <= i && c.next >= 0 {
 		start := c.next
 		nl := strings.IndexByte(c.text[start:], '\n')
@@ -138,7 +151,7 @@ func (c *codeView) line(i int) (start, end int, ok bool) {
 
 // lineRunes is line i as runes, cut to codeLineBytes, a carriage return
 // dropped and tabs expanded to their stops.
-func (c *codeView) lineRunes(i int) []rune {
+func (c *CodeView) lineRunes(i int) []rune {
 	start, end, _ := c.line(i)
 	s := strings.TrimSuffix(c.text[start:end], "\r")
 	if len(s) > codeLineBytes {
@@ -160,7 +173,7 @@ func (c *codeView) lineRunes(i int) []rune {
 // lineSpans is line i's runes and their spans. The lines before it are
 // highlighted first when they have not been: a construct spanning lines
 // carries its state forward.
-func (c *codeView) lineSpans(i int) ([]rune, []widget.TextSpan) {
+func (c *CodeView) lineSpans(i int) ([]rune, []widget.TextSpan) {
 	if c.hl == nil {
 		return c.lineRunes(i), nil
 	}
@@ -180,7 +193,7 @@ func (c *codeView) lineSpans(i int) ([]rune, []widget.TextSpan) {
 
 // restyle reads the roles' colors from the stylesheet and rebuilds the
 // scheme when the palette changed; true when it did.
-func (c *codeView) restyle() bool {
+func (c *CodeView) restyle() bool {
 	var colors [len(codeRoles)]render.Color
 	for i, p := range c.probes {
 		colors[i] = widget.CascadeColor(p)
@@ -201,7 +214,7 @@ func (c *codeView) restyle() bool {
 
 // bind shows line i in row, unless it already shows it for this text
 // and palette.
-func (c *codeView) bind(row *codeRow, i int) {
+func (c *CodeView) bind(row *codeRow, i int) {
 	if row.line == i && row.gen == c.gen {
 		return
 	}
@@ -214,7 +227,7 @@ func (c *codeView) bind(row *codeRow, i int) {
 
 // appendMarkup is line rs in lys-ui markup, each span in its scheme
 // style and the rest in the text's own color.
-func (c *codeView) appendMarkup(dst []byte, rs []rune, spans []widget.TextSpan) []byte {
+func (c *CodeView) appendMarkup(dst []byte, rs []rune, spans []widget.TextSpan) []byte {
 	at := 0
 	plain := func(to int) {
 		for _, r := range rs[at:to] {
@@ -232,7 +245,7 @@ func (c *codeView) appendMarkup(dst []byte, rs []rune, spans []widget.TextSpan) 
 		dst = append(dst, "<span"...)
 		if st.Color != 0 {
 			dst = append(dst, ` foreground="`...)
-			dst = append(dst, hexColor(st.Color)...)
+			dst = append(dst, HexColor(st.Color)...)
 			dst = append(dst, '"')
 		}
 		if st.Bold {
@@ -270,14 +283,14 @@ func appendEscapedRune(dst []byte, r rune) []byte {
 // row is the pooled row for the n-th line shown, made the first time a
 // pane is that tall and parented at once, so the stylesheet reaches it
 // before it is first measured.
-func (c *codeView) row(n int) *codeRow {
+func (c *CodeView) row(n int) *codeRow {
 	for len(c.rows) <= n {
 		r := &codeRow{line: -1}
 		r.num = widget.NewLabel(c.font, c.px, "", 0)
-		r.num.AddClass("launcher-preview-gutter")
+		r.num.AddClass("code-view-gutter")
 		r.num.SetAlignment(render.AlignEnd)
 		r.code = widget.NewRichLabel(c.font, c.px, "", 0)
-		r.code.AddClass("launcher-preview-line")
+		r.code.AddClass("code-view-line")
 		r.code.SetWrap(true)
 		widget.SetParents(c, r.num, r.code)
 		c.rows = append(c.rows, r)
@@ -286,10 +299,10 @@ func (c *codeView) row(n int) *codeRow {
 }
 
 // Measure is flexible: the pane gives the view its room.
-func (c *codeView) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
+func (c *CodeView) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 // Arrange finds, highlights and lays out the lines that fit, top down.
-func (c *codeView) Arrange(r render.Rect) {
+func (c *CodeView) Arrange(r render.Rect) {
 	c.ArrangeSelf(r)
 	c.setKids()
 	c.restyle()
@@ -324,7 +337,7 @@ func (c *codeView) Arrange(r render.Rect) {
 
 // setKids makes the rows shown and the style probes the view's children:
 // every widget the cascade reaches.
-func (c *codeView) setKids() {
+func (c *CodeView) setKids() {
 	c.kids = append(c.kids[:0], c.shown...)
 	for _, p := range c.probes {
 		c.kids = append(c.kids, p)
@@ -334,11 +347,11 @@ func (c *codeView) setKids() {
 }
 
 // ArrangeRoot mirrors Arrange for the root path.
-func (c *codeView) ArrangeRoot(r render.Rect) { c.Arrange(r) }
+func (c *CodeView) ArrangeRoot(r render.Rect) { c.Arrange(r) }
 
 // Paint paints the rows shown, clipped to the view. A palette that
 // changed since they were bound lays them out again for the next frame.
-func (c *codeView) Paint(cv *render.Canvas) {
+func (c *CodeView) Paint(cv *render.Canvas) {
 	if c.restyle() {
 		c.InvalidateLayout()
 	}
@@ -350,7 +363,7 @@ func (c *codeView) Paint(cv *render.Canvas) {
 }
 
 // Children are the rows shown and the style probes.
-func (c *codeView) Children() []widget.Widget { return c.kids }
+func (c *CodeView) Children() []widget.Widget { return c.kids }
 
 // HitTest makes the view the leaf the pointer lands on.
-func (c *codeView) HitTest(p widget.Point) widget.Widget { return c.HitLeaf(c, p) }
+func (c *CodeView) HitTest(p widget.Point) widget.Widget { return c.HitLeaf(c, p) }

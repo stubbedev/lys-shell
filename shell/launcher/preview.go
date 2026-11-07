@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -37,7 +38,7 @@ const previewSettle = 40 * time.Millisecond
 type previewPane struct {
 	box     *paneBox
 	image   *widget.Image
-	code    *codeView
+	code    *widgets.CodeView
 	facts   *widget.Box
 	rows    []factRow
 	summary *rowSummary
@@ -77,7 +78,7 @@ func newPreviewPane(font render.Font, px func(int) int, height int) *previewPane
 	p.image = widget.NewImage(nil)
 	p.image.SetScale(widget.ImageFit)
 	p.image.AddClass("launcher-preview-image")
-	p.code = newCodeView(font, widgetsSmallPx())
+	p.code = widgets.NewCodeView(font, widgetsSmallPx())
 	p.facts = widget.NewBox(widget.Column, px(4), 0)
 	p.facts.AddClass("launcher-preview-facts")
 	p.summary = newRowSummary(font, px)
@@ -105,8 +106,8 @@ func (p *previewPane) show(facts []engine.PreviewFact, c engine.PreviewContent, 
 		p.image.SetImage(img)
 	}
 	p.code.SetVisible(text != "")
-	if text != "" && (text != p.code.text || c.Name != p.code.name) {
-		p.code.setText(text, c.Name)
+	if text != "" && (text != p.code.Text() || c.Name != p.code.Name()) {
+		p.code.SetText(text, c.Name)
 	}
 	p.showFacts(facts)
 	p.summary.box.SetVisible(false)

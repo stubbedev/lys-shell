@@ -230,7 +230,7 @@ func TestTheClipboardModePreviewsItsEntries(t *testing.T) {
 	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 2 })
 	v := h.s.cur.views
 	h.rest("the text", func() bool { return v.pane.code.Visible() })
-	if got := v.pane.code.text; got != "first line\nsecond line" {
+	if got := v.pane.code.Text(); got != "first line\nsecond line" {
 		t.Errorf("text %q, want the entry with its lines", got)
 	}
 	h.key("Down")

@@ -1,4 +1,4 @@
-package launcher
+package widgets
 
 import (
 	"strconv"
@@ -16,14 +16,14 @@ import (
 
 // codeOn is a code view under the shell's stylesheet for cfg's palette,
 // laid out w by h.
-func codeOn(t *testing.T, cfg *config.Config, text, name string, w, h int) (*widget.Box, *codeView) {
+func codeOn(t *testing.T, cfg *config.Config, text, name string, w, h int) (*widget.Box, *CodeView) {
 	t.Helper()
-	c := newCodeView(treetest.Font(t), 13)
+	c := NewCodeView(treetest.Font(t), 13)
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.Append(c, true)
 	root.AttachStylesheet(apptheme.New(cfg).Sheet)
-	c.setText(text, name)
-	layout(root, w, h)
+	c.SetText(text, name)
+	layoutAt(root, w, h)
 	return root, c
 }
 
@@ -37,7 +37,7 @@ func paletteOf(t *testing.T, cfg *config.Config) *styling.Palette {
 }
 
 // lineMarkup is the markup line i of the view was bound with.
-func lineMarkup(t *testing.T, c *codeView, i int) string {
+func lineMarkup(t *testing.T, c *CodeView, i int) string {
 	t.Helper()
 	if i >= len(c.rows) || c.rows[i].line != i {
 		t.Fatalf("line %d is not shown", i)
@@ -68,11 +68,11 @@ func TestTokensTakeThePalettesColors(t *testing.T) {
 		_, c := codeOn(t, cfg, src, "greet.go", 360, 400)
 		line := lineMarkup(t, c, 3)
 		for word, want := range map[string]render.Color{"func": p.Primary, "int": p.Blue, `&quot;hi&quot;`: p.Green, "42": p.Yellow} {
-			if tag := spanOf(line, word); !strings.Contains(tag, hexColor(want)) {
-				t.Errorf("%s: %q is %q, want %s", cfg.Styling.Appearance, word, tag, hexColor(want))
+			if tag := spanOf(line, word); !strings.Contains(tag, HexColor(want)) {
+				t.Errorf("%s: %q is %q, want %s", cfg.Styling.Appearance, word, tag, HexColor(want))
 			}
 		}
-		if tag := spanOf(lineMarkup(t, c, 2), "// greet says hello."); !strings.Contains(tag, hexColor(p.FgMuted)) || !strings.Contains(tag, "italic") {
+		if tag := spanOf(lineMarkup(t, c, 2), "// greet says hello."); !strings.Contains(tag, HexColor(p.FgMuted)) || !strings.Contains(tag, "italic") {
 			t.Errorf("%s: the comment is %q", cfg.Styling.Appearance, tag)
 		}
 	}
@@ -91,11 +91,11 @@ func TestALanguageIsFoundByNameShebangOrNotAtAll(t *testing.T) {
 		t.Errorf("plain text: %q, gutter %q", m, plain.rows[1].num.Text())
 	}
 	_, copied := codeOn(t, cfg, "package main\n\nfunc main() {}\n", "", 360, 400)
-	if tag := spanOf(lineMarkup(t, copied, 2), "func"); !strings.Contains(tag, hexColor(paletteOf(t, cfg).Primary)) {
+	if tag := spanOf(lineMarkup(t, copied, 2), "func"); !strings.Contains(tag, HexColor(paletteOf(t, cfg).Primary)) {
 		t.Errorf("copied Go source: the keyword is %q", tag)
 	}
 	_, script := codeOn(t, cfg, "#!/bin/sh\nif true; then echo hi; fi\n", "", 360, 400)
-	if tag := spanOf(lineMarkup(t, script, 1), "if"); !strings.Contains(tag, hexColor(paletteOf(t, cfg).Primary)) {
+	if tag := spanOf(lineMarkup(t, script, 1), "if"); !strings.Contains(tag, HexColor(paletteOf(t, cfg).Primary)) {
 		t.Errorf("the shell keyword is %q", tag)
 	}
 }
@@ -119,14 +119,14 @@ func TestOnlyTheLinesThatFitAreHighlighted(t *testing.T) {
 	if found := len(c.lines); found > shown+1 {
 		t.Errorf("%d lines found for %d shown", found, shown)
 	}
-	allocs := testing.AllocsPerRun(20, func() { layout(root, 360, 300) })
+	allocs := testing.AllocsPerRun(20, func() { layoutAt(root, 360, 300) })
 	if c.highlighted != shown {
 		t.Errorf("laying the same text out again highlighted %d more lines", c.highlighted-shown)
 	}
 	if allocs > 0 {
 		t.Errorf("laying the same text out again allocates %.0f times", allocs)
 	}
-	layout(root, 360, 600)
+	layoutAt(root, 360, 600)
 	taller := len(c.shown) / 2
 	if taller <= shown || c.highlighted != taller {
 		t.Errorf("a taller pane shows %d lines and highlighted %d in all", taller, c.highlighted)
@@ -138,7 +138,7 @@ func TestOnlyTheLinesThatFitAreHighlighted(t *testing.T) {
 func TestALineShownLaterCarriesTheStateAbove(t *testing.T) {
 	src := "/* a comment\nstill the comment\n*/ int x;\n"
 	root, c := codeOn(t, config.Defaults(), src, "a.c", 360, 1)
-	layout(root, 360, 400)
+	layoutAt(root, 360, 400)
 	if tag := spanOf(lineMarkup(t, c, 1), "still the comment"); !strings.Contains(tag, "italic") {
 		t.Errorf("the second line of the comment is %q", tag)
 	}
@@ -176,4 +176,10 @@ func TestLinesAreMonospaced(t *testing.T) {
 	if narrow != wide {
 		t.Errorf("iiii is %dpx and MMMM %dpx: the lines are not monospaced", narrow, wide)
 	}
+}
+
+// layoutAt measures and arranges root at w x h, building the visible rows.
+func layoutAt(root widget.Widget, w, h int) {
+	widget.SizeWithin(root, widget.Size{W: w, H: h})
+	root.Arrange(render.Rect{W: w, H: h})
 }

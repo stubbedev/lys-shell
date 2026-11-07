@@ -1,7 +1,6 @@
 package launcher
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"time"
@@ -14,11 +13,8 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
+	"github.com/stubbedev/lys-shell/shell/widgets"
 )
-
-func hexColor(c render.Color) string {
-	return fmt.Sprintf("#%02x%02x%02x", c.R(), c.G(), c.B())
-}
 
 // panelViews is the panel's widget tree, built once per config and
 // handed from one panel to the next.
@@ -532,7 +528,7 @@ func (l *searchList) highlightTag() string {
 	accent := widget.Current().Accent
 	if l.openTag == "" || accent != l.openColor {
 		l.openColor = accent
-		l.openTag = "<span weight=\"700\" foreground=\"" + hexColor(accent) + "\">"
+		l.openTag = "<span weight=\"700\" foreground=\"" + widgets.HexColor(accent) + "\">"
 	}
 	return l.openTag
 }
