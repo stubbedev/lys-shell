@@ -88,12 +88,18 @@ const windowPreviewPx = 720
 
 // Capture captures the window's contents, scaled to fit the preview
 // pane.
-func (win WindowInfo) Capture(context.Context) (image.Image, error) {
+func (win WindowInfo) Capture(ctx context.Context) (image.Image, error) {
+	return win.CaptureAt(ctx, windowPreviewPx)
+}
+
+// CaptureAt captures the window's contents scaled down until its smaller
+// side is at most px (sharepreview.ResizeToFit).
+func (win WindowInfo) CaptureAt(_ context.Context, px int) (image.Image, error) {
 	return sharepreview.WindowThumb(sharepreview.Toplevel{
 		Class: win.Class, Title: win.Title,
 		WindowAddress: win.HyprlandAddress, HasAddress: win.HyprlandAddress != 0,
 		Identifier: win.ToplevelIdentifier,
-	}, windowPreviewPx)
+	}, px)
 }
 
 // Preview is the window's side pane: its picture, captured once its row

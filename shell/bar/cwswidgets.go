@@ -5,9 +5,11 @@ import (
 	"strconv"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -38,6 +40,8 @@ func newCwsRow(m *cwsView) {
 	}
 	m.circle = m.measureCircle()
 	m.segs.SetInlineStyle(inlineDecls(styling.WorkspacesCSS(m.cfg, m.otherMonitor, bar)) + " --ws-circle: " + strconv.Itoa(m.circle) + "px;")
+	m.preview = newWindowPreview(m.ctx, revealHoldOf(m.ctx))
+	m.ctx.OnRetire(m.preview.stop)
 	drop := m.segs.EnableDrop()
 	drop.AddClass(m.cfg.ActiveIndicator.CSSClass())
 	drop.SetClass("vertical", m.vertical())
@@ -108,6 +112,7 @@ func (m *cwsView) setSegments(models []cwsButtonModel) {
 		if i >= kept {
 			seg.SetOnPointer(func(e widget.PointerEvent) bool { return m.pointer(i, e) })
 			seg.SetOnScroll(m.scroll)
+			seg.SetOnHoverWithin(func(on bool) { m.hoverSegment(i, seg, on) })
 		}
 		if shown.sameContent(model, m.cfg) {
 			for j, app := range model.appIcons {
@@ -259,4 +264,28 @@ func (m *cwsView) scroll(e widget.ScrollEvent) bool {
 		m.dispatchScroll(m.cfg.Click.ScrollUp)
 	}
 	return true
+}
+
+// Attach keeps the bar surface the window previews open from.
+func (m *cwsView) Attach(host app.Host) { m.preview.Attach(host) }
+
+// hoverSegment previews segment i's workspace once the pointer rests on
+// it.
+func (m *cwsView) hoverSegment(i int, seg widget.Boundser, on bool) {
+	if !on || m.previewOf == nil || i >= len(m.shown) {
+		m.preview.hover(false, seg, nil)
+		return
+	}
+	ws := m.shown[i].ws
+	m.preview.hover(true, seg, func() ([]previewWindow, previewActions) {
+		return m.previewOf(ws), &compositorActions{backend: modes.DetectWindows()}
+	})
+}
+
+// revealHoldOf keeps ctx's bar revealed while a preview of it shows.
+func revealHoldOf(ctx ModuleContext) func() func() {
+	if ctx.Dropdowns == nil {
+		return nil
+	}
+	return func() func() { return ctx.Dropdowns.holdReveal(ctx.Connector) }
 }

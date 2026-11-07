@@ -113,3 +113,18 @@ segments.workspaces button.segment.workspace.indicator-underline.active-other-mo
 .workspace-icon.urgent {
   opacity: 0.5;
 }
+
+.window-preview {
+  padding: calc(8px * var(--global-scale));
+}
+.window-preview-cell {
+  border-radius: calc(8px * var(--global-scale));
+  padding: calc(4px * var(--global-scale));
+  background-color: var(--bg-surface);
+}
+.window-preview-cell:hover {
+  background-color: color-mix(in srgb, var(--accent) 22%, var(--bg-surface));
+}
+.window-preview-thumbnail {
+  border-radius: calc(4px * var(--global-scale));
+}

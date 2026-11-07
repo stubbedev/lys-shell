@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strconv"
 
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
@@ -142,6 +143,8 @@ type dock struct {
 	launch  func(taskApp)
 	// hide is the dock's reveal controller, the bar's too.
 	hide *autoHide
+	// preview shows an app's windows on a hover rest over its entry.
+	preview *windowPreview
 	// size is the panel's size as last shown, which a hidden dock keeps
 	// for what would cover it and for its reveal strip.
 	size  widget.Size
@@ -188,6 +191,7 @@ func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output) *dock
 		apply:      d.applyHidden,
 	}
 	d.surface.SetOnHoverWithin(d.hide.setHovered)
+	d.preview = newWindowPreview(ctx, d.hide.hold)
 	d.rects = d.hub.windows.owner()
 	d.stops = append(d.stops, d.hub.windows.subscribe(d.render), d.hub.subscribeGeometry(d.syncHidden))
 	d.render()
@@ -201,11 +205,16 @@ func (d *dock) close() {
 		stop()
 	}
 	d.hide.close()
+	d.preview.stop()
 	d.rects.release()
 }
 
-// attach keeps the dock's surface, which its rectangles and menus are on.
-func (d *dock) attach(host app.Host) { d.host = host }
+// attach keeps the dock's surface, which its rectangles, menus and
+// previews are on.
+func (d *dock) attach(host app.Host) {
+	d.host = host
+	d.preview.Attach(host)
+}
 
 // render shows an entry per app, reusing each app's entry.
 func (d *dock) render() {
@@ -258,7 +267,22 @@ func (d *dock) newEntry() *dockEntry {
 		d.menu(e)
 		return true
 	})
+	e.SetOnHoverWithin(func(on bool) {
+		d.preview.hover(on && len(e.app.windows) > 1, e, func() ([]previewWindow, previewActions) { return dockPreview(e.app) })
+	})
 	return e
+}
+
+// dockPreview is an app's windows as its entry's preview shows them.
+func dockPreview(a dockApp) ([]previewWindow, previewActions) {
+	actions := taskActions{windows: make(map[string]taskWindow, len(a.windows))}
+	windows := make([]previewWindow, len(a.windows))
+	for i, w := range a.windows {
+		id := strconv.Itoa(i)
+		actions.windows[id] = w
+		windows[i] = previewWindow{id: id, title: w.Title(), appID: w.AppID()}
+	}
+	return windows, actions
 }
 
 // activate launches a closed app and brings up an open one's next

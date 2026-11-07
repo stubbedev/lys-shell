@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -64,6 +66,10 @@ type cwsView struct {
 	// each segment holds of its model.
 	shown    []cwsButtonModel
 	segShown []cwsSegmentShown
+	// preview shows a workspace's windows on a hover rest; previewOf
+	// lists them, nil where the module cannot.
+	preview   *windowPreview
+	previewOf func(ws cwsWorkspace) []previewWindow
 }
 
 // cwsModule is the sway/niri/mango workspaces component: the container,
@@ -97,6 +103,7 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
+	m.previewOf = m.workspaceWindows
 	m.hideUntilRead(m.segs)
 	reads := newOffLoopRead(ctx, kind+"-workspaces", m.read, m.apply)
 	if ctx.App == nil {
@@ -310,4 +317,26 @@ func (m *cwsModule) Stop() {
 
 func (m *cwsModule) closeIPC() {
 	m.stopOnce.Do(m.backend.close)
+}
+
+// workspaceWindows is what a workspace preview shows: the workspace's
+// windows, placed where lys-wm's geometry says on lys-wm.
+func (m *cwsModule) workspaceWindows(ws cwsWorkspace) []previewWindow {
+	rects := map[uint64]lyswm.Rect{}
+	if m.kind == "lys-wm" && m.ctx.Tasks != nil {
+		if windows, ok := m.ctx.Tasks.geometry(); ok {
+			for _, w := range windows {
+				rects[w.ID] = w.Rect
+			}
+		}
+	}
+	var out []previewWindow
+	for _, w := range m.windows {
+		if !w.hasWorkspace || w.workspace != ws.id {
+			continue
+		}
+		rect, placed := rects[w.id]
+		out = append(out, previewWindow{id: strconv.FormatUint(w.id, 10), title: w.app.Title, appID: w.app.AppID, rect: rect, hasRect: placed})
+	}
+	return out
 }

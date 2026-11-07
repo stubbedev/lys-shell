@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/appicons"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // The hyprland-workspaces module (hyprland_workspaces/): the filter
@@ -318,6 +319,7 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	newCwsRow(&m.cwsView)
+	m.previewOf = m.workspaceWindows
 	m.hideUntilRead(m.segs)
 	m.firstDue.Store(true)
 	m.rulesDue.Store(true)
@@ -838,3 +840,19 @@ func (m *hyprlandWorkspaces) ownsChrome() {}
 
 // Stop releases the blink timer.
 func (m *hyprlandWorkspaces) Stop() { m.stopBlink() }
+
+// workspaceWindows is what a workspace preview shows: the workspace's
+// mapped windows where Hyprland places them.
+func (m *hyprlandWorkspaces) workspaceWindows(ws cwsWorkspace) []previewWindow {
+	var out []previewWindow
+	for _, c := range m.clients {
+		if c.Workspace.ID != ws.num || !c.Mapped || c.Hidden {
+			continue
+		}
+		out = append(out, previewWindow{
+			id: c.Address, title: c.Title, appID: c.Class,
+			rect: lyswm.Rect{X: c.At[0], Y: c.At[1], Width: c.Size[0], Height: c.Size[1]}, hasRect: true,
+		})
+	}
+	return out
+}

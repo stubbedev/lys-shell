@@ -319,6 +319,18 @@ func (r *dropdownRegistry) reconfigure(ctx ModuleContext) {
 
 // attachHost registers the layer window a connector's dropdowns open
 // on, with the monitor's logical height for the popover ceiling.
+// holdReveal keeps connector's bar revealed until the returned release;
+// a bar that does not auto-hide has nothing to hold.
+func (r *dropdownRegistry) holdReveal(connector string) (release func()) {
+	r.mu.Lock()
+	hold := r.revealHolds[connector]
+	r.mu.Unlock()
+	if hold == nil {
+		return func() {}
+	}
+	return hold()
+}
+
 // setRevealHold is what keeps connector's bar revealed while a dropdown
 // is open on it; nil drops it.
 func (r *dropdownRegistry) setRevealHold(connector string, hold func() (release func())) {
@@ -484,16 +496,11 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	w, _, _ := dropdownDims(name, r.cfg)
 	cfg := dropdownPopover(r.cfg, bound, content, monH, w)
 	cfg.OnClosed = holdDropdown(anchor, r.cfg.Bar.DropdownFreezeLabel, content)
-	r.mu.Lock()
-	hold := r.revealHolds[connector]
-	r.mu.Unlock()
-	if hold != nil {
-		release, closed := hold(), cfg.OnClosed
-		cfg.OnClosed = func() {
-			release()
-			if closed != nil {
-				closed()
-			}
+	release, closed := r.holdReveal(connector), cfg.OnClosed
+	cfg.OnClosed = func() {
+		release()
+		if closed != nil {
+			closed()
 		}
 	}
 	if f, ok := content.(dropdownFocuser); ok {
