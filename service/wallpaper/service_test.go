@@ -556,3 +556,49 @@ func TestMaterialExtractionFailsLoudlyWithoutRasters(t *testing.T) {
 		t.Errorf("a failed sample = %v, want an error naming the monitor", err)
 	}
 }
+
+func TestPreviewShowsOverTheSetImageAndThemesFromIt(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	dir := imageDir(t, "a.png", "b.png")
+	sampled := 0
+	s := New(Options{
+		Extractor: extract.Config{Tool: extract.Material, MatugenScheme: config.MatugenSchemeTonalSpot},
+		Rand:      seeded(),
+		Sample: func(context.Context, string) ([]material.ARGB, error) {
+			sampled++
+			return []material.ARGB{material.RGB(0x20, 0x60, byte(0x40*sampled))}, nil
+		},
+	})
+	s.RegisterMonitor("DP-1")
+	s.RegisterMonitor("DP-2")
+	a, b := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png")
+	if err := s.SetWallpaper(a, ""); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	_ = s.ExtractColors(ctx)
+	changes, stop := s.Changes()
+	defer stop()
+	if err := s.SetPreview(b, "DP-1"); err != nil {
+		t.Fatal(err)
+	}
+	waitTick(t, changes)
+	if got := wallpaperOf(t, s, "DP-1"); got != b {
+		t.Errorf("DP-1 shows %s during its preview, want b", got)
+	}
+	if got := wallpaperOf(t, s, "DP-2"); got != a {
+		t.Errorf("DP-2 shows %s, want a", got)
+	}
+	_ = s.ExtractColors(ctx)
+	if sampled != 2 {
+		t.Errorf("the previewed theming monitor was sampled %d times in all, want 2", sampled)
+	}
+	s.EndPreview()
+	waitTick(t, changes)
+	if got := wallpaperOf(t, s, "DP-1"); got != a {
+		t.Errorf("DP-1 shows %s after the preview, want a again", got)
+	}
+	if err := s.SetPreview(filepath.Join(dir, "missing.png"), ""); err == nil {
+		t.Error("previewing a missing image succeeded")
+	}
+}

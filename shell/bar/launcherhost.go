@@ -30,10 +30,20 @@ import (
 // (so a reload reaches the next one). The returned stop closes the
 // socket; open toggles the search panel in process, as a bare
 // `lys-shell launcher` does.
-func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, live func() ModuleContext, theme *apptheme.Theme, font render.Font) (stop, open func()) {
+// launcherShell is what the launcher draws on beyond the module context:
+// the wallpaper picker's service (nil without one) and the compositor's
+// focused output.
+type launcherShell struct {
+	wallpapers launcher.Wallpapers
+	focused    func() (string, bool)
+}
+
+func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, live func() ModuleContext, theme *apptheme.Theme, font render.Font, sh launcherShell) (stop, open func()) {
 	ctx := live()
 	deps := launcher.Deps{
-		Invoke: application.Invoke,
+		Invoke:        application.Invoke,
+		Wallpapers:    sh.wallpapers,
+		FocusedOutput: sh.focused,
 		After: func(d time.Duration, fn func()) func() {
 			t := time.AfterFunc(d, func() { application.Invoke(fn) })
 			return func() { t.Stop() }
@@ -75,15 +85,17 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 			return search.OpenFrecency(path, time.Now)
 		},
 	}
-	deps.Search = panelDeps(current, live, newBrowserIndex(), &deps)
+	var surface *launcher.Surface
+	openPicker := func() { surface.Open(inProcessSession(launcher.WallpaperMode)) }
+	deps.Search = panelDeps(current, live, newBrowserIndex(), &deps, openPicker)
 	if ctx.Clipboard != nil {
 		deps.Clipboard = ctx.Clipboard
 	}
 	if ctx.Bitwarden != nil {
 		deps.Vault = func() engine.Mode { return newVaultMode(ctx.Bitwarden, application.Invoke, time.Now) }
 	}
-	surface := launcher.New(deps)
-	open = func() { surface.Open(searchSession()) }
+	surface = launcher.New(deps)
+	open = func() { surface.Open(inProcessSession(launcher.SearchMode)) }
 	stop, err := launcheripc.NewServer(surface).Listen()
 	if err != nil {
 		log.Printf("launcher: the launcher socket is unavailable: %v", err)
@@ -94,8 +106,8 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 
 var inProcessSessions atomic.Uint64
 
-func searchSession() *launcheripc.Session {
-	mode := launcher.SearchMode
+// inProcessSession is a session the shell opens itself, in mode.
+func inProcessSession(mode string) *launcheripc.Session {
 	sess, _ := launcheripc.NewSession(1<<63|inProcessSessions.Add(1), launcheripc.SessionOptions{Mode: &mode}, false, nil)
 	return sess
 }
@@ -116,11 +128,14 @@ func newBrowserIndex() *search.BrowserIndex {
 // panelDeps is what each search session draws on. It asks live each time,
 // on the UI loop as a session opens: a service that started after the
 // shell did is in the context by then.
-func panelDeps(current func() *config.Config, live func() ModuleContext, browser *search.BrowserIndex, deps *launcher.Deps) func() search.Deps {
+func panelDeps(current func() *config.Config, live func() ModuleContext, browser *search.BrowserIndex, deps *launcher.Deps, openPicker func()) func() search.Deps {
 	settingsPages := settingspage.NewLister()
 	return func() search.Deps {
 		cfg := current()
 		controls := controlSourcesOf(live())
+		if deps.Wallpapers != nil {
+			controls.wallpaper = openPicker
+		}
 		d := search.Deps{
 			Env:           search.RealEnv(cfg.Launcher.Terminal),
 			Windows:       modes.DetectWindows(),

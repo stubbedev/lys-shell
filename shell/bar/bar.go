@@ -43,6 +43,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/upower"
 	"github.com/stubbedev/lys-shell/service/weather"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
+	"github.com/stubbedev/lys-shell/shell/launcher"
 	"github.com/stubbedev/lys-shell/shell/layering"
 	"github.com/stubbedev/lys-shell/shell/lockclient"
 	"github.com/stubbedev/lys-shell/shell/osd"
@@ -752,7 +753,11 @@ func (s *shellStart) mount() {
 		})
 	})
 	// The launcher surface serves `lys-shell launcher` sessions.
-	stopLauncher, openLauncher := startLauncher(application, sess.Outputs, current.Load, func() ModuleContext { return rt.ctx }, theme, font)
+	var walls launcher.Wallpapers
+	if s.wall != nil && baseCtx.SetConfig != nil {
+		walls = s.wall.NewPicker(current.Load, baseCtx.SetConfig)
+	}
+	stopLauncher, openLauncher := startLauncher(application, sess.Outputs, current.Load, func() ModuleContext { return rt.ctx }, theme, font, launcherShell{wallpapers: walls, focused: focused})
 	s.down.add(stopLauncher)
 	if sess.GlobalShortcutsManager() != nil {
 		s.down.add(registerShellShortcuts(application.RegisterGlobalShortcut, shellShortcuts(openLauncher, func() {

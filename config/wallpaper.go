@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"math"
+	"path/filepath"
 	"reflect"
 	"slices"
 )
@@ -31,6 +32,10 @@ type WallpaperConfig struct {
 	// Show the same cycling wallpaper on all monitors. Only affects shuffle
 	// mode since sequential already displays the same image.
 	CyclingSameImage bool `cfg:"cycling-same-image"`
+	// Directories the wallpaper picker (`lys-shell launcher -show wallpaper`)
+	// lists images from. Empty lists the cycling directory and the
+	// `Wallpapers` folder of `XDG_PICTURES_DIR`.
+	PickerDirectories []string `cfg:"picker-directories"`
 	// Per-monitor wallpaper and fit mode settings. Each entry targets a
 	// monitor by connector name. See [`MonitorWallpaperConfig`] for the
 	// available fields.
@@ -56,8 +61,26 @@ func DefaultsWallpaper() WallpaperConfig {
 		FitMode:             FitFill,
 		CyclingMode:         CyclingSequential,
 		CyclingIntervalMins: CyclingIntervalDefault,
+		PickerDirectories:   []string{},
 		Monitors:            []MonitorWallpaperConfig{},
 	}
+}
+
+// PickerDirs is where the wallpaper picker looks: picker-directories,
+// else the cycling directory and pictures' Wallpapers folder (pictures
+// is XDG_PICTURES_DIR, "" when there is none).
+func (w WallpaperConfig) PickerDirs(pictures string) []string {
+	if len(w.PickerDirectories) > 0 {
+		return w.PickerDirectories
+	}
+	var dirs []string
+	if w.CyclingDirectory != "" {
+		dirs = append(dirs, w.CyclingDirectory)
+	}
+	if pictures != "" {
+		dirs = append(dirs, filepath.Join(pictures, "Wallpapers"))
+	}
+	return dirs
 }
 
 // Monitor finds the entry for a connector.

@@ -10309,6 +10309,11 @@
           "default": [],
           "description": "Per-monitor wallpaper and fit mode settings. Each entry targets a\nmonitor by connector name. See [`MonitorWallpaperConfig`] for the\navailable fields.\n\n## Example\n\n```yaml\nwallpaper:\n  monitors:\n    - name: DP-1\n      wallpaper: /home/me/pictures/wall-primary.png\n      fit-mode: fill\n    - name: HDMI-1\n      wallpaper: /home/me/pictures/wall-secondary.png\n      fit-mode: fit\n```"
         },
+        "picker-directories": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Directories the wallpaper picker (`lys-shell launcher -show wallpaper`)\nlists images from. Empty lists the cycling directory and the\n`Wallpapers` folder of `XDG_PICTURES_DIR`."
+        },
         "wallpaper": {
           "$ref": "#/$defs/string",
           "default": "",
@@ -12516,6 +12521,7 @@
         "cycling-same-image": false,
         "fit-mode": "fill",
         "monitors": [],
+        "picker-directories": [],
         "wallpaper": ""
       },
       "description": "Wallpaper service settings."

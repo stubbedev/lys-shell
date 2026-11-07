@@ -42,7 +42,11 @@ const ThumbnailScheme = "thumbnail://"
 // ThumbnailCacheDir is $XDG_CACHE_HOME/thumbnails/normal (an absolute
 // XDG_CACHE_HOME only), else ~/.cache/thumbnails/normal: the shared
 // spec directory, deliberately not a lys-shell-private one.
-func ThumbnailCacheDir() string {
+func ThumbnailCacheDir() string { return thumbnailCacheDir("normal") }
+
+// thumbnailCacheDir is the spec directory of one thumbnail size flavour
+// ("normal", "large") under the shared cache.
+func thumbnailCacheDir(flavour string) string {
 	base := os.Getenv("XDG_CACHE_HOME")
 	if !filepath.IsAbs(base) {
 		base = ""
@@ -54,14 +58,16 @@ func ThumbnailCacheDir() string {
 			base = os.TempDir()
 		}
 	}
-	return filepath.Join(base, "thumbnails", "normal")
+	return filepath.Join(base, "thumbnails", flavour)
 }
 
 // ThumbnailCachePath is where file's thumbnail lives per the spec: the
 // md5 of its file:// URI, as PNG.
-func ThumbnailCachePath(file string) string {
+func ThumbnailCachePath(file string) string { return thumbnailPath(ThumbnailCacheDir(), file) }
+
+func thumbnailPath(dir, file string) string {
 	sum := md5.Sum([]byte(fileuri.FromPath(file))) //nolint:gosec // the spec's digest, not security
-	return filepath.Join(ThumbnailCacheDir(), hex.EncodeToString(sum[:])+".png")
+	return filepath.Join(dir, hex.EncodeToString(sum[:])+".png")
 }
 
 // CachedThumbnail returns an existing thumbnail no older than the file,

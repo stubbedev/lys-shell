@@ -45,6 +45,8 @@ type controlSources struct {
 	screenshot func(mode, target string)
 	recorder   recorderSwitch
 	pickColor  func()
+	// wallpaper opens the wallpaper picker; nil without one.
+	wallpaper func()
 }
 
 // controlSourcesOf picks the sources out of the running shell.
@@ -85,6 +87,12 @@ func toggleTitle(on bool, onKey, offKey, onIcon, offIcon string) (string, string
 // toggles are the quick toggles, each saying what choosing it does now.
 func (s controlSources) toggles(ctx context.Context) []search.Control {
 	var out []search.Control
+	if s.wallpaper != nil {
+		out = append(out, search.Control{
+			ID: "wallpaper", Title: i18n.T("launcher-control-wallpaper"), Keywords: "wallpaper background desktop picture theme", Icon: "ld-image-symbolic",
+			Effect: search.RunOnceClosed(s.wallpaper),
+		})
+	}
 	if s.dnd != nil {
 		on := s.dnd.DND()
 		title, icon := toggleTitle(on, "launcher-control-dnd-on", "launcher-control-dnd-off", "ld-bell-off-symbolic", "ld-bell-symbolic")

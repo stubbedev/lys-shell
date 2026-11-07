@@ -83,6 +83,12 @@ type Deps struct {
 	// (app.WatchFiles); the search panel's kept sources load again then.
 	// Nil loads them again in every session.
 	WatchFiles search.WatchFunc
+	// Wallpapers is what the wallpaper picker sets wallpapers through; nil
+	// leaves the shell without the picker.
+	Wallpapers Wallpapers
+	// FocusedOutput is the compositor's focused output, false when it
+	// cannot tell.
+	FocusedOutput func() (string, bool)
 	// FireHook runs a -on-* hook (engine.FireHook; a test seam).
 	FireHook func(command string, ctx engine.HookContext)
 }
@@ -143,8 +149,10 @@ type rowPreviewRequest struct {
 type Surface struct {
 	d   Deps
 	cur *active
-	// panel is the live search session; cur and panel never both live.
-	panel *panel
+	// panel is the live search session and picker the live wallpaper
+	// picker; at most one of cur, panel and picker lives.
+	panel  *panel
+	picker *picker
 	// views are the search panel's, kept between panels.
 	views *panelViews
 	// sources are the search panel's, kept for the surface's lifetime.
@@ -153,6 +161,8 @@ type Surface struct {
 	model        matchModel
 	multi        multiSelect
 	sel          int
+	// spawn runs work off the loop (the picker's thumbnails).
+	spawn func(func())
 }
 
 // New builds the surface over its collaborators.
@@ -160,7 +170,7 @@ func New(d Deps) *Surface {
 	if d.FireHook == nil {
 		d.FireHook = engine.FireHook
 	}
-	s := &Surface{d: d, sel: -1, sources: search.NewSources(d.WatchFiles, time.Now)}
+	s := &Surface{d: d, sel: -1, sources: search.NewSources(d.WatchFiles, time.Now), spawn: func(fn func()) { go fn() }}
 	s.openFrecency = s.sources.Frecency(func() (*search.Frecency, error) { return s.d.OpenFrecency() })
 	return s
 }
@@ -181,11 +191,26 @@ func (s *Surface) ClientGone(id uint64) {
 		if s.panel != nil && s.panel.sess.ID == id {
 			s.panel.release()
 		}
+		if s.picker != nil && s.picker.sess.ID == id {
+			s.picker.release()
+		}
 	})
 }
 
 // openSession is open_session.
 func (s *Surface) openSession(sess *launcheripc.Session) {
+	if s.picker != nil {
+		switch {
+		case wantsPicker(sess.Options):
+			s.picker.finish(false, "")
+			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
+			return
+		case !sess.Replace:
+			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameBusy})
+			return
+		}
+		s.picker.finish(false, "")
+	}
 	if s.panel != nil {
 		// The bind that opened the panel closes it; anything else asking
 		// for the screen takes it only when it says -replace.
@@ -209,6 +234,10 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 	}
 	if wantsSearch(sess.Options) && s.d.Search != nil {
 		s.openPanel(sess)
+		return
+	}
+	if wantsPicker(sess.Options) {
+		s.openPicker(sess)
 		return
 	}
 	cfg := s.d.Config()

@@ -68,7 +68,7 @@ func TestARefusedShortcutLeavesTheOthersBound(t *testing.T) {
 }
 
 func TestTheShortcutSessionIsTheSearchPanelApartFromCLISessions(t *testing.T) {
-	a, b := searchSession(), searchSession()
+	a, b := inProcessSession(launcher.SearchMode), inProcessSession(launcher.SearchMode)
 	if a.Options.Mode == nil || *a.Options.Mode != launcher.SearchMode || a.Options.Dmenu || a.Replace {
 		t.Errorf("session options = %+v, want the search panel as a bare lys-shell launcher asks", a.Options)
 	}

@@ -193,6 +193,7 @@ symlink named `rofi`, the binary takes the same flags directly.
 ```sh
 lys-shell launcher            # the search panel, see the Launcher guide
 lys-shell launcher -show drun
+lys-shell launcher -show wallpaper   # the wallpaper picker
 printf 'a\nb\n' | lys-shell launcher -dmenu
 lys-shell launcher -e "Build finished"
 ```

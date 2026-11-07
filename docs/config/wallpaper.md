@@ -15,6 +15,7 @@ Wallpaper rendering, cycling, and per-monitor overrides.
 |---|---|---|---|
 | `wallpaper` | string | `""` | A single image file to use as the wallpaper on all monitors. Leave empty to use cycling and/or per-monitor overrides instead; a monitor none of them gives an image shows the built-in wallpaper. |
 | `fit-mode` | [`FitMode`](/config/types#fit-mode) | `"fill"` | How the wallpaper is scaled to the screen. Per-monitor entries in `wallpaper.monitors` override this. |
+| `picker-directories` | array of string | `[]` | Directories the wallpaper picker (`lys-shell launcher -show wallpaper`) lists images from. Empty lists the cycling directory and the `Wallpapers` folder of `XDG_PICTURES_DIR`. |
 
 ## Cycling
 
@@ -58,6 +59,7 @@ wallpaper:
   cycling-mode: sequential
   cycling-interval-mins: 15
   cycling-same-image: false
+  picker-directories: []
   monitors: []
 ```
 

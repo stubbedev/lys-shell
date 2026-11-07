@@ -79,3 +79,22 @@ row:hover > .launcher-search-row,
 .launcher-search-notice {
   color: var(--status-error);
 }
+.launcher-wallpaper-grid {
+  padding: calc(8px * var(--global-scale));
+}
+.launcher-wallpaper-grid > child {
+  border-radius: calc(10px * var(--global-scale));
+  padding: calc(6px * var(--global-scale));
+}
+.launcher-wallpaper-grid > child:hover {
+  background-color: color-mix(in srgb, var(--fg-default) 6%, transparent);
+}
+.launcher-wallpaper-grid > child:selected {
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.launcher-wallpaper-thumbnail {
+  border-radius: calc(6px * var(--global-scale));
+}
+.launcher-wallpaper-name {
+  color: var(--fg-muted);
+}

@@ -1584,6 +1584,7 @@ var schemaDocs = map[string]string{
 	"WallpaperConfig.CyclingSameImage":                       "Show the same cycling wallpaper on all monitors. Only affects shuffle\nmode since sequential already displays the same image.",
 	"WallpaperConfig.FitMode":                                "How the wallpaper is scaled to the screen. Per-monitor entries in\n`wallpaper.monitors` override this.",
 	"WallpaperConfig.Monitors":                               "Per-monitor wallpaper and fit mode settings. Each entry targets a\nmonitor by connector name. See [`MonitorWallpaperConfig`] for the\navailable fields.\n\n## Example\n\n```yaml\nwallpaper:\n  monitors:\n    - name: DP-1\n      wallpaper: /home/me/pictures/wall-primary.png\n      fit-mode: fill\n    - name: HDMI-1\n      wallpaper: /home/me/pictures/wall-secondary.png\n      fit-mode: fit\n```",
+	"WallpaperConfig.PickerDirectories":                      "Directories the wallpaper picker (`lys-shell launcher -show wallpaper`)\nlists images from. Empty lists the cycling directory and the\n`Wallpapers` folder of `XDG_PICTURES_DIR`.",
 	"WallpaperConfig.Wallpaper":                              "A single image file to use as the wallpaper on all monitors. Leave empty\nto use cycling and/or per-monitor overrides instead; a monitor none of\nthem gives an image shows the built-in wallpaper.",
 	"WallustBackend":                                         "Wallust image sampling backend.",
 	"WallustBackend=fastresize":                              "SIMD-accelerated resize.",

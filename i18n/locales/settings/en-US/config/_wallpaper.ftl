@@ -25,6 +25,9 @@ settings-wallpaper-cycling-interval-mins = Cycling Interval
 settings-wallpaper-cycling-same-image = Same Image On All Monitors
     .description = Show the same cycling wallpaper on all monitors (only affects shuffle mode)
 
+settings-wallpaper-picker-directories = Picker Directories
+    .description = Folders the wallpaper picker lists images from (empty: the cycling directory and Pictures/Wallpapers)
+
 settings-wallpaper-monitors = Monitor Wallpapers
     .description = Per-monitor wallpaper assignments
 

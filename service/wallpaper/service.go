@@ -56,9 +56,11 @@ type Service struct {
 	cycling        *Cycling
 	sharedCycle    bool
 	themingMonitor string
-	extractor      extract.Config
-	sample         Sampler
-	rng            *rand.Rand
+	// previews are the images monitors show over their set ones.
+	previews  map[string]string
+	extractor extract.Config
+	sample    Sampler
+	rng       *rand.Rand
 
 	// extractMu serializes extractions (the Rust extractor task and the
 	// D-Bus ExtractColors method both reach extract_colors); it also
@@ -102,11 +104,64 @@ func (s *Service) Changes() (<-chan struct{}, func()) { return s.changes.Subscri
 // re-read the palette cache on it.
 func (s *Service) Extracted() (<-chan struct{}, func()) { return s.extracted.Subscribe() }
 
-// Monitors snapshots the per-monitor state.
+// Monitors snapshots the per-monitor state as shown: a monitor
+// previewing an image (SetPreview) shows that image.
 func (s *Service) Monitors() map[string]MonitorState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return maps.Clone(s.monitors)
+	return s.shownLocked()
+}
+
+// shownLocked is the monitor state with the previews over it; s.mu is
+// held.
+func (s *Service) shownLocked() map[string]MonitorState {
+	shown := maps.Clone(s.monitors)
+	for name, path := range s.previews {
+		if st, ok := shown[name]; ok {
+			st.Wallpaper = path
+			shown[name] = st
+		}
+	}
+	return shown
+}
+
+// SetPreview shows path on one monitor, or every monitor when monitor
+// is empty, without changing what is set: EndPreview puts the set
+// images back. A missing file is an ImageNotFoundError.
+func (s *Service) SetPreview(path, monitor string) error {
+	if !exists(path) {
+		return &ImageNotFoundError{Path: path}
+	}
+	s.mu.Lock()
+	before := s.shownLocked()
+	next := map[string]string{}
+	for name := range s.monitors {
+		if monitor == "" || name == monitor {
+			next[name] = path
+		}
+	}
+	s.previews = next
+	changed := !maps.Equal(before, s.shownLocked())
+	s.mu.Unlock()
+	if changed {
+		feed.Notify(&s.changes)
+		s.kickExtract(false)
+	}
+	return nil
+}
+
+// EndPreview drops the previews: every monitor shows its set image
+// again.
+func (s *Service) EndPreview() {
+	s.mu.Lock()
+	before := s.shownLocked()
+	s.previews = nil
+	changed := !maps.Equal(before, s.monitors)
+	s.mu.Unlock()
+	if changed {
+		feed.Notify(&s.changes)
+		s.kickExtract(false)
+	}
 }
 
 // MonitorNames lists the registered monitors, sorted.
@@ -121,7 +176,7 @@ func (s *Service) MonitorNames() []string {
 func (s *Service) Wallpaper(monitor string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	st, ok := s.monitors[monitor]
+	st, ok := s.shownLocked()[monitor]
 	return st.Wallpaper, ok && st.Wallpaper != ""
 }
 
@@ -458,7 +513,7 @@ func (s *Service) extract(ctx context.Context, reset bool) error {
 		s.extractedAny = false
 	}
 	s.mu.Lock()
-	monitor, path, skip := themingPath(s.monitors, s.themingMonitor)
+	monitor, path, skip := themingPath(s.shownLocked(), s.themingMonitor)
 	cfg := s.extractor
 	s.mu.Unlock()
 	if skip || s.extractedAny && path == s.lastExtracted {

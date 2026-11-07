@@ -257,7 +257,7 @@ func TestAPickedColorIsHex(t *testing.T) {
 func TestAServiceStartingAfterTheShellReachesTheNextSession(t *testing.T) {
 	var ctx ModuleContext
 	cfg := config.Defaults()
-	deps := panelDeps(func() *config.Config { return cfg }, func() ModuleContext { return ctx }, nil, &launcher.Deps{})
+	deps := panelDeps(func() *config.Config { return cfg }, func() ModuleContext { return ctx }, nil, &launcher.Deps{}, func() {})
 	if got := deps().Toggles(context.Background()); len(got) != 0 {
 		t.Fatalf("no service, rows %q", titlesOf(got))
 	}
@@ -281,4 +281,30 @@ func TestCancellingOrFailingToPickCopiesNothing(t *testing.T) {
 	copied := func(hex string) { t.Errorf("copied %s", hex) }
 	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{}, false, nil }, copied)
 	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{1, 1, 1}, false, errors.New("busy") }, copied)
+}
+
+type nopWallpapers struct{ launcher.Wallpapers }
+
+func TestTheWallpaperRowOpensThePickerOnceThePanelHasGone(t *testing.T) {
+	var ctx ModuleContext
+	cfg := config.Defaults()
+	opened := 0
+	deps := panelDeps(func() *config.Config { return cfg }, func() ModuleContext { return ctx }, nil, &launcher.Deps{}, func() { opened++ })
+	if got := titlesOf(deps().Toggles(context.Background())); slices.Contains(got, "Choose Wallpaper") {
+		t.Fatalf("a shell without a wallpaper service offers the picker: %q", got)
+	}
+	deps = panelDeps(func() *config.Config { return cfg }, func() ModuleContext { return ctx }, nil, &launcher.Deps{Wallpapers: nopWallpapers{}}, func() { opened++ })
+	rows := deps().Toggles(context.Background())
+	i := slices.IndexFunc(rows, func(c search.Control) bool { return c.Title == "Choose Wallpaper" })
+	if i < 0 {
+		t.Fatalf("rows %q, want the wallpaper picker", titlesOf(rows))
+	}
+	run, ok := rows[i].Effect.(search.RunOnceClosed)
+	if !ok {
+		t.Fatalf("the wallpaper row runs %T, want it once the panel has closed", rows[i].Effect)
+	}
+	run()
+	if opened != 1 {
+		t.Errorf("the picker opened %d times, want 1", opened)
+	}
 }

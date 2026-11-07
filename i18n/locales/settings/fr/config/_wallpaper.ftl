@@ -33,6 +33,9 @@ settings-wallpaper-cycling-interval-mins = Intervalle de rotation
 settings-wallpaper-cycling-same-image = Même image sur tous les moniteurs
     .description = Afficher le même fond d'écran en rotation sur tous les moniteurs (n'affecte que le mode aléatoire)
 
+settings-wallpaper-picker-directories = Dossiers du sélecteur
+    .description = Dossiers dont le sélecteur de fond d'écran liste les images (vide : le dossier de rotation et Images/Wallpapers)
+
 settings-wallpaper-monitors = Fonds d'écran par moniteur
     .description = Assignation de fond d'écran par moniteur
 

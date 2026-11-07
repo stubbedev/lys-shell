@@ -41,7 +41,7 @@ be running, as it hosts the panel.
 | Bitwarden | `Bitwarden Vault` opens the vault, asking for the master password if it is locked |
 | Quick links, snippets | From `launcher.search`, see below |
 | Browser bookmarks, history | Bookmarks from two typed letters, history from three, each with the site's icon. `Browser Bookmarks` and `Most Visited Sites` list them all. Firefox and Chromium families |
-| Quick toggles | Do not disturb, Wi-Fi, Bluetooth, and switching the audio output |
+| Quick toggles | Do not disturb, Wi-Fi, Bluetooth, switching the audio output, and Choose Wallpaper, which opens the wallpaper picker |
 | Media | Play, pause and skip on the active player |
 | Capture | Screenshots, screen recording and the color picker, which copies the hex value. They start once the panel has closed |
 | Processes | `Kill Process` lists your processes, largest first; ending one asks for a second Enter. The compositor, the shell and what started them are not listed |
@@ -104,6 +104,21 @@ highlighted, so a large file previews as fast as a small one.
 <img src="/launcher-preview-clipboard-mode.png" alt="The clipboard mode previewing a copied text in full">
 <img src="/launcher-preview-clipboard-mode-other.png" alt="The clipboard mode previewing an entry by its type and size">
 <img src="/launcher-preview-search-mode.png" alt="The search panel previewing a file">
+
+## The wallpaper picker
+
+`lys-shell launcher -show wallpaper`, or the Choose Wallpaper row of the search
+panel, opens a grid of the images in `wallpaper.picker-directories` (by default
+the cycling directory and the `Wallpapers` folder of your pictures directory),
+filtered by name as you type. Arrow keys move through the grid; where the
+selection rests, the monitor the picker opened on (`launcher.monitor`, else the
+focused one) shows it, and with `styling.theme-provider: wallpaper` the shell
+re-themes from it too. Enter keeps it for that monitor, Ctrl+Enter for every
+monitor, and Esc puts back what was there. The choice is saved to the config.
+
+Thumbnails are the freedesktop large thumbnails in
+`$XDG_CACHE_HOME/thumbnails/large`, made for the cells in view the first time and
+read back from there afterwards, so a file manager shares them.
 
 ## The file index
 

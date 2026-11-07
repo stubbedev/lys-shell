@@ -1,7 +1,9 @@
 package wallpaper
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -139,7 +141,7 @@ func newCycling(directory string, mode CyclingMode, interval time.Duration, rng 
 	if !exists(directory) {
 		return nil, &DirectoryNotFoundError{Path: directory}
 	}
-	images, err := scanImages(directory)
+	images, err := ScanImages(directory)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +155,7 @@ func newCycling(directory string, mode CyclingMode, interval time.Duration, rng 
 // refreshed is the pool rescanned (CyclingConfig::refresh): an emptied
 // directory empties the pool rather than failing.
 func (c *Cycling) refreshed(rng *rand.Rand) (*Cycling, error) {
-	images, err := scanImages(c.Directory)
+	images, err := ScanImages(c.Directory)
 	if err != nil {
 		return nil, err
 	}
@@ -172,10 +174,10 @@ func orderImages(images []string, mode CyclingMode, rng *rand.Rand) {
 	}
 }
 
-// scanImages lists the directory's entries with a supported extension
+// ScanImages lists the directory's entries with a supported extension
 // (scan_directory_for_images); like the Rust scan it does not look at
 // the entry type, so a directory named x.png is listed too.
-func scanImages(directory string) ([]string, error) {
+func ScanImages(directory string) ([]string, error) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return nil, fmt.Errorf("I/O error: %w", err)
@@ -204,4 +206,27 @@ func extension(name string) (string, bool) {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// PickerImages lists the supported images of every directory, sorted by
+// path and each once. A directory that does not exist has none; one that
+// cannot be read is skipped with its error returned.
+func PickerImages(dirs []string) ([]string, error) {
+	var (
+		images []string
+		errs   []error
+	)
+	for _, dir := range dirs {
+		found, err := ScanImages(dir)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("listing wallpapers in %s: %w", dir, err))
+			continue
+		}
+		images = append(images, found...)
+	}
+	slices.Sort(images)
+	return slices.Compact(images), errors.Join(errs...)
 }
