@@ -152,8 +152,8 @@ func TestOffLoopReadEndsWithItsGeneration(t *testing.T) {
 
 func loopContext(t *testing.T) (ModuleContext, *app.Application) {
 	t.Helper()
-	a := apptest.Run(t)
 	ctx := newTestContext(t, config.Defaults())
+	a := apptest.Run(t)
 	ctx.App = a
 	return ctx, a
 }
