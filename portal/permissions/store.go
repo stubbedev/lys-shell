@@ -223,6 +223,19 @@ func (s Store) revokeShortcuts(app, id string) (int, error) {
 	return n, err
 }
 
+// Set gives app perms on the entry id of table (SetPermission,
+// creating the entry when missing): the yes or no of a background or
+// notification grant.
+func (s Store) Set(ctx context.Context, app string, table Table, id string, perms []string) error {
+	if table == Shortcuts {
+		return fmt.Errorf("set %s for %s: shortcuts are bound through the portal, not set", id, app)
+	}
+	if err := s.obj().CallWithContext(ctx, StoreIface+".SetPermission", 0, string(table), true, id, app, perms).Err; err != nil {
+		return fmt.Errorf("set %s %s for %s to %v: %w", table, id, app, perms, err)
+	}
+	return nil
+}
+
 // Watch calls changed on every edit of the permission store, until
 // stop; edits of the shortcut store are not announced.
 func (s Store) Watch(changed func()) (stop func(), err error) {

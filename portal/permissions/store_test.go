@@ -175,3 +175,20 @@ func TestParseTable(t *testing.T) {
 		t.Error("an entry parsed as a table")
 	}
 }
+
+// Set writes an app's yes or no for an entry, creating it, and refuses
+// the shortcut store, which only the portal binds.
+func TestSetWritesTheAppsPermission(t *testing.T) {
+	s, conn := storeRig(t)
+	ctx := context.Background()
+	if err := s.Set(ctx, "org.app", permissions.Background, "background", []string{"no"}); err != nil {
+		t.Fatal(err)
+	}
+	perms, _, ok := permstoretest.Lookup(t, conn, permissions.Background, "background")
+	if !ok || !reflect.DeepEqual(perms["org.app"], []string{"no"}) {
+		t.Fatalf("background = %v %v", perms, ok)
+	}
+	if err := s.Set(ctx, "org.app", permissions.Shortcuts, "toggle", []string{"no"}); err == nil {
+		t.Fatal("a shortcut was set through the store")
+	}
+}

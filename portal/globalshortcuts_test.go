@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -11,6 +12,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/portal/permissions"
 )
 
 // fakeShortcuts is the compositor's shortcut manager.
@@ -339,5 +342,25 @@ func waitFor(t *testing.T, cond func() bool) {
 		if time.Now().After(deadline) {
 			t.Fatal("condition never held")
 		}
+	}
+}
+
+// A shortcut forgotten through the shared permission store (lys-settings'
+// Privacy page, the CLI) is gone from the app's next session: the portal
+// reads the store at each bind instead of keeping a copy.
+func TestAShortcutRevokedThroughTheStoreIsForgotten(t *testing.T) {
+	r, _, _ := shortcutsRig(t, nil)
+	r.shortcutSession(t, sessA)
+	r.bind(t, sessA, shortcut{"mic", props("Mic")}, shortcut{"next", props("Next")})
+	store := permissions.Store{ShortcutsPath: r.backend.shortcuts.storePath}
+	if _, err := store.Revoke(context.Background(), "org.app", permissions.Shortcuts, "mic"); err != nil {
+		t.Fatal(err)
+	}
+	r.shortcutSession(t, sessB)
+	if got := shortcutIDs(r.listShortcuts(t, sessB)); !slices.Equal(got, []string{"next=Next"}) {
+		t.Fatalf("after the revoke a fresh session lists %v, want only next", got)
+	}
+	if _, got := r.bind(t, sessB, shortcut{"next", props("Next")}); !slices.Equal(shortcutIDs(got), []string{"next=Next"}) {
+		t.Fatalf("the next BindShortcuts reply holds %v", shortcutIDs(got))
 	}
 }
