@@ -512,15 +512,17 @@ pkgs.testers.nixosTest {
     def shell_state():
         return run("systemctl --user show -P ActiveState lys-shell.service").strip()
 
-    def chooser_area():
-        return region(*middle_of(out))
+    calm = capture("before-chooser", out)
 
-    calm = chooser_area()
+    def chooser_shown():
+        box = changed_box(calm, capture("chooser", out))
+        return box is not None and box[2] - box[0] > 400 and box[3] - box[1] > 300
+
     run("systemctl --user stop lys-shell.service")
     wait("lys-shell to stop", lambda: shell_state() == "inactive", tries=30)
     machine.succeed(f"su - ${user} -c '{env} portal-client filechooser > /tmp/lys/chooser.json 2>&1 &'")
     wait("the file chooser request to start lys-shell", lambda: shell_state() == "active", tries=30)
-    wait("the file chooser dialog from the activated shell", lambda: chooser_area() != calm, tries=30)
+    wait("the file chooser dialog from the activated shell", chooser_shown, tries=30)
     time.sleep(1)
     shot("15-file-chooser-after-activation")
     machine.send_key("esc")
@@ -529,7 +531,7 @@ pkgs.testers.nixosTest {
     print("portal file chooser:", answer)
     if answer["code"] != 1:
         raise Exception(f"Esc in the file chooser answered {answer}, want cancelled")
-    wait("the file chooser to close", lambda: chooser_area() == calm, tries=30)
+    wait("the file chooser to close", lambda: not chooser_shown(), tries=30)
 
     logs()
   '';
