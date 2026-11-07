@@ -4,11 +4,12 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/internal/drmconn"
 	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -22,19 +23,13 @@ import (
 // compositor.
 const ScreenCastIface = "org.freedesktop.impl.portal.ScreenCast"
 
-// Restore tokens are (suv): vendor, version, and the target payload.
-const (
-	restoreVendor  = version.Name
-	restoreVersion = uint32(1)
-)
-
 // castState is a session's screen sharing: the options gathered across
 // the calls and the streams Start runs. It lives on the session,
 // guarded by its mu.
 type castState struct {
 	types, cursorMode, persistMode uint32
 	multiple                       bool
-	restore                        []sharepicker.Target
+	restore                        []restoreTarget
 	streams                        []startedStream
 }
 
@@ -53,6 +48,12 @@ type screenCast struct {
 	focused func() (string, error)
 	// windows are lys-wm's windows.
 	windows func() ([]lyswm.Window, error)
+	// toplevels are the compositor's windows with their identifiers
+	// (listToplevels; a fake in tests).
+	toplevels func() ([]capture.Toplevel, error)
+	// displays are the monitors behind the connectors (readDisplays; a
+	// fake in tests).
+	displays func() (map[string]displayID, error)
 }
 
 // startedStream is a running stream and what Start reported of it;
@@ -66,7 +67,51 @@ type startedStream struct {
 }
 
 func newScreenCast(conn *dbus.Conn, s *sessions, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
-	return &screenCast{conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows}
+	return &screenCast{
+		conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows,
+		toplevels: listToplevels, displays: func() (map[string]displayID, error) { return readDisplays(drmconn.Dir) },
+	}
+}
+
+// sources lists what targets of these kinds resolve against.
+func (c *screenCast) sources(targets []sharepicker.Target) (sources, error) {
+	var now sources
+	var errs []error
+	if slices.ContainsFunc(targets, func(t sharepicker.Target) bool { return t.Kind == sharepicker.TargetWindow }) {
+		windows, err := c.toplevels()
+		now.windows = windows
+		errs = append(errs, err)
+	}
+	if slices.ContainsFunc(targets, func(t sharepicker.Target) bool { return t.Kind != sharepicker.TargetWindow }) {
+		outputs, err := c.outputs()
+		for _, o := range outputs {
+			now.outputs = append(now.outputs, o.name)
+		}
+		displays, derr := c.displays()
+		now.displays = displays
+		errs = append(errs, err, derr)
+	}
+	return now, errors.Join(errs...)
+}
+
+// describe is what a restore token keeps of the targets; a source that
+// cannot be listed is kept by its name alone.
+func (c *screenCast) describe(targets []sharepicker.Target) []restoreTarget {
+	now, err := c.sources(targets)
+	if err != nil {
+		warnf("screencast: the restore token keeps sources by name only: %v", err)
+	}
+	return describe(targets, now)
+}
+
+// resolveRestore is the current targets a token's kept ones name.
+func (c *screenCast) resolveRestore(kept []restoreTarget) ([]sharepicker.Target, error) {
+	picked := pickedOf(kept)
+	now, err := c.sources(picked)
+	if err != nil {
+		return nil, err
+	}
+	return resolve(kept, now)
 }
 
 // lysWMFocusedOutput is the output lys-wm says is focused.
@@ -338,36 +383,6 @@ type castStream struct {
 	Props Vardict
 }
 
-// restoreToken is the (suv) restore_data.
-type restoreToken struct {
-	Vendor  string
-	Version uint32
-	Data    dbus.Variant
-}
-
-// encodeRestore keeps every target of the session, as the picker
-// replies them.
-func encodeRestore(targets []sharepicker.Target) restoreToken {
-	return restoreToken{restoreVendor, restoreVersion, dbus.MakeVariant(sharepicker.JoinTargets(targets))}
-}
-
-// decodeRestore reads a token this portal issued; any other is none.
-func decodeRestore(v dbus.Variant) ([]sharepicker.Target, bool) {
-	fields, ok := v.Value().([]any)
-	if !ok || len(fields) != 3 || fields[0] != restoreVendor {
-		return nil, false
-	}
-	data, ok := fields[2].(dbus.Variant)
-	if !ok {
-		return nil, false
-	}
-	payload, ok := data.Value().(string)
-	if !ok {
-		return nil, false
-	}
-	return sharepicker.ParseTargets(payload)
-}
-
 // streamProps are a started stream's properties: its source type and,
 // for an output or a region, its position and size in the compositor's
 // logical space. A window's are not known, so it carries neither.
@@ -423,10 +438,10 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 	o.c.sharing(s)
 	multiple, _ := optBool(options, "multiple")
 	persist, _ := optU32(options, "persist_mode")
-	var restore []sharepicker.Target
+	var restore []restoreTarget
 	if v, ok := options["restore_data"]; ok {
-		if targets, ok := decodeRestore(v); ok && allOfTypes(targets, types) {
-			restore = targets
+		if g, ok := decodeRestore(v); ok && g.devices == 0 && allOfTypes(pickedOf(g.targets), types) {
+			restore = g.targets
 		}
 	}
 	s.mu.Lock()
@@ -459,7 +474,7 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 	}
 	results := Vardict{"streams": dbus.MakeVariant(shared.streams)}
 	if cfg := o.c.config(s); cfg.persistMode > 0 && shared.allowToken {
-		results["restore_data"] = dbus.MakeVariant(encodeRestore(shared.targets))
+		results["restore_data"] = dbus.MakeVariant(encodeRestore(restoreGrant{targets: o.c.describe(shared.targets)}))
 		results["persist_mode"] = dbus.MakeVariant(cfg.persistMode)
 	}
 	return ResponseSuccess, results, nil
@@ -479,8 +494,15 @@ type sharedScreens struct {
 func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	cfg := c.config(s)
 	// Replaying a token is the grant it was issued for.
-	restoring := len(cfg.restore) > 0
-	allowToken, targets := restoring, cfg.restore
+	var restoring, allowToken bool
+	var targets []sharepicker.Target
+	if len(cfg.restore) > 0 {
+		resolved, err := c.resolveRestore(cfg.restore)
+		if err != nil {
+			warnf("screencast: the restore token names no current source, re-prompting: %v", err)
+		}
+		restoring, allowToken, targets = err == nil, err == nil, resolved
+	}
 	if !restoring {
 		var code uint32
 		if allowToken, targets, code = c.choose(call, cfg); code != ResponseSuccess {

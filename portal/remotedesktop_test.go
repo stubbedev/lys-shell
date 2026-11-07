@@ -89,7 +89,7 @@ func remoteRigStarts(t *testing.T, dialErr error) (*rig, *fakeSink, *fakeStarts)
 	sink := &fakeSink{keymap: []byte(testKeymap)}
 	starts := &fakeStarts{fail: map[string]bool{}}
 	r := newRig(t, func(b *Backend) {
-		b.screenCast = newScreenCast(b.conn, b.sessions, starts.start, starts.outputs)
+		b.screenCast = starts.screenCast(b)
 		b.remote = newRemoteDesktop(b.conn, b.sessions, b.screenCast, func() (inputSink, error) {
 			if dialErr != nil {
 				return nil, dialErr
@@ -287,12 +287,12 @@ func TestRemoteDesktopRestoreToken(t *testing.T) {
 	r, _ := remoteRig(t, nil)
 	d := serveDialogs(t, r, true)
 	res := r.startSharing(t, "r/screen:DP-2", Vardict{"persist_mode": dbus.MakeVariant(uint32(2))})
-	kept, ok := decodeRemoteRestore(res["restore_data"])
-	if !ok || res["persist_mode"].Value() != uint32(2) || kept.devices != 3 || !slices.Equal(payloads(kept.targets), []string{"screen:DP-2"}) {
+	kept, ok := decodeRestore(res["restore_data"])
+	if !ok || res["persist_mode"].Value() != uint32(2) || kept.devices != 3 || !slices.Equal(payloads(pickedOf(kept.targets)), []string{"screen:DP-2"}) {
 		t.Fatalf("token keeps %+v, %v (results %v)", kept, ok, res)
 	}
 	// The frontend hands the token back as the (suv) it got.
-	token := dbus.MakeVariant(encodeRemoteRestore(kept))
+	token := dbus.MakeVariant(encodeRestore(kept))
 
 	r2, sink2 := remoteRig(t, nil)
 	d2 := serveDialogs(t, r2, false)
@@ -319,8 +319,11 @@ func TestRemoteDesktopRestoreToken(t *testing.T) {
 	if code, _ := r3.remoteStart(t, Vardict{"restore_data": token, "types": dbus.MakeVariant(deviceKeyboard)}); code != ResponseCancelled || len(d3.asked.Load()) != 1 {
 		t.Errorf("a token of other devices = %d, asked %d times", code, len(d3.asked.Load()))
 	}
-	if _, ok := decodeRemoteRestore(dbus.MakeVariant(encodeRestore([]sharepicker.Target{{Kind: sharepicker.TargetOutput, Name: "DP-1"}}))); ok {
-		t.Error("a ScreenCast token decoded as a RemoteDesktop one")
+	r4, _ := remoteRig(t, nil)
+	d4 := serveDialogs(t, r4, false)
+	castToken := dbus.MakeVariant(encodeRestore(grantOf(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: "DP-1"})))
+	if code, _ := r4.remoteStart(t, Vardict{"restore_data": castToken}); code != ResponseCancelled || len(d4.asked.Load()) != 1 {
+		t.Errorf("a ScreenCast token replayed a RemoteDesktop grant: %d, asked %d times", code, len(d4.asked.Load()))
 	}
 	if len(d.asked.Load()) != 1 {
 		t.Errorf("the first start asked %d times", len(d.asked.Load()))

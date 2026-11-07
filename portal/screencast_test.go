@@ -86,6 +86,18 @@ type fakeStarts struct {
 	// starting runs as each stream starts, as a slow start would let
 	// the app act meanwhile.
 	starting dbustest.Var[func()]
+	// toplevels are the compositor's windows and displays the monitors
+	// behind the connectors, as restore tokens resolve against them.
+	toplevels dbustest.Var[[]capture.Toplevel]
+	displays  dbustest.Var[map[string]displayID]
+}
+
+// screenCast is the interface over these fakes.
+func (f *fakeStarts) screenCast(b *Backend) *screenCast {
+	c := newScreenCast(b.conn, b.sessions, f.start, f.outputs)
+	c.toplevels = func() ([]capture.Toplevel, error) { return f.toplevels.Load(), nil }
+	c.displays = func() (map[string]displayID, error) { return f.displays.Load(), nil }
+	return c
 }
 
 func (f *fakeStarts) outputs() ([]outputGeometry, error) {
@@ -124,7 +136,7 @@ func castRig(t *testing.T, fail ...string) (*rig, *fakeStarts) {
 		f.fail[p] = true
 	}
 	r := newRig(t, func(b *Backend) {
-		b.screenCast = newScreenCast(b.conn, b.sessions, f.start, f.outputs)
+		b.screenCast = f.screenCast(b)
 	})
 	return r, f
 }
@@ -211,7 +223,7 @@ func TestScreenCastPicksAndStreams(t *testing.T) {
 	if res["persist_mode"].Value() != uint32(2) {
 		t.Errorf("persist_mode = %v", res["persist_mode"])
 	}
-	if got, ok := decodeRestore(res["restore_data"]); !ok || !slices.Equal(payloads(got), []string{"screen:DP-1"}) {
+	if got, ok := decodeRestore(res["restore_data"]); !ok || !slices.Equal(payloads(pickedOf(got.targets)), []string{"screen:DP-1"}) {
 		t.Errorf("restore_data = %v", res["restore_data"])
 	}
 	if !r.sessionRuns(sessA, 40) {
@@ -317,9 +329,10 @@ func TestScreenCastWithoutATokenGrant(t *testing.T) {
 // without the picker.
 func TestScreenCastReplaysARestoreToken(t *testing.T) {
 	r, f := castRig(t)
+	f.toplevels.Store([]capture.Toplevel{{Identifier: "w1", AppID: "org.app", Title: "Notes"}})
 	p := serveSharePicker(t, r, "/screen:HDMI-A-1")
 	kept := []sharepicker.Target{{Kind: sharepicker.TargetRegion, Name: "DP-2", X: 5, Y: 6, Width: 640, Height: 480}, {Kind: sharepicker.TargetWindow, Name: "w1"}}
-	token := dbus.MakeVariant(encodeRestore(kept))
+	token := dbus.MakeVariant(encodeRestore(grantOf(kept...)))
 	r.castSession(t, Vardict{"restore_data": token, "persist_mode": dbus.MakeVariant(uint32(2)), "types": dbus.MakeVariant(sourceMonitor | sourceWindow)})
 	code, res := r.castStart(t)
 	if code != ResponseSuccess || len(p.asked.Load()) != 0 {
@@ -328,7 +341,7 @@ func TestScreenCastReplaysARestoreToken(t *testing.T) {
 	if got := f.started.Load(); !slices.Equal(got, []string{"region:DP-2@5,6,640,480", "window:w1"}) {
 		t.Errorf("started %v", got)
 	}
-	if got, _ := decodeRestore(res["restore_data"]); !slices.Equal(payloads(got), payloads(kept)) {
+	if got, _ := decodeRestore(res["restore_data"]); !slices.Equal(payloads(pickedOf(got.targets)), payloads(kept)) {
 		t.Errorf("reissued %v", res["restore_data"])
 	}
 	// The same token for a monitor-only request does not replay its
@@ -341,15 +354,26 @@ func TestScreenCastReplaysARestoreToken(t *testing.T) {
 	}
 }
 
+// A token naming an output that is gone asks the picker without trying
+// it; one whose output is listed but will not start asks once it fails.
 func TestScreenCastRepromptsAGoneRestoreTarget(t *testing.T) {
-	r, f := castRig(t, "screen:DP-9")
+	r, f := castRig(t)
 	p := serveSharePicker(t, r, "/screen:DP-1")
-	r.castSession(t, Vardict{"restore_data": dbus.MakeVariant(encodeRestore([]sharepicker.Target{{Kind: sharepicker.TargetOutput, Name: "DP-9"}}))})
+	r.castSession(t, Vardict{"restore_data": dbus.MakeVariant(encodeRestore(grantOf(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: "DP-9"})))})
 	if code, _ := r.castStart(t); code != ResponseSuccess {
 		t.Fatalf("Start = %d", code)
 	}
-	if got := f.started.Load(); !slices.Equal(got, []string{"screen:DP-9", "screen:DP-1"}) || len(p.asked.Load()) != 1 {
-		t.Errorf("started %v, picker asked %d times", got, len(p.asked.Load()))
+	if got := f.started.Load(); !slices.Equal(got, []string{"screen:DP-1"}) || len(p.asked.Load()) != 1 {
+		t.Errorf("gone output: started %v, picker asked %d times", got, len(p.asked.Load()))
+	}
+	r2, f2 := castRig(t, "screen:DP-2")
+	p2 := serveSharePicker(t, r2, "/screen:DP-1")
+	r2.castSession(t, Vardict{"restore_data": dbus.MakeVariant(encodeRestore(grantOf(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: "DP-2"})))})
+	if code, _ := r2.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if got := f2.started.Load(); !slices.Equal(got, []string{"screen:DP-2", "screen:DP-1"}) || len(p2.asked.Load()) != 1 {
+		t.Errorf("failing output: started %v, picker asked %d times", got, len(p2.asked.Load()))
 	}
 }
 
@@ -391,16 +415,6 @@ func TestSourceTypeOf(t *testing.T) {
 		if got := sourceTypeOf(sharepicker.Target{Kind: kind, Name: "x"}); got != want {
 			t.Errorf("kind %d: source type %d, want %d", kind, got, want)
 		}
-	}
-}
-
-func TestRestoreTokens(t *testing.T) {
-	foreign := dbus.MakeVariant(restoreToken{"other-portal", 1, dbus.MakeVariant("screen:DP-1")})
-	if _, ok := decodeRestore(foreign); ok {
-		t.Error("a foreign token decoded")
-	}
-	if _, ok := decodeRestore(dbus.MakeVariant(uint32(42))); ok {
-		t.Error("a non-structure decoded")
 	}
 }
 

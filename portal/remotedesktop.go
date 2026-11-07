@@ -7,7 +7,6 @@ import (
 	"image"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -169,51 +168,8 @@ func keysymTable(keymap []byte) map[uint32]keysymKey {
 // its devices; it lives on the session, guarded by its mu.
 type remoteState struct {
 	types, persistMode uint32
-	restore            *remoteRestore
+	restore            *restoreGrant
 	input              *remoteInput
-}
-
-// remoteRestore is what a RemoteDesktop restore token keeps: the device
-// types the user granted and the screens shared with them.
-type remoteRestore struct {
-	devices uint32
-	targets []sharepicker.Target
-}
-
-// remoteTokenPrefix marks a RemoteDesktop token's data, which a
-// ScreenCast token's never starts with.
-const remoteTokenPrefix = "remote:"
-
-func encodeRemoteRestore(r remoteRestore) restoreToken {
-	data := remoteTokenPrefix + strconv.FormatUint(uint64(r.devices), 10) + "/" + sharepicker.JoinTargets(r.targets)
-	return restoreToken{restoreVendor, restoreVersion, dbus.MakeVariant(data)}
-}
-
-// decodeRemoteRestore reads a RemoteDesktop token this portal issued;
-// any other is none.
-func decodeRemoteRestore(v dbus.Variant) (remoteRestore, bool) {
-	fields, ok := v.Value().([]any)
-	if !ok || len(fields) != 3 || fields[0] != restoreVendor {
-		return remoteRestore{}, false
-	}
-	data, _ := fields[2].(dbus.Variant)
-	payload, _ := data.Value().(string)
-	rest, ok := strings.CutPrefix(payload, remoteTokenPrefix)
-	devices, targets, found := strings.Cut(rest, "/")
-	if !ok || !found {
-		return remoteRestore{}, false
-	}
-	n, err := strconv.ParseUint(devices, 10, 32)
-	if err != nil || n == 0 || uint32(n)&^availableDevices != 0 {
-		return remoteRestore{}, false
-	}
-	r := remoteRestore{devices: uint32(n)}
-	if targets != "" {
-		if r.targets, ok = sharepicker.ParseTargets(targets); !ok {
-			return remoteRestore{}, false
-		}
-	}
-	return r, true
 }
 
 // started is whether Start created the session's devices.
@@ -326,9 +282,9 @@ func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID str
 		return ResponseOther, Vardict{}, nil
 	}
 	persist, _ := optU32(options, "persist_mode")
-	var restore *remoteRestore
+	var restore *restoreGrant
 	if v, ok := options["restore_data"]; ok {
-		if r, ok := decodeRemoteRestore(v); ok {
+		if r, ok := decodeRestore(v); ok && r.devices != 0 {
 			restore = &r
 		}
 	}
@@ -378,7 +334,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		// picker's token box, and a token replays the screens it kept.
 		s.mu.Lock()
 		s.cast.persistMode = state.persistMode
-		if restoring && len(state.restore.targets) > 0 && allOfTypes(state.restore.targets, s.cast.types) {
+		if restoring && len(state.restore.targets) > 0 && allOfTypes(pickedOf(state.restore.targets), s.cast.types) {
 			s.cast.restore = state.restore.targets
 		}
 		s.mu.Unlock()
@@ -425,7 +381,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 	results["devices"] = dbus.MakeVariant(state.types)
 	results["clipboard_enabled"] = dbus.MakeVariant(clipboard)
 	if state.persistMode > 0 && (!sharing || shared.allowToken) {
-		results["restore_data"] = dbus.MakeVariant(encodeRemoteRestore(remoteRestore{devices: state.types, targets: shared.targets}))
+		results["restore_data"] = dbus.MakeVariant(encodeRestore(restoreGrant{devices: state.types, targets: o.r.cast.describe(shared.targets)}))
 		results["persist_mode"] = dbus.MakeVariant(state.persistMode)
 	}
 	return ResponseSuccess, results, nil

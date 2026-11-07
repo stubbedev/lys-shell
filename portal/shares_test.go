@@ -78,7 +78,7 @@ func TestAStartedShareIsListedAndStopEndsItsSession(t *testing.T) {
 func TestAWindowShareNamesItsWindow(t *testing.T) {
 	f := &fakeStarts{fail: map[string]bool{}}
 	r := newRig(t, func(b *Backend) {
-		b.screenCast = newScreenCast(b.conn, b.sessions, f.start, f.outputs)
+		b.screenCast = f.screenCast(b)
 		b.shares.titles = func() map[string]string { return map[string]string{"lys-wm-7": "Notes - Editor"} }
 	})
 	serveSharePicker(t, r, "/window:lys-wm-7")
