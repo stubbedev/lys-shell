@@ -70,10 +70,11 @@ buildGo127Module {
   pname = "lys-shell";
   inherit version src;
 
-  # The module cache's hash: every go.mod change (a lys-ui bump) changes
-  # it; `just vendor-hash` recomputes it (a stale one is reused, not
-  # reported, the derivation being fixed-output).
-  vendorHash = "sha256-veTHRTfWeVxAikG5vnOvySDxtbmRfohTrz0E71sNG4U=";
+  # The vendored modules' hash: a go.mod change (a lys-ui bump) and the
+  # first import of a package not vendored yet both change it, since only
+  # imported packages are vendored; `just vendor-hash` recomputes it (a
+  # stale one is reused, not reported, the derivation being fixed-output).
+  vendorHash = "sha256-GNOXkKBuDRRJR7Y7OOJRHb3HUyoi3Lau4JpopUAMdAw=";
 
   subPackages = [
     "cmd/lys-shell"

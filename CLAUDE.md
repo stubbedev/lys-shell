@@ -17,8 +17,9 @@ just hyprland-vm            # the shell on a live Hyprland in a NixOS VM (KVM), 
 just clockwatch-vm          # the clock-jump watcher on a real kernel in a NixOS VM (KVM): clock steps and suspend
 ```
 
-After a `go.mod` change (a lys-ui bump), refresh `nix/lys-shell.nix`'s
-`vendorHash` with `just vendor-hash`.
+After a `go.mod` change (a lys-ui bump), or the first import of a module
+package nothing imported before (only imported packages are vendored),
+refresh `nix/lys-shell.nix`'s `vendorHash` with `just vendor-hash`.
 
 ## Tests define behavior
 
