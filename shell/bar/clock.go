@@ -24,7 +24,7 @@ func newClock(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("clock: no format")
 	}
 	cfg, store := ctx.Config.Clock, ctx.Calendar
-	btn := newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), clockLabel(cfg, store, time.Now()))
+	btn := newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), clockLabel(cfg, store, time.Now(), shellClockNames()))
 	if ctx.App == nil {
 		return &clock{btn: btn}, nil
 	}
@@ -48,7 +48,7 @@ func newClock(ctx ModuleContext) (Module, error) {
 			}
 			return walltimer.Start(life, layout.Resolution(), fire)
 		},
-		sample: func() (string, bool) { return clockLabel(cfg, store, time.Now()), true },
+		sample: func() (string, bool) { return clockLabel(cfg, store, time.Now(), shellClockNames()), true },
 		same:   func(a, b string) bool { return a == b },
 	}
 	if err := joinSampler(ctx.Life(), ctx.Polls, spec, func(text string) { ctx.Invoke(func() { btn.SetLabel(text) }) }); err != nil {

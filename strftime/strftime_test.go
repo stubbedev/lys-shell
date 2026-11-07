@@ -67,6 +67,11 @@ func TestCompileRejectsEverySpecifierItFormats(t *testing.T) {
 			t.Errorf("specifier %q accepted by the custom table fails Compile: %v", string(spec), err)
 		}
 	}
+	for spec := range named {
+		if _, err := Compile("%" + string(spec)); err != nil {
+			t.Errorf("specifier %q accepted by the named table fails Compile: %v", string(spec), err)
+		}
+	}
 }
 
 // TestPaddingFlags pins chrono's padding modifiers, which the lock
@@ -148,5 +153,21 @@ func TestResolutionFollowsTheSecondsFields(t *testing.T) {
 		if got := layout.Resolution(); got != want {
 			t.Errorf("%q: resolution %v, want %v", format, got, want)
 		}
+	}
+}
+
+func TestFormatInRendersTheGivenNames(t *testing.T) {
+	names := English
+	names.Weekdays[time.Tuesday], names.ShortWeekdays[time.Tuesday] = "mardi", "mar."
+	names.Months[time.September-1], names.ShortMonths[time.September-1] = "septembre", "sept."
+	layout, err := Compile("%A %-d %B, %a %b %Y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := layout.FormatIn(ref, names), "mardi 29 septembre, mar. sept. 2026"; got != want {
+		t.Errorf("FormatIn = %q, want %q", got, want)
+	}
+	if got, want := layout.Format(ref), "Tuesday 29 September, Tue Sep 2026"; got != want {
+		t.Errorf("Format = %q, want %q", got, want)
 	}
 }

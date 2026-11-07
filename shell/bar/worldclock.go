@@ -25,12 +25,13 @@ type worldClockTemplate struct {
 	load    func(string) (*time.Location, error)
 	zones   map[string]*time.Location
 	layouts map[string]*strftime.Layout
+	names   strftime.Names
 	now     time.Time
 	finest  time.Duration
 }
 
-func newWorldClockTemplate(format string, load func(string) (*time.Location, error)) *worldClockTemplate {
-	t := &worldClockTemplate{format: format, load: load, zones: map[string]*time.Location{}, layouts: map[string]*strftime.Layout{}, finest: time.Minute}
+func newWorldClockTemplate(format string, names strftime.Names, load func(string) (*time.Location, error)) *worldClockTemplate {
+	t := &worldClockTemplate{format: format, names: names, load: load, zones: map[string]*time.Location{}, layouts: map[string]*strftime.Layout{}, finest: time.Minute}
 	t.env.AddFunction("tz", t.tz)
 	return t
 }
@@ -61,7 +62,7 @@ func (t *worldClockTemplate) tz(args []any, _ map[string]any) (any, error) {
 		t.layouts[layout] = compiled
 	}
 	t.finest = min(t.finest, formatted.Resolution())
-	return formatted.Format(t.now.In(location)), nil
+	return formatted.FormatIn(t.now.In(location), t.names), nil
 }
 
 func (t *worldClockTemplate) render(now time.Time) string {
@@ -74,7 +75,7 @@ func (t *worldClockTemplate) render(now time.Time) string {
 }
 
 func worldClockRender(format string, now time.Time) string {
-	return newWorldClockTemplate(format, time.LoadLocation).render(now)
+	return newWorldClockTemplate(format, shellClockNames(), time.LoadLocation).render(now)
 }
 
 // worldClock is the module: the format re-renders when its text can
@@ -90,7 +91,7 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.WorldClock
 	m := &worldClockModule{}
 	m.btn = newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), "")
-	template := newWorldClockTemplate(cfg.Format, time.LoadLocation)
+	template := newWorldClockTemplate(cfg.Format, shellClockNames(), time.LoadLocation)
 	spec := samplerSpec[string]{
 		key:   configKey("world-clock", ctx.Config),
 		pause: pauseLocked,

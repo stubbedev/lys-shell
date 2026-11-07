@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -43,7 +44,30 @@ var (
 		"cal-month-january", "cal-month-february", "cal-month-march", "cal-month-april", "cal-month-may", "cal-month-june",
 		"cal-month-july", "cal-month-august", "cal-month-september", "cal-month-october", "cal-month-november", "cal-month-december",
 	}
+	calendarShortDayIDs = [7]string{
+		"cal-day-short-sunday", "cal-day-short-monday", "cal-day-short-tuesday", "cal-day-short-wednesday", "cal-day-short-thursday", "cal-day-short-friday", "cal-day-short-saturday",
+	}
+	calendarShortMonthIDs = [12]string{
+		"cal-month-short-january", "cal-month-short-february", "cal-month-short-march", "cal-month-short-april", "cal-month-short-may", "cal-month-short-june",
+		"cal-month-short-july", "cal-month-short-august", "cal-month-short-september", "cal-month-short-october", "cal-month-short-november", "cal-month-short-december",
+	}
 )
+
+// clockNames is the weekday and month names a strftime format renders, in
+// the loader's language.
+func clockNames(l *i18n.Loader) strftime.Names {
+	var n strftime.Names
+	for d := range n.Weekdays {
+		n.Weekdays[d], n.ShortWeekdays[d] = l.Get(calendarDayIDs[d]), l.Get(calendarShortDayIDs[d])
+	}
+	for m := range n.Months {
+		n.Months[m], n.ShortMonths[m] = l.Get(calendarMonthIDs[m]), l.Get(calendarShortMonthIDs[m])
+	}
+	return n
+}
+
+// shellClockNames is clockNames in the desktop locale, built once.
+var shellClockNames = sync.OnceValue(func() strftime.Names { return clockNames(i18n.Shell()) })
 
 // calendarNames gives widget.Calendar the shell's localized month and
 // weekday names and its configured week start.

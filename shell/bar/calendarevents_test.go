@@ -11,9 +11,11 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	shelllocales "github.com/stubbedev/lys-shell/i18n/locales/shell"
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/calendar"
 	"github.com/stubbedev/lys-shell/shell/treetest"
+	"github.com/stubbedev/lys-shell/strftime"
 )
 
 func icsEvent(uid, summary, start, end string) string {
@@ -142,21 +144,49 @@ func TestClockLabelShowsTheNextEvent(t *testing.T) {
 		{at(9, 20, 0), "20:00 Wed 09:00 Standup"},
 		{at(10, 15, 0), "15:00 "},
 	} {
-		if got := clockLabel(cfg, store, tc.now); got != tc.want {
+		if got := clockLabel(cfg, store, tc.now, strftime.English); got != tc.want {
 			t.Errorf("label at %v = %q, want %q", tc.now, got, tc.want)
 		}
 	}
 	twelve := cfg
 	twelve.Format = mustStrftimeFormat(t, "%I:%M %p {{ next_event }}")
-	if got := clockLabel(twelve, store, at(10, 13, 0)); got != "01:00 PM 2:00 PM Review" {
+	if got := clockLabel(twelve, store, at(10, 13, 0), strftime.English); got != "01:00 PM 2:00 PM Review" {
 		t.Errorf("12-hour label = %q", got)
 	}
 	plain := cfg
 	plain.Format = mustStrftimeFormat(t, "%H:%M")
-	if got := clockLabel(plain, store, at(10, 8, 0)); got != "08:00" {
+	if got := clockLabel(plain, store, at(10, 8, 0), strftime.English); got != "08:00" {
 		t.Errorf("a format without the placeholder = %q", got)
 	}
-	if got := clockLabel(cfg, nil, at(10, 8, 0)); got != "08:00 " {
+	if got := clockLabel(cfg, nil, at(10, 8, 0), strftime.English); got != "08:00 " {
 		t.Errorf("no calendar store = %q", got)
+	}
+}
+
+func TestTheClockLabelNamesDaysAndMonthsInTheShellLanguage(t *testing.T) {
+	_, store := calendarFixture(t)
+	names := func(lang string) strftime.Names {
+		l, err := i18n.Select(i18n.NewAssets(shelllocales.FS), []i18n.LangID{i18n.MustLangID(lang)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return clockNames(l)
+	}
+	french, english := names("fr"), names("en-US")
+	if english != strftime.English {
+		t.Errorf("the en-US names %+v are not strftime's English %+v", english, strftime.English)
+	}
+	cfg := config.DefaultsClock()
+	cfg.Format = mustStrftimeFormat(t, "%a %b %d %I:%M %p")
+	now := time.Date(2026, time.November, 7, 19, 55, 0, 0, time.Local)
+	if got, want := clockLabel(cfg, nil, now, french), "sam. nov. 07 07:55 PM"; got != want {
+		t.Errorf("fr label = %q, want %q", got, want)
+	}
+	if got, want := clockLabel(cfg, nil, now, english), "Sat Nov 07 07:55 PM"; got != want {
+		t.Errorf("en-US label = %q, want %q", got, want)
+	}
+	cfg.Format = mustStrftimeFormat(t, "%A %-d %B {{ next_event }}")
+	if got, want := clockLabel(cfg, store, time.Date(2027, time.March, 9, 20, 0, 0, 0, time.Local), french), "mardi 9 mars mer. 09:00 Standup"; got != want {
+		t.Errorf("fr label with the next event = %q, want %q", got, want)
 	}
 }

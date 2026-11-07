@@ -23,7 +23,8 @@ func Compile(format string) (*Layout, error) {
 	for _, spec := range specs(format) {
 		_, inLayouts := layouts[spec]
 		_, inCustom := custom[spec]
-		if !inLayouts && !inCustom {
+		_, inNamed := named[spec]
+		if !inLayouts && !inCustom && !inNamed {
 			return nil, fmt.Errorf("strftime: unsupported specifier %q in %q", "%"+string(spec), format)
 		}
 	}
@@ -44,13 +45,31 @@ func (l *Layout) Resolution() time.Duration {
 // String returns the source format.
 func (l *Layout) String() string { return l.src }
 
-// Format renders t through the compiled format. Literal text passes
-// through unchanged; "%%" renders a single percent sign. A chrono
-// padding flag between the percent and the specifier re-pads numeric
-// fields: "-" drops the padding (%-d is "5"), "_" pads with spaces,
-// "0" with zeros; on text fields the flag changes nothing, as in
-// chrono.
-func (l *Layout) Format(t time.Time) string {
+// Format renders t through the compiled format with English names.
+func (l *Layout) Format(t time.Time) string { return l.FormatIn(t, English) }
+
+// Names are the weekday and month names %A, %a, %B and %b render,
+// indexed by time.Weekday and by time.Month minus one.
+type Names struct {
+	Weekdays, ShortWeekdays [7]string
+	Months, ShortMonths     [12]string
+}
+
+// English is the C locale's names.
+var English = Names{
+	Weekdays:      [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
+	ShortWeekdays: [7]string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"},
+	Months:        [12]string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"},
+	ShortMonths:   [12]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
+}
+
+// FormatIn renders t through the compiled format with the given names.
+// Literal text passes through unchanged; "%%" renders a single percent
+// sign. A chrono padding flag between the percent and the specifier
+// re-pads numeric fields: "-" drops the padding (%-d is "5"), "_" pads
+// with spaces, "0" with zeros; on text fields the flag changes nothing,
+// as in chrono.
+func (l *Layout) FormatIn(t time.Time, names Names) string {
 	var b strings.Builder
 	for i := 0; i < len(l.src); {
 		c := l.src[i]
@@ -70,13 +89,16 @@ func (l *Layout) Format(t time.Time) string {
 			b.WriteByte('%')
 			continue
 		}
-		b.WriteString(pad(render(spec, t), spec, flag))
+		b.WriteString(pad(render(spec, t, names), spec, flag))
 	}
 	return b.String()
 }
 
 // render formats one validated specifier.
-func render(spec byte, t time.Time) string {
+func render(spec byte, t time.Time, names Names) string {
+	if name, ok := named[spec]; ok {
+		return name(names, t)
+	}
 	if goLayout, ok := layouts[spec]; ok {
 		return t.Format(goLayout)
 	}
@@ -158,10 +180,6 @@ var layouts = map[byte]string{
 	'm': "01",
 	'd': "02",
 	'e': "_2",
-	'a': "Mon",
-	'A': "Monday",
-	'b': "Jan",
-	'B': "January",
 	'H': "15",
 	'I': "03",
 	'M': "04",
@@ -169,6 +187,14 @@ var layouts = map[byte]string{
 	'p': "PM",
 	'Z': "MST",
 	'z': "-0700",
+}
+
+// named maps the specifiers that render a weekday or month name.
+var named = map[byte]func(Names, time.Time) string{
+	'a': func(n Names, t time.Time) string { return n.ShortWeekdays[t.Weekday()] },
+	'A': func(n Names, t time.Time) string { return n.Weekdays[t.Weekday()] },
+	'b': func(n Names, t time.Time) string { return n.ShortMonths[t.Month()-1] },
+	'B': func(n Names, t time.Time) string { return n.Months[t.Month()-1] },
 }
 
 // custom maps specifiers needing arithmetic beyond a Go layout.

@@ -14,6 +14,27 @@ cal-day-thursday = Thursday
 cal-day-friday = Friday
 cal-day-saturday = Saturday
 
+cal-day-short-sunday = Sun
+cal-day-short-monday = Mon
+cal-day-short-tuesday = Tue
+cal-day-short-wednesday = Wed
+cal-day-short-thursday = Thu
+cal-day-short-friday = Fri
+cal-day-short-saturday = Sat
+
+cal-month-short-january = Jan
+cal-month-short-february = Feb
+cal-month-short-march = Mar
+cal-month-short-april = Apr
+cal-month-short-may = May
+cal-month-short-june = Jun
+cal-month-short-july = Jul
+cal-month-short-august = Aug
+cal-month-short-september = Sep
+cal-month-short-october = Oct
+cal-month-short-november = Nov
+cal-month-short-december = Dec
+
 # { $month } - localized month name, { $day } - day number, { $year } - four-digit year
 cal-clock-date-rest = , { $month } { $day }, { $year }
 

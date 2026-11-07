@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/service/calendar"
+	"github.com/stubbedev/lys-shell/strftime"
 	"github.com/stubbedev/lys-shell/styling"
 )
 
@@ -83,7 +84,7 @@ func reminderBody(o calendar.Occurrence, use12h bool) string {
 	return body
 }
 
-func nextEventText(store *calendar.Store, now time.Time, use12h bool) string {
+func nextEventText(store *calendar.Store, now time.Time, use12h bool, names strftime.Names) string {
 	if store == nil {
 		return ""
 	}
@@ -93,17 +94,17 @@ func nextEventText(store *calendar.Store, now time.Time, use12h bool) string {
 	}
 	when := clockText(o.Start, use12h)
 	if y, m, d := o.Start.Date(); y != now.Year() || m != now.Month() || d != now.Day() {
-		when = strftimeOf("%a", o.Start) + " " + when
+		when = names.ShortWeekdays[o.Start.Weekday()] + " " + when
 	}
 	return when + " " + o.Summary
 }
 
-func clockLabel(cfg config.ClockConfig, store *calendar.Store, now time.Time) string {
-	text := cfg.Format.Format(now)
+func clockLabel(cfg config.ClockConfig, store *calendar.Store, now time.Time, names strftime.Names) string {
+	text := cfg.Format.Layout().FormatIn(now, names)
 	if !strings.Contains(text, nextEventPlaceholder) {
 		return text
 	}
-	return strings.ReplaceAll(text, nextEventPlaceholder, nextEventText(store, now, calendarIs12h(cfg.Format.String())))
+	return strings.ReplaceAll(text, nextEventPlaceholder, nextEventText(store, now, calendarIs12h(cfg.Format.String()), names))
 }
 
 type calendarAgenda struct {

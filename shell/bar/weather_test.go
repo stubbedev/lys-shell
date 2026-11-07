@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/weather"
+	"github.com/stubbedev/lys-shell/strftime"
 )
 
 // osWrite writes one config variant for the load tests.
@@ -166,14 +167,14 @@ func TestWorldClockResolutionIsTheFinestLayoutUsed(t *testing.T) {
 }
 
 func worldClockFinest(format string) time.Duration {
-	template := newWorldClockTemplate(format, time.LoadLocation)
+	template := newWorldClockTemplate(format, strftime.English, time.LoadLocation)
 	template.render(time.Now())
 	return template.finest
 }
 
 func TestWorldClockLoadsEachZoneOnceAndRendersWithinItsBudget(t *testing.T) {
 	loads := map[string]int{}
-	template := newWorldClockTemplate("{{ tz('UTC', '%H:%M') }} {{ tz('Asia/Tokyo', '%H:%M') }} {{ tz('UTC', '%H') }}", func(zone string) (*time.Location, error) {
+	template := newWorldClockTemplate("{{ tz('UTC', '%H:%M') }} {{ tz('Asia/Tokyo', '%H:%M') }} {{ tz('UTC', '%H') }}", strftime.English, func(zone string) (*time.Location, error) {
 		loads[zone]++
 		return time.LoadLocation(zone)
 	})
