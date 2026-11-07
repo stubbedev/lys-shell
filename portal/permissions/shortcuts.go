@@ -19,10 +19,14 @@ import (
 )
 
 // Shortcut is one global shortcut an app bound, as lys keeps it for the
-// app's later sessions.
+// app's later sessions: Trigger is the key the user gave it over
+// xx_hotkey_v1 in the accelerator label form ("Ctrl+Alt+P"), "" where
+// the compositor's config binds the keys or the user left it
+// unassigned.
 type Shortcut struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`
+	Trigger     string `json:"trigger,omitempty"`
 }
 
 // ShortcutsPath is the shortcut store,

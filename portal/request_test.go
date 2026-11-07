@@ -115,7 +115,7 @@ func interactiveCases() []interactiveCase {
 			held := dialogs(t, r)
 			g := r.backend.shortcuts
 			g.mu.Lock()
-			g.start = func(func(string, bool)) (shortcutDevice, error) { return &fakeShortcuts{}, nil }
+			g.start = func(shortcutEvents) (shortcutDevice, error) { return &fakeShortcuts{}, nil }
 			g.mu.Unlock()
 			if c, err := code(r, GlobalShortcutsIface+".CreateSession", handle, sessB, "org.app", Vardict{}); err != nil || c != ResponseSuccess {
 				t.Fatalf("CreateSession = %d, %v", c, err)

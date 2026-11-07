@@ -1027,3 +1027,78 @@ func TestAnAccessDialogIsOpenedForTheRequestWindow(t *testing.T) {
 		t.Error("a dialog nothing shows granted the access")
 	}
 }
+
+// The shortcuts editor shows a recorder per shortcut at its trigger
+// with the compositor's refusal under it, takes the keyboard on the
+// first recorder, refuses a key another row holds, and saves what each
+// row was left with; Cancel answers no.
+func TestBindShortcutsEditsEachTrigger(t *testing.T) {
+	hs := newHarness(t, nil)
+	r := portaldialogs.ShortcutsRequest{Title: "Global shortcuts", Note: "They work in the background.", Rows: []portaldialogs.ShortcutRow{
+		{ID: "shot", Description: "Take a screenshot", Trigger: "Ctrl+Alt+P"},
+		{ID: "talk", Description: "Push to talk", Trigger: "Super+F9", Refusal: "Another shortcut already uses Super+F9."},
+	}}
+	type answer struct {
+		ok       bool
+		triggers []portaldialogs.ShortcutTrigger
+	}
+	run := func(act func(c app.LayerConfig, recs []*widget.ShortcutRecorder)) answer {
+		t.Helper()
+		got := make(chan answer, 1)
+		go func() {
+			ok, triggers := hs.h.BindShortcuts(portaldialogs.Caller{Handle: "/r/keys"}, r)
+			got <- answer{ok, triggers}
+		}()
+		c := hs.open(t)
+		recs := treetest.All[*widget.ShortcutRecorder](c.Root)
+		if len(recs) != 2 {
+			t.Fatalf("the editor shows %d recorders, want 2", len(recs))
+		}
+		act(c, recs)
+		return <-got
+	}
+
+	a := run(func(c app.LayerConfig, recs []*widget.ShortcutRecorder) {
+		if recs[0].Accel() != "Ctrl+Alt+P" || recs[1].Accel() != "Super+F9" || recs[0].Error() != "" || recs[1].Error() != r.Rows[1].Refusal {
+			t.Errorf("rows start at %q (%q) and %q (%q)", recs[0].Accel(), recs[0].Error(), recs[1].Accel(), recs[1].Error())
+		}
+		if labels := treetest.Labels(c.Root); !slices.Contains(labels, "Take a screenshot") || !slices.Contains(labels, "Push to talk") {
+			t.Errorf("the editor labels %v", labels)
+		}
+		var focused widget.Widget
+		hs.do(func() {
+			hs.mu.Lock()
+			focused = hs.windows[len(hs.windows)-1].focused
+			hs.mu.Unlock()
+		})
+		if c.Keyboard != app.KeyboardExclusive || focused != widget.FirstFocusable(recs[0]) {
+			t.Errorf("keyboard %v focused %T, want the first recorder holding the keyboard", c.Keyboard, focused)
+		}
+		hs.do(func() {
+			recs[1].StartRecording()
+			recs[1].RecordPress(xkb.Keysym('p'), widget.ModCtrl|widget.ModAlt)
+		})
+		if !recs[1].Recording() || !strings.Contains(recs[1].Error(), "Take a screenshot already uses Ctrl+Alt+P") {
+			t.Errorf("recording the first row's key: recording=%v error=%q", recs[1].Recording(), recs[1].Error())
+		}
+		hs.do(func() {
+			recs[1].RecordPress(xkb.KeyF10, widget.ModSuper)
+			treetest.Button(t, c.Root, "Save").OnClick()
+		})
+	})
+	want := []portaldialogs.ShortcutTrigger{{ID: "shot", Trigger: "Ctrl+Alt+P"}, {ID: "talk", Trigger: "Super+F10"}}
+	if !a.ok || !slices.Equal(a.triggers, want) {
+		t.Errorf("save = %+v, want %+v", a, want)
+	}
+
+	a = run(func(c app.LayerConfig, recs []*widget.ShortcutRecorder) {
+		hs.do(func() {
+			recs[0].StartRecording()
+			recs[0].RecordPress(xkb.KeyBackSpace, 0)
+			treetest.Button(t, c.Root, "Cancel").OnClick()
+		})
+	})
+	if a.ok || a.triggers != nil {
+		t.Errorf("cancel = %+v", a)
+	}
+}

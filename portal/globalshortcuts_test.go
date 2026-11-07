@@ -20,6 +20,8 @@ type fakeShortcuts struct {
 	unregistered dbustest.Var[[]string]
 }
 
+func (*fakeShortcuts) shortcutDevice() {}
+
 func (f *fakeShortcuts) register(key, id, appID, description, trigger string) (func(), error) {
 	f.registered.Update(func(r []string) []string { return append(r, appID+"/"+id+"|"+description+"|"+trigger) })
 	return func() {
@@ -34,11 +36,11 @@ func shortcutsRig(t *testing.T, startErr error) (*rig, *fakeShortcuts, *fakeDial
 	f := &fakeShortcuts{}
 	store := filepath.Join(t.TempDir(), "portal-shortcuts.json")
 	r := newRig(t, func(b *Backend) {
-		b.shortcuts = newGlobalShortcuts(b.conn, b.sessions, store, func(on func(string, bool)) (shortcutDevice, error) {
+		b.shortcuts = newGlobalShortcuts(b.conn, b.sessions, store, func(events shortcutEvents) (shortcutDevice, error) {
 			if startErr != nil {
 				return nil, startErr
 			}
-			f.onEvent.Store(on)
+			f.onEvent.Store(events.pressed)
 			return f, nil
 		})
 		b.shortcuts.now = func() uint64 { return 1234 }

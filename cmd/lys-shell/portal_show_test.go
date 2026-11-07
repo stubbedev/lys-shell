@@ -79,6 +79,10 @@ func (fakeDialogs) Password(portaldialogs.Caller, portaldialogs.PasswordRequest)
 	return false, "", nil
 }
 
+func (fakeDialogs) BindShortcuts(portaldialogs.Caller, portaldialogs.ShortcutsRequest) (bool, []portaldialogs.ShortcutTrigger) {
+	return false, nil
+}
+
 func (f fakeDialogs) Authenticate(c portaldialogs.Caller, r portaldialogs.AuthRequest) portaldialogs.AuthReply {
 	f.got.Store([]any{c.Handle, r})
 	return f.auth.Load()

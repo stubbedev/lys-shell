@@ -9,8 +9,8 @@ failure, so the test script can assert the outcome.
     portal-client globalshortcuts
     portal-client filechooser
 
-globalshortcuts binds one shortcut, prints the bind response, then
-waits for its Activated signal and prints that.
+globalshortcuts binds one shortcut preferring CTRL+ALT+p, prints the
+bind response, then waits for its Activated signal and prints that.
 """
 
 import json
@@ -128,7 +128,7 @@ def globalshortcuts():
     with conn.filter(rule) as signals:
         code, results = request(
             gs, "BindShortcuts", "oa(sa{sv})s", session,
-            [("lys-vm-test", {"description": ("s", "lys-shell VM test")})], "",
+            [("lys-vm-test", {"description": ("s", "lys-shell VM test"), "preferred_trigger": ("s", "CTRL+ALT+p")})], "",
             options={},
         )
         print(json.dumps({"bound": code, "results": plain(results)}), flush=True)

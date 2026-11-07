@@ -365,6 +365,13 @@ type fakeDialogs struct {
 	// answers are Access choices' values by choice id, each one's start
 	// value when unset.
 	answers dbustest.Var[map[string]string]
+	// editor answers the n-th shortcuts editor shown (from 0): the
+	// triggers the user leaves by shortcut id, a row's own where absent,
+	// and whether they confirm; unset, every editor is confirmed as
+	// shown.
+	editor dbustest.Var[func(n int) (map[string]string, bool)]
+	// editors are the shortcuts editors shown.
+	editors dbustest.Var[[]portaldialogs.ShortcutsRequest]
 }
 
 // answer records a dialog and gives the configured verdict, no when
@@ -442,6 +449,32 @@ func (f *fakeDialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordR
 		return false, "", nil
 	}
 	return true, "typed", nil
+}
+
+func (f *fakeDialogs) BindShortcuts(c portaldialogs.Caller, r portaldialogs.ShortcutsRequest) (bool, []portaldialogs.ShortcutTrigger) {
+	n := len(f.editors.Load())
+	f.editors.Update(func(e []portaldialogs.ShortcutsRequest) []portaldialogs.ShortcutsRequest {
+		return append(slices.Clone(e), r)
+	})
+	if !f.answer(c, r) {
+		return false, nil
+	}
+	var rekeys map[string]string
+	if editor := f.editor.Load(); editor != nil {
+		var ok bool
+		if rekeys, ok = editor(n); !ok {
+			return false, nil
+		}
+	}
+	triggers := make([]portaldialogs.ShortcutTrigger, len(r.Rows))
+	for i, row := range r.Rows {
+		trigger, ok := rekeys[row.ID]
+		if !ok {
+			trigger = row.Trigger
+		}
+		triggers[i] = portaldialogs.ShortcutTrigger{ID: row.ID, Trigger: trigger}
+	}
+	return true, triggers
 }
 
 // The xdg-desktop-portal backend never authenticates (that is

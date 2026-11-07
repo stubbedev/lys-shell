@@ -25,6 +25,7 @@ let
       layout = "us,de";
       options = "grp:alt_shift_toggle";
     };
+    client_hotkeys = true;
     binds = [
       {
         chord = "SUPER + R";
@@ -493,12 +494,18 @@ pkgs.testers.nixosTest {
         raise Exception(f"the screenshot portal answered {answer}")
     machine.succeed(f"test -s '{uri[len('file://'):]}'")
 
-    allow("globalshortcuts", "shortcuts.json", "14-shortcut-consent")
+    # lys-wm offers xx_hotkey_v1 (client_hotkeys): the bind shows the
+    # shortcuts editor with the app's preferred trigger, saved as is, and
+    # the real key fires the shortcut.
+    allow("globalshortcuts", "shortcuts.json", "14-shortcut-editor")
     wait("the bound shortcut", lambda: machine.execute("grep -q bound /tmp/lys/shortcuts.json")[0] == 0, tries=30)
     bound = json.loads(machine.succeed("head -n1 /tmp/lys/shortcuts.json"))
     if bound["bound"] != 0:
         raise Exception(f"BindShortcuts answered {bound}")
-    dispatch("global dev.stubbe.lys.VmTest:lys-vm-test")
+    described = [s["trigger_description"] for s in bound["results"]["shortcuts"]]
+    if described != ["Ctrl+Alt+P"]:
+        raise Exception(f"the bound shortcut is described as {described}, want the preferred Ctrl+Alt+P")
+    machine.send_key("ctrl-alt-p")
     wait("the shortcut's activation", lambda: machine.execute("grep -q activated /tmp/lys/shortcuts.json")[0] == 0, tries=30)
     print("global shortcut:", machine.succeed("cat /tmp/lys/shortcuts.json"))
 

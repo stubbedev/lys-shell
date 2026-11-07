@@ -19,7 +19,7 @@ Implemented natively by `lys-shell portal`:
 | `ScreenCast` | native PipeWire producer + wlr-screencopy / ext-image-copy capture |
 | `RemoteDesktop` | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1`: relative+absolute pointer, scroll, evdev + keysym keys (libxkbcommon), and an `ConnectToEIS` libei socket (`reis`) |
 | `Screenshot` (+ PickColor) | the shell's `dev.stubbe.lys.Screenshot1` overlay |
-| `GlobalShortcuts` | `hyprland-global-shortcuts-v1` (where the compositor implements it) |
+| `GlobalShortcuts` (v2) | lys-wm's `xx_hotkey_v1` (`client_hotkeys`): the shell's shortcuts editor, a recorder per shortcut starting at the app's preferred trigger, the key kept for the app's later sessions; else `hyprland-global-shortcuts-v1`, keys bound in the compositor's config |
 | `Settings` | `lys-shell-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast, reduced-motion) |
 | `Notification` (v2) | the shell's notification daemon: update by id, body click as the default action, buttons with targets, priority/category/display hints, markup body, themed, file-descriptor and bytes icons |
 | `Wallpaper` | `dev.stubbe.lys.Wallpaper1` |
@@ -115,9 +115,11 @@ NixOS / home-manager module alongside the shell.
   Wallpaper / Inhibit**: work on any compositor implementing the standard
   capture (`ext-image-copy-capture` or `wlr-screencopy`) and virtual-input
   (`wlr-virtual-pointer`, `virtual-keyboard`) protocols.
-- **GlobalShortcuts**: requires `hyprland-global-shortcuts-v1`. Compositors that
-  do not implement it (currently niri, mango) accept binds but never deliver
-  activations — there is no portal-agnostic global-shortcut mechanism.
+- **GlobalShortcuts**: requires `xx_hotkey_v1` (lys-wm with `client_hotkeys`),
+  where the user picks each key in the shell, or `hyprland-global-shortcuts-v1`,
+  where the compositor's config binds them. Compositors with neither (currently
+  niri, mango) accept binds but never deliver activations — there is no
+  portal-agnostic global-shortcut mechanism.
 
 ## Platform limitations (not stubs — no Wayland mechanism exists)
 

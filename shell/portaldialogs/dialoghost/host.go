@@ -2,6 +2,7 @@ package dialoghost
 
 import (
 	"cmp"
+	"fmt"
 	"log"
 	"slices"
 	"strings"
@@ -337,6 +338,52 @@ func (h *Dialogs) ChooseDevices(c portaldialogs.Caller, devices []portaldialogs.
 		return false, nil
 	}
 	return true, picked
+}
+
+// BindShortcuts is the global shortcuts editor (GNOME's and KDE's
+// portal dialogs): a row per shortcut, its description beside a
+// recorder that starts at its trigger, and the compositor's refusal of
+// that trigger under it. A key another row holds is refused while the
+// user records. Saving answers the trigger each row was left with.
+func (h *Dialogs) BindShortcuts(c portaldialogs.Caller, r portaldialogs.ShortcutsRequest) (bool, []portaldialogs.ShortcutTrigger) {
+	var triggers []portaldialogs.ShortcutTrigger
+	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+		recorders := make([]*widget.ShortcutRecorder, len(r.Rows))
+		rows := make([]widget.Widget, len(r.Rows))
+		for i, row := range r.Rows {
+			rec := widget.NewShortcutRecorder(h.d.Font, row.Trigger)
+			rec.AddClass("portal-dialog-shortcut")
+			rec.SetAccessibleName(row.Description)
+			rec.SetError(row.Refusal)
+			rec.Validate = func(accel string) error {
+				for j, other := range recorders {
+					if j != i && other.Accel() == accel {
+						return fmt.Errorf("%s already uses %s", r.Rows[j].Description, accel)
+					}
+				}
+				return nil
+			}
+			recorders[i] = rec
+			line := widget.NewBox(widget.Row, widget.Current().Spacing, 0)
+			line.AddClass("portal-dialog-shortcut-row")
+			line.AppendAligned(h.label(row.Description, "portal-dialog-shortcut-label"), true, widget.AlignCenter)
+			line.AppendAligned(rec, false, widget.AlignStart)
+			rows[i] = line
+		}
+		h.focus = widget.FirstFocusable(recorders[0])
+		save := func() {
+			triggers = make([]portaldialogs.ShortcutTrigger, len(r.Rows))
+			for i, row := range r.Rows {
+				triggers[i] = portaldialogs.ShortcutTrigger{ID: row.ID, Trigger: recorders[i].Accel()}
+			}
+			answer(true, "")
+		}
+		return h.surface(r.Title, r.Note, rows, h.cancel("Cancel", answer), h.accept("Save", save))
+	})
+	if !ok {
+		return false, nil
+	}
+	return true, triggers
 }
 
 // ConfirmInstall confirms a dynamic launcher: its icon, the URL a web
