@@ -189,10 +189,19 @@ func splitLines(data []byte) []string {
 	return strings.Split(text, "\n")
 }
 
-// setListKey sets key=v1;v2; in group, adding the group (at the end) or
-// the key (at the end of its group) when missing.
+// SetKey is data, a key file, with key=value in group: the key's line
+// replaced, or added at the end of its group, or the group added at the
+// end; every other line is kept byte for byte.
+func SetKey(data []byte, group, key, value string) []byte {
+	return []byte(strings.Join(setKey(splitLines(data), group, key, value), "\n") + "\n")
+}
+
 func setListKey(lines []string, group, key string, values []string) []string {
-	entry := key + "=" + strings.Join(values, ";") + ";"
+	return setKey(lines, group, key, strings.Join(values, ";")+";")
+}
+
+func setKey(lines []string, group, key, value string) []string {
+	entry := key + "=" + value
 	start, end := -1, len(lines)
 	for i, l := range lines {
 		trimmed := strings.TrimSpace(l)

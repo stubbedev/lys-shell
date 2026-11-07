@@ -161,3 +161,16 @@ func TestSetDefaultsWritesEveryTypeAndLeavesTheRestByteForByte(t *testing.T) {
 		t.Errorf("a temporary file was left: %v", entries)
 	}
 }
+
+func TestSetKeyReplacesOrAddsOneLine(t *testing.T) {
+	in := "# keep\n[Desktop Entry]\nName=Foot\nHidden=false\n\n[Desktop Action new]\nName=New\n"
+	if got := string(SetKey([]byte(in), "Desktop Entry", "Hidden", "true")); got != "# keep\n[Desktop Entry]\nName=Foot\nHidden=true\n\n[Desktop Action new]\nName=New\n" {
+		t.Errorf("replace: %q", got)
+	}
+	if got := string(SetKey([]byte("[Desktop Entry]\nName=Foot\n\n[Desktop Action new]\nName=New\n"), "Desktop Entry", "Hidden", "true")); got != "[Desktop Entry]\nName=Foot\nHidden=true\n\n[Desktop Action new]\nName=New\n" {
+		t.Errorf("add to the group: %q", got)
+	}
+	if got := string(SetKey(nil, "Desktop Entry", "Hidden", "true")); got != "[Desktop Entry]\nHidden=true\n" {
+		t.Errorf("new group: %q", got)
+	}
+}
