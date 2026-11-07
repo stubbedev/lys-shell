@@ -847,6 +847,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand --help 'Print help'
             cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)'
             cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand permissions 'List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)'
             cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -858,6 +859,32 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand --allow-token 'Pre-check the "allow restore token" box'
             cand -h 'Print help'
             cand --help 'Print help'
+        }
+        &'lys-shell;portal;permissions'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List every app''s grants'
+            cand revoke 'Revoke an app''s grants in a table, or one entry of it'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;portal;permissions;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;permissions;revoke'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;portal;permissions;help'= {
+            cand list 'List every app''s grants'
+            cand revoke 'Revoke an app''s grants in a table, or one entry of it'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;portal;permissions;help;list'= {
+        }
+        &'lys-shell;portal;permissions;help;revoke'= {
+        }
+        &'lys-shell;portal;permissions;help;help'= {
         }
         &'lys-shell;portal;show'= {
             cand -h 'Print help'
@@ -968,12 +995,21 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;portal;help'= {
             cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)'
             cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand permissions 'List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)'
             cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;portal;help;run'= {
         }
         &'lys-shell;portal;help;share-picker'= {
+        }
+        &'lys-shell;portal;help;permissions'= {
+            cand list 'List every app''s grants'
+            cand revoke 'Revoke an app''s grants in a table, or one entry of it'
+        }
+        &'lys-shell;portal;help;permissions;list'= {
+        }
+        &'lys-shell;portal;help;permissions;revoke'= {
         }
         &'lys-shell;portal;help;show'= {
             cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
@@ -1314,11 +1350,20 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;portal'= {
             cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)'
             cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand permissions 'List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)'
             cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
         }
         &'lys-shell;help;portal;run'= {
         }
         &'lys-shell;help;portal;share-picker'= {
+        }
+        &'lys-shell;help;portal;permissions'= {
+            cand list 'List every app''s grants'
+            cand revoke 'Revoke an app''s grants in a table, or one entry of it'
+        }
+        &'lys-shell;help;portal;permissions;list'= {
+        }
+        &'lys-shell;help;portal;permissions;revoke'= {
         }
         &'lys-shell;help;portal;show'= {
             cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'

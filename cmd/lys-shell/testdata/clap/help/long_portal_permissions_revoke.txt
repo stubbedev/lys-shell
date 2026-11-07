@@ -1,0 +1,11 @@
+Revoke an app's grants in a table, or one entry of it
+
+Usage: lys-shell portal permissions revoke <APP> <TABLE> [ENTRY]
+
+Arguments:
+  <APP>    App id (e.g., org.mozilla.firefox)
+  <TABLE>  Table the grants are kept in [possible values: background, devices, gamemode, global-shortcuts, inhibit, input-capture, location, notifications, realtime, remote-desktop, screencast, screenshot, usb, wallpaper]
+  [ENTRY]  Entry of the table to revoke (e.g., camera); every entry when left out
+
+Options:
+  -h, --help  Print help

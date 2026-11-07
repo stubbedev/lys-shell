@@ -397,6 +397,9 @@ _lys-shell() {
             lys__shell__help__panel,toggle)
                 cmd="lys__shell__help__panel__toggle"
                 ;;
+            lys__shell__help__portal,permissions)
+                cmd="lys__shell__help__portal__permissions"
+                ;;
             lys__shell__help__portal,run)
                 cmd="lys__shell__help__portal__run"
                 ;;
@@ -405,6 +408,12 @@ _lys-shell() {
                 ;;
             lys__shell__help__portal,show)
                 cmd="lys__shell__help__portal__show"
+                ;;
+            lys__shell__help__portal__permissions,list)
+                cmd="lys__shell__help__portal__permissions__list"
+                ;;
+            lys__shell__help__portal__permissions,revoke)
+                cmd="lys__shell__help__portal__permissions__revoke"
                 ;;
             lys__shell__help__portal__show,access)
                 cmd="lys__shell__help__portal__show__access"
@@ -775,6 +784,9 @@ _lys-shell() {
             lys__shell__portal,help)
                 cmd="lys__shell__portal__help"
                 ;;
+            lys__shell__portal,permissions)
+                cmd="lys__shell__portal__permissions"
+                ;;
             lys__shell__portal,run)
                 cmd="lys__shell__portal__run"
                 ;;
@@ -787,6 +799,9 @@ _lys-shell() {
             lys__shell__portal__help,help)
                 cmd="lys__shell__portal__help__help"
                 ;;
+            lys__shell__portal__help,permissions)
+                cmd="lys__shell__portal__help__permissions"
+                ;;
             lys__shell__portal__help,run)
                 cmd="lys__shell__portal__help__run"
                 ;;
@@ -795,6 +810,12 @@ _lys-shell() {
                 ;;
             lys__shell__portal__help,show)
                 cmd="lys__shell__portal__help__show"
+                ;;
+            lys__shell__portal__help__permissions,list)
+                cmd="lys__shell__portal__help__permissions__list"
+                ;;
+            lys__shell__portal__help__permissions,revoke)
+                cmd="lys__shell__portal__help__permissions__revoke"
                 ;;
             lys__shell__portal__help__show,access)
                 cmd="lys__shell__portal__help__show__access"
@@ -828,6 +849,24 @@ _lys-shell() {
                 ;;
             lys__shell__portal__help__show,wallpaper)
                 cmd="lys__shell__portal__help__show__wallpaper"
+                ;;
+            lys__shell__portal__permissions,help)
+                cmd="lys__shell__portal__permissions__help"
+                ;;
+            lys__shell__portal__permissions,list)
+                cmd="lys__shell__portal__permissions__list"
+                ;;
+            lys__shell__portal__permissions,revoke)
+                cmd="lys__shell__portal__permissions__revoke"
+                ;;
+            lys__shell__portal__permissions__help,help)
+                cmd="lys__shell__portal__permissions__help__help"
+                ;;
+            lys__shell__portal__permissions__help,list)
+                cmd="lys__shell__portal__permissions__help__list"
+                ;;
+            lys__shell__portal__permissions__help,revoke)
+                cmd="lys__shell__portal__permissions__help__revoke"
                 ;;
             lys__shell__portal__show,access)
                 cmd="lys__shell__portal__show__access"
@@ -2516,8 +2555,50 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__portal)
-            opts="run share-picker show"
+            opts="run share-picker permissions show"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__portal__permissions)
+            opts="list revoke"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__portal__permissions__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__portal__permissions__revoke)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -4534,7 +4615,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal)
-            opts="-h --help run share-picker show help"
+            opts="-h --help run share-picker permissions show help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4548,7 +4629,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__portal__help)
-            opts="run share-picker show help"
+            opts="run share-picker permissions show help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4564,6 +4645,48 @@ _lys-shell() {
         lys__shell__portal__help__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__help__permissions)
+            opts="list revoke"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__help__permissions__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__help__permissions__revoke)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -4760,6 +4883,104 @@ _lys-shell() {
         lys__shell__portal__help__show__wallpaper)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions)
+            opts="-h --help list revoke help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions__help)
+            opts="list revoke help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions__help__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions__help__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions__help__revoke)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions__list)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__portal__permissions__revoke)
+            opts="-h --help <APP> background devices gamemode global-shortcuts inhibit input-capture location notifications realtime remote-desktop screencast screenshot usb wallpaper [ENTRY]"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi

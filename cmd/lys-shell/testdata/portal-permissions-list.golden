@@ -1,0 +1,7 @@
+APP                    TABLE             ENTRY                                 GRANTED
+com.example.Chat       devices           camera                                no
+com.example.Chat       devices           microphone                            yes
+com.obsproject.Studio  screencast        6f1f0c5e-2b0e-4a5e-9a51-7b1e7a1d2c3f  yes
+org.app                devices           camera                                yes
+org.app                global-shortcuts  toggle-recording                      Start or stop recording
+org.app                usb               usb:1d6b/0003/                        yes

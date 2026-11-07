@@ -24,6 +24,7 @@ func portalCommand() *cli.Command {
 				Args:  []*cli.Arg{allowToken},
 				Run:   runSharePicker,
 			},
+			portalPermissionsCommand(),
 			{
 				Name:  "show",
 				About: "Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)",

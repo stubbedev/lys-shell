@@ -1050,6 +1050,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)')
             [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('permissions', 'permissions', [CompletionResultType]::ParameterValue, 'List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
@@ -1063,6 +1064,39 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--allow-token', '--allow-token', [CompletionResultType]::ParameterName, 'Pre-check the "allow restore token" box')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;permissions' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List every app''s grants')
+            [CompletionResult]::new('revoke', 'revoke', [CompletionResultType]::ParameterValue, 'Revoke an app''s grants in a table, or one entry of it')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;portal;permissions;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;permissions;revoke' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;portal;permissions;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List every app''s grants')
+            [CompletionResult]::new('revoke', 'revoke', [CompletionResultType]::ParameterValue, 'Revoke an app''s grants in a table, or one entry of it')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;portal;permissions;help;list' {
+            break
+        }
+        'lys-shell;portal;permissions;help;revoke' {
+            break
+        }
+        'lys-shell;portal;permissions;help;help' {
             break
         }
         'lys-shell;portal;show' {
@@ -1199,6 +1233,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
         'lys-shell;portal;help' {
             [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)')
             [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('permissions', 'permissions', [CompletionResultType]::ParameterValue, 'List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
@@ -1207,6 +1242,17 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;portal;help;share-picker' {
+            break
+        }
+        'lys-shell;portal;help;permissions' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List every app''s grants')
+            [CompletionResult]::new('revoke', 'revoke', [CompletionResultType]::ParameterValue, 'Revoke an app''s grants in a table, or one entry of it')
+            break
+        }
+        'lys-shell;portal;help;permissions;list' {
+            break
+        }
+        'lys-shell;portal;help;permissions;revoke' {
             break
         }
         'lys-shell;portal;help;show' {
@@ -1659,6 +1705,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
         'lys-shell;help;portal' {
             [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `lys-shell portal`)')
             [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('permissions', 'permissions', [CompletionResultType]::ParameterValue, 'List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
             break
         }
@@ -1666,6 +1713,17 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;portal;share-picker' {
+            break
+        }
+        'lys-shell;help;portal;permissions' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List every app''s grants')
+            [CompletionResult]::new('revoke', 'revoke', [CompletionResultType]::ParameterValue, 'Revoke an app''s grants in a table, or one entry of it')
+            break
+        }
+        'lys-shell;help;portal;permissions;list' {
+            break
+        }
+        'lys-shell;help;portal;permissions;revoke' {
             break
         }
         'lys-shell;help;portal;show' {

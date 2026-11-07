@@ -210,11 +210,15 @@ lys-shell logout
 
 The desktop portal backend. Without a subcommand `portal` runs the backend, which
 is what the installed D-Bus and systemd units exec. `portal show` previews a
-dialog without an application request:
+dialog without an application request. `portal permissions` lists what apps
+were granted (persistent screen-share tokens, camera and microphone, location,
+background, USB devices, global shortcuts) and revokes a table or one entry of it:
 
 ```sh
 lys-shell portal
 lys-shell portal show file-chooser
+lys-shell portal permissions list
+lys-shell portal permissions revoke org.example.App devices camera
 ```
 
 Run the desktop shell in the foreground:

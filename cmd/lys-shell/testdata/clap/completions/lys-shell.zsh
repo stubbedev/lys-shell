@@ -1460,6 +1460,67 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(permissions)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_lys-shell__portal__permissions_commands" \
+"*::: :->permissions" \
+&& ret=0
+
+    case $state in
+    (permissions)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-portal-permissions-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(revoke)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+':app -- App id (e.g., org.mozilla.firefox):_default' \
+':table -- Table the grants are kept in:(background devices gamemode global-shortcuts inhibit input-capture location notifications realtime remote-desktop screencast screenshot usb wallpaper)' \
+'::entry -- Entry of the table to revoke (e.g., camera); every entry when left out:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_lys-shell__portal__permissions__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-portal-permissions-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(revoke)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (show)
 _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
@@ -1635,6 +1696,30 @@ _arguments "${_arguments_options[@]}" : \
 (share-picker)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
+;;
+(permissions)
+_arguments "${_arguments_options[@]}" : \
+":: :_lys-shell__portal__help__permissions_commands" \
+"*::: :->permissions" \
+&& ret=0
+
+    case $state in
+    (permissions)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-portal-help-permissions-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(revoke)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
 ;;
 (show)
 _arguments "${_arguments_options[@]}" : \
@@ -2300,6 +2385,30 @@ _arguments "${_arguments_options[@]}" : \
 (share-picker)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
+;;
+(permissions)
+_arguments "${_arguments_options[@]}" : \
+":: :_lys-shell__help__portal__permissions_commands" \
+"*::: :->permissions" \
+&& ret=0
+
+    case $state in
+    (permissions)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-help-portal-permissions-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(revoke)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
 ;;
 (show)
 _arguments "${_arguments_options[@]}" : \
@@ -3031,9 +3140,28 @@ _lys-shell__help__portal_commands() {
     local commands; commands=(
 'run:Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing \`lys-shell portal\`)' \
 'share-picker:xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)' \
+'permissions:List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)' \
 'show:Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)' \
     )
     _describe -t commands 'lys-shell help portal commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__portal__permissions_commands] )) ||
+_lys-shell__help__portal__permissions_commands() {
+    local commands; commands=(
+'list:List every app'\''s grants' \
+'revoke:Revoke an app'\''s grants in a table, or one entry of it' \
+    )
+    _describe -t commands 'lys-shell help portal permissions commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__portal__permissions__list_commands] )) ||
+_lys-shell__help__portal__permissions__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help portal permissions list commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__portal__permissions__revoke_commands] )) ||
+_lys-shell__help__portal__permissions__revoke_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help portal permissions revoke commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__portal__run_commands] )) ||
 _lys-shell__help__portal__run_commands() {
@@ -3890,6 +4018,7 @@ _lys-shell__portal_commands() {
     local commands; commands=(
 'run:Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing \`lys-shell portal\`)' \
 'share-picker:xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)' \
+'permissions:List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)' \
 'show:Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -3900,6 +4029,7 @@ _lys-shell__portal__help_commands() {
     local commands; commands=(
 'run:Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing \`lys-shell portal\`)' \
 'share-picker:xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)' \
+'permissions:List and revoke what apps were granted through the portal (screen-share tokens, devices, background, shortcuts)' \
 'show:Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -3909,6 +4039,24 @@ _lys-shell__portal__help_commands() {
 _lys-shell__portal__help__help_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell portal help help commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__help__permissions_commands] )) ||
+_lys-shell__portal__help__permissions_commands() {
+    local commands; commands=(
+'list:List every app'\''s grants' \
+'revoke:Revoke an app'\''s grants in a table, or one entry of it' \
+    )
+    _describe -t commands 'lys-shell portal help permissions commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__help__permissions__list_commands] )) ||
+_lys-shell__portal__help__permissions__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal help permissions list commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__help__permissions__revoke_commands] )) ||
+_lys-shell__portal__help__permissions__revoke_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal help permissions revoke commands' commands "$@"
 }
 (( $+functions[_lys-shell__portal__help__run_commands] )) ||
 _lys-shell__portal__help__run_commands() {
@@ -3991,6 +4139,49 @@ _lys-shell__portal__help__show__screenshot_commands() {
 _lys-shell__portal__help__show__wallpaper_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell portal help show wallpaper commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions_commands] )) ||
+_lys-shell__portal__permissions_commands() {
+    local commands; commands=(
+'list:List every app'\''s grants' \
+'revoke:Revoke an app'\''s grants in a table, or one entry of it' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'lys-shell portal permissions commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions__help_commands] )) ||
+_lys-shell__portal__permissions__help_commands() {
+    local commands; commands=(
+'list:List every app'\''s grants' \
+'revoke:Revoke an app'\''s grants in a table, or one entry of it' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'lys-shell portal permissions help commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions__help__help_commands] )) ||
+_lys-shell__portal__permissions__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal permissions help help commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions__help__list_commands] )) ||
+_lys-shell__portal__permissions__help__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal permissions help list commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions__help__revoke_commands] )) ||
+_lys-shell__portal__permissions__help__revoke_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal permissions help revoke commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions__list_commands] )) ||
+_lys-shell__portal__permissions__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal permissions list commands' commands "$@"
+}
+(( $+functions[_lys-shell__portal__permissions__revoke_commands] )) ||
+_lys-shell__portal__permissions__revoke_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell portal permissions revoke commands' commands "$@"
 }
 (( $+functions[_lys-shell__portal__run_commands] )) ||
 _lys-shell__portal__run_commands() {

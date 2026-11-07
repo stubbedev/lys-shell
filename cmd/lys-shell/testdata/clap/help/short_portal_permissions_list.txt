@@ -1,0 +1,6 @@
+List every app's grants
+
+Usage: lys-shell portal permissions list
+
+Options:
+  -h, --help  Print help
