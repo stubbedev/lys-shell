@@ -14,9 +14,11 @@ password or one-time code.
 The vault lives in lys-secrets (`dev.stubbe.lys.Vault1`), the one
 process holding its keys; the shell shows it and copies from it. The
 idle lock and the sync interval are lys-secrets' settings
-(`--vault-lock-after`, `--vault-sync-interval`). Copied secrets are
-marked so clipboard managers, the shell's own history included, do
-not keep them.
+(`--vault-lock-after`, `--vault-sync-interval`). lys-secrets keeps the
+session's credential in the keyring, so a restart of the shell or of
+lys-secrets leaves the vault locked, and the master password alone
+opens it again. Copied secrets are marked so clipboard managers, the
+shell's own history included, do not keep them.
 
 The launcher's `vault` mode (`lys-shell launcher -show vault`) searches
 the open vault from anywhere: Enter copies an item's password (or its
