@@ -1,8 +1,10 @@
 // Package fswatch turns inotify events into coalesced change ticks, the
 // Go counterpart of the `notify` crate watchers the Rust services use
 // (the mail service's recursive maildir watch, the brightness sysfs
-// watch). Consumers only need "something under here changed", so the
-// events themselves are not surfaced: each burst is one tick.
+// watch). Most consumers only need "something under here changed": each
+// burst is one tick. A named watcher (NewNamed) also keeps the names
+// that changed, coalesced per name, for a consumer that applies each
+// change instead of reading everything again.
 //
 // The reader blocks in poll(2) on the inotify fd and an eventfd, so an
 // idle watcher costs nothing and Close wakes it without a timeout.
@@ -38,15 +40,52 @@ type Watcher struct {
 	mu     sync.Mutex
 	dirs   map[int]string
 	closed bool
+	// named keeps pending, the events since the last Take, one per name
+	// at index[name]; rescan replaces them when names were lost.
+	named   bool
+	pending []Event
+	index   map[string]int
+	rescan  bool
 
 	ticks chan struct{}
 	done  chan struct{}
+}
+
+// maxPending is how many distinct names a named watcher holds between
+// two Takes; past it the names are dropped for a rescan.
+const maxPending = 4096
+
+// Event is one name in a watched directory and every event it saw
+// since the last Take.
+type Event struct {
+	Name string
+	Mask uint32
+}
+
+// Batch is what changed since the last Take: each name once, in the
+// order it first changed. Rescan reports that names were lost (the
+// kernel queue overflowed, or more names changed than a batch holds) or
+// the watched directory itself was deleted or moved, so only reading it
+// again is right; Events is then empty.
+type Batch struct {
+	Events []Event
+	Rescan bool
 }
 
 // New starts a watcher for mask. With recursive set, Add walks the
 // whole tree and directories created later are watched as they
 // appear, which is what a recursive notify watcher does.
 func New(mask uint32, recursive bool) (*Watcher, error) {
+	return start(mask, recursive, false)
+}
+
+// NewNamed starts a watcher for mask on single directories that also
+// keeps the names that changed for Take.
+func NewNamed(mask uint32) (*Watcher, error) {
+	return start(mask, false, true)
+}
+
+func start(mask uint32, recursive, named bool) (*Watcher, error) {
 	if mask == 0 {
 		return nil, errors.New("fswatch: empty event mask")
 	}
@@ -70,6 +109,8 @@ func New(mask uint32, recursive bool) (*Watcher, error) {
 		wake:      wake,
 		mask:      mask,
 		recursive: recursive,
+		named:     named,
+		index:     map[string]int{},
 		dirs:      map[int]string{},
 		ticks:     make(chan struct{}, 1),
 		done:      make(chan struct{}),
@@ -80,6 +121,17 @@ func New(mask uint32, recursive bool) (*Watcher, error) {
 
 // Changed ticks once per burst of events; it closes after Close.
 func (w *Watcher) Changed() <-chan struct{} { return w.ticks }
+
+// Take hands over what changed since the last Take; a watcher not made
+// by NewNamed has no names to hand over.
+func (w *Watcher) Take() Batch {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	b := Batch{Events: w.pending, Rescan: w.rescan}
+	w.pending, w.rescan = nil, false
+	clear(w.index)
+	return b
+}
 
 // Add watches path (and, recursively, every directory below it).
 func (w *Watcher) Add(path string) error {
@@ -184,8 +236,34 @@ func (w *Watcher) loop(fds []unix.PollFd) {
 	}
 }
 
+// lost is a kernel queue overflow, or the watched directory itself
+// going: events that cannot be applied name by name.
+const lost = unix.IN_Q_OVERFLOW | unix.IN_DELETE_SELF | unix.IN_MOVE_SELF
+
+// note keeps a named watcher's event: merged into its name's, or a
+// rescan for one that lost names.
+func (w *Watcher) note(name string, mask uint32) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.rescan || (name == "" && mask&lost == 0) {
+		return
+	}
+	if i, ok := w.index[name]; ok && mask&lost == 0 {
+		w.pending[i].Mask |= mask
+		return
+	}
+	if mask&lost != 0 || len(w.pending) >= maxPending {
+		w.pending, w.rescan = nil, true
+		clear(w.index)
+		return
+	}
+	w.index[name] = len(w.pending)
+	w.pending = append(w.pending, Event{Name: name, Mask: mask})
+}
+
 // handle parses one read's worth of events, adding watches for new
-// subdirectories, and reports whether any matched the mask.
+// subdirectories, and reports whether any matched the mask or lost
+// events.
 func (w *Watcher) handle(buf []byte) bool {
 	changed := false
 	for off := 0; off+unix.SizeofInotifyEvent <= len(buf); {
@@ -214,8 +292,12 @@ func (w *Watcher) handle(buf []byte) bool {
 				_ = w.Add(filepath.Join(parent, name))
 			}
 		}
-		if mask&w.mask != 0 {
-			changed = true
+		if mask&(w.mask|unix.IN_Q_OVERFLOW) == 0 {
+			continue
+		}
+		changed = true
+		if w.named {
+			w.note(name, mask&(w.mask|lost))
 		}
 	}
 	return changed
