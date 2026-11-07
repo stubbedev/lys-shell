@@ -3,6 +3,7 @@ package bar
 import (
 	"log"
 	"slices"
+	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
@@ -125,7 +126,7 @@ func (b *surfaceSet[L]) sync(name string, entry *surfaceEntry[L]) {
 // the loop) and serves dev.stubbe.lys.Shell1 over state, with lock as its
 // Lock hook. The single-instance check claimed the id before RunWith; a
 // shell without a session bus serves neither.
-func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellipc.State, lock func() bool, dashboardToggle func(monitor string) error) func() {
+func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellipc.State, lock func() bool, dashboardToggle func(monitor string) error, barReveal func(monitor string)) func() {
 	if conn == nil {
 		log.Print("shell ipc: no session bus")
 		return func() {}
@@ -147,6 +148,7 @@ func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellip
 		// daemon's are.
 		VPNSSOCallback:  network.NativeSignIn.DeliverSSOCallback,
 		DashboardToggle: dashboardToggle,
+		BarReveal:       barReveal,
 	}); err == nil {
 		releases = append(releases, release)
 	} else {
@@ -242,6 +244,21 @@ func (b *surfaceSet[L]) restyle(cfg *config.Config) {
 	for _, name := range b.order {
 		if r, ok := b.bars[name].layer.(restyler); ok {
 			r.Restyle(cfg)
+		}
+	}
+}
+
+// peeker is a surface `lys-shell panel reveal` shows for a while.
+type peeker interface{ peek(d time.Duration) }
+
+// peek reveals monitor's bar ("" every bar) for d, where it auto-hides.
+func (b *surfaceSet[L]) peek(monitor string, d time.Duration) {
+	for _, name := range b.order {
+		if monitor != "" && name != monitor {
+			continue
+		}
+		if p, ok := b.bars[name].layer.(peeker); ok {
+			p.peek(d)
 		}
 	}
 }

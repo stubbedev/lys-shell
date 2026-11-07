@@ -201,6 +201,8 @@ type Hooks struct {
 	// false means none is waiting.
 	VPNSSOCallback  func(uri string) bool
 	DashboardToggle func(monitor string) error
+	// BarReveal shows an auto-hiding bar ("" every bar) for a few seconds.
+	BarReveal func(monitor string)
 }
 
 // daemon is the dev.stubbe.lys.Shell1 object (ShellIpcDaemon).
@@ -224,6 +226,15 @@ func (d *daemon) BarShow(monitor string) *dbus.Error {
 // BarToggle toggles a bar ("" for all).
 func (d *daemon) BarToggle(monitor string) *dbus.Error {
 	d.state.Toggle(monitor)
+	return nil
+}
+
+// BarReveal shows an auto-hiding bar ("" every bar) for a few seconds.
+func (d *daemon) BarReveal(monitor string) *dbus.Error {
+	if d.hooks.BarReveal == nil {
+		return dbusx.Failed("bars not ready (shell UI not initialized)")
+	}
+	d.hooks.BarReveal(monitor)
 	return nil
 }
 

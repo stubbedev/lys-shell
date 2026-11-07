@@ -12,6 +12,7 @@ Commands:
   hide       Hide the bar on a monitor
   show       Show the bar on a monitor
   toggle     Toggle bar visibility on a monitor
+  reveal     Show an auto-hiding bar on a monitor for a few seconds
   dashboard  Open or close the dashboard dropdown
   help       Print this message or the help of the given subcommand(s)
 

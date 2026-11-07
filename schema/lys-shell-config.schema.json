@@ -590,6 +590,54 @@
       },
       "type": "object"
     },
+    "BarAutoHide": {
+      "oneOf": [
+        {
+          "const": "never",
+          "description": "The bar always shows.",
+          "type": "string"
+        },
+        {
+          "const": "always",
+          "description": "The bar hides whenever the pointer is not on it.",
+          "type": "string"
+        },
+        {
+          "const": "windows-overlap",
+          "description": "The bar hides while a window overlaps it (lys-wm; elsewhere as always).",
+          "type": "string"
+        },
+        {
+          "const": "fullscreen",
+          "description": "The bar hides while a window fills its monitor (lys-wm; elsewhere as always).",
+          "type": "string"
+        }
+      ]
+    },
+    "BarAutoHide2": {
+      "oneOf": [
+        {
+          "const": "never",
+          "description": "The bar always shows.",
+          "type": "string"
+        },
+        {
+          "const": "always",
+          "description": "The bar hides whenever the pointer is not on it.",
+          "type": "string"
+        },
+        {
+          "const": "windows-overlap",
+          "description": "The bar hides while a window overlaps it (lys-wm; elsewhere as always).",
+          "type": "string"
+        },
+        {
+          "const": "fullscreen",
+          "description": "The bar hides while a window fills its monitor (lys-wm; elsewhere as always).",
+          "type": "string"
+        }
+      ]
+    },
     "BarButtonVariant": {
       "description": "Visual style variants for bar buttons.",
       "oneOf": [
@@ -613,6 +661,16 @@
     "BarConfig": {
       "description": "Bar chrome: per-monitor layout, spacing, colors, and button styling.",
       "properties": {
+        "auto-hide": {
+          "$ref": "#/$defs/BarAutoHide2",
+          "default": "never",
+          "description": "When the bar hides, leaving a thin strip at its edge that reveals it\nunder the pointer. A layout entry's `auto-hide` overrides it for its\nmonitors."
+        },
+        "auto-hide-delay-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 300,
+          "description": "How long the bar stays after the pointer leaves it, or after it stops\nbeing needed, before it hides (milliseconds)."
+        },
         "background-opacity": {
           "$ref": "#/$defs/Percentage",
           "default": 60,
@@ -766,7 +824,7 @@
         "exclusive": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Reserve screen space for the bar.\n\nWhen disabled, windows may overlap the bar and the bar draws over them."
+          "description": "Reserve screen space for the bar.\n\nWhen disabled, windows may overlap the bar and the bar draws over them.\nAn auto-hiding bar never reserves space."
         },
         "inset-edge": {
           "$ref": "#/$defs/Size",
@@ -787,6 +845,7 @@
           "$ref": "#/$defs/Array_of_BarLayout",
           "default": [
             {
+              "auto-hide": null,
               "center": [
                 "clock"
               ],
@@ -894,6 +953,18 @@
     "BarLayout": {
       "description": "Layout configuration for a bar on a specific monitor.\n\n## Examples\n\n```yaml\n# Single modules\nbar:\n  layout:\n    - monitor: \"*\"\n      left: [dashboard]\n      center: [clock]\n      right: [systray]\n\n    # Module with custom CSS class for per-instance styling\n    - monitor: DP-1\n      left:\n        - {module: clock, class: primary-clock}\n        - clock\n      center: [media]\n\n    # Grouped modules (share a visual container, CSS-targetable by name)\n    - monitor: DP-2\n      left:\n        - {name: status, modules: [battery, network]}\n\n    # Groups can also contain classed modules\n    - monitor: DP-3\n      left:\n        - name: clocks\n          modules:\n            - {module: clock, class: local}\n            - {module: world-clock, class: remote}\n\n    # Inherit from another layout\n    - monitor: \"*\"\n      left: [dashboard]\n      center: [clock]\n      right: [systray]\n    - monitor: HDMI-1\n      extends: \"*\"\n      right: [volume, systray]  # Override just this section\n\n    # Hide bar on a specific monitor\n    - monitor: HDMI-2\n      show: false\n```",
       "properties": {
+        "auto-hide": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BarAutoHide"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the bar hides on this monitor; unset follows `bar.auto-hide`."
+        },
         "center": {
           "default": [
             "clock"
@@ -11405,6 +11476,8 @@
     "bar": {
       "$ref": "#/$defs/BarConfig",
       "default": {
+        "auto-hide": "never",
+        "auto-hide-delay-ms": 300,
         "background-opacity": 60,
         "bg": "bg-surface",
         "border-color": "border-default",
@@ -11441,6 +11514,7 @@
         "layer": "top",
         "layout": [
           {
+            "auto-hide": null,
             "center": [
               "clock"
             ],

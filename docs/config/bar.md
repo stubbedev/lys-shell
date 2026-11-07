@@ -22,6 +22,8 @@ Bar chrome: per-monitor layout, spacing, colors, and button styling.
 | `module-gap` | [`Size`](/config/types#size) | `0.5` | Gap between modules and groups on the bar. |
 | `location` | [`Location`](/config/types#location) | `"top"` | Bar position on screen edge. |
 | `exclusive` | bool | `true` | Reserve screen space for the bar. |
+| `auto-hide` | [`BarAutoHide2`](/config/types#bar-auto-hide2) | `"never"` | When the bar hides, leaving a thin strip at its edge that reveals it under the pointer. A layout entry's `auto-hide` overrides it for its monitors. |
+| `auto-hide-delay-ms` | u32 | `300` | How long the bar stays after the pointer leaves it, or after it stops being needed, before it hides (milliseconds). |
 | `layer` | [`Layer`](/config/types#layer) | `"top"` | Layer-shell layer the bar is placed on. |
 | `background-opacity` | [`Percentage`](/config/types#percentage) | `60` | Bar background opacity (0-100). Below 100 the compositor blurs what is behind the bar; where it offers no blur the bar rests on its opaque color. |
 | `border-location` | [`BorderLocation`](/config/types#border-location) | `"all"` | Border placement for bar. |
@@ -74,6 +76,7 @@ bar:
 ::: details More about `exclusive`
 
 When disabled, windows may overlap the bar and the bar draws over them.
+An auto-hiding bar never reserves space.
 
 :::
 
@@ -149,6 +152,8 @@ bar:
   module-gap: 0.5
   location: top
   exclusive: true
+  auto-hide: never
+  auto-hide-delay-ms: 300
   layer: top
   bg: bg-surface
   background-opacity: 60

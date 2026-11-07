@@ -46,6 +46,9 @@ type dropdownRegistry struct {
 	// from releases them (reconfigure).
 	instances        map[string]widget.Widget
 	dashboardAnchors map[string]widget.Widget
+	// revealHolds keep each connector's auto-hiding bar revealed while one
+	// of its dropdowns is open.
+	revealHolds map[string]func() (release func())
 	// idle runs fn on the loop once the bars have had their first frames,
 	// and invoke on the loop's next turn; nil idle builds nothing ahead
 	// of an open (buildAhead sets them). prebuilt is the build of the
@@ -155,16 +158,17 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 	// bar hands its modules leaves fg to the stylesheet (zero), which
 	// would paint every default-colored dropdown label transparent.
 	r := &dropdownRegistry{
-		app:      application,
-		cfg:      cfg,
-		font:     font,
-		style:    style,
-		look:     lookOf(style),
-		hosts:    make(map[string]app.Host),
-		builders: dropdownBuilders(),
-		openPop:  make(map[string]*app.Popover),
-		openName: make(map[string]string),
-		monH:     make(map[string]int),
+		app:         application,
+		cfg:         cfg,
+		font:        font,
+		style:       style,
+		look:        lookOf(style),
+		hosts:       make(map[string]app.Host),
+		revealHolds: make(map[string]func() func()),
+		builders:    dropdownBuilders(),
+		openPop:     make(map[string]*app.Popover),
+		openName:    make(map[string]string),
+		monH:        make(map[string]int),
 
 		instances:        make(map[string]widget.Widget),
 		dashboardAnchors: make(map[string]widget.Widget),
@@ -315,6 +319,18 @@ func (r *dropdownRegistry) reconfigure(ctx ModuleContext) {
 
 // attachHost registers the layer window a connector's dropdowns open
 // on, with the monitor's logical height for the popover ceiling.
+// setRevealHold is what keeps connector's bar revealed while a dropdown
+// is open on it; nil drops it.
+func (r *dropdownRegistry) setRevealHold(connector string, hold func() (release func())) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if hold == nil {
+		delete(r.revealHolds, connector)
+		return
+	}
+	r.revealHolds[connector] = hold
+}
+
 func (r *dropdownRegistry) attachHost(connector string, host app.Host, monH int) {
 	r.mu.Lock()
 	r.hosts[connector] = host
@@ -468,6 +484,18 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	w, _, _ := dropdownDims(name, r.cfg)
 	cfg := dropdownPopover(r.cfg, bound, content, monH, w)
 	cfg.OnClosed = holdDropdown(anchor, r.cfg.Bar.DropdownFreezeLabel, content)
+	r.mu.Lock()
+	hold := r.revealHolds[connector]
+	r.mu.Unlock()
+	if hold != nil {
+		release, closed := hold(), cfg.OnClosed
+		cfg.OnClosed = func() {
+			release()
+			if closed != nil {
+				closed()
+			}
+		}
+	}
 	if f, ok := content.(dropdownFocuser); ok {
 		cfg.Focus = f.dropdownFocus()
 	}

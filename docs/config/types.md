@@ -108,6 +108,24 @@ String.
 | `"critical"` | At UPower's critical warning level. |
 | `"never"` | Never switch automatically. |
 
+## BarAutoHide {#bar-auto-hide}
+
+| Value | Meaning |
+|---|---|
+| `"never"` | The bar always shows. |
+| `"always"` | The bar hides whenever the pointer is not on it. |
+| `"windows-overlap"` | The bar hides while a window overlaps it (lys-wm; elsewhere as always). |
+| `"fullscreen"` | The bar hides while a window fills its monitor (lys-wm; elsewhere as always). |
+
+## BarAutoHide2 {#bar-auto-hide2}
+
+| Value | Meaning |
+|---|---|
+| `"never"` | The bar always shows. |
+| `"always"` | The bar hides whenever the pointer is not on it. |
+| `"windows-overlap"` | The bar hides while a window overlaps it (lys-wm; elsewhere as always). |
+| `"fullscreen"` | The bar hides while a window fills its monitor (lys-wm; elsewhere as always). |
+
 ## BarButtonVariant {#bar-button-variant}
 
 Visual style variants for bar buttons.
@@ -227,6 +245,7 @@ bar:
 | `monitor` | Monitor connector name (e.g., `"DP-1"`) or `"*"` for all monitors. |
 | `extends` | Inherit from another layout by its monitor value (e.g., `"*"`). |
 | `show` | Whether the bar is visible on this monitor. |
+| `auto-hide` | When the bar hides on this monitor; unset follows `bar.auto-hide`. |
 | `left` | Modules in the left section. |
 | `center` | Modules in the center section. |
 | `right` | Modules in the right section. |

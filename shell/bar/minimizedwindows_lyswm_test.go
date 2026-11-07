@@ -303,7 +303,7 @@ func TestTheDockOnLysWM(t *testing.T) {
 	}
 	read := func() state {
 		return onLiveLoop(shell, func() state {
-			s := state{hidden: d.hidden, hides: d.hides, reveals: d.reveals}
+			s := state{hidden: d.hide.hidden, hides: d.hide.hides, reveals: d.hide.reveals}
 			if e := d.entries[probeID]; e != nil {
 				s.running, s.minimize = e.HasClass("running"), e.HasClass("minimized")
 			}
@@ -391,7 +391,7 @@ func TestTheDockSurfaceReservesItsEdgeUnlessItAutoHides(t *testing.T) {
 	var reserved int
 	until(t, "the tiled probe ending above the dock", func() error {
 		bottom, err := height()
-		if err == nil && bottom >= full-dockRevealPx {
+		if err == nil && bottom >= full-revealPx {
 			err = fmt.Errorf("the probe reaches %d of %d", bottom, full)
 		}
 		reserved = full - bottom

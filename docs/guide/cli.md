@@ -16,6 +16,7 @@ lys-shell panel inspect
 lys-shell panel hide DP-1
 lys-shell panel show DP-1
 lys-shell panel toggle
+lys-shell panel reveal DP-1     # an auto-hiding bar shows for a few seconds
 
 # Open or close the dashboard, on the focused monitor or the one named
 lys-shell panel dashboard

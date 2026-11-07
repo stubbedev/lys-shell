@@ -379,6 +379,9 @@ _lys-shell() {
             lys__shell__help__panel,restart)
                 cmd="lys__shell__help__panel__restart"
                 ;;
+            lys__shell__help__panel,reveal)
+                cmd="lys__shell__help__panel__reveal"
+                ;;
             lys__shell__help__panel,settings)
                 cmd="lys__shell__help__panel__settings"
                 ;;
@@ -730,6 +733,9 @@ _lys-shell() {
             lys__shell__panel,restart)
                 cmd="lys__shell__panel__restart"
                 ;;
+            lys__shell__panel,reveal)
+                cmd="lys__shell__panel__reveal"
+                ;;
             lys__shell__panel,settings)
                 cmd="lys__shell__panel__settings"
                 ;;
@@ -762,6 +768,9 @@ _lys-shell() {
                 ;;
             lys__shell__panel__help,restart)
                 cmd="lys__shell__panel__help__restart"
+                ;;
+            lys__shell__panel__help,reveal)
+                cmd="lys__shell__panel__help__reveal"
                 ;;
             lys__shell__panel__help,settings)
                 cmd="lys__shell__panel__help__settings"
@@ -2401,7 +2410,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__panel)
-            opts="start stop restart status settings inspect hide show toggle dashboard"
+            opts="start stop restart status settings inspect hide show toggle reveal dashboard"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2457,6 +2466,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__panel__restart)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__panel__reveal)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -4293,7 +4316,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__panel)
-            opts="-h --help start stop restart status settings inspect hide show toggle dashboard help"
+            opts="-h --help start stop restart status settings inspect hide show toggle reveal dashboard help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4321,7 +4344,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__panel__help)
-            opts="start stop restart status settings inspect hide show toggle dashboard help"
+            opts="start stop restart status settings inspect hide show toggle reveal dashboard help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4391,6 +4414,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__panel__help__restart)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__panel__help__reveal)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -4518,6 +4555,20 @@ _lys-shell() {
             ;;
         lys__shell__panel__restart)
             opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__panel__reveal)
+            opts="-h --help [MONITOR]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

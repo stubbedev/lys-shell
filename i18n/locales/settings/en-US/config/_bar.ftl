@@ -29,6 +29,12 @@ settings-bar-location = Location
 settings-bar-exclusive = Exclusive
     .description = Reserve screen space for the bar instead of drawing over windows
 
+settings-bar-auto-hide = Auto-Hide
+    .description = When the bar hides, keeping a thin strip at its edge that reveals it under the pointer
+
+settings-bar-auto-hide-delay-ms = Auto-Hide Delay
+    .description = How long the bar stays after the pointer leaves before it hides (milliseconds)
+
 settings-bar-layer = Layer
     .description = Layer-shell layer the bar is placed on
 
@@ -149,6 +155,12 @@ enum-location-bottom = Bottom
 enum-location-left = Left
 enum-location-right = Right
 
+
+## BarAutoHide variants
+enum-bar-auto-hide-never = Never
+enum-bar-auto-hide-always = Always
+enum-bar-auto-hide-windows-overlap = When Windows Overlap
+enum-bar-auto-hide-fullscreen = In Full Screen
 
 ## ShadowPreset variants
 enum-shadow-preset-none = None

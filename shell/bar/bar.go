@@ -784,6 +784,8 @@ func (s *shellStart) mount() {
 			return true
 		}, func(monitor string) error {
 			return toggleDashboardOnLoop(application, rt, monitor, focused)
+		}, func(monitor string) {
+			application.Invoke(func() { bars.peek(monitor, peekDuration) })
 		})
 	})
 	// The launcher surface serves `lys-shell launcher` sessions.
@@ -833,7 +835,7 @@ func barConfigFor(ctx ModuleContext, layout config.BarLayout, output *app.Output
 		Output:    output,
 		Bar:       buildRoot(ctx, layout, output.Name),
 		Layer:     layering.For(ctx.Config.General, ctx.Config.Bar.Layer),
-		Exclusive: ctx.Config.Bar.Exclusive,
+		Exclusive: barExclusive(ctx.Config.Bar, layout),
 		Namespace: "lys-shell-bar-" + output.Name,
 	}
 }
@@ -993,6 +995,7 @@ func (h *barHost) open(output *app.Output, layout config.BarLayout) (surfaceLaye
 	}
 	window.SetBackgroundBlur(barBlur(ctx.Config))
 	w := &barWindow{host: h, output: output, layer: window, bar: bc.Bar, gen: ctx.gen, layerKind: bc.Layer}
+	w.startAutoHide(ctx, layout, loopAfter(h.app))
 	w.attach(ctx)
 	if h.holder != nil {
 		h.holder.add(window)
@@ -1009,6 +1012,13 @@ type barWindow struct {
 	bar       *widget.Bar
 	gen       *mountGen
 	layerKind app.Layer
+	// hide is the bar's reveal controller, the dock's too; stopGeom ends
+	// its following of the windows.
+	hide     *autoHide
+	stopGeom func()
+	// thickness is the bar's size across its edge while it last showed,
+	// which a hidden bar keeps for what would cover it.
+	thickness int
 }
 
 // attach hands the window to what ctx's modules and the dropdowns
@@ -1018,6 +1028,7 @@ func (w *barWindow) attach(ctx ModuleContext) {
 		a.Attach(w.layer)
 	}
 	w.host.rt.ctx.Dropdowns.attachHost(w.output.Name, w.layer, logicalSize(w.output).H)
+	w.host.rt.ctx.Dropdowns.setRevealHold(w.output.Name, w.hide.hold)
 }
 
 // Rebuild refills the bar from the current mount generation on its own
@@ -1039,9 +1050,11 @@ func (w *barWindow) Rebuild(layout config.BarLayout) error {
 		}
 	}
 	w.layer.SetBackgroundBlur(barBlur(cfg))
-	if err := w.layer.SetExclusive(cfg.Bar.Exclusive); err != nil {
-		return fmt.Errorf("set exclusive %v: %w", cfg.Bar.Exclusive, err)
+	exclusive := barExclusive(cfg.Bar, layout)
+	if err := w.layer.SetExclusive(exclusive); err != nil {
+		return fmt.Errorf("set exclusive %v: %w", exclusive, err)
 	}
+	w.hide.setMode(cfg.Bar.AutoHideOn(layout), autoHideDelay(cfg.Bar))
 	ctx := w.host.context(w.output)
 	w.gen.retire()
 	w.gen = ctx.gen
@@ -1051,6 +1064,11 @@ func (w *barWindow) Rebuild(layout config.BarLayout) error {
 }
 
 func (w *barWindow) Close() {
+	w.hide.close()
+	if w.stopGeom != nil {
+		w.stopGeom()
+	}
+	w.host.rt.ctx.Dropdowns.setRevealHold(w.output.Name, nil)
 	if w.host.holder != nil {
 		w.host.holder.remove(w.layer)
 	}

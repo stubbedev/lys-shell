@@ -136,7 +136,7 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 	cfg := config.DefaultsDock()
 	cfg.AutoHide = true
 	r := newDockRig(t, cfg, &fakeWindow{appID: "foot", outputs: []string{"DP-1"}})
-	if r.d.hidden {
+	if r.d.hide.hidden {
 		t.Fatal("the dock hides with nothing covering it")
 	}
 	top := 0
@@ -146,32 +146,32 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 	}
 	r.d.hub.geometryChanged()
 	r.d.hub.geometryChanged()
-	if !r.d.hidden || r.d.panel.Visible() || !r.d.reveal.Visible() || r.d.hides != 1 {
-		t.Fatalf("covered: hidden %v, hides %d", r.d.hidden, r.d.hides)
+	if !r.d.hide.hidden || r.d.panel.Visible() || !r.d.reveal.Visible() || r.d.hide.hides != 1 {
+		t.Fatalf("covered: hidden %v, hides %d", r.d.hide.hidden, r.d.hide.hides)
 	}
 	r.d.surface.Measure(widget.Column, widget.Unknown)
 	r.d.surface.Arrange(render.Rect{Y: 798, W: 1000, H: 2})
 	strip := r.d.reveal.Bounds()
 	pointer := &widget.Router{Root: r.d.surface}
 	pointer.Move(widget.Point{X: strip.X + strip.W/2, Y: strip.Y + strip.H/2})
-	if r.d.hidden || r.d.reveals != 1 {
-		t.Fatalf("hovered: hidden %v, reveals %d", r.d.hidden, r.d.reveals)
+	if r.d.hide.hidden || r.d.hide.reveals != 1 {
+		t.Fatalf("hovered: hidden %v, reveals %d", r.d.hide.hidden, r.d.hide.reveals)
 	}
 	pointer.Leave()
-	if !r.d.hidden || r.d.hides != 2 {
-		t.Fatalf("left: hidden %v, hides %d", r.d.hidden, r.d.hides)
+	if !r.d.hide.hidden || r.d.hide.hides != 2 {
+		t.Fatalf("left: hidden %v, hides %d", r.d.hide.hidden, r.d.hide.hides)
 	}
 	r.geom.windows[0].Minimized, r.geom.windows[0].Stack = true, nil
 	r.d.hub.geometryChanged()
-	if r.d.hidden || r.d.reveals != 2 || r.d.hides != 2 {
-		t.Fatalf("uncovered: hidden %v, hides %d reveals %d", r.d.hidden, r.d.hides, r.d.reveals)
+	if r.d.hide.hidden || r.d.hide.reveals != 2 || r.d.hide.hides != 2 {
+		t.Fatalf("uncovered: hidden %v, hides %d reveals %d", r.d.hide.hidden, r.d.hide.hides, r.d.hide.reveals)
 	}
 
 	fixed := newDockRig(t, config.DefaultsDock())
 	fixed.geom.windows = r.geom.windows[:1]
 	fixed.geom.windows[0].Minimized, fixed.geom.windows[0].Stack = false, &top
 	fixed.d.hub.geometryChanged()
-	if fixed.d.hidden || fixed.d.hides != 0 {
+	if fixed.d.hide.hidden || fixed.d.hide.hides != 0 {
 		t.Fatal("a dock that does not auto-hide hid")
 	}
 }
@@ -184,7 +184,7 @@ func TestAnAutoHidingDockWithoutGeometryShowsOnlyUnderThePointer(t *testing.T) {
 	r := newDockRig(t, cfg)
 	r.d.hub.geom = nil
 	r.d.hub.geometryChanged()
-	if !r.d.hidden {
+	if !r.d.hide.hidden {
 		t.Fatal("without geometry the dock stays shown")
 	}
 }

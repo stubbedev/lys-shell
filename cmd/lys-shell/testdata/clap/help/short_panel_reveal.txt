@@ -1,0 +1,9 @@
+Show an auto-hiding bar on a monitor for a few seconds
+
+Usage: lys-shell panel reveal [MONITOR]
+
+Arguments:
+  [MONITOR]  Monitor connector name (e.g., "DP-1"). Omit to reveal all
+
+Options:
+  -h, --help  Print help

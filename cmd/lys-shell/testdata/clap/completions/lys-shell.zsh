@@ -685,6 +685,13 @@ _arguments "${_arguments_options[@]}" : \
 '::monitor -- Monitor connector name (e.g., "DP-1"). Omit to toggle all:_default' \
 && ret=0
 ;;
+(reveal)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+'::monitor -- Monitor connector name (e.g., "DP-1"). Omit to reveal all:_default' \
+&& ret=0
+;;
 (dashboard)
 _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
@@ -737,6 +744,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (toggle)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(reveal)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -2090,6 +2101,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(reveal)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (dashboard)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -3081,6 +3096,7 @@ _lys-shell__help__panel_commands() {
 'hide:Hide the bar on a monitor' \
 'show:Show the bar on a monitor' \
 'toggle:Toggle bar visibility on a monitor' \
+'reveal:Show an auto-hiding bar on a monitor for a few seconds' \
 'dashboard:Open or close the dashboard dropdown' \
     )
     _describe -t commands 'lys-shell help panel commands' commands "$@"
@@ -3104,6 +3120,11 @@ _lys-shell__help__panel__inspect_commands() {
 _lys-shell__help__panel__restart_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help panel restart commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__panel__reveal_commands] )) ||
+_lys-shell__help__panel__reveal_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help panel reveal commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__panel__settings_commands] )) ||
 _lys-shell__help__panel__settings_commands() {
@@ -3886,6 +3907,7 @@ _lys-shell__panel_commands() {
 'hide:Hide the bar on a monitor' \
 'show:Show the bar on a monitor' \
 'toggle:Toggle bar visibility on a monitor' \
+'reveal:Show an auto-hiding bar on a monitor for a few seconds' \
 'dashboard:Open or close the dashboard dropdown' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -3908,6 +3930,7 @@ _lys-shell__panel__help_commands() {
 'hide:Hide the bar on a monitor' \
 'show:Show the bar on a monitor' \
 'toggle:Toggle bar visibility on a monitor' \
+'reveal:Show an auto-hiding bar on a monitor for a few seconds' \
 'dashboard:Open or close the dashboard dropdown' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -3937,6 +3960,11 @@ _lys-shell__panel__help__inspect_commands() {
 _lys-shell__panel__help__restart_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell panel help restart commands' commands "$@"
+}
+(( $+functions[_lys-shell__panel__help__reveal_commands] )) ||
+_lys-shell__panel__help__reveal_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell panel help reveal commands' commands "$@"
 }
 (( $+functions[_lys-shell__panel__help__settings_commands] )) ||
 _lys-shell__panel__help__settings_commands() {
@@ -3982,6 +4010,11 @@ _lys-shell__panel__inspect_commands() {
 _lys-shell__panel__restart_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell panel restart commands' commands "$@"
+}
+(( $+functions[_lys-shell__panel__reveal_commands] )) ||
+_lys-shell__panel__reveal_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell panel reveal commands' commands "$@"
 }
 (( $+functions[_lys-shell__panel__settings_commands] )) ||
 _lys-shell__panel__settings_commands() {

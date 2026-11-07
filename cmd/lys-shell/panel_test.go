@@ -138,6 +138,46 @@ func TestPanelBarVisibility(t *testing.T) {
 	}
 }
 
+func TestPanelRevealReachesTheBars(t *testing.T) {
+	dbustest.Session(t)
+	state := shellipc.NewState(nil)
+	release, err := shellipc.Serve(dbustest.SessionConn(t), state, shellipc.Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, stderr, code := runCaptured(t, false, "panel", "reveal"); code != 1 || !strings.Contains(stderr, "bars not ready") {
+		t.Errorf("no bars yet: %d %q", code, stderr)
+	}
+	release()
+	var mu sync.Mutex
+	var revealed []string
+	release, err = shellipc.Serve(dbustest.SessionConn(t), state, shellipc.Hooks{BarReveal: func(monitor string) {
+		mu.Lock()
+		defer mu.Unlock()
+		revealed = append(revealed, monitor)
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	for _, s := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"panel", "reveal"}, "All bars revealed\n"},
+		{[]string{"panel", "reveal", "DP-2"}, "Bar revealed on DP-2\n"},
+	} {
+		if stdout, stderr, code := runCaptured(t, false, s.args...); code != 0 || stdout != s.want {
+			t.Errorf("%v: %d %q %q", s.args, code, stdout, stderr)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []string{"", "DP-2"}; !slices.Equal(revealed, want) {
+		t.Errorf("revealed %q, want %q", revealed, want)
+	}
+}
+
 func TestShellRefusesASecondInstance(t *testing.T) {
 	dbustest.Session(t)
 	started := 0

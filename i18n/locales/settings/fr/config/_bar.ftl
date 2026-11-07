@@ -145,6 +145,10 @@ enum-location-right = Droite
 
 
 ## Variantes de ShadowPreset
+enum-bar-auto-hide-never = Jamais
+enum-bar-auto-hide-always = Toujours
+enum-bar-auto-hide-windows-overlap = Quand des fenêtres la chevauchent
+enum-bar-auto-hide-fullscreen = En plein écran
 enum-shadow-preset-none = Aucune
 enum-shadow-preset-drop = Portée
 enum-shadow-preset-floating = Flottante
@@ -168,5 +172,9 @@ enum-icon-position-end = Fin
 
 settings-bar-exclusive = Exclusive
     .description = Réserver l'espace de l'écran pour la barre au lieu de la dessiner par-dessus les fenêtres
+settings-bar-auto-hide = Masquage automatique
+    .description = Quand la barre se masque, en gardant au bord une fine bande qui la révèle sous le pointeur
+settings-bar-auto-hide-delay-ms = Délai de masquage
+    .description = Combien de temps la barre reste après le départ du pointeur avant de se masquer (millisecondes)
 settings-bar-layer = Couche
     .description = Couche layer-shell sur laquelle la barre est placée

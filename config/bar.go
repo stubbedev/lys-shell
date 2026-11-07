@@ -48,7 +48,15 @@ type BarConfig struct {
 	// Reserve screen space for the bar.
 	//
 	// When disabled, windows may overlap the bar and the bar draws over them.
+	// An auto-hiding bar never reserves space.
 	Exclusive bool `cfg:"exclusive"`
+	// When the bar hides, leaving a thin strip at its edge that reveals it
+	// under the pointer. A layout entry's `auto-hide` overrides it for its
+	// monitors.
+	AutoHide BarAutoHide `cfg:"auto-hide"`
+	// How long the bar stays after the pointer leaves it, or after it stops
+	// being needed, before it hides (milliseconds).
+	AutoHideDelayMs uint32 `cfg:"auto-hide-delay-ms"`
 	// Layer-shell layer the bar is placed on.
 	Layer Layer `cfg:"layer"`
 	// Bar background color.
@@ -154,6 +162,8 @@ func PlainBar() BarConfig {
 		ModuleGap:                 Scale(0.5),
 		Location:                  LocationTop,
 		Exclusive:                 true,
+		AutoHide:                  AutoHideNever,
+		AutoHideDelayMs:           300,
 		Layer:                     LayerTop,
 		BG:                        mustColor("bg-surface"),
 		BackgroundOpacity:         100,
@@ -202,6 +212,8 @@ type BarLayout struct {
 	Extends *string `cfg:"extends"`
 	// Whether the bar is visible on this monitor.
 	Show bool `cfg:"show"`
+	// When the bar hides on this monitor; unset follows `bar.auto-hide`.
+	AutoHide *BarAutoHide `cfg:"auto-hide"`
 	// Modules in the left section.
 	Left []BarItem `cfg:"left"`
 	// Modules in the center section.
@@ -295,6 +307,32 @@ const (
 )
 
 var _ = registerEnum(ShadowNone, ShadowDrop, ShadowFloating)
+
+// BarAutoHide is when an auto-hiding bar hides.
+type BarAutoHide string
+
+// Bar auto-hide modes.
+const (
+	// The bar always shows.
+	AutoHideNever BarAutoHide = "never"
+	// The bar hides whenever the pointer is not on it.
+	AutoHideAlways BarAutoHide = "always"
+	// The bar hides while a window overlaps it (lys-wm; elsewhere as always).
+	AutoHideWindowsOverlap BarAutoHide = "windows-overlap"
+	// The bar hides while a window fills its monitor (lys-wm; elsewhere as always).
+	AutoHideFullscreen BarAutoHide = "fullscreen"
+)
+
+var _ = registerEnum(AutoHideNever, AutoHideAlways, AutoHideWindowsOverlap, AutoHideFullscreen)
+
+// AutoHideOn is the auto-hide mode of a monitor showing layout: the
+// layout's own, else the bar's.
+func (b BarConfig) AutoHideOn(layout BarLayout) BarAutoHide {
+	if layout.AutoHide != nil {
+		return *layout.AutoHide
+	}
+	return b.AutoHide
+}
 
 // MarginPx is the layer margin the shadow needs to render unclipped.
 func (s ShadowPreset) MarginPx() uint32 {

@@ -57,3 +57,11 @@ bar.right {
   border-radius: var(--bar-group-rounding-element);
   padding: calc(var(--bar-group-padding-px) * 1px);
 }
+bar.auto-hidden,
+bar.auto-hidden.blur-unavailable {
+  background-color: transparent;
+  border-width: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+}

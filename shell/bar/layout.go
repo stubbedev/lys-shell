@@ -57,5 +57,8 @@ func mergeParent(layout config.BarLayout, all []config.BarLayout, visited map[st
 	if len(resolved.Right) == 0 {
 		resolved.Right = parent.Right
 	}
+	if resolved.AutoHide == nil {
+		resolved.AutoHide = parent.AutoHide
+	}
 	return resolved
 }

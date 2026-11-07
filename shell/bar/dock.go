@@ -16,10 +16,6 @@ import (
 	"github.com/stubbedev/lys-shell/shell/layering"
 )
 
-// dockRevealPx is the strip a hidden dock keeps at its edge, which the
-// pointer reaches to reveal it.
-const dockRevealPx = 2
-
 // dockMinimizedAlpha is the running indicator's opacity while every
 // window of its app is minimized.
 const dockMinimizedAlpha = 0.35
@@ -144,14 +140,12 @@ type dock struct {
 	host    app.Host
 	rects   *rectOwner
 	launch  func(taskApp)
-	hovered bool
-	hidden  bool
+	// hide is the dock's reveal controller, the bar's too.
+	hide *autoHide
 	// size is the panel's size as last shown, which a hidden dock keeps
 	// for what would cover it and for its reveal strip.
-	size widget.Size
-	// hides and reveals count the auto-hide transitions.
-	hides, reveals int
-	stops          []func()
+	size  widget.Size
+	stops []func()
 }
 
 type dockEntry struct {
@@ -176,7 +170,7 @@ func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output) *dock
 	d.px = taskIconPx(cfg.IconSize, ctx.Config)
 	d.panel = &arrangedBox{Box: widget.NewBox(d.axis, trayItemGap(ctx), 0), arranged: d.claim}
 	d.panel.AddClass("dock", string(cfg.Edge))
-	d.reveal = widget.NewDrawingArea(dockRevealPx, dockRevealPx)
+	d.reveal = widget.NewDrawingArea(revealPx, revealPx)
 	d.reveal.AddClass("dock-reveal")
 	d.reveal.SetVisible(false)
 	across := widget.Column
@@ -187,10 +181,13 @@ func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output) *dock
 	d.surface.AddClass("dock-surface")
 	d.surface.Append(d.panel, false)
 	d.surface.Append(d.reveal, false)
-	d.surface.SetOnHoverWithin(func(on bool) {
-		d.hovered = on
-		d.syncHidden()
-	})
+	d.hide = &autoHide{
+		mode:       dockMode(cfg),
+		covered:    func() (bool, bool) { on, _, known := d.windows(); return on, known },
+		fullscreen: func() (bool, bool) { _, on, known := d.windows(); return on, known },
+		apply:      d.applyHidden,
+	}
+	d.surface.SetOnHoverWithin(d.hide.setHovered)
 	d.rects = d.hub.windows.owner()
 	d.stops = append(d.stops, d.hub.windows.subscribe(d.render), d.hub.subscribeGeometry(d.syncHidden))
 	d.render()
@@ -203,6 +200,7 @@ func (d *dock) close() {
 	for _, stop := range d.stops {
 		stop()
 	}
+	d.hide.close()
 	d.rects.release()
 }
 
@@ -301,7 +299,7 @@ func launchApp(app taskApp) {
 
 // claim names each app's entry as the minimize rectangle of its windows.
 func (d *dock) claim() {
-	if d.host == nil || d.hidden {
+	if d.host == nil || d.hide.hidden {
 		return
 	}
 	claims := map[taskWindow]rectClaim{}
@@ -314,39 +312,41 @@ func (d *dock) claim() {
 	d.rects.set(claims)
 }
 
-// covered reports whether a window covers the dock where it shows.
-// Without lys-wm's window geometry it counts as always covered, so an
-// auto-hiding dock shows only under the pointer.
-func (d *dock) covered() bool {
-	windows, ok := d.hub.geometry()
-	if !ok {
-		return true
+// dockMode is the reveal mode an auto-hiding dock has: it hides while a
+// window covers it.
+func dockMode(cfg config.DockConfig) config.BarAutoHide {
+	if cfg.AutoHide {
+		return config.AutoHideWindowsOverlap
 	}
-	out := lyswm.Rect{X: int(d.output.LogicalX), Y: int(d.output.LogicalY), Width: int(d.output.LogicalW), Height: int(d.output.LogicalH)}
-	return covered(windows, d.output.Name, dockArea(d.cfg.Edge, out, d.size))
+	return config.AutoHideNever
 }
 
-// syncHidden hides an auto-hiding dock while a window covers it and the
-// pointer is not on it, and reveals it otherwise.
+// windows reports a window covering the dock where it shows and one
+// filling its output; known is false without lys-wm's window geometry,
+// so an auto-hiding dock shows only under the pointer.
+func (d *dock) windows() (covering, fullscreen, known bool) {
+	out := lyswm.Rect{X: int(d.output.LogicalX), Y: int(d.output.LogicalY), Width: int(d.output.LogicalW), Height: int(d.output.LogicalH)}
+	return windowsOn(d.hub, d.output.Name, dockArea(d.cfg.Edge, out, d.size))
+}
+
+// syncHidden measures the shown dock and lets the reveal controller
+// decide again.
 func (d *dock) syncHidden() {
-	if !d.hidden {
+	if !d.hide.hidden {
 		d.size = widget.SizeWithin(d.panel, widget.Size{W: int(d.output.LogicalW), H: int(d.output.LogicalH)})
 	}
-	hide := d.cfg.AutoHide && !d.hovered && d.covered()
-	if hide == d.hidden {
-		return
-	}
-	d.hidden = hide
+	d.hide.sync()
+}
+
+// applyHidden swaps the entries for the reveal strip, or back.
+func (d *dock) applyHidden(hide bool) {
 	if hide {
-		d.hides++
 		d.rects.release()
-	} else {
-		d.reveals++
 	}
 	if d.axis == widget.Row {
-		d.reveal.SetContentSize(d.size.W, dockRevealPx)
+		d.reveal.SetContentSize(d.size.W, revealPx)
 	} else {
-		d.reveal.SetContentSize(dockRevealPx, d.size.H)
+		d.reveal.SetContentSize(revealPx, d.size.H)
 	}
 	d.panel.SetVisible(!hide)
 	d.reveal.SetVisible(hide)

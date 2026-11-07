@@ -34,6 +34,7 @@ func panelCommand() *cli.Command {
 			{Name: "hide", About: "Hide the bar on a monitor", Args: monitor("hide"), Run: barVisibility("hide bar", "BarHide", "All bars hidden", "Bar hidden on ")},
 			{Name: "show", About: "Show the bar on a monitor", Args: monitor("show"), Run: barVisibility("show bar", "BarShow", "All bars shown", "Bar shown on ")},
 			{Name: "toggle", About: "Toggle bar visibility on a monitor", Args: monitor("toggle"), Run: barVisibility("toggle bar", "BarToggle", "All bars toggled", "Bar toggled on ")},
+			{Name: "reveal", About: "Show an auto-hiding bar on a monitor for a few seconds", Args: monitor("reveal"), Run: barVisibility("reveal bar", "BarReveal", "All bars revealed", "Bar revealed on ")},
 			{Name: "dashboard", About: "Open or close the dashboard dropdown", Args: []*cli.Arg{{ID: "monitor", Help: `Monitor connector name (e.g., "DP-1"). Omit for the focused monitor`}}, Run: panelDashboard},
 		},
 	}

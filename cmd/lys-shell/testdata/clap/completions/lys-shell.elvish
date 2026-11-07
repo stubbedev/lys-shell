@@ -405,6 +405,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand hide 'Hide the bar on a monitor'
             cand show 'Show the bar on a monitor'
             cand toggle 'Toggle bar visibility on a monitor'
+            cand reveal 'Show an auto-hiding bar on a monitor for a few seconds'
             cand dashboard 'Open or close the dashboard dropdown'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -444,6 +445,10 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'lys-shell;panel;reveal'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'lys-shell;panel;dashboard'= {
             cand -h 'Print help'
             cand --help 'Print help'
@@ -458,6 +463,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand hide 'Hide the bar on a monitor'
             cand show 'Show the bar on a monitor'
             cand toggle 'Toggle bar visibility on a monitor'
+            cand reveal 'Show an auto-hiding bar on a monitor for a few seconds'
             cand dashboard 'Open or close the dashboard dropdown'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -478,6 +484,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;panel;help;show'= {
         }
         &'lys-shell;panel;help;toggle'= {
+        }
+        &'lys-shell;panel;help;reveal'= {
         }
         &'lys-shell;panel;help;dashboard'= {
         }
@@ -1208,6 +1216,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand hide 'Hide the bar on a monitor'
             cand show 'Show the bar on a monitor'
             cand toggle 'Toggle bar visibility on a monitor'
+            cand reveal 'Show an auto-hiding bar on a monitor for a few seconds'
             cand dashboard 'Open or close the dashboard dropdown'
         }
         &'lys-shell;help;panel;start'= {
@@ -1227,6 +1236,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;panel;show'= {
         }
         &'lys-shell;help;panel;toggle'= {
+        }
+        &'lys-shell;help;panel;reveal'= {
         }
         &'lys-shell;help;panel;dashboard'= {
         }
