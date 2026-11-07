@@ -30,34 +30,30 @@ let
     in
     lib.removeSuffix "\"" (lib.removePrefix "const Version = \"" line);
 
-  # Only the Go tree, so editing docs or nix files does not rebuild it.
+  nonGoDirs = [
+    "contrib"
+    "docs"
+    "nix"
+    "packaging"
+    "schema"
+    "scripts"
+    "tests"
+  ];
+  goDirs = lib.attrNames (
+    lib.filterAttrs (
+      name: type: type == "directory" && !lib.hasPrefix "." name && !lib.elem name nonGoDirs
+    ) (builtins.readDir ../.)
+  );
+
   src = lib.fileset.toSource {
     root = ../.;
-    fileset = lib.fileset.unions [
-      ../go.mod
-      ../go.sum
-      ../cava
-      ../cmd
-      ../config
-      ../i18n
-      ../imagedecode
-      ../internal
-      ../logging
-      ../offheap
-      ../outputsize
-      ../portal
-      ../resources
-      ../service
-      ../settingspage
-      ../shell
-      ../shlex
-      ../strftime
-      ../styling
-      ../swaytest
-      ../testhome
-      ../third_party
-      ../useraccount
-    ];
+    fileset = lib.fileset.unions (
+      [
+        ../go.mod
+        ../go.sum
+      ]
+      ++ map (dir: ../. + "/${dir}") goDirs
+    );
   };
 
   # The binaries that draw through lys-ui and dlopen the GPU and media
