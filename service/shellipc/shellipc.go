@@ -6,6 +6,8 @@
 package shellipc
 
 import (
+	"log"
+	"maps"
 	"slices"
 	"sort"
 	"sync"
@@ -16,17 +18,24 @@ import (
 
 // dev.stubbe.lys.Shell1 (wayle-ipc/src/shell_ipc.rs).
 const (
-	ServiceName = "dev.stubbe.lys.Shell1"
-	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/Shell")
+	ServiceName       = "dev.stubbe.lys.Shell1"
+	ServicePath       = dbus.ObjectPath("/dev/stubbe/lys/Shell")
+	propertiesChanged = "org.freedesktop.DBus.Properties.PropertiesChanged"
 )
 
 // State is ShellIpcState: the connectors that have a bar and the
-// hidden subset. Changes reach OnHidden with the new hidden set.
+// hidden subset. Changes reach OnHidden with the new hidden set, and
+// the served Shell1 object announces them as PropertiesChanged.
 type State struct {
 	mu         sync.Mutex
 	connectors []string
 	hidden     map[string]bool
 	onHidden   func(hidden map[string]bool)
+
+	// announceMu orders the announcements, so the last one sent carries
+	// the latest values; announce is nil while nothing serves the state.
+	announceMu sync.Mutex
+	announce   func(changed map[string]dbus.Variant)
 }
 
 // NewState builds an empty state; onHidden (may be nil) observes every
@@ -36,21 +45,21 @@ func NewState(onHidden func(hidden map[string]bool)) *State {
 }
 
 // SetConnectors is monitors.rs's sync_ipc_state: the bars that exist,
-// with hidden entries for vanished connectors dropped.
+// with hidden entries for vanished connectors dropped. Call it on every
+// change of the set, startup's and each hotplug's.
 func (s *State) SetConnectors(connectors []string) {
 	s.mu.Lock()
+	connectorsChanged := !slices.Equal(s.connectors, connectors)
 	s.connectors = slices.Clone(connectors)
-	changed := false
+	hiddenChanged := false
 	for name := range s.hidden {
 		if !slices.Contains(connectors, name) {
 			delete(s.hidden, name)
-			changed = true
+			hiddenChanged = true
 		}
 	}
 	s.mu.Unlock()
-	if changed {
-		s.notify()
-	}
+	s.changed(connectorsChanged, hiddenChanged)
 }
 
 // Hidden reports whether connector's bar is hidden.
@@ -60,17 +69,42 @@ func (s *State) Hidden(connector string) bool {
 	return s.hidden[connector]
 }
 
-func (s *State) notify() {
-	if s.onHidden == nil {
+// changed tells onHidden of a new hidden set and announces the changed
+// properties.
+func (s *State) changed(connectors, hidden bool) {
+	if hidden && s.onHidden != nil {
+		s.mu.Lock()
+		snapshot := make(map[string]bool, len(s.hidden))
+		for k := range s.hidden {
+			snapshot[k] = true
+		}
+		s.mu.Unlock()
+		s.onHidden(snapshot)
+	}
+	if !connectors && !hidden {
 		return
 	}
-	s.mu.Lock()
-	snapshot := make(map[string]bool, len(s.hidden))
-	for k := range s.hidden {
-		snapshot[k] = true
+	s.announceMu.Lock()
+	defer s.announceMu.Unlock()
+	if s.announce == nil {
+		return
 	}
-	s.mu.Unlock()
-	s.onHidden(snapshot)
+	props := make(map[string]dbus.Variant, 2)
+	if connectors {
+		props["Connectors"] = dbus.MakeVariant(s.connectorList())
+	}
+	if hidden {
+		props["BarHidden"] = dbus.MakeVariant(s.hiddenSorted())
+	}
+	s.announce(props)
+}
+
+// announceTo has every later change announced through announce, nil
+// for none.
+func (s *State) announceTo(announce func(changed map[string]dbus.Variant)) {
+	s.announceMu.Lock()
+	defer s.announceMu.Unlock()
+	s.announce = announce
 }
 
 // update applies fn under the lock and notifies when it reports a
@@ -79,9 +113,7 @@ func (s *State) update(fn func() bool) {
 	s.mu.Lock()
 	changed := fn()
 	s.mu.Unlock()
-	if changed {
-		s.notify()
-	}
+	s.changed(false, changed)
 }
 
 // Hide is bar.rs's hide: "" hides every bar; an unknown connector is
@@ -221,10 +253,12 @@ func (d *daemon) VpnSsoCallback(uri string) *dbus.Error {
 	return dbusx.Failed("no VPN browser sign-in is waiting for a callback")
 }
 
-// Serve exports dev.stubbe.lys.Shell1 over state.
+// Serve exports dev.stubbe.lys.Shell1 over state; from then until the
+// release, each change of its Connectors or BarHidden is announced with
+// PropertiesChanged.
 func Serve(conn *dbus.Conn, state *State, hooks Hooks) (func(), error) {
 	d := &daemon{state: state, hooks: hooks}
-	return dbusx.Serve(conn, dbusx.Service{
+	release, err := dbusx.Serve(conn, dbusx.Service{
 		Name:      ServiceName,
 		Path:      ServicePath,
 		Interface: ServiceName,
@@ -234,4 +268,16 @@ func Serve(conn *dbus.Conn, state *State, hooks Hooks) (func(), error) {
 			"Connectors": func() any { return state.connectorList() },
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
+	state.announceTo(func(changed map[string]dbus.Variant) {
+		if err := conn.Emit(ServicePath, propertiesChanged, ServiceName, changed, []string{}); err != nil {
+			log.Printf("shell ipc: announce %v: %v", slices.Sorted(maps.Keys(changed)), err)
+		}
+	})
+	return func() {
+		state.announceTo(nil)
+		release()
+	}, nil
 }

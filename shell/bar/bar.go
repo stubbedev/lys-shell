@@ -559,23 +559,10 @@ func (s *shellStart) mount() {
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
 	bars := newBarSet(host.open)
-	// plugOutput gives a named output its bar; startup
-	// outputs and hotplugged ones (once their connector name is known)
-	// take the same path, the Rust SyncMonitors. A bar that cannot open
-	// is logged, not fatal.
-	plugOutput := func(output *app.Output) {
-		if output.Name == "" {
-			return
-		}
-		layout, show := barLayoutFor(current.Load(), output.Name)
-		bars.plug(output, layout, show)
-	}
-	for _, output := range sess.Outputs() {
-		plugOutput(output)
-	}
-	s.down.add(sess.WatchOutputIdentity(plugOutput))
-	s.down.add(sess.WatchOutputs(nil, func(output *app.Output) {
-		bars.unplug(output)
+	// A bar that cannot open is logged, not fatal.
+	s.down.add(bars.followOutputs(sess, func(connector string) (config.BarLayout, bool) {
+		return barLayoutFor(current.Load(), connector)
+	}, func(output *app.Output) {
 		osdSrv.DetachOutput(output.Name)
 		if popupHost != nil {
 			popupHost.DetachOutput(output.Name)
@@ -692,7 +679,7 @@ func (s *shellStart) mount() {
 	visibility := shellipc.NewState(func(hidden map[string]bool) {
 		application.Invoke(func() { bars.apply(hidden) })
 	})
-	visibility.SetConnectors(bars.connectors())
+	bars.publishTo(visibility.SetConnectors)
 	s.down.addAsync(func() func() {
 		return serveShellIPC(s.session, application, visibility, func() bool {
 			locker.Lock()

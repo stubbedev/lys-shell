@@ -20,6 +20,9 @@ type barSet struct {
 	open  func(*app.Output, config.BarLayout) (barLayer, error)
 	order []string
 	bars  map[string]*barEntry
+	// publish hears connectors() after each plug, unplug and reload;
+	// nil until publishTo.
+	publish func(connectors []string)
 }
 
 // barLayer is the part of a bar's layer window the set drives.
@@ -57,6 +60,19 @@ func (b *barSet) connectors() []string {
 	return out
 }
 
+// publishTo hands publish the connectors now and after every later
+// change of the set. It runs on the loop goroutine, as the changes do.
+func (b *barSet) publishTo(publish func(connectors []string)) {
+	b.publish = publish
+	b.published()
+}
+
+func (b *barSet) published() {
+	if b.publish != nil {
+		b.publish(b.connectors())
+	}
+}
+
 // apply closes the bars in hidden and reopens the others. It runs on
 // the loop goroutine.
 func (b *barSet) apply(hidden map[string]bool) {
@@ -84,6 +100,7 @@ func (b *barSet) reload(layoutFor func(connector string) (config.BarLayout, bool
 		}
 		b.sync(name, entry)
 	}
+	b.published()
 }
 
 // sync opens or closes the entry's layer to match shows and hidden.
@@ -161,6 +178,7 @@ func (b *barSet) plug(output *app.Output, layout config.BarLayout, shows bool) {
 	b.order = append(b.order, output.Name)
 	b.bars[output.Name] = entry
 	b.sync(output.Name, entry)
+	b.published()
 }
 
 // unplug closes an unplugged output's bar and forgets it.
@@ -170,6 +188,7 @@ func (b *barSet) unplug(output *app.Output) {
 			b.drop(name)
 		}
 	}
+	b.published()
 }
 
 func (b *barSet) drop(name string) {
@@ -178,4 +197,38 @@ func (b *barSet) drop(name string) {
 	}
 	delete(b.bars, name)
 	b.order = slices.DeleteFunc(b.order, func(n string) bool { return n == name })
+}
+
+// followOutputs gives every named output of sess its bar from
+// layoutFor, the startup outputs and each one plugged or renamed later,
+// the Rust SyncMonitors; unplugged runs once an unplugged output's bar
+// is gone. The returned stop ends the watch. It runs on the loop
+// goroutine.
+func (b *barSet) followOutputs(sess outputSource, layoutFor func(connector string) (config.BarLayout, bool), unplugged func(*app.Output)) (stop func()) {
+	plug := func(output *app.Output) {
+		if output.Name == "" {
+			return
+		}
+		layout, show := layoutFor(output.Name)
+		b.plug(output, layout, show)
+	}
+	for _, output := range sess.Outputs() {
+		plug(output)
+	}
+	stopIdentity := sess.WatchOutputIdentity(plug)
+	stopOutputs := sess.WatchOutputs(nil, func(output *app.Output) {
+		b.unplug(output)
+		unplugged(output)
+	})
+	return func() {
+		stopOutputs()
+		stopIdentity()
+	}
+}
+
+// outputSource is the part of the Wayland session followOutputs reads.
+type outputSource interface {
+	Outputs() []*app.Output
+	WatchOutputIdentity(fn func(*app.Output)) (stop func())
+	WatchOutputs(added, removed func(*app.Output)) (stop func())
 }
