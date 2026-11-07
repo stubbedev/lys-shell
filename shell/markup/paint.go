@@ -27,7 +27,7 @@ type View struct {
 }
 
 func (v View) at(p image.Point) (float64, float64) {
-	return v.X + float64(p.X)*v.Scale, v.Y + float64(p.Y)*v.Scale
+	return v.X + float64(float64(p.X)*v.Scale), v.Y + float64(float64(p.Y)*v.Scale)
 }
 
 func (v View) point(p image.Point) (int, int) {
@@ -103,19 +103,19 @@ func paintArrow(cv *render.Canvas, m Mark, v View) {
 	fx, fy := v.at(from)
 	tx, ty := v.at(to)
 	dx, dy := tx-fx, ty-fy
-	n := math.Sqrt(dx*dx + dy*dy)
+	n := math.Sqrt(float64(dx*dx) + float64(dy*dy))
 	if n == 0 {
 		return
 	}
 	ux, uy := dx/n, dy/n
 	head := math.Min(v.length(float64(max(headMinPx, headRatio*m.Size))), n)
-	bx, by := tx-ux*head, ty-uy*head
+	bx, by := tx-float64(ux*head), ty-float64(uy*head)
 	cv.Line(int(math.Round(fx)), int(math.Round(fy)), int(math.Round(bx)), int(math.Round(by)), v.stroke(m.Size), m.Color)
 	half := head * 0.6
 	var p render.Path
 	p.MoveTo(tx, ty)
-	p.LineTo(bx-uy*half, by+ux*half)
-	p.LineTo(bx+uy*half, by-ux*half)
+	p.LineTo(bx-float64(uy*half), by+float64(ux*half))
+	p.LineTo(bx+float64(uy*half), by-float64(ux*half))
 	p.Close()
 	cv.FillPath(&p, m.Color)
 }
@@ -137,18 +137,19 @@ func paintMarker(cv *render.Canvas, m Mark, v View, font render.Font) {
 func ellipseRing(v View, r image.Rectangle, width float64) *render.Path {
 	x0, y0 := v.at(r.Min)
 	x1, y1 := v.at(r.Max)
-	cx, cy := (x0+x1)/2, (y0+y1)/2
-	rx, ry := (x1-x0)/2, (y1-y0)/2
+	cx, cy := float64((x0+x1)/2), float64((y0+y1)/2)
+	rx, ry := float64((x1-x0)/2), float64((y1-y0)/2)
 	var p render.Path
-	ellipse(&p, cx, cy, rx+width/2, ry+width/2, false)
-	if irx, iry := rx-width/2, ry-width/2; irx > 0 && iry > 0 {
+	half := float64(width / 2)
+	ellipse(&p, cx, cy, rx+half, ry+half, false)
+	if irx, iry := rx-half, ry-half; irx > 0 && iry > 0 {
 		ellipse(&p, cx, cy, irx, iry, true)
 	}
 	return &p
 }
 
 func ellipse(p *render.Path, cx, cy, rx, ry float64, reverse bool) {
-	kx, ky := rx*ellipseK, ry*ellipseK
+	kx, ky := float64(rx*ellipseK), float64(ry*ellipseK)
 	if reverse {
 		ky = -ky
 		ry = -ry

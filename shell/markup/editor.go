@@ -382,10 +382,10 @@ func (c *canvasView) fit() View {
 	if s <= 0 {
 		s = 1
 	}
-	w, h := float64(ib.Dx())*s, float64(ib.Dy())*s
+	w, h := float64(float64(ib.Dx())*s), float64(float64(ib.Dy())*s)
 	return View{
-		X:     float64(b.X) + (float64(b.W)-w)/2 - float64(ib.Min.X)*s,
-		Y:     float64(b.Y) + (float64(b.H)-h)/2 - float64(ib.Min.Y)*s,
+		X:     float64(b.X) + float64((float64(b.W)-w)/2) - float64(float64(ib.Min.X)*s),
+		Y:     float64(b.Y) + float64((float64(b.H)-h)/2) - float64(float64(ib.Min.Y)*s),
 		Scale: s,
 	}
 }
