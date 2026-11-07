@@ -67,8 +67,9 @@ type call struct {
 
 // begin mounts the Request for one call to the app's request at handle.
 // dismiss, when set, is the shell service's Dismiss: it takes the call's
-// dialog down should the app close the request mid-dialog.
-func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, dismiss func(ctx context.Context, handle string) error) (*call, error) {
+// dialog down should the app close the request mid-dialog, or ended
+// close: the end of the session the call runs on closes its Request.
+func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, ended <-chan struct{}, dismiss func(ctx context.Context, handle string) error) (*call, error) {
 	req, err := mountRequest(conn, handle)
 	if err != nil {
 		return nil, fmt.Errorf("mount the request at %s: %w", handle, err)
@@ -80,17 +81,20 @@ func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, 
 	}
 	c.watching.Go(func() {
 		select {
+		case <-ended:
+			req.cancel()
 		case <-req.Cancelled():
-			cancel()
-			if dismiss == nil {
-				return
-			}
-			dctx, dcancel := context.WithTimeout(context.Background(), shellCallTimeout)
-			defer dcancel()
-			if err := dismiss(dctx, string(handle)); err != nil {
-				warnf("dismissing the dialog for %s: %v", handle, err)
-			}
 		case <-c.done:
+			return
+		}
+		cancel()
+		if dismiss == nil {
+			return
+		}
+		dctx, dcancel := context.WithTimeout(context.Background(), shellCallTimeout)
+		defer dcancel()
+		if err := dismiss(dctx, string(handle)); err != nil {
+			warnf("dismissing the dialog for %s: %v", handle, err)
 		}
 	})
 	return c, nil
@@ -126,7 +130,16 @@ func (c *call) end() {
 // beginOr is begin for a method replying (u, a{sv}): a Request that
 // cannot be mounted fails the call with Other.
 func beginOr(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, dismiss func(context.Context, string) error) (*call, bool) {
-	c, err := begin(conn, handle, appID, parentWindow, dismiss)
+	return callOr(begin(conn, handle, appID, parentWindow, nil, dismiss))
+}
+
+// beginOnSession is beginOr for a call on session s: the session ending
+// mid-call closes the call's Request, and so dismisses its dialog.
+func beginOnSession(conn *dbus.Conn, handle dbus.ObjectPath, s *session, parentWindow string, dismiss func(context.Context, string) error) (*call, bool) {
+	return callOr(begin(conn, handle, s.appID, parentWindow, s.ended, dismiss))
+}
+
+func callOr(c *call, err error) (*call, bool) {
 	if err != nil {
 		warnf("%v", err)
 		return nil, false

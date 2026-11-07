@@ -361,7 +361,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		return ResponseOther, Vardict{}, nil
 	}
 	dialogs := portaldialogs.NewClient(o.r.conn)
-	c, ok := beginOr(o.r.conn, handle, appID, parent, func(ctx context.Context, h string) error {
+	c, ok := beginOnSession(o.r.conn, handle, s, parent, func(ctx context.Context, h string) error {
 		return errors.Join(dialogs.Dismiss(ctx, h), sharepicker.NewClient(o.r.conn).Dismiss(ctx, h))
 	})
 	if !ok {
@@ -411,6 +411,11 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		return ResponseOther, Vardict{}, nil
 	}
 	s.mu.Lock()
+	if s.cleanups == nil {
+		s.mu.Unlock()
+		sink.Close()
+		return ResponseCancelled, Vardict{}, nil
+	}
 	old := s.remote.input
 	s.remote.input = &remoteInput{sink: sink, granted: state.types}
 	s.mu.Unlock()

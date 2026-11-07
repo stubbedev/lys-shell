@@ -275,9 +275,14 @@ func allOfTypes(targets []sharepicker.Target, types uint32) bool {
 	return true
 }
 
+// errSessionClosed is begin's refusal of a session that ended while its
+// streams started: nothing would ever stop them.
+var errSessionClosed = errors.New("the session closed")
+
 // begin starts a stream per target; one that fails stops the ones this
-// call started, so a partial set never runs. A stream that ends by
-// itself (its window closed, its output unplugged) ends the session.
+// call started, so a partial set never runs, and so does a session that
+// ended meanwhile. A stream that ends by itself (its window closed, its
+// output unplugged) ends the session.
 func (c *screenCast) begin(session *session, targets []sharepicker.Target, cursorMode uint32) ([]startedStream, error) {
 	var started []startedStream
 	for _, t := range targets {
@@ -288,12 +293,17 @@ func (c *screenCast) begin(session *session, targets []sharepicker.Target, curso
 		}
 		started = append(started, startedStream{stream: s, target: t, node: s.NodeID(), stopped: make(chan struct{})})
 	}
+	session.mu.Lock()
+	if session.cleanups == nil {
+		session.mu.Unlock()
+		c.stopStreams(started)
+		return nil, errSessionClosed
+	}
+	session.cast.streams = append(session.cast.streams, started...)
+	session.mu.Unlock()
 	for _, s := range started {
 		go c.watch(session, s)
 	}
-	session.mu.Lock()
-	session.cast.streams = append(session.cast.streams, started...)
-	session.mu.Unlock()
 	c.sessions.notifyShares()
 	return started, nil
 }
@@ -430,7 +440,7 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 		warnf("screencast: Start: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	call, ok := beginOr(o.c.conn, handle, appID, parent, sharepicker.NewClient(o.c.conn).Dismiss)
+	call, ok := beginOnSession(o.c.conn, handle, s, parent, sharepicker.NewClient(o.c.conn).Dismiss)
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
@@ -438,6 +448,9 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 	shared, code := o.c.share(call, s)
 	if code != ResponseSuccess {
 		return code, Vardict{}, nil
+	}
+	if s.closed() {
+		return ResponseCancelled, Vardict{}, nil
 	}
 	results := Vardict{"streams": dbus.MakeVariant(shared.streams)}
 	if cfg := o.c.config(s); cfg.persistMode > 0 && shared.allowToken {
@@ -470,7 +483,7 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 		}
 	}
 	streams, err := c.begin(s, targets, cfg.cursorMode)
-	if err != nil && restoring {
+	if err != nil && restoring && !errors.Is(err, errSessionClosed) {
 		warnf("screencast: restored target unavailable, re-prompting: %v", err)
 		var code uint32
 		if allowToken, targets, code = c.choose(call, cfg); code != ResponseSuccess {
@@ -478,7 +491,10 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 		}
 		streams, err = c.begin(s, targets, cfg.cursorMode)
 	}
-	if err != nil {
+	switch {
+	case errors.Is(err, errSessionClosed):
+		return sharedScreens{}, ResponseCancelled
+	case err != nil:
 		warnf("screencast: failed to start stream: %v", err)
 		return sharedScreens{}, ResponseOther
 	}

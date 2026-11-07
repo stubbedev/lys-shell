@@ -83,6 +83,9 @@ type fakeStarts struct {
 	slowOutputs dbustest.Var[time.Duration]
 	// layout replaces the two outputs when set.
 	layout dbustest.Var[[]outputGeometry]
+	// starting runs as each stream starts, as a slow start would let
+	// the app act meanwhile.
+	starting dbustest.Var[func()]
 }
 
 func (f *fakeStarts) outputs() ([]outputGeometry, error) {
@@ -100,6 +103,9 @@ func (f *fakeStarts) outputs() ([]outputGeometry, error) {
 }
 
 func (f *fakeStarts) start(t sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+	if starting := f.starting.Load(); starting != nil {
+		starting()
+	}
 	f.started.Update(func(s []string) []string {
 		return append(s, t.Payload()+map[bool]string{true: "+cursor", false: ""}[cursor])
 	})

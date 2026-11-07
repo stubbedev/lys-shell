@@ -423,7 +423,7 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 		return slices.ContainsFunc(before, func(b shortcut) bool { return b.ID == sc.ID })
 	})
 	dialogs := portaldialogs.NewClient(o.g.conn)
-	c, ok := beginOr(o.g.conn, handle, s.appID, parent, dialogs.Dismiss)
+	c, ok := beginOnSession(o.g.conn, handle, s, parent, dialogs.Dismiss)
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
@@ -440,6 +440,10 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 	if err := o.g.register(dev, session, owner, shortcuts); err != nil {
 		warnf("global shortcuts: %v", err)
 		return ResponseOther, Vardict{}, nil
+	}
+	if s.closed() {
+		o.g.closeSession(session)
+		return ResponseCancelled, Vardict{}, nil
 	}
 	s.mu.Lock()
 	s.shortcuts.bound = true

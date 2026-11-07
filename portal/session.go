@@ -59,9 +59,19 @@ type session struct {
 	// clipboard.
 	clipboard bool
 
+	// ended closes as the session ends, before its cleanups run, so a
+	// call in flight on it ends as one whose Request closed.
+	ended    chan struct{}
 	once     sync.Once
 	cleanups []func()
 	unexport func()
+}
+
+// closed reports whether the session has ended.
+func (s *session) closed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cleanups == nil
 }
 
 // onClose registers fn to run when the session closes, after the
@@ -108,7 +118,7 @@ func (r *sessions) create(path dbus.ObjectPath, kind sessionKind, appID string) 
 	if _, live := r.get(path); live {
 		return nil, fmt.Errorf("a session is already live at %s", path)
 	}
-	s := &session{path: path, kind: kind, appID: appID, cleanups: []func(){}}
+	s := &session{path: path, kind: kind, appID: appID, ended: make(chan struct{}), cleanups: []func(){}}
 	unexport, err := dbusx.Export(r.conn, path, dbusx.Interface{
 		Name:       SessionIface,
 		Methods:    sessionObject{r: r, s: s},
@@ -178,6 +188,7 @@ func (r *sessions) end(s *session, announce bool) {
 		r.mu.Lock()
 		delete(r.live, s.path)
 		r.mu.Unlock()
+		close(s.ended)
 		s.mu.Lock()
 		cleanups := s.cleanups
 		s.cleanups = nil
