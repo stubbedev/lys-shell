@@ -25,6 +25,8 @@ type fakeNM struct {
 
 	mu            sync.Mutex
 	registrations []registration
+	// onRegister, when set, runs as an agent registers, before NM answers.
+	onRegister    func()
 	order         []dbus.ObjectPath
 	profiles      map[dbus.ObjectPath]ConnectionDict
 	active        map[dbus.ObjectPath]*fakeActive
@@ -518,6 +520,20 @@ func (a fakeAgentManager) RegisterWithCapabilities(sender dbus.Sender, id string
 	a.f.mu.Lock()
 	a.f.registrations = append(a.f.registrations, registration{sender: string(sender), id: id, caps: caps})
 	a.f.mu.Unlock()
+	if a.f.onRegister != nil {
+		a.f.onRegister()
+	}
+	return nil
+}
+
+func (a fakeAgentManager) Unregister(sender dbus.Sender) *dbus.Error {
+	a.f.mu.Lock()
+	defer a.f.mu.Unlock()
+	kept := slices.DeleteFunc(slices.Clone(a.f.registrations), func(r registration) bool { return r.sender == string(sender) })
+	if len(kept) == len(a.f.registrations) {
+		return dbus.NewError(errAgentNotRegistered, []any{"not registered"})
+	}
+	a.f.registrations = kept
 	return nil
 }
 

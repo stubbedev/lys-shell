@@ -170,7 +170,9 @@ func serveFixtureWith(t *testing.T, budget time.Duration, vault Vault) *agentFix
 	agent := NewAgent()
 	signIn := &fakeSignIn{}
 	states := &profileStates{m: map[string]ActiveState{}}
-	must(t, serveAgent(t.Context(), conn, &agentObject{agent: agent, signIn: signIn, vault: vault, active: states.read, budget: budget}))
+	stopAgent, err := serveAgent(t.Context(), conn, &agentObject{agent: agent, signIn: signIn, vault: vault, active: states.read, budget: budget})
+	must(t, err)
+	t.Cleanup(func() { must(t, stopAgent()) })
 	f.registered(t)
 	return &agentFixture{nm: f, agent: agent, name: conn.Names()[0], signIn: signIn, states: states}
 }
@@ -335,9 +337,11 @@ func TestAgentHasNothingToAskForAnOpenconnectCookieOrAnUnknownSetting(t *testing
 	// No sign-in wired: an openconnect request is not a prompt.
 	conn := fx.nm.client()
 	agent := NewAgent()
-	must(t, serveAgent(t.Context(), conn, &agentObject{agent: agent, budget: RequestBudget}))
+	stopAgent, err := serveAgent(t.Context(), conn, &agentObject{agent: agent, budget: RequestBudget})
+	must(t, err)
+	t.Cleanup(func() { must(t, stopAgent()) })
 	name := conn.Names()[0]
-	_, err := fx.nm.getSecrets(context.Background(), name, gpConnection("work"), settingPath(1), "vpn", []string{"cookie", "gateway", "gwcert"}, flagAllowInteraction)
+	_, err = fx.nm.getSecrets(context.Background(), name, gpConnection("work"), settingPath(1), "vpn", []string{"cookie", "gateway", "gwcert"}, flagAllowInteraction)
 	if errName(err) != errNoSecrets {
 		t.Errorf("openconnect cookie: err = %v, want NoSecrets", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"log"
 	"maps"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbusx"
@@ -614,27 +615,71 @@ func replyMap(setting string, values map[string]string) ConnectionDict {
 // and a silently unregistered agent looks exactly like a VPN that asks
 // for nothing and fails). A failure to register is logged, not fatal:
 // lys-shell still works without answering secrets, and NM may not be up
-// yet. The watch ends with ctx.
-func serveAgent(ctx context.Context, conn *dbus.Conn, obj *agentObject) error {
+// yet. The watch ends with ctx. stop ends it, unregisters the agent and
+// takes the export back: the connection is shared, so NM would otherwise
+// keep asking an object that is gone.
+func serveAgent(ctx context.Context, conn *dbus.Conn, obj *agentObject) (stop func() error, err error) {
 	if err := conn.Export(obj, AgentPath, agentIface); err != nil {
-		return fmt.Errorf("network: export secret agent: %w", err)
+		return nil, fmt.Errorf("network: export secret agent: %w", err)
 	}
+	unexport := func() error {
+		if err := conn.Export(nil, AgentPath, agentIface); err != nil {
+			return fmt.Errorf("network: unexport secret agent: %w", err)
+		}
+		return nil
+	}
+	r := &agentRegistration{conn: conn}
 	// Only a new owner is interesting; NM going away takes the
 	// registration with it and there is nothing to redo.
-	if _, err := dbusx.WatchOwner(ctx, conn, BusName, func() { register(ctx, conn) }); err != nil {
-		return fmt.Errorf("network: %w", err)
+	unwatch, err := dbusx.WatchOwner(ctx, conn, BusName, func() { r.register(ctx) })
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("network: %w", err), unexport())
 	}
-	register(ctx, conn)
-	return nil
+	r.register(ctx)
+	return func() error { return errors.Join(unwatch(), r.unregister(), unexport()) }, nil
 }
 
+// agentRegistration is the agent's standing with NM's agent manager.
+type agentRegistration struct {
+	conn *dbus.Conn
+	// asked is set once a registration went out: NM may have taken one
+	// whose answer never arrived.
+	asked atomic.Bool
+}
+
+// NM's answers to an Unregister that has nothing to withdraw: the agent
+// was never registered, or NM is not running.
+const (
+	errAgentNotRegistered = "org.freedesktop.NetworkManager.AgentManager.NotRegistered"
+	errServiceUnknown     = "org.freedesktop.DBus.Error.ServiceUnknown"
+)
+
 // register announces the agent to NM's agent manager.
-func register(ctx context.Context, conn *dbus.Conn) {
-	err := conn.Object(BusName, agentManagerPath).CallWithContext(ctx,
+func (r *agentRegistration) register(ctx context.Context) {
+	r.asked.Store(true)
+	err := r.conn.Object(BusName, agentManagerPath).CallWithContext(ctx,
 		agentManagerIface+".RegisterWithCapabilities", 0, AgentID, capabilityVPNHints).Err
 	if err != nil {
 		log.Printf("network: cannot register as secret agent; VPN prompts will not appear: %v", err)
 		return
 	}
 	log.Printf("network: registered as NetworkManager secret agent")
+}
+
+// unregister withdraws any registration NM may hold, bounded by
+// unwatchTimeout.
+func (r *agentRegistration) unregister() error {
+	if !r.asked.Swap(false) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), unwatchTimeout)
+	defer cancel()
+	err := r.conn.Object(BusName, agentManagerPath).CallWithContext(ctx, agentManagerIface+".Unregister", 0).Err
+	if err == nil || errors.Is(err, dbus.ErrClosed) {
+		return nil
+	}
+	if dbusErr, ok := errors.AsType[dbus.Error](err); ok && (dbusErr.Name == errAgentNotRegistered || dbusErr.Name == errServiceUnknown) {
+		return nil
+	}
+	return fmt.Errorf("network: unregister the secret agent: %w", err)
 }

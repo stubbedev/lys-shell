@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -40,27 +41,22 @@ type Settings struct {
 	changes  feed.Tick
 }
 
-// newSettings reads every profile and starts following NM's
-// announcements until ctx ends.
-func newSettings(ctx context.Context, n nm) (*Settings, error) {
+// newSettings reads every profile and follows NM's announcements until
+// ctx ends; stop takes its watch off the connection.
+func newSettings(ctx context.Context, n nm) (*Settings, func() error, error) {
 	s := &Settings{nm: n}
-	signals := make(chan *dbus.Signal, 64)
-	n.conn.Signal(signals)
-	for _, opt := range [][]dbus.MatchOption{
-		{dbus.WithMatchObjectPath(settingsPath), dbus.WithMatchInterface(settingsIface)},
-		{dbus.WithMatchInterface(connectionIface), dbus.WithMatchMember("Updated")},
-	} {
-		if err := n.conn.AddMatchSignalContext(ctx, opt...); err != nil {
-			n.conn.RemoveSignal(signals)
-			return nil, fmt.Errorf("network: watch settings: %w", err)
-		}
+	watch, err := watchSignals(ctx, n.conn, 64,
+		[]dbus.MatchOption{dbus.WithMatchObjectPath(settingsPath), dbus.WithMatchInterface(settingsIface)},
+		[]dbus.MatchOption{dbus.WithMatchInterface(connectionIface), dbus.WithMatchMember("Updated")},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("network: watch settings: %w", err)
 	}
 	if err := s.reload(ctx); err != nil {
-		n.conn.RemoveSignal(signals)
-		return nil, err
+		return nil, nil, errors.Join(err, watch.stop())
 	}
-	go s.follow(ctx, signals)
-	return s, nil
+	go s.follow(ctx, watch.signals)
+	return s, watch.stop, nil
 }
 
 // reload re-reads the whole list (startup, and NM coming back).
@@ -101,7 +97,6 @@ func (s *Settings) read(ctx context.Context, path dbus.ObjectPath) (Profile, err
 }
 
 func (s *Settings) follow(ctx context.Context, signals chan *dbus.Signal) {
-	defer s.nm.conn.RemoveSignal(signals)
 	for {
 		select {
 		case <-ctx.Done():

@@ -2,8 +2,9 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
+	"log"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
@@ -29,26 +30,47 @@ type Service struct {
 // in natively (NativeSignIn); other secrets come from vault when it has
 // them (nil for no vault), else from the user.
 func Start(ctx context.Context, conn *dbus.Conn, vault Vault) (*Service, error) {
-	return start(ctx, conn, NativeSignIn, vault, RequestBudget, defaultResumeTiming)
+	return start(ctx, conn, NativeSignIn, vault, defaultResumeTiming)
 }
 
-func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, vault Vault, budget time.Duration, timing resumeTiming) (*Service, error) {
-	n := nm{conn: conn}
-	settings, err := newSettings(ctx, n)
-	if err != nil {
-		return nil, fmt.Errorf("cannot initialize network service: cannot initialize Settings: %w", err)
+// start brings the service up under a context of its own. What it puts
+// on conn (the agent export, the match rules, the signal channels) is
+// taken back when ctx ends, and right away, before start returns, when a
+// step fails: conn is the bar's shared system connection, which outlives
+// the service.
+func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, vault Vault, timing resumeTiming) (*Service, error) {
+	life, cancel := context.WithCancel(ctx)
+	var held unwind
+	fail := func(err error) (*Service, error) {
+		cancel()
+		return nil, errors.Join(err, held.run())
 	}
+	n := nm{conn: conn}
+	settings, stopSettings, err := newSettings(life, n)
+	if err != nil {
+		return fail(fmt.Errorf("cannot initialize network service: cannot initialize Settings: %w", err))
+	}
+	held.push(stopSettings)
 	svc := &Service{Settings: settings, Agent: NewAgent()}
-	if device, ok := findWifiDevice(ctx, n); ok {
+	if device, ok := findWifiDevice(life, n); ok {
 		svc.Wifi = &Wifi{nm: n, settings: settings, Device: device}
 	}
-	if err := serveAgent(ctx, conn, &agentObject{agent: svc.Agent, signIn: signIn, vault: vault, active: n.profileState, budget: budget}); err != nil {
-		return nil, err
-	}
-	vpn, err := newVPNService(ctx, n, settings, svc.Agent, signIn, timing)
+	stopAgent, err := serveAgent(life, conn, &agentObject{agent: svc.Agent, signIn: signIn, vault: vault, active: n.profileState, budget: RequestBudget})
 	if err != nil {
-		return nil, err
+		return fail(err)
 	}
+	held.push(stopAgent)
+	vpn, stopVPN, err := newVPNService(life, n, settings, svc.Agent, signIn, timing)
+	if err != nil {
+		return fail(err)
+	}
+	held.push(stopVPN)
 	svc.VPN = vpn
+	context.AfterFunc(ctx, func() {
+		cancel()
+		if err := held.run(); err != nil {
+			log.Printf("network: stop: %v", err)
+		}
+	})
 	return svc, nil
 }

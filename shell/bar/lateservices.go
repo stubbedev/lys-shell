@@ -31,8 +31,9 @@ type lateStart func() (apply func(*ModuleContext), stop func(), err error)
 // holds one the shell still lacks. A start that fails is retried on
 // the next appearance; one that succeeded is not run again.
 type lateServices struct {
-	mu    sync.Mutex
-	stops []func()
+	mu        sync.Mutex
+	stops     []func()
+	unwatches []func() error
 }
 
 // watch follows the names on conn until ctx ends. invoke runs on the
@@ -40,7 +41,7 @@ type lateServices struct {
 func (l *lateServices) watch(ctx context.Context, conn *dbus.Conn, starts map[string]lateStart, invoke func(func()), rebuild func(apply func(*ModuleContext))) error {
 	for _, name := range lateServiceNames {
 		start := starts[name]
-		if _, err := dbusx.WatchOwner(ctx, conn, name, func() {
+		unwatch, err := dbusx.WatchOwner(ctx, conn, name, func() {
 			var apply func(*ModuleContext)
 			if start != nil {
 				a, stop, err := start()
@@ -54,15 +55,29 @@ func (l *lateServices) watch(ctx context.Context, conn *dbus.Conn, starts map[st
 				}
 			}
 			invoke(func() { rebuild(apply) })
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
+		l.mu.Lock()
+		l.unwatches = append(l.unwatches, unwatch)
+		l.mu.Unlock()
 	}
 	return nil
 }
 
-// stop ends every client a late start brought up.
+// stop ends the watches, taking their match rules off the shared
+// connection, and every client a late start brought up.
 func (l *lateServices) stop() {
+	l.mu.Lock()
+	unwatches := l.unwatches
+	l.unwatches = nil
+	l.mu.Unlock()
+	for _, unwatch := range unwatches {
+		if err := unwatch(); err != nil {
+			log.Printf("bar: %v", err)
+		}
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, stop := range l.stops {

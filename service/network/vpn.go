@@ -138,8 +138,8 @@ type VPNService struct {
 }
 
 // newVPNService builds the rows from NM's current profiles and starts
-// watching until ctx ends.
-func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, signIn SignIn, timing resumeTiming) (*VPNService, error) {
+// watching until ctx ends; stop takes its watch off the connection.
+func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, signIn SignIn, timing resumeTiming) (*VPNService, func() error, error) {
 	s := &VPNService{
 		nm:         n,
 		settings:   settings,
@@ -150,27 +150,23 @@ func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, 
 		timing:     timing,
 		watched:    make(map[dbus.ObjectPath]*vpnEntry),
 	}
-	signals := make(chan *dbus.Signal, 64)
-	n.conn.Signal(signals)
-	for _, match := range [][]dbus.MatchOption{
-		{dbus.WithMatchObjectPath(nmPath), dbus.WithMatchInterface(properties), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, nmIface)},
-		{dbus.WithMatchInterface(activeIface), dbus.WithMatchMember("StateChanged")},
+	watch, err := watchSignals(ctx, n.conn, 64,
+		[]dbus.MatchOption{dbus.WithMatchObjectPath(nmPath), dbus.WithMatchInterface(properties), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, nmIface)},
+		[]dbus.MatchOption{dbus.WithMatchInterface(activeIface), dbus.WithMatchMember("StateChanged")},
 		dbusx.OwnerMatch(BusName),
-		{dbus.WithMatchObjectPath(login1Path), dbus.WithMatchInterface(login1Iface), dbus.WithMatchMember("PrepareForSleep")},
-	} {
-		if err := n.conn.AddMatchSignalContext(ctx, match...); err != nil {
-			n.conn.RemoveSignal(signals)
-			return nil, fmt.Errorf("network: watch VPNs: %w", err)
-		}
+		[]dbus.MatchOption{dbus.WithMatchObjectPath(login1Path), dbus.WithMatchInterface(login1Iface), dbus.WithMatchMember("PrepareForSleep")},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("network: watch VPNs: %w", err)
 	}
 	s.managerState = n.managerState(ctx)
 	profiles := settings.Changes(ctx)
 	failures := agent.Failures(ctx)
 	s.rebuild()
 	s.resync(ctx)
-	go s.run(ctx, signals, profiles, failures)
+	go s.run(ctx, watch.signals, profiles, failures)
 	go s.watchUnderlay(ctx)
-	return s, nil
+	return s, watch.stop, nil
 }
 
 // Entries snapshots the rows in NM's profile order.
@@ -526,7 +522,6 @@ func (s *VPNService) applyFailure() {
 // per-connection transitions, sign-in failures, and the two resume
 // triggers.
 func (s *VPNService) run(ctx context.Context, signals chan *dbus.Signal, profiles, failures <-chan struct{}) {
-	defer s.nm.conn.RemoveSignal(signals)
 	sleep := &sleepResume{vpn: s}
 	restart := &restartResume{vpn: s}
 	for {
