@@ -36,17 +36,20 @@ func startInhibitRig(t *testing.T) *inhibitRig {
 	t.Helper()
 	a := apptest.Run(t)
 	state := idleinhibit.NewState(idleinhibit.Duration{})
-	anchor := widget.NewBox(widget.Row, 0, 0)
-	anchor.SetSizeRequest(40, 30)
 	holder := &idleHolder{state: state, inhibit: a.InhibitIdle}
-	apptest.On(a, func() error {
+	var anchor *widget.Box
+	if err := apptest.On(a, func() error {
+		anchor = widget.NewBox(widget.Row, 0, 0)
+		anchor.SetSizeRequest(40, 30)
 		layer, err := a.NewLayer(app.LayerConfig{Root: anchor, Anchor: app.AnchorTop | app.AnchorLeft | app.AnchorRight, Height: 30, Namespace: "idle-rig", Layer: app.LayerTop})
 		if err != nil {
 			return err
 		}
 		holder.add(layer)
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	apptest.Until(t, a, "the bar is laid out", func() bool { return anchor.Bounds() != render.Rect{} })
 	changes, stop := state.Changes()
 	t.Cleanup(stop)
