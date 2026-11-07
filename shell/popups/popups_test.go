@@ -764,9 +764,9 @@ func TestClearAllRemovesTheStacksNotifications(t *testing.T) {
 		}
 		s.hover(s.card(mail[2]).summary)
 		s.click(stack.clear)
-		waitFor(t, "the mail stack leaving the store", func() bool { return !notifytest.IDs(notifytest.Stored(t, st))[mail[0]] })
+		waitFor(t, "the mail stack leaving the store", func() bool { return !notifytest.IDs(st.Stored(t))[mail[0]] })
 		s.p.sync()
-		up, kept, onDisk := notifytest.IDs(s.svc.Popups()), notifytest.IDs(notifytest.History(t, s.svc)), notifytest.IDs(notifytest.Stored(t, st))
+		up, kept, onDisk := notifytest.IDs(s.svc.Popups()), notifytest.IDs(notifytest.History(t, s.svc)), notifytest.IDs(st.Stored(t))
 		for _, id := range mail {
 			if up[id] || kept[id] || onDisk[id] {
 				t.Errorf("%s: clear all left mail %d: popped %v, in history %v, stored %v", behavior, id, up[id], kept[id], onDisk[id])

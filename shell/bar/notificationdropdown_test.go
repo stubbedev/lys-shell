@@ -244,7 +244,7 @@ func TestNotificationGroupHeaderClickTargets(t *testing.T) {
 
 // clearableDropdown is a laid-out notification dropdown over a stored
 // history of three mails and two chats, every one still popped up.
-func clearableDropdown(t *testing.T) (*notificationView, *notifications.Service, *notifications.Store) {
+func clearableDropdown(t *testing.T) (*notificationView, *notifications.Service, notifytest.Store) {
 	t.Helper()
 	svc := newNotifTestService(t)
 	st := notifytest.AttachStore(t, svc)
@@ -270,8 +270,8 @@ func TestNotificationDropdownClearAllClick(t *testing.T) {
 	v, svc, st := clearableDropdown(t)
 	title := treetest.WithClass(v.Children()[0], "title")[0]
 	routeClick(v, title)
-	if svc.Count() != 5 || len(notifytest.Stored(t, st)) != 5 || len(svc.Popups()) != 5 || len(v.groups) != 2 || !v.clearAll.Visible() {
-		t.Fatalf("a click beside clear all: count %d, stored %d, popups %d, groups %d", svc.Count(), len(notifytest.Stored(t, st)), len(svc.Popups()), len(v.groups))
+	if svc.Count() != 5 || len(st.Stored(t)) != 5 || len(svc.Popups()) != 5 || len(v.groups) != 2 || !v.clearAll.Visible() {
+		t.Fatalf("a click beside clear all: count %d, stored %d, popups %d, groups %d", svc.Count(), len(st.Stored(t)), len(svc.Popups()), len(v.groups))
 	}
 
 	routeClick(v, v.clearAll)
@@ -282,7 +282,7 @@ func TestNotificationDropdownClearAllClick(t *testing.T) {
 	if n := len(notifytest.History(t, svc)); n != 0 || svc.Count() != 0 {
 		t.Errorf("history after clear all = %d (count %d)", n, svc.Count())
 	}
-	if n := len(notifytest.Stored(t, st)); n != 0 {
+	if n := len(st.Stored(t)); n != 0 {
 		t.Errorf("store after clear all = %d", n)
 	}
 	if n := len(svc.Popups()); n != 0 {
@@ -307,7 +307,7 @@ func TestNotificationGroupClearRemovesOnlyItsApp(t *testing.T) {
 	}
 	for name, left := range map[string][]*notifications.Notification{
 		"history": notifytest.History(t, svc),
-		"store":   notifytest.Stored(t, st),
+		"store":   st.Stored(t),
 		"popups":  svc.Popups(),
 	} {
 		if len(left) != 2 || left[0].AppName != "chat" || left[1].AppName != "chat" {

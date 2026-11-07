@@ -6,13 +6,24 @@ package notifytest
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
+// settleTimeout bounds the wait for the service's queued store writes.
+const settleTimeout = 10 * time.Second
+
+// Store is a service's store as a test reads it back: through the
+// service, whose writes reach the disk after its calls return.
+type Store struct {
+	svc *notifications.Service
+	st  *notifications.Store
+}
+
 // AttachStore persists svc's history in a store on a temporary file,
 // closed when the test ends; call it before the first notification.
-func AttachStore(t *testing.T, svc *notifications.Service) *notifications.Store {
+func AttachStore(t *testing.T, svc *notifications.Service) Store {
 	t.Helper()
 	st, err := notifications.OpenStore(filepath.Join(t.TempDir(), "notifications.db"))
 	if err != nil {
@@ -22,23 +33,25 @@ func AttachStore(t *testing.T, svc *notifications.Service) *notifications.Store 
 	if err := svc.AttachStore(st); err != nil {
 		t.Fatal(err)
 	}
-	return st
+	return Store{svc: svc, st: st}
 }
 
-// History is the first page of svc's history, newest first.
-func History(t *testing.T, svc *notifications.Service) []*notifications.Notification {
+// Stored is the first page of what the store holds once every write the
+// service queued so far has landed, newest first.
+func (s Store) Stored(t *testing.T) []*notifications.Notification {
 	t.Helper()
-	got, err := svc.Page(nil, notifications.MaxPage)
+	s.svc.FlushWrites(settleTimeout)
+	got, err := s.st.Page(nil, notifications.MaxPage)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return got
 }
 
-// Stored is the first page of what st holds, newest first.
-func Stored(t *testing.T, st *notifications.Store) []*notifications.Notification {
+// History is the first page of svc's history, newest first.
+func History(t *testing.T, svc *notifications.Service) []*notifications.Notification {
 	t.Helper()
-	got, err := st.Page(nil, notifications.MaxPage)
+	got, err := svc.Page(nil, notifications.MaxPage)
 	if err != nil {
 		t.Fatal(err)
 	}
