@@ -2,8 +2,11 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -53,8 +56,10 @@ func (o requestObject) Close() *dbus.Error {
 
 // call is one method call's Request at its handle. ctx ends when the
 // app closes the request, and the shell is then asked to take down the
-// dialog the call shows; the call's Request lives until end.
+// dialog the call shows once the call reached it; the call's Request
+// lives until end.
 type call struct {
+	conn   *dbus.Conn
 	ctx    context.Context
 	caller portaldialogs.Caller
 	req    *request
@@ -63,6 +68,12 @@ type call struct {
 	// watching ends once the Close watcher returned, its dismissal
 	// (if any) sent.
 	watching sync.WaitGroup
+	// reached is set once a shell service the call shows a dialog
+	// through has an owner, so there may be a dialog to dismiss.
+	reached atomic.Bool
+	// missing is why a shell service did not appear: every later shell
+	// call fails at once, and the reply is other.
+	missing error
 }
 
 // begin mounts the Request for one call to the app's request at handle.
@@ -76,7 +87,7 @@ func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, 
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &call{
-		ctx: ctx, caller: portaldialogs.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow, Modal: true},
+		conn: conn, ctx: ctx, caller: portaldialogs.Caller{Handle: string(handle), AppID: appID, ParentWindow: parentWindow, Modal: true},
 		req: req, cancel: cancel, done: make(chan struct{}),
 	}
 	c.watching.Go(func() {
@@ -88,7 +99,7 @@ func begin(conn *dbus.Conn, handle dbus.ObjectPath, appID, parentWindow string, 
 			return
 		}
 		cancel()
-		if dismiss == nil {
+		if dismiss == nil || !c.reached.Load() {
 			return
 		}
 		dctx, dcancel := context.WithTimeout(context.Background(), shellCallTimeout)
@@ -106,6 +117,83 @@ func (c *call) modal(options Vardict) {
 	if modal, ok := optBool(options, "modal"); ok {
 		c.caller.Modal = modal
 	}
+}
+
+// shellAppearBound bounds the wait for the shell to own a service a call
+// shows its dialog through: the shell's RestartSec after a crash and its
+// start fit well within it.
+var shellAppearBound = 10 * time.Second
+
+// on is the context to call the shell's service with. A service without
+// an owner (the shell restarting, or not started) is waited for, and
+// activated where the bus can, for up to shellAppearBound; one that does
+// not appear, or the app closing the request meanwhile, is a cancelled
+// context, which fails the call without sending it.
+func (c *call) on(service string) context.Context {
+	if c.missing == nil {
+		err := c.awaitOwner(service)
+		if err == nil {
+			c.reached.Store(true)
+			return c.ctx
+		}
+		if !c.closed() {
+			warnf("%v", err)
+		}
+		c.missing = err
+	}
+	ctx, cancel := context.WithCancelCause(c.ctx)
+	cancel(c.missing)
+	return ctx
+}
+
+// awaitOwner returns once service has an owner, or with why it has none.
+func (c *call) awaitOwner(service string) error {
+	if _, err := dbusx.NameOwner(c.ctx, c.conn, service); err == nil {
+		return nil
+	}
+	appeared := make(chan struct{}, 1)
+	stop, err := dbusx.WatchOwner(c.ctx, c.conn, service, func() {
+		select {
+		case appeared <- struct{}{}:
+		default:
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("wait for %s: %w", service, err)
+	}
+	defer func() {
+		if err := stop(); err != nil {
+			warnf("%v", err)
+		}
+	}()
+	if _, err := dbusx.NameOwner(c.ctx, c.conn, service); err == nil {
+		return nil
+	}
+	activated := c.conn.BusObject().GoWithContext(c.ctx, "org.freedesktop.DBus.StartServiceByName", 0, nil, service, uint32(0)).Done
+	bound := time.NewTimer(shellAppearBound)
+	defer bound.Stop()
+	for {
+		select {
+		case <-appeared:
+			return nil
+		case call := <-activated:
+			activated = nil
+			if err := call.Err; err != nil && !isServiceUnknown(err) {
+				warnf("activating %s: %v", service, err)
+			}
+		case <-c.ctx.Done():
+			return fmt.Errorf("wait for %s: %w", service, c.ctx.Err())
+		case <-bound.C:
+			return fmt.Errorf("the shell does not own %s after %v", service, shellAppearBound)
+		}
+	}
+}
+
+// isServiceUnknown reports whether err is the bus saying it cannot
+// activate a name: nothing installs an activation file for it.
+func isServiceUnknown(err error) bool {
+	dbusErr, ok := errors.AsType[dbus.Error](err)
+	return ok && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown"
 }
 
 // closed reports whether the app closed the request.
@@ -149,11 +237,13 @@ func callOr(c *call, err error) (*call, bool) {
 
 // response maps a dialog's outcome onto a reply code: the app having
 // closed the request is a cancel whatever the shell answered; then a
-// failed dialog (no shell) is other, a no a cancel, a yes success.
+// failed dialog (no shell, or one that left) is other, a no a cancel, a yes success.
 func (c *call) response(what string, ok bool, err error) uint32 {
 	switch {
 	case c.closed():
 		return ResponseCancelled
+	case c.missing != nil:
+		return ResponseOther
 	case err != nil:
 		warnf("%s: dialog failed: %v", what, err)
 		return ResponseOther

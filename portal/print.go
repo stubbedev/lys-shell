@@ -43,7 +43,7 @@ func (p printPortal) PreparePrint(handle dbus.ObjectPath, appID, parent, title s
 	}
 	req.HasCurrentPage, _ = optBool(options, "has_current_page")
 	req.HasSelectedPages, _ = optBool(options, "has_selected_pages")
-	granted, chosen, setup, token, err := client.Prepare(c.ctx, c.caller, req)
+	granted, chosen, setup, token, err := client.Prepare(c.on(printdialog.ServiceName), c.caller, req)
 	if code := c.response("print prepare", granted, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
@@ -111,7 +111,7 @@ func (p printPortal) Print(handle dbus.ObjectPath, appID, parent, title string, 
 	defer c.end()
 	c.modal(options)
 	token, _ := optU32(options, "token")
-	sent, err := client.Print(c.ctx, c.caller, title, fd, token)
+	sent, err := client.Print(c.on(printdialog.ServiceName), c.caller, title, fd, token)
 	switch {
 	case c.closed():
 		return ResponseCancelled, Vardict{}, nil

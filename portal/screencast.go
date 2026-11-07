@@ -129,10 +129,12 @@ func (c *screenCast) clickWindow(call *call, cfg castState) ([]sharepicker.Targe
 			req.Screen = name
 		}
 	}
-	reply, err := sharepicker.NewClient(c.conn).PickWindow(call.ctx, call.caller, req)
+	reply, err := sharepicker.NewClient(c.conn).PickWindow(call.on(sharepicker.ServiceName), call.caller, req)
 	switch {
 	case call.closed():
 		return nil, ResponseCancelled, true
+	case call.missing != nil:
+		return nil, ResponseOther, true
 	case err != nil:
 		warnf("screencast: no click-to-pick, so the picker asks: %v", err)
 		return nil, 0, false
@@ -239,18 +241,21 @@ func (c *screenCast) config(s *session) castState {
 }
 
 // pick asks the share picker for sources of the session's types. The
-// code is cancelled for the user's cancel, a closed request, or no
-// shell, and other for a reply the picker should not have made: one
-// malformed, or naming a type not asked for.
+// code is cancelled for the user's cancel, a closed request, or a failed
+// picker call, and other for a shell that never appeared or a reply the
+// picker should not have made: one malformed, or naming a type not asked
+// for.
 func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []sharepicker.Target, code uint32) {
 	// No window list: the picker enumerates toplevels itself and
 	// replies identifiers the capture re-resolves.
-	reply, err := sharepicker.NewClient(c.conn).Pick(call.ctx, call.caller, sharepicker.Request{
+	reply, err := sharepicker.NewClient(c.conn).Pick(call.on(sharepicker.ServiceName), call.caller, sharepicker.Request{
 		Sources: pickerSources(cfg.types), AllowToken: cfg.persistMode > 0, Multiple: cfg.multiple,
 	})
 	switch {
 	case call.closed():
 		return false, nil, ResponseCancelled
+	case call.missing != nil:
+		return false, nil, ResponseOther
 	case err != nil:
 		warnf("screencast: picker call failed: %v", err)
 		return false, nil, ResponseCancelled

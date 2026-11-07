@@ -356,8 +356,8 @@ func TestScreenCastRepromptsAGoneRestoreTarget(t *testing.T) {
 func TestScreenCastCancels(t *testing.T) {
 	r, f := castRig(t)
 	r.castSession(t, Vardict{})
-	if code, _ := r.castStart(t); code != ResponseCancelled {
-		t.Errorf("no shell = %d, want cancelled", code)
+	if code, _ := r.castStart(t); code != ResponseOther {
+		t.Errorf("no shell = %d, want other once the shell did not appear", code)
 	}
 	serveSharePicker(t, r, "")
 	if code, _ := r.castStart(t); code != ResponseCancelled || len(f.started.Load()) != 0 {

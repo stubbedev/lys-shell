@@ -429,7 +429,7 @@ func (o globalShortcutsObject) BindShortcuts(handle, session dbus.ObjectPath, sh
 	}
 	defer c.end()
 	if len(fresh) > 0 {
-		allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+		allowed, _, err := dialogs.Access(c.on(portaldialogs.ServiceName), c.caller, portaldialogs.AccessRequest{
 			Title: "Allow global shortcuts?", Subtitle: "They work while the app is in the background.",
 			Body: consentBody(owner, fresh), GrantLabel: "Allow", DenyLabel: "Deny", Icon: shortcutsIcon,
 		})

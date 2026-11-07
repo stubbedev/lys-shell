@@ -77,7 +77,7 @@ func (f fileChooser) OpenFile(handle dbus.ObjectPath, appID, parent, title strin
 	c.modal(options)
 	multiple, _ := optBool(options, "multiple")
 	directory, _ := optBool(options, "directory")
-	res, err := client.Open(c.ctx, c.caller, filechooser.OpenRequest{
+	res, err := client.Open(c.on(filechooser.ServiceName), c.caller, filechooser.OpenRequest{
 		Title: title, Multiple: multiple, Directory: directory,
 		Filters: filters, CurrentFolder: currentFolder(options),
 		AcceptLabel: accept, CurrentFilter: current, Choices: choices,
@@ -105,7 +105,7 @@ func (f fileChooser) SaveFile(handle dbus.ObjectPath, appID, parent, title strin
 		file := cString(b)
 		folder, name = filepath.Dir(file), filepath.Base(file)
 	}
-	res, err := client.Save(c.ctx, c.caller, filechooser.SaveRequest{
+	res, err := client.Save(c.on(filechooser.ServiceName), c.caller, filechooser.SaveRequest{
 		Title: title, CurrentName: name, Filters: filters, CurrentFolder: folder,
 		AcceptLabel: accept, CurrentFilter: current, Choices: choices,
 	})
@@ -139,7 +139,7 @@ func (f fileChooser) SaveFiles(handle dbus.ObjectPath, appID, parent, title stri
 	}
 	defer c.end()
 	c.modal(options)
-	res, err := client.Open(c.ctx, c.caller, filechooser.OpenRequest{
+	res, err := client.Open(c.on(filechooser.ServiceName), c.caller, filechooser.OpenRequest{
 		Title: title, Directory: true, CurrentFolder: currentFolder(options), AcceptLabel: accept, Choices: choices,
 	})
 	if err != nil || len(res.URIs) == 0 {

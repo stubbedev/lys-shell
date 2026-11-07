@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=dev.stubbe.lys.Print1
+Exec=/usr/bin/lys-shell shell
+SystemdService=lys-shell.service

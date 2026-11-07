@@ -83,7 +83,7 @@ func (w wallpaperPortal) SetWallpaperURI(handle dbus.ObjectPath, appID, parent, 
 	}
 	defer c.end()
 	if preview, _ := optBool(options, "show-preview"); preview {
-		set, err := dialogs.ConfirmWallpaper(c.ctx, c.caller, uri)
+		set, err := dialogs.ConfirmWallpaper(c.on(portaldialogs.ServiceName), c.caller, uri)
 		if code := c.response("wallpaper preview", set, err); code != ResponseSuccess {
 			return code, nil
 		}
@@ -98,7 +98,7 @@ func (w wallpaperPortal) SetWallpaperURI(handle dbus.ObjectPath, appID, parent, 
 		return ResponseOther, nil
 	}
 	if target.desktop {
-		if err := wallpaper.NewClient(w.conn).SetWallpaper(c.ctx, kept, ""); err != nil {
+		if err := wallpaper.NewClient(w.conn).SetWallpaper(c.on(wallpaper.ServiceName), kept, ""); err != nil {
 			warnf("wallpaper: set_wallpaper failed: %v", err)
 			return ResponseOther, nil
 		}

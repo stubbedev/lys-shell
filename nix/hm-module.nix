@@ -7,6 +7,12 @@ self:
 }:
 let
   cfg = config.programs.lys-shell;
+  busActivated = [
+    "org.freedesktop.impl.portal.desktop.lys.service"
+  ]
+  ++ builtins.filter (
+    name: lib.hasPrefix "dev.stubbe.lys." name && lib.hasSuffix ".service" name
+  ) (builtins.attrNames (builtins.readDir ../resources));
   yamlFormat = pkgs.formats.yaml { };
 
   pkgIfPresent = name: lib.optional (builtins.hasAttr name pkgs) (builtins.getAttr name pkgs);
@@ -212,16 +218,17 @@ in
 
     # User-level xdg-desktop-portal backend: discovery (.portal), D-Bus
     # activation, routing, and the activated service. The frontend reads these
-    # from $XDG_DATA_HOME / $XDG_CONFIG_HOME. Per-key form so these merge with
-    # the `lys-shell/config.yaml` entry above.
-    xdg.dataFile."xdg-desktop-portal/portals/lys-shell.portal" = lib.mkIf cfg.portal.enable {
-      source = "${cfg.package}/share/xdg-desktop-portal/portals/lys-shell.portal";
-    };
-    xdg.dataFile."dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service" =
-      lib.mkIf cfg.portal.enable
-        {
-          source = "${cfg.package}/share/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service";
-        };
+    # from $XDG_DATA_HOME / $XDG_CONFIG_HOME.
+    xdg.dataFile = lib.mkIf cfg.portal.enable (
+      lib.genAttrs
+        (
+          [ "xdg-desktop-portal/portals/lys-shell.portal" ]
+          ++ map (name: "dbus-1/services/${name}") busActivated
+        )
+        (path: {
+          source = "${cfg.package}/share/${path}";
+        })
+    );
     # Generic fallback config (read when no <desktop>-portals.conf matches).
     xdg.configFile."xdg-desktop-portal/portals.conf" = lib.mkIf cfg.portal.enable {
       source = "${cfg.package}/share/lys-shell/lys-shell-portals.conf";

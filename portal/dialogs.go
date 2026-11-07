@@ -66,7 +66,7 @@ func (a accessMethods) AccessDialog(handle dbus.ObjectPath, appID, parent, title
 		warnf("access: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	granted, picked, err := client.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+	granted, picked, err := client.Access(c.on(portaldialogs.ServiceName), c.caller, portaldialogs.AccessRequest{
 		Title: title, Subtitle: subtitle, Body: body,
 		GrantLabel: stringOr(options, "grant_label", "Allow"),
 		DenyLabel:  stringOr(options, "deny_label", "Deny"),
@@ -101,7 +101,7 @@ func (a accountMethods) GetUserInformation(handle dbus.ObjectPath, appID, parent
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
-	shared, info, err := client.Account(c.ctx, c.caller, stringOr(options, "reason", ""), portaldialogs.AccountInfo{Name: acct.RealName, Image: acct.Avatar})
+	shared, info, err := client.Account(c.on(portaldialogs.ServiceName), c.caller, stringOr(options, "reason", ""), portaldialogs.AccountInfo{Name: acct.RealName, Image: acct.Avatar})
 	if code := c.response("account", shared, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
@@ -127,7 +127,7 @@ func (a appChooserMethods) ChooseApplication(handle dbus.ObjectPath, appID, pare
 	}
 	defer c.end()
 	c.modal(options)
-	choice, err := client.ChooseApplication(c.ctx, c.caller, portaldialogs.ChooserRequest{
+	choice, err := client.ChooseApplication(c.on(portaldialogs.ServiceName), c.caller, portaldialogs.ChooserRequest{
 		Choices:     choices,
 		LastChoice:  stringOr(options, "last_choice", ""),
 		ContentType: stringOr(options, "content_type", ""),
@@ -194,7 +194,7 @@ func (l launcherMethods) PrepareInstall(handle dbus.ObjectPath, appID, parent, n
 	}
 	defer c.end()
 	c.modal(options)
-	yes, chosen, err := client.ConfirmInstall(c.ctx, c.caller, req)
+	yes, chosen, err := client.ConfirmInstall(c.on(portaldialogs.ServiceName), c.caller, req)
 	if code := c.response("dynamiclauncher", yes, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}

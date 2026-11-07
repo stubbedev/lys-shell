@@ -388,7 +388,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		if sharing {
 			body = "It asks to control " + devicesPhrase(state.types) + " and to see your screen."
 		}
-		allowed, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+		allowed, _, err := dialogs.Access(c.on(portaldialogs.ServiceName), c.caller, portaldialogs.AccessRequest{
 			Title: "Allow remote control?", Body: body,
 			GrantLabel: "Allow", DenyLabel: "Deny", Icon: remoteDesktopIcon,
 		})

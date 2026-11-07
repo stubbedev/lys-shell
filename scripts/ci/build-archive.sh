@@ -31,6 +31,7 @@ cp resources/lys-shell.service \
 	resources/dev.stubbe.lys.vpn-sso-callback.desktop \
 	resources/lys-shell.portal \
 	resources/org.freedesktop.impl.portal.desktop.lys.service \
+	resources/dev.stubbe.lys.*.service \
 	resources/xdg-desktop-portal-lys-shell.service \
 	resources/lys-shell-portals.conf \
 	resources/geoclue-lys-shell.conf \

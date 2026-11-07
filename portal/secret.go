@@ -130,7 +130,7 @@ func (s secret) RetrieveSecret(handle dbus.ObjectPath, appID string, fd dbus.Uni
 		return ResponseOther, Vardict{}, nil
 	}
 	consent := func() (bool, error) {
-		granted, _, err := dialogs.Access(c.ctx, c.caller, portaldialogs.AccessRequest{
+		granted, _, err := dialogs.Access(c.on(portaldialogs.ServiceName), c.caller, portaldialogs.AccessRequest{
 			Title:      "Keep this app's key in Bitwarden?",
 			Subtitle:   appID,
 			Body:       "The key encrypts the passwords this app saves. In your Bitwarden vault it survives reinstalling and is the same on every computer you use the vault on. A copy stays in this computer's keyring either way.",

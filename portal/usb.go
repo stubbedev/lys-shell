@@ -53,7 +53,7 @@ func (u usb) AcquireDevices(handle dbus.ObjectPath, parent, appID string, device
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
-	allowed, picked, err := client.ChooseDevices(c.ctx, c.caller, asked)
+	allowed, picked, err := client.ChooseDevices(c.on(portaldialogs.ServiceName), c.caller, asked)
 	if code := c.response("usb", allowed, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}

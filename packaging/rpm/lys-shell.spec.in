@@ -53,6 +53,7 @@ install -m 0644 lys-shell.portal %{buildroot}%{_datadir}/xdg-desktop-portal/port
 install -m 0644 lys-shell-portals.conf %{buildroot}%{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
 install -d %{buildroot}%{_datadir}/dbus-1/services
 install -m 0644 org.freedesktop.impl.portal.desktop.lys.service %{buildroot}%{_datadir}/dbus-1/services/
+install -m 0644 dev.stubbe.lys.*.service %{buildroot}%{_datadir}/dbus-1/services/
 
 
 install -d %{buildroot}%{_sysconfdir}/geoclue/conf.d
@@ -88,6 +89,7 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
 %{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
 %{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service
+%{_datadir}/dbus-1/services/dev.stubbe.lys.*.service
 %{_datadir}/applications/dev.stubbe.lys.vpn-sso-callback.desktop
 %{_datadir}/icons/hicolor/scalable/actions/*.svg
 %{_datadir}/bash-completion/completions/lys-shell

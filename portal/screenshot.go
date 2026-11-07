@@ -139,7 +139,7 @@ func (s screenshotPortal) Screenshot(handle dbus.ObjectPath, appID, parent strin
 	defer c.end()
 	c.modal(options)
 	if ask {
-		allowed, selections, err := dialogs.Access(c.ctx, c.caller, screenshotChooser)
+		allowed, selections, err := dialogs.Access(c.on(portaldialogs.ServiceName), c.caller, screenshotChooser)
 		if code := c.response("screenshot chooser", allowed, err); code != ResponseSuccess {
 			return code, Vardict{}, nil
 		}
@@ -150,7 +150,7 @@ func (s screenshotPortal) Screenshot(handle dbus.ObjectPath, appID, parent strin
 	}
 	window := ""
 	if sh.target == targetPickedWindow {
-		reply, err := picker.Pick(c.ctx, c.caller, sharepicker.Request{Sources: sharepicker.SourceWindows})
+		reply, err := picker.Pick(c.on(sharepicker.ServiceName), c.caller, sharepicker.Request{Sources: sharepicker.SourceWindows})
 		if code := c.response("screenshot window picker", reply != "", err); code != ResponseSuccess {
 			return code, Vardict{}, nil
 		}
@@ -161,7 +161,7 @@ func (s screenshotPortal) Screenshot(handle dbus.ObjectPath, appID, parent strin
 		}
 		window = targets[0].Name
 	}
-	path, err := client.CapturePrivate(c.ctx, c.caller, screenshotMode(sh.target), window, sh.pointer)
+	path, err := client.CapturePrivate(c.on(screenshot.ServiceName), c.caller, screenshotMode(sh.target), window, sh.pointer)
 	if code := c.response("screenshot", path != "", err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}
@@ -178,7 +178,7 @@ func (s screenshotPortal) PickColor(handle dbus.ObjectPath, appID, parent string
 	}
 	defer c.end()
 	c.modal(options)
-	color, picked, err := client.PickColor(c.ctx, c.caller)
+	color, picked, err := client.PickColor(c.on(screenshot.ServiceName), c.caller)
 	if code := c.response("color pick", picked, err); code != ResponseSuccess {
 		return code, Vardict{}, nil
 	}

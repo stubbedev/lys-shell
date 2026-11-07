@@ -2,11 +2,19 @@ package portal
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/portaldialogs"
+
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/shell/filechooser"
+	"github.com/stubbedev/lys-shell/shell/printdialog"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
+	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
 const implPrefix = "org.freedesktop.impl.portal."
@@ -107,5 +115,49 @@ func TestVersionOnlyWhereTheSpecDefinesOne(t *testing.T) {
 		if want := slices.Contains(versioned, name); has != want {
 			t.Errorf("%s exports version: %v, want %v", name, has, want)
 		}
+	}
+}
+
+// shellServices are the shell's services the portal shows dialogs
+// through.
+var shellServices = []string{
+	filechooser.ServiceName, printdialog.ServiceName, sharepicker.ServiceName,
+	portaldialogs.ServiceName, screenshot.ServiceName, wallpaper.ServiceName,
+}
+
+// TestShellServicesAreActivatable pins one D-Bus activation file per
+// shell service, each starting the shell's unit, and every package
+// installing them all: a request arriving while the shell is down then
+// starts it.
+func TestShellServicesAreActivatable(t *testing.T) {
+	const glob = "dev.stubbe.lys.*.service"
+	files, err := filepath.Glob("../resources/" + glob)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range files {
+		names = append(names, strings.TrimSuffix(filepath.Base(f), ".service"))
+	}
+	if want := slices.Sorted(slices.Values(shellServices)); !slices.Equal(names, want) {
+		t.Errorf("activation files for %v, want %v", names, want)
+	}
+	for _, name := range shellServices {
+		want := "[D-BUS Service]\nName=" + name + "\nExec=/usr/bin/lys-shell shell\nSystemdService=lys-shell.service\n"
+		if got := readResource(t, name+".service"); got != want {
+			t.Errorf("%s.service =\n%s\nwant\n%s", name, got, want)
+		}
+	}
+	for _, installer := range []string{"../nix/lys-shell.nix", "../packaging/debian/rules", "../packaging/rpm/lys-shell.spec.in", "../scripts/ci/build-archive.sh"} {
+		b, err := os.ReadFile(installer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), glob) {
+			t.Errorf("%s does not install %s", installer, glob)
+		}
+	}
+	if spec := readResource(t, "../packaging/rpm/lys-shell.spec.in"); !strings.Contains(spec, "%{_datadir}/dbus-1/services/"+glob) {
+		t.Errorf("the rpm does not list %s among its files", glob)
 	}
 }

@@ -122,6 +122,10 @@ buildGo127Module {
     substitute resources/org.freedesktop.impl.portal.desktop.lys.service \
       $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service \
       --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
+    for activation in resources/dev.stubbe.lys.*.service; do
+      substitute "$activation" "$out/share/dbus-1/services/$(basename "$activation")" \
+        --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
+    done
     substitute resources/xdg-desktop-portal-lys-shell.service \
       $out/share/lys-shell/xdg-desktop-portal-lys-shell.service \
       --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
