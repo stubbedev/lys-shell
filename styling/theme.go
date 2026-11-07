@@ -50,7 +50,7 @@ func ThemeCSS(p config.Palette, general config.GeneralConfig, bar config.BarConf
 	barValues := bar.Rounding.BarCSSValues()
 	buttonValues := bar.ButtonRounding.BarElementCSSValues()
 	groupValues := bar.ButtonGroupRounding.BarElementCSSValues()
-	dropdownOpacity := float32(bar.DropdownOpacity) / 100
+	dropdownOpacity := float32(s.SurfaceOpacity(bar.DropdownOpacity)) / 100
 
 	var b strings.Builder
 	decl := func(name, value string) { b.WriteString("    " + name + ": " + value + ";\n") }
@@ -95,9 +95,10 @@ func ThemeCSS(p config.Palette, general config.GeneralConfig, bar config.BarConf
 }
 
 // NotificationCSS declares the popup cards' resting surface: the card
-// color, the palette's elevated surface, at popup-opacity.
-func NotificationCSS(p config.Palette, n config.NotificationConfig) string {
-	return ":root {\n    --notification-popup-surface: " + hexToRGBA(p.Elevated, float32(n.PopupOpacity)/100) + ";\n}"
+// color, the palette's elevated surface, at popup-opacity as the styling
+// lets surfaces show it.
+func NotificationCSS(p config.Palette, n config.NotificationConfig, s config.StylingConfig) string {
+	return ":root {\n    --notification-popup-surface: " + hexToRGBA(p.Elevated, float32(s.SurfaceOpacity(n.PopupOpacity))/100) + ";\n}"
 }
 
 // PaletteFromHex converts a resolved hex palette to the render-color
@@ -130,18 +131,11 @@ func PaletteFromHex(p config.Palette) (*Palette, error) {
 	return out, nil
 }
 
-// ConfigPalette is the render palette the styling config resolves to:
-// the active palette through its provider, a failing provider leaving
-// the configured palette (as Rust logs and falls back), an unparsable
-// one the compiled Default. Failures are returned for the caller to
-// log; the palette is always usable.
+// ConfigPalette is the render palette the styling config resolves to
+// (ShellPalette).
 func ConfigPalette(s config.StylingConfig) (*Palette, error) {
-	resolved, resolveErr := ResolvePalette(s.ActivePalette(), s)
-	p, err := PaletteFromHex(resolved)
-	if err != nil {
-		return Default(), err
-	}
-	return p, resolveErr
+	_, p, err := ShellPalette(s)
+	return p, err
 }
 
 // TokensCSS declares every palette token (--bg-overlay, --accent, ...)
@@ -175,5 +169,5 @@ func cssColor(c render.Color) string {
 // rules, the palette and config block for palette, the tokens resolved
 // from p, the same palette as render colors, and the type scale.
 func BundleCSS(cfg *config.Config, palette config.Palette, p *Palette) string {
-	return StaticCSS + "\n" + ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling) + "\n" + NotificationCSS(palette, cfg.Notification) + "\n" + TokensCSS(p) + "\n" + TypeScaleCSS()
+	return StaticCSS + "\n" + ThemeCSS(palette, cfg.General, cfg.Bar, cfg.Styling) + "\n" + NotificationCSS(palette, cfg.Notification, cfg.Styling) + "\n" + TokensCSS(p) + "\n" + TypeScaleCSS()
 }

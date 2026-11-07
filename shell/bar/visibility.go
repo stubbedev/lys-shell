@@ -7,6 +7,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
@@ -231,4 +232,16 @@ type outputSource interface {
 	Outputs() []*app.Output
 	WatchOutputIdentity(fn func(*app.Output)) (stop func())
 	WatchOutputs(added, removed func(*app.Output)) (stop func())
+}
+
+// restyler is a surface that takes a config's styling in place.
+type restyler interface{ Restyle(cfg *config.Config) }
+
+// restyle restyles every open surface that can be, in place.
+func (b *surfaceSet[L]) restyle(cfg *config.Config) {
+	for _, name := range b.order {
+		if r, ok := b.bars[name].layer.(restyler); ok {
+			r.Restyle(cfg)
+		}
+	}
 }

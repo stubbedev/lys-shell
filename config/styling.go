@@ -13,9 +13,15 @@ type StylingConfig struct {
 	// palette; `Light`/`Dark` force the mode (static palettes swap to their
 	// built-in light/dark variant when one exists).
 	Appearance Appearance `cfg:"appearance"`
-	// Ask apps for higher contrast: the `contrast` preference the
-	// desktop portal tells GTK, Qt and Chromium apps.
+	// High contrast: the shell's own surfaces switch to a high-contrast
+	// palette with solid borders and visible focus rings, turn opaque, and
+	// apps are asked for it through the desktop portal's `contrast`
+	// preference.
 	HighContrast bool `cfg:"high-contrast"`
+	// Reduce transparency: every shell surface is opaque and asks for no
+	// background blur, whatever its own opacity setting says. High contrast
+	// implies it.
+	ReduceTransparency bool `cfg:"reduce-transparency"`
 	// ColorExtractor is theme-provider, theming-monitor, and the
 	// matugen-/wallust-/pywal- keys.
 	ColorExtractor ColorExtractorConfig `cfg:",inline"`
@@ -28,6 +34,19 @@ type StylingConfig struct {
 	// Available is the discovered themes, populated at runtime from
 	// the built-ins and themes/ (never read from a config file).
 	Available []ThemeEntry `cfg:"-"`
+}
+
+// Translucent reports whether shell surfaces may be see-through:
+// neither reduce-transparency nor high-contrast is on.
+func (s StylingConfig) Translucent() bool { return !s.ReduceTransparency && !s.HighContrast }
+
+// SurfaceOpacity is a configured surface opacity as the shell shows it:
+// fully opaque while translucency is off, the setting otherwise.
+func (s StylingConfig) SurfaceOpacity(p Percentage) Percentage {
+	if !s.Translucent() {
+		return 100
+	}
+	return p
 }
 
 // DefaultsStyling returns the schema defaults.

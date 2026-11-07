@@ -9493,7 +9493,7 @@
         "high-contrast": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "Ask apps for higher contrast: the `contrast` preference the\ndesktop portal tells GTK, Qt and Chromium apps."
+          "description": "High contrast: the shell's own surfaces switch to a high-contrast\npalette with solid borders and visible focus rings, turn opaque, and\napps are asked for it through the desktop portal's `contrast`\npreference."
         },
         "matugen-contrast": {
           "$ref": "#/$defs/SignedNormalizedF64",
@@ -9555,6 +9555,11 @@
           "$ref": "#/$defs/NormalizedF64",
           "default": 0.05,
           "description": "Pywal saturation adjustment (0.0-1.0)."
+        },
+        "reduce-transparency": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Reduce transparency: every shell surface is opaque and asks for no\nbackground blur, whatever its own opacity setting says. High contrast\nimplies it."
         },
         "rounding": {
           "$ref": "#/$defs/RoundingLevel",
@@ -12643,6 +12648,7 @@
         "pywal-contrast": 3.0,
         "pywal-light": false,
         "pywal-saturation": 0.05,
+        "reduce-transparency": false,
         "rounding": "default",
         "scale": 1.0,
         "theme-provider": "lys-shell",

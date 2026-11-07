@@ -276,3 +276,12 @@ func TestActionsAreFlatTilesOnGlass(t *testing.T) {
 		}
 	}
 }
+
+func TestTheMenuAsksForNoBlurWithReducedTransparency(t *testing.T) {
+	h := newHarness(t)
+	h.cfg.Styling.ReduceTransparency = true
+	h.m.Show()
+	if h.opened[0].BackgroundBlur {
+		t.Error("reduce-transparency still asks for the blur")
+	}
+}

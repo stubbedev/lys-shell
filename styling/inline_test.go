@@ -45,7 +45,7 @@ func TestBarCSSDefaults(t *testing.T) {
 		"--bar-group-opacity: 100%; --bar-group-border-color: var(--border-accent); " +
 		"--bar-group-border-top: 0; --bar-group-border-bottom: 0; --bar-group-border-left: 0; " +
 		"--bar-group-border-right: 0; --bar-shadow: none; --bar-shadow-margin: 0; }"
-	if got := BarCSS(config.PlainBar(), config.ThemeProviderLysShell); got != want {
+	if got := BarCSS(config.PlainBar(), providerStyling(config.ThemeProviderLysShell)); got != want {
 		t.Errorf("BarCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 }
@@ -77,18 +77,18 @@ func TestBarCSSConfigured(t *testing.T) {
 		"--bar-group-border-top: 3; --bar-group-border-bottom: 3; --bar-group-border-left: 3; " +
 		"--bar-group-border-right: 3; --bar-shadow: 0 -1px 2px 1px rgba(0, 0, 0, 0.25); --bar-shadow-margin: 4; }"
 	// Under matugen the custom hexes fall back to the field defaults.
-	if got := BarCSS(bar, config.ThemeProviderMatugen); got != want {
+	if got := BarCSS(bar, providerStyling(config.ThemeProviderMatugen)); got != want {
 		t.Errorf("BarCSS =\n%s\nwant\n%s", got, want)
 	}
 	// Under lys-shell they are used as-is.
-	custom := BarCSS(bar, config.ThemeProviderLysShell)
+	custom := BarCSS(bar, providerStyling(config.ThemeProviderLysShell))
 	for _, part := range []string{"--bar-bg: #123456;", "--bar-group-bg: #abcdef;"} {
 		if !contains(custom, part) {
 			t.Errorf("lys-shell BarCSS lacks %q:\n%s", part, custom)
 		}
 	}
 	bar.ButtonGroupPadding = config.Size{Value: 5.5, Unit: config.SizePixels}
-	if got := BarCSS(bar, config.ThemeProviderLysShell); !contains(got, "--bar-group-padding-px: 6;") {
+	if got := BarCSS(bar, providerStyling(config.ThemeProviderLysShell)); !contains(got, "--bar-group-padding-px: 6;") {
 		t.Errorf("a pixel group padding is taken literally (rounded):\n%s", got)
 	}
 }
@@ -213,4 +213,10 @@ func TestContainerCSS(t *testing.T) {
 	if got := ContainerCSS(c, bar, config.ThemeProviderLysShell); !contains(got, "--bar-container-bg: #222222;") {
 		t.Errorf("lys-shell keeps the custom background:\n%s", got)
 	}
+}
+
+func providerStyling(p config.ThemeProvider) config.StylingConfig {
+	s := config.DefaultsStyling()
+	s.ColorExtractor.ThemeProvider = p
+	return s
 }

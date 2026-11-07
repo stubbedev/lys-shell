@@ -169,7 +169,11 @@ enum-rounding-level-full = Complet
 settings-styling-appearance = Apparence
     .description = Mode clair ou sombre. Auto suit la palette ou le fournisseur ; Clair et Sombre l'imposent
 settings-styling-high-contrast = Contraste élevé
-    .description = Demander aux applications un contraste plus élevé via le portail du bureau
+    .description = Une palette à contraste élevé, des bordures pleines et des surfaces opaques pour le shell, et un contraste plus élevé demandé aux applications via le portail du bureau
+
+settings-styling-reduce-transparency = Réduire la transparence
+    .description = Rendre opaques toutes les surfaces du shell, sans flou d'arrière-plan
+
 enum-appearance-auto = Auto
 enum-appearance-light = Clair
 enum-appearance-dark = Sombre

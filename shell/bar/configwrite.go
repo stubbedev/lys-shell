@@ -97,17 +97,25 @@ func (c ModuleContext) setConfig(path string, value any) {
 // barsAffected reports whether a reload changes anything the bars
 // render. The recorder's capture settings, which its dropdown writes,
 // only shape the next recording: rebuilding the bars for them would
-// close the dropdown being edited.
+// close the dropdown being edited. High contrast and reduce transparency
+// restyle the open bars instead (accessibilityChanged).
 func barsAffected(old, next *config.Config) bool {
 	if old == nil || next == nil {
 		return true
 	}
 	a, b := *old, *next
 	for _, c := range []*config.Config{&a, &b} {
+		c.Styling.HighContrast, c.Styling.ReduceTransparency = false, false
 		r := &c.Recorder
 		r.Microphone, r.MicrophoneDevice, r.SystemAudio = false, "", false
 		r.WebcamEnabled, r.WebcamDevice = false, ""
 		r.WebcamX, r.WebcamY = 0, 0
 	}
 	return !reflect.DeepEqual(a, b)
+}
+
+// accessibilityChanged reports a change of high contrast or reduce
+// transparency, which restyles the open bars without rebuilding them.
+func accessibilityChanged(old, next *config.Config) bool {
+	return old.Styling.HighContrast != next.Styling.HighContrast || old.Styling.ReduceTransparency != next.Styling.ReduceTransparency
 }

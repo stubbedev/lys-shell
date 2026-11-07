@@ -140,8 +140,10 @@ func borderSides(location config.BorderLocation, width int) (top, bottom, left, 
 // BarCSS is the bar's variable block (crates/lys-shell/src/shell/bar/
 // styling.rs build_css): scale, colors, borders, the pixel-rounded
 // spacing, the button opacity and weight, the group chrome, and the
-// shadow.
-func BarCSS(bar config.BarConfig, provider config.ThemeProvider) string {
+// shadow. The background opacity is the one the styling lets surfaces
+// show.
+func BarCSS(bar config.BarConfig, s config.StylingConfig) string {
+	provider := s.ColorExtractor.ThemeProvider
 	defaults := config.Defaults().Bar
 	scale := float32(bar.Scale)
 	top, bottom, left, right := borderSides(bar.BorderLocation, int(bar.BorderWidth))
@@ -160,7 +162,7 @@ func BarCSS(bar config.BarConfig, provider config.ThemeProvider) string {
 	b.WriteString(".bar { ")
 	decl("--bar-scale", formatF32(scale))
 	decl("--bar-bg", ResolveColorCSS(bar.BG, defaults.BG, provider))
-	decl("--bar-opacity", itoa(int(bar.BackgroundOpacity))+"%")
+	decl("--bar-opacity", itoa(int(s.SurfaceOpacity(bar.BackgroundOpacity)))+"%")
 	decl("--bar-border-color", ResolveColorCSS(bar.BorderColor, defaults.BorderColor, provider))
 	decl("--bar-border-top", itoa(top))
 	decl("--bar-border-bottom", itoa(bottom))

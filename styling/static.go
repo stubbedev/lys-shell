@@ -73,6 +73,7 @@ var sheetOrder = []string{
 	"modules/region_overlay.css",
 	"modules/share_picker.css",
 	"modules/weather_dropdown/index.css",
+	"base/contrast.css",
 }
 
 // StaticCSS is the built-in stylesheet: every file in sheetOrder,

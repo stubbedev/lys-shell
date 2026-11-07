@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -230,4 +231,32 @@ func TestAChangedBundleInstallsWithNoParseOnTheLoop(t *testing.T) {
 	if installs != 1 || theme.loaded != b.css {
 		t.Errorf("%d installs, want the changed bundle installed once", installs)
 	}
+}
+
+func TestHighContrastReachesTheWidgetThemeAndTheBundle(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := config.Defaults()
+	cfg.Styling.HighContrast = true
+	th := New(cfg)
+	t.Cleanup(func() { widget.SetMediaContrast(false) })
+	if p := th.RenderPalette(); !p.HighContrast || *p != *mustHighContrast(t) {
+		t.Errorf("render palette %+v, want the dark high-contrast palette", p)
+	}
+	wt := widget.Current()
+	if wt.Text != render.RGB(0xff, 0xff, 0xff) || wt.Bg != render.RGB(0, 0, 0) {
+		t.Errorf("widget theme text %v on %v, want white on black", wt.Text, wt.Bg)
+	}
+	if !strings.Contains(th.Bundle(), "--fg-muted: #ffffff;") {
+		t.Error("the bundle's muted text is not the high-contrast text color")
+	}
+}
+
+func mustHighContrast(t *testing.T) *styling.Palette {
+	t.Helper()
+	p, err := styling.PaletteFromHex(styling.HighContrastPalette(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.HighContrast = true
+	return p
 }

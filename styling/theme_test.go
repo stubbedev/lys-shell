@@ -249,7 +249,7 @@ func TestNotificationCSSTintsTheCardColor(t *testing.T) {
 	if got := paint(40); got[3] < 0x60 || got[3] > 0x6a {
 		t.Errorf("popup-opacity 40 paints alpha %#02x, want about 40%%", got[3])
 	}
-	if !strings.Contains(NotificationCSS(palette, config.NotificationConfig{PopupOpacity: 40}), ", 0.40);") {
-		t.Errorf("NotificationCSS at 40 = %q", NotificationCSS(palette, config.NotificationConfig{PopupOpacity: 40}))
+	if !strings.Contains(NotificationCSS(palette, config.NotificationConfig{PopupOpacity: 40}, config.DefaultsStyling()), ", 0.40);") {
+		t.Errorf("NotificationCSS at 40 = %q", NotificationCSS(palette, config.NotificationConfig{PopupOpacity: 40}, config.DefaultsStyling()))
 	}
 }

@@ -189,3 +189,62 @@ func TestBarSetFollowsHotplug(t *testing.T) {
 		t.Fatalf("rename: order %v layers %d", set.order, len(layers))
 	}
 }
+
+type restylingLayer struct {
+	fakeLayer
+	restyled []*config.Config
+}
+
+func (r *restylingLayer) Restyle(cfg *config.Config) { r.restyled = append(r.restyled, cfg) }
+
+// High contrast and reduce transparency restyle the open bars in place:
+// no layer opens, closes or rebuilds its modules.
+func TestAccessibilityTogglesRestyleTheBarsInPlace(t *testing.T) {
+	var layers []*restylingLayer
+	set := newSurfaceSet(func(*app.Output, config.BarLayout) (surfaceLayer[config.BarLayout], error) {
+		l := &restylingLayer{}
+		layers = append(layers, l)
+		return l, nil
+	})
+	set.plug(&app.Output{Name: "DP-1"}, clockLayout, true)
+	set.plug(&app.Output{Name: "DP-2"}, clockLayout, true)
+	base := config.Defaults()
+	for _, toggle := range []func(*config.Config){
+		func(c *config.Config) { c.Styling.ReduceTransparency = true },
+		func(c *config.Config) { c.Styling.HighContrast = true },
+	} {
+		next := config.Defaults()
+		toggle(next)
+		if barsAffected(base, next) || !accessibilityChanged(base, next) {
+			t.Fatalf("the toggle rebuilds the bars (%t) or goes unnoticed (%t)", barsAffected(base, next), !accessibilityChanged(base, next))
+		}
+		set.restyle(next)
+	}
+	if len(layers) != 2 {
+		t.Fatalf("%d layers opened, want the two bars", len(layers))
+	}
+	for i, l := range layers {
+		if len(l.rebuilt) != 0 || l.closed || len(l.restyled) != 2 {
+			t.Errorf("bar %d: %d rebuilds, closed %t, %d restyles; want 2 restyles alone", i, len(l.rebuilt), l.closed, len(l.restyled))
+		}
+	}
+	if accessibilityChanged(base, config.Defaults()) {
+		t.Error("an unrelated reload counts as an accessibility change")
+	}
+}
+
+func TestBarBlurFollowsTheSurfaceOpacity(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bar.BackgroundOpacity = 60
+	if !barBlur(cfg) {
+		t.Fatal("a translucent bar asks for no blur")
+	}
+	cfg.Styling.ReduceTransparency = true
+	if barBlur(cfg) {
+		t.Error("reduce-transparency still asks for blur")
+	}
+	cfg.Styling.ReduceTransparency, cfg.Styling.HighContrast = false, true
+	if barBlur(cfg) {
+		t.Error("high contrast still asks for blur")
+	}
+}

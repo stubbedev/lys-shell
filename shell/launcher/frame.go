@@ -82,9 +82,10 @@ func (f *panelFrame) retarget() {
 	f.motion.resize(f.target(f.root.bounds()))
 }
 
-// panelLayer is every session's layer surface over root; a press outside
+// panelLayer is every session's layer surface over root, blurring behind
+// it while translucent surfaces are allowed; a press outside
 // the panel runs outside.
-func panelLayer(output *app.Output, f *panelFrame, keys func(app.Accel) bool, outside, closed func()) app.LayerConfig {
+func panelLayer(translucent bool, output *app.Output, f *panelFrame, keys func(app.Accel) bool, outside, closed func()) app.LayerConfig {
 	return app.LayerConfig{
 		Layer:          app.LayerOverlay,
 		Anchor:         app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
@@ -94,7 +95,7 @@ func panelLayer(output *app.Output, f *panelFrame, keys func(app.Accel) bool, ou
 		Root:           f.root,
 		Output:         output,
 		OwnMotion:      true,
-		BackgroundBlur: true,
+		BackgroundBlur: translucent,
 		KeyCapture:     keys,
 		OnPress: func(_ uint32, over widget.Widget) {
 			if over == widget.Widget(f.root) {

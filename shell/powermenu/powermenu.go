@@ -120,7 +120,7 @@ func (m *Menu) Show() {
 		Keyboard:       app.KeyboardExclusive,
 		Namespace:      "lys-shell-power-menu",
 		Root:           root,
-		BackgroundBlur: true,
+		BackgroundBlur: cfg.Styling.Translucent(),
 		KeyCapture: func(a app.Accel) bool {
 			switch a.Sym { // whatever modifiers are held
 			case escape.Sym:

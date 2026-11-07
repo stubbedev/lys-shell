@@ -204,7 +204,7 @@ func (o *Osd) place() bool {
 		Keyboard:       app.KeyboardNone,
 		Namespace:      "lys-shell-osd",
 		Root:           f.rev,
-		BackgroundBlur: true,
+		BackgroundBlur: o.cfg.Styling.Translucent(),
 	})
 	if err != nil {
 		log.Printf("osd: cannot map on %s: %v", output.Name, err)

@@ -12,7 +12,10 @@ settings-styling-appearance = Appearance
     .description = Light/dark mode. Auto follows the palette/provider; Light/Dark force it
 
 settings-styling-high-contrast = High Contrast
-    .description = Ask apps for higher contrast through the desktop portal
+    .description = A high-contrast palette, solid borders and opaque surfaces for the shell, and higher contrast asked of apps through the desktop portal
+
+settings-styling-reduce-transparency = Reduce Transparency
+    .description = Make every shell surface opaque, without background blur
 
 settings-styling-theme-provider = Theme Provider
     .description = Source for color palette (lys-shell, wallpaper, matugen, pywal, wallust)

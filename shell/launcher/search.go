@@ -76,7 +76,7 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, preview: newPreviewLoader(s.d, engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher)))}
 	s.panel = p
 	p.v = s.panelViewsFor(p, cfg)
-	win, err := s.d.Open(panelLayer(s.outputFor(cfg.Launcher.Monitor), p.v.panelFrame, p.keyCaptured,
+	win, err := s.d.Open(panelLayer(cfg.Styling.Translucent(), s.outputFor(cfg.Launcher.Monitor), p.v.panelFrame, p.keyCaptured,
 		func() { p.finish(search.Cancel{}) },
 		func() {
 			if s.panel == p {

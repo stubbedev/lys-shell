@@ -663,9 +663,14 @@ func (s *shellStart) mount() {
 				restyle(next)
 			} else {
 				// The open bars stay; dropdowns opened from now on
-				// read the new snapshot.
+				// read the new snapshot, and a change of high contrast
+				// or transparency restyles the bars in place.
 				rt.ctx.Config = next
 				rt.ctx.Dropdowns.setConfig(next)
+				if accessibilityChanged(old, next) {
+					rt.rederive(next)
+					bars.restyle(next)
+				}
 			}
 			osdSrv.SetConfig(next)
 			s.backlights.SetExternal(next.Brightness.EnableExternal)
@@ -834,7 +839,7 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) *wi
 func fillBar(bar *widget.Bar, ctx ModuleContext, layout config.BarLayout) {
 	cfg := ctx.Config
 	bar.SetClass("floating", floating(cfg))
-	bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
+	bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling)))
 	for _, z := range []struct {
 		box   *widget.Box
 		items []config.BarItem
@@ -958,7 +963,7 @@ func (h *barHost) open(output *app.Output, layout config.BarLayout) (surfaceLaye
 		ctx.gen.retire()
 		return nil, err
 	}
-	window.SetBackgroundBlur(ctx.Config.Bar.BackgroundOpacity < 100)
+	window.SetBackgroundBlur(barBlur(ctx.Config))
 	w := &barWindow{host: h, output: output, layer: window, bar: bc.Bar, gen: ctx.gen, layerKind: bc.Layer}
 	w.attach(ctx)
 	if h.holder != nil {
@@ -1005,7 +1010,7 @@ func (w *barWindow) Rebuild(layout config.BarLayout) error {
 			return fmt.Errorf("move to %s: %w", cfg.Bar.Location, err)
 		}
 	}
-	w.layer.SetBackgroundBlur(cfg.Bar.BackgroundOpacity < 100)
+	w.layer.SetBackgroundBlur(barBlur(cfg))
 	if err := w.layer.SetExclusive(cfg.Bar.Exclusive); err != nil {
 		return fmt.Errorf("set exclusive %v: %w", cfg.Bar.Exclusive, err)
 	}
@@ -1044,4 +1049,25 @@ func startTrayHost(session *dbus.Conn, store *sni.Store) (*sni.Host, error) {
 		return nil, errors.New("no session bus")
 	}
 	return sni.NewHostOn(session, store)
+}
+
+// barBlur reports whether a bar asks the compositor to blur behind it:
+// its background shows through, as the styling lets it.
+func barBlur(cfg *config.Config) bool {
+	return cfg.Styling.SurfaceOpacity(cfg.Bar.BackgroundOpacity) < 100
+}
+
+// rederive takes the theme's new palette into the style the modules
+// read, keeping the mounted modules.
+func (r *barRuntime) rederive(cfg *config.Config) {
+	*r.palette = *r.theme.RenderPalette()
+	r.style = computeStyle(cfg, r.palette)
+	r.moduleStyle = r.style.forModules()
+}
+
+// Restyle gives the open bar cfg's variables and blur in place: its
+// modules stay, the stylesheet restyles them on the next frame.
+func (w *barWindow) Restyle(cfg *config.Config) {
+	w.bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling)))
+	w.layer.SetBackgroundBlur(barBlur(cfg))
 }

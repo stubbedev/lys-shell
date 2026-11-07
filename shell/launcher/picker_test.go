@@ -219,3 +219,17 @@ func TestPickerWithoutTheWallpaperServiceCancels(t *testing.T) {
 		t.Errorf("no wallpaper service: %+v, picker %v, %d windows", f, h.s.picker, len(h.windows))
 	}
 }
+
+func TestLauncherSurfacesAskForBlurOnlyWhileTranslucent(t *testing.T) {
+	h := newPickerHarness(t, "/w/a.png")
+	h.openPicker()
+	if !h.windows[0].cfg.BackgroundBlur {
+		t.Fatal("a translucent launcher asks for no blur")
+	}
+	h.press("Escape")
+	h.cfg.Styling.ReduceTransparency = true
+	h.openPicker()
+	if h.windows[1].cfg.BackgroundBlur {
+		t.Error("reduce-transparency still asks for blur")
+	}
+}

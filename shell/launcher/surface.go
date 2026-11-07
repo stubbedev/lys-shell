@@ -833,7 +833,7 @@ func (s *Surface) outputFor(name string) *app.Output {
 // reveal maps the surface, focuses the entry and plays the panel's enter.
 func (s *Surface) reveal(a *active) {
 	cfg := s.d.Config()
-	win, err := s.d.Open(panelLayer(s.outputFor(cfg.Launcher.Monitor), a.views.panelFrame, s.keyCaptured,
+	win, err := s.d.Open(panelLayer(cfg.Styling.Translucent(), s.outputFor(cfg.Launcher.Monitor), a.views.panelFrame, s.keyCaptured,
 		func() { s.onKey(keyBinding{action: keyCancel}) },
 		func() {
 			// The compositor took the surface away (output gone).

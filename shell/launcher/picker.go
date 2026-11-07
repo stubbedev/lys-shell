@@ -114,7 +114,7 @@ func (s *Surface) openPicker(sess *launcheripc.Session) {
 	p.build(cfg)
 	p.thumbs = newThumbQueue(pickerColumns*(pickerLines+1), p.walls.LoadThumbnail, s.spawn, s.d.Invoke)
 	s.picker = p
-	win, err := s.d.Open(panelLayer(s.outputFor(monitor), p.frame, p.keyCaptured, func() { p.finish(false, "") }, func() {
+	win, err := s.d.Open(panelLayer(cfg.Styling.Translucent(), s.outputFor(monitor), p.frame, p.keyCaptured, func() { p.finish(false, "") }, func() {
 		if s.picker == p {
 			p.win = nil
 			p.finish(false, "")

@@ -27,6 +27,9 @@ type Palette struct {
 	Primary               render.Color
 	Red, Yellow           render.Color
 	Green, Blue           render.Color
+	// HighContrast derives the tokens for high contrast: muted and subtle
+	// text and every border are the text color itself.
+	HighContrast bool
 }
 
 // Default is the built-in catppuccin-mocha palette, the set the shell
@@ -74,6 +77,12 @@ func ColorMix(a, b render.Color, pct int) render.Color {
 // table, one entry per token; a token without a mix is a palette color
 // passed through. It is the only definition of the tokens.
 func (p *Palette) Token(t config.CssToken) (render.Color, bool) {
+	if p.HighContrast {
+		switch t {
+		case config.TokenFgMuted, config.TokenFgSubtle, config.TokenBorderSubtle, config.TokenBorderDefault, config.TokenBorderStrong:
+			return p.Fg, true
+		}
+	}
 	switch t {
 	case config.TokenBgBase:
 		return p.Bg, true

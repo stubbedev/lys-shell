@@ -738,7 +738,7 @@ func (p *Popups) ensureWindow(out *app.Output) (window, *widget.Box, error) {
 		Namespace:      "lys-shell-notification-popup",
 		Keyboard:       app.KeyboardOnDemand,
 		Root:           p.host,
-		BackgroundBlur: true,
+		BackgroundBlur: p.cfg.Styling.Translucent(),
 	})
 	return win, p.list, err
 }

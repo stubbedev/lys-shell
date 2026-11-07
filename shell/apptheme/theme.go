@@ -41,9 +41,10 @@ const ComponentPriority = widget.StylePriorityUser + 200
 // programmatic styling), plus the resolved palette the Go-painted
 // surfaces read.
 type Theme struct {
-	cfg     *config.Config
-	Sheet   *widget.Stylesheet
-	palette config.Palette
+	cfg      *config.Config
+	Sheet    *widget.Stylesheet
+	palette  config.Palette
+	rendered *styling.Palette
 	// scope keeps Sheet attached from the first reload on: lys-ui
 	// installs a stylesheet loaded with no attachment process-wide, so
 	// a reload before any root took the bundle, or after every root
@@ -75,9 +76,10 @@ var parseStylesheet = widget.ParseStylesheet
 
 // CompiledBundle is a bundle compiled off the loop, for Apply on it.
 type CompiledBundle struct {
-	css     string
-	parsed  *widget.ParsedStylesheet
-	palette config.Palette
+	css      string
+	parsed   *widget.ParsedStylesheet
+	palette  config.Palette
+	rendered *styling.Palette
 }
 
 // New resolves the palette, compiles the bundle and installs lys-ui's
@@ -94,9 +96,12 @@ func New(cfg *config.Config) *Theme {
 	return t
 }
 
-// installWidgetTheme gives lys-ui's widgets the resolved palette.
+// installWidgetTheme gives lys-ui's widgets the resolved palette, and
+// the stylesheet's prefers-contrast media feature the high-contrast
+// setting.
 func (t *Theme) installWidgetTheme() {
 	InstallWidgetTheme(t.RenderPalette(), t.cfg)
+	widget.SetMediaContrast(t.cfg.Styling.HighContrast)
 }
 
 // Bundle builds init_css_provider's CSS (bootstrap.rs): static, theme,
@@ -105,14 +110,14 @@ func (t *Theme) installWidgetTheme() {
 // resolving the palette on the way.
 func (t *Theme) Bundle() string {
 	b := Compile(t.cfg)
-	t.palette = b.palette
+	t.palette, t.rendered = b.palette, b.rendered
 	return b.css
 }
 
 // Compile reads the provider palette and the user's stylesheet and builds the
 // bundle: file reads and string work, safe off the loop.
 func Compile(cfg *config.Config) CompiledBundle {
-	palette, err := styling.ResolvePalette(cfg.Styling.ActivePalette(), cfg.Styling)
+	palette, rendered, err := styling.ShellPalette(cfg.Styling)
 	if err != nil {
 		log.Printf("styling: %v", err)
 	}
@@ -122,19 +127,14 @@ func Compile(cfg *config.Config) CompiledBundle {
 	} else {
 		log.Printf("styling: cannot resolve config dir; user styles disabled: %v", err)
 	}
-	rendered, err := styling.PaletteFromHex(palette)
-	if err != nil {
-		log.Printf("styling: palette: %v", err)
-		rendered = styling.Default()
-	}
 	bundle := styling.BundleCSS(cfg, palette, rendered) + "\n" + cfg.Animations.CSSOverrides() + "\n" + user
-	return CompiledBundle{css: bundle, parsed: parseStylesheet(bundle), palette: palette}
+	return CompiledBundle{css: bundle, parsed: parseStylesheet(bundle), palette: palette, rendered: rendered}
 }
 
 // Apply takes a compiled bundle on the loop. A bundle equal to the loaded one
 // touches nothing: no parse, no restyle of any root.
 func (t *Theme) Apply(b CompiledBundle) {
-	t.palette = b.palette
+	t.palette, t.rendered = b.palette, b.rendered
 	if b.css == t.loaded {
 		return
 	}
@@ -168,14 +168,7 @@ func (t *Theme) Precompile(cfg *config.Config) {
 
 // RenderPalette is the resolved palette as render colors, for the
 // surfaces the stylesheet does not reach (OSD, popups, dropdowns).
-func (t *Theme) RenderPalette() *styling.Palette {
-	p, err := styling.PaletteFromHex(t.palette)
-	if err != nil {
-		log.Printf("styling: palette: %v", err)
-		return styling.Default()
-	}
-	return p
-}
+func (t *Theme) RenderPalette() *styling.Palette { return t.rendered }
 
 // FollowDesktopFontSize makes 1rem what it is in a GTK app on this
 // desktop - the desktop font's size, GTK's "Sans 10" without one - now
