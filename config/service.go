@@ -32,6 +32,8 @@ type Service struct {
 	nextSub      int
 	session      sessionMotion
 	motionWarned *bool
+	encoded      any
+	encodedFor   *Config
 
 	secretsMu   sync.Mutex
 	secretsSubs map[int]func()
@@ -265,7 +267,12 @@ func (s *Service) Value() any {
 // GetByPath returns the effective value at a dot path, as the config
 // serializes (canonical keys; f32 values widened to f64).
 func (s *Service) GetByPath(path string) (any, error) {
-	v := widenFloats(encode(s.Config()))
+	s.mu.Lock()
+	if s.encodedFor != s.cfg {
+		s.encoded, s.encodedFor = widenFloats(encode(s.cfg)), s.cfg
+	}
+	v := s.encoded
+	s.mu.Unlock()
 	for seg := range strings.SplitSeq(path, ".") {
 		next, ok := lookup(v, seg)
 		if !ok {
@@ -273,7 +280,7 @@ func (s *Service) GetByPath(path string) (any, error) {
 		}
 		v = next
 	}
-	return v, nil
+	return widenFloats(v), nil
 }
 
 // SetByPath sets a runtime override at a dot path. A value the field

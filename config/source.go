@@ -2,6 +2,7 @@ package config
 
 import (
 	"strings"
+	"sync"
 )
 
 // ValueSource is the layer a field's effective value comes from: the
@@ -89,10 +90,13 @@ func (s *Service) RuntimeValue(path string) (any, bool) {
 	return stagedValue(s.staged, canonical)
 }
 
+// encodedDefaults is the defaults encoded once: they never change.
+var encodedDefaults = sync.OnceValue(func() any { return widenFloats(encode(Defaults())) })
+
 // DefaultValue is the built-in default at a dot path, encoded as the
-// config serializes it.
+// config serializes it, a copy the caller owns.
 func DefaultValue(path string) (any, error) {
-	v := widenFloats(encode(Defaults()))
+	v := encodedDefaults()
 	for seg := range strings.SplitSeq(path, ".") {
 		next, ok := lookup(v, seg)
 		if !ok {
@@ -100,7 +104,7 @@ func DefaultValue(path string) (any, error) {
 		}
 		v = next
 	}
-	return v, nil
+	return widenFloats(v), nil
 }
 
 // stagedValue is the leaf staged at a canonical path, plain.

@@ -379,3 +379,48 @@ func TestMissingRuntimeYAMLIsNoOverrides(t *testing.T) {
 		_ = os.Remove(runtime)
 	}
 }
+
+func TestAReadByPathWalksTheConfigEncodedOnceAndHandsOutACopy(t *testing.T) {
+	svc := Load(t.TempDir(), DiscardDiagnostics)
+	defer svc.Close()
+	whole := testing.AllocsPerRun(5, func() { widenFloats(encode(svc.Config())) })
+	if _, err := svc.GetByPath("bar.location"); err != nil {
+		t.Fatal(err)
+	}
+	if leaf := testing.AllocsPerRun(50, func() { _, _ = svc.GetByPath("bar.location") }); leaf*100 > whole {
+		t.Fatalf("a leaf read allocates %v, near the %v of encoding the whole config", leaf, whole)
+	}
+	bar, err := svc.GetByPath("bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bar.(*table).set("location", "mutated")
+	if v, _ := svc.GetByPath("bar.location"); v == "mutated" {
+		t.Fatal("a caller's change to a read reached the service")
+	}
+	if err := svc.SetByPath("bar.location", "bottom"); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := svc.GetByPath("bar.location"); v != "bottom" {
+		t.Fatalf("a read after a change shows %v", v)
+	}
+}
+
+func TestADefaultByPathWalksTheDefaultsEncodedOnceAndHandsOutACopy(t *testing.T) {
+	whole := testing.AllocsPerRun(5, func() { widenFloats(encode(Defaults())) })
+	if _, err := DefaultValue("bar.location"); err != nil {
+		t.Fatal(err)
+	}
+	if leaf := testing.AllocsPerRun(50, func() { _, _ = DefaultValue("bar.location") }); leaf*100 > whole {
+		t.Fatalf("a default read allocates %v, near the %v of encoding the defaults", leaf, whole)
+	}
+	bar, err := DefaultValue("bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := DefaultValue("bar.location")
+	bar.(*table).set("location", "mutated")
+	if v, _ := DefaultValue("bar.location"); v != want {
+		t.Fatalf("a caller's change to a default reached the defaults: %v", v)
+	}
+}
