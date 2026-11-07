@@ -96,7 +96,7 @@ func (v *bitwardenView) buildSends() widget.Widget {
 	v.sendForm.Add(widget.NewField(v.font, i18n.T("dropdown-bitwarden-send-password"), v.sendPw.entry), nil)
 	v.sendForm.OnSubmit = v.createSend
 	page.Append(v.sendForm, false)
-	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-back"), func() { v.setSending(false) }, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-send-create"), v.sendForm.Submit, css.SuggestedAction)), false)
+	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-back"), i18n.T("dropdown-bitwarden-back-vault-tooltip"), func() { v.setSending(false) }, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-send-create"), i18n.T("dropdown-bitwarden-send-create-tooltip"), v.sendForm.Submit, css.SuggestedAction)), false)
 	v.sendStatus = v.caption(css.DimLabel)
 	page.Append(v.sendStatus, false)
 	card, list := itemCard()

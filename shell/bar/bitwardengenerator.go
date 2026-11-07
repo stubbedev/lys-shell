@@ -72,7 +72,7 @@ func (v *bitwardenView) buildGenerator() widget.Widget {
 	page.Append(v.genSt, true)
 	v.genStatus = v.caption(css.DimLabel)
 	page.Append(v.genStatus, false)
-	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-back"), func() { v.setGenerating(false) }, css.Outline)), false)
+	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-back"), i18n.T("dropdown-bitwarden-back-vault-tooltip"), func() { v.setGenerating(false) }, css.Outline)), false)
 	return page
 }
 

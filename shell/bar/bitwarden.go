@@ -344,6 +344,7 @@ func (m *bitwardenModule) render() {
 		text = bitwardenLabel(cfg.Format, st)
 	}
 	m.btn.SetLabel(text)
+	m.btn.SetTooltip(bitwardenTooltip(st.State))
 	if m.icon == nil {
 		return
 	}
@@ -445,3 +446,13 @@ func (v bitwardenNetworkVault) Save(ctx context.Context, name string, e network.
 }
 
 var errBitwardenNoNetworkFolder = errors.New("bitwarden: no network folder is configured")
+
+func bitwardenTooltip(s vault.State) string {
+	switch s {
+	case vault.StateUnlocked:
+		return i18n.T("dropdown-bitwarden-tooltip-unlocked")
+	case vault.StateLocked:
+		return i18n.T("dropdown-bitwarden-tooltip-locked")
+	}
+	return i18n.T("dropdown-bitwarden-tooltip-logged-out")
+}

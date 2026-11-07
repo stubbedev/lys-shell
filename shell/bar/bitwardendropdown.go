@@ -202,6 +202,7 @@ type bitwardenView struct {
 	password   *secretEntry
 	apiKey     bool
 	apiLabel   *widget.Label
+	apiBtn     *widget.Button
 	clientID   *widget.Field
 	clientIDIn *widget.Entry
 	secret     *widget.Field
@@ -418,8 +419,10 @@ func (v *bitwardenView) iconButton(icon, tooltip string, onClick func()) *widget
 	return b
 }
 
-func (v *bitwardenView) textButton(text string, onClick func(), classes ...string) *widget.Button {
-	return dropdownButton(widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), text, 0), onClick, classes...)
+func (v *bitwardenView) textButton(text, tooltip string, onClick func(), classes ...string) *widget.Button {
+	b := dropdownButton(widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), text, 0), onClick, classes...)
+	b.SetTooltip(tooltip)
+	return b
 }
 
 // caption is a wrapped secondary line, hidden while empty.
@@ -467,7 +470,8 @@ func (v *bitwardenView) buildLogin() widget.Widget {
 	v.loginForm.OnSubmit = v.login
 	page.Append(v.loginForm, false)
 	v.apiLabel = widget.NewLabel(v.font, v.px*styling.Caption.Ratio(), "", 0)
-	page.Append(formActions(dropdownButton(v.apiLabel, v.toggleAPIKey, css.Link), v.textButton(i18n.T("dropdown-bitwarden-login"), v.loginForm.Submit, css.SuggestedAction)), false)
+	v.apiBtn = dropdownButton(v.apiLabel, v.toggleAPIKey, css.Link)
+	page.Append(formActions(v.apiBtn, v.textButton(i18n.T("dropdown-bitwarden-login"), i18n.T("dropdown-bitwarden-login-tooltip"), v.loginForm.Submit, css.SuggestedAction)), false)
 	v.setAPIKey(false)
 	return page
 }
@@ -491,11 +495,12 @@ func (v *bitwardenView) setAPIKey(on bool) {
 	v.apiKey = on
 	v.clientID.SetVisible(on)
 	v.secret.SetVisible(on)
-	label := i18n.T("dropdown-bitwarden-use-api-key")
+	label, tooltip := i18n.T("dropdown-bitwarden-use-api-key"), i18n.T("dropdown-bitwarden-use-api-key-tooltip")
 	if on {
-		label = i18n.T("dropdown-bitwarden-use-password")
+		label, tooltip = i18n.T("dropdown-bitwarden-use-password"), i18n.T("dropdown-bitwarden-use-password-tooltip")
 	}
 	v.apiLabel.SetText(label)
+	v.apiBtn.SetTooltip(tooltip)
 }
 
 func (v *bitwardenView) buildChallenge() widget.Widget {
@@ -511,8 +516,8 @@ func (v *bitwardenView) buildChallenge() widget.Widget {
 	v.code.SetPlaceholder(i18n.T("dropdown-bitwarden-code-placeholder"))
 	v.code.OnActivate = func(string) { v.submitCode() }
 	page.Append(v.code, false)
-	v.sendEmail = v.textButton(i18n.T("dropdown-bitwarden-send-code"), v.sendCode, css.Link)
-	page.Append(formActions(v.sendEmail, v.textButton(i18n.T("dropdown-bitwarden-back"), v.back, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-verify"), v.submitCode, css.SuggestedAction)), false)
+	v.sendEmail = v.textButton(i18n.T("dropdown-bitwarden-send-code"), i18n.T("dropdown-bitwarden-send-code-tooltip"), v.sendCode, css.Link)
+	page.Append(formActions(v.sendEmail, v.textButton(i18n.T("dropdown-bitwarden-back"), i18n.T("dropdown-bitwarden-back-login-tooltip"), v.back, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-verify"), i18n.T("dropdown-bitwarden-verify-tooltip"), v.submitCode, css.SuggestedAction)), false)
 	return page
 }
 
@@ -526,7 +531,7 @@ func (v *bitwardenView) buildUnlock() widget.Widget {
 	v.unlockPw.entry.SetPlaceholder(i18n.T("dropdown-bitwarden-master-password"))
 	v.unlockPw.entry.OnActivate = func(string) { v.unlock() }
 	page.Append(v.unlockPw.entry, false)
-	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-unlock"), v.unlock, css.SuggestedAction)), false)
+	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-unlock"), i18n.T("dropdown-bitwarden-unlock-tooltip"), v.unlock, css.SuggestedAction)), false)
 	return page
 }
 
@@ -573,7 +578,7 @@ func (v *bitwardenView) buildReprompt() widget.Widget {
 	v.repromptPw.entry.SetPlaceholder(i18n.T("dropdown-bitwarden-master-password"))
 	v.repromptPw.entry.OnActivate = func(string) { v.confirmReprompt() }
 	page.Append(v.repromptPw.entry, false)
-	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-cancel"), v.cancelReprompt, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-copy"), v.confirmReprompt, css.SuggestedAction)), false)
+	page.Append(formActions(v.textButton(i18n.T("dropdown-bitwarden-cancel"), i18n.T("dropdown-bitwarden-cancel-tooltip"), v.cancelReprompt, css.Outline), v.textButton(i18n.T("dropdown-bitwarden-copy"), i18n.T("dropdown-bitwarden-copy-reprompt-tooltip"), v.confirmReprompt, css.SuggestedAction)), false)
 	return page
 }
 
