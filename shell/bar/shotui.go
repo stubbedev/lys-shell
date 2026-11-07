@@ -6,9 +6,12 @@ import (
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	timeclock "github.com/stubbedev/lys-shell/internal/clock"
+	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/markup"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/shotthumb"
@@ -63,6 +66,8 @@ func (u *shotUI) wire(h *screenshot.Host) {
 		})
 	}
 	h.OpenFolder = func(dir string) { u.app.Invoke(func() { u.app.OpenPath(dir) }) }
+	h.OpenURL = func(uri string) { u.app.Invoke(func() { u.app.OpenURL(uri) }) }
+	h.Working = u.working
 }
 
 func (u *shotUI) present(s screenshot.Saved) {
@@ -143,4 +148,34 @@ func markupPalette(s config.StylingConfig) []render.Color {
 		p = styling.Default()
 	}
 	return []render.Color{p.Red, p.Yellow, p.Green, p.Blue, p.Primary, p.Fg, p.Bg}
+}
+
+func (u *shotUI) working(cancel func()) func() {
+	opened := make(chan *app.LayerWindow, 1)
+	u.app.Invoke(func() {
+		label := widget.NewLabel(u.font, toolbarPx, i18n.T("screenshot-reading-text"), 0)
+		box := widget.NewBox(widget.Row, 0, 12)
+		box.SetElement("item")
+		box.Append(label, false)
+		w, err := u.app.NewLayer(app.LayerConfig{
+			Layer:     app.LayerOverlay,
+			Anchor:    app.AnchorTop,
+			Margin:    app.Margins{Top: 48},
+			Keyboard:  app.KeyboardExclusive,
+			Namespace: "lys-shell-screenshot-reading",
+			Root:      box,
+			OnKey:     keys.OnEscape(u.app.KeySym, cancel),
+		})
+		if err != nil {
+			log.Printf("screenshot: reading indicator: %v", err)
+		}
+		opened <- w
+	})
+	return func() {
+		u.app.Invoke(func() {
+			if w := <-opened; w != nil {
+				w.Close()
+			}
+		})
+	}
 }

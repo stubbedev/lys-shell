@@ -31,6 +31,8 @@ func screenshotCommand() *cli.Command {
 				Run: captureScreenshot(screenshot.ModeOutput),
 			},
 			{Name: "window", About: "Capture the active window", Run: captureScreenshot(screenshot.ModeWindow)},
+			{Name: "text", About: "Copy the text in a dragged region to the clipboard (OCR through tesseract)", Run: readScreen(screenshot.ReadText)},
+			{Name: "qr", About: "Decode the QR code in a dragged region", Run: readScreen(screenshot.ReadQR)},
 		},
 	}
 }
@@ -58,6 +60,31 @@ func captureScreenshot(mode string) func(*cli.Matches) error {
 		} else {
 			_, _ = fmt.Fprintf(m.Stdout(), "Screenshot saved to %s\n", path)
 		}
+		return nil
+	}
+}
+
+// readScreen reads a dragged region for kind and prints what it read;
+// nothing is saved.
+func readScreen(kind screenshot.ReadKind) func(*cli.Matches) error {
+	return func(m *cli.Matches) error {
+		conn, err := dbus.ConnectSessionBus()
+		if err != nil {
+			return fmt.Errorf("Failed to connect to D-Bus session bus: %w", err) //nolint:staticcheck // the Rust CLI's message
+		}
+		defer func() { _ = conn.Close() }()
+		text, err := screenshot.NewClient(conn).Read(context.Background(), portaldialogs.Caller{}, kind)
+		if errors.Is(err, screenshot.ErrBusy) {
+			return dbuscli.Message("Screen not read: " + err.Error())
+		}
+		if err != nil {
+			return dbuscli.FormatError("Screenshot", "read the screen", err)
+		}
+		if text == "" {
+			_, _ = fmt.Fprintln(m.Stdout(), "Screen reading cancelled")
+			return nil
+		}
+		_, _ = fmt.Fprintln(m.Stdout(), text)
 		return nil
 	}
 }

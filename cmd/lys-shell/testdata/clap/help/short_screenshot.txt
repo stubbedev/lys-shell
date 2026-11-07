@@ -6,6 +6,8 @@ Commands:
   region  Capture a dragged region or a clicked window
   output  Capture a whole output (the focused output when NAME is omitted)
   window  Capture the active window
+  text    Copy the text in a dragged region to the clipboard (OCR through tesseract)
+  qr      Decode the QR code in a dragged region
   help    Print this message or the help of the given subcommand(s)
 
 Options:

@@ -6930,6 +6930,7 @@
             "left-click": "lys-shell screenshot region",
             "middle-click": "lys-shell screenshot window",
             "notify": true,
+            "ocr-languages": [],
             "output-directory": "",
             "right-click": "lys-shell screenshot output",
             "scroll-down": "",
@@ -9411,7 +9412,7 @@
       "type": "object"
     },
     "ScreenshotConfig": {
-      "description": "Screenshot capture button.\n\nClick the bar button to capture a region, output, or window. Controllable\nfrom the CLI / RPC socket: `lys-shell screenshot region|output|window`.\n\nAfter a capture a thumbnail floats in a screen corner: click it to mark\nthe image up (crop, arrow, rectangle, ellipse, freehand, text,\nhighlighter, numbered markers and pixelation, with undo and redo; Enter\nsaves over the file and copies it, Ctrl+S saves a copy elsewhere), drag\nit into an app, or delete the capture with its close button.",
+      "description": "Screenshot capture button.\n\nClick the bar button to capture a region, output, or window. Controllable\nfrom the CLI / RPC socket: `lys-shell screenshot region|output|window`.\n\nAfter a capture a thumbnail floats in a screen corner: click it to mark\nthe image up (crop, arrow, rectangle, ellipse, freehand, text,\nhighlighter, numbered markers and pixelation, with undo and redo; Enter\nsaves over the file and copies it, Ctrl+S saves a copy elsewhere), drag\nit into an app, or delete the capture with its close button.\n\n`lys-shell screenshot text` copies the text in a dragged region (through\ntesseract, which must be installed) and `lys-shell screenshot qr` decodes\nthe QR code in one; neither saves a file.",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -9492,6 +9493,11 @@
           "$ref": "#/$defs/boolean",
           "default": true,
           "description": "Show a desktop notification after capturing. With the thumbnail\ndisabled it carries Edit, Open folder and Delete buttons."
+        },
+        "ocr-languages": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Tesseract language codes `lys-shell screenshot text` reads with (e.g.\n`[eng, deu]`). Empty follows the session language."
         },
         "output-directory": {
           "$ref": "#/$defs/Directory",
@@ -12968,6 +12974,7 @@
           "left-click": "lys-shell screenshot region",
           "middle-click": "lys-shell screenshot window",
           "notify": true,
+          "ocr-languages": [],
           "output-directory": "",
           "right-click": "lys-shell screenshot output",
           "scroll-down": "",

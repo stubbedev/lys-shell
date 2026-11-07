@@ -843,6 +843,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand region 'Capture a dragged region or a clicked window'
             cand output 'Capture a whole output (the focused output when NAME is omitted)'
             cand window 'Capture the active window'
+            cand text 'Copy the text in a dragged region to the clipboard (OCR through tesseract)'
+            cand qr 'Decode the QR code in a dragged region'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;screenshot;region'= {
@@ -857,10 +859,20 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'lys-shell;screenshot;text'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;screenshot;qr'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'lys-shell;screenshot;help'= {
             cand region 'Capture a dragged region or a clicked window'
             cand output 'Capture a whole output (the focused output when NAME is omitted)'
             cand window 'Capture the active window'
+            cand text 'Copy the text in a dragged region to the clipboard (OCR through tesseract)'
+            cand qr 'Decode the QR code in a dragged region'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;screenshot;help;region'= {
@@ -868,6 +880,10 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;screenshot;help;output'= {
         }
         &'lys-shell;screenshot;help;window'= {
+        }
+        &'lys-shell;screenshot;help;text'= {
+        }
+        &'lys-shell;screenshot;help;qr'= {
         }
         &'lys-shell;screenshot;help;help'= {
         }
@@ -1413,12 +1429,18 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand region 'Capture a dragged region or a clicked window'
             cand output 'Capture a whole output (the focused output when NAME is omitted)'
             cand window 'Capture the active window'
+            cand text 'Copy the text in a dragged region to the clipboard (OCR through tesseract)'
+            cand qr 'Decode the QR code in a dragged region'
         }
         &'lys-shell;help;screenshot;region'= {
         }
         &'lys-shell;help;screenshot;output'= {
         }
         &'lys-shell;help;screenshot;window'= {
+        }
+        &'lys-shell;help;screenshot;text'= {
+        }
+        &'lys-shell;help;screenshot;qr'= {
         }
         &'lys-shell;help;colorpicker'= {
         }

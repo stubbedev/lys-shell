@@ -33,7 +33,8 @@ Suggests:
  upower,
  power-profiles-daemon,
  pipewire-pulse,
- wireplumber
+ wireplumber,
+ tesseract-ocr
 Description: Wayland desktop shell
  lys-shell is a compositor-agnostic Wayland desktop shell: bar, dropdowns,
  launcher, notifications, OSD, and an xdg-desktop-portal

@@ -1442,6 +1442,18 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(text)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(qr)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_lys-shell__screenshot__help_commands" \
@@ -1463,6 +1475,14 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (window)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(text)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(qr)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -2484,6 +2504,14 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (window)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(text)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(qr)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -3519,6 +3547,8 @@ _lys-shell__help__screenshot_commands() {
 'region:Capture a dragged region or a clicked window' \
 'output:Capture a whole output (the focused output when NAME is omitted)' \
 'window:Capture the active window' \
+'text:Copy the text in a dragged region to the clipboard (OCR through tesseract)' \
+'qr:Decode the QR code in a dragged region' \
     )
     _describe -t commands 'lys-shell help screenshot commands' commands "$@"
 }
@@ -3527,10 +3557,20 @@ _lys-shell__help__screenshot__output_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help screenshot output commands' commands "$@"
 }
+(( $+functions[_lys-shell__help__screenshot__qr_commands] )) ||
+_lys-shell__help__screenshot__qr_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help screenshot qr commands' commands "$@"
+}
 (( $+functions[_lys-shell__help__screenshot__region_commands] )) ||
 _lys-shell__help__screenshot__region_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help screenshot region commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__screenshot__text_commands] )) ||
+_lys-shell__help__screenshot__text_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help screenshot text commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__screenshot__window_commands] )) ||
 _lys-shell__help__screenshot__window_commands() {
@@ -4797,6 +4837,8 @@ _lys-shell__screenshot_commands() {
 'region:Capture a dragged region or a clicked window' \
 'output:Capture a whole output (the focused output when NAME is omitted)' \
 'window:Capture the active window' \
+'text:Copy the text in a dragged region to the clipboard (OCR through tesseract)' \
+'qr:Decode the QR code in a dragged region' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'lys-shell screenshot commands' commands "$@"
@@ -4807,6 +4849,8 @@ _lys-shell__screenshot__help_commands() {
 'region:Capture a dragged region or a clicked window' \
 'output:Capture a whole output (the focused output when NAME is omitted)' \
 'window:Capture the active window' \
+'text:Copy the text in a dragged region to the clipboard (OCR through tesseract)' \
+'qr:Decode the QR code in a dragged region' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'lys-shell screenshot help commands' commands "$@"
@@ -4821,10 +4865,20 @@ _lys-shell__screenshot__help__output_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell screenshot help output commands' commands "$@"
 }
+(( $+functions[_lys-shell__screenshot__help__qr_commands] )) ||
+_lys-shell__screenshot__help__qr_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell screenshot help qr commands' commands "$@"
+}
 (( $+functions[_lys-shell__screenshot__help__region_commands] )) ||
 _lys-shell__screenshot__help__region_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell screenshot help region commands' commands "$@"
+}
+(( $+functions[_lys-shell__screenshot__help__text_commands] )) ||
+_lys-shell__screenshot__help__text_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell screenshot help text commands' commands "$@"
 }
 (( $+functions[_lys-shell__screenshot__help__window_commands] )) ||
 _lys-shell__screenshot__help__window_commands() {
@@ -4836,10 +4890,20 @@ _lys-shell__screenshot__output_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell screenshot output commands' commands "$@"
 }
+(( $+functions[_lys-shell__screenshot__qr_commands] )) ||
+_lys-shell__screenshot__qr_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell screenshot qr commands' commands "$@"
+}
 (( $+functions[_lys-shell__screenshot__region_commands] )) ||
 _lys-shell__screenshot__region_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell screenshot region commands' commands "$@"
+}
+(( $+functions[_lys-shell__screenshot__text_commands] )) ||
+_lys-shell__screenshot__text_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell screenshot text commands' commands "$@"
 }
 (( $+functions[_lys-shell__screenshot__window_commands] )) ||
 _lys-shell__screenshot__window_commands() {

@@ -502,8 +502,14 @@ _lys-shell() {
             lys__shell__help__screenshot,output)
                 cmd="lys__shell__help__screenshot__output"
                 ;;
+            lys__shell__help__screenshot,qr)
+                cmd="lys__shell__help__screenshot__qr"
+                ;;
             lys__shell__help__screenshot,region)
                 cmd="lys__shell__help__screenshot__region"
+                ;;
+            lys__shell__help__screenshot,text)
+                cmd="lys__shell__help__screenshot__text"
                 ;;
             lys__shell__help__screenshot,window)
                 cmd="lys__shell__help__screenshot__window"
@@ -1084,8 +1090,14 @@ _lys-shell() {
             lys__shell__screenshot,output)
                 cmd="lys__shell__screenshot__output"
                 ;;
+            lys__shell__screenshot,qr)
+                cmd="lys__shell__screenshot__qr"
+                ;;
             lys__shell__screenshot,region)
                 cmd="lys__shell__screenshot__region"
+                ;;
+            lys__shell__screenshot,text)
+                cmd="lys__shell__screenshot__text"
                 ;;
             lys__shell__screenshot,window)
                 cmd="lys__shell__screenshot__window"
@@ -1096,8 +1108,14 @@ _lys-shell() {
             lys__shell__screenshot__help,output)
                 cmd="lys__shell__screenshot__help__output"
                 ;;
+            lys__shell__screenshot__help,qr)
+                cmd="lys__shell__screenshot__help__qr"
+                ;;
             lys__shell__screenshot__help,region)
                 cmd="lys__shell__screenshot__help__region"
+                ;;
+            lys__shell__screenshot__help,text)
+                cmd="lys__shell__screenshot__help__text"
                 ;;
             lys__shell__screenshot__help,window)
                 cmd="lys__shell__screenshot__help__window"
@@ -3147,7 +3165,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__screenshot)
-            opts="region output window"
+            opts="region output window text qr"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -3174,7 +3192,35 @@ _lys-shell() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        lys__shell__help__screenshot__qr)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         lys__shell__help__screenshot__region)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__screenshot__text)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -6129,7 +6175,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__screenshot)
-            opts="-h --help region output window help"
+            opts="-h --help region output window text qr help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -6143,7 +6189,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__screenshot__help)
-            opts="region output window help"
+            opts="region output window text qr help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -6184,7 +6230,35 @@ _lys-shell() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        lys__shell__screenshot__help__qr)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         lys__shell__screenshot__help__region)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__screenshot__help__text)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -6226,7 +6300,35 @@ _lys-shell() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        lys__shell__screenshot__qr)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         lys__shell__screenshot__region)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__screenshot__text)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

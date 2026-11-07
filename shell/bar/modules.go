@@ -35,6 +35,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/weather"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/powermenu"
+	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
 // ModuleContext carries what a module needs at construction time: the
@@ -122,6 +123,9 @@ type ModuleContext struct {
 	// Screenshot starts a capture on the in-process screenshot host
 	// (the `lys-shell screenshot ...` builtin); nil before the host is up.
 	Screenshot func(mode, target string)
+	// ReadScreen reads a dragged region's text or QR code (the `lys-shell
+	// screenshot text|qr` builtin); nil before the host is up.
+	ReadScreen func(kind screenshot.ReadKind)
 	// PickColor picks a pixel of the screen and copies its color; nil
 	// before the host is up.
 	PickColor func()

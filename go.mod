@@ -3,6 +3,7 @@ module github.com/stubbedev/lys-shell
 go 1.27.3
 
 require (
+	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
 	github.com/stubbedev/lys-lib v0.3.11-0.20261107174905-cacc8baced7d
 	github.com/stubbedev/lys-secrets v0.3.12
@@ -26,6 +27,7 @@ require (
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	modernc.org/libc v1.80.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect

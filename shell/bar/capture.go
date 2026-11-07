@@ -1,6 +1,8 @@
 package bar
 
 import (
+	"context"
+	"errors"
 	"image"
 	"log"
 	"slices"
@@ -124,6 +126,17 @@ func (s *captureServices) trigger(mode, target string) {
 	go func() {
 		if _, err := s.host.Capture(portaldialogs.Caller{}, mode, target); err != nil {
 			log.Printf("screenshot: %v", err)
+		}
+	}()
+}
+
+func (s *captureServices) read(kind screenshot.ReadKind) {
+	go func() {
+		if _, err := s.host.Read(portaldialogs.Caller{}, kind); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("screenshot: reading the screen: %v", err)
+			if s.host.Toast != nil {
+				s.host.Toast(err.Error(), "ld-scan-text-symbolic")
+			}
 		}
 	}()
 }

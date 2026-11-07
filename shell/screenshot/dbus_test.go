@@ -33,6 +33,10 @@ func (s *switchCapturer) PickColorText(c portaldialogs.Caller, opts colorpicker.
 	return fakeCapturer{err: s.err.Load()}.PickColorText(c, opts, copyText)
 }
 
+func (s *switchCapturer) Read(c portaldialogs.Caller, kind ReadKind) (string, error) {
+	return fakeCapturer{err: s.err.Load()}.Read(c, kind)
+}
+
 func (s *switchCapturer) Dismiss(string) {}
 
 func TestDaemonOverTheBus(t *testing.T) {

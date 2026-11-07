@@ -44,6 +44,7 @@ type capturer interface {
 	CapturePrivate(c portaldialogs.Caller, mode, target string, pointer bool) (string, error)
 	PickColor(c portaldialogs.Caller) (color [3]float64, picked bool, err error)
 	PickColorText(c portaldialogs.Caller, opts colorpicker.Options, copyText bool) (text string, picked bool, err error)
+	Read(c portaldialogs.Caller, kind ReadKind) (string, error)
 	Dismiss(handle string)
 }
 
@@ -128,6 +129,21 @@ func (d *Daemon) PickColorText(c portaldialogs.Caller, format string, noLoupe, c
 	return picked, text, nil
 }
 
+// Read lets the user drag a region and reads its text (kind "text") or
+// its QR code (kind "qr"), replying what it read; empty when the
+// selection was cancelled. Nothing is saved.
+func (d *Daemon) Read(c portaldialogs.Caller, kind string) (string, *dbus.Error) {
+	k, err := ParseReadKind(kind)
+	if err != nil {
+		return "", dbus.MakeFailedError(err)
+	}
+	text, err := d.host.Read(c, k)
+	if err != nil {
+		return "", errorReply(err)
+	}
+	return text, nil
+}
+
 // Dismiss cancels the region selection or color pick showing for the
 // request at handle.
 func (d *Daemon) Dismiss(handle string) *dbus.Error {
@@ -176,6 +192,14 @@ func (c *Client) PickColor(ctx context.Context, caller portaldialogs.Caller) (co
 func (c *Client) PickColorText(ctx context.Context, caller portaldialogs.Caller, format config.ColorFormat, noLoupe, copyText bool) (text string, picked bool, err error) {
 	err = c.obj.CallWithContext(ctx, iface+".PickColorText", 0, caller, string(format), noLoupe, copyText).Store(&picked, &text)
 	return text, picked, replyErr(err)
+}
+
+// Read asks the shell to read a dragged region; see Daemon.Read. A
+// refused request is ErrBusy.
+func (c *Client) Read(ctx context.Context, caller portaldialogs.Caller, kind ReadKind) (string, error) {
+	var text string
+	err := c.obj.CallWithContext(ctx, iface+".Read", 0, caller, string(kind)).Store(&text)
+	return text, replyErr(err)
 }
 
 // Dismiss cancels the selection or pick showing for the request at

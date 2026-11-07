@@ -567,6 +567,13 @@ func (f fakeCapturer) PickColorText(_ portaldialogs.Caller, opts colorpicker.Opt
 	return fmt.Sprintf("%s %v %v", opts.Format, opts.NoLoupe, copyText), f.err == nil, f.err
 }
 
+func (f fakeCapturer) Read(_ portaldialogs.Caller, kind ReadKind) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return "read:" + string(kind), nil
+}
+
 func (fakeCapturer) Dismiss(string) {}
 
 func TestDaemonMethods(t *testing.T) {

@@ -41,7 +41,7 @@ func TestScreenshotCancelledStaysACancel(t *testing.T) {
 func TestScreenshotSubcommandsReachTheService(t *testing.T) {
 	bus := dbustest.Start(t)
 	bus.UseAsSessionBus(t)
-	for _, args := range [][]string{{"region"}, {"window"}, {"output"}, {"output", "DP-1"}} {
+	for _, args := range [][]string{{"region"}, {"window"}, {"output"}, {"output", "DP-1"}, {"text"}, {"qr"}} {
 		_, stderr, code := runCaptured(t, false, append([]string{"screenshot"}, args...)...)
 		if code != 1 || !strings.Contains(stderr, "Screenshot service not running. Start lys-shell shell first.") {
 			t.Errorf("screenshot %v: code %d stderr %q, want the not-running error from the bus", args, code, stderr)
@@ -60,5 +60,24 @@ func TestScreenshotRejectsBadArguments(t *testing.T) {
 		if _, _, code := runCaptured(t, false, append([]string{"screenshot"}, args...)...); code != 2 {
 			t.Errorf("screenshot %v exited %d, want the usage error 2", args, code)
 		}
+	}
+}
+
+func TestScreenshotTextWithoutTesseractNamesIt(t *testing.T) {
+	dbustest.Session(t)
+	t.Setenv("PATH", t.TempDir())
+	export(t, screenshot.NewDaemon(&screenshot.Host{Region: stubRegion{}}).Export)
+	stdout, stderr, code := runCaptured(t, false, "screenshot", "text")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "tesseract is not installed") {
+		t.Fatalf("code %d stdout %q stderr %q", code, stdout, stderr)
+	}
+}
+
+func TestScreenshotQRCancelledStaysACancel(t *testing.T) {
+	dbustest.Session(t)
+	export(t, screenshot.NewDaemon(&screenshot.Host{Region: stubRegion{}}).Export)
+	stdout, stderr, code := runCaptured(t, false, "screenshot", "qr")
+	if code != 0 || stdout != "Screen reading cancelled\n" || stderr != "" {
+		t.Fatalf("code %d stdout %q stderr %q", code, stdout, stderr)
 	}
 }

@@ -12,6 +12,10 @@ package config
 // highlighter, numbered markers and pixelation, with undo and redo; Enter
 // saves over the file and copies it, Ctrl+S saves a copy elsewhere), drag
 // it into an app, or delete the capture with its close button.
+//
+// `lys-shell screenshot text` copies the text in a dragged region (through
+// tesseract, which must be installed) and `lys-shell screenshot qr` decodes
+// the QR code in one; neither saves a file.
 type ScreenshotConfig struct {
 	// Bar button icon.
 	Icon string `cfg:"icon"`
@@ -30,6 +34,9 @@ type ScreenshotConfig struct {
 	ThumbnailMs uint32 `cfg:"thumbnail-ms"`
 	// Screen corner the floating thumbnail sits in.
 	ThumbnailPosition ScreenshotCorner `cfg:"thumbnail-position"`
+	// Tesseract language codes `lys-shell screenshot text` reads with (e.g.
+	// `[eng, deu]`). Empty follows the session language.
+	OcrLanguages []string `cfg:"ocr-languages"`
 	// Display border around button.
 	BorderShow bool `cfg:"border-show"`
 	// Border color token.
@@ -72,6 +79,7 @@ func DefaultsScreenshot() ScreenshotConfig {
 		Notify:            true,
 		ThumbnailMs:       5000,
 		ThumbnailPosition: ScreenshotBottomRight,
+		OcrLanguages:      []string{},
 		BorderShow:        false,
 		BorderColor:       mustColor("accent"),
 		IconShow:          true,

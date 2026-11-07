@@ -1,0 +1,6 @@
+Copy the text in a dragged region to the clipboard (OCR through tesseract)
+
+Usage: lys-shell screenshot text
+
+Options:
+  -h, --help  Print help

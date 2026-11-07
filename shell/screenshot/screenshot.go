@@ -80,7 +80,7 @@ type Host struct {
 	// Copy puts an image on the clipboard and returns what takes that
 	// copy back, nil when nothing can; nil disables the copy.
 	Copy func(image.Image) (retract func(), err error)
-	// CopyText puts text on the clipboard: a picked color.
+	// CopyText puts text on the clipboard: a picked color, or text Read read.
 	CopyText func(string) error
 	// Notify announces a saved screenshot, and a failed copy with it;
 	// nil sends the desktop notification.
@@ -92,6 +92,13 @@ type Host struct {
 	// the folder it was saved in: the notification's buttons.
 	Edit       func(Saved)
 	OpenFolder func(dir string)
+	// Toast and OpenURL deliver what Read read: a line in a toast, a
+	// decoded link in the browser.
+	Toast   func(text, icon string)
+	OpenURL func(string)
+	// Working shows that tesseract is reading, with a way for the user
+	// to cancel it; finished takes that down.
+	Working func(cancel func()) (finished func())
 	// Forget drops the GPU textures of the frozen frames with these
 	// identities, once the overlay that drew them has closed.
 	Forget func(ids []render.ImageID)
@@ -268,12 +275,16 @@ const (
 	ActionEdit       Action = "edit"
 	ActionOpenFolder Action = "open-folder"
 	ActionDelete     Action = "delete"
+	ActionCopy       Action = "copy"
+	ActionOpen       Action = "open"
 )
 
 var actionLabels = map[Action]string{
 	ActionEdit:       "screenshot-action-edit",
 	ActionOpenFolder: "screenshot-action-open-folder",
 	ActionDelete:     "screenshot-action-delete",
+	ActionCopy:       "screenshot-action-copy",
+	ActionOpen:       "screenshot-action-open",
 }
 
 func (h *Host) act(a Action, shot Saved) {

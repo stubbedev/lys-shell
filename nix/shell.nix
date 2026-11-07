@@ -51,6 +51,9 @@
           wl-clipboard
           # bwrap, the sandbox the file chooser runs thumbnailers in.
           bubblewrap
+          # tesseract, the OCR engine `lys-shell screenshot text` runs, which
+          # the screen-reading tests read a fixture line with.
+          tesseract
           # GTK 3 and GTK 4 apps, through PyGObject, printing through the
           # real portal to the print dialog (portal's GTK print tests).
           (python3.withPackages (ps: [ ps.pygobject3 ]))

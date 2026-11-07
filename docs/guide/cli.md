@@ -173,7 +173,17 @@ Screenshots:
 lys-shell screenshot region        # drag a region or click a window, adjust, Enter
 lys-shell screenshot output DP-1   # whole output (focused output if omitted)
 lys-shell screenshot window        # the active window
+lys-shell screenshot text          # copy the text in a dragged region (needs tesseract)
+lys-shell screenshot qr            # decode the QR code in a dragged region
 ```
+
+`text` and `qr` save nothing. `text` reads the region with tesseract in the
+languages `screenshot.ocr-languages` names (the session language when empty),
+copies the text and shows its first line in a toast; Esc while it reads stops
+tesseract. Without tesseract it fails naming it, and the launcher offers no
+"Copy Text from Screen" row. `qr` decodes in-process and announces the code
+with Copy, and Open for a link; a region without a code reports "no code
+found" and copies nothing. Both print what they read.
 
 The color picker, over the running shell's own overlay (bind it to a key, or use it in a
 script):

@@ -313,3 +313,34 @@ func TestAToneTypedFromTheActionsBecomesTheConfiguredDefault(t *testing.T) {
 		t.Errorf("the written path: %v, tone %q", err, svc.Config().Launcher.Emoji.SkinTone)
 	}
 }
+
+func TestReadingRowsFollowTesseract(t *testing.T) {
+	var reads []screenshot.ReadKind
+	tesseract := true
+	s := controlSources{
+		readScreen: func(k screenshot.ReadKind) { reads = append(reads, k) },
+		ocr:        func() bool { return tesseract },
+	}
+	rows := s.captureControls(context.Background())
+	if got, want := titlesOf(rows), []string{"Copy Text from Screen", "Scan QR Code"}; !slices.Equal(got, want) {
+		t.Fatalf("rows %q, want %q", got, want)
+	}
+	if len(reads) != 0 {
+		t.Fatal("listing read the screen")
+	}
+	for _, r := range rows {
+		closed, ok := r.Effect.(search.RunOnceClosed)
+		if !ok {
+			t.Fatalf("%s runs %T, with the panel on the screen", r.Title, r.Effect)
+		}
+		closed()
+	}
+	if !slices.Equal(reads, []screenshot.ReadKind{screenshot.ReadText, screenshot.ReadQR}) {
+		t.Fatalf("reads %v", reads)
+	}
+
+	tesseract = false
+	if got, want := titlesOf(s.captureControls(context.Background())), []string{"Scan QR Code"}; !slices.Equal(got, want) {
+		t.Fatalf("without tesseract rows %q, want %q", got, want)
+	}
+}

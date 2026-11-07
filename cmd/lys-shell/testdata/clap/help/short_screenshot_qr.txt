@@ -1,0 +1,6 @@
+Decode the QR code in a dragged region
+
+Usage: lys-shell screenshot qr
+
+Options:
+  -h, --help  Print help

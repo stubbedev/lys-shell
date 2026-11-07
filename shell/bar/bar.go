@@ -598,6 +598,7 @@ func (s *shellStart) mount() {
 	}, cfg)
 	osdRef.Store(osdSrv)
 	captureSvc := newCaptureServices(application, sess.Outputs, current.Load, baseCtx.Hyprland, baseCtx.Clipboard, font, theme.Sheet)
+	captureSvc.host.Toast = baseCtx.Toast
 	s.down.add(captureSvc.close)
 	s.down.addAsync(func() func() { return captureSvc.serve(s.session) })
 	focused := screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput
@@ -605,6 +606,7 @@ func (s *shellStart) mount() {
 		return servePortalHosts(s.session, application, sess.Outputs, current.Load, focused, font, theme.Sheet, s.systemUp.Load)
 	})
 	baseCtx.Screenshot = captureSvc.trigger
+	baseCtx.ReadScreen = captureSvc.read
 	baseCtx.PickColor = func() {
 		captureSvc.pickColor(func(text string) {
 			application.Invoke(func() {

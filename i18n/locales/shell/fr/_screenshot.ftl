@@ -15,3 +15,6 @@ screenshot-tool-text = Texte
 screenshot-tool-highlight = Surligneur
 screenshot-tool-marker = Marqueur numéroté
 screenshot-tool-pixelate = Pixeliser
+screenshot-action-copy = Copier
+screenshot-action-open = Ouvrir
+screenshot-reading-text = Lecture du texte… Échap annule

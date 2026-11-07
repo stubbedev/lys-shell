@@ -1046,6 +1046,8 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a dragged region or a clicked window')
             [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
             [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('text', 'text', [CompletionResultType]::ParameterValue, 'Copy the text in a dragged region to the clipboard (OCR through tesseract)')
+            [CompletionResult]::new('qr', 'qr', [CompletionResultType]::ParameterValue, 'Decode the QR code in a dragged region')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1064,10 +1066,22 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'lys-shell;screenshot;text' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;screenshot;qr' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'lys-shell;screenshot;help' {
             [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a dragged region or a clicked window')
             [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
             [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('text', 'text', [CompletionResultType]::ParameterValue, 'Copy the text in a dragged region to the clipboard (OCR through tesseract)')
+            [CompletionResult]::new('qr', 'qr', [CompletionResultType]::ParameterValue, 'Decode the QR code in a dragged region')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1078,6 +1092,12 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;screenshot;help;window' {
+            break
+        }
+        'lys-shell;screenshot;help;text' {
+            break
+        }
+        'lys-shell;screenshot;help;qr' {
             break
         }
         'lys-shell;screenshot;help;help' {
@@ -1782,6 +1802,8 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a dragged region or a clicked window')
             [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
             [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('text', 'text', [CompletionResultType]::ParameterValue, 'Copy the text in a dragged region to the clipboard (OCR through tesseract)')
+            [CompletionResult]::new('qr', 'qr', [CompletionResultType]::ParameterValue, 'Decode the QR code in a dragged region')
             break
         }
         'lys-shell;help;screenshot;region' {
@@ -1791,6 +1813,12 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;screenshot;window' {
+            break
+        }
+        'lys-shell;help;screenshot;text' {
+            break
+        }
+        'lys-shell;help;screenshot;qr' {
             break
         }
         'lys-shell;help;colorpicker' {

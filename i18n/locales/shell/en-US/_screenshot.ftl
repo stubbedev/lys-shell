@@ -15,3 +15,6 @@ screenshot-tool-text = Text
 screenshot-tool-highlight = Highlighter
 screenshot-tool-marker = Numbered marker
 screenshot-tool-pixelate = Pixelate
+screenshot-action-copy = Copy
+screenshot-action-open = Open
+screenshot-reading-text = Reading text… Esc cancels
