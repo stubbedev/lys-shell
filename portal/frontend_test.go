@@ -379,6 +379,9 @@ func TestFrontendScreenCastStreamsToARealConsumer(t *testing.T) {
 	if len(streams) != 1 || streams[0].Node == 0 {
 		t.Fatalf("streams = %+v", streams)
 	}
+	if got, want := streams[0].Props["pipewire-serial"].Value(), pwtest.Serial(t, streams[0].Node); got != want {
+		t.Errorf("pipewire-serial %v, the registry lists node %d with object.serial %d", got, streams[0].Node, want)
+	}
 
 	consumer := pwtest.Consume(t, "lys-shell-screencast")
 	for range 3 {

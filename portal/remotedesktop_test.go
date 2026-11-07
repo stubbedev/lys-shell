@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/eis"
+	"github.com/stubbedev/lys-lib/eis/eistest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/vinput"
@@ -651,5 +652,56 @@ func TestStreamsPairWithTheirEISRegions(t *testing.T) {
 	}
 	if box != image.Rect(0, 0, 3200, 1080) || !slices.Equal(regions, want) {
 		t.Errorf("EIS layout %v regions %+v, want %+v", box, regions, want)
+	}
+}
+
+// A libei client on the session's EIS socket sees one absolute region
+// per monitor stream, carrying the stream's mapping_id, and none for a
+// window stream; absolute motion to the centre of DP-2's region lands
+// the pointer at DP-2's centre in the layout, and a touch inside it
+// reaches the touchscreen.
+func TestLibeiSeesARegionPerMonitorStream(t *testing.T) {
+	l := eistest.Load(t)
+	r, sink := touchRig(t)
+	serveDialogs(t, r, true)
+	streams := castStreams(t, r.startSharing(t, "/screen:DP-2;window:w1", Vardict{}))
+	mapping, _ := streams[0].Props["mapping_id"].Value().(string)
+	var fd dbus.UnixFD
+	if err := r.obj.Call(RemoteDesktopIface+".ConnectToEIS", 0, sessA, "org.app", Vardict{}).Store(&fd); err != nil {
+		t.Fatal(err)
+	}
+	sink.events.Store(nil)
+	got := l.Drive(t, int(fd), "lys-shell-test", []uintptr{eistest.CapAbsolute, eistest.CapTouch}, 2, 5*time.Second, func(d eistest.Device) {
+		d.Start()
+		if d.Has(eistest.CapAbsolute) {
+			d.MotionAbsolute(1280+960, 540)
+		}
+		if d.Has(eistest.CapTouch) {
+			d.Touch(1300, 10, 1310, 20)
+		}
+		d.Frame()
+		d.Stop()
+	})
+	want := []eistest.Region{{X: 1280, Y: 0, Width: 1920, Height: 1080, MappingID: mapping}}
+	if len(got.Devices) != 2 {
+		t.Fatalf("devices %q resumed, want an absolute pointer and a touchscreen", got.Devices)
+	}
+	for _, dev := range got.Devices {
+		if !slices.Equal(got.Regions[dev], want) {
+			t.Errorf("%s regions %+v, want %+v", dev, got.Regions[dev], want)
+		}
+	}
+	events := []string{
+		"abs 573440 138240 819200 276480",
+		"touch down 0 332800 2560 819200 276480",
+		"touch motion 0 335360 5120 819200 276480",
+		"touch up 0",
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && len(sink.events.Load()) < len(events) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := sink.events.Load(); !slices.Equal(got, events) {
+		t.Errorf("replayed %q, want %q", got, events)
 	}
 }
