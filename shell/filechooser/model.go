@@ -602,9 +602,11 @@ func fileKind(e Entry) string {
 	return "File"
 }
 
-// Place is a sidebar shortcut.
+// Place is a sidebar shortcut; Bookmark marks one from the GTK
+// bookmarks file, which the sidebar can remove.
 type Place struct {
 	Label, Path, Icon string
+	Bookmark          bool
 }
 
 // userPlaceDirs are the user directories offered when present: the
@@ -627,7 +629,7 @@ func UserPlaces(env xdg.Env, home string) ([]Place, error) {
 	if home == "" {
 		return nil, nil
 	}
-	places := []Place{{"Home", home, "ld-house-symbolic"}}
+	places := []Place{{Label: "Home", Path: home, Icon: "ld-house-symbolic"}}
 	var errs []error
 	for _, d := range userPlaceDirs {
 		path, ok, err := env.UserDir(d.key)
@@ -643,7 +645,7 @@ func UserPlaces(env xdg.Env, home string) ([]Place, error) {
 			continue
 		}
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			places = append(places, Place{filepath.Base(path), path, d.icon})
+			places = append(places, Place{Label: filepath.Base(path), Path: path, Icon: d.icon})
 		}
 	}
 	bookmarks, err := gtkBookmarks(env)
@@ -656,11 +658,11 @@ func UserPlaces(env xdg.Env, home string) ([]Place, error) {
 // gtkBookmarks are the folders in GTK 3's bookmarks file, which GTK 4
 // reads too; none when there is no config directory or no file.
 func gtkBookmarks(env xdg.Env) ([]Place, error) {
-	dir, ok := env.ConfigDir("gtk-3.0")
-	if !ok {
+	file := BookmarksFile(env)
+	if file == "" {
 		return nil, nil
 	}
-	f, err := os.Open(filepath.Join(dir, "bookmarks")) //nolint:gosec // the user's own GTK bookmarks
+	f, err := os.Open(file) //nolint:gosec // the user's own GTK bookmarks
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -693,7 +695,7 @@ func bookmarks(r io.Reader) ([]Place, error) {
 		if label = strings.TrimSpace(label); label == "" {
 			label = filepath.Base(path)
 		}
-		places = append(places, Place{label, path, "ld-folder-symbolic"})
+		places = append(places, Place{Label: label, Path: path, Icon: "ld-folder-symbolic", Bookmark: true})
 	}
 	return places, sc.Err()
 }
@@ -766,9 +768,9 @@ func ListRecent(path string, mode Mode) ([]Entry, error) {
 // mounts, those under /media, /run/media/<user> and the home
 // directory (not hidden ones).
 func OtherLocations(mounts io.Reader, home, user string) []Place {
-	locations := []Place{{"Computer", "/", "ld-hard-drive-symbolic"}}
+	locations := []Place{{Label: "Computer", Path: "/", Icon: "ld-hard-drive-symbolic"}}
 	for _, path := range VisibleMounts(mounts, home, user) {
-		locations = append(locations, Place{filepath.Base(path), path, "ld-usb-symbolic"})
+		locations = append(locations, Place{Label: filepath.Base(path), Path: path, Icon: "ld-usb-symbolic"})
 	}
 	return locations
 }
@@ -814,7 +816,7 @@ func NetworkLocations(runtimeDir string) []Place {
 	var places []Place
 	for _, de := range des {
 		if de.IsDir() {
-			places = append(places, Place{gvfsLabel(de.Name()), filepath.Join(dir, de.Name()), "ld-server-symbolic"})
+			places = append(places, Place{Label: gvfsLabel(de.Name()), Path: filepath.Join(dir, de.Name()), Icon: "ld-server-symbolic"})
 		}
 	}
 	return places

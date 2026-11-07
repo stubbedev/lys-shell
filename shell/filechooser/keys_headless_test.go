@@ -70,7 +70,7 @@ func headlessChooser(t *testing.T, a *app.Application, home string) *Chooser {
 		Font:      treetest.Font(t),
 		MIME:      testDB(t),
 		Home:      home,
-		Places:    func() []Place { return []Place{{"Home", home, "user-home-symbolic"}} },
+		Places:    func() []Place { return []Place{{Label: "Home", Path: home, Icon: "user-home-symbolic"}} },
 		Locations: func() []Place { return nil },
 	})
 }

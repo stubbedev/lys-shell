@@ -109,7 +109,7 @@ func (c *Chooser) fillLocations(l locations) {
 			continue
 		}
 		shown[v.Object] = true
-		list.Append(c.volumeRow(v, Place{p.Label, p.Path, volumeIcon(v)}), false)
+		list.Append(c.volumeRow(v, Place{Label: p.Label, Path: p.Path, Icon: volumeIcon(v)}), false)
 	}
 	for _, v := range l.volumes {
 		if shown[v.Object] {
@@ -119,7 +119,7 @@ func (c *Chooser) fillLocations(l locations) {
 		if v.Mounted() {
 			at = v.MountPoints[0]
 		}
-		list.Append(c.volumeRow(v, Place{v.Label, at, volumeIcon(v)}), false)
+		list.Append(c.volumeRow(v, Place{Label: v.Label, Path: at, Icon: volumeIcon(v)}), false)
 	}
 }
 

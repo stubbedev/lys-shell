@@ -218,7 +218,7 @@ func TestSidebarKeepsItsWidth(t *testing.T) {
 		label := tc.label
 		t.Run(tc.name, func(t *testing.T) {
 			hs := newHarness(t, "")
-			hs.c.d.Places = func() []Place { return []Place{{label, hs.root, "folder-symbolic"}} }
+			hs.c.d.Places = func() []Place { return []Place{{Label: label, Path: hs.root, Icon: "folder-symbolic"}} }
 			hs.open(t, OpenRequest{})
 			hs.run(func() {
 				hs.laidOut(t)

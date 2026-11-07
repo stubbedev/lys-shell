@@ -148,8 +148,8 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		Sheet:     hs.theme.Sheet,
 		MIME:      testDB(t),
 		Home:      hs.root,
-		Places:    func() []Place { return []Place{{"Home", hs.root, "user-home-symbolic"}} },
-		Locations: func() []Place { return []Place{{"Computer", "/", "drive-harddisk-symbolic"}} },
+		Places:    func() []Place { return []Place{{Label: "Home", Path: hs.root, Icon: "user-home-symbolic"}} },
+		Locations: func() []Place { return []Place{{Label: "Computer", Path: "/", Icon: "drive-harddisk-symbolic"}} },
 		ViewFile:  viewFile,
 		ForgetImage: func(id render.ImageID) {
 			hs.forgotten = append(hs.forgotten, id)
@@ -512,6 +512,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 	if got := hs.shown(); !slices.Equal(got[:2], []string{"pics", "docs"}) {
 		t.Errorf("name descending = %v", got)
 	}
+	hs.c.viewFile.wait()
 	if b, _ := os.ReadFile(viewFile); string(b) != "name desc list\n" {
 		t.Errorf("persisted view = %q", b)
 	}
@@ -1674,7 +1675,7 @@ func TestLocationsFollowTheMounts(t *testing.T) {
 	hs := newHarness(t, "")
 	var changed func()
 	stopped := 0
-	locations := []Place{{"Computer", "/", "drive-harddisk-symbolic"}}
+	locations := []Place{{Label: "Computer", Path: "/", Icon: "drive-harddisk-symbolic"}}
 	hs.c.d.Locations = func() []Place { return locations }
 	hs.c.d.WatchLocations = func(c func()) func() {
 		changed = c
@@ -1684,7 +1685,7 @@ func TestLocationsFollowTheMounts(t *testing.T) {
 	if hs.hasButton("USB stick") {
 		t.Fatal("a mount listed before it came")
 	}
-	locations = append(locations, Place{"USB stick", "/run/media/u/stick", "drive-removable-media-symbolic"})
+	locations = append(locations, Place{Label: "USB stick", Path: "/run/media/u/stick", Icon: "drive-removable-media-symbolic"})
 	changed()
 	hs.settle()
 	if !hs.hasButton("USB stick") {
@@ -1807,10 +1808,10 @@ func TestDragFilesOut(t *testing.T) {
 // sidebar's GThemedIcon does: folder-documents finds folder.
 func TestPlaceIconFallsBackAlongTheName(t *testing.T) {
 	treetest.IconTheme(t, "folder")
-	if treetest.Ink(placeIcon(Place{"Documents", "/d", "folder-documents"})) == 0 {
+	if treetest.Ink(placeIcon(Place{Label: "Documents", Path: "/d", Icon: "folder-documents"})) == 0 {
 		t.Error("a place icon with a present dash-shortened form drew nothing")
 	}
-	if treetest.Ink(placeIcon(Place{"Odd", "/o", "unrelated"})) != 0 {
+	if treetest.Ink(placeIcon(Place{Label: "Odd", Path: "/o", Icon: "unrelated"})) != 0 {
 		t.Error("an absent place icon drew something")
 	}
 }
@@ -2173,7 +2174,7 @@ func TestTheChooserMapsWhilePlacesAndLocationsHold(t *testing.T) {
 	hs.c.d.Places = func() []Place {
 		asked <- "places"
 		<-release
-		return []Place{{"Held", hs.root, "user-home-symbolic"}}
+		return []Place{{Label: "Held", Path: hs.root, Icon: "user-home-symbolic"}}
 	}
 	hs.c.d.Locations = func() []Place {
 		asked <- "locations"

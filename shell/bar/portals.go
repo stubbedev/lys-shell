@@ -79,6 +79,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 		WatchLocations: filechooser.WatchSystemLocations,
 		Drives:         drives,
 		ViewFile:       viewFile,
+		BookmarksFile:  filechooser.BookmarksFile(xdg.OS),
 		RecentFile:     filechooser.RecentFile(),
 		TrashDirs:      filechooser.SystemTrashDirs(home),
 		Target:         func() *app.Output { return dialogOutput(outputs(), focused) },

@@ -100,8 +100,13 @@ type Deps struct {
 	// mounted or not, through; nil, or a nil client while the system
 	// bus is not up, lists the mounts alone.
 	Drives func() *udisks.Client
-	// ViewFile persists the sort and layout; "" keeps them in memory.
+	// ViewFile persists the sort and layout, and beside it the folder
+	// each app last picked in; "" keeps them in memory.
 	ViewFile string
+	// BookmarksFile is the GTK bookmarks file Ctrl+D and a folder
+	// dropped on the sidebar add to, and a bookmark's menu removes
+	// from (BookmarksFile); "" offers no editing.
+	BookmarksFile string
 	// RecentFile is the recently-used list the Recent place lists
 	// (RecentFile()); "" offers no Recent.
 	RecentFile string
@@ -173,8 +178,13 @@ type Chooser struct {
 	moved    bool
 	placedOn string
 
-	// reader lists the folders shown.
+	// reader lists the folders shown; pc completes the location entry.
 	reader *dirReader
+	pc     pathCompletion
+	// viewFile keeps the view, folders the folder each app last picked
+	// in.
+	viewFile stateFile
+	folders  *folderMemory
 	// pv is the preview shown or loading, and previewLoader what loads
 	// one off the loop.
 	pv            previewState
@@ -211,8 +221,8 @@ func newThumbSet() *thumbSet {
 func New(d Deps) *Chooser {
 	c := &Chooser{
 		d: d, view: defaultView, columns: [3]int{90, 150, 90}, thumbnailer: newThumbnailer(), thumbs: newThumbSet(),
-		reader: newDirReader(),
-		size:   widget.Size{W: panelW, H: panelH},
+		reader: newDirReader(), viewFile: stateFile{path: d.ViewFile}, folders: loadFolderMemory(foldersFile(d.ViewFile)),
+		size: widget.Size{W: panelW, H: panelH},
 	}
 	c.previewLoader = c.loadPreview
 	if d.ViewFile != "" {
@@ -289,6 +299,9 @@ func statPath(path string) func() pathStat {
 }
 
 func (c *Chooser) ask(caller portaldialogs.Caller, r request) Result {
+	if r.folder == "" && caller.AppID != "" {
+		r.folder = c.folders.folder(caller.AppID)
+	}
 	r.folder = usableFolder(r.folder)
 	ch := make(chan Result, 1)
 	c.d.Invoke(func() {
@@ -317,6 +330,7 @@ func (c *Chooser) finish(uris []string) {
 	}
 	res := Result{URIs: uris}
 	if len(uris) > 0 {
+		c.rememberFolder(uris[0])
 		if c.s.active >= 0 && c.s.active < len(c.s.filters) {
 			res.Filter = c.s.filters[c.s.active]
 		}
@@ -478,10 +492,12 @@ type ui struct {
 	noticeLabel *widget.Label
 	replace     *widget.Button
 	// location is the typed path entry (Ctrl+L) the crumbs give way to.
-	location *widget.Entry
+	location *locationEntry
 	// newFolder is the row naming a folder to create.
 	newFolder     *widget.Box
 	newFolderName *widget.Entry
+	// favorites is the sidebar's Favorites list.
+	favorites *widget.Box
 	// locations is the sidebar's Locations list, unlock the passphrase
 	// prompt of a locked volume under it.
 	locations *widget.Box
@@ -585,7 +601,10 @@ func (c *Chooser) build(r request) {
 	u.crumbs = widget.NewBox(widget.Row, th.Spacing/4, 0)
 	u.crumbs.AddClass("file-chooser-crumbs")
 	crumbBar.Append(u.crumbs, true)
-	u.location = widget.NewEntry(c.d.Font, widgets.TextPx(styling.Body, 1), 0)
+	combo := widget.NewComboEntry(c.d.Font, widgets.TextPx(styling.Body, 1), nil, "")
+	combo.SetTrailingIcon("", 0, nil)
+	u.location = &locationEntry{ComboEntry: combo, tab: c.tabLocation}
+	u.location.OnChanged = c.completeLocation
 	u.location.AddClass("file-chooser-location")
 	u.location.SetPlaceholder("Type a path")
 	u.location.OnActivate = c.goToLocation
@@ -706,7 +725,7 @@ func viewIcon(grid bool) string {
 // mounts, which refreshLocations rebuilds).
 func (c *Chooser) sidebar(u *ui) widget.Widget {
 	th := widget.Current()
-	box := widget.NewBox(widget.Column, th.Spacing/4, th.Padding)
+	box := &dropZone{Box: widget.NewBox(widget.Column, th.Spacing/4, th.Padding), onDrop: c.droppedOnSidebar}
 	box.AddClass("file-chooser-sidebar")
 	section := func(title string, places []Place) *widget.Box {
 		header := widget.NewBox(widget.Row, 0, 0)
@@ -719,10 +738,9 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 		box.Append(list, false)
 		return list
 	}
-	// Recent and Trash list files to open, never a folder to save in.
-	opening := c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple
+	opening := c.opening()
 	favorites := c.favorites(nil, opening)
-	favoritesList := section("Favorites", favorites)
+	u.favorites = section("Favorites", favorites)
 	u.locations = section("Locations", nil)
 	u.unlock = c.newUnlockRow()
 	box.Append(u.unlock.box, false)
@@ -732,7 +750,7 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 			if c.ui != u {
 				return
 			}
-			c.fillPlaces(favoritesList, c.favorites(places, opening))
+			c.fillPlaces(u.favorites, c.favorites(places, opening))
 			c.fillLocations(locations)
 		})
 	}()
@@ -746,15 +764,19 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	return scroll
 }
 
+// opening reports a pick of files to open: Recent and Trash list
+// files to open, never a folder to save in.
+func (c *Chooser) opening() bool { return c.s.mode == ModeOpenFile || c.s.mode == ModeOpenMultiple }
+
 // favorites is the Favorites list around the user's places.
 func (c *Chooser) favorites(places []Place, opening bool) []Place {
 	var favorites []Place
 	if c.d.RecentFile != "" && opening {
-		favorites = append(favorites, Place{"Recent", recentLocation, "ld-history-symbolic"})
+		favorites = append(favorites, Place{Label: "Recent", Path: recentLocation, Icon: "ld-history-symbolic"})
 	}
 	favorites = append(favorites, places...)
 	if c.d.TrashDirs != nil && opening {
-		favorites = append(favorites, Place{"Trash", trashLocation, "ld-trash-2-symbolic"})
+		favorites = append(favorites, Place{Label: "Trash", Path: trashLocation, Icon: "ld-trash-2-symbolic"})
 	}
 	return favorites
 }
@@ -771,7 +793,12 @@ func placeIcon(p Place) *widget.Icon {
 func (c *Chooser) fillPlaces(list *widget.Box, places []Place) {
 	list.Clear()
 	for _, p := range places {
-		list.Append(c.placeButton(p, func() { c.goTo(p.Path) }), false)
+		b := c.placeButton(p, func() { c.goTo(p.Path) })
+		if !p.Bookmark || c.d.BookmarksFile == "" {
+			list.Append(b, false)
+			continue
+		}
+		list.Append(widget.NewContextMenu(c.d.Font, b, widget.MenuItem{Label: "Remove from Bookmarks", OnClick: func() { c.unbookmark(p.Path) }}), false)
 	}
 }
 
@@ -1081,6 +1108,8 @@ func (c *Chooser) freeThumbs() {
 func (c *Chooser) Close() {
 	c.freeThumbs()
 	c.thumbnailer.work.Close()
+	c.viewFile.wait()
+	c.folders.file.wait()
 }
 
 // --- surface --------------------------------------------------------
@@ -1135,6 +1164,10 @@ func (c *Chooser) show() {
 	if err := win.SetFocus(first); err != nil {
 		log.Printf("file chooser: cannot focus %T: %v", first, err)
 		c.finish(nil)
+		return
+	}
+	if c.s.mode == ModeSave {
+		selectStem(c.ui.name)
 	}
 }
 
@@ -1183,7 +1216,7 @@ func (c *Chooser) key(r *widget.Router, sym xkb.Keysym, mods app.Mods) {
 	}
 	typing := false
 	switch r.Focused().(type) {
-	case *widget.Entry, *widget.SearchEntry:
+	case *widget.Entry, *widget.SearchEntry, *locationEntry:
 		typing = true
 	}
 	ctrl, alt := mods&app.ModCtrl != 0, mods&app.ModAlt != 0
@@ -1206,6 +1239,8 @@ func (c *Chooser) key(r *widget.Router, sym xkb.Keysym, mods app.Mods) {
 		c.showLocation("")
 	case sym == 'f' && ctrl:
 		c.focus(c.ui.search)
+	case sym == 'd' && ctrl:
+		c.bookmark(c.s.dir)
 	}
 }
 
@@ -1389,6 +1424,7 @@ func (c *Chooser) typeAhead(r rune) {
 // text (GTK opens it on Ctrl+L, and on typing / or ~).
 func (c *Chooser) showLocation(text string) {
 	u := c.ui
+	c.pc = pathCompletion{}
 	u.crumbs.SetVisible(false)
 	u.location.SetVisible(true)
 	u.location.SetText(text)
@@ -1565,12 +1601,7 @@ func (c *Chooser) sortBy(col SortColumn) {
 // file, across restarts (best effort).
 func (c *Chooser) saveView() {
 	c.view = c.s.view
-	if c.d.ViewFile == "" {
-		return
-	}
-	if err := os.MkdirAll(filepath.Dir(c.d.ViewFile), 0o700); err == nil {
-		_ = os.WriteFile(c.d.ViewFile, []byte(c.view.String()), 0o600)
-	}
+	c.viewFile.write([]byte(c.view.String()))
 }
 
 // updateSortLabels marks the sort column with its direction.
