@@ -75,8 +75,8 @@ func (f fakeDialogs) ConfirmInstall(_ portaldialogs.Caller, r portaldialogs.Laun
 	return f.yes.Load(), r.Name
 }
 
-func (fakeDialogs) Password(portaldialogs.Caller, portaldialogs.PasswordRequest) (bool, string) {
-	return false, ""
+func (fakeDialogs) Password(portaldialogs.Caller, portaldialogs.PasswordRequest) (bool, string, []portaldialogs.Selection) {
+	return false, "", nil
 }
 
 func (f fakeDialogs) Authenticate(c portaldialogs.Caller, r portaldialogs.AuthRequest) portaldialogs.AuthReply {

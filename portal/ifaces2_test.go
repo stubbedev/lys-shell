@@ -437,11 +437,11 @@ func (f *fakeDialogs) ConfirmInstall(c portaldialogs.Caller, r portaldialogs.Lau
 	return true, "Renamed"
 }
 
-func (f *fakeDialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string) {
+func (f *fakeDialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string, []portaldialogs.Selection) {
 	if !f.answer(c, r) {
-		return false, ""
+		return false, "", nil
 	}
-	return true, "typed"
+	return true, "typed", nil
 }
 
 // The xdg-desktop-portal backend never authenticates (that is

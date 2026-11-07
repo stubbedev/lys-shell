@@ -904,13 +904,14 @@ func TestPasswordAsksOnceOrTwice(t *testing.T) {
 	type answer struct {
 		ok       bool
 		password string
+		picked   []portaldialogs.Selection
 	}
 	run := func(r portaldialogs.PasswordRequest, act func(c app.LayerConfig, entries []*widget.Entry)) answer {
 		t.Helper()
 		got := make(chan answer, 1)
 		go func() {
-			ok, pw := hs.h.Password(portaldialogs.Caller{Handle: "/r/p"}, r)
-			got <- answer{ok, pw}
+			ok, pw, picked := hs.h.Password(portaldialogs.Caller{Handle: "/r/p"}, r)
+			got <- answer{ok, pw, picked}
 		}()
 		c := hs.open(t)
 		entries := treetest.All[*widget.Entry](c.Root)
@@ -973,5 +974,29 @@ func TestPasswordAsksOnceOrTwice(t *testing.T) {
 	})
 	if !r.ok || r.password != "one" {
 		t.Errorf("new password = %+v", r)
+	}
+
+	remember := portaldialogs.Choice{ID: "remember", Label: "Remember in the login keyring"}
+	r = run(portaldialogs.PasswordRequest{Title: "Key", AcceptLabel: "Update", CancelLabel: "Keep the old password", Choices: []portaldialogs.Choice{remember}}, func(c app.LayerConfig, entries []*widget.Entry) {
+		treetest.Button(t, c.Root, "Keep the old password")
+		checks := treetest.All[*widget.CheckButton](c.Root)
+		if len(checks) != 1 || checks[0].Checked() {
+			t.Fatalf("the choice shows as %d check buttons", len(checks))
+		}
+		hs.do(func() {
+			checks[0].SetChecked(true)
+			entries[0].SetText("phrase")
+			treetest.Button(t, c.Root, "Update").OnClick()
+		})
+	})
+	if !r.ok || r.password != "phrase" || !slices.Equal(r.picked, []portaldialogs.Selection{{ID: "remember", Value: "true"}}) {
+		t.Errorf("a password with a choice = %+v", r)
+	}
+
+	r = run(portaldialogs.PasswordRequest{Title: "Key", CancelLabel: "Keep the old password", Choices: []portaldialogs.Choice{remember}}, func(c app.LayerConfig, _ []*widget.Entry) {
+		hs.do(func() { treetest.Button(t, c.Root, "Keep the old password").OnClick() })
+	})
+	if r.ok || r.password != "" || r.picked != nil {
+		t.Errorf("a cancelled password with a choice = %+v", r)
 	}
 }

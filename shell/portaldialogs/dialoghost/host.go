@@ -1,6 +1,7 @@
 package dialoghost
 
 import (
+	"cmp"
 	"log"
 	"path/filepath"
 	"slices"
@@ -232,9 +233,12 @@ func (h *Dialogs) Account(c portaldialogs.Caller, reason string, info portaldial
 }
 
 // Password asks for a password in a masked entry; with Confirm it asks
-// twice and accepts only matching, non-empty entries. Enter submits.
-func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string) {
-	return h.ask(c, func(answer func(bool, string)) widget.Widget {
+// twice and accepts only matching, non-empty entries. The request's
+// choices sit under the entries, and its labels name the buttons. Enter
+// submits.
+func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string, []portaldialogs.Selection) {
+	var picked []portaldialogs.Selection
+	ok, password := h.ask(c, func(answer func(bool, string)) widget.Widget {
 		entry := h.passwordEntry("Password")
 		rows := []widget.Widget{entry}
 		var again *widget.Entry
@@ -242,6 +246,8 @@ func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordReque
 			again = h.passwordEntry("Repeat the password")
 			rows = append(rows, again)
 		}
+		choices, collect := widgets.ChoiceRows(h.d.Font, r.Choices, "portal-dialog-choice")
+		rows = append(rows, choices...)
 		status := h.label("", "portal-dialog-error")
 		if r.Retry {
 			status.SetText("The password was wrong. Try again.")
@@ -255,6 +261,7 @@ func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordReque
 			case again != nil && again.Text() != entry.Text():
 				status.SetText("The passwords do not match.")
 			default:
+				picked = collect()
 				answer(true, entry.Text())
 			}
 		}
@@ -266,12 +273,16 @@ func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordReque
 		if again != nil {
 			again.OnActivate = func(string) { submit() }
 		}
-		action := "Unlock"
+		action := cmp.Or(r.AcceptLabel, "Unlock")
 		if r.Confirm {
-			action = "Continue"
+			action = cmp.Or(r.AcceptLabel, "Continue")
 		}
-		return h.surface(r.Title, r.Body, rows, h.cancel("Cancel", answer), h.accept(action, submit))
+		return h.surface(r.Title, r.Body, rows, h.cancel(cmp.Or(r.CancelLabel, "Cancel"), answer), h.accept(action, submit))
 	})
+	if !ok {
+		return false, "", nil
+	}
+	return true, password, picked
 }
 
 // passwordEntry is a masked dialog entry.
