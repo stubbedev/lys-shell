@@ -3093,6 +3093,66 @@
         ""
       ]
     },
+    "IdleConfig": {
+      "description": "Built-in idle policy: dim, lock, screens off, suspend, lock before sleep.\n\nEach stage runs after the session has been idle for its timeout, with\nseparate timeouts on AC and on battery.\n\nIdle inhibitors hold every stage: a video or game holding the\ncompositor's idle inhibitor, the idle-inhibit module's toggle, a\nsandboxed app through the portal, and apps calling\n`org.freedesktop.ScreenSaver.Inhibit`. Turn `enable` off to leave idle to\nswayidle or hypridle instead.",
+      "properties": {
+        "dim": {
+          "$ref": "#/$defs/IdleTimeouts",
+          "default": {
+            "ac": "4m",
+            "battery": "2m"
+          },
+          "description": "Idle time before the backlights dim."
+        },
+        "dim-percent": {
+          "$ref": "#/$defs/IdleDimPercent",
+          "default": 30,
+          "description": "Share of its level, in percent, a dimmed backlight keeps. Input\nrestores the exact level it had."
+        },
+        "enable": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Run the built-in idle policy. Turn it off when swayidle or hypridle\nhandles idle, so the two do not both act."
+        },
+        "lock": {
+          "$ref": "#/$defs/IdleTimeouts",
+          "default": {
+            "ac": "5m",
+            "battery": "3m"
+          },
+          "description": "Idle time before the session locks (through logind, which starts the\nlock screen)."
+        },
+        "lock-before-sleep": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Lock the session before the system sleeps (a lid close, a suspend\nfrom any program), and hold the sleep until the lock screen is up, so\nthe machine always wakes locked."
+        },
+        "screen-off": {
+          "$ref": "#/$defs/IdleTimeouts",
+          "default": {
+            "ac": "10m",
+            "battery": "5m"
+          },
+          "description": "Idle time before the outputs power off. Input powers them back on."
+        },
+        "suspend": {
+          "$ref": "#/$defs/IdleTimeouts",
+          "default": {
+            "ac": "never",
+            "battery": "15m"
+          },
+          "description": "Idle time before the system suspends."
+        }
+      },
+      "type": "object"
+    },
+    "IdleDimPercent": {
+      "description": "Percentage from 1 to 100.",
+      "format": "struct",
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+    },
     "IdleInhibitConfig": {
       "description": "Toggle that prevents screen dim, lock, and suspend while active.\n\nControllable from the CLI: `lys-shell idle on|off|duration|remaining|status`.",
       "properties": {
@@ -3215,6 +3275,27 @@
       "maximum": 71582788,
       "minimum": 0,
       "type": "integer"
+    },
+    "IdleTimeout": {
+      "description": "Idle time as a duration (`90s`, `5m`, `1h30m`) from 1s up, or `never`.",
+      "pattern": "^(never|([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+)$",
+      "type": "string"
+    },
+    "IdleTimeouts": {
+      "description": "Idle timeouts on AC and on battery.",
+      "properties": {
+        "ac": {
+          "$ref": "#/$defs/IdleTimeout",
+          "default": "4m",
+          "description": "Timeout on AC power."
+        },
+        "battery": {
+          "$ref": "#/$defs/IdleTimeout",
+          "default": "2m",
+          "description": "Timeout on battery."
+        }
+      },
+      "type": "object"
     },
     "KeybindModeConfig": {
       "description": "Current keybind-mode indicator for modal compositors.",
@@ -11081,6 +11162,31 @@
         "tearing-mode": false
       },
       "description": "General lys-shell settings."
+    },
+    "idle": {
+      "$ref": "#/$defs/IdleConfig",
+      "default": {
+        "dim": {
+          "ac": "4m",
+          "battery": "2m"
+        },
+        "dim-percent": 30,
+        "enable": true,
+        "lock": {
+          "ac": "5m",
+          "battery": "3m"
+        },
+        "lock-before-sleep": true,
+        "screen-off": {
+          "ac": "10m",
+          "battery": "5m"
+        },
+        "suspend": {
+          "ac": "never",
+          "battery": "15m"
+        }
+      },
+      "description": "Built-in idle policy: dim, lock, screens off and suspend."
     },
     "imports": {
       "default": [],

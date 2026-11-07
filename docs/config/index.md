@@ -23,6 +23,7 @@ Editor intellisense via JSON Schema. Install the [YAML extension](https://market
 | [`dock`](/config/dock) | A dock of pinned apps and open windows, on its own surface beside the bar. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
+| [`idle`](/config/idle) | Built-in idle policy: dim, lock, screens off, suspend, lock before sleep. |
 | [`launcher`](/config/launcher) | Application launcher / dmenu (rofi replacement). |
 | [`login`](/config/login) | Login screen: the greeter and the lock screen, one screen in two modes. |
 | [`mail-account`](/config/mail-account) | One mail account in the `modules.mail` per-account breakdown. |

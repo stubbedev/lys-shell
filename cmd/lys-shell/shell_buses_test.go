@@ -14,7 +14,7 @@ import (
 var shellSessionNames = []string{
 	"dev.stubbe.lys.shell", "dev.stubbe.lys.Shell1", "dev.stubbe.lys.Wallpaper1",
 	"dev.stubbe.lys.Audio1", "dev.stubbe.lys.Brightness1", "dev.stubbe.lys.Recorder1",
-	"dev.stubbe.lys.Notifications1", "org.freedesktop.Notifications", "dev.stubbe.lys.IdleInhibit1",
+	"dev.stubbe.lys.Notifications1", "org.freedesktop.Notifications", "dev.stubbe.lys.IdleInhibit1", "org.freedesktop.ScreenSaver",
 	"dev.stubbe.lys.Media1", "dev.stubbe.lys.SystemTray1", "dev.stubbe.lys.Screenshot1",
 	"dev.stubbe.lys.SharePicker1", "dev.stubbe.lys.PortalDialogs1", "dev.stubbe.lys.FileChooser1",
 	"dev.stubbe.lys.Print1",

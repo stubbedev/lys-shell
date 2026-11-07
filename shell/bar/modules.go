@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
+	"github.com/stubbedev/lys-shell/service/idle"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/mail"
 	"github.com/stubbedev/lys-shell/service/mpris"
@@ -54,6 +55,8 @@ type ModuleContext struct {
 	Networking    *network.Service // secret agent, VPNs, wifi; nil without NM
 	PowerProfiles powerprofiles.Source
 	IdleInhibit   *idleinhibit.State
+	// Idle is the built-in idle policy, nil when it does not run.
+	Idle          *idle.Service
 	Treeman       treeman.Source
 	Notifications *notifications.Service
 	Recorder      *recorder.State

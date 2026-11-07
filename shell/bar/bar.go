@@ -221,6 +221,7 @@ type shellStart struct {
 	lateStarts   map[string]lateStart
 	backlights   *brightness.System
 	inhibitState *idleinhibit.State
+	idle         *idlePolicy
 	weatherSvc   *weather.Service
 	notifSvc     *notifications.Service
 	customUpd    *customUpdates
@@ -298,6 +299,12 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 	}
 	s.backlights = backlights
 	s.down.add(func() { _ = backlights.Close() })
+	idlePolicy, stopIdle := startIdlePolicy(s.system, backlights, s.cfg.Idle)
+	s.idle = idlePolicy
+	s.down.add(stopIdle)
+	if idlePolicy != nil {
+		s.ctx.Idle = idlePolicy.svc
+	}
 	s.ctx.Brightness = backlights
 	s.down.add(func() { _ = audio.Close() })
 	s.ctx.Pulse = audio
@@ -654,6 +661,9 @@ func (s *shellStart) mount() {
 			}
 			osdSrv.SetConfig(next)
 			s.backlights.SetExternal(next.Brightness.EnableExternal)
+			if s.idle != nil {
+				s.idle.configure(next.Idle)
+			}
 			applyNotificationConfig(s.notifSvc, next.Notification)
 			s.weatherSvc.Configure(weatherSettings(next.Weather))
 			if s.wall != nil {

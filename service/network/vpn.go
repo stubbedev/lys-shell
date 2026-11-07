@@ -17,6 +17,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/service/logind"
 )
 
 // This file is VPN state and control with NetworkManager as the single
@@ -154,7 +155,7 @@ func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, 
 		[]dbus.MatchOption{dbus.WithMatchObjectPath(nmPath), dbus.WithMatchInterface(properties), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, nmIface)},
 		[]dbus.MatchOption{dbus.WithMatchInterface(activeIface), dbus.WithMatchMember("StateChanged")},
 		dbusx.OwnerMatch(BusName),
-		[]dbus.MatchOption{dbus.WithMatchObjectPath(login1Path), dbus.WithMatchInterface(login1Iface), dbus.WithMatchMember("PrepareForSleep")},
+		logind.PrepareForSleepMatch(),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("network: watch VPNs: %w", err)
@@ -568,11 +569,9 @@ func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepR
 			reason, _ := sig.Body[1].(uint32)
 			s.stateChanged(sig.Path, state, reason)
 		}
-	case login1Iface + ".PrepareForSleep":
-		if len(sig.Body) == 1 {
-			if start, ok := sig.Body[0].(bool); ok {
-				sleep.prepareForSleep(ctx, start)
-			}
+	case logind.PrepareForSleep.Name():
+		if s, err := logind.PrepareForSleep.Decode(sig); err == nil {
+			sleep.prepareForSleep(ctx, s.Start)
 		}
 	default:
 		if oldOwner, newOwner, ok := dbusx.NameOwnerChange(sig, BusName); ok {

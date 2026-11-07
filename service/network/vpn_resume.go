@@ -26,11 +26,6 @@ import (
 // stays off, and nothing is recorded across a reboot, so this can never
 // become a VPN that dials itself unattended.
 
-const (
-	login1Path  = "/org/freedesktop/login1"
-	login1Iface = "org.freedesktop.login1.Manager"
-)
-
 // resumeTiming is resume.rs's constants, injectable for tests.
 type resumeTiming struct {
 	// networkWait is how long to wait for the network after a wake;

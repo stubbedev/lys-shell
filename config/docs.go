@@ -124,6 +124,7 @@ func docSpecs() []docSpec {
 		top("dock", docStandard(), func(c *Config) any { return &c.Dock }),
 		top("dropdowns", docStandard(), func(c *Config) any { return &c.Dropdowns }),
 		top("general", docStandard(), func(c *Config) any { return &c.General }),
+		top("idle", docStandard(), func(c *Config) any { return &c.Idle }),
 		top("launcher", docStandard(), func(c *Config) any { return &c.Launcher }),
 		top("login", docStandard(), func(c *Config) any { return &c.Login }),
 		top("osd", docStandard(), func(c *Config) any { return &c.Osd }),

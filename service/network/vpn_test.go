@@ -12,6 +12,7 @@ import (
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/service/logind"
 	"github.com/stubbedev/lys-shell/service/network/openconnect"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
 )
@@ -409,8 +410,7 @@ func TestTheSSOCallbackReachesAWaitingSignIn(t *testing.T) {
 // sleep emits logind's PrepareForSleep from its own peer.
 func (fx *serviceFixture) sleep(t *testing.T, start bool) {
 	t.Helper()
-	logind := fx.nm.bus.Conn(t)
-	must(t, logind.Emit(login1Path, login1Iface+".PrepareForSleep", start))
+	must(t, logind.PrepareForSleep.Emit(fx.nm.bus.Conn(t), logind.ManagerPath, logind.Sleep{Start: start}))
 }
 
 func TestATunnelUpAtSuspendIsBroughtBackUnattendedOnWake(t *testing.T) {

@@ -4,6 +4,7 @@
 package logindtest
 
 import (
+	"io"
 	"os"
 	"testing"
 
@@ -18,6 +19,16 @@ const errNoSuchSession = "org.freedesktop.login1.NoSuchSession"
 
 // autoPath is logind's session object alias for the "auto" session.
 const autoPath = logind.ManagerPath + "/session/auto"
+
+// The entries Events records, in the order they happen.
+const (
+	EventLock              = "lock"
+	EventLockedHint        = "locked-hint"
+	EventUnlockedHint      = "unlocked-hint"
+	EventInhibit           = "inhibit"
+	EventInhibitorReleased = "inhibitor-released"
+	EventSuspend           = "suspend"
+)
 
 // Logind is the fake. Its manager resolves "auto" to the user's display
 // session, and "self" to nothing, since the caller is in no session.
@@ -34,7 +45,16 @@ type Logind struct {
 	// LockedHint is what the sessions report for LockedHint.
 	LockedHint dbustest.Var[bool]
 	// Asked counts the GetSession calls, so a test can tell nobody came.
-	Asked   dbustest.Var[int]
+	Asked dbustest.Var[int]
+	// Events lists the lock, LockedHint, inhibitor and suspend events in
+	// the order they happened.
+	Events dbustest.Var[[]string]
+	// Inhibitors counts the sleep delay inhibitors held now.
+	Inhibitors dbustest.Var[int]
+	// OnLock runs after a Lock is recorded, as the lock screen answering
+	// logind's Lock signal would; nil does nothing.
+	OnLock  dbustest.Var[func()]
+	conn    *dbus.Conn
 	display dbus.ObjectPath
 }
 
@@ -44,6 +64,7 @@ func Start(t *testing.T, display dbus.ObjectPath) *Logind {
 	t.Helper()
 	l := &Logind{Bus: dbustest.Start(t), display: display}
 	conn := l.Bus.Conn(t)
+	l.conn = conn
 	if err := conn.Export(manager{l}, logind.ManagerPath, logind.ManagerIf); err != nil {
 		t.Fatalf("logindtest: export the manager: %v", err)
 	}
@@ -78,6 +99,27 @@ func StartUnit(t *testing.T, display dbus.ObjectPath) *Logind {
 	return l
 }
 
+// SetLockedHint changes the display session's LockedHint and announces it
+// with PropertiesChanged, as logind does when the lock screen sets it.
+func (l *Logind) SetLockedHint(locked bool) error {
+	l.LockedHint.Store(locked)
+	event := EventUnlockedHint
+	if locked {
+		event = EventLockedHint
+	}
+	l.record(event)
+	return l.conn.Emit(l.display, "org.freedesktop.DBus.Properties.PropertiesChanged", logind.SessionIf, map[string]dbus.Variant{"LockedHint": dbus.MakeVariant(locked)}, []string{})
+}
+
+// PrepareForSleep emits the manager's PrepareForSleep(start).
+func (l *Logind) PrepareForSleep(start bool) error {
+	return logind.PrepareForSleep.Emit(l.conn, logind.ManagerPath, logind.Sleep{Start: start})
+}
+
+func (l *Logind) record(event string) {
+	l.Events.Update(func(events []string) []string { return append(events, event) })
+}
+
 type manager struct{ l *Logind }
 
 func (m manager) GetSession(name string) (dbus.ObjectPath, *dbus.Error) {
@@ -96,6 +138,30 @@ func (m manager) LockSession(name string) *dbus.Error {
 	return session{m.l, path}.Lock()
 }
 
+func (m manager) Suspend(bool) *dbus.Error {
+	m.l.record(EventSuspend)
+	return nil
+}
+
+func (m manager) Inhibit(what, _, _, mode string) (*os.File, *dbus.Error) {
+	if what != "sleep" || mode != "delay" {
+		return nil, dbus.NewError("org.freedesktop.DBus.Error.NotSupported", []any{"the fake takes sleep delay inhibitors only"})
+	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, dbus.MakeFailedError(err)
+	}
+	m.l.Inhibitors.Update(func(n int) int { return n + 1 })
+	m.l.record(EventInhibit)
+	go func() {
+		_, _ = io.Copy(io.Discard, r)
+		_ = r.Close()
+		m.l.Inhibitors.Update(func(n int) int { return n - 1 })
+		m.l.record(EventInhibitorReleased)
+	}()
+	return w, nil
+}
+
 type session struct {
 	l    *Logind
 	path dbus.ObjectPath
@@ -108,6 +174,10 @@ func (s session) Terminate() *dbus.Error {
 
 func (s session) Lock() *dbus.Error {
 	s.l.Locked.Update(func(paths []dbus.ObjectPath) []dbus.ObjectPath { return append(paths, s.path) })
+	s.l.record(EventLock)
+	if hook := s.l.OnLock.Load(); hook != nil {
+		go hook()
+	}
 	return nil
 }
 

@@ -133,6 +133,8 @@ func deviceFromProps(props map[string]dbus.Variant) Device {
 // DisplayDevicePath is UPower's composite device across all batteries.
 const DisplayDevicePath = "/org/freedesktop/UPower/devices/DisplayDevice"
 
+const managerPath = dbus.ObjectPath("/org/freedesktop/UPower")
+
 const (
 	// BusName is UPower's well-known name on the system bus.
 	BusName             = "org.freedesktop.UPower"
@@ -188,10 +190,28 @@ func (s *System) EnableChargeThreshold(ctx context.Context, enabled bool) error 
 // Subscribe matches PropertiesChanged for the DisplayDevice and ticks
 // the channel per signal. The match is removed by stop.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	if err := s.conn.AddMatchSignal(
-		dbus.WithMatchObjectPath(s.path),
-		dbus.WithMatchInterface(propertiesInterface),
-	); err != nil {
+	return s.subscribe(ctx, s.path)
+}
+
+// OnBattery reads UPower's OnBattery: the machine runs on its battery.
+func (s *System) OnBattery(ctx context.Context) (bool, error) {
+	var on bool
+	err := s.conn.Object(BusName, managerPath).CallWithContext(ctx, propertiesInterface+".Get", 0, BusName, "OnBattery").Store(&on)
+	if err != nil {
+		return false, fmt.Errorf("upower: read OnBattery: %w", err)
+	}
+	return on, nil
+}
+
+// SubscribeOnBattery ticks per PropertiesChanged of UPower itself, which
+// carries OnBattery. The match is removed by stop.
+func (s *System) SubscribeOnBattery(ctx context.Context) (<-chan struct{}, func(), error) {
+	return s.subscribe(ctx, managerPath)
+}
+
+func (s *System) subscribe(ctx context.Context, path dbus.ObjectPath) (<-chan struct{}, func(), error) {
+	match := []dbus.MatchOption{dbus.WithMatchObjectPath(path), dbus.WithMatchInterface(propertiesInterface)}
+	if err := s.conn.AddMatchSignal(match...); err != nil {
 		return nil, nil, fmt.Errorf("upower: match signal: %w", err)
 	}
 	ticks := make(chan struct{}, 1)
@@ -207,7 +227,7 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 				if !ok {
 					return
 				}
-				if sig.Path != s.path || sig.Name != propertiesInterface+".PropertiesChanged" {
+				if sig.Path != path || sig.Name != propertiesInterface+".PropertiesChanged" {
 					continue
 				}
 				select {
@@ -218,10 +238,7 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 		}
 	}()
 	stop := func() {
-		_ = s.conn.RemoveMatchSignal(
-			dbus.WithMatchObjectPath(s.path),
-			dbus.WithMatchInterface(propertiesInterface),
-		)
+		_ = s.conn.RemoveMatchSignal(match...)
 		s.conn.RemoveSignal(signals)
 	}
 	return ticks, stop, nil

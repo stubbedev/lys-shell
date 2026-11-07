@@ -2,6 +2,7 @@ package idleinhibit
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -18,9 +19,10 @@ type Daemon struct {
 // NewDaemon wraps the state for export.
 func NewDaemon(state *State) *Daemon { return &Daemon{state: state} }
 
-// Export serves the interface under its well-known name and releases
-// the holds of every caller that leaves the bus; the returned release
-// stops both.
+// Export serves the interface under its well-known name, and
+// org.freedesktop.ScreenSaver on the same holds unless another program
+// owns that name, and releases the holds of every caller that leaves the
+// bus; the returned release stops all of it.
 func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	d.conn = conn
 	match := []dbus.MatchOption{
@@ -42,7 +44,13 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 		_ = conn.RemoveMatchSignal(match...)
 		return nil, err
 	}
+	screenSaver, err := d.serveScreenSaver(conn)
+	if err != nil {
+		log.Printf("%v; apps calling org.freedesktop.ScreenSaver hold idle through its owner, not lys-shell", err)
+		screenSaver = func() {}
+	}
 	return func() {
+		screenSaver()
 		release()
 		conn.RemoveSignal(signals)
 		close(done)

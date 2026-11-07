@@ -61,6 +61,8 @@ type Config struct {
 	Portal PortalConfig `cfg:"portal"`
 	// Clipboard history settings.
 	Clipboard ClipboardConfig `cfg:"clipboard"`
+	// Built-in idle policy: dim, lock, screens off and suspend.
+	Idle IdleConfig `cfg:"idle"`
 }
 
 // Defaults returns the schema defaults for every section.
@@ -81,6 +83,7 @@ func Defaults() *Config {
 		Wallpaper:     DefaultsWallpaper(),
 		Portal:        DefaultsPortal(),
 		Clipboard:     DefaultsClipboard(),
+		Idle:          DefaultsIdle(),
 	}
 }
 

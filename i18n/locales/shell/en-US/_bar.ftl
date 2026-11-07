@@ -26,6 +26,15 @@ bar-window-title-empty = Desktop
 ## Idle Inhibit
 bar-idle-inhibit-on = On
 bar-idle-inhibit-off = Off
+bar-idle-policy-off = The built-in idle policy is off
+bar-idle-held-by = Idle held by { $holders }
+bar-idle-held-by-you = you
+bar-idle-all-reached = Every idle stage has run
+bar-idle-next = Next: { $stage } after { $after } idle
+bar-idle-stage-dim = dim
+bar-idle-stage-lock = lock
+bar-idle-stage-screen-off = screens off
+bar-idle-stage-suspend = suspend
 
 ## Recorder
 bar-recorder-idle = Idle

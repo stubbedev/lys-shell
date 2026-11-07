@@ -1,12 +1,14 @@
 // Package logind is systemd-logind on the system bus as lys-shell uses
-// it: the user's session resolved without the environment, and logging
-// out of it.
+// it: the user's session resolved without the environment, logging out
+// of it, locking it, suspending, and holding sleep off until it is locked.
 package logind
 
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -45,4 +47,41 @@ func Logout(ctx context.Context, conn *dbus.Conn) error {
 		return fmt.Errorf("log out: logind Terminate %s: %w", path, err)
 	}
 	return nil
+}
+
+// Sleep is PrepareForSleep's argument: true as the system is about to
+// sleep, false once it has woken.
+type Sleep struct{ Start bool }
+
+// PrepareForSleep is the manager's signal around a suspend or hibernate.
+var PrepareForSleep = dbusx.NewSignal[Sleep](ManagerIf, "PrepareForSleep")
+
+// PrepareForSleepMatch matches PrepareForSleep from the manager.
+func PrepareForSleepMatch() []dbus.MatchOption {
+	return []dbus.MatchOption{dbus.WithMatchObjectPath(ManagerPath), dbus.WithMatchInterface(ManagerIf), dbus.WithMatchMember("PrepareForSleep")}
+}
+
+// Suspend asks logind to suspend the system, not interactively: a polkit
+// prompt is never shown for it.
+func Suspend(ctx context.Context, conn *dbus.Conn) error {
+	if err := conn.Object(Service, ManagerPath).CallWithContext(ctx, ManagerIf+".Suspend", 0, false).Err; err != nil {
+		return fmt.Errorf("logind Suspend: %w", err)
+	}
+	return nil
+}
+
+// InhibitSleep takes a delay inhibitor on sleep for who, saying why: logind
+// waits (up to its InhibitDelayMaxSec) before sleeping until the returned
+// file is closed.
+func InhibitSleep(ctx context.Context, conn *dbus.Conn, who, why string) (*os.File, error) {
+	var fd dbus.UnixFD
+	err := conn.Object(Service, ManagerPath).CallWithContext(ctx, ManagerIf+".Inhibit", 0, "sleep", who, why, "delay").Store(&fd)
+	if err != nil {
+		return nil, fmt.Errorf("logind Inhibit sleep delay for %s: %w", who, err)
+	}
+	f, err := dbusx.File(fd, "logind sleep inhibitor")
+	if err != nil {
+		return nil, fmt.Errorf("logind Inhibit sleep delay for %s: %w", who, err)
+	}
+	return f, nil
 }

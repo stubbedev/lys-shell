@@ -2,8 +2,10 @@ package bar
 
 import (
 	"log"
+	"maps"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -11,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/jinja"
+	"github.com/stubbedev/lys-shell/service/idle"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 )
 
@@ -63,6 +66,10 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 	m.render()
 	changes, stop := state.Changes()
 	follow(m.ctx, changes, stop, func(struct{}) { m.render() })
+	if policy := ctx.Idle; policy != nil {
+		changes, stop := policy.Changes()
+		follow(m.ctx, changes, stop, func(struct{}) { m.render() })
+	}
 	return m, nil
 }
 
@@ -75,6 +82,7 @@ func (m *idleInhibitModule) render() {
 		text = idleInhibitLabel(cfg.Format, snap.Active, snap.Duration, snap.RemainingS)
 	}
 	m.btn.SetLabel(text)
+	m.btn.SetTooltip(idleTooltip(m.ctx.Idle, m.state))
 	if setter := m.icon; setter != nil {
 		icon := cfg.Icons()[config.IdleInhibitInactive]
 		if snap.Active {
@@ -136,4 +144,35 @@ func (h *idleHolder) drop() {
 		h.release()
 	}
 	h.host, h.release = nil, nil
+}
+
+func idleTooltip(policy *idle.Service, state *idleinhibit.State) string {
+	if policy == nil {
+		return i18n.T("bar-idle-policy-off")
+	}
+	status := policy.Status()
+	if !status.Enabled {
+		return i18n.T("bar-idle-policy-off")
+	}
+	if state.Inhibiting() {
+		return i18n.T("bar-idle-held-by", i18n.Str("holders", strings.Join(idleHolders(state), ", ")))
+	}
+	next, ok := status.Next()
+	if !ok {
+		return i18n.T("bar-idle-all-reached")
+	}
+	return i18n.T("bar-idle-next", i18n.Str("stage", i18n.T("bar-idle-stage-"+next.Stage.String())), i18n.Str("after", idle.FormatDuration(next.After)))
+}
+
+func idleHolders(state *idleinhibit.State) []string {
+	holds := state.Holds()
+	names := make([]string, 0, len(holds)+1)
+	if state.Active() {
+		names = append(names, i18n.T("bar-idle-held-by-you"))
+	}
+	ids := slices.Sorted(maps.Keys(holds))
+	for _, id := range ids {
+		names = append(names, holds[id].App)
+	}
+	return names
 }

@@ -567,6 +567,14 @@ An icon theme name.
 
 String.
 
+## IdleDimPercent {#idle-dim-percent}
+
+Percentage from 1 to 100.
+
+Number in `[1, 100]`.
+
+Serialises as `struct`.
+
 ## IdleInhibitDuration {#idle-inhibit-duration}
 
 Idle inhibit duration in whole minutes, 0 for indefinite.
@@ -574,6 +582,21 @@ Idle inhibit duration in whole minutes, 0 for indefinite.
 Number in `[0, 71582788]`.
 
 Serialises as `uint32`.
+
+## IdleTimeout {#idle-timeout}
+
+Idle time as a duration (`90s`, `5m`, `1h30m`) from 1s up, or `never`.
+
+String matching `^(never|([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+)$`.
+
+## IdleTimeouts {#idle-timeouts}
+
+Idle timeouts on AC and on battery.
+
+| Field | Description |
+|---|---|
+| `ac` | Timeout on AC power. |
+| `battery` | Timeout on battery. |
 
 ## LabelStrategy {#label-strategy}
 

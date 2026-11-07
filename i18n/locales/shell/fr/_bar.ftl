@@ -26,6 +26,15 @@ bar-window-title-empty = Bureau
 ## Inhibition de la veille
 bar-idle-inhibit-on = Activé
 bar-idle-inhibit-off = Désactivé
+bar-idle-policy-off = La gestion intégrée de l'inactivité est désactivée
+bar-idle-held-by = Inactivité retenue par { $holders }
+bar-idle-held-by-you = vous
+bar-idle-all-reached = Toutes les étapes d'inactivité ont eu lieu
+bar-idle-next = Prochaine étape : { $stage } après { $after } d'inactivité
+bar-idle-stage-dim = assombrir
+bar-idle-stage-lock = verrouiller
+bar-idle-stage-screen-off = éteindre les écrans
+bar-idle-stage-suspend = mettre en veille
 
 ## Enregistreur
 bar-recorder-idle = Inactif

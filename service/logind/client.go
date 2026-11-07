@@ -119,3 +119,66 @@ func SystemClient(ctx context.Context, what string) *Client {
 	}
 	return l
 }
+
+// Lock asks logind to lock the session: logind sends the session's Lock
+// signal, which the lock screen answers.
+func (l *Client) Lock(ctx context.Context) error {
+	if err := l.conn.Object(Service, l.path).CallWithContext(ctx, SessionIf+".Lock", 0).Err; err != nil {
+		return fmt.Errorf("logind: Lock %s: %w", l.path, err)
+	}
+	return nil
+}
+
+// WaitLocked returns once the session's LockedHint is true, or with ctx's
+// error when it ends first.
+func (l *Client) WaitLocked(ctx context.Context) error {
+	opts := []dbus.MatchOption{
+		dbus.WithMatchObjectPath(l.path),
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchMember("PropertiesChanged"),
+		dbus.WithMatchArg(0, SessionIf),
+	}
+	if err := l.conn.AddMatchSignalContext(ctx, opts...); err != nil {
+		return fmt.Errorf("logind: watch LockedHint of %s: %w", l.path, err)
+	}
+	defer func() {
+		removing, removed := context.WithTimeout(context.Background(), CallTimeout)
+		defer removed()
+		_ = l.conn.RemoveMatchSignalContext(removing, opts...)
+	}()
+	signals := make(chan *dbus.Signal, 8)
+	l.conn.Signal(signals)
+	defer l.conn.RemoveSignal(signals)
+	locked, err := l.LockedHint(ctx)
+	if err != nil {
+		return err
+	}
+	for !locked {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("logind: wait for LockedHint of %s: %w", l.path, ctx.Err())
+		case sig, ok := <-signals:
+			if !ok {
+				return fmt.Errorf("logind: wait for LockedHint of %s: the bus connection closed", l.path)
+			}
+			locked = lockedHintChanged(sig, l.path)
+		}
+	}
+	return nil
+}
+
+func lockedHintChanged(sig *dbus.Signal, path dbus.ObjectPath) bool {
+	if sig.Path != path || sig.Name != "org.freedesktop.DBus.Properties.PropertiesChanged" || len(sig.Body) < 2 {
+		return false
+	}
+	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return false
+	}
+	v, ok := changed["LockedHint"]
+	if !ok {
+		return false
+	}
+	locked, ok := v.Value().(bool)
+	return ok && locked
+}
