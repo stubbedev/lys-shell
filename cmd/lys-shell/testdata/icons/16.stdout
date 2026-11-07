@@ -1,4 +1,4 @@
-Would install 62 icons:
+Would install 64 icons:
   cm-gone-symbolic (no auto-install: import manually)
   ld-activity-symbolic (from lucide)
   ld-alert-triangle-symbolic (from lucide)
@@ -25,6 +25,7 @@ Would install 62 icons:
   ld-ethernet-port-symbolic (from lucide)
   ld-globe-symbolic (from lucide)
   ld-hard-drive-symbolic (from lucide)
+  ld-history-symbolic (from lucide)
   ld-keyboard-symbolic (from lucide)
   ld-layers-symbolic (from lucide)
   ld-leaf-symbolic (from lucide)
@@ -53,6 +54,7 @@ Would install 62 icons:
   ld-volume-2-symbolic (from lucide)
   ld-volume-symbolic (from lucide)
   ld-volume-x-symbolic (from lucide)
+  ld-webcam-symbolic (from lucide)
   ld-wifi-high-symbolic (from lucide)
   ld-wifi-low-symbolic (from lucide)
   ld-wifi-off-symbolic (from lucide)
