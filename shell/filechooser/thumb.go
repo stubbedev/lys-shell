@@ -79,25 +79,77 @@ func newThumbnailer() *thumbnailer {
 // its decode's bytes in the budget, and gives up with ctx's error once
 // ctx is done. The caller frees the result.
 func (th *thumbnailer) thumbnail(ctx context.Context, path, mimeType string, px int) (thumbRaster, error) {
+	var out thumbRaster
+	err := th.withWorker(ctx, func() error {
+		src, err := th.source(ctx, path, mimeType, px)
+		if err == nil {
+			out, err = th.squareCrop(src, px)
+		}
+		return err
+	})
+	return out, err
+}
+
+// preview is the file's image fitted into a w x h box, its aspect kept
+// and never scaled up, and the source's pixel size: a raster image
+// decoded whole within the budget, else the large thumbnail the cache
+// holds or a thumbnailer makes (whose source size is not known). The
+// caller frees the result.
+func (th *thumbnailer) preview(ctx context.Context, path, mimeType string, w, h int) (thumbRaster, image.Point, error) {
+	var out thumbRaster
+	var size image.Point
+	err := th.withWorker(ctx, func() error {
+		var src image.Image
+		var err error
+		if isRaster(path) {
+			var info os.FileInfo
+			if info, err = os.Stat(path); err == nil {
+				src, err = th.decodeRaster(ctx, path, info)
+			}
+			if err == nil {
+				size = src.Bounds().Size()
+			}
+		} else {
+			src, err = th.source(ctx, path, mimeType, flavorFor(max(w, h)).px)
+		}
+		if err == nil {
+			out, err = th.fitRaster(src, w, h)
+		}
+		return err
+	})
+	return out, size, err
+}
+
+// withWorker runs fn once a worker is free, or gives up with ctx's
+// error once ctx is done.
+func (th *thumbnailer) withWorker(ctx context.Context, fn func() error) error {
 	select {
 	case th.workers <- struct{}{}:
 	case <-ctx.Done():
-		return thumbRaster{}, ctx.Err()
+		return ctx.Err()
 	}
 	defer func() { <-th.workers }()
+	return fn()
+}
+
+// source is the image a thumbnail of px is made from: the one the
+// cache holds, else, unless a fresh fail entry says making one failed
+// before, a raster image decoded or the output of the thumbnailer
+// installed for mimeType, written to the cache fitted to px's size.
+func (th *thumbnailer) source(ctx context.Context, path, mimeType string, px int) (image.Image, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return thumbRaster{}, err
+		return nil, err
 	}
 	tc, err := cacheFor(path, info)
 	if err != nil {
-		return thumbRaster{}, err
+		return nil, err
 	}
 	if src, err := tc.lookup(px); err == nil {
-		return th.squareCrop(src, px)
+		return src, nil
 	}
 	if tc.failed() {
-		return thumbRaster{}, errNoThumb
+		return nil, errNoThumb
 	}
 	var src image.Image
 	switch entry, ok := th.installed()[mimeType]; {
@@ -106,15 +158,20 @@ func (th *thumbnailer) thumbnail(ctx context.Context, path, mimeType string, px 
 	case ok:
 		src, err = entry.run(ctx, path, tc.uri, flavorFor(px).px, th.runTimeout)
 	default:
-		return thumbRaster{}, errNoThumb
+		return nil, errNoThumb
 	}
 	if err != nil {
 		if ctx.Err() == nil && !errors.Is(err, errThumbTooLarge) {
 			th.writeFail(tc)
 		}
-		return thumbRaster{}, err
+		return nil, err
 	}
-	return th.cacheAndCrop(tc, src, px)
+	if tc.root != "" {
+		if err := th.cache(tc, src, flavorFor(px)); err != nil {
+			log.Printf("file chooser: caching the thumbnail of %s: %v", tc.uri, err)
+		}
+	}
+	return src, nil
 }
 
 // decodeRaster decodes a raster image within the byte budget.
@@ -134,51 +191,48 @@ func (th *thumbnailer) decodeRaster(ctx context.Context, path string, info os.Fi
 	return th.decode(ctx, path)
 }
 
-// cacheAndCrop writes src, fitted to the cache size px falls in, to
-// the cache, and crops the row's square from src itself. A cache that
-// cannot be written still shows the thumbnail.
-func (th *thumbnailer) cacheAndCrop(tc thumbCache, src image.Image, px int) (thumbRaster, error) {
-	if tc.root != "" {
-		if err := th.cache(tc, src, flavorFor(px)); err != nil {
-			log.Printf("file chooser: caching the thumbnail of %s: %v", tc.uri, err)
-		}
-	}
-	return th.squareCrop(src, px)
-}
-
 // cache writes src, fitted to flavor, as the file's thumbnail there.
 func (th *thumbnailer) cache(tc thumbCache, src image.Image, flavor thumbSize) error {
-	fitted, pix, err := th.fit(src, flavor.px)
+	if b := src.Bounds(); b.Dx() <= flavor.px && b.Dy() <= flavor.px {
+		return th.encodeAndStore(tc, src, src.Bounds(), flavor)
+	}
+	fitted, err := th.fitRaster(src, flavor.px, flavor.px)
 	if err != nil {
 		return err
 	}
-	data, err := tc.encode(fitted, src.Bounds())
-	if ferr := offheap.Free(&th.mem, pix...); ferr != nil {
-		err = errors.Join(err, ferr)
-	}
+	err = th.encodeAndStore(tc, fitted.image, src.Bounds(), flavor)
+	return errors.Join(err, th.free([]thumbRaster{fitted}))
+}
+
+func (th *thumbnailer) encodeAndStore(tc thumbCache, img image.Image, source image.Rectangle, flavor thumbSize) error {
+	data, err := tc.encode(img, source)
 	if err != nil {
 		return err
 	}
 	return th.store(tc.path(flavor.dir), data)
 }
 
-// fit is src scaled to fit an edge square, kept as it is when it fits
-// already (the spec never scales up); pix holds a scaled copy's pixels.
-func (th *thumbnailer) fit(src image.Image, edge int) (image.Image, []memory.Slice[byte], error) {
-	b := src.Bounds()
-	if b.Dx() <= edge && b.Dy() <= edge {
-		return src, nil, nil
+// fitSize is the size b scales to inside a w x h box, its aspect kept
+// and never larger than b.
+func fitSize(b image.Rectangle, w, h int) image.Point {
+	if b.Dx() <= w && b.Dy() <= h {
+		return b.Size()
 	}
-	w, h := edge, max(1, b.Dy()*edge/b.Dx())
-	if b.Dy() > b.Dx() {
-		w, h = max(1, b.Dx()*edge/b.Dy()), edge
+	if b.Dx()*h >= b.Dy()*w {
+		return image.Pt(w, max(1, b.Dy()*w/b.Dx()))
 	}
-	dst, pix, err := offheap.NewRGBA(&th.mem, w, h)
+	return image.Pt(max(1, b.Dx()*h/b.Dy()), h)
+}
+
+// fitRaster is src scaled into a w x h box as fitSize says.
+func (th *thumbnailer) fitRaster(src image.Image, w, h int) (thumbRaster, error) {
+	size := fitSize(src.Bounds(), w, h)
+	dst, pix, err := offheap.NewRGBA(&th.mem, size.X, size.Y)
 	if err != nil {
-		return nil, nil, err
+		return thumbRaster{}, err
 	}
-	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
-	return dst, []memory.Slice[byte]{pix}, nil
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Src, nil)
+	return thumbRaster{image: render.NewStillImage(dst), pix: pix}, nil
 }
 
 // writeFail records that no thumbnail could be made for the file as

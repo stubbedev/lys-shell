@@ -590,11 +590,16 @@ func previewInfo(e Entry) string {
 	if e.IsDir {
 		return "Folder · " + FormatTime(e.Modified)
 	}
-	kind := "File"
-	if k := e.Kind(); k != "File" {
-		kind = k + " file"
+	return fileKind(e) + " · " + HumanSize(e.Size) + " · " + FormatTime(e.Modified)
+}
+
+// fileKind names a file's type by its extension: "PNG file", or "File"
+// without one.
+func fileKind(e Entry) string {
+	if ext := e.ext(); ext != "" {
+		return strings.ToUpper(ext) + " file"
 	}
-	return kind + " · " + HumanSize(e.Size) + " · " + FormatTime(e.Modified)
+	return "File"
 }
 
 // Place is a sidebar shortcut.

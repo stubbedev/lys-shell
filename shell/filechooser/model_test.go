@@ -29,7 +29,7 @@ func testDB(t *testing.T) *mime.Database {
 	}
 	files := map[string]string{
 		"globs2": "50:image/png:*.png\n50:image/jpeg:*.jpg\n50:image/webp:*.webp\n50:image/gif:*.gif\n" +
-			"50:text/plain:*.txt\n50:text/markdown:*.md\n50:image/svg+xml:*.svg\n50:application/pdf:*.pdf\n",
+			"50:text/plain:*.txt\n50:text/x-go:*.go\n50:text/markdown:*.md\n50:image/svg+xml:*.svg\n50:application/pdf:*.pdf\n",
 		"subclasses": "image/svg+xml application/xml\napplication/xml text/plain\n",
 	}
 	for name, body := range files {

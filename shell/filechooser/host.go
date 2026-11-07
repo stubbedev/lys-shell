@@ -170,6 +170,10 @@ type Chooser struct {
 
 	// reader lists the folders shown.
 	reader *dirReader
+	// pv is the preview shown or loading, and previewLoader what loads
+	// one off the loop.
+	pv            previewState
+	previewLoader func(context.Context, previewRequest) (preview, error)
 	// thumbnailer makes the thumbnails; thumbs are the request's.
 	thumbnailer *thumbnailer
 	thumbs      *thumbSet
@@ -205,6 +209,7 @@ func New(d Deps) *Chooser {
 		reader: newDirReader(),
 		size:   widget.Size{W: panelW, H: panelH},
 	}
+	c.previewLoader = c.loadPreview
 	if d.ViewFile != "" {
 		if b, err := os.ReadFile(d.ViewFile); err == nil {
 			c.view = parseView(string(b))
@@ -446,25 +451,23 @@ func (c *Chooser) unwatch() {
 
 // ui holds the widgets a request updates.
 type ui struct {
-	root                    *widget.FloatingPanel
-	crumbs                  *widget.Box
-	search                  *widget.SearchEntry
-	name                    *widget.Entry
-	list                    *widget.List
-	grid                    *widget.GridView
-	listView, gridView      *typeAhead
-	colHeader               *widget.Box
-	colRow                  *columnRow
-	sortButtons             [4]*widget.Button
-	sortLabels              [4]*widget.Label
-	columns                 [3]widget.Widget
-	empty                   *widget.Label
-	quicklook               *widget.Box
-	qlIcon                  *widget.Box
-	qlName, qlInfo          *widget.Label
-	preview                 *widget.Box
-	pvIcon                  *widget.Box
-	pvName, pvInfo          *widget.Label
+	root               *widget.FloatingPanel
+	crumbs             *widget.Box
+	search             *widget.SearchEntry
+	name               *widget.Entry
+	list               *widget.List
+	grid               *widget.GridView
+	listView, gridView *typeAhead
+	colHeader          *widget.Box
+	colRow             *columnRow
+	sortButtons        [4]*widget.Button
+	sortLabels         [4]*widget.Label
+	columns            [3]widget.Widget
+	empty              *widget.Label
+	// quicklook and preview are Quick Look's card and the preview
+	// pane, ql and pv what shows in them.
+	quicklook, preview      *widget.Box
+	ql, pv                  *previewView
 	filter                  *widget.Dropdown
 	viewToggle              *widget.Button
 	viewIcon                *widget.Box
@@ -603,12 +606,12 @@ func (c *Chooser) build(r request) {
 	body.AddClass("file-chooser-body")
 	body.Append(c.sidebar(u), false)
 	body.Append(c.views(u), true)
-	var card *widget.Box
-	card, u.pvIcon, u.pvName, u.pvInfo = c.previewCard("file-chooser-preview", 22)
+	paneW := previewW - 4*th.Padding
+	u.pv = c.newPreviewView("file-chooser-preview", 22, paneW, paneImageH, paneW, paneTextH)
 	// The pane, not just its card, hides: a hidden card would still
 	// hold its width in the row.
-	card.SetSizeRequest(previewW, 0)
-	u.preview = card
+	u.pv.card.SetSizeRequest(previewW, 0)
+	u.preview = u.pv.card
 	u.preview.SetVisible(false)
 	body.Append(u.preview, false)
 
@@ -814,7 +817,8 @@ func (c *Chooser) views(u *ui) widget.Widget {
 	}
 
 	u.empty = c.label("No items", "file-chooser-empty", css.DimLabel)
-	u.quicklook, u.qlIcon, u.qlName, u.qlInfo = c.previewCard("file-chooser-quicklook", 32)
+	u.ql = c.newPreviewView("file-chooser-quicklook", 32, quicklookImageW, quicklookImageH, quicklookTextW, quicklookTextH)
+	u.quicklook = u.ql.card
 	u.quicklook.AddClass(css.Card)
 	u.quicklook.SetVisible(false)
 
@@ -894,27 +898,6 @@ func (c *Chooser) columnGrip(i int) widget.Widget {
 	}
 	g.onEnd = func() { c.ui.list.Refresh() }
 	return g
-}
-
-// previewCard is an icon, a name and a detail line: the quick look
-// card and the preview pane.
-func (c *Chooser) previewCard(class string, nameChars int) (card, icon *widget.Box, name, info *widget.Label) {
-	th := widget.Current()
-	card = widget.NewBox(widget.Column, th.Spacing, 2*th.Padding)
-	card.AddClass(class)
-	icon = widget.NewBox(widget.Row, 0, 0)
-	icon.AddClass(class + "-icon")
-	name = c.label("", class+"-name")
-	name.SetAlignment(render.AlignCenter)
-	name.SetWrap(true)
-	name.SetMaxWidthChars(nameChars)
-	info = c.label("", class+"-info", css.Caption, css.DimLabel)
-	info.SetAlignment(render.AlignCenter)
-	info.SetWrap(true)
-	card.Append(widgets.Center(icon), false)
-	card.Append(name, false)
-	card.Append(info, false)
-	return card, icon, name, info
 }
 
 // rows is a List model over the session's entries: list rows, or grid
@@ -1068,6 +1051,7 @@ func (c *Chooser) landThumb(set *thumbSet, key thumbKey, done thumbRaster, err e
 // forgets their textures, and their pixels go once every List recorded
 // until now has ended.
 func (c *Chooser) freeThumbs() {
+	c.dropPreview()
 	set := c.thumbs
 	set.cancel()
 	rasters := make([]thumbRaster, 0, len(set.found))
@@ -1225,7 +1209,7 @@ func (c *Chooser) key(r *widget.Router, sym xkb.Keysym, mods app.Mods) {
 
 func (c *Chooser) escape() {
 	if c.ui.quicklook.Visible() {
-		c.ui.quicklook.SetVisible(false)
+		c.closeQuicklook()
 		return
 	}
 	c.finish(nil)
@@ -1309,7 +1293,7 @@ func (c *Chooser) relist() {
 	}
 	u.empty.SetText(empty)
 	u.empty.SetVisible(len(c.s.entries) == 0)
-	u.quicklook.SetVisible(false)
+	c.closeQuicklook()
 	c.refreshPreview()
 }
 
@@ -1553,7 +1537,19 @@ func (c *Chooser) toggleView() {
 
 func (c *Chooser) togglePreview(on bool) {
 	c.ui.preview.SetVisible(on)
+	if !on && !c.ui.quicklook.Visible() {
+		c.dropPreview()
+	}
 	c.refreshPreview()
+}
+
+// closeQuicklook hides Quick Look, and lets the preview go when the
+// pane is hidden too.
+func (c *Chooser) closeQuicklook() {
+	c.ui.quicklook.SetVisible(false)
+	if !c.ui.preview.Visible() {
+		c.dropPreview()
+	}
 }
 
 func (c *Chooser) sortBy(col SortColumn) {
@@ -1704,34 +1700,31 @@ func (c *Chooser) selected() (Entry, bool) {
 func (c *Chooser) toggleQuicklook() {
 	u := c.ui
 	if u.quicklook.Visible() {
-		u.quicklook.SetVisible(false)
+		c.closeQuicklook()
 		return
 	}
-	if e, ok := c.selected(); ok {
-		c.fillPreview(u.qlIcon, u.qlName, u.qlInfo, e)
+	if _, ok := c.selected(); ok {
 		u.quicklook.SetVisible(true)
+		c.refreshPreview()
 	}
 }
 
+// refreshPreview shows the selected entry in the previews showing, or
+// says nothing is selected.
 func (c *Chooser) refreshPreview() {
 	u := c.ui
-	if u == nil || !u.preview.Visible() {
+	if u == nil || len(c.openPreviews()) == 0 {
 		return
 	}
 	if e, ok := c.selected(); ok {
-		c.fillPreview(u.pvIcon, u.pvName, u.pvInfo, e)
+		c.showPreview(e)
 		return
 	}
-	u.pvIcon.Clear()
-	u.pvName.SetText("No selection")
-	u.pvInfo.SetText("")
-}
-
-func (c *Chooser) fillPreview(icon *widget.Box, name, info *widget.Label, e Entry) {
-	icon.Clear()
-	icon.Append(c.entryIcon(e, previewIconPx), false)
-	name.SetText(e.Name())
-	info.SetText(previewInfo(e))
+	c.dropPreview()
+	u.quicklook.SetVisible(false)
+	u.pv.visual.Clear()
+	u.pv.name.SetText("No selection")
+	u.pv.info.SetText("")
 }
 
 // --- system defaults ------------------------------------------------

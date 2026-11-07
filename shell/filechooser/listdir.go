@@ -65,31 +65,74 @@ type dirCounts struct {
 // with nothing known about it.
 func (r *dirReader) List(dir string, mode Mode) ([]Entry, dirCounts, error) {
 	var counts dirCounts
+	paths := pathArena{prefix: dirPrefix(dir)}
+	var entries []Entry
+	var st unix.Stat_t
+	n, err := r.scan(dir, func(fd int, name []byte, cname *byte) bool {
+		counts.stats++
+		e := Entry{Path: paths.join(name)}
+		if statAt(fd, cname, &st) == nil {
+			e = entryOf(e.Path, &st)
+		}
+		if !e.IsDir && mode.folders() {
+			return true
+		}
+		if len(entries) == cap(entries) {
+			entries = slices.Grow(entries, max(len(entries), entriesStart))
+		}
+		entries = append(entries, e)
+		return true
+	})
+	counts.getdents = n
+	if err != nil {
+		return nil, counts, err
+	}
+	slices.SortFunc(entries, func(a, b Entry) int { return strings.Compare(a.Path, b.Path) })
+	return entries, counts, nil
+}
+
+// Count counts dir's entries in one getdents64 pass, stopping at
+// limit; more reports that it stopped there.
+func (r *dirReader) Count(dir string, limit int) (n int, more bool, err error) {
+	_, err = r.scan(dir, func(int, []byte, *byte) bool {
+		if n == limit {
+			more = true
+			return false
+		}
+		n++
+		return true
+	})
+	return n, more, err
+}
+
+// scan opens dir and hands visit each entry but . and ..: the
+// directory fd, the name, and the name NUL-terminated in the dirent
+// buffer, which stays valid only during the call. A false from visit
+// stops the scan. It reports the getdents64 calls made.
+func (r *dirReader) scan(dir string, visit func(fd int, name []byte, cname *byte) bool) (int, error) {
 	fd, err := unix.Open(dir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return nil, counts, &fs.PathError{Op: "open", Path: dir, Err: err}
+		return 0, &fs.PathError{Op: "open", Path: dir, Err: err}
 	}
 	defer func() { _ = unix.Close(fd) }()
 	buf, err := r.bufs.Get(dirBufSize)
 	if err != nil {
-		return nil, counts, fmt.Errorf("listing %s: a %d byte buffer: %w", dir, dirBufSize, err)
+		return 0, fmt.Errorf("reading %s: a %d byte buffer: %w", dir, dirBufSize, err)
 	}
 	defer func() { _ = r.bufs.Put(buf) }()
 	b := buf.Bytes()
-	paths := pathArena{prefix: dirPrefix(dir)}
-	var entries []Entry
-	var st unix.Stat_t
+	calls := 0
 	for {
 		n, err := unix.Getdents(fd, b)
-		counts.getdents++
+		calls++
 		if errors.Is(err, unix.EINTR) {
 			continue
 		}
 		if err != nil {
-			return nil, counts, &fs.PathError{Op: "getdents", Path: dir, Err: err}
+			return calls, &fs.PathError{Op: "getdents", Path: dir, Err: err}
 		}
 		if n == 0 {
-			break
+			return calls, nil
 		}
 		for off := 0; off < n; {
 			reclen := int(binary.NativeEndian.Uint16(b[off+direntReclen:]))
@@ -100,22 +143,11 @@ func (r *dirReader) List(dir string, mode Mode) ([]Entry, dirCounts, error) {
 			if string(name) == "." || string(name) == ".." {
 				continue
 			}
-			counts.stats++
-			e := Entry{Path: paths.join(name)}
-			if statAt(fd, &b[at], &st) == nil {
-				e = entryOf(e.Path, &st)
+			if !visit(fd, name, &b[at]) {
+				return calls, nil
 			}
-			if !e.IsDir && mode.folders() {
-				continue
-			}
-			if len(entries) == cap(entries) {
-				entries = slices.Grow(entries, max(len(entries), entriesStart))
-			}
-			entries = append(entries, e)
 		}
 	}
-	slices.SortFunc(entries, func(a, b Entry) int { return strings.Compare(a.Path, b.Path) })
-	return entries, counts, nil
 }
 
 // statAt stats the NUL-terminated name at name relative to the

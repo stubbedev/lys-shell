@@ -6,8 +6,10 @@ package mime
 
 import (
 	"bufio"
+	"encoding/xml"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +36,10 @@ type Database struct {
 	// the types it subclasses.
 	aliases map[string]string
 	parents map[string][]string
+	// dirs are the data directories loaded, which Comment reads the
+	// per-type files of; comments caches what it read.
+	dirs     []string
+	comments sync.Map
 }
 
 var (
@@ -76,6 +82,7 @@ func Load(dirs []string) *Database {
 	db := &Database{
 		literal: map[string]glob{}, icons: map[string]string{},
 		aliases: map[string]string{}, parents: map[string][]string{},
+		dirs: dirs,
 	}
 	seen := map[string]bool{}
 	for _, dir := range dirs {
@@ -294,4 +301,49 @@ func (db *Database) IsA(mimeType, base string) bool {
 		return false
 	}
 	return walk(mimeType)
+}
+
+// Comment is mimeType's description in English ("JPEG image"), from
+// the first data directory whose mime/<type>.xml has one; "" for a type
+// none describes. Each type's file is read once.
+func (db *Database) Comment(mimeType string) string {
+	mimeType = db.canonical(mimeType)
+	if c, ok := db.comments.Load(mimeType); ok {
+		return c.(string) //nolint:errcheck // only strings are stored
+	}
+	comment := ""
+	for _, dir := range db.dirs {
+		if c, ok := readComment(filepath.Join(dir, "mime", mimeType+".xml")); ok {
+			comment = c
+			break
+		}
+	}
+	db.comments.Store(mimeType, comment)
+	return comment
+}
+
+// readComment is the untranslated <comment> of a per-type file that
+// update-mime-database wrote.
+func readComment(path string) (string, bool) {
+	f, err := os.Open(path) //nolint:gosec // a shared-mime-info file in a data directory
+	if err != nil {
+		return "", false
+	}
+	defer func() { _ = f.Close() }()
+	dec := xml.NewDecoder(f)
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return "", false
+		}
+		start, ok := tok.(xml.StartElement)
+		if !ok || start.Name.Local != "comment" || slices.ContainsFunc(start.Attr, func(a xml.Attr) bool { return a.Name.Local == "lang" }) {
+			continue
+		}
+		var text string
+		if err := dec.DecodeElement(&text, &start); err != nil {
+			return "", false
+		}
+		return text, true
+	}
 }

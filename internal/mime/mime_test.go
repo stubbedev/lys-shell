@@ -134,3 +134,40 @@ func TestIsATerminatesOnACycle(t *testing.T) {
 		t.Error("a cycle claimed an unrelated base")
 	}
 }
+
+// A type's comment is its untranslated <comment>, from the first data
+// directory with one, through its alias; an undescribed type has none.
+func TestComment(t *testing.T) {
+	first, second := t.TempDir(), t.TempDir()
+	write := func(dir, typ, body string) {
+		path := filepath.Join(dir, "mime", typ+".xml")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(first, "image/jpeg", `<?xml version="1.0" encoding="utf-8"?>
+<mime-type xmlns="http://www.freedesktop.org/standards/shared-mime-info" type="image/jpeg">
+  <comment xml:lang="de">JPEG-Bild</comment>
+  <comment>JPEG image</comment>
+</mime-type>`)
+	write(second, "image/jpeg", `<mime-type type="image/jpeg"><comment>later</comment></mime-type>`)
+	write(second, "video/x-matroska", `<mime-type type="video/x-matroska"><comment>Matroska video</comment></mime-type>`)
+	if err := os.WriteFile(filepath.Join(first, "mime", "aliases"), []byte("video/matroska video/x-matroska\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db := Load([]string{first, second})
+	for typ, want := range map[string]string{"image/jpeg": "JPEG image", "video/matroska": "Matroska video", "text/x-nothing": ""} {
+		if got := db.Comment(typ); got != want {
+			t.Errorf("Comment(%s) = %q, want %q", typ, got, want)
+		}
+	}
+	if err := os.Remove(filepath.Join(first, "mime", "image", "jpeg.xml")); err != nil {
+		t.Fatal(err)
+	}
+	if got := db.Comment("image/jpeg"); got != "JPEG image" {
+		t.Errorf("a second Comment read the file again: %q", got)
+	}
+}
