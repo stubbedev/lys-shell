@@ -51,6 +51,7 @@ launcher-system-reboot = Restart
 launcher-system-shutdown = Shut Down
 launcher-system-confirm = Press Enter for { $what }, Esc to go back.
 launcher-settings-subtitle = Settings page
+launcher-setting-subtitle = Setting on { $page }
 launcher-clipboard-gone = That entry has left the clipboard history
 launcher-picker-clipboard = Clipboard History
 launcher-picker-emoji = Emoji Picker

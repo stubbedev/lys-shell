@@ -51,6 +51,7 @@ launcher-system-reboot = Redémarrer
 launcher-system-shutdown = Éteindre
 launcher-system-confirm = Entrée pour confirmer : { $what }. Échap pour revenir.
 launcher-settings-subtitle = Page de paramètres
+launcher-setting-subtitle = Paramètre de { $page }
 launcher-clipboard-gone = Cette entrée n'est plus dans l'historique du presse-papiers
 launcher-picker-clipboard = Historique du presse-papiers
 launcher-picker-emoji = Sélecteur d'émojis

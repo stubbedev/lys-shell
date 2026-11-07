@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"slices"
 	"sync"
 	"time"
 )
@@ -22,17 +21,32 @@ const (
 	PageFlag = "--page"
 	// ListFlag prints the pages with Encode and exits.
 	ListFlag = "--list-pages"
+	// SettingFlag opens the app on the page holding a setting, with that
+	// setting focused, by path.
+	SettingFlag = "--setting"
 )
 
 // Page is one page of the app, its title in the desktop's language.
 type Page struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Icon  string `json:"icon"`
+	ID       string    `json:"id"`
+	Title    string    `json:"title"`
+	Icon     string    `json:"icon"`
+	Settings []Setting `json:"settings,omitempty"`
+}
+
+// Setting is one setting of a page: its path, its title and the words a
+// search should find it by, in the desktop's language.
+type Setting struct {
+	Path     string   `json:"path"`
+	Title    string   `json:"title"`
+	Keywords []string `json:"keywords,omitempty"`
 }
 
 // Argv opens the app on a page.
 func (p Page) Argv() []string { return []string{Program, PageFlag, p.ID} }
+
+// Argv opens the app on the setting.
+func (s Setting) Argv() []string { return []string{Program, SettingFlag, s.Path} }
 
 // ErrNotInstalled is the app missing from the path, which is a choice and not a
 // failure: lys-settings is a package of its own.
@@ -109,15 +123,25 @@ func validate(pages []Page) error {
 	if pages == nil {
 		return errors.New("settingspage: no page list")
 	}
-	seen := make([]string, 0, len(pages))
+	seen := make(map[string]bool, len(pages))
+	paths := map[string]string{}
 	for i, p := range pages {
 		if p.ID == "" || p.Title == "" {
 			return fmt.Errorf("settingspage: page %d has no ID or title: %+v", i, p)
 		}
-		if slices.Contains(seen, p.ID) {
+		if seen[p.ID] {
 			return fmt.Errorf("settingspage: page %q is listed twice", p.ID)
 		}
-		seen = append(seen, p.ID)
+		seen[p.ID] = true
+		for j, s := range p.Settings {
+			if s.Path == "" || s.Title == "" {
+				return fmt.Errorf("settingspage: setting %d of page %q has no path or title: %+v", j, p.ID, s)
+			}
+			if on, twice := paths[s.Path]; twice {
+				return fmt.Errorf("settingspage: setting %q is listed on page %q and on page %q", s.Path, on, p.ID)
+			}
+			paths[s.Path] = p.ID
+		}
 	}
 	return nil
 }

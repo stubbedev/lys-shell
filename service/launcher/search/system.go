@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -134,22 +135,38 @@ func (s *Settings) Load(ctx context.Context, publish func([]Entry)) {
 		log.Printf("launcher: no settings pages to offer: %v", err)
 		return
 	}
-	entries := make([]Entry, 0, len(pages))
+	count := len(pages)
+	for _, p := range pages {
+		count += len(p.Settings)
+	}
+	entries := make([]Entry, 0, count)
+	pageSubtitle := i18n.T("launcher-settings-subtitle")
 	for _, p := range pages {
 		id := "settings:" + p.ID
-		entries = append(entries, Entry{ID: id, Learn: id, Title: p.Title, Subtitle: i18n.T("launcher-settings-subtitle"), Keywords: p.ID, Icon: launcher.IconName(p.Icon), Data: p})
+		icon := launcher.IconName(p.Icon)
+		entries = append(entries, Entry{ID: id, Learn: id, Title: p.Title, Subtitle: pageSubtitle, Keywords: p.ID, Icon: icon, Data: p})
+		subtitle := i18n.T("launcher-setting-subtitle", i18n.Str("page", p.Title))
+		for _, s := range p.Settings {
+			id := "setting:" + s.Path
+			entries = append(entries, Entry{ID: id, Learn: id, Title: s.Title, Subtitle: subtitle, Keywords: strings.Join(s.Keywords, " "), Icon: icon, Data: s})
+		}
 	}
 	publish(entries)
 }
 
 // Actions implements Provider.
 func (s *Settings) Actions(e Entry) []Action {
-	p, ok := e.Data.(settingspage.Page)
-	if !ok {
+	var argv []string
+	switch d := e.Data.(type) {
+	case settingspage.Page:
+		argv = d.Argv()
+	case settingspage.Setting:
+		argv = d.Argv()
+	default:
 		return nil
 	}
 	return []Action{{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-		s.env.Spawn(p.Argv())
+		s.env.Spawn(argv)
 		return Close{}
 	}}}
 }

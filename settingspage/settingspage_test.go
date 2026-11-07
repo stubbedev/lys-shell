@@ -5,13 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 )
 
 func TestAListSurvivesTheRoundTrip(t *testing.T) {
-	want := []Page{{ID: "bar-general", Title: "Bar", Icon: "ld-panel-top-symbolic"}, {ID: "wm-input", Title: "Saisie"}}
+	want := []Page{{ID: "bar-general", Title: "Bar", Icon: "ld-panel-top-symbolic"}, {ID: "wm-input", Title: "Saisie", Settings: []Setting{{Path: "wm:input.touchpad.natural_scroll", Title: "Défilement naturel", Keywords: []string{"inverser"}}}}}
 	data, err := Encode(want)
 	if err != nil {
 		t.Fatal(err)
@@ -20,7 +21,7 @@ func TestAListSurvivesTheRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%+v, want %+v", got, want)
 	}
 }
@@ -36,13 +37,17 @@ func TestAnEmptyListIsNotAMissingOne(t *testing.T) {
 
 func TestDecodeRefusesWhatCouldNotOpen(t *testing.T) {
 	for name, data := range map[string]string{
-		"not json":        "lys-settings 0.1.0\n",
-		"empty output":    "",
-		"no id":           `[{"id":"","title":"Bar","icon":""}]`,
-		"no title":        `[{"id":"bar","title":"","icon":""}]`,
-		"twice":           `[{"id":"bar","title":"A","icon":""},{"id":"bar","title":"B","icon":""}]`,
-		"unknown field":   `[{"id":"bar","title":"A","icon":"","group":"x"}]`,
-		"object not list": `{"id":"bar"}`,
+		"not json":              "lys-settings 0.1.0\n",
+		"empty output":          "",
+		"no id":                 `[{"id":"","title":"Bar","icon":""}]`,
+		"no title":              `[{"id":"bar","title":"","icon":""}]`,
+		"twice":                 `[{"id":"bar","title":"A","icon":""},{"id":"bar","title":"B","icon":""}]`,
+		"unknown field":         `[{"id":"bar","title":"A","icon":"","group":"x"}]`,
+		"object not list":       `{"id":"bar"}`,
+		"setting without path":  `[{"id":"bar","title":"A","icon":"","settings":[{"path":"","title":"T"}]}]`,
+		"setting without title": `[{"id":"bar","title":"A","icon":"","settings":[{"path":"bar.x","title":""}]}]`,
+		"setting on two pages":  `[{"id":"a","title":"A","icon":"","settings":[{"path":"x","title":"X"}]},{"id":"b","title":"B","icon":"","settings":[{"path":"x","title":"X"}]}]`,
+		"unknown setting field": `[{"id":"bar","title":"A","icon":"","settings":[{"path":"x","title":"X","row":1}]}]`,
 	} {
 		if got, err := Decode([]byte(data)); err == nil {
 			t.Errorf("%s: decoded %+v", name, got)
@@ -77,7 +82,7 @@ func TestListReadsWhatTheAppPrints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(got, []Page{{ID: "wm-input", Title: "Input", Icon: "i"}}) {
+	if !reflect.DeepEqual(got, []Page{{ID: "wm-input", Title: "Input", Icon: "i"}}) {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -137,5 +142,21 @@ func TestAListerAsksAgainAfterAFailure(t *testing.T) {
 	fakeApp(t, `echo '[{"id":"a","title":"A","icon":""}]'`)
 	if got, err := list(context.Background()); err != nil || len(got) != 1 {
 		t.Fatalf("installed later: %+v, %v", got, err)
+	}
+}
+
+func TestASettingsArgvOpensTheSetting(t *testing.T) {
+	if got := (Setting{Path: "wm:input.touchpad.natural_scroll"}).Argv(); !slices.Equal(got, []string{"lys-settings", "--setting", "wm:input.touchpad.natural_scroll"}) {
+		t.Fatalf("%q", got)
+	}
+}
+
+func TestAPageWithoutSettingsEncodesAsBefore(t *testing.T) {
+	data, err := Encode([]Page{{ID: "bar", Title: "Bar", Icon: "i"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(data); got != `[{"id":"bar","title":"Bar","icon":"i"}]`+"\n" {
+		t.Fatalf("%s", got)
 	}
 }

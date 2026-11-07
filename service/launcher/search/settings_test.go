@@ -77,3 +77,33 @@ func TestSettingsReportsAnAppThatFailsEveryTime(t *testing.T) {
 		t.Fatalf("said %d times: %s", n, logged.String())
 	}
 }
+
+func TestSettingsOffersEachSettingAndOpensItFocused(t *testing.T) {
+	var spawned [][]string
+	env := Env{Spawn: func(argv []string) { spawned = append(spawned, argv) }}
+	p := NewSettings(env, func(context.Context) ([]settingspage.Page, error) {
+		return []settingspage.Page{{ID: "wm-input", Title: "Input", Icon: "ld-keyboard-symbolic", Settings: []settingspage.Setting{
+			{Path: "wm:input.touchpad.natural_scroll", Title: "Natural scroll", Keywords: []string{"reverse", "scrolling"}},
+		}}}, nil
+	})
+	var got []Entry
+	p.Load(context.Background(), func(e []Entry) { got = e })
+	if len(got) != 2 {
+		t.Fatalf("%+v", got)
+	}
+	s := got[1]
+	if s.ID != "setting:wm:input.touchpad.natural_scroll" || s.Title != "Natural scroll" || s.Keywords != "reverse scrolling" || !strings.Contains(s.Subtitle, "Input") || s.Icon != got[0].Icon {
+		t.Fatalf("%+v", s)
+	}
+	actions := p.Actions(s)
+	if len(actions) != 1 {
+		t.Fatalf("%d actions", len(actions))
+	}
+	actions[0].Run(context.Background())
+	if len(spawned) != 1 || !slices.Equal(spawned[0], []string{"lys-settings", "--setting", "wm:input.touchpad.natural_scroll"}) {
+		t.Fatalf("%q", spawned)
+	}
+	if p.Actions(Entry{Data: "not a page"}) != nil {
+		t.Fatal("an entry of another provider has actions")
+	}
+}
