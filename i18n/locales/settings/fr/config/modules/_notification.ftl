@@ -101,3 +101,20 @@ enum-icon-source-application = Application
 enum-notification-sounds-off = Désactivés
 enum-notification-sounds-critical = Critiques uniquement
 enum-notification-sounds-all = Toutes
+
+## Ne pas déranger et concentration
+
+settings-modules-notifications-dnd-allow-critical = Autoriser les critiques
+    .description = Les notifications critiques, comme une batterie faible ou une alarme, s'affichent même en mode ne pas déranger
+
+settings-modules-notifications-dnd-allow-apps = Applications autorisées
+    .description = Noms d'applications ou entrées de bureau, avec les jokers * et ?, dont les notifications s'affichent même en mode ne pas déranger
+
+settings-modules-notifications-dnd-schedule = Programmation
+    .description = Plages de la semaine où le mode ne pas déranger s'active de lui-même ; une plage qui finit avant de commencer se poursuit après minuit
+
+settings-modules-notifications-dnd-while-sharing = Pendant le partage d'écran
+    .description = Activer le mode ne pas déranger pendant que l'écran est partagé ou enregistré
+
+settings-modules-notifications-dnd-while-fullscreen = En plein écran
+    .description = Activer le mode ne pas déranger pendant qu'une fenêtre est en plein écran

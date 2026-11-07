@@ -53,9 +53,12 @@ func TestEveryLabeledFieldHasItsFTLKey(t *testing.T) {
 
 func TestI18nKey(t *testing.T) {
 	for path, want := range map[string]string{
-		"osd.enabled":                 "settings-osd-enabled",
-		"modules.battery.level-icons": "settings-modules-battery-level-icons",
-		"bar.location":                "settings-bar-location",
+		"osd.enabled":                        "settings-osd-enabled",
+		"modules.battery.level-icons":        "settings-modules-battery-level-icons",
+		"bar.location":                       "settings-bar-location",
+		"idle.dim.ac":                        "settings-idle-timeouts-ac",
+		"idle.lock-before-sleep":             "settings-idle-lock-before-sleep",
+		"modules.notifications.dnd.schedule": "settings-modules-notifications-dnd-schedule",
 	} {
 		if got, ok := I18nKey(path); !ok || got != want {
 			t.Errorf("I18nKey(%s) = %q %v, want %q", path, got, ok, want)

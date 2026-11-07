@@ -101,3 +101,20 @@ enum-icon-source-application = Application
 enum-notification-sounds-off = Off
 enum-notification-sounds-critical = Critical Only
 enum-notification-sounds-all = All
+
+## Do Not Disturb and Focus
+
+settings-modules-notifications-dnd-allow-critical = Allow critical
+    .description = Critical notifications, such as a low battery or an alarm, pop up even in do-not-disturb
+
+settings-modules-notifications-dnd-allow-apps = Allowed apps
+    .description = App names or desktop entries, with * and ? globs, whose notifications pop up even in do-not-disturb
+
+settings-modules-notifications-dnd-schedule = Schedule
+    .description = Times of the week do-not-disturb turns itself on; a window ending before it starts runs past midnight
+
+settings-modules-notifications-dnd-while-sharing = While sharing the screen
+    .description = Turn do-not-disturb on while the screen is shared or recorded
+
+settings-modules-notifications-dnd-while-fullscreen = While fullscreen
+    .description = Turn do-not-disturb on while a window is fullscreen
