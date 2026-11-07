@@ -10199,7 +10199,7 @@
         "high-contrast": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "High contrast: the shell's own surfaces switch to a high-contrast\npalette with solid borders and visible focus rings, turn opaque, and\napps are asked for it through the desktop portal's `contrast`\npreference."
+          "description": "High contrast: the shell's own surfaces switch to a high-contrast\npalette with solid borders and visible focus rings, turn opaque, a\nmodule's custom label color yields to its palette default, and\napps are asked for it through the desktop portal's `contrast`\npreference."
         },
         "matugen-contrast": {
           "$ref": "#/$defs/SignedNormalizedF64",

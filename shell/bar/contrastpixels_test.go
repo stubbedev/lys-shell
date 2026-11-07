@@ -2,6 +2,7 @@ package bar
 
 import (
 	"image"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -51,16 +52,41 @@ func TestAccessibleBarPixelsAreOpaqueAndHighContrast(t *testing.T) {
 			t.Error("the default bar's surface is opaque, want its 60% background showing the desktop")
 		}
 	})
+	dim, err := config.ParseColorValue("#45465c")
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Run("a dim label", func(t *testing.T) {
 		cfg := config.Defaults()
 		cfg.Styling.ReduceTransparency = true
-		dim, err := config.ParseColorValue("#45465c")
-		if err != nil {
-			t.Fatal(err)
-		}
 		cfg.Clock.LabelColor = dim
 		if r := paintClockBar(t, cfg).labelContrast(t); r >= aaaTextContrast {
 			t.Errorf("a dim label reads %.2f:1, want the check to find it below %.0f:1", r, aaaTextContrast)
+		}
+	})
+	for _, appearance := range []config.Appearance{config.AppearanceDark, config.AppearanceLight} {
+		t.Run("a dim label under high contrast "+string(appearance), func(t *testing.T) {
+			cfg := config.Defaults()
+			cfg.Styling.HighContrast, cfg.Styling.Appearance = true, appearance
+			cfg.Clock.LabelColor = dim
+			if r := paintClockBar(t, cfg).labelContrast(t); r < aaaTextContrast {
+				t.Errorf("a dim custom label under high contrast reads %.2f:1, want at least %.0f:1", r, aaaTextContrast)
+			}
+		})
+	}
+	t.Run("turning high contrast on restyles a dim label in place", func(t *testing.T) {
+		cfg := config.Defaults()
+		cfg.Clock.LabelColor = dim
+		_, _, root := paintBar(t, styledContext(t, cfg), clockLayout, contrastPixelsWidth)
+		btn := treetest.WithClass(root, "bar-button")[0].(*barButton)
+		if !strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: #45465c;") {
+			t.Fatalf("the dim label is not applied before the toggle: %q", btn.InlineStyle())
+		}
+		high := *cfg
+		high.Styling.HighContrast = true
+		restyleButtons(root, &high)
+		if strings.Contains(btn.InlineStyle(), "#45465c") {
+			t.Errorf("the dim label survives turning high contrast on: %q", btn.InlineStyle())
 		}
 	})
 }

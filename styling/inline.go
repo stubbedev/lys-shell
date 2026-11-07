@@ -45,13 +45,32 @@ func ResolveIconColor(b config.ButtonConfig, variant config.BarButtonVariant, pr
 	return config.TokenFgOnAccent.CSSVar()
 }
 
+// ResolveLabelColor is a bar button's text color: the threshold override
+// when one is active, else the configured color through ResolveColorCSS.
+// Under high contrast a custom hex from either yields to the field's
+// default token, which the high-contrast palette keeps legible.
+func ResolveLabelColor(b config.ButtonConfig, s config.StylingConfig, t config.ThresholdColors) string {
+	color := b.Colors.Label
+	if t.LabelColor != nil {
+		color = *t.LabelColor
+	}
+	switch {
+	case s.HighContrast && color.Kind == config.ColorCustom:
+		return b.Defaults.Label.ToCSS()
+	case t.LabelColor != nil:
+		return color.ToCSS()
+	}
+	return ResolveColorCSS(color, b.Defaults.Label, s.ColorExtractor.ThemeProvider)
+}
+
 // ButtonCSS is one bar button's variable block (bar_buttons/styling.rs
 // build_css): the five colors, each a threshold override when one is
 // active, and the bar's button border width.
-func ButtonCSS(b config.ButtonConfig, bar config.BarConfig, provider config.ThemeProvider, t config.ThresholdColors) string {
+func ButtonCSS(b config.ButtonConfig, bar config.BarConfig, s config.StylingConfig, t config.ThresholdColors) string {
+	provider := s.ColorExtractor.ThemeProvider
 	return "* { " +
 		"--bar-btn-icon-color: " + config.ResolveOr(t.IconColor, ResolveIconColor(b, bar.ButtonVariant, provider)) + "; " +
-		"--bar-btn-label-color: " + config.ResolveOr(t.LabelColor, ResolveColorCSS(b.Colors.Label, b.Defaults.Label, provider)) + "; " +
+		"--bar-btn-label-color: " + ResolveLabelColor(b, s, t) + "; " +
 		"--bar-btn-icon-bg: " + config.ResolveOr(t.IconBgColor, ResolveColorCSS(b.Colors.IconBg, b.Defaults.IconBg, provider)) + "; " +
 		"--bar-btn-bg: " + config.ResolveOr(t.ButtonBgColor, ResolveColorCSS(b.Colors.ButtonBg, b.Defaults.ButtonBg, provider)) + "; " +
 		"--bar-btn-border-color: " + config.ResolveOr(t.BorderColor, ResolveColorCSS(b.Colors.Border, b.Defaults.Border, provider)) + "; " +

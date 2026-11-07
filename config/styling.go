@@ -14,7 +14,8 @@ type StylingConfig struct {
 	// built-in light/dark variant when one exists).
 	Appearance Appearance `cfg:"appearance"`
 	// High contrast: the shell's own surfaces switch to a high-contrast
-	// palette with solid borders and visible focus rings, turn opaque, and
+	// palette with solid borders and visible focus rings, turn opaque, a
+	// module's custom label color yields to its palette default, and
 	// apps are asked for it through the desktop portal's `contrast`
 	// preference.
 	HighContrast bool `cfg:"high-contrast"`

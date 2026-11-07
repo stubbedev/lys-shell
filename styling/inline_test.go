@@ -1,6 +1,7 @@
 package styling
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -111,7 +112,7 @@ func TestButtonCSS(t *testing.T) {
 	want := "* { --bar-btn-icon-color: var(--fg-on-accent); --bar-btn-label-color: var(--yellow); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: var(--bg-surface-elevated); " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 1px; }"
-	if got := ButtonCSS(battery, bar, config.ThemeProviderLysShell, config.ThresholdColors{}); got != want {
+	if got := ButtonCSS(battery, bar, providedBy(config.ThemeProviderLysShell), config.ThresholdColors{}); got != want {
 		t.Errorf("ButtonCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 
@@ -122,7 +123,7 @@ func TestButtonCSS(t *testing.T) {
 	want = "* { --bar-btn-icon-color: var(--fg-default); --bar-btn-label-color: var(--yellow); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: var(--bg-surface-elevated); " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 3px; }"
-	if got := ButtonCSS(battery, basic, config.ThemeProviderLysShell, config.ThresholdColors{}); got != want {
+	if got := ButtonCSS(battery, basic, providedBy(config.ThemeProviderLysShell), config.ThresholdColors{}); got != want {
 		t.Errorf("ButtonCSS basic =\n%s\nwant\n%s", got, want)
 	}
 
@@ -132,18 +133,18 @@ func TestButtonCSS(t *testing.T) {
 	want = "* { --bar-btn-icon-color: var(--fg-on-accent); --bar-btn-label-color: var(--status-error); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: #ff0000; " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 1px; }"
-	if got := ButtonCSS(battery, bar, config.ThemeProviderMatugen, over); got != want {
+	if got := ButtonCSS(battery, bar, providedBy(config.ThemeProviderMatugen), over); got != want {
 		t.Errorf("ButtonCSS thresholds =\n%s\nwant\n%s", got, want)
 	}
 
 	// Custom hexes: kept under lys-shell, the schema default under a provider.
 	custom := battery
 	custom.Colors.Icon, custom.Colors.Label = color(t, "#010203"), color(t, "#040506")
-	if got := ButtonCSS(custom, bar, config.ThemeProviderLysShell, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: #010203;") ||
+	if got := ButtonCSS(custom, bar, providedBy(config.ThemeProviderLysShell), config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: #010203;") ||
 		!contains(got, "--bar-btn-label-color: #040506;") {
 		t.Errorf("lys-shell keeps custom hexes:\n%s", got)
 	}
-	if got := ButtonCSS(custom, basic, config.ThemeProviderPywal, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: var(--fg-default);") ||
+	if got := ButtonCSS(custom, basic, providedBy(config.ThemeProviderPywal), config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: var(--fg-default);") ||
 		!contains(got, "--bar-btn-label-color: var(--yellow);") {
 		t.Errorf("a provider falls back to the defaults (auto icon → default ink):\n%s", got)
 	}
@@ -219,4 +220,40 @@ func providerStyling(p config.ThemeProvider) config.StylingConfig {
 	s := config.DefaultsStyling()
 	s.ColorExtractor.ThemeProvider = p
 	return s
+}
+
+func providedBy(p config.ThemeProvider) config.StylingConfig {
+	s := config.Defaults().Styling
+	s.ColorExtractor.ThemeProvider = p
+	return s
+}
+
+func TestHighContrastWinsOverCustomLabelColors(t *testing.T) {
+	d := config.Defaults()
+	clock, _ := d.ModuleButton("clock")
+	clock.Colors.Label = color(t, "#45465c")
+	dim := color(t, "#303030")
+	token := color(t, "status-error")
+	high := providedBy(config.ThemeProviderLysShell)
+	high.HighContrast = true
+	def := clock.Defaults.Label.ToCSS()
+	for _, tc := range []struct {
+		name    string
+		styling config.StylingConfig
+		over    config.ThresholdColors
+		want    string
+	}{
+		{"a custom label under high contrast", high, config.ThresholdColors{}, def},
+		{"a custom threshold under high contrast", high, config.ThresholdColors{LabelColor: &dim}, def},
+		{"a token threshold under high contrast", high, config.ThresholdColors{LabelColor: &token}, "var(--status-error)"},
+		{"a custom label without high contrast", providedBy(config.ThemeProviderLysShell), config.ThresholdColors{}, "#45465c"},
+		{"a custom threshold without high contrast", providedBy(config.ThemeProviderLysShell), config.ThresholdColors{LabelColor: &dim}, "#303030"},
+	} {
+		if got := ResolveLabelColor(clock, tc.styling, tc.over); got != tc.want {
+			t.Errorf("%s: label color %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	if !strings.HasPrefix(def, "var(--") {
+		t.Errorf("the clock's default label color %q is not a palette token", def)
+	}
 }

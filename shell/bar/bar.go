@@ -1127,9 +1127,10 @@ func (r *barRuntime) rederive(cfg *config.Config) {
 	r.moduleStyle = r.style.forModules()
 }
 
-// Restyle gives the open bar cfg's variables and blur in place: its
-// modules stay, the stylesheet restyles them on the next frame.
+// Restyle gives the open bar and its buttons cfg's variables and blur in
+// place: its modules stay, the stylesheet restyles them on the next frame.
 func (w *barWindow) Restyle(cfg *config.Config) {
 	w.bar.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling)))
+	restyleButtons(w.bar, cfg)
 	w.layer.SetBackgroundBlur(barBlur(cfg))
 }

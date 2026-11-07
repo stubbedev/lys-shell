@@ -240,7 +240,40 @@ func (b *barButton) refresh() {
 	b.RemoveClass(b.ownClasses...)
 	b.ownClasses = b.classes()
 	b.AddClass(b.ownClasses...)
-	b.SetInlineStyle(inlineDecls(styling.ButtonCSS(b.button, b.cfg.Bar, b.cfg.Styling.ColorExtractor.ThemeProvider, b.thresholds)))
+	b.applyVariables()
+}
+
+// applyVariables sets the per-button variables from the config and the
+// active thresholds.
+func (b *barButton) applyVariables() {
+	b.SetInlineStyle(inlineDecls(styling.ButtonCSS(b.button, b.cfg.Bar, b.cfg.Styling, b.thresholds)))
+}
+
+// restyleFor gives the button cfg's variables in place, for a reload
+// that only changes high contrast or reduce transparency.
+func (b *barButton) restyleFor(cfg *config.Config) {
+	if b.cfg == nil {
+		return
+	}
+	b.cfg = cfg
+	b.applyVariables()
+}
+
+// restyleButtons restyles every bar button under w for cfg, a hidden
+// revealer's content included.
+func restyleButtons(w widget.Widget, cfg *config.Config) {
+	if b, ok := w.(interface{ restyleFor(*config.Config) }); ok {
+		b.restyleFor(cfg)
+	}
+	if r, ok := w.(*widget.Revealer); ok {
+		restyleButtons(r.Child(), cfg)
+		return
+	}
+	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
+		for _, k := range c.Children() {
+			restyleButtons(k, cfg)
+		}
+	}
 }
 
 // classes is BarButton::css_classes beyond lys-ui's bar-button and
