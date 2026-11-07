@@ -67,6 +67,9 @@ type NotificationConfig struct {
 	// App-name or desktop-entry globs whose notifications never play a
 	// sound.
 	SoundMuteApps []string `cfg:"sound-mute-apps"`
+	// Volume of notification sounds, as a percentage of the sound as
+	// recorded.
+	SoundVolume Percentage `cfg:"sound-volume"`
 	// How notification icons are resolved.
 	//
 	// | Mode | Per-notification image | No image provided |
@@ -172,6 +175,7 @@ func DefaultsNotification() NotificationConfig {
 		Sounds:             NotificationSoundsCritical,
 		SoundDefault:       "message-new-instant",
 		SoundMuteApps:      []string{},
+		SoundVolume:        100,
 		IconSource:         IconSourceAutomatic,
 		HistoryMemory:      NotificationHistoryMemory{limit: notifications.DefaultMemoryLimit()},
 		HistoryStored:      NotificationHistoryStored{limit: notifications.DefaultStoredLimit()},
@@ -399,5 +403,5 @@ func (c NotificationConfig) SoundPolicy() sounds.Policy {
 		NotificationSoundsCritical: sounds.Critical,
 		NotificationSoundsAll:      sounds.All,
 	}
-	return sounds.Policy{Mode: modes[c.Sounds], Default: c.SoundDefault, MuteApps: c.SoundMuteApps}
+	return sounds.Policy{Mode: modes[c.Sounds], Default: c.SoundDefault, MuteApps: c.SoundMuteApps, Volume: float64(c.SoundVolume) / 100}
 }

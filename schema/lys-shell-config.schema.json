@@ -6822,6 +6822,7 @@
             "scroll-up": "",
             "sound-default": "message-new-instant",
             "sound-mute-apps": [],
+            "sound-volume": 100,
             "sounds": "critical",
             "thresholds": [],
             "tooltip": true
@@ -8126,6 +8127,11 @@
           "$ref": "#/$defs/Array_of_string",
           "default": [],
           "description": "App-name or desktop-entry globs whose notifications never play a\nsound."
+        },
+        "sound-volume": {
+          "$ref": "#/$defs/Percentage",
+          "default": 100,
+          "description": "Volume of notification sounds, as a percentage of the sound as\nrecorded."
         },
         "sounds": {
           "$ref": "#/$defs/NotificationSounds",
@@ -13014,6 +13020,7 @@
           "scroll-up": "",
           "sound-default": "message-new-instant",
           "sound-mute-apps": [],
+          "sound-volume": 100,
           "sounds": "critical",
           "thresholds": [],
           "tooltip": true

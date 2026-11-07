@@ -33,18 +33,21 @@ func run(m *testing.M, home string) int {
 	return m.Run()
 }
 
-// Isolate points HOME and the XDG per-user directories under home and
-// creates the runtime directory, which must exist with mode 0700.
+// Isolate points HOME and the XDG per-user directories under home, pins
+// the sound server to the scratch runtime directory's socket, which only
+// a test's own fake serves, and creates the runtime directory, which must
+// exist with mode 0700.
 func Isolate(home string) error {
-	for key, sub := range map[string]string{
-		"HOME":            "",
-		"XDG_CONFIG_HOME": "config",
-		"XDG_DATA_HOME":   "data",
-		"XDG_STATE_HOME":  "state",
-		"XDG_CACHE_HOME":  "cache",
-		"XDG_RUNTIME_DIR": "run",
+	for key, value := range map[string]string{
+		"HOME":            home,
+		"XDG_CONFIG_HOME": filepath.Join(home, "config"),
+		"XDG_DATA_HOME":   filepath.Join(home, "data"),
+		"XDG_STATE_HOME":  filepath.Join(home, "state"),
+		"XDG_CACHE_HOME":  filepath.Join(home, "cache"),
+		"XDG_RUNTIME_DIR": filepath.Join(home, "run"),
+		"PULSE_SERVER":    "unix:" + filepath.Join(home, "run", "pulse", "native"),
 	} {
-		if err := os.Setenv(key, filepath.Join(home, sub)); err != nil {
+		if err := os.Setenv(key, value); err != nil {
 			return fmt.Errorf("set %s: %w", key, err)
 		}
 	}

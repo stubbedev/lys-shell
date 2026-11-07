@@ -29,12 +29,14 @@ type Policy struct {
 	Default string
 	// MuteApps are app-name or desktop-entry globs that never sound.
 	MuteApps []string
+	// Volume is the sounds' linear level, 1 playing them as recorded.
+	Volume float64
 }
 
 // Player plays a sample through the audio server's cache, loading it on
 // the first play (*pulse.Service).
 type Player interface {
-	PlaySample(ctx context.Context, name string, props native.PropList, load func() (native.Sample, error)) error
+	PlaySample(ctx context.Context, p native.SamplePlay, load func() (native.Sample, error)) error
 }
 
 // playTimeout bounds one play: the audio server answers at once or not at
@@ -89,7 +91,10 @@ func (a *Announcer) Run(events <-chan notifications.Event) {
 // Announce plays n's sound when the policy, do-not-disturb, a share and
 // the sink's mute all let it.
 func (a *Announcer) Announce(n *notifications.Notification) {
-	path, event, ok := a.sound(n)
+	a.mu.Lock()
+	policy := a.policy
+	a.mu.Unlock()
+	path, event, ok := a.sound(policy, n)
 	if !ok {
 		return
 	}
@@ -101,7 +106,7 @@ func (a *Announcer) Announce(n *notifications.Notification) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), playTimeout)
 	defer cancel()
-	if err := a.player.PlaySample(ctx, "lys-shell:"+path, props, func() (native.Sample, error) { return a.load(path) }); err != nil {
+	if err := a.player.PlaySample(ctx, native.SamplePlay{Name: "lys-shell:" + path, Volume: native.LinearVolume(policy.Volume), Props: props}, func() (native.Sample, error) { return a.load(path) }); err != nil {
 		log.Printf("sounds: %v", err)
 	}
 }
@@ -113,10 +118,7 @@ func (a *Announcer) load(path string) (native.Sample, error) {
 	return a.decode(path)
 }
 
-func (a *Announcer) sound(n *notifications.Notification) (path, event string, ok bool) {
-	a.mu.Lock()
-	policy := a.policy
-	a.mu.Unlock()
+func (a *Announcer) sound(policy Policy, n *notifications.Notification) (path, event string, ok bool) {
 	switch {
 	case policy.Mode == Off, policy.Mode == Critical && n.Urgency != notifications.UrgencyCritical:
 		return "", "", false

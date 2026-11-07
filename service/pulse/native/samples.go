@@ -84,24 +84,33 @@ func (c *Conn) sendAudio(ctx context.Context, channel uint32, data []byte) error
 	return nil
 }
 
+// SamplePlay is one play of a cached sample: Name on the sink named Sink,
+// or on the default sink when Sink is empty, at Volume; Props describe this
+// playback (media.role and friends).
+type SamplePlay struct {
+	Name   string
+	Sink   string
+	Volume Volume
+	Props  PropList
+}
+
 // ErrNoSample is a sample the server's cache does not hold.
 var ErrNoSample = errors.New("pulse: no such sample in the server's cache")
 
-// PlaySample plays the cached sample name on the default sink at its own
-// volume (PLAY_SAMPLE); props describe this playback (media.role and
-// friends). A name the cache lacks is ErrNoSample.
-func (c *Conn) PlaySample(ctx context.Context, name string, props PropList) error {
+// PlaySample plays a cached sample (PLAY_SAMPLE). A name the cache lacks
+// is ErrNoSample.
+func (c *Conn) PlaySample(ctx context.Context, p SamplePlay) error {
 	var w Writer
 	w.U32(InvalidIndex)
-	w.OptString("")
-	w.U32(uint32(VolumeInvalid))
-	w.String(name)
-	w.PropList(props)
+	w.OptString(p.Sink)
+	w.U32(uint32(p.Volume))
+	w.String(p.Name)
+	w.PropList(p.Props)
 	if _, err := c.request(ctx, CmdPlaySample, &w, nil); err != nil {
 		if errors.Is(err, ErrNoEntity) {
-			return fmt.Errorf("pulse: play %s: %w", name, ErrNoSample)
+			return fmt.Errorf("pulse: play %s: %w", p.Name, ErrNoSample)
 		}
-		return fmt.Errorf("pulse: play %s: %w", name, err)
+		return fmt.Errorf("pulse: play %s: %w", p.Name, err)
 	}
 	return nil
 }

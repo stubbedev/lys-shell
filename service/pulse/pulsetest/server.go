@@ -680,12 +680,7 @@ func (c *conn) deviceInfo(tag uint32, r *native.Reader, failed func() bool, sink
 	}
 	d, ok := m[index]
 	if name != "" {
-		ok = false
-		for _, cand := range m {
-			if cand.Name == name {
-				d, ok = cand, true
-			}
-		}
+		d, ok = named(m, name)
 	}
 	c.s.mu.Unlock()
 	if !ok {
@@ -894,10 +889,7 @@ func setDefaultHandler(sink bool) handler {
 		if sink {
 			m = s.sinks
 		}
-		found := false
-		for _, d := range m {
-			found = found || d.Name == name
-		}
+		_, found := named(m, name)
 		if found {
 			if sink {
 				s.info.DefaultSink = name
@@ -975,13 +967,7 @@ func (c *conn) createRecord(tag uint32, r *native.Reader, failed func() bool) bo
 	if name == "" {
 		name = s.info.DefaultSource
 	}
-	var source native.DeviceInfo
-	found := false
-	for _, d := range s.sources {
-		if d.Name == name {
-			source, found = d, true
-		}
-	}
+	source, found := named(s.sources, name)
 	if found {
 		rec.Channel = s.nextChannel
 		s.nextChannel++
@@ -1047,4 +1033,13 @@ func (c *conn) deleteRecord(tag uint32, r *native.Reader, failed func() bool) bo
 	c.reply(tag, nil)
 	s.RemoveSourceOutput(rec.SourceOutput)
 	return true
+}
+
+func named(m map[uint32]native.DeviceInfo, name string) (native.DeviceInfo, bool) {
+	for _, d := range m {
+		if d.Name == name {
+			return d, true
+		}
+	}
+	return native.DeviceInfo{}, false
 }

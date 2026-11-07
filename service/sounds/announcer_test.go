@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 )
 
@@ -100,12 +101,15 @@ func h(kv ...any) map[string]dbus.Variant {
 }
 
 func TestASoundNamePlaysItsThemeFileOnceDecoded(t *testing.T) {
-	r := newRig(t, Policy{Mode: All, Default: "dialog-warning"})
+	r := newRig(t, Policy{Mode: All, Default: "dialog-warning", Volume: 0.5})
 	r.notify("chat", h("sound-name", "message-new-instant"))
 	r.notify("chat", h("sound-name", "message-new-instant"))
 	plays := r.srv.Plays()
 	if len(plays) != 2 || plays[0].Name != "lys-shell:"+filepath.Join(r.theme, "message-new-instant.oga") {
 		t.Fatalf("plays = %+v", plays)
+	}
+	if plays[0].Volume != native.VolumeNorm/2 || plays[0].Sink != "" {
+		t.Errorf("played on %q at %#x, want the default sink at half volume", plays[0].Sink, plays[0].Volume)
 	}
 	if plays[0].Props["media.role"] != "event" || plays[0].Props["event.id"] != "message-new-instant" {
 		t.Errorf("props = %v", plays[0].Props)

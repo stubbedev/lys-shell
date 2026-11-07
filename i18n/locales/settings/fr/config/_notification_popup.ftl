@@ -72,3 +72,5 @@ settings-modules-notifications-sound-default = Son par défaut
 
 settings-modules-notifications-sound-mute-apps = Applications muettes
     .description = Motifs de noms d'applications dont les notifications ne jouent jamais de son
+settings-modules-notifications-sound-volume = Volume des sons
+    .description = Intensité des sons de notification, en part du son enregistré

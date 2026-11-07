@@ -7,10 +7,13 @@ import (
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
-// Play is one PLAY_SAMPLE the fake answered.
+// Play is one PLAY_SAMPLE the fake answered: Sink is the sink it named,
+// empty for the default one.
 type Play struct {
-	Name  string
-	Props native.PropList
+	Name   string
+	Sink   string
+	Volume native.Volume
+	Props  native.PropList
 }
 
 type upload struct {
@@ -120,8 +123,8 @@ func (c *conn) finishUpload(tag uint32, r *native.Reader, failed func() bool) bo
 
 func (c *conn) playSample(tag uint32, r *native.Reader, failed func() bool) bool {
 	_ = r.U32()
-	_, _ = r.String()
-	_ = r.U32()
+	sink, _ := r.String()
+	volume := native.Volume(r.U32())
 	name, _ := r.String()
 	var props native.PropList
 	if c.negotiated() >= 13 {
@@ -136,8 +139,11 @@ func (c *conn) playSample(tag uint32, r *native.Reader, failed func() bool) bool
 	s := c.s
 	s.mu.Lock()
 	_, ok := s.samples[name]
+	if ok && sink != "" {
+		_, ok = named(s.sinks, sink)
+	}
 	if ok {
-		s.plays = append(s.plays, Play{Name: name, Props: props})
+		s.plays = append(s.plays, Play{Name: name, Sink: sink, Volume: volume, Props: props})
 	}
 	s.mu.Unlock()
 	if !ok {

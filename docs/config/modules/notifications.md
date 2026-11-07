@@ -36,6 +36,7 @@ bar:
 | `sounds` | [`NotificationSounds`](/config/types#notification-sounds) | `"critical"` | Which notifications play a sound: `off`, `critical` (urgent ones only), or `all`. Sounds stay silent in do-not-disturb, while the screen is shared or recorded, and while the default output is muted. |
 | `sound-default` | string | `"message-new-instant"` | Sound theme name a notification without its own sound plays, and what a sound the theme lacks falls back to. |
 | `sound-mute-apps` | array of string | `[]` | App-name or desktop-entry globs whose notifications never play a sound. |
+| `sound-volume` | [`Percentage`](/config/types#percentage) | `100` | Volume of notification sounds, as a percentage of the sound as recorded. |
 | `icon-source` | [`IconSource`](/config/types#icon-source) | `"automatic"` | How notification icons are resolved. |
 | `history-memory` | [`NotificationHistoryMemory`](/config/types#notification-history-memory) | `200` | How many of the newest notifications the history keeps in memory. Older ones stay on disk and load as the dropdown scrolls to them. |
 | `history-stored` | [`NotificationHistoryStored`](/config/types#notification-history-stored) | `10000` | How many notifications the history keeps on disk. The oldest are deleted past it. |
@@ -164,6 +165,7 @@ modules:
     sounds: critical
     sound-default: message-new-instant
     sound-mute-apps: []
+    sound-volume: 100
     icon-source: automatic
     history-memory: 200
     history-stored: 10000

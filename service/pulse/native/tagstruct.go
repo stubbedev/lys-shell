@@ -174,6 +174,10 @@ const (
 	VolumeInvalid Volume = 0xFFFFFFFF
 )
 
+// LinearVolume is the raw volume of a linear level, 1 being VolumeNorm,
+// truncated.
+func LinearVolume(level float64) Volume { return Volume(level * float64(VolumeNorm)) }
+
 // CVolume is pa_cvolume: one raw volume per channel.
 type CVolume []Volume
 

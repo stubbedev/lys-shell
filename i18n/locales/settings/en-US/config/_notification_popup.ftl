@@ -72,3 +72,5 @@ settings-modules-notifications-sound-default = Default Sound
 
 settings-modules-notifications-sound-mute-apps = Silent Apps
     .description = App-name globs whose notifications never play a sound
+settings-modules-notifications-sound-volume = Sound Volume
+    .description = How loud notification sounds play, as a share of the sound as recorded

@@ -1229,6 +1229,7 @@ var schemaDocs = map[string]string{
 	"NotificationConfig.ScrollUp":                            "Action on scroll up.",
 	"NotificationConfig.SoundDefault":                        "Sound theme name a notification without its own sound plays, and\nwhat a sound the theme lacks falls back to.",
 	"NotificationConfig.SoundMuteApps":                       "App-name or desktop-entry globs whose notifications never play a\nsound.",
+	"NotificationConfig.SoundVolume":                         "Volume of notification sounds, as a percentage of the sound as\nrecorded.",
 	"NotificationConfig.Sounds":                              "Which notifications play a sound: `off`, `critical` (urgent ones\nonly), or `all`. Sounds stay silent in do-not-disturb, while the\nscreen is shared or recorded, and while the default output is muted.",
 	"NotificationConfig.Thresholds":                          "Dynamic color thresholds based on notification count.\n\nEntries are checked in order; the last matching entry wins for each\ncolor slot. Use `above` for high-value warnings (e.g., many unread\nnotifications).\n\n## Example\n\n```yaml\nmodules:\n  notifications:\n    thresholds:\n      - above: 5\n        icon-color: status-warning\n        label-color: status-warning\n      - above: 20\n        icon-color: status-error\n        label-color: status-error\n```",
 	"NotificationConfig.Tooltip":                             "Show the module's state in a tooltip on hover.",

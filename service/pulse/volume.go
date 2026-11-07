@@ -195,7 +195,7 @@ func volumeFromPulseSingle(raw native.Volume) Volume {
 func (v Volume) toPulse() native.CVolume {
 	out := make(native.CVolume, len(v.levels))
 	for i, l := range v.levels {
-		out[i] = native.Volume(l * float64(native.VolumeNorm))
+		out[i] = native.LinearVolume(l)
 	}
 	return out
 }

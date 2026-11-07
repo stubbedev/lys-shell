@@ -7,7 +7,7 @@ import (
 )
 
 func TestIsolatePointsEveryUserDirUnderHome(t *testing.T) {
-	for _, k := range []string{"HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"} {
+	for _, k := range []string{"HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR", "PULSE_SERVER"} {
 		t.Setenv(k, "/real/"+k)
 	}
 	home := t.TempDir()
@@ -17,6 +17,7 @@ func TestIsolatePointsEveryUserDirUnderHome(t *testing.T) {
 	want := map[string]string{
 		"HOME": home, "XDG_CONFIG_HOME": home + "/config", "XDG_DATA_HOME": home + "/data",
 		"XDG_STATE_HOME": home + "/state", "XDG_CACHE_HOME": home + "/cache", "XDG_RUNTIME_DIR": home + "/run",
+		"PULSE_SERVER": "unix:" + home + "/run/pulse/native",
 	}
 	for k, v := range want {
 		if got := os.Getenv(k); got != v {
