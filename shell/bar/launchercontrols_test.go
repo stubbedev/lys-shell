@@ -239,22 +239,6 @@ func TestNoServicesOfferNoRows(t *testing.T) {
 	}
 }
 
-func TestAPickedColorIsHex(t *testing.T) {
-	for _, tc := range []struct {
-		c    [3]float64
-		want string
-	}{
-		{[3]float64{0, 0, 0}, "#000000"},
-		{[3]float64{1, 1, 1}, "#FFFFFF"},
-		{[3]float64{1.0 / 255, 128.0 / 255, 254.0 / 255}, "#0180FE"},
-		{[3]float64{-1, 2, 0.5}, "#00FF80"},
-	} {
-		if got := hexOfColor(tc.c); got != tc.want {
-			t.Errorf("hexOfColor(%v) = %s, want %s", tc.c, got, tc.want)
-		}
-	}
-}
-
 func TestAServiceStartingAfterTheShellReachesTheNextSession(t *testing.T) {
 	var ctx ModuleContext
 	cfg := config.Defaults()
@@ -272,16 +256,16 @@ func TestAServiceStartingAfterTheShellReachesTheNextSession(t *testing.T) {
 func TestAPickedColorIsHandedOver(t *testing.T) {
 	var got []string
 	copied := func(hex string) { got = append(got, hex) }
-	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{1, 0, 0}, true, nil }, copied)
-	if !slices.Equal(got, []string{"#FF0000"}) {
+	deliverPickedColor(func() (string, bool, error) { return "rgb(255, 0, 0)", true, nil }, copied)
+	if !slices.Equal(got, []string{"rgb(255, 0, 0)"}) {
 		t.Errorf("picked: %q", got)
 	}
 }
 
 func TestCancellingOrFailingToPickCopiesNothing(t *testing.T) {
 	copied := func(hex string) { t.Errorf("copied %s", hex) }
-	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{}, false, nil }, copied)
-	deliverPickedColor(func() ([3]float64, bool, error) { return [3]float64{1, 1, 1}, false, errors.New("busy") }, copied)
+	deliverPickedColor(func() (string, bool, error) { return "", false, nil }, copied)
+	deliverPickedColor(func() (string, bool, error) { return "#FFFFFF", false, errors.New("busy") }, copied)
 }
 
 type nopWallpapers struct{ launcher.Wallpapers }

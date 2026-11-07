@@ -53,9 +53,9 @@ type pickAnswer struct {
 
 type gatedPicker struct{ *gated[pickAnswer] }
 
-func (p gatedPicker) Request(ctx context.Context, frames regionoverlay.Frames) (colorpicker.RGB, bool, error) {
+func (p gatedPicker) Request(ctx context.Context, frames regionoverlay.Frames, _ colorpicker.Options) (colorpicker.Pick, bool, error) {
 	a, err := p.open(ctx, frames)
-	return a.c, a.ok, err
+	return colorpicker.Pick{Color: a.c}, a.ok, err
 }
 
 // gateRig is a host whose overlays share the real gate, counting the

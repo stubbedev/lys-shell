@@ -9,7 +9,9 @@ import (
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -48,7 +50,7 @@ func newRig(t *testing.T) *rig {
 	gate := &regionoverlay.Gate{}
 	return &rig{
 		a:      a,
-		p:      New(a, gate, a.Session().Outputs, font, ""),
+		p:      New(a, gate, a.Session().Outputs, font, "", func() config.ColorFormat { return config.ColorFormatHex }),
 		region: regionoverlay.New(a, gate, a.Session().Outputs, nil, font, nil),
 		kb:     keytest.Dial(t, a),
 	}
@@ -67,15 +69,18 @@ func (r *rig) frames() (map[string]render.StillImage, error) {
 
 // pick opens the picker and waits until it holds the keyboard; the answer
 // arrives on the returned channel. It ends with the test.
-func (r *rig) pick(t *testing.T) chan result {
+func (r *rig) pick(t *testing.T) chan result { return r.pickWith(t, Options{}) }
+
+// pickWith is pick with opts.
+func (r *rig) pickWith(t *testing.T, opts Options) chan result {
 	t.Helper()
 	apptest.Until(t, r.a, "an output appeared", func() bool { return len(r.a.Session().Outputs()) > 0 })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	answers := make(chan result, 1)
 	go func() {
-		c, ok, err := r.p.Request(ctx, r.frames)
-		answers <- result{color: c, ok: ok, err: err}
+		p, ok, err := r.p.Request(ctx, r.frames, opts)
+		answers <- result{pick: p, ok: ok, err: err}
 	}()
 	apptest.Until(t, r.a, "the picker took the keyboard", func() bool {
 		return len(r.p.surfaces) > 0 && r.a.Session().KeyboardFocus() == r.p.surfaces[0].HostSurface()
@@ -156,7 +161,7 @@ func TestHeadlessPickIsRefusedDuringARegionSelection(t *testing.T) {
 	}()
 	keytest.AwaitFocus(t, r.a)
 	refused := within(t, "the pick's refusal", func() error {
-		_, _, err := r.p.Request(context.Background(), uncaptured(t))
+		_, _, err := r.p.Request(context.Background(), uncaptured(t), Options{})
 		return err
 	})
 	if !errors.Is(refused, regionoverlay.ErrBusy) {
@@ -180,4 +185,29 @@ func within[T any](t *testing.T, what string, fn func() T) T {
 	answered := make(chan T, 1)
 	go func() { answered <- fn() }()
 	return apptest.Answer(t, what, answered)
+}
+
+// Tab on a real keyboard moves the readout to the next format, and the
+// pick answers in the format shown at the click.
+func TestHeadlessTabCyclesTheFormatThePickIsWrittenIn(t *testing.T) {
+	r := newRig(t)
+	answers := r.pickWith(t, Options{Format: config.ColorFormatRGB})
+	r.kb.Tap(keytest.Tab)
+	apptest.Until(t, r.a, "the readout moved on", func() bool { return r.p.format == config.ColorFormatHSL })
+	apptest.On(r.a, func() struct{} {
+		v := r.p.views[0]
+		b := v.Bounds()
+		v.ClickAt(widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/3})
+		return struct{}{}
+	})
+	got := apptest.Answer(t, "the pick after Tab", answers)
+	if !got.ok || got.pick.Format != config.ColorFormatHSL || got.pick.Text() != "hsl(0, 0%, 0%)" {
+		t.Fatalf("picked %+v (%q), want the black frame written as hsl", got, got.pick.Text())
+	}
+	again := r.pick(t)
+	if f := apptest.On(r.a, func() config.ColorFormat { return r.p.format }); f != config.ColorFormatHSL {
+		t.Errorf("the next pick starts in %s, want the one last used", f)
+	}
+	r.kb.Tap(keytest.Escape)
+	apptest.Answer(t, "the second pick", again)
 }

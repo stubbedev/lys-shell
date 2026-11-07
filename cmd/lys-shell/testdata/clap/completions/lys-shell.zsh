@@ -1478,6 +1478,16 @@ esac
     ;;
 esac
 ;;
+(colorpicker)
+_arguments "${_arguments_options[@]}" : \
+'-f+[Format the readout starts in (Tab in the picker cycles it) \[default\: colorpicker.format, or the last one used\]]:FORMAT:(hex rgb hsl hsv oklch cmyk)' \
+'--format=[Format the readout starts in (Tab in the picker cycles it) \[default\: colorpicker.format, or the last one used\]]:FORMAT:(hex rgb hsl hsv oklch cmyk)' \
+'--no-copy[Print the color without copying it]' \
+'--no-loupe[Show a crosshair instead of the magnifier]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
 (widget)
 _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
@@ -2481,6 +2491,10 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(colorpicker)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (widget)
 _arguments "${_arguments_options[@]}" : \
 ":: :_lys-shell__help__widget_commands" \
@@ -2654,6 +2668,7 @@ _lys-shell_commands() {
 'vpn:VPN commands' \
 'recorder:Screen recorder control commands' \
 'screenshot:Screenshot capture commands' \
+'colorpicker:Pick a color on screen, print it and copy it; exit status 1 when cancelled' \
 'widget:Widget control commands' \
 'toast:Show a custom on-screen toast' \
 'portal:xdg-desktop-portal backend, screencast picker stub, and dialog previewer' \
@@ -2771,6 +2786,11 @@ _lys-shell__brightness_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell brightness commands' commands "$@"
 }
+(( $+functions[_lys-shell__colorpicker_commands] )) ||
+_lys-shell__colorpicker_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell colorpicker commands' commands "$@"
+}
 (( $+functions[_lys-shell__completions_commands] )) ||
 _lys-shell__completions_commands() {
     local commands; commands=()
@@ -2887,6 +2907,7 @@ _lys-shell__help_commands() {
 'vpn:VPN commands' \
 'recorder:Screen recorder control commands' \
 'screenshot:Screenshot capture commands' \
+'colorpicker:Pick a color on screen, print it and copy it; exit status 1 when cancelled' \
 'widget:Widget control commands' \
 'toast:Show a custom on-screen toast' \
 'portal:xdg-desktop-portal backend, screencast picker stub, and dialog previewer' \
@@ -2948,6 +2969,11 @@ _lys-shell__help__audio__status_commands() {
 _lys-shell__help__brightness_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help brightness commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__colorpicker_commands] )) ||
+_lys-shell__help__colorpicker_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help colorpicker commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__completions_commands] )) ||
 _lys-shell__help__completions_commands() {

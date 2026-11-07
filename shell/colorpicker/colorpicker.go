@@ -2,10 +2,12 @@
 // (crates/lys-shell/src/shell/color_picker): a frozen-frame layer
 // surface per monitor with a zoom loupe that follows the pointer - the
 // magnified pixels around it, a crosshair on the exact pixel a click
-// picks, a hex readout, and a row of recently picked swatches. A click
-// samples that pixel; Escape cancels. The screenshot host captures the
-// frames and hands them over (it owns the capture path), and the
-// portal's Screenshot.PickColor reaches it over dev.stubbe.lys.Screenshot1.
+// picks, and the color's readout in the chosen format, which Tab cycles -
+// and a strip of recently picked swatches, a click on one picking it
+// again. A click samples that pixel; Escape cancels. The screenshot host
+// captures the frames and hands them over (it owns the capture path), and
+// the portal's Screenshot.PickColor and `lys-shell colorpicker` reach it
+// over dev.stubbe.lys.Screenshot1.
 package colorpicker
 
 import (
@@ -22,9 +24,11 @@ import (
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/xdg"
+	"github.com/stubbedev/lys-lib/xkb"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/loupe"
@@ -36,11 +40,14 @@ const (
 	// historyMax is the most swatches kept.
 	historyMax = 8
 
-	panelPad   = 10
-	readoutH   = 28
-	swatchSize = 16
-	swatchGap  = 4
-	hexPx      = 13.0
+	panelPad  = 10
+	readoutH  = 28
+	swatchGap = 4
+	hexPx     = 13.0
+	// stripSwatch and stripMargin size the recent swatches' strip at the
+	// bottom of each output.
+	stripSwatch = 28
+	stripMargin = 24
 )
 
 // Colors of the loupe card.
@@ -48,6 +55,7 @@ var (
 	cardBacking   = render.RGBA(20, 20, 26, 235)
 	hexColor      = render.RGBA(255, 255, 255, 242)
 	swatchOutline = render.RGBA(255, 255, 255, 77)
+	swatchHover   = render.RGBA(255, 255, 255, 242)
 )
 
 // RGB is one 8-bit color.
@@ -61,11 +69,30 @@ func (c RGB) Float() (r, g, b float64) {
 	return float64(c.R) / 255, float64(c.G) / 255, float64(c.B) / 255
 }
 
+// Options shape one pick.
+type Options struct {
+	// Format is the readout's first format; empty starts in the one the
+	// last pick used, else the configured one.
+	Format config.ColorFormat
+	// NoLoupe shows a crosshair pointer over the frozen screen instead of
+	// the magnifier.
+	NoLoupe bool
+}
+
+// Pick is a picked color and the format the readout showed at the click.
+type Pick struct {
+	Color  RGB
+	Format config.ColorFormat
+}
+
+// Text is the color written in the format shown.
+func (p Pick) Text() string { return p.Color.Format(p.Format) }
+
 // result is one request's answer: a pick, a cancel, or a failure.
 type result struct {
-	color RGB
-	ok    bool
-	err   error
+	pick Pick
+	ok   bool
+	err  error
 }
 
 // Picker is the picker component. Request is its entry point; the rest
@@ -77,17 +104,25 @@ type Picker struct {
 	font    render.Font
 	// historyPath is where the swatches persist; empty disables it.
 	historyPath string
+	// configured is the format a pick starts in until one is used.
+	configured func() config.ColorFormat
 
-	history  []RGB
+	history []RGB
+	// used is the format the last pick was made in, empty before one.
+	used     config.ColorFormat
 	reply    chan result
 	surfaces []*app.LayerWindow
+	views    []*surface
+	// format and noLoupe are the open request's readout and look.
+	format  config.ColorFormat
+	noLoupe bool
 }
 
 // New builds the picker. gate is the shell's one capture gate; font is
 // the readout's monospace bold face; the history loads from historyPath
-// (HistoryPath for the real one).
-func New(a *app.Application, gate *regionoverlay.Gate, outputs func() []*app.Output, font render.Font, historyPath string) *Picker {
-	return &Picker{app: a, gate: gate, outputs: outputs, font: font, historyPath: historyPath, history: loadHistory(historyPath)}
+// (HistoryPath for the real one); configured reads colorpicker.format.
+func New(a *app.Application, gate *regionoverlay.Gate, outputs func() []*app.Output, font render.Font, historyPath string, configured func() config.ColorFormat) *Picker {
+	return &Picker{app: a, gate: gate, outputs: outputs, font: font, historyPath: historyPath, configured: configured, history: loadHistory(historyPath)}
 }
 
 // HistoryPath is the persisted swatch file:
@@ -103,18 +138,19 @@ func HistoryPath() string {
 
 // Request opens the picker over the frozen frames (keyed by connector),
 // which frames captures once the gate admits the request, and blocks until
-// a click picks a pixel (ok), or the user cancels or ctx ends (not ok, no
-// error). A monitor without a frame gets no surface; when no frame matches
-// any monitor there is nothing to pick from, and that is an error naming
-// both, not a cancel. While another session holds the gate the request
-// opens nothing, takes no frames and answers regionoverlay.ErrBusy. Call it
-// from any goroutine but the loop's.
-func (p *Picker) Request(ctx context.Context, frames regionoverlay.Frames) (RGB, bool, error) {
-	r, err := regionoverlay.OpenSession(ctx, p.gate, p.app.Invoke, frames, p.show, p.cancel)
+// a click picks a pixel or a recent swatch (ok), or the user cancels or
+// ctx ends (not ok, no error). A monitor without a frame gets no surface;
+// when no frame matches any monitor there is nothing to pick from, and that
+// is an error naming both, not a cancel. While another session holds the
+// gate the request opens nothing, takes no frames and answers
+// regionoverlay.ErrBusy. Call it from any goroutine but the loop's.
+func (p *Picker) Request(ctx context.Context, frames regionoverlay.Frames, opts Options) (Pick, bool, error) {
+	show := func(frames map[string]render.StillImage, ch chan result) { p.show(frames, ch, opts) }
+	r, err := regionoverlay.OpenSession(ctx, p.gate, p.app.Invoke, frames, show, p.cancel)
 	if err != nil {
-		return RGB{}, false, err
+		return Pick{}, false, err
 	}
-	return r.color, r.ok, r.err
+	return r.pick, r.ok, r.err
 }
 
 // cancel answers the request at ch, if it is still the open one, as
@@ -125,21 +161,48 @@ func (p *Picker) cancel(ch chan result) {
 	}
 }
 
-func (p *Picker) show(frames map[string]render.StillImage, ch chan result) {
+// startFormat is the readout's first format for a request asking for f.
+func (p *Picker) startFormat(f config.ColorFormat) config.ColorFormat {
+	switch {
+	case f != "":
+		return f
+	case p.used != "":
+		return p.used
+	}
+	return p.configured()
+}
+
+// key is the picker's keyboard: Escape cancels, Tab cycles the readout's
+// format.
+func (p *Picker) key(_ *widget.Router, sym xkb.Keysym, _ app.Mods) {
+	switch sym {
+	case xkb.KeyEscape:
+		p.finish(RGB{}, false)
+	case xkb.KeyTab:
+		p.format = p.format.Next()
+		for _, v := range p.views {
+			v.Invalidate()
+		}
+	}
+}
+
+func (p *Picker) show(frames map[string]render.StillImage, ch chan result, opts Options) {
 	p.reply = ch
+	p.format, p.noLoupe = p.startFormat(opts.Format), opts.NoLoupe
 	for _, out := range p.outputs() {
 		mon := regionoverlay.MonitorOf(out)
 		frame, ok := frames[mon.Connector]
 		if !ok || frame.RGBA == nil {
 			continue
 		}
-		l := &surface{p: p, frame: frame, logicalW: mon.Width, logicalH: mon.Height}
-		layer, err := regionoverlay.OpenSurface(p.app, out, "lys-shell-color-picker", l, keys.OnEscape(p.app.KeySym, func() { p.finish(RGB{}, false) }))
+		l := &surface{p: p, frame: frame, logicalW: mon.Width, logicalH: mon.Height, hoverSwatch: -1}
+		layer, err := regionoverlay.OpenSurface(p.app, out, "lys-shell-color-picker", l, keys.OnKey(p.app.KeySym, p.key))
 		if err != nil {
 			log.Printf("color picker: surface on %s: %v", mon.Connector, err)
 			continue
 		}
 		p.surfaces = append(p.surfaces, layer)
+		p.views = append(p.views, l)
 	}
 	if len(p.surfaces) == 0 {
 		names := make([]string, 0, len(p.outputs()))
@@ -150,14 +213,17 @@ func (p *Picker) show(frames map[string]render.StillImage, ch chan result) {
 	}
 }
 
-// finish answers the open request, remembering a pick in the history,
-// and tears the surfaces down.
+// finish answers the open request, remembering a pick in the history
+// and its format for the next pick, and tears the surfaces down.
 func (p *Picker) finish(c RGB, ok bool) {
-	if ok {
-		p.history = pushHistory(p.history, c)
-		saveHistory(p.historyPath, p.history)
+	if !ok {
+		p.answer(result{})
+		return
 	}
-	p.answer(result{color: c, ok: ok})
+	p.history = pushHistory(p.history, c)
+	saveHistory(p.historyPath, p.history)
+	p.used = p.format
+	p.answer(result{pick: Pick{Color: c, Format: p.format}, ok: true})
 }
 
 // answer tears the surfaces down and then replies to the open request,
@@ -167,7 +233,7 @@ func (p *Picker) answer(r result) {
 	for _, s := range p.surfaces {
 		s.Close()
 	}
-	p.surfaces = nil
+	p.surfaces, p.views = nil, nil
 	if p.reply != nil {
 		p.reply <- r
 		p.reply = nil
@@ -248,6 +314,8 @@ type surface struct {
 
 	cursorX, cursorY float64
 	hasCursor        bool
+	// hoverSwatch is the recent swatch under the pointer, -1 for none.
+	hoverSwatch int
 }
 
 // Measure asks for nothing: the surface takes the whole output.
@@ -256,28 +324,42 @@ func (l *surface) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{}
 func (l *surface) HitTest(p widget.Point) widget.Widget { return l.HitLeaf(l, p) }
 
 // CursorName implements widget.CursorNamer: the loupe replaces the
-// pointer.
-func (l *surface) CursorName() string { return "none" }
+// pointer, a crosshair stands in without one, and over the recent
+// swatches the pointer is the arrow that clicks one.
+func (l *surface) CursorName() string {
+	switch {
+	case l.hoverSwatch >= 0:
+		return "default"
+	case l.p.noLoupe:
+		return "crosshair"
+	}
+	return "none"
+}
 
 // HoverMove implements widget.HoverMover.
 func (l *surface) HoverMove(p widget.Point) {
 	b := l.Bounds()
 	l.cursorX, l.cursorY, l.hasCursor = float64(p.X-b.X), float64(p.Y-b.Y), true
+	l.hoverSwatch = swatchAt(stripRects(b, len(l.p.history)), p)
 	l.Invalidate()
 }
 
 // SetHovered implements widget.HoverSetter: leaving hides the loupe.
 func (l *surface) SetHovered(on bool) {
 	if !on {
-		l.hasCursor = false
+		l.hasCursor, l.hoverSwatch = false, -1
 		l.Invalidate()
 	}
 }
 
-// ClickAt implements widget.Clicker: the release picks the pixel under
-// it.
+// ClickAt implements widget.Clicker: the release picks the recent swatch
+// under it, else the pixel under it.
 func (l *surface) ClickAt(p widget.Point) {
 	b := l.Bounds()
+	if i := swatchAt(stripRects(b, len(l.p.history)), p); i >= 0 {
+		l.p.finish(l.p.history[i], true)
+		return
+	}
 	x, y := loupe.SampleAt(l.frame.RGBA, l.logicalW, l.logicalH, float64(p.X-b.X), float64(p.Y-b.Y))
 	l.p.finish(pixel(l.frame.RGBA, x, y), true)
 }
@@ -285,47 +367,75 @@ func (l *surface) ClickAt(p widget.Point) {
 func (l *surface) Paint(cv *render.Canvas) {
 	b := l.Bounds()
 	loupe.DrawFrame(cv, l.frame, b)
-	if l.hasCursor {
-		drawLoupe(cv, l.p.font, l.frame.RGBA, l.logicalW, l.logicalH, b, l.cursorX, l.cursorY, l.p.history)
+	drawStrip(cv, l.p.history, stripRects(b, len(l.p.history)), l.hoverSwatch)
+	if l.hasCursor && l.hoverSwatch < 0 && !l.p.noLoupe {
+		drawLoupe(cv, l.p.font, l.frame.RGBA, l.logicalW, l.logicalH, b, l.cursorX, l.cursorY, l.p.format)
 	}
 }
 
 // drawLoupe paints the loupe card near the cursor (flipping to stay on
-// screen): the magnified grid, the crosshair on the center pixel, the
-// color chip with its hex, and the history swatches. box is the
-// surface's logical rect, (cx, cy) the cursor inside it.
-func drawLoupe(cv *render.Canvas, font render.Font, img *image.RGBA, logicalW, logicalH int, box render.Rect, cx, cy float64, history []RGB) {
+// screen): the magnified grid, the crosshair on the center pixel, and the
+// color chip with its readout in format. box is the surface's logical
+// rect, (cx, cy) the cursor inside it.
+func drawLoupe(cv *render.Canvas, font render.Font, img *image.RGBA, logicalW, logicalH int, box render.Rect, cx, cy float64, format config.ColorFormat) {
 	centerX, centerY := loupe.SampleAt(img, logicalW, logicalH, cx, cy)
-	historyH := 0
-	if len(history) > 0 {
-		historyH = swatchSize + panelPad
+	picked := pixel(img, centerX, centerY)
+	var shaped *render.ShapedText
+	panelW := loupe.Size
+	if font != nil {
+		shaped = font.Shape(picked.Format(format), hexPx)
+		panelW = max(panelW, 28+int(shaped.Advance()+0.5)+panelPad)
 	}
-	panelW, panelH := loupe.Size, loupe.Size+readoutH+historyH
+	panelH := loupe.Size + readoutH
 	x0, y0 := loupe.Place(box, cx, cy, panelW, panelH)
 
 	cv.FillRect(render.Rect{X: x0 - 4, Y: y0 - 4, W: panelW + 8, H: panelH + 8}, cardBacking)
-	loupe.Draw(cv, img, centerX, centerY, x0, y0)
+	loupe.Draw(cv, img, centerX, centerY, x0+(panelW-loupe.Size)/2, y0)
 
-	picked := pixel(img, centerX, centerY)
 	ry := y0 + loupe.Size
 	cv.FillRect(render.Rect{X: x0, Y: ry + 4, W: 20, H: 20}, render.RGB(picked.R, picked.G, picked.B))
-	if font != nil {
-		shaped := font.Shape(picked.Hex(), hexPx)
+	if shaped != nil {
 		font.Draw(cv, shaped, x0+28, ry+19, hexColor)
 	}
-	drawHistory(cv, history, x0, ry+readoutH, panelW)
 }
 
-// drawHistory paints the swatch row at (x0, y), clipped to the panel
-// width.
-func drawHistory(cv *render.Canvas, history []RGB, x0, y, panelW int) {
-	for i, c := range history {
-		hx := x0 + i*(swatchSize+swatchGap)
-		if hx+swatchSize > x0+panelW {
-			break
-		}
-		r := render.Rect{X: hx, Y: y, W: swatchSize, H: swatchSize}
+// stripRects are the n recent swatches' rects, centered along the bottom
+// of box.
+func stripRects(box render.Rect, n int) []render.Rect {
+	if n == 0 {
+		return nil
+	}
+	w := n*stripSwatch + (n-1)*swatchGap
+	x := box.X + (box.W-w)/2
+	y := box.Y + box.H - stripMargin - stripSwatch
+	rects := make([]render.Rect, n)
+	for i := range rects {
+		rects[i] = render.Rect{X: x + i*(stripSwatch+swatchGap), Y: y, W: stripSwatch, H: stripSwatch}
+	}
+	return rects
+}
+
+// swatchAt is the index of the rect holding p, -1 for none.
+func swatchAt(rects []render.Rect, p widget.Point) int {
+	return slices.IndexFunc(rects, func(r render.Rect) bool {
+		return p.X >= r.X && p.X < r.X+r.W && p.Y >= r.Y && p.Y < r.Y+r.H
+	})
+}
+
+// drawStrip paints the recent swatches on a card, the hovered one ringed.
+func drawStrip(cv *render.Canvas, history []RGB, rects []render.Rect, hover int) {
+	if len(rects) == 0 {
+		return
+	}
+	first, last := rects[0], rects[len(rects)-1]
+	cv.FillRect(render.Rect{X: first.X - panelPad, Y: first.Y - panelPad, W: last.X + last.W - first.X + 2*panelPad, H: stripSwatch + 2*panelPad}, cardBacking)
+	for i, r := range rects {
+		c := history[i]
 		cv.FillRect(r, render.RGB(c.R, c.G, c.B))
+		if i == hover {
+			cv.BorderRect(r, 2, swatchHover)
+			continue
+		}
 		cv.BorderRect(r, 1, swatchOutline)
 	}
 }

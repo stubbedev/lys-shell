@@ -22,6 +22,9 @@ _lys-shell() {
             lys__shell,brightness)
                 cmd="lys__shell__brightness"
                 ;;
+            lys__shell,colorpicker)
+                cmd="lys__shell__colorpicker"
+                ;;
             lys__shell,completions)
                 cmd="lys__shell__completions"
                 ;;
@@ -180,6 +183,9 @@ _lys-shell() {
                 ;;
             lys__shell__help,brightness)
                 cmd="lys__shell__help__brightness"
+                ;;
+            lys__shell__help,colorpicker)
+                cmd="lys__shell__help__colorpicker"
                 ;;
             lys__shell__help,completions)
                 cmd="lys__shell__help__completions"
@@ -1199,7 +1205,7 @@ _lys-shell() {
 
     case "${cmd}" in
         lys__shell)
-            opts="-h -V --help --version audio brightness config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
+            opts="-h -V --help --version audio brightness config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot colorpicker widget toast portal shell completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1472,6 +1478,28 @@ _lys-shell() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        lys__shell__colorpicker)
+            opts="-f -h --format --no-copy --no-loupe --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --format)
+                    COMPREPLY=($(compgen -W "hex rgb hsl hsv oklch cmyk" -- "${cur}"))
+                    return 0
+                    ;;
+                -f)
+                    COMPREPLY=($(compgen -W "hex rgb hsl hsv oklch cmyk" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         lys__shell__completions)
             opts="-h --help bash elvish fish powershell zsh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
@@ -1705,7 +1733,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help)
-            opts="audio brightness config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot widget toast portal shell completions help"
+            opts="audio brightness config icons media notify panel power systray wallpaper idle launcher lock logout vpn recorder screenshot colorpicker widget toast portal shell completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1831,6 +1859,20 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__brightness)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__colorpicker)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

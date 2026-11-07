@@ -3,7 +3,6 @@ package bar
 import (
 	"context"
 	"log"
-	"math"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
@@ -11,7 +10,6 @@ import (
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
-	"github.com/stubbedev/lys-shell/shell/colorpicker"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
@@ -229,10 +227,4 @@ func (s controlSources) captureControls(context.Context) []search.Control {
 		})
 	}
 	return out
-}
-
-// hexOfColor is a picked color, in sRGB channels of [0, 1], as #RRGGBB.
-func hexOfColor(c [3]float64) string {
-	channel := func(v float64) uint8 { return uint8(math.Round(max(0, min(v, 1)) * 255)) }
-	return colorpicker.RGB{R: channel(c[0]), G: channel(c[1]), B: channel(c[2])}.Hex()
 }

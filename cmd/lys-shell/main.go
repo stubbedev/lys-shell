@@ -39,6 +39,7 @@ func rootCommand() *cli.Command {
 			vpnCommand(),
 			recorderCommand(),
 			screenshotCommand(),
+			colorpickerCommand(),
 			widgetCommand(),
 			toastCommand(),
 			portalCommand(),

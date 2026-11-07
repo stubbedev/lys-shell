@@ -175,6 +175,20 @@ lys-shell screenshot output DP-1   # whole output (focused output if omitted)
 lys-shell screenshot window        # the active window
 ```
 
+The color picker, over the running shell's own overlay (bind it to a key, or use it in a
+script):
+
+```sh
+lys-shell colorpicker                         # print and copy, in colorpicker.format
+lys-shell colorpicker --format oklch          # hex, rgb, hsl, hsv, oklch or cmyk
+lys-shell colorpicker --no-copy --no-loupe    # print only, crosshair instead of the magnifier
+```
+
+Tab in the picker cycles the readout through the formats; what it shows at the click is
+printed and copied, and the next pick starts in it. The recent swatches along the bottom
+of the screen can be clicked to pick one again. Escape prints nothing and exits with
+status 1.
+
 Icons. Install bundled assets, pull from a CDN source, import local SVGs, or
 sync everything referenced in your config:
 

@@ -61,6 +61,8 @@ type Config struct {
 	Portal PortalConfig `cfg:"portal"`
 	// Clipboard history settings.
 	Clipboard ClipboardConfig `cfg:"clipboard"`
+	// Color picker settings.
+	ColorPicker ColorPickerConfig `cfg:"colorpicker"`
 	// Built-in idle policy: dim, lock, screens off and suspend.
 	Idle IdleConfig `cfg:"idle"`
 }
@@ -83,6 +85,7 @@ func Defaults() *Config {
 		Wallpaper:     DefaultsWallpaper(),
 		Portal:        DefaultsPortal(),
 		Clipboard:     DefaultsClipboard(),
+		ColorPicker:   DefaultsColorPicker(),
 		Idle:          DefaultsIdle(),
 	}
 }

@@ -606,18 +606,9 @@ func (s *shellStart) mount() {
 	})
 	baseCtx.Screenshot = captureSvc.trigger
 	baseCtx.PickColor = func() {
-		captureSvc.pickColor(func(hex string) {
+		captureSvc.pickColor(func(text string) {
 			application.Invoke(func() {
-				c := application.Clipboard()
-				if c == nil {
-					log.Printf("launcher: picked %s, but there is no clipboard to copy it to", hex)
-					return
-				}
-				if err := c.WriteText(hex); err != nil {
-					log.Printf("launcher: copying the picked color: %v", err)
-					return
-				}
-				baseCtx.Toast(i18n.T("launcher-control-color-copied", i18n.Str("color", hex)), "ld-palette-symbolic")
+				baseCtx.Toast(i18n.T("launcher-control-color-copied", i18n.Str("color", text)), "ld-palette-symbolic")
 			})
 		})
 	}

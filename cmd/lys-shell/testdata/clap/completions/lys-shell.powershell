@@ -42,6 +42,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
             [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
             [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
+            [CompletionResult]::new('colorpicker', 'colorpicker', [CompletionResultType]::ParameterValue, 'Pick a color on screen, print it and copy it; exit status 1 when cancelled')
             [CompletionResult]::new('widget', 'widget', [CompletionResultType]::ParameterValue, 'Widget control commands')
             [CompletionResult]::new('toast', 'toast', [CompletionResultType]::ParameterValue, 'Show a custom on-screen toast')
             [CompletionResult]::new('portal', 'portal', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer')
@@ -1082,6 +1083,15 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
         'lys-shell;screenshot;help;help' {
             break
         }
+        'lys-shell;colorpicker' {
+            [CompletionResult]::new('-f', '-f', [CompletionResultType]::ParameterName, 'Format the readout starts in (Tab in the picker cycles it) [default: colorpicker.format, or the last one used]')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Format the readout starts in (Tab in the picker cycles it) [default: colorpicker.format, or the last one used]')
+            [CompletionResult]::new('--no-copy', '--no-copy', [CompletionResultType]::ParameterName, 'Print the color without copying it')
+            [CompletionResult]::new('--no-loupe', '--no-loupe', [CompletionResultType]::ParameterName, 'Show a crosshair instead of the magnifier')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'lys-shell;widget' {
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
@@ -1403,6 +1413,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
             [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
             [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
+            [CompletionResult]::new('colorpicker', 'colorpicker', [CompletionResultType]::ParameterValue, 'Pick a color on screen, print it and copy it; exit status 1 when cancelled')
             [CompletionResult]::new('widget', 'widget', [CompletionResultType]::ParameterValue, 'Widget control commands')
             [CompletionResult]::new('toast', 'toast', [CompletionResultType]::ParameterValue, 'Show a custom on-screen toast')
             [CompletionResult]::new('portal', 'portal', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer')
@@ -1780,6 +1791,9 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;screenshot;window' {
+            break
+        }
+        'lys-shell;help;colorpicker' {
             break
         }
         'lys-shell;help;widget' {

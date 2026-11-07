@@ -9,6 +9,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/shell/colorpicker"
 )
 
 // switchCapturer is a host whose failure the test flips while the
@@ -25,6 +27,10 @@ func (s *switchCapturer) CapturePrivate(c portaldialogs.Caller, mode, target str
 
 func (s *switchCapturer) PickColor(c portaldialogs.Caller) ([3]float64, bool, error) {
 	return fakeCapturer{err: s.err.Load()}.PickColor(c)
+}
+
+func (s *switchCapturer) PickColorText(c portaldialogs.Caller, opts colorpicker.Options, copyText bool) (string, bool, error) {
+	return fakeCapturer{err: s.err.Load()}.PickColorText(c, opts, copyText)
 }
 
 func (s *switchCapturer) Dismiss(string) {}

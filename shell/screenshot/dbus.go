@@ -7,6 +7,9 @@ import (
 
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/shell/colorpicker"
 )
 
 // D-Bus identity (wayle-ipc's screenshot proxy).
@@ -40,6 +43,7 @@ type capturer interface {
 	Capture(c portaldialogs.Caller, mode, target string) (string, error)
 	CapturePrivate(c portaldialogs.Caller, mode, target string, pointer bool) (string, error)
 	PickColor(c portaldialogs.Caller) (color [3]float64, picked bool, err error)
+	PickColorText(c portaldialogs.Caller, opts colorpicker.Options, copyText bool) (text string, picked bool, err error)
 	Dismiss(handle string)
 }
 
@@ -103,6 +107,27 @@ func (d *Daemon) PickColor(c portaldialogs.Caller) (bool, float64, float64, floa
 	return picked, color[0], color[1], color[2], nil
 }
 
+// PickColorText picks one screen color interactively as PickColor does,
+// replying whether the user picked one and the color written in the
+// format the readout showed at the click. format names the readout's
+// first format, empty for the last one used; noLoupe shows a crosshair
+// instead of the magnifier; copyText puts the text on the clipboard.
+func (d *Daemon) PickColorText(c portaldialogs.Caller, format string, noLoupe, copyText bool) (bool, string, *dbus.Error) {
+	opts := colorpicker.Options{NoLoupe: noLoupe}
+	if format != "" {
+		f, err := config.ParseColorFormat(format)
+		if err != nil {
+			return false, "", dbus.MakeFailedError(err)
+		}
+		opts.Format = f
+	}
+	text, picked, err := d.host.PickColorText(c, opts, copyText)
+	if err != nil {
+		return false, "", errorReply(err)
+	}
+	return picked, text, nil
+}
+
 // Dismiss cancels the region selection or color pick showing for the
 // request at handle.
 func (d *Daemon) Dismiss(handle string) *dbus.Error {
@@ -142,6 +167,15 @@ func (c *Client) CapturePrivate(ctx context.Context, caller portaldialogs.Caller
 func (c *Client) PickColor(ctx context.Context, caller portaldialogs.Caller) (color [3]float64, picked bool, err error) {
 	err = c.obj.CallWithContext(ctx, iface+".PickColor", 0, caller).Store(&picked, &color[0], &color[1], &color[2])
 	return color, picked, replyErr(err)
+}
+
+// PickColorText asks the shell for an interactive color pick written in
+// a format; see Daemon.PickColorText. An empty format starts in the one
+// last used. picked is false for the user's cancel, and a refused
+// request is ErrBusy.
+func (c *Client) PickColorText(ctx context.Context, caller portaldialogs.Caller, format config.ColorFormat, noLoupe, copyText bool) (text string, picked bool, err error) {
+	err = c.obj.CallWithContext(ctx, iface+".PickColorText", 0, caller, string(format), noLoupe, copyText).Store(&picked, &text)
+	return text, picked, replyErr(err)
 }
 
 // Dismiss cancels the selection or pick showing for the request at

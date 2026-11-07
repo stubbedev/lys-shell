@@ -23,8 +23,8 @@ func (busyRegion) Request(context.Context, regionoverlay.Frames) (regionoverlay.
 
 type busyPicker struct{}
 
-func (busyPicker) Request(context.Context, regionoverlay.Frames) (colorpicker.RGB, bool, error) {
-	return colorpicker.RGB{}, false, screenshot.ErrBusy
+func (busyPicker) Request(context.Context, regionoverlay.Frames, colorpicker.Options) (colorpicker.Pick, bool, error) {
+	return colorpicker.Pick{}, false, screenshot.ErrBusy
 }
 
 // The real portal backend in front of the real daemon: an app asking while a

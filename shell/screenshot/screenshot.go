@@ -73,13 +73,15 @@ type Host struct {
 		Request(ctx context.Context, frames regionoverlay.Frames) (regionoverlay.Selection, bool, error)
 	}
 	Picker interface {
-		Request(ctx context.Context, frames regionoverlay.Frames) (colorpicker.RGB, bool, error)
+		Request(ctx context.Context, frames regionoverlay.Frames, opts colorpicker.Options) (colorpicker.Pick, bool, error)
 	}
 	// Focus resolves the focused output and the active window.
 	Focus Focus
 	// Copy puts an image on the clipboard and returns what takes that
 	// copy back, nil when nothing can; nil disables the copy.
 	Copy func(image.Image) (retract func(), err error)
+	// CopyText puts text on the clipboard: a picked color.
+	CopyText func(string) error
 	// Notify announces a saved screenshot, and a failed copy with it;
 	// nil sends the desktop notification.
 	Notify func(Notice)
@@ -467,11 +469,39 @@ func (h *Host) captureFullScreen(pointer bool) (*image.RGBA, error) {
 // the user cancelled, ErrBusy answers while a capture overlay is open, and
 // any other error is a failure.
 func (h *Host) PickColor(caller portaldialogs.Caller) (color [3]float64, picked bool, err error) {
+	p, ok, err := h.pick(caller, colorpicker.Options{})
+	if err != nil || !ok {
+		return color, false, err
+	}
+	color[0], color[1], color[2] = p.Color.Float()
+	return color, true, nil
+}
+
+// PickColorText lets the user pick one pixel as PickColor does and
+// returns it written in the format the readout showed at the click,
+// which opts.Format starts it in; with copyText it is put on the
+// clipboard too. picked is false when the user cancelled.
+func (h *Host) PickColorText(caller portaldialogs.Caller, opts colorpicker.Options, copyText bool) (text string, picked bool, err error) {
+	p, ok, err := h.pick(caller, opts)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	text = p.Text()
+	if copyText {
+		if err := h.CopyText(text); err != nil {
+			return "", false, fmt.Errorf("cannot copy the picked color %s: %w", text, err)
+		}
+	}
+	return text, true, nil
+}
+
+// pick freezes every output and runs the picker over them.
+func (h *Host) pick(caller portaldialogs.Caller, opts colorpicker.Options) (colorpicker.Pick, bool, error) {
 	ctx, done := h.dismissable(caller.Handle)
 	defer done()
 	var frozen []frozenOutput
 	defer func() { h.release(frozen) }()
-	c, ok, err := h.Picker.Request(ctx, func() (map[string]render.StillImage, error) {
+	return h.Picker.Request(ctx, func() (map[string]render.StillImage, error) {
 		var err error
 		if frozen, err = h.captureAll(false); err != nil {
 			return nil, err
@@ -480,12 +510,7 @@ func (h *Host) PickColor(caller portaldialogs.Caller) (color [3]float64, picked 
 			return nil, errors.New("no outputs available")
 		}
 		return framesOf(frozen), nil
-	})
-	if err != nil || !ok {
-		return color, false, err
-	}
-	color[0], color[1], color[2] = c.Float()
-	return color, true, nil
+	}, opts)
 }
 
 // maxNameTries bounds the numbered names saveNew tries.

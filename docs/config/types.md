@@ -379,6 +379,17 @@ Number in `[8, 1024]`.
 
 Serialises as `uint32`.
 
+## ColorFormat {#color-format}
+
+| Value | Meaning |
+|---|---|
+| `"hex"` | `#RRGGBB`. |
+| `"rgb"` | `rgb(r, g, b)`, each channel 0-255. |
+| `"hsl"` | `hsl(h, s%, l%)`. |
+| `"hsv"` | `hsv(h, s%, v%)`. |
+| `"oklch"` | `oklch(L% C h)`, as CSS Color 4 writes it. |
+| `"cmyk"` | `cmyk(c%, m%, y%, k%)`, converted without a color profile. |
+
 ## ColorValue {#color-value}
 
 CSS token, hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa), 'transparent', or 'auto'

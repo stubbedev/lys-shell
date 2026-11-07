@@ -59,15 +59,26 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		}
 		return mons
 	}
-	copyImage := clipboardCopier(application, clip)
+	put := clipboardCopier(application, clip)
+	copyImage := func(img image.Image) (func(), error) {
+		content, err := transfer.Image(img)
+		if err != nil {
+			return nil, err
+		}
+		return put(content)
+	}
 	s := &captureServices{host: &screenshot.Host{
 		Config:   func() config.ScreenshotConfig { return current().Screenshot },
 		Monitors: monitors,
 		Gate:     gate,
 		Region:   region,
-		Picker:   colorpicker.New(application, gate, outputs, font, colorpicker.HistoryPath()),
+		Picker:   colorpicker.New(application, gate, outputs, font, colorpicker.HistoryPath(), func() config.ColorFormat { return current().ColorPicker.Format }),
 		Focus:    focus,
 		Copy:     copyImage,
+		CopyText: func(text string) error {
+			_, err := put(transfer.Text(text))
+			return err
+		},
 		Forget: func(ids []render.ImageID) {
 			application.Invoke(func() {
 				for _, id := range ids {
@@ -117,22 +128,26 @@ func (s *captureServices) trigger(mode, target string) {
 	}()
 }
 
-// pickColor lets the user pick a pixel and hands its color to copied, on
-// its own goroutine; cancelling hands over nothing.
-func (s *captureServices) pickColor(copied func(hex string)) {
-	go deliverPickedColor(func() ([3]float64, bool, error) { return s.host.PickColor(portaldialogs.Caller{}) }, copied)
+// pickColor lets the user pick a pixel, copies it in the format the
+// picker showed, and hands the copied text to copied, on its own
+// goroutine; cancelling hands over nothing.
+func (s *captureServices) pickColor(copied func(text string)) {
+	go deliverPickedColor(func() (string, bool, error) {
+		return s.host.PickColorText(portaldialogs.Caller{}, colorpicker.Options{}, true)
+	}, copied)
 }
 
-// deliverPickedColor hands over what pick picked: cancelling hands over
-// nothing, and a failure is logged rather than pretending a color.
-func deliverPickedColor(pick func() ([3]float64, bool, error), copied func(hex string)) {
-	color, picked, err := pick()
+// deliverPickedColor hands over what pick picked and copied: cancelling
+// hands over nothing, and a failure is logged rather than pretending a
+// color.
+func deliverPickedColor(pick func() (string, bool, error), copied func(text string)) {
+	text, picked, err := pick()
 	if err != nil {
 		log.Printf("launcher: picking a color: %v", err)
 		return
 	}
 	if picked {
-		copied(hexOfColor(color))
+		copied(text)
 	}
 }
 
@@ -166,12 +181,11 @@ func logicalOutputSize(application *app.Application, outputs func() []*app.Outpu
 	}
 }
 
-func clipboardCopier(application *app.Application, clip *clipboard.Clipboard) func(image.Image) (func(), error) {
-	return func(img image.Image) (func(), error) {
-		content, err := transfer.Image(img)
-		if err != nil {
-			return nil, err
-		}
+// clipboardCopier puts content on the clipboard from any goroutine but
+// the loop's, waiting for the loop to have done it, and returns what
+// takes that copy back, nil when nothing can.
+func clipboardCopier(application *app.Application, clip *clipboard.Clipboard) func(transfer.Content) (func(), error) {
+	return func(content transfer.Content) (func(), error) {
 		type put struct {
 			retract func()
 			err     error

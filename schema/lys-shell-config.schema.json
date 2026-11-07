@@ -2078,6 +2078,51 @@
       },
       "type": "object"
     },
+    "ColorFormat": {
+      "oneOf": [
+        {
+          "const": "hex",
+          "description": "`#RRGGBB`.",
+          "type": "string"
+        },
+        {
+          "const": "rgb",
+          "description": "`rgb(r, g, b)`, each channel 0-255.",
+          "type": "string"
+        },
+        {
+          "const": "hsl",
+          "description": "`hsl(h, s%, l%)`.",
+          "type": "string"
+        },
+        {
+          "const": "hsv",
+          "description": "`hsv(h, s%, v%)`.",
+          "type": "string"
+        },
+        {
+          "const": "oklch",
+          "description": "`oklch(L% C h)`, as CSS Color 4 writes it.",
+          "type": "string"
+        },
+        {
+          "const": "cmyk",
+          "description": "`cmyk(c%, m%, y%, k%)`, converted without a color profile.",
+          "type": "string"
+        }
+      ]
+    },
+    "ColorPickerConfig": {
+      "description": "Color picker settings.",
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/ColorFormat",
+          "default": "hex",
+          "description": "The format the picker's readout starts in, and the one a pick is\ncopied and printed in. Tab in the picker cycles the readout through\nthe formats; the one shown at the click is used, and kept for the\nnext pick."
+        }
+      },
+      "type": "object"
+    },
     "ColorValue": {
       "anyOf": [
         {
@@ -11856,6 +11901,13 @@
         "pinned-mib": 16
       },
       "description": "Clipboard history settings."
+    },
+    "colorpicker": {
+      "$ref": "#/$defs/ColorPickerConfig",
+      "default": {
+        "format": "hex"
+      },
+      "description": "Color picker settings."
     },
     "dock": {
       "$ref": "#/$defs/DockConfig",

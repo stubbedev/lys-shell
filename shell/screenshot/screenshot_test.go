@@ -3,6 +3,7 @@ package screenshot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -190,11 +191,15 @@ type fakePicker struct {
 	err error
 }
 
-func (f fakePicker) Request(_ context.Context, frames regionoverlay.Frames) (colorpicker.RGB, bool, error) {
+func (f fakePicker) Request(_ context.Context, frames regionoverlay.Frames, opts colorpicker.Options) (colorpicker.Pick, bool, error) {
 	if _, err := frames(); err != nil {
-		return colorpicker.RGB{}, false, err
+		return colorpicker.Pick{}, false, err
 	}
-	return f.c, f.ok, f.err
+	format := opts.Format
+	if format == "" {
+		format = config.ColorFormatHex
+	}
+	return colorpicker.Pick{Color: f.c, Format: format}, f.ok, f.err
 }
 
 // fixed is a Config that never reloads.
@@ -558,6 +563,10 @@ func (f fakeCapturer) PickColor(portaldialogs.Caller) ([3]float64, bool, error) 
 	return [3]float64{0.5, 0.25, 1}, f.err == nil, f.err
 }
 
+func (f fakeCapturer) PickColorText(_ portaldialogs.Caller, opts colorpicker.Options, copyText bool) (string, bool, error) {
+	return fmt.Sprintf("%s %v %v", opts.Format, opts.NoLoupe, copyText), f.err == nil, f.err
+}
+
 func (fakeCapturer) Dismiss(string) {}
 
 func TestDaemonMethods(t *testing.T) {
@@ -714,5 +723,43 @@ func TestHostFreesTheFramesAfterTheFence(t *testing.T) {
 	drawing.End()
 	if live := h.mem.Stats().Live; live != 0 {
 		t.Fatalf("%d frames still allocated after the last List ended", live)
+	}
+}
+
+func TestPickColorTextCopiesTheTextThePickerShowed(t *testing.T) {
+	h, _, _ := testHost(t, nil)
+	h.Picker = fakePicker{c: colorpicker.RGB{R: 255}, ok: true}
+	var copied []string
+	h.CopyText = func(s string) error {
+		copied = append(copied, s)
+		return nil
+	}
+	text, picked, err := h.PickColorText(portaldialogs.Caller{}, colorpicker.Options{Format: config.ColorFormatCMYK}, true)
+	if err != nil || !picked || text != "cmyk(0%, 100%, 100%, 0%)" || !slices.Equal(copied, []string{text}) {
+		t.Fatalf("PickColorText = %q %v %v, copied %q", text, picked, err, copied)
+	}
+	if _, _, err := h.PickColorText(portaldialogs.Caller{}, colorpicker.Options{}, false); err != nil || len(copied) != 1 {
+		t.Errorf("without copying: %v, copied %q", err, copied)
+	}
+	h.CopyText = func(string) error { return errors.New("no seat") }
+	if _, picked, err := h.PickColorText(portaldialogs.Caller{}, colorpicker.Options{}, true); err == nil || picked {
+		t.Error("a failed copy passed for a pick")
+	}
+	h.Picker = fakePicker{}
+	if _, picked, err := h.PickColorText(portaldialogs.Caller{}, colorpicker.Options{}, true); err != nil || picked {
+		t.Errorf("a cancel: picked %v, %v", picked, err)
+	}
+}
+
+func TestDaemonPickColorTextParsesTheFormat(t *testing.T) {
+	d := &Daemon{host: fakeCapturer{}}
+	if picked, text, err := d.PickColorText(portaldialogs.Caller{}, "oklch", true, false); err != nil || !picked || text != "oklch true false" {
+		t.Fatalf("PickColorText = %v %q %v", picked, text, err)
+	}
+	if _, text, err := d.PickColorText(portaldialogs.Caller{}, "", false, true); err != nil || text != " false true" {
+		t.Fatalf("no format: %q %v", text, err)
+	}
+	if _, _, err := d.PickColorText(portaldialogs.Caller{}, "lab", false, true); err == nil {
+		t.Error("an unknown format reached the picker")
 	}
 }

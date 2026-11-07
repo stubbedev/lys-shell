@@ -39,6 +39,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand vpn 'VPN commands'
             cand recorder 'Screen recorder control commands'
             cand screenshot 'Screenshot capture commands'
+            cand colorpicker 'Pick a color on screen, print it and copy it; exit status 1 when cancelled'
             cand widget 'Widget control commands'
             cand toast 'Show a custom on-screen toast'
             cand portal 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer'
@@ -870,6 +871,14 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         }
         &'lys-shell;screenshot;help;help'= {
         }
+        &'lys-shell;colorpicker'= {
+            cand -f 'Format the readout starts in (Tab in the picker cycles it) [default: colorpicker.format, or the last one used]'
+            cand --format 'Format the readout starts in (Tab in the picker cycles it) [default: colorpicker.format, or the last one used]'
+            cand --no-copy 'Print the color without copying it'
+            cand --no-loupe 'Show a crosshair instead of the magnifier'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'lys-shell;widget'= {
             cand -h 'Print help'
             cand --help 'Print help'
@@ -1129,6 +1138,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand vpn 'VPN commands'
             cand recorder 'Screen recorder control commands'
             cand screenshot 'Screenshot capture commands'
+            cand colorpicker 'Pick a color on screen, print it and copy it; exit status 1 when cancelled'
             cand widget 'Widget control commands'
             cand toast 'Show a custom on-screen toast'
             cand portal 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer'
@@ -1409,6 +1419,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;screenshot;output'= {
         }
         &'lys-shell;help;screenshot;window'= {
+        }
+        &'lys-shell;help;colorpicker'= {
         }
         &'lys-shell;help;widget'= {
             cand update 'Push an output update to a bar widget by its config id'

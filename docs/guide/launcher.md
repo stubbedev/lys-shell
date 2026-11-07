@@ -44,7 +44,7 @@ be running, as it hosts the panel.
 | Browser bookmarks, history | Bookmarks from two typed letters, history from three, each with the site's icon. `Browser Bookmarks` and `Most Visited Sites` list them all. Firefox and Chromium families |
 | Quick toggles | Do not disturb, Wi-Fi, Bluetooth, switching the audio output, and Choose Wallpaper, which opens the wallpaper picker |
 | Media | Play, pause and skip on the active player |
-| Capture | Screenshots, screen recording and the color picker, which copies the hex value. They start once the panel has closed |
+| Capture | Screenshots, screen recording and the color picker, which copies the color in the format the picker showed (see [`colorpicker`](/config/colorpicker); Tab in the picker cycles it). They start once the panel has closed |
 | Processes | `Kill Process` lists your processes, largest first; ending one asks for a second Enter. The compositor, the shell and what started them are not listed |
 | Script commands | From a folder, see below |
 | Shell | `>command` runs a command; the actions panel can run it in a terminal |

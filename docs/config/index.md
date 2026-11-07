@@ -20,6 +20,7 @@ Editor intellisense via JSON Schema. Install the [YAML extension](https://market
 | [`animations`](/config/animations) | Enter/exit and change animations for transient surfaces. |
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
 | [`clipboard`](/config/clipboard) | Clipboard history settings. |
+| [`colorpicker`](/config/colorpicker) | Color picker settings. |
 | [`dock`](/config/dock) | A dock of pinned apps and open windows, on its own surface beside the bar. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |

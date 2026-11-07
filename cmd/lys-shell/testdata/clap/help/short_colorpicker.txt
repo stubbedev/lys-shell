@@ -1,0 +1,9 @@
+Pick a color on screen, print it and copy it; exit status 1 when cancelled
+
+Usage: lys-shell colorpicker [OPTIONS]
+
+Options:
+  -f, --format <FORMAT>  Format the readout starts in (Tab in the picker cycles it) [default: colorpicker.format, or the last one used] [possible values: hex, rgb, hsl, hsv, oklch, cmyk]
+      --no-copy          Print the color without copying it
+      --no-loupe         Show a crosshair instead of the magnifier
+  -h, --help             Print help

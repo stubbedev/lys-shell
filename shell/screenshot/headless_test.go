@@ -129,7 +129,7 @@ func TestHeadlessHostOverlaysAdmitOneSession(t *testing.T) {
 	h, _, _ := testHost(t, nil)
 	h.Gate = gate
 	h.Region = regionoverlay.New(a, gate, outputs, nil, font, nil)
-	h.Picker = colorpicker.New(a, gate, outputs, font, "")
+	h.Picker = colorpicker.New(a, gate, outputs, font, "", func() config.ColorFormat { return config.ColorFormatHex })
 	h.Monitors = func() []regionoverlay.Monitor {
 		return apptest.On(a, func() []regionoverlay.Monitor {
 			var mons []regionoverlay.Monitor

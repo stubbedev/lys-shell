@@ -21,6 +21,7 @@ Wayland services CLI
   [1m[32mvpn[0m          VPN commands
   [1m[32mrecorder[0m     Screen recorder control commands
   [1m[32mscreenshot[0m   Screenshot capture commands
+  [1m[32mcolorpicker[0m  Pick a color on screen, print it and copy it; exit status 1 when cancelled
   [1m[32mwidget[0m       Widget control commands
   [1m[32mtoast[0m        Show a custom on-screen toast
   [1m[32mportal[0m       xdg-desktop-portal backend, screencast picker stub, and dialog previewer

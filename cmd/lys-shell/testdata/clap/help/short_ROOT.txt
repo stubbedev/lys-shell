@@ -20,6 +20,7 @@ Commands:
   vpn          VPN commands
   recorder     Screen recorder control commands
   screenshot   Screenshot capture commands
+  colorpicker  Pick a color on screen, print it and copy it; exit status 1 when cancelled
   widget       Widget control commands
   toast        Show a custom on-screen toast
   portal       xdg-desktop-portal backend, screencast picker stub, and dialog previewer
