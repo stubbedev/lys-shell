@@ -15,7 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"

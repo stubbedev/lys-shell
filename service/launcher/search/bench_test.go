@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/desktopentry"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )

@@ -1,11 +1,12 @@
 package desktopentry
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/stubbedev/lys-lib/atomicfile"
 )
 
 // The mimeapps.list groups (the XDG mime-apps spec).
@@ -82,6 +83,26 @@ func readAssociations(lists []string, mimeType string) associations {
 	return as
 }
 
+// Default is the app mimeType opens with, as xdg-mime query default
+// answers: the first installed default the lists name, in their order
+// and not removed by a list above, else the first installed app that
+// declares the type.
+func Default(dirs, lists []string, mimeType string) (App, bool) {
+	as := readAssociations(lists, mimeType)
+	all := AllApps(dirs)
+	for _, id := range as.defaults {
+		if i := slices.IndexFunc(all, func(a App) bool { return a.ID == id }); i >= 0 {
+			return all[i], true
+		}
+	}
+	for _, a := range all {
+		if !as.removed[a.ID] && slices.Contains(a.MimeTypes(), mimeType) {
+			return a, true
+		}
+	}
+	return App{}, false
+}
+
 // RecommendedFor is g_app_info_get_recommended_for_type: the installed
 // apps for mimeType - the default first, then the added associations,
 // then every app declaring the type - without the removed ones.
@@ -121,7 +142,13 @@ func RecommendedFor(dirs, lists []string, mimeType string) []App {
 // SetDefault is g_app_info_set_as_default_for_type: id becomes the
 // default for mimeType in the user's mimeapps.list and the first of
 // its added associations; the rest of the file is kept.
-func SetDefault(id, mimeType string) error {
+func SetDefault(id, mimeType string) error { return SetDefaults(id, []string{mimeType}) }
+
+// SetDefaults makes id the default for every one of mimeTypes, as
+// SetDefault does for one, in one atomic replacement of the user's
+// mimeapps.list: other groups, keys and comments are kept byte for byte,
+// and a desktop-specific list is read by Default but never written.
+func SetDefaults(id string, mimeTypes []string) error {
 	lists := MimeAppsLists()
 	var path string
 	for _, l := range lists {
@@ -138,25 +165,28 @@ func SetDefault(id, mimeType string) error {
 		return err
 	}
 	lines := splitLines(data)
-	lines = setListKey(lines, groupDefault, mimeType, []string{id})
-	var added []string
-	if kf, err := ParseKeyFile(data); err == nil {
-		added = kf.List(groupAdded, mimeType)
+	kf, parseErr := ParseKeyFile(data)
+	for _, mimeType := range mimeTypes {
+		lines = setListKey(lines, groupDefault, mimeType, []string{id})
+		var added []string
+		if parseErr == nil {
+			added = kf.List(groupAdded, mimeType)
+		}
+		added = append([]string{id}, slices.DeleteFunc(added, func(s string) bool { return s == id })...)
+		lines = setListKey(lines, groupAdded, mimeType, added)
 	}
-	added = append([]string{id}, slices.DeleteFunc(added, func(s string) bool { return s == id })...)
-	lines = setListKey(lines, groupAdded, mimeType, added)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // ~/.config, readable as any config dir
 		return err
 	}
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644) //nolint:gosec // mimeapps.list is world-readable config
+	return atomicfile.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
 }
 
 func splitLines(data []byte) []string {
-	data = bytes.TrimRight(data, "\n")
-	if len(data) == 0 {
+	text := strings.TrimSuffix(string(data), "\n")
+	if text == "" {
 		return nil
 	}
-	return strings.Split(string(data), "\n")
+	return strings.Split(text, "\n")
 }
 
 // setListKey sets key=v1;v2; in group, adding the group (at the end) or

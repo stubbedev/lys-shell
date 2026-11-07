@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/desktopentry"
+	"github.com/stubbedev/lys-shell/desktopentry"
 	"github.com/stubbedev/lys-shell/shlex"
 )
 
