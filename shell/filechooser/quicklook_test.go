@@ -21,7 +21,8 @@ import (
 )
 
 // loadWatch counts the preview loads started, the goroutines they ran
-// on and what each read, and can hold every load until released.
+// on, what each read and the context of each entry's last load, and
+// can hold every load until released.
 type loadWatch struct {
 	mu      sync.Mutex
 	started int
@@ -29,12 +30,12 @@ type loadWatch struct {
 	onLoop  int
 	loop    map[int64]bool
 	hold    chan struct{}
-	ctxs    []context.Context
+	ctxs    map[string]context.Context
 }
 
 func watchLoads(t *testing.T, hs *harness) *loadWatch {
 	t.Helper()
-	w := &loadWatch{loop: map[int64]bool{goroutineID(): true}}
+	w := &loadWatch{loop: map[int64]bool{goroutineID(): true}, ctxs: map[string]context.Context{}}
 	queue := make(chan int64, 1)
 	hs.invoke(func() { queue <- goroutineID() })
 	w.loop[<-queue] = true
@@ -42,7 +43,7 @@ func watchLoads(t *testing.T, hs *harness) *loadWatch {
 	hs.c.previewLoader = func(ctx context.Context, req previewRequest) (preview, error) {
 		w.mu.Lock()
 		w.started++
-		w.ctxs = append(w.ctxs, ctx)
+		w.ctxs[req.entry.Name()] = ctx
 		if w.loop[goroutineID()] {
 			w.onLoop++
 		}
@@ -242,14 +243,19 @@ func TestPreviewLoadsOncePerRest(t *testing.T) {
 	w.hold = make(chan struct{})
 	w.mu.Unlock()
 	hs.do(func() { hs.c.activeView().Select(3) })
-	for deadline := time.Now().Add(treetest.Liveness); w.count() < before+2; time.Sleep(time.Millisecond) {
+	held := func() context.Context {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.ctxs["note3.txt"]
+	}
+	for deadline := time.Now().Add(treetest.Liveness); held() == nil; time.Sleep(time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("the held load never started")
 		}
 	}
 	hs.do(func() { hs.c.activeView().Select(4) })
+	superseded := held()
 	w.mu.Lock()
-	superseded := w.ctxs[len(w.ctxs)-1]
 	close(w.hold)
 	w.hold = nil
 	w.mu.Unlock()
