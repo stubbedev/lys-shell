@@ -362,9 +362,9 @@ A module with an associated CSS class for custom styling.
 
 String.
 
-## ClipboardHistoryMiB {#clipboard-history-mi-b}
+## ClipboardMiB {#clipboard-mi-b}
 
-Clipboard history budget in MiB.
+Clipboard budget in MiB.
 
 Number in `[8, 1024]`.
 

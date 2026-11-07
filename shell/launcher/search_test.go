@@ -239,6 +239,34 @@ func TestBackspaceOnAnEmptyFieldLeavesTheLevel(t *testing.T) {
 	h.until("back", func() bool { return p.depth == 0 })
 }
 
+func TestCtrlBackspaceForgetsTheSelectedClipboardRow(t *testing.T) {
+	h := newPanelHarness(t)
+	clip := newLauncherClipboard(t, [2]string{"text/plain", "zulu kept"}, [2]string{"text/plain", "zulu gone"})
+	h.cfg.Launcher.Search.Providers = append(h.cfg.Launcher.Search.Providers, config.SearchClipboard)
+	deps := h.s.d.Search
+	h.s.d.Search = func() search.Deps {
+		d := deps()
+		d.Clipboard = clip
+		return d
+	}
+	p, _ := h.openPanel()
+	h.typed(p, "zulu gone")
+	h.until("the clipboard row", func() bool { return p.selectedTitle() == "zulu gone" })
+	if !h.key("Control+BackSpace") {
+		t.Fatal("Ctrl+Backspace on a clipboard row went to the field")
+	}
+	h.until("the row gone", func() bool { return !slices.Contains(p.rowTitles(), "zulu gone") })
+	if n := clip.history.Len(); n != 1 {
+		t.Errorf("%d entries left, want the other one", n)
+	}
+
+	h.typed(p, "alpha")
+	h.until("a quick link selected", func() bool { return p.selectedTitle() == "Alpha Docs" })
+	if h.key("Control+BackSpace") {
+		t.Error("a row with nothing to remove must leave Ctrl+Backspace to the field")
+	}
+}
+
 func TestTabCompletesOrOpensActions(t *testing.T) {
 	h := newPanelHarness(t)
 	p, _ := h.openPanel()
@@ -608,7 +636,7 @@ func TestHighlightMarkup(t *testing.T) {
 }
 
 func TestEveryPanelKeyParsesAndDigitsStayOut(t *testing.T) {
-	for _, spec := range []string{"Down", "Up", "Control+n", "Control+p", "Return", "Tab", "Escape", "Control+k", "Control+1", "Control+9", "Page_Down"} {
+	for _, spec := range []string{"Down", "Up", "Control+n", "Control+p", "Return", "Tab", "Escape", "Control+k", "Control+1", "Control+9", "Page_Down", "Control+BackSpace"} {
 		accel, err := app.ParseAccel(spec)
 		if err != nil {
 			t.Fatal(err)

@@ -53,7 +53,10 @@ func (c *Clipboard) read() []Entry {
 	for i, e := range all {
 		// Preview folds the lines into one, so the title is what is searched.
 		entries[i] = Entry{
-			ID: "clipboard:" + strconv.FormatUint(e.ID, 10), Title: e.Preview(clipboardPreviewChars), Icon: clipboardIcon(e), Data: clipboardData{id: e.ID, kind: e.Kind(), paths: e.Paths()},
+			ID: "clipboard:" + strconv.FormatUint(e.ID, 10), Title: e.Preview(clipboardPreviewChars), Icon: clipboardIcon(e), Data: clipboardData{id: e.ID, kind: e.Kind(), paths: e.Paths(), pinned: e.Pinned},
+		}
+		if e.Pinned {
+			entries[i].Hint = i18n.T("launcher-clipboard-pinned")
 		}
 		if c.previews {
 			entries[i].Preview = modes.EntryPreview(c.history, e)
@@ -75,9 +78,10 @@ func clipboardIcon(e clipboard.Entry) launcher.Icon {
 }
 
 type clipboardData struct {
-	id    uint64
-	kind  clipboard.Kind
-	paths []string
+	id     uint64
+	kind   clipboard.Kind
+	paths  []string
+	pinned bool
 }
 
 // Actions implements Provider.
@@ -95,16 +99,38 @@ func (c *Clipboard) Actions(e Entry) []Action {
 	if len(d.paths) > 0 {
 		actions = append(actions, copyAction(i18n.T("launcher-action-copy-path"), strings.Join(d.paths, "\n")))
 	}
+	if c.history.CanPin() {
+		actions = append(actions, c.pinAction(d))
+	}
 	return append(actions,
-		Action{Title: i18n.T("launcher-action-forget"), Icon: "ld-trash-2-symbolic", Run: func(context.Context) Outcome {
+		Action{Title: i18n.T("launcher-action-forget"), Icon: "ld-trash-2-symbolic", Key: ActionKeyDelete, Run: func(context.Context) Outcome {
 			c.history.Forget(d.id)
 			return Reload{}
 		}},
-		Action{Title: i18n.T("launcher-action-clear-history"), Icon: "ld-trash-2-symbolic", Run: func(context.Context) Outcome {
-			c.history.Clear()
+		Action{Title: i18n.T("launcher-action-clear-unpinned"), Icon: "ld-trash-2-symbolic", Run: func(context.Context) Outcome {
+			c.history.ClearUnpinned()
 			return Reload{}
 		}},
 	)
+}
+
+// pinAction pins the entry, or unpins a pinned one; a refused pin (the
+// pinned budget is full) is said in the footer.
+func (c *Clipboard) pinAction(d clipboardData) Action {
+	if d.pinned {
+		return Action{Title: i18n.T("launcher-action-unpin"), Icon: "ld-x-symbolic", Run: func(context.Context) Outcome {
+			if err := c.history.Unpin(d.id); err != nil {
+				return Stay{Message: err.Error()}
+			}
+			return Reload{}
+		}}
+	}
+	return Action{Title: i18n.T("launcher-action-pin"), Icon: "ld-bookmark-symbolic", Run: func(context.Context) Outcome {
+		if err := c.history.Pin(d.id); err != nil {
+			return Stay{Message: err.Error()}
+		}
+		return Reload{}
+	}}
 }
 
 // Emoji offers the emoji table.

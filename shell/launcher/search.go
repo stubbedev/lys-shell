@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 
 	"github.com/rivo/uniseg"
@@ -391,6 +392,12 @@ func (p *panel) keyCaptured(press app.Accel) bool {
 			return false
 		}
 		p.eng.Back()
+	case panelDelete:
+		i := slices.IndexFunc(p.actions, func(a search.Action) bool { return a.Key == search.ActionKeyDelete })
+		if i < 0 {
+			return false
+		}
+		p.activate(i)
 	case panelNumber:
 		if at := p.nthItem(k.n); at >= 0 {
 			p.setSelected(at, false)
@@ -535,6 +542,7 @@ const (
 	panelActions
 	panelBack
 	panelBackspace
+	panelDelete
 	panelNumber
 )
 
@@ -551,11 +559,12 @@ var panelKeys = func() map[app.Accel]panelKey {
 		"Up": {do: panelUp}, "Control+p": {do: panelUp},
 		"Page_Down": {do: panelPageDown}, "Page_Up": {do: panelPageUp},
 		"Return": {do: panelAccept}, "KP_Enter": {do: panelAccept},
-		"Control+Return": {do: panelAcceptSecond},
-		"Tab":            {do: panelTab},
-		"Control+k":      {do: panelActions},
-		"Escape":         {do: panelBack},
-		"BackSpace":      {do: panelBackspace},
+		"Control+Return":    {do: panelAcceptSecond},
+		"Tab":               {do: panelTab},
+		"Control+k":         {do: panelActions},
+		"Escape":            {do: panelBack},
+		"BackSpace":         {do: panelBackspace},
+		"Control+BackSpace": {do: panelDelete},
 	}
 	for i := 1; i <= 9; i++ {
 		table["Control+"+strconv.Itoa(i)] = panelKey{do: panelNumber, n: i}

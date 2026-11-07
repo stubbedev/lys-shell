@@ -199,7 +199,7 @@ type launcherClipboard struct{ history *clipboard.History }
 
 func newLauncherClipboard(t *testing.T, selections ...[2]string) *launcherClipboard {
 	t.Helper()
-	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes*4)
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes*4, clipboard.MaxEntryBytes*4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,8 +214,14 @@ func newLauncherClipboard(t *testing.T, selections ...[2]string) *launcherClipbo
 
 func (c *launcherClipboard) Entries() *clipboard.Snapshot { return c.history.Entries() }
 func (c *launcherClipboard) Forget(id uint64) bool        { return c.history.Remove(id) }
-func (c *launcherClipboard) Clear()                       { c.history.Clear() }
-func (*launcherClipboard) Copy(uint64) bool               { return true }
+func (c *launcherClipboard) ClearUnpinned()               { c.history.ClearUnpinned() }
+func (*launcherClipboard) CanPin() bool                   { return true }
+func (c *launcherClipboard) Pin(id uint64) error          { return c.history.Pin(id) }
+func (c *launcherClipboard) Unpin(id uint64) error {
+	c.history.Unpin(id)
+	return nil
+}
+func (*launcherClipboard) Copy(uint64) bool { return true }
 
 // The clipboard mode previews its entries in full: text whole, and an
 // entry that is neither text nor picture by its type and size.

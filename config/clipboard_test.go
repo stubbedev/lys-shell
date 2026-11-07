@@ -28,7 +28,7 @@ func TestClipboardHistoryBudgetRefusesWhatCannotHoldAnEntry(t *testing.T) {
 	for _, mib := range []int64{clipboard.MinBudgetMiB - 1, 0, -1, clipboard.MaxBudgetMiB + 1} {
 		path := writeFile(t, t.TempDir(), "config.yaml", "clipboard:\n  history-mib: "+strconv.FormatInt(mib, 10)+"\n")
 		cfg, err := LoadFile(path)
-		want := "Error: clipboard history budget out of range: " + strconv.FormatInt(mib, 10) + " MiB, valid 8-1024 (at least the largest entry kept)"
+		want := "Error: clipboard budget out of range: " + strconv.FormatInt(mib, 10) + " MiB, valid 8-1024 (at least the largest entry kept)"
 		if err == nil || !strings.Contains(err.Error(), "Field: clipboard.history-mib") || !strings.Contains(err.Error(), want) {
 			t.Errorf("%d MiB: err = %v, want the field's range diagnostic", mib, err)
 		}
@@ -42,5 +42,31 @@ func TestClipboardHistoryBudgetIsABoundedSpin(t *testing.T) {
 	m, ok := Field("clipboard.history-mib")
 	if !ok || m.Kind != FieldInt || m.Min != clipboard.MinBudgetMiB || m.Max != clipboard.MaxBudgetMiB {
 		t.Errorf("meta = %+v, want an int field in %d-%d", m, clipboard.MinBudgetMiB, clipboard.MaxBudgetMiB)
+	}
+}
+
+func TestClipboardPinnedBudgetAndPersistLoad(t *testing.T) {
+	d := Defaults().Clipboard
+	if d.PinnedMiB.Budget() != clipboard.DefaultPinnedBudget() || d.Persist {
+		t.Errorf("defaults: pinned %d MiB, persist %v", d.PinnedMiB.Budget().MiB(), d.Persist)
+	}
+	path := writeFile(t, t.TempDir(), "config.yaml", "clipboard:\n  pinned-mib: 32\n  persist: true\n")
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clipboard.PinnedMiB.Budget().MiB() != 32 || !cfg.Clipboard.Persist {
+		t.Errorf("loaded pinned %d MiB, persist %v", cfg.Clipboard.PinnedMiB.Budget().MiB(), cfg.Clipboard.Persist)
+	}
+}
+
+func TestClipboardPinnedBudgetRefusesWhatCannotHoldAnEntry(t *testing.T) {
+	path := writeFile(t, t.TempDir(), "config.yaml", "clipboard:\n  pinned-mib: 1\n")
+	cfg, err := LoadFile(path)
+	if err == nil || !strings.Contains(err.Error(), "Field: clipboard.pinned-mib") {
+		t.Errorf("err = %v, want the field's range diagnostic", err)
+	}
+	if cfg.Clipboard.PinnedMiB != DefaultsClipboard().PinnedMiB {
+		t.Errorf("kept %d MiB, want the default", cfg.Clipboard.PinnedMiB.Budget().MiB())
 	}
 }

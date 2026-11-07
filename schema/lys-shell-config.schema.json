@@ -1928,15 +1928,25 @@
       "description": "Clipboard history settings.",
       "properties": {
         "history-mib": {
-          "$ref": "#/$defs/ClipboardHistoryMiB",
+          "$ref": "#/$defs/ClipboardMiB",
           "default": 64,
-          "description": "Most memory the history keeps, in MiB, across every entry. The\noldest entries are forgotten to make room for a new one. The\nbudget is never less than the largest single entry kept."
+          "description": "Most memory the history keeps, in MiB, across every entry that is\nnot pinned. The oldest entries are forgotten to make room for a\nnew one. The budget is never less than the largest single entry\nkept."
+        },
+        "persist": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Keep the whole history across restarts, in\n`$XDG_DATA_HOME/lys-shell/clipboard-history/`, rather than in\nmemory only. Turning it off removes what was kept. Selections a\npassword manager marks secret are never kept either way."
+        },
+        "pinned-mib": {
+          "$ref": "#/$defs/ClipboardMiB",
+          "default": 16,
+          "description": "Most the pinned entries hold, in MiB. Pinned entries are listed\nfirst, kept in `$XDG_DATA_HOME/lys-shell/clipboard-pinned/` across\nrestarts and never forgotten to make room; a pin past this budget\nis refused."
         }
       },
       "type": "object"
     },
-    "ClipboardHistoryMiB": {
-      "description": "Clipboard history budget in MiB.",
+    "ClipboardMiB": {
+      "description": "Clipboard budget in MiB.",
       "format": "uint32",
       "maximum": 1024,
       "minimum": 8,
@@ -11551,7 +11561,9 @@
     "clipboard": {
       "$ref": "#/$defs/ClipboardConfig",
       "default": {
-        "history-mib": 64
+        "history-mib": 64,
+        "persist": false,
+        "pinned-mib": 16
       },
       "description": "Clipboard history settings."
     },

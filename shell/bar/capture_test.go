@@ -89,11 +89,11 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 	t.Cleanup(sess.Close)
 	application := app.NewApplication(sess)
 	application.SetClipboard(app.NewClipboard(sess))
-	history, err := clipboard.DefaultHistory(clipboard.DefaultBudget())
+	history, err := clipboard.DefaultHistory(clipboard.DefaultBudget(), clipboard.DefaultPinnedBudget())
 	if err != nil {
 		t.Fatal(err)
 	}
-	clip, err := clipboard.Start(application, history)
+	clip, err := clipboard.Start(application, history, clipboard.Stores{})
 	if err != nil {
 		t.Fatalf("the shell's clipboard on sway: %v", err)
 	}

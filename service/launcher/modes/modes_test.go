@@ -554,7 +554,7 @@ type fakeClipboard struct {
 // returns the ids they are stored under.
 func newFakeClipboard(t *testing.T, selections ...[2]string) (*fakeClipboard, []uint64) {
 	t.Helper()
-	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes)
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +574,16 @@ func (f *fakeClipboard) Entries() *clipboard.Snapshot { return f.history.Entries
 
 func (f *fakeClipboard) Forget(id uint64) bool { return f.history.Remove(id) }
 
-func (f *fakeClipboard) Clear() { f.history.Clear(); f.cleared = true }
+func (f *fakeClipboard) ClearUnpinned() { f.history.ClearUnpinned(); f.cleared = true }
+
+func (*fakeClipboard) CanPin() bool { return true }
+
+func (f *fakeClipboard) Pin(id uint64) error { return f.history.Pin(id) }
+
+func (f *fakeClipboard) Unpin(id uint64) error {
+	f.history.Unpin(id)
+	return nil
+}
 
 func (f *fakeClipboard) Copy(id uint64) bool {
 	f.copied = append(f.copied, id)
@@ -628,10 +637,33 @@ func TestClipboardRestoresAndForgets(t *testing.T) {
 		t.Errorf("forget one = %#v", r)
 	}
 	if _, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateKbCustom{N: 2}, "").(launcher.ActionReload); !ok || !f.cleared {
-		t.Error("kb-custom-2 forgets everything")
+		t.Error("kb-custom-2 forgets every unpinned entry")
 	}
 	if _, ok := m.idAt(launcher.RowTarget(5)); ok {
 		t.Error("a row past the end resolves to nothing")
+	}
+}
+
+func TestClipboardKbCustom3TogglesThePin(t *testing.T) {
+	f, ids := newFakeClipboard(t, [2]string{"text/plain", "keep"}, [2]string{"text/plain", "newer"})
+	m := NewClipboard(f)
+	m.Load(bg)
+	r, ok := m.Activate(bg, launcher.RowTarget(1), launcher.ActivateKbCustom{N: 3}, "").(launcher.ActionReload)
+	if !ok || r.State.Items[0].Display != "keep" || !r.State.Items[0].Flags.Has(launcher.FlagActive) || r.State.Items[1].Flags.Has(launcher.FlagActive) {
+		t.Fatalf("pin = %#v, want the pin first and active", r)
+	}
+	m.Activate(bg, launcher.RowTarget(1), launcher.ActivateKbCustom{N: 2}, "")
+	st := m.Load(bg)
+	if len(st.Items) != 1 || st.Items[0].Display != "keep" {
+		t.Fatalf("kb-custom-2 took the pin: %#v", st.Items)
+	}
+	r, _ = m.Activate(bg, launcher.RowTarget(0), launcher.ActivateKbCustom{N: 3}, "").(launcher.ActionReload)
+	if r.State.Items[0].Flags.Has(launcher.FlagActive) {
+		t.Error("kb-custom-3 on a pin did not unpin it")
+	}
+	f.history.Remove(ids[0])
+	if r, _ := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateKbCustom{N: 3}, "").(launcher.ActionReload); r.State.Message == nil {
+		t.Error("a refused pin must say why")
 	}
 }
 

@@ -15,8 +15,11 @@ import (
 type ClipboardHistory interface {
 	Entries() *clipboard.Snapshot
 	Forget(id uint64) bool
-	Clear()
+	ClearUnpinned()
 	Copy(id uint64) bool
+	CanPin() bool
+	Pin(id uint64) error
+	Unpin(id uint64) error
 }
 
 // Row icons, one per clipboard.Kind (clipboard.rs).
@@ -30,12 +33,14 @@ const (
 // previewChars is how much of an entry a row shows.
 const previewChars = 160
 
-// kb-custom-1 forgets the selected entry, kb-custom-2 the whole
-// history: a clipboard history is exactly where a password ends up when
-// a password manager forgets to mark it.
+// kb-custom-1 forgets the selected entry, kb-custom-2 every entry that
+// is not pinned: a clipboard history is exactly where a password ends up
+// when a password manager forgets to mark it. kb-custom-3 pins or unpins
+// the selected entry.
 const (
 	forgetOne uint8 = 1
 	forgetAll uint8 = 2
+	togglePin uint8 = 3
 )
 
 // Clipboard lists the session's clipboard history (clipboard.rs): the
@@ -45,8 +50,10 @@ const (
 type Clipboard struct {
 	history ClipboardHistory
 	// ids are the entry ids in row order, so a row index resolves to
-	// the entry it was drawn for even after something new arrives.
-	ids []uint64
+	// the entry it was drawn for even after something new arrives;
+	// pinned says which of them are pinned.
+	ids    []uint64
+	pinned []bool
 }
 
 // NewClipboard builds the mode; a nil history is a compositor without
@@ -58,7 +65,7 @@ func (*Clipboard) Name() string { return "clipboard" }
 
 func (c *Clipboard) state() launcher.ModeState {
 	if c.history == nil {
-		c.ids = nil
+		c.ids, c.pinned = nil, nil
 		msg := "No clipboard history: the compositor does not support wlr-data-control."
 		return launcher.ModeState{Prompt: "clipboard", Message: &msg, NoCustom: true, UseHotKeys: true}
 	}
@@ -66,12 +73,17 @@ func (c *Clipboard) state() launcher.ModeState {
 	defer snap.Release()
 	entries := snap.Entries()
 	c.ids = make([]uint64, len(entries))
+	c.pinned = make([]bool, len(entries))
 	items := make([]launcher.Item, len(entries))
 	for i, e := range entries {
 		c.ids[i] = e.ID
 		preview := e.Preview(previewChars)
 		info := strconv.FormatUint(e.ID, 10)
 		items[i] = launcher.Item{Display: preview, MatchText: preview, Info: &info, Icon: iconFor(e)}
+		if e.Pinned {
+			items[i].Flags = launcher.FlagActive
+		}
+		c.pinned[i] = e.Pinned
 	}
 	// Typed text matching nothing must not land on the clipboard: this
 	// mode restores, it does not compose.
@@ -90,7 +102,8 @@ func (c *Clipboard) idAt(target launcher.Target) (uint64, bool) {
 // Load lists the history, most recent first.
 func (c *Clipboard) Load(context.Context) launcher.ModeState { return c.state() }
 
-// Activate restores the entry; kb-custom-1/2 forget one or all.
+// Activate restores the entry; kb-custom-1/2 forget one or every
+// unpinned one, kb-custom-3 pins or unpins it.
 func (c *Clipboard) Activate(_ context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
 	id, ok := c.idAt(target)
 	if c.history == nil || !ok {
@@ -102,7 +115,15 @@ func (c *Clipboard) Activate(_ context.Context, target launcher.Target, kind lau
 			c.history.Forget(id)
 			return launcher.ActionReload{State: c.state()}
 		case forgetAll:
-			c.history.Clear()
+			c.history.ClearUnpinned()
+			return launcher.ActionReload{State: c.state()}
+		case togglePin:
+			if err := c.togglePin(target, id); err != nil {
+				msg := err.Error()
+				state := c.state()
+				state.Message = &msg
+				return launcher.ActionReload{State: state}
+			}
 			return launcher.ActionReload{State: c.state()}
 		}
 	}
@@ -192,4 +213,13 @@ func entryBytes(history ClipboardHistory, id uint64) ([]byte, error) {
 		}
 	}
 	return nil, clipboard.ErrEntryGone
+}
+
+// togglePin pins the row's entry, or unpins a pinned one.
+func (c *Clipboard) togglePin(target launcher.Target, id uint64) error {
+	i, _ := target.Row()
+	if c.pinned[i] {
+		return c.history.Unpin(id)
+	}
+	return c.history.Pin(id)
 }

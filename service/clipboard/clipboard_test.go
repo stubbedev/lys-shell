@@ -155,7 +155,7 @@ func newTestClipboard(t *testing.T, h *History) (*Clipboard, *fakeDevice) {
 		h = defaultHistory(t)
 	}
 	dev := &fakeDevice{}
-	c := start(dev, func(fn func()) { fn() }, h)
+	c := start(dev, func(fn func()) { fn() }, h, Stores{})
 	t.Cleanup(c.Close)
 	return c, dev
 }
@@ -409,7 +409,7 @@ func TestForgetAndClear(t *testing.T) {
 	if got := texts(c.history); !slices.Equal(got, []string{"c", "a"}) {
 		t.Fatalf("entries = %v", got)
 	}
-	c.Clear()
+	c.ClearUnpinned()
 	if c.history.Len() != 0 {
 		t.Fatal("Clear left entries")
 	}
@@ -469,7 +469,7 @@ func TestARestoredEntryStillPastesAfterTheHistoryDropsIt(t *testing.T) {
 	c.Copy(ids(c)[0])
 
 	remember(dev, textMime, "newer")
-	c.Clear()
+	c.ClearUnpinned()
 
 	if n := live(h); n != 1 {
 		t.Fatalf("%d allocations while the claim serves the dropped entry, want 1", n)
@@ -496,7 +496,7 @@ func TestAPasteInFlightOutlivesItsClaimAndEntry(t *testing.T) {
 	dev.claims[0].src.Send(textMime, w)
 	<-w.started
 
-	c.Clear()
+	c.ClearUnpinned()
 	dev.claims[0].cancel()
 	if n := live(h); n != 1 {
 		t.Fatalf("%d allocations mid-paste, want the paste's 1", n)
@@ -538,7 +538,7 @@ func TestAFailedClaimLetsGoOfTheEntry(t *testing.T) {
 	dev.claimErr = errors.New("finished")
 
 	c.Copy(ids(c)[0])
-	c.Clear()
+	c.ClearUnpinned()
 
 	if n := live(h); n != 0 {
 		t.Fatalf("%d allocations after a refused claim", n)

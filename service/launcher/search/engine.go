@@ -421,7 +421,7 @@ func (*actionsProvider) Immediate() {}
 func (p *actionsProvider) Load(_ context.Context, publish func([]Entry)) {
 	entries := make([]Entry, len(p.actions))
 	for i, a := range p.actions {
-		entries[i] = Entry{ID: strconv.Itoa(i), Title: a.Title, Icon: launcher.IconName(a.Icon), Data: a}
+		entries[i] = Entry{ID: strconv.Itoa(i), Title: a.Title, Hint: a.Key.Label(), Icon: launcher.IconName(a.Icon), Data: a}
 	}
 	publish(entries)
 }

@@ -121,8 +121,28 @@ type Action struct {
 	Title string
 	// Icon leads its row in the actions panel.
 	Icon string
+	// Key runs it straight from the list, without the actions panel.
+	Key ActionKey
 	// Run does it.
 	Run func(ctx context.Context) Outcome
+}
+
+// ActionKey is a key that runs a row's action from the list itself.
+type ActionKey uint8
+
+const (
+	// ActionKeyNone is an action reached through the actions panel only.
+	ActionKeyNone ActionKey = iota
+	// ActionKeyDelete is Ctrl+Backspace: remove what the row stands for.
+	ActionKeyDelete
+)
+
+// Label is the key as the actions panel shows it, "" for none.
+func (k ActionKey) Label() string {
+	if k == ActionKeyDelete {
+		return "Ctrl+Backspace"
+	}
+	return ""
 }
 
 // Outcome is what the panel does after an action ran.

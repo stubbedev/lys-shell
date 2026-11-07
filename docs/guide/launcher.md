@@ -36,7 +36,7 @@ be running, as it hosts the panel.
 | Calculator | `6*7`, `sqrt(16)`, conversions (`5 km to mi`, `100 f in c`, `1 GiB to MB`), currencies, times and dates, see below |
 | System | Lock, sleep, log out, restart, shut down, through the [`power`](/config/modules/power) commands. Those that end the session ask for a second Enter |
 | Settings | Each page of [`lys-settings`](https://github.com/stubbedev/lys-settings), when it is installed |
-| Clipboard | The history, in the list from three typed letters; `Clipboard History` lists it all |
+| Clipboard | The history, in the list from three typed letters; `Clipboard History` lists it all, pinned entries first. See [Clipboard history](#clipboard-history) |
 | Emoji | In the list from two typed letters; `Emoji Picker` lists them all |
 | Bitwarden | `Bitwarden Vault` opens the vault, asking for the master password if it is locked |
 | Quick links, snippets | From `launcher.search`, see below |
@@ -97,6 +97,7 @@ is the last day of February.
 | `Ctrl+1` … `Ctrl+9` | Take that row in view |
 | `Esc` | Go back a level, then close |
 | `Backspace` | In an empty field, go back a level |
+| `Ctrl+Backspace` | On a clipboard row, forget it |
 
 The footer always shows what `Enter` and `Ctrl+Enter` will do. A right click on a
 row opens its actions; a click outside the panel closes it.
@@ -129,6 +130,29 @@ highlighted, so a large file previews as fast as a small one.
 <img src="/launcher-preview-clipboard-mode.png" alt="The clipboard mode previewing a copied text in full">
 <img src="/launcher-preview-clipboard-mode-other.png" alt="The clipboard mode previewing an entry by its type and size">
 <img src="/launcher-preview-search-mode.png" alt="The search panel previewing a file">
+
+## Clipboard history
+
+The shell remembers what you copy, in memory, up to
+[`clipboard.history-mib`](/config/clipboard). A selection a password manager marks
+secret is never remembered, and so can never be pinned or written to disk.
+
+The actions panel (`Ctrl+K`) on a clipboard row pins it. A pinned entry is
+listed first, marked Pinned, and kept in
+`$XDG_DATA_HOME/lys-shell/clipboard-pinned/` (files only you can read), so it
+survives restarts and logging out with its bytes and type exactly as copied; the
+budget never forgets it to make room. Pins have their own budget,
+`clipboard.pinned-mib`, and a pin past it is refused with the reason in the
+footer. Unpin returns the entry to the rest of the history. `Ctrl+Backspace`
+forgets a row, pinned or not, and `Clear Unpinned` forgets everything else.
+
+With `clipboard.persist: true` the whole history is kept, in
+`$XDG_DATA_HOME/lys-shell/clipboard-history/`; turning it off removes that
+folder's entries. Stored entries are read back only when the launcher first
+lists them, so they cost nothing at login.
+
+In `lys-shell launcher -show clipboard`, `kb-custom-1` forgets the selected entry,
+`kb-custom-2` every unpinned one, and `kb-custom-3` pins or unpins it.
 
 ## The wallpaper picker
 

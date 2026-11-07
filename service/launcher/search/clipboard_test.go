@@ -28,7 +28,7 @@ type fakeHistory struct {
 
 func newFakeHistory(t *testing.T, selections ...[2]string) *fakeHistory {
 	t.Helper()
-	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes*4)
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes*4, clipboard.MaxEntryBytes*4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,14 @@ func newFakeHistory(t *testing.T, selections ...[2]string) *fakeHistory {
 
 func (f *fakeHistory) Entries() *clipboard.Snapshot { return f.history.Entries() }
 func (f *fakeHistory) Forget(id uint64) bool        { return f.history.Remove(id) }
-func (f *fakeHistory) Clear()                       { f.history.Clear() }
+func (f *fakeHistory) ClearUnpinned()               { f.history.ClearUnpinned() }
+func (*fakeHistory) CanPin() bool                   { return true }
+func (f *fakeHistory) Pin(id uint64) error          { return f.history.Pin(id) }
+func (f *fakeHistory) Unpin(id uint64) error {
+	f.history.Unpin(id)
+	return nil
+}
+
 func (f *fakeHistory) Copy(id uint64) bool {
 	f.copied = append(f.copied, id)
 	return !f.refuse
@@ -237,3 +244,88 @@ func writeTemp(t *testing.T, name string, data []byte) string {
 	}
 	return path
 }
+
+func actionTitled(t *testing.T, actions []Action, title string) Action {
+	t.Helper()
+	for _, a := range actions {
+		if a.Title == title {
+			return a
+		}
+	}
+	t.Fatalf("no %q action in %d actions", title, len(actions))
+	return Action{}
+}
+
+func TestClipboardPinsListFirstAndSurviveClearUnpinned(t *testing.T) {
+	h := newFakeHistory(t, [2]string{"text/plain", "keep me"}, [2]string{"text/plain", "newer"})
+	c := NewClipboard(h, false)
+	got := loaded(t, c)
+	if got[1].Hint != "" {
+		t.Errorf("an unpinned row is marked %q", got[1].Hint)
+	}
+	actions := c.Actions(got[1])
+	for _, a := range actions {
+		if a.Title == i18n.T("launcher-action-unpin") {
+			t.Error("an unpinned row offers Unpin")
+		}
+	}
+	if _, ok := actionTitled(t, actions, i18n.T("launcher-action-pin")).Run(ctx).(Reload); !ok {
+		t.Fatal("pin did not reload")
+	}
+	got = loaded(t, c)
+	if got[0].Title != "keep me" || got[0].Hint != i18n.T("launcher-clipboard-pinned") {
+		t.Fatalf("rows %+v, want the pin first and marked", got)
+	}
+	actions = c.Actions(got[0])
+	actionTitled(t, actions, i18n.T("launcher-action-clear-unpinned")).Run(ctx)
+	if got = loaded(t, c); len(got) != 1 || got[0].Title != "keep me" {
+		t.Fatalf("clear unpinned left %+v", got)
+	}
+	actionTitled(t, c.Actions(got[0]), i18n.T("launcher-action-unpin")).Run(ctx)
+	if got = loaded(t, c); got[0].Hint != "" {
+		t.Error("unpinned row still marked")
+	}
+}
+
+func TestClipboardForgetIsCtrlBackspace(t *testing.T) {
+	h := newFakeHistory(t, [2]string{"text/plain", "one"})
+	c := NewClipboard(h, false)
+	actions := c.Actions(loaded(t, c)[0])
+	var keyed []string
+	for _, a := range actions {
+		if a.Key == ActionKeyDelete {
+			keyed = append(keyed, a.Title)
+		}
+	}
+	if !slices.Equal(keyed, []string{i18n.T("launcher-action-forget")}) {
+		t.Errorf("Ctrl+Backspace runs %v, want Forget alone", keyed)
+	}
+	if ActionKeyDelete.Label() != "Ctrl+Backspace" || ActionKeyNone.Label() != "" {
+		t.Error("key labels")
+	}
+}
+
+func TestARefusedPinIsSaidInTheFooter(t *testing.T) {
+	h := newFakeHistory(t, [2]string{"text/plain", "x"})
+	c := NewClipboard(h, false)
+	row := loaded(t, c)[0]
+	pin := actionTitled(t, c.Actions(row), i18n.T("launcher-action-pin"))
+	h.history.Remove(row.Data.(clipboardData).id)
+	if s, ok := pin.Run(ctx).(Stay); !ok || s.Message == "" {
+		t.Error("a refused pin must say why")
+	}
+}
+
+func TestNoPinActionWithoutAStore(t *testing.T) {
+	h := &noPinHistory{newFakeHistory(t, [2]string{"text/plain", "x"})}
+	c := NewClipboard(h, false)
+	for _, a := range c.Actions(loaded(t, c)[0]) {
+		if a.Title == i18n.T("launcher-action-pin") {
+			t.Error("Pin offered where nothing can keep it")
+		}
+	}
+}
+
+type noPinHistory struct{ *fakeHistory }
+
+func (noPinHistory) CanPin() bool { return false }

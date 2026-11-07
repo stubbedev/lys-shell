@@ -18,7 +18,7 @@ func entry(mime, data string) content { return content{mime: mime, data: []byte(
 // must have freed every entry.
 func mustHistory(t *testing.T, capacity, maxBytes, budget int) *History {
 	t.Helper()
-	h, err := NewHistory(capacity, maxBytes, budget)
+	h, err := NewHistory(capacity, maxBytes, budget, budget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,10 +140,10 @@ func TestAZeroCapacityHistoryRemembersNothing(t *testing.T) {
 }
 
 func TestNegativeBoundsAreAnError(t *testing.T) {
-	if _, err := NewHistory(-1, 8, 8); err == nil {
+	if _, err := NewHistory(-1, 8, 8, 8); err == nil {
 		t.Error("negative capacity accepted")
 	}
-	if _, err := NewHistory(8, -1, 8); err == nil {
+	if _, err := NewHistory(8, -1, 8, 8); err == nil {
 		t.Error("negative entry size accepted")
 	}
 }
@@ -535,10 +535,10 @@ func TestAReleasedSnapshotCannotBeRead(t *testing.T) {
 }
 
 func TestBudgetsSmallerThanAnEntryAreRefused(t *testing.T) {
-	if _, err := NewHistory(8, 16, 15); err == nil {
+	if _, err := NewHistory(8, 16, 15, 16); err == nil {
 		t.Error("a budget below the largest entry was accepted")
 	}
-	if _, err := NewHistory(8, 16, 16); err != nil {
+	if _, err := NewHistory(8, 16, 16, 16); err != nil {
 		t.Errorf("a budget of exactly the largest entry was refused: %v", err)
 	}
 	h := mustHistory(t, 8, 4, 8)
@@ -569,7 +569,7 @@ func TestBudgetRange(t *testing.T) {
 	if MinBudgetMiB*MiB != MaxEntryBytes {
 		t.Errorf("the least budget, %d MiB, is not the largest entry, %d bytes", MinBudgetMiB, MaxEntryBytes)
 	}
-	if _, err := DefaultHistory(Budget{}); err == nil {
+	if _, err := DefaultHistory(Budget{}, DefaultPinnedBudget()); err == nil {
 		t.Error("a zero budget built a history")
 	}
 }

@@ -50,13 +50,14 @@ const MaxEntryBytes = 8 * MiB
 // entry the history keeps, so every entry it accepts fits; the most
 // keeps the budget in an int on every platform.
 const (
-	MinBudgetMiB     = MaxEntryBytes / MiB
-	DefaultBudgetMiB = 64
-	MaxBudgetMiB     = 1024
+	MinBudgetMiB           = MaxEntryBytes / MiB
+	DefaultBudgetMiB       = 64
+	DefaultPinnedBudgetMiB = 16
+	MaxBudgetMiB           = 1024
 )
 
 // ErrBudgetRange reports a byte budget outside MinBudgetMiB-MaxBudgetMiB.
-var ErrBudgetRange = errors.New("clipboard history budget out of range")
+var ErrBudgetRange = errors.New("clipboard budget out of range")
 
 // Budget is the most the history holds in all, validated: never less
 // than one entry of MaxEntryBytes.
@@ -72,6 +73,9 @@ func NewBudget(mib int64) (Budget, error) {
 
 // DefaultBudget is DefaultBudgetMiB.
 func DefaultBudget() Budget { return Budget{mib: DefaultBudgetMiB} }
+
+// DefaultPinnedBudget is DefaultPinnedBudgetMiB.
+func DefaultPinnedBudget() Budget { return Budget{mib: DefaultPinnedBudgetMiB} }
 
 // MiB is the budget in mebibytes.
 func (b Budget) MiB() int64 { return int64(b.mib) }
@@ -215,6 +219,9 @@ type Entry struct {
 	// Mime is the type the bytes are in, and the one they are offered
 	// back under.
 	Mime string
+	// Pinned entries are listed first, survive restarts and are never
+	// evicted.
+	Pinned bool
 
 	p    *payload
 	snap *Snapshot
@@ -387,47 +394,65 @@ func offerMimes(mime string) []string {
 	return mimes
 }
 
-// History is the most-recent-first clipboard history, bounded by
-// entry count and by total bytes. It is plain bookkeeping and not safe
-// for concurrent use; the Clipboard service guards it.
+// History is the clipboard history: pinned entries first, then the
+// rest, each most recent first. The unpinned entries are bounded by
+// entry count and by total bytes, the oldest making way for a new one;
+// pinned entries are never evicted, and their own byte budget refuses a
+// pin rather than dropping one. An entry restored from a Store holds no
+// bytes until it is filled. It is plain bookkeeping and not safe for
+// concurrent use; the Clipboard service guards it.
 type History struct {
 	mem           memory.Shared
 	entries       []stored
 	capacity      int
 	maxEntryBytes int
 	budget        int
-	// size is the bytes the entries hold in all.
-	size   int
-	nextID uint64
-	closed bool
+	pinnedBudget  int
+	// size and count are the unpinned entries' bytes and number,
+	// pinnedSize the pinned entries' bytes.
+	size       int
+	count      int
+	pinnedSize int
+	nextID     uint64
+	closed     bool
 }
 
-// stored is one entry the history holds.
+// stored is one entry the history holds. p is nil while a restored
+// entry's bytes are still only on disk; digest is set once summed.
 type stored struct {
-	id   uint64
-	mime string
-	p    *payload
+	id     uint64
+	mime   string
+	size   int
+	p      *payload
+	digest Digest
+	summed bool
+	pinned bool
 }
 
-// NewHistory builds an empty history keeping at most capacity entries
-// of at most maxEntryBytes each, budget bytes in all. A zero capacity
-// or entry size remembers nothing. A negative bound is an error, and
-// so is a budget smaller than the largest entry: that entry would be
-// accepted only to evict everything, itself included.
-func NewHistory(capacity, maxEntryBytes, budget int) (*History, error) {
+// NewHistory builds an empty history keeping at most capacity unpinned
+// entries of at most maxEntryBytes each, budget bytes in all, and
+// pinned entries of pinnedBudget bytes in all. A zero capacity or entry
+// size remembers nothing. A negative bound is an error, and so is a
+// budget smaller than the largest entry: that entry would be accepted
+// only to evict everything, itself included.
+func NewHistory(capacity, maxEntryBytes, budget, pinnedBudget int) (*History, error) {
 	if capacity < 0 || maxEntryBytes < 0 {
 		return nil, fmt.Errorf("clipboard: history bounds must not be negative (capacity %d, max entry %d)", capacity, maxEntryBytes)
 	}
 	if err := checkBudget(maxEntryBytes, budget); err != nil {
 		return nil, err
 	}
-	return &History{capacity: capacity, maxEntryBytes: maxEntryBytes, budget: budget, nextID: 1}, nil
+	if err := checkBudget(maxEntryBytes, pinnedBudget); err != nil {
+		return nil, err
+	}
+	return &History{capacity: capacity, maxEntryBytes: maxEntryBytes, budget: budget, pinnedBudget: pinnedBudget, nextID: 1}, nil
 }
 
 // DefaultHistory is the history the shell runs with: DefaultCapacity
-// entries of up to MaxEntryBytes, budget in all.
-func DefaultHistory(budget Budget) (*History, error) {
-	return NewHistory(DefaultCapacity, MaxEntryBytes, budget.Bytes())
+// entries of up to MaxEntryBytes, budget in all, and pinned entries of
+// pinned in all.
+func DefaultHistory(budget, pinned Budget) (*History, error) {
+	return NewHistory(DefaultCapacity, MaxEntryBytes, budget.Bytes(), pinned.Bytes())
 }
 
 // checkBudget refuses a budget that cannot hold the largest entry.
@@ -443,51 +468,67 @@ var errClosed = errors.New("clipboard: the history is closed")
 
 // Push records a selection and returns the id it is stored under.
 // Re-copying something already remembered moves it to the front and
-// keeps its id rather than adding a second copy: the clipboard is a
-// stack of what you have, and the same bytes twice is one thing. The
-// same bytes under another mime are another entry — pasting a PNG
-// back as text/plain would hand the receiver bytes it cannot use. The
-// oldest entries make way until the history is within its capacity
-// and budget again.
+// keeps its id (and its pin) rather than adding a second copy: the
+// clipboard is a stack of what you have, and the same bytes twice is
+// one thing. The same bytes under another mime are another entry —
+// pasting a PNG back as text/plain would hand the receiver bytes it
+// cannot use. The oldest unpinned entries make way until the history is
+// within its capacity and budget again.
 //
 // False when the selection is not worth remembering: empty,
 // oversized, whitespace-only text, or a zero-capacity history. An
 // error when the history is closed or the bytes cannot be held.
 func (h *History) Push(mime string, data []byte) (uint64, bool, error) {
-	if v := h.judge(mime, data); v.settled {
+	v := h.judge(mime, data)
+	if v.settled {
 		return v.id, v.kept, v.err
 	}
 	buf, err := offheap.Clone(&h.mem, data)
 	if err != nil {
 		return 0, false, fmt.Errorf("clipboard: %w", err)
 	}
-	return h.insert(mime, buf), true, nil
+	return h.place(mime, buf, v), true, nil
 }
 
 // pushOwned is Push of bytes already off the heap in the history's
 // memory, taking buf: it becomes the entry, or is freed.
 func (h *History) pushOwned(mime string, buf memory.Slice[byte]) (uint64, bool, error) {
-	if v := h.judge(mime, buf.Elems()); v.settled {
+	v := h.judge(mime, buf.Elems())
+	if v.settled {
 		if err := offheap.Free(&h.mem, buf); err != nil {
 			v.err = errors.Join(v.err, fmt.Errorf("clipboard: freeing a selection not kept: %w", err))
 		}
 		return v.id, v.kept, v.err
 	}
-	return h.insert(mime, buf), true, nil
+	return h.place(mime, buf, v), true, nil
+}
+
+// place stores buf: as the bytes of the restored entry judge matched and
+// moved to the front, or as a new entry.
+func (h *History) place(mime string, buf memory.Slice[byte], v verdict) uint64 {
+	if v.fill {
+		h.entries[0].p = newPayload(&h.mem, buf)
+		return v.id
+	}
+	return h.insert(mime, buf)
 }
 
 // verdict is what Push makes of a selection before it needs its own
 // bytes: settled when it is refused, already held, or cannot be
-// recorded at all.
+// recorded at all. fill is a restored entry, matched by digest and moved
+// to the front, that takes the selection's bytes as its own.
 type verdict struct {
 	settled bool
+	fill    bool
 	id      uint64
 	kept    bool
 	err     error
 }
 
 // judge settles a selection that needs no new entry: refused, or
-// already held under mime, which it moves to the front.
+// already held under mime, which it moves to the front. An entry whose
+// bytes are still on disk is matched by digest, summed only when one of
+// that mime and size is waiting.
 func (h *History) judge(mime string, data []byte) verdict {
 	if h.closed {
 		return verdict{settled: true, err: errClosed}
@@ -495,19 +536,32 @@ func (h *History) judge(mime string, data []byte) verdict {
 	if len(data) == 0 || len(data) > h.maxEntryBytes || h.capacity == 0 {
 		return verdict{settled: true}
 	}
-	// Whitespace-only text comes from a stray drag as often as from
-	// intent, and is unrecognisable as a row. Non-text is judged by
-	// length alone: bytes that look like whitespace are still content.
 	if IsTextMime(mime) && utf8.Valid(data) && strings.TrimSpace(string(data)) == "" {
 		return verdict{settled: true}
 	}
-	i := slices.IndexFunc(h.entries, func(e stored) bool { return e.mime == mime && bytes.Equal(e.p.bytes(), data) })
+	var sum Digest
+	summed := false
+	i := slices.IndexFunc(h.entries, func(e stored) bool {
+		if e.mime != mime || e.size != len(data) {
+			return false
+		}
+		if e.p != nil {
+			return bytes.Equal(e.p.bytes(), data)
+		}
+		if !summed {
+			sum, summed = DigestOf(data), true
+		}
+		return e.digest == sum
+	})
 	if i < 0 {
 		return verdict{}
 	}
 	entry := h.entries[i]
 	copy(h.entries[1:i+1], h.entries[:i])
 	h.entries[0] = entry
+	if entry.p == nil {
+		return verdict{fill: true, id: entry.id}
+	}
 	return verdict{settled: true, id: entry.id, kept: true}
 }
 
@@ -515,32 +569,48 @@ func (h *History) judge(mime string, data []byte) verdict {
 func (h *History) insert(mime string, buf memory.Slice[byte]) uint64 {
 	id := h.nextID
 	h.nextID++
-	h.entries = slices.Insert(h.entries, 0, stored{id: id, mime: mime, p: newPayload(&h.mem, buf)})
-	h.size += buf.Len()
+	h.entries = slices.Insert(h.entries, 0, stored{id: id, mime: mime, size: buf.Len(), p: newPayload(&h.mem, buf)})
+	h.account(h.entries[0], 1)
 	h.evict()
 	return id
 }
 
-// evict drops the oldest entries until the history is within its
-// capacity and budget. The newest always stays: it is no larger than
-// maxEntryBytes, which the budget holds.
+// account adds (sign 1) or removes (sign -1) an entry's bytes from the
+// total of its kind.
+func (h *History) account(e stored, sign int) {
+	if e.pinned {
+		h.pinnedSize += sign * e.size
+		return
+	}
+	h.size += sign * e.size
+	h.count += sign
+}
+
+// evict drops the oldest unpinned entries until the history is within
+// its capacity and budget. The newest always stays: it is no larger
+// than maxEntryBytes, which the budget holds.
 func (h *History) evict() {
-	for len(h.entries) > h.capacity || h.size > h.budget {
+	for h.count > h.capacity || h.size > h.budget {
 		last := len(h.entries) - 1
-		h.drop(h.entries[last])
-		h.entries[last] = stored{}
-		h.entries = h.entries[:last]
+		for h.entries[last].pinned {
+			last--
+		}
+		h.removeAt(last)
 	}
 }
 
-// drop lets go of an entry leaving the history.
-func (h *History) drop(e stored) {
-	h.size -= e.p.data.Len()
-	e.p.release()
+// removeAt lets go of the entry at i.
+func (h *History) removeAt(i int) {
+	e := h.entries[i]
+	h.account(e, -1)
+	if e.p != nil {
+		e.p.release()
+	}
+	h.entries = slices.Delete(h.entries, i, i+1)
 }
 
-// SetBudget bounds the history to budget bytes from now on, evicting
-// the oldest entries past it.
+// SetBudget bounds the unpinned entries to budget bytes from now on,
+// evicting the oldest past it.
 func (h *History) SetBudget(budget int) error {
 	if err := checkBudget(h.maxEntryBytes, budget); err != nil {
 		return err
@@ -550,22 +620,43 @@ func (h *History) SetBudget(budget int) error {
 	return nil
 }
 
-// Entries returns every entry, most recent first, each held until the
-// snapshot is released.
+// SetPinnedBudget bounds the pinned entries to budget bytes for pins
+// from now on. Entries already pinned stay: a pin is never undone
+// behind the user's back.
+func (h *History) SetPinnedBudget(budget int) error {
+	if err := checkBudget(h.maxEntryBytes, budget); err != nil {
+		return err
+	}
+	h.pinnedBudget = budget
+	return nil
+}
+
+// Entries returns every entry whose bytes are in memory, pinned first,
+// each most recent first, each held until the snapshot is released.
 func (h *History) Entries() *Snapshot {
-	s := &Snapshot{entries: make([]Entry, len(h.entries))}
-	for i, e := range h.entries {
-		e.p.hold()
-		s.entries[i] = Entry{ID: e.id, Mime: e.mime, p: e.p, snap: s}
+	s := &Snapshot{entries: make([]Entry, 0, len(h.entries))}
+	for _, pinned := range [...]bool{true, false} {
+		for _, e := range h.entries {
+			if e.pinned != pinned || e.p == nil {
+				continue
+			}
+			e.p.hold()
+			s.entries = append(s.entries, Entry{ID: e.id, Mime: e.mime, Pinned: e.pinned, p: e.p, snap: s})
+		}
 	}
 	return s
 }
 
+func (h *History) index(id uint64) int {
+	return slices.IndexFunc(h.entries, func(e stored) bool { return e.id == id })
+}
+
 // hold returns the entry with this id, held for the caller to release;
-// false once it aged out or was removed.
+// false once it aged out or was removed, or while its bytes are only
+// on disk.
 func (h *History) hold(id uint64) (string, *payload, bool) {
-	i := slices.IndexFunc(h.entries, func(e stored) bool { return e.id == id })
-	if i < 0 {
+	i := h.index(id)
+	if i < 0 || h.entries[i].p == nil {
 		return "", nil, false
 	}
 	e := h.entries[i]
@@ -573,29 +664,170 @@ func (h *History) hold(id uint64) (string, *payload, bool) {
 	return e.mime, e.p, true
 }
 
-// Remove forgets one entry, reporting whether it was there.
+// Remove forgets one entry, pinned or not, reporting whether it was
+// there.
 func (h *History) Remove(id uint64) bool {
-	i := slices.IndexFunc(h.entries, func(e stored) bool { return e.id == id })
+	i := h.index(id)
 	if i < 0 {
 		return false
 	}
-	h.drop(h.entries[i])
-	h.entries = slices.Delete(h.entries, i, i+1)
+	h.removeAt(i)
 	return true
 }
 
-// Clear forgets everything.
+// pinned reports whether the entry with this id is pinned.
+func (h *History) pinned(id uint64) bool {
+	i := h.index(id)
+	return i >= 0 && h.entries[i].pinned
+}
+
+// ClearUnpinned forgets every entry that is not pinned.
+func (h *History) ClearUnpinned() {
+	h.entries = slices.DeleteFunc(h.entries, func(e stored) bool {
+		if e.pinned {
+			return false
+		}
+		h.account(e, -1)
+		if e.p != nil {
+			e.p.release()
+		}
+		return true
+	})
+}
+
+// Clear forgets everything, pinned entries included.
 func (h *History) Clear() {
 	for _, e := range h.entries {
-		h.drop(e)
+		if e.p != nil {
+			e.p.release()
+		}
 	}
 	h.entries = nil
+	h.size, h.count, h.pinnedSize = 0, 0, 0
 }
 
 // Close forgets everything for good: a later Push is an error.
 func (h *History) Close() {
 	h.Clear()
 	h.closed = true
+}
+
+// ErrPinnedFull is a pin past the pinned entries' byte budget.
+var ErrPinnedFull = errors.New("clipboard: the pinned entries' budget is full")
+
+// errNotInMemory is a pin of an entry whose bytes were not read yet.
+var errNotInMemory = errors.New("clipboard: the entry's bytes are not in memory")
+
+// Pin keeps the entry with this id for good: listed first, never
+// evicted, and refused past the pinned budget.
+func (h *History) Pin(id uint64) error {
+	i := h.index(id)
+	if i < 0 {
+		return ErrEntryGone
+	}
+	e := &h.entries[i]
+	switch {
+	case e.pinned:
+		return nil
+	case e.p == nil:
+		return errNotInMemory
+	case h.pinnedSize+e.size > h.pinnedBudget:
+		return fmt.Errorf("%w: %s of %s pinned, the entry is %s", ErrPinnedFull, HumanSize(h.pinnedSize), HumanSize(h.pinnedBudget), HumanSize(e.size))
+	}
+	h.account(*e, -1)
+	e.pinned = true
+	h.account(*e, 1)
+	return nil
+}
+
+// Unpin returns the entry with this id to the rest of the history,
+// where the budget may evict it; false when it was not pinned.
+func (h *History) Unpin(id uint64) bool {
+	i := h.index(id)
+	if i < 0 || !h.entries[i].pinned {
+		return false
+	}
+	e := &h.entries[i]
+	h.account(*e, -1)
+	e.pinned = false
+	h.account(*e, 1)
+	h.evict()
+	return true
+}
+
+// restore adds entries a Store holds, oldest last, without their bytes.
+func (h *History) restore(records []Record, pinned bool) {
+	for _, r := range records {
+		e := stored{id: h.nextID, mime: r.Mime, size: r.Size, digest: r.Digest, summed: true, pinned: pinned}
+		h.nextID++
+		h.entries = append(h.entries, e)
+		h.account(e, 1)
+	}
+	h.evict()
+}
+
+// onDisk is an entry whose bytes are still only in a Store.
+type onDisk struct {
+	id     uint64
+	pinned bool
+	rec    Record
+}
+
+// unloaded lists the entries whose bytes are still only on disk; with
+// a non-zero id, only that one.
+func (h *History) unloaded(id uint64) []onDisk {
+	var out []onDisk
+	for _, e := range h.entries {
+		if e.p == nil && (id == 0 || e.id == id) {
+			out = append(out, onDisk{id: e.id, pinned: e.pinned, rec: Record{Digest: e.digest, Mime: e.mime, Size: e.size}})
+		}
+	}
+	return out
+}
+
+// fill gives a restored entry its bytes, taking buf; false, buf not
+// taken, when the entry left or was filled meanwhile.
+func (h *History) fill(id uint64, buf memory.Slice[byte]) bool {
+	i := h.index(id)
+	if i < 0 || h.entries[i].p != nil {
+		return false
+	}
+	h.entries[i].p = newPayload(&h.mem, buf)
+	return true
+}
+
+// heldEntry is an entry handed out for storing, its bytes (when in
+// memory) held until released.
+type heldEntry struct {
+	id     uint64
+	mime   string
+	size   int
+	p      *payload
+	digest Digest
+	summed bool
+}
+
+// held lists the pinned or the unpinned entries in order, holding the
+// bytes of those in memory.
+func (h *History) held(pinned bool) []heldEntry {
+	var out []heldEntry
+	for _, e := range h.entries {
+		if e.pinned != pinned {
+			continue
+		}
+		if e.p != nil {
+			e.p.hold()
+		}
+		out = append(out, heldEntry{id: e.id, mime: e.mime, size: e.size, p: e.p, digest: e.digest, summed: e.summed})
+	}
+	return out
+}
+
+// setDigest remembers an entry's digest once summed.
+func (h *History) setDigest(id uint64, d Digest) {
+	if i := h.index(id); i >= 0 {
+		h.entries[i].digest, h.entries[i].summed = d, true
+	}
 }
 
 // Len reports how many entries are held.
@@ -642,3 +874,15 @@ var ErrEntryGone = errors.New("clipboard: the entry is no longer in the history"
 // Bytes copies the entry's bytes out, for a reader that outlives its
 // snapshot.
 func (e Entry) Bytes() []byte { return slices.Clone(e.content().data) }
+
+// dropUnloaded forgets the unpinned entries whose bytes are still only
+// on disk.
+func (h *History) dropUnloaded() {
+	h.entries = slices.DeleteFunc(h.entries, func(e stored) bool {
+		if e.pinned || e.p != nil {
+			return false
+		}
+		h.account(e, -1)
+		return true
+	})
+}

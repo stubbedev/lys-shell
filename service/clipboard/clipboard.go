@@ -26,6 +26,10 @@ type Clipboard struct {
 	history *History
 	closed  bool
 
+	pins    *Store
+	saver   *saver
+	storing sync.Mutex
+
 	dev    selectionDevice
 	invoke func(func())
 
@@ -100,12 +104,22 @@ type selectionOffer interface {
 // history, and nothing else depends on it.
 var ErrNoDataControl = errors.New("clipboard: compositor lacks ext-data-control-v1 and zwlr_data_control_manager_v1")
 
-// Start begins watching the session's selection into history. Call it
-// once at shell startup rather than when the launcher first opens, so
-// the history covers the session instead of starting empty at the
-// moment somebody goes looking for it. Fails with ErrNoDataControl
-// when the compositor offers no data-control protocol.
-func Start(a *app.Application, history *History) (*Clipboard, error) {
+// Stores are where the history keeps entries across restarts.
+type Stores struct {
+	// Pinned holds the pinned entries; nil offers no pinning.
+	Pinned *Store
+	// History holds the unpinned entries as well; nil keeps them in
+	// memory only.
+	History *Store
+}
+
+// Start begins watching the session's selection into history, after
+// restoring what stores hold. Call it once at shell startup rather than
+// when the launcher first opens, so the history covers the session
+// instead of starting empty at the moment somebody goes looking for it.
+// Fails with ErrNoDataControl when the compositor offers no
+// data-control protocol.
+func Start(a *app.Application, history *History, stores Stores) (*Clipboard, error) {
 	dc, err := a.DataControl()
 	if errors.Is(err, app.ErrDataControlUnavailable) {
 		return nil, ErrNoDataControl
@@ -113,45 +127,73 @@ func Start(a *app.Application, history *History) (*Clipboard, error) {
 	if err != nil {
 		return nil, err
 	}
-	return start(dataControl{dc}, a.Invoke, history), nil
+	return start(dataControl{dc}, a.Invoke, history, stores), nil
 }
 
 // start wires the service onto a device; invoke runs a function on
-// the loop goroutine.
-func start(dev selectionDevice, invoke func(func()), history *History) *Clipboard {
-	c := &Clipboard{history: history, dev: dev, invoke: invoke}
+// the loop goroutine. The stored entries join the history by their
+// index alone: their bytes are read when something first lists them.
+func start(dev selectionDevice, invoke func(func()), history *History, stores Stores) *Clipboard {
+	c := &Clipboard{history: history, dev: dev, invoke: invoke, pins: stores.Pinned}
+	if stores.Pinned != nil {
+		history.restore(stores.Pinned.Records(), true)
+	}
+	if stores.History != nil {
+		history.restore(stores.History.Records(), false)
+		c.startSaver(stores.History)
+	}
 	dev.watch(c.selectionChanged)
 	return c
 }
 
-// Entries returns a snapshot of the history, most recent first, for
-// the caller to release once it has read it.
+// Entries returns a snapshot of the history, pinned entries first, for
+// the caller to release once it has read it. Entries restored from disk
+// are read in first.
 func (c *Clipboard) Entries() *Snapshot {
+	c.load(0)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.history.Entries()
 }
 
-// Forget drops one entry, reporting whether it was there.
+// Forget drops one entry, pinned or not, reporting whether it was
+// there.
 func (c *Clipboard) Forget(id uint64) bool {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.history.Remove(id)
+	pinned := c.history.pinned(id)
+	ok := c.history.Remove(id)
+	c.changedLocked()
+	c.mu.Unlock()
+	if pinned {
+		if err := c.store(c.pins, true); err != nil {
+			log.Printf("clipboard: forgetting pinned entry %d: %v", id, err)
+		}
+	}
+	return ok
 }
 
-// Clear forgets everything.
-func (c *Clipboard) Clear() {
+// ClearUnpinned forgets every entry that is not pinned.
+func (c *Clipboard) ClearUnpinned() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.history.Clear()
+	c.history.ClearUnpinned()
+	c.changedLocked()
 }
 
-// SetBudget bounds the history to budget from now on, dropping the
-// oldest entries past it.
+// SetBudget bounds the unpinned entries to budget from now on, dropping
+// the oldest past it.
 func (c *Clipboard) SetBudget(budget Budget) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	defer c.changedLocked()
 	return c.history.SetBudget(budget.Bytes())
+}
+
+// SetPinnedBudget bounds what pins may hold from now on.
+func (c *Clipboard) SetPinnedBudget(budget Budget) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.history.SetPinnedBudget(budget.Bytes())
 }
 
 // Copy puts a remembered entry back on the clipboard, under the mime
@@ -159,6 +201,7 @@ func (c *Clipboard) SetBudget(budget Budget) error {
 // whether the entry was still in the history. The entry keeps its
 // place: a restore is not a new copy.
 func (c *Clipboard) Copy(id uint64) bool {
+	c.load(id)
 	c.mu.Lock()
 	mime, p, ok := c.history.hold(id)
 	c.mu.Unlock()
@@ -262,8 +305,8 @@ func (c *Clipboard) serve(src app.SelectionSource, release func()) error {
 // Close gives up a restored selection and frees the history; the
 // clipboard records nothing afterwards. Pastes still being written
 // free their entry when they finish; reads still in flight are freed
-// now, and their transfers end on the next write. Loop goroutine, or
-// once the loop ended.
+// now, and their transfers end on the next write. A persisted history
+// is saved one last time first. Loop goroutine, or once the loop ended.
 func (c *Clipboard) Close() {
 	if s := c.serving; s != nil {
 		c.serving = nil
@@ -274,6 +317,9 @@ func (c *Clipboard) Close() {
 		r.discard()
 	}
 	c.reads = nil
+	if err := c.stopSaver(true); err != nil {
+		log.Printf("clipboard: saving the history on close: %v", err)
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.closed = true
@@ -356,6 +402,7 @@ func (c *Clipboard) flushReads() {
 	for len(c.reads) > 0 && c.reads[0].done {
 		if r := c.reads[0]; r.ok {
 			c.remember(r)
+			c.changedLocked()
 		}
 		c.reads[0] = nil
 		c.reads = c.reads[1:]

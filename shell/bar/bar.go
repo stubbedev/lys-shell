@@ -544,12 +544,12 @@ func (s *shellStart) mount() {
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).
-	history, err := clipboard.DefaultHistory(cfg.Clipboard.HistoryMiB.Budget())
+	history, err := clipboard.DefaultHistory(cfg.Clipboard.HistoryMiB.Budget(), cfg.Clipboard.PinnedMiB.Budget())
 	if err != nil {
 		s.fail(fmt.Errorf("bar: clipboard history: %w", err))
 		return
 	}
-	if clip, err := clipboard.Start(application, history); err == nil {
+	if clip, err := clipboard.Start(application, history, clipboardStores(cfg.Clipboard)); err == nil {
 		baseCtx.Clipboard = clip
 		s.down.add(clip.Close)
 	} else {
@@ -710,9 +710,7 @@ func (s *shellStart) mount() {
 				popupHost.SetConfig(next)
 			}
 			if baseCtx.Clipboard != nil {
-				if err := baseCtx.Clipboard.SetBudget(next.Clipboard.HistoryMiB.Budget()); err != nil {
-					log.Printf("bar: clipboard history budget: %v", err)
-				}
+				reconfigureClipboard(baseCtx.Clipboard, next.Clipboard)
 			}
 		})
 		s.down.add(svc.Subscribe(func(old, next *config.Config) {
