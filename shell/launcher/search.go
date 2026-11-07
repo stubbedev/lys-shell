@@ -2,11 +2,9 @@ package launcher
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/rivo/uniseg"
 	"github.com/stubbedev/lys-ui/app"
@@ -27,10 +25,6 @@ const SearchMode = "search"
 func wantsSearch(o launcheripc.SessionOptions) bool {
 	return !o.Dmenu && o.ErrorMessage == nil && o.Mode != nil && *o.Mode == SearchMode
 }
-
-// previewSettle is how long the selection must rest before its preview
-// loads: arrowing through a list reads no files.
-const previewSettle = 40 * time.Millisecond
 
 // panel is one search session on the UI loop: the widgets, the frame
 // they show, and the engine behind them.
@@ -69,8 +63,7 @@ type panel struct {
 	acceptArmed bool
 	notice      string
 	closing     bool
-	thumbs      search.Thumbnailing
-	previewStop func()
+	preview     *previewLoader
 	previewFor  string
 	// afterClose runs once the surface has gone and the keyboard with it.
 	afterClose func()
@@ -80,7 +73,7 @@ type panel struct {
 func (s *Surface) openPanel(sess *launcheripc.Session) {
 	cfg := s.d.Config()
 	ctx, cancel := context.WithCancel(context.Background())
-	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, thumbs: engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher))}
+	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, preview: newPreviewLoader(s.d, engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher)))}
 	s.panel = p
 	p.v = s.panelViewsFor(p, cfg)
 	win, err := s.d.Open(panelLayer(s.outputFor(cfg.Launcher.Monitor), p.v.panelFrame, p.keyCaptured,
@@ -452,36 +445,17 @@ func (p *panel) schedulePreview() {
 	if id != "" && id == p.previewFor {
 		return
 	}
-	if p.previewStop != nil {
-		p.previewStop()
-		p.previewStop = nil
-	}
+	ctx := p.preview.start(p.ctx)
 	if id == "" {
 		p.previewFor = ""
-		p.v.showPreview(search.PreviewContent{}, nil, entry)
+		p.v.showPreview(engine.PreviewContent{}, nil, entry)
 		return
 	}
 	p.previewFor = id
-	preview := row.Entry.Preview
-	ctx, cancel := context.WithCancel(p.ctx)
-	stopTimer := p.s.d.After(previewSettle, func() {
-		go func() {
-			content, err := search.LoadPreview(ctx, preview, p.thumbs)
-			p.s.d.Invoke(func() {
-				if ctx.Err() != nil || p.s.panel != p || p.previewFor != id {
-					return
-				}
-				if err != nil && !errors.Is(err, search.ErrNoPreview) {
-					log.Printf("launcher: preview: %v", err)
-				}
-				p.v.showPreview(content, err, entry)
-			})
-		}()
+	preview := entry.Preview
+	p.preview.settle(func() {
+		p.preview.fetch(ctx, preview, func(c engine.PreviewContent, err error) { p.v.showPreview(c, err, entry) })
 	})
-	p.previewStop = func() {
-		stopTimer()
-		cancel()
-	}
 }
 
 // finish ends the session: the outcome's effect, the CLI's answer, the
@@ -524,9 +498,7 @@ func (p *panel) teardown() {
 	if p.s.panel == p {
 		p.s.panel = nil
 	}
-	if p.previewStop != nil {
-		p.previewStop()
-	}
+	p.preview.stop()
 	p.cancel()
 	if p.eng != nil {
 		p.eng.Stop()

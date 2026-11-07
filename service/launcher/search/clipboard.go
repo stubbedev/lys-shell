@@ -56,37 +56,10 @@ func (c *Clipboard) read() []Entry {
 			ID: "clipboard:" + strconv.FormatUint(e.ID, 10), Title: e.Preview(clipboardPreviewChars), Icon: clipboardIcon(e), Data: clipboardData{id: e.ID, kind: e.Kind(), paths: e.Paths()},
 		}
 		if c.previews {
-			entries[i].Preview = c.preview(e)
+			entries[i].Preview = modes.EntryPreview(c.history, e)
 		}
 	}
 	return entries
-}
-
-func (c *Clipboard) preview(e clipboard.Entry) Preview {
-	id := e.ID
-	load := func() ([]byte, error) { return c.entryBytes(id) }
-	switch e.Kind() {
-	case clipboard.KindImage:
-		return Preview{Load: load}
-	case clipboard.KindFiles:
-		if paths := e.Paths(); len(paths) == 1 {
-			return Preview{Path: paths[0]}
-		}
-	}
-	// Read when the row is selected, not copied up front for every entry.
-	return Preview{Load: load, LoadsText: true}
-}
-
-// entryBytes copies one entry's bytes out while a snapshot holds them.
-func (c *Clipboard) entryBytes(id uint64) ([]byte, error) {
-	snap := c.history.Entries()
-	defer snap.Release()
-	for _, e := range snap.Entries() {
-		if e.ID == id {
-			return e.Bytes(), nil
-		}
-	}
-	return nil, clipboard.ErrEntryGone
 }
 
 func clipboardIcon(e clipboard.Entry) launcher.Icon {

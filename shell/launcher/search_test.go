@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
@@ -572,7 +573,7 @@ func TestPreviewLoadsWhenTheSelectionRests(t *testing.T) {
 		t.Fatal("the preview must wait for the selection to rest")
 	}
 	h.timers[timers-1].fn()
-	h.until("the text", func() bool { return p.v.text.Visible() && strings.Contains(p.v.text.Text(), "truly") })
+	h.until("the text", func() bool { return p.v.pane.text.Visible() && strings.Contains(p.v.pane.text.Text(), "truly") })
 }
 
 func TestPreviewOffStaysOff(t *testing.T) {
@@ -944,7 +945,7 @@ func TestAFrameForTheSameRowLeavesItsPreviewLoading(t *testing.T) {
 		t.Errorf("%d new timers: the same row need not load twice", len(h.timers)-count)
 	}
 	waiting.fn()
-	h.until("the text", func() bool { return p.v.text.Visible() && strings.Contains(p.v.text.Text(), "truly") })
+	h.until("the text", func() bool { return p.v.pane.text.Visible() && strings.Contains(p.v.pane.text.Text(), "truly") })
 }
 
 // A selected row with nothing to load shows itself, never an empty pane;
@@ -955,8 +956,8 @@ func TestARowWithNothingToLoadShowsItselfInThePane(t *testing.T) {
 	h.typed(p, "signature")
 	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
 	h.timers[len(h.timers)-1].fn()
-	h.until("the text", func() bool { return p.v.text.Visible() })
-	if p.v.summary.box.Visible() {
+	h.until("the text", func() bool { return p.v.pane.text.Visible() })
+	if p.v.pane.summary.box.Visible() {
 		t.Error("a loaded preview must replace the summary")
 	}
 	h.key("Down")
@@ -964,10 +965,10 @@ func TestARowWithNothingToLoadShowsItselfInThePane(t *testing.T) {
 	if row.Entry.Preview.Any() {
 		t.Fatalf("%q has a preview; the test wants a row without one", row.Entry.Title)
 	}
-	if !p.v.summary.box.Visible() || p.v.summary.title.Text() != row.Entry.Title {
-		t.Errorf("summary shown %v, title %q, want %q", p.v.summary.box.Visible(), p.v.summary.title.Text(), row.Entry.Title)
+	if !p.v.pane.summary.box.Visible() || p.v.pane.summary.title.Text() != row.Entry.Title {
+		t.Errorf("summary shown %v, title %q, want %q", p.v.pane.summary.box.Visible(), p.v.pane.summary.title.Text(), row.Entry.Title)
 	}
-	if p.v.text.Visible() || p.v.image.Visible() {
+	if p.v.pane.text.Visible() || p.v.pane.image.Visible() {
 		t.Error("the previous row's content stayed in the pane")
 	}
 }
@@ -977,12 +978,12 @@ func TestAPreviewThatCannotLoadShowsTheRow(t *testing.T) {
 	h := newPanelHarness(t)
 	p, _ := h.openPanel()
 	entry := &search.Entry{Title: "broken.bin", Subtitle: "/tmp"}
-	p.v.showPreview(search.PreviewContent{}, errors.New("no"), entry)
-	if !p.v.summary.box.Visible() || p.v.summary.title.Text() != "broken.bin" || p.v.summary.subtitle.Text() != "/tmp" {
-		t.Errorf("summary %v %q %q", p.v.summary.box.Visible(), p.v.summary.title.Text(), p.v.summary.subtitle.Text())
+	p.v.showPreview(engine.PreviewContent{}, errors.New("no"), entry)
+	if !p.v.pane.summary.box.Visible() || p.v.pane.summary.title.Text() != "broken.bin" || p.v.pane.summary.subtitle.Text() != "/tmp" {
+		t.Errorf("summary %v %q %q", p.v.pane.summary.box.Visible(), p.v.pane.summary.title.Text(), p.v.pane.summary.subtitle.Text())
 	}
-	p.v.showPreview(search.PreviewContent{}, nil, nil)
-	if p.v.summary.box.Visible() {
+	p.v.showPreview(engine.PreviewContent{}, nil, nil)
+	if p.v.pane.summary.box.Visible() {
 		t.Error("with no row selected there is nothing to say")
 	}
 }
@@ -996,21 +997,21 @@ func TestThePreviewPaneHoldsItsWidth(t *testing.T) {
 	h.typed(p, "signature")
 	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
 	data := make([]byte, render.Stride(renderW)*renderH)
-	widths := func(c search.PreviewContent) (list, pane, textH int) {
+	widths := func(c engine.PreviewContent) (list, pane, textH int) {
 		p.v.showPreview(c, nil, nil)
 		p.v.motion.snapSize(p.v.targetW(), p.v.targetH())
 		paintPanel(p, data)
-		return p.v.list.Bounds().W, p.v.pane.Bounds().W, p.v.text.Bounds().H
+		return p.v.list.Bounds().W, p.v.pane.box.Bounds().W, p.v.pane.text.Bounds().H
 	}
-	short, wantPane, oneLine := widths(search.PreviewContent{Text: "x"})
-	if wantPane != p.v.previewW {
-		t.Errorf("pane %d wide, want %d", wantPane, p.v.previewW)
+	short, wantPane, oneLine := widths(engine.PreviewContent{Text: "x"})
+	if wantPane != p.v.pane.width {
+		t.Errorf("pane %d wide, want %d", wantPane, p.v.pane.width)
 	}
-	list, pane, _ := widths(search.PreviewContent{Image: image.NewRGBA(image.Rect(0, 0, 4000, 300))})
+	list, pane, _ := widths(engine.PreviewContent{Image: image.NewRGBA(image.Rect(0, 0, 4000, 300))})
 	if list != short || pane != wantPane {
 		t.Errorf("with a wide picture list %d and pane %d, want %d and %d", list, pane, short, wantPane)
 	}
-	list, pane, wrapped := widths(search.PreviewContent{Text: strings.Repeat("a long line of text ", 40)})
+	list, pane, wrapped := widths(engine.PreviewContent{Text: strings.Repeat("a long line of text ", 40)})
 	if list != short || pane != wantPane {
 		t.Errorf("with a long line list %d and pane %d, want %d and %d", list, pane, short, wantPane)
 	}

@@ -177,7 +177,7 @@ func (f *Files) entry(d *fileData, block *strings.Builder, icons map[string]laun
 	}
 	e.Icon = icon
 	if f.cfg.Previews {
-		e.Preview = Preview{Path: path}
+		e.Preview = launcher.Preview{Path: path}
 	}
 	return e
 }

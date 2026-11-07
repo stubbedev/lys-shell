@@ -122,6 +122,20 @@ type active struct {
 	mouse    []mouseEntry
 	// afterClose runs once the surface has gone and the keyboard with it.
 	afterClose func()
+	// previews is the active mode describing its rows; preview loads the
+	// selected one once it rests, previewGen counts the states loaded, and
+	// previewing is the row asked for, nil for none.
+	previews   bool
+	preview    *previewLoader
+	previewGen uint64
+	previewing *rowPreviewRequest
+}
+
+// rowPreviewRequest is the row the pane is loading or showing, and the
+// context its load runs under.
+type rowPreviewRequest struct {
+	key rowPreviewKey
+	ctx context.Context
 }
 
 // Surface is the launcher (shell/launcher/mod.rs): it serves the
@@ -215,6 +229,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 		thumbs: engine.NewThumbnailer(setup.ui.previewCmd), ctx: ctx, cancel: cancel,
 		keys: compileKeys(setup.ui.keybindings), mouse: compileMouse(setup.ui.mouseBindings),
 	}
+	a.preview = newPreviewLoader(s.d, a.thumbs)
 	s.multi = multiSelect{picked: map[uint32]bool{}, ballotSelected: setup.ui.ballotSelected, ballotUnselected: setup.ui.ballotUnselected}
 	s.model.update(nil, nil)
 	s.sel = -1
@@ -266,6 +281,12 @@ func (k *sessionSink) onAction(act engine.Action) {
 	}
 }
 
+func (k *sessionSink) onPreview(p enginePreview) {
+	if k.live() {
+		k.s.onPreview(p)
+	}
+}
+
 // onMatches is EngineEvent::Matches: the list swaps, the selection
 // lands where the session asked, -select/-selected-row apply once, and
 // -auto-select accepts a lone result.
@@ -275,6 +296,7 @@ func (s *Surface) onMatches(m engineMatches) {
 	s.model.update(m.items, m.matched)
 	a.views.list.reset(s.model.len())
 	a.views.setRows(s.model.len())
+	a.views.showPane(a.previews && s.model.len() > 0)
 	if n := s.model.len(); n > 0 {
 		target := 0
 		switch {
@@ -291,6 +313,7 @@ func (s *Surface) onMatches(m engineMatches) {
 	} else {
 		s.selectRow(-1)
 	}
+	s.schedulePreview()
 	s.resize()
 	s.armDump()
 }
@@ -315,6 +338,8 @@ func (s *Surface) onState(st engineState) {
 	default:
 		a.pending = pendingSelection{}
 	}
+	a.previews = st.previews && !a.dump && s.d.Config().Launcher.Search.Previews
+	a.previewGen++
 	a.modePrompt = st.prompt
 	a.masked = st.password
 	a.views.setMasked(a.ui.password || st.password)
@@ -405,7 +430,48 @@ func (s *Surface) selectRow(pos int) {
 	if s.cur != nil {
 		s.cur.views.list.setSelected(pos)
 		s.fireSelectionHook()
+		s.schedulePreview()
 	}
+}
+
+// schedulePreview asks the mode for the selected row's preview once the
+// selection rests. The row already loading or shown stands; any other
+// row's wait and load are dropped.
+func (s *Surface) schedulePreview() {
+	a := s.cur
+	if a == nil || !a.views.pane.box.Visible() {
+		return
+	}
+	item, ok := s.model.itemIndex(s.sel)
+	key := rowPreviewKey{gen: a.previewGen, item: item}
+	if ok && a.previewing != nil && a.previewing.key == key {
+		return
+	}
+	ctx := a.preview.start(a.ctx)
+	if !ok {
+		a.previewing = nil
+		a.views.pane.show(nil, engine.PreviewContent{}, nil)
+		return
+	}
+	a.previewing = &rowPreviewRequest{key: key, ctx: ctx}
+	a.preview.settle(func() { s.send(cmdPreview{index: item, key: key}) })
+}
+
+// onPreview loads the mode's description of the row still asked for.
+func (s *Surface) onPreview(p enginePreview) {
+	a := s.cur
+	req := a.previewing
+	if req == nil || req.key != p.key || req.ctx.Err() != nil {
+		return
+	}
+	if !p.ok {
+		a.views.pane.show(nil, engine.PreviewContent{}, nil)
+		return
+	}
+	a.preview.fetch(req.ctx, p.preview, func(c engine.PreviewContent, err error) {
+		a.views.pane.show(p.preview.Facts, c, err)
+		s.resize()
+	})
 }
 
 // fireSelectionHook is fire_selection_hook.
@@ -673,6 +739,7 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 	if a.dumpStop != nil {
 		a.dumpStop()
 	}
+	a.preview.stop()
 	a.cancel()
 	if frame != nil {
 		a.sess.Reply(*frame)

@@ -3,7 +3,9 @@ package modes
 import (
 	"context"
 	"strconv"
+	"strings"
 
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/launcher"
 )
@@ -133,4 +135,61 @@ func iconFor(e clipboard.Entry) launcher.Icon {
 		}
 	}
 	return launcher.IconName(name)
+}
+
+// RowPreview is the row's entry in full, read from the history only once
+// the row is selected; false once the entry has left the history.
+func (c *Clipboard) RowPreview(index uint32) (launcher.Preview, bool) {
+	id, ok := c.idAt(launcher.RowTarget(index))
+	if c.history == nil || !ok {
+		return launcher.Preview{}, false
+	}
+	snap := c.history.Entries()
+	defer snap.Release()
+	for _, e := range snap.Entries() {
+		if e.ID == id {
+			return EntryPreview(c.history, e), true
+		}
+	}
+	return launcher.Preview{}, false
+}
+
+// EntryPreview is a clipboard entry's side pane: text whole, an image
+// decoded with its type and size, one copied file as that file, several
+// as their paths, and anything else its type and size. Bytes are copied
+// out of the history only when the row is selected.
+func EntryPreview(history ClipboardHistory, e clipboard.Entry) launcher.Preview {
+	id := e.ID
+	load := func() ([]byte, error) { return entryBytes(history, id) }
+	facts := func() []launcher.PreviewFact {
+		return []launcher.PreviewFact{
+			{Label: i18n.T("launcher-preview-type"), Value: e.Mime},
+			{Label: i18n.T("launcher-preview-size"), Value: clipboard.HumanSize(e.Size())},
+		}
+	}
+	switch e.Kind() {
+	case clipboard.KindText:
+		return launcher.Preview{Load: load, LoadsText: true}
+	case clipboard.KindImage:
+		return launcher.Preview{Load: load, Facts: facts()}
+	case clipboard.KindFiles:
+		paths := e.Paths()
+		if len(paths) == 1 {
+			return launcher.Preview{Path: paths[0]}
+		}
+		return launcher.Preview{Text: strings.Join(paths, "\n")}
+	}
+	return launcher.Preview{Facts: facts()}
+}
+
+// entryBytes copies one entry's bytes out while a snapshot holds them.
+func entryBytes(history ClipboardHistory, id uint64) ([]byte, error) {
+	snap := history.Entries()
+	defer snap.Release()
+	for _, e := range snap.Entries() {
+		if e.ID == id {
+			return e.Bytes(), nil
+		}
+	}
+	return nil, clipboard.ErrEntryGone
 }

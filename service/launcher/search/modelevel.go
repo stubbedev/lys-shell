@@ -70,7 +70,7 @@ func (p *modeProvider) Load(_ context.Context, publish func([]Entry)) {
 		}
 		entries[i] = Entry{ID: it.MatchText + "\x00" + title, Title: title, Keywords: it.MatchText, Icon: it.Icon, Data: uint32(i)}
 		if previewer, ok := p.mode.(launcher.Previewer); ok {
-			entries[i].Preview.Image, _ = previewer.RowPreview(uint32(i))
+			entries[i].Preview, _ = previewer.RowPreview(uint32(i))
 		}
 	}
 	publish(entries)

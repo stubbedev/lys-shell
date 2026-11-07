@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/lyswm"
@@ -85,14 +86,30 @@ type WindowInfo struct {
 // the preview pane's width at a 2x scale.
 const windowPreviewPx = 720
 
-// Preview captures the window's contents, scaled to fit the preview
+// Capture captures the window's contents, scaled to fit the preview
 // pane.
-func (win WindowInfo) Preview(context.Context) (image.Image, error) {
+func (win WindowInfo) Capture(context.Context) (image.Image, error) {
 	return sharepreview.WindowThumb(sharepreview.Toplevel{
 		Class: win.Class, Title: win.Title,
 		WindowAddress: win.HyprlandAddress, HasAddress: win.HyprlandAddress != 0,
 		Identifier: win.ToplevelIdentifier,
 	}, windowPreviewPx)
+}
+
+// Preview is the window's side pane: its picture, captured once its row
+// is selected, over its title, application and workspace.
+func (win WindowInfo) Preview() launcher.Preview {
+	facts := make([]launcher.PreviewFact, 0, 3)
+	if win.Title != "" {
+		facts = append(facts, launcher.PreviewFact{Label: i18n.T("launcher-preview-title"), Value: win.Title})
+	}
+	if win.Class != "" {
+		facts = append(facts, launcher.PreviewFact{Label: i18n.T("launcher-preview-app"), Value: win.Class})
+	}
+	if win.Workspace != "" {
+		facts = append(facts, launcher.PreviewFact{Label: i18n.T("launcher-preview-workspace"), Value: win.Workspace})
+	}
+	return launcher.Preview{Image: win.Capture, Facts: facts}
 }
 
 // WindowBackend talks to one compositor. The Rust mode shelled out to
@@ -212,12 +229,12 @@ func (w *Window) Delete(ctx context.Context, index uint32) launcher.Action {
 // AllowsCustom is false.
 func (*Window) AllowsCustom() bool { return false }
 
-// RowPreview captures the row's window.
-func (w *Window) RowPreview(index uint32) (func(context.Context) (image.Image, error), bool) {
+// RowPreview is the row's window.
+func (w *Window) RowPreview(index uint32) (launcher.Preview, bool) {
 	if int(index) >= len(w.windows) {
-		return nil, false
+		return launcher.Preview{}, false
 	}
-	return w.windows[index].Preview, true
+	return w.windows[index].Preview(), true
 }
 
 func windowItem(win WindowInfo, cfg WindowConfig) launcher.Item {

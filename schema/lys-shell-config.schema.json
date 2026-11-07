@@ -4025,7 +4025,7 @@
         "previews": {
           "$ref": "#/$defs/boolean",
           "default": true,
-          "description": "Show the side pane for files, snippets and clipboard entries."
+          "description": "Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes."
         },
         "providers": {
           "$ref": "#/$defs/Array_of_LauncherSearchProvider",

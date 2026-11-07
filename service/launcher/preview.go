@@ -1,4 +1,4 @@
-package search
+package launcher
 
 import (
 	"bytes"
@@ -27,21 +27,51 @@ const (
 
 // ErrNoPreview is a row with nothing to show: a binary file nothing can
 // thumbnail, a directory.
-var ErrNoPreview = errors.New("search: nothing to preview")
+var ErrNoPreview = errors.New("launcher: nothing to preview")
 
-// PreviewContent is a loaded preview: an image or text.
+// Preview is what a row shows in the side pane. The zero Preview is
+// none.
+type Preview struct {
+	// Path is a file to picture or read.
+	Path string
+	// Text is text to show as it is.
+	Text string
+	// Load produces an encoded image, or text with LoadsText, off the UI loop
+	// and only when the row is selected.
+	Load      func() ([]byte, error)
+	LoadsText bool
+	// Image produces a decoded image off the UI loop, only when the row is
+	// selected: a window's contents, captured from the compositor.
+	Image func(context.Context) (image.Image, error)
+	// Facts describe the row beside whatever loads: a window's title, app
+	// and workspace, a clipboard entry's type and size.
+	Facts []PreviewFact
+}
+
+// PreviewFact is one labelled line of a preview.
+type PreviewFact struct{ Label, Value string }
+
+// Any reports whether there is anything to preview.
+func (p Preview) Any() bool {
+	return p.Path != "" || p.Text != "" || p.Load != nil || p.Image != nil || len(p.Facts) > 0
+}
+
+// PreviewContent is a loaded preview: an image or text. Name is the file
+// the text was read from, "" for text from no file.
 type PreviewContent struct {
 	Image image.Image
 	Text  string
+	Name  string
 }
 
-// Thumbnailing turns a file into an image file; launcher.Thumbnailer
-// over the XDG thumbnailers.
+// Thumbnailing turns a file into an image file; Thumbnailer over the XDG
+// thumbnailers.
 type Thumbnailing interface {
 	Generate(ctx context.Context, file string) (string, bool)
 }
 
-// LoadPreview loads a preview, off the UI loop.
+// LoadPreview loads a preview, off the UI loop. Facts alone have nothing
+// to load: ErrNoPreview.
 func LoadPreview(ctx context.Context, p Preview, thumbs Thumbnailing) (PreviewContent, error) {
 	switch {
 	case p.Image != nil:
@@ -104,7 +134,7 @@ func loadFilePreview(ctx context.Context, path string, thumbs Thumbnailing) (Pre
 		}
 	}
 	if text, ok := textOf(head, n == previewTextBytes); ok {
-		return PreviewContent{Text: text}, nil
+		return PreviewContent{Text: text, Name: path}, nil
 	}
 	if thumbs != nil {
 		if thumb, ok := thumbs.Generate(ctx, path); ok {

@@ -50,7 +50,7 @@ func (l *Links) Load(_ context.Context, publish func([]Entry)) {
 		first, _, _ := strings.Cut(s.Text, "\n")
 		e := Entry{ID: id, Learn: id, Title: s.Name, Subtitle: first, Keywords: s.Keyword, Icon: launcher.IconName("ld-file-text-symbolic"), Data: s}
 		if l.previews {
-			e.Preview = Preview{Text: s.Text}
+			e.Preview = launcher.Preview{Text: s.Text}
 		}
 		entries = append(entries, e)
 	}

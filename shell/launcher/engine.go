@@ -29,6 +29,12 @@ type (
 	// cmdModeComplete opens the completer, or closes it when open: the
 	// same key does both, so one opened by accident is no trap.
 	cmdModeComplete struct{}
+	// cmdPreview asks the active mode to describe item index for the
+	// preview pane; the answer carries key back.
+	cmdPreview struct {
+		index uint32
+		key   rowPreviewKey
+	}
 )
 
 func (cmdSetQuery) isEngineCmd()      {}
@@ -39,6 +45,7 @@ func (cmdModeNext) isEngineCmd()      {}
 func (cmdModePrevious) isEngineCmd()  {}
 func (cmdModeTo) isEngineCmd()        {}
 func (cmdModeComplete) isEngineCmd()  {}
+func (cmdPreview) isEngineCmd()       {}
 
 // engineState is a (re)loaded mode's state for the surface.
 type engineState struct {
@@ -55,6 +62,9 @@ type engineState struct {
 	newSelection  *uint32
 	// password masks the input (ModeState.Password).
 	password bool
+	// previews is the active mode describing its rows for the preview
+	// pane.
+	previews bool
 }
 
 // engineMatches is a fresh match result.
@@ -63,12 +73,28 @@ type engineMatches struct {
 	matched []uint32
 }
 
+// rowPreviewKey names the row a preview was asked for: an item of one
+// loaded state, gen counting the states.
+type rowPreviewKey struct {
+	gen  uint64
+	item uint32
+}
+
+// enginePreview is the active mode's description of a row; ok is false
+// when it has none.
+type enginePreview struct {
+	key     rowPreviewKey
+	preview engine.Preview
+	ok      bool
+}
+
 // engineSink receives the actor's events; the surface implements it
 // and every call arrives through deliver, on the UI loop.
 type engineSink interface {
 	onState(engineState)
 	onMatches(engineMatches)
 	onAction(engine.Action)
+	onPreview(enginePreview)
 }
 
 // actor is one session's engine goroutine. Its queue is unbounded and
@@ -132,6 +158,7 @@ func (a *actor) run(ctx context.Context, sess *engine.Session, initial int, sink
 			prompt: st.Prompt, message: st.Message, activeMode: sess.ActiveIndex(), modeNames: sess.ModeNames(),
 			multi: st.MultiSelect, afterActivate: afterActivate, keepFilter: st.KeepFilter,
 			keepSelection: st.KeepSelection, newSelection: st.NewSelection, password: st.Password,
+			previews: sess.Previews(),
 		}
 		deliver(func() { sink.onState(ev) })
 	}
@@ -179,6 +206,10 @@ func (a *actor) run(ctx context.Context, sess *engine.Session, initial int, sink
 			sess.SwitchTo(ctx, c.index)
 			sendState(false)
 			pushMatches()
+		case cmdPreview:
+			p, ok := sess.RowPreview(c.index)
+			ev := enginePreview{key: c.key, preview: p, ok: ok}
+			deliver(func() { sink.onPreview(ev) })
 		case cmdModeComplete:
 			if sess.Completing() {
 				sess.CancelCompleter(ctx)

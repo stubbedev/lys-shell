@@ -26,6 +26,7 @@ type views struct {
 	*panelChrome
 	frame *widget.Box
 	list  *resultList
+	pane  *previewPane
 	tabs  *widget.Box
 	// width is the panel's width before the output holds it in.
 	width int
@@ -61,6 +62,10 @@ func (s *Surface) buildViews(a *active) *views {
 	v.frame = widget.NewBox(widget.Column, 0, 0)
 	v.frame.AddClass("launcher-list")
 	v.frame.Append(v.list, true)
+	v.pane = newPreviewPane(s.d.Font, px, previewMinRows*v.list.rowH+2*v.list.edge())
+	body := widget.NewBox(widget.Row, 0, 0)
+	body.Append(v.frame, true)
+	body.Append(v.pane.box, false)
 
 	v.tabs = widget.NewBox(widget.Row, 0, 0)
 	v.tabs.SetElement("togglegroup")
@@ -73,7 +78,7 @@ func (s *Surface) buildViews(a *active) *views {
 	content.Append(v.input, false)
 	content.Append(v.message, false)
 	content.Append(v.sep, false)
-	content.Append(v.frame, true)
+	content.Append(body, true)
 	content.Append(v.tabs, false)
 	content.Append(v.footer, false)
 
@@ -152,10 +157,23 @@ func (v *views) setRows(n int) {
 // targetIn is the panel's size in an output: as tall as its content, up to
 // the room below where the panel sits.
 func (v *views) targetIn(out render.Rect) (w, h int) {
-	w = panelWidthIn(out, v.width)
+	w = v.width
+	if v.pane.box.Visible() {
+		w += v.pane.width
+	}
+	w = panelWidthIn(out, w)
 	h = v.content.Measure(widget.Column, w).Nat
 	if out.H > 0 {
 		h = min(h, int(float64(out.H)*(1-panelTopFraction))-panelEdgeGap)
 	}
 	return w, max(h, 1)
+}
+
+// showPane shows the preview pane beside the list, previewMinRows rows
+// tall so a short list still has room to preview.
+func (v *views) showPane(on bool) {
+	if on == v.pane.box.Visible() {
+		return
+	}
+	v.pane.box.SetVisible(on)
 }

@@ -211,7 +211,7 @@ type LauncherSearchConfig struct {
 	// Directory of script commands. Empty uses `launcher/commands` in the
 	// config directory.
 	CommandsDir string `cfg:"commands-dir,type=Directory"`
-	// Show the side pane for files, snippets and clipboard entries.
+	// Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes.
 	Previews bool `cfg:"previews"`
 	// Links to open by name or keyword.
 	Quicklinks []LauncherQuicklink `cfg:"quicklinks"`

@@ -149,6 +149,23 @@ func (s *Session) ActiveIndex() int { return s.active }
 // State is the active mode's state (prompt, message, flags).
 func (s *Session) State() ModeState { return s.state }
 
+// Previews reports whether the active mode describes its rows for the
+// preview pane.
+func (s *Session) Previews() bool {
+	_, ok := s.modes[s.active].(Previewer)
+	return ok
+}
+
+// RowPreview is the active mode's preview of item index; false when the
+// mode has none for it.
+func (s *Session) RowPreview(index uint32) (Preview, bool) {
+	p, ok := s.modes[s.active].(Previewer)
+	if !ok {
+		return Preview{}, false
+	}
+	return p.RowPreview(index)
+}
+
 // Load loads (or reloads) the active mode into the engine.
 func (s *Session) Load(ctx context.Context) {
 	s.applyState(s.modes[s.active].Load(ctx))

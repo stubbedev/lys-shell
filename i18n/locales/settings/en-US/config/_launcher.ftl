@@ -256,7 +256,7 @@ settings-launcher-search-commands-dir = Script Commands Folder
     .description = Empty uses launcher/commands in the config folder
 
 settings-launcher-search-previews = Previews
-    .description = Show the side pane for files, snippets and clipboard entries
+    .description = Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes
 
 settings-launcher-search-quicklinks = Quick Links
     .description = Links to open by name or keyword

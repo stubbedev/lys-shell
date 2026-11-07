@@ -1,9 +1,6 @@
 package launcher
 
-import (
-	"context"
-	"image"
-)
+import "context"
 
 // ActivateKind is how an entry was accepted: ActivateDefault,
 // ActivateAlt, ActivateCustom, or ActivateKbCustom.
@@ -161,11 +158,11 @@ type Deleter interface {
 	Delete(ctx context.Context, index uint32) Action
 }
 
-// Previewer pictures a row for the search panel's preview pane: the
-// returned func captures it off the UI loop when the row is selected.
-// false leaves the row without a picture.
+// Previewer describes a row for the preview pane, cheaply: whatever
+// costs (a capture, a read) is in the Preview's funcs, which run off the
+// UI loop once the row is selected. false leaves the row without one.
 type Previewer interface {
-	RowPreview(index uint32) (func(context.Context) (image.Image, error), bool)
+	RowPreview(index uint32) (Preview, bool)
 }
 
 // CustomPolicy lets a mode refuse typed text that matches no row.

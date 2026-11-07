@@ -76,6 +76,26 @@ turns learning off.
 The footer always shows what `Enter` and `Ctrl+Enter` will do. A right click on a
 row opens its actions; a click outside the panel closes it.
 
+## The preview pane
+
+Beside the list, the pane shows the selected row once the selection rests, so
+arrowing through a list reads no files and captures no windows:
+
+| Row | Pane |
+| --- | --- |
+| File | An image at fit size, the text of a text file, or a thumbnail |
+| Snippet | Its text |
+| Clipboard entry | Text in full, an image at fit size with its type and size, a copied file as that file, anything else its type and size |
+| Window | Its picture, captured from the compositor, with its title, app and workspace |
+
+`lys-shell launcher -show window` and `-show clipboard` show the same pane.
+`launcher.search.previews: false` turns it off everywhere.
+
+<img src="/launcher-preview-window-mode.png" alt="The window mode previewing a window: its picture, title, app and workspace">
+<img src="/launcher-preview-clipboard-mode.png" alt="The clipboard mode previewing a copied text in full">
+<img src="/launcher-preview-clipboard-mode-other.png" alt="The clipboard mode previewing an entry by its type and size">
+<img src="/launcher-preview-search-mode.png" alt="The search panel previewing a file">
+
 ## The file index
 
 There is no daemon. While the panel is open, and only if the index is older than

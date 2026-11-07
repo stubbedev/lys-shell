@@ -126,7 +126,7 @@ func TestPanelPaintsOnlyThePanel(t *testing.T) {
 	h.typed(p, "signature")
 	h.until("the snippet", func() bool { return p.selectedTitle() == "Signature" })
 	h.timers[len(h.timers)-1].fn()
-	h.until("the text", func() bool { return p.v.text.Visible() })
+	h.until("the text", func() bool { return p.v.pane.text.Visible() })
 	check("4-preview")
 	h.typed(p, "6*7")
 	h.until("the answer", func() bool { return p.selectedTitle() == "42" })
@@ -527,16 +527,16 @@ func TestAHeroEmojisInkStaysInsideItsLabel(t *testing.T) {
 	h.cfg.Launcher.Search.Providers = []config.LauncherSearchProvider{config.SearchEmoji}
 	p, _ := h.openPanel()
 	h.typed(p, "grinning")
-	h.until("the faces", func() bool { return p.v.summary.glyph.Visible() && p.v.summary.glyph.Text() != "" })
+	h.until("the faces", func() bool { return p.v.pane.summary.glyph.Visible() && p.v.pane.summary.glyph.Text() != "" })
 	data := make([]byte, render.Stride(renderW)*renderH)
 	paintPanel(p, data)
 	paintPanel(p, data)
 	savePanel(t, data, "emoji-hero")
-	gb := p.v.summary.glyph.Bounds()
-	titleTop := p.v.summary.title.Bounds().Y
-	top, bottom, found := inkRows(data, gb.X, gb.X+gb.W, gb.X-1, p.v.pane.Bounds().Y, titleTop)
+	gb := p.v.pane.summary.glyph.Bounds()
+	titleTop := p.v.pane.summary.title.Bounds().Y
+	top, bottom, found := inkRows(data, gb.X, gb.X+gb.W, gb.X-1, p.v.pane.box.Bounds().Y, titleTop)
 	if !found {
-		t.Fatalf("the hero %q paints no ink", p.v.summary.glyph.Text())
+		t.Fatalf("the hero %q paints no ink", p.v.pane.summary.glyph.Text())
 	}
 	if top < gb.Y || bottom >= gb.Y+gb.H {
 		t.Errorf("hero ink [%d,%d] leaves its label %v", top, bottom, gb)

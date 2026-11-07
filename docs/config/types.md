@@ -714,7 +714,7 @@ The search panel: one ranked list over apps, windows, files and more.
 | `file-roots` | Directories the file index walks (`~` allowed). Empty indexes the home |
 | `file-exclude` | Directory names the file index skips, on top of hidden ones and the |
 | `commands-dir` | Directory of script commands. Empty uses `launcher/commands` in the |
-| `previews` | Show the side pane for files, snippets and clipboard entries. |
+| `previews` | Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes. |
 | `quicklinks` | Links to open by name or keyword. |
 | `snippets` | Text to copy by name or keyword. |
 

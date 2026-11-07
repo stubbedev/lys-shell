@@ -689,7 +689,7 @@ var schemaDocs = map[string]string{
 	"LauncherSearchConfig.CommandsDir":                       "Directory of script commands. Empty uses `launcher/commands` in the\nconfig directory.",
 	"LauncherSearchConfig.FileExclude":                       "Directory names the file index skips, on top of hidden ones and the\nbuilt-in list (`node_modules`, `vendor`, `target`, ...).",
 	"LauncherSearchConfig.FileRoots":                         "Directories the file index walks (`~` allowed). Empty indexes the home\ndirectory.",
-	"LauncherSearchConfig.Previews":                          "Show the side pane for files, snippets and clipboard entries.",
+	"LauncherSearchConfig.Previews":                          "Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes.",
 	"LauncherSearchConfig.Providers":                         "What the list searches, and what it leaves out by omission.",
 	"LauncherSearchConfig.Quicklinks":                        "Links to open by name or keyword.",
 	"LauncherSearchConfig.Snippets":                          "Text to copy by name or keyword.",

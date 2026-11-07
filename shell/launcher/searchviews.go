@@ -2,10 +2,8 @@ package launcher
 
 import (
 	"fmt"
-	"image"
 	"math"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -16,16 +14,6 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
-	"github.com/stubbedev/lys-shell/styling"
-)
-
-// The panel's measures of its own, in logical pixels at scale 1; frame.go
-// holds what every session shares.
-const (
-	// previewMinRows is the least the list area is tall beside a preview:
-	// a pane one row high shows nothing.
-	previewMinRows = 7
-	previewWidth   = 360
 )
 
 func hexColor(c render.Color) string {
@@ -41,28 +29,24 @@ type panelViews struct {
 	p   *panel
 	cfg *config.Config
 	// hl is the query's copy for highlighting, on the UI loop.
-	hl      engine.FuzzyQuery
-	body    *widget.Box
-	list    *searchList
-	pane    *widget.Box
-	image   *widget.Image
-	text    *widget.Label
-	summary *rowSummary
-	font    render.Font
-	scale   float64
-	lines   int
-	// baseW is the width without the preview pane, previewW the pane's.
-	baseW, previewW int
-	withPreview     bool
+	hl    engine.FuzzyQuery
+	body  *widget.Box
+	list  *searchList
+	pane  *previewPane
+	font  render.Font
+	scale float64
+	lines int
+	// baseW is the width without the preview pane.
+	baseW       int
+	withPreview bool
 }
 
 func newPanelViews(d Deps, cfg *config.Config) *panelViews {
 	scale := float64(cfg.Styling.Scale)
 	px := scaledPx(cfg)
-	body := fontPx()
 	v := &panelViews{
 		cfg: cfg, font: d.Font, scale: scale, lines: max(int(cfg.Launcher.Lines), 1),
-		baseW: launcherWidthPx(cfg), previewW: px(previewWidth),
+		baseW: launcherWidthPx(cfg),
 	}
 	v.panelChrome = newPanelChrome(d, cfg, func(text string) {
 		if p := v.p; p != nil && p.eng != nil && !p.closing {
@@ -73,24 +57,10 @@ func newPanelViews(d Deps, cfg *config.Config) *panelViews {
 
 	v.list = newSearchList(v, cfg, d.Font, d.Variants, px(searchRowHeight), px(headerRowHeight), px(searchIconSize))
 	v.list.bindAsync(v.searchIcon, "ld-search-symbolic")
-	v.pane = widget.NewBox(widget.Column, 0, px(12))
-	v.pane.AddClass("launcher-search-preview")
-	v.pane.SetInlineStyle(styling.WidthStyle(v.previewW))
-	v.image = widget.NewImage(nil)
-	v.image.SetScale(widget.ImageFit)
-	v.image.AddClass("launcher-search-preview-image")
-	v.text = widget.NewLabel(d.Font, body, "", 0)
-	v.text.AddClass("launcher-search-preview-text")
-	v.text.SetWrap(true)
-	v.summary = newRowSummary(d.Font, px)
-	v.pane.Append(v.image, true)
-	v.pane.Append(v.text, false)
-	v.pane.Append(v.summary.box, false)
-	v.showPreview(search.PreviewContent{}, nil, nil)
-	v.pane.SetVisible(false)
+	v.pane = newPreviewPane(d.Font, px, 0)
 	v.body = widget.NewBox(widget.Row, 0, 0)
 	v.body.Append(v.list, true)
-	v.body.Append(v.pane, false)
+	v.body.Append(v.pane.box, false)
 
 	content := widget.NewBox(widget.Column, 0, 0)
 	content.Append(v.input, false)
@@ -125,8 +95,8 @@ func (v *panelViews) bind(p *panel, invoke func(func())) {
 	v.notice.SetText("")
 	v.footer.SetVisible(false)
 	v.withPreview = false
-	v.pane.SetVisible(false)
-	v.showPreview(search.PreviewContent{}, nil, nil)
+	v.pane.box.SetVisible(false)
+	v.pane.show(nil, engine.PreviewContent{}, nil)
 	v.motion.reset(v.baseW, v.fieldH())
 }
 
@@ -136,9 +106,6 @@ func (v *panelViews) release(p *panel) {
 		v.p = nil
 	}
 }
-
-// widgetsSmallPx is the footer's text size.
-func widgetsSmallPx() float64 { return math.Round(fontPx() * 0.85) }
 
 // fieldH is the fixed height above the list.
 func (v *panelViews) fieldH() int { return int(math.Round(inputRowHeight * v.scale)) }
@@ -180,7 +147,7 @@ func (v *panelViews) targetH() int {
 func (v *panelViews) targetW() int {
 	w := v.baseW
 	if v.withPreview {
-		w += v.previewW
+		w += v.pane.width
 	}
 	return panelWidthIn(v.root.bounds(), w)
 }
@@ -219,7 +186,7 @@ func (v *panelViews) setHasPreview(on bool, p *panel) {
 		return
 	}
 	v.withPreview = on
-	v.pane.SetVisible(on)
+	v.pane.box.SetVisible(on)
 }
 
 // setFooter shows the hints, or a failure said out loud.
@@ -234,86 +201,18 @@ func (v *panelViews) setFooter(p *panel) {
 	v.showHints()
 }
 
-// showPreview shows content; err or nothing shows what the row says of
-// itself, so the pane is never blank while a row is selected.
-func (v *panelViews) showPreview(c search.PreviewContent, err error, entry *search.Entry) {
-	var img image.Image
-	text := ""
-	if err == nil {
-		img, text = c.Image, c.Text
+// showPreview shows the entry's facts and loaded content; with nothing
+// to show it shows what the row says of itself, so the pane is never
+// blank while a row is selected.
+func (v *panelViews) showPreview(c engine.PreviewContent, err error, entry *search.Entry) {
+	var facts []engine.PreviewFact
+	if entry != nil {
+		facts = entry.Preview.Facts
 	}
-	v.image.SetVisible(img != nil)
-	if img != nil {
-		v.image.SetImage(img)
+	if v.pane.show(facts, c, err) || entry == nil {
+		return
 	}
-	v.text.SetVisible(text != "")
-	if text != "" {
-		v.text.SetText(previewLines(text))
-	}
-	v.summary.box.SetVisible(img == nil && text == "" && entry != nil)
-	if img == nil && text == "" && entry != nil {
-		v.summary.show(v.list, entry)
-	}
-}
-
-// heroIconSize is the summary's picture, in logical pixels at scale 1.
-const heroIconSize = 72
-
-// rowSummary is the pane for a row with nothing to load: its picture
-// large, its title and its subtitle.
-type rowSummary struct {
-	box      *widget.Box
-	icon     *asyncIcon
-	glyph    *widget.Label
-	title    *widget.Label
-	subtitle *widget.Label
-}
-
-func newRowSummary(font render.Font, px func(int) int) *rowSummary {
-	s := &rowSummary{box: widget.NewBox(widget.Column, px(8), 0)}
-	s.box.AddClass("launcher-search-preview-summary")
-	s.box.SetPadding(render.Insets{Top: px(24)})
-	s.icon = newAsyncIcon(px(heroIconSize), "launcher-search-preview-icon")
-	s.box.AppendAligned(s.icon.slot, false, widget.AlignCenter)
-	s.glyph = widget.NewLabel(font, float64(px(heroIconSize))*glyphFontFactor, "", 0)
-	s.box.AppendAligned(s.glyph, false, widget.AlignCenter)
-	s.title = widget.NewLabel(font, math.Round(fontPx()*1.15), "", 0)
-	s.title.AddClass("launcher-search-preview-title")
-	s.title.SetWrap(true)
-	s.title.SetAlignment(render.AlignCenter)
-	s.box.Append(s.title, false)
-	s.subtitle = widget.NewLabel(font, widgetsSmallPx(), "", 0)
-	s.subtitle.AddClass(css.DimLabel)
-	s.subtitle.SetWrap(true)
-	s.subtitle.SetAlignment(render.AlignCenter)
-	s.box.Append(s.subtitle, false)
-	return s
-}
-
-func (s *rowSummary) show(l *searchList, e *search.Entry) {
-	s.glyph.SetVisible(e.Glyph != "")
-	s.glyph.SetText(e.Glyph)
-	s.icon.slot.SetVisible(e.Glyph == "")
-	if e.Glyph == "" {
-		l.bindAsync(s.icon, iconSource(e.Icon))
-	}
-	s.title.SetText(e.Title)
-	s.subtitle.SetText(e.Subtitle)
-	s.subtitle.SetVisible(e.Subtitle != "")
-}
-
-// previewLines cuts text to what a pane can show, so laying it out stays
-// cheap whatever was copied.
-func previewLines(text string) string {
-	const maxLines, maxBytes = 40, 4096
-	if len(text) > maxBytes {
-		text = strings.ToValidUTF8(text[:maxBytes], "")
-	}
-	lines := strings.SplitN(text, "\n", maxLines+1)
-	if len(lines) > maxLines {
-		lines = lines[:maxLines]
-	}
-	return strings.Join(lines, "\n")
+	v.pane.showSummary(v.list.bindAsync, iconSource(entry.Icon), entry.Glyph, entry.Title, entry.Subtitle)
 }
 
 // searchList is the virtualized result list: a fixed height per row kind,
@@ -727,7 +626,7 @@ func (l *searchList) setScale(num, denom int) {
 	}
 	l.v.searchIcon.name = ""
 	l.bindAsync(l.v.searchIcon, "ld-search-symbolic")
-	hero := l.v.summary.icon
+	hero := l.v.pane.summary.icon
 	name := hero.name
 	hero.name = ""
 	l.bindAsync(hero, name)

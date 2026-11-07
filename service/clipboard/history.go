@@ -232,6 +232,9 @@ func (e Entry) content() content {
 // Kind reports what the entry is, from its mime type.
 func (e Entry) Kind() Kind { return kindOf(e.Mime) }
 
+// Size is how many bytes the entry holds.
+func (e Entry) Size() int { return len(e.content().data) }
+
 // Paths returns the decoded paths in a text/uri-list entry.
 func (e Entry) Paths() []string { return e.content().paths() }
 
@@ -317,9 +320,9 @@ func (c content) preview(maxChars int) string {
 			label = fmt.Sprintf("%s (%d files)", strings.Join(names, ", "), len(names))
 		}
 	case KindImage:
-		label = "Image · " + c.mime + " · " + humanSize(len(c.data))
+		label = "Image · " + c.mime + " · " + HumanSize(len(c.data))
 	case KindOther:
-		label = c.mime + " · " + humanSize(len(c.data))
+		label = c.mime + " · " + HumanSize(len(c.data))
 	}
 	return truncateChars(label, maxChars)
 }
@@ -617,8 +620,8 @@ func truncateChars(text string, maxChars int) string {
 	return b.String()
 }
 
-// humanSize is a byte count short enough for a list row.
-func humanSize(n int) string {
+// HumanSize is a byte count short enough for a list row.
+func HumanSize(n int) string {
 	units := [...]string{"B", "KB", "MB", "GB"}
 	size := float64(n)
 	unit := 0

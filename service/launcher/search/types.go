@@ -8,7 +8,6 @@ package search
 
 import (
 	"context"
-	"image"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/i18n"
@@ -84,25 +83,6 @@ var (
 	sectionTitles     [sectionCount]string
 )
 
-// Preview is what a row shows in the side pane. The zero Preview is
-// none.
-type Preview struct {
-	// Path is a file to picture or read.
-	Path string
-	// Text is text to show as it is.
-	Text string
-	// Load produces an encoded image, or text with LoadsText, off the UI loop
-	// and only when the row is selected.
-	Load      func() ([]byte, error)
-	LoadsText bool
-	// Image produces a decoded image off the UI loop, only when the row is
-	// selected: a window's contents, captured from the compositor.
-	Image func(context.Context) (image.Image, error)
-}
-
-// Any reports whether there is anything to preview.
-func (p Preview) Any() bool { return p.Path != "" || p.Text != "" || p.Load != nil || p.Image != nil }
-
 // Entry is one row a provider offers.
 type Entry struct {
 	// ID identifies the row across queries, so the selection can follow
@@ -129,7 +109,7 @@ type Entry struct {
 	// indexed.
 	Rank int
 	// Preview is the row's side pane.
-	Preview Preview
+	Preview launcher.Preview
 	// Data is the provider's own, for Actions.
 	Data any
 }

@@ -22,13 +22,13 @@ func (m *picturedMode) Load(context.Context) launcher.ModeState {
 	return launcher.ModeState{Items: items}
 }
 
-func (m *picturedMode) RowPreview(index uint32) (func(context.Context) (image.Image, error), bool) {
+func (m *picturedMode) RowPreview(index uint32) (launcher.Preview, bool) {
 	if !m.pictured[index] {
-		return nil, false
+		return launcher.Preview{}, false
 	}
-	return func(context.Context) (image.Image, error) {
+	return launcher.Preview{Image: func(context.Context) (image.Image, error) {
 		return image.NewRGBA(image.Rect(0, 0, int(index)+1, 1)), nil
-	}, true
+	}}, true
 }
 
 func modeEntries(t *testing.T, mode launcher.Mode) []Entry {
@@ -47,7 +47,7 @@ func TestAModeThatPicturesItsRowsGivesThemAnImagePreview(t *testing.T) {
 		t.Error("a row the mode does not picture has a preview")
 	}
 	for _, i := range []int{0, 2} {
-		content, err := LoadPreview(context.Background(), got[i].Preview, nil)
+		content, err := launcher.LoadPreview(context.Background(), got[i].Preview, nil)
 		if err != nil || content.Image == nil || content.Image.Bounds().Dx() != i+1 {
 			t.Errorf("row %d previewed %+v, %v; want its own picture", i, content, err)
 		}

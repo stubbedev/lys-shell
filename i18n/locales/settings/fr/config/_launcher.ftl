@@ -244,7 +244,7 @@ settings-launcher-search-commands-dir = Dossier des commandes de script
     .description = Vide utilise launcher/commands dans le dossier de configuration
 
 settings-launcher-search-previews = Aperçus
-    .description = Afficher le volet latéral pour les fichiers, les extraits et les entrées du presse-papiers
+    .description = Afficher le volet latéral pour les fichiers, les extraits, les fenêtres et les entrées du presse-papiers, dans le panneau de recherche et les modes fenêtre et presse-papiers
 
 settings-launcher-search-quicklinks = Liens rapides
     .description = Liens à ouvrir par nom ou mot-clé

@@ -1,13 +1,20 @@
 package search
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
 
@@ -56,7 +63,7 @@ func TestClipboardRowsAreTheHistoryNewestFirst(t *testing.T) {
 	if len(got) != 2 || got[0].Title != "first line second line" || got[1].Title != "older" {
 		t.Fatalf("rows %+v", got)
 	}
-	content, err := LoadPreview(ctx, got[0].Preview, nil)
+	content, err := launcher.LoadPreview(ctx, got[0].Preview, nil)
 	if err != nil || content.Text != "first line\nsecond line" {
 		t.Errorf("the pane keeps the lines: %q, %v", content.Text, err)
 	}
@@ -95,12 +102,12 @@ func TestClipboardImagePreviewReadsTheEntryWhenAsked(t *testing.T) {
 	if got[0].Preview.Load == nil {
 		t.Fatalf("preview %+v", got[0].Preview)
 	}
-	content, err := LoadPreview(ctx, got[0].Preview, nil)
+	content, err := launcher.LoadPreview(ctx, got[0].Preview, nil)
 	if err != nil || content.Image == nil {
 		t.Fatalf("content %+v, %v", content, err)
 	}
 	h.history.Clear()
-	if _, err := LoadPreview(ctx, got[0].Preview, nil); err == nil {
+	if _, err := launcher.LoadPreview(ctx, got[0].Preview, nil); err == nil {
 		t.Error("an entry gone since the row was drawn is an error")
 	}
 }
@@ -207,4 +214,26 @@ func TestPickersOfferOnlyWhatIsThereAndOpenALevel(t *testing.T) {
 	if push := p.Actions(rows[2])[0].Run(ctx).(Push); push.Level != vault {
 		t.Errorf("the vault row opens the vault's level: %+v", push)
 	}
+}
+
+var ctx = context.Background()
+
+func pngBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, 4, 3))
+	img.Set(1, 1, color.NRGBA{R: 255, A: 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func writeTemp(t *testing.T, name string, data []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

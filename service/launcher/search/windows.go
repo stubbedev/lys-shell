@@ -47,7 +47,7 @@ func (w *Windows) Load(ctx context.Context, publish func([]Entry)) {
 		}
 		entries = append(entries, Entry{
 			ID: "window:" + win.ID, Learn: "window:" + strings.ToLower(win.Class), Title: title, Subtitle: subtitle,
-			Icon: launcher.IconName(strings.ToLower(win.Class)), Data: win, Preview: Preview{Image: win.Preview},
+			Icon: launcher.IconName(strings.ToLower(win.Class)), Data: win, Preview: win.Preview(),
 		})
 	}
 	publish(entries)
