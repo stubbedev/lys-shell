@@ -454,11 +454,12 @@ func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) wid
 // follow keeps the view current while open: service changes rebuild
 // it, and the data age re-renders every minute (UPDATED_AGO_INTERVAL).
 func (v *weatherView) follow(life context.Context) {
-	v.refresh()
 	if v.ctx.App == nil || v.svc == nil {
+		v.refresh()
 		return
 	}
 	changes, unsubscribe := v.svc.Subscribe()
+	v.refresh()
 	go func() {
 		defer unsubscribe()
 		ticker := time.NewTicker(weatherUpdatedEvery)
