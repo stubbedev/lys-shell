@@ -40,6 +40,8 @@ settings-login-greeter-cursor-theme = Thème de curseur
     .description = Thème Xcursor utilisé sur l'écran de connexion (vide = valeur par défaut du système)
 settings-login-greeter-cursor-size = Taille du curseur
     .description = Taille logique du curseur, mise à l'échelle pour chaque écran afin qu'il reste net en HiDPI
+settings-login-greeter-screen-reader = Lecteur d'écran
+    .description = Lecteur d'écran que lancent le menu d'accessibilité de l'écran de connexion et Super+Alt+S ; masqué s'il n'est pas installé
 enum-lock-background-color = Couleur
 enum-lock-background-image = Image
 enum-lock-background-wallpaper = Fond d'écran

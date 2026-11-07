@@ -56,6 +56,7 @@ login:
     show-power-buttons: true
     cursor-theme: ""
     cursor-size: 24
+    screen-reader: orca
 ```
 
 

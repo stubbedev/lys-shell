@@ -93,6 +93,10 @@ type LoginGreeterConfig struct {
 	// Logical cursor size on the login screen. Scaled automatically per
 	// display, so HiDPI outputs get a matching high-resolution cursor.
 	CursorSize uint32 `cfg:"cursor-size"`
+	// Screen reader the accessibility menu and Super+Alt+S start: a
+	// program on the PATH or an absolute path. Its row is hidden when it
+	// is not installed.
+	ScreenReader string `cfg:"screen-reader,type=Program"`
 	// CursorThemeExplicit and CursorSizeExplicit record that a layer
 	// set the key: explicit values beat cursor auto-detection, schema
 	// defaults do not.
@@ -109,7 +113,7 @@ func DefaultsLogin() LoginConfig {
 		DateFormat:         mustStrftime("%A, %B %-d"),
 		ShowFailedAttempts: true,
 		Lock:               LoginLockConfig{Enabled: true, PamService: "system-auth", ShowMedia: true, ShowBattery: true, Fingerprint: true},
-		Greeter:            LoginGreeterConfig{ShowUserList: true, ShowPowerButtons: true, CursorSize: 24},
+		Greeter:            LoginGreeterConfig{ShowUserList: true, ShowPowerButtons: true, CursorSize: 24, ScreenReader: "orca"},
 	}
 }
 

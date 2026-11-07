@@ -798,6 +798,7 @@ var schemaDocs = map[string]string{
 	"LoginGreeterConfig.CursorSize":                          "Logical cursor size on the login screen. Scaled automatically per\ndisplay, so HiDPI outputs get a matching high-resolution cursor.",
 	"LoginGreeterConfig.CursorTheme":                         "Xcursor theme used on the login screen (empty = system default).",
 	"LoginGreeterConfig.CursorThemeExplicit":                 "CursorThemeExplicit and CursorSizeExplicit record that a layer\nset the key: explicit values beat cursor auto-detection, schema\ndefaults do not.",
+	"LoginGreeterConfig.ScreenReader":                        "Screen reader the accessibility menu and Super+Alt+S start: a\nprogram on the PATH or an absolute path. Its row is hidden when it\nis not installed.",
 	"LoginGreeterConfig.ShowPowerButtons":                    "Show the shutdown/reboot buttons at the bottom of the screen.",
 	"LoginGreeterConfig.ShowUserList":                        "Show clickable avatars for the machine's login users.",
 	"LoginLockConfig":                                        "Lock mode: the login screen locking the session via `ext-session-lock-v1`.\n\nWhen `enabled`, the session locks in response to the logind `Lock` signal\n(`loginctl lock-session`), the `lys-shell lock` CLI, or the shell IPC\n`lock()` method. The lock surface grabs all input and survives client\ncrashes (the compositor shows a solid color), unlike a layer-shell overlay.",

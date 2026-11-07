@@ -65,6 +65,9 @@ settings-login-greeter-cursor-theme = Cursor Theme
 settings-login-greeter-cursor-size = Cursor Size
     .description = Logical cursor size; scaled per display so HiDPI outputs get a sharp cursor
 
+settings-login-greeter-screen-reader = Screen Reader
+    .description = Screen reader the greeter's accessibility menu and Super+Alt+S start; hidden when not installed
+
 ## LockBackground variants
 enum-lock-background-color = Color
 enum-lock-background-image = Image

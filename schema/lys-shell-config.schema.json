@@ -4659,6 +4659,7 @@
           "default": {
             "cursor-size": 24,
             "cursor-theme": "",
+            "screen-reader": "orca",
             "show-power-buttons": true,
             "show-user-list": true
           },
@@ -4708,6 +4709,11 @@
           "$ref": "#/$defs/CursorTheme",
           "default": "",
           "description": "Xcursor theme used on the login screen (empty = system default)."
+        },
+        "screen-reader": {
+          "$ref": "#/$defs/Program",
+          "default": "orca",
+          "description": "Screen reader the accessibility menu and Super+Alt+S start: a\nprogram on the PATH or an absolute path. Its row is hidden when it\nis not installed."
         },
         "show-power-buttons": {
           "$ref": "#/$defs/boolean",
@@ -11471,6 +11477,7 @@
         "greeter": {
           "cursor-size": 24,
           "cursor-theme": "",
+          "screen-reader": "orca",
           "show-power-buttons": true,
           "show-user-list": true
         },
