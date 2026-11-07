@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/third_party/wayland/wl"
 	"github.com/stubbedev/lys-lib/third_party/wayland/wlclient"
@@ -145,6 +146,22 @@ func (f *Filter) Protocol() string {
 		return ctmIface
 	}
 	return gammaIface
+}
+
+const (
+	ctmEaseStep   = 100 * time.Millisecond
+	gammaEaseStep = time.Second
+)
+
+// EaseStep is how often an ease steps on the filter's protocol so that no
+// step shows: a CTM matrix crosses wl_fixed's 1/256 steps, so it is
+// evaluated often enough to move one of them at a time, while 16-bit
+// gamma ramps change smoothly once a second.
+func (f *Filter) EaseStep() time.Duration {
+	if f.Protocol() == ctmIface {
+		return ctmEaseStep
+	}
+	return gammaEaseStep
 }
 
 // Apply tints every output with s, binding the protocol on first use.

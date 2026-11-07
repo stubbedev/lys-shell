@@ -440,3 +440,27 @@ func TestEaseCommitCounts(t *testing.T) {
 		}
 	}
 }
+
+func TestAnEaseStepsFasterOnTheCoarserProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		ctm, gamma bool
+		want       time.Duration
+	}{{"ctm", true, true, ctmEaseStep}, {"gamma", false, true, gammaEaseStep}} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp := newCompositor(t, tc.ctm, tc.gamma)
+			comp.addOutput("DP-1")
+			f, err := Open(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			if got := f.EaseStep(); got != tc.want {
+				t.Errorf("EaseStep on %s = %v, want %v", f.Protocol(), got, tc.want)
+			}
+		})
+	}
+	if ctmEaseStep >= gammaEaseStep {
+		t.Errorf("CTM steps every %v, gamma every %v: CTM's coarser encoding needs the finer step", ctmEaseStep, gammaEaseStep)
+	}
+}

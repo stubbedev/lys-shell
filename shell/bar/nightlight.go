@@ -24,13 +24,12 @@ import (
 // The schedule's cadence. A jump of the clock, as a resume from suspend
 // is, wakes it at once; otherwise it wakes every nightlightScheduleTick,
 // all it has should the kernel refuse to report jumps, and steps every
-// nightlightEaseTick inside a transition, where 900 steps over the
-// default 15 minutes keep each one below what shows. A location refreshes every
+// filter's EaseStep inside a transition, which keeps each step below what
+// shows. A location refreshes every
 // nightlightLocationEach, and a failed lookup retries sooner so a
 // GeoClue that comes up after the shell is picked up.
 const (
 	nightlightScheduleTick  = time.Minute
-	nightlightEaseTick      = time.Second
 	nightlightLocationEach  = 6 * time.Hour
 	nightlightLocationRetry = 5 * time.Minute
 	nightlightLookupTimeout = 30 * time.Second
@@ -58,6 +57,7 @@ func nightlightVars(live *nightlight.Setting, temp, gamma int) map[string]any {
 // colourFilter is the display filter the module drives.
 type colourFilter interface {
 	Protocol() string
+	EaseStep() time.Duration
 	Apply(nightlight.Setting) error
 	Clear() error
 	Refused() error
@@ -378,8 +378,8 @@ func (m *nightlightModule) armTick() {
 // runs, otherwise a minute or until the next transition starts,
 // whichever comes first, so a transition starts on time.
 func (m *nightlightModule) nextTick() time.Duration {
-	if m.stepping {
-		return nightlightEaseTick
+	if m.stepping && m.filter != nil {
+		return m.filter.EaseStep()
 	}
 	now := m.env.now()
 	next, ok := nightlight.NextEase(now, *m.location, m.ctx.Config.Nightlight.TransitionDuration.Transition())

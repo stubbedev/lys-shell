@@ -51,6 +51,10 @@ func (f *fakeSunset) Refused() error { return f.refused }
 
 func (f *fakeSunset) Protocol() string { return "fake_colour_v1" }
 
+const fakeEaseStep = 250 * time.Millisecond
+
+func (f *fakeSunset) EaseStep() time.Duration { return fakeEaseStep }
+
 func (f *fakeSunset) Close() { f.closed, f.running = true, false }
 
 func (f *fakeSunset) env(t *testing.T) sunsetEnv {
@@ -882,11 +886,11 @@ func TestNightlightTicksFastOnlyDuringAnEase(t *testing.T) {
 	}
 	fake.clock = start.Add(length / 2)
 	m.evaluate()
-	if got := m.nextTick(); got != nightlightEaseTick {
-		t.Errorf("during the ease = %v, want %v", got, nightlightEaseTick)
+	if got := m.nextTick(); got != fakeEaseStep {
+		t.Errorf("during the ease = %v, want %v", got, fakeEaseStep)
 	}
 	m.toggle()
-	if got := m.nextTick(); got == nightlightEaseTick {
+	if got := m.nextTick(); got == fakeEaseStep {
 		t.Error("an override keeps the fast tick")
 	}
 	m.toggle()
@@ -916,7 +920,7 @@ func TestNightlightStepsOnItsTimer(t *testing.T) {
 	stopped := fake.starts
 	fake.clock = start.Add(length * 3 / 4)
 	headlessLoop.Unlock()
-	time.Sleep(nightlightEaseTick + 100*time.Millisecond)
+	time.Sleep(fakeEaseStep + 100*time.Millisecond)
 	headlessLoop.Lock()
 	defer headlessLoop.Unlock()
 	if fake.starts != stopped {
