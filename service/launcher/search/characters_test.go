@@ -95,6 +95,9 @@ func TestCharacterActionsCopyTheCodePointAndEntity(t *testing.T) {
 }
 
 func TestACharacterSearchBuildsOnlyTheRowsItShows(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the race detector allocates")
+	}
 	c := NewCharacters(charnames.Shared)
 	cost := func(query string) float64 {
 		q := launcher.NewFuzzyQuery(query)
