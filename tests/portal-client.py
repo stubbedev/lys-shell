@@ -7,6 +7,7 @@ failure, so the test script can assert the outcome.
     portal-client screencast
     portal-client pickcolor
     portal-client globalshortcuts
+    portal-client filechooser
 
 globalshortcuts binds one shortcut, prints the bind response, then
 waits for its Activated signal and prints that.
@@ -86,6 +87,13 @@ def pickcolor():
     return request("org.freedesktop.portal.Screenshot", "PickColor", "s", "", options={})
 
 
+def filechooser():
+    return request(
+        "org.freedesktop.portal.FileChooser", "OpenFile", "ss", "", "Open a file",
+        options={},
+    )
+
+
 def register(app_id):
     """Declares the client's app id to the frontend (host.portal.Registry),
     as a host app must before the portals that need one."""
@@ -149,7 +157,13 @@ def screencast():
     return request(cast, "Start", "os", session, "", options={})
 
 
-modes = {"screenshot": screenshot, "screencast": screencast, "pickcolor": pickcolor, "globalshortcuts": globalshortcuts}
+modes = {
+    "screenshot": screenshot,
+    "screencast": screencast,
+    "pickcolor": pickcolor,
+    "globalshortcuts": globalshortcuts,
+    "filechooser": filechooser,
+}
 code, results = modes[sys.argv[1]]()
 print(json.dumps({"code": code, "results": plain(results)}))
 sys.exit(0 if code == 0 else 1)

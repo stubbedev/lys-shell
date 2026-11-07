@@ -239,7 +239,7 @@ pkgs.testers.nixosTest {
 
     def shell_execs():
         records = machine.execute("ausearch --raw -k user-exec")[1]
-        return sum(1 for line in records.splitlines() if line.startswith("type=SYSCALL") and "lys-shell" in line)
+        return [line for line in records.splitlines() if line.startswith("type=SYSCALL") and "lys-shell" in line]
 
     def middle_of(o):
         r = o["rect"]
@@ -261,12 +261,14 @@ pkgs.testers.nixosTest {
         dispatch(f"global dev.stubbe.lys.shell:{action}")
         for o in (first, second):
             wait(f"{action} on {o['name']}", lambda o=o: (colors(*bar_strip(o)) <= 2) == hidden, tries=30)
-    if shell_execs() != execs:
+    started = shell_execs()[len(execs):]
+    if started:
         logs()
-        raise Exception(f"the shortcuts started lys-shell {shell_execs() - execs} times, want none")
-    print("lys-shell execs during the shortcut presses:", shell_execs() - execs)
+        print("\n".join(started))
+        print(machine.execute("ausearch -i -k user-exec | tail -n 60")[1])
+        raise Exception(f"the shortcuts started lys-shell {len(started)} times, want none")
     run("lys-shell --version")
-    wait("the exec count to see a CLI run", lambda: shell_execs() > execs, tries=10)
+    wait("the exec count to see a CLI run", lambda: len(shell_execs()) > len(execs), tries=10)
 
     dispatch("exec foot")
     wait("a foot window", lambda: len(windows()) == 1, tries=60)
@@ -499,6 +501,28 @@ pkgs.testers.nixosTest {
     dispatch("global dev.stubbe.lys.VmTest:lys-vm-test")
     wait("the shortcut's activation", lambda: machine.execute("grep -q activated /tmp/lys/shortcuts.json")[0] == 0, tries=30)
     print("global shortcut:", machine.succeed("cat /tmp/lys/shortcuts.json"))
+
+    def shell_state():
+        return run("systemctl --user show -P ActiveState lys-shell.service").strip()
+
+    def chooser_area():
+        return region(*middle_of(out))
+
+    calm = chooser_area()
+    run("systemctl --user stop lys-shell.service")
+    wait("lys-shell to stop", lambda: shell_state() == "inactive", tries=30)
+    machine.succeed(f"su - ${user} -c '{env} portal-client filechooser > /tmp/lys/chooser.json 2>&1 &'")
+    wait("the file chooser request to start lys-shell", lambda: shell_state() == "active", tries=30)
+    wait("the file chooser dialog from the activated shell", lambda: chooser_area() != calm, tries=30)
+    time.sleep(1)
+    shot("15-file-chooser-after-activation")
+    machine.send_key("esc")
+    wait("the file chooser answer", lambda: machine.execute("grep -q code /tmp/lys/chooser.json")[0] == 0, tries=30)
+    answer = json.loads(machine.succeed("cat /tmp/lys/chooser.json"))
+    print("portal file chooser:", answer)
+    if answer["code"] != 1:
+        raise Exception(f"Esc in the file chooser answered {answer}, want cancelled")
+    wait("the file chooser to close", lambda: chooser_area() == calm, tries=30)
 
     logs()
   '';
