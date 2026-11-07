@@ -926,6 +926,7 @@ crashes (the compositor shows a solid color), unlike a layer-shell overlay.
 | `show-media` | Show the track a media player is playing, with play/pause and next, |
 | `show-battery` | Show the battery's charge in the top right corner. Absent on a |
 | `fingerprint` | Accept an enrolled fingerprint (fprintd) alongside the password: |
+| `show-switch-user` | Offer "Switch user" under the password when the machine has more than |
 
 ## MailAccount {#mail-account}
 

@@ -51,6 +51,7 @@ login:
     show-media: true
     show-battery: true
     fingerprint: true
+    show-switch-user: true
   greeter:
     show-user-list: true
     show-power-buttons: true

@@ -10,3 +10,4 @@ lock-media-pause = Pause
 lock-media-next = Piste suivante
 lock-battery = { $percent } %
 lock-battery-charging = En charge
+lock-switch-user = Changer d'utilisateur

@@ -826,6 +826,7 @@ var schemaDocs = map[string]string{
 	"LoginLockConfig.PamService":                             "PAM service name used to authenticate the unlock. Distro-dependent:\n`system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry.",
 	"LoginLockConfig.ShowBattery":                            "Show the battery's charge in the top right corner. Absent on a\nmachine without a battery.",
 	"LoginLockConfig.ShowMedia":                              "Show the track a media player is playing, with play/pause and next,\nunder the clock. Only a player's local cover art is shown.",
+	"LoginLockConfig.ShowSwitchUser":                         "Offer \"Switch user\" under the password when the machine has more than\none account to log in to: lys-login's display manager starts a greeter\non a free VT and keeps this session running, locked.",
 	"LysWMWorkspacesConfig":                                  "lys-wm workspace indicators with click-to-switch.",
 	"LysWMWorkspacesConfig.ActiveColor":                      "Color for the active (visible on its output) workspace.\n\nIn `background` indicator mode, also used as the button background.",
 	"LysWMWorkspacesConfig.ActiveIndicator":                  "Visual indicator for the active workspace.",

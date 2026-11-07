@@ -4759,7 +4759,8 @@
             "lock-on-start": false,
             "pam-service": "system-auth",
             "show-battery": true,
-            "show-media": true
+            "show-media": true,
+            "show-switch-user": true
           },
           "description": "The lock screen's own settings."
         },
@@ -4854,6 +4855,11 @@
           "$ref": "#/$defs/boolean",
           "default": true,
           "description": "Show the track a media player is playing, with play/pause and next,\nunder the clock. Only a player's local cover art is shown."
+        },
+        "show-switch-user": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Offer \"Switch user\" under the password when the machine has more than\none account to log in to: lys-login's display manager starts a greeter\non a free VT and keeps this session running, locked."
         }
       },
       "type": "object"
@@ -11661,7 +11667,8 @@
           "lock-on-start": false,
           "pam-service": "system-auth",
           "show-battery": true,
-          "show-media": true
+          "show-media": true,
+          "show-switch-user": true
         },
         "max-attempts": 0,
         "show-clock": true,

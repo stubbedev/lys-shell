@@ -10,3 +10,4 @@ lock-media-pause = Pause
 lock-media-next = Next track
 lock-battery = { $percent }%
 lock-battery-charging = Charging
+lock-switch-user = Switch User

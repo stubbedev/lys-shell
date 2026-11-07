@@ -53,6 +53,9 @@ settings-login-lock-show-battery = Show Battery
 settings-login-lock-fingerprint = Fingerprint
     .description = Unlock with an enrolled fingerprint (fprintd) alongside the password
 
+settings-login-lock-show-switch-user = Show Switch User
+    .description = Offer "Switch user" on the lock screen when the machine has more than one account
+
 settings-login-greeter-show-user-list = Show User List
     .description = Show clickable avatars for the machine's login users above the username field
 

@@ -78,6 +78,10 @@ type LoginLockConfig struct {
 	// match counts as a failed attempt. Nothing changes without fprintd or
 	// an enrolled finger.
 	Fingerprint bool `cfg:"fingerprint"`
+	// Offer "Switch user" under the password when the machine has more than
+	// one account to log in to: lys-login's display manager starts a greeter
+	// on a free VT and keeps this session running, locked.
+	ShowSwitchUser bool `cfg:"show-switch-user"`
 }
 
 // LoginGreeterConfig is login.greeter.
@@ -112,7 +116,7 @@ func DefaultsLogin() LoginConfig {
 		ClockFormat:        mustStrftime("%H:%M"),
 		DateFormat:         mustStrftime("%A, %B %-d"),
 		ShowFailedAttempts: true,
-		Lock:               LoginLockConfig{Enabled: true, PamService: "system-auth", ShowMedia: true, ShowBattery: true, Fingerprint: true},
+		Lock:               LoginLockConfig{Enabled: true, PamService: "system-auth", ShowMedia: true, ShowBattery: true, Fingerprint: true, ShowSwitchUser: true},
 		Greeter:            LoginGreeterConfig{ShowUserList: true, ShowPowerButtons: true, CursorSize: 24, ScreenReader: "orca"},
 	}
 }
