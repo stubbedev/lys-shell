@@ -29,6 +29,7 @@ var i18nPrefixes = map[string]string{
 	"IdleConfig":                "settings-idle",
 	"IdleInhibitConfig":         "settings-modules-idle-inhibit",
 	"IdleTimeouts":              "settings-idle-timeouts",
+	"PasswordsConfig":           "settings-passwords",
 	"KeybindModeConfig":         "settings-modules-keybind-mode",
 	"KeyboardInputConfig":       "settings-modules-keyboard-input",
 	"LysWMWorkspacesConfig":     "settings-modules-lys-wm-workspaces",

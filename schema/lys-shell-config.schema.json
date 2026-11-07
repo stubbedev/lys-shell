@@ -8526,6 +8526,17 @@
       "minimum": 5,
       "type": "integer"
     },
+    "PasswordsConfig": {
+      "description": "The Passwords page over the keyring.",
+      "properties": {
+        "reveal-reprompt-minutes": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Minutes after which revealing a secret asks for the collection's\npassword again, counted from when the page last saw it unlocked; 0\nnever asks again."
+        }
+      },
+      "type": "object"
+    },
     "Percentage": {
       "description": "Percentage value clamped to 0-100.",
       "format": "uint8",
@@ -13380,6 +13391,13 @@
         "text-align": "center"
       },
       "description": "On-screen display settings."
+    },
+    "passwords": {
+      "$ref": "#/$defs/PasswordsConfig",
+      "default": {
+        "reveal-reprompt-minutes": 0
+      },
+      "description": "The Passwords page over the keyring."
     },
     "portal": {
       "$ref": "#/$defs/PortalConfig",

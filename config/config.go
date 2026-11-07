@@ -65,6 +65,8 @@ type Config struct {
 	ColorPicker ColorPickerConfig `cfg:"colorpicker"`
 	// Built-in idle policy: dim, lock, screens off and suspend.
 	Idle IdleConfig `cfg:"idle"`
+	// The Passwords page over the keyring.
+	Passwords PasswordsConfig `cfg:"passwords"`
 }
 
 // Defaults returns the schema defaults for every section.
@@ -87,6 +89,7 @@ func Defaults() *Config {
 		Clipboard:     DefaultsClipboard(),
 		ColorPicker:   DefaultsColorPicker(),
 		Idle:          DefaultsIdle(),
+		Passwords:     DefaultsPasswords(),
 	}
 }
 

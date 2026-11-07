@@ -29,6 +29,7 @@ Editor intellisense via JSON Schema. Install the [YAML extension](https://market
 | [`login`](/config/login) | Login screen: the greeter and the lock screen, one screen in two modes. |
 | [`mail-account`](/config/mail-account) | One mail account in the `modules.mail` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
+| [`passwords`](/config/passwords) | The Passwords page over the keyring. |
 | [`portal`](/config/portal) | Desktop-portal policy for sandboxed apps. |
 | [`share-picker`](/config/share-picker) | Screen-share picker shown by xdg-desktop-portal when an app requests a |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
