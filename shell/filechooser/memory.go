@@ -16,49 +16,8 @@ import (
 	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-shell/internal/statefile"
 )
-
-// stateFile writes one small state file off the loop, whole each time:
-// the newest content wins, an older write still running never lands
-// over it, and wait returns once every write handed over has ended. A
-// file of "" keeps nothing.
-type stateFile struct {
-	path    string
-	mu      sync.Mutex
-	queued  uint64
-	written uint64
-	writes  sync.WaitGroup
-}
-
-// write hands data over to be written.
-func (f *stateFile) write(data []byte) {
-	if f.path == "" {
-		return
-	}
-	f.mu.Lock()
-	f.queued++
-	seq := f.queued
-	f.mu.Unlock()
-	f.writes.Go(func() {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		if seq < f.written {
-			return
-		}
-		if err := os.MkdirAll(filepath.Dir(f.path), 0o700); err != nil {
-			log.Printf("file chooser: saving %s: %v", f.path, err)
-			return
-		}
-		if err := atomicfile.WriteFile(f.path, data, 0o600); err != nil {
-			log.Printf("file chooser: saving %s: %v", f.path, err)
-			return
-		}
-		f.written = seq
-	})
-}
-
-// wait waits for the writes handed over.
-func (f *stateFile) wait() { f.writes.Wait() }
 
 // maxAppFolders is how many apps' last folders are kept.
 const maxAppFolders = 64
@@ -70,7 +29,7 @@ const maxAppFolders = 64
 type folderMemory struct {
 	mu   sync.Mutex
 	apps []appFolder
-	file stateFile
+	file statefile.File
 }
 
 type appFolder struct{ app, dir string }
@@ -78,7 +37,7 @@ type appFolder struct{ app, dir string }
 // loadFolderMemory reads the memory kept in path; a file that is not
 // there is an empty memory.
 func loadFolderMemory(path string) *folderMemory {
-	m := &folderMemory{file: stateFile{path: path}}
+	m := &folderMemory{file: statefile.File{Path: path}}
 	if path == "" {
 		return m
 	}
@@ -128,7 +87,7 @@ func (m *folderMemory) remember(app, dir string) {
 		b.WriteString(a.app + "\t" + a.dir + "\n")
 	}
 	m.mu.Unlock()
-	m.file.write([]byte(b.String()))
+	m.file.Write([]byte(b.String()))
 }
 
 // foldersFile is where the folder memory is kept beside the view

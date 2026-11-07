@@ -512,7 +512,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 	if got := hs.shown(); !slices.Equal(got[:2], []string{"pics", "docs"}) {
 		t.Errorf("name descending = %v", got)
 	}
-	hs.c.viewFile.wait()
+	hs.c.viewFile.Wait()
 	if b, _ := os.ReadFile(viewFile); string(b) != "name desc list\n" {
 		t.Errorf("persisted view = %q", b)
 	}
@@ -521,7 +521,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 		t.Error("grid view did not swap the views")
 	}
 	// The next chooser starts as this one was left.
-	hs.c.viewFile.wait()
+	hs.c.viewFile.Wait()
 	again := newHarness(t, viewFile)
 	if again.c.view != (view{SortName, false, true}) {
 		t.Errorf("reloaded view = %+v", again.c.view)

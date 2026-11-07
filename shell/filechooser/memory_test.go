@@ -119,7 +119,7 @@ func TestFolderIsKeptPerApp(t *testing.T) {
 		hs.click(t, "Cancel")
 		answer(t, got)
 	}
-	hs.c.folders.file.wait()
+	hs.c.folders.file.Wait()
 	if dir := loadFolderMemory(foldersFile(viewFile)).folder(app.AppID); dir != docs {
 		t.Errorf("after a restart org.app's folder is %q, want %s", dir, docs)
 	}

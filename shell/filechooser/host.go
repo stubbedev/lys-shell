@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/fswatch"
 	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-shell/internal/statefile"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
@@ -183,7 +184,7 @@ type Chooser struct {
 	pc     pathCompletion
 	// viewFile keeps the view, folders the folder each app last picked
 	// in.
-	viewFile stateFile
+	viewFile statefile.File
 	folders  *folderMemory
 	// pv is the preview shown or loading, and previewLoader what loads
 	// one off the loop.
@@ -221,7 +222,7 @@ func newThumbSet() *thumbSet {
 func New(d Deps) *Chooser {
 	c := &Chooser{
 		d: d, view: defaultView, columns: [3]int{90, 150, 90}, thumbnailer: newThumbnailer(), thumbs: newThumbSet(),
-		reader: newDirReader(), viewFile: stateFile{path: d.ViewFile}, folders: loadFolderMemory(foldersFile(d.ViewFile)),
+		reader: newDirReader(), viewFile: statefile.File{Path: d.ViewFile}, folders: loadFolderMemory(foldersFile(d.ViewFile)),
 		size: widget.Size{W: panelW, H: panelH},
 	}
 	c.previewLoader = c.loadPreview
@@ -1108,8 +1109,8 @@ func (c *Chooser) freeThumbs() {
 func (c *Chooser) Close() {
 	c.freeThumbs()
 	c.thumbnailer.work.Close()
-	c.viewFile.wait()
-	c.folders.file.wait()
+	c.viewFile.Wait()
+	c.folders.file.Wait()
 }
 
 // --- surface --------------------------------------------------------
@@ -1601,7 +1602,7 @@ func (c *Chooser) sortBy(col SortColumn) {
 // file, across restarts (best effort).
 func (c *Chooser) saveView() {
 	c.view = c.s.view
-	c.viewFile.write([]byte(c.view.String()))
+	c.viewFile.Write([]byte(c.view.String()))
 }
 
 // updateSortLabels marks the sort column with its direction.
