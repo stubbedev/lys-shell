@@ -181,6 +181,11 @@ recorder-check:
 schema:
     {{go}} run ./cmd/lys-shell config schema --stdout > schema/lys-shell-config.schema.json
 
+# Regenerate the launcher's Unicode character name table from the Unicode
+# Character Database of the pinned nixpkgs.
+unicode-names:
+    {{go}} run ./internal/tools/unicodegen "$(nix build --inputs-from . --no-link --print-out-paths nixpkgs#unicode-character-database)/share/unicode" service/launcher/charnames/names.bin.gz
+
 # Set nix/lys-shell.nix's vendorHash to the hash of the modules go.sum pins.
 vendor-hash:
     nix run github:stubbedev/lys-ci#vendor-hash -- nix/lys-shell.nix .#lys-shell.goModules

@@ -100,7 +100,7 @@ func BenchmarkLoadApps(b *testing.B) {
 
 // BenchmarkLoadEmoji decompresses and prepares the emoji table.
 func BenchmarkLoadEmoji(b *testing.B) {
-	e := NewEmoji(modes.AvailableEmoji)
+	e := NewEmoji(modes.AvailableEmoji, modes.ToneNone, nil)
 	b.ReportAllocs()
 	for b.Loop() {
 		e.Load(context.Background(), func([]Entry) {})

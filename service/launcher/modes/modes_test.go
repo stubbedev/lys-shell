@@ -479,6 +479,12 @@ func TestEmojiGlyphs(t *testing.T) {
 	if GlyphFromCodes([]uint32{0x2764, 0}) != "❤️" {
 		t.Error("a zero becomes VS16")
 	}
+	if got := GlyphFromCodes([]uint32{0x1f44d, 0x1f3fb}); got != "👍" {
+		t.Errorf("thumbs up with no tone = %q, want the default yellow", got)
+	}
+	if got := GlyphFromCodes([]uint32{0x261d, 0x1f3fb}); got != "☝️" {
+		t.Errorf("index pointing up with no tone = %q, want it kept an emoji with VS16", got)
+	}
 	if _, ok := rowToEmoji(nil, "grinning", "grinning", nil, nil); ok {
 		t.Error("no codepoints is no emoji")
 	}
@@ -488,6 +494,57 @@ func TestEmojiGlyphs(t *testing.T) {
 	if _, ok := rowToEmoji([]uint32{0x1f600}, "", "", nil, nil); ok {
 		t.Error("an unnamed glyph is no emoji")
 	}
+}
+
+func TestEmojiSkinTones(t *testing.T) {
+	thumbs, _ := rowToEmoji([]uint32{0x1f44d, 0x1f3fb}, "thumbs up", "", nil, nil)
+	if !thumbs.Toneable() {
+		t.Fatal("thumbs up takes no tone")
+	}
+	want := map[SkinTone]string{ToneNone: "👍", ToneLight: "👍🏻", ToneMediumLight: "👍🏼", ToneMedium: "👍🏽", ToneMediumDark: "👍🏾", ToneDark: "👍🏿"}
+	for tone, glyph := range want {
+		if got := thumbs.WithTone(tone); got != glyph {
+			t.Errorf("tone %d = %q, want %q", tone, got, glyph)
+		}
+	}
+	pair, _ := rowToEmoji([]uint32{0x1f9d1, 0x1f3fb, 0x200d, 0x1f91d, 0x200d, 0x1f9d1, 0x1f3fb}, "people holding hands", "", nil, nil)
+	if got := pair.WithTone(ToneDark); got != "🧑🏿‍🤝‍🧑🏿" {
+		t.Errorf("both people take the tone: %q", got)
+	}
+	heart, _ := rowToEmoji([]uint32{0x2764, 0}, "red heart", "", nil, nil)
+	if heart.Toneable() || heart.WithTone(ToneMedium) != "❤️" {
+		t.Errorf("an emoji without a placeholder changed: toneable %v, %q", heart.Toneable(), heart.WithTone(ToneMedium))
+	}
+}
+
+func TestTheEmbeddedTableTonesThumbsUp(t *testing.T) {
+	t.Setenv("LANG", "C")
+	for _, e := range AvailableEmoji() {
+		switch e.Name {
+		case "thumbs up":
+			if e.Glyph != "👍" || e.WithTone(ToneMedium) != "👍🏽" {
+				t.Errorf("thumbs up = %q, medium %q", e.Glyph, e.WithTone(ToneMedium))
+			}
+		case "red heart":
+			if e.Toneable() {
+				t.Error("red heart takes a tone")
+			}
+		}
+	}
+	m := NewEmoji(ToneDark)
+	for i, e := range m.emojis {
+		if e.Name != "thumbs up" {
+			continue
+		}
+		if c, ok := m.Activate(bg, launcher.RowTarget(uint32(i)), launcher.ActivateDefault{}, "").(launcher.ActionType); !ok || c.Text != "👍🏿" {
+			t.Errorf("the dark emoji mode entered %#v", c)
+		}
+		if items := m.Load(bg).Items; *items[i].Info != "👍🏿" {
+			t.Errorf("the row shows %q", *items[i].Info)
+		}
+		return
+	}
+	t.Fatal("no thumbs up in the table")
 }
 
 func TestEmojiNamesAndKeywords(t *testing.T) {
@@ -503,7 +560,7 @@ func TestEmojiNamesAndKeywords(t *testing.T) {
 	if !reflect.DeepEqual(e.Keywords, []string{"face", "smile"}) {
 		t.Errorf("deduped = %q", e.Keywords)
 	}
-	item := emojiItem(Emoji{Glyph: "🍺", Name: "beer mug", Keywords: []string{"bar", "drink"}})
+	item := emojiItem(Emoji{Glyph: "🍺", Name: "beer mug", Keywords: []string{"bar", "drink"}}, ToneDark)
 	if item.Display != "🍺  beer mug" || !strings.Contains(item.MatchText, "drink") || *item.Info != "🍺" {
 		t.Errorf("item = %+v", item)
 	}
@@ -536,7 +593,7 @@ func TestTheEmbeddedEmojiTableLoads(t *testing.T) {
 	if !found {
 		t.Error("grinning face missing from GTK's table")
 	}
-	m := NewEmoji()
+	m := NewEmoji(ToneNone)
 	if c, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateDefault{}, "").(launcher.ActionType); !ok || c.Text != emojis[0].Glyph {
 		t.Errorf("accept copies the glyph: %#v", c)
 	}

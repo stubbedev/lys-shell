@@ -89,6 +89,8 @@ type Deps struct {
 	// FocusedOutput is the compositor's focused output, false when it
 	// cannot tell.
 	FocusedOutput func() (string, bool)
+	// Emoji is the emoji table the grid shows (modes.AvailableEmoji).
+	Emoji func() []modes.Emoji
 	// FireHook runs a -on-* hook (engine.FireHook; a test seam).
 	FireHook func(command string, ctx engine.HookContext)
 }
@@ -149,10 +151,12 @@ type rowPreviewRequest struct {
 type Surface struct {
 	d   Deps
 	cur *active
-	// panel is the live search session and picker the live wallpaper
-	// picker; at most one of cur, panel and picker lives.
-	panel  *panel
-	picker *picker
+	// panel is the live search session, picker the live wallpaper picker
+	// and emojiGrid the live emoji grid; at most one of cur, panel, picker
+	// and emojiGrid lives.
+	panel     *panel
+	picker    *picker
+	emojiGrid *emojiGrid
 	// views are the search panel's, kept between panels.
 	views *panelViews
 	// sources are the search panel's, kept for the surface's lifetime.
@@ -169,6 +173,9 @@ type Surface struct {
 func New(d Deps) *Surface {
 	if d.FireHook == nil {
 		d.FireHook = engine.FireHook
+	}
+	if d.Emoji == nil {
+		d.Emoji = modes.AvailableEmoji
 	}
 	s := &Surface{d: d, sel: -1, sources: search.NewSources(d.WatchFiles, time.Now), spawn: func(fn func()) { go fn() }}
 	s.openFrecency = s.sources.Frecency(func() (*search.Frecency, error) { return s.d.OpenFrecency() })
@@ -194,6 +201,9 @@ func (s *Surface) ClientGone(id uint64) {
 		if s.picker != nil && s.picker.sess.ID == id {
 			s.picker.release()
 		}
+		if s.emojiGrid != nil && s.emojiGrid.sess.ID == id {
+			s.emojiGrid.release()
+		}
 	})
 }
 
@@ -210,6 +220,18 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 			return
 		}
 		s.picker.finish(false, "")
+	}
+	if s.emojiGrid != nil {
+		switch {
+		case wantsEmojiGrid(sess.Options):
+			s.emojiGrid.finish("", false)
+			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
+			return
+		case !sess.Replace:
+			sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameBusy})
+			return
+		}
+		s.emojiGrid.finish("", false)
 	}
 	if s.panel != nil {
 		// The bind that opened the panel closes it; anything else asking
@@ -238,6 +260,10 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 	}
 	if wantsPicker(sess.Options) {
 		s.openPicker(sess)
+		return
+	}
+	if wantsEmojiGrid(sess.Options) {
+		s.openEmojiGrid(sess)
 		return
 	}
 	cfg := s.d.Config()

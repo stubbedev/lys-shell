@@ -97,7 +97,8 @@ func (c ModuleContext) setConfig(path string, value any) {
 // barsAffected reports whether a reload changes anything the bars
 // render. The recorder's capture settings, which its dropdown writes,
 // only shape the next recording: rebuilding the bars for them would
-// close the dropdown being edited. High contrast and reduce transparency
+// close the dropdown being edited, and no bar renders the emoji skin tone
+// the launcher keeps from a pick. High contrast and reduce transparency
 // restyle the open bars instead (accessibilityChanged).
 func barsAffected(old, next *config.Config) bool {
 	if old == nil || next == nil {
@@ -110,6 +111,7 @@ func barsAffected(old, next *config.Config) bool {
 		r.Microphone, r.MicrophoneDevice, r.SystemAudio = false, "", false
 		r.WebcamEnabled, r.WebcamDevice = false, ""
 		r.WebcamX, r.WebcamY = 0, 0
+		c.Launcher.Emoji.SkinTone = ""
 	}
 	return !reflect.DeepEqual(a, b)
 }

@@ -701,6 +701,14 @@ Desktop-entry fields searched by drun (rofi `-drun-match-fields`).
 | `"comment"` | Comment. |
 | `"keywords"` | Keywords list. |
 
+## LauncherEmojiConfig {#launcher-emoji-config}
+
+How emoji are offered.
+
+| Field | Description |
+|---|---|
+| `skin-tone` | The skin tone of person and hand emoji. Picking a tone from an emoji's |
+
 ## LauncherFileSort {#launcher-file-sort}
 
 File sorting in the file browser (rofi filebrowser `sorting-method`).
@@ -813,6 +821,7 @@ A source of rows in the search panel.
 | `"settings"` | Pages of lys-settings. |
 | `"clipboard"` | The clipboard history. |
 | `"emoji"` | The emoji table. |
+| `"characters"` | Every character Unicode names: arrows, maths, currency signs, box drawing. |
 | `"vault"` | The Bitwarden vault. |
 | `"links"` | Quick links and snippets. |
 | `"browser-bookmarks"` | Bookmarks of the installed browsers (Firefox and Chromium families). |
@@ -824,6 +833,19 @@ A source of rows in the search panel.
 | `"scripts"` | Script commands from the commands directory. |
 | `"shell"` | `>command` runs a shell command. |
 | `"web"` | The web search fallback. |
+
+## LauncherSkinTone {#launcher-skin-tone}
+
+A skin tone for person and hand emoji.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | The default yellow. |
+| `"light"` | Light skin tone. |
+| `"medium-light"` | Medium-light skin tone. |
+| `"medium"` | Medium skin tone. |
+| `"medium-dark"` | Medium-dark skin tone. |
+| `"dark"` | Dark skin tone. |
 
 ## LauncherSnippet {#launcher-snippet}
 

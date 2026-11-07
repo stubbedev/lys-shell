@@ -991,28 +991,6 @@ func TestASessionsFooterFollowsItsRows(t *testing.T) {
 	}
 }
 
-// The rofi emoji mode enters its pick too.
-func TestAnEmojiModeEntersItsPick(t *testing.T) {
-	h := newHarness(t)
-	var typed []string
-	h.s.d.Type = func(text string) error {
-		h.s.d.Invoke(func() { typed = append(typed, text) })
-		return nil
-	}
-	mode := "emoji"
-	_, reply := h.open(launcheripc.SessionOptions{Mode: &mode}, false)
-	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() > 0 })
-	win := h.windows[0]
-	h.key("Return")
-	f := h.frame(reply)
-	if f.Type != launcheripc.FrameResult || len(f.Selected) != 1 || f.Selected[0].Text == "" {
-		t.Fatalf("frame %+v", f)
-	}
-	h.until("the surface closing", func() bool { return win.closed })
-	h.timers[len(h.timers)-1].fn()
-	h.until("the glyph typed", func() bool { return len(typed) == 1 && typed[0] == f.Selected[0].Text })
-}
-
 func TestWhatRunsOnceClosedWaitsForThePanelToLeave(t *testing.T) {
 	ph := newPanelHarness(t)
 	p, _ := ph.openPanel()

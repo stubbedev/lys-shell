@@ -96,7 +96,39 @@ type LauncherConfig struct {
 	Combi LauncherCombiConfig `cfg:"combi"`
 	// The search panel, `lys-shell launcher` with no arguments.
 	Search LauncherSearchConfig `cfg:"search"`
+	// Emoji in the search panel, the emoji grid and the emoji mode.
+	Emoji LauncherEmojiConfig `cfg:"emoji"`
 }
+
+// LauncherEmojiConfig is a [launcher] schema type.
+//
+// How emoji are offered.
+type LauncherEmojiConfig struct {
+	// The skin tone of person and hand emoji. Picking a tone from an emoji's
+	// actions makes it the new default.
+	SkinTone LauncherSkinTone `cfg:"skin-tone"`
+}
+
+// LauncherSkinTone is a [launcher] schema type.
+//
+// A skin tone for person and hand emoji.
+type LauncherSkinTone string
+
+// LauncherSkinTone values.
+const (
+	// The default yellow.
+	SkinToneNone LauncherSkinTone = "none"
+	// Light skin tone.
+	SkinToneLight LauncherSkinTone = "light"
+	// Medium-light skin tone.
+	SkinToneMediumLight LauncherSkinTone = "medium-light"
+	// Medium skin tone.
+	SkinToneMedium LauncherSkinTone = "medium"
+	// Medium-dark skin tone.
+	SkinToneMediumDark LauncherSkinTone = "medium-dark"
+	// Dark skin tone.
+	SkinToneDark LauncherSkinTone = "dark"
+)
 
 // LauncherHistoryConfig is a [launcher] schema type (launcher/mod.rs, launcher/types.rs).
 //
@@ -270,6 +302,8 @@ const (
 	SearchClipboard LauncherSearchProvider = "clipboard"
 	// The emoji table.
 	SearchEmoji LauncherSearchProvider = "emoji"
+	// Every character Unicode names: arrows, maths, currency signs, box drawing.
+	SearchCharacters LauncherSearchProvider = "characters"
 	// The Bitwarden vault.
 	SearchVault LauncherSearchProvider = "vault"
 	// Quick links and snippets.
@@ -434,8 +468,9 @@ var (
 	_ = registerEnum(DrunFieldName, DrunFieldGeneric, DrunFieldExec, DrunFieldCategories, DrunFieldComment, DrunFieldKeywords)
 	_ = registerEnum(WindowFieldTitle, WindowFieldClass, WindowFieldName, WindowFieldRole, WindowFieldDesktop)
 	_ = registerEnum(FileSortName, FileSortMtime, FileSortAtime, FileSortCtime)
+	_ = registerEnum(SkinToneNone, SkinToneLight, SkinToneMediumLight, SkinToneMedium, SkinToneMediumDark, SkinToneDark)
 	_ = registerEnum(SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
-		SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb)
+		SearchClipboard, SearchEmoji, SearchCharacters, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb)
 )
 
 // launcherLocations is rofi's -location numbering: 0 center, then
@@ -476,6 +511,7 @@ func DefaultsLauncher() LauncherConfig {
 		MouseBindings:  map[string]string{},
 		Styles:         map[string]string{},
 		History:        LauncherHistoryConfig{Enable: true, MaxSize: 25},
+		Emoji:          LauncherEmojiConfig{SkinTone: SkinToneNone},
 		Drun: LauncherDrunConfig{
 			MatchFields: []LauncherDrunField{
 				DrunFieldName, DrunFieldGeneric, DrunFieldExec, DrunFieldCategories, DrunFieldKeywords,
@@ -508,7 +544,7 @@ func DefaultsLauncher() LauncherConfig {
 		Search: LauncherSearchConfig{
 			Providers: []LauncherSearchProvider{
 				SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
-				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb,
+				SearchClipboard, SearchEmoji, SearchCharacters, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb,
 			},
 			WebEngine:     "DuckDuckGo",
 			WebURL:        "https://duckduckgo.com/?q={query}",

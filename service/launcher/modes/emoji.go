@@ -34,24 +34,84 @@ const emojiDataType = "a(aussasasu)"
 
 // Emoji is one emoji as the mode needs it.
 type Emoji struct {
-	// Glyph is the emoji itself.
+	// Glyph is the emoji itself, with no skin tone.
 	Glyph string
 	// Name is what to call it, localized where there is a translation.
 	Name string
 	// Keywords are everything the matcher sees beyond the name.
 	Keywords []string
+	// toned is the glyph with U+1F3FB where a skin tone goes, "" for an
+	// emoji that takes none.
+	toned string
 }
 
-// GlyphFromCodes assembles the glyph. A 0 is GTK's placeholder for a
-// variation selector or skin tone; with none chosen GTK substitutes
-// U+FE0F, which makes the emoji render as emoji rather than monochrome
-// text, so this does the same. Values that are not characters (a
+// SkinTone is the Fitzpatrick modifier person and hand emoji take.
+type SkinTone uint8
+
+// The skin tones: none (the default yellow), then light to dark.
+const (
+	ToneNone SkinTone = iota
+	ToneLight
+	ToneMediumLight
+	ToneMedium
+	ToneMediumDark
+	ToneDark
+)
+
+// SkinTones are the five tones an emoji can take, light to dark.
+var SkinTones = [...]SkinTone{ToneLight, ToneMediumLight, ToneMedium, ToneMediumDark, ToneDark}
+
+const (
+	tonePlaceholder   = 0x1f3fb
+	variationSelector = 0xfe0f
+	firstEmojiBlock   = 0x1f000
+)
+
+// Toneable reports an emoji that takes a skin tone.
+func (e Emoji) Toneable() bool { return e.toned != "" }
+
+// WithTone is the glyph in tone t, the plain glyph for an emoji that takes
+// none.
+func (e Emoji) WithTone(t SkinTone) string {
+	if e.toned == "" {
+		return e.Glyph
+	}
+	return applyTone(e.toned, t)
+}
+
+// applyTone fills the tone placeholders of template. With no tone a
+// placeholder after a character older than the emoji blocks becomes U+FE0F,
+// which keeps ☝ an emoji rather than a text symbol, and goes otherwise.
+func applyTone(template string, t SkinTone) string {
+	var b strings.Builder
+	b.Grow(len(template))
+	var prev rune
+	for _, r := range template {
+		if r != tonePlaceholder {
+			b.WriteRune(r)
+			prev = r
+			continue
+		}
+		switch {
+		case t != ToneNone:
+			b.WriteRune(tonePlaceholder - 1 + rune(t))
+		case prev < firstEmojiBlock:
+			b.WriteRune(variationSelector)
+		}
+	}
+	return b.String()
+}
+
+// templateFromCodes assembles the glyph from GTK's code points. GTK marks
+// where a skin tone goes with U+1F3FB, kept here as the placeholder, and a
+// variation selector with 0, which becomes U+FE0F so the emoji renders as
+// emoji rather than monochrome text. Values that are not characters (a
 // surrogate, past U+10FFFF) are dropped.
-func GlyphFromCodes(codes []uint32) string {
+func templateFromCodes(codes []uint32) string {
 	var b strings.Builder
 	for _, c := range codes {
 		if c == 0 {
-			c = 0xfe0f
+			c = variationSelector
 		}
 		r := rune(c)
 		if c > utf8.MaxRune || !utf8.ValidRune(r) {
@@ -62,12 +122,19 @@ func GlyphFromCodes(codes []uint32) string {
 	return b.String()
 }
 
+// GlyphFromCodes is the glyph GTK's code points make, with no skin tone.
+func GlyphFromCodes(codes []uint32) string { return applyTone(templateFromCodes(codes), ToneNone) }
+
 // rowToEmoji turns one table row into an Emoji. Both languages' names
 // and keywords are matchable; the localized name is the one shown.
 func rowToEmoji(codes []uint32, nameEn, name string, keywordsEn, keywords []string) (Emoji, bool) {
-	glyph := GlyphFromCodes(codes)
-	if glyph == "" {
+	template := templateFromCodes(codes)
+	if template == "" {
 		return Emoji{}, false
+	}
+	e := Emoji{Glyph: applyTone(template, ToneNone)}
+	if strings.ContainsRune(template, tonePlaceholder) {
+		e.toned = template
 	}
 	shown := name
 	if shown == "" {
@@ -88,7 +155,8 @@ func rowToEmoji(codes []uint32, nameEn, name string, keywordsEn, keywords []stri
 			all = append(all, k)
 		}
 	}
-	return Emoji{Glyph: glyph, Name: shown, Keywords: all}, true
+	e.Name, e.Keywords = shown, all
+	return e, true
 }
 
 // languagesFor is the tag widening GTK's chooser does: fr_CA.UTF-8 asks
@@ -197,10 +265,10 @@ func readGzip(r io.Reader) ([]byte, error) {
 // emojiItem is the row for one emoji: the glyph and name shown, the
 // keywords invisible but matchable, and the glyph alone as its info so
 // an accept enters the emoji and not its name.
-func emojiItem(e Emoji) launcher.Item {
-	glyph := e.Glyph
+func emojiItem(e Emoji, tone SkinTone) launcher.Item {
+	glyph := e.WithTone(tone)
 	return launcher.Item{
-		Display:   e.Glyph + "  " + e.Name,
+		Display:   glyph + "  " + e.Name,
 		MatchText: e.Name + " " + strings.Join(e.Keywords, " "),
 		Info:      &glyph,
 	}
@@ -209,10 +277,12 @@ func emojiItem(e Emoji) launcher.Item {
 // EmojiMode picks an emoji by name; accept enters it in the focused window.
 type EmojiMode struct {
 	emojis []Emoji
+	tone   SkinTone
 }
 
-// NewEmoji reads the table (once per process).
-func NewEmoji() *EmojiMode { return &EmojiMode{emojis: AvailableEmoji()} }
+// NewEmoji reads the table (once per process); emoji that take a skin tone
+// show and enter it in tone.
+func NewEmoji(tone SkinTone) *EmojiMode { return &EmojiMode{emojis: AvailableEmoji(), tone: tone} }
 
 // Name is "emoji".
 func (*EmojiMode) Name() string { return "emoji" }
@@ -221,7 +291,7 @@ func (*EmojiMode) Name() string { return "emoji" }
 func (m *EmojiMode) Load(context.Context) launcher.ModeState {
 	items := make([]launcher.Item, len(m.emojis))
 	for i, e := range m.emojis {
-		items[i] = emojiItem(e)
+		items[i] = emojiItem(e, m.tone)
 	}
 	return launcher.ModeState{Items: items, Prompt: "emoji"}
 }
@@ -232,7 +302,7 @@ func (m *EmojiMode) Activate(_ context.Context, target launcher.Target, _ launch
 	if !ok || int(i) >= len(m.emojis) {
 		return launcher.ActionNothing{}
 	}
-	return launcher.ActionType{Text: m.emojis[i].Glyph}
+	return launcher.ActionType{Text: m.emojis[i].WithTone(m.tone)}
 }
 
 // AllowsCustom is false: typed text matching no emoji is not an emoji.

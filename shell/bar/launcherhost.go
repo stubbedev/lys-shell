@@ -147,6 +147,10 @@ func panelDeps(current func() *config.Config, live func() ModuleContext, browser
 			Capture:       controls.captureControls,
 			SettingsPages: settingsPages,
 		}
+		d.SkinTone = search.SkinToneOf(cfg.Launcher.Emoji.SkinTone)
+		d.SetSkinTone = func(tone modes.SkinTone) {
+			live().setConfig(skinTonePath, string(search.SkinToneName(tone)))
+		}
 		if cfg.Launcher.Search.CurrencyRates && rates != nil {
 			d.Rates = rates
 		}
@@ -159,6 +163,9 @@ func panelDeps(current func() *config.Config, live func() ModuleContext, browser
 		return d
 	}
 }
+
+// skinTonePath is where a skin tone picked from an emoji's actions is kept.
+const skinTonePath = "launcher.emoji.skin-tone"
 
 // newCurrencyRates keeps the ECB rates in the cache directory; without one
 // the panel answers no currencies.

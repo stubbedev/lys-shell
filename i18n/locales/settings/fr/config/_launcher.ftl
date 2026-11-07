@@ -263,6 +263,7 @@ enum-launcher-search-provider-system = Commandes système
 enum-launcher-search-provider-settings = Pages de paramètres
 enum-launcher-search-provider-clipboard = Historique du presse-papiers
 enum-launcher-search-provider-emoji = Émojis
+enum-launcher-search-provider-characters = Caractères Unicode
 enum-launcher-search-provider-vault = Coffre Bitwarden
 enum-launcher-search-provider-links = Liens rapides et extraits
 enum-launcher-search-provider-browser-bookmarks = Marque-pages du navigateur
@@ -300,3 +301,19 @@ settings-launcher-window-format-placeholder-r = Rôle de la fenêtre (toujours v
 settings-launcher-combi-display-format-placeholder-mode = Mode d'où provient la ligne
 
 settings-launcher-combi-display-format-placeholder-text = Texte de la ligne
+
+# Emoji
+
+settings-launcher-emoji = Émojis
+    .description = Les émojis du panneau de recherche, de la grille d'émojis et du mode émoji
+
+settings-launcher-emoji-skin-tone = Teint
+    .description = Le teint des émojis de personnes et de mains ; en choisir un dans les actions d'un émoji en fait le teint par défaut
+
+## LauncherSkinTone variants
+enum-launcher-skin-tone-none = Par défaut (jaune)
+enum-launcher-skin-tone-light = Clair
+enum-launcher-skin-tone-medium-light = Moyennement clair
+enum-launcher-skin-tone-medium = Légèrement mat
+enum-launcher-skin-tone-medium-dark = Mat
+enum-launcher-skin-tone-dark = Foncé

@@ -31,6 +31,7 @@ const (
 	SectionFiles
 	SectionClipboard
 	SectionEmoji
+	SectionCharacters
 	SectionVault
 	SectionWeb
 	// SectionNone is a flat list: an actions panel or a picker.
@@ -43,7 +44,7 @@ var sectionKeys = [sectionCount]string{
 	SectionWindows: "launcher-section-windows", SectionCommands: "launcher-section-commands",
 	SectionLinks: "launcher-section-links", SectionBrowser: "launcher-section-browser", SectionSettings: "launcher-section-settings",
 	SectionFiles: "launcher-section-files", SectionClipboard: "launcher-section-clipboard",
-	SectionEmoji: "launcher-section-emoji", SectionVault: "launcher-section-vault",
+	SectionEmoji: "launcher-section-emoji", SectionCharacters: "launcher-section-characters", SectionVault: "launcher-section-vault",
 	SectionWeb: "launcher-section-web",
 }
 
@@ -51,7 +52,7 @@ var sectionKeys = [sectionCount]string{
 // section without one is bound only by flatRowCap.
 var sectionCaps = [sectionCount]int{
 	SectionApps: 6, SectionWindows: 5, SectionCommands: 5, SectionLinks: 6, SectionBrowser: 6,
-	SectionSettings: 4, SectionFiles: 6, SectionClipboard: 3, SectionEmoji: 4,
+	SectionSettings: 4, SectionFiles: 6, SectionClipboard: 3, SectionEmoji: 4, SectionCharacters: 4,
 }
 
 // rowCap is how many rows the section shows.
@@ -217,6 +218,23 @@ type Immediate interface{ Immediate() }
 // query on the engine goroutine, so it must be quick.
 type Answerer interface {
 	Answer(query string) []Entry
+}
+
+// Searcher is a provider with too many rows to publish (every character
+// Unicode names): it matches the query against a compact table of its own,
+// on the engine goroutine, and returns at most limit rows with their
+// scores, best first, building only those. An empty query lists its first
+// rows.
+type Searcher interface {
+	Search(q *launcher.FuzzyQuery, query string, limit int) []Found
+}
+
+// Found is a row a Searcher built, its score, and its title as the matcher
+// reads it, for highlights.
+type Found struct {
+	Entry Entry
+	Score int32
+	Title []rune
 }
 
 // Level is one screen of the panel: the search field and what it

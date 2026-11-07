@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
+	"github.com/stubbedev/lys-shell/service/launcher/search"
 )
 
 // uiSettings are one session's resolved UI knobs (setup.rs UiSettings).
@@ -218,7 +219,7 @@ func buildMode(name string, opts launcheripc.SessionOptions, cfg *config.Config,
 	case "clipboard":
 		return modes.NewClipboard(deps.clipboard)
 	case "emoji":
-		return modes.NewEmoji()
+		return modes.NewEmoji(search.SkinToneOf(l.Emoji.SkinTone))
 	case VaultModeName:
 		if deps.vault == nil {
 			return nil

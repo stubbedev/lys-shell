@@ -128,8 +128,10 @@ type ranked struct {
 	corpus *corpus
 	index  int32
 	score  int32
-	// answer is an Answerer's row, which indexes nothing.
+	// answer is an Answerer's or a Searcher's row, which indexes nothing;
+	// title is a Searcher's row's title as the matcher read it.
 	answer *Entry
+	title  []rune
 }
 
 func (r ranked) entry() *Entry {

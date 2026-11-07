@@ -27,6 +27,11 @@ func TestBarsAffected(t *testing.T) {
 	if barsAffected(base, capture) {
 		t.Error("recorder capture settings rebuild the bars")
 	}
+	tone := config.Defaults()
+	tone.Launcher.Emoji.SkinTone = config.SkinToneDark
+	if barsAffected(base, tone) {
+		t.Error("the emoji skin tone picked in the launcher rebuilds the bars")
+	}
 	icon := config.Defaults()
 	icon.Recorder.IconIdle = "other"
 	if !barsAffected(base, icon) {

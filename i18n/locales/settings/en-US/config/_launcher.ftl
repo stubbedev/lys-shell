@@ -275,6 +275,7 @@ enum-launcher-search-provider-system = System Commands
 enum-launcher-search-provider-settings = Settings Pages
 enum-launcher-search-provider-clipboard = Clipboard History
 enum-launcher-search-provider-emoji = Emoji
+enum-launcher-search-provider-characters = Unicode Characters
 enum-launcher-search-provider-vault = Bitwarden Vault
 enum-launcher-search-provider-links = Quick Links and Snippets
 enum-launcher-search-provider-browser-bookmarks = Browser Bookmarks
@@ -312,3 +313,19 @@ settings-launcher-window-format-placeholder-r = Window role (always empty)
 settings-launcher-combi-display-format-placeholder-mode = Mode the row comes from
 
 settings-launcher-combi-display-format-placeholder-text = The row's own text
+
+# Emoji
+
+settings-launcher-emoji = Emoji
+    .description = Emoji in the search panel, the emoji grid and the emoji mode
+
+settings-launcher-emoji-skin-tone = Skin Tone
+    .description = The skin tone of person and hand emoji; picking one from an emoji's actions makes it the default
+
+## LauncherSkinTone variants
+enum-launcher-skin-tone-none = Default (Yellow)
+enum-launcher-skin-tone-light = Light
+enum-launcher-skin-tone-medium-light = Medium-Light
+enum-launcher-skin-tone-medium = Medium
+enum-launcher-skin-tone-medium-dark = Medium-Dark
+enum-launcher-skin-tone-dark = Dark

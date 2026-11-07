@@ -624,6 +624,10 @@ func (e *Engine) compute(st *levelState, late bool, rows []Row) []Row {
 		if queryLen < spec.MinQuery {
 			continue
 		}
+		if s, ok := c.prov.(Searcher); ok {
+			e.searched(c, s.Search(&e.query, st.query, limit), limit)
+			continue
+		}
 		c.scan(&e.query, st.query)
 		if len(c.hits) == 0 {
 			continue
@@ -660,8 +664,21 @@ func (e *Engine) compute(st *levelState, late bool, rows []Row) []Row {
 	return rows
 }
 
+// searched ranks a Searcher's rows into its section.
+func (e *Engine) searched(c *corpus, found []Found, limit int) {
+	if len(found) == 0 {
+		return
+	}
+	sec := e.sectionOf(c.spec.Section)
+	for i := range found {
+		f := &found[i]
+		score := f.Score + intconv.Clamp[int32](c.spec.Weight)
+		sec.rows = insertTop(sec.rows, ranked{corpus: c, answer: &f.Entry, title: f.Title, score: score}, limit)
+	}
+}
+
 func rowOf(r ranked) Row {
-	row := Row{Entry: r.entry(), prov: r.corpus.prov}
+	row := Row{Entry: r.entry(), prov: r.corpus.prov, title: r.title}
 	if r.answer == nil {
 		row.title = r.corpus.titles[r.index]
 	}
@@ -676,6 +693,14 @@ func (e *Engine) emptyRows(st *levelState, rows []Row) []Row {
 	root := st.isRoot()
 	for _, c := range st.corpora {
 		if c.spec.MinQuery > 0 && !root {
+			continue
+		}
+		if s, ok := c.prov.(Searcher); ok {
+			if !root {
+				for _, f := range s.Search(&e.query, "", flatRowCap) {
+					cands = append(cands, ranked{corpus: c, answer: &f.Entry, title: f.Title})
+				}
+			}
 			continue
 		}
 		for i := range c.entries {

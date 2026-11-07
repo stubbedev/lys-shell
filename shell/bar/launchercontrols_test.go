@@ -8,6 +8,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
+	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/pulse"
@@ -306,5 +307,25 @@ func TestTheWallpaperRowOpensThePickerOnceThePanelHasGone(t *testing.T) {
 	run()
 	if opened != 1 {
 		t.Errorf("the picker opened %d times, want 1", opened)
+	}
+}
+
+func TestAToneTypedFromTheActionsBecomesTheConfiguredDefault(t *testing.T) {
+	var set [][2]any
+	ctx := ModuleContext{SetConfig: func(path string, value any) { set = append(set, [2]any{path, value}) }}
+	cfg := config.Defaults()
+	cfg.Launcher.Emoji.SkinTone = config.SkinToneMediumLight
+	d := panelDeps(func() *config.Config { return cfg }, func() ModuleContext { return ctx }, nil, &launcher.Deps{}, func() {})()
+	if d.SkinTone != modes.ToneMediumLight {
+		t.Errorf("the session's tone = %d", d.SkinTone)
+	}
+	d.SetSkinTone(modes.ToneDark)
+	if len(set) != 1 || set[0] != [2]any{"launcher.emoji.skin-tone", "dark"} {
+		t.Errorf("config writes %v", set)
+	}
+	svc := config.Load(t.TempDir(), config.DiscardDiagnostics)
+	t.Cleanup(svc.Close)
+	if err := svc.SetByPath(set[0][0].(string), set[0][1]); err != nil || svc.Config().Launcher.Emoji.SkinTone != config.SkinToneDark {
+		t.Errorf("the written path: %v, tone %q", err, svc.Config().Launcher.Emoji.SkinTone)
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
 
@@ -165,7 +166,7 @@ func fakeEmoji() []modes.Emoji {
 }
 
 func TestEmojiRowsSearchTheirKeywordsAndEnterTheGlyph(t *testing.T) {
-	p := NewEmoji(fakeEmoji)
+	p := NewEmoji(fakeEmoji, modes.ToneNone, nil)
 	got := loaded(t, p)
 	if len(got) != 2 || got[1].Glyph != "🚀" || !strings.Contains(got[1].Keywords, "launch") {
 		t.Fatalf("rows %+v", got)
@@ -187,7 +188,7 @@ func TestEmojiRowsSearchTheirKeywordsAndEnterTheGlyph(t *testing.T) {
 
 func TestEmojiInAListFindsByKeyword(t *testing.T) {
 	s := &sink{}
-	e := start(t, s, nil, NewEmoji(fakeEmoji))
+	e := start(t, s, nil, NewEmoji(fakeEmoji, modes.ToneNone, nil))
 	e.SetQuery("launch", 1)
 	until(t, s, "#"+SectionEmoji.Title(), "rocket")
 }
@@ -202,23 +203,27 @@ func pickerTitles(t *testing.T, p *Pickers) []string {
 }
 
 func TestPickersOfferOnlyWhatIsThereAndOpenALevel(t *testing.T) {
-	if got := pickerTitles(t, NewPickers(nil, nil, PickerLevels{}, true)); got != nil {
+	if got := pickerTitles(t, NewPickers(nil, PickerLevels{}, true)); got != nil {
 		t.Errorf("nothing available: %v", got)
 	}
 	h := newFakeHistory(t, [2]string{"text/plain", "one"})
 	vault := &Level{Title: "V"}
-	p := NewPickers(h, fakeEmoji, PickerLevels{Vault: func() *Level { return vault }}, true)
-	if got := pickerTitles(t, p); !slices.Equal(got, []string{"picker:clipboard", "picker:emoji", "picker:vault"}) {
+	p := NewPickers(h, PickerLevels{
+		Emoji:      func() *Level { return EmojiLevel(fakeEmoji, modes.ToneNone, nil) },
+		Characters: func() *Level { return CharactersLevel(charnames.Shared) },
+		Vault:      func() *Level { return vault },
+	}, true)
+	if got := pickerTitles(t, p); !slices.Equal(got, []string{"picker:clipboard", "picker:emoji", "picker:characters", "picker:vault"}) {
 		t.Fatalf("rows %v", got)
 	}
 	rows := loaded(t, p)
-	for i, want := range []Section{SectionNone, SectionNone} {
+	for i, want := range []Section{SectionNone, SectionNone, SectionNone} {
 		push, ok := p.Actions(rows[i])[0].Run(ctx).(Push)
 		if !ok || push.Level.Providers[0].Spec().Section != want {
 			t.Errorf("picker %d: %+v", i, push)
 		}
 	}
-	if push := p.Actions(rows[2])[0].Run(ctx).(Push); push.Level != vault {
+	if push := p.Actions(rows[3])[0].Run(ctx).(Push); push.Level != vault {
 		t.Errorf("the vault row opens the vault's level: %+v", push)
 	}
 }

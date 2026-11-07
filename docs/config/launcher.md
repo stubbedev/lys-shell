@@ -48,6 +48,7 @@ Application launcher / dmenu (rofi replacement).
 | `filebrowser` | [`LauncherFilebrowserConfig`](/config/types#launcher-filebrowser-config) | `{...}` | file browser mode. |
 | `combi` | [`LauncherCombiConfig`](/config/types#launcher-combi-config) | `{...}` | combi (combined modes) mode. |
 | `search` | [`LauncherSearchConfig`](/config/types#launcher-search-config) | `{...}` | The search panel, `lys-shell launcher` with no arguments. |
+| `emoji` | [`LauncherEmojiConfig`](/config/types#launcher-emoji-config) | `{...}` | Emoji in the search panel, the emoji grid and the emoji mode. |
 
 ::: details More about `styles`
 
@@ -145,6 +146,7 @@ launcher:
       - settings
       - clipboard
       - emoji
+      - characters
       - vault
       - links
       - browser-bookmarks
@@ -165,6 +167,8 @@ launcher:
     previews: true
     quicklinks: []
     snippets: []
+  emoji:
+    skin-tone: none
 ```
 
 

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/answer"
+	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/settingspage"
 )
@@ -36,6 +37,10 @@ type Deps struct {
 	// Toggles, Media and Capture read the rows of the shell's services; a
 	// nil one offers none.
 	Toggles, Media, Capture func(ctx context.Context) []Control
+	// SkinTone is what person and hand emoji show in; SetSkinTone keeps a tone
+	// picked from an emoji's actions as the new default (nil keeps none).
+	SkinTone    modes.SkinTone
+	SetSkinTone func(modes.SkinTone)
 	// Rates are the currency reference rates, kept across sessions; nil
 	// answers no currencies.
 	Rates *answer.Rates
@@ -115,7 +120,10 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	if has(config.SearchClipboard) && d.Clipboard != nil {
 		root.Providers = append(root.Providers, NewClipboard(d.Clipboard, cfg.Previews))
 	}
-	add(config.SearchEmoji, func() Provider { return keep("emoji", NewEmoji(modes.AvailableEmoji), keepSpec{}) })
+	add(config.SearchEmoji, func() Provider {
+		return keep(fmt.Sprintf("emoji\x00%d", d.SkinTone), NewEmoji(modes.AvailableEmoji, d.SkinTone, d.SetSkinTone), keepSpec{})
+	})
+	add(config.SearchCharacters, func() Provider { return NewCharacters(charnames.Shared) })
 	for _, group := range []struct {
 		provider config.LauncherSearchProvider
 		load     func(ctx context.Context) []Control
@@ -142,14 +150,16 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	if has(config.SearchClipboard) {
 		history = d.Clipboard
 	}
-	var emoji func() []modes.Emoji
 	if has(config.SearchEmoji) {
-		emoji = modes.AvailableEmoji
+		levels.Emoji = func() *Level { return EmojiLevel(modes.AvailableEmoji, d.SkinTone, d.SetSkinTone) }
+	}
+	if has(config.SearchCharacters) {
+		levels.Characters = func() *Level { return CharactersLevel(charnames.Shared) }
 	}
 	if has(config.SearchVault) && d.Vault != nil {
 		levels.Vault = func() *Level { return ModeLevel(d.Vault(), i18n.T("launcher-picker-vault")) }
 	}
-	if pickers := NewPickers(history, emoji, levels, cfg.Previews); len(pickers.items) > 0 {
+	if pickers := NewPickers(history, levels, cfg.Previews); len(pickers.items) > 0 {
 		root.Providers = append(root.Providers, pickers)
 	}
 	add(config.SearchWeb, func() Provider { return NewWeb(d.Env, cfg.WebEngine, cfg.WebURL) })

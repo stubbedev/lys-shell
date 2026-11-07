@@ -5,9 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
 
@@ -135,13 +137,19 @@ func (c *Clipboard) pinAction(d clipboardData) Action {
 
 // Emoji offers the emoji table.
 type Emoji struct {
-	load func() []modes.Emoji
-	flat bool
+	load    func() []modes.Emoji
+	tone    modes.SkinTone
+	setTone func(modes.SkinTone)
+	flat    bool
 }
 
-// NewEmoji offers load's emoji (modes.AvailableEmoji). It decompresses a
-// table, so it runs only on the provider's goroutine.
-func NewEmoji(load func() []modes.Emoji) *Emoji { return &Emoji{load: load} }
+// NewEmoji offers load's emoji (modes.AvailableEmoji) in skin tone tone.
+// Typing a tone picked from an emoji's actions hands it to setTone, which
+// keeps it as the new default. Load decompresses a table, so it runs only
+// on the provider's goroutine.
+func NewEmoji(load func() []modes.Emoji, tone modes.SkinTone, setTone func(modes.SkinTone)) *Emoji {
+	return &Emoji{load: load, tone: tone, setTone: setTone}
+}
 
 // Spec implements Provider.
 func (e *Emoji) Spec() Spec {
@@ -157,22 +165,77 @@ func (e *Emoji) Load(_ context.Context, publish func([]Entry)) {
 	entries := make([]Entry, len(table))
 	for i, em := range table {
 		id := "emoji:" + em.Glyph
-		entries[i] = Entry{ID: id, Learn: id, Title: em.Name, Keywords: strings.Join(em.Keywords, " "), Glyph: em.Glyph, Data: em}
+		entries[i] = Entry{ID: id, Learn: id, Title: em.Name, Keywords: strings.Join(em.Keywords, " "), Glyph: em.WithTone(e.tone), Data: em}
 	}
 	publish(entries)
 }
 
-// Actions implements Provider.
-func (*Emoji) Actions(e Entry) []Action {
-	em, ok := e.Data.(modes.Emoji)
+var skinTones = [...]struct {
+	name config.LauncherSkinTone
+	key  string
+}{
+	modes.ToneNone:        {config.SkinToneNone, ""},
+	modes.ToneLight:       {config.SkinToneLight, "launcher-skin-tone-light"},
+	modes.ToneMediumLight: {config.SkinToneMediumLight, "launcher-skin-tone-medium-light"},
+	modes.ToneMedium:      {config.SkinToneMedium, "launcher-skin-tone-medium"},
+	modes.ToneMediumDark:  {config.SkinToneMediumDark, "launcher-skin-tone-medium-dark"},
+	modes.ToneDark:        {config.SkinToneDark, "launcher-skin-tone-dark"},
+}
+
+// SkinToneOf is the config's skin tone as emoji take it.
+func SkinToneOf(name config.LauncherSkinTone) modes.SkinTone {
+	for tone, t := range skinTones {
+		if t.name == name {
+			return modes.SkinTone(tone)
+		}
+	}
+	panic("launcher: skin tone " + string(name) + " has no emoji modifier")
+}
+
+// SkinToneName is tone as the config spells it.
+func SkinToneName(tone modes.SkinTone) config.LauncherSkinTone { return skinTones[tone].name }
+
+// Actions implements Provider: type and copy in the current tone, then,
+// for an emoji that takes one, each of the five tones.
+func (e *Emoji) Actions(entry Entry) []Action {
+	em, ok := entry.Data.(modes.Emoji)
 	if !ok {
 		return nil
 	}
-	return []Action{
-		{Title: i18n.T("launcher-action-type"), Icon: "ld-keyboard-symbolic", Run: func(context.Context) Outcome { return Type{Text: em.Glyph} }},
-		copyAction(i18n.T("launcher-action-copy"), em.Glyph),
+	glyph := em.WithTone(e.tone)
+	actions := []Action{
+		{Title: i18n.T("launcher-action-type"), Icon: "ld-keyboard-symbolic", Run: func(context.Context) Outcome { return Type{Text: glyph} }},
+		copyAction(i18n.T("launcher-action-copy"), glyph),
 		copyAction(i18n.T("launcher-action-copy-name"), em.Name),
 	}
+	if !em.Toneable() {
+		return actions
+	}
+	for _, tone := range modes.SkinTones {
+		variant := em.WithTone(tone)
+		actions = append(actions, Action{
+			Title: i18n.T("launcher-action-type-skin-tone", i18n.Str("emoji", variant), i18n.Str("tone", i18n.T(skinTones[tone].key))),
+			Icon:  "ld-smile-symbolic",
+			Run: func(context.Context) Outcome {
+				if e.setTone != nil {
+					e.setTone(tone)
+				}
+				return Type{Text: variant}
+			},
+		})
+	}
+	return actions
+}
+
+// EmojiLevel lists every emoji, as the Emoji Picker row opens it.
+func EmojiLevel(load func() []modes.Emoji, tone modes.SkinTone, setTone func(modes.SkinTone)) *Level {
+	return &Level{Title: i18n.T("launcher-picker-emoji"), Placeholder: i18n.T("launcher-placeholder-filter"), Providers: []Provider{&Emoji{load: load, tone: tone, setTone: setTone, flat: true}}}
+}
+
+// CharactersLevel searches every named character, as the Unicode
+// Characters row and `-show unicode` open it.
+func CharactersLevel(table func() (*charnames.Table, error)) *Level {
+	return &Level{Title: i18n.T("launcher-picker-characters"), Placeholder: i18n.T("launcher-placeholder-characters"), Providers: []Provider{&Characters{table: table, flat: true}}}
 }
 
 // Pickers are root rows that open a whole list of their own: the full
@@ -190,12 +253,12 @@ type picker struct {
 // PickerLevels are the levels of the pickers with nothing to configure;
 // a nil one leaves its row out.
 type PickerLevels struct {
-	Vault, Bookmarks, Visited, Processes func() *Level
+	Emoji, Characters, Vault, Bookmarks, Visited, Processes func() *Level
 }
 
 // NewPickers builds the rows for what is available. A nil history leaves
 // its row out, as does a nil level.
-func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, levels PickerLevels, previews bool) *Pickers {
+func NewPickers(history modes.ClipboardHistory, levels PickerLevels, previews bool) *Pickers {
 	p := &Pickers{}
 	if history != nil {
 		title := i18n.T("launcher-picker-clipboard")
@@ -203,11 +266,11 @@ func NewPickers(history modes.ClipboardHistory, emoji func() []modes.Emoji, leve
 			return &Level{Title: title, Placeholder: i18n.T("launcher-placeholder-filter"), Providers: []Provider{&Clipboard{history: history, flat: true, previews: previews}}}
 		}})
 	}
-	if emoji != nil {
-		title := i18n.T("launcher-picker-emoji")
-		p.items = append(p.items, picker{"emoji", title, "emoji smiley picker symbols", "ld-smile-symbolic", func() *Level {
-			return &Level{Title: title, Placeholder: i18n.T("launcher-placeholder-filter"), Providers: []Provider{&Emoji{load: emoji, flat: true}}}
-		}})
+	if levels.Emoji != nil {
+		p.items = append(p.items, picker{"emoji", i18n.T("launcher-picker-emoji"), "emoji smiley picker symbols", "ld-smile-symbolic", levels.Emoji})
+	}
+	if levels.Characters != nil {
+		p.items = append(p.items, picker{"characters", i18n.T("launcher-picker-characters"), "unicode character map symbols arrows maths glyphs", "ld-a-large-small-symbolic", levels.Characters})
 	}
 	if levels.Vault != nil {
 		p.items = append(p.items, picker{"vault", i18n.T("launcher-picker-vault"), "bitwarden bw password vault secrets", "ld-shield-check-symbolic", levels.Vault})

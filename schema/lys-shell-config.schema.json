@@ -3887,6 +3887,13 @@
           },
           "description": "drun (application) mode."
         },
+        "emoji": {
+          "$ref": "#/$defs/LauncherEmojiConfig",
+          "default": {
+            "skin-tone": "none"
+          },
+          "description": "Emoji in the search panel, the emoji grid and the emoji mode."
+        },
         "filebrowser": {
           "$ref": "#/$defs/LauncherFilebrowserConfig",
           "default": {
@@ -4011,6 +4018,7 @@
               "settings",
               "clipboard",
               "emoji",
+              "characters",
               "vault",
               "links",
               "browser-bookmarks",
@@ -4204,6 +4212,17 @@
           "type": "string"
         }
       ]
+    },
+    "LauncherEmojiConfig": {
+      "description": "How emoji are offered.",
+      "properties": {
+        "skin-tone": {
+          "$ref": "#/$defs/LauncherSkinTone",
+          "default": "none",
+          "description": "The skin tone of person and hand emoji. Picking a tone from an emoji's\nactions makes it the new default."
+        }
+      },
+      "type": "object"
     },
     "LauncherFileSort": {
       "description": "File sorting in the file browser (rofi filebrowser `sorting-method`).",
@@ -4443,6 +4462,7 @@
             "settings",
             "clipboard",
             "emoji",
+            "characters",
             "vault",
             "links",
             "browser-bookmarks",
@@ -4524,6 +4544,11 @@
           "type": "string"
         },
         {
+          "const": "characters",
+          "description": "Every character Unicode names: arrows, maths, currency signs, box drawing.",
+          "type": "string"
+        },
+        {
           "const": "vault",
           "description": "The Bitwarden vault.",
           "type": "string"
@@ -4576,6 +4601,41 @@
         {
           "const": "web",
           "description": "The web search fallback.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherSkinTone": {
+      "description": "A skin tone for person and hand emoji.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "The default yellow.",
+          "type": "string"
+        },
+        {
+          "const": "light",
+          "description": "Light skin tone.",
+          "type": "string"
+        },
+        {
+          "const": "medium-light",
+          "description": "Medium-light skin tone.",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "description": "Medium skin tone.",
+          "type": "string"
+        },
+        {
+          "const": "medium-dark",
+          "description": "Medium-dark skin tone.",
+          "type": "string"
+        },
+        {
+          "const": "dark",
+          "description": "Dark skin tone.",
           "type": "string"
         }
       ]
@@ -11941,6 +12001,9 @@
           "show-actions": false,
           "url-launcher": "xdg-open"
         },
+        "emoji": {
+          "skin-tone": "none"
+        },
         "filebrowser": {
           "command": "",
           "directories-first": true,
@@ -11991,6 +12054,7 @@
             "settings",
             "clipboard",
             "emoji",
+            "characters",
             "vault",
             "links",
             "browser-bookmarks",

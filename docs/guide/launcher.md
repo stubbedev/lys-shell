@@ -37,7 +37,8 @@ be running, as it hosts the panel.
 | System | Lock, sleep, log out, restart, shut down, through the [`power`](/config/modules/power) commands. Those that end the session ask for a second Enter |
 | Settings | Each page of [`lys-settings`](https://github.com/stubbedev/lys-settings), when it is installed |
 | Clipboard | The history, in the list from three typed letters; `Clipboard History` lists it all, pinned entries first. See [Clipboard history](#clipboard-history) |
-| Emoji | In the list from two typed letters; `Emoji Picker` lists them all |
+| Emoji | In the list from two typed letters, in your skin tone; `Emoji Picker` lists them all, see below |
+| Unicode characters | Any character Unicode names, from three typed letters: `right arrow` finds →, `degree` finds °. `Unicode Characters` lists them all |
 | Bitwarden | `Bitwarden Vault` opens the vault, asking for the master password if it is locked |
 | Quick links, snippets | From `launcher.search`, see below |
 | Browser bookmarks, history | Bookmarks from two typed letters, history from three, each with the site's icon. `Browser Bookmarks` and `Most Visited Sites` list them all. Firefox and Chromium families |
@@ -154,6 +155,26 @@ lists them, so they cost nothing at login.
 In `lys-shell launcher -show clipboard`, `kb-custom-1` forgets the selected entry,
 `kb-custom-2` every unpinned one, and `kb-custom-3` pins or unpins it.
 
+## Emoji and characters
+
+Person and hand emoji show in `launcher.emoji.skin-tone` (`none`, the default
+yellow, or `light`, `medium-light`, `medium`, `medium-dark`, `dark`). The actions
+panel (`Ctrl+K`) on one of them lists all five tones; typing one makes it the new
+default, saved to the config.
+
+`lys-shell launcher -show emoji` opens every emoji as a grid: type to filter by name
+or keyword, arrows move in both directions, the footer names the selected one,
+`Enter` types it into the window you came from and `Ctrl+Enter` copies it.
+
+`lys-shell launcher -show unicode` opens the search on every named character:
+arrows, maths, currency signs, box drawing, IPA, combining marks (shown on a dotted
+circle) and invisible ones such as `zero width joiner` or `nbsp`. A query matches
+the starts of the words of a character's name or its aliases, `U+2192` finds that
+code point and a character typed on its own finds its name. `Enter` types the
+character; the actions copy it, its code point (`U+2192`) or its HTML entity
+(`&#x2192;`). The names come from the Unicode Character Database, built into the
+binary and read the first time you search them.
+
 ## The wallpaper picker
 
 `lys-shell launcher -show wallpaper`, or the Choose Wallpaper row of the search
@@ -235,4 +256,5 @@ is logged with its file and line, and that command stays out of the list.
 
 Everything else about `lys-shell launcher` is unchanged. `-dmenu`, `-show drun` and
 the other rofi flags, `-e`, hooks, exit codes and a `rofi` symlink all behave as they
-did, on their own surface. `-show search` is the panel by name.
+did, on their own surface. `-show search` is the panel by name; `-show emoji` is the
+emoji grid above rather than a list.

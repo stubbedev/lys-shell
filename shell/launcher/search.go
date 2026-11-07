@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 )
 
@@ -22,9 +23,13 @@ import (
 // rofi session: `-show search`, or `lys-shell launcher` with no arguments.
 const SearchMode = "search"
 
+// UnicodeMode is the mode name that opens the search panel on every named
+// Unicode character.
+const UnicodeMode = "unicode"
+
 // wantsSearch reports a session asking for the panel.
 func wantsSearch(o launcheripc.SessionOptions) bool {
-	return !o.Dmenu && o.ErrorMessage == nil && o.Mode != nil && *o.Mode == SearchMode
+	return !o.Dmenu && o.ErrorMessage == nil && o.Mode != nil && (*o.Mode == SearchMode || *o.Mode == UnicodeMode)
 }
 
 // panel is one search session on the UI loop: the widgets, the frame
@@ -99,9 +104,14 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 		p.finish(search.Cancel{})
 		return
 	}
-	deps := s.d.Search()
-	deps.Sources = s.sources
-	root := search.NewRoot(cfg.Launcher.Search, cfg.Power, deps, os.Getenv("HOME"))
+	var root *search.Level
+	if *sess.Options.Mode == UnicodeMode {
+		root = search.CharactersLevel(charnames.Shared)
+	} else {
+		deps := s.d.Search()
+		deps.Sources = s.sources
+		root = search.NewRoot(cfg.Launcher.Search, cfg.Power, deps, os.Getenv("HOME"))
+	}
 	if sess.Options.Filter != nil {
 		root.Query = *sess.Options.Filter
 	}
