@@ -98,7 +98,7 @@ buildGo127Module {
   # thumbnailers in, which it refuses to run without.
   postFixup = ''
     for bin in ${lib.concatStringsSep " " wrapped}; do
-      wrapProgram $out/bin/$bin \
+      wrapProgram "$out/bin/$bin" \
         --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath libs}" \
         --suffix PATH : "${lib.makeBinPath [ bubblewrap ]}"
     done
@@ -123,7 +123,7 @@ buildGo127Module {
       $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service \
       --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
     for activation in resources/dev.stubbe.lys.*.service; do
-      substitute "$activation" "$out/share/dbus-1/services/$(basename "$activation")" \
+      substitute "$activation" "$out/share/dbus-1/services/''${activation##*/}" \
         --replace-fail /usr/bin/lys-shell "$out/bin/lys-shell"
     done
     substitute resources/xdg-desktop-portal-lys-shell.service \
