@@ -137,7 +137,7 @@ func captureAllOutputs(mem *memory.Shared, pointer bool) ([]frozenOutput, error)
 		if o.Name == "" {
 			continue
 		}
-		f, err := c.CaptureOutput(o, capture.Options{Cursor: pointer})
+		f, err := c.CaptureOutput(o, screenshotOptions(pointer))
 		if err != nil {
 			return nil, fmt.Errorf("output capture failed: %w", err)
 		}
@@ -179,7 +179,7 @@ func captureOutput(name string, pointer bool) (*image.RGBA, error) {
 	default:
 		return nil, errors.New("no outputs available")
 	}
-	f, err := c.CaptureOutput(target, capture.Options{Cursor: pointer})
+	f, err := c.CaptureOutput(target, screenshotOptions(pointer))
 	if err != nil {
 		return nil, fmt.Errorf("output capture failed: %w", err)
 	}
@@ -201,7 +201,7 @@ func captureWindow(t windowTarget, pointer bool) (*image.RGBA, error) {
 	defer func() { _ = c.Close() }()
 	var f *capture.Frame
 	if t.identifier == "" && t.hasHandle && c.HasHyprlandExport() {
-		f, err = c.CaptureHyprlandWindow(t.hyprlandHandle, capture.Options{Cursor: pointer})
+		f, err = c.CaptureHyprlandWindow(t.hyprlandHandle, screenshotOptions(pointer))
 		if err != nil {
 			return nil, fmt.Errorf("window capture failed: %w", err)
 		}
@@ -223,7 +223,7 @@ func captureWindow(t windowTarget, pointer bool) (*image.RGBA, error) {
 		if idx < 0 {
 			return nil, errors.New("could not find the target window to capture")
 		}
-		f, err = c.CaptureToplevel(tls[idx], capture.Options{Cursor: pointer})
+		f, err = c.CaptureToplevel(tls[idx], screenshotOptions(pointer))
 		if err != nil {
 			return nil, fmt.Errorf("window capture failed: %w", err)
 		}
@@ -368,4 +368,11 @@ func clampNonNeg(v float64) int {
 		return 0
 	}
 	return int(v)
+}
+
+// screenshotOptions is every capture here: a one-shot screenshot the
+// user asked for, which a compositor keeping surfaces out of screen
+// sharing lets show them, with the pointer when pointer is set.
+func screenshotOptions(pointer bool) capture.Options {
+	return capture.Options{Cursor: pointer, Intent: capture.Screenshot}
 }
