@@ -109,6 +109,9 @@ func (w *waylandLoop) start() (*app.Application, chan struct{}, error) {
 type outputGeometry struct {
 	name                string
 	x, y, width, height int32
+	// scale is the output's pixels per logical pixel, 0 when its mode
+	// or logical size is not known.
+	scale float32
 }
 
 // outputs is every output's logical geometry, read on the loop.
@@ -119,9 +122,22 @@ func (w *waylandLoop) outputs() ([]outputGeometry, error) {
 		sess := w.sess
 		w.mu.Unlock()
 		for _, o := range sess.Outputs() {
-			out = append(out, outputGeometry{name: o.Name, x: o.LogicalX, y: o.LogicalY, width: o.LogicalW, height: o.LogicalH})
+			out = append(out, outputGeometry{name: o.Name, x: o.LogicalX, y: o.LogicalY, width: o.LogicalW, height: o.LogicalH, scale: physicalScale(o.ModeW, o.ModeH, o.LogicalW, o.LogicalH, o.Transform)})
 		}
 		return nil
 	})
 	return out, err
+}
+
+// physicalScale is an output's pixels per logical pixel: its mode width
+// over its logical width, the mode turned first when the output is
+// rotated a quarter turn (an odd wl_output.transform).
+func physicalScale(modeW, modeH int, logicalW, logicalH int32, transform int32) float32 {
+	if transform%2 == 1 {
+		modeW, logicalW = modeH, logicalH
+	}
+	if modeW <= 0 || logicalW <= 0 {
+		return 0
+	}
+	return float32(modeW) / float32(logicalW)
 }

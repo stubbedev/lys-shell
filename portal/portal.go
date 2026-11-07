@@ -72,7 +72,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	// compositor, started by the first of them.
 	loop := &waylandLoop{}
 	b.screenCast = newScreenCast(conn, b.sessions, b.castReminder(), screenStreams{openDevice: openVulkanAllocator}.start, loop.outputs)
-	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput)
+	b.remote = newRemoteDesktop(conn, b.sessions, b.screenCast, dialInput, touchOffered)
 	b.shares = newShares(conn, b.sessions)
 	b.clipboard = newClipboardBridge(conn, b.sessions, waylandClipboardStarter(loop))
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, permissions.ShortcutsPath(), waylandShortcutsStarter(loop))

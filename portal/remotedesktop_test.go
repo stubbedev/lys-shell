@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"slices"
@@ -23,6 +24,8 @@ import (
 type fakeSink struct {
 	events dbustest.Var[[]string]
 	closed dbustest.Var[bool]
+	// touch is whether the last dial asked for a touchscreen.
+	touch  dbustest.Var[bool]
 	keymap []byte
 }
 
@@ -53,8 +56,19 @@ func (f *fakeSink) AxisStop(src vinput.AxisSource, a vinput.ScrollAxis) error {
 	return nil
 }
 func (f *fakeSink) Key(c uint32, p bool) error { f.log(sprint("key", c, p)); return nil }
-func (f *fakeSink) Keymap() []byte             { return f.keymap }
-func (f *fakeSink) Close()                     { f.closed.Store(true) }
+func (f *fakeSink) TouchDown(id, x, y, w, h uint32) error {
+	f.log(sprint("touch down", id, x, y, w, h))
+	return nil
+}
+
+func (f *fakeSink) TouchMotion(id, x, y, w, h uint32) error {
+	f.log(sprint("touch motion", id, x, y, w, h))
+	return nil
+}
+func (f *fakeSink) TouchUp(id uint32) error { f.log(sprint("touch up", id)); return nil }
+func (f *fakeSink) TouchCancel() error      { f.log("touch cancel"); return nil }
+func (f *fakeSink) Keymap() []byte          { return f.keymap }
+func (f *fakeSink) Close()                  { f.closed.Store(true) }
 
 func sprint(parts ...any) string { return strings.TrimSuffix(fmt.Sprintln(parts...), "\n") }
 
@@ -79,23 +93,30 @@ xkb_symbols "test" {
 // remoteRig has the fake virtual input, the fake streams over a
 // 2x-scaled DP-1 left of a 1x DP-2, and a fake clipboard device.
 func remoteRig(t *testing.T, dialErr error) (*rig, *fakeSink) {
-	r, sink, _ := remoteRigStarts(t, dialErr)
+	r, sink, _ := remoteRigStarts(t, dialErr, false)
+	return r, sink
+}
+
+// touchRig is remoteRig on a compositor that takes touch.
+func touchRig(t *testing.T) (*rig, *fakeSink) {
+	r, sink, _ := remoteRigStarts(t, nil, true)
 	return r, sink
 }
 
 // remoteRigStarts is remoteRig with its fake streams, for a test that
 // steers them.
-func remoteRigStarts(t *testing.T, dialErr error) (*rig, *fakeSink, *fakeStarts) {
+func remoteRigStarts(t *testing.T, dialErr error, touch bool) (*rig, *fakeSink, *fakeStarts) {
 	sink := &fakeSink{keymap: []byte(testKeymap)}
 	starts := &fakeStarts{fail: map[string]bool{}}
 	r := newRig(t, func(b *Backend) {
 		b.screenCast = starts.screenCast(b)
-		b.remote = newRemoteDesktop(b.conn, b.sessions, b.screenCast, func() (inputSink, error) {
+		b.remote = newRemoteDesktop(b.conn, b.sessions, b.screenCast, func(touch bool) (inputSink, error) {
 			if dialErr != nil {
 				return nil, dialErr
 			}
+			sink.touch.Store(touch)
 			return sink, nil
-		})
+		}, func() bool { return touch })
 		b.clipboard = newClipboardBridge(b.conn, b.sessions, func(func(selectionChange)) (clipDevice, error) {
 			return &fakeClip{data: "copied"}, nil
 		})
@@ -134,7 +155,7 @@ func TestRemoteDesktopAsksFirst(t *testing.T) {
 	if code, _ := r.remoteStart(t, Vardict{}); code != ResponseCancelled {
 		t.Errorf("denied = %d", code)
 	}
-	if got := d.asked.Load(); len(got) == 0 || !strings.Contains(got[0].(portaldialogs.AccessRequest).Body, "your keyboard and pointer") {
+	if got := d.asked.Load(); len(got) == 0 || !strings.Contains(got[0].(portaldialogs.AccessRequest).Body, "It asks to control your keyboard and your pointer.") {
 		t.Errorf("consent asked %v, want the devices named", got)
 	}
 	if err := r.notifyErr("NotifyPointerMotion", 1.0, 2.0); err == nil {
@@ -200,7 +221,9 @@ func TestRemoteDesktopReplaysInput(t *testing.T) {
 	r.notify(t, "NotifyKeyboardKeysym", int32(0x41), uint32(0))
 	r.notify(t, "NotifyKeyboardKeysym", int32(0x61), uint32(1)) // a
 	r.notify(t, "NotifyKeyboardKeysym", int32(0x7a), uint32(1)) // z: not in the keymap
-	r.notify(t, "NotifyTouchDown", uint32(40), uint32(0), 1.0, 1.0)
+	if err := r.notifyErr("NotifyTouchDown", uint32(40), uint32(0), 1.0, 1.0); err == nil {
+		t.Error("a session not granted the touchscreen took a touch")
+	}
 	want := []string{
 		"motion 1.5 -2",
 		"abs 353408 0 819200 276480",
@@ -272,7 +295,7 @@ func TestRemoteDesktopEnforcesTheGrantedDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := eisInput{in}
+	e := eisInput{in: in}
 	e.Key(30, true)
 	e.Keysym(0x61, true)
 	e.Motion(1, 1)
@@ -403,7 +426,7 @@ func TestRemoteDesktopFinishEndsTheScroll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	eisInput{in}.ScrollStop(true, false)
+	eisInput{in: in}.ScrollStop(true, false)
 	want := []string{
 		"axis finger 0 2",
 		"axis finger 0 3", "axis finger 1 1", "stop finger 0", "stop finger 1",
@@ -416,7 +439,7 @@ func TestRemoteDesktopFinishEndsTheScroll(t *testing.T) {
 
 	keyboardOnly := &remoteInput{sink: sink, granted: deviceKeyboard}
 	sink.events.Store(nil)
-	eisInput{keyboardOnly}.ScrollStop(true, true)
+	eisInput{in: keyboardOnly}.ScrollStop(true, true)
 	if got := sink.events.Load(); len(got) != 0 {
 		t.Errorf("a scroll stop without the pointer granted reached the devices: %q", got)
 	}
@@ -424,7 +447,7 @@ func TestRemoteDesktopFinishEndsTheScroll(t *testing.T) {
 
 func TestEISScrollAddsUpHiResSteps(t *testing.T) {
 	sink := &fakeSink{}
-	e := eisInput{&remoteInput{sink: sink, granted: devicePointer}}
+	e := eisInput{in: &remoteInput{sink: sink, granted: devicePointer}}
 	e.ScrollDiscrete(0, 60)
 	e.ScrollDiscrete(0, 60)
 	e.ScrollDiscrete(-240, 0)
@@ -468,7 +491,7 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := eisInput{in}
+	e := eisInput{in: in}
 	e.ScrollDiscrete(-120, 240)
 	e.ScrollDiscrete(0, 0)
 	e.Scroll(1, 0)
@@ -484,7 +507,7 @@ func TestRemoteDesktopConnectToEIS(t *testing.T) {
 // a button and a scroll sent after an absolute motion whose layout
 // query is slow do not overtake it.
 func TestRemoteInputKeepsItsOrder(t *testing.T) {
-	r, sink, starts := remoteRigStarts(t, nil)
+	r, sink, starts := remoteRigStarts(t, nil, false)
 	serveDialogs(t, r, true)
 	r.startSharing(t, "/screen:DP-2", Vardict{})
 	starts.slowOutputs.Store(100 * time.Millisecond)
@@ -514,5 +537,74 @@ func TestOnlyInputMethodsAreOrdered(t *testing.T) {
 		if slices.Contains(got, m) {
 			t.Errorf("%s is ordered", m)
 		}
+	}
+}
+
+// A compositor that takes touch offers the touchscreen; a granted
+// session's touches land in the layout as absolute motion does, each
+// slot on a virtual point of its own, and a point not down moves and
+// lifts nothing.
+func TestRemoteDesktopTouch(t *testing.T) {
+	plain, _ := remoteRig(t, nil)
+	if v, err := plain.obj.GetProperty(RemoteDesktopIface + ".AvailableDeviceTypes"); err != nil || v.Value() != uint32(3) {
+		t.Errorf("AvailableDeviceTypes without touch = %v, %v", v, err)
+	}
+	r, sink := touchRig(t)
+	if v, err := r.obj.GetProperty(RemoteDesktopIface + ".AvailableDeviceTypes"); err != nil || v.Value() != uint32(7) {
+		t.Errorf("AvailableDeviceTypes with touch = %v, %v", v, err)
+	}
+	d := serveDialogs(t, r, true)
+	res := r.startSharing(t, "/screen:DP-2;window:w1", Vardict{})
+	if res["devices"].Value() != uint32(7) || !sink.touch.Load() {
+		t.Fatalf("Start = %v, touchscreen dialed %v", res, sink.touch.Load())
+	}
+	if body := d.asked.Load()[0].(portaldialogs.AccessRequest).Body; body != "It asks to control your keyboard, your pointer and your touchscreen and to see your screen." {
+		t.Errorf("consent body %q", body)
+	}
+	r.notify(t, "NotifyTouchDown", uint32(40), uint32(3), 10.0, 20.0)
+	r.notify(t, "NotifyTouchDown", uint32(40), uint32(5), 1920.0, 2000.0)
+	r.notify(t, "NotifyTouchDown", uint32(40), uint32(3), 50.0, 50.0)
+	r.notify(t, "NotifyTouchMotion", uint32(40), uint32(3), 30.0, 40.0)
+	r.notify(t, "NotifyTouchUp", uint32(3))
+	r.notify(t, "NotifyTouchUp", uint32(3))
+	r.notify(t, "NotifyTouchMotion", uint32(40), uint32(3), 1.0, 1.0)
+	r.notify(t, "NotifyTouchDown", uint32(40), uint32(9), 0.0, 0.0)
+	if err := r.notifyErr("NotifyTouchDown", uint32(41), uint32(1), 1.0, 1.0); err == nil {
+		t.Error("a window stream, whose place is unknown, took a touch")
+	}
+	want := []string{
+		"touch down 0 330240 5120 819200 276480",
+		"touch down 1 819200 276480 819200 276480",
+		"touch motion 0 335360 10240 819200 276480",
+		"touch up 0",
+		"touch down 0 327680 0 819200 276480",
+	}
+	if got := sink.events.Load(); !slices.Equal(got, want) {
+		t.Errorf("touch =\n%q\nwant\n%q", got, want)
+	}
+	in, err := r.backend.remote.input(sessA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink.events.Store(nil)
+	eisInput{in: in, box: image.Rect(0, 0, 3200, 1080)}.TouchCancel(1)
+	if got := sink.events.Load(); !slices.Equal(got, []string{"touch cancel"}) {
+		t.Errorf("an EIS cancel = %q, want every point cancelled", got)
+	}
+}
+
+// A session granted no touchscreen drops an EIS client's touches, and
+// one granted no pointer its absolute motion.
+func TestEISDropsUngrantedAbsoluteInput(t *testing.T) {
+	sink := &fakeSink{}
+	box := image.Rect(0, 0, 3200, 1080)
+	eisInput{in: &remoteInput{sink: sink, granted: deviceKeyboard | devicePointer}, box: box}.TouchDown(1, 10, 10)
+	eisInput{in: &remoteInput{sink: sink, granted: deviceKeyboard | deviceTouchscreen}, box: box}.MotionAbsolute(10, 10)
+	if got := sink.events.Load(); len(got) != 0 {
+		t.Errorf("ungranted input reached the devices: %q", got)
+	}
+	eisInput{in: &remoteInput{sink: sink, granted: devicePointer}, box: box}.MotionAbsolute(1280+960, 540)
+	if got := sink.events.Load(); !slices.Equal(got, []string{"abs 573440 138240 819200 276480"}) {
+		t.Errorf("absolute motion to DP-2's centre = %q", got)
 	}
 }

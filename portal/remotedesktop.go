@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math/bits"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -21,18 +23,21 @@ import (
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// RemoteDesktopIface lets a session drive the pointer and keyboard:
-// after the user consents, the Notify* methods
-// and an EIS connection are replayed onto a virtual pointer and
-// keyboard. Touch is not supported.
+// RemoteDesktopIface lets a session drive the pointer, the keyboard and,
+// where the compositor serves a virtual touchscreen, touch: after the
+// user consents, the Notify* methods and an EIS connection are replayed
+// onto virtual devices.
 const RemoteDesktopIface = "org.freedesktop.impl.portal.RemoteDesktop"
 
-// Device types; touch (4) is not offered.
+// Device types. Touchscreen is offered only where the compositor
+// serves lys_virtual_touch_v1; allDevices is every type a restore token
+// may name.
 const (
-	deviceKeyboard uint32 = 1
-	devicePointer  uint32 = 2
+	deviceKeyboard    uint32 = 1
+	devicePointer     uint32 = 2
+	deviceTouchscreen uint32 = 4
 
-	availableDevices = deviceKeyboard | devicePointer
+	allDevices = deviceKeyboard | devicePointer | deviceTouchscreen
 )
 
 // keyLeftShift is the evdev code a shifted keysym is typed with.
@@ -48,11 +53,27 @@ type inputSink interface {
 	AxisDiscrete(src vinput.AxisSource, axis vinput.ScrollAxis, value float64, steps int32) error
 	AxisStop(src vinput.AxisSource, axis vinput.ScrollAxis) error
 	Key(code uint32, pressed bool) error
+	TouchDown(id, x, y, width, height uint32) error
+	TouchMotion(id, x, y, width, height uint32) error
+	TouchUp(id uint32) error
+	TouchCancel() error
 	Keymap() []byte
 	Close()
 }
 
-func dialInput() (inputSink, error) { return vinput.Dial("", vinput.Options{Keyboard: true}) }
+func dialInput(touch bool) (inputSink, error) {
+	return vinput.Dial("", vinput.Options{Keyboard: true, Touch: touch})
+}
+
+// touchOffered probes the compositor once for a virtual touchscreen; a
+// failed probe offers none, with a warning naming why.
+var touchOffered = sync.OnceValue(func() bool {
+	ok, err := vinput.TouchAvailable("")
+	if err != nil {
+		warnf("remotedesktop: cannot tell whether the compositor takes touch, so touch is not offered: %v", err)
+	}
+	return ok
+})
 
 // remoteInput is a started session's devices, the device types the
 // user granted, its keysym table, and the scroll left over from hi-res
@@ -66,6 +87,70 @@ type remoteInput struct {
 	scrollMu sync.Mutex
 	// scrollRest is each axis' 120ths of a detent not yet a whole step.
 	scrollRest [2]int32
+
+	touchMu sync.Mutex
+	// touches maps each touch point down, by where it came from, to
+	// the virtual touchscreen's id for it, and touchIDs has the bit of
+	// each id taken.
+	touches  map[touchKey]uint32
+	touchIDs uint64
+}
+
+// touchKey is a touch point as its sender numbers it: a D-Bus slot or an
+// EIS touch id, which may coincide.
+type touchKey struct {
+	eis bool
+	id  uint32
+}
+
+// maxTouches bounds the points down at once, below the virtual
+// touchscreen's id range.
+const maxTouches = 64
+
+// touchDown puts a new point down at (x, y) of extent (w, h); a point
+// already down, or one past maxTouches, is dropped.
+func (in *remoteInput) touchDown(k touchKey, x, y, w, h uint32) {
+	in.touchMu.Lock()
+	defer in.touchMu.Unlock()
+	if _, down := in.touches[k]; down || len(in.touches) >= maxTouches {
+		return
+	}
+	if in.touches == nil {
+		in.touches = map[touchKey]uint32{}
+	}
+	id := intconv.Must[uint32](bits.TrailingZeros64(^in.touchIDs))
+	in.touches[k] = id
+	in.touchIDs |= 1 << id
+	_ = in.sink.TouchDown(id, x, y, w, h)
+}
+
+func (in *remoteInput) touchMotion(k touchKey, x, y, w, h uint32) {
+	in.touchMu.Lock()
+	defer in.touchMu.Unlock()
+	if id, down := in.touches[k]; down {
+		_ = in.sink.TouchMotion(id, x, y, w, h)
+	}
+}
+
+func (in *remoteInput) touchUp(k touchKey) {
+	in.touchMu.Lock()
+	defer in.touchMu.Unlock()
+	if id, down := in.touches[k]; down {
+		delete(in.touches, k)
+		in.touchIDs &^= 1 << id
+		_ = in.sink.TouchUp(id)
+	}
+}
+
+// touchCancel cancels every point down, as wl_touch.cancel does.
+func (in *remoteInput) touchCancel() {
+	in.touchMu.Lock()
+	defer in.touchMu.Unlock()
+	if len(in.touches) > 0 {
+		clear(in.touches)
+		in.touchIDs = 0
+		_ = in.sink.TouchCancel()
+	}
 }
 
 // keysymKey is how a keysym is typed: its key, and whether shift and
@@ -182,12 +267,24 @@ type remoteDesktop struct {
 	sessions *sessions
 	// cast shares the session's screens and knows its streams.
 	cast *screenCast
-	// dial creates a session's devices (dialInput; a fake in tests).
-	dial func() (inputSink, error)
+	// dial creates a session's devices, the touchscreen when asked
+	// (dialInput; a fake in tests).
+	dial func(touch bool) (inputSink, error)
+	// touch is whether the compositor takes touch (touchOffered; fixed
+	// in tests).
+	touch func() bool
 }
 
-func newRemoteDesktop(conn *dbus.Conn, s *sessions, cast *screenCast, dial func() (inputSink, error)) *remoteDesktop {
-	return &remoteDesktop{conn: conn, sessions: s, cast: cast, dial: dial}
+func newRemoteDesktop(conn *dbus.Conn, s *sessions, cast *screenCast, dial func(touch bool) (inputSink, error), touch func() bool) *remoteDesktop {
+	return &remoteDesktop{conn: conn, sessions: s, cast: cast, dial: dial, touch: touch}
+}
+
+// offered is the device types AvailableDeviceTypes names.
+func (r *remoteDesktop) offered() uint32 {
+	if r.touch() {
+		return allDevices
+	}
+	return deviceKeyboard | devicePointer
 }
 
 func (r *remoteDesktop) iface() dbusx.Interface {
@@ -196,7 +293,7 @@ func (r *remoteDesktop) iface() dbusx.Interface {
 		Methods: remoteDesktopObject{r},
 		Ordered: inputMethods(),
 		Properties: dbusx.Getters{
-			"AvailableDeviceTypes": func() any { return availableDevices },
+			"AvailableDeviceTypes": func() any { return r.offered() },
 			"version":              func() any { return uint32(2) },
 		},
 	}
@@ -273,12 +370,13 @@ func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID str
 		warnf("remotedesktop: SelectDevices: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
+	offered := o.r.offered()
 	types, ok := optU32(options, "types")
 	if !ok {
-		types = availableDevices
+		types = offered
 	}
-	if types == 0 || types&^availableDevices != 0 {
-		warnf("remotedesktop: SelectDevices: device types %#x, of %#x offered", types, availableDevices)
+	if types == 0 || types&^offered != 0 {
+		warnf("remotedesktop: SelectDevices: device types %#x, of %#x offered", types, offered)
 		return ResponseOther, Vardict{}, nil
 	}
 	persist, _ := optU32(options, "persist_mode")
@@ -294,15 +392,46 @@ func (o remoteDesktopObject) SelectDevices(_, session dbus.ObjectPath, appID str
 	return ResponseSuccess, Vardict{}, nil
 }
 
-// devicesPhrase names device types for the consent dialog.
-func devicesPhrase(types uint32) string {
-	switch types {
-	case deviceKeyboard:
-		return "your keyboard"
-	case devicePointer:
-		return "your pointer"
+// remoteConsentBody says what a session asks for: control of its device
+// types, the screen when it shares one, and the clipboard when it asked.
+func remoteConsentBody(types uint32, sharing, clipboard bool) string {
+	var asks []string
+	if types != 0 {
+		asks = append(asks, "to control "+phraseList(devicesNames(types)))
 	}
-	return "your keyboard and pointer"
+	if sharing {
+		asks = append(asks, "to see your screen")
+	}
+	if clipboard {
+		asks = append(asks, "to use your clipboard")
+	}
+	if len(asks) == 0 {
+		return "It asks for a remote desktop session with no devices."
+	}
+	return "It asks " + phraseList(asks) + "."
+}
+
+// devicesNames names device types, each with "your".
+func devicesNames(types uint32) []string {
+	var names []string
+	for _, d := range []struct {
+		bit  uint32
+		name string
+	}{{deviceKeyboard, "keyboard"}, {devicePointer, "pointer"}, {deviceTouchscreen, "touchscreen"}} {
+		if types&d.bit != 0 {
+			names = append(names, "your "+d.name)
+		}
+	}
+	return names
+}
+
+// phraseList joins phrases as a sentence lists them: "a", "a and b",
+// "a, b and c".
+func phraseList(phrases []string) string {
+	if len(phrases) == 1 {
+		return phrases[0]
+	}
+	return strings.Join(phrases[:len(phrases)-1], ", ") + " and " + phrases[len(phrases)-1]
 }
 
 // Start asks the user to allow control of the selected devices (and
@@ -340,10 +469,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		s.mu.Unlock()
 	}
 	if !restoring {
-		body := "It asks to control " + devicesPhrase(state.types) + "."
-		if sharing {
-			body = "It asks to control " + devicesPhrase(state.types) + " and to see your screen."
-		}
+		body := remoteConsentBody(state.types, sharing, clipboard)
 		allowed, _, err := dialogs.Access(c.on(portaldialogs.ServiceName), c.caller, portaldialogs.AccessRequest{
 			Title: "Allow remote control?", Body: body,
 			GrantLabel: "Allow", DenyLabel: "Deny", Icon: remoteDesktopIcon,
@@ -361,7 +487,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		}
 		results["streams"] = dbus.MakeVariant(shared.streams)
 	}
-	sink, err := o.r.dial()
+	sink, err := o.r.dial(state.types&deviceTouchscreen != 0)
 	if err != nil {
 		warnf("remotedesktop: cannot start virtual input: %v", err)
 		return ResponseOther, Vardict{}, nil
@@ -408,38 +534,104 @@ func (o remoteDesktopObject) NotifyPointerMotion(session dbus.ObjectPath, _ Vard
 }
 
 // absoluteScale keeps a fraction of a logical pixel in the virtual
-// pointer's whole-number absolute motion.
+// devices' whole-number absolute positions.
 const absoluteScale = 256
 
-// NotifyPointerMotionAbsolute moves the pointer to (x, y) of one of the
-// session's monitor streams, in its logical coordinates: placed by the
-// stream's position in the compositor's layout, whose extent the
-// virtual pointer's absolute motion spans.
-func (o remoteDesktopObject) NotifyPointerMotionAbsolute(session dbus.ObjectPath, _ Vardict, stream uint32, x, y float64) *dbus.Error {
+// absolutePoint is a point of the layout as the virtual devices' absolute
+// positions take it: offset from the layout's corner and scaled by
+// absoluteScale, within the layout's scaled extent.
+type absolutePoint struct{ x, y, width, height uint32 }
+
+// layoutPoint is (x, y), offset from the layout box's corner in logical
+// pixels and clamped into the box, as an absolutePoint.
+func layoutPoint(box image.Rectangle, x, y float64) absolutePoint {
+	x = min(max(x, 0), float64(box.Dx()))
+	y = min(max(y, 0), float64(box.Dy()))
+	return absolutePoint{
+		uint32(x * absoluteScale), uint32(y * absoluteScale),
+		intconv.Clamp[uint32](box.Dx() * absoluteScale), intconv.Clamp[uint32](box.Dy() * absoluteScale),
+	}
+}
+
+// streamPoint places (x, y) of one of the session's monitor streams, in
+// its logical coordinates and clamped into it, by the stream's position
+// in the compositor's layout.
+func (o remoteDesktopObject) streamPoint(session dbus.ObjectPath, stream uint32, x, y float64) (absolutePoint, *dbus.Error) {
 	s, err := o.r.session(session)
 	if err != nil {
-		return dbusx.Failed(err.Error())
+		return absolutePoint{}, dbusx.Failed(err.Error())
 	}
 	st, ok := o.r.cast.stream(s, stream)
 	if !ok {
-		return dbusx.Failed(fmt.Sprintf("session %s runs no stream %d", session, stream))
+		return absolutePoint{}, dbusx.Failed(fmt.Sprintf("session %s runs no stream %d", session, stream))
 	}
 	outputs, err := o.r.cast.outputs()
 	if err != nil {
-		return dbusx.Failed(fmt.Sprintf("no output layout for absolute motion: %v", err))
+		return absolutePoint{}, dbusx.Failed(fmt.Sprintf("no output layout for absolute input: %v", err))
 	}
 	sx, sy, sw, sh, ok := targetGeometry(st.target, outputs)
 	if !ok {
-		return dbusx.Failed(fmt.Sprintf("stream %d has no place in the layout", stream))
+		return absolutePoint{}, dbusx.Failed(fmt.Sprintf("stream %d has no place in the layout", stream))
 	}
 	box := layoutBox(outputs)
 	gx := float64(sx) + min(max(x, 0), float64(sw))
 	gy := float64(sy) + min(max(y, 0), float64(sh))
-	return o.with(session, devicePointer, func(in *remoteInput) {
-		_ = in.sink.MotionAbsolute(
-			uint32((gx-float64(box.Min.X))*absoluteScale), uint32((gy-float64(box.Min.Y))*absoluteScale),
-			intconv.Clamp[uint32](box.Dx()*absoluteScale), intconv.Clamp[uint32](box.Dy()*absoluteScale))
-	})
+	return layoutPoint(box, gx-float64(box.Min.X), gy-float64(box.Min.Y)), nil
+}
+
+// NotifyPointerMotionAbsolute moves the pointer to (x, y) of one of the
+// session's monitor streams, in its logical coordinates.
+func (o remoteDesktopObject) NotifyPointerMotionAbsolute(session dbus.ObjectPath, _ Vardict, stream uint32, x, y float64) *dbus.Error {
+	p, derr := o.streamPoint(session, stream, x, y)
+	if derr != nil {
+		return derr
+	}
+	return o.with(session, devicePointer, func(in *remoteInput) { _ = in.sink.MotionAbsolute(p.x, p.y, p.width, p.height) })
+}
+
+// eisRegions are the EIS regions of the session's monitor streams, cut
+// from the layout box: one per output or region stream, offset from the
+// box's corner, at its output's scale, with the stream's mapping_id. A
+// session sharing no screen, or only windows, has none.
+func (r *remoteDesktop) eisRegions(s *session) (image.Rectangle, []eis.Region, error) {
+	streams := r.cast.streams(s)
+	if !slices.ContainsFunc(streams, func(st startedStream) bool { return sourceTypeOf(st.target) == sourceMonitor }) {
+		return image.Rectangle{}, nil, nil
+	}
+	outputs, err := r.cast.outputs()
+	if err != nil {
+		return image.Rectangle{}, nil, fmt.Errorf("no output layout for the EIS regions: %w", err)
+	}
+	box := layoutBox(outputs)
+	var regions []eis.Region
+	for _, st := range streams {
+		x, y, w, h, ok := targetGeometry(st.target, outputs)
+		if !ok {
+			continue
+		}
+		i := slices.IndexFunc(outputs, func(o outputGeometry) bool { return o.name == st.target.Name })
+		area := image.Rect(int(x), int(y), int(x)+int(w), int(y)+int(h)).Sub(box.Min)
+		region, err := eisRegion(area, outputs[i].scale, mappingID(st))
+		if err != nil {
+			return image.Rectangle{}, nil, fmt.Errorf("stream %d: %w", st.node, err)
+		}
+		regions = append(regions, region)
+	}
+	return box, regions, nil
+}
+
+func eisRegion(area image.Rectangle, scale float32, mapping string) (eis.Region, error) {
+	var r eis.Region
+	var errs [4]error
+	r.X, errs[0] = intconv.Exact[uint32](area.Min.X)
+	r.Y, errs[1] = intconv.Exact[uint32](area.Min.Y)
+	r.Width, errs[2] = intconv.Exact[uint32](area.Dx())
+	r.Height, errs[3] = intconv.Exact[uint32](area.Dy())
+	if err := errors.Join(errs[:]...); err != nil {
+		return eis.Region{}, fmt.Errorf("region %v: %w", area, err)
+	}
+	r.Scale, r.MappingID = scale, mapping
+	return r, nil
 }
 
 // layoutBox is the outputs' bounding box in the compositor's logical
@@ -537,28 +729,75 @@ func (o remoteDesktopObject) NotifyKeyboardKeysym(session dbus.ObjectPath, _ Var
 	return o.with(session, deviceKeyboard, func(in *remoteInput) { in.keysym(sym, state != 0) })
 }
 
-// NotifyTouchDown is unsupported.
-func (remoteDesktopObject) NotifyTouchDown(_ dbus.ObjectPath, _ Vardict, _, _ uint32, _, _ float64) *dbus.Error {
-	warnf("remotedesktop: touch input not supported")
-	return nil
+// NotifyTouchDown puts touch point slot down at (x, y) of one of the
+// session's monitor streams, as NotifyPointerMotionAbsolute places the
+// pointer.
+func (o remoteDesktopObject) NotifyTouchDown(session dbus.ObjectPath, _ Vardict, stream, slot uint32, x, y float64) *dbus.Error {
+	p, derr := o.streamPoint(session, stream, x, y)
+	if derr != nil {
+		return derr
+	}
+	return o.with(session, deviceTouchscreen, func(in *remoteInput) { in.touchDown(touchKey{id: slot}, p.x, p.y, p.width, p.height) })
 }
 
-// NotifyTouchMotion is unsupported.
-func (remoteDesktopObject) NotifyTouchMotion(_ dbus.ObjectPath, _ Vardict, _, _ uint32, _, _ float64) *dbus.Error {
-	return nil
+// NotifyTouchMotion moves touch point slot to (x, y) of a stream.
+func (o remoteDesktopObject) NotifyTouchMotion(session dbus.ObjectPath, _ Vardict, stream, slot uint32, x, y float64) *dbus.Error {
+	p, derr := o.streamPoint(session, stream, x, y)
+	if derr != nil {
+		return derr
+	}
+	return o.with(session, deviceTouchscreen, func(in *remoteInput) { in.touchMotion(touchKey{id: slot}, p.x, p.y, p.width, p.height) })
 }
 
-// NotifyTouchUp is unsupported.
-func (remoteDesktopObject) NotifyTouchUp(_ dbus.ObjectPath, _ Vardict, _ uint32) *dbus.Error {
-	return nil
+// NotifyTouchUp lifts touch point slot.
+func (o remoteDesktopObject) NotifyTouchUp(session dbus.ObjectPath, _ Vardict, slot uint32) *dbus.Error {
+	return o.with(session, deviceTouchscreen, func(in *remoteInput) { in.touchUp(touchKey{id: slot}) })
 }
 
 // eisInput replays an EIS client's emulation onto a session's devices,
-// the device types the user granted only.
-type eisInput struct{ in *remoteInput }
+// the device types the user granted only. box is the layout the EIS
+// regions were cut from: an absolute position is offset from its corner.
+type eisInput struct {
+	in  *remoteInput
+	box image.Rectangle
+}
 
 func (e eisInput) pointer() bool  { return e.in.granted&devicePointer != 0 }
 func (e eisInput) keyboard() bool { return e.in.granted&deviceKeyboard != 0 }
+func (e eisInput) touch() bool    { return e.in.granted&deviceTouchscreen != 0 }
+
+func (e eisInput) MotionAbsolute(x, y float64) {
+	if e.pointer() {
+		p := layoutPoint(e.box, x, y)
+		_ = e.in.sink.MotionAbsolute(p.x, p.y, p.width, p.height)
+	}
+}
+
+func (e eisInput) TouchDown(id uint32, x, y float64) {
+	if e.touch() {
+		p := layoutPoint(e.box, x, y)
+		e.in.touchDown(touchKey{eis: true, id: id}, p.x, p.y, p.width, p.height)
+	}
+}
+
+func (e eisInput) TouchMotion(id uint32, x, y float64) {
+	if e.touch() {
+		p := layoutPoint(e.box, x, y)
+		e.in.touchMotion(touchKey{eis: true, id: id}, p.x, p.y, p.width, p.height)
+	}
+}
+
+func (e eisInput) TouchUp(id uint32) {
+	if e.touch() {
+		e.in.touchUp(touchKey{eis: true, id: id})
+	}
+}
+
+func (e eisInput) TouchCancel(uint32) {
+	if e.touch() {
+		e.in.touchCancel()
+	}
+}
 
 func (e eisInput) Motion(dx, dy float64) {
 	if e.pointer() {
@@ -606,14 +845,23 @@ func (e eisInput) ScrollStop(x, y bool) {
 }
 
 // ConnectToEIS hands the app an EIS socket for the started session,
-// which libei clients prefer to the Notify* calls; godbus closes this
-// end's copy once the reply is out.
+// which libei clients prefer to the Notify* calls, with an absolute
+// region per monitor stream carrying the stream's mapping_id; godbus
+// closes this end's copy once the reply is out.
 func (o remoteDesktopObject) ConnectToEIS(session dbus.ObjectPath, _ string, _ Vardict) (*os.File, *dbus.Error) {
 	in, err := o.r.input(session)
 	if err != nil {
 		return nil, dbusx.Failed(err.Error())
 	}
-	f, err := eis.Pair(eisInput{in}, shellName)
+	s, err := o.r.session(session)
+	if err != nil {
+		return nil, dbusx.Failed(err.Error())
+	}
+	box, regions, err := o.r.eisRegions(s)
+	if err != nil {
+		return nil, dbusx.Failed(err.Error())
+	}
+	f, err := eis.Pair(eisInput{in: in, box: box}, shellName, regions)
 	if err != nil {
 		return nil, dbusx.Failed(err.Error())
 	}

@@ -57,6 +57,10 @@ func serveSharePicker(t *testing.T, r *rig, reply string) *fakeSharePicker {
 	return f
 }
 
+// fakeSerialOffset sets a fake stream's object.serial apart from its
+// node id, as PipeWire's serials are.
+const fakeSerialOffset = 1000
+
 // fakeStream is a started stream; vanish ends it as a closed window
 // would.
 type fakeStream struct {
@@ -66,6 +70,7 @@ type fakeStream struct {
 }
 
 func (s *fakeStream) NodeID() uint32         { return s.node }
+func (s *fakeStream) Serial() uint64         { return uint64(s.node) + fakeSerialOffset }
 func (s *fakeStream) Size() (int32, int32)   { return 1920, 1080 }
 func (s *fakeStream) Ended() <-chan struct{} { return s.ended }
 func (s *fakeStream) Close()                 { s.closed.Store(true) }
@@ -119,8 +124,8 @@ func (f *fakeStarts) outputs() ([]outputGeometry, error) {
 		return layout, nil
 	}
 	return []outputGeometry{
-		{name: "DP-1", x: 0, y: 0, width: 1280, height: 720},
-		{name: "DP-2", x: 1280, y: 0, width: 1920, height: 1080},
+		{name: "DP-1", x: 0, y: 0, width: 1280, height: 720, scale: 2},
+		{name: "DP-2", x: 1280, y: 0, width: 1920, height: 1080, scale: 1},
 	}, nil
 }
 
@@ -196,10 +201,10 @@ func payloads(targets []sharepicker.Target) []string {
 }
 
 // Without lys-wm's virtual outputs, neither virtual sources nor cursor
-// metadata are offered.
+// metadata are offered; the interface is version 6.
 func TestScreenCastProperties(t *testing.T) {
 	r, _ := castRig(t)
-	for name, want := range map[string]uint32{"AvailableSourceTypes": 3, "AvailableCursorModes": 3, "version": 4} {
+	for name, want := range map[string]uint32{"AvailableSourceTypes": 3, "AvailableCursorModes": 3, "version": 6} {
 		if v, err := r.obj.GetProperty(ScreenCastIface + "." + name); err != nil || v.Value() != want {
 			t.Errorf("%s = %v, %v", name, v, err)
 		}

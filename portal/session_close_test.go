@@ -34,7 +34,7 @@ func sessionStartCases() []sessionStartCase {
 			return r, f, p
 		}, func(r *rig) (uint32, error) { return call(r, ScreenCastIface+".Start") }},
 		{"RemoteDesktop", func(t *testing.T) (*rig, *fakeStarts, *fakeSharePicker) {
-			r, _, f := remoteRigStarts(t, nil)
+			r, _, f := remoteRigStarts(t, nil, false)
 			serveDialogs(t, r, true)
 			p := serveSharePicker(t, r, reply)
 			r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})

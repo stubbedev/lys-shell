@@ -166,7 +166,7 @@ func decodeRestoreV1(payload string) (restoreGrant, bool) {
 	if rest, remote := strings.CutPrefix(payload, remoteTokenV1Tag); remote {
 		devices, targets, found := strings.Cut(rest, "/")
 		n, err := strconv.ParseUint(devices, 10, 32)
-		if !found || err != nil || n == 0 || uint32(n)&^availableDevices != 0 {
+		if !found || err != nil || n == 0 || uint32(n)&^allDevices != 0 {
 			return restoreGrant{}, false
 		}
 		g.devices, payload = uint32(n), targets
@@ -209,7 +209,7 @@ func decodeRestoreV3(data dbus.Variant) (restoreGrant, bool) {
 // decodeTargets reads the device types and the sources of a version 2 or
 // 3 grant.
 func decodeTargets(devices uint32, targets []tokenTarget) (restoreGrant, bool) {
-	if devices&^availableDevices != 0 {
+	if devices&^allDevices != 0 {
 		return restoreGrant{}, false
 	}
 	g := restoreGrant{devices: devices, targets: make([]restoreTarget, len(targets))}

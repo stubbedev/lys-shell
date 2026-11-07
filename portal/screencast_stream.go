@@ -24,6 +24,7 @@ const defaultFPS = 60
 // the stream can no longer produce: its source vanished.
 type screenStream interface {
 	NodeID() uint32
+	Serial() uint64
 	Size() (width, height int32)
 	Ended() <-chan struct{}
 	Close()
@@ -64,6 +65,7 @@ func (s *pipewireStream) watch(sourceEnded <-chan struct{}) {
 }
 
 func (s *pipewireStream) NodeID() uint32              { return s.producer.NodeID() }
+func (s *pipewireStream) Serial() uint64              { return s.producer.Serial() }
 func (s *pipewireStream) Size() (width, height int32) { return s.width, s.height }
 func (s *pipewireStream) Ended() <-chan struct{}      { return s.ended }
 

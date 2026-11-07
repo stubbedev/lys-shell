@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/stubbedev/lys-lib/capture"
@@ -77,6 +78,7 @@ type startedStream struct {
 	stream  screenStream
 	target  sharepicker.Target
 	node    uint32
+	serial  uint64
 	stopped chan struct{}
 }
 
@@ -252,11 +254,7 @@ func (c *screenCast) iface() dbusx.Interface {
 		Properties: dbusx.Getters{
 			"AvailableSourceTypes": func() any { return c.availableSources() },
 			"AvailableCursorModes": func() any { return availableCursorModes },
-			// 4: cursor_mode (2), source_type (3) and restore_data /
-			// persist_mode (4) are honoured; mapping_id (5) and
-			// pipewire-serial (6) are not, so claiming them would
-			// promise a contract the streams do not keep.
-			"version": func() any { return uint32(4) },
+			"version":              func() any { return uint32(6) },
 		},
 	}
 }
@@ -361,7 +359,7 @@ func (c *screenCast) beginWith(session *session, targets []sharepicker.Target, c
 			c.stopStreams(started)
 			return nil, err
 		}
-		started = append(started, startedStream{stream: s, target: t, node: s.NodeID(), stopped: make(chan struct{})})
+		started = append(started, startedStream{stream: s, target: t, node: s.NodeID(), serial: s.Serial(), stopped: make(chan struct{})})
 	}
 	session.mu.Lock()
 	if session.cleanups == nil {
@@ -403,20 +401,40 @@ type castStream struct {
 	Props Vardict
 }
 
-// streamProps are a started stream's properties: its source type and,
-// for an output or a region, its position and size in the compositor's
-// logical space. A window's are not known, so it carries neither.
+// streamProps are a started stream's properties: its source type, its
+// node's PipeWire object.serial and, for an output or a region, its
+// position and size in the compositor's logical space and the mapping
+// id of its EIS region. A window's place is not known, so it carries
+// none of the last three.
 func streamProps(st startedStream, outputs []outputGeometry) Vardict {
 	sourceType := sourceTypeOf(st.target)
 	if _, ok := virtualOf(st); ok {
 		sourceType = sourceVirtual
 	}
-	props := Vardict{"source_type": dbus.MakeVariant(sourceType)}
+	props := Vardict{
+		"source_type":     dbus.MakeVariant(sourceType),
+		"pipewire-serial": dbus.MakeVariant(st.serial),
+	}
 	if x, y, w, h, ok := targetGeometry(st.target, outputs); ok {
 		props["position"] = dbus.MakeVariant(castSize{x, y})
 		props["size"] = dbus.MakeVariant(castSize{w, h})
+		props["mapping_id"] = dbus.MakeVariant(mappingID(st))
 	}
 	return props
+}
+
+// mappingID ties a monitor stream to the EIS region of the same area:
+// its node's serial, which no other stream shares.
+func mappingID(st startedStream) string { return strconv.FormatUint(st.serial, 10) }
+
+// streams is the session's running streams.
+func (c *screenCast) streams(s *session) []startedStream {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cast == nil {
+		return nil
+	}
+	return slices.Clone(s.cast.streams)
 }
 
 // screenCastObject carries the interface's D-Bus methods.
