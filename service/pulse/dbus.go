@@ -1,6 +1,7 @@
 package pulse
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strconv"
@@ -381,6 +382,8 @@ func introspection() *introspect.Node {
 					method("SetDefaultSource", arg("device_index", "u", "in")),
 					method("ListSinks", arg("", "a(uss)", "out")),
 					method("ListSources", arg("", "a(uss)", "out")),
+					method("ListCards", arg("cards", "a(usssas)", "out")),
+					method("SetCardProfile", arg("card", "u", "in"), arg("profile", "s", "in")),
 					method("GetDefaultSinkInfo", arg("", "a{ss}", "out")),
 					method("GetDefaultSourceInfo", arg("", "a{ss}", "out")),
 				},
@@ -546,4 +549,48 @@ func (c *Client) SinkCount(ctx context.Context) (uint32, error) {
 // SourceCount reads the SourceCount property.
 func (c *Client) SourceCount(ctx context.Context) (uint32, error) {
 	return property[uint32](ctx, c, "SourceCount")
+}
+
+// CardEntry is one ListCards row: (index, name, description, active
+// profile, the profiles that can be chosen now) on the wire.
+type CardEntry struct {
+	Index       uint32
+	Name        string
+	Description string
+	Active      string
+	Profiles    []string
+}
+
+// ListCards lists the cards with their available profiles.
+func (o *audioObject) ListCards() ([]CardEntry, *dbus.Error) {
+	var out []CardEntry
+	for _, c := range o.svc.Cards() {
+		e := CardEntry{Index: c.Index, Name: c.Name, Description: cmp.Or(c.Props["device.description"], c.Name), Active: c.ActiveProfile, Profiles: []string{}}
+		for _, p := range c.Profiles {
+			if p.Available {
+				e.Profiles = append(e.Profiles, p.Name)
+			}
+		}
+		out = append(out, e)
+	}
+	return nonNil(out), nil
+}
+
+// SetCardProfile switches a card's profile.
+func (o *audioObject) SetCardProfile(card uint32, profile string) *dbus.Error {
+	if err := o.svc.SetCardProfile(context.Background(), card, profile); err != nil {
+		return failed(err)
+	}
+	return nil
+}
+
+// ListCards lists the cards and their available profiles.
+func (c *Client) ListCards(ctx context.Context) ([]CardEntry, error) {
+	var out []CardEntry
+	return out, c.call(ctx, "ListCards", &out)
+}
+
+// SetCardProfile switches a card's profile.
+func (c *Client) SetCardProfile(ctx context.Context, card uint32, profile string) error {
+	return c.call(ctx, "SetCardProfile", nil, card, profile)
 }

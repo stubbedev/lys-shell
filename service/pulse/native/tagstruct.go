@@ -247,6 +247,16 @@ func (w *Writer) U32(v uint32) {
 	w.raw32(v)
 }
 
+// Count appends a 'L' field holding the length of a list of what.
+func (w *Writer) Count(n int, what string) {
+	v, err := intconv.Exact[uint32](n)
+	if err != nil {
+		w.fail("%d %s", n, what)
+		return
+	}
+	w.U32(v)
+}
+
 // U8 appends a 'B' field.
 func (w *Writer) U8(v uint8) { w.buf = append(w.buf, tagU8, v) }
 

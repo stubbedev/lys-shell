@@ -36,6 +36,7 @@ type Server struct {
 	sources       map[uint32]native.DeviceInfo
 	sinkInputs    map[uint32]native.StreamInfo
 	sourceOutputs map[uint32]native.StreamInfo
+	cards         map[uint32]native.CardInfo
 	failures      map[uint32]native.Error
 	conns         map[*conn]struct{}
 	records       []*Record
@@ -67,6 +68,7 @@ func New(t testing.TB) *Server {
 		sources:       map[uint32]native.DeviceInfo{},
 		sinkInputs:    map[uint32]native.StreamInfo{},
 		sourceOutputs: map[uint32]native.StreamInfo{},
+		cards:         map[uint32]native.CardInfo{},
 		failures:      map[uint32]native.Error{},
 		conns:         map[*conn]struct{}{},
 		nextIndex:     1000,
@@ -513,6 +515,9 @@ func init() {
 		native.CmdCreateUploadStream:    (*conn).createUpload,
 		native.CmdFinishUploadStream:    (*conn).finishUpload,
 		native.CmdPlaySample:            (*conn).playSample,
+		native.CmdGetCardInfoList:       (*conn).cardList,
+		native.CmdGetCardInfo:           (*conn).cardInfo,
+		native.CmdSetCardProfile:        (*conn).setCardProfile,
 	}
 }
 

@@ -251,3 +251,30 @@ func TestDaemonNameIsExclusive(t *testing.T) {
 		t.Fatal("a second daemon took the name")
 	}
 }
+
+func TestDaemonCards(t *testing.T) {
+	srv := fixture(t)
+	srv.PutCard(headset())
+	svc := connect(t, srv)
+	bus := dbustest.Start(t)
+	release, err := NewDaemon(svc).Export(bus.Conn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(release)
+	c := NewClient(bus.Conn(t))
+	ctx := context.Background()
+	cards, err := c.ListCards(ctx)
+	if err != nil || len(cards) != 1 || cards[0].Description != "Headset" || cards[0].Active != "a2dp-sink" || len(cards[0].Profiles) != 3 {
+		t.Fatalf("ListCards = %+v, %v", cards, err)
+	}
+	if err := c.SetCardProfile(ctx, 7, "headset-head-unit"); err != nil {
+		t.Fatal(err)
+	}
+	if card, _ := srv.Card(7); card.ActiveProfile != "headset-head-unit" {
+		t.Fatalf("the server's card is on %q", card.ActiveProfile)
+	}
+	if err := c.SetCardProfile(ctx, 7, "nope"); err == nil {
+		t.Fatal("an unknown profile was taken")
+	}
+}

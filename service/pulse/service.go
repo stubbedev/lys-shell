@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -24,7 +25,7 @@ const clientName = "lys-shell-pulse"
 
 // subscriptionMask is backend/events's interest set.
 const subscriptionMask = native.MaskSink | native.MaskSource | native.MaskSinkInput |
-	native.MaskSourceOutput | native.MaskServer
+	native.MaskSourceOutput | native.MaskServer | native.MaskCard
 
 const dialTimeout = 5 * time.Second
 
@@ -63,6 +64,7 @@ type Service struct {
 	outputs       map[uint32]OutputDevice
 	inputs        map[uint32]InputDevice
 	streams       map[StreamKey]AudioStream
+	cards         map[uint32]native.CardInfo
 	defaultSink   string
 	defaultSource string
 	subs          map[int]chan struct{}
@@ -83,6 +85,7 @@ type snapshot struct {
 	sinks, sources []native.DeviceInfo
 	inputs         []native.StreamInfo
 	outputs        []native.StreamInfo
+	cards          []native.CardInfo
 	info           native.ServerInfo
 }
 
@@ -96,6 +99,7 @@ func newService(server string) *Service {
 		outputs: map[uint32]OutputDevice{},
 		inputs:  map[uint32]InputDevice{},
 		streams: map[StreamKey]AudioStream{},
+		cards:   map[uint32]native.CardInfo{},
 		subs:    map[int]chan struct{}{},
 	}
 }
@@ -167,6 +171,9 @@ func discover(ctx context.Context, conn *native.Conn) (snapshot, error) {
 	if snap.outputs, err = conn.SourceOutputs(ctx); err != nil {
 		return snap, err
 	}
+	if snap.cards, err = conn.Cards(ctx); err != nil {
+		return snap, err
+	}
 	snap.info, err = conn.ServerInfo(ctx)
 	return snap, err
 }
@@ -186,6 +193,9 @@ func (s *Service) install(sess *session, snap snapshot) {
 	}
 	for _, st := range snap.outputs {
 		s.streams[StreamKey{Index: st.Index, Type: StreamRecord}] = fromStream(st, StreamRecord)
+	}
+	for _, c := range snap.cards {
+		s.cards[c.Index] = c
 	}
 	s.defaultSink, s.defaultSource = snap.info.DefaultSink, snap.info.DefaultSource
 	s.mu.Unlock()
@@ -208,6 +218,7 @@ func (s *Service) clearLocked() {
 	clear(s.outputs)
 	clear(s.inputs)
 	clear(s.streams)
+	clear(s.cards)
 	s.defaultSink, s.defaultSource = "", ""
 }
 
@@ -307,6 +318,8 @@ func (s *Service) handleEvent(sess *session, ev native.SubscribeEvent) {
 		changed, err = s.foldStream(ctx, sess, ev, StreamPlayback, sess.conn.SinkInput)
 	case native.FacilitySourceOutput:
 		changed, err = s.foldStream(ctx, sess, ev, StreamRecord, sess.conn.SourceOutput)
+	case native.FacilityCard:
+		changed, err = foldObject(s, sess, ev, s.cards, sess.conn.Card, func(c native.CardInfo) native.CardInfo { return c })
 	case native.FacilityServer:
 		if ev.Operation == native.OpChange {
 			changed, err = s.refreshDefaults(ctx, sess)
@@ -324,8 +337,8 @@ func (s *Service) handleEvent(sess *session, ev native.SubscribeEvent) {
 	}
 }
 
-func foldObject[T any](s *Service, sess *session, ev native.SubscribeEvent, m map[uint32]T,
-	query func(context.Context, uint32) (native.DeviceInfo, error), convert func(native.DeviceInfo) T,
+func foldObject[I, T any](s *Service, sess *session, ev native.SubscribeEvent, m map[uint32]T,
+	query func(context.Context, uint32) (I, error), convert func(I) T,
 ) (bool, error) {
 	if ev.Operation == native.OpRemove {
 		s.mu.Lock()
@@ -702,4 +715,31 @@ func (s *Service) MoveStream(ctx context.Context, key StreamKey, device DeviceKe
 		return conn.MoveSinkInput(ctx, key.Index, device.Index)
 	}
 	return conn.MoveSourceOutput(ctx, key.Index, device.Index)
+}
+
+// Card is one sound card: its profiles and the active one.
+type Card = native.CardInfo
+
+// Cards lists every card by index.
+func (s *Service) Cards() []Card {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Card, 0, len(s.cards))
+	for _, index := range slices.Sorted(maps.Keys(s.cards)) {
+		c := s.cards[index]
+		c.Profiles = slices.Clone(c.Profiles)
+		c.Ports = slices.Clone(c.Ports)
+		out = append(out, c)
+	}
+	return out
+}
+
+// SetCardProfile switches the card at index to profile (A2DP and
+// HFP on a headset, analog and HDMI on a card).
+func (s *Service) SetCardProfile(ctx context.Context, index uint32, profile string) error {
+	conn, err := s.current()
+	if err != nil {
+		return err
+	}
+	return conn.SetCardProfile(ctx, index, profile)
 }
