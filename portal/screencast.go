@@ -1,12 +1,14 @@
 package portal
 
 import (
+	"context"
 	"errors"
 	"slices"
 
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/drmconn"
@@ -30,6 +32,7 @@ type castState struct {
 	types, cursorMode, persistMode uint32
 	multiple                       bool
 	restore                        []restoreTarget
+	restoreVirtual                 *virtualSize
 	streams                        []startedStream
 }
 
@@ -54,6 +57,11 @@ type screenCast struct {
 	// displays are the monitors behind the connectors (readDisplays; a
 	// fake in tests).
 	displays func() (map[string]displayID, error)
+	// virtualOffered, createVirtual and removeVirtual ask lys-wm whether
+	// it makes virtual outputs, make one and remove it (a fake in tests).
+	virtualOffered func() (bool, error)
+	createVirtual  func(virtualSize) (string, error)
+	removeVirtual  func(name string) error
 }
 
 // startedStream is a running stream and what Start reported of it;
@@ -70,6 +78,7 @@ func newScreenCast(conn *dbus.Conn, s *sessions, start func(sharepicker.Target, 
 	return &screenCast{
 		conn: conn, sessions: s, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows,
 		toplevels: listToplevels, displays: func() (map[string]displayID, error) { return readDisplays(drmconn.Dir) },
+		virtualOffered: lyswm.OffersVirtualOutputs, createVirtual: createLysWMOutput, removeVirtual: lyswm.RemoveOutput,
 	}
 }
 
@@ -235,7 +244,7 @@ func (c *screenCast) iface() dbusx.Interface {
 		Name:    ScreenCastIface,
 		Methods: screenCastObject{c},
 		Properties: dbusx.Getters{
-			"AvailableSourceTypes": func() any { return availableSources },
+			"AvailableSourceTypes": func() any { return c.availableSources() },
 			"AvailableCursorModes": func() any { return availableCursorModes },
 			// 4: cursor_mode (2), source_type (3) and restore_data /
 			// persist_mode (4) are honoured; mapping_id (5) and
@@ -334,9 +343,14 @@ var errSessionClosed = errors.New("the session closed")
 // ended meanwhile. A stream that ends by itself (its window closed, its
 // output unplugged) ends the session.
 func (c *screenCast) begin(session *session, targets []sharepicker.Target, cursorMode uint32) ([]startedStream, error) {
+	return c.beginWith(session, targets, cursorMode, c.start)
+}
+
+// beginWith is begin starting each stream with start.
+func (c *screenCast) beginWith(session *session, targets []sharepicker.Target, cursorMode uint32, start func(sharepicker.Target, bool, uint32) (screenStream, error)) ([]startedStream, error) {
 	var started []startedStream
 	for _, t := range targets {
-		s, err := c.start(t, cursorMode == cursorEmbedded, defaultFPS)
+		s, err := start(t, cursorMode == cursorEmbedded, defaultFPS)
 		if err != nil {
 			c.stopStreams(started)
 			return nil, err
@@ -387,7 +401,11 @@ type castStream struct {
 // for an output or a region, its position and size in the compositor's
 // logical space. A window's are not known, so it carries neither.
 func streamProps(st startedStream, outputs []outputGeometry) Vardict {
-	props := Vardict{"source_type": dbus.MakeVariant(sourceTypeOf(st.target))}
+	sourceType := sourceTypeOf(st.target)
+	if _, ok := virtualOf(st); ok {
+		sourceType = sourceVirtual
+	}
+	props := Vardict{"source_type": dbus.MakeVariant(sourceType)}
 	if x, y, w, h, ok := targetGeometry(st.target, outputs); ok {
 		props["position"] = dbus.MakeVariant(castSize{x, y})
 		props["size"] = dbus.MakeVariant(castSize{w, h})
@@ -423,8 +441,8 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 	if !ok {
 		types = sourceMonitor
 	}
-	if types == 0 || types&^availableSources != 0 {
-		warnf("screencast: SelectSources: source types %#x, of %#x offered", types, availableSources)
+	if available := o.c.availableSources(); types == 0 || types&^available != 0 {
+		warnf("screencast: SelectSources: source types %#x, of %#x offered", types, available)
 		return ResponseOther, Vardict{}, nil
 	}
 	cursor, ok := optU32(options, "cursor_mode")
@@ -439,14 +457,15 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 	multiple, _ := optBool(options, "multiple")
 	persist, _ := optU32(options, "persist_mode")
 	var restore []restoreTarget
+	var restoreVirtual *virtualSize
 	if v, ok := options["restore_data"]; ok {
-		if g, ok := decodeRestore(v); ok && g.devices == 0 && allOfTypes(pickedOf(g.targets), types) {
-			restore = g.targets
+		if g, ok := decodeRestore(v); ok && g.devices == 0 && g.fits(types) {
+			restore, restoreVirtual = g.targets, g.virtual
 		}
 	}
 	s.mu.Lock()
 	streams := s.cast.streams
-	*s.cast = castState{types: types, cursorMode: cursor, persistMode: persist, multiple: multiple, restore: restore, streams: streams}
+	*s.cast = castState{types: types, cursorMode: cursor, persistMode: persist, multiple: multiple, restore: restore, restoreVirtual: restoreVirtual, streams: streams}
 	s.mu.Unlock()
 	return ResponseSuccess, Vardict{}, nil
 }
@@ -460,7 +479,9 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 		warnf("screencast: Start: %v", err)
 		return ResponseOther, Vardict{}, nil
 	}
-	call, ok := beginOnSession(o.c.conn, handle, s, parent, sharepicker.NewClient(o.c.conn).Dismiss)
+	call, ok := beginOnSession(o.c.conn, handle, s, parent, func(ctx context.Context, h string) error {
+		return errors.Join(sharepicker.NewClient(o.c.conn).Dismiss(ctx, h), portaldialogs.NewClient(o.c.conn).Dismiss(ctx, h))
+	})
 	if !ok {
 		return ResponseOther, Vardict{}, nil
 	}
@@ -474,18 +495,30 @@ func (o screenCastObject) Start(handle, session dbus.ObjectPath, appID, parent s
 	}
 	results := Vardict{"streams": dbus.MakeVariant(shared.streams)}
 	if cfg := o.c.config(s); cfg.persistMode > 0 && shared.allowToken {
-		results["restore_data"] = dbus.MakeVariant(encodeRestore(restoreGrant{targets: o.c.describe(shared.targets)}))
+		results["restore_data"] = dbus.MakeVariant(encodeRestore(o.c.grant(0, shared)))
 		results["persist_mode"] = dbus.MakeVariant(cfg.persistMode)
 	}
 	return ResponseSuccess, results, nil
 }
 
 // sharedScreens is what share started: the streams Start replies, the
-// sources behind them, and whether the user granted a restore token.
+// sources behind them, the virtual outputs it made, and whether the user
+// granted a restore token.
 type sharedScreens struct {
 	streams    []castStream
 	targets    []sharepicker.Target
+	virtual    []virtualSize
 	allowToken bool
+}
+
+// grant is the restore grant of what share started, with the
+// RemoteDesktop device types granted beside it.
+func (c *screenCast) grant(devices uint32, shared sharedScreens) restoreGrant {
+	g := restoreGrant{devices: devices, targets: c.describe(shared.targets)}
+	if len(shared.virtual) > 0 {
+		g.virtual = &shared.virtual[0]
+	}
+	return g
 }
 
 // share picks the session's sources (or replays its restore targets)
@@ -493,6 +526,9 @@ type sharedScreens struct {
 // session's.
 func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 	cfg := c.config(s)
+	if cfg.types == sourceVirtual || cfg.restoreVirtual != nil {
+		return c.shareVirtual(call, s, cfg)
+	}
 	// Replaying a token is the grant it was issued for.
 	var restoring, allowToken bool
 	var targets []sharepicker.Target
@@ -525,15 +561,23 @@ func (c *screenCast) share(call *call, s *session) (sharedScreens, uint32) {
 		warnf("screencast: failed to start stream: %v", err)
 		return sharedScreens{}, ResponseOther
 	}
+	return c.reply(streams, targets, allowToken), ResponseSuccess
+}
+
+// reply is what share started, with each stream's properties.
+func (c *screenCast) reply(streams []startedStream, targets []sharepicker.Target, allowToken bool) sharedScreens {
 	outputs, err := c.outputs()
 	if err != nil {
 		warnf("screencast: no output geometry, so no stream positions: %v", err)
 	}
-	out := make([]castStream, 0, len(streams))
+	shared := sharedScreens{streams: make([]castStream, 0, len(streams)), targets: targets, allowToken: allowToken}
 	for _, st := range streams {
-		out = append(out, castStream{st.node, streamProps(st, outputs)})
+		shared.streams = append(shared.streams, castStream{st.node, streamProps(st, outputs)})
+		if v, ok := virtualOf(st); ok {
+			shared.virtual = append(shared.virtual, v.size)
+		}
 	}
-	return sharedScreens{streams: out, targets: targets, allowToken: allowToken}, ResponseSuccess
+	return shared
 }
 
 // stream is the session's running stream on node.

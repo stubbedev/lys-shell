@@ -6,13 +6,15 @@ import (
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
-// Source types of ScreenCast (the AvailableSourceTypes bits). Virtual
-// (4), a new virtual monitor, is not offered: there are none to make.
+// Source types of ScreenCast (the AvailableSourceTypes bits). Virtual,
+// a new output the desktop extends onto, is offered only where lys-wm
+// makes virtual outputs.
 const (
 	sourceMonitor uint32 = 1
 	sourceWindow  uint32 = 2
+	sourceVirtual uint32 = 4
 
-	availableSources = sourceMonitor | sourceWindow
+	pickedSources = sourceMonitor | sourceWindow
 )
 
 // Cursor modes of ScreenCast (AvailableCursorModes bits). Metadata (4)

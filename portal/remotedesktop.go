@@ -334,8 +334,8 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 		// picker's token box, and a token replays the screens it kept.
 		s.mu.Lock()
 		s.cast.persistMode = state.persistMode
-		if restoring && len(state.restore.targets) > 0 && allOfTypes(pickedOf(state.restore.targets), s.cast.types) {
-			s.cast.restore = state.restore.targets
+		if restoring && (len(state.restore.targets) > 0 || state.restore.virtual != nil) && state.restore.fits(s.cast.types) {
+			s.cast.restore, s.cast.restoreVirtual = state.restore.targets, state.restore.virtual
 		}
 		s.mu.Unlock()
 	}
@@ -381,7 +381,7 @@ func (o remoteDesktopObject) Start(handle, session dbus.ObjectPath, appID, paren
 	results["devices"] = dbus.MakeVariant(state.types)
 	results["clipboard_enabled"] = dbus.MakeVariant(clipboard)
 	if state.persistMode > 0 && (!sharing || shared.allowToken) {
-		results["restore_data"] = dbus.MakeVariant(encodeRestore(restoreGrant{devices: state.types, targets: o.r.cast.describe(shared.targets)}))
+		results["restore_data"] = dbus.MakeVariant(encodeRestore(o.r.cast.grant(state.types, shared)))
 		results["persist_mode"] = dbus.MakeVariant(state.persistMode)
 	}
 	return ResponseSuccess, results, nil

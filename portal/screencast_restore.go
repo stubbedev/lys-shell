@@ -22,11 +22,12 @@ import (
 // Restore tokens are (suv): vendor, version, and the grant. Version 1
 // kept the picker's reply as a string; version 2 keeps each source's
 // identity, so a token outlives the window mapping and the connector it
-// was issued for.
+// was issued for; version 3 adds the size of a virtual output.
 const (
 	restoreVendor           = version.Name
 	restoreV1        uint32 = 1
 	restoreV2        uint32 = 2
+	restoreV3        uint32 = 3
 	remoteTokenV1Tag        = "remote:"
 )
 
@@ -53,10 +54,18 @@ type restoreTarget struct {
 }
 
 // restoreGrant is what a token replays: the RemoteDesktop device types
-// granted (none for a ScreenCast token) and the sources shared.
+// granted (none for a ScreenCast token), the sources shared, and the size
+// of the virtual output streamed, if one was.
 type restoreGrant struct {
 	devices uint32
 	targets []restoreTarget
+	virtual *virtualSize
+}
+
+// fits reports whether a session of the source types may replay the
+// grant's sources.
+func (g restoreGrant) fits(types uint32) bool {
+	return allOfTypes(pickedOf(g.targets), types) && (g.virtual == nil || types&sourceVirtual != 0)
 }
 
 // pickedOf is every kept target as it was picked.
@@ -74,6 +83,17 @@ type tokenGrant struct {
 	Targets []tokenTarget
 }
 
+// tokenGrantV3 is a version 3 grant on the wire: a version 2 grant and
+// the virtual outputs' sizes, (ua(yssssssiiii)a(ii)).
+type tokenGrantV3 struct {
+	Devices uint32
+	Targets []tokenTarget
+	Virtual []tokenSize
+}
+
+// tokenSize is a virtual output's size on the wire.
+type tokenSize struct{ Width, Height int32 }
+
 // tokenTarget is one source on the wire. Name is the connector or the
 // toplevel identifier; the app id and title are a window's, the display
 // an output's or a region's, the rectangle a region's.
@@ -86,7 +106,10 @@ type tokenTarget struct {
 }
 
 func encodeRestore(g restoreGrant) restoreToken {
-	wire := tokenGrant{Devices: g.devices, Targets: make([]tokenTarget, len(g.targets))}
+	wire := tokenGrantV3{Devices: g.devices, Targets: make([]tokenTarget, len(g.targets)), Virtual: []tokenSize{}}
+	if g.virtual != nil {
+		wire.Virtual = append(wire.Virtual, tokenSize{g.virtual.width, g.virtual.height})
+	}
 	for i, t := range g.targets {
 		wire.Targets[i] = tokenTarget{
 			Kind: t.picked.Kind, Name: t.picked.Name, AppID: t.appID, Title: t.title,
@@ -94,7 +117,7 @@ func encodeRestore(g restoreGrant) restoreToken {
 			X: t.picked.X, Y: t.picked.Y, Width: t.picked.Width, Height: t.picked.Height,
 		}
 	}
-	return restoreToken{restoreVendor, restoreV2, dbus.MakeVariant(wire)}
+	return restoreToken{restoreVendor, restoreV3, dbus.MakeVariant(wire)}
 }
 
 // decodeRestore reads a token this portal issued, of a version it
@@ -116,7 +139,13 @@ func decodeRestore(v dbus.Variant) (restoreGrant, bool) {
 		}
 		return decodeRestoreV1(payload)
 	case restoreV2:
-		return decodeRestoreV2(data)
+		var wire tokenGrant
+		if err := dbus.Store([]any{data.Value()}, &wire); err != nil {
+			return restoreGrant{}, false
+		}
+		return decodeTargets(wire.Devices, wire.Targets)
+	case restoreV3:
+		return decodeRestoreV3(data)
 	}
 	return restoreGrant{}, false
 }
@@ -146,13 +175,33 @@ func decodeRestoreV1(payload string) (restoreGrant, bool) {
 	return g, true
 }
 
-func decodeRestoreV2(data dbus.Variant) (restoreGrant, bool) {
-	var wire tokenGrant
-	if err := dbus.Store([]any{data.Value()}, &wire); err != nil || wire.Devices&^availableDevices != 0 {
+// decodeRestoreV3 reads a version 3 grant: at most one virtual output, of
+// a size above 0.
+func decodeRestoreV3(data dbus.Variant) (restoreGrant, bool) {
+	var wire tokenGrantV3
+	if err := dbus.Store([]any{data.Value()}, &wire); err != nil || len(wire.Virtual) > 1 {
 		return restoreGrant{}, false
 	}
-	g := restoreGrant{devices: wire.Devices, targets: make([]restoreTarget, len(wire.Targets))}
-	for i, w := range wire.Targets {
+	g, ok := decodeTargets(wire.Devices, wire.Targets)
+	if !ok || len(wire.Virtual) == 0 {
+		return g, ok
+	}
+	v := wire.Virtual[0]
+	if v.Width <= 0 || v.Height <= 0 {
+		return restoreGrant{}, false
+	}
+	g.virtual = &virtualSize{v.Width, v.Height}
+	return g, true
+}
+
+// decodeTargets reads the device types and the sources of a version 2 or
+// 3 grant.
+func decodeTargets(devices uint32, targets []tokenTarget) (restoreGrant, bool) {
+	if devices&^availableDevices != 0 {
+		return restoreGrant{}, false
+	}
+	g := restoreGrant{devices: devices, targets: make([]restoreTarget, len(targets))}
+	for i, w := range targets {
 		picked := sharepicker.Target{Kind: w.Kind, Name: w.Name, X: w.X, Y: w.Y, Width: w.Width, Height: w.Height}
 		if _, ok := sharepicker.ParseTarget(picked.Payload()); !ok || w.Kind > sharepicker.TargetRegion {
 			return restoreGrant{}, false

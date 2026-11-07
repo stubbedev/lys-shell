@@ -90,6 +90,8 @@ type fakeStarts struct {
 	// behind the connectors, as restore tokens resolve against them.
 	toplevels dbustest.Var[[]capture.Toplevel]
 	displays  dbustest.Var[map[string]displayID]
+	// virtual is lys-wm's virtual outputs.
+	virtual fakeVirtual
 }
 
 // screenCast is the interface over these fakes.
@@ -97,6 +99,7 @@ func (f *fakeStarts) screenCast(b *Backend) *screenCast {
 	c := newScreenCast(b.conn, b.sessions, f.start, f.outputs)
 	c.toplevels = func() ([]capture.Toplevel, error) { return f.toplevels.Load(), nil }
 	c.displays = func() (map[string]displayID, error) { return f.displays.Load(), nil }
+	c.virtualOffered, c.createVirtual, c.removeVirtual = f.virtual.offeredNow, f.virtual.create, f.virtual.remove
 	return c
 }
 
@@ -185,7 +188,8 @@ func payloads(targets []sharepicker.Target) []string {
 	return out
 }
 
-// Neither virtual monitors nor cursor metadata are offered.
+// Without lys-wm's virtual outputs, neither virtual sources nor cursor
+// metadata are offered.
 func TestScreenCastProperties(t *testing.T) {
 	r, _ := castRig(t)
 	for name, want := range map[string]uint32{"AvailableSourceTypes": 3, "AvailableCursorModes": 3, "version": 4} {
