@@ -129,12 +129,12 @@ func (f *fakeStarts) outputs() ([]outputGeometry, error) {
 	}, nil
 }
 
-func (f *fakeStarts) start(t sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+func (f *fakeStarts) start(t sharepicker.Target, cursor cursorMode, fps uint32) (screenStream, error) {
 	if starting := f.starting.Load(); starting != nil {
 		starting()
 	}
 	f.started.Update(func(s []string) []string {
-		return append(s, t.Payload()+map[bool]string{true: "+cursor", false: ""}[cursor])
+		return append(s, t.Payload()+map[cursorMode]string{cursorHidden: "", cursorEmbedded: "+cursor", cursorMetadata: "+meta"}[cursor])
 	})
 	if f.fail[t.Payload()] {
 		return nil, errors.New("gone")
@@ -204,7 +204,7 @@ func payloads(targets []sharepicker.Target) []string {
 // metadata are offered; the interface is version 6.
 func TestScreenCastProperties(t *testing.T) {
 	r, _ := castRig(t)
-	for name, want := range map[string]uint32{"AvailableSourceTypes": 3, "AvailableCursorModes": 3, "version": 6} {
+	for name, want := range map[string]uint32{"AvailableSourceTypes": 3, "AvailableCursorModes": 7, "version": 6} {
 		if v, err := r.obj.GetProperty(ScreenCastIface + "." + name); err != nil || v.Value() != want {
 			t.Errorf("%s = %v, %v", name, v, err)
 		}
@@ -309,8 +309,9 @@ func TestScreenCastRefusesWhatIsNotOffered(t *testing.T) {
 	for _, options := range []Vardict{
 		{"types": dbus.MakeVariant(uint32(4))},
 		{"types": dbus.MakeVariant(uint32(0))},
-		{"cursor_mode": dbus.MakeVariant(uint32(4))},
-		{"cursor_mode": dbus.MakeVariant(cursorHidden | cursorEmbedded)},
+		{"cursor_mode": dbus.MakeVariant(uint32(8))},
+		{"cursor_mode": dbus.MakeVariant(uint32(0))},
+		{"cursor_mode": dbus.MakeVariant(uint32(cursorEmbedded | cursorMetadata))},
 	} {
 		if code, _ := r.interactive(t, ScreenCastIface+".SelectSources", handle, sessA, "org.app", options); code != ResponseOther {
 			t.Errorf("SelectSources %v = %d, want other", options, code)
@@ -325,10 +326,24 @@ func TestScreenCastRefusesWhatIsNotOffered(t *testing.T) {
 	}
 }
 
+// The metadata cursor mode is offered and taken: its streams start with
+// the pointer carried beside the frames.
+func TestScreenCastTakesTheMetadataCursorMode(t *testing.T) {
+	r, f := castRig(t)
+	serveSharePicker(t, r, "/screen:DP-1")
+	r.castSession(t, Vardict{"cursor_mode": dbus.MakeVariant(uint32(cursorMetadata))})
+	if code, _ := r.castStart(t); code != ResponseSuccess {
+		t.Fatalf("Start = %d", code)
+	}
+	if got := f.started.Load(); !slices.Equal(got, []string{"screen:DP-1+meta"}) {
+		t.Errorf("started %v, want the metadata cursor", got)
+	}
+}
+
 func TestScreenCastWithoutATokenGrant(t *testing.T) {
 	r, f := castRig(t)
 	p := serveSharePicker(t, r, "/window:kitty-1")
-	r.castSession(t, Vardict{"persist_mode": dbus.MakeVariant(uint32(1)), "cursor_mode": dbus.MakeVariant(cursorEmbedded), "types": dbus.MakeVariant(sourceWindow)})
+	r.castSession(t, Vardict{"persist_mode": dbus.MakeVariant(uint32(1)), "cursor_mode": dbus.MakeVariant(uint32(cursorEmbedded)), "types": dbus.MakeVariant(sourceWindow)})
 	_, res := r.castStart(t)
 	if _, ok := res["restore_data"]; ok {
 		t.Error("a token the user did not grant")
@@ -462,7 +477,7 @@ func TestEffectiveFPS(t *testing.T) {
 func TestStartProducerRefusesAZeroFrameRate(t *testing.T) {
 	closed := false
 	g := producerGeometry{width: 64, height: 32, stride: 256, format: capture.FormatXRGB8888, fps: effectiveFPS(0, 60000)}
-	s, err := startProducer(g, pattern{}, nil, func() { closed = true })
+	s, err := startProducer(g, pattern{}, nil, nil, func() { closed = true })
 	if want := "pipewire: Config.FPS is 0"; s != nil || err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Fatalf("startProducer at 0 fps = %v, %v; want an error starting %q", s, err, want)
 	}

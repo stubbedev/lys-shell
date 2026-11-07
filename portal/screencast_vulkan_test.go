@@ -170,13 +170,13 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 
 	logged := captureLog(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	s, err := streams.startGPU(output, false, 30)
+	s, err := streams.startGPU(output, castCursor{}, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}
 	s.Close()
 	region := sharepicker.Target{Kind: sharepicker.TargetRegion, Name: output.Name, X: 10, Y: 20, Width: 200, Height: 100}
-	s, err = streams.startGPU(region, false, 30)
+	s, err = streams.startGPU(region, castCursor{}, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined a region: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 		t.Errorf("the region's stream is %dx%d, want 200x100", w, h)
 	}
 	s.Close()
-	s, err = streams.start(output, false, 30)
+	s, err = streams.start(output, cursorHidden, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestOutputStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	}
 
 	noVulkan := errors.New("no Vulkan device")
-	s, err = screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return nil, noVulkan }}.start(output, false, 30)
+	s, err = screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return nil, noVulkan }}.start(output, cursorHidden, 30)
 	if err != nil {
 		t.Fatalf("no Vulkan device failed the stream instead of falling back: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestWindowStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 
 	logged := captureLog(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	s, err := streams.startWindowGPU(window.Name, false, 30)
+	s, err := streams.startWindowGPU(window.Name, castCursor{}, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestWindowStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 		}
 	}
 	s.Close()
-	s, err = streams.start(window, false, 30)
+	s, err = streams.start(window, cursorHidden, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func TestWindowStreamTakesTheGPUOrSaysWhyNot(t *testing.T) {
 	}
 
 	noVulkan := errors.New("no Vulkan device")
-	s, err = screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return nil, noVulkan }}.start(window, false, 30)
+	s, err = screenStreams{openDevice: func(uint64) (gpuAllocator, error) { return nil, noVulkan }}.start(window, cursorHidden, 30)
 	if err != nil {
 		t.Fatalf("no Vulkan device failed the stream instead of falling back: %v", err)
 	}

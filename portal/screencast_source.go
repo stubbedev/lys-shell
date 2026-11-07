@@ -17,14 +17,28 @@ const (
 	pickedSources = sourceMonitor | sourceWindow
 )
 
-// Cursor modes of ScreenCast (AvailableCursorModes bits). Metadata (4)
-// is not offered: the streams carry no cursor meta.
-const (
-	cursorHidden   uint32 = 1
-	cursorEmbedded uint32 = 2
+// cursorMode is a ScreenCast cursor mode, one AvailableCursorModes bit:
+// the pointer left out, painted into the frames, or carried beside them
+// as a cursor meta.
+type cursorMode uint32
 
-	availableCursorModes = cursorHidden | cursorEmbedded
+const (
+	cursorHidden   cursorMode = 1
+	cursorEmbedded cursorMode = 2
+	cursorMetadata cursorMode = 4
+
+	availableCursorModes = cursorHidden | cursorEmbedded | cursorMetadata
 )
+
+// parseCursorMode is the one mode a cursor_mode option names; false for
+// none, several, or one not offered.
+func parseCursorMode(v uint32) (cursorMode, bool) {
+	switch m := cursorMode(v); m {
+	case cursorHidden, cursorEmbedded, cursorMetadata:
+		return m, true
+	}
+	return 0, false
+}
 
 // pickerSources is what the share picker offers for the source types:
 // a monitor is a whole output or a region of one.

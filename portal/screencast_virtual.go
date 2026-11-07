@@ -96,7 +96,7 @@ func (c *screenCast) shareVirtual(call *call, s *session, cfg castState) (shared
 		return sharedScreens{}, ResponseOther
 	}
 	target := sharepicker.Target{Kind: sharepicker.TargetOutput, Name: name}
-	streams, err := c.beginWith(s, []sharepicker.Target{target}, cfg.cursorMode, func(t sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+	streams, err := c.beginWith(s, []sharepicker.Target{target}, cfg.cursorMode, func(t sharepicker.Target, cursor cursorMode, fps uint32) (screenStream, error) {
 		st, err := c.start(t, cursor, fps)
 		if err != nil {
 			return nil, err

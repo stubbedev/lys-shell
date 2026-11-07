@@ -31,10 +31,11 @@ const ScreenCastIface = "org.freedesktop.impl.portal.ScreenCast"
 // the calls and the streams Start runs. It lives on the session,
 // guarded by its mu.
 type castState struct {
-	types, cursorMode, persistMode uint32
-	multiple                       bool
-	restore                        []restoreTarget
-	restoreVirtual                 *virtualSize
+	types, persistMode uint32
+	cursorMode         cursorMode
+	multiple           bool
+	restore            []restoreTarget
+	restoreVirtual     *virtualSize
 	// restoreIssued is when the replayed grant was given, zero when
 	// its token does not say.
 	restoreIssued time.Time
@@ -47,7 +48,7 @@ type screenCast struct {
 	conn     *dbus.Conn
 	sessions *sessions
 	// start runs one stream (screenStreams.start; a fake in tests).
-	start func(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error)
+	start func(target sharepicker.Target, cursor cursorMode, fps uint32) (screenStream, error)
 	// outputs is the outputs' logical geometry (the Wayland loop's; a
 	// fake in tests).
 	outputs func() ([]outputGeometry, error)
@@ -82,7 +83,7 @@ type startedStream struct {
 	stopped chan struct{}
 }
 
-func newScreenCast(conn *dbus.Conn, s *sessions, reminder castReminder, start func(sharepicker.Target, bool, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
+func newScreenCast(conn *dbus.Conn, s *sessions, reminder castReminder, start func(sharepicker.Target, cursorMode, uint32) (screenStream, error), outputs func() ([]outputGeometry, error)) *screenCast {
 	return &screenCast{
 		conn: conn, sessions: s, reminder: reminder, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows,
 		toplevels: listToplevels, displays: func() (map[string]displayID, error) { return readDisplays(drmconn.Dir) },
@@ -253,7 +254,7 @@ func (c *screenCast) iface() dbusx.Interface {
 		Methods: screenCastObject{c},
 		Properties: dbusx.Getters{
 			"AvailableSourceTypes": func() any { return c.availableSources() },
-			"AvailableCursorModes": func() any { return availableCursorModes },
+			"AvailableCursorModes": func() any { return uint32(availableCursorModes) },
 			"version":              func() any { return uint32(6) },
 		},
 	}
@@ -346,15 +347,15 @@ var errSessionClosed = errors.New("the session closed")
 // call started, so a partial set never runs, and so does a session that
 // ended meanwhile. A stream that ends by itself (its window closed, its
 // output unplugged) ends the session.
-func (c *screenCast) begin(session *session, targets []sharepicker.Target, cursorMode uint32) ([]startedStream, error) {
-	return c.beginWith(session, targets, cursorMode, c.start)
+func (c *screenCast) begin(session *session, targets []sharepicker.Target, cursor cursorMode) ([]startedStream, error) {
+	return c.beginWith(session, targets, cursor, c.start)
 }
 
 // beginWith is begin starting each stream with start.
-func (c *screenCast) beginWith(session *session, targets []sharepicker.Target, cursorMode uint32, start func(sharepicker.Target, bool, uint32) (screenStream, error)) ([]startedStream, error) {
+func (c *screenCast) beginWith(session *session, targets []sharepicker.Target, cursor cursorMode, start func(sharepicker.Target, cursorMode, uint32) (screenStream, error)) ([]startedStream, error) {
 	var started []startedStream
 	for _, t := range targets {
-		s, err := start(t, cursorMode == cursorEmbedded, defaultFPS)
+		s, err := start(t, cursor, defaultFPS)
 		if err != nil {
 			c.stopStreams(started)
 			return nil, err
@@ -469,13 +470,12 @@ func (o screenCastObject) SelectSources(_, session dbus.ObjectPath, appID string
 		warnf("screencast: SelectSources: source types %#x, of %#x offered", types, available)
 		return ResponseOther, Vardict{}, nil
 	}
-	cursor, ok := optU32(options, "cursor_mode")
-	if !ok {
-		cursor = cursorHidden
-	}
-	if cursor != cursorHidden && cursor != cursorEmbedded {
-		warnf("screencast: SelectSources: cursor mode %#x, of %#x offered", cursor, availableCursorModes)
-		return ResponseOther, Vardict{}, nil
+	cursor := cursorHidden
+	if v, ok := optU32(options, "cursor_mode"); ok {
+		if cursor, ok = parseCursorMode(v); !ok {
+			warnf("screencast: SelectSources: cursor mode %#x, of %#x offered", v, availableCursorModes)
+			return ResponseOther, Vardict{}, nil
+		}
 	}
 	o.c.sharing(s)
 	multiple, _ := optBool(options, "multiple")

@@ -34,6 +34,7 @@ type screenStream interface {
 // the source does or when the producer is cut off from PipeWire.
 type pipewireStream struct {
 	producer      *pipewire.Producer
+	source        pipewire.Source
 	width, height int32
 	ended         chan struct{}
 	stop          chan struct{}
@@ -41,9 +42,9 @@ type pipewireStream struct {
 	closeSource   func()
 }
 
-func newPipewireStream(p *pipewire.Producer, width, height int32, sourceEnded <-chan struct{}, closeSource func()) *pipewireStream {
+func newPipewireStream(p *pipewire.Producer, src pipewire.Source, width, height int32, sourceEnded <-chan struct{}, closeSource func()) *pipewireStream {
 	s := &pipewireStream{
-		producer: p, width: width, height: height, closeSource: closeSource,
+		producer: p, source: src, width: width, height: height, closeSource: closeSource,
 		ended: make(chan struct{}), stop: make(chan struct{}), watched: make(chan struct{}),
 	}
 	go s.watch(sourceEnded)
@@ -107,15 +108,40 @@ type screenStreams struct {
 	openDevice func(dev uint64) (gpuAllocator, error)
 }
 
-// start opens the capture for target and its PipeWire producer. An
+// start opens the capture for target, the pointer when the cursor mode
+// carries it beside the frames, and its PipeWire producer.
+func (st screenStreams) start(target sharepicker.Target, mode cursorMode, fps uint32) (screenStream, error) {
+	cur := castCursor{paint: mode == cursorEmbedded}
+	if mode == cursorMetadata {
+		p, err := openCastPointer(target)
+		if err != nil {
+			return nil, err
+		}
+		cur.pointer = p
+	}
+	s, err := st.startCapture(target, cur, fps)
+	if err != nil && cur.pointer != nil {
+		cur.pointer.close()
+	}
+	return s, err
+}
+
+// castCursor is how a stream shows the pointer: painted into its frames,
+// carried beside them by pointer, or neither.
+type castCursor struct {
+	paint   bool
+	pointer *castPointer
+}
+
+// startCapture opens the capture for target and its producer. An
 // output, a region and a window stream zero-copy when the compositor and
 // the GPU allow; else, logged with the reason, an output streams from an
 // ext-image-copy session (damage-driven: a static screen sends nothing
 // new), and a compositor without it, a region, and a window take one
 // screencopy or toplevel capture per frame.
-func (st screenStreams) start(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+func (st screenStreams) startCapture(target sharepicker.Target, cur castCursor, fps uint32) (screenStream, error) {
 	if target.Kind == sharepicker.TargetWindow {
-		s, err := st.startWindowGPU(target.Name, cursor, fps)
+		s, err := st.startWindowGPU(target.Name, cur, fps)
 		if err == nil {
 			return s, nil
 		}
@@ -125,7 +151,7 @@ func (st screenStreams) start(target sharepicker.Target, cursor bool, fps uint32
 		warnf("screencast: window %s streams through shared memory: %v", target.Name, err)
 	}
 	if target.Kind == sharepicker.TargetOutput || target.Kind == sharepicker.TargetRegion {
-		s, err := st.startGPU(target, cursor, fps)
+		s, err := st.startGPU(target, cur, fps)
 		if err == nil {
 			return s, nil
 		}
@@ -134,20 +160,20 @@ func (st screenStreams) start(target sharepicker.Target, cursor bool, fps uint32
 		}
 		if target.Kind == sharepicker.TargetRegion {
 			warnf("screencast: a region of output %s streams through shared memory: %v", target.Name, err)
-			return startSnapshotStream(target, cursor, fps)
+			return startSnapshotStream(target, cur, fps)
 		}
 		warnf("screencast: output %s streams through shared memory: %v", target.Name, err)
-		if s, err := capture.OpenOutputStream(target.Name, cursor); err == nil {
+		if s, err := capture.OpenOutputStream(target.Name, cur.paint); err == nil {
 			info := s.Info()
 			return startProducer(producerGeometry{
 				width: info.Width, height: info.Height, stride: info.Stride, format: info.Format,
 				fps: effectiveFPS(fps, info.RefreshMHz), transform: uint32(info.Transform),
-			}, &extSource{stream: s}, s.Done(), func() { _ = s.Close() })
+			}, &extSource{stream: s}, cur.pointer, s.Done(), func() { _ = s.Close() })
 		} else if !errors.Is(err, capture.ErrUnsupported) {
 			return nil, err
 		}
 	}
-	return startSnapshotStream(target, cursor, fps)
+	return startSnapshotStream(target, cur, fps)
 }
 
 // producerGeometry is the stream's fixed layout, from its first frame.
@@ -157,7 +183,10 @@ type producerGeometry struct {
 	fps, transform        uint32
 }
 
-func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{}, closeSource func()) (screenStream, error) {
+// startProducer streams src, with pointer beside the frames when it is not
+// nil. A producer that does not start closes the source, and leaves the
+// pointer to the caller; a running stream closes both.
+func startProducer(g producerGeometry, src pipewire.Source, pointer *castPointer, ended <-chan struct{}, closeSource func()) (screenStream, error) {
 	width, errW := intconv.Exact[int32](g.width)
 	height, errH := intconv.Exact[int32](g.height)
 	uwidth, errUW := intconv.Exact[uint32](g.width)
@@ -167,16 +196,26 @@ func startProducer(g producerGeometry, src pipewire.Source, ended <-chan struct{
 		closeSource()
 		return nil, fmt.Errorf("screencast: a %dx%d stream of stride %d: %w", g.width, g.height, g.stride, err)
 	}
-	p, err := pipewire.Start(pipewire.Config{
+	cfg := pipewire.Config{
 		Application: shellName, Name: screencastNode,
 		Width: uwidth, Height: uheight, Stride: stride,
 		Format: videoFormat(g.format), FPS: g.fps, Transform: g.transform, Source: src,
-	})
+	}
+	closeAll := closeSource
+	if pointer != nil {
+		pointer.fit(g.width, g.height)
+		cfg.Cursor = pointer
+		closeAll = func() {
+			closeSource()
+			pointer.close()
+		}
+	}
+	p, err := pipewire.Start(cfg)
 	if err != nil {
 		closeSource()
 		return nil, err
 	}
-	return newPipewireStream(p, width, height, ended, closeSource), nil
+	return newPipewireStream(p, src, width, height, ended, closeAll), nil
 }
 
 // videoFormat maps the wl_shm format the compositor returned; an
@@ -227,6 +266,85 @@ func (e *extSource) Fill(dst []byte) ([]pipewire.Rect, bool) {
 	e.seq, e.sent, e.at = f.Seq, true, now
 	return rects(f.Damage), true
 }
+
+// castPointer is the pointer a metadata cursor mode stream carries: the
+// capture cursor over its output or window, whose frames it is placed in
+// as the compositor places it. A region's frames are the region of its
+// output (in the output's buffer pixels, the logical region scaled as the
+// frames are): the pointer is placed from the region's corner, and off the
+// region it is not over the frames.
+type castPointer struct {
+	cursor *capture.Cursor
+	// region is a region target's logical rectangle, nil for a whole
+	// output or a window; crop is it in the cursor's coordinates, set by
+	// fit.
+	region, crop *image.Rectangle
+}
+
+// openCastPointer follows the pointer over target's output or window.
+func openCastPointer(target sharepicker.Target) (*castPointer, error) {
+	open := capture.OpenOutputCursor
+	if target.Kind == sharepicker.TargetWindow {
+		open = capture.OpenToplevelCursor
+	}
+	k, err := open(target.Name)
+	if err != nil {
+		return nil, fmt.Errorf("screencast: follow the pointer over %s: %w", target.Payload(), err)
+	}
+	return &castPointer{cursor: k, region: regionOf(target)}, nil
+}
+
+// fit places a region's pointer in its frames of width x height.
+func (p *castPointer) fit(width, height int) {
+	r := p.region
+	if r == nil || r.Dx() <= 0 || r.Dy() <= 0 {
+		return
+	}
+	crop := image.Rect(0, 0, width, height).Add(image.Pt(r.Min.X*width/r.Dx(), r.Min.Y*height/r.Dy()))
+	p.crop = &crop
+}
+
+func (p *castPointer) CursorState() pipewire.CursorState {
+	s := p.cursor.State()
+	at := image.Pt(s.X, s.Y)
+	if !s.Inside {
+		return pipewire.CursorState{}
+	}
+	if c := p.crop; c != nil {
+		if !at.In(*c) {
+			return pipewire.CursorState{}
+		}
+		at = at.Sub(c.Min)
+	}
+	return pipewire.CursorState{
+		Visible: true,
+		X:       intconv.Clamp[int32](at.X), Y: intconv.Clamp[int32](at.Y),
+		HotspotX: intconv.Clamp[int32](s.HotspotX), HotspotY: intconv.Clamp[int32](s.HotspotY),
+		Shape: s.Shape,
+	}
+}
+
+// CursorBitmap reads shape's image, whose layout is the state's while the
+// state still numbers it: a shape's number is never reused.
+func (p *castPointer) CursorBitmap(shape uint64, dst []byte, side int) (pipewire.CursorBitmap, bool) {
+	s := p.cursor.State()
+	if s.Shape != shape {
+		return pipewire.CursorBitmap{}, false
+	}
+	w, h, ok := p.cursor.ReadImage(shape, dst, side, side)
+	if !ok {
+		return pipewire.CursorBitmap{}, false
+	}
+	return pipewire.CursorBitmap{
+		Format: videoFormat(s.Format),
+		Width:  intconv.Clamp[uint32](w), Height: intconv.Clamp[uint32](h),
+		Stride: intconv.Clamp[uint32](w * s.Format.BytesPerPixel()),
+	}, true
+}
+
+func (p *castPointer) NotifyCursor(wake func()) { p.cursor.OnChange(wake) }
+
+func (p *castPointer) close() { _ = p.cursor.Close() }
 
 func rects(damage []capture.Rect) []pipewire.Rect {
 	out := make([]pipewire.Rect, len(damage))
@@ -299,7 +417,7 @@ func copyRows(dst []byte, f *capture.Frame) {
 }
 
 // startSnapshotStream captures per frame on a connection of its own.
-func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+func startSnapshotStream(target sharepicker.Target, cur castCursor, fps uint32) (screenStream, error) {
 	c, err := capture.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to wayland: %w", err)
@@ -317,14 +435,14 @@ func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (sc
 		}
 		gone = outputGone(c, target.Name)
 		refresh, transform = o.RefreshMHz, o.Transform
-		grab = outputGrab(c, o, regionOf(target), cursor)
+		grab = outputGrab(c, o, regionOf(target), cur.paint)
 	case sharepicker.TargetWindow:
 		t, ok := findToplevel(c, target.Name)
 		if !ok {
 			_ = c.Close()
 			return nil, fmt.Errorf("window '%s' is gone", target.Name)
 		}
-		grab = toplevelGrab(c, t, cursor)
+		grab = toplevelGrab(c, t, cur.paint)
 		gone = toplevelGone(c, target.Name)
 	}
 	first, err := grab(nil)
@@ -337,7 +455,7 @@ func startSnapshotStream(target sharepicker.Target, cursor bool, fps uint32) (sc
 	return startProducer(producerGeometry{
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, refresh), transform: uint32(transform),
-	}, src, watch.ended, func() { _ = c.Close() })
+	}, src, cur.pointer, watch.ended, func() { _ = c.Close() })
 }
 
 // outputGone reports, on each call, whether the output left.
@@ -460,7 +578,7 @@ func (st screenStreams) deviceLayouts(offered capture.DmabufFormat) (gpuAllocato
 // startGPU streams an output or a region of one zero-copy when the
 // compositor and the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise,
 // and the caller takes the shared-memory paths.
-func (st screenStreams) startGPU(target sharepicker.Target, cursor bool, fps uint32) (screenStream, error) {
+func (st screenStreams) startGPU(target sharepicker.Target, cur castCursor, fps uint32) (screenStream, error) {
 	c, fail, err := connectForDmabuf()
 	if err != nil {
 		return nil, err
@@ -473,14 +591,14 @@ func (st screenStreams) startGPU(target sharepicker.Target, cursor bool, fps uin
 	region := regionOf(target)
 	var offered capture.DmabufFormat
 	if region != nil {
-		offered, err = c.DmabufRegionFormat(o, *region, cursor)
+		offered, err = c.DmabufRegionFormat(o, *region, cur.paint)
 	} else {
-		offered, err = c.DmabufFormat(o, cursor)
+		offered, err = c.DmabufFormat(o, cur.paint)
 	}
 	if err != nil {
 		return fail(err)
 	}
-	grab := outputGrab(c, o, region, cursor)
+	grab := outputGrab(c, o, region, cur.paint)
 	first, err := grab(nil)
 	if err != nil {
 		return fail(err)
@@ -491,7 +609,7 @@ func (st screenStreams) startGPU(target sharepicker.Target, cursor bool, fps uin
 	}
 	watch := newVanishWatch(outputGone(c, output))
 	shm := newSnapshotSource(grab, first, watch)
-	src, err := probeGPUSource(shm, dev, screencopy{c: c, region: region}, offered, layouts, o, cursor, first)
+	src, err := probeGPUSource(shm, dev, screencopy{c: c, region: region}, offered, layouts, o, cur.paint, first)
 	if err != nil {
 		dev.Close()
 		return fail(err)
@@ -500,7 +618,7 @@ func (st screenStreams) startGPU(target sharepicker.Target, cursor bool, fps uin
 	return startProducer(producerGeometry{
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, o.RefreshMHz), transform: uint32(o.Transform),
-	}, src, watch.ended, func() {
+	}, src, cur.pointer, watch.ended, func() {
 		dev.Close()
 		_ = c.Close()
 	})
@@ -509,7 +627,7 @@ func (st screenStreams) startGPU(target sharepicker.Target, cursor bool, fps uin
 // startWindowGPU streams a window zero-copy over a capture session of
 // its own (screencast_window.go) when the compositor and the GPU allow;
 // errNoDmabuf otherwise, and the caller takes the shared-memory path.
-func (st screenStreams) startWindowGPU(id string, cursor bool, fps uint32) (screenStream, error) {
+func (st screenStreams) startWindowGPU(id string, cur castCursor, fps uint32) (screenStream, error) {
 	c, fail, err := connectForDmabuf()
 	if err != nil {
 		return nil, err
@@ -518,12 +636,12 @@ func (st screenStreams) startWindowGPU(id string, cursor bool, fps uint32) (scre
 	if !ok {
 		return fail(fmt.Errorf("window '%s' is gone", id))
 	}
-	grab := toplevelGrab(c, t, cursor)
+	grab := toplevelGrab(c, t, cur.paint)
 	first, err := grab(nil)
 	if err != nil {
 		return fail(err)
 	}
-	offered, err := windowDmabufFormat(c, t, cursor)
+	offered, err := windowDmabufFormat(c, t, cur.paint)
 	if err != nil {
 		return fail(err)
 	}
@@ -532,7 +650,7 @@ func (st screenStreams) startWindowGPU(id string, cursor bool, fps uint32) (scre
 		return fail(err)
 	}
 	watch := newVanishWatch(toplevelGone(c, id))
-	ws := &windowSession{c: c, t: t, cursor: cursor}
+	ws := &windowSession{c: c, t: t, cursor: cur.paint}
 	src, err := newWindowGPUSource(newSnapshotSource(grab, first, watch), dev, ws, offered, layouts)
 	if err != nil {
 		dev.Close()
@@ -541,7 +659,7 @@ func (st screenStreams) startWindowGPU(id string, cursor bool, fps uint32) (scre
 	return startProducer(producerGeometry{
 		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
 		fps: effectiveFPS(fps, 0),
-	}, src, watch.ended, func() {
+	}, src, cur.pointer, watch.ended, func() {
 		src.Close()
 		dev.Close()
 		_ = c.Close()

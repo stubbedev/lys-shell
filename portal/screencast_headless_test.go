@@ -33,7 +33,7 @@ func TestHeadlessScreenStreams(t *testing.T) {
 		{Kind: sharepicker.TargetOutput, Name: outs[0].Name},
 		{Kind: sharepicker.TargetRegion, Name: outs[0].Name, X: 10, Y: 20, Width: 200, Height: 100},
 	} {
-		s, err := streams.start(target, true, defaultFPS)
+		s, err := streams.start(target, cursorEmbedded, defaultFPS)
 		if err != nil {
 			t.Fatalf("%s: %v", target.Payload(), err)
 		}
@@ -46,10 +46,10 @@ func TestHeadlessScreenStreams(t *testing.T) {
 		}
 		s.Close()
 	}
-	if _, err := streams.start(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: "NOPE-1"}, false, defaultFPS); err == nil {
+	if _, err := streams.start(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: "NOPE-1"}, cursorHidden, defaultFPS); err == nil {
 		t.Error("a missing output streamed")
 	}
-	if _, err := streams.start(sharepicker.Target{Kind: sharepicker.TargetWindow, Name: "no-such-window"}, false, defaultFPS); err == nil {
+	if _, err := streams.start(sharepicker.Target{Kind: sharepicker.TargetWindow, Name: "no-such-window"}, cursorHidden, defaultFPS); err == nil {
 		t.Error("a missing window streamed")
 	}
 }
@@ -73,7 +73,7 @@ func TestHeadlessGPUStream(t *testing.T) {
 	}
 	pwtest.Start(t)
 	streams := screenStreams{openDevice: openVulkanAllocator}
-	s, err := streams.startGPU(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: outs[0].Name}, false, 30)
+	s, err := streams.startGPU(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: outs[0].Name}, castCursor{}, 30)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}
