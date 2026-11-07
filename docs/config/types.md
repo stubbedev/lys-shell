@@ -312,6 +312,15 @@ Border placement for bar buttons.
 | `"right"` | Border on right edge only. |
 | `"all"` | Border on all edges. |
 
+## CalendarSource {#calendar-source}
+
+A vdir calendar: a directory of iCalendar files, one event per file.
+
+| Field | Description |
+|---|---|
+| `path` | Directory of .ics files; a leading `~/` is the home directory. |
+| `color` | Color of the calendar's events in the dropdown's agenda. |
+
 ## CavaDirection {#cava-direction}
 
 Bar growth direction relative to the bar's attached screen edge.

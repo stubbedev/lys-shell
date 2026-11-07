@@ -85,6 +85,23 @@ type ClockConfig struct {
 	DropdownShowSeconds bool `cfg:"dropdown-show-seconds"`
 	// First day of the week in the calendar dropdown.
 	CalendarWeekdayStart WeekStart `cfg:"calendar-weekday-start"`
+	// vdir calendars whose events the calendar dropdown shows: directories of
+	// .ics files, one per event, as vdirsyncer and khal keep them (`~/` is the
+	// home directory). Edits show without a restart; syncing stays with
+	// vdirsyncer, the shell never goes online for them. The bar label shows
+	// the next event through a `{{ next_event }}` placeholder in `format`, and
+	// event reminders (VALARM) become notifications.
+	//
+	// ## Example
+	//
+	// ```yaml
+	// modules:
+	//   clock:
+	//     calendars:
+	//       - {path: ~/.local/share/calendars/work, color: blue}
+	//       - {path: ~/.local/share/calendars/home}
+	// ```
+	Calendars []CalendarSource `cfg:"calendars"`
 }
 
 // DefaultsClock returns the schema defaults.
@@ -108,6 +125,7 @@ func DefaultsClock() ClockConfig {
 		ScrollDown:           ClickAction{},
 		DropdownShowSeconds:  false,
 		CalendarWeekdayStart: WeekStartSunday,
+		Calendars:            []CalendarSource{},
 	}
 }
 
@@ -115,3 +133,15 @@ func DefaultsClock() ClockConfig {
 func (c ClockConfig) Clicks() ClickConfig {
 	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }
+
+// CalendarSource is one `modules.clock.calendars` entry.
+//
+// A vdir calendar: a directory of iCalendar files, one event per file.
+type CalendarSource struct {
+	// Directory of .ics files; a leading `~/` is the home directory.
+	Path string `cfg:"path,required,type=Directory"`
+	// Color of the calendar's events in the dropdown's agenda.
+	Color ColorValue `cfg:"color,default"`
+}
+
+func (CalendarSource) noStructDefault() {}

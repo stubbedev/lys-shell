@@ -357,6 +357,8 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 	} else {
 		log.Printf("media: %v", mediaErr)
 	}
+	s.ctx.Calendar = startCalendar(s.cfg.Clock, s.current.Load)
+	s.down.add(s.ctx.Calendar.Close)
 	if dir, ok := xdg.OS.CacheDir(version.Name); ok {
 		s.ctx.Lyrics = lyrics.New(lyrics.Endpoint, filepath.Join(dir, "lyrics"))
 	} else {
@@ -704,6 +706,7 @@ func (s *shellStart) mount() {
 				s.sounds.SetPolicy(next.Notification.SoundPolicy())
 			}
 			s.weatherSvc.Configure(weatherSettings(next.Weather))
+			reconfigureCalendar(baseCtx.Calendar, old.Clock, next.Clock)
 			if s.wall != nil {
 				s.wall.SetConfig(next)
 			}

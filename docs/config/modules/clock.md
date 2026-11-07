@@ -29,6 +29,7 @@ bar:
 | `label-show` | bool | `true` | Display text label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `calendar-weekday-start` | [`WeekStart`](/config/types#week-start) | `"sunday"` | First day of the week in the calendar dropdown. |
+| `calendars` | array of [`CalendarSource`](/config/types#calendar-source) | `[]` | vdir calendars whose events the calendar dropdown shows: directories of .ics files, one per event, as vdirsyncer and khal keep them (`~/` is the home directory). Edits show without a restart; syncing stays with vdirsyncer, the shell never goes online for them. The bar label shows the next event through a `{{ next_event }}` placeholder in `format`, and event reminders (VALARM) become notifications. |
 
 ::: details More about `format`
 
@@ -51,6 +52,20 @@ bar:
 - `"%H:%M"` - "14:30"
 - `"%I:%M %p"` - "02:30 PM"
 - `"%a %b %d %I:%M %p"` - "Mon Jan 15 02:30 PM"
+
+:::
+
+::: details More about `calendars`
+
+#### Example
+
+```yaml
+modules:
+  clock:
+    calendars:
+      - {path: ~/.local/share/calendars/work, color: blue}
+      - {path: ~/.local/share/calendars/home}
+```
 
 :::
 
@@ -103,6 +118,7 @@ modules:
     scroll-down: ""
     dropdown-show-seconds: false
     calendar-weekday-start: sunday
+    calendars: []
 ```
 
 

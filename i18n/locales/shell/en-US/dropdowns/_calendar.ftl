@@ -1,6 +1,8 @@
 ### Calendar Dropdown
 
 dropdown-calendar-title = Calendar
+dropdown-calendar-all-day = All day
+dropdown-calendar-no-events = No events
 
 ## Clock Display
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/calendar"
 	"github.com/stubbedev/lys-shell/strftime"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -88,6 +89,8 @@ type calendarView struct {
 	cal                           *widget.Calendar
 	names                         calendarNames
 	timeRow                       *widget.Box
+	agenda                        *calendarAgenda
+	agendaRule                    *widget.Separator
 
 	today widget.Date
 
@@ -106,6 +109,10 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.hero(), false)
 	content.Append(widget.NewSeparator(widget.Horizontal), false)
 	content.Append(v.calendar(), false)
+	v.agendaRule = widget.NewSeparator(widget.Horizontal)
+	v.agenda = newCalendarAgenda(font, px)
+	content.Append(v.agendaRule, false)
+	content.Append(v.agenda, false)
 	v.Append(content, false)
 	v.startFollowing()
 	return v
@@ -170,6 +177,9 @@ func (v *calendarView) calendar() widget.Widget {
 	v.names = calendarNames{weekStart: calendarWeekStart(v.ctx.Config.Clock.CalendarWeekdayStart)}
 	v.cal.SetNames(v.names)
 	v.cal.SetToday(v.today)
+	v.cal.OnMonth = func(widget.Date) { v.markMonth() }
+	v.cal.OnSelect = func(widget.Date) { v.showAgenda() }
+	v.cal.Detail = v.dayDetail
 	col.Append(v.cal, false)
 	return col
 }
@@ -208,8 +218,23 @@ func (v *calendarView) tick() {
 
 func (v *calendarView) follow(life context.Context) {
 	v.tick()
+	v.refreshEvents()
 	if v.ctx.App == nil {
 		return
+	}
+	if v.ctx.Calendar != nil {
+		changes, stop := v.ctx.Calendar.Changes()
+		go func() {
+			defer stop()
+			for {
+				select {
+				case <-life.Done():
+					return
+				case <-changes:
+					v.ctx.Invoke(v.refreshEvents)
+				}
+			}
+		}()
 	}
 	go func() {
 		ticker := time.NewTicker(time.Second)
@@ -224,3 +249,47 @@ func (v *calendarView) follow(life context.Context) {
 		}
 	}()
 }
+
+func (v *calendarView) hasEvents() bool { return v.ctx.Calendar != nil && v.ctx.Calendar.Configured() }
+
+func (v *calendarView) refreshEvents() {
+	shown := v.hasEvents()
+	v.agenda.SetVisible(shown)
+	v.agendaRule.SetVisible(shown)
+	v.markMonth()
+	v.showAgenda()
+}
+
+func (v *calendarView) day(d widget.Date) []calendar.Occurrence {
+	if !v.hasEvents() || d.IsZero() {
+		return nil
+	}
+	return v.ctx.Calendar.Month(d.Year, d.Month).Day(d.Day)
+}
+
+func (v *calendarView) markMonth() {
+	v.cal.ClearMarks()
+	if !v.hasEvents() {
+		return
+	}
+	first := v.cal.Shown()
+	month := v.ctx.Calendar.Month(first.Year, first.Month)
+	for d := 1; d <= 31; d++ {
+		if len(month.Day(d)) > 0 {
+			v.cal.MarkDay(widget.Date{Year: first.Year, Month: first.Month, Day: d})
+		}
+	}
+}
+
+func (v *calendarView) showAgenda() {
+	if !v.hasEvents() {
+		return
+	}
+	day := v.cal.Selection()
+	if day.IsZero() {
+		day = v.today
+	}
+	v.agenda.show(v.day(day), calendarIs12h(v.ctx.Config.Clock.Format.String()))
+}
+
+func (v *calendarView) dayDetail(d widget.Date) string { return dayDetail(v.day(d)) }

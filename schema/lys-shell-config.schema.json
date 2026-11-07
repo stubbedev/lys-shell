@@ -399,6 +399,12 @@
       },
       "type": "array"
     },
+    "Array_of_CalendarSource": {
+      "items": {
+        "$ref": "#/$defs/CalendarSource"
+      },
+      "type": "array"
+    },
     "Array_of_CustomModuleDefinition": {
       "items": {
         "$ref": "#/$defs/CustomModuleDefinition"
@@ -1682,6 +1688,24 @@
       },
       "type": "object"
     },
+    "CalendarSource": {
+      "description": "A vdir calendar: a directory of iCalendar files, one event per file.",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Color of the calendar's events in the dropdown's agenda."
+        },
+        "path": {
+          "$ref": "#/$defs/Directory",
+          "description": "Directory of .ics files; a leading `~/` is the home directory."
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
     "CavaConfig": {
       "description": "Audio frequency bars visualising the output stream.",
       "properties": {
@@ -1974,6 +1998,11 @@
           "$ref": "#/$defs/WeekStart",
           "default": "sunday",
           "description": "First day of the week in the calendar dropdown."
+        },
+        "calendars": {
+          "$ref": "#/$defs/Array_of_CalendarSource",
+          "default": [],
+          "description": "vdir calendars whose events the calendar dropdown shows: directories of\n.ics files, one per event, as vdirsyncer and khal keep them (`~/` is the\nhome directory). Edits show without a restart; syncing stays with\nvdirsyncer, the shell never goes online for them. The bar label shows\nthe next event through a `{{ next_event }}` placeholder in `format`, and\nevent reminders (VALARM) become notifications.\n\n## Example\n\n```yaml\nmodules:\n  clock:\n    calendars:\n      - {path: ~/.local/share/calendars/work, color: blue}\n      - {path: ~/.local/share/calendars/home}\n```"
         },
         "dropdown-show-seconds": {
           "$ref": "#/$defs/boolean",
@@ -6082,6 +6111,7 @@
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
             "calendar-weekday-start": "sunday",
+            "calendars": [],
             "dropdown-show-seconds": false,
             "format": "%a %b %d %I:%M %p",
             "icon-bg-color": "accent",
@@ -12094,6 +12124,7 @@
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
           "calendar-weekday-start": "sunday",
+          "calendars": [],
           "dropdown-show-seconds": false,
           "format": "%a %b %d %I:%M %p",
           "icon-bg-color": "accent",

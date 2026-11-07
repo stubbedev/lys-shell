@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/calendar"
 	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/idle"
@@ -51,6 +52,9 @@ type ModuleContext struct {
 	Brightness brightness.Source
 	Pulse      pulse.Source
 	Media      mpris.Source
+	// Calendar holds the vdir calendars the calendar dropdown and the
+	// clock read; nil in headless construction.
+	Calendar *calendar.Store
 	// Lyrics looks up the media dropdown's lyrics; nil when the cache
 	// directory is unknown.
 	Lyrics        *lyrics.Service

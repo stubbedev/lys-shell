@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -22,7 +23,8 @@ func newClock(ctx ModuleContext) (Module, error) {
 	if layout == nil {
 		return nil, errors.New("clock: no format")
 	}
-	btn := newBarButton(ctx, moduleIcon(ctx, ctx.Config.Clock.Icon()), layout.Format(time.Now()))
+	cfg, store := ctx.Config.Clock, ctx.Calendar
+	btn := newBarButton(ctx, moduleIcon(ctx, cfg.Icon()), clockLabel(cfg, store, time.Now()))
 	if ctx.App == nil {
 		return &clock{btn: btn}, nil
 	}
@@ -30,9 +32,23 @@ func newClock(ctx ModuleContext) (Module, error) {
 		key:   configKey("clock", ctx.Config),
 		pause: pauseLocked,
 		source: func(life context.Context, fire func()) error {
+			if store != nil && strings.Contains(cfg.Format.String(), nextEventPlaceholder) {
+				changes, stop := store.Changes()
+				go func() {
+					defer stop()
+					for {
+						select {
+						case <-life.Done():
+							return
+						case <-changes:
+							fire()
+						}
+					}
+				}()
+			}
 			return walltimer.Start(life, layout.Resolution(), fire)
 		},
-		sample: func() (string, bool) { return layout.Format(time.Now()), true },
+		sample: func() (string, bool) { return clockLabel(cfg, store, time.Now()), true },
 		same:   func(a, b string) bool { return a == b },
 	}
 	if err := joinSampler(ctx.Life(), ctx.Polls, spec, func(text string) { ctx.Invoke(func() { btn.SetLabel(text) }) }); err != nil {

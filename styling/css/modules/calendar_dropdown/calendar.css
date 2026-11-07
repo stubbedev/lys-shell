@@ -1,3 +1,10 @@
 .calendar-dropdown calendar .weekend {
   color: color-mix(in srgb, var(--accent) 50%, var(--fg-muted));
 }
+
+.calendar-dropdown .cal-event-color {
+  border-radius: var(--radius-full);
+}
+.calendar-dropdown label.cal-event-summary {
+  color: var(--fg-default);
+}

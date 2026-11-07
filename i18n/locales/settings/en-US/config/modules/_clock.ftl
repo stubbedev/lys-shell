@@ -64,3 +64,6 @@ enum-week-start-thursday = Thursday
 enum-week-start-friday = Friday
 enum-week-start-saturday = Saturday
 enum-week-start-sunday = Sunday
+
+settings-modules-clock-calendars = Calendars
+    .description = vdir directories of .ics files (vdirsyncer, khal) whose events the calendar dropdown shows

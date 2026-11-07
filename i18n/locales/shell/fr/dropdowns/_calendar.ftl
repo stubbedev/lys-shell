@@ -1,6 +1,8 @@
 ### Menu déroulant du calendrier
 
 dropdown-calendar-title = Calendrier
+dropdown-calendar-all-day = Toute la journée
+dropdown-calendar-no-events = Aucun événement
 
 ## Affichage de l'horloge
 
