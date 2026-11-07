@@ -3,7 +3,6 @@ package dialoghost
 import (
 	"cmp"
 	"log"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -423,13 +422,7 @@ func (h *Dialogs) label(text string, classes ...string) *widget.Label {
 
 // icon is a themed icon (or an icon file), nil for none.
 func (h *Dialogs) icon(name string, px int) *widget.Icon {
-	if name == "" {
-		return nil
-	}
-	if filepath.IsAbs(name) {
-		return widgets.NewAsyncFileIcon(name, "", px, h.d.Invoke, nil)
-	}
-	return widget.NewThemeIconFallback(name, px)
+	return widgets.NewAppIcon(name, px, h.d.Invoke)
 }
 
 // headerIcon is the header image slot showing a themed icon.

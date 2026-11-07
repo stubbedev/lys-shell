@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"log"
+	"path/filepath"
 	"sync"
 
 	"github.com/stubbedev/lys-ui/widget"
@@ -89,4 +90,17 @@ func loadFileIcon(key fileIconKey) {
 	for _, done := range waiters {
 		done()
 	}
+}
+
+// NewAppIcon is a desktop entry's Icon= value as an icon: a file decoded
+// off the loop (through post) when the value is a path, else the theme
+// name with GTK's app icon fallbacks; nil when the entry names none.
+func NewAppIcon(name string, size int, post func(func())) *widget.Icon {
+	if name == "" {
+		return nil
+	}
+	if filepath.IsAbs(name) {
+		return NewAsyncFileIcon(name, "", size, post, nil)
+	}
+	return widget.NewThemeIconFallback(name, size)
 }
