@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"slices"
 	"strconv"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/batteryalert"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/upower"
 	"github.com/stubbedev/lys-shell/shell/widgets"
@@ -173,10 +175,14 @@ type batteryView struct {
 	profilesUnavailable *widget.Alert
 	activeProfile       string
 
+	devicesSection *widget.Box
+	devices        *widget.Box
+
 	// device and profiles read the two services; a write's re-read goes
 	// through them too, so it can never land after a newer change.
-	device   *refresher[batteryRead]
-	profiles *refresher[*powerprofiles.Snapshot]
+	device      *refresher[batteryRead]
+	profiles    *refresher[*powerprofiles.Snapshot]
+	peripherals *refresher[[]upower.Peripheral]
 
 	*openFollow
 }
@@ -195,15 +201,18 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	v.body.Add("empty", empty)
 	v.body.Add("battery", v.batterySection())
 	content.Append(v.body, false)
+	content.Append(v.deviceSection(), false)
 	content.Append(v.profileSection(), false)
 	v.Append(content, true)
 	v.applyDevice(upower.Device{}, false)
+	v.applyPeripherals(nil)
 	v.applyProfiles(nil)
 	if ctx.Battery != nil {
 		v.device = newRefresher(ctx, v.life, func(c context.Context) batteryRead {
 			dev, ok := v.readDevice(c)
 			return batteryRead{dev, ok}
 		}, func(r batteryRead) { v.applyDevice(r.dev, r.ok) })
+		v.peripherals = newRefresher(ctx, v.life, v.readPeripherals, v.applyPeripherals)
 	}
 	if ctx.PowerProfiles != nil {
 		v.profiles = newRefresher(ctx, v.life, v.readProfiles, v.applyProfiles)
@@ -523,8 +532,43 @@ func (v *batteryView) selectProfile(name string) {
 func (v *batteryView) follow(life context.Context) {
 	if src := v.ctx.Battery; src != nil {
 		followInto(life, "battery", src.Subscribe, v.device)
+		followInto(life, "battery peripherals", src.SubscribePeripherals, v.peripherals)
 	}
 	if src := v.ctx.PowerProfiles; src != nil {
 		followInto(life, "power profiles", src.Subscribe, v.profiles)
 	}
+}
+
+// deviceSection lists the peripherals UPower reports, hidden while
+// there are none.
+func (v *batteryView) deviceSection() widget.Widget {
+	v.devices = widget.NewBox(widget.Column, 0, 0)
+	v.devices.AddClass(css.Card)
+	v.devicesSection = dropdownSection(sectionLabel(v.font, i18n.T("dropdown-battery-devices")), v.devices)
+	return v.devicesSection
+}
+
+func (v *batteryView) readPeripherals(ctx context.Context) []upower.Peripheral {
+	list, err := v.ctx.Battery.Peripherals(ctx)
+	if err != nil {
+		log.Printf("battery: %v", err)
+		return nil
+	}
+	return list
+}
+
+// applyPeripherals rebuilds the device rows: each peripheral's icon
+// ringed by its charge, its name and its percentage.
+func (v *batteryView) applyPeripherals(list []upower.Peripheral) {
+	v.devices.Clear()
+	for _, p := range list {
+		percent := uint8(min(max(math.Round(p.Percentage), 0), 100))
+		row := widget.NewItem(v.font, batteryalert.PeripheralName(p), strconv.Itoa(int(percent))+"%")
+		row.SetSmall(true)
+		row.SetEllipsize(true)
+		row.AddClass("battery-device")
+		row.SetMedia(newGlyphRing(batteryalert.PeripheralIcon(p), percent), true)
+		v.devices.Append(row, false)
+	}
+	v.devicesSection.SetVisible(len(list) > 0)
 }

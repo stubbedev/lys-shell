@@ -1,14 +1,18 @@
 // Package upower reads battery state from UPower over the system D-Bus,
 // the Go counterpart of crates/wayle-battery's zbus proxy: the
-// DisplayDevice aggregate by default, live updates through
-// PropertiesChanged.
+// DisplayDevice aggregate, the peripherals UPower enumerates beside it,
+// and live updates through PropertiesChanged, DeviceAdded and
+// DeviceRemoved.
 package upower
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -98,6 +102,17 @@ type Device struct {
 	ChargeThresholdEnabled   bool
 }
 
+// propReader stores the named property of a GetAll reply into dst. A
+// property that is missing or of the wrong type leaves dst untouched:
+// older UPower releases lack some, and a device type lacks others.
+func propReader(props map[string]dbus.Variant) func(name string, dst any) {
+	return func(name string, dst any) {
+		if v, ok := props[name]; ok {
+			_ = v.Store(dst)
+		}
+	}
+}
+
 // deviceFromProps decodes a GetAll reply. A property that is missing or
 // of the wrong type keeps its zero value: older UPower releases lack
 // the charge-threshold properties.
@@ -105,11 +120,7 @@ func deviceFromProps(props map[string]dbus.Variant) Device {
 	var d Device
 	var state, warning uint32
 	var tte, ttf int64
-	read := func(name string, dst any) {
-		if v, ok := props[name]; ok {
-			_ = v.Store(dst)
-		}
-	}
+	read := propReader(props)
 	read("Percentage", &d.Percentage)
 	read("State", &state)
 	read("TimeToEmpty", &tte)
@@ -130,16 +141,114 @@ func deviceFromProps(props map[string]dbus.Variant) Device {
 	return d
 }
 
+// Rank orders the levels a battery alert follows: 0 for none, 1 for
+// Low, 2 for Critical and Action.
+func (w WarningLevel) Rank() uint8 {
+	switch w {
+	case WarningLow:
+		return 1
+	case WarningCritical, WarningAction:
+		return 2
+	}
+	return 0
+}
+
+// DeviceKind mirrors UPower's device Type enum.
+type DeviceKind uint8
+
+// Device kinds, numbered as UPower's Type property.
+const (
+	KindUnknown DeviceKind = iota
+	KindLinePower
+	KindBattery
+	KindUPS
+	KindMonitor
+	KindMouse
+	KindKeyboard
+	KindPDA
+	KindPhone
+	KindMediaPlayer
+	KindTablet
+	KindComputer
+	KindGamingInput
+	KindPen
+	KindTouchpad
+	KindModem
+	KindNetwork
+	KindHeadset
+	KindSpeakers
+	KindHeadphones
+	KindVideo
+	KindOtherAudio
+	KindRemoteControl
+	KindPrinter
+	KindScanner
+	KindCamera
+	KindWearable
+	KindToy
+	KindBluetoothGeneric
+	kindCount
+)
+
+// KindFromUint32 maps UPower's wire value; anything else is Unknown.
+func KindFromUint32(v uint32) DeviceKind {
+	if v < uint32(kindCount) {
+		return DeviceKind(v)
+	}
+	return KindUnknown
+}
+
+// Peripheral is one device UPower reports beside the DisplayDevice
+// aggregate: a wireless mouse, a keyboard, a controller, a headset, a
+// UPS.
+type Peripheral struct {
+	Path         dbus.ObjectPath
+	Kind         DeviceKind
+	Model        string
+	Percentage   float64
+	State        DeviceState
+	WarningLevel WarningLevel
+}
+
+// peripheralFromProps decodes one enumerated device's GetAll reply; ok
+// is false for what is not a peripheral: line power, a battery powering
+// the machine (the DisplayDevice aggregates those), and a device that
+// is not present.
+func peripheralFromProps(path dbus.ObjectPath, props map[string]dbus.Variant) (Peripheral, bool) {
+	var kind, state, warning uint32
+	var powerSupply, present bool
+	p := Peripheral{Path: path}
+	read := propReader(props)
+	read("Type", &kind)
+	read("PowerSupply", &powerSupply)
+	read("IsPresent", &present)
+	read("Model", &p.Model)
+	read("Percentage", &p.Percentage)
+	read("State", &state)
+	read("WarningLevel", &warning)
+	p.Kind = KindFromUint32(kind)
+	p.State = StateFromUint32(state)
+	p.WarningLevel = WarningFromUint32(warning)
+	if !present || p.Kind == KindLinePower || p.Kind == KindBattery && powerSupply {
+		return Peripheral{}, false
+	}
+	return p, true
+}
+
 // DisplayDevicePath is UPower's composite device across all batteries.
 const DisplayDevicePath = "/org/freedesktop/UPower/devices/DisplayDevice"
 
-const managerPath = dbus.ObjectPath("/org/freedesktop/UPower")
+const (
+	managerPath = dbus.ObjectPath("/org/freedesktop/UPower")
+	devicesPath = dbus.ObjectPath("/org/freedesktop/UPower/devices")
+)
 
 const (
 	// BusName is UPower's well-known name on the system bus.
 	BusName             = "org.freedesktop.UPower"
 	deviceInterface     = "org.freedesktop.UPower.Device"
 	propertiesInterface = "org.freedesktop.DBus.Properties"
+	propertiesChanged   = propertiesInterface + ".PropertiesChanged"
 )
 
 // Source is the seam the bar module and dropdown consume; tests swap
@@ -154,6 +263,12 @@ type Source interface {
 	// EnableChargeThreshold turns the charge limit on or off
 	// (Device::enable_charge_threshold).
 	EnableChargeThreshold(ctx context.Context, enabled bool) error
+	// Peripherals returns the peripherals UPower enumerates, ordered by
+	// object path.
+	Peripherals(ctx context.Context) ([]Peripheral, error)
+	// SubscribePeripherals delivers a tick per device added or removed
+	// and per PropertiesChanged on any device but the DisplayDevice.
+	SubscribePeripherals(ctx context.Context) (<-chan struct{}, func(), error)
 }
 
 // System reads the real UPower on the system bus.
@@ -169,13 +284,21 @@ func NewOn(conn *dbus.Conn) *System {
 
 // Read fetches every DisplayDevice property in one GetAll.
 func (s *System) Read(ctx context.Context) (Device, error) {
-	var props map[string]dbus.Variant
-	err := s.conn.Object(BusName, s.path).
-		CallWithContext(ctx, propertiesInterface+".GetAll", 0, deviceInterface).Store(&props)
+	props, err := s.getAll(ctx, s.path)
 	if err != nil {
-		return Device{}, fmt.Errorf("upower: GetAll: %w", err)
+		return Device{}, err
 	}
 	return deviceFromProps(props), nil
+}
+
+func (s *System) getAll(ctx context.Context, path dbus.ObjectPath) (map[string]dbus.Variant, error) {
+	var props map[string]dbus.Variant
+	err := s.conn.Object(BusName, path).
+		CallWithContext(ctx, propertiesInterface+".GetAll", 0, deviceInterface).Store(&props)
+	if err != nil {
+		return nil, fmt.Errorf("upower: GetAll %s: %w", path, err)
+	}
+	return props, nil
 }
 
 // EnableChargeThreshold calls the device's EnableChargeThreshold.
@@ -187,10 +310,52 @@ func (s *System) EnableChargeThreshold(ctx context.Context, enabled bool) error 
 	return nil
 }
 
-// Subscribe matches PropertiesChanged for the DisplayDevice and ticks
-// the channel per signal. The match is removed by stop.
+// Subscribe matches PropertiesChanged for the DisplayDevice, and UPower
+// gaining an owner, and ticks the channel per signal. The matches are
+// removed by stop.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	return s.subscribe(ctx, s.path)
+	return s.subscribe(ctx, propertiesOf(s.path), ownerAppeared)
+}
+
+// Peripherals enumerates UPower's devices and reads each one, keeping
+// the peripherals.
+func (s *System) Peripherals(ctx context.Context) ([]Peripheral, error) {
+	var paths []dbus.ObjectPath
+	if err := s.conn.Object(BusName, managerPath).CallWithContext(ctx, BusName+".EnumerateDevices", 0).Store(&paths); err != nil {
+		return nil, fmt.Errorf("upower: EnumerateDevices: %w", err)
+	}
+	out := make([]Peripheral, 0, len(paths))
+	for _, path := range paths {
+		props, err := s.getAll(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+		if p, ok := peripheralFromProps(path, props); ok {
+			out = append(out, p)
+		}
+	}
+	slices.SortFunc(out, func(a, b Peripheral) int { return cmp.Compare(a.Path, b.Path) })
+	return out, nil
+}
+
+// SubscribePeripherals matches DeviceAdded and DeviceRemoved on UPower
+// and PropertiesChanged under its devices, and UPower gaining an owner.
+// The matches are removed by stop.
+func (s *System) SubscribePeripherals(ctx context.Context) (<-chan struct{}, func(), error) {
+	return s.subscribe(ctx,
+		signalFilter{
+			match: []dbus.MatchOption{dbus.WithMatchObjectPath(managerPath), dbus.WithMatchInterface(BusName)},
+			accept: func(sig *dbus.Signal) bool {
+				return sig.Path == managerPath && (sig.Name == BusName+".DeviceAdded" || sig.Name == BusName+".DeviceRemoved")
+			},
+		},
+		signalFilter{
+			match: []dbus.MatchOption{dbus.WithMatchPathNamespace(devicesPath), dbus.WithMatchInterface(propertiesInterface)},
+			accept: func(sig *dbus.Signal) bool {
+				return sig.Path != DisplayDevicePath && sig.Name == propertiesChanged
+			},
+		},
+		ownerAppeared)
 }
 
 // OnBattery reads UPower's OnBattery: the machine runs on its battery.
@@ -206,13 +371,51 @@ func (s *System) OnBattery(ctx context.Context) (bool, error) {
 // SubscribeOnBattery ticks per PropertiesChanged of UPower itself, which
 // carries OnBattery. The match is removed by stop.
 func (s *System) SubscribeOnBattery(ctx context.Context) (<-chan struct{}, func(), error) {
-	return s.subscribe(ctx, managerPath)
+	return s.subscribe(ctx, propertiesOf(managerPath))
 }
 
-func (s *System) subscribe(ctx context.Context, path dbus.ObjectPath) (<-chan struct{}, func(), error) {
-	match := []dbus.MatchOption{dbus.WithMatchObjectPath(path), dbus.WithMatchInterface(propertiesInterface)}
-	if err := s.conn.AddMatchSignal(match...); err != nil {
-		return nil, nil, fmt.Errorf("upower: match signal: %w", err)
+// signalFilter is one match rule on the bus and the check a delivered
+// signal must pass, since the connection hands every subscriber every
+// signal it receives.
+type signalFilter struct {
+	match  []dbus.MatchOption
+	accept func(*dbus.Signal) bool
+}
+
+// ownerAppeared filters UPower starting or restarting, after which
+// everything read before is stale.
+var ownerAppeared = signalFilter{
+	match: dbusx.OwnerMatch(BusName),
+	accept: func(sig *dbus.Signal) bool {
+		_, owner, ok := dbusx.NameOwnerChange(sig, BusName)
+		return ok && owner != ""
+	},
+}
+
+// propertiesOf filters PropertiesChanged on path.
+func propertiesOf(path dbus.ObjectPath) signalFilter {
+	return signalFilter{
+		match: []dbus.MatchOption{dbus.WithMatchObjectPath(path), dbus.WithMatchInterface(propertiesInterface)},
+		accept: func(sig *dbus.Signal) bool {
+			return sig.Path == path && sig.Name == propertiesChanged
+		},
+	}
+}
+
+func (s *System) subscribe(ctx context.Context, filters ...signalFilter) (<-chan struct{}, func(), error) {
+	removeMatches := func(added []signalFilter) {
+		for _, f := range added {
+			_ = s.conn.RemoveMatchSignal(f.match...)
+		}
+	}
+	for i, f := range filters {
+		if err := s.conn.AddMatchSignal(f.match...); err != nil {
+			removeMatches(filters[:i])
+			return nil, nil, fmt.Errorf("upower: match signal: %w", err)
+		}
+	}
+	accepted := func(sig *dbus.Signal) bool {
+		return slices.ContainsFunc(filters, func(f signalFilter) bool { return f.accept(sig) })
 	}
 	ticks := make(chan struct{}, 1)
 	signals := make(chan *dbus.Signal, 16)
@@ -227,18 +430,18 @@ func (s *System) subscribe(ctx context.Context, path dbus.ObjectPath) (<-chan st
 				if !ok {
 					return
 				}
-				if sig.Path != path || sig.Name != propertiesInterface+".PropertiesChanged" {
+				if !accepted(sig) {
 					continue
 				}
 				select {
 				case ticks <- struct{}{}:
-				default: // coalesce: one pending tick is enough
+				default:
 				}
 			}
 		}
 	}()
 	stop := func() {
-		_ = s.conn.RemoveMatchSignal(match...)
+		removeMatches(filters)
 		s.conn.RemoveSignal(signals)
 	}
 	return ticks, stop, nil

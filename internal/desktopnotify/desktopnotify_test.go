@@ -86,3 +86,33 @@ func TestSendCarriesTheIconAsImagePathOnlyWhenSet(t *testing.T) {
 		t.Errorf("iconless send hints = %v, want no image-path", daemon.hints[1])
 	}
 }
+
+func TestSendCriticalCarriesTheCriticalUrgencyAndSendDoesNot(t *testing.T) {
+	bus := dbustest.Start(t)
+	daemonConn := bus.Conn(t)
+	daemon := &fakeDaemon{}
+	if err := daemonConn.Export(daemon, path, busName); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := daemonConn.RequestName(busName, dbus.NameFlagDoNotQueue); err != nil {
+		t.Fatal(err)
+	}
+	sender := NewSender(bus.Conn(t))
+	if _, err := sender.SendCritical(context.Background(), "lys-shell", "Battery low", "9% remaining", "ld-battery-low-symbolic"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sender.Send(context.Background(), "lys-shell", "s", "b", ""); err != nil {
+		t.Fatal(err)
+	}
+	daemon.mu.Lock()
+	defer daemon.mu.Unlock()
+	if got, ok := daemon.hints[0]["urgency"]; !ok || got.Value() != byte(2) {
+		t.Errorf("critical hints = %v, want urgency byte 2", daemon.hints[0])
+	}
+	if got, ok := daemon.hints[0]["image-path"]; !ok || got.Value() != "ld-battery-low-symbolic" {
+		t.Errorf("critical hints = %v, want the icon as image-path", daemon.hints[0])
+	}
+	if _, ok := daemon.hints[1]["urgency"]; ok {
+		t.Errorf("plain send hints = %v, want no urgency", daemon.hints[1])
+	}
+}

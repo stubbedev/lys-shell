@@ -520,3 +520,40 @@ func TestBatteryProfileSegmentsFitTheDropdown(t *testing.T) {
 		}
 	}
 }
+
+func TestBatteryDropdownListsPeripherals(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	src := newFakeBattery(presentBattery())
+	ctx.Battery = src
+	v := batteryDropdown(ctx).(*batteryView)
+	defer v.dropdownClosed()
+	if v.devicesSection.Visible() || len(v.devices.Children()) != 0 {
+		t.Fatal("no peripherals: want the devices section hidden and empty")
+	}
+
+	mouse := upower.Peripheral{Path: "/org/freedesktop/UPower/devices/mouse_0", Kind: upower.KindMouse, Model: "MX Master 3", Percentage: 5, WarningLevel: upower.WarningLow}
+	pad := upower.Peripheral{Path: "/org/freedesktop/UPower/devices/gaming_input_0", Kind: upower.KindGamingInput, Percentage: 72.6}
+	src.setPeripherals(mouse, pad)
+	waitHeadless(t, "two device rows", func() bool { return len(v.devices.Children()) == 2 })
+	if !v.devicesSection.Visible() {
+		t.Error("peripherals listed but the section is hidden")
+	}
+	rows := v.devices.Children()
+	for i, want := range [][2]string{{"MX Master 3", "5%"}, {i18n.T("battery-device-controller"), "73%"}} {
+		item, ok := rows[i].(*widget.Item)
+		if !ok {
+			t.Fatalf("row %d is %T, want an Item", i, rows[i])
+		}
+		if got := [2]string{itemText(item, "title"), itemText(item, "description")}; got != want {
+			t.Errorf("row %d = %q, want %q", i, got, want)
+		}
+	}
+
+	src.setPeripherals(pad)
+	waitHeadless(t, "the removed mouse gone", func() bool { return len(v.devices.Children()) == 1 })
+	if got := itemText(v.devices.Children()[0].(*widget.Item), "title"); got != i18n.T("battery-device-controller") {
+		t.Errorf("remaining row = %q, want the controller", got)
+	}
+	src.setPeripherals()
+	waitHeadless(t, "the section hidden", func() bool { return !v.devicesSection.Visible() })
+}

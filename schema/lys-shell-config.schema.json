@@ -490,6 +490,25 @@
         "auto"
       ]
     },
+    "AutoSaverLevel": {
+      "oneOf": [
+        {
+          "const": "low",
+          "description": "At UPower's low warning level.",
+          "type": "string"
+        },
+        {
+          "const": "critical",
+          "description": "At UPower's critical warning level.",
+          "type": "string"
+        },
+        {
+          "const": "never",
+          "description": "Never switch automatically.",
+          "type": "string"
+        }
+      ]
+    },
     "BackgroundAppsConfig": {
       "description": "Background apps indicator.\n\nShows while a sandboxed app keeps running without a window, as the\ndesktop portal's background monitor lists them; its dropdown names each\napp with the status it reports and a button that stops it.",
       "properties": {
@@ -991,7 +1010,7 @@
       "description": "Bar module name. Built-in modules or custom modules with a `custom-<id>` pattern."
     },
     "BatteryConfig": {
-      "description": "Battery level, charging state, and a dropdown with power-profile controls.\n\n::: warning\n\nThis module uses `upower` (D-Bus) for battery information. Ensure `upower` daemon is running and exposes a battery device (verify with `upower --battery` or `upower --dump`).\n\n:::",
+      "description": "Battery level, charging state, and a dropdown with the batteries of\nperipherals UPower reports (wireless mice, keyboards, controllers,\nheadsets) and power-profile controls. Low and critical battery levels\nsend critical notifications whether or not the module is placed.\n\n::: warning\n\nThis module uses `upower` (D-Bus) for battery information. Ensure `upower` daemon is running and exposes a battery device (verify with `upower --battery` or `upower --dump`).\n\n:::",
       "properties": {
         "alert-icon": {
           "$ref": "#/$defs/string",
@@ -1080,6 +1099,16 @@
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on middle click."
+        },
+        "notify-charged-at": {
+          "$ref": "#/$defs/Percentage",
+          "default": 0,
+          "description": "Notify once when the charging battery reaches this percentage. Set to\n0 to disable."
+        },
+        "notify-low": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Send a critical notification when the battery, or a peripheral UPower\nreports such as a wireless mouse, enters UPower's low or critical\nwarning level.\n\nThe levels follow UPower's `PercentageLow` and `PercentageCritical`.\nEach level notifies once; plugging in and unplugging again re-arms them."
         },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
@@ -5816,6 +5845,8 @@
               "ld-battery-full-symbolic"
             ],
             "middle-click": "",
+            "notify-charged-at": 0,
+            "notify-low": true,
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
@@ -6521,6 +6552,7 @@
         "power-profiles": {
           "$ref": "#/$defs/PowerProfilesConfig",
           "default": {
+            "auto-saver-at": "never",
             "border-color": "blue",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
@@ -8352,6 +8384,11 @@
     "PowerProfilesConfig": {
       "description": "Power profile indicator and switcher (power-profiles-daemon).\n\nShows the active profile with a per-profile icon and color, and cycles\nthrough the available profiles on click. Backed by the same\npower-profiles-daemon D-Bus interface as `powerprofilesctl`.",
       "properties": {
+        "auto-saver-at": {
+          "$ref": "#/$defs/AutoSaverLevel",
+          "default": "never",
+          "description": "Switch to power-saver when the battery reaches this UPower warning\nlevel, and back to the previous profile once it is on AC again."
+        },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "blue",
@@ -11724,6 +11761,8 @@
             "ld-battery-full-symbolic"
           ],
           "middle-click": "",
+          "notify-charged-at": 0,
+          "notify-low": true,
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
@@ -12329,6 +12368,7 @@
           "suspend-command": "systemctl suspend"
         },
         "power-profiles": {
+          "auto-saver-at": "never",
           "border-color": "blue",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",

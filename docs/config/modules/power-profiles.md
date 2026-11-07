@@ -34,6 +34,7 @@ bar:
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `false` | Display label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
+| `auto-saver-at` | [`AutoSaverLevel`](/config/types#auto-saver-level) | `"never"` | Switch to power-saver when the battery reaches this UPower warning level, and back to the previous profile once it is on AC again. |
 
 ::: details More about `format`
 
@@ -102,6 +103,7 @@ modules:
     middle-click: ""
     scroll-up: ""
     scroll-down: ""
+    auto-saver-at: never
 ```
 
 

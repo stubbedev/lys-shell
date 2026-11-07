@@ -56,7 +56,25 @@ type PowerProfilesConfig struct {
 	ScrollUp ClickAction `cfg:"scroll-up"`
 	// Action on scroll down.
 	ScrollDown ClickAction `cfg:"scroll-down"`
+	// Switch to power-saver when the battery reaches this UPower warning
+	// level, and back to the previous profile once it is on AC again.
+	AutoSaverAt AutoSaverLevel `cfg:"auto-saver-at"`
 }
+
+// AutoSaverLevel is the battery warning level that switches to power-saver.
+type AutoSaverLevel string
+
+// AutoSaverLevel values.
+const (
+	// At UPower's low warning level.
+	AutoSaverLow AutoSaverLevel = "low"
+	// At UPower's critical warning level.
+	AutoSaverCritical AutoSaverLevel = "critical"
+	// Never switch automatically.
+	AutoSaverNever AutoSaverLevel = "never"
+)
+
+var _ = registerEnum(AutoSaverLow, AutoSaverCritical, AutoSaverNever)
 
 // DefaultsPowerProfiles returns the schema defaults.
 func DefaultsPowerProfiles() PowerProfilesConfig {
@@ -82,6 +100,7 @@ func DefaultsPowerProfiles() PowerProfilesConfig {
 		MiddleClick:      ClickAction{},
 		ScrollUp:         ClickAction{},
 		ScrollDown:       ClickAction{},
+		AutoSaverAt:      AutoSaverNever,
 	}
 }
 

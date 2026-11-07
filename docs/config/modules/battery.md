@@ -7,7 +7,10 @@ outline: [2, 3]
 
 <div v-pre>
 
-Battery level, charging state, and a dropdown with power-profile controls.
+Battery level, charging state, and a dropdown with the batteries of
+peripherals UPower reports (wireless mice, keyboards, controllers,
+headsets) and power-profile controls. Low and critical battery levels
+send critical notifications whether or not the module is placed.
 
 ::: warning
 
@@ -37,6 +40,8 @@ bar:
 | `format` | string | `"{{ percent }}%"` | Format string for the label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `thresholds` | array of [`ThresholdEntry`](/config/types#threshold-entry) | `[]` | Dynamic color thresholds based on battery percentage. |
+| `notify-low` | bool | `true` | Send a critical notification when the battery, or a peripheral UPower reports such as a wireless mouse, enters UPower's low or critical warning level. |
+| `notify-charged-at` | [`Percentage`](/config/types#percentage) | `0` | Notify once when the charging battery reaches this percentage. Set to 0 to disable. |
 
 ::: details More about `level-icons`
 
@@ -74,6 +79,13 @@ modules:
         icon-color: status-error
         label-color: status-error
 ```
+
+:::
+
+::: details More about `notify-low`
+
+The levels follow UPower's `PercentageLow` and `PercentageCritical`.
+Each level notifies once; plugging in and unplugging again re-arms them.
 
 :::
 
@@ -125,6 +137,8 @@ modules:
     scroll-up: ""
     scroll-down: ""
     thresholds: []
+    notify-low: true
+    notify-charged-at: 0
 ```
 
 

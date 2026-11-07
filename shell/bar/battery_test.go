@@ -90,15 +90,17 @@ func ptrF(v float64) *float64 {
 // fakeBattery is a scriptable upower.Source, safe across a follow
 // goroutine and the test.
 type fakeBattery struct {
-	mu        sync.Mutex
-	dev       upower.Device
-	ticks     chan struct{}
-	read      chan struct{}
-	threshold []bool
+	mu          sync.Mutex
+	dev         upower.Device
+	ticks       chan struct{}
+	read        chan struct{}
+	threshold   []bool
+	peripherals []upower.Peripheral
+	pticks      chan struct{}
 }
 
 func newFakeBattery(dev upower.Device) *fakeBattery {
-	return &fakeBattery{dev: dev, ticks: make(chan struct{}, 4), read: make(chan struct{}, 1)}
+	return &fakeBattery{dev: dev, ticks: make(chan struct{}, 4), read: make(chan struct{}, 1), pticks: make(chan struct{}, 4)}
 }
 
 func (f *fakeBattery) Read(context.Context) (upower.Device, error) {
@@ -137,6 +139,25 @@ func (f *fakeBattery) thresholdCalls() []bool {
 }
 
 func (f *fakeBattery) Push() { f.ticks <- struct{}{} }
+
+func (f *fakeBattery) Peripherals(context.Context) ([]upower.Peripheral, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.peripherals), nil
+}
+
+func (f *fakeBattery) SubscribePeripherals(context.Context) (<-chan struct{}, func(), error) {
+	return f.pticks, func() {}, nil
+}
+
+// setPeripherals replaces the scripted peripherals and ticks their
+// subscription.
+func (f *fakeBattery) setPeripherals(list ...upower.Peripheral) {
+	f.mu.Lock()
+	f.peripherals = list
+	f.mu.Unlock()
+	f.pticks <- struct{}{}
+}
 
 func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	cfg := config.Defaults()

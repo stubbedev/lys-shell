@@ -65,6 +65,15 @@ settings-modules-power-profiles-scroll-up = Scroll Up
 settings-modules-power-profiles-scroll-down = Scroll Down
     .description = Shell command on scroll down
 
+settings-modules-power-profiles-auto-saver-at = Automatic Power Saver
+    .description = Battery level that switches to power-saver until AC returns
+
 ## Format placeholders
 
 settings-modules-power-profiles-format-placeholder-profile = Active profile name (power-saver, balanced, performance)
+
+## AutoSaverLevel variants
+enum-auto-saver-level-low = Low
+enum-auto-saver-level-critical = Critical
+enum-auto-saver-level-never = Never
+

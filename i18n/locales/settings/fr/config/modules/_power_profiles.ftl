@@ -65,6 +65,15 @@ settings-modules-power-profiles-scroll-up = Défilement vers le haut
 settings-modules-power-profiles-scroll-down = Défilement vers le bas
     .description = Commande shell au défilement vers le bas
 
+settings-modules-power-profiles-auto-saver-at = Économie d'énergie automatique
+    .description = Niveau de batterie qui active l'économie d'énergie jusqu'au retour du secteur
+
 ## Format placeholders
 
 settings-modules-power-profiles-format-placeholder-profile = Nom du profil actif (power-saver, balanced, performance)
+
+## AutoSaverLevel variants
+enum-auto-saver-level-low = Faible
+enum-auto-saver-level-critical = Critique
+enum-auto-saver-level-never = Jamais
+

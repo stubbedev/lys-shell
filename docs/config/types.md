@@ -100,6 +100,14 @@ An audio source name.
 
 String.
 
+## AutoSaverLevel {#auto-saver-level}
+
+| Value | Meaning |
+|---|---|
+| `"low"` | At UPower's low warning level. |
+| `"critical"` | At UPower's critical warning level. |
+| `"never"` | Never switch automatically. |
+
 ## BarButtonVariant {#bar-button-variant}
 
 Visual style variants for bar buttons.

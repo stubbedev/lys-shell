@@ -393,6 +393,9 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 				s.down.add(func() { _ = server.Release() })
 			}
 		}
+		if s.ctx.Battery != nil {
+			s.down.add(startBatteryAlerts(s.ctx.Battery, s.ctx.PowerProfiles, conn, s.current.Load))
+		}
 		// The recorder asks the share picker on this bus for an output or
 		// a region, records it on the GPU with audio from the audio service,
 		// and reports through the OSD and desktop notifications.

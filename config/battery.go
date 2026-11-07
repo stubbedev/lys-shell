@@ -2,7 +2,10 @@ package config
 
 // BatteryConfig is ported from crates/wayle-config/src/schemas/modules/battery/mod.rs.
 //
-// Battery level, charging state, and a dropdown with power-profile controls.
+// Battery level, charging state, and a dropdown with the batteries of
+// peripherals UPower reports (wireless mice, keyboards, controllers,
+// headsets) and power-profile controls. Low and critical battery levels
+// send critical notifications whether or not the module is placed.
 //
 // ::: warning
 //
@@ -71,6 +74,16 @@ type BatteryConfig struct {
 	//         label-color: status-error
 	// ```
 	Thresholds []ThresholdEntry `cfg:"thresholds"`
+	// Send a critical notification when the battery, or a peripheral UPower
+	// reports such as a wireless mouse, enters UPower's low or critical
+	// warning level.
+	//
+	// The levels follow UPower's `PercentageLow` and `PercentageCritical`.
+	// Each level notifies once; plugging in and unplugging again re-arms them.
+	NotifyLow bool `cfg:"notify-low"`
+	// Notify once when the charging battery reaches this percentage. Set to
+	// 0 to disable.
+	NotifyChargedAt Percentage `cfg:"notify-charged-at"`
 }
 
 // DefaultsBattery returns the schema defaults.
@@ -100,6 +113,7 @@ func DefaultsBattery() BatteryConfig {
 		ScrollUp:       ClickAction{},
 		ScrollDown:     ClickAction{},
 		Thresholds:     []ThresholdEntry{},
+		NotifyLow:      true,
 	}
 }
 

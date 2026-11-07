@@ -59,6 +59,12 @@ settings-modules-battery-left-click = Left Click
 settings-modules-battery-thresholds = Thresholds
     .description = Color thresholds that change based on value levels
 
+settings-modules-battery-notify-low = Low Battery Notifications
+    .description = Notify when the battery or a peripheral reaches the low or critical level
+
+settings-modules-battery-notify-charged-at = Charged Notification
+    .description = Notify once when charging reaches this percentage (0 disables)
+
 ## Format placeholders
 
 settings-modules-battery-format-placeholder-percent = Battery level (0-100)

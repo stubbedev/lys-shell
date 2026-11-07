@@ -30,9 +30,24 @@ func NewSender(conn *dbus.Conn) *Sender { return &Sender{conn: conn} }
 // Send posts one notification with the daemon's default timeout and
 // returns its id. appIcon is a themed icon name or an absolute path.
 func (s *Sender) Send(ctx context.Context, appName, summary, body, appIcon string) (uint32, error) {
+	return s.send(ctx, appName, summary, body, appIcon, iconHints(appIcon))
+}
+
+// urgencyCritical is the freedesktop urgency hint's critical level, which
+// the daemon shows until dismissed and lets through do-not-disturb.
+const urgencyCritical byte = 2
+
+// SendCritical is Send at critical urgency.
+func (s *Sender) SendCritical(ctx context.Context, appName, summary, body, appIcon string) (uint32, error) {
+	hints := iconHints(appIcon)
+	hints["urgency"] = dbus.MakeVariant(urgencyCritical)
+	return s.send(ctx, appName, summary, body, appIcon, hints)
+}
+
+func (s *Sender) send(ctx context.Context, appName, summary, body, appIcon string, hints map[string]dbus.Variant) (uint32, error) {
 	var id uint32
 	call := s.conn.Object(busName, path).CallWithContext(ctx, method, 0,
-		appName, uint32(0), appIcon, summary, body, []string{}, iconHints(appIcon), int32(-1))
+		appName, uint32(0), appIcon, summary, body, []string{}, hints, int32(-1))
 	if call.Err != nil {
 		return 0, fmt.Errorf("desktopnotify: Notify: %w", call.Err)
 	}
