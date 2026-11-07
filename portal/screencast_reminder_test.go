@@ -147,7 +147,7 @@ func TestATransientShareNeverReminds(t *testing.T) {
 // that cannot start still shares.
 func TestTheReminderOpensThePrivacySettings(t *testing.T) {
 	r, f, d, token := reminderRig(t)
-	s := &spawned{fail: map[string]bool{}}
+	s := &spawned{}
 	r.backend.spawn = s.spawn
 	issued := f.clock.Now()
 	f.clock.Advance(40 * day)
@@ -162,7 +162,7 @@ func TestTheReminderOpensThePrivacySettings(t *testing.T) {
 	}
 	r.closeSession(t, sessA)
 
-	s.fail["lys-settings"] = true
+	s.failOn("lys-settings")
 	done = r.replay(t, token)
 	waitNotify(t, d, 2)
 	_ = d.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", d.next.Load(), reminderSettings)

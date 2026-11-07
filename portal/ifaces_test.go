@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -37,23 +38,34 @@ func (r *rig) interactive(t *testing.T, method string, args ...any) (uint32, map
 type spawned struct {
 	argv dbustest.Var[[][]string]
 	env  dbustest.Var[[][]string]
-	fail map[string]bool
+	fail dbustest.Var[map[string]bool]
 }
 
 func (s *spawned) spawn(argv, env []string) error {
 	s.argv.Update(func(all [][]string) [][]string { return append(all, argv) })
 	s.env.Update(func(all [][]string) [][]string { return append(all, env) })
-	if s.fail[argv[0]] {
+	if s.fail.Load()[argv[0]] {
 		return os.ErrNotExist
 	}
 	return nil
 }
 
+func (s *spawned) failOn(names ...string) {
+	s.fail.Update(func(fail map[string]bool) map[string]bool {
+		next := maps.Clone(fail)
+		if next == nil {
+			next = make(map[string]bool, len(names))
+		}
+		for _, name := range names {
+			next[name] = true
+		}
+		return next
+	})
+}
+
 func spawnRig(t *testing.T, fail ...string) (*rig, *spawned) {
-	s := &spawned{fail: map[string]bool{}}
-	for _, f := range fail {
-		s.fail[f] = true
-	}
+	s := &spawned{}
+	s.failOn(fail...)
 	return newRig(t, func(b *Backend) { b.spawn = s.spawn }), s
 }
 
