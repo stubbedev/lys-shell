@@ -62,7 +62,7 @@ func TestShell1ConnectorsFollowHotplug(t *testing.T) {
 	client.Signal(signals)
 
 	o := &fakeOpener{}
-	set := newBarSet(o.open)
+	set := newSurfaceSet(o.open)
 	first := apptest.On(a, func() string {
 		t.Cleanup(set.followOutputs(a.Session(), showClock, func(*app.Output) {}))
 		set.publishTo(state.SetConnectors)

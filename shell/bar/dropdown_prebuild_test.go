@@ -146,7 +146,7 @@ func TestAMountedBarBuildsItsDropdownsAhead(t *testing.T) {
 	if n := apptest.On(a, func() int { rt.mount(a, cfg); return built() }); n != 0 {
 		t.Fatalf("%d dropdowns built before a bar attached", n)
 	}
-	var bar barLayer
+	var bar surfaceLayer[config.BarLayout]
 	if err := apptest.On(a, func() (err error) { bar, err = host.open(outputs[0], cfg.Bar.Layout[0]); return err }); err != nil {
 		t.Fatal(err)
 	}

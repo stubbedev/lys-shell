@@ -27,14 +27,14 @@ func (f *fakeLayer) Rebuild(layout config.BarLayout) error {
 	return nil
 }
 
-// fakeOpener opens fakeLayers for newBarSet, failing while fail is
+// fakeOpener opens fakeLayers for newSurfaceSet, failing while fail is
 // set; layers lists them in opening order.
 type fakeOpener struct {
 	fail   bool
 	layers []*fakeLayer
 }
 
-func (o *fakeOpener) open(*app.Output, config.BarLayout) (barLayer, error) {
+func (o *fakeOpener) open(*app.Output, config.BarLayout) (surfaceLayer[config.BarLayout], error) {
 	if o.fail {
 		return nil, errors.New("no surface")
 	}
@@ -52,7 +52,7 @@ func showClock(string) (config.BarLayout, bool) { return clockLayout, true }
 // the layer is rebuilt with the new layout.
 func TestBarSetReloadRebuildsInPlace(t *testing.T) {
 	o := &fakeOpener{}
-	set := newBarSet(o.open)
+	set := newSurfaceSet(o.open)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	set.reload(showClock)
 	set.reload(showClock)
@@ -69,7 +69,7 @@ func TestBarSetReloadRebuildsInPlace(t *testing.T) {
 // apply retries it.
 func TestBarSetReloadReopensARefusingSurface(t *testing.T) {
 	o := &fakeOpener{}
-	set := newBarSet(o.open)
+	set := newSurfaceSet(o.open)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	o.layers[0].refuse = errors.New("gone")
 	set.reload(showClock)
@@ -92,7 +92,7 @@ func TestBarSetReloadReopensARefusingSurface(t *testing.T) {
 // A hidden bar or one the new layout drops is not rebuilt.
 func TestBarSetReloadLeavesHiddenAndDroppedBars(t *testing.T) {
 	o := &fakeOpener{}
-	set := newBarSet(o.open)
+	set := newSurfaceSet(o.open)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	set.plug(&app.Output{Name: "DP-2"}, config.BarLayout{}, true)
 	set.apply(map[string]bool{"DP-2": true})
@@ -109,7 +109,7 @@ func TestBarSetClosesHiddenAndReopensShown(t *testing.T) {
 	opened := map[string]int{}
 	layers := map[string]*fakeLayer{}
 	var failOpen bool
-	set := newBarSet(func(o *app.Output, _ config.BarLayout) (barLayer, error) {
+	set := newSurfaceSet(func(o *app.Output, _ config.BarLayout) (surfaceLayer[config.BarLayout], error) {
 		if failOpen {
 			return nil, errors.New("no surface")
 		}
@@ -151,7 +151,7 @@ func TestBarSetClosesHiddenAndReopensShown(t *testing.T) {
 // again is not reopened.
 func TestBarSetFollowsHotplug(t *testing.T) {
 	var layers []*fakeLayer
-	set := newBarSet(func(*app.Output, config.BarLayout) (barLayer, error) {
+	set := newSurfaceSet(func(*app.Output, config.BarLayout) (surfaceLayer[config.BarLayout], error) {
 		l := &fakeLayer{}
 		layers = append(layers, l)
 		return l, nil

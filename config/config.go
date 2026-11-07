@@ -37,6 +37,8 @@ type Config struct {
 	General GeneralConfig `cfg:"general"`
 	// Bar layout and module placement.
 	Bar BarConfig `cfg:"bar"`
+	// The standalone dock: pinned apps and open windows on a surface of its own.
+	Dock DockConfig `cfg:"dock"`
 	// Dropdown foldout panel sizing.
 	Dropdowns DropdownsConfig `cfg:"dropdowns"`
 	// Styling configuration (theme, fonts, scale).
@@ -67,6 +69,7 @@ func Defaults() *Config {
 		Imports:       []string{},
 		General:       DefaultsGeneral(),
 		Bar:           DefaultsBar(),
+		Dock:          DefaultsDock(),
 		Dropdowns:     DropdownsConfig{},
 		Styling:       DefaultsStyling(),
 		ModulesConfig: DefaultsModules(),

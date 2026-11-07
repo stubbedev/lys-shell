@@ -7,50 +7,50 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
 
-// barSet tracks each output's bar for `lys-shell panel hide|show|toggle`
-// (the Rust shell's BarMap plus the hidden_bars watcher) and config
-// reloads. lys-ui cannot unmap a layer surface, so hiding closes the
-// bar's layer and showing builds a fresh one with open.
-type barSet struct {
-	open  func(*app.Output, config.BarLayout) (barLayer, error)
+// surfaceSet tracks each output's surface of one kind, a bar or a dock,
+// built from a per-output layout L, for config reloads and, for the bars,
+// `lys-shell panel hide|show|toggle` (the Rust shell's BarMap plus the
+// hidden_bars watcher). lys-ui cannot unmap a layer surface, so hiding
+// closes the layer and showing builds a fresh one with open.
+type surfaceSet[L any] struct {
+	open  func(*app.Output, L) (surfaceLayer[L], error)
 	order []string
-	bars  map[string]*barEntry
+	bars  map[string]*surfaceEntry[L]
 	// publish hears connectors() after each plug, unplug and reload;
 	// nil until publishTo.
 	publish func(connectors []string)
 }
 
-// barLayer is the part of a bar's layer window the set drives.
-type barLayer interface {
+// surfaceLayer is the part of a layer window the set drives.
+type surfaceLayer[L any] interface {
 	Close()
 	// Rebuild refills the open bar from layout and the current config
 	// on its own surface; an error means the surface refused the
 	// change.
-	Rebuild(layout config.BarLayout) error
+	Rebuild(layout L) error
 }
 
-type barEntry struct {
+type surfaceEntry[L any] struct {
 	output *app.Output
-	layout config.BarLayout
+	layout L
 	// shows is whether the layout gives the output a bar; hidden is
 	// the Shell1 hide state. The layer is open exactly when shows and
 	// not hidden.
 	shows, hidden bool
-	layer         barLayer
+	layer         surfaceLayer[L]
 }
 
-func newBarSet(open func(*app.Output, config.BarLayout) (barLayer, error)) *barSet {
-	return &barSet{open: open, bars: map[string]*barEntry{}}
+func newSurfaceSet[L any](open func(*app.Output, L) (surfaceLayer[L], error)) *surfaceSet[L] {
+	return &surfaceSet[L]{open: open, bars: map[string]*surfaceEntry[L]{}}
 }
 
 // connectors names the outputs whose layout gives them a bar, in
 // creation order.
-func (b *barSet) connectors() []string {
+func (b *surfaceSet[L]) connectors() []string {
 	var out []string
 	for _, name := range b.order {
 		if b.bars[name].shows {
@@ -62,12 +62,12 @@ func (b *barSet) connectors() []string {
 
 // publishTo hands publish the connectors now and after every later
 // change of the set. It runs on the loop goroutine, as the changes do.
-func (b *barSet) publishTo(publish func(connectors []string)) {
+func (b *surfaceSet[L]) publishTo(publish func(connectors []string)) {
 	b.publish = publish
 	b.published()
 }
 
-func (b *barSet) published() {
+func (b *surfaceSet[L]) published() {
 	if b.publish != nil {
 		b.publish(b.connectors())
 	}
@@ -75,7 +75,7 @@ func (b *barSet) published() {
 
 // apply closes the bars in hidden and reopens the others. It runs on
 // the loop goroutine.
-func (b *barSet) apply(hidden map[string]bool) {
+func (b *surfaceSet[L]) apply(hidden map[string]bool) {
 	for _, name := range b.order {
 		entry := b.bars[name]
 		entry.hidden = hidden[name]
@@ -87,7 +87,7 @@ func (b *barSet) apply(hidden map[string]bool) {
 // bar that stays rebuilds on its own surface, and outputs the new
 // layout shows or hides follow it. A surface that refuses the rebuild
 // is closed and opened afresh. The Shell1 hide state survives.
-func (b *barSet) reload(layoutFor func(connector string) (config.BarLayout, bool)) {
+func (b *surfaceSet[L]) reload(layoutFor func(connector string) (L, bool)) {
 	for _, name := range b.order {
 		entry := b.bars[name]
 		entry.layout, entry.shows = layoutFor(name)
@@ -104,7 +104,7 @@ func (b *barSet) reload(layoutFor func(connector string) (config.BarLayout, bool
 }
 
 // sync opens or closes the entry's layer to match shows and hidden.
-func (b *barSet) sync(name string, entry *barEntry) {
+func (b *surfaceSet[L]) sync(name string, entry *surfaceEntry[L]) {
 	want := entry.shows && !entry.hidden
 	switch {
 	case !want && entry.layer != nil:
@@ -162,7 +162,7 @@ func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellip
 // (SyncMonitors) and opens its bar when the layout shows one. An
 // output already registered under its name is left alone; one that
 // was renamed is moved.
-func (b *barSet) plug(output *app.Output, layout config.BarLayout, shows bool) {
+func (b *surfaceSet[L]) plug(output *app.Output, layout L, shows bool) {
 	for name, entry := range b.bars {
 		if entry.output == output && name != output.Name {
 			b.drop(name)
@@ -174,7 +174,7 @@ func (b *barSet) plug(output *app.Output, layout config.BarLayout, shows bool) {
 		}
 		b.drop(output.Name)
 	}
-	entry := &barEntry{output: output, layout: layout, shows: shows}
+	entry := &surfaceEntry[L]{output: output, layout: layout, shows: shows}
 	b.order = append(b.order, output.Name)
 	b.bars[output.Name] = entry
 	b.sync(output.Name, entry)
@@ -182,7 +182,7 @@ func (b *barSet) plug(output *app.Output, layout config.BarLayout, shows bool) {
 }
 
 // unplug closes an unplugged output's bar and forgets it.
-func (b *barSet) unplug(output *app.Output) {
+func (b *surfaceSet[L]) unplug(output *app.Output) {
 	for name, entry := range b.bars {
 		if entry.output == output {
 			b.drop(name)
@@ -191,7 +191,7 @@ func (b *barSet) unplug(output *app.Output) {
 	b.published()
 }
 
-func (b *barSet) drop(name string) {
+func (b *surfaceSet[L]) drop(name string) {
 	if entry := b.bars[name]; entry.layer != nil {
 		entry.layer.Close()
 	}
@@ -204,7 +204,7 @@ func (b *barSet) drop(name string) {
 // the Rust SyncMonitors; unplugged runs once an unplugged output's bar
 // is gone. The returned stop ends the watch. It runs on the loop
 // goroutine.
-func (b *barSet) followOutputs(sess outputSource, layoutFor func(connector string) (config.BarLayout, bool), unplugged func(*app.Output)) (stop func()) {
+func (b *surfaceSet[L]) followOutputs(sess outputSource, layoutFor func(connector string) (L, bool), unplugged func(*app.Output)) (stop func()) {
 	plug := func(output *app.Output) {
 		if output.Name == "" {
 			return

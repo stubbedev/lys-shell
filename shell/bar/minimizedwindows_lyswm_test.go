@@ -264,3 +264,149 @@ func TestProbeWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// On a real lys-wm, an auto-hiding dock shows the probe's app running,
+// hides while the probe's tile covers it, reveals once the probe is
+// minimized, marked so, and a click on its entry brings the probe back
+// focused, which covers and hides the dock again: two hides and one
+// reveal, with the probe's rectangle on its dock entry.
+func TestTheDockOnLysWM(t *testing.T) {
+	lyswmtest.Headless(t)
+	cfg := config.DefaultsDock()
+	cfg.AutoHide = true
+	const probeID = "org.example.DockProbe"
+	var (
+		d   *dock
+		hub *taskHub
+	)
+	geometry, err := lyswm.WatchWindows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(geometry.Close)
+	rects := 0
+	shell := liveApp(t, func(a *app.Application, out *app.Output) error {
+		ctx := newTestContext(t, config.Defaults())
+		ctx.App, ctx.Connector = a, out.Name
+		hub = newTaskHub(countingToplevels{appToplevels{a}, &rects}, a.Invoke)
+		hub.followGeometry(geometry, geometry.Ticks(), a.Invoke)
+		ctx.Tasks = hub
+		d = newDock(ctx, cfg, out)
+		layer, err := a.NewLayer(app.LayerConfig{Output: out, Layer: app.LayerTop, Anchor: dockAnchor(cfg.Edge), Keyboard: app.KeyboardNone, Namespace: "lys-shell-test-dock", Root: d.surface})
+		d.attach(layer)
+		return err
+	})
+	type state struct {
+		hidden            bool
+		hides, reveals    int
+		running, minimize bool
+	}
+	read := func() state {
+		return onLiveLoop(shell, func() state {
+			s := state{hidden: d.hidden, hides: d.hides, reveals: d.reveals}
+			if e := d.entries[probeID]; e != nil {
+				s.running, s.minimize = e.HasClass("running"), e.HasClass("minimized")
+			}
+			return s
+		})
+	}
+	if s := read(); s.hidden {
+		t.Fatal("the dock hides with no window open")
+	}
+	startProbeProcess(t, probeID, "dock probe")
+	until(t, "the probe running on the dock, covering and hiding it", func() error {
+		if s := read(); !s.running || !s.hidden || s.hides != 1 {
+			return fmt.Errorf("%+v", s)
+		}
+		return nil
+	})
+	w, err := lysWMWindow(probeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lyswm.Dispatch("minimize " + strconv.FormatUint(w.ID, 10)); err != nil {
+		t.Fatal(err)
+	}
+	until(t, "the dock revealed with the probe marked minimized", func() error {
+		if s := read(); s.hidden || !s.minimize || s.reveals != 1 {
+			return fmt.Errorf("%+v", s)
+		}
+		return nil
+	})
+	until(t, "the probe's rectangle on its dock entry", func() error {
+		return onLiveLoop(shell, func() error {
+			e := d.entries[probeID]
+			for win, sent := range hub.windows.sent {
+				if win.AppID() == probeID && sent.rect == e.Bounds() && !sent.rect.Empty() {
+					return nil
+				}
+			}
+			return fmt.Errorf("sent %+v, entry %+v", hub.windows.sent, e.Bounds())
+		})
+	})
+	shell.Invoke(func() { d.entries[probeID].ClickAt(widget.Point{}) })
+	until(t, "the probe back and focused", func() error {
+		w, err := lysWMWindow(probeID)
+		if err == nil && (w.Minimized || !w.Focused) {
+			err = fmt.Errorf("window %+v", w)
+		}
+		return err
+	})
+	until(t, "the dock hidden again", func() error {
+		if s := read(); !s.hidden || s.hides != 2 || s.reveals != 1 {
+			return fmt.Errorf("%+v", s)
+		}
+		return nil
+	})
+}
+
+// On a real lys-wm, a dock surface that does not auto-hide reserves its
+// thickness, so a tiled window ends above it; rebuilt to auto-hide on
+// the same surface, it reserves nothing and the window takes the whole
+// output again.
+func TestTheDockSurfaceReservesItsEdgeUnlessItAutoHides(t *testing.T) {
+	lyswmtest.Headless(t)
+	cfg := config.DefaultsDock()
+	cfg.Enabled = true
+	var (
+		window surfaceLayer[config.DockConfig]
+		output *app.Output
+	)
+	shell := liveApp(t, func(a *app.Application, out *app.Output) error {
+		ctx := newTestContext(t, config.Defaults())
+		ctx.App = a
+		ctx.Tasks = newTaskHub(appToplevels{a}, a.Invoke)
+		output = out
+		var err error
+		window, err = (&dockHost{app: a, rt: &barRuntime{ctx: ctx}}).open(out, cfg)
+		return err
+	})
+	const probeID = "org.example.TiledProbe"
+	startProbeProcess(t, probeID, "tiled")
+	height := func() (int, error) {
+		w, err := lysWMWindow(probeID)
+		return w.Rect.Y + w.Rect.Height, err
+	}
+	full := int(onLiveLoop(shell, func() int32 { return output.LogicalH }))
+	var reserved int
+	until(t, "the tiled probe ending above the dock", func() error {
+		bottom, err := height()
+		if err == nil && bottom >= full-dockRevealPx {
+			err = fmt.Errorf("the probe reaches %d of %d", bottom, full)
+		}
+		reserved = full - bottom
+		return err
+	})
+	cfg.AutoHide = true
+	if err := onLiveLoop(shell, func() error { return window.Rebuild(cfg) }); err != nil {
+		t.Fatal(err)
+	}
+	until(t, "the probe over the whole output again", func() error {
+		bottom, err := height()
+		if err == nil && full-bottom >= reserved {
+			err = fmt.Errorf("the probe still ends at %d of %d", bottom, full)
+		}
+		return err
+	})
+	shell.Invoke(window.Close)
+}

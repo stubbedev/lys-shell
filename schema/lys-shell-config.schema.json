@@ -2532,6 +2532,69 @@
         }
       ]
     },
+    "DockConfig": {
+      "description": "A dock of pinned apps and open windows, on its own surface beside the bar.\n\nPinned apps launch on click. Open windows show under their app's icon\nwith a running indicator, dimmed while all of them are minimized; a click\nfocuses the app's window, bringing a minimized one back, and cycles\nthrough its windows. Windows minimize into their dock icon. Works on any\ncompositor with the wlr foreign-toplevel protocol; hiding when a window\ncovers the dock needs lys-wm.",
+      "properties": {
+        "auto-hide": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Hide the dock while a window covers it, revealing it when the\npointer reaches its edge. When on, the dock reserves no space. Seeing\nwhich windows cover it needs lys-wm; elsewhere the dock shows only\nwhile the pointer is on it."
+        },
+        "edge": {
+          "$ref": "#/$defs/DockEdge",
+          "default": "bottom",
+          "description": "Screen edge the dock sits on."
+        },
+        "enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Show the dock."
+        },
+        "icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-app-window-symbolic",
+          "description": "Icon for an app without a desktop entry icon."
+        },
+        "icon-size": {
+          "$ref": "#/$defs/Size",
+          "default": 2.0,
+          "description": "Size of each app's icon. Accepts a scale multiplier or pixels (e.g. `\"48px\"`)."
+        },
+        "monitors": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [
+            "*"
+          ],
+          "description": "Outputs that show the dock, by connector name (e.g. `\"DP-1\"`), or\n`\"*\"` for every output."
+        },
+        "pinned": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Apps always on the dock, in order, by desktop entry id without\n`.desktop` (e.g. `\"firefox\"`, `\"org.gnome.Nautilus\"`), the app id\ntheir windows report."
+        }
+      },
+      "type": "object"
+    },
+    "DockEdge": {
+      "description": "Screen edge the dock sits on.",
+      "oneOf": [
+        {
+          "const": "bottom",
+          "description": "Bottom edge of the screen.",
+          "type": "string"
+        },
+        {
+          "const": "left",
+          "description": "Left edge of the screen.",
+          "type": "string"
+        },
+        {
+          "const": "right",
+          "description": "Right edge of the screen.",
+          "type": "string"
+        }
+      ]
+    },
     "DropdownSize": {
       "description": "Size override for a dropdown foldout panel.\n\nEach field is optional: when unset the dropdown keeps its built-in default\nwidth (scaled by the global scale) and the height of its content. The\nwidth is a [`Size`]: a scale multiplier of the built-in base (e.g. `1.5`)\nor an absolute pixel length (e.g. `\"480px\"`). The height is a pixel\nlength only.",
       "properties": {
@@ -10936,6 +10999,21 @@
         "history-mib": 64
       },
       "description": "Clipboard history settings."
+    },
+    "dock": {
+      "$ref": "#/$defs/DockConfig",
+      "default": {
+        "auto-hide": false,
+        "edge": "bottom",
+        "enabled": false,
+        "icon": "ld-app-window-symbolic",
+        "icon-size": 2.0,
+        "monitors": [
+          "*"
+        ],
+        "pinned": []
+      },
+      "description": "The standalone dock: pinned apps and open windows on a surface of its own."
     },
     "dropdowns": {
       "$ref": "#/$defs/DropdownsConfig",

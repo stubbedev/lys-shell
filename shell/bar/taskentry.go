@@ -4,12 +4,14 @@ import (
 	"log"
 	"math"
 	"path/filepath"
+	"slices"
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -18,8 +20,10 @@ import (
 // the docks share: the one window list and its apps' desktop entries.
 // It runs on the loop.
 type taskHub struct {
-	windows *taskWindows
-	apps    *taskApps
+	windows      *taskWindows
+	apps         *taskApps
+	geom         windowGeometry
+	geomWatchers []*func()
 }
 
 func newTaskHub(src toplevelSource, post func(func())) *taskHub {
@@ -142,5 +146,50 @@ func openTaskMenu(ctx ModuleContext, host app.Host, anchor widget.Boundser, item
 	font, px := dropdownFont(ctx)
 	if _, err := ctx.App.OpenMenuPopover(host, app.MenuPopoverConfig{Anchor: anchor, Face: font, SizePx: px, Items: items, Gap: widget.PopoverGap}); err != nil {
 		log.Printf("task menu: %v", err)
+	}
+}
+
+// windowGeometry is where lys-wm's windows are: the watcher that keeps
+// them, read on the loop.
+type windowGeometry interface {
+	Windows() []lyswm.Window
+}
+
+// followGeometry keeps lys-wm's window geometry in the hub: the docks
+// re-check whether a window covers them after each change. It runs on
+// the loop; ticks closes when the stream ends, which drops the geometry.
+func (h *taskHub) followGeometry(g windowGeometry, ticks <-chan struct{}, post func(func())) {
+	h.geom = g
+	go func() {
+		for range ticks {
+			post(h.geometryChanged)
+		}
+		post(func() {
+			h.geom = nil
+			h.geometryChanged()
+		})
+	}()
+}
+
+func (h *taskHub) geometryChanged() {
+	for _, fn := range slices.Clone(h.geomWatchers) {
+		(*fn)()
+	}
+}
+
+// geometry is every lys-wm window, false without lys-wm's geometry.
+func (h *taskHub) geometry() ([]lyswm.Window, bool) {
+	if h.geom == nil {
+		return nil, false
+	}
+	return h.geom.Windows(), true
+}
+
+// subscribeGeometry calls fn after each geometry change; stop ends it.
+func (h *taskHub) subscribeGeometry(fn func()) (stop func()) {
+	w := &fn
+	h.geomWatchers = append(h.geomWatchers, w)
+	return func() {
+		h.geomWatchers = slices.DeleteFunc(h.geomWatchers, func(o *func()) bool { return o == w })
 	}
 }

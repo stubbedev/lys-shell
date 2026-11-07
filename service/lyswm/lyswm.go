@@ -244,6 +244,8 @@ const (
 	EventClose         EventKind = "close"
 	EventMove          EventKind = "move"
 	EventTitle         EventKind = "title"
+	EventAppID         EventKind = "appid"
+	EventRect          EventKind = "rect"
 	EventIcon          EventKind = "icon"
 	EventUrgent        EventKind = "urgent"
 	EventMinimized     EventKind = "minimized"
@@ -257,12 +259,20 @@ const (
 )
 
 type event struct {
-	Event  EventKind       `json:"event"`
-	Submap *string         `json:"submap"`
-	Layout *Layout         `json:"layout"`
-	Locks  *Locks          `json:"locks"`
-	Motion *bool           `json:"reduced_motion"`
-	Window json.RawMessage `json:"window"`
+	Event     EventKind       `json:"event"`
+	Submap    *string         `json:"submap"`
+	Layout    *Layout         `json:"layout"`
+	Locks     *Locks          `json:"locks"`
+	Motion    *bool           `json:"reduced_motion"`
+	Window    json.RawMessage `json:"window"`
+	Workspace *int            `json:"workspace"`
+	Title     *string         `json:"title"`
+	AppID     *string         `json:"app_id"`
+	Output    json.RawMessage `json:"output"`
+	Rect      *Rect           `json:"rect"`
+	Urgent    *bool           `json:"urgent"`
+	Minimized *bool           `json:"minimized"`
+	Stack     json.RawMessage `json:"stack"`
 }
 
 // Watcher follows the watch stream and ticks after each event of the
@@ -325,7 +335,7 @@ func (w *Watcher) pump(reader *bufio.Reader) {
 		}
 		var e event
 		if err := json.Unmarshal(line, &e); err != nil || e.Event == "" {
-			log.Printf("lys-wm: event stream ended on a line it cannot read (%v): %.200q", err, line)
+			log.Printf("lys-wm: event stream ended on a line it cannot read (%v): %.200q", err, line) //nolint:gosec // %q escapes the line
 			return
 		}
 		if w.onEvent != nil {

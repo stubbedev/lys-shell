@@ -104,7 +104,7 @@ func TestBarReloadKeepsTheSurface(t *testing.T) {
 
 	var opened []*barWindow
 	closes := 0
-	set := newBarSet(func(o *app.Output, l config.BarLayout) (barLayer, error) {
+	set := newSurfaceSet(func(o *app.Output, l config.BarLayout) (surfaceLayer[config.BarLayout], error) {
 		layer, err := host.open(o, l)
 		if err != nil {
 			return nil, err

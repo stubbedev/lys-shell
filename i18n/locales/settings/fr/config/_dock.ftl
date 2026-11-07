@@ -1,0 +1,17 @@
+settings-dock-enabled = Afficher le dock
+    .description = Afficher le dock des applications épinglées et des fenêtres ouvertes
+settings-dock-monitors = Écrans
+    .description = Écrans qui affichent le dock, par nom de connecteur, ou * pour tous les écrans
+settings-dock-edge = Bord
+    .description = Bord de l'écran où se place le dock
+settings-dock-icon-size = Taille des icônes
+    .description = Taille de l'icône de chaque application
+settings-dock-auto-hide = Masquage automatique
+    .description = Masquer le dock quand une fenêtre le couvre et le révéler au bord de l'écran ; ne réserve aucun espace
+settings-dock-pinned = Applications épinglées
+    .description = Applications toujours présentes dans le dock, par identifiant d'entrée de bureau
+settings-dock-icon = Icône de secours
+    .description = Icône d'une application sans icône d'entrée de bureau
+enum-dock-edge-bottom = Bas
+enum-dock-edge-left = Gauche
+enum-dock-edge-right = Droite

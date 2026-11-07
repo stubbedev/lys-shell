@@ -20,6 +20,7 @@ var i18nPrefixes = map[string]string{
 	"ClockConfig":               "settings-modules-clock",
 	"CpuConfig":                 "settings-modules-cpu",
 	"DashboardConfig":           "settings-modules-dashboard",
+	"DockConfig":                "settings-dock",
 	"DropdownsConfig":           "settings-dropdowns",
 	"GeneralConfig":             "settings-general",
 	"HyprlandWorkspacesConfig":  "settings-modules-hyprland-workspaces",

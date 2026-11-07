@@ -432,6 +432,16 @@ What identifies a workspace in the UI.
 | `"icon"` | Show icon from `workspace-map` (falls back to label if unmapped). |
 | `"none"` | Show nothing - only app icons visible. |
 
+## DockEdge {#dock-edge}
+
+Screen edge the dock sits on.
+
+| Value | Meaning |
+|---|---|
+| `"bottom"` | Bottom edge of the screen. |
+| `"left"` | Left edge of the screen. |
+| `"right"` | Right edge of the screen. |
+
 ## DropdownSize {#dropdown-size}
 
 Size override for a dropdown foldout panel.

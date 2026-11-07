@@ -579,6 +579,17 @@ func (s *shellStart) mount() {
 		tasks := newTaskHub(appToplevels{application}, application.Invoke)
 		s.down.add(tasks.close)
 		baseCtx.Tasks = tasks
+		if detectCompositor() == compositorLysWM {
+			s.down.addAsync(func() func() {
+				geometry, err := lyswm.WatchWindows()
+				if err != nil {
+					log.Printf("dock: lys-wm window geometry: %v; an auto-hiding dock hides whenever the pointer leaves it", err)
+					return func() {}
+				}
+				application.Invoke(func() { tasks.followGeometry(geometry, geometry.Ticks(), application.Invoke) })
+				return geometry.Close
+			})
+		}
 	}
 	rt.ctx = baseCtx
 	rt.mount(application, cfg)
@@ -589,7 +600,7 @@ func (s *shellStart) mount() {
 		go popupHost.Run()
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
-	bars := newBarSet(host.open)
+	bars := newSurfaceSet(host.open)
 	// A bar that cannot open is logged, not fatal.
 	s.down.add(bars.followOutputs(sess, func(connector string) (config.BarLayout, bool) {
 		return barLayoutFor(current.Load(), connector)
@@ -600,6 +611,10 @@ func (s *shellStart) mount() {
 		}
 		rt.ctx.Dropdowns.detachHost(output.Name)
 	}))
+	docks := newSurfaceSet((&dockHost{app: application, rt: rt}).open)
+	s.down.add(docks.followOutputs(sess, func(connector string) (config.DockConfig, bool) {
+		return dockFor(current.Load(), connector)
+	}, func(*app.Output) {}))
 	// restyle re-derives the palette, styles, and font from cfg and
 	// rebuilds the bars from them (the Rust modules re-render from their
 	// property watches, and the CSS watcher recompiles the bundle).
@@ -609,6 +624,7 @@ func (s *shellStart) mount() {
 		}
 		rt.mount(application, cfg)
 		bars.reload(func(connector string) (config.BarLayout, bool) { return barLayoutFor(cfg, connector) })
+		docks.reload(func(connector string) (config.DockConfig, bool) { return dockFor(cfg, connector) })
 	}
 	// A service that starts after the shell (or restarts) brings its
 	// modules back: its client starts if it could not before, and the
@@ -912,7 +928,7 @@ func (h *barHost) context(output *app.Output) ModuleContext {
 }
 
 // open shows one output's bar.
-func (h *barHost) open(output *app.Output, layout config.BarLayout) (barLayer, error) {
+func (h *barHost) open(output *app.Output, layout config.BarLayout) (surfaceLayer[config.BarLayout], error) {
 	ctx := h.context(output)
 	bc := barConfigFor(ctx, layout, output)
 	window, err := h.app.NewBar(bc)

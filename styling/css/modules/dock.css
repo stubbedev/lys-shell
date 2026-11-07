@@ -4,3 +4,14 @@
   padding: var(--space-2xs);
 }
 
+.dock {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xs);
+  margin: var(--space-sm);
+}
+
+.dock-item.minimized image {
+  opacity: 0.6;
+}
