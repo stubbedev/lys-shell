@@ -519,9 +519,10 @@ type fakeAgentManager struct{ f *fakeNM }
 func (a fakeAgentManager) RegisterWithCapabilities(sender dbus.Sender, id string, caps uint32) *dbus.Error {
 	a.f.mu.Lock()
 	a.f.registrations = append(a.f.registrations, registration{sender: string(sender), id: id, caps: caps})
+	onRegister := a.f.onRegister
 	a.f.mu.Unlock()
-	if a.f.onRegister != nil {
-		a.f.onRegister()
+	if onRegister != nil {
+		onRegister()
 	}
 	return nil
 }

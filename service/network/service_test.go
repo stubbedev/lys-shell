@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
@@ -30,13 +31,15 @@ func TestAFailedStartLeavesTheSharedConnectionAsItWas(t *testing.T) {
 	f := startFakeNM(t)
 	conn := f.client()
 	ctx, cancel := context.WithCancel(t.Context())
-	registered := false
-	f.onRegister = func() { registered = true; cancel() }
+	var registered atomic.Bool
+	f.mu.Lock()
+	f.onRegister = func() { registered.Store(true); cancel() }
+	f.mu.Unlock()
 	svc, err := start(ctx, conn, &fakeSignIn{}, nil, fastResume)
 	if err == nil || svc != nil {
 		t.Fatalf("start with its context ending at the registration = %v, %v; want an error", svc, err)
 	}
-	if !registered {
+	if !registered.Load() {
 		t.Fatal("start failed before the agent registered, so nothing tested the unwinding")
 	}
 	if rules, exported, reg := leftOn(t, f, conn); len(rules) != 0 || exported || reg {
