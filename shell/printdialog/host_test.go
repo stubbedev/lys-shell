@@ -68,6 +68,10 @@ func (f *fakeScheduler) Printer(_ context.Context, name string) (ipp.Printer, er
 	return ipp.Printer{}, errors.New("no printer " + name)
 }
 
+func (f *fakeScheduler) CreateLocalPrinter(_ context.Context, _, name string) (string, error) {
+	return name, nil
+}
+
 func (f *fakeScheduler) Print(_ context.Context, j ipp.Job) (int32, error) {
 	b, _ := io.ReadAll(j.Document)
 	f.mu.Lock()

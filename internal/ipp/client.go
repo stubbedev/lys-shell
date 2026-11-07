@@ -3,6 +3,7 @@ package ipp
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -73,6 +74,9 @@ type Printer struct {
 	// State is printer-state: 3 idle, 4 processing, 5 stopped.
 	State     int32
 	Accepting bool
+	// UUID is its printer-uuid ("urn:uuid:…"), DeviceURI where CUPS
+	// sends its jobs.
+	UUID, DeviceURI string
 	// StateReasons are its printer-state-reasons keywords ("none" left
 	// out), Markers its supplies.
 	StateReasons []string
@@ -104,7 +108,7 @@ const (
 // printerAttributes are the attributes a Printer reads.
 var printerAttributes = []string{
 	"printer-name", "printer-location", "printer-state", "printer-state-message", "printer-state-reasons",
-	"printer-is-accepting-jobs", "marker-names", "marker-colors", "marker-levels",
+	"printer-is-accepting-jobs", "printer-uuid", "device-uri", "marker-names", "marker-colors", "marker-levels",
 	"media-supported", "media-default", "sides-supported", "sides-default",
 	"print-color-mode-supported", "print-color-mode-default", "print-quality-supported", "print-quality-default",
 }
@@ -142,10 +146,20 @@ func (c *Client) Printers(ctx context.Context) ([]Printer, error) {
 
 // Printer reads one queue's attributes (Get-Printer-Attributes).
 func (c *Client) Printer(ctx context.Context, name string) (Printer, error) {
-	req := Message{Code: OpGetPrinterAttributes, Groups: []Group{operation(PrinterURI(name),
+	return c.Attributes(ctx, PrinterURI(name))
+}
+
+// Attributes reads the attributes of the printer at printerURI, posted
+// to its path (Get-Printer-Attributes).
+func (c *Client) Attributes(ctx context.Context, printerURI string) (Printer, error) {
+	u, err := url.Parse(printerURI)
+	if err != nil {
+		return Printer{}, fmt.Errorf("ipp: printer URI %q: %w", printerURI, err)
+	}
+	req := Message{Code: OpGetPrinterAttributes, Groups: []Group{operation(printerURI,
 		String(TagKeyword, "requested-attributes", printerAttributes...),
 	)}}
-	resp, err := c.do(ctx, "/printers/"+url.PathEscape(name), req, nil)
+	resp, err := c.do(ctx, u.EscapedPath(), req, nil)
 	if err != nil {
 		return Printer{}, err
 	}
@@ -154,7 +168,61 @@ func (c *Client) Printer(ctx context.Context, name string) (Printer, error) {
 			return p, nil
 		}
 	}
-	return Printer{}, fmt.Errorf("ipp: no attributes for printer %s", name)
+	return Printer{}, fmt.Errorf("ipp: no attributes for printer %s", printerURI)
+}
+
+// CreateLocalPrinter has CUPS make a temporary IPP Everywhere queue for
+// the printer at deviceURI, which it removes once idle
+// (CUPS-Create-Local-Printer), and reports its name.
+func (c *Client) CreateLocalPrinter(ctx context.Context, deviceURI, name string) (string, error) {
+	req := Message{Code: OpCUPSCreateLocalPrinter, Groups: []Group{
+		operation("ipp://localhost/"),
+		{Tag: GroupPrinter, Attrs: []Attr{String(TagName, "printer-name", name), String(TagURI, "device-uri", deviceURI)}},
+	}}
+	resp, err := c.do(ctx, "/", req, nil)
+	if err != nil {
+		return "", fmt.Errorf("ipp: a queue for %s: %w", deviceURI, err)
+	}
+	for _, g := range resp.Groups {
+		if g.Tag != GroupPrinter {
+			continue
+		}
+		u, err := url.Parse(g.Text("printer-uri-supported"))
+		if err != nil {
+			continue
+		}
+		if queue, ok := strings.CutPrefix(u.Path, "/printers/"); ok && queue != "" {
+			return url.PathUnescape(queue)
+		}
+	}
+	return "", fmt.Errorf("ipp: CUPS named no queue for %s", deviceURI)
+}
+
+// DeviceAttributes reads the attributes of a network printer at its own
+// ipp:// or ipps:// URI, as the dialog does for one found over DNS-SD
+// before CUPS has a queue for it. An ipps printer's certificate is
+// self-signed as a rule, and only its capabilities are read, so it is
+// not verified; the job itself goes through CUPS.
+func DeviceAttributes(ctx context.Context, uri string) (Printer, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return Printer{}, fmt.Errorf("ipp: printer URI %q: %w", uri, err)
+	}
+	port := u.Port()
+	if port == "" {
+		port = "631"
+	}
+	c := &Client{http: &http.Client{Timeout: requestTimeout}}
+	switch u.Scheme {
+	case "ipp":
+		c.base = "http://" + net.JoinHostPort(u.Hostname(), port)
+	case "ipps":
+		c.base = "https://" + net.JoinHostPort(u.Hostname(), port)
+		c.http.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // capabilities only, from a printer whose certificate is self-signed
+	default:
+		return Printer{}, fmt.Errorf("ipp: printer URI %q is neither ipp nor ipps", uri)
+	}
+	return c.Attributes(ctx, uri)
 }
 
 // Default is the scheduler's default destination (CUPS-Get-Default),
@@ -184,7 +252,10 @@ func printerOf(g Group) (Printer, bool) {
 	if g.Tag != GroupPrinter {
 		return Printer{}, false
 	}
-	p := Printer{Name: g.Text("printer-name"), Location: g.Text("printer-location"), StateMessage: g.Text("printer-state-message"), Accepting: true}
+	p := Printer{
+		Name: g.Text("printer-name"), Location: g.Text("printer-location"), StateMessage: g.Text("printer-state-message"),
+		UUID: g.Text("printer-uuid"), DeviceURI: g.Text("device-uri"), Accepting: true,
+	}
 	if p.Name == "" {
 		return Printer{}, false
 	}

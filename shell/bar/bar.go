@@ -41,7 +41,6 @@ import (
 	"github.com/stubbedev/lys-shell/service/screenshare"
 	"github.com/stubbedev/lys-shell/service/sounds"
 	"github.com/stubbedev/lys-shell/service/treeman"
-	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/service/upower"
 	"github.com/stubbedev/lys-shell/service/weather"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
@@ -214,10 +213,10 @@ type shellStart struct {
 	svc         *config.Service
 	session     *dbus.Conn
 	system      *dbus.Conn
-	// drives is the UDisks2 client on the system bus once it is up,
-	// which the file chooser lists volumes through.
-	drives  atomic.Pointer[udisks.Client]
-	rebuild func(apply func(*ModuleContext))
+	// systemUp is the system bus once it is up, which the portal hosts
+	// reach UDisks2 and Avahi on.
+	systemUp atomic.Pointer[dbus.Conn]
+	rebuild  func(apply func(*ModuleContext))
 	// current is the live config snapshot the long-lived services read.
 	current *atomic.Pointer[config.Config]
 	// osdRef is the OSD once it exists; the recorder toasts through it.
@@ -262,7 +261,7 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 		s.system = system
 		s.down.add(func() { _ = system.Close() })
 		s.ctx.System = system
-		s.drives.Store(udisks.New(system))
+		s.systemUp.Store(system)
 	}
 	s.lateStarts = map[string]lateStart{}
 	bwLife, stopBitwarden := context.WithCancel(context.Background())
@@ -582,7 +581,7 @@ func (s *shellStart) mount() {
 	s.down.addAsync(func() func() { return captureSvc.serve(s.session) })
 	focused := screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput
 	s.down.addAsync(func() func() {
-		return servePortalHosts(s.session, application, sess.Outputs, current.Load, focused, font, theme.Sheet, s.drives.Load)
+		return servePortalHosts(s.session, application, sess.Outputs, current.Load, focused, font, theme.Sheet, s.systemUp.Load)
 	})
 	baseCtx.Screenshot = captureSvc.trigger
 	baseCtx.PickColor = func() {

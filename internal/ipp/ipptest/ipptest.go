@@ -1,7 +1,9 @@
 // Package ipptest is a fake CUPS scheduler on loopback for tests: the
 // queues a test sets answer CUPS-Get-Printers, Get-Printer-Attributes
-// and CUPS-Get-Default, and Print-Job records what it is sent. Nothing
-// reaches a real printer or the host's cupsd.
+// and CUPS-Get-Default, CUPS-Create-Local-Printer adds one, and
+// Print-Job records what it is sent. It also stands in for a network
+// printer answering its own attributes. Nothing reaches a real printer
+// or the host's cupsd.
 package ipptest
 
 import (
@@ -31,6 +33,10 @@ type Server struct {
 	Addr string
 	srv  *httptest.Server
 
+	// device answers every Get-Printer-Attributes with its attributes,
+	// as one network printer does at its own URI.
+	device []ipp.Attr
+
 	mu       sync.Mutex
 	names    []string
 	printers map[string][]ipp.Attr
@@ -46,12 +52,35 @@ func Start(t *testing.T) *Server {
 	t.Helper()
 	s := &Server{printers: map[string][]ipp.Attr{}}
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
+	s.cleanup(t)
+	return s
+}
+
+// StartDevice runs a network printer on loopback, over TLS with a
+// self-signed certificate (ipps) or plain HTTP (ipp), answering its
+// attributes at any URI.
+func StartDevice(t *testing.T, secure bool, attrs ...ipp.Attr) *Server {
+	t.Helper()
+	s := &Server{printers: map[string][]ipp.Attr{}, device: attrs}
+	if secure {
+		s.srv = httptest.NewTLSServer(http.HandlerFunc(s.serve))
+	} else {
+		s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
+	}
+	s.cleanup(t)
+	return s
+}
+
+func (s *Server) cleanup(t *testing.T) {
 	t.Cleanup(func() {
 		s.Release()
 		s.srv.Close()
 	})
-	s.Addr = strings.TrimPrefix(s.srv.URL, "http://")
-	return s
+	u, err := url.Parse(s.srv.URL)
+	if err != nil {
+		t.Fatalf("ipptest: the server's URL %q: %v", s.srv.URL, err)
+	}
+	s.Addr = u.Host
 }
 
 // Client is a client of the scheduler.
@@ -176,6 +205,10 @@ func (s *Server) answer(req ipp.Message, doc []byte) ipp.Message {
 		}
 		resp.Groups = append(resp.Groups, ipp.Group{Tag: ipp.GroupPrinter, Attrs: []ipp.Attr{ipp.String(ipp.TagName, "printer-name", s.def)}})
 	case ipp.OpGetPrinterAttributes:
+		if s.device != nil {
+			resp.Groups = append(resp.Groups, ipp.Group{Tag: ipp.GroupPrinter, Attrs: s.device})
+			break
+		}
 		attrs, ok := s.printers[queueOf(req)]
 		if !ok {
 			resp.Code = statusNotFound
@@ -190,10 +223,44 @@ func (s *Server) answer(req ipp.Message, doc []byte) ipp.Message {
 		}
 		s.jobs = append(s.jobs, Job{Printer: name, Groups: req.Groups, Document: doc})
 		resp.Groups = append(resp.Groups, ipp.Group{Tag: ipp.GroupJob, Attrs: []ipp.Attr{ipp.Int("job-id", int32(len(s.jobs)))}}) //nolint:gosec // a test's handful of jobs
+	case ipp.OpCUPSCreateLocalPrinter:
+		var name, device string
+		for _, g := range req.Groups {
+			if g.Tag == ipp.GroupPrinter {
+				name, device = g.Text("printer-name"), g.Text("device-uri")
+			}
+		}
+		if name == "" || device == "" {
+			resp.Code = 0x0400
+			break
+		}
+		if _, ok := s.printers[name]; !ok {
+			s.names = append(s.names, name)
+		}
+		s.printers[name] = []ipp.Attr{
+			ipp.String(ipp.TagName, "printer-name", name), ipp.String(ipp.TagURI, "device-uri", device),
+			ipp.Enum("printer-state", ipp.StateIdle),
+		}
+		resp.Groups = append(resp.Groups, ipp.Group{Tag: ipp.GroupPrinter, Attrs: []ipp.Attr{
+			ipp.String(ipp.TagURI, "printer-uri-supported", ipp.PrinterURI(name)), ipp.Int("printer-id", int32(len(s.names))), //nolint:gosec // a test's handful of queues
+		}})
 	default:
 		resp.Code = 0x0501
 	}
 	return resp
+}
+
+// Created is the device URI of each queue CUPS-Create-Local-Printer
+// made, by name.
+func (s *Server) Created(name string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range s.printers[name] {
+		if a.Name == "device-uri" && len(a.Values) > 0 {
+			return a.Values[0].Text
+		}
+	}
+	return ""
 }
 
 // queueOf is the queue a request's printer-uri names.

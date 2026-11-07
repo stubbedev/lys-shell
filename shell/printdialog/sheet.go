@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/shell/widgets"
 	"github.com/stubbedev/lys-shell/styling"
 )
@@ -43,6 +44,12 @@ type sheet struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	refreshing bool
+
+	// cupsQueues are the scheduler's queues once it answered, network
+	// the printers found over DNS-SD, browser the browse finding them.
+	cupsQueues []queue
+	network    []queue
+	browser    *dnssd.Browser
 
 	copies      *widget.SpinButton
 	pagesDrop   *choices[pagesKind]
@@ -84,7 +91,7 @@ func (h *Dialog) newSheet(r PrepareRequest) *sheet {
 	printers.SetMaxContentHeight(listMaxHeight)
 	printers.SetSizeRequest(0, listMinHeight)
 
-	file := queue{name: fileQueue, caps: capabilitiesOf(nil)}
+	file := fileQueueRow()
 	initial := initialForm(r, file.caps)
 	th := widget.Current()
 	px := widgets.TextPx(styling.Body, 1)
@@ -230,10 +237,13 @@ func (s *sheet) selectQueue(row int) {
 		return
 	}
 	q := s.queues[i]
-	s.outputRow.SetVisible(q.name == fileQueue)
+	s.outputRow.SetVisible(q.kind == queueFile)
 	s.replaceNote.SetVisible(false)
 	s.confirmedReplace = false
 	s.offer(q.caps, s.form())
+	if q.kind == queueNetwork && !q.capsRead {
+		s.readCaps(q)
+	}
 }
 
 // setQueues lists queues, under the "looking" row while loading, and
@@ -272,6 +282,7 @@ func (s *sheet) setQueues(queues []queue, want string, loading bool) {
 // lpoptions for theirs, off the loop, and lists them once they answer;
 // then it follows the selected printer's state.
 func (s *sheet) load() {
+	s.browse()
 	cups, lpoptions := s.h.d.CUPS, s.h.d.LPOptions
 	go func() {
 		ctx, cancel := context.WithTimeout(s.ctx, listTimeout)
@@ -289,11 +300,11 @@ func (s *sheet) load() {
 			if s.ctx.Err() != nil {
 				return
 			}
-			queues := make([]queue, 0, len(printers)+1)
+			s.cupsQueues = make([]queue, 0, len(printers))
 			for _, p := range printers {
-				queues = append(queues, cupsQueue(p))
+				s.cupsQueues = append(s.cupsQueues, cupsQueue(p))
 			}
-			queues = append(queues, queue{name: fileQueue, caps: capabilitiesOf(nil)})
+			queues := s.compose()
 			s.setQueues(queues, preferredQueue(queues, settingOf(s.r.Settings, "printer"), user, def), false)
 			go s.follow()
 		})
@@ -302,7 +313,7 @@ func (s *sheet) load() {
 
 // cupsQueue is a CUPS printer's row.
 func cupsQueue(p ipp.Printer) queue {
-	return queue{name: p.Name, detail: printerDetail(p), caps: capabilitiesOf(&p), cups: true}
+	return queue{kind: queueCUPS, name: p.Name, detail: printerDetail(p), caps: capabilitiesOf(&p), uuid: p.UUID, device: p.DeviceURI}
 }
 
 // follow reads the selected printer's state again every RefreshEvery
@@ -324,7 +335,7 @@ func (s *sheet) follow() {
 // shows it in its row, one read at a time; the form stays as it is.
 func (s *sheet) refreshSelected() {
 	q, ok := s.selected()
-	if s.ctx.Err() != nil || s.refreshing || !ok || !q.cups {
+	if s.ctx.Err() != nil || s.refreshing || !ok || q.kind != queueCUPS {
 		return
 	}
 	s.refreshing = true
@@ -349,7 +360,7 @@ func (s *sheet) refreshSelected() {
 
 // showState shows a printer's state in its row.
 func (s *sheet) showState(p ipp.Printer) {
-	i := slices.IndexFunc(s.queues, func(q queue) bool { return q.cups && q.name == p.Name })
+	i := slices.IndexFunc(s.queues, func(q queue) bool { return q.kind == queueCUPS && q.name == p.Name })
 	if i < 0 {
 		return
 	}
@@ -358,8 +369,14 @@ func (s *sheet) showState(p ipp.Printer) {
 	s.details[i].SetVisible(s.queues[i].detail != "")
 }
 
-// close stops the loading and the state reads.
-func (s *sheet) close() { s.cancel() }
+// close stops the loading, the state reads and the browsing.
+func (s *sheet) close() {
+	s.cancel()
+	if s.browser != nil {
+		stopBrowsing(s.browser)
+		s.browser = nil
+	}
+}
 
 // confirm answers the form for the queue selected; Print to File asks
 // once before replacing a file that exists.
@@ -370,8 +387,12 @@ func (s *sheet) confirm() {
 		return
 	}
 	f := s.form()
-	if q.name != fileQueue {
+	switch q.kind {
+	case queueCUPS:
 		s.h.finish(prepared{printer: q.name, form: f}, true)
+		return
+	case queueNetwork:
+		s.h.finish(prepared{printer: q.name, device: q.device, form: f}, true)
 		return
 	}
 	file := s.output

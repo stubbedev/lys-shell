@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
@@ -59,7 +60,7 @@ const printerRefresh = 3 * time.Second
 // CUPS' IPP). Without a bus the portal answers those requests
 // "other". The returned stop ends the hosts once the loop has ended,
 // freeing what the file chooser still holds.
-func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet, drives func() *udisks.Client) (stop func()) {
+func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, sheet *widget.Stylesheet, system func() *dbus.Conn) (stop func()) {
 	if conn == nil {
 		log.Print("portal hosts: no session bus")
 		return func() {}
@@ -81,13 +82,18 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 		Places:         func() []filechooser.Place { return userPlaces(home) },
 		Locations:      filechooser.SystemLocations(home),
 		WatchLocations: filechooser.WatchSystemLocations,
-		Drives:         drives,
-		ViewFile:       viewFile,
-		BookmarksFile:  filechooser.BookmarksFile(xdg.OS),
-		RecentFile:     filechooser.RecentFile(),
-		TrashDirs:      filechooser.SystemTrashDirs(home),
-		Target:         func() *app.Output { return dialogOutput(outputs(), focused) },
-		ForgetImage:    application.ForgetImage,
+		Drives: func() *udisks.Client {
+			if conn := system(); conn != nil {
+				return udisks.New(conn)
+			}
+			return nil
+		},
+		ViewFile:      viewFile,
+		BookmarksFile: filechooser.BookmarksFile(xdg.OS),
+		RecentFile:    filechooser.RecentFile(),
+		TrashDirs:     filechooser.SystemTrashDirs(home),
+		Target:        func() *app.Output { return dialogOutput(outputs(), focused) },
+		ForgetImage:   application.ForgetImage,
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)
@@ -119,9 +125,16 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 		CUPS:         cups,
 		LPOptions:    filepath.Join(home, ".cups", "lpoptions"),
 		RefreshEvery: printerRefresh,
-		PickOutput:   func(suggested string, chosen func(string)) { pickOutput(application, chooser, suggested, chosen) },
-		Home:         home,
-		User:         currentUser(),
+		DNSSD: func() *dnssd.Client {
+			if conn := system(); conn != nil {
+				return dnssd.New(conn)
+			}
+			return nil
+		},
+		Device:     ipp.DeviceAttributes,
+		PickOutput: func(suggested string, chosen func(string)) { pickOutput(application, chooser, suggested, chosen) },
+		Home:       home,
+		User:       currentUser(),
 	})
 	if _, err := printdialog.NewDaemon(printer).Export(conn); err != nil {
 		log.Printf("print: daemon: %v", err)

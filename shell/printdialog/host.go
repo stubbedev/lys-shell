@@ -20,6 +20,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
+	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
@@ -74,6 +75,12 @@ type Deps struct {
 	// RefreshEvery is how often the selected printer's state is read
 	// again while the dialog is open.
 	RefreshEvery time.Duration
+	// DNSSD browses the network for driverless printers while the
+	// dialog is open; nil, or a nil client while the system bus is not
+	// up, lists the CUPS queues alone. Device reads a network printer's
+	// attributes at its own URI (ipp.DeviceAttributes).
+	DNSSD  func() *dnssd.Client
+	Device func(ctx context.Context, uri string) (ipp.Printer, error)
 	// PickOutput lets the user choose the file Print to File writes
 	// (the shell's file chooser), starting from suggested, and calls
 	// chosen with its path on the loop; never on a cancel. It returns
@@ -92,20 +99,43 @@ type Scheduler interface {
 	Default(ctx context.Context) (string, error)
 	Printer(ctx context.Context, name string) (ipp.Printer, error)
 	Print(ctx context.Context, j ipp.Job) (int32, error)
+	CreateLocalPrinter(ctx context.Context, deviceURI, name string) (string, error)
 }
 
+// queueKind is where a printer row's jobs go.
+type queueKind uint8
+
+const (
+	// queueCUPS is a CUPS queue, whose state is followed.
+	queueCUPS queueKind = iota
+	// queueNetwork is a driverless printer found over DNS-SD, printed
+	// to through a temporary queue CUPS makes for it.
+	queueNetwork
+	// queueFile is Print to File.
+	queueFile
+)
+
 // queue is one printer row: its name, the detail line, and what it
-// offers; cups for a CUPS queue, whose state is followed.
+// offers. A CUPS queue carries its printer-uuid and device URI, which
+// a network printer is told apart from it by; a network printer its
+// DNS-SD key, the URI CUPS is to reach it at, the URI its own
+// attributes are read at, its UUID, and whether its capabilities were
+// read yet.
 type queue struct {
+	kind         queueKind
 	name, detail string
 	caps         capabilities
-	cups         bool
+	uuid, device string
+	key, query   string
+	capsRead     bool
 }
 
 // prepared is a confirmed form stashed under its token until Print,
-// for the app that prepared it until it expires.
+// for the app that prepared it until it expires; device is a network
+// printer's URI, which a temporary queue is made for.
 type prepared struct {
 	printer string
+	device  string
 	form    form
 	appID   string
 	expires time.Time
@@ -228,8 +258,17 @@ func (h *Dialog) Print(c portaldialogs.Caller, title string, document *os.File, 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), spoolTimeout)
 	defer cancel()
+	printer := job.printer
+	if job.device != "" {
+		local, err := h.d.CUPS.CreateLocalPrinter(ctx, job.device, localQueueName(job.printer))
+		if err != nil {
+			log.Printf("print: a queue for %s: %v", job.printer, err)
+			return false
+		}
+		printer = local
+	}
 	_, err := h.d.CUPS.Print(ctx, ipp.Job{
-		Printer: job.printer, Title: title, User: h.d.User, Format: documentFormat,
+		Printer: printer, Title: title, User: h.d.User, Format: documentFormat,
 		Attrs: job.form.jobAttrs(), Document: document,
 	})
 	if err != nil {
