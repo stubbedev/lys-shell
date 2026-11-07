@@ -168,6 +168,8 @@ type Chooser struct {
 	moved    bool
 	placedOn string
 
+	// reader lists the folders shown.
+	reader *dirReader
 	// thumbnailer makes the thumbnails; thumbs are the request's.
 	thumbnailer *thumbnailer
 	thumbs      *thumbSet
@@ -200,7 +202,8 @@ func newThumbSet() *thumbSet {
 func New(d Deps) *Chooser {
 	c := &Chooser{
 		d: d, view: defaultView, columns: [3]int{90, 150, 90}, thumbnailer: newThumbnailer(), thumbs: newThumbSet(),
-		size: widget.Size{W: panelW, H: panelH},
+		reader: newDirReader(),
+		size:   widget.Size{W: panelW, H: panelH},
 	}
 	if d.ViewFile != "" {
 		if b, err := os.ReadFile(d.ViewFile); err == nil {
@@ -322,7 +325,7 @@ func (c *Chooser) begin(r request) {
 	}
 	c.thumbs = newThumbSet()
 	c.replacing = ""
-	c.s = newSession(r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
+	c.s = newSession(c.reader, r.mode, r.folder, r.filters, c.d.MIME, c.d.Home, c.view)
 	c.s.hidden, c.s.recursive, c.s.recentFile, c.s.trashDirs = c.hidden, c.recursive, c.d.RecentFile, c.d.TrashDirs
 	c.s.request = c.requestListing
 	if r.currentFilter > 0 && int(r.currentFilter) < len(c.s.filters) {
@@ -362,14 +365,15 @@ func (c *Chooser) requestListing(dir string) {
 	c.watch(dir)
 }
 
-// watch follows dir on disk, reloading its listing when it changes;
-// Recent, Trash and a folder that cannot be watched are not followed.
+// watch follows dir on disk, applying each change to its listing row
+// by row, and reading it again only when changes were lost; Recent,
+// Trash and a folder that cannot be watched are not followed.
 func (c *Chooser) watch(dir string) {
 	c.unwatch()
 	if virtualLocation(dir) {
 		return
 	}
-	w, err := fswatch.New(fswatch.Changes, false)
+	w, err := fswatch.NewNamed(fswatch.Changes)
 	if err != nil {
 		log.Printf("file chooser: cannot follow %s: %v", dir, err)
 		return
@@ -380,16 +384,55 @@ func (c *Chooser) watch(dir string) {
 	}
 	c.watcher = w
 	s := c.s
-	go func() {
-		for range w.Changed() {
-			c.d.Invoke(func() {
-				if c.s == s && c.watcher == w && s.dir == dir && !s.loading {
+	go followDir(w, dir, s.mode, func(u dirUpdate) {
+		c.d.Invoke(func() {
+			if c.s != s || c.watcher != w || s.dir != dir {
+				return
+			}
+			if u.rescan {
+				if !s.loading {
 					c.reloading, c.reloadKeep = true, c.selectedPath()
 					s.reload()
 				}
-			})
+				return
+			}
+			keep := c.selectedPath()
+			if s.applyChanges(dir, u.changes) {
+				c.relistKeeping(keep)
+			}
+		})
+	})
+}
+
+// changeSource is a named watch: a tick per burst, and what changed.
+type changeSource interface {
+	Changed() <-chan struct{}
+	Take() fswatch.Batch
+}
+
+// dirUpdate is one burst of changes to a folder, stated; rescan when
+// they cannot be applied name by name.
+type dirUpdate struct {
+	changes []dirChange
+	rescan  bool
+}
+
+// followDir states every burst of changes src reports in dir, off the
+// loop, and hands it to apply, until src closes.
+func followDir(src changeSource, dir string, mode Mode, apply func(dirUpdate)) {
+	for range src.Changed() {
+		b := src.Take()
+		switch {
+		case b.Rescan:
+			apply(dirUpdate{rescan: true})
+		case len(b.Events) > 0:
+			names := make([]string, len(b.Events))
+			for i, e := range b.Events {
+				names[i] = e.Name
+			}
+			apply(dirUpdate{changes: statChanges(dir, names, mode)})
 		}
-	}()
+	}
 }
 
 func (c *Chooser) unwatch() {

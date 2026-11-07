@@ -1628,8 +1628,8 @@ func TestDropSelectsTheFile(t *testing.T) {
 	}
 }
 
-// A file appearing in the folder shown is listed without navigating,
-// the selection kept; a change after the dialog moved on lists nothing.
+// A file appearing in, then leaving, the folder shown changes its row
+// without navigating, the selection kept; a change after the dialog moved on lists nothing.
 func TestListingFollowsTheFolder(t *testing.T) {
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{})
@@ -1647,6 +1647,22 @@ func TestListingFollowsTheFolder(t *testing.T) {
 	hs.do(func() { sel, ok = hs.c.selected() })
 	if !ok || sel.Name() != "b.txt" {
 		t.Errorf("after the reload %v %v is selected, want b.txt", sel.Name(), ok)
+	}
+	before := hs.shown()
+	if err := os.Remove(filepath.Join(hs.root, "c.txt")); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(treetest.Liveness); slices.Contains(hs.shown(), "c.txt"); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the removed file stayed listed: %v", hs.shown())
+		}
+	}
+	if got, want := hs.shown(), slices.DeleteFunc(before, func(n string) bool { return n == "c.txt" }); !slices.Equal(got, want) {
+		t.Errorf("after the removal %v, want %v", got, want)
+	}
+	hs.do(func() { sel, ok = hs.c.selected() })
+	if !ok || sel.Name() != "b.txt" {
+		t.Errorf("after the removal %v %v is selected, want b.txt", sel.Name(), ok)
 	}
 	hs.click(t, "Cancel")
 	answer(t, got)

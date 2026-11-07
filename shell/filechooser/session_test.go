@@ -18,7 +18,7 @@ func tree(t *testing.T) string {
 
 func open(t *testing.T, mode Mode, folder string, filters []Filter) *session {
 	t.Helper()
-	s := newSession(mode, folder, filters, testDB(t), "/nonexistent-home", defaultView)
+	s := newSession(testReader, mode, folder, filters, testDB(t), "/nonexistent-home", defaultView)
 	s.refresh()
 	return s
 }
@@ -31,7 +31,7 @@ func TestSessionStartsInTheRequestedFolderElseHome(t *testing.T) {
 	if s := open(t, ModeOpenFile, usableFolder(filepath.Join(root, "b.txt")), nil); s.dir != "/nonexistent-home" {
 		t.Errorf("a file as the folder = %s, want home", s.dir)
 	}
-	if s := newSession(ModeOpenFile, "", nil, testDB(t), "", defaultView); s.dir != "/" {
+	if s := newSession(testReader, ModeOpenFile, "", nil, testDB(t), "", defaultView); s.dir != "/" {
 		t.Errorf("no folder and no home = %s, want /", s.dir)
 	}
 }
@@ -306,7 +306,7 @@ func TestSessionHiddenRules(t *testing.T) {
 // a reload keeps showing the old listing until the new one lands.
 func TestSessionListingArrivesLate(t *testing.T) {
 	root := tree(t)
-	s := newSession(ModeOpenFile, root, nil, testDB(t), "/nonexistent-home", defaultView)
+	s := newSession(testReader, ModeOpenFile, root, nil, testDB(t), "/nonexistent-home", defaultView)
 	var asked []string
 	s.request = func(dir string) { asked = append(asked, dir) }
 	s.refresh()

@@ -378,17 +378,17 @@ func TestWalkSearchStreamsBatchesAndCaps(t *testing.T) {
 func TestListDirReturnsEverythingButHonorsFolderMode(t *testing.T) {
 	root := t.TempDir()
 	touch(t, root, "sub/", "visible.txt", ".hidden.txt")
-	all, err := ListDir(root, ModeOpenFile)
+	all, _, err := testReader.List(root, ModeOpenFile)
 	got := names(all)
 	slices.Sort(got)
 	if err != nil || !slices.Equal(got, []string{".hidden.txt", "sub", "visible.txt"}) {
 		t.Errorf("listing = %v, %v; want everything", got, err)
 	}
-	folders, _ := ListDir(root, ModeFolder)
+	folders, _, _ := testReader.List(root, ModeFolder)
 	if got := names(folders); !slices.Equal(got, []string{"sub"}) {
 		t.Errorf("folder mode = %v, want only folders", got)
 	}
-	if got, err := ListDir(filepath.Join(root, "missing"), ModeOpenFile); got != nil || err == nil {
+	if got, _, err := testReader.List(filepath.Join(root, "missing"), ModeOpenFile); got != nil || err == nil {
 		t.Errorf("an unreadable directory = %v, %v; want none and the error", got, err)
 	}
 }

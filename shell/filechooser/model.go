@@ -15,6 +15,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/stubbedev/lys-lib/xdg"
 
@@ -84,47 +86,28 @@ func (e Entry) Name() string {
 	return filepath.Base(e.Path)
 }
 
-// Kind is the displayed type: Folder, the uppercased extension (PNG),
-// or File without one.
-func (e Entry) Kind() string {
-	if e.IsDir {
+// ext is a file's extension without its dot, "" for none.
+func (e Entry) ext() string { return strings.TrimPrefix(filepath.Ext(e.Name()), ".") }
+
+// kindKey is what the Kind column sorts by, compared folded: Kind
+// before the extension is upper cased.
+func (e Entry) kindKey() string {
+	switch ext := e.ext(); {
+	case e.IsDir:
 		return "Folder"
-	}
-	if ext := strings.TrimPrefix(filepath.Ext(e.Name()), "."); ext != "" {
-		return strings.ToUpper(ext)
+	case ext != "":
+		return ext
 	}
 	return "File"
 }
 
-// statEntry stats path (following symlinks) into an Entry; a folder
-// pick has no use for files.
-func statEntry(path string, mode Mode) (Entry, bool) {
-	e := Entry{Path: path}
-	if info, err := os.Stat(path); err == nil {
-		e.IsDir, e.Size, e.Modified = info.IsDir(), info.Size(), info.ModTime()
+// Kind is the displayed type: Folder, the uppercased extension (PNG),
+// or File without one.
+func (e Entry) Kind() string {
+	if ext := e.ext(); !e.IsDir && ext != "" {
+		return strings.ToUpper(ext)
 	}
-	if !e.IsDir && mode.folders() {
-		return Entry{}, false
-	}
-	return e, true
-}
-
-// ListDir lists dir in full. Only the mode rule applies here, because
-// it cannot change while the listing is cached; the hidden toggle, the
-// type filter and the search text partition the cached listing. A
-// directory that cannot be read is an error.
-func ListDir(dir string, mode Mode) ([]Entry, error) {
-	des, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	entries := make([]Entry, 0, len(des))
-	for _, de := range des {
-		if e, ok := statEntry(filepath.Join(dir, de.Name()), mode); ok {
-			entries = append(entries, e)
-		}
-	}
-	return entries, nil
+	return e.kindKey()
 }
 
 // hiddenNames are the names dir's .hidden file lists, one a line, which
@@ -242,7 +225,7 @@ var sortNames = [...]string{"name", "size", "modified", "kind"}
 
 // SortEntries orders directories first, then by the column.
 func SortEntries(entries []Entry, key SortColumn, asc bool) {
-	byName := func(a, b Entry) int { return strings.Compare(strings.ToLower(a.Name()), strings.ToLower(b.Name())) }
+	byName := func(a, b Entry) int { return compareFold(a.Name(), b.Name()) }
 	slices.SortStableFunc(entries, func(a, b Entry) int {
 		if a.IsDir != b.IsDir {
 			if a.IsDir {
@@ -257,7 +240,7 @@ func SortEntries(entries []Entry, key SortColumn, asc bool) {
 		case SortModified:
 			c = a.Modified.Compare(b.Modified)
 		case SortKind:
-			c = cmp.Or(strings.Compare(strings.ToLower(a.Kind()), strings.ToLower(b.Kind())), byName(a, b))
+			c = cmp.Or(compareFold(a.kindKey(), b.kindKey()), byName(a, b))
 		default:
 			c = byName(a, b)
 		}
@@ -526,7 +509,50 @@ func (f textFilter) matches(name string) bool {
 	case f.pattern != nil:
 		return f.pattern.Matches(name, false)
 	}
-	return strings.Contains(strings.ToLower(name), f.needle)
+	return containsFold(name, f.needle)
+}
+
+// compareFold compares a and b as their lower case would, without
+// making it.
+func compareFold(a, b string) int {
+	for a != "" && b != "" {
+		ra, na := utf8.DecodeRuneInString(a)
+		rb, nb := utf8.DecodeRuneInString(b)
+		if c := cmp.Compare(unicode.ToLower(ra), unicode.ToLower(rb)); c != 0 {
+			return c
+		}
+		a, b = a[na:], b[nb:]
+	}
+	return cmp.Compare(len(a), len(b))
+}
+
+// containsFold reports whether s, lowered, contains lower, which is
+// lower case already.
+func containsFold(s, lower string) bool {
+	if lower == "" {
+		return true
+	}
+	for i := range s {
+		if hasPrefixFold(s[i:], lower) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPrefixFold(s, lower string) bool {
+	for lower != "" {
+		if s == "" {
+			return false
+		}
+		rs, ns := utf8.DecodeRuneInString(s)
+		rl, nl := utf8.DecodeRuneInString(lower)
+		if unicode.ToLower(rs) != rl {
+			return false
+		}
+		s, lower = s[ns:], lower[nl:]
+	}
+	return true
 }
 
 // HumanSize is a byte count in binary units (1.5 KB).

@@ -3,6 +3,7 @@ package filechooser
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/stubbedev/lys-shell/internal/fileuri"
@@ -29,6 +30,10 @@ type session struct {
 	listed      string
 	listErr     error
 	loading     bool
+	// reader lists folders; pending are the changes that came while
+	// the listing was being read, applied once it lands.
+	reader  *dirReader
+	pending []dirChange
 	// request reads dir's listing and hands it to setListing, at once
 	// or later (the host reads off the loop).
 	request func(dir string)
@@ -53,8 +58,8 @@ type session struct {
 // newSession starts at folder when it is a directory, else home, else
 // /. Nothing is listed until the first refresh; listings are read at
 // once until request is replaced.
-func newSession(mode Mode, folder string, filters []Filter, db *mime.Database, home string, v view) *session {
-	s := &session{mode: mode, db: db, filters: withAllFiles(filters), view: v}
+func newSession(reader *dirReader, mode Mode, folder string, filters []Filter, db *mime.Database, home string, v view) *session {
+	s := &session{reader: reader, mode: mode, db: db, filters: withAllFiles(filters), view: v}
 	s.request = func(dir string) { s.setListing(dir, s.read(dir)) }
 	s.dir = startDir(folder, home)
 	return s
@@ -92,7 +97,7 @@ func (s *session) searching() bool { return s.recursive && s.search != "" }
 // until its listing arrives.
 func (s *session) refresh() {
 	if !s.searching() && s.listed != s.dir {
-		s.listed, s.all, s.hiddenNames, s.listErr, s.loading = s.dir, nil, nil, nil, true
+		s.listed, s.all, s.hiddenNames, s.listErr, s.loading, s.pending = s.dir, nil, nil, nil, true, nil
 		s.entries = s.entries[:0]
 		s.request(s.dir)
 		return
@@ -125,7 +130,7 @@ func (s *session) read(dir string) listing {
 		entries, err := ListTrash(s.trashDirs(), s.mode)
 		return listing{entries: entries, err: err}
 	}
-	entries, err := ListDir(dir, s.mode)
+	entries, _, err := s.reader.List(dir, s.mode)
 	return listing{entries: entries, hidden: hiddenNames(dir), err: err}
 }
 
@@ -136,8 +141,72 @@ func (s *session) setListing(dir string, l listing) bool {
 		return false
 	}
 	s.all, s.hiddenNames, s.listErr, s.loading = l.entries, l.hidden, l.err, false
+	pending := s.pending
+	s.pending = nil
+	s.patch(pending)
 	s.partition()
 	return true
+}
+
+// dirChange is one name in a listed folder as stated after it changed:
+// its entry, or gone; hidden is the folder's .hidden list read again
+// when the change was to that file.
+type dirChange struct {
+	name    string
+	entry   Entry
+	present bool
+	hidden  map[string]bool
+}
+
+// statChanges states the names of a change batch in dir; safe off the
+// loop.
+func statChanges(dir string, names []string, mode Mode) []dirChange {
+	changes := make([]dirChange, len(names))
+	for i, name := range names {
+		e, ok := statEntry(filepath.Join(dir, name), mode)
+		changes[i] = dirChange{name: name, entry: e, present: ok}
+		if name == ".hidden" {
+			changes[i].hidden = hiddenNames(dir)
+		}
+	}
+	return changes
+}
+
+// applyChanges applies changes to dir's listing, row by row; false
+// when dir is not the folder listed. Changes coming while the listing
+// is read wait for it: each was stated after its event, so applied
+// after the listing in order they leave every name as it last was.
+func (s *session) applyChanges(dir string, changes []dirChange) bool {
+	if dir != s.listed || virtualLocation(dir) {
+		return false
+	}
+	if s.loading {
+		s.pending = append(s.pending, changes...)
+		return false
+	}
+	s.patch(changes)
+	s.refresh()
+	return true
+}
+
+// patch applies changes to the listing, kept sorted by path.
+func (s *session) patch(changes []dirChange) {
+	prefix := dirPrefix(s.listed)
+	for _, c := range changes {
+		if c.hidden != nil || c.name == ".hidden" {
+			s.hiddenNames = c.hidden
+		}
+		path := prefix + c.name
+		i, found := slices.BinarySearchFunc(s.all, path, func(e Entry, p string) int { return strings.Compare(e.Path, p) })
+		switch {
+		case c.present && found:
+			s.all[i] = c.entry
+		case c.present:
+			s.all = slices.Insert(s.all, i, c.entry)
+		case found:
+			s.all = slices.Delete(s.all, i, i+1)
+		}
+	}
 }
 
 // partition filters and sorts the listing (or the matches) into
