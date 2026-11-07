@@ -353,7 +353,7 @@ func TestReducedMotionReachesThePortal(t *testing.T) {
 }
 
 func TestTheHostsGTKAnimationsSettingReachesThePortal(t *testing.T) {
-	r := settingsRig(t, gtksettings.Settings{Animations: gtksettings.AnimationsOff}, nil)
+	r := settingsRig(t, gtksettings.Settings{Animations: gtksettings.ToggleOff}, nil)
 	if v, _ := r.read(AppearanceNS, keyReducedMotion); v != uint32(1) {
 		t.Errorf("reduced-motion = %v with gtk-enable-animations off", v)
 	}
